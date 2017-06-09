@@ -1,0 +1,6 @@
+result code = -1
+standard error = {
+Tests/Diagnostics/hull-shader-invalid-domain.spire(39): error 50053: 'Domain' should be either 'triangles' or 'quads'.
+}
+standard output = {
+}

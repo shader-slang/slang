@@ -1,0 +1,103 @@
+result code = 0
+standard error = {
+}
+standard output = {
+{
+    "parameters": [
+        {
+            "name": "MyConstantBuffer",
+            "binding": {"kind": "constantBuffer", "index": 0},
+            "type": {
+                "kind": "constantBuffer",
+                "elementType": {
+                    "kind": "struct",
+                    "fields": [
+                        {
+                            "name": "x",
+                            "type": {
+                                "kind": "scalar",
+                                "scalarType": "float32"
+                            },
+                            "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                        },
+                        {
+                            "name": "a",
+                            "type": {
+                                "kind": "array",
+                                "elementCount": 10,
+                                "elementType": {
+                                    "kind": "scalar",
+                                    "scalarType": "float32"
+                                },
+                                "uniformStride": 16
+                            },
+                            "binding": {"kind": "uniform", "offset": 16, "size": 160}
+                        },
+                        {
+                            "name": "y",
+                            "type": {
+                                "kind": "scalar",
+                                "scalarType": "float32"
+                            },
+                            "binding": {"kind": "uniform", "offset": 176, "size": 4}
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "tx",
+            "binding": {"kind": "shaderResource", "index": 0},
+            "type": {
+                "kind": "resource",
+                "baseShape": "texture2D"
+            }
+        },
+        {
+            "name": "ta",
+            "binding": {"kind": "shaderResource", "index": 1, "count": 16},
+            "type": {
+                "kind": "array",
+                "elementCount": 16,
+                "elementType": {
+                    "kind": "resource",
+                    "baseShape": "texture2D"
+                }
+            }
+        },
+        {
+            "name": "ty",
+            "binding": {"kind": "shaderResource", "index": 17},
+            "type": {
+                "kind": "resource",
+                "baseShape": "texture2D"
+            }
+        },
+        {
+            "name": "sx",
+            "binding": {"kind": "samplerState", "index": 0},
+            "type": {
+                "kind": "samplerState"
+            }
+        },
+        {
+            "name": "sa",
+            "binding": {"kind": "samplerState", "index": 1, "count": 4},
+            "type": {
+                "kind": "array",
+                "elementCount": 4,
+                "elementType": {
+                    "kind": "samplerState"
+                }
+            }
+        },
+        {
+            "name": "sy",
+            "binding": {"kind": "samplerState", "index": 5},
+            "type": {
+                "kind": "samplerState"
+            }
+        }
+    ]
+}
+}

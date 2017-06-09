@@ -1,0 +1,7 @@
+result code = -1
+standard error = {
+Tests/Diagnostics/missing-file.spire(1): error 20001: unexpected end of file, expected ';'
+Tests/Diagnostics/missing-file.spire(4): error 2: cannot find file 'does-not-exist.spire'.
+}
+standard output = {
+}

@@ -1,0 +1,6 @@
+result code = -1
+standard error = {
+Tests/Diagnostics/break-outside-loop.spire(4): error 30003: 'break' must appear inside loop constructs.
+}
+standard output = {
+}

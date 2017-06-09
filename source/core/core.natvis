@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+
+<Type Name="CoreLib::Basic::String">
+    <DisplayString>{buffer.pointer,s}</DisplayString>
+	<StringView>buffer.pointer,s</StringView>
+</Type>
+
+<Type Name="CoreLib::Basic::ArrayView&lt;*&gt;">
+  <DisplayString>{{ size={_count} }}</DisplayString>
+  <Expand>
+    <Item Name="[size]">_count</Item>
+    <ArrayItems>
+      <Size>_count</Size>
+      <ValuePointer>_buffer</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+
+<Type Name="CoreLib::Basic::List&lt;*&gt;">
+    <DisplayString>{{ size={_count} }}</DisplayString>
+    <Expand>
+        <Item Name="[size]">_count</Item>
+        <Item Name="[capacity]">bufferSize</Item>
+        <ArrayItems>
+            <Size>_count</Size>
+            <ValuePointer>buffer</ValuePointer>
+        </ArrayItems>
+    </Expand>
+</Type>
+
+
+<Type Name="CoreLib::Basic::Array&lt;*,*&gt;">
+  <DisplayString>{{ size={_count} }}</DisplayString>
+  <Expand>
+    <Item Name="[size]">_count</Item>
+    <ArrayItems>
+      <Size>_count</Size>
+      <ValuePointer>_buffer</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+  
+<Type Name="CoreLib::Basic::LinkedList&lt;*&gt;">
+    <DisplayString>{{ size={FCount} }}</DisplayString>
+    <Expand>
+        <LinkedListItems>
+            <Size>FCount</Size>
+            <HeadPointer>FHead</HeadPointer>
+            <NextPointer>pNext</NextPointer>
+            <ValueNode>Value</ValueNode>
+        </LinkedListItems>
+    </Expand>
+</Type>
+
+<Type Name="CoreLib::Basic::Dictionary&lt;*,*&gt;">
+    <DisplayString>{{ size={_count} }}</DisplayString>
+    <Expand>
+        <Item Name="[size]">_count</Item>
+        <Item Name="[capacity]">bucketSizeMinusOne + 1</Item>
+        <ArrayItems>
+           <Size>bucketSizeMinusOne + 1</Size>
+           <ValuePointer>hashMap</ValuePointer>
+        </ArrayItems>
+    </Expand>
+</Type>
+
+<Type Name="CoreLib::Basic::EnumerableDictionary&lt;*,*&gt;">
+    <DisplayString>{{ size={_count} }}</DisplayString>
+    <Expand>
+        <Item Name="[size]">_count</Item>
+        <Item Name="[capacity]">bucketSizeMinusOne + 1</Item>
+        <LinkedListItems>
+            <Size>kvPairs.FCount</Size>
+            <HeadPointer>kvPairs.FHead</HeadPointer>
+            <NextPointer>pNext</NextPointer>
+            <ValueNode>Value</ValueNode>
+        </LinkedListItems>
+    </Expand>
+</Type>
+
+<Type Name="CoreLib::Basic::EnumerableHashSet&lt;*,*&gt;">
+    <DisplayString>{{ size={dict._count} }}</DisplayString>
+    <Expand>
+        <Item Name="[size]">dict._count</Item>
+        <Item Name="[capacity]">dict.bucketSizeMinusOne + 1</Item>
+        <LinkedListItems>
+            <Size>dict.kvPairs.FCount</Size>
+            <HeadPointer>dict.kvPairs.FHead</HeadPointer>
+            <NextPointer>pNext</NextPointer>
+            <ValueNode>Value</ValueNode>
+        </LinkedListItems>
+    </Expand>
+</Type>
+
+<Type Name="CoreLib::Basic::RefPtrImpl&lt;*,*,*&gt;">
+    <SmartPointer Usage="Minimal">pointer</SmartPointer>
+    <DisplayString Condition="pointer == 0">empty</DisplayString>
+    <DisplayString Condition="pointer != 0">RefPtr {*pointer}</DisplayString>
+    <Expand>
+      <ExpandedItem>pointer</ExpandedItem>
+    </Expand>
+</Type>
+</AutoVisualizer>

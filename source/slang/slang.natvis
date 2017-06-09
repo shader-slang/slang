@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  <Type Name="Slang::Compiler::CFGNode">
+    <DisplayString>{{CFG Basic Block}}</DisplayString>
+    <Expand>
+      <LinkedListItems>
+        <Size>kvPairs.FCount</Size>
+        <HeadPointer>kvPairs.FHead</HeadPointer>
+        <NextPointer>pNext</NextPointer>
+        <ValueNode>Value</ValueNode>
+      </LinkedListItems>
+    </Expand>
+  </Type>
+</AutoVisualizer>

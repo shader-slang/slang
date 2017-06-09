@@ -1,0 +1,6 @@
+result code = -1
+standard error = {
+Tests/Diagnostics/missing-include-file.spire(4): error 15300: failed to find include file 'does-not-exist.h'
+}
+standard output = {
+}

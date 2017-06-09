@@ -1,0 +1,6 @@
+result code = -1
+standard error = {
+Tests/Diagnostics/hull-shader-no-domain.spire(32): error 50052: 'HullShader' requires attribute 'Domain'.
+}
+standard output = {
+}

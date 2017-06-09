@@ -1,0 +1,6 @@
+result code = -1
+standard error = {
+Tests/Diagnostics/function-redefinition.spire(5): error 30001: 'foo(int)': function redefinition.
+}
+standard output = {
+}
