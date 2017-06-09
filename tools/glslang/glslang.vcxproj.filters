@@ -87,13 +87,7 @@
     <ClCompile Include="..\..\external\glslang\glslang\MachineIndependent\preprocessor\PpContext.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\external\glslang\glslang\MachineIndependent\preprocessor\PpMemory.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\external\glslang\glslang\MachineIndependent\preprocessor\PpScanner.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\external\glslang\glslang\MachineIndependent\preprocessor\PpSymbols.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\external\glslang\glslang\MachineIndependent\preprocessor\PpTokens.cpp">
