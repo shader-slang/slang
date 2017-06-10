@@ -1,0 +1,22 @@
+
+# version format
+version: 0.0.{build}
+
+# build worker image
+image: Visual Studio 2015
+
+# platforms to build
+platform:
+  - Win32
+  - x64
+
+# configurations to build
+configuration:
+  - Debug
+  - Release
+
+# specify build settings
+build:
+  project: slang.sln
+
+# TODO: need to invoke test script here
