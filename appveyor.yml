@@ -5,6 +5,10 @@ version: 0.0.{build}
 # build worker image
 image: Visual Studio 2015
 
+# script to run before build
+install:
+  - git submodule update --init --recursive
+
 # platforms to build
 platform:
   - Win32
