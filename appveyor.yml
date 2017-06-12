@@ -2,32 +2,32 @@
 # Try to set AppVeyord build "version" to something reasonable,
 # based on what we are trying to build.
 init:
-  - ps: >-
-    if ($end:APPVEYOR_REPO_TAG -eq "true")
-    {
-        # If we are building from a tag in the repository,
-        # then use the tag name as the start of the build version
-        $versionName = "$($env:APPVEYOR_REPO_TAG_NAME.TrimStart("v"))"
-    }
-    else if($env:APPVEYOR_PULL_REQUEST_NUMBER)
-    {
-        # Otherwise, if we are building for a pull request,
-        # then use the pull request number to name our build version
-        $versionName = "pr$env:APPVEYOR_PULL_REQUEST_NUMBER"
-    }
-    else
-    {
-        # Otherwise, just set a build name based on the
-        # branch that we are building against
-        $versionName = "$env:APPVEYOR_REPO_BRANCH"
-    }
-    # Finally, we set the AppVeyor build version to use our version
-    # name with the build number appended.
-    #
-    # The string "appveyor" is being included before the build number
-    # in case we need to differentiate builds being made with different
-    # continuous integration providers.
-    Update-AppveyorBuild -Version "$versionName+appveyor.$env:APPVEYOR_BUILD_NUMBER"
+  - ps: |
+      if ($env:APPVEYOR_REPO_TAG -eq "true")
+      {
+          # If we are building from a tag in the repository,
+          # then use the tag name as the start of the build version
+          $versionName = "$($env:APPVEYOR_REPO_TAG_NAME.TrimStart("v"))"
+      }
+      else if($env:APPVEYOR_PULL_REQUEST_NUMBER)
+      {
+          # Otherwise, if we are building for a pull request,
+          # then use the pull request number to name our build version
+          $versionName = "pr$env:APPVEYOR_PULL_REQUEST_NUMBER"
+      }
+      else
+      {
+          # Otherwise, just set a build name based on the
+          # branch that we are building against
+          $versionName = "$env:APPVEYOR_REPO_BRANCH"
+      }
+      # Finally, we set the AppVeyor build version to use our version
+      # name with the build number appended.
+      #
+      # The string "appveyor" is being included before the build number
+      # in case we need to differentiate builds being made with different
+      # continuous integration providers.
+      Update-AppveyorBuild -Version "$versionName+appveyor.$env:APPVEYOR_BUILD_NUMBER"
 
 # Our solution file is currently set up for VS2015
 image: Visual Studio 2015

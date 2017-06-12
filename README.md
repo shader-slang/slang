@@ -1,6 +1,6 @@
 # Slang
 
-![AppVeyor build status](https://ci.appveyor.com/api/projects/status/kt9ch5niwkslk5p4/branch/master?svg=true)
+[![AppVeyor build status](https://ci.appveyor.com/api/projects/status/kt9ch5niwkslk5p4/branch/master?svg=true)](https://ci.appveyor.com/project/tangent-vector/slang/branch/master)
 
 Slang is a library for compiling real-time shader code.
 It can be used with either existing HLSL or GLSL code, or with code written directly in Slang.
