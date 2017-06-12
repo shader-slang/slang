@@ -12,6 +12,7 @@ enum class Mode
 {
     Slang,
     HLSL,
+    GLSL,
     GLSLCrossCompile,
 };
 

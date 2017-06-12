@@ -262,16 +262,26 @@ int main(
 
     // Next, we create a window using that window class.
 
+    // We will create a borderless window since our screen-capture logic in GL
+    // seems to get thrown off by having to deal with a window frame.
+    DWORD windowStyle = WS_POPUP;
     DWORD windowExtendedStyle = 0;
-    DWORD windowStyle = 0;
-    LPWSTR windowName = L"Slang Hello World";
+
+
+    RECT windowRect = { 0, 0, gWindowWidth, gWindowHeight };
+    AdjustWindowRectEx(&windowRect, windowStyle, /*hasMenu=*/false, windowExtendedStyle);
+
+    auto width = windowRect.right - windowRect.left;
+    auto height = windowRect.bottom - windowRect.top;
+
+    LPWSTR windowName = L"Slang Render Test";
     HWND windowHandle = CreateWindowExW(
         windowExtendedStyle,
         (LPWSTR)windowClassAtom,
         windowName,
         windowStyle,
         0, 0, // x, y
-        gWindowWidth, gWindowHeight,
+        width, height,
         NULL, // parent
         NULL, // menu
         instance,
@@ -291,6 +301,7 @@ int main(
         renderer = createD3D11Renderer();
         break;
 
+    case Mode::GLSL:
     case Mode::GLSLCrossCompile:
         renderer = createGLRenderer();
         break;
@@ -349,6 +360,8 @@ int main(
             // Whenver we don't have Windows events to process,
             // we render a frame.
 
+            static const float kClearColor[] = { 0.25, 0.25, 0.25, 1.0 };
+            renderer->setClearColor(kClearColor);
             renderer->clearFrame();
 
             renderFrameInner(renderer);

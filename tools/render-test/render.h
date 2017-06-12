@@ -79,7 +79,9 @@ class Renderer
 public:
     virtual void initialize(void* inWindowHandle) = 0;
 
+    virtual void setClearColor(float const* color) = 0;
     virtual void clearFrame() = 0;
+
     virtual void presentFrame() = 0;
 
     virtual void captureScreenShot(char const* outputPath) = 0;

@@ -842,6 +842,11 @@ TestResult runHLSLCrossCompileRenderComparisonTest(TestInput& input)
     return runHLSLRenderComparisonTestImpl(input, "-slang", "-glsl-cross");
 }
 
+TestResult runHLSLAndGLSLComparisonTest(TestInput& input)
+{
+    return runHLSLRenderComparisonTestImpl(input, "-hlsl", "-glsl");
+}
+
 TestResult runTest(
     String const&       filePath,
     TestOptions const&  testOptions,
@@ -857,6 +862,7 @@ TestResult runTest(
         { "COMPARE_HLSL", &runHLSLComparisonTest },
         { "COMPARE_HLSL_RENDER", &runHLSLRenderComparisonTest },
         { "COMPARE_HLSL_CROSS_COMPILE_RENDER", &runHLSLCrossCompileRenderComparisonTest},
+        { "COMPARE_HLSL_GLSL_RENDER", &runHLSLAndGLSLComparisonTest },
         { "COMPARE_GLSL", &runGLSLComparisonTest },
         { nullptr, nullptr },
     };

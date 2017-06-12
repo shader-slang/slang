@@ -362,6 +362,13 @@ ID3DBlob* compileHLSLShader(
     flags |= D3DCOMPILE_DEBUG;
     flags |= D3DCOMPILE_OPTIMIZATION_LEVEL0 | D3DCOMPILE_SKIP_OPTIMIZATION;
 
+    // We will always define `__HLSL__` when compiling here, so that
+    // input code can react differently to being compiled as pure HLSL.
+    D3D_SHADER_MACRO defines[] = {
+        { "__HLSL__", "1" },
+        { nullptr, nullptr },
+    };
+
     // The `D3DCompile` entry point takes a bunch of parameters, but we
     // don't really need most of them for Slang-generated code.
     ID3DBlob* dxShaderBlob = nullptr;
@@ -370,7 +377,7 @@ ID3DBlob* compileHLSLShader(
         source,
         strlen(source),
         sourcePath,
-        nullptr,
+        &defines[0],
         nullptr,
         entryPointName,
         dxProfileName,
@@ -383,8 +390,14 @@ ID3DBlob* compileHLSLShader(
     // then we will print them out (whether or not the compilation failed).
     if( dxErrorBlob )
     {
+        fputs(
+            (char const*)dxErrorBlob->GetBufferPointer(),
+            stderr);
+        fflush(stderr);
+
         OutputDebugStringA(
             (char const*)dxErrorBlob->GetBufferPointer());
+
         dxErrorBlob->Release();
     }
 
@@ -523,7 +536,13 @@ public:
 
         DXGI_SWAP_CHAIN_DESC dxSwapChainDesc = { 0 };
         dxSwapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-        dxSwapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+
+        // Note(tfoley): Disabling sRGB for DX back buffer for now, so that we
+        // can get consistent output with OpenGL, where setting up sRGB will
+        // probably be more involved.
+//        dxSwapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+        dxSwapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+
         dxSwapChainDesc.SampleDesc.Count = 1;
         dxSwapChainDesc.SampleDesc.Quality = 0;
         dxSwapChainDesc.BufferCount = 2;
@@ -601,12 +620,17 @@ public:
         dxImmediateContext->RSSetViewports(1, &dxViewport);
     }
 
+    float clearColor[4] = { 0, 0, 0, 0 };
+    virtual void setClearColor(float const* color) override
+    {
+        memcpy(clearColor, color, sizeof(clearColor));
+    }
+
     virtual void clearFrame() override
     {
-        static const float kClearColor[] = { 0.25, 0.25, 0.25, 1.0 };
         dxImmediateContext->ClearRenderTargetView(
             dxBackBufferRTV,
-            kClearColor);
+            clearColor);
     }
 
     virtual void presentFrame() override

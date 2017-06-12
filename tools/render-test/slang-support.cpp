@@ -20,6 +20,10 @@ struct SlangShaderCompilerWrapper : public ShaderCompiler
 
         spSetCodeGenTarget(slangRequest, target);
 
+        // Define a macro so that shader code in a test can detect when it is being
+        // compiled as Slang source code.
+        spAddPreprocessorDefine(slangRequest, "__SLANG__", "1");
+
         int translationUnitIndex = spAddTranslationUnit(slangRequest, SLANG_SOURCE_LANGUAGE_SLANG, nullptr);
 
         spAddTranslationUnitSourceString(slangRequest, translationUnitIndex, request.source.path, request.source.text);
