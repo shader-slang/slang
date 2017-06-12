@@ -616,26 +616,51 @@ namespace Slang
 
                 #undef CASE
 
+                else if (AdvanceIf(parser, "__intrinsic_op"))
+                {
+                    auto modifier = new IntrinsicOpModifier();
+                    modifier->Position = loc;
+
+                    parser->ReadToken(TokenType::LParent);
+                    if (parser->LookAheadToken(TokenType::IntLiterial))
+                    {
+                        modifier->op = (IntrinsicOp)StringToInt(parser->ReadToken().Content);
+                    }
+                    else
+                    {
+                        modifier->opToken = parser->ReadToken(TokenType::Identifier);
+
+                        modifier->op = findIntrinsicOp(modifier->opToken.Content.Buffer());
+
+                        if (modifier->op == IntrinsicOp::Unknown)
+                        {
+                            parser->sink->diagnose(loc, Diagnostics::unimplemented, "unknown intrinsic op");
+                        }
+                    }
+
+                    parser->ReadToken(TokenType::RParent);
+
+                    AddModifier(&modifierLink, modifier);
+                }
+
                 else if (AdvanceIf(parser, "__intrinsic"))
                 {
-                    auto modifier = new IntrinsicModifier();
+                    auto modifier = new TargetIntrinsicModifier();
                     modifier->Position = loc;
 
                     if (AdvanceIf(parser, TokenType::LParent))
                     {
-                        if (parser->LookAheadToken(TokenType::IntLiterial))
-                        {
-                            modifier->op = (IntrinsicOp)StringToInt(parser->ReadToken().Content);
-                        }
-                        else
-                        {
-                            modifier->opToken = parser->ReadToken(TokenType::Identifier);
+                        modifier->targetToken = parser->ReadToken(TokenType::Identifier);
 
-                            modifier->op = findIntrinsicOp(modifier->opToken.Content.Buffer());
-
-                            if (modifier->op == IntrinsicOp::Unknown)
+                        if( AdvanceIf(parser, TokenType::Comma) )
+                        {
+                            if( parser->LookAheadToken(TokenType::StringLiterial) )
                             {
-                                parser->sink->diagnose(loc, Diagnostics::unimplemented, "unknown intrinsic op");
+                                modifier->definitionToken = parser->ReadToken();
+                            }
+                            else
+                            {
+                                modifier->definitionToken = parser->ReadToken(TokenType::Identifier);
                             }
                         }
 
@@ -760,21 +785,18 @@ namespace Slang
             }
         }
 
-        static RefPtr<Decl> ParseUsing(
+        static RefPtr<Decl> parseImportDecl(
             Parser* parser)
         {
-            parser->ReadToken("using");
-            if (parser->tokenReader.PeekTokenType() == TokenType::StringLiterial)
-            {
-                auto usingDecl = new UsingFileDecl();
-                usingDecl->fileName = parser->ReadToken(TokenType::StringLiterial);
-                parser->ReadToken(TokenType::Semicolon);
-                return usingDecl;
-            }
-            else
-            {
-                unexpected();
-            }
+            parser->ReadToken("__import");
+
+            auto decl = new ImportDecl();
+            decl->nameToken = parser->ReadToken(TokenType::Identifier);
+            decl->scope = parser->currentScope;
+
+            parser->ReadToken(TokenType::Semicolon);
+
+            return decl;
         }
 
         static Token ParseDeclName(
@@ -2123,8 +2145,6 @@ parser->ReadToken(TokenType::Comma);
                 decl = ParseDeclaratorDecl(parser, containerDecl);
             else if (parser->LookAheadToken("typedef"))
                 decl = ParseTypeDef(parser);
-            else if (parser->LookAheadToken("using"))
-                decl = ParseUsing(parser);
             else if (parser->LookAheadToken("cbuffer") || parser->LookAheadToken("tbuffer"))
                 decl = ParseHLSLBufferDecl(parser);
             else if (parser->LookAheadToken("__generic"))
@@ -2141,6 +2161,8 @@ parser->ReadToken(TokenType::Comma);
                 decl = ParseTraitDecl(parser);
             else if(parser->LookAheadToken("__modifier"))
                 decl = parseModifierDecl(parser);
+            else if(parser->LookAheadToken("__import"))
+                decl = parseImportDecl(parser);
             else if (AdvanceIf(parser, TokenType::Semicolon))
             {
                 decl = new EmptyDecl();

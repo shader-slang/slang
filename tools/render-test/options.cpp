@@ -60,6 +60,14 @@ void parseOptions(int* argc, char** argv)
         {
             gOptions.mode = Mode::GLSL;
         }
+        else if( strcmp(arg, "-hlsl-rewrite") == 0 )
+        {
+            gOptions.mode = Mode::HLSLRewrite;
+        }
+        else if( strcmp(arg, "-glsl-rewrite") == 0 )
+        {
+            gOptions.mode = Mode::GLSLRewrite;
+        }
         else if( strcmp(arg, "-slang") == 0 )
         {
             gOptions.mode = Mode::Slang;

@@ -8,16 +8,16 @@
 #define LINE_STRING STRINGIZE(__LINE__)
 
 enum { kLibIncludeStringLine = __LINE__+1 };
-const char * LibIncludeStringChunks[] = { R"(
+const char * LibIncludeStringChunks[] = { R"=(
 
 typedef uint UINT;
 
-__generic<T> __intrinsic(Assign) T operator=(out T left, T right);
+__generic<T> __intrinsic_op(Assign) T operator=(out T left, T right);
 
-__generic<T,U> __intrinsic(Sequence) U operator,(T left, U right);
+__generic<T,U> __intrinsic_op(Sequence) U operator,(T left, U right);
 
-__generic<T> __intrinsic(Select) T operator?:(bool condition, T ifTrue, T ifFalse);
-__generic<T, let N : int> __intrinsic(Select) vector<T,N> operator?:(vector<bool,N> condition, vector<T,N> ifTrue, vector<T,N> ifFalse);
+__generic<T> __intrinsic_op(Select) T operator?:(bool condition, T ifTrue, T ifFalse);
+__generic<T, let N : int> __intrinsic_op(Select) vector<T,N> operator?:(vector<bool,N> condition, vector<T,N> ifTrue, vector<T,N> ifFalse);
 
 __generic<T> __magic_type(HLSLAppendStructuredBufferType) struct AppendStructuredBuffer
 {
@@ -234,7 +234,7 @@ __generic<T> __magic_type(HLSLPointStreamType) struct PointStream {};
 __generic<T> __magic_type(HLSLLineStreamType) struct LineStream {};
 __generic<T> __magic_type(HLSLLineStreamType) struct TriangleStream {};
 
-)", R"(
+)=", R"=(
 
 // Note(tfoley): Trying to systematically add all the HLSL builtins
 
@@ -503,7 +503,7 @@ __generic<T : __BuiltinFloatingPointType> __intrinsic T fwidth(T x);
 __generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> fwidth(vector<T,N> x);
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> fwidth(matrix<T,N,M> x);
 
-)", R"(
+)=", R"=(
 
 // Get number of samples in render target
 __intrinsic uint GetRenderTargetSampleCount();
@@ -615,27 +615,27 @@ __intrinsic uint4 msad4(uint reference, uint2 source, uint4 accum);
 // General inner products
 
 // scalar-scalar
-__generic<T : __BuiltinArithmeticType> __intrinsic(Mul_Scalar_Scalar) T mul(T x, T y);
+__generic<T : __BuiltinArithmeticType> __intrinsic_op(Mul_Scalar_Scalar) T mul(T x, T y);
 
 // scalar-vector and vector-scalar
-__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic(Mul_Vector_Scalar) vector<T,N> mul(vector<T,N> x, T y);
-__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic(Mul_Scalar_Vector) vector<T,N> mul(T x, vector<T,N> y);
+__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic_op(Mul_Vector_Scalar) vector<T,N> mul(vector<T,N> x, T y);
+__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic_op(Mul_Scalar_Vector) vector<T,N> mul(T x, vector<T,N> y);
 
 // scalar-matrix and matrix-scalar
-__generic<T : __BuiltinArithmeticType, let N : int, let M :int> __intrinsic(Mul_Matrix_Scalar) matrix<T,N,M> mul(matrix<T,N,M> x, T y);
-__generic<T : __BuiltinArithmeticType, let N : int, let M :int> __intrinsic(Mul_Scalar_Matrix) matrix<T,N,M> mul(T x, matrix<T,N,M> y);
+__generic<T : __BuiltinArithmeticType, let N : int, let M :int> __intrinsic_op(Mul_Matrix_Scalar) matrix<T,N,M> mul(matrix<T,N,M> x, T y);
+__generic<T : __BuiltinArithmeticType, let N : int, let M :int> __intrinsic_op(Mul_Scalar_Matrix) matrix<T,N,M> mul(T x, matrix<T,N,M> y);
 
 // vector-vector (dot product)
-__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic(InnerProduct_Vector_Vector) T mul(vector<T,N> x, vector<T,N> y);
+__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic_op(InnerProduct_Vector_Vector) T mul(vector<T,N> x, vector<T,N> y);
 
 // vector-matrix
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic(InnerProduct_Vector_Matrix) vector<T,M> mul(vector<T,N> x, matrix<T,N,M> y);
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic_op(InnerProduct_Vector_Matrix) vector<T,M> mul(vector<T,N> x, matrix<T,N,M> y);
 
 // matrix-vector
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic(InnerProduct_Matrix_Vector) vector<T,N> mul(matrix<T,N,M> x, vector<T,M> y);
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic_op(InnerProduct_Matrix_Vector) vector<T,N> mul(matrix<T,N,M> x, vector<T,M> y);
 
 // matrix-matrix
-__generic<T : __BuiltinArithmeticType, let R : int, let N : int, let C : int> __intrinsic(InnerProduct_Matrix_Matrix) matrix<T,R,C> mul(matrix<T,R,N> x, matrix<T,N,C> y);
+__generic<T : __BuiltinArithmeticType, let R : int, let N : int, let C : int> __intrinsic_op(InnerProduct_Matrix_Matrix) matrix<T,R,C> mul(matrix<T,R,N> x, matrix<T,N,C> y);
 
 // noise (deprecated)
 __intrinsic float noise(float x);
@@ -759,9 +759,17 @@ __generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> r
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> rsqrt(matrix<T,N,M> x);
 
 // Clamp value to [0,1] range
-__generic<T : __BuiltinFloatingPointType> __intrinsic T saturate(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> saturate(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> saturate(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType>
+__intrinsic(glsl, "clamp($0, 0, 1)") __intrinsic
+T saturate(T x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__intrinsic(glsl, "clamp($0, 0, 1)") __intrinsic
+vector<T,N> saturate(vector<T,N> x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__intrinsic(glsl, "clamp($0, 0, 1)") __intrinsic
+matrix<T,N,M> saturate(matrix<T,N,M> x);
 
 
 // Extract sign of value
@@ -769,7 +777,7 @@ __generic<T : __BuiltinSignedArithmeticType> __intrinsic int sign(T x);
 __generic<T : __BuiltinSignedArithmeticType, let N : int> __intrinsic vector<int,N> sign(vector<T,N> x);
 __generic<T : __BuiltinSignedArithmeticType, let N : int, let M : int> __intrinsic matrix<int,N,M> sign(matrix<T,N,M> x);
 
-)", R"(
+)=", R"=(
 
 
 // Sine
@@ -853,7 +861,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> t
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> trunc(matrix<T,N,M> x);
 
 
-)", R"(
+)=", R"=(
 
 // Shader model 6.0 stuff
 
@@ -930,13 +938,13 @@ __generic<T : __BuiltinType, let N : int> __intrinsic vector<T,N> WaveReadLaneAt
 __generic<T : __BuiltinType, let N : int, let M : int> __intrinsic matrix<T,N,M> WaveReadLaneAt(matrix<T,N,M> expr, int laneIndex);
 
 
-)", R"(
+)=", R"=(
 
 // `typedef`s to help with the fact that HLSL has been sorta-kinda case insensitive at various points
 typedef Texture2D texture2D;
 
 #line default
-)" };
+)=" };
 
 
 using namespace CoreLib::Basic;
@@ -1522,19 +1530,6 @@ namespace Slang
             sb << "__intrinsic mat4 operator * (mat4, mat4);\n";
 #endif
 
-#if 0
-            sb << "__intrinsic(And) bool operator && (bool, bool);\n";
-            sb << "__intrinsic(Or) bool operator || (bool, bool);\n";
-
-            for (auto type : intTypes)
-            {
-                sb << "__intrinsic(And) bool operator && (bool, " << type << ");\n";
-                sb << "__intrinsic(Or) bool operator || (bool, " << type << ");\n";
-                sb << "__intrinsic(And) bool operator && (" << type << ", bool);\n";
-                sb << "__intrinsic(Or) bool operator || (" << type << ", bool);\n";
-            }
-#endif
-
             for (auto op : unaryOps)
             {
                 for (auto type : kBaseTypes)
@@ -1547,17 +1542,17 @@ namespace Slang
 
                     // scalar version
                     sb << fixity;
-                    sb << "__intrinsic(" << int(op.opCode) << ") " << type.name << " operator" << op.opName << "(" << qual << type.name << " value);\n";
+                    sb << "__intrinsic_op(" << int(op.opCode) << ") " << type.name << " operator" << op.opName << "(" << qual << type.name << " value);\n";
 
                     // vector version
                     sb << "__generic<let N : int> ";
                     sb << fixity;
-                    sb << "__intrinsic(" << int(op.opCode) << ") vector<" << type.name << ",N> operator" << op.opName << "(" << qual << "vector<" << type.name << ",N> value);\n";
+                    sb << "__intrinsic_op(" << int(op.opCode) << ") vector<" << type.name << ",N> operator" << op.opName << "(" << qual << "vector<" << type.name << ",N> value);\n";
 
                     // matrix version
                     sb << "__generic<let N : int, let M : int> ";
                     sb << fixity;
-                    sb << "__intrinsic(" << int(op.opCode) << ") matrix<" << type.name << ",N,M> operator" << op.opName << "(" << qual << "matrix<" << type.name << ",N,M> value);\n";
+                    sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << type.name << ",N,M> operator" << op.opName << "(" << qual << "matrix<" << type.name << ",N,M> value);\n";
                 }
             }
 
@@ -1580,15 +1575,15 @@ namespace Slang
                     // TODO: handle `SHIFT`
 
                     // scalar version
-                    sb << "__intrinsic(" << int(op.opCode) << ") " << resultType << " operator" << op.opName << "(" << leftQual << leftType << " left, " << rightType << " right);\n";
+                    sb << "__intrinsic_op(" << int(op.opCode) << ") " << resultType << " operator" << op.opName << "(" << leftQual << leftType << " left, " << rightType << " right);\n";
 
                     // vector version
                     sb << "__generic<let N : int> ";
-                    sb << "__intrinsic(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(" << leftQual << "vector<" << leftType << ",N> left, vector<" << rightType << ",N> right);\n";
+                    sb << "__intrinsic_op(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(" << leftQual << "vector<" << leftType << ",N> left, vector<" << rightType << ",N> right);\n";
 
                     // matrix version
                     sb << "__generic<let N : int, let M : int> ";
-                    sb << "__intrinsic(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << leftQual << "matrix<" << leftType << ",N,M> left, matrix<" << rightType << ",N,M> right);\n";
+                    sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << leftQual << "matrix<" << leftType << ",N,M> left, matrix<" << rightType << ",N,M> right);\n";
                 }
             }
 

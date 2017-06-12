@@ -135,7 +135,6 @@ public:
         switch (type)
         {
         case GL_DEBUG_TYPE_ERROR:
-            assert(!"unexpected");
             break;
 
         default:
@@ -471,7 +470,48 @@ public:
 
     GLuint loadShader(GLenum stage, char const* source)
     {
-        auto shaderID = glCreateShader(stage);
+
+        // GLSL in monumentally stupid. It officially requires the `#version` directive
+        // to be the first thing in the file, which wouldn't be so bad but the API
+        // doesn't provide a way to pass a `#define` into your shader other than by
+        // prepending it to the whole thing.
+        //
+        // We are going to solve this problem by doing some surgery on the source
+        // that was passed in.
+
+        char const* sourceBegin = source;
+        char const* sourceEnd = source + strlen(source);
+
+        // Look for a version directive in the user-provided source.
+        char const* versionBegin = strstr(source, "#version");
+        char const* versionEnd = nullptr;
+        if( versionBegin )
+        {
+            // If we found a directive, then scan for the end-of-line
+            // after it, and use that to specify the slice.
+            versionEnd = strchr(versionBegin, '\n');
+            if( !versionEnd )
+            {
+                versionEnd = sourceEnd;
+            }
+            else
+            {
+                versionEnd = versionEnd + 1;
+            }
+        }
+        else
+        {
+            // If we didn't find a directive, then treat it as being
+            // a zero-byte slice at the start of the string
+            versionBegin = sourceBegin;
+            versionEnd = sourceBegin;
+        }
+
+        enum { kMaxSourceStringCount = 16 };
+        GLchar const* sourceStrings[kMaxSourceStringCount];
+        GLint sourceStringLengths[kMaxSourceStringCount];
+
+        int sourceStringCount = 0;
 
         char const* stagePrelude = "\n";
         switch (stage)
@@ -492,18 +532,28 @@ public:
             "#define __GLSL__ 1\n"
             ;
 
-        char const* sourceStrings[] =
-        {
-            stagePrelude,
-            prelude,
-            source,
-        };
+#define ADD_SOURCE_STRING_SPAN(BEGIN, END)                              \
+        sourceStrings[sourceStringCount] = BEGIN;                       \
+        sourceStringLengths[sourceStringCount++] = GLint(END - BEGIN)   \
+        /* end */
 
+#define ADD_SOURCE_STRING(BEGIN)                                        \
+        sourceStrings[sourceStringCount] = BEGIN;                       \
+        sourceStringLengths[sourceStringCount++] = GLint(strlen(BEGIN)) \
+        /* end */
+
+        ADD_SOURCE_STRING_SPAN(versionBegin, versionEnd);
+        ADD_SOURCE_STRING(stagePrelude);
+        ADD_SOURCE_STRING(prelude);
+        ADD_SOURCE_STRING_SPAN(sourceBegin, versionBegin);
+        ADD_SOURCE_STRING_SPAN(versionEnd, sourceEnd);
+
+        auto shaderID = glCreateShader(stage);
         glShaderSource(
             shaderID,
-            sizeof(sourceStrings) / sizeof(sourceStrings[0]),
+            sourceStringCount,
             &sourceStrings[0],
-            nullptr);
+            &sourceStringLengths[0]);
         glCompileShader(shaderID);
 
         GLint success = GL_FALSE;

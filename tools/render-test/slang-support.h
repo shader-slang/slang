@@ -7,6 +7,9 @@
 
 namespace renderer_test {
 
-ShaderCompiler* createSlangShaderCompiler(ShaderCompiler* innerCompiler, SlangCompileTarget target);
+ShaderCompiler* createSlangShaderCompiler(
+    ShaderCompiler*     innerCompiler,
+    SlangSourceLanguage sourceLanguage,
+    SlangCompileTarget  target);
 
 } // renderer_test

@@ -12,6 +12,7 @@ struct SlangShaderCompilerWrapper : public ShaderCompiler
 {
     ShaderCompiler*     innerCompiler;
     SlangCompileTarget  target;
+    SlangSourceLanguage sourceLanguage;
 
     virtual ShaderProgram* compileProgram(ShaderCompileRequest const& request) override
     {
@@ -20,16 +21,58 @@ struct SlangShaderCompilerWrapper : public ShaderCompiler
 
         spSetCodeGenTarget(slangRequest, target);
 
-        // Define a macro so that shader code in a test can detect when it is being
-        // compiled as Slang source code.
-        spAddPreprocessorDefine(slangRequest, "__SLANG__", "1");
+        // Define a macro so that shader code in a test can detect what language we
+        // are nominally working with.
+        char const* langDefine = nullptr;
+        switch (sourceLanguage)
+        {
+        case SLANG_SOURCE_LANGUAGE_GLSL:    langDefine = "__GLSL__";    break;
+        case SLANG_SOURCE_LANGUAGE_HLSL:    langDefine = "__HLSL__";    break;
+        case SLANG_SOURCE_LANGUAGE_SLANG:   langDefine = "__SLANG__";   break;
+        default:
+            assert(!"unexpected");
+            break;
+        }
+        spAddPreprocessorDefine(slangRequest, langDefine, "1");
 
-        int translationUnitIndex = spAddTranslationUnit(slangRequest, SLANG_SOURCE_LANGUAGE_SLANG, nullptr);
+        int vertexTranslationUnit = 0;
+        int fragmentTranslationUnit = 0;
+        if( sourceLanguage == SLANG_SOURCE_LANGUAGE_GLSL )
+        {
+            // GLSL presents unique challenges because, frankly, it got the whole
+            // compilation model wrong. One aspect of working around this is that
+            // we will compile the same source file multiple times: once per
+            // entry point, and we will have different preprocessor definitions
+            // active in each case.
 
-        spAddTranslationUnitSourceString(slangRequest, translationUnitIndex, request.source.path, request.source.text);
+            vertexTranslationUnit = spAddTranslationUnit(slangRequest, sourceLanguage, nullptr);
+            spAddTranslationUnitSourceString(slangRequest, vertexTranslationUnit, request.source.path, request.source.text);
 
-        int vertexEntryPoint = spAddTranslationUnitEntryPoint(slangRequest, translationUnitIndex, request.vertexShader.name,   spFindProfile(slangSession, request.vertexShader.profile));
-        int fragmentEntryPoint = spAddTranslationUnitEntryPoint(slangRequest, translationUnitIndex, request.fragmentShader.name, spFindProfile(slangSession, request.fragmentShader.profile));
+            spTranslationUnit_addPreprocessorDefine(slangRequest, vertexTranslationUnit, "__GLSL_VERTEX__", "1");
+
+            fragmentTranslationUnit = spAddTranslationUnit(slangRequest, sourceLanguage, nullptr);
+            spAddTranslationUnitSourceString(slangRequest, fragmentTranslationUnit, request.source.path, request.source.text);
+
+            spTranslationUnit_addPreprocessorDefine(slangRequest, fragmentTranslationUnit, "__GLSL_FRAGMENT__", "1");
+        }
+        else
+        {
+            int translationUnit = spAddTranslationUnit(slangRequest, sourceLanguage, nullptr);
+            spAddTranslationUnitSourceString(slangRequest, translationUnit, request.source.path, request.source.text);
+
+            vertexTranslationUnit = translationUnit;
+            fragmentTranslationUnit = translationUnit;
+        }
+
+
+        // If we aren't dealing with true Slang input, then don't enable checking.
+        if (sourceLanguage != SLANG_SOURCE_LANGUAGE_SLANG)
+        {
+            spSetCompileFlags(slangRequest, SLANG_COMPILE_FLAG_NO_CHECKING);
+        }
+
+        int vertexEntryPoint = spAddTranslationUnitEntryPoint(slangRequest, vertexTranslationUnit, request.vertexShader.name,   spFindProfile(slangSession, request.vertexShader.profile));
+        int fragmentEntryPoint = spAddTranslationUnitEntryPoint(slangRequest, fragmentTranslationUnit, request.fragmentShader.name, spFindProfile(slangSession, request.fragmentShader.profile));
 
         int compileErr = spCompile(slangRequest);
         if(auto diagnostics = spGetDiagnosticOutput(slangRequest))
@@ -43,12 +86,18 @@ struct SlangShaderCompilerWrapper : public ShaderCompiler
             return nullptr;
         }
 
-        char const* translatedCode = spGetTranslationUnitSource(slangRequest, translationUnitIndex);
-        char const* vertexCode = spGetEntryPointSource(slangRequest, translationUnitIndex, vertexEntryPoint);
-        char const* fragmentCode = spGetEntryPointSource(slangRequest, translationUnitIndex, fragmentEntryPoint);
 
         ShaderCompileRequest innerRequest = request;
-        innerRequest.source.text = translatedCode;
+
+        if( sourceLanguage != SLANG_SOURCE_LANGUAGE_GLSL )
+        {
+            char const* translatedCode = spGetTranslationUnitSource(slangRequest, 0);
+            innerRequest.source.text = translatedCode;
+        }
+
+        char const* vertexCode = spGetEntryPointSource(slangRequest, vertexTranslationUnit, vertexEntryPoint);
+        char const* fragmentCode = spGetEntryPointSource(slangRequest, fragmentTranslationUnit, fragmentEntryPoint);
+
         innerRequest.vertexShader.source.text = vertexCode;
         innerRequest.fragmentShader.source.text = fragmentCode;
 
@@ -66,10 +115,14 @@ struct SlangShaderCompilerWrapper : public ShaderCompiler
     }
 };
 
-ShaderCompiler* createSlangShaderCompiler(ShaderCompiler* innerCompiler, SlangCompileTarget target)
+ShaderCompiler* createSlangShaderCompiler(
+    ShaderCompiler*     innerCompiler,
+    SlangSourceLanguage sourceLanguage,
+    SlangCompileTarget  target)
 {
     auto result = new SlangShaderCompilerWrapper();
     result->innerCompiler = innerCompiler;
+    result->sourceLanguage = sourceLanguage;
     result->target = target;
 
     return result;

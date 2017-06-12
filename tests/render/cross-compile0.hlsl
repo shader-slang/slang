@@ -6,6 +6,10 @@
 // but the two will share a dependency on a file of
 // pure Spire code that provides the actual shading logic.
 
+
+// Pull in Spire code depdendency using extended syntax:
+__import cross_compile0;
+
 #if defined(__HLSL__)
 
 cbuffer Uniforms
@@ -74,6 +78,8 @@ FragmentStageOutput fragmentMain(FragmentStageInput input)
 
 	float3 color = input.coarseVertex.color;
 
+	color = transformColor(color);
+
 	output.fragment.color = float4(color, 1.0);
 
 	return output;
@@ -129,6 +135,8 @@ out vec4 fragment_color;
 void main()
 {
 	vec3 color = coarse_color;
+
+	color = transformColor(color);
 
 	fragment_color = vec4(color, 1.0);
 }

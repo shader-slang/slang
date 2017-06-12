@@ -25,6 +25,13 @@ struct EmitContext
 
     // A set of words reserved by the target
     Dictionary<String, String> reservedWords;
+
+    // For GLSL output, we can't emit traidtional `#line` directives
+    // with a file path in them, so we maintain a map that associates
+    // each path with a unique integer, and then we output those
+    // instead.
+    Dictionary<String, int> mapGLSLSourcePathToID;
+    int glslSourceIDCount = 0;
 };
 
 //
@@ -267,7 +274,7 @@ static bool MaybeEmitParens(EmitContext* context, int outerPrec, int prec)
 // might have introduced, but which interfere with our ability
 // to use it effectively in the target language
 static RefPtr<ExpressionSyntaxNode> prepareLValueExpr(
-    EmitContext*                    context,
+    EmitContext*                    /*context*/,
     RefPtr<ExpressionSyntaxNode>    expr)
 {
     for(;;)
@@ -370,6 +377,77 @@ static void EmitUnaryAssignExpr(
     emitUnaryExprImpl(context, outerPrec, prec, preOp, postOp, expr, true);
 }
 
+// Determine if a target intrinsic modifer is applicable to the target
+// we are currently emitting code for.
+static bool isTargetIntrinsicModifierApplicable(
+    EmitContext*                    context,
+    RefPtr<TargetIntrinsicModifier> modifier)
+{
+    auto const& targetToken = modifier->targetToken;
+
+    // If no target name was specified, then the modifier implicitly
+    // applies to all targets.
+    if(targetToken.Type == TokenType::Unknown)
+        return true;
+
+    // Otherwise, we need to check if the target name matches what
+    // we expect.
+    auto const& targetName = targetToken.Content;
+
+    switch(context->target)
+    {
+    default:
+        assert(!"unexpected");
+        return false;
+
+    case CodeGenTarget::GLSL: return targetName == "glsl";
+    case CodeGenTarget::HLSL: return targetName == "hlsl";
+    }
+}
+
+// Find an intrinsic modifier appropriate to the current compilation target.
+//
+// If there are multiple such modifiers, this should return the best one.
+static RefPtr<TargetIntrinsicModifier> findTargetIntrinsicModifier(
+    EmitContext*                    context,
+    RefPtr<ModifiableSyntaxNode>    syntax)
+{
+    RefPtr<TargetIntrinsicModifier> bestModifier;
+    for(auto m : syntax->GetModifiersOfType<TargetIntrinsicModifier>())
+    {
+        if(!isTargetIntrinsicModifierApplicable(context, m))
+            continue;
+
+        // For now "better"-ness is defined as: a modifier
+        // with a specified target is better than one without
+        // (it is more specific)
+        if(!bestModifier || bestModifier->targetToken.Type == TokenType::Unknown)
+        {
+            bestModifier = m;
+        }
+    }
+
+    return bestModifier;
+}
+
+static String getStringOrIdentifierTokenValue(
+    Token const& token)
+{
+    switch(token.Type)
+    {
+    default:
+        assert(!"unexpected");
+        return "";
+
+    case TokenType::Identifier:
+        return token.Content;
+
+    case TokenType::StringLiterial:
+        return getStringLiteralTokenValue(token);
+        break;
+    }
+}
+
 static void emitCallExpr(
     EmitContext*                        context,
     RefPtr<InvokeExpressionSyntaxNode>  callExpr,
@@ -380,9 +458,9 @@ static void emitCallExpr(
     {
         auto funcDeclRef = funcDeclRefExpr->declRef;
         auto funcDecl = funcDeclRef.GetDecl();
-        if (auto intrinsicModifier = funcDecl->FindModifier<IntrinsicModifier>())
+        if (auto intrinsicOpModifier = funcDecl->FindModifier<IntrinsicOpModifier>())
         {
-            switch (intrinsicModifier->op)
+            switch (intrinsicOpModifier->op)
             {
 #define CASE(NAME, OP) case IntrinsicOp::NAME: EmitBinExpr(context, outerPrec, kPrecedence_##NAME, #OP, callExpr); return
             CASE(Mul, *);
@@ -473,7 +551,69 @@ static void emitCallExpr(
             default:
                 break;
             }
+        }
+        else if(auto targetIntrinsicModifier = findTargetIntrinsicModifier(context, funcDecl))
+        {
+            if(targetIntrinsicModifier->definitionToken.Type != TokenType::Unknown)
+            {
+                auto name = getStringOrIdentifierTokenValue(targetIntrinsicModifier->definitionToken);
 
+                if(name.IndexOf('$') < 0)
+                {
+                    // Simple case: it is just an ordinary name, so we call it like a builtin.
+                    //
+                    // TODO: this case could probably handle things like operators, for generality?
+
+                    emit(context, name);
+                    Emit(context, "(");
+                    int argCount = callExpr->Arguments.Count();
+                    for (int aa = 0; aa < argCount; ++aa)
+                    {
+                        if (aa != 0) Emit(context, ", ");
+                        EmitExpr(context, callExpr->Arguments[aa]);
+                    }
+                    Emit(context, ")");
+                    return;
+                }
+                else
+                {
+                    // General case: we are going to emit some more complex text.
+
+                    int argCount = callExpr->Arguments.Count();
+
+                    Emit(context, "(");
+
+                    char const* cursor = name.begin();
+                    char const* end = name.end();
+                    while(cursor != end)
+                    {
+                        char c = *cursor++;
+                        if( c != '$' )
+                        {
+                            // Not an escape sequence
+                            emitRawTextSpan(context, &c, &c+1);
+                            continue;
+                        }
+
+                        assert(cursor != end);
+
+                        char d = *cursor++;
+                        assert(('0' <= d) && (d <= '9'));
+
+                        int argIndex = d - '0';
+                        assert((0 <= argIndex) && (argIndex < argCount));
+                        Emit(context, "(");
+                        EmitExpr(context, callExpr->Arguments[argIndex]);
+                        Emit(context, ")");
+                    }
+
+                    Emit(context, ")");
+                }
+
+                return;
+            }
+
+            // TODO: emit as approperiate for this target
 
             // We might be calling an intrinsic subscript operation,
             // and should desugar it accordingly
@@ -1178,23 +1318,51 @@ static void EmitLoopAttributes(EmitContext* context, RefPtr<StatementSyntaxNode>
     }
 }
 
-static void advanceToSourceLocation(
+// Emit a `#line` directive to the output.
+// Doesn't udpate state of source-location tracking.
+static void emitLineDirective(
     EmitContext*        context,
     CodePosition const& sourceLocation)
 {
-    // If we are currently emitting code at a source location with
-    // a differnet file or line, *or* if the source location is
-    // somehow later on the line than what we want to emit,
-    // then we need to emit a new `#line` directive.
-    if(sourceLocation.FileName != context->loc.FileName
-        || sourceLocation.Line != context->loc.Line
-        || sourceLocation.Col < context->loc.Col)
-    {
-        emitRawText(context, "\n#line ");
+    emitRawText(context, "\n#line ");
 
-        char buffer[16];
-        sprintf(buffer, "%d", sourceLocation.Line);
+    char buffer[16];
+    sprintf(buffer, "%d", sourceLocation.Line);
+    emitRawText(context, buffer);
+
+    emitRawText(context, " ");
+
+    if(context->target == CodeGenTarget::GLSL)
+    {
+        auto path = sourceLocation.FileName;
+
+        // GLSL doesn't support the traditional form of a `#line` directive without
+        // an extension. Rather than depend on that extension we will output
+        // a directive in the traditional GLSL fashion.
+        //
+        // TODO: Add some kind of configuration where we require the appropriate
+        // extension and then emit a traditional line directive.
+
+        int id = 0;
+        if(!context->mapGLSLSourcePathToID.TryGetValue(path, id))
+        {
+            id = context->glslSourceIDCount++;
+            context->mapGLSLSourcePathToID.Add(path, id);
+        }
+
+        sprintf(buffer, "%d", id);
         emitRawText(context, buffer);
+    }
+    else
+    {
+        // The simple case is to emit the path for the current source
+        // location. We need to be a little bit careful with this,
+        // because the path might include backslash characters if we
+        // are on Windows, and we want to canonicalize those over
+        // to forward slashes.
+        //
+        // TODO: Canonicalization like this should be done centrally
+        // in a module that tracks source files.
 
         emitRawText(context, "\"");
         for(auto c : sourceLocation.FileName)
@@ -1213,11 +1381,39 @@ static void advanceToSourceLocation(
                 break;
             }
         }
-        emitRawText(context, "\"\n");
+        emitRawText(context, "\"");
+    }
+
+    emitRawText(context, "\n");
+}
+
+// Emit a `#line` directive to the output, and also
+// ensure that source location tracking information
+// is correct based on the directive we just output.
+static void emitLineDirectiveAndUpdateSourceLocation(
+    EmitContext*        context,
+    CodePosition const& sourceLocation)
+{
+    emitLineDirective(context, sourceLocation);
     
-        context->loc.FileName = sourceLocation.FileName;
-        context->loc.Line = sourceLocation.Line;
-        context->loc.Col = 1;
+    context->loc.FileName = sourceLocation.FileName;
+    context->loc.Line = sourceLocation.Line;
+    context->loc.Col = 1;
+}
+
+static void advanceToSourceLocation(
+    EmitContext*        context,
+    CodePosition const& sourceLocation)
+{
+    // If we are currently emitting code at a source location with
+    // a differnet file or line, *or* if the source location is
+    // somehow later on the line than what we want to emit,
+    // then we need to emit a new `#line` directive.
+    if(sourceLocation.FileName != context->loc.FileName
+        || sourceLocation.Line != context->loc.Line
+        || sourceLocation.Col < context->loc.Col)
+    {
+        emitLineDirectiveAndUpdateSourceLocation(context, sourceLocation);
     }
 
     // Now indent up to the appropriate column, so that error messages
@@ -2279,6 +2475,24 @@ static void EmitDeclImpl(EmitContext* context, RefPtr<Decl> decl, RefPtr<VarLayo
 	{
 		return;
 	}
+    else if( auto importDecl = decl.As<ImportDecl>())
+    {
+        // When in "rewriter" mode, we need to emit the code of the imported
+        // module in-place at the `import` site.
+
+        auto moduleDecl = importDecl->importedModuleDecl;
+
+        // TODO: do we need to modify the code generation environment at
+        // all when doing this recursive emit?
+        //
+        // TODO: what if we import the same module along two different
+        // paths? Probably need  logic to avoid emitting the same
+        // module more than once.
+
+        EmitDeclsInContainer(context, moduleDecl);
+
+        return;
+    }
     else if( auto emptyDecl = decl.As<EmptyDecl>() )
     {
         EmitModifiers(context, emptyDecl);

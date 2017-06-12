@@ -193,11 +193,12 @@ namespace Slang
             return visitor->VisitParameter(this);
         }
 
-        // UsingFileDecl
+        // ImportDecl
 
-        RefPtr<SyntaxNode> UsingFileDecl::Accept(SyntaxVisitor * visitor)
+        RefPtr<SyntaxNode> ImportDecl::Accept(SyntaxVisitor * visitor)
         {
-            return visitor->VisitUsingFileDecl(this);
+            visitor->visitImportDecl(this);
+            return this;
         }
 
         //
