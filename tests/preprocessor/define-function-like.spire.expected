@@ -1,7 +1,0 @@
-result code = -1
-standard error = {
-Tests/Preprocessor/define-function-like.spire(16): error 30015: undefined identifier 'x'.
-Tests/Preprocessor/define-function-like.spire(16): error 30015: undefined identifier 'x'.
-}
-standard output = {
-}

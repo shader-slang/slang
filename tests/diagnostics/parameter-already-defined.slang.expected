@@ -1,0 +1,6 @@
+result code = -1
+standard error = {
+tests/diagnostics/parameter-already-defined.slang(4): error 30002: parameter 'a' already defined.
+}
+standard output = {
+}

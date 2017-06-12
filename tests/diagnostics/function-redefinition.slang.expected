@@ -1,0 +1,6 @@
+result code = -1
+standard error = {
+tests/diagnostics/function-redefinition.slang(5): error 30001: 'foo(int)': function redefinition.
+}
+standard output = {
+}

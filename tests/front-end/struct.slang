@@ -2,7 +2,7 @@
 // test that `struct` decls work
 
 // Note(tfoley): disabled during syntax transition
-// #include "pipeline-simple.spireh"
+// #include "pipeline-simple.slang.h"
 
 // struct declaration
 struct Foo

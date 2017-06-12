@@ -1,6 +1,0 @@
-result code = -1
-standard error = {
-Tests/FrontEnd/parser-error-unclosed-curly.spire(4): error 20001: unexpected end of file, expected '}'
-}
-standard output = {
-}

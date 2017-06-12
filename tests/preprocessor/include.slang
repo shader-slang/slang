@@ -3,6 +3,6 @@
 
 int foo() { return 0; }
 
-#include "include-a.spireh"
+#include "include-a.slang.h"
 
 int baz() { return bar(); }

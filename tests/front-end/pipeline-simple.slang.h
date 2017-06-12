@@ -1,4 +1,4 @@
-// pipeline-simple.spireh
+// pipeline-simple.slang.h
 
 
 // TODO(tfoley): strip this down to a minimal pipeline
