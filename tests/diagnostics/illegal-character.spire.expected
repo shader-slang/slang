@@ -1,6 +1,0 @@
-result code = -1
-standard error = {
-Tests/Diagnostics/illegal-character.spire(4): error 10000: illegal character '`'
-}
-standard output = {
-}

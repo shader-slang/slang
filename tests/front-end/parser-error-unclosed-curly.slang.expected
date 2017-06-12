@@ -1,0 +1,6 @@
+result code = -1
+standard error = {
+tests/front-end/parser-error-unclosed-curly.slang(4): error 20001: unexpected end of file, expected '}'
+}
+standard output = {
+}

@@ -1,6 +1,0 @@
-result code = -1
-standard error = {
-Tests/Diagnostics/continue-outside-loop.spire(4): error 30004: 'continue' must appear inside loop constructs.
-}
-standard output = {
-}
