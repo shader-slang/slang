@@ -135,9 +135,8 @@ namespace Slang
         //
         // We always look for the longest match possible.
         //
-        static void handleNewLine(Lexer* lexer)
+        static void handleNewLineInner(Lexer* lexer, int c)
         {
-            int c = advanceRaw(lexer);
             assert(c == '\n' || c == '\r');
 
             int d = peekRaw(lexer);
@@ -168,8 +167,14 @@ namespace Slang
                 switch (d)
                 {
                 case '\r': case '\n':
-                    // The newline was escaped, so return the character after *that*
-                    return lexer->cursor[2];
+                    {
+                        // The newline was escaped, so return the code point after *that*
+
+                        int e = lexer->cursor[2];
+                        if ((d ^ e) == ('\r' ^ '\n'))
+                            return lexer->cursor[3];
+                        return e;
+                    }
 
                 default:
                     break;
@@ -207,7 +212,8 @@ namespace Slang
                     {
                     case '\r': case '\n':
                         // handle the end-of-line for our source location tracking
-                        handleNewLine(lexer);
+                        lexer->cursor++;
+                        handleNewLineInner(lexer, d);
 
                         // Now try again, looking at the character after the
                         // escaped nmewline.
@@ -230,6 +236,11 @@ namespace Slang
             }
         }
 
+        static void handleNewLine(Lexer* lexer)
+        {
+            int c = advance(lexer);
+            handleNewLineInner(lexer, c);
+        }
 
         static void lexLineComment(Lexer* lexer)
         {
