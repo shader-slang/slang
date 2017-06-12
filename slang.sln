@@ -8,8 +8,6 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "hello", "examples\hello\hel
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "core", "source\core\core.vcxproj", "{F9BE7957-8399-899E-0C49-E714FDDD4B65}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "utils", "utils", "{37016FF6-E6AF-4316-BC2B-0152FC0C969E}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{74C5F0DC-93BB-4BF3-AC65-8C65491570F7}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang", "source\slang\slang.vcxproj", "{DB00DA62-0533-4AFD-B59F-A67D5B3A0808}"
