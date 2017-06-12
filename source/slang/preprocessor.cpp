@@ -450,8 +450,35 @@ static PreprocessorMacro* LookupMacro(PreprocessorEnvironment* environment, Stri
 
 static PreprocessorEnvironment* GetCurrentEnvironment(Preprocessor* preprocessor)
 {
+    // The environment we will use for looking up a macro is assocaited
+    // with the current input stream (because it may include entries
+    // for macro arguments).
+    //
+    // We need to be careful, though, when we are at the end of an
+    // input stream (e.g., representing one argument), so that we
+    // don't use its environment.
+
     PreprocessorInputStream* inputStream = preprocessor->inputStream;
-    return inputStream ? inputStream->environment : &preprocessor->globalEnv;
+
+    for(;;)
+    {
+        // If there is no input stream that isn't at its end,
+        // then fall back to the global environment.
+        if (!inputStream)
+            return &preprocessor->globalEnv;
+
+        // If the current input stream is at its end, then
+        // fall back to its parent stream.
+        if (inputStream->tokenReader.PeekTokenType() == TokenType::EndOfFile)
+        {
+            inputStream = inputStream->parent;
+            continue;
+        }
+
+        // If we've found an active stream that isn't at its end,
+        // then use that for lookup.
+        return inputStream->environment;
+    }
 }
 
 static PreprocessorMacro* LookupMacro(Preprocessor* preprocessor, String const& name)
