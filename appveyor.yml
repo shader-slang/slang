@@ -9,7 +9,7 @@ init:
           # then use the tag name as the start of the build version
           $versionName = "$($env:APPVEYOR_REPO_TAG_NAME.TrimStart("v"))"
       }
-      else if($env:APPVEYOR_PULL_REQUEST_NUMBER)
+      elseif($env:APPVEYOR_PULL_REQUEST_NUMBER)
       {
           # Otherwise, if we are building for a pull request,
           # then use the pull request number to name our build version
