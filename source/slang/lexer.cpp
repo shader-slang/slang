@@ -99,39 +99,137 @@ namespace Slang
 
         enum { kEOF = -1 };
 
-        static int peek(Lexer* lexer)
+        // Get the next input byte, without any handling of
+        // escaped newlines, non-ASCII code points, source locations, etc.
+        static int peekRaw(Lexer* lexer)
         {
+            // If we are at the end of the input, return a designated end-of-file value
             if(lexer->cursor == lexer->end)
                 return kEOF;
 
+            // Otherwise, just look at the next byte
             return *lexer->cursor;
         }
 
-        static int advance(Lexer* lexer)
+        // Read one input byte without any special handling (similar to `peekRaw`)
+        static int advanceRaw(Lexer* lexer)
         {
-            if(lexer->cursor == lexer->end)
-                return kEOF;
+            // The logic here is basically the same as for `peekRaw()`,
+            // escape we advance `cursor` if we aren't at the end.
 
-            lexer->loc.Col++;
-            lexer->loc.Pos++;
+            if (lexer->cursor == lexer->end)
+                return kEOF;
 
             return *lexer->cursor++;
         }
 
+        // When the cursor is already at the first byte of an end-of-line sequence,
+        // consume one or two bytes that compose the sequence.
+        //
+        // Basically, a newline is one of:
+        //
+        //  "\n"
+        //  "\r"
+        //  "\r\n"
+        //  "\n\r"
+        //
+        // We always look for the longest match possible.
+        //
         static void handleNewLine(Lexer* lexer)
         {
-            int c = advance(lexer);
+            int c = advanceRaw(lexer);
             assert(c == '\n' || c == '\r');
 
-            int d = peek(lexer);
+            int d = peekRaw(lexer);
             if( (c ^ d) == ('\n' ^ '\r') )
             {
-                advance(lexer);
+                advanceRaw(lexer);
             }
 
             lexer->loc.Line++;
             lexer->loc.Col = 1;
         }
+
+        // Look ahead one code point, dealing with complications like
+        // escaped newlines.
+        static int peek(Lexer* lexer)
+        {
+            // Look at the next raw byte, and decide what to do
+            int c = peekRaw(lexer);
+
+            if(c == '\\')
+            {
+                // We might have a backslash-escaped newline.
+                // Look at the next byte (if any) to see.
+                //
+                // Note(tfoley): We are assuming a null-terminated input here,
+                // so that we can safely look at the next byte without issue.
+                int d = lexer->cursor[1];
+                switch (d)
+                {
+                case '\r': case '\n':
+                    // The newline was escaped, so return the character after *that*
+                    return lexer->cursor[2];
+
+                default:
+                    break;
+                }
+            }
+            // TODO: handle UTF-8 encoding for non-ASCII code points here
+
+            // Default case is to just hand along the byte we read as an ASCII code point.
+            return c;
+        }
+
+        // Get the next code point from the input, and advance the cursor.
+        static int advance(Lexer* lexer)
+        {
+            // We are going to loop, but only as a way of handling
+            // escaped line endings.
+            for (;;)
+            {
+                // If we are at the end of the input, then the task is easy.
+                if (lexer->cursor == lexer->end)
+                    return kEOF;
+
+                // Look at the next raw byte, and decide what to do
+                int c = *lexer->cursor++;
+
+                if (c == '\\')
+                {
+                    // We might have a backslash-escaped newline.
+                    // Look at the next byte (if any) to see.
+                    //
+                    // Note(tfoley): We are assuming a null-terminated input here,
+                    // so that we can safely look at the next byte without issue.
+                    int d = *lexer->cursor;
+                    switch (d)
+                    {
+                    case '\r': case '\n':
+                        // handle the end-of-line for our source location tracking
+                        handleNewLine(lexer);
+
+                        // Now try again, looking at the character after the
+                        // escaped nmewline.
+                        continue;
+
+                    default:
+                        break;
+                    }
+                }
+
+                // TODO: Need to handle non-ASCII code points.
+
+                // Default case is to advance by one location
+                // and return the raw byte we saw.
+
+                lexer->loc.Col++;
+                lexer->loc.Pos++;
+
+                return c;
+            }
+        }
+
 
         static void lexLineComment(Lexer* lexer)
         {
