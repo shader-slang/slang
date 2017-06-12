@@ -1,12 +1,17 @@
-//TEST:COMPARE_HLSL_CROSS_COMPILE_RENDER:
+//TEST:COMPARE_HLSL_GLSL_RENDER:
 
-// Now we are going to test that we can cross-compile a Spire/HLSL
-// input file over to GLSL and render with it.
+// This is a basic test case for cross-compilation behavior.
+//
+// We will define distinct HLSL and GLSL entry points,
+// but the two will share a dependency on a file of
+// pure Spire code that provides the actual shading logic.
+
+#if defined(__HLSL__)
 
 cbuffer Uniforms
 {
 	float4x4 modelViewProjection;
-}
+};
 
 struct AssembledVertex
 {
@@ -23,7 +28,6 @@ struct Fragment
 {
 	float4 color;
 };
-
 
 // Vertex  Shader
 
@@ -49,6 +53,7 @@ VertexStageOutput vertexMain(VertexStageInput input)
 	output.sv_position = mul(modelViewProjection, float4(position, 1.0));
 
 	return output;
+	
 }
 
 // Fragment Shader
@@ -74,3 +79,61 @@ FragmentStageOutput fragmentMain(FragmentStageInput input)
 	return output;
 }
 
+#elif defined(__GLSL__)
+
+#version 420
+
+uniform Uniforms
+{
+	mat4x4 modelViewProjection;
+};
+
+#define ASSEMBLED_VERTEX(QUAL)		\
+	/* */
+
+#define V2F(QUAL)			\
+	QUAL vec3 coarse_color;	\
+	/* */
+
+// Vertex  Shader
+
+#ifdef __GLSL_VERTEX__
+
+layout(location = 0)
+in vec3 assembled_position;
+
+layout(location = 1)
+in vec3 assembled_color;
+
+V2F(out)
+
+void main()
+{
+	vec3 position = assembled_position;
+	vec3 color	= assembled_color;
+
+	coarse_color = color;
+//	gl_Position = modelViewProjection * vec4(position, 1.0);
+	gl_Position = vec4(position, 1.0) * modelViewProjection;
+}
+
+#endif
+
+#ifdef __GLSL_FRAGMENT__
+
+V2F(in)
+
+layout(location = 0)
+out vec4 fragment_color;
+
+void main()
+{
+	vec3 color = coarse_color;
+
+	fragment_color = vec4(color, 1.0);
+}
+
+
+#endif
+
+#endif

@@ -56,6 +56,10 @@ void parseOptions(int* argc, char** argv)
         {
             gOptions.mode = Mode::HLSL;
         }
+        else if( strcmp(arg, "-glsl") == 0 )
+        {
+            gOptions.mode = Mode::GLSL;
+        }
         else if( strcmp(arg, "-slang") == 0 )
         {
             gOptions.mode = Mode::Slang;
