@@ -1,26 +1,59 @@
 
-# version format
-version: 0.0.{build}
+# Try to set AppVeyord build "version" to something reasonable,
+# based on what we are trying to build.
+init:
+  - ps: |
+      if ($env:APPVEYOR_REPO_TAG -eq "true")
+      {
+          # If we are building from a tag in the repository,
+          # then use the tag name as the start of the build version
+          $versionName = "$($env:APPVEYOR_REPO_TAG_NAME.TrimStart("v"))"
+      }
+      elseif($env:APPVEYOR_PULL_REQUEST_NUMBER)
+      {
+          # Otherwise, if we are building for a pull request,
+          # then use the pull request number to name our build version
+          $versionName = "pr$env:APPVEYOR_PULL_REQUEST_NUMBER"
+      }
+      else
+      {
+          # Otherwise, just set a build name based on the
+          # branch that we are building against
+          $versionName = "$env:APPVEYOR_REPO_BRANCH"
+      }
+      # Finally, we set the AppVeyor build version to use our version
+      # name with the build number appended.
+      #
+      # The string "appveyor" is being included before the build number
+      # in case we need to differentiate builds being made with different
+      # continuous integration providers.
+      Update-AppveyorBuild -Version "$versionName+appveyor.$env:APPVEYOR_BUILD_NUMBER"
 
-# build worker image
+# Our solution file is currently set up for VS2015
 image: Visual Studio 2015
 
-# script to run before build
+# The project uses a submodule for the "glslang" dependency,
+# so we need to make sure to pull that before building.
 install:
   - git submodule update --init --recursive
 
-# platforms to build
+# We want to build the full matrix of platforms and configurations
+# that we support on Windows.
 platform:
   - Win32
   - x64
-
-# configurations to build
 configuration:
   - Debug
   - Release
 
-# specify build settings
+# MSBUILD should ideally be able to find our solution file
+# automatically, but it seems to get confused, so we specify
+# the file name to use here.
 build:
   project: slang.sln
 
-# TODO: need to invoke test script here
+# TODO: need to invoke our test script as part of the build
+
+# TODO: need to figure out what we want to package for deployment
+
+# TODO: on a successful build of a tag, push to GitHub releases
