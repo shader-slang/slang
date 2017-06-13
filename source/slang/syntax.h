@@ -72,7 +72,16 @@ namespace Slang
 
         IntrinsicOp findIntrinsicOp(char const* name);
 
-        class IntrinsicModifier : public Modifier
+        // Base class for modifiers that mark something as "intrinsic"
+        // and thus lacking a direct implementation in the language.
+        class IntrinsicModifierBase : public Modifier
+        {
+        };
+
+        // A modifier that marks something as one of a small set of
+        // truly intrinsic operations that the compiler knows about
+        // directly.
+        class IntrinsicOpModifier : public IntrinsicModifierBase
         {
         public:
             // token that names the intrinsic op
@@ -81,6 +90,20 @@ namespace Slang
             // The opcode for the intrinsic operation
             IntrinsicOp op = IntrinsicOp::Unknown;
         };
+
+        // A modifier that marks something as an intrinsic function,
+        // for some subset of targets.
+        class TargetIntrinsicModifier : public IntrinsicModifierBase
+        {
+        public:
+            // Token that names the target that the operation
+            // is an intrisic for.
+            Token targetToken;
+
+            // A custom definition for the operation
+            Token definitionToken;
+        };
+
 
 
         class InOutModifier : public OutModifier {};
@@ -2041,22 +2064,12 @@ namespace Slang
             virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
         };
 
-        class UsingFileDecl : public Decl
-        {
-        public:
-            Token fileName;
-
-            virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
-        };
-
+        // A "module" of code (essentiately, a single translation unit)
+        // that provides a scope for some number of declarations.
         class ProgramSyntaxNode : public ContainerDecl
         {
         public:
             // Access members of specific types
-            FilteredMemberList<UsingFileDecl> GetUsings()
-            {
-                return GetMembersOfType<UsingFileDecl>();
-            }
             FilteredMemberList<FunctionSyntaxNode> GetFunctions()
             {
                 return GetMembersOfType<FunctionSyntaxNode>();
@@ -2074,14 +2087,25 @@ namespace Slang
             {
                 return GetMembersOfType<TypeDefDecl>();
             }
-#if 0
-            void Include(ProgramSyntaxNode * other)
-            {
-                Members.AddRange(other->Members);
-            }
-#endif
+
             virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
         };
+
+                class ImportDecl : public Decl
+        {
+        public:
+            // The name of the module we are trying to import
+            Token nameToken;
+
+            // The scope that we want to import into
+            RefPtr<Scope> scope;
+
+            // The module that actually got imported
+            RefPtr<ProgramSyntaxNode>   importedModuleDecl;
+
+            virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+        };
+
 
         class IfStatementSyntaxNode : public StatementSyntaxNode
         {
@@ -2492,10 +2516,7 @@ namespace Slang
                 return program;
             }
 
-            virtual RefPtr<UsingFileDecl> VisitUsingFileDecl(UsingFileDecl * decl)
-            {
-                return decl;
-            }
+            virtual void visitImportDecl(ImportDecl * decl) = 0;
 
             virtual RefPtr<FunctionSyntaxNode> VisitFunction(FunctionSyntaxNode* func)
             {

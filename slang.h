@@ -224,6 +224,19 @@ extern "C"
         SlangSourceLanguage     language,
         char const*             name);
 
+    /** Add a preprocessor definition that is scoped to a single translation unit.
+
+    @param translationUnitIndex The index of the translation unit to get the definition.
+    @param key The name of the macro to define.
+    @param value The value of the macro to define.
+    */
+    SLANG_API void spTranslationUnit_addPreprocessorDefine(
+        SlangCompileRequest*    request,
+        int                     translationUnitIndex,
+        const char*             key,
+        const char*             value);
+
+
     /** Add a source file to the given translation unit
     */
     SLANG_API void spAddTranslationUnitSourceFile(

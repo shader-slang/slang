@@ -49,15 +49,18 @@ namespace Slang
             ProgramSyntaxNode * program = nullptr;
             FunctionSyntaxNode * function = nullptr;
             CompileOptions const* options = nullptr;
+            CompileRequest* request = nullptr;
 
             // lexical outer statements
             List<StatementSyntaxNode*> outerStmts;
         public:
             SemanticsVisitor(
                 DiagnosticSink * pErr,
-                CompileOptions const& options)
+                CompileOptions const& options,
+                CompileRequest* request)
                 : SyntaxVisitor(pErr)
                 , options(&options)
+                , request(request)
             {
             }
 
@@ -686,7 +689,7 @@ namespace Slang
 
 
                             int argIndex = 0;
-                            for(auto& fieldDeclRef : toStructDeclRef.GetMembersOfType<FieldDeclRef>())
+                            for(auto fieldDeclRef : toStructDeclRef.GetMembersOfType<FieldDeclRef>())
                             {
                                 if(argIndex >= argCount)
                                 {
@@ -1083,7 +1086,7 @@ namespace Slang
 
             RefPtr<Modifier> checkModifier(
                 RefPtr<Modifier>    m,
-                Decl*               decl)
+                Decl*               /*decl*/)
             {
                 if(auto hlslUncheckedAttribute = m.As<HLSLUncheckedAttribute>())
                 {
@@ -1878,7 +1881,7 @@ namespace Slang
                 if (!funcDeclRefExpr) return nullptr;
 
                 auto funcDeclRef = funcDeclRefExpr->declRef;
-                auto intrinsicMod = funcDeclRef.GetDecl()->FindModifier<IntrinsicModifier>();
+                auto intrinsicMod = funcDeclRef.GetDecl()->FindModifier<IntrinsicOpModifier>();
                 if (!intrinsicMod) return nullptr;
 
                 // Let's not constant-fold operations with more than a certain number of arguments, for simplicity
@@ -4892,13 +4895,44 @@ namespace Slang
 
                 return expr;
             }
+
+            virtual void visitImportDecl(ImportDecl* decl) override
+            {
+                // We need to look for a module with the specified name
+                // (whether it has already been loaded, or needs to
+                // be loaded), and then put its declarations into
+                // the current scope.
+
+                auto name = decl->nameToken.Content;
+                auto scope = decl->scope;
+
+                // Try to load a module matching the name
+                auto importedModuleDecl = findOrImportModule(request, name, decl->nameToken.Position);
+
+                // If we didn't find a matching module, then bail out
+                if (!importedModuleDecl)
+                    return;
+
+                // Record the module that was imported, so that we can use
+                // it later during code generation.
+                decl->importedModuleDecl = importedModuleDecl;
+
+                // Create a new sub-scope to wire the module
+                // into our lookup chain.
+                auto subScope = new Scope();
+                subScope->containerDecl = importedModuleDecl.Ptr();
+
+                subScope->nextSibling = scope->nextSibling;
+                scope->nextSibling = subScope;
+            }
         };
 
-        SyntaxVisitor * CreateSemanticsVisitor(
-            DiagnosticSink * err,
-            CompileOptions const& options)
+        SyntaxVisitor* CreateSemanticsVisitor(
+            DiagnosticSink*         err,
+            CompileOptions const&   options,
+            CompileRequest*         request)
         {
-            return new SemanticsVisitor(err, options);
+            return new SemanticsVisitor(err, options, request);
         }
 
         //

@@ -844,7 +844,7 @@ TestResult runHLSLCrossCompileRenderComparisonTest(TestInput& input)
 
 TestResult runHLSLAndGLSLComparisonTest(TestInput& input)
 {
-    return runHLSLRenderComparisonTestImpl(input, "-hlsl", "-glsl");
+    return runHLSLRenderComparisonTestImpl(input, "-hlsl-rewrite", "-glsl-rewrite");
 }
 
 TestResult runTest(

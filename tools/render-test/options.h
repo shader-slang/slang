@@ -10,9 +10,18 @@ typedef uintptr_t UInt;
 
 enum class Mode
 {
+    // Slang being used as an HLSL-ish compiler
     Slang,
+
+    // Raw HLSL or GLSL input, bypassing Slang
     HLSL,
     GLSL,
+
+    // Raw HLSL or GLSL input, passed through the Slang rewriter
+    HLSLRewrite,
+    GLSLRewrite,
+
+    // Slang/HLSL input -> GLSL output
     GLSLCrossCompile,
 };
 

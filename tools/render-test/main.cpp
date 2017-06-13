@@ -298,10 +298,12 @@ int main(
     {
     case Mode::Slang:
     case Mode::HLSL:
+    case Mode::HLSLRewrite:
         renderer = createD3D11Renderer();
         break;
 
     case Mode::GLSL:
+    case Mode::GLSLRewrite:
     case Mode::GLSLCrossCompile:
         renderer = createGLRenderer();
         break;
@@ -318,11 +320,19 @@ int main(
     switch( gOptions.mode )
     {
     case Mode::Slang:
-        shaderCompiler = createSlangShaderCompiler(shaderCompiler, SLANG_HLSL);
+        shaderCompiler = createSlangShaderCompiler(shaderCompiler, SLANG_SOURCE_LANGUAGE_SLANG, SLANG_HLSL);
+        break;
+
+    case Mode::HLSLRewrite:
+        shaderCompiler = createSlangShaderCompiler(shaderCompiler, SLANG_SOURCE_LANGUAGE_HLSL, SLANG_HLSL);
+        break;
+
+    case Mode::GLSLRewrite:
+        shaderCompiler = createSlangShaderCompiler(shaderCompiler, SLANG_SOURCE_LANGUAGE_GLSL, SLANG_GLSL);
         break;
 
     case Mode::GLSLCrossCompile:
-        shaderCompiler = createSlangShaderCompiler(shaderCompiler, SLANG_GLSL);
+        shaderCompiler = createSlangShaderCompiler(shaderCompiler, SLANG_SOURCE_LANGUAGE_SLANG, SLANG_GLSL);
         break;
 
     default:

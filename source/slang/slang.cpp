@@ -2,9 +2,11 @@
 
 #include "../core/slang-io.h"
 #include "../slang/slang-stdlib.h"
+#include "parameter-binding.h"
 #include "../slang/parser.h"
 #include "../slang/preprocessor.h"
 #include "../slang/reflection.h"
+#include "syntax-visitors.h"
 #include "../slang/type-layout.h"
 
 #ifdef _WIN32
@@ -19,128 +21,142 @@ using namespace CoreLib::Basic;
 using namespace CoreLib::IO;
 using namespace Slang::Compiler;
 
-namespace SlangLib
+namespace Slang {
+namespace Compiler {
+
+static void stdlibDiagnosticCallback(
+    char const* message,
+    void*       userData)
 {
-    static void stdlibDiagnosticCallback(
-        char const* message,
-        void*       userData)
-    {
-        fputs(message, stderr);
-        fflush(stderr);
+    fputs(message, stderr);
+    fflush(stderr);
 #ifdef WIN32
-        OutputDebugStringA(message);
+    OutputDebugStringA(message);
 #endif
+}
+
+class Session
+{
+public:
+    bool useCache = false;
+    CoreLib::String cacheDir;
+
+    RefPtr<Scope>   slangLanguageScope;
+    RefPtr<Scope>   hlslLanguageScope;
+    RefPtr<Scope>   glslLanguageScope;
+
+    List<RefPtr<ProgramSyntaxNode>> loadedModuleCode;
+
+
+    Session(bool /*pUseCache*/, CoreLib::String /*pCacheDir*/)
+    {
+        // Initialize global state
+        // TODO: move this into the session instead
+        BasicExpressionType::Init();
+
+        // Create scopes for various language builtins.
+        //
+        // TODO: load these on-demand to avoid parsing
+        // stdlib code for languages the user won't use.
+
+        slangLanguageScope = new Scope();
+
+        hlslLanguageScope = new Scope();
+        hlslLanguageScope->parent = slangLanguageScope;
+
+        glslLanguageScope = new Scope();
+        glslLanguageScope->parent = slangLanguageScope;
+
+        addBuiltinSource(slangLanguageScope, "stdlib", SlangStdLib::GetCode());
+        addBuiltinSource(glslLanguageScope, "glsl", getGLSLLibraryCode());
     }
 
-    class Session
+    ~Session()
     {
-    public:
-        bool useCache = false;
-        CoreLib::String cacheDir;
+        // We need to clean up the strings for the standard library
+        // code that we might have allocated and loaded into static
+        // variables (TODO: don't use `static` variables for this stuff)
 
-        RefPtr<ShaderCompiler> compiler;
+        SlangStdLib::Finalize();
 
-        RefPtr<Scope>   slangLanguageScope;
-        RefPtr<Scope>   hlslLanguageScope;
-        RefPtr<Scope>   glslLanguageScope;
+        // Ditto for our type represnetation stuff
 
-        List<RefPtr<ProgramSyntaxNode>> loadedModuleCode;
+        ExpressionType::Finalize();
+    }
 
-
-        Session(bool /*pUseCache*/, CoreLib::String /*pCacheDir*/)
-        {
-            compiler = CreateShaderCompiler();
-
-            // Create scopes for various language builtins.
-            //
-            // TODO: load these on-demand to avoid parsing
-            // stdlib code for languages the user won't use.
-
-            slangLanguageScope = new Scope();
-
-            hlslLanguageScope = new Scope();
-            hlslLanguageScope->parent = slangLanguageScope;
-
-            glslLanguageScope = new Scope();
-            glslLanguageScope->parent = slangLanguageScope;
-
-            addBuiltinSource(slangLanguageScope, "stdlib", SlangStdLib::GetCode());
-            addBuiltinSource(glslLanguageScope, "glsl", getGLSLLibraryCode());
-        }
-
-        ~Session()
-        {
-            // We need to clean up the strings for the standard library
-            // code that we might have allocated and loaded into static
-            // variables (TODO: don't use `static` variables for this stuff)
-
-            SlangStdLib::Finalize();
-
-            // Ditto for our type represnetation stuff
-
-            ExpressionType::Finalize();
-        }
-
-        CompileUnit createPredefUnit()
-        {
-            CompileUnit translationUnit;
-
-
-            RefPtr<ProgramSyntaxNode> translationUnitSyntax = new ProgramSyntaxNode();
-
-            TranslationUnitOptions translationUnitOptions;
-            translationUnit.options = translationUnitOptions;
-            translationUnit.SyntaxNode = translationUnitSyntax;
-
-            return translationUnit;
-        }
-
-        void addBuiltinSource(
-            RefPtr<Scope> const&    scope,
-            String const&           path,
-            String const&           source);
-    };
-
-    struct CompileRequest
+    CompileUnit createPredefUnit()
     {
-        // Pointer to parent session
-        Session* mSession;
+        CompileUnit translationUnit;
 
-        // Input options
-        CompileOptions Options;
 
-        // Output stuff
-        DiagnosticSink mSink;
-        String mDiagnosticOutput;
+        RefPtr<ProgramSyntaxNode> translationUnitSyntax = new ProgramSyntaxNode();
 
-        RefPtr<CollectionOfTranslationUnits> mCollectionOfTranslationUnits;
+        TranslationUnitOptions translationUnitOptions;
+        translationUnit.options = translationUnitOptions;
+        translationUnit.SyntaxNode = translationUnitSyntax;
 
-        RefPtr<ProgramLayout> mReflectionData;
+        return translationUnit;
+    }
 
-        CompileResult mResult;
+    void addBuiltinSource(
+        RefPtr<Scope> const&    scope,
+        String const&           path,
+        String const&           source);
+};
 
-        List<String> mDependencyFilePaths;
+struct CompileRequest
+{
+    // Pointer to parent session
+    Session* mSession;
 
-        CompileRequest(Session* session)
-            : mSession(session)
-        {}
+    // Input options
+    CompileOptions Options;
 
-        ~CompileRequest()
-        {}
+    // Output stuff
+    DiagnosticSink mSink;
+    String mDiagnosticOutput;
 
-        struct IncludeHandlerImpl : IncludeHandler
+    RefPtr<CollectionOfTranslationUnits> mCollectionOfTranslationUnits;
+
+    RefPtr<ProgramLayout> mReflectionData;
+
+    CompileResult mResult;
+
+    List<String> mDependencyFilePaths;
+
+    CompileRequest(Session* session)
+        : mSession(session)
+    {}
+
+    ~CompileRequest()
+    {}
+
+    struct IncludeHandlerImpl : IncludeHandler
+    {
+        CompileRequest* request;
+
+        List<String> searchDirs;
+
+        virtual bool TryToFindIncludeFile(
+            CoreLib::String const& pathToInclude,
+            CoreLib::String const& pathIncludedFrom,
+            CoreLib::String* outFoundPath,
+            CoreLib::String* outFoundSource) override
         {
-            CompileRequest* request;
-
-            List<String> searchDirs;
-
-            virtual bool TryToFindIncludeFile(
-                CoreLib::String const& pathToInclude,
-                CoreLib::String const& pathIncludedFrom,
-                CoreLib::String* outFoundPath,
-                CoreLib::String* outFoundSource) override
+            String path = Path::Combine(Path::GetDirectoryName(pathIncludedFrom), pathToInclude);
+            if (File::Exists(path))
             {
-                String path = Path::Combine(Path::GetDirectoryName(pathIncludedFrom), pathToInclude);
+                *outFoundPath = path;
+                *outFoundSource = File::ReadAllText(path);
+
+                request->mDependencyFilePaths.Add(path);
+
+                return true;
+            }
+
+            for (auto & dir : searchDirs)
+            {
+                path = Path::Combine(dir, pathToInclude);
                 if (File::Exists(path))
                 {
                     *outFoundPath = path;
@@ -150,303 +166,453 @@ namespace SlangLib
 
                     return true;
                 }
-
-                for (auto & dir : searchDirs)
-                {
-                    path = Path::Combine(dir, pathToInclude);
-                    if (File::Exists(path))
-                    {
-                        *outFoundPath = path;
-                        *outFoundSource = File::ReadAllText(path);
-
-                        request->mDependencyFilePaths.Add(path);
-
-                        return true;
-                    }
-                }
-                return false;
             }
-        };
-
-
-        CompileUnit parseTranslationUnit(
-            TranslationUnitOptions const&   translationUnitOptions)
-        {
-            auto& options = Options;
-
-            IncludeHandlerImpl includeHandler;
-            includeHandler.request = this;
-
-            CompileUnit translationUnit;
-
-            RefPtr<Scope> languageScope;
-            switch( translationUnitOptions.sourceLanguage )
-            {
-            case SourceLanguage::HLSL:
-                languageScope = mSession->hlslLanguageScope;
-                break;
-
-            case SourceLanguage::GLSL:
-                languageScope = mSession->glslLanguageScope;
-                break;
-
-            case SourceLanguage::Slang:
-            default:
-                languageScope = mSession->slangLanguageScope;
-                break;
-            }
-
-
-            auto& preprocesorDefinitions = options.PreprocessorDefinitions;
-
-            RefPtr<ProgramSyntaxNode> translationUnitSyntax = new ProgramSyntaxNode();
-
-            for( auto sourceFile : translationUnitOptions.sourceFiles )
-            {
-                auto sourceFilePath = sourceFile->path;
-
-                auto searchDirs = options.SearchDirectories;
-                searchDirs.Reverse();
-                searchDirs.Add(Path::GetDirectoryName(sourceFilePath));
-                searchDirs.Reverse();
-                includeHandler.searchDirs = searchDirs;
-
-                String source = sourceFile->content;
-
-                auto tokens = preprocessSource(
-                    source,
-                    sourceFilePath,
-                    mResult.GetErrorWriter(),
-                    &includeHandler,
-                    preprocesorDefinitions,
-                    translationUnitSyntax.Ptr());
-
-                parseSourceFile(
-                    translationUnitSyntax.Ptr(),
-                    options,
-                    tokens,
-                    mResult.GetErrorWriter(),
-                    sourceFilePath,
-                    languageScope);
-            }
-
-            translationUnit.options = translationUnitOptions;
-            translationUnit.SyntaxNode = translationUnitSyntax;
-
-            return translationUnit;
-        }
-
-        int executeCompilerDriverActions()
-        {
-            // If we are being asked to do pass-through, then we need to do that here...
-            if (Options.passThrough != PassThroughMode::None)
-            {
-                for( auto& translationUnitOptions : Options.translationUnits )
-                {
-                    switch( translationUnitOptions.sourceLanguage )
-                    {
-                    // We can pass-through code written in a native shading language
-                    case SourceLanguage::GLSL:
-                    case SourceLanguage::HLSL:
-                        break;
-
-                    // All other translation units need to be skipped
-                    default:
-                        continue;
-                    }
-
-                    auto sourceFile = translationUnitOptions.sourceFiles[0];
-                    auto sourceFilePath = sourceFile->path;
-                    String source = sourceFile->content;
-
-                    mSession->compiler->PassThrough(
-                        source,
-                        sourceFilePath,
-                        Options,
-                        translationUnitOptions);
-                }
-                return 0;
-            }
-
-            // TODO: load the stdlib
-
-            mCollectionOfTranslationUnits = new CollectionOfTranslationUnits();
-
-            // Parse everything from the input files requested
-            //
-            // TODO: this may trigger the loading and/or compilation of additional modules.
-            for( auto& translationUnitOptions : Options.translationUnits )
-            {
-                auto translationUnit = parseTranslationUnit(translationUnitOptions);
-                mCollectionOfTranslationUnits->translationUnits.Add(translationUnit);
-            }
-            if( mResult.GetErrorCount() != 0 )
-                return 1;
-
-            // Now perform semantic checks, emit output, etc.
-            mSession->compiler->Compile(
-                mResult, mCollectionOfTranslationUnits.Ptr(), Options);
-            if(mResult.GetErrorCount() != 0)
-                return 1;
-
-            mReflectionData = mCollectionOfTranslationUnits->layout;
-
-            return 0;
-        }
-
-        // Act as expected of the API-based compiler
-        int executeAPIActions()
-        {
-            mResult.mSink = &mSink;
-
-            int err = executeCompilerDriverActions();
-
-            mDiagnosticOutput = mSink.outputBuffer.ProduceString();
-
-            if(mSink.GetErrorCount() != 0)
-                return mSink.GetErrorCount();
-
-            return err;
-        }
-
-        int addTranslationUnit(SourceLanguage language, String const& name)
-        {
-            int result = Options.translationUnits.Count();
-
-            TranslationUnitOptions translationUnit;
-            translationUnit.sourceLanguage = SourceLanguage(language);
-
-            Options.translationUnits.Add(translationUnit);
-
-            return result;
-        }
-
-        void addTranslationUnitSourceString(
-            int             translationUnitIndex,
-            String const&   path,
-            String const&   source)
-        {
-            RefPtr<SourceFile> sourceFile = new SourceFile();
-            sourceFile->path = path;
-            sourceFile->content = source;
-
-            Options.translationUnits[translationUnitIndex].sourceFiles.Add(sourceFile);
-        }
-
-        void addTranslationUnitSourceFile(
-            int             translationUnitIndex,
-            String const&   path)
-        {
-            String source;
-            try
-            {
-                source = File::ReadAllText(path);
-            }
-            catch( ... )
-            {
-                // Emit a diagnostic!
-                mSink.diagnose(
-                    CodePosition(0,0,0,path),
-                    Diagnostics::cannotOpenFile,
-                    path);
-                return;
-            }
-
-            addTranslationUnitSourceString(
-                translationUnitIndex,
-                path,
-                source);
-
-            mDependencyFilePaths.Add(path);
-        }
-
-        int addTranslationUnitEntryPoint(
-            int                     translationUnitIndex,
-            String const&           name,
-            Profile                 profile)
-        {
-            EntryPointOption entryPoint;
-            entryPoint.name = name;
-            entryPoint.profile = profile;
-
-            // TODO: realistically want this to be global across all TUs...
-            int result = Options.translationUnits[translationUnitIndex].entryPoints.Count();
-
-            Options.translationUnits[translationUnitIndex].entryPoints.Add(entryPoint);
-            return result;
+            return false;
         }
     };
 
-    void Session::addBuiltinSource(
-        RefPtr<Scope> const&    scope,
-        String const&           path,
-        String const&           source)
+
+    CompileUnit parseTranslationUnit(
+        TranslationUnitOptions const&   translationUnitOptions,
+        CompileOptions&                 options)
     {
-        CompileRequest compileRequest(this);
+        IncludeHandlerImpl includeHandler;
+        includeHandler.request = this;
 
-        auto translationUnitIndex = compileRequest.addTranslationUnit(SourceLanguage::Slang, path);
+        CompileUnit translationUnit;
 
-        compileRequest.addTranslationUnitSourceString(
+        RefPtr<Scope> languageScope;
+        switch (translationUnitOptions.sourceLanguage)
+        {
+        case SourceLanguage::HLSL:
+            languageScope = mSession->hlslLanguageScope;
+            break;
+
+        case SourceLanguage::GLSL:
+            languageScope = mSession->glslLanguageScope;
+            break;
+
+        case SourceLanguage::Slang:
+        default:
+            languageScope = mSession->slangLanguageScope;
+            break;
+        }
+
+        Dictionary<String, String> preprocessorDefinitions;
+        for(auto& def : options.preprocessorDefinitions)
+            preprocessorDefinitions.Add(def.Key, def.Value);
+        for(auto& def : translationUnitOptions.preprocessorDefinitions)
+            preprocessorDefinitions.Add(def.Key, def.Value);
+
+        RefPtr<ProgramSyntaxNode> translationUnitSyntax = new ProgramSyntaxNode();
+
+        for (auto sourceFile : translationUnitOptions.sourceFiles)
+        {
+            auto sourceFilePath = sourceFile->path;
+
+            auto searchDirs = options.SearchDirectories;
+            searchDirs.Reverse();
+            searchDirs.Add(Path::GetDirectoryName(sourceFilePath));
+            searchDirs.Reverse();
+            includeHandler.searchDirs = searchDirs;
+
+            String source = sourceFile->content;
+
+            auto tokens = preprocessSource(
+                source,
+                sourceFilePath,
+                mResult.GetErrorWriter(),
+                &includeHandler,
+                preprocessorDefinitions,
+                translationUnitSyntax.Ptr());
+
+            parseSourceFile(
+                translationUnitSyntax.Ptr(),
+                options,
+                tokens,
+                mResult.GetErrorWriter(),
+                sourceFilePath,
+                languageScope);
+        }
+
+        translationUnit.options = translationUnitOptions;
+        translationUnit.SyntaxNode = translationUnitSyntax;
+
+        return translationUnit;
+    }
+
+    CompileUnit parseTranslationUnit(
+        TranslationUnitOptions const&   translationUnitOptions)
+    {
+        return parseTranslationUnit(translationUnitOptions, Options);
+    }
+
+    void checkTranslationUnit(
+        CompileUnit&            translationUnit,
+        RefPtr<SyntaxVisitor>   visitor)
+    {
+        visitor->setSourceLanguage(translationUnit.options.sourceLanguage);
+        translationUnit.SyntaxNode->Accept(visitor.Ptr());
+    }
+
+    void checkTranslationUnit(
+        CompileUnit&    translationUnit,
+        CompileOptions& options)
+    {
+        RefPtr<SyntaxVisitor> visitor = CreateSemanticsVisitor(
+            mResult.GetErrorWriter(),
+            options,
+            this);
+
+        checkTranslationUnit(translationUnit, visitor);
+    }
+
+    void checkCollectionOfTranslationUnits(
+        RefPtr<CollectionOfTranslationUnits>    collectionOfTranslationUnits)
+    {
+        RefPtr<SyntaxVisitor> visitor = CreateSemanticsVisitor(
+            mResult.GetErrorWriter(),
+            Options,
+            this);
+
+        for( auto& translationUnit : collectionOfTranslationUnits->translationUnits )
+        {
+            checkTranslationUnit(translationUnit, visitor);
+        }
+    }
+
+    void generateOutputForCollectionOfTranslationUnits(
+        RefPtr<CollectionOfTranslationUnits>    collectionOfTranslationUnits)
+    {
+        // Do binding generation, and then reflection (globally)
+        // before we move on to any code-generation activites.
+        GenerateParameterBindings(collectionOfTranslationUnits.Ptr());
+
+
+        // HACK(tfoley): for right now I just want to pretty-print an AST
+        // into another language, so the whole compiler back-end is just
+        // getting in the way.
+        //
+        // I'm going to bypass it for now and see what I can do:
+
+        ExtraContext extra;
+        extra.options = &Options;
+        extra.programLayout = collectionOfTranslationUnits->layout.Ptr();
+        extra.compileResult = &mResult;
+
+        generateOutput(extra, collectionOfTranslationUnits.Ptr());
+    }
+
+    int executeCompilerDriverActions()
+    {
+        // If we are being asked to do pass-through, then we need to do that here...
+        if (Options.passThrough != PassThroughMode::None)
+        {
+            for (auto& translationUnitOptions : Options.translationUnits)
+            {
+                switch (translationUnitOptions.sourceLanguage)
+                {
+                    // We can pass-through code written in a native shading language
+                case SourceLanguage::GLSL:
+                case SourceLanguage::HLSL:
+                    break;
+
+                    // All other translation units need to be skipped
+                default:
+                    continue;
+                }
+
+                auto sourceFile = translationUnitOptions.sourceFiles[0];
+                auto sourceFilePath = sourceFile->path;
+                String source = sourceFile->content;
+
+                auto translationUnitResult = passThrough(
+                    source,
+                    sourceFilePath,
+                    Options,
+                    translationUnitOptions);
+
+                mResult.translationUnits.Add(translationUnitResult);
+            }
+            return 0;
+        }
+
+        // TODO: load the stdlib
+
+        mCollectionOfTranslationUnits = new CollectionOfTranslationUnits();
+
+        // Parse everything from the input files requested
+        //
+        // TODO: this may trigger the loading and/or compilation of additional modules.
+        for (auto& translationUnitOptions : Options.translationUnits)
+        {
+            auto translationUnit = parseTranslationUnit(translationUnitOptions);
+            mCollectionOfTranslationUnits->translationUnits.Add(translationUnit);
+        }
+        if (mResult.GetErrorCount() != 0)
+            return 1;
+
+        // Perform semantic checking on the whole collection
+        checkCollectionOfTranslationUnits(mCollectionOfTranslationUnits);
+        if (mResult.GetErrorCount() != 0)
+            return 1;
+
+        // Generate output code, in whatever format was requested
+        generateOutputForCollectionOfTranslationUnits(mCollectionOfTranslationUnits);
+        if (mResult.GetErrorCount() != 0)
+            return 1;
+
+        // Extract the reflection layout information so that users
+        // can easily query it.
+        mReflectionData = mCollectionOfTranslationUnits->layout;
+
+        return 0;
+    }
+
+    // Act as expected of the API-based compiler
+    int executeAPIActions()
+    {
+        mResult.mSink = &mSink;
+
+        int err = executeCompilerDriverActions();
+
+        mDiagnosticOutput = mSink.outputBuffer.ProduceString();
+
+        if (mSink.GetErrorCount() != 0)
+            return mSink.GetErrorCount();
+
+        return err;
+    }
+
+    int addTranslationUnit(SourceLanguage language, String const& name)
+    {
+        int result = Options.translationUnits.Count();
+
+        TranslationUnitOptions translationUnit;
+        translationUnit.sourceLanguage = SourceLanguage(language);
+
+        Options.translationUnits.Add(translationUnit);
+
+        return result;
+    }
+
+    void addTranslationUnitSourceString(
+        int             translationUnitIndex,
+        String const&   path,
+        String const&   source)
+    {
+        RefPtr<SourceFile> sourceFile = new SourceFile();
+        sourceFile->path = path;
+        sourceFile->content = source;
+
+        Options.translationUnits[translationUnitIndex].sourceFiles.Add(sourceFile);
+    }
+
+    void addTranslationUnitSourceFile(
+        int             translationUnitIndex,
+        String const&   path)
+    {
+        String source;
+        try
+        {
+            source = File::ReadAllText(path);
+        }
+        catch (...)
+        {
+            // Emit a diagnostic!
+            mSink.diagnose(
+                CodePosition(0, 0, 0, path),
+                Diagnostics::cannotOpenFile,
+                path);
+            return;
+        }
+
+        addTranslationUnitSourceString(
             translationUnitIndex,
             path,
             source);
 
-        int err = compileRequest.executeAPIActions();
-        if(err)
-        {
-            fprintf(stderr, "%s", compileRequest.mDiagnosticOutput.Buffer());
-
-#ifdef _WIN32
-            OutputDebugStringA(compileRequest.mDiagnosticOutput.Buffer());
-#endif
-
-            assert(!"error in stdlib");
-        }
-
-        // Extract the AST for the code we just parsed
-        auto syntax = compileRequest.mCollectionOfTranslationUnits->translationUnits[translationUnitIndex].SyntaxNode;
-
-        // HACK(tfoley): mark all declarations in the "stdlib" so
-        // that we can detect them later (e.g., so we don't emit them)
-        for (auto m : syntax->Members)
-        {
-            auto fromStdLibModifier = new FromStdLibModifier();
-
-            fromStdLibModifier->next = m->modifiers.first;
-            m->modifiers.first = fromStdLibModifier;
-        }
-
-        // Add the resulting code to the appropriate scope
-        if( !scope->containerDecl )
-        {
-            // We are the first chunk of code to be loaded for this scope
-            scope->containerDecl = syntax.Ptr();
-        }
-        else
-        {
-            // We need to create a new scope to link into the whole thing
-            auto subScope = new Scope();
-            subScope->containerDecl = syntax.Ptr();
-            subScope->nextSibling = scope->nextSibling;
-            scope->nextSibling = subScope;
-        }
-
-        // We need to retain this AST so that we can use it in other code
-        // (Note that the `Scope` type does not retain the AST it points to)
-        loadedModuleCode.Add(syntax);
+        mDependencyFilePaths.Add(path);
     }
+
+    int addTranslationUnitEntryPoint(
+        int                     translationUnitIndex,
+        String const&           name,
+        Profile                 profile)
+    {
+        EntryPointOption entryPoint;
+        entryPoint.name = name;
+        entryPoint.profile = profile;
+
+        // TODO: realistically want this to be global across all TUs...
+        int result = Options.translationUnits[translationUnitIndex].entryPoints.Count();
+
+        Options.translationUnits[translationUnitIndex].entryPoints.Add(entryPoint);
+        return result;
+    }
+
+    Dictionary<String, RefPtr<ProgramSyntaxNode>> loadedModules;
+
+    RefPtr<ProgramSyntaxNode> findOrImportModule(
+        String const&       name,
+        CodePosition const& loc)
+    {
+        // Have we already loaded a module matching this name?
+        // If so, return it.
+        RefPtr<ProgramSyntaxNode> moduleDecl;
+        if (loadedModules.TryGetValue(name, moduleDecl))
+            return moduleDecl;
+
+        // Derive a file name for the module, by taking the given
+        // identifier, replacing all occurences of `_` with `-`,
+        // and then appending `.slang`.
+        //
+        // For example, `foo_bar` becomes `foo-bar.slang`.
+
+        StringBuilder sb;
+        for (auto c : name)
+        {
+            if (c == '_')
+                c = '-';
+
+            sb.Append(c);
+        }
+        sb.Append(".slang");
+
+        String fileName = sb.ProduceString();
+
+        // Next, try to find the file of the given name,
+        // using our ordinary include-handling logic.
+
+        IncludeHandlerImpl includeHandler;
+        includeHandler.request = this;
+
+        String pathIncludedFrom = loc.FileName;
+
+        String foundPath;
+        String foundSource;
+        bool found = includeHandler.TryToFindIncludeFile(fileName, pathIncludedFrom, &foundPath, &foundSource);
+        if (!found)
+        {
+            this->mSink.diagnose(loc, Diagnostics::cannotFindFile, fileName);
+
+            loadedModules[name] = nullptr;
+            return nullptr;
+        }
+
+        // We've found a file that we can load for the given module, so
+        // now we need to try compiling it, etc.
+
+        // We don't want to use the same options that the user specified
+        // for loading modules on-demand. In particular, we always want
+        // semantic checking to be enabled.
+        CompileOptions moduleOptions;
+        moduleOptions.SearchDirectories = Options.SearchDirectories;
+        moduleOptions.profile = Options.profile;
+
+        RefPtr<SourceFile> sourceFile = new SourceFile();
+        sourceFile->path = foundPath;
+        sourceFile->content = foundSource;
+
+        TranslationUnitOptions translationUnitOptions;
+        translationUnitOptions.sourceFiles.Add(sourceFile);
+
+        CompileUnit translationUnit = parseTranslationUnit(translationUnitOptions, moduleOptions);
+
+        // TODO: handle errors
+
+        checkTranslationUnit(translationUnit, moduleOptions);
+
+        // Skip code generation
+
+        //
+
+        moduleDecl = translationUnit.SyntaxNode;
+
+        loadedModules.Add(name, moduleDecl);
+
+        return moduleDecl;
+    }
+
+};
+
+RefPtr<ProgramSyntaxNode> findOrImportModule(
+    CompileRequest*     request,
+    String const&       name,
+    CodePosition const& loc)
+{
+    return request->findOrImportModule(name, loc);
 }
 
-using namespace SlangLib;
+void Session::addBuiltinSource(
+    RefPtr<Scope> const&    scope,
+    String const&           path,
+    String const&           source)
+{
+    CompileRequest compileRequest(this);
+
+    auto translationUnitIndex = compileRequest.addTranslationUnit(SourceLanguage::Slang, path);
+
+    compileRequest.addTranslationUnitSourceString(
+        translationUnitIndex,
+        path,
+        source);
+
+    int err = compileRequest.executeAPIActions();
+    if (err)
+    {
+        fprintf(stderr, "%s", compileRequest.mDiagnosticOutput.Buffer());
+
+#ifdef _WIN32
+        OutputDebugStringA(compileRequest.mDiagnosticOutput.Buffer());
+#endif
+
+        assert(!"error in stdlib");
+    }
+
+    // Extract the AST for the code we just parsed
+    auto syntax = compileRequest.mCollectionOfTranslationUnits->translationUnits[translationUnitIndex].SyntaxNode;
+
+    // HACK(tfoley): mark all declarations in the "stdlib" so
+    // that we can detect them later (e.g., so we don't emit them)
+    for (auto m : syntax->Members)
+    {
+        auto fromStdLibModifier = new FromStdLibModifier();
+
+        fromStdLibModifier->next = m->modifiers.first;
+        m->modifiers.first = fromStdLibModifier;
+    }
+
+    // Add the resulting code to the appropriate scope
+    if (!scope->containerDecl)
+    {
+        // We are the first chunk of code to be loaded for this scope
+        scope->containerDecl = syntax.Ptr();
+    }
+    else
+    {
+        // We need to create a new scope to link into the whole thing
+        auto subScope = new Scope();
+        subScope->containerDecl = syntax.Ptr();
+        subScope->nextSibling = scope->nextSibling;
+        scope->nextSibling = subScope;
+    }
+
+    // We need to retain this AST so that we can use it in other code
+    // (Note that the `Scope` type does not retain the AST it points to)
+    loadedModuleCode.Add(syntax);
+}
+
+}}
 
 // implementation of C interface
 
-#define SESSION(x) reinterpret_cast<SlangLib::Session *>(x)
-#define REQ(x) reinterpret_cast<SlangLib::CompileRequest*>(x)
+#define SESSION(x) reinterpret_cast<Slang::Compiler::Session *>(x)
+#define REQ(x) reinterpret_cast<Slang::Compiler::CompileRequest*>(x)
 
 SLANG_API SlangSession* spCreateSession(const char * cacheDir)
 {
-    return reinterpret_cast<SlangSession *>(new SlangLib::Session((cacheDir ? true : false), cacheDir));
+    return reinterpret_cast<SlangSession *>(new Slang::Compiler::Session((cacheDir ? true : false), cacheDir));
 }
 
 SLANG_API void spDestroySession(
@@ -476,7 +642,7 @@ SLANG_API SlangCompileRequest* spCreateCompileRequest(
     SlangSession* session)
 {
     auto s = SESSION(session);
-    auto req = new SlangLib::CompileRequest(s);
+    auto req = new Slang::Compiler::CompileRequest(s);
     return reinterpret_cast<SlangCompileRequest*>(req);
 }
 
@@ -536,7 +702,7 @@ SLANG_API void spAddPreprocessorDefine(
     const char*             key,
     const char*             value)
 {
-    REQ(request)->Options.PreprocessorDefinitions[key] = value;
+    REQ(request)->Options.preprocessorDefinitions[key] = value;
 }
 
 SLANG_API char const* spGetDiagnosticOutput(
@@ -559,6 +725,18 @@ SLANG_API int spAddTranslationUnit(
     return req->addTranslationUnit(
         SourceLanguage(language),
         name ? name : "");
+}
+
+SLANG_API void spTranslationUnit_addPreprocessorDefine(
+    SlangCompileRequest*    request,
+    int                     translationUnitIndex,
+    const char*             key,
+    const char*             value)
+{
+    auto req = REQ(request);
+
+    req->Options.translationUnits[translationUnitIndex].preprocessorDefinitions[key] = value;
+
 }
 
 SLANG_API void spAddTranslationUnitSourceFile(

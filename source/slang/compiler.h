@@ -17,6 +17,7 @@ namespace Slang
     {
         class ILConstOperand;
         struct IncludeHandler;
+        struct CompileRequest;
 
         enum class CompilerMode
         {
@@ -87,28 +88,31 @@ namespace Slang
 
             // The source file(s) that will be compiled to form this translation unit
             List<RefPtr<SourceFile> > sourceFiles;
+
+            // Preprocessor definitions to use for this translation unit only
+            // (whereas the ones on `CompileOptions` will be shared)
+            Dictionary<String, String> preprocessorDefinitions;
         };
 
         class CompileOptions
         {
         public:
-            CompilerMode Mode = CompilerMode::ProduceShader;
+            // What target language are we compiling to?
             CodeGenTarget Target = CodeGenTarget::Unknown;
-            StageTarget stage = StageTarget::Unknown;
-            EnumerableDictionary<String, String> BackendArguments;
 
-            String SymbolToCompile;
-            String outputName;
-            List<String> TemplateShaderArguments;
+            // Directories to search for `#include` files or `import`ed modules
             List<String> SearchDirectories;
-            Dictionary<String, String> PreprocessorDefinitions;
 
+            // Definitions to provide during preprocessing
+            Dictionary<String, String> preprocessorDefinitions;
+
+            // Translation units we are being asked to compile
             List<TranslationUnitOptions> translationUnits;
 
-            // the code generation profile we've been asked to use
+            // The code generation profile we've been asked to use.
             Profile profile;
 
-            // should we just pass the input to another compiler?
+            // Should we just pass the input to another compiler?
             PassThroughMode passThrough = PassThroughMode::None;
 
             // Flags supplied through the API
@@ -133,13 +137,34 @@ namespace Slang
             RefPtr<ProgramLayout> layout;
         };
 
+        // Context information for code generation
+        struct ExtraContext
+        {
+            CompileOptions const* options = nullptr;
+            TranslationUnitOptions const* translationUnitOptions = nullptr;
+
+            CompileResult* compileResult = nullptr;
+
+            RefPtr<ProgramSyntaxNode>   programSyntax;
+            ProgramLayout*              programLayout;
+
+            String sourceText;
+            String sourcePath;
+
+            CompileOptions const& getOptions() { return *options; }
+            TranslationUnitOptions const& getTranslationUnitOptions() { return *translationUnitOptions; }
+        };
+
+#if 0
+
         class ShaderCompiler : public CoreLib::Basic::Object
         {
         public:
             virtual void Compile(
                 CompileResult&                  result,
                 CollectionOfTranslationUnits*   collectionOfTranslationUnits,
-                const CompileOptions&           options) = 0;
+                const CompileOptions&           options,
+                CompileRequest*                 request) = 0;
 
             virtual TranslationUnitResult PassThrough(
                 String const&			sourceText,
@@ -150,6 +175,17 @@ namespace Slang
         };
 
         ShaderCompiler * CreateShaderCompiler();
+#endif
+
+        TranslationUnitResult passThrough(
+            String const&			sourceText,
+            String const&			sourcePath,
+            const CompileOptions &	options,
+            TranslationUnitOptions const& translationUnitOptions);
+
+        void generateOutput(
+            ExtraContext&                   context,
+            CollectionOfTranslationUnits*   collectionOfTranslationUnits);
     }
 }
 
