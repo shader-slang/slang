@@ -205,6 +205,15 @@ void OSProcessSpawner::pushExecutableName(
 {
     executableName_ = executableName;
     commandLine_.Append(executableName);
+    isExecutablePath_ = false;
+}
+
+void OSProcessSpawner::pushExecutablePath(
+    CoreLib::Basic::String executablePath)
+{
+    executableName_ = executablePath;
+    commandLine_.Append(executablePath);
+    isExecutablePath_ = true;
 }
 
 void OSProcessSpawner::pushArgument(
@@ -305,7 +314,7 @@ OSError OSProcessSpawner::spawnAndWaitForCompletion()
 
     // `CreateProcess` requires write access to this, for some reason...
     BOOL success = CreateProcessW(
-        executableName_.ToWString(),
+        isExecutablePath_ ? executableName_.ToWString() : nullptr,
         (LPWSTR)commandLine_.ToString().ToWString(),
         nullptr,
         nullptr,

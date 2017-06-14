@@ -22,6 +22,20 @@ using namespace CoreLib::IO;
 #include <stdlib.h>
 #include <stdarg.h>
 
+enum OutputMode
+{
+    // Default mode is to write test results to the console
+    kOutputMode_Default = 0,
+
+    // When running under AppVeyor contiuous integration, we
+    // need to output test results in a way that the AppVeyor
+    // environment can pick up and display.
+    kOutputMode_AppVeyor,
+};
+
+struct TestCategory;
+TestCategory* findTestCategory(String const& name);
+
 struct Options
 {
     char const* appName = "slang-test";
@@ -37,6 +51,15 @@ struct Options
 
     // force generation of baselines for HLSL tests
     bool generateHLSLBaselines = false;
+
+    // kind of output to generate
+    OutputMode outputMode = kOutputMode_Default;
+
+    // Only run tests that match one of the given categories
+    Dictionary<TestCategory*, TestCategory*> includeCategories;
+
+    // Exclude test taht match one these categories
+    Dictionary<TestCategory*, TestCategory*> excludeCategories;
 };
 Options options;
 
@@ -74,7 +97,7 @@ void parseOptions(int* argc, char** argv)
             break;
         }
 
-        if( strcmp(arg, "--bindir") == 0 )
+        if( strcmp(arg, "-bindir") == 0 )
         {
             if( argCursor == argEnd )
             {
@@ -98,6 +121,56 @@ void parseOptions(int* argc, char** argv)
         else if( strcmp(arg, "-debug") == 0 )
         {
             // Assumed to be handle by .bat file that called us
+        }
+        else if( strcmp(arg, "-configuration") == 0 )
+        {
+            if( argCursor == argEnd )
+            {
+                fprintf(stderr, "error: expected operand for '%s'\n", arg);
+                exit(1);
+            }
+            argCursor++;
+            // Assumed to be handle by .bat file that called us
+        }
+        else if( strcmp(arg, "-platform") == 0 )
+        {
+            if( argCursor == argEnd )
+            {
+                fprintf(stderr, "error: expected operand for '%s'\n", arg);
+                exit(1);
+            }
+            argCursor++;
+            // Assumed to be handle by .bat file that called us
+        }
+        else if( strcmp(arg, "-appveyor") == 0 )
+        {
+            options.outputMode = kOutputMode_AppVeyor;
+        }
+        else if( strcmp(arg, "-category") == 0 )
+        {
+            if( argCursor == argEnd )
+            {
+                fprintf(stderr, "error: expected operand for '%s'\n", arg);
+                exit(1);
+            }
+            auto category = findTestCategory(*argCursor++);
+            if(category)
+            {
+                options.includeCategories.Add(category, category);
+            }
+        }
+        else if( strcmp(arg, "-exclude") == 0 )
+        {
+            if( argCursor == argEnd )
+            {
+                fprintf(stderr, "error: expected operand for '%s'\n", arg);
+                exit(1);
+            }
+            auto category = findTestCategory(*argCursor++);
+            if(category)
+            {
+                options.excludeCategories.Add(category, category);
+            }
         }
         else
         {
@@ -231,11 +304,53 @@ String collectRestOfLine(char const** ioCursor)
     return getString(textBegin, textEnd);
 }
 
+// A category that a test can be tagged with
+struct TestCategory
+{
+    // The name of the category, from the user perspective
+    String name;
+
+    // The logical "super-category" of this category
+    TestCategory* parent;
+
+    // A list of categories that we explcitly want to exclude
+    List<TestCategory*> prohibitedCategories;
+};
+
+Dictionary<String, TestCategory*> testCategories;
+TestCategory* defaultTestCategory;
+
+TestCategory* addTestCategory(String const& name, TestCategory* parent)
+{
+    TestCategory* category = new TestCategory();
+    category->name = name;
+
+    category->parent = parent;
+
+    testCategories.Add(name, category);
+
+    return category;
+}
+
+TestCategory* findTestCategory(String const& name)
+{
+    TestCategory* category = nullptr;
+    if( !testCategories.TryGetValue(name, category) )
+    {
+        error("unknown test category name '%s'\n", name.Buffer());
+        return nullptr;
+    }
+    return category;
+}
+
 // Optiosn for a particular test
 struct TestOptions
 {
     String command;
     List<String> args;
+
+    // The categories that this test was assigned to
+    List<TestCategory*> categories;
 };
 
 // Information on tests to run for a particular file
@@ -250,7 +365,71 @@ TestResult gatherTestOptions(
 {
     char const* cursor = *ioCursor;
 
-    // Start by scanning for the sub-command name:
+    TestOptions testOptions;
+
+    // Right after the `TEST` keyword, the user may specify
+    // one or more categories for the test.
+    if(*cursor == '(')
+    {
+        cursor++;
+        // optional test category
+        skipHorizontalSpace(&cursor);
+        char const* categoryStart = cursor;
+        for(;;)
+        {
+            switch( *cursor )
+            {
+            default:
+                cursor++;
+                continue;
+
+            case ',':
+            case ')':
+                {
+                    char const* categoryEnd = cursor;
+                    cursor++;
+
+                    auto categoryName = getString(categoryStart, categoryEnd);
+                    TestCategory* category = findTestCategory(categoryName);
+
+                    if(!category)
+                    {
+                        return kTestResult_Fail;
+                    }
+
+                    testOptions.categories.Add(category);
+
+                    if( *categoryEnd == ',' )
+                    {
+                        skipHorizontalSpace(&cursor);
+                        categoryStart = cursor;
+                        continue;
+                    }
+                }
+                break;
+        
+            case 0: case '\r': case '\n':
+                return kTestResult_Fail;
+            }
+
+            break;
+        }
+    }
+
+    // If no categories were specified, then add the default category
+    if(testOptions.categories.Count() == 0)
+    {
+        testOptions.categories.Add(defaultTestCategory);
+    }
+
+    if(*cursor == ':')
+        cursor++;
+    else
+    {
+        return kTestResult_Fail;
+    }
+
+    // Next scan for a sub-command name
     char const* commandStart = cursor;
     for(;;)
     {
@@ -270,11 +449,15 @@ TestResult gatherTestOptions(
         break;
     }
     char const* commandEnd = cursor;
+
+    testOptions.command = getString(commandStart, commandEnd);
+
     if(*cursor == ':')
         cursor++;
-
-    TestOptions testOptions;
-    testOptions.command = getString(commandStart, commandEnd);
+    else
+    {
+        return kTestResult_Fail;
+    }
 
     // Now scan for arguments. For now we just assume that
     // any whitespace separation indicates a new argument
@@ -344,14 +527,14 @@ TestResult gatherTestsForFile(
         skipHorizontalSpace(&cursor);
 
         // Look for a pattern that matches what we want
-        if(match(&cursor, "//TEST:"))
+        if(match(&cursor, "//TEST_IGNORE_FILE"))
+        {
+            return kTestResult_Ignored;
+        }
+        else if(match(&cursor, "//TEST"))
         {
             if(gatherTestOptions(&cursor, testList) != kTestResult_Pass)
                 return kTestResult_Fail;
-        }
-        else if(match(&cursor, "//TEST_IGNORE_FILE"))
-        {
-            return kTestResult_Ignored;
         }
         else
         {
@@ -372,6 +555,7 @@ OSError spawnAndWait(String	testPath, OSProcessSpawner& spawner)
     OSError err = spawner.spawnAndWaitForCompletion();
     if (err != kOSError_None)
     {
+//        fprintf(stderr, "failed to run test '%S'\n", testPath.ToWString());
         error("failed to run test '%S'", testPath.ToWString());
     }
     return err;
@@ -426,7 +610,7 @@ TestResult runSimpleTest(TestInput& input)
 
     OSProcessSpawner spawner;
 
-    spawner.pushExecutableName(String(options.binDir) + "slangc.exe");
+    spawner.pushExecutablePath(String(options.binDir) + "slangc.exe");
     spawner.pushArgument(filePath999);
 
     for( auto arg : input.testOptions->args )
@@ -485,7 +669,7 @@ TestResult generateHLSLBaseline(TestInput& input)
     auto outputStem = input.outputStem;
 
     OSProcessSpawner spawner;
-    spawner.pushExecutableName(String(options.binDir) + "slangc.exe");
+    spawner.pushExecutablePath(String(options.binDir) + "slangc.exe");
     spawner.pushArgument(filePath999);
 
     for( auto arg : input.testOptions->args )
@@ -531,7 +715,7 @@ TestResult runHLSLComparisonTest(TestInput& input)
 
     OSProcessSpawner spawner;
 
-    spawner.pushExecutableName(String(options.binDir) + "slangc.exe");
+    spawner.pushExecutablePath(String(options.binDir) + "slangc.exe");
     spawner.pushArgument(filePath999);
 
     for( auto arg : input.testOptions->args )
@@ -621,7 +805,7 @@ TestResult doGLSLComparisonTestRun(
 
     OSProcessSpawner spawner;
 
-    spawner.pushExecutableName(String(options.binDir) + "slangc.exe");
+    spawner.pushExecutablePath(String(options.binDir) + "slangc.exe");
     spawner.pushArgument(filePath999);
 
     if( langDefine )
@@ -710,7 +894,7 @@ TestResult doRenderComparisonTestRun(TestInput& input, char const* langOption, c
 
     OSProcessSpawner spawner;
 
-    spawner.pushExecutableName(String(options.binDir) + "render-test.exe");
+    spawner.pushExecutablePath(String(options.binDir) + "render-test.exe");
     spawner.pushArgument(filePath999);
 
     for( auto arg : input.testOptions->args )
@@ -913,6 +1097,150 @@ struct TestContext
     int failedTestCount;
 };
 
+// deal with the fallout of a test having completed, whether
+// passed or failed or who-knows-what.
+void handleTestResult(
+    TestContext*    context,
+    String const&   testName,
+    TestResult      testResult)
+{
+    switch( testResult )
+    {
+    case kTestResult_Fail:
+        context->failedTestCount++;
+        break;
+
+    case kTestResult_Pass:
+        context->passedTestCount++;
+        break;
+
+    case kTestResult_Ignored:
+        // Note that we don't currently add ignored tests into
+        // the totals, which is kind of inaccurate.
+        break;
+
+    default:
+        assert(!"unexpected");
+        break;
+    }
+
+//    printf("OUTPUT_MODE: %d\n", options.outputMode);
+    switch( options.outputMode )
+    {
+    case kOutputMode_Default:
+        {
+            char const* resultString = "UNEXPECTED";
+            switch( testResult )
+            {
+            case kTestResult_Fail:      resultString = "FAILED";  break;
+            case kTestResult_Pass:      resultString = "passed";  break;
+            case kTestResult_Ignored:   resultString = "ignored"; break;
+            default:
+                assert(!"unexpected");
+                break;
+            }
+
+            printf("%s test: '%S'\n", resultString, testName.ToWString());
+        }
+        break;
+
+    case kOutputMode_AppVeyor:
+        {
+            char const* resultString = "None";
+            switch( testResult )
+            {
+            case kTestResult_Fail:      resultString = "Failed";  break;
+            case kTestResult_Pass:      resultString = "Passed";  break;
+            case kTestResult_Ignored:   resultString = "Ignored"; break;
+            default:
+                assert(!"unexpected");
+                break;
+            }
+
+
+            OSProcessSpawner spawner;
+            spawner.pushExecutableName("appveyor");
+            spawner.pushArgument("AddTest");
+            spawner.pushArgument(testName);
+            spawner.pushArgument("-FileName");
+            // TODO: this isn't actually a file name in all cases
+            spawner.pushArgument(testName);
+            spawner.pushArgument("-Framework");
+            spawner.pushArgument("slang-test");
+            spawner.pushArgument("-Outcome");
+            spawner.pushArgument(resultString);
+
+            auto err = spawner.spawnAndWaitForCompletion();
+
+            if( err != kOSError_None )
+            {
+                error("failed to add appveyor test results for '%S'\n", testName.ToWString());
+
+#if 0
+                fprintf(stderr, "[%d] TEST RESULT: %s {%d} {%s} {%s}\n", err, spawner.commandLine_.Buffer(),
+                    spawner.getResultCode(),
+                    spawner.getStandardOutput().begin(),
+                    spawner.getStandardError().begin());
+#endif
+            }
+        }
+        break;
+
+    default:
+        assert(!"unexpected");
+        break;
+    }
+}
+
+bool testCategoryMatches(
+    TestCategory*   sub,
+    TestCategory*   sup)
+{
+    auto ss = sub;
+    while(ss)
+    {
+        if(ss == sup)
+            return true;
+
+        ss = ss->parent;
+    }
+    return false;
+}
+
+bool testCategoryMatches(
+    TestCategory*                           categoryToMatch,
+    Dictionary<TestCategory*, TestCategory*> categorySet)
+{
+    for( auto item : categorySet )
+    {
+        if(testCategoryMatches(categoryToMatch, item.Value))
+            return true;
+    }
+    return false;
+}
+
+bool testPassesCategoryMask(
+    TestContext*        context,
+    TestOptions const&  test)
+{
+    // Don't include a test we should filter out
+    for( auto testCategory : test.categories )
+    {
+        if(testCategoryMatches(testCategory, options.excludeCategories))
+            return false;
+    }
+
+    // Otherwise inclue any test the user asked for
+    for( auto testCategory : test.categories )
+    {
+        if(testCategoryMatches(testCategory, options.includeCategories))
+            return true;
+    }
+
+    // skip by default
+    return false;
+}
+
 void runTestsOnFile(
     TestContext*    context,
     String          filePath)
@@ -929,10 +1257,7 @@ void runTestsOnFile(
     // Note cases where a test file exists, but we found nothing to run
     if( testList.tests.Count() == 0 )
     {
-        context->totalTestCount++;
-        context->failedTestCount++;
-
-        printf("FAILED test: '%S' (no test commands found)\n", filePath.ToWString());
+        handleTestResult(context, filePath, kTestResult_Ignored);
         return;
     }
 
@@ -940,9 +1265,16 @@ void runTestsOnFile(
     int subTestCount = 0;
     for( auto& tt : testList.tests )
     {
+        int subTestIndex = subTestCount++;
+
+        // Check that the test passes our current category mask
+        if(!testPassesCategoryMask(context, tt))
+        {
+            continue;
+        }
+
         context->totalTestCount++;
 
-        int subTestIndex = subTestCount++;
 
         String outputStem = filePath;
         if(subTestIndex != 0)
@@ -951,22 +1283,9 @@ void runTestsOnFile(
         }
 
         TestResult result = runTest(filePath, outputStem, tt, testList);
-        if(result == kTestResult_Ignored)
-            return;
 
-        if (result == kTestResult_Pass)
-        {
-            printf("passed");
-            context->passedTestCount++;
-        }
-        else
-        {
-            printf("FAILED");
-            context->failedTestCount++;
-        }
+        handleTestResult(context, outputStem, result);
 
-        printf(" test: '%S'", outputStem.ToWString());
-        printf("\n");
     }
 }
 
@@ -1038,7 +1357,36 @@ int main(
     int		argc,
     char**	argv)
 {
+    // Set up our test categories here
+
+    auto fullTestCategory = addTestCategory("full", nullptr);
+
+    auto quickTestCategory = addTestCategory("quick", fullTestCategory);
+
+    auto smokeTestCategory = addTestCategory("smoke", quickTestCategory);
+
+    auto renderTestCategory = addTestCategory("render", fullTestCategory);
+
+    // An un-categorized test will always belong to the `full` category
+    defaultTestCategory = fullTestCategory;
+
+    //
+
+
     parseOptions(&argc, argv);
+
+    if( options.includeCategories.Count() == 0 )
+    {
+        options.includeCategories.Add(fullTestCategory, fullTestCategory);
+    }
+
+    // Exclude rendering tests when building under AppVeyor.
+    //
+    // TODO: this is very ad hoc, and we should do something cleaner.
+    if( options.outputMode == kOutputMode_AppVeyor )
+    {
+        options.excludeCategories.Add(renderTestCategory, renderTestCategory);
+    }
 
     TestContext context = { 0 };
 

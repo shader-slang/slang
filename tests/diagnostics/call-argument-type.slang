@@ -1,4 +1,4 @@
-//TEST:SIMPLE:
+//TEST(smoke):SIMPLE:
 // call function with wrong argument type
 
 struct A {};

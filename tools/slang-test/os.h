@@ -129,6 +129,11 @@ struct OSProcessSpawner
     void pushExecutableName(
         CoreLib::Basic::String executableName);
 
+    // Set the executable name for the process to be spawned.
+    // Note: this call must be made before any arguments are pushed.
+    void pushExecutablePath(
+        CoreLib::Basic::String executablePath);
+
     // Append an argument for the process to be spawned.
     void pushArgument(
         CoreLib::Basic::String argument);
@@ -155,6 +160,9 @@ struct OSProcessSpawner
 #ifdef WIN32
     CoreLib::Basic::String executableName_;
     CoreLib::Basic::StringBuilder commandLine_;
+
+    // Is the executable specified by path, rather than just by name?
+    bool isExecutablePath_;
 #else
 #endif
 };
