@@ -1,34 +1,3 @@
-
-# Try to set AppVeyord build "version" to something reasonable,
-# based on what we are trying to build.
-init:
-  - ps: |
-      if ($env:APPVEYOR_REPO_TAG -eq "true")
-      {
-          # If we are building from a tag in the repository,
-          # then use the tag name as the start of the build version
-          $versionName = "$($env:APPVEYOR_REPO_TAG_NAME.TrimStart("v"))"
-      }
-      elseif($env:APPVEYOR_PULL_REQUEST_NUMBER)
-      {
-          # Otherwise, if we are building for a pull request,
-          # then use the pull request number to name our build version
-          $versionName = "pr$env:APPVEYOR_PULL_REQUEST_NUMBER"
-      }
-      else
-      {
-          # Otherwise, just set a build name based on the
-          # branch that we are building against
-          $versionName = "$env:APPVEYOR_REPO_BRANCH"
-      }
-      # Finally, we set the AppVeyor build version to use our version
-      # name with the build number appended.
-      #
-      # The string "appveyor" is being included before the build number
-      # in case we need to differentiate builds being made with different
-      # continuous integration providers.
-      Update-AppveyorBuild -Version "$versionName+appveyor.$env:APPVEYOR_BUILD_NUMBER"
-
 # Our solution file is currently set up for VS2015
 image: Visual Studio 2015
 
@@ -42,17 +11,48 @@ install:
 platform:
   - Win32
   - x64
+
 configuration:
-  - Debug
   - Release
+  - Debug
+
+# In the interests of time, go ahead and immediately fail a build
+# if any job fails, rather than keep on building to discover the
+# full set of failures.
+matrix:
+  fast_finish: true
 
 # MSBUILD should ideally be able to find our solution file
 # automatically, but it seems to get confused, so we specify
 # the file name to use here.
 build:
   project: slang.sln
+  parallel: true
+  verbosity: minimal
 
-# TODO: need to invoke our test script as part of the build
+# Testing
+
+# We only run tests on the Release build for now, just to speed
+# up the build process.
+#
+# TODO: We should really define different levels of tests, and
+# at least run some "smoke" tests across all builds.
+
+test_script:
+  - ps: |
+      if ($env:CONFIGURATION -eq "Debug")
+      {
+        $testCategory = "smoke"
+      }
+      elseif($env:PLATFORM -eq "x64")
+      {
+        $testCategory = "full"
+      }
+      else
+      {
+        $testCategory = "quick"
+      }
+      .\test.bat -platform %PLATFORM% -configuration %CONFIGURATION% -appveyor -category $testCategory
 
 # TODO: need to figure out what we want to package for deployment
 

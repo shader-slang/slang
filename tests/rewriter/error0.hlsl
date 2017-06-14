@@ -1,4 +1,4 @@
-//TEST:COMPARE_HLSL: -no-checking -target dxbc-assembly -profile ps_4_0 -entry main
+//TEST(smoke):COMPARE_HLSL: -no-checking -target dxbc-assembly -profile ps_4_0 -entry main
 
 // We need to confirm that when there is an error in
 // the input code, we allow the downstream compiler

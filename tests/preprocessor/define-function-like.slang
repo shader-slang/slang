@@ -1,4 +1,4 @@
-//TEST:SIMPLE:
+//TEST(smoke):SIMPLE:
 // support for function-like macros
 
 #define FOO(x) 1.0 + x
