@@ -1,29 +1,36 @@
-//TEST:COMPARE_GLSL:
 #version 450
+//TEST:COMPARE_GLSL:
+//TEST:COMPARE_GLSL:-DBINDING
+
+#if defined(__SLANG__) && defined(BINDING)
+#define LAYOUT(X) /* empty */
+#else
+#define LAYOUT(X) layout(X)
+#endif
 
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_ARB_shading_language_420pack : enable
 
-layout (binding = 0) uniform sampler2D samplerPositionDepth;
-layout (binding = 1) uniform sampler2D samplerNormal;
-layout (binding = 2) uniform sampler2D ssaoNoise;
+LAYOUT(binding = 0) uniform sampler2D samplerPositionDepth;
+LAYOUT(binding = 1) uniform sampler2D samplerNormal;
+LAYOUT(binding = 2) uniform sampler2D ssaoNoise;
 
 layout (constant_id = 0) const int SSAO_KERNEL_SIZE = 64;
 layout (constant_id = 1) const float SSAO_RADIUS = 0.5;
 
-layout (binding = 3) uniform UBOSSAOKernel
+LAYOUT(binding = 3) uniform UBOSSAOKernel
 {
 	vec4 samples[SSAO_KERNEL_SIZE];
 } uboSSAOKernel;
 
-layout (binding = 4) uniform UBO 
+LAYOUT(binding = 4) uniform UBO 
 {
 	mat4 projection;
 } ubo;
 
-layout (location = 0) in vec2 inUV;
+LAYOUT(location = 0) in vec2 inUV;
 
-layout (location = 0) out float outFragColor;
+LAYOUT(location = 0) out float outFragColor;
 
 void main() 
 {

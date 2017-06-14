@@ -399,8 +399,19 @@ String getOutput(OSProcessSpawner& spawner)
 
 struct TestInput
 {
+    // Path to the input file for the test
     String              filePath;
+
+    // Prefix for the path that test output should write to
+    // (usually the same as `filePath`, but will differ when
+    // we run multiple tests out of the same file)
+    String              outputStem;
+
+    // Arguments for the test (usually to be interpreted
+    // as command line args)
     TestOptions const*  testOptions;
+
+    // The list of tests that will be run on this file
     FileTestList const* testList;
 };
 
@@ -410,26 +421,27 @@ TestResult runSimpleTest(TestInput& input)
 {
     // need to execute the stand-alone Slang compiler on the file, and compare its output to what we expect
 
-    auto filePath = input.filePath;
+    auto filePath999 = input.filePath;
+    auto outputStem = input.outputStem;
 
     OSProcessSpawner spawner;
 
     spawner.pushExecutableName(String(options.binDir) + "slangc.exe");
-    spawner.pushArgument(filePath);
+    spawner.pushArgument(filePath999);
 
     for( auto arg : input.testOptions->args )
     {
         spawner.pushArgument(arg);
     }
 
-    if (spawnAndWait(filePath, spawner) != kOSError_None)
+    if (spawnAndWait(outputStem, spawner) != kOSError_None)
     {
         return kTestResult_Fail;
     }
 
     String actualOutput = getOutput(spawner);
 
-    String expectedOutputPath = filePath + ".expected";
+    String expectedOutputPath = outputStem + ".expected";
     String expectedOutput;
     try
     {
@@ -459,7 +471,7 @@ TestResult runSimpleTest(TestInput& input)
     // diagnose the problem.
     if (result == kTestResult_Fail)
     {
-        String actualOutputPath = filePath + ".actual";
+        String actualOutputPath = outputStem + ".actual";
         CoreLib::IO::File::WriteAllText(actualOutputPath, actualOutput);
     }
 
@@ -469,11 +481,12 @@ TestResult runSimpleTest(TestInput& input)
 #ifdef SLANG_TEST_SUPPORT_HLSL
 TestResult generateHLSLBaseline(TestInput& input)
 {
-    auto filePath = input.filePath;
+    auto filePath999 = input.filePath;
+    auto outputStem = input.outputStem;
 
     OSProcessSpawner spawner;
     spawner.pushExecutableName(String(options.binDir) + "slangc.exe");
-    spawner.pushArgument(filePath);
+    spawner.pushArgument(filePath999);
 
     for( auto arg : input.testOptions->args )
     {
@@ -485,13 +498,13 @@ TestResult generateHLSLBaseline(TestInput& input)
     spawner.pushArgument("-pass-through");
     spawner.pushArgument("fxc");
 
-    if (spawnAndWait(filePath, spawner) != kOSError_None)
+    if (spawnAndWait(outputStem, spawner) != kOSError_None)
     {
         return kTestResult_Fail;
     }
 
     String expectedOutput = getOutput(spawner);
-    String expectedOutputPath = filePath + ".expected";
+    String expectedOutputPath = outputStem + ".expected";
     try
     {
         CoreLib::IO::File::WriteAllText(expectedOutputPath, expectedOutput);
@@ -505,10 +518,11 @@ TestResult generateHLSLBaseline(TestInput& input)
 
 TestResult runHLSLComparisonTest(TestInput& input)
 {
-    auto filePath = input.filePath;
+    auto filePath999 = input.filePath;
+    auto outputStem = input.outputStem;
 
     // We will use the Microsoft compiler to generate out expected output here
-    String expectedOutputPath = filePath + ".expected";
+    String expectedOutputPath = outputStem + ".expected";
 
     // Generate the expected output using standard HLSL compiler
     generateHLSLBaseline(input);
@@ -518,7 +532,7 @@ TestResult runHLSLComparisonTest(TestInput& input)
     OSProcessSpawner spawner;
 
     spawner.pushExecutableName(String(options.binDir) + "slangc.exe");
-    spawner.pushArgument(filePath);
+    spawner.pushArgument(filePath999);
 
     for( auto arg : input.testOptions->args )
     {
@@ -532,7 +546,7 @@ TestResult runHLSLComparisonTest(TestInput& input)
     spawner.pushArgument("-target");
     spawner.pushArgument("dxbc-assembly");
 
-    if (spawnAndWait(filePath, spawner) != kOSError_None)
+    if (spawnAndWait(outputStem, spawner) != kOSError_None)
     {
         return kTestResult_Fail;
     }
@@ -587,7 +601,7 @@ TestResult runHLSLComparisonTest(TestInput& input)
     // diagnose the problem.
     if (result == kTestResult_Fail)
     {
-        String actualOutputPath = filePath + ".actual";
+        String actualOutputPath = outputStem + ".actual";
         CoreLib::IO::File::WriteAllText(actualOutputPath, actualOutput);
     }
 
@@ -602,12 +616,13 @@ TestResult doGLSLComparisonTestRun(
     char const* outputKind,
     String* outOutput)
 {
-    auto filePath = input.filePath;
+    auto filePath999 = input.filePath;
+    auto outputStem = input.outputStem;
 
     OSProcessSpawner spawner;
 
     spawner.pushExecutableName(String(options.binDir) + "slangc.exe");
-    spawner.pushArgument(filePath);
+    spawner.pushArgument(filePath999);
 
     if( langDefine )
     {
@@ -631,7 +646,7 @@ TestResult doGLSLComparisonTestRun(
         spawner.pushArgument(arg);
     }
 
-    if (spawnAndWait(filePath, spawner) != kOSError_None)
+    if (spawnAndWait(outputStem, spawner) != kOSError_None)
     {
         return kTestResult_Fail;
     }
@@ -651,7 +666,7 @@ TestResult doGLSLComparisonTestRun(
     outputBuilder.Append(standardOuptut);
     outputBuilder.Append("}\n");
 
-    String outputPath = filePath + outputKind;
+    String outputPath = outputStem + outputKind;
     String output = outputBuilder.ProduceString();
 
     *outOutput = output;
@@ -661,7 +676,8 @@ TestResult doGLSLComparisonTestRun(
 
 TestResult runGLSLComparisonTest(TestInput& input)
 {
-    auto filePath = input.filePath;
+    auto filePath999 = input.filePath;
+    auto outputStem = input.outputStem;
 
     String expectedOutput;
     String actualOutput;
@@ -669,8 +685,8 @@ TestResult runGLSLComparisonTest(TestInput& input)
     TestResult hlslResult   =  doGLSLComparisonTestRun(input, "__GLSL__",  "glslang", ".expected",    &expectedOutput);
     TestResult slangResult  =  doGLSLComparisonTestRun(input, "__SLANG__", nullptr,   ".actual",      &actualOutput);
 
-    CoreLib::IO::File::WriteAllText(filePath + ".expected", expectedOutput);
-    CoreLib::IO::File::WriteAllText(filePath + ".actual",   actualOutput);
+    CoreLib::IO::File::WriteAllText(outputStem + ".expected", expectedOutput);
+    CoreLib::IO::File::WriteAllText(outputStem + ".actual",   actualOutput);
 
     if( hlslResult  == kTestResult_Fail )   return kTestResult_Fail;
     if( slangResult == kTestResult_Fail )   return kTestResult_Fail;
@@ -689,12 +705,13 @@ TestResult doRenderComparisonTestRun(TestInput& input, char const* langOption, c
 {
     // TODO: delete any existing files at the output path(s) to avoid stale outputs leading to a false pass
 
-    auto filePath = input.filePath;
+    auto filePath999 = input.filePath;
+    auto outputStem = input.outputStem;
 
     OSProcessSpawner spawner;
 
     spawner.pushExecutableName(String(options.binDir) + "render-test.exe");
-    spawner.pushArgument(filePath);
+    spawner.pushArgument(filePath999);
 
     for( auto arg : input.testOptions->args )
     {
@@ -703,9 +720,9 @@ TestResult doRenderComparisonTestRun(TestInput& input, char const* langOption, c
 
     spawner.pushArgument(langOption);
     spawner.pushArgument("-o");
-    spawner.pushArgument(filePath + outputKind + ".png");
+    spawner.pushArgument(outputStem + outputKind + ".png");
 
-    if (spawnAndWait(filePath, spawner) != kOSError_None)
+    if (spawnAndWait(outputStem, spawner) != kOSError_None)
     {
         return kTestResult_Fail;
     }
@@ -725,7 +742,7 @@ TestResult doRenderComparisonTestRun(TestInput& input, char const* langOption, c
     outputBuilder.Append(standardOuptut);
     outputBuilder.Append("}\n");
 
-    String outputPath = filePath + outputKind;
+    String outputPath = outputStem + outputKind;
     String output = outputBuilder.ProduceString();
 
     *outOutput = output;
@@ -804,16 +821,17 @@ TestResult runHLSLRenderComparisonTestImpl(
     char const* expectedArg,
     char const* actualArg)
 {
-    auto filePath = input.filePath;
+    auto filePath999 = input.filePath;
+    auto outputStem = input.outputStem;
 
     String expectedOutput;
     String actualOutput;
 
     TestResult hlslResult   =  doRenderComparisonTestRun(input, expectedArg,  ".expected",    &expectedOutput);
-    TestResult slangResult  =  doRenderComparisonTestRun(input, actualArg, ".actual",      &actualOutput);
+    TestResult slangResult  =  doRenderComparisonTestRun(input, actualArg,    ".actual",      &actualOutput);
 
-    CoreLib::IO::File::WriteAllText(filePath + ".expected", expectedOutput);
-    CoreLib::IO::File::WriteAllText(filePath + ".actual",   actualOutput);
+    CoreLib::IO::File::WriteAllText(outputStem + ".expected", expectedOutput);
+    CoreLib::IO::File::WriteAllText(outputStem + ".actual",   actualOutput);
 
     if( hlslResult  == kTestResult_Fail )   return kTestResult_Fail;
     if( slangResult == kTestResult_Fail )   return kTestResult_Fail;
@@ -825,7 +843,7 @@ TestResult runHLSLRenderComparisonTestImpl(
 
     // Next do an image comparison on the expected output images!
 
-    TestResult imageCompareResult = doImageComparison(filePath);
+    TestResult imageCompareResult = doImageComparison(outputStem);
     if(imageCompareResult != kTestResult_Pass)
         return imageCompareResult;
 
@@ -849,6 +867,7 @@ TestResult runHLSLAndGLSLComparisonTest(TestInput& input)
 
 TestResult runTest(
     String const&       filePath,
+    String const&       outputStem,
     TestOptions const&  testOptions,
     FileTestList const& testList)
 {
@@ -874,6 +893,7 @@ TestResult runTest(
 
         TestInput testInput;
         testInput.filePath = filePath;
+        testInput.outputStem = outputStem;
         testInput.testOptions = &testOptions;
         testInput.testList = &testList;
 
@@ -924,7 +944,13 @@ void runTestsOnFile(
 
         int subTestIndex = subTestCount++;
 
-        TestResult result = runTest(filePath, tt, testList);
+        String outputStem = filePath;
+        if(subTestIndex != 0)
+        {
+            outputStem = outputStem + "." + String(subTestIndex);
+        }
+
+        TestResult result = runTest(filePath, outputStem, tt, testList);
         if(result == kTestResult_Ignored)
             return;
 
@@ -939,11 +965,7 @@ void runTestsOnFile(
             context->failedTestCount++;
         }
 
-        printf(" test: '%S'", filePath.ToWString());
-        if( subTestIndex )
-        {
-            printf(" subtest:%d", subTestIndex);
-        }
+        printf(" test: '%S'", outputStem.ToWString());
         printf("\n");
     }
 }
