@@ -12,8 +12,6 @@ namespace Slang {
 typedef intptr_t Int;
 typedef uintptr_t UInt;
 
-namespace Compiler {
-
 // Forward declarations
 
 enum class BaseType;
@@ -545,6 +543,6 @@ createStructuredBufferTypeLayout(
 
 //
 
-}}
+}
 
 #endif

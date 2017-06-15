@@ -7,7 +7,6 @@
 #include "source-loc.h"
 
 namespace Slang {
-namespace Compiler {
 
 using namespace CoreLib::Basic;
 
@@ -45,6 +44,6 @@ public:
 
 
 
-}}
+} // namespace Slang
 
 #endif

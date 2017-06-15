@@ -1,10 +1,7 @@
 // profile.cpp
 #include "Profile.h"
 
-
 namespace Slang {
-namespace Compiler {
-
 
 ProfileFamily getProfileFamily(ProfileVersion version)
 {
@@ -17,4 +14,4 @@ ProfileFamily getProfileFamily(ProfileVersion version)
     }
 }
 
-}}
+}

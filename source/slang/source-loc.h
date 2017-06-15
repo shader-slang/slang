@@ -5,7 +5,6 @@
 #include "../core/basic.h"
 
 namespace Slang {
-namespace Compiler {
 
 using namespace CoreLib::Basic;
 
@@ -42,6 +41,6 @@ public:
 };
 
 
-}}
+} // namespace Slang
 
 #endif

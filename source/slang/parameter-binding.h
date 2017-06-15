@@ -7,7 +7,6 @@
 #include "../../Slang.h"
 
 namespace Slang {
-namespace Compiler {
 
 class CollectionOfTranslationUnits;
 
@@ -27,6 +26,6 @@ class CollectionOfTranslationUnits;
 void GenerateParameterBindings(
     CollectionOfTranslationUnits*   program);
 
-}}
+}
 
 #endif // SLANG_REFLECTION_H

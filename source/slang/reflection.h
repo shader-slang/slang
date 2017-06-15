@@ -16,8 +16,6 @@ typedef int64_t     Int64;
 typedef uintptr_t   UInt;
 typedef uint64_t    UInt64;
 
-namespace Compiler {
-
 class ProgramLayout;
 class TypeLayout;
 
@@ -34,6 +32,6 @@ UInt getReflectionFieldCount(ExpressionType* type);
 UInt getReflectionFieldByIndex(ExpressionType* type, UInt index);
 UInt getReflectionFieldByIndex(TypeLayout* typeLayout, UInt index);
 
-}}
+}
 
 #endif // SLANG_REFLECTION_H

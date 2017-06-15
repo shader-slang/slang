@@ -4,7 +4,6 @@
 #include <assert.h>
 
 namespace Slang {
-namespace Compiler {
 
 char const* TokenTypeToString(TokenType type)
 {
@@ -19,4 +18,4 @@ char const* TokenTypeToString(TokenType type)
     }
 }
 
-}}
+} // namespace Slang

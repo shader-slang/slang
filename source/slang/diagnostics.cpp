@@ -15,7 +15,6 @@
 #endif
 
 namespace Slang {
-namespace Compiler {
 
 void printDiagnosticArg(StringBuilder& sb, char const* str)
 {
@@ -201,4 +200,4 @@ namespace Diagnostics
 }
 
 
-}} // namespace Slang::Compiler
+} // namespace Slang

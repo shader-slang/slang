@@ -149,7 +149,7 @@ struct OptionsParser
 #undef CASE
 
 #define CASE(EXT, LANG, PROFILE) \
-        else if(path.EndsWith(EXT)) do { addInputForeignShaderPath(path, SLANG_SOURCE_LANGUAGE_##LANG, SlangProfileID(Slang::Compiler::Profile::PROFILE)); } while(0)
+        else if(path.EndsWith(EXT)) do { addInputForeignShaderPath(path, SLANG_SOURCE_LANGUAGE_##LANG, SlangProfileID(Slang::Profile::PROFILE)); } while(0)
         // TODO: need a way to pass along stage/profile and entry-point info for these cases...
         CASE(".vert", GLSL, GLSL_Vertex);
         CASE(".frag", GLSL, GLSL_Fragment);

@@ -18,7 +18,7 @@ using namespace CoreLib;
 // idioms for using the preprocessor, found in shader code in the wild.
 
 
-namespace Slang{ namespace Compiler {
+namespace Slang{
 
 // State of a preprocessor conditional, which can change when
 // we encounter directives like `#elif` or `#endif`
@@ -2056,4 +2056,4 @@ TokenList preprocessSource(
     return tokens;
 }
 
-}}
+}

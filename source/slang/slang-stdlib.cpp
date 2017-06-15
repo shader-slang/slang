@@ -951,903 +951,899 @@ using namespace CoreLib::Basic;
 
 namespace Slang
 {
-    namespace Compiler
+    static String stdlibPath;
+
+    String getStdlibPath()
     {
-        static String stdlibPath;
-
-        String getStdlibPath()
-        {
-            if(stdlibPath.Length() != 0)
-                return stdlibPath;
-
-            StringBuilder pathBuilder;
-            for( auto cc = __FILE__; *cc; ++cc )
-            {
-                switch( *cc )
-                {
-                case '\n':
-                case '\t':
-                case '\\':
-                    pathBuilder << "\\";
-                default:
-                    pathBuilder << *cc;
-                    break;
-                }
-            }
-            stdlibPath = pathBuilder.ProduceString();
-
+        if(stdlibPath.Length() != 0)
             return stdlibPath;
-        }
 
-        String SlangStdLib::code;
-
-        enum
+        StringBuilder pathBuilder;
+        for( auto cc = __FILE__; *cc; ++cc )
         {
-            SINT_MASK   = 1 << 0,
-            FLOAT_MASK  = 1 << 1,
-            COMPARISON  = 1 << 2,
-            BOOL_MASK   = 1 << 3,
-            UINT_MASK   = 1 << 4,
-            ASSIGNMENT  = 1 << 5,
-            POSTFIX     = 1 << 6,
+            switch( *cc )
+            {
+            case '\n':
+            case '\t':
+            case '\\':
+                pathBuilder << "\\";
+            default:
+                pathBuilder << *cc;
+                break;
+            }
+        }
+        stdlibPath = pathBuilder.ProduceString();
 
-            INT_MASK = SINT_MASK | UINT_MASK,
-            ARITHMETIC_MASK = INT_MASK | FLOAT_MASK,
-            LOGICAL_MASK = INT_MASK | BOOL_MASK,
-            ANY_MASK = INT_MASK | FLOAT_MASK | BOOL_MASK,
+        return stdlibPath;
+    }
+
+    String SlangStdLib::code;
+
+    enum
+    {
+        SINT_MASK   = 1 << 0,
+        FLOAT_MASK  = 1 << 1,
+        COMPARISON  = 1 << 2,
+        BOOL_MASK   = 1 << 3,
+        UINT_MASK   = 1 << 4,
+        ASSIGNMENT  = 1 << 5,
+        POSTFIX     = 1 << 6,
+
+        INT_MASK = SINT_MASK | UINT_MASK,
+        ARITHMETIC_MASK = INT_MASK | FLOAT_MASK,
+        LOGICAL_MASK = INT_MASK | BOOL_MASK,
+        ANY_MASK = INT_MASK | FLOAT_MASK | BOOL_MASK,
+    };
+
+    String SlangStdLib::GetCode()
+    {
+        if (code.Length() > 0)
+            return code;
+        StringBuilder sb;
+
+        // generate operator overloads
+
+
+
+        struct OpInfo { IntrinsicOp opCode; char const* opName; unsigned flags;  };
+
+        OpInfo unaryOps[] = {
+            { IntrinsicOp::Neg,     "-",    ARITHMETIC_MASK },
+            { IntrinsicOp::Not,     "!",    ANY_MASK        },
+            { IntrinsicOp::Not,     "~",    INT_MASK        },
+            { IntrinsicOp::PreInc,  "++",   ARITHMETIC_MASK | ASSIGNMENT },
+            { IntrinsicOp::PreDec,  "--",   ARITHMETIC_MASK | ASSIGNMENT },
+            { IntrinsicOp::PostInc, "++",   ARITHMETIC_MASK | ASSIGNMENT | POSTFIX },
+            { IntrinsicOp::PostDec, "--",   ARITHMETIC_MASK | ASSIGNMENT | POSTFIX },
         };
 
-        String SlangStdLib::GetCode()
-        {
-            if (code.Length() > 0)
-                return code;
-            StringBuilder sb;
+        OpInfo binaryOps[] = {
+            { IntrinsicOp::Add,     "+",    ARITHMETIC_MASK },
+            { IntrinsicOp::Sub,     "-",    ARITHMETIC_MASK },
+            { IntrinsicOp::Mul,     "*",    ARITHMETIC_MASK },
+            { IntrinsicOp::Div,     "/",    ARITHMETIC_MASK },
+            { IntrinsicOp::Mod,     "%",    INT_MASK },
 
-            // generate operator overloads
+            { IntrinsicOp::And,     "&&",   LOGICAL_MASK },
+            { IntrinsicOp::Or,      "||",   LOGICAL_MASK },
 
+            { IntrinsicOp::BitAnd,  "&",    LOGICAL_MASK },
+            { IntrinsicOp::BitOr,   "|",    LOGICAL_MASK },
+            { IntrinsicOp::BitXor,  "^",    LOGICAL_MASK },
 
+            { IntrinsicOp::Lsh,     "<<",   INT_MASK },
+            { IntrinsicOp::Rsh,     ">>",   INT_MASK },
 
-            struct OpInfo { IntrinsicOp opCode; char const* opName; unsigned flags;  };
+            { IntrinsicOp::Eql,     "==",   ANY_MASK | COMPARISON },
+            { IntrinsicOp::Neq,     "!=",   ANY_MASK | COMPARISON },
 
-            OpInfo unaryOps[] = {
-                { IntrinsicOp::Neg,     "-",    ARITHMETIC_MASK },
-                { IntrinsicOp::Not,     "!",    ANY_MASK        },
-                { IntrinsicOp::Not,     "~",    INT_MASK        },
-                { IntrinsicOp::PreInc,  "++",   ARITHMETIC_MASK | ASSIGNMENT },
-                { IntrinsicOp::PreDec,  "--",   ARITHMETIC_MASK | ASSIGNMENT },
-                { IntrinsicOp::PostInc, "++",   ARITHMETIC_MASK | ASSIGNMENT | POSTFIX },
-                { IntrinsicOp::PostDec, "--",   ARITHMETIC_MASK | ASSIGNMENT | POSTFIX },
-            };
+            { IntrinsicOp::Greater, ">",    ARITHMETIC_MASK | COMPARISON },
+            { IntrinsicOp::Less,    "<",    ARITHMETIC_MASK | COMPARISON },
+            { IntrinsicOp::Geq,     ">=",   ARITHMETIC_MASK | COMPARISON },
+            { IntrinsicOp::Leq,     "<=",   ARITHMETIC_MASK | COMPARISON },
 
-            OpInfo binaryOps[] = {
-                { IntrinsicOp::Add,     "+",    ARITHMETIC_MASK },
-                { IntrinsicOp::Sub,     "-",    ARITHMETIC_MASK },
-                { IntrinsicOp::Mul,     "*",    ARITHMETIC_MASK },
-                { IntrinsicOp::Div,     "/",    ARITHMETIC_MASK },
-                { IntrinsicOp::Mod,     "%",    INT_MASK },
-
-                { IntrinsicOp::And,     "&&",   LOGICAL_MASK },
-                { IntrinsicOp::Or,      "||",   LOGICAL_MASK },
-
-                { IntrinsicOp::BitAnd,  "&",    LOGICAL_MASK },
-                { IntrinsicOp::BitOr,   "|",    LOGICAL_MASK },
-                { IntrinsicOp::BitXor,  "^",    LOGICAL_MASK },
-
-                { IntrinsicOp::Lsh,     "<<",   INT_MASK },
-                { IntrinsicOp::Rsh,     ">>",   INT_MASK },
-
-                { IntrinsicOp::Eql,     "==",   ANY_MASK | COMPARISON },
-                { IntrinsicOp::Neq,     "!=",   ANY_MASK | COMPARISON },
-
-                { IntrinsicOp::Greater, ">",    ARITHMETIC_MASK | COMPARISON },
-                { IntrinsicOp::Less,    "<",    ARITHMETIC_MASK | COMPARISON },
-                { IntrinsicOp::Geq,     ">=",   ARITHMETIC_MASK | COMPARISON },
-                { IntrinsicOp::Leq,     "<=",   ARITHMETIC_MASK | COMPARISON },
-
-                { IntrinsicOp::AddAssign,     "+=",    ASSIGNMENT | ARITHMETIC_MASK },
-                { IntrinsicOp::SubAssign,     "-=",    ASSIGNMENT | ARITHMETIC_MASK },
-                { IntrinsicOp::MulAssign,     "*=",    ASSIGNMENT | ARITHMETIC_MASK },
-                { IntrinsicOp::DivAssign,     "/=",    ASSIGNMENT | ARITHMETIC_MASK },
-                { IntrinsicOp::ModAssign,     "%=",    ASSIGNMENT | ARITHMETIC_MASK },
-                { IntrinsicOp::AndAssign,     "&=",    ASSIGNMENT | LOGICAL_MASK },
-                { IntrinsicOp::OrAssign,      "|=",    ASSIGNMENT | LOGICAL_MASK },
-                { IntrinsicOp::XorAssign,     "^=",    ASSIGNMENT | LOGICAL_MASK },
-                { IntrinsicOp::LshAssign,     "<<=",   ASSIGNMENT | INT_MASK },
-                { IntrinsicOp::RshAssign,     ">>=",   ASSIGNMENT | INT_MASK },
+            { IntrinsicOp::AddAssign,     "+=",    ASSIGNMENT | ARITHMETIC_MASK },
+            { IntrinsicOp::SubAssign,     "-=",    ASSIGNMENT | ARITHMETIC_MASK },
+            { IntrinsicOp::MulAssign,     "*=",    ASSIGNMENT | ARITHMETIC_MASK },
+            { IntrinsicOp::DivAssign,     "/=",    ASSIGNMENT | ARITHMETIC_MASK },
+            { IntrinsicOp::ModAssign,     "%=",    ASSIGNMENT | ARITHMETIC_MASK },
+            { IntrinsicOp::AndAssign,     "&=",    ASSIGNMENT | LOGICAL_MASK },
+            { IntrinsicOp::OrAssign,      "|=",    ASSIGNMENT | LOGICAL_MASK },
+            { IntrinsicOp::XorAssign,     "^=",    ASSIGNMENT | LOGICAL_MASK },
+            { IntrinsicOp::LshAssign,     "<<=",   ASSIGNMENT | INT_MASK },
+            { IntrinsicOp::RshAssign,     ">>=",   ASSIGNMENT | INT_MASK },
 
 
-            };
+        };
 
-            /*
-            String floatTypes[] = { "float", "float2", "float3", "float4" };
-            String intTypes[] = { "int", "int2", "int3", "int4" };
-            String uintTypes[] = { "uint", "uint2", "uint3", "uint4" };
-            */
+        /*
+        String floatTypes[] = { "float", "float2", "float3", "float4" };
+        String intTypes[] = { "int", "int2", "int3", "int4" };
+        String uintTypes[] = { "uint", "uint2", "uint3", "uint4" };
+        */
 
-            String path = getStdlibPath();
+        String path = getStdlibPath();
 
 
 
 #define EMIT_LINE_DIRECTIVE() sb << "#line " << (__LINE__+1) << " \"" << path << "\"\n"
 
-            // Generate declarations for all the base types
+        // Generate declarations for all the base types
 
-            static const struct {
-                char const* name;
-                BaseType	tag;
-                unsigned    flags;
-            } kBaseTypes[] = {
-                { "void",	BaseType::Void,     0 },
-                { "int",	BaseType::Int,      SINT_MASK },
-                { "float",	BaseType::Float,    FLOAT_MASK },
-                { "uint",	BaseType::UInt,     UINT_MASK },
-                { "bool",	BaseType::Bool,     BOOL_MASK },
-                { "uint64_t", BaseType::UInt64, UINT_MASK },
-            };
-            static const int kBaseTypeCount = sizeof(kBaseTypes) / sizeof(kBaseTypes[0]);
-            for (int tt = 0; tt < kBaseTypeCount; ++tt)
+        static const struct {
+            char const* name;
+            BaseType	tag;
+            unsigned    flags;
+        } kBaseTypes[] = {
+            { "void",	BaseType::Void,     0 },
+            { "int",	BaseType::Int,      SINT_MASK },
+            { "float",	BaseType::Float,    FLOAT_MASK },
+            { "uint",	BaseType::UInt,     UINT_MASK },
+            { "bool",	BaseType::Bool,     BOOL_MASK },
+            { "uint64_t", BaseType::UInt64, UINT_MASK },
+        };
+        static const int kBaseTypeCount = sizeof(kBaseTypes) / sizeof(kBaseTypes[0]);
+        for (int tt = 0; tt < kBaseTypeCount; ++tt)
+        {
+            EMIT_LINE_DIRECTIVE();
+            sb << "__builtin_type(" << int(kBaseTypes[tt].tag) << ") struct " << kBaseTypes[tt].name;
+
+            // Declare interface conformances for this type
+
+            sb << "\n    : __BuiltinType\n";
+
+            switch( kBaseTypes[tt].tag )
             {
+            case BaseType::Float:
+                sb << "\n    , __BuiltinFloatingPointType\n";
+                sb << "\n    ,  __BuiltinRealType\n";
+                // fall through to:
+            case BaseType::Int:
+                sb << "\n    ,  __BuiltinSignedArithmeticType\n";
+                // fall through to:
+            case BaseType::UInt:
+            case BaseType::UInt64:
+                sb << "\n    ,  __BuiltinArithmeticType\n";
+                // fall through to:
+            case BaseType::Bool:
+                sb << "\n    ,  __BuiltinType\n";
+                break;
+
+            default:
+                break;
+            }
+
+            sb << "\n{\n";
+
+
+            // Declare initializers to convert from various other types
+            for( int ss = 0; ss < kBaseTypeCount; ++ss )
+            {
+                if( kBaseTypes[ss].tag == BaseType::Void )
+                    continue;
+
                 EMIT_LINE_DIRECTIVE();
-                sb << "__builtin_type(" << int(kBaseTypes[tt].tag) << ") struct " << kBaseTypes[tt].name;
-
-                // Declare interface conformances for this type
-
-                sb << "\n    : __BuiltinType\n";
-
-                switch( kBaseTypes[tt].tag )
-                {
-                case BaseType::Float:
-                    sb << "\n    , __BuiltinFloatingPointType\n";
-                    sb << "\n    ,  __BuiltinRealType\n";
-                    // fall through to:
-                case BaseType::Int:
-                    sb << "\n    ,  __BuiltinSignedArithmeticType\n";
-                    // fall through to:
-                case BaseType::UInt:
-                case BaseType::UInt64:
-                    sb << "\n    ,  __BuiltinArithmeticType\n";
-                    // fall through to:
-                case BaseType::Bool:
-                    sb << "\n    ,  __BuiltinType\n";
-                    break;
-
-                default:
-                    break;
-                }
-
-                sb << "\n{\n";
-
-
-                // Declare initializers to convert from various other types
-                for( int ss = 0; ss < kBaseTypeCount; ++ss )
-                {
-                    if( kBaseTypes[ss].tag == BaseType::Void )
-                        continue;
-
-                    EMIT_LINE_DIRECTIVE();
-                    sb << "__init(" << kBaseTypes[ss].name << " value);\n";
-                }
-
-                sb << "};\n";
+                sb << "__init(" << kBaseTypes[ss].name << " value);\n";
             }
 
-            // Declare ad hoc aliases for some types, just to get things compiling
-            //
-            // TODO(tfoley): At the very least, `double` should be treated as a distinct type.
-            sb << "typedef float double;\n";
-            sb << "typedef float half;\n";
-
-            // Declare vector and matrix types
-
-            sb << "__generic<T = float, let N : int = 4> __magic_type(Vector) struct vector\n{\n";
-            sb << "    __init(T value);\n"; // initialize from single scalar
             sb << "};\n";
-            sb << "__generic<T = float, let R : int = 4, let C : int = 4> __magic_type(Matrix) struct matrix {};\n";
+        }
 
-            static const struct {
-                char const* name;
-                char const* glslPrefix;
-            } kTypes[] =
+        // Declare ad hoc aliases for some types, just to get things compiling
+        //
+        // TODO(tfoley): At the very least, `double` should be treated as a distinct type.
+        sb << "typedef float double;\n";
+        sb << "typedef float half;\n";
+
+        // Declare vector and matrix types
+
+        sb << "__generic<T = float, let N : int = 4> __magic_type(Vector) struct vector\n{\n";
+        sb << "    __init(T value);\n"; // initialize from single scalar
+        sb << "};\n";
+        sb << "__generic<T = float, let R : int = 4, let C : int = 4> __magic_type(Matrix) struct matrix {};\n";
+
+        static const struct {
+            char const* name;
+            char const* glslPrefix;
+        } kTypes[] =
+        {
+            {"float", ""},
+            {"int", "i"},
+            {"uint", "u"},
+            {"bool", "b"},
+        };
+        static const int kTypeCount = sizeof(kTypes) / sizeof(kTypes[0]);
+
+        for (int tt = 0; tt < kTypeCount; ++tt)
+        {
+            // Declare HLSL vector types
+            for (int ii = 1; ii <= 4; ++ii)
             {
-                {"float", ""},
-                {"int", "i"},
-                {"uint", "u"},
-                {"bool", "b"},
-            };
-            static const int kTypeCount = sizeof(kTypes) / sizeof(kTypes[0]);
-
-            for (int tt = 0; tt < kTypeCount; ++tt)
-            {
-                // Declare HLSL vector types
-                for (int ii = 1; ii <= 4; ++ii)
-                {
-                    sb << "typedef vector<" << kTypes[tt].name << "," << ii << "> " << kTypes[tt].name << ii << ";\n";
-                }
-
-                // Declare HLSL matrix types
-                for (int rr = 2; rr <= 4; ++rr)
-                for (int cc = 2; cc <= 4; ++cc)
-                {
-                    sb << "typedef matrix<" << kTypes[tt].name << "," << rr << "," << cc << "> " << kTypes[tt].name << rr << "x" << cc << ";\n";
-                }
+                sb << "typedef vector<" << kTypes[tt].name << "," << ii << "> " << kTypes[tt].name << ii << ";\n";
             }
 
-            static const char* kComponentNames[]{ "x", "y", "z", "w" };
-            static const char* kVectorNames[]{ "", "x", "xy", "xyz", "xyzw" };
-
-            // Need to add constructors to the types above
-            for (int N = 2; N <= 4; ++N)
+            // Declare HLSL matrix types
+            for (int rr = 2; rr <= 4; ++rr)
+            for (int cc = 2; cc <= 4; ++cc)
             {
-                sb << "__generic<T> __extension vector<T, " << N << ">\n{\n";
+                sb << "typedef matrix<" << kTypes[tt].name << "," << rr << "," << cc << "> " << kTypes[tt].name << rr << "x" << cc << ";\n";
+            }
+        }
 
-                // initialize from N scalars
-                sb << "__init(";
-                for (int ii = 0; ii < N; ++ii)
+        static const char* kComponentNames[]{ "x", "y", "z", "w" };
+        static const char* kVectorNames[]{ "", "x", "xy", "xyz", "xyzw" };
+
+        // Need to add constructors to the types above
+        for (int N = 2; N <= 4; ++N)
+        {
+            sb << "__generic<T> __extension vector<T, " << N << ">\n{\n";
+
+            // initialize from N scalars
+            sb << "__init(";
+            for (int ii = 0; ii < N; ++ii)
+            {
+                if (ii != 0) sb << ", ";
+                sb << "T " << kComponentNames[ii];
+            }
+            sb << ");\n";
+
+            // Initialize from an M-vector and then scalars
+            for (int M = 2; M < N; ++M)
+            {
+                sb << "__init(vector<T," << M << "> " << kVectorNames[M];
+                for (int ii = M; ii < N; ++ii)
                 {
-                    if (ii != 0) sb << ", ";
-                    sb << "T " << kComponentNames[ii];
+                    sb << ", T " << kComponentNames[ii];
                 }
                 sb << ");\n";
-
-                // Initialize from an M-vector and then scalars
-                for (int M = 2; M < N; ++M)
-                {
-                    sb << "__init(vector<T," << M << "> " << kVectorNames[M];
-                    for (int ii = M; ii < N; ++ii)
-                    {
-                        sb << ", T " << kComponentNames[ii];
-                    }
-                    sb << ");\n";
-                }
-
-                // initialize from another vector of the same size
-                //
-                // TODO(tfoley): this overlaps with implicit conversions.
-                // We should look for a way that we can define implicit
-                // conversions directly in the stdlib instead...
-                sb << "__generic<U> __init(vector<U," << N << ">);\n";
-
-                sb << "}\n";
             }
 
-            for( int R = 2; R <= 4; ++R )
-            for( int C = 2; C <= 4; ++C )
+            // initialize from another vector of the same size
+            //
+            // TODO(tfoley): this overlaps with implicit conversions.
+            // We should look for a way that we can define implicit
+            // conversions directly in the stdlib instead...
+            sb << "__generic<U> __init(vector<U," << N << ">);\n";
+
+            sb << "}\n";
+        }
+
+        for( int R = 2; R <= 4; ++R )
+        for( int C = 2; C <= 4; ++C )
+        {
+            sb << "__generic<T> __extension matrix<T, " << R << "," << C << ">\n{\n";
+
+            // initialize from R*C scalars
+            sb << "__init(";
+            for( int ii = 0; ii < R; ++ii )
+            for( int jj = 0; jj < C; ++jj )
             {
-                sb << "__generic<T> __extension matrix<T, " << R << "," << C << ">\n{\n";
-
-                // initialize from R*C scalars
-                sb << "__init(";
-                for( int ii = 0; ii < R; ++ii )
-                for( int jj = 0; jj < C; ++jj )
-                {
-                    if ((ii+jj) != 0) sb << ", ";
-                    sb << "T m" << ii << jj;
-                }
-                sb << ");\n";
-
-                // Initialize from R C-vectors
-                sb << "__init(";
-                for (int ii = 0; ii < R; ++ii)
-                {
-                    if(ii != 0) sb << ", ";
-                    sb << "vector<T," << C << "> row" << ii;
-                }
-                sb << ");\n";
-
-
-                // initialize from another matrix of the same size
-                //
-                // TODO(tfoley): See comment about how this overlaps
-                // with implicit conversion, in the `vector` case above
-                sb << "__generic<U> __init(matrix<U," << R << ", " << C << ">);\n";
-
-                sb << "}\n";
+                if ((ii+jj) != 0) sb << ", ";
+                sb << "T m" << ii << jj;
             }
+            sb << ");\n";
 
-
-            // Declare built-in texture and sampler types
-
-            sb << "__magic_type(SamplerState," << int(SamplerStateType::Flavor::SamplerState) << ") struct SamplerState {};";
-            sb << "__magic_type(SamplerState," << int(SamplerStateType::Flavor::SamplerComparisonState) << ") struct SamplerComparisonState {};";
-
-            // TODO(tfoley): Need to handle `RW*` variants of texture types as well...
-            static const struct {
-                char const*			name;
-                TextureType::Shape	baseShape;
-                int					coordCount;
-            } kBaseTextureTypes[] = {
-                { "Texture1D",		TextureType::Shape1D,	1 },
-                { "Texture2D",		TextureType::Shape2D,	2 },
-                { "Texture3D",		TextureType::Shape3D,	3 },
-                { "TextureCube",	TextureType::ShapeCube,	3 },
-            };
-            static const int kBaseTextureTypeCount = sizeof(kBaseTextureTypes) / sizeof(kBaseTextureTypes[0]);
-
-
-            static const struct {
-                char const*         name;
-                SlangResourceAccess access;
-            } kBaseTextureAccessLevels[] = {
-                { "",                   SLANG_RESOURCE_ACCESS_READ },
-                { "RW",                 SLANG_RESOURCE_ACCESS_READ_WRITE },
-                { "RasterizerOrdered",  SLANG_RESOURCE_ACCESS_RASTER_ORDERED },
-            };
-            static const int kBaseTextureAccessLevelCount = sizeof(kBaseTextureAccessLevels) / sizeof(kBaseTextureAccessLevels[0]);
-
-            for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
+            // Initialize from R C-vectors
+            sb << "__init(";
+            for (int ii = 0; ii < R; ++ii)
             {
-                char const* name = kBaseTextureTypes[tt].name;
-                TextureType::Shape baseShape = kBaseTextureTypes[tt].baseShape;
+                if(ii != 0) sb << ", ";
+                sb << "vector<T," << C << "> row" << ii;
+            }
+            sb << ");\n";
 
-                for (int isArray = 0; isArray < 2; ++isArray)
+
+            // initialize from another matrix of the same size
+            //
+            // TODO(tfoley): See comment about how this overlaps
+            // with implicit conversion, in the `vector` case above
+            sb << "__generic<U> __init(matrix<U," << R << ", " << C << ">);\n";
+
+            sb << "}\n";
+        }
+
+
+        // Declare built-in texture and sampler types
+
+        sb << "__magic_type(SamplerState," << int(SamplerStateType::Flavor::SamplerState) << ") struct SamplerState {};";
+        sb << "__magic_type(SamplerState," << int(SamplerStateType::Flavor::SamplerComparisonState) << ") struct SamplerComparisonState {};";
+
+        // TODO(tfoley): Need to handle `RW*` variants of texture types as well...
+        static const struct {
+            char const*			name;
+            TextureType::Shape	baseShape;
+            int					coordCount;
+        } kBaseTextureTypes[] = {
+            { "Texture1D",		TextureType::Shape1D,	1 },
+            { "Texture2D",		TextureType::Shape2D,	2 },
+            { "Texture3D",		TextureType::Shape3D,	3 },
+            { "TextureCube",	TextureType::ShapeCube,	3 },
+        };
+        static const int kBaseTextureTypeCount = sizeof(kBaseTextureTypes) / sizeof(kBaseTextureTypes[0]);
+
+
+        static const struct {
+            char const*         name;
+            SlangResourceAccess access;
+        } kBaseTextureAccessLevels[] = {
+            { "",                   SLANG_RESOURCE_ACCESS_READ },
+            { "RW",                 SLANG_RESOURCE_ACCESS_READ_WRITE },
+            { "RasterizerOrdered",  SLANG_RESOURCE_ACCESS_RASTER_ORDERED },
+        };
+        static const int kBaseTextureAccessLevelCount = sizeof(kBaseTextureAccessLevels) / sizeof(kBaseTextureAccessLevels[0]);
+
+        for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
+        {
+            char const* name = kBaseTextureTypes[tt].name;
+            TextureType::Shape baseShape = kBaseTextureTypes[tt].baseShape;
+
+            for (int isArray = 0; isArray < 2; ++isArray)
+            {
+                // Arrays of 3D textures aren't allowed
+                if (isArray && baseShape == TextureType::Shape3D) continue;
+
+                for (int isMultisample = 0; isMultisample < 2; ++isMultisample)
+                for (int accessLevel = 0; accessLevel < kBaseTextureAccessLevelCount; ++accessLevel)
                 {
-                    // Arrays of 3D textures aren't allowed
-                    if (isArray && baseShape == TextureType::Shape3D) continue;
+                    auto access = kBaseTextureAccessLevels[accessLevel].access;
 
-                    for (int isMultisample = 0; isMultisample < 2; ++isMultisample)
-                    for (int accessLevel = 0; accessLevel < kBaseTextureAccessLevelCount; ++accessLevel)
-                    {
-                        auto access = kBaseTextureAccessLevels[accessLevel].access;
+                    // TODO: any constraints to enforce on what gets to be multisampled?
 
-                        // TODO: any constraints to enforce on what gets to be multisampled?
-
-                        unsigned flavor = baseShape;
-                        if (isArray)		flavor |= TextureType::ArrayFlag;
-                        if (isMultisample)	flavor |= TextureType::MultisampleFlag;
+                    unsigned flavor = baseShape;
+                    if (isArray)		flavor |= TextureType::ArrayFlag;
+                    if (isMultisample)	flavor |= TextureType::MultisampleFlag;
 //                        if (isShadow)		flavor |= TextureType::ShadowFlag;
 
-                        flavor |= (access << 8);
+                    flavor |= (access << 8);
 
 
-                        // emit a generic signature
-                        // TODO: allow for multisample count to come in as well...
-                        sb << "__generic<T = float4> ";
+                    // emit a generic signature
+                    // TODO: allow for multisample count to come in as well...
+                    sb << "__generic<T = float4> ";
 
-                        sb << "__magic_type(Texture," << int(flavor) << ") struct ";
-                        sb << kBaseTextureAccessLevels[accessLevel].name;
-                        sb << name;
-                        if (isMultisample) sb << "MS";
-                        if (isArray) sb << "Array";
+                    sb << "__magic_type(Texture," << int(flavor) << ") struct ";
+                    sb << kBaseTextureAccessLevels[accessLevel].name;
+                    sb << name;
+                    if (isMultisample) sb << "MS";
+                    if (isArray) sb << "Array";
 //                        if (isShadow) sb << "Shadow";
-                        sb << "\n{";
+                    sb << "\n{";
+
+                    if( !isMultisample )
+                    {
+                        sb << "float CalculateLevelOfDetail(SamplerState s, ";
+                        sb << "float" << kBaseTextureTypes[tt].coordCount << " location);\n";
+
+                        sb << "float CalculateLevelOfDetailUnclamped(SamplerState s, ";
+                        sb << "float" << kBaseTextureTypes[tt].coordCount << " location);\n";
+
+                        // TODO: `Gather` operation
+                        // (tricky because it returns a 4-vector of the element type
+                        // of the texture components...)
+                    }
+
+                    // TODO: `GetDimensions` operations
+
+                    for(int isFloat = 0; isFloat < 2; ++isFloat)
+                    for(int includeMipInfo = 0; includeMipInfo < 2; ++includeMipInfo)
+                    {
+                        char const* t = isFloat ? "out float " : "out UINT ";
+
+                        sb << "void GetDimensions(";
+                        if(includeMipInfo)
+                            sb << "UINT mipLevel, ";
+
+                        switch(baseShape)
+                        {
+                        case TextureType::Shape1D:
+                            sb << t << "width";
+                            break;
+
+                        case TextureType::Shape2D:
+                        case TextureType::ShapeCube:
+                            sb << t << "width,";
+                            sb << t << "height";
+                            break;
+
+                        case TextureType::Shape3D:
+                            sb << t << "width,";
+                            sb << t << "height,";
+                            sb << t << "depth";
+                            break;
+
+                        default:
+                            assert(!"unexpected");
+                            break;
+                        }
+
+                        if(isArray)
+                        {
+                            sb << ", " << t << "elements";
+                        }
+
+                        if(includeMipInfo)
+                            sb << ", " << t << "numberOfLevels";
+
+                        sb << ");\n";
+                    }
+
+                    // `GetSamplePosition()`
+                    if( isMultisample )
+                    {
+                        sb << "float2 GetSamplePosition(int s);\n";
+                    }
+
+                    // `Load()`
+
+                    if( kBaseTextureTypes[tt].coordCount + isArray < 4 )
+                    {
+                        sb << "T Load(";
+                        sb << "int" << kBaseTextureTypes[tt].coordCount + isArray + 1 << " location);\n";
 
                         if( !isMultisample )
-                        {
-                            sb << "float CalculateLevelOfDetail(SamplerState s, ";
-                            sb << "float" << kBaseTextureTypes[tt].coordCount << " location);\n";
-
-                            sb << "float CalculateLevelOfDetailUnclamped(SamplerState s, ";
-                            sb << "float" << kBaseTextureTypes[tt].coordCount << " location);\n";
-
-                            // TODO: `Gather` operation
-                            // (tricky because it returns a 4-vector of the element type
-                            // of the texture components...)
-                        }
-
-                        // TODO: `GetDimensions` operations
-
-                        for(int isFloat = 0; isFloat < 2; ++isFloat)
-                        for(int includeMipInfo = 0; includeMipInfo < 2; ++includeMipInfo)
-                        {
-                            char const* t = isFloat ? "out float " : "out UINT ";
-
-                            sb << "void GetDimensions(";
-                            if(includeMipInfo)
-                                sb << "UINT mipLevel, ";
-
-                            switch(baseShape)
-                            {
-                            case TextureType::Shape1D:
-                                sb << t << "width";
-                                break;
-
-                            case TextureType::Shape2D:
-                            case TextureType::ShapeCube:
-                                sb << t << "width,";
-                                sb << t << "height";
-                                break;
-
-                            case TextureType::Shape3D:
-                                sb << t << "width,";
-                                sb << t << "height,";
-                                sb << t << "depth";
-                                break;
-
-                            default:
-                                assert(!"unexpected");
-                                break;
-                            }
-
-                            if(isArray)
-                            {
-                                sb << ", " << t << "elements";
-                            }
-
-                            if(includeMipInfo)
-                                sb << ", " << t << "numberOfLevels";
-
-                            sb << ");\n";
-                        }
-
-                        // `GetSamplePosition()`
-                        if( isMultisample )
-                        {
-                            sb << "float2 GetSamplePosition(int s);\n";
-                        }
-
-                        // `Load()`
-
-                        if( kBaseTextureTypes[tt].coordCount + isArray < 4 )
                         {
                             sb << "T Load(";
-                            sb << "int" << kBaseTextureTypes[tt].coordCount + isArray + 1 << " location);\n";
-
-                            if( !isMultisample )
-                            {
-                                sb << "T Load(";
-                                sb << "int" << kBaseTextureTypes[tt].coordCount + isArray + 1 << " location, ";
-                                sb << "int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
-                            }
-                            else
-                            {
-                                sb << "T Load(";
-                                sb << "int" << kBaseTextureTypes[tt].coordCount + isArray + 1 << " location, ";
-                                sb << "int sampleIndex, ";
-                                sb << "int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
-                            }
+                            sb << "int" << kBaseTextureTypes[tt].coordCount + isArray + 1 << " location, ";
+                            sb << "int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
                         }
-
-                        if(baseShape != TextureType::ShapeCube)
+                        else
                         {
-                            // subscript operator
-                            sb << "__intrinsic __subscript(uint" << kBaseTextureTypes[tt].coordCount + isArray << " location) -> T;\n";
+                            sb << "T Load(";
+                            sb << "int" << kBaseTextureTypes[tt].coordCount + isArray + 1 << " location, ";
+                            sb << "int sampleIndex, ";
+                            sb << "int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
                         }
+                    }
 
-                        if( !isMultisample )
+                    if(baseShape != TextureType::ShapeCube)
+                    {
+                        // subscript operator
+                        sb << "__intrinsic __subscript(uint" << kBaseTextureTypes[tt].coordCount + isArray << " location) -> T;\n";
+                    }
+
+                    if( !isMultisample )
+                    {
+                        // `Sample()`
+
+                        sb << "T Sample(SamplerState s, ";
+                        sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location);\n";
+
+                        if( baseShape != TextureType::ShapeCube )
                         {
-                            // `Sample()`
-
-                            sb << "T Sample(SamplerState s, ";
-                            sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location);\n";
-
-                            if( baseShape != TextureType::ShapeCube )
-                            {
-                                sb << "T Sample(SamplerState s, ";
-                                sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
-                                sb << "int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
-                            }
-
                             sb << "T Sample(SamplerState s, ";
                             sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
-                            if( baseShape != TextureType::ShapeCube )
-                            {
-                                sb << "int" << kBaseTextureTypes[tt].coordCount << " offset, ";
-                            }
-                            sb << "float clamp);\n";
+                            sb << "int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
+                        }
 
-                            sb << "T Sample(SamplerState s, ";
-                            sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
-                            if( baseShape != TextureType::ShapeCube )
-                            {
-                                sb << "int" << kBaseTextureTypes[tt].coordCount << " offset, ";
-                            }
-                            sb << "float clamp, out uint status);\n";
+                        sb << "T Sample(SamplerState s, ";
+                        sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
+                        if( baseShape != TextureType::ShapeCube )
+                        {
+                            sb << "int" << kBaseTextureTypes[tt].coordCount << " offset, ";
+                        }
+                        sb << "float clamp);\n";
+
+                        sb << "T Sample(SamplerState s, ";
+                        sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
+                        if( baseShape != TextureType::ShapeCube )
+                        {
+                            sb << "int" << kBaseTextureTypes[tt].coordCount << " offset, ";
+                        }
+                        sb << "float clamp, out uint status);\n";
 
 
-                            // `SampleBias()`
+                        // `SampleBias()`
+                        sb << "T SampleBias(SamplerState s, ";
+                        sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, float bias);\n";
+
+                        if( baseShape != TextureType::ShapeCube )
+                        {
                             sb << "T SampleBias(SamplerState s, ";
-                            sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, float bias);\n";
+                            sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, float bias, ";
+                            sb << "int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
+                        }
 
-                            if( baseShape != TextureType::ShapeCube )
-                            {
-                                sb << "T SampleBias(SamplerState s, ";
-                                sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, float bias, ";
-                                sb << "int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
-                            }
+                        // `SampleCmp()` and `SampleCmpLevelZero`
+                        sb << "T SampleCmp(SamplerComparisonState s, ";
+                        sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
+                        sb << "float compareValue";
+                        sb << ");\n";
 
-                            // `SampleCmp()` and `SampleCmpLevelZero`
-                            sb << "T SampleCmp(SamplerComparisonState s, ";
+                        sb << "T SampleCmpLevelZero(SamplerComparisonState s, ";
+                        sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
+                        sb << "float compareValue";
+                        sb << ");\n";
+
+                        if( baseShape != TextureType::ShapeCube )
+                        {
+                            // Note(tfoley): MSDN seems confused, and claims that the `offset`
+                            // parameter for `SampleCmp` is available for everything but 3D
+                            // textures, while `Sample` and `SampleBias` are consistent in
+                            // saying they only exclude `offset` for cube maps (which makes
+                            // sense). I'm going to assume the documentation for `SampleCmp`
+                            // is just wrong.
+
+                            sb << "T SampleCmp(SamplerState s, ";
                             sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
-                            sb << "float compareValue";
-                            sb << ");\n";
+                            sb << "float compareValue, ";
+                            sb << "int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
 
-                            sb << "T SampleCmpLevelZero(SamplerComparisonState s, ";
+                            sb << "T SampleCmpLevelZero(SamplerState s, ";
                             sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
-                            sb << "float compareValue";
-                            sb << ");\n";
+                            sb << "float compareValue, ";
+                            sb << "int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
+                        }
 
-                            if( baseShape != TextureType::ShapeCube )
-                            {
-                                // Note(tfoley): MSDN seems confused, and claims that the `offset`
-                                // parameter for `SampleCmp` is available for everything but 3D
-                                // textures, while `Sample` and `SampleBias` are consistent in
-                                // saying they only exclude `offset` for cube maps (which makes
-                                // sense). I'm going to assume the documentation for `SampleCmp`
-                                // is just wrong.
+                        sb << "T SampleGrad(SamplerState s, ";
+                        sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
+                        sb << "float" << kBaseTextureTypes[tt].coordCount << " gradX, ";
+                        sb << "float" << kBaseTextureTypes[tt].coordCount << " gradY";
+                        sb << ");\n";
 
-                                sb << "T SampleCmp(SamplerState s, ";
-                                sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
-                                sb << "float compareValue, ";
-                                sb << "int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
-
-                                sb << "T SampleCmpLevelZero(SamplerState s, ";
-                                sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
-                                sb << "float compareValue, ";
-                                sb << "int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
-                            }
-
+                        if( baseShape != TextureType::ShapeCube )
+                        {
                             sb << "T SampleGrad(SamplerState s, ";
                             sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                             sb << "float" << kBaseTextureTypes[tt].coordCount << " gradX, ";
-                            sb << "float" << kBaseTextureTypes[tt].coordCount << " gradY";
-                            sb << ");\n";
+                            sb << "float" << kBaseTextureTypes[tt].coordCount << " gradY, ";
+                            sb << "int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
+                        }
 
-                            if( baseShape != TextureType::ShapeCube )
-                            {
-                                sb << "T SampleGrad(SamplerState s, ";
-                                sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
-                                sb << "float" << kBaseTextureTypes[tt].coordCount << " gradX, ";
-                                sb << "float" << kBaseTextureTypes[tt].coordCount << " gradY, ";
-                                sb << "int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
-                            }
+                        // `SampleLevel`
 
-                            // `SampleLevel`
+                        sb << "T SampleLevel(SamplerState s, ";
+                        sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
+                        sb << "float level);\n";
 
+                        if( baseShape != TextureType::ShapeCube )
+                        {
                             sb << "T SampleLevel(SamplerState s, ";
                             sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
-                            sb << "float level);\n";
-
-                            if( baseShape != TextureType::ShapeCube )
-                            {
-                                sb << "T SampleLevel(SamplerState s, ";
-                                sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
-                                sb << "float level, ";
-                                sb << "int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
-                            }
+                            sb << "float level, ";
+                            sb << "int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
                         }
-
-                        sb << "\n};\n";
                     }
+
+                    sb << "\n};\n";
                 }
             }
-
-            // Declare additional built-in generic types
-
-            sb << "__generic<T> __magic_type(ConstantBuffer) struct ConstantBuffer {};\n";
-            sb << "__generic<T> __magic_type(TextureBuffer) struct TextureBuffer {};\n";
-
-            sb << "__generic<T> __magic_type(PackedBuffer) struct PackedBuffer {};\n";
-            sb << "__generic<T> __magic_type(Uniform) struct Uniform {};\n";
-            sb << "__generic<T> __magic_type(Patch) struct Patch {};\n";
-
-
-            // Stale declarations for GLSL inner-product builtins
-#if 0
-            sb << "__intrinsic vec3 operator * (vec3, mat3);\n";
-            sb << "__intrinsic vec3 operator * (mat3, vec3);\n";
-
-            sb << "__intrinsic vec4 operator * (vec4, mat4);\n";
-            sb << "__intrinsic vec4 operator * (mat4, vec4);\n";
-
-            sb << "__intrinsic mat3 operator * (mat3, mat3);\n";
-            sb << "__intrinsic mat4 operator * (mat4, mat4);\n";
-#endif
-
-            for (auto op : unaryOps)
-            {
-                for (auto type : kBaseTypes)
-                {
-                    if ((type.flags & op.flags) == 0)
-                        continue;
-
-                    char const* fixity = (op.flags & POSTFIX) != 0 ? "__postfix " : "__prefix ";
-                    char const* qual = (op.flags & ASSIGNMENT) != 0 ? "in out " : "";
-
-                    // scalar version
-                    sb << fixity;
-                    sb << "__intrinsic_op(" << int(op.opCode) << ") " << type.name << " operator" << op.opName << "(" << qual << type.name << " value);\n";
-
-                    // vector version
-                    sb << "__generic<let N : int> ";
-                    sb << fixity;
-                    sb << "__intrinsic_op(" << int(op.opCode) << ") vector<" << type.name << ",N> operator" << op.opName << "(" << qual << "vector<" << type.name << ",N> value);\n";
-
-                    // matrix version
-                    sb << "__generic<let N : int, let M : int> ";
-                    sb << fixity;
-                    sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << type.name << ",N,M> operator" << op.opName << "(" << qual << "matrix<" << type.name << ",N,M> value);\n";
-                }
-            }
-
-            for (auto op : binaryOps)
-            {
-                for (auto type : kBaseTypes)
-                {
-                    if ((type.flags & op.flags) == 0)
-                        continue;
-
-                    char const* leftType = type.name;
-                    char const* rightType = leftType;
-                    char const* resultType = leftType;
-
-                    if (op.flags & COMPARISON) resultType = "bool";
-
-                    char const* leftQual = "";
-                    if(op.flags & ASSIGNMENT) leftQual = "in out ";
-
-                    // TODO: handle `SHIFT`
-
-                    // scalar version
-                    sb << "__intrinsic_op(" << int(op.opCode) << ") " << resultType << " operator" << op.opName << "(" << leftQual << leftType << " left, " << rightType << " right);\n";
-
-                    // vector version
-                    sb << "__generic<let N : int> ";
-                    sb << "__intrinsic_op(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(" << leftQual << "vector<" << leftType << ",N> left, vector<" << rightType << ",N> right);\n";
-
-                    // matrix version
-                    sb << "__generic<let N : int, let M : int> ";
-                    sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << leftQual << "matrix<" << leftType << ",N,M> left, matrix<" << rightType << ",N,M> right);\n";
-                }
-            }
-
-#if 0
-            for (auto op : intUnaryOps)
-            {
-                String opName = GetOperatorFunctionName(op);
-                for (int i = 0; i < 4; i++)
-                {
-                    auto itype = intTypes[i];
-                    auto utype = uintTypes[i];
-                    for (int j = 0; j < 2; j++)
-                    {
-                        auto retType = (op == Operator::Not) ? "bool" : j == 0 ? itype : utype;
-                        sb << "__intrinsic " << retType << " operator " << opName << "(" << (j == 0 ? itype : utype) << ");\n";
-                    }
-                }
-            }
-
-            for (auto op : floatUnaryOps)
-            {
-                String opName = GetOperatorFunctionName(op);
-                for (int i = 0; i < 4; i++)
-                {
-                    auto type = floatTypes[i];
-                    auto retType = (op == Operator::Not) ? "bool" : type;
-                    sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ");\n";
-                }
-            }
-
-            for (auto op : floatOps)
-            {
-                String opName = GetOperatorFunctionName(op);
-                for (int i = 0; i < 4; i++)
-                {
-                    auto type = floatTypes[i];
-                    auto itype = intTypes[i];
-                    auto utype = uintTypes[i];
-                    auto retType = ((op >= Operator::Eql && op <= Operator::Leq) || op == Operator::And || op == Operator::Or) ? "bool" : type;
-                    sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << type << ");\n";
-                    sb << "__intrinsic " << retType << " operator " << opName << "(" << itype << ", " << type << ");\n";
-                    sb << "__intrinsic " << retType << " operator " << opName << "(" << utype << ", " << type << ");\n";
-                    sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << itype << ");\n";
-                    sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << utype << ");\n";
-                    if (i > 0)
-                    {
-                        sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << floatTypes[0] << ");\n";
-                        sb << "__intrinsic " << retType << " operator " << opName << "(" << floatTypes[0] << ", " << type << ");\n";
-
-                        sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << intTypes[0] << ");\n";
-                        sb << "__intrinsic " << retType << " operator " << opName << "(" << intTypes[0] << ", " << type << ");\n";
-
-                        sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << uintTypes[0] << ");\n";
-                        sb << "__intrinsic " << retType << " operator " << opName << "(" << uintTypes[0] << ", " << type << ");\n";
-                    }
-                }
-            }
-
-            for (auto op : intOps)
-            {
-                String opName = GetOperatorFunctionName(op);
-                for (int i = 0; i < 4; i++)
-                {
-                    auto type = intTypes[i];
-                    auto utype = uintTypes[i];
-                    auto retType = ((op >= Operator::Eql && op <= Operator::Leq) || op == Operator::And || op == Operator::Or) ? "bool" : type;
-                    sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << type << ");\n";
-                    sb << "__intrinsic " << retType << " operator " << opName << "(" << utype << ", " << type << ");\n";
-                    sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << utype << ");\n";
-                    sb << "__intrinsic " << retType << " operator " << opName << "(" << utype << ", " << utype << ");\n";
-                    if (i > 0)
-                    {
-                        sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << intTypes[0] << ");\n";
-                        sb << "__intrinsic " << retType << " operator " << opName << "(" << intTypes[0] << ", " << type << ");\n";
-
-                        sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << uintTypes[0] << ");\n";
-                        sb << "__intrinsic " << retType << " operator " << opName << "(" << uintTypes[0] << ", " << type << ");\n";
-                    }
-                }
-            }
-#endif
-
-            // Output a suitable `#line` directive to point at our raw stdlib code above
-            sb << "\n#line " << kLibIncludeStringLine << " \"" << path << "\"\n";
-
-            int chunkCount = sizeof(LibIncludeStringChunks) / sizeof(LibIncludeStringChunks[0]);
-            for (int cc = 0; cc < chunkCount; ++cc)
-            {
-                sb << LibIncludeStringChunks[cc];
-            }
-
-            code = sb.ProduceString();
-            return code;
         }
 
+        // Declare additional built-in generic types
 
-        // GLSL-specific library code
+        sb << "__generic<T> __magic_type(ConstantBuffer) struct ConstantBuffer {};\n";
+        sb << "__generic<T> __magic_type(TextureBuffer) struct TextureBuffer {};\n";
 
-        String glslLibraryCode;
+        sb << "__generic<T> __magic_type(PackedBuffer) struct PackedBuffer {};\n";
+        sb << "__generic<T> __magic_type(Uniform) struct Uniform {};\n";
+        sb << "__generic<T> __magic_type(Patch) struct Patch {};\n";
 
-        String getGLSLLibraryCode()
+
+        // Stale declarations for GLSL inner-product builtins
+#if 0
+        sb << "__intrinsic vec3 operator * (vec3, mat3);\n";
+        sb << "__intrinsic vec3 operator * (mat3, vec3);\n";
+
+        sb << "__intrinsic vec4 operator * (vec4, mat4);\n";
+        sb << "__intrinsic vec4 operator * (mat4, vec4);\n";
+
+        sb << "__intrinsic mat3 operator * (mat3, mat3);\n";
+        sb << "__intrinsic mat4 operator * (mat4, mat4);\n";
+#endif
+
+        for (auto op : unaryOps)
         {
-            if(glslLibraryCode.Length() != 0)
-                return glslLibraryCode;
+            for (auto type : kBaseTypes)
+            {
+                if ((type.flags & op.flags) == 0)
+                    continue;
 
-            String path = getStdlibPath();
+                char const* fixity = (op.flags & POSTFIX) != 0 ? "__postfix " : "__prefix ";
+                char const* qual = (op.flags & ASSIGNMENT) != 0 ? "in out " : "";
 
-            StringBuilder sb;
+                // scalar version
+                sb << fixity;
+                sb << "__intrinsic_op(" << int(op.opCode) << ") " << type.name << " operator" << op.opName << "(" << qual << type.name << " value);\n";
+
+                // vector version
+                sb << "__generic<let N : int> ";
+                sb << fixity;
+                sb << "__intrinsic_op(" << int(op.opCode) << ") vector<" << type.name << ",N> operator" << op.opName << "(" << qual << "vector<" << type.name << ",N> value);\n";
+
+                // matrix version
+                sb << "__generic<let N : int, let M : int> ";
+                sb << fixity;
+                sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << type.name << ",N,M> operator" << op.opName << "(" << qual << "matrix<" << type.name << ",N,M> value);\n";
+            }
+        }
+
+        for (auto op : binaryOps)
+        {
+            for (auto type : kBaseTypes)
+            {
+                if ((type.flags & op.flags) == 0)
+                    continue;
+
+                char const* leftType = type.name;
+                char const* rightType = leftType;
+                char const* resultType = leftType;
+
+                if (op.flags & COMPARISON) resultType = "bool";
+
+                char const* leftQual = "";
+                if(op.flags & ASSIGNMENT) leftQual = "in out ";
+
+                // TODO: handle `SHIFT`
+
+                // scalar version
+                sb << "__intrinsic_op(" << int(op.opCode) << ") " << resultType << " operator" << op.opName << "(" << leftQual << leftType << " left, " << rightType << " right);\n";
+
+                // vector version
+                sb << "__generic<let N : int> ";
+                sb << "__intrinsic_op(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(" << leftQual << "vector<" << leftType << ",N> left, vector<" << rightType << ",N> right);\n";
+
+                // matrix version
+                sb << "__generic<let N : int, let M : int> ";
+                sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << leftQual << "matrix<" << leftType << ",N,M> left, matrix<" << rightType << ",N,M> right);\n";
+            }
+        }
+
+#if 0
+        for (auto op : intUnaryOps)
+        {
+            String opName = GetOperatorFunctionName(op);
+            for (int i = 0; i < 4; i++)
+            {
+                auto itype = intTypes[i];
+                auto utype = uintTypes[i];
+                for (int j = 0; j < 2; j++)
+                {
+                    auto retType = (op == Operator::Not) ? "bool" : j == 0 ? itype : utype;
+                    sb << "__intrinsic " << retType << " operator " << opName << "(" << (j == 0 ? itype : utype) << ");\n";
+                }
+            }
+        }
+
+        for (auto op : floatUnaryOps)
+        {
+            String opName = GetOperatorFunctionName(op);
+            for (int i = 0; i < 4; i++)
+            {
+                auto type = floatTypes[i];
+                auto retType = (op == Operator::Not) ? "bool" : type;
+                sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ");\n";
+            }
+        }
+
+        for (auto op : floatOps)
+        {
+            String opName = GetOperatorFunctionName(op);
+            for (int i = 0; i < 4; i++)
+            {
+                auto type = floatTypes[i];
+                auto itype = intTypes[i];
+                auto utype = uintTypes[i];
+                auto retType = ((op >= Operator::Eql && op <= Operator::Leq) || op == Operator::And || op == Operator::Or) ? "bool" : type;
+                sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << type << ");\n";
+                sb << "__intrinsic " << retType << " operator " << opName << "(" << itype << ", " << type << ");\n";
+                sb << "__intrinsic " << retType << " operator " << opName << "(" << utype << ", " << type << ");\n";
+                sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << itype << ");\n";
+                sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << utype << ");\n";
+                if (i > 0)
+                {
+                    sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << floatTypes[0] << ");\n";
+                    sb << "__intrinsic " << retType << " operator " << opName << "(" << floatTypes[0] << ", " << type << ");\n";
+
+                    sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << intTypes[0] << ");\n";
+                    sb << "__intrinsic " << retType << " operator " << opName << "(" << intTypes[0] << ", " << type << ");\n";
+
+                    sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << uintTypes[0] << ");\n";
+                    sb << "__intrinsic " << retType << " operator " << opName << "(" << uintTypes[0] << ", " << type << ");\n";
+                }
+            }
+        }
+
+        for (auto op : intOps)
+        {
+            String opName = GetOperatorFunctionName(op);
+            for (int i = 0; i < 4; i++)
+            {
+                auto type = intTypes[i];
+                auto utype = uintTypes[i];
+                auto retType = ((op >= Operator::Eql && op <= Operator::Leq) || op == Operator::And || op == Operator::Or) ? "bool" : type;
+                sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << type << ");\n";
+                sb << "__intrinsic " << retType << " operator " << opName << "(" << utype << ", " << type << ");\n";
+                sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << utype << ");\n";
+                sb << "__intrinsic " << retType << " operator " << opName << "(" << utype << ", " << utype << ");\n";
+                if (i > 0)
+                {
+                    sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << intTypes[0] << ");\n";
+                    sb << "__intrinsic " << retType << " operator " << opName << "(" << intTypes[0] << ", " << type << ");\n";
+
+                    sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << uintTypes[0] << ");\n";
+                    sb << "__intrinsic " << retType << " operator " << opName << "(" << uintTypes[0] << ", " << type << ");\n";
+                }
+            }
+        }
+#endif
+
+        // Output a suitable `#line` directive to point at our raw stdlib code above
+        sb << "\n#line " << kLibIncludeStringLine << " \"" << path << "\"\n";
+
+        int chunkCount = sizeof(LibIncludeStringChunks) / sizeof(LibIncludeStringChunks[0]);
+        for (int cc = 0; cc < chunkCount; ++cc)
+        {
+            sb << LibIncludeStringChunks[cc];
+        }
+
+        code = sb.ProduceString();
+        return code;
+    }
+
+
+    // GLSL-specific library code
+
+    String glslLibraryCode;
+
+    String getGLSLLibraryCode()
+    {
+        if(glslLibraryCode.Length() != 0)
+            return glslLibraryCode;
+
+        String path = getStdlibPath();
+
+        StringBuilder sb;
 
 #define RAW(TEXT)           \
-    EMIT_LINE_DIRECTIVE();  \
-    sb << TEXT;
+EMIT_LINE_DIRECTIVE();  \
+sb << TEXT;
 
-            static const struct {
-                char const* name;
-                char const* glslPrefix;
-            } kTypes[] =
-            {
-                {"float", ""},
-                {"int", "i"},
-                {"uint", "u"},
-                {"bool", "b"},
-            };
-            static const int kTypeCount = sizeof(kTypes) / sizeof(kTypes[0]);
+        static const struct {
+            char const* name;
+            char const* glslPrefix;
+        } kTypes[] =
+        {
+            {"float", ""},
+            {"int", "i"},
+            {"uint", "u"},
+            {"bool", "b"},
+        };
+        static const int kTypeCount = sizeof(kTypes) / sizeof(kTypes[0]);
 
-            for( int tt = 0; tt < kTypeCount; ++tt )
+        for( int tt = 0; tt < kTypeCount; ++tt )
+        {
+            // Declare GLSL aliases for HLSL types
+            for (int vv = 2; vv <= 4; ++vv)
             {
-                // Declare GLSL aliases for HLSL types
-                for (int vv = 2; vv <= 4; ++vv)
-                {
-                    sb << "typedef " << kTypes[tt].name << vv << " " << kTypes[tt].glslPrefix << "vec" << vv << ";\n";
-                    sb << "typedef " << kTypes[tt].name << vv << "x" << vv << " " << kTypes[tt].glslPrefix << "mat" << vv << ";\n";
-                }
-                for (int rr = 2; rr <= 4; ++rr)
-                for (int cc = 2; cc <= 4; ++cc)
-                {
-                    sb << "typedef " << kTypes[tt].name << rr << "x" << cc << " " << kTypes[tt].glslPrefix << "mat" << rr << "x" << cc << ";\n";
-                }
+                sb << "typedef " << kTypes[tt].name << vv << " " << kTypes[tt].glslPrefix << "vec" << vv << ";\n";
+                sb << "typedef " << kTypes[tt].name << vv << "x" << vv << " " << kTypes[tt].glslPrefix << "mat" << vv << ";\n";
             }
-
-            // TODO(tfoley): Need to handle `RW*` variants of texture types as well...
-            static const struct {
-                char const*			name;
-                TextureType::Shape	baseShape;
-                int					coordCount;
-            } kBaseTextureTypes[] = {
-                { "1D",		TextureType::Shape1D,	1 },
-                { "2D",		TextureType::Shape2D,	2 },
-                { "3D",		TextureType::Shape3D,	3 },
-                { "Cube",	TextureType::ShapeCube,	3 },
-            };
-            static const int kBaseTextureTypeCount = sizeof(kBaseTextureTypes) / sizeof(kBaseTextureTypes[0]);
-
-
-            static const struct {
-                char const*         name;
-                SlangResourceAccess access;
-            } kBaseTextureAccessLevels[] = {
-                { "",                   SLANG_RESOURCE_ACCESS_READ },
-                { "RW",                 SLANG_RESOURCE_ACCESS_READ_WRITE },
-                { "RasterizerOrdered",  SLANG_RESOURCE_ACCESS_RASTER_ORDERED },
-            };
-            static const int kBaseTextureAccessLevelCount = sizeof(kBaseTextureAccessLevels) / sizeof(kBaseTextureAccessLevels[0]);
-
-            for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
+            for (int rr = 2; rr <= 4; ++rr)
+            for (int cc = 2; cc <= 4; ++cc)
             {
-                char const* shapeName = kBaseTextureTypes[tt].name;
-                TextureType::Shape baseShape = kBaseTextureTypes[tt].baseShape;
+                sb << "typedef " << kTypes[tt].name << rr << "x" << cc << " " << kTypes[tt].glslPrefix << "mat" << rr << "x" << cc << ";\n";
+            }
+        }
 
-                for (int isArray = 0; isArray < 2; ++isArray)
+        // TODO(tfoley): Need to handle `RW*` variants of texture types as well...
+        static const struct {
+            char const*			name;
+            TextureType::Shape	baseShape;
+            int					coordCount;
+        } kBaseTextureTypes[] = {
+            { "1D",		TextureType::Shape1D,	1 },
+            { "2D",		TextureType::Shape2D,	2 },
+            { "3D",		TextureType::Shape3D,	3 },
+            { "Cube",	TextureType::ShapeCube,	3 },
+        };
+        static const int kBaseTextureTypeCount = sizeof(kBaseTextureTypes) / sizeof(kBaseTextureTypes[0]);
+
+
+        static const struct {
+            char const*         name;
+            SlangResourceAccess access;
+        } kBaseTextureAccessLevels[] = {
+            { "",                   SLANG_RESOURCE_ACCESS_READ },
+            { "RW",                 SLANG_RESOURCE_ACCESS_READ_WRITE },
+            { "RasterizerOrdered",  SLANG_RESOURCE_ACCESS_RASTER_ORDERED },
+        };
+        static const int kBaseTextureAccessLevelCount = sizeof(kBaseTextureAccessLevels) / sizeof(kBaseTextureAccessLevels[0]);
+
+        for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
+        {
+            char const* shapeName = kBaseTextureTypes[tt].name;
+            TextureType::Shape baseShape = kBaseTextureTypes[tt].baseShape;
+
+            for (int isArray = 0; isArray < 2; ++isArray)
+            {
+                // Arrays of 3D textures aren't allowed
+                if (isArray && baseShape == TextureType::Shape3D) continue;
+
+                for (int isMultisample = 0; isMultisample < 2; ++isMultisample)
                 {
-                    // Arrays of 3D textures aren't allowed
-                    if (isArray && baseShape == TextureType::Shape3D) continue;
+                    auto access = SLANG_RESOURCE_ACCESS_READ;
 
-                    for (int isMultisample = 0; isMultisample < 2; ++isMultisample)
-                    {
-                        auto access = SLANG_RESOURCE_ACCESS_READ;
-
-                        // TODO: any constraints to enforce on what gets to be multisampled?
+                    // TODO: any constraints to enforce on what gets to be multisampled?
 
                         
-                        unsigned flavor = baseShape;
-                        if (isArray)		flavor |= TextureType::ArrayFlag;
-                        if (isMultisample)	flavor |= TextureType::MultisampleFlag;
+                    unsigned flavor = baseShape;
+                    if (isArray)		flavor |= TextureType::ArrayFlag;
+                    if (isMultisample)	flavor |= TextureType::MultisampleFlag;
 //                        if (isShadow)		flavor |= TextureType::ShadowFlag;
 
-                        flavor |= (access << 8);
+                    flavor |= (access << 8);
 
-                        StringBuilder nameBuilder;
-                        nameBuilder << shapeName;
-                        if (isMultisample) nameBuilder << "MS";
-                        if (isArray) nameBuilder << "Array";
-                        auto name = nameBuilder.ProduceString();
+                    StringBuilder nameBuilder;
+                    nameBuilder << shapeName;
+                    if (isMultisample) nameBuilder << "MS";
+                    if (isArray) nameBuilder << "Array";
+                    auto name = nameBuilder.ProduceString();
 
-                        sb << "__generic<T> ";
-                        sb << "__magic_type(TextureSampler," << int(flavor) << ") struct ";
-                        sb << "__sampler" << name;
-                        sb << " {};\n";
+                    sb << "__generic<T> ";
+                    sb << "__magic_type(TextureSampler," << int(flavor) << ") struct ";
+                    sb << "__sampler" << name;
+                    sb << " {};\n";
 
-                        sb << "__generic<T> ";
-                        sb << "__magic_type(Texture," << int(flavor) << ") struct ";
-                        sb << "__texture" << name;
-                        sb << " {};\n";
+                    sb << "__generic<T> ";
+                    sb << "__magic_type(Texture," << int(flavor) << ") struct ";
+                    sb << "__texture" << name;
+                    sb << " {};\n";
 
-                        sb << "__generic<T> ";
-                        sb << "__magic_type(GLSLImageType," << int(flavor) << ") struct ";
-                        sb << "__image" << name;
-                        sb << " {};\n";
+                    sb << "__generic<T> ";
+                    sb << "__magic_type(GLSLImageType," << int(flavor) << ") struct ";
+                    sb << "__image" << name;
+                    sb << " {};\n";
 
-                        // TODO(tfoley): flesh this out for all the available prefixes
-                        static const struct
-                        {
-                            char const* prefix;
-                            char const* elementType;
-                        } kTextureElementTypes[] = {
-                            { "", "vec4" },
-                            { "i", "ivec4" },
-                            { "u", "uvec4" },
-                            { nullptr, nullptr },
-                        };
-                        for( auto ee = kTextureElementTypes; ee->prefix; ++ee )
-                        {
-                            sb << "typedef __sampler" << name << "<" << ee->elementType << "> " << ee->prefix << "sampler" << name << ";\n";
-                            sb << "typedef __texture" << name << "<" << ee->elementType << "> " << ee->prefix << "texture" << name << ";\n";
-                            sb << "typedef __image" << name << "<" << ee->elementType << "> " << ee->prefix << "image" << name << ";\n";
-                        }
+                    // TODO(tfoley): flesh this out for all the available prefixes
+                    static const struct
+                    {
+                        char const* prefix;
+                        char const* elementType;
+                    } kTextureElementTypes[] = {
+                        { "", "vec4" },
+                        { "i", "ivec4" },
+                        { "u", "uvec4" },
+                        { nullptr, nullptr },
+                    };
+                    for( auto ee = kTextureElementTypes; ee->prefix; ++ee )
+                    {
+                        sb << "typedef __sampler" << name << "<" << ee->elementType << "> " << ee->prefix << "sampler" << name << ";\n";
+                        sb << "typedef __texture" << name << "<" << ee->elementType << "> " << ee->prefix << "texture" << name << ";\n";
+                        sb << "typedef __image" << name << "<" << ee->elementType << "> " << ee->prefix << "image" << name << ";\n";
                     }
                 }
             }
-
-            sb << "__generic<T> __magic_type(GLSLInputParameterBlockType) struct __GLSLInputParameterBlock {};\n";
-            sb << "__generic<T> __magic_type(GLSLOutputParameterBlockType) struct __GLSLOutputParameterBlock {};\n";
-            sb << "__generic<T> __magic_type(GLSLShaderStorageBufferType) struct __GLSLShaderStorageBuffer {};\n";
-
-            sb << "__magic_type(SamplerState," << int(SamplerStateType::Flavor::SamplerState) << ") struct sampler {};";
-
-            sb << "__magic_type(GLSLInputAttachmentType) struct subpassInput {};";
-
-            // Define additional keywords
-            sb << "__modifier(GLSLBufferModifier)       buffer;\n";
-            sb << "__modifier(GLSLWriteOnlyModifier)    writeonly;\n";
-            sb << "__modifier(GLSLReadOnlyModifier)     readonly;\n";
-            sb << "__modifier(GLSLPatchModifier)        patch;\n";
-
-            sb << "__modifier(SimpleModifier)           flat;\n";
-
-            glslLibraryCode = sb.ProduceString();
-            return glslLibraryCode;
         }
 
+        sb << "__generic<T> __magic_type(GLSLInputParameterBlockType) struct __GLSLInputParameterBlock {};\n";
+        sb << "__generic<T> __magic_type(GLSLOutputParameterBlockType) struct __GLSLOutputParameterBlock {};\n";
+        sb << "__generic<T> __magic_type(GLSLShaderStorageBufferType) struct __GLSLShaderStorageBuffer {};\n";
 
+        sb << "__magic_type(SamplerState," << int(SamplerStateType::Flavor::SamplerState) << ") struct sampler {};";
 
-        //
+        sb << "__magic_type(GLSLInputAttachmentType) struct subpassInput {};";
 
-        void SlangStdLib::Finalize()
-        {
-            code = nullptr;
-            stdlibPath = String();
-            glslLibraryCode = String();
-        }
+        // Define additional keywords
+        sb << "__modifier(GLSLBufferModifier)       buffer;\n";
+        sb << "__modifier(GLSLWriteOnlyModifier)    writeonly;\n";
+        sb << "__modifier(GLSLReadOnlyModifier)     readonly;\n";
+        sb << "__modifier(GLSLPatchModifier)        patch;\n";
 
+        sb << "__modifier(SimpleModifier)           flat;\n";
+
+        glslLibraryCode = sb.ProduceString();
+        return glslLibraryCode;
     }
-}
 
+
+
+    //
+
+    void SlangStdLib::Finalize()
+    {
+        code = nullptr;
+        stdlibPath = String();
+        glslLibraryCode = String();
+    }
+
+}

@@ -11,7 +11,7 @@
 #pragma warning(disable:4996)
 #endif
 
-namespace Slang { namespace Compiler {
+namespace Slang {
 
 struct EmitContext
 {
@@ -2748,4 +2748,4 @@ String emitProgram(
 }
 
 
-}} // Slang::Compiler
+} // namespace Slang

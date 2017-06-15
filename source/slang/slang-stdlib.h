@@ -5,19 +5,16 @@
 
 namespace Slang
 {
-    namespace Compiler
+    class SlangStdLib
     {
-        class SlangStdLib
-        {
-        private:
-            static CoreLib::String code;
-        public:
-            static CoreLib::String GetCode();
-            static void Finalize();
-        };
+    private:
+        static CoreLib::String code;
+    public:
+        static CoreLib::String GetCode();
+        static void Finalize();
+    };
 
-        CoreLib::String getGLSLLibraryCode();
-    }
+    CoreLib::String getGLSLLibraryCode();
 }
 
 #endif

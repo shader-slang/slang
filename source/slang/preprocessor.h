@@ -5,7 +5,7 @@
 #include "../core/basic.h"
 #include "../slang/lexer.h"
 
-namespace Slang{ namespace Compiler {
+namespace Slang {
 
 class DiagnosticSink;
 class ProgramSyntaxNode;
@@ -30,6 +30,6 @@ TokenList preprocessSource(
     CoreLib::Dictionary<CoreLib::String, CoreLib::String>  defines,
     ProgramSyntaxNode*  syntax);
 
-}}
+} // namespace Slang
 
 #endif

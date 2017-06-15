@@ -10,7 +10,6 @@
 #define SLANG_EXHAUSTIVE_SWITCH() default: assert(!"unexpected"); break;
 
 namespace Slang {
-namespace Compiler {
 
 // Information on ranges of registers already claimed/used
 struct UsedRange
@@ -1249,4 +1248,4 @@ void GenerateParameterBindings(
     program->layout = programLayout;
 }
 
-}}
+}

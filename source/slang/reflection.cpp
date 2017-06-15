@@ -9,7 +9,6 @@
 // Implementation to back public-facing reflection API
 
 using namespace Slang;
-using namespace Slang::Compiler;
 
 
 // Conversion routines to help with strongly-typed reflection API
@@ -750,13 +749,6 @@ SLANG_API SlangReflectionEntryPoint* spReflection_getEntryPointByIndex(SlangRefl
 
 
 namespace Slang {
-namespace Compiler {
-
-
-
-
-
-
 
 // Debug helper code: dump reflection data after generation
 
@@ -1401,4 +1393,4 @@ String emitReflectionJSON(
     return writer.sb.ProduceString();
 }
 
-}}
+}
