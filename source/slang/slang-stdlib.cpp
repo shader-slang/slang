@@ -239,22 +239,22 @@ __generic<T> __magic_type(HLSLLineStreamType) struct TriangleStream {};
 // Note(tfoley): Trying to systematically add all the HLSL builtins
 
 // A type that can be used as an operand for builtins
-__trait __BuiltinType {}
+interface __BuiltinType {}
 
 // A type that can be used for arithmetic operations
-__trait __BuiltinArithmeticType : __BuiltinType {}
+interface __BuiltinArithmeticType : __BuiltinType {}
 
 // A type that logically has a sign (positive/negative/zero)
-__trait __BuiltinSignedArithmeticType : __BuiltinArithmeticType {}
+interface __BuiltinSignedArithmeticType : __BuiltinArithmeticType {}
 
 // A type that can represent integers
-__trait __BuiltinIntegerType : __BuiltinArithmeticType {}
+interface __BuiltinIntegerType : __BuiltinArithmeticType {}
 
 // A type that can represent non-integers
-__trait __BuiltinRealType : __BuiltinArithmeticType {}
+interface __BuiltinRealType : __BuiltinArithmeticType {}
 
 // A type that uses a floating-point representation
-__trait __BuiltinFloatingPointType : __BuiltinRealType, __BuiltinSignedType {}
+interface __BuiltinFloatingPointType : __BuiltinRealType, __BuiltinSignedArithmeticType {}
 
 // Try to terminate the current draw or dispatch call (HLSL SM 4.0)
 __intrinsic void abort();
@@ -1088,32 +1088,35 @@ namespace Slang
             for (int tt = 0; tt < kBaseTypeCount; ++tt)
             {
                 EMIT_LINE_DIRECTIVE();
-                sb << "__builtin_type(" << int(kBaseTypes[tt].tag) << ") struct " << kBaseTypes[tt].name << "\n{\n";
+                sb << "__builtin_type(" << int(kBaseTypes[tt].tag) << ") struct " << kBaseTypes[tt].name;
 
-                // Declare trait conformances for this type
+                // Declare interface conformances for this type
 
-                sb << "__conforms __BuiltinType;\n";
+                sb << "\n    : __BuiltinType\n";
 
                 switch( kBaseTypes[tt].tag )
                 {
                 case BaseType::Float:
-                    sb << "__conforms __BuiltinFloatingPointType;\n";
-                    sb << "__conforms __BuiltinRealType;\n";
+                    sb << "\n    , __BuiltinFloatingPointType\n";
+                    sb << "\n    ,  __BuiltinRealType\n";
                     // fall through to:
                 case BaseType::Int:
-                    sb << "__conforms __BuiltinSignedArithmeticType;\n";
+                    sb << "\n    ,  __BuiltinSignedArithmeticType\n";
                     // fall through to:
                 case BaseType::UInt:
                 case BaseType::UInt64:
-                    sb << "__conforms __BuiltinArithmeticType;\n";
+                    sb << "\n    ,  __BuiltinArithmeticType\n";
                     // fall through to:
                 case BaseType::Bool:
-                    sb << "__conforms __BuiltinType;\n";
+                    sb << "\n    ,  __BuiltinType\n";
                     break;
 
                 default:
                     break;
                 }
+
+                sb << "\n{\n";
+
 
                 // Declare initializers to convert from various other types
                 for( int ss = 0; ss < kBaseTypeCount; ++ss )

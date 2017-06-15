@@ -1311,19 +1311,19 @@ namespace Slang
             return visitor->VisitDefaultStmt(this);
         }
 
-        // TraitDecl
+        // InterfaceDecl
 
-        RefPtr<SyntaxNode> TraitDecl::Accept(SyntaxVisitor * visitor)
+        RefPtr<SyntaxNode> InterfaceDecl::Accept(SyntaxVisitor * visitor)
         {
-            visitor->VisitTraitDecl(this);
+            visitor->visitInterfaceDecl(this);
             return this;
         }
 
-        // TraitConformanceDecl
+        // InheritanceDecl
 
-        RefPtr<SyntaxNode> TraitConformanceDecl::Accept(SyntaxVisitor * visitor)
+        RefPtr<SyntaxNode> InheritanceDecl::Accept(SyntaxVisitor * visitor)
         {
-            visitor->VisitTraitConformanceDecl(this);
+            visitor->visitInheritanceDecl(this);
             return this;
         }
 

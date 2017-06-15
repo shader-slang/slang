@@ -546,6 +546,12 @@ namespace Slang
                 // No conversion at all
                 kConversionCost_None = 0,
 
+                // Conversions based on explicit sub-typing relationships are the cheapest
+                //
+                // TODO(tfoley): We will eventually need a discipline for ranking
+                // when two up-casts are comparable.
+                kConversionCost_CastToInterface = 50,
+
                 // Conversion that is lossless and keeps the "kind" of the value the same
                 kConversionCost_RankPromotion = 100,
 
@@ -901,6 +907,25 @@ namespace Slang
                     }
                 }
 
+                if (auto toDeclRefType = toType->As<DeclRefType>())
+                {
+                    auto toTypeDeclRef = toDeclRefType->declRef;
+                    if (auto interfaceDeclRef = toTypeDeclRef.As<InterfaceDeclRef>())
+                    {
+                        // Trying to convert to an interface type.
+                        //
+                        // We will allow this if the type conforms to the interface.
+                        if (DoesTypeConformToInterface(fromType, interfaceDeclRef))
+                        {
+                            if (outToExpr)
+                                *outToExpr = CreateImplicitCastExpr(toType, fromExpr);
+                            if (outCost)
+                                *outCost = kConversionCost_CastToInterface;
+                            return true;
+                        }
+                    }
+                }
+
                 // TODO: more cases!
 
                 return false;
@@ -1045,24 +1070,32 @@ namespace Slang
                 return genericDecl;
             }
 
-            virtual void VisitTraitConformanceDecl(TraitConformanceDecl* conformanceDecl) override
+            virtual void visitInterfaceDecl(InterfaceDecl* decl) override
             {
-                // check the type being conformed to
-                auto base = conformanceDecl->base;
+                // TODO: do some actual checking of members here
+            }
+
+            virtual void visitInheritanceDecl(InheritanceDecl* inheritanceDecl) override
+            {
+                // check the type being inherited from
+                auto base = inheritanceDecl->base;
                 base = TranslateTypeNode(base);
-                conformanceDecl->base = base;
+                inheritanceDecl->base = base;
+
+                // For now we only allow inheritance from interfaces, so
+                // we will validate that the type expression names an interface
 
                 if(auto declRefType = base.type->As<DeclRefType>())
                 {
-                    if(auto traitDeclRef = declRefType->declRef.As<TraitDeclRef>())
+                    if(auto interfaceDeclRef = declRefType->declRef.As<InterfaceDeclRef>())
                     {
-                        conformanceDecl->traitDeclRef = traitDeclRef;
                         return;
                     }
                 }
 
-                // We expected a trait here
-                getSink()->diagnose( conformanceDecl, Diagnostics::expectedATraitGot, base.type);
+                // If type expression didn't name an interface, we'll emit an error here
+                // TODO: deal with the case of an error in the type expression (don't cascade)
+                getSink()->diagnose( base.exp, Diagnostics::expectedAnInterfaceGot, base.type);
             }
 
             RefPtr<ConstantIntVal> checkConstantIntVal(
@@ -2479,20 +2512,24 @@ namespace Slang
                     vectorType->elementCount);
             }
 
-            bool DoesTypeConformToTrait(
+            bool DoesTypeConformToInterface(
                 RefPtr<ExpressionType>  type,
-                TraitDeclRef            traitDeclRef)
+                InterfaceDeclRef        interfaceDeclRef)
             {
                 // for now look up a conformance member...
                 if(auto declRefType = type->As<DeclRefType>())
                 {
                     if( auto aggTypeDeclRef = declRefType->declRef.As<AggTypeDeclRef>() )
                     {
-                        for( auto conformanceRef : aggTypeDeclRef.GetMembersOfType<TraitConformanceDeclRef>())
+                        for( auto inheritanceDeclRef : aggTypeDeclRef.GetMembersOfType<InheritanceDeclRef>())
                         {
-                            EnsureDecl(conformanceRef.GetDecl());
+                            EnsureDecl(inheritanceDeclRef.GetDecl());
 
-                            if(traitDeclRef.Equals(conformanceRef.GetTraitDeclRef()))
+                            auto inheritedDeclRefType = inheritanceDeclRef.getBaseType()->As<DeclRefType>();
+                            if (!inheritedDeclRefType)
+                                continue;
+
+                            if(interfaceDeclRef.Equals(inheritedDeclRefType->declRef))
                                 return true;
                         }
                     }
@@ -2502,12 +2539,12 @@ namespace Slang
                 return false;
             }
 
-            RefPtr<ExpressionType> TryJoinTypeWithTrait(
+            RefPtr<ExpressionType> TryJoinTypeWithInterface(
                 RefPtr<ExpressionType>  type,
-                TraitDeclRef            traitDeclRef)
+                InterfaceDeclRef        interfaceDeclRef)
             {
                 // The most basic test here should be: does the type declare conformance to the trait.
-                if(DoesTypeConformToTrait(type, traitDeclRef))
+                if(DoesTypeConformToInterface(type, interfaceDeclRef))
                     return type;
 
                 // There is a more nuanced case if `type` is a builtin type, and we need to make it
@@ -2590,18 +2627,18 @@ namespace Slang
                 // HACK: trying to work trait types in here...
                 if(auto leftDeclRefType = left->As<DeclRefType>())
                 {
-                    if( auto leftTraitRef = leftDeclRefType->declRef.As<TraitDeclRef>() )
+                    if( auto leftInterfaceRef = leftDeclRefType->declRef.As<InterfaceDeclRef>() )
                     {
                         // 
-                        return TryJoinTypeWithTrait(right, leftTraitRef);
+                        return TryJoinTypeWithInterface(right, leftInterfaceRef);
                     }
                 }
                 if(auto rightDeclRefType = right->As<DeclRefType>())
                 {
-                    if( auto rightTraitRef = rightDeclRefType->declRef.As<TraitDeclRef>() )
+                    if( auto rightInterfaceRef = rightDeclRefType->declRef.As<InterfaceDeclRef>() )
                     {
                         // 
-                        return TryJoinTypeWithTrait(left, rightTraitRef);
+                        return TryJoinTypeWithInterface(left, rightInterfaceRef);
                     }
                 }
 
