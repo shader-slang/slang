@@ -9,13 +9,13 @@ namespace Slang {
 struct BreadcrumbInfo
 {
     LookupResultItem::Breadcrumb::Kind kind;
-    DeclRef declRef;
+    DeclRef<Decl> declRef;
     BreadcrumbInfo* prev = nullptr;
 };
 
 void DoLocalLookupImpl(
     String const&		    name,
-    ContainerDeclRef	    containerDeclRef,
+    DeclRef<ContainerDecl>	    containerDeclRef,
     LookupRequest const&    request,
     LookupResult&		    result,
     BreadcrumbInfo*		    inBreadcrumbs);
@@ -113,7 +113,7 @@ LookupResult refineLookup(LookupResult const& inResult, LookupMask mask)
     LookupResult result;
     for (auto item : inResult.items)
     {
-        if (!DeclPassesLookupMask(item.declRef.GetDecl(), mask))
+        if (!DeclPassesLookupMask(item.declRef.getDecl(), mask))
             continue;
 
         AddToLookupResult(result, item);
@@ -122,7 +122,7 @@ LookupResult refineLookup(LookupResult const& inResult, LookupMask mask)
 }
 
 LookupResultItem CreateLookupResultItem(
-    DeclRef declRef,
+    DeclRef<Decl> declRef,
     BreadcrumbInfo* breadcrumbInfos)
 {
     LookupResultItem item;
@@ -167,7 +167,7 @@ void DoMemberLookupImpl(
 
     if (auto baseDeclRefType = baseType->As<DeclRefType>())
     {
-        if (auto baseAggTypeDeclRef = baseDeclRefType->declRef.As<AggTypeDeclRef>())
+        if (auto baseAggTypeDeclRef = baseDeclRefType->declRef.As<AggTypeDecl>())
         {
             DoLocalLookupImpl(name, baseAggTypeDeclRef, request, ioResult, breadcrumbs);
         }
@@ -178,7 +178,7 @@ void DoMemberLookupImpl(
 
 void DoMemberLookupImpl(
     String const&	        name,
-    DeclRef			        baseDeclRef,
+    DeclRef<Decl>			        baseDeclRef,
     LookupRequest const&    request,
     LookupResult&	        ioResult,
     BreadcrumbInfo*	        breadcrumbs)
@@ -190,12 +190,12 @@ void DoMemberLookupImpl(
 // Look for members of the given name in the given container for declarations
 void DoLocalLookupImpl(
     String const&		    name,
-    ContainerDeclRef	    containerDeclRef,
+    DeclRef<ContainerDecl>	    containerDeclRef,
     LookupRequest const&    request,
     LookupResult&		    result,
     BreadcrumbInfo*		    inBreadcrumbs)
 {
-    ContainerDecl* containerDecl = containerDeclRef.GetDecl();
+    ContainerDecl* containerDecl = containerDeclRef.getDecl();
 
     // Ensure that the lookup dictionary in the container is up to date
     if (!containerDecl->memberDictionaryIsValid)
@@ -217,7 +217,7 @@ void DoLocalLookupImpl(
             continue;
 
         // The declaration passed the test, so add it!
-        AddToLookupResult(result, CreateLookupResultItem(DeclRef(m, containerDeclRef.substitutions), inBreadcrumbs));
+        AddToLookupResult(result, CreateLookupResultItem(DeclRef<Decl>(m, containerDeclRef.substitutions), inBreadcrumbs));
     }
 
 
@@ -228,7 +228,7 @@ void DoLocalLookupImpl(
     {
         // The reference to the transparent member should use whatever
         // substitutions we used in referring to its outer container
-        DeclRef transparentMemberDeclRef(transparentInfo.decl, containerDeclRef.substitutions);
+        DeclRef<Decl> transparentMemberDeclRef(transparentInfo.decl, containerDeclRef.substitutions);
 
         // We need to leave a breadcrumb so that we know that the result
         // of lookup involves a member lookup step here
@@ -261,7 +261,7 @@ void DoLookupImpl(
             if(!link->containerDecl)
                 continue;
 
-            ContainerDeclRef containerRef = DeclRef(link->containerDecl, nullptr).As<ContainerDeclRef>();
+            DeclRef<ContainerDecl> containerRef = DeclRef<Decl>(link->containerDecl, nullptr).As<ContainerDecl>();
             DoLocalLookupImpl(name, containerRef, request, result, nullptr);
         }
 
@@ -292,19 +292,12 @@ LookupResult LookUp(String const& name, RefPtr<Scope> scope)
 
 // perform lookup within the context of a particular container declaration,
 // and do *not* look further up the chain
-LookupResult LookUpLocal(String const& name, ContainerDeclRef containerDeclRef)
+LookupResult LookUpLocal(String const& name, DeclRef<ContainerDecl> containerDeclRef)
 {
     LookupRequest request;
     LookupResult result;
     DoLocalLookupImpl(name, containerDeclRef, request, result, nullptr);
     return result;
 }
-
-LookupResult LookUpLocal(String const& name, ContainerDecl* containerDecl)
-{
-    ContainerDeclRef containerRef = DeclRef(containerDecl, nullptr).As<ContainerDeclRef>();
-    return LookUpLocal(name, containerRef);
-}
-
 
 }

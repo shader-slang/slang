@@ -700,73 +700,123 @@ namespace Slang
 
     // A reference to a declaration, which may include
     // substitutions for generic parameters.
-    struct DeclRef
+    struct DeclRefBase
     {
         typedef Decl DeclType;
 
         // The underlying declaration
         Decl* decl = nullptr;
-        Decl* GetDecl() const { return decl; }
+        Decl* getDecl() const { return decl; }
 
         // Optionally, a chain of substititions to perform
         RefPtr<Substitutions> substitutions;
 
-        DeclRef()
+        DeclRefBase()
         {}
 
-        DeclRef(Decl* decl, RefPtr<Substitutions> substitutions)
+        DeclRefBase(Decl* decl, RefPtr<Substitutions> substitutions)
             : decl(decl)
             , substitutions(substitutions)
         {}
 
         // Apply substitutions to a type or ddeclaration
         RefPtr<ExpressionType> Substitute(RefPtr<ExpressionType> type) const;
-        DeclRef Substitute(DeclRef declRef) const;
+
+        DeclRefBase Substitute(DeclRefBase declRef) const;
 
         // Apply substitutions to an expression
         RefPtr<ExpressionSyntaxNode> Substitute(RefPtr<ExpressionSyntaxNode> expr) const;
 
         // Apply substitutions to this declaration reference
-        DeclRef SubstituteImpl(Substitutions* subst, int* ioDiff);
+        DeclRefBase SubstituteImpl(Substitutions* subst, int* ioDiff);
 
         // Check if this is an equivalent declaration reference to another
-        bool Equals(DeclRef const& declRef) const;
-        bool operator == (const DeclRef& other) const
+        bool Equals(DeclRefBase const& declRef) const;
+        bool operator == (const DeclRefBase& other) const
         {
             return Equals(other);
         }
 
         // Convenience accessors for common properties of declarations
         String const& GetName() const;
-        DeclRef GetParent() const;
-
-        // "dynamic cast" to a more specific declaration reference type
-        template<typename T>
-        T As() const
-        {
-            T result;
-            result.decl = dynamic_cast<T::DeclType*>(decl);
-            result.substitutions = substitutions;
-            return result;
-        }
-
-        // Implicit conversion mostly so we can use a `DeclRef`
-        // in a conditional context
-        operator Decl*() const
-        {
-            return decl;
-        }
+        DeclRefBase GetParent() const;
 
         int GetHashCode() const;
     };
 
-    // Helper macro for defining `DeclRef` subtypes
-    #define SLANG_DECLARE_DECL_REF(D)				    \
-        typedef D DeclType;							    \
-        D* GetDecl() const { return (D*) decl; }	    \
-        /* */
+    template<typename T>
+    struct DeclRef : DeclRefBase
+    {
+        typedef T DeclType;
 
+        DeclRef()
+        {}
 
+        DeclRef(T* decl, RefPtr<Substitutions> substitutions)
+            : DeclRefBase(decl, substitutions)
+        {}
+
+        template <typename U>
+        DeclRef(DeclRef<U> const& other,
+            typename EnableIf<IsConvertible<T*, U*>::Value, void>::type* = 0)
+            : DeclRefBase(other.decl, other.substitutions)
+        {
+        }
+
+        // "dynamic cast" to a more specific declaration reference type
+        template<typename T>
+        DeclRef<T> As() const
+        {
+            DeclRef<T> result;
+            result.decl = dynamic_cast<T*>(decl);
+            result.substitutions = substitutions;
+            return result;
+        }
+
+        T* getDecl() const
+        {
+            return (T*)decl;
+        }
+
+        operator T*() const
+        {
+            return getDecl();
+        }
+
+        //
+        static DeclRef<T> unsafeInit(DeclRefBase const& declRef)
+        {
+            return DeclRef<T>((T*) declRef.decl, declRef.substitutions);
+        }
+
+        RefPtr<ExpressionType> Substitute(RefPtr<ExpressionType> type) const
+        {
+            return DeclRefBase::Substitute(type);
+        }
+        RefPtr<ExpressionSyntaxNode> Substitute(RefPtr<ExpressionSyntaxNode> expr) const
+        {
+            return DeclRefBase::Substitute(expr);
+        }
+
+        // Apply substitutions to a type or ddeclaration
+        template<typename U>
+        DeclRef<U> Substitute(DeclRef<U> declRef) const
+        {
+            return DeclRef<U>::unsafeInit(DeclRefBase::Substitute(declRef));
+        }
+
+        // Apply substitutions to this declaration reference
+        DeclRef<T> SubstituteImpl(Substitutions* subst, int* ioDiff)
+        {
+            return DeclRef<T>::unsafeInit(DeclRefBase::SubstituteImpl(subst, ioDiff));
+        }
+
+        DeclRef<ContainerDecl> GetParent() const
+        {
+            return DeclRef<ContainerDecl>::unsafeInit(DeclRefBase::GetParent());
+        }
+
+    };
 
     // The type of a reference to an overloaded name
     class OverloadGroupType : public ExpressionType
@@ -809,17 +859,17 @@ namespace Slang
     class DeclRefType : public ExpressionType
     {
     public:
-        DeclRef declRef;
+        DeclRef<Decl> declRef;
 
         virtual String ToString() override;
         virtual RefPtr<Val> SubstituteImpl(Substitutions* subst, int* ioDiff) override;
 
-        static DeclRefType* Create(DeclRef declRef);
+        static DeclRefType* Create(DeclRef<Decl> declRef);
 
     protected:
         DeclRefType()
         {}
-        DeclRefType(DeclRef declRef)
+        DeclRefType(DeclRef<Decl> declRef)
             : declRef(declRef)
         {}
         virtual int GetHashCode() override;
@@ -1246,7 +1296,7 @@ namespace Slang
         List<RefPtr<Decl>> Members;
 
         template<typename T>
-        FilteredMemberList<T> GetMembersOfType()
+        FilteredMemberList<T> getMembersOfType()
         {
             return FilteredMemberList<T>(Members);
         }
@@ -1286,9 +1336,9 @@ namespace Slang
             return count;
         }
 
-        List<T> ToArray() const
+        List<DeclRef<T>> ToArray() const
         {
-            List<T> result;
+            List<DeclRef<T>> result;
             for (auto d : *this)
                 result.Add(d);
             return result;
@@ -1320,9 +1370,9 @@ namespace Slang
                 ptr = list->Adjust(ptr + 1, end);
             }
 
-            T operator*()
+            DeclRef<T> operator*()
             {
-                return DeclRef(ptr->Ptr(), list->substitutions).As<T>();
+                return DeclRef<T>((T*) ptr->Ptr(), list->substitutions);
             }
         };
 
@@ -1333,7 +1383,7 @@ namespace Slang
         {
             while (ptr != end)
             {
-                DeclRef declRef(ptr->Ptr(), substitutions);
+                DeclRef<Decl> declRef(ptr->Ptr(), substitutions);
                 if (declRef.As<T>())
                     return ptr;
                 ptr++;
@@ -1342,22 +1392,16 @@ namespace Slang
         }
     };
 
-    struct ContainerDeclRef : DeclRef
+    inline FilteredMemberRefList<Decl> getMembers(DeclRef<ContainerDecl> const& declRef)
     {
-        SLANG_DECLARE_DECL_REF(ContainerDecl);
+        return FilteredMemberRefList<Decl>(declRef.getDecl()->Members, declRef.substitutions);
+    }
 
-        FilteredMemberRefList<DeclRef> GetMembers() const
-        {
-            return FilteredMemberRefList<DeclRef>(GetDecl()->Members, substitutions);
-        }
-
-        template<typename T>
-        FilteredMemberRefList<T> GetMembersOfType() const
-        {
-            return FilteredMemberRefList<T>(GetDecl()->Members, substitutions);
-        }
-
-    };
+    template<typename T>
+    inline FilteredMemberRefList<T> getMembersOfType(DeclRef<ContainerDecl> const& declRef)
+    {
+        return FilteredMemberRefList<T>(declRef.getDecl()->Members, declRef.substitutions);
+    }
 
     //
     // Type Expressions
@@ -1417,14 +1461,15 @@ namespace Slang
         RefPtr<ExpressionSyntaxNode> Expr;
     };
 
-    struct VarDeclBaseRef : DeclRef
+    inline RefPtr<ExpressionType> GetType(DeclRef<VarDeclBase> const& declRef)
     {
-        SLANG_DECLARE_DECL_REF(VarDeclBase);
+        return declRef.Substitute(declRef.getDecl()->Type);
+    }
 
-        RefPtr<ExpressionType> GetType() const { return Substitute(GetDecl()->Type); }
-
-        RefPtr<ExpressionSyntaxNode> getInitExpr() const { return Substitute(GetDecl()->Expr); }
-    };
+    inline RefPtr<ExpressionSyntaxNode> getInitExpr(DeclRef<VarDeclBase> const& declRef)
+    {
+        return declRef.Substitute(declRef.getDecl()->Expr);
+    }
 
     // A field of a `struct` type
     class StructField : public VarDeclBase
@@ -1433,11 +1478,6 @@ namespace Slang
         StructField()
         {}
         virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
-    };
-
-    struct FieldDeclRef : VarDeclBaseRef
-    {
-        SLANG_DECLARE_DECL_REF(StructField)
     };
 
     // An `AggTypeDeclBase` captures the shared functionality
@@ -1453,11 +1493,6 @@ namespace Slang
     public:
     };
 
-    struct AggTypeDeclBaseRef : ContainerDeclRef
-    {
-        SLANG_DECLARE_DECL_REF(AggTypeDeclBase);
-    };
-
     // An extension to apply to an existing type
     class ExtensionDecl : public AggTypeDeclBase
     {
@@ -1471,12 +1506,11 @@ namespace Slang
         virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
     };
 
-    struct ExtensionDeclRef : AggTypeDeclBaseRef
-    {
-        SLANG_DECLARE_DECL_REF(ExtensionDecl);
 
-        RefPtr<ExpressionType> GetTargetType() const { return Substitute(GetDecl()->targetType); }
-    };
+    inline RefPtr<ExpressionType> GetTargetType(DeclRef<ExtensionDecl> const& declRef)
+    {
+        return declRef.Substitute(declRef.getDecl()->targetType);
+    }
 
     // Declaration of a type that represents some sort of aggregate
     class AggTypeDecl : public AggTypeDeclBase
@@ -1487,7 +1521,7 @@ namespace Slang
         ExtensionDecl* candidateExtensions = nullptr;
         FilteredMemberList<StructField> GetFields()
         {
-            return GetMembersOfType<StructField>();
+            return getMembersOfType<StructField>();
         }
         StructField* FindField(String name)
         {
@@ -1511,12 +1545,10 @@ namespace Slang
         }
     };
 
-    struct AggTypeDeclRef : public AggTypeDeclBaseRef
+    inline ExtensionDecl* GetCandidateExtensions(DeclRef<AggTypeDecl> const& declRef)
     {
-        SLANG_DECLARE_DECL_REF(AggTypeDecl);
-            
-        ExtensionDecl* GetCandidateExtensions() const { return GetDecl()->candidateExtensions; }
-    };
+        return declRef.getDecl()->candidateExtensions;
+    }
 
     class StructSyntaxNode : public AggTypeDecl
     {
@@ -1524,24 +1556,15 @@ namespace Slang
         virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
     };
 
-    struct StructDeclRef : public AggTypeDeclRef
+    inline FilteredMemberRefList<StructField> GetFields(DeclRef<StructSyntaxNode> const& declRef)
     {
-        SLANG_DECLARE_DECL_REF(StructSyntaxNode);
-
-        FilteredMemberRefList<FieldDeclRef> GetFields() const { return GetMembersOfType<FieldDeclRef>(); }
-    };
+        return getMembersOfType<StructField>(declRef);
+    }
 
     class ClassSyntaxNode : public AggTypeDecl
     {
     public:
         virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
-    };
-
-    struct ClassDeclRef : public AggTypeDeclRef
-    {
-        SLANG_DECLARE_DECL_REF(ClassSyntaxNode);
-
-        FilteredMemberRefList<FieldDeclRef> GetFields() const { return GetMembersOfType<FieldDeclRef>(); }
     };
 
     // An interface which other types can conform to
@@ -1550,12 +1573,6 @@ namespace Slang
     public:
         virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
     };
-
-    struct InterfaceDeclRef : public AggTypeDeclRef
-    {
-        SLANG_DECLARE_DECL_REF(InterfaceDecl);
-    };
-
 
     // A kind of pseudo-member that represents an explicit
     // or implicit inheritance relationship.
@@ -1569,12 +1586,10 @@ namespace Slang
         virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
     };
 
-    struct InheritanceDeclRef : public DeclRef
+    inline RefPtr<ExpressionType> getBaseType(DeclRef<InheritanceDecl> const& declRef)
     {
-        SLANG_DECLARE_DECL_REF(InheritanceDecl);
-
-        RefPtr<ExpressionType> getBaseType() { return Substitute(GetDecl()->base.type); }
-    };
+        return declRef.Substitute(declRef.getDecl()->base.type);
+    }
 
     // TODO: may eventually need sub-classes for explicit/direct vs. implicit/indirect inheritance
 
@@ -1582,11 +1597,6 @@ namespace Slang
     // A declaration that represents a simple (non-aggregate) type
     class SimpleTypeDecl : public Decl
     {
-    };
-
-    struct SimpleTypeDeclRef : DeclRef
-    {
-        SLANG_DECLARE_DECL_REF(SimpleTypeDecl)
     };
 
     // A `typedef` declaration
@@ -1598,22 +1608,20 @@ namespace Slang
         virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
     };
 
-    struct TypeDefDeclRef : SimpleTypeDeclRef
+    inline RefPtr<ExpressionType> GetType(DeclRef<TypeDefDecl> const& declRef)
     {
-        SLANG_DECLARE_DECL_REF(TypeDefDecl);
-
-        RefPtr<ExpressionType> GetType() const { return Substitute(GetDecl()->Type); }
-    };
+        return declRef.Substitute(declRef.getDecl()->Type);
+    }
 
     // A type alias of some kind (e.g., via `typedef`)
     class NamedExpressionType : public ExpressionType
     {
     public:
-        NamedExpressionType(TypeDefDeclRef declRef)
+        NamedExpressionType(DeclRef<TypeDefDecl> declRef)
             : declRef(declRef)
         {}
 
-        TypeDefDeclRef declRef;
+        DeclRef<TypeDefDecl> declRef;
 
         virtual String ToString() override;
 
@@ -1664,47 +1672,32 @@ namespace Slang
         virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
     };
 
-    struct ParamDeclRef : VarDeclBaseRef
-    {
-        SLANG_DECLARE_DECL_REF(ParameterSyntaxNode);
-    };
-
     // Base class for things that have parameter lists and can thus be applied to arguments ("called")
     class CallableDecl : public ContainerDecl
     {
     public:
         FilteredMemberList<ParameterSyntaxNode> GetParameters()
         {
-            return GetMembersOfType<ParameterSyntaxNode>();
+            return getMembersOfType<ParameterSyntaxNode>();
         }
         TypeExp ReturnType;
     };
 
-    struct CallableDeclRef : ContainerDeclRef
+    inline RefPtr<ExpressionType> GetResultType(DeclRef<CallableDecl> const& declRef)
     {
-        SLANG_DECLARE_DECL_REF(CallableDecl);
+        return declRef.Substitute(declRef.getDecl()->ReturnType.type.Ptr());
+    }
 
-        RefPtr<ExpressionType> GetResultType() const
-        {
-            return Substitute(GetDecl()->ReturnType.type.Ptr());
-        }
-
-        FilteredMemberRefList<ParamDeclRef> GetParameters()
-        {
-            return GetMembersOfType<ParamDeclRef>();
-        }
-    };
+    inline FilteredMemberRefList<ParameterSyntaxNode> GetParameters(DeclRef<CallableDecl> const& declRef)
+    {
+        return getMembersOfType<ParameterSyntaxNode>(declRef);
+    }
 
     // Base class for callable things that may also have a body that is evaluated to produce their result
     class FunctionDeclBase : public CallableDecl
     {
     public:
         RefPtr<StatementSyntaxNode> Body;
-    };
-
-    struct FuncDeclBaseRef : CallableDeclRef
-    {
-        SLANG_DECLARE_DECL_REF(FunctionDeclBase);
     };
 
     // Function types are currently used for references to symbols that name
@@ -1714,7 +1707,7 @@ namespace Slang
     class FuncType : public ExpressionType
     {
     public:
-        CallableDeclRef declRef;
+        DeclRef<CallableDecl> declRef;
 
         virtual String ToString() override;
     protected:
@@ -1730,21 +1723,11 @@ namespace Slang
         virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
     };
 
-    struct ConstructorDeclRef : FuncDeclBaseRef
-    {
-        SLANG_DECLARE_DECL_REF(ConstructorDecl);
-    };
-
     // A subscript operation used to index instances of a type
     class SubscriptDecl : public CallableDecl
     {
     public:
         virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
-    };
-
-    struct SubscriptDeclRef : CallableDeclRef
-    {
-        SLANG_DECLARE_DECL_REF(SubscriptDecl);
     };
 
     // An "accessor" for a subscript or property
@@ -1776,12 +1759,6 @@ namespace Slang
         }
     };
 
-    struct FuncDeclRef : FuncDeclBaseRef
-    {
-        SLANG_DECLARE_DECL_REF(FunctionSyntaxNode);
-    };
-
-
     struct Scope : public RefObject
     {
         // The parent of this scope (where lookup should go if nothing is found locally)
@@ -1806,7 +1783,7 @@ namespace Slang
         RefPtr<Scope>   scope;
 
         // The declaration of the symbol being referenced
-        DeclRef declRef;
+        DeclRef<Decl> declRef;
     };
 
     class VarExpressionSyntaxNode : public DeclRefExpr
@@ -1848,10 +1825,10 @@ namespace Slang
             };
 
             Kind kind;
-            DeclRef declRef;
+            DeclRef<Decl> declRef;
             RefPtr<Breadcrumb> next;
 
-            Breadcrumb(Kind kind, DeclRef declRef, RefPtr<Breadcrumb> next)
+            Breadcrumb(Kind kind, DeclRef<Decl> declRef, RefPtr<Breadcrumb> next)
                 : kind(kind)
                 , declRef(declRef)
                 , next(next)
@@ -1859,7 +1836,7 @@ namespace Slang
         };
 
         // A properly-specialized reference to the declaration that was found.
-        DeclRef declRef;
+        DeclRef<Decl> declRef;
 
         // Any breadcrumbs needed in order to turn that declaration
         // reference into a well-formed expression.
@@ -1870,10 +1847,10 @@ namespace Slang
         RefPtr<Breadcrumb> breadcrumbs;
 
         LookupResultItem() = default;
-        explicit LookupResultItem(DeclRef declRef)
+        explicit LookupResultItem(DeclRef<Decl> declRef)
             : declRef(declRef)
         {}
-        LookupResultItem(DeclRef declRef, RefPtr<Breadcrumb> breadcrumbs)
+        LookupResultItem(DeclRef<Decl> declRef, RefPtr<Breadcrumb> breadcrumbs)
             : declRef(declRef)
             , breadcrumbs(breadcrumbs)
         {}
@@ -1894,7 +1871,7 @@ namespace Slang
         List<LookupResultItem> items;
 
         // Was at least one result found?
-        bool isValid() const { return item.declRef.GetDecl() != nullptr; }
+        bool isValid() const { return item.declRef.getDecl() != nullptr; }
 
         bool isOverloaded() const { return items.Count() > 1; }
     };
@@ -2076,20 +2053,20 @@ namespace Slang
         // Access members of specific types
         FilteredMemberList<FunctionSyntaxNode> GetFunctions()
         {
-            return GetMembersOfType<FunctionSyntaxNode>();
+            return getMembersOfType<FunctionSyntaxNode>();
         }
 
         FilteredMemberList<ClassSyntaxNode> GetClasses()
         {
-            return GetMembersOfType<ClassSyntaxNode>();
+            return getMembersOfType<ClassSyntaxNode>();
         }
         FilteredMemberList<StructSyntaxNode> GetStructs()
         {
-            return GetMembersOfType<StructSyntaxNode>();
+            return getMembersOfType<StructSyntaxNode>();
         }
         FilteredMemberList<TypeDefDecl> GetTypeDefs()
         {
-            return GetMembersOfType<TypeDefDecl>();
+            return getMembersOfType<TypeDefDecl>();
         }
 
         virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
@@ -2372,23 +2349,23 @@ namespace Slang
         virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
     };
 
-    struct GenericDeclRef : ContainerDeclRef
+    inline Decl* GetInner(DeclRef<GenericDecl> const& declRef)
     {
-        SLANG_DECLARE_DECL_REF(GenericDecl);
-
-        Decl* GetInner() const { return GetDecl()->inner.Ptr(); }
-    };
+        // TODO: Should really return a `DeclRef<Decl>` for the inner
+        // declaration, and not just a raw pointer
+        return declRef.getDecl()->inner.Ptr();
+    }
 
     // The "type" of an expression that names a generic declaration.
     class GenericDeclRefType : public ExpressionType
     {
     public:
-        GenericDeclRefType(GenericDeclRef declRef)
+        GenericDeclRefType(DeclRef<GenericDecl> declRef)
             : declRef(declRef)
         {}
 
-        GenericDeclRef declRef;
-        GenericDeclRef const& GetDeclRef() const { return declRef; }
+        DeclRef<GenericDecl> declRef;
+        DeclRef<GenericDecl> const& GetDeclRef() const { return declRef; }
 
         virtual String ToString() override;
 
@@ -2413,11 +2390,6 @@ namespace Slang
         virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
     };
 
-    struct GenericTypeParamDeclRef : SimpleTypeDeclRef
-    {
-        SLANG_DECLARE_DECL_REF(GenericTypeParamDecl);
-    };
-
     // A constraint placed as part of a generic declaration
     class GenericTypeConstraintDecl : public Decl
     {
@@ -2432,14 +2404,15 @@ namespace Slang
         virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
     };
 
-    struct GenericTypeConstraintDeclRef : DeclRef
+    inline RefPtr<ExpressionType> GetSub(DeclRef<GenericTypeConstraintDecl> const& declRef)
     {
-        SLANG_DECLARE_DECL_REF(GenericTypeConstraintDecl);
+        return declRef.Substitute(declRef.getDecl()->sub);
+    }
 
-        RefPtr<ExpressionType> GetSub() { return Substitute(GetDecl()->sub); }
-        RefPtr<ExpressionType> GetSup() { return Substitute(GetDecl()->sup); }
-    };
-
+    inline RefPtr<ExpressionType> GetSup(DeclRef<GenericTypeConstraintDecl> const& declRef)
+    {
+        return declRef.Substitute(declRef.getDecl()->sup);
+    }
 
     class GenericValueParamDecl : public VarDeclBase
     {
@@ -2447,18 +2420,13 @@ namespace Slang
         virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
     };
 
-    struct GenericValueParamDeclRef : VarDeclBaseRef
-    {
-        SLANG_DECLARE_DECL_REF(GenericValueParamDecl);
-    };
-
     // The logical "value" of a rererence to a generic value parameter
     class GenericParamIntVal : public IntVal
     {
     public:
-        VarDeclBaseRef declRef;
+        DeclRef<VarDeclBase> declRef;
 
-        GenericParamIntVal(VarDeclBaseRef declRef)
+        GenericParamIntVal(DeclRef<VarDeclBase> declRef)
             : declRef(declRef)
         {}
 

@@ -291,17 +291,8 @@ namespace Slang
     {
         auto declRefType = AsDeclRefType();
         if (!declRefType) return false;
-        auto structDeclRef = declRefType->declRef.As<StructDeclRef>();
+        auto structDeclRef = declRefType->declRef.As<StructSyntaxNode>();
         if (!structDeclRef) return false;
-        return true;
-    }
-
-    bool ExpressionType::IsClass()
-    {
-        auto declRefType = AsDeclRefType();
-        if (!declRefType) return false;
-        auto classDeclRef = declRefType->declRef.As<ClassDeclRef>();
-        if (!classDeclRef) return false;
         return true;
     }
 
@@ -405,7 +396,7 @@ namespace Slang
 
         // the case we especially care about is when this type references a declaration
         // of a generic parameter, since that is what we might be substituting...
-        if (auto genericTypeParamDecl = dynamic_cast<GenericTypeParamDecl*>(declRef.GetDecl()))
+        if (auto genericTypeParamDecl = dynamic_cast<GenericTypeParamDecl*>(declRef.getDecl()))
         {
             // search for a substitution that might apply to us
             for (auto s = subst; s; s = s->outer.Ptr())
@@ -443,7 +434,7 @@ namespace Slang
 
 
         int diff = 0;
-        DeclRef substDeclRef = declRef.SubstituteImpl(subst, &diff);
+        DeclRef<Decl> substDeclRef = declRef.SubstituteImpl(subst, &diff);
 
         if (!diff)
             return this;
@@ -471,15 +462,15 @@ namespace Slang
 
     // TODO: need to figure out how to unify this with the logic
     // in the generic case...
-    DeclRefType* DeclRefType::Create(DeclRef declRef)
+    DeclRefType* DeclRefType::Create(DeclRef<Decl> declRef)
     {
-        if (auto builtinMod = declRef.GetDecl()->FindModifier<BuiltinTypeModifier>())
+        if (auto builtinMod = declRef.getDecl()->FindModifier<BuiltinTypeModifier>())
         {
             auto type = new BasicExpressionType(builtinMod->tag);
             type->declRef = declRef;
             return type;
         }
-        else if (auto magicMod = declRef.GetDecl()->FindModifier<MagicTypeModifier>())
+        else if (auto magicMod = declRef.getDecl()->FindModifier<MagicTypeModifier>())
         {
             Substitutions* subst = declRef.substitutions.Ptr();
 
@@ -679,7 +670,7 @@ namespace Slang
 
     ExpressionType* NamedExpressionType::CreateCanonicalType()
     {
-        return declRef.GetType()->GetCanonicalType();
+        return GetType(declRef)->GetCanonicalType();
     }
 
     int NamedExpressionType::GetHashCode()
@@ -754,7 +745,7 @@ namespace Slang
     String GenericDeclRefType::ToString()
     {
         // TODO: what is appropriate here?
-        return "<GenericDeclRef>";
+        return "<DeclRef<GenericDecl>>";
     }
 
     bool GenericDeclRefType::EqualsImpl(ExpressionType * type)
@@ -1034,13 +1025,13 @@ namespace Slang
             // the generic decl associated with the substitution list must be
             // the generic decl that declared this parameter
             auto genericDecl = s->genericDecl;
-            if (genericDecl != declRef.GetDecl()->ParentDecl)
+            if (genericDecl != declRef.getDecl()->ParentDecl)
                 continue;
 
             int index = 0;
             for (auto m : genericDecl->Members)
             {
-                if (m.Ptr() == declRef.GetDecl())
+                if (m.Ptr() == declRef.getDecl())
                 {
                     // We've found it, so return the corresponding specialization argument
                     (*ioDiff)++;
@@ -1144,9 +1135,9 @@ namespace Slang
     }
 
 
-    // DeclRef
+    // DeclRefBase
 
-    RefPtr<ExpressionType> DeclRef::Substitute(RefPtr<ExpressionType> type) const
+    RefPtr<ExpressionType> DeclRefBase::Substitute(RefPtr<ExpressionType> type) const
     {
         // No substitutions? Easy.
         if (!substitutions)
@@ -1158,7 +1149,7 @@ namespace Slang
         return type->Substitute(substitutions.Ptr()).As<ExpressionType>();
     }
 
-    DeclRef DeclRef::Substitute(DeclRef declRef) const
+    DeclRefBase DeclRefBase::Substitute(DeclRefBase declRef) const
     {
         if(!substitutions)
             return declRef;
@@ -1167,7 +1158,7 @@ namespace Slang
         return declRef.SubstituteImpl(substitutions.Ptr(), &diff);
     }
 
-    RefPtr<ExpressionSyntaxNode> DeclRef::Substitute(RefPtr<ExpressionSyntaxNode> expr) const
+    RefPtr<ExpressionSyntaxNode> DeclRefBase::Substitute(RefPtr<ExpressionSyntaxNode> expr) const
     {
         // No substitutions? Easy.
         if (!substitutions)
@@ -1179,7 +1170,7 @@ namespace Slang
     }
 
 
-    DeclRef DeclRef::SubstituteImpl(Substitutions* subst, int* ioDiff)
+    DeclRefBase DeclRefBase::SubstituteImpl(Substitutions* subst, int* ioDiff)
     {
         if (!substitutions) return *this;
 
@@ -1191,7 +1182,7 @@ namespace Slang
 
         *ioDiff += diff;
 
-        DeclRef substDeclRef;
+        DeclRefBase substDeclRef;
         substDeclRef.decl = decl;
         substDeclRef.substitutions = substSubst;
         return substDeclRef;
@@ -1199,7 +1190,7 @@ namespace Slang
 
 
     // Check if this is an equivalent declaration reference to another
-    bool DeclRef::Equals(DeclRef const& declRef) const
+    bool DeclRefBase::Equals(DeclRefBase const& declRef) const
     {
         if (decl != declRef.decl)
             return false;
@@ -1211,30 +1202,30 @@ namespace Slang
     }
 
     // Convenience accessors for common properties of declarations
-    String const& DeclRef::GetName() const
+    String const& DeclRefBase::GetName() const
     {
         return decl->Name.Content;
     }
 
-    DeclRef DeclRef::GetParent() const
+    DeclRefBase DeclRefBase::GetParent() const
     {
         auto parentDecl = decl->ParentDecl;
         if (auto parentGeneric = dynamic_cast<GenericDecl*>(parentDecl))
         {
             // We need to strip away one layer of specialization
             assert(substitutions);
-            return DeclRef(parentGeneric, substitutions->outer);
+            return DeclRefBase(parentGeneric, substitutions->outer);
         }
         else
         {
             // If the parent isn't a generic, then it must
             // use the same specializations as this declaration
-            return DeclRef(parentDecl, substitutions);
+            return DeclRefBase(parentDecl, substitutions);
         }
 
     }
 
-    int DeclRef::GetHashCode() const
+    int DeclRefBase::GetHashCode() const
     {
         auto rs = PointerHash<1>::GetHashCode(decl);
         if (substitutions)
@@ -1365,7 +1356,7 @@ namespace Slang
         RefPtr<Decl>                decl,
         RefPtr<BuiltinTypeModifier> modifier)
     {
-        auto type = DeclRefType::Create(DeclRef(decl.Ptr(), nullptr));
+        auto type = DeclRefType::Create(DeclRef<Decl>(decl.Ptr(), nullptr));
         ExpressionType::sBuiltinTypes[(int)modifier->tag] = type;
     }
 

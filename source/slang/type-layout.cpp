@@ -1009,7 +1009,7 @@ SimpleLayoutInfo GetLayoutImpl(
     {
         auto declRef = declRefType->declRef;
 
-        if (auto structDeclRef = declRef.As<StructDeclRef>())
+        if (auto structDeclRef = declRef.As<StructSyntaxNode>())
         {
             RefPtr<StructTypeLayout> typeLayout;
             if (outTypeLayout)
@@ -1022,11 +1022,11 @@ SimpleLayoutInfo GetLayoutImpl(
 
             UniformLayoutInfo info = rules->BeginStructLayout();
 
-            for (auto field : structDeclRef.GetFields())
+            for (auto field : GetFields(structDeclRef))
             {
                 RefPtr<TypeLayout> fieldTypeLayout;
                 UniformLayoutInfo fieldInfo = GetLayoutImpl(
-                    field.GetType().Ptr(),
+                    GetType(field).Ptr(),
                     rules,
                     outTypeLayout ? &fieldTypeLayout : nullptr).getUniformLayout();
 
@@ -1053,7 +1053,7 @@ SimpleLayoutInfo GetLayoutImpl(
                     fieldLayout->varDecl = field;
                     fieldLayout->typeLayout = fieldTypeLayout;
                     typeLayout->fields.Add(fieldLayout);
-                    typeLayout->mapVarToLayout.Add(field.GetDecl(), fieldLayout);
+                    typeLayout->mapVarToLayout.Add(field.getDecl(), fieldLayout);
 
                     // Set up uniform offset information, if there is any uniform data in the field
                     if( fieldTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform) )

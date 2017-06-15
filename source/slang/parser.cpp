@@ -754,7 +754,7 @@ namespace Slang
                     if( lookupResult.isValid() && !lookupResult.isOverloaded() )
                     {
                         auto& item = lookupResult.item;
-                        auto decl = item.declRef.GetDecl();
+                        auto decl = item.declRef.getDecl();
 
                         if( auto modifierDecl = dynamic_cast<ModifierDecl*>(decl) )
                         {
@@ -1910,7 +1910,7 @@ namespace Slang
                 auto paramConstraint = new GenericTypeConstraintDecl();
                 parser->FillPosition(paramConstraint);
 
-                auto paramType = DeclRefType::Create(DeclRef(paramDecl, nullptr));
+                auto paramType = DeclRefType::Create(DeclRef<Decl>(paramDecl, nullptr));
 
                 auto paramTypeExpr = new SharedTypeExpr();
                 paramTypeExpr->Position = paramDecl->Position;
@@ -2365,7 +2365,7 @@ parser->ReadToken(TokenType::Comma);
         if(!lookupResult.isValid() || lookupResult.isOverloaded())
             return false;
 
-        auto decl = lookupResult.item.declRef.GetDecl();
+        auto decl = lookupResult.item.declRef.getDecl();
         if( auto typeDecl = dynamic_cast<AggTypeDecl*>(decl) )
         {
             return true;
