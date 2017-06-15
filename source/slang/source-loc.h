@@ -5,9 +5,6 @@
 #include "../core/basic.h"
 
 namespace Slang {
-namespace Compiler {
-
-using namespace CoreLib::Basic;
 
 class CodePosition
 {
@@ -42,6 +39,6 @@ public:
 };
 
 
-}}
+} // namespace Slang
 
 #endif

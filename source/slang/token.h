@@ -7,9 +7,6 @@
 #include "source-loc.h"
 
 namespace Slang {
-namespace Compiler {
-
-using namespace CoreLib::Basic;
 
 enum class TokenType
 {
@@ -45,6 +42,6 @@ public:
 
 
 
-}}
+} // namespace Slang
 
 #endif

@@ -6,7 +6,6 @@
 #include <assert.h>
 
 namespace Slang {
-namespace Compiler {
 
 size_t RoundToAlignment(size_t offset, size_t alignment)
 {
@@ -1122,4 +1121,4 @@ SimpleLayoutInfo GetLayout(ExpressionType* type, LayoutRule rule)
     return GetLayout(type, rulesImpl);
 }
 
-}}
+} // namespace Slang

@@ -2,7 +2,6 @@
 #include "lookup.h"
 
 namespace Slang {
-namespace Compiler {
 
 //
 
@@ -308,4 +307,4 @@ LookupResult LookUpLocal(String const& name, ContainerDecl* containerDecl)
 }
 
 
-}}
+}

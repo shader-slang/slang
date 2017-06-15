@@ -17,12 +17,7 @@
 #undef NOMINMAX
 #endif
 
-using namespace CoreLib::Basic;
-using namespace CoreLib::IO;
-using namespace Slang::Compiler;
-
 namespace Slang {
-namespace Compiler {
 
 static void stdlibDiagnosticCallback(
     char const* message,
@@ -39,7 +34,7 @@ class Session
 {
 public:
     bool useCache = false;
-    CoreLib::String cacheDir;
+    String cacheDir;
 
     RefPtr<Scope>   slangLanguageScope;
     RefPtr<Scope>   hlslLanguageScope;
@@ -48,7 +43,7 @@ public:
     List<RefPtr<ProgramSyntaxNode>> loadedModuleCode;
 
 
-    Session(bool /*pUseCache*/, CoreLib::String /*pCacheDir*/)
+    Session(bool /*pUseCache*/, String /*pCacheDir*/)
     {
         // Initialize global state
         // TODO: move this into the session instead
@@ -138,10 +133,10 @@ struct CompileRequest
         List<String> searchDirs;
 
         virtual bool TryToFindIncludeFile(
-            CoreLib::String const& pathToInclude,
-            CoreLib::String const& pathIncludedFrom,
-            CoreLib::String* outFoundPath,
-            CoreLib::String* outFoundSource) override
+            String const& pathToInclude,
+            String const& pathIncludedFrom,
+            String* outFoundPath,
+            String* outFoundSource) override
         {
             String path = Path::Combine(Path::GetDirectoryName(pathIncludedFrom), pathToInclude);
             if (File::Exists(path))
@@ -603,16 +598,16 @@ void Session::addBuiltinSource(
     loadedModuleCode.Add(syntax);
 }
 
-}}
+}
 
 // implementation of C interface
 
-#define SESSION(x) reinterpret_cast<Slang::Compiler::Session *>(x)
-#define REQ(x) reinterpret_cast<Slang::Compiler::CompileRequest*>(x)
+#define SESSION(x) reinterpret_cast<Slang::Session *>(x)
+#define REQ(x) reinterpret_cast<Slang::CompileRequest*>(x)
 
 SLANG_API SlangSession* spCreateSession(const char * cacheDir)
 {
-    return reinterpret_cast<SlangSession *>(new Slang::Compiler::Session((cacheDir ? true : false), cacheDir));
+    return reinterpret_cast<SlangSession *>(new Slang::Session((cacheDir ? true : false), cacheDir));
 }
 
 SLANG_API void spDestroySession(
@@ -642,7 +637,7 @@ SLANG_API SlangCompileRequest* spCreateCompileRequest(
     SlangSession* session)
 {
     auto s = SESSION(session);
-    auto req = new Slang::Compiler::CompileRequest(s);
+    auto req = new Slang::CompileRequest(s);
     return reinterpret_cast<SlangCompileRequest*>(req);
 }
 
@@ -668,14 +663,14 @@ SLANG_API void spSetCodeGenTarget(
         SlangCompileRequest*    request,
         int target)
 {
-    REQ(request)->Options.Target = (CodeGenTarget)target;
+    REQ(request)->Options.Target = (Slang::CodeGenTarget)target;
 }
 
 SLANG_API void spSetPassThrough(
     SlangCompileRequest*    request,
     SlangPassThrough        passThrough)
 {
-    REQ(request)->Options.passThrough = PassThroughMode(passThrough);
+    REQ(request)->Options.passThrough = Slang::PassThroughMode(passThrough);
 }
 
 SLANG_API void spSetDiagnosticCallback(
@@ -723,7 +718,7 @@ SLANG_API int spAddTranslationUnit(
     auto req = REQ(request);
 
     return req->addTranslationUnit(
-        SourceLanguage(language),
+        Slang::SourceLanguage(language),
         name ? name : "");
 }
 
@@ -781,7 +776,7 @@ SLANG_API SlangProfileID spFindProfile(
     SlangSession*   session,
     char const*     name)
 {
-    return Profile::LookUp(name).raw;
+    return Slang::Profile::LookUp(name).raw;
 }
 
 SLANG_API int spAddTranslationUnitEntryPoint(
@@ -800,7 +795,7 @@ SLANG_API int spAddTranslationUnitEntryPoint(
     return req->addTranslationUnitEntryPoint(
         translationUnitIndex,
         name,
-        Profile(Profile::RawVal(profile)));
+        Slang::Profile(Slang::Profile::RawVal(profile)));
 }
 
 

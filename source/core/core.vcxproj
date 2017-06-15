@@ -26,13 +26,9 @@
     <ClInclude Include="common.h" />
     <ClInclude Include="dictionary.h" />
     <ClInclude Include="exception.h" />
-    <ClInclude Include="func.h" />
     <ClInclude Include="hash.h" />
     <ClInclude Include="int-set.h" />
-    <ClInclude Include="link.h" />
-    <ClInclude Include="linq.h" />
     <ClInclude Include="list.h" />
-    <ClInclude Include="memory-pool.h" />
     <ClInclude Include="secure-crt.h" />
     <ClInclude Include="slang-io.h" />
     <ClInclude Include="slang-math.h" />
@@ -43,9 +39,7 @@
     <ClInclude Include="type-traits.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="memory-pool.cpp" />
     <ClCompile Include="slang-io.cpp" />
-    <ClCompile Include="slang-math.cpp" />
     <ClCompile Include="slang-string.cpp" />
     <ClCompile Include="stream.cpp" />
     <ClCompile Include="text-io.cpp" />

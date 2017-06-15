@@ -8,89 +8,42 @@
 
 namespace Slang
 {
-    namespace Compiler
+    void IndentString(StringBuilder & sb, String src);
+
+    struct EntryPointResult
     {
-#if 0
-        class ShaderMetaData
+        String outputSource;
+    };
+
+    struct TranslationUnitResult
+    {
+        String outputSource;
+        List<EntryPointResult> entryPoints;
+    };
+
+    class CompileResult
+    {
+    public:
+        DiagnosticSink* mSink = nullptr;
+
+        // Per-translation-unit results
+        List<TranslationUnitResult> translationUnits;
+
+        CompileResult()
+        {}
+        ~CompileResult()
         {
-        public:
-            CoreLib::String ShaderName;
-            CoreLib::EnumerableDictionary<CoreLib::String, CoreLib::RefPtr<ILModuleParameterSet>> ParameterSets; // bindingName->DescSet
-        };
-
-        class StageSource
+        }
+        DiagnosticSink * GetErrorWriter()
         {
-        public:
-            String MainCode;
-            List<unsigned char> BinaryCode;
-        };
-
-        class CompiledShaderSource
+            return mSink;
+        }
+        int GetErrorCount()
         {
-        public:
-            EnumerableDictionary<String, StageSource> Stages;
-            ShaderMetaData MetaData;
-        };
-#endif
+            return mSink->GetErrorCount();
+        }
+    };
 
-        void IndentString(StringBuilder & sb, String src);
-
-        struct EntryPointResult
-        {
-            String outputSource;
-        };
-
-        struct TranslationUnitResult
-        {
-            String outputSource;
-            List<EntryPointResult> entryPoints;
-        };
-
-        class CompileResult
-        {
-        public:
-            DiagnosticSink* mSink = nullptr;
-
-#if 0
-            String ScheduleFile;
-            RefPtr<ILProgram> Program;
-            EnumerableDictionary<String, CompiledShaderSource> CompiledSource; // shader -> stage -> code
-#endif
-
-            // Per-translation-unit results
-            List<TranslationUnitResult> translationUnits;
-
-#if 0
-            void PrintDiagnostics()
-            {
-                for (int i = 0; i < sink.diagnostics.Count(); i++)
-                {
-                    fprintf(stderr, "%S(%d): %s %d: %S\n",
-                        sink.diagnostics[i].Position.FileName.ToWString(),
-                        sink.diagnostics[i].Position.Line,
-                        getSeverityName(sink.diagnostics[i].severity),
-                        sink.diagnostics[i].ErrorID,
-                        sink.diagnostics[i].Message.ToWString());
-                }
-            }
-#endif
-
-            CompileResult()
-            {}
-            ~CompileResult()
-            {
-            }
-            DiagnosticSink * GetErrorWriter()
-            {
-                return mSink;
-            }
-            int GetErrorCount()
-            {
-                return mSink->GetErrorCount();
-            }
-        };
-
-    }
 }
 
 #endif

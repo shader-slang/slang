@@ -11,7 +11,7 @@
 
 #define VARIADIC_TEMPLATE
 
-namespace CoreLib
+namespace Slang
 {
 	typedef int64_t Int64;
 	typedef unsigned short Word;
@@ -20,28 +20,19 @@ namespace CoreLib
 #else
 	typedef int PtrInt;
 #endif
-	namespace Basic
+
+	template <typename T>
+	inline T&& _Move(T & obj)
 	{
-		class Object
-		{
-		public:
-			virtual ~Object()
-			{}
-		};
+		return static_cast<T&&>(obj);
+	}
 
-		template <typename T>
-		inline T&& _Move(T & obj)
-		{
-			return static_cast<T&&>(obj);
-		}
-
-		template <typename T>
-		inline void Swap(T & v0, T & v1)
-		{
-			T tmp = _Move(v0);
-			v0 = _Move(v1);
-			v1 = _Move(tmp);
-		}
+	template <typename T>
+	inline void Swap(T & v0, T & v1)
+	{
+		T tmp = _Move(v0);
+		v0 = _Move(v1);
+		v1 = _Move(tmp);
 	}
 }
 

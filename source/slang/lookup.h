@@ -4,7 +4,6 @@
 #include "Syntax.h"
 
 namespace Slang {
-namespace Compiler {
 
 // Take an existing lookup result and refine it to only include
 // results that pass the given `LookupMask`.
@@ -36,6 +35,6 @@ QualType getTypeForDeclRef(
     DeclRef                 declRef);
 
 
-}}
+}
 
 #endif

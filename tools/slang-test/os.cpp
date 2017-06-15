@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-using namespace CoreLib::Basic;
+using namespace Slang;
 
 // Platform-specific code follows
 
@@ -54,8 +54,8 @@ bool OSFindFilesResult::findNextFile()
 }
 
 OSFindFilesResult osFindFilesInDirectoryMatchingPattern(
-    CoreLib::Basic::String directoryPath,
-    CoreLib::Basic::String pattern)
+    Slang::String directoryPath,
+    Slang::String pattern)
 {
     // TODO: add separator to end of directory path if needed
 
@@ -87,13 +87,13 @@ OSFindFilesResult osFindFilesInDirectoryMatchingPattern(
 }
 
 OSFindFilesResult osFindFilesInDirectory(
-    CoreLib::Basic::String directoryPath)
+    Slang::String directoryPath)
 {
     return osFindFilesInDirectoryMatchingPattern(directoryPath, "*");
 }
 
 OSFindFilesResult osFindChildDirectories(
-    CoreLib::Basic::String directoryPath)
+    Slang::String directoryPath)
 {
     // TODO: add separator to end of directory path if needed
 
@@ -189,7 +189,7 @@ static DWORD WINAPI osReaderThreadProc(LPVOID threadParam)
         }
         bytesRead = (DWORD)(writeCursor - buffer);
 
-        // Note: Current Slang CoreLib gives no way to know
+        // Note: Current "core" implementation gives no way to know
         // the length of the buffer, so we ultimately have
         // to just assume null termination...
         outputBuilder.Append(buffer, bytesRead);
@@ -201,7 +201,7 @@ static DWORD WINAPI osReaderThreadProc(LPVOID threadParam)
 }
 
 void OSProcessSpawner::pushExecutableName(
-    CoreLib::Basic::String executableName)
+    Slang::String executableName)
 {
     executableName_ = executableName;
     commandLine_.Append(executableName);
@@ -209,7 +209,7 @@ void OSProcessSpawner::pushExecutableName(
 }
 
 void OSProcessSpawner::pushExecutablePath(
-    CoreLib::Basic::String executablePath)
+    Slang::String executablePath)
 {
     executableName_ = executablePath;
     commandLine_.Append(executablePath);
@@ -217,7 +217,7 @@ void OSProcessSpawner::pushExecutablePath(
 }
 
 void OSProcessSpawner::pushArgument(
-    CoreLib::Basic::String argument)
+    Slang::String argument)
 {
     // TODO(tfoley): handle cases where arguments need some escaping
     commandLine_.Append(" ");

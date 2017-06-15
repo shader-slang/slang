@@ -8,17 +8,12 @@
 
 namespace Slang
 {
-    namespace Compiler
-    {
-        using namespace CoreLib::Basic;
+    class ProgramSyntaxNode;
+    class ProgramLayout;
 
-        class ProgramSyntaxNode;
-        class ProgramLayout;
-
-        String emitProgram(
-            ProgramSyntaxNode*  program,
-            ProgramLayout*      programLayout,
-            CodeGenTarget       target);
-    }
+    String emitProgram(
+        ProgramSyntaxNode*  program,
+        ProgramLayout*      programLayout,
+        CodeGenTarget       target);
 }
 #endif
