@@ -120,6 +120,11 @@ namespace Slang
             ContainerDecl*				containerDecl,
             TokenType	                closingToken);
 
+        // Parse the `{}`-delimeted body of an aggregate type declaration
+        static void parseAggTypeDeclBody(
+            Parser*             parser,
+            AggTypeDeclBase*    decl);
+
         static RefPtr<Modifier> ParseOptSemantics(
             Parser* parser);
 
@@ -1016,7 +1021,7 @@ namespace Slang
         }
 
 
-        static String GenerateName(Parser* parser, String const& base)
+        static String GenerateName(Parser* /*parser*/, String const& base)
         {
             // TODO: somehow mangle the name to avoid clashes
             return base;
@@ -1439,8 +1444,6 @@ namespace Slang
 
                 declGroupBuilder.addDecl(firstDecl);
                 return declGroupBuilder.getResult();
-
-                return firstDecl;
             }
 
             // Otherwise we have multiple declarations in a sequence, and these
@@ -1684,8 +1687,7 @@ namespace Slang
             ParseOptSemantics(parser, bufferVarDecl.Ptr());
 
             // The declarations in the body belong to the data type.
-            parser->ReadToken(TokenType::LBrace);
-            ParseDeclBody(parser, bufferDataTypeDecl.Ptr(), TokenType::RBrace);
+            parseAggTypeDeclBody(parser, bufferDataTypeDecl.Ptr());
 
             // All HLSL buffer declarations are "transparent" in that their
             // members are implicitly made visible in the parent scope.
@@ -1833,8 +1835,7 @@ namespace Slang
             blockVarDecl->Type.exp = blockVarTypeExpr;
 
             // The declarations in the body belong to the data type.
-            parser->ReadToken(TokenType::LBrace);
-            ParseDeclBody(parser, blockDataTypeDecl.Ptr(), TokenType::RBrace);
+            parseAggTypeDeclBody(parser, blockDataTypeDecl.Ptr());
 
             if( parser->LookAheadToken(TokenType::Identifier) )
             {
@@ -1964,48 +1965,47 @@ parser->ReadToken(TokenType::Comma);
             return decl;
         }
 
-        static RefPtr<Decl> ParseTraitConformanceDecl(
-            Parser* parser)
-        {
-            RefPtr<TraitConformanceDecl> decl = new TraitConformanceDecl();
-            parser->FillPosition(decl.Ptr());
-            parser->ReadToken("__conforms");
-
-            decl->base = parser->ParseTypeExp();
-
-            return decl;
-        }
-
-
         static RefPtr<ExtensionDecl> ParseExtensionDecl(Parser* parser)
         {
             RefPtr<ExtensionDecl> decl = new ExtensionDecl();
             parser->FillPosition(decl.Ptr());
             parser->ReadToken("__extension");
             decl->targetType = parser->ParseTypeExp();
-            parser->ReadToken(TokenType::LBrace);
-            ParseDeclBody(parser, decl.Ptr(), TokenType::RBrace);
+
+            parseAggTypeDeclBody(parser, decl.Ptr());
+
             return decl;
         }
 
-        static RefPtr<TraitDecl> ParseTraitDecl(Parser* parser)
+        static void parseOptionalInheritanceClause(Parser* parser, AggTypeDecl* decl)
         {
-            RefPtr<TraitDecl> decl = new TraitDecl();
-            parser->FillPosition(decl.Ptr());
-            parser->ReadToken("__trait");
-            decl->Name = parser->ReadToken(TokenType::Identifier);
-
             if( AdvanceIf(parser, TokenType::Colon) )
             {
                 do
                 {
                     auto base = parser->ParseTypeExp();
-                    decl->bases.Add(base);
+
+                    auto inheritanceDecl = new InheritanceDecl();
+                    inheritanceDecl->Position = base.exp->Position;
+                    inheritanceDecl->base = base;
+
+                    AddMember(decl, inheritanceDecl);
+
                 } while( AdvanceIf(parser, TokenType::Comma) );
             }
+        }
 
-            parser->ReadToken(TokenType::LBrace);
-            ParseDeclBody(parser, decl.Ptr(), TokenType::RBrace);
+        static RefPtr<InterfaceDecl> parseInterfaceDecl(Parser* parser)
+        {
+            RefPtr<InterfaceDecl> decl = new InterfaceDecl();
+            parser->FillPosition(decl.Ptr());
+            parser->ReadToken("interface");
+            decl->Name = parser->ReadToken(TokenType::Identifier);
+
+            parseOptionalInheritanceClause(parser, decl.Ptr());
+
+            parseAggTypeDeclBody(parser, decl.Ptr());
+
             return decl;
         }
 
@@ -2149,16 +2149,14 @@ parser->ReadToken(TokenType::Comma);
                 decl = ParseHLSLBufferDecl(parser);
             else if (parser->LookAheadToken("__generic"))
                 decl = ParseGenericDecl(parser);
-            else if (parser->LookAheadToken("__conforms"))
-                decl = ParseTraitConformanceDecl(parser);
             else if (parser->LookAheadToken("__extension"))
                 decl = ParseExtensionDecl(parser);
             else if (parser->LookAheadToken("__init"))
                 decl = ParseConstructorDecl(parser);
             else if (parser->LookAheadToken("__subscript"))
                 decl = ParseSubscriptDecl(parser);
-            else if (parser->LookAheadToken("__trait"))
-                decl = ParseTraitDecl(parser);
+            else if (parser->LookAheadToken("interface"))
+                decl = parseInterfaceDecl(parser);
             else if(parser->LookAheadToken("__modifier"))
                 decl = parseModifierDecl(parser);
             else if(parser->LookAheadToken("__import"))
@@ -2251,6 +2249,27 @@ parser->ReadToken(TokenType::Comma);
             }
         }
 
+        // Parse the `{}`-delimeted body of an aggregate type declaration
+        static void parseAggTypeDeclBody(
+            Parser*             parser,
+            AggTypeDeclBase*    decl)
+        {
+            // TODO: the scope used for the body might need to be
+            // slightly specialized to deal with the complexity
+            // of how `this` works.
+            //
+            // Alternatively, that complexity can be pushed down
+            // to semantic analysis so that it doesn't clutter
+            // things here.
+            parser->PushScope(decl);
+
+            parser->ReadToken(TokenType::LBrace);
+            ParseDeclBody(parser, decl, TokenType::RBrace);
+
+            parser->PopScope();
+        }
+
+
         void Parser::parseSourceFile(ProgramSyntaxNode* program)
         {
             if (outerScope)
@@ -2281,9 +2300,15 @@ parser->ReadToken(TokenType::Comma);
             RefPtr<StructSyntaxNode> rs = new StructSyntaxNode();
             FillPosition(rs.Ptr());
             ReadToken("struct");
+
+            // TODO: support `struct` declaration without tag
             rs->Name = ReadToken(TokenType::Identifier);
-            ReadToken(TokenType::LBrace);
-            ParseDeclBody(this, rs.Ptr(), TokenType::RBrace);
+
+            // We allow for an inheritance clause on a `struct`
+            // so that it can conform to interfaces.
+            parseOptionalInheritanceClause(this, rs.Ptr());
+
+            parseAggTypeDeclBody(this, rs.Ptr());
 
             return rs;
         }
@@ -2295,7 +2320,8 @@ parser->ReadToken(TokenType::Comma);
             ReadToken("class");
             rs->Name = ReadToken(TokenType::Identifier);
             ReadToken(TokenType::LBrace);
-            ParseDeclBody(this, rs.Ptr(), TokenType::RBrace);
+            parseOptionalInheritanceClause(this, rs.Ptr());
+            parseAggTypeDeclBody(this, rs.Ptr());
             return rs;
         }
 

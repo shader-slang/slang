@@ -1453,8 +1453,26 @@ namespace Slang
             SLANG_DECLARE_DECL_REF(StructField)
         };
 
+        // An `AggTypeDeclBase` captures the shared functionality
+        // between true aggregate type declarations and extension
+        // declarations:
+        //
+        // - Both can container members (they are `ContainerDecl`s)
+        // - Both can have declared bases
+        // - Both expose a `this` variable in their body
+        //
+        class AggTypeDeclBase : public ContainerDecl
+        {
+        public:
+        };
+
+        struct AggTypeDeclBaseRef : ContainerDeclRef
+        {
+            SLANG_DECLARE_DECL_REF(AggTypeDeclBase);
+        };
+
         // An extension to apply to an existing type
-        class ExtensionDecl : public ContainerDecl
+        class ExtensionDecl : public AggTypeDeclBase
         {
         public:
             TypeExp targetType;
@@ -1466,7 +1484,7 @@ namespace Slang
             virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
         };
 
-        struct ExtensionDeclRef : ContainerDeclRef
+        struct ExtensionDeclRef : AggTypeDeclBaseRef
         {
             SLANG_DECLARE_DECL_REF(ExtensionDecl);
 
@@ -1474,9 +1492,10 @@ namespace Slang
         };
 
         // Declaration of a type that represents some sort of aggregate
-        class AggTypeDecl : public ContainerDecl
+        class AggTypeDecl : public AggTypeDeclBase
         {
         public:
+
             // extensions that might apply to this declaration
             ExtensionDecl* candidateExtensions = nullptr;
             FilteredMemberList<StructField> GetFields()
@@ -1505,7 +1524,7 @@ namespace Slang
             }
         };
 
-        struct AggTypeDeclRef : public ContainerDeclRef
+        struct AggTypeDeclRef : public AggTypeDeclBaseRef
         {
             SLANG_DECLARE_DECL_REF(AggTypeDecl);
             
@@ -1538,42 +1557,40 @@ namespace Slang
             FilteredMemberRefList<FieldDeclRef> GetFields() const { return GetMembersOfType<FieldDeclRef>(); }
         };
 
-        // A trait which other types can conform to
-        class TraitDecl : public AggTypeDecl
+        // An interface which other types can conform to
+        class InterfaceDecl : public AggTypeDecl
         {
         public:
-            List<TypeExp> bases;
-
             virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
         };
 
-        struct TraitDeclRef : public AggTypeDeclRef
+        struct InterfaceDeclRef : public AggTypeDeclRef
         {
-            SLANG_DECLARE_DECL_REF(TraitDecl);
+            SLANG_DECLARE_DECL_REF(InterfaceDecl);
         };
 
 
-        // A declaration that states that the enclosing type supports a given trait
+        // A kind of pseudo-member that represents an explicit
+        // or implicit inheritance relationship.
         //
-        // TODO: this same construct might be used for represent other inheritance-like cases
-        class TraitConformanceDecl : public Decl
+        class InheritanceDecl : public Decl
         {
         public:
             // The type expression as written
             TypeExp base;
 
-            // The trait that we found we conform to...
-            TraitDeclRef traitDeclRef;
-
             virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
         };
 
-        struct TraitConformanceDeclRef : public DeclRef
+        struct InheritanceDeclRef : public DeclRef
         {
-            SLANG_DECLARE_DECL_REF(TraitConformanceDecl);
+            SLANG_DECLARE_DECL_REF(InheritanceDecl);
 
-            TraitDeclRef GetTraitDeclRef() { return Substitute(GetDecl()->traitDeclRef).As<TraitDeclRef>(); }
+            RefPtr<ExpressionType> getBaseType() { return Substitute(GetDecl()->base.type); }
         };
+
+        // TODO: may eventually need sub-classes for explicit/direct vs. implicit/indirect inheritance
+
 
         // A declaration that represents a simple (non-aggregate) type
         class SimpleTypeDecl : public Decl
@@ -2744,11 +2761,9 @@ namespace Slang
 
             virtual void visitAccessorDecl(AccessorDecl* decl) = 0;
 
-            virtual void VisitTraitDecl(TraitDecl* /*decl*/)
-            {}
+            virtual void visitInterfaceDecl(InterfaceDecl* /*decl*/) = 0;
 
-            virtual void VisitTraitConformanceDecl(TraitConformanceDecl* /*decl*/)
-            {}
+            virtual void visitInheritanceDecl(InheritanceDecl* /*decl*/) = 0;
 
             virtual RefPtr<ExpressionSyntaxNode> VisitSharedTypeExpr(SharedTypeExpr* typeExpr)
             {
