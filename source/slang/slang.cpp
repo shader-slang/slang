@@ -17,9 +17,6 @@
 #undef NOMINMAX
 #endif
 
-using namespace CoreLib::Basic;
-using namespace CoreLib::IO;
-
 namespace Slang {
 
 static void stdlibDiagnosticCallback(
@@ -37,7 +34,7 @@ class Session
 {
 public:
     bool useCache = false;
-    CoreLib::String cacheDir;
+    String cacheDir;
 
     RefPtr<Scope>   slangLanguageScope;
     RefPtr<Scope>   hlslLanguageScope;
@@ -46,7 +43,7 @@ public:
     List<RefPtr<ProgramSyntaxNode>> loadedModuleCode;
 
 
-    Session(bool /*pUseCache*/, CoreLib::String /*pCacheDir*/)
+    Session(bool /*pUseCache*/, String /*pCacheDir*/)
     {
         // Initialize global state
         // TODO: move this into the session instead
@@ -136,10 +133,10 @@ struct CompileRequest
         List<String> searchDirs;
 
         virtual bool TryToFindIncludeFile(
-            CoreLib::String const& pathToInclude,
-            CoreLib::String const& pathIncludedFrom,
-            CoreLib::String* outFoundPath,
-            CoreLib::String* outFoundSource) override
+            String const& pathToInclude,
+            String const& pathIncludedFrom,
+            String* outFoundPath,
+            String* outFoundSource) override
         {
             String path = Path::Combine(Path::GetDirectoryName(pathIncludedFrom), pathToInclude);
             if (File::Exists(path))

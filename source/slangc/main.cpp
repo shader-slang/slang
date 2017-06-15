@@ -4,14 +4,13 @@
 
 #include "core/slang-io.h"
 
+using namespace Slang;
+
 #include <assert.h>
 
 // Currently only used for looking up `Profile::` values that aren't
 // exported by the public API
 #include "../slang/profile.h"
-
-using namespace CoreLib::Basic;
-using namespace CoreLib::IO;
 
 // Try to read an argument for a command-line option.
 wchar_t const* tryReadCommandLineArgumentRaw(wchar_t const* option, wchar_t***ioCursor, wchar_t**end)

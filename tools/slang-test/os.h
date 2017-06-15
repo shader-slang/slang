@@ -32,8 +32,8 @@ enum OSError
 // A helper type used during enumeration of files in a directory.
 struct OSFindFilesResult
 {
-    CoreLib::Basic::String				directoryPath_;
-    CoreLib::Basic::String				filePath_;
+    Slang::String				directoryPath_;
+    Slang::String				filePath_;
 #ifdef WIN32
     HANDLE				findHandle_;
     WIN32_FIND_DATAW	fileData_;
@@ -57,7 +57,7 @@ struct OSFindFilesResult
                 context_ = NULL;
             }
         }
-        CoreLib::Basic::String const& operator*() const
+        Slang::String const& operator*() const
         {
             return context_->filePath_;
         }
@@ -86,10 +86,10 @@ struct OSFindFilesResult
 // for( auto subdir : osFindChildDirectories(dir))
 // { ... }
 //
-// Each element in the range is a `CoreLib::Basic::String` representing the
+// Each element in the range is a `Slang::String` representing the
 // path to a subdirecotry of the directory.
 OSFindFilesResult osFindChildDirectories(
-    CoreLib::Basic::String directoryPath);
+    Slang::String directoryPath);
 
 // Enumerate files in the given `directoryPath` that match the provided
 // `pattern` as a simplified regex for files to return (e.g., "*.txt")
@@ -99,11 +99,11 @@ OSFindFilesResult osFindChildDirectories(
 // for( auto file : osFindFilesInDirectoryMatchingPattern(dir, "*.txt"))
 // { ... }
 //
-// Each element in the range is a `CoreLib::Basic::String` representing the
+// Each element in the range is a `Slang::String` representing the
 // path to a file in the directory.
 OSFindFilesResult osFindFilesInDirectoryMatchingPattern(
-    CoreLib::Basic::String directoryPath,
-    CoreLib::Basic::String pattern);
+    Slang::String directoryPath,
+    Slang::String pattern);
 
 // Enumerate files in the given `directoryPath`  and return a logical
 // collection of the results that can be iterated with a range-based
@@ -112,10 +112,10 @@ OSFindFilesResult osFindFilesInDirectoryMatchingPattern(
 // for( auto file : osFindFilesInDirectory(dir))
 // { ... }
 //
-// Each element in the range is a `CoreLib::Basic::String` representing the
+// Each element in the range is a `Slang::String` representing the
 // path to a file in the directory.
 OSFindFilesResult osFindFilesInDirectory(
-    CoreLib::Basic::String directoryPath);
+    Slang::String directoryPath);
 
 
 // An `OSProcessSpawner` can be used to launch a process, and handles
@@ -127,16 +127,16 @@ struct OSProcessSpawner
     // Set the executable name for the process to be spawned.
     // Note: this call must be made before any arguments are pushed.
     void pushExecutableName(
-        CoreLib::Basic::String executableName);
+        Slang::String executableName);
 
     // Set the executable name for the process to be spawned.
     // Note: this call must be made before any arguments are pushed.
     void pushExecutablePath(
-        CoreLib::Basic::String executablePath);
+        Slang::String executablePath);
 
     // Append an argument for the process to be spawned.
     void pushArgument(
-        CoreLib::Basic::String argument);
+        Slang::String argument);
 
     // Attempt to spawn the process, and wait for it to complete.
     // Returns an error if the attempt to spawn and/or wait fails,
@@ -150,16 +150,16 @@ struct OSProcessSpawner
     // on exit, along with the output it wrote to stdout and stderr.
     typedef int ResultCode;
     ResultCode getResultCode() { return resultCode_; }
-    CoreLib::Basic::String const& getStandardOutput() { return standardOutput_; }
-    CoreLib::Basic::String const& getStandardError() { return standardError_; }
+    Slang::String const& getStandardOutput() { return standardOutput_; }
+    Slang::String const& getStandardError() { return standardError_; }
 
     // "private" data follows
-    CoreLib::Basic::String standardOutput_;
-    CoreLib::Basic::String standardError_;
+    Slang::String standardOutput_;
+    Slang::String standardError_;
     ResultCode resultCode_;
 #ifdef WIN32
-    CoreLib::Basic::String executableName_;
-    CoreLib::Basic::StringBuilder commandLine_;
+    Slang::String executableName_;
+    Slang::StringBuilder commandLine_;
 
     // Is the executable specified by path, rather than just by name?
     bool isExecutablePath_;

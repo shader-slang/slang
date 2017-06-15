@@ -26,7 +26,6 @@
     <ClInclude Include="common.h" />
     <ClInclude Include="dictionary.h" />
     <ClInclude Include="exception.h" />
-    <ClInclude Include="func.h" />
     <ClInclude Include="hash.h" />
     <ClInclude Include="int-set.h" />
     <ClInclude Include="link.h" />

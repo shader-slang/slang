@@ -154,7 +154,7 @@ namespace Slang
 
 #if 0
 
-    class ShaderCompiler : public CoreLib::Basic::Object
+    class ShaderCompiler : public Slang::Object
     {
     public:
         virtual void Compile(

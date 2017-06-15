@@ -2,12 +2,12 @@
 
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
 
-<Type Name="CoreLib::Basic::String">
+<Type Name="Slang::String">
     <DisplayString>{buffer.pointer,s}</DisplayString>
 	<StringView>buffer.pointer,s</StringView>
 </Type>
 
-<Type Name="CoreLib::Basic::ArrayView&lt;*&gt;">
+<Type Name="Slang::ArrayView&lt;*&gt;">
   <DisplayString>{{ size={_count} }}</DisplayString>
   <Expand>
     <Item Name="[size]">_count</Item>
@@ -18,7 +18,7 @@
   </Expand>
 </Type>
 
-<Type Name="CoreLib::Basic::List&lt;*&gt;">
+<Type Name="Slang::List&lt;*&gt;">
     <DisplayString>{{ size={_count} }}</DisplayString>
     <Expand>
         <Item Name="[size]">_count</Item>
@@ -31,7 +31,7 @@
 </Type>
 
 
-<Type Name="CoreLib::Basic::Array&lt;*,*&gt;">
+<Type Name="Slang::Array&lt;*,*&gt;">
   <DisplayString>{{ size={_count} }}</DisplayString>
   <Expand>
     <Item Name="[size]">_count</Item>
@@ -42,7 +42,7 @@
   </Expand>
 </Type>
   
-<Type Name="CoreLib::Basic::LinkedList&lt;*&gt;">
+<Type Name="Slang::LinkedList&lt;*&gt;">
     <DisplayString>{{ size={FCount} }}</DisplayString>
     <Expand>
         <LinkedListItems>
@@ -54,7 +54,7 @@
     </Expand>
 </Type>
 
-<Type Name="CoreLib::Basic::Dictionary&lt;*,*&gt;">
+<Type Name="Slang::Dictionary&lt;*,*&gt;">
     <DisplayString>{{ size={_count} }}</DisplayString>
     <Expand>
         <Item Name="[size]">_count</Item>
@@ -66,7 +66,7 @@
     </Expand>
 </Type>
 
-<Type Name="CoreLib::Basic::EnumerableDictionary&lt;*,*&gt;">
+<Type Name="Slang::EnumerableDictionary&lt;*,*&gt;">
     <DisplayString>{{ size={_count} }}</DisplayString>
     <Expand>
         <Item Name="[size]">_count</Item>
@@ -80,7 +80,7 @@
     </Expand>
 </Type>
 
-<Type Name="CoreLib::Basic::EnumerableHashSet&lt;*,*&gt;">
+<Type Name="Slang::EnumerableHashSet&lt;*,*&gt;">
     <DisplayString>{{ size={dict._count} }}</DisplayString>
     <Expand>
         <Item Name="[size]">dict._count</Item>
@@ -94,7 +94,7 @@
     </Expand>
 </Type>
 
-<Type Name="CoreLib::Basic::RefPtrImpl&lt;*,*,*&gt;">
+<Type Name="Slang::RefPtrImpl&lt;*,*,*&gt;">
     <SmartPointer Usage="Minimal">pointer</SmartPointer>
     <DisplayString Condition="pointer == 0">empty</DisplayString>
     <DisplayString Condition="pointer != 0">RefPtr {*pointer}</DisplayString>

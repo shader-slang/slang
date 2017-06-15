@@ -947,8 +947,6 @@ typedef Texture2D texture2D;
 )=" };
 
 
-using namespace CoreLib::Basic;
-
 namespace Slang
 {
     static String stdlibPath;

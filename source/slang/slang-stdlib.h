@@ -8,13 +8,13 @@ namespace Slang
     class SlangStdLib
     {
     private:
-        static CoreLib::String code;
+        static String code;
     public:
-        static CoreLib::String GetCode();
+        static String GetCode();
         static void Finalize();
     };
 
-    CoreLib::String getGLSLLibraryCode();
+    String getGLSLLibraryCode();
 }
 
 #endif

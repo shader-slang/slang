@@ -26,7 +26,7 @@ void printDiagnosticArg(StringBuilder& sb, int str)
     sb << str;
 }
 
-void printDiagnosticArg(StringBuilder& sb, CoreLib::Basic::String const& str)
+void printDiagnosticArg(StringBuilder& sb, Slang::String const& str)
 {
     sb << str;
 }

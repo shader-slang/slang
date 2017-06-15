@@ -30,9 +30,6 @@
 #undef CreateDirectory
 #endif
 
-using namespace CoreLib::Basic;
-using namespace CoreLib::IO;
-
 namespace Slang
 {
     //

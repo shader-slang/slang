@@ -10,8 +10,6 @@
 
 #include <assert.h>
 
-using namespace CoreLib;
-
 // This file provides an implementation of a simple C-style preprocessor.
 // It does not aim for 100% compatibility with any particular preprocessor
 // specification, but the goal is to have it accept the most common
@@ -207,7 +205,7 @@ static void DestroyInputStream(Preprocessor* /*preprocessor*/, PreprocessorInput
 
 // Create an input stream to represent a pre-tokenized input file.
 // TODO(tfoley): pre-tokenizing files isn't going to work in the long run.
-static PreprocessorInputStream* CreateInputStreamForSource(Preprocessor* preprocessor, CoreLib::String const& source, CoreLib::String const& fileName)
+static PreprocessorInputStream* CreateInputStreamForSource(Preprocessor* preprocessor, String const& source, String const& fileName)
 {
     SourceTextInputStream* inputStream = new SourceTextInputStream();
     InitializeInputStream(preprocessor, inputStream);
@@ -2009,11 +2007,11 @@ static TokenList ReadAllTokens(
 }
 
 TokenList preprocessSource(
-    CoreLib::String const& source,
-    CoreLib::String const& fileName,
+    String const& source,
+    String const& fileName,
     DiagnosticSink* sink,
     IncludeHandler* includeHandler,
-    CoreLib::Dictionary<CoreLib::String, CoreLib::String>  defines,
+    Dictionary<String, String>  defines,
     ProgramSyntaxNode*  syntax)
 {
     Preprocessor preprocessor;

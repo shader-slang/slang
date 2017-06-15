@@ -11,7 +11,6 @@
 
 namespace Slang
 {
-    using namespace CoreLib::Basic;
     class SyntaxVisitor;
     class FunctionSyntaxNode;
 
@@ -850,7 +849,7 @@ namespace Slang
         {
             BaseType = baseType;
         }
-        virtual CoreLib::Basic::String ToString() override;
+        virtual Slang::String ToString() override;
     protected:
         virtual BasicExpressionType* GetScalarType() override;
         virtual bool EqualsImpl(ExpressionType * type) override;
@@ -1034,7 +1033,7 @@ namespace Slang
     public:
         RefPtr<ExpressionType> BaseType;
         RefPtr<IntVal> ArrayLength;
-        virtual CoreLib::Basic::String ToString() override;
+        virtual Slang::String ToString() override;
     protected:
         virtual bool EqualsImpl(ExpressionType * type) override;
         virtual ExpressionType* CreateCanonicalType() override;

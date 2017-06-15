@@ -6,8 +6,6 @@
 
 namespace Slang
 {
-    using namespace CoreLib::Basic;
-
     struct TokenList
     {
         Token* begin() const;

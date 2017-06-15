@@ -8,8 +8,6 @@
 
 namespace Slang
 {
-    using namespace CoreLib::Basic;
-
     class ProgramSyntaxNode;
     class ProgramLayout;
 

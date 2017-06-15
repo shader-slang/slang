@@ -8,8 +8,6 @@
 
 namespace Slang {
 
-using namespace CoreLib::Basic;
-
 enum class TokenType
 {
 #define TOKEN(NAME, DESC) NAME,

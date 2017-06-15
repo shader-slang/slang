@@ -21,9 +21,9 @@ namespace Slang
         return this;
     }
 
-    CoreLib::Basic::String BasicExpressionType::ToString()
+    Slang::String BasicExpressionType::ToString()
     {
-        CoreLib::Basic::StringBuilder res;
+        Slang::StringBuilder res;
 
         switch (BaseType)
         {
@@ -360,7 +360,7 @@ namespace Slang
         else
             return BaseType->GetHashCode();
     }
-    CoreLib::Basic::String ArrayExpressionType::ToString()
+    Slang::String ArrayExpressionType::ToString()
     {
         if (ArrayLength)
             return BaseType->ToString() + "[" + ArrayLength->ToString() + "]";

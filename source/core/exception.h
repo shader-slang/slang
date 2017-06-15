@@ -4,112 +4,109 @@
 #include "common.h"
 #include "slang-string.h"
 
-namespace CoreLib
+namespace Slang
 {
-	namespace Basic
+	class Exception : public Object
 	{
-		class Exception : public Object
+	public:
+		String Message;
+		Exception()
+		{}
+		Exception(const String & message)
+			: Message(message)
 		{
-		public:
-			String Message;
-			Exception()
-			{}
-			Exception(const String & message)
-				: Message(message)
-			{
-			}
-		};
+		}
+	};
 
-		class IndexOutofRangeException : public Exception
+	class IndexOutofRangeException : public Exception
+	{
+	public:
+		IndexOutofRangeException()
+		{}
+		IndexOutofRangeException(const String & message)
+			: Exception(message)
 		{
-		public:
-			IndexOutofRangeException()
-			{}
-			IndexOutofRangeException(const String & message)
-				: Exception(message)
-			{
-			}
+		}
 
-		};
+	};
 
-		class InvalidOperationException : public Exception
+	class InvalidOperationException : public Exception
+	{
+	public:
+		InvalidOperationException()
+		{}
+		InvalidOperationException(const String & message)
+			: Exception(message)
 		{
-		public:
-			InvalidOperationException()
-			{}
-			InvalidOperationException(const String & message)
-				: Exception(message)
-			{
-			}
+		}
 
-		};
+	};
 		
-		class ArgumentException : public Exception
+	class ArgumentException : public Exception
+	{
+	public:
+		ArgumentException()
+		{}
+		ArgumentException(const String & message)
+			: Exception(message)
 		{
-		public:
-			ArgumentException()
-			{}
-			ArgumentException(const String & message)
-				: Exception(message)
-			{
-			}
+		}
 
-		};
+	};
 
-		class KeyNotFoundException : public Exception
+	class KeyNotFoundException : public Exception
+	{
+	public:
+		KeyNotFoundException()
+		{}
+		KeyNotFoundException(const String & message)
+			: Exception(message)
 		{
-		public:
-			KeyNotFoundException()
-			{}
-			KeyNotFoundException(const String & message)
-				: Exception(message)
-			{
-			}
-		};
-		class KeyExistsException : public Exception
+		}
+	};
+	class KeyExistsException : public Exception
+	{
+	public:
+		KeyExistsException()
+		{}
+		KeyExistsException(const String & message)
+			: Exception(message)
 		{
-		public:
-			KeyExistsException()
-			{}
-			KeyExistsException(const String & message)
-				: Exception(message)
-			{
-			}
-		};
+		}
+	};
 
-		class NotSupportedException : public Exception
+	class NotSupportedException : public Exception
+	{
+	public:
+		NotSupportedException()
+		{}
+		NotSupportedException(const String & message)
+			: Exception(message)
 		{
-		public:
-			NotSupportedException()
-			{}
-			NotSupportedException(const String & message)
-				: Exception(message)
-			{
-			}
-		};
+		}
+	};
 
-		class NotImplementedException : public Exception
+	class NotImplementedException : public Exception
+	{
+	public:
+		NotImplementedException()
+		{}
+		NotImplementedException(const String & message)
+			: Exception(message)
 		{
-		public:
-			NotImplementedException()
-			{}
-			NotImplementedException(const String & message)
-				: Exception(message)
-			{
-			}
-		};
+		}
+	};
 
-		class InvalidProgramException : public Exception
+	class InvalidProgramException : public Exception
+	{
+	public:
+		InvalidProgramException()
+		{}
+		InvalidProgramException(const String & message)
+			: Exception(message)
 		{
-		public:
-			InvalidProgramException()
-			{}
-			InvalidProgramException(const String & message)
-				: Exception(message)
-			{
-			}
-		};
-	}
+		}
+	};
 }
 
 #endif

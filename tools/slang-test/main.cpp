@@ -2,8 +2,7 @@
 
 #include "../../source/core/slang-io.h"
 
-using namespace CoreLib::Basic;
-using namespace CoreLib::IO;
+using namespace Slang;
 
 #include "os.h"
 
@@ -509,9 +508,9 @@ TestResult gatherTestsForFile(
     String fileContents;
     try
     {
-        fileContents = CoreLib::IO::File::ReadAllText(filePath);
+        fileContents = Slang::File::ReadAllText(filePath);
     }
-    catch (CoreLib::IO::IOException)
+    catch (Slang::IOException)
     {
         return kTestResult_Fail;
     }
@@ -629,9 +628,9 @@ TestResult runSimpleTest(TestInput& input)
     String expectedOutput;
     try
     {
-        expectedOutput = CoreLib::IO::File::ReadAllText(expectedOutputPath);
+        expectedOutput = Slang::File::ReadAllText(expectedOutputPath);
     }
-    catch (CoreLib::IO::IOException)
+    catch (Slang::IOException)
     {
     }
 
@@ -656,7 +655,7 @@ TestResult runSimpleTest(TestInput& input)
     if (result == kTestResult_Fail)
     {
         String actualOutputPath = outputStem + ".actual";
-        CoreLib::IO::File::WriteAllText(actualOutputPath, actualOutput);
+        Slang::File::WriteAllText(actualOutputPath, actualOutput);
     }
 
     return result;
@@ -691,9 +690,9 @@ TestResult generateHLSLBaseline(TestInput& input)
     String expectedOutputPath = outputStem + ".expected";
     try
     {
-        CoreLib::IO::File::WriteAllText(expectedOutputPath, expectedOutput);
+        Slang::File::WriteAllText(expectedOutputPath, expectedOutput);
     }
-    catch (CoreLib::IO::IOException)
+    catch (Slang::IOException)
     {
         return kTestResult_Fail;
     }
@@ -758,9 +757,9 @@ TestResult runHLSLComparisonTest(TestInput& input)
     String expectedOutput;
     try
     {
-        expectedOutput = CoreLib::IO::File::ReadAllText(expectedOutputPath);
+        expectedOutput = Slang::File::ReadAllText(expectedOutputPath);
     }
-    catch (CoreLib::IO::IOException)
+    catch (Slang::IOException)
     {
     }
 
@@ -786,7 +785,7 @@ TestResult runHLSLComparisonTest(TestInput& input)
     if (result == kTestResult_Fail)
     {
         String actualOutputPath = outputStem + ".actual";
-        CoreLib::IO::File::WriteAllText(actualOutputPath, actualOutput);
+        Slang::File::WriteAllText(actualOutputPath, actualOutput);
     }
 
     return result;
@@ -869,8 +868,8 @@ TestResult runGLSLComparisonTest(TestInput& input)
     TestResult hlslResult   =  doGLSLComparisonTestRun(input, "__GLSL__",  "glslang", ".expected",    &expectedOutput);
     TestResult slangResult  =  doGLSLComparisonTestRun(input, "__SLANG__", nullptr,   ".actual",      &actualOutput);
 
-    CoreLib::IO::File::WriteAllText(outputStem + ".expected", expectedOutput);
-    CoreLib::IO::File::WriteAllText(outputStem + ".actual",   actualOutput);
+    Slang::File::WriteAllText(outputStem + ".expected", expectedOutput);
+    Slang::File::WriteAllText(outputStem + ".actual",   actualOutput);
 
     if( hlslResult  == kTestResult_Fail )   return kTestResult_Fail;
     if( slangResult == kTestResult_Fail )   return kTestResult_Fail;
@@ -1014,8 +1013,8 @@ TestResult runHLSLRenderComparisonTestImpl(
     TestResult hlslResult   =  doRenderComparisonTestRun(input, expectedArg,  ".expected",    &expectedOutput);
     TestResult slangResult  =  doRenderComparisonTestRun(input, actualArg,    ".actual",      &actualOutput);
 
-    CoreLib::IO::File::WriteAllText(outputStem + ".expected", expectedOutput);
-    CoreLib::IO::File::WriteAllText(outputStem + ".actual",   actualOutput);
+    Slang::File::WriteAllText(outputStem + ".expected", expectedOutput);
+    Slang::File::WriteAllText(outputStem + ".actual",   actualOutput);
 
     if( hlslResult  == kTestResult_Fail )   return kTestResult_Fail;
     if( slangResult == kTestResult_Fail )   return kTestResult_Fail;

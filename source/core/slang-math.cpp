@@ -1,9 +1,8 @@
 #include "slang-math.h"
 
-namespace CoreLib
+#if 0
+namespace Slang
 {
-	namespace Basic
-	{
-		const float Math::Pi = 3.141592654f;
-	}
+	const float Math::Pi = 3.141592654f;
 }
+#endif

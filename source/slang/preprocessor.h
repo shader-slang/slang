@@ -15,19 +15,19 @@ class ProgramSyntaxNode;
 struct IncludeHandler
 {
     virtual bool TryToFindIncludeFile(
-        CoreLib::String const& pathToInclude,
-        CoreLib::String const& pathIncludedFrom,
-        CoreLib::String* outFoundPath,
-        CoreLib::String* outFoundSource) = 0;
+        String const& pathToInclude,
+        String const& pathIncludedFrom,
+        String* outFoundPath,
+        String* outFoundSource) = 0;
 };
 
 // Take a string of source code and preprocess it into a list of tokens.
 TokenList preprocessSource(
-    CoreLib::String const& source,
-    CoreLib::String const& fileName,
+    String const& source,
+    String const& fileName,
     DiagnosticSink* sink,
     IncludeHandler* includeHandler,
-    CoreLib::Dictionary<CoreLib::String, CoreLib::String>  defines,
+    Dictionary<String, String>  defines,
     ProgramSyntaxNode*  syntax);
 
 } // namespace Slang
