@@ -1068,7 +1068,7 @@ namespace Slang
             return genericDecl;
         }
 
-        virtual void visitInterfaceDecl(InterfaceDecl* decl) override
+        virtual void visitInterfaceDecl(InterfaceDecl* /*decl*/) override
         {
             // TODO: do some actual checking of members here
         }

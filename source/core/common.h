@@ -20,12 +20,6 @@ namespace Slang
 #else
 	typedef int PtrInt;
 #endif
-	class Object
-	{
-	public:
-		virtual ~Object()
-		{}
-	};
 
 	template <typename T>
 	inline T&& _Move(T & obj)

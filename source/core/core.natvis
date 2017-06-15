@@ -42,18 +42,6 @@
   </Expand>
 </Type>
   
-<Type Name="Slang::LinkedList&lt;*&gt;">
-    <DisplayString>{{ size={FCount} }}</DisplayString>
-    <Expand>
-        <LinkedListItems>
-            <Size>FCount</Size>
-            <HeadPointer>FHead</HeadPointer>
-            <NextPointer>pNext</NextPointer>
-            <ValueNode>Value</ValueNode>
-        </LinkedListItems>
-    </Expand>
-</Type>
-
 <Type Name="Slang::Dictionary&lt;*,*&gt;">
     <DisplayString>{{ size={_count} }}</DisplayString>
     <Expand>
@@ -63,34 +51,6 @@
            <Size>bucketSizeMinusOne + 1</Size>
            <ValuePointer>hashMap</ValuePointer>
         </ArrayItems>
-    </Expand>
-</Type>
-
-<Type Name="Slang::EnumerableDictionary&lt;*,*&gt;">
-    <DisplayString>{{ size={_count} }}</DisplayString>
-    <Expand>
-        <Item Name="[size]">_count</Item>
-        <Item Name="[capacity]">bucketSizeMinusOne + 1</Item>
-        <LinkedListItems>
-            <Size>kvPairs.FCount</Size>
-            <HeadPointer>kvPairs.FHead</HeadPointer>
-            <NextPointer>pNext</NextPointer>
-            <ValueNode>Value</ValueNode>
-        </LinkedListItems>
-    </Expand>
-</Type>
-
-<Type Name="Slang::EnumerableHashSet&lt;*,*&gt;">
-    <DisplayString>{{ size={dict._count} }}</DisplayString>
-    <Expand>
-        <Item Name="[size]">dict._count</Item>
-        <Item Name="[capacity]">dict.bucketSizeMinusOne + 1</Item>
-        <LinkedListItems>
-            <Size>dict.kvPairs.FCount</Size>
-            <HeadPointer>dict.kvPairs.FHead</HeadPointer>
-            <NextPointer>pNext</NextPointer>
-            <ValueNode>Value</ValueNode>
-        </LinkedListItems>
     </Expand>
 </Type>
 

@@ -884,7 +884,6 @@ namespace slang
 #ifdef SLANG_INCLUDE_IMPLEMENTATION
 
 #include "source/core/slang-io.cpp"
-#include "source/core/slang-math.cpp"
 #include "source/core/slang-string.cpp"
 #include "source/core/stream.cpp"
 #include "source/core/text-io.cpp"

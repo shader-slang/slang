@@ -152,28 +152,6 @@ namespace Slang
         TranslationUnitOptions const& getTranslationUnitOptions() { return *translationUnitOptions; }
     };
 
-#if 0
-
-    class ShaderCompiler : public Slang::Object
-    {
-    public:
-        virtual void Compile(
-            CompileResult&                  result,
-            CollectionOfTranslationUnits*   collectionOfTranslationUnits,
-            const CompileOptions&           options,
-            CompileRequest*                 request) = 0;
-
-        virtual TranslationUnitResult PassThrough(
-            String const&			sourceText,
-            String const&			sourcePath,
-            const CompileOptions &	options,
-            TranslationUnitOptions const& translationUnitOptions) = 0;
-
-    };
-
-    ShaderCompiler * CreateShaderCompiler();
-#endif
-
     TranslationUnitResult passThrough(
         String const&			sourceText,
         String const&			sourcePath,

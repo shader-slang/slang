@@ -9,14 +9,14 @@ namespace Slang
 	using Slang::List;
 	using Slang::_EndLine;
 
-	class TextReader : public Slang::Object
+	class TextReader
 	{
 	protected:
 		char decodedChar[5];
 		int decodedCharPtr = 0, decodedCharSize = 0;
 		virtual void ReadChar() = 0;
 	public:
-		~TextReader()
+		virtual ~TextReader()
 		{
 			Close();
 		}
@@ -45,10 +45,10 @@ namespace Slang
 		}
 	};
 
-	class TextWriter : public Slang::Object
+	class TextWriter
 	{
 	public:
-		~TextWriter()
+		virtual ~TextWriter()
 		{
 			Close();
 		}
@@ -267,7 +267,7 @@ namespace Slang
         }
 	};
 
-	class StreamReader : public TextReader
+    class StreamReader : public TextReader
 	{
 	private:
 		RefPtr<Stream> stream;
@@ -311,7 +311,6 @@ namespace Slang
             stream.Release();
         }
 	};
-
 }
 
 #endif

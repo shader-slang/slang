@@ -36,11 +36,6 @@ void printDiagnosticArg(StringBuilder& sb, Decl* decl)
     sb << decl->Name.Content;
 }
 
-void printDiagnosticArg(StringBuilder& sb, Type* type)
-{
-    sb << type->DataType->ToString();
-}
-
 void printDiagnosticArg(StringBuilder& sb, ExpressionType* type)
 {
     sb << type->ToString();
@@ -174,10 +169,10 @@ void DiagnosticSink::diagnoseImpl(CodePosition const& pos, DiagnosticInfo const&
     if( callback )
     {
         // If so, pass the error string along to them
-        StringBuilder sb;
-        formatDiagnostic(sb, diagnostic);
+        StringBuilder messageBuilder;
+        formatDiagnostic(messageBuilder, diagnostic);
 
-        callback(sb.ProduceString().begin(), callbackUserData);
+        callback(messageBuilder.ProduceString().begin(), callbackUserData);
     }
     else
     {

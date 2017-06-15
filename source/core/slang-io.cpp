@@ -10,13 +10,6 @@
 
 namespace Slang
 {
-	CommandLineWriter * currentCommandWriter = nullptr;
-
-	void SetCommandLineWriter(CommandLineWriter * writer)
-	{
-		currentCommandWriter = writer;
-	}
-
 	bool File::Exists(const String & fileName)
 	{
 #ifdef _WIN32

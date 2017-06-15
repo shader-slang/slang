@@ -6,7 +6,7 @@
 
 namespace Slang
 {
-	class Exception : public Object
+	class Exception
 	{
 	public:
 		String Message;
@@ -16,6 +16,9 @@ namespace Slang
 			: Message(message)
 		{
 		}
+
+        virtual ~Exception()
+        {}
 	};
 
 	class IndexOutofRangeException : public Exception

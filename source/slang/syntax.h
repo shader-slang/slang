@@ -1133,16 +1133,6 @@ namespace Slang
         return 0;
     }
 
-    class Type
-    {
-    public:
-        RefPtr<ExpressionType> DataType;
-        // ContrainedWorlds: Implementation must be defined at at least one of of these worlds in order to satisfy global dependency
-        // FeasibleWorlds: The component can be computed at any of these worlds
-        EnumerableHashSet<String> ConstrainedWorlds, FeasibleWorlds;
-        EnumerableHashSet<String> PinnedWorlds;
-    };
-
     class ContainerDecl;
 
 
@@ -2507,7 +2497,7 @@ namespace Slang
 
     //
 
-    class SyntaxVisitor : public Object
+    class SyntaxVisitor
     {
     protected:
         DiagnosticSink * sink = nullptr;
@@ -2523,6 +2513,10 @@ namespace Slang
         SyntaxVisitor(DiagnosticSink * sink)
             : sink(sink)
         {}
+        virtual ~SyntaxVisitor()
+        {
+        }
+
         virtual RefPtr<ProgramSyntaxNode> VisitProgram(ProgramSyntaxNode* program)
         {
             for (auto & m : program->Members)

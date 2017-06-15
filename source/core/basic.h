@@ -6,10 +6,8 @@
 #include "slang-string.h"
 #include "array.h"
 #include "list.h"
-#include "link.h"
 #include "smart-pointer.h"
 #include "exception.h"
 #include "dictionary.h"
-#include "linq.h"
 
 #endif
