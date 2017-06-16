@@ -110,9 +110,9 @@ namespace Slang
         }
 
         RefPtr<ExpressionSyntaxNode> ConstructDeclRefExpr(
-            DeclRef							declRef,
-            RefPtr<ExpressionSyntaxNode>	baseExpr,
-            RefPtr<ExpressionSyntaxNode>	originalExpr)
+            DeclRef<Decl>                     declRef,
+            RefPtr<ExpressionSyntaxNode>    baseExpr,
+            RefPtr<ExpressionSyntaxNode>    originalExpr)
         {
             if (baseExpr)
             {
@@ -302,11 +302,11 @@ namespace Slang
         // The arguments should already be checked against
         // the declaration.
         RefPtr<ExpressionType> InstantiateGenericType(
-            GenericDeclRef								genericDeclRef,
+            DeclRef<GenericDecl>								genericDeclRef,
             List<RefPtr<ExpressionSyntaxNode>> const&	args)
         {
             RefPtr<Substitutions> subst = new Substitutions();
-            subst->genericDecl = genericDeclRef.GetDecl();
+            subst->genericDecl = genericDeclRef.getDecl();
             subst->outer = genericDeclRef.substitutions;
 
             for (auto argExpr : args)
@@ -314,8 +314,8 @@ namespace Slang
                 subst->args.Add(ExtractGenericArgVal(argExpr));
             }
 
-            DeclRef innerDeclRef;
-            innerDeclRef.decl = genericDeclRef.GetInner();
+            DeclRef<Decl> innerDeclRef;
+            innerDeclRef.decl = GetInner(genericDeclRef);
             innerDeclRef.substitutions = subst;
 
             return DeclRefType::Create(innerDeclRef);
@@ -391,7 +391,7 @@ namespace Slang
                 auto genericDeclRef = genericDeclRefType->GetDeclRef();
                 EnsureDecl(genericDeclRef.decl);
                 List<RefPtr<ExpressionSyntaxNode>> args;
-                for (RefPtr<Decl> member : genericDeclRef.GetDecl()->Members)
+                for (RefPtr<Decl> member : genericDeclRef.getDecl()->Members)
                 {
                     if (auto typeParam = member.As<GenericTypeParamDecl>())
                     {
@@ -685,7 +685,7 @@ namespace Slang
                 if(auto toDeclRefType = toType->As<DeclRefType>())
                 {
                     auto toTypeDeclRef = toDeclRefType->declRef;
-                    if(auto toStructDeclRef = toTypeDeclRef.As<StructDeclRef>())
+                    if(auto toStructDeclRef = toTypeDeclRef.As<StructSyntaxNode>())
                     {
                         // Trying to initialize a `struct` type given an initializer list.
                         // We will go through the fields in order and try to match them
@@ -693,7 +693,7 @@ namespace Slang
 
 
                         int argIndex = 0;
-                        for(auto fieldDeclRef : toStructDeclRef.GetMembersOfType<FieldDeclRef>())
+                        for(auto fieldDeclRef : getMembersOfType<StructField>(toStructDeclRef))
                         {
                             if(argIndex >= argCount)
                             {
@@ -708,7 +708,7 @@ namespace Slang
                             ConversionCost argCost;
 
                             bool argResult = TryCoerceImpl(
-                                fieldDeclRef.GetType(),
+                                GetType(fieldDeclRef),
                                 outToExpr ? &coercedArg : nullptr,
                                 arg->Type,
                                 arg,
@@ -908,7 +908,7 @@ namespace Slang
             if (auto toDeclRefType = toType->As<DeclRefType>())
             {
                 auto toTypeDeclRef = toDeclRefType->declRef;
-                if (auto interfaceDeclRef = toTypeDeclRef.As<InterfaceDeclRef>())
+                if (auto interfaceDeclRef = toTypeDeclRef.As<InterfaceDecl>())
                 {
                     // Trying to convert to an interface type.
                     //
@@ -1085,7 +1085,7 @@ namespace Slang
 
             if(auto declRefType = base.type->As<DeclRefType>())
             {
-                if(auto interfaceDeclRef = declRefType->declRef.As<InterfaceDeclRef>())
+                if(auto interfaceDeclRef = declRefType->declRef.As<InterfaceDecl>())
                 {
                     return;
                 }
@@ -1255,7 +1255,7 @@ namespace Slang
 			}
             // HACK(tfoley): Visiting all generic declarations here,
             // because otherwise they won't get visited.
-            for (auto & g : program->GetMembersOfType<GenericDecl>())
+            for (auto & g : program->getMembersOfType<GenericDecl>())
             {
                 VisitGenericDecl(g.Ptr());
             }
@@ -1912,7 +1912,7 @@ namespace Slang
             if (!funcDeclRefExpr) return nullptr;
 
             auto funcDeclRef = funcDeclRefExpr->declRef;
-            auto intrinsicMod = funcDeclRef.GetDecl()->FindModifier<IntrinsicOpModifier>();
+            auto intrinsicMod = funcDeclRef.getDecl()->FindModifier<IntrinsicOpModifier>();
             if (!intrinsicMod) return nullptr;
 
             // Let's not constant-fold operations with more than a certain number of arguments, for simplicity
@@ -2024,7 +2024,7 @@ namespace Slang
             {
                 auto declRef = declRefExpr->declRef;
 
-                if (auto genericValParamRef = declRef.As<GenericValueParamDeclRef>())
+                if (auto genericValParamRef = declRef.As<GenericValueParamDecl>())
                 {
                     // TODO(tfoley): handle the case of non-`int` value parameters...
                     return new GenericParamIntVal(genericValParamRef);
@@ -2032,9 +2032,9 @@ namespace Slang
 
                 // We may also need to check for references to variables that
                 // are defined in a way that can be used as a constant expression:
-                if(auto varRef = declRef.As<VarDeclBaseRef>())
+                if(auto varRef = declRef.As<VarDeclBase>())
                 {
-                    auto varDecl = varRef.GetDecl();
+                    auto varDecl = varRef.getDecl();
 
                     switch(sourceLanguage)
                     {
@@ -2046,7 +2046,7 @@ namespace Slang
                             if(auto constAttr = varDecl->FindModifier<ConstModifier>())
                             {
                                 // HLSL `static const` can be used as a constant expression
-                                if(auto initExpr = varRef.getInitExpr())
+                                if(auto initExpr = getInitExpr(varRef))
                                 {
                                     return TryConstantFoldExpr(initExpr.Ptr());
                                 }
@@ -2077,7 +2077,7 @@ namespace Slang
                                 // TODO(tfoley): this is cloned from the case above that handles generic value parameters
                                 return new GenericParamIntVal(varRef);
                             }
-                            else if(auto initExpr = varRef.getInitExpr())
+                            else if(auto initExpr = getInitExpr(varRef))
                             {
                                 // This is an ordinary constant, and not a specialization constant, so we
                                 // can try to fold its value right now.
@@ -2180,7 +2180,7 @@ namespace Slang
             substitutions->args.Add(elementType);
             substitutions->args.Add(elementCount);
 
-            auto declRef = DeclRef(vectorTypeDecl.Ptr(), substitutions);
+            auto declRef = DeclRef<Decl>(vectorTypeDecl.Ptr(), substitutions);
 
             return DeclRefType::Create(declRef)->As<VectorExpressionType>();
         }
@@ -2257,10 +2257,10 @@ namespace Slang
 
             if (auto declRefType = baseType->AsDeclRefType())
             {
-                if (auto aggTypeDeclRef = declRefType->declRef.As<AggTypeDeclRef>())
+                if (auto aggTypeDeclRef = declRefType->declRef.As<AggTypeDecl>())
                 {
                     // Checking of the type must be complete before we can reference its members safely
-                    EnsureDecl(aggTypeDeclRef.GetDecl(), DeclCheckState::Checked);
+                    EnsureDecl(aggTypeDeclRef.getDecl(), DeclCheckState::Checked);
 
                     // Note(tfoley): The name used for lookup here is a bit magical, since
                     // it must match what the parser installed in subscript declarations.
@@ -2330,7 +2330,7 @@ namespace Slang
             RefPtr<ExpressionType> resultType;
             if (auto funcDeclRef = funcType->declRef)
             {
-                EnsureDecl(funcDeclRef.GetDecl());
+                EnsureDecl(funcDeclRef.getDecl());
 
                 params = funcDeclRef->GetParameters().ToArray();
                 resultType = funcDecl->ReturnType;
@@ -2403,9 +2403,9 @@ namespace Slang
             if (auto targetDeclRefType = decl->targetType->As<DeclRefType>())
             {
                 // Attach our extension to that type as a candidate...
-                if (auto aggTypeDeclRef = targetDeclRefType->declRef.As<AggTypeDeclRef>())
+                if (auto aggTypeDeclRef = targetDeclRefType->declRef.As<AggTypeDecl>())
                 {
-                    auto aggTypeDecl = aggTypeDeclRef.GetDecl();
+                    auto aggTypeDecl = aggTypeDeclRef.getDecl();
                     decl->nextCandidateExtension = aggTypeDecl->candidateExtensions;
                     aggTypeDecl->candidateExtensions = decl;
                 }
@@ -2512,18 +2512,18 @@ namespace Slang
 
         bool DoesTypeConformToInterface(
             RefPtr<ExpressionType>  type,
-            InterfaceDeclRef        interfaceDeclRef)
+            DeclRef<InterfaceDecl>        interfaceDeclRef)
         {
             // for now look up a conformance member...
             if(auto declRefType = type->As<DeclRefType>())
             {
-                if( auto aggTypeDeclRef = declRefType->declRef.As<AggTypeDeclRef>() )
+                if( auto aggTypeDeclRef = declRefType->declRef.As<AggTypeDecl>() )
                 {
-                    for( auto inheritanceDeclRef : aggTypeDeclRef.GetMembersOfType<InheritanceDeclRef>())
+                    for( auto inheritanceDeclRef : getMembersOfType<InheritanceDecl>(aggTypeDeclRef))
                     {
-                        EnsureDecl(inheritanceDeclRef.GetDecl());
+                        EnsureDecl(inheritanceDeclRef.getDecl());
 
-                        auto inheritedDeclRefType = inheritanceDeclRef.getBaseType()->As<DeclRefType>();
+                        auto inheritedDeclRefType = getBaseType(inheritanceDeclRef)->As<DeclRefType>();
                         if (!inheritedDeclRefType)
                             continue;
 
@@ -2539,7 +2539,7 @@ namespace Slang
 
         RefPtr<ExpressionType> TryJoinTypeWithInterface(
             RefPtr<ExpressionType>  type,
-            InterfaceDeclRef        interfaceDeclRef)
+            DeclRef<InterfaceDecl>        interfaceDeclRef)
         {
             // The most basic test here should be: does the type declare conformance to the trait.
             if(DoesTypeConformToInterface(type, interfaceDeclRef))
@@ -2625,7 +2625,7 @@ namespace Slang
             // HACK: trying to work trait types in here...
             if(auto leftDeclRefType = left->As<DeclRefType>())
             {
-                if( auto leftInterfaceRef = leftDeclRefType->declRef.As<InterfaceDeclRef>() )
+                if( auto leftInterfaceRef = leftDeclRefType->declRef.As<InterfaceDecl>() )
                 {
                     // 
                     return TryJoinTypeWithInterface(right, leftInterfaceRef);
@@ -2633,7 +2633,7 @@ namespace Slang
             }
             if(auto rightDeclRefType = right->As<DeclRefType>())
             {
-                if( auto rightInterfaceRef = rightDeclRefType->declRef.As<InterfaceDeclRef>() )
+                if( auto rightInterfaceRef = rightDeclRefType->declRef.As<InterfaceDecl>() )
                 {
                     // 
                     return TryJoinTypeWithInterface(left, rightInterfaceRef);
@@ -2655,14 +2655,14 @@ namespace Slang
         // we solved for along the way.
         RefPtr<Substitutions> TrySolveConstraintSystem(
             ConstraintSystem*		system,
-            GenericDeclRef          genericDeclRef)
+            DeclRef<GenericDecl>          genericDeclRef)
         {
             // For now the "solver" is going to be ridiculously simplistic.
 
             // The generic itself will have some constraints, so we need to try and solve those too
-            for( auto constraintDeclRef : genericDeclRef.GetMembersOfType<GenericTypeConstraintDeclRef>() )
+            for( auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(genericDeclRef) )
             {
-                if(!TryUnifyTypes(*system, constraintDeclRef.GetSub(), constraintDeclRef.GetSup()))
+                if(!TryUnifyTypes(*system, GetSub(constraintDeclRef), GetSup(constraintDeclRef)))
                     return nullptr;
             }
 
@@ -2670,14 +2670,14 @@ namespace Slang
             // each we will try to find a way to satisfy all
             // the constraints for that parameter
             List<RefPtr<Val>> args;
-            for (auto m : genericDeclRef.GetMembers())
+            for (auto m : getMembers(genericDeclRef))
             {
-                if (auto typeParam = m.As<GenericTypeParamDeclRef>())
+                if (auto typeParam = m.As<GenericTypeParamDecl>())
                 {
                     RefPtr<ExpressionType> type = nullptr;
                     for (auto& c : system->constraints)
                     {
-                        if (c.decl != typeParam.GetDecl())
+                        if (c.decl != typeParam.getDecl())
                             continue;
 
                         auto cType = c.val.As<ExpressionType>();
@@ -2708,7 +2708,7 @@ namespace Slang
                     }
                     args.Add(type);
                 }
-                else if (auto valParam = m.As<GenericValueParamDeclRef>())
+                else if (auto valParam = m.As<GenericValueParamDecl>())
                 {
                     // TODO(tfoley): maybe support more than integers some day?
                     // TODO(tfoley): figure out how this needs to interact with
@@ -2716,7 +2716,7 @@ namespace Slang
                     RefPtr<IntVal> val = nullptr;
                     for (auto& c : system->constraints)
                     {
-                        if (c.decl != valParam.GetDecl())
+                        if (c.decl != valParam.getDecl())
                             continue;
 
                         auto cVal = c.val.As<IntVal>();
@@ -2764,7 +2764,7 @@ namespace Slang
             // Consruct a reference to the extension with our constraint variables
             // as the 
             RefPtr<Substitutions> solvedSubst = new Substitutions();
-            solvedSubst->genericDecl = genericDeclRef.GetDecl();
+            solvedSubst->genericDecl = genericDeclRef.getDecl();
             solvedSubst->outer = genericDeclRef.substitutions;
             solvedSubst->args = args;
 
@@ -2780,7 +2780,7 @@ namespace Slang
                     RefPtr<ExpressionType> type = nullptr;
                     for (auto& c : system->constraints)
                     {
-                        if (c.decl != typeVar->declRef.GetDecl())
+                        if (c.decl != typeVar->declRef.getDecl())
                             continue;
 
                         auto cType = c.val.As<ExpressionType>();
@@ -2815,7 +2815,7 @@ namespace Slang
                     RefPtr<IntVal> val = nullptr;
                     for (auto& c : system->constraints)
                     {
-                        if (c.decl != valueVar->declRef.GetDecl())
+                        if (c.decl != valueVar->declRef.getDecl())
                             continue;
 
                         auto cVal = c.val.As<IntVal>();
@@ -2944,7 +2944,7 @@ namespace Slang
         };
 
         // count the number of parameters required/allowed for a callable
-        ParamCounts CountParameters(FilteredMemberRefList<ParamDeclRef> params)
+        ParamCounts CountParameters(FilteredMemberRefList<ParameterSyntaxNode> params)
         {
             ParamCounts counts = { 0, 0 };
             for (auto param : params)
@@ -2961,7 +2961,7 @@ namespace Slang
                 // 2. We are not handling the possibility of multiple declarations for
                 //    a single function, where we'd need to merge default parameters across
                 //    all the declarations.
-                if (!param.GetDecl()->Expr)
+                if (!param.getDecl()->Expr)
                 {
                     counts.required++;
                 }
@@ -2970,10 +2970,10 @@ namespace Slang
         }
 
         // count the number of parameters required/allowed for a generic
-        ParamCounts CountParameters(GenericDeclRef genericRef)
+        ParamCounts CountParameters(DeclRef<GenericDecl> genericRef)
         {
             ParamCounts counts = { 0, 0 };
-            for (auto m : genericRef.GetDecl()->Members)
+            for (auto m : genericRef.getDecl()->Members)
             {
                 if (auto typeParam = m.As<GenericTypeParamDecl>())
                 {
@@ -3004,11 +3004,11 @@ namespace Slang
             switch (candidate.flavor)
             {
             case OverloadCandidate::Flavor::Func:
-                paramCounts = CountParameters(candidate.item.declRef.As<CallableDeclRef>().GetParameters());
+                paramCounts = CountParameters(GetParameters(candidate.item.declRef.As<CallableDecl>()));
                 break;
 
             case OverloadCandidate::Flavor::Generic:
-                paramCounts = CountParameters(candidate.item.declRef.As<GenericDeclRef>());
+                paramCounts = CountParameters(candidate.item.declRef.As<GenericDecl>());
                 break;
 
             default:
@@ -3084,12 +3084,12 @@ namespace Slang
         {
             auto& args = context.appExpr->Arguments;
 
-            auto genericDeclRef = candidate.item.declRef.As<GenericDeclRef>();
+            auto genericDeclRef = candidate.item.declRef.As<GenericDecl>();
 
             int aa = 0;
-            for (auto memberRef : genericDeclRef.GetMembers())
+            for (auto memberRef : getMembers(genericDeclRef))
             {
-                if (auto typeParamRef = memberRef.As<GenericTypeParamDeclRef>())
+                if (auto typeParamRef = memberRef.As<GenericTypeParamDecl>())
                 {
                     auto arg = args[aa++];
 
@@ -3105,14 +3105,14 @@ namespace Slang
                         TypeExp typeExp = CoerceToProperType(TypeExp(arg));
                     }
                 }
-                else if (auto valParamRef = memberRef.As<GenericValueParamDeclRef>())
+                else if (auto valParamRef = memberRef.As<GenericValueParamDecl>())
                 {
                     auto arg = args[aa++];
 
                     if (context.mode == OverloadResolveContext::Mode::JustTrying)
                     {
                         ConversionCost cost = kConversionCost_None;
-                        if (!CanCoerce(valParamRef.GetType(), arg->Type, &cost))
+                        if (!CanCoerce(GetType(valParamRef), arg->Type, &cost))
                         {
                             return false;
                         }
@@ -3120,7 +3120,7 @@ namespace Slang
                     }
                     else
                     {
-                        arg = Coerce(valParamRef.GetType(), arg);
+                        arg = Coerce(GetType(valParamRef), arg);
                         auto val = ExtractGenericArgInteger(arg);
                     }
                 }
@@ -3140,11 +3140,11 @@ namespace Slang
             auto& args = context.appExpr->Arguments;
             int argCount = args.Count();
 
-            List<ParamDeclRef> params;
+            List<DeclRef<ParameterSyntaxNode>> params;
             switch (candidate.flavor)
             {
             case OverloadCandidate::Flavor::Func:
-                params = candidate.item.declRef.As<CallableDeclRef>().GetParameters().ToArray();
+                params = GetParameters(candidate.item.declRef.As<CallableDecl>()).ToArray();
                 break;
 
             case OverloadCandidate::Flavor::Generic:
@@ -3167,7 +3167,7 @@ namespace Slang
                 if (context.mode == OverloadResolveContext::Mode::JustTrying)
                 {
                     ConversionCost cost = kConversionCost_None;
-                    if (!CanCoerce(param.GetType(), arg->Type, &cost))
+                    if (!CanCoerce(GetType(param), arg->Type, &cost))
                     {
                         return false;
                     }
@@ -3175,7 +3175,7 @@ namespace Slang
                 }
                 else
                 {
-                    arg = Coerce(param.GetType(), arg);
+                    arg = Coerce(GetType(param), arg);
                 }
             }
             return true;
@@ -3224,7 +3224,7 @@ namespace Slang
                 assert(!"unexpected");
                 return CreateErrorExpr(appExpr.Ptr());
             }
-            auto baseGenericRef = baseDeclRefExpr->declRef.As<GenericDeclRef>();
+            auto baseGenericRef = baseDeclRefExpr->declRef.As<GenericDecl>();
             if (!baseGenericRef)
             {
                 assert(!"unexpected");
@@ -3232,7 +3232,7 @@ namespace Slang
             }
 
             RefPtr<Substitutions> subst = new Substitutions();
-            subst->genericDecl = baseGenericRef.GetDecl();
+            subst->genericDecl = baseGenericRef.getDecl();
             subst->outer = baseGenericRef.substitutions;
 
             for (auto arg : appExpr->Arguments)
@@ -3240,7 +3240,7 @@ namespace Slang
                 subst->args.Add(ExtractGenericArgVal(arg));
             }
 
-            DeclRef innerDeclRef(baseGenericRef.GetInner(), subst);
+            DeclRef<Decl> innerDeclRef(GetInner(baseGenericRef), subst);
 
             return ConstructDeclRefExpr(
                 innerDeclRef,
@@ -3298,9 +3298,9 @@ namespace Slang
                     context.appExpr->Type = candidate.resultType;
 
                     // A call may yield an l-value, and we should take a look at the candidate to be sure
-                    if(auto subscriptDeclRef = candidate.item.declRef.As<SubscriptDeclRef>())
+                    if(auto subscriptDeclRef = candidate.item.declRef.As<SubscriptDecl>())
                     {
-                        for(auto setter : subscriptDeclRef.GetDecl()->GetMembersOfType<SetterDecl>())
+                        for(auto setter : subscriptDeclRef.getDecl()->getMembersOfType<SetterDecl>())
                         {
                             context.appExpr->Type.IsLeftValue = true;
                         }
@@ -3442,15 +3442,15 @@ namespace Slang
 
         void AddFuncOverloadCandidate(
             LookupResultItem			item,
-            CallableDeclRef             funcDeclRef,
+            DeclRef<CallableDecl>             funcDeclRef,
             OverloadResolveContext&		context)
         {
-            EnsureDecl(funcDeclRef.GetDecl());
+            EnsureDecl(funcDeclRef.getDecl());
 
             OverloadCandidate candidate;
             candidate.flavor = OverloadCandidate::Flavor::Func;
             candidate.item = item;
-            candidate.resultType = funcDeclRef.GetResultType();
+            candidate.resultType = GetResultType(funcDeclRef);
 
             AddOverloadCandidate(context, candidate);
         }
@@ -3480,10 +3480,10 @@ namespace Slang
         void AddCtorOverloadCandidate(
             LookupResultItem		typeItem,
             RefPtr<ExpressionType>	type,
-            ConstructorDeclRef		ctorDeclRef,
+            DeclRef<ConstructorDecl>		ctorDeclRef,
             OverloadResolveContext&	context)
         {
-            EnsureDecl(ctorDeclRef.GetDecl());
+            EnsureDecl(ctorDeclRef.getDecl());
 
             // `typeItem` refers to the type being constructed (the thing
             // that was applied as a function) so we need to construct
@@ -3622,12 +3622,12 @@ namespace Slang
 
         bool TryUnifyIntParam(
             ConstraintSystem&       constraints,
-            VarDeclBaseRef const&   varRef,
+            DeclRef<VarDeclBase> const&   varRef,
             RefPtr<IntVal>          val)
         {
-            if(auto genericValueParamRef = varRef.As<GenericValueParamDeclRef>())
+            if(auto genericValueParamRef = varRef.As<GenericValueParamDecl>())
             {
-                return TryUnifyIntParam(constraints, genericValueParamRef.GetDecl(), val);
+                return TryUnifyIntParam(constraints, genericValueParamRef.getDecl(), val);
             }
             else
             {
@@ -3644,18 +3644,18 @@ namespace Slang
             {
                 auto fstDeclRef = fstDeclRefType->declRef;
 
-                if (auto typeParamDecl = dynamic_cast<GenericTypeParamDecl*>(fstDeclRef.GetDecl()))
+                if (auto typeParamDecl = dynamic_cast<GenericTypeParamDecl*>(fstDeclRef.getDecl()))
                     return TryUnifyTypeParam(constraints, typeParamDecl, snd);
 
                 if (auto sndDeclRefType = snd->As<DeclRefType>())
                 {
                     auto sndDeclRef = sndDeclRefType->declRef;
 
-                    if (auto typeParamDecl = dynamic_cast<GenericTypeParamDecl*>(sndDeclRef.GetDecl()))
+                    if (auto typeParamDecl = dynamic_cast<GenericTypeParamDecl*>(sndDeclRef.getDecl()))
                         return TryUnifyTypeParam(constraints, typeParamDecl, fst);
 
                     // can't be unified if they refer to differnt declarations.
-                    if (fstDeclRef.GetDecl() != sndDeclRef.GetDecl()) return false;
+                    if (fstDeclRef.getDecl() != sndDeclRef.getDecl()) return false;
 
                     // next we need to unify the substitutions applied
                     // to each decalration reference.
@@ -3697,7 +3697,7 @@ namespace Slang
             {
                 auto fstDeclRef = fstDeclRefType->declRef;
 
-                if (auto typeParamDecl = dynamic_cast<GenericTypeParamDecl*>(fstDeclRef.GetDecl()))
+                if (auto typeParamDecl = dynamic_cast<GenericTypeParamDecl*>(fstDeclRef.getDecl()))
                     return TryUnifyTypeParam(constraints, typeParamDecl, snd);
             }
 
@@ -3705,7 +3705,7 @@ namespace Slang
             {
                 auto sndDeclRef = sndDeclRefType->declRef;
 
-                if (auto typeParamDecl = dynamic_cast<GenericTypeParamDecl*>(sndDeclRef.GetDecl()))
+                if (auto typeParamDecl = dynamic_cast<GenericTypeParamDecl*>(sndDeclRef.getDecl()))
                     return TryUnifyTypeParam(constraints, typeParamDecl, fst);
             }
 
@@ -3746,7 +3746,7 @@ namespace Slang
         }
 
         // Is the candidate extension declaration actually applicable to the given type
-        ExtensionDeclRef ApplyExtensionToType(
+        DeclRef<ExtensionDecl> ApplyExtensionToType(
             ExtensionDecl*			extDecl,
             RefPtr<ExpressionType>	type)
         {
@@ -3755,21 +3755,21 @@ namespace Slang
                 ConstraintSystem constraints;
 
                 if (!TryUnifyTypes(constraints, extDecl->targetType, type))
-                    return DeclRef().As<ExtensionDeclRef>();
+                    return DeclRef<Decl>().As<ExtensionDecl>();
 
-                auto constraintSubst = TrySolveConstraintSystem(&constraints, DeclRef(extGenericDecl, nullptr).As<GenericDeclRef>());
+                auto constraintSubst = TrySolveConstraintSystem(&constraints, DeclRef<Decl>(extGenericDecl, nullptr).As<GenericDecl>());
                 if (!constraintSubst)
                 {
-                    return DeclRef().As<ExtensionDeclRef>();
+                    return DeclRef<Decl>().As<ExtensionDecl>();
                 }
 
                 // Consruct a reference to the extension with our constraint variables
                 // set as they were found by solving the constraint system.
-                ExtensionDeclRef extDeclRef = DeclRef(extDecl, constraintSubst).As<ExtensionDeclRef>();
+                DeclRef<ExtensionDecl> extDeclRef = DeclRef<Decl>(extDecl, constraintSubst).As<ExtensionDecl>();
 
                 // We expect/require that the result of unification is such that
                 // the target types are now equal
-                assert(extDeclRef.GetTargetType()->Equals(type));
+                assert(GetTargetType(extDeclRef)->Equals(type));
 
                 return extDeclRef;
             }
@@ -3778,27 +3778,27 @@ namespace Slang
                 // The easy case is when the extension isn't generic:
                 // either it applies to the type or not.
                 if (!type->Equals(extDecl->targetType))
-                    return DeclRef().As<ExtensionDeclRef>();
-                return DeclRef(extDecl, nullptr).As<ExtensionDeclRef>();
+                    return DeclRef<Decl>().As<ExtensionDecl>();
+                return DeclRef<Decl>(extDecl, nullptr).As<ExtensionDecl>();
             }
         }
 
         bool TryUnifyArgAndParamTypes(
             ConstraintSystem&				system,
             RefPtr<ExpressionSyntaxNode>	argExpr,
-            ParamDeclRef					paramDeclRef)
+            DeclRef<ParameterSyntaxNode>					paramDeclRef)
         {
             // TODO(tfoley): potentially need a bit more
             // nuance in case where argument might be
             // an overload group...
-            return TryUnifyTypes(system, argExpr->Type, paramDeclRef.GetType());
+            return TryUnifyTypes(system, argExpr->Type, GetType(paramDeclRef));
         }
 
         // Take a generic declaration and try to specialize its parameters
         // so that the resulting inner declaration can be applicable in
         // a particular context...
-        DeclRef SpecializeGenericForOverload(
-            GenericDeclRef			genericDeclRef,
+        DeclRef<Decl> SpecializeGenericForOverload(
+            DeclRef<GenericDecl>			genericDeclRef,
             OverloadResolveContext&	context)
         {
             ConstraintSystem constraints;
@@ -3806,15 +3806,15 @@ namespace Slang
             // Construct a reference to the inner declaration that has any generic
             // parameter substitutions in place already, but *not* any substutions
             // for the generic declaration we are currently trying to infer.
-            auto innerDecl = genericDeclRef.GetInner();
-            DeclRef unspecializedInnerRef = DeclRef(innerDecl, genericDeclRef.substitutions);
+            auto innerDecl = GetInner(genericDeclRef);
+            DeclRef<Decl> unspecializedInnerRef = DeclRef<Decl>(innerDecl, genericDeclRef.substitutions);
 
             // Check what type of declaration we are dealing with, and then try
             // to match it up with the arguments accordingly...
-            if (auto funcDeclRef = unspecializedInnerRef.As<CallableDeclRef>())
+            if (auto funcDeclRef = unspecializedInnerRef.As<CallableDecl>())
             {
                 auto& args = context.appExpr->Arguments;
-                auto params = funcDeclRef.GetParameters().ToArray();
+                auto params = GetParameters(funcDeclRef).ToArray();
 
                 int argCount = args.Count();
                 int paramCount = params.Count();
@@ -3823,14 +3823,14 @@ namespace Slang
                 // TODO(tfoley): need more nuance here
                 if (argCount != paramCount)
                 {
-                    return DeclRef(nullptr, nullptr);
+                    return DeclRef<Decl>(nullptr, nullptr);
                 }
 
                 for (int aa = 0; aa < argCount; ++aa)
                 {
 #if 0
                     if (!TryUnifyArgAndParamTypes(constraints, args[aa], params[aa]))
-                        return DeclRef(nullptr, nullptr);
+                        return DeclRef<Decl>(nullptr, nullptr);
 #else
                     // The question here is whether failure to "unify" an argument
                     // and parameter should lead to immediate failure.
@@ -3857,41 +3857,41 @@ namespace Slang
             else
             {
                 // TODO(tfoley): any other cases needed here?
-                return DeclRef(nullptr, nullptr);
+                return DeclRef<Decl>(nullptr, nullptr);
             }
 
             auto constraintSubst = TrySolveConstraintSystem(&constraints, genericDeclRef);
             if (!constraintSubst)
             {
                 // constraint solving failed
-                return DeclRef(nullptr, nullptr);
+                return DeclRef<Decl>(nullptr, nullptr);
             }
 
             // We can now construct a reference to the inner declaration using
             // the solution to our constraints.
-            return DeclRef(innerDecl, constraintSubst);
+            return DeclRef<Decl>(innerDecl, constraintSubst);
         }
 
         void AddAggTypeOverloadCandidates(
             LookupResultItem		typeItem,
             RefPtr<ExpressionType>	type,
-            AggTypeDeclRef			aggTypeDeclRef,
+            DeclRef<AggTypeDecl>			aggTypeDeclRef,
             OverloadResolveContext&	context)
         {
-            for (auto ctorDeclRef : aggTypeDeclRef.GetMembersOfType<ConstructorDeclRef>())
+            for (auto ctorDeclRef : getMembersOfType<ConstructorDecl>(aggTypeDeclRef))
             {
                 // now work through this candidate...
                 AddCtorOverloadCandidate(typeItem, type, ctorDeclRef, context);
             }
 
             // Now walk through any extensions we can find for this types
-            for (auto ext = aggTypeDeclRef.GetCandidateExtensions(); ext; ext = ext->nextCandidateExtension)
+            for (auto ext = GetCandidateExtensions(aggTypeDeclRef); ext; ext = ext->nextCandidateExtension)
             {
                 auto extDeclRef = ApplyExtensionToType(ext, type);
                 if (!extDeclRef)
                     continue;
 
-                for (auto ctorDeclRef : extDeclRef.GetMembersOfType<ConstructorDeclRef>())
+                for (auto ctorDeclRef : getMembersOfType<ConstructorDecl>(extDeclRef))
                 {
                     // TODO(tfoley): `typeItem` here should really reference the extension...
 
@@ -3900,15 +3900,15 @@ namespace Slang
                 }
 
                 // Also check for generic constructors
-                for (auto genericDeclRef : extDeclRef.GetMembersOfType<GenericDeclRef>())
+                for (auto genericDeclRef : getMembersOfType<GenericDecl>(extDeclRef))
                 {
-                    if (auto ctorDecl = genericDeclRef.GetDecl()->inner.As<ConstructorDecl>())
+                    if (auto ctorDecl = genericDeclRef.getDecl()->inner.As<ConstructorDecl>())
                     {
-                        DeclRef innerRef = SpecializeGenericForOverload(genericDeclRef, context);
+                        DeclRef<Decl> innerRef = SpecializeGenericForOverload(genericDeclRef, context);
                         if (!innerRef)
                             continue;
 
-                        ConstructorDeclRef innerCtorRef = innerRef.As<ConstructorDeclRef>();
+                        DeclRef<ConstructorDecl> innerCtorRef = innerRef.As<ConstructorDecl>();
 
                         AddCtorOverloadCandidate(typeItem, type, innerCtorRef, context);
 
@@ -3924,7 +3924,7 @@ namespace Slang
         {
             if (auto declRefType = type->As<DeclRefType>())
             {
-                if (auto aggTypeDeclRef = declRefType->declRef.As<AggTypeDeclRef>())
+                if (auto aggTypeDeclRef = declRefType->declRef.As<AggTypeDecl>())
                 {
                     AddAggTypeOverloadCandidates(LookupResultItem(aggTypeDeclRef), type, aggTypeDeclRef, context);
                 }
@@ -3937,19 +3937,19 @@ namespace Slang
         {
             auto declRef = item.declRef;
 
-            if (auto funcDeclRef = item.declRef.As<CallableDeclRef>())
+            if (auto funcDeclRef = item.declRef.As<CallableDecl>())
             {
                 AddFuncOverloadCandidate(item, funcDeclRef, context);
             }
-            else if (auto aggTypeDeclRef = item.declRef.As<AggTypeDeclRef>())
+            else if (auto aggTypeDeclRef = item.declRef.As<AggTypeDecl>())
             {
                 auto type = DeclRefType::Create(aggTypeDeclRef);
                 AddAggTypeOverloadCandidates(item, type, aggTypeDeclRef, context);
             }
-            else if (auto genericDeclRef = item.declRef.As<GenericDeclRef>())
+            else if (auto genericDeclRef = item.declRef.As<GenericDecl>())
             {
                 // Try to infer generic arguments, based on the context
-                DeclRef innerRef = SpecializeGenericForOverload(genericDeclRef, context);
+                DeclRef<Decl> innerRef = SpecializeGenericForOverload(genericDeclRef, context);
 
                 if (innerRef)
                 {
@@ -3975,9 +3975,9 @@ namespace Slang
                     AddOverloadCandidateInner(context, candidate);
                 }
             }
-            else if( auto typeDefDeclRef = item.declRef.As<TypeDefDeclRef>() )
+            else if( auto typeDefDeclRef = item.declRef.As<TypeDefDecl>() )
             {
-                AddTypeOverloadCandidates(typeDefDeclRef.GetType(), context);
+                AddTypeOverloadCandidates(GetType(typeDefDeclRef), context);
             }
             else
             {
@@ -4033,21 +4033,21 @@ namespace Slang
             sb << val->ToString();
         }
 
-        void formatDeclPath(StringBuilder& sb, DeclRef declRef)
+        void formatDeclPath(StringBuilder& sb, DeclRef<Decl> declRef)
         {
             // Find the parent declaration
             auto parentDeclRef = declRef.GetParent();
 
             // If the immediate parent is a generic, then we probably
             // want the declaration above that...
-            auto parentGenericDeclRef = parentDeclRef.As<GenericDeclRef>();
+            auto parentGenericDeclRef = parentDeclRef.As<GenericDecl>();
             if(parentGenericDeclRef)
             {
                 parentDeclRef = parentGenericDeclRef.GetParent();
             }
 
             // Depending on what the parent is, we may want to format things specially
-            if(auto aggTypeDeclRef = parentDeclRef.As<AggTypeDeclRef>())
+            if(auto aggTypeDeclRef = parentDeclRef.As<AggTypeDecl>())
             {
                 formatDeclPath(sb, aggTypeDeclRef);
                 sb << ".";
@@ -4060,7 +4060,7 @@ namespace Slang
             if( parentGenericDeclRef )
             {
                 assert(declRef.substitutions);
-                assert(declRef.substitutions->genericDecl == parentGenericDeclRef.GetDecl());
+                assert(declRef.substitutions->genericDecl == parentGenericDeclRef.getDecl());
 
                 sb << "<";
                 bool first = true;
@@ -4074,20 +4074,20 @@ namespace Slang
             }
         }
 
-        void formatDeclParams(StringBuilder& sb, DeclRef declRef)
+        void formatDeclParams(StringBuilder& sb, DeclRef<Decl> declRef)
         {
-            if (auto funcDeclRef = declRef.As<CallableDeclRef>())
+            if (auto funcDeclRef = declRef.As<CallableDecl>())
             {
 
                 // This is something callable, so we need to also print parameter types for overloading
                 sb << "(";
 
                 bool first = true;
-                for (auto paramDeclRef : funcDeclRef.GetParameters())
+                for (auto paramDeclRef : GetParameters(funcDeclRef))
                 {
                     if (!first) sb << ", ";
 
-                    formatType(sb, paramDeclRef.GetType());
+                    formatType(sb, GetType(paramDeclRef));
 
                     first = false;
 
@@ -4095,25 +4095,25 @@ namespace Slang
 
                 sb << ")";
             }
-            else if(auto genericDeclRef = declRef.As<GenericDeclRef>())
+            else if(auto genericDeclRef = declRef.As<GenericDecl>())
             {
                 sb << "<";
                 bool first = true;
-                for (auto paramDeclRef : genericDeclRef.GetMembers())
+                for (auto paramDeclRef : getMembers(genericDeclRef))
                 {
-                    if(auto genericTypeParam = paramDeclRef.As<GenericTypeParamDeclRef>())
+                    if(auto genericTypeParam = paramDeclRef.As<GenericTypeParamDecl>())
                     {
                         if (!first) sb << ", ";
                         first = false;
 
                         sb << genericTypeParam.GetName();
                     }
-                    else if(auto genericValParam = paramDeclRef.As<GenericValueParamDeclRef>())
+                    else if(auto genericValParam = paramDeclRef.As<GenericValueParamDecl>())
                     {
                         if (!first) sb << ", ";
                         first = false;
 
-                        formatType(sb, genericValParam.GetType());
+                        formatType(sb, GetType(genericValParam));
                         sb << " ";
                         sb << genericValParam.GetName();
                     }
@@ -4122,20 +4122,20 @@ namespace Slang
                 }
                 sb << ">";
 
-                formatDeclParams(sb, DeclRef(genericDeclRef.GetInner(), genericDeclRef.substitutions));
+                formatDeclParams(sb, DeclRef<Decl>(GetInner(genericDeclRef), genericDeclRef.substitutions));
             }
             else
             {
             }
         }
 
-        void formatDeclSignature(StringBuilder& sb, DeclRef declRef)
+        void formatDeclSignature(StringBuilder& sb, DeclRef<Decl> declRef)
         {
             formatDeclPath(sb, declRef);
             formatDeclParams(sb, declRef);
         }
 
-        String getDeclSignatureString(DeclRef declRef)
+        String getDeclSignatureString(DeclRef<Decl> declRef)
         {
             StringBuilder sb;
             formatDeclSignature(sb, declRef);
@@ -4283,9 +4283,9 @@ namespace Slang
             LookupResultItem		baseItem,
             OverloadResolveContext&	context)
         {
-            if (auto genericDeclRef = baseItem.declRef.As<GenericDeclRef>())
+            if (auto genericDeclRef = baseItem.declRef.As<GenericDecl>())
             {
-                EnsureDecl(genericDeclRef.GetDecl());
+                EnsureDecl(genericDeclRef.getDecl());
 
                 OverloadCandidate candidate;
                 candidate.flavor = OverloadCandidate::Flavor::Generic;
@@ -4414,11 +4414,11 @@ namespace Slang
             {
                 auto declRef = baseDeclRefExpr->declRef;
 
-                if (auto genericDeclRef = declRef.As<GenericDeclRef>())
+                if (auto genericDeclRef = declRef.As<GenericDecl>())
                 {
                     int argCount = typeNode->Args.Count();
                     int argIndex = 0;
-                    for (RefPtr<Decl> member : genericDeclRef.GetDecl()->Members)
+                    for (RefPtr<Decl> member : genericDeclRef.getDecl()->Members)
                     {
                         if (auto typeParam = member.As<GenericTypeParamDecl>())
                         {
@@ -4500,7 +4500,7 @@ namespace Slang
                 {
                     List<RefPtr<ParameterSyntaxNode>> paramsStorage;
                     List<RefPtr<ParameterSyntaxNode>> * params = nullptr;
-                    if (auto func = funcType->declRef.GetDecl())
+                    if (auto func = funcType->declRef.getDecl())
                     {
                         paramsStorage = func->GetParameters().ToArray();
                         params = &paramsStorage;
@@ -4622,7 +4622,7 @@ namespace Slang
 #endif
 
         // Get the type to use when referencing a declaration
-        QualType GetTypeForDeclRef(DeclRef declRef)
+        QualType GetTypeForDeclRef(DeclRef<Decl> declRef)
         {
             return getTypeForDeclRef(
                 this,
@@ -4792,10 +4792,10 @@ namespace Slang
             }
             else if (auto declRefType = baseType->AsDeclRefType())
             {
-                if (auto aggTypeDeclRef = declRefType->declRef.As<AggTypeDeclRef>())
+                if (auto aggTypeDeclRef = declRefType->declRef.As<AggTypeDecl>())
                 {
                     // Checking of the type must be complete before we can reference its members safely
-                    EnsureDecl(aggTypeDeclRef.GetDecl(), DeclCheckState::Checked);
+                    EnsureDecl(aggTypeDeclRef.getDecl(), DeclCheckState::Checked);
 
 
                     LookupResult lookupResult = LookUpLocal(expr->MemberName, aggTypeDeclRef);
@@ -4809,7 +4809,7 @@ namespace Slang
                         expr->BaseExpression,
                         expr);
 #if 0
-                    DeclRef memberDeclRef(lookupResult.decl, aggTypeDeclRef.substitutions);
+                    DeclRef<Decl> memberDeclRef(lookupResult.decl, aggTypeDeclRef.substitutions);
                     return ConstructDeclRefExpr(memberDeclRef, expr->BaseExpression, expr);
 #endif
 
@@ -4831,11 +4831,11 @@ namespace Slang
 
                         if (!memberDecl)
                         {
-                            memberDecl = m.GetDecl();
+                            memberDecl = m.getDecl();
                         }
                         else
                         {
-                            secondDecl = m.GetDecl();
+                            secondDecl = m.getDecl();
                             break;
                         }
                     }
@@ -4852,7 +4852,7 @@ namespace Slang
                     if (!secondDecl)
                     {
                         // TODO: need to
-                        DeclRef memberDeclRef(memberDecl, aggTypeDeclRef.substitutions);
+                        DeclRef<Decl> memberDeclRef(memberDecl, aggTypeDeclRef.substitutions);
 
                         expr->declRef = memberDeclRef;
                         expr->Type = GetTypeForDeclRef(memberDeclRef);
@@ -4976,48 +4976,48 @@ namespace Slang
     QualType getTypeForDeclRef(
         SemanticsVisitor*       sema,
         DiagnosticSink*         sink,
-        DeclRef                 declRef,
+        DeclRef<Decl>                 declRef,
         RefPtr<ExpressionType>* outTypeResult)
     {
         if( sema )
         {
-            sema->EnsureDecl(declRef.GetDecl());
+            sema->EnsureDecl(declRef.getDecl());
         }
 
         // We need to insert an appropriate type for the expression, based on
         // what we found.
-        if (auto varDeclRef = declRef.As<VarDeclBaseRef>())
+        if (auto varDeclRef = declRef.As<VarDeclBase>())
         {
             QualType qualType;
-            qualType.type = varDeclRef.GetType();
+            qualType.type = GetType(varDeclRef);
             qualType.IsLeftValue = true; // TODO(tfoley): allow explicit `const` or `let` variables
             return qualType;
         }
-        else if (auto typeAliasDeclRef = declRef.As<TypeDefDeclRef>())
+        else if (auto typeAliasDeclRef = declRef.As<TypeDefDecl>())
         {
             auto type = new NamedExpressionType(typeAliasDeclRef);
             *outTypeResult = type;
             return new TypeType(type);
         }
-        else if (auto aggTypeDeclRef = declRef.As<AggTypeDeclRef>())
+        else if (auto aggTypeDeclRef = declRef.As<AggTypeDecl>())
         {
             auto type = DeclRefType::Create(aggTypeDeclRef);
             *outTypeResult = type;
             return new TypeType(type);
         }
-        else if (auto simpleTypeDeclRef = declRef.As<SimpleTypeDeclRef>())
+        else if (auto simpleTypeDeclRef = declRef.As<SimpleTypeDecl>())
         {
             auto type = DeclRefType::Create(simpleTypeDeclRef);
             *outTypeResult = type;
             return new TypeType(type);
         }
-        else if (auto genericDeclRef = declRef.As<GenericDeclRef>())
+        else if (auto genericDeclRef = declRef.As<GenericDecl>())
         {
             auto type = new GenericDeclRefType(genericDeclRef);
             *outTypeResult = type;
             return new TypeType(type);
         }
-        else if (auto funcDeclRef = declRef.As<CallableDeclRef>())
+        else if (auto funcDeclRef = declRef.As<CallableDecl>())
         {
             auto type = new FuncType();
             type->declRef = funcDeclRef;
@@ -5032,7 +5032,7 @@ namespace Slang
     }
 
     QualType getTypeForDeclRef(
-        DeclRef                 declRef)
+        DeclRef<Decl>                 declRef)
     {
         RefPtr<ExpressionType> typeResult;
         return getTypeForDeclRef(nullptr, nullptr, declRef, &typeResult);

@@ -43,7 +43,7 @@ static void EmitType(EmitContext* context, RefPtr<ExpressionType> type, String c
 static void EmitType(EmitContext* context, RefPtr<ExpressionType> type);
 static void EmitExpr(EmitContext* context, RefPtr<ExpressionSyntaxNode> expr);
 static void EmitStmt(EmitContext* context, RefPtr<StatementSyntaxNode> stmt);
-static void EmitDeclRef(EmitContext* context, DeclRef declRef);
+static void EmitDeclRef(EmitContext* context, DeclRef<Decl> declRef);
 
 // Low-level emit logic
 
@@ -457,7 +457,7 @@ static void emitCallExpr(
     if (auto funcDeclRefExpr = funcExpr.As<DeclRefExpr>())
     {
         auto funcDeclRef = funcDeclRefExpr->declRef;
-        auto funcDecl = funcDeclRef.GetDecl();
+        auto funcDecl = funcDeclRef.getDecl();
         if (auto intrinsicOpModifier = funcDecl->FindModifier<IntrinsicOpModifier>())
         {
             switch (intrinsicOpModifier->op)
@@ -617,7 +617,7 @@ static void emitCallExpr(
 
             // We might be calling an intrinsic subscript operation,
             // and should desugar it accordingly
-            if(auto subscriptDeclRef = funcDeclRef.As<SubscriptDeclRef>())
+            if(auto subscriptDeclRef = funcDeclRef.As<SubscriptDecl>())
             {
                 // We expect any subscript operation to be invoked as a member,
                 // so the function expression had better be in the correct form.
@@ -647,7 +647,7 @@ static void emitCallExpr(
     if (auto funcDeclRefExpr = funcExpr.As<DeclRefExpr>())
     {
         auto declRef = funcDeclRefExpr->declRef;
-        if (auto ctorDeclRef = declRef.As<ConstructorDeclRef>())
+        if (auto ctorDeclRef = declRef.As<ConstructorDecl>())
         {
             // We really want to emit a reference to the type begin constructed
             EmitType(context, callExpr->Type);
@@ -1604,7 +1604,7 @@ static void EmitVal(EmitContext* context, RefPtr<Val> val)
     }
 }
 
-static void EmitDeclRef(EmitContext* context, DeclRef declRef)
+static void EmitDeclRef(EmitContext* context, DeclRef<Decl> declRef)
 {
     // TODO: need to qualify a declaration name based on parent scopes/declarations
 
@@ -1614,10 +1614,10 @@ static void EmitDeclRef(EmitContext* context, DeclRef declRef)
     // If the declaration is nested directly in a generic, then
     // we need to output the generic arguments here
     auto parentDeclRef = declRef.GetParent();
-    if (auto genericDeclRef = parentDeclRef.As<GenericDeclRef>())
+    if (auto genericDeclRef = parentDeclRef.As<GenericDecl>())
     {
         // Only do this for declarations of appropriate flavors
-        if(auto funcDeclRef = declRef.As<FuncDeclBaseRef>())
+        if(auto funcDeclRef = declRef.As<FunctionDeclBase>())
         {
             // Don't emit generic arguments for functions, because HLSL doesn't allow them
             return;
@@ -1869,16 +1869,16 @@ static void EmitStructDecl(EmitContext* context, RefPtr<StructSyntaxNode> decl)
 }
 
 // Shared emit logic for variable declarations (used for parameters, locals, globals, fields)
-static void EmitVarDeclCommon(EmitContext* context, VarDeclBaseRef declRef)
+static void EmitVarDeclCommon(EmitContext* context, DeclRef<VarDeclBase> declRef)
 {
-    EmitModifiers(context, declRef.GetDecl());
+    EmitModifiers(context, declRef.getDecl());
 
-    EmitType(context, declRef.GetType(), declRef.GetName());
+    EmitType(context, GetType(declRef), declRef.GetName());
 
-    EmitSemantics(context, declRef.GetDecl());
+    EmitSemantics(context, declRef.getDecl());
 
     // TODO(tfoley): technically have to apply substitution here too...
-    if (auto initExpr = declRef.GetDecl()->Expr)
+    if (auto initExpr = declRef.getDecl()->Expr)
     {
         Emit(context, " = ");
         EmitExpr(context, initExpr);
@@ -1888,7 +1888,7 @@ static void EmitVarDeclCommon(EmitContext* context, VarDeclBaseRef declRef)
 // Shared emit logic for variable declarations (used for parameters, locals, globals, fields)
 static void EmitVarDeclCommon(EmitContext* context, RefPtr<VarDeclBase> decl)
 {
-    EmitVarDeclCommon(context, DeclRef(decl.Ptr(), nullptr).As<VarDeclBaseRef>());
+    EmitVarDeclCommon(context, DeclRef<Decl>(decl.Ptr(), nullptr).As<VarDeclBase>());
 }
 
 // Emit a single `regsiter` semantic, as appropriate for a given resource-type-specific layout info
@@ -2033,14 +2033,14 @@ static void emitHLSLParameterBlockDecl(
     emitHLSLRegisterSemantic(context, *info);
 
     Emit(context, "\n{\n");
-    if (auto structRef = declRefType->declRef.As<StructDeclRef>())
+    if (auto structRef = declRefType->declRef.As<StructSyntaxNode>())
     {
-        for (auto field : structRef.GetMembersOfType<FieldDeclRef>())
+        for (auto field : getMembersOfType<StructField>(structRef))
         {
             EmitVarDeclCommon(context, field);
 
             RefPtr<VarLayout> fieldLayout;
-            structTypeLayout->mapVarToLayout.TryGetValue(field.GetDecl(), fieldLayout);
+            structTypeLayout->mapVarToLayout.TryGetValue(field.getDecl(), fieldLayout);
             assert(fieldLayout);
 
             // Emit explicit layout annotations for every field
@@ -2197,12 +2197,12 @@ static void emitGLSLParameterBlockDecl(
     }
 
     Emit(context, "\n{\n");
-    if (auto structRef = declRefType->declRef.As<StructDeclRef>())
+    if (auto structRef = declRefType->declRef.As<StructSyntaxNode>())
     {
-        for (auto field : structRef.GetMembersOfType<FieldDeclRef>())
+        for (auto field : getMembersOfType<StructField>(structRef))
         {
             RefPtr<VarLayout> fieldLayout;
-            structTypeLayout->mapVarToLayout.TryGetValue(field.GetDecl(), fieldLayout);
+            structTypeLayout->mapVarToLayout.TryGetValue(field.getDecl(), fieldLayout);
             assert(fieldLayout);
 
             // TODO(tfoley): We may want to emit *some* of these,
@@ -2292,7 +2292,7 @@ static void EmitFuncDecl(EmitContext* context, RefPtr<FunctionSyntaxNode> decl)
 
     Emit(context, "(");
     bool first = true;
-    for (auto paramDecl : decl->GetMembersOfType<ParameterSyntaxNode>())
+    for (auto paramDecl : decl->getMembersOfType<ParameterSyntaxNode>())
     {
         if (!first) Emit(context, ", ");
         EmitParamDecl(context, paramDecl);

@@ -219,8 +219,8 @@ class VarLayout : public RefObject
 {
 public:
     // The variable we are laying out
-    VarDeclBaseRef          varDecl;
-    VarDeclBase* getVariable() { return varDecl.GetDecl(); }
+    DeclRef<VarDeclBase>          varDecl;
+    VarDeclBase* getVariable() { return varDecl.getDecl(); }
 
     String const& getName() { return getVariable()->getName(); }
 
