@@ -119,7 +119,7 @@ namespace Slang
                 auto expr = new MemberExpressionSyntaxNode();
                 expr->Position = originalExpr->Position;
                 expr->BaseExpression = baseExpr;
-                expr->MemberName = declRef.GetName();
+                expr->name = declRef.GetName();
                 expr->Type = GetTypeForDeclRef(declRef);
                 expr->declRef = declRef;
                 return expr;
@@ -128,7 +128,7 @@ namespace Slang
             {
                 auto expr = new VarExpressionSyntaxNode();
                 expr->Position = originalExpr->Position;
-                expr->Variable = declRef.GetName();
+                expr->name = declRef.GetName();
                 expr->Type = GetTypeForDeclRef(declRef);
                 expr->declRef = declRef;
                 return expr;
@@ -4207,9 +4207,9 @@ namespace Slang
 
                 String funcName;
                 if (auto baseVar = funcExpr.As<VarExpressionSyntaxNode>())
-                    funcName = baseVar->Variable;
+                    funcName = baseVar->name;
                 else if(auto baseMemberRef = funcExpr.As<MemberExpressionSyntaxNode>())
-                    funcName = baseMemberRef->MemberName;
+                    funcName = baseMemberRef->name;
 
                 String argsList = GetCallSignatureString(expr);
 
@@ -4547,7 +4547,7 @@ namespace Slang
 
             expr->Type = ExpressionType::Error;
 
-            auto lookupResult = LookUp(expr->Variable, expr->scope);
+            auto lookupResult = LookUp(expr->name, expr->scope);
             if (lookupResult.isValid())
             {
                 return createLookupResultExpr(
@@ -4556,7 +4556,7 @@ namespace Slang
                     expr);
             }
 
-            getSink()->diagnose(expr, Diagnostics::undefinedIdentifier2, expr->Variable);
+            getSink()->diagnose(expr, Diagnostics::undefinedIdentifier2, expr->name);
 
             return expr;
         }
@@ -4674,9 +4674,9 @@ namespace Slang
             bool anyDuplicates = false;
             bool anyError = false;
 
-            for (int i = 0; i < memberRefExpr->MemberName.Length(); i++)
+            for (int i = 0; i < memberRefExpr->name.Length(); i++)
             {
-                auto ch = memberRefExpr->MemberName[i];
+                auto ch = memberRefExpr->name[i];
                 int elementIndex = -1;
                 switch (ch)
                 {
@@ -4798,7 +4798,7 @@ namespace Slang
                     EnsureDecl(aggTypeDeclRef.getDecl(), DeclCheckState::Checked);
 
 
-                    LookupResult lookupResult = LookUpLocal(expr->MemberName, aggTypeDeclRef);
+                    LookupResult lookupResult = LookUpLocal(expr->name, aggTypeDeclRef);
                     if (!lookupResult.isValid())
                     {
                         goto fail;
@@ -4894,7 +4894,7 @@ namespace Slang
 
                 // catch-all
             fail:
-                getSink()->diagnose(expr, Diagnostics::noMemberOfNameInType, expr->MemberName, baseType);
+                getSink()->diagnose(expr, Diagnostics::noMemberOfNameInType, expr->name, baseType);
                 expr->Type = ExpressionType::Error;
                 return expr;
             }
@@ -4906,7 +4906,7 @@ namespace Slang
             if (!baseType->Equals(ExpressionType::Error.Ptr()) &&
                 expr->Type->Equals(ExpressionType::Error.Ptr()))
             {
-                getSink()->diagnose(expr, Diagnostics::typeHasNoPublicMemberOfName, baseType, expr->MemberName);
+                getSink()->diagnose(expr, Diagnostics::typeHasNoPublicMemberOfName, baseType, expr->name);
             }
             return expr;
         }
