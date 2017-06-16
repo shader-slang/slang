@@ -1302,7 +1302,7 @@ namespace Slang
         auto expr = new VarExpressionSyntaxNode();
         expr->scope = parser->currentScope.Ptr();
         expr->Position = decl->getNameToken().Position;
-        expr->Variable = decl->getName();
+        expr->name = decl->getName();
         return expr;
     }
 
@@ -1347,7 +1347,7 @@ namespace Slang
         auto basicType = new VarExpressionSyntaxNode();
         basicType->scope = parser->currentScope.Ptr();
         basicType->Position = typeName.Position;
-        basicType->Variable = typeName.Content;
+        basicType->name = typeName.Content;
 
         RefPtr<ExpressionSyntaxNode> typeExpr = basicType;
 
@@ -1659,13 +1659,13 @@ namespace Slang
         // Construct a type expression to reference the buffer data type
         auto bufferDataTypeExpr = new VarExpressionSyntaxNode();
         bufferDataTypeExpr->Position = bufferDataTypeDecl->Position;
-        bufferDataTypeExpr->Variable = bufferDataTypeDecl->Name.Content;
+        bufferDataTypeExpr->name = bufferDataTypeDecl->Name.Content;
         bufferDataTypeExpr->scope = parser->currentScope.Ptr();
 
         // Construct a type exrpession to reference the type constructor
         auto bufferWrapperTypeExpr = new VarExpressionSyntaxNode();
         bufferWrapperTypeExpr->Position = bufferWrapperTypeNamePos;
-        bufferWrapperTypeExpr->Variable = bufferWrapperTypeName;
+        bufferWrapperTypeExpr->name = bufferWrapperTypeName;
 
         // Always need to look this up in the outer scope,
         // so that it won't collide with, e.g., a local variable called `ConstantBuffer`
@@ -1812,13 +1812,13 @@ namespace Slang
         // Construct a type expression to reference the buffer data type
         auto blockDataTypeExpr = new VarExpressionSyntaxNode();
         blockDataTypeExpr->Position = blockDataTypeDecl->Position;
-        blockDataTypeExpr->Variable = blockDataTypeDecl->Name.Content;
+        blockDataTypeExpr->name = blockDataTypeDecl->Name.Content;
         blockDataTypeExpr->scope = parser->currentScope.Ptr();
 
         // Construct a type exrpession to reference the type constructor
         auto blockWrapperTypeExpr = new VarExpressionSyntaxNode();
         blockWrapperTypeExpr->Position = pos;
-        blockWrapperTypeExpr->Variable = blockWrapperTypeName;
+        blockWrapperTypeExpr->name = blockWrapperTypeName;
         // Always need to look this up in the outer scope,
         // so that it won't collide with, e.g., a local variable called `ConstantBuffer`
         blockWrapperTypeExpr->scope = parser->outerScope;
@@ -2894,7 +2894,7 @@ parser->ReadToken(TokenType::Comma);
         }
 
         auto opExpr = new VarExpressionSyntaxNode();
-        opExpr->Variable = opToken.Content;
+        opExpr->name = opToken.Content;
         opExpr->scope = parser->currentScope;
         opExpr->Position = opToken.Position;
 
@@ -3060,7 +3060,7 @@ parser->ReadToken(TokenType::Comma);
             varExpr->scope = currentScope.Ptr();
             FillPosition(varExpr.Ptr());
             auto token = ReadToken(TokenType::Identifier);
-            varExpr->Variable = token.Content;
+            varExpr->name = token.Content;
             rs = varExpr;
         }
 
@@ -3125,7 +3125,7 @@ parser->ReadToken(TokenType::Comma);
                 FillPosition(memberExpr.Ptr());
                 memberExpr->BaseExpression = rs;
                 ReadToken(TokenType::Dot); 
-                memberExpr->MemberName = ReadToken(TokenType::Identifier).Content;
+                memberExpr->name = ReadToken(TokenType::Identifier).Content;
                 rs = memberExpr;
             }
         }

@@ -448,6 +448,51 @@ static String getStringOrIdentifierTokenValue(
     }
 }
 
+// Emit a call expression that doesn't involve any special cases,
+// just an expression of the form `f(a0, a1, ...)`
+static void emitSimpleCallExpr(
+    EmitContext*                        context,
+    RefPtr<InvokeExpressionSyntaxNode>  callExpr,
+    int                                 outerPrec)
+{
+    bool needClose = MaybeEmitParens(context, outerPrec, kPrecedence_Postfix);
+
+    auto funcExpr = callExpr->FunctionExpr;
+    if (auto funcDeclRefExpr = funcExpr.As<DeclRefExpr>())
+    {
+        auto declRef = funcDeclRefExpr->declRef;
+        if (auto ctorDeclRef = declRef.As<ConstructorDecl>())
+        {
+            // We really want to emit a reference to the type begin constructed
+            EmitType(context, callExpr->Type);
+        }
+        else
+        {
+            // default case: just emit the decl ref
+            EmitExpr(context, funcExpr);
+        }
+    }
+    else
+    {
+        // default case: just emit the expression
+        EmitPostfixExpr(context, funcExpr);
+    }
+
+    Emit(context, "(");
+    int argCount = callExpr->Arguments.Count();
+    for (int aa = 0; aa < argCount; ++aa)
+    {
+        if (aa != 0) Emit(context, ", ");
+        EmitExpr(context, callExpr->Arguments[aa]);
+    }
+    Emit(context, ")");
+
+    if (needClose)
+    {
+        Emit(context, ")");
+    }
+}
+
 static void emitCallExpr(
     EmitContext*                        context,
     RefPtr<InvokeExpressionSyntaxNode>  callExpr,
@@ -458,7 +503,47 @@ static void emitCallExpr(
     {
         auto funcDeclRef = funcDeclRefExpr->declRef;
         auto funcDecl = funcDeclRef.getDecl();
-        if (auto intrinsicOpModifier = funcDecl->FindModifier<IntrinsicOpModifier>())
+        if(!funcDecl)
+        {
+            // This can occur when we are dealing with unchecked input syntax,
+            // because we are in "rewriter" mode. In this case we should go
+            // ahead and emit things in the form that they were written.
+            if( auto infixExpr = callExpr.As<InfixExpr>() )
+            {
+                EmitBinExpr(
+                    context,
+                    outerPrec,
+                    kPrecedence_Comma,
+                    funcDeclRefExpr->name.Buffer(),
+                    callExpr);
+            }
+            else if( auto prefixExpr = callExpr.As<PrefixExpr>() )
+            {
+                EmitUnaryExpr(
+                    context,
+                    outerPrec,
+                    kPrecedence_Prefix,
+                    funcDeclRefExpr->name.Buffer(),
+                    "",
+                    callExpr);
+            }
+            else if(auto postfixExpr = callExpr.As<PostfixExpr>())
+            {
+                EmitUnaryExpr(
+                    context,
+                    outerPrec,
+                    kPrecedence_Postfix,
+                    "",
+                    funcDeclRefExpr->name.Buffer(),
+                    callExpr);
+            }
+            else
+            {
+                emitSimpleCallExpr(context, callExpr, outerPrec);
+            }
+            return;
+        }
+        else if (auto intrinsicOpModifier = funcDecl->FindModifier<IntrinsicOpModifier>())
         {
             switch (intrinsicOpModifier->op)
             {
@@ -641,42 +726,7 @@ static void emitCallExpr(
     }
 
     // Fall through to default handling...
-
-    bool needClose = MaybeEmitParens(context, outerPrec, kPrecedence_Postfix);
-
-    if (auto funcDeclRefExpr = funcExpr.As<DeclRefExpr>())
-    {
-        auto declRef = funcDeclRefExpr->declRef;
-        if (auto ctorDeclRef = declRef.As<ConstructorDecl>())
-        {
-            // We really want to emit a reference to the type begin constructed
-            EmitType(context, callExpr->Type);
-        }
-        else
-        {
-            // default case: just emit the decl ref
-            EmitExpr(context, funcExpr);
-        }
-    }
-    else
-    {
-        // default case: just emit the expression
-        EmitPostfixExpr(context, funcExpr);
-    }
-
-    Emit(context, "(");
-    int argCount = callExpr->Arguments.Count();
-    for (int aa = 0; aa < argCount; ++aa)
-    {
-        if (aa != 0) Emit(context, ", ");
-        EmitExpr(context, callExpr->Arguments[aa]);
-    }
-    Emit(context, ")");
-
-    if (needClose)
-    {
-        Emit(context, ")");
-    }
+    emitSimpleCallExpr(context, callExpr, outerPrec);
 }
 
 static void EmitExprWithPrecedence(EmitContext* context, RefPtr<ExpressionSyntaxNode> expr, int outerPrec)
@@ -761,7 +811,7 @@ static void EmitExprWithPrecedence(EmitContext* context, RefPtr<ExpressionSyntax
         }
         else
         {
-            emitName(context, varExpr->Variable);
+            emitName(context, varExpr->name);
         }
     }
     else if (auto derefExpr = expr.As<DerefExpr>())

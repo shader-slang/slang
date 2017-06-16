@@ -1784,14 +1784,14 @@ namespace Slang
 
         // The declaration of the symbol being referenced
         DeclRef<Decl> declRef;
+
+        // The name of the symbol being referenced
+        String name;
     };
 
     class VarExpressionSyntaxNode : public DeclRefExpr
     {
     public:
-        // The name of the symbol being referenced
-        String Variable;
-
         virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
     };
 
@@ -1984,7 +1984,6 @@ namespace Slang
     {
     public:
         RefPtr<ExpressionSyntaxNode> BaseExpression;
-        String MemberName;
         virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
     };
 
