@@ -1424,6 +1424,9 @@ static void emitLineDirective(
                 emitRawText(context, charBuffer);
                 break;
 
+            // The incoming file path might use `/` and/or `\\` as
+            // a directory separator. We want to canonicalize this.
+            //
             // TODO: should probably canonicalize paths to not use backslash somewhere else
             // in the compilation pipeline...
             case '\\':
@@ -1463,7 +1466,26 @@ static void advanceToSourceLocation(
         || sourceLocation.Line != context->loc.Line
         || sourceLocation.Col < context->loc.Col)
     {
-        emitLineDirectiveAndUpdateSourceLocation(context, sourceLocation);
+        // Special case: if we are in the same file, and within a small number
+        // of lines of the target location, then go ahead and output newlines
+        // to get us caught up.
+        enum { kSmallLineCount = 3 };
+        auto lineDiff = sourceLocation.Line - context->loc.Line;
+        if(sourceLocation.FileName == context->loc.FileName
+            && sourceLocation.Line > context->loc.Line
+            && lineDiff <= kSmallLineCount)
+        {
+            for(int ii = 0; ii < lineDiff; ++ii )
+            {
+                Emit(context, "\n");
+            }
+            assert(sourceLocation.Line == context->loc.Line);
+        }
+        else
+        {
+            // Go ahead and output a `#line` directive to get us caught up
+            emitLineDirectiveAndUpdateSourceLocation(context, sourceLocation);
+        }
     }
 
     // Now indent up to the appropriate column, so that error messages
