@@ -13,9 +13,6 @@ namespace Slang
         Slang = SLANG_SOURCE_LANGUAGE_SLANG,
         HLSL = SLANG_SOURCE_LANGUAGE_HLSL,
         GLSL = SLANG_SOURCE_LANGUAGE_GLSL,
-
-        // A separate PACKAGE of Slang code that has been imported
-        ImportedSlangCode,
     };
 
     // TODO(tfoley): This should merge with the above...

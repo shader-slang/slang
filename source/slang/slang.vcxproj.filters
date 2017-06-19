@@ -25,6 +25,7 @@
     <ClInclude Include="token.h" />
     <ClInclude Include="token-defs.h" />
     <ClInclude Include="type-layout.h" />
+    <ClInclude Include="..\..\slang.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="check.cpp" />

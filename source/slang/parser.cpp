@@ -2,6 +2,7 @@
 
 #include <assert.h>
 
+#include "compiler.h"
 #include "lookup.h"
 
 namespace Slang
@@ -31,7 +32,9 @@ namespace Slang
     class Parser
     {
     public:
-        CompileOptions& options;
+        CompileOptions const&           options;
+        TranslationUnitOptions const&   translationUnitOptions;
+
         int anonymousCounter = 0;
 
         RefPtr<Scope> outerScope;
@@ -64,12 +67,14 @@ namespace Slang
             currentScope = currentScope->parent;
         }
         Parser(
-            CompileOptions& options,
+            CompileOptions const& options,
+            TranslationUnitOptions const& translationUnitOptions,
             TokenSpan const& _tokens,
             DiagnosticSink * sink,
             String _fileName,
             RefPtr<Scope> const& outerScope)
             : options(options)
+            , translationUnitOptions(translationUnitOptions)
             , tokenReader(_tokens)
             , sink(sink)
             , fileName(_fileName)
@@ -2495,7 +2500,7 @@ parser->ReadToken(TokenType::Comma);
 
     RefPtr<StatementSyntaxNode> Parser::ParseBlockStatement()
     {
-        if( options.flags & SLANG_COMPILE_FLAG_NO_CHECKING )
+        if( translationUnitOptions.compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING )
         {
             // We have been asked to parse the input, but not attempt to understand it.
 
@@ -3150,16 +3155,17 @@ parser->ReadToken(TokenType::Comma);
         return rs;
     }
 
-            // Parse a source file into an existing translation unit
+    // Parse a source file into an existing translation unit
     void parseSourceFile(
-        ProgramSyntaxNode*  translationUnitSyntax,
-        CompileOptions&     options,
-        TokenSpan const&    tokens,
-        DiagnosticSink*     sink,
-        String const&       fileName,
-        RefPtr<Scope> const&outerScope)
+        ProgramSyntaxNode*              translationUnitSyntax,
+        CompileOptions const&           options,
+        TranslationUnitOptions const&   translationUnitOptions,
+        TokenSpan const&                tokens,
+        DiagnosticSink*                 sink,
+        String const&                   fileName,
+        RefPtr<Scope> const&            outerScope)
     {
-        Parser parser(options, tokens, sink, fileName, outerScope);
+        Parser parser(options, translationUnitOptions, tokens, sink, fileName, outerScope);
         return parser.parseSourceFile(translationUnitSyntax);
     }
 }

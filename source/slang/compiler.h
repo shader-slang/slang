@@ -89,6 +89,9 @@ namespace Slang
         // Preprocessor definitions to use for this translation unit only
         // (whereas the ones on `CompileOptions` will be shared)
         Dictionary<String, String> preprocessorDefinitions;
+
+        // Compile flags for this translation unit
+        SlangCompileFlags compileFlags = 0;
     };
 
 
@@ -132,8 +135,8 @@ namespace Slang
         // Should we just pass the input to another compiler?
         PassThroughMode passThrough = PassThroughMode::None;
 
-        // Flags supplied through the API
-        SlangCompileFlags flags = 0;
+        // Compile flags to be shared by all translation units
+        SlangCompileFlags compileFlags = 0;
     };
 
     // This is the representation of a given translation unit
