@@ -47,6 +47,7 @@ namespace Slang
         ProgramSyntaxNode * program = nullptr;
         FunctionSyntaxNode * function = nullptr;
         CompileOptions const* options = nullptr;
+        TranslationUnitOptions const* translationUnitOptions = nullptr;
         CompileRequest* request = nullptr;
 
         // lexical outer statements
@@ -55,14 +56,17 @@ namespace Slang
         SemanticsVisitor(
             DiagnosticSink * pErr,
             CompileOptions const& options,
+            TranslationUnitOptions const& translationUnitOptions,
             CompileRequest* request)
             : SyntaxVisitor(pErr)
             , options(&options)
+            , translationUnitOptions(&translationUnitOptions)
             , request(request)
         {
         }
 
         CompileOptions const& getOptions() { return *options; }
+        TranslationUnitOptions const& getTranslationUnitOptions() { return *translationUnitOptions; }
 
     public:
         // Translate Types
@@ -965,7 +969,7 @@ namespace Slang
             // expressions without a type, and we need to ignore them.
             if( !fromExpr->Type.type )
             {
-                if(getOptions().flags & SLANG_COMPILE_FLAG_NO_CHECKING )
+                if(getTranslationUnitOptions().compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING )
                     return fromExpr;
             }
 
@@ -977,7 +981,7 @@ namespace Slang
                 fromExpr.Ptr(),
                 nullptr))
             {
-                if(!(getOptions().flags & SLANG_COMPILE_FLAG_NO_CHECKING))
+                if(!(getTranslationUnitOptions().compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING))
                 {
                     getSink()->diagnose(fromExpr->Position, Diagnostics::typeMismatch, toType, fromExpr->Type);
                 }
@@ -4963,11 +4967,12 @@ namespace Slang
     };
 
     SyntaxVisitor* CreateSemanticsVisitor(
-        DiagnosticSink*         err,
-        CompileOptions const&   options,
-        CompileRequest*         request)
+        DiagnosticSink*                 err,
+        CompileOptions const&           options,
+        TranslationUnitOptions const&   translationUnitOptions,
+        CompileRequest*                 request)
     {
-        return new SemanticsVisitor(err, options, request);
+        return new SemanticsVisitor(err, options, translationUnitOptions, request);
     }
 
     //

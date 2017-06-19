@@ -246,6 +246,7 @@ struct CompileRequest
             parseSourceFile(
                 translationUnitSyntax.Ptr(),
                 options,
+                translationUnitOptions,
                 tokens,
                 mResult.GetErrorWriter(),
                 sourceFilePath,
@@ -279,6 +280,7 @@ struct CompileRequest
         RefPtr<SyntaxVisitor> visitor = CreateSemanticsVisitor(
             mResult.GetErrorWriter(),
             options,
+            translationUnit.options,
             this);
 
         checkTranslationUnit(translationUnit, visitor);
@@ -287,14 +289,9 @@ struct CompileRequest
     void checkCollectionOfTranslationUnits(
         RefPtr<CollectionOfTranslationUnits>    collectionOfTranslationUnits)
     {
-        RefPtr<SyntaxVisitor> visitor = CreateSemanticsVisitor(
-            mResult.GetErrorWriter(),
-            Options,
-            this);
-
         for( auto& translationUnit : collectionOfTranslationUnits->translationUnits )
         {
-            checkTranslationUnit(translationUnit, visitor);
+            checkTranslationUnit(translationUnit, Options);
         }
     }
 
@@ -322,6 +319,21 @@ struct CompileRequest
 
     int executeCompilerDriverActions()
     {
+        // Do some cleanup on settings specified by user.
+        // In particular, we want to propagate flags from the overall request down to
+        // each translation unit.
+        for( auto& translationUnitOptions : Options.translationUnits )
+        {
+            translationUnitOptions.compileFlags |= Options.compileFlags;
+
+            // However, the "no checking" flag shouldn't be applied to
+            // any translation unit that is native Slang code.
+            if( translationUnitOptions.sourceLanguage == SourceLanguage::Slang )
+            {
+                translationUnitOptions.compileFlags &= SLANG_COMPILE_FLAG_NO_CHECKING;
+            }
+        }
+
         // If we are being asked to do pass-through, then we need to do that here...
         if (Options.passThrough != PassThroughMode::None)
         {
@@ -727,7 +739,7 @@ SLANG_API void spSetCompileFlags(
     SlangCompileRequest*    request,
     SlangCompileFlags       flags)
 {
-    REQ(request)->Options.flags = flags;
+    REQ(request)->Options.compileFlags = flags;
 }
 
 SLANG_API void spSetCodeGenTarget(

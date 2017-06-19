@@ -12,11 +12,13 @@ namespace Slang
     class ShaderCompiler;
     class ShaderLinkInfo;
     class ShaderSymbol;
+    class TranslationUnitOptions;
 
     SyntaxVisitor* CreateSemanticsVisitor(
-        DiagnosticSink*         err,
-        CompileOptions const&   options,
-        CompileRequest*         request);
+        DiagnosticSink*                 err,
+        CompileOptions const&           options,
+        TranslationUnitOptions const&   translationUnitOptions,
+        CompileRequest*                 request);
 
     // Look for a module that matches the given name:
     // either one we've loaded already, or one we
