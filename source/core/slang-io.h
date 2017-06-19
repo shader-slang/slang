@@ -20,11 +20,8 @@ namespace Slang
 	class Path
 	{
 	public:
-#ifdef _WIN32
-		static const char PathDelimiter = '\\';
-#else
 		static const char PathDelimiter = '/';
-#endif
+
 		static String TruncateExt(const String & path);
 		static String ReplaceExt(const String & path, const char * newExt);
 		static String GetFileName(const String & path);

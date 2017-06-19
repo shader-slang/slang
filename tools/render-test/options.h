@@ -25,12 +25,21 @@ enum class Mode
     GLSLCrossCompile,
 };
 
+enum
+{
+    // maximum number of command-line arguments to pass along to slang
+    kMaxSlangArgs = 16,
+};
+
 struct Options
 {
     char const* appName = "render-test";
     char const* sourcePath = nullptr;
     char const* outputPath = nullptr;
     Mode mode = Mode::Slang;
+
+    char const* slangArgs[kMaxSlangArgs];
+    int slangArgCount = 0;
 };
 
 extern Options gOptions;

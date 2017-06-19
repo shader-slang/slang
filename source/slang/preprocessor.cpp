@@ -16,7 +16,16 @@
 // idioms for using the preprocessor, found in shader code in the wild.
 
 
-namespace Slang{
+namespace Slang {
+
+// Forward declaration for code provided in `slang.cpp`
+//
+// TODO: Need an appropriate header for this.
+String autoImportModule(
+    CompileRequest*     request,
+    String const&       path,
+    String const&       source,
+    CodePosition const& loc);
 
 // State of a preprocessor conditional, which can change when
 // we encounter directives like `#elif` or `#endif`
@@ -170,6 +179,9 @@ struct Preprocessor
 
     // Syntax for the program we are trying to parse
     ProgramSyntaxNode*                      syntax;
+
+    // The over-arching compile request taht is invoking us
+    CompileRequest*                         compileRequest;
 };
 
 // Convenience routine to access the diagnostic sink
@@ -1475,7 +1487,6 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
     String foundPath;
     String foundSource;
 
-
     IncludeHandler* includeHandler = context->preprocessor->includeHandler;
     if (!includeHandler)
     {
@@ -1483,10 +1494,17 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
         GetSink(context)->diagnose(pathToken.Position, Diagnostics::noIncludeHandlerSpecified);
         return;
     }
-    if (!includeHandler->TryToFindIncludeFile(path, pathIncludedFrom, &foundPath, &foundSource))
+    auto includeResult = includeHandler->TryToFindIncludeFile(path, pathIncludedFrom, &foundPath, &foundSource);
+
+    switch (includeResult)
     {
+    case IncludeResult::NotFound:
+    case IncludeResult::Error:
         GetSink(context)->diagnose(pathToken.Position, Diagnostics::includeFailed, path);
         return;
+
+    case IncludeResult::FoundIncludeFile:
+        break;
     }
 
     // Do all checking related to the end of this directive before we push a new stream,
@@ -1494,12 +1512,50 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
     // a switch of input stream
     expectEndOfDirective(context);
 
-    // Push the new file onto our stack of input streams
-    // TODO(tfoley): check if we have made our include stack too deep
-    PreprocessorInputStream* inputStream = CreateInputStreamForSource(context->preprocessor, foundSource, foundPath);
-    inputStream->parent = context->preprocessor->inputStream;
-    context->preprocessor->inputStream = inputStream;
-}
+    switch( includeResult )
+    {
+    case IncludeResult::FoundIncludeFile:
+        {
+            // Push the new file onto our stack of input streams
+            // TODO(tfoley): check if we have made our include stack too deep
+            PreprocessorInputStream* inputStream = CreateInputStreamForSource(context->preprocessor, foundSource, foundPath);
+            inputStream->parent = context->preprocessor->inputStream;
+            context->preprocessor->inputStream = inputStream;
+        }
+        break;
+ 
+    case IncludeResult::FoundAutoImportFile:
+        {
+            //
+ 
+            String autoImportName = autoImportModule(
+                context->preprocessor->compileRequest,
+                foundPath,
+                foundSource,
+                GetDirectiveLoc(context));
+ 
+            SourceTextInputStream* inputStream = new SourceTextInputStream();
+ 
+            Token token;
+            token.Type = TokenType::AutoImport;
+            token.Position = GetDirectiveLoc(context);
+            token.flags = 0;
+            token.Content = autoImportName;
+ 
+            inputStream->lexedTokens.mTokens.Add(token);
+ 
+            token.Type = TokenType::EndOfFile;
+            token.flags = TokenFlag::AfterWhitespace | TokenFlag::AtStartOfLine;
+            inputStream->lexedTokens.mTokens.Add(token);
+ 
+            inputStream->tokenReader = TokenReader(inputStream->lexedTokens);
+ 
+            inputStream->parent = context->preprocessor->inputStream;
+            context->preprocessor->inputStream = inputStream;
+        }
+        break;
+    }
+ }
 
 // Handle a `#define` directive
 static void HandleDefineDirective(PreprocessorDirectiveContext* context)
@@ -2007,16 +2063,18 @@ static TokenList ReadAllTokens(
 }
 
 TokenList preprocessSource(
-    String const& source,
-    String const& fileName,
-    DiagnosticSink* sink,
-    IncludeHandler* includeHandler,
-    Dictionary<String, String>  defines,
-    ProgramSyntaxNode*  syntax)
+    String const&               source,
+    String const&               fileName,
+    DiagnosticSink*             sink,
+    IncludeHandler*             includeHandler,
+     Dictionary<String, String> defines,
+    ProgramSyntaxNode*          syntax,
+    CompileRequest*             compileRequest)
 {
     Preprocessor preprocessor;
     InitializePreprocessor(&preprocessor, sink);
     preprocessor.syntax = syntax;
+    preprocessor.compileRequest = compileRequest;
 
     preprocessor.includeHandler = includeHandler;
     for (auto p : defines)

@@ -141,6 +141,16 @@ namespace Slang
 				memcpy(buffer.Ptr(), str, length + 1);
 			}
 		}
+        String(const char* textBegin, char const* textEnd)
+		{
+			if (textBegin != textEnd)
+			{
+				length = (int)(textEnd - textBegin);
+				buffer = new char[length + 1];
+				memcpy(buffer.Ptr(), textBegin, length + 1);
+                buffer.Ptr()[length] = 0;
+			}
+		}
 		String(char chr)
 		{
 			if (chr)

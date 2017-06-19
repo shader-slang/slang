@@ -91,6 +91,26 @@ namespace Slang
         Dictionary<String, String> preprocessorDefinitions;
     };
 
+
+    struct SearchDirectory
+    {
+        enum Kind
+        {
+            Default,
+            AutoImport,
+        };
+
+        SearchDirectory() = default;
+        SearchDirectory(SearchDirectory const& other) = default;
+        SearchDirectory(String const& path, Kind kind)
+            : path(path)
+            , kind(kind)
+        {}
+
+        String  path;
+        Kind    kind;
+    };
+
     class CompileOptions
     {
     public:
@@ -98,7 +118,7 @@ namespace Slang
         CodeGenTarget Target = CodeGenTarget::Unknown;
 
         // Directories to search for `#include` files or `import`ed modules
-        List<String> SearchDirectories;
+        List<SearchDirectory> searchDirectories;
 
         // Definitions to provide during preprocessing
         Dictionary<String, String> preprocessorDefinitions;

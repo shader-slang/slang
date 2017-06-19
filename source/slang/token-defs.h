@@ -30,6 +30,8 @@ TOKEN(NewLine,          "newline")
 TOKEN(LineComment,      "line comment")
 TOKEN(BlockComment,     "block comment")
 
+TOKEN(AutoImport,       "automatic import directive")
+
 #define PUNCTUATION(id, text) \
     TOKEN(id, "'" text "'")
 
