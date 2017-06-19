@@ -1008,10 +1008,12 @@ static void DestroyConditional(PreprocessorConditional* conditional)
 }
 
 // Start a preprocessor conditional, with an initial enable/disable state.
-static void BeginConditional(PreprocessorDirectiveContext* context, bool enable)
+static void beginConditional(
+    PreprocessorDirectiveContext*   context,
+    PreprocessorInputStream*        inputStream,
+    bool                            enable)
 {
     Preprocessor* preprocessor = context->preprocessor;
-    PreprocessorInputStream* inputStream = preprocessor->inputStream;
     assert(inputStream);
 
     PreprocessorConditional* conditional = CreateConditional(preprocessor);
@@ -1041,6 +1043,14 @@ static void BeginConditional(PreprocessorDirectiveContext* context, bool enable)
     // Push conditional onto the stack
     conditional->parent = inputStream->conditional;
     inputStream->conditional = conditional;
+}
+
+// Start a preprocessor conditional, with an initial enable/disable state.
+static void beginConditional(
+    PreprocessorDirectiveContext*   context,
+    bool                            enable)
+{
+    beginConditional(context, context->preprocessor->inputStream, enable);
 }
 
 //
@@ -1302,11 +1312,16 @@ static PreprocessorExpressionValue ParseAndEvaluateExpression(PreprocessorDirect
 // Handle a `#if` directive
 static void HandleIfDirective(PreprocessorDirectiveContext* context)
 {
+    // Record current inpu stream in case preprocessor expression
+    // changes the input stream to a macro expansion while we
+    // are parsing.
+    auto inputStream = context->preprocessor->inputStream;
+
     // Parse a preprocessor expression.
     PreprocessorExpressionValue value = ParseAndEvaluateExpression(context);
 
     // Begin a preprocessor block, enabled based on the expression.
-    BeginConditional(context, value != 0);
+    beginConditional(context, inputStream, value != 0);
 }
 
 // Handle a `#ifdef` directive
@@ -1319,7 +1334,7 @@ static void HandleIfDefDirective(PreprocessorDirectiveContext* context)
     String name = nameToken.Content;
 
     // Check if the name is defined.
-    BeginConditional(context, LookupMacro(context, name) != NULL);
+    beginConditional(context, LookupMacro(context, name) != NULL);
 }
 
 // Handle a `#ifndef` directive
@@ -1332,7 +1347,7 @@ static void HandleIfNDefDirective(PreprocessorDirectiveContext* context)
     String name = nameToken.Content;
 
     // Check if the name is defined.
-    BeginConditional(context, LookupMacro(context, name) == NULL);
+    beginConditional(context, LookupMacro(context, name) == NULL);
 }
 
 // Handle a `#else` directive
@@ -1376,6 +1391,11 @@ static void HandleElseDirective(PreprocessorDirectiveContext* context)
 // Handle a `#elif` directive
 static void HandleElifDirective(PreprocessorDirectiveContext* context)
 {
+    // Need to grab current input stream *before* we try to parse
+    // the conditional expression.
+    PreprocessorInputStream* inputStream = context->preprocessor->inputStream;
+    assert(inputStream);
+
     // HACK(tfoley): handle an empty `elif` like an `else` directive
     //
     // This is the behavior expected by at least one input program.
@@ -1389,9 +1409,6 @@ static void HandleElifDirective(PreprocessorDirectiveContext* context)
     }
 
     PreprocessorExpressionValue value = ParseAndEvaluateExpression(context);
-
-    PreprocessorInputStream* inputStream = context->preprocessor->inputStream;
-    assert(inputStream);
 
     // if we aren't inside a conditional, then error
     PreprocessorConditional* conditional = inputStream->conditional;
