@@ -802,6 +802,18 @@ namespace Slang
         return decl;
     }
 
+    static RefPtr<Decl> parseAutoImportDecl(
+        Parser* parser)
+    {
+        Token importToken = parser->ReadToken(TokenType::AutoImport);
+
+        auto decl = new ImportDecl();
+        decl->nameToken = importToken;
+        decl->scope = parser->currentScope;
+
+        return decl;
+    }
+
     static Token ParseDeclName(
         Parser* parser)
     {
@@ -2159,6 +2171,8 @@ parser->ReadToken(TokenType::Comma);
             decl = parseModifierDecl(parser);
         else if(parser->LookAheadToken("__import"))
             decl = parseImportDecl(parser);
+        else if(parser->LookAheadToken(TokenType::AutoImport))
+            decl = parseAutoImportDecl(parser);
         else if (AdvanceIf(parser, TokenType::Semicolon))
         {
             decl = new EmptyDecl();

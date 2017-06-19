@@ -193,6 +193,7 @@
     <ClCompile Include="emit.cpp" />
     <ClCompile Include="lexer.cpp" />
     <ClCompile Include="lookup.cpp" />
+    <ClCompile Include="options.cpp" />
     <ClCompile Include="parameter-binding.cpp" />
     <ClCompile Include="parser.cpp" />
     <ClCompile Include="preprocessor.cpp" />

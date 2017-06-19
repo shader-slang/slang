@@ -35,6 +35,8 @@ struct SlangShaderCompilerWrapper : public ShaderCompiler
         }
         spAddPreprocessorDefine(slangRequest, langDefine, "1");
 
+        spProcessCommandLineArguments(slangRequest, &gOptions.slangArgs[0], gOptions.slangArgCount);
+
         int vertexTranslationUnit = 0;
         int fragmentTranslationUnit = 0;
         if( sourceLanguage == SLANG_SOURCE_LANGUAGE_GLSL )

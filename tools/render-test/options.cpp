@@ -76,6 +76,22 @@ void parseOptions(int* argc, char** argv)
         {
             gOptions.mode = Mode::GLSLCrossCompile;
         }
+        else if( strcmp(arg, "-xslang") == 0 )
+        {
+            // This is an option that we want to pass along to Slang
+
+            if( argCursor == argEnd )
+            {
+                fprintf(stderr, "expected argument for '%s' option\n", arg);
+                exit(1);
+            }
+            if( gOptions.slangArgCount == kMaxSlangArgs )
+            {
+                fprintf(stderr, "maximum number of '%s' options exceeded (%d)\n", arg, kMaxSlangArgs);
+                exit(1);
+            }
+            gOptions.slangArgs[gOptions.slangArgCount++] = *argCursor++;
+        }
         else
         {
             fprintf(stderr, "unknown option '%s'\n", arg);

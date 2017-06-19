@@ -7,14 +7,23 @@
 
 namespace Slang {
 
+struct CompileRequest;
 class DiagnosticSink;
 class ProgramSyntaxNode;
+
+enum class IncludeResult
+{
+    Error,
+    NotFound,
+    FoundIncludeFile,
+    FoundAutoImportFile,
+};
 
 // Callback interface for the preprocessor to use when looking
 // for files in `#include` directives.
 struct IncludeHandler
 {
-    virtual bool TryToFindIncludeFile(
+    virtual IncludeResult TryToFindIncludeFile(
         String const& pathToInclude,
         String const& pathIncludedFrom,
         String* outFoundPath,
@@ -23,12 +32,13 @@ struct IncludeHandler
 
 // Take a string of source code and preprocess it into a list of tokens.
 TokenList preprocessSource(
-    String const& source,
-    String const& fileName,
-    DiagnosticSink* sink,
-    IncludeHandler* includeHandler,
-    Dictionary<String, String>  defines,
-    ProgramSyntaxNode*  syntax);
+    String const&               source,
+    String const&               fileName,
+    DiagnosticSink*             sink,
+    IncludeHandler*             includeHandler,
+     Dictionary<String, String> defines,
+    ProgramSyntaxNode*          syntax,
+    CompileRequest*             compileRequest);
 
 } // namespace Slang
 

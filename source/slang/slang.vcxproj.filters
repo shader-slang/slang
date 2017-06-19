@@ -43,5 +43,6 @@
     <ClCompile Include="syntax.cpp" />
     <ClCompile Include="token.cpp" />
     <ClCompile Include="type-layout.cpp" />
+    <ClCompile Include="options.cpp" />
   </ItemGroup>
 </Project>
