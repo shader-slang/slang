@@ -19,6 +19,8 @@ struct EmitContext
 
     // Current source position for tracking purposes...
     CodePosition loc;
+    CodePosition nextSourceLocation;
+    bool needToUpdateSourceLocation;
 
     // The target language we want to generate code for
     CodeGenTarget target;
@@ -39,11 +41,25 @@ struct EmitContext
 static void EmitDecl(EmitContext* context, RefPtr<Decl> decl);
 static void EmitDecl(EmitContext* context, RefPtr<DeclBase> declBase);
 static void EmitDeclUsingLayout(EmitContext* context, RefPtr<Decl> decl, RefPtr<VarLayout> layout);
+
+static void EmitType(EmitContext* context, RefPtr<ExpressionType> type, Token const& nameToken);
 static void EmitType(EmitContext* context, RefPtr<ExpressionType> type, String const& name);
 static void EmitType(EmitContext* context, RefPtr<ExpressionType> type);
+
+static void EmitType(EmitContext* context, TypeExp const& typeExp, Token const& nameToken);
+static void EmitType(EmitContext* context, TypeExp const& typeExp, String const& name);
+static void EmitType(EmitContext* context, TypeExp const& typeExp);
+
 static void EmitExpr(EmitContext* context, RefPtr<ExpressionSyntaxNode> expr);
 static void EmitStmt(EmitContext* context, RefPtr<StatementSyntaxNode> stmt);
 static void EmitDeclRef(EmitContext* context, DeclRef<Decl> declRef);
+
+static void advanceToSourceLocation(
+    EmitContext*        context,
+    CodePosition const& sourceLocation);
+
+static void flushSourceLocationChange(
+    EmitContext*        context);
 
 // Low-level emit logic
 
@@ -62,6 +78,10 @@ static void emitRawText(EmitContext* context, char const* text)
 
 static void emitTextSpan(EmitContext* context, char const* textBegin, char const* textEnd)
 {
+    // If the source location has changed in a way that required update,
+    // do it now!
+    flushSourceLocationChange(context);
+
     // Emit the raw text
     emitRawTextSpan(context, textBegin, textEnd);
 
@@ -116,7 +136,10 @@ static bool isReservedWord(EmitContext* context, String const& name)
     return context->reservedWords.TryGetValue(name) != nullptr;
 }
 
-static void emitName(EmitContext* context, String const& inName)
+static void emitName(
+    EmitContext*        context,
+    String const&       inName,
+    CodePosition const& loc)
 {
     String name = inName;
 
@@ -149,7 +172,18 @@ static void emitName(EmitContext* context, String const& inName)
         name = name + "_";
     }
 
+    advanceToSourceLocation(context, loc);
     emit(context, name);
+}
+
+static void emitName(EmitContext* context, Token const& nameToken)
+{
+    emitName(context, nameToken.Content, nameToken.Position);
+}
+
+static void emitName(EmitContext* context, String const& name)
+{
+    emitName(context, name, CodePosition());
 }
 
 static void Emit(EmitContext* context, UInt value)
@@ -796,6 +830,10 @@ static void EmitExprWithPrecedence(EmitContext* context, RefPtr<ExpressionSyntax
     {
         needClose = MaybeEmitParens(context, outerPrec, kPrecedence_Atomic);
 
+        // TODO: This won't be valid if we had to generate a qualified
+        // reference for some reason.
+        advanceToSourceLocation(context, varExpr->Position);
+
         // Because of the "rewriter" use case, it is possible that we will
         // be trying to emit an expression that hasn't been wired up to
         // any associated declaration. In that case, we will just emit
@@ -917,6 +955,7 @@ struct EDeclarator
 
     // Used for `Flavor::Name`
     String name;
+    CodePosition loc;
 
     // Used for `Flavor::Array`
     IntVal* elementCount;
@@ -931,7 +970,7 @@ static void EmitDeclarator(EmitContext* context, EDeclarator* declarator)
     switch (declarator->flavor)
     {
     case EDeclarator::Flavor::Name:
-        emitName(context, declarator->name);
+        emitName(context, declarator->name, declarator->loc);
         break;
 
     case EDeclarator::Flavor::Array:
@@ -1040,7 +1079,7 @@ static void emitHLSLTextureType(
     }
     Emit(context, "<");
     EmitType(context, texType->elementType);
-    Emit(context, ">");
+    Emit(context, " >");
 }
 
 static void emitGLSLTextureOrTextureSamplerType(
@@ -1196,7 +1235,6 @@ static void EmitType(EmitContext* context, RefPtr<ExpressionType> type, EDeclara
             break;
         }
 
-        Emit(context, " ");
         EmitDeclarator(context, declarator);
         return;
     }
@@ -1234,28 +1272,24 @@ static void EmitType(EmitContext* context, RefPtr<ExpressionType> type, EDeclara
             break;
         }
 
-        Emit(context, " ");
         EmitDeclarator(context, declarator);
         return;
     }
     else if (auto texType = type->As<TextureType>())
     {
         emitTextureType(context, texType);
-        Emit(context, " ");
         EmitDeclarator(context, declarator);
         return;
     }
     else if (auto textureSamplerType = type->As<TextureSamplerType>())
     {
         emitTextureSamplerType(context, textureSamplerType);
-        Emit(context, " ");
         EmitDeclarator(context, declarator);
         return;
     }
     else if (auto imageType = type->As<GLSLImageType>())
     {
         emitImageType(context, imageType);
-        Emit(context, " ");
         EmitDeclarator(context, declarator);
         return;
     }
@@ -1314,18 +1348,55 @@ static void EmitType(EmitContext* context, RefPtr<ExpressionType> type, EDeclara
     throw "unimplemented";
 }
 
-static void EmitType(EmitContext* context, RefPtr<ExpressionType> type, String const& name)
+static void EmitType(
+    EmitContext*            context,
+    RefPtr<ExpressionType>  type,
+    CodePosition const&     typeLoc,
+    String const&           name,
+    CodePosition const&     nameLoc)
 {
+    advanceToSourceLocation(context, typeLoc);
+
     EDeclarator nameDeclarator;
     nameDeclarator.flavor = EDeclarator::Flavor::Name;
     nameDeclarator.name = name;
+    nameDeclarator.loc = nameLoc;
     EmitType(context, type, &nameDeclarator);
+}
+
+
+static void EmitType(EmitContext* context, RefPtr<ExpressionType> type, Token const& nameToken)
+{
+    EmitType(context, type, CodePosition(), nameToken.Content, nameToken.Position);
+}
+
+
+static void EmitType(EmitContext* context, RefPtr<ExpressionType> type, String const& name)
+{
+    EmitType(context, type, CodePosition(), name, CodePosition());
 }
 
 static void EmitType(EmitContext* context, RefPtr<ExpressionType> type)
 {
     EmitType(context, type, nullptr);
 }
+
+static void EmitType(EmitContext* context, TypeExp const& typeExp, Token const& nameToken)
+{
+    EmitType(context, typeExp.type, typeExp.exp->Position, nameToken.Content, nameToken.Position);
+}
+
+static void EmitType(EmitContext* context, TypeExp const& typeExp, String const& name)
+{
+    EmitType(context, typeExp.type, typeExp.exp->Position, name, CodePosition());
+}
+
+static void EmitType(EmitContext* context, TypeExp const& typeExp)
+{
+    advanceToSourceLocation(context, typeExp.exp->Position);
+    EmitType(context, typeExp.type, nullptr);
+}
+
 
 // Statements
 
@@ -1424,6 +1495,9 @@ static void emitLineDirective(
                 emitRawText(context, charBuffer);
                 break;
 
+            // The incoming file path might use `/` and/or `\\` as
+            // a directory separator. We want to canonicalize this.
+            //
             // TODO: should probably canonicalize paths to not use backslash somewhere else
             // in the compilation pipeline...
             case '\\':
@@ -1451,10 +1525,14 @@ static void emitLineDirectiveAndUpdateSourceLocation(
     context->loc.Col = 1;
 }
 
-static void advanceToSourceLocation(
+static void emitLineDirectiveIfNeeded(
     EmitContext*        context,
     CodePosition const& sourceLocation)
 {
+    // Ignore invalid source locations
+    if(sourceLocation.Line <= 0)
+        return;
+
     // If we are currently emitting code at a source location with
     // a differnet file or line, *or* if the source location is
     // somehow later on the line than what we want to emit,
@@ -1463,7 +1541,26 @@ static void advanceToSourceLocation(
         || sourceLocation.Line != context->loc.Line
         || sourceLocation.Col < context->loc.Col)
     {
-        emitLineDirectiveAndUpdateSourceLocation(context, sourceLocation);
+        // Special case: if we are in the same file, and within a small number
+        // of lines of the target location, then go ahead and output newlines
+        // to get us caught up.
+        enum { kSmallLineCount = 3 };
+        auto lineDiff = sourceLocation.Line - context->loc.Line;
+        if(sourceLocation.FileName == context->loc.FileName
+            && sourceLocation.Line > context->loc.Line
+            && lineDiff <= kSmallLineCount)
+        {
+            for(int ii = 0; ii < lineDiff; ++ii )
+            {
+                Emit(context, "\n");
+            }
+            assert(sourceLocation.Line == context->loc.Line);
+        }
+        else
+        {
+            // Go ahead and output a `#line` directive to get us caught up
+            emitLineDirectiveAndUpdateSourceLocation(context, sourceLocation);
+        }
     }
 
     // Now indent up to the appropriate column, so that error messages
@@ -1482,6 +1579,32 @@ static void advanceToSourceLocation(
         }
         context->loc.Col = sourceLocation.Col;
     }
+}
+
+static void advanceToSourceLocation(
+    EmitContext*        context,
+    CodePosition const& sourceLocation)
+{
+    // Skip invalid locations
+    if(sourceLocation.Line <= 0)
+        return;
+
+    context->needToUpdateSourceLocation = true;
+    context->nextSourceLocation = sourceLocation;
+}
+
+static void flushSourceLocationChange(
+    EmitContext*        context)
+{
+    if(!context->needToUpdateSourceLocation)
+        return;
+
+    // Note: the order matters here, because trying to update
+    // the source location may involve outputting text that
+    // advances the location, and outputting text is what
+    // triggers this flush operation.
+    context->needToUpdateSourceLocation = false;
+    emitLineDirectiveIfNeeded(context, context->nextSourceLocation);
 }
 
 static void emitTokenWithLocation(EmitContext* context, Token const& token)
@@ -1520,6 +1643,9 @@ static void EmitUnparsedStmt(EmitContext* context, RefPtr<UnparsedStmt> stmt)
 
 static void EmitStmt(EmitContext* context, RefPtr<StatementSyntaxNode> stmt)
 {
+    // Try to ensure that debugging can find the right location
+    advanceToSourceLocation(context, stmt->Position);
+
     if (auto blockStmt = stmt.As<BlockStatementSyntaxNode>())
     {
         EmitBlockStmt(context, blockStmt);
@@ -1681,7 +1807,7 @@ static void EmitDeclRef(EmitContext* context, DeclRef<Decl> declRef)
             if (aa != 0) Emit(context, ",");
             EmitVal(context, subst->args[aa]);
         }
-        Emit(context, ">");
+        Emit(context, " >");
     }
 
 }
@@ -1719,6 +1845,8 @@ static void EmitModifiers(EmitContext* context, RefPtr<Decl> decl)
 
     for (auto mod = decl->modifiers.first; mod; mod = mod->next)
     {
+        advanceToSourceLocation(context, mod->Position);
+
         if (0) {}
 
         #define CASE(TYPE, KEYWORD) \
@@ -1909,7 +2037,7 @@ static void EmitStructDecl(EmitContext* context, RefPtr<StructSyntaxNode> decl)
         return;
 
     Emit(context, "struct ");
-    emitName(context, decl->Name.Content);
+    emitName(context, decl->Name);
     Emit(context, "\n{\n");
 
     // TODO(tfoley): Need to hoist members functions, etc. out to global scope
@@ -1923,7 +2051,7 @@ static void EmitVarDeclCommon(EmitContext* context, DeclRef<VarDeclBase> declRef
 {
     EmitModifiers(context, declRef.getDecl());
 
-    EmitType(context, GetType(declRef), declRef.GetName());
+    EmitType(context, GetType(declRef), declRef.getDecl()->getNameToken());
 
     EmitSemantics(context, declRef.getDecl());
 
@@ -2073,7 +2201,7 @@ static void emitHLSLParameterBlockDecl(
     if( auto reflectionNameModifier = varDecl->FindModifier<ParameterBlockReflectionName>() )
     {
         Emit(context, " ");
-        emitName(context, reflectionNameModifier->nameToken.Content);
+        emitName(context, reflectionNameModifier->nameToken);
     }
 
     EmitSemantics(context, varDecl, kESemanticMask_None);
@@ -2243,7 +2371,7 @@ static void emitGLSLParameterBlockDecl(
     if( auto reflectionNameModifier = varDecl->FindModifier<ParameterBlockReflectionName>() )
     {
         Emit(context, " ");
-        emitName(context, reflectionNameModifier->nameToken.Content);
+        emitName(context, reflectionNameModifier->nameToken);
     }
 
     Emit(context, "\n{\n");
@@ -2269,7 +2397,7 @@ static void emitGLSLParameterBlockDecl(
     if( varDecl->Name.Type != TokenType::Unknown )
     {
         Emit(context, " ");
-        emitName(context, varDecl->Name.Content);
+        emitName(context, varDecl->Name);
     }
 
     Emit(context, ";\n");
@@ -2338,7 +2466,7 @@ static void EmitFuncDecl(EmitContext* context, RefPtr<FunctionSyntaxNode> decl)
     // isn't allowed by declarator syntax and/or language rules, we could
     // hypothetically wrap things in a `typedef` and work around it.
 
-    EmitType(context, decl->ReturnType, decl->Name.Content);
+    EmitType(context, decl->ReturnType, decl->Name);
 
     Emit(context, "(");
     bool first = true;
@@ -2494,6 +2622,10 @@ static void EmitDeclImpl(EmitContext* context, RefPtr<Decl> decl, RefPtr<VarLayo
     // since different targets might have different sets of builtins.
     if (decl->HasModifier<FromStdLibModifier>())
         return;
+
+
+    // Try to ensure that debugging can find the right location
+    advanceToSourceLocation(context, decl->Position);
 
     if (auto typeDefDecl = decl.As<TypeDefDecl>())
     {
