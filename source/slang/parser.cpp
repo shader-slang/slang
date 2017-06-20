@@ -32,8 +32,7 @@ namespace Slang
     class Parser
     {
     public:
-        CompileOptions const&           options;
-        TranslationUnitOptions const&   translationUnitOptions;
+        TranslationUnitRequest* translationUnit;
 
         int anonymousCounter = 0;
 
@@ -67,15 +66,11 @@ namespace Slang
             currentScope = currentScope->parent;
         }
         Parser(
-            CompileOptions const& options,
-            TranslationUnitOptions const& translationUnitOptions,
             TokenSpan const& _tokens,
             DiagnosticSink * sink,
             String _fileName,
             RefPtr<Scope> const& outerScope)
-            : options(options)
-            , translationUnitOptions(translationUnitOptions)
-            , tokenReader(_tokens)
+            : tokenReader(_tokens)
             , sink(sink)
             , fileName(_fileName)
             , outerScope(outerScope)
@@ -2500,7 +2495,7 @@ parser->ReadToken(TokenType::Comma);
 
     RefPtr<StatementSyntaxNode> Parser::ParseBlockStatement()
     {
-        if( translationUnitOptions.compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING )
+        if( translationUnit->compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING )
         {
             // We have been asked to parse the input, but not attempt to understand it.
 
@@ -3157,15 +3152,16 @@ parser->ReadToken(TokenType::Comma);
 
     // Parse a source file into an existing translation unit
     void parseSourceFile(
-        ProgramSyntaxNode*              translationUnitSyntax,
-        CompileOptions const&           options,
-        TranslationUnitOptions const&   translationUnitOptions,
+        TranslationUnitRequest*         translationUnit,
         TokenSpan const&                tokens,
         DiagnosticSink*                 sink,
         String const&                   fileName,
         RefPtr<Scope> const&            outerScope)
     {
-        Parser parser(options, translationUnitOptions, tokens, sink, fileName, outerScope);
-        return parser.parseSourceFile(translationUnitSyntax);
+        Parser parser(tokens, sink, fileName, outerScope);
+
+        parser.translationUnit = translationUnit;
+
+        return parser.parseSourceFile(translationUnit->SyntaxNode.Ptr());
     }
 }

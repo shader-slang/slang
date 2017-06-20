@@ -100,8 +100,8 @@ HRESULT initialize( ID3D11Device* dxDevice )
     char const* vertexProfileName   = "vs_4_0";
     char const* fragmentProfileName = "ps_4_0";
 
-    spAddTranslationUnitEntryPoint(slangRequest, translationUnitIndex, vertexEntryPointName,   spFindProfile(slangSession, vertexProfileName));
-    spAddTranslationUnitEntryPoint(slangRequest, translationUnitIndex, fragmentEntryPointName, spFindProfile(slangSession, fragmentProfileName));
+    spAddEntryPoint(slangRequest, translationUnitIndex, vertexEntryPointName,   spFindProfile(slangSession, vertexProfileName));
+    spAddEntryPoint(slangRequest, translationUnitIndex, fragmentEntryPointName, spFindProfile(slangSession, fragmentProfileName));
 
     int compileErr = spCompile(slangRequest);
     if(auto diagnostics = spGetDiagnosticOutput(slangRequest))

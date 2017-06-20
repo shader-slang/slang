@@ -9,9 +9,7 @@ namespace Slang
 {
     // Parse a source file into an existing translation unit
     void parseSourceFile(
-        ProgramSyntaxNode*              translationUnitSyntax,
-        CompileOptions const&           options,
-        TranslationUnitOptions const&   translationUnitOptions,
+        TranslationUnitRequest*         translationUnit,
         TokenSpan const&                tokens,
         DiagnosticSink*                 sink,
         String const&                   fileName,

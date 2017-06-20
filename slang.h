@@ -281,7 +281,7 @@ extern "C"
 
     /** Add an entry point in a particular translation unit
     */
-    SLANG_API int spAddTranslationUnitEntryPoint(
+    SLANG_API int spAddEntryPoint(
         SlangCompileRequest*    request,
         int                     translationUnitIndex,
         char const*             name,
@@ -337,7 +337,6 @@ extern "C"
     */
     SLANG_API char const* spGetEntryPointSource(
         SlangCompileRequest*    request,
-        int                     translationUnitIndex,
         int                     entryPointIndex);
 
 
