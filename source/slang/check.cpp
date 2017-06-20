@@ -44,7 +44,7 @@ namespace Slang
 
     class SemanticsVisitor : public SyntaxVisitor
     {
-        ProgramSyntaxNode * program = nullptr;
+//        ProgramSyntaxNode * program = nullptr;
         FunctionSyntaxNode * function = nullptr;
 
         CompileRequest* request = nullptr;
@@ -1239,37 +1239,40 @@ namespace Slang
                 }
             }
 
+            // We need/want to visit any `import` declarations before
+            // anything else, to make sure that scoping works.
+            for(auto& importDecl : programNode->getMembersOfType<ImportDecl>())
+            {
+                EnsureDecl(importDecl);
+            }
+
             //
 
-            HashSet<String> funcNames;
-            this->program = programNode;
-            this->function = nullptr;
-
-            for (auto & s : program->GetTypeDefs())
+            for (auto & s : programNode->GetTypeDefs())
                 VisitTypeDefDecl(s.Ptr());
-            for (auto & s : program->GetStructs())
+            for (auto & s : programNode->GetStructs())
             {
                 VisitStruct(s.Ptr());
             }
-			for (auto & s : program->GetClasses())
+			for (auto & s : programNode->GetClasses())
 			{
 				VisitClass(s.Ptr());
 			}
             // HACK(tfoley): Visiting all generic declarations here,
             // because otherwise they won't get visited.
-            for (auto & g : program->getMembersOfType<GenericDecl>())
+            for (auto & g : programNode->getMembersOfType<GenericDecl>())
             {
                 VisitGenericDecl(g.Ptr());
             }
 
-            for (auto & func : program->GetFunctions())
+            for (auto & func : programNode->GetFunctions())
             {
                 if (!func->IsChecked(DeclCheckState::Checked))
                 {
                     VisitFunctionDeclaration(func.Ptr());
                 }
             }
-            for (auto & func : program->GetFunctions())
+            for (auto & func : programNode->GetFunctions())
             {
                 EnsureDecl(func);
             }
@@ -4935,6 +4938,9 @@ namespace Slang
 
         virtual void visitImportDecl(ImportDecl* decl) override
         {
+            if(decl->IsChecked(DeclCheckState::Checked))
+                return;
+
             // We need to look for a module with the specified name
             // (whether it has already been loaded, or needs to
             // be loaded), and then put its declarations into
@@ -4961,6 +4967,8 @@ namespace Slang
 
             subScope->nextSibling = scope->nextSibling;
             scope->nextSibling = subScope;
+
+            decl->SetCheckState(DeclCheckState::Checked);
         }
     };
 

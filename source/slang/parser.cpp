@@ -488,6 +488,9 @@ namespace Slang
 
     RefPtr<TypeDefDecl> ParseTypeDef(Parser* parser)
     {
+        RefPtr<TypeDefDecl> typeDefDecl = new TypeDefDecl();
+        typeDefDecl->Position = parser->tokenReader.PeekLoc();
+
         // Consume the `typedef` keyword
         parser->ReadToken("typedef");
 
@@ -496,7 +499,6 @@ namespace Slang
 
         auto nameToken = parser->ReadToken(TokenType::Identifier);
 
-        RefPtr<TypeDefDecl> typeDefDecl = new TypeDefDecl();
         typeDefDecl->Name = nameToken;
         typeDefDecl->Type = type;
 
