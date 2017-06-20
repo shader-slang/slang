@@ -230,9 +230,23 @@ __generic<T> __magic_type(HLSLRWStructuredBufferType) struct RWStructuredBuffer
     __intrinsic __subscript(uint index) -> T { get; set; }
 };
 
-__generic<T> __magic_type(HLSLPointStreamType) struct PointStream {};
-__generic<T> __magic_type(HLSLLineStreamType) struct LineStream {};
-__generic<T> __magic_type(HLSLLineStreamType) struct TriangleStream {};
+__generic<T> __magic_type(HLSLPointStreamType) struct PointStream
+{
+    void Append(T value);
+    void RestartStrip();
+};
+
+__generic<T> __magic_type(HLSLLineStreamType) struct LineStream
+{
+    void Append(T value);
+    void RestartStrip();
+};
+
+__generic<T> __magic_type(HLSLLineStreamType) struct TriangleStream
+{
+    void Append(T value);
+    void RestartStrip();
+};
 
 )=", R"=(
 
@@ -1202,6 +1216,21 @@ namespace Slang
             // We should look for a way that we can define implicit
             // conversions directly in the stdlib instead...
             sb << "__generic<U> __init(vector<U," << N << ">);\n";
+
+            // Initialize from two vectors, of size M and N-M
+            for(int M = 2; M <= (N-2); ++M)
+            {
+                int K = N - M;
+                assert(K >= 2);
+
+                sb << "__init(vector<T," << M << "> " << kVectorNames[M];
+                sb << ", vector<T," << K << "> ";
+                for (int ii = 0; ii < K; ++ii)
+                {
+                    sb << kComponentNames[ii];
+                }
+                sb << ");\n";
+            }
 
             sb << "}\n";
         }
