@@ -525,6 +525,22 @@ namespace Slang
                 return textureType;
             }
 
+            // TODO: eventually everything should follow this pattern,
+            // and we can drive the dispatch with a table instead
+            // of this ridiculously slow `if` cascade.
+
+        #define CASE(n,T)													\
+            else if(magicMod->name == #n) {									\
+                auto type = new T();										\
+                type->declRef = declRef;									\
+                return type;												\
+            }
+
+            CASE(HLSLInputPatchType, HLSLInputPatchType)
+            CASE(HLSLOutputPatchType, HLSLOutputPatchType)
+
+        #undef CASE
+
             #define CASE(n,T)													\
                 else if(magicMod->name == #n) {									\
                     assert(subst && subst->args.Count() == 1);					\
@@ -550,8 +566,6 @@ namespace Slang
             CASE(HLSLRWStructuredBufferType, HLSLRWStructuredBufferType)
             CASE(HLSLAppendStructuredBufferType, HLSLAppendStructuredBufferType)
             CASE(HLSLConsumeStructuredBufferType, HLSLConsumeStructuredBufferType)
-            CASE(HLSLInputPatchType, HLSLInputPatchType)
-            CASE(HLSLOutputPatchType, HLSLOutputPatchType)
 
             CASE(HLSLPointStreamType, HLSLPointStreamType)
             CASE(HLSLLineStreamType, HLSLPointStreamType)
@@ -1470,4 +1484,17 @@ namespace Slang
         return IntrinsicOp::Unknown;
     }
 
+    //
+
+    // HLSLPatchType
+
+    ExpressionType* HLSLPatchType::getElementType()
+    {
+        return this->declRef.substitutions->args[0].As<ExpressionType>().Ptr();
+    }
+
+    IntVal* HLSLPatchType::getElementCount()
+    {
+        return this->declRef.substitutions->args[1].As<IntVal>().Ptr();
+    }
 }
