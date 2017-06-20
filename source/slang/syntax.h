@@ -1044,8 +1044,15 @@ namespace Slang
     class HLSLAppendStructuredBufferType : public BuiltinGenericType {};
     class HLSLConsumeStructuredBufferType : public BuiltinGenericType {};
 
-    class HLSLInputPatchType : public BuiltinGenericType {};
-    class HLSLOutputPatchType : public BuiltinGenericType {};
+    class HLSLPatchType : public DeclRefType
+    {
+    public:
+        ExpressionType* getElementType();
+        IntVal*         getElementCount();
+    };
+
+    class HLSLInputPatchType : public HLSLPatchType {};
+    class HLSLOutputPatchType : public HLSLPatchType {};
 
     // HLSL geometry shader output stream types
 

@@ -78,12 +78,12 @@ __generic<T> __magic_type(HLSLConsumeStructuredBufferType) struct ConsumeStructu
         out uint stride);
 };
 
-__generic<T> __magic_type(HLSLInputPatchType) struct InputPatch
+__generic<T, let N : int> __magic_type(HLSLInputPatchType) struct InputPatch
 {
     __intrinsic __subscript(uint index) -> T;
 };
 
-__generic<T> __magic_type(HLSLOutputPatchType) struct OutputPatch
+__generic<T, let N : int> __magic_type(HLSLOutputPatchType) struct OutputPatch
 {
     __intrinsic __subscript(uint index) -> T { set; }
 };
