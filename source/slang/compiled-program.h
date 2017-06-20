@@ -8,42 +8,6 @@
 
 namespace Slang
 {
-    void IndentString(StringBuilder & sb, String src);
-
-    struct EntryPointResult
-    {
-        String outputSource;
-    };
-
-    struct TranslationUnitResult
-    {
-        String outputSource;
-        List<EntryPointResult> entryPoints;
-    };
-
-    class CompileResult
-    {
-    public:
-        DiagnosticSink* mSink = nullptr;
-
-        // Per-translation-unit results
-        List<TranslationUnitResult> translationUnits;
-
-        CompileResult()
-        {}
-        ~CompileResult()
-        {
-        }
-        DiagnosticSink * GetErrorWriter()
-        {
-            return mSink;
-        }
-        int GetErrorCount()
-        {
-            return mSink->GetErrorCount();
-        }
-    };
-
 }
 
 #endif

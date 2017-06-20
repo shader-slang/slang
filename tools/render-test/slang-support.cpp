@@ -73,8 +73,8 @@ struct SlangShaderCompilerWrapper : public ShaderCompiler
             spSetCompileFlags(slangRequest, SLANG_COMPILE_FLAG_NO_CHECKING);
         }
 
-        int vertexEntryPoint = spAddTranslationUnitEntryPoint(slangRequest, vertexTranslationUnit, request.vertexShader.name,   spFindProfile(slangSession, request.vertexShader.profile));
-        int fragmentEntryPoint = spAddTranslationUnitEntryPoint(slangRequest, fragmentTranslationUnit, request.fragmentShader.name, spFindProfile(slangSession, request.fragmentShader.profile));
+        int vertexEntryPoint = spAddEntryPoint(slangRequest, vertexTranslationUnit, request.vertexShader.name,   spFindProfile(slangSession, request.vertexShader.profile));
+        int fragmentEntryPoint = spAddEntryPoint(slangRequest, fragmentTranslationUnit, request.fragmentShader.name, spFindProfile(slangSession, request.fragmentShader.profile));
 
         int compileErr = spCompile(slangRequest);
         if(auto diagnostics = spGetDiagnosticOutput(slangRequest))
@@ -97,8 +97,8 @@ struct SlangShaderCompilerWrapper : public ShaderCompiler
             innerRequest.source.text = translatedCode;
         }
 
-        char const* vertexCode = spGetEntryPointSource(slangRequest, vertexTranslationUnit, vertexEntryPoint);
-        char const* fragmentCode = spGetEntryPointSource(slangRequest, fragmentTranslationUnit, fragmentEntryPoint);
+        char const* vertexCode = spGetEntryPointSource(slangRequest, vertexEntryPoint);
+        char const* fragmentCode = spGetEntryPointSource(slangRequest, fragmentEntryPoint);
 
         innerRequest.vertexShader.source.text = vertexCode;
         innerRequest.fragmentShader.source.text = fragmentCode;

@@ -46,27 +46,25 @@ namespace Slang
     {
         ProgramSyntaxNode * program = nullptr;
         FunctionSyntaxNode * function = nullptr;
-        CompileOptions const* options = nullptr;
-        TranslationUnitOptions const* translationUnitOptions = nullptr;
+
         CompileRequest* request = nullptr;
+        TranslationUnitRequest* translationUnit = nullptr;
 
         // lexical outer statements
         List<StatementSyntaxNode*> outerStmts;
     public:
         SemanticsVisitor(
             DiagnosticSink * pErr,
-            CompileOptions const& options,
-            TranslationUnitOptions const& translationUnitOptions,
-            CompileRequest* request)
+            CompileRequest*         request,
+            TranslationUnitRequest* translationUnit)
             : SyntaxVisitor(pErr)
-            , options(&options)
-            , translationUnitOptions(&translationUnitOptions)
             , request(request)
+            , translationUnit(translationUnit)
         {
         }
 
-        CompileOptions const& getOptions() { return *options; }
-        TranslationUnitOptions const& getTranslationUnitOptions() { return *translationUnitOptions; }
+        CompileRequest* getCompileRequest() { return request; }
+        TranslationUnitRequest* getTranslationUnit() { return translationUnit; }
 
     public:
         // Translate Types
@@ -969,7 +967,7 @@ namespace Slang
             // expressions without a type, and we need to ignore them.
             if( !fromExpr->Type.type )
             {
-                if(getTranslationUnitOptions().compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING )
+                if(getTranslationUnit()->compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING )
                     return fromExpr;
             }
 
@@ -981,7 +979,7 @@ namespace Slang
                 fromExpr.Ptr(),
                 nullptr))
             {
-                if(!(getTranslationUnitOptions().compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING))
+                if(!(getTranslationUnit()->compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING))
                 {
                     getSink()->diagnose(fromExpr->Position, Diagnostics::typeMismatch, toType, fromExpr->Type);
                 }
@@ -4967,12 +4965,11 @@ namespace Slang
     };
 
     SyntaxVisitor* CreateSemanticsVisitor(
-        DiagnosticSink*                 err,
-        CompileOptions const&           options,
-        TranslationUnitOptions const&   translationUnitOptions,
-        CompileRequest*                 request)
+        DiagnosticSink*         err,
+        CompileRequest*         request,
+        TranslationUnitRequest* translationUnit)
     {
-        return new SemanticsVisitor(err, options, translationUnitOptions, request);
+        return new SemanticsVisitor(err, request, translationUnit);
     }
 
     //

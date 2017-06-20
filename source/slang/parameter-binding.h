@@ -8,7 +8,7 @@
 
 namespace Slang {
 
-class CollectionOfTranslationUnits;
+class CompileRequest;
 
 // The parameter-binding interface is responsible for assigning
 // binding locations/registers to every parameter of a shader
@@ -23,8 +23,8 @@ class CollectionOfTranslationUnits;
 // and attach that information to the syntax nodes
 // of the program.
 
-void GenerateParameterBindings(
-    CollectionOfTranslationUnits*   program);
+void generateParameterBindings(
+    CompileRequest*     compileRequest);
 
 }
 
