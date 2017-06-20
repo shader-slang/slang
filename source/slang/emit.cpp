@@ -34,6 +34,8 @@ struct EmitContext
     // instead.
     Dictionary<String, int> mapGLSLSourcePathToID;
     int glslSourceIDCount = 0;
+
+    HashSet<ProgramSyntaxNode*> modulesAlreadyEmitted;
 };
 
 //
@@ -2662,16 +2664,24 @@ static void EmitDeclImpl(EmitContext* context, RefPtr<Decl> decl, RefPtr<VarLayo
         // When in "rewriter" mode, we need to emit the code of the imported
         // module in-place at the `import` site.
 
-        auto moduleDecl = importDecl->importedModuleDecl;
+        auto moduleDecl = importDecl->importedModuleDecl.Ptr();
 
-        // TODO: do we need to modify the code generation environment at
-        // all when doing this recursive emit?
-        //
-        // TODO: what if we import the same module along two different
-        // paths? Probably need  logic to avoid emitting the same
-        // module more than once.
+        // We might import the same module along two different paths,
+        // so we need to be careful to only emit each module once
+        // per output.
+        if(!context->modulesAlreadyEmitted.Contains(moduleDecl))
+        {
+            // Add the module to our set before emitting it, just
+            // in case a circular reference would lead us to
+            // infinite recursion (but that shouldn't be allowed
+            // in the first place).
+            context->modulesAlreadyEmitted.Add(moduleDecl);
 
-        EmitDeclsInContainer(context, moduleDecl);
+            // TODO: do we need to modify the code generation environment at
+            // all when doing this recursive emit?
+
+            EmitDeclsInContainer(context, moduleDecl);
+        }
 
         return;
     }
