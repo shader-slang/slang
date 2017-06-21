@@ -1022,7 +1022,7 @@ namespace Slang
         OpInfo unaryOps[] = {
             { IntrinsicOp::Neg,     "-",    ARITHMETIC_MASK },
             { IntrinsicOp::Not,     "!",    ANY_MASK        },
-            { IntrinsicOp::Not,     "~",    INT_MASK        },
+            { IntrinsicOp::BitNot,  "~",    INT_MASK        },
             { IntrinsicOp::PreInc,  "++",   ARITHMETIC_MASK | ASSIGNMENT },
             { IntrinsicOp::PreDec,  "--",   ARITHMETIC_MASK | ASSIGNMENT },
             { IntrinsicOp::PostInc, "++",   ARITHMETIC_MASK | ASSIGNMENT | POSTFIX },
