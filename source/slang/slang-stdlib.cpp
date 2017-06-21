@@ -1150,6 +1150,7 @@ namespace Slang
         // Declare vector and matrix types
 
         sb << "__generic<T = float, let N : int = 4> __magic_type(Vector) struct vector\n{\n";
+        sb << "    typedef T Element;\n";
         sb << "    __init(T value);\n"; // initialize from single scalar
         sb << "};\n";
         sb << "__generic<T = float, let R : int = 4, let C : int = 4> __magic_type(Matrix) struct matrix {};\n";
@@ -1343,13 +1344,9 @@ namespace Slang
 
                         sb << "float CalculateLevelOfDetailUnclamped(SamplerState s, ";
                         sb << "float" << kBaseTextureTypes[tt].coordCount << " location);\n";
-
-                        // TODO: `Gather` operation
-                        // (tricky because it returns a 4-vector of the element type
-                        // of the texture components...)
                     }
 
-                    // TODO: `GetDimensions` operations
+                    // `GetDimensions`
 
                     for(int isFloat = 0; isFloat < 2; ++isFloat)
                     for(int includeMipInfo = 0; includeMipInfo < 2; ++includeMipInfo)
@@ -1532,12 +1529,104 @@ namespace Slang
                     }
 
                     sb << "\n};\n";
+
+                    // `Gather*()` operations are handled via an `extension` declaration,
+                    // because this lets us capture the element type of the texture.
+                    //
+                    // TODO: longer-term there should be something like a `TextureElementType`
+                    // interface, that both scalars and vectors implement, that then exposes
+                    // a `Scalar` associated type, and `Gather` can return `vector<T.Scalar, 4>`.
+                    //
+                    static const struct {
+                        char const* genericPrefix;
+                        char const* elementType;
+                    } kGatherExtensionCases[] = {
+                        { "__generic<T, let N : int>", "vector<T,N>" },
+
+                        // TODO: need a case here for scalars `T`, but also
+                        // need to ensure that case doesn't accidentally match
+                        // for `T = vector<...>`, which requires actual checking
+                        // of constraints on generic parameters.
+                    };
+                    for(auto cc : kGatherExtensionCases)
+                    {
+                        // TODO: this should really be an `if` around the entire `Gather` logic
+                        if (isMultisample) break;
+
+                        EMIT_LINE_DIRECTIVE();
+                        sb << cc.genericPrefix << " __extension ";
+                        sb << kBaseTextureAccessLevels[accessLevel].name;
+                        sb << name;
+                        if (isArray) sb << "Array";
+                        sb << "<" << cc.elementType << " >";
+                        sb << "\n{\n";
+
+
+                        // `Gather`
+                        // (tricky because it returns a 4-vector of the element type
+                        // of the texture components...)
+                        //
+                        // TODO: is it actually correct to restrict these so that, e.g.,
+                        // `GatherAlpha()` isn't allowed on `Texture2D<float3>` because
+                        // it nominally doesn't have an alpha component?
+                        static const struct {
+                            int componentIndex;
+                            char const* componentName;
+                        } kGatherComponets[] = {
+                            { 0, "" },
+                            { 0, "Red" },
+                            { 1, "Green" },
+                            { 2, "Blue" },
+                            { 3, "Alpha" },
+                        };
+
+                        for(auto cc : kGatherComponets)
+                        {
+                            auto componentIndex = cc.componentIndex;
+                            auto componentName = cc.componentName;
+
+                            EMIT_LINE_DIRECTIVE();
+                            sb << "vector<T, 4> Gather" << componentName << "(SamplerState s, ";
+                            sb << "float" << kBaseTextureTypes[tt].coordCount << " location);\n";
+
+                            EMIT_LINE_DIRECTIVE();
+                            sb << "vector<T, 4> Gather" << componentName << "(SamplerState s, ";
+                            sb << "float" << kBaseTextureTypes[tt].coordCount << " location, ";
+                            sb << "int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
+
+                            EMIT_LINE_DIRECTIVE();
+                            sb << "vector<T, 4> Gather" << componentName << "(SamplerState s, ";
+                            sb << "float" << kBaseTextureTypes[tt].coordCount << " location, ";
+                            sb << "int" << kBaseTextureTypes[tt].coordCount << " offset, ";
+                            sb << "out uint status);\n";
+
+                            EMIT_LINE_DIRECTIVE();
+                            sb << "vector<T, 4> Gather" << componentName << "(SamplerState s, ";
+                            sb << "float" << kBaseTextureTypes[tt].coordCount << " location, ";
+                            sb << "int" << kBaseTextureTypes[tt].coordCount << " offset1, ";
+                            sb << "int" << kBaseTextureTypes[tt].coordCount << " offset2, ";
+                            sb << "int" << kBaseTextureTypes[tt].coordCount << " offset3, ";
+                            sb << "int" << kBaseTextureTypes[tt].coordCount << " offset4);\n";
+
+                            EMIT_LINE_DIRECTIVE();
+                            sb << "vector<T, 4> Gather" << componentName << "(SamplerState s, ";
+                            sb << "float" << kBaseTextureTypes[tt].coordCount << " location, ";
+                            sb << "int" << kBaseTextureTypes[tt].coordCount << " offset1, ";
+                            sb << "int" << kBaseTextureTypes[tt].coordCount << " offset2, ";
+                            sb << "int" << kBaseTextureTypes[tt].coordCount << " offset3, ";
+                            sb << "int" << kBaseTextureTypes[tt].coordCount << " offset4, ";
+                            sb << "out uint status);\n";
+                        }
+
+                        EMIT_LINE_DIRECTIVE();
+                        sb << "\n}\n";
+                    }
                 }
             }
         }
 
         // Declare additional built-in generic types
-
+        EMIT_LINE_DIRECTIVE();
         sb << "__generic<T> __magic_type(ConstantBuffer) struct ConstantBuffer {};\n";
         sb << "__generic<T> __magic_type(TextureBuffer) struct TextureBuffer {};\n";
 

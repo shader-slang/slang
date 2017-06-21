@@ -5,6 +5,14 @@ namespace Slang {
 
 //
 
+DeclRef<ExtensionDecl> ApplyExtensionToType(
+    SemanticsVisitor*       semantics,
+    ExtensionDecl*          extDecl,
+    RefPtr<ExpressionType>  type);
+
+//
+
+
 // Helper for constructing breadcrumb trails during lookup, without unnecessary heap allocaiton
 struct BreadcrumbInfo
 {
@@ -190,7 +198,7 @@ void DoMemberLookupImpl(
 // Look for members of the given name in the given container for declarations
 void DoLocalLookupImpl(
     String const&		    name,
-    DeclRef<ContainerDecl>	    containerDeclRef,
+    DeclRef<ContainerDecl>	containerDeclRef,
     LookupRequest const&    request,
     LookupResult&		    result,
     BreadcrumbInfo*		    inBreadcrumbs)
@@ -241,7 +249,24 @@ void DoLocalLookupImpl(
         DoMemberLookupImpl(name, transparentMemberDeclRef, request, result, &memberRefBreadcrumb);
     }
 
-    // TODO(tfoley): need to consider lookup via extension here?
+    // Consider lookup via extension
+    if( auto aggTypeDeclRef = containerDeclRef.As<AggTypeDecl>() )
+    {
+        RefPtr<ExpressionType> type = DeclRefType::Create(aggTypeDeclRef);
+
+        for (auto ext = GetCandidateExtensions(aggTypeDeclRef); ext; ext = ext->nextCandidateExtension)
+        {
+            auto extDeclRef = ApplyExtensionToType(request.semantics, ext, type);
+            if (!extDeclRef)
+                continue;
+
+            // TODO: eventually we need to insert a breadcrumb here so that
+            // the constructed result can somehow indicate that a member
+            // was found through an extension.
+
+            DoLocalLookupImpl(name, extDeclRef, request, result, inBreadcrumbs);
+        }
+    }
 }
 
 void DoLookupImpl(
@@ -258,10 +283,34 @@ void DoLookupImpl(
         // also finding a hit in another
         for(auto link = scope; link; link = link->nextSibling)
         {
-            if(!link->containerDecl)
+            auto containerDecl = link->containerDecl;
+
+            if(!containerDecl)
                 continue;
 
-            DeclRef<ContainerDecl> containerRef = DeclRef<Decl>(link->containerDecl, nullptr).As<ContainerDecl>();
+            // If the container is a generic, then we need to instantiate it
+            // at the parameters themselves, so provide a fully-resolved
+            // declaration reference for lookup.
+            RefPtr<Substitutions> subst = nullptr;
+            if(auto parentGenericDecl = dynamic_cast<GenericDecl*>(containerDecl->ParentDecl))
+            {
+                subst = new Substitutions();
+                subst->genericDecl = parentGenericDecl;
+
+                for( auto pp : parentGenericDecl->Members )
+                {
+                    if( auto genericTypeParam = pp.As<GenericTypeParamDecl>() )
+                    {
+                        subst->args.Add(DeclRefType::Create(DeclRef<GenericTypeParamDecl>(genericTypeParam.Ptr(), nullptr)));
+                    }
+                    else if( auto genericValParam = pp.As<GenericValueParamDecl>() )
+                    {
+                        subst->args.Add(new GenericParamIntVal(DeclRef<GenericValueParamDecl>(genericValParam.Ptr(), nullptr)));
+                    }
+                }
+            }
+
+            DeclRef<ContainerDecl> containerRef = DeclRef<Decl>(containerDecl, subst).As<ContainerDecl>();
             DoLocalLookupImpl(name, containerRef, request, result, nullptr);
         }
 
@@ -283,18 +332,27 @@ LookupResult DoLookup(String const& name, LookupRequest const& request)
     return result;
 }
 
-LookupResult LookUp(String const& name, RefPtr<Scope> scope)
+LookupResult LookUp(
+    SemanticsVisitor*   semantics,
+    String const&       name,
+    RefPtr<Scope>       scope)
 {
     LookupRequest request;
+    request.semantics = semantics;
     request.scope = scope;
     return DoLookup(name, request);
 }
 
 // perform lookup within the context of a particular container declaration,
 // and do *not* look further up the chain
-LookupResult LookUpLocal(String const& name, DeclRef<ContainerDecl> containerDeclRef)
+LookupResult LookUpLocal(
+    SemanticsVisitor*       semantics,
+    String const&           name,
+    DeclRef<ContainerDecl>  containerDeclRef)
 {
     LookupRequest request;
+    request.semantics = semantics;
+
     LookupResult result;
     DoLocalLookupImpl(name, containerDeclRef, request, result, nullptr);
     return result;
