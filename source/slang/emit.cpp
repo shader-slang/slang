@@ -1719,6 +1719,27 @@ static void EmitStmt(EmitContext* context, RefPtr<StatementSyntaxNode> stmt)
         EmitBlockStmt(context, forStmt->Statement);
         return;
     }
+    else if (auto whileStmt = stmt.As<WhileStatementSyntaxNode>())
+    {
+        EmitLoopAttributes(context, whileStmt);
+
+        Emit(context, "while(");
+        EmitExpr(context, whileStmt->Predicate);
+        Emit(context, ")\n");
+        EmitBlockStmt(context, whileStmt->Statement);
+        return;
+    }
+    else if (auto doWhileStmt = stmt.As<DoWhileStatementSyntaxNode>())
+    {
+        EmitLoopAttributes(context, doWhileStmt);
+
+        Emit(context, "do(");
+        EmitBlockStmt(context, doWhileStmt->Statement);
+        Emit(context, " while(");
+        EmitExpr(context, doWhileStmt->Predicate);
+        Emit(context, ")\n");
+        return;
+    }
     else if (auto discardStmt = stmt.As<DiscardStatementSyntaxNode>())
     {
         Emit(context, "discard;\n");

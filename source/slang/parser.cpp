@@ -750,6 +750,7 @@ namespace Slang
                 if( parser->LookAheadToken(TokenType::Identifier) )
                 {
                     LookupResult lookupResult = LookUp(
+                        nullptr, // No semantics visitor available yet!
                         parser->tokenReader.PeekToken().Content,
                         parser->currentScope);
 
@@ -1331,6 +1332,32 @@ namespace Slang
         RefPtr<ExpressionSyntaxNode>    expr;
     };
 
+    static RefPtr<ExpressionSyntaxNode> parseGenericApp(
+        Parser*                         parser,
+        RefPtr<ExpressionSyntaxNode>    base)
+    {
+        RefPtr<GenericAppExpr> genericApp = new GenericAppExpr();
+
+        parser->FillPosition(genericApp.Ptr()); // set up scope for lookup
+        genericApp->FunctionExpr = base;
+        parser->ReadToken(TokenType::OpLess);
+        parser->genericDepth++;
+        // For now assume all generics have at least one argument
+        genericApp->Arguments.Add(ParseGenericArg(parser));
+        while (AdvanceIf(parser, TokenType::Comma))
+        {
+            genericApp->Arguments.Add(ParseGenericArg(parser));
+        }
+        parser->genericDepth--;
+
+        // TODO: probably want to suppot `>>` and `>=` here as well,
+        // and split up those tokens as needed.
+        //
+        parser->ReadToken(TokenType::OpGreater);
+
+        return genericApp;
+    }
+
     static TypeSpec
     parseTypeSpec(Parser* parser)
     {
@@ -1367,21 +1394,7 @@ namespace Slang
 
         if (parser->LookAheadToken(TokenType::OpLess))
         {
-            RefPtr<GenericAppExpr> gtype = new GenericAppExpr();
-            parser->FillPosition(gtype.Ptr()); // set up scope for lookup
-            gtype->Position = typeName.Position;
-            gtype->FunctionExpr = typeExpr;
-            parser->ReadToken(TokenType::OpLess);
-            parser->genericDepth++;
-            // For now assume all generics have at least one argument
-            gtype->Arguments.Add(ParseGenericArg(parser));
-            while (AdvanceIf(parser, TokenType::Comma))
-            {
-                gtype->Arguments.Add(ParseGenericArg(parser));
-            }
-            parser->genericDepth--;
-            parser->ReadToken(TokenType::OpGreater);
-            typeExpr = gtype;
+            typeExpr = parseGenericApp(parser, typeExpr);
         }
 
         typeSpec.expr = typeExpr;
@@ -1959,10 +1972,10 @@ namespace Slang
         {
             AddMember(decl, ParseGenericParamDecl(parser, decl));
 
-if( parser->LookAheadToken(TokenType::OpGreater) )
-break;
+            if( parser->LookAheadToken(TokenType::OpGreater) )
+                break;
 
-parser->ReadToken(TokenType::Comma);
+            parser->ReadToken(TokenType::Comma);
         }
         parser->genericDepth--;
         parser->ReadToken(TokenType::OpGreater);
@@ -2370,14 +2383,33 @@ parser->ReadToken(TokenType::Comma);
         return stmt;
     }
 
-    static bool peekTypeName(Parser* parser)
+    static bool isGenericName(Parser* parser, String const& name)
     {
-        if(!parser->LookAheadToken(TokenType::Identifier))
+        auto lookupResult = LookUp(
+            nullptr, // no semantics visitor available yet
+            name,
+            parser->currentScope);
+        if(!lookupResult.isValid() || lookupResult.isOverloaded())
             return false;
 
-        auto name = parser->tokenReader.PeekToken().Content;
+        auto decl = lookupResult.item.declRef.getDecl();
+        if( auto genericDecl = dynamic_cast<GenericDecl*>(decl) )
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
 
-        auto lookupResult = LookUp(name, parser->currentScope);
+
+    static bool isTypeName(Parser* parser, String const& name)
+    {
+        auto lookupResult = LookUp(
+            nullptr, // no semantics visitor available yet
+            name,
+            parser->currentScope);
         if(!lookupResult.isValid() || lookupResult.isOverloaded())
             return false;
 
@@ -2394,6 +2426,15 @@ parser->ReadToken(TokenType::Comma);
         {
             return false;
         }
+    }
+
+    static bool peekTypeName(Parser* parser)
+    {
+        if(!parser->LookAheadToken(TokenType::Identifier))
+            return false;
+
+        auto name = parser->tokenReader.PeekToken().Content;
+        return isTypeName(parser, name);
     }
 
     RefPtr<StatementSyntaxNode> Parser::ParseStatement()
@@ -2766,6 +2807,8 @@ parser->ReadToken(TokenType::Comma);
     {
         switch(type)
         {
+        case TokenType::QuestionMark:
+            return Precedence::TernaryConditional;
         case TokenType::Comma:
             return Precedence::Comma;
         case TokenType::OpAssign:
@@ -2918,8 +2961,79 @@ parser->ReadToken(TokenType::Comma);
 
     }
 
+    static RefPtr<ExpressionSyntaxNode> createInfixExpr(
+        Parser*                         /*parser*/,
+        RefPtr<ExpressionSyntaxNode>    left,
+        RefPtr<ExpressionSyntaxNode>    op,
+        RefPtr<ExpressionSyntaxNode>    right)
+    {
+        RefPtr<InfixExpr> expr = new InfixExpr();
+        expr->Position = op->Position;
+        expr->FunctionExpr = op;
+        expr->Arguments.Add(left);
+        expr->Arguments.Add(right);
+        return expr;
+    }
+
+    static RefPtr<ExpressionSyntaxNode> parseInfixExprWithPrecedence(
+        Parser*                         parser,
+        RefPtr<ExpressionSyntaxNode>    inExpr,
+        Precedence                      prec)
+    {
+        auto expr = inExpr;
+        for(;;)
+        {
+            auto opTokenType = parser->tokenReader.PeekTokenType();
+            auto opPrec = GetOpLevel(parser, opTokenType);
+            if(opPrec < prec)
+                break;
+
+            auto op = parseOperator(parser);
+
+            // Special case the `?:` operator since it is the
+            // one non-binary case we need to deal with.
+            if(opTokenType == TokenType::QuestionMark)
+            {
+                RefPtr<SelectExpressionSyntaxNode> select = new SelectExpressionSyntaxNode();
+                select->Position = op->Position;
+                select->FunctionExpr = op;
+
+                select->Arguments.Add(expr);
+
+                select->Arguments.Add(parser->ParseExpression(opPrec));
+                parser->ReadToken(TokenType::Colon);
+                select->Arguments.Add(parser->ParseExpression(opPrec));
+
+                expr = select;
+                continue;
+            }
+
+            auto right = parser->ParseLeafExpression();
+
+            for(;;)
+            {
+                auto nextOpPrec = GetOpLevel(parser, parser->tokenReader.PeekTokenType());
+                
+                if((GetAssociativityFromLevel(nextOpPrec) == Associativity::Right) && (nextOpPrec != opPrec))
+                    break;
+                else if( nextOpPrec <= opPrec)
+                    break;
+
+                right = parseInfixExprWithPrecedence(parser, right, nextOpPrec);
+            }
+
+            expr = createInfixExpr(parser, expr, op, right);
+        }
+        return expr;
+    }
+
     RefPtr<ExpressionSyntaxNode> Parser::ParseExpression(Precedence level)
     {
+        auto expr = ParseLeafExpression();
+        return parseInfixExprWithPrecedence(this, expr, level);
+
+#if 0
+
         if (level == Precedence::Prefix)
             return ParseLeafExpression();
         if (level == Precedence::TernaryConditional)
@@ -2975,10 +3089,266 @@ parser->ReadToken(TokenType::Comma);
                 return left;
             }
         }
+#endif
+    }
+
+    static TokenType peekTokenType(Parser* parser)
+    {
+        return parser->tokenReader.PeekTokenType();
+    }
+
+    // We *might* be looking at an application of a generic to arguments,
+    // but we need to disambiguate to make sure.
+    static RefPtr<ExpressionSyntaxNode> maybeParseGenericApp(
+        Parser*                             parser,
+
+        // TODO: need to support more general expressions here
+        RefPtr<VarExpressionSyntaxNode>     base)
+    {
+        if(peekTokenType(parser) != TokenType::OpLess)
+            return base;
+
+        if(!isGenericName(parser, base->name))
+            return base;
+
+        // Okay, seems likely that we are looking at a generic app
+
+        return parseGenericApp(parser, base);
+    }
+
+    static RefPtr<ExpressionSyntaxNode> parseAtomicExpr(Parser* parser)
+    {
+        switch( peekTokenType(parser) )
+        {
+        default:
+            // TODO: should this return an error expression instead of NULL?
+            parser->sink->diagnose(parser->tokenReader.PeekLoc(), Diagnostics::syntaxError);
+            return nullptr;
+
+        // Either:
+        // - parenthized expression `(exp)`
+        // - cast `(type) exp`
+        //
+        // Proper disambiguation requires mixing up parsing
+        // and semantic checking (which we should do eventually)
+        // but for now we will follow some hueristics.
+        case TokenType::LParent:
+            {
+                parser->ReadToken(TokenType::LParent);
+
+                RefPtr<ExpressionSyntaxNode> expr;
+                if (peekTypeName(parser) && parser->LookAheadToken(TokenType::RParent, 1))
+                {
+                    RefPtr<TypeCastExpressionSyntaxNode> tcexpr = new TypeCastExpressionSyntaxNode();
+                    parser->FillPosition(tcexpr.Ptr());
+                    tcexpr->TargetType = parser->ParseTypeExp();
+                    parser->ReadToken(TokenType::RParent);
+                    tcexpr->Expression = parser->ParseExpression(Precedence::Multiplicative); // Note(tfoley): need to double-check this
+                    expr = tcexpr;
+                }
+                else
+                {
+                    expr = parser->ParseExpression();
+                    parser->ReadToken(TokenType::RParent);
+                }
+
+                return expr;
+            }
+
+        // An initializer list `{ expr, ... }`
+        case TokenType::LBrace:
+            {
+                RefPtr<InitializerListExpr> initExpr = new InitializerListExpr();
+                parser->FillPosition(initExpr.Ptr());
+
+                // Initializer list
+                parser->ReadToken(TokenType::LBrace);
+
+                List<RefPtr<ExpressionSyntaxNode>> exprs;
+
+                for(;;)
+                {
+                    if(AdvanceIfMatch(parser, TokenType::RBrace))
+                        break;
+
+                    auto expr = parser->ParseArgExpr();
+                    if( expr )
+                    {
+                        initExpr->args.Add(expr);
+                    }
+
+                    if(AdvanceIfMatch(parser, TokenType::RBrace))
+                        break;
+
+                    parser->ReadToken(TokenType::Comma);
+                }
+
+                return initExpr;
+            }
+
+        case TokenType::IntLiterial:
+        case TokenType::DoubleLiterial:
+            {
+                RefPtr<ConstantExpressionSyntaxNode> constExpr = new ConstantExpressionSyntaxNode();
+                auto token = parser->tokenReader.AdvanceToken();
+                parser->FillPosition(constExpr.Ptr());
+                if (token.Type == TokenType::IntLiterial)
+                {
+                    constExpr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Int;
+                    constExpr->IntValue = StringToInt(token.Content);
+                }
+                else if (token.Type == TokenType::DoubleLiterial)
+                {
+                    constExpr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Float;
+                    constExpr->FloatValue = (FloatingPointLiteralValue) StringToDouble(token.Content);
+                }
+
+                return constExpr;
+            }
+
+        case TokenType::Identifier:
+            {
+                // TODO(tfoley): Need a name-lookup step here to resolve
+                // syntactic keywords in expression context.
+
+                if (parser->LookAheadToken("true") || parser->LookAheadToken("false"))
+                {
+                    RefPtr<ConstantExpressionSyntaxNode> constExpr = new ConstantExpressionSyntaxNode();
+                    auto token = parser->tokenReader.AdvanceToken();
+                    parser->FillPosition(constExpr.Ptr());
+                    constExpr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Bool;
+                    constExpr->IntValue = token.Content == "true" ? 1 : 0;
+
+                    return constExpr;
+                }
+
+                // Default behavior is just to create a name expression
+                RefPtr<VarExpressionSyntaxNode> varExpr = new VarExpressionSyntaxNode();
+                varExpr->scope = parser->currentScope.Ptr();
+                parser->FillPosition(varExpr.Ptr());
+                auto token = parser->ReadToken(TokenType::Identifier);
+                varExpr->name = token.Content;
+
+                if(peekTokenType(parser) == TokenType::OpLess)
+                {
+                    return maybeParseGenericApp(parser, varExpr);
+                }
+
+                return varExpr;
+            }
+        }
+    }
+
+    static RefPtr<ExpressionSyntaxNode> parsePostfixExpr(Parser* parser)
+    {
+        auto expr = parseAtomicExpr(parser);
+        for(;;)
+        {
+            switch( peekTokenType(parser) )
+            {
+            default:
+                return expr;
+
+            // Postfix increment/decrement
+            case TokenType::OpInc:
+            case TokenType::OpDec:
+                {
+                    RefPtr<OperatorExpressionSyntaxNode> postfixExpr = new PostfixExpr();
+                    parser->FillPosition(postfixExpr.Ptr());
+                    postfixExpr->FunctionExpr = parseOperator(parser);
+                    postfixExpr->Arguments.Add(expr);
+
+                    expr = postfixExpr;
+                }
+                break;
+
+            // Subscript operation `a[i]`
+            case TokenType::LBracket:
+                {
+                    RefPtr<IndexExpressionSyntaxNode> indexExpr = new IndexExpressionSyntaxNode();
+                    indexExpr->BaseExpression = expr;
+                    parser->FillPosition(indexExpr.Ptr());
+                    parser->ReadToken(TokenType::LBracket);
+                    indexExpr->IndexExpression = parser->ParseExpression();
+                    parser->ReadToken(TokenType::RBracket);
+
+                    expr = indexExpr;
+                }
+                break;
+
+            // Call oepration `f(x)`
+            case TokenType::LParent:
+                {
+                    RefPtr<InvokeExpressionSyntaxNode> invokeExpr = new InvokeExpressionSyntaxNode();
+                    invokeExpr->FunctionExpr = expr;
+                    parser->FillPosition(invokeExpr.Ptr());
+                    parser->ReadToken(TokenType::LParent);
+                    while (!parser->tokenReader.IsAtEnd())
+                    {
+                        if (!parser->LookAheadToken(TokenType::RParent))
+                            invokeExpr->Arguments.Add(parser->ParseArgExpr());
+                        else
+                        {
+                            break;
+                        }
+                        if (!parser->LookAheadToken(TokenType::Comma))
+                            break;
+                        parser->ReadToken(TokenType::Comma);
+                    }
+                    parser->ReadToken(TokenType::RParent);
+
+                    expr = invokeExpr;
+                }
+                break;
+
+            // Member access `x.m`
+            case TokenType::Dot:
+                {
+                    RefPtr<MemberExpressionSyntaxNode> memberExpr = new MemberExpressionSyntaxNode();
+
+                    // TODO(tfoley): why would a member expression need this?
+                    memberExpr->scope = parser->currentScope.Ptr();
+
+                    parser->FillPosition(memberExpr.Ptr());
+                    memberExpr->BaseExpression = expr;
+                    parser->ReadToken(TokenType::Dot); 
+                    memberExpr->name = parser->ReadToken(TokenType::Identifier).Content;
+
+                    expr = memberExpr;
+                }
+                break;
+            }
+        }
+    }
+
+    static RefPtr<ExpressionSyntaxNode> parsePrefixExpr(Parser* parser)
+    {
+        switch( peekTokenType(parser) )
+        {
+        default:
+            return parsePostfixExpr(parser);
+
+        case TokenType::OpInc:
+        case TokenType::OpDec:
+        case TokenType::OpNot:
+        case TokenType::OpBitNot:
+        case TokenType::OpSub:
+            {
+                RefPtr<PrefixExpr> prefixExpr = new PrefixExpr();
+                parser->FillPosition(prefixExpr.Ptr());
+                prefixExpr->FunctionExpr = parseOperator(parser);
+                prefixExpr->Arguments.Add(parsePrefixExpr(parser));
+                return prefixExpr;
+            }
+            break;
+        }
     }
 
     RefPtr<ExpressionSyntaxNode> Parser::ParseLeafExpression()
     {
+        return parsePrefixExpr(this);
+
+#if 0
         RefPtr<ExpressionSyntaxNode> rs;
         if (LookAheadToken(TokenType::OpInc) ||
             LookAheadToken(TokenType::OpDec) ||
@@ -3150,6 +3520,7 @@ parser->ReadToken(TokenType::Comma);
             sink->diagnose(tokenReader.PeekLoc(), Diagnostics::syntaxError);
         }
         return rs;
+#endif
     }
 
     // Parse a source file into an existing translation unit
