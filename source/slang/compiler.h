@@ -150,21 +150,13 @@ namespace Slang
     // A directory to be searched when looking for files (e.g., `#include`)
     struct SearchDirectory
     {
-        enum Kind
-        {
-            Default,
-            AutoImport,
-        };
-
         SearchDirectory() = default;
         SearchDirectory(SearchDirectory const& other) = default;
-        SearchDirectory(String const& path, Kind kind)
+        SearchDirectory(String const& path)
             : path(path)
-            , kind(kind)
         {}
 
         String  path;
-        Kind    kind;
     };
 
     class Session;

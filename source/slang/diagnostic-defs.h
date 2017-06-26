@@ -92,6 +92,7 @@ DIAGNOSTIC(-1, Note, seeOpeningToken, "see opening '$0'")
 
 // 153xx - #include
 DIAGNOSTIC(15300, Error, includeFailed, "failed to find include file '$0'")
+DIAGNOSTIC(15301, Error, importFailed, "failed to find imported file '$0'")
 DIAGNOSTIC(-1, Error, noIncludeHandlerSpecified, "no `#include` handler was specified")
 
 // 154xx - macro definition

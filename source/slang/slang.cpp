@@ -103,21 +103,7 @@ struct IncludeHandlerImpl : IncludeHandler
 
             request->mDependencyFilePaths.Add(path);
 
-            // HACK(tfoley): We might have found the file in the same directory,
-            // but what if this is also inside an auto-import path?
-            for (auto & dir : request->searchDirectories)
-            {
-                // Only consider auto-import paths
-                if(dir.kind != SearchDirectory::Kind::AutoImport)
-                    continue;
-
-                String otherPath = Path::Combine(dir.path, pathToInclude);
-
-                if(otherPath == path)
-                    return IncludeResult::FoundAutoImportFile;
-            }
-
-            return IncludeResult::FoundIncludeFile;
+            return IncludeResult::Found;
         }
 
         for (auto & dir : request->searchDirectories)
@@ -130,14 +116,7 @@ struct IncludeHandlerImpl : IncludeHandler
 
                 request->mDependencyFilePaths.Add(path);
 
-                switch( dir.kind )
-                {
-                case SearchDirectory::Kind::Default:
-                    return IncludeResult::FoundIncludeFile;
-
-                case SearchDirectory::Kind::AutoImport:
-                    return IncludeResult::FoundAutoImportFile;
-                }
+                return IncludeResult::Found;
             }
         }
         return IncludeResult::NotFound;
@@ -674,14 +653,7 @@ SLANG_API void spAddSearchPath(
         SlangCompileRequest*    request,
         const char*             path)
 {
-    REQ(request)->searchDirectories.Add(Slang::SearchDirectory(path, Slang::SearchDirectory::Kind::Default));
-}
-
-SLANG_API void spAddAutoImportPath(
-    SlangCompileRequest*    request,
-    const char*             path)
-{
-    REQ(request)->searchDirectories.Add(Slang::SearchDirectory(path, Slang::SearchDirectory::Kind::AutoImport));
+    REQ(request)->searchDirectories.Add(Slang::SearchDirectory(path));
 }
 
 SLANG_API void spAddPreprocessorDefine(

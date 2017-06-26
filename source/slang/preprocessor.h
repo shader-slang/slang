@@ -15,8 +15,7 @@ enum class IncludeResult
 {
     Error,
     NotFound,
-    FoundIncludeFile,
-    FoundAutoImportFile,
+    Found,
 };
 
 // Callback interface for the preprocessor to use when looking

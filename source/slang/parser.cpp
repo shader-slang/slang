@@ -805,10 +805,10 @@ namespace Slang
         return decl;
     }
 
-    static RefPtr<Decl> parseAutoImportDecl(
+    static RefPtr<Decl> parsePoundImportDecl(
         Parser* parser)
     {
-        Token importToken = parser->ReadToken(TokenType::AutoImport);
+        Token importToken = parser->ReadToken(TokenType::PoundImport);
 
         auto decl = new ImportDecl();
         decl->nameToken = importToken;
@@ -2186,8 +2186,8 @@ namespace Slang
             decl = parseModifierDecl(parser);
         else if(parser->LookAheadToken("__import"))
             decl = parseImportDecl(parser);
-        else if(parser->LookAheadToken(TokenType::AutoImport))
-            decl = parseAutoImportDecl(parser);
+        else if(parser->LookAheadToken(TokenType::PoundImport))
+            decl = parsePoundImportDecl(parser);
         else if (AdvanceIf(parser, TokenType::Semicolon))
         {
             decl = new EmptyDecl();

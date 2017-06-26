@@ -1489,6 +1489,75 @@ static void expectEndOfDirective(PreprocessorDirectiveContext* context)
     AdvanceRawToken(context->preprocessor);
 }
 
+// Handle a `#import` directive
+static void HandleImportDirective(PreprocessorDirectiveContext* context)
+{
+    Token pathToken;
+    if(!Expect(context, TokenType::StringLiterial, Diagnostics::expectedTokenInPreprocessorDirective, &pathToken))
+        return;
+
+    String path = getFileNameTokenValue(pathToken);
+
+    // TODO(tfoley): make this robust in presence of `#line`
+    String pathIncludedFrom = GetDirectiveLoc(context).FileName;
+    String foundPath;
+    String foundSource;
+
+    IncludeHandler* includeHandler = context->preprocessor->includeHandler;
+    if (!includeHandler)
+    {
+        GetSink(context)->diagnose(pathToken.Position, Diagnostics::importFailed, path);
+        GetSink(context)->diagnose(pathToken.Position, Diagnostics::noIncludeHandlerSpecified);
+        return;
+    }
+    auto includeResult = includeHandler->TryToFindIncludeFile(path, pathIncludedFrom, &foundPath, &foundSource);
+
+    switch (includeResult)
+    {
+    case IncludeResult::NotFound:
+    case IncludeResult::Error:
+        GetSink(context)->diagnose(pathToken.Position, Diagnostics::importFailed, path);
+        return;
+
+    case IncludeResult::Found:
+        break;
+    }
+
+    // Do all checking related to the end of this directive before we push a new stream,
+    // just to avoid complications where that check would need to deal with
+    // a switch of input stream
+    expectEndOfDirective(context);
+
+    // Import code from the chosen file
+    String autoImportName = autoImportModule(
+        context->preprocessor->compileRequest,
+        foundPath,
+        foundSource,
+        GetDirectiveLoc(context));
+ 
+    // Now create a dummy token stream to represent the import request,
+    // so that it can be manifest in the user's program
+    SourceTextInputStream* inputStream = new SourceTextInputStream();
+ 
+    Token token;
+    token.Type = TokenType::PoundImport;
+    token.Position = GetDirectiveLoc(context);
+    token.flags = 0;
+    token.Content = autoImportName;
+ 
+    inputStream->lexedTokens.mTokens.Add(token);
+ 
+    token.Type = TokenType::EndOfFile;
+    token.flags = TokenFlag::AfterWhitespace | TokenFlag::AtStartOfLine;
+    inputStream->lexedTokens.mTokens.Add(token);
+ 
+    inputStream->tokenReader = TokenReader(inputStream->lexedTokens);
+ 
+    inputStream->parent = context->preprocessor->inputStream;
+    context->preprocessor->inputStream = inputStream;
+}
+
+
 
 // Handle a `#include` directive
 static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
@@ -1520,7 +1589,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
         GetSink(context)->diagnose(pathToken.Position, Diagnostics::includeFailed, path);
         return;
 
-    case IncludeResult::FoundIncludeFile:
+    case IncludeResult::Found:
         break;
     }
 
@@ -1529,50 +1598,12 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
     // a switch of input stream
     expectEndOfDirective(context);
 
-    switch( includeResult )
-    {
-    case IncludeResult::FoundIncludeFile:
-        {
-            // Push the new file onto our stack of input streams
-            // TODO(tfoley): check if we have made our include stack too deep
-            PreprocessorInputStream* inputStream = CreateInputStreamForSource(context->preprocessor, foundSource, foundPath);
-            inputStream->parent = context->preprocessor->inputStream;
-            context->preprocessor->inputStream = inputStream;
-        }
-        break;
- 
-    case IncludeResult::FoundAutoImportFile:
-        {
-            //
- 
-            String autoImportName = autoImportModule(
-                context->preprocessor->compileRequest,
-                foundPath,
-                foundSource,
-                GetDirectiveLoc(context));
- 
-            SourceTextInputStream* inputStream = new SourceTextInputStream();
- 
-            Token token;
-            token.Type = TokenType::AutoImport;
-            token.Position = GetDirectiveLoc(context);
-            token.flags = 0;
-            token.Content = autoImportName;
- 
-            inputStream->lexedTokens.mTokens.Add(token);
- 
-            token.Type = TokenType::EndOfFile;
-            token.flags = TokenFlag::AfterWhitespace | TokenFlag::AtStartOfLine;
-            inputStream->lexedTokens.mTokens.Add(token);
- 
-            inputStream->tokenReader = TokenReader(inputStream->lexedTokens);
- 
-            inputStream->parent = context->preprocessor->inputStream;
-            context->preprocessor->inputStream = inputStream;
-        }
-        break;
-    }
- }
+    // Push the new file onto our stack of input streams
+    // TODO(tfoley): check if we have made our include stack too deep
+    PreprocessorInputStream* inputStream = CreateInputStreamForSource(context->preprocessor, foundSource, foundPath);
+    inputStream->parent = context->preprocessor->inputStream;
+    context->preprocessor->inputStream = inputStream;
+}
 
 // Handle a `#define` directive
 static void HandleDefineDirective(PreprocessorDirectiveContext* context)
@@ -1878,6 +1909,7 @@ static const PreprocessorDirective kDirectives[] =
     { "elif",       &HandleElifDirective,       ProcessWhenSkipping },
     { "endif",      &HandleEndIfDirective,      ProcessWhenSkipping },
 
+    { "import",     &HandleImportDirective,     0 },
     { "include",    &HandleIncludeDirective,    0 },
     { "define",     &HandleDefineDirective,     0 },
     { "undef",      &HandleUndefDirective,      0 },
