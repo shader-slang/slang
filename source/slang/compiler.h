@@ -150,21 +150,13 @@ namespace Slang
     // A directory to be searched when looking for files (e.g., `#include`)
     struct SearchDirectory
     {
-        enum Kind
-        {
-            Default,
-            AutoImport,
-        };
-
         SearchDirectory() = default;
         SearchDirectory(SearchDirectory const& other) = default;
-        SearchDirectory(String const& path, Kind kind)
+        SearchDirectory(String const& path)
             : path(path)
-            , kind(kind)
         {}
 
         String  path;
-        Kind    kind;
     };
 
     class Session;
@@ -211,8 +203,15 @@ namespace Slang
         RefPtr<ProgramLayout> layout;
 
         // Modules that have been dynamically loaded via `import`
-        Dictionary<String, RefPtr<ProgramSyntaxNode>> loadedModulesMap;
+        //
+        // This is a list of unique modules loaded, in the order they were encountered.
         List<RefPtr<ProgramSyntaxNode> > loadedModulesList;
+
+        // Map from the logical name of a module to its definition
+        Dictionary<String, RefPtr<ProgramSyntaxNode>> mapPathToLoadedModule;
+
+        // Map from the path of a module file to its definition
+        Dictionary<String, RefPtr<ProgramSyntaxNode>> mapNameToLoadedModules;
 
 
         CompileRequest(Session* session)
@@ -255,10 +254,9 @@ namespace Slang
             String const&       source,
             CodePosition const& loc);
 
-        String autoImportModule(
+        void handlePoundImport(
             String const&       path,
-            String const&       source,
-            CodePosition const& loc);
+            TokenList const&    tokens);
 
         RefPtr<ProgramSyntaxNode> findOrImportModule(
             String const&       name,

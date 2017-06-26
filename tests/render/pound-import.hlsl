@@ -1,4 +1,4 @@
-//TEST(smoke,render):COMPARE_HLSL_GLSL_RENDER: -xslang -auto-import-dir -xslang tests/render/
+//TEST(smoke,render):COMPARE_HLSL_GLSL_RENDER:
 
 // This is a basic test case for cross-compilation behavior.
 //
@@ -8,7 +8,7 @@
 
 
 // Pull in Spire code depdendency using extended syntax:
-#include "auto-import.slang.h"
+#import "pound-import.slang.h"
 
 #if defined(__HLSL__)
 

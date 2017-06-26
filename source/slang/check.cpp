@@ -52,6 +52,14 @@ namespace Slang
 
         // lexical outer statements
         List<StatementSyntaxNode*> outerStmts;
+
+        // We need to track what has been `import`ed,
+        // to avoid importing the same thing more than once
+        //
+        // TODO: a smarter approach might be to filter
+        // out duplicate references during lookup.
+        HashSet<ProgramSyntaxNode*> importedModules;
+
     public:
         SemanticsVisitor(
             DiagnosticSink * pErr,
@@ -4908,6 +4916,15 @@ namespace Slang
             // Record the module that was imported, so that we can use
             // it later during code generation.
             decl->importedModuleDecl = importedModuleDecl;
+
+            // If we've imported this one already, then
+            // skip the step where we modify the current scope.
+            if (importedModules.Contains(importedModuleDecl.Ptr()))
+            {
+                return;
+            }
+            importedModules.Add(importedModuleDecl.Ptr());
+
 
             // Create a new sub-scope to wire the module
             // into our lookup chain.

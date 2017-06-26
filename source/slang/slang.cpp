@@ -103,21 +103,7 @@ struct IncludeHandlerImpl : IncludeHandler
 
             request->mDependencyFilePaths.Add(path);
 
-            // HACK(tfoley): We might have found the file in the same directory,
-            // but what if this is also inside an auto-import path?
-            for (auto & dir : request->searchDirectories)
-            {
-                // Only consider auto-import paths
-                if(dir.kind != SearchDirectory::Kind::AutoImport)
-                    continue;
-
-                String otherPath = Path::Combine(dir.path, pathToInclude);
-
-                if(otherPath == path)
-                    return IncludeResult::FoundAutoImportFile;
-            }
-
-            return IncludeResult::FoundIncludeFile;
+            return IncludeResult::Found;
         }
 
         for (auto & dir : request->searchDirectories)
@@ -130,14 +116,7 @@ struct IncludeHandlerImpl : IncludeHandler
 
                 request->mDependencyFilePaths.Add(path);
 
-                switch( dir.kind )
-                {
-                case SearchDirectory::Kind::Default:
-                    return IncludeResult::FoundIncludeFile;
-
-                case SearchDirectory::Kind::AutoImport:
-                    return IncludeResult::FoundAutoImportFile;
-                }
+                return IncludeResult::Found;
             }
         }
         return IncludeResult::NotFound;
@@ -188,8 +167,7 @@ void CompileRequest::parseTranslationUnit(
             &mSink,
             &includeHandler,
             combinedPreprocessorDefinitions,
-            translationUnitSyntax.Ptr(),
-            this);
+            translationUnit);
 
         parseSourceFile(
             translationUnit,
@@ -419,28 +397,52 @@ RefPtr<ProgramSyntaxNode> CompileRequest::loadModule(
 
     RefPtr<ProgramSyntaxNode> moduleDecl = translationUnit->SyntaxNode;
 
-    loadedModulesMap.Add(name, moduleDecl);
+    mapPathToLoadedModule.Add(path, moduleDecl);
+    mapNameToLoadedModules.Add(name, moduleDecl);
     loadedModulesList.Add(moduleDecl);
 
     return moduleDecl;
 
 }
 
-String CompileRequest::autoImportModule(
+void CompileRequest::handlePoundImport(
     String const&       path,
-    String const&       source,
-    CodePosition const& loc)
+    TokenList const&    tokens)
 {
-    // TODO: may want to have some kind of canonicalization step here
-    String name = path;
+    RefPtr<TranslationUnitRequest> translationUnit = new TranslationUnitRequest();
+    translationUnit->compileRequest = this;
 
-    // Have we already loaded a module matching this name?
-    if (loadedModulesMap.TryGetValue(name))
-        return name;
+    // Imported code is always native Slang code
+    RefPtr<Scope> languageScope = mSession->slangLanguageScope;
 
-    loadModule(name, path, source, loc);
+    RefPtr<ProgramSyntaxNode> translationUnitSyntax = new ProgramSyntaxNode();
+    translationUnit->SyntaxNode = translationUnitSyntax;
 
-    return name;
+    parseSourceFile(
+        translationUnit.Ptr(),
+        tokens,
+        &mSink,
+        path,
+        languageScope);
+
+    // TODO: handle errors
+
+    checkTranslationUnit(translationUnit.Ptr());
+
+    // Skip code generation
+
+    //
+
+    RefPtr<ProgramSyntaxNode> moduleDecl = translationUnit->SyntaxNode;
+
+    // TODO: It is a bit broken here that we use the module path,
+    // as the "name" when registering things, but this saves
+    // us the trouble of trying to special-case things when
+    // checking an `import` down the road.
+    mapNameToLoadedModules.Add(path, moduleDecl);
+
+    mapPathToLoadedModule.Add(path, moduleDecl);
+    loadedModulesList.Add(moduleDecl);
 }
 
 RefPtr<ProgramSyntaxNode> CompileRequest::findOrImportModule(
@@ -450,7 +452,7 @@ RefPtr<ProgramSyntaxNode> CompileRequest::findOrImportModule(
     // Have we already loaded a module matching this name?
     // If so, return it.
     RefPtr<ProgramSyntaxNode> moduleDecl;
-    if (loadedModulesMap.TryGetValue(name, moduleDecl))
+    if (mapNameToLoadedModules.TryGetValue(name, moduleDecl))
         return moduleDecl;
 
     // Derive a file name for the module, by taking the given
@@ -489,7 +491,7 @@ RefPtr<ProgramSyntaxNode> CompileRequest::findOrImportModule(
         {
             this->mSink.diagnose(loc, Diagnostics::cannotFindFile, fileName);
 
-            loadedModulesMap[name] = nullptr;
+            mapNameToLoadedModules[name] = nullptr;
             return nullptr;
         }
         break;
@@ -497,6 +499,11 @@ RefPtr<ProgramSyntaxNode> CompileRequest::findOrImportModule(
     default:
         break;
     }
+
+    // Maybe this was loaded previously via `#import`
+    if (mapPathToLoadedModule.TryGetValue(foundPath, moduleDecl))
+        return moduleDecl;
+
 
     // We've found a file that we can load for the given module, so
     // go ahead and perform the module-load action
@@ -513,15 +520,6 @@ RefPtr<ProgramSyntaxNode> findOrImportModule(
     CodePosition const& loc)
 {
     return request->findOrImportModule(name, loc);
-}
-
-String autoImportModule(
-    CompileRequest*     request,
-    String const&       path,
-    String const&       source,
-    CodePosition const& loc)
-{
-    return request->autoImportModule(path, source, loc);
 }
 
 void Session::addBuiltinSource(
@@ -674,14 +672,7 @@ SLANG_API void spAddSearchPath(
         SlangCompileRequest*    request,
         const char*             path)
 {
-    REQ(request)->searchDirectories.Add(Slang::SearchDirectory(path, Slang::SearchDirectory::Kind::Default));
-}
-
-SLANG_API void spAddAutoImportPath(
-    SlangCompileRequest*    request,
-    const char*             path)
-{
-    REQ(request)->searchDirectories.Add(Slang::SearchDirectory(path, Slang::SearchDirectory::Kind::AutoImport));
+    REQ(request)->searchDirectories.Add(Slang::SearchDirectory(path));
 }
 
 SLANG_API void spAddPreprocessorDefine(

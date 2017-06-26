@@ -204,16 +204,6 @@ extern "C"
         const char*             searchDir);
 
     /*!
-    @brief Add a path to use when searching for referenced files, that automatically treats `#include` as `__import`
-    This behaves just like `spAddSearchPath()` except that any `#include` file found through this path
-    will be treated as if it was referenced with `__import`.
-    @param ctx The compilation context.
-    @param searchDir The additional search directory.
-    */
-    SLANG_API void spAddAutoImportPath(
-        SlangCompileRequest*    request,
-        const char*             searchDir);
-    /*!
     @brief Add a macro definition to be used during preprocessing.
     @param key The name of the macro to define.
     @param value The value of the macro to define.
