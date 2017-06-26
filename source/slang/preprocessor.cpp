@@ -167,11 +167,23 @@ struct Preprocessor
     // represent end-of-input situations.
     Token                                   endOfFileToken;
 
-    // Syntax for the program we are trying to parse
-    ProgramSyntaxNode*                      syntax;
+    // The translation unit that is being parsed
+    TranslationUnitRequest*                 translationUnit;
 
-    // The over-arching compile request taht is invoking us
-    CompileRequest*                         compileRequest;
+    TranslationUnitRequest* getTranslationUnit()
+    {
+        return translationUnit;
+    }
+
+    ProgramSyntaxNode* getSyntax()
+    {
+        return getTranslationUnit()->SyntaxNode.Ptr();
+    }
+
+    CompileRequest* getCompileRequest()
+    {
+        return getTranslationUnit()->compileRequest;
+    }
 };
 
 // Convenience routine to access the diagnostic sink
@@ -1733,7 +1745,7 @@ static void handleGLSLVersionDirective(PreprocessorDirectiveContext* context)
     // Attach the modifier to the program we are parsing!
 
     addModifier(
-        context->preprocessor->syntax,
+        context->preprocessor->getSyntax(),
         modifier);
 }
 
@@ -1777,7 +1789,7 @@ static void handleGLSLExtensionDirective(PreprocessorDirectiveContext* context)
     // Attach the modifier to the program we are parsing!
 
     addModifier(
-        context->preprocessor->syntax,
+        context->preprocessor->getSyntax(),
         modifier);
 }
 
@@ -2029,14 +2041,12 @@ TokenList preprocessSource(
     String const&               fileName,
     DiagnosticSink*             sink,
     IncludeHandler*             includeHandler,
-     Dictionary<String, String> defines,
-    ProgramSyntaxNode*          syntax,
-    CompileRequest*             compileRequest)
+    Dictionary<String, String>  defines,
+    TranslationUnitRequest*     translationUnit)
 {
     Preprocessor preprocessor;
     InitializePreprocessor(&preprocessor, sink);
-    preprocessor.syntax = syntax;
-    preprocessor.compileRequest = compileRequest;
+    preprocessor.translationUnit = translationUnit;
 
     preprocessor.includeHandler = includeHandler;
     for (auto p : defines)
@@ -2116,21 +2126,24 @@ static void HandleImportDirective(PreprocessorDirectiveContext* context)
     expectEndOfDirective(context);
 
     // TODO: may want to have some kind of canonicalization step here
-    String moduleName = foundPath;
+    String moduleKey = foundPath;
 
     // Import code from the chosen file, if needed. We only
     // need to import on the first `#import` directive, and
     // after that we ignore additional `#import`s for the same file.
     {
-        auto request = context->preprocessor->compileRequest;
+        auto translationUnit = context->preprocessor->translationUnit;
+        auto request = translationUnit->compileRequest;
 
 
         // Have we already loaded a module matching this name?
-        if (request->loadedModulesMap.TryGetValue(moduleName))
+        if (request->mapPathToLoadedModule.TryGetValue(moduleKey))
         {
-            // The module has already been loaded, so we bail out
-            // and leave *nothing* in the input stream.
-            return;
+            // The module has already been loaded, so we don't need to
+            // actually tokenize the code here. But note that we *do*
+            // go on to insert tokens for an `import` operation into
+            // the stream, so it is up to downstream code to avoid
+            // re-importing the same thing twice.
         }
         else
         {
@@ -2158,8 +2171,7 @@ static void HandleImportDirective(PreprocessorDirectiveContext* context)
 
             // Now we need to do something with those tokens we read
             request->handlePoundImport(
-                moduleName,
-                foundPath,
+                moduleKey,
                 subTokens);
         }
     }
@@ -2172,7 +2184,7 @@ static void HandleImportDirective(PreprocessorDirectiveContext* context)
     token.Type = TokenType::PoundImport;
     token.Position = GetDirectiveLoc(context);
     token.flags = 0;
-    token.Content = moduleName;
+    token.Content = foundPath;
  
     inputStream->lexedTokens.mTokens.Add(token);
  

@@ -203,8 +203,15 @@ namespace Slang
         RefPtr<ProgramLayout> layout;
 
         // Modules that have been dynamically loaded via `import`
-        Dictionary<String, RefPtr<ProgramSyntaxNode>> loadedModulesMap;
+        //
+        // This is a list of unique modules loaded, in the order they were encountered.
         List<RefPtr<ProgramSyntaxNode> > loadedModulesList;
+
+        // Map from the logical name of a module to its definition
+        Dictionary<String, RefPtr<ProgramSyntaxNode>> mapPathToLoadedModule;
+
+        // Map from the path of a module file to its definition
+        Dictionary<String, RefPtr<ProgramSyntaxNode>> mapNameToLoadedModules;
 
 
         CompileRequest(Session* session)
@@ -248,7 +255,6 @@ namespace Slang
             CodePosition const& loc);
 
         void handlePoundImport(
-            String const&       name,
             String const&       path,
             TokenList const&    tokens);
 

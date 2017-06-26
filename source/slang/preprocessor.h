@@ -7,9 +7,9 @@
 
 namespace Slang {
 
-class CompileRequest;
 class DiagnosticSink;
 class ProgramSyntaxNode;
+class TranslationUnitRequest;
 
 enum class IncludeResult
 {
@@ -35,9 +35,8 @@ TokenList preprocessSource(
     String const&               fileName,
     DiagnosticSink*             sink,
     IncludeHandler*             includeHandler,
-     Dictionary<String, String> defines,
-    ProgramSyntaxNode*          syntax,
-    CompileRequest*             compileRequest);
+    Dictionary<String, String>  defines,
+    TranslationUnitRequest*     translationUnit);
 
 } // namespace Slang
 

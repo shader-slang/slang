@@ -167,8 +167,7 @@ void CompileRequest::parseTranslationUnit(
             &mSink,
             &includeHandler,
             combinedPreprocessorDefinitions,
-            translationUnitSyntax.Ptr(),
-            this);
+            translationUnit);
 
         parseSourceFile(
             translationUnit,
@@ -398,7 +397,8 @@ RefPtr<ProgramSyntaxNode> CompileRequest::loadModule(
 
     RefPtr<ProgramSyntaxNode> moduleDecl = translationUnit->SyntaxNode;
 
-    loadedModulesMap.Add(name, moduleDecl);
+    mapPathToLoadedModule.Add(path, moduleDecl);
+    mapNameToLoadedModules.Add(name, moduleDecl);
     loadedModulesList.Add(moduleDecl);
 
     return moduleDecl;
@@ -406,7 +406,6 @@ RefPtr<ProgramSyntaxNode> CompileRequest::loadModule(
 }
 
 void CompileRequest::handlePoundImport(
-    String const&       name,
     String const&       path,
     TokenList const&    tokens)
 {
@@ -436,7 +435,13 @@ void CompileRequest::handlePoundImport(
 
     RefPtr<ProgramSyntaxNode> moduleDecl = translationUnit->SyntaxNode;
 
-    loadedModulesMap.Add(name, moduleDecl);
+    // TODO: It is a bit broken here that we use the module path,
+    // as the "name" when registering things, but this saves
+    // us the trouble of trying to special-case things when
+    // checking an `import` down the road.
+    mapNameToLoadedModules.Add(path, moduleDecl);
+
+    mapPathToLoadedModule.Add(path, moduleDecl);
     loadedModulesList.Add(moduleDecl);
 }
 
@@ -447,7 +452,7 @@ RefPtr<ProgramSyntaxNode> CompileRequest::findOrImportModule(
     // Have we already loaded a module matching this name?
     // If so, return it.
     RefPtr<ProgramSyntaxNode> moduleDecl;
-    if (loadedModulesMap.TryGetValue(name, moduleDecl))
+    if (mapNameToLoadedModules.TryGetValue(name, moduleDecl))
         return moduleDecl;
 
     // Derive a file name for the module, by taking the given
@@ -486,7 +491,7 @@ RefPtr<ProgramSyntaxNode> CompileRequest::findOrImportModule(
         {
             this->mSink.diagnose(loc, Diagnostics::cannotFindFile, fileName);
 
-            loadedModulesMap[name] = nullptr;
+            mapNameToLoadedModules[name] = nullptr;
             return nullptr;
         }
         break;
@@ -494,6 +499,11 @@ RefPtr<ProgramSyntaxNode> CompileRequest::findOrImportModule(
     default:
         break;
     }
+
+    // Maybe this was loaded previously via `#import`
+    if (mapPathToLoadedModule.TryGetValue(foundPath, moduleDecl))
+        return moduleDecl;
+
 
     // We've found a file that we can load for the given module, so
     // go ahead and perform the module-load action
