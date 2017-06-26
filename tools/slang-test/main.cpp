@@ -660,8 +660,8 @@ TestResult runSimpleTest(TestInput& input)
         if (options.outputMode == kOutputMode_AppVeyor)
         {
             fprintf(stderr, "ERROR:\n"
-                "EXPECTED{{{\n%s}}}\n",
-                "ACTUAL{{{%s}}}\n",
+                "EXPECTED{{{\n%s}}}\n"
+                "ACTUAL{{{\n%s}}}\n",
                 expectedOutput.Buffer(),
                 actualOutput.Buffer());
             fflush(stderr);
