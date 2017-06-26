@@ -419,7 +419,8 @@ RefPtr<ProgramSyntaxNode> CompileRequest::loadModule(
 
     RefPtr<ProgramSyntaxNode> moduleDecl = translationUnit->SyntaxNode;
 
-    loadedModules.Add(name, moduleDecl);
+    loadedModulesMap.Add(name, moduleDecl);
+    loadedModulesList.Add(moduleDecl);
 
     return moduleDecl;
 
@@ -434,7 +435,7 @@ String CompileRequest::autoImportModule(
     String name = path;
 
     // Have we already loaded a module matching this name?
-    if (loadedModules.TryGetValue(name))
+    if (loadedModulesMap.TryGetValue(name))
         return name;
 
     loadModule(name, path, source, loc);
@@ -449,7 +450,7 @@ RefPtr<ProgramSyntaxNode> CompileRequest::findOrImportModule(
     // Have we already loaded a module matching this name?
     // If so, return it.
     RefPtr<ProgramSyntaxNode> moduleDecl;
-    if (loadedModules.TryGetValue(name, moduleDecl))
+    if (loadedModulesMap.TryGetValue(name, moduleDecl))
         return moduleDecl;
 
     // Derive a file name for the module, by taking the given
@@ -488,7 +489,7 @@ RefPtr<ProgramSyntaxNode> CompileRequest::findOrImportModule(
         {
             this->mSink.diagnose(loc, Diagnostics::cannotFindFile, fileName);
 
-            loadedModules[name] = nullptr;
+            loadedModulesMap[name] = nullptr;
             return nullptr;
         }
         break;

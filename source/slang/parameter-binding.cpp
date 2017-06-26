@@ -134,9 +134,6 @@ struct SharedParameterBindingContext
     // All shader parameters we've discovered so far, and started to lay out...
     List<RefPtr<ParameterInfo>> parameters;
 
-    // A dictionary to accellerate looking up parameters by name
-    Dictionary<String, ParameterInfo*> mapNameToParameterInfo;
-
     // The program layout we are trying to construct
     RefPtr<ProgramLayout> programLayout;
 
@@ -157,6 +154,9 @@ struct ParameterBindingContext
 
     // The layout rules to use while computing usage...
     LayoutRulesFamilyImpl* layoutRules;
+
+    // A dictionary to accellerate looking up parameters by name
+    Dictionary<String, ParameterInfo*> mapNameToParameterInfo;
 
     // What stage (if any) are we compiling for?
     Stage stage;
@@ -448,7 +448,7 @@ static void collectGlobalScopeParameter(
     // of this parameter:
     auto parameterName = varDecl->Name.Content;
     ParameterInfo* parameterInfo = nullptr;
-    if( context->shared->mapNameToParameterInfo.TryGetValue(parameterName, parameterInfo) )
+    if( context->mapNameToParameterInfo.TryGetValue(parameterName, parameterInfo) )
     {
         // If the parameters have the same name, but don't "match" according to some reasonable rules,
         // then we need to bail out.
@@ -463,7 +463,7 @@ static void collectGlobalScopeParameter(
     {
         parameterInfo = new ParameterInfo();
         context->shared->parameters.Add(parameterInfo);
-        context->shared->mapNameToParameterInfo.Add(parameterName, parameterInfo);
+        context->mapNameToParameterInfo.Add(parameterName, parameterInfo);
     }
     else
     {
@@ -1061,10 +1061,34 @@ inferStageForTranslationUnit(
     return Stage::Unknown;
 }
 
+static void collectModuleParameters(
+    ParameterBindingContext*    inContext,
+    ProgramSyntaxNode*          module)
+{
+    // Each loaded module provides a separate (logical) namespace for
+    // parameters, so that two parameters with the same name, in
+    // distinct modules, should yield different bindings.
+    //
+    ParameterBindingContext contextData = *inContext;
+    auto context = &contextData;
+
+    context->stage = Stage::Unknown;
+
+    // A loaded module cannot define entry points that
+    // we'll expose (for now), so we just need to
+    // consider global-scope parameters.
+    collectGlobalScopeParameters(context, module);
+}
+
 static void collectParameters(
     ParameterBindingContext*        inContext,
     CompileRequest*                 request)
 {
+    // All of the parameters in translation units directly
+    // referenced in the compile request are part of one
+    // logical namespace/"linkage" so that two parameters
+    // with the same name should represent the same
+    // parameter, and get the same binding(s)
     ParameterBindingContext contextData = *inContext;
     auto context = &contextData;
 
@@ -1081,6 +1105,12 @@ static void collectParameters(
             context->stage = entryPoint->profile.GetStage();
             collectEntryPointParameters(context, entryPoint.Ptr(), translationUnit->SyntaxNode.Ptr());
         }
+    }
+
+    // Now collect parameters from loaded modules
+    for (auto& module : request->loadedModulesList)
+    {
+        collectModuleParameters(context, module.Ptr());
     }
 }
 
