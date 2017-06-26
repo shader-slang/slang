@@ -211,7 +211,8 @@ namespace Slang
         RefPtr<ProgramLayout> layout;
 
         // Modules that have been dynamically loaded via `import`
-        Dictionary<String, RefPtr<ProgramSyntaxNode>> loadedModules;
+        Dictionary<String, RefPtr<ProgramSyntaxNode>> loadedModulesMap;
+        List<RefPtr<ProgramSyntaxNode> > loadedModulesList;
 
 
         CompileRequest(Session* session)
