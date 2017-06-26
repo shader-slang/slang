@@ -632,9 +632,20 @@ createParameterBlockTypeLayout(
     RefPtr<TypeLayout>          elementTypeLayout,
     LayoutRulesImpl*            rules)
 {
-    auto info = getParameterBlockLayoutInfo(
-        parameterBlockType,
-        rules);
+    SimpleLayoutInfo info;
+    if (parameterBlockType)
+    {
+        info = getParameterBlockLayoutInfo(
+            parameterBlockType,
+            rules);
+    }
+    else
+    {
+        // If there is no concrete type, then it seems like we are
+        // being asked to compute layout for the global scope
+        info = rules->GetObjectLayout(ShaderParameterKind::ConstantBuffer);
+    }
+ 
 
     auto typeLayout = new ParameterBlockTypeLayout();
 
