@@ -405,21 +405,39 @@ RefPtr<ProgramSyntaxNode> CompileRequest::loadModule(
 
 }
 
-String CompileRequest::autoImportModule(
+void CompileRequest::handlePoundImport(
+    String const&       name,
     String const&       path,
-    String const&       source,
-    CodePosition const& loc)
+    TokenList const&    tokens)
 {
-    // TODO: may want to have some kind of canonicalization step here
-    String name = path;
+    RefPtr<TranslationUnitRequest> translationUnit = new TranslationUnitRequest();
+    translationUnit->compileRequest = this;
 
-    // Have we already loaded a module matching this name?
-    if (loadedModulesMap.TryGetValue(name))
-        return name;
+    // Imported code is always native Slang code
+    RefPtr<Scope> languageScope = mSession->slangLanguageScope;
 
-    loadModule(name, path, source, loc);
+    RefPtr<ProgramSyntaxNode> translationUnitSyntax = new ProgramSyntaxNode();
+    translationUnit->SyntaxNode = translationUnitSyntax;
 
-    return name;
+    parseSourceFile(
+        translationUnit.Ptr(),
+        tokens,
+        &mSink,
+        path,
+        languageScope);
+
+    // TODO: handle errors
+
+    checkTranslationUnit(translationUnit.Ptr());
+
+    // Skip code generation
+
+    //
+
+    RefPtr<ProgramSyntaxNode> moduleDecl = translationUnit->SyntaxNode;
+
+    loadedModulesMap.Add(name, moduleDecl);
+    loadedModulesList.Add(moduleDecl);
 }
 
 RefPtr<ProgramSyntaxNode> CompileRequest::findOrImportModule(
@@ -492,15 +510,6 @@ RefPtr<ProgramSyntaxNode> findOrImportModule(
     CodePosition const& loc)
 {
     return request->findOrImportModule(name, loc);
-}
-
-String autoImportModule(
-    CompileRequest*     request,
-    String const&       path,
-    String const&       source,
-    CodePosition const& loc)
-{
-    return request->autoImportModule(path, source, loc);
 }
 
 void Session::addBuiltinSource(

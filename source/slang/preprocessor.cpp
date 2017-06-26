@@ -1,12 +1,11 @@
-// Preprocessor.cpp
-#include "Preprocessor.h"
+// preprocessor.cpp
+#include "preprocessor.h"
 
-#include "Diagnostics.h"
-#include "Lexer.h"
-
-// Needed so that we can construct modifier syntax
-// to represent GLSL directives
-#include "Syntax.h"
+#include "compiler.h"
+#include "diagnostics.h"
+#include "lexer.h"
+// Needed so that we can construct modifier syntax to represent GLSL directives
+#include "syntax.h"
 
 #include <assert.h>
 
@@ -17,15 +16,6 @@
 
 
 namespace Slang {
-
-// Forward declaration for code provided in `slang.cpp`
-//
-// TODO: Need an appropriate header for this.
-String autoImportModule(
-    CompileRequest*     request,
-    String const&       path,
-    String const&       source,
-    CodePosition const& loc);
 
 // State of a preprocessor conditional, which can change when
 // we encounter directives like `#elif` or `#endif`
@@ -315,11 +305,6 @@ static Token AdvanceRawToken(Preprocessor* preprocessor)
                 EndInputStream(preprocessor, inputStream);
                 continue;
             }
-            else
-            {
-                // HACK(tfoley): A place to fall into debugger...
-                int f = 0;
-            }
         }
 
         // Everything worked, so read a token from the top-most stream
@@ -350,11 +335,6 @@ static Token PeekRawToken(Preprocessor* preprocessor)
             {
                 inputStream = inputStream->parent;
                 continue;
-            }
-            else
-            {
-                // HACK(tfoley): A place to fall into debugger...
-                int f = 0;
             }
         }
 
@@ -1490,74 +1470,7 @@ static void expectEndOfDirective(PreprocessorDirectiveContext* context)
 }
 
 // Handle a `#import` directive
-static void HandleImportDirective(PreprocessorDirectiveContext* context)
-{
-    Token pathToken;
-    if(!Expect(context, TokenType::StringLiterial, Diagnostics::expectedTokenInPreprocessorDirective, &pathToken))
-        return;
-
-    String path = getFileNameTokenValue(pathToken);
-
-    // TODO(tfoley): make this robust in presence of `#line`
-    String pathIncludedFrom = GetDirectiveLoc(context).FileName;
-    String foundPath;
-    String foundSource;
-
-    IncludeHandler* includeHandler = context->preprocessor->includeHandler;
-    if (!includeHandler)
-    {
-        GetSink(context)->diagnose(pathToken.Position, Diagnostics::importFailed, path);
-        GetSink(context)->diagnose(pathToken.Position, Diagnostics::noIncludeHandlerSpecified);
-        return;
-    }
-    auto includeResult = includeHandler->TryToFindIncludeFile(path, pathIncludedFrom, &foundPath, &foundSource);
-
-    switch (includeResult)
-    {
-    case IncludeResult::NotFound:
-    case IncludeResult::Error:
-        GetSink(context)->diagnose(pathToken.Position, Diagnostics::importFailed, path);
-        return;
-
-    case IncludeResult::Found:
-        break;
-    }
-
-    // Do all checking related to the end of this directive before we push a new stream,
-    // just to avoid complications where that check would need to deal with
-    // a switch of input stream
-    expectEndOfDirective(context);
-
-    // Import code from the chosen file
-    String autoImportName = autoImportModule(
-        context->preprocessor->compileRequest,
-        foundPath,
-        foundSource,
-        GetDirectiveLoc(context));
- 
-    // Now create a dummy token stream to represent the import request,
-    // so that it can be manifest in the user's program
-    SourceTextInputStream* inputStream = new SourceTextInputStream();
- 
-    Token token;
-    token.Type = TokenType::PoundImport;
-    token.Position = GetDirectiveLoc(context);
-    token.flags = 0;
-    token.Content = autoImportName;
- 
-    inputStream->lexedTokens.mTokens.Add(token);
- 
-    token.Type = TokenType::EndOfFile;
-    token.flags = TokenFlag::AfterWhitespace | TokenFlag::AtStartOfLine;
-    inputStream->lexedTokens.mTokens.Add(token);
- 
-    inputStream->tokenReader = TokenReader(inputStream->lexedTokens);
- 
-    inputStream->parent = context->preprocessor->inputStream;
-    context->preprocessor->inputStream = inputStream;
-}
-
-
+static void HandleImportDirective(PreprocessorDirectiveContext* context);
 
 // Handle a `#include` directive
 static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
@@ -2160,5 +2073,119 @@ TokenList preprocessSource(
 
     return tokens;
 }
+
+//
+
+// Handle a `#import` directive
+static void HandleImportDirective(PreprocessorDirectiveContext* context)
+{
+    Token pathToken;
+    if(!Expect(context, TokenType::StringLiterial, Diagnostics::expectedTokenInPreprocessorDirective, &pathToken))
+        return;
+
+    String path = getFileNameTokenValue(pathToken);
+
+    // TODO(tfoley): make this robust in presence of `#line`
+    String pathIncludedFrom = GetDirectiveLoc(context).FileName;
+    String foundPath;
+    String foundSource;
+
+    IncludeHandler* includeHandler = context->preprocessor->includeHandler;
+    if (!includeHandler)
+    {
+        GetSink(context)->diagnose(pathToken.Position, Diagnostics::importFailed, path);
+        GetSink(context)->diagnose(pathToken.Position, Diagnostics::noIncludeHandlerSpecified);
+        return;
+    }
+    auto includeResult = includeHandler->TryToFindIncludeFile(path, pathIncludedFrom, &foundPath, &foundSource);
+
+    switch (includeResult)
+    {
+    case IncludeResult::NotFound:
+    case IncludeResult::Error:
+        GetSink(context)->diagnose(pathToken.Position, Diagnostics::importFailed, path);
+        return;
+
+    case IncludeResult::Found:
+        break;
+    }
+
+    // Do all checking related to the end of this directive before we push a new stream,
+    // just to avoid complications where that check would need to deal with
+    // a switch of input stream
+    expectEndOfDirective(context);
+
+    // TODO: may want to have some kind of canonicalization step here
+    String moduleName = foundPath;
+
+    // Import code from the chosen file, if needed. We only
+    // need to import on the first `#import` directive, and
+    // after that we ignore additional `#import`s for the same file.
+    {
+        auto request = context->preprocessor->compileRequest;
+
+
+        // Have we already loaded a module matching this name?
+        if (request->loadedModulesMap.TryGetValue(moduleName))
+        {
+            // The module has already been loaded, so we bail out
+            // and leave *nothing* in the input stream.
+            return;
+        }
+        else
+        {
+            // We are going to preprocess the file using the *same* preprocessor
+            // state that is already active. The main alternative would be
+            // to construct a fresh preprocessor and use that. The current
+            // choice is made so that macros defined in the imported file
+            // will be made visible to the importer, rather than disappear
+            // when a sub-preprocessor gets finalized.
+            auto preprocessor = context->preprocessor;
+
+            // We need to save/restore the input stream, so that we can
+            // re-use the preprocessor
+            PreprocessorInputStream* savedStream = preprocessor->inputStream;
+
+            // Create an input stream for reading from the imported file
+            PreprocessorInputStream* subInputStream = CreateInputStreamForSource(preprocessor, foundSource, foundPath);
+
+            // Now preprocess that stream
+            preprocessor->inputStream = subInputStream;
+            TokenList subTokens = ReadAllTokens(preprocessor);
+
+            // Restore the previous input stream
+            preprocessor->inputStream = savedStream;
+
+            // Now we need to do something with those tokens we read
+            request->handlePoundImport(
+                moduleName,
+                foundPath,
+                subTokens);
+        }
+    }
+ 
+    // Now create a dummy token stream to represent the import request,
+    // so that it can be manifest in the user's program
+    SourceTextInputStream* inputStream = new SourceTextInputStream();
+ 
+    Token token;
+    token.Type = TokenType::PoundImport;
+    token.Position = GetDirectiveLoc(context);
+    token.flags = 0;
+    token.Content = moduleName;
+ 
+    inputStream->lexedTokens.mTokens.Add(token);
+ 
+    token.Type = TokenType::EndOfFile;
+    token.flags = TokenFlag::AfterWhitespace | TokenFlag::AtStartOfLine;
+    inputStream->lexedTokens.mTokens.Add(token);
+ 
+    inputStream->tokenReader = TokenReader(inputStream->lexedTokens);
+ 
+    inputStream->parent = context->preprocessor->inputStream;
+    context->preprocessor->inputStream = inputStream;
+}
+
+
 
 }

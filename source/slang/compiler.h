@@ -247,10 +247,10 @@ namespace Slang
             String const&       source,
             CodePosition const& loc);
 
-        String autoImportModule(
+        void handlePoundImport(
+            String const&       name,
             String const&       path,
-            String const&       source,
-            CodePosition const& loc);
+            TokenList const&    tokens);
 
         RefPtr<ProgramSyntaxNode> findOrImportModule(
             String const&       name,
