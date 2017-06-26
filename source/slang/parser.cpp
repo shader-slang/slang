@@ -3014,9 +3014,7 @@ namespace Slang
             {
                 auto nextOpPrec = GetOpLevel(parser, parser->tokenReader.PeekTokenType());
                 
-                if((GetAssociativityFromLevel(nextOpPrec) == Associativity::Right) && (nextOpPrec != opPrec))
-                    break;
-                else if( nextOpPrec <= opPrec)
+                if((GetAssociativityFromLevel(nextOpPrec) == Associativity::Right) ? (nextOpPrec < opPrec) : (nextOpPrec <= opPrec))
                     break;
 
                 right = parseInfixExprWithPrecedence(parser, right, nextOpPrec);
@@ -3201,6 +3199,33 @@ namespace Slang
                 {
                     constExpr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Float;
                     constExpr->FloatValue = (FloatingPointLiteralValue) StringToDouble(token.Content);
+                }
+
+                return constExpr;
+            }
+
+        case TokenType::StringLiterial:
+            {
+                RefPtr<ConstantExpressionSyntaxNode> constExpr = new ConstantExpressionSyntaxNode();
+                auto token = parser->tokenReader.AdvanceToken();
+                parser->FillPosition(constExpr.Ptr());
+                constExpr->ConstType = ConstantExpressionSyntaxNode::ConstantType::String;
+
+                if (!parser->LookAheadToken(TokenType::StringLiterial))
+                {
+                    // Easy/common case: a single string
+                    constExpr->stringValue = getStringLiteralTokenValue(token);
+                }
+                else
+                {
+                    StringBuilder sb;
+                    sb << getStringLiteralTokenValue(token);
+                    while (parser->LookAheadToken(TokenType::StringLiterial))
+                    {
+                        token = parser->tokenReader.AdvanceToken();
+                        sb << getStringLiteralTokenValue(token);
+                    }
+                    constExpr->stringValue = sb.ProduceString();
                 }
 
                 return constExpr;

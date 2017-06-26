@@ -1,4 +1,3 @@
-//TEST_IGNORE_FILE: Currently failing due to Spire compiler issues.
 //TEST:COMPARE_HLSL: -target dxbc-assembly -profile vs_4_0 -entry BezierVS -profile hs_5_0 -entry BezierHS -profile ds_5_0 -entry BezierDS -profile ps_4_0 -entry BezierPS -entry SolidColorPS
 //--------------------------------------------------------------------------------------
 // File: SimpleBezier11.hlsl

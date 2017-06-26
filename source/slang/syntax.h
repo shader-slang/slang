@@ -1917,7 +1917,10 @@ namespace Slang
     public:
         enum class ConstantType
         {
-            Int, Bool, Float
+            Int,
+            Bool,
+            Float,
+            String,
         };
         ConstantType ConstType;
         union
@@ -1925,6 +1928,7 @@ namespace Slang
             int IntValue;
             FloatingPointLiteralValue FloatValue;
         };
+        String stringValue;
         virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
     };
 

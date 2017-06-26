@@ -765,6 +765,34 @@ static void emitCallExpr(
     emitSimpleCallExpr(context, callExpr, outerPrec);
 }
 
+static void emitStringLiteral(
+    EmitContext*    context,
+    String const&   value)
+{
+    emit(context, "\"");
+    for (auto c : value)
+    {
+        // TODO: This needs a more complete implementation,
+        // especially if we want to support Unicode.
+
+        char buffer[] = { c, 0 };
+        switch (c)
+        {
+        default:
+            emit(context, buffer);
+            break;
+
+        case '\"': emit(context, "\\\"");
+        case '\'': emit(context, "\\\'");
+        case '\\': emit(context, "\\\\");
+        case '\n': emit(context, "\\n");
+        case '\r': emit(context, "\\r");
+        case '\t': emit(context, "\\t");
+        }
+    }
+    emit(context, "\"");
+}
+
 static void EmitExprWithPrecedence(EmitContext* context, RefPtr<ExpressionSyntaxNode> expr, int outerPrec)
 {
     bool needClose = false;
@@ -873,6 +901,9 @@ static void EmitExprWithPrecedence(EmitContext* context, RefPtr<ExpressionSyntax
             break;
         case ConstantExpressionSyntaxNode::ConstantType::Bool:
             Emit(context, litExpr->IntValue ? "true" : "false");
+            break;
+        case ConstantExpressionSyntaxNode::ConstantType::String:
+            emitStringLiteral(context, litExpr->stringValue);
             break;
         default:
             assert(!"unreachable");
