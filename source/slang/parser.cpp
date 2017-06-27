@@ -619,6 +619,9 @@ namespace Slang
             CASE(__prefix,   PrefixModifier);
             CASE(__postfix,  PostfixModifier);
 
+            // Modifier to apply to `import` that should be re-exported
+            CASE(__exported,  ExportedModifier);
+
             #undef CASE
 
             else if (AdvanceIf(parser, "__intrinsic_op"))

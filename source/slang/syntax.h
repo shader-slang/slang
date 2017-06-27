@@ -57,6 +57,7 @@ namespace Slang
     SIMPLE_MODIFIER(FromStdLib);
     SIMPLE_MODIFIER(Prefix);
     SIMPLE_MODIFIER(Postfix);
+    SIMPLE_MODIFIER(Exported);
 
 #undef SIMPLE_MODIFIER
 
