@@ -35,7 +35,16 @@ struct EmitContext
     Dictionary<String, int> mapGLSLSourcePathToID;
     int glslSourceIDCount = 0;
 
+    // We only want to emit each `import`ed module one time, so
+    // we maintain a set of already-emitted modules.
     HashSet<ProgramSyntaxNode*> modulesAlreadyEmitted;
+
+    // We track the original global-scope layout so that we can
+    // find layout information for `import`ed parameters.
+    //
+    // TODO: This will probably change if we represent imports
+    // explicitly in the layout data.
+    StructTypeLayout*   globalStructLayout;
 };
 
 //
@@ -2628,6 +2637,8 @@ static void EmitProgram(
     auto globalScopeLayout = programLayout->globalScopeLayout;
     if( auto globalStructLayout = globalScopeLayout.As<StructTypeLayout>() )
     {
+        context->globalStructLayout = globalStructLayout.Ptr();
+
         // The `struct` case is easy enough to handle: we just
         // emit all the declarations directly, using their layout
         // information as a guideline.
@@ -2656,6 +2667,8 @@ static void EmitProgram(
 
         // We expect all constant buffers to contain `struct` types for now
         assert(elementTypeStructLayout);
+
+        context->globalStructLayout = elementTypeStructLayout.Ptr();
 
         EmitDeclsInContainerUsingLayout(
             context,
@@ -2732,7 +2745,7 @@ static void EmitDeclImpl(EmitContext* context, RefPtr<Decl> decl, RefPtr<VarLayo
             // TODO: do we need to modify the code generation environment at
             // all when doing this recursive emit?
 
-            EmitDeclsInContainer(context, moduleDecl);
+            EmitDeclsInContainerUsingLayout(context, moduleDecl, context->globalStructLayout);
         }
 
         return;
