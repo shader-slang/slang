@@ -4893,6 +4893,36 @@ namespace Slang
             return expr;
         }
 
+        void importModuleIntoScope(Scope* scope, ProgramSyntaxNode* moduleDecl)
+        {
+            // If we've imported this one already, then
+            // skip the step where we modify the current scope.
+            if (importedModules.Contains(moduleDecl))
+            {
+                return;
+            }
+            importedModules.Add(moduleDecl);
+
+
+            // Create a new sub-scope to wire the module
+            // into our lookup chain.
+            auto subScope = new Scope();
+            subScope->containerDecl = moduleDecl;
+
+            subScope->nextSibling = scope->nextSibling;
+            scope->nextSibling = subScope;
+
+            // Also import any modules from nested `import` declarations
+            // with the `__exported` modifier
+            for (auto importDecl : moduleDecl->getMembersOfType<ImportDecl>())
+            {
+                if (!importDecl->HasModifier<ExportedModifier>())
+                    continue;
+
+                importModuleIntoScope(scope, importDecl->importedModuleDecl.Ptr());
+            }
+        }
+
         virtual void visitImportDecl(ImportDecl* decl) override
         {
             if(decl->IsChecked(DeclCheckState::Checked))
@@ -4917,22 +4947,7 @@ namespace Slang
             // it later during code generation.
             decl->importedModuleDecl = importedModuleDecl;
 
-            // If we've imported this one already, then
-            // skip the step where we modify the current scope.
-            if (importedModules.Contains(importedModuleDecl.Ptr()))
-            {
-                return;
-            }
-            importedModules.Add(importedModuleDecl.Ptr());
-
-
-            // Create a new sub-scope to wire the module
-            // into our lookup chain.
-            auto subScope = new Scope();
-            subScope->containerDecl = importedModuleDecl.Ptr();
-
-            subScope->nextSibling = scope->nextSibling;
-            scope->nextSibling = subScope;
+            importModuleIntoScope(scope.Ptr(), importedModuleDecl.Ptr());
 
             decl->SetCheckState(DeclCheckState::Checked);
         }
