@@ -794,14 +794,45 @@ namespace Slang
         }
     }
 
+    static TokenType peekTokenType(Parser* parser)
+    {
+        return parser->tokenReader.PeekTokenType();
+    }
+
     static RefPtr<Decl> parseImportDecl(
         Parser* parser)
     {
         parser->ReadToken("__import");
 
         auto decl = new ImportDecl();
-        decl->nameToken = parser->ReadToken(TokenType::Identifier);
         decl->scope = parser->currentScope;
+
+        if (peekTokenType(parser) == TokenType::StringLiterial)
+        {
+            auto nameToken = parser->ReadToken(TokenType::StringLiterial);
+            nameToken.Content = getStringLiteralTokenValue(nameToken);
+            decl->nameToken = nameToken;
+        }
+        else
+        {
+            auto nameToken = parser->ReadToken(TokenType::Identifier);
+
+            // We allow a dotted format for the name, as sugar
+            if (peekTokenType(parser) == TokenType::Dot)
+            {
+                StringBuilder sb;
+                sb << nameToken.Content;
+                while (AdvanceIf(parser, TokenType::Dot))
+                {
+                    sb << "/";
+                    sb << parser->ReadToken(TokenType::Identifier).Content;
+                }
+
+                nameToken.Content = sb.ProduceString();
+            }
+
+            decl->nameToken = nameToken;
+        }
 
         parser->ReadToken(TokenType::Semicolon);
 
@@ -3091,11 +3122,6 @@ namespace Slang
             }
         }
 #endif
-    }
-
-    static TokenType peekTokenType(Parser* parser)
-    {
-        return parser->tokenReader.PeekTokenType();
     }
 
     // We *might* be looking at an application of a generic to arguments,
