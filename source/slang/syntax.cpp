@@ -1,8 +1,6 @@
 #include "syntax.h"
 
-#pragma warning AAA
 #include "visitor.h"
-#pragma warning BBB
 
 #include <typeinfo>
 #include <assert.h>
@@ -55,9 +53,6 @@ namespace Slang
         return res.ProduceString();
     }
 
-#pragma warning CCC
-
-
     // Generate dispatch logic and other definitions for all syntax classes
 #define SYNTAX_CLASS(NAME, BASE) /* empty */
 #include "object-meta-begin.h"
@@ -78,8 +73,6 @@ namespace Slang
 #include "val-defs.h"
 
 #include "object-meta-end.h"
-
-#pragma warning DDD
 
 void ExpressionType::accept(IValVisitor* visitor, void* extra)
 {
@@ -881,9 +874,20 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
         auto parentDecl = decl->ParentDecl;
         if (auto parentGeneric = dynamic_cast<GenericDecl*>(parentDecl))
         {
-            // We need to strip away one layer of specialization
-            assert(substitutions);
-            return DeclRefBase(parentGeneric, substitutions->outer);
+            if (substitutions && substitutions->genericDecl == parentDecl)
+            {
+                // We strip away the specializations that were applied to
+                // the parent, since we were asked for a reference *to* the parent.
+                return DeclRefBase(parentGeneric, substitutions->outer);
+            }
+            else
+            {
+                // Either we don't have specializations, or the inner-most
+                // specializations didn't apply to the parent decl. This
+                // can happen if we are looking at an unspecialized
+                // declaration that is a child of a generic.
+                return DeclRefBase(parentGeneric, substitutions);
+            }
         }
         else
         {

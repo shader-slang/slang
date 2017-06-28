@@ -2617,10 +2617,13 @@ namespace Slang
 
 
         RefPtr<ScopeDecl> scopeDecl = new ScopeDecl();
-        RefPtr<BlockStatementSyntaxNode> blockStatement = new BlockStatementSyntaxNode();
+        RefPtr<BlockStmt> blockStatement = new BlockStmt();
         blockStatement->scopeDecl = scopeDecl;
         PushScope(scopeDecl.Ptr());
         ReadToken(TokenType::LBrace);
+
+        RefPtr<StatementSyntaxNode> body;
+
         if(!tokenReader.IsAtEnd())
         {
             FillPosition(blockStatement.Ptr());
@@ -2630,11 +2633,29 @@ namespace Slang
             auto stmt = ParseStatement();
             if(stmt)
             {
-                blockStatement->Statements.Add(stmt);
+                if (!body)
+                {
+                    body = stmt;
+                }
+                else if (auto seqStmt = body.As<SeqStmt>())
+                {
+                    seqStmt->stmts.Add(stmt);
+                }
+                else
+                {
+                    RefPtr<SeqStmt> newBody = new SeqStmt();
+                    newBody->Position = blockStatement->Position;
+                    newBody->stmts.Add(body);
+                    newBody->stmts.Add(stmt);
+
+                    body = newBody;
+                }
             }
             TryRecover(this);
         }
         PopScope();
+
+        blockStatement->body = body;
         return blockStatement;
     }
 
@@ -3054,7 +3075,19 @@ namespace Slang
                 right = parseInfixExprWithPrecedence(parser, right, nextOpPrec);
             }
 
-            expr = createInfixExpr(parser, expr, op, right);
+            if (opTokenType == TokenType::OpAssign)
+            {
+                RefPtr<AssignExpr> assignExpr = new AssignExpr();
+                assignExpr->Position = op->Position;
+                assignExpr->left = expr;
+                assignExpr->right = right;
+
+                expr = assignExpr;
+            }
+            else
+            {
+                expr = createInfixExpr(parser, expr, op, right);
+            }
         }
         return expr;
     }

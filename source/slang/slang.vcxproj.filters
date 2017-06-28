@@ -37,6 +37,7 @@
     <ClInclude Include="type-defs.h" />
     <ClInclude Include="val-defs.h" />
     <ClInclude Include="visitor.h" />
+    <ClInclude Include="lower.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="check.cpp" />
@@ -56,5 +57,6 @@
     <ClCompile Include="token.cpp" />
     <ClCompile Include="type-layout.cpp" />
     <ClCompile Include="options.cpp" />
+    <ClCompile Include="lower.cpp" />
   </ItemGroup>
 </Project>

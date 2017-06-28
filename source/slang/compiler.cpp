@@ -55,10 +55,11 @@ namespace Slang
 
     //
 
-    String emitHLSLForTranslationUnit(
-        TranslationUnitRequest* translationUnit)
+    String emitHLSLForEntryPoint(
+        EntryPointRequest*  entryPoint)
     {
-        auto compileRequest = translationUnit->compileRequest;
+        auto compileRequest = entryPoint->compileRequest;
+        auto translationUnit = entryPoint->getTranslationUnit();
         if (compileRequest->passThrough != PassThroughMode::None)
         {
             // Generate a string that includes the content of
@@ -92,8 +93,8 @@ namespace Slang
         }
         else
         {
-            return emitProgram(
-                translationUnit->SyntaxNode.Ptr(),
+            return emitEntryPoint(
+                entryPoint,
                 compileRequest->layout.Ptr(),
                 CodeGenTarget::HLSL);
         }
@@ -137,8 +138,8 @@ namespace Slang
         {
             // TODO(tfoley): need to pass along the entry point
             // so that we properly emit it as the `main` function.
-            return emitProgram(
-                translationUnit->SyntaxNode.Ptr(),
+            return emitEntryPoint(
+                entryPoint,
                 compileRequest->layout.Ptr(),
                 CodeGenTarget::GLSL);
         }
@@ -180,15 +181,7 @@ namespace Slang
             assert(D3DCompile_);
         }
 
-        // The HLSL compiler will try to "canonicalize" our input file path,
-        // and we don't want it to do that, because they it won't report
-        // the same locations on error messages that we would.
-        //
-        // To work around that, we prepend a custom `#line` directive.
-
-        auto translationUnit = entryPoint->getTranslationUnit();
-
-        auto hlslCode = emitHLSLForTranslationUnit(translationUnit);
+        auto hlslCode = emitHLSLForEntryPoint(entryPoint);
 
         ID3DBlob* codeBlob;
         ID3DBlob* diagnosticsBlob;
@@ -223,6 +216,7 @@ namespace Slang
         if (FAILED(hr))
         {
             // TODO(tfoley): What to do on failure?
+            exit(1);
         }
         return data;
     }
@@ -400,6 +394,13 @@ namespace Slang
 
         switch (compileRequest->Target)
         {
+        case CodeGenTarget::HLSL:
+            {
+                String code = emitHLSLForEntryPoint(entryPoint);
+                result.outputSource = code;
+            }
+            break;
+
         case CodeGenTarget::GLSL:
             {
                 String code = emitGLSLForEntryPoint(entryPoint);
@@ -505,45 +506,7 @@ namespace Slang
     TranslationUnitResult emitTranslationUnit(
         TranslationUnitRequest* translationUnit)
     {
-        auto compileRequest = translationUnit->compileRequest;
-
-        // Most of our code generation targets will require us
-        // to proceed through one entry point at a time, but
-        // in some cases we can emit an entire translation unit
-        // in one go.
-
-        switch (compileRequest->Target)
-        {
-        default:
-            // The default behavior is going to loop over all the entry
-            // points, and then collect an aggregate result.
-            return emitTranslationUnitEntryPoints(translationUnit);
-
-        case CodeGenTarget::HLSL:
-            // When targetting HLSL, we can emit the entire translation unit
-            // as a single HLSL program, and include all the entry points.
-            {
-
-                String hlsl = emitHLSLForTranslationUnit(translationUnit);
-
-                TranslationUnitResult result;
-                result.outputSource = hlsl;
-
-                // Because the user might ask for per-entry-point source,
-                // we will just attach the same string as the result for
-                // each entry point.
-                for( auto& entryPoint : translationUnit->entryPoints )
-                {
-                    EntryPointResult entryPointResult;
-                    entryPointResult.outputSource = hlsl;
-
-                    entryPoint->result = entryPointResult;
-                }
-
-                return result;
-            }
-            break;
-        }
+        return emitTranslationUnitEntryPoints(translationUnit);
     }
 
 #if 0

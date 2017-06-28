@@ -3,7 +3,8 @@
 // Syntax class definitions for compile-time values.
 
 // A compile-time integer (may not have a specific concrete value)
-SIMPLE_SYNTAX_CLASS(IntVal, Val)
+ABSTRACT_SYNTAX_CLASS(IntVal, Val)
+END_SYNTAX_CLASS()
 
 // Trivial case of a value that is just a constant integer
 SYNTAX_CLASS(ConstantIntVal, IntVal)

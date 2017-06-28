@@ -6,8 +6,14 @@ ABSTRACT_SYNTAX_CLASS(ScopeStmt, StatementSyntaxNode)
     SYNTAX_FIELD(RefPtr<ScopeDecl>, scopeDecl)
 END_SYNTAX_CLASS()
 
-SYNTAX_CLASS(BlockStatementSyntaxNode, ScopeStmt)
-    SYNTAX_FIELD(List<RefPtr<StatementSyntaxNode>>, Statements)
+// A sequence of statements, treated as a single statement
+SYNTAX_CLASS(SeqStmt, StatementSyntaxNode)
+    SYNTAX_FIELD(List<RefPtr<StatementSyntaxNode>>, stmts)
+END_SYNTAX_CLASS()
+
+// The simplest kind of scope statement: just a `{...}` block
+SYNTAX_CLASS(BlockStmt, ScopeStmt)
+    SYNTAX_FIELD(RefPtr<StatementSyntaxNode>, body);
 END_SYNTAX_CLASS()
 
 SYNTAX_CLASS(UnparsedStmt, StatementSyntaxNode)

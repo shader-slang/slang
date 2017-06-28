@@ -107,3 +107,8 @@ SYNTAX_CLASS(SharedTypeExpr, ExpressionSyntaxNode)
     SYNTAX_FIELD(TypeExp, base)
 END_SYNTAX_CLASS()
 
+SYNTAX_CLASS(AssignExpr, ExpressionSyntaxNode)
+    SYNTAX_FIELD(RefPtr<ExpressionSyntaxNode>, left);
+    SYNTAX_FIELD(RefPtr<ExpressionSyntaxNode>, right);
+END_SYNTAX_CLASS()
+
