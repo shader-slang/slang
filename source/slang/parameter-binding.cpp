@@ -895,7 +895,7 @@ static void processEntryPointParameter(
     else if( auto matrixType = type->As<MatrixExpressionType>() )
     {
         auto rowCount = GetIntVal(matrixType->getRowCount());
-        processSimpleEntryPointParameter(context, basicType, state, rowCount);
+        processSimpleEntryPointParameter(context, basicType, state, (int) rowCount);
     }
     else if( auto arrayType = type->As<ArrayExpressionType>() )
     {

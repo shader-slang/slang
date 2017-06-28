@@ -1155,9 +1155,9 @@ namespace Slang
                     hlslNumThreadsAttribute->Position   = hlslUncheckedAttribute->Position;
                     hlslNumThreadsAttribute->nameToken  = hlslUncheckedAttribute->nameToken;
                     hlslNumThreadsAttribute->args       = hlslUncheckedAttribute->args;
-                    hlslNumThreadsAttribute->x          = xVal->value;
-                    hlslNumThreadsAttribute->y          = yVal->value;
-                    hlslNumThreadsAttribute->z          = zVal->value;
+                    hlslNumThreadsAttribute->x          = (int32_t) xVal->value;
+                    hlslNumThreadsAttribute->y          = (int32_t) yVal->value;
+                    hlslNumThreadsAttribute->z          = (int32_t) zVal->value;
 
                     return hlslNumThreadsAttribute;
                 }
@@ -1683,7 +1683,7 @@ namespace Slang
             return stmt;
         }
 
-        int GetMinBound(RefPtr<IntVal> val)
+        IntegerLiteralValue GetMinBound(RefPtr<IntVal> val)
         {
             if (auto constantVal = val.As<ConstantIntVal>())
                 return constantVal->value;
@@ -1913,7 +1913,7 @@ namespace Slang
         IntVal* GetIntVal(ConstantExpressionSyntaxNode* expr)
         {
             // TODO(tfoley): don't keep allocating here!
-            return new ConstantIntVal(expr->IntValue);
+            return new ConstantIntVal(expr->integerValue);
         }
 
         RefPtr<IntVal> TryConstantFoldExpr(
@@ -1939,7 +1939,7 @@ namespace Slang
 
             // Before checking the operation name, let's look at the arguments
             RefPtr<IntVal> argVals[kMaxArgs];
-            int constArgVals[kMaxArgs];
+            IntegerLiteralValue constArgVals[kMaxArgs];
             int argCount = 0;
             bool allConst = true;
             for (auto argExpr : invokeExpr->Arguments)
@@ -1977,7 +1977,7 @@ namespace Slang
             }
 
             // At this point, all the operands had simple integer values, so we are golden.
-            int resultValue = 0;
+            IntegerLiteralValue resultValue = 0;
             auto opName = funcDeclRef.GetName();
 
             // handle binary operators
@@ -4674,15 +4674,15 @@ namespace Slang
         }
 
         RefPtr<ExpressionSyntaxNode> CheckSwizzleExpr(
-            MemberExpressionSyntaxNode*	memberRefExpr,
-            RefPtr<ExpressionType>		baseElementType,
-            int							baseElementCount)
+            MemberExpressionSyntaxNode* memberRefExpr,
+            RefPtr<ExpressionType>      baseElementType,
+            IntegerLiteralValue         baseElementCount)
         {
             RefPtr<SwizzleExpr> swizExpr = new SwizzleExpr();
             swizExpr->Position = memberRefExpr->Position;
             swizExpr->base = memberRefExpr->BaseExpression;
 
-            int limitElement = baseElementCount;
+            IntegerLiteralValue limitElement = baseElementCount;
 
             int elementIndices[4];
             int elementCount = 0;

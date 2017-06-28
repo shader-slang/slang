@@ -233,7 +233,7 @@ SLANG_API unsigned int spReflectionType_GetRowCount(SlangReflectionType* inType)
 
     if(auto matrixType = dynamic_cast<MatrixExpressionType*>(type))
     {
-        return GetIntVal(matrixType->getRowCount());
+        return (unsigned int) GetIntVal(matrixType->getRowCount());
     }
     else if(auto vectorType = dynamic_cast<VectorExpressionType*>(type))
     {
@@ -254,11 +254,11 @@ SLANG_API unsigned int spReflectionType_GetColumnCount(SlangReflectionType* inTy
 
     if(auto matrixType = dynamic_cast<MatrixExpressionType*>(type))
     {
-        return GetIntVal(matrixType->getColumnCount());
+        return (unsigned int) GetIntVal(matrixType->getColumnCount());
     }
     else if(auto vectorType = dynamic_cast<VectorExpressionType*>(type))
     {
-        return GetIntVal(vectorType->elementCount);
+        return (unsigned int) GetIntVal(vectorType->elementCount);
     }
     else if( auto basicType = dynamic_cast<BasicExpressionType*>(type) )
     {
