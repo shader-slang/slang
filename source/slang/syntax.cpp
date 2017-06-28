@@ -1268,7 +1268,7 @@ namespace Slang
 
     // IntVal
 
-    int GetIntVal(RefPtr<IntVal> val)
+    IntegerLiteralValue GetIntVal(RefPtr<IntVal> val)
     {
         if (auto constantVal = val.As<ConstantIntVal>())
         {
@@ -1294,7 +1294,7 @@ namespace Slang
 
     int ConstantIntVal::GetHashCode()
     {
-        return value;
+        return (int) value;
     }
 
     // SwitchStmt

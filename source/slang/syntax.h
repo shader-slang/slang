@@ -437,15 +437,15 @@ namespace Slang
 
     // Try to extract a simple integer value from an `IntVal`.
     // This fill assert-fail if the object doesn't represent a literal value.
-    int GetIntVal(RefPtr<IntVal> val);
+    IntegerLiteralValue GetIntVal(RefPtr<IntVal> val);
 
     // Trivial case of a value that is just a constant integer
     class ConstantIntVal : public IntVal
     {
     public:
-        int value;
+        IntegerLiteralValue value;
 
-        ConstantIntVal(int value)
+        ConstantIntVal(IntegerLiteralValue value)
             : value(value)
         {}
 
@@ -1188,7 +1188,7 @@ namespace Slang
     {
         auto constantVal = vecType->elementCount.As<ConstantIntVal>();
         if (constantVal)
-            return constantVal->value;
+            return (int) constantVal->value;
         // TODO: what to do in this case?
         return 0;
     }
@@ -1913,8 +1913,6 @@ namespace Slang
         virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
     };
 
-    typedef double FloatingPointLiteralValue;
-
     class ConstantExpressionSyntaxNode : public ExpressionSyntaxNode
     {
     public:
@@ -1930,8 +1928,8 @@ namespace Slang
         ConstantType ConstType;
         union
         {
-            int IntValue;
-            FloatingPointLiteralValue FloatValue;
+            IntegerLiteralValue         integerValue;
+            FloatingPointLiteralValue   floatingPointValue;
         };
         String stringValue;
         virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;

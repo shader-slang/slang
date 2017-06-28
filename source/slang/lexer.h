@@ -92,7 +92,7 @@ namespace Slang
     String getStringLiteralTokenValue(Token const& token);
     String getFileNameTokenValue(Token const& token);
 
-    typedef unsigned long long IntegerLiteralValue;
+    typedef long long IntegerLiteralValue;
     typedef double FloatingPointLiteralValue;
 
     IntegerLiteralValue getIntegerLiteralValue(Token const& token, String* outSuffix = 0);

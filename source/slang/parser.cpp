@@ -3276,7 +3276,7 @@ namespace Slang
                 }
 
                 constExpr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Int;
-                constExpr->IntValue = value;
+                constExpr->integerValue = value;
                 constExpr->Type = suffixType;
 
                 return constExpr;
@@ -3345,7 +3345,7 @@ namespace Slang
                 }
 
                 constExpr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Float;
-                constExpr->FloatValue = value;
+                constExpr->floatingPointValue = value;
                 constExpr->Type = suffixType;
 
                 return constExpr;
@@ -3391,7 +3391,7 @@ namespace Slang
                     constExpr->token = token;
                     parser->FillPosition(constExpr.Ptr());
                     constExpr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Bool;
-                    constExpr->IntValue = token.Content == "true" ? 1 : 0;
+                    constExpr->integerValue = token.Content == "true" ? 1 : 0;
 
                     return constExpr;
                 }

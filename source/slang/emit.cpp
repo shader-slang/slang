@@ -197,6 +197,14 @@ static void emitName(EmitContext* context, String const& name)
     emitName(context, name, CodePosition());
 }
 
+static void Emit(EmitContext* context, IntegerLiteralValue value)
+{
+    char buffer[32];
+    sprintf(buffer, "%lld", value);
+    Emit(context, buffer);
+}
+
+
 static void Emit(EmitContext* context, UInt value)
 {
     char buffer[32];
@@ -923,7 +931,7 @@ static void EmitExprWithPrecedence(EmitContext* context, RefPtr<ExpressionSyntax
             {
                 assert(!"unimplemented");
             }
-            Emit(context, litExpr->IntValue);
+            Emit(context, litExpr->integerValue);
             Emit(context, suffix);
             break;
 
@@ -945,12 +953,12 @@ static void EmitExprWithPrecedence(EmitContext* context, RefPtr<ExpressionSyntax
             {
                 assert(!"unimplemented");
             }
-            Emit(context, litExpr->FloatValue);
+            Emit(context, litExpr->floatingPointValue);
             Emit(context, suffix);
             break;
 
         case ConstantExpressionSyntaxNode::ConstantType::Bool:
-            Emit(context, litExpr->IntValue ? "true" : "false");
+            Emit(context, litExpr->integerValue ? "true" : "false");
             break;
         case ConstantExpressionSyntaxNode::ConstantType::String:
             emitStringLiteral(context, litExpr->stringValue);

@@ -544,7 +544,7 @@ static int GetElementCount(RefPtr<IntVal> val)
 {
     if (auto constantVal = val.As<ConstantIntVal>())
     {
-        return constantVal->value;
+        return (int) constantVal->value;
     }
     else if( auto varRefVal = val.As<GenericParamIntVal>() )
     {
