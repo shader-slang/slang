@@ -375,6 +375,7 @@ namespace Slang
         UInt,
         UInt64,
         Float,
+        Double,
 #if 0
         Texture2D = 48,
         TextureCube = 49,
@@ -485,6 +486,7 @@ namespace Slang
 
         static ExpressionType* GetBool();
         static ExpressionType* GetFloat();
+        static ExpressionType* getDoubleType();
         static ExpressionType* GetInt();
         static ExpressionType* GetUInt();
         static ExpressionType* GetVoid();
@@ -1916,6 +1918,8 @@ namespace Slang
     class ConstantExpressionSyntaxNode : public ExpressionSyntaxNode
     {
     public:
+        Token token;
+
         enum class ConstantType
         {
             Int,

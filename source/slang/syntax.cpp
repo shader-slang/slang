@@ -1397,6 +1397,11 @@ namespace Slang
         return sBuiltinTypes[(int)BaseType::Float].GetValue().Ptr();
     }
 
+    ExpressionType* ExpressionType::getDoubleType()
+    {
+        return sBuiltinTypes[(int)BaseType::Double].GetValue().Ptr();
+    }
+
     ExpressionType* ExpressionType::GetInt()
     {
         return sBuiltinTypes[(int)BaseType::Int].GetValue().Ptr();

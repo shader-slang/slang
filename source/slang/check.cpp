@@ -1887,6 +1887,10 @@ namespace Slang
         }
         virtual RefPtr<ExpressionSyntaxNode> VisitConstantExpression(ConstantExpressionSyntaxNode *expr) override
         {
+            // The expression might already have a type, determined by its suffix
+            if(expr->Type.type)
+                return expr;
+
             switch (expr->ConstType)
             {
             case ConstantExpressionSyntaxNode::ConstantType::Int:

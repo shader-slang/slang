@@ -219,6 +219,8 @@ static void Emit(EmitContext* context, double value)
     Emit(context, buffer);
 }
 
+static void emitTokenWithLocation(EmitContext* context, Token const& token);
+
 // Expressions
 
 // Determine if an expression should not be emitted when it is the base of
@@ -487,7 +489,7 @@ static String getStringOrIdentifierTokenValue(
     case TokenType::Identifier:
         return token.Content;
 
-    case TokenType::StringLiterial:
+    case TokenType::StringLiteral:
         return getStringLiteralTokenValue(token);
         break;
     }
@@ -900,14 +902,53 @@ static void EmitExprWithPrecedence(EmitContext* context, RefPtr<ExpressionSyntax
     {
         needClose = MaybeEmitParens(context, outerPrec, kPrecedence_Atomic);
 
+        char const* suffix = "";
+        auto type = litExpr->Type.type;
         switch (litExpr->ConstType)
         {
         case ConstantExpressionSyntaxNode::ConstantType::Int:
+            if(!type)
+            {
+                // Special case for "rewrite" mode
+                emitTokenWithLocation(context, litExpr->token);
+                break;
+            }
+            if(type->Equals(ExpressionType::GetInt()))
+            {}
+            else if(type->Equals(ExpressionType::GetUInt()))
+            {
+                suffix = "u";
+            }
+            else
+            {
+                assert(!"unimplemented");
+            }
             Emit(context, litExpr->IntValue);
+            Emit(context, suffix);
             break;
+
+
         case ConstantExpressionSyntaxNode::ConstantType::Float:
+            if(!type)
+            {
+                // Special case for "rewrite" mode
+                emitTokenWithLocation(context, litExpr->token);
+                break;
+            }
+            if(type->Equals(ExpressionType::GetFloat()))
+            {}
+            else if(type->Equals(ExpressionType::getDoubleType()))
+            {
+                suffix = "l";
+            }
+            else
+            {
+                assert(!"unimplemented");
+            }
             Emit(context, litExpr->FloatValue);
+            Emit(context, suffix);
             break;
+
         case ConstantExpressionSyntaxNode::ConstantType::Bool:
             Emit(context, litExpr->IntValue ? "true" : "false");
             break;
