@@ -3214,21 +3214,139 @@ namespace Slang
             }
 
         case TokenType::IntegerLiteral:
+            {
+                RefPtr<ConstantExpressionSyntaxNode> constExpr = new ConstantExpressionSyntaxNode();
+                parser->FillPosition(constExpr.Ptr());
+
+                auto token = parser->tokenReader.AdvanceToken();
+                constExpr->token = token;
+
+                String suffix;
+                IntegerLiteralValue value = getIntegerLiteralValue(token, &suffix);
+
+                // Look at any suffix on the value
+                char const* suffixCursor = suffix.begin();
+
+                RefPtr<ExpressionType> suffixType = nullptr;
+                if( suffixCursor && *suffixCursor )
+                {
+                    int lCount = 0;
+                    int uCount = 0;
+                    int unknownCount = 0;
+                    while(*suffixCursor)
+                    {
+                        switch( *suffixCursor++ )
+                        {
+                        case 'l': case 'L':
+                            lCount++;
+                            break;
+
+                        case 'u': case 'U':
+                            uCount++;
+                            break;
+
+                        default:
+                            unknownCount++;
+                            break;
+                        }
+                    }
+
+                    if(unknownCount)
+                    {
+                        parser->sink->diagnose(token, Diagnostics::invalidIntegerLiteralSuffix, suffix);
+                        suffixType = ExpressionType::GetError();
+                    }
+                    // `u` or `ul` suffix -> `uint`
+                    else if(uCount == 1 && (lCount <= 1))
+                    {
+                        suffixType = ExpressionType::GetUInt();
+                    }
+                    // `l` suffix on integer -> `int` (== `long`)
+                    else if(lCount == 1 && !uCount)
+                    {
+                        suffixType = ExpressionType::GetInt();
+                    }
+                    // TODO: probably need `ll` and `ull`
+                    // TODO: are there other suffixes we need to handle?
+                    else
+                    {
+                        parser->sink->diagnose(token, Diagnostics::invalidIntegerLiteralSuffix, suffix);
+                        suffixType = ExpressionType::GetError();
+                    }
+                }
+
+                constExpr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Int;
+                constExpr->IntValue = value;
+                constExpr->Type = suffixType;
+
+                return constExpr;
+            }
+
+
         case TokenType::FloatingPointLiteral:
             {
                 RefPtr<ConstantExpressionSyntaxNode> constExpr = new ConstantExpressionSyntaxNode();
-                auto token = parser->tokenReader.AdvanceToken();
                 parser->FillPosition(constExpr.Ptr());
-                if (token.Type == TokenType::IntegerLiteral)
+
+                auto token = parser->tokenReader.AdvanceToken();
+                constExpr->token = token;
+
+                String suffix;
+                FloatingPointLiteralValue value = getFloatingPointLiteralValue(token, &suffix);
+
+                // Look at any suffix on the value
+                char const* suffixCursor = suffix.begin();
+
+                RefPtr<ExpressionType> suffixType = nullptr;
+                if( suffixCursor && *suffixCursor )
                 {
-                    constExpr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Int;
-                    constExpr->IntValue = StringToInt(token.Content);
+                    int fCount = 0;
+                    int lCount = 0;
+                    int unknownCount = 0;
+                    while(*suffixCursor)
+                    {
+                        switch( *suffixCursor++ )
+                        {
+                        case 'f': case 'F':
+                            fCount++;
+                            break;
+
+                        case 'l': case 'L':
+                            lCount++;
+                            break;
+
+                        default:
+                            unknownCount++;
+                            break;
+                        }
+                    }
+
+                    if(unknownCount)
+                    {
+                        parser->sink->diagnose(token, Diagnostics::invalidFloatingPOintLiteralSuffix, suffix);
+                        suffixType = ExpressionType::GetError();
+                    }
+                    // `f` suffix -> `float`
+                    if(fCount == 1 && !lCount)
+                    {
+                        suffixType = ExpressionType::GetFloat();
+                    }
+                    // `l` or `lf` suffix on float -> `double`
+                    else if(lCount == 1 && (fCount <= 1))
+                    {
+                        suffixType = ExpressionType::getDoubleType();
+                    }
+                    // TODO: are there other suffixes we need to handle?
+                    else
+                    {
+                        parser->sink->diagnose(token, Diagnostics::invalidFloatingPOintLiteralSuffix, suffix);
+                        suffixType = ExpressionType::GetError();
+                    }
                 }
-                else if (token.Type == TokenType::FloatingPointLiteral)
-                {
-                    constExpr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Float;
-                    constExpr->FloatValue = (FloatingPointLiteralValue) StringToDouble(token.Content);
-                }
+
+                constExpr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Float;
+                constExpr->FloatValue = value;
+                constExpr->Type = suffixType;
 
                 return constExpr;
             }
@@ -3237,6 +3355,7 @@ namespace Slang
             {
                 RefPtr<ConstantExpressionSyntaxNode> constExpr = new ConstantExpressionSyntaxNode();
                 auto token = parser->tokenReader.AdvanceToken();
+                constExpr->token = token;
                 parser->FillPosition(constExpr.Ptr());
                 constExpr->ConstType = ConstantExpressionSyntaxNode::ConstantType::String;
 
@@ -3269,6 +3388,7 @@ namespace Slang
                 {
                     RefPtr<ConstantExpressionSyntaxNode> constExpr = new ConstantExpressionSyntaxNode();
                     auto token = parser->tokenReader.AdvanceToken();
+                    constExpr->token = token;
                     parser->FillPosition(constExpr.Ptr());
                     constExpr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Bool;
                     constExpr->IntValue = token.Content == "true" ? 1 : 0;

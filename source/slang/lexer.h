@@ -91,6 +91,12 @@ namespace Slang
     // Helper routines for extracting values from tokens
     String getStringLiteralTokenValue(Token const& token);
     String getFileNameTokenValue(Token const& token);
+
+    typedef unsigned long long IntegerLiteralValue;
+    typedef double FloatingPointLiteralValue;
+
+    IntegerLiteralValue getIntegerLiteralValue(Token const& token, String* outSuffix = 0);
+    FloatingPointLiteralValue getFloatingPointLiteralValue(Token const& token, String* outSuffix = 0);
 }
 
 #endif

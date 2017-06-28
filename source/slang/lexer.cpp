@@ -415,25 +415,34 @@ namespace Slang
         return tokenType;
     }
 
-    static bool maybeLexNumberExponent(Lexer* lexer, int base)
+    static bool isNumberExponent(char c, int base)
     {
-        switch( peek(lexer) )
+        switch( c )
         {
         default:
             return false;
 
         case 'e': case 'E':
             if(base != 10) return false;
-            advance(lexer);
             break;
 
         case 'p': case 'P':
             if(base != 16) return false;
-            advance(lexer);
             break;
         }
 
-        // we saw an exponent marker, so we must 
+        return true;
+    }
+
+    static bool maybeLexNumberExponent(Lexer* lexer, int base)
+    {
+        if(!isNumberExponent(peek(lexer), base))
+            return false;
+
+        // we saw an exponent marker
+        advance(lexer);
+
+        // Now start to read the exponent
         switch( peek(lexer) )
         {
         case '+': case '-':
@@ -480,6 +489,197 @@ namespace Slang
 
         maybeLexNumberSuffix(lexer, tokenType);
         return tokenType;
+    }
+
+    static int maybeReadDigit(char const** ioCursor, int base)
+    {
+        auto& cursor = *ioCursor;
+
+        for(;;)
+        {
+            int digitVal = 0;
+            int c = *cursor;
+            switch(c)
+            {
+            default:
+                return -1;
+
+            // TODO: need to decide on digit separator characters
+            case '_':
+                cursor++;
+                continue;
+
+            case '0': case '1': case '2': case '3': case '4':
+            case '5': case '6': case '7': case '8': case '9':
+                cursor++;
+                return c - '0';
+
+            case 'a': case 'b': case 'c': case 'd': case 'e': case 'f':
+                if(base > 10)
+                {
+                    cursor++;
+                    return c - 'a';
+                }
+                return -1;
+
+            case 'A': case 'B': case 'C': case 'D': case 'E': case 'F':
+                if(base > 10)
+                {
+                    cursor++;
+                    return c - 'A';
+                }
+                return -1;
+            }
+        }
+    }
+
+    static int readOptionalBase(char const** ioCursor)
+    {
+        auto& cursor = *ioCursor;
+        if( *cursor == '0' )
+        {
+            cursor++;
+            switch(*cursor)
+            {
+            case 'x': case 'X':
+                cursor++;
+                return 16;
+
+            case 'b': case 'B':
+                cursor++;
+                return 2;
+
+            case '0': case '1': case '2': case '3': case '4':
+            case '5': case '6': case '7': case '8': case '9':
+                return 8;
+
+            default:
+                return 10;
+            }
+        }
+
+        return 10;
+    }
+
+
+
+    IntegerLiteralValue getIntegerLiteralValue(Token const& token, String* outSuffix)
+    {
+        IntegerLiteralValue value = 0;
+
+        char const* cursor = token.Content.begin();
+        char const* end = token.Content.end();
+
+        int base = readOptionalBase(&cursor);
+
+        for( ;;)
+        {
+            int digit = maybeReadDigit(&cursor, base);
+            if(digit < 0)
+                break;
+
+            value = value*base + digit;
+        }
+
+        if(outSuffix)
+        {
+            *outSuffix = String(cursor, end);
+        }
+
+        return value;
+    }
+
+    FloatingPointLiteralValue getFloatingPointLiteralValue(Token const& token, String* outSuffix)
+    {
+        FloatingPointLiteralValue value = 0;
+
+        char const* cursor = token.Content.begin();
+        char const* end = token.Content.end();
+
+        int radix = readOptionalBase(&cursor);
+
+        bool seenDot = false;
+        FloatingPointLiteralValue divisor = 1;
+        for( ;;)
+        {
+            if(*cursor == '.')
+            {
+                cursor++;
+                seenDot = true;
+                continue;
+            }
+
+            int digit = maybeReadDigit(&cursor, radix);
+            if(digit < 0)
+                break;
+
+            value = value*radix + digit;
+
+            if(seenDot)
+            {
+                divisor *= radix;
+            }
+        }
+
+        // Now read optional exponent
+        if(isNumberExponent(*cursor, radix))
+        {
+            cursor++;
+
+            bool exponentIsNegative = false;
+            switch(*cursor)
+            {
+            default:
+                break;
+
+            case '-':
+                exponentIsNegative = true;
+                cursor++;
+                break;
+
+            case '+':
+                cursor++;
+                break;
+            }
+
+            int exponentRadix = 10;
+            int exponent = 0;
+
+            for(;;)
+            {
+                int digit = maybeReadDigit(&cursor, exponentRadix);
+                if(digit < 0)
+                    break;
+
+                exponent = exponent*exponentRadix + digit;
+            }
+
+            FloatingPointLiteralValue exponentBase = 10;
+            if(radix == 16)
+            {
+                exponentBase = 2;
+            }
+
+            FloatingPointLiteralValue exponentValue = pow(exponentBase, exponent);
+
+            if( exponentIsNegative )
+            {
+                divisor *= exponentValue;
+            }
+            else
+            {
+                value *= exponentValue;
+            }
+        }
+
+        value /= divisor;
+
+        if(outSuffix)
+        {
+            *outSuffix = String(cursor, end);
+        }
+
+        return value;
     }
 
     static void lexStringLiteralBody(Lexer* lexer, char quote)
