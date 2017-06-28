@@ -630,7 +630,7 @@ namespace Slang
                 modifier->Position = loc;
 
                 parser->ReadToken(TokenType::LParent);
-                if (parser->LookAheadToken(TokenType::IntLiterial))
+                if (parser->LookAheadToken(TokenType::IntegerLiteral))
                 {
                     modifier->op = (IntrinsicOp)StringToInt(parser->ReadToken().Content);
                 }
@@ -662,7 +662,7 @@ namespace Slang
 
                     if( AdvanceIf(parser, TokenType::Comma) )
                     {
-                        if( parser->LookAheadToken(TokenType::StringLiterial) )
+                        if( parser->LookAheadToken(TokenType::StringLiteral) )
                         {
                             modifier->definitionToken = parser->ReadToken();
                         }
@@ -708,7 +708,7 @@ namespace Slang
 
                     if(AdvanceIf(parser, TokenType::OpAssign))
                     {
-                        modifier->valToken = parser->ReadToken(TokenType::IntLiterial);
+                        modifier->valToken = parser->ReadToken(TokenType::IntegerLiteral);
                     }
 
                     AddModifier(&modifierLink, modifier);
@@ -726,7 +726,7 @@ namespace Slang
             {
                 RefPtr<BuiltinTypeModifier> modifier = new BuiltinTypeModifier();
                 parser->ReadToken(TokenType::LParent);
-                modifier->tag = BaseType(StringToInt(parser->ReadToken(TokenType::IntLiterial).Content));
+                modifier->tag = BaseType(StringToInt(parser->ReadToken(TokenType::IntegerLiteral).Content));
                 parser->ReadToken(TokenType::RParent);
 
                 AddModifier(&modifierLink, modifier);
@@ -738,7 +738,7 @@ namespace Slang
                 modifier->name = parser->ReadToken(TokenType::Identifier).Content;
                 if (AdvanceIf(parser, TokenType::Comma))
                 {
-                    modifier->tag = uint32_t(StringToInt(parser->ReadToken(TokenType::IntLiterial).Content));
+                    modifier->tag = uint32_t(StringToInt(parser->ReadToken(TokenType::IntegerLiteral).Content));
                 }
                 parser->ReadToken(TokenType::RParent);
 
@@ -807,9 +807,9 @@ namespace Slang
         auto decl = new ImportDecl();
         decl->scope = parser->currentScope;
 
-        if (peekTokenType(parser) == TokenType::StringLiterial)
+        if (peekTokenType(parser) == TokenType::StringLiteral)
         {
-            auto nameToken = parser->ReadToken(TokenType::StringLiterial);
+            auto nameToken = parser->ReadToken(TokenType::StringLiteral);
             nameToken.Content = getStringLiteralTokenValue(nameToken);
             decl->nameToken = nameToken;
         }
@@ -3213,18 +3213,18 @@ namespace Slang
                 return initExpr;
             }
 
-        case TokenType::IntLiterial:
-        case TokenType::DoubleLiterial:
+        case TokenType::IntegerLiteral:
+        case TokenType::FloatingPointLiteral:
             {
                 RefPtr<ConstantExpressionSyntaxNode> constExpr = new ConstantExpressionSyntaxNode();
                 auto token = parser->tokenReader.AdvanceToken();
                 parser->FillPosition(constExpr.Ptr());
-                if (token.Type == TokenType::IntLiterial)
+                if (token.Type == TokenType::IntegerLiteral)
                 {
                     constExpr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Int;
                     constExpr->IntValue = StringToInt(token.Content);
                 }
-                else if (token.Type == TokenType::DoubleLiterial)
+                else if (token.Type == TokenType::FloatingPointLiteral)
                 {
                     constExpr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Float;
                     constExpr->FloatValue = (FloatingPointLiteralValue) StringToDouble(token.Content);
@@ -3233,14 +3233,14 @@ namespace Slang
                 return constExpr;
             }
 
-        case TokenType::StringLiterial:
+        case TokenType::StringLiteral:
             {
                 RefPtr<ConstantExpressionSyntaxNode> constExpr = new ConstantExpressionSyntaxNode();
                 auto token = parser->tokenReader.AdvanceToken();
                 parser->FillPosition(constExpr.Ptr());
                 constExpr->ConstType = ConstantExpressionSyntaxNode::ConstantType::String;
 
-                if (!parser->LookAheadToken(TokenType::StringLiterial))
+                if (!parser->LookAheadToken(TokenType::StringLiteral))
                 {
                     // Easy/common case: a single string
                     constExpr->stringValue = getStringLiteralTokenValue(token);
@@ -3249,7 +3249,7 @@ namespace Slang
                 {
                     StringBuilder sb;
                     sb << getStringLiteralTokenValue(token);
-                    while (parser->LookAheadToken(TokenType::StringLiterial))
+                    while (parser->LookAheadToken(TokenType::StringLiteral))
                     {
                         token = parser->tokenReader.AdvanceToken();
                         sb << getStringLiteralTokenValue(token);
@@ -3467,18 +3467,18 @@ namespace Slang
             rs = initExpr;
         }
 
-        else if (LookAheadToken(TokenType::IntLiterial) ||
-            LookAheadToken(TokenType::DoubleLiterial))
+        else if (LookAheadToken(TokenType::IntegerLiteral) ||
+            LookAheadToken(TokenType::FloatingPointLiteral))
         {
             RefPtr<ConstantExpressionSyntaxNode> constExpr = new ConstantExpressionSyntaxNode();
             auto token = tokenReader.AdvanceToken();
             FillPosition(constExpr.Ptr());
-            if (token.Type == TokenType::IntLiterial)
+            if (token.Type == TokenType::IntegerLiteral)
             {
                 constExpr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Int;
                 constExpr->IntValue = StringToInt(token.Content);
             }
-            else if (token.Type == TokenType::DoubleLiterial)
+            else if (token.Type == TokenType::FloatingPointLiteral)
             {
                 constExpr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Float;
                 constExpr->FloatValue = (FloatingPointLiteralValue) StringToDouble(token.Content);

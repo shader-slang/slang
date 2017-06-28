@@ -487,7 +487,7 @@ static String getStringOrIdentifierTokenValue(
     case TokenType::Identifier:
         return token.Content;
 
-    case TokenType::StringLiterial:
+    case TokenType::StringLiteral:
         return getStringLiteralTokenValue(token);
         break;
     }

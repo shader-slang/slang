@@ -1083,7 +1083,7 @@ static PreprocessorExpressionValue ParseAndEvaluateUnaryExpression(PreprocessorD
             return value;
         }
 
-    case TokenType::IntLiterial:
+    case TokenType::IntegerLiteral:
         return StringToInt(AdvanceToken(context).Content);
 
     case TokenType::Identifier:
@@ -1488,7 +1488,7 @@ static void HandleImportDirective(PreprocessorDirectiveContext* context);
 static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
 {
     Token pathToken;
-    if(!Expect(context, TokenType::StringLiterial, Diagnostics::expectedTokenInPreprocessorDirective, &pathToken))
+    if(!Expect(context, TokenType::StringLiteral, Diagnostics::expectedTokenInPreprocessorDirective, &pathToken))
         return;
 
     String path = getFileNameTokenValue(pathToken);
@@ -1656,7 +1656,7 @@ static void HandleErrorDirective(PreprocessorDirectiveContext* context)
 static void HandleLineDirective(PreprocessorDirectiveContext* context)
 {
     int line = 0;
-    if (PeekTokenType(context) == TokenType::IntLiterial)
+    if (PeekTokenType(context) == TokenType::IntegerLiteral)
     {
         line = StringToInt(AdvanceToken(context).Content);
     }
@@ -1672,7 +1672,7 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
     else
     {
         GetSink(context)->diagnose(PeekLoc(context), Diagnostics::expected2TokensInPreprocessorDirective,
-            TokenType::IntLiterial,
+            TokenType::IntegerLiteral,
             "default",
             GetDirectiveName(context));
         context->parseError = true;
@@ -1686,11 +1686,11 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
     {
         file = directiveLoc.FileName;
     }
-    else if (PeekTokenType(context) == TokenType::StringLiterial)
+    else if (PeekTokenType(context) == TokenType::StringLiteral)
     {
         file = AdvanceToken(context).Content;
     }
-    else if (PeekTokenType(context) == TokenType::IntLiterial)
+    else if (PeekTokenType(context) == TokenType::IntegerLiteral)
     {
         // Note(tfoley): GLSL allows the "source string" to be indicated by an integer
         // TODO(tfoley): Figure out a better way to handle this, if it matters
@@ -1698,7 +1698,7 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
     }
     else
     {
-        Expect(context, TokenType::StringLiterial, Diagnostics::expectedTokenInPreprocessorDirective);
+        Expect(context, TokenType::StringLiteral, Diagnostics::expectedTokenInPreprocessorDirective);
         return;
     }
 
@@ -1723,7 +1723,7 @@ static void handleGLSLVersionDirective(PreprocessorDirectiveContext* context)
     Token versionNumberToken;
     if(!ExpectRaw(
         context,
-        TokenType::IntLiterial,
+        TokenType::IntegerLiteral,
         Diagnostics::expectedTokenInPreprocessorDirective,
         &versionNumberToken))
     {
@@ -2090,7 +2090,7 @@ TokenList preprocessSource(
 static void HandleImportDirective(PreprocessorDirectiveContext* context)
 {
     Token pathToken;
-    if(!Expect(context, TokenType::StringLiterial, Diagnostics::expectedTokenInPreprocessorDirective, &pathToken))
+    if(!Expect(context, TokenType::StringLiteral, Diagnostics::expectedTokenInPreprocessorDirective, &pathToken))
         return;
 
     String path = getFileNameTokenValue(pathToken);

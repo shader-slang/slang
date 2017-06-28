@@ -370,7 +370,7 @@ namespace Slang
         {
         case 'f': case 'F':
             advance(lexer);
-            return TokenType::DoubleLiterial;
+            return TokenType::FloatingPointLiteral;
 
         default:
             break;
@@ -453,21 +453,21 @@ namespace Slang
         lexDigits(lexer, base);
         maybeLexNumberExponent(lexer, base);
             
-        return maybeLexNumberSuffix(lexer, TokenType::DoubleLiterial);
+        return maybeLexNumberSuffix(lexer, TokenType::FloatingPointLiteral);
     }
 
     static TokenType lexNumber(Lexer* lexer, int base)
     {
         // TODO(tfoley): Need to consider whehter to allow any kind of digit separator character.
 
-        TokenType tokenType = TokenType::IntLiterial;
+        TokenType tokenType = TokenType::IntegerLiteral;
 
         // At the start of things, we just concern ourselves with digits
         lexDigits(lexer, base);
 
         if( peek(lexer) == '.' )
         {
-            tokenType = TokenType::DoubleLiterial;
+            tokenType = TokenType::FloatingPointLiteral;
 
             advance(lexer);
             lexDigits(lexer, base);
@@ -475,7 +475,7 @@ namespace Slang
 
         if( maybeLexNumberExponent(lexer, base))
         {
-            tokenType = TokenType::DoubleLiterial;
+            tokenType = TokenType::FloatingPointLiteral;
         }
 
         maybeLexNumberSuffix(lexer, tokenType);
@@ -575,8 +575,8 @@ namespace Slang
 
     String getStringLiteralTokenValue(Token const& token)
     {
-        assert(token.Type == TokenType::StringLiterial
-            || token.Type == TokenType::CharLiterial);
+        assert(token.Type == TokenType::StringLiteral
+            || token.Type == TokenType::CharLiteral);
 
         char const* cursor = token.Content.begin();
         char const* end = token.Content.end();
@@ -758,7 +758,7 @@ namespace Slang
                 switch(peek(lexer))
                 {
                 default:
-                    return TokenType::IntLiterial;
+                    return TokenType::IntegerLiteral;
 
                 case '.':
                     advance(lexer);
@@ -798,12 +798,12 @@ namespace Slang
         case '\"':
             advance(lexer);
             lexStringLiteralBody(lexer, '\"');
-            return TokenType::StringLiterial;
+            return TokenType::StringLiteral;
 
         case '\'':
             advance(lexer);
             lexStringLiteralBody(lexer, '\'');
-            return TokenType::CharLiterial;
+            return TokenType::CharLiteral;
 
         case '+':
             advance(lexer);
