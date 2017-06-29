@@ -40,24 +40,46 @@ namespace Slang
 		sb.Append(newExt);
 		return sb.ProduceString();
 	}
+
+    static UInt findLastSeparator(String const& path)
+    {
+		UInt slashPos = path.LastIndexOf('/');
+        UInt backslashPos = path.LastIndexOf('\\');
+
+        if (slashPos == -1) return backslashPos;
+        if (backslashPos == -1) return slashPos;
+
+        UInt pos = slashPos;
+        if (backslashPos > slashPos)
+            pos = backslashPos;
+
+        return pos;
+    }
+
 	String Path::GetFileName(const String & path)
 	{
-		int pos = path.LastIndexOf('/');
-		pos = Math::Max(path.LastIndexOf('\\'), pos) + 1;
-		return path.SubString(pos, path.Length()-pos);
+        UInt pos = findLastSeparator(path);
+        if (pos != -1)
+        {
+            pos = pos + 1;
+            return path.SubString(pos, path.Length() - pos);
+        }
+        else
+        {
+            return path;
+        }
 	}
 	String Path::GetFileNameWithoutEXT(const String & path)
 	{
-		int pos = path.LastIndexOf('/');
-		pos = Math::Max(path.LastIndexOf('\\'), pos) + 1;
-		int dotPos = path.LastIndexOf('.');
-		if (dotPos <= pos)
-			dotPos = path.Length();
-		return path.SubString(pos, dotPos - pos);
+        String fileName = GetFileName(path);
+		int dotPos = fileName.LastIndexOf('.');
+		if (dotPos == -1)
+            return fileName;
+		return fileName.SubString(0, dotPos);
 	}
 	String Path::GetFileExt(const String & path)
 	{
-		int dotPos = path.LastIndexOf('.');
+		UInt dotPos = path.LastIndexOf('.');
 		if (dotPos != -1)
 			return path.SubString(dotPos+1, path.Length()-dotPos-1);
 		else
@@ -65,8 +87,7 @@ namespace Slang
 	}
 	String Path::GetDirectoryName(const String & path)
 	{
-		int pos = path.LastIndexOf('/');
-		pos = Math::Max(path.LastIndexOf('\\'), pos);
+        UInt pos = findLastSeparator(path);
 		if (pos != -1)
 			return path.SubString(0, pos);
 		else

@@ -238,7 +238,7 @@ struct OptionsParser
                     }
                     else
                     {
-                        fprintf(stderr, "unknown code generation target '%S'\n", name.ToWString());
+                        fprintf(stderr, "unknown code generation target '%S'\n", name.ToWString().begin());
                         exit(1);
                     }
 
@@ -302,7 +302,7 @@ struct OptionsParser
                     else if (name == "glslang") { passThrough = SLANG_PASS_THROUGH_GLSLANG; }
                     else
                     {
-                        fprintf(stderr, "unknown pass-through target '%S'\n", name.ToWString());
+                        fprintf(stderr, "unknown pass-through target '%S'\n", name.ToWString().begin());
                         exit(1);
                     }
 
@@ -387,7 +387,7 @@ struct OptionsParser
                 }
                 else
                 {
-                    fprintf(stderr, "unknown command-line option '%S'\n", argStr.ToWString());
+                    fprintf(stderr, "unknown command-line option '%S'\n", argStr.ToWString().begin());
                     // TODO: print a usage message
                     exit(1);
                 }

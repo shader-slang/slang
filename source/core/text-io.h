@@ -263,7 +263,7 @@ namespace Slang
 		}
         void ReleaseStream()
         {
-            stream.Release();
+            stream = 0;
         }
 	};
 
@@ -308,7 +308,7 @@ namespace Slang
 		}
         void ReleaseStream()
         {
-            stream.Release();
+            stream = 0;
         }
 	};
 }

@@ -211,8 +211,8 @@ LayoutSemanticInfo ExtractLayoutSemanticInfo(
     // TODO: need to parse and handle `space` binding
     int space = 0;
 
-    int index = 0;
-    for (int ii = 1; ii < registerName.Length(); ++ii)
+    UInt index = 0;
+    for (UInt ii = 1; ii < registerName.Length(); ++ii)
     {
         int c = registerName[ii];
         if (c >= '0' && c <= '9')

@@ -664,25 +664,10 @@ namespace Slang
             : IsLeftValue(false)
         {}
 
-        QualType(RefPtr<ExpressionType> type)
-            : type(type)
-            , IsLeftValue(false)
-        {}
-
         QualType(ExpressionType* type)
             : type(type)
             , IsLeftValue(false)
         {}
-
-        void operator=(RefPtr<ExpressionType> t)
-        {
-            *this = QualType(t);
-        }
-
-        void operator=(ExpressionType* t)
-        {
-            *this = QualType(t);
-        }
 
         ExpressionType* Ptr() { return type.Ptr(); }
 
@@ -1444,7 +1429,7 @@ namespace Slang
             return type->Equals(other.Ptr());
         }
         ExpressionType* Ptr() { return type.Ptr(); }
-        operator RefPtr<ExpressionType>()
+        operator ExpressionType*()
         {
             return type;
         }
@@ -1473,7 +1458,7 @@ namespace Slang
 
     inline RefPtr<ExpressionType> GetType(DeclRef<VarDeclBase> const& declRef)
     {
-        return declRef.Substitute(declRef.getDecl()->Type);
+        return declRef.Substitute(declRef.getDecl()->Type.Ptr());
     }
 
     inline RefPtr<ExpressionSyntaxNode> getInitExpr(DeclRef<VarDeclBase> const& declRef)
@@ -1519,7 +1504,7 @@ namespace Slang
 
     inline RefPtr<ExpressionType> GetTargetType(DeclRef<ExtensionDecl> const& declRef)
     {
-        return declRef.Substitute(declRef.getDecl()->targetType);
+        return declRef.Substitute(declRef.getDecl()->targetType.Ptr());
     }
 
     // Declaration of a type that represents some sort of aggregate
@@ -1620,7 +1605,7 @@ namespace Slang
 
     inline RefPtr<ExpressionType> GetType(DeclRef<TypeDefDecl> const& declRef)
     {
-        return declRef.Substitute(declRef.getDecl()->Type);
+        return declRef.Substitute(declRef.getDecl()->Type.Ptr());
     }
 
     // A type alias of some kind (e.g., via `typedef`)
@@ -2423,12 +2408,12 @@ namespace Slang
 
     inline RefPtr<ExpressionType> GetSub(DeclRef<GenericTypeConstraintDecl> const& declRef)
     {
-        return declRef.Substitute(declRef.getDecl()->sub);
+        return declRef.Substitute(declRef.getDecl()->sub.Ptr());
     }
 
     inline RefPtr<ExpressionType> GetSup(DeclRef<GenericTypeConstraintDecl> const& declRef)
     {
-        return declRef.Substitute(declRef.getDecl()->sup);
+        return declRef.Substitute(declRef.getDecl()->sup.Ptr());
     }
 
     class GenericValueParamDecl : public VarDeclBase
@@ -2482,7 +2467,7 @@ namespace Slang
 
     //
 
-    class SyntaxVisitor
+    class SyntaxVisitor : public RefObject
     {
     protected:
         DiagnosticSink * sink = nullptr;

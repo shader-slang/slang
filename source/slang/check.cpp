@@ -155,7 +155,7 @@ namespace Slang
             auto derefExpr = new DerefExpr();
             derefExpr->Position = originalExpr->Position;
             derefExpr->base = base;
-            derefExpr->Type = ptrLikeType->elementType;
+            derefExpr->Type = QualType(ptrLikeType->elementType);
 
             // TODO(tfoley): handle l-value status here
 
@@ -198,7 +198,7 @@ namespace Slang
             {
                 auto overloadedExpr = new OverloadedExpr();
                 overloadedExpr->Position = originalExpr->Position;
-                overloadedExpr->Type = ExpressionType::Overloaded;
+                overloadedExpr->Type = QualType(ExpressionType::Overloaded);
                 overloadedExpr->base = baseExpr;
                 overloadedExpr->lookupResult2 = lookupResult;
                 return overloadedExpr;
@@ -236,7 +236,7 @@ namespace Slang
                 }
 
                 // TODO(tfoley): should we construct a new ErrorExpr here?
-                overloadedExpr->Type = ExpressionType::Error;
+                overloadedExpr->Type = QualType(ExpressionType::Error);
                 return overloadedExpr;
             }
 
@@ -518,7 +518,7 @@ namespace Slang
 
         RefPtr<ExpressionSyntaxNode> CreateErrorExpr(ExpressionSyntaxNode* expr)
         {
-            expr->Type = ExpressionType::Error;
+            expr->Type = QualType(ExpressionType::Error);
             return expr;
         }
 
@@ -787,7 +787,7 @@ namespace Slang
                 {
                     auto toInitializerListExpr = new InitializerListExpr();
                     toInitializerListExpr->Position = fromInitializerListExpr->Position;
-                    toInitializerListExpr->Type = toType;
+                    toInitializerListExpr->Type = QualType(toType);
                     toInitializerListExpr->args = coercedArgs;
 
 
@@ -960,7 +960,7 @@ namespace Slang
             auto castExpr = new TypeCastExpressionSyntaxNode();
             castExpr->Position = fromExpr->Position;
             castExpr->TargetType.type = toType;
-            castExpr->Type = toType;
+            castExpr->Type = QualType(toType);
             castExpr->Expression = fromExpr;
             return castExpr;
         }
@@ -1020,7 +1020,7 @@ namespace Slang
                 // then coerce any initializer to the type
                 if (initExpr)
                 {
-                    initExpr = Coerce(type, initExpr);
+                    initExpr = Coerce(type.Ptr(), initExpr);
                 }
             }
             else
@@ -1668,7 +1668,7 @@ namespace Slang
                 {
                     if (function)
                     {
-                        stmt->Expression = Coerce(function->ReturnType, stmt->Expression);
+                        stmt->Expression = Coerce(function->ReturnType.Ptr(), stmt->Expression);
                     }
                     else
                     {
@@ -1801,7 +1801,7 @@ namespace Slang
                 // TODO(tfoley): should coercion of initializer lists be special-cased
                 // here, or handled as a general case for coercion?
 
-                initExpr = Coerce(varDecl->Type, initExpr);
+                initExpr = Coerce(varDecl->Type.Ptr(), initExpr);
                 varDecl->Expr = initExpr;
             }
 
@@ -1903,7 +1903,7 @@ namespace Slang
                 expr->Type = ExpressionType::GetFloat();
                 break;
             default:
-                expr->Type = ExpressionType::Error;
+                expr->Type = QualType(ExpressionType::Error);
                 throw "Invalid constant type.";
                 break;
             }
@@ -2167,7 +2167,7 @@ namespace Slang
                 return CreateErrorExpr(subscriptExpr.Ptr());
             }
 
-            subscriptExpr->Type = elementType;
+            subscriptExpr->Type = QualType(elementType);
 
             // TODO(tfoley): need to be more careful about this stuff
             subscriptExpr->Type.IsLeftValue = baseExpr->Type.IsLeftValue;
@@ -2237,7 +2237,7 @@ namespace Slang
 
                 auto elementType = CoerceToUsableType(TypeExp(baseExpr, baseTypeType->type));
                 auto arrayType = new ArrayExpressionType();
-                arrayType->BaseType = elementType;
+                arrayType->BaseType = elementType.Ptr();
                 arrayType->ArrayLength = elementCount;
 
                 typeResult = arrayType;
@@ -2401,7 +2401,7 @@ namespace Slang
         {
             // TODO(tfoley): Actual checking logic needs to go here...
 
-            appExpr->Type = type;
+            appExpr->Type = QualType(type);
             return appExpr;
         }
 
@@ -3290,7 +3290,7 @@ namespace Slang
             }
 
             context.mode = OverloadResolveContext::Mode::ForReal;
-            context.appExpr->Type = ExpressionType::Error;
+            context.appExpr->Type = QualType(ExpressionType::Error);
 
             if (!TryCheckOverloadCandidateArity(context, candidate))
                 goto error;
@@ -3312,7 +3312,7 @@ namespace Slang
                 {
                 case OverloadCandidate::Flavor::Func:
                     context.appExpr->FunctionExpr = baseExpr;
-                    context.appExpr->Type = candidate.resultType;
+                    context.appExpr->Type = QualType(candidate.resultType);
 
                     // A call may yield an l-value, and we should take a look at the candidate to be sure
                     if(auto subscriptDeclRef = candidate.item.declRef.As<SubscriptDecl>())
@@ -3771,7 +3771,7 @@ namespace Slang
             {
                 ConstraintSystem constraints;
 
-                if (!TryUnifyTypes(constraints, extDecl->targetType, type))
+                if (!TryUnifyTypes(constraints, extDecl->targetType.Ptr(), type))
                     return DeclRef<Decl>().As<ExtensionDecl>();
 
                 auto constraintSubst = TrySolveConstraintSystem(&constraints, DeclRef<Decl>(extGenericDecl, nullptr).As<GenericDecl>());
@@ -4291,7 +4291,7 @@ namespace Slang
             {
                 // Nothing at all was found that we could even consider invoking
                 getSink()->diagnose(expr->FunctionExpr, Diagnostics::expectedFunction);
-                expr->Type = ExpressionType::Error;
+                expr->Type = QualType(ExpressionType::Error);
                 return expr;
             }
         }
@@ -4562,7 +4562,7 @@ namespace Slang
             if (expr->declRef)
                 return expr;
 
-            expr->Type = ExpressionType::Error;
+            expr->Type = QualType(ExpressionType::Error);
 
             auto lookupResult = LookUp(this, expr->name, expr->scope);
             if (lookupResult.isValid())
@@ -4587,7 +4587,7 @@ namespace Slang
             if (expr->Expression->Type->Equals(ExpressionType::Error.Ptr()))
             {
                 // If the expression being casted has an error type, then just silently succeed
-                expr->Type = targetType;
+                expr->Type = targetType.Ptr();
                 return expr;
             }
             else if (auto targetArithType = targetType->AsArithmeticType())
@@ -4604,7 +4604,7 @@ namespace Slang
 
                     // TODO(tfoley): this checking is incomplete here, and could
                     // lead to downstream compilation failures
-                    expr->Type = targetType;
+                    expr->Type = targetType.Ptr();
                     return expr;
                 }
             }
@@ -4612,7 +4612,7 @@ namespace Slang
         fail:
             // Default: in no other case succeds, then the cast failed and we emit a diagnostic.
             getSink()->diagnose(expr, Diagnostics::invalidTypeCast, expr->Expression->Type, targetType->ToString());
-            expr->Type = ExpressionType::Error;
+            expr->Type = QualType(ExpressionType::Error);
             return expr;
         }
 #if TIMREMOVED
@@ -4656,11 +4656,11 @@ namespace Slang
                 auto& type = expr->Type;
                 if (auto pointerLikeType = type->As<PointerLikeType>())
                 {
-                    type = pointerLikeType->elementType;
+                    type = QualType(pointerLikeType->elementType);
 
                     auto derefExpr = new DerefExpr();
                     derefExpr->base = expr;
-                    derefExpr->Type = pointerLikeType->elementType;
+                    derefExpr->Type = QualType(pointerLikeType->elementType);
 
                     // TODO(tfoley): deal with l-value-ness here
 
@@ -4691,7 +4691,7 @@ namespace Slang
             bool anyDuplicates = false;
             bool anyError = false;
 
-            for (int i = 0; i < memberRefExpr->name.Length(); i++)
+            for (UInt i = 0; i < memberRefExpr->name.Length(); i++)
             {
                 auto ch = memberRefExpr->name[i];
                 int elementIndex = -1;
@@ -4738,7 +4738,7 @@ namespace Slang
 
             if (anyError)
             {
-                swizExpr->Type = ExpressionType::Error;
+                swizExpr->Type = QualType(ExpressionType::Error);
             }
             else if (elementCount == 1)
             {
@@ -4747,15 +4747,15 @@ namespace Slang
                 // Note(tfoley): the official HLSL rules seem to be that it produces
                 // a one-component vector, which is then implicitly convertible to
                 // a scalar, but that seems like it just adds complexity.
-                swizExpr->Type = baseElementType;
+                swizExpr->Type = QualType(baseElementType);
             }
             else
             {
                 // TODO(tfoley): would be nice to "re-sugar" type
                 // here if the input type had a sugared name...
-                swizExpr->Type = createVectorType(
+                swizExpr->Type = QualType(createVectorType(
                     baseElementType,
-                    new ConstantIntVal(elementCount));
+                    new ConstantIntVal(elementCount)));
             }
 
             // A swizzle can be used as an l-value as long as there
@@ -4861,14 +4861,14 @@ namespace Slang
                 // catch-all
             fail:
                 getSink()->diagnose(expr, Diagnostics::noMemberOfNameInType, expr->name, baseType);
-                expr->Type = ExpressionType::Error;
+                expr->Type = QualType(ExpressionType::Error);
                 return expr;
             }
             // All remaining cases assume we have a `BasicType`
             else if (!baseType->AsBasicType())
-                expr->Type = ExpressionType::Error;
+                expr->Type = QualType(ExpressionType::Error);
             else
-                expr->Type = ExpressionType::Error;
+                expr->Type = QualType(ExpressionType::Error);
             if (!baseType->Equals(ExpressionType::Error.Ptr()) &&
                 expr->Type->Equals(ExpressionType::Error.Ptr()))
             {
@@ -5023,7 +5023,7 @@ namespace Slang
         {
             sink->diagnose(declRef, Diagnostics::unimplemented, "cannot form reference to this kind of declaration");
         }
-        return ExpressionType::Error;
+        return QualType(ExpressionType::Error);
     }
 
     QualType getTypeForDeclRef(

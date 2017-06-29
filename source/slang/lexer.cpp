@@ -415,7 +415,7 @@ namespace Slang
         return tokenType;
     }
 
-    static bool isNumberExponent(char c, int base)
+    static bool isNumberExponent(int c, int base)
     {
         switch( c )
         {
@@ -497,7 +497,6 @@ namespace Slang
 
         for(;;)
         {
-            int digitVal = 0;
             int c = *cursor;
             switch(c)
             {
