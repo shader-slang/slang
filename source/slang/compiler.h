@@ -224,9 +224,6 @@ namespace Slang
         void parseTranslationUnit(
             TranslationUnitRequest* translationUnit);
 
-        void CompileRequest::checkTranslationUnit(
-            TranslationUnitRequest* translationUnit);
-
         void checkAllTranslationUnits();
 
         int executeActionsInner();

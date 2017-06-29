@@ -167,12 +167,17 @@
     <ClInclude Include="..\..\slang.h" />
     <ClInclude Include="compiled-program.h" />
     <ClInclude Include="compiler.h" />
+    <ClInclude Include="decl-defs.h" />
     <ClInclude Include="diagnostic-defs.h" />
     <ClInclude Include="diagnostics.h" />
     <ClInclude Include="emit.h" />
+    <ClInclude Include="expr-defs.h" />
     <ClInclude Include="intrinsic-defs.h" />
     <ClInclude Include="lexer.h" />
     <ClInclude Include="lookup.h" />
+    <ClInclude Include="modifier-defs.h" />
+    <ClInclude Include="object-meta-begin.h" />
+    <ClInclude Include="object-meta-end.h" />
     <ClInclude Include="parameter-binding.h" />
     <ClInclude Include="parser.h" />
     <ClInclude Include="preprocessor.h" />
@@ -181,11 +186,17 @@
     <ClInclude Include="reflection.h" />
     <ClInclude Include="slang-stdlib.h" />
     <ClInclude Include="source-loc.h" />
+    <ClInclude Include="stmt-defs.h" />
+    <ClInclude Include="syntax-base-defs.h" />
+    <ClInclude Include="syntax-defs.h" />
     <ClInclude Include="syntax-visitors.h" />
     <ClInclude Include="syntax.h" />
     <ClInclude Include="token-defs.h" />
     <ClInclude Include="token.h" />
+    <ClInclude Include="type-defs.h" />
     <ClInclude Include="type-layout.h" />
+    <ClInclude Include="val-defs.h" />
+    <ClInclude Include="visitor.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="check.cpp" />

@@ -178,18 +178,6 @@ void CompileRequest::parseTranslationUnit(
     }
 }
 
-void CompileRequest::checkTranslationUnit(
-    TranslationUnitRequest* translationUnit)
-{
-    RefPtr<SyntaxVisitor> visitor = CreateSemanticsVisitor(
-        &mSink,
-        this,
-        translationUnit);
-
-    visitor->setSourceLanguage(translationUnit->sourceLanguage);
-    translationUnit->SyntaxNode->Accept(visitor.Ptr());
-}
-
 void CompileRequest::checkAllTranslationUnits()
 {
     for( auto& translationUnit : translationUnits )

@@ -1,5 +1,9 @@
 #include "syntax.h"
-#include "syntax-visitors.h"
+
+#pragma warning AAA
+#include "visitor.h"
+#pragma warning BBB
+
 #include <typeinfo>
 #include <assert.h>
 
@@ -51,176 +55,47 @@ namespace Slang
         return res.ProduceString();
     }
 
-    RefPtr<SyntaxNode> ProgramSyntaxNode::Accept(SyntaxVisitor * visitor)
+#pragma warning CCC
+
+
+    // Generate dispatch logic and other definitions for all syntax classes
+#define SYNTAX_CLASS(NAME, BASE) /* empty */
+#include "object-meta-begin.h"
+
+#include "syntax-base-defs.h"
+#undef SYNTAX_CLASS
+#undef ABSTRACT_SYNTAX_CLASS
+
+#define ABSTRACT_SYNTAX_CLASS(NAME, BASE) /* empty */
+#define SYNTAX_CLASS(NAME, BASE)                                \
+    void NAME::accept(NAME::Visitor* visitor, void* extra)      \
+    { visitor->dispatch_##NAME(this, extra); }
+#include "expr-defs.h"
+#include "decl-defs.h"
+#include "modifier-defs.h"
+#include "stmt-defs.h"
+#include "type-defs.h"
+#include "val-defs.h"
+
+#include "object-meta-end.h"
+
+#pragma warning DDD
+
+void ExpressionType::accept(IValVisitor* visitor, void* extra)
+{
+    accept((ITypeVisitor*)visitor, extra);
+}
+
+    // TypeExp
+
+    bool TypeExp::Equals(ExpressionType* other)
     {
-        return visitor->VisitProgram(this);
+        return type->Equals(other);
     }
 
-    RefPtr<SyntaxNode> FunctionSyntaxNode::Accept(SyntaxVisitor * visitor)
+    bool TypeExp::Equals(RefPtr<ExpressionType> other)
     {
-        return visitor->VisitFunction(this);
-    }
-
-    //
-
-    RefPtr<SyntaxNode> ScopeDecl::Accept(SyntaxVisitor * visitor)
-    {
-        return visitor->VisitScopeDecl(this);
-    }
-
-    //
-
-    RefPtr<SyntaxNode> BlockStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
-    {
-        return visitor->VisitBlockStatement(this);
-    }
-
-    RefPtr<SyntaxNode> BreakStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
-    {
-        return visitor->VisitBreakStatement(this);
-    }
-
-    RefPtr<SyntaxNode> ContinueStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
-    {
-        return visitor->VisitContinueStatement(this);
-    }
-
-    RefPtr<SyntaxNode> DoWhileStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
-    {
-        return visitor->VisitDoWhileStatement(this);
-    }
-
-    RefPtr<SyntaxNode> EmptyStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
-    {
-        return visitor->VisitEmptyStatement(this);
-    }
-
-    RefPtr<SyntaxNode> ForStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
-    {
-        return visitor->VisitForStatement(this);
-    }
-
-    RefPtr<SyntaxNode> IfStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
-    {
-        return visitor->VisitIfStatement(this);
-    }
-
-    RefPtr<SyntaxNode> ReturnStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
-    {
-        return visitor->VisitReturnStatement(this);
-    }
-
-    RefPtr<SyntaxNode> VarDeclrStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
-    {
-        return visitor->VisitVarDeclrStatement(this);
-    }
-
-    RefPtr<SyntaxNode> Variable::Accept(SyntaxVisitor * visitor)
-    {
-        return visitor->VisitDeclrVariable(this);
-    }
-
-    RefPtr<SyntaxNode> WhileStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
-    {
-        return visitor->VisitWhileStatement(this);
-    }
-
-    RefPtr<SyntaxNode> ExpressionStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
-    {
-        return visitor->VisitExpressionStatement(this);
-    }
-
-    RefPtr<SyntaxNode> ConstantExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
-    {
-        return visitor->VisitConstantExpression(this);
-    }
-
-    RefPtr<SyntaxNode> IndexExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
-    {
-        return visitor->VisitIndexExpression(this);
-    }
-    RefPtr<SyntaxNode> MemberExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
-    {
-        return visitor->VisitMemberExpression(this);
-    }
-
-    // SwizzleExpr
-
-    RefPtr<SyntaxNode> SwizzleExpr::Accept(SyntaxVisitor * visitor)
-    {
-        return visitor->VisitSwizzleExpression(this);
-    }
-
-    // DerefExpr
-
-    RefPtr<SyntaxNode> DerefExpr::Accept(SyntaxVisitor * /*visitor*/)
-    {
-        // throw "unimplemented";
-        return this;
-    }
-
-    //
-
-    RefPtr<SyntaxNode> InvokeExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
-    {
-        return visitor->VisitInvokeExpression(this);
-    }
-
-    RefPtr<SyntaxNode> TypeCastExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
-    {
-        return visitor->VisitTypeCastExpression(this);
-    }
-
-    RefPtr<SyntaxNode> VarExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
-    {
-        return visitor->VisitVarExpression(this);
-    }
-
-    // OverloadedExpr
-
-    RefPtr<SyntaxNode> OverloadedExpr::Accept(SyntaxVisitor * /*visitor*/)
-    {
-//			throw "unimplemented";
-        return this;
-    }
-
-    //
-
-    RefPtr<SyntaxNode> ParameterSyntaxNode::Accept(SyntaxVisitor * visitor)
-    {
-        return visitor->VisitParameter(this);
-    }
-
-    // ImportDecl
-
-    RefPtr<SyntaxNode> ImportDecl::Accept(SyntaxVisitor * visitor)
-    {
-        visitor->visitImportDecl(this);
-        return this;
-    }
-
-    //
-
-    RefPtr<SyntaxNode> StructField::Accept(SyntaxVisitor * visitor)
-    {
-        return visitor->VisitStructField(this);
-    }
-    RefPtr<SyntaxNode> StructSyntaxNode::Accept(SyntaxVisitor * visitor)
-    {
-        return visitor->VisitStruct(this);
-    }
-    RefPtr<SyntaxNode> ClassSyntaxNode::Accept(SyntaxVisitor * visitor)
-    {
-        return visitor->VisitClass(this);
-    }
-    RefPtr<SyntaxNode> TypeDefDecl::Accept(SyntaxVisitor * visitor)
-    {
-        return visitor->VisitTypeDefDecl(this);
-    }
-
-    RefPtr<SyntaxNode> DiscardStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
-    {
-        return visitor->VisitDiscardStatement(this);
+        return type->Equals(other.Ptr());
     }
 
     // BasicExpressionType
@@ -357,10 +232,6 @@ namespace Slang
             return BaseType->ToString() + "[" + ArrayLength->ToString() + "]";
         else
             return BaseType->ToString() + "[]";
-    }
-    RefPtr<SyntaxNode> GenericAppExpr::Accept(SyntaxVisitor * visitor)
-    {
-        return visitor->VisitGenericApp(this);
     }
 
     // DeclRefType
@@ -826,190 +697,6 @@ namespace Slang
         return this->declRef.substitutions->args[2].As<IntVal>().Ptr();
     }
 
-    //
-
-#if 0
-    String GetOperatorFunctionName(Operator op)
-    {
-        switch (op)
-        {
-        case Operator::Add:
-        case Operator::AddAssign:
-            return "+";
-        case Operator::Sub:
-        case Operator::SubAssign:
-            return "-";
-        case Operator::Neg:
-            return "-";
-        case Operator::Not:
-            return "!";
-        case Operator::BitNot:
-            return "~";
-        case Operator::PreInc:
-        case Operator::PostInc:
-            return "++";
-        case Operator::PreDec:
-        case Operator::PostDec:
-            return "--";
-        case Operator::Mul:
-        case Operator::MulAssign:
-            return "*";
-        case Operator::Div:
-        case Operator::DivAssign:
-            return "/";
-        case Operator::Mod:
-        case Operator::ModAssign:
-            return "%";
-        case Operator::Lsh:
-        case Operator::LshAssign:
-            return "<<";
-        case Operator::Rsh:
-        case Operator::RshAssign:
-            return ">>";
-        case Operator::Eql:
-            return "==";
-        case Operator::Neq:
-            return "!=";
-        case Operator::Greater:
-            return ">";
-        case Operator::Less:
-            return "<";
-        case Operator::Geq:
-            return ">=";
-        case Operator::Leq:
-            return "<=";
-        case Operator::BitAnd:
-        case Operator::AndAssign:
-            return "&";
-        case Operator::BitXor:
-        case Operator::XorAssign:
-            return "^";
-        case Operator::BitOr:
-        case Operator::OrAssign:
-            return "|";
-        case Operator::And:
-            return "&&";
-        case Operator::Or:
-            return "||";
-        case Operator::Sequence:
-            return ",";
-        case Operator::Select:
-            return "?:";
-        case Operator::Assign:
-            return "=";
-        default:
-            return "";
-        }
-    }
-#endif
-    String OperatorToString(Operator op)
-    {
-        switch (op)
-        {
-        case Slang::Operator::Neg:
-            return "-";
-        case Slang::Operator::Not:
-            return "!";
-        case Slang::Operator::PreInc:
-            return "++";
-        case Slang::Operator::PreDec:
-            return "--";
-        case Slang::Operator::PostInc:
-            return "++";
-        case Slang::Operator::PostDec:
-            return "--";
-        case Slang::Operator::Mul:
-        case Slang::Operator::MulAssign:
-            return "*";
-        case Slang::Operator::Div:
-        case Slang::Operator::DivAssign:
-            return "/";
-        case Slang::Operator::Mod:
-        case Slang::Operator::ModAssign:
-            return "%";
-        case Slang::Operator::Add:
-        case Slang::Operator::AddAssign:
-            return "+";
-        case Slang::Operator::Sub:
-        case Slang::Operator::SubAssign:
-            return "-";
-        case Slang::Operator::Lsh:
-        case Slang::Operator::LshAssign:
-            return "<<";
-        case Slang::Operator::Rsh:
-        case Slang::Operator::RshAssign:
-            return ">>";
-        case Slang::Operator::Eql:
-            return "==";
-        case Slang::Operator::Neq:
-            return "!=";
-        case Slang::Operator::Greater:
-            return ">";
-        case Slang::Operator::Less:
-            return "<";
-        case Slang::Operator::Geq:
-            return ">=";
-        case Slang::Operator::Leq:
-            return "<=";
-        case Slang::Operator::BitAnd:
-        case Slang::Operator::AndAssign:
-            return "&";
-        case Slang::Operator::BitXor:
-        case Slang::Operator::XorAssign:
-            return "^";
-        case Slang::Operator::BitOr:
-        case Slang::Operator::OrAssign:
-            return "|";
-        case Slang::Operator::And:
-            return "&&";
-        case Slang::Operator::Or:
-            return "||";
-        case Slang::Operator::Assign:
-            return "=";
-        default:
-            return "ERROR";
-        }
-    }
-
-    // TypeExp
-
-    TypeExp TypeExp::Accept(SyntaxVisitor* visitor)
-    {
-        return visitor->VisitTypeExp(*this);
-    }
-
-    // BuiltinTypeModifier
-
-    // MagicTypeModifier
-
-    // GenericDecl
-
-    RefPtr<SyntaxNode> GenericDecl::Accept(SyntaxVisitor * visitor)
-    {
-        return visitor->VisitGenericDecl(this);
-    }
-
-    // GenericTypeParamDecl
-
-    RefPtr<SyntaxNode> GenericTypeParamDecl::Accept(SyntaxVisitor * /*visitor*/) {
-        //throw "unimplemented";
-        return this;
-    }
-
-    // GenericTypeConstraintDecl
-
-    RefPtr<SyntaxNode> GenericTypeConstraintDecl::Accept(SyntaxVisitor * visitor)
-    {
-        return this;
-    }
-
-    // GenericValueParamDecl
-
-    RefPtr<SyntaxNode> GenericValueParamDecl::Accept(SyntaxVisitor * /*visitor*/) {
-        //throw "unimplemented";
-        return this;
-    }
-
     // GenericParamIntVal
 
     bool GenericParamIntVal::EqualsVal(Val* val)
@@ -1066,38 +753,6 @@ namespace Slang
         }
 
         // Nothing found: don't substittue.
-        return this;
-    }
-
-    // ExtensionDecl
-
-    RefPtr<SyntaxNode> ExtensionDecl::Accept(SyntaxVisitor * visitor)
-    {
-        visitor->VisitExtensionDecl(this);
-        return this;
-    }
-
-    // ConstructorDecl
-
-    RefPtr<SyntaxNode> ConstructorDecl::Accept(SyntaxVisitor * visitor)
-    {
-        visitor->VisitConstructorDecl(this);
-        return this;
-    }
-
-    // SubscriptDecl
-
-    RefPtr<SyntaxNode> SubscriptDecl::Accept(SyntaxVisitor * visitor)
-    {
-        visitor->visitSubscriptDecl(this);
-        return this;
-    }
-
-    // AccessorDecl
-
-    RefPtr<SyntaxNode> AccessorDecl::Accept(SyntaxVisitor * visitor)
-    {
-        visitor->visitAccessorDecl(this);
         return this;
     }
 
@@ -1297,73 +952,6 @@ namespace Slang
         return (int) value;
     }
 
-    // SwitchStmt
-
-    RefPtr<SyntaxNode> SwitchStmt::Accept(SyntaxVisitor * visitor)
-    {
-        return visitor->VisitSwitchStmt(this);
-    }
-
-    RefPtr<SyntaxNode> CaseStmt::Accept(SyntaxVisitor * visitor)
-    {
-        return visitor->VisitCaseStmt(this);
-    }
-
-    RefPtr<SyntaxNode> DefaultStmt::Accept(SyntaxVisitor * visitor)
-    {
-        return visitor->VisitDefaultStmt(this);
-    }
-
-    // InterfaceDecl
-
-    RefPtr<SyntaxNode> InterfaceDecl::Accept(SyntaxVisitor * visitor)
-    {
-        visitor->visitInterfaceDecl(this);
-        return this;
-    }
-
-    // InheritanceDecl
-
-    RefPtr<SyntaxNode> InheritanceDecl::Accept(SyntaxVisitor * visitor)
-    {
-        visitor->visitInheritanceDecl(this);
-        return this;
-    }
-
-    // SharedTypeExpr
-
-    RefPtr<SyntaxNode> SharedTypeExpr::Accept(SyntaxVisitor * visitor)
-    {
-        return visitor->VisitSharedTypeExpr(this);
-    }
-
-    // OperatorExpressionSyntaxNode
-
-#if 0
-    void OperatorExpressionSyntaxNode::SetOperator(RefPtr<Scope> scope, Slang::Operator op)
-    {
-        this->Operator = op;
-        auto opExpr = new VarExpressionSyntaxNode();
-        opExpr->Variable = GetOperatorFunctionName(Operator);
-        opExpr->scope = scope;
-        opExpr->Position = this->Position;
-        this->FunctionExpr = opExpr;
-    }
-#endif
-
-    RefPtr<SyntaxNode> OperatorExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
-    {
-        return visitor->VisitOperatorExpression(this);
-    }
-
-    // DeclGroup
-
-    RefPtr<SyntaxNode> DeclGroup::Accept(SyntaxVisitor * visitor)
-    {
-        visitor->VisitDeclGroup(this);
-        return this;
-    }
-
     //
 
     void RegisterBuiltinDecl(
@@ -1425,34 +1013,6 @@ namespace Slang
     ExpressionType* ExpressionType::GetError()
     {
         return ExpressionType::Error.Ptr();
-    }
-
-    //
-
-    RefPtr<SyntaxNode> UnparsedStmt::Accept(SyntaxVisitor * visitor)
-    {
-        return this;
-    }
-
-    //
-
-    RefPtr<SyntaxNode> InitializerListExpr::Accept(SyntaxVisitor * visitor)
-    {
-        return visitor->visitInitializerListExpr(this);
-    }
-
-    //
-
-    RefPtr<SyntaxNode> ModifierDecl::Accept(SyntaxVisitor * visitor)
-    {
-        return this;
-    }
-
-    //
-
-    RefPtr<SyntaxNode> EmptyDecl::Accept(SyntaxVisitor * visitor)
-    {
-        return this;
     }
 
     //
