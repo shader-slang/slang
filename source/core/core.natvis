@@ -3,8 +3,8 @@
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
 
 <Type Name="Slang::String">
-    <DisplayString>{buffer.pointer,s}</DisplayString>
-	<StringView>buffer.pointer,s</StringView>
+    <DisplayString>{((char*) (buffer.pointer+1)),s}</DisplayString>
+	<StringView>((char*) (buffer.pointer+1)),s</StringView>
 </Type>
 
 <Type Name="Slang::ArrayView&lt;*&gt;">

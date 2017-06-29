@@ -84,7 +84,7 @@ int MAIN(int argc, char** argv)
 #ifndef _DEBUG
     catch (Exception & e)
     {
-        printf("internal compiler error: %S\n", e.Message.ToWString());
+        printf("internal compiler error: %S\n", e.Message.ToWString().begin());
         return 1;
     }
 #endif

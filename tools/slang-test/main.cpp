@@ -548,7 +548,7 @@ OSError spawnAndWait(String	testPath, OSProcessSpawner& spawner)
 {
     if( options.shouldBeVerbose )
     {
-        fprintf(stderr, "%s\n", spawner.commandLine_.Buffer());
+        fprintf(stderr, "%s\n", spawner.commandLine_.ToString().begin());
     }
 
     OSError err = spawner.spawnAndWaitForCompletion();
@@ -1149,7 +1149,7 @@ void handleTestResult(
                 break;
             }
 
-            printf("%s test: '%S'\n", resultString, testName.ToWString());
+            printf("%s test: '%S'\n", resultString, testName.ToWString().begin());
         }
         break;
 

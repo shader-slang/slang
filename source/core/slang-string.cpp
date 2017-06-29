@@ -3,42 +3,76 @@
 
 namespace Slang
 {
-	_EndLine EndLine;
-	String StringConcat(const char * lhs, int leftLen, const char * rhs, int rightLen)
-	{
-		String res;
-		res.length = leftLen + rightLen;
-		res.buffer = new char[res.length + 1];
-		strcpy_s(res.buffer.Ptr(), res.length + 1, lhs);
-		strcpy_s(res.buffer + leftLen, res.length + 1 - leftLen, rhs);
-		return res;
-	}
-	String operator+(const char * op1, const String & op2)
-	{
-		if(!op2.buffer)
-			return String(op1);
+    // OSString
 
-		return StringConcat(op1, (int)strlen(op1), op2.buffer.Ptr(), op2.length);
+    OSString::OSString()
+        : beginData(0)
+        , endData(0)
+    {}
+
+    OSString::OSString(wchar_t* begin, wchar_t* end)
+        : beginData(begin)
+        , endData(end)
+    {}
+
+    OSString::~OSString()
+    {
+        if (beginData)
+        {
+            delete[] beginData;
+        }
+    }
+
+    static const wchar_t kEmptyOSString[] = { 0 };
+
+    wchar_t const* OSString::begin() const
+    {
+        return beginData ? beginData : kEmptyOSString;
+    }
+
+    wchar_t const* OSString::end() const
+    {
+        return endData ? endData : kEmptyOSString;
+    }
+
+    // StringSlice
+
+    StringSlice::StringSlice()
+        : representation(0)
+        , beginIndex(0)
+        , endIndex(0)
+    {}
+
+    StringSlice::StringSlice(String const& str, UInt beginIndex, UInt endIndex)
+        : representation(str.buffer)
+        , beginIndex(beginIndex)
+        , endIndex(endIndex)
+    {}
+
+
+    //
+
+	_EndLine EndLine;
+
+    String operator+(const char * op1, const String & op2)
+	{
+        String result(op1);
+        result.append(op2);
+        return result;
 	}
 
 	String operator+(const String & op1, const char * op2)
 	{
-		if(!op1.buffer)
-			return String(op2);
-
-		return StringConcat(op1.buffer.Ptr(), op1.length, op2, (int)strlen(op2));
+        String result(op1);
+        result.append(op2);
+        return result;
 	}
 
 	String operator+(const String & op1, const String & op2)
 	{
-		if(!op1.buffer && !op2.buffer)
-			return String();
-		else if(!op1.buffer)
-			return String(op2);
-		else if(!op2.buffer)
-			return String(op1);
-
-		return StringConcat(op1.buffer.Ptr(), op1.length, op2.buffer.Ptr(), op2.length);
+        String result(op1);
+        result.append(op2);
+        return result;
 	}
 
 	int StringToInt(const String & str, int radix)
@@ -64,6 +98,7 @@ namespace Slang
 		return strtof(str.Buffer(), NULL);
 	}
 
+#if 0
 	String String::ReplaceAll(String src, String dst) const
 	{
 		String rs = *this;
@@ -77,6 +112,7 @@ namespace Slang
 		}
 		return rs;
 	}
+#endif
 
 	String String::FromWString(const wchar_t * wstr)
 	{
@@ -113,51 +149,150 @@ namespace Slang
 		return String(buf);
 	}
 
-	const wchar_t * String::ToWString(int * len) const
+	OSString String::ToWString(int* outLength) const
 	{
 		if (!buffer)
 		{
-			if (len)
-				*len = 0;
-			return L"";
+            return OSString();
 		}
 		else
 		{
-			if (wcharBuffer)
-			{
-				if (len)
-					*len = (int)wcslen(wcharBuffer);
-				return wcharBuffer;
-			}
 			List<char> buf;
 			Slang::Encoding::UTF16->GetBytes(buf, *this);
-			if (len)
-				*len = buf.Count() / sizeof(wchar_t);
+
+            auto length = buf.Count() / sizeof(wchar_t);
+			if (outLength)
+				*outLength = length;
+
 			buf.Add(0);
 			buf.Add(0);
-			const_cast<String*>(this)->wcharBuffer = (wchar_t*)buf.Buffer();
+
+            wchar_t* beginData = (wchar_t*)buf.Buffer();
+            wchar_t* endData = beginData + length;
+
 			buf.ReleaseBuffer();
-			return wcharBuffer;
+
+            return OSString(beginData, endData);
 		}
 	}
 
-	String String::PadLeft(char ch, int pLen)
-	{
-		StringBuilder sb;
-		for (int i = 0; i < pLen - this->length; i++)
-			sb << ch;
-		for (int i = 0; i < this->length; i++)
-			sb << buffer[i];
-		return sb.ProduceString();
-	}
+    //
 
-	String String::PadRight(char ch, int pLen)
-	{
-		StringBuilder sb;
-		for (int i = 0; i < this->length; i++)
-			sb << buffer[i];
-		for (int i = 0; i < pLen - this->length; i++)
-			sb << ch;
-		return sb.ProduceString();
-	}
+    void String::ensureUniqueStorageWithCapacity(UInt requiredCapacity)
+    {
+        if (buffer && buffer->isUniquelyReferenced() && buffer->capacity >= requiredCapacity)
+            return;
+
+        UInt newCapacity = buffer ? 2*buffer->capacity : 16;
+        if (newCapacity < requiredCapacity)
+        {
+            newCapacity = requiredCapacity;
+        }
+
+        UInt length = getLength();
+        StringRepresentation* newRepresentation = StringRepresentation::createWithCapacityAndLength(newCapacity, length);
+
+        if (buffer)
+        {
+            memcpy(newRepresentation->getData(), buffer->getData(), length + 1);
+        }
+
+        buffer = newRepresentation;
+    }
+
+    char* String::prepareForAppend(UInt count)
+    {
+        auto oldLength = getLength();
+        auto newLength = oldLength + count;
+        ensureUniqueStorageWithCapacity(newLength);
+        return getData() + oldLength;
+    }
+
+
+    void String::append(const char* textBegin, char const* textEnd)
+    {
+        auto oldLength = getLength();
+        auto textLength = textEnd - textBegin;
+
+        auto newLength = oldLength + textLength;
+
+        ensureUniqueStorageWithCapacity(newLength);
+
+        memcpy(getData() + oldLength, textBegin, textLength);
+        getData()[newLength] = 0;
+        buffer->length = newLength;
+    }
+
+    void String::append(char const* str)
+    {
+        if (str)
+        {
+            append(str, str + strlen(str));
+        }
+    }
+
+    void String::append(char chr)
+    {
+        append(&chr, &chr + 1);
+    }
+
+    void String::append(String const& str)
+    {
+        if (!buffer)
+        {
+            buffer = str.buffer;
+            return;
+        }
+
+        append(str.begin(), str.end());
+    }
+
+    void String::append(StringSlice const& slice)
+    {
+        append(slice.begin(), slice.end());
+    }
+
+    void String::append(int value, int radix)
+    {
+        enum { kCount = 33 };
+        char* data = prepareForAppend(kCount);
+        auto count = IntToAscii(data, value, radix);
+        ReverseInternalAscii(data, count);
+        buffer->length += count;
+    }
+
+    void String::append(unsigned int value, int radix)
+    {
+        enum { kCount = 33 };
+        char* data = prepareForAppend(kCount);
+        auto count = IntToAscii(data, value, radix);
+        ReverseInternalAscii(data, count);
+        buffer->length += count;
+    }
+
+    void String::append(long long value, int radix)
+    {
+        enum { kCount = 65 };
+        char* data = prepareForAppend(kCount);
+        auto count = IntToAscii(data, value, radix);
+        ReverseInternalAscii(data, count);
+        buffer->length += count;
+    }
+
+
+    void String::append(float val, const char * format)
+    {
+        enum { kCount = 128 };
+        char* data = prepareForAppend(kCount);
+        sprintf_s(data, kCount, format, val);
+        buffer->length += strnlen_s(data, kCount);
+    }
+
+    void String::append(double val, const char * format)
+    {
+        enum { kCount = 128 };
+        char* data = prepareForAppend(kCount);
+        sprintf_s(data, kCount, format, val);
+        buffer->length += strnlen_s(data, kCount);
+    }
 }

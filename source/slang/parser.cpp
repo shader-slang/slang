@@ -3277,7 +3277,7 @@ namespace Slang
 
                 constExpr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Int;
                 constExpr->integerValue = value;
-                constExpr->Type = suffixType;
+                constExpr->Type = QualType(suffixType);
 
                 return constExpr;
             }
@@ -3346,7 +3346,7 @@ namespace Slang
 
                 constExpr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Float;
                 constExpr->floatingPointValue = value;
-                constExpr->Type = suffixType;
+                constExpr->Type = QualType(suffixType);
 
                 return constExpr;
             }

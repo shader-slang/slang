@@ -1975,7 +1975,7 @@ sb << TEXT;
 
     void SlangStdLib::Finalize()
     {
-        code = nullptr;
+        code = String();
         stdlibPath = String();
         glslLibraryCode = String();
     }

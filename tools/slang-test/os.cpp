@@ -314,8 +314,8 @@ OSError OSProcessSpawner::spawnAndWaitForCompletion()
 
     // `CreateProcess` requires write access to this, for some reason...
     BOOL success = CreateProcessW(
-        isExecutablePath_ ? executableName_.ToWString() : nullptr,
-        (LPWSTR)commandLine_.ToString().ToWString(),
+        isExecutablePath_ ? executableName_.ToWString().begin() : nullptr,
+        (LPWSTR)commandLine_.ToString().ToWString().begin(),
         nullptr,
         nullptr,
         true,

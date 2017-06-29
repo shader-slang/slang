@@ -32,7 +32,7 @@ namespace Slang
 		Start, End, Current
 	};
 
-	class Stream
+	class Stream : public RefObject
 	{
 	public:
         virtual ~Stream() {}
