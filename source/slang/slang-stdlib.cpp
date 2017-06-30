@@ -1722,85 +1722,6 @@ namespace Slang
             }
         }
 
-#if 0
-        for (auto op : intUnaryOps)
-        {
-            String opName = GetOperatorFunctionName(op);
-            for (int i = 0; i < 4; i++)
-            {
-                auto itype = intTypes[i];
-                auto utype = uintTypes[i];
-                for (int j = 0; j < 2; j++)
-                {
-                    auto retType = (op == Operator::Not) ? "bool" : j == 0 ? itype : utype;
-                    sb << "__intrinsic " << retType << " operator " << opName << "(" << (j == 0 ? itype : utype) << ");\n";
-                }
-            }
-        }
-
-        for (auto op : floatUnaryOps)
-        {
-            String opName = GetOperatorFunctionName(op);
-            for (int i = 0; i < 4; i++)
-            {
-                auto type = floatTypes[i];
-                auto retType = (op == Operator::Not) ? "bool" : type;
-                sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ");\n";
-            }
-        }
-
-        for (auto op : floatOps)
-        {
-            String opName = GetOperatorFunctionName(op);
-            for (int i = 0; i < 4; i++)
-            {
-                auto type = floatTypes[i];
-                auto itype = intTypes[i];
-                auto utype = uintTypes[i];
-                auto retType = ((op >= Operator::Eql && op <= Operator::Leq) || op == Operator::And || op == Operator::Or) ? "bool" : type;
-                sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << type << ");\n";
-                sb << "__intrinsic " << retType << " operator " << opName << "(" << itype << ", " << type << ");\n";
-                sb << "__intrinsic " << retType << " operator " << opName << "(" << utype << ", " << type << ");\n";
-                sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << itype << ");\n";
-                sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << utype << ");\n";
-                if (i > 0)
-                {
-                    sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << floatTypes[0] << ");\n";
-                    sb << "__intrinsic " << retType << " operator " << opName << "(" << floatTypes[0] << ", " << type << ");\n";
-
-                    sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << intTypes[0] << ");\n";
-                    sb << "__intrinsic " << retType << " operator " << opName << "(" << intTypes[0] << ", " << type << ");\n";
-
-                    sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << uintTypes[0] << ");\n";
-                    sb << "__intrinsic " << retType << " operator " << opName << "(" << uintTypes[0] << ", " << type << ");\n";
-                }
-            }
-        }
-
-        for (auto op : intOps)
-        {
-            String opName = GetOperatorFunctionName(op);
-            for (int i = 0; i < 4; i++)
-            {
-                auto type = intTypes[i];
-                auto utype = uintTypes[i];
-                auto retType = ((op >= Operator::Eql && op <= Operator::Leq) || op == Operator::And || op == Operator::Or) ? "bool" : type;
-                sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << type << ");\n";
-                sb << "__intrinsic " << retType << " operator " << opName << "(" << utype << ", " << type << ");\n";
-                sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << utype << ");\n";
-                sb << "__intrinsic " << retType << " operator " << opName << "(" << utype << ", " << utype << ");\n";
-                if (i > 0)
-                {
-                    sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << intTypes[0] << ");\n";
-                    sb << "__intrinsic " << retType << " operator " << opName << "(" << intTypes[0] << ", " << type << ");\n";
-
-                    sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << uintTypes[0] << ");\n";
-                    sb << "__intrinsic " << retType << " operator " << opName << "(" << uintTypes[0] << ", " << type << ");\n";
-                }
-            }
-        }
-#endif
-
         // Output a suitable `#line` directive to point at our raw stdlib code above
         sb << "\n#line " << kLibIncludeStringLine << " \"" << path << "\"\n";
 
@@ -1827,10 +1748,6 @@ namespace Slang
         String path = getStdlibPath();
 
         StringBuilder sb;
-
-#define RAW(TEXT)           \
-EMIT_LINE_DIRECTIVE();  \
-sb << TEXT;
 
         static const struct {
             char const* name;

@@ -11,11 +11,10 @@ namespace Slang
     class ShaderCompiler;
     class ShaderLinkInfo;
     class ShaderSymbol;
+
     class TranslationUnitRequest;
 
-    SyntaxVisitor* CreateSemanticsVisitor(
-        DiagnosticSink*         err,
-        CompileRequest*         request,
+    void checkTranslationUnit(
         TranslationUnitRequest* translationUnit);
 
     // Look for a module that matches the given name:

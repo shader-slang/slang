@@ -5,7 +5,7 @@
 
 namespace Slang {
 
-class SemanticsVisitor;
+struct SemanticsVisitor;
 
 // Take an existing lookup result and refine it to only include
 // results that pass the given `LookupMask`.
@@ -31,7 +31,6 @@ LookupResult LookUpLocal(
 
 // TODO: this belongs somewhere else
 
-class SemanticsVisitor;
 QualType getTypeForDeclRef(
     SemanticsVisitor*       sema,
     DiagnosticSink*         sink,
