@@ -506,7 +506,7 @@ namespace Slang
             String result;
             for (auto c : *this)
             {
-                int d = (c >= 'a' && c <= 'z') ? (c - ('a' - 'A')) : c;
+                char d = (c >= 'a' && c <= 'z') ? (c - ('a' - 'A')) : c;
                 result.append(d);
             }
             return result;
@@ -517,7 +517,7 @@ namespace Slang
             String result;
             for (auto c : *this)
             {
-                int d = (c >= 'A' && c <= 'Z') ? (c - ('A' - 'a')) : c;
+                char d = (c >= 'A' && c <= 'Z') ? (c - ('A' - 'a')) : c;
                 result.append(d);
             }
             return result;
