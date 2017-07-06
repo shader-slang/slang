@@ -23,7 +23,7 @@ namespace Slang
 
 	String Path::TruncateExt(const String & path)
 	{
-		int dotPos = path.LastIndexOf('.');
+		UInt dotPos = path.LastIndexOf('.');
 		if (dotPos != -1)
 			return path.SubString(0, dotPos);
 		else
@@ -32,7 +32,7 @@ namespace Slang
 	String Path::ReplaceExt(const String & path, const char * newExt)
 	{
 		StringBuilder sb(path.Length()+10);
-		int dotPos = path.LastIndexOf('.');
+		UInt dotPos = path.LastIndexOf('.');
 		if (dotPos == -1)
 			dotPos = path.Length();
 		sb.Append(path.Buffer(), dotPos);
@@ -72,7 +72,7 @@ namespace Slang
 	String Path::GetFileNameWithoutEXT(const String & path)
 	{
         String fileName = GetFileName(path);
-		int dotPos = fileName.LastIndexOf('.');
+		UInt dotPos = fileName.LastIndexOf('.');
 		if (dotPos == -1)
             return fileName;
 		return fileName.SubString(0, dotPos);

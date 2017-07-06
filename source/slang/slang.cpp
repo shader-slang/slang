@@ -19,17 +19,6 @@
 
 namespace Slang {
 
-static void stdlibDiagnosticCallback(
-    char const* message,
-    void*       userData)
-{
-    fputs(message, stderr);
-    fflush(stderr);
-#ifdef WIN32
-    OutputDebugStringA(message);
-#endif
-}
-
 class Session
 {
 public:
@@ -281,9 +270,9 @@ int CompileRequest::executeActions()
     return err;
 }
 
-int CompileRequest::addTranslationUnit(SourceLanguage language, String const& name)
+int CompileRequest::addTranslationUnit(SourceLanguage language, String const&)
 {
-    int result = translationUnits.Count();
+    UInt result = translationUnits.Count();
 
     RefPtr<TranslationUnitRequest> translationUnit = new TranslationUnitRequest();
     translationUnit->compileRequest = this;
@@ -291,7 +280,7 @@ int CompileRequest::addTranslationUnit(SourceLanguage language, String const& na
 
     translationUnits.Add(translationUnit);
 
-    return result;
+    return (int) result;
 }
 
 void CompileRequest::addTranslationUnitSourceString(
@@ -336,27 +325,27 @@ void CompileRequest::addTranslationUnitSourceFile(
 int CompileRequest::addEntryPoint(
     int                     translationUnitIndex,
     String const&           name,
-    Profile                 profile)
+    Profile                 entryPointProfile)
 {
     RefPtr<EntryPointRequest> entryPoint = new EntryPointRequest();
     entryPoint->compileRequest = this;
     entryPoint->name = name;
-    entryPoint->profile = profile;
+    entryPoint->profile = entryPointProfile;
     entryPoint->translationUnitIndex = translationUnitIndex;
 
     auto translationUnit = translationUnits[translationUnitIndex].Ptr();
     translationUnit->entryPoints.Add(entryPoint);
 
-    int result = entryPoints.Count();
+    UInt result = entryPoints.Count();
     entryPoints.Add(entryPoint);
-    return result;
+    return (int) result;
 }
 
 RefPtr<ProgramSyntaxNode> CompileRequest::loadModule(
     String const&       name,
     String const&       path,
     String const&       source,
-    CodePosition const& loc)
+    CodePosition const&)
 {
     RefPtr<TranslationUnitRequest> translationUnit = new TranslationUnitRequest();
     translationUnit->compileRequest = this;
@@ -714,7 +703,7 @@ SLANG_API void spAddTranslationUnitSourceFile(
     auto req = REQ(request);
     if(!path) return;
     if(translationUnitIndex < 0) return;
-    if(translationUnitIndex >= req->translationUnits.Count()) return;
+    if(Slang::UInt(translationUnitIndex) >= req->translationUnits.Count()) return;
 
     req->addTranslationUnitSourceFile(
         translationUnitIndex,
@@ -732,7 +721,7 @@ SLANG_API void spAddTranslationUnitSourceString(
     auto req = REQ(request);
     if(!source) return;
     if(translationUnitIndex < 0) return;
-    if(translationUnitIndex >= req->translationUnits.Count()) return;
+    if(Slang::UInt(translationUnitIndex) >= req->translationUnits.Count()) return;
 
     if(!path) path = "";
 
@@ -744,7 +733,7 @@ SLANG_API void spAddTranslationUnitSourceString(
 }
 
 SLANG_API SlangProfileID spFindProfile(
-    SlangSession*   session,
+    SlangSession*,
     char const*     name)
 {
     return Slang::Profile::LookUp(name).raw;
@@ -760,7 +749,7 @@ SLANG_API int spAddEntryPoint(
     auto req = REQ(request);
     if(!name) return -1;
     if(translationUnitIndex < 0) return -1;
-    if(translationUnitIndex >= req->translationUnits.Count()) return -1;
+    if(Slang::UInt(translationUnitIndex) >= req->translationUnits.Count()) return -1;
 
     return req->addEntryPoint(
         translationUnitIndex,
@@ -785,7 +774,7 @@ spGetDependencyFileCount(
 {
     if(!request) return 0;
     auto req = REQ(request);
-    return req->mDependencyFilePaths.Count();
+    return (int) req->mDependencyFilePaths.Count();
 }
 
 /** Get the path to a file this compilation dependend on.
@@ -805,7 +794,7 @@ spGetTranslationUnitCount(
     SlangCompileRequest*    request)
 {
     auto req = REQ(request);
-    return req->translationUnits.Count();
+    return (int) req->translationUnits.Count();
 }
 
 // Get the output code associated with a specific translation unit

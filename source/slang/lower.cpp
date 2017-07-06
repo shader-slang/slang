@@ -80,7 +80,7 @@ struct StructuralTransformStmtVisitor
     : StructuralTransformVisitorBase<V>
     , StmtVisitor<StructuralTransformStmtVisitor<V>, RefPtr<StatementSyntaxNode>>
 {
-    void transformFields(StatementSyntaxNode* result, StatementSyntaxNode* obj)
+    void transformFields(StatementSyntaxNode*, StatementSyntaxNode*)
     {
     }
 
@@ -457,7 +457,7 @@ struct LoweringVisitor
     //
 
     StatementSyntaxNode* translateStmtRef(
-        StatementSyntaxNode*    stmt)
+        StatementSyntaxNode*)
     {
         throw "unimplemented";
     }
@@ -666,13 +666,13 @@ struct LoweringVisitor
     }
 
     RefPtr<Substitutions> translateSubstitutions(
-        Substitutions*  substitutions)
+        Substitutions*  inSubstitutions)
     {
-        if (!substitutions) return nullptr;
+        if (!inSubstitutions) return nullptr;
 
         RefPtr<Substitutions> result = new Substitutions();
-        result->genericDecl = translateDeclRef(substitutions->genericDecl).As<GenericDecl>();
-        for (auto arg : substitutions->args)
+        result->genericDecl = translateDeclRef(inSubstitutions->genericDecl).As<GenericDecl>();
+        for (auto arg : inSubstitutions->args)
         {
             result->args.Add(translateVal(arg));
         }
@@ -740,9 +740,8 @@ struct LoweringVisitor
         }
         else
         {
-            DeclVisitor::dispatch(declBase);
+            return DeclVisitor::dispatch(declBase);
         }
-
     }
 
     RefPtr<Decl> lowerDecl(
@@ -922,8 +921,8 @@ struct LoweringVisitor
         //
         // If this is a global variable (program scope), then add it
         // to the global scope.
-        RefPtr<ContainerDecl> parentDecl = decl->ParentDecl;
-        if (auto parentModuleDecl = parentDecl.As<ProgramSyntaxNode>())
+        RefPtr<ContainerDecl> pp = decl->ParentDecl;
+        if (auto parentModuleDecl = pp.As<ProgramSyntaxNode>())
         {
             addMember(
                 translateDeclRef(parentModuleDecl),
@@ -1138,10 +1137,6 @@ struct LoweringVisitor
             subscriptExpr->Position = varExpr->Position;
             subscriptExpr->BaseExpression = varExpr;
 
-            // TODO: we need to construct syntax for a loop to initialize
-            // the array here...
-            throw "unimplemented";
-
             // Note that we use the original `varLayout` that was passed in,
             // since that is the layout that will ultimately need to be
             // used on the array elements.
@@ -1154,6 +1149,9 @@ struct LoweringVisitor
                 varLayout,
                 subscriptExpr);
 
+            // TODO: we need to construct syntax for a loop to initialize
+            // the array here...
+            throw "unimplemented";
         }
         else if (auto declRefType = varType->As<DeclRefType>())
         {

@@ -297,7 +297,7 @@ public:
 
             glAttr.streamIndex = 0;
             glAttr.format = getVertexAttributeFormat(inputAttr.format);
-            glAttr.offset = inputAttr.offset;
+            glAttr.offset = (GLsizei) inputAttr.offset;
         }
 
         return (InputLayout*)inputLayout;
@@ -388,7 +388,7 @@ public:
 
             assert(!offsets || !offsets[ii]);
 
-            glBindBufferBase(GL_UNIFORM_BUFFER, slot, bufferID);
+            glBindBufferBase(GL_UNIFORM_BUFFER, (GLuint) slot, bufferID);
         }
     }
 
@@ -405,18 +405,18 @@ public:
             glBindBuffer(GL_ARRAY_BUFFER, boundVertexStreamBuffers[streamIndex]);
 
             glVertexAttribPointer(
-                ii,
-                attr.format.componentCount,
+                (GLuint) ii,
+                 attr.format.componentCount,
                 attr.format.componentType,
                 attr.format.normalized,
-                boundVertexStreamStrides[streamIndex],
+                (GLsizei) boundVertexStreamStrides[streamIndex],
                 (GLvoid*)(attr.offset + boundVertexStreamOffsets[streamIndex]));
 
-            glEnableVertexAttribArray(ii);
+            glEnableVertexAttribArray((GLuint)ii);
         }
         for (UInt ii = attrCount; ii < kMaxVertexStreams; ++ii)
         {
-            glDisableVertexAttribArray(ii);
+            glDisableVertexAttribArray((GLuint)ii);
         }
     }
 
@@ -424,7 +424,7 @@ public:
     {
         flushStateForDraw();
 
-        glDrawArrays(boundPrimitiveTopology, startVertex, vertexCount);
+        glDrawArrays(boundPrimitiveTopology, (GLint) startVertex, (GLsizei) vertexCount);
     }
 
     // ShaderCompiler interface

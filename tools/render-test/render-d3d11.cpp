@@ -8,6 +8,9 @@
 
 #include <Slang.h>
 
+#ifdef _MSC_VER
+#pragma warning(disable: 4996)
+#endif
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "external/stb/stb_image_write.h"
 
@@ -660,7 +663,7 @@ public:
     virtual Buffer* createBuffer(BufferDesc const& desc) override
     {
         D3D11_BUFFER_DESC dxBufferDesc = { 0 };
-        dxBufferDesc.ByteWidth = desc.size;
+        dxBufferDesc.ByteWidth = (UINT) desc.size;
 
         switch( desc.flavor )
         {
@@ -715,10 +718,10 @@ public:
         for( UInt ii = 0; ii < inputElementCount; ++ii )
         {
             dxInputElements[ii].SemanticName            = inputElements[ii].semanticName;
-            dxInputElements[ii].SemanticIndex           = inputElements[ii].semanticIndex;
+            dxInputElements[ii].SemanticIndex           = (UINT) inputElements[ii].semanticIndex;
             dxInputElements[ii].Format                  = mapFormat(inputElements[ii].format);
             dxInputElements[ii].InputSlot               = 0;
-            dxInputElements[ii].AlignedByteOffset       = inputElements[ii].offset;
+            dxInputElements[ii].AlignedByteOffset       = (UINT) inputElements[ii].offset;
             dxInputElements[ii].InputSlotClass          = D3D11_INPUT_PER_VERTEX_DATA;
             dxInputElements[ii].InstanceDataStepRate    = 0;
 
@@ -738,9 +741,11 @@ public:
                 return nullptr;
             }
 
-            hlslCursor+= sprintf(hlslCursor, "%s a%d : %s%d", typeName, ii,
+            hlslCursor+= sprintf(hlslCursor, "%s a%d : %s%d",
+                typeName,
+                (int) ii,
                 inputElements[ii].semanticName,
-                inputElements[ii].semanticIndex);
+                (int) inputElements[ii].semanticIndex);
         }
 
         hlslCursor += sprintf(hlslCursor, "\n) : SV_Position { return 0; }");
@@ -752,7 +757,7 @@ public:
         ID3D11InputLayout* dxInputLayout = nullptr;
         HRESULT hr = dxDevice->CreateInputLayout(
             &dxInputElements[0],
-            inputElementCount,
+            (UINT) inputElementCount,
             dxVertexShaderBlob->GetBufferPointer(),
             dxVertexShaderBlob->GetBufferSize(),
             &dxInputLayout);
@@ -839,13 +844,15 @@ public:
 
         for( UInt ii = 0; ii < slotCount; ++ii )
         {
-            dxVertexStrides[ii] = strides[ii];
-            dxVertexOffsets[ii] = offsets[ii];
+            dxVertexStrides[ii] = (UINT) strides[ii];
+            dxVertexOffsets[ii] = (UINT) offsets[ii];
         }
 
         auto dxVertexBuffers = (ID3D11Buffer* const*) buffers;
 
-        dxContext->IASetVertexBuffers(startSlot, slotCount, &dxVertexBuffers[0], &dxVertexStrides[0], &dxVertexOffsets[0]);
+        dxContext->IASetVertexBuffers(
+            (UINT) startSlot,
+            (UINT) slotCount, &dxVertexBuffers[0], &dxVertexStrides[0], &dxVertexOffsets[0]);
     }
 
     virtual void setShaderProgram(ShaderProgram* inProgram) override
@@ -866,8 +873,10 @@ public:
 
         auto dxConstantBuffers = (ID3D11Buffer* const*) buffers;
 
-        dxContext->VSSetConstantBuffers(startSlot, slotCount, &dxConstantBuffers[0]);
-        dxContext->VSSetConstantBuffers(startSlot, slotCount, &dxConstantBuffers[0]);
+        dxContext->VSSetConstantBuffers(
+            (UINT) startSlot, (UINT) slotCount, &dxConstantBuffers[0]);
+        dxContext->VSSetConstantBuffers(
+            (UINT) startSlot, (UINT) slotCount, &dxConstantBuffers[0]);
     }
 
 
@@ -875,7 +884,7 @@ public:
     {
         auto dxContext = dxImmediateContext;
 
-        dxContext->Draw(vertexCount, startVertex);
+        dxContext->Draw((UINT) vertexCount, (UINT) startVertex);
     }
 
 

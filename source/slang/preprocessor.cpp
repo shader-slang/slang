@@ -600,8 +600,8 @@ static void MaybeBeginMacroExpansion(
             expansion->environment = &expansion->argumentEnvironment;
 
             // Try to read any arguments present.
-            int paramCount = macro->params.Count();
-            int argIndex = 0;
+            UInt paramCount = macro->params.Count();
+            UInt argIndex = 0;
 
             switch (PeekRawTokenType(preprocessor))
             {
@@ -702,7 +702,7 @@ static void MaybeBeginMacroExpansion(
                 GetSink(preprocessor)->diagnose(PeekLoc(preprocessor), Diagnostics::expectedTokenInMacroArguments, TokenType::RParent, PeekRawTokenType(preprocessor));
             }
 
-            int argCount = argIndex;
+            UInt argCount = argIndex;
             if (argCount != paramCount)
             {
                 // TODO: diagnose

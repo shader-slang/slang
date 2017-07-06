@@ -149,7 +149,7 @@ namespace Slang
 		return String(buf);
 	}
 
-	OSString String::ToWString(int* outLength) const
+	OSString String::ToWString(UInt* outLength) const
 	{
 		if (!buffer)
 		{

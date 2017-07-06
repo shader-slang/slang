@@ -14,8 +14,8 @@ namespace Slang {
 // Information on ranges of registers already claimed/used
 struct UsedRange
 {
-    int begin;
-    int end;
+    UInt begin;
+    UInt end;
 };
 bool operator<(UsedRange left, UsedRange right)
 {
@@ -51,7 +51,7 @@ struct UsedRanges
         ranges.Sort();
     }
 
-    void Add(int begin, int end)
+    void Add(UInt begin, UInt end)
     {
         UsedRange range;
         range.begin = begin;
@@ -61,16 +61,16 @@ struct UsedRanges
 
 
     // Try to find space for `count` entries
-    int Allocate(int count)
+    UInt Allocate(UInt count)
     {
-        int begin = 0;
+        UInt begin = 0;
 
-        int rangeCount = ranges.Count();
-        for (int rr = 0; rr < rangeCount; ++rr)
+        UInt rangeCount = ranges.Count();
+        for (UInt rr = 0; rr < rangeCount; ++rr)
         {
             // try to fit in before this range...
 
-            int end = ranges[rr].begin;
+            UInt end = ranges[rr].begin;
 
             // If there is enough space...
             if (end >= begin + count)
@@ -165,8 +165,8 @@ struct ParameterBindingContext
 struct LayoutSemanticInfo
 {
     LayoutResourceKind  kind; // the register kind
-    int                 space;
-    int                 index;
+    UInt                space;
+    UInt                index;
 
     // TODO: need to deal with component-granularity binding...
 };
@@ -229,15 +229,15 @@ LayoutSemanticInfo ExtractLayoutSemanticInfo(
     // TODO: handle component mask part of things...
 
     info.kind = kind;
-    info.index = index;
+    info.index = (int) index;
     info.space = space;
     return info;
 }
 
 static bool doesParameterMatch(
-    ParameterBindingContext*    context,
-    RefPtr<VarLayout>           varLayout,
-    ParameterInfo*              parameterInfo)
+    ParameterBindingContext*,
+    RefPtr<VarLayout>,
+    ParameterInfo*)
 {
     // TODO: need to implement this eventually
     return true;
@@ -250,20 +250,23 @@ static bool doesParameterMatch(
 template<typename T>
 static bool findLayoutArg(
     RefPtr<ModifiableSyntaxNode>    syntax,
-    int*                            outVal)
+    UInt*                           outVal)
 {
     for( auto modifier : syntax->GetModifiersOfType<T>() )
     {
-        *outVal = (int) strtol(modifier->valToken.Content.Buffer(), nullptr, 10);
-        return true;
+        if( modifier )
+        {
+            *outVal = (UInt) strtoull(modifier->valToken.Content.Buffer(), nullptr, 10);
+            return true;
+        }
     }
     return false;
 }
 
 template<typename T>
 static bool findLayoutArg(
-    DeclRef<Decl> declRef,
-    int*    outVal)
+    DeclRef<Decl>   declRef,
+    UInt*           outVal)
 {
     return findLayoutArg<T>(declRef.getDecl(), outVal);
 }
@@ -395,7 +398,6 @@ getTypeLayoutForGlobalShaderParameter(
     ParameterBindingContext*    context,
     VarDeclBase*                varDecl)
 {
-    auto rules = context->layoutRules;
     switch( context->shared->sourceLanguage )
     {
     case SourceLanguage::Slang:
@@ -478,7 +480,7 @@ static void addExplicitParameterBinding(
     ParameterBindingContext*    context,
     RefPtr<ParameterInfo>       parameterInfo,
     LayoutSemanticInfo const&   semanticInfo,
-    int                         count)
+    UInt                        count)
 {
     auto kind = semanticInfo.kind;
 
@@ -575,7 +577,7 @@ static void addExplicitParameterBindings_GLSL(
     LayoutSemanticInfo semanticInfo;
     semanticInfo.index = 0;
     semanticInfo.space = 0;
-    if( (resInfo = typeLayout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot)) )
+    if( (resInfo = typeLayout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot)) != nullptr )
     {
         // Try to find `binding` and `set`
         if(!findLayoutArg<GLSLBindingLayoutModifier>(varDecl, &semanticInfo.index))
@@ -583,19 +585,19 @@ static void addExplicitParameterBindings_GLSL(
 
         findLayoutArg<GLSLSetLayoutModifier>(varDecl, &semanticInfo.space);
     }
-    else if( (resInfo = typeLayout->FindResourceInfo(LayoutResourceKind::VertexInput)) )
+    else if( (resInfo = typeLayout->FindResourceInfo(LayoutResourceKind::VertexInput)) != nullptr )
     {
         // Try to find `location` binding
         if(!findLayoutArg<GLSLLocationLayoutModifier>(varDecl, &semanticInfo.index))
             return;
     }
-    else if( (resInfo = typeLayout->FindResourceInfo(LayoutResourceKind::FragmentOutput)) )
+    else if( (resInfo = typeLayout->FindResourceInfo(LayoutResourceKind::FragmentOutput)) != nullptr )
     {
         // Try to find `location` binding
         if(!findLayoutArg<GLSLLocationLayoutModifier>(varDecl, &semanticInfo.index))
             return;
     }
-    else if( (resInfo = typeLayout->FindResourceInfo(LayoutResourceKind::SpecializationConstant)) )
+    else if( (resInfo = typeLayout->FindResourceInfo(LayoutResourceKind::SpecializationConstant)) != nullptr )
     {
         // Try to find `constant_id` binding
         if(!findLayoutArg<GLSLConstantIDLayoutModifier>(varDecl, &semanticInfo.index))
@@ -733,8 +735,8 @@ SimpleSemanticInfo decomposeSimpleSemantic(
 
     // look for a trailing sequence of decimal digits
     // at the end of the composed name
-    int length = composedName.Length();
-    int indexLoc = length;
+    UInt length = composedName.Length();
+    UInt indexLoc = length;
     while( indexLoc > 0 )
     {
         auto c = composedName[indexLoc-1];
@@ -888,29 +890,29 @@ static RefPtr<TypeLayout> processEntryPointParameter(
     {
         return processSimpleEntryPointParameter(context, basicType, state);
     }
-    else if(auto basicType = type->As<VectorExpressionType>())
+    else if(auto vectorType = type->As<VectorExpressionType>())
     {
-        return processSimpleEntryPointParameter(context, basicType, state);
+        return processSimpleEntryPointParameter(context, vectorType, state);
     }
     // A matrix is processed as if it was an array of rows
     else if( auto matrixType = type->As<MatrixExpressionType>() )
     {
         auto rowCount = GetIntVal(matrixType->getRowCount());
-        return processSimpleEntryPointParameter(context, basicType, state, (int) rowCount);
+        return processSimpleEntryPointParameter(context, matrixType, state, (int) rowCount);
     }
     else if( auto arrayType = type->As<ArrayExpressionType>() )
     {
         // Note: Bad Things will happen if we have an array input
         // without a semantic already being enforced.
         
-        auto elementCount = GetIntVal(arrayType->ArrayLength);
+        auto elementCount = (UInt) GetIntVal(arrayType->ArrayLength);
 
         // We use the first element to derive the layout for the element type
         auto elementTypeLayout = processEntryPointParameter(context, arrayType->BaseType, state);
 
         // We still walk over subsequent elements to make sure they consume resources
         // as needed
-        for( int ii = 1; ii < elementCount; ++ii )
+        for( UInt ii = 1; ii < elementCount; ++ii )
         {
             processEntryPointParameter(context, arrayType->BaseType, state);
         }

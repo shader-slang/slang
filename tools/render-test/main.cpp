@@ -15,6 +15,10 @@
 #undef WIN32_LEAN_AND_MEAN
 #undef NOMINMAX
 
+#ifdef _MSC_VER
+#pragma warning(disable: 4996)
+#endif
+
 namespace renderer_test {
 
 //

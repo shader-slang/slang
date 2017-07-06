@@ -9,6 +9,7 @@ namespace Slang
 {
     // TODO: Need to centralize these typedefs
     typedef uintptr_t UInt;
+    typedef intptr_t Int;
 
     // Base class for all reference-counted objects
     class RefObject

@@ -26,6 +26,12 @@ void printDiagnosticArg(StringBuilder& sb, int str)
     sb << str;
 }
 
+void printDiagnosticArg(StringBuilder& sb, UInt val)
+{
+    // TODO: make this robust
+    sb << (int) val;
+}
+
 void printDiagnosticArg(StringBuilder& sb, Slang::String const& str)
 {
     sb << str;

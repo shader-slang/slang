@@ -549,8 +549,8 @@ static void emitSimpleCallExpr(
     }
 
     Emit(context, "(");
-    int argCount = callExpr->Arguments.Count();
-    for (int aa = 0; aa < argCount; ++aa)
+    UInt argCount = callExpr->Arguments.Count();
+    for (UInt aa = 0; aa < argCount; ++aa)
     {
         if (aa != 0) Emit(context, ", ");
         EmitExpr(context, callExpr->Arguments[aa]);
@@ -721,8 +721,8 @@ static void emitCallExpr(
 
                     emit(context, name);
                     Emit(context, "(");
-                    int argCount = callExpr->Arguments.Count();
-                    for (int aa = 0; aa < argCount; ++aa)
+                    UInt argCount = callExpr->Arguments.Count();
+                    for (UInt aa = 0; aa < argCount; ++aa)
                     {
                         if (aa != 0) Emit(context, ", ");
                         EmitExpr(context, callExpr->Arguments[aa]);
@@ -734,7 +734,7 @@ static void emitCallExpr(
                 {
                     // General case: we are going to emit some more complex text.
 
-                    int argCount = callExpr->Arguments.Count();
+                    UInt argCount = callExpr->Arguments.Count();
 
                     Emit(context, "(");
 
@@ -782,8 +782,8 @@ static void emitCallExpr(
                     Emit(context, "(");
                     EmitExpr(context, memberExpr->BaseExpression);
                     Emit(context, ")[");
-                    int argCount = callExpr->Arguments.Count();
-                    for (int aa = 0; aa < argCount; ++aa)
+                    UInt argCount = callExpr->Arguments.Count();
+                    for (UInt aa = 0; aa < argCount; ++aa)
                     {
                         if (aa != 0) Emit(context, ", ");
                         EmitExpr(context, callExpr->Arguments[aa]);
@@ -1483,12 +1483,6 @@ static void EmitType(EmitContext* context, RefPtr<ExpressionType> type, Token co
     EmitType(context, type, CodePosition(), nameToken.Content, nameToken.Position);
 }
 
-
-static void EmitType(EmitContext* context, RefPtr<ExpressionType> type, String const& name)
-{
-    EmitType(context, type, CodePosition(), name, CodePosition());
-}
-
 static void EmitType(EmitContext* context, RefPtr<ExpressionType> type)
 {
     EmitType(context, type, nullptr);
@@ -1504,13 +1498,6 @@ static void EmitType(EmitContext* context, TypeExp const& typeExp, String const&
 {
     EmitType(context, typeExp.type, typeExp.exp->Position, name, CodePosition());
 }
-
-static void EmitType(EmitContext* context, TypeExp const& typeExp)
-{
-    advanceToSourceLocation(context, typeExp.exp->Position);
-    EmitType(context, typeExp.type, nullptr);
-}
-
 
 // Statements
 
@@ -1974,8 +1961,8 @@ static void EmitDeclRef(EmitContext* context, DeclRef<Decl> declRef)
 
         Substitutions* subst = declRef.substitutions.Ptr();
         Emit(context, "<");
-        int argCount = subst->args.Count();
-        for (int aa = 0; aa < argCount; ++aa)
+        UInt argCount = subst->args.Count();
+        for (UInt aa = 0; aa < argCount; ++aa)
         {
             if (aa != 0) Emit(context, ",");
             EmitVal(context, subst->args[aa]);
@@ -2064,7 +2051,7 @@ static void EmitModifiers(EmitContext* context, RefPtr<Decl> decl)
             if (argCount != 0)
             {
                 Emit(context, "(");
-                for (int aa = 0; aa < argCount; ++aa)
+                for (UInt aa = 0; aa < argCount; ++aa)
                 {
                     if (aa != 0) Emit(context, ", ");
                     EmitExpr(context, args[aa]);
@@ -3025,9 +3012,9 @@ String emitEntryPoint(
     // where there were global-scope uniforms.
     auto globalScopeLayout = programLayout->globalScopeLayout;
     StructTypeLayout* globalStructLayout = nullptr;
-    if( auto globalStructLayout = globalScopeLayout.As<StructTypeLayout>() )
+    if( auto gs = globalScopeLayout.As<StructTypeLayout>() )
     {
-        globalStructLayout = globalStructLayout.Ptr();
+        globalStructLayout = gs.Ptr();
     }
     else if(auto globalConstantBufferLayout = globalScopeLayout.As<ParameterBlockTypeLayout>())
     {

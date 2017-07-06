@@ -1598,10 +1598,9 @@ namespace Slang
                             { 3, "Alpha" },
                         };
 
-                        for(auto cc : kGatherComponets)
+                        for(auto kk : kGatherComponets)
                         {
-                            auto componentIndex = cc.componentIndex;
-                            auto componentName = cc.componentName;
+                            auto componentName = kk.componentName;
 
                             EMIT_LINE_DIRECTIVE();
                             sb << "vector<T, 4> Gather" << componentName << "(SamplerState s, ";
