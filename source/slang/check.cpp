@@ -717,7 +717,7 @@ namespace Slang
                         // up with initializer arguments.
 
 
-                        int argIndex = 0;
+                        UInt argIndex = 0;
                         for(auto fieldDeclRef : getMembersOfType<StructField>(toStructDeclRef))
                         {
                             if(argIndex >= argCount)
@@ -1144,27 +1144,27 @@ namespace Slang
             return constIntVal;
         }
 
-        void visit(ModifierDecl* decl)
+        void visit(ModifierDecl*)
         {
             // These are only used in the stdlib, so no checking is needed
         }
 
-        void visit(GenericTypeParamDecl* decl)
+        void visit(GenericTypeParamDecl*)
         {
             // These are only used in the stdlib, so no checking is needed for now
         }
 
-        void visit(GenericValueParamDecl* decl)
+        void visit(GenericValueParamDecl*)
         {
             // These are only used in the stdlib, so no checking is needed for now
         }
 
-        void visit(GenericTypeConstraintDecl* decl)
+        void visit(GenericTypeConstraintDecl*)
         {
             // These are only used in the stdlib, so no checking is needed for now
         }
 
-        void visit(Modifier* modifier)
+        void visit(Modifier*)
         {
             // Do nothing with modifiers for now
         }
@@ -1442,7 +1442,7 @@ namespace Slang
             if (fstParamCount != sndParamCount)
                 return false;
 
-            for (int ii = 0; ii < fstParamCount; ++ii)
+            for (UInt ii = 0; ii < fstParamCount; ++ii)
             {
                 auto fstParam = fstParams[ii];
                 auto sndParam = sndParams[ii];
@@ -1597,10 +1597,10 @@ namespace Slang
         template<typename T>
         T* FindOuterStmt()
         {
-            int outerStmtCount = outerStmts.Count();
-            for (int ii = outerStmtCount - 1; ii >= 0; --ii)
+            UInt outerStmtCount = outerStmts.Count();
+            for (UInt ii = outerStmtCount; ii > 0; --ii)
             {
-                auto outerStmt = outerStmts[ii];
+                auto outerStmt = outerStmts[ii-1];
                 auto found = dynamic_cast<T*>(outerStmt);
                 if (found)
                     return found;
@@ -2988,8 +2988,8 @@ namespace Slang
 
         struct ParamCounts
         {
-            int required;
-            int allowed;
+            UInt required;
+            UInt allowed;
         };
 
         // count the number of parameters required/allowed for a callable
@@ -3048,7 +3048,7 @@ namespace Slang
             OverloadResolveContext&		context,
             OverloadCandidate const&	candidate)
         {
-            int argCount = context.appExpr->Arguments.Count();
+            UInt argCount = context.appExpr->Arguments.Count();
             ParamCounts paramCounts = { 0, 0 };
             switch (candidate.flavor)
             {
@@ -3187,7 +3187,7 @@ namespace Slang
             OverloadCandidate&		candidate)
         {
             auto& args = context.appExpr->Arguments;
-            int argCount = args.Count();
+            UInt argCount = args.Count();
 
             List<DeclRef<ParameterSyntaxNode>> params;
             switch (candidate.flavor)
@@ -3208,7 +3208,7 @@ namespace Slang
             // case where one or more parameters had defaults.
             assert(argCount <= params.Count());
 
-            for (int ii = 0; ii < argCount; ++ii)
+            for (UInt ii = 0; ii < argCount; ++ii)
             {
                 auto& arg = args[ii];
                 auto param = params[ii];
@@ -3410,7 +3410,7 @@ namespace Slang
                 bool anyFiltered = false;
                 // Note that we are querying the list length on every iteration,
                 // because we might remove things.
-                for (int cc = 0; cc < context.bestCandidates.Count(); ++cc)
+                for (UInt cc = 0; cc < context.bestCandidates.Count(); ++cc)
                 {
                     int cmp = CompareOverloadCandidates(&candidate, &context.bestCandidates[cc]);
                     if (cmp < 0)
@@ -3624,8 +3624,8 @@ namespace Slang
 
             // Their arguments must unify
             assert(fst->args.Count() == snd->args.Count());
-            int argCount = fst->args.Count();
-            for (int aa = 0; aa < argCount; ++aa)
+            UInt argCount = fst->args.Count();
+            for (UInt aa = 0; aa < argCount; ++aa)
             {
                 if (!TryUnifyVals(constraints, fst->args[aa], snd->args[aa]))
                     return false;
@@ -3865,8 +3865,8 @@ namespace Slang
                 auto& args = context.appExpr->Arguments;
                 auto params = GetParameters(funcDeclRef).ToArray();
 
-                int argCount = args.Count();
-                int paramCount = params.Count();
+                UInt argCount = args.Count();
+                UInt paramCount = params.Count();
 
                 // Bail out on mismatch.
                 // TODO(tfoley): need more nuance here
@@ -3875,7 +3875,7 @@ namespace Slang
                     return DeclRef<Decl>(nullptr, nullptr);
                 }
 
-                for (int aa = 0; aa < argCount; ++aa)
+                for (UInt aa = 0; aa < argCount; ++aa)
                 {
 #if 0
                     if (!TryUnifyArgAndParamTypes(constraints, args[aa], params[aa]))
@@ -4289,9 +4289,9 @@ namespace Slang
                     }
                 }
 
-                int candidateCount = context.bestCandidates.Count();
-                int maxCandidatesToPrint = 10; // don't show too many candidates at once...
-                int candidateIndex = 0;
+                UInt candidateCount = context.bestCandidates.Count();
+                UInt maxCandidatesToPrint = 10; // don't show too many candidates at once...
+                UInt candidateIndex = 0;
                 for (auto candidate : context.bestCandidates)
                 {
                     String declString = getDeclSignatureString(candidate.item);
@@ -4561,7 +4561,7 @@ namespace Slang
                     }
                     if (params)
                     {
-                        for (int i = 0; i < (*params).Count(); i++)
+                        for (UInt i = 0; i < (*params).Count(); i++)
                         {
                             if ((*params)[i]->HasModifier<OutModifier>())
                             {

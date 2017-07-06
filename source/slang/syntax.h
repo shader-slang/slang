@@ -420,9 +420,9 @@ namespace Slang
         // TODO(tfoley): It is ugly to have these.
         // We should probably fix the call sites instead.
         RefPtr<T>& First() { return *begin(); }
-        int Count()
+        UInt Count()
         {
-            int count = 0;
+            UInt count = 0;
             for (auto iter : (*this))
             {
                 (void)iter;

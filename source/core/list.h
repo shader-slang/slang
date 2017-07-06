@@ -34,19 +34,19 @@ namespace Slang
 	class AllocateMethod
 	{
 	public:
-		static inline T* Alloc(int size)
+		static inline T* Alloc(UInt size)
 		{
 			TAllocator allocator;
 			T * rs = (T*)allocator.Alloc(size*sizeof(T));
 			Initializer<T, std::is_pod<T>::value>::Initialize(rs, size);
 			return rs;
 		}
-		static inline void Free(T * ptr, int bufferSize)
+		static inline void Free(T * ptr, UInt bufferSize)
 		{
 			TAllocator allocator;
 			if (!std::is_trivially_destructible<T>::value)
 			{
-				for (int i = 0; i<bufferSize; i++)
+				for (UInt i = 0; i<bufferSize; i++)
 					ptr[i].~T();
 			}
 			allocator.Free(ptr);
@@ -57,11 +57,11 @@ namespace Slang
 	class AllocateMethod<T, StandardAllocator>
 	{
 	public:
-		static inline T* Alloc(int size)
+		static inline T* Alloc(UInt size)
 		{
 			return new T[size];
 		}
-		static inline void Free(T* ptr, int /*bufferSize*/)
+		static inline void Free(T* ptr, UInt /*bufferSize*/)
 		{
 			delete [] ptr;
 		}
@@ -83,7 +83,7 @@ namespace Slang
 	{
 	private:
 
-		inline T * Allocate(int size)
+		inline T * Allocate(UInt size)
 		{
 			return AllocateMethod<T, TAllocator>::Alloc(size);
 				
@@ -92,9 +92,9 @@ namespace Slang
 		static const int InitialSize = 16;
 		TAllocator allocator;
 	private:
-		T * buffer;
-		int _count;
-		int bufferSize;
+		T*      buffer;
+		UInt    _count;
+		UInt    bufferSize;
 		void FreeBuffer()
 		{
 			AllocateMethod<T, TAllocator>::Free(buffer, bufferSize);
@@ -239,7 +239,7 @@ namespace Slang
 		{
 			if (bufferSize < _count + 1)
 			{
-				int newBufferSize = InitialSize;
+				UInt newBufferSize = InitialSize;
 				if (bufferSize)
 					newBufferSize = (bufferSize << 1);
 
@@ -252,7 +252,7 @@ namespace Slang
 		{
 			if (bufferSize < _count + 1)
 			{
-				int newBufferSize = InitialSize;
+				UInt newBufferSize = InitialSize;
 				if (bufferSize)
 					newBufferSize = (bufferSize << 1);
 
@@ -262,7 +262,7 @@ namespace Slang
 
 		}
 
-		int Count() const
+		UInt Count() const
 		{
 			return _count;
 		}
@@ -272,21 +272,21 @@ namespace Slang
 			return buffer;
 		}
 
-		int Capacity() const
+		UInt Capacity() const
 		{
 			return bufferSize;
 		}
 
-		void Insert(int id, const T & val)
+		void Insert(UInt id, const T & val)
 		{
 			InsertRange(id, &val, 1);
 		}
 
-		void InsertRange(int id, const T * vals, int n)
+		void InsertRange(UInt id, const T * vals, UInt n)
 		{
 			if (bufferSize < _count + n)
 			{
-				int newBufferSize = InitialSize;
+				UInt newBufferSize = InitialSize;
 				while (newBufferSize < _count + n)
 					newBufferSize = newBufferSize << 1;
 
@@ -300,9 +300,9 @@ namespace Slang
 					}
 					else*/
 					{
-						for (int i = 0; i < id; i++)
+						for (UInt i = 0; i < id; i++)
 							newBuffer[i] = buffer[i];
-						for (int i = id; i < _count; i++)
+						for (UInt i = id; i < _count; i++)
 							newBuffer[i + n] = T(static_cast<T&&>(buffer[i]));
 					}
 					FreeBuffer();
@@ -316,14 +316,14 @@ namespace Slang
 					memmove(buffer + id + n, buffer + id, sizeof(T) * (_count - id));
 				else*/
 				{
-					for (int i = _count - 1; i >= id; i--)
-						buffer[i + n] = static_cast<T&&>(buffer[i]);
+					for (UInt i = _count; i > id; i--)
+						buffer[i + n - 1] = static_cast<T&&>(buffer[i - 1]);
 				}
 			}
 			/*if (std::has_trivial_copy_assign<T>::value && std::has_trivial_destructor<T>::value)
 				memcpy(buffer + id, vals, sizeof(T) * n);
 			else*/
-				for (int i = 0; i < n; i++)
+				for (UInt i = 0; i < n; i++)
 					buffer[id + i] = vals[i];
 
 			_count += n;
@@ -345,7 +345,7 @@ namespace Slang
 			InsertRange(_count, list.Buffer(), list.Count());
 		}
 
-		void AddRange(const T * vals, int n)
+		void AddRange(const T * vals, UInt n)
 		{
 			InsertRange(_count, vals, n);
 		}
@@ -355,21 +355,19 @@ namespace Slang
 			InsertRange(_count, list.buffer, list._count);
 		}
 
-		void RemoveRange(int id, int deleteCount)
+		void RemoveRange(UInt id, UInt deleteCount)
 		{
 #if _DEBUG
-			if (id >= _count || id < 0)
+			if (id >= _count)
 				throw "Remove: Index out of range.";
-			if(deleteCount < 0)
-				throw "Remove: deleteCount smaller than zero.";
 #endif
-			int actualDeleteCount = ((id + deleteCount) >= _count)? (_count - id) : deleteCount;
-			for (int i = id + actualDeleteCount; i < _count; i++)
+			UInt actualDeleteCount = ((id + deleteCount) >= _count)? (_count - id) : deleteCount;
+			for (UInt i = id + actualDeleteCount; i < _count; i++)
 				buffer[i - actualDeleteCount] = static_cast<T&&>(buffer[i]);
 			_count -= actualDeleteCount;
 		}
 
-		void RemoveAt(int id)
+		void RemoveAt(UInt id)
 		{
 			RemoveRange(id, 1);
 		}
@@ -395,7 +393,7 @@ namespace Slang
 			FastRemoveAt(idx);
 		}
 
-		void FastRemoveAt(int idx)
+		void FastRemoveAt(UInt idx)
 		{
 			if (idx != -1 && _count - 1 != idx)
 			{
@@ -409,7 +407,7 @@ namespace Slang
 			_count = 0;
 		}
 
-		void Reserve(int size)
+		void Reserve(UInt size)
 		{
 			if(size > bufferSize)
 			{
@@ -420,7 +418,7 @@ namespace Slang
 						memcpy(newBuffer, buffer, _count * sizeof(T));
 					else*/
 					{
-						for (int i = 0; i < _count; i++)
+						for (UInt i = 0; i < _count; i++)
 							newBuffer[i] = static_cast<T&&>(buffer[i]);
 					}
 					FreeBuffer();
@@ -430,9 +428,9 @@ namespace Slang
 			}
 		}
 
-		void GrowToSize(int size)
+		void GrowToSize(UInt size)
 		{
-			int newBufferSize = 1<<Math::Log2Ceil(size);
+			UInt newBufferSize = UInt(1) << Math::Log2Ceil(size);
 			if (bufferSize < newBufferSize)
 			{
 				Reserve(newBufferSize);
@@ -440,13 +438,13 @@ namespace Slang
 			this->_count = size;
 		}
 
-		void SetSize(int size)
+		void SetSize(UInt size)
 		{
 			Reserve(size);
 			_count = size;
 		}
 
-		void UnsafeShrinkToSize(int size)
+		void UnsafeShrinkToSize(UInt size)
 		{
 			_count = size;
 		}
@@ -472,19 +470,19 @@ namespace Slang
 #endif
 #endif
 
-		FORCE_INLINE T & operator [](int id) const
+		FORCE_INLINE T & operator [](UInt id) const
 		{
 #if _DEBUG
-			if(id >= _count || id < 0)
+			if(id >= _count)
 				throw IndexOutofRangeException("Operator[]: Index out of Range.");
 #endif
 			return buffer[id];
 		}
 
 		template<typename Func>
-		int FindFirst(const Func & predicate) const
+		UInt FindFirst(const Func & predicate) const
 		{
-			for (int i = 0; i < _count; i++)
+			for (UInt i = 0; i < _count; i++)
 			{
 				if (predicate(buffer[i]))
 					return i;
@@ -493,18 +491,18 @@ namespace Slang
 		}
 
 		template<typename Func>
-		int FindLast(const Func & predicate) const
+		UInt FindLast(const Func & predicate) const
 		{
-			for (int i = _count - 1; i >= 0; i--)
+			for (UInt i = _count; i > 0; i--)
 			{
-				if (predicate(buffer[i]))
-					return i;
+				if (predicate(buffer[i-1]))
+					return i-1;
 			}
 			return -1;
 		}
 
 		template<typename T2>
-		int IndexOf(const T2 & val) const
+		UInt IndexOf(const T2 & val) const
 		{
 			for (int i = 0; i < _count; i++)
 			{
@@ -515,12 +513,12 @@ namespace Slang
 		}
 
 		template<typename T2>
-		int LastIndexOf(const T2 & val) const
+		UInt LastIndexOf(const T2 & val) const
 		{
-			for (int i = _count - 1; i >= 0; i--)
+			for (int i = _count; i > 0; i--)
 			{
-				if(buffer[i] == val)
-					return i;
+				if(buffer[i-1] == val)
+					return i-1;
 			}
 			return -1;
 		}
@@ -532,7 +530,7 @@ namespace Slang
 
 		bool Contains(const T & val)
 		{
-			for (int i = 0; i<_count; i++)
+			for (UInt i = 0; i<_count; i++)
 				if (buffer[i] == val)
 					return true;
 			return false;

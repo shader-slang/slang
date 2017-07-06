@@ -225,7 +225,7 @@ struct DefaultVaryingLayoutRulesImpl : DefaultLayoutRulesImpl
         return kind;
     }
 
-    SimpleLayoutInfo GetScalarLayout(BaseType baseType) override
+    SimpleLayoutInfo GetScalarLayout(BaseType) override
     {
         // Assume that all scalars take up one "slot"
         return SimpleLayoutInfo(
@@ -233,7 +233,7 @@ struct DefaultVaryingLayoutRulesImpl : DefaultLayoutRulesImpl
             1);
     }
 
-    virtual SimpleLayoutInfo GetScalarLayout(slang::TypeReflection::ScalarType scalarType)
+    virtual SimpleLayoutInfo GetScalarLayout(slang::TypeReflection::ScalarType)
     {
         // Assume that all scalars take up one "slot"
         return SimpleLayoutInfo(
@@ -241,7 +241,7 @@ struct DefaultVaryingLayoutRulesImpl : DefaultLayoutRulesImpl
             1);
     }
 
-    SimpleLayoutInfo GetVectorLayout(SimpleLayoutInfo elementInfo, size_t elementCount) override
+    SimpleLayoutInfo GetVectorLayout(SimpleLayoutInfo, size_t) override
     {
         // Vectors take up one slot by default
         //
@@ -276,7 +276,7 @@ struct GLSLSpecializationConstantLayoutRulesImpl : DefaultLayoutRulesImpl
         return LayoutResourceKind::SpecializationConstant;
     }
 
-    SimpleLayoutInfo GetScalarLayout(BaseType baseType) override
+    SimpleLayoutInfo GetScalarLayout(BaseType) override
     {
         // Assume that all scalars take up one "slot"
         return SimpleLayoutInfo(
@@ -284,7 +284,7 @@ struct GLSLSpecializationConstantLayoutRulesImpl : DefaultLayoutRulesImpl
             1);
     }
 
-    virtual SimpleLayoutInfo GetScalarLayout(slang::TypeReflection::ScalarType scalarType)
+    virtual SimpleLayoutInfo GetScalarLayout(slang::TypeReflection::ScalarType)
     {
         // Assume that all scalars take up one "slot"
         return SimpleLayoutInfo(
@@ -292,7 +292,7 @@ struct GLSLSpecializationConstantLayoutRulesImpl : DefaultLayoutRulesImpl
             1);
     }
 
-    SimpleLayoutInfo GetVectorLayout(SimpleLayoutInfo elementInfo, size_t elementCount) override
+    SimpleLayoutInfo GetVectorLayout(SimpleLayoutInfo, size_t elementCount) override
     {
         // GLSL doesn't support vectors of specialization constants,
         // but we will assume that, if supported, they would use one slot per element.
@@ -308,7 +308,7 @@ GLSLSpecializationConstantLayoutRulesImpl kGLSLSpecializationConstantLayoutRules
 
 struct GLSLObjectLayoutRulesImpl : ObjectLayoutRulesImpl
 {
-    virtual SimpleLayoutInfo GetObjectLayout(ShaderParameterKind kind) override
+    virtual SimpleLayoutInfo GetObjectLayout(ShaderParameterKind) override
     {
         // In Vulkan GLSL, pretty much every object is just a descriptor-table slot.
         // We can refine this method once we support a case where this isn't true.
@@ -954,7 +954,7 @@ SimpleLayoutInfo GetLayoutImpl(
         return GetSimpleLayoutImpl(
             rules->GetVectorLayout(
                 GetLayout(vecType->elementType.Ptr(), rules),
-                GetIntVal(vecType->elementCount)),
+                (size_t) GetIntVal(vecType->elementCount)),
             type,
             rules,
             outTypeLayout);
@@ -964,8 +964,8 @@ SimpleLayoutInfo GetLayoutImpl(
         return GetSimpleLayoutImpl(
             rules->GetMatrixLayout(
                 GetLayout(matType->getElementType(), rules),
-                GetIntVal(matType->getRowCount()),
-                GetIntVal(matType->getColumnCount())),
+                (size_t) GetIntVal(matType->getRowCount()),
+                (size_t) GetIntVal(matType->getColumnCount())),
             type,
             rules,
             outTypeLayout);

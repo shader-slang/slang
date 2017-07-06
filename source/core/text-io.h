@@ -273,7 +273,7 @@ namespace Slang
 		RefPtr<Stream> stream;
 		List<char> buffer;
 		Encoding * encoding;
-		int ptr;
+		UInt ptr;
 		char ReadBufferChar();
 		void ReadBuffer();
 			

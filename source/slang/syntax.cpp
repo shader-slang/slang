@@ -782,9 +782,9 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
         if (genericDecl != subst->genericDecl)
             return false;
 
-        int argCount = args.Count();
+        UInt argCount = args.Count();
         assert(args.Count() == subst->args.Count());
-        for (int aa = 0; aa < argCount; ++aa)
+        for (UInt aa = 0; aa < argCount; ++aa)
         {
             if (!args[aa]->EqualsVal(subst->args[aa].Ptr()))
                 return false;

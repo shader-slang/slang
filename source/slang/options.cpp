@@ -80,7 +80,7 @@ struct OptionsParser
     {
         auto translationUnitIndex = spAddTranslationUnit(compileRequest, language, nullptr);
 
-        assert(translationUnitIndex == rawTranslationUnits.Count());
+        assert(UInt(translationUnitIndex) == rawTranslationUnits.Count());
 
         RawTranslationUnit rawTranslationUnit;
         rawTranslationUnit.sourceLanguage = language;

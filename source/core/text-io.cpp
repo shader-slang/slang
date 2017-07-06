@@ -215,7 +215,7 @@ namespace Slang
 		{
 #ifdef _WIN32
 			int flag = IS_TEXT_UNICODE_SIGNATURE | IS_TEXT_UNICODE_REVERSE_SIGNATURE | IS_TEXT_UNICODE_STATISTICS | IS_TEXT_UNICODE_ASCII16;
-			int rs = IsTextUnicode(buffer.Buffer(), buffer.Count(), &flag);
+			int rs = IsTextUnicode(buffer.Buffer(), (int) buffer.Count(), &flag);
 			if (rs)
 			{
 				if (flag & (IS_TEXT_UNICODE_SIGNATURE | IS_TEXT_UNICODE_STATISTICS))

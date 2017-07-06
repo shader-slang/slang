@@ -452,7 +452,7 @@ namespace Slang
             return getData();
 		}
 
-        OSString ToWString(int* len = 0) const;
+        OSString ToWString(UInt* len = 0) const;
 
 		bool Equals(const String & str, bool caseSensitive = true)
 		{
@@ -506,7 +506,7 @@ namespace Slang
             String result;
             for (auto c : *this)
             {
-                int d = (c >= 'a' && c <= 'z') ? (c - ('a' - 'A')) : c;
+                char d = (c >= 'a' && c <= 'z') ? (c - ('a' - 'A')) : c;
                 result.append(d);
             }
             return result;
@@ -517,7 +517,7 @@ namespace Slang
             String result;
             for (auto c : *this)
             {
-                int d = (c >= 'A' && c <= 'Z') ? (c - ('A' - 'a')) : c;
+                char d = (c >= 'A' && c <= 'Z') ? (c - ('A' - 'a')) : c;
                 result.append(d);
             }
             return result;
@@ -636,13 +636,13 @@ namespace Slang
 	class StringBuilder : public String
 	{
 	private:
-		static const int InitialSize = 1024;
+        enum { InitialSize = 1024 };
 	public:
-		explicit StringBuilder(int bufferSize = InitialSize)
+		explicit StringBuilder(UInt bufferSize = InitialSize)
 		{
             ensureUniqueStorageWithCapacity(bufferSize);
 		}
-		void EnsureCapacity(int size)
+		void EnsureCapacity(UInt size)
 		{
             ensureUniqueStorageWithCapacity(size);
 		}
@@ -678,7 +678,7 @@ namespace Slang
 		}
 		StringBuilder & operator << (const char * str)
 		{
-			Append(str, (int)strlen(str));
+			Append(str, strlen(str));
 			return *this;
 		}
 		StringBuilder & operator << (const String & str)
@@ -736,9 +736,9 @@ namespace Slang
 		}
 		void Append(const char * str)
 		{
-			Append(str, (int)strlen(str));
+			Append(str, strlen(str));
 		}
-		void Append(const char * str, int strLen)
+		void Append(const char * str, UInt strLen)
 		{
             append(str, str + strLen);
 		}
