@@ -8,11 +8,14 @@
 
 namespace Slang
 {
-    class ProgramSyntaxNode;
+    class EntryPointRequest;
     class ProgramLayout;
+    class TranslationUnitRequest;
 
-    String emitProgram(
-        ProgramSyntaxNode*  program,
+    // Emit code for a single entry point, based on
+    // the input translation unit.
+    String emitEntryPoint(
+        EntryPointRequest*  entryPoint,
         ProgramLayout*      programLayout,
         CodeGenTarget       target);
 }

@@ -14,6 +14,7 @@ namespace Slang
     class Substitutions;
     class SyntaxVisitor;
     class FunctionSyntaxNode;
+    class Layout;
 
     struct IExprVisitor;
     struct IDeclVisitor;
@@ -347,8 +348,14 @@ namespace Slang
         {
             return DeclRef<ContainerDecl>::unsafeInit(DeclRefBase::GetParent());
         }
-
     };
+
+    
+    template<typename T>
+    inline DeclRef<T> makeDeclRef(T* decl)
+    {
+        return DeclRef<T>(decl, nullptr);
+    }
 
     template<typename T>
     struct FilteredMemberList

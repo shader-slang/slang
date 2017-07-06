@@ -1581,11 +1581,16 @@ namespace Slang
             DeclVisitor::dispatch(stmt->decl);
         }
 
-        void visit(BlockStatementSyntaxNode *stmt)
+        void visit(BlockStmt* stmt)
         {
-            for (auto & node : stmt->Statements)
+            checkStmt(stmt->body);
+        }
+
+        void visit(SeqStmt* stmt)
+        {
+            for(auto ss : stmt->stmts)
             {
-                checkStmt(node);
+                checkStmt(ss);
             }
         }
 
@@ -2412,6 +2417,24 @@ namespace Slang
 
             appExpr->Type = QualType(type);
             return appExpr;
+        }
+
+        //
+
+        RefPtr<ExpressionSyntaxNode> visit(AssignExpr* expr)
+        {
+            expr->left = CheckExpr(expr->left);
+
+            auto type = expr->left->Type;
+
+            expr->right = Coerce(type, CheckTerm(expr->right));
+
+            if (!type.IsLeftValue)
+            {
+                getSink()->diagnose(expr, Diagnostics::assignNonLValue);
+            }
+            expr->Type = type;
+            return expr;
         }
 
 

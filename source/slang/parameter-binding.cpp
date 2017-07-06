@@ -767,56 +767,22 @@ SimpleSemanticInfo decomposeSimpleSemantic(
     return info;
 }
 
-enum class EntryPointParameterDirection
+enum EntryPointParameterDirection
 {
-    Input,
-    Output,
+    kEntryPointParameterDirection_Input  = 0x1,
+    kEntryPointParameterDirection_Output = 0x2,
 };
+typedef unsigned int EntryPointParameterDirectionMask;
 
 struct EntryPointParameterState
 {
-    String*                         optSemanticName;
-    int*                            ioSemanticIndex;
-    EntryPointParameterDirection    direction;
-    int                             semanticSlotCount;
+    String*                             optSemanticName;
+    int*                                ioSemanticIndex;
+    EntryPointParameterDirectionMask    directionMask;
+    int                                 semanticSlotCount;
 };
 
-static void processSimpleEntryPointInput(
-    ParameterBindingContext*        context,
-    RefPtr<ExpressionType>          type,
-    EntryPointParameterState const& state)
-{
-    auto optSemanticName    =  state.optSemanticName;
-    auto semanticIndex      = *state.ioSemanticIndex;
-    auto semanticSlotCount  =  state.semanticSlotCount;
-}
-
-static void processSimpleEntryPointOutput(
-    ParameterBindingContext*        context,
-    RefPtr<ExpressionType>          type,
-    EntryPointParameterState const& state)
-{
-    auto optSemanticName    =  state.optSemanticName;
-    auto semanticIndex      = *state.ioSemanticIndex;
-    auto semanticSlotCount  =  state.semanticSlotCount;
-
-    if(!optSemanticName)
-        return;
-
-    auto semanticName = *optSemanticName;
-
-    // Note: I'm just doing something expedient here and detecting `SV_Target`
-    // outputs and claiming the appropriate register range right away.
-    //
-    // TODO: we should really be building up some representation of all of this,
-    // once we've gone to the trouble of looking it all up...
-    if( semanticName.ToLower() == "sv_target" )
-    {
-        context->shared->usedResourceRanges[int(LayoutResourceKind::UnorderedAccess)].Add(semanticIndex, semanticIndex + semanticSlotCount);
-    }
-}
-
-static void processSimpleEntryPointParameter(
+static RefPtr<TypeLayout> processSimpleEntryPointParameter(
     ParameterBindingContext*        context,
     RefPtr<ExpressionType>          type,
     EntryPointParameterState const& inState,
@@ -825,28 +791,63 @@ static void processSimpleEntryPointParameter(
     EntryPointParameterState state = inState;
     state.semanticSlotCount = semanticSlotCount;
 
-    switch( state.direction )
+    auto optSemanticName    =  state.optSemanticName;
+    auto semanticIndex      = *state.ioSemanticIndex;
+
+    String semanticName = optSemanticName ? *optSemanticName : "";
+    String sn = semanticName.ToLower();
+
+    RefPtr<TypeLayout> typeLayout =  new TypeLayout();
+    if (sn.StartsWith("sv_"))
     {
-    case EntryPointParameterDirection::Input:
-        processSimpleEntryPointInput(context, type, state);
-        break;
+        // System-value semantic.
 
-    case EntryPointParameterDirection::Output:
-        processSimpleEntryPointOutput(context, type, state);
-        break;
+        if (state.directionMask & kEntryPointParameterDirection_Output)
+        {
+            // Note: I'm just doing something expedient here and detecting `SV_Target`
+            // outputs and claiming the appropriate register range right away.
+            //
+            // TODO: we should really be building up some representation of all of this,
+            // once we've gone to the trouble of looking it all up...
+            if( sn == "sv_target" )
+            {
+                context->shared->usedResourceRanges[int(LayoutResourceKind::UnorderedAccess)].Add(semanticIndex, semanticIndex + semanticSlotCount);
+            }
+        }
 
-    SLANG_EXHAUSTIVE_SWITCH()
+        // TODO: add some kind of usage information for system input/output
+    }
+    else
+    {
+        // user-defined semantic
+
+        if (state.directionMask & kEntryPointParameterDirection_Input)
+        {
+            auto rules = context->layoutRules->getVaryingInputRules();
+            SimpleLayoutInfo layout = GetLayout(type, rules);
+            typeLayout->addResourceUsage(layout.kind, layout.size);
+        }
+
+        if (state.directionMask & kEntryPointParameterDirection_Output)
+        {
+            auto rules = context->layoutRules->getVaryingOutputRules();
+            SimpleLayoutInfo layout = GetLayout(type, rules);
+            typeLayout->addResourceUsage(layout.kind, layout.size);
+        }
     }
 
     *state.ioSemanticIndex += state.semanticSlotCount;
+    typeLayout->type = type;
+
+    return typeLayout;
 }
 
-static void processEntryPointParameter(
+static RefPtr<TypeLayout> processEntryPointParameter(
     ParameterBindingContext*        context,
     RefPtr<ExpressionType>          type,
     EntryPointParameterState const& state);
 
-static void processEntryPointParameterWithPossibleSemantic(
+static RefPtr<TypeLayout> processEntryPointParameterWithPossibleSemantic(
     ParameterBindingContext*        context,
     Decl*                           declForSemantic,
     RefPtr<ExpressionType>          type,
@@ -873,11 +874,11 @@ static void processEntryPointParameterWithPossibleSemantic(
     // *or* we couldn't find an explicit semantic to apply on the given
     // declaration, so we will just recursive with whatever we have at
     // the moment.
-    processEntryPointParameter(context, type, state);
+    return processEntryPointParameter(context, type, state);
 }
 
 
-static void processEntryPointParameter(
+static RefPtr<TypeLayout> processEntryPointParameter(
     ParameterBindingContext*        context,
     RefPtr<ExpressionType>          type,
     EntryPointParameterState const& state)
@@ -885,31 +886,50 @@ static void processEntryPointParameter(
     // Scalar and vector types are treated as outputs directly
     if(auto basicType = type->As<BasicExpressionType>())
     {
-        processSimpleEntryPointParameter(context, basicType, state);
+        return processSimpleEntryPointParameter(context, basicType, state);
     }
     else if(auto basicType = type->As<VectorExpressionType>())
     {
-        processSimpleEntryPointParameter(context, basicType, state);
+        return processSimpleEntryPointParameter(context, basicType, state);
     }
     // A matrix is processed as if it was an array of rows
     else if( auto matrixType = type->As<MatrixExpressionType>() )
     {
         auto rowCount = GetIntVal(matrixType->getRowCount());
-        processSimpleEntryPointParameter(context, basicType, state, (int) rowCount);
+        return processSimpleEntryPointParameter(context, basicType, state, (int) rowCount);
     }
     else if( auto arrayType = type->As<ArrayExpressionType>() )
     {
+        // Note: Bad Things will happen if we have an array input
+        // without a semantic already being enforced.
+        
         auto elementCount = GetIntVal(arrayType->ArrayLength);
 
-        for( int ii = 0; ii < elementCount; ++ii )
+        // We use the first element to derive the layout for the element type
+        auto elementTypeLayout = processEntryPointParameter(context, arrayType->BaseType, state);
+
+        // We still walk over subsequent elements to make sure they consume resources
+        // as needed
+        for( int ii = 1; ii < elementCount; ++ii )
         {
             processEntryPointParameter(context, arrayType->BaseType, state);
         }
+
+        RefPtr<ArrayTypeLayout> arrayTypeLayout = new ArrayTypeLayout();
+        arrayTypeLayout->elementTypeLayout = elementTypeLayout;
+        arrayTypeLayout->type = arrayType;
+
+        for (auto rr : elementTypeLayout->resourceInfos)
+        {
+            arrayTypeLayout->findOrAddResourceInfo(rr.kind)->count = rr.count * elementCount;
+        }
+
+        return arrayTypeLayout;
     }
     // Ignore a bunch of types that don't make sense here...
-    else if(auto textureType = type->As<TextureType>()) {}
-    else if(auto samplerStateType = type->As<SamplerStateType>()) {}
-    else if(auto constantBufferType = type->As<ConstantBufferType>()) {}
+    else if (auto textureType = type->As<TextureType>()) { return nullptr;  }
+    else if(auto samplerStateType = type->As<SamplerStateType>()) { return nullptr;  }
+    else if(auto constantBufferType = type->As<ConstantBufferType>()) { return nullptr;  }
     // Catch declaration-reference types late in the sequence, since
     // otherwise they will include all of the above cases...
     else if( auto declRefType = type->As<DeclRefType>() )
@@ -918,15 +938,36 @@ static void processEntryPointParameter(
 
         if (auto structDeclRef = declRef.As<StructSyntaxNode>())
         {
+            RefPtr<StructTypeLayout> structLayout = new StructTypeLayout();
+            structLayout->type = type;
+
             // Need to recursively walk the fields of the structure now...
             for( auto field : GetFields(structDeclRef) )
             {
-                processEntryPointParameterWithPossibleSemantic(
+                auto fieldTypeLayout = processEntryPointParameterWithPossibleSemantic(
                     context,
                     field.getDecl(),
                     GetType(field),
                     state);
+
+                RefPtr<VarLayout> fieldVarLayout = new VarLayout();
+                fieldVarLayout->varDecl = field;
+                fieldVarLayout->typeLayout = fieldTypeLayout;
+
+                for (auto rr : fieldTypeLayout->resourceInfos)
+                {
+                    assert(rr.count != 0);
+
+                    auto structRes = structLayout->findOrAddResourceInfo(rr.kind);
+                    fieldVarLayout->findOrAddResourceInfo(rr.kind)->index = structRes->count;
+                    structRes->count += rr.count;
+                }
+
+                structLayout->fields.Add(fieldVarLayout);
+                structLayout->mapVarToLayout.Add(field.getDecl(), fieldVarLayout);
             }
+
+            return structLayout;
         }
         else
         {
@@ -937,6 +978,9 @@ static void processEntryPointParameter(
     {
         assert(!"unimplemented");
     }
+
+    assert(!"unexpected");
+    return nullptr;
 }
 
 static void collectEntryPointParameters(
@@ -998,42 +1042,68 @@ static void collectEntryPointParameters(
 
         // We have an entry-point parameter, and need to figure out what to do with it.
 
+        // TODO: need to handle `uniform`-qualified parameters here
+        if (paramDecl->HasModifier<UniformModifier>())
+            continue;
+
+        state.directionMask = 0;
+
         // If it appears to be an input, process it as such.
         if( paramDecl->HasModifier<InModifier>() || paramDecl->HasModifier<InOutModifier>() || !paramDecl->HasModifier<OutModifier>() )
         {
-            state.direction = EntryPointParameterDirection::Input;
-
-            processEntryPointParameterWithPossibleSemantic(
-                context,
-                paramDecl.Ptr(),
-                paramDecl->Type.type,
-                state);
+            state.directionMask |= kEntryPointParameterDirection_Input;
         }
 
         // If it appears to be an output, process it as such.
         if(paramDecl->HasModifier<OutModifier>() || paramDecl->HasModifier<InOutModifier>())
         {
-            state.direction = EntryPointParameterDirection::Output;
-
-            processEntryPointParameterWithPossibleSemantic(
-                context,
-                paramDecl.Ptr(),
-                paramDecl->Type.type,
-                state);
+            state.directionMask |= kEntryPointParameterDirection_Output;
         }
+
+        auto paramTypeLayout = processEntryPointParameterWithPossibleSemantic(
+            context,
+            paramDecl.Ptr(),
+            paramDecl->Type.type,
+            state);
+
+        RefPtr<VarLayout> paramVarLayout = new VarLayout();
+        paramVarLayout->varDecl = makeDeclRef(paramDecl.Ptr());
+        paramVarLayout->typeLayout = paramTypeLayout;
+
+        for (auto rr : paramTypeLayout->resourceInfos)
+        {
+            auto entryPointRes = entryPointLayout->findOrAddResourceInfo(rr.kind);
+            paramVarLayout->findOrAddResourceInfo(rr.kind)->index = entryPointRes->count;
+            entryPointRes->count += rr.count;
+        }
+
+        entryPointLayout->fields.Add(paramVarLayout);
+        entryPointLayout->mapVarToLayout.Add(paramDecl, paramVarLayout);
     }
 
     // If we can find an output type for the entry point, then process it as
     // an output parameter.
     if( auto resultType = entryPointFuncDecl->ReturnType.type )
     {
-        state.direction = EntryPointParameterDirection::Output;
+        state.directionMask = kEntryPointParameterDirection_Output;
 
-        processEntryPointParameterWithPossibleSemantic(
+        auto resultTypeLayout = processEntryPointParameterWithPossibleSemantic(
             context,
             entryPointFuncDecl,
             resultType,
             state);
+
+        RefPtr<VarLayout> resultLayout = new VarLayout();
+        resultLayout->typeLayout = resultTypeLayout;
+
+        for (auto rr : resultTypeLayout->resourceInfos)
+        {
+            auto entryPointRes = entryPointLayout->findOrAddResourceInfo(rr.kind);
+            resultLayout->findOrAddResourceInfo(rr.kind)->index = entryPointRes->count;
+            entryPointRes->count += rr.count;
+        }
+
+        entryPointLayout->resultLayout = resultLayout;
     }
 }
 

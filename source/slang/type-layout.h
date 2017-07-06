@@ -143,8 +143,13 @@ struct SimpleArrayLayoutInfo : SimpleLayoutInfo
 
 struct LayoutRulesImpl;
 
+// Base class for things that store layout info
+class Layout : public RefObject
+{
+};
+
 // A reified reprsentation of a particular laid-out type
-class TypeLayout : public RefObject
+class TypeLayout : public Layout
 {
 public:
     // The type that was laid out
@@ -215,7 +220,7 @@ enum VarLayoutFlag : VarLayoutFlags
 };
 
 // A reified layout for a particular variable, field, etc.
-class VarLayout : public RefObject
+class VarLayout : public Layout
 {
 public:
     // The variable we are laying out
@@ -324,7 +329,14 @@ public:
 
 // Layout information for a single shader entry point
 // within a program
-class EntryPointLayout : public RefObject
+//
+// Treated as a subclass of `StructTypeLayout` becase
+// it needs to include computed layout information
+// for the parameters of the entry point.
+//
+// TODO: where to store layout info for the return
+// type of the function?
+class EntryPointLayout : public StructTypeLayout
 {
 public:
     // The corresponding function declaration
@@ -332,10 +344,13 @@ public:
 
     // The shader profile that was used to compile the entry point
     Profile profile;
+
+    // Layout for any results of the entry point
+    RefPtr<VarLayout> resultLayout;
 };
 
 // Layout information for the global scope of a program
-class ProgramLayout : public RefObject
+class ProgramLayout : public Layout
 {
 public:
     // We store a layout for the declarations at the global
@@ -358,14 +373,6 @@ public:
     // will (eventually) belong there...
     List<RefPtr<EntryPointLayout>> entryPoints;
 };
-
-// A modifier to be attached to syntax after we've computed layout
-class ComputedLayoutModifier : public Modifier
-{
-public:
-    RefPtr<TypeLayout> typeLayout;
-};
-
 
 struct LayoutRulesFamilyImpl;
 

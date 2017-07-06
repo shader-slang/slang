@@ -901,6 +901,7 @@ namespace slang
 #include "source/slang/parser.cpp"
 #include "source/slang/preprocessor.cpp"
 #include "source/slang/lookup.cpp"
+#include "source/slang/lower.cpp"
 #include "source/slang/check.cpp"
 #include "source/slang/compiler.cpp"
 #include "source/slang/slang-stdlib.cpp"

@@ -269,3 +269,7 @@ SIMPLE_SYNTAX_CLASS(HLSLTriangleModifier     , HLSLGeometryShaderInputPrimitiveT
 SIMPLE_SYNTAX_CLASS(HLSLLineAdjModifier      , HLSLGeometryShaderInputPrimitiveTypeModifier)
 SIMPLE_SYNTAX_CLASS(HLSLTriangleAdjModifier  , HLSLGeometryShaderInputPrimitiveTypeModifier)
 
+// A modifier to be attached to syntax after we've computed layout
+SYNTAX_CLASS(ComputedLayoutModifier, Modifier)
+    FIELD(RefPtr<Layout>, layout)
+END_SYNTAX_CLASS()
