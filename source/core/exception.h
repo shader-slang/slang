@@ -110,6 +110,13 @@ namespace Slang
 		{
 		}
 	};
+
+    #define SLANG_UNEXPECTED(reason) \
+        throw Slang::Exception("unexpected: " reason)
+
+    #define SLANG_UNIMPLEMENTED_X(what) \
+        throw Slang::NotImplementedException("unimplemented: " what)
+
 }
 
 #endif

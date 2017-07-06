@@ -826,11 +826,68 @@ struct LoweringVisitor
     }
 
     // Catch-all
-    RefPtr<Decl> visit(
-        Decl* decl)
+
+    RefPtr<Decl> visit(ModifierDecl*)
     {
-        assert(!"unimplemented");
-        return decl;
+        // should not occur in user code
+        SLANG_UNEXPECTED("modifiers shouldn't occur in user code");
+    }
+
+    RefPtr<Decl> visit(GenericValueParamDecl*)
+    {
+        SLANG_UNEXPECTED("generics should be lowered to specialized decls");
+    }
+
+    RefPtr<Decl> visit(GenericTypeParamDecl*)
+    {
+        SLANG_UNEXPECTED("generics should be lowered to specialized decls");
+    }
+
+    RefPtr<Decl> visit(GenericTypeConstraintDecl*)
+    {
+        SLANG_UNEXPECTED("generics should be lowered to specialized decls");
+    }
+
+    RefPtr<Decl> visit(GenericDecl*)
+    {
+        SLANG_UNEXPECTED("generics should be lowered to specialized decls");
+    }
+
+    RefPtr<Decl> visit(ProgramSyntaxNode*)
+    {
+        SLANG_UNEXPECTED("module decls should be lowered explicitly");
+    }
+
+    RefPtr<Decl> visit(SubscriptDecl*)
+    {
+        // We don't expect to find direct references to a subscript
+        // declaration, but rather to the underlying accessors
+        return nullptr;
+    }
+
+    RefPtr<Decl> visit(InheritanceDecl*)
+    {
+        // We should deal with these explicitly, as part of lowering
+        // the type that contains them.
+        return nullptr;
+    }
+
+    RefPtr<Decl> visit(ExtensionDecl*)
+    {
+        // Extensions won't exist in the lowered code: their members
+        // will turn into ordinary functions that get called explicitly
+        return nullptr;
+    }
+
+    RefPtr<Decl> visit(TypeDefDecl* decl)
+    {
+        RefPtr<TypeDefDecl> loweredDecl = new TypeDefDecl();
+        lowerDeclCommon(loweredDecl, decl);
+
+        loweredDecl->Type = lowerType(decl->Type);
+
+        addMember(shared->loweredProgram, loweredDecl);
+        return loweredDecl;
     }
 
     RefPtr<ImportDecl> visit(ImportDecl* decl)
