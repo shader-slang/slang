@@ -1491,12 +1491,15 @@ static void EmitType(EmitContext* context, RefPtr<ExpressionType> type)
 static void EmitType(EmitContext* context, TypeExp const& typeExp, Token const& nameToken)
 {
     EmitType(context, typeExp.type,
-        typeExp.exp ? typeExp.exp->Position : CodePosition(), nameToken.Content, nameToken.Position);
+        typeExp.exp ? typeExp.exp->Position : CodePosition(),
+        nameToken.Content, nameToken.Position);
 }
 
 static void EmitType(EmitContext* context, TypeExp const& typeExp, String const& name)
 {
-    EmitType(context, typeExp.type, typeExp.exp->Position, name, CodePosition());
+    EmitType(context, typeExp.type,
+        typeExp.exp ? typeExp.exp->Position : CodePosition(),
+        name, CodePosition());
 }
 
 // Statements

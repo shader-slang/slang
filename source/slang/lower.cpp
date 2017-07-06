@@ -60,6 +60,7 @@ struct StructuralTransformVisitorBase
 
     RefPtr<ScopeDecl> transformSyntaxField(ScopeDecl* decl)
     {
+        if(!decl) return nullptr;
         return visitor->transformSyntaxField(decl).As<ScopeDecl>();
     }
 
@@ -263,6 +264,7 @@ struct LoweringVisitor
     RefPtr<ExpressionType> lowerType(
         ExpressionType* type)
     {
+        if(!type) return nullptr;
         return TypeVisitor::dispatch(type);
     }
 
@@ -456,12 +458,11 @@ struct LoweringVisitor
     // Statements
     //
 
-    StatementSyntaxNode* translateStmtRef(
-        StatementSyntaxNode*)
-    {
-        throw "unimplemented";
-    }
-
+    // Lowering one statement to another.
+    // The source statement might desugar into multiple statements,
+    // (or event to none), and in such a case this function wraps
+    // the result up as a `SeqStmt` or `EmptyStmt` as appropriate.
+    //
     RefPtr<StatementSyntaxNode> lowerStmt(
         StatementSyntaxNode* stmt)
     {
@@ -483,6 +484,37 @@ struct LoweringVisitor
         }
     }
 
+
+    // Structure to track "outer" statements during lowering
+    struct StmtLoweringState
+    {
+        // The next "outer" statement entry
+        StmtLoweringState*      parent = nullptr;
+
+        // The outer statement (both lowered and original)
+        StatementSyntaxNode*    loweredStmt = nullptr;
+        StatementSyntaxNode*    originalStmt = nullptr;
+    };
+    StmtLoweringState stmtLoweringState;
+
+    // Translate a reference from one statement to an outer statement
+    StatementSyntaxNode* translateStmtRef(
+        StatementSyntaxNode* originalStmt)
+    {
+        if(!originalStmt) return nullptr;
+
+        for( auto state = &stmtLoweringState; state; state = state->parent )
+        {
+            if(state->originalStmt == originalStmt)
+                return state->loweredStmt;
+        }
+
+        assert(!"unexepcted");
+
+        return nullptr;
+    }
+
+    // Expand a statement to be lowered into one or more statements
     void lowerStmtImpl(
         StatementSyntaxNode* stmt)
     {
@@ -498,14 +530,17 @@ struct LoweringVisitor
 
     LoweringVisitor pushScope(
         RefPtr<ScopeStmt>   loweredStmt,
-        RefPtr<ScopeStmt>   stmt)
+        RefPtr<ScopeStmt>   originalStmt)
     {
-        loweredStmt->scopeDecl = translateDeclRef(stmt->scopeDecl).As<ScopeDecl>();
+        loweredStmt->scopeDecl = translateDeclRef(originalStmt->scopeDecl).As<ScopeDecl>();
 
         LoweringVisitor subVisitor = *this;
         subVisitor.isBuildingStmt = true;
         subVisitor.stmtBeingBuilt = nullptr;
         subVisitor.parentDecl = loweredStmt->scopeDecl;
+        subVisitor.stmtLoweringState.parent = &stmtLoweringState;
+        subVisitor.stmtLoweringState.originalStmt = originalStmt;
+        subVisitor.stmtLoweringState.loweredStmt = loweredStmt;
         return subVisitor;
     }
 
@@ -562,11 +597,11 @@ struct LoweringVisitor
     void visit(BlockStmt* stmt)
     {
         RefPtr<BlockStmt> loweredStmt = new BlockStmt();
+        lowerScopeStmtFields(loweredStmt, stmt);
 
         LoweringVisitor subVisitor = pushScope(loweredStmt, stmt);
-        subVisitor.stmtBeingBuilt = loweredStmt;
 
-        subVisitor.lowerStmtImpl(stmt->body);
+        loweredStmt->body = subVisitor.lowerStmt(stmt->body);
 
         addStmt(loweredStmt);
     }
@@ -589,10 +624,152 @@ struct LoweringVisitor
         DeclVisitor::dispatch(stmt->decl);
     }
 
-    // catch-all
-    void visit(StatementSyntaxNode* stmt)
+    void lowerStmtFields(
+        StatementSyntaxNode* loweredStmt,
+        StatementSyntaxNode* originalStmt)
     {
-        auto loweredStmt = structuralTransform(stmt, this);
+        loweredStmt->Position = originalStmt->Position;
+        loweredStmt->modifiers = originalStmt->modifiers;
+    }
+
+    void lowerScopeStmtFields(
+        ScopeStmt* loweredStmt,
+        ScopeStmt* originalStmt)
+    {
+        lowerStmtFields(loweredStmt, originalStmt);
+        loweredStmt->scopeDecl = translateDeclRef(originalStmt->scopeDecl).As<ScopeDecl>();
+    }
+
+    // Child statements reference their parent statement,
+    // so we need to translate that cross-reference
+    void lowerChildStmtFields(
+        ChildStmt* loweredStmt,
+        ChildStmt* originalStmt)
+    {
+        lowerStmtFields(loweredStmt, originalStmt);
+
+        loweredStmt->parentStmt = translateStmtRef(originalStmt->parentStmt);
+    }
+
+    void visit(ContinueStatementSyntaxNode* stmt)
+    {
+        RefPtr<ContinueStatementSyntaxNode> loweredStmt = new ContinueStatementSyntaxNode();
+        lowerChildStmtFields(loweredStmt, stmt);
+        addStmt(loweredStmt);
+    }
+
+    void visit(BreakStatementSyntaxNode* stmt)
+    {
+        RefPtr<BreakStatementSyntaxNode> loweredStmt = new BreakStatementSyntaxNode();
+        lowerChildStmtFields(loweredStmt, stmt);
+        addStmt(loweredStmt);
+    }
+
+    void visit(DefaultStmt* stmt)
+    {
+        RefPtr<DefaultStmt> loweredStmt = new DefaultStmt();
+        lowerChildStmtFields(loweredStmt, stmt);
+        addStmt(loweredStmt);
+    }
+
+    void visit(DiscardStatementSyntaxNode* stmt)
+    {
+        RefPtr<DiscardStatementSyntaxNode> loweredStmt = new DiscardStatementSyntaxNode();
+        lowerStmtFields(loweredStmt, stmt);
+        addStmt(loweredStmt);
+    }
+
+    void visit(EmptyStatementSyntaxNode* stmt)
+    {
+        RefPtr<EmptyStatementSyntaxNode> loweredStmt = new EmptyStatementSyntaxNode();
+        lowerStmtFields(loweredStmt, stmt);
+        addStmt(loweredStmt);
+    }
+
+    void visit(UnparsedStmt* stmt)
+    {
+        RefPtr<UnparsedStmt> loweredStmt = new UnparsedStmt();
+        lowerStmtFields(loweredStmt, stmt);
+
+        loweredStmt->tokens = stmt->tokens;
+
+        addStmt(loweredStmt);
+    }
+
+    void visit(CaseStmt* stmt)
+    {
+        RefPtr<CaseStmt> loweredStmt = new CaseStmt();
+        lowerChildStmtFields(loweredStmt, stmt);
+
+        loweredStmt->expr = lowerExpr(stmt->expr);
+
+        addStmt(loweredStmt);
+    }
+
+    void visit(IfStatementSyntaxNode* stmt)
+    {
+        RefPtr<IfStatementSyntaxNode> loweredStmt = new IfStatementSyntaxNode();
+        lowerStmtFields(loweredStmt, stmt);
+
+        loweredStmt->Predicate          = lowerExpr(stmt->Predicate);
+        loweredStmt->PositiveStatement  = lowerStmt(stmt->PositiveStatement);
+        loweredStmt->NegativeStatement  = lowerStmt(stmt->NegativeStatement);
+
+        addStmt(loweredStmt);
+    }
+
+    void visit(SwitchStmt* stmt)
+    {
+        RefPtr<SwitchStmt> loweredStmt = new SwitchStmt();
+        lowerScopeStmtFields(loweredStmt, stmt);
+
+        LoweringVisitor subVisitor = pushScope(loweredStmt, stmt);
+
+        loweredStmt->condition  = subVisitor.lowerExpr(stmt->condition);
+        loweredStmt->body       = subVisitor.lowerStmt(stmt->body);
+
+        addStmt(loweredStmt);
+    }
+
+
+    void visit(ForStatementSyntaxNode* stmt)
+    {
+        RefPtr<ForStatementSyntaxNode> loweredStmt = new ForStatementSyntaxNode();
+        lowerScopeStmtFields(loweredStmt, stmt);
+
+        LoweringVisitor subVisitor = pushScope(loweredStmt, stmt);
+
+        loweredStmt->InitialStatement       = subVisitor.lowerStmt(stmt->InitialStatement);
+        loweredStmt->SideEffectExpression   = subVisitor.lowerExpr(stmt->SideEffectExpression);
+        loweredStmt->PredicateExpression    = subVisitor.lowerExpr(stmt->PredicateExpression);
+        loweredStmt->Statement              = subVisitor.lowerStmt(stmt->Statement);
+
+        addStmt(loweredStmt);
+    }
+
+    void visit(WhileStatementSyntaxNode* stmt)
+    {
+        RefPtr<WhileStatementSyntaxNode> loweredStmt = new WhileStatementSyntaxNode();
+        lowerScopeStmtFields(loweredStmt, stmt);
+
+        LoweringVisitor subVisitor = pushScope(loweredStmt, stmt);
+
+        loweredStmt->Predicate  = subVisitor.lowerExpr(stmt->Predicate);
+        loweredStmt->Statement  = subVisitor.lowerStmt(stmt->Statement);
+
+        addStmt(loweredStmt);
+    }
+
+    void visit(DoWhileStatementSyntaxNode* stmt)
+    {
+        RefPtr<DoWhileStatementSyntaxNode> loweredStmt = new DoWhileStatementSyntaxNode();
+        lowerScopeStmtFields(loweredStmt, stmt);
+
+        LoweringVisitor subVisitor = pushScope(loweredStmt, stmt);
+
+        loweredStmt->Statement  = subVisitor.lowerStmt(stmt->Statement);
+        loweredStmt->Predicate  = subVisitor.lowerExpr(stmt->Predicate);
+
         addStmt(loweredStmt);
     }
 
