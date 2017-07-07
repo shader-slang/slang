@@ -80,6 +80,33 @@ struct TypeVisitor<Derived,void,Base> : Base
 #include "object-meta-end.h"
 };
 
+template<typename Derived, typename Arg, typename Base = ITypeVisitor>
+struct TypeVisitorWithArg : Base
+{
+    void dispatch(ExpressionType* type, Arg const& arg)
+    {
+        type->accept(this, (void*)&arg);
+    }
+
+#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) /* empty */
+#define SYNTAX_CLASS(NAME, BASE) \
+    virtual void dispatch_##NAME(NAME* obj, void* arg) override \
+    { ((Derived*) this)->visit##NAME(obj, *(Arg*)arg); }
+
+#include "object-meta-begin.h"
+#include "type-defs.h"
+#include "object-meta-end.h"
+
+#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) SYNTAX_CLASS(NAME, BASE)
+#define SYNTAX_CLASS(NAME, BASE) \
+    void visit##NAME(NAME* obj, Arg const& arg) \
+    { ((Derived*) this)->visit##BASE(obj, arg); }
+
+#include "object-meta-begin.h"
+#include "type-defs.h"
+#include "object-meta-end.h"
+};
+
 //
 // Expression Visitors
 //
@@ -145,6 +172,33 @@ struct ExprVisitor<Derived,void> : IExprVisitor
 #define SYNTAX_CLASS(NAME, BASE) \
     void visit##NAME(NAME* obj) \
     { ((Derived*) this)->visit##BASE(obj); }
+
+#include "object-meta-begin.h"
+#include "expr-defs.h"
+#include "object-meta-end.h"
+};
+
+template<typename Derived, typename Arg>
+struct ExprVisitorWithArg : IExprVisitor
+{
+    void dispatch(ExpressionSyntaxNode* obj, Arg const& arg)
+    {
+        obj->accept(this, (void*)&arg);
+    }
+
+#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) /* empty */
+#define SYNTAX_CLASS(NAME, BASE) \
+    virtual void dispatch_##NAME(NAME* obj, void* arg) override \
+    { ((Derived*) this)->visit##NAME(obj, *(Arg*)arg); }
+
+#include "object-meta-begin.h"
+#include "expr-defs.h"
+#include "object-meta-end.h"
+
+#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) SYNTAX_CLASS(NAME, BASE)
+#define SYNTAX_CLASS(NAME, BASE) \
+    void visit##NAME(NAME* obj, Arg const& arg) \
+    { ((Derived*) this)->visit##BASE(obj, arg); }
 
 #include "object-meta-begin.h"
 #include "expr-defs.h"
@@ -292,6 +346,34 @@ struct DeclVisitor<Derived,void> : IDeclVisitor
 #include "decl-defs.h"
 #include "object-meta-end.h"
 };
+
+template<typename Derived, typename Arg>
+struct DeclVisitorWithArg : IDeclVisitor
+{
+    void dispatch(DeclBase* obj, Arg const& arg)
+    {
+        obj->accept(this, (void*)&arg);
+    }
+
+#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) /* empty */
+#define SYNTAX_CLASS(NAME, BASE) \
+    virtual void dispatch_##NAME(NAME* obj, void* arg) override \
+    { ((Derived*) this)->visit##NAME(obj, *(Arg*)arg); }
+
+#include "object-meta-begin.h"
+#include "decl-defs.h"
+#include "object-meta-end.h"
+
+#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) SYNTAX_CLASS(NAME, BASE)
+#define SYNTAX_CLASS(NAME, BASE) \
+    void visit##NAME(NAME* obj, Arg const& arg) \
+    { ((Derived*) this)->visit##BASE(obj, arg); }
+
+#include "object-meta-begin.h"
+#include "decl-defs.h"
+#include "object-meta-end.h"
+};
+
 
 //
 // Modifier Visitors

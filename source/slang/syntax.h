@@ -671,6 +671,11 @@ namespace Slang
         bool isValid() const { return item.declRef.getDecl() != nullptr; }
 
         bool isOverloaded() const { return items.Count() > 1; }
+
+        String const& getName() const
+        {
+            return items.Count() > 1 ? items[0].declRef.GetName() : item.declRef.GetName();
+        }
     };
 
     struct SemanticsVisitor;
