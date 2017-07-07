@@ -2021,7 +2021,6 @@ static void EmitModifiers(EmitContext* context, RefPtr<Decl> decl)
         CASE(HLSLPreciseModifier, precise);
         CASE(HLSLEffectSharedModifier, shared);
         CASE(HLSLGroupSharedModifier, groupshared);
-        CASE(HLSLStaticModifier, static);
         CASE(HLSLUniformModifier, uniform);
         CASE(HLSLVolatileModifier, volatile);
 
@@ -2042,6 +2041,27 @@ static void EmitModifiers(EmitContext* context, RefPtr<Decl> decl)
         CASE(ConstModifier, const);
 
         #undef CASE
+
+        else if (auto staticModifier = mod.As<HLSLStaticModifier>())
+        {
+            // GLSL does not support the `static` keyword.
+            // HLSL uses it both to mark global variables as being "thread-local"
+            // (rather than shader inputs), and also seems to support function-`static`
+            // variables.
+            // The latter case needs to be dealt with in lowering anyway, so that
+            // we only need to deal with globals here, and GLSL variables
+            // don't need a `static` modifier anyway.
+
+            switch(context->shared->target)
+            {
+            default:
+                Emit(context, "static");
+                break;
+
+            case CodeGenTarget::GLSL:
+                break;
+            }
+        }
 
         // TODO: eventually we should be checked these modifiers, but for
         // now we can emit them unchecked, I guess
