@@ -1466,7 +1466,7 @@ struct EmitVisitor
                 {
                     auto name = getStringOrIdentifierTokenValue(targetIntrinsicModifier->definitionToken);
 
-                    if(name.IndexOf('$') < 0)
+                    if(name.IndexOf('$') == -1)
                     {
                         // Simple case: it is just an ordinary name, so we call it like a builtin.
                         //

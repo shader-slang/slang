@@ -592,9 +592,20 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic 
 __generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic T length(vector<T,N> x);
 
 // Linear interpolation
-__generic<T : __BuiltinFloatingPointType> __intrinsic T lerp(T x, T y, T s);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> lerp(vector<T,N> x, vector<T,N> y, vector<T,N> s);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> lerp(matrix<T,N,M> x, matrix<T,N,M> y, matrix<T,N,M> s);
+__generic<T : __BuiltinFloatingPointType>
+__intrinsic(glsl, mix)
+__intrinsic
+T lerp(T x, T y, T s);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__intrinsic(glsl, mix)
+__intrinsic
+vector<T,N> lerp(vector<T,N> x, vector<T,N> y, vector<T,N> s);
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__intrinsic(glsl, mix)
+__intrinsic
+matrix<T,N,M> lerp(matrix<T,N,M> x, matrix<T,N,M> y, matrix<T,N,M> s);
 
 // Legacy lighting function (obsolete)
 __intrinsic float4 lit(float n_dot_l, float n_dot_h, float m);
