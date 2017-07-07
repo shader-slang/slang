@@ -842,6 +842,10 @@ static void emitReflectionVarBindingInfoJSON(
     CASE(VERTEX_INPUT, vertexInput);
     CASE(FRAGMENT_OUTPUT, fragmentOutput);
     CASE(SAMPLER_STATE, samplerState);
+    CASE(UNIFORM, uniform);
+    CASE(DESCRIPTOR_TABLE_SLOT, descriptorTableSlot);
+    CASE(SPECIALIZATION_CONSTANT, specializationConstant);
+    CASE(MIXED, mixed);
     #undef CASE
 
         default:
