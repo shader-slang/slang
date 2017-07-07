@@ -1059,6 +1059,12 @@ struct LoweringVisitor
 
     RefPtr<Decl> visitTypeDefDecl(TypeDefDecl* decl)
     {
+        if (shared->target == CodeGenTarget::GLSL)
+        {
+            // GLSL does not support `typedef`, so we will lower it out of existence here
+            return nullptr;
+        }
+
         RefPtr<TypeDefDecl> loweredDecl = new TypeDefDecl();
         lowerDeclCommon(loweredDecl, decl);
 
