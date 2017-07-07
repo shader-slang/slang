@@ -341,9 +341,20 @@ __generic<T : __BuiltinFloatingPointType> __intrinsic T atan(T x);
 __generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> atan(vector<T,N> x);
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> atan(matrix<T,N,M> x);
 
-__generic<T : __BuiltinFloatingPointType> __intrinsic T atan2(T y, T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> atan2(vector<T,N> y, vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> atan2(matrix<T,N,M> y, matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType>
+__intrinsic(glsl,"atan($0,$1)")
+__intrinsic
+T atan2(T y, T x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__intrinsic(glsl,"atan($0,$1)")
+__intrinsic
+vector<T,N> atan2(vector<T,N> y, vector<T,N> x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__intrinsic(glsl,"atan($0,$1)")
+__intrinsic
+matrix<T,N,M> atan2(matrix<T,N,M> y, matrix<T,N,M> x);
 
 // Ceiling (HLSL SM 1.0)
 __generic<T : __BuiltinFloatingPointType> __intrinsic T ceil(T x);
@@ -1324,7 +1335,6 @@ namespace Slang
 
                     flavor |= (access << 8);
 
-
                     // emit a generic signature
                     // TODO: allow for multisample count to come in as well...
                     sb << "__generic<T = float4> ";
@@ -1475,11 +1485,15 @@ namespace Slang
 
 
                         // `SampleBias()`
+                        sb << "__intrinsic(glsl, \"texture($p, $1, $2)\")\n";
+                        sb << "__intrinsic\n";
                         sb << "T SampleBias(SamplerState s, ";
                         sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, float bias);\n";
 
                         if( baseShape != TextureType::ShapeCube )
                         {
+                            sb << "__intrinsic(glsl, \"textureOffset($p, $1, $2, $3)\")\n";
+                            sb << "__intrinsic\n";
                             sb << "T SampleBias(SamplerState s, ";
                             sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, float bias, ";
                             sb << "int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
@@ -1533,12 +1547,16 @@ namespace Slang
 
                         // `SampleLevel`
 
+                        sb << "__intrinsic(glsl, \"textureLod($p, $1, $2)\")\n";
+                        sb << "__intrinsic\n";
                         sb << "T SampleLevel(SamplerState s, ";
                         sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                         sb << "float level);\n";
 
                         if( baseShape != TextureType::ShapeCube )
                         {
+                            sb << "__intrinsic(glsl, \"textureLodOffset($p, $1, $2, $3)\")\n";
+                            sb << "__intrinsic\n";
                             sb << "T SampleLevel(SamplerState s, ";
                             sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                             sb << "float level, ";

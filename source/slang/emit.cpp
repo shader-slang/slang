@@ -1506,13 +1506,69 @@ struct EmitVisitor
                             assert(cursor != end);
 
                             char d = *cursor++;
-                            assert(('0' <= d) && (d <= '9'));
 
-                            UInt argIndex = d - '0';
-                            assert((0 <= argIndex) && (argIndex < argCount));
-                            Emit("(");
-                            EmitExpr(callExpr->Arguments[argIndex]);
-                            Emit(")");
+                            switch (d)
+                            {
+                            case '0': case '1': case '2': case '3': case '4':
+                            case '5': case '6': case '7': case '8': case '9':
+                                {
+                                    // Simple case: emit one of the direct arguments to the call
+                                    UInt argIndex = d - '0';
+                                    assert((0 <= argIndex) && (argIndex < argCount));
+                                    Emit("(");
+                                    EmitExpr(callExpr->Arguments[argIndex]);
+                                    Emit(")");
+                                }
+                                break;
+
+                            case 'o':
+                                // For a call using object-oriented syntax, this
+                                // expands to the "base" object used for the call
+                                if (auto memberExpr = callExpr->FunctionExpr.As<MemberExpressionSyntaxNode>())
+                                {
+                                    Emit("(");
+                                    EmitExpr(memberExpr->BaseExpression);
+                                    Emit(")");
+                                }
+                                else
+                                {
+                                    assert(!"unexpected");
+                                }
+                                break;
+
+                            case 'p':
+                                // If we are calling a D3D texturing operation in the form t.Foo(s, ...),
+                                // then this form will pair up the t and s arguments as needed for a GLSL
+                                // texturing operation.
+                                assert(argCount > 0);
+                                if (auto memberExpr = callExpr->FunctionExpr.As<MemberExpressionSyntaxNode>())
+                                {
+                                    auto base = memberExpr->BaseExpression;
+                                    if (auto baseTextureType = base->Type->As<TextureType>())
+                                    {
+                                        emitGLSLTextureOrTextureSamplerType(baseTextureType, "sampler");
+                                        Emit("(");
+                                        EmitExpr(memberExpr->BaseExpression);
+                                        Emit(",");
+                                        EmitExpr(callExpr->Arguments[0]);
+                                        Emit(")");
+                                    }
+                                    else
+                                    {
+                                        assert(!"unexpected");
+                                    }
+
+                                }
+                                else
+                                {
+                                    assert(!"unexpected");
+                                }
+                                break;
+
+                            default:
+                                assert(!"unexpected");
+                                break;
+                            }
                         }
 
                         Emit(")");
