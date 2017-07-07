@@ -1837,6 +1837,10 @@ struct EmitVisitor
 
     void EmitLoopAttributes(RefPtr<StatementSyntaxNode> decl)
     {
+        // Don't emit these attributes for GLSL, because it doesn't understand them
+        if (context->shared->target == CodeGenTarget::GLSL)
+            return;
+
         // TODO(tfoley): There really ought to be a semantic checking step for attributes,
         // that turns abstract syntax into a concrete hierarchy of attribute types (e.g.,
         // a specific `LoopModifier` or `UnrollModifier`).
