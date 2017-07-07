@@ -243,14 +243,16 @@ namespace Slang
             if (lookupResult.isOverloaded())
             {
                 // We had an ambiguity anyway, so report it.
-                getSink()->diagnose(overloadedExpr, Diagnostics::ambiguousReference, lookupResult.items[0].declRef.GetName());
-
-                for(auto item : lookupResult.items)
+                if (!isRewriteMode())
                 {
-                    String declString = getDeclSignatureString(item);
-                    getSink()->diagnose(item.declRef, Diagnostics::overloadCandidate, declString);
-                }
+                    getSink()->diagnose(overloadedExpr, Diagnostics::ambiguousReference, lookupResult.items[0].declRef.GetName());
 
+                    for(auto item : lookupResult.items)
+                    {
+                        String declString = getDeclSignatureString(item);
+                        getSink()->diagnose(item.declRef, Diagnostics::overloadCandidate, declString);
+                    }
+                }
                 // TODO(tfoley): should we construct a new ErrorExpr here?
                 overloadedExpr->Type = QualType(ExpressionType::Error);
                 return overloadedExpr;
@@ -276,9 +278,11 @@ namespace Slang
                 return expr;
             }
 
-            getSink()->diagnose(expr, Diagnostics::unimplemented, "expected a type");
-            // TODO: construct some kind of `ErrorExpr`?
-            return expr;
+            if (!isRewriteMode())
+            {
+                getSink()->diagnose(expr, Diagnostics::unimplemented, "expected a type");
+            }
+            return CreateErrorExpr(expr);
         }
 
         RefPtr<ExpressionType> ExpectAType(RefPtr<ExpressionSyntaxNode> expr)
@@ -424,7 +428,10 @@ namespace Slang
                         {
                             if (outProperType)
                             {
-                                getSink()->diagnose(typeExp.exp.Ptr(), Diagnostics::unimplemented, "can't fill in default for generic type parameter");
+                                if (!isRewriteMode())
+                                {
+                                    getSink()->diagnose(typeExp.exp.Ptr(), Diagnostics::unimplemented, "can't fill in default for generic type parameter");
+                                }
                                 *outProperType = ExpressionType::Error;
                             }
                             return false;
@@ -440,7 +447,10 @@ namespace Slang
                         {
                             if (outProperType)
                             {
-                                getSink()->diagnose(typeExp.exp.Ptr(), Diagnostics::unimplemented, "can't fill in default for generic type parameter");
+                                if (!isRewriteMode())
+                                {
+                                    getSink()->diagnose(typeExp.exp.Ptr(), Diagnostics::unimplemented, "can't fill in default for generic type parameter");
+                                }
                                 *outProperType = ExpressionType::Error;
                             }
                             return false;
@@ -511,7 +521,10 @@ namespace Slang
                 if (basicType->BaseType == BaseType::Void)
                 {
                     // TODO(tfoley): pick the right diagnostic message
-                    getSink()->diagnose(result.exp.Ptr(), Diagnostics::invalidTypeVoid);
+                    if (!isRewriteMode())
+                    {
+                        getSink()->diagnose(result.exp.Ptr(), Diagnostics::invalidTypeVoid);
+                    }
                     result.type = ExpressionType::Error;
                     return result;
                 }
@@ -634,7 +647,9 @@ namespace Slang
                 CASE(Int, Signed, Int32);
                 CASE(UInt, Unsigned, Int32);
                 CASE(UInt64, Unsigned, Int64);
+                CASE(Half, Float, Int16);
                 CASE(Float, Float, Int32);
+                CASE(Double, Float, Int64);
                 CASE(Void, Error, Error);
 
             #undef CASE
@@ -972,7 +987,7 @@ namespace Slang
             RefPtr<ExpressionType>			toType,
             RefPtr<ExpressionSyntaxNode>	fromExpr)
         {
-            auto castExpr = new TypeCastExpressionSyntaxNode();
+            auto castExpr = new ImplicitCastExpr();
             castExpr->Position = fromExpr->Position;
             castExpr->TargetType.type = toType;
             castExpr->Type = QualType(toType);
@@ -980,6 +995,10 @@ namespace Slang
             return castExpr;
         }
 
+        bool isRewriteMode()
+        {
+            return (getTranslationUnit()->compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING) != 0;
+        }
 
         // Perform type coercion, and emit errors if it isn't possible
         RefPtr<ExpressionSyntaxNode> Coerce(
@@ -990,7 +1009,7 @@ namespace Slang
             // expressions without a type, and we need to ignore them.
             if( !fromExpr->Type.type )
             {
-                if(getTranslationUnit()->compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING )
+                if(isRewriteMode())
                     return fromExpr;
             }
 
@@ -1002,7 +1021,7 @@ namespace Slang
                 fromExpr.Ptr(),
                 nullptr))
             {
-                if(!(getTranslationUnit()->compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING))
+                if(!isRewriteMode())
                 {
                     getSink()->diagnose(fromExpr->Position, Diagnostics::typeMismatch, toType, fromExpr->Type);
                 }
@@ -1041,13 +1060,20 @@ namespace Slang
             else
             {
                 // TODO: infer a type from the initializers
+
                 if (!initExpr)
                 {
-                    getSink()->diagnose(varDecl, Diagnostics::unimplemented, "variable declaration with no type must have initializer");
+                    if (!isRewriteMode())
+                    {
+                        getSink()->diagnose(varDecl, Diagnostics::unimplemented, "variable declaration with no type must have initializer");
+                    }
                 }
                 else
                 {
-                    getSink()->diagnose(varDecl, Diagnostics::unimplemented, "type inference for variable declaration");
+                    if (!isRewriteMode())
+                    {
+                        getSink()->diagnose(varDecl, Diagnostics::unimplemented, "type inference for variable declaration");
+                    }
                 }
             }
 
@@ -1122,7 +1148,10 @@ namespace Slang
 
             // If type expression didn't name an interface, we'll emit an error here
             // TODO: deal with the case of an error in the type expression (don't cascade)
-            getSink()->diagnose( base.exp, Diagnostics::expectedAnInterfaceGot, base.type);
+            if (!isRewriteMode())
+            {
+                getSink()->diagnose( base.exp, Diagnostics::expectedAnInterfaceGot, base.type);
+            }
         }
 
         RefPtr<ConstantIntVal> checkConstantIntVal(
@@ -1138,7 +1167,10 @@ namespace Slang
             auto constIntVal = intVal.As<ConstantIntVal>();
             if(!constIntVal)
             {
-                getSink()->diagnose(expr->Position, Diagnostics::expectedIntegerConstantNotLiteral);
+                if (!isRewriteMode())
+                {
+                    getSink()->diagnose(expr->Position, Diagnostics::expectedIntegerConstantNotLiteral);
+                }
                 return nullptr;
             }
             return constIntVal;
@@ -1503,7 +1535,10 @@ namespace Slang
                 if (!funcDecl->ReturnType.Equals(prevFuncDecl->ReturnType))
                 {
                     // Bad dedeclaration
-                    getSink()->diagnose(funcDecl, Diagnostics::unimplemented, "redeclaration has a different return type");
+                    if (!isRewriteMode())
+                    {
+                        getSink()->diagnose(funcDecl, Diagnostics::unimplemented, "redeclaration has a different return type");
+                    }
 
                     // Don't bother emitting other errors at this point
                     break;
@@ -1517,7 +1552,10 @@ namespace Slang
                 if (funcDecl->Body && prevFuncDecl->Body)
                 {
                     // Redefinition
-                    getSink()->diagnose(funcDecl, Diagnostics::unimplemented, "function redefinition");
+                    if (!isRewriteMode())
+                    {
+                        getSink()->diagnose(funcDecl, Diagnostics::unimplemented, "function redefinition");
+                    }
 
                     // Don't bother emitting other errors
                     break;
@@ -1539,7 +1577,12 @@ namespace Slang
 
             para->Type = CheckUsableType(para->Type);
             if (para->Type.Equals(ExpressionType::GetVoid()))
-                getSink()->diagnose(para, Diagnostics::parameterCannotBeVoid);
+            {
+                if (!isRewriteMode())
+                {
+                    getSink()->diagnose(para, Diagnostics::parameterCannotBeVoid);
+                }
+            }
         }
 
         void VisitFunctionDeclaration(FunctionSyntaxNode *functionNode)
@@ -1556,7 +1599,12 @@ namespace Slang
                 checkDecl(para);
 
                 if (paraNames.Contains(para->Name.Content))
-                    getSink()->diagnose(para, Diagnostics::parameterAlreadyDefined, para->Name);
+                {
+                    if (!isRewriteMode())
+                    {
+                        getSink()->diagnose(para, Diagnostics::parameterAlreadyDefined, para->Name);
+                    }
+                }
                 else
                     paraNames.Add(para->Name.Content);
             }
@@ -1613,7 +1661,10 @@ namespace Slang
             auto outer = FindOuterStmt<BreakableStmt>();
             if (!outer)
             {
-                getSink()->diagnose(stmt, Diagnostics::breakOutsideLoop);
+                if (!isRewriteMode())
+                {
+                    getSink()->diagnose(stmt, Diagnostics::breakOutsideLoop);
+                }
             }
             stmt->parentStmt = outer;
         }
@@ -1622,7 +1673,10 @@ namespace Slang
             auto outer = FindOuterStmt<LoopStmt>();
             if (!outer)
             {
-                getSink()->diagnose(stmt, Diagnostics::continueOutsideLoop);
+                if (!isRewriteMode())
+                {
+                    getSink()->diagnose(stmt, Diagnostics::continueOutsideLoop);
+                }
             }
             stmt->parentStmt = outer;
         }
@@ -1691,7 +1745,10 @@ namespace Slang
 
             if (!switchStmt)
             {
-                getSink()->diagnose(stmt, Diagnostics::caseOutsideSwitch);
+                if (!isRewriteMode())
+                {
+                    getSink()->diagnose(stmt, Diagnostics::caseOutsideSwitch);
+                }
             }
             else
             {
@@ -1707,7 +1764,10 @@ namespace Slang
             auto switchStmt = FindOuterStmt<SwitchStmt>();
             if (!switchStmt)
             {
-                getSink()->diagnose(stmt, Diagnostics::defaultOutsideSwitch);
+                if (!isRewriteMode())
+                {
+                    getSink()->diagnose(stmt, Diagnostics::defaultOutsideSwitch);
+                }
             }
             stmt->parentStmt = switchStmt;
         }
@@ -1717,12 +1777,6 @@ namespace Slang
             checkStmt(stmt->PositiveStatement);
             checkStmt(stmt->NegativeStatement);
         }
-
-        void visitUnparsedStmt(UnparsedStmt*)
-        {
-            // Nothing to do
-        }
-
 
         void visitEmptyStatementSyntaxNode(EmptyStatementSyntaxNode*)
         {
@@ -1739,7 +1793,12 @@ namespace Slang
             if (!stmt->Expression)
             {
                 if (function && !function->ReturnType.Equals(ExpressionType::GetVoid()))
-                    getSink()->diagnose(stmt, Diagnostics::returnNeedsExpression);
+                {
+                    if (!isRewriteMode())
+                    {
+                        getSink()->diagnose(stmt, Diagnostics::returnNeedsExpression);
+                    }
+                }
             }
             else
             {
@@ -1832,7 +1891,10 @@ namespace Slang
             // TODO(tfoley): How to handle the case where bound isn't known?
             if (GetMinBound(elementCount) <= 0)
             {
-                getSink()->diagnose(varDecl, Diagnostics::invalidArraySize);
+                if (!isRewriteMode())
+                {
+                    getSink()->diagnose(varDecl, Diagnostics::invalidArraySize);
+                }
                 return;
             }
         }
@@ -1853,7 +1915,12 @@ namespace Slang
 #endif
             varDecl->Type = typeExp;
             if (varDecl->Type.Equals(ExpressionType::GetVoid()))
-                getSink()->diagnose(varDecl, Diagnostics::invalidTypeVoid);
+            {
+                if (!isRewriteMode())
+                {
+                    getSink()->diagnose(varDecl, Diagnostics::invalidTypeVoid);
+                }
+            }
 
             if(auto initExpr = varDecl->Expr)
             {
@@ -2160,7 +2227,10 @@ namespace Slang
             auto result = TryCheckIntegerConstantExpression(expr.Ptr());
             if (!result)
             {
-                getSink()->diagnose(expr, Diagnostics::expectedIntegerConstantNotConstant);
+                if (!isRewriteMode())
+                {
+                    getSink()->diagnose(expr, Diagnostics::expectedIntegerConstantNotConstant);
+                }
             }
             return result;
         }
@@ -2177,7 +2247,10 @@ namespace Slang
             if (!indexExpr->Type->Equals(ExpressionType::GetInt()) &&
                 !indexExpr->Type->Equals(ExpressionType::GetUInt()))
             {
-                getSink()->diagnose(indexExpr, Diagnostics::subscriptIndexNonInteger);
+                if (!isRewriteMode())
+                {
+                    getSink()->diagnose(indexExpr, Diagnostics::subscriptIndexNonInteger);
+                }
                 return CreateErrorExpr(subscriptExpr.Ptr());
             }
 
@@ -2320,7 +2393,10 @@ namespace Slang
 
         fail:
             {
-                getSink()->diagnose(subscriptExpr, Diagnostics::subscriptNonArray, baseType);
+                if (!isRewriteMode())
+                {
+                    getSink()->diagnose(subscriptExpr, Diagnostics::subscriptNonArray, baseType);
+                }
                 return CreateErrorExpr(subscriptExpr);
             }
         }
@@ -2419,6 +2495,16 @@ namespace Slang
             return appExpr;
         }
 
+        RefPtr<ExpressionSyntaxNode> visitParenExpr(ParenExpr* expr)
+        {
+            auto base = expr->base;
+            base = CheckTerm(base);
+
+            expr->base = base;
+            expr->Type = base->Type;
+            return expr;
+        }
+
         //
 
         RefPtr<ExpressionSyntaxNode> visitAssignExpr(AssignExpr* expr)
@@ -2431,7 +2517,10 @@ namespace Slang
 
             if (!type.IsLeftValue)
             {
-                getSink()->diagnose(expr, Diagnostics::assignNonLValue);
+                if (!isRewriteMode())
+                {
+                    getSink()->diagnose(expr, Diagnostics::assignNonLValue);
+                }
             }
             expr->Type = type;
             return expr;
@@ -2460,7 +2549,10 @@ namespace Slang
                 }
                 else
                 {
-                    getSink()->diagnose(decl->targetType.exp, Diagnostics::unimplemented, "expected a nominal type here");
+                    if (!isRewriteMode())
+                    {
+                        getSink()->diagnose(decl->targetType.exp, Diagnostics::unimplemented, "expected a nominal type here");
+                    }
                 }
             }
             else if (decl->targetType->Equals(ExpressionType::Error))
@@ -2469,7 +2561,10 @@ namespace Slang
             }
             else
             {
-                getSink()->diagnose(decl->targetType.exp, Diagnostics::unimplemented, "expected a nominal type here");
+                if (!isRewriteMode())
+                {
+                    getSink()->diagnose(decl->targetType.exp, Diagnostics::unimplemented, "expected a nominal type here");
+                }
             }
 
             decl->SetCheckState(DeclCheckState::CheckedHeader);
@@ -3073,12 +3168,18 @@ namespace Slang
             {
                 if (argCount < paramCounts.required)
                 {
-                    getSink()->diagnose(context.appExpr, Diagnostics::notEnoughArguments, argCount, paramCounts.required);
+                    if (!isRewriteMode())
+                    {
+                        getSink()->diagnose(context.appExpr, Diagnostics::notEnoughArguments, argCount, paramCounts.required);
+                    }
                 }
                 else
                 {
                     assert(argCount > paramCounts.allowed);
-                    getSink()->diagnose(context.appExpr, Diagnostics::tooManyArguments, argCount, paramCounts.allowed);
+                    if (!isRewriteMode())
+                    {
+                        getSink()->diagnose(context.appExpr, Diagnostics::tooManyArguments, argCount, paramCounts.allowed);
+                    }
                 }
             }
 
@@ -3100,8 +3201,11 @@ namespace Slang
 
                 if (context.mode != OverloadResolveContext::Mode::JustTrying)
                 {
-                    getSink()->diagnose(context.appExpr, Diagnostics::expectedPrefixOperator);
-                    getSink()->diagnose(decl, Diagnostics::seeDefinitionOf, decl->getName());
+                    if (!isRewriteMode())
+                    {
+                        getSink()->diagnose(context.appExpr, Diagnostics::expectedPrefixOperator);
+                        getSink()->diagnose(decl, Diagnostics::seeDefinitionOf, decl->getName());
+                    }
                 }
 
                 return false;
@@ -3113,8 +3217,11 @@ namespace Slang
 
                 if (context.mode != OverloadResolveContext::Mode::JustTrying)
                 {
-                    getSink()->diagnose(context.appExpr, Diagnostics::expectedPostfixOperator);
-                    getSink()->diagnose(decl, Diagnostics::seeDefinitionOf, decl->getName());
+                    if (!isRewriteMode())
+                    {
+                        getSink()->diagnose(context.appExpr, Diagnostics::expectedPostfixOperator);
+                        getSink()->diagnose(decl, Diagnostics::seeDefinitionOf, decl->getName());
+                    }
                 }
 
                 return false;
@@ -3311,13 +3418,16 @@ namespace Slang
             if (candidate.status == OverloadCandidate::Status::GenericArgumentInferenceFailed)
             {
                 String callString = GetCallSignatureString(context.appExpr);
-                getSink()->diagnose(
-                    context.appExpr,
-                    Diagnostics::genericArgumentInferenceFailed,
-                    callString);
+                if (!isRewriteMode())
+                {
+                    getSink()->diagnose(
+                        context.appExpr,
+                        Diagnostics::genericArgumentInferenceFailed,
+                        callString);
 
-                String declString = getDeclSignatureString(candidate.item);
-                getSink()->diagnose(candidate.item.declRef, Diagnostics::genericSignatureTried, declString);
+                    String declString = getDeclSignatureString(candidate.item);
+                    getSink()->diagnose(candidate.item.declRef, Diagnostics::genericSignatureTried, declString);
+                }
                 goto error;
             }
 
@@ -4223,6 +4333,14 @@ namespace Slang
             {
                 return CreateErrorExpr(expr);
             }
+            // If any of the arguments is an error, then we should bail out, to avoid
+            // cascading errors where we successfully pick an overload, but not the one
+            // the user meant.
+            for (auto arg : expr->Arguments)
+            {
+                if (IsErrorExpr(arg))
+                    return CreateErrorExpr(expr);
+            }
 
             OverloadResolveContext context;
             context.appExpr = expr;
@@ -4268,11 +4386,17 @@ namespace Slang
                     // We will construct a diagnostic message to help out.
                     if (funcName.Length() != 0)
                     {
-                        getSink()->diagnose(expr, Diagnostics::noApplicableOverloadForNameWithArgs, funcName, argsList);
+                        if (!isRewriteMode())
+                        {
+                            getSink()->diagnose(expr, Diagnostics::noApplicableOverloadForNameWithArgs, funcName, argsList);
+                        }
                     }
                     else
                     {
-                        getSink()->diagnose(expr, Diagnostics::noApplicableWithArgs, argsList);
+                        if (!isRewriteMode())
+                        {
+                            getSink()->diagnose(expr, Diagnostics::noApplicableWithArgs, argsList);
+                        }
                     }
                 }
                 else
@@ -4281,32 +4405,41 @@ namespace Slang
 
                     if (funcName.Length() != 0)
                     {
-                        getSink()->diagnose(expr, Diagnostics::ambiguousOverloadForNameWithArgs, funcName, argsList);
+                        if (!isRewriteMode())
+                        {
+                            getSink()->diagnose(expr, Diagnostics::ambiguousOverloadForNameWithArgs, funcName, argsList);
+                        }
                     }
                     else
                     {
-                        getSink()->diagnose(expr, Diagnostics::ambiguousOverloadWithArgs, argsList);
+                        if (!isRewriteMode())
+                        {
+                            getSink()->diagnose(expr, Diagnostics::ambiguousOverloadWithArgs, argsList);
+                        }
                     }
                 }
 
-                UInt candidateCount = context.bestCandidates.Count();
-                UInt maxCandidatesToPrint = 10; // don't show too many candidates at once...
-                UInt candidateIndex = 0;
-                for (auto candidate : context.bestCandidates)
+                if (!isRewriteMode())
                 {
-                    String declString = getDeclSignatureString(candidate.item);
+                    UInt candidateCount = context.bestCandidates.Count();
+                    UInt maxCandidatesToPrint = 10; // don't show too many candidates at once...
+                    UInt candidateIndex = 0;
+                    for (auto candidate : context.bestCandidates)
+                    {
+                        String declString = getDeclSignatureString(candidate.item);
 
-                    declString = declString + "[" + String(candidate.conversionCostSum) + "]";
+                        declString = declString + "[" + String(candidate.conversionCostSum) + "]";
 
-                    getSink()->diagnose(candidate.item.declRef, Diagnostics::overloadCandidate, declString);
+                        getSink()->diagnose(candidate.item.declRef, Diagnostics::overloadCandidate, declString);
 
-                    candidateIndex++;
-                    if (candidateIndex == maxCandidatesToPrint)
-                        break;
-                }
-                if (candidateIndex != candidateCount)
-                {
-                    getSink()->diagnose(expr, Diagnostics::moreOverloadCandidates, candidateCount - candidateIndex);
+                        candidateIndex++;
+                        if (candidateIndex == maxCandidatesToPrint)
+                            break;
+                    }
+                    if (candidateIndex != candidateCount)
+                    {
+                        getSink()->diagnose(expr, Diagnostics::moreOverloadCandidates, candidateCount - candidateIndex);
+                    }
                 }
 
                 return CreateErrorExpr(expr);
@@ -4322,7 +4455,10 @@ namespace Slang
             else
             {
                 // Nothing at all was found that we could even consider invoking
-                getSink()->diagnose(expr->FunctionExpr, Diagnostics::expectedFunction);
+                if (!isRewriteMode())
+                {
+                    getSink()->diagnose(expr->FunctionExpr, Diagnostics::expectedFunction);
+                }
                 expr->Type = QualType(ExpressionType::Error);
                 return expr;
             }
@@ -4417,7 +4553,10 @@ namespace Slang
 
                     // TODO(tfoley): print a reasonable message here...
 
-                    getSink()->diagnose(genericAppExpr, Diagnostics::unimplemented, "no applicable generic");
+                    if (!isRewriteMode())
+                    {
+                        getSink()->diagnose(genericAppExpr, Diagnostics::unimplemented, "no applicable generic");
+                    }
 
                     return CreateErrorExpr(genericAppExpr);
                 }
@@ -4448,76 +4587,12 @@ namespace Slang
             else
             {
                 // Nothing at all was found that we could even consider invoking
-                getSink()->diagnose(genericAppExpr, Diagnostics::unimplemented, "expected a generic");
+                if (!isRewriteMode())
+                {
+                    getSink()->diagnose(genericAppExpr, Diagnostics::unimplemented, "expected a generic");
+                }
                 return CreateErrorExpr(genericAppExpr);
             }
-
-
-#if TIMREMOVED
-
-            if (IsErrorExpr(base))
-            {
-                return CreateErrorExpr(typeNode);
-            }
-            else if(auto baseDeclRefExpr = base.As<DeclRefExpr>())
-            {
-                auto declRef = baseDeclRefExpr->declRef;
-
-                if (auto genericDeclRef = declRef.As<GenericDecl>())
-                {
-                    int argCount = typeNode->Args.Count();
-                    int argIndex = 0;
-                    for (RefPtr<Decl> member : genericDeclRef.getDecl()->Members)
-                    {
-                        if (auto typeParam = member.As<GenericTypeParamDecl>())
-                        {
-                            if (argIndex == argCount)
-                            {
-                                // Too few arguments!
-
-                            }
-
-                            // TODO: checking!
-                        }
-                        else if (auto valParam = member.As<GenericValueParamDecl>())
-                        {
-                            // TODO: checking
-                        }
-                        else
-                        {
-
-                        }
-                    }
-                    if (argIndex != argCount)
-                    {
-                        // Too many arguments!
-                    }
-
-                    // Now instantiate the declaration given those arguments
-                    auto type = InstantiateGenericType(genericDeclRef, args);
-                    typeResult = type;
-                    typeNode->Type = new TypeExpressionType(type);
-                    return typeNode;
-                }
-            }
-            else if (auto overloadedExpr = base.As<OverloadedExpr>())
-            {
-                // We are referring to a bunch of declarations, each of which might be generic
-                LookupResult result;
-                for (auto item : overloadedExpr->lookupResult2.items)
-                {
-                    auto applied = TryApplyGeneric(item, typeNode);
-                    if (!applied)
-                        continue;
-
-                    AddToLookupResult(result, appliedItem);
-                }
-            }
-
-            // TODO: correct diagnostic here!
-            getSink()->diagnose(typeNode, Diagnostics::expectedAGeneric, base->Type);
-            return CreateErrorExpr(typeNode);
-#endif
         }
 
         RefPtr<ExpressionSyntaxNode> visitSharedTypeExpr(SharedTypeExpr* expr)
@@ -4568,7 +4643,10 @@ namespace Slang
                                 if (i < expr->Arguments.Count() && expr->Arguments[i]->Type->AsBasicType() &&
                                     !expr->Arguments[i]->Type.IsLeftValue)
                                 {
-                                    getSink()->diagnose(expr->Arguments[i], Diagnostics::argumentExpectedLValue, (*params)[i]->Name);
+                                    if (!isRewriteMode())
+                                    {
+                                        getSink()->diagnose(expr->Arguments[i], Diagnostics::argumentExpectedLValue, (*params)[i]->Name);
+                                    }
                                 }
                             }
                         }
@@ -4610,7 +4688,10 @@ namespace Slang
                     expr);
             }
 
-            getSink()->diagnose(expr, Diagnostics::undefinedIdentifier2, expr->name);
+            if (!isRewriteMode())
+            {
+                getSink()->diagnose(expr, Diagnostics::undefinedIdentifier2, expr->name);
+            }
 
             return expr;
         }
@@ -4651,32 +4732,13 @@ namespace Slang
 
         fail:
             // Default: in no other case succeds, then the cast failed and we emit a diagnostic.
-            getSink()->diagnose(expr, Diagnostics::invalidTypeCast, expr->Expression->Type, targetType->ToString());
+            if (!isRewriteMode())
+            {
+                getSink()->diagnose(expr, Diagnostics::invalidTypeCast, expr->Expression->Type, targetType->ToString());
+            }
             expr->Type = QualType(ExpressionType::Error);
             return expr;
         }
-#if TIMREMOVED
-        virtual RefPtr<ExpressionSyntaxNode> VisitSelectExpression(SelectExpressionSyntaxNode * expr) override
-        {
-            auto selectorExpr = expr->SelectorExpr;
-            selectorExpr = CheckExpr(selectorExpr);
-            selectorExpr = Coerce(ExpressionType::GetBool(), selectorExpr);
-            expr->SelectorExpr = selectorExpr;
-
-            // TODO(tfoley): We need a general purpose "join" on types for inferring
-            // generic argument types for builtins/intrinsics, so this should really
-            // be using the exact same logic...
-            //
-            expr->Expr0 = expr->Expr0->Accept(this).As<ExpressionSyntaxNode>();
-            expr->Expr1 = expr->Expr1->Accept(this).As<ExpressionSyntaxNode>();
-            if (!expr->Expr0->Type->Equals(expr->Expr1->Type.Ptr()))
-            {
-                getSink()->diagnose(expr, Diagnostics::selectValuesTypeMismatch);
-            }
-            expr->Type = expr->Expr0->Type;
-            return expr;
-        }
-#endif
 
         // Get the type to use when referencing a declaration
         QualType GetTypeForDeclRef(DeclRef<Decl> declRef)
@@ -4771,7 +4833,10 @@ namespace Slang
                 case 'w': case 'a': elementIndex = 3; break;
                 default:
                     // An invalid character in the swizzle is an error
-                    getSink()->diagnose(swizExpr, Diagnostics::unimplemented, "invalid component name for swizzle");
+                    if (!isRewriteMode())
+                    {
+                        getSink()->diagnose(swizExpr, Diagnostics::unimplemented, "invalid component name for swizzle");
+                    }
                     anyError = true;
                     continue;
                 }
@@ -4782,7 +4847,10 @@ namespace Slang
                 // Make sure the index is in range for the source type
                 if (elementIndex >= limitElement)
                 {
-                    getSink()->diagnose(swizExpr, Diagnostics::unimplemented, "swizzle component out of range for type");
+                    if (!isRewriteMode())
+                    {
+                        getSink()->diagnose(swizExpr, Diagnostics::unimplemented, "swizzle component out of range for type");
+                    }
                     anyError = true;
                     continue;
                 }
@@ -4806,7 +4874,7 @@ namespace Slang
 
             if (anyError)
             {
-                swizExpr->Type = QualType(ExpressionType::Error);
+                return CreateErrorExpr(memberRefExpr);
             }
             else if (elementCount == 1)
             {
@@ -4844,7 +4912,10 @@ namespace Slang
             }
             else
             {
-                getSink()->diagnose(memberRefExpr, Diagnostics::unimplemented, "swizzle on vector of unknown size");
+                if (!isRewriteMode())
+                {
+                    getSink()->diagnose(memberRefExpr, Diagnostics::unimplemented, "swizzle on vector of unknown size");
+                }
                 return CreateErrorExpr(memberRefExpr);
             }
         }
@@ -4928,7 +4999,10 @@ namespace Slang
 
                 // catch-all
             fail:
-                getSink()->diagnose(expr, Diagnostics::noMemberOfNameInType, expr->name, baseType);
+                if (!isRewriteMode())
+                {
+                    getSink()->diagnose(expr, Diagnostics::noMemberOfNameInType, expr->name, baseType);
+                }
                 expr->Type = QualType(ExpressionType::Error);
                 return expr;
             }
@@ -4940,7 +5014,10 @@ namespace Slang
             if (!baseType->Equals(ExpressionType::Error.Ptr()) &&
                 expr->Type->Equals(ExpressionType::Error.Ptr()))
             {
-                getSink()->diagnose(expr, Diagnostics::typeHasNoPublicMemberOfName, baseType, expr->name);
+                if (!isRewriteMode())
+                {
+                    getSink()->diagnose(expr, Diagnostics::typeHasNoPublicMemberOfName, baseType, expr->name);
+                }
             }
             return expr;
         }

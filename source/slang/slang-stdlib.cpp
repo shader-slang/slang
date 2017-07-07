@@ -7,17 +7,39 @@
 #define STRINGIZE2(x) #x
 #define LINE_STRING STRINGIZE(__LINE__)
 
-enum { kLibIncludeStringLine = __LINE__+1 };
-const char * LibIncludeStringChunks[] = { R"=(
+enum { kCoreLibIncludeStringLine = __LINE__ + 1 };
+const char* kCoreLibIncludeStringChunks[] = { R"=(
 
-typedef uint UINT;
+// A type that can be used as an operand for builtins
+interface __BuiltinType {}
 
-__generic<T> __intrinsic_op(Assign) T operator=(out T left, T right);
+// A type that can be used for arithmetic operations
+interface __BuiltinArithmeticType : __BuiltinType {}
+
+// A type that logically has a sign (positive/negative/zero)
+interface __BuiltinSignedArithmeticType : __BuiltinArithmeticType {}
+
+// A type that can represent integers
+interface __BuiltinIntegerType : __BuiltinArithmeticType {}
+
+// A type that can represent non-integers
+interface __BuiltinRealType : __BuiltinArithmeticType {}
+
+// A type that uses a floating-point representation
+interface __BuiltinFloatingPointType : __BuiltinRealType, __BuiltinSignedArithmeticType {}
 
 __generic<T,U> __intrinsic_op(Sequence) U operator,(T left, U right);
 
 __generic<T> __intrinsic_op(Select) T operator?:(bool condition, T ifTrue, T ifFalse);
 __generic<T, let N : int> __intrinsic_op(Select) vector<T,N> operator?:(vector<bool,N> condition, vector<T,N> ifTrue, vector<T,N> ifFalse);
+
+)=" };
+
+
+enum { kHLSLLibIncludeStringLine = __LINE__+1 };
+const char * kHLSLLibIncludeStringChunks[] = { R"=(
+
+typedef uint UINT;
 
 __generic<T> __magic_type(HLSLAppendStructuredBufferType) struct AppendStructuredBuffer
 {
@@ -251,24 +273,6 @@ __generic<T> __magic_type(HLSLLineStreamType) struct TriangleStream
 )=", R"=(
 
 // Note(tfoley): Trying to systematically add all the HLSL builtins
-
-// A type that can be used as an operand for builtins
-interface __BuiltinType {}
-
-// A type that can be used for arithmetic operations
-interface __BuiltinArithmeticType : __BuiltinType {}
-
-// A type that logically has a sign (positive/negative/zero)
-interface __BuiltinSignedArithmeticType : __BuiltinArithmeticType {}
-
-// A type that can represent integers
-interface __BuiltinIntegerType : __BuiltinArithmeticType {}
-
-// A type that can represent non-integers
-interface __BuiltinRealType : __BuiltinArithmeticType {}
-
-// A type that uses a floating-point representation
-interface __BuiltinFloatingPointType : __BuiltinRealType, __BuiltinSignedArithmeticType {}
 
 // Try to terminate the current draw or dispatch call (HLSL SM 4.0)
 __intrinsic void abort();
@@ -1011,7 +1015,11 @@ namespace Slang
         return stdlibPath;
     }
 
-    String SlangStdLib::code;
+    // Cached code for the various libraries
+    String coreLibraryCode;
+    String slangLibraryCode;
+    String hlslLibraryCode;
+    String glslLibraryCode;
 
     enum
     {
@@ -1029,93 +1037,88 @@ namespace Slang
         ANY_MASK = INT_MASK | FLOAT_MASK | BOOL_MASK,
     };
 
-    String SlangStdLib::GetCode()
+    static const struct {
+        char const* name;
+        BaseType	tag;
+        unsigned    flags;
+    } kBaseTypes[] = {
+        { "void",	BaseType::Void,     0 },
+        { "int",	BaseType::Int,      SINT_MASK },
+        { "half",	BaseType::Half,     FLOAT_MASK },
+        { "float",	BaseType::Float,    FLOAT_MASK },
+        { "double",	BaseType::Double,   FLOAT_MASK },
+        { "uint",	BaseType::UInt,     UINT_MASK },
+        { "bool",	BaseType::Bool,     BOOL_MASK },
+        { "uint64_t", BaseType::UInt64, UINT_MASK },
+    };
+
+    struct OpInfo { IntrinsicOp opCode; char const* opName; unsigned flags; };
+
+    static const OpInfo unaryOps[] = {
+        { IntrinsicOp::Pos,     "+",    ARITHMETIC_MASK },
+        { IntrinsicOp::Neg,     "-",    ARITHMETIC_MASK },
+        { IntrinsicOp::Not,     "!",    ANY_MASK        },
+        { IntrinsicOp::BitNot,  "~",    INT_MASK        },
+        { IntrinsicOp::PreInc,  "++",   ARITHMETIC_MASK | ASSIGNMENT },
+        { IntrinsicOp::PreDec,  "--",   ARITHMETIC_MASK | ASSIGNMENT },
+        { IntrinsicOp::PostInc, "++",   ARITHMETIC_MASK | ASSIGNMENT | POSTFIX },
+        { IntrinsicOp::PostDec, "--",   ARITHMETIC_MASK | ASSIGNMENT | POSTFIX },
+    };
+
+    static const OpInfo binaryOps[] = {
+        { IntrinsicOp::Add,     "+",    ARITHMETIC_MASK },
+        { IntrinsicOp::Sub,     "-",    ARITHMETIC_MASK },
+        { IntrinsicOp::Mul,     "*",    ARITHMETIC_MASK },
+        { IntrinsicOp::Div,     "/",    ARITHMETIC_MASK },
+        { IntrinsicOp::Mod,     "%",    INT_MASK },
+
+        { IntrinsicOp::And,     "&&",   LOGICAL_MASK },
+        { IntrinsicOp::Or,      "||",   LOGICAL_MASK },
+
+        { IntrinsicOp::BitAnd,  "&",    LOGICAL_MASK },
+        { IntrinsicOp::BitOr,   "|",    LOGICAL_MASK },
+        { IntrinsicOp::BitXor,  "^",    LOGICAL_MASK },
+
+        { IntrinsicOp::Lsh,     "<<",   INT_MASK },
+        { IntrinsicOp::Rsh,     ">>",   INT_MASK },
+
+        { IntrinsicOp::Eql,     "==",   ANY_MASK | COMPARISON },
+        { IntrinsicOp::Neq,     "!=",   ANY_MASK | COMPARISON },
+
+        { IntrinsicOp::Greater, ">",    ARITHMETIC_MASK | COMPARISON },
+        { IntrinsicOp::Less,    "<",    ARITHMETIC_MASK | COMPARISON },
+        { IntrinsicOp::Geq,     ">=",   ARITHMETIC_MASK | COMPARISON },
+        { IntrinsicOp::Leq,     "<=",   ARITHMETIC_MASK | COMPARISON },
+
+        { IntrinsicOp::AddAssign,     "+=",    ASSIGNMENT | ARITHMETIC_MASK },
+        { IntrinsicOp::SubAssign,     "-=",    ASSIGNMENT | ARITHMETIC_MASK },
+        { IntrinsicOp::MulAssign,     "*=",    ASSIGNMENT | ARITHMETIC_MASK },
+        { IntrinsicOp::DivAssign,     "/=",    ASSIGNMENT | ARITHMETIC_MASK },
+        { IntrinsicOp::ModAssign,     "%=",    ASSIGNMENT | ARITHMETIC_MASK },
+        { IntrinsicOp::AndAssign,     "&=",    ASSIGNMENT | LOGICAL_MASK },
+        { IntrinsicOp::OrAssign,      "|=",    ASSIGNMENT | LOGICAL_MASK },
+        { IntrinsicOp::XorAssign,     "^=",    ASSIGNMENT | LOGICAL_MASK },
+        { IntrinsicOp::LshAssign,     "<<=",   ASSIGNMENT | INT_MASK },
+        { IntrinsicOp::RshAssign,     ">>=",   ASSIGNMENT | INT_MASK },
+    };
+
+
+    String getCoreLibraryCode()
     {
-        if (code.Length() > 0)
-            return code;
+        if (coreLibraryCode.Length() > 0)
+            return coreLibraryCode;
+
         StringBuilder sb;
 
         // generate operator overloads
 
 
-
-        struct OpInfo { IntrinsicOp opCode; char const* opName; unsigned flags;  };
-
-        OpInfo unaryOps[] = {
-            { IntrinsicOp::Neg,     "-",    ARITHMETIC_MASK },
-            { IntrinsicOp::Not,     "!",    ANY_MASK        },
-            { IntrinsicOp::BitNot,  "~",    INT_MASK        },
-            { IntrinsicOp::PreInc,  "++",   ARITHMETIC_MASK | ASSIGNMENT },
-            { IntrinsicOp::PreDec,  "--",   ARITHMETIC_MASK | ASSIGNMENT },
-            { IntrinsicOp::PostInc, "++",   ARITHMETIC_MASK | ASSIGNMENT | POSTFIX },
-            { IntrinsicOp::PostDec, "--",   ARITHMETIC_MASK | ASSIGNMENT | POSTFIX },
-        };
-
-        OpInfo binaryOps[] = {
-            { IntrinsicOp::Add,     "+",    ARITHMETIC_MASK },
-            { IntrinsicOp::Sub,     "-",    ARITHMETIC_MASK },
-            { IntrinsicOp::Mul,     "*",    ARITHMETIC_MASK },
-            { IntrinsicOp::Div,     "/",    ARITHMETIC_MASK },
-            { IntrinsicOp::Mod,     "%",    INT_MASK },
-
-            { IntrinsicOp::And,     "&&",   LOGICAL_MASK },
-            { IntrinsicOp::Or,      "||",   LOGICAL_MASK },
-
-            { IntrinsicOp::BitAnd,  "&",    LOGICAL_MASK },
-            { IntrinsicOp::BitOr,   "|",    LOGICAL_MASK },
-            { IntrinsicOp::BitXor,  "^",    LOGICAL_MASK },
-
-            { IntrinsicOp::Lsh,     "<<",   INT_MASK },
-            { IntrinsicOp::Rsh,     ">>",   INT_MASK },
-
-            { IntrinsicOp::Eql,     "==",   ANY_MASK | COMPARISON },
-            { IntrinsicOp::Neq,     "!=",   ANY_MASK | COMPARISON },
-
-            { IntrinsicOp::Greater, ">",    ARITHMETIC_MASK | COMPARISON },
-            { IntrinsicOp::Less,    "<",    ARITHMETIC_MASK | COMPARISON },
-            { IntrinsicOp::Geq,     ">=",   ARITHMETIC_MASK | COMPARISON },
-            { IntrinsicOp::Leq,     "<=",   ARITHMETIC_MASK | COMPARISON },
-
-            { IntrinsicOp::AddAssign,     "+=",    ASSIGNMENT | ARITHMETIC_MASK },
-            { IntrinsicOp::SubAssign,     "-=",    ASSIGNMENT | ARITHMETIC_MASK },
-            { IntrinsicOp::MulAssign,     "*=",    ASSIGNMENT | ARITHMETIC_MASK },
-            { IntrinsicOp::DivAssign,     "/=",    ASSIGNMENT | ARITHMETIC_MASK },
-            { IntrinsicOp::ModAssign,     "%=",    ASSIGNMENT | ARITHMETIC_MASK },
-            { IntrinsicOp::AndAssign,     "&=",    ASSIGNMENT | LOGICAL_MASK },
-            { IntrinsicOp::OrAssign,      "|=",    ASSIGNMENT | LOGICAL_MASK },
-            { IntrinsicOp::XorAssign,     "^=",    ASSIGNMENT | LOGICAL_MASK },
-            { IntrinsicOp::LshAssign,     "<<=",   ASSIGNMENT | INT_MASK },
-            { IntrinsicOp::RshAssign,     ">>=",   ASSIGNMENT | INT_MASK },
-
-
-        };
-
-        /*
-        String floatTypes[] = { "float", "float2", "float3", "float4" };
-        String intTypes[] = { "int", "int2", "int3", "int4" };
-        String uintTypes[] = { "uint", "uint2", "uint3", "uint4" };
-        */
-
         String path = getStdlibPath();
-
-
 
 #define EMIT_LINE_DIRECTIVE() sb << "#line " << (__LINE__+1) << " \"" << path << "\"\n"
 
         // Generate declarations for all the base types
 
-        static const struct {
-            char const* name;
-            BaseType	tag;
-            unsigned    flags;
-        } kBaseTypes[] = {
-            { "void",	BaseType::Void,     0 },
-            { "int",	BaseType::Int,      SINT_MASK },
-            { "float",	BaseType::Float,    FLOAT_MASK },
-            { "uint",	BaseType::UInt,     UINT_MASK },
-            { "bool",	BaseType::Bool,     BOOL_MASK },
-            { "uint64_t", BaseType::UInt64, UINT_MASK },
-        };
         static const int kBaseTypeCount = sizeof(kBaseTypes) / sizeof(kBaseTypes[0]);
         for (int tt = 0; tt < kBaseTypeCount; ++tt)
         {
@@ -1126,7 +1129,7 @@ namespace Slang
 
             sb << "\n    : __BuiltinType\n";
 
-            switch( kBaseTypes[tt].tag )
+            switch (kBaseTypes[tt].tag)
             {
             case BaseType::Float:
                 sb << "\n    , __BuiltinFloatingPointType\n";
@@ -1151,9 +1154,9 @@ namespace Slang
 
 
             // Declare initializers to convert from various other types
-            for( int ss = 0; ss < kBaseTypeCount; ++ss )
+            for (int ss = 0; ss < kBaseTypeCount; ++ss)
             {
-                if( kBaseTypes[ss].tag == BaseType::Void )
+                if (kBaseTypes[ss].tag == BaseType::Void)
                     continue;
 
                 EMIT_LINE_DIRECTIVE();
@@ -1162,12 +1165,6 @@ namespace Slang
 
             sb << "};\n";
         }
-
-        // Declare ad hoc aliases for some types, just to get things compiling
-        //
-        // TODO(tfoley): At the very least, `double` should be treated as a distinct type.
-        sb << "typedef float double;\n";
-        sb << "typedef float half;\n";
 
         // Declare vector and matrix types
 
@@ -1204,6 +1201,12 @@ namespace Slang
                 sb << "typedef matrix<" << kTypes[tt].name << "," << rr << "," << cc << "> " << kTypes[tt].name << rr << "x" << cc << ";\n";
             }
         }
+
+        // Declare additional built-in generic types
+//        EMIT_LINE_DIRECTIVE();
+        sb << "__generic<T> __magic_type(ConstantBuffer) struct ConstantBuffer {};\n";
+        sb << "__generic<T> __magic_type(TextureBuffer) struct TextureBuffer {};\n";
+
 
         static const char* kComponentNames[]{ "x", "y", "z", "w" };
         static const char* kVectorNames[]{ "", "x", "xy", "xyz", "xyzw" };
@@ -1292,7 +1295,6 @@ namespace Slang
             sb << "}\n";
         }
 
-
         // Declare built-in texture and sampler types
 
         sb << "__magic_type(SamplerState," << int(SamplerStateType::Flavor::SamplerState) << ") struct SamplerState {};";
@@ -1372,11 +1374,11 @@ namespace Slang
                     for(int isFloat = 0; isFloat < 2; ++isFloat)
                     for(int includeMipInfo = 0; includeMipInfo < 2; ++includeMipInfo)
                     {
-                        char const* t = isFloat ? "out float " : "out UINT ";
+                        char const* t = isFloat ? "out float " : "out uint ";
 
                         sb << "void GetDimensions(";
                         if(includeMipInfo)
-                            sb << "UINT mipLevel, ";
+                            sb << "uint mipLevel, ";
 
                         switch(baseShape)
                         {
@@ -1671,27 +1673,6 @@ namespace Slang
             }
         }
 
-        // Declare additional built-in generic types
-        EMIT_LINE_DIRECTIVE();
-        sb << "__generic<T> __magic_type(ConstantBuffer) struct ConstantBuffer {};\n";
-        sb << "__generic<T> __magic_type(TextureBuffer) struct TextureBuffer {};\n";
-
-        sb << "__generic<T> __magic_type(PackedBuffer) struct PackedBuffer {};\n";
-        sb << "__generic<T> __magic_type(Uniform) struct Uniform {};\n";
-        sb << "__generic<T> __magic_type(Patch) struct Patch {};\n";
-
-
-        // Stale declarations for GLSL inner-product builtins
-#if 0
-        sb << "__intrinsic vec3 operator * (vec3, mat3);\n";
-        sb << "__intrinsic vec3 operator * (mat3, vec3);\n";
-
-        sb << "__intrinsic vec4 operator * (vec4, mat4);\n";
-        sb << "__intrinsic vec4 operator * (mat4, vec4);\n";
-
-        sb << "__intrinsic mat3 operator * (mat3, mat3);\n";
-        sb << "__intrinsic mat4 operator * (mat4, mat4);\n";
-#endif
 
         for (auto op : unaryOps)
         {
@@ -1745,28 +1726,92 @@ namespace Slang
                 sb << "__intrinsic_op(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(" << leftQual << "vector<" << leftType << ",N> left, vector<" << rightType << ",N> right);\n";
 
                 // matrix version
+
+                // skip matrix-matrix multiply operations here, so that GLSL doesn't see them
+                switch (op.opCode)
+                {
+                case IntrinsicOp::Mul:
+                case IntrinsicOp::MulAssign:
+                    break;
+
+                default:
+                    sb << "__generic<let N : int, let M : int> ";
+                    sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << leftQual << "matrix<" << leftType << ",N,M> left, matrix<" << rightType << ",N,M> right);\n";
+                    break;
+                }
+            }
+        }
+
+        // Output a suitable `#line` directive to point at our raw stdlib code above
+        sb << "\n#line " << kCoreLibIncludeStringLine << " \"" << path << "\"\n";
+
+        int chunkCount = sizeof(kCoreLibIncludeStringChunks) / sizeof(kCoreLibIncludeStringChunks[0]);
+        for (int cc = 0; cc < chunkCount; ++cc)
+        {
+            sb << kCoreLibIncludeStringChunks[cc];
+        }
+
+        coreLibraryCode = sb.ProduceString();
+        return coreLibraryCode;
+    }
+
+    String getHLSLLibraryCode()
+    {
+        if (hlslLibraryCode.Length() > 0)
+            return hlslLibraryCode;
+
+        StringBuilder sb;
+
+
+//        sb << "__generic<T> __magic_type(PackedBuffer) struct PackedBuffer {};\n";
+//        sb << "__generic<T> __magic_type(Uniform) struct Uniform {};\n";
+//        sb << "__generic<T> __magic_type(Patch) struct Patch {};\n";
+
+        // Component-wise multiplication ops
+        for(auto op : binaryOps)
+        {
+            switch (op.opCode)
+            {
+            default:
+                continue;
+
+            case IntrinsicOp::Mul:
+            case IntrinsicOp::MulAssign:
+                break;
+            }
+
+            for (auto type : kBaseTypes)
+            {
+                if ((type.flags & op.flags) == 0)
+                    continue;
+
+                char const* leftType = type.name;
+                char const* rightType = leftType;
+                char const* resultType = leftType;
+
+                char const* leftQual = "";
+                if(op.flags & ASSIGNMENT) leftQual = "in out ";
+
                 sb << "__generic<let N : int, let M : int> ";
                 sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << leftQual << "matrix<" << leftType << ",N,M> left, matrix<" << rightType << ",N,M> right);\n";
             }
         }
 
         // Output a suitable `#line` directive to point at our raw stdlib code above
-        sb << "\n#line " << kLibIncludeStringLine << " \"" << path << "\"\n";
+        sb << "\n#line " << kHLSLLibIncludeStringLine << " \"" << getStdlibPath() << "\"\n";
 
-        int chunkCount = sizeof(LibIncludeStringChunks) / sizeof(LibIncludeStringChunks[0]);
+        int chunkCount = sizeof(kHLSLLibIncludeStringChunks) / sizeof(kHLSLLibIncludeStringChunks[0]);
         for (int cc = 0; cc < chunkCount; ++cc)
         {
-            sb << LibIncludeStringChunks[cc];
+            sb << kHLSLLibIncludeStringChunks[cc];
         }
 
-        code = sb.ProduceString();
-        return code;
+        hlslLibraryCode = sb.ProduceString();
+        return hlslLibraryCode;
     }
 
 
     // GLSL-specific library code
-
-    String glslLibraryCode;
 
     String getGLSLLibraryCode()
     {
@@ -1794,15 +1839,41 @@ namespace Slang
             // Declare GLSL aliases for HLSL types
             for (int vv = 2; vv <= 4; ++vv)
             {
-                sb << "typedef " << kTypes[tt].name << vv << " " << kTypes[tt].glslPrefix << "vec" << vv << ";\n";
-                sb << "typedef " << kTypes[tt].name << vv << "x" << vv << " " << kTypes[tt].glslPrefix << "mat" << vv << ";\n";
+                sb << "typedef vector<" << kTypes[tt].name << "," << vv << "> " << kTypes[tt].glslPrefix << "vec" << vv << ";\n";
+                sb << "typedef matrix<" << kTypes[tt].name << "," << vv << "," << vv << "> " << kTypes[tt].glslPrefix << "mat" << vv << ";\n";
             }
             for (int rr = 2; rr <= 4; ++rr)
             for (int cc = 2; cc <= 4; ++cc)
             {
-                sb << "typedef " << kTypes[tt].name << rr << "x" << cc << " " << kTypes[tt].glslPrefix << "mat" << rr << "x" << cc << ";\n";
+                sb << "typedef matrix<" << kTypes[tt].name << "," << rr << "," << cc << "> " << kTypes[tt].glslPrefix << "mat" << rr << "x" << cc << ";\n";
             }
         }
+
+        // Multiplication operations for vectors + matrices
+
+        // scalar-vector and vector-scalar
+        sb << "__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic_op(Mul) vector<T,N> operator*(vector<T,N> x, T y);\n";
+        sb << "__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic_op(Mul) vector<T,N> operator*(T x, vector<T,N> y);\n";
+
+        // scalar-matrix and matrix-scalar
+        sb << "__generic<T : __BuiltinArithmeticType, let N : int, let M :int> __intrinsic_op(Mul) matrix<T,N,M> operator*(matrix<T,N,M> x, T y);\n";
+        sb << "__generic<T : __BuiltinArithmeticType, let N : int, let M :int> __intrinsic_op(Mul) matrix<T,N,M> operator*(T x, matrix<T,N,M> y);\n";
+
+        // vector-vector (dot product)
+        sb << "__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic_op(Mul) T operator*(vector<T,N> x, vector<T,N> y);\n";
+
+        // vector-matrix
+        sb << "__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic_op(Mul) vector<T,M> operator*(vector<T,N> x, matrix<T,N,M> y);\n";
+
+        // matrix-vector
+        sb << "__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic_op(Mul) vector<T,N> operator*(matrix<T,N,M> x, vector<T,M> y);\n";
+
+        // matrix-matrix
+        sb << "__generic<T : __BuiltinArithmeticType, let R : int, let N : int, let C : int> __intrinsic_op(Mul) matrix<T,R,C> operator*(matrix<T,R,N> x, matrix<T,N,C> y);\n";
+
+
+
+        //
 
         // TODO(tfoley): Need to handle `RW*` variants of texture types as well...
         static const struct {
@@ -1909,6 +1980,7 @@ namespace Slang
         sb << "__modifier(GLSLPatchModifier)        patch;\n";
 
         sb << "__modifier(SimpleModifier)           flat;\n";
+        sb << "__modifier(SimpleModifier)           highp;\n";
 
         glslLibraryCode = sb.ProduceString();
         return glslLibraryCode;
@@ -1918,10 +1990,12 @@ namespace Slang
 
     //
 
-    void SlangStdLib::Finalize()
+    void finalizeShaderLibrary()
     {
-        code = String();
         stdlibPath = String();
+
+        coreLibraryCode = String();
+        hlslLibraryCode = String();
         glslLibraryCode = String();
     }
 

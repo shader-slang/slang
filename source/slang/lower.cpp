@@ -451,6 +451,7 @@ struct LoweringVisitor
         lowerExprCommon(loweredExpr, expr);
         loweredExpr->BaseExpression = loweredBase;
         loweredExpr->declRef = loweredDeclRef;
+        loweredExpr->name = expr->name;
 
         return loweredExpr;
     }
@@ -684,16 +685,6 @@ struct LoweringVisitor
     {
         RefPtr<EmptyStatementSyntaxNode> loweredStmt = new EmptyStatementSyntaxNode();
         lowerStmtFields(loweredStmt, stmt);
-        addStmt(loweredStmt);
-    }
-
-    void visitUnparsedStmt(UnparsedStmt* stmt)
-    {
-        RefPtr<UnparsedStmt> loweredStmt = new UnparsedStmt();
-        lowerStmtFields(loweredStmt, stmt);
-
-        loweredStmt->tokens = stmt->tokens;
-
         addStmt(loweredStmt);
     }
 

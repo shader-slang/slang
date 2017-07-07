@@ -25,8 +25,9 @@ public:
     bool useCache = false;
     String cacheDir;
 
-    RefPtr<Scope>   slangLanguageScope;
+    RefPtr<Scope>   coreLanguageScope;
     RefPtr<Scope>   hlslLanguageScope;
+    RefPtr<Scope>   slangLanguageScope;
     RefPtr<Scope>   glslLanguageScope;
 
     List<RefPtr<ProgramSyntaxNode>> loadedModuleCode;
@@ -43,15 +44,19 @@ public:
         // TODO: load these on-demand to avoid parsing
         // stdlib code for languages the user won't use.
 
-        slangLanguageScope = new Scope();
+        coreLanguageScope = new Scope();
 
         hlslLanguageScope = new Scope();
-        hlslLanguageScope->parent = slangLanguageScope;
+        hlslLanguageScope->nextSibling = coreLanguageScope;
+
+        slangLanguageScope = new Scope();
+        slangLanguageScope->nextSibling = hlslLanguageScope;
 
         glslLanguageScope = new Scope();
-        glslLanguageScope->parent = slangLanguageScope;
+        glslLanguageScope->nextSibling = coreLanguageScope;
 
-        addBuiltinSource(slangLanguageScope, "stdlib", SlangStdLib::GetCode());
+        addBuiltinSource(coreLanguageScope, "core", getCoreLibraryCode());
+        addBuiltinSource(hlslLanguageScope, "hlsl", getHLSLLibraryCode());
         addBuiltinSource(glslLanguageScope, "glsl", getGLSLLibraryCode());
     }
 
@@ -61,7 +66,7 @@ public:
         // code that we might have allocated and loaded into static
         // variables (TODO: don't use `static` variables for this stuff)
 
-        SlangStdLib::Finalize();
+        finalizeShaderLibrary();
 
         // Ditto for our type represnetation stuff
 

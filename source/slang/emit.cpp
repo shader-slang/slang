@@ -238,7 +238,9 @@ struct EmitVisitor
 
         if (isReservedWord(name))
         {
-            name = name + "_";
+            // TODO(tfoley): Need to put this back in, as part of lowering.
+
+//            name = name + "_";
         }
 
         advanceToSourceLocation(loc);
@@ -970,6 +972,14 @@ struct EmitVisitor
         {
             e = derefExpr->base;
         }
+
+        if (auto declRefExpr = e.As<DeclRefExpr>())
+        {
+            auto decl = declRefExpr->declRef.getDecl();
+            if (decl && decl->HasModifier<TransparentModifier>())
+                return true;
+        }
+
         // Is the expression referencing a constant buffer?
         if (auto cbufferType = e->Type->As<ConstantBufferType>())
         {
@@ -1308,6 +1318,13 @@ struct EmitVisitor
         if(needClose) Emit(")");
     }
 
+    void visitParenExpr(ParenExpr* expr, ExprEmitArg const& arg)
+    {
+        Emit("(");
+        EmitExpr(expr->base);
+        Emit(")");
+    }
+
     void visitAssignExpr(AssignExpr* assignExpr, ExprEmitArg const& arg)
     {
         auto outerPrec = arg.outerPrec;
@@ -1317,6 +1334,64 @@ struct EmitVisitor
         EmitExprWithPrecedence(assignExpr->right, kPrecedence_Assign);
         if(needClose) Emit(")");
     }
+
+    void emitUncheckedCallExpr(
+        RefPtr<InvokeExpressionSyntaxNode>  callExpr,
+        String const&                       funcName,
+        ExprEmitArg const&                  arg)
+    {
+        auto outerPrec = arg.outerPrec;
+        auto funcExpr = callExpr->FunctionExpr;
+
+        // This can occur when we are dealing with unchecked input syntax,
+        // because we are in "rewriter" mode. In this case we should go
+        // ahead and emit things in the form that they were written.
+        if( auto infixExpr = callExpr.As<InfixExpr>() )
+        {
+            EmitBinExpr(
+                outerPrec,
+                kPrecedence_Comma,
+                funcName.Buffer(),
+                callExpr);
+        }
+        else if( auto prefixExpr = callExpr.As<PrefixExpr>() )
+        {
+            EmitUnaryExpr(
+                outerPrec,
+                kPrecedence_Prefix,
+                funcName.Buffer(),
+                "",
+                callExpr);
+        }
+        else if(auto postfixExpr = callExpr.As<PostfixExpr>())
+        {
+            EmitUnaryExpr(
+                outerPrec,
+                kPrecedence_Postfix,
+                "",
+                funcName.Buffer(),
+                callExpr);
+        }
+        else
+        {
+            bool needClose = MaybeEmitParens(outerPrec, kPrecedence_Postfix);
+
+            auto funcExpr = callExpr->FunctionExpr;
+            EmitExpr(funcExpr);
+
+            Emit("(");
+            UInt argCount = callExpr->Arguments.Count();
+            for (UInt aa = 0; aa < argCount; ++aa)
+            {
+                if (aa != 0) Emit(", ");
+                EmitExpr(callExpr->Arguments[aa]);
+            }
+            Emit(")");
+
+            if (needClose) Emit(")");
+        }
+    }
+
 
     void visitInvokeExpressionSyntaxNode(
         RefPtr<InvokeExpressionSyntaxNode>  callExpr,
@@ -1331,39 +1406,7 @@ struct EmitVisitor
             auto funcDecl = funcDeclRef.getDecl();
             if(!funcDecl)
             {
-                // This can occur when we are dealing with unchecked input syntax,
-                // because we are in "rewriter" mode. In this case we should go
-                // ahead and emit things in the form that they were written.
-                if( auto infixExpr = callExpr.As<InfixExpr>() )
-                {
-                    EmitBinExpr(
-                        outerPrec,
-                        kPrecedence_Comma,
-                        funcDeclRefExpr->name.Buffer(),
-                        callExpr);
-                }
-                else if( auto prefixExpr = callExpr.As<PrefixExpr>() )
-                {
-                    EmitUnaryExpr(
-                        outerPrec,
-                        kPrecedence_Prefix,
-                        funcDeclRefExpr->name.Buffer(),
-                        "",
-                        callExpr);
-                }
-                else if(auto postfixExpr = callExpr.As<PostfixExpr>())
-                {
-                    EmitUnaryExpr(
-                        outerPrec,
-                        kPrecedence_Postfix,
-                        "",
-                        funcDeclRefExpr->name.Buffer(),
-                        callExpr);
-                }
-                else
-                {
-                    emitSimpleCallExpr(callExpr, outerPrec);
-                }
+                emitUncheckedCallExpr(callExpr, funcDeclRef.GetName(), arg);
                 return;
             }
             else if (auto intrinsicOpModifier = funcDecl->FindModifier<IntrinsicOpModifier>())
@@ -1408,6 +1451,7 @@ struct EmitVisitor
             case IntrinsicOp::Sequence: EmitBinExpr(outerPrec, kPrecedence_Comma, ",", callExpr); return;
 
     #define CASE(NAME, OP) case IntrinsicOp::NAME: EmitUnaryExpr(outerPrec, kPrecedence_Prefix, #OP, "", callExpr); return
+                CASE(Pos, +);
                 CASE(Neg, -);
                 CASE(Not, !);
                 CASE(BitNot, ~);
@@ -1603,6 +1647,11 @@ struct EmitVisitor
                 }
             }
         }
+        else if (auto overloadedExpr = funcExpr.As<OverloadedExpr>())
+        {
+            emitUncheckedCallExpr(callExpr, overloadedExpr->lookupResult2.getName(), arg);
+            return;
+        }
 
         // Fall through to default handling...
         emitSimpleCallExpr(callExpr, outerPrec);
@@ -1633,7 +1682,16 @@ struct EmitVisitor
             Emit(".");
         }
 
-        emitName(memberExpr->declRef.GetName());
+        if (!memberExpr->declRef)
+        {
+            // This case arises when checking didn't find anything, but we were
+            // in "rewrite" mode so we blazed ahead anyway.
+            emitName(memberExpr->name);
+        }
+        else
+        {
+            emit(memberExpr->declRef.GetName());
+        }
 
         if(needClose) Emit(")");
     }
@@ -1655,14 +1713,17 @@ struct EmitVisitor
         if(needClose) Emit(")");
     }
 
-    void visitIndexExpressionSyntaxNode(IndexExpressionSyntaxNode* indexExpr, ExprEmitArg const& arg)
+    void visitIndexExpressionSyntaxNode(IndexExpressionSyntaxNode* subscriptExpr, ExprEmitArg const& arg)
     {
         auto outerPrec = arg.outerPrec;
         bool needClose = MaybeEmitParens(outerPrec, kPrecedence_Postfix);
 
-        EmitExprWithPrecedence(indexExpr->BaseExpression, kPrecedence_Postfix);
+        EmitExprWithPrecedence(subscriptExpr->BaseExpression, kPrecedence_Postfix);
         Emit("[");
-        EmitExpr(indexExpr->IndexExpression);
+        if (auto indexExpr = subscriptExpr->IndexExpression)
+        {
+            EmitExpr(indexExpr);
+        }
         Emit("]");
 
         if(needClose) Emit(")");
@@ -1696,7 +1757,7 @@ struct EmitVisitor
         }
         else
         {
-            emitName(varExpr->name);
+            emit(varExpr->name);
         }
 
         if(needClose) Emit(")");
@@ -1777,6 +1838,16 @@ struct EmitVisitor
 
     void visitTypeCastExpressionSyntaxNode(TypeCastExpressionSyntaxNode* castExpr, ExprEmitArg const& arg)
     {
+        if (context->isRewrite)
+        {
+            if (dynamic_cast<ImplicitCastExpr*>(castExpr))
+            {
+                // This was an implicit cast, so don't try to output it
+                EmitExprWithPrecedence(castExpr->Expression, arg.outerPrec);
+                return;
+            }
+        }
+
         bool needClose = false;
         switch(context->shared->target)
         {
@@ -1858,18 +1929,6 @@ struct EmitVisitor
         }
     }
 
-
-    void EmitUnparsedStmt(RefPtr<UnparsedStmt> stmt)
-    {
-        // TODO: actually emit the tokens that made up the statement...
-        Emit("{\n");
-        for( auto& token : stmt->tokens )
-        {
-            emitTokenWithLocation(token);
-        }
-        Emit("}\n");
-    }
-
     void EmitStmt(RefPtr<StatementSyntaxNode> stmt)
     {
         // Try to ensure that debugging can find the right location
@@ -1886,11 +1945,6 @@ struct EmitVisitor
             {
                 EmitStmt(ss);
             }
-            return;
-        }
-        else if( auto unparsedStmt = stmt.As<UnparsedStmt>() )
-        {
-            EmitUnparsedStmt(unparsedStmt);
             return;
         }
         else if (auto exprStmt = stmt.As<ExpressionStatementSyntaxNode>())

@@ -5,16 +5,11 @@
 
 namespace Slang
 {
-    class SlangStdLib
-    {
-    private:
-        static String code;
-    public:
-        static String GetCode();
-        static void Finalize();
-    };
-
+    String getCoreLibraryCode();
+    String getHLSLLibraryCode();
     String getGLSLLibraryCode();
+
+    void finalizeShaderLibrary();
 }
 
 #endif

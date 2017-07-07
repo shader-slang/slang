@@ -96,6 +96,9 @@ SYNTAX_CLASS(TypeCastExpressionSyntaxNode, ExpressionSyntaxNode)
     SYNTAX_FIELD(RefPtr<ExpressionSyntaxNode>, Expression)
 END_SYNTAX_CLASS()
 
+SYNTAX_CLASS(ImplicitCastExpr, TypeCastExpressionSyntaxNode)
+END_SYNTAX_CLASS()
+
 SIMPLE_SYNTAX_CLASS(SelectExpressionSyntaxNode, OperatorExpressionSyntaxNode)
 
 SIMPLE_SYNTAX_CLASS(GenericAppExpr, AppExprBase)
@@ -112,3 +115,10 @@ SYNTAX_CLASS(AssignExpr, ExpressionSyntaxNode)
     SYNTAX_FIELD(RefPtr<ExpressionSyntaxNode>, right);
 END_SYNTAX_CLASS()
 
+// Just an expression inside parentheses `(exp)`
+//
+// We keep this around explicitly to be sure we don't lose any structure
+// when we do rewriter stuff.
+SYNTAX_CLASS(ParenExpr, ExpressionSyntaxNode)
+    SYNTAX_FIELD(RefPtr<ExpressionSyntaxNode>, base);
+END_SYNTAX_CLASS()

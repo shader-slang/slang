@@ -16,11 +16,6 @@ SYNTAX_CLASS(BlockStmt, ScopeStmt)
     SYNTAX_FIELD(RefPtr<StatementSyntaxNode>, body);
 END_SYNTAX_CLASS()
 
-SYNTAX_CLASS(UnparsedStmt, StatementSyntaxNode)
-    // The tokens that were contained between `{` and `}`
-    FIELD(List<Token>, tokens)
-END_SYNTAX_CLASS()
-
 SIMPLE_SYNTAX_CLASS(EmptyStatementSyntaxNode, StatementSyntaxNode)
 
 SIMPLE_SYNTAX_CLASS(DiscardStatementSyntaxNode, StatementSyntaxNode)

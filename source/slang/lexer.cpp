@@ -517,7 +517,7 @@ namespace Slang
                 if(base > 10)
                 {
                     cursor++;
-                    return c - 'a';
+                    return 10 + c - 'a';
                 }
                 return -1;
 
@@ -525,7 +525,7 @@ namespace Slang
                 if(base > 10)
                 {
                     cursor++;
-                    return c - 'A';
+                    return 10 + c - 'A';
                 }
                 return -1;
             }
@@ -957,7 +957,7 @@ namespace Slang
                 switch(peek(lexer))
                 {
                 default:
-                    return TokenType::IntegerLiteral;
+                    return maybeLexNumberSuffix(lexer, TokenType::IntegerLiteral);
 
                 case '.':
                     advance(lexer);
