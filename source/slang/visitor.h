@@ -24,8 +24,8 @@ struct ITypeVisitor
 #include "object-meta-end.h"
 };
 
-template<typename Derived, typename Result = void>
-struct TypeVisitor : ITypeVisitor
+template<typename Derived, typename Result = void, typename Base = ITypeVisitor>
+struct TypeVisitor : Base
 {
     Result dispatch(ExpressionType* type)
     {
@@ -37,16 +37,24 @@ struct TypeVisitor : ITypeVisitor
 #define ABSTRACT_SYNTAX_CLASS(NAME,BASE) /* empty */
 #define SYNTAX_CLASS(NAME, BASE) \
     virtual void dispatch_##NAME(NAME* obj, void* extra) override \
-    { *(Result*)extra = ((Derived*) this)->visit(obj); }
+    { *(Result*)extra = ((Derived*) this)->visit##NAME(obj); }
 
 #include "object-meta-begin.h"
 #include "type-defs.h"
 #include "object-meta-end.h"
 
+#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) SYNTAX_CLASS(NAME, BASE)
+#define SYNTAX_CLASS(NAME, BASE) \
+    Result visit##NAME(NAME* obj) \
+    { return ((Derived*) this)->visit##BASE(obj); }
+
+#include "object-meta-begin.h"
+#include "type-defs.h"
+#include "object-meta-end.h"
 };
 
-template<typename Derived>
-struct TypeVisitor<Derived,void> : ITypeVisitor
+template<typename Derived, typename Base>
+struct TypeVisitor<Derived,void,Base> : Base
 {
     void dispatch(ExpressionType* type)
     {
@@ -56,12 +64,20 @@ struct TypeVisitor<Derived,void> : ITypeVisitor
 #define ABSTRACT_SYNTAX_CLASS(NAME,BASE) /* empty */
 #define SYNTAX_CLASS(NAME, BASE) \
     virtual void dispatch_##NAME(NAME* obj, void*) override \
-    { ((Derived*) this)->visit(obj); }
+    { ((Derived*) this)->visit##NAME(obj); }
 
 #include "object-meta-begin.h"
 #include "type-defs.h"
 #include "object-meta-end.h"
 
+#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) SYNTAX_CLASS(NAME, BASE)
+#define SYNTAX_CLASS(NAME, BASE) \
+    void visit##NAME(NAME* obj) \
+    { ((Derived*) this)->visit##BASE(obj); }
+
+#include "object-meta-begin.h"
+#include "type-defs.h"
+#include "object-meta-end.h"
 };
 
 //
@@ -92,12 +108,20 @@ struct ExprVisitor : IExprVisitor
 #define ABSTRACT_SYNTAX_CLASS(NAME,BASE) /* empty */
 #define SYNTAX_CLASS(NAME, BASE) \
     virtual void dispatch_##NAME(NAME* obj, void* extra) override \
-    { *(Result*)extra = ((Derived*) this)->visit(obj); }
+    { *(Result*)extra = ((Derived*) this)->visit##NAME(obj); }
 
 #include "object-meta-begin.h"
 #include "expr-defs.h"
 #include "object-meta-end.h"
 
+#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) SYNTAX_CLASS(NAME, BASE)
+#define SYNTAX_CLASS(NAME, BASE) \
+    Result visit##NAME(NAME* obj) \
+    { return ((Derived*) this)->visit##BASE(obj); }
+
+#include "object-meta-begin.h"
+#include "expr-defs.h"
+#include "object-meta-end.h"
 };
 
 template<typename Derived>
@@ -111,12 +135,20 @@ struct ExprVisitor<Derived,void> : IExprVisitor
 #define ABSTRACT_SYNTAX_CLASS(NAME,BASE) /* empty */
 #define SYNTAX_CLASS(NAME, BASE) \
     virtual void dispatch_##NAME(NAME* obj, void*) override \
-    { ((Derived*) this)->visit(obj); }
+    { ((Derived*) this)->visit##NAME(obj); }
 
 #include "object-meta-begin.h"
 #include "expr-defs.h"
 #include "object-meta-end.h"
 
+#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) SYNTAX_CLASS(NAME, BASE)
+#define SYNTAX_CLASS(NAME, BASE) \
+    void visit##NAME(NAME* obj) \
+    { ((Derived*) this)->visit##BASE(obj); }
+
+#include "object-meta-begin.h"
+#include "expr-defs.h"
+#include "object-meta-end.h"
 };
 
 //
@@ -147,12 +179,20 @@ struct StmtVisitor : IStmtVisitor
 #define ABSTRACT_SYNTAX_CLASS(NAME,BASE) /* empty */
 #define SYNTAX_CLASS(NAME, BASE) \
     virtual void dispatch_##NAME(NAME* obj, void* extra) override \
-    { *(Result*)extra = ((Derived*) this)->visit(obj); }
+    { *(Result*)extra = ((Derived*) this)->visit##NAME(obj); }
 
 #include "object-meta-begin.h"
 #include "stmt-defs.h"
 #include "object-meta-end.h"
 
+#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) SYNTAX_CLASS(NAME, BASE)
+#define SYNTAX_CLASS(NAME, BASE) \
+    Result visit##NAME(NAME* obj) \
+    { return ((Derived*) this)->visit##BASE(obj); }
+
+#include "object-meta-begin.h"
+#include "stmt-defs.h"
+#include "object-meta-end.h"
 };
 
 template<typename Derived>
@@ -166,12 +206,20 @@ struct StmtVisitor<Derived,void> : IStmtVisitor
 #define ABSTRACT_SYNTAX_CLASS(NAME,BASE) /* empty */
 #define SYNTAX_CLASS(NAME, BASE) \
     virtual void dispatch_##NAME(NAME* obj, void*) override \
-    { ((Derived*) this)->visit(obj); }
+    { ((Derived*) this)->visit##NAME(obj); }
 
 #include "object-meta-begin.h"
 #include "stmt-defs.h"
 #include "object-meta-end.h"
 
+#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) SYNTAX_CLASS(NAME, BASE)
+#define SYNTAX_CLASS(NAME, BASE) \
+    void visit##NAME(NAME* obj) \
+    { ((Derived*) this)->visit##BASE(obj); }
+
+#include "object-meta-begin.h"
+#include "stmt-defs.h"
+#include "object-meta-end.h"
 };
 
 //
@@ -202,12 +250,20 @@ struct DeclVisitor : IDeclVisitor
 #define ABSTRACT_SYNTAX_CLASS(NAME,BASE) /* empty */
 #define SYNTAX_CLASS(NAME, BASE) \
     virtual void dispatch_##NAME(NAME* obj, void* extra) override \
-    { *(Result*)extra = ((Derived*) this)->visit(obj); }
+    { *(Result*)extra = ((Derived*) this)->visit##NAME(obj); }
 
 #include "object-meta-begin.h"
 #include "decl-defs.h"
 #include "object-meta-end.h"
 
+#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) SYNTAX_CLASS(NAME, BASE)
+#define SYNTAX_CLASS(NAME, BASE) \
+    Result visit##NAME(NAME* obj) \
+    { return ((Derived*) this)->visit##BASE(obj); }
+
+#include "object-meta-begin.h"
+#include "decl-defs.h"
+#include "object-meta-end.h"
 };
 
 template<typename Derived>
@@ -221,12 +277,20 @@ struct DeclVisitor<Derived,void> : IDeclVisitor
 #define ABSTRACT_SYNTAX_CLASS(NAME,BASE) /* empty */
 #define SYNTAX_CLASS(NAME, BASE) \
     virtual void dispatch_##NAME(NAME* obj, void*) override \
-    { ((Derived*) this)->visit(obj); }
+    { ((Derived*) this)->visit##NAME(obj); }
 
 #include "object-meta-begin.h"
 #include "decl-defs.h"
 #include "object-meta-end.h"
 
+#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) SYNTAX_CLASS(NAME, BASE)
+#define SYNTAX_CLASS(NAME, BASE) \
+    void visit##NAME(NAME* obj) \
+    { ((Derived*) this)->visit##BASE(obj); }
+
+#include "object-meta-begin.h"
+#include "decl-defs.h"
+#include "object-meta-end.h"
 };
 
 //
@@ -257,12 +321,20 @@ struct ModifierVisitor : IModifierVisitor
 #define ABSTRACT_SYNTAX_CLASS(NAME,BASE) /* empty */
 #define SYNTAX_CLASS(NAME, BASE) \
     virtual void dispatch_##NAME(NAME* obj, void* extra) override \
-    { *(Result*)extra = ((Derived*) this)->visit(obj); }
+    { *(Result*)extra = ((Derived*) this)->visit##NAME(obj); }
 
 #include "object-meta-begin.h"
 #include "modifier-defs.h"
 #include "object-meta-end.h"
 
+#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) SYNTAX_CLASS(NAME, BASE)
+#define SYNTAX_CLASS(NAME, BASE) \
+    Result visit##NAME(NAME* obj) \
+    { return ((Derived*) this)->visit##BASE(obj); }
+
+#include "object-meta-begin.h"
+#include "modifier-defs.h"
+#include "object-meta-end.h"
 };
 
 template<typename Derived>
@@ -276,12 +348,20 @@ struct ModifierVisitor<Derived, void> : IModifierVisitor
 #define ABSTRACT_SYNTAX_CLASS(NAME,BASE) /* empty */
 #define SYNTAX_CLASS(NAME, BASE) \
     virtual void dispatch_##NAME(NAME* obj, void*) override \
-    { ((Derived*) this)->visit(obj); }
+    { ((Derived*) this)->visit##NAME(obj); }
 
 #include "object-meta-begin.h"
 #include "modifier-defs.h"
 #include "object-meta-end.h"
 
+#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) SYNTAX_CLASS(NAME, BASE)
+#define SYNTAX_CLASS(NAME, BASE) \
+    void visit##NAME(NAME* obj) \
+    { ((Derived*) this)->visit##BASE(obj); }
+
+#include "object-meta-begin.h"
+#include "modifier-defs.h"
+#include "object-meta-end.h"
 };
 
 //
@@ -299,8 +379,8 @@ struct IValVisitor : ITypeVisitor
 #include "object-meta-end.h"
 };
 
-template<typename Derived, typename Result = void>
-struct ValVisitor : IValVisitor
+template<typename Derived, typename Result = void, typename TypeResult = void>
+struct ValVisitor : TypeVisitor<Derived, TypeResult, IValVisitor>
 {
     Result dispatch(Val* val)
     {
@@ -312,17 +392,24 @@ struct ValVisitor : IValVisitor
 #define ABSTRACT_SYNTAX_CLASS(NAME,BASE) /* empty */
 #define SYNTAX_CLASS(NAME, BASE) \
     virtual void dispatch_##NAME(NAME* obj, void* extra) override \
-    { *(Result*)extra = ((Derived*) this)->visit(obj); }
+    { *(Result*)extra = ((Derived*) this)->visit##NAME(obj); }
 
 #include "object-meta-begin.h"
 #include "val-defs.h"
-#include "type-defs.h"
 #include "object-meta-end.h"
 
+#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) SYNTAX_CLASS(NAME, BASE)
+#define SYNTAX_CLASS(NAME, BASE) \
+    Result visit##NAME(NAME* obj) \
+    { return ((Derived*) this)->visit##BASE(obj); }
+
+#include "object-meta-begin.h"
+#include "val-defs.h"
+#include "object-meta-end.h"
 };
 
 template<typename Derived>
-struct ValVisitor<Derived, void> : IValVisitor
+struct ValVisitor<Derived, void, void> : TypeVisitor<Derived, void, IValVisitor>
 {
     void dispatch(Val* val)
     {
@@ -332,11 +419,19 @@ struct ValVisitor<Derived, void> : IValVisitor
 #define ABSTRACT_SYNTAX_CLASS(NAME,BASE) /* empty */
 #define SYNTAX_CLASS(NAME, BASE) \
     virtual void dispatch_##NAME(NAME* obj, void*) override \
-    { ((Derived*) this)->visit(obj); }
+    { ((Derived*) this)->visit##NAME(obj); }
 
 #include "object-meta-begin.h"
 #include "val-defs.h"
-#include "type-defs.h"
+#include "object-meta-end.h"
+
+#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) SYNTAX_CLASS(NAME, BASE)
+#define SYNTAX_CLASS(NAME, BASE) \
+    void visit##NAME(NAME* obj) \
+    { ((Derived*) this)->visit##BASE(obj); }
+
+#include "object-meta-begin.h"
+#include "val-defs.h"
 #include "object-meta-end.h"
 
 };

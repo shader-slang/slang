@@ -1072,7 +1072,7 @@ namespace Slang
             EnsureDecl(decl, DeclCheckState::Checked);
         }
 
-        void visit(GenericDecl* genericDecl)
+        void visitGenericDecl(GenericDecl* genericDecl)
         {
             // check the parameters
             for (auto m : genericDecl->Members)
@@ -1097,12 +1097,12 @@ namespace Slang
             checkDecl(genericDecl->inner);
         }
 
-        void visit(InterfaceDecl* /*decl*/)
+        void visitInterfaceDecl(InterfaceDecl* /*decl*/)
         {
             // TODO: do some actual checking of members here
         }
 
-        void visit(InheritanceDecl* inheritanceDecl)
+        void visitInheritanceDecl(InheritanceDecl* inheritanceDecl)
         {
             // check the type being inherited from
             auto base = inheritanceDecl->base;
@@ -1144,27 +1144,27 @@ namespace Slang
             return constIntVal;
         }
 
-        void visit(ModifierDecl*)
+        void visitModifierDecl(ModifierDecl*)
         {
             // These are only used in the stdlib, so no checking is needed
         }
 
-        void visit(GenericTypeParamDecl*)
+        void visitGenericTypeParamDecl(GenericTypeParamDecl*)
         {
             // These are only used in the stdlib, so no checking is needed for now
         }
 
-        void visit(GenericValueParamDecl*)
+        void visitGenericValueParamDecl(GenericValueParamDecl*)
         {
             // These are only used in the stdlib, so no checking is needed for now
         }
 
-        void visit(GenericTypeConstraintDecl*)
+        void visitGenericTypeConstraintDecl(GenericTypeConstraintDecl*)
         {
             // These are only used in the stdlib, so no checking is needed for now
         }
 
-        void visit(Modifier*)
+        void visitModifier(Modifier*)
         {
             // Do nothing with modifiers for now
         }
@@ -1270,7 +1270,7 @@ namespace Slang
             decl->modifiers.first = resultModifiers;
         }
 
-        void visit(ProgramSyntaxNode* programNode)
+        void visitProgramSyntaxNode(ProgramSyntaxNode* programNode)
         {
             // Try to register all the builtin decls
             for (auto decl : programNode->Members)
@@ -1347,7 +1347,7 @@ namespace Slang
             }
         }
 
-		void visit(ClassSyntaxNode * classNode)
+		void visitClassSyntaxNode(ClassSyntaxNode * classNode)
 		{
 			if (classNode->IsChecked(DeclCheckState::Checked))
 				return;
@@ -1360,7 +1360,7 @@ namespace Slang
 			}
 		}
 
-        void visit(StructField* field)
+        void visitStructField(StructField* field)
         {
             // TODO: bottleneck through general-case variable checking
 
@@ -1368,7 +1368,7 @@ namespace Slang
             field->SetCheckState(DeclCheckState::Checked);
         }
 
-        void visit(StructSyntaxNode * structNode)
+        void visitStructSyntaxNode(StructSyntaxNode * structNode)
         {
             if (structNode->IsChecked(DeclCheckState::Checked))
                 return;
@@ -1380,7 +1380,7 @@ namespace Slang
             }
         }
 
-        void visit(DeclGroup* declGroup)
+        void visitDeclGroup(DeclGroup* declGroup)
         {
             for (auto decl : declGroup->decls)
             {
@@ -1388,7 +1388,7 @@ namespace Slang
             }
         }
 
-        void visit(TypeDefDecl* decl)
+        void visitTypeDefDecl(TypeDefDecl* decl)
         {
             if (decl->IsChecked(DeclCheckState::Checked)) return;
 
@@ -1403,7 +1403,7 @@ namespace Slang
             StmtVisitor::dispatch(stmt);
         }
 
-        void visit(FunctionSyntaxNode *functionNode)
+        void visitFunctionSyntaxNode(FunctionSyntaxNode *functionNode)
         {
             if (functionNode->IsChecked(DeclCheckState::Checked))
                 return;
@@ -1528,12 +1528,12 @@ namespace Slang
             }
         }
 
-        void visit(ScopeDecl*)
+        void visitScopeDecl(ScopeDecl*)
         {
             // Nothing to do
         }
 
-        void visit(ParameterSyntaxNode* para)
+        void visitParameterSyntaxNode(ParameterSyntaxNode* para)
         {
             // TODO: This needs to bottleneck through the common variable checks
 
@@ -1567,7 +1567,7 @@ namespace Slang
             ValidateFunctionRedeclaration(functionNode);
         }
 
-        void visit(VarDeclrStatementSyntaxNode* stmt)
+        void visitVarDeclrStatementSyntaxNode(VarDeclrStatementSyntaxNode* stmt)
         {
             // We directly dispatch here instead of using `EnsureDecl()` for two
             // reasons:
@@ -1581,12 +1581,12 @@ namespace Slang
             DeclVisitor::dispatch(stmt->decl);
         }
 
-        void visit(BlockStmt* stmt)
+        void visitBlockStmt(BlockStmt* stmt)
         {
             checkStmt(stmt->body);
         }
 
-        void visit(SeqStmt* stmt)
+        void visitSeqStmt(SeqStmt* stmt)
         {
             for(auto ss : stmt->stmts)
             {
@@ -1608,7 +1608,7 @@ namespace Slang
             return nullptr;
         }
 
-        void visit(BreakStatementSyntaxNode *stmt)
+        void visitBreakStatementSyntaxNode(BreakStatementSyntaxNode *stmt)
         {
             auto outer = FindOuterStmt<BreakableStmt>();
             if (!outer)
@@ -1617,7 +1617,7 @@ namespace Slang
             }
             stmt->parentStmt = outer;
         }
-        void visit(ContinueStatementSyntaxNode *stmt)
+        void visitContinueStatementSyntaxNode(ContinueStatementSyntaxNode *stmt)
         {
             auto outer = FindOuterStmt<LoopStmt>();
             if (!outer)
@@ -1645,7 +1645,7 @@ namespace Slang
             return e;
         }
 
-        void visit(DoWhileStatementSyntaxNode *stmt)
+        void visitDoWhileStatementSyntaxNode(DoWhileStatementSyntaxNode *stmt)
         {
             PushOuterStmt(stmt);
             stmt->Predicate = checkPredicateExpr(stmt->Predicate);
@@ -1653,7 +1653,7 @@ namespace Slang
 
             PopOuterStmt(stmt);
         }
-        void visit(ForStatementSyntaxNode *stmt)
+        void visitForStatementSyntaxNode(ForStatementSyntaxNode *stmt)
         {
             PushOuterStmt(stmt);
             checkStmt(stmt->InitialStatement);
@@ -1669,7 +1669,7 @@ namespace Slang
 
             PopOuterStmt(stmt);
         }
-        void visit(SwitchStmt* stmt)
+        void visitSwitchStmt(SwitchStmt* stmt)
         {
             PushOuterStmt(stmt);
             // TODO(tfoley): need to coerce condition to an integral type...
@@ -1682,7 +1682,7 @@ namespace Slang
 
             PopOuterStmt(stmt);
         }
-        void visit(CaseStmt* stmt)
+        void visitCaseStmt(CaseStmt* stmt)
         {
             // TODO(tfoley): Need to coerce to type being switch on,
             // and ensure that value is a compile-time constant
@@ -1702,7 +1702,7 @@ namespace Slang
             stmt->expr = expr;
             stmt->parentStmt = switchStmt;
         }
-        void visit(DefaultStmt* stmt)
+        void visitDefaultStmt(DefaultStmt* stmt)
         {
             auto switchStmt = FindOuterStmt<SwitchStmt>();
             if (!switchStmt)
@@ -1711,30 +1711,30 @@ namespace Slang
             }
             stmt->parentStmt = switchStmt;
         }
-        void visit(IfStatementSyntaxNode *stmt)
+        void visitIfStatementSyntaxNode(IfStatementSyntaxNode *stmt)
         {
             stmt->Predicate = checkPredicateExpr(stmt->Predicate);
             checkStmt(stmt->PositiveStatement);
             checkStmt(stmt->NegativeStatement);
         }
 
-        void visit(UnparsedStmt*)
+        void visitUnparsedStmt(UnparsedStmt*)
         {
             // Nothing to do
         }
 
 
-        void visit(EmptyStatementSyntaxNode*)
+        void visitEmptyStatementSyntaxNode(EmptyStatementSyntaxNode*)
         {
             // Nothing to do
         }
 
-        void visit(DiscardStatementSyntaxNode*)
+        void visitDiscardStatementSyntaxNode(DiscardStatementSyntaxNode*)
         {
             // Nothing to do
         }
 
-        void visit(ReturnStatementSyntaxNode *stmt)
+        void visitReturnStatementSyntaxNode(ReturnStatementSyntaxNode *stmt)
         {
             if (!stmt->Expression)
             {
@@ -1837,7 +1837,7 @@ namespace Slang
             }
         }
 
-        void visit(Variable* varDecl)
+        void visitVariable(Variable* varDecl)
         {
             TypeExp typeExp = CheckUsableType(varDecl->Type);
 #if 0
@@ -1887,19 +1887,19 @@ namespace Slang
             varDecl->SetCheckState(DeclCheckState::Checked);
         }
 
-        void visit(WhileStatementSyntaxNode *stmt)
+        void visitWhileStatementSyntaxNode(WhileStatementSyntaxNode *stmt)
         {
             PushOuterStmt(stmt);
             stmt->Predicate = checkPredicateExpr(stmt->Predicate);
             checkStmt(stmt->Statement);
             PopOuterStmt(stmt);
         }
-        void visit(ExpressionStatementSyntaxNode *stmt)
+        void visitExpressionStatementSyntaxNode(ExpressionStatementSyntaxNode *stmt)
         {
             stmt->Expression = CheckExpr(stmt->Expression);
         }
 
-        RefPtr<ExpressionSyntaxNode> visit(ConstantExpressionSyntaxNode *expr)
+        RefPtr<ExpressionSyntaxNode> visitConstantExpressionSyntaxNode(ConstantExpressionSyntaxNode *expr)
         {
             // The expression might already have a type, determined by its suffix
             if(expr->Type.type)
@@ -2216,7 +2216,7 @@ namespace Slang
             return DeclRefType::Create(declRef)->As<VectorExpressionType>();
         }
 
-        RefPtr<ExpressionSyntaxNode> visit(IndexExpressionSyntaxNode* subscriptExpr)
+        RefPtr<ExpressionSyntaxNode> visitIndexExpressionSyntaxNode(IndexExpressionSyntaxNode* subscriptExpr)
         {
             auto baseExpr = subscriptExpr->BaseExpression;
             baseExpr = CheckExpr(baseExpr);
@@ -2421,7 +2421,7 @@ namespace Slang
 
         //
 
-        RefPtr<ExpressionSyntaxNode> visit(AssignExpr* expr)
+        RefPtr<ExpressionSyntaxNode> visitAssignExpr(AssignExpr* expr)
         {
             expr->left = CheckExpr(expr->left);
 
@@ -2440,7 +2440,7 @@ namespace Slang
 
         //
 
-        void visit(ExtensionDecl* decl)
+        void visitExtensionDecl(ExtensionDecl* decl)
         {
             if (decl->IsChecked(DeclCheckState::Checked)) return;
 
@@ -2483,7 +2483,7 @@ namespace Slang
             decl->SetCheckState(DeclCheckState::Checked);
         }
 
-        void visit(ConstructorDecl* decl)
+        void visitConstructorDecl(ConstructorDecl* decl)
         {
             if (decl->IsChecked(DeclCheckState::Checked)) return;
             decl->SetCheckState(DeclCheckState::CheckingHeader);
@@ -2499,7 +2499,7 @@ namespace Slang
         }
 
 
-        void visit(SubscriptDecl* decl)
+        void visitSubscriptDecl(SubscriptDecl* decl)
         {
             if (decl->IsChecked(DeclCheckState::Checked)) return;
             decl->SetCheckState(DeclCheckState::CheckingHeader);
@@ -2516,7 +2516,7 @@ namespace Slang
             decl->SetCheckState(DeclCheckState::Checked);
         }
 
-        void visit(AccessorDecl* decl)
+        void visitAccessorDecl(AccessorDecl* decl)
         {
             // TODO: check the body!
 
@@ -4369,7 +4369,7 @@ namespace Slang
             }
         }
 
-        RefPtr<ExpressionSyntaxNode> visit(GenericAppExpr * genericAppExpr)
+        RefPtr<ExpressionSyntaxNode> visitGenericAppExpr(GenericAppExpr * genericAppExpr)
         {
             // We are applying a generic to arguments, but there might be multiple generic
             // declarations with the same name, so this becomes a specialized case of
@@ -4520,7 +4520,7 @@ namespace Slang
 #endif
         }
 
-        RefPtr<ExpressionSyntaxNode> visit(SharedTypeExpr* expr)
+        RefPtr<ExpressionSyntaxNode> visitSharedTypeExpr(SharedTypeExpr* expr)
         {
             if (!expr->Type.Ptr())
             {
@@ -4578,7 +4578,7 @@ namespace Slang
             return rs;
         }
 
-        RefPtr<ExpressionSyntaxNode> visit(InvokeExpressionSyntaxNode *expr)
+        RefPtr<ExpressionSyntaxNode> visitInvokeExpressionSyntaxNode(InvokeExpressionSyntaxNode *expr)
         {
             // check the base expression first
             expr->FunctionExpr = CheckExpr(expr->FunctionExpr);
@@ -4593,7 +4593,7 @@ namespace Slang
         }
 
 
-        RefPtr<ExpressionSyntaxNode> visit(VarExpressionSyntaxNode *expr)
+        RefPtr<ExpressionSyntaxNode> visitVarExpressionSyntaxNode(VarExpressionSyntaxNode *expr)
         {
             // If we've already resolved this expression, don't try again.
             if (expr->declRef)
@@ -4615,7 +4615,7 @@ namespace Slang
             return expr;
         }
 
-        RefPtr<ExpressionSyntaxNode> visit(TypeCastExpressionSyntaxNode * expr)
+        RefPtr<ExpressionSyntaxNode> visitTypeCastExpressionSyntaxNode(TypeCastExpressionSyntaxNode * expr)
         {
             expr->Expression = CheckTerm(expr->Expression);
             auto targetType = CheckProperType(expr->TargetType);
@@ -4694,19 +4694,19 @@ namespace Slang
         // deal with this cases here, even if they are no-ops.
         //
 
-        RefPtr<ExpressionSyntaxNode> visit(DerefExpr* expr)
+        RefPtr<ExpressionSyntaxNode> visitDerefExpr(DerefExpr* expr)
         {
             assert(!"unexpected");
             return expr;
         }
 
-        RefPtr<ExpressionSyntaxNode> visit(SwizzleExpr* expr)
+        RefPtr<ExpressionSyntaxNode> visitSwizzleExpr(SwizzleExpr* expr)
         {
             assert(!"unexpected");
             return expr;
         }
 
-        RefPtr<ExpressionSyntaxNode> visit(OverloadedExpr* expr)
+        RefPtr<ExpressionSyntaxNode> visitOverloadedExpr(OverloadedExpr* expr)
         {
             assert(!"unexpected");
             return expr;
@@ -4850,7 +4850,7 @@ namespace Slang
         }
 
 
-        RefPtr<ExpressionSyntaxNode> visit(MemberExpressionSyntaxNode * expr)
+        RefPtr<ExpressionSyntaxNode> visitMemberExpressionSyntaxNode(MemberExpressionSyntaxNode * expr)
         {
             expr->BaseExpression = CheckExpr(expr->BaseExpression);
 
@@ -4949,7 +4949,7 @@ namespace Slang
 
         //
 
-        RefPtr<ExpressionSyntaxNode> visit(InitializerListExpr* expr)
+        RefPtr<ExpressionSyntaxNode> visitInitializerListExpr(InitializerListExpr* expr)
         {
             // When faced with an initializer list, we first just check the sub-expressions blindly.
             // Actually making them conform to a desired type will wait for when we know the desired
@@ -4995,12 +4995,12 @@ namespace Slang
             }
         }
 
-        void visit(EmptyDecl* /*decl*/)
+        void visitEmptyDecl(EmptyDecl* /*decl*/)
         {
             // nothing to do
         }
 
-        void visit(ImportDecl* decl)
+        void visitImportDecl(ImportDecl* decl)
         {
             if(decl->IsChecked(DeclCheckState::Checked))
                 return;
