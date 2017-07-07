@@ -755,7 +755,7 @@ static void emitCallExpr(
                         char d = *cursor++;
                         assert(('0' <= d) && (d <= '9'));
 
-                        int argIndex = d - '0';
+                        UInt argIndex = d - '0';
                         assert((0 <= argIndex) && (argIndex < argCount));
                         Emit(context, "(");
                         EmitExpr(context, callExpr->Arguments[argIndex]);
