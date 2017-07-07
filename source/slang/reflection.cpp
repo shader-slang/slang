@@ -100,6 +100,14 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
     {
         return SLANG_TYPE_KIND_CONSTANT_BUFFER;
     }
+    else if (type->As<TextureBufferType>())
+    {
+        return SLANG_TYPE_KIND_TEXTURE_BUFFER;
+    }
+    else if (type->As<GLSLShaderStorageBufferType>())
+    {
+        return SLANG_TYPE_KIND_SHADER_STORAGE_BUFFER;
+    }
     else if (auto samplerStateType = type->As<SamplerStateType>())
     {
         return SLANG_TYPE_KIND_SAMPLER_STATE;
@@ -1049,6 +1057,24 @@ static void emitReflectionTypeInfoJSON(
             type->getElementType());
         break;
 
+    case SLANG_TYPE_KIND_TEXTURE_BUFFER:
+        write(writer, "\"kind\": \"textureBuffer\"");
+        write(writer, ",\n");
+        write(writer, "\"elementType\": ");
+        emitReflectionTypeJSON(
+            writer,
+            type->getElementType());
+        break;
+
+    case SLANG_TYPE_KIND_SHADER_STORAGE_BUFFER:
+        write(writer, "\"kind\": \"shaderStorageBuffer\"");
+        write(writer, ",\n");
+        write(writer, "\"elementType\": ");
+        emitReflectionTypeJSON(
+            writer,
+            type->getElementType());
+        break;
+
     case SLANG_TYPE_KIND_SCALAR:
         write(writer, "\"kind\": \"scalar\"");
         write(writer, ",\n");
@@ -1184,6 +1210,23 @@ static void emitReflectionTypeLayoutInfoJSON(
             typeLayout->getElementTypeLayout());
         break;
 
+    case SLANG_TYPE_KIND_TEXTURE_BUFFER:
+        write(writer, "\"kind\": \"textureBuffer\"");
+        write(writer, ",\n");
+        write(writer, "\"elementType\": ");
+        emitReflectionTypeLayoutJSON(
+            writer,
+            typeLayout->getElementTypeLayout());
+        break;
+
+    case SLANG_TYPE_KIND_SHADER_STORAGE_BUFFER:
+        write(writer, "\"kind\": \"shaderStorageBuffer\"");
+        write(writer, ",\n");
+        write(writer, "\"elementType\": ");
+        emitReflectionTypeLayoutJSON(
+            writer,
+            typeLayout->getElementTypeLayout());
+        break;
     }
 
     // TODO: emit size info for types
