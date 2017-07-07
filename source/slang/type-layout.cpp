@@ -163,10 +163,11 @@ struct Std140LayoutRulesImpl : GLSLConstantBufferLayoutRulesImpl
     SimpleLayoutInfo GetVectorLayout(SimpleLayoutInfo elementInfo, size_t elementCount) override
     {
         assert(elementInfo.kind == LayoutResourceKind::Uniform);
+        auto size = elementInfo.size * elementCount;
         SimpleLayoutInfo vectorInfo(
             LayoutResourceKind::Uniform,
-            elementInfo.size * elementCount,
-            RoundUpToPowerOfTwo(elementInfo.size * elementInfo.alignment));
+            size,
+            RoundUpToPowerOfTwo(size));
         return vectorInfo;
     }
 };
