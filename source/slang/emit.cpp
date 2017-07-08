@@ -84,6 +84,194 @@ static String getStringOrIdentifierTokenValue(
 }
 
 
+enum EPrecedence
+{
+#define LEFT(NAME)                      \
+    kEPrecedence_##NAME##_Left,     \
+    kEPrecedence_##NAME##_Right
+
+#define RIGHT(NAME)                     \
+    kEPrecedence_##NAME##_Right,    \
+    kEPrecedence_##NAME##_Left
+
+#define NONASSOC(NAME)                  \
+    kEPrecedence_##NAME##_Left,     \
+    kEPrecedence_##NAME##_Right = kEPrecedence_##NAME##_Left
+
+    NONASSOC(None),
+    LEFT(Comma),
+
+    NONASSOC(General),
+
+    RIGHT(Assign),
+
+    RIGHT(Conditional),
+
+    LEFT(Or),
+    LEFT(And),
+    LEFT(BitOr),
+    LEFT(BitXor),
+    LEFT(BitAnd),
+
+    LEFT(Equality),
+    LEFT(Relational),
+    LEFT(Shift),
+    LEFT(Additive),
+    LEFT(Multiplicative),
+    RIGHT(Prefix),
+    LEFT(Postfix),
+    NONASSOC(Atomic),
+
+#if 0
+
+    kEPrecedence_None,
+    kEPrecedence_Comma,
+
+    kEPrecedence_Assign,
+    kEPrecedence_AddAssign = kEPrecedence_Assign,
+    kEPrecedence_SubAssign = kEPrecedence_Assign,
+    kEPrecedence_MulAssign = kEPrecedence_Assign,
+    kEPrecedence_DivAssign = kEPrecedence_Assign,
+    kEPrecedence_ModAssign = kEPrecedence_Assign,
+    kEPrecedence_LshAssign = kEPrecedence_Assign,
+    kEPrecedence_RshAssign = kEPrecedence_Assign,
+    kEPrecedence_OrAssign = kEPrecedence_Assign,
+    kEPrecedence_AndAssign = kEPrecedence_Assign,
+    kEPrecedence_XorAssign = kEPrecedence_Assign,
+
+    kEPrecedence_General = kEPrecedence_Assign,
+
+    kEPrecedence_Conditional, // "ternary"
+    kEPrecedence_Or,
+    kEPrecedence_And,
+    kEPrecedence_BitOr,
+    kEPrecedence_BitXor,
+    kEPrecedence_BitAnd,
+
+    kEPrecedence_Eql,
+    kEPrecedence_Neq = kEPrecedence_Eql,
+
+    kEPrecedence_Less,
+    kEPrecedence_Greater = kEPrecedence_Less,
+    kEPrecedence_Leq = kEPrecedence_Less,
+    kEPrecedence_Geq = kEPrecedence_Less,
+
+    kEPrecedence_Lsh,
+    kEPrecedence_Rsh = kEPrecedence_Lsh,
+
+    kEPrecedence_Add,
+    kEPrecedence_Sub = kEPrecedence_Add,
+
+    kEPrecedence_Mul,
+    kEPrecedence_Div = kEPrecedence_Mul,
+    kEPrecedence_Mod = kEPrecedence_Mul,
+
+    kEPrecedence_Prefix,
+    kEPrecedence_Postfix,
+    kEPrecedence_Atomic = kEPrecedence_Postfix
+
+#endif
+
+};
+
+// Info on an op for emit purposes
+struct EOpInfo
+{
+    char const* op;
+    EPrecedence leftPrecedence;
+    EPrecedence rightPrecedence;
+};
+
+#define OP(NAME, TEXT, PREC) \
+static const EOpInfo kEOp_##NAME = { TEXT, kEPrecedence_##PREC##_Left, kEPrecedence_##PREC##_Right, }
+
+OP(None,        "",     None);
+
+OP(Comma,       ",",    Comma);
+
+OP(General,     "",     General);
+
+OP(Assign,      "=",    Assign);
+OP(AddAssign,   "+=",   Assign);
+OP(SubAssign,   "-=",   Assign);
+OP(MulAssign,   "*=",   Assign);
+OP(DivAssign,   "/=",   Assign);
+OP(ModAssign,   "%=",   Assign);
+OP(LshAssign,   "<<=",  Assign);
+OP(RshAssign,   ">>=",  Assign);
+OP(OrAssign,    "|=",   Assign);
+OP(AndAssign,   "&=",   Assign);
+OP(XorAssign,   "^=",   Assign);
+
+OP(Conditional, "?:",   Conditional);
+
+OP(Or,          "||",   Or);
+OP(And,         "&&",   And);
+OP(BitOr,       "|",    BitOr);
+OP(BitXor,      "^",    BitXor);
+OP(BitAnd,      "&",    BitAnd);
+
+OP(Eql,         "==",   Equality);
+OP(Neq,         "!=",   Equality);
+
+OP(Less,        "<",    Relational);
+OP(Greater,     ">",    Relational);
+OP(Leq,         "<=",   Relational);
+OP(Geq,         ">=",   Relational);
+
+OP(Lsh,         "<<",   Shift);
+OP(Rsh,         ">>",   Shift);
+
+OP(Add,         "+",    Additive);
+OP(Sub,         "-",    Additive);
+
+OP(Mul,         "*",    Multiplicative);
+OP(Div,         "/",    Multiplicative);
+OP(Mod,         "%",    Multiplicative);
+
+OP(Prefix,      "",     Prefix);
+OP(Postfix,     "",     Postfix);
+OP(Atomic,      "",     Atomic);
+
+#undef OP
+
+// Table to allow data-driven lookup of an op based on its
+// name (to assist when outputting unchecked operator calls)
+static EOpInfo const* const kInfixOpInfos[] =
+{
+    &kEOp_Comma,
+    &kEOp_Assign,
+    &kEOp_AddAssign,
+    &kEOp_SubAssign,
+    &kEOp_MulAssign,
+    &kEOp_DivAssign,
+    &kEOp_ModAssign,
+    &kEOp_LshAssign,
+    &kEOp_RshAssign,
+    &kEOp_OrAssign,
+    &kEOp_AndAssign,
+    &kEOp_XorAssign,
+    &kEOp_Or,
+    &kEOp_And,
+    &kEOp_BitOr,
+    &kEOp_BitXor,
+    &kEOp_BitAnd,
+    &kEOp_Eql,
+    &kEOp_Neq,
+    &kEOp_Less,
+    &kEOp_Greater,
+    &kEOp_Leq,
+    &kEOp_Geq,
+    &kEOp_Lsh,
+    &kEOp_Rsh,
+    &kEOp_Add,
+    &kEOp_Sub,
+    &kEOp_Mul,
+    &kEOp_Div,
+    &kEOp_Mod,
+};
+
+
 //
 
 // represents a declarator for use in emitting types
@@ -113,7 +301,7 @@ struct TypeEmitArg
 
 struct ExprEmitArg
 {
-    int outerPrec;
+    EOpInfo outerPrec;
 };
 
 struct DeclEmitArg
@@ -989,73 +1177,30 @@ struct EmitVisitor
         return false;
     }
 
-    enum
-    {
-        kPrecedence_None,
-        kPrecedence_Comma,
-
-        kPrecedence_Assign,
-        kPrecedence_AddAssign = kPrecedence_Assign,
-        kPrecedence_SubAssign = kPrecedence_Assign,
-        kPrecedence_MulAssign = kPrecedence_Assign,
-        kPrecedence_DivAssign = kPrecedence_Assign,
-        kPrecedence_ModAssign = kPrecedence_Assign,
-        kPrecedence_LshAssign = kPrecedence_Assign,
-        kPrecedence_RshAssign = kPrecedence_Assign,
-        kPrecedence_OrAssign = kPrecedence_Assign,
-        kPrecedence_AndAssign = kPrecedence_Assign,
-        kPrecedence_XorAssign = kPrecedence_Assign,
-
-        kPrecedence_General = kPrecedence_Assign,
-
-        kPrecedence_Conditional, // "ternary"
-        kPrecedence_Or,
-        kPrecedence_And,
-        kPrecedence_BitOr,
-        kPrecedence_BitXor,
-        kPrecedence_BitAnd,
-
-        kPrecedence_Eql,
-        kPrecedence_Neq = kPrecedence_Eql,
-
-        kPrecedence_Less,
-        kPrecedence_Greater = kPrecedence_Less,
-        kPrecedence_Leq = kPrecedence_Less,
-        kPrecedence_Geq = kPrecedence_Less,
-
-        kPrecedence_Lsh,
-        kPrecedence_Rsh = kPrecedence_Lsh,
-
-        kPrecedence_Add,
-        kPrecedence_Sub = kPrecedence_Add,
-
-        kPrecedence_Mul,
-        kPrecedence_Div = kPrecedence_Mul,
-        kPrecedence_Mod = kPrecedence_Mul,
-
-        kPrecedence_Prefix,
-        kPrecedence_Postfix,
-        kPrecedence_Atomic = kPrecedence_Postfix
-    };
-
+#if 0
     void EmitPostfixExpr(RefPtr<ExpressionSyntaxNode> expr)
     {
-        EmitExprWithPrecedence(expr, kPrecedence_Postfix);
+        EmitExprWithPrecedence(expr, kEOp_Postfix);
     }
+#endif
 
     void EmitExpr(RefPtr<ExpressionSyntaxNode> expr)
     {
-        EmitExprWithPrecedence(expr, kPrecedence_General);
+        EmitExprWithPrecedence(expr, kEOp_General);
     }
 
-    bool MaybeEmitParens(int outerPrec, int prec)
+    bool MaybeEmitParens(EOpInfo& outerPrec, EOpInfo prec)
     {
-        if (prec <= outerPrec)
+        bool needParens = (prec.leftPrecedence <= outerPrec.leftPrecedence)
+            || (prec.rightPrecedence <= outerPrec.rightPrecedence);
+
+        if (needParens)
         {
             Emit("(");
-            return true;
+
+            outerPrec = kEOp_None;
         }
-        return false;
+        return needParens;
     }
 
     // When we are going to emit an expression in an l-value context,
@@ -1081,8 +1226,8 @@ struct EmitVisitor
     }
 
     void emitInfixExprImpl(
-        int outerPrec,
-        int prec,
+        EOpInfo outerPrec,
+        EOpInfo prec,
         char const* op,
         RefPtr<InvokeExpressionSyntaxNode> binExpr,
         bool isAssign)
@@ -1095,30 +1240,30 @@ struct EmitVisitor
             left = prepareLValueExpr(left);
         }
 
-        EmitExprWithPrecedence(left, prec);
+        EmitExprWithPrecedence(left, leftSide(outerPrec, prec));
         Emit(" ");
         Emit(op);
         Emit(" ");
-        EmitExprWithPrecedence(binExpr->Arguments[1], prec);
+        EmitExprWithPrecedence(binExpr->Arguments[1], rightSide(prec, outerPrec));
         if (needsClose)
         {
             Emit(")");
         }
     }
 
-    void EmitBinExpr(int outerPrec, int prec, char const* op, RefPtr<InvokeExpressionSyntaxNode> binExpr)
+    void EmitBinExpr(EOpInfo outerPrec, EOpInfo prec, char const* op, RefPtr<InvokeExpressionSyntaxNode> binExpr)
     {
         emitInfixExprImpl(outerPrec, prec, op, binExpr, false);
     }
 
-    void EmitBinAssignExpr(int outerPrec, int prec, char const* op, RefPtr<InvokeExpressionSyntaxNode> binExpr)
+    void EmitBinAssignExpr(EOpInfo outerPrec, EOpInfo prec, char const* op, RefPtr<InvokeExpressionSyntaxNode> binExpr)
     {
         emitInfixExprImpl(outerPrec, prec, op, binExpr, true);
     }
 
     void emitUnaryExprImpl(
-        int outerPrec,
-        int prec,
+        EOpInfo outerPrec,
+        EOpInfo prec,
         char const* preOp,
         char const* postOp,
         RefPtr<InvokeExpressionSyntaxNode> expr,
@@ -1133,7 +1278,16 @@ struct EmitVisitor
             arg = prepareLValueExpr(arg);
         }
 
-        EmitExprWithPrecedence(arg, prec);
+        if (preOp)
+        {
+            EmitExprWithPrecedence(arg, rightSide(prec, outerPrec));
+        }
+        else
+        {
+            assert(postOp);
+            EmitExprWithPrecedence(arg, leftSide(outerPrec, prec));
+        }
+
         Emit(postOp);
         if (needsClose)
         {
@@ -1142,8 +1296,8 @@ struct EmitVisitor
     }
 
     void EmitUnaryExpr(
-        int outerPrec,
-        int prec,
+        EOpInfo outerPrec,
+        EOpInfo prec,
         char const* preOp,
         char const* postOp,
         RefPtr<InvokeExpressionSyntaxNode> expr)
@@ -1152,8 +1306,8 @@ struct EmitVisitor
     }
 
     void EmitUnaryAssignExpr(
-        int outerPrec,
-        int prec,
+        EOpInfo outerPrec,
+        EOpInfo prec,
         char const* preOp,
         char const* postOp,
         RefPtr<InvokeExpressionSyntaxNode> expr)
@@ -1216,9 +1370,10 @@ struct EmitVisitor
     // just an expression of the form `f(a0, a1, ...)`
     void emitSimpleCallExpr(
         RefPtr<InvokeExpressionSyntaxNode>  callExpr,
-        int                                 outerPrec)
+        EOpInfo                             outerPrec)
     {
-        bool needClose = MaybeEmitParens(outerPrec, kPrecedence_Postfix);
+        auto prec = kEOp_Postfix;
+        bool needClose = MaybeEmitParens(outerPrec, prec);
 
         auto funcExpr = callExpr->FunctionExpr;
         if (auto funcDeclRefExpr = funcExpr.As<DeclRefExpr>())
@@ -1232,13 +1387,13 @@ struct EmitVisitor
             else
             {
                 // default case: just emit the decl ref
-                EmitExpr(funcExpr);
+                EmitExprWithPrecedence(funcExpr, leftSide(outerPrec, prec));
             }
         }
         else
         {
             // default case: just emit the expression
-            EmitPostfixExpr(funcExpr);
+            EmitExprWithPrecedence(funcExpr, leftSide(outerPrec, prec));
         }
 
         Emit("(");
@@ -1283,13 +1438,37 @@ struct EmitVisitor
         emit("\"");
     }
 
-    void EmitExprWithPrecedence(RefPtr<ExpressionSyntaxNode> expr, int outerPrec)
+    EOpInfo leftSide(EOpInfo const& outerPrec, EOpInfo const& prec)
+    {
+        EOpInfo result;
+        result.leftPrecedence = outerPrec.leftPrecedence;
+        result.rightPrecedence = prec.leftPrecedence;
+        return result;
+    }
+
+    EOpInfo rightSide(EOpInfo const& prec, EOpInfo const& outerPrec)
+    {
+        EOpInfo result;
+        result.leftPrecedence = prec.rightPrecedence;
+        result.rightPrecedence = outerPrec.rightPrecedence;
+        return result;
+    }
+
+    void EmitExprWithPrecedence(RefPtr<ExpressionSyntaxNode> expr, EOpInfo outerPrec)
     {
         ExprEmitArg arg;
         arg.outerPrec = outerPrec;
 
         ExprVisitorWithArg::dispatch(expr, arg);
     }
+
+    void EmitExprWithPrecedence(RefPtr<ExpressionSyntaxNode> expr, EPrecedence leftPrec, EPrecedence rightPrec)
+    {
+        EOpInfo outerPrec;
+        outerPrec.leftPrecedence = leftPrec;
+        outerPrec.rightPrecedence = rightPrec;
+    }
+
 
 #define UNEXPECTED(NAME)                        \
     void visit##NAME(NAME*, ExprEmitArg const&) \
@@ -1299,39 +1478,43 @@ struct EmitVisitor
 
 #undef UNEXPECTED
 
-    void visitSharedTypeExpr(SharedTypeExpr* expr, ExprEmitArg const& arg)
+    void visitSharedTypeExpr(SharedTypeExpr* expr, ExprEmitArg const&)
     {
         emitTypeExp(expr->base);
     }
 
     void visitSelectExpressionSyntaxNode(SelectExpressionSyntaxNode* selectExpr, ExprEmitArg const& arg)
     {
+        auto prec = kEOp_Conditional;
         auto outerPrec = arg.outerPrec;
-        bool needClose = MaybeEmitParens(outerPrec, kPrecedence_Conditional);
+        bool needClose = MaybeEmitParens(outerPrec, kEOp_Conditional);
 
-        EmitExprWithPrecedence(selectExpr->Arguments[0], kPrecedence_Conditional);
+        // TODO(tfoley): Need to ver the precedence here...
+
+        EmitExprWithPrecedence(selectExpr->Arguments[0], leftSide(outerPrec, prec));
         Emit(" ? ");
-        EmitExprWithPrecedence(selectExpr->Arguments[1], kPrecedence_Conditional);
+        EmitExprWithPrecedence(selectExpr->Arguments[1], prec);
         Emit(" : ");
-        EmitExprWithPrecedence(selectExpr->Arguments[2], kPrecedence_Conditional);
+        EmitExprWithPrecedence(selectExpr->Arguments[2], rightSide(prec, outerPrec));
 
         if(needClose) Emit(")");
     }
 
-    void visitParenExpr(ParenExpr* expr, ExprEmitArg const& arg)
+    void visitParenExpr(ParenExpr* expr, ExprEmitArg const&)
     {
         Emit("(");
-        EmitExpr(expr->base);
+        EmitExprWithPrecedence(expr->base, kEOp_None);
         Emit(")");
     }
 
     void visitAssignExpr(AssignExpr* assignExpr, ExprEmitArg const& arg)
     {
+        auto prec = kEOp_Assign;
         auto outerPrec = arg.outerPrec;
-        bool needClose = MaybeEmitParens(outerPrec, kPrecedence_Assign);
-        EmitExprWithPrecedence(assignExpr->left, kPrecedence_Assign);
+        bool needClose = MaybeEmitParens(outerPrec, prec);
+        EmitExprWithPrecedence(assignExpr->left, leftSide(outerPrec, prec));
         Emit(" = ");
-        EmitExprWithPrecedence(assignExpr->right, kPrecedence_Assign);
+        EmitExprWithPrecedence(assignExpr->right, rightSide(prec, outerPrec));
         if(needClose) Emit(")");
     }
 
@@ -1348,9 +1531,19 @@ struct EmitVisitor
         // ahead and emit things in the form that they were written.
         if( auto infixExpr = callExpr.As<InfixExpr>() )
         {
+            auto prec = kEOp_Comma;
+            for (auto opInfo : kInfixOpInfos)
+            {
+                if (funcName == opInfo->op)
+                {
+                    prec = *opInfo;
+                    break;
+                }
+            }
+
             EmitBinExpr(
                 outerPrec,
-                kPrecedence_Comma,
+                prec,
                 funcName.Buffer(),
                 callExpr);
         }
@@ -1358,7 +1551,7 @@ struct EmitVisitor
         {
             EmitUnaryExpr(
                 outerPrec,
-                kPrecedence_Prefix,
+                kEOp_Prefix,
                 funcName.Buffer(),
                 "",
                 callExpr);
@@ -1367,16 +1560,15 @@ struct EmitVisitor
         {
             EmitUnaryExpr(
                 outerPrec,
-                kPrecedence_Postfix,
+                kEOp_Postfix,
                 "",
                 funcName.Buffer(),
                 callExpr);
         }
         else
         {
-            bool needClose = MaybeEmitParens(outerPrec, kPrecedence_Postfix);
+            bool needClose = MaybeEmitParens(outerPrec, kEOp_Postfix);
 
-            auto funcExpr = callExpr->FunctionExpr;
             EmitExpr(funcExpr);
 
             Emit("(");
@@ -1413,7 +1605,7 @@ struct EmitVisitor
             {
                 switch (intrinsicOpModifier->op)
                 {
-    #define CASE(NAME, OP) case IntrinsicOp::NAME: EmitBinExpr(outerPrec, kPrecedence_##NAME, #OP, callExpr); return
+    #define CASE(NAME, OP) case IntrinsicOp::NAME: EmitBinExpr(outerPrec, kEOp_##NAME, #OP, callExpr); return
                 CASE(Mul, *);
                 CASE(Div, / );
                 CASE(Mod, %);
@@ -1434,7 +1626,7 @@ struct EmitVisitor
                 CASE(Or, || );
     #undef CASE
 
-    #define CASE(NAME, OP) case IntrinsicOp::NAME: EmitBinAssignExpr(outerPrec, kPrecedence_##NAME, #OP, callExpr); return
+    #define CASE(NAME, OP) case IntrinsicOp::NAME: EmitBinAssignExpr(outerPrec, kEOp_##NAME, #OP, callExpr); return
                 CASE(Assign, =);
                 CASE(AddAssign, +=);
                 CASE(SubAssign, -=);
@@ -1448,21 +1640,21 @@ struct EmitVisitor
                 CASE(XorAssign, ^=);
     #undef CASE
 
-            case IntrinsicOp::Sequence: EmitBinExpr(outerPrec, kPrecedence_Comma, ",", callExpr); return;
+            case IntrinsicOp::Sequence: EmitBinExpr(outerPrec, kEOp_Comma, ",", callExpr); return;
 
-    #define CASE(NAME, OP) case IntrinsicOp::NAME: EmitUnaryExpr(outerPrec, kPrecedence_Prefix, #OP, "", callExpr); return
+    #define CASE(NAME, OP) case IntrinsicOp::NAME: EmitUnaryExpr(outerPrec, kEOp_Prefix, #OP, "", callExpr); return
                 CASE(Pos, +);
                 CASE(Neg, -);
                 CASE(Not, !);
                 CASE(BitNot, ~);
     #undef CASE
 
-    #define CASE(NAME, OP) case IntrinsicOp::NAME: EmitUnaryAssignExpr(outerPrec, kPrecedence_Prefix, #OP, "", callExpr); return
+    #define CASE(NAME, OP) case IntrinsicOp::NAME: EmitUnaryAssignExpr(outerPrec, kEOp_Prefix, #OP, "", callExpr); return
                 CASE(PreInc, ++);
                 CASE(PreDec, --);
     #undef CASE
 
-    #define CASE(NAME, OP) case IntrinsicOp::NAME: EmitUnaryAssignExpr(outerPrec, kPrecedence_Postfix, "", #OP, callExpr); return
+    #define CASE(NAME, OP) case IntrinsicOp::NAME: EmitUnaryAssignExpr(outerPrec, kEOp_Postfix, "", #OP, callExpr); return
                 CASE(PostInc, ++);
                 CASE(PostDec, --);
     #undef CASE
@@ -1661,8 +1853,9 @@ struct EmitVisitor
 
     void visitMemberExpressionSyntaxNode(MemberExpressionSyntaxNode* memberExpr, ExprEmitArg const& arg)
     {
+        auto prec = kEOp_Postfix;
         auto outerPrec = arg.outerPrec;
-        bool needClose = MaybeEmitParens(outerPrec, kPrecedence_Postfix);
+        bool needClose = MaybeEmitParens(outerPrec, prec);
 
         // TODO(tfoley): figure out a good way to reference
         // declarations that might be generic and/or might
@@ -1678,7 +1871,7 @@ struct EmitVisitor
         }
         else
         {
-            EmitExprWithPrecedence(memberExpr->BaseExpression, kPrecedence_Postfix);
+            EmitExprWithPrecedence(memberExpr->BaseExpression, leftSide(outerPrec, prec));
             Emit(".");
         }
 
@@ -1698,10 +1891,11 @@ struct EmitVisitor
 
     void visitSwizzleExpr(SwizzleExpr* swizExpr, ExprEmitArg const& arg)
     {
+        auto prec = kEOp_Postfix;
         auto outerPrec = arg.outerPrec;
-        bool needClose = MaybeEmitParens(outerPrec, kPrecedence_Postfix);
+        bool needClose = MaybeEmitParens(outerPrec, prec);
 
-        EmitExprWithPrecedence(swizExpr->base, kPrecedence_Postfix);
+        EmitExprWithPrecedence(swizExpr->base, leftSide(outerPrec, prec));
         Emit(".");
         static const char* kComponentNames[] = { "x", "y", "z", "w" };
         int elementCount = swizExpr->elementCount;
@@ -1715,10 +1909,11 @@ struct EmitVisitor
 
     void visitIndexExpressionSyntaxNode(IndexExpressionSyntaxNode* subscriptExpr, ExprEmitArg const& arg)
     {
+        auto prec = kEOp_Postfix;
         auto outerPrec = arg.outerPrec;
-        bool needClose = MaybeEmitParens(outerPrec, kPrecedence_Postfix);
+        bool needClose = MaybeEmitParens(outerPrec, prec);
 
-        EmitExprWithPrecedence(subscriptExpr->BaseExpression, kPrecedence_Postfix);
+        EmitExprWithPrecedence(subscriptExpr->BaseExpression, leftSide(outerPrec, prec));
         Emit("[");
         if (auto indexExpr = subscriptExpr->IndexExpression)
         {
@@ -1729,14 +1924,16 @@ struct EmitVisitor
         if(needClose) Emit(")");
     }
 
-    void visitOverloadedExpr(OverloadedExpr* expr, ExprEmitArg const& arg)
+    void visitOverloadedExpr(OverloadedExpr* expr, ExprEmitArg const&)
     {
         emitName(expr->lookupResult2.getName());
     }
 
     void visitVarExpressionSyntaxNode(VarExpressionSyntaxNode* varExpr, ExprEmitArg const& arg)
     {
-        bool needClose = MaybeEmitParens(arg.outerPrec, kPrecedence_Atomic);
+        auto prec = kEOp_Atomic;
+        auto outerPrec = arg.outerPrec;
+        bool needClose = MaybeEmitParens(outerPrec, kEOp_Atomic);
 
         // TODO: This won't be valid if we had to generate a qualified
         // reference for some reason.
@@ -1765,16 +1962,14 @@ struct EmitVisitor
 
     void visitDerefExpr(DerefExpr* derefExpr, ExprEmitArg const& arg)
     {
-        auto outerPrec = arg.outerPrec;
-
         // TODO(tfoley): dereference shouldn't always be implicit
-        EmitExprWithPrecedence(derefExpr->base, outerPrec);
+        ExprVisitorWithArg::dispatch(derefExpr->base, arg);
     }
 
     void visitConstantExpressionSyntaxNode(ConstantExpressionSyntaxNode* litExpr, ExprEmitArg const& arg)
     {
         auto outerPrec = arg.outerPrec;
-        bool needClose = MaybeEmitParens(outerPrec, kPrecedence_Atomic);
+        bool needClose = MaybeEmitParens(outerPrec, kEOp_Atomic);
 
         char const* suffix = "";
         auto type = litExpr->Type.type;
@@ -1843,7 +2038,7 @@ struct EmitVisitor
             if (dynamic_cast<ImplicitCastExpr*>(castExpr))
             {
                 // This was an implicit cast, so don't try to output it
-                EmitExprWithPrecedence(castExpr->Expression, arg.outerPrec);
+                ExprVisitorWithArg::dispatch(castExpr->Expression, arg);
                 return;
             }
         }
@@ -1862,19 +2057,23 @@ struct EmitVisitor
         default:
             // HLSL (and C/C++) prefer cast syntax
             // (In fact, HLSL doesn't allow constructor syntax for some conversions it allows as a cast)
-            needClose = MaybeEmitParens(arg.outerPrec, kPrecedence_Prefix);
+            {
+                auto prec = kEOp_Prefix;
+                auto outerPrec = arg.outerPrec;
+                needClose = MaybeEmitParens(outerPrec, prec);
 
-            Emit("(");
-            EmitType(castExpr->Type);
-            Emit(")(");
-            EmitExpr(castExpr->Expression);
-            Emit(")");
+                Emit("(");
+                EmitType(castExpr->Type);
+                Emit(")(");
+                EmitExpr(castExpr->Expression);
+                Emit(")");
+            }
             break;
         }
         if(needClose) Emit(")");
     }
 
-    void visitInitializerListExpr(InitializerListExpr* expr, ExprEmitArg const& arg)
+    void visitInitializerListExpr(InitializerListExpr* expr, ExprEmitArg const&)
     {
         Emit("{ ");
         for(auto& arg : expr->args)
