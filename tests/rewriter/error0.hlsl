@@ -4,14 +4,24 @@
 // the input code, we allow the downstream compiler
 // to detect and report the error, not us...
 
-// This file presents a simple case, where we forgot a semicolon.
+// A key goal here is that errors get reported at
+// the right source location, ideally including
+// all of file, line, and column info.
+
+// This file used to have a parse error (missing semicolon),
+// but at this point we need to parse function bodies, even
+// if we don't check them, so we can't avoid reporting that one.
+//
+// I'm switching it to a type error instead:
+
+struct S { int x; };
 
 float4 main() : SV_Target
 {
     float a = 1.0;
 
-    // no semicolon at the end of this line!
-    float b = 2.0
+    // Invalid assignment:
+    S s = a;
 
     float c = a + b;
 
