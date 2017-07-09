@@ -44,6 +44,11 @@ namespace Slang
         String fileName;
         int genericDepth = 0;
 
+        // Have we seen any `import` declarations? If so, we need
+        // to parse function bodies completely, even if we are in
+        // "rewrite" mode.
+        bool haveSeenAnyImportDecls = false;
+
         // Is the parser in a "recovering" state?
         // During recovery we don't emit additional errors, until we find
         // a token that we expected, when we exit recovery.
@@ -802,6 +807,8 @@ namespace Slang
     static RefPtr<Decl> parseImportDecl(
         Parser* parser)
     {
+        parser->haveSeenAnyImportDecls = true;
+
         parser->ReadToken("__import");
 
         auto decl = new ImportDecl();
@@ -842,6 +849,8 @@ namespace Slang
     static RefPtr<Decl> parsePoundImportDecl(
         Parser* parser)
     {
+        parser->haveSeenAnyImportDecls = true;
+
         Token importToken = parser->ReadToken(TokenType::PoundImport);
 
         auto decl = new ImportDecl();
@@ -2599,6 +2608,53 @@ namespace Slang
 
     RefPtr<StatementSyntaxNode> Parser::ParseBlockStatement()
     {
+        // If we are being asked not to check things *and* we haven't
+        // seen any `import` declarations yet, then we can safely assume
+        // that function bodies should be left as-is.
+        if( (translationUnit->compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING)
+            && !haveSeenAnyImportDecls )
+        {
+            // We have been asked to parse the input, but not attempt to understand it.
+
+            // TODO: record start/end locations...
+
+            List<Token> tokens;
+
+            ReadToken(TokenType::LBrace);
+
+            int depth = 1;
+            for( ;;)
+            {
+                switch( tokenReader.PeekTokenType() )
+                {
+                case TokenType::EndOfFile:
+                    goto done;
+
+                case TokenType::RBrace:
+                    depth--;
+                    if(depth == 0)
+                        goto done;
+                    break;
+
+                case TokenType::LBrace:
+                    depth++;
+                    break;
+
+                default:
+                    break;
+                }
+
+                auto token = tokenReader.AdvanceToken();
+                tokens.Add(token);
+            }
+        done:
+            ReadToken(TokenType::RBrace);
+
+            RefPtr<UnparsedStmt> unparsedStmt = new UnparsedStmt();
+            unparsedStmt->tokens = tokens;
+            return unparsedStmt;
+        }
+
         RefPtr<ScopeDecl> scopeDecl = new ScopeDecl();
         RefPtr<BlockStmt> blockStatement = new BlockStmt();
         blockStatement->scopeDecl = scopeDecl;

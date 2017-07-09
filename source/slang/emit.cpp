@@ -2121,6 +2121,17 @@ struct EmitVisitor
         }
     }
 
+    void EmitUnparsedStmt(RefPtr<UnparsedStmt> stmt)
+    {
+        // TODO: actually emit the tokens that made up the statement...
+        Emit("{\n");
+        for( auto& token : stmt->tokens )
+        {
+            emitTokenWithLocation(token);
+        }
+        Emit("}\n");
+    }
+
     void EmitStmt(RefPtr<StatementSyntaxNode> stmt)
     {
         // Try to ensure that debugging can find the right location
@@ -2137,6 +2148,11 @@ struct EmitVisitor
             {
                 EmitStmt(ss);
             }
+            return;
+        }
+        else if( auto unparsedStmt = stmt.As<UnparsedStmt>() )
+        {
+            EmitUnparsedStmt(unparsedStmt);
             return;
         }
         else if (auto exprStmt = stmt.As<ExpressionStatementSyntaxNode>())

@@ -688,6 +688,16 @@ struct LoweringVisitor
         addStmt(loweredStmt);
     }
 
+    void visitUnparsedStmt(UnparsedStmt* stmt)
+    {
+        RefPtr<UnparsedStmt> loweredStmt = new UnparsedStmt();
+        lowerStmtFields(loweredStmt, stmt);
+
+        loweredStmt->tokens = stmt->tokens;
+
+        addStmt(loweredStmt);
+    }
+
     void visitCaseStmt(CaseStmt* stmt)
     {
         RefPtr<CaseStmt> loweredStmt = new CaseStmt();

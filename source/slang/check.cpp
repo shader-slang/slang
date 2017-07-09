@@ -1790,6 +1790,11 @@ namespace Slang
             checkStmt(stmt->NegativeStatement);
         }
 
+        void visitUnparsedStmt(UnparsedStmt*)
+        {
+            // Nothing to do
+        }
+
         void visitEmptyStatementSyntaxNode(EmptyStatementSyntaxNode*)
         {
             // Nothing to do
