@@ -2128,6 +2128,12 @@ namespace Slang
         RefPtr<IntVal> TryConstantFoldExpr(
             ExpressionSyntaxNode* expr)
         {
+            // Unwrap any "identity" expressions
+            while (auto parenExpr = dynamic_cast<ParenExpr*>(expr))
+            {
+                expr = parenExpr->base;
+            }
+
             // TODO(tfoley): more serious constant folding here
             if (auto constExp = dynamic_cast<ConstantExpressionSyntaxNode*>(expr))
             {
