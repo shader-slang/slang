@@ -176,6 +176,7 @@ namespace Slang
         Int,
         UInt,
         UInt64,
+        Half,
         Float,
         Double,
     };
@@ -688,22 +689,6 @@ namespace Slang
         RefPtr<Scope>       endScope    = nullptr;
 
         LookupMask          mask        = LookupMask::All;
-    };
-
-    enum class Operator
-    {
-        Neg, Not, BitNot, PreInc, PreDec, PostInc, PostDec,
-        Mul, Div, Mod,
-        Add, Sub,
-        Lsh, Rsh,
-        Eql, Neq, Greater, Less, Geq, Leq,
-        BitAnd, BitXor, BitOr,
-        And,
-        Or,
-        Sequence,
-        Select,
-        Assign = 200, AddAssign, SubAssign, MulAssign, DivAssign, ModAssign,
-        LshAssign, RshAssign, OrAssign, AndAssign, XorAssign,
     };
 
     // Generate class definition for all syntax classes

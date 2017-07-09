@@ -44,6 +44,11 @@ namespace Slang
         String fileName;
         int genericDepth = 0;
 
+        // Have we seen any `import` declarations? If so, we need
+        // to parse function bodies completely, even if we are in
+        // "rewrite" mode.
+        bool haveSeenAnyImportDecls = false;
+
         // Is the parser in a "recovering" state?
         // During recovery we don't emit additional errors, until we find
         // a token that we expected, when we exit recovery.
@@ -802,6 +807,8 @@ namespace Slang
     static RefPtr<Decl> parseImportDecl(
         Parser* parser)
     {
+        parser->haveSeenAnyImportDecls = true;
+
         parser->ReadToken("__import");
 
         auto decl = new ImportDecl();
@@ -842,6 +849,8 @@ namespace Slang
     static RefPtr<Decl> parsePoundImportDecl(
         Parser* parser)
     {
+        parser->haveSeenAnyImportDecls = true;
+
         Token importToken = parser->ReadToken(TokenType::PoundImport);
 
         auto decl = new ImportDecl();
@@ -1392,6 +1401,28 @@ namespace Slang
         return genericApp;
     }
 
+    // Parse option `[]` braces after a type expression, that indicate an array type
+    static RefPtr<ExpressionSyntaxNode> parsePostfixTypeSuffix(
+        Parser* parser,
+        RefPtr<ExpressionSyntaxNode> inTypeExpr)
+    {
+        auto typeExpr = inTypeExpr;
+        while (parser->LookAheadToken(TokenType::LBracket))
+        {
+            RefPtr<IndexExpressionSyntaxNode> arrType = new IndexExpressionSyntaxNode();
+            arrType->Position = typeExpr->Position;
+            arrType->BaseExpression = typeExpr;
+            parser->ReadToken(TokenType::LBracket);
+            if (!parser->LookAheadToken(TokenType::RBracket))
+            {
+                arrType->IndexExpression = parser->ParseExpression();
+            }
+            parser->ReadToken(TokenType::RBracket);
+            typeExpr = arrType;
+        }
+        return typeExpr;
+    }
+
     static TypeSpec
     parseTypeSpec(Parser* parser)
     {
@@ -1431,10 +1462,15 @@ namespace Slang
             typeExpr = parseGenericApp(parser, typeExpr);
         }
 
+        // GLSL allows `[]` directly in a type specifier
+        if (parser->translationUnit->sourceLanguage == SourceLanguage::GLSL)
+        {
+            typeExpr = parsePostfixTypeSuffix(parser, typeExpr);
+        }
+
         typeSpec.expr = typeExpr;
         return typeSpec;
     }
-
 
     static RefPtr<DeclBase> ParseDeclaratorDecl(
         Parser*         parser,
@@ -2572,7 +2608,11 @@ namespace Slang
 
     RefPtr<StatementSyntaxNode> Parser::ParseBlockStatement()
     {
-        if( translationUnit->compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING )
+        // If we are being asked not to check things *and* we haven't
+        // seen any `import` declarations yet, then we can safely assume
+        // that function bodies should be left as-is.
+        if( (translationUnit->compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING)
+            && !haveSeenAnyImportDecls )
         {
             // We have been asked to parse the input, but not attempt to understand it.
 
@@ -2614,7 +2654,6 @@ namespace Slang
             unparsedStmt->tokens = tokens;
             return unparsedStmt;
         }
-
 
         RefPtr<ScopeDecl> scopeDecl = new ScopeDecl();
         RefPtr<BlockStmt> blockStatement = new BlockStmt();
@@ -2690,12 +2729,32 @@ namespace Slang
     RefPtr<ForStatementSyntaxNode> Parser::ParseForStatement()
     {
         RefPtr<ScopeDecl> scopeDecl = new ScopeDecl();
-        RefPtr<ForStatementSyntaxNode> stmt = new ForStatementSyntaxNode();
+
+        // HLSL implements the bad approach to scoping a `for` loop
+        // variable, and we want to respect that, but *only* when
+        // parsing HLSL code.
+        //
+
+        bool brokenScoping = translationUnit->sourceLanguage == SourceLanguage::HLSL;
+
+        // We will create a distinct syntax node class for the unscoped
+        // case, just so that we can correctly handle it in downstream
+        // logic.
+        //
+        RefPtr<ForStatementSyntaxNode> stmt;
+        if (brokenScoping)
+        {
+            stmt = new UnscopedForStmt();
+        }
+        else
+        {
+            stmt = new ForStatementSyntaxNode();
+        }
+
         stmt->scopeDecl = scopeDecl;
 
-        // Note(tfoley): HLSL implements `for` with incorrect scoping.
-        // We need an option to turn on this behavior in a kind of "legacy" mode
-//			PushScope(scopeDecl.Ptr());
+        if(!brokenScoping)
+            PushScope(scopeDecl.Ptr());
         FillPosition(stmt.Ptr());
         ReadToken("for");
         ReadToken(TokenType::LParent);
@@ -2721,7 +2780,10 @@ namespace Slang
             stmt->SideEffectExpression = ParseExpression();
         ReadToken(TokenType::RParent);
         stmt->Statement = ParseStatement();
-//			PopScope();
+
+        if (!brokenScoping)
+            PopScope();
+
         return stmt;
     }
 
@@ -2816,19 +2878,7 @@ namespace Slang
         }
         auto typeExpr = typeSpec.expr;
 
-        while (LookAheadToken(TokenType::LBracket))
-        {
-            RefPtr<IndexExpressionSyntaxNode> arrType = new IndexExpressionSyntaxNode();
-            arrType->Position = typeExpr->Position;
-            arrType->BaseExpression = typeExpr;
-            ReadToken(TokenType::LBracket);
-            if (!LookAheadToken(TokenType::RBracket))
-            {
-                arrType->IndexExpression = ParseExpression();
-            }
-            ReadToken(TokenType::RBracket);
-            typeExpr = arrType;
-        }
+        typeExpr = parsePostfixTypeSuffix(this, typeExpr);
 
         return typeExpr;
     }
@@ -2912,83 +2962,6 @@ namespace Slang
             return Precedence::Multiplicative;
         default:
             return Precedence::Invalid;
-        }
-    }
-
-    Operator GetOpFromToken(Token & token)
-    {
-        switch(token.Type)
-        {
-        case TokenType::Comma:
-            return Operator::Sequence;
-        case TokenType::OpAssign:
-            return Operator::Assign;
-        case TokenType::OpAddAssign:
-            return Operator::AddAssign;
-        case TokenType::OpSubAssign:
-            return Operator::SubAssign;
-        case TokenType::OpMulAssign:
-            return Operator::MulAssign;
-        case TokenType::OpDivAssign:
-            return Operator::DivAssign;
-        case TokenType::OpModAssign:
-            return Operator::ModAssign;
-        case TokenType::OpShlAssign:
-            return Operator::LshAssign;
-        case TokenType::OpShrAssign:
-            return Operator::RshAssign;
-        case TokenType::OpOrAssign:
-            return Operator::OrAssign;
-        case TokenType::OpAndAssign:
-            return Operator::AddAssign;
-        case TokenType::OpXorAssign:
-            return Operator::XorAssign;
-        case TokenType::OpOr:
-            return Operator::Or;
-        case TokenType::OpAnd:
-            return Operator::And;
-        case TokenType::OpBitOr:
-            return Operator::BitOr;
-        case TokenType::OpBitXor:
-            return Operator::BitXor;
-        case TokenType::OpBitAnd:
-            return Operator::BitAnd;
-        case TokenType::OpEql:
-            return Operator::Eql;
-        case TokenType::OpNeq:
-            return Operator::Neq;
-        case TokenType::OpGeq:
-            return Operator::Geq;
-        case TokenType::OpLeq:
-            return Operator::Leq;
-        case TokenType::OpGreater:
-            return Operator::Greater;
-        case TokenType::OpLess:
-            return Operator::Less;
-        case TokenType::OpLsh:
-            return Operator::Lsh;
-        case TokenType::OpRsh:
-            return Operator::Rsh;
-        case TokenType::OpAdd:
-            return Operator::Add;
-        case TokenType::OpSub:
-            return Operator::Sub;
-        case TokenType::OpMul:
-            return Operator::Mul;
-        case TokenType::OpDiv:
-            return Operator::Div;
-        case TokenType::OpMod:
-            return Operator::Mod;
-        case TokenType::OpInc:
-            return Operator::PostInc;
-        case TokenType::OpDec:
-            return Operator::PostDec;
-        case TokenType::OpNot:
-            return Operator::Not;
-        case TokenType::OpBitNot:
-            return Operator::BitNot;
-        default:
-            throw "Illegal TokenType.";
         }
     }
 
@@ -3194,25 +3167,27 @@ namespace Slang
         // but for now we will follow some hueristics.
         case TokenType::LParent:
             {
-                parser->ReadToken(TokenType::LParent);
+                Token openParen = parser->ReadToken(TokenType::LParent);
 
-                RefPtr<ExpressionSyntaxNode> expr;
                 if (peekTypeName(parser) && parser->LookAheadToken(TokenType::RParent, 1))
                 {
-                    RefPtr<TypeCastExpressionSyntaxNode> tcexpr = new TypeCastExpressionSyntaxNode();
+                    RefPtr<TypeCastExpressionSyntaxNode> tcexpr = new ExplicitCastExpr();
                     parser->FillPosition(tcexpr.Ptr());
                     tcexpr->TargetType = parser->ParseTypeExp();
                     parser->ReadToken(TokenType::RParent);
                     tcexpr->Expression = parser->ParseExpression(Precedence::Multiplicative); // Note(tfoley): need to double-check this
-                    expr = tcexpr;
+                    return tcexpr;
                 }
                 else
                 {
-                    expr = parser->ParseExpression();
+                    RefPtr<ExpressionSyntaxNode> base = parser->ParseExpression();
                     parser->ReadToken(TokenType::RParent);
-                }
 
-                return expr;
+                    RefPtr<ParenExpr> parenExpr = new ParenExpr();
+                    parenExpr->Position = openParen.Position;
+                    parenExpr->base = base;
+                    return parenExpr;
+                }
             }
 
         // An initializer list `{ expr, ... }`
@@ -3476,7 +3451,11 @@ namespace Slang
                     indexExpr->BaseExpression = expr;
                     parser->FillPosition(indexExpr.Ptr());
                     parser->ReadToken(TokenType::LBracket);
-                    indexExpr->IndexExpression = parser->ParseExpression();
+                    // TODO: eventually we may want to support multiple arguments inside the `[]`
+                    if (!parser->LookAheadToken(TokenType::RBracket))
+                    {
+                        indexExpr->IndexExpression = parser->ParseExpression();
+                    }
                     parser->ReadToken(TokenType::RBracket);
 
                     expr = indexExpr;
@@ -3539,6 +3518,7 @@ namespace Slang
         case TokenType::OpDec:
         case TokenType::OpNot:
         case TokenType::OpBitNot:
+        case TokenType::OpAdd:
         case TokenType::OpSub:
             {
                 RefPtr<PrefixExpr> prefixExpr = new PrefixExpr();
