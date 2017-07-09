@@ -91,12 +91,23 @@ SYNTAX_CLASS(DerefExpr, ExpressionSyntaxNode)
     SYNTAX_FIELD(RefPtr<ExpressionSyntaxNode>, base)
 END_SYNTAX_CLASS()
 
+// Any operation that performs type-casting
 SYNTAX_CLASS(TypeCastExpressionSyntaxNode, ExpressionSyntaxNode)
     SYNTAX_FIELD(TypeExp, TargetType)
     SYNTAX_FIELD(RefPtr<ExpressionSyntaxNode>, Expression)
 END_SYNTAX_CLASS()
 
+// An explicit type-cast that appear in the user's code with `(Type) expr` syntax
+SYNTAX_CLASS(ExplicitCastExpr, TypeCastExpressionSyntaxNode)
+END_SYNTAX_CLASS()
+
+// An implicit type-cast inserted during semantic checking
 SYNTAX_CLASS(ImplicitCastExpr, TypeCastExpressionSyntaxNode)
+END_SYNTAX_CLASS()
+
+// An implicit type-cast that should also be hidden on output,
+// because we don't want to mess with the user's code
+SYNTAX_CLASS(HiddenImplicitCastExpr, ImplicitCastExpr)
 END_SYNTAX_CLASS()
 
 SIMPLE_SYNTAX_CLASS(SelectExpressionSyntaxNode, OperatorExpressionSyntaxNode)

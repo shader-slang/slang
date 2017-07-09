@@ -2031,18 +2031,15 @@ struct EmitVisitor
         if(needClose) Emit(")");
     }
 
+    void visitHiddenImplicitCastExpr(HiddenImplicitCastExpr* castExpr, ExprEmitArg const& arg)
+    {
+        // This was an implicit cast inserted in code parsed in "rewriter" mode,
+        // so we don't want to output it and change what the user's code looked like.
+        ExprVisitorWithArg::dispatch(castExpr->Expression, arg);
+    }
+
     void visitTypeCastExpressionSyntaxNode(TypeCastExpressionSyntaxNode* castExpr, ExprEmitArg const& arg)
     {
-        if (context->isRewrite)
-        {
-            if (dynamic_cast<ImplicitCastExpr*>(castExpr))
-            {
-                // This was an implicit cast, so don't try to output it
-                ExprVisitorWithArg::dispatch(castExpr->Expression, arg);
-                return;
-            }
-        }
-
         bool needClose = false;
         switch(context->shared->target)
         {

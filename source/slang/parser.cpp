@@ -3092,7 +3092,7 @@ namespace Slang
 
                 if (peekTypeName(parser) && parser->LookAheadToken(TokenType::RParent, 1))
                 {
-                    RefPtr<TypeCastExpressionSyntaxNode> tcexpr = new TypeCastExpressionSyntaxNode();
+                    RefPtr<TypeCastExpressionSyntaxNode> tcexpr = new ExplicitCastExpr();
                     parser->FillPosition(tcexpr.Ptr());
                     tcexpr->TargetType = parser->ParseTypeExp();
                     parser->ReadToken(TokenType::RParent);

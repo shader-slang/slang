@@ -987,7 +987,19 @@ namespace Slang
             RefPtr<ExpressionType>			toType,
             RefPtr<ExpressionSyntaxNode>	fromExpr)
         {
-            auto castExpr = new ImplicitCastExpr();
+            // In "rewrite" mode, we will generate a different syntax node
+            // to indicate that this type-cast was implicitly generated
+            // by the compiler, and shouldn't appear in the output code.
+            RefPtr<TypeCastExpressionSyntaxNode> castExpr;
+            if (isRewriteMode())
+            {
+                castExpr = new HiddenImplicitCastExpr();
+            }
+            else
+            {
+                castExpr = new ImplicitCastExpr();
+            }
+
             castExpr->Position = fromExpr->Position;
             castExpr->TargetType.type = toType;
             castExpr->Type = QualType(toType);
