@@ -21,9 +21,6 @@ struct SharedEmitContext
     // The target language we want to generate code for
     CodeGenTarget target;
 
-    // A set of words reserved by the target
-    Dictionary<String, String> reservedWords;
-
     // The string of code we've built so far
     StringBuilder sb;
 
@@ -385,47 +382,11 @@ struct EmitVisitor
         Emit(text.begin(), text.end());
     }
 
-    bool isReservedWord(String const& name)
-    {
-        return context->shared->reservedWords.TryGetValue(name) != nullptr;
-    }
-
     void emitName(
         String const&       inName,
         CodePosition const& loc)
     {
         String name = inName;
-
-        // By default, we would like to emit a name in the generated
-        // code exactly as it appeared in the soriginal program.
-        // When that isn't possible, we'd like to emit a name as
-        // close to the original as possible (to ensure that existing
-        // debugging tools still work reasonably well).
-        //
-        // One reason why a name might not be allowed as-is is that
-        // it could collide with a reserved word in the target language.
-        // Another reason is that it might not follow a naming convention
-        // imposed by the target (e.g., in GLSL names starting with
-        // `gl_` or containing `__` are reserved).
-        //
-        // Given a name that should not be allowed, we want to
-        // change it to a name that *is* allowed. e.g., by adding
-        // `_` to the end of a reserved word.
-        //
-        // The next problem this creates is that the modified name
-        // could not collide with an existing use of the same
-        // (valid) name.
-        //
-        // For now we are going to solve this problem in a simple
-        // and ad hoc fashion, but longer term we'll want to do
-        // something sytematic.
-
-        if (isReservedWord(name))
-        {
-            // TODO(tfoley): Need to put this back in, as part of lowering.
-
-//            name = name + "_";
-        }
 
         advanceToSourceLocation(loc);
         emit(name);
@@ -3261,159 +3222,6 @@ struct EmitVisitor
             throw "unimplemented";
         }
     }
-
-    void registerReservedWord(
-        String const&   name)
-    {
-        context->shared->reservedWords.Add(name, name);
-    }
-
-    void registerReservedWords()
-    {
-    #define WORD(NAME) registerReservedWord(#NAME)
-
-        switch (context->shared->target)
-        {
-        case CodeGenTarget::GLSL:
-            WORD(attribute);
-            WORD(const);
-            WORD(uniform);
-            WORD(varying);
-            WORD(buffer);
-
-            WORD(shared);
-            WORD(coherent);
-            WORD(volatile);
-            WORD(restrict);
-            WORD(readonly);
-            WORD(writeonly);
-            WORD(atomic_unit);
-            WORD(layout);
-            WORD(centroid);
-            WORD(flat);
-            WORD(smooth);
-            WORD(noperspective);
-            WORD(patch);
-            WORD(sample);
-            WORD(break);
-            WORD(continue);
-            WORD(do);
-            WORD(for);
-            WORD(while);
-            WORD(switch);
-            WORD(case);
-            WORD(default);
-            WORD(if);
-            WORD(else);
-            WORD(subroutine);
-            WORD(in);
-            WORD(out);
-            WORD(inout);
-            WORD(float);
-            WORD(double);
-            WORD(int);
-            WORD(void);
-            WORD(bool);
-            WORD(true);
-            WORD(false);
-            WORD(invariant);
-            WORD(precise);
-            WORD(discard);
-            WORD(return);
-
-            WORD(lowp);
-            WORD(mediump);
-            WORD(highp);
-            WORD(precision);
-            WORD(struct);
-            WORD(uint);
-
-            WORD(common);
-            WORD(partition);
-            WORD(active);
-            WORD(asm);
-            WORD(class);
-            WORD(union);
-            WORD(enum);
-            WORD(typedef);
-            WORD(template);
-            WORD(this);
-            WORD(resource);
-
-            WORD(goto);
-            WORD(inline);
-            WORD(noinline);
-            WORD(public);
-            WORD(static);
-            WORD(extern);
-            WORD(external);
-            WORD(interface);
-            WORD(long);
-            WORD(short);
-            WORD(half);
-            WORD(fixed);
-            WORD(unsigned);
-            WORD(superp);
-            WORD(input);
-            WORD(output);
-            WORD(filter);
-            WORD(sizeof);
-            WORD(cast);
-            WORD(namespace);
-            WORD(using);
-
-    #define CASE(NAME) \
-        WORD(NAME ## 2); WORD(NAME ## 3); WORD(NAME ## 4)
-
-            CASE(mat);
-            CASE(dmat);
-            CASE(mat2x);
-            CASE(mat3x);
-            CASE(mat4x);
-            CASE(dmat2x);
-            CASE(dmat3x);
-            CASE(dmat4x);
-            CASE(vec);
-            CASE(ivec);
-            CASE(bvec);
-            CASE(dvec);
-            CASE(uvec);
-            CASE(hvec);
-            CASE(fvec);
-
-    #undef CASE
-
-    #define CASE(NAME)          \
-        WORD(NAME ## 1D);       \
-        WORD(NAME ## 2D);       \
-        WORD(NAME ## 3D);       \
-        WORD(NAME ## Cube);     \
-        WORD(NAME ## 1DArray);  \
-        WORD(NAME ## 2DArray);  \
-        WORD(NAME ## 3DArray);  \
-        WORD(NAME ## CubeArray);\
-        WORD(NAME ## 2DMS);     \
-        WORD(NAME ## 2DMSArray) \
-        /* end */
-
-    #define CASE2(NAME)     \
-        CASE(NAME);         \
-        CASE(i ## NAME);    \
-        CASE(u ## NAME)     \
-        /* end */
-
-        CASE2(sampler);
-        CASE2(image);
-        CASE2(texture);
-
-    #undef CASE2
-    #undef CASE
-            break;
-
-        default:
-            break;
-        }
-    }
 };
 
 String emitEntryPoint(
@@ -3473,9 +3281,6 @@ String emitEntryPoint(
     context.shared = &sharedContext;
 
     EmitVisitor visitor(&context);
-
-    // TODO: this should only need to take the shared context
-    visitor.registerReservedWords();
 
     auto translationUnitSyntax = translationUnit->SyntaxNode.Ptr();
 
