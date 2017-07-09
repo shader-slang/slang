@@ -66,6 +66,7 @@ SIMPLE_SYNTAX_CLASS(DefaultStmt, CaseStmtBase)
 ABSTRACT_SYNTAX_CLASS(LoopStmt, BreakableStmt)
 END_SYNTAX_CLASS()
 
+// A `for` statement
 SYNTAX_CLASS(ForStatementSyntaxNode, LoopStmt)
     SYNTAX_FIELD(RefPtr<StatementSyntaxNode>, InitialStatement)
     SYNTAX_FIELD(RefPtr<ExpressionSyntaxNode>, SideEffectExpression)
@@ -73,6 +74,10 @@ SYNTAX_CLASS(ForStatementSyntaxNode, LoopStmt)
     SYNTAX_FIELD(RefPtr<StatementSyntaxNode>, Statement)
 END_SYNTAX_CLASS()
 
+// A `for` statement in a language that doesn't restrict the scope
+// of the loop variable to the body.
+SYNTAX_CLASS(UnscopedForStmt, ForStatementSyntaxNode);
+END_SYNTAX_CLASS()
 
 SYNTAX_CLASS(WhileStatementSyntaxNode, LoopStmt)
     SYNTAX_FIELD(RefPtr<ExpressionSyntaxNode>, Predicate)

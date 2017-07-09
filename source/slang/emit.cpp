@@ -57,10 +57,6 @@ struct EmitContext
 {
     // The shared context that is in effect
     SharedEmitContext* shared;
-
-    // Are we in "rewrite" mode, where we are trying to reproduce the input
-    // code as closely as posible?
-    bool isRewrite;
 };
 
 //
@@ -2196,12 +2192,10 @@ struct EmitVisitor
             // The one wrinkle is that HLSL implements the
             // bad approach to scoping a `for` loop variable,
             // so we need to avoid those outer `{...}` when
-            // we are generating HLSL via "rewrite" (that is,
-            // without our semantic checks).
+            // we are emitting code that was written in HLSL.
             //
             bool brokenScoping = false;
-            if (context->shared->target == CodeGenTarget::HLSL
-                && context->isRewrite)
+            if (forStmt.As<UnscopedForStmt>())
             {
                 brokenScoping = true;
             }
@@ -3406,10 +3400,6 @@ struct EmitVisitor
     }
 };
 
-bool isRewriteRequest(
-    SourceLanguage  sourceLanguage,
-    CodeGenTarget   target);
-
 String emitEntryPoint(
     EntryPointRequest*  entryPoint,
     ProgramLayout*      programLayout,
@@ -3465,9 +3455,6 @@ String emitEntryPoint(
 
     EmitContext context;
     context.shared = &sharedContext;
-    context.isRewrite = isRewriteRequest(
-        translationUnit->sourceLanguage,
-        target);
 
     EmitVisitor visitor(&context);
 

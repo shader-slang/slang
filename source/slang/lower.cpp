@@ -723,10 +723,10 @@ struct LoweringVisitor
         addStmt(loweredStmt);
     }
 
-
-    void visitForStatementSyntaxNode(ForStatementSyntaxNode* stmt)
+    void lowerForStmtCommon(
+        RefPtr<ForStatementSyntaxNode>  loweredStmt,
+        ForStatementSyntaxNode*         stmt)
     {
-        RefPtr<ForStatementSyntaxNode> loweredStmt = new ForStatementSyntaxNode();
         lowerScopeStmtFields(loweredStmt, stmt);
 
         LoweringVisitor subVisitor = pushScope(loweredStmt, stmt);
@@ -737,6 +737,16 @@ struct LoweringVisitor
         loweredStmt->Statement              = subVisitor.lowerStmt(stmt->Statement);
 
         addStmt(loweredStmt);
+    }
+
+    void visitForStatementSyntaxNode(ForStatementSyntaxNode* stmt)
+    {
+        lowerForStmtCommon(new ForStatementSyntaxNode(), stmt);
+    }
+
+    void visitUnscopedForStmt(UnscopedForStmt* stmt)
+    {
+        lowerForStmtCommon(new UnscopedForStmt(), stmt);
     }
 
     void visitWhileStatementSyntaxNode(WhileStatementSyntaxNode* stmt)

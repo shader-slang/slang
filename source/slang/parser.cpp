@@ -2673,12 +2673,32 @@ namespace Slang
     RefPtr<ForStatementSyntaxNode> Parser::ParseForStatement()
     {
         RefPtr<ScopeDecl> scopeDecl = new ScopeDecl();
-        RefPtr<ForStatementSyntaxNode> stmt = new ForStatementSyntaxNode();
+
+        // HLSL implements the bad approach to scoping a `for` loop
+        // variable, and we want to respect that, but *only* when
+        // parsing HLSL code.
+        //
+
+        bool brokenScoping = translationUnit->sourceLanguage == SourceLanguage::HLSL;
+
+        // We will create a distinct syntax node class for the unscoped
+        // case, just so that we can correctly handle it in downstream
+        // logic.
+        //
+        RefPtr<ForStatementSyntaxNode> stmt;
+        if (brokenScoping)
+        {
+            stmt = new UnscopedForStmt();
+        }
+        else
+        {
+            stmt = new ForStatementSyntaxNode();
+        }
+
         stmt->scopeDecl = scopeDecl;
 
-        // Note(tfoley): HLSL implements `for` with incorrect scoping.
-        // We need an option to turn on this behavior in a kind of "legacy" mode
-//			PushScope(scopeDecl.Ptr());
+        if(!brokenScoping)
+            PushScope(scopeDecl.Ptr());
         FillPosition(stmt.Ptr());
         ReadToken("for");
         ReadToken(TokenType::LParent);
@@ -2704,7 +2724,10 @@ namespace Slang
             stmt->SideEffectExpression = ParseExpression();
         ReadToken(TokenType::RParent);
         stmt->Statement = ParseStatement();
-//			PopScope();
+
+        if (!brokenScoping)
+            PopScope();
+
         return stmt;
     }
 
