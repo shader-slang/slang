@@ -1714,10 +1714,14 @@ struct LoweringVisitor
         if (loweredEntryPointFunc->getName() == "main")
             loweredEntryPointFunc->Name.Content = "main_";
 
+        RefPtr<BlockStmt> bodyStmt = new BlockStmt();
+        bodyStmt->scopeDecl = new ScopeDecl();
+
         // We will want to generate declarations into the body of our new `main()`
         LoweringVisitor subVisitor = *this;
         subVisitor.isBuildingStmt = true;
         subVisitor.stmtBeingBuilt = nullptr;
+        subVisitor.parentDecl = bodyStmt->scopeDecl;
 
         // The parameters of the entry-point function will be translated to
         // both a local variable (for passing to/from the entry point func),
@@ -1839,7 +1843,9 @@ struct LoweringVisitor
                 VaryingParameterDirection::Output);
         }
 
-        mainDecl->Body = subVisitor.stmtBeingBuilt;
+        bodyStmt->body = subVisitor.stmtBeingBuilt;
+
+        mainDecl->Body = bodyStmt;
 
 
         // Once we are done building the body, we append our new declaration to the program.
