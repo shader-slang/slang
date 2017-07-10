@@ -1431,6 +1431,22 @@ namespace Slang
                     {
                         int loadCoordCount = kBaseTextureTypes[tt].coordCount + isArray + (isMultisample?0:1);
 
+                        // When translating to GLSL, we need to break apart the `location` argument.
+                        //
+                        // TODO: this should realy be handled by having this member actually get lowered!
+                        int glslLoadCoordCount = kBaseTextureTypes[tt].coordCount + isArray;
+                        static const char* kGLSLLoadCoordsSwizzle[] = { "", "", "x", "xy", "xyz", "xyzw" };
+                        static const char* kGLSLLoadLODSwizzle[]    = { "", "", "y", "z", "w", "error" };
+
+                        if (isMultisample)
+                        {
+                            sb << "__intrinsic(glsl, \"texelFetch($P, $0, $1)\")\n";
+                        }
+                        else
+                        {
+                            sb << "__intrinsic(glsl, \"texelFetch($P, ($0)." << kGLSLLoadCoordsSwizzle[loadCoordCount] << ", ($0)." << kGLSLLoadLODSwizzle[loadCoordCount] << ")\")\n";
+                        }
+                        sb << "__intrinsic\n";
                         sb << "T Load(";
                         sb << "int" << loadCoordCount << " location";
                         if(isMultisample)
@@ -1439,6 +1455,15 @@ namespace Slang
                         }
                         sb << ");\n";
 
+                        if (isMultisample)
+                        {
+                            sb << "__intrinsic(glsl, \"texelFetchOffset($P, $0, $1, $2)\")\n";
+                        }
+                        else
+                        {
+                            sb << "__intrinsic(glsl, \"texelFetch($P, ($0)." << kGLSLLoadCoordsSwizzle[loadCoordCount] << ", ($0)." << kGLSLLoadLODSwizzle[loadCoordCount] << ", $1)\")\n";
+                        }
+                        sb << "__intrinsic\n";
                         sb << "T Load(";
                         sb << "int" << loadCoordCount << " location";
                         if(isMultisample)
@@ -1470,11 +1495,15 @@ namespace Slang
                     {
                         // `Sample()`
 
+                        sb << "__intrinsic(glsl, \"texture($p, $1)\")\n";
+                        sb << "__intrinsic\n";
                         sb << "T Sample(SamplerState s, ";
                         sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location);\n";
 
                         if( baseShape != TextureType::ShapeCube )
                         {
+                            sb << "__intrinsic(glsl, \"textureOffset($p, $1)\")\n";
+                            sb << "__intrinsic\n";
                             sb << "T Sample(SamplerState s, ";
                             sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                             sb << "int" << kBaseTextureTypes[tt].coordCount << " offset);\n";

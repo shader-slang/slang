@@ -1,4 +1,4 @@
-//TEST:SIMPLE:-profile vs_5_0
+//TEST:SIMPLE:-target none -profile vs_5_0
 
 // Confirm that `#import` interacts with preprocessor as expected
 

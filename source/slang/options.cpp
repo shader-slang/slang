@@ -5,6 +5,7 @@
 
 #include "../../slang.h"
 
+#include "compiler.h"
 #include "profile.h"
 
 #include <assert.h>
@@ -229,6 +230,7 @@ struct OptionsParser
 
                     CASE(spirv, SPIRV);
                     CASE(spirv-assembly, SPIRV_ASM);
+                    CASE(none, TARGET_NONE);
 
                 #undef CASE
 

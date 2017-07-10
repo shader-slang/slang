@@ -84,8 +84,8 @@ FragmentStageOutput fragmentMain(FragmentStageInput input)
 #define ASSEMBLED_VERTEX(QUAL)		\
 	/* */
 
-#define V2F(QUAL)			\
-	QUAL vec3 coarse_color;	\
+#define V2F(QUAL)									\
+	layout(location = 0) QUAL vec3 coarse_color;	\
 	/* */
 
 // Vertex  Shader

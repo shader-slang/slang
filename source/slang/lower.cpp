@@ -1,6 +1,7 @@
 // lower.cpp
 #include "lower.h"
 
+#include "type-layout.h"
 #include "visitor.h"
 
 namespace Slang
@@ -193,6 +194,8 @@ public:
 
 struct SharedLoweringContext
 {
+    CompileRequest* compileRequest;
+
     ProgramLayout*  programLayout;
 
     // The target we are going to generate code for.
@@ -1371,6 +1374,23 @@ struct LoweringVisitor
         return loweredDecl;
     }
 
+    SourceLanguage getSourceLanguage(ProgramSyntaxNode* moduleDecl)
+    {
+        for (auto translationUnit : shared->compileRequest->translationUnits)
+        {
+            if (moduleDecl == translationUnit->SyntaxNode)
+                return translationUnit->sourceLanguage;
+        }
+
+        for (auto loadedModuleDecl : shared->compileRequest->loadedModulesList)
+        {
+            if (moduleDecl == loadedModuleDecl)
+                return SourceLanguage::Slang;
+        }
+
+        return SourceLanguage::Unknown;
+    }
+
     RefPtr<VarDeclBase> visitVariable(
         Variable* decl)
     {
@@ -1525,38 +1545,93 @@ struct LoweringVisitor
             type = arrayType;
         }
 
+        // We need to create a reference to the global-scope declaration
+        // of the proper GLSL input/output variable. This might
+        // be a user-defined input/output, or a system-defined `gl_` one.
+        RefPtr<ExpressionSyntaxNode> globalVarExpr;
+
+        // Handle system-value inputs/outputs
+        assert(varLayout);
+        auto systemValueSemantic = varLayout->systemValueSemantic;
+        if (systemValueSemantic.Length() != 0)
+        {
+            auto ns = systemValueSemantic.ToLower();
+
+            if (ns == "sv_target")
+            {
+                // Note: we do *not* need to generate some kind of `gl_`
+                // builtin for fragment-shader outputs: they are just
+                // ordinary `out` variables, with ordinary `location`s,
+                // as far as GLSL is concerned.
+            }
+            else if (ns == "sv_position")
+            {
+                RefPtr<VarExpressionSyntaxNode> globalVarRef = new VarExpressionSyntaxNode();
+                globalVarRef->name = "gl_Position";
+                globalVarExpr = globalVarRef;
+            }
+            else
+            {
+                assert(!"unhandled");
+            }
+        }
+
+        // If we didn't match some kind of builtin input/output,
+        // then declare a user input/output variable instead
+        if (!globalVarExpr)
+        {
+            RefPtr<Variable> globalVarDecl = new Variable();
+            globalVarDecl->Name.Content = info.name;
+            globalVarDecl->Type.type = type;
+
+            ensureDeclHasAValidName(globalVarDecl);
+
+            addMember(shared->loweredProgram, globalVarDecl);
+
+            // Add the layout information
+            RefPtr<ComputedLayoutModifier> modifier = new ComputedLayoutModifier();
+            modifier->layout = varLayout;
+            addModifier(globalVarDecl, modifier);
+
+            // Add appropriate in/out modifier
+            switch (info.direction)
+            {
+            case VaryingParameterDirection::Input:
+                addModifier(globalVarDecl, new InModifier());
+                break;
+
+            case VaryingParameterDirection::Output:
+                addModifier(globalVarDecl, new OutModifier());
+                break;
+            }
+
+
+            RefPtr<VarExpressionSyntaxNode> globalVarRef = new VarExpressionSyntaxNode();
+            globalVarRef->Position = globalVarDecl->Position;
+            globalVarRef->declRef = makeDeclRef(globalVarDecl.Ptr());
+            globalVarRef->name = globalVarDecl->getName();
+
+            globalVarExpr = globalVarRef;
+        }
+
         // TODO: if we are declaring an SOA-ized array,
         // this is where those array dimensions would need
         // to be tacked on.
+        //
+        // That is, this logic should be getting collected into a loop,
+        // and so we need to have a loop variable we can use to
+        // index into the two different expressions.
 
-        RefPtr<Variable> globalVarDecl = new Variable();
-        globalVarDecl->Name.Content = info.name;
-        globalVarDecl->Type.type = type;
-
-        ensureDeclHasAValidName(globalVarDecl);
-
-        addMember(shared->loweredProgram, globalVarDecl);
-
-        // Add the layout information
-        RefPtr<ComputedLayoutModifier> modifier = new ComputedLayoutModifier();
-        modifier->layout = varLayout;
-        addModifier(globalVarDecl, modifier);
 
         // Need to generate an assignment in the right direction.
-        //
-        // TODO: for now I am just dealing with input:
-
         switch (info.direction)
         {
         case VaryingParameterDirection::Input:
-            addModifier(globalVarDecl, new InModifier());
-            assign(varExpr, globalVarDecl);
+            assign(varExpr, globalVarExpr);
             break;
 
         case VaryingParameterDirection::Output:
-            addModifier(globalVarDecl, new OutModifier());
-
-            assign(globalVarDecl, varExpr);
+            assign(globalVarExpr, varExpr);
             break;
         }
     }
@@ -1683,6 +1758,18 @@ struct LoweringVisitor
         info.name = name;
         info.direction = direction;
 
+        // Ensure that we don't get name collisions on `inout` variables
+        switch (direction)
+        {
+        case VaryingParameterDirection::Input:
+            info.name = "SLANG_in_" + name;
+            break;
+
+        case VaryingParameterDirection::Output:
+            info.name = "SLANG_out_" + name;
+            break;
+        }
+
         lowerShaderParameterToGLSLGLobalsRec(
             info,
             localVarDecl->getType(),
@@ -1713,10 +1800,14 @@ struct LoweringVisitor
         if (loweredEntryPointFunc->getName() == "main")
             loweredEntryPointFunc->Name.Content = "main_";
 
+        RefPtr<BlockStmt> bodyStmt = new BlockStmt();
+        bodyStmt->scopeDecl = new ScopeDecl();
+
         // We will want to generate declarations into the body of our new `main()`
         LoweringVisitor subVisitor = *this;
         subVisitor.isBuildingStmt = true;
         subVisitor.stmtBeingBuilt = nullptr;
+        subVisitor.parentDecl = bodyStmt->scopeDecl;
 
         // The parameters of the entry-point function will be translated to
         // both a local variable (for passing to/from the entry point func),
@@ -1769,7 +1860,7 @@ struct LoweringVisitor
         {
             resultVarDecl = new Variable();
             resultVarDecl->Position = loweredEntryPointFunc->Position;
-            resultVarDecl->Name.Content = "_main_result";
+            resultVarDecl->Name.Content = "main_result";
             resultVarDecl->Type = TypeExp(loweredEntryPointFunc->ReturnType);
 
             ensureDeclHasAValidName(resultVarDecl);
@@ -1838,7 +1929,9 @@ struct LoweringVisitor
                 VaryingParameterDirection::Output);
         }
 
-        mainDecl->Body = subVisitor.stmtBeingBuilt;
+        bodyStmt->body = subVisitor.stmtBeingBuilt;
+
+        mainDecl->Body = bodyStmt;
 
 
         // Once we are done building the body, we append our new declaration to the program.
@@ -2003,6 +2096,7 @@ LoweredEntryPoint lowerEntryPoint(
     CodeGenTarget       target)
 {
     SharedLoweringContext sharedContext;
+    sharedContext.compileRequest = entryPoint->compileRequest;
     sharedContext.programLayout = programLayout;
     sharedContext.target = target;
 

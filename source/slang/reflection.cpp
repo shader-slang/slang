@@ -112,7 +112,7 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
     {
         return SLANG_TYPE_KIND_SAMPLER_STATE;
     }
-    else if (auto textureType = type->As<TextureType>())
+    else if (auto textureType = type->As<TextureTypeBase>())
     {
         return SLANG_TYPE_KIND_RESOURCE;
     }
@@ -326,7 +326,7 @@ SLANG_API SlangResourceShape spReflectionType_GetResourceShape(SlangReflectionTy
         type = arrayType->BaseType.Ptr();
     }
 
-    if(auto textureType = type->As<TextureType>())
+    if(auto textureType = type->As<TextureTypeBase>())
     {
         return textureType->getShape();
     }
@@ -363,7 +363,7 @@ SLANG_API SlangResourceAccess spReflectionType_GetResourceAccess(SlangReflection
         type = arrayType->BaseType.Ptr();
     }
 
-    if(auto textureType = type->As<TextureType>())
+    if(auto textureType = type->As<TextureTypeBase>())
     {
         return textureType->getAccess();
     }
@@ -385,6 +385,9 @@ SLANG_API SlangResourceAccess spReflectionType_GetResourceAccess(SlangReflection
     CASE(HLSLByteAddressBufferType,         SLANG_BYTE_ADDRESS_BUFFER,  SLANG_RESOURCE_ACCESS_READ);
     CASE(HLSLRWByteAddressBufferType,       SLANG_BYTE_ADDRESS_BUFFER,  SLANG_RESOURCE_ACCESS_READ_WRITE);
     CASE(UntypedBufferResourceType,         SLANG_BYTE_ADDRESS_BUFFER,  SLANG_RESOURCE_ACCESS_READ);
+
+    // This isn't entirely accurate, but I can live with it for now
+    CASE(GLSLShaderStorageBufferType,       SLANG_STRUCTURED_BUFFER, SLANG_RESOURCE_ACCESS_READ_WRITE);
 #undef CASE
 
     return SLANG_RESOURCE_ACCESS_NONE;
@@ -400,7 +403,7 @@ SLANG_API SlangReflectionType* spReflectionType_GetResourceResultType(SlangRefle
         type = arrayType->BaseType.Ptr();
     }
 
-    if (auto textureType = type->As<TextureType>())
+    if (auto textureType = type->As<TextureTypeBase>())
     {
         return convert(textureType->elementType.Ptr());
     }

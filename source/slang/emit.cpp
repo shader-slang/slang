@@ -48,6 +48,10 @@ struct SharedEmitContext
     StructTypeLayout*   globalStructLayout;
 
     ProgramLayout*      programLayout;
+
+    ProgramSyntaxNode*  program;
+
+    bool                needHackSamplerForTexelFetch = false;
 };
 
 struct EmitContext
@@ -1758,6 +1762,66 @@ struct EmitVisitor
                                 }
                                 break;
 
+                            case 'P':
+                                {
+                                    // Okay, we need a collosal hack to deal with the fact that GLSL `texelFetch()`
+                                    // for Vulkan seems to be completely broken by design. It's signature wants
+                                    // a `sampler2D` for consistency with its peers, but the actual SPIR-V operation
+                                    // ignores the sampler paart of it, and just used the `texture2D` part.
+                                    //
+                                    // The HLSL equivalent (e.g., `Texture2D.Load()`) doesn't provide a sampler
+                                    // argument, so we seemingly need to conjure one out of thin air. :(
+                                    //
+                                    // We are going to hack this *hard* for now.
+
+                                    // Try to find a suitable sampler-type shader parameter in the global scope
+                                    // (fingers crossed)
+                                    RefPtr<VarDeclBase> samplerVar;
+                                    for (auto d : context->shared->program->Members)
+                                    {
+                                        if (auto varDecl = d.As<VarDeclBase>())
+                                        {
+                                            if (auto samplerType = varDecl->Type.type->As<SamplerStateType>())
+                                            {
+                                                samplerVar = varDecl;
+                                                break;
+                                            }
+                                        }
+                                    }
+
+                                    if (auto memberExpr = callExpr->FunctionExpr.As<MemberExpressionSyntaxNode>())
+                                    {
+                                        auto base = memberExpr->BaseExpression;
+                                        if (auto baseTextureType = base->Type->As<TextureType>())
+                                        {
+                                            emitGLSLTextureOrTextureSamplerType(baseTextureType, "sampler");
+                                            Emit("(");
+                                            EmitExpr(memberExpr->BaseExpression);
+                                            Emit(",");
+                                            if (samplerVar)
+                                            {
+                                                EmitDeclRef(makeDeclRef(samplerVar.Ptr()));
+                                            }
+                                            else
+                                            {
+                                                Emit("SLANG_hack_samplerForTexelFetch");
+                                                context->shared->needHackSamplerForTexelFetch = true;
+                                            }
+                                            Emit(")");
+                                        }
+                                        else
+                                        {
+                                            assert(!"unexpected");
+                                        }
+
+                                    }
+                                    else
+                                    {
+                                        assert(!"unexpected");
+                                    }
+                                }
+                                break;
+
                             default:
                                 assert(!"unexpected");
                                 break;
@@ -2095,6 +2159,11 @@ struct EmitVisitor
 
     void EmitStmt(RefPtr<StatementSyntaxNode> stmt)
     {
+        // TODO(tfoley): this shouldn't occur, but sometimes
+        // lowering will get confused by an empty function body...
+        if (!stmt)
+            return;
+
         // Try to ensure that debugging can find the right location
         advanceToSourceLocation(stmt->Position);
 
@@ -2476,6 +2545,9 @@ struct EmitVisitor
             #define CASE(TYPE, KEYWORD) \
                 else if(auto mod_##TYPE = mod.As<TYPE>()) Emit(#KEYWORD " ")
 
+            #define CASE2(TYPE, HLSL_NAME, GLSL_NAME) \
+                else if(auto mod_##TYPE = mod.As<TYPE>()) Emit((context->shared->target == CodeGenTarget::GLSL) ? GLSL_NAME : HLSL_NAME)
+
             CASE(RowMajorLayoutModifier, row_major);
             CASE(ColumnMajorLayoutModifier, column_major);
             CASE(HLSLNoInterpolationModifier, nointerpolation);
@@ -2502,6 +2574,7 @@ struct EmitVisitor
             CASE(ConstModifier, const);
 
             #undef CASE
+            #undef CASE2
 
             else if (auto staticModifier = mod.As<HLSLStaticModifier>())
             {
@@ -2949,7 +3022,8 @@ struct EmitVisitor
     }
 
     void emitGLSLLayoutQualifiers(
-        RefPtr<VarLayout>               layout)
+        RefPtr<VarLayout>               layout,
+        LayoutResourceKind              filter = LayoutResourceKind::None)
     {
         if(!layout) return;
 
@@ -2964,6 +3038,13 @@ struct EmitVisitor
 
         for( auto info : layout->resourceInfos )
         {
+            // Skip info that doesn't match our filter
+            if (filter != LayoutResourceKind::None
+                && filter != info.kind)
+            {
+                continue;
+            }
+
             emitGLSLLayoutQualifier(info);
         }
     }
@@ -3095,7 +3176,33 @@ struct EmitVisitor
             return;
         }
 
-        emitGLSLLayoutQualifiers(layout);
+
+        if (context->shared->target == CodeGenTarget::GLSL)
+        {
+            if (decl->HasModifier<InModifier>())
+            {
+                emitGLSLLayoutQualifiers(layout, LayoutResourceKind::VertexInput);
+            }
+            else if (decl->HasModifier<OutModifier>())
+            {
+                emitGLSLLayoutQualifiers(layout, LayoutResourceKind::FragmentOutput);
+            }
+            else
+            {
+                emitGLSLLayoutQualifiers(layout);
+            }
+
+            // If we have a uniform that wasn't tagged `uniform` in GLSL, then fix that here
+            if (layout
+                && !decl->HasModifier<HLSLUniformModifier>())
+            {
+                if (layout->FindResourceInfo(LayoutResourceKind::Uniform)
+                    || layout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot))
+                {
+                    Emit("uniform ");
+                }
+            }
+        }
 
         EmitVarDeclCommon(decl);
 
@@ -3288,6 +3395,9 @@ String emitEntryPoint(
     // There may be global-scope modifiers that we should emit now
     visitor.emitGLSLPreprocessorDirectives(translationUnitSyntax);
 
+    String prefix = sharedContext.sb.ProduceString();
+    sharedContext.sb.Clear();
+
     switch(target)
     {
     case CodeGenTarget::GLSL:
@@ -3302,6 +3412,8 @@ String emitEntryPoint(
     }
 
     auto lowered = lowerEntryPoint(entryPoint, programLayout, target);
+
+    sharedContext.program = lowered.program;
 
     visitor.EmitDeclsInContainer(lowered.program.Ptr());
 
@@ -3324,7 +3436,19 @@ String emitEntryPoint(
 
     String code = sharedContext.sb.ProduceString();
 
-    return code;
+    StringBuilder finalResultBuilder;
+    finalResultBuilder << prefix;
+
+    if (sharedContext.needHackSamplerForTexelFetch)
+    {
+        finalResultBuilder << "layout(set = 0, binding = 0) uniform sampler SLANG_hack_samplerForTexelFetch;\n";
+    }
+
+    finalResultBuilder << code;
+
+    String finalResult = finalResultBuilder.ProduceString();
+
+    return finalResult;
 }
 
 } // namespace Slang
