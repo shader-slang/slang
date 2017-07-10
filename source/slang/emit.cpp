@@ -1598,7 +1598,7 @@ struct EmitVisitor
             auto funcDecl = funcDeclRef.getDecl();
             if(!funcDecl)
             {
-                emitUncheckedCallExpr(callExpr, funcDeclRef.GetName(), arg);
+                emitUncheckedCallExpr(callExpr, funcDeclRefExpr->name, arg);
                 return;
             }
             else if (auto intrinsicOpModifier = funcDecl->FindModifier<IntrinsicOpModifier>())
