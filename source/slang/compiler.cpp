@@ -197,6 +197,7 @@ namespace Slang
             0,
             &codeBlob,
             &diagnosticsBlob);
+
         List<uint8_t> data;
         if (codeBlob)
         {
@@ -243,7 +244,7 @@ namespace Slang
     }
 #endif
 
-    String EmitDXBytecodeAssemblyForEntryPoint(
+    List<uint8_t> EmitDXBytecodeAssemblyForEntryPoint(
         EntryPointRequest*  entryPoint)
     {
         static pD3DDisassemble D3DDisassemble_ = nullptr;
@@ -259,7 +260,7 @@ namespace Slang
         List<uint8_t> dxbc = EmitDXBytecodeForEntryPoint(entryPoint);
         if (!dxbc.Count())
         {
-            return "";
+            return List<uint8_t>();
         }
 
         ID3DBlob* codeBlob;
@@ -270,10 +271,10 @@ namespace Slang
             nullptr,
             &codeBlob);
 
-        String result;
+        List<uint8_t> result;
         if (codeBlob)
         {
-            result = String((char const*) codeBlob->GetBufferPointer());
+            result.AddRange((uint8_t*)codeBlob->GetBufferPointer(), codeBlob->GetBufferSize());
             codeBlob->Release();
         }
         if (FAILED(hr))
@@ -314,8 +315,9 @@ namespace Slang
     }
 
 
-    String emitSPIRVAssemblyForEntryPoint(
-        EntryPointRequest*  entryPoint)
+    List<uint8_t> emitSPIRVForEntryPoint(
+        EntryPointRequest*  entryPoint,
+        bool spirvAssembly)
     {
         String rawGLSL = emitGLSLForEntryPoint(entryPoint);
 
@@ -329,34 +331,32 @@ namespace Slang
             assert(glslang_compile);
         }
 
-        StringBuilder diagnosticBuilder;
-        StringBuilder outputBuilder;
+        List<uint8_t> diagnosticOutput;
+        List<uint8_t> output;
 
-        auto outputFunc = [](char const* text, void* userData)
+        auto outputFunc = [](void const* data, size_t size, void* userData)
         {
-            *(StringBuilder*)userData << text;
+            ((List<uint8_t>*)userData)->AddRange((uint8_t*)data, size);
         };
 
         glslang_CompileRequest request;
         request.sourcePath = "slang";
         request.sourceText = rawGLSL.begin();
-        request.slangStage = (SlangStage) entryPoint->profile.GetStage();
+        request.slangStage = (SlangStage)entryPoint->profile.GetStage();
+        request.disassembleResult = spirvAssembly;
 
         request.diagnosticFunc = outputFunc;
-        request.diagnosticUserData = &diagnosticBuilder;
+        request.diagnosticUserData = &diagnosticOutput;
 
         request.outputFunc = outputFunc;
-        request.outputUserData = &outputBuilder;
+        request.outputUserData = &output;
 
         int err = glslang_compile(&request);
 
-        String diagnostics = diagnosticBuilder.ProduceString();
-        String output = outputBuilder.ProduceString();
-
-        if(err)
+        if (err)
         {
-            OutputDebugStringA(diagnostics.Buffer());
-            fprintf(stderr, "%s", diagnostics.Buffer());
+            OutputDebugStringA((char const *)diagnosticOutput.Buffer());
+            fwrite(diagnosticOutput.Buffer(), 1, diagnosticOutput.Count(), stderr);
             exit(1);
         }
 
@@ -397,67 +397,42 @@ namespace Slang
         case CodeGenTarget::HLSL:
             {
                 String code = emitHLSLForEntryPoint(entryPoint);
-                result.outputSource = code;
+                result.outputSource.AddRange((uint8_t*)code.Buffer(), code.Length());
             }
             break;
 
         case CodeGenTarget::GLSL:
             {
                 String code = emitGLSLForEntryPoint(entryPoint);
-                result.outputSource = code;
+                result.outputSource.AddRange((uint8_t*)code.Buffer(), code.Length());
             }
             break;
 
         case CodeGenTarget::DXBytecode:
             {
-                auto code = EmitDXBytecodeForEntryPoint(entryPoint);
-
-                // TODO(tfoley): Need to figure out an appropriate interface
-                // for returning binary code, in addition to source.
-#if 0
-                if (context.compileResult)
-                {
-                    StringBuilder sb;
-                    sb.Append((char*) code.begin(), code.Count());
-
-                    String codeString = sb.ProduceString();
-                    result.outputSource = codeString;
-                }
-                else
-#endif
-                {
-                    int col = 0;
-                    for(auto ii : code)
-                    {
-                        if(col != 0) fputs(" ", stdout);
-                        fprintf(stdout, "%02X", ii);
-                        col++;
-                        if(col == 8)
-                        {
-                            fputs("\n", stdout);
-                            col = 0;
-                        }
-                    }
-                    if(col != 0)
-                    {
-                        fputs("\n", stdout);
-                    }
-                }
-                return result;
+                List<uint8_t> code = EmitDXBytecodeForEntryPoint(entryPoint);
+                result.outputSource.AddRange(code.Buffer(), code.Count());
             }
             break;
 
         case CodeGenTarget::DXBytecodeAssembly:
             {
-                String code = EmitDXBytecodeAssemblyForEntryPoint(entryPoint);
-                result.outputSource = code;
+                List<uint8_t> code = EmitDXBytecodeAssemblyForEntryPoint(entryPoint);
+                result.outputSource.AddRange(code.Buffer(), code.Count());
+            }
+            break;
+
+        case CodeGenTarget::SPIRV:
+            {
+                List<uint8_t> code = emitSPIRVForEntryPoint(entryPoint, false);
+                result.outputSource.AddRange(code.Buffer(), code.Count());
             }
             break;
 
         case CodeGenTarget::SPIRVAssembly:
             {
-                String code = emitSPIRVAssemblyForEntryPoint(entryPoint);
-                result.outputSource = code;
+                List<uint8_t> code = emitSPIRVForEntryPoint(entryPoint, true);
+                result.outputSource.AddRange(code.Buffer(), code.Count());
             }
             break;
 
@@ -493,14 +468,11 @@ namespace Slang
         // The result for the translation unit will just be the concatenation
         // of the results for each entry point. This doesn't actually make
         // much sense, but it is good enough for now.
-        //
-        // TODO: Replace this with a packaged JSON and/or binary format.
-        StringBuilder sb;
         for (auto& entryPoint : translationUnit->entryPoints)
         {
-            sb << entryPoint->result.outputSource;
+            UInt size = entryPoint->result.outputSource.Count();
+            result.outputSource.AddRange(entryPoint->result.outputSource.Buffer(), size);
         }
-        result.outputSource = sb.ProduceString();
 
         return result;
     }

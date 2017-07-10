@@ -54,7 +54,7 @@ namespace Slang
     // Result of compiling an entry point
     struct EntryPointResult
     {
-        String outputSource;
+        List<uint8_t> outputSource;
     };
 
     // Describes an entry point that we've been requested to compile
@@ -108,7 +108,7 @@ namespace Slang
     // Result of compiling a translation unit
     struct TranslationUnitResult
     {
-        String outputSource;
+        List<uint8_t> outputSource;
     };
 
     // A single translation unit requested to be compiled.
