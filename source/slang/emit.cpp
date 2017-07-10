@@ -2628,7 +2628,7 @@ struct EmitVisitor
                 switch(context->shared->target)
                 {
                 default:
-                    Emit("static");
+                    Emit("static ");
                     break;
 
                 case CodeGenTarget::GLSL:
