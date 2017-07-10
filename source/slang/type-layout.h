@@ -237,6 +237,10 @@ public:
     // Additional flags
     VarLayoutFlags flags = 0;
 
+    // System-value semantic (and index) if this is a system value
+    String  systemValueSemantic;
+    int     systemValueSemanticIndex;
+
     // The start register(s) for any resources
     struct ResourceInfo
     {

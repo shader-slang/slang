@@ -1545,38 +1545,93 @@ struct LoweringVisitor
             type = arrayType;
         }
 
+        // We need to create a reference to the global-scope declaration
+        // of the proper GLSL input/output variable. This might
+        // be a user-defined input/output, or a system-defined `gl_` one.
+        RefPtr<ExpressionSyntaxNode> globalVarExpr;
+
+        // Handle system-value inputs/outputs
+        assert(varLayout);
+        auto systemValueSemantic = varLayout->systemValueSemantic;
+        if (systemValueSemantic.Length() != 0)
+        {
+            auto ns = systemValueSemantic.ToLower();
+
+            if (ns == "sv_target")
+            {
+                // Note: we do *not* need to generate some kind of `gl_`
+                // builtin for fragment-shader outputs: they are just
+                // ordinary `out` variables, with ordinary `location`s,
+                // as far as GLSL is concerned.
+            }
+            else if (ns == "sv_position")
+            {
+                RefPtr<VarExpressionSyntaxNode> globalVarRef = new VarExpressionSyntaxNode();
+                globalVarRef->name = "gl_Position";
+                globalVarExpr = globalVarRef;
+            }
+            else
+            {
+                assert(!"unhandled");
+            }
+        }
+
+        // If we didn't match some kind of builtin input/output,
+        // then declare a user input/output variable instead
+        if (!globalVarExpr)
+        {
+            RefPtr<Variable> globalVarDecl = new Variable();
+            globalVarDecl->Name.Content = info.name;
+            globalVarDecl->Type.type = type;
+
+            ensureDeclHasAValidName(globalVarDecl);
+
+            addMember(shared->loweredProgram, globalVarDecl);
+
+            // Add the layout information
+            RefPtr<ComputedLayoutModifier> modifier = new ComputedLayoutModifier();
+            modifier->layout = varLayout;
+            addModifier(globalVarDecl, modifier);
+
+            // Add appropriate in/out modifier
+            switch (info.direction)
+            {
+            case VaryingParameterDirection::Input:
+                addModifier(globalVarDecl, new InModifier());
+                break;
+
+            case VaryingParameterDirection::Output:
+                addModifier(globalVarDecl, new OutModifier());
+                break;
+            }
+
+
+            RefPtr<VarExpressionSyntaxNode> globalVarRef = new VarExpressionSyntaxNode();
+            globalVarRef->Position = globalVarDecl->Position;
+            globalVarRef->declRef = makeDeclRef(globalVarDecl.Ptr());
+            globalVarRef->name = globalVarDecl->getName();
+
+            globalVarExpr = globalVarRef;
+        }
+
         // TODO: if we are declaring an SOA-ized array,
         // this is where those array dimensions would need
         // to be tacked on.
+        //
+        // That is, this logic should be getting collected into a loop,
+        // and so we need to have a loop variable we can use to
+        // index into the two different expressions.
 
-        RefPtr<Variable> globalVarDecl = new Variable();
-        globalVarDecl->Name.Content = info.name;
-        globalVarDecl->Type.type = type;
-
-        ensureDeclHasAValidName(globalVarDecl);
-
-        addMember(shared->loweredProgram, globalVarDecl);
-
-        // Add the layout information
-        RefPtr<ComputedLayoutModifier> modifier = new ComputedLayoutModifier();
-        modifier->layout = varLayout;
-        addModifier(globalVarDecl, modifier);
 
         // Need to generate an assignment in the right direction.
-        //
-        // TODO: for now I am just dealing with input:
-
         switch (info.direction)
         {
         case VaryingParameterDirection::Input:
-            addModifier(globalVarDecl, new InModifier());
-            assign(varExpr, globalVarDecl);
+            assign(varExpr, globalVarExpr);
             break;
 
         case VaryingParameterDirection::Output:
-            addModifier(globalVarDecl, new OutModifier());
-
-            assign(globalVarDecl, varExpr);
+            assign(globalVarExpr, varExpr);
             break;
         }
     }

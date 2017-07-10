@@ -788,6 +788,7 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
     ParameterBindingContext*        context,
     RefPtr<ExpressionType>          type,
     EntryPointParameterState const& inState,
+    RefPtr<VarLayout>               varLayout,
     int                             semanticSlotCount = 1)
 {
     EntryPointParameterState state = inState;
@@ -815,6 +816,13 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
             {
                 context->shared->usedResourceRanges[int(LayoutResourceKind::UnorderedAccess)].Add(semanticIndex, semanticIndex + semanticSlotCount);
             }
+        }
+
+        // Remember the system-value semantic so that we can query it later
+        if (varLayout)
+        {
+            varLayout->systemValueSemantic = semanticName;
+            varLayout->systemValueSemanticIndex = semanticIndex;
         }
 
         // TODO: add some kind of usage information for system input/output
@@ -847,13 +855,15 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
 static RefPtr<TypeLayout> processEntryPointParameter(
     ParameterBindingContext*        context,
     RefPtr<ExpressionType>          type,
-    EntryPointParameterState const& state);
+    EntryPointParameterState const& state,
+    RefPtr<VarLayout>               varLayout);
 
 static RefPtr<TypeLayout> processEntryPointParameterWithPossibleSemantic(
     ParameterBindingContext*        context,
     Decl*                           declForSemantic,
     RefPtr<ExpressionType>          type,
-    EntryPointParameterState const& state)
+    EntryPointParameterState const& state,
+    RefPtr<VarLayout>               varLayout)
 {
     // If there is no explicit semantic already in effect, *and* we find an explicit
     // semantic on the associated declaration, then we'll use it.
@@ -868,7 +878,7 @@ static RefPtr<TypeLayout> processEntryPointParameterWithPossibleSemantic(
             subState.optSemanticName = &semanticInfo.name;
             subState.ioSemanticIndex = &semanticIndex;
 
-            processEntryPointParameter(context, type, subState);
+            processEntryPointParameter(context, type, subState, varLayout);
         }
     }
 
@@ -876,29 +886,30 @@ static RefPtr<TypeLayout> processEntryPointParameterWithPossibleSemantic(
     // *or* we couldn't find an explicit semantic to apply on the given
     // declaration, so we will just recursive with whatever we have at
     // the moment.
-    return processEntryPointParameter(context, type, state);
+    return processEntryPointParameter(context, type, state, varLayout);
 }
 
 
 static RefPtr<TypeLayout> processEntryPointParameter(
     ParameterBindingContext*        context,
     RefPtr<ExpressionType>          type,
-    EntryPointParameterState const& state)
+    EntryPointParameterState const& state,
+    RefPtr<VarLayout>               varLayout)
 {
     // Scalar and vector types are treated as outputs directly
     if(auto basicType = type->As<BasicExpressionType>())
     {
-        return processSimpleEntryPointParameter(context, basicType, state);
+        return processSimpleEntryPointParameter(context, basicType, state, varLayout);
     }
     else if(auto vectorType = type->As<VectorExpressionType>())
     {
-        return processSimpleEntryPointParameter(context, vectorType, state);
+        return processSimpleEntryPointParameter(context, vectorType, state, varLayout);
     }
     // A matrix is processed as if it was an array of rows
     else if( auto matrixType = type->As<MatrixExpressionType>() )
     {
         auto rowCount = GetIntVal(matrixType->getRowCount());
-        return processSimpleEntryPointParameter(context, matrixType, state, (int) rowCount);
+        return processSimpleEntryPointParameter(context, matrixType, state, varLayout, (int) rowCount);
     }
     else if( auto arrayType = type->As<ArrayExpressionType>() )
     {
@@ -908,13 +919,13 @@ static RefPtr<TypeLayout> processEntryPointParameter(
         auto elementCount = (UInt) GetIntVal(arrayType->ArrayLength);
 
         // We use the first element to derive the layout for the element type
-        auto elementTypeLayout = processEntryPointParameter(context, arrayType->BaseType, state);
+        auto elementTypeLayout = processEntryPointParameter(context, arrayType->BaseType, state, varLayout);
 
         // We still walk over subsequent elements to make sure they consume resources
         // as needed
         for( UInt ii = 1; ii < elementCount; ++ii )
         {
-            processEntryPointParameter(context, arrayType->BaseType, state);
+            processEntryPointParameter(context, arrayType->BaseType, state, nullptr);
         }
 
         RefPtr<ArrayTypeLayout> arrayTypeLayout = new ArrayTypeLayout();
@@ -946,14 +957,16 @@ static RefPtr<TypeLayout> processEntryPointParameter(
             // Need to recursively walk the fields of the structure now...
             for( auto field : GetFields(structDeclRef) )
             {
+                RefPtr<VarLayout> fieldVarLayout = new VarLayout();
+                fieldVarLayout->varDecl = field;
+
                 auto fieldTypeLayout = processEntryPointParameterWithPossibleSemantic(
                     context,
                     field.getDecl(),
                     GetType(field),
-                    state);
+                    state,
+                    fieldVarLayout);
 
-                RefPtr<VarLayout> fieldVarLayout = new VarLayout();
-                fieldVarLayout->varDecl = field;
                 fieldVarLayout->typeLayout = fieldTypeLayout;
 
                 for (auto rr : fieldTypeLayout->resourceInfos)
@@ -1062,14 +1075,16 @@ static void collectEntryPointParameters(
             state.directionMask |= kEntryPointParameterDirection_Output;
         }
 
+        RefPtr<VarLayout> paramVarLayout = new VarLayout();
+        paramVarLayout->varDecl = makeDeclRef(paramDecl.Ptr());
+
         auto paramTypeLayout = processEntryPointParameterWithPossibleSemantic(
             context,
             paramDecl.Ptr(),
             paramDecl->Type.type,
-            state);
+            state,
+            paramVarLayout);
 
-        RefPtr<VarLayout> paramVarLayout = new VarLayout();
-        paramVarLayout->varDecl = makeDeclRef(paramDecl.Ptr());
         paramVarLayout->typeLayout = paramTypeLayout;
 
         for (auto rr : paramTypeLayout->resourceInfos)
@@ -1089,13 +1104,15 @@ static void collectEntryPointParameters(
     {
         state.directionMask = kEntryPointParameterDirection_Output;
 
+        RefPtr<VarLayout> resultLayout = new VarLayout();
+
         auto resultTypeLayout = processEntryPointParameterWithPossibleSemantic(
             context,
             entryPointFuncDecl,
             resultType,
-            state);
+            state,
+            resultLayout);
 
-        RefPtr<VarLayout> resultLayout = new VarLayout();
         resultLayout->typeLayout = resultTypeLayout;
 
         for (auto rr : resultTypeLayout->resourceInfos)
