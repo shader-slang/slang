@@ -4,7 +4,6 @@
     <Natvis Include="slang.natvis" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="compiled-program.h" />
     <ClInclude Include="compiler.h" />
     <ClInclude Include="diagnostic-defs.h" />
     <ClInclude Include="diagnostics.h" />

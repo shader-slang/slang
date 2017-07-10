@@ -543,15 +543,18 @@ LayoutRulesFamilyImpl* GetLayoutRulesFamilyImpl(LayoutRulesFamily rule)
     }
 }
 
-LayoutRulesFamilyImpl* GetLayoutRulesFamilyImpl(SourceLanguage language)
+LayoutRulesFamilyImpl* GetLayoutRulesFamilyImpl(CodeGenTarget target)
 {
-    switch (language)
+    switch (target)
     {
-    case SourceLanguage::Slang:
-    case SourceLanguage::HLSL:
+    case CodeGenTarget::HLSL:
+    case CodeGenTarget::DXBytecode:
+    case CodeGenTarget::DXBytecodeAssembly:
         return &kHLSLLayoutRulesFamilyImpl;
 
-    case SourceLanguage::GLSL:
+    case CodeGenTarget::GLSL:
+    case CodeGenTarget::SPIRV:
+    case CodeGenTarget::SPIRVAssembly:
         return &kGLSLLayoutRulesFamilyImpl;
 
     default:

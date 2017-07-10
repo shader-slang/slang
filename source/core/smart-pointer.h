@@ -163,7 +163,7 @@ namespace Slang
 
         ~RefPtr()
         {
-            releaseReference(pointer);
+            releaseReference((Slang::RefObject*) pointer);
         }
 
         T& operator*() const

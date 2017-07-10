@@ -2,6 +2,7 @@
 #define SLANG_TYPE_LAYOUT_H
 
 #include "../core/basic.h"
+#include "compiler.h"
 #include "profile.h"
 #include "syntax.h"
 
@@ -513,7 +514,7 @@ struct LayoutRulesFamilyImpl
 
 LayoutRulesImpl* GetLayoutRulesImpl(LayoutRule rule);
 LayoutRulesFamilyImpl* GetLayoutRulesFamilyImpl(LayoutRulesFamily rule);
-LayoutRulesFamilyImpl* GetLayoutRulesFamilyImpl(SourceLanguage language);
+LayoutRulesFamilyImpl* GetLayoutRulesFamilyImpl(CodeGenTarget target);
 
 SimpleLayoutInfo GetLayout(ExpressionType* type, LayoutRulesImpl* rules);
 

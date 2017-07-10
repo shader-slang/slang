@@ -1,6 +1,7 @@
 // lower.cpp
 #include "lower.h"
 
+#include "type-layout.h"
 #include "visitor.h"
 
 namespace Slang

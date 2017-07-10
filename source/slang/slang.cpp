@@ -179,6 +179,30 @@ void CompileRequest::checkAllTranslationUnits()
         checkTranslationUnit(translationUnit.Ptr());
     }
 }
+// Try to infer a single common source language for a request
+static SourceLanguage inferSourceLanguage(CompileRequest* request)
+{
+    SourceLanguage language = SourceLanguage::Unknown;
+    for (auto& translationUnit : request->translationUnits)
+    {
+        // Allow any other language to overide Slang as a choice
+        if (language == SourceLanguage::Unknown
+            || language == SourceLanguage::Slang)
+        {
+            language = translationUnit->sourceLanguage;
+        }
+        else if (language == translationUnit->sourceLanguage)
+        {
+            // same language as we currently have, so keep going
+        }
+        else
+        {
+            // we found a mismatch, so inference fails
+            return SourceLanguage::Unknown;
+        }
+    }
+    return language;
+}
 
 int CompileRequest::executeActionsInner()
 {
@@ -194,6 +218,26 @@ int CompileRequest::executeActionsInner()
         if( translationUnit->sourceLanguage == SourceLanguage::Slang )
         {
             translationUnit->compileFlags &= ~SLANG_COMPILE_FLAG_NO_CHECKING;
+        }
+    }
+
+    // If no code-generation target was specified, then try to infer one from the source language,
+    // just to make sure we can do something reasonable when `reflection-json` is specified
+    if (Target == CodeGenTarget::Unknown)
+    {
+        auto language = inferSourceLanguage(this);
+        switch (language)
+        {
+        case SourceLanguage::HLSL:
+            Target = CodeGenTarget::DXBytecodeAssembly;
+            break;
+
+        case SourceLanguage::GLSL:
+            Target = CodeGenTarget::SPIRVAssembly;
+            break;
+
+        default:
+            break;
         }
     }
 
@@ -628,7 +672,17 @@ SLANG_API void spSetCodeGenTarget(
         SlangCompileRequest*    request,
         int target)
 {
-    REQ(request)->Target = (Slang::CodeGenTarget)target;
+    if (target == SLANG_REFLECTION_JSON)
+    {
+        // HACK: We special case this because reflection JSON is actually
+        // an additional output step that layers on top of an existing
+        // target
+        REQ(request)->extraTarget = Slang::CodeGenTarget::ReflectionJSON;
+    }
+    else
+    {
+        REQ(request)->Target = (Slang::CodeGenTarget)target;
+    }
 }
 
 SLANG_API void spSetPassThrough(

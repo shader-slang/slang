@@ -137,9 +137,6 @@ struct SharedParameterBindingContext
     // The program layout we are trying to construct
     RefPtr<ProgramLayout> programLayout;
 
-    // The source language we are trying to use
-    SourceLanguage sourceLanguage;
-
     // Information on what ranges of "registers" have already
     // been claimed, for each resource type
     UsedRanges usedResourceRanges[kLayoutResourceKindCount];
@@ -160,6 +157,9 @@ struct ParameterBindingContext
 
     // What stage (if any) are we compiling for?
     Stage stage;
+
+    // The source language we are trying to use
+    SourceLanguage sourceLanguage;
 };
 
 struct LayoutSemanticInfo
@@ -398,7 +398,7 @@ getTypeLayoutForGlobalShaderParameter(
     ParameterBindingContext*    context,
     VarDeclBase*                varDecl)
 {
-    switch( context->shared->sourceLanguage )
+    switch( context->sourceLanguage )
     {
     case SourceLanguage::Slang:
     case SourceLanguage::HLSL:
@@ -1167,6 +1167,7 @@ static void collectParameters(
     for( auto& translationUnit : request->translationUnits )
     {
         context->stage = inferStageForTranslationUnit(translationUnit.Ptr());
+        context->sourceLanguage = translationUnit->sourceLanguage;
 
         // First look at global-scope parameters
         collectGlobalScopeParameters(context, translationUnit->SyntaxNode.Ptr());
@@ -1189,31 +1190,13 @@ static void collectParameters(
 void generateParameterBindings(
     CompileRequest*                 request)
 {
-    // TODO: infer a language or set of language rules to use based on the
-    // source files and entry points given
-    auto language = SourceLanguage::Unknown;
-    for( auto& translationUnit : request->translationUnits )
-    {
-        auto translationUnitLanguage = translationUnit->sourceLanguage;
-        if( language == SourceLanguage::Unknown )
-        {
-            language = translationUnitLanguage;
-        }
-        else if( language == translationUnitLanguage )
-        {
-            // same language: nothing to do...
-        }
-        else
-        {
-            // mismatch!
-            // TODO(tfoley): emit a diagnostic
-        }
-    }
+    // Try to find rules based on the selected code-generation target
+    auto rules = GetLayoutRulesFamilyImpl(request->Target);
 
-    // TODO(tfoley): We should really be picking layout rules
-    // based on the *target* language, and not the source...
-    auto rules = GetLayoutRulesFamilyImpl(language);
-    assert(rules);
+    // If there was no target, or there are no rules for the target,
+    // then bail out here.
+    if (!rules)
+        return;
 
     RefPtr<ProgramLayout> programLayout = new ProgramLayout;
 
@@ -1222,7 +1205,6 @@ void generateParameterBindings(
     SharedParameterBindingContext sharedContext;
     sharedContext.defaultLayoutRules = rules;
     sharedContext.programLayout = programLayout;
-    sharedContext.sourceLanguage = language;
 
     // Create a sub-context to collect parameters that get
     // declared into the global scope

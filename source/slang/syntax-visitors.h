@@ -3,7 +3,6 @@
 
 #include "diagnostics.h"
 #include "syntax.h"
-#include "compiled-program.h"
 
 namespace Slang
 {

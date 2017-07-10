@@ -3,11 +3,9 @@
 
 #include "../core/basic.h"
 
-#include "compiled-program.h"
 #include "diagnostics.h"
 #include "profile.h"
 #include "syntax.h"
-#include "type-layout.h"
 
 #include "../../slang.h"
 
@@ -15,6 +13,7 @@ namespace Slang
 {
     struct IncludeHandler;
     class CompileRequest;
+    class ProgramLayout;
 
     enum class CompilerMode
     {
@@ -169,6 +168,10 @@ namespace Slang
 
         // What target language are we compiling to?
         CodeGenTarget Target = CodeGenTarget::Unknown;
+
+        // An "extra" target that might override the first one
+        // when it comes to deciding output format, etc.
+        CodeGenTarget extraTarget = CodeGenTarget::Unknown;
 
         // Directories to search for `#include` files or `import`ed modules
         List<SearchDirectory> searchDirectories;

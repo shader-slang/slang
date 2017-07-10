@@ -5,6 +5,7 @@
 
 #include "../../slang.h"
 
+#include "compiler.h"
 #include "profile.h"
 
 #include <assert.h>

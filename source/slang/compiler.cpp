@@ -520,17 +520,9 @@ namespace Slang
     void generateOutput(
         CompileRequest* compileRequest)
     {
-        switch (compileRequest->Target)
+        // Allow for an "extra" target to verride things first.
+        switch (compileRequest->extraTarget)
         {
-        default:
-            // For most targets, we will do things per-translation-unit
-            for( auto translationUnit : compileRequest->translationUnits )
-            {
-                TranslationUnitResult translationUnitResult = emitTranslationUnit(translationUnit.Ptr());
-                translationUnit->result = translationUnitResult;
-            }
-            break;
-
         case CodeGenTarget::ReflectionJSON:
             {
                 String reflectionJSON = emitReflectionJSON(compileRequest->layout.Ptr());
@@ -538,8 +530,20 @@ namespace Slang
                 // HACK(tfoley): just print it out since that is what people probably expect.
                 // TODO: need a way to control where output gets routed across all possible targets.
                 fprintf(stdout, "%s", reflectionJSON.begin());
+
+                return;
             }
             break;
+
+        default:
+            break;
+        }
+
+        // For most targets, we will do things per-translation-unit
+        for( auto translationUnit : compileRequest->translationUnits )
+        {
+            TranslationUnitResult translationUnitResult = emitTranslationUnit(translationUnit.Ptr());
+            translationUnit->result = translationUnitResult;
         }
     }
 }

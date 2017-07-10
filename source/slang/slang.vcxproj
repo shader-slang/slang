@@ -165,7 +165,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\slang.h" />
-    <ClInclude Include="compiled-program.h" />
     <ClInclude Include="compiler.h" />
     <ClInclude Include="decl-defs.h" />
     <ClInclude Include="diagnostic-defs.h" />
