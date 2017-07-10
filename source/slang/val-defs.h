@@ -11,6 +11,8 @@ SYNTAX_CLASS(ConstantIntVal, IntVal)
     FIELD(IntegerLiteralValue, value)
 
     RAW(
+    ConstantIntVal()
+    {}
     ConstantIntVal(IntegerLiteralValue value)
         : value(value)
     {}
@@ -26,6 +28,8 @@ SYNTAX_CLASS(GenericParamIntVal, IntVal)
     DECL_FIELD(DeclRef<VarDeclBase>, declRef)
 
     RAW(
+    GenericParamIntVal()
+    {}
     GenericParamIntVal(DeclRef<VarDeclBase> declRef)
         : declRef(declRef)
     {}

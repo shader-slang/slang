@@ -51,12 +51,12 @@ RAW(
 
     static DeclRefType* Create(DeclRef<Decl> declRef);
 
-protected:
     DeclRefType()
     {}
     DeclRefType(DeclRef<Decl> declRef)
         : declRef(declRef)
     {}
+protected:
     virtual int GetHashCode() override;
     virtual bool EqualsImpl(ExpressionType * type) override;
     virtual ExpressionType* CreateCanonicalType() override;
@@ -64,7 +64,7 @@ protected:
 END_SYNTAX_CLASS()
 
 // Base class for types that can be used in arithmetic expressions
-SYNTAX_CLASS(ArithmeticExpressionType, DeclRefType)
+ABSTRACT_SYNTAX_CLASS(ArithmeticExpressionType, DeclRefType)
 RAW(
     virtual BasicExpressionType* GetScalarType() = 0;
 )
@@ -142,6 +142,8 @@ RAW(
     SlangResourceShape getShape() const { return flavor & 0xFF; }
     SlangResourceAccess getAccess() const { return (flavor >> 8) & 0xFF; }
 
+    TextureTypeBase()
+    {}
     TextureTypeBase(
         Flavor flavor,
         RefPtr<ExpressionType> elementType)
@@ -153,6 +155,8 @@ END_SYNTAX_CLASS()
 
 SYNTAX_CLASS(TextureType, TextureTypeBase)
 RAW(
+    TextureType()
+    {}
     TextureType(
         Flavor flavor,
         RefPtr<ExpressionType> elementType)
@@ -165,6 +169,8 @@ END_SYNTAX_CLASS()
 // as they exist in, e.g., GLSL
 SYNTAX_CLASS(TextureSamplerType, TextureTypeBase)
 RAW(
+    TextureSamplerType()
+    {}
     TextureSamplerType(
         Flavor flavor,
         RefPtr<ExpressionType> elementType)
@@ -176,6 +182,8 @@ END_SYNTAX_CLASS()
 // This is a base type for `image*` types, as they exist in GLSL
 SYNTAX_CLASS(GLSLImageType, TextureTypeBase)
 RAW(
+    GLSLImageType()
+    {}
     GLSLImageType(
         Flavor flavor,
         RefPtr<ExpressionType> elementType)
@@ -289,6 +297,8 @@ SYNTAX_CLASS(TypeType, ExpressionType)
 
 RAW(
 public:
+    TypeType()
+    {}
     TypeType(RefPtr<ExpressionType> type)
         : type(type)
     {}
@@ -340,6 +350,8 @@ SYNTAX_CLASS(NamedExpressionType, ExpressionType)
     DECL_FIELD(DeclRef<TypeDefDecl>, declRef)
 
 RAW(
+    NamedExpressionType()
+    {}
     NamedExpressionType(DeclRef<TypeDefDecl> declRef)
         : declRef(declRef)
     {}
@@ -376,6 +388,8 @@ SYNTAX_CLASS(GenericDeclRefType, ExpressionType)
     DECL_FIELD(DeclRef<GenericDecl>, declRef)
 
     RAW(
+    GenericDeclRefType()
+    {}
     GenericDeclRefType(DeclRef<GenericDecl> declRef)
         : declRef(declRef)
     {}

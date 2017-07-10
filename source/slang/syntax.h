@@ -231,6 +231,65 @@ namespace Slang
         RefPtr<ExpressionType> operator->() { return type; }
     };
 
+    // A reference to a class of syntax node, that can be
+    // used to create instances on the fly
+    struct SyntaxClassBase
+    {
+        typedef void* (*CreateFunc)();
+
+        SyntaxClassBase()
+        {}
+
+        SyntaxClassBase(CreateFunc createFunc)
+            : createFunc(createFunc)
+        {}
+
+        void* createInstanceImpl()
+        {
+            return createFunc ? createFunc() : nullptr;
+        }
+
+        CreateFunc createFunc = nullptr;
+
+        template<typename T>
+        struct Impl
+        {
+            static void* createFunc();
+        };
+    };
+
+    template<typename T>
+    struct SyntaxClass : SyntaxClassBase
+    {
+        SyntaxClass()
+        {}
+
+        template <typename U>
+        SyntaxClass(SyntaxClass<U> const& other,
+            typename EnableIf<IsConvertible<T*, U*>::Value, void>::type* = 0)
+            : SyntaxClassBase(other.createFunc)
+        {
+        }
+
+        T* createInstance()
+        {
+            return (T*)createInstanceImpl();
+        }
+
+        static SyntaxClass<T> getClass()
+        {
+            SyntaxClass<T> result;
+            result.createFunc = &SyntaxClass::Impl<T>::createFunc;
+            return result;
+        }
+    };
+
+    template<typename T>
+    SyntaxClass<T> getClass()
+    {
+        return SyntaxClass<T>::getClass();
+    }
+
 
     // A reference to a declaration, which may include
     // substitutions for generic parameters.
