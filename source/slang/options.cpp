@@ -230,6 +230,7 @@ struct OptionsParser
 
                     CASE(spirv, SPIRV);
                     CASE(spirv-assembly, SPIRV_ASM);
+                    CASE(none, TARGET_NONE);
 
                 #undef CASE
 

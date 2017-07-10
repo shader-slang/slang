@@ -461,6 +461,10 @@ namespace Slang
             }
             break;
 
+        case CodeGenTarget::None:
+            // The user requested no output
+            break;
+
         // Note(tfoley): We currently hit this case when compiling the stdlib
         case CodeGenTarget::Unknown:
             break;

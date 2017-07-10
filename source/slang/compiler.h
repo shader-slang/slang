@@ -36,6 +36,7 @@ namespace Slang
     enum class CodeGenTarget
     {
         Unknown             = SLANG_TARGET_UNKNOWN,
+        None                = SLANG_TARGET_NONE,
         GLSL                = SLANG_GLSL,
         GLSL_Vulkan         = SLANG_GLSL_VULKAN,
         GLSL_Vulkan_OneDesc = SLANG_GLSL_VULKAN_ONE_DESC,

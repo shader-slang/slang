@@ -2159,6 +2159,11 @@ struct EmitVisitor
 
     void EmitStmt(RefPtr<StatementSyntaxNode> stmt)
     {
+        // TODO(tfoley): this shouldn't occur, but sometimes
+        // lowering will get confused by an empty function body...
+        if (!stmt)
+            return;
+
         // Try to ensure that debugging can find the right location
         advanceToSourceLocation(stmt->Position);
 

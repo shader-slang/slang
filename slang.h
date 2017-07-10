@@ -66,6 +66,7 @@ extern "C"
     enum
     {
         SLANG_TARGET_UNKNOWN,
+        SLANG_TARGET_NONE,
         SLANG_GLSL,
         SLANG_GLSL_VULKAN,
         SLANG_GLSL_VULKAN_ONE_DESC,
