@@ -1684,6 +1684,18 @@ struct LoweringVisitor
         info.name = name;
         info.direction = direction;
 
+        // Ensure that we don't get name collisions on `inout` variables
+        switch (direction)
+        {
+        case VaryingParameterDirection::Input:
+            info.name = "SLANG_in_" + name;
+            break;
+
+        case VaryingParameterDirection::Output:
+            info.name = "SLANG_out_" + name;
+            break;
+        }
+
         lowerShaderParameterToGLSLGLobalsRec(
             info,
             localVarDecl->getType(),
@@ -1774,7 +1786,7 @@ struct LoweringVisitor
         {
             resultVarDecl = new Variable();
             resultVarDecl->Position = loweredEntryPointFunc->Position;
-            resultVarDecl->Name.Content = "_main_result";
+            resultVarDecl->Name.Content = "main_result";
             resultVarDecl->Type = TypeExp(loweredEntryPointFunc->ReturnType);
 
             ensureDeclHasAValidName(resultVarDecl);
