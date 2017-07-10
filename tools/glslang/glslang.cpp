@@ -171,7 +171,7 @@ int glslang_compile(glslang_CompileRequest* request)
         }
         else
         {
-            dump(spirv.data(), spirv.size() * sizeof(spirv[0]), request->outputFunc, request->outputUserData, stdout);
+            dump(spirv.data(), spirv.size() * sizeof(unsigned int), request->outputFunc, request->outputUserData, stdout);
         }
     }
 
