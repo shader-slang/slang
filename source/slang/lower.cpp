@@ -194,6 +194,8 @@ public:
 
 struct SharedLoweringContext
 {
+    CompileRequest* compileRequest;
+
     ProgramLayout*  programLayout;
 
     // The target we are going to generate code for.
@@ -1372,6 +1374,23 @@ struct LoweringVisitor
         return loweredDecl;
     }
 
+    SourceLanguage getSourceLanguage(ProgramSyntaxNode* moduleDecl)
+    {
+        for (auto translationUnit : shared->compileRequest->translationUnits)
+        {
+            if (moduleDecl == translationUnit->SyntaxNode)
+                return translationUnit->sourceLanguage;
+        }
+
+        for (auto loadedModuleDecl : shared->compileRequest->loadedModulesList)
+        {
+            if (moduleDecl == loadedModuleDecl)
+                return SourceLanguage::Slang;
+        }
+
+        return SourceLanguage::Unknown;
+    }
+
     RefPtr<VarDeclBase> visitVariable(
         Variable* decl)
     {
@@ -2022,6 +2041,7 @@ LoweredEntryPoint lowerEntryPoint(
     CodeGenTarget       target)
 {
     SharedLoweringContext sharedContext;
+    sharedContext.compileRequest = entryPoint->compileRequest;
     sharedContext.programLayout = programLayout;
     sharedContext.target = target;
 

@@ -1045,7 +1045,7 @@ static void collectEntryPointParameters(
         // We have an entry-point parameter, and need to figure out what to do with it.
 
         // TODO: need to handle `uniform`-qualified parameters here
-        if (paramDecl->HasModifier<UniformModifier>())
+        if (paramDecl->HasModifier<HLSLUniformModifier>())
             continue;
 
         state.directionMask = 0;
