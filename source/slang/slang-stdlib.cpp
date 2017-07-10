@@ -1914,6 +1914,7 @@ namespace Slang
             { "2D",		TextureType::Shape2D,	2 },
             { "3D",		TextureType::Shape3D,	3 },
             { "Cube",	TextureType::ShapeCube,	3 },
+            { "Buffer", TextureType::ShapeBuffer,   1 },
         };
         static const int kBaseTextureTypeCount = sizeof(kBaseTextureTypes) / sizeof(kBaseTextureTypes[0]);
 
