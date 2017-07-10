@@ -2,7 +2,7 @@
 #ifndef GLSLANG_H_INCLUDED
 #define GLSLANG_H_INCLUDED
 
-typedef void (*glslang_OutputFunc)(char const* text, void* userData);
+typedef void (*glslang_OutputFunc)(void const* data, size_t size, void* userData);
 
 struct glslang_CompileRequest
 {
@@ -16,6 +16,8 @@ struct glslang_CompileRequest
     void*               outputUserData;
 
     int                 slangStage;
+
+    bool                disassembleResult;
 };
 
 typedef int (*glslang_CompileFunc)(glslang_CompileRequest* request);

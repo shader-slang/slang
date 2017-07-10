@@ -51,21 +51,22 @@ static TBuiltInResource gResources =
 };
 
 static void dump(
-    std::string const&      text,
-    glslang_OutputFunc      outputFunc,
-    void*                   outputUserData,
-    FILE*                   fallbackStream)
+    void const*         data,
+    size_t              size,
+    glslang_OutputFunc  outputFunc,
+    void*               outputUserData,
+    FILE*               fallbackStream)
 {
     if( outputFunc )
     {
-        outputFunc(text.c_str(), outputUserData);
+        outputFunc(data, size, outputUserData);
     }
     else
     {
-        fprintf(fallbackStream, "%s", text.c_str());
+        fwrite(data, 1, size, fallbackStream);
 
         // also output it for debug purposes
-        OutputDebugStringA(text.c_str());
+        OutputDebugStringA((char const*)data);
     }
 }
 
@@ -73,7 +74,7 @@ static void dumpDiagnostics(
     glslang_CompileRequest* request,
     std::string const&      log)
 {
-    dump(log, request->diagnosticFunc, request->diagnosticUserData, stderr);
+    dump(log.c_str(), log.length(), request->diagnosticFunc, request->diagnosticUserData, stderr);
 }
 
 extern "C"
@@ -161,13 +162,18 @@ int glslang_compile(glslang_CompileRequest* request)
 
         dumpDiagnostics(request, logger.getAllMessages());
 
-        std::stringstream spirvAsmStream;
-
-        spv::Disassemble(spirvAsmStream, spirv);
-
-        dump(spirvAsmStream.str(), request->outputFunc, request->outputUserData, stdout);
+        if (request->disassembleResult)
+        {
+            std::stringstream spirvAsmStream;
+            spv::Disassemble(spirvAsmStream, spirv);
+            std::string result = spirvAsmStream.str();
+            dump(result.c_str(), result.length(), request->outputFunc, request->outputUserData, stdout);
+        }
+        else
+        {
+            dump(spirv.data(), spirv.size() * sizeof(spirv[0]), request->outputFunc, request->outputUserData, stdout);
+        }
     }
-
 
     glslang::FinalizeProcess();
 
