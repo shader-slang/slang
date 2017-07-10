@@ -148,6 +148,11 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
             return SLANG_TYPE_KIND_STRUCT;
         }
     }
+    else if (auto errorType = type->As<ErrorType>())
+    {
+        // This means we saw a type we didn't understand in the user's code
+        return SLANG_TYPE_KIND_NONE;
+    }
 
     assert(!"unexpected");
     return SLANG_TYPE_KIND_NONE;

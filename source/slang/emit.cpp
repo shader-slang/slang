@@ -776,6 +776,7 @@ struct EmitVisitor
         case TextureType::Shape2D:		Emit("2D");		break;
         case TextureType::Shape3D:		Emit("3D");		break;
         case TextureType::ShapeCube:	Emit("Cube");	break;
+        case TextureType::ShapeBuffer:	Emit("Buffer");	break;
         default:
             assert(!"unreachable");
             break;
@@ -1084,18 +1085,56 @@ struct EmitVisitor
         emitTypeImpl(type, nullptr);
     }
 
+    void emitTypeBasedOnExpr(ExpressionSyntaxNode* expr, EDeclarator* declarator)
+    {
+        if (auto subscriptExpr = dynamic_cast<IndexExpressionSyntaxNode*>(expr))
+        {
+            // Looks like an array
+            emitTypeBasedOnExpr(subscriptExpr->BaseExpression, declarator);
+            Emit("[");
+            if (auto indexExpr = subscriptExpr->IndexExpression)
+            {
+                EmitExpr(indexExpr);
+            }
+            Emit("]");
+        }
+        else
+        {
+            // Default case
+            EmitExpr(expr);
+            EmitDeclarator(declarator);
+        }
+    }
+
+    void EmitType(TypeExp const& typeExp, String const& name, CodePosition const& nameLoc)
+    {
+        if (!typeExp.type || typeExp.type->As<ErrorType>())
+        {
+            assert(typeExp.exp);
+
+            EDeclarator nameDeclarator;
+            nameDeclarator.flavor = EDeclarator::Flavor::Name;
+            nameDeclarator.name = name;
+            nameDeclarator.loc = nameLoc;
+
+            emitTypeBasedOnExpr(typeExp.exp, &nameDeclarator);
+        }
+        else
+        {
+            EmitType(typeExp.type,
+                typeExp.exp ? typeExp.exp->Position : CodePosition(),
+                name, nameLoc);
+        }
+    }
+
     void EmitType(TypeExp const& typeExp, Token const& nameToken)
     {
-        EmitType(typeExp.type,
-            typeExp.exp ? typeExp.exp->Position : CodePosition(),
-            nameToken.Content, nameToken.Position);
+        EmitType(typeExp, nameToken.Content, nameToken.Position);
     }
 
     void EmitType(TypeExp const& typeExp, String const& name)
     {
-        EmitType(typeExp.type,
-            typeExp.exp ? typeExp.exp->Position : CodePosition(),
-            name, CodePosition());
+        EmitType(typeExp, name, CodePosition());
     }
 
     void emitTypeExp(TypeExp const& typeExp)
@@ -2758,7 +2797,15 @@ struct EmitVisitor
     {
         EmitModifiers(declRef.getDecl());
 
-        EmitType(GetType(declRef), declRef.getDecl()->getNameToken());
+        auto type = GetType(declRef);
+        if (!type || type->As<ErrorType>())
+        {
+            EmitType(declRef.getDecl()->Type, declRef.getDecl()->getNameToken());
+        }
+        else
+        {
+            EmitType(GetType(declRef), declRef.getDecl()->getNameToken());
+        }
 
         EmitSemantics(declRef.getDecl());
 

@@ -415,6 +415,9 @@ enum class ShaderParameterKind
     InputRenderTarget,
 
     SamplerState,
+
+    Image,
+    MutableImage,
 };
 
 struct SimpleLayoutRulesImpl

@@ -895,6 +895,28 @@ SimpleLayoutInfo GetLayoutImpl(
             rules,
             outTypeLayout);
     }
+    else if (auto imageType = type->As<GLSLImageType>())
+    {
+        // TODO: the logic here should really be defined by the rules,
+        // and not at this top level...
+        ShaderParameterKind kind;
+        switch( imageType->getAccess() )
+        {
+        default:
+            kind = ShaderParameterKind::MutableImage;
+            break;
+
+        case SLANG_RESOURCE_ACCESS_READ:
+            kind = ShaderParameterKind::Image;
+            break;
+        }
+
+        return GetSimpleLayoutImpl(
+            rules->GetObjectLayout(kind),
+            type,
+            rules,
+            outTypeLayout);
+    }
     else if (auto textureSamplerType = type->As<TextureSamplerType>())
     {
         // TODO: the logic here should really be defined by the rules,
@@ -1125,6 +1147,19 @@ SimpleLayoutInfo GetLayoutImpl(
 
             return info;
         }
+    }
+    else if (auto errorType = type->As<ErrorType>())
+    {
+        // An error type means that we encountered something we don't understand.
+        //
+        // We should probalby inform the user with an error message here.
+
+        SimpleLayoutInfo info;
+        return GetSimpleLayoutImpl(
+            info,
+            type,
+            rules,
+            outTypeLayout);
     }
 
     // catch-all case in case nothing matched

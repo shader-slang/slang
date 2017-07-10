@@ -445,6 +445,7 @@ struct LoweringVisitor
     {
         TypeExp result;
         result.type = lowerType(typeExp.type);
+        result.exp = lowerExpr(typeExp.exp);
         return result;
     }
 

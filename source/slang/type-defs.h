@@ -125,6 +125,7 @@ RAW(
         Shape2D			= SLANG_TEXTURE_2D,
         Shape3D			= SLANG_TEXTURE_3D,
         ShapeCube		= SLANG_TEXTURE_CUBE,
+        ShapeBuffer     = SLANG_TEXTURE_BUFFER,
 
         Shape1DArray	= Shape1D | ArrayFlag,
         Shape2DArray	= Shape2D | ArrayFlag,
