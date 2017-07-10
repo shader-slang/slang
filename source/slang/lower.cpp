@@ -1299,17 +1299,20 @@ struct LoweringVisitor
 
     RefPtr<ImportDecl> visitImportDecl(ImportDecl* decl)
     {
-        // No need to translate things here if we are
-        // in "full" mode, because we will selectively
-        // translate the imported declarations at their
-        // use sites(s).
-        if (!shared->isRewrite)
-            return nullptr;
-
-        for (auto dd : decl->importedModuleDecl->Members)
-        {
-            translateDeclRef(dd);
-        }
+        // We could unconditionally output the declarations in the
+        // imported code, but this could cause problems if any
+        // of those declarations used capabilities not allowed
+        // by the target pipeline stage (e.g., `discard` is
+        // an error in a GLSL vertex shader file, even if
+        // it is in a function that never gets called).
+        //
+        // As a result, we just ignore the `import` step,
+        // and allow declarations to be pulled in by
+        // their use sites.
+        //
+        // If this proves to be a problem, we will need
+        // a pass that resolves which declarations in imported
+        // modules are "valid" for the chosen target stage.
 
         // Don't actually include a representation of
         // the import declaration in the output
