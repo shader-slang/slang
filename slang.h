@@ -314,7 +314,7 @@ extern "C"
     spGetTranslationUnitCount(
         SlangCompileRequest*    request);
 
-    /** Get the output code associated with a specific translation unit
+    /** Get the output code associated with a specific translation unit.
 
     The lifetime of the output pointer is the same as `request`.
     */
@@ -322,13 +322,22 @@ extern "C"
         SlangCompileRequest*    request,
         int                     translationUnitIndex);
 
-    /** Get the output code associated with a specific entry point.
+    /** Get the output source code associated with a specific entry point.
 
     The lifetime of the output pointer is the same as `request`.
     */
     SLANG_API char const* spGetEntryPointSource(
         SlangCompileRequest*    request,
         int                     entryPointIndex);
+
+    /** Get the output bytecode associated with a specific entry point.
+
+    The lifetime of the output pointer is the same as `request`.
+    */
+    SLANG_API void const* spGetEntryPointCode(
+        SlangCompileRequest*    request,
+        int                     entryPointIndex,
+        size_t*                 outSize);
 
 
     /* Note(tfoley): working on new reflection interface...
