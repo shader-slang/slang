@@ -1816,9 +1816,9 @@ struct EmitVisitor
                                     // Try to find a suitable sampler-type shader parameter in the global scope
                                     // (fingers crossed)
                                     RefPtr<VarDeclBase> samplerVar;
-                                    for (auto d : context->shared->program->Members)
+                                    for (auto dd : context->shared->program->Members)
                                     {
-                                        if (auto varDecl = d.As<VarDeclBase>())
+                                        if (auto varDecl = dd.As<VarDeclBase>())
                                         {
                                             if (auto samplerType = varDecl->Type.type->As<SamplerStateType>())
                                             {
@@ -3203,6 +3203,14 @@ struct EmitVisitor
 
     void visitVarDeclBase(RefPtr<VarDeclBase> decl, DeclEmitArg const& arg)
     {
+        // Skip fields that have been tuple-ified and don't contribute
+        // any fields of "ordinary" type.
+        if (auto tupleFieldMod = decl->FindModifier<TupleFieldModifier>())
+        {
+            if (!tupleFieldMod->hasAnyNonTupleFields)
+                return;
+        }
+
         RefPtr<VarLayout> layout = arg.layout;
         layout = maybeFetchLayout(decl, layout);
 

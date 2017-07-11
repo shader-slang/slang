@@ -1434,7 +1434,6 @@ namespace Slang
                         // When translating to GLSL, we need to break apart the `location` argument.
                         //
                         // TODO: this should realy be handled by having this member actually get lowered!
-                        int glslLoadCoordCount = kBaseTextureTypes[tt].coordCount + isArray;
                         static const char* kGLSLLoadCoordsSwizzle[] = { "", "", "x", "xy", "xyz", "xyzw" };
                         static const char* kGLSLLoadLODSwizzle[]    = { "", "", "y", "z", "w", "error" };
 

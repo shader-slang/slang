@@ -168,7 +168,7 @@ RefPtr<ExpressionSyntaxNode> structuralTransform(
 //
 
 // Pseudo-syntax used during lowering
-class TupleDecl : public VarDeclBase
+class TupleVarDecl : public VarDeclBase
 {
 public:
     virtual void accept(IDeclVisitor *, void *) override
@@ -176,7 +176,9 @@ public:
         throw "unexpected";
     }
 
-    List<RefPtr<VarDeclBase>> decls;
+    TupleTypeModifier*          tupleType;
+    RefPtr<VarDeclBase>         primaryDecl;
+    List<RefPtr<VarDeclBase>>   tupleDecls;
 };
 
 // Pseudo-syntax used during lowering:
@@ -189,7 +191,19 @@ public:
         throw "unexpected";
     }
 
-    List<RefPtr<ExpressionSyntaxNode>> exprs;
+    struct Element
+    {
+        DeclRef<VarDeclBase>            tupleFieldDeclRef;
+        RefPtr<ExpressionSyntaxNode>    expr;
+    };
+
+    // Optional reference to the "primary" value of the tuple,
+    // in the case of a tuple type with "orinary" fields
+    RefPtr<ExpressionSyntaxNode>    primaryExpr;
+
+    // Additional fields to store values for any non-ordinary fields
+    // (or fields that aren't exclusively orginary)
+    List<Element>                   tupleElements;
 };
 
 struct SharedLoweringContext
@@ -263,7 +277,7 @@ struct LoweringVisitor
 
     void registerReservedWords()
     {
-    #define WORD(NAME) registerReservedWord(#NAME)
+#define WORD(NAME) registerReservedWord(#NAME)
 
         switch (shared->target)
         {
@@ -355,7 +369,7 @@ struct LoweringVisitor
             WORD(namespace);
             WORD(using);
 
-    #define CASE(NAME) \
+#define CASE(NAME) \
         WORD(NAME ## 2); WORD(NAME ## 3); WORD(NAME ## 4)
 
             CASE(mat);
@@ -374,9 +388,9 @@ struct LoweringVisitor
             CASE(hvec);
             CASE(fvec);
 
-    #undef CASE
+#undef CASE
 
-    #define CASE(NAME)          \
+#define CASE(NAME)          \
         WORD(NAME ## 1D);       \
         WORD(NAME ## 2D);       \
         WORD(NAME ## 3D);       \
@@ -389,22 +403,22 @@ struct LoweringVisitor
         WORD(NAME ## 2DMSArray) \
         /* end */
 
-    #define CASE2(NAME)     \
+#define CASE2(NAME)     \
         CASE(NAME);         \
         CASE(i ## NAME);    \
         CASE(u ## NAME)     \
         /* end */
 
-        CASE2(sampler);
-        CASE2(image);
-        CASE2(texture);
+            CASE2(sampler);
+            CASE2(image);
+            CASE2(texture);
 
-    #undef CASE2
-    #undef CASE
+#undef CASE2
+#undef CASE
             break;
 
-        default:
-            break;
+            default:
+                break;
         }
     }
 
@@ -436,7 +450,7 @@ struct LoweringVisitor
     RefPtr<ExpressionType> lowerType(
         ExpressionType* type)
     {
-        if(!type) return nullptr;
+        if (!type) return nullptr;
         return TypeVisitor::dispatch(type);
     }
 
@@ -546,7 +560,7 @@ struct LoweringVisitor
         CodePosition const& loc,
         VarDeclBase*        decl)
     {
-        if (auto tupleDecl = dynamic_cast<TupleDecl*>(decl))
+        if (auto tupleDecl = dynamic_cast<TupleVarDecl*>(decl))
         {
             return createTupleRef(loc, tupleDecl);
         }
@@ -561,17 +575,30 @@ struct LoweringVisitor
     }
 
     RefPtr<ExpressionSyntaxNode> createTupleRef(
-        CodePosition const& loc,
-        TupleDecl*          decl)
+        CodePosition const&     loc,
+        TupleVarDecl*           decl)
     {
         RefPtr<TupleExpr> result = new TupleExpr();
         result->Position = loc;
         result->Type.type = decl->Type.type;
 
-        for (auto dd : decl->decls)
+        if (auto primaryDecl = decl->primaryDecl)
         {
-            auto expr = createVarRef(loc, dd);
-            result->exprs.Add(expr);
+            result->primaryExpr = createVarRef(loc, primaryDecl);
+        }
+
+        for (auto dd : decl->tupleDecls)
+        {
+            auto tupleVarMod = dd->FindModifier<TupleVarModifier>();
+            assert(tupleVarMod);
+            auto tupleFieldMod = tupleVarMod->tupleField;
+            assert(tupleFieldMod);
+            assert(tupleFieldMod->decl);
+
+            TupleExpr::Element elem;
+            elem.tupleFieldDeclRef = makeDeclRef(tupleFieldMod->decl);
+            elem.expr = createVarRef(loc, dd);
+            result->tupleElements.Add(elem);
         }
 
         return result;
@@ -587,12 +614,12 @@ struct LoweringVisitor
         auto loweredDeclRef = translateDeclRef(expr->declRef);
         auto loweredDecl = loweredDeclRef.getDecl();
 
-        if (auto tupleDecl = dynamic_cast<TupleDecl*>(loweredDecl))
+        if (auto tupleVarDecl = dynamic_cast<TupleVarDecl*>(loweredDecl))
         {
             // If we are referencing a declaration that got tuple-ified,
             // then we need to produce a tuple expression as well.
 
-            return createTupleRef(expr->Position, tupleDecl);
+            return createTupleRef(expr->Position, tupleVarDecl);
         }
 
         RefPtr<VarExpressionSyntaxNode> loweredExpr = new VarExpressionSyntaxNode();
@@ -601,23 +628,149 @@ struct LoweringVisitor
         return loweredExpr;
     }
 
+    void addArgs(
+        InvokeExpressionSyntaxNode*     callExpr,
+        RefPtr<ExpressionSyntaxNode>    argExpr)
+    {
+        if (auto argTuple = argExpr.As<TupleExpr>())
+        {
+            if (argTuple->primaryExpr)
+            {
+                addArgs(callExpr, argTuple->primaryExpr);
+                for (auto elem : argTuple->tupleElements)
+                {
+                    addArgs(callExpr, elem.expr);
+                }
+            }
+        }
+        else
+        {
+            callExpr->Arguments.Add(argExpr);
+        }
+    }
+
+    RefPtr<ExpressionSyntaxNode> lowerCallExpr(
+        RefPtr<InvokeExpressionSyntaxNode>  loweredExpr,
+        InvokeExpressionSyntaxNode*         expr)
+    {
+        lowerExprCommon(loweredExpr, expr);
+
+        loweredExpr->FunctionExpr = lowerExpr(expr->FunctionExpr);
+
+        for (auto arg : expr->Arguments)
+        {
+            auto loweredArg = lowerExpr(arg);
+            addArgs(loweredExpr, loweredArg);
+        }
+
+        return loweredExpr;
+    }
+
+    RefPtr<ExpressionSyntaxNode> visitInvokeExpressionSyntaxNode(
+        InvokeExpressionSyntaxNode* expr)
+    {
+        return lowerCallExpr(new InvokeExpressionSyntaxNode(), expr);
+    }
+
+    RefPtr<ExpressionSyntaxNode> visitInfixExpr(
+        InfixExpr* expr)
+    {
+        return lowerCallExpr(new InfixExpr(), expr);
+    }
+
+    RefPtr<ExpressionSyntaxNode> visitPrefixExpr(
+        PrefixExpr* expr)
+    {
+        return lowerCallExpr(new PrefixExpr(), expr);
+    }
+
+    RefPtr<ExpressionSyntaxNode> visitSelectExpressionSyntaxNode(
+        SelectExpressionSyntaxNode* expr)
+    {
+        // TODO: A tuple needs to be special-cased here
+
+        return lowerCallExpr(new SelectExpressionSyntaxNode(), expr);
+    }
+
+    RefPtr<ExpressionSyntaxNode> visitPostfixExpr(
+        PostfixExpr* expr)
+    {
+        return lowerCallExpr(new PostfixExpr(), expr);
+    }
+
+    RefPtr<ExpressionSyntaxNode> visitDerefExpr(
+        DerefExpr*  expr)
+    {
+        auto loweredBase = lowerExpr(expr->base);
+
+        if (auto baseTuple = loweredBase.As<TupleExpr>())
+        {
+            if (auto primaryExpr = baseTuple->primaryExpr)
+            {
+                RefPtr<DerefExpr> loweredPrimary = new DerefExpr();
+                lowerExprCommon(loweredPrimary, expr);
+                loweredPrimary->base = baseTuple->primaryExpr;
+                baseTuple->primaryExpr = loweredPrimary;
+                return baseTuple;
+            }
+        }
+
+        RefPtr<DerefExpr> loweredExpr = new DerefExpr();
+        lowerExprCommon(loweredExpr, expr);
+        loweredExpr->base = loweredBase;
+        return loweredExpr;
+    }
+
     RefPtr<ExpressionSyntaxNode> visitMemberExpressionSyntaxNode(
         MemberExpressionSyntaxNode* expr)
     {
         auto loweredBase = lowerExpr(expr->BaseExpression);
 
+        auto loweredDeclRef = translateDeclRef(expr->declRef);
+
         // Are we extracting an element from a tuple?
         if (auto baseTuple = loweredBase.As<TupleExpr>())
         {
-            // We need to find the correct member expression,
-            // based on the actual tuple type.
+            auto tupleFieldMod = loweredDeclRef.getDecl()->FindModifier<TupleFieldModifier>();
+            if (tupleFieldMod)
+            {
+                // This field has a tuple part to it, so we need to search for it
 
-            throw "unimplemented";
+                RefPtr<ExpressionSyntaxNode> tupleFieldExpr;
+                for (auto elem : baseTuple->tupleElements)
+                {
+                    if (loweredDeclRef.getDecl() == elem.tupleFieldDeclRef.getDecl())
+                    {
+                        tupleFieldExpr = elem.expr;
+                        break;
+                    }
+                }
+
+                if (!tupleFieldMod->hasAnyNonTupleFields)
+                    return tupleFieldExpr;
+
+                auto tupleFieldTupleExpr = tupleFieldExpr.As<TupleExpr>();
+                assert(tupleFieldTupleExpr);
+                assert(!tupleFieldTupleExpr->primaryExpr);
+
+
+                RefPtr<MemberExpressionSyntaxNode> loweredPrimaryExpr = new MemberExpressionSyntaxNode();
+                lowerExprCommon(loweredPrimaryExpr, expr);
+                loweredPrimaryExpr->BaseExpression = baseTuple->primaryExpr;
+                loweredPrimaryExpr->declRef = loweredDeclRef;
+                loweredPrimaryExpr->name = expr->name;
+
+                tupleFieldTupleExpr->primaryExpr = loweredPrimaryExpr;
+                return tupleFieldTupleExpr;
+            }
+
+            // If the field was a non-tupe field, then we can
+            // simply fall through to the ordinary case below.
+            loweredBase = baseTuple->primaryExpr;
         }
 
         // Default handling:
-        auto loweredDeclRef = translateDeclRef(expr->declRef);
-        assert(!dynamic_cast<TupleDecl*>(loweredDeclRef.getDecl()));
+        assert(!dynamic_cast<TupleVarDecl*>(loweredDeclRef.getDecl()));
 
         RefPtr<MemberExpressionSyntaxNode> loweredExpr = new MemberExpressionSyntaxNode();
         lowerExprCommon(loweredExpr, expr);
@@ -640,7 +793,7 @@ struct LoweringVisitor
     RefPtr<StatementSyntaxNode> lowerStmt(
         StatementSyntaxNode* stmt)
     {
-        if(!stmt)
+        if (!stmt)
             return nullptr;
 
         LoweringVisitor subVisitor = *this;
@@ -648,7 +801,7 @@ struct LoweringVisitor
 
         subVisitor.lowerStmtImpl(stmt);
 
-        if( !subVisitor.stmtBeingBuilt )
+        if (!subVisitor.stmtBeingBuilt)
         {
             return new EmptyStatementSyntaxNode();
         }
@@ -675,11 +828,11 @@ struct LoweringVisitor
     StatementSyntaxNode* translateStmtRef(
         StatementSyntaxNode* originalStmt)
     {
-        if(!originalStmt) return nullptr;
+        if (!originalStmt) return nullptr;
 
-        for( auto state = &stmtLoweringState; state; state = state->parent )
+        for (auto state = &stmtLoweringState; state; state = state->parent)
         {
-            if(state->originalStmt == originalStmt)
+            if (state->originalStmt == originalStmt)
                 return state->loweredStmt;
         }
 
@@ -723,7 +876,7 @@ struct LoweringVisitor
         StatementSyntaxNode*            stmt)
     {
         // add a statement to the code we are building...
-        if( !dest )
+        if (!dest)
         {
             dest = stmt;
             return;
@@ -782,7 +935,7 @@ struct LoweringVisitor
 
     void visitSeqStmt(SeqStmt* stmt)
     {
-        for( auto ss : stmt->stmts )
+        for (auto ss : stmt->stmts)
         {
             lowerStmtImpl(ss);
         }
@@ -885,9 +1038,9 @@ struct LoweringVisitor
         RefPtr<IfStatementSyntaxNode> loweredStmt = new IfStatementSyntaxNode();
         lowerStmtFields(loweredStmt, stmt);
 
-        loweredStmt->Predicate          = lowerExpr(stmt->Predicate);
-        loweredStmt->PositiveStatement  = lowerStmt(stmt->PositiveStatement);
-        loweredStmt->NegativeStatement  = lowerStmt(stmt->NegativeStatement);
+        loweredStmt->Predicate = lowerExpr(stmt->Predicate);
+        loweredStmt->PositiveStatement = lowerStmt(stmt->PositiveStatement);
+        loweredStmt->NegativeStatement = lowerStmt(stmt->NegativeStatement);
 
         addStmt(loweredStmt);
     }
@@ -899,8 +1052,8 @@ struct LoweringVisitor
 
         LoweringVisitor subVisitor = pushScope(loweredStmt, stmt);
 
-        loweredStmt->condition  = subVisitor.lowerExpr(stmt->condition);
-        loweredStmt->body       = subVisitor.lowerStmt(stmt->body);
+        loweredStmt->condition = subVisitor.lowerExpr(stmt->condition);
+        loweredStmt->body = subVisitor.lowerStmt(stmt->body);
 
         addStmt(loweredStmt);
     }
@@ -913,10 +1066,10 @@ struct LoweringVisitor
 
         LoweringVisitor subVisitor = pushScope(loweredStmt, stmt);
 
-        loweredStmt->InitialStatement       = subVisitor.lowerStmt(stmt->InitialStatement);
-        loweredStmt->SideEffectExpression   = subVisitor.lowerExpr(stmt->SideEffectExpression);
-        loweredStmt->PredicateExpression    = subVisitor.lowerExpr(stmt->PredicateExpression);
-        loweredStmt->Statement              = subVisitor.lowerStmt(stmt->Statement);
+        loweredStmt->InitialStatement = subVisitor.lowerStmt(stmt->InitialStatement);
+        loweredStmt->SideEffectExpression = subVisitor.lowerExpr(stmt->SideEffectExpression);
+        loweredStmt->PredicateExpression = subVisitor.lowerExpr(stmt->PredicateExpression);
+        loweredStmt->Statement = subVisitor.lowerStmt(stmt->Statement);
 
         addStmt(loweredStmt);
     }
@@ -938,8 +1091,8 @@ struct LoweringVisitor
 
         LoweringVisitor subVisitor = pushScope(loweredStmt, stmt);
 
-        loweredStmt->Predicate  = subVisitor.lowerExpr(stmt->Predicate);
-        loweredStmt->Statement  = subVisitor.lowerStmt(stmt->Statement);
+        loweredStmt->Predicate = subVisitor.lowerExpr(stmt->Predicate);
+        loweredStmt->Statement = subVisitor.lowerStmt(stmt->Statement);
 
         addStmt(loweredStmt);
     }
@@ -951,8 +1104,8 @@ struct LoweringVisitor
 
         LoweringVisitor subVisitor = pushScope(loweredStmt, stmt);
 
-        loweredStmt->Statement  = subVisitor.lowerStmt(stmt->Statement);
-        loweredStmt->Predicate  = subVisitor.lowerExpr(stmt->Predicate);
+        loweredStmt->Statement = subVisitor.lowerStmt(stmt->Statement);
+        loweredStmt->Predicate = subVisitor.lowerExpr(stmt->Predicate);
 
         addStmt(loweredStmt);
     }
@@ -1057,10 +1210,10 @@ struct LoweringVisitor
         return result;
     }
 
-   RefPtr<Decl> translateDeclRef(
+    RefPtr<Decl> translateDeclRef(
         Decl* decl)
     {
-       if (!decl) return nullptr;
+        if (!decl) return nullptr;
 
         // We don't want to translate references to built-in declarations,
         // since they won't be subtituted anyway.
@@ -1069,7 +1222,7 @@ struct LoweringVisitor
 
         // If any parent of the declaration was in the stdlib, then
         // we need to skip it.
-        for(auto pp = decl; pp; pp = pp->ParentDecl)
+        for (auto pp = decl; pp; pp = pp->ParentDecl)
         {
             if (pp->HasModifier<FromStdLibModifier>())
                 return decl;
@@ -1086,11 +1239,11 @@ struct LoweringVisitor
         return lowerDecl(decl);
     }
 
-   RefPtr<ContainerDecl> translateDeclRef(
-       ContainerDecl* decl)
-   {
-       return translateDeclRef((Decl*)decl).As<ContainerDecl>();
-   }
+    RefPtr<ContainerDecl> translateDeclRef(
+        ContainerDecl* decl)
+    {
+        return translateDeclRef((Decl*)decl).As<ContainerDecl>();
+    }
 
     RefPtr<DeclBase> lowerDeclBase(
         DeclBase* declBase)
@@ -1123,7 +1276,10 @@ struct LoweringVisitor
     void addDecl(
         Decl* decl)
     {
-        if(isBuildingStmt)
+        if (!decl)
+            return;
+
+        if (isBuildingStmt)
         {
             RefPtr<VarDeclrStatementSyntaxNode> declStmt = new VarDeclrStatementSyntaxNode();
             declStmt->Position = decl->Position;
@@ -1184,6 +1340,31 @@ struct LoweringVisitor
         }
     }
 
+    RefPtr<VarLayout> tryToFindLayout(
+        Decl* decl)
+    {
+        auto loweredParent = translateDeclRef(decl->ParentDecl);
+        if (loweredParent)
+        {
+            auto layoutMod = loweredParent->FindModifier<ComputedLayoutModifier>();
+            if (layoutMod)
+            {
+                auto parentLayout = layoutMod->layout;
+                if (auto structLayout = parentLayout.As<StructTypeLayout>())
+                {
+                    RefPtr<VarLayout> fieldLayout;
+                    if (structLayout->mapVarToLayout.TryGetValue(decl, fieldLayout))
+                    {
+                        return fieldLayout;
+                    }
+                }
+
+                // TODO: are there other cases to handle here?
+            }
+        }
+        return nullptr;
+    }
+
     void lowerDeclCommon(
         Decl* loweredDecl,
         Decl* decl)
@@ -1205,24 +1386,9 @@ struct LoweringVisitor
 
         // deal with layout stuff
 
-        auto loweredParent = translateDeclRef(decl->ParentDecl);
-        if (loweredParent)
+        if (auto fieldLayout = tryToFindLayout(decl))
         {
-            auto layoutMod = loweredParent->FindModifier<ComputedLayoutModifier>();
-            if (layoutMod)
-            {
-                auto parentLayout = layoutMod->layout;
-                if (auto structLayout = parentLayout.As<StructTypeLayout>())
-                {
-                    RefPtr<VarLayout> fieldLayout;
-                    if (structLayout->mapVarToLayout.TryGetValue(decl, fieldLayout))
-                    {
-                        attachLayout(loweredDecl, fieldLayout);
-                    }
-                }
-
-                // TODO: are there other cases to handle here?
-            }
+            attachLayout(loweredDecl, fieldLayout);
         }
     }
 
@@ -1297,7 +1463,7 @@ struct LoweringVisitor
         return loweredDecl;
     }
 
-    RefPtr<ImportDecl> visitImportDecl(ImportDecl* decl)
+    RefPtr<ImportDecl> visitImportDecl(ImportDecl*)
     {
         // We could unconditionally output the declarations in the
         // imported code, but this could cause problems if any
@@ -1336,6 +1502,35 @@ struct LoweringVisitor
         return loweredDecl;
     }
 
+    TupleTypeModifier* isTupleType(ExpressionType* type)
+    {
+        if (auto declRefType = type->As<DeclRefType>())
+        {
+            if (auto tupleTypeMod = declRefType->declRef.getDecl()->FindModifier<TupleTypeModifier>())
+            {
+                return tupleTypeMod;
+            }
+        }
+
+        return nullptr;
+    }
+
+    bool isResourceType(ExpressionType* type)
+    {
+        if (auto textureTypeBase = type->As<TextureTypeBase>())
+        {
+            return true;
+        }
+        else if (auto samplerType = type->As<SamplerStateType>())
+        {
+            return true;
+        }
+
+        // TODO: need more comprehensive coverage here
+
+        return false;
+    }
+
     RefPtr<Decl> visitAggTypeDecl(AggTypeDecl* decl)
     {
         // We want to lower any aggregate type declaration
@@ -1344,19 +1539,103 @@ struct LoweringVisitor
         // Any non-field members (e.g., methods) will be
         // lowered separately.
 
-        // TODO: also need to figure out how to handle fields
-        // with types that should not be allowed in a `struct`
-        // for the chosen target.
-        // (also: what to do if there are no fields left
-        // after removing invalid ones?)
-
         RefPtr<StructSyntaxNode> loweredDecl = new StructSyntaxNode();
         lowerDeclCommon(loweredDecl, decl);
 
+        // We need to be ready to turn this type into a "tuple" type,
+        // if it has any members that can't normally be kept in a `struct`
+        //
+        // We don't want to do this unconditionally, though, because
+        // then we'll end up changing the meaning of user code in
+        // languages like HLSL that support such nesting.
+
+        bool shouldDesugarTupleTypes = false;
+        if (getTarget() == CodeGenTarget::GLSL)
+        {
+            // Always desugar this stuff for GLSL, since it doesn't
+            // support nesting of resources in structs.
+            //
+            // TODO: Need a way to make this more fine-grained to
+            // handle cases where a nested member might be allowed
+            // due to, e.g., bindless textures.
+            shouldDesugarTupleTypes = true;
+        }
+
+        bool isResultATupleType = false;
+        bool hasAnyNonTupleFields = false;
+
         for (auto field : decl->getMembersOfType<VarDeclBase>())
         {
-            // TODO: anything more to do than this?
-            addMember(loweredDecl, translateDeclRef(field));
+            // We lower the field, which will involve lowering the field type
+            auto loweredField = translateDeclRef(field).As<VarDeclBase>();
+
+            // Add the field to the result declaration
+            addMember(loweredDecl, loweredField);
+
+            // Don't consider any of the following desugaring logic,
+            // if we aren't supposed to be desugaring this type
+            if (!shouldDesugarTupleTypes)
+            {
+                hasAnyNonTupleFields = true;
+                continue;
+            }
+
+            // If the field is of a type that requires special handling,
+            // we need to make a note of it.
+            auto loweredFieldType = loweredField->Type.type;
+            bool isTupleField = false;
+            bool fieldHasAnyNonTupleFields = false;
+            bool fieldHasTupleType = false;
+            if (auto fieldTupleTypeMod = isTupleType(loweredFieldType))
+            {
+                isTupleField = true;
+                fieldHasTupleType = true;
+                if (fieldTupleTypeMod->hasAnyNonTupleFields)
+                {
+                    fieldHasAnyNonTupleFields = true;
+                    hasAnyNonTupleFields = true;
+                }
+            }
+            if (isResourceType(loweredFieldType))
+            {
+                isTupleField = true;
+            }
+            else
+            {
+                hasAnyNonTupleFields = true;
+            }
+
+            if (isTupleField)
+            {
+                isResultATupleType = true;
+
+                RefPtr<TupleFieldModifier> tupleFieldMod = new TupleFieldModifier();
+                tupleFieldMod->decl = loweredField;
+                tupleFieldMod->hasAnyNonTupleFields = fieldHasAnyNonTupleFields;
+                tupleFieldMod->isNestedTuple = fieldHasTupleType;
+
+                addModifier(loweredField, tupleFieldMod);
+            }
+        }
+
+        // An empty `struct` must be treated as a tuple type,
+        // in order to ensure that we don't mess up layout logic
+        //
+        // (Also, GLSL doesn't allow empty structs IIRC)
+        //
+        // Note: in this one case we are desugaring things even
+        // when targetting HLSL, just to keep things manageable.
+        if (!hasAnyNonTupleFields)
+        {
+            isResultATupleType = true;
+        }
+
+        if (isResultATupleType)
+        {
+            RefPtr<TupleTypeModifier> tupleTypeMod = new TupleTypeModifier();
+            tupleTypeMod->decl = loweredDecl;
+            tupleTypeMod->hasAnyNonTupleFields = hasAnyNonTupleFields;
+            addModifier(loweredDecl, tupleTypeMod);
         }
 
         addMember(
@@ -1366,16 +1645,350 @@ struct LoweringVisitor
         return loweredDecl;
     }
 
-    RefPtr<VarDeclBase> lowerVarDeclCommon(
+    RefPtr<VarDeclBase> lowerSimpleVarDeclCommon(
         RefPtr<VarDeclBase> loweredDecl,
-        VarDeclBase*        decl)
+        VarDeclBase*        decl,
+        TypeExp const&      loweredType)
     {
         lowerDeclCommon(loweredDecl, decl);
 
-        loweredDecl->Type = lowerType(decl->Type);
+        loweredDecl->Type = loweredType;
         loweredDecl->Expr = lowerExpr(decl->Expr);
 
         return loweredDecl;
+    }
+    RefPtr<VarDeclBase> lowerSimpleVarDeclCommon(
+        RefPtr<VarDeclBase> loweredDecl,
+        VarDeclBase*        decl)
+    {
+        auto loweredType = lowerType(decl->Type);
+        return lowerSimpleVarDeclCommon(loweredDecl, decl, loweredType);
+    }
+
+    void createTupleTypeSecondaryVarDecls(
+        RefPtr<TupleVarDecl>            tupleDecl,
+        SyntaxClass<VarDeclBase>        varDeclClass,
+        String const&                   name,
+        RefPtr<ExpressionType>          tupleType,
+        DeclRef<AggTypeDecl>            tupleTypeDecl,
+        RefPtr<ExpressionSyntaxNode>    initExpr,
+        RefPtr<VarLayout>               primaryVarLayout,
+        RefPtr<StructTypeLayout>        tupleTypeLayout)
+    {
+        // Next, we need to go through the declarations in the aggregate
+        // type, and deal with all of those that should be tuple-ified.
+        for (auto dd : getMembersOfType<VarDeclBase>(tupleTypeDecl))
+        {
+            if (dd.getDecl()->HasModifier<HLSLStaticModifier>())
+                continue;
+
+            auto tupleFieldMod = dd.getDecl()->FindModifier<TupleFieldModifier>();
+            if (!tupleFieldMod)
+                continue;
+
+            // TODO: need to extract the initializer for this field
+            assert(!initExpr);
+            RefPtr<ExpressionSyntaxNode> fieldInitExpr;
+
+            String fieldName = name + "_" + dd.GetName();
+
+            auto fieldType = GetType(dd);
+
+            Decl* originalFieldDecl;
+            shared->mapLoweredDeclToOriginal.TryGetValue(dd, originalFieldDecl);
+            assert(originalFieldDecl);
+
+            RefPtr<VarLayout> fieldLayout;
+            if(tupleTypeLayout)
+            {
+                tupleTypeLayout->mapVarToLayout.TryGetValue(originalFieldDecl, fieldLayout);
+            }
+            if (fieldLayout && primaryVarLayout)
+            {
+                // The layout for a field may need to be adjusted
+                // based on a base offset stored in the primary
+                // variable.
+                //
+                // For example, if the primary variable was recoreded
+                // to start at descriptor-table slot N, then the
+                // field layout might say it uses slot k, but that
+                // needs to be understood relative to the parent,
+                // so we want slot N + k... and actuall N + k + 1,
+                // in the case where the parent itself took up
+                // space of that type...
+
+                bool needsOffset = false;
+                for (auto rr : fieldLayout->resourceInfos)
+                {
+                    if (auto parentInfo = primaryVarLayout->FindResourceInfo(rr.kind))
+                    {
+                        if (parentInfo->index != 0 || parentInfo->space != 0)
+                        {
+                            needsOffset = true;
+                            break;
+                        }
+
+                        // Even if the base offset of the parent is zero, we may still
+                        // need to offset the child, because the parent consumes a
+                        // resources of the same kind...
+                        if (primaryVarLayout->typeLayout->type->As<UniformParameterBlockType>())
+                        {
+                            switch (rr.kind)
+                            {
+                            default:
+                                break;
+
+                            case LayoutResourceKind::ConstantBuffer:
+                            case LayoutResourceKind::DescriptorTableSlot:
+                                needsOffset = true;
+                                break;
+                            }
+                            if (needsOffset)
+                                break;
+                        }
+                    }
+                }
+                if (needsOffset)
+                {
+                    RefPtr<VarLayout> newFieldLayout = new VarLayout();
+                    newFieldLayout->typeLayout = fieldLayout->typeLayout;
+                    newFieldLayout->flags = fieldLayout->flags;
+                    newFieldLayout->varDecl = fieldLayout->varDecl;
+                    newFieldLayout->systemValueSemantic = fieldLayout->systemValueSemantic;
+                    newFieldLayout->systemValueSemanticIndex = fieldLayout->systemValueSemanticIndex;
+
+                    for (auto resInfo : fieldLayout->resourceInfos)
+                    {
+                        auto newResInfo = newFieldLayout->findOrAddResourceInfo(resInfo.kind);
+                        newResInfo->index = resInfo.index;
+                        newResInfo->space = resInfo.space;
+                        if (auto parentInfo = primaryVarLayout->FindResourceInfo(resInfo.kind))
+                        {
+                            newResInfo->index += parentInfo->index;
+                            newResInfo->space += parentInfo->space;
+
+                            // Very special-case hack to deal with the case where the parent
+                            // itself consumes a resources of the same type as the field.
+                            if (primaryVarLayout->typeLayout->type->As<UniformParameterBlockType>())
+                            {
+                                switch (resInfo.kind)
+                                {
+                                default:
+                                    break;
+
+                                case LayoutResourceKind::ConstantBuffer:
+                                case LayoutResourceKind::DescriptorTableSlot:
+                                    newResInfo->index += 1;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    fieldLayout = newFieldLayout;
+                }
+
+            }
+
+            RefPtr<VarDeclBase> fieldVarOrTupleDecl;
+            if (auto fieldTupleTypeMod = isTupleType(fieldType))
+            {
+                // If the field is itself a tuple, then recurse
+                RefPtr<TupleVarDecl> fieldTupleDecl = new TupleVarDecl();
+                fieldTupleDecl->tupleType = fieldTupleTypeMod;
+                createTupleTypeSecondaryVarDecls(
+                    fieldTupleDecl,
+                    varDeclClass,
+                    fieldName,
+                    fieldType,
+                    makeDeclRef(fieldTupleTypeMod->decl),
+                    fieldInitExpr,
+                    fieldLayout,
+                    getBodyStructTypeLayout(fieldLayout->typeLayout));
+
+                 fieldVarOrTupleDecl = fieldTupleDecl;
+            }
+            else
+            {
+                // Otherwise the field has a simple type, and we just need to declare the variable here
+                RefPtr<VarDeclBase> fieldVarDecl = varDeclClass.createInstance();
+                fieldVarDecl->Name.Content = fieldName;
+                fieldVarDecl->Type.type = fieldType;
+
+                addDecl(fieldVarDecl);
+
+                if (fieldLayout)
+                {
+                    RefPtr<ComputedLayoutModifier> layoutMod = new ComputedLayoutModifier();
+                    layoutMod->layout = fieldLayout;
+                    addModifier(fieldVarDecl, layoutMod);
+                }
+
+                fieldVarOrTupleDecl = fieldVarDecl;
+            }
+
+            RefPtr<TupleVarModifier> fieldTupleVarMod = new TupleVarModifier();
+            fieldTupleVarMod->tupleField = tupleFieldMod;
+            addModifier(fieldVarOrTupleDecl, fieldTupleVarMod);
+
+            tupleDecl->tupleDecls.Add(fieldVarOrTupleDecl);
+        }
+    }
+
+    RefPtr<VarDeclBase> createTupleTypeVarDecls(
+        SyntaxClass<VarDeclBase>        varDeclClass,
+        RefPtr<VarDeclBase>             originalVarDecl,
+        String const&                   name,
+        RefPtr<ExpressionType>          tupleType,
+        DeclRef<AggTypeDecl>            tupleTypeDecl,
+        TupleTypeModifier*              tupleTypeMod,
+        RefPtr<ExpressionSyntaxNode>    initExpr,
+        RefPtr<VarLayout>               primaryVarLayout,
+        RefPtr<StructTypeLayout>        tupleTypeLayout)
+    {
+        // Not handling initializers just yet...
+        assert(!initExpr);
+
+        // We'll need a placeholder declaration to wrap the whole thing up:
+        RefPtr<TupleVarDecl> tupleDecl = new TupleVarDecl();
+        tupleDecl->Name.Content = name;
+
+        // First, if the tuple type had any "ordinary" data,
+        // then we go ahead and create a declaration for that stuff
+        if (tupleTypeMod->hasAnyNonTupleFields)
+        {
+            RefPtr<VarDeclBase> primaryVarDecl = varDeclClass.createInstance();
+            primaryVarDecl->Name.Content = name;
+            primaryVarDecl->Type.type = tupleType;
+
+            primaryVarDecl->modifiers = originalVarDecl->modifiers;
+
+            tupleDecl->primaryDecl = primaryVarDecl;
+
+            if (primaryVarLayout)
+            {
+                RefPtr<ComputedLayoutModifier> layoutMod = new ComputedLayoutModifier();
+                layoutMod->layout = primaryVarLayout;
+                addModifier(primaryVarDecl, layoutMod);
+            }
+
+            addDecl(primaryVarDecl);
+        }
+
+        createTupleTypeSecondaryVarDecls(
+            tupleDecl,
+            varDeclClass,
+            name,
+            tupleType,
+            tupleTypeDecl,
+            initExpr,
+            primaryVarLayout,
+            tupleTypeLayout);
+
+        return tupleDecl;
+    }
+
+    RefPtr<StructTypeLayout> getBodyStructTypeLayout(RefPtr<TypeLayout> typeLayout)
+    {
+        if (!typeLayout)
+            return nullptr;
+
+        while (auto parameterBlockTypeLayout = typeLayout.As<ParameterBlockTypeLayout>())
+        {
+            typeLayout = parameterBlockTypeLayout->elementTypeLayout;
+        }
+
+        if (auto structTypeLayout = typeLayout.As<StructTypeLayout>())
+        {
+            return structTypeLayout;
+        }
+
+        return nullptr;
+    }
+
+    RefPtr<VarDeclBase> createTupleTypeVarDecls(
+        SyntaxClass<VarDeclBase>        varDeclClass,
+        RefPtr<VarDeclBase>             originalVarDecl,
+        String const&                   name,
+        RefPtr<ExpressionType>          tupleType,
+        TupleTypeModifier*              tupleTypeMod,
+        RefPtr<ExpressionSyntaxNode>    initExpr,
+        RefPtr<VarLayout>               primaryVarLayout)
+    {
+        RefPtr<StructTypeLayout> tupleTypeLayout;
+        if (primaryVarLayout)
+        {
+            auto primaryTypeLayout = primaryVarLayout->typeLayout;
+            tupleTypeLayout = getBodyStructTypeLayout(primaryTypeLayout);
+        }
+
+        return createTupleTypeVarDecls(
+            varDeclClass,
+            originalVarDecl,
+            name,
+            tupleType,
+            makeDeclRef(tupleTypeMod->decl),
+            tupleTypeMod,
+            initExpr,
+            primaryVarLayout,
+            tupleTypeLayout);
+    }
+
+    RefPtr<VarDeclBase> lowerVarDeclCommon(
+        VarDeclBase*                decl,
+        SyntaxClass<VarDeclBase>    loweredDeclClass)
+    {
+        auto loweredType = lowerType(decl->Type);
+
+        if (auto tupleTypeMod = isTupleType(loweredType))
+        {
+            auto varLayout = tryToFindLayout(decl).As<VarLayout>();
+
+            // The type for the variable is a "tuple type"
+            // so we need to go ahead and create multiple variables
+            // to represent it.
+
+            // If the variable had an initializer, we expect it
+            // to resolve to a tuple *value*
+            auto loweredInit = lowerExpr(decl->Expr);
+
+            // TODO: need to extract layout here and propagate it down!
+
+            auto tupleDecl = createTupleTypeVarDecls(
+                loweredDeclClass,
+                decl,
+                decl->getName(),
+                loweredType.type,
+                tupleTypeMod,
+                loweredInit,
+                varLayout);
+
+            shared->loweredDecls.Add(decl, tupleDecl);
+            return nullptr;
+        }
+        if (auto bufferType = loweredType->As<UniformParameterBlockType>())
+        {
+            auto varLayout = tryToFindLayout(decl).As<VarLayout>();
+
+            auto elementType = bufferType->elementType;
+            if (auto elementTupleTypeMod = isTupleType(elementType))
+            {
+                auto tupleDecl = createTupleTypeVarDecls(
+                    loweredDeclClass,
+                    decl,
+                    decl->getName(),
+                    loweredType.type,
+                    elementTupleTypeMod,
+                    nullptr,
+                    varLayout);
+
+                shared->loweredDecls.Add(decl, tupleDecl);
+                return nullptr;
+            }
+        }
+
+        RefPtr<VarDeclBase> loweredDecl = loweredDeclClass.createInstance();
+        return lowerSimpleVarDeclCommon(loweredDecl, decl, loweredType);
     }
 
     SourceLanguage getSourceLanguage(ProgramSyntaxNode* moduleDecl)
@@ -1398,7 +2011,9 @@ struct LoweringVisitor
     RefPtr<VarDeclBase> visitVariable(
         Variable* decl)
     {
-        auto loweredDecl = lowerVarDeclCommon(new Variable(), decl);
+        auto loweredDecl = lowerVarDeclCommon(decl, getClass<Variable>());
+        if(!loweredDecl)
+            return nullptr;
 
         // We need to add things to an appropriate scope, based on what
         // we are referencing.
@@ -1426,13 +2041,15 @@ struct LoweringVisitor
     RefPtr<VarDeclBase> visitStructField(
         StructField* decl)
     {
-        return lowerVarDeclCommon(new StructField(), decl);
+        return lowerSimpleVarDeclCommon(new StructField(), decl);
     }
 
     RefPtr<VarDeclBase> visitParameterSyntaxNode(
         ParameterSyntaxNode* decl)
     {
-        return lowerVarDeclCommon(new ParameterSyntaxNode(), decl);
+        auto loweredDecl = lowerVarDeclCommon(decl, getClass<ParameterSyntaxNode>());
+        addDecl(loweredDecl);
+        return loweredDecl;
     }
 
     RefPtr<DeclBase> transformSyntaxField(DeclBase* decl)
@@ -1460,23 +2077,23 @@ struct LoweringVisitor
         lowerDeclCommon(loweredDecl, decl);
 
         // TODO: push scope for parent decl here...
-
-        // TODO: need to copy over relevant modifiers
-
-        for (auto paramDecl : decl->GetParameters())
-        {
-            addMember(loweredDecl, translateDeclRef(paramDecl));
-        }
-
-        auto loweredReturnType = lowerType(decl->ReturnType);
-
-        loweredDecl->ReturnType = loweredReturnType;
+        LoweringVisitor subVisitor = *this;
+        subVisitor.parentDecl = loweredDecl;
 
         // If we are a being called recurisvely, then we need to
         // be careful not to let the context get polluted
-        LoweringVisitor subVisitor = *this;
         subVisitor.resultVariable = nullptr;
         subVisitor.stmtBeingBuilt = nullptr;
+        subVisitor.isBuildingStmt = false;
+
+        for (auto paramDecl : decl->GetParameters())
+        {
+            subVisitor.translateDeclRef(paramDecl);
+        }
+
+        auto loweredReturnType = subVisitor.lowerType(decl->ReturnType);
+
+        loweredDecl->ReturnType = loweredReturnType;
 
         loweredDecl->Body = subVisitor.lowerStmt(decl->Body);
 
