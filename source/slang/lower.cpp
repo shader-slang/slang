@@ -1299,17 +1299,20 @@ struct LoweringVisitor
 
     RefPtr<ImportDecl> visitImportDecl(ImportDecl* decl)
     {
-        // No need to translate things here if we are
-        // in "full" mode, because we will selectively
-        // translate the imported declarations at their
-        // use sites(s).
-        if (!shared->isRewrite)
-            return nullptr;
-
-        for (auto dd : decl->importedModuleDecl->Members)
-        {
-            translateDeclRef(dd);
-        }
+        // We could unconditionally output the declarations in the
+        // imported code, but this could cause problems if any
+        // of those declarations used capabilities not allowed
+        // by the target pipeline stage (e.g., `discard` is
+        // an error in a GLSL vertex shader file, even if
+        // it is in a function that never gets called).
+        //
+        // As a result, we just ignore the `import` step,
+        // and allow declarations to be pulled in by
+        // their use sites.
+        //
+        // If this proves to be a problem, we will need
+        // a pass that resolves which declarations in imported
+        // modules are "valid" for the chosen target stage.
 
         // Don't actually include a representation of
         // the import declaration in the output
@@ -1528,6 +1531,14 @@ struct LoweringVisitor
         VaryingParameterArraySpec*  arraySpecs = nullptr;
     };
 
+    RefPtr<ExpressionSyntaxNode> createGLSLBuiltinRef(
+        char const* name)
+    {
+        RefPtr<VarExpressionSyntaxNode> globalVarRef = new VarExpressionSyntaxNode();
+        globalVarRef->name = name;
+        return globalVarRef;
+    }
+
 
     void lowerSimpleShaderParameterToGLSLGlobal(
         VaryingParameterInfo const&     info,
@@ -1567,9 +1578,121 @@ struct LoweringVisitor
             }
             else if (ns == "sv_position")
             {
-                RefPtr<VarExpressionSyntaxNode> globalVarRef = new VarExpressionSyntaxNode();
-                globalVarRef->name = "gl_Position";
-                globalVarExpr = globalVarRef;
+                if (info.direction == VaryingParameterDirection::Input)
+                {
+                    globalVarExpr = createGLSLBuiltinRef("gl_FragCoord");
+                }
+                else
+                {
+                    globalVarExpr = createGLSLBuiltinRef("gl_Position");
+                }
+            }
+            else if (ns == "sv_clipdistance")
+            {
+                globalVarExpr = createGLSLBuiltinRef("gl_ClipDistance");
+            }
+            else if (ns == "sv_culldistance")
+            {
+                // TODO: ARB_cull_distance
+                globalVarExpr = createGLSLBuiltinRef("gl_CullDistance");
+            }
+            else if (ns == "sv_coverage")
+            {
+                if (info.direction == VaryingParameterDirection::Input)
+                {
+                    globalVarExpr = createGLSLBuiltinRef("gl_SampleMaskIn");
+                }
+                else
+                {
+                    globalVarExpr = createGLSLBuiltinRef("gl_SampleMask");
+                }
+            }
+            else if (ns == "sv_depth")
+            {
+                globalVarExpr = createGLSLBuiltinRef("gl_FragDepth");
+            }
+            else if (ns == "sv_depthgreaterequal")
+            {
+                // TODO: layout(depth_greater) out float gl_FragDepth;
+                globalVarExpr = createGLSLBuiltinRef("gl_FragDepth");
+            }
+            else if (ns == "sv_depthlessequal")
+            {
+                // TODO: layout(depth_less) out float gl_FragDepth;
+                globalVarExpr = createGLSLBuiltinRef("gl_FragDepth");
+            }
+            else if (ns == "sv_dispatchthreadid")
+            {
+                globalVarExpr = createGLSLBuiltinRef("gl_GlobalInvocationID");
+            }
+            else if (ns == "sv_domainlocation")
+            {
+                globalVarExpr = createGLSLBuiltinRef("gl_TessCoord");
+            }
+            else if (ns == "sv_groupid")
+            {
+                globalVarExpr = createGLSLBuiltinRef("gl_WorkGroupID");
+            }
+            else if (ns == "sv_groupindex")
+            {
+                globalVarExpr = createGLSLBuiltinRef("gl_LocationInvocationIndex");
+            }
+            else if (ns == "sv_groupthreadid")
+            {
+                globalVarExpr = createGLSLBuiltinRef("gl_LocalInvocationID");
+            }
+            else if (ns == "sv_gsinstanceid")
+            {
+                globalVarExpr = createGLSLBuiltinRef("gl_InvocationID");
+            }
+            else if (ns == "sv_insidetessfactor")
+            {
+                globalVarExpr = createGLSLBuiltinRef("gl_TessLevelInner");
+            }
+            else if (ns == "sv_instanceid")
+            {
+                globalVarExpr = createGLSLBuiltinRef("gl_InstanceIndex");
+            }
+            else if (ns == "sv_isfrontface")
+            {
+                globalVarExpr = createGLSLBuiltinRef("gl_FrontFacing");
+            }
+            else if (ns == "sv_outputcontrolpointid")
+            {
+                globalVarExpr = createGLSLBuiltinRef("gl_InvocationID");
+            }
+            else if (ns == "sv_outputcontrolpointid")
+            {
+                globalVarExpr = createGLSLBuiltinRef("gl_InvocationID");
+            }
+            else if (ns == "sv_primitiveid")
+            {
+                globalVarExpr = createGLSLBuiltinRef("gl_PrimitiveID");
+            }
+            else if (ns == "sv_rendertargetarrayindex")
+            {
+                globalVarExpr = createGLSLBuiltinRef("gl_Layer");
+            }
+            else if (ns == "sv_sampleindex")
+            {
+                globalVarExpr = createGLSLBuiltinRef("gl_SampleID");
+            }
+            else if (ns == "sv_stencilref")
+            {
+                // TODO: ARB_shader_stencil_export
+                globalVarExpr = createGLSLBuiltinRef("gl_SampleID");
+            }
+            else if (ns == "sv_tessfactor")
+            {
+                globalVarExpr = createGLSLBuiltinRef("gl_TessLevelOuter");
+            }
+            else if (ns == "sv_vertexid")
+            {
+                globalVarExpr = createGLSLBuiltinRef("gl_VertexIndex");
+            }
+            else if (ns == "sv_viewportarrayindex")
+            {
+                globalVarExpr = createGLSLBuiltinRef("gl_ViewportIndex");
             }
             else
             {
