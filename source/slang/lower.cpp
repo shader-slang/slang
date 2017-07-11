@@ -637,10 +637,10 @@ struct LoweringVisitor
             if (argTuple->primaryExpr)
             {
                 addArgs(callExpr, argTuple->primaryExpr);
-                for (auto elem : argTuple->tupleElements)
-                {
-                    addArgs(callExpr, elem.expr);
-                }
+            }
+            for (auto elem : argTuple->tupleElements)
+            {
+                addArgs(callExpr, elem.expr);
             }
         }
         else
@@ -727,6 +727,7 @@ struct LoweringVisitor
         auto loweredBase = lowerExpr(expr->BaseExpression);
 
         auto loweredDeclRef = translateDeclRef(expr->declRef);
+
 
         // Are we extracting an element from a tuple?
         if (auto baseTuple = loweredBase.As<TupleExpr>())
@@ -1517,6 +1518,11 @@ struct LoweringVisitor
 
     bool isResourceType(ExpressionType* type)
     {
+        while (auto arrayType = type->As<ArrayExpressionType>())
+        {
+            type = arrayType->BaseType;
+        }
+
         if (auto textureTypeBase = type->As<TextureTypeBase>())
         {
             return true;
@@ -1580,6 +1586,7 @@ struct LoweringVisitor
                 continue;
             }
 
+
             // If the field is of a type that requires special handling,
             // we need to make a note of it.
             auto loweredFieldType = loweredField->Type.type;
@@ -1596,7 +1603,7 @@ struct LoweringVisitor
                     hasAnyNonTupleFields = true;
                 }
             }
-            if (isResourceType(loweredFieldType))
+            else if (isResourceType(loweredFieldType))
             {
                 isTupleField = true;
             }
@@ -1638,9 +1645,18 @@ struct LoweringVisitor
             addModifier(loweredDecl, tupleTypeMod);
         }
 
-        addMember(
-            shared->loweredProgram,
-            loweredDecl);
+        if (isResultATupleType && !hasAnyNonTupleFields)
+        {
+            // We don't want any pure-tuple types showing up in
+            // the output program, so we skip that here.
+        }
+        else
+        {
+            addMember(
+                shared->loweredProgram,
+                loweredDecl);
+        }
+
 
         return loweredDecl;
     }
@@ -1934,7 +1950,7 @@ struct LoweringVisitor
             tupleTypeLayout);
     }
 
-    RefPtr<VarDeclBase> lowerVarDeclCommon(
+    RefPtr<VarDeclBase> lowerVarDeclCommonInner(
         VarDeclBase*                decl,
         SyntaxClass<VarDeclBase>    loweredDeclClass)
     {
@@ -1964,7 +1980,7 @@ struct LoweringVisitor
                 varLayout);
 
             shared->loweredDecls.Add(decl, tupleDecl);
-            return nullptr;
+            return tupleDecl;
         }
         if (auto bufferType = loweredType->As<UniformParameterBlockType>())
         {
@@ -1983,12 +1999,40 @@ struct LoweringVisitor
                     varLayout);
 
                 shared->loweredDecls.Add(decl, tupleDecl);
-                return nullptr;
+                return tupleDecl;
             }
         }
 
         RefPtr<VarDeclBase> loweredDecl = loweredDeclClass.createInstance();
+        addDecl(loweredDecl);
         return lowerSimpleVarDeclCommon(loweredDecl, decl, loweredType);
+    }
+
+    RefPtr<VarDeclBase> lowerVarDeclCommon(
+        VarDeclBase*                decl,
+        SyntaxClass<VarDeclBase>    loweredDeclClass)
+    {
+        // We need to add things to an appropriate scope, based on what
+        // we are referencing.
+        //
+        // If this is a global variable (program scope), then add it
+        // to the global scope.
+        RefPtr<ContainerDecl> pp = decl->ParentDecl;
+        if (auto parentModuleDecl = pp.As<ProgramSyntaxNode>())
+        {
+            LoweringVisitor subVisitor = *this;
+            subVisitor.parentDecl = translateDeclRef(parentModuleDecl);
+            subVisitor.isBuildingStmt = false;
+
+            return subVisitor.lowerVarDeclCommonInner(decl, loweredDeclClass);
+        }
+        // TODO: handle `static` function-scope variables
+        else
+        {
+            // The default behavior is to lower into whatever
+            // scope was already in places
+            return lowerVarDeclCommonInner(decl, loweredDeclClass);
+        }
     }
 
     SourceLanguage getSourceLanguage(ProgramSyntaxNode* moduleDecl)
@@ -2015,26 +2059,6 @@ struct LoweringVisitor
         if(!loweredDecl)
             return nullptr;
 
-        // We need to add things to an appropriate scope, based on what
-        // we are referencing.
-        //
-        // If this is a global variable (program scope), then add it
-        // to the global scope.
-        RefPtr<ContainerDecl> pp = decl->ParentDecl;
-        if (auto parentModuleDecl = pp.As<ProgramSyntaxNode>())
-        {
-            addMember(
-                translateDeclRef(parentModuleDecl),
-                loweredDecl);
-        }
-        // TODO: handle `static` function-scope variables
-        else
-        {
-            // A local variable declaration will get added to the
-            // statement scope we are currently processing.
-            addDecl(loweredDecl);
-        }
-
         return loweredDecl;
     }
 
@@ -2048,7 +2072,6 @@ struct LoweringVisitor
         ParameterSyntaxNode* decl)
     {
         auto loweredDecl = lowerVarDeclCommon(decl, getClass<ParameterSyntaxNode>());
-        addDecl(loweredDecl);
         return loweredDecl;
     }
 
