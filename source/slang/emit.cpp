@@ -2812,8 +2812,16 @@ struct EmitVisitor
         // TODO(tfoley): technically have to apply substitution here too...
         if (auto initExpr = declRef.getDecl()->Expr)
         {
-            Emit(" = ");
-            EmitExpr(initExpr);
+            if (declRef.As<ParameterSyntaxNode>()
+                && context->shared->target == CodeGenTarget::GLSL)
+            {
+                // Don't emit default parameter values when lowering to GLSL
+            }
+            else
+            {
+                Emit(" = ");
+                EmitExpr(initExpr);
+            }
         }
     }
 
