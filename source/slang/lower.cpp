@@ -1804,7 +1804,7 @@ struct LoweringVisitor
                     makeDeclRef(fieldTupleTypeMod->decl),
                     fieldInitExpr,
                     fieldLayout,
-                    getBodyStructTypeLayout(fieldLayout->typeLayout));
+                    getBodyStructTypeLayout(fieldLayout ? fieldLayout->typeLayout : nullptr));
 
                  fieldVarOrTupleDecl = fieldTupleDecl;
             }
