@@ -1941,7 +1941,8 @@ namespace Slang
 
                 for (int isMultisample = 0; isMultisample < 2; ++isMultisample)
                 {
-                    auto access = SLANG_RESOURCE_ACCESS_READ;
+                    auto readAccess = SLANG_RESOURCE_ACCESS_READ;
+                    auto readWriteAccess = SLANG_RESOURCE_ACCESS_READ_WRITE;
 
                     // TODO: any constraints to enforce on what gets to be multisampled?
 
@@ -1951,7 +1952,10 @@ namespace Slang
                     if (isMultisample)	flavor |= TextureType::MultisampleFlag;
 //                        if (isShadow)		flavor |= TextureType::ShadowFlag;
 
-                    flavor |= (access << 8);
+
+
+                    unsigned readFlavor = flavor | (readAccess << 8);
+                    unsigned readWriteFlavor = flavor | (readWriteAccess << 8);
 
                     StringBuilder nameBuilder;
                     nameBuilder << shapeName;
@@ -1960,17 +1964,17 @@ namespace Slang
                     auto name = nameBuilder.ProduceString();
 
                     sb << "__generic<T> ";
-                    sb << "__magic_type(TextureSampler," << int(flavor) << ") struct ";
+                    sb << "__magic_type(TextureSampler," << int(readFlavor) << ") struct ";
                     sb << "__sampler" << name;
                     sb << " {};\n";
 
                     sb << "__generic<T> ";
-                    sb << "__magic_type(Texture," << int(flavor) << ") struct ";
+                    sb << "__magic_type(Texture," << int(readFlavor) << ") struct ";
                     sb << "__texture" << name;
                     sb << " {};\n";
 
                     sb << "__generic<T> ";
-                    sb << "__magic_type(GLSLImageType," << int(flavor) << ") struct ";
+                    sb << "__magic_type(GLSLImageType," << int(readWriteFlavor) << ") struct ";
                     sb << "__image" << name;
                     sb << " {};\n";
 
