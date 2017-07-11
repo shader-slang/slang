@@ -1921,6 +1921,9 @@ static Token ReadToken(Preprocessor* preprocessor)
     {
         // Look at the next raw token in the input.
         Token const& token = PeekRawToken(preprocessor);
+        if (token.Type == TokenType::EndOfFile)
+            return token;
+
 
         // If we have a directive (`#` at start of line) then handle it
         if ((token.Type == TokenType::Pound) && (token.flags & TokenFlag::AtStartOfLine))
@@ -1980,7 +1983,7 @@ static void FinalizePreprocessor(
     while (input)
     {
         PreprocessorInputStream* parent = input->parent;
-        DestroyInputStream(preprocessor, input);
+        EndInputStream(preprocessor, input);
         input = parent;
     }
 

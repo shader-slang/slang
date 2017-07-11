@@ -271,7 +271,7 @@ namespace Slang
     }
 #endif
 
-    List<uint8_t> EmitDXBytecodeAssemblyForEntryPoint(
+    String EmitDXBytecodeAssemblyForEntryPoint(
         EntryPointRequest*  entryPoint)
     {
         static pD3DDisassemble D3DDisassemble_ = nullptr;
@@ -287,7 +287,7 @@ namespace Slang
         List<uint8_t> dxbc = EmitDXBytecodeForEntryPoint(entryPoint);
         if (!dxbc.Count())
         {
-            return List<uint8_t>();
+            return String();
         }
 
         ID3DBlob* codeBlob;
@@ -298,10 +298,12 @@ namespace Slang
             nullptr,
             &codeBlob);
 
-        List<uint8_t> result;
+        String result;
         if (codeBlob)
         {
-            result.AddRange((uint8_t*)codeBlob->GetBufferPointer(), codeBlob->GetBufferSize());
+            char const* codeBegin = (char const*)codeBlob->GetBufferPointer();
+            char const* codeEnd = codeBegin + codeBlob->GetBufferSize();
+            result.append(codeBegin, codeEnd);
             codeBlob->Release();
         }
         if (FAILED(hr))
@@ -341,10 +343,9 @@ namespace Slang
         return glslCompiler;
     }
 
-
-    List<uint8_t> emitSPIRVForEntryPoint(
-        EntryPointRequest*  entryPoint,
-        bool spirvAssembly)
+    int invokeGLSLCompilerForEntryPoint(
+        EntryPointRequest*          entryPoint,
+        glslang_CompileRequest&     request)
     {
         String rawGLSL = emitGLSLForEntryPoint(entryPoint);
 
@@ -358,36 +359,75 @@ namespace Slang
             assert(glslang_compile);
         }
 
-        List<uint8_t> diagnosticOutput;
-        List<uint8_t> output;
+        String diagnosticOutput;
+        auto diagnosticOutputFunc = [](void const* data, size_t size, void* userData)
+        {
+            (*(String*)userData).append((char const*)data, (char const*)data + size);
+        };
 
+        request.sourcePath = "slang";
+        request.sourceText = rawGLSL.begin();
+        request.slangStage = (SlangStage)entryPoint->profile.GetStage();
+
+        request.diagnosticFunc = diagnosticOutputFunc;
+        request.diagnosticUserData = &diagnosticOutput;
+
+        int err = glslang_compile(&request);
+
+        if (err)
+        {
+            OutputDebugStringA(diagnosticOutput.Buffer());
+            fprintf(stderr, "%s", diagnosticOutput.Buffer());
+            exit(1);
+        }
+
+        return 0;
+    }
+
+
+    List<uint8_t> emitSPIRVForEntryPoint(
+        EntryPointRequest*  entryPoint)
+    {
+        List<uint8_t> output;
         auto outputFunc = [](void const* data, size_t size, void* userData)
         {
             ((List<uint8_t>*)userData)->AddRange((uint8_t*)data, size);
         };
 
         glslang_CompileRequest request;
-        request.sourcePath = "slang";
-        request.sourceText = rawGLSL.begin();
-        request.slangStage = (SlangStage)entryPoint->profile.GetStage();
-        request.disassembleResult = spirvAssembly;
-
-        request.diagnosticFunc = outputFunc;
-        request.diagnosticUserData = &diagnosticOutput;
-
         request.outputFunc = outputFunc;
         request.outputUserData = &output;
+        request.disassembleResult = false;
 
-        int err = glslang_compile(&request);
+        int err = invokeGLSLCompilerForEntryPoint(entryPoint, request);
 
         if (err)
         {
-            char const* diagnosticString = (char const*)diagnosticOutput.Buffer();
-            String debugStr(diagnosticString, diagnosticString + diagnosticOutput.Count());
+            return List<uint8_t>();
+        }
 
-            OutputDebugStringA(debugStr.Buffer());
-            fprintf(stderr, "%s", debugStr.Buffer());
-            exit(1);
+        return output;
+    }
+
+    String emitSPIRVAssemblyForEntryPoint(
+        EntryPointRequest*  entryPoint)
+    {
+        String output;
+        auto outputFunc = [](void const* data, size_t size, void* userData)
+        {
+            (*(String*)userData).append((char const*)data, (char const*)data + size);
+        };
+
+        glslang_CompileRequest request;
+        request.outputFunc = outputFunc;
+        request.outputUserData = &output;
+        request.disassembleResult = true;
+
+        int err = invokeGLSLCompilerForEntryPoint(entryPoint, request);
+
+        if (err)
+        {
+            String();
         }
 
         return output;
@@ -447,21 +487,21 @@ namespace Slang
 
         case CodeGenTarget::DXBytecodeAssembly:
             {
-                List<uint8_t> code = EmitDXBytecodeAssemblyForEntryPoint(entryPoint);
+                String code = EmitDXBytecodeAssemblyForEntryPoint(entryPoint);
                 result = CompileResult(code);
             }
             break;
 
         case CodeGenTarget::SPIRV:
             {
-                List<uint8_t> code = emitSPIRVForEntryPoint(entryPoint, false);
+                List<uint8_t> code = emitSPIRVForEntryPoint(entryPoint);
                 result = CompileResult(code);
             }
             break;
 
         case CodeGenTarget::SPIRVAssembly:
             {
-                List<uint8_t> code = emitSPIRVForEntryPoint(entryPoint, true);
+                String code = emitSPIRVAssemblyForEntryPoint(entryPoint);
                 result = CompileResult(code);
             }
             break;

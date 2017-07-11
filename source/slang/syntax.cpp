@@ -64,7 +64,8 @@ namespace Slang
 #define ABSTRACT_SYNTAX_CLASS(NAME, BASE) /* empty */
 #define SYNTAX_CLASS(NAME, BASE)                                \
     void NAME::accept(NAME::Visitor* visitor, void* extra)      \
-    { visitor->dispatch_##NAME(this, extra); }
+    { visitor->dispatch_##NAME(this, extra); }                  \
+    void* SyntaxClassBase::Impl<NAME>::createFunc() { return new NAME(); }
 #include "expr-defs.h"
 #include "decl-defs.h"
 #include "modifier-defs.h"
