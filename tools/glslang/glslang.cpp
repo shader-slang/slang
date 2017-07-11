@@ -66,7 +66,8 @@ static void dump(
         fwrite(data, 1, size, fallbackStream);
 
         // also output it for debug purposes
-        OutputDebugStringA((char const*)data);
+        std::string str((char const*)data, size);
+        OutputDebugStringA(str.c_str());
     }
 }
 

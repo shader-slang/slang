@@ -322,15 +322,6 @@ extern "C"
         SlangCompileRequest*    request,
         int                     translationUnitIndex);
 
-    /** Get the output bytecode associated with a specific translation unit.
-
-    The lifetime of the output pointer is the same as `request`.
-    */
-    SLANG_API void const* spGetTranslationUnitCode(
-        SlangCompileRequest*    request,
-        int                     translationUnitIndex,
-        size_t*                 outSize);
-
     /** Get the output source code associated with a specific entry point.
 
     The lifetime of the output pointer is the same as `request`.

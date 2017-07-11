@@ -862,18 +862,7 @@ SLANG_API char const* spGetTranslationUnitSource(
     int                     translationUnitIndex)
 {
     auto req = REQ(request);
-    return (char const*)req->translationUnits[translationUnitIndex]->result.outputSource.Buffer();
-}
-
-SLANG_API void const* spGetTranslationUnitCode(
-    SlangCompileRequest*    request,
-    int                     translationUnitIndex,
-    size_t*                 outSize)
-{
-    auto req = REQ(request);
-    Slang::TranslationUnitResult& result = req->translationUnits[translationUnitIndex]->result;
-    *outSize = (size_t)result.outputSource.Count();
-    return result.outputSource.Buffer();
+    return req->translationUnits[translationUnitIndex]->result.outputString.Buffer();
 }
 
 SLANG_API char const* spGetEntryPointSource(
@@ -881,8 +870,7 @@ SLANG_API char const* spGetEntryPointSource(
     int                     entryPointIndex)
 {
     auto req = REQ(request);
-    return (char const*)req->entryPoints[entryPointIndex]->result.outputSource.Buffer();
-
+    return req->entryPoints[entryPointIndex]->result.outputString.Buffer();
 }
 
 SLANG_API void const* spGetEntryPointCode(
@@ -891,9 +879,9 @@ SLANG_API void const* spGetEntryPointCode(
     size_t*                 outSize)
 {
     auto req = REQ(request);
-    Slang::EntryPointResult& result = req->entryPoints[entryPointIndex]->result;
-    *outSize = (size_t)result.outputSource.Count();
-    return result.outputSource.Buffer();
+    Slang::CompileResult& result = req->entryPoints[entryPointIndex]->result;
+    if(outSize) *outSize = result.outputBinary.Count();
+    return result.outputBinary.Buffer();
 }
 
 // Reflection API
