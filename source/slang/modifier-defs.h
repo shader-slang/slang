@@ -208,17 +208,20 @@ SIMPLE_SYNTAX_CLASS(GLSLColumnMajorLayoutModifier, RowMajorLayoutModifier)
 
 // More HLSL Keyword
 
+ABSTRACT_SYNTAX_CLASS(InterpolationModeModifier, Modifier)
+END_SYNTAX_CLASS()
+
 // HLSL `nointerpolation` modifier
-SIMPLE_SYNTAX_CLASS(HLSLNoInterpolationModifier, Modifier)
+SIMPLE_SYNTAX_CLASS(HLSLNoInterpolationModifier, InterpolationModeModifier)
 
 // HLSL `linear` modifier
-SIMPLE_SYNTAX_CLASS(HLSLLinearModifier, Modifier)
+SIMPLE_SYNTAX_CLASS(HLSLLinearModifier, InterpolationModeModifier)
 
 // HLSL `sample` modifier
-SIMPLE_SYNTAX_CLASS(HLSLSampleModifier, Modifier)
+SIMPLE_SYNTAX_CLASS(HLSLSampleModifier, InterpolationModeModifier)
 
 // HLSL `centroid` modifier
-SIMPLE_SYNTAX_CLASS(HLSLCentroidModifier, Modifier)
+SIMPLE_SYNTAX_CLASS(HLSLCentroidModifier, InterpolationModeModifier)
 
 // HLSL `precise` modifier
 SIMPLE_SYNTAX_CLASS(HLSLPreciseModifier, Modifier)

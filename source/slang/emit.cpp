@@ -2556,6 +2556,35 @@ struct EmitVisitor
         Emit(";\n");
     }
 
+    bool shouldSkipModifierForDecl(
+        Modifier*   modifier,
+        Decl*       decl)
+    {
+        switch(context->shared->target)
+        {
+        default:
+            break;
+
+        case CodeGenTarget::GLSL:
+            {
+                // Don't emit interpolation mode modifiers on `struct` fields
+                // (only allowed on global or block `in`/`out`)
+                if (auto interpolationMod = dynamic_cast<InterpolationModeModifier*>(modifier))
+                {
+                    if (auto fieldDecl = dynamic_cast<StructField*>(decl))
+                    {
+                        return true;
+                    }
+                }
+
+            }
+            break;
+        }
+
+
+        return false;
+    }
+
     // Emit any modifiers that should go in front of a declaration
     void EmitModifiers(RefPtr<Decl> decl)
     {
@@ -2587,6 +2616,9 @@ struct EmitVisitor
 
         for (auto mod = decl->modifiers.first; mod; mod = mod->next)
         {
+            if (shouldSkipModifierForDecl(mod, decl))
+                continue;
+
             advanceToSourceLocation(mod->Position);
 
             if (0) {}
