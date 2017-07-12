@@ -22,6 +22,12 @@ standard output = {
                 "access": "readWrite"
             }
         }
+    ],
+    "entryPoints": [
+        {
+            "name": "main",
+            "stage:": "fragment"
+        }
     ]
 }
 }

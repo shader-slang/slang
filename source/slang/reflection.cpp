@@ -651,7 +651,70 @@ SLANG_API unsigned spReflectionParameter_GetBindingSpace(SlangReflectionParamete
     return 0;
 }
 
+// Helpers for getting parameter count
+
+namespace Slang
+{
+    static unsigned getParameterCount(RefPtr<TypeLayout> typeLayout)
+    {
+        if(auto parameterBlockLayout = typeLayout.As<ParameterBlockTypeLayout>())
+        {
+            typeLayout = parameterBlockLayout->elementTypeLayout;
+        }
+
+        if(auto structLayout = typeLayout.As<StructTypeLayout>())
+        {
+            return (unsigned) structLayout->fields.Count();
+        }
+
+        return 0;
+    }
+
+    static VarLayout* getParameterByIndex(RefPtr<TypeLayout> typeLayout, unsigned index)
+    {
+        if(auto parameterBlockLayout = typeLayout.As<ParameterBlockTypeLayout>())
+        {
+            typeLayout = parameterBlockLayout->elementTypeLayout;
+        }
+
+        if(auto structLayout = typeLayout.As<StructTypeLayout>())
+        {
+            return structLayout->fields[index];
+        }
+
+        return 0;
+    }
+}
+
 // Entry Point Reflection
+
+SLANG_API char const* spReflectionEntryPoint_getName(
+    SlangReflectionEntryPoint* inEntryPoint)
+{
+    auto entryPointLayout = convert(inEntryPoint);
+    if(!entryPointLayout) return 0;
+
+    return entryPointLayout->entryPoint->getName().begin();
+}
+
+SLANG_API unsigned spReflectionEntryPoint_getParameterCount(
+    SlangReflectionEntryPoint* inEntryPoint)
+{
+    auto entryPointLayout = convert(inEntryPoint);
+    if(!entryPointLayout) return 0;
+
+    return getParameterCount(entryPointLayout);
+}
+
+SLANG_API SlangReflectionVariableLayout* spReflectionEntryPoint_getParameterByIndex(
+    SlangReflectionEntryPoint*  inEntryPoint,
+    unsigned                    index)
+{
+    auto entryPointLayout = convert(inEntryPoint);
+    if(!entryPointLayout) return 0;
+
+    return convert(getParameterByIndex(entryPointLayout, index));
+}
 
 SLANG_API SlangStage spReflectionEntryPoint_getStage(SlangReflectionEntryPoint* inEntryPoint)
 {
@@ -1395,6 +1458,49 @@ Range<T> range(T end)
     return Range<T>(T(0), end);
 }
 
+static void emitReflectionEntryPointJSON(
+    PrettyWriter&                   writer,
+    slang::EntryPointReflection*    entryPoint)
+{
+    write(writer, "{\n");
+    indent(writer);
+
+    emitReflectionNameInfoJSON(writer, entryPoint->getName());
+
+    switch (entryPoint->getStage())
+    {
+    case SLANG_STAGE_VERTEX:    write(writer, ",\n\"stage:\": \"vertex\"");     break;
+    case SLANG_STAGE_HULL:      write(writer, ",\n\"stage:\": \"hull\"");       break;
+    case SLANG_STAGE_DOMAIN:    write(writer, ",\n\"stage:\": \"domain\"");     break;
+    case SLANG_STAGE_GEOMETRY:  write(writer, ",\n\"stage:\": \"geometry\"");   break;
+    case SLANG_STAGE_FRAGMENT:  write(writer, ",\n\"stage:\": \"fragment\"");   break;
+    case SLANG_STAGE_COMPUTE:   write(writer, ",\n\"stage:\": \"compute\"");    break;
+    default:
+        break;
+    }
+
+    auto parameterCount = entryPoint->getParameterCount();
+    if (parameterCount)
+    {
+        write(writer, ",\n\"parameters\": [\n");
+        indent(writer);
+
+        for( auto pp : range(parameterCount) )
+        {
+            if(pp != 0) write(writer, ",\n");
+
+            auto parameter = entryPoint->getParameterByIndex(pp);
+            emitReflectionParamJSON(writer, parameter);
+        }
+
+        dedent(writer);
+        write(writer, "\n]");
+    }
+
+    dedent(writer);
+    write(writer, "\n}");
+}
+
 static void emitReflectionJSON(
     PrettyWriter&               writer,
     slang::ShaderReflection*    programReflection)
@@ -1415,6 +1521,25 @@ static void emitReflectionJSON(
 
     dedent(writer);
     write(writer, "\n]");
+
+    auto entryPointCount = programReflection->getEntryPointCount();
+    if (entryPointCount)
+    {
+        write(writer, ",\n\"entryPoints\": [\n");
+        indent(writer);
+
+        for (auto ee : range(entryPointCount))
+        {
+            if (ee != 0) write(writer, ",\n");
+
+            auto entryPoint = programReflection->getEntryPointByIndex(ee);
+            emitReflectionEntryPointJSON(writer, entryPoint);
+        }
+
+        dedent(writer);
+        write(writer, "\n]");
+    }
+
     dedent(writer);
     write(writer, "\n}\n");
 }
