@@ -303,17 +303,40 @@ namespace Slang
         if (!parser->isRecovering)
             return true;
 
-        // Determine if we are looking for a closing token at all...
-        bool lookingForClose = false;
+        // Determine if we are looking for common closing tokens,
+        // so that we can know whether or we are allowed to skip
+        // over them.
+
+        bool lookingForEOF = false;
+        bool lookingForRCurly = false;
+        bool lookingForRParen = false;
+        bool lookingForRSquare = false;
+
         for (int ii = 0; ii < recoverBeforeCount; ++ii)
         {
-            if (IsClosingToken(recoverBefore[ii]))
-                lookingForClose = true;
+            switch (recoverBefore[ii])
+            {
+            default:
+                break;
+
+            case TokenType::EndOfFile:  lookingForEOF       = true; break;
+            case TokenType::RBrace:     lookingForRCurly    = true; break;
+            case TokenType::RParent:    lookingForRParen    = true; break;
+            case TokenType::RBracket:   lookingForRSquare   = true; break;
+            }
         }
         for (int ii = 0; ii < recoverAfterCount; ++ii)
         {
-            if (IsClosingToken(recoverAfter[ii]))
-                lookingForClose = true;
+            switch (recoverBefore[ii])
+            {
+            default:
+                break;
+
+            case TokenType::EndOfFile:  lookingForEOF       = true; break;
+            case TokenType::RBrace:     lookingForRCurly    = true; break;
+            case TokenType::RParent:    lookingForRParen    = true; break;
+            case TokenType::RBracket:   lookingForRSquare   = true; break;
+            }
         }
 
         TokenReader* tokenReader = &parser->tokenReader;
@@ -354,12 +377,23 @@ namespace Slang
             // we are looking for a closing token
             case TokenType::RParent:
             case TokenType::RBracket:
-                if (!lookingForClose)
+                if (lookingForRParen || lookingForRSquare || lookingForRCurly || lookingForEOF)
+                {
+                    // We are looking for a closing token, so it is okay to skip these
+                }
+                else
                     return false;
                 break;
 
-            // never skip a `}`, to avoid spurious errors
+            // Don't skip a `}`, to avoid spurious errors,
+            // with the exception of when we are looking for EOF
             case TokenType::RBrace:
+                if (lookingForRCurly || lookingForEOF)
+                {
+                    // We are looking for end-of-file, so it is okay to skip here
+                }
+                else
+
                 return false;
             }
 
@@ -2342,7 +2376,6 @@ namespace Slang
         while(!AdvanceIfMatch(parser, closingToken))
         {
             ParseDecl(parser, containerDecl);
-            TryRecover(parser);
         }
     }
 
