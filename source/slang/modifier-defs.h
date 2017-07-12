@@ -53,6 +53,12 @@ SYNTAX_CLASS(TargetIntrinsicModifier, IntrinsicModifierBase)
     FIELD(Token, definitionToken)
 END_SYNTAX_CLASS()
 
+// A modifier to tag something as an intrinsic that requires
+// a certain GLSL extension to be enabled when used
+SYNTAX_CLASS(RequiredGLSLExtensionModifier, Modifier)
+    FIELD(Token, extensionNameToken)
+END_SYNTAX_CLASS()
+
 SIMPLE_SYNTAX_CLASS(InOutModifier, OutModifier)
 
 // This is a special sentinel modifier that gets added
@@ -208,17 +214,20 @@ SIMPLE_SYNTAX_CLASS(GLSLColumnMajorLayoutModifier, RowMajorLayoutModifier)
 
 // More HLSL Keyword
 
+ABSTRACT_SYNTAX_CLASS(InterpolationModeModifier, Modifier)
+END_SYNTAX_CLASS()
+
 // HLSL `nointerpolation` modifier
-SIMPLE_SYNTAX_CLASS(HLSLNoInterpolationModifier, Modifier)
+SIMPLE_SYNTAX_CLASS(HLSLNoInterpolationModifier, InterpolationModeModifier)
 
 // HLSL `linear` modifier
-SIMPLE_SYNTAX_CLASS(HLSLLinearModifier, Modifier)
+SIMPLE_SYNTAX_CLASS(HLSLLinearModifier, InterpolationModeModifier)
 
 // HLSL `sample` modifier
-SIMPLE_SYNTAX_CLASS(HLSLSampleModifier, Modifier)
+SIMPLE_SYNTAX_CLASS(HLSLSampleModifier, InterpolationModeModifier)
 
 // HLSL `centroid` modifier
-SIMPLE_SYNTAX_CLASS(HLSLCentroidModifier, Modifier)
+SIMPLE_SYNTAX_CLASS(HLSLCentroidModifier, InterpolationModeModifier)
 
 // HLSL `precise` modifier
 SIMPLE_SYNTAX_CLASS(HLSLPreciseModifier, Modifier)

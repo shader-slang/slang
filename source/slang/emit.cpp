@@ -52,6 +52,10 @@ struct SharedEmitContext
     ProgramSyntaxNode*  program;
 
     bool                needHackSamplerForTexelFetch = false;
+
+    // Record the GLSL extnsions we have already emitted a `#extension` for
+    HashSet<String> glslExtensionsRequired;
+    StringBuilder glslExtensionRequireLines;
 };
 
 struct EmitContext
@@ -450,7 +454,17 @@ struct EmitVisitor
 
         emitRawText(" ");
 
-        if(context->shared->target == CodeGenTarget::GLSL)
+        bool shouldUseGLSLStyleLineDirective = false;
+
+        // Let's not do this
+#if 0
+        if (context->shared->target == CodeGenTarget::GLSL)
+        {
+            shouldUseGLSLStyleLineDirective = true;
+        }
+#endif
+
+        if(shouldUseGLSLStyleLineDirective)
         {
             auto path = sourceLocation.FileName;
 
@@ -1584,6 +1598,19 @@ struct EmitVisitor
         }
     }
 
+    void requireGLSLExtension(String const& name)
+    {
+        if (context->shared->glslExtensionsRequired.Contains(name))
+            return;
+
+        StringBuilder& sb = context->shared->glslExtensionRequireLines;
+
+        sb.append("#extension ");
+        sb.append(name);
+        sb.append(" : require\n");
+
+        context->shared->glslExtensionsRequired.Add(name);
+    }
 
     void visitInvokeExpressionSyntaxNode(
         RefPtr<InvokeExpressionSyntaxNode>  callExpr,
@@ -1698,6 +1725,17 @@ struct EmitVisitor
             }
             else if(auto targetIntrinsicModifier = findTargetIntrinsicModifier(funcDecl))
             {
+                if (context->shared->target == CodeGenTarget::GLSL)
+                {
+                    // Does this intrinsic requie a particular GLSL extension that wouldn't be available by default?
+                    if (auto requiredGLSLExtensionModifier = funcDecl->FindModifier<RequiredGLSLExtensionModifier>())
+                    {
+                        // If so, we had better request the extension.
+                        requireGLSLExtension(requiredGLSLExtensionModifier->extensionNameToken.Content);
+                    }
+                }
+
+
                 if(targetIntrinsicModifier->definitionToken.Type != TokenType::Unknown)
                 {
                     auto name = getStringOrIdentifierTokenValue(targetIntrinsicModifier->definitionToken);
@@ -2546,6 +2584,35 @@ struct EmitVisitor
         Emit(";\n");
     }
 
+    bool shouldSkipModifierForDecl(
+        Modifier*   modifier,
+        Decl*       decl)
+    {
+        switch(context->shared->target)
+        {
+        default:
+            break;
+
+        case CodeGenTarget::GLSL:
+            {
+                // Don't emit interpolation mode modifiers on `struct` fields
+                // (only allowed on global or block `in`/`out`)
+                if (auto interpolationMod = dynamic_cast<InterpolationModeModifier*>(modifier))
+                {
+                    if (auto fieldDecl = dynamic_cast<StructField*>(decl))
+                    {
+                        return true;
+                    }
+                }
+
+            }
+            break;
+        }
+
+
+        return false;
+    }
+
     // Emit any modifiers that should go in front of a declaration
     void EmitModifiers(RefPtr<Decl> decl)
     {
@@ -2577,6 +2644,9 @@ struct EmitVisitor
 
         for (auto mod = decl->modifiers.first; mod; mod = mod->next)
         {
+            if (shouldSkipModifierForDecl(mod, decl))
+                continue;
+
             advanceToSourceLocation(mod->Position);
 
             if (0) {}
@@ -3507,6 +3577,8 @@ String emitEntryPoint(
 
     StringBuilder finalResultBuilder;
     finalResultBuilder << prefix;
+
+    finalResultBuilder << sharedContext.glslExtensionRequireLines.ProduceString();
 
     if (sharedContext.needHackSamplerForTexelFetch)
     {

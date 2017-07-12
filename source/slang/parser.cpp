@@ -717,6 +717,17 @@ namespace Slang
                 AddModifier(&modifierLink, modifier);
             }
 
+            else if (AdvanceIf(parser, "__glsl_extension"))
+            {
+                auto modifier = new RequiredGLSLExtensionModifier();
+                modifier->Position = loc;
+
+                parser->ReadToken(TokenType::LParent);
+                modifier->extensionNameToken = parser->ReadToken(TokenType::Identifier);
+                parser->ReadToken(TokenType::RParent);
+
+                AddModifier(&modifierLink, modifier);
+            }
 
             else if (AdvanceIf(parser, "layout"))
             {

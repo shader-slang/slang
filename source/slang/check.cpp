@@ -2540,7 +2540,11 @@ namespace Slang
 
             if (!type.IsLeftValue)
             {
-                if (!isRewriteMode())
+                if (type->As<ErrorType>())
+                {
+                    // Don't report an l-value issue on an errorneous expression
+                }
+                else if (!isRewriteMode())
                 {
                     getSink()->diagnose(expr, Diagnostics::assignNonLValue);
                 }

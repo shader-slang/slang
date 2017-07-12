@@ -413,27 +413,33 @@ __intrinsic
 matrix<T,N,M> ddx(matrix<T,N,M> x);
 
 __generic<T : __BuiltinFloatingPointType>
+__glsl_extension(GL_ARB_derivative_control)
 __intrinsic(glsl, dFdxCoarse)
 __intrinsic
 T ddx_coarse(T x);
 __generic<T : __BuiltinFloatingPointType, let N : int>
+__glsl_extension(GL_ARB_derivative_control)
 __intrinsic(glsl, dFdxCoarse)
 __intrinsic
 vector<T,N> ddx_coarse(vector<T,N> x);
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__glsl_extension(GL_ARB_derivative_control)
 __intrinsic(glsl, dFdxCoarse)
 __intrinsic
 matrix<T,N,M> ddx_coarse(matrix<T,N,M> x);
 
 __generic<T : __BuiltinFloatingPointType>
+__glsl_extension(GL_ARB_derivative_control)
 __intrinsic(glsl, dFdxFine)
 __intrinsic
 T ddx_fine(T x);
 __generic<T : __BuiltinFloatingPointType, let N : int>
+__glsl_extension(GL_ARB_derivative_control)
 __intrinsic(glsl, dFdxFine)
 __intrinsic
 vector<T,N> ddx_fine(vector<T,N> x);
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__glsl_extension(GL_ARB_derivative_control)
 __intrinsic(glsl, dFdxFine)
 __intrinsic
 matrix<T,N,M> ddx_fine(matrix<T,N,M> x);
@@ -452,27 +458,33 @@ __intrinsic
  matrix<T,N,M> ddy(matrix<T,N,M> x);
 
 __generic<T : __BuiltinFloatingPointType>
+__glsl_extension(GL_ARB_derivative_control)
 __intrinsic(glsl, dFdyCoarse)
 __intrinsic
 T ddy_coarse(T x);
 __generic<T : __BuiltinFloatingPointType, let N : int>
+__glsl_extension(GL_ARB_derivative_control)
 __intrinsic(glsl, dFdyCoarse)
 __intrinsic
 vector<T,N> ddy_coarse(vector<T,N> x);
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__glsl_extension(GL_ARB_derivative_control)
 __intrinsic(glsl, dFdyCoarse)
 __intrinsic
 matrix<T,N,M> ddy_coarse(matrix<T,N,M> x);
 
 __generic<T : __BuiltinFloatingPointType>
+__glsl_extension(GL_ARB_derivative_control)
 __intrinsic(glsl, dFdyFine)
 __intrinsic
 T ddy_fine(T x);
 __generic<T : __BuiltinFloatingPointType, let N : int>
+__glsl_extension(GL_ARB_derivative_control)
 __intrinsic(glsl, dFdyFine)
 __intrinsic
 vector<T,N> ddy_fine(vector<T,N> x);
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__glsl_extension(GL_ARB_derivative_control)
 __intrinsic(glsl, dFdyFine)
 __intrinsic
 matrix<T,N,M> ddy_fine(matrix<T,N,M> x);

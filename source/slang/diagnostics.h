@@ -185,6 +185,12 @@ namespace Slang
         }
 
         void diagnoseImpl(CodePosition const& pos, DiagnosticInfo const& info, int argCount, DiagnosticArg const* const* args);
+
+        // Add a diagnostic with raw text
+        // (used when we get errors from a downstream compiler)
+        void diagnoseRaw(
+            Severity    severity,
+            char const* message);
     };
 
     namespace Diagnostics
