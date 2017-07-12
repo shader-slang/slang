@@ -631,6 +631,69 @@ struct LoweringVisitor
         return loweredExpr;
     }
 
+    RefPtr<ExpressionSyntaxNode> createAssignExpr(
+        RefPtr<ExpressionSyntaxNode>    leftExpr,
+        RefPtr<ExpressionSyntaxNode>    rightExpr)
+    {
+        auto leftTuple = leftExpr.As<TupleExpr>();
+        auto rightTuple = rightExpr.As<TupleExpr>();
+        if (leftTuple && rightTuple)
+        {
+            RefPtr<TupleExpr> resultTuple = new TupleExpr();
+            resultTuple->Type = leftExpr->Type;
+
+            if (leftTuple->primaryExpr)
+            {
+                assert(rightTuple->primaryExpr);
+
+                resultTuple->primaryExpr = createAssignExpr(
+                    leftTuple->primaryExpr,
+                    rightTuple->primaryExpr);
+            }
+
+            auto elementCount = leftTuple->tupleElements.Count();
+            assert(elementCount == rightTuple->tupleElements.Count());
+            for (UInt ee = 0; ee < elementCount; ++ee)
+            {
+                auto leftElement = leftTuple->tupleElements[ee];
+                auto rightElement = rightTuple->tupleElements[ee];
+
+                TupleExpr::Element resultElement;
+
+                resultElement.tupleFieldDeclRef = leftElement.tupleFieldDeclRef;
+                resultElement.expr = createAssignExpr(
+                    leftElement.expr,
+                    rightElement.expr);
+
+                resultTuple->tupleElements.Add(resultElement);
+            }
+
+            return resultTuple;
+        }
+        else
+        {
+            assert(!leftTuple && !rightTuple);
+        }
+
+
+        RefPtr<AssignExpr> loweredExpr = new AssignExpr();
+        loweredExpr->Type = leftExpr->Type;
+        loweredExpr->left = leftExpr;
+        loweredExpr->right = rightExpr;
+        return loweredExpr;
+    }
+
+    RefPtr<ExpressionSyntaxNode> visitAssignExpr(
+        AssignExpr* expr)
+    {
+        auto leftExpr = lowerExpr(expr->left);
+        auto rightExpr = lowerExpr(expr->right);
+
+        auto loweredExpr = createAssignExpr(leftExpr, rightExpr);
+        lowerExprCommon(loweredExpr, expr);
+        return loweredExpr;
+    }
+
     void addArgs(
         InvokeExpressionSyntaxNode*     callExpr,
         RefPtr<ExpressionSyntaxNode>    argExpr)
@@ -917,8 +980,21 @@ struct LoweringVisitor
     void addExprStmt(
         RefPtr<ExpressionSyntaxNode>    expr)
     {
-        // TODO: handle cases where the `expr` cannot be directly
-        // represented as a single statement
+        // Desugar tuples in statement position
+        if (auto tupleExpr = expr.As<TupleExpr>())
+        {
+            if (tupleExpr->primaryExpr)
+            {
+                addExprStmt(tupleExpr->primaryExpr);
+            }
+            for (auto ee : tupleExpr->tupleElements)
+            {
+                addExprStmt(ee.expr);
+            }
+            return;
+        }
+
+        // TODO: could also desugar "operator comma" here
 
         RefPtr<ExpressionStatementSyntaxNode> stmt = new ExpressionStatementSyntaxNode();
         stmt->Expression = expr;
