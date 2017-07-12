@@ -52,6 +52,10 @@ struct SharedEmitContext
     ProgramSyntaxNode*  program;
 
     bool                needHackSamplerForTexelFetch = false;
+
+    // Record the GLSL extnsions we have already emitted a `#extension` for
+    HashSet<String> glslExtensionsRequired;
+    StringBuilder glslExtensionRequireLines;
 };
 
 struct EmitContext
@@ -1594,6 +1598,19 @@ struct EmitVisitor
         }
     }
 
+    void requireGLSLExtension(String const& name)
+    {
+        if (context->shared->glslExtensionsRequired.Contains(name))
+            return;
+
+        StringBuilder& sb = context->shared->glslExtensionRequireLines;
+
+        sb.append("#extension ");
+        sb.append(name);
+        sb.append(" : require\n");
+
+        context->shared->glslExtensionsRequired.Add(name);
+    }
 
     void visitInvokeExpressionSyntaxNode(
         RefPtr<InvokeExpressionSyntaxNode>  callExpr,
@@ -1708,6 +1725,17 @@ struct EmitVisitor
             }
             else if(auto targetIntrinsicModifier = findTargetIntrinsicModifier(funcDecl))
             {
+                if (context->shared->target == CodeGenTarget::GLSL)
+                {
+                    // Does this intrinsic requie a particular GLSL extension that wouldn't be available by default?
+                    if (auto requiredGLSLExtensionModifier = funcDecl->FindModifier<RequiredGLSLExtensionModifier>())
+                    {
+                        // If so, we had better request the extension.
+                        requireGLSLExtension(requiredGLSLExtensionModifier->extensionNameToken.Content);
+                    }
+                }
+
+
                 if(targetIntrinsicModifier->definitionToken.Type != TokenType::Unknown)
                 {
                     auto name = getStringOrIdentifierTokenValue(targetIntrinsicModifier->definitionToken);
@@ -3549,6 +3577,8 @@ String emitEntryPoint(
 
     StringBuilder finalResultBuilder;
     finalResultBuilder << prefix;
+
+    finalResultBuilder << sharedContext.glslExtensionRequireLines.ProduceString();
 
     if (sharedContext.needHackSamplerForTexelFetch)
     {

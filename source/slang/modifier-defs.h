@@ -53,6 +53,12 @@ SYNTAX_CLASS(TargetIntrinsicModifier, IntrinsicModifierBase)
     FIELD(Token, definitionToken)
 END_SYNTAX_CLASS()
 
+// A modifier to tag something as an intrinsic that requires
+// a certain GLSL extension to be enabled when used
+SYNTAX_CLASS(RequiredGLSLExtensionModifier, Modifier)
+    FIELD(Token, extensionNameToken)
+END_SYNTAX_CLASS()
+
 SIMPLE_SYNTAX_CLASS(InOutModifier, OutModifier)
 
 // This is a special sentinel modifier that gets added
