@@ -236,15 +236,14 @@ namespace Slang
             // TODO(tfoley): need a better policy for how we translate diagnostics
             // back into the Slang world (although we should always try to generate
             // HLSL that doesn't produce any diagnostics...)
-            String diagnostics = (char const*) diagnosticsBlob->GetBufferPointer();
-            fprintf(stderr, "%s", diagnostics.begin());
-            OutputDebugStringA(diagnostics.begin());
+            entryPoint->compileRequest->mSink.diagnoseRaw(
+                FAILED(hr) ? Severity::Error : Severity::Warning,
+                (char const*) diagnosticsBlob->GetBufferPointer());
             diagnosticsBlob->Release();
         }
         if (FAILED(hr))
         {
-            // TODO(tfoley): What to do on failure?
-            exit(1);
+            return List<uint8_t>();
         }
         return data;
     }
@@ -376,9 +375,10 @@ namespace Slang
 
         if (err)
         {
-            OutputDebugStringA(diagnosticOutput.Buffer());
-            fprintf(stderr, "%s", diagnosticOutput.Buffer());
-            exit(1);
+            entryPoint->compileRequest->mSink.diagnoseRaw(
+                Severity::Error,
+                diagnosticOutput.begin());
+            return err;
         }
 
         return 0;
