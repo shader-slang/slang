@@ -514,12 +514,25 @@ extern "C"
 
     // Entry Point Reflection
 
+    SLANG_API char const* spReflectionEntryPoint_getName(
+        SlangReflectionEntryPoint* entryPoint);
+
+    SLANG_API unsigned spReflectionEntryPoint_getParameterCount(
+        SlangReflectionEntryPoint* entryPoint);
+
+    SLANG_API SlangReflectionVariableLayout* spReflectionEntryPoint_getParameterByIndex(
+        SlangReflectionEntryPoint*  entryPoint,
+        unsigned                    index);
+
     SLANG_API SlangStage spReflectionEntryPoint_getStage(SlangReflectionEntryPoint* entryPoint);
 
     SLANG_API void spReflectionEntryPoint_getComputeThreadGroupSize(
         SlangReflectionEntryPoint*  entryPoint,
         SlangUInt                   axisCount,
         SlangUInt*                  outSizeAlongAxis);
+
+    SLANG_API int spReflectionEntryPoint_usesAnySampleRateInput(
+        SlangReflectionEntryPoint* entryPoint);
 
     // Shader Reflection
 
@@ -857,6 +870,21 @@ namespace slang
 
     struct EntryPointReflection
     {
+        char const* getName()
+        {
+            return spReflectionEntryPoint_getName((SlangReflectionEntryPoint*) this);
+        }
+
+        unsigned getParameterCount()
+        {
+            return spReflectionEntryPoint_getParameterCount((SlangReflectionEntryPoint*) this);
+        }
+
+        VariableLayoutReflection* getParameterByIndex(unsigned index)
+        {
+            return (VariableLayoutReflection*) spReflectionEntryPoint_getParameterByIndex((SlangReflectionEntryPoint*) this, index);
+        }
+
         SlangStage getStage()
         {
             return spReflectionEntryPoint_getStage((SlangReflectionEntryPoint*) this);
@@ -867,6 +895,11 @@ namespace slang
             SlangUInt*  outSizeAlongAxis)
         {
             return spReflectionEntryPoint_getComputeThreadGroupSize((SlangReflectionEntryPoint*) this, axisCount, outSizeAlongAxis);
+        }
+
+        bool usesAnySampleRateInput()
+        {
+            return 0 != spReflectionEntryPoint_usesAnySampleRateInput((SlangReflectionEntryPoint*) this);
         }
     };
 

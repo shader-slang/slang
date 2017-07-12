@@ -98,6 +98,12 @@ standard output = {
                 "kind": "samplerState"
             }
         }
+    ],
+    "entryPoints": [
+        {
+            "name": "main",
+            "stage:": "fragment"
+        }
     ]
 }
 }

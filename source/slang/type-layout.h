@@ -352,6 +352,12 @@ public:
 
     // Layout for any results of the entry point
     RefPtr<VarLayout> resultLayout;
+
+    enum Flag : unsigned
+    {
+        usesAnySampleRateInput = 0x1,
+    };
+    unsigned flags = 0;
 };
 
 // Layout information for the global scope of a program

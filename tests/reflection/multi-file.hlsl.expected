@@ -233,6 +233,16 @@ standard output = {
                 }
             }
         }
+    ],
+    "entryPoints": [
+        {
+            "name": "mainFS",
+            "stage:": "fragment"
+        },
+        {
+            "name": "mainVS",
+            "stage:": "vertex"
+        }
     ]
 }
 }

@@ -1,0 +1,55 @@
+result code = 0
+standard error = {
+}
+standard output = {
+{
+    "parameters": [
+        {
+            "name": "t",
+            "binding": {"kind": "descriptorTableSlot", "index": 0},
+            "type": {
+                "kind": "resource",
+                "baseShape": "texture2D"
+            }
+        },
+        {
+            "name": "s",
+            "binding": {"kind": "descriptorTableSlot", "index": 1},
+            "type": {
+                "kind": "samplerState"
+            }
+        },
+        {
+            "name": "uv",
+            "binding": {"kind": "vertexInput", "index": 0},
+            "type": {
+                "kind": "vector",
+                "elementCount": 2,
+                "elementType": {
+                    "kind": "scalar",
+                    "scalarType": "float32"
+                }
+            }
+        },
+        {
+            "name": "c",
+            "binding": {"kind": "fragmentOutput", "index": 0},
+            "type": {
+                "kind": "vector",
+                "elementCount": 4,
+                "elementType": {
+                    "kind": "scalar",
+                    "scalarType": "float32"
+                }
+            }
+        }
+    ],
+    "entryPoints": [
+        {
+            "name": "main",
+            "stage:": "fragment",
+            "usesAnySampleRateInput": true
+        }
+    ]
+}
+}

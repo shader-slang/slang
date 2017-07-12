@@ -2,9 +2,11 @@
 
 // Confirm that we expose GLSL `image` types through reflection
 
-uniform imageBuffer iBuffer;
+layout(rgba32f)
+uniform writeonly imageBuffer iBuffer;
 
-uniform image2D i2D;
+layout(rgba32f)
+uniform writeonly image2D i2D;
 
 void main()
 {}
