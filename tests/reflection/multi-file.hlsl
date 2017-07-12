@@ -1,4 +1,4 @@
-//TEST:SIMPLE:-profile ps_4_0 -target reflection-json Tests/bindings/multi-file-extra.hlsl
+//TEST:SIMPLE:-profile ps_4_0 -entry mainFS -target reflection-json tests/reflection/multi-file-extra.hlsl -profile vs_4_0 -entry mainVS
 
 // Here we are testing the case where multiple translation units are provided
 // at once, so that we want combined reflection information for the resulting
@@ -44,7 +44,7 @@ Texture2D sharedTV;
 Texture2D sharedTF;
 
 
-float4 main() : SV_Position
+float4 mainFS() : SV_Target
 {
 	// Go ahead and use everything here, just to make sure things got placed correctly
 	return use(sharedT, sharedS)

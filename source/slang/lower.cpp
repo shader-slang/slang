@@ -210,7 +210,8 @@ struct SharedLoweringContext
 {
     CompileRequest* compileRequest;
 
-    ProgramLayout*  programLayout;
+    ProgramLayout*      programLayout;
+    EntryPointLayout*   entryPointLayout;
 
     // The target we are going to generate code for.
     // 
@@ -607,6 +608,8 @@ struct LoweringVisitor
     RefPtr<ExpressionSyntaxNode> visitVarExpressionSyntaxNode(
         VarExpressionSyntaxNode* expr)
     {
+        doSampleRateInputCheck(expr->name);
+
         // If the expression didn't get resolved, we can leave it as-is
         if (!expr->declRef)
             return expr;
@@ -1018,6 +1021,12 @@ struct LoweringVisitor
     {
         RefPtr<UnparsedStmt> loweredStmt = new UnparsedStmt();
         lowerStmtFields(loweredStmt, stmt);
+
+        for (auto token : stmt->tokens)
+        {
+            if (token.Type == TokenType::Identifier)
+                doSampleRateInputCheck(token.Content);
+        }
 
         loweredStmt->tokens = stmt->tokens;
 
@@ -2052,9 +2061,39 @@ struct LoweringVisitor
         return SourceLanguage::Unknown;
     }
 
+    void setSampleRateFlag()
+    {
+        shared->entryPointLayout->flags |= EntryPointLayout::Flag::usesAnySampleRateInput;
+    }
+
+    void doSampleRateInputCheck(VarDeclBase* decl)
+    {
+        if (decl->HasModifier<HLSLSampleModifier>())
+        {
+            setSampleRateFlag();
+        }
+    }
+
+    void doSampleRateInputCheck(String const& name)
+    {
+        if (name == "gl_SampleIndex")
+        {
+            setSampleRateFlag();
+        }
+    }
+
     RefPtr<VarDeclBase> visitVariable(
         Variable* decl)
     {
+        // Global variable? Check if it is a sample-rate input.
+        if (dynamic_cast<ProgramSyntaxNode*>(decl->ParentDecl))
+        {
+            if (decl->HasModifier<InModifier>())
+            {
+                doSampleRateInputCheck(decl);
+            }
+        }
+
         auto loweredDecl = lowerVarDeclCommon(decl, getClass<Variable>());
         if(!loweredDecl)
             return nullptr;
@@ -2904,6 +2943,8 @@ LoweredEntryPoint lowerEntryPoint(
 
     bool isRewrite = isRewriteRequest(translationUnit->sourceLanguage, target);
     sharedContext.isRewrite = isRewrite;
+
+    sharedContext.entryPointLayout = visitor.findEntryPointLayout(entryPoint);
 
     LoweredEntryPoint result;
     if (isRewrite)

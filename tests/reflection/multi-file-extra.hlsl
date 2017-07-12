@@ -18,7 +18,7 @@ float4 use(float  val) { return val; };
 float4 use(float2 val) { return float4(val,0.0,0.0); };
 float4 use(float3 val) { return float4(val,0.0); };
 float4 use(float4 val) { return val; };
-float4 use(Texture2D t, SamplerState s) { return t.Sample(s, 0.0); }
+float4 use(Texture2D t, SamplerState s) { return t.SampleLevel(s, 0.0, 0.0); }
 
 // Start with some parameters that will appear in both shaders
 Texture2D sharedT;
@@ -51,7 +51,7 @@ Texture2D sharedTV;
 Texture2D sharedTF;
 
 
-float4 main() : SV_Target
+float4 mainVS() : SV_Position
 {
 	// Go ahead and use everything here, just to make sure things got placed correctly
 	return use(sharedT, sharedS)

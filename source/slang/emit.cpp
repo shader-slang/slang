@@ -2833,7 +2833,10 @@ struct EmitVisitor
 
     // Emit a single `regsiter` semantic, as appropriate for a given resource-type-specific layout info
     void emitHLSLRegisterSemantic(
-        VarLayout::ResourceInfo const&  info)
+        VarLayout::ResourceInfo const&  info,
+
+        // Keyword to use in the uniform case (`register` for globals, `packoffset` inside a `cbuffer`)
+        char const* uniformSemanticSpelling = "register")
     {
         if( info.kind == LayoutResourceKind::Uniform )
         {
@@ -2845,7 +2848,9 @@ struct EmitVisitor
             // units, and then a "component" within that register, based on 4-byte
             // offsets from there. We cannot support more fine-grained offsets than that.
 
-            Emit(": packoffset(c");
+            Emit(": ");
+            Emit(uniformSemanticSpelling);
+            Emit("(c");
 
             // Size of a logical `c` register in bytes
             auto registerSize = 16;
@@ -2907,7 +2912,8 @@ struct EmitVisitor
 
     // Emit all the `register` semantics that are appropriate for a particular variable layout
     void emitHLSLRegisterSemantics(
-        RefPtr<VarLayout>   layout)
+        RefPtr<VarLayout>   layout,
+        char const*         uniformSemanticSpelling = "register")
     {
         if (!layout) return;
 
@@ -2922,7 +2928,7 @@ struct EmitVisitor
 
         for( auto rr : layout->resourceInfos )
         {
-            emitHLSLRegisterSemantic(rr);
+            emitHLSLRegisterSemantic(rr, uniformSemanticSpelling);
         }
     }
 
@@ -3026,7 +3032,7 @@ struct EmitVisitor
                         offsetResource.space += cbufferResource->space;
                     }
 
-                    emitHLSLRegisterSemantic(offsetResource);
+                    emitHLSLRegisterSemantic(offsetResource, "packoffset");
                 }
 
                 Emit(";\n");

@@ -531,6 +531,9 @@ extern "C"
         SlangUInt                   axisCount,
         SlangUInt*                  outSizeAlongAxis);
 
+    SLANG_API int spReflectionEntryPoint_usesAnySampleRateInput(
+        SlangReflectionEntryPoint* entryPoint);
+
     // Shader Reflection
 
     SLANG_API unsigned spReflection_GetParameterCount(SlangReflection* reflection);
@@ -892,6 +895,11 @@ namespace slang
             SlangUInt*  outSizeAlongAxis)
         {
             return spReflectionEntryPoint_getComputeThreadGroupSize((SlangReflectionEntryPoint*) this, axisCount, outSizeAlongAxis);
+        }
+
+        bool usesAnySampleRateInput()
+        {
+            return 0 != spReflectionEntryPoint_usesAnySampleRateInput((SlangReflectionEntryPoint*) this);
         }
     };
 

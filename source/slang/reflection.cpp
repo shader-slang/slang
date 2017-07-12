@@ -751,6 +751,18 @@ SLANG_API void spReflectionEntryPoint_getComputeThreadGroupSize(
     }
 }
 
+SLANG_API int spReflectionEntryPoint_usesAnySampleRateInput(
+    SlangReflectionEntryPoint* inEntryPoint)
+{
+    auto entryPointLayout = convert(inEntryPoint);
+    if(!entryPointLayout)
+        return 0;
+
+    if (entryPointLayout->profile.GetStage() != Stage::Fragment)
+        return 0;
+
+    return (entryPointLayout->flags & EntryPointLayout::Flag::usesAnySampleRateInput) != 0;
+}
 
 // Shader Reflection
 
@@ -1495,6 +1507,11 @@ static void emitReflectionEntryPointJSON(
 
         dedent(writer);
         write(writer, "\n]");
+    }
+
+    if (entryPoint->usesAnySampleRateInput())
+    {
+        write(writer, ",\n\"usesAnySampleRateInput\": true");
     }
 
     dedent(writer);
