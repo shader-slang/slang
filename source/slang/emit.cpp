@@ -450,7 +450,17 @@ struct EmitVisitor
 
         emitRawText(" ");
 
-        if(context->shared->target == CodeGenTarget::GLSL)
+        bool shouldUseGLSLStyleLineDirective = false;
+
+        // Let's not do this
+#if 0
+        if (context->shared->target == CodeGenTarget::GLSL)
+        {
+            shouldUseGLSLStyleLineDirective = true;
+        }
+#endif
+
+        if(shouldUseGLSLStyleLineDirective)
         {
             auto path = sourceLocation.FileName;
 
