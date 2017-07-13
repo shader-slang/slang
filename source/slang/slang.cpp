@@ -880,8 +880,29 @@ SLANG_API void const* spGetEntryPointCode(
 {
     auto req = REQ(request);
     Slang::CompileResult& result = req->entryPoints[entryPointIndex]->result;
-    if(outSize) *outSize = result.outputBinary.Count();
-    return result.outputBinary.Buffer();
+
+    void const* data = nullptr;
+    size_t size = 0;
+
+    switch (result.format)
+    {
+    case Slang::ResultFormat::None:
+    default:
+        break;
+
+    case Slang::ResultFormat::Binary:
+        data = result.outputBinary.Buffer();
+        size = result.outputBinary.Count();
+        break;
+
+    case Slang::ResultFormat::Text:
+        data = result.outputString.Buffer();
+        size = result.outputString.Length();
+        break;
+    }
+
+    if(outSize) *outSize = size;
+    return data;
 }
 
 // Reflection API

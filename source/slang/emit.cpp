@@ -18,8 +18,16 @@ namespace Slang {
 // Shared state for an entire emit session
 struct SharedEmitContext
 {
+    // The entry point we are being asked to compile
+    EntryPointRequest* entryPoint;
+
     // The target language we want to generate code for
     CodeGenTarget target;
+
+    // The final code generation target
+    //
+    // For example, `target` might be `GLSL`, while `finalTarget` might be `SPIRV`
+    CodeGenTarget finalTarget;
 
     // The string of code we've built so far
     StringBuilder sb;
@@ -456,13 +464,17 @@ struct EmitVisitor
 
         bool shouldUseGLSLStyleLineDirective = false;
 
-        // Let's not do this
-#if 0
-        if (context->shared->target == CodeGenTarget::GLSL)
+        // TODO: Eventually we should give he user a proper API
+        // and command-line mechanism to control what kind of line
+        // directives we output (and to turn the feature off
+        // completely), but for now we always emit C-style line
+        // directives *unless* the final target language is raw
+        // GLSL code (all other targets will eventually pass
+        // through glslang, which supports C-style line directives).
+        if (context->shared->finalTarget == CodeGenTarget::GLSL)
         {
             shouldUseGLSLStyleLineDirective = true;
         }
-#endif
 
         if(shouldUseGLSLStyleLineDirective)
         {
@@ -3387,6 +3399,68 @@ struct EmitVisitor
         }
     }
 
+    void emitGLSLVersionDirective(
+        ProgramSyntaxNode*  program)
+    {
+        // Did the user provide an explicit `#version` directive in their code?
+        if( auto versionDirective = program->FindModifier<GLSLVersionDirective>() )
+        {
+            // TODO(tfoley): Emit an appropriate `#line` directive...
+
+            Emit("#version ");
+            emit(versionDirective->versionNumberToken.Content);
+            if(versionDirective->glslProfileToken.Type != TokenType::Unknown)
+            {
+                Emit(" ");
+                emit(versionDirective->glslProfileToken.Content);
+            }
+            Emit("\n");
+            return;
+        }
+
+        // No explicit version was given. This could be because we are cross-compiling,
+        // but it also might just be that they user wrote GLSL without thinking about
+        // versions.
+
+        // First, look and see if the target profile gives us a version to use:
+        auto profile = context->shared->entryPoint->profile;
+        if (profile.getFamily() == ProfileFamily::GLSL)
+        {
+            switch (profile.GetVersion())
+            {
+#define CASE(TAG, VALUE)    \
+            case ProfileVersion::TAG: Emit("#version " #VALUE "\n"); return
+
+            CASE(GLSL_110, 110);
+            CASE(GLSL_120, 120);
+            CASE(GLSL_130, 130);
+            CASE(GLSL_140, 140);
+            CASE(GLSL_150, 150);
+            CASE(GLSL_330, 330);
+            CASE(GLSL_400, 400);
+            CASE(GLSL_410, 410);
+            CASE(GLSL_420, 420);
+            CASE(GLSL_430, 430);
+            CASE(GLSL_440, 440);
+            CASE(GLSL_450, 450);
+#undef CASE
+
+            default:
+                break;
+            }
+        }
+
+        // No information is available for us to guess a profile,
+        // so it seems like we need to pick one out of thin air.
+        //
+        // Ideally we should infer a minimum required version based
+        // on the constructs we have seen used in the user's code
+        //
+        // For now we just fall back to a reasonably recent version.
+
+        Emit("#version 420\n");
+    }
+
     void emitGLSLPreprocessorDirectives(
         RefPtr<ProgramSyntaxNode>   program)
     {
@@ -3400,30 +3474,8 @@ struct EmitVisitor
             break;
         }
 
-        if( auto versionDirective = program->FindModifier<GLSLVersionDirective>() )
-        {
-            // TODO(tfoley): Emit an appropriate `#line` directive...
+        emitGLSLVersionDirective(program);
 
-            Emit("#version ");
-            emit(versionDirective->versionNumberToken.Content);
-            if(versionDirective->glslProfileToken.Type != TokenType::Unknown)
-            {
-                Emit(" ");
-                emit(versionDirective->glslProfileToken.Content);
-            }
-            Emit("\n");
-        }
-        else
-        {
-            // No explicit version was given (probably because we are cross-compiling).
-            //
-            // We need to pick an appropriate version, ideally based on the features
-            // that the shader ends up using.
-            //
-            // For now we just fall back to a reasonably recent version.
-
-            Emit("#version 420\n");
-        }
 
         // TODO: when cross-compiling we may need to output additional `#extension` directives
         // based on the features that we have used.
@@ -3479,6 +3531,8 @@ String emitEntryPoint(
 
     SharedEmitContext sharedContext;
     sharedContext.target = target;
+    sharedContext.finalTarget = entryPoint->compileRequest->Target;
+    sharedContext.entryPoint = entryPoint;
 
     sharedContext.programLayout = programLayout;
 

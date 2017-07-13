@@ -947,6 +947,7 @@ namespace slang
 #include "source/slang/parameter-binding.cpp"
 #include "source/slang/parser.cpp"
 #include "source/slang/preprocessor.cpp"
+#include "source/slang/profile.cpp"
 #include "source/slang/lookup.cpp"
 #include "source/slang/lower.cpp"
 #include "source/slang/check.cpp"
