@@ -26,6 +26,10 @@
 #include <d3dcompiler.h>
 #endif
 
+#ifdef _MSC_VER
+#pragma warning(disable: 4996)
+#endif
+
 #ifdef CreateDirectory
 #undef CreateDirectory
 #endif
@@ -77,8 +81,6 @@ namespace Slang
 
         return Profile::Unknown;
     }
-
-
 
     //
 
@@ -209,6 +211,7 @@ namespace Slang
         }
 
         auto hlslCode = emitHLSLForEntryPoint(entryPoint);
+        maybeDumpIntermediate(entryPoint->compileRequest, hlslCode.Buffer(), CodeGenTarget::HLSL);
 
         ID3DBlob* codeBlob;
         ID3DBlob* diagnosticsBlob;
@@ -270,8 +273,10 @@ namespace Slang
     }
 #endif
 
-    String EmitDXBytecodeAssemblyForEntryPoint(
-        EntryPointRequest*  entryPoint)
+    String dissassembleDXBC(
+        CompileRequest*,
+        void const*         data,
+        size_t              size)
     {
         static pD3DDisassemble D3DDisassemble_ = nullptr;
         if (!D3DDisassemble_)
@@ -283,16 +288,15 @@ namespace Slang
             assert(D3DDisassemble_);
         }
 
-        List<uint8_t> dxbc = EmitDXBytecodeForEntryPoint(entryPoint);
-        if (!dxbc.Count())
+        if (!data || !size)
         {
             return String();
         }
 
         ID3DBlob* codeBlob;
         HRESULT hr = D3DDisassemble_(
-            &dxbc[0],
-            dxbc.Count(),
+            data,
+            size,
             0,
             nullptr,
             &codeBlob);
@@ -309,6 +313,21 @@ namespace Slang
         {
             // TODO(tfoley): need to figure out what to diagnose here...
         }
+        return result;
+    }
+
+    String EmitDXBytecodeAssemblyForEntryPoint(
+        EntryPointRequest*  entryPoint)
+    {
+
+        List<uint8_t> dxbc = EmitDXBytecodeForEntryPoint(entryPoint);
+        if (!dxbc.Count())
+        {
+            return String();
+        }
+
+        String result = dissassembleDXBC(entryPoint->compileRequest, dxbc.Buffer(), dxbc.Count());
+
         return result;
     }
 
@@ -332,7 +351,6 @@ namespace Slang
     }
 #endif
 
-
     HMODULE getGLSLCompilerDLL()
     {
         // TODO(tfoley): let user specify version of glslang DLL to use.
@@ -342,11 +360,11 @@ namespace Slang
         return glslCompiler;
     }
 
-    int invokeGLSLCompilerForEntryPoint(
-        EntryPointRequest*          entryPoint,
+
+    int invokeGLSLCompiler(
+        CompileRequest*             slangCompileRequest,
         glslang_CompileRequest&     request)
     {
-        String rawGLSL = emitGLSLForEntryPoint(entryPoint);
 
         static glslang_CompileFunc glslang_compile = nullptr;
         if (!glslang_compile)
@@ -364,10 +382,6 @@ namespace Slang
             (*(String*)userData).append((char const*)data, (char const*)data + size);
         };
 
-        request.sourcePath = "slang";
-        request.sourceText = rawGLSL.begin();
-        request.slangStage = (SlangStage)entryPoint->profile.GetStage();
-
         request.diagnosticFunc = diagnosticOutputFunc;
         request.diagnosticUserData = &diagnosticOutput;
 
@@ -375,7 +389,7 @@ namespace Slang
 
         if (err)
         {
-            entryPoint->compileRequest->mSink.diagnoseRaw(
+            slangCompileRequest->mSink.diagnoseRaw(
                 Severity::Error,
                 diagnosticOutput.begin());
             return err;
@@ -384,10 +398,42 @@ namespace Slang
         return 0;
     }
 
+    String dissassembleSPIRV(
+        CompileRequest*     slangRequest,
+        void const*         data,
+        size_t              size)
+    {
+        String output;
+        auto outputFunc = [](void const* data, size_t size, void* userData)
+        {
+            (*(String*)userData).append((char const*)data, (char const*)data + size);
+        };
+
+        glslang_CompileRequest request;
+        request.action = GLSLANG_ACTION_DISSASSEMBLE_SPIRV;
+
+        request.inputBegin  = data;
+        request.inputEnd    = (char*)data + size;
+
+        request.outputFunc = outputFunc;
+        request.outputUserData = &output;
+
+        int err = invokeGLSLCompiler(slangRequest, request);
+
+        if (err)
+        {
+            String();
+        }
+
+        return output;
+    }
 
     List<uint8_t> emitSPIRVForEntryPoint(
         EntryPointRequest*  entryPoint)
     {
+        String rawGLSL = emitGLSLForEntryPoint(entryPoint);
+        maybeDumpIntermediate(entryPoint->compileRequest, rawGLSL.Buffer(), CodeGenTarget::GLSL);
+
         List<uint8_t> output;
         auto outputFunc = [](void const* data, size_t size, void* userData)
         {
@@ -395,11 +441,17 @@ namespace Slang
         };
 
         glslang_CompileRequest request;
+        request.action = GLSLANG_ACTION_COMPILE_GLSL_TO_SPIRV;
+        request.sourcePath = "slang";
+        request.slangStage = (SlangStage)entryPoint->profile.GetStage();
+
+        request.inputBegin  = rawGLSL.begin();
+        request.inputEnd    = rawGLSL.end();
+
         request.outputFunc = outputFunc;
         request.outputUserData = &output;
-        request.disassembleResult = false;
 
-        int err = invokeGLSLCompilerForEntryPoint(entryPoint, request);
+        int err = invokeGLSLCompiler(entryPoint->compileRequest, request);
 
         if (err)
         {
@@ -412,25 +464,12 @@ namespace Slang
     String emitSPIRVAssemblyForEntryPoint(
         EntryPointRequest*  entryPoint)
     {
-        String output;
-        auto outputFunc = [](void const* data, size_t size, void* userData)
-        {
-            (*(String*)userData).append((char const*)data, (char const*)data + size);
-        };
+        List<uint8_t> spirv = emitSPIRVForEntryPoint(entryPoint);
+        if (spirv.Count() == 0)
+            return String();
 
-        glslang_CompileRequest request;
-        request.outputFunc = outputFunc;
-        request.outputUserData = &output;
-        request.disassembleResult = true;
-
-        int err = invokeGLSLCompilerForEntryPoint(entryPoint, request);
-
-        if (err)
-        {
-            String();
-        }
-
-        return output;
+        String result = dissassembleSPIRV(entryPoint->compileRequest, spirv.begin(), spirv.Count());
+        return result;
     }
 #endif
 
@@ -461,12 +500,14 @@ namespace Slang
         CompileResult result;
 
         auto compileRequest = entryPoint->compileRequest;
+        auto target = compileRequest->Target;
 
-        switch (compileRequest->Target)
+        switch (target)
         {
         case CodeGenTarget::HLSL:
             {
                 String code = emitHLSLForEntryPoint(entryPoint);
+                maybeDumpIntermediate(compileRequest, code.Buffer(), target);
                 result = CompileResult(code);
             }
             break;
@@ -474,6 +515,7 @@ namespace Slang
         case CodeGenTarget::GLSL:
             {
                 String code = emitGLSLForEntryPoint(entryPoint);
+                maybeDumpIntermediate(compileRequest, code.Buffer(), target);
                 result = CompileResult(code);
             }
             break;
@@ -481,6 +523,7 @@ namespace Slang
         case CodeGenTarget::DXBytecode:
             {
                 List<uint8_t> code = EmitDXBytecodeForEntryPoint(entryPoint);
+                maybeDumpIntermediate(compileRequest, code.Buffer(), code.Count(), target);
                 result = CompileResult(code);
             }
             break;
@@ -488,6 +531,7 @@ namespace Slang
         case CodeGenTarget::DXBytecodeAssembly:
             {
                 String code = EmitDXBytecodeAssemblyForEntryPoint(entryPoint);
+                maybeDumpIntermediate(compileRequest, code.Buffer(), target);
                 result = CompileResult(code);
             }
             break;
@@ -495,6 +539,7 @@ namespace Slang
         case CodeGenTarget::SPIRV:
             {
                 List<uint8_t> code = emitSPIRVForEntryPoint(entryPoint);
+                maybeDumpIntermediate(compileRequest, code.Buffer(), code.Count(), target);
                 result = CompileResult(code);
             }
             break;
@@ -502,6 +547,7 @@ namespace Slang
         case CodeGenTarget::SPIRVAssembly:
             {
                 String code = emitSPIRVAssemblyForEntryPoint(entryPoint);
+                maybeDumpIntermediate(compileRequest, code.Buffer(), target);
                 result = CompileResult(code);
             }
             break;
@@ -602,6 +648,109 @@ namespace Slang
             break;
         }
 
+    }
+
+    // Debug logic for dumping intermediate outputs
+
+    //
+
+    void dumpIntermediate(
+        CompileRequest*,
+        void const*     data,
+        size_t          size,
+        char const*     ext,
+        bool            isBinary)
+    {
+        static int counter = 0;
+        int id = counter++;
+
+        String path;
+        path.append("slang-");
+        path.append(id);
+        path.append(ext);
+
+        FILE* file = fopen(path.Buffer(), isBinary ? "wb" : "w");
+        if (!file) return;
+
+        fwrite(data, size, 1, file);
+        fclose(file);
+    }
+
+    void dumpIntermediateText(
+        CompileRequest* compileRequest,
+        void const*     data,
+        size_t          size,
+        char const*     ext)
+    {
+        dumpIntermediate(compileRequest, data, size, ext, false);
+    }
+
+    void dumpIntermediateBinary(
+        CompileRequest* compileRequest,
+        void const*     data,
+        size_t          size,
+        char const*     ext)
+    {
+        dumpIntermediate(compileRequest, data, size, ext, true);
+    }
+
+    void maybeDumpIntermediate(
+        CompileRequest* compileRequest,
+        void const*     data,
+        size_t          size,
+        CodeGenTarget   target)
+    {
+        if (!compileRequest->shouldDumpIntermediates)
+            return;
+
+        switch (target)
+        {
+        default:
+            break;
+
+        case CodeGenTarget::HLSL:
+            dumpIntermediateText(compileRequest, data, size, ".hlsl");
+            break;
+
+        case CodeGenTarget::GLSL:
+            dumpIntermediateText(compileRequest, data, size, ".glsl");
+            break;
+
+        case CodeGenTarget::SPIRVAssembly:
+            dumpIntermediateText(compileRequest, data, size, ".spv.asm");
+            break;
+
+        case CodeGenTarget::DXBytecodeAssembly:
+            dumpIntermediateText(compileRequest, data, size, ".dxbc.asm");
+            break;
+
+        case CodeGenTarget::SPIRV:
+            dumpIntermediateBinary(compileRequest, data, size, ".spv");
+            {
+                String spirvAssembly = dissassembleSPIRV(compileRequest, data, size);
+                dumpIntermediateText(compileRequest, spirvAssembly.begin(), spirvAssembly.Length(), ".spv.asm");
+            }
+            break;
+
+        case CodeGenTarget::DXBytecode:
+            dumpIntermediateBinary(compileRequest, data, size, ".dxbc");
+            {
+                String dxbcAssembly = dissassembleDXBC(compileRequest, data, size);
+                dumpIntermediateText(compileRequest, dxbcAssembly.begin(), dxbcAssembly.Length(), ".dxbc.asm");
+            }
+            break;
+        }
+    }
+
+    void maybeDumpIntermediate(
+        CompileRequest* compileRequest,
+        char const*     text,
+        CodeGenTarget   target)
+    {
+        if (!compileRequest->shouldDumpIntermediates)
+            return;
+
+        maybeDumpIntermediate(compileRequest, text, strlen(text), target);
     }
 
 }
