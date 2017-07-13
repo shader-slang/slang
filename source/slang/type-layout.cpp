@@ -1053,10 +1053,30 @@ SimpleLayoutInfo GetLayoutImpl(
                 // The uniform case was already handled above
                 if( elementResourceInfo.kind == LayoutResourceKind::Uniform )
                     continue;
+
+                // In almost all cases, the resources consumed by an array
+                // will be its element count times the resources consumed
+                // by its element type. The one exception to this is
+                // arrays of resources in Vulkan GLSL, where an entire array
+                // only consumes a single descriptor-table slot.
+                //
+                // Note: We extend this logic to arbitrary arrays-of-structs,
+                // under the assumption that downstream legalization will
+                // turn those into scalarized structs-of-arrays and this
+                // logic will work out.
+                UInt arrayResourceCount = 0;
+                if (elementResourceInfo.kind == LayoutResourceKind::DescriptorTableSlot)
+                {
+                    arrayResourceCount = elementResourceInfo.count;
+                }
+                else
+                {
+                    arrayResourceCount = elementResourceInfo.count * elementCount;
+                }
             
                 typeLayout->addResourceUsage(
                     elementResourceInfo.kind,
-                    elementResourceInfo.count * elementCount);
+                    arrayResourceCount);
             }
         }
         return arrayUniformInfo;
