@@ -170,6 +170,13 @@ extern "C"
         SlangCompileFlags       flags);
 
     /*!
+    @brief Set whether to dump intermediate results (for debugging) or not.
+    */
+    SLANG_API void spSetDumpIntermediates(
+        SlangCompileRequest*    request,
+        int                     enable);
+
+    /*!
     @brief Sets the target for code generation.
     @param ctx The compilation context.
     @param target The code generation target. Possible values are:

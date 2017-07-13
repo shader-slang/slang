@@ -4,10 +4,18 @@
 
 typedef void (*glslang_OutputFunc)(void const* data, size_t size, void* userData);
 
+enum
+{
+    GLSLANG_ACTION_COMPILE_GLSL_TO_SPIRV,
+    GLSLANG_ACTION_DISSASSEMBLE_SPIRV,
+};
+
 struct glslang_CompileRequest
 {
     char const*         sourcePath;
-    char const*         sourceText;
+
+    void const*         inputBegin;
+    void const*         inputEnd;
 
     glslang_OutputFunc  diagnosticFunc;
     void*               diagnosticUserData;
@@ -17,7 +25,7 @@ struct glslang_CompileRequest
 
     int                 slangStage;
 
-    bool                disassembleResult;
+    unsigned            action;
 };
 
 typedef int (*glslang_CompileFunc)(glslang_CompileRequest* request);

@@ -668,6 +668,14 @@ SLANG_API void spSetCompileFlags(
     REQ(request)->compileFlags = flags;
 }
 
+SLANG_API void spSetDumpIntermediates(
+    SlangCompileRequest*    request,
+    int                     enable)
+{
+    REQ(request)->shouldDumpIntermediates = enable != 0;
+}
+
+
 SLANG_API void spSetCodeGenTarget(
         SlangCompileRequest*    request,
         int target)

@@ -78,12 +78,8 @@ static void dumpDiagnostics(
     dump(log.c_str(), log.length(), request->diagnosticFunc, request->diagnosticUserData, stderr);
 }
 
-extern "C"
-_declspec(dllexport)
-int glslang_compile(glslang_CompileRequest* request)
+static int glslang_compileGLSLToSPIRV(glslang_CompileRequest* request)
 {
-    glslang::InitializeProcess();
-
     EShLanguage glslangStage;
     switch( request->slangStage )
     {
@@ -109,12 +105,15 @@ int glslang_compile(glslang_CompileRequest* request)
     glslang::TProgram* program = new glslang::TProgram();
     auto programPtr = std::unique_ptr<glslang::TProgram>(program);
 
-    int sourceTextLength = (int) strlen(request->sourceText);
+    char const* sourceText = (char const*)request->inputBegin;
+    char const* sourceTextEnd = (char const*)request->inputEnd;
+
+    int sourceTextLength = (int)(sourceTextEnd - sourceText);
 
     shader->setPreamble("#extension GL_GOOGLE_cpp_style_line_directive : require\n");
 
     shader->setStringsWithLengthsAndNames(
-        &request->sourceText,
+        &sourceText,
         &sourceTextLength,
         &request->sourcePath,
         1);
@@ -163,20 +162,52 @@ int glslang_compile(glslang_CompileRequest* request)
 
         dumpDiagnostics(request, logger.getAllMessages());
 
-        if (request->disassembleResult)
-        {
-            std::stringstream spirvAsmStream;
-            spv::Disassemble(spirvAsmStream, spirv);
-            std::string result = spirvAsmStream.str();
-            dump(result.c_str(), result.length(), request->outputFunc, request->outputUserData, stdout);
-        }
-        else
-        {
-            dump(spirv.data(), spirv.size() * sizeof(unsigned int), request->outputFunc, request->outputUserData, stdout);
-        }
+        dump(spirv.data(), spirv.size() * sizeof(unsigned int), request->outputFunc, request->outputUserData, stdout);
+    }
+
+    return 0;
+}
+
+static int glslang_dissassembleSPIRV(glslang_CompileRequest* request)
+{
+    typedef unsigned int SPIRVWord;
+
+    SPIRVWord const* spirvBegin = (SPIRVWord const*)request->inputBegin;
+    SPIRVWord const* spirvEnd   = (SPIRVWord const*)request->inputEnd;
+
+    std::vector<SPIRVWord> spirv(spirvBegin, spirvEnd);
+
+    std::stringstream spirvAsmStream;
+    spv::Disassemble(spirvAsmStream, spirv);
+    std::string result = spirvAsmStream.str();
+    dump(result.c_str(), result.length(), request->outputFunc, request->outputUserData, stdout);
+
+    return 0;
+}
+
+extern "C"
+_declspec(dllexport)
+int glslang_compile(glslang_CompileRequest* request)
+{
+    glslang::InitializeProcess();
+
+    int result = 0;
+    switch(request->action)
+    {
+    default:
+        result = 1;
+        break;
+
+    case GLSLANG_ACTION_COMPILE_GLSL_TO_SPIRV:
+        result = glslang_compileGLSLToSPIRV(request);
+        break;
+
+    case GLSLANG_ACTION_DISSASSEMBLE_SPIRV:
+        result = glslang_dissassembleSPIRV(request);
+        break;
     }
 
     glslang::FinalizeProcess();
 
-    return 0;
+    return result;
 }

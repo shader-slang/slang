@@ -207,6 +207,9 @@ namespace Slang
         // Compile flags to be shared by all translation units
         SlangCompileFlags compileFlags = 0;
 
+        // Should we dump intermediate results along the way, for debugging?
+        bool shouldDumpIntermediates = false;
+
         // Output stuff
         DiagnosticSink mSink;
         String mDiagnosticOutput;
@@ -277,6 +280,17 @@ namespace Slang
 
     void generateOutput(
         CompileRequest* compileRequest);
+
+    // Helper to dump intermediate output when debugging
+    void maybeDumpIntermediate(
+        CompileRequest* compileRequest,
+        void const*     data,
+        size_t          size,
+        CodeGenTarget   target);
+    void maybeDumpIntermediate(
+        CompileRequest* compileRequest,
+        char const*     text,
+        CodeGenTarget   target);
 }
 
 #endif
