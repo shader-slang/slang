@@ -476,16 +476,28 @@ SLANG_API size_t spReflectionTypeLayout_GetElementStride(SlangReflectionTypeLayo
 
     if( auto arrayTypeLayout = dynamic_cast<ArrayTypeLayout*>(typeLayout))
     {
-        if(category == SLANG_PARAMETER_CATEGORY_UNIFORM)
+        switch (category)
         {
+        // We store the stride explictly for the uniform case
+        case SLANG_PARAMETER_CATEGORY_UNIFORM:
             return arrayTypeLayout->uniformStride;
-        }
-        else
-        {
-            auto elementTypeLayout = arrayTypeLayout->elementTypeLayout;
-            auto info = elementTypeLayout->FindResourceInfo(LayoutResourceKind(category));
-            if(!info) return 0;
-            return info->count;
+
+        // For most other cases (resource registers), the "stride"
+        // of an array is simply the number of resources (if any)
+        // consumed by its element type.
+        default:
+            {
+                auto elementTypeLayout = arrayTypeLayout->elementTypeLayout;
+                auto info = elementTypeLayout->FindResourceInfo(LayoutResourceKind(category));
+                if(!info) return 0;
+                return info->count;
+            }
+
+        // An import special case, though, is Vulkan descriptor-table slots,
+        // where an entire array will use a single `binding`, so that the
+        // effective stride is zero:
+        case SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT:
+            return 0;
         }
     }
 
