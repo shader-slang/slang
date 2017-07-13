@@ -72,7 +72,7 @@ namespace Slang
     Profile Profile::LookUp(char const* name)
     {
         #define PROFILE(TAG, NAME, STAGE, VERSION)	if(strcmp(name, #NAME) == 0) return Profile::TAG;
-        #define PROFILE_ALIAS(TAG, NAME)			if(strcmp(name, #NAME) == 0) return Profile::TAG;
+        #define PROFILE_ALIAS(TAG, DEF, NAME)		if(strcmp(name, #NAME) == 0) return Profile::TAG;
         #include "profile-defs.h"
 
         return Profile::Unknown;

@@ -54,6 +54,7 @@ namespace Slang
         Unknown,
 
 #define PROFILE(TAG, NAME, STAGE, VERSION) TAG = (uint32_t(Stage::STAGE) << 16) | uint32_t(ProfileVersion::VERSION),
+#define PROFILE_ALIAS(TAG, DEF, NAME) TAG = DEF,
 #include "profile-defs.h"
         };
 

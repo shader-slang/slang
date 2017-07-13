@@ -32,7 +32,7 @@
 #endif
 
 #ifndef PROFILE_ALIAS
-#define PROFILE_ALIAS(TAG, NAME) /* empty */
+#define PROFILE_ALIAS(TAG, DEF, NAME) /* empty */
 #endif
 
 // Source and destination languages
@@ -78,7 +78,18 @@ PROFILE_VERSION(DX_4_0_Level_9_3,	DX)
 PROFILE_VERSION(DX_4_1,				DX)
 PROFILE_VERSION(DX_5_0,				DX)
 
-PROFILE_VERSION(GLSL,               GLSL)
+PROFILE_VERSION(GLSL_110,           GLSL)
+PROFILE_VERSION(GLSL_120,           GLSL)
+PROFILE_VERSION(GLSL_130,           GLSL)
+PROFILE_VERSION(GLSL_140,           GLSL)
+PROFILE_VERSION(GLSL_150,           GLSL)
+PROFILE_VERSION(GLSL_330,           GLSL)
+PROFILE_VERSION(GLSL_400,           GLSL)
+PROFILE_VERSION(GLSL_410,           GLSL)
+PROFILE_VERSION(GLSL_420,           GLSL)
+PROFILE_VERSION(GLSL_430,           GLSL)
+PROFILE_VERSION(GLSL_440,           GLSL)
+PROFILE_VERSION(GLSL_450,           GLSL)
 
 
 // Specific profiles
@@ -104,14 +115,83 @@ PROFILE(DX_Vertex_4_0_Level_9_3,	vs_4_0_level_9_3,	Vertex,		DX_4_0_Level_9_3)
 PROFILE(DX_Vertex_4_1,				vs_4_1,				Vertex,		DX_4_1)
 PROFILE(DX_Vertex_5_0,				vs_5_0,				Vertex,		DX_5_0)
 
-//
+// Define all the GLSL profiles
 
-PROFILE(GLSL_Compute,               glsl_compute,       Compute,    GLSL)
-PROFILE(GLSL_Vertex,                glsl_vertex,        Vertex,     GLSL)
-PROFILE(GLSL_Fragment,              glsl_fragment,      Fragment,   GLSL)
-PROFILE(GLSL_Geometry,              glsl_geometry,      Geometry,   GLSL)
-PROFILE(GLSL_TessControl,           glsl_tess_control,  Hull,       GLSL)
-PROFILE(GLSL_TessEval,              glsl_tess_eval,     Domain,     GLSL)
+#define P(UPPER, LOWER, VERSION) \
+PROFILE(GLSL_##UPPER##_##VERSION,   glsl_##LOWER##_##VERSION, UPPER, GLSL_##VERSION)
+
+P(Vertex, vertex, 110)
+P(Vertex, vertex, 120)
+P(Vertex, vertex, 130)
+P(Vertex, vertex, 140)
+P(Vertex, vertex, 150)
+P(Vertex, vertex, 330)
+P(Vertex, vertex, 400)
+P(Vertex, vertex, 410)
+P(Vertex, vertex, 420)
+P(Vertex, vertex, 430)
+P(Vertex, vertex, 440)
+P(Vertex, vertex, 450)
+
+P(Fragment, fragment, 110)
+P(Fragment, fragment, 120)
+P(Fragment, fragment, 130)
+P(Fragment, fragment, 140)
+P(Fragment, fragment, 150)
+P(Fragment, fragment, 330)
+P(Fragment, fragment, 400)
+P(Fragment, fragment, 410)
+P(Fragment, fragment, 420)
+P(Fragment, fragment, 430)
+P(Fragment, fragment, 440)
+P(Fragment, fragment, 450)
+
+P(Geometry, geometry, 150)
+P(Geometry, geometry, 330)
+P(Geometry, geometry, 400)
+P(Geometry, geometry, 410)
+P(Geometry, geometry, 420)
+P(Geometry, geometry, 430)
+P(Geometry, geometry, 440)
+P(Geometry, geometry, 450)
+
+P(Compute, compute, 430)
+P(Compute, compute, 440)
+P(Compute, compute, 450)
+
+#undef P
+#define P(UPPER, LOWER, STAGE, VERSION) \
+PROFILE(GLSL_##UPPER##_##VERSION,   glsl_##LOWER##_##VERSION, STAGE, GLSL_##VERSION)
+
+P(TessControl, tess_control, Hull, 400)
+P(TessControl, tess_control, Hull, 410)
+P(TessControl, tess_control, Hull, 420)
+P(TessControl, tess_control, Hull, 430)
+P(TessControl, tess_control, Hull, 440)
+P(TessControl, tess_control, Hull, 450)
+
+P(TessEval, tess_eval, Domain, 400)
+P(TessEval, tess_eval, Domain, 410)
+P(TessEval, tess_eval, Domain, 420)
+P(TessEval, tess_eval, Domain, 430)
+P(TessEval, tess_eval, Domain, 440)
+P(TessEval, tess_eval, Domain, 450)
+
+#undef P
+
+// Define a default profile for each GLSL stage that just
+// uses the latest language version we know of
+
+PROFILE_ALIAS(GLSL_Vertex,      GLSL_Vertex_450,        glsl_vertex)
+PROFILE_ALIAS(GLSL_Fragment,    GLSL_Fragment_450,      glsl_fragment)
+PROFILE_ALIAS(GLSL_Geometry,    GLSL_Geometry_450,      glsl_geometry)
+PROFILE_ALIAS(GLSL_TessControl, GLSL_TessControl_450,   glsl_tess_control)
+PROFILE_ALIAS(GLSL_TessEval,    GLSL_TessEval_450,      glsl_tess_eval)
+PROFILE_ALIAS(GLSL_Compute,     GLSL_Compute_450,       glsl_compute)
+
+// TODO: define a profile for each GLSL *version* that we can
+// use as a catch-all when the stage can be inferred from
+// something else
 
 #undef LANGUAGE
 #undef LANGUAGE_ALIAS
