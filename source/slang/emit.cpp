@@ -21,6 +21,11 @@ struct SharedEmitContext
     // The target language we want to generate code for
     CodeGenTarget target;
 
+    // The final code generation target
+    //
+    // For example, `target` might be `GLSL`, while `finalTarget` might be `SPIRV`
+    CodeGenTarget finalTarget;
+
     // The string of code we've built so far
     StringBuilder sb;
 
@@ -456,13 +461,17 @@ struct EmitVisitor
 
         bool shouldUseGLSLStyleLineDirective = false;
 
-        // Let's not do this
-#if 0
-        if (context->shared->target == CodeGenTarget::GLSL)
+        // TODO: Eventually we should give he user a proper API
+        // and command-line mechanism to control what kind of line
+        // directives we output (and to turn the feature off
+        // completely), but for now we always emit C-style line
+        // directives *unless* the final target language is raw
+        // GLSL code (all other targets will eventually pass
+        // through glslang, which supports C-style line directives).
+        if (context->shared->finalTarget == CodeGenTarget::GLSL)
         {
             shouldUseGLSLStyleLineDirective = true;
         }
-#endif
 
         if(shouldUseGLSLStyleLineDirective)
         {
@@ -3479,6 +3488,7 @@ String emitEntryPoint(
 
     SharedEmitContext sharedContext;
     sharedContext.target = target;
+    sharedContext.finalTarget = entryPoint->compileRequest->Target;
 
     sharedContext.programLayout = programLayout;
 
