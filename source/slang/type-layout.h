@@ -517,10 +517,11 @@ struct LayoutRulesImpl
 
 struct LayoutRulesFamilyImpl
 {
-    virtual LayoutRulesImpl* getConstantBufferRules()   = 0;
-    virtual LayoutRulesImpl* getTextureBufferRules()    = 0;
-    virtual LayoutRulesImpl* getVaryingInputRules()     = 0;
-    virtual LayoutRulesImpl* getVaryingOutputRules()    = 0;
+    virtual LayoutRulesImpl* getConstantBufferRules()       = 0;
+    virtual LayoutRulesImpl* getPushConstantBufferRules()   = 0;
+    virtual LayoutRulesImpl* getTextureBufferRules()        = 0;
+    virtual LayoutRulesImpl* getVaryingInputRules()         = 0;
+    virtual LayoutRulesImpl* getVaryingOutputRules()        = 0;
     virtual LayoutRulesImpl* getSpecializationConstantRules()   = 0;
     virtual LayoutRulesImpl* getShaderStorageBufferRules()      = 0;
 };

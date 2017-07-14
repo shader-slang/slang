@@ -206,7 +206,7 @@ namespace Slang
 #define SLANG_UNIMPLEMENTED(sink, pos, what) \
     (sink)->diagnose(Slang::CodePosition(__LINE__, 0, 0, __FILE__), Slang::Diagnostics::unimplemented, what)
 
-#define SLANG_UNREACHABLE(msg) do { assert(!"ureachable code:" msg); exit(1); } while(0)
+#define SLANG_UNREACHABLE(msg) do { assert(!"ureachable code:" msg); throw 0; } while(0)
 #else
 #define SLANG_INTERNAL_ERROR(sink, pos) \
     (sink)->diagnose(pos, Slang::Diagnostics::internalCompilerError)
