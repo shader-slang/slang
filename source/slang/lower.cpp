@@ -1828,25 +1828,6 @@ struct LoweringVisitor
                             needsOffset = true;
                             break;
                         }
-
-                        // Even if the base offset of the parent is zero, we may still
-                        // need to offset the child, because the parent consumes a
-                        // resources of the same kind...
-                        if (primaryVarLayout->typeLayout->type->As<UniformParameterBlockType>())
-                        {
-                            switch (rr.kind)
-                            {
-                            default:
-                                break;
-
-                            case LayoutResourceKind::ConstantBuffer:
-                            case LayoutResourceKind::DescriptorTableSlot:
-                                needsOffset = true;
-                                break;
-                            }
-                            if (needsOffset)
-                                break;
-                        }
                     }
                 }
                 if (needsOffset)
@@ -1867,22 +1848,6 @@ struct LoweringVisitor
                         {
                             newResInfo->index += parentInfo->index;
                             newResInfo->space += parentInfo->space;
-
-                            // Very special-case hack to deal with the case where the parent
-                            // itself consumes a resources of the same type as the field.
-                            if (primaryVarLayout->typeLayout->type->As<UniformParameterBlockType>())
-                            {
-                                switch (resInfo.kind)
-                                {
-                                default:
-                                    break;
-
-                                case LayoutResourceKind::ConstantBuffer:
-                                case LayoutResourceKind::DescriptorTableSlot:
-                                    newResInfo->index += 1;
-                                    break;
-                                }
-                            }
                         }
                     }
 

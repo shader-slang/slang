@@ -1342,8 +1342,9 @@ void generateParameterBindings(
     {
         auto globalConstantBufferLayout = createParameterBlockTypeLayout(
             nullptr,
-            globalScopeStructLayout,
-            globalScopeRules);
+            globalScopeRules,
+            globalScopeRules->GetObjectLayout(ShaderParameterKind::ConstantBuffer),
+            globalScopeStructLayout);
 
         globalScopeLayout = globalConstantBufferLayout;
     }
