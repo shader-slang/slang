@@ -748,6 +748,9 @@ namespace Slang
                     CASE(set,           GLSLSetLayoutModifier);
                     CASE(location,      GLSLLocationLayoutModifier);
                     CASE(push_constant, GLSLPushConstantLayoutModifier);
+                    CASE(local_size_x,  GLSLLocalSizeXLayoutModifier);
+                    CASE(local_size_y,  GLSLLocalSizeYLayoutModifier);
+                    CASE(local_size_z,  GLSLLocalSizeZLayoutModifier);
 
                 #undef CASE
                     else
