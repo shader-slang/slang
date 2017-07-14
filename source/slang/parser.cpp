@@ -747,6 +747,7 @@ namespace Slang
                     CASE(binding,       GLSLBindingLayoutModifier);
                     CASE(set,           GLSLSetLayoutModifier);
                     CASE(location,      GLSLLocationLayoutModifier);
+                    CASE(push_constant, GLSLPushConstantLayoutModifier);
 
                 #undef CASE
                     else

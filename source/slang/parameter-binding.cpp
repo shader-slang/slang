@@ -101,7 +101,7 @@ struct ParameterBindingInfo
 
 enum
 {
-    kLayoutResourceKindCount = SLANG_PARAMETER_CATEGORY_MIXED,
+    kLayoutResourceKindCount = SLANG_PARAMETER_CATEGORY_COUNT,
 };
 
 // Information on a single parameter
@@ -289,6 +289,11 @@ getTypeLayoutForGlobalShaderParameter_GLSL(
     // so that it won't be present on the declaration
     // any more. As such we also inspect the type
     // of the variable.
+
+    // We want to check for a constant-buffer type with a `push_constant` layout
+    // qualifier before we move on to anything else.
+    if (varDecl->HasModifier<GLSLPushConstantLayoutModifier>() && type->As<ConstantBufferType>())
+        return CreateTypeLayout(type, rules->getPushConstantBufferRules());
 
     // TODO(tfoley): We have multiple variations of
     // the `uniform` modifier right now, and that

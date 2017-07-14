@@ -118,15 +118,6 @@ static int glslang_compileGLSLToSPIRV(glslang_CompileRequest* request)
         &request->sourcePath,
         1);
 
-    // Note: this seems required to get past a bug where
-    // glslang complains about a declaration of `out gl_PerVertex`
-    // that it (seemingly) *should* allow according to the GLSL-for-Vulkan
-    // extension.
-    shader->setAutoMapLocations(true);
-
-    // Let's auto-map the bindings too, just because we can
-    shader->setAutoMapBindings(true);
-
     EShMessages messages = EShMessages(EShMsgSpvRules | EShMsgVulkanRules);
 
     if( !shader->parse(&gResources, 110, false, messages) )

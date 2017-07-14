@@ -3161,6 +3161,11 @@ struct EmitVisitor
             }
             Emit(")\n");
             break;
+
+        case LayoutResourceKind::PushConstantBuffer:
+            Emit("layout(push_constant)\n");
+            break;
+
         }
     }
 

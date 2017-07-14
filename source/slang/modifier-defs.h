@@ -109,6 +109,7 @@ SIMPLE_SYNTAX_CLASS(GLSLConstantIDLayoutModifier , GLSLParsedLayoutModifier)
 SIMPLE_SYNTAX_CLASS(GLSLBindingLayoutModifier    , GLSLParsedLayoutModifier)
 SIMPLE_SYNTAX_CLASS(GLSLSetLayoutModifier        , GLSLParsedLayoutModifier)
 SIMPLE_SYNTAX_CLASS(GLSLLocationLayoutModifier   , GLSLParsedLayoutModifier)
+SIMPLE_SYNTAX_CLASS(GLSLPushConstantLayoutModifier, GLSLParsedLayoutModifier)
 
 // A catch-all for single-keyword modifiers
 SIMPLE_SYNTAX_CLASS(SimpleModifier, Modifier)

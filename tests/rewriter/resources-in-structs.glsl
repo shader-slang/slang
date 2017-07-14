@@ -47,8 +47,10 @@ uniform texture2D SLANG_parameterBlock_U_m_t;
 layout(binding = 2)
 uniform sampler SLANG_parameterBlock_U_m_s;
 
+layout(location = 0)
 in vec2 uv;
 
+layout(location = 0)
 out vec4 color;
 
 void main()

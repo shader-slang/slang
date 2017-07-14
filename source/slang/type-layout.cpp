@@ -337,6 +337,19 @@ struct GLSLObjectLayoutRulesImpl : ObjectLayoutRulesImpl
 };
 GLSLObjectLayoutRulesImpl kGLSLObjectLayoutRulesImpl;
 
+struct GLSLPushConstantBufferObjectLayoutRulesImpl : GLSLObjectLayoutRulesImpl
+{
+    virtual SimpleLayoutInfo GetObjectLayout(ShaderParameterKind kind) override
+    {
+        // Special-case the layout for a constant-buffer, because we don't
+        // want it to allocate a descriptor-table slot
+        return SimpleLayoutInfo(LayoutResourceKind::PushConstantBuffer, 1);
+
+        return GLSLObjectLayoutRulesImpl::GetObjectLayout(kind);
+    }
+};
+GLSLPushConstantBufferObjectLayoutRulesImpl kGLSLPushConstantBufferObjectLayoutRulesImpl_;
+
 struct HLSLObjectLayoutRulesImpl : ObjectLayoutRulesImpl
 {
     virtual SimpleLayoutInfo GetObjectLayout(ShaderParameterKind kind) override
@@ -392,6 +405,7 @@ HLSLVaryingLayoutRulesImpl kHLSLVaryingOutputLayoutRulesImpl(LayoutResourceKind:
 struct GLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
 {
     virtual LayoutRulesImpl* getConstantBufferRules() override;
+    virtual LayoutRulesImpl* getPushConstantBufferRules() override;
     virtual LayoutRulesImpl* getTextureBufferRules() override;
     virtual LayoutRulesImpl* getVaryingInputRules() override;
     virtual LayoutRulesImpl* getVaryingOutputRules() override;
@@ -402,6 +416,7 @@ struct GLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
 struct HLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
 {
     virtual LayoutRulesImpl* getConstantBufferRules() override;
+    virtual LayoutRulesImpl* getPushConstantBufferRules() override;
     virtual LayoutRulesImpl* getTextureBufferRules() override;
     virtual LayoutRulesImpl* getVaryingInputRules() override;
     virtual LayoutRulesImpl* getVaryingOutputRules() override;
@@ -421,6 +436,10 @@ LayoutRulesImpl kStd140LayoutRulesImpl_ = {
 
 LayoutRulesImpl kStd430LayoutRulesImpl_ = {
     &kGLSLLayoutRulesFamilyImpl, &kStd430LayoutRulesImpl, &kGLSLObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kGLSLPushConstantLayoutRulesImpl_ = {
+    &kGLSLLayoutRulesFamilyImpl, &kStd430LayoutRulesImpl, &kGLSLPushConstantBufferObjectLayoutRulesImpl_,
 };
 
 LayoutRulesImpl kGLSLVaryingInputLayoutRulesImpl_ = {
@@ -460,6 +479,11 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getConstantBufferRules()
     return &kStd140LayoutRulesImpl_;
 }
 
+LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getPushConstantBufferRules()
+{
+    return &kGLSLPushConstantLayoutRulesImpl_;
+}
+
 LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getTextureBufferRules()
 {
     return nullptr;
@@ -488,6 +512,11 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getShaderStorageBufferRules()
 //
 
 LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getConstantBufferRules()
+{
+    return &kHLSLConstantBufferLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getPushConstantBufferRules()
 {
     return &kHLSLConstantBufferLayoutRulesImpl_;
 }
