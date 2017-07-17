@@ -361,14 +361,12 @@ struct HLSLObjectLayoutRulesImpl : ObjectLayoutRulesImpl
 
         case ShaderParameterKind::TextureUniformBuffer:
         case ShaderParameterKind::StructuredBuffer:
-        case ShaderParameterKind::SampledBuffer:
         case ShaderParameterKind::RawBuffer:
         case ShaderParameterKind::Buffer:
         case ShaderParameterKind::Texture:
             return SimpleLayoutInfo(LayoutResourceKind::ShaderResource, 1);
 
         case ShaderParameterKind::MutableStructuredBuffer:
-        case ShaderParameterKind::MutableSampledBuffer:
         case ShaderParameterKind::MutableRawBuffer:
         case ShaderParameterKind::MutableBuffer:
         case ShaderParameterKind::MutableTexture:
@@ -1041,8 +1039,6 @@ SimpleLayoutInfo GetLayoutImpl(
             type, rules, outTypeLayout);                        \
     } while(0)
 
-    CASE(HLSLBufferType,                    SampledBuffer);
-    CASE(HLSLRWBufferType,                  MutableSampledBuffer);
     CASE(HLSLByteAddressBufferType,         RawBuffer);
     CASE(HLSLRWByteAddressBufferType,       MutableRawBuffer);
 

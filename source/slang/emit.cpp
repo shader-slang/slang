@@ -771,6 +771,7 @@ struct EmitVisitor
         case TextureType::Shape2D:		Emit("Texture2D");		break;
         case TextureType::Shape3D:		Emit("Texture3D");		break;
         case TextureType::ShapeCube:	Emit("TextureCube");	break;
+        case TextureType::ShapeBuffer:  Emit("Buffer");         break;
         default:
             assert(!"unreachable");
             break;
