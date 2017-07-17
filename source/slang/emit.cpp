@@ -2667,11 +2667,12 @@ struct EmitVisitor
                 else if(auto mod_##TYPE = mod.As<TYPE>()) Emit(#KEYWORD " ")
 
             #define CASE2(TYPE, HLSL_NAME, GLSL_NAME) \
-                else if(auto mod_##TYPE = mod.As<TYPE>()) Emit((context->shared->target == CodeGenTarget::GLSL) ? GLSL_NAME : HLSL_NAME)
+                else if(auto mod_##TYPE = mod.As<TYPE>()) Emit((context->shared->target == CodeGenTarget::GLSL) ? (#GLSL_NAME " ") : (#HLSL_NAME " "))
 
             CASE(RowMajorLayoutModifier, row_major);
             CASE(ColumnMajorLayoutModifier, column_major);
-            CASE(HLSLNoInterpolationModifier, nointerpolation);
+
+            CASE2(HLSLNoInterpolationModifier, nointerpolation, flat);
             CASE(HLSLPreciseModifier, precise);
             CASE(HLSLEffectSharedModifier, shared);
             CASE(HLSLGroupSharedModifier, groupshared);
