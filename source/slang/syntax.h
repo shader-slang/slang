@@ -244,7 +244,7 @@ namespace Slang
             : createFunc(createFunc)
         {}
 
-        void* createInstanceImpl()
+        void* createInstanceImpl() const
         {
             return createFunc ? createFunc() : nullptr;
         }
@@ -271,7 +271,7 @@ namespace Slang
         {
         }
 
-        T* createInstance()
+        T* createInstance() const
         {
             return (T*)createInstanceImpl();
         }

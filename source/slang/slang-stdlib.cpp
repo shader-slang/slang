@@ -1440,6 +1440,66 @@ namespace Slang
                     for(int isFloat = 0; isFloat < 2; ++isFloat)
                     for(int includeMipInfo = 0; includeMipInfo < 2; ++includeMipInfo)
                     {
+                        {
+                            sb << "__intrinsic(glsl, \"(";
+
+                            int aa = 0;
+                            String lodStr = "0";
+                            if (includeMipInfo)
+                            {
+                                int mipLevelArg = aa++;
+                                lodStr.append("$");
+                                lodStr.append(mipLevelArg);
+                            }
+
+                            int cc = 0;
+                            switch(baseShape)
+                            {
+                            case TextureType::Shape1D:
+                                sb << "($" << aa++ << " = textureSize($P, " << lodStr << "))";
+                                cc = 1;
+                                break;
+
+                            case TextureType::Shape2D:
+                            case TextureType::ShapeCube:
+                                sb << "($" << aa++ << " = textureSize($P, " << lodStr << ").x)";
+                                sb << ", ($" << aa++ << " = textureSize($P, " << lodStr << ").y)";
+                                cc = 2;
+                                break;
+
+                            case TextureType::Shape3D:
+                                sb << "($" << aa++ << " = textureSize($P, " << lodStr << ").x)";
+                                sb << ", ($" << aa++ << " = textureSize($P, " << lodStr << ").y)";
+                                sb << ", ($" << aa++ << " = textureSize($P, " << lodStr << ").z)";
+                                cc = 3;
+                                break;
+
+                            default:
+                                assert(!"unexpected");
+                                break;
+                            }
+
+                            if(isArray)
+                            {
+                                sb << ", ($" << aa++ << " = textureSize($P, " << lodStr << ")." << kComponentNames[cc] << ")";
+                            }
+
+                            if(isMultisample)
+                            {
+                                sb << ", ($" << aa++ << " = textureSamples($P))";
+                            }
+
+                            if (includeMipInfo)
+                            {
+                                sb << ", ($" << aa++ << " = textureQueryLevels($P))";
+                            }
+
+
+                            sb << ")\")\n";
+                            sb << "__intrinsic\n";
+
+                        }
+
                         char const* t = isFloat ? "out float " : "out uint ";
 
                         sb << "void GetDimensions(";
@@ -1612,6 +1672,48 @@ namespace Slang
                         sb << "float compareValue";
                         sb << ");\n";
 
+                        int baseCoordCount = kBaseTextureTypes[tt].coordCount;
+                        int arrCoordCount = baseCoordCount + isArray;
+                        if (arrCoordCount < 3)
+                        {
+                            int extCoordCount = arrCoordCount + 1;
+
+                            if (extCoordCount < 3)
+                                extCoordCount = 3;
+
+                            sb << "__intrinsic(glsl, \"textureLod($p, ";
+
+                            sb << "vec" << extCoordCount << "($1,";
+                            for (int ii = arrCoordCount; ii < extCoordCount - 1; ++ii)
+                            {
+                                sb << " 0.0,";
+                            }
+                            sb << "$2)";
+
+                            sb << ", 0.0)\")\n";
+                        }
+                        else if(arrCoordCount <= 3)
+                        {
+                            int extCoordCount = arrCoordCount + 1;
+
+                            if (extCoordCount < 3)
+                                extCoordCount = 3;
+
+                            sb << "__intrinsic(glsl, \"textureGrad($p, ";
+
+                            sb << "vec" << extCoordCount << "($1,";
+                            for (int ii = arrCoordCount; ii < extCoordCount - 1; ++ii)
+                            {
+                                sb << " 0.0,";
+                            }
+                            sb << "$2)";
+
+                            // Construct gradients
+                            sb << ", vec" << baseCoordCount << "(0.0)";
+                            sb << ", vec" << baseCoordCount << "(0.0)";
+                            sb << ")\")\n";
+                        }
+                        sb << "__intrinsic\n";
                         sb << "T SampleCmpLevelZero(SamplerComparisonState s, ";
                         sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                         sb << "float compareValue";
@@ -1637,6 +1739,9 @@ namespace Slang
                             sb << "int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
                         }
 
+
+                        sb << "__intrinsic(glsl, \"textureGrad($p, $1, $2, $3)\")\n";
+                        sb << "__intrinsic\n";
                         sb << "T SampleGrad(SamplerState s, ";
                         sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                         sb << "float" << kBaseTextureTypes[tt].coordCount << " gradX, ";
@@ -1645,6 +1750,8 @@ namespace Slang
 
                         if( baseShape != TextureType::ShapeCube )
                         {
+                            sb << "__intrinsic(glsl, \"textureGradOffset($p, $1, $2, $3, $4)\")\n";
+                            sb << "__intrinsic\n";
                             sb << "T SampleGrad(SamplerState s, ";
                             sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                             sb << "float" << kBaseTextureTypes[tt].coordCount << " gradX, ";
