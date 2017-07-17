@@ -1440,6 +1440,66 @@ namespace Slang
                     for(int isFloat = 0; isFloat < 2; ++isFloat)
                     for(int includeMipInfo = 0; includeMipInfo < 2; ++includeMipInfo)
                     {
+                        {
+                            sb << "__intrinsic(glsl, \"(";
+
+                            int aa = 0;
+                            String lodStr = "0";
+                            if (includeMipInfo)
+                            {
+                                int mipLevelArg = aa++;
+                                lodStr.append("$");
+                                lodStr.append(mipLevelArg);
+                            }
+
+                            int cc = 0;
+                            switch(baseShape)
+                            {
+                            case TextureType::Shape1D:
+                                sb << "($" << aa++ << " = textureSize($P, " << lodStr << "))";
+                                cc = 1;
+                                break;
+
+                            case TextureType::Shape2D:
+                            case TextureType::ShapeCube:
+                                sb << "($" << aa++ << " = textureSize($P, " << lodStr << ").x)";
+                                sb << ", ($" << aa++ << " = textureSize($P, " << lodStr << ").y)";
+                                cc = 2;
+                                break;
+
+                            case TextureType::Shape3D:
+                                sb << "($" << aa++ << " = textureSize($P, " << lodStr << ").x)";
+                                sb << ", ($" << aa++ << " = textureSize($P, " << lodStr << ").y)";
+                                sb << ", ($" << aa++ << " = textureSize($P, " << lodStr << ").z)";
+                                cc = 3;
+                                break;
+
+                            default:
+                                assert(!"unexpected");
+                                break;
+                            }
+
+                            if(isArray)
+                            {
+                                sb << ", ($" << aa++ << " = textureSize($P, " << lodStr << ")." << kComponentNames[cc] << ")";
+                            }
+
+                            if(isMultisample)
+                            {
+                                sb << ", ($" << aa++ << " = textureSamples($P))";
+                            }
+
+                            if (includeMipInfo)
+                            {
+                                sb << ", ($" << aa++ << " = textureQueryLevels($P))";
+                            }
+
+
+                            sb << ")\")\n";
+                            sb << "__intrinsic\n";
+
+                        }
+
                         char const* t = isFloat ? "out float " : "out uint ";
 
                         sb << "void GetDimensions(";
