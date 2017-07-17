@@ -221,7 +221,8 @@ public:
 
 struct SharedLoweringContext
 {
-    CompileRequest* compileRequest;
+    CompileRequest*     compileRequest;
+    EntryPointRequest*  entryPointRequest;
 
     ProgramLayout*      programLayout;
     EntryPointLayout*   entryPointLayout;
@@ -2329,6 +2330,31 @@ struct LoweringVisitor
         return false;
     }
 
+    void requireGLSLVersion(ProfileVersion version)
+    {
+        if (shared->target != CodeGenTarget::GLSL)
+            return;
+
+        auto entryPoint = shared->entryPointRequest;
+        auto profile = entryPoint->profile;
+        auto currentVersion = profile.GetVersion();
+        if (profile.getFamily() == ProfileFamily::GLSL)
+        {
+            // Check if this profile is newer
+            if ((UInt)version > (UInt)profile.GetVersion())
+            {
+                profile.setVersion(version);
+                entryPoint->profile = profile;
+            }
+        }
+        else
+        {
+            // Non-GLSL target? Set it to a GLSL one.
+            profile.setVersion(version);
+            entryPoint->profile = profile;
+        }
+    }
+
     void lowerSimpleShaderParameterToGLSLGlobal(
         VaryingParameterInfo const&     info,
         RefPtr<ExpressionType>          varType,
@@ -2460,6 +2486,10 @@ struct LoweringVisitor
             }
             else if (ns == "sv_rendertargetarrayindex")
             {
+                if (info.direction == VaryingParameterDirection::Input)
+                {
+                    requireGLSLVersion(ProfileVersion::GLSL_430);
+                }
                 globalVarExpr = createGLSLBuiltinRef("gl_Layer");
             }
             else if (ns == "sv_sampleindex")
@@ -3040,6 +3070,7 @@ LoweredEntryPoint lowerEntryPoint(
 {
     SharedLoweringContext sharedContext;
     sharedContext.compileRequest = entryPoint->compileRequest;
+    sharedContext.entryPointRequest = entryPoint;
     sharedContext.programLayout = programLayout;
     sharedContext.target = target;
 

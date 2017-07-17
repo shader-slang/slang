@@ -70,6 +70,11 @@ namespace Slang
         ProfileVersion GetVersion() const { return ProfileVersion(uint32_t(raw) & 0xFFFF); }
         ProfileFamily getFamily() const { return getProfileFamily(GetVersion()); }
 
+        void setVersion(ProfileVersion version)
+        {
+            raw = (raw & ~0xFFFF) | uint32_t(version);
+        }
+
         static Profile LookUp(char const* name);
 
         RawVal raw = Unknown;

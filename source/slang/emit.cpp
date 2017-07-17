@@ -3604,6 +3604,13 @@ String emitEntryPoint(
 
     auto translationUnitSyntax = translationUnit->SyntaxNode.Ptr();
 
+    // We perform lowering of the program before emitting *anything*,
+    // because the lowering process might change how we emit some
+    // boilerplate at the start of the ouput for GLSL (e.g., what
+    // version we require).
+    auto lowered = lowerEntryPoint(entryPoint, programLayout, target);
+    sharedContext.program = lowered.program;
+
 
     // There may be global-scope modifiers that we should emit now
     visitor.emitGLSLPreprocessorDirectives(translationUnitSyntax);
@@ -3624,9 +3631,6 @@ String emitEntryPoint(
         break;
     }
 
-    auto lowered = lowerEntryPoint(entryPoint, programLayout, target);
-
-    sharedContext.program = lowered.program;
 
     visitor.EmitDeclsInContainer(lowered.program.Ptr());
 
