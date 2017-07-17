@@ -1495,14 +1495,28 @@ struct EmitVisitor
         outerPrec.rightPrecedence = rightPrec;
     }
 
+    void visitGenericAppExpr(GenericAppExpr* expr, ExprEmitArg const& arg)
+    {
+        auto prec = kEOp_Postfix;
+        auto outerPrec = arg.outerPrec;
+        bool needClose = MaybeEmitParens(outerPrec, prec);
 
-#define UNEXPECTED(NAME)                        \
-    void visit##NAME(NAME*, ExprEmitArg const&) \
-    { Emit(#NAME); }
+        EmitExprWithPrecedence(expr->FunctionExpr, leftSide(outerPrec, prec));
+        Emit("<");
+        bool first = true;
+        for(auto aa : expr->Arguments)
+        {
+            if(!first) Emit(", ");
+            EmitExpr(aa);
+            first = false;
+        }
+        Emit(" >");
 
-    UNEXPECTED(GenericAppExpr);
-
-#undef UNEXPECTED
+        if(needClose)
+        {
+            Emit(")");
+        }
+    }
 
     void visitSharedTypeExpr(SharedTypeExpr* expr, ExprEmitArg const&)
     {

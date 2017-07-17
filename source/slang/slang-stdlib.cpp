@@ -264,7 +264,7 @@ __generic<T> __magic_type(HLSLLineStreamType) struct LineStream
     void RestartStrip();
 };
 
-__generic<T> __magic_type(HLSLLineStreamType) struct TriangleStream
+__generic<T> __magic_type(HLSLTriangleStreamType) struct TriangleStream
 {
     void Append(T value);
     void RestartStrip();
