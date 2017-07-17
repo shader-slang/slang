@@ -7,6 +7,19 @@
 namespace Slang
 {
 
+struct CloneVisitor
+    : ModifierVisitor<CloneVisitor, RefPtr<Modifier>>
+{
+#define ABSTRACT_SYNTAX_CLASS(NAME, BASE) /* empty */
+#define SYNTAX_CLASS(NAME, BASE, ...)                   \
+    RefPtr<NAME> visit ## NAME(NAME* obj) { return new NAME(*obj); }
+
+#include "object-meta-begin.h"
+#include "modifier-defs.h"
+#include "object-meta-end.h"
+
+};
+
 //
 
 template<typename V>
@@ -2244,11 +2257,40 @@ struct LoweringVisitor
         IntVal*                     elementCount;
     };
 
+    struct VaryingParameterVarChain
+    {
+        VaryingParameterVarChain*   next = nullptr;
+        VarDeclBase*                varDecl;
+    };
+
+    template<typename T>
+    T* findModifier(VaryingParameterVarChain* chain)
+    {
+        for (auto c = chain; c; c = c->next)
+        {
+            auto v = c->varDecl;
+            if (auto mod = v->FindModifier<T>())
+                return mod;
+        }
+        return nullptr;
+    }
+
+    RefPtr<Modifier> cloneModifier(Modifier* modifier)
+    {
+        if (!modifier) return nullptr;
+
+        // For now we just do a shallow copy of the modifier
+
+        CloneVisitor visitor;
+        return visitor.dispatch(modifier);
+    }
+
     struct VaryingParameterInfo
     {
         String                      name;
         VaryingParameterDirection   direction;
         VaryingParameterArraySpec*  arraySpecs = nullptr;
+        VaryingParameterVarChain*   varChain = nullptr;
     };
 
     RefPtr<ExpressionSyntaxNode> createGLSLBuiltinRef(
@@ -2259,6 +2301,33 @@ struct LoweringVisitor
         return globalVarRef;
     }
 
+    bool isIntegralType(
+        ExpressionType* type)
+    {
+        if (auto baseType = type->As<BasicExpressionType>())
+        {
+            switch (baseType->BaseType)
+            {
+            default:
+                return false;
+
+            case BaseType::Int:
+            case BaseType::UInt:
+            case BaseType::UInt64:
+                return true;
+            }
+        }
+        else if (auto vecType = type->As<VectorExpressionType>())
+        {
+            return isIntegralType(vecType->elementType);
+        }
+        else if (auto matType = type->As<MatrixExpressionType>())
+        {
+            return isIntegralType(matType->getElementType());
+        }
+
+        return false;
+    }
 
     void lowerSimpleShaderParameterToGLSLGlobal(
         VaryingParameterInfo const&     info,
@@ -2449,6 +2518,26 @@ struct LoweringVisitor
                 break;
             }
 
+            // We want to copy certain modifiers from the declaration as given,
+            // over to the newly created global variable. The most important
+            // of these is any interpolation-mode modifier.
+            //
+            // Note that a shader parameter could have been nested inside
+            // a `struct` type, so we will look for interpolation modifiers
+            // starting on the "deepest" field, and working out way out.
+
+            // Look for interpolation mode modifier
+            if (auto interpolationModeModifier = findModifier<InterpolationModeModifier>(info.varChain))
+            {
+                addModifier(globalVarDecl, cloneModifier(interpolationModeModifier));
+            }
+            // Otherwise, check if we need to add one:
+            else if (isIntegralType(varType))
+            {
+                auto mod = new HLSLNoInterpolationModifier();
+                addModifier(globalVarDecl, mod);
+            }
+
 
             RefPtr<VarExpressionSyntaxNode> globalVarRef = new VarExpressionSyntaxNode();
             globalVarRef->Position = globalVarDecl->Position;
@@ -2554,8 +2643,13 @@ struct LoweringVisitor
                     fieldExpr->declRef = fieldDeclRef;
                     fieldExpr->BaseExpression = varExpr;
 
+                    VaryingParameterVarChain fieldVarChain;
+                    fieldVarChain.next = info.varChain;
+                    fieldVarChain.varDecl = fieldDeclRef.getDecl();
+
                     VaryingParameterInfo fieldInfo = info;
                     fieldInfo.name = info.name + "_" + fieldDeclRef.GetName();
+                    fieldInfo.varChain = &fieldVarChain;
 
                     // Need to find the layout for the given field...
                     Decl* originalFieldDecl = nullptr;
@@ -2598,9 +2692,14 @@ struct LoweringVisitor
         expr->declRef = declRef;
         expr->Type.type = GetType(declRef);
 
+        VaryingParameterVarChain varChain;
+        varChain.next = nullptr;
+        varChain.varDecl = localVarDecl;
+
         VaryingParameterInfo info;
         info.name = name;
         info.direction = direction;
+        info.varChain = &varChain;
 
         // Ensure that we don't get name collisions on `inout` variables
         switch (direction)

@@ -671,6 +671,83 @@ TestResult runSimpleTest(TestInput& input)
     return result;
 }
 
+TestResult runCrossCompilerTest(TestInput& input)
+{
+    // need to execute the stand-alone Slang compiler on the file
+    // then on the same file + `.glsl` and compare output
+
+    auto filePath = input.filePath;
+    auto outputStem = input.outputStem;
+
+    OSProcessSpawner actualSpawner;
+    OSProcessSpawner expectedSpawner;
+
+    actualSpawner.pushExecutablePath(String(options.binDir) + "slangc.exe");
+    expectedSpawner.pushExecutablePath(String(options.binDir) + "slangc.exe");
+
+    actualSpawner.pushArgument(filePath);
+    expectedSpawner.pushArgument(filePath + ".glsl");
+
+    for( auto arg : input.testOptions->args )
+    {
+        actualSpawner.pushArgument(arg);
+        expectedSpawner.pushArgument(arg);
+    }
+    expectedSpawner.pushArgument("-no-checking");
+
+    if (spawnAndWait(outputStem, expectedSpawner) != kOSError_None)
+    {
+        return kTestResult_Fail;
+    }
+
+    String expectedOutput = getOutput(expectedSpawner);
+    String expectedOutputPath = outputStem + ".expected";
+    try
+    {
+        Slang::File::WriteAllText(expectedOutputPath, expectedOutput);
+    }
+    catch (Slang::IOException)
+    {
+        return kTestResult_Fail;
+    }
+
+    if (spawnAndWait(outputStem, actualSpawner) != kOSError_None)
+    {
+        return kTestResult_Fail;
+    }
+    String actualOutput = getOutput(actualSpawner);
+
+    TestResult result = kTestResult_Pass;
+
+    // Otherwise we compare to the expected output
+    if (actualOutput != expectedOutput)
+    {
+        result = kTestResult_Fail;
+    }
+
+    // If the test failed, then we write the actual output to a file
+    // so that we can easily diff it from the command line and
+    // diagnose the problem.
+    if (result == kTestResult_Fail)
+    {
+        String actualOutputPath = outputStem + ".actual";
+        Slang::File::WriteAllText(actualOutputPath, actualOutput);
+
+        if (options.outputMode == kOutputMode_AppVeyor)
+        {
+            fprintf(stderr, "ERROR:\n"
+                "EXPECTED{{{\n%s}}}\n"
+                "ACTUAL{{{\n%s}}}\n",
+                expectedOutput.Buffer(),
+                actualOutput.Buffer());
+            fflush(stderr);
+        }
+    }
+
+    return result;
+}
+
+
 #ifdef SLANG_TEST_SUPPORT_HLSL
 TestResult generateHLSLBaseline(TestInput& input)
 {
@@ -1076,6 +1153,7 @@ TestResult runTest(
         { "COMPARE_HLSL_CROSS_COMPILE_RENDER", &runHLSLCrossCompileRenderComparisonTest},
         { "COMPARE_HLSL_GLSL_RENDER", &runHLSLAndGLSLComparisonTest },
         { "COMPARE_GLSL", &runGLSLComparisonTest },
+        { "CROSS_COMPILE", &runCrossCompilerTest },
         { nullptr, nullptr },
     };
 
