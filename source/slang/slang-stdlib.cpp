@@ -1833,6 +1833,27 @@ namespace Slang
                     sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << leftQual << "matrix<" << leftType << ",N,M> left, matrix<" << rightType << ",N,M> right);\n";
                     break;
                 }
+
+                // We are going to go ahead and explicitly define combined
+                // operations for the scalar-op-vector, etc. cases, rather
+                // than rely on promotion rules.
+
+                // scalar-vector and scalar-matrix
+                if (!(op.flags & ASSIGNMENT))
+                {
+                    sb << "__generic<let N : int> ";
+                    sb << "__intrinsic_op(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(" << leftQual << leftType << " left, vector<" << rightType << ",N> right);\n";
+
+                    sb << "__generic<let N : int, let M : int> ";
+                    sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << leftQual << leftType << " left, matrix<" << rightType << ",N,M> right);\n";
+                }
+
+                // vector-scalar and matrix-scalar
+                sb << "__generic<let N : int> ";
+                sb << "__intrinsic_op(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(" << leftQual << "vector<" << leftType << ",N> left, " << rightType << " right);\n";
+
+                sb << "__generic<let N : int, let M : int> ";
+                sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << leftQual << "matrix<" << leftType << ",N,M> left, " << rightType << " right);\n";
             }
         }
 
