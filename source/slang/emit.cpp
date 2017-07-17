@@ -2683,6 +2683,9 @@ struct EmitVisitor
             #define CASE2(TYPE, HLSL_NAME, GLSL_NAME) \
                 else if(auto mod_##TYPE = mod.As<TYPE>()) Emit((context->shared->target == CodeGenTarget::GLSL) ? (#GLSL_NAME " ") : (#HLSL_NAME " "))
 
+            #define CASE2_RAW(TYPE, HLSL_NAME, GLSL_NAME) \
+                else if(auto mod_##TYPE = mod.As<TYPE>()) Emit((context->shared->target == CodeGenTarget::GLSL) ? (GLSL_NAME) : (HLSL_NAME))
+
             CASE(RowMajorLayoutModifier, row_major);
             CASE(ColumnMajorLayoutModifier, column_major);
 
@@ -2703,7 +2706,7 @@ struct EmitVisitor
             CASE(HLSLLineAdjModifier, lineadj);
             CASE(HLSLTriangleAdjModifier, triangleadj);
 
-            CASE(HLSLLinearModifier, linear);
+            CASE2_RAW(HLSLLinearModifier, "linear ", "");
             CASE(HLSLSampleModifier, sample);
             CASE(HLSLCentroidModifier, centroid);
 
