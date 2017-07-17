@@ -994,6 +994,11 @@ static RefPtr<TypeLayout> processEntryPointParameter(
             assert(!"unimplemented");
         }
     }
+    // If we ran into an error in checking the user's code, then skip this parameter
+    else if( auto errorType = type->As<ErrorType>() )
+    {
+        return nullptr;
+    }
     else
     {
         assert(!"unimplemented");
@@ -1089,6 +1094,10 @@ static void collectEntryPointParameters(
             paramDecl->Type.type,
             state,
             paramVarLayout);
+
+        // Skip parameters for which we could not compute a layout
+        if(!paramTypeLayout)
+            continue;
 
         paramVarLayout->typeLayout = paramTypeLayout;
 
