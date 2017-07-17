@@ -403,9 +403,6 @@ enum class ShaderParameterKind
     StructuredBuffer,
     MutableStructuredBuffer,
 
-    SampledBuffer,
-    MutableSampledBuffer,
-
     RawBuffer,
     MutableRawBuffer,
 

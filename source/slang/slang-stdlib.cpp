@@ -50,17 +50,6 @@ __generic<T> __magic_type(HLSLAppendStructuredBufferType) struct AppendStructure
         out uint stride);
 };
 
-__generic<T> __magic_type(HLSLBufferType) struct Buffer
-{
-    __intrinsic void GetDimensions(
-        out uint dim);
-
-    __intrinsic T Load(int location);
-    __intrinsic T Load(int location, out uint status);
-
-    __intrinsic __subscript(uint index) -> T;
-};
-
 __magic_type(HLSLByteAddressBufferType) struct ByteAddressBuffer
 {
     __intrinsic void GetDimensions(
@@ -108,19 +97,6 @@ __generic<T, let N : int> __magic_type(HLSLInputPatchType) struct InputPatch
 __generic<T, let N : int> __magic_type(HLSLOutputPatchType) struct OutputPatch
 {
     __intrinsic __subscript(uint index) -> T { set; }
-};
-
-__generic<T> __magic_type(HLSLRWBufferType) struct RWBuffer
-{
-    // Note(tfoley): duplication with declaration of `Buffer`
-
-    __intrinsic void GetDimensions(
-        out uint dim);
-
-    __intrinsic T Load(int location);
-    __intrinsic T Load(int location, out uint status);
-
-    __intrinsic __subscript(uint index) -> T { get; set; }
 };
 
 __magic_type(HLSLRWByteAddressBufferType) struct RWByteAddressBuffer
@@ -1985,10 +1961,6 @@ namespace Slang
         StringBuilder sb;
 
 
-//        sb << "__generic<T> __magic_type(PackedBuffer) struct PackedBuffer {};\n";
-//        sb << "__generic<T> __magic_type(Uniform) struct Uniform {};\n";
-//        sb << "__generic<T> __magic_type(Patch) struct Patch {};\n";
-
         // Component-wise multiplication ops
         for(auto op : binaryOps)
         {
@@ -2017,6 +1989,48 @@ namespace Slang
                 sb << "__generic<let N : int, let M : int> ";
                 sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << leftQual << "matrix<" << leftType << ",N,M> left, matrix<" << rightType << ",N,M> right);\n";
             }
+        }
+
+        //
+
+        // Buffer types
+
+        static const struct {
+            char const*         name;
+            SlangResourceAccess access;
+        } kBaseBufferAccessLevels[] = {
+            { "",                   SLANG_RESOURCE_ACCESS_READ },
+            { "RW",                 SLANG_RESOURCE_ACCESS_READ_WRITE },
+            { "RasterizerOrdered",  SLANG_RESOURCE_ACCESS_RASTER_ORDERED },
+        };
+        static const int kBaseBufferAccessLevelCount = sizeof(kBaseBufferAccessLevels) / sizeof(kBaseBufferAccessLevels[0]);
+
+        for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
+        {
+
+            sb << "__generic<T> __magic_type(Texture, ";
+            sb << ResourceType::makeFlavor(ResourceType::Shape::ShapeBuffer, kBaseBufferAccessLevels[aa].access);
+            sb << ") struct ";
+            sb << kBaseBufferAccessLevels[aa].name;
+            sb << "Buffer {\n";
+
+            sb << "__intrinsic void GetDimensions(out uint dim);\n";
+
+            sb << "__intrinsic T Load(int location);\n";
+            sb << "__intrinsic T Load(int location, out uint status);\n";
+
+            sb << "__intrinsic __subscript(uint index) -> T";
+
+            if (kBaseBufferAccessLevels[aa].access != SLANG_RESOURCE_ACCESS_READ)
+            {
+                sb << " { get; set; }\n";
+            }
+            else
+            {
+                sb << ";\n";
+            }
+
+            sb << "};\n";
         }
 
         // Output a suitable `#line` directive to point at our raw stdlib code above

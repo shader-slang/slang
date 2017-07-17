@@ -421,13 +421,7 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
             CASE(GLSLOutputParameterBlockType, GLSLOutputParameterBlockType)
             CASE(GLSLShaderStorageBufferType, GLSLShaderStorageBufferType)
 
-            CASE(PackedBuffer, PackedBufferType)
-            CASE(Uniform, UniformBufferType)
-            CASE(Patch, PatchType)
-
-            CASE(HLSLBufferType, HLSLBufferType)
             CASE(HLSLStructuredBufferType, HLSLStructuredBufferType)
-            CASE(HLSLRWBufferType, HLSLRWBufferType)
             CASE(HLSLRWStructuredBufferType, HLSLRWStructuredBufferType)
             CASE(HLSLAppendStructuredBufferType, HLSLAppendStructuredBufferType)
             CASE(HLSLConsumeStructuredBufferType, HLSLConsumeStructuredBufferType)

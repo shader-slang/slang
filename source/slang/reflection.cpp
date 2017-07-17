@@ -123,10 +123,6 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
         return SLANG_TYPE_KIND_RESOURCE;    \
     } while(0)
 
-    CASE(HLSLBufferType);
-    CASE(HLSLRWBufferType);
-    CASE(HLSLBufferType);
-    CASE(HLSLRWBufferType);
     CASE(HLSLStructuredBufferType);
     CASE(HLSLRWStructuredBufferType);
     CASE(HLSLAppendStructuredBufferType);
@@ -342,10 +338,6 @@ SLANG_API SlangResourceShape spReflectionType_GetResourceShape(SlangReflectionTy
         return SHAPE;               \
     } while(0)
 
-    CASE(HLSLBufferType,                    SLANG_TEXTURE_BUFFER, SLANG_RESOURCE_ACCESS_READ);
-    CASE(HLSLRWBufferType,                  SLANG_TEXTURE_BUFFER, SLANG_RESOURCE_ACCESS_READ_WRITE);
-    CASE(HLSLBufferType,                    SLANG_TEXTURE_BUFFER, SLANG_RESOURCE_ACCESS_READ);
-    CASE(HLSLRWBufferType,                  SLANG_TEXTURE_BUFFER, SLANG_RESOURCE_ACCESS_READ_WRITE);
     CASE(HLSLStructuredBufferType,          SLANG_STRUCTURED_BUFFER, SLANG_RESOURCE_ACCESS_READ);
     CASE(HLSLRWStructuredBufferType,        SLANG_STRUCTURED_BUFFER, SLANG_RESOURCE_ACCESS_READ_WRITE);
     CASE(HLSLAppendStructuredBufferType,    SLANG_STRUCTURED_BUFFER, SLANG_RESOURCE_ACCESS_APPEND);
@@ -379,10 +371,6 @@ SLANG_API SlangResourceAccess spReflectionType_GetResourceAccess(SlangReflection
         return ACCESS;              \
     } while(0)
 
-    CASE(HLSLBufferType,                    SLANG_TEXTURE_BUFFER, SLANG_RESOURCE_ACCESS_READ);
-    CASE(HLSLRWBufferType,                  SLANG_TEXTURE_BUFFER, SLANG_RESOURCE_ACCESS_READ_WRITE);
-    CASE(HLSLBufferType,                    SLANG_TEXTURE_BUFFER, SLANG_RESOURCE_ACCESS_READ);
-    CASE(HLSLRWBufferType,                  SLANG_TEXTURE_BUFFER, SLANG_RESOURCE_ACCESS_READ_WRITE);
     CASE(HLSLStructuredBufferType,          SLANG_STRUCTURED_BUFFER, SLANG_RESOURCE_ACCESS_READ);
     CASE(HLSLRWStructuredBufferType,        SLANG_STRUCTURED_BUFFER, SLANG_RESOURCE_ACCESS_READ_WRITE);
     CASE(HLSLAppendStructuredBufferType,    SLANG_STRUCTURED_BUFFER, SLANG_RESOURCE_ACCESS_APPEND);
@@ -418,11 +406,6 @@ SLANG_API SlangReflectionType* spReflectionType_GetResourceResultType(SlangRefle
     else if(type->As<TYPE>()) do {                                                      \
         return convert(type->As<TYPE>()->elementType.Ptr());                            \
     } while(0)
-
-    CASE(HLSLBufferType,                    SLANG_TEXTURE_BUFFER, SLANG_RESOURCE_ACCESS_READ);
-    CASE(HLSLRWBufferType,                  SLANG_TEXTURE_BUFFER, SLANG_RESOURCE_ACCESS_READ_WRITE);
-    CASE(HLSLBufferType,                    SLANG_TEXTURE_BUFFER, SLANG_RESOURCE_ACCESS_READ);
-    CASE(HLSLRWBufferType,                  SLANG_TEXTURE_BUFFER, SLANG_RESOURCE_ACCESS_READ_WRITE);
 
     // TODO: structured buffer needs to expose type layout!
 

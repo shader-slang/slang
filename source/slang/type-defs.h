@@ -91,16 +91,8 @@ protected:
 )
 END_SYNTAX_CLASS()
 
-
-SYNTAX_CLASS(TextureTypeBase, DeclRefType)
-    // The type that results from fetching an element from this texture
-    SYNTAX_FIELD(RefPtr<ExpressionType>, elementType)
-
-    // Bits representing the kind of texture type we are looking at
-    // (e.g., `Texture2DMS` vs. `TextureCubeArray`)
-    RAW(typedef uint16_t Flavor;)
-    FIELD(Flavor, flavor)
-
+// Base type for things we think of as "resources"
+ABSTRACT_SYNTAX_CLASS(ResourceTypeBase, DeclRefType)
 RAW(
     enum
     {
@@ -132,7 +124,6 @@ RAW(
         // No Shape3DArray
         ShapeCubeArray	= ShapeCube | ArrayFlag,
     };
-            
 
     Shape GetBaseShape() const { return Shape(flavor & ShapeMask); }
     bool isArray() const { return (flavor & ArrayFlag) != 0; }
@@ -142,14 +133,35 @@ RAW(
     SlangResourceShape getShape() const { return flavor & 0xFF; }
     SlangResourceAccess getAccess() const { return (flavor >> 8) & 0xFF; }
 
+    // Bits representing the kind of resource we are looking at
+    // (e.g., `Texture2DMS` vs. `TextureCubeArray`)
+    typedef uint16_t Flavor;
+
+    static Flavor makeFlavor(SlangResourceShape shape, SlangResourceAccess access)
+    {
+        return Flavor(shape | (access << 8));
+    }
+)
+    FIELD(Flavor, flavor)
+END_SYNTAX_CLASS()
+
+// Resources that contain "elements" that can be fetched
+ABSTRACT_SYNTAX_CLASS(ResourceType, ResourceTypeBase)
+    // The type that results from fetching an element from this resource
+    SYNTAX_FIELD(RefPtr<ExpressionType>, elementType)
+END_SYNTAX_CLASS()
+
+ABSTRACT_SYNTAX_CLASS(TextureTypeBase, ResourceType)
+RAW(
     TextureTypeBase()
     {}
     TextureTypeBase(
         Flavor flavor,
         RefPtr<ExpressionType> elementType)
-        : elementType(elementType)
-        , flavor(flavor)
-    {}
+    {
+        this->elementType = elementType;
+        this->flavor = flavor;
+    }
 )
 END_SYNTAX_CLASS()
 
@@ -213,17 +225,8 @@ END_SYNTAX_CLASS()
 // in the element type.
 SIMPLE_SYNTAX_CLASS(PointerLikeType, BuiltinGenericType)
 
-// Generic types used in existing Slang code
-// TODO(tfoley): check that these are actually working right...
-SIMPLE_SYNTAX_CLASS(PatchType, PointerLikeType)
-SIMPLE_SYNTAX_CLASS(StorageBufferType, BuiltinGenericType)
-SIMPLE_SYNTAX_CLASS(UniformBufferType, PointerLikeType)
-SIMPLE_SYNTAX_CLASS(PackedBufferType, BuiltinGenericType)
-
 // HLSL buffer-type resources
 
-SIMPLE_SYNTAX_CLASS(HLSLBufferType, BuiltinGenericType)
-SIMPLE_SYNTAX_CLASS(HLSLRWBufferType, BuiltinGenericType)
 SIMPLE_SYNTAX_CLASS(HLSLStructuredBufferType, BuiltinGenericType)
 SIMPLE_SYNTAX_CLASS(HLSLRWStructuredBufferType, BuiltinGenericType)
 
