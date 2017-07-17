@@ -1612,6 +1612,48 @@ namespace Slang
                         sb << "float compareValue";
                         sb << ");\n";
 
+                        int baseCoordCount = kBaseTextureTypes[tt].coordCount;
+                        int arrCoordCount = baseCoordCount + isArray;
+                        if (arrCoordCount < 3)
+                        {
+                            int extCoordCount = arrCoordCount + 1;
+
+                            if (extCoordCount < 3)
+                                extCoordCount = 3;
+
+                            sb << "__intrinsic(glsl, \"textureLod($p, ";
+
+                            sb << "vec" << extCoordCount << "($1,";
+                            for (int ii = arrCoordCount; ii < extCoordCount - 1; ++ii)
+                            {
+                                sb << " 0.0,";
+                            }
+                            sb << "$2)";
+
+                            sb << ", 0.0)\")\n";
+                        }
+                        else if(arrCoordCount <= 3)
+                        {
+                            int extCoordCount = arrCoordCount + 1;
+
+                            if (extCoordCount < 3)
+                                extCoordCount = 3;
+
+                            sb << "__intrinsic(glsl, \"textureGrad($p, ";
+
+                            sb << "vec" << extCoordCount << "($1,";
+                            for (int ii = arrCoordCount; ii < extCoordCount - 1; ++ii)
+                            {
+                                sb << " 0.0,";
+                            }
+                            sb << "$2)";
+
+                            // Construct gradients
+                            sb << ", vec" << baseCoordCount << "(0.0)";
+                            sb << ", vec" << baseCoordCount << "(0.0)";
+                            sb << ")\")\n";
+                        }
+                        sb << "__intrinsic\n";
                         sb << "T SampleCmpLevelZero(SamplerComparisonState s, ";
                         sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                         sb << "float compareValue";

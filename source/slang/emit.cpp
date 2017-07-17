@@ -1041,7 +1041,7 @@ struct EmitVisitor
         default:
             switch (samplerStateType->flavor)
             {
-            case SamplerStateType::Flavor::SamplerState:			Emit("SamplerState");				break;
+            case SamplerStateType::Flavor::SamplerState:			Emit("SamplerState");			break;
             case SamplerStateType::Flavor::SamplerComparisonState:	Emit("SamplerComparisonState");	break;
             default:
                 assert(!"unreachable");
@@ -1050,7 +1050,15 @@ struct EmitVisitor
             break;
 
         case CodeGenTarget::GLSL:
-            Emit("sampler");
+            switch (samplerStateType->flavor)
+            {
+            case SamplerStateType::Flavor::SamplerState:			Emit("sampler");		break;
+            case SamplerStateType::Flavor::SamplerComparisonState:	Emit("samplerShadow");	break;
+            default:
+                assert(!"unreachable");
+                break;
+            }
+            break;
             break;
         }
 
@@ -1847,6 +1855,15 @@ struct EmitVisitor
                                     if (auto baseTextureType = base->Type->As<TextureType>())
                                     {
                                         emitGLSLTextureOrTextureSamplerType(baseTextureType, "sampler");
+
+                                        if (auto samplerType = callExpr->Arguments[0]->Type.type->As<SamplerStateType>())
+                                        {
+                                            if (samplerType->flavor == SamplerStateType::Flavor::SamplerComparisonState)
+                                            {
+                                                Emit("Shadow");
+                                            }
+                                        }
+
                                         Emit("(");
                                         EmitExpr(memberExpr->BaseExpression);
                                         Emit(",");
