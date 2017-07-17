@@ -1739,6 +1739,9 @@ namespace Slang
                             sb << "int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
                         }
 
+
+                        sb << "__intrinsic(glsl, \"textureGrad($p, $1, $2, $3)\")\n";
+                        sb << "__intrinsic\n";
                         sb << "T SampleGrad(SamplerState s, ";
                         sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                         sb << "float" << kBaseTextureTypes[tt].coordCount << " gradX, ";
@@ -1747,6 +1750,8 @@ namespace Slang
 
                         if( baseShape != TextureType::ShapeCube )
                         {
+                            sb << "__intrinsic(glsl, \"textureGradOffset($p, $1, $2, $3, $4)\")\n";
+                            sb << "__intrinsic\n";
                             sb << "T SampleGrad(SamplerState s, ";
                             sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                             sb << "float" << kBaseTextureTypes[tt].coordCount << " gradX, ";
