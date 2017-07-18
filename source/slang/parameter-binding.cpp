@@ -234,12 +234,37 @@ LayoutSemanticInfo ExtractLayoutSemanticInfo(
     return info;
 }
 
+// This function is supposed to determine if two global shader
+// parameter declarations represent the same logical parameter
+// (so that they should get the exact same binding(s) allocated).
+//
 static bool doesParameterMatch(
     ParameterBindingContext*,
-    RefPtr<VarLayout>,
+    RefPtr<VarLayout>   varLayout,
     ParameterInfo*)
 {
-    // TODO: need to implement this eventually
+    // Any "varying" parameter should automatically be excluded
+    //
+    // Note that we use the `typeLayout` field rather than
+    // looking at resource information on the variable directly,
+    // because this may be called when binding hasn't been performed.
+    for (auto rr : varLayout->typeLayout->resourceInfos)
+    {
+        switch (rr.kind)
+        {
+        case LayoutResourceKind::VertexInput:
+        case LayoutResourceKind::FragmentOutput:
+            return false;
+
+        default:
+            break;
+        }
+    }
+
+    // TODO: this is where we should apply a more detailed
+    // matching process, to check that the existing
+    // declarations conform to the same basic layout.
+
     return true;
 }
 
@@ -470,7 +495,7 @@ static void collectGlobalScopeParameter(
     {
         parameterInfo = new ParameterInfo();
         context->shared->parameters.Add(parameterInfo);
-        context->mapNameToParameterInfo.Add(parameterName, parameterInfo);
+        context->mapNameToParameterInfo.AddIfNotExists(parameterName, parameterInfo);
     }
     else
     {
