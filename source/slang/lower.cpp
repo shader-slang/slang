@@ -1628,6 +1628,41 @@ struct LoweringVisitor
         lowerForStmtCommon(new UnscopedForStmt(), stmt);
     }
 
+    void visitCompileTimeForStmt(CompileTimeForStmt* stmt)
+    {
+        // We can either lower this here, so that emit logic doesn't have to deal with it,
+        // or else just translate it and then let emit deal with it.
+        //
+        // The right answer is really to lower it here, I guess.
+
+        auto rangeBeginVal = GetIntVal(stmt->rangeBeginVal);
+        auto rangeEndVal = GetIntVal(stmt->rangeEndVal);
+
+        if (rangeBeginVal >= rangeEndVal)
+            return;
+
+        auto varDecl = stmt->varDecl;
+
+        auto varType = lowerType(varDecl->Type);
+
+        for (IntegerLiteralValue ii = rangeBeginVal; ii < rangeEndVal; ++ii)
+        {
+            RefPtr<ConstantExpressionSyntaxNode> constExpr = new ConstantExpressionSyntaxNode();
+            constExpr->Type.type = varType.type;
+            constExpr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Int;
+            constExpr->integerValue = ii;
+
+            RefPtr<VaryingTupleVarDecl> loweredVarDecl = new VaryingTupleVarDecl();
+            loweredVarDecl->Position = varDecl->Position;
+            loweredVarDecl->Type = varType;
+            loweredVarDecl->Expr = constExpr;
+
+            shared->loweredDecls[varDecl] = loweredVarDecl;
+
+            lowerStmtImpl(stmt->body);
+        }
+    }
+
     void visitWhileStatementSyntaxNode(WhileStatementSyntaxNode* stmt)
     {
         RefPtr<WhileStatementSyntaxNode> loweredStmt = new WhileStatementSyntaxNode();

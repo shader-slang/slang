@@ -2555,6 +2555,67 @@ namespace Slang
         return isTypeName(parser, name);
     }
 
+    RefPtr<StatementSyntaxNode> parseCompileTimeForStmt(
+        Parser* parser)
+    {
+        RefPtr<ScopeDecl> scopeDecl = new ScopeDecl();
+        RefPtr<CompileTimeForStmt> stmt = new CompileTimeForStmt();
+        stmt->scopeDecl = scopeDecl;
+
+
+        parser->ReadToken("for");
+        parser->ReadToken(TokenType::LParent);
+
+        Token varNameToken = parser->ReadToken(TokenType::Identifier);
+        RefPtr<Variable> varDecl = new Variable();
+        varDecl->Name = varNameToken;
+        varDecl->Position = varNameToken.Position;
+
+        stmt->varDecl = varDecl;
+
+        parser->ReadToken("in");
+        parser->ReadToken("Range");
+        parser->ReadToken(TokenType::LParent);
+
+        RefPtr<ExpressionSyntaxNode> rangeBeginExpr;
+        RefPtr<ExpressionSyntaxNode> rangeEndExpr = parser->ParseArgExpr();
+        if (AdvanceIf(parser, TokenType::Comma))
+        {
+            rangeBeginExpr = rangeEndExpr;
+            rangeEndExpr = parser->ParseArgExpr();
+        }
+
+        stmt->rangeBeginExpr = rangeBeginExpr;
+        stmt->rangeEndExpr = rangeEndExpr;
+
+        parser->ReadToken(TokenType::RParent);
+        parser->ReadToken(TokenType::RParent);
+
+        parser->PushScope(scopeDecl);
+        AddMember(parser->currentScope, varDecl);
+
+        stmt->body = parser->ParseStatement();
+
+        parser->PopScope();
+
+        return stmt;
+    }
+
+    RefPtr<StatementSyntaxNode> parseCompileTimeStmt(
+        Parser* parser)
+    {
+        parser->ReadToken(TokenType::Dollar);
+        if (parser->LookAheadToken("for"))
+        {
+            return parseCompileTimeForStmt(parser);
+        }
+        else
+        {
+            Unexpected(parser);
+            return nullptr;
+        }
+    }
+
     RefPtr<StatementSyntaxNode> Parser::ParseStatement()
     {
         auto modifiers = ParseModifiers(this);
@@ -2591,6 +2652,10 @@ namespace Slang
             statement = ParseCaseStmt(this);
         else if (LookAheadToken("default"))
             statement = ParseDefaultStmt(this);
+        else if (LookAheadToken(TokenType::Dollar))
+        {
+            statement = parseCompileTimeStmt(this);
+        }
         else if (LookAheadToken(TokenType::Identifier))
         {
             // We might be looking at a local declaration, or an

@@ -1603,7 +1603,7 @@ namespace Slang
 
                         if( baseShape != TextureType::ShapeCube )
                         {
-                            sb << "__intrinsic(glsl, \"textureOffset($p, $1)\")\n";
+                            sb << "__intrinsic(glsl, \"textureOffset($p, $1, $2)\")\n";
                             sb << "__intrinsic\n";
                             sb << "T Sample(SamplerState s, ";
                             sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
