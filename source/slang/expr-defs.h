@@ -56,11 +56,21 @@ SYNTAX_CLASS(InitializerListExpr, ExpressionSyntaxNode)
     SYNTAX_FIELD(List<RefPtr<ExpressionSyntaxNode>>, args)
 END_SYNTAX_CLASS()
 
+// A base class for expressions with arguments
+ABSTRACT_SYNTAX_CLASS(ExprWithArgsBase, ExpressionSyntaxNode)
+    SYNTAX_FIELD(List<RefPtr<ExpressionSyntaxNode>>, Arguments)
+END_SYNTAX_CLASS()
+
+// An aggregate type constructor
+SYNTAX_CLASS(AggTypeCtorExpr, ExprWithArgsBase)
+    SYNTAX_FIELD(TypeExp, base);
+END_SYNTAX_CLASS()
+
+
 // A base expression being applied to arguments: covers
 // both ordinary `()` function calls and `<>` generic application
-ABSTRACT_SYNTAX_CLASS(AppExprBase, ExpressionSyntaxNode)
+ABSTRACT_SYNTAX_CLASS(AppExprBase, ExprWithArgsBase)
     SYNTAX_FIELD(RefPtr<ExpressionSyntaxNode>, FunctionExpr)
-    SYNTAX_FIELD(List<RefPtr<ExpressionSyntaxNode>>, Arguments)
 END_SYNTAX_CLASS()
 
 SIMPLE_SYNTAX_CLASS(InvokeExpressionSyntaxNode, AppExprBase)

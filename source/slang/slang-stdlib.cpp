@@ -1808,13 +1808,19 @@ namespace Slang
 
                         for(auto kk : kGatherComponets)
                         {
+                            auto componentIndex = kk.componentIndex;
                             auto componentName = kk.componentName;
 
                             EMIT_LINE_DIRECTIVE();
+                            
+                            sb << "__intrinsic(glsl, \"textureGather($p, $1, " << componentIndex << ")\")\n";
+                            sb << "__intrinsic\n";
                             sb << "vector<T, 4> Gather" << componentName << "(SamplerState s, ";
                             sb << "float" << kBaseTextureTypes[tt].coordCount << " location);\n";
 
                             EMIT_LINE_DIRECTIVE();
+                            sb << "__intrinsic(glsl, \"textureGatherOffset($p, $1, $2, " << componentIndex << ")\")\n";
+                            sb << "__intrinsic\n";
                             sb << "vector<T, 4> Gather" << componentName << "(SamplerState s, ";
                             sb << "float" << kBaseTextureTypes[tt].coordCount << " location, ";
                             sb << "int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
@@ -1826,6 +1832,8 @@ namespace Slang
                             sb << "out uint status);\n";
 
                             EMIT_LINE_DIRECTIVE();
+                            sb << "__intrinsic(glsl, \"textureGatherOffsets($p, $1, int" << kBaseTextureTypes[tt].coordCount << "[]($2, $3, $4, $5), " << componentIndex << ")\")\n";
+                            sb << "__intrinsic\n";
                             sb << "vector<T, 4> Gather" << componentName << "(SamplerState s, ";
                             sb << "float" << kBaseTextureTypes[tt].coordCount << " location, ";
                             sb << "int" << kBaseTextureTypes[tt].coordCount << " offset1, ";

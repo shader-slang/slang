@@ -1991,7 +1991,25 @@ struct EmitVisitor
         emitSimpleCallExpr(callExpr, outerPrec);
     }
 
+    void visitAggTypeCtorExpr(AggTypeCtorExpr* expr, ExprEmitArg const& arg)
+    {
+        auto prec = kEOp_Postfix;
+        auto outerPrec = arg.outerPrec;
+        bool needClose = MaybeEmitParens(outerPrec, prec);
 
+        emitTypeExp(expr->base);
+        Emit("(");
+        bool first = true;
+        for (auto aa : expr->Arguments)
+        {
+            if (!first) Emit(", ");
+            EmitExpr(aa);
+            first = false;
+        }
+        Emit(")");
+
+        if(needClose) Emit(")");
+    }
 
     void visitMemberExpressionSyntaxNode(MemberExpressionSyntaxNode* memberExpr, ExprEmitArg const& arg)
     {
@@ -3245,17 +3263,23 @@ struct EmitVisitor
         auto declRefType = dataType->As<DeclRefType>();
         assert(declRefType);
 
-        // We expect to always have layout information
-        assert(layout);
+        // We expect the layout, if present, to be for a structured type...
+        RefPtr<StructTypeLayout> structTypeLayout;
+        if (layout)
+        {
 
-        // We expect the layout to be for a structured type...
-        RefPtr<ParameterBlockTypeLayout> bufferLayout = layout->typeLayout.As<ParameterBlockTypeLayout>();
-        assert(bufferLayout);
+            auto typeLayout = layout->typeLayout;
+            if (auto bufferLayout = typeLayout.As<ParameterBlockTypeLayout>())
+            {
+                typeLayout = bufferLayout->elementTypeLayout;
+            }
 
-        RefPtr<StructTypeLayout> structTypeLayout = bufferLayout->elementTypeLayout.As<StructTypeLayout>();
-        assert(structTypeLayout);
+            structTypeLayout = typeLayout.As<StructTypeLayout>();
+            assert(structTypeLayout);
 
-        emitGLSLLayoutQualifiers(layout);
+            emitGLSLLayoutQualifiers(layout);
+        }
+
 
         EmitModifiers(varDecl);
 
@@ -3293,13 +3317,16 @@ struct EmitVisitor
         {
             for (auto field : getMembersOfType<StructField>(structRef))
             {
-                RefPtr<VarLayout> fieldLayout;
-                structTypeLayout->mapVarToLayout.TryGetValue(field.getDecl(), fieldLayout);
-    //            assert(fieldLayout);
+                if (structTypeLayout)
+                {
+                    RefPtr<VarLayout> fieldLayout;
+                    structTypeLayout->mapVarToLayout.TryGetValue(field.getDecl(), fieldLayout);
+                    //            assert(fieldLayout);
 
-                // TODO(tfoley): We may want to emit *some* of these,
-                // some of the time...
-    //            emitGLSLLayoutQualifiers(fieldLayout);
+                    // TODO(tfoley): We may want to emit *some* of these,
+                    // some of the time...
+        //            emitGLSLLayoutQualifiers(fieldLayout);
+                }
 
                 EmitVarDeclCommon(field);
 
