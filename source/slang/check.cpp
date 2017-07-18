@@ -1735,6 +1735,48 @@ namespace Slang
 
             PopOuterStmt(stmt);
         }
+
+        RefPtr<ExpressionSyntaxNode> checkExpressionAndExpectIntegerConstant(RefPtr<ExpressionSyntaxNode> expr, RefPtr<IntVal>* outIntVal)
+        {
+            expr = CheckExpr(expr);
+            auto intVal = CheckIntegerConstantExpression(expr);
+            if (outIntVal)
+                *outIntVal = intVal;
+            return expr;
+        }
+
+        void visitCompileTimeForStmt(CompileTimeForStmt* stmt)
+        {
+            PushOuterStmt(stmt);
+
+            stmt->varDecl->Type.type = ExpressionType::GetInt();
+            addModifier(stmt->varDecl, new ConstModifier());
+
+            RefPtr<IntVal> rangeBeginVal;
+            RefPtr<IntVal> rangeEndVal;
+
+            if (stmt->rangeBeginExpr)
+            {
+                stmt->rangeBeginExpr = checkExpressionAndExpectIntegerConstant(stmt->rangeBeginExpr, &rangeBeginVal);
+            }
+            else
+            {
+                RefPtr<ConstantIntVal> rangeBeginConst = new ConstantIntVal();
+                rangeBeginConst->value = 0;
+                rangeBeginVal = rangeBeginConst;
+            }
+
+            stmt->rangeEndExpr = checkExpressionAndExpectIntegerConstant(stmt->rangeEndExpr, &rangeEndVal);
+
+            stmt->rangeBeginVal = rangeBeginVal;
+            stmt->rangeEndVal = rangeEndVal;
+
+            checkStmt(stmt->body);
+
+
+            PopOuterStmt(stmt);
+        }
+
         void visitSwitchStmt(SwitchStmt* stmt)
         {
             PushOuterStmt(stmt);

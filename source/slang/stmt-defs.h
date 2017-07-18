@@ -96,6 +96,16 @@ SYNTAX_CLASS(DoWhileStatementSyntaxNode, LoopStmt)
     SYNTAX_FIELD(RefPtr<ExpressionSyntaxNode>, Predicate)
 END_SYNTAX_CLASS()
 
+// A compile-time, range-based `for` loop, which will not appear in the output code
+SYNTAX_CLASS(CompileTimeForStmt, ScopeStmt)
+    SYNTAX_FIELD(RefPtr<Variable>, varDecl)
+    SYNTAX_FIELD(RefPtr<ExpressionSyntaxNode>, rangeBeginExpr)
+    SYNTAX_FIELD(RefPtr<ExpressionSyntaxNode>, rangeEndExpr)
+    SYNTAX_FIELD(RefPtr<StatementSyntaxNode>, body)
+    SYNTAX_FIELD(RefPtr<IntVal>, rangeBeginVal)
+    SYNTAX_FIELD(RefPtr<IntVal>, rangeEndVal)
+END_SYNTAX_CLASS()
+
 // The case of child statements that do control flow relative
 // to their parent statement.
 ABSTRACT_SYNTAX_CLASS(JumpStmt, ChildStmt)
