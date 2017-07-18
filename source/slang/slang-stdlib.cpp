@@ -2024,12 +2024,12 @@ namespace Slang
 
             sb << "__intrinsic void GetDimensions(out uint dim);\n";
 
-            sb << "__intrinsic(glsl, \"texelFetch($P, $0)\")\n";
+            sb << "__intrinsic(glsl, \"texelFetch($P, $0)$z\")\n";
             sb << "__intrinsic T Load(int location);\n";
 
             sb << "__intrinsic T Load(int location, out uint status);\n";
 
-            sb << "__intrinsic(glsl, \"texelFetch($P, int($0))\")\n";
+            sb << "__intrinsic(glsl, \"texelFetch($P, int($0))$z\")\n";
             sb << "__intrinsic __subscript(uint index) -> T";
 
             if (kBaseBufferAccessLevels[aa].access != SLANG_RESOURCE_ACCESS_READ)
