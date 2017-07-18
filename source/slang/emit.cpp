@@ -1943,6 +1943,52 @@ struct EmitVisitor
                                 }
                                 break;
 
+                            case 'z':
+                                // If we are calling a D3D texturing operation in the form t.Foo(s, ...),
+                                // where `t` is a `Texture*<T>`, then this is the step where we try to
+                                // properly swizzle the output of the equivalent GLSL call into the right
+                                // shape.
+                                assert(argCount > 0);
+                                if (auto memberExpr = callExpr->FunctionExpr.As<MemberExpressionSyntaxNode>())
+                                {
+                                    auto base = memberExpr->BaseExpression;
+                                    if (auto baseTextureType = base->Type->As<TextureType>())
+                                    {
+                                        auto elementType = baseTextureType->elementType;
+                                        if (auto basicType = elementType->As<BasicExpressionType>())
+                                        {
+                                            // A scalar result is expected
+                                            Emit(".x");
+                                        }
+                                        else if (auto vectorType = elementType->As<VectorExpressionType>())
+                                        {
+                                            // A vector result is expected
+                                            auto elementCount = GetIntVal(vectorType->elementCount);
+
+                                            if (elementCount < 4)
+                                            {
+                                                char const* swiz[] = { "", ".x", ".xy", ".xyz", "" };
+                                                Emit(swiz[elementCount]);
+                                            }
+                                        }
+                                        else
+                                        {
+                                            // What other cases are possible?
+                                        }
+                                    }
+                                    else
+                                    {
+                                        assert(!"unexpected");
+                                    }
+
+                                }
+                                else
+                                {
+                                    assert(!"unexpected");
+                                }
+                                break;
+
+
                             default:
                                 assert(!"unexpected");
                                 break;
