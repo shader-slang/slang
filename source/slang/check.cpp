@@ -4801,6 +4801,12 @@ namespace Slang
             return expr;
         }
 
+        RefPtr<ExpressionSyntaxNode> visitAggTypeCtorExpr(AggTypeCtorExpr* expr)
+        {
+            assert(!"unexpected");
+            return expr;
+        }
+
         //
         //
         //

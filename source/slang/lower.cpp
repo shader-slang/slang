@@ -219,6 +219,35 @@ public:
     List<Element>                   tupleElements;
 };
 
+// Pseudo-syntax used during lowering
+class VaryingTupleVarDecl : public VarDeclBase
+{
+public:
+    virtual void accept(IDeclVisitor *, void *) override
+    {
+        throw "unexpected";
+    }
+};
+
+// Pseudo-syntax used during lowering:
+// represents an ordered list of expressions as a single unit
+class VaryingTupleExpr : public ExpressionSyntaxNode
+{
+public:
+    virtual void accept(IExprVisitor *, void *) override
+    {
+        throw "unexpected";
+    }
+
+    struct Element
+    {
+        DeclRef<VarDeclBase>            originalFieldDeclRef;
+        RefPtr<ExpressionSyntaxNode>    expr;
+    };
+
+    List<Element>   elements;
+};
+
 struct SharedLoweringContext
 {
     CompileRequest*     compileRequest;
@@ -241,6 +270,13 @@ struct SharedLoweringContext
 
     Dictionary<Decl*, RefPtr<Decl>> loweredDecls;
     Dictionary<Decl*, Decl*> mapLoweredDeclToOriginal;
+
+    // Work to be done at the very start and end of the entry point
+    RefPtr<StatementSyntaxNode> entryPointInitializeStmt;
+    RefPtr<StatementSyntaxNode> entryPointFinalizeStmt;
+
+    // Counter used for generating unique temporary names
+    int nameCounter = 0;
 
     bool isRewrite;
 };
@@ -544,11 +580,20 @@ struct LoweringVisitor
     // Expressions
     //
 
-    RefPtr<ExpressionSyntaxNode> lowerExpr(
+    RefPtr<ExpressionSyntaxNode> lowerExprOrTuple(
         ExpressionSyntaxNode* expr)
     {
         if (!expr) return nullptr;
         return ExprVisitor::dispatch(expr);
+    }
+
+    RefPtr<ExpressionSyntaxNode> lowerExpr(
+        ExpressionSyntaxNode* expr)
+    {
+        if (!expr) return nullptr;
+
+        auto result = lowerExprOrTuple(expr);
+        return maybeReifyTuple(result);
     }
 
     // catch-all
@@ -571,6 +616,14 @@ struct LoweringVisitor
         loweredExpr->Type.type = lowerType(expr->Type.type);
     }
 
+    RefPtr<ExpressionSyntaxNode> createUncheckedVarRef(
+        char const* name)
+    {
+        RefPtr<VarExpressionSyntaxNode> result = new VarExpressionSyntaxNode();
+        result->name = name;
+        return result;
+    }
+
     RefPtr<ExpressionSyntaxNode> createVarRef(
         CodePosition const& loc,
         VarDeclBase*        decl)
@@ -579,12 +632,17 @@ struct LoweringVisitor
         {
             return createTupleRef(loc, tupleDecl);
         }
+        else if (auto varyingTupleDecl = dynamic_cast<VaryingTupleVarDecl*>(decl))
+        {
+            return createVaryingTupleRef(loc, varyingTupleDecl);
+        }
         else
         {
             RefPtr<VarExpressionSyntaxNode> result = new VarExpressionSyntaxNode();
             result->Position = loc;
             result->Type.type = decl->Type.type;
             result->declRef = makeDeclRef(decl);
+            result->name = decl->getName();
             return result;
         }
     }
@@ -616,7 +674,14 @@ struct LoweringVisitor
             result->tupleElements.Add(elem);
         }
 
-return result;
+        return result;
+    }
+
+    RefPtr<ExpressionSyntaxNode> createVaryingTupleRef(
+        CodePosition const&     loc,
+        VaryingTupleVarDecl*    decl)
+    {
+        return decl->Expr;
     }
 
     RefPtr<ExpressionSyntaxNode> visitVarExpressionSyntaxNode(
@@ -638,11 +703,83 @@ return result;
 
             return createTupleRef(expr->Position, tupleVarDecl);
         }
+        else if (auto varyingTupleVarDecl = dynamic_cast<VaryingTupleVarDecl*>(loweredDecl))
+        {
+            return createVaryingTupleRef(expr->Position, varyingTupleVarDecl);
+        }
 
         RefPtr<VarExpressionSyntaxNode> loweredExpr = new VarExpressionSyntaxNode();
         lowerExprCommon(loweredExpr, expr);
         loweredExpr->declRef = loweredDeclRef;
+        loweredExpr->name = expr->name;
         return loweredExpr;
+    }
+
+    String generateName()
+    {
+        int id = shared->nameCounter++;
+
+        String result;
+        result.append("SLANG_tmp_");
+        result.append(id);
+        return result;
+    }
+
+    // The idea of this function is to take an expression that we plan to
+    // use/evaluate more than once, and if needed replace it with a
+    // reference to a temporary (initialized with the expr) so that it
+    // can safely be re-evaluated.
+    RefPtr<ExpressionSyntaxNode> maybeMoveTemp(
+        RefPtr<ExpressionSyntaxNode> expr)
+    {
+        // TODO: actually implement this properly!
+
+        // Certain expressions are already in a form we can directly re-use,
+        // so  there is no reason to move them.
+        if (expr.As<VarExpressionSyntaxNode>())
+            return expr;
+        if (expr.As<ConstantExpressionSyntaxNode>())
+            return expr;
+
+        if (auto varyingTupleExpr = expr.As<VaryingTupleExpr>())
+        {
+            RefPtr<VaryingTupleExpr> resultExpr = new VaryingTupleExpr();
+            resultExpr->Position = expr->Position;
+            resultExpr->Type = expr->Type;
+            for (auto ee : varyingTupleExpr->elements)
+            {
+                VaryingTupleExpr::Element elem;
+                elem.originalFieldDeclRef = ee.originalFieldDeclRef;
+                elem.expr = maybeMoveTemp(ee.expr);
+
+                resultExpr->elements.Add(elem);
+            }
+
+            return resultExpr;
+        }
+
+        // TODO: handle the tuple cases here...
+
+        // In the general case, though, we need to introduce a temporary
+        RefPtr<Variable> varDecl = new Variable();
+        varDecl->Name.Content = generateName();
+        varDecl->Type.type = expr->Type.type;
+        varDecl->Expr = expr;
+
+        addDecl(varDecl);
+
+        return createVarRef(expr->Position, varDecl);
+    }
+
+    // Similar to the above, this ensures that an l-value expression
+    // is safe to re-evaluate, by recursively moving things off
+    // to temporaries where needed.
+    RefPtr<ExpressionSyntaxNode> ensureSimpleLValue(
+        RefPtr<ExpressionSyntaxNode> expr)
+    {
+        // TODO: actually implement this properly!
+
+        return expr;
     }
 
     RefPtr<ExpressionSyntaxNode> createAssignExpr(
@@ -689,6 +826,133 @@ return result;
             assert(!leftTuple && !rightTuple);
         }
 
+        auto leftVaryingTuple = leftExpr.As<VaryingTupleExpr>();
+        auto rightVaryingTuple = rightExpr.As<VaryingTupleExpr>();
+        if (leftVaryingTuple && rightVaryingTuple)
+        {
+            RefPtr<VaryingTupleExpr> resultTuple = new VaryingTupleExpr();
+            resultTuple->Type.type = lowerType(leftExpr->Type.type);
+            resultTuple->Position = leftExpr->Position;
+
+            assert(resultTuple->Type.type);
+
+            UInt elementCount = leftVaryingTuple->elements.Count();
+            assert(elementCount == rightVaryingTuple->elements.Count());
+
+            for (UInt ee = 0; ee < elementCount; ++ee)
+            {
+                auto leftElem = leftVaryingTuple->elements[ee];
+                auto rightElem = rightVaryingTuple->elements[ee];
+
+                VaryingTupleExpr::Element elem;
+                elem.originalFieldDeclRef = leftElem.originalFieldDeclRef;
+                elem.expr = createAssignExpr(
+                    leftElem.expr,
+                    rightElem.expr);
+            }
+        }
+        else if (leftVaryingTuple)
+        {
+            // Assigning from ordinary expression on RHS to tuple.
+            // This will naturally yield a tuple expression.
+            //
+            // TODO: need to be careful about side-effects, or
+            // about dropping sub-expressions after the assignment.
+            // For now this will really only work directly in
+            // a statement context.
+
+            UInt elementCount = leftVaryingTuple->elements.Count();
+
+            // Move everything into temps if we can
+
+            rightExpr = maybeMoveTemp(rightExpr);
+            for (UInt ee = 0; ee < elementCount; ++ee)
+            {
+                auto& leftElem = leftVaryingTuple->elements[ee];
+                leftElem.expr = ensureSimpleLValue(leftElem.expr);
+            }
+
+            // We need to combine the sub-expressions into a giant sequence expression.
+            //
+            // We will procede through thigns from last to first, to build a bunch
+            // of "operator comma" expressions bottom-up.
+            RefPtr<ExpressionSyntaxNode> resultExpr = leftExpr;
+
+            for (UInt ee = 0; ee < elementCount; ++ee)
+            {
+                auto leftElem = leftVaryingTuple->elements[elementCount - ee - 1];
+
+                RefPtr<MemberExpressionSyntaxNode> rightElemExpr = new MemberExpressionSyntaxNode();
+                rightElemExpr->Position = rightExpr->Position;
+                rightElemExpr->Type = leftElem.expr->Type;
+                rightElemExpr->declRef = leftElem.originalFieldDeclRef;
+                rightElemExpr->name = leftElem.originalFieldDeclRef.GetName();
+                rightElemExpr->BaseExpression = rightExpr;
+
+                auto subExpr = createAssignExpr(
+                    leftElem.expr,
+                    rightElemExpr);
+
+                RefPtr<InfixExpr> seqExpr = new InfixExpr();
+                seqExpr->FunctionExpr = createUncheckedVarRef(",");
+                seqExpr->Arguments.Add(subExpr);
+                seqExpr->Arguments.Add(resultExpr);
+
+                resultExpr = seqExpr;
+            }
+
+            return resultExpr;
+        }
+        else if (rightVaryingTuple)
+        {
+            // Pretty much the same as the above case, and we should
+            // probably try to share code eventually.
+
+            UInt elementCount = rightVaryingTuple->elements.Count();
+
+            // Move everything into temps if we can
+
+            leftExpr = ensureSimpleLValue(leftExpr);
+            for (UInt ee = 0; ee < elementCount; ++ee)
+            {
+                auto& rightElem = rightVaryingTuple->elements[ee];
+                rightElem.expr = maybeMoveTemp(rightElem.expr);
+            }
+
+            // We need to combine the sub-expressions into a giant sequence expression.
+            //
+            // We will procede through thigns from last to first, to build a bunch
+            // of "operator comma" expressions bottom-up.
+            RefPtr<ExpressionSyntaxNode> resultExpr = leftExpr;
+
+            for (UInt ee = 0; ee < elementCount; ++ee)
+            {
+                auto rightElem = rightVaryingTuple->elements[elementCount - ee - 1];
+
+                RefPtr<MemberExpressionSyntaxNode> leftElemExpr = new MemberExpressionSyntaxNode();
+                leftElemExpr->Position = leftExpr->Position;
+                leftElemExpr->Type = rightElem.expr->Type;
+                leftElemExpr->declRef = rightElem.originalFieldDeclRef;
+                leftElemExpr->name = rightElem.originalFieldDeclRef.GetName();
+                leftElemExpr->BaseExpression = leftExpr;
+
+                auto subExpr = createAssignExpr(
+                    leftElemExpr,
+                    rightElem.expr);
+
+                RefPtr<InfixExpr> seqExpr = new InfixExpr();
+                seqExpr->FunctionExpr = createUncheckedVarRef(",");
+                seqExpr->Arguments.Add(subExpr);
+                seqExpr->Arguments.Add(resultExpr);
+
+                resultExpr = seqExpr;
+            }
+
+            return resultExpr;
+        }
+
+        // Default case: no tuples of any kind...
+
 
         RefPtr<AssignExpr> loweredExpr = new AssignExpr();
         loweredExpr->Type = leftExpr->Type;
@@ -700,8 +964,8 @@ return result;
     RefPtr<ExpressionSyntaxNode> visitAssignExpr(
         AssignExpr* expr)
     {
-        auto leftExpr = lowerExpr(expr->left);
-        auto rightExpr = lowerExpr(expr->right);
+        auto leftExpr = lowerExprOrTuple(expr->left);
+        auto rightExpr = lowerExprOrTuple(expr->right);
 
         auto loweredExpr = createAssignExpr(leftExpr, rightExpr);
         lowerExprCommon(loweredExpr, expr);
@@ -728,6 +992,8 @@ return result;
 
         if (auto baseTuple = baseExpr.As<TupleExpr>())
         {
+            indexExpr = maybeMoveTemp(indexExpr);
+
             auto loweredExpr = new TupleExpr();
             loweredExpr->Type.type = getSubscripResultType(baseExpr->Type.type);
 
@@ -750,6 +1016,26 @@ return result;
 
             return loweredExpr;
         }
+        else if (auto baseVaryingTuple = baseExpr.As<VaryingTupleExpr>())
+        {
+            indexExpr = maybeMoveTemp(indexExpr);
+
+            auto loweredExpr = new VaryingTupleExpr();
+            loweredExpr->Type.type = getSubscripResultType(baseExpr->Type.type);
+
+            assert(loweredExpr->Type.type);
+
+            for (auto elem : baseVaryingTuple->elements)
+            {
+                VaryingTupleExpr::Element loweredElem;
+                loweredElem.originalFieldDeclRef = elem.originalFieldDeclRef;
+                loweredElem.expr = createSubscriptExpr(
+                    elem.expr,
+                    indexExpr);
+            }
+
+            return loweredExpr;
+        }
         else
         {
             // Default case: just reconstrut a subscript expr
@@ -766,12 +1052,16 @@ return result;
     RefPtr<ExpressionSyntaxNode> visitIndexExpressionSyntaxNode(
         IndexExpressionSyntaxNode* subscriptExpr)
     {
-        auto baseExpr = lowerExpr(subscriptExpr->BaseExpression);
+        auto baseExpr = lowerExprOrTuple(subscriptExpr->BaseExpression);
         auto indexExpr = lowerExpr(subscriptExpr->IndexExpression);
 
         // An attempt to subscript a tuple must be turned into a
         // tuple of subscript expressions.
         if (auto baseTuple = baseExpr.As<TupleExpr>())
+        {
+            return createSubscriptExpr(baseExpr, indexExpr);
+        }
+        else if (auto baseVaryingTuple = baseExpr.As<VaryingTupleExpr>())
         {
             return createSubscriptExpr(baseExpr, indexExpr);
         }
@@ -786,8 +1076,42 @@ return result;
         }
     }
 
+    RefPtr<ExpressionSyntaxNode> maybeReifyTuple(
+        RefPtr<ExpressionSyntaxNode> expr)
+    {
+        if (auto tupleExpr = expr.As<TupleExpr>())
+        {
+            // TODO: need to diagnose
+            return expr;
+        }
+        else if (auto varyingTupleExpr = expr.As<VaryingTupleExpr>())
+        {
+            // Need to pass an ordinary (non-tuple) expression of
+            // the corresponding type here.
+
+            // TODO(tfoley): This won't work at all for an `out` or `inout`
+            // function argument, so we'll need to figure out a plan
+            // to handle that case...
+
+            RefPtr<AggTypeCtorExpr> resultExpr = new AggTypeCtorExpr();
+            resultExpr->Type = varyingTupleExpr->Type;
+            resultExpr->base.type = varyingTupleExpr->Type.type;
+            assert(resultExpr->Type.type);
+
+            for (auto elem : varyingTupleExpr->elements)
+            {
+                addArgs(resultExpr, elem.expr);
+            }
+
+            return resultExpr;
+        }
+
+        // Default case: nothing special to this expression
+        return expr;
+    }
+
     void addArgs(
-        InvokeExpressionSyntaxNode*     callExpr,
+        ExprWithArgsBase*               callExpr,
         RefPtr<ExpressionSyntaxNode>    argExpr)
     {
         if (auto argTuple = argExpr.As<TupleExpr>())
@@ -800,6 +1124,13 @@ return result;
             {
                 addArgs(callExpr, elem.expr);
             }
+        }
+        else if (auto varyingArgTuple = argExpr.As<VaryingTupleExpr>())
+        {
+            // Need to pass an ordinary (non-tuple) expression of
+            // the corresponding type here.
+
+            callExpr->Arguments.Add(maybeReifyTuple(argExpr));
         }
         else
         {
@@ -817,7 +1148,7 @@ return result;
 
         for (auto arg : expr->Arguments)
         {
-            auto loweredArg = lowerExpr(arg);
+            auto loweredArg = lowerExprOrTuple(arg);
             addArgs(loweredExpr, loweredArg);
         }
 
@@ -859,7 +1190,7 @@ return result;
     RefPtr<ExpressionSyntaxNode> visitDerefExpr(
         DerefExpr*  expr)
     {
-        auto loweredBase = lowerExpr(expr->base);
+        auto loweredBase = lowerExprOrTuple(expr->base);
 
         if (auto baseTuple = loweredBase.As<TupleExpr>())
         {
@@ -882,7 +1213,7 @@ return result;
     RefPtr<ExpressionSyntaxNode> visitMemberExpressionSyntaxNode(
         MemberExpressionSyntaxNode* expr)
     {
-        auto loweredBase = lowerExpr(expr->BaseExpression);
+        auto loweredBase = lowerExprOrTuple(expr->BaseExpression);
 
         auto loweredDeclRef = translateDeclRef(expr->declRef);
 
@@ -926,6 +1257,20 @@ return result;
             // If the field was a non-tupe field, then we can
             // simply fall through to the ordinary case below.
             loweredBase = baseTuple->primaryExpr;
+        }
+        else if (auto baseVaryingTuple = loweredBase.As<VaryingTupleExpr>())
+        {
+            // Search for the element corresponding to this field
+            for(auto elem : baseVaryingTuple->elements)
+            {
+                if (expr->declRef.getDecl() == elem.originalFieldDeclRef.getDecl())
+                {
+                    // We found the field!
+                    return elem.expr;
+                }
+            }
+
+            assert(!"unexpected");
         }
 
         // Default handling:
@@ -1085,8 +1430,29 @@ return result;
             }
             return;
         }
-
-        // TODO: could also desugar "operator comma" here
+        else if (auto varyingTupleExpr = expr.As<VaryingTupleExpr>())
+        {
+            for (auto ee : varyingTupleExpr->elements)
+            {
+                addExprStmt(ee.expr);
+            }
+            return;
+        }
+        else if (auto infixExpr = expr.As<InfixExpr>())
+        {
+            if (auto varExpr = infixExpr->FunctionExpr.As<VarExpressionSyntaxNode>())
+            {
+                if (varExpr->name == ",")
+                {
+                    // Call to "operator comma"
+                    for (auto aa : infixExpr->Arguments)
+                    {
+                        addExprStmt(aa);
+                    }
+                    return;
+                }
+            }
+        }
 
         RefPtr<ExpressionStatementSyntaxNode> stmt = new ExpressionStatementSyntaxNode();
         stmt->Expression = expr;
@@ -1115,7 +1481,7 @@ return result;
 
     void visitExpressionStatementSyntaxNode(ExpressionStatementSyntaxNode* stmt)
     {
-        addExprStmt(lowerExpr(stmt->Expression));
+        addExprStmt(lowerExprOrTuple(stmt->Expression));
     }
 
     void visitVarDeclrStatementSyntaxNode(VarDeclrStatementSyntaxNode* stmt)
@@ -1302,11 +1668,7 @@ return result;
         RefPtr<ExpressionSyntaxNode> destExpr,
         RefPtr<ExpressionSyntaxNode> srcExpr)
     {
-        RefPtr<AssignExpr> assignExpr = new AssignExpr();
-        assignExpr->Position = destExpr->Position;
-        assignExpr->left = destExpr;
-        assignExpr->right = srcExpr;
-
+        auto assignExpr = createAssignExpr(destExpr, srcExpr);
         addExprStmt(assignExpr);
     }
 
@@ -1330,7 +1692,7 @@ return result;
             if (resultVariable)
             {
                 // Do it as an assignment
-                assign(resultVariable, lowerExpr(stmt->Expression));
+                assign(resultVariable, lowerExprOrTuple(stmt->Expression));
             }
             else
             {
@@ -2293,6 +2655,32 @@ return result;
         }
     }
 
+    bool isImportedStructType(RefPtr<ExpressionType> type)
+    {
+        if (type->As<BasicExpressionType>()) return false;
+        else if (type->As<VectorExpressionType>()) return false;
+        else if (type->As<MatrixExpressionType>()) return false;
+        else if (type->As<ResourceType>()) return false;
+        else if (type->As<BuiltinGenericType>()) return false;
+        else if (auto declRefType = type->As<DeclRefType>())
+        {
+            if (auto aggTypeDeclRef = declRefType->declRef.As<AggTypeDecl>())
+            {
+                Decl* pp = aggTypeDeclRef.getDecl();
+                while (pp->ParentDecl)
+                    pp = pp->ParentDecl;
+
+                // Did the declaration come from this translation unit?
+                if (pp == shared->entryPointRequest->getTranslationUnit()->SyntaxNode.Ptr())
+                    return false;
+
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     RefPtr<VarDeclBase> visitVariable(
         Variable* decl)
     {
@@ -2302,6 +2690,49 @@ return result;
             if (decl->HasModifier<InModifier>())
             {
                 doSampleRateInputCheck(decl);
+            }
+
+            auto varLayout = tryToFindLayout(decl);
+            if (varLayout)
+            {
+                auto inRes = varLayout->FindResourceInfo(LayoutResourceKind::VertexInput);
+                auto outRes = varLayout->FindResourceInfo(LayoutResourceKind::FragmentOutput);
+
+                if( (inRes || outRes) && isImportedStructType(decl->Type.type))
+                {
+                    // We are seemingly looking at a GLSL global-scope varying
+                    // of an aggregate type which was imported from library
+                    // code. We should destructure that into individual
+                    // declarations.
+
+                    // We can't easily support `in out` declarations with this approach
+                    assert(!(inRes && outRes));
+
+                    RefPtr<ExpressionSyntaxNode> loweredExpr;
+                    if (inRes)
+                    {
+                        loweredExpr = lowerShaderParameterToGLSLGLobals(
+                            decl,
+                            varLayout,
+                            VaryingParameterDirection::Input);
+                    }
+
+                    if (outRes)
+                    {
+                        loweredExpr = lowerShaderParameterToGLSLGLobals(
+                            decl,
+                            varLayout,
+                            VaryingParameterDirection::Output);
+                    }
+
+                    assert(loweredExpr);
+                    auto loweredDecl = createVaryingTupleVarDecl(
+                        decl,
+                        loweredExpr);
+
+                    registerLoweredDecl(loweredDecl, decl);
+                    return loweredDecl;
+                }
             }
         }
 
@@ -2511,11 +2942,10 @@ return result;
         }
     }
 
-    void lowerSimpleShaderParameterToGLSLGlobal(
+    RefPtr<ExpressionSyntaxNode> lowerSimpleShaderParameterToGLSLGlobal(
         VaryingParameterInfo const&     info,
         RefPtr<ExpressionType>          varType,
-        RefPtr<VarLayout>               varLayout,
-        RefPtr<ExpressionSyntaxNode>    varExpr)
+        RefPtr<VarLayout>               varLayout)
     {
         RefPtr<ExpressionType> type = varType;
 
@@ -2720,8 +3150,16 @@ return result;
             // Otherwise, check if we need to add one:
             else if (isIntegralType(varType))
             {
-                auto mod = new HLSLNoInterpolationModifier();
-                addModifier(globalVarDecl, mod);
+                if (info.direction == VaryingParameterDirection::Input
+                    && shared->entryPointRequest->profile.GetStage() == Stage::Vertex)
+                {
+                    // Don't add extra qualification to VS inputs
+                }
+                else
+                {
+                    auto mod = new HLSLNoInterpolationModifier();
+                    addModifier(globalVarDecl, mod);
+                }
             }
 
 
@@ -2733,33 +3171,13 @@ return result;
             globalVarExpr = globalVarRef;
         }
 
-        // TODO: if we are declaring an SOA-ized array,
-        // this is where those array dimensions would need
-        // to be tacked on.
-        //
-        // That is, this logic should be getting collected into a loop,
-        // and so we need to have a loop variable we can use to
-        // index into the two different expressions.
-
-
-        // Need to generate an assignment in the right direction.
-        switch (info.direction)
-        {
-        case VaryingParameterDirection::Input:
-            assign(varExpr, globalVarExpr);
-            break;
-
-        case VaryingParameterDirection::Output:
-            assign(globalVarExpr, varExpr);
-            break;
-        }
+        return globalVarExpr;
     }
 
-    void lowerShaderParameterToGLSLGLobalsRec(
+    RefPtr<ExpressionSyntaxNode> lowerShaderParameterToGLSLGLobalsRec(
         VaryingParameterInfo const&     info,
         RefPtr<ExpressionType>          varType,
-        RefPtr<VarLayout>               varLayout,
-        RefPtr<ExpressionSyntaxNode>    varExpr)
+        RefPtr<VarLayout>               varLayout)
     {
         assert(varLayout);
 
@@ -2789,25 +3207,16 @@ return result;
             VaryingParameterInfo arrayInfo = info;
             arrayInfo.arraySpecs = &arraySpec;
 
-            RefPtr<IndexExpressionSyntaxNode> subscriptExpr = new IndexExpressionSyntaxNode();
-            subscriptExpr->Position = varExpr->Position;
-            subscriptExpr->BaseExpression = varExpr;
-
             // Note that we use the original `varLayout` that was passed in,
             // since that is the layout that will ultimately need to be
             // used on the array elements.
             //
             // TODO: That won't actually work if we ever had an array of
             // heterogeneous stuff...
-            lowerShaderParameterToGLSLGLobalsRec(
+            return lowerShaderParameterToGLSLGLobalsRec(
                 arrayInfo,
                 arrayType->BaseType,
-                varLayout,
-                subscriptExpr);
-
-            // TODO: we need to construct syntax for a loop to initialize
-            // the array here...
-            throw "unimplemented";
+                varLayout);
         }
         else if (auto declRefType = varType->As<DeclRefType>())
         {
@@ -2817,17 +3226,16 @@ return result;
                 // The shader parameter had a structured type, so we need
                 // to destructure it into its constituent fields
 
+                RefPtr<VaryingTupleExpr> tupleExpr = new VaryingTupleExpr();
+                tupleExpr->Type.type = varType;
+
+                assert(tupleExpr->Type.type);
+
                 for (auto fieldDeclRef : getMembersOfType<VarDeclBase>(aggTypeDeclRef))
                 {
                     // Don't emit storage for `static` fields here, of course
                     if (fieldDeclRef.getDecl()->HasModifier<HLSLStaticModifier>())
                         continue;
-
-                    RefPtr<MemberExpressionSyntaxNode> fieldExpr = new MemberExpressionSyntaxNode();
-                    fieldExpr->Position = varExpr->Position;
-                    fieldExpr->Type.type = GetType(fieldDeclRef);
-                    fieldExpr->declRef = fieldDeclRef;
-                    fieldExpr->BaseExpression = varExpr;
 
                     VaryingParameterVarChain fieldVarChain;
                     fieldVarChain.next = info.varChain;
@@ -2849,38 +3257,38 @@ return result;
                     structTypeLayout->mapVarToLayout.TryGetValue(originalFieldDecl, fieldLayout);
                     assert(fieldLayout);
 
-                    lowerShaderParameterToGLSLGLobalsRec(
+                    auto loweredFieldExpr = lowerShaderParameterToGLSLGLobalsRec(
                         fieldInfo,
                         GetType(fieldDeclRef),
-                        fieldLayout,
-                        fieldExpr);
+                        fieldLayout);
+
+                    VaryingTupleExpr::Element elem;
+                    elem.originalFieldDeclRef = makeDeclRef(originalFieldDecl).As<VarDeclBase>();
+                    elem.expr = loweredFieldExpr;
+
+                    tupleExpr->elements.Add(elem);
                 }
 
                 // Okay, we are done with this parameter
-                return;
+                return tupleExpr;
             }
         }
 
         // Default case: just try to emit things as-is
-        lowerSimpleShaderParameterToGLSLGlobal(info, varType, varLayout, varExpr);
+        return lowerSimpleShaderParameterToGLSLGlobal(info, varType, varLayout);
     }
 
-    void lowerShaderParameterToGLSLGLobals(
-        RefPtr<Variable>            localVarDecl,
+    RefPtr<ExpressionSyntaxNode> lowerShaderParameterToGLSLGLobals(
+        RefPtr<VarDeclBase>         originalVarDecl,
         RefPtr<VarLayout>           paramLayout,
         VaryingParameterDirection   direction)
     {
-        auto name = localVarDecl->getName();
-        auto declRef = makeDeclRef(localVarDecl.Ptr());
-
-        RefPtr<VarExpressionSyntaxNode> expr = new VarExpressionSyntaxNode();
-        expr->name = name;
-        expr->declRef = declRef;
-        expr->Type.type = GetType(declRef);
+        auto name = originalVarDecl->getName();
+        auto declRef = makeDeclRef(originalVarDecl.Ptr());
 
         VaryingParameterVarChain varChain;
         varChain.next = nullptr;
-        varChain.varDecl = localVarDecl;
+        varChain.varDecl = originalVarDecl;
 
         VaryingParameterInfo info;
         info.name = name;
@@ -2899,11 +3307,45 @@ return result;
             break;
         }
 
-        lowerShaderParameterToGLSLGLobalsRec(
+        auto loweredType = lowerType(originalVarDecl->Type);
+
+        auto loweredExpr = lowerShaderParameterToGLSLGLobalsRec(
             info,
-            localVarDecl->getType(),
-            paramLayout,
-            expr);
+            loweredType.type,
+            paramLayout);
+
+#if 0
+        RefPtr<VaryingTupleVarDecl> loweredDecl = createVaryingTupleVarDecl(
+            originalVarDecl,
+            loweredType,
+            loweredExpr);
+
+        registerLoweredDecl(loweredDecl, originalVarDecl);
+        addDecl(loweredDecl);
+#endif
+
+        return loweredExpr;
+    }
+
+    RefPtr<VaryingTupleVarDecl> createVaryingTupleVarDecl(
+        RefPtr<VarDeclBase>             originalVarDecl,
+        TypeExp const&                  loweredType,
+        RefPtr<ExpressionSyntaxNode>    loweredExpr)
+    {
+        RefPtr<VaryingTupleVarDecl> loweredDecl = new VaryingTupleVarDecl();
+        loweredDecl->Name = originalVarDecl->Name;
+        loweredDecl->Type = loweredType;
+        loweredDecl->Expr = loweredExpr;
+
+        return loweredDecl;
+    }
+
+    RefPtr<VaryingTupleVarDecl> createVaryingTupleVarDecl(
+        RefPtr<VarDeclBase>             originalVarDecl,
+        RefPtr<ExpressionSyntaxNode>    loweredExpr)
+    {
+        auto loweredType = lowerType(originalVarDecl->Type);
+        return createVaryingTupleVarDecl(originalVarDecl, loweredType, loweredExpr);
     }
 
     struct EntryPointParamPair
@@ -2976,10 +3418,12 @@ return result;
                 || paramDecl->HasModifier<InOutModifier>()
                 || !paramDecl->HasModifier<OutModifier>())
             {
-                subVisitor.lowerShaderParameterToGLSLGLobals(
-                    paramPair.lowered,
+                auto loweredExpr = subVisitor.lowerShaderParameterToGLSLGLobals(
+                    paramPair.original,
                     paramPair.layout,
                     VaryingParameterDirection::Input);
+
+                subVisitor.assign(paramPair.lowered, loweredExpr);
             }
         }
 
@@ -3044,18 +3488,27 @@ return result;
             if (paramDecl->HasModifier<OutModifier>()
                 || paramDecl->HasModifier<InOutModifier>())
             {
-                subVisitor.lowerShaderParameterToGLSLGLobals(
-                    paramPair.lowered,
+                auto loweredExpr = subVisitor.lowerShaderParameterToGLSLGLobals(
+                    paramPair.original,
                     paramPair.layout,
                     VaryingParameterDirection::Output);
+
+                subVisitor.assign(loweredExpr, paramPair.lowered);
             }
         }
         if (resultVarDecl)
         {
-            subVisitor.lowerShaderParameterToGLSLGLobals(
-                resultVarDecl,
-                entryPointLayout->resultLayout,
-                VaryingParameterDirection::Output);
+            VaryingParameterInfo info;
+            info.name = "SLANG_out_" + resultVarDecl->getName();
+            info.direction = VaryingParameterDirection::Output;
+            info.varChain = nullptr;
+
+            auto loweredExpr = lowerShaderParameterToGLSLGLobalsRec(
+                info,
+                resultVarDecl->Type.type,
+                entryPointLayout->resultLayout);
+
+            subVisitor.assign(loweredExpr, resultVarDecl);
         }
 
         bodyStmt->body = subVisitor.stmtBeingBuilt;

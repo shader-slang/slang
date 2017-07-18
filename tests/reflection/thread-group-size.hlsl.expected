@@ -21,7 +21,9 @@ standard output = {
             "parameters": [
                 {
                     "name": "tid",
-                    "binding": {"kind": "vertexInput", "index": 0},
+                    "bindings": [
+
+                    ],
                     "type": {
                         "kind": "vector",
                         "elementCount": 3,
