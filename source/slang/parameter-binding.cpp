@@ -1177,6 +1177,9 @@ static void collectModuleParameters(
 
     context->stage = Stage::Unknown;
 
+    // All imported modules are implicitly Slang code
+    context->sourceLanguage = SourceLanguage::Slang;
+
     // A loaded module cannot define entry points that
     // we'll expose (for now), so we just need to
     // consider global-scope parameters.
