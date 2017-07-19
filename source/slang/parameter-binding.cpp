@@ -379,9 +379,17 @@ static bool findLayoutArg(
 
 //
 
+static String getReflectionName(VarDeclBase* varDecl)
+{
+    if (auto reflectionNameModifier = varDecl->FindModifier<ParameterBlockReflectionName>())
+        return reflectionNameModifier->nameToken.Content;
+
+    return varDecl->getName();
+}
+
 static bool isGLSLBuiltinName(VarDeclBase* varDecl)
 {
-    return varDecl->getName().StartsWith("gl_");
+    return getReflectionName(varDecl).StartsWith("gl_");
 }
 
 RefPtr<ExpressionType> tryGetEffectiveTypeForGLSLVaryingInput(
@@ -614,7 +622,6 @@ static void collectGlobalScopeGLSLVaryingParameter(
     // Now add it to our list of reflection parameters, so
     // that it can get a location assigned later...
 
-    auto parameterName = varDecl->Name.Content;
     ParameterInfo* parameterInfo = new ParameterInfo();
     parameterInfo->translationUnit = context->translationUnit;
     context->shared->parameters.Add(parameterInfo);
@@ -670,7 +677,7 @@ static void collectGlobalScopeParameter(
     //
     // First we look for an existing entry matching the name
     // of this parameter:
-    auto parameterName = varDecl->Name.Content;
+    auto parameterName = getReflectionName(varDecl);
     ParameterInfo* parameterInfo = nullptr;
     if( context->mapNameToParameterInfo.TryGetValue(parameterName, parameterInfo) )
     {
@@ -747,7 +754,7 @@ static void addExplicitParameterBinding(
             || bindingInfo.space != semanticInfo.space )
         {
             auto firstVarDecl = parameterInfo->varLayouts[0]->varDecl.getDecl();
-            getSink(context)->diagnose(firstVarDecl, Diagnostics::conflictingExplicitBindingsForParameter, firstVarDecl->getName());
+            getSink(context)->diagnose(firstVarDecl, Diagnostics::conflictingExplicitBindingsForParameter, getReflectionName(firstVarDecl));
         }
 
         // TODO(tfoley): `register` semantics can technically be
@@ -773,7 +780,9 @@ static void addExplicitParameterBinding(
             auto paramA = parameterInfo->varLayouts[0]->varDecl.getDecl();
             auto paramB = overlappedParameterInfo->varLayouts[0]->varDecl.getDecl();
 
-            getSink(context)->diagnose(paramA, Diagnostics::parameterBindingsOverlap, paramA->getName(), paramB->getName());
+            getSink(context)->diagnose(paramA, Diagnostics::parameterBindingsOverlap,
+                getReflectionName(paramA),
+                getReflectionName(paramB));
         }
     }
 }
