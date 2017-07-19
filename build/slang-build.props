@@ -3,8 +3,8 @@
   <ImportGroup Label="PropertySheets" />
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
-    <OutDir>$(SolutionDir)bin\$(PlatformShortName)\$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)intermediate\$(PlatformShortName)\$(Configuration)\$(ProjectName)\</IntDir>
+    <OutDir>$(SolutionDir)bin\windows-$(PlatformShortName)\$(Configuration.ToLower())\</OutDir>
+    <IntDir>$(SolutionDir)intermediate\windows-$(PlatformShortName)\$(Configuration.ToLower())\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <ItemDefinitionGroup />
   <ItemGroup />

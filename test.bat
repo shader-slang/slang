@@ -31,6 +31,9 @@ if "%1"=="-configuration" (
 
 :: When done with arguments, we'll just fall through here
 
+
+
+
 :: Set root directory to the directory where `test.bat` resides
 :: (which should be the root of the source tree)
 SET "SLANG_TEST_ROOT=%~dp0"
@@ -45,7 +48,7 @@ IF "%SLANG_TEST_CONFIG%" == "" ( SET "SLANG_TEST_CONFIG=Debug" )
 IF "%SLANG_TEST_PLATFORM%"=="Win32" ( Set "SLANG_TEST_PLATFORM=x86" )
 
 :: Establish the directory where the binaries to be tested reside
-set "SLANG_TEST_BIN_DIR=%SLANG_TEST_ROOT%bin\%SLANG_TEST_PLATFORM%\%SLANG_TEST_CONFIG%\"
+set "SLANG_TEST_BIN_DIR=%SLANG_TEST_ROOT%bin\windows-%SLANG_TEST_PLATFORM%\%SLANG_TEST_CONFIG%\"
 
 :: ensure that any built tools are visible
 SET "PATH=%PATH%;%SLANG_TEST_BIN_DIR%"
