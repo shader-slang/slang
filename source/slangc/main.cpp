@@ -1,5 +1,6 @@
 ﻿// main.cpp
 
+#define SLANG_DYNAMIC
 #include "../slang.h"
 
 #include "core/slang-io.h"

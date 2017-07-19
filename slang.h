@@ -2,7 +2,7 @@
 #define SLANG_H
 
 #ifdef _MSC_VER
-#ifdef SLANG_COMPILING_DLL
+#ifdef SLANG_DYNAMIC_EXPORT
 #define SLANG_API __declspec(dllexport)
 #else
 #ifdef SLANG_DYNAMIC

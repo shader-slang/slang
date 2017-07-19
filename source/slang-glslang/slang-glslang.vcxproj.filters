@@ -132,7 +132,7 @@
     <ClCompile Include="..\..\external\glslang\SPIRV\SPVRemapper.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="glslang.cpp" />
+    <ClCompile Include="slang-glslang.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\external\glslang\glslang\MachineIndependent\gl_types.h">
@@ -240,7 +240,7 @@
     <ClInclude Include="..\..\external\glslang\SPIRV\SPVRemapper.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="glslang.h">
+    <ClInclude Include="slang-glslang.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

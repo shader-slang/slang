@@ -13,12 +13,15 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang", "source\slang\slang.vcxproj", "{DB00DA62-0533-4AFD-B59F-A67D5B3A0808}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slangc", "source\slangc\slangc.vcxproj", "{D56CBCEB-1EB5-4CA8-AEC4-48EA35ED61C7}"
+	ProjectSection(ProjectDependencies) = postProject
+		{C495878A-832C-485B-B347-0998A90CC936} = {C495878A-832C-485B-B347-0998A90CC936}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang-test", "tools\slang-test\slang-test.vcxproj", "{0C768A18-1D25-4000-9F37-DA5FE99E3B64}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "render-test", "tools\render-test\render-test.vcxproj", "{96610759-07B9-4EEB-A974-5C634A2E742B}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "glslang", "tools\glslang\glslang.vcxproj", "{C495878A-832C-485B-B347-0998A90CC936}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang-glslang", "source\slang-glslang\slang-glslang.vcxproj", "{C495878A-832C-485B-B347-0998A90CC936}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -92,6 +95,5 @@ Global
 		{E6385042-1649-4803-9EBD-168F8B7EF131} = {B625E3E2-3B0B-4A01-9D10-957F84092E10}
 		{0C768A18-1D25-4000-9F37-DA5FE99E3B64} = {74C5F0DC-93BB-4BF3-AC65-8C65491570F7}
 		{96610759-07B9-4EEB-A974-5C634A2E742B} = {74C5F0DC-93BB-4BF3-AC65-8C65491570F7}
-		{C495878A-832C-485B-B347-0998A90CC936} = {74C5F0DC-93BB-4BF3-AC65-8C65491570F7}
 	EndGlobalSection
 EndGlobal

@@ -1,5 +1,5 @@
-// glslang.cpp
-#include "glslang.h"
+// slang-glslang.cpp
+#include "slang-glslang.h"
 
 
 #include "StandAlone/ResourceLimits.h"
