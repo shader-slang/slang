@@ -186,7 +186,7 @@ class TupleVarDecl : public VarDeclBase
 public:
     virtual void accept(IDeclVisitor *, void *) override
     {
-        throw "unexpected";
+        SLANG_UNEXPECTED("tuples should not appear in lowered code");
     }
 
     TupleTypeModifier*          tupleType;
@@ -201,7 +201,7 @@ class TupleExpr : public ExpressionSyntaxNode
 public:
     virtual void accept(IExprVisitor *, void *) override
     {
-        throw "unexpected";
+        SLANG_UNEXPECTED("tuples should not appear in lowered code");
     }
 
     struct Element
@@ -225,7 +225,7 @@ class VaryingTupleVarDecl : public VarDeclBase
 public:
     virtual void accept(IDeclVisitor *, void *) override
     {
-        throw "unexpected";
+        SLANG_UNEXPECTED("tuples should not appear in lowered code");
     }
 };
 
@@ -236,7 +236,7 @@ class VaryingTupleExpr : public ExpressionSyntaxNode
 public:
     virtual void accept(IExprVisitor *, void *) override
     {
-        throw "unexpected";
+        SLANG_UNEXPECTED("tuples should not appear in lowered code");
     }
 
     struct Element
@@ -667,10 +667,10 @@ struct LoweringVisitor
         for (auto dd : decl->tupleDecls)
         {
             auto tupleVarMod = dd->FindModifier<TupleVarModifier>();
-            assert(tupleVarMod);
+            SLANG_RELEASE_ASSERT(tupleVarMod);
             auto tupleFieldMod = tupleVarMod->tupleField;
-            assert(tupleFieldMod);
-            assert(tupleFieldMod->decl);
+            SLANG_RELEASE_ASSERT(tupleFieldMod);
+            SLANG_RELEASE_ASSERT(tupleFieldMod->decl);
 
             TupleExpr::Element elem;
             elem.tupleFieldDeclRef = makeDeclRef(tupleFieldMod->decl);
@@ -799,7 +799,7 @@ struct LoweringVisitor
 
             if (leftTuple->primaryExpr)
             {
-                assert(rightTuple->primaryExpr);
+                SLANG_RELEASE_ASSERT(rightTuple->primaryExpr);
 
                 resultTuple->primaryExpr = createAssignExpr(
                     leftTuple->primaryExpr,
@@ -807,7 +807,7 @@ struct LoweringVisitor
             }
 
             auto elementCount = leftTuple->tupleElements.Count();
-            assert(elementCount == rightTuple->tupleElements.Count());
+            SLANG_RELEASE_ASSERT(elementCount == rightTuple->tupleElements.Count());
             for (UInt ee = 0; ee < elementCount; ++ee)
             {
                 auto leftElement = leftTuple->tupleElements[ee];
@@ -827,7 +827,7 @@ struct LoweringVisitor
         }
         else
         {
-            assert(!leftTuple && !rightTuple);
+            SLANG_RELEASE_ASSERT(!leftTuple && !rightTuple);
         }
 
         auto leftVaryingTuple = leftExpr.As<VaryingTupleExpr>();
@@ -838,10 +838,10 @@ struct LoweringVisitor
             resultTuple->Type.type = lowerType(leftExpr->Type.type);
             resultTuple->Position = leftExpr->Position;
 
-            assert(resultTuple->Type.type);
+            SLANG_RELEASE_ASSERT(resultTuple->Type.type);
 
             UInt elementCount = leftVaryingTuple->elements.Count();
-            assert(elementCount == rightVaryingTuple->elements.Count());
+            SLANG_RELEASE_ASSERT(elementCount == rightVaryingTuple->elements.Count());
 
             for (UInt ee = 0; ee < elementCount; ++ee)
             {
@@ -1027,7 +1027,7 @@ struct LoweringVisitor
             auto loweredExpr = new VaryingTupleExpr();
             loweredExpr->Type.type = getSubscripResultType(baseExpr->Type.type);
 
-            assert(loweredExpr->Type.type);
+            SLANG_RELEASE_ASSERT(loweredExpr->Type.type);
 
             for (auto elem : baseVaryingTuple->elements)
             {
@@ -1100,7 +1100,7 @@ struct LoweringVisitor
             RefPtr<AggTypeCtorExpr> resultExpr = new AggTypeCtorExpr();
             resultExpr->Type = varyingTupleExpr->Type;
             resultExpr->base.type = varyingTupleExpr->Type.type;
-            assert(resultExpr->Type.type);
+            SLANG_RELEASE_ASSERT(resultExpr->Type.type);
 
             for (auto elem : varyingTupleExpr->elements)
             {
@@ -1214,6 +1214,11 @@ struct LoweringVisitor
         return loweredExpr;
     }
 
+    DiagnosticSink* getSink()
+    {
+        return &shared->compileRequest->mSink;
+    }
+
     RefPtr<ExpressionSyntaxNode> visitMemberExpressionSyntaxNode(
         MemberExpressionSyntaxNode* expr)
     {
@@ -1244,8 +1249,8 @@ struct LoweringVisitor
                     return tupleFieldExpr;
 
                 auto tupleFieldTupleExpr = tupleFieldExpr.As<TupleExpr>();
-                assert(tupleFieldTupleExpr);
-                assert(!tupleFieldTupleExpr->primaryExpr);
+                SLANG_RELEASE_ASSERT(tupleFieldTupleExpr);
+                SLANG_RELEASE_ASSERT(!tupleFieldTupleExpr->primaryExpr);
 
 
                 RefPtr<MemberExpressionSyntaxNode> loweredPrimaryExpr = new MemberExpressionSyntaxNode();
@@ -1274,11 +1279,11 @@ struct LoweringVisitor
                 }
             }
 
-            assert(!"unexpected");
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), expr, "failed to find tuple field during lowering");
         }
 
         // Default handling:
-        assert(!dynamic_cast<TupleVarDecl*>(loweredDeclRef.getDecl()));
+        SLANG_RELEASE_ASSERT(!dynamic_cast<TupleVarDecl*>(loweredDeclRef.getDecl()));
 
         RefPtr<MemberExpressionSyntaxNode> loweredExpr = new MemberExpressionSyntaxNode();
         lowerExprCommon(loweredExpr, expr);
@@ -1344,7 +1349,7 @@ struct LoweringVisitor
                 return state->loweredStmt;
         }
 
-        assert(!"unexepcted");
+        SLANG_DIAGNOSE_UNEXPECTED(getSink(), originalStmt, "failed to find outer statement during lowering");
 
         return nullptr;
     }
@@ -1755,7 +1760,7 @@ struct LoweringVisitor
         if (auto litVal = dynamic_cast<ConstantIntVal*>(val))
             return val;
 
-        throw 99;
+        SLANG_UNEXPECTED("unhandled value kind");
     }
 
     RefPtr<Substitutions> translateSubstitutions(
@@ -1871,7 +1876,7 @@ struct LoweringVisitor
         // translated, which the user will maintain via pua/pop.
         //
 
-        assert(parentDecl);
+        SLANG_RELEASE_ASSERT(parentDecl);
         addMember(parentDecl, decl);
     }
 
@@ -2337,7 +2342,7 @@ struct LoweringVisitor
                 continue;
 
             // TODO: need to extract the initializer for this field
-            assert(!info.initExpr);
+            SLANG_RELEASE_ASSERT(!info.initExpr);
             RefPtr<ExpressionSyntaxNode> fieldInitExpr;
 
             String fieldName = info.name + "_" + dd.GetName();
@@ -2346,7 +2351,7 @@ struct LoweringVisitor
 
             Decl* originalFieldDecl;
             shared->mapLoweredDeclToOriginal.TryGetValue(dd, originalFieldDecl);
-            assert(originalFieldDecl);
+            SLANG_RELEASE_ASSERT(originalFieldDecl);
 
             RefPtr<VarLayout> fieldLayout;
             if(info.tupleTypeLayout)
@@ -2477,7 +2482,7 @@ struct LoweringVisitor
         RefPtr<StructTypeLayout>        tupleTypeLayout)
     {
         // Not handling initializers just yet...
-        assert(!initExpr);
+        SLANG_RELEASE_ASSERT(!initExpr);
 
         // We'll need a placeholder declaration to wrap the whole thing up:
         RefPtr<TupleVarDecl> tupleDecl = new TupleVarDecl();
@@ -2745,7 +2750,7 @@ struct LoweringVisitor
                     // declarations.
 
                     // We can't easily support `in out` declarations with this approach
-                    assert(!(inRes && outRes));
+                    SLANG_RELEASE_ASSERT(!(inRes && outRes));
 
                     RefPtr<ExpressionSyntaxNode> loweredExpr;
                     if (inRes)
@@ -2764,7 +2769,7 @@ struct LoweringVisitor
                             VaryingParameterDirection::Output);
                     }
 
-                    assert(loweredExpr);
+                    SLANG_RELEASE_ASSERT(loweredExpr);
                     auto loweredDecl = createVaryingTupleVarDecl(
                         decl,
                         loweredExpr);
@@ -2987,7 +2992,7 @@ struct LoweringVisitor
         RefPtr<ExpressionSyntaxNode> globalVarExpr;
 
         // Handle system-value inputs/outputs
-        assert(varLayout);
+        SLANG_RELEASE_ASSERT(varLayout);
         auto systemValueSemantic = varLayout->systemValueSemantic;
         if (systemValueSemantic.Length() != 0)
         {
@@ -3124,7 +3129,7 @@ struct LoweringVisitor
             }
             else
             {
-                assert(!"unhandled");
+                getSink()->diagnose(info.varChain->varDecl, Diagnostics::unknownSystemValueSemantic, systemValueSemantic);
             }
         }
 
@@ -3202,7 +3207,7 @@ struct LoweringVisitor
         RefPtr<ExpressionType>          varType,
         RefPtr<VarLayout>               varLayout)
     {
-        assert(varLayout);
+        SLANG_RELEASE_ASSERT(varLayout);
 
         if (auto basicType = varType->As<BasicExpressionType>())
         {
@@ -3252,7 +3257,7 @@ struct LoweringVisitor
                 RefPtr<VaryingTupleExpr> tupleExpr = new VaryingTupleExpr();
                 tupleExpr->Type.type = varType;
 
-                assert(tupleExpr->Type.type);
+                SLANG_RELEASE_ASSERT(tupleExpr->Type.type);
 
                 for (auto fieldDeclRef : getMembersOfType<VarDeclBase>(aggTypeDeclRef))
                 {
@@ -3271,14 +3276,14 @@ struct LoweringVisitor
                     // Need to find the layout for the given field...
                     Decl* originalFieldDecl = nullptr;
                     shared->mapLoweredDeclToOriginal.TryGetValue(fieldDeclRef.getDecl(), originalFieldDecl);
-                    assert(originalFieldDecl);
+                    SLANG_RELEASE_ASSERT(originalFieldDecl);
 
                     auto structTypeLayout = varLayout->typeLayout.As<StructTypeLayout>();
-                    assert(structTypeLayout);
+                    SLANG_RELEASE_EXPECT(structTypeLayout, "expected a structure type layout");
 
                     RefPtr<VarLayout> fieldLayout;
                     structTypeLayout->mapVarToLayout.TryGetValue(originalFieldDecl, fieldLayout);
-                    assert(fieldLayout);
+                    SLANG_RELEASE_ASSERT(fieldLayout);
 
                     auto loweredFieldExpr = lowerShaderParameterToGLSLGLobalsRec(
                         fieldInfo,
@@ -3414,7 +3419,7 @@ struct LoweringVisitor
         {
             RefPtr<VarLayout> paramLayout;
             entryPointLayout->mapVarToLayout.TryGetValue(paramDecl.Ptr(), paramLayout);
-            assert(paramLayout);
+            SLANG_RELEASE_ASSERT(paramLayout);
 
             RefPtr<Variable> localVarDecl = new Variable();
             localVarDecl->Position = paramDecl->Position;
@@ -3657,13 +3662,13 @@ static RefPtr<StructTypeLayout> getGlobalStructLayout(
         auto elementTypeStructLayout = elementTypeLayout.As<StructTypeLayout>();
 
         // We expect all constant buffers to contain `struct` types for now
-        assert(elementTypeStructLayout);
+        SLANG_RELEASE_ASSERT(elementTypeStructLayout);
 
         globalStructLayout = elementTypeStructLayout.Ptr();
     }
     else
     {
-        assert(!"unexpected");
+        SLANG_UNEXPECTED("unhandled type for global-scope parameter layout");
     }
     return globalStructLayout;
 }

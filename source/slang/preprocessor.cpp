@@ -705,8 +705,7 @@ static void MaybeBeginMacroExpansion(
             UInt argCount = argIndex;
             if (argCount != paramCount)
             {
-                // TODO: diagnose
-                throw 99;
+                GetSink(preprocessor)->diagnose(PeekLoc(preprocessor), Diagnostics::wrongNumberOfArgumentsToMacro, paramCount, argCount);
             }
 
             // We are ready to expand.
@@ -1006,7 +1005,7 @@ static void beginConditional(
     bool                            enable)
 {
     Preprocessor* preprocessor = context->preprocessor;
-    assert(inputStream);
+    SLANG_ASSERT(inputStream);
 
     PreprocessorConditional* conditional = CreateConditional(preprocessor);
 
@@ -1346,7 +1345,7 @@ static void HandleIfNDefDirective(PreprocessorDirectiveContext* context)
 static void HandleElseDirective(PreprocessorDirectiveContext* context)
 {
     PreprocessorInputStream* inputStream = context->preprocessor->inputStream;
-    assert(inputStream);
+    SLANG_ASSERT(inputStream);
 
     // if we aren't inside a conditional, then error
     PreprocessorConditional* conditional = inputStream->conditional;
@@ -1386,7 +1385,7 @@ static void HandleElifDirective(PreprocessorDirectiveContext* context)
     // Need to grab current input stream *before* we try to parse
     // the conditional expression.
     PreprocessorInputStream* inputStream = context->preprocessor->inputStream;
-    assert(inputStream);
+    SLANG_ASSERT(inputStream);
 
     // HACK(tfoley): handle an empty `elif` like an `else` directive
     //
@@ -1438,7 +1437,7 @@ static void HandleElifDirective(PreprocessorDirectiveContext* context)
 static void HandleEndIfDirective(PreprocessorDirectiveContext* context)
 {
     PreprocessorInputStream* inputStream = context->preprocessor->inputStream;
-    assert(inputStream);
+    SLANG_ASSERT(inputStream);
 
     // if we aren't inside a conditional, then error
     PreprocessorConditional* conditional = inputStream->conditional;

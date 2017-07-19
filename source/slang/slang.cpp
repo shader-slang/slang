@@ -571,7 +571,7 @@ void Session::addBuiltinSource(
         OutputDebugStringA(compileRequest->mDiagnosticOutput.Buffer());
 #endif
 
-        assert(!"error in stdlib");
+        SLANG_UNEXPECTED("error in Slang standard library");
     }
 
     // Extract the AST for the code we just parsed
@@ -831,8 +831,16 @@ SLANG_API int spCompile(
 {
     auto req = REQ(request);
 
-    int anyErrors = req->executeActions();
-    return anyErrors;
+    try
+    {
+        int anyErrors = req->executeActions();
+        return anyErrors;
+    }
+    catch (...)
+    {
+        req->mSink.diagnose(Slang::CodePosition(), Slang::Diagnostics::compilationAborted);
+        return 1;
+    }
 }
 
 SLANG_API int

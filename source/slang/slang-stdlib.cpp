@@ -1289,7 +1289,7 @@ namespace Slang
             for(int M = 2; M <= (N-2); ++M)
             {
                 int K = N - M;
-                assert(K >= 2);
+                SLANG_ASSERT(K >= 2);
 
                 sb << "__init(vector<T," << M << "> " << kVectorNames[M];
                 sb << ", vector<T," << K << "> ";
@@ -1453,7 +1453,7 @@ namespace Slang
                                 break;
 
                             default:
-                                assert(!"unexpected");
+                                SLANG_UNEXPECTED("unhandled resource shape");
                                 break;
                             }
 

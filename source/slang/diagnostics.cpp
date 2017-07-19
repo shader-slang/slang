@@ -100,7 +100,7 @@ static void formatDiagnosticMessage(StringBuilder& sb, char const* format, int a
         if (!*spanEnd)
             return;
 
-        assert(*spanEnd == '$');
+        SLANG_API(*spanEnd == '$');
         spanEnd++;
         int d = *spanEnd++;
         switch (d)

@@ -47,6 +47,7 @@ DIAGNOSTIC(    1, Error, cannotOpenFile, "cannot open file '$0'.")
 DIAGNOSTIC(    2, Error, cannotFindFile, "cannot find file '$0'.")
 DIAGNOSTIC(    2, Error, unsupportedCompilerMode, "unsupported compiler mode.")
 DIAGNOSTIC(    4, Error, cannotWriteOutputFile, "cannot write output file '$0'.")
+DIAGNOSTIC(    5, Error, failedToLoadDynamicLibrary, "failed to load dynamic library '$0'")
 
 //
 // 1xxxx - Lexical anaylsis
@@ -102,6 +103,7 @@ DIAGNOSTIC(15403, Error, expectedTokenInMacroParameters, "expected '$0' in macro
 
 // 155xx - macro expansion
 DIAGNOSTIC(15500, Warning, expectedTokenInMacroArguments, "expected '$0' in macro invocation")
+DIAGNOSTIC(15501, Error, wrongNumberOfArgumentsToMacro, "wrong number of arguments to macro (expected $0, got $1)")
 
 // 159xx - user-defined error/warning
 DIAGNOSTIC(15900, Error,    userDefinedError,   "#error: $0")
@@ -298,6 +300,10 @@ DIAGNOSTIC(40002, Error, invalidBindingValue, "binding location '$0' is out of v
 DIAGNOSTIC(40003, Error, bindingExceedsLimit, "binding location '$0' assigned to component '$1' exceeds maximum limit.")
 DIAGNOSTIC(40004, Error, bindingAlreadyOccupiedByModule, "DescriptorSet ID '$0' is already occupied by module instance '$1'.")
 DIAGNOSTIC(40005, Error, topLevelModuleUsedWithoutSpecifyingBinding, "top level module '$0' is being used without specifying binding location. Use [Binding: \"index\"] attribute to provide a binding location.")
+
+
+DIAGNOSTIC(49999, Error, unknownSystemValueSemantic, "unknown system-value semantic '$0'")
+
 //
 // 5xxxx - Target code generation.
 //
@@ -339,7 +345,9 @@ DIAGNOSTIC(51092, Error, stageDoesntHaveInputWorld, "'$0' doesn't appear to have
 
 // 99999 - Internal compiler errors, and not-yet-classified diagnostics.
 
+DIAGNOSTIC(99999, Internal, unimplemented, "unimplemented: $0")
+DIAGNOSTIC(99999, Internal, unexpected, "uuexpected: $0")
 DIAGNOSTIC(99999, Internal, internalCompilerError, "internal compiler error")
-DIAGNOSTIC(99999, Internal, unimplemented, "unimplemented feature: $0")
+DIAGNOSTIC(99999, Error, compilationAborted, "compilation aborted due to internal error");
 
 #undef DIAGNOSTIC

@@ -79,7 +79,6 @@ void requireGLSLVersion(
     ProfileVersion      version)
 {
     auto profile = entryPoint->profile;
-    auto currentVersion = profile.GetVersion();
     if (profile.getFamily() == ProfileFamily::GLSL)
     {
         // Check if this profile is newer
@@ -105,8 +104,8 @@ static String getStringOrIdentifierTokenValue(
     switch(token.Type)
     {
     default:
-        assert(!"unexpected");
-        return "";
+        SLANG_UNEXPECTED("needed an identifier or string literal");
+        break;
 
     case TokenType::Identifier:
         return token.Content;
@@ -600,7 +599,7 @@ struct EmitVisitor
                 {
                     Emit("\n");
                 }
-                assert(sourceLocation.Line == context->shared->loc.Line);
+                SLANG_RELEASE_ASSERT(sourceLocation.Line == context->shared->loc.Line);
             }
             else
             {
@@ -674,6 +673,10 @@ struct EmitVisitor
         emit(token.Content);
     }
 
+    DiagnosticSink* getSink()
+    {
+        return &context->shared->entryPoint->compileRequest->mSink;
+    }
 
     //
     // Types
@@ -691,7 +694,7 @@ struct EmitVisitor
         }
         else
         {
-            assert(!"unimplemented");
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), CodePosition(), "unknown type of integer constant value");
         }
     }
 
@@ -723,7 +726,7 @@ struct EmitVisitor
             break;
 
         default:
-            assert(!"unreachable");
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), CodePosition(), "unknown declarator flavor");
             break;
         }
     }
@@ -742,8 +745,9 @@ struct EmitVisitor
             case BaseType::Int:		Emit("i");		break;
             case BaseType::UInt:	Emit("u");		break;
             case BaseType::Bool:	Emit("b");		break;
+            case BaseType::Double:	Emit("d");		break;
             default:
-                assert(!"unreachable");
+                SLANG_DIAGNOSE_UNEXPECTED(getSink(), CodePosition(), "unhandled GLSL type prefix");
                 break;
             }
         }
@@ -757,7 +761,7 @@ struct EmitVisitor
         }
         else
         {
-            assert(!"unreachable");
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), CodePosition(), "unhandled GLSL type prefix");
         }
     }
 
@@ -786,7 +790,7 @@ struct EmitVisitor
             break;
 
         default:
-            assert(!"unreachable");
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), CodePosition(), "unhandled resource access mode");
             break;
         }
 
@@ -798,7 +802,7 @@ struct EmitVisitor
         case TextureType::ShapeCube:	Emit("TextureCube");	break;
         case TextureType::ShapeBuffer:  Emit("Buffer");         break;
         default:
-            assert(!"unreachable");
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), CodePosition(), "unhandled resource shape");
             break;
         }
 
@@ -830,7 +834,7 @@ struct EmitVisitor
         case TextureType::ShapeCube:	Emit("Cube");	break;
         case TextureType::ShapeBuffer:	Emit("Buffer");	break;
         default:
-            assert(!"unreachable");
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), CodePosition(), "unhandled resource shape");
             break;
         }
 
@@ -876,7 +880,7 @@ struct EmitVisitor
             break;
 
         default:
-            assert(!"unreachable");
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), CodePosition(), "unhandled code generation target");
             break;
         }
     }
@@ -891,7 +895,7 @@ struct EmitVisitor
             break;
 
         default:
-            assert(!"unreachable");
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), CodePosition(), "this target should see combined texture-sampler types");
             break;
         }
     }
@@ -910,7 +914,7 @@ struct EmitVisitor
             break;
 
         default:
-            assert(!"unreachable");
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), CodePosition(), "this target should see GLSL image types");
             break;
         }
     }
@@ -959,8 +963,9 @@ struct EmitVisitor
         case BaseType::Float:	Emit("float");		break;
         case BaseType::UInt:	Emit("uint");		break;
         case BaseType::Bool:	Emit("bool");		break;
+        case BaseType::Double:	Emit("double");		break;
         default:
-            assert(!"unreachable");
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), CodePosition(), "unhandled scalar type");
             break;
         }
 
@@ -992,7 +997,7 @@ struct EmitVisitor
             break;
 
         default:
-            assert(!"unreachable");
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), CodePosition(), "unhandled code generation target");
             break;
         }
 
@@ -1030,7 +1035,7 @@ struct EmitVisitor
             break;
 
         default:
-            assert(!"unreachable");
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), CodePosition(), "unhandled code generation target");
             break;
         }
 
@@ -1070,7 +1075,7 @@ struct EmitVisitor
             case SamplerStateType::Flavor::SamplerState:			Emit("SamplerState");			break;
             case SamplerStateType::Flavor::SamplerComparisonState:	Emit("SamplerComparisonState");	break;
             default:
-                assert(!"unreachable");
+                SLANG_DIAGNOSE_UNEXPECTED(getSink(), CodePosition(), "unhandled sampler state flavor");
                 break;
             }
             break;
@@ -1081,7 +1086,7 @@ struct EmitVisitor
             case SamplerStateType::Flavor::SamplerState:			Emit("sampler");		break;
             case SamplerStateType::Flavor::SamplerComparisonState:	Emit("samplerShadow");	break;
             default:
-                assert(!"unreachable");
+                SLANG_DIAGNOSE_UNEXPECTED(getSink(), CodePosition(), "unhandled sampler state flavor");
                 break;
             }
             break;
@@ -1170,7 +1175,10 @@ struct EmitVisitor
     {
         if (!typeExp.type || typeExp.type->As<ErrorType>())
         {
-            assert(typeExp.exp);
+            if (!typeExp.exp)
+            {
+                SLANG_DIAGNOSE_UNEXPECTED(getSink(), CodePosition(), "unresolved type expression should have expression part");
+            }
 
             EDeclarator nameDeclarator;
             nameDeclarator.flavor = EDeclarator::Flavor::Name;
@@ -1344,7 +1352,7 @@ struct EmitVisitor
         }
         else
         {
-            assert(postOp);
+            SLANG_ASSERT(postOp);
             EmitExprWithPrecedence(arg, leftSide(outerPrec, prec));
         }
 
@@ -1394,7 +1402,7 @@ struct EmitVisitor
         switch(context->shared->target)
         {
         default:
-            assert(!"unexpected");
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), CodePosition(), "unhandled code generation target");
             return false;
 
         case CodeGenTarget::GLSL: return targetName == "glsl";
@@ -1877,7 +1885,7 @@ struct EmitVisitor
                                 continue;
                             }
 
-                            assert(cursor != end);
+                            SLANG_RELEASE_ASSERT(cursor != end);
 
                             char d = *cursor++;
 
@@ -1888,7 +1896,7 @@ struct EmitVisitor
                                 {
                                     // Simple case: emit one of the direct arguments to the call
                                     UInt argIndex = d - '0';
-                                    assert((0 <= argIndex) && (argIndex < argCount));
+                                    SLANG_RELEASE_ASSERT((0 <= argIndex) && (argIndex < argCount));
                                     Emit("(");
                                     EmitExpr(callExpr->Arguments[argIndex]);
                                     Emit(")");
@@ -1906,7 +1914,7 @@ struct EmitVisitor
                                 }
                                 else
                                 {
-                                    assert(!"unexpected");
+                                    SLANG_UNEXPECTED("bad format in intrinsic definition");
                                 }
                                 break;
 
@@ -1914,7 +1922,7 @@ struct EmitVisitor
                                 // If we are calling a D3D texturing operation in the form t.Foo(s, ...),
                                 // then this form will pair up the t and s arguments as needed for a GLSL
                                 // texturing operation.
-                                assert(argCount > 0);
+                                SLANG_RELEASE_ASSERT(argCount > 0);
                                 if (auto memberExpr = callExpr->FunctionExpr.As<MemberExpressionSyntaxNode>())
                                 {
                                     auto base = memberExpr->BaseExpression;
@@ -1938,13 +1946,13 @@ struct EmitVisitor
                                     }
                                     else
                                     {
-                                        assert(!"unexpected");
+                                        SLANG_UNEXPECTED("bad format in intrinsic definition");
                                     }
 
                                 }
                                 else
                                 {
-                                    assert(!"unexpected");
+                                    SLANG_UNEXPECTED("bad format in intrinsic definition");
                                 }
                                 break;
 
@@ -1997,13 +2005,13 @@ struct EmitVisitor
                                         }
                                         else
                                         {
-                                            assert(!"unexpected");
+                                            SLANG_UNEXPECTED("bad format in intrinsic definition");
                                         }
 
                                     }
                                     else
                                     {
-                                        assert(!"unexpected");
+                                        SLANG_UNEXPECTED("bad format in intrinsic definition");
                                     }
                                 }
                                 break;
@@ -2013,7 +2021,7 @@ struct EmitVisitor
                                 // where `t` is a `Texture*<T>`, then this is the step where we try to
                                 // properly swizzle the output of the equivalent GLSL call into the right
                                 // shape.
-                                assert(argCount > 0);
+                                SLANG_RELEASE_ASSERT(argCount > 0);
                                 if (auto memberExpr = callExpr->FunctionExpr.As<MemberExpressionSyntaxNode>())
                                 {
                                     auto base = memberExpr->BaseExpression;
@@ -2043,19 +2051,19 @@ struct EmitVisitor
                                     }
                                     else
                                     {
-                                        assert(!"unexpected");
+                                        SLANG_UNEXPECTED("bad format in intrinsic definition");
                                     }
 
                                 }
                                 else
                                 {
-                                    assert(!"unexpected");
+                                    SLANG_UNEXPECTED("bad format in intrinsic definition");
                                 }
                                 break;
 
 
                             default:
-                                assert(!"unexpected");
+                                SLANG_UNEXPECTED("bad format in intrinsic definition");
                                 break;
                             }
                         }
@@ -2261,7 +2269,7 @@ struct EmitVisitor
             }
             else
             {
-                assert(!"unimplemented");
+                SLANG_DIAGNOSE_UNEXPECTED(getSink(), litExpr, "unhandled type for integer literal");
             }
             Emit(litExpr->integerValue);
             Emit(suffix);
@@ -2283,7 +2291,7 @@ struct EmitVisitor
             }
             else
             {
-                assert(!"unimplemented");
+                SLANG_DIAGNOSE_UNEXPECTED(getSink(), litExpr, "unhandled type for floating-point literal");
             }
             Emit(litExpr->floatingPointValue);
             Emit(suffix);
@@ -2296,7 +2304,7 @@ struct EmitVisitor
             emitStringLiteral(litExpr->stringValue);
             break;
         default:
-            assert(!"unreachable");
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), litExpr, "unhandled kind of literal expression");
             break;
         }
         if(needClose) Emit(")");
@@ -2588,8 +2596,7 @@ struct EmitVisitor
             return;
         }
 
-        throw "unimplemented";
-
+        SLANG_UNEXPECTED("unhandled statement kind");
     }
 
     //
@@ -2716,7 +2723,7 @@ struct EmitVisitor
     {
         // Note(tfoley): any `typedef`s should already have been filtered
         // out if we are generating GLSL.
-        assert(context->shared->target != CodeGenTarget::GLSL);
+        SLANG_RELEASE_ASSERT(context->shared->target != CodeGenTarget::GLSL);
 
         Emit("typedef ");
         EmitType(decl->Type, decl->Name.Content);
@@ -2968,7 +2975,7 @@ struct EmitVisitor
         }
         else
         {
-            assert(!"unimplemented");
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), semantic->Position, "unhandled kind of semantic");
         }
     }
 
@@ -3116,7 +3123,7 @@ struct EmitVisitor
             if (byteOffsetInRegister != 0)
             {
                 // The value had better occupy a whole number of components.
-                assert(byteOffsetInRegister % componentSize == 0);
+                SLANG_RELEASE_ASSERT(byteOffsetInRegister % componentSize == 0);
 
                 size_t startComponent = byteOffsetInRegister / componentSize;
 
@@ -3144,7 +3151,7 @@ struct EmitVisitor
                 Emit("s");
                 break;
             default:
-                assert(!"unexpected");
+                SLANG_DIAGNOSE_UNEXPECTED(getSink(), CodePosition(), "unhandled HLSL register type");
                 break;
             }
             Emit(info.index);
@@ -3192,7 +3199,7 @@ struct EmitVisitor
         if (!modifier) return nullptr;
 
         auto computedLayout = modifier->layout;
-        assert(computedLayout);
+        SLANG_RELEASE_ASSERT(computedLayout);
 
         auto varLayout = computedLayout.As<VarLayout>();
         return varLayout;
@@ -3208,18 +3215,18 @@ struct EmitVisitor
 
         // We expect/require the data type to be a user-defined `struct` type
         auto declRefType = dataType->As<DeclRefType>();
-        assert(declRefType);
+        SLANG_RELEASE_ASSERT(declRefType);
 
         // We expect to always have layout information
         layout = maybeFetchLayout(varDecl, layout);
-        assert(layout);
+        SLANG_RELEASE_ASSERT(layout);
 
         // We expect the layout to be for a structured type...
         RefPtr<ParameterBlockTypeLayout> bufferLayout = layout->typeLayout.As<ParameterBlockTypeLayout>();
-        assert(bufferLayout);
+        SLANG_RELEASE_ASSERT(bufferLayout);
 
         RefPtr<StructTypeLayout> structTypeLayout = bufferLayout->elementTypeLayout.As<StructTypeLayout>();
-        assert(structTypeLayout);
+        SLANG_RELEASE_ASSERT(structTypeLayout);
 
         if( auto constantBufferType = parameterBlockType->As<ConstantBufferType>() )
         {
@@ -3239,7 +3246,7 @@ struct EmitVisitor
         EmitSemantics(varDecl, kESemanticMask_None);
 
         auto info = layout->FindResourceInfo(LayoutResourceKind::ConstantBuffer);
-        assert(info);
+        SLANG_RELEASE_ASSERT(info);
         emitHLSLRegisterSemantic(*info);
 
         Emit("\n{\n");
@@ -3254,7 +3261,7 @@ struct EmitVisitor
                 EmitVarDeclCommon(field);
 
                 RefPtr<VarLayout> fieldLayout = structTypeLayout->fields[fieldIndex];
-                assert(fieldLayout->varDecl.GetName() == field.GetName());
+                SLANG_RELEASE_ASSERT(fieldLayout->varDecl.GetName() == field.GetName());
 
                 // Emit explicit layout annotations for every field
                 for( auto rr : fieldLayout->resourceInfos )
@@ -3273,7 +3280,7 @@ struct EmitVisitor
                         // If the member of the cbuffer uses a resource, it had better
                         // appear as part of the cubffer layout as well.
                         auto cbufferResource = layout->FindResourceInfo(kind);
-                        assert(cbufferResource);
+                        SLANG_RELEASE_ASSERT(cbufferResource);
 
                         offsetResource.index += cbufferResource->index;
                         offsetResource.space += cbufferResource->space;
@@ -3372,7 +3379,7 @@ struct EmitVisitor
 
         // We expect/require the data type to be a user-defined `struct` type
         auto declRefType = dataType->As<DeclRefType>();
-        assert(declRefType);
+        SLANG_RELEASE_ASSERT(declRefType);
 
         // We expect the layout, if present, to be for a structured type...
         RefPtr<StructTypeLayout> structTypeLayout;
@@ -3386,7 +3393,7 @@ struct EmitVisitor
             }
 
             structTypeLayout = typeLayout.As<StructTypeLayout>();
-            assert(structTypeLayout);
+            SLANG_RELEASE_ASSERT(structTypeLayout);
 
             emitGLSLLayoutQualifiers(layout);
         }
@@ -3413,7 +3420,7 @@ struct EmitVisitor
         }
         else
         {
-            assert(!"unexpected");
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), varDecl, "unhandled GLSL shader parameter kind");
             Emit("uniform");
         }
 
@@ -3471,7 +3478,7 @@ struct EmitVisitor
             break;
 
         default:
-            assert(!"unexpected");
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), varDecl, "unhandled code generation target");
             break;
         }
     }
@@ -3696,7 +3703,7 @@ struct EmitVisitor
         }
         else
         {
-            throw "unimplemented";
+            SLANG_UNEXPECTED("unhandled declaration kind");
         }
     }
 };
@@ -3746,13 +3753,13 @@ String emitEntryPoint(
         auto elementTypeStructLayout = elementTypeLayout.As<StructTypeLayout>();
 
         // We expect all constant buffers to contain `struct` types for now
-        assert(elementTypeStructLayout);
+        SLANG_RELEASE_ASSERT(elementTypeStructLayout);
 
         globalStructLayout = elementTypeStructLayout.Ptr();
     }
     else
     {
-        assert(!"unexpected");
+        SLANG_UNEXPECTED("uhandled global-scope binding layout");
     }
     sharedContext.globalStructLayout = globalStructLayout;
 

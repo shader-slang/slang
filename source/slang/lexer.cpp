@@ -11,14 +11,14 @@ namespace Slang
 
     Token* TokenList::begin() const
     {
-        assert(mTokens.Count());
+        SLANG_ASSERT(mTokens.Count());
         return &mTokens[0];
     }
 
     Token* TokenList::end() const
     {
-        assert(mTokens.Count());
-        assert(mTokens[mTokens.Count()-1].Type == TokenType::EndOfFile);
+        SLANG_ASSERT(mTokens.Count());
+        SLANG_ASSERT(mTokens[mTokens.Count()-1].Type == TokenType::EndOfFile);
         return &mTokens[mTokens.Count() - 1];
     }
 
@@ -48,7 +48,7 @@ namespace Slang
     {
         if (mCursor == mEnd)
             return TokenType::EndOfFile;
-        assert(mCursor);
+        SLANG_ASSERT(mCursor);
         return mCursor->Type;
     }
 
@@ -56,7 +56,7 @@ namespace Slang
     {
         if (!mCursor)
             return CodePosition();
-        assert(mCursor);
+        SLANG_ASSERT(mCursor);
         return mCursor->Position;
     }
 
@@ -135,7 +135,7 @@ namespace Slang
     //
     static void handleNewLineInner(Lexer* lexer, int c)
     {
-        assert(c == '\n' || c == '\r');
+        SLANG_ASSERT(c == '\n' || c == '\r');
 
         int d = peekRaw(lexer);
         if( (c ^ d) == ('\n' ^ '\r') )
@@ -774,26 +774,26 @@ namespace Slang
 
     String getStringLiteralTokenValue(Token const& token)
     {
-        assert(token.Type == TokenType::StringLiteral
+        SLANG_ASSERT(token.Type == TokenType::StringLiteral
             || token.Type == TokenType::CharLiteral);
 
         char const* cursor = token.Content.begin();
         char const* end = token.Content.end();
 
         auto quote = *cursor++;
-        assert(quote == '\'' || quote == '"');
+        SLANG_ASSERT(quote == '\'' || quote == '"');
 
         StringBuilder valueBuilder;
         for(;;)
         {
-            assert(cursor != end);
+            SLANG_ASSERT(cursor != end);
 
             auto c = *cursor++;
 
             // If we see a closing quote, then we are at the end of the string literal
             if(c == quote)
             {
-                assert(cursor == end);
+                SLANG_ASSERT(cursor == end);
                 return valueBuilder.ProduceString();
             }
 

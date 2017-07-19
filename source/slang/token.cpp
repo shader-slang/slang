@@ -10,7 +10,7 @@ char const* TokenTypeToString(TokenType type)
     switch( type )
     {
     default:
-        assert(!"unexpected");
+        SLANG_ASSERT(!"unexpected");
         return "<uknown>";
 
 #define TOKEN(NAME, DESC) case TokenType::NAME: return DESC;

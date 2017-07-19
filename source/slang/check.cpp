@@ -166,7 +166,7 @@ namespace Slang
             RefPtr<ExpressionSyntaxNode> originalExpr)
         {
             auto ptrLikeType = base->Type->As<PointerLikeType>();
-            assert(ptrLikeType);
+            SLANG_ASSERT(ptrLikeType);
 
             auto derefExpr = new DerefExpr();
             derefExpr->Position = originalExpr->Position;
@@ -228,7 +228,7 @@ namespace Slang
         RefPtr<ExpressionSyntaxNode> ResolveOverloadedExpr(RefPtr<OverloadedExpr> overloadedExpr, LookupMask mask)
         {
             auto lookupResult = overloadedExpr->lookupResult2;
-            assert(lookupResult.isValid() && lookupResult.isOverloaded());
+            SLANG_RELEASE_ASSERT(lookupResult.isValid() && lookupResult.isOverloaded());
 
             // Take the lookup result we had, and refine it based on what is expected in context.
             lookupResult = refineLookup(lookupResult, mask);
@@ -840,7 +840,7 @@ namespace Slang
                     auto fromInfo = GetBaseTypeConversionInfo(fromBasicType->BaseType);
 
                     // We expect identical types to have been dealt with already.
-                    assert(toInfo.kind != fromInfo.kind || toInfo.rank != fromInfo.rank);
+                    SLANG_ASSERT(toInfo.kind != fromInfo.kind || toInfo.rank != fromInfo.rank);
 
                     if (outToExpr)
                         *outToExpr = CreateImplicitCastExpr(toType, fromExpr);
@@ -1512,7 +1512,7 @@ namespace Slang
         void ValidateFunctionRedeclaration(FunctionSyntaxNode* funcDecl)
         {
             auto parentDecl = funcDecl->ParentDecl;
-            assert(parentDecl);
+            SLANG_RELEASE_ASSERT(parentDecl);
             if (!parentDecl) return;
 
             // Look at previously-declared functions with the same name,
@@ -2489,77 +2489,6 @@ namespace Slang
             return Coerce(type, expr);
         }
 
-        // Resolve a call to a function, represented here
-        // by a symbol with a `FuncType` type.
-        RefPtr<ExpressionSyntaxNode> ResolveFunctionApp(
-            RefPtr<FuncType>			funcType,
-            InvokeExpressionSyntaxNode*	/*appExpr*/)
-        {
-            // TODO(tfoley): Actual checking logic needs to go here...
-#if 0
-            auto& args = appExpr->Arguments;
-            List<RefPtr<ParameterSyntaxNode>> params;
-            RefPtr<ExpressionType> resultType;
-            if (auto funcDeclRef = funcType->declRef)
-            {
-                EnsureDecl(funcDeclRef.getDecl());
-
-                params = funcDeclRef->GetParameters().ToArray();
-                resultType = funcDecl->ReturnType;
-            }
-            else if (auto funcSym = funcType->Func)
-            {
-                auto funcDecl = funcSym->SyntaxNode;
-                EnsureDecl(funcDecl);
-
-                params = funcDecl->GetParameters().ToArray();
-                resultType = funcDecl->ReturnType;
-            }
-            else if (auto componentFuncSym = funcType->Component)
-            {
-                auto componentFuncDecl = componentFuncSym->Implementations.First()->SyntaxNode;
-                params = componentFuncDecl->GetParameters().ToArray();
-                resultType = componentFuncDecl->Type;
-            }
-
-            auto argCount = args.Count();
-            auto paramCount = params.Count();
-            if (argCount != paramCount)
-            {
-                getSink()->diagnose(appExpr, Diagnostics::unimplemented, "wrong number of arguments for call");
-                appExpr->Type = ExpressionType::Error;
-                return appExpr;
-            }
-
-            for (int ii = 0; ii < argCount; ++ii)
-            {
-                auto arg = args[ii];
-                auto param = params[ii];
-
-                arg = CoerceExprToType(arg, param->Type);
-
-                args[ii] = arg;
-            }
-
-            assert(resultType);
-            appExpr->Type = resultType;
-            return appExpr;
-#else
-            throw "unimplemented";
-#endif
-        }
-
-        // Resolve a constructor call, formed by apply a type to arguments
-        RefPtr<ExpressionSyntaxNode> ResolveConstructorApp(
-            RefPtr<ExpressionType>		type,
-            InvokeExpressionSyntaxNode*	appExpr)
-        {
-            // TODO(tfoley): Actual checking logic needs to go here...
-
-            appExpr->Type = QualType(type);
-            return appExpr;
-        }
-
         RefPtr<ExpressionSyntaxNode> visitParenExpr(ParenExpr* expr)
         {
             auto base = expr->base;
@@ -2794,7 +2723,7 @@ namespace Slang
                         return left;
                     else
                     {
-                        assert(rightFlavor > leftFlavor);
+                        SLANG_ASSERT(rightFlavor > leftFlavor);
                         return right;
                     }
                 }
@@ -2894,7 +2823,7 @@ namespace Slang
                             continue;
 
                         auto cType = c.val.As<ExpressionType>();
-                        assert(cType.Ptr());
+                        SLANG_RELEASE_ASSERT(cType.Ptr());
 
                         if (!type)
                         {
@@ -2933,7 +2862,7 @@ namespace Slang
                             continue;
 
                         auto cVal = c.val.As<IntVal>();
-                        assert(cVal.Ptr());
+                        SLANG_RELEASE_ASSERT(cVal.Ptr());
 
                         if (!val)
                         {
@@ -2982,104 +2911,6 @@ namespace Slang
             solvedSubst->args = args;
 
             return solvedSubst;
-
-
-#if 0
-            List<RefPtr<Val>> solvedArgs;
-            for (auto varArg : varSubst->args)
-            {
-                if (auto typeVar = dynamic_cast<ConstraintVarType*>(varArg.Ptr()))
-                {
-                    RefPtr<ExpressionType> type = nullptr;
-                    for (auto& c : system->constraints)
-                    {
-                        if (c.decl != typeVar->declRef.getDecl())
-                            continue;
-
-                        auto cType = c.val.As<ExpressionType>();
-                        assert(cType.Ptr());
-
-                        if (!type)
-                        {
-                            type = cType;
-                        }
-                        else
-                        {
-                            if (!type->Equals(cType))
-                            {
-                                // failure!
-                                return nullptr;
-                            }
-                        }
-
-                        c.satisfied = true;
-                    }
-
-                    if (!type)
-                    {
-                        // failure!
-                        return nullptr;
-                    }
-                    solvedArgs.Add(type);
-                }
-                else if (auto valueVar = dynamic_cast<ConstraintVarInt*>(varArg.Ptr()))
-                {
-                    // TODO(tfoley): maybe support more than integers some day?
-                    RefPtr<IntVal> val = nullptr;
-                    for (auto& c : system->constraints)
-                    {
-                        if (c.decl != valueVar->declRef.getDecl())
-                            continue;
-
-                        auto cVal = c.val.As<IntVal>();
-                        assert(cVal.Ptr());
-
-                        if (!val)
-                        {
-                            val = cVal;
-                        }
-                        else
-                        {
-                            if (val->value != cVal->value)
-                            {
-                                // failure!
-                                return nullptr;
-                            }
-                        }
-
-                        c.satisfied = true;
-                    }
-
-                    if (!val)
-                    {
-                        // failure!
-                        return nullptr;
-                    }
-                    solvedArgs.Add(val);
-                }
-                else
-                {
-                    // ignore anything that isn't a generic parameter
-                }
-            }
-
-            // Make sure we haven't constructed any spurious constraints
-            // that we aren't able to satisfy:
-            for (auto c : system->constraints)
-            {
-                if (!c.satisfied)
-                {
-                    return nullptr;
-                }
-            }
-
-            RefPtr<Substitutions> newSubst = new Substitutions();
-            newSubst->genericDecl = varSubst->genericDecl;
-            newSubst->outer = varSubst->outer;
-            newSubst->args = solvedArgs;
-            return newSubst;
-
-#endif
         }
 
         //
@@ -3225,7 +3056,7 @@ namespace Slang
                 break;
 
             default:
-                assert(!"unexpected");
+                SLANG_UNEXPECTED("unknown flavor of overload candidate");
                 break;
             }
 
@@ -3244,7 +3075,7 @@ namespace Slang
                 }
                 else
                 {
-                    assert(argCount > paramCounts.allowed);
+                    SLANG_ASSERT(argCount > paramCounts.allowed);
                     if (!isRewriteMode())
                     {
                         getSink()->diagnose(context.appExpr, Diagnostics::tooManyArguments, argCount, paramCounts.allowed);
@@ -3376,13 +3207,13 @@ namespace Slang
                 return TryCheckGenericOverloadCandidateTypes(context, candidate);
 
             default:
-                assert(!"unexpected");
+                SLANG_UNEXPECTED("unknown flavor of overload candidate");
                 break;
             }
 
             // Note(tfoley): We might have fewer arguments than parameters in the
             // case where one or more parameters had defaults.
-            assert(argCount <= params.Count());
+            SLANG_RELEASE_ASSERT(argCount <= params.Count());
 
             for (UInt ii = 0; ii < argCount; ++ii)
             {
@@ -3446,13 +3277,13 @@ namespace Slang
             auto baseDeclRefExpr = baseExpr.As<DeclRefExpr>();
             if (!baseDeclRefExpr)
             {
-                assert(!"unexpected");
+                SLANG_DIAGNOSE_UNEXPECTED(getSink(), baseExpr, "expected a reference to a generic declaration");
                 return CreateErrorExpr(appExpr.Ptr());
             }
             auto baseGenericRef = baseDeclRefExpr->declRef.As<GenericDecl>();
             if (!baseGenericRef)
             {
-                assert(!"unexpected");
+                SLANG_DIAGNOSE_UNEXPECTED(getSink(), baseExpr, "expected a reference to a generic declaration");
                 return CreateErrorExpr(appExpr.Ptr());
             }
 
@@ -3544,7 +3375,7 @@ namespace Slang
                     break;
 
                 default:
-                    assert(!"unexpected");
+                    SLANG_DIAGNOSE_UNEXPECTED(getSink(), context.appExpr, "unknown overload candidate flavor");
                     break;
                 }
             }
@@ -3614,7 +3445,7 @@ namespace Slang
                 // isn't transitive). Therefore we confirm that we either chose to keep
                 // this candidate (in which case filtering is okay), or we didn't filter
                 // anything.
-                assert(keepThisCandidate || !anyFiltered);
+                SLANG_ASSERT(keepThisCandidate || !anyFiltered);
             }
             else if(context.bestCandidate)
             {
@@ -3802,7 +3633,7 @@ namespace Slang
                 return false;
 
             // Their arguments must unify
-            assert(fst->args.Count() == snd->args.Count());
+            SLANG_RELEASE_ASSERT(fst->args.Count() == snd->args.Count());
             UInt argCount = fst->args.Count();
             for (UInt aa = 0; aa < argCount; ++aa)
             {
@@ -3997,7 +3828,7 @@ namespace Slang
 
                 // We expect/require that the result of unification is such that
                 // the target types are now equal
-                assert(GetTargetType(extDeclRef)->Equals(type));
+                SLANG_ASSERT(GetTargetType(extDeclRef)->Equals(type));
 
                 return extDeclRef;
             }
@@ -4232,7 +4063,7 @@ namespace Slang
             else if (auto overloadedExpr = funcExpr.As<OverloadedExpr>())
             {
                 auto lookupResult = overloadedExpr->lookupResult2;
-                assert(lookupResult.isOverloaded());
+                SLANG_RELEASE_ASSERT(lookupResult.isOverloaded());
                 for(auto item : lookupResult.items)
                 {
                     AddDeclRefOverloadCandidates(item, context);
@@ -4287,8 +4118,8 @@ namespace Slang
             // signature
             if( parentGenericDeclRef )
             {
-                assert(declRef.substitutions);
-                assert(declRef.substitutions->genericDecl == parentGenericDeclRef.getDecl());
+                SLANG_RELEASE_ASSERT(declRef.substitutions);
+                SLANG_RELEASE_ASSERT(declRef.substitutions->genericDecl == parentGenericDeclRef.getDecl());
 
                 sb << "<";
                 bool first = true;
@@ -4827,25 +4658,25 @@ namespace Slang
 
         RefPtr<ExpressionSyntaxNode> visitDerefExpr(DerefExpr* expr)
         {
-            assert(!"unexpected");
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), expr, "should not appear in input syntax");
             return expr;
         }
 
         RefPtr<ExpressionSyntaxNode> visitSwizzleExpr(SwizzleExpr* expr)
         {
-            assert(!"unexpected");
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), expr, "should not appear in input syntax");
             return expr;
         }
 
         RefPtr<ExpressionSyntaxNode> visitOverloadedExpr(OverloadedExpr* expr)
         {
-            assert(!"unexpected");
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), expr, "should not appear in input syntax");
             return expr;
         }
 
         RefPtr<ExpressionSyntaxNode> visitAggTypeCtorExpr(AggTypeCtorExpr* expr)
         {
-            assert(!"unexpected");
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), expr, "should not appear in input syntax");
             return expr;
         }
 
