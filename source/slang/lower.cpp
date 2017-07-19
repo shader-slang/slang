@@ -1,6 +1,7 @@
 // lower.cpp
 #include "lower.h"
 
+#include "emit.h"
 #include "type-layout.h"
 #include "visitor.h"
 
@@ -253,6 +254,8 @@ struct SharedLoweringContext
     CompileRequest*     compileRequest;
     EntryPointRequest*  entryPointRequest;
 
+    ExtensionUsageTracker* extensionUsageTracker;
+
     ProgramLayout*      programLayout;
     EntryPointLayout*   entryPointLayout;
 
@@ -278,7 +281,8 @@ struct SharedLoweringContext
     // Counter used for generating unique temporary names
     int nameCounter = 0;
 
-    bool isRewrite;
+    bool isRewrite = false;
+    bool requiresCopyGLPositionToPositionPerView = false;
 };
 
 static void attachLayout(
@@ -786,9 +790,242 @@ struct LoweringVisitor
         return expr;
     }
 
-    RefPtr<ExpressionSyntaxNode> createAssignExpr(
+    // When constructing assignment syntax, we can either
+    // just leave things alone, or create code that will
+    // try to coerce types to "fix up" differences in
+    // the apparent type of things.
+    enum class AssignMode
+    {
+        Default,
+        WithFixups,
+    };
+
+    RefPtr<ExpressionSyntaxNode> createSimpleAssignExpr(
         RefPtr<ExpressionSyntaxNode>    leftExpr,
         RefPtr<ExpressionSyntaxNode>    rightExpr)
+    {
+        RefPtr<AssignExpr> loweredExpr = new AssignExpr();
+        loweredExpr->Type = leftExpr->Type;
+        loweredExpr->left = leftExpr;
+        loweredExpr->right = rightExpr;
+        return loweredExpr;
+    }
+
+    RefPtr<ExpressionSyntaxNode> convertExprForAssignmentWithFixups(
+        RefPtr<ExpressionType>          leftType,
+        RefPtr<ExpressionSyntaxNode>    rightExpr)
+    {
+        auto rightType = rightExpr->Type.type;
+        if (auto leftArrayType = leftType->As<ArrayExpressionType>())
+        {
+            // LHS type was an array
+
+            if (auto rightVecType = rightType->As<VectorExpressionType>())
+            {
+                // RHS type was a vector
+                if (auto leftElemVecType = leftArrayType->BaseType->As<VectorExpressionType>())
+                {
+                    // LHS element type was also a vector, so this is a "scalar splat
+                    // to array" case.
+                }
+                else
+                {
+                    // LHS is an array of non-vectors, while RHS is a vector,
+                    // so in this case we want to splat out the vector elements
+                    // to create an array and use that.
+                    rightExpr = maybeMoveTemp(rightExpr);
+
+                    RefPtr<AggTypeCtorExpr> ctorExpr = new AggTypeCtorExpr();
+                    ctorExpr->Position = rightExpr->Position;
+                    ctorExpr->Type.type = leftType;
+                    ctorExpr->base.type = leftType;
+
+                    int elementCount = (int) GetIntVal(rightVecType->elementCount);
+                    for (int ee = 0; ee < elementCount; ++ee)
+                    {
+                        RefPtr<SwizzleExpr> swizzleExpr = new SwizzleExpr();
+                        swizzleExpr->Position = rightExpr->Position;
+                        swizzleExpr->Type.type = rightVecType->elementType;
+                        swizzleExpr->base = rightExpr;
+                        swizzleExpr->elementCount = 1;
+                        swizzleExpr->elementIndices[0] = ee;
+
+                        auto convertedArgExpr = convertExprForAssignmentWithFixups(
+                            leftArrayType->BaseType,
+                            swizzleExpr);
+
+                        ctorExpr->Arguments.Add(convertedArgExpr);
+                    }
+
+                    return ctorExpr;
+                }
+            }
+        }
+
+        // Default case: if the types didn't match, try to insert
+        // an explicit cast to deal with the issue.
+        return createCastExpr(leftType, rightExpr);
+
+    }
+
+    RefPtr<ExpressionSyntaxNode> createConstIntExpr(IntegerLiteralValue value)
+    {
+        RefPtr<ConstantExpressionSyntaxNode> expr = new ConstantExpressionSyntaxNode();
+        expr->Type.type = getIntType();
+        expr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Int;
+        expr->integerValue = value;
+        return expr;
+    }
+
+    struct SeqExprBuilder
+    {
+        RefPtr<ExpressionSyntaxNode> expr;
+        RefPtr<ExpressionSyntaxNode>* link = nullptr;
+    };
+
+    RefPtr<ExpressionSyntaxNode> createSimpleVarExpr(char const* name)
+    {
+        RefPtr<VarExpressionSyntaxNode> varExpr = new VarExpressionSyntaxNode();
+        varExpr->name = name;
+        return varExpr;
+    }
+
+    RefPtr<InvokeExpressionSyntaxNode> createSeqExpr(
+        RefPtr<ExpressionSyntaxNode>    left,
+        RefPtr<ExpressionSyntaxNode>    right)
+    {
+        RefPtr<InfixExpr> seqExpr = new InfixExpr();
+        seqExpr->Position = left->Position;
+        seqExpr->Type = right->Type;
+        seqExpr->FunctionExpr = createSimpleVarExpr(",");
+        seqExpr->Arguments.Add(left);
+        seqExpr->Arguments.Add(right);
+        return seqExpr;
+    }
+
+    void addExpr(SeqExprBuilder* builder, RefPtr<ExpressionSyntaxNode> expr)
+    {
+        // No expression to add? Do nothing.
+        if (!expr) return;
+
+        if (!builder->expr)
+        {
+            // No expression so far?
+            // Set up a single-expression result.
+
+            builder->expr = expr;
+            builder->link = &builder->expr;
+            return;
+        }
+
+        // There is an existing expression, so we need to append
+        // to the sequence of expressions. The invariant is
+        // that `link` points to the last expression in the
+        // sequence.
+
+        // We will extract the old last element, and construct
+        // a new sequence expression ("operator comma") that
+        // concatenates with with our new last expression.
+        auto oldLastExpr = *builder->link;
+        auto seqExpr = createSeqExpr(oldLastExpr, expr);
+
+        // Now we need to overwrite the old last expression,
+        // wherever it occured in the AST (which we handily
+        // stored in `link`) and set our `link` to track
+        // the new last expression (which will be the second
+        // argument to our sequence expression).
+        *builder->link = seqExpr;
+        builder->link = &seqExpr->Arguments[1];
+    }
+
+    RefPtr<ExpressionSyntaxNode> createSimpleAssignExprWithFixups(
+        RefPtr<ExpressionSyntaxNode>    leftExpr,
+        RefPtr<ExpressionSyntaxNode>    rightExpr)
+    {
+        auto leftType = leftExpr->Type.type;
+        auto rightType = rightExpr->Type.type;
+
+        // If types are unknown, or match, then just do
+        // things the ordinary way.
+        if (!leftType
+            || !rightType
+            || leftType->As<ErrorType>()
+            || rightType->As<ErrorType>()
+            || leftType->Equals(rightType))
+        {
+            return createSimpleAssignExpr(leftExpr, rightExpr);
+        }
+
+        // Otherwise, start to look at the types involved,
+        // and see if we can do something.
+
+        if (auto leftArrayType = leftType->As<ArrayExpressionType>())
+        {
+            // LHS type was an array
+
+            if (auto rightVecType = rightType->As<VectorExpressionType>())
+            {
+                // RHS type was a vector
+                if (auto leftElemVecType = leftArrayType->BaseType->As<VectorExpressionType>())
+                {
+                    // LHS element type was also a vector, so this is a "scalar splat
+                    // to array" case.
+                }
+                else
+                {
+                    // LHS is an array of non-vectors, while RHS is a vector,
+                    // so in this case we want to splat out the vector elements
+                    // to create an array and use that.
+                    leftExpr = maybeMoveTemp(leftExpr);
+                    rightExpr = maybeMoveTemp(rightExpr);
+
+                    SeqExprBuilder builder;
+
+                    int elementCount = (int) GetIntVal(rightVecType->elementCount);
+                    for (int ee = 0; ee < elementCount; ++ee)
+                    {
+                        // LHS array element
+                        RefPtr<IndexExpressionSyntaxNode> arrayElemExpr = new IndexExpressionSyntaxNode();
+                        arrayElemExpr->Position = leftExpr->Position;
+                        arrayElemExpr->Type.type = leftArrayType->BaseType;
+                        arrayElemExpr->BaseExpression = leftExpr;
+                        arrayElemExpr->IndexExpression = createConstIntExpr(ee);
+
+                        // RHS swizzle
+                        RefPtr<SwizzleExpr> swizzleExpr = new SwizzleExpr();
+                        swizzleExpr->Position = rightExpr->Position;
+                        swizzleExpr->Type.type = rightVecType->elementType;
+                        swizzleExpr->base = rightExpr;
+                        swizzleExpr->elementCount = 1;
+                        swizzleExpr->elementIndices[0] = ee;
+
+                        auto elemAssignExpr = createSimpleAssignExprWithFixups(
+                            arrayElemExpr,
+                            swizzleExpr);
+
+                        addExpr(&builder, elemAssignExpr);
+                    }
+
+                    return builder.expr;
+                }
+            }
+        }
+
+
+
+
+        // TODO: are there any cases we can't solve with a cast?
+
+        // Try to convert the right-hand-side expression to have the type
+        // we expect on the left-hand side
+        auto convertedRightExpr = convertExprForAssignmentWithFixups(leftType, rightExpr);
+        return createSimpleAssignExpr(leftExpr, convertedRightExpr);
+    }
+
+    RefPtr<ExpressionSyntaxNode> createAssignExpr(
+        RefPtr<ExpressionSyntaxNode>    leftExpr,
+        RefPtr<ExpressionSyntaxNode>    rightExpr,
+        AssignMode                      mode = AssignMode::Default)
     {
         auto leftTuple = leftExpr.As<TupleExpr>();
         auto rightTuple = rightExpr.As<TupleExpr>();
@@ -803,7 +1040,8 @@ struct LoweringVisitor
 
                 resultTuple->primaryExpr = createAssignExpr(
                     leftTuple->primaryExpr,
-                    rightTuple->primaryExpr);
+                    rightTuple->primaryExpr,
+                    mode);
             }
 
             auto elementCount = leftTuple->tupleElements.Count();
@@ -818,7 +1056,8 @@ struct LoweringVisitor
                 resultElement.tupleFieldDeclRef = leftElement.tupleFieldDeclRef;
                 resultElement.expr = createAssignExpr(
                     leftElement.expr,
-                    rightElement.expr);
+                    rightElement.expr,
+                    mode);
 
                 resultTuple->tupleElements.Add(resultElement);
             }
@@ -852,7 +1091,8 @@ struct LoweringVisitor
                 elem.originalFieldDeclRef = leftElem.originalFieldDeclRef;
                 elem.expr = createAssignExpr(
                     leftElem.expr,
-                    rightElem.expr);
+                    rightElem.expr,
+                    mode);
             }
         }
         else if (leftVaryingTuple)
@@ -888,14 +1128,15 @@ struct LoweringVisitor
 
                 RefPtr<MemberExpressionSyntaxNode> rightElemExpr = new MemberExpressionSyntaxNode();
                 rightElemExpr->Position = rightExpr->Position;
-                rightElemExpr->Type = leftElem.expr->Type;
+                rightElemExpr->Type.type = GetType(leftElem.originalFieldDeclRef);
                 rightElemExpr->declRef = leftElem.originalFieldDeclRef;
                 rightElemExpr->name = leftElem.originalFieldDeclRef.GetName();
                 rightElemExpr->BaseExpression = rightExpr;
 
                 auto subExpr = createAssignExpr(
                     leftElem.expr,
-                    rightElemExpr);
+                    rightElemExpr,
+                    mode);
 
                 RefPtr<InfixExpr> seqExpr = new InfixExpr();
                 seqExpr->FunctionExpr = createUncheckedVarRef(",");
@@ -942,7 +1183,8 @@ struct LoweringVisitor
 
                 auto subExpr = createAssignExpr(
                     leftElemExpr,
-                    rightElem.expr);
+                    rightElem.expr,
+                    mode);
 
                 RefPtr<InfixExpr> seqExpr = new InfixExpr();
                 seqExpr->FunctionExpr = createUncheckedVarRef(",");
@@ -957,12 +1199,14 @@ struct LoweringVisitor
 
         // Default case: no tuples of any kind...
 
+        switch (mode)
+        {
+        default:
+            return createSimpleAssignExpr(leftExpr, rightExpr);
 
-        RefPtr<AssignExpr> loweredExpr = new AssignExpr();
-        loweredExpr->Type = leftExpr->Type;
-        loweredExpr->left = leftExpr;
-        loweredExpr->right = rightExpr;
-        return loweredExpr;
+        case AssignMode::WithFixups:
+            return createSimpleAssignExprWithFixups(leftExpr, rightExpr);
+        }
     }
 
     RefPtr<ExpressionSyntaxNode> visitAssignExpr(
@@ -1462,6 +1706,11 @@ struct LoweringVisitor
                 }
             }
         }
+        else if (auto varExpr = expr.As<VarExpressionSyntaxNode>())
+        {
+            // Skip an expression that is just a reference to a single variable
+            return;
+        }
 
         RefPtr<ExpressionStatementSyntaxNode> stmt = new ExpressionStatementSyntaxNode();
         stmt->Expression = expr;
@@ -1710,9 +1959,10 @@ struct LoweringVisitor
 
     void assign(
         RefPtr<ExpressionSyntaxNode> destExpr,
-        RefPtr<ExpressionSyntaxNode> srcExpr)
+        RefPtr<ExpressionSyntaxNode> srcExpr,
+        AssignMode                   mode = AssignMode::Default)
     {
-        auto assignExpr = createAssignExpr(destExpr, srcExpr);
+        auto assignExpr = createAssignExpr(destExpr, srcExpr, mode);
         addExprStmt(assignExpr);
     }
 
@@ -1724,6 +1974,38 @@ struct LoweringVisitor
     void assign(RefPtr<ExpressionSyntaxNode> expr, VarDeclBase* varDecl)
     {
         assign(expr, createVarRef(expr->Position, varDecl));
+    }
+
+    RefPtr<ExpressionSyntaxNode> createCastExpr(
+        RefPtr<ExpressionType>          type,
+        RefPtr<ExpressionSyntaxNode>    expr)
+    {
+        RefPtr<ExplicitCastExpr> castExpr = new ExplicitCastExpr();
+        castExpr->Position = expr->Position;
+        castExpr->Type.type = type;
+        castExpr->TargetType.type = type;
+        castExpr->Expression = expr;
+        return castExpr;
+    }
+
+    // Like `assign`, but with some extra logic to handle cases
+    // where the types don't actually line up, because of
+    // differences in how something is declared in HLSL vs. GLSL
+    void assignWithFixups(
+        RefPtr<ExpressionSyntaxNode> destExpr,
+        RefPtr<ExpressionSyntaxNode> srcExpr)
+    {
+        assign(destExpr, srcExpr, AssignMode::WithFixups);
+    }
+
+    void assignWithFixups(VarDeclBase* varDecl, RefPtr<ExpressionSyntaxNode> expr)
+    {
+        assignWithFixups(createVarRef(expr->Position, varDecl), expr);
+    }
+
+    void assignWithFixups(RefPtr<ExpressionSyntaxNode> expr, VarDeclBase* varDecl)
+    {
+        assignWithFixups(expr, createVarRef(expr->Position, varDecl));
     }
 
     void visitReturnStatementSyntaxNode(ReturnStatementSyntaxNode* stmt)
@@ -2926,10 +3208,12 @@ struct LoweringVisitor
     };
 
     RefPtr<ExpressionSyntaxNode> createGLSLBuiltinRef(
-        char const* name)
+        char const*             name,
+        RefPtr<ExpressionType>  type)
     {
         RefPtr<VarExpressionSyntaxNode> globalVarRef = new VarExpressionSyntaxNode();
         globalVarRef->name = name;
+        globalVarRef->Type.type = type;
         return globalVarRef;
     }
 
@@ -2970,6 +3254,82 @@ struct LoweringVisitor
         Slang::requireGLSLVersion(entryPoint, version);
     }
 
+    RefPtr<ExpressionType> getFloatType()
+    {
+        return ExpressionType::GetFloat();
+    }
+
+    RefPtr<ExpressionType> getIntType()
+    {
+        return ExpressionType::GetInt();
+    }
+
+    RefPtr<ExpressionType> getUIntType()
+    {
+        return ExpressionType::GetUInt();
+    }
+
+    RefPtr<ExpressionType> getBoolType()
+    {
+        return ExpressionType::GetBool();
+    }
+
+    RefPtr<VectorExpressionType> getVectorType(
+        RefPtr<ExpressionType>  elementType,
+        RefPtr<IntVal>          elementCount)
+    {
+        auto vectorGenericDecl = findMagicDecl("Vector").As<GenericDecl>();
+        auto vectorTypeDecl = vectorGenericDecl->inner;
+               
+        auto substitutions = new Substitutions();
+        substitutions->genericDecl = vectorGenericDecl.Ptr();
+        substitutions->args.Add(elementType);
+        substitutions->args.Add(elementCount);
+
+        auto declRef = DeclRef<Decl>(vectorTypeDecl.Ptr(), substitutions);
+
+        return DeclRefType::Create(declRef)->As<VectorExpressionType>();
+    }
+
+    RefPtr<IntVal> getConstantIntVal(IntegerLiteralValue value)
+    {
+        RefPtr<ConstantIntVal> intVal = new ConstantIntVal();
+        intVal->value = value;
+        return intVal;
+    }
+
+    RefPtr<VectorExpressionType> getVectorType(
+        RefPtr<ExpressionType>  elementType,
+        int                     elementCount)
+    {
+        return getVectorType(elementType, getConstantIntVal(elementCount));
+    }
+
+    RefPtr<ArrayExpressionType> getUnsizedArrayType(
+        RefPtr<ExpressionType>  elementType)
+    {
+        RefPtr<ArrayExpressionType> arrayType = new ArrayExpressionType();
+        arrayType->BaseType = elementType;
+        return arrayType;
+    }
+
+    RefPtr<ArrayExpressionType> getArrayType(
+        RefPtr<ExpressionType>  elementType,
+        RefPtr<IntVal>          elementCount)
+    {
+        RefPtr<ArrayExpressionType> arrayType = new ArrayExpressionType();
+        arrayType->BaseType = elementType;
+        arrayType->ArrayLength = elementCount;
+        return arrayType;
+    }
+
+    RefPtr<ArrayExpressionType> getArrayType(
+        RefPtr<ExpressionType>  elementType,
+        IntegerLiteralValue     elementCount)
+    {
+        return getArrayType(elementType, getConstantIntVal(elementCount));
+    }
+
     RefPtr<ExpressionSyntaxNode> lowerSimpleShaderParameterToGLSLGlobal(
         VaryingParameterInfo const&     info,
         RefPtr<ExpressionType>          varType,
@@ -2985,6 +3345,8 @@ struct LoweringVisitor
 
             type = arrayType;
         }
+
+        assert(type);
 
         // We need to create a reference to the global-scope declaration
         // of the proper GLSL input/output variable. This might
@@ -3009,94 +3371,90 @@ struct LoweringVisitor
             {
                 if (info.direction == VaryingParameterDirection::Input)
                 {
-                    globalVarExpr = createGLSLBuiltinRef("gl_FragCoord");
+                    globalVarExpr = createGLSLBuiltinRef("gl_FragCoord", getVectorType(getFloatType(), 4));
                 }
                 else
                 {
-                    globalVarExpr = createGLSLBuiltinRef("gl_Position");
+                    globalVarExpr = createGLSLBuiltinRef("gl_Position", getVectorType(getFloatType(), 4));
                 }
             }
             else if (ns == "sv_clipdistance")
             {
-                globalVarExpr = createGLSLBuiltinRef("gl_ClipDistance");
+                globalVarExpr = createGLSLBuiltinRef("gl_ClipDistance", getUnsizedArrayType(getFloatType()));
             }
             else if (ns == "sv_culldistance")
             {
-                // TODO: ARB_cull_distance
-                globalVarExpr = createGLSLBuiltinRef("gl_CullDistance");
+                requireGLSLExtension(shared->extensionUsageTracker, "ARB_cull_distance");
+                globalVarExpr = createGLSLBuiltinRef("gl_CullDistance", getUnsizedArrayType(getFloatType()));
             }
             else if (ns == "sv_coverage")
             {
                 if (info.direction == VaryingParameterDirection::Input)
                 {
-                    globalVarExpr = createGLSLBuiltinRef("gl_SampleMaskIn");
+                    globalVarExpr = createGLSLBuiltinRef("gl_SampleMaskIn", getUnsizedArrayType(getIntType()));
                 }
                 else
                 {
-                    globalVarExpr = createGLSLBuiltinRef("gl_SampleMask");
+                    globalVarExpr = createGLSLBuiltinRef("gl_SampleMask", getUnsizedArrayType(getIntType()));
                 }
             }
             else if (ns == "sv_depth")
             {
-                globalVarExpr = createGLSLBuiltinRef("gl_FragDepth");
+                globalVarExpr = createGLSLBuiltinRef("gl_FragDepth", getFloatType());
             }
             else if (ns == "sv_depthgreaterequal")
             {
                 // TODO: layout(depth_greater) out float gl_FragDepth;
-                globalVarExpr = createGLSLBuiltinRef("gl_FragDepth");
+                globalVarExpr = createGLSLBuiltinRef("gl_FragDepth", getFloatType());
             }
             else if (ns == "sv_depthlessequal")
             {
                 // TODO: layout(depth_less) out float gl_FragDepth;
-                globalVarExpr = createGLSLBuiltinRef("gl_FragDepth");
+                globalVarExpr = createGLSLBuiltinRef("gl_FragDepth", getFloatType());
             }
             else if (ns == "sv_dispatchthreadid")
             {
-                globalVarExpr = createGLSLBuiltinRef("gl_GlobalInvocationID");
+                globalVarExpr = createGLSLBuiltinRef("gl_GlobalInvocationID", getVectorType(getUIntType(), 3));
             }
             else if (ns == "sv_domainlocation")
             {
-                globalVarExpr = createGLSLBuiltinRef("gl_TessCoord");
+                globalVarExpr = createGLSLBuiltinRef("gl_TessCoord", getVectorType(getFloatType(), 3));
             }
             else if (ns == "sv_groupid")
             {
-                globalVarExpr = createGLSLBuiltinRef("gl_WorkGroupID");
+                globalVarExpr = createGLSLBuiltinRef("gl_WorkGroupID", getVectorType(getUIntType(), 3));
             }
             else if (ns == "sv_groupindex")
             {
-                globalVarExpr = createGLSLBuiltinRef("gl_LocationInvocationIndex");
+                globalVarExpr = createGLSLBuiltinRef("gl_LocalInvocationIndex", getUIntType());
             }
             else if (ns == "sv_groupthreadid")
             {
-                globalVarExpr = createGLSLBuiltinRef("gl_LocalInvocationID");
+                globalVarExpr = createGLSLBuiltinRef("gl_LocalInvocationID", getVectorType(getUIntType(), 3));
             }
             else if (ns == "sv_gsinstanceid")
             {
-                globalVarExpr = createGLSLBuiltinRef("gl_InvocationID");
+                globalVarExpr = createGLSLBuiltinRef("gl_InvocationID", getIntType());
             }
             else if (ns == "sv_insidetessfactor")
             {
-                globalVarExpr = createGLSLBuiltinRef("gl_TessLevelInner");
+                globalVarExpr = createGLSLBuiltinRef("gl_TessLevelInner", getArrayType(getFloatType(), 2));
             }
             else if (ns == "sv_instanceid")
             {
-                globalVarExpr = createGLSLBuiltinRef("gl_InstanceIndex");
+                globalVarExpr = createGLSLBuiltinRef("gl_InstanceIndex", getIntType());
             }
             else if (ns == "sv_isfrontface")
             {
-                globalVarExpr = createGLSLBuiltinRef("gl_FrontFacing");
+                globalVarExpr = createGLSLBuiltinRef("gl_FrontFacing", getBoolType());
             }
             else if (ns == "sv_outputcontrolpointid")
             {
-                globalVarExpr = createGLSLBuiltinRef("gl_InvocationID");
-            }
-            else if (ns == "sv_outputcontrolpointid")
-            {
-                globalVarExpr = createGLSLBuiltinRef("gl_InvocationID");
+                globalVarExpr = createGLSLBuiltinRef("gl_InvocationID", getIntType());
             }
             else if (ns == "sv_primitiveid")
             {
-                globalVarExpr = createGLSLBuiltinRef("gl_PrimitiveID");
+                globalVarExpr = createGLSLBuiltinRef("gl_PrimitiveID", getIntType());
             }
             else if (ns == "sv_rendertargetarrayindex")
             {
@@ -3104,28 +3462,61 @@ struct LoweringVisitor
                 {
                     requireGLSLVersion(ProfileVersion::GLSL_430);
                 }
-                globalVarExpr = createGLSLBuiltinRef("gl_Layer");
+                globalVarExpr = createGLSLBuiltinRef("gl_Layer", getIntType());
             }
             else if (ns == "sv_sampleindex")
             {
-                globalVarExpr = createGLSLBuiltinRef("gl_SampleID");
+                setSampleRateFlag();
+                globalVarExpr = createGLSLBuiltinRef("gl_SampleID", getIntType());
             }
             else if (ns == "sv_stencilref")
             {
-                // TODO: ARB_shader_stencil_export
-                globalVarExpr = createGLSLBuiltinRef("gl_SampleID");
+                requireGLSLExtension(shared->extensionUsageTracker, "ARB_shader_stencil_export");
+                globalVarExpr = createGLSLBuiltinRef("gl_FragStencilRef", getIntType());
             }
             else if (ns == "sv_tessfactor")
             {
-                globalVarExpr = createGLSLBuiltinRef("gl_TessLevelOuter");
+                globalVarExpr = createGLSLBuiltinRef("gl_TessLevelOuter", getArrayType(getFloatType(), 4));
             }
             else if (ns == "sv_vertexid")
             {
-                globalVarExpr = createGLSLBuiltinRef("gl_VertexIndex");
+                globalVarExpr = createGLSLBuiltinRef("gl_VertexIndex", getIntType());
             }
             else if (ns == "sv_viewportarrayindex")
             {
-                globalVarExpr = createGLSLBuiltinRef("gl_ViewportIndex");
+                globalVarExpr = createGLSLBuiltinRef("gl_ViewportIndex", getIntType());
+            }
+            else if (ns == "nv_x_right")
+            {
+                requireGLSLVersion(ProfileVersion::GLSL_450);
+                requireGLSLExtension(shared->extensionUsageTracker, "GL_NVX_multiview_per_view_attributes");
+
+                // The actual output in GLSL is:
+                //
+                //    vec4 gl_PositionPerViewNV[];
+                //
+                // and is meant to support an arbitrary number of views,
+                // while the HLSL case just defines a second position
+                // output.
+                //
+                // For now we will hack this by:
+                //   1. Mapping an `NV_X_Right` output to `gl_PositionPerViewNV[1]`
+                //      (that is, just one element of the output array)
+                //   2. Adding logic to copy the traditional `gl_Position` output
+                //      over to `gl_PositionPerViewNV[0]`
+                //
+
+                globalVarExpr = createGLSLBuiltinRef("gl_PositionPerViewNV[1]",
+                    getVectorType(getFloatType(), 4));
+
+                shared->requiresCopyGLPositionToPositionPerView = true;
+            }
+            else if (ns == "nv_viewport_mask")
+            {
+                requireGLSLVersion(ProfileVersion::GLSL_450);
+                requireGLSLExtension(shared->extensionUsageTracker, "GL_NVX_multiview_per_view_attributes");
+                globalVarExpr = createGLSLBuiltinRef("gl_ViewportMaskPerViewNV",
+                    getUnsizedArrayType(getIntType()));
             }
             else
             {
@@ -3193,6 +3584,7 @@ struct LoweringVisitor
 
             RefPtr<VarExpressionSyntaxNode> globalVarRef = new VarExpressionSyntaxNode();
             globalVarRef->Position = globalVarDecl->Position;
+            globalVarRef->Type.type = globalVarDecl->Type.type;
             globalVarRef->declRef = makeDeclRef(globalVarDecl.Ptr());
             globalVarRef->name = globalVarDecl->getName();
 
@@ -3451,7 +3843,7 @@ struct LoweringVisitor
                     paramPair.layout,
                     VaryingParameterDirection::Input);
 
-                subVisitor.assign(paramPair.lowered, loweredExpr);
+                subVisitor.assignWithFixups(paramPair.lowered, loweredExpr);
             }
         }
 
@@ -3521,7 +3913,7 @@ struct LoweringVisitor
                     paramPair.layout,
                     VaryingParameterDirection::Output);
 
-                subVisitor.assign(loweredExpr, paramPair.lowered);
+                subVisitor.assignWithFixups(loweredExpr, paramPair.lowered);
             }
         }
         if (resultVarDecl)
@@ -3536,7 +3928,13 @@ struct LoweringVisitor
                 resultVarDecl->Type.type,
                 entryPointLayout->resultLayout);
 
-            subVisitor.assign(loweredExpr, resultVarDecl);
+            subVisitor.assignWithFixups(loweredExpr, resultVarDecl);
+        }
+        if (shared->requiresCopyGLPositionToPositionPerView)
+        {
+            subVisitor.assign(
+                createSimpleVarExpr("gl_PositionPerViewNV[0]"),
+                createSimpleVarExpr("gl_Position"));
         }
 
         bodyStmt->body = subVisitor.stmtBeingBuilt;
@@ -3701,15 +4099,17 @@ bool isRewriteRequest(
 
 
 LoweredEntryPoint lowerEntryPoint(
-    EntryPointRequest*  entryPoint,
-    ProgramLayout*      programLayout,
-    CodeGenTarget       target)
+    EntryPointRequest*      entryPoint,
+    ProgramLayout*          programLayout,
+    CodeGenTarget           target,
+    ExtensionUsageTracker*  extensionUsageTracker)
 {
     SharedLoweringContext sharedContext;
     sharedContext.compileRequest = entryPoint->compileRequest;
     sharedContext.entryPointRequest = entryPoint;
     sharedContext.programLayout = programLayout;
     sharedContext.target = target;
+    sharedContext.extensionUsageTracker = extensionUsageTracker;
 
     auto translationUnit = entryPoint->getTranslationUnit();
 

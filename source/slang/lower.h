@@ -17,6 +17,8 @@ namespace Slang
     class ProgramLayout;
     class TranslationUnitRequest;
 
+    struct ExtensionUsageTracker;
+
     struct LoweredEntryPoint
     {
         // The actual lowered entry point
@@ -31,8 +33,9 @@ namespace Slang
     // Emit code for a single entry point, based on
     // the input translation unit.
     LoweredEntryPoint lowerEntryPoint(
-        EntryPointRequest*  entryPoint,
-        ProgramLayout*      programLayout,
-        CodeGenTarget       target);
+        EntryPointRequest*      entryPoint,
+        ProgramLayout*          programLayout,
+        CodeGenTarget           target,
+        ExtensionUsageTracker*  extensionUsageTracker);
 }
 #endif

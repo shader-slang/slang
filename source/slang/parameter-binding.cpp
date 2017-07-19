@@ -1081,7 +1081,8 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
     String sn = semanticName.ToLower();
 
     RefPtr<TypeLayout> typeLayout =  new TypeLayout();
-    if (sn.StartsWith("sv_"))
+    if (sn.StartsWith("sv_")
+        || sn.StartsWith("nv_"))
     {
         // System-value semantic.
 
