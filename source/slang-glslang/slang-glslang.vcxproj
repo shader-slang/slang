@@ -21,8 +21,9 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{C495878A-832C-485B-B347-0998A90CC936}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>glslang</RootNamespace>
+    <RootNamespace>slang_glslang</RootNamespace>
     <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
+    <ProjectName>slang-glslang</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -189,7 +190,7 @@
     <ClCompile Include="..\..\external\glslang\SPIRV\SPVRemapper.cpp" />
     <ClCompile Include="..\..\external\glslang\StandAlone\ResourceLimits.cpp" />
     <ClCompile Include="..\..\external\glslang\StandAlone\StandAlone.cpp" />
-    <ClCompile Include="glslang.cpp" />
+    <ClCompile Include="slang-glslang.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\external\glslang\glslang\MachineIndependent\glslang_tab.cpp.h" />
@@ -227,7 +228,7 @@
     <ClInclude Include="..\..\external\glslang\SPIRV\SPVRemapper.h" />
     <ClInclude Include="..\..\external\glslang\StandAlone\ResourceLimits.h" />
     <ClInclude Include="..\..\external\glslang\StandAlone\Worklist.h" />
-    <ClInclude Include="glslang.h" />
+    <ClInclude Include="slang-glslang.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

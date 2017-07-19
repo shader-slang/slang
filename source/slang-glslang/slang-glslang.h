@@ -1,6 +1,6 @@
-// glslang.h
-#ifndef GLSLANG_H_INCLUDED
-#define GLSLANG_H_INCLUDED
+// slang-glslang.h
+#ifndef SLANG_GLSLANG_H_INCLUDED
+#define SLANG_GLSLANG_H_INCLUDED
 
 typedef void (*glslang_OutputFunc)(void const* data, size_t size, void* userData);
 

@@ -14,7 +14,7 @@
 #include "emit.h"
 
 // Utilities for pass-through modes
-#include "../../tools/glslang/glslang.h"
+#include "../slang-glslang/slang-glslang.h"
 
 
 #ifdef _WIN32
@@ -354,7 +354,7 @@ namespace Slang
     HMODULE getGLSLCompilerDLL()
     {
         // TODO(tfoley): let user specify version of glslang DLL to use.
-        static HMODULE glslCompiler =  LoadLibraryA("glslang");
+        static HMODULE glslCompiler =  LoadLibraryA("slang-glslang");
         // TODO(tfoley): handle case where we can't find it gracefully
         assert(glslCompiler);
         return glslCompiler;
