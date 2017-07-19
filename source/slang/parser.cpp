@@ -729,6 +729,19 @@ namespace Slang
                 AddModifier(&modifierLink, modifier);
             }
 
+            else if (AdvanceIf(parser, "__glsl_version"))
+            {
+                auto modifier = new RequiredGLSLVersionModifier();
+                modifier->Position = loc;
+
+                parser->ReadToken(TokenType::LParent);
+                modifier->versionNumberToken = parser->ReadToken(TokenType::IntegerLiteral);
+                parser->ReadToken(TokenType::RParent);
+
+                AddModifier(&modifierLink, modifier);
+            }
+
+
             else if (AdvanceIf(parser, "layout"))
             {
                 parser->ReadToken(TokenType::LParent);

@@ -74,6 +74,31 @@ struct EmitContext
 
 //
 
+void requireGLSLVersion(
+    EntryPointRequest*  entryPoint,
+    ProfileVersion      version)
+{
+    auto profile = entryPoint->profile;
+    auto currentVersion = profile.GetVersion();
+    if (profile.getFamily() == ProfileFamily::GLSL)
+    {
+        // Check if this profile is newer
+        if ((UInt)version > (UInt)profile.GetVersion())
+        {
+            profile.setVersion(version);
+            entryPoint->profile = profile;
+        }
+    }
+    else
+    {
+        // Non-GLSL target? Set it to a GLSL one.
+        profile.setVersion(version);
+        entryPoint->profile = profile;
+    }
+}
+
+//
+
 static String getStringOrIdentifierTokenValue(
     Token const& token)
 {
@@ -1647,6 +1672,39 @@ struct EmitVisitor
         context->shared->glslExtensionsRequired.Add(name);
     }
 
+    void requireGLSLVersion(ProfileVersion version)
+    {
+        if (context->shared->target != CodeGenTarget::GLSL)
+            return;
+
+        auto entryPoint = context->shared->entryPoint;
+        Slang::requireGLSLVersion(entryPoint, version);
+    }
+
+    void requireGLSLVersion(int version)
+    {
+        switch (version)
+        {
+    #define CASE(NUMBER) \
+        case NUMBER: requireGLSLVersion(ProfileVersion::GLSL_##NUMBER); break
+
+        CASE(110);
+        CASE(120);
+        CASE(130);
+        CASE(140);
+        CASE(150);
+        CASE(330);
+        CASE(400);
+        CASE(410);
+        CASE(420);
+        CASE(430);
+        CASE(440);
+        CASE(450);
+
+    #undef CASE
+        }
+    }
+
     void visitInvokeExpressionSyntaxNode(
         RefPtr<InvokeExpressionSyntaxNode>  callExpr,
         ExprEmitArg const& arg)
@@ -1767,6 +1825,13 @@ struct EmitVisitor
                     {
                         // If so, we had better request the extension.
                         requireGLSLExtension(requiredGLSLExtensionModifier->extensionNameToken.Content);
+                    }
+
+                    // Does this intrinsic requie a particular GLSL extension that wouldn't be available by default?
+                    if (auto requiredGLSLVersionModifier = funcDecl->FindModifier<RequiredGLSLVersionModifier>())
+                    {
+                        // If so, we had better request the extension.
+                        requireGLSLVersion((int) getIntegerLiteralValue(requiredGLSLVersionModifier->versionNumberToken));
                     }
                 }
 
@@ -3705,47 +3770,22 @@ String emitEntryPoint(
     auto lowered = lowerEntryPoint(entryPoint, programLayout, target);
     sharedContext.program = lowered.program;
 
+    // Note that we emit the main body code of the program *before*
+    // we emit any leading preprocessor directives for GLSL.
+    // This is to give the emit logic a change to make last-minute
+    // adjustments like changing the required GLSL version.
+    //
+    // TODO: All such adjustments would be better handled during
+    // lowering, but that requires having a semantic rather than
+    // textual format for the HLSL->GLSL mapping.
+    visitor.EmitDeclsInContainer(lowered.program.Ptr());
+    String code = sharedContext.sb.ProduceString();
+    sharedContext.sb.Clear();
 
     // There may be global-scope modifiers that we should emit now
     visitor.emitGLSLPreprocessorDirectives(translationUnitSyntax);
-
     String prefix = sharedContext.sb.ProduceString();
-    sharedContext.sb.Clear();
 
-    switch(target)
-    {
-    case CodeGenTarget::GLSL:
-        {
-            // TODO(tfoley): Need a plan for how to enable/disable these as needed...
-//            Emit(context, "#extension GL_GOOGLE_cpp_style_line_directive : require\n");
-        }
-        break;
-
-    default:
-        break;
-    }
-
-
-    visitor.EmitDeclsInContainer(lowered.program.Ptr());
-
-#if 0
-    if( isRewrite )
-    {
-        // In rewrite mode, we will just emit the text of the translation unit as given,
-        // and not pay attention to the specific entry point that was requested.
-        //
-        // It is a user error to request GLSL output and have an entry point name
-        // other than `main`.
-        EmitDeclsInContainerUsingLayout(&context, translationUnitSyntax, globalStructLayout);
-    }
-    else
-    {
-        // We are being asked to emit a single entry point in "full" mode.
-        emitEntryPoint(&context, entryPoint);
-    }
-#endif
-
-    String code = sharedContext.sb.ProduceString();
 
     StringBuilder finalResultBuilder;
     finalResultBuilder << prefix;

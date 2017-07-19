@@ -1417,6 +1417,7 @@ namespace Slang
                     for(int includeMipInfo = 0; includeMipInfo < 2; ++includeMipInfo)
                     {
                         {
+                            sb << "__glsl_version(450)\n";
                             sb << "__intrinsic(glsl, \"(";
 
                             int aa = 0;
@@ -1424,8 +1425,9 @@ namespace Slang
                             if (includeMipInfo)
                             {
                                 int mipLevelArg = aa++;
-                                lodStr.append("$");
+                                lodStr = "int($";
                                 lodStr.append(mipLevelArg);
+                                lodStr.append(")");
                             }
 
                             int cc = 0;

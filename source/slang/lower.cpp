@@ -291,6 +291,10 @@ static void attachLayout(
     addModifier(syntax, modifier);
 }
 
+void requireGLSLVersion(
+    EntryPointRequest*  entryPoint,
+    ProfileVersion      version);
+
 struct LoweringVisitor
     : ExprVisitor<LoweringVisitor, RefPtr<ExpressionSyntaxNode>>
     , StmtVisitor<LoweringVisitor, void>
@@ -2958,23 +2962,7 @@ struct LoweringVisitor
             return;
 
         auto entryPoint = shared->entryPointRequest;
-        auto profile = entryPoint->profile;
-        auto currentVersion = profile.GetVersion();
-        if (profile.getFamily() == ProfileFamily::GLSL)
-        {
-            // Check if this profile is newer
-            if ((UInt)version > (UInt)profile.GetVersion())
-            {
-                profile.setVersion(version);
-                entryPoint->profile = profile;
-            }
-        }
-        else
-        {
-            // Non-GLSL target? Set it to a GLSL one.
-            profile.setVersion(version);
-            entryPoint->profile = profile;
-        }
+        Slang::requireGLSLVersion(entryPoint, version);
     }
 
     RefPtr<ExpressionSyntaxNode> lowerSimpleShaderParameterToGLSLGlobal(
