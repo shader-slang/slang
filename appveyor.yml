@@ -1,6 +1,18 @@
 # Our solution file is currently set up for VS2015
 image: Visual Studio 2015
 
+init:
+  # Construct a version number suitable for using as a release name
+  - ps: >-
+      if ($env:APPVEYOR_REPO_TAG -eq "true")
+      {
+        $env:SLANG_VERSION = "$($env:APPVEYOR_REPO_TAG_NAME.TrimStart("v"))"
+      }
+      else
+      {
+        $env:SLANG_VERSION = "dev-$($env:APPVEYOR_REPO_COMMIT.Substring(0, 7))"
+      }
+
 # The project uses a submodule for the "glslang" dependency,
 # so we need to make sure to pull that before building.
 install:
@@ -8,9 +20,11 @@ install:
 
 # We want to build the full matrix of platforms and configurations
 # that we support on Windows.
+#
+# Put Release|x64 first since that is the target which runs the most tests.
 platform:
-  - Win32
   - x64
+  - Win32
 
 configuration:
   - Release
@@ -54,6 +68,49 @@ test_script:
       }
       .\test.bat -platform %PLATFORM% -configuration %CONFIGURATION% -appveyor -category $testCategory
 
-# TODO: need to figure out what we want to package for deployment
+# Package up the stuff we want to deploy into a single .zip file
 
-# TODO: on a successful build of a tag, push to GitHub releases
+after_build:
+  - ps: |
+      if ($env:PLATFORM -eq "x64")
+      {
+        $env:SLANG_DEPLOY_PLATFORM = "win64"
+      }
+      else
+      {
+        $env:SLANG_DEPLOY_PLATFORM = "win32"
+      }
+      $env:SLANG_BINARY_ARCHIVE = "slang-$($env:SLANG_VERSION)-$($env:SLANG_DEPLOY_PLATFORM).zip"
+      $env:SLANG_SOURCE_ARCHIVE = "slang-$($env:SLANG_VERSION)-source.zip"
+      7z a "$env:SLANG_BINARY_ARCHIVE" slang.h
+      7z a "$env:SLANG_BINARY_ARCHIVE" bin\*\*\slang.dll
+      7z a "$env:SLANG_BINARY_ARCHIVE" bin\*\*\slang.lib
+      7z a "$env:SLANG_BINARY_ARCHIVE" bin\*\*\slang-glslang.dll
+      7z a "$env:SLANG_BINARY_ARCHIVE" bin\*\*\slangc.exe
+      7z a "$env:SLANG_SOURCE_ARCHIVE" slang.h
+      7z a "$env:SLANG_SOURCE_ARCHIVE" source\*\*.h
+      7z a "$env:SLANG_SOURCE_ARCHIVE" source\*\*.cpp
+
+# Register the created .zip file as an artifact with AppVeyor
+
+artifacts:
+  - path: $(SLANG_BINARY_ARCHIVE)
+    name: binary_archive
+  - path: $(SLANG_SOURCE_ARCHIVE)
+    name: source_archive
+
+# On a successful build of a tag, push archices to GitHub releases
+
+deploy:
+  release: v$(SLANG_VERSION)
+  description: 'Slang $(SLANG_VERSION)'
+  provider: GitHub
+  auth_token:
+    secure: +FukP7TA9F+fofZRZnu2FSqPcrQ1u4r8r4pl+/83owiY6M1R4ykg+8RcSzXi2f63
+  artifact: 'binary_archive,source_archive'
+  draft: false
+  prerelease: false
+  force_update: true # TODO: consider if we can avoid this
+  on:
+    configuration: Release
+    appveyor_repo_tag: true        # deploy on tag push only
