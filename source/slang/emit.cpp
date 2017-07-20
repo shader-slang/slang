@@ -15,6 +15,31 @@
 
 namespace Slang {
 
+struct ExtensionUsageTracker
+{
+    // Record the GLSL extnsions we have already emitted a `#extension` for
+    HashSet<String> glslExtensionsRequired;
+    StringBuilder glslExtensionRequireLines;
+};
+
+void requireGLSLExtension(
+    ExtensionUsageTracker*  tracker,
+    String const&           name)
+{
+    if (tracker->glslExtensionsRequired.Contains(name))
+        return;
+
+    StringBuilder& sb = tracker->glslExtensionRequireLines;
+
+    sb.append("#extension ");
+    sb.append(name);
+    sb.append(" : require\n");
+
+    tracker->glslExtensionsRequired.Add(name);
+}
+
+
+
 // Shared state for an entire emit session
 struct SharedEmitContext
 {
@@ -61,9 +86,7 @@ struct SharedEmitContext
 
     bool                needHackSamplerForTexelFetch = false;
 
-    // Record the GLSL extnsions we have already emitted a `#extension` for
-    HashSet<String> glslExtensionsRequired;
-    StringBuilder glslExtensionRequireLines;
+    ExtensionUsageTracker extensionUsageTracker;
 };
 
 struct EmitContext
@@ -1668,16 +1691,7 @@ struct EmitVisitor
 
     void requireGLSLExtension(String const& name)
     {
-        if (context->shared->glslExtensionsRequired.Contains(name))
-            return;
-
-        StringBuilder& sb = context->shared->glslExtensionRequireLines;
-
-        sb.append("#extension ");
-        sb.append(name);
-        sb.append(" : require\n");
-
-        context->shared->glslExtensionsRequired.Add(name);
+        Slang::requireGLSLExtension(&context->shared->extensionUsageTracker, name);
     }
 
     void requireGLSLVersion(ProfileVersion version)
@@ -3774,7 +3788,7 @@ String emitEntryPoint(
     // because the lowering process might change how we emit some
     // boilerplate at the start of the ouput for GLSL (e.g., what
     // version we require).
-    auto lowered = lowerEntryPoint(entryPoint, programLayout, target);
+    auto lowered = lowerEntryPoint(entryPoint, programLayout, target, &sharedContext.extensionUsageTracker);
     sharedContext.program = lowered.program;
 
     // Note that we emit the main body code of the program *before*
@@ -3797,7 +3811,7 @@ String emitEntryPoint(
     StringBuilder finalResultBuilder;
     finalResultBuilder << prefix;
 
-    finalResultBuilder << sharedContext.glslExtensionRequireLines.ProduceString();
+    finalResultBuilder << sharedContext.extensionUsageTracker.glslExtensionRequireLines.ProduceString();
 
     if (sharedContext.needHackSamplerForTexelFetch)
     {
