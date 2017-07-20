@@ -188,12 +188,21 @@ namespace Slang
     }
 
 #ifdef _WIN32
-    void* GetD3DCompilerDLL()
+    HMODULE loadD3DCompilerDLL(CompileRequest* request)
+    {
+        char const* libraryName = "d3dcompiler_47";
+        HMODULE d3dCompiler =  LoadLibraryA(libraryName);
+        if (!d3dCompiler)
+        {
+            request->mSink.diagnose(CodePosition(), Diagnostics::failedToLoadDynamicLibrary, libraryName);
+        }
+        return d3dCompiler;
+    }
+
+    HMODULE getD3DCompilerDLL(CompileRequest* request)
     {
         // TODO(tfoley): let user specify version of d3dcompiler DLL to use.
-        static HMODULE d3dCompiler =  LoadLibraryA("d3dcompiler_47");
-        // TODO(tfoley): handle case where we can't find it gracefully
-        assert(d3dCompiler);
+        static HMODULE d3dCompiler = loadD3DCompilerDLL(request);
         return d3dCompiler;
     }
 
@@ -203,11 +212,13 @@ namespace Slang
         static pD3DCompile D3DCompile_ = nullptr;
         if (!D3DCompile_)
         {
-            HMODULE d3dCompiler = (HMODULE)GetD3DCompilerDLL();
-            assert(d3dCompiler);
+            HMODULE d3dCompiler = getD3DCompilerDLL(entryPoint->compileRequest);
+            if (!d3dCompiler)
+                return List<uint8_t>();
 
             D3DCompile_ = (pD3DCompile)GetProcAddress(d3dCompiler, "D3DCompile");
-            assert(D3DCompile_);
+            if (!D3DCompile_)
+                return List<uint8_t>();
         }
 
         auto hlslCode = emitHLSLForEntryPoint(entryPoint);
@@ -274,18 +285,20 @@ namespace Slang
 #endif
 
     String dissassembleDXBC(
-        CompileRequest*,
+        CompileRequest*     compileRequest,
         void const*         data,
         size_t              size)
     {
         static pD3DDisassemble D3DDisassemble_ = nullptr;
         if (!D3DDisassemble_)
         {
-            HMODULE d3dCompiler = (HMODULE)GetD3DCompilerDLL();
-            assert(d3dCompiler);
+            HMODULE d3dCompiler = getD3DCompilerDLL(compileRequest);
+            if (!d3dCompiler)
+                return String();
 
             D3DDisassemble_ = (pD3DDisassemble)GetProcAddress(d3dCompiler, "D3DDisassemble");
-            assert(D3DDisassemble_);
+            if (!D3DDisassemble_)
+                return String();
         }
 
         if (!data || !size)
@@ -351,12 +364,21 @@ namespace Slang
     }
 #endif
 
-    HMODULE getGLSLCompilerDLL()
+    HMODULE loadGLSLCompilerDLL(CompileRequest* request)
     {
+        char const* libraryName = "slang-glslang";
         // TODO(tfoley): let user specify version of glslang DLL to use.
-        static HMODULE glslCompiler =  LoadLibraryA("slang-glslang");
-        // TODO(tfoley): handle case where we can't find it gracefully
-        assert(glslCompiler);
+        HMODULE glslCompiler =  LoadLibraryA(libraryName);
+        if (!glslCompiler)
+        {
+            request->mSink.diagnose(CodePosition(), Diagnostics::failedToLoadDynamicLibrary, libraryName);
+        }
+        return glslCompiler;
+    }
+
+    HMODULE getGLSLCompilerDLL(CompileRequest* request)
+    {
+        static HMODULE glslCompiler =  loadGLSLCompilerDLL(request);
         return glslCompiler;
     }
 
@@ -369,11 +391,13 @@ namespace Slang
         static glslang_CompileFunc glslang_compile = nullptr;
         if (!glslang_compile)
         {
-            HMODULE glslCompiler = getGLSLCompilerDLL();
-            assert(glslCompiler);
+            HMODULE glslCompiler = getGLSLCompilerDLL(slangCompileRequest);
+            if (!glslCompiler)
+                return 1;
 
             glslang_compile = (glslang_CompileFunc)GetProcAddress(glslCompiler, "glslang_compile");
-            assert(glslang_compile);
+            if (!glslang_compile)
+                return 1;
         }
 
         String diagnosticOutput;
@@ -561,7 +585,8 @@ namespace Slang
             break;
 
         default:
-            throw "unimplemented";
+            SLANG_UNEXPECTED("unhandled code generation target");
+            break;
         }
 
         return result;

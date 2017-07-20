@@ -206,15 +206,15 @@ namespace Slang
 #define SLANG_UNIMPLEMENTED(sink, pos, what) \
     (sink)->diagnose(Slang::CodePosition(__LINE__, 0, 0, __FILE__), Slang::Diagnostics::unimplemented, what)
 
-#define SLANG_UNREACHABLE(msg) do { assert(!"ureachable code:" msg); throw 0; } while(0)
 #else
 #define SLANG_INTERNAL_ERROR(sink, pos) \
     (sink)->diagnose(pos, Slang::Diagnostics::internalCompilerError)
 #define SLANG_UNIMPLEMENTED(sink, pos, what) \
     (sink)->diagnose(pos, Slang::Diagnostics::unimplemented, what)
 
-// TODO: find something that will perform better
-#define SLANG_UNREACHABLE(msg) exit(1)
 #endif
+
+#define SLANG_DIAGNOSE_UNEXPECTED(sink, pos, message) \
+    (sink)->diagnose(pos, Slang::Diagnostics::unexpected, message)
 
 #endif

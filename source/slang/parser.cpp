@@ -848,8 +848,9 @@ namespace Slang
                             }
                             else
                             {
+                                SLANG_DIAGNOSE_UNEXPECTED(parser->sink, parser->tokenReader.PeekLoc(), "needed a modifier");
+
                                 parser->ReadToken(TokenType::Identifier);
-                                assert(!"unexpected");
                             }
                         }
                     }
@@ -1377,7 +1378,7 @@ namespace Slang
         void addDecl(
             RefPtr<Decl>    newDecl)
         {
-            assert(newDecl);
+            SLANG_ASSERT(newDecl);
             
             if( decl )
             {
@@ -1715,7 +1716,7 @@ namespace Slang
 
         RefPtr<Modifier> result;
         RefPtr<Modifier>* link = &result;
-        assert(!*link);
+        SLANG_ASSERT(!*link);
 
         for (;;)
         {
@@ -2440,7 +2441,7 @@ namespace Slang
         ParseDeclBody(this, program, TokenType::EndOfFile);
         PopScope();
 
-        assert(currentScope == outerScope);
+        SLANG_RELEASE_ASSERT(currentScope == outerScope);
         currentScope = nullptr;
     }
 

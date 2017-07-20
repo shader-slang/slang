@@ -3,6 +3,14 @@
 
 namespace Slang
 {
+    // TODO: this belongs in a different file:
+
+    SLANG_RETURN_NEVER void signalUnexpectedError(char const* message)
+    {
+        throw InternalError(message);
+    }
+
+
     // OSString
 
     OSString::OSString()

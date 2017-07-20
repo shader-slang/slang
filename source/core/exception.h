@@ -111,12 +111,16 @@ namespace Slang
 		}
 	};
 
-    #define SLANG_UNEXPECTED(reason) \
-        throw Slang::Exception("unexpected: " reason)
-
-    #define SLANG_UNIMPLEMENTED_X(what) \
-        throw Slang::NotImplementedException("unimplemented: " what)
-
+	class InternalError : public Exception
+	{
+	public:
+		InternalError()
+		{}
+		InternalError(const String & message)
+			: Exception(message)
+		{
+		}
+	};
 }
 
 #endif

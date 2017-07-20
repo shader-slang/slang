@@ -147,7 +147,7 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
         {
             // TODO(tfoley): worry about thread safety here?
             et->canonicalType = et->CreateCanonicalType();
-            assert(et->canonicalType);
+            SLANG_ASSERT(et->canonicalType);
         }
         return et->canonicalType;
     }
@@ -314,14 +314,14 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
     static RefPtr<ExpressionType> ExtractGenericArgType(RefPtr<Val> val)
     {
         auto type = val.As<ExpressionType>();
-        assert(type.Ptr());
+        SLANG_RELEASE_ASSERT(type.Ptr());
         return type;
     }
 
     static RefPtr<IntVal> ExtractGenericArgInteger(RefPtr<Val> val)
     {
         auto intVal = val.As<IntVal>();
-        assert(intVal.Ptr());
+        SLANG_RELEASE_ASSERT(intVal.Ptr());
         return intVal;
     }
 
@@ -348,7 +348,7 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
             }
             else if (magicMod->name == "Vector")
             {
-                assert(subst && subst->args.Count() == 2);
+                SLANG_ASSERT(subst && subst->args.Count() == 2);
                 auto vecType = new VectorExpressionType();
                 vecType->declRef = declRef;
                 vecType->elementType = ExtractGenericArgType(subst->args[0]);
@@ -357,14 +357,14 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
             }
             else if (magicMod->name == "Matrix")
             {
-                assert(subst && subst->args.Count() == 3);
+                SLANG_ASSERT(subst && subst->args.Count() == 3);
                 auto matType = new MatrixExpressionType();
                 matType->declRef = declRef;
                 return matType;
             }
             else if (magicMod->name == "Texture")
             {
-                assert(subst && subst->args.Count() >= 1);
+                SLANG_ASSERT(subst && subst->args.Count() >= 1);
                 auto textureType = new TextureType(
                     TextureType::Flavor(magicMod->tag),
                     ExtractGenericArgType(subst->args[0]));
@@ -373,7 +373,7 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
             }
             else if (magicMod->name == "TextureSampler")
             {
-                assert(subst && subst->args.Count() >= 1);
+                SLANG_ASSERT(subst && subst->args.Count() >= 1);
                 auto textureType = new TextureSamplerType(
                     TextureType::Flavor(magicMod->tag),
                     ExtractGenericArgType(subst->args[0]));
@@ -382,7 +382,7 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
             }
             else if (magicMod->name == "GLSLImageType")
             {
-                assert(subst && subst->args.Count() >= 1);
+                SLANG_ASSERT(subst && subst->args.Count() >= 1);
                 auto textureType = new GLSLImageType(
                     TextureType::Flavor(magicMod->tag),
                     ExtractGenericArgType(subst->args[0]));
@@ -408,7 +408,7 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
 
             #define CASE(n,T)													\
                 else if(magicMod->name == #n) {									\
-                    assert(subst && subst->args.Count() == 1);					\
+                    SLANG_ASSERT(subst && subst->args.Count() == 1);			\
                     auto type = new T();										\
                     type->elementType = ExtractGenericArgType(subst->args[0]);	\
                     type->declRef = declRef;									\
@@ -450,7 +450,7 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
 
             else
             {
-                throw "unimplemented";
+                SLANG_UNEXPECTED("unhandled type");
             }
         }
         else
@@ -537,7 +537,7 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
 
     bool NamedExpressionType::EqualsImpl(ExpressionType * /*type*/)
     {
-        assert(!"unreachable");
+        SLANG_UNEXPECTED("unreachable");
         return false;
     }
 
@@ -548,7 +548,7 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
 
     int NamedExpressionType::GetHashCode()
     {
-        assert(!"unreachable");
+        SLANG_UNEXPECTED("unreachable");
         return 0;
     }
 
@@ -609,7 +609,7 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
 
     int TypeType::GetHashCode()
     {
-        assert(!"unreachable");
+        SLANG_UNEXPECTED("unreachable");
         return 0;
     }
 
@@ -778,7 +778,7 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
             return false;
 
         UInt argCount = args.Count();
-        assert(args.Count() == subst->args.Count());
+        SLANG_RELEASE_ASSERT(args.Count() == subst->args.Count());
         for (UInt aa = 0; aa < argCount; ++aa)
         {
             if (!args[aa]->EqualsVal(subst->args[aa].Ptr()))
@@ -821,7 +821,7 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
         if (!substitutions)
             return expr;
 
-        assert(!"unimplemented");
+        SLANG_UNIMPLEMENTED_X("generic substitution into expressions");
 
         return expr;
     }
@@ -928,7 +928,7 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
         {
             return constantVal->value;
         }
-        assert(!"unexpected");
+        SLANG_UNEXPECTED("needed a known integer value");
         return 0;
     }
 
@@ -1032,7 +1032,7 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
     #undef CASE
         else
         {
-            assert(!"unexpected");
+            SLANG_UNEXPECTED("unhandled syntax class name");
             return nullptr;
         }
     }

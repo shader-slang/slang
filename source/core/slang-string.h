@@ -1,8 +1,10 @@
 #ifndef FUNDAMENTAL_LIB_STRING_H
 #define FUNDAMENTAL_LIB_STRING_H
+
 #include <string.h>
 #include <cstdlib>
 #include <stdio.h>
+
 #include "smart-pointer.h"
 #include "common.h"
 #include "hash.h"
@@ -80,7 +82,7 @@ namespace Slang
 
         static StringRepresentation* createWithCapacityAndLength(UInt capacity, UInt length)
         {
-            assert(capacity >= length);
+            SLANG_ASSERT(capacity >= length);
             void* allocation = operator new(sizeof(StringRepresentation) + capacity + 1);
             StringRepresentation* obj = new(allocation) StringRepresentation();
             obj->capacity = capacity;

@@ -7,8 +7,6 @@
 
 #include "../../slang.h"
 
-#define SLANG_EXHAUSTIVE_SWITCH() default: assert(!"unexpected"); break;
-
 namespace Slang {
 
 struct ParameterInfo;
@@ -34,8 +32,8 @@ bool operator<(UsedRange left, UsedRange right)
 
 static bool rangesOverlap(UsedRange const& x, UsedRange const& y)
 {
-    assert(x.begin <= x.end);
-    assert(y.begin <= y.end);
+    SLANG_ASSERT(x.begin <= x.end);
+    SLANG_ASSERT(y.begin <= y.end);
 
     // If they don't overlap, then one must be earlier than the other,
     // and that one must therefore *end* before the other *begins*
@@ -503,14 +501,14 @@ getTypeLayoutForGlobalShaderParameter_GLSL(
     if (auto effectiveVaryingInputType = tryGetEffectiveTypeForGLSLVaryingInput(context, varDecl))
     {
         // We expect to handle these elsewhere
-        assert(!"unexpected");
+        SLANG_DIAGNOSE_UNEXPECTED(getSink(context), varDecl, "GLSL varying input");
         return CreateTypeLayout(effectiveVaryingInputType, rules->getVaryingInputRules());
     }
 
     if (auto effectiveVaryingOutputType = tryGetEffectiveTypeForGLSLVaryingOutput(context, varDecl))
     {
         // We expect to handle these elsewhere
-        assert(!"unexpected");
+        SLANG_DIAGNOSE_UNEXPECTED(getSink(context), varDecl, "GLSL varying output");
         return CreateTypeLayout(effectiveVaryingOutputType, rules->getVaryingOutputRules());
     }
 
@@ -568,7 +566,7 @@ getTypeLayoutForGlobalShaderParameter(
         return getTypeLayoutForGlobalShaderParameter_GLSL(context, varDecl);
 
     default:
-        assert(false);
+        SLANG_UNEXPECTED("unhandled source language");
         return nullptr;
     }
 }
@@ -900,7 +898,7 @@ void generateParameterBindings(
     RefPtr<ParameterInfo>       parameterInfo)
 {
     // There must be at least one declaration for the parameter.
-    assert(parameterInfo->varLayouts.Count() != 0);
+    SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.Count() != 0);
 
     // Iterate over all declarations looking for explicit binding information.
     for( auto& varLayout : parameterInfo->varLayouts )
@@ -928,7 +926,7 @@ static void completeBindingsForParameter(
     // that earlier code has validated that the declarations
     // "match".
 
-    assert(parameterInfo->varLayouts.Count() != 0);
+    SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.Count() != 0);
     auto firstVarLayout = parameterInfo->varLayouts.First();
     auto firstTypeLayout = firstVarLayout->typeLayout;
 
@@ -1258,7 +1256,7 @@ static RefPtr<TypeLayout> processEntryPointParameter(
 
                 for (auto rr : fieldTypeLayout->resourceInfos)
                 {
-                    assert(rr.count != 0);
+                    SLANG_RELEASE_ASSERT(rr.count != 0);
 
                     auto structRes = structLayout->findOrAddResourceInfo(rr.kind);
                     fieldVarLayout->findOrAddResourceInfo(rr.kind)->index = structRes->count;
@@ -1273,7 +1271,7 @@ static RefPtr<TypeLayout> processEntryPointParameter(
         }
         else
         {
-            assert(!"unimplemented");
+            SLANG_UNEXPECTED("unhandled type kind");
         }
     }
     // If we ran into an error in checking the user's code, then skip this parameter
@@ -1281,12 +1279,8 @@ static RefPtr<TypeLayout> processEntryPointParameter(
     {
         return nullptr;
     }
-    else
-    {
-        assert(!"unimplemented");
-    }
 
-    assert(!"unexpected");
+    SLANG_UNEXPECTED("unhandled type kind");
     return nullptr;
 }
 
@@ -1545,7 +1539,7 @@ void generateParameterBindings(
     bool anyGlobalUniforms = false;
     for( auto& parameterInfo : sharedContext.parameters )
     {
-        assert(parameterInfo->varLayouts.Count() != 0);
+        SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.Count() != 0);
         auto firstVarLayout = parameterInfo->varLayouts.First();
 
         // Does the field have any uniform data?
@@ -1606,7 +1600,7 @@ void generateParameterBindings(
     UniformLayoutInfo structLayoutInfo = globalScopeRules->BeginStructLayout();
     for( auto& parameterInfo : sharedContext.parameters )
     {
-        assert(parameterInfo->varLayouts.Count() != 0);
+        SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.Count() != 0);
         auto firstVarLayout = parameterInfo->varLayouts.First();
 
         // Does the field have any uniform data?

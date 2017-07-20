@@ -1,6 +1,7 @@
 #ifndef FUNDAMENTAL_LIB_SMART_POINTER_H
 #define FUNDAMENTAL_LIB_SMART_POINTER_H
 
+#include "common.h"
 #include "type-traits.h"
 
 #include <assert.h>
@@ -36,7 +37,7 @@ namespace Slang
 
         void releaseReference()
         {
-            assert(referenceCount != 0);
+            SLANG_ASSERT(referenceCount != 0);
             if(--referenceCount == 0)
             {
                 delete this;
@@ -45,7 +46,7 @@ namespace Slang
 
         bool isUniquelyReferenced()
         {
-            assert(referenceCount != 0);
+            SLANG_ASSERT(referenceCount != 0);
             return referenceCount == 1;
         }
     };

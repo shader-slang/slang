@@ -6,6 +6,12 @@
 
 #include <assert.h>
 
+// Don't signal errors for stuff we don't implement here,
+// and instead just try to return things defensively
+//
+// Slang developers can switch this when debugging.
+#define SLANG_REFLECTION_UNEXPECTED() do {} while(0)
+
 // Implementation to back public-facing reflection API
 
 using namespace Slang;
@@ -150,7 +156,7 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
         return SLANG_TYPE_KIND_NONE;
     }
 
-    assert(!"unexpected");
+    SLANG_REFLECTION_UNEXPECTED();
     return SLANG_TYPE_KIND_NONE;
 }
 
@@ -308,7 +314,7 @@ SLANG_API SlangScalarType spReflectionType_GetScalarType(SlangReflectionType* in
 #undef CASE
 
         default:
-            assert(!"unexpected");
+            SLANG_REFLECTION_UNEXPECTED();
             return SLANG_SCALAR_TYPE_NONE;
             break;
         }
@@ -967,7 +973,7 @@ static void emitReflectionVarBindingInfoJSON(
 
         default:
             write(writer, "unknown");
-            assert(!"unexpected");
+            SLANG_UNEXPECTED("unhandled case");
             break;
         }
         write(writer, "\"");
@@ -1071,7 +1077,7 @@ static void emitReflectionScalarTypeInfoJSON(
     {
     default:
         write(writer, "unknown");
-        assert(!"unexpected");
+        SLANG_UNEXPECTED("unhandled case");
         break;
 #define CASE(TAG, ID) case slang::TypeReflection::ScalarType::TAG: write(writer, #ID); break
         CASE(Void, void);
@@ -1109,7 +1115,7 @@ static void emitReflectionTypeInfoJSON(
             {
             default:
                 write(writer, "unknown");
-                assert(!"unexpected");
+                SLANG_UNEXPECTED("unhandled case");
                 break;
 
 #define CASE(SHAPE, NAME) case SLANG_##SHAPE: write(writer, #NAME); break
@@ -1141,7 +1147,7 @@ static void emitReflectionTypeInfoJSON(
                 {
                 default:
                     write(writer, "unknown");
-                    assert(!"unexpected");
+                    SLANG_UNEXPECTED("unhandled case");
                     break;
 
                 case SLANG_RESOURCE_ACCESS_READ:
@@ -1253,7 +1259,7 @@ static void emitReflectionTypeInfoJSON(
         break;
 
     default:
-        assert(!"unimplemented");
+        SLANG_UNEXPECTED("unhandled case");
         break;
     }
 }
@@ -1373,58 +1379,6 @@ static void emitReflectionVarInfoJSON(
     write(writer, "\"type\": ");
     emitReflectionTypeJSON(writer, var->getType());
 }
-
-#if 0
-static void emitReflectionBindingInfoJSON(
-    PrettyWriter& writer,
-    
-    ReflectionParameterNode* param)
-{
-    auto info = &param->binding;
-
-    if( info->category == SLANG_PARAMETER_CATEGORY_MIXED )
-    {
-        write(writer,"\"bindings\": [\n");
-        indent(writer);
-
-        ReflectionSize bindingCount = info->bindingCount;
-        assert(bindingCount);
-        ReflectionParameterBindingInfo* bindings = info->bindings;
-        for( ReflectionSize bb = 0; bb < bindingCount; ++bb )
-        {
-            if (bb != 0) write(writer, ",\n");
-
-            write(writer,"{");
-            auto& binding = bindings[bb];
-            emitReflectionVarBindingInfoJSON(
-                writer,
-                binding.category,
-                binding.index,
-                (ReflectionSize) param->GetTypeLayout()->GetSize(binding.category),
-                binding.space);
-
-            write(writer,"}");
-        }
-        dedent(writer);
-        write(writer,"\n]");
-    }
-    else
-    {
-        write(writer,"\"binding\": {");
-        indent(writer);
-
-        emitReflectionVarBindingInfoJSON(
-            writer,
-            info->category,
-            info->index,
-            (ReflectionSize) param->GetTypeLayout()->GetSize(info->category),
-            info->space);
-
-        dedent(writer);
-        write(writer,"}");
-    }
-}
-#endif
 
 static void emitReflectionParamJSON(
     PrettyWriter&                       writer,

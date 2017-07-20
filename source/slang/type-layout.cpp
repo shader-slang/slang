@@ -38,8 +38,11 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         case BaseType::Bool:
             return SimpleLayoutInfo( LayoutResourceKind::Uniform, 4, 4 );
 
+        case BaseType::Double:
+            return SimpleLayoutInfo( LayoutResourceKind::Uniform, 8, 8 );
+
         default:
-            assert(!"unimplemented");
+            SLANG_UNEXPECTED("uhandled scalar type");
             return SimpleLayoutInfo( LayoutResourceKind::Uniform, 0, 1 );
         }
     }
@@ -64,7 +67,7 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         case slang::TypeReflection::ScalarType::Float64:    return SimpleLayoutInfo( LayoutResourceKind::Uniform, 8,8);
 
         default:
-            assert(!"unimplemented");
+            SLANG_UNEXPECTED("unhandled scalar type");
             return SimpleLayoutInfo();
         }
     }
@@ -164,7 +167,7 @@ struct GLSLConstantBufferLayoutRulesImpl : DefaultConstantBufferLayoutRulesImpl
 static SimpleLayoutInfo getGLSLVectorLayout(
     SimpleLayoutInfo elementInfo, size_t elementCount)
 {
-    assert(elementInfo.kind == LayoutResourceKind::Uniform);
+    SLANG_RELEASE_ASSERT(elementInfo.kind == LayoutResourceKind::Uniform);
     auto size = elementInfo.size * elementCount;
     SimpleLayoutInfo vectorInfo(
         LayoutResourceKind::Uniform,
@@ -380,7 +383,7 @@ struct HLSLObjectLayoutRulesImpl : ObjectLayoutRulesImpl
         case ShaderParameterKind::InputRenderTarget:
             // TODO: how to handle these?
         default:
-            assert(!"unimplemented");
+            SLANG_UNEXPECTED("unhandled shader parameter kind");
             return SimpleLayoutInfo();
         }
     }
@@ -601,7 +604,7 @@ static int GetElementCount(RefPtr<IntVal> val)
         // TODO(tfoley): do something sensible in this case
         return 0;
     }
-    assert(!"unexpected");
+    SLANG_UNEXPECTED("unhandled integer literal kind");
     return 0;
 }
 
@@ -670,7 +673,7 @@ static SimpleLayoutInfo getParameterBlockLayoutInfo(
     }
     else
     {
-        assert(!"unexpected");
+        SLANG_UNEXPECTED("unhandled parameter block type");
         return SimpleLayoutInfo();
     }
 }
@@ -696,8 +699,8 @@ createParameterBlockTypeLayout(
     // and hence no uniform data).
     // 
     typeLayout->uniformAlignment = parameterBlockInfo.alignment;
-    assert(!typeLayout->FindResourceInfo(LayoutResourceKind::Uniform));
-    assert(typeLayout->uniformAlignment == 1);
+    SLANG_RELEASE_ASSERT(!typeLayout->FindResourceInfo(LayoutResourceKind::Uniform));
+    SLANG_RELEASE_ASSERT(typeLayout->uniformAlignment == 1);
 
     // TODO(tfoley): There is a subtle question here of whether
     // a constant buffer declaration that then contains zero
@@ -801,7 +804,7 @@ LayoutRulesImpl* getParameterBufferElementTypeLayoutRules(
     }
     else
     {
-        assert(!"unexpected");
+        SLANG_UNEXPECTED("uhandled parameter block type");
         return nullptr;
     }
 }
@@ -843,8 +846,8 @@ createStructuredBufferTypeLayout(
     typeLayout->elementTypeLayout = elementTypeLayout;
 
     typeLayout->uniformAlignment = info.alignment;
-    assert(!typeLayout->FindResourceInfo(LayoutResourceKind::Uniform));
-    assert(typeLayout->uniformAlignment == 1);
+    SLANG_RELEASE_ASSERT(!typeLayout->FindResourceInfo(LayoutResourceKind::Uniform));
+    SLANG_RELEASE_ASSERT(typeLayout->uniformAlignment == 1);
 
     if( info.size != 0 )
     {
@@ -1211,7 +1214,7 @@ SimpleLayoutInfo GetLayoutImpl(
                             continue;
 
                         // We should not have already processed this resource type
-                        assert(!fieldLayout->FindResourceInfo(fieldTypeResourceInfo.kind));
+                        SLANG_RELEASE_ASSERT(!fieldLayout->FindResourceInfo(fieldTypeResourceInfo.kind));
 
                         // The field will need offset information for this kind
                         auto fieldResourceInfo = fieldLayout->AddResourceInfo(fieldTypeResourceInfo.kind);
@@ -1258,7 +1261,7 @@ SimpleLayoutInfo GetLayoutImpl(
     }
 
     // catch-all case in case nothing matched
-    assert(!"unimplemented");
+    SLANG_ASSERT(!"unimplemented");
     SimpleLayoutInfo info;
     return GetSimpleLayoutImpl(
         info,

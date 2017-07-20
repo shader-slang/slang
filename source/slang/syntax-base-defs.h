@@ -238,7 +238,7 @@ ABSTRACT_SYNTAX_CLASS(Decl, DeclBase)
     bool IsChecked(DeclCheckState state) { return checkState >= state; }
     void SetCheckState(DeclCheckState state)
     {
-        assert(state >= checkState);
+        SLANG_RELEASE_ASSERT(state >= checkState);
         checkState = state;
     }
     )
