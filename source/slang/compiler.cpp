@@ -690,7 +690,7 @@ namespace Slang
         int id = counter++;
 
         String path;
-        path.append("slang-");
+        path.append("slang-dump-");
         path.append(id);
         path.append(ext);
 

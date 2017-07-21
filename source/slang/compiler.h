@@ -48,6 +48,14 @@ namespace Slang
         ReflectionJSON      = SLANG_REFLECTION_JSON,
     };
 
+    enum class LineDirectiveMode : SlangLineDirectiveMode
+    {
+        Default     = SLANG_LINE_DIRECTIVE_MODE_DEFAULT,
+        None        = SLANG_LINE_DIRECTIVE_MODE_NONE,
+        Standard    = SLANG_LINE_DIRECTIVE_MODE_STANDARD,
+        GLSL        = SLANG_LINE_DIRECTIVE_MODE_GLSL,
+    };
+
     enum class ResultFormat
     {
         None,
@@ -209,6 +217,9 @@ namespace Slang
 
         // Should we dump intermediate results along the way, for debugging?
         bool shouldDumpIntermediates = false;
+
+        // How should `#line` directives be emitted (if at all)?
+        LineDirectiveMode lineDirectiveMode = LineDirectiveMode::Default;
 
         // Output stuff
         DiagnosticSink mSink;

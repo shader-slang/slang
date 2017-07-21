@@ -96,6 +96,18 @@ extern "C"
         SLANG_COMPILE_FLAG_NO_CHECKING = 1 << 0, /**< Disable semantic checking as much as possible. */
     };
 
+    /*!
+    @brief Options to control emission of `#line` directives
+    */
+    typedef unsigned int SlangLineDirectiveMode;
+    enum
+    {
+        SLANG_LINE_DIRECTIVE_MODE_DEFAULT = 0,  /**< Default behavior: pick behavior base on target. */
+        SLANG_LINE_DIRECTIVE_MODE_NONE,         /**< Don't emit line directives at all. */
+        SLANG_LINE_DIRECTIVE_MODE_STANDARD,     /**< Emit standard C-style `#line` directives. */
+        SLANG_LINE_DIRECTIVE_MODE_GLSL,         /**< Emit GLSL-style directives with file *number* instead of name */
+    };
+
     typedef int SlangSourceLanguage;
     enum
     {
@@ -175,6 +187,13 @@ extern "C"
     SLANG_API void spSetDumpIntermediates(
         SlangCompileRequest*    request,
         int                     enable);
+
+    /*!
+    @brief Set whether (and how) `#line` directives hsould be output.
+    */
+    SLANG_API void spSetLineDirectiveMode(
+        SlangCompileRequest*    request,
+        SlangLineDirectiveMode  mode);
 
     /*!
     @brief Sets the target for code generation.
