@@ -511,16 +511,33 @@ struct EmitVisitor
 
         bool shouldUseGLSLStyleLineDirective = false;
 
-        // TODO: Eventually we should give he user a proper API
-        // and command-line mechanism to control what kind of line
-        // directives we output (and to turn the feature off
-        // completely), but for now we always emit C-style line
-        // directives *unless* the final target language is raw
-        // GLSL code (all other targets will eventually pass
-        // through glslang, which supports C-style line directives).
-        if (context->shared->finalTarget == CodeGenTarget::GLSL)
+        auto mode = context->shared->entryPoint->compileRequest->lineDirectiveMode;
+        switch (mode)
         {
+        case LineDirectiveMode::None:
+            SLANG_UNEXPECTED("should not trying to emit '#line' directive");
+            return;
+
+        case LineDirectiveMode::Default:
+        default:
+            // To try to make the default behavior reasonable, we will
+            // always use C-style line directives (to give the user
+            // good source locations on error messages from downstream
+            // compilers) *unless* they requested raw GLSL as the
+            // output (in which case we want to maximize compatibility
+            // with downstream tools).
+            if (context->shared->finalTarget == CodeGenTarget::GLSL)
+            {
+                shouldUseGLSLStyleLineDirective = true;
+            }
+            break;
+
+        case LineDirectiveMode::Standard:
+            break;
+
+        case LineDirectiveMode::GLSL:
             shouldUseGLSLStyleLineDirective = true;
+            break;
         }
 
         if(shouldUseGLSLStyleLineDirective)
@@ -597,6 +614,12 @@ struct EmitVisitor
     void emitLineDirectiveIfNeeded(
         CodePosition const& sourceLocation)
     {
+        // Don't do any of this work if the user has requested that we
+        // not emit line directives.
+        auto mode = context->shared->entryPoint->compileRequest->lineDirectiveMode;
+        if (mode == LineDirectiveMode::None)
+            return;
+
         // Ignore invalid source locations
         if(sourceLocation.Line <= 0)
             return;
@@ -675,13 +698,16 @@ struct EmitVisitor
 
     void emitTokenWithLocation(Token const& token)
     {
-        if( token.Position.FileName.Length() != 0 )
+        auto mode = context->shared->entryPoint->compileRequest->lineDirectiveMode;
+        if (mode == LineDirectiveMode::None)
+            return;
+
+
+        if ((mode == LineDirectiveMode::None)
+            || token.Position.FileName.Length() == 0)
         {
-            advanceToSourceLocation(token.Position);
-        }
-        else
-        {
-            // If we don't have the original position info, we need to play
+            // If we don't have the original position info, or we are in the
+            // mode where the user didn't want line directives, we need to play
             // it safe and emit whitespace to line things up nicely
 
             if(token.flags & TokenFlag::AtStartOfLine)
@@ -690,6 +716,13 @@ struct EmitVisitor
             // so we will just insert it aggressively, to play it safe.
             else //  if(token.flags & TokenFlag::AfterWhitespace)
                 Emit(" ");
+        }
+        else
+        {
+            // If location information is available, and we are emitting
+            // such information, then just advance our tracking location
+            // to the right place.
+            advanceToSourceLocation(token.Position);
         }
 
         // Emit the raw textual content of the token

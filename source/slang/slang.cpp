@@ -675,6 +675,15 @@ SLANG_API void spSetDumpIntermediates(
     REQ(request)->shouldDumpIntermediates = enable != 0;
 }
 
+SLANG_API void spSetLineDirectiveMode(
+    SlangCompileRequest*    request,
+    SlangLineDirectiveMode  mode)
+{
+    // TODO: validation
+
+    REQ(request)->lineDirectiveMode = Slang::LineDirectiveMode(mode);
+}
+
 
 SLANG_API void spSetCodeGenTarget(
         SlangCompileRequest*    request,
