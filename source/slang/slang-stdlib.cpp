@@ -560,9 +560,20 @@ __generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> f
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> fmod(matrix<T,N,M> x, matrix<T,N,M> y);
 
 // Fractional part
-__generic<T : __BuiltinFloatingPointType> __intrinsic T frac(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> frac(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> frac(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType>
+__intrinsic(glsl, fract)
+__intrinsic
+T frac(T x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__intrinsic(glsl, fract)
+__intrinsic
+vector<T,N> frac(vector<T,N> x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__intrinsic(glsl, fract)
+__intrinsic
+matrix<T,N,M> frac(matrix<T,N,M> x);
 
 // Split float into mantissa and exponent
 __generic<T : __BuiltinFloatingPointType> __intrinsic T frexp(T x, out T exp);
