@@ -3582,9 +3582,14 @@ struct LoweringVisitor
             else if (isIntegralType(varType))
             {
                 if (info.direction == VaryingParameterDirection::Input
-                    && shared->entryPointRequest->profile.GetStage() == Stage::Vertex)
+                    && shared->entryPointRequest->profile.GetStage() != Stage::Fragment)
                 {
-                    // Don't add extra qualification to VS inputs
+                    // Don't add extra qualification to vertex shader inputs
+                }
+                else if (info.direction == VaryingParameterDirection::Output
+                    && shared->entryPointRequest->profile.GetStage() == Stage::Fragment)
+                {
+                    // Don't add extra qualification to fragment shader outputs
                 }
                 else
                 {
