@@ -3848,7 +3848,10 @@ String emitEntryPoint(
 
     if (sharedContext.needHackSamplerForTexelFetch)
     {
-        finalResultBuilder << "layout(set = 0, binding = 0) uniform sampler SLANG_hack_samplerForTexelFetch;\n";
+        finalResultBuilder
+            << "layout(set = 0, binding = "
+            << programLayout->bindingForHackSampler
+            << ") uniform sampler SLANG_hack_samplerForTexelFetch;\n";
     }
 
     finalResultBuilder << code;

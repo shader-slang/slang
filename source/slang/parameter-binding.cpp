@@ -1501,6 +1501,31 @@ static void collectParameters(
     }
 }
 
+static bool isGLSLCrossCompilerNeeded(CompileRequest* request)
+{
+    switch (request->Target)
+    {
+    default:
+        return false;
+
+    case CodeGenTarget::GLSL:
+    case CodeGenTarget::SPIRV:
+    case CodeGenTarget::SPIRVAssembly:
+        break;
+    }
+
+    if (request->loadedModulesList.Count() != 0)
+        return true;
+
+    for (auto tu : request->translationUnits)
+    {
+        if (tu->sourceLanguage != SourceLanguage::GLSL)
+            return true;
+    }
+
+    return false;
+}
+
 void generateParameterBindings(
     CompileRequest*                 request)
 {
@@ -1647,6 +1672,39 @@ void generateParameterBindings(
             globalScopeStructLayout);
 
         globalScopeLayout = globalConstantBufferLayout;
+    }
+
+    // Final final step: pick a binding for the "hack sampler", if needed...
+    //
+    // We only want to do this if the GLSL cross-compilation support is
+    // being invoked, so that we don't gum up other shaders.
+    if(isGLSLCrossCompilerNeeded(request))
+    {
+        UInt space = 0;
+        auto hackSamplerUsedRanges = findUsedRangeSetForSpace(&context, space);
+
+        UInt binding = hackSamplerUsedRanges->usedResourceRanges[(int)LayoutResourceKind::DescriptorTableSlot].Allocate(nullptr, 1);
+
+        programLayout->bindingForHackSampler = (int)binding;
+
+        RefPtr<Variable> var = new Variable();
+        var->Name.Content = "SLANG_hack_samplerForTexelFetch";
+        var->Type.type = new SamplerStateType();
+
+        auto typeLayout = new TypeLayout();
+        typeLayout->type = var->Type.type;
+        typeLayout->addResourceUsage(LayoutResourceKind::DescriptorTableSlot, 1);
+
+        auto varLayout = new VarLayout();
+        varLayout->varDecl = makeDeclRef(var.Ptr());
+        varLayout->typeLayout = typeLayout;
+        auto resInfo = varLayout->AddResourceInfo(LayoutResourceKind::DescriptorTableSlot);
+        resInfo->index = binding;
+        resInfo->space = space;
+
+        programLayout->hackSamplerVar = var;
+
+        globalScopeStructLayout->fields.Add(varLayout);
     }
 
     // We now have a bunch of layout information, which we should

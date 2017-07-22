@@ -383,6 +383,11 @@ public:
     // and any entry-point-specific parameter data
     // will (eventually) belong there...
     List<RefPtr<EntryPointLayout>> entryPoints;
+
+    // HACK: binding to use when we have to create
+    // a dummy sampler just to appease glslang
+    int bindingForHackSampler = 0;
+    RefPtr<VarDeclBase> hackSamplerVar;
 };
 
 struct LayoutRulesFamilyImpl;
