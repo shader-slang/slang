@@ -55,8 +55,9 @@ out vec4 color;
 
 void main()
 {
+	Material SLANG_tmp_0 = m;
 	color = evaluateMaterial(
-		m,
+		SLANG_tmp_0,
 		SLANG_parameterBlock_U_m_t,
 		SLANG_parameterBlock_U_m_s, uv);
 }
