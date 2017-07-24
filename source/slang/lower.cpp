@@ -733,6 +733,18 @@ struct LoweringVisitor
         return result;
     }
 
+    RefPtr<ExpressionSyntaxNode> moveTemp(RefPtr<ExpressionSyntaxNode> expr)
+    {
+        RefPtr<Variable> varDecl = new Variable();
+        varDecl->Name.Content = generateName();
+        varDecl->Type.type = expr->Type.type;
+        varDecl->Expr = expr;
+
+        addDecl(varDecl);
+
+        return createVarRef(expr->Position, varDecl);
+    }
+
     // The idea of this function is to take an expression that we plan to
     // use/evaluate more than once, and if needed replace it with a
     // reference to a temporary (initialized with the expr) so that it
@@ -769,14 +781,7 @@ struct LoweringVisitor
         // TODO: handle the tuple cases here...
 
         // In the general case, though, we need to introduce a temporary
-        RefPtr<Variable> varDecl = new Variable();
-        varDecl->Name.Content = generateName();
-        varDecl->Type.type = expr->Type.type;
-        varDecl->Expr = expr;
-
-        addDecl(varDecl);
-
-        return createVarRef(expr->Position, varDecl);
+        return moveTemp(expr);
     }
 
     // Similar to the above, this ensures that an l-value expression
@@ -1289,11 +1294,11 @@ struct LoweringVisitor
             // Default case: just reconstrut a subscript expr
             auto loweredExpr = new IndexExpressionSyntaxNode();
 
-            loweredExpr->Type.type = getSubscripResultType(baseExpr->Type.type);
+loweredExpr->Type.type = getSubscripResultType(baseExpr->Type.type);
 
-            loweredExpr->BaseExpression = baseExpr;
-            loweredExpr->IndexExpression = indexExpr;
-            return loweredExpr;
+loweredExpr->BaseExpression = baseExpr;
+loweredExpr->IndexExpression = indexExpr;
+return loweredExpr;
         }
     }
 
@@ -1358,6 +1363,84 @@ struct LoweringVisitor
         return expr;
     }
 
+    bool needGlslangBug988Workaround(
+        RefPtr<ExpressionSyntaxNode> inExpr)
+    {
+        switch (getTarget())
+        {
+        default:
+            return false;
+
+        case CodeGenTarget::GLSL:
+            break;
+        }
+
+        // There are two conditions we care about here:
+        //
+        // (1) is the *type* of the expression something that needs the WAR
+        // (2) does the expression reference a constant-buffer member?
+        //
+
+        // Issue (1): is the type of the expression something that needs the WAR?
+
+        auto exprType = inExpr->Type.type;
+        exprType = unwrapArray(exprType);
+
+        if (!isStructType(exprType))
+            return false;
+
+
+        // Issue (2): does the expression reference a constant-buffer member?
+
+        auto expr = inExpr;
+        for (;;)
+        {
+            if (auto memberRefExpr = expr.As<MemberExpressionSyntaxNode>())
+            {
+                expr = memberRefExpr->BaseExpression;
+                continue;
+            }
+
+            if (auto derefExpr = expr.As<DerefExpr>())
+            {
+                expr = derefExpr->base;
+                continue;
+            }
+
+            if (auto subscriptExpr = expr.As<IndexExpressionSyntaxNode>())
+            {
+                expr = subscriptExpr->BaseExpression;
+                continue;
+            }
+
+            break;
+        }
+
+        if (auto varExpr = expr.As<VarExpressionSyntaxNode>())
+        {
+            auto declRef = varExpr->declRef;
+            if (!declRef)
+                return false;
+
+            if (auto varDeclRef = declRef.As<Variable>())
+            {
+                auto varType = GetType(varDeclRef);
+
+                while (auto arrayType = varType->As<ArrayExpressionType>())
+                {
+                    varType = arrayType->BaseType;
+                }
+
+                if (auto constantBufferType = varType->As<ConstantBufferType>())
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     void addArgs(
         ExprWithArgsBase*               callExpr,
         RefPtr<ExpressionSyntaxNode>    argExpr)
@@ -1382,6 +1465,17 @@ struct LoweringVisitor
         }
         else
         {
+            // This should be the default case where we have a perfectly
+            // ordinary expression, but we need to work around a glslang
+            // but here, where passing a member of a `uniform` block
+            // that has `struct` type directly to a function call causes
+            // invalid SPIR-V to be generated.
+            if (needGlslangBug988Workaround(argExpr))
+            {
+                argExpr = moveTemp(argExpr);
+            }
+
+            // Here's the actual default case where we just add an argment
             callExpr->Arguments.Add(argExpr);
         }
     }
@@ -2981,8 +3075,28 @@ struct LoweringVisitor
         }
     }
 
+    AggTypeDecl* isStructType(RefPtr<ExpressionType> type)
+    {
+        if (type->As<BasicExpressionType>()) return nullptr;
+        else if (type->As<VectorExpressionType>()) return nullptr;
+        else if (type->As<MatrixExpressionType>()) return nullptr;
+        else if (type->As<ResourceType>()) return nullptr;
+        else if (type->As<BuiltinGenericType>()) return nullptr;
+        else if (auto declRefType = type->As<DeclRefType>())
+        {
+            if (auto aggTypeDeclRef = declRefType->declRef.As<AggTypeDecl>())
+            {
+                return aggTypeDeclRef.getDecl();
+            }
+        }
+
+        return nullptr;
+    }
+
     bool isImportedStructType(RefPtr<ExpressionType> type)
     {
+        // TODO: make this use `isStructType` above
+
         if (type->As<BasicExpressionType>()) return false;
         else if (type->As<VectorExpressionType>()) return false;
         else if (type->As<MatrixExpressionType>()) return false;
