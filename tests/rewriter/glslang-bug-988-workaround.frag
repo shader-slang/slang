@@ -25,7 +25,8 @@ out vec4 result;
 
 void main()
 {
-	result = doIt(foo);
+	vec4 r = doIt(foo);
+	result = r;
 }
 
 #else
@@ -52,7 +53,8 @@ out vec4 result;
 void main()
 {
 	Foo SLANG_tmp_0 = foo;
-	result = doIt(SLANG_tmp_0);
+	vec4 r = doIt(SLANG_tmp_0);
+	result = r;
 }
 
 #endif

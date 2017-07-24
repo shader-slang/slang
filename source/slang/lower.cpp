@@ -3006,8 +3006,16 @@ return loweredExpr;
         }
 
         RefPtr<VarDeclBase> loweredDecl = loweredDeclClass.createInstance();
+
+        // Note: we lower the declaration (including its initialization expression, if any)
+        // *before* we add the declaration to the current context (e.g., a statement being
+        // built), so that any operations inside the initialization expression that
+        // might need to inject statements/temporaries/whatever happen *before*
+        // the declaration of this variable.
+        auto result = lowerSimpleVarDeclCommon(loweredDecl, decl, loweredType);
         addDecl(loweredDecl);
-        return lowerSimpleVarDeclCommon(loweredDecl, decl, loweredType);
+
+        return result;
     }
 
     RefPtr<VarDeclBase> lowerVarDeclCommon(
