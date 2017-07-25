@@ -26,6 +26,9 @@
 #include <d3dcompiler.h>
 #endif
 
+#include <io.h>
+#include <fcntl.h> 
+
 #ifdef _MSC_VER
 #pragma warning(disable: 4996)
 #endif
@@ -318,7 +321,7 @@ namespace Slang
         if (codeBlob)
         {
             char const* codeBegin = (char const*)codeBlob->GetBufferPointer();
-            char const* codeEnd = codeBegin + codeBlob->GetBufferSize();
+            char const* codeEnd = codeBegin + codeBlob->GetBufferSize() - 1;
             result.append(codeBegin, codeEnd);
             codeBlob->Release();
         }
@@ -592,6 +595,183 @@ namespace Slang
         return result;
     }
 
+    enum class OutputFileKind
+    {
+        Text,
+        Binary,
+    };
+
+    static void writeOutputFile(
+        CompileRequest* compileRequest,
+        FILE*           file,
+        String const&   path,
+        void const*     data,
+        size_t          size)
+    {
+        size_t count = fwrite(data, size, 1, file);
+        if (count != 1)
+        {
+            compileRequest->mSink.diagnose(
+                CodePosition(),
+                Diagnostics::cannotWriteOutputFile,
+                path);
+        }
+    }
+
+    static void writeOutputFile(
+        CompileRequest* compileRequest,
+        String const&   path,
+        void const*     data,
+        size_t          size,
+        OutputFileKind  kind)
+    {
+        FILE* file = fopen(
+            path.Buffer(),
+            kind == OutputFileKind::Binary ? "wb" : "w");
+        if (!file)
+        {
+            compileRequest->mSink.diagnose(
+                CodePosition(),
+                Diagnostics::cannotWriteOutputFile,
+                path);
+            return;
+        }
+
+        writeOutputFile(compileRequest, file, path, data, size);
+        fclose(file);
+    }
+
+    static void writeEntryPointResultToFile(
+        EntryPointRequest*  entryPoint)
+    {
+        auto compileRequest = entryPoint->compileRequest;
+        auto outputPath = entryPoint->outputPath;
+        auto result = entryPoint->result;
+        switch (result.format)
+        {
+        case ResultFormat::Text:
+            {
+                auto text = result.outputString;
+                writeOutputFile(compileRequest,
+                    outputPath,
+                    text.begin(),
+                    text.end() - text.begin(),
+                    OutputFileKind::Text);
+            }
+            break;
+
+        case ResultFormat::Binary:
+            {
+                auto& data = result.outputBinary;
+                writeOutputFile(compileRequest,
+                    outputPath,
+                    data.begin(),
+                    data.end() - data.begin(),
+                    OutputFileKind::Binary);
+            }
+            break;
+
+        default:
+            SLANG_UNEXPECTED("unhandled output format");
+            break;
+        }
+
+    }
+
+    static void writeOutputToConsole(
+        CompileRequest*,
+        String const&   text)
+    {
+        fwrite(
+            text.begin(),
+            text.end() - text.begin(),
+            1,
+            stdout);
+    }
+
+    static void writeEntryPointResultToStandardOutput(
+        EntryPointRequest*  entryPoint)
+    {
+        auto compileRequest = entryPoint->compileRequest;
+        auto result = entryPoint->result;
+
+        switch (result.format)
+        {
+        case ResultFormat::Text:
+            writeOutputToConsole(compileRequest, result.outputString);
+            break;
+
+        case ResultFormat::Binary:
+            {
+                auto& data = result.outputBinary;
+                int stdoutFileDesc = _fileno(stdout);
+                if (_isatty(stdoutFileDesc))
+                {
+                    // Writing to console, so we need to generate text output.
+
+                    switch (compileRequest->Target)
+                    {
+                    case CodeGenTarget::DXBytecode:
+                        {
+                            String assembly = dissassembleDXBC(compileRequest,
+                                data.begin(),
+                                data.end() - data.begin());
+                            writeOutputToConsole(compileRequest, assembly);
+                        }
+                        break;
+
+                    case CodeGenTarget::SPIRV:
+                        {
+                            String assembly = dissassembleSPIRV(compileRequest,
+                                data.begin(),
+                                data.end() - data.begin());
+                            writeOutputToConsole(compileRequest, assembly);
+                        }
+                        break;
+
+                    default:
+                        SLANG_UNEXPECTED("unhandled output format");
+                        return;
+                    }
+                }
+                else
+                {
+                    // Redirecting stdout to a file, so do the usual thing
+                    _setmode(stdoutFileDesc, _O_BINARY);
+                    writeOutputFile(
+                        compileRequest,
+                        stdout,
+                        "stdout",
+                        data.begin(),
+                        data.end() - data.begin());
+                }
+            }
+            break;
+
+        default:
+            SLANG_UNEXPECTED("unhandled output format");
+            break;
+        }
+
+    }
+
+    static void writeEntryPointResult(
+        EntryPointRequest*  entryPoint)
+    {
+        // Skip the case with no output
+        if (entryPoint->result.format == ResultFormat::None)
+            return;
+
+        if (entryPoint->outputPath.Length())
+        {
+            writeEntryPointResultToFile(entryPoint);
+        }
+        else
+        {
+            writeEntryPointResultToStandardOutput(entryPoint);
+        }
+    }
+
     CompileResult emitTranslationUnitEntryPoints(
         TranslationUnitRequest* translationUnit)
     {
@@ -645,6 +825,7 @@ namespace Slang
 
 
         // Allow for an "extra" target to verride things before we finish.
+        String extraResult;
         switch (compileRequest->extraTarget)
         {
         case CodeGenTarget::ReflectionJSON:
@@ -661,16 +842,32 @@ namespace Slang
                     entryPoint->result = CompileResult();
                 }
 
-                // HACK(tfoley): just print it out since that is what people probably expect.
-                // TODO: need a way to control where output gets routed across all possible targets.
-                fprintf(stdout, "%s", reflectionJSON.begin());
-
-                return;
+                extraResult = reflectionJSON;
             }
             break;
 
         default:
             break;
+        }
+
+        // If we are in command-line mode, we might be expected to actually
+        // write output to one or more files here.
+
+        if (compileRequest->isCommandLineCompile)
+        {
+            switch (compileRequest->extraTarget)
+            {
+            case CodeGenTarget::ReflectionJSON:
+                fprintf(stdout, "%s", extraResult.begin());
+                break;
+
+            default:
+                for( auto entryPoint : compileRequest->entryPoints )
+                {
+                    writeEntryPointResult(entryPoint);
+                }
+                break;
+            }
         }
 
     }

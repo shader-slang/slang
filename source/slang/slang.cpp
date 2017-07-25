@@ -684,6 +684,12 @@ SLANG_API void spSetLineDirectiveMode(
     REQ(request)->lineDirectiveMode = Slang::LineDirectiveMode(mode);
 }
 
+SLANG_API void spSetCommandLineCompilerMode(
+    SlangCompileRequest* request)
+{
+    REQ(request)->isCommandLineCompile = true;
+
+}
 
 SLANG_API void spSetCodeGenTarget(
         SlangCompileRequest*    request,
