@@ -102,6 +102,10 @@ namespace Slang
         // supposed to be defined in.
         int translationUnitIndex;
 
+        // The output path requested for this entry point.
+        // (only used when compiling from the command line)
+        String outputPath;
+
         // The resulting output for the enry point
         //
         // TODO: low-level code generation should be a distinct step
@@ -220,6 +224,9 @@ namespace Slang
 
         // How should `#line` directives be emitted (if at all)?
         LineDirectiveMode lineDirectiveMode = LineDirectiveMode::Default;
+
+        // Are we being driven by the command-line `slangc`, and should act accordingly?
+        bool isCommandLineCompile = false;
 
         // Output stuff
         DiagnosticSink mSink;

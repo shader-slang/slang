@@ -49,6 +49,18 @@ DIAGNOSTIC(    2, Error, unsupportedCompilerMode, "unsupported compiler mode.")
 DIAGNOSTIC(    4, Error, cannotWriteOutputFile, "cannot write output file '$0'.")
 DIAGNOSTIC(    5, Error, failedToLoadDynamicLibrary, "failed to load dynamic library '$0'")
 
+DIAGNOSTIC(    6, Error, tooManyOutputPathsSpecified,
+    "$0 output paths specified, but only $1 entry points given")
+
+DIAGNOSTIC(    6, Error, noOutputPathSpecifiedForEntryPoint,
+    "no output path specified for entry point '$0' (the '-o' option for an entry point must precede the corresponding '-entry')")
+
+DIAGNOSTIC(    6, Error, outputPathsImplyDifferentFormats,
+    "the output paths '$0' and '$1' require different code-generation targets")
+
+DIAGNOSTIC(    6, Error, cannotDeduceOutputFormatFromPath,
+    "cannot deduce an output format from the output path '$0'")
+
 //
 // 1xxxx - Lexical anaylsis
 //

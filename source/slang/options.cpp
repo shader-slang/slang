@@ -40,6 +40,8 @@ struct OptionsParser
     SlangSession*           session = nullptr;
     SlangCompileRequest*    compileRequest = nullptr;
 
+    Slang::CompileRequest*  requestImpl = nullptr;
+
     struct RawTranslationUnit
     {
         SlangSourceLanguage sourceLanguage;
@@ -55,6 +57,7 @@ struct OptionsParser
         String          name;
         SlangProfileID  profileID = SLANG_PROFILE_UNKNOWN;
         int             translationUnitIndex = -1;
+        int             outputPathIndex = -1;
     };
 
     // Collect entry point names, so that we can associate them
@@ -73,7 +76,20 @@ struct OptionsParser
 
     SlangProfileID currentProfileID = SLANG_PROFILE_UNKNOWN;
 
+    // How many times were `-profile` options given?
+    int profileOptionCount = 0;
+
     SlangCompileFlags flags = 0;
+
+    struct RawOutputPath
+    {
+        String              path;
+        SlangCompileTarget  target;
+    };
+
+    List<RawOutputPath> rawOutputPaths;
+
+    SlangCompileTarget chosenTarget = SLANG_TARGET_NONE;
 
     int addTranslationUnit(
         SlangSourceLanguage language,
@@ -169,6 +185,52 @@ struct OptionsParser
         }
     }
 
+    void addOutputPath(
+        String const&       path,
+        SlangCompileTarget  target)
+    {
+        RawOutputPath rawOutputPath;
+        rawOutputPath.path = path;
+        rawOutputPath.target = target;
+
+        rawOutputPaths.Add(rawOutputPath);
+    }
+
+    void addOutputPath(char const* inPath)
+    {
+        String path = String(inPath);
+
+        if (!inPath) {}
+#define CASE(EXT, TARGET)   \
+        else if(path.EndsWith(EXT)) do { addOutputPath(path, SLANG_##TARGET); } while(0)
+
+        CASE(".hlsl", HLSL);
+        CASE(".fx",   HLSL);
+
+        CASE(".dxbc", DXBC);
+        CASE(".dxbc.asm", DXBC_ASM);
+
+        CASE(".glsl", GLSL);
+        CASE(".vert", GLSL);
+        CASE(".frag", GLSL);
+        CASE(".geom", GLSL);
+        CASE(".tesc", GLSL);
+        CASE(".tese", GLSL);
+        CASE(".comp", GLSL);
+
+        CASE(".spv",        SPIRV);
+        CASE(".spv.asm",    SPIRV_ASM);
+
+#undef CASE
+
+        else
+        {
+            // Allow an unknown-format `-o`, assuming we get a target format
+            // from another argument.
+            addOutputPath(path, SLANG_TARGET_UNKNOWN);
+        }
+    }
+
     int parse(
         int             argc,
         char const* const*  argv)
@@ -244,6 +306,7 @@ struct OptionsParser
                         exit(1);
                     }
 
+                    this->chosenTarget = target;
                     spSetCodeGenTarget(compileRequest, target);
                 }
                 // A "profile" specifies both a specific target stage and a general level
@@ -260,6 +323,7 @@ struct OptionsParser
                     else
                     {
                         currentProfileID = profileID;
+                        profileOptionCount++;
                     }
                 }
                 else if (argStr == "-entry")
@@ -269,6 +333,10 @@ struct OptionsParser
                     RawEntryPoint entry;
                     entry.name = name;
                     entry.translationUnitIndex = currentTranslationUnitIndex;
+
+                    int outputPathCount = (int) rawOutputPaths.Count();
+                    int currentOutputPathIndex = outputPathCount - 1;
+                    entry.outputPathIndex = currentOutputPathIndex;
 
                     // TODO(tfoley): Allow user to fold a specification of a profile into the entry-point name,
                     // for the case where they might be compiling multiple entry points in one invocation...
@@ -377,6 +445,16 @@ struct OptionsParser
                         compileRequest,
                         String(includeDirStr).begin());
                 }
+                //
+                // A `-o` option is used to specify a desired output file.
+                else if (argStr == "-o")
+                {
+                    char const* outputPath = tryReadCommandLineArgumentRaw(
+                        arg, &argCursor, argEnd);
+                    if (!outputPath) continue;
+
+                    addOutputPath(outputPath);
+                }
                 else if (argStr == "--")
                 {
                     // The `--` option causes us to stop trying to parse options,
@@ -472,22 +550,148 @@ struct OptionsParser
                 break;
             }
 
-            if( anyEntryPointWithoutProfile )
+            // Issue an error if there are entry points without a profile,
+            // and no profile was specified.
+            if( anyEntryPointWithoutProfile
+                && currentProfileID == SLANG_PROFILE_UNKNOWN)
             {
-                fprintf(stderr, "error: no profile specified; use the '-profile <profile name>' option");
+                fprintf(stderr, "error: no profile specified; use the '-profile <profile name>' option\n");
                 exit(1);
             }
-            // TODO: issue an error if we have multiple `-profile` options *and*
-            // there are entry points that didn't get a profile.
+            // Issue an error if we have mulitple `-profile` options *and*
+            // there were entry points that didn't get a profile, *and*
+            // there we m
+            if (anyEntryPointWithoutProfile
+                && profileOptionCount > 1)
+            {
+                if (rawEntryPoints.Count() > 1)
+                {
+                    fprintf(stderr, "error: when multiple entry points are specified, each must have a profile given (with '-profile') before the '-entry' option\n");
+                    exit(1);
+                }
+            }
+            // TODO: need to issue an error on a `-profile` option that doesn't actually
+            // affect any entry point...
+
+            // Take the profile that was specified on the command line, and
+            // apply it to any entry points that don't already have a profile.
+            for( auto& e : rawEntryPoints )
+            {
+                if( e.profileID == SLANG_PROFILE_UNKNOWN )
+                {
+                    e.profileID = currentProfileID;
+                }
+            }
+        }
+
+        // Did the user try to specify output path(s)?
+        if (rawOutputPaths.Count() != 0)
+        {
+            if (rawEntryPoints.Count() == 1 && rawOutputPaths.Count() == 1)
+            {
+                // There was exactly one entry point, and exactly one output path,
+                // so we can directly use that path for the entry point.
+                rawEntryPoints[0].outputPathIndex = 0;
+            }
+            else if (rawOutputPaths.Count() > rawEntryPoints.Count())
+            {
+                requestImpl->mSink.diagnose(
+                    CodePosition(),
+                    Diagnostics::tooManyOutputPathsSpecified,
+                    rawOutputPaths.Count(),
+                    rawEntryPoints.Count());
+            }
             else
             {
-                for( auto& e : rawEntryPoints )
+                // If the user tried to apply explicit output paths, but there
+                // were any entry points that didn't pick up a path, that is
+                // an error:
+                for( auto& entryPoint : rawEntryPoints )
                 {
-                    if( e.profileID == SLANG_PROFILE_UNKNOWN )
+                    if (entryPoint.outputPathIndex < 0)
                     {
-                        e.profileID = currentProfileID;
+                        requestImpl->mSink.diagnose(
+                            CodePosition(),
+                            Diagnostics::noOutputPathSpecifiedForEntryPoint,
+                            entryPoint.name);
+
+                        // Don't emit this same error for other entry
+                        // points, even if we have more
+                        break;
                     }
                 }
+            }
+
+            // All of the output paths had better agree on the format
+            // they should provide.
+            switch (chosenTarget)
+            {
+            case SLANG_TARGET_NONE:
+            case SLANG_TARGET_UNKNOWN:
+                // No direct `-target` argument given, so try to infer
+                // a target from the entry points:
+                {
+                    bool anyUnknownTargets = false;
+                    for (auto rawOutputPath : rawOutputPaths)
+                    {
+                        if (rawOutputPath.target == SLANG_TARGET_UNKNOWN)
+                        {
+                            // This file didn't imply a target, and that
+                            // needs to be an error:
+                            requestImpl->mSink.diagnose(
+                                CodePosition(),
+                                Diagnostics::cannotDeduceOutputFormatFromPath,
+                                rawOutputPath.path);
+
+                            // Don't keep looking for errors
+                            anyUnknownTargets = true;
+                            break;
+                        }
+                    }
+
+                    if (!anyUnknownTargets)
+                    {
+                        // Okay, all the files have explicit targets,
+                        // so we will set the code generation target
+                        // accordingly, and then ensure that all
+                        // the other output paths specified (if any)
+                        // are consistent with the chosen target.
+                        //
+                        auto target = rawOutputPaths[0].target;
+                        spSetCodeGenTarget(
+                            compileRequest,
+                            target);
+
+                        for (auto rawOutputPath : rawOutputPaths)
+                        {
+                            if (rawOutputPath.target != target)
+                            {
+                                // This file didn't imply a target, and that
+                                // needs to be an error:
+                                requestImpl->mSink.diagnose(
+                                    CodePosition(),
+                                    Diagnostics::outputPathsImplyDifferentFormats,
+                                    rawOutputPaths[0].path,
+                                    rawOutputPath.path);
+
+                                // Don't keep looking for errors
+                                break;
+                            }
+                        }
+                    }
+
+                }
+                break;
+
+            default:
+                {
+                    // An explicit target was given on the command-line.
+                    // We will trust that the user knows what they are
+                    // doing, even if one of the output files implies
+                    // a different format.
+                }
+                break;
+
             }
         }
 
@@ -507,18 +711,27 @@ struct OptionsParser
 
             if( anyEntryPointWithoutTranslationUnit && translationUnitCount != 1 )
             {
-                fprintf(stderr, "error: when using multiple translation units, entry points must be specified after their translation unit file(s)");
+                fprintf(stderr, "error: when using multiple translation units, entry points must be specified after their translation unit file(s)\n");
                 exit(1);
             }
 
             // Now place all those entry points where they belong
             for( auto& entryPoint : rawEntryPoints )
             {
-                spAddEntryPoint(
+                int entryPointIndex = spAddEntryPoint(
                     compileRequest,
                     entryPoint.translationUnitIndex,
                     entryPoint.name.begin(),
                     entryPoint.profileID);
+
+                // If an output path was specified for the entry point,
+                // when we need to provide it here.
+                if (entryPoint.outputPathIndex >= 0)
+                {
+                    auto rawOutputPath = rawOutputPaths[entryPoint.outputPathIndex];
+
+                    requestImpl->entryPoints[entryPointIndex]->outputPath = rawOutputPath.path;
+                }
             }
         }
 
@@ -533,6 +746,9 @@ struct OptionsParser
         }
 #endif
 
+        if (requestImpl->mSink.GetErrorCount() != 0)
+            return 1;
+
         return 0;
     }
 };
@@ -545,6 +761,7 @@ int parseOptions(
 {
     OptionsParser parser;
     parser.compileRequest = compileRequest;
+    parser.requestImpl = (Slang::CompileRequest*) compileRequest;
     return parser.parse(argc, argv);
 }
 

@@ -3,6 +3,8 @@
 #define SLANG_DYNAMIC
 #include "../slang.h"
 
+SLANG_API void spSetCommandLineCompilerMode(SlangCompileRequest* request);
+
 #include "core/slang-io.h"
 
 using namespace Slang;
@@ -31,6 +33,8 @@ int MAIN(int argc, char** argv)
 
     SlangSession* session = spCreateSession(nullptr);
     SlangCompileRequest* compileRequest = spCreateCompileRequest(session);
+
+    spSetCommandLineCompilerMode(compileRequest);
 
     char const* appName = "slangc";
     if(argc > 0) appName = argv[0];
@@ -62,6 +66,9 @@ int MAIN(int argc, char** argv)
             exit(-1);
         }
 
+#if 0
+        // Produce output as the command-line compiler driver should.
+
         // Now dump the output from the compilation to stdout.
         //
         // TODO: Need a way to control where output goes so that
@@ -76,6 +83,7 @@ int MAIN(int argc, char** argv)
             fputs(output, stdout);
         }
         fflush(stdout);
+#endif
 
         // Now that we are done, clean up after ourselves
 
