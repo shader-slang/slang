@@ -87,9 +87,13 @@ after_build:
       7z a "$env:SLANG_BINARY_ARCHIVE" bin\*\*\slang.lib
       7z a "$env:SLANG_BINARY_ARCHIVE" bin\*\*\slang-glslang.dll
       7z a "$env:SLANG_BINARY_ARCHIVE" bin\*\*\slangc.exe
+      7z a "$env:SLANG_BINARY_ARCHIVE" docs\*.md
       7z a "$env:SLANG_SOURCE_ARCHIVE" slang.h
       7z a "$env:SLANG_SOURCE_ARCHIVE" source\*\*.h
       7z a "$env:SLANG_SOURCE_ARCHIVE" source\*\*.cpp
+      7z a "$env:SLANG_SOURCE_ARCHIVE" docs\*.md
+      7z a "$env:SLANG_SOURCE_ARCHIVE" README.md
+      7z a "$env:SLANG_SOURCE_ARCHIVE" LICENSE
 
 # Register the created .zip file as an artifact with AppVeyor
 
