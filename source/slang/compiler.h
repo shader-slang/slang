@@ -309,6 +309,69 @@ namespace Slang
         CompileRequest* compileRequest,
         char const*     text,
         CodeGenTarget   target);
+
+    //
+
+    class Session
+    {
+    public:
+        //
+
+        RefPtr<Scope>   coreLanguageScope;
+        RefPtr<Scope>   hlslLanguageScope;
+        RefPtr<Scope>   slangLanguageScope;
+        RefPtr<Scope>   glslLanguageScope;
+
+        List<RefPtr<ProgramSyntaxNode>> loadedModuleCode;
+
+
+        //
+
+        // Generated code for stdlib, etc.
+        String stdlibPath;
+        String coreLibraryCode;
+        String slangLibraryCode;
+        String hlslLibraryCode;
+        String glslLibraryCode;
+
+        String getStdlibPath();
+        String getCoreLibraryCode();
+        String getHLSLLibraryCode();
+        String getGLSLLibraryCode();
+
+        // Basic types that we don't want to re-create all the time
+        RefPtr<ExpressionType> errorType;
+        RefPtr<ExpressionType> initializerListType;
+        RefPtr<ExpressionType> overloadedType;
+
+        Dictionary<int, RefPtr<ExpressionType>> builtinTypes;
+        Dictionary<String, Decl*> magicDecls;
+        List<RefPtr<ExpressionType>> canonicalTypes;
+
+        void initializeTypes();
+
+        ExpressionType* getBoolType();
+        ExpressionType* getFloatType();
+        ExpressionType* getDoubleType();
+        ExpressionType* getIntType();
+        ExpressionType* getUIntType();
+        ExpressionType* getVoidType();
+        ExpressionType* getBuiltinType(BaseType flavor);
+
+        ExpressionType* getInitializerListType();
+        ExpressionType* getOverloadedType();
+        ExpressionType* getErrorType();
+
+        //
+
+        Session();
+
+        void addBuiltinSource(
+            RefPtr<Scope> const&    scope,
+            String const&           path,
+            String const&           source);
+    };
+
 }
 
 #endif

@@ -321,6 +321,11 @@ struct LoweringVisitor
     // then this will point to that variable.
     RefPtr<Variable>            resultVariable;
 
+    Session* getSession()
+    {
+        return shared->compileRequest->mSession;
+    }
+
     CodeGenTarget getTarget() { return shared->target; }
 
     bool isReservedWord(String const& name)
@@ -539,20 +544,25 @@ struct LoweringVisitor
 
     RefPtr<ExpressionType> visitGenericDeclRefType(GenericDeclRefType* type)
     {
-        return new GenericDeclRefType(translateDeclRef(DeclRef<Decl>(type->declRef)).As<GenericDecl>());
+        return getGenericDeclRefType(
+            type->getSession(),
+            translateDeclRef(DeclRef<Decl>(type->declRef)).As<GenericDecl>());
     }
 
     RefPtr<ExpressionType> visitFuncType(FuncType* type)
     {
-        RefPtr<FuncType> loweredType = new FuncType();
-        loweredType->declRef = translateDeclRef(DeclRef<Decl>(type->declRef)).As<CallableDecl>();
+        RefPtr<FuncType> loweredType = getFuncType(
+            getSession(),
+            translateDeclRef(DeclRef<Decl>(type->declRef)).As<CallableDecl>());
         return loweredType;
     }
 
     RefPtr<ExpressionType> visitDeclRefType(DeclRefType* type)
     {
         auto loweredDeclRef = translateDeclRef(type->declRef);
-        return DeclRefType::Create(loweredDeclRef);
+        return DeclRefType::Create(
+            type->getSession(),
+            loweredDeclRef);
     }
 
     RefPtr<ExpressionType> visitNamedExpressionType(NamedExpressionType* type)
@@ -563,19 +573,21 @@ struct LoweringVisitor
             return lowerType(GetType(type->declRef));
         }
 
-        return new NamedExpressionType(translateDeclRef(DeclRef<Decl>(type->declRef)).As<TypeDefDecl>());
+        return getNamedType(
+            type->getSession(),
+            translateDeclRef(DeclRef<Decl>(type->declRef)).As<TypeDefDecl>());
     }
 
     RefPtr<ExpressionType> visitTypeType(TypeType* type)
     {
-        return new TypeType(lowerType(type->type));
+        return getTypeType(lowerType(type->type));
     }
 
     RefPtr<ExpressionType> visitArrayExpressionType(ArrayExpressionType* type)
     {
-        RefPtr<ArrayExpressionType> loweredType = new ArrayExpressionType();
-        loweredType->BaseType = lowerType(type->BaseType);
-        loweredType->ArrayLength = lowerVal(type->ArrayLength).As<IntVal>();
+        RefPtr<ArrayExpressionType> loweredType = Slang::getArrayType(
+            lowerType(type->BaseType),
+            lowerVal(type->ArrayLength).As<IntVal>());
         return loweredType;
     }
 
@@ -2815,9 +2827,9 @@ return loweredExpr;
                 RefPtr<ExpressionType> fieldVarType = fieldType;
                 for (auto aa = info.arraySpecs; aa; aa = aa->next)
                 {
-                    RefPtr<ArrayExpressionType> arrayType = new ArrayExpressionType();
-                    arrayType->BaseType = fieldVarType;
-                    arrayType->ArrayLength = aa->elementCount;
+                    RefPtr<ArrayExpressionType> arrayType = Slang::getArrayType(
+                        fieldVarType,
+                        aa->elementCount);
 
                     fieldVarType = arrayType;
                 }
@@ -3378,29 +3390,32 @@ return loweredExpr;
 
     RefPtr<ExpressionType> getFloatType()
     {
-        return ExpressionType::GetFloat();
+        return getSession()->getFloatType();
     }
 
     RefPtr<ExpressionType> getIntType()
     {
-        return ExpressionType::GetInt();
+        return getSession()->getIntType();
     }
 
     RefPtr<ExpressionType> getUIntType()
     {
-        return ExpressionType::GetUInt();
+        return getSession()->getUIntType();
     }
 
     RefPtr<ExpressionType> getBoolType()
     {
-        return ExpressionType::GetBool();
+        return getSession()->getBoolType();
     }
 
     RefPtr<VectorExpressionType> getVectorType(
         RefPtr<ExpressionType>  elementType,
         RefPtr<IntVal>          elementCount)
     {
-        auto vectorGenericDecl = findMagicDecl("Vector").As<GenericDecl>();
+        auto session = getSession();
+        auto vectorGenericDecl = findMagicDecl(
+            session,
+            "Vector").As<GenericDecl>();
         auto vectorTypeDecl = vectorGenericDecl->inner;
                
         auto substitutions = new Substitutions();
@@ -3410,7 +3425,9 @@ return loweredExpr;
 
         auto declRef = DeclRef<Decl>(vectorTypeDecl.Ptr(), substitutions);
 
-        return DeclRefType::Create(declRef)->As<VectorExpressionType>();
+        return DeclRefType::Create(
+            session,
+            declRef)->As<VectorExpressionType>();
     }
 
     RefPtr<IntVal> getConstantIntVal(IntegerLiteralValue value)
@@ -3430,18 +3447,7 @@ return loweredExpr;
     RefPtr<ArrayExpressionType> getUnsizedArrayType(
         RefPtr<ExpressionType>  elementType)
     {
-        RefPtr<ArrayExpressionType> arrayType = new ArrayExpressionType();
-        arrayType->BaseType = elementType;
-        return arrayType;
-    }
-
-    RefPtr<ArrayExpressionType> getArrayType(
-        RefPtr<ExpressionType>  elementType,
-        RefPtr<IntVal>          elementCount)
-    {
-        RefPtr<ArrayExpressionType> arrayType = new ArrayExpressionType();
-        arrayType->BaseType = elementType;
-        arrayType->ArrayLength = elementCount;
+        RefPtr<ArrayExpressionType> arrayType = Slang::getArrayType(elementType);
         return arrayType;
     }
 
@@ -3449,7 +3455,7 @@ return loweredExpr;
         RefPtr<ExpressionType>  elementType,
         IntegerLiteralValue     elementCount)
     {
-        return getArrayType(elementType, getConstantIntVal(elementCount));
+        return Slang::getArrayType(elementType, getConstantIntVal(elementCount));
     }
 
     RefPtr<ExpressionSyntaxNode> lowerSimpleShaderParameterToGLSLGlobal(
@@ -3461,9 +3467,9 @@ return loweredExpr;
 
         for (auto aa = info.arraySpecs; aa; aa = aa->next)
         {
-            RefPtr<ArrayExpressionType> arrayType = new ArrayExpressionType();
-            arrayType->BaseType = type;
-            arrayType->ArrayLength = aa->elementCount;
+            RefPtr<ArrayExpressionType> arrayType = Slang::getArrayType(
+                type,
+                aa->elementCount);
 
             type = arrayType;
         }
@@ -3923,7 +3929,7 @@ return loweredExpr;
 
         // Now we will generate a `void main() { ... }` function to call the lowered code.
         RefPtr<FunctionSyntaxNode> mainDecl = new FunctionSyntaxNode();
-        mainDecl->ReturnType.type = ExpressionType::GetVoid();
+        mainDecl->ReturnType.type = getSession()->getVoidType();
         mainDecl->Name.Content = "main";
 
         // If the user's entry point was called `main` then rename it here
@@ -3988,7 +3994,7 @@ return loweredExpr;
 
         // Generate a local variable for the result, if any
         RefPtr<Variable> resultVarDecl;
-        if (!loweredEntryPointFunc->ReturnType->Equals(ExpressionType::GetVoid()))
+        if (!loweredEntryPointFunc->ReturnType->Equals(getSession()->getVoidType()))
         {
             resultVarDecl = new Variable();
             resultVarDecl->Position = loweredEntryPointFunc->Position;
@@ -4003,8 +4009,9 @@ return loweredExpr;
         // Now generate a call to the entry-point function, using the local variables
         auto entryPointDeclRef = makeDeclRef(loweredEntryPointFunc.Ptr());
 
-        RefPtr<FuncType> entryPointType = new FuncType();
-        entryPointType->declRef = entryPointDeclRef;
+        auto entryPointType = getFuncType(
+            getSession(),
+            entryPointDeclRef);
 
         RefPtr<VarExpressionSyntaxNode> entryPointRef = new VarExpressionSyntaxNode();
         entryPointRef->name = loweredEntryPointFunc->getName();
@@ -4106,7 +4113,7 @@ return loweredExpr;
         // global-scope declaration.
         auto loweredReturnType = lowerType(entryPointDecl->ReturnType);
         RefPtr<Variable> resultGlobal;
-        if (!loweredReturnType->Equals(ExpressionType::GetVoid()))
+        if (!loweredReturnType->Equals(getSession()->getVoidType()))
         {
             resultGlobal = new Variable();
             // TODO: need a scheme for generating unique names
@@ -4117,7 +4124,7 @@ return loweredExpr;
         }
 
         loweredDecl->Name.Content = "main";
-        loweredDecl->ReturnType.type = ExpressionType::GetVoid();
+        loweredDecl->ReturnType.type = getSession()->getVoidType();
 
         // We will emit the body statement in a context where
         // a `return` statmenet will generate writes to the

@@ -1,7 +1,6 @@
 #include "../../slang.h"
 
 #include "../core/slang-io.h"
-#include "../slang/slang-stdlib.h"
 #include "parameter-binding.h"
 #include "../slang/parser.h"
 #include "../slang/preprocessor.h"
@@ -19,65 +18,31 @@
 
 namespace Slang {
 
-class Session
+Session::Session()
 {
-public:
-    bool useCache = false;
-    String cacheDir;
+    // Initialize representations of some very basic types:
+    initializeTypes();
 
-    RefPtr<Scope>   coreLanguageScope;
-    RefPtr<Scope>   hlslLanguageScope;
-    RefPtr<Scope>   slangLanguageScope;
-    RefPtr<Scope>   glslLanguageScope;
+    // Create scopes for various language builtins.
+    //
+    // TODO: load these on-demand to avoid parsing
+    // stdlib code for languages the user won't use.
 
-    List<RefPtr<ProgramSyntaxNode>> loadedModuleCode;
+    coreLanguageScope = new Scope();
 
+    hlslLanguageScope = new Scope();
+    hlslLanguageScope->nextSibling = coreLanguageScope;
 
-    Session(bool /*pUseCache*/, String /*pCacheDir*/)
-    {
-        // Initialize global state
-        // TODO: move this into the session instead
-        BasicExpressionType::Init();
+    slangLanguageScope = new Scope();
+    slangLanguageScope->nextSibling = hlslLanguageScope;
 
-        // Create scopes for various language builtins.
-        //
-        // TODO: load these on-demand to avoid parsing
-        // stdlib code for languages the user won't use.
+    glslLanguageScope = new Scope();
+    glslLanguageScope->nextSibling = coreLanguageScope;
 
-        coreLanguageScope = new Scope();
-
-        hlslLanguageScope = new Scope();
-        hlslLanguageScope->nextSibling = coreLanguageScope;
-
-        slangLanguageScope = new Scope();
-        slangLanguageScope->nextSibling = hlslLanguageScope;
-
-        glslLanguageScope = new Scope();
-        glslLanguageScope->nextSibling = coreLanguageScope;
-
-        addBuiltinSource(coreLanguageScope, "core", getCoreLibraryCode());
-        addBuiltinSource(hlslLanguageScope, "hlsl", getHLSLLibraryCode());
-        addBuiltinSource(glslLanguageScope, "glsl", getGLSLLibraryCode());
-    }
-
-    ~Session()
-    {
-        // We need to clean up the strings for the standard library
-        // code that we might have allocated and loaded into static
-        // variables (TODO: don't use `static` variables for this stuff)
-
-        finalizeShaderLibrary();
-
-        // Ditto for our type represnetation stuff
-
-        ExpressionType::Finalize();
-    }
-
-    void addBuiltinSource(
-        RefPtr<Scope> const&    scope,
-        String const&           path,
-        String const&           source);
-};
+    addBuiltinSource(coreLanguageScope, "core", getCoreLibraryCode());
+    addBuiltinSource(hlslLanguageScope, "hlsl", getHLSLLibraryCode());
+    addBuiltinSource(glslLanguageScope, "glsl", getGLSLLibraryCode());
+}
 
 struct IncludeHandlerImpl : IncludeHandler
 {
@@ -614,9 +579,9 @@ void Session::addBuiltinSource(
 #define SESSION(x) reinterpret_cast<Slang::Session *>(x)
 #define REQ(x) reinterpret_cast<Slang::CompileRequest*>(x)
 
-SLANG_API SlangSession* spCreateSession(const char * cacheDir)
+SLANG_API SlangSession* spCreateSession(const char*)
 {
-    return reinterpret_cast<SlangSession *>(new Slang::Session((cacheDir ? true : false), cacheDir));
+    return reinterpret_cast<SlangSession *>(new Slang::Session());
 }
 
 SLANG_API void spDestroySession(

@@ -80,6 +80,12 @@ namespace Slang
             , fileName(_fileName)
             , outerScope(outerScope)
         {}
+
+        Session* getSession()
+        {
+            return translationUnit->compileRequest->mSession;
+        }
+
         RefPtr<ProgramSyntaxNode> Parse();
 
         Token ReadToken();
@@ -820,6 +826,7 @@ namespace Slang
                 if( parser->LookAheadToken(TokenType::Identifier) )
                 {
                     LookupResult lookupResult = LookUp(
+                        parser->getSession(),
                         nullptr, // No semantics visitor available yet!
                         parser->tokenReader.PeekToken().Content,
                         parser->currentScope);
@@ -2070,12 +2077,14 @@ namespace Slang
                 auto paramConstraint = new GenericTypeConstraintDecl();
                 parser->FillPosition(paramConstraint);
 
-                auto paramType = DeclRefType::Create(DeclRef<Decl>(paramDecl, nullptr));
+                auto paramType = DeclRefType::Create(
+                    parser->getSession(),
+                    DeclRef<Decl>(paramDecl, nullptr));
 
                 auto paramTypeExpr = new SharedTypeExpr();
                 paramTypeExpr->Position = paramDecl->Position;
                 paramTypeExpr->base.type = paramType;
-                paramTypeExpr->Type = new TypeType(paramType);
+                paramTypeExpr->Type = QualType(getTypeType(paramType));
 
                 paramConstraint->sub = TypeExp(paramTypeExpr);
                 paramConstraint->sup = parser->ParseTypeExp();
@@ -2518,6 +2527,7 @@ namespace Slang
     static bool isGenericName(Parser* parser, String const& name)
     {
         auto lookupResult = LookUp(
+            parser->getSession(),
             nullptr, // no semantics visitor available yet
             name,
             parser->currentScope);
@@ -2539,6 +2549,7 @@ namespace Slang
     static bool isTypeName(Parser* parser, String const& name)
     {
         auto lookupResult = LookUp(
+            parser->getSession(),
             nullptr, // no semantics visitor available yet
             name,
             parser->currentScope);
@@ -3389,24 +3400,24 @@ namespace Slang
                     if(unknownCount)
                     {
                         parser->sink->diagnose(token, Diagnostics::invalidIntegerLiteralSuffix, suffix);
-                        suffixType = ExpressionType::GetError();
+                        suffixType = parser->getSession()->getErrorType();
                     }
                     // `u` or `ul` suffix -> `uint`
                     else if(uCount == 1 && (lCount <= 1))
                     {
-                        suffixType = ExpressionType::GetUInt();
+                        suffixType = parser->getSession()->getUIntType();
                     }
                     // `l` suffix on integer -> `int` (== `long`)
                     else if(lCount == 1 && !uCount)
                     {
-                        suffixType = ExpressionType::GetInt();
+                        suffixType = parser->getSession()->getIntType();
                     }
                     // TODO: probably need `ll` and `ull`
                     // TODO: are there other suffixes we need to handle?
                     else
                     {
                         parser->sink->diagnose(token, Diagnostics::invalidIntegerLiteralSuffix, suffix);
-                        suffixType = ExpressionType::GetError();
+                        suffixType = parser->getSession()->getErrorType();
                     }
                 }
 
@@ -3459,23 +3470,23 @@ namespace Slang
                     if(unknownCount)
                     {
                         parser->sink->diagnose(token, Diagnostics::invalidFloatingPOintLiteralSuffix, suffix);
-                        suffixType = ExpressionType::GetError();
+                        suffixType = parser->getSession()->getErrorType();
                     }
                     // `f` suffix -> `float`
                     if(fCount == 1 && !lCount)
                     {
-                        suffixType = ExpressionType::GetFloat();
+                        suffixType = parser->getSession()->getFloatType();
                     }
                     // `l` or `lf` suffix on float -> `double`
                     else if(lCount == 1 && (fCount <= 1))
                     {
-                        suffixType = ExpressionType::getDoubleType();
+                        suffixType = parser->getSession()->getDoubleType();
                     }
                     // TODO: are there other suffixes we need to handle?
                     else
                     {
                         parser->sink->diagnose(token, Diagnostics::invalidFloatingPOintLiteralSuffix, suffix);
-                        suffixType = ExpressionType::GetError();
+                        suffixType = parser->getSession()->getErrorType();
                     }
                 }
 

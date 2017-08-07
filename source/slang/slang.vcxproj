@@ -184,7 +184,6 @@
     <ClInclude Include="profile-defs.h" />
     <ClInclude Include="profile.h" />
     <ClInclude Include="reflection.h" />
-    <ClInclude Include="slang-stdlib.h" />
     <ClInclude Include="source-loc.h" />
     <ClInclude Include="stmt-defs.h" />
     <ClInclude Include="syntax-base-defs.h" />

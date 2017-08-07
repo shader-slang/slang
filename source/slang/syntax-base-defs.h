@@ -62,29 +62,9 @@ ABSTRACT_SYNTAX_CLASS(ExpressionType, Val)
 
 RAW(
 public:
-    static RefPtr<ExpressionType> Error;
-    static RefPtr<ExpressionType> initializerListType;
-    static RefPtr<ExpressionType> Overloaded;
+    Session* getSession() { return this->session; }
+    void setSession(Session* s) { this->session = s; }
 
-    static Dictionary<int, RefPtr<ExpressionType>> sBuiltinTypes;
-    static Dictionary<String, Decl*> sMagicDecls;
-
-    // Note: just exists to make sure we can clean up
-    // canonical types we create along the way
-    static List<RefPtr<ExpressionType>> sCanonicalTypes;
-
-
-
-    static ExpressionType* GetBool();
-    static ExpressionType* GetFloat();
-    static ExpressionType* getDoubleType();
-    static ExpressionType* GetInt();
-    static ExpressionType* GetUInt();
-    static ExpressionType* GetVoid();
-    static ExpressionType* getInitializerListType();
-    static ExpressionType* GetError();
-
-public:
     virtual String ToString() = 0;
 
     bool Equals(ExpressionType * type);
@@ -115,8 +95,6 @@ public:
     bool IsSampler() { return As<SamplerStateType>() != nullptr; }
     bool IsStruct();
     bool IsClass();
-    static void Init();
-    static void Finalize();
     ExpressionType* GetCanonicalType();
 
     virtual RefPtr<Val> SubstituteImpl(Substitutions* subst, int* ioDiff) override;
@@ -127,6 +105,8 @@ protected:
 
     virtual ExpressionType* CreateCanonicalType() = 0;
     ExpressionType* canonicalType = nullptr;
+
+    Session* session = nullptr;
     )
 END_SYNTAX_CLASS()
 

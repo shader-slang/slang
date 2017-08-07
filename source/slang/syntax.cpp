@@ -1,5 +1,6 @@
 #include "syntax.h"
 
+#include "compiler.h"
 #include "visitor.h"
 
 #include <typeinfo>
@@ -165,38 +166,69 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
         return true;
     }
 
-#if 0
-    RefPtr<ExpressionType> ExpressionType::Bool;
-    RefPtr<ExpressionType> ExpressionType::UInt;
-    RefPtr<ExpressionType> ExpressionType::Int;
-    RefPtr<ExpressionType> ExpressionType::Float;
-    RefPtr<ExpressionType> ExpressionType::Float2;
-    RefPtr<ExpressionType> ExpressionType::Void;
-#endif
-    RefPtr<ExpressionType> ExpressionType::Error;
-    RefPtr<ExpressionType> ExpressionType::initializerListType;
-    RefPtr<ExpressionType> ExpressionType::Overloaded;
-
-    Dictionary<int, RefPtr<ExpressionType>> ExpressionType::sBuiltinTypes;
-    Dictionary<String, Decl*> ExpressionType::sMagicDecls;
-    List<RefPtr<ExpressionType>> ExpressionType::sCanonicalTypes;
-
-    void ExpressionType::Init()
+    void Session::initializeTypes()
     {
-        Error = new ErrorType();
+        errorType = new ErrorType();
+        errorType->setSession(this);
+
         initializerListType = new InitializerListType();
-        Overloaded = new OverloadGroupType();
+        initializerListType->setSession(this);
+
+        overloadedType = new OverloadGroupType();
+        overloadedType->setSession(this);
     }
-    void ExpressionType::Finalize()
+
+    ExpressionType* Session::getBoolType()
     {
-        Error = nullptr;
-        initializerListType = nullptr;
-        Overloaded = nullptr;
-        // Note(tfoley): This seems to be just about the only way to clear out a List<T>
-        sCanonicalTypes = List<RefPtr<ExpressionType>>();
-		sBuiltinTypes = Dictionary<int, RefPtr<ExpressionType>>();
-		sMagicDecls = Dictionary<String, Decl*>();
+        return getBuiltinType(BaseType::Bool);
     }
+
+    ExpressionType* Session::getFloatType()
+    {
+        return getBuiltinType(BaseType::Float);
+    }
+
+    ExpressionType* Session::getDoubleType()
+    {
+        return getBuiltinType(BaseType::Double);
+    }
+
+    ExpressionType* Session::getIntType()
+    {
+        return getBuiltinType(BaseType::Int);
+    }
+
+    ExpressionType* Session::getUIntType()
+    {
+        return getBuiltinType(BaseType::UInt);
+    }
+
+    ExpressionType* Session::getVoidType()
+    {
+        return getBuiltinType(BaseType::Void);
+    }
+
+    ExpressionType* Session::getBuiltinType(BaseType flavor)
+    {
+        return RefPtr<ExpressionType>(builtinTypes[(int)flavor]);
+    }
+
+    ExpressionType* Session::getInitializerListType()
+    {
+        return initializerListType;
+    }
+
+    ExpressionType* Session::getOverloadedType()
+    {
+        return overloadedType;
+    }
+
+    ExpressionType* Session::getErrorType()
+    {
+        return errorType;
+    }
+
+
     bool ArrayExpressionType::EqualsImpl(ExpressionType * type)
     {
         auto arrType = type->AsArrayType();
@@ -206,11 +238,11 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
     }
     ExpressionType* ArrayExpressionType::CreateCanonicalType()
     {
-        auto canonicalBaseType = BaseType->GetCanonicalType();
-        auto canonicalArrayType = new ArrayExpressionType();
-        sCanonicalTypes.Add(canonicalArrayType);
-        canonicalArrayType->BaseType = canonicalBaseType;
-        canonicalArrayType->ArrayLength = ArrayLength;
+        auto canonicalElementType = BaseType->GetCanonicalType();
+        auto canonicalArrayType = getArrayType(
+            canonicalElementType,
+            ArrayLength);
+        session->canonicalTypes.Add(canonicalArrayType);
         return canonicalArrayType;
     }
     int ArrayExpressionType::GetHashCode()
@@ -308,7 +340,7 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
         *ioDiff += diff;
 
         // Re-construct the type in case we are using a specialized sub-class
-        return DeclRefType::Create(substDeclRef);
+        return DeclRefType::Create(getSession(), substDeclRef);
     }
 
     static RefPtr<ExpressionType> ExtractGenericArgType(RefPtr<Val> val)
@@ -327,11 +359,14 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
 
     // TODO: need to figure out how to unify this with the logic
     // in the generic case...
-    DeclRefType* DeclRefType::Create(DeclRef<Decl> declRef)
+    DeclRefType* DeclRefType::Create(
+        Session*        session,
+        DeclRef<Decl>   declRef)
     {
         if (auto builtinMod = declRef.getDecl()->FindModifier<BuiltinTypeModifier>())
         {
             auto type = new BasicExpressionType(builtinMod->tag);
+            type->setSession(session);
             type->declRef = declRef;
             return type;
         }
@@ -342,6 +377,7 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
             if (magicMod->name == "SamplerState")
             {
                 auto type = new SamplerStateType();
+                type->setSession(session);
                 type->declRef = declRef;
                 type->flavor = SamplerStateType::Flavor(magicMod->tag);
                 return type;
@@ -350,6 +386,7 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
             {
                 SLANG_ASSERT(subst && subst->args.Count() == 2);
                 auto vecType = new VectorExpressionType();
+                vecType->setSession(session);
                 vecType->declRef = declRef;
                 vecType->elementType = ExtractGenericArgType(subst->args[0]);
                 vecType->elementCount = ExtractGenericArgInteger(subst->args[1]);
@@ -359,6 +396,7 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
             {
                 SLANG_ASSERT(subst && subst->args.Count() == 3);
                 auto matType = new MatrixExpressionType();
+                matType->setSession(session);
                 matType->declRef = declRef;
                 return matType;
             }
@@ -368,6 +406,7 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
                 auto textureType = new TextureType(
                     TextureType::Flavor(magicMod->tag),
                     ExtractGenericArgType(subst->args[0]));
+                textureType->setSession(session);
                 textureType->declRef = declRef;
                 return textureType;
             }
@@ -377,6 +416,7 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
                 auto textureType = new TextureSamplerType(
                     TextureType::Flavor(magicMod->tag),
                     ExtractGenericArgType(subst->args[0]));
+                textureType->setSession(session);
                 textureType->declRef = declRef;
                 return textureType;
             }
@@ -386,6 +426,7 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
                 auto textureType = new GLSLImageType(
                     TextureType::Flavor(magicMod->tag),
                     ExtractGenericArgType(subst->args[0]));
+                textureType->setSession(session);
                 textureType->declRef = declRef;
                 return textureType;
             }
@@ -396,7 +437,8 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
 
         #define CASE(n,T)													\
             else if(magicMod->name == #n) {									\
-                auto type = new T();										\
+                auto type = new T();									    \
+                type->setSession(session);                                  \
                 type->declRef = declRef;									\
                 return type;												\
             }
@@ -409,7 +451,8 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
             #define CASE(n,T)													\
                 else if(magicMod->name == #n) {									\
                     SLANG_ASSERT(subst && subst->args.Count() == 1);			\
-                    auto type = new T();										\
+                    auto type = new T();									    \
+                    type->setSession(session);                                  \
                     type->elementType = ExtractGenericArgType(subst->args[0]);	\
                     type->declRef = declRef;									\
                     return type;												\
@@ -435,7 +478,8 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
             // "magic" builtin types which have no generic parameters
             #define CASE(n,T)													\
                 else if(magicMod->name == #n) {									\
-                    auto type = new T();										\
+                    auto type = new T();									    \
+                    type->setSession(session);                                  \
                     type->declRef = declRef;									\
                     return type;												\
                 }
@@ -455,7 +499,9 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
         }
         else
         {
-            return new DeclRefType(declRef);
+            auto type = new DeclRefType(declRef);
+            type->setSession(session);
+            return type;
         }
     }
 
@@ -602,8 +648,8 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
 
     ExpressionType* TypeType::CreateCanonicalType()
     {
-        auto canType = new TypeType(type->GetCanonicalType());
-        sCanonicalTypes.Add(canType);
+        auto canType = getTypeType(type->GetCanonicalType());
+        session->canonicalTypes.Add(canType);
         return canType;
     }
 
@@ -953,65 +999,30 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
 
     //
 
-    void RegisterBuiltinDecl(
+    void registerBuiltinDecl(
+        Session*                    session,
         RefPtr<Decl>                decl,
         RefPtr<BuiltinTypeModifier> modifier)
     {
-        auto type = DeclRefType::Create(DeclRef<Decl>(decl.Ptr(), nullptr));
-        ExpressionType::sBuiltinTypes[(int)modifier->tag] = type;
+        auto type = DeclRefType::Create(
+            session,
+            DeclRef<Decl>(decl.Ptr(), nullptr));
+        session->builtinTypes[(int)modifier->tag] = type;
     }
 
-    void RegisterMagicDecl(
+    void registerMagicDecl(
+        Session*                    session,
         RefPtr<Decl>                decl,
         RefPtr<MagicTypeModifier>   modifier)
     {
-        ExpressionType::sMagicDecls[modifier->name] = decl.Ptr();
+        session->magicDecls[modifier->name] = decl.Ptr();
     }
 
     RefPtr<Decl> findMagicDecl(
-        String const& name)
+        Session*        session,
+        String const&   name)
     {
-        return ExpressionType::sMagicDecls[name].GetValue();
-    }
-
-    ExpressionType* ExpressionType::GetBool()
-    {
-        return sBuiltinTypes[(int)BaseType::Bool].GetValue().Ptr();
-    }
-
-    ExpressionType* ExpressionType::GetFloat()
-    {
-        return sBuiltinTypes[(int)BaseType::Float].GetValue().Ptr();
-    }
-
-    ExpressionType* ExpressionType::getDoubleType()
-    {
-        return sBuiltinTypes[(int)BaseType::Double].GetValue().Ptr();
-    }
-
-    ExpressionType* ExpressionType::GetInt()
-    {
-        return sBuiltinTypes[(int)BaseType::Int].GetValue().Ptr();
-    }
-
-    ExpressionType* ExpressionType::GetUInt()
-    {
-        return sBuiltinTypes[(int)BaseType::UInt].GetValue().Ptr();
-    }
-
-    ExpressionType* ExpressionType::GetVoid()
-    {
-        return sBuiltinTypes[(int)BaseType::Void].GetValue().Ptr();
-    }
-
-    ExpressionType* ExpressionType::getInitializerListType()
-    {
-        return initializerListType.Ptr();
-    }
-
-    ExpressionType* ExpressionType::GetError()
-    {
-        return ExpressionType::Error.Ptr();
+        return session->magicDecls[name].GetValue();
     }
 
     //
@@ -1061,4 +1072,74 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
     {
         return this->declRef.substitutions->args[1].As<IntVal>().Ptr();
     }
+
+    // Constructors for types
+
+    RefPtr<ArrayExpressionType> getArrayType(
+        ExpressionType* elementType,
+        IntVal*         elementCount)
+    {
+        auto session = elementType->getSession();
+        auto arrayType = new ArrayExpressionType();
+        arrayType->setSession(session);
+        arrayType->BaseType = elementType;
+        arrayType->ArrayLength = elementCount;
+        return arrayType;
+    }
+
+    RefPtr<ArrayExpressionType> getArrayType(
+        ExpressionType* elementType)
+    {
+        auto session = elementType->getSession();
+        auto arrayType = new ArrayExpressionType();
+        arrayType->setSession(session);
+        arrayType->BaseType = elementType;
+        return arrayType;
+    }
+
+    RefPtr<NamedExpressionType> getNamedType(
+        Session*                    session,
+        DeclRef<TypeDefDecl> const& declRef)
+    {
+        auto namedType = new NamedExpressionType(declRef);
+        namedType->setSession(session);
+        return namedType;
+    }
+
+    RefPtr<TypeType> getTypeType(
+        ExpressionType* type)
+    {
+        auto session = type->getSession();
+        auto typeType = new TypeType(type);
+        typeType->setSession(session);
+        return typeType;
+    }
+
+    RefPtr<FuncType> getFuncType(
+        Session*                        session,
+        DeclRef<CallableDecl> const&    declRef)
+    {
+        auto funcType = new FuncType();
+        funcType->setSession(session);
+        funcType->declRef = declRef;
+        return funcType;
+    }
+
+    RefPtr<GenericDeclRefType> getGenericDeclRefType(
+        Session*                    session,
+        DeclRef<GenericDecl> const& declRef)
+    {
+        auto genericDeclRefType = new GenericDeclRefType(declRef);
+        genericDeclRefType->setSession(session);
+        return genericDeclRefType;
+    }
+
+    RefPtr<SamplerStateType> getSamplerStateType(
+        Session*        session)
+    {
+        auto samplerStateType = new SamplerStateType();
+        samplerStateType->setSession(session);
+        return samplerStateType;
+    }
+
 }
