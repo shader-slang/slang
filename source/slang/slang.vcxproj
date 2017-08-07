@@ -172,8 +172,10 @@
     <ClInclude Include="emit.h" />
     <ClInclude Include="expr-defs.h" />
     <ClInclude Include="intrinsic-defs.h" />
+    <ClInclude Include="ir.h" />
     <ClInclude Include="lexer.h" />
     <ClInclude Include="lookup.h" />
+    <ClInclude Include="lower-to-ir.h" />
     <ClInclude Include="modifier-defs.h" />
     <ClInclude Include="name.h" />
     <ClInclude Include="object-meta-begin.h" />
@@ -203,8 +205,10 @@
     <ClCompile Include="compiler.cpp" />
     <ClCompile Include="diagnostics.cpp" />
     <ClCompile Include="emit.cpp" />
+    <ClCompile Include="ir.cpp" />
     <ClCompile Include="lexer.cpp" />
     <ClCompile Include="lookup.cpp" />
+    <ClCompile Include="lower-to-ir.cpp" />
     <ClCompile Include="lower.cpp" />
     <ClCompile Include="name.cpp" />
     <ClCompile Include="options.cpp" />

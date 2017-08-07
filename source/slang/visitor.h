@@ -34,6 +34,13 @@ struct TypeVisitor : Base
         return result;
     }
 
+    Result dispatchType(Type* type)
+    {
+        Result result;
+        type->accept(this, &result);
+        return result;
+    }
+
 #define ABSTRACT_SYNTAX_CLASS(NAME,BASE) /* empty */
 #define SYNTAX_CLASS(NAME, BASE) \
     virtual void dispatch_##NAME(NAME* obj, void* extra) override \
@@ -57,6 +64,11 @@ template<typename Derived, typename Base>
 struct TypeVisitor<Derived,void,Base> : Base
 {
     void dispatch(Type* type)
+    {
+        type->accept(this, 0);
+    }
+
+    void dispatchType(Type* type)
     {
         type->accept(this, 0);
     }
