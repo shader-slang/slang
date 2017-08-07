@@ -88,6 +88,10 @@ namespace Slang
 
         CompileRequest* getCompileRequest() { return request; }
         TranslationUnitRequest* getTranslationUnit() { return translationUnit; }
+        Session* getSession()
+        {
+            return getCompileRequest()->mSession;
+        }
 
     public:
         // Translate Types
@@ -107,7 +111,7 @@ namespace Slang
             {
                 return typeType->type;
             }
-            return ExpressionType::Error;
+            return getSession()->getErrorType();
         }
         RefPtr<ExpressionType> TranslateTypeNode(const RefPtr<ExpressionSyntaxNode> & node)
         {
@@ -214,7 +218,8 @@ namespace Slang
             {
                 auto overloadedExpr = new OverloadedExpr();
                 overloadedExpr->Position = originalExpr->Position;
-                overloadedExpr->Type = QualType(ExpressionType::Overloaded);
+                overloadedExpr->Type = QualType(
+                    getSession()->getOverloadedType());
                 overloadedExpr->base = baseExpr;
                 overloadedExpr->lookupResult2 = lookupResult;
                 return overloadedExpr;
@@ -253,9 +258,9 @@ namespace Slang
                         getSink()->diagnose(item.declRef, Diagnostics::overloadCandidate, declString);
                     }
                 }
+
                 // TODO(tfoley): should we construct a new ErrorExpr here?
-                overloadedExpr->Type = QualType(ExpressionType::Error);
-                return overloadedExpr;
+                return CreateErrorExpr(overloadedExpr);
             }
 
             // otherwise, we had a single decl and it was valid, hooray!
@@ -273,7 +278,7 @@ namespace Slang
             {
                 return expr;
             }
-            else if (expr->Type.type->Equals(ExpressionType::Error))
+            else if (auto errorType = expr->Type.type->As<ErrorType>())
             {
                 return expr;
             }
@@ -292,7 +297,7 @@ namespace Slang
             {
                 return typeType->type;
             }
-            return ExpressionType::Error;
+            return getSession()->getErrorType();
         }
 
         RefPtr<ExpressionType> ExtractGenericArgType(RefPtr<ExpressionSyntaxNode> exp)
@@ -317,7 +322,7 @@ namespace Slang
             {
                 return typeType->type;
             }
-            else if (exp->Type->Equals(ExpressionType::Error))
+            else if (auto errorType = exp->Type->As<ErrorType>())
             {
                 return exp->Type.type;
             }
@@ -332,7 +337,7 @@ namespace Slang
         // The arguments should already be checked against
         // the declaration.
         RefPtr<ExpressionType> InstantiateGenericType(
-            DeclRef<GenericDecl>								genericDeclRef,
+            DeclRef<GenericDecl>						genericDeclRef,
             List<RefPtr<ExpressionSyntaxNode>> const&	args)
         {
             RefPtr<Substitutions> subst = new Substitutions();
@@ -348,7 +353,9 @@ namespace Slang
             innerDeclRef.decl = GetInner(genericDeclRef);
             innerDeclRef.substitutions = subst;
 
-            return DeclRefType::Create(innerDeclRef);
+            return DeclRefType::Create(
+                getSession(),
+                innerDeclRef);
         }
 
         // Make sure a declaration has been checked, so we can refer to it.
@@ -432,7 +439,7 @@ namespace Slang
                                 {
                                     getSink()->diagnose(typeExp.exp.Ptr(), Diagnostics::unimplemented, "can't fill in default for generic type parameter");
                                 }
-                                *outProperType = ExpressionType::Error;
+                                *outProperType = getSession()->getErrorType();
                             }
                             return false;
                         }
@@ -451,7 +458,7 @@ namespace Slang
                                 {
                                     getSink()->diagnose(typeExp.exp.Ptr(), Diagnostics::unimplemented, "can't fill in default for generic type parameter");
                                 }
-                                *outProperType = ExpressionType::Error;
+                                *outProperType = getSession()->getErrorType();
                             }
                             return false;
                         }
@@ -525,7 +532,7 @@ namespace Slang
                     {
                         getSink()->diagnose(result.exp.Ptr(), Diagnostics::invalidTypeVoid);
                     }
-                    result.type = ExpressionType::Error;
+                    result.type = getSession()->getErrorType();
                     return result;
                 }
             }
@@ -546,7 +553,7 @@ namespace Slang
 
         RefPtr<ExpressionSyntaxNode> CreateErrorExpr(ExpressionSyntaxNode* expr)
         {
-            expr->Type = QualType(ExpressionType::Error);
+            expr->Type = QualType(getSession()->getErrorType());
             return expr;
         }
 
@@ -554,7 +561,7 @@ namespace Slang
         {
             // TODO: we may want other cases here...
 
-            if (expr->Type->Equals(ExpressionType::Error))
+            if (auto errorType = expr->Type->As<ErrorType>())
                 return true;
 
             return false;
@@ -1042,7 +1049,9 @@ namespace Slang
                 // clobber the type on `fromExpr`, and an invariant here is that coercion
                 // really shouldn't *change* the expression that is passed in, but should
                 // introduce new AST nodes to coerce its value to a different type...
-                return CreateImplicitCastExpr(ExpressionType::Error, fromExpr);
+                return CreateImplicitCastExpr(
+                    getSession()->getErrorType(),
+                    fromExpr);
             }
             return expr;
         }
@@ -1327,11 +1336,11 @@ namespace Slang
 
                 if (auto builtinMod = inner->FindModifier<BuiltinTypeModifier>())
                 {
-                    RegisterBuiltinDecl(decl, builtinMod);
+                    registerBuiltinDecl(getSession(), decl, builtinMod);
                 }
                 if (auto magicMod = inner->FindModifier<MagicTypeModifier>())
                 {
-                    RegisterMagicDecl(decl, magicMod);
+                    registerMagicDecl(getSession(), decl, magicMod);
                 }
             }
 
@@ -1588,7 +1597,7 @@ namespace Slang
             // TODO: This needs to bottleneck through the common variable checks
 
             para->Type = CheckUsableType(para->Type);
-            if (para->Type.Equals(ExpressionType::GetVoid()))
+            if (para->Type.Equals(getSession()->getVoidType()))
             {
                 if (!isRewriteMode())
                 {
@@ -1707,7 +1716,7 @@ namespace Slang
         {
             RefPtr<ExpressionSyntaxNode> e = expr;
             e = CheckTerm(e);
-            e = Coerce(ExpressionType::GetBool(), e);
+            e = Coerce(getSession()->getBoolType(), e);
             return e;
         }
 
@@ -1749,7 +1758,7 @@ namespace Slang
         {
             PushOuterStmt(stmt);
 
-            stmt->varDecl->Type.type = ExpressionType::GetInt();
+            stmt->varDecl->Type.type = getSession()->getIntType();
             addModifier(stmt->varDecl, new ConstModifier());
 
             RefPtr<IntVal> rangeBeginVal;
@@ -1851,7 +1860,7 @@ namespace Slang
         {
             if (!stmt->Expression)
             {
-                if (function && !function->ReturnType.Equals(ExpressionType::GetVoid()))
+                if (function && !function->ReturnType.Equals(getSession()->getVoidType()))
                 {
                     if (!isRewriteMode())
                     {
@@ -1862,7 +1871,7 @@ namespace Slang
             else
             {
                 stmt->Expression = CheckTerm(stmt->Expression);
-                if (!stmt->Expression->Type->Equals(ExpressionType::Error.Ptr()))
+                if (!stmt->Expression->Type->Equals(getSession()->getErrorType()))
                 {
                     if (function)
                     {
@@ -1922,12 +1931,9 @@ namespace Slang
 
             // Create a new array type based on the size we found,
             // and install it into our type.
-            auto newArrayType = new ArrayExpressionType();
-            newArrayType->BaseType = arrayType->BaseType;
-            newArrayType->ArrayLength = elementCount;
-
-            // Okay we are good to go!
-            varDecl->Type.type = newArrayType;
+            varDecl->Type.type = getArrayType(
+                arrayType->BaseType,
+                elementCount);
         }
 
         void ValidateArraySizeForVariable(Variable* varDecl)
@@ -1973,7 +1979,7 @@ namespace Slang
             }
 #endif
             varDecl->Type = typeExp;
-            if (varDecl->Type.Equals(ExpressionType::GetVoid()))
+            if (varDecl->Type.Equals(getSession()->getVoidType()))
             {
                 if (!isRewriteMode())
                 {
@@ -2034,16 +2040,16 @@ namespace Slang
             switch (expr->ConstType)
             {
             case ConstantExpressionSyntaxNode::ConstantType::Int:
-                expr->Type = ExpressionType::GetInt();
+                expr->Type = getSession()->getIntType();
                 break;
             case ConstantExpressionSyntaxNode::ConstantType::Bool:
-                expr->Type = ExpressionType::GetBool();
+                expr->Type = getSession()->getBoolType();
                 break;
             case ConstantExpressionSyntaxNode::ConstantType::Float:
-                expr->Type = ExpressionType::GetFloat();
+                expr->Type = getSession()->getFloatType();
                 break;
             default:
-                expr->Type = QualType(ExpressionType::Error);
+                expr->Type = QualType(getSession()->getErrorType());
                 throw "Invalid constant type.";
                 break;
             }
@@ -2273,7 +2279,7 @@ namespace Slang
         // or NULL if the expression isn't recognized as a constant.
         RefPtr<IntVal> TryCheckIntegerConstantExpression(ExpressionSyntaxNode* exp)
         {
-            if (!exp->Type.type->Equals(ExpressionType::GetInt()))
+            if (!exp->Type.type->Equals(getSession()->getIntType()))
             {
                 return nullptr;
             }
@@ -2288,7 +2294,7 @@ namespace Slang
         RefPtr<IntVal> CheckIntegerConstantExpression(ExpressionSyntaxNode* inExpr)
         {
             // First coerce the expression to the expected type
-            auto expr = Coerce(ExpressionType::GetInt(),inExpr);
+            auto expr = Coerce(getSession()->getIntType(),inExpr);
             auto result = TryCheckIntegerConstantExpression(expr.Ptr());
             if (!result)
             {
@@ -2309,8 +2315,8 @@ namespace Slang
             auto baseExpr = subscriptExpr->BaseExpression;
             auto indexExpr = subscriptExpr->IndexExpression;
 
-            if (!indexExpr->Type->Equals(ExpressionType::GetInt()) &&
-                !indexExpr->Type->Equals(ExpressionType::GetUInt()))
+            if (!indexExpr->Type->Equals(getSession()->getIntType()) &&
+                !indexExpr->Type->Equals(getSession()->getUIntType()))
             {
                 if (!isRewriteMode())
                 {
@@ -2341,7 +2347,9 @@ namespace Slang
             RefPtr<ExpressionType>  elementType,
             RefPtr<IntVal>          elementCount)
         {
-            auto vectorGenericDecl = findMagicDecl("Vector").As<GenericDecl>();
+            auto session = getSession();
+            auto vectorGenericDecl = findMagicDecl(
+                session, "Vector").As<GenericDecl>();
             auto vectorTypeDecl = vectorGenericDecl->inner;
                
             auto substitutions = new Substitutions();
@@ -2351,7 +2359,9 @@ namespace Slang
 
             auto declRef = DeclRef<Decl>(vectorTypeDecl.Ptr(), substitutions);
 
-            return DeclRefType::Create(declRef)->As<VectorExpressionType>();
+            return DeclRefType::Create(
+                session,
+                declRef)->As<VectorExpressionType>();
         }
 
         RefPtr<ExpressionSyntaxNode> visitIndexExpressionSyntaxNode(IndexExpressionSyntaxNode* subscriptExpr)
@@ -2388,12 +2398,12 @@ namespace Slang
                 }
 
                 auto elementType = CoerceToUsableType(TypeExp(baseExpr, baseTypeType->type));
-                auto arrayType = new ArrayExpressionType();
-                arrayType->BaseType = elementType.Ptr();
-                arrayType->ArrayLength = elementCount;
+                auto arrayType = getArrayType(
+                    elementType,
+                    elementCount);
 
                 typeResult = arrayType;
-                subscriptExpr->Type = new TypeType(arrayType);
+                subscriptExpr->Type = QualType(getTypeType(arrayType));
                 return subscriptExpr;
             }
             else if (auto baseArrayType = baseType->As<ArrayExpressionType>())
@@ -2433,7 +2443,9 @@ namespace Slang
 
                     // Note(tfoley): The name used for lookup here is a bit magical, since
                     // it must match what the parser installed in subscript declarations.
-                    LookupResult lookupResult = LookUpLocal(this, "operator[]", aggTypeDeclRef);
+                    LookupResult lookupResult = LookUpLocal(
+                        getSession(),
+                        this, "operator[]", aggTypeDeclRef);
                     if (!lookupResult.isValid())
                     {
                         goto fail;
@@ -2553,7 +2565,7 @@ namespace Slang
                     }
                 }
             }
-            else if (decl->targetType->Equals(ExpressionType::Error))
+            else if (decl->targetType->Equals(getSession()->getErrorType()))
             {
                 // there was an error, so ignore
             }
@@ -3332,7 +3344,7 @@ namespace Slang
             }
 
             context.mode = OverloadResolveContext::Mode::ForReal;
-            context.appExpr->Type = QualType(ExpressionType::Error);
+            context.appExpr->Type = QualType(getSession()->getErrorType());
 
             if (!TryCheckOverloadCandidateArity(context, candidate))
                 goto error;
@@ -4002,7 +4014,9 @@ namespace Slang
             }
             else if (auto aggTypeDeclRef = item.declRef.As<AggTypeDecl>())
             {
-                auto type = DeclRefType::Create(aggTypeDeclRef);
+                auto type = DeclRefType::Create(
+                    getSession(),
+                    aggTypeDeclRef);
                 AddAggTypeOverloadCandidates(item, type, aggTypeDeclRef, context);
             }
             else if (auto genericDeclRef = item.declRef.As<GenericDecl>())
@@ -4359,7 +4373,7 @@ namespace Slang
                 {
                     getSink()->diagnose(expr->FunctionExpr, Diagnostics::expectedFunction);
                 }
-                expr->Type = QualType(ExpressionType::Error);
+                expr->Type = QualType(getSession()->getErrorType());
                 return expr;
             }
         }
@@ -4577,9 +4591,11 @@ namespace Slang
             if (expr->declRef)
                 return expr;
 
-            expr->Type = QualType(ExpressionType::Error);
+            expr->Type = QualType(getSession()->getErrorType());
 
-            auto lookupResult = LookUp(this, expr->name, expr->scope);
+            auto lookupResult = LookUp(
+                getSession(),
+                this, expr->name, expr->scope);
             if (lookupResult.isValid())
             {
                 return createLookupResultExpr(
@@ -4603,7 +4619,7 @@ namespace Slang
             expr->TargetType = targetType;
 
             // The way to perform casting depends on the types involved
-            if (expr->Expression->Type->Equals(ExpressionType::Error.Ptr()))
+            if (expr->Expression->Type->Equals(getSession()->getErrorType()))
             {
                 // If the expression being casted has an error type, then just silently succeed
                 expr->Type = targetType.Ptr();
@@ -4636,7 +4652,7 @@ namespace Slang
             {
                 getSink()->diagnose(expr, Diagnostics::invalidTypeCast, expr->Expression->Type, targetType->ToString());
             }
-            expr->Type = QualType(ExpressionType::Error);
+            expr->Type = QualType(getSession()->getErrorType());
             return expr;
         }
 
@@ -4644,6 +4660,7 @@ namespace Slang
         QualType GetTypeForDeclRef(DeclRef<Decl> declRef)
         {
             return getTypeForDeclRef(
+                getSession(),
                 this,
                 getSink(),
                 declRef,
@@ -4868,7 +4885,9 @@ namespace Slang
                         // Checking of the type must be complete before we can reference its members safely
                         EnsureDecl(aggTypeDeclRef.getDecl(), DeclCheckState::Checked);
 
-                        LookupResult lookupResult = LookUpLocal(this, expr->name, aggTypeDeclRef);
+                        LookupResult lookupResult = LookUpLocal(
+                            getSession(),
+                            this, expr->name, aggTypeDeclRef);
                         if (!lookupResult.isValid())
                         {
                             goto fail;
@@ -4891,7 +4910,9 @@ namespace Slang
                     // Checking of the type must be complete before we can reference its members safely
                     EnsureDecl(aggTypeDeclRef.getDecl(), DeclCheckState::Checked);
 
-                    LookupResult lookupResult = LookUpLocal(this, expr->name, aggTypeDeclRef);
+                    LookupResult lookupResult = LookUpLocal(
+                        getSession(),
+                        this, expr->name, aggTypeDeclRef);
                     if (!lookupResult.isValid())
                     {
                         goto fail;
@@ -4909,16 +4930,16 @@ namespace Slang
                 {
                     getSink()->diagnose(expr, Diagnostics::noMemberOfNameInType, expr->name, baseType);
                 }
-                expr->Type = QualType(ExpressionType::Error);
+                expr->Type = QualType(getSession()->getErrorType());
                 return expr;
             }
             // All remaining cases assume we have a `BasicType`
             else if (!baseType->AsBasicType())
-                expr->Type = QualType(ExpressionType::Error);
+                expr->Type = QualType(getSession()->getErrorType());
             else
-                expr->Type = QualType(ExpressionType::Error);
-            if (!baseType->Equals(ExpressionType::Error.Ptr()) &&
-                expr->Type->Equals(ExpressionType::Error.Ptr()))
+                expr->Type = QualType(getSession()->getErrorType());
+            if (!baseType->Equals(getSession()->getErrorType()) &&
+                expr->Type->Equals(getSession()->getErrorType()))
             {
                 if (!isRewriteMode())
                 {
@@ -4943,7 +4964,7 @@ namespace Slang
                 arg = CheckTerm(arg);
             }
 
-            expr->Type = ExpressionType::getInitializerListType();
+            expr->Type = getSession()->getInitializerListType();
 
             return expr;
         }
@@ -5028,9 +5049,10 @@ namespace Slang
 
     // Get the type to use when referencing a declaration
     QualType getTypeForDeclRef(
+        Session*                session,
         SemanticsVisitor*       sema,
         DiagnosticSink*         sink,
-        DeclRef<Decl>                 declRef,
+        DeclRef<Decl>           declRef,
         RefPtr<ExpressionType>* outTypeResult)
     {
         if( sema )
@@ -5049,47 +5071,47 @@ namespace Slang
         }
         else if (auto typeAliasDeclRef = declRef.As<TypeDefDecl>())
         {
-            auto type = new NamedExpressionType(typeAliasDeclRef);
+            auto type = getNamedType(session, typeAliasDeclRef);
             *outTypeResult = type;
-            return new TypeType(type);
+            return QualType(getTypeType(type));
         }
         else if (auto aggTypeDeclRef = declRef.As<AggTypeDecl>())
         {
-            auto type = DeclRefType::Create(aggTypeDeclRef);
+            auto type = DeclRefType::Create(session, aggTypeDeclRef);
             *outTypeResult = type;
-            return new TypeType(type);
+            return QualType(getTypeType(type));
         }
         else if (auto simpleTypeDeclRef = declRef.As<SimpleTypeDecl>())
         {
-            auto type = DeclRefType::Create(simpleTypeDeclRef);
+            auto type = DeclRefType::Create(session, simpleTypeDeclRef);
             *outTypeResult = type;
-            return new TypeType(type);
+            return QualType(getTypeType(type));
         }
         else if (auto genericDeclRef = declRef.As<GenericDecl>())
         {
-            auto type = new GenericDeclRefType(genericDeclRef);
+            auto type = getGenericDeclRefType(session, genericDeclRef);
             *outTypeResult = type;
-            return new TypeType(type);
+            return QualType(getTypeType(type));
         }
         else if (auto funcDeclRef = declRef.As<CallableDecl>())
         {
-            auto type = new FuncType();
-            type->declRef = funcDeclRef;
-            return type;
+            auto type = getFuncType(session, funcDeclRef);
+            return QualType(type);
         }
 
         if( sink )
         {
             sink->diagnose(declRef, Diagnostics::unimplemented, "cannot form reference to this kind of declaration");
         }
-        return QualType(ExpressionType::Error);
+        return QualType(session->getErrorType());
     }
 
     QualType getTypeForDeclRef(
-        DeclRef<Decl>                 declRef)
+        Session*        session,
+        DeclRef<Decl>   declRef)
     {
         RefPtr<ExpressionType> typeResult;
-        return getTypeForDeclRef(nullptr, nullptr, declRef, &typeResult);
+        return getTypeForDeclRef(session, nullptr, nullptr, declRef, &typeResult);
     }
 
     DeclRef<ExtensionDecl> ApplyExtensionToType(

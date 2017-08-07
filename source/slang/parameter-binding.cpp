@@ -1689,7 +1689,7 @@ void generateParameterBindings(
 
         RefPtr<Variable> var = new Variable();
         var->Name.Content = "SLANG_hack_samplerForTexelFetch";
-        var->Type.type = new SamplerStateType();
+        var->Type.type = getSamplerStateType(request->mSession);
 
         auto typeLayout = new TypeLayout();
         typeLayout->type = var->Type.type;

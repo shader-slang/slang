@@ -17,7 +17,6 @@
     <ClInclude Include="profile.h" />
     <ClInclude Include="profile-defs.h" />
     <ClInclude Include="reflection.h" />
-    <ClInclude Include="slang-stdlib.h" />
     <ClInclude Include="source-loc.h" />
     <ClInclude Include="syntax.h" />
     <ClInclude Include="syntax-visitors.h" />

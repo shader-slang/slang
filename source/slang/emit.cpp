@@ -375,6 +375,11 @@ struct EmitVisitor
         : context(context)
     {}
 
+    Session* getSession()
+    {
+        return context->shared->entryPoint->compileRequest->mSession;
+    }
+
     // Low-level emit logic
 
     void emitRawTextSpan(char const* textBegin, char const* textEnd)
@@ -2308,9 +2313,9 @@ struct EmitVisitor
                 emitTokenWithLocation(litExpr->token);
                 break;
             }
-            if(type->Equals(ExpressionType::GetInt()))
+            if(type->Equals(getSession()->getIntType()))
             {}
-            else if(type->Equals(ExpressionType::GetUInt()))
+            else if(type->Equals(getSession()->getUIntType()))
             {
                 suffix = "u";
             }
@@ -2330,9 +2335,9 @@ struct EmitVisitor
                 emitTokenWithLocation(litExpr->token);
                 break;
             }
-            if(type->Equals(ExpressionType::GetFloat()))
+            if(type->Equals(getSession()->getFloatType()))
             {}
-            else if(type->Equals(ExpressionType::getDoubleType()))
+            else if(type->Equals(getSession()->getDoubleType()))
             {
                 suffix = "l";
             }

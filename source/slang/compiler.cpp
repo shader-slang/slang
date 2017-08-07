@@ -8,7 +8,6 @@
 #include "parser.h"
 #include "preprocessor.h"
 #include "syntax-visitors.h"
-#include "slang-stdlib.h"
 
 #include "reflection.h"
 #include "emit.h"
@@ -883,8 +882,20 @@ namespace Slang
         char const*     ext,
         bool            isBinary)
     {
-        static int counter = 0;
-        int id = counter++;
+        // Try to generate a unique ID for the file to dump,
+        // even in cases where there might be multiple threads
+        // doing compilation.
+        //
+        // This is primarily a debugging aid, so we don't
+        // really need/want to do anything too elaborate
+
+        static uint32_t counter = 0;
+#ifdef WIN32
+        uint32_t id = InterlockedIncrement(&counter);
+#else
+        // TODO: actually implement the case for other platforms
+        uint32_t id = counter++;
+#endif
 
         String path;
         path.append("slang-dump-");

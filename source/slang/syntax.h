@@ -11,6 +11,7 @@
 
 namespace Slang
 {
+    class Session;
     class Substitutions;
     class SyntaxVisitor;
     class FunctionSyntaxNode;
@@ -1074,16 +1075,19 @@ namespace Slang
     //
     // TODO(tfoley): These should really belong to the compilation context!
     //
-    void RegisterBuiltinDecl(
+    void registerBuiltinDecl(
+        Session*                    session,
         RefPtr<Decl>                decl,
         RefPtr<BuiltinTypeModifier> modifier);
-    void RegisterMagicDecl(
+    void registerMagicDecl(
+        Session*                    session,
         RefPtr<Decl>                decl,
         RefPtr<MagicTypeModifier>   modifier);
 
     // Look up a magic declaration by its name
     RefPtr<Decl> findMagicDecl(
-        String const& name);
+        Session*        session,
+        String const&   name);
 
     // Create an instance of a syntax class by name
     SyntaxNodeBase* createInstanceOfSyntaxClassByName(
@@ -1170,6 +1174,34 @@ namespace Slang
         // declaration, and not just a raw pointer
         return declRef.getDecl()->inner.Ptr();
     }
+
+
+    //
+
+    RefPtr<ArrayExpressionType> getArrayType(
+        ExpressionType* elementType,
+        IntVal*         elementCount);
+
+    RefPtr<ArrayExpressionType> getArrayType(
+        ExpressionType* elementType);
+
+    RefPtr<NamedExpressionType> getNamedType(
+        Session*                    session,
+        DeclRef<TypeDefDecl> const& declRef);
+
+    RefPtr<TypeType> getTypeType(
+        ExpressionType* type);
+
+    RefPtr<FuncType> getFuncType(
+        Session*                        session,
+        DeclRef<CallableDecl> const&    declRef);
+
+    RefPtr<GenericDeclRefType> getGenericDeclRefType(
+        Session*                    session,
+        DeclRef<GenericDecl> const& declRef);
+
+    RefPtr<SamplerStateType> getSamplerStateType(
+        Session*        session);
 
 } // namespace Slang
 

@@ -49,11 +49,14 @@ RAW(
     virtual String ToString() override;
     virtual RefPtr<Val> SubstituteImpl(Substitutions* subst, int* ioDiff) override;
 
-    static DeclRefType* Create(DeclRef<Decl> declRef);
+    static DeclRefType* Create(
+        Session*        session,
+        DeclRef<Decl>   declRef);
 
     DeclRefType()
     {}
-    DeclRefType(DeclRef<Decl> declRef)
+    DeclRefType(
+        DeclRef<Decl> declRef)
         : declRef(declRef)
     {}
 protected:
@@ -66,6 +69,7 @@ END_SYNTAX_CLASS()
 // Base class for types that can be used in arithmetic expressions
 ABSTRACT_SYNTAX_CLASS(ArithmeticExpressionType, DeclRefType)
 RAW(
+public:
     virtual BasicExpressionType* GetScalarType() = 0;
 )
 END_SYNTAX_CLASS()
@@ -75,11 +79,9 @@ SYNTAX_CLASS(BasicExpressionType, ArithmeticExpressionType)
     FIELD(BaseType, BaseType)
 
 RAW(
-    BasicExpressionType()
-    {
-        BaseType = Slang::BaseType::Int;
-    }
-    BasicExpressionType(Slang::BaseType baseType)
+    BasicExpressionType() {}
+    BasicExpressionType(
+        Slang::BaseType baseType)
     {
         BaseType = baseType;
     }
@@ -211,7 +213,9 @@ SYNTAX_CLASS(SamplerStateType, DeclRefType)
     {
         SamplerState,
         SamplerComparisonState,
-    };)
+    };
+
+    )
     FIELD(Flavor, flavor)
 END_SYNTAX_CLASS()
 
@@ -284,6 +288,7 @@ SYNTAX_CLASS(ArrayExpressionType, ExpressionType)
 
 RAW(
     virtual Slang::String ToString() override;
+
 protected:
     virtual bool EqualsImpl(ExpressionType * type) override;
     virtual ExpressionType* CreateCanonicalType() override;
@@ -336,6 +341,7 @@ END_SYNTAX_CLASS()
 // A matrix type, e.g., `matrix<T,R,C>`
 SYNTAX_CLASS(MatrixExpressionType, ArithmeticExpressionType)
 RAW(
+
     ExpressionType* getElementType();
     IntVal*         getRowCount();
     IntVal*         getColumnCount();
@@ -355,7 +361,8 @@ SYNTAX_CLASS(NamedExpressionType, ExpressionType)
 RAW(
     NamedExpressionType()
     {}
-    NamedExpressionType(DeclRef<TypeDefDecl> declRef)
+    NamedExpressionType(
+        DeclRef<TypeDefDecl> declRef)
         : declRef(declRef)
     {}
 
@@ -377,6 +384,9 @@ SYNTAX_CLASS(FuncType, ExpressionType)
     DECL_FIELD(DeclRef<CallableDecl>, declRef)
 
 RAW(
+    FuncType()
+    {}
+
     virtual String ToString() override;
 protected:
     virtual bool EqualsImpl(ExpressionType * type) override;
@@ -393,7 +403,8 @@ SYNTAX_CLASS(GenericDeclRefType, ExpressionType)
     RAW(
     GenericDeclRefType()
     {}
-    GenericDeclRefType(DeclRef<GenericDecl> declRef)
+    GenericDeclRefType(
+        DeclRef<GenericDecl> declRef)
         : declRef(declRef)
     {}
 

@@ -22,8 +22,9 @@ struct BreadcrumbInfo
 };
 
 void DoLocalLookupImpl(
+    Session*                session,
     String const&		    name,
-    DeclRef<ContainerDecl>	    containerDeclRef,
+    DeclRef<ContainerDecl>  containerDeclRef,
     LookupRequest const&    request,
     LookupResult&		    result,
     BreadcrumbInfo*		    inBreadcrumbs);
@@ -151,6 +152,7 @@ LookupResultItem CreateLookupResultItem(
 }
 
 void DoMemberLookupImpl(
+    Session*                session,
     String const&			name,
     RefPtr<ExpressionType>	baseType,
     LookupRequest const&    request,
@@ -168,7 +170,9 @@ void DoMemberLookupImpl(
         derefBreacrumb.prev = breadcrumbs;
 
         // Recursively perform lookup on the result of deref
-        return DoMemberLookupImpl(name, pointerLikeType->elementType, request, ioResult, &derefBreacrumb);
+        return DoMemberLookupImpl(
+            session,
+            name, pointerLikeType->elementType, request, ioResult, &derefBreacrumb);
     }
 
     // Default case: no dereference needed
@@ -177,7 +181,9 @@ void DoMemberLookupImpl(
     {
         if (auto baseAggTypeDeclRef = baseDeclRefType->declRef.As<AggTypeDecl>())
         {
-            DoLocalLookupImpl(name, baseAggTypeDeclRef, request, ioResult, breadcrumbs);
+            DoLocalLookupImpl(
+                session,
+                name, baseAggTypeDeclRef, request, ioResult, breadcrumbs);
         }
     }
 
@@ -185,18 +191,24 @@ void DoMemberLookupImpl(
 }
 
 void DoMemberLookupImpl(
-    String const&	        name,
-    DeclRef<Decl>			        baseDeclRef,
+    Session*                session,
+    String const&           name,
+    DeclRef<Decl>           baseDeclRef,
     LookupRequest const&    request,
     LookupResult&	        ioResult,
     BreadcrumbInfo*	        breadcrumbs)
 {
-    auto baseType = getTypeForDeclRef(baseDeclRef);
-    return DoMemberLookupImpl(name, baseType, request, ioResult, breadcrumbs);
+    auto baseType = getTypeForDeclRef(
+        session,
+        baseDeclRef);
+    return DoMemberLookupImpl(
+        session,
+        name, baseType, request, ioResult, breadcrumbs);
 }
 
 // Look for members of the given name in the given container for declarations
 void DoLocalLookupImpl(
+    Session*                session,
     String const&		    name,
     DeclRef<ContainerDecl>	containerDeclRef,
     LookupRequest const&    request,
@@ -246,13 +258,21 @@ void DoLocalLookupImpl(
         memberRefBreadcrumb.declRef = transparentMemberDeclRef;
         memberRefBreadcrumb.prev = inBreadcrumbs;
 
-        DoMemberLookupImpl(name, transparentMemberDeclRef, request, result, &memberRefBreadcrumb);
+        DoMemberLookupImpl(
+            session,
+            name,
+            transparentMemberDeclRef,
+            request,
+            result,
+            &memberRefBreadcrumb);
     }
 
     // Consider lookup via extension
     if( auto aggTypeDeclRef = containerDeclRef.As<AggTypeDecl>() )
     {
-        RefPtr<ExpressionType> type = DeclRefType::Create(aggTypeDeclRef);
+        RefPtr<ExpressionType> type = DeclRefType::Create(
+            session,
+            aggTypeDeclRef);
 
         for (auto ext = GetCandidateExtensions(aggTypeDeclRef); ext; ext = ext->nextCandidateExtension)
         {
@@ -264,12 +284,15 @@ void DoLocalLookupImpl(
             // the constructed result can somehow indicate that a member
             // was found through an extension.
 
-            DoLocalLookupImpl(name, extDeclRef, request, result, inBreadcrumbs);
+            DoLocalLookupImpl(
+                session,
+                name, extDeclRef, request, result, inBreadcrumbs);
         }
     }
 }
 
 void DoLookupImpl(
+    Session*                session,
     String const&           name,
     LookupRequest const&    request,
     LookupResult&           result)
@@ -301,7 +324,9 @@ void DoLookupImpl(
                 {
                     if( auto genericTypeParam = pp.As<GenericTypeParamDecl>() )
                     {
-                        subst->args.Add(DeclRefType::Create(DeclRef<GenericTypeParamDecl>(genericTypeParam.Ptr(), nullptr)));
+                        subst->args.Add(DeclRefType::Create(
+                            session,
+                            DeclRef<GenericTypeParamDecl>(genericTypeParam.Ptr(), nullptr)));
                     }
                     else if( auto genericValParam = pp.As<GenericValueParamDecl>() )
                     {
@@ -311,7 +336,9 @@ void DoLookupImpl(
             }
 
             DeclRef<ContainerDecl> containerRef = DeclRef<Decl>(containerDecl, subst).As<ContainerDecl>();
-            DoLocalLookupImpl(name, containerRef, request, result, nullptr);
+            DoLocalLookupImpl(
+                session,
+                name, containerRef, request, result, nullptr);
         }
 
         if (result.isValid())
@@ -325,14 +352,18 @@ void DoLookupImpl(
     // If we run out of scopes, then we are done.
 }
 
-LookupResult DoLookup(String const& name, LookupRequest const& request)
+LookupResult DoLookup(
+    Session*    session,
+    String const& name,
+    LookupRequest const& request)
 {
     LookupResult result;
-    DoLookupImpl(name, request, result);
+    DoLookupImpl(session, name, request, result);
     return result;
 }
 
 LookupResult LookUp(
+    Session*            session,
     SemanticsVisitor*   semantics,
     String const&       name,
     RefPtr<Scope>       scope)
@@ -340,12 +371,13 @@ LookupResult LookUp(
     LookupRequest request;
     request.semantics = semantics;
     request.scope = scope;
-    return DoLookup(name, request);
+    return DoLookup(session, name, request);
 }
 
 // perform lookup within the context of a particular container declaration,
 // and do *not* look further up the chain
 LookupResult LookUpLocal(
+    Session*                session,
     SemanticsVisitor*       semantics,
     String const&           name,
     DeclRef<ContainerDecl>  containerDeclRef)
@@ -354,7 +386,7 @@ LookupResult LookUpLocal(
     request.semantics = semantics;
 
     LookupResult result;
-    DoLocalLookupImpl(name, containerDeclRef, request, result, nullptr);
+    DoLocalLookupImpl(session, name, containerDeclRef, request, result, nullptr);
     return result;
 }
 

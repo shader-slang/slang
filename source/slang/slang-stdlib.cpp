@@ -1,6 +1,6 @@
 // slang-stdlib.cpp
 
-#include "slang-stdlib.h"
+#include "compiler.h"
 #include "syntax.h"
 
 #define STRINGIZE(x) STRINGIZE2(x)
@@ -1042,9 +1042,7 @@ typedef Texture2D texture2D;
 
 namespace Slang
 {
-    static String stdlibPath;
-
-    String getStdlibPath()
+    String Session::getStdlibPath()
     {
         if(stdlibPath.Length() != 0)
             return stdlibPath;
@@ -1067,12 +1065,6 @@ namespace Slang
 
         return stdlibPath;
     }
-
-    // Cached code for the various libraries
-    String coreLibraryCode;
-    String slangLibraryCode;
-    String hlslLibraryCode;
-    String glslLibraryCode;
 
     enum
     {
@@ -1156,7 +1148,7 @@ namespace Slang
     };
 
 
-    String getCoreLibraryCode()
+    String Session::getCoreLibraryCode()
     {
         if (coreLibraryCode.Length() > 0)
             return coreLibraryCode;
@@ -1974,7 +1966,7 @@ namespace Slang
         return coreLibraryCode;
     }
 
-    String getHLSLLibraryCode()
+    String Session::getHLSLLibraryCode()
     {
         if (hlslLibraryCode.Length() > 0)
             return hlslLibraryCode;
@@ -2073,7 +2065,7 @@ namespace Slang
 
     // GLSL-specific library code
 
-    String getGLSLLibraryCode()
+    String Session::getGLSLLibraryCode()
     {
         if(glslLibraryCode.Length() != 0)
             return glslLibraryCode;
@@ -2283,18 +2275,4 @@ namespace Slang
         glslLibraryCode = sb.ProduceString();
         return glslLibraryCode;
     }
-
-
-
-    //
-
-    void finalizeShaderLibrary()
-    {
-        stdlibPath = String();
-
-        coreLibraryCode = String();
-        hlslLibraryCode = String();
-        glslLibraryCode = String();
-    }
-
 }

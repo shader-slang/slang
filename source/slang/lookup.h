@@ -18,6 +18,7 @@ void buildMemberDictionary(ContainerDecl* decl);
 // Look up a name in the given scope, proceeding up through
 // parent scopes as needed.
 LookupResult LookUp(
+    Session*            session,
     SemanticsVisitor*   semantics,
     String const&       name,
     RefPtr<Scope>       scope);
@@ -25,6 +26,7 @@ LookupResult LookUp(
 // perform lookup within the context of a particular container declaration,
 // and do *not* look further up the chain
 LookupResult LookUpLocal(
+    Session*                session,
     SemanticsVisitor*       semantics,
     String const&           name,
     DeclRef<ContainerDecl>  containerDeclRef);
@@ -32,13 +34,15 @@ LookupResult LookUpLocal(
 // TODO: this belongs somewhere else
 
 QualType getTypeForDeclRef(
+    Session*                session,
     SemanticsVisitor*       sema,
     DiagnosticSink*         sink,
-    DeclRef<Decl>                 declRef,
+    DeclRef<Decl>           declRef,
     RefPtr<ExpressionType>* outTypeResult);
 
 QualType getTypeForDeclRef(
-    DeclRef<Decl>                 declRef);
+    Session*        session,
+    DeclRef<Decl>   declRef);
 
 
 }
