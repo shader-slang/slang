@@ -112,7 +112,7 @@ void CompileRequest::parseTranslationUnit(
     for(auto& def : translationUnit->preprocessorDefinitions)
         combinedPreprocessorDefinitions.Add(def.Key, def.Value);
 
-    RefPtr<ProgramSyntaxNode> translationUnitSyntax = new ProgramSyntaxNode();
+    RefPtr<ModuleDecl> translationUnitSyntax = new ModuleDecl();
     translationUnit->SyntaxNode = translationUnitSyntax;
 
     for (auto sourceFile : translationUnit->sourceFiles)
@@ -355,7 +355,7 @@ int CompileRequest::addEntryPoint(
     return (int) result;
 }
 
-RefPtr<ProgramSyntaxNode> CompileRequest::loadModule(
+RefPtr<ModuleDecl> CompileRequest::loadModule(
     String const&       name,
     String const&       path,
     String const&       source,
@@ -386,7 +386,7 @@ RefPtr<ProgramSyntaxNode> CompileRequest::loadModule(
 
     //
 
-    RefPtr<ProgramSyntaxNode> moduleDecl = translationUnit->SyntaxNode;
+    RefPtr<ModuleDecl> moduleDecl = translationUnit->SyntaxNode;
 
     mapPathToLoadedModule.Add(path, moduleDecl);
     mapNameToLoadedModules.Add(name, moduleDecl);
@@ -406,7 +406,7 @@ void CompileRequest::handlePoundImport(
     // Imported code is always native Slang code
     RefPtr<Scope> languageScope = mSession->slangLanguageScope;
 
-    RefPtr<ProgramSyntaxNode> translationUnitSyntax = new ProgramSyntaxNode();
+    RefPtr<ModuleDecl> translationUnitSyntax = new ModuleDecl();
     translationUnit->SyntaxNode = translationUnitSyntax;
 
     parseSourceFile(
@@ -424,7 +424,7 @@ void CompileRequest::handlePoundImport(
 
     //
 
-    RefPtr<ProgramSyntaxNode> moduleDecl = translationUnit->SyntaxNode;
+    RefPtr<ModuleDecl> moduleDecl = translationUnit->SyntaxNode;
 
     // TODO: It is a bit broken here that we use the module path,
     // as the "name" when registering things, but this saves
@@ -436,13 +436,13 @@ void CompileRequest::handlePoundImport(
     loadedModulesList.Add(moduleDecl);
 }
 
-RefPtr<ProgramSyntaxNode> CompileRequest::findOrImportModule(
+RefPtr<ModuleDecl> CompileRequest::findOrImportModule(
     String const&       name,
     CodePosition const& loc)
 {
     // Have we already loaded a module matching this name?
     // If so, return it.
-    RefPtr<ProgramSyntaxNode> moduleDecl;
+    RefPtr<ModuleDecl> moduleDecl;
     if (mapNameToLoadedModules.TryGetValue(name, moduleDecl))
         return moduleDecl;
 
@@ -505,7 +505,7 @@ RefPtr<ProgramSyntaxNode> CompileRequest::findOrImportModule(
         loc);
 }
 
-RefPtr<ProgramSyntaxNode> findOrImportModule(
+RefPtr<ModuleDecl> findOrImportModule(
     CompileRequest*     request,
     String const&       name,
     CodePosition const& loc)

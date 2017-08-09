@@ -86,37 +86,37 @@ namespace Slang
             return translationUnit->compileRequest->mSession;
         }
 
-        RefPtr<ProgramSyntaxNode> Parse();
+        RefPtr<ModuleDecl> Parse();
 
         Token ReadToken();
         Token ReadToken(TokenType type);
         Token ReadToken(const char * string);
         bool LookAheadToken(TokenType type, int offset = 0);
         bool LookAheadToken(const char * string, int offset = 0);
-        void                                        parseSourceFile(ProgramSyntaxNode* program);
-        RefPtr<ProgramSyntaxNode>					ParseProgram();
-        RefPtr<StructSyntaxNode>					ParseStruct();
-        RefPtr<ClassSyntaxNode>					    ParseClass();
-        RefPtr<StatementSyntaxNode>					ParseStatement();
-        RefPtr<StatementSyntaxNode>			        ParseBlockStatement();
-        RefPtr<VarDeclrStatementSyntaxNode>			ParseVarDeclrStatement(Modifiers modifiers);
-        RefPtr<IfStatementSyntaxNode>				ParseIfStatement();
-        RefPtr<ForStatementSyntaxNode>				ParseForStatement();
-        RefPtr<WhileStatementSyntaxNode>			ParseWhileStatement();
-        RefPtr<DoWhileStatementSyntaxNode>			ParseDoWhileStatement();
-        RefPtr<BreakStatementSyntaxNode>			ParseBreakStatement();
-        RefPtr<ContinueStatementSyntaxNode>			ParseContinueStatement();
-        RefPtr<ReturnStatementSyntaxNode>			ParseReturnStatement();
-        RefPtr<ExpressionStatementSyntaxNode>		ParseExpressionStatement();
-        RefPtr<ExpressionSyntaxNode>				ParseExpression(Precedence level = Precedence::Comma);
+        void                                        parseSourceFile(ModuleDecl* program);
+        RefPtr<ModuleDecl>					ParseProgram();
+        RefPtr<StructDecl>					ParseStruct();
+        RefPtr<ClassDecl>					    ParseClass();
+        RefPtr<Stmt>					ParseStatement();
+        RefPtr<Stmt>			        ParseBlockStatement();
+        RefPtr<DeclStmt>			ParseVarDeclrStatement(Modifiers modifiers);
+        RefPtr<IfStmt>				ParseIfStatement();
+        RefPtr<ForStmt>				ParseForStatement();
+        RefPtr<WhileStmt>			ParseWhileStatement();
+        RefPtr<DoWhileStmt>			ParseDoWhileStatement();
+        RefPtr<BreakStmt>			ParseBreakStatement();
+        RefPtr<ContinueStmt>			ParseContinueStatement();
+        RefPtr<ReturnStmt>			ParseReturnStatement();
+        RefPtr<ExpressionStmt>		ParseExpressionStatement();
+        RefPtr<Expr>				ParseExpression(Precedence level = Precedence::Comma);
 
         // Parse an expression that might be used in an initializer or argument context, so we should avoid operator-comma
-        inline RefPtr<ExpressionSyntaxNode>			ParseInitExpr() { return ParseExpression(Precedence::Assignment); }
-        inline RefPtr<ExpressionSyntaxNode>			ParseArgExpr()  { return ParseExpression(Precedence::Assignment); }
+        inline RefPtr<Expr>			ParseInitExpr() { return ParseExpression(Precedence::Assignment); }
+        inline RefPtr<Expr>			ParseArgExpr()  { return ParseExpression(Precedence::Assignment); }
 
-        RefPtr<ExpressionSyntaxNode>				ParseLeafExpression();
-        RefPtr<ParameterSyntaxNode>					ParseParameter();
-        RefPtr<ExpressionSyntaxNode>				ParseType();
+        RefPtr<Expr>				ParseLeafExpression();
+        RefPtr<ParamDecl>					ParseParameter();
+        RefPtr<Expr>				ParseType();
         TypeExp										ParseTypeExp();
 
         Parser & operator = (const Parser &) = delete;
@@ -204,7 +204,7 @@ namespace Slang
     static TokenType SkipBalancedToken(
         TokenReader* reader)
     {
-        TokenType tokenType = reader->AdvanceToken().Type;
+        TokenType tokenType = reader->AdvanceToken().type;
         switch (tokenType)
         {
         default:
@@ -526,7 +526,7 @@ namespace Slang
         return false;
     }
 
-    RefPtr<ProgramSyntaxNode> Parser::Parse()
+    RefPtr<ModuleDecl> Parser::Parse()
     {
         return ParseProgram();
     }
@@ -545,7 +545,7 @@ namespace Slang
         auto nameToken = parser->ReadToken(TokenType::Identifier);
 
         typeDefDecl->Name = nameToken;
-        typeDefDecl->Type = type;
+        typeDefDecl->type = type;
 
         return typeDefDecl;
     }
@@ -937,7 +937,7 @@ namespace Slang
         if (AdvanceIf(parser, "operator"))
         {
             name = parser->ReadToken();
-            switch (name.Type)
+            switch (name.type)
             {
             case TokenType::OpAdd: case TokenType::OpSub: case TokenType::OpMul: case TokenType::OpDiv:
             case TokenType::OpMod: case TokenType::OpNot: case TokenType::OpBitNot: case TokenType::OpLsh: case TokenType::OpRsh:
@@ -1017,16 +1017,16 @@ namespace Slang
         CodePosition openBracketLoc;
 
         // The expression that yields the element count, or NULL
-        RefPtr<ExpressionSyntaxNode>	elementCountExpr;
+        RefPtr<Expr>	elementCountExpr;
     };
 
     // "Unwrapped" information about a declarator
     struct DeclaratorInfo
     {
-        RefPtr<ExpressionSyntaxNode>	typeSpec;
+        RefPtr<Expr>	typeSpec;
         Token							nameToken;
         RefPtr<Modifier>				semantics;
-        RefPtr<ExpressionSyntaxNode>	initializer;
+        RefPtr<Expr>	initializer;
     };
 
     // Add a member declaration to its container, and ensure that its
@@ -1081,7 +1081,7 @@ namespace Slang
     static void ParseFuncDeclHeader(
         Parser*                     parser,
         DeclaratorInfo const&       declaratorInfo,
-        RefPtr<FunctionSyntaxNode>  decl)
+        RefPtr<FuncDecl>  decl)
     {
         parser->PushScope(decl.Ptr());
 
@@ -1099,7 +1099,7 @@ namespace Slang
         ContainerDecl*          /*containerDecl*/,
         DeclaratorInfo const&   declaratorInfo)
     {
-        RefPtr<FunctionSyntaxNode> decl = new FunctionSyntaxNode();
+        RefPtr<FuncDecl> decl = new FuncDecl();
         ParseFuncDeclHeader(parser, declaratorInfo, decl);
 
         if (AdvanceIf(parser, TokenType::Semicolon))
@@ -1118,13 +1118,13 @@ namespace Slang
     static RefPtr<VarDeclBase> CreateVarDeclForContext(
         ContainerDecl*  containerDecl )
     {
-        if (dynamic_cast<StructSyntaxNode*>(containerDecl) || dynamic_cast<ClassSyntaxNode*>(containerDecl))
+        if (dynamic_cast<StructDecl*>(containerDecl) || dynamic_cast<ClassDecl*>(containerDecl))
         {
             return new StructField();
         }
         else if (dynamic_cast<CallableDecl*>(containerDecl))
         {
-            return new ParameterSyntaxNode();
+            return new ParamDecl();
         }
         else
         {
@@ -1167,7 +1167,7 @@ namespace Slang
     {
         parser->FillPosition(decl.Ptr());
 
-        if( declaratorInfo.nameToken.Type == TokenType::Unknown )
+        if( declaratorInfo.nameToken.type == TokenType::Unknown )
         {
             // HACK(tfoley): we always give a name, even if the declarator didn't include one... :(
             decl->Name.Content = generateName(parser);
@@ -1177,11 +1177,11 @@ namespace Slang
             decl->Position = declaratorInfo.nameToken.Position;
             decl->Name = declaratorInfo.nameToken;
         }
-        decl->Type = TypeExp(declaratorInfo.typeSpec);
+        decl->type = TypeExp(declaratorInfo.typeSpec);
 
         AddModifiers(decl.Ptr(), declaratorInfo.semantics);
 
-        decl->Expr = declaratorInfo.initializer;
+        decl->initExpr = declaratorInfo.initializer;
     }
 
     static RefPtr<Declarator> ParseDeclarator(Parser* parser);
@@ -1291,7 +1291,7 @@ namespace Slang
     {
         RefPtr<Declarator>				declarator;
         RefPtr<Modifier>				semantics;
-        RefPtr<ExpressionSyntaxNode>	initializer;
+        RefPtr<Expr>	initializer;
     };
 
     // Parse a declarator plus optional semantics
@@ -1348,7 +1348,7 @@ namespace Slang
                     // TODO(tfoley): we don't support pointers for now
                     auto arrayDeclarator = (ArrayDeclarator*) declarator.Ptr();
 
-                    auto arrayTypeExpr = new IndexExpressionSyntaxNode();
+                    auto arrayTypeExpr = new IndexExpr();
                     arrayTypeExpr->Position = arrayDeclarator->openBracketLoc;
                     arrayTypeExpr->BaseExpression = ioInfo->typeSpec;
                     arrayTypeExpr->IndexExpression = arrayDeclarator->elementCountExpr;
@@ -1413,13 +1413,13 @@ namespace Slang
     };
 
     // Pares an argument to an application of a generic
-    RefPtr<ExpressionSyntaxNode> ParseGenericArg(Parser* parser)
+    RefPtr<Expr> ParseGenericArg(Parser* parser)
     {
         return parser->ParseArgExpr();
     }
 
     // Create a type expression that will refer to the given declaration
-    static RefPtr<ExpressionSyntaxNode>
+    static RefPtr<Expr>
     createDeclRefType(Parser* parser, RefPtr<Decl> decl)
     {
         // For now we just construct an expression that
@@ -1427,7 +1427,7 @@ namespace Slang
         //
         // TODO: do this better, e.g. by filling in the `declRef` field directly
 
-        auto expr = new VarExpressionSyntaxNode();
+        auto expr = new VarExpr();
         expr->scope = parser->currentScope.Ptr();
         expr->Position = decl->getNameToken().Position;
         expr->name = decl->getName();
@@ -1442,12 +1442,12 @@ namespace Slang
         RefPtr<Decl>                    decl;
 
         // Put the resulting expression (which should evaluate to a type) here
-        RefPtr<ExpressionSyntaxNode>    expr;
+        RefPtr<Expr>    expr;
     };
 
-    static RefPtr<ExpressionSyntaxNode> parseGenericApp(
+    static RefPtr<Expr> parseGenericApp(
         Parser*                         parser,
-        RefPtr<ExpressionSyntaxNode>    base)
+        RefPtr<Expr>    base)
     {
         RefPtr<GenericAppExpr> genericApp = new GenericAppExpr();
 
@@ -1472,14 +1472,14 @@ namespace Slang
     }
 
     // Parse option `[]` braces after a type expression, that indicate an array type
-    static RefPtr<ExpressionSyntaxNode> parsePostfixTypeSuffix(
+    static RefPtr<Expr> parsePostfixTypeSuffix(
         Parser* parser,
-        RefPtr<ExpressionSyntaxNode> inTypeExpr)
+        RefPtr<Expr> inTypeExpr)
     {
         auto typeExpr = inTypeExpr;
         while (parser->LookAheadToken(TokenType::LBracket))
         {
-            RefPtr<IndexExpressionSyntaxNode> arrType = new IndexExpressionSyntaxNode();
+            RefPtr<IndexExpr> arrType = new IndexExpr();
             arrType->Position = typeExpr->Position;
             arrType->BaseExpression = typeExpr;
             parser->ReadToken(TokenType::LBracket);
@@ -1520,12 +1520,12 @@ namespace Slang
 
         Token typeName = parser->ReadToken(TokenType::Identifier);
 
-        auto basicType = new VarExpressionSyntaxNode();
+        auto basicType = new VarExpr();
         basicType->scope = parser->currentScope.Ptr();
         basicType->Position = typeName.Position;
         basicType->name = typeName.Content;
 
-        RefPtr<ExpressionSyntaxNode> typeExpr = basicType;
+        RefPtr<Expr> typeExpr = basicType;
 
         if (parser->LookAheadToken(TokenType::OpLess))
         {
@@ -1797,7 +1797,7 @@ namespace Slang
         // We are going to represent each buffer as a pair of declarations.
         // The first is a type declaration that holds all the members, while
         // the second is a variable declaration that uses the buffer type.
-        RefPtr<StructSyntaxNode> bufferDataTypeDecl = new StructSyntaxNode();
+        RefPtr<StructDecl> bufferDataTypeDecl = new StructDecl();
         RefPtr<Variable> bufferVarDecl = new Variable();
 
         // Both declarations will have a location that points to the name
@@ -1824,13 +1824,13 @@ namespace Slang
         // these constructs directly into the AST and *then* desugar them.
 
         // Construct a type expression to reference the buffer data type
-        auto bufferDataTypeExpr = new VarExpressionSyntaxNode();
+        auto bufferDataTypeExpr = new VarExpr();
         bufferDataTypeExpr->Position = bufferDataTypeDecl->Position;
         bufferDataTypeExpr->name = bufferDataTypeDecl->Name.Content;
         bufferDataTypeExpr->scope = parser->currentScope.Ptr();
 
         // Construct a type exrpession to reference the type constructor
-        auto bufferWrapperTypeExpr = new VarExpressionSyntaxNode();
+        auto bufferWrapperTypeExpr = new VarExpr();
         bufferWrapperTypeExpr->Position = bufferWrapperTypeNamePos;
         bufferWrapperTypeExpr->name = bufferWrapperTypeName;
 
@@ -1845,7 +1845,7 @@ namespace Slang
         bufferVarTypeExpr->FunctionExpr = bufferWrapperTypeExpr;
         bufferVarTypeExpr->Arguments.Add(bufferDataTypeExpr);
 
-        bufferVarDecl->Type.exp = bufferVarTypeExpr;
+        bufferVarDecl->type.exp = bufferVarTypeExpr;
 
         // Any semantics applied to the bufer declaration are taken as applying
         // to the variable instead.
@@ -1953,7 +1953,7 @@ namespace Slang
         // We are going to represent each buffer as a pair of declarations.
         // The first is a type declaration that holds all the members, while
         // the second is a variable declaration that uses the buffer type.
-        RefPtr<StructSyntaxNode> blockDataTypeDecl = new StructSyntaxNode();
+        RefPtr<StructDecl> blockDataTypeDecl = new StructDecl();
         RefPtr<Variable> blockVarDecl = new Variable();
 
         addModifier(blockDataTypeDecl, new ImplicitParameterBlockElementTypeModifier());
@@ -1977,13 +1977,13 @@ namespace Slang
         // these constructs directly into the AST and *then* desugar them.
 
         // Construct a type expression to reference the buffer data type
-        auto blockDataTypeExpr = new VarExpressionSyntaxNode();
+        auto blockDataTypeExpr = new VarExpr();
         blockDataTypeExpr->Position = blockDataTypeDecl->Position;
         blockDataTypeExpr->name = blockDataTypeDecl->Name.Content;
         blockDataTypeExpr->scope = parser->currentScope.Ptr();
 
         // Construct a type exrpession to reference the type constructor
-        auto blockWrapperTypeExpr = new VarExpressionSyntaxNode();
+        auto blockWrapperTypeExpr = new VarExpr();
         blockWrapperTypeExpr->Position = pos;
         blockWrapperTypeExpr->name = blockWrapperTypeName;
         // Always need to look this up in the outer scope,
@@ -1997,7 +1997,7 @@ namespace Slang
         blockVarTypeExpr->FunctionExpr = blockWrapperTypeExpr;
         blockVarTypeExpr->Arguments.Add(blockDataTypeExpr);
 
-        blockVarDecl->Type.exp = blockVarTypeExpr;
+        blockVarDecl->type.exp = blockVarTypeExpr;
 
         // The declarations in the body belong to the data type.
         parseAggTypeDeclBody(parser, blockDataTypeDecl.Ptr());
@@ -2056,11 +2056,11 @@ namespace Slang
             paramDecl->Name = parser->ReadToken(TokenType::Identifier);
             if (AdvanceIf(parser, TokenType::Colon))
             {
-                paramDecl->Type = parser->ParseTypeExp();
+                paramDecl->type = parser->ParseTypeExp();
             }
             if (AdvanceIf(parser, TokenType::OpAssign))
             {
-                paramDecl->Expr = parser->ParseInitExpr();
+                paramDecl->initExpr = parser->ParseInitExpr();
             }
             return paramDecl;
         }
@@ -2084,7 +2084,7 @@ namespace Slang
                 auto paramTypeExpr = new SharedTypeExpr();
                 paramTypeExpr->Position = paramDecl->Position;
                 paramTypeExpr->base.type = paramType;
-                paramTypeExpr->Type = QualType(getTypeType(paramType));
+                paramTypeExpr->type = QualType(getTypeType(paramType));
 
                 paramConstraint->sub = TypeExp(paramTypeExpr);
                 paramConstraint->sup = parser->ParseTypeExp();
@@ -2438,7 +2438,7 @@ namespace Slang
     }
 
 
-    void Parser::parseSourceFile(ProgramSyntaxNode* program)
+    void Parser::parseSourceFile(ModuleDecl* program)
     {
         if (outerScope)
         {
@@ -2454,18 +2454,18 @@ namespace Slang
         currentScope = nullptr;
     }
 
-    RefPtr<ProgramSyntaxNode> Parser::ParseProgram()
+    RefPtr<ModuleDecl> Parser::ParseProgram()
     {
-        RefPtr<ProgramSyntaxNode> program = new ProgramSyntaxNode();
+        RefPtr<ModuleDecl> program = new ModuleDecl();
 
         parseSourceFile(program.Ptr());
 
         return program;
     }
 
-    RefPtr<StructSyntaxNode> Parser::ParseStruct()
+    RefPtr<StructDecl> Parser::ParseStruct()
     {
-        RefPtr<StructSyntaxNode> rs = new StructSyntaxNode();
+        RefPtr<StructDecl> rs = new StructDecl();
         FillPosition(rs.Ptr());
         ReadToken("struct");
 
@@ -2481,9 +2481,9 @@ namespace Slang
         return rs;
     }
 
-    RefPtr<ClassSyntaxNode> Parser::ParseClass()
+    RefPtr<ClassDecl> Parser::ParseClass()
     {
-        RefPtr<ClassSyntaxNode> rs = new ClassSyntaxNode();
+        RefPtr<ClassDecl> rs = new ClassDecl();
         FillPosition(rs.Ptr());
         ReadToken("class");
         rs->Name = ReadToken(TokenType::Identifier);
@@ -2493,7 +2493,7 @@ namespace Slang
         return rs;
     }
 
-    static RefPtr<StatementSyntaxNode> ParseSwitchStmt(Parser* parser)
+    static RefPtr<Stmt> ParseSwitchStmt(Parser* parser)
     {
         RefPtr<SwitchStmt> stmt = new SwitchStmt();
         parser->FillPosition(stmt.Ptr());
@@ -2505,7 +2505,7 @@ namespace Slang
         return stmt;
     }
 
-    static RefPtr<StatementSyntaxNode> ParseCaseStmt(Parser* parser)
+    static RefPtr<Stmt> ParseCaseStmt(Parser* parser)
     {
         RefPtr<CaseStmt> stmt = new CaseStmt();
         parser->FillPosition(stmt.Ptr());
@@ -2515,7 +2515,7 @@ namespace Slang
         return stmt;
     }
 
-    static RefPtr<StatementSyntaxNode> ParseDefaultStmt(Parser* parser)
+    static RefPtr<Stmt> ParseDefaultStmt(Parser* parser)
     {
         RefPtr<DefaultStmt> stmt = new DefaultStmt();
         parser->FillPosition(stmt.Ptr());
@@ -2580,7 +2580,7 @@ namespace Slang
         return isTypeName(parser, name);
     }
 
-    RefPtr<StatementSyntaxNode> parseCompileTimeForStmt(
+    RefPtr<Stmt> parseCompileTimeForStmt(
         Parser* parser)
     {
         RefPtr<ScopeDecl> scopeDecl = new ScopeDecl();
@@ -2602,8 +2602,8 @@ namespace Slang
         parser->ReadToken("Range");
         parser->ReadToken(TokenType::LParent);
 
-        RefPtr<ExpressionSyntaxNode> rangeBeginExpr;
-        RefPtr<ExpressionSyntaxNode> rangeEndExpr = parser->ParseArgExpr();
+        RefPtr<Expr> rangeBeginExpr;
+        RefPtr<Expr> rangeEndExpr = parser->ParseArgExpr();
         if (AdvanceIf(parser, TokenType::Comma))
         {
             rangeBeginExpr = rangeEndExpr;
@@ -2626,7 +2626,7 @@ namespace Slang
         return stmt;
     }
 
-    RefPtr<StatementSyntaxNode> parseCompileTimeStmt(
+    RefPtr<Stmt> parseCompileTimeStmt(
         Parser* parser)
     {
         parser->ReadToken(TokenType::Dollar);
@@ -2641,11 +2641,11 @@ namespace Slang
         }
     }
 
-    RefPtr<StatementSyntaxNode> Parser::ParseStatement()
+    RefPtr<Stmt> Parser::ParseStatement()
     {
         auto modifiers = ParseModifiers(this);
 
-        RefPtr<StatementSyntaxNode> statement;
+        RefPtr<Stmt> statement;
         if (LookAheadToken(TokenType::LBrace))
             statement = ParseBlockStatement();
         else if (peekTypeName(this))
@@ -2666,7 +2666,7 @@ namespace Slang
             statement = ParseReturnStatement();
         else if (LookAheadToken("discard"))
         {
-            statement = new DiscardStatementSyntaxNode();
+            statement = new DiscardStmt();
             FillPosition(statement.Ptr());
             ReadToken("discard");
             ReadToken(TokenType::Semicolon);
@@ -2693,7 +2693,7 @@ namespace Slang
             // Try to parse a type (knowing that the type grammar is
             // a subset of the expression grammar, and so this should
             // always succeed).
-            RefPtr<ExpressionSyntaxNode> type = ParseType();
+            RefPtr<Expr> type = ParseType();
             // We don't actually care about the type, though, so
             // don't retain it
             type = nullptr;
@@ -2721,7 +2721,7 @@ namespace Slang
         }
         else if (LookAheadToken(TokenType::Semicolon))
         {
-            statement = new EmptyStatementSyntaxNode();
+            statement = new EmptyStmt();
             FillPosition(statement.Ptr());
             ReadToken(TokenType::Semicolon);
         }
@@ -2744,7 +2744,7 @@ namespace Slang
         return statement;
     }
 
-    RefPtr<StatementSyntaxNode> Parser::ParseBlockStatement()
+    RefPtr<Stmt> Parser::ParseBlockStatement()
     {
         // If we are being asked not to check things *and* we haven't
         // seen any `import` declarations yet, then we can safely assume
@@ -2799,7 +2799,7 @@ namespace Slang
         PushScope(scopeDecl.Ptr());
         ReadToken(TokenType::LBrace);
 
-        RefPtr<StatementSyntaxNode> body;
+        RefPtr<Stmt> body;
 
         if(!tokenReader.IsAtEnd())
         {
@@ -2836,10 +2836,10 @@ namespace Slang
         return blockStatement;
     }
 
-    RefPtr<VarDeclrStatementSyntaxNode> Parser::ParseVarDeclrStatement(
+    RefPtr<DeclStmt> Parser::ParseVarDeclrStatement(
         Modifiers modifiers)
     {
-        RefPtr<VarDeclrStatementSyntaxNode>varDeclrStatement = new VarDeclrStatementSyntaxNode();
+        RefPtr<DeclStmt>varDeclrStatement = new DeclStmt();
         
         FillPosition(varDeclrStatement.Ptr());
         auto decl = ParseDeclWithModifiers(this, currentScope->containerDecl, modifiers);
@@ -2847,9 +2847,9 @@ namespace Slang
         return varDeclrStatement;
     }
 
-    RefPtr<IfStatementSyntaxNode> Parser::ParseIfStatement()
+    RefPtr<IfStmt> Parser::ParseIfStatement()
     {
-        RefPtr<IfStatementSyntaxNode> ifStatement = new IfStatementSyntaxNode();
+        RefPtr<IfStmt> ifStatement = new IfStmt();
         FillPosition(ifStatement.Ptr());
         ReadToken("if");
         ReadToken(TokenType::LParent);
@@ -2864,7 +2864,7 @@ namespace Slang
         return ifStatement;
     }
 
-    RefPtr<ForStatementSyntaxNode> Parser::ParseForStatement()
+    RefPtr<ForStmt> Parser::ParseForStatement()
     {
         RefPtr<ScopeDecl> scopeDecl = new ScopeDecl();
 
@@ -2879,14 +2879,14 @@ namespace Slang
         // case, just so that we can correctly handle it in downstream
         // logic.
         //
-        RefPtr<ForStatementSyntaxNode> stmt;
+        RefPtr<ForStmt> stmt;
         if (brokenScoping)
         {
             stmt = new UnscopedForStmt();
         }
         else
         {
-            stmt = new ForStatementSyntaxNode();
+            stmt = new ForStmt();
         }
 
         stmt->scopeDecl = scopeDecl;
@@ -2925,9 +2925,9 @@ namespace Slang
         return stmt;
     }
 
-    RefPtr<WhileStatementSyntaxNode> Parser::ParseWhileStatement()
+    RefPtr<WhileStmt> Parser::ParseWhileStatement()
     {
-        RefPtr<WhileStatementSyntaxNode> whileStatement = new WhileStatementSyntaxNode();
+        RefPtr<WhileStmt> whileStatement = new WhileStmt();
         FillPosition(whileStatement.Ptr());
         ReadToken("while");
         ReadToken(TokenType::LParent);
@@ -2937,9 +2937,9 @@ namespace Slang
         return whileStatement;
     }
 
-    RefPtr<DoWhileStatementSyntaxNode> Parser::ParseDoWhileStatement()
+    RefPtr<DoWhileStmt> Parser::ParseDoWhileStatement()
     {
-        RefPtr<DoWhileStatementSyntaxNode> doWhileStatement = new DoWhileStatementSyntaxNode();
+        RefPtr<DoWhileStmt> doWhileStatement = new DoWhileStmt();
         FillPosition(doWhileStatement.Ptr());
         ReadToken("do");
         doWhileStatement->Statement = ParseStatement();
@@ -2951,27 +2951,27 @@ namespace Slang
         return doWhileStatement;
     }
 
-    RefPtr<BreakStatementSyntaxNode> Parser::ParseBreakStatement()
+    RefPtr<BreakStmt> Parser::ParseBreakStatement()
     {
-        RefPtr<BreakStatementSyntaxNode> breakStatement = new BreakStatementSyntaxNode();
+        RefPtr<BreakStmt> breakStatement = new BreakStmt();
         FillPosition(breakStatement.Ptr());
         ReadToken("break");
         ReadToken(TokenType::Semicolon);
         return breakStatement;
     }
 
-    RefPtr<ContinueStatementSyntaxNode>	Parser::ParseContinueStatement()
+    RefPtr<ContinueStmt>	Parser::ParseContinueStatement()
     {
-        RefPtr<ContinueStatementSyntaxNode> continueStatement = new ContinueStatementSyntaxNode();
+        RefPtr<ContinueStmt> continueStatement = new ContinueStmt();
         FillPosition(continueStatement.Ptr());
         ReadToken("continue");
         ReadToken(TokenType::Semicolon);
         return continueStatement;
     }
 
-    RefPtr<ReturnStatementSyntaxNode> Parser::ParseReturnStatement()
+    RefPtr<ReturnStmt> Parser::ParseReturnStatement()
     {
-        RefPtr<ReturnStatementSyntaxNode> returnStatement = new ReturnStatementSyntaxNode();
+        RefPtr<ReturnStmt> returnStatement = new ReturnStmt();
         FillPosition(returnStatement.Ptr());
         ReadToken("return");
         if (!LookAheadToken(TokenType::Semicolon))
@@ -2980,9 +2980,9 @@ namespace Slang
         return returnStatement;
     }
 
-    RefPtr<ExpressionStatementSyntaxNode> Parser::ParseExpressionStatement()
+    RefPtr<ExpressionStmt> Parser::ParseExpressionStatement()
     {
-        RefPtr<ExpressionStatementSyntaxNode> statement = new ExpressionStatementSyntaxNode();
+        RefPtr<ExpressionStmt> statement = new ExpressionStmt();
             
         FillPosition(statement.Ptr());
         statement->Expression = ParseExpression();
@@ -2991,9 +2991,9 @@ namespace Slang
         return statement;
     }
 
-    RefPtr<ParameterSyntaxNode> Parser::ParseParameter()
+    RefPtr<ParamDecl> Parser::ParseParameter()
     {
-        RefPtr<ParameterSyntaxNode> parameter = new ParameterSyntaxNode();
+        RefPtr<ParamDecl> parameter = new ParamDecl();
         parameter->modifiers = ParseModifiers(this);
 
         DeclaratorInfo declaratorInfo;
@@ -3007,7 +3007,7 @@ namespace Slang
         return parameter;
     }
 
-    RefPtr<ExpressionSyntaxNode> Parser::ParseType()
+    RefPtr<Expr> Parser::ParseType()
     {
         auto typeSpec = parseTypeSpec(this);
         if( typeSpec.decl )
@@ -3103,7 +3103,7 @@ namespace Slang
         }
     }
 
-    static RefPtr<ExpressionSyntaxNode> parseOperator(Parser* parser)
+    static RefPtr<Expr> parseOperator(Parser* parser)
     {
         Token opToken;
         switch(parser->tokenReader.PeekTokenType())
@@ -3118,7 +3118,7 @@ namespace Slang
             break;
         }
 
-        auto opExpr = new VarExpressionSyntaxNode();
+        auto opExpr = new VarExpr();
         opExpr->name = opToken.Content;
         opExpr->scope = parser->currentScope;
         opExpr->Position = opToken.Position;
@@ -3127,11 +3127,11 @@ namespace Slang
 
     }
 
-    static RefPtr<ExpressionSyntaxNode> createInfixExpr(
+    static RefPtr<Expr> createInfixExpr(
         Parser*                         /*parser*/,
-        RefPtr<ExpressionSyntaxNode>    left,
-        RefPtr<ExpressionSyntaxNode>    op,
-        RefPtr<ExpressionSyntaxNode>    right)
+        RefPtr<Expr>    left,
+        RefPtr<Expr>    op,
+        RefPtr<Expr>    right)
     {
         RefPtr<InfixExpr> expr = new InfixExpr();
         expr->Position = op->Position;
@@ -3141,9 +3141,9 @@ namespace Slang
         return expr;
     }
 
-    static RefPtr<ExpressionSyntaxNode> parseInfixExprWithPrecedence(
+    static RefPtr<Expr> parseInfixExprWithPrecedence(
         Parser*                         parser,
-        RefPtr<ExpressionSyntaxNode>    inExpr,
+        RefPtr<Expr>    inExpr,
         Precedence                      prec)
     {
         auto expr = inExpr;
@@ -3160,7 +3160,7 @@ namespace Slang
             // one non-binary case we need to deal with.
             if(opTokenType == TokenType::QuestionMark)
             {
-                RefPtr<SelectExpressionSyntaxNode> select = new SelectExpressionSyntaxNode();
+                RefPtr<SelectExpr> select = new SelectExpr();
                 select->Position = op->Position;
                 select->FunctionExpr = op;
 
@@ -3203,7 +3203,7 @@ namespace Slang
         return expr;
     }
 
-    RefPtr<ExpressionSyntaxNode> Parser::ParseExpression(Precedence level)
+    RefPtr<Expr> Parser::ParseExpression(Precedence level)
     {
         auto expr = ParseLeafExpression();
         return parseInfixExprWithPrecedence(this, expr, level);
@@ -3218,7 +3218,7 @@ namespace Slang
             auto condition = ParseExpression(Precedence(level + 1));
             if (LookAheadToken(TokenType::QuestionMark))
             {
-                RefPtr<SelectExpressionSyntaxNode> select = new SelectExpressionSyntaxNode();
+                RefPtr<SelectExpr> select = new SelectExpr();
                 FillPosition(select.Ptr());
 
                 select->Arguments.Add(condition);
@@ -3240,7 +3240,7 @@ namespace Slang
                 auto left = ParseExpression(Precedence(level + 1));
                 while (GetOpLevel(this, tokenReader.PeekTokenType()) == level)
                 {
-                    RefPtr<OperatorExpressionSyntaxNode> tmp = new InfixExpr();
+                    RefPtr<OperatorExpr> tmp = new InfixExpr();
                     tmp->FunctionExpr = parseOperator(this);
 
                     tmp->Arguments.Add(left);
@@ -3255,7 +3255,7 @@ namespace Slang
                 auto left = ParseExpression(Precedence(level + 1));
                 if (GetOpLevel(this, tokenReader.PeekTokenType()) == level)
                 {
-                    RefPtr<OperatorExpressionSyntaxNode> tmp = new InfixExpr();
+                    RefPtr<OperatorExpr> tmp = new InfixExpr();
                     tmp->Arguments.Add(left);
                     FillPosition(tmp.Ptr());
                     tmp->FunctionExpr = parseOperator(this);
@@ -3270,11 +3270,11 @@ namespace Slang
 
     // We *might* be looking at an application of a generic to arguments,
     // but we need to disambiguate to make sure.
-    static RefPtr<ExpressionSyntaxNode> maybeParseGenericApp(
+    static RefPtr<Expr> maybeParseGenericApp(
         Parser*                             parser,
 
         // TODO: need to support more general expressions here
-        RefPtr<VarExpressionSyntaxNode>     base)
+        RefPtr<VarExpr>     base)
     {
         if(peekTokenType(parser) != TokenType::OpLess)
             return base;
@@ -3287,7 +3287,7 @@ namespace Slang
         return parseGenericApp(parser, base);
     }
 
-    static RefPtr<ExpressionSyntaxNode> parseAtomicExpr(Parser* parser)
+    static RefPtr<Expr> parseAtomicExpr(Parser* parser)
     {
         switch( peekTokenType(parser) )
         {
@@ -3309,7 +3309,7 @@ namespace Slang
 
                 if (peekTypeName(parser) && parser->LookAheadToken(TokenType::RParent, 1))
                 {
-                    RefPtr<TypeCastExpressionSyntaxNode> tcexpr = new ExplicitCastExpr();
+                    RefPtr<TypeCastExpr> tcexpr = new ExplicitCastExpr();
                     parser->FillPosition(tcexpr.Ptr());
                     tcexpr->TargetType = parser->ParseTypeExp();
                     parser->ReadToken(TokenType::RParent);
@@ -3318,7 +3318,7 @@ namespace Slang
                 }
                 else
                 {
-                    RefPtr<ExpressionSyntaxNode> base = parser->ParseExpression();
+                    RefPtr<Expr> base = parser->ParseExpression();
                     parser->ReadToken(TokenType::RParent);
 
                     RefPtr<ParenExpr> parenExpr = new ParenExpr();
@@ -3337,7 +3337,7 @@ namespace Slang
                 // Initializer list
                 parser->ReadToken(TokenType::LBrace);
 
-                List<RefPtr<ExpressionSyntaxNode>> exprs;
+                List<RefPtr<Expr>> exprs;
 
                 for(;;)
                 {
@@ -3361,7 +3361,7 @@ namespace Slang
 
         case TokenType::IntegerLiteral:
             {
-                RefPtr<ConstantExpressionSyntaxNode> constExpr = new ConstantExpressionSyntaxNode();
+                RefPtr<ConstantExpr> constExpr = new ConstantExpr();
                 parser->FillPosition(constExpr.Ptr());
 
                 auto token = parser->tokenReader.AdvanceToken();
@@ -3373,7 +3373,7 @@ namespace Slang
                 // Look at any suffix on the value
                 char const* suffixCursor = suffix.begin();
 
-                RefPtr<ExpressionType> suffixType = nullptr;
+                RefPtr<Type> suffixType = nullptr;
                 if( suffixCursor && *suffixCursor )
                 {
                     int lCount = 0;
@@ -3421,9 +3421,9 @@ namespace Slang
                     }
                 }
 
-                constExpr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Int;
+                constExpr->ConstType = ConstantExpr::ConstantType::Int;
                 constExpr->integerValue = value;
-                constExpr->Type = QualType(suffixType);
+                constExpr->type = QualType(suffixType);
 
                 return constExpr;
             }
@@ -3431,7 +3431,7 @@ namespace Slang
 
         case TokenType::FloatingPointLiteral:
             {
-                RefPtr<ConstantExpressionSyntaxNode> constExpr = new ConstantExpressionSyntaxNode();
+                RefPtr<ConstantExpr> constExpr = new ConstantExpr();
                 parser->FillPosition(constExpr.Ptr());
 
                 auto token = parser->tokenReader.AdvanceToken();
@@ -3443,7 +3443,7 @@ namespace Slang
                 // Look at any suffix on the value
                 char const* suffixCursor = suffix.begin();
 
-                RefPtr<ExpressionType> suffixType = nullptr;
+                RefPtr<Type> suffixType = nullptr;
                 if( suffixCursor && *suffixCursor )
                 {
                     int fCount = 0;
@@ -3490,20 +3490,20 @@ namespace Slang
                     }
                 }
 
-                constExpr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Float;
+                constExpr->ConstType = ConstantExpr::ConstantType::Float;
                 constExpr->floatingPointValue = value;
-                constExpr->Type = QualType(suffixType);
+                constExpr->type = QualType(suffixType);
 
                 return constExpr;
             }
 
         case TokenType::StringLiteral:
             {
-                RefPtr<ConstantExpressionSyntaxNode> constExpr = new ConstantExpressionSyntaxNode();
+                RefPtr<ConstantExpr> constExpr = new ConstantExpr();
                 auto token = parser->tokenReader.AdvanceToken();
                 constExpr->token = token;
                 parser->FillPosition(constExpr.Ptr());
-                constExpr->ConstType = ConstantExpressionSyntaxNode::ConstantType::String;
+                constExpr->ConstType = ConstantExpr::ConstantType::String;
 
                 if (!parser->LookAheadToken(TokenType::StringLiteral))
                 {
@@ -3532,18 +3532,18 @@ namespace Slang
 
                 if (parser->LookAheadToken("true") || parser->LookAheadToken("false"))
                 {
-                    RefPtr<ConstantExpressionSyntaxNode> constExpr = new ConstantExpressionSyntaxNode();
+                    RefPtr<ConstantExpr> constExpr = new ConstantExpr();
                     auto token = parser->tokenReader.AdvanceToken();
                     constExpr->token = token;
                     parser->FillPosition(constExpr.Ptr());
-                    constExpr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Bool;
+                    constExpr->ConstType = ConstantExpr::ConstantType::Bool;
                     constExpr->integerValue = token.Content == "true" ? 1 : 0;
 
                     return constExpr;
                 }
 
                 // Default behavior is just to create a name expression
-                RefPtr<VarExpressionSyntaxNode> varExpr = new VarExpressionSyntaxNode();
+                RefPtr<VarExpr> varExpr = new VarExpr();
                 varExpr->scope = parser->currentScope.Ptr();
                 parser->FillPosition(varExpr.Ptr());
                 auto token = parser->ReadToken(TokenType::Identifier);
@@ -3559,7 +3559,7 @@ namespace Slang
         }
     }
 
-    static RefPtr<ExpressionSyntaxNode> parsePostfixExpr(Parser* parser)
+    static RefPtr<Expr> parsePostfixExpr(Parser* parser)
     {
         auto expr = parseAtomicExpr(parser);
         for(;;)
@@ -3573,7 +3573,7 @@ namespace Slang
             case TokenType::OpInc:
             case TokenType::OpDec:
                 {
-                    RefPtr<OperatorExpressionSyntaxNode> postfixExpr = new PostfixExpr();
+                    RefPtr<OperatorExpr> postfixExpr = new PostfixExpr();
                     parser->FillPosition(postfixExpr.Ptr());
                     postfixExpr->FunctionExpr = parseOperator(parser);
                     postfixExpr->Arguments.Add(expr);
@@ -3585,7 +3585,7 @@ namespace Slang
             // Subscript operation `a[i]`
             case TokenType::LBracket:
                 {
-                    RefPtr<IndexExpressionSyntaxNode> indexExpr = new IndexExpressionSyntaxNode();
+                    RefPtr<IndexExpr> indexExpr = new IndexExpr();
                     indexExpr->BaseExpression = expr;
                     parser->FillPosition(indexExpr.Ptr());
                     parser->ReadToken(TokenType::LBracket);
@@ -3603,7 +3603,7 @@ namespace Slang
             // Call oepration `f(x)`
             case TokenType::LParent:
                 {
-                    RefPtr<InvokeExpressionSyntaxNode> invokeExpr = new InvokeExpressionSyntaxNode();
+                    RefPtr<InvokeExpr> invokeExpr = new InvokeExpr();
                     invokeExpr->FunctionExpr = expr;
                     parser->FillPosition(invokeExpr.Ptr());
                     parser->ReadToken(TokenType::LParent);
@@ -3628,7 +3628,7 @@ namespace Slang
             // Member access `x.m`
             case TokenType::Dot:
                 {
-                    RefPtr<MemberExpressionSyntaxNode> memberExpr = new MemberExpressionSyntaxNode();
+                    RefPtr<MemberExpr> memberExpr = new MemberExpr();
 
                     // TODO(tfoley): why would a member expression need this?
                     memberExpr->scope = parser->currentScope.Ptr();
@@ -3645,7 +3645,7 @@ namespace Slang
         }
     }
 
-    static RefPtr<ExpressionSyntaxNode> parsePrefixExpr(Parser* parser)
+    static RefPtr<Expr> parsePrefixExpr(Parser* parser)
     {
         switch( peekTokenType(parser) )
         {
@@ -3669,19 +3669,19 @@ namespace Slang
         }
     }
 
-    RefPtr<ExpressionSyntaxNode> Parser::ParseLeafExpression()
+    RefPtr<Expr> Parser::ParseLeafExpression()
     {
         return parsePrefixExpr(this);
 
 #if 0
-        RefPtr<ExpressionSyntaxNode> rs;
+        RefPtr<Expr> rs;
         if (LookAheadToken(TokenType::OpInc) ||
             LookAheadToken(TokenType::OpDec) ||
             LookAheadToken(TokenType::OpNot) ||
             LookAheadToken(TokenType::OpBitNot) ||
             LookAheadToken(TokenType::OpSub))
         {
-            RefPtr<OperatorExpressionSyntaxNode> unaryExpr = new PrefixExpr();
+            RefPtr<OperatorExpr> unaryExpr = new PrefixExpr();
             FillPosition(unaryExpr.Ptr());
             unaryExpr->FunctionExpr = parseOperator(this);
             unaryExpr->Arguments.Add(ParseLeafExpression());
@@ -3692,10 +3692,10 @@ namespace Slang
         if (LookAheadToken(TokenType::LParent))
         {
             ReadToken(TokenType::LParent);
-            RefPtr<ExpressionSyntaxNode> expr;
+            RefPtr<Expr> expr;
             if (peekTypeName(this) && LookAheadToken(TokenType::RParent, 1))
             {
-                RefPtr<TypeCastExpressionSyntaxNode> tcexpr = new TypeCastExpressionSyntaxNode();
+                RefPtr<TypeCastExpr> tcexpr = new TypeCastExpr();
                 FillPosition(tcexpr.Ptr());
                 tcexpr->TargetType = ParseTypeExp();
                 ReadToken(TokenType::RParent);
@@ -3717,7 +3717,7 @@ namespace Slang
             // Initializer list
             ReadToken(TokenType::LBrace);
 
-            List<RefPtr<ExpressionSyntaxNode>> exprs;
+            List<RefPtr<Expr>> exprs;
 
             for(;;)
             {
@@ -3741,33 +3741,33 @@ namespace Slang
         else if (LookAheadToken(TokenType::IntegerLiteral) ||
             LookAheadToken(TokenType::FloatingPointLiteral))
         {
-            RefPtr<ConstantExpressionSyntaxNode> constExpr = new ConstantExpressionSyntaxNode();
+            RefPtr<ConstantExpr> constExpr = new ConstantExpr();
             auto token = tokenReader.AdvanceToken();
             FillPosition(constExpr.Ptr());
-            if (token.Type == TokenType::IntegerLiteral)
+            if (token.type == TokenType::IntegerLiteral)
             {
-                constExpr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Int;
+                constExpr->ConstType = ConstantExpr::ConstantType::Int;
                 constExpr->IntValue = StringToInt(token.Content);
             }
-            else if (token.Type == TokenType::FloatingPointLiteral)
+            else if (token.type == TokenType::FloatingPointLiteral)
             {
-                constExpr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Float;
+                constExpr->ConstType = ConstantExpr::ConstantType::Float;
                 constExpr->FloatValue = (FloatingPointLiteralValue) StringToDouble(token.Content);
             }
             rs = constExpr;
         }
         else if (LookAheadToken("true") || LookAheadToken("false"))
         {
-            RefPtr<ConstantExpressionSyntaxNode> constExpr = new ConstantExpressionSyntaxNode();
+            RefPtr<ConstantExpr> constExpr = new ConstantExpr();
             auto token = tokenReader.AdvanceToken();
             FillPosition(constExpr.Ptr());
-            constExpr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Bool;
+            constExpr->ConstType = ConstantExpr::ConstantType::Bool;
             constExpr->IntValue = token.Content == "true" ? 1 : 0;
             rs = constExpr;
         }
         else if (LookAheadToken(TokenType::Identifier))
         {
-            RefPtr<VarExpressionSyntaxNode> varExpr = new VarExpressionSyntaxNode();
+            RefPtr<VarExpr> varExpr = new VarExpr();
             varExpr->scope = currentScope.Ptr();
             FillPosition(varExpr.Ptr());
             auto token = ReadToken(TokenType::Identifier);
@@ -3784,7 +3784,7 @@ namespace Slang
         {
             if (LookAheadToken(TokenType::OpInc))
             {
-                RefPtr<OperatorExpressionSyntaxNode> unaryExpr = new PostfixExpr();
+                RefPtr<OperatorExpr> unaryExpr = new PostfixExpr();
                 FillPosition(unaryExpr.Ptr());
                 unaryExpr->FunctionExpr = parseOperator(this);
                 unaryExpr->Arguments.Add(rs);
@@ -3792,7 +3792,7 @@ namespace Slang
             }
             else if (LookAheadToken(TokenType::OpDec))
             {
-                RefPtr<OperatorExpressionSyntaxNode> unaryExpr = new PostfixExpr();
+                RefPtr<OperatorExpr> unaryExpr = new PostfixExpr();
                 FillPosition(unaryExpr.Ptr());
                 unaryExpr->FunctionExpr = parseOperator(this);
                 unaryExpr->Arguments.Add(rs);
@@ -3800,7 +3800,7 @@ namespace Slang
             }
             else if (LookAheadToken(TokenType::LBracket))
             {
-                RefPtr<IndexExpressionSyntaxNode> indexExpr = new IndexExpressionSyntaxNode();
+                RefPtr<IndexExpr> indexExpr = new IndexExpr();
                 indexExpr->BaseExpression = rs;
                 FillPosition(indexExpr.Ptr());
                 ReadToken(TokenType::LBracket);
@@ -3810,7 +3810,7 @@ namespace Slang
             }
             else if (LookAheadToken(TokenType::LParent))
             {
-                RefPtr<InvokeExpressionSyntaxNode> invokeExpr = new InvokeExpressionSyntaxNode();
+                RefPtr<InvokeExpr> invokeExpr = new InvokeExpr();
                 invokeExpr->FunctionExpr = rs;
                 FillPosition(invokeExpr.Ptr());
                 ReadToken(TokenType::LParent);
@@ -3831,7 +3831,7 @@ namespace Slang
             }
             else if (LookAheadToken(TokenType::Dot))
             {
-                RefPtr<MemberExpressionSyntaxNode> memberExpr = new MemberExpressionSyntaxNode();
+                RefPtr<MemberExpr> memberExpr = new MemberExpr();
                 memberExpr->scope = currentScope.Ptr();
                 FillPosition(memberExpr.Ptr());
                 memberExpr->BaseExpression = rs;

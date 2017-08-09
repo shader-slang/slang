@@ -390,7 +390,7 @@ static bool isGLSLBuiltinName(VarDeclBase* varDecl)
     return getReflectionName(varDecl).StartsWith("gl_");
 }
 
-RefPtr<ExpressionType> tryGetEffectiveTypeForGLSLVaryingInput(
+RefPtr<Type> tryGetEffectiveTypeForGLSLVaryingInput(
     ParameterBindingContext*    context,
     VarDeclBase*                varDecl)
 {
@@ -428,7 +428,7 @@ RefPtr<ExpressionType> tryGetEffectiveTypeForGLSLVaryingInput(
     return nullptr;
 }
 
-RefPtr<ExpressionType> tryGetEffectiveTypeForGLSLVaryingOutput(
+RefPtr<Type> tryGetEffectiveTypeForGLSLVaryingOutput(
     ParameterBindingContext*    context,
     VarDeclBase*                varDecl)
 {
@@ -592,14 +592,14 @@ struct EntryPointParameterState
 
 static RefPtr<TypeLayout> processEntryPointParameter(
     ParameterBindingContext*        context,
-    RefPtr<ExpressionType>          type,
+    RefPtr<Type>          type,
     EntryPointParameterState const& state,
     RefPtr<VarLayout>               varLayout);
 
 static void collectGlobalScopeGLSLVaryingParameter(
     ParameterBindingContext*        context,
     RefPtr<VarDeclBase>             varDecl,
-    RefPtr<ExpressionType>          effectiveType,
+    RefPtr<Type>          effectiveType,
     EntryPointParameterDirection    direction)
 {
     int defaultSemanticIndex = 0;
@@ -994,7 +994,7 @@ static void completeBindingsForParameter(
 
 static void collectGlobalScopeParameters(
     ParameterBindingContext*    context,
-    ProgramSyntaxNode*          program)
+    ModuleDecl*          program)
 {
     // First enumerate parameters at global scope
     for( auto decl : program->Members )
@@ -1066,7 +1066,7 @@ SimpleSemanticInfo decomposeSimpleSemantic(
 
 static RefPtr<TypeLayout> processSimpleEntryPointParameter(
     ParameterBindingContext*        context,
-    RefPtr<ExpressionType>          type,
+    RefPtr<Type>          type,
     EntryPointParameterState const& inState,
     RefPtr<VarLayout>               varLayout,
     int                             semanticSlotCount = 1)
@@ -1147,7 +1147,7 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
 static RefPtr<TypeLayout> processEntryPointParameterWithPossibleSemantic(
     ParameterBindingContext*        context,
     Decl*                           declForSemantic,
-    RefPtr<ExpressionType>          type,
+    RefPtr<Type>          type,
     EntryPointParameterState const& state,
     RefPtr<VarLayout>               varLayout)
 {
@@ -1178,7 +1178,7 @@ static RefPtr<TypeLayout> processEntryPointParameterWithPossibleSemantic(
 
 static RefPtr<TypeLayout> processEntryPointParameter(
     ParameterBindingContext*        context,
-    RefPtr<ExpressionType>          type,
+    RefPtr<Type>          type,
     EntryPointParameterState const& state,
     RefPtr<VarLayout>               varLayout)
 {
@@ -1235,7 +1235,7 @@ static RefPtr<TypeLayout> processEntryPointParameter(
     {
         auto declRef = declRefType->declRef;
 
-        if (auto structDeclRef = declRef.As<StructSyntaxNode>())
+        if (auto structDeclRef = declRef.As<StructDecl>())
         {
             RefPtr<StructTypeLayout> structLayout = new StructTypeLayout();
             structLayout->type = type;
@@ -1288,7 +1288,7 @@ static RefPtr<TypeLayout> processEntryPointParameter(
 static void collectEntryPointParameters(
     ParameterBindingContext*        context,
     EntryPointRequest*              entryPoint,
-    ProgramSyntaxNode*              translationUnitSyntax)
+    ModuleDecl*              translationUnitSyntax)
 {
     // First, look for the entry point with the specified name
 
@@ -1307,7 +1307,7 @@ static void collectEntryPointParameters(
         return;
     }
 
-    FunctionSyntaxNode* entryPointFuncDecl = dynamic_cast<FunctionSyntaxNode*>(entryPointDecl);
+    FuncDecl* entryPointFuncDecl = dynamic_cast<FuncDecl*>(entryPointDecl);
     if( !entryPointFuncDecl )
     {
         // Not a function!
@@ -1368,7 +1368,7 @@ static void collectEntryPointParameters(
         auto paramTypeLayout = processEntryPointParameterWithPossibleSemantic(
             context,
             paramDecl.Ptr(),
-            paramDecl->Type.type,
+            paramDecl->type.type,
             state,
             paramVarLayout);
 
@@ -1443,7 +1443,7 @@ inferStageForTranslationUnit(
 
 static void collectModuleParameters(
     ParameterBindingContext*    inContext,
-    ProgramSyntaxNode*          module)
+    ModuleDecl*          module)
 {
     // Each loaded module provides a separate (logical) namespace for
     // parameters, so that two parameters with the same name, in
@@ -1689,10 +1689,10 @@ void generateParameterBindings(
 
         RefPtr<Variable> var = new Variable();
         var->Name.Content = "SLANG_hack_samplerForTexelFetch";
-        var->Type.type = getSamplerStateType(request->mSession);
+        var->type.type = getSamplerStateType(request->mSession);
 
         auto typeLayout = new TypeLayout();
-        typeLayout->type = var->Type.type;
+        typeLayout->type = var->type.type;
         typeLayout->addResourceUsage(LayoutResourceKind::DescriptorTableSlot, 1);
 
         auto varLayout = new VarLayout();

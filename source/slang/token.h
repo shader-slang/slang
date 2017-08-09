@@ -26,7 +26,7 @@ typedef unsigned int TokenFlags;
 class Token
 {
 public:
-	TokenType Type = TokenType::Unknown;
+	TokenType type = TokenType::Unknown;
 	String Content;
 	CodePosition Position;
     TokenFlags flags = 0;
@@ -34,7 +34,7 @@ public:
 	Token(TokenType type, const String & content, int line, int col, int pos, String fileName, TokenFlags flags = 0)
         : flags(flags)
 	{
-		Type = type;
+		type = type;
 		Content = content;
 		Position = CodePosition(line, col, pos, fileName);
 	}

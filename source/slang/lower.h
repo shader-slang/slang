@@ -22,12 +22,12 @@ namespace Slang
     struct LoweredEntryPoint
     {
         // The actual lowered entry point
-        RefPtr<FunctionSyntaxNode>  entryPoint;
+        RefPtr<FuncDecl>  entryPoint;
 
         // The generated program AST that
         // contains the entry point and any
         // other declarations it uses
-        RefPtr<ProgramSyntaxNode>   program;
+        RefPtr<ModuleDecl>   program;
     };
 
     // Emit code for a single entry point, based on

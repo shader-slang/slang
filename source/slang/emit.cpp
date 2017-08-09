@@ -71,7 +71,7 @@ struct SharedEmitContext
 
     // We only want to emit each `import`ed module one time, so
     // we maintain a set of already-emitted modules.
-    HashSet<ProgramSyntaxNode*> modulesAlreadyEmitted;
+    HashSet<ModuleDecl*> modulesAlreadyEmitted;
 
     // We track the original global-scope layout so that we can
     // find layout information for `import`ed parameters.
@@ -82,7 +82,7 @@ struct SharedEmitContext
 
     ProgramLayout*      programLayout;
 
-    ProgramSyntaxNode*  program;
+    ModuleDecl*  program;
 
     bool                needHackSamplerForTexelFetch = false;
 
@@ -124,7 +124,7 @@ void requireGLSLVersion(
 static String getStringOrIdentifierTokenValue(
     Token const& token)
 {
-    switch(token.Type)
+    switch(token.type)
     {
     default:
         SLANG_UNEXPECTED("needed an identifier or string literal");
@@ -793,7 +793,7 @@ struct EmitVisitor
     }
 
     void emitGLSLTypePrefix(
-        RefPtr<ExpressionType>  type)
+        RefPtr<Type>  type)
     {
         if(auto basicElementType = type->As<BasicExpressionType>())
         {
@@ -980,7 +980,7 @@ struct EmitVisitor
         }
     }
 
-    void emitTypeImpl(RefPtr<ExpressionType> type, EDeclarator* declarator)
+    void emitTypeImpl(RefPtr<Type> type, EDeclarator* declarator)
     {
         TypeEmitArg arg;
         arg.declarator = declarator;
@@ -1186,7 +1186,7 @@ struct EmitVisitor
     }
 
     void EmitType(
-        RefPtr<ExpressionType>  type,
+        RefPtr<Type>  type,
         CodePosition const&     typeLoc,
         String const&           name,
         CodePosition const&     nameLoc)
@@ -1201,19 +1201,19 @@ struct EmitVisitor
     }
 
 
-    void EmitType(RefPtr<ExpressionType> type, Token const& nameToken)
+    void EmitType(RefPtr<Type> type, Token const& nameToken)
     {
         EmitType(type, CodePosition(), nameToken.Content, nameToken.Position);
     }
 
-    void EmitType(RefPtr<ExpressionType> type)
+    void EmitType(RefPtr<Type> type)
     {
         emitTypeImpl(type, nullptr);
     }
 
-    void emitTypeBasedOnExpr(ExpressionSyntaxNode* expr, EDeclarator* declarator)
+    void emitTypeBasedOnExpr(Expr* expr, EDeclarator* declarator)
     {
-        if (auto subscriptExpr = dynamic_cast<IndexExpressionSyntaxNode*>(expr))
+        if (auto subscriptExpr = dynamic_cast<IndexExpr*>(expr))
         {
             // Looks like an array
             emitTypeBasedOnExpr(subscriptExpr->BaseExpression, declarator);
@@ -1278,13 +1278,13 @@ struct EmitVisitor
 
     // Determine if an expression should not be emitted when it is the base of
     // a member reference expression.
-    bool IsBaseExpressionImplicit(RefPtr<ExpressionSyntaxNode> expr)
+    bool IsBaseExpressionImplicit(RefPtr<Expr> expr)
     {
         // HACK(tfoley): For now, anything with a constant-buffer type should be
         // left implicit.
 
         // Look through any dereferencing that took place
-        RefPtr<ExpressionSyntaxNode> e = expr;
+        RefPtr<Expr> e = expr;
         while (auto derefExpr = e.As<DerefExpr>())
         {
             e = derefExpr->base;
@@ -1298,7 +1298,7 @@ struct EmitVisitor
         }
 
         // Is the expression referencing a constant buffer?
-        if (auto cbufferType = e->Type->As<ConstantBufferType>())
+        if (auto cbufferType = e->type->As<ConstantBufferType>())
         {
             return true;
         }
@@ -1307,13 +1307,13 @@ struct EmitVisitor
     }
 
 #if 0
-    void EmitPostfixExpr(RefPtr<ExpressionSyntaxNode> expr)
+    void EmitPostfixExpr(RefPtr<Expr> expr)
     {
         EmitExprWithPrecedence(expr, kEOp_Postfix);
     }
 #endif
 
-    void EmitExpr(RefPtr<ExpressionSyntaxNode> expr)
+    void EmitExpr(RefPtr<Expr> expr)
     {
         EmitExprWithPrecedence(expr, kEOp_General);
     }
@@ -1336,12 +1336,12 @@ struct EmitVisitor
     // we may need to ignore certain constructs that the type-checker
     // might have introduced, but which interfere with our ability
     // to use it effectively in the target language
-    RefPtr<ExpressionSyntaxNode> prepareLValueExpr(
-        RefPtr<ExpressionSyntaxNode>    expr)
+    RefPtr<Expr> prepareLValueExpr(
+        RefPtr<Expr>    expr)
     {
         for(;;)
         {
-            if(auto typeCastExpr = expr.As<TypeCastExpressionSyntaxNode>())
+            if(auto typeCastExpr = expr.As<TypeCastExpr>())
             {
                 expr = typeCastExpr->Expression;
             }
@@ -1358,7 +1358,7 @@ struct EmitVisitor
         EOpInfo outerPrec,
         EOpInfo prec,
         char const* op,
-        RefPtr<InvokeExpressionSyntaxNode> binExpr,
+        RefPtr<InvokeExpr> binExpr,
         bool isAssign)
     {
         bool needsClose = MaybeEmitParens(outerPrec, prec);
@@ -1380,12 +1380,12 @@ struct EmitVisitor
         }
     }
 
-    void EmitBinExpr(EOpInfo outerPrec, EOpInfo prec, char const* op, RefPtr<InvokeExpressionSyntaxNode> binExpr)
+    void EmitBinExpr(EOpInfo outerPrec, EOpInfo prec, char const* op, RefPtr<InvokeExpr> binExpr)
     {
         emitInfixExprImpl(outerPrec, prec, op, binExpr, false);
     }
 
-    void EmitBinAssignExpr(EOpInfo outerPrec, EOpInfo prec, char const* op, RefPtr<InvokeExpressionSyntaxNode> binExpr)
+    void EmitBinAssignExpr(EOpInfo outerPrec, EOpInfo prec, char const* op, RefPtr<InvokeExpr> binExpr)
     {
         emitInfixExprImpl(outerPrec, prec, op, binExpr, true);
     }
@@ -1395,7 +1395,7 @@ struct EmitVisitor
         EOpInfo prec,
         char const* preOp,
         char const* postOp,
-        RefPtr<InvokeExpressionSyntaxNode> expr,
+        RefPtr<InvokeExpr> expr,
         bool isAssign)
     {
         bool needsClose = MaybeEmitParens(outerPrec, prec);
@@ -1429,7 +1429,7 @@ struct EmitVisitor
         EOpInfo prec,
         char const* preOp,
         char const* postOp,
-        RefPtr<InvokeExpressionSyntaxNode> expr)
+        RefPtr<InvokeExpr> expr)
     {
         emitUnaryExprImpl(outerPrec, prec, preOp, postOp, expr, false);
     }
@@ -1439,7 +1439,7 @@ struct EmitVisitor
         EOpInfo prec,
         char const* preOp,
         char const* postOp,
-        RefPtr<InvokeExpressionSyntaxNode> expr)
+        RefPtr<InvokeExpr> expr)
     {
         emitUnaryExprImpl(outerPrec, prec, preOp, postOp, expr, true);
     }
@@ -1453,7 +1453,7 @@ struct EmitVisitor
 
         // If no target name was specified, then the modifier implicitly
         // applies to all targets.
-        if(targetToken.Type == TokenType::Unknown)
+        if(targetToken.type == TokenType::Unknown)
             return true;
 
         // Otherwise, we need to check if the target name matches what
@@ -1486,7 +1486,7 @@ struct EmitVisitor
             // For now "better"-ness is defined as: a modifier
             // with a specified target is better than one without
             // (it is more specific)
-            if(!bestModifier || bestModifier->targetToken.Type == TokenType::Unknown)
+            if(!bestModifier || bestModifier->targetToken.type == TokenType::Unknown)
             {
                 bestModifier = m;
             }
@@ -1498,7 +1498,7 @@ struct EmitVisitor
     // Emit a call expression that doesn't involve any special cases,
     // just an expression of the form `f(a0, a1, ...)`
     void emitSimpleCallExpr(
-        RefPtr<InvokeExpressionSyntaxNode>  callExpr,
+        RefPtr<InvokeExpr>  callExpr,
         EOpInfo                             outerPrec)
     {
         auto prec = kEOp_Postfix;
@@ -1511,7 +1511,7 @@ struct EmitVisitor
             if (auto ctorDeclRef = declRef.As<ConstructorDecl>())
             {
                 // We really want to emit a reference to the type begin constructed
-                EmitType(callExpr->Type);
+                EmitType(callExpr->type);
             }
             else
             {
@@ -1583,7 +1583,7 @@ struct EmitVisitor
         return result;
     }
 
-    void EmitExprWithPrecedence(RefPtr<ExpressionSyntaxNode> expr, EOpInfo outerPrec)
+    void EmitExprWithPrecedence(RefPtr<Expr> expr, EOpInfo outerPrec)
     {
         ExprEmitArg arg;
         arg.outerPrec = outerPrec;
@@ -1591,7 +1591,7 @@ struct EmitVisitor
         ExprVisitorWithArg::dispatch(expr, arg);
     }
 
-    void EmitExprWithPrecedence(RefPtr<ExpressionSyntaxNode> expr, EPrecedence leftPrec, EPrecedence rightPrec)
+    void EmitExprWithPrecedence(RefPtr<Expr> expr, EPrecedence leftPrec, EPrecedence rightPrec)
     {
         EOpInfo outerPrec;
         outerPrec.leftPrecedence = leftPrec;
@@ -1626,7 +1626,7 @@ struct EmitVisitor
         emitTypeExp(expr->base);
     }
 
-    void visitSelectExpressionSyntaxNode(SelectExpressionSyntaxNode* selectExpr, ExprEmitArg const& arg)
+    void visitSelectExpr(SelectExpr* selectExpr, ExprEmitArg const& arg)
     {
         auto prec = kEOp_Conditional;
         auto outerPrec = arg.outerPrec;
@@ -1662,7 +1662,7 @@ struct EmitVisitor
     }
 
     void emitUncheckedCallExpr(
-        RefPtr<InvokeExpressionSyntaxNode>  callExpr,
+        RefPtr<InvokeExpr>  callExpr,
         String const&                       funcName,
         ExprEmitArg const&                  arg)
     {
@@ -1765,8 +1765,8 @@ struct EmitVisitor
         }
     }
 
-    void visitInvokeExpressionSyntaxNode(
-        RefPtr<InvokeExpressionSyntaxNode>  callExpr,
+    void visitInvokeExpr(
+        RefPtr<InvokeExpr>  callExpr,
         ExprEmitArg const& arg)
     {
         auto outerPrec = arg.outerPrec;
@@ -1896,7 +1896,7 @@ struct EmitVisitor
                 }
 
 
-                if(targetIntrinsicModifier->definitionToken.Type != TokenType::Unknown)
+                if(targetIntrinsicModifier->definitionToken.type != TokenType::Unknown)
                 {
                     auto name = getStringOrIdentifierTokenValue(targetIntrinsicModifier->definitionToken);
 
@@ -1958,7 +1958,7 @@ struct EmitVisitor
                             case 'o':
                                 // For a call using object-oriented syntax, this
                                 // expands to the "base" object used for the call
-                                if (auto memberExpr = callExpr->FunctionExpr.As<MemberExpressionSyntaxNode>())
+                                if (auto memberExpr = callExpr->FunctionExpr.As<MemberExpr>())
                                 {
                                     Emit("(");
                                     EmitExpr(memberExpr->BaseExpression);
@@ -1975,14 +1975,14 @@ struct EmitVisitor
                                 // then this form will pair up the t and s arguments as needed for a GLSL
                                 // texturing operation.
                                 SLANG_RELEASE_ASSERT(argCount > 0);
-                                if (auto memberExpr = callExpr->FunctionExpr.As<MemberExpressionSyntaxNode>())
+                                if (auto memberExpr = callExpr->FunctionExpr.As<MemberExpr>())
                                 {
                                     auto base = memberExpr->BaseExpression;
-                                    if (auto baseTextureType = base->Type->As<TextureType>())
+                                    if (auto baseTextureType = base->type->As<TextureType>())
                                     {
                                         emitGLSLTextureOrTextureSamplerType(baseTextureType, "sampler");
 
-                                        if (auto samplerType = callExpr->Arguments[0]->Type.type->As<SamplerStateType>())
+                                        if (auto samplerType = callExpr->Arguments[0]->type.type->As<SamplerStateType>())
                                         {
                                             if (samplerType->flavor == SamplerStateType::Flavor::SamplerComparisonState)
                                             {
@@ -2027,7 +2027,7 @@ struct EmitVisitor
                                     {
                                         if (auto varDecl = dd.As<VarDeclBase>())
                                         {
-                                            if (auto samplerType = varDecl->Type.type->As<SamplerStateType>())
+                                            if (auto samplerType = varDecl->type.type->As<SamplerStateType>())
                                             {
                                                 samplerVar = varDecl;
                                                 break;
@@ -2035,10 +2035,10 @@ struct EmitVisitor
                                         }
                                     }
 
-                                    if (auto memberExpr = callExpr->FunctionExpr.As<MemberExpressionSyntaxNode>())
+                                    if (auto memberExpr = callExpr->FunctionExpr.As<MemberExpr>())
                                     {
                                         auto base = memberExpr->BaseExpression;
-                                        if (auto baseTextureType = base->Type->As<TextureType>())
+                                        if (auto baseTextureType = base->type->As<TextureType>())
                                         {
                                             emitGLSLTextureOrTextureSamplerType(baseTextureType, "sampler");
                                             Emit("(");
@@ -2074,10 +2074,10 @@ struct EmitVisitor
                                 // properly swizzle the output of the equivalent GLSL call into the right
                                 // shape.
                                 SLANG_RELEASE_ASSERT(argCount > 0);
-                                if (auto memberExpr = callExpr->FunctionExpr.As<MemberExpressionSyntaxNode>())
+                                if (auto memberExpr = callExpr->FunctionExpr.As<MemberExpr>())
                                 {
                                     auto base = memberExpr->BaseExpression;
-                                    if (auto baseTextureType = base->Type->As<TextureType>())
+                                    if (auto baseTextureType = base->type->As<TextureType>())
                                     {
                                         auto elementType = baseTextureType->elementType;
                                         if (auto basicType = elementType->As<BasicExpressionType>())
@@ -2134,7 +2134,7 @@ struct EmitVisitor
                 {
                     // We expect any subscript operation to be invoked as a member,
                     // so the function expression had better be in the correct form.
-                    if(auto memberExpr = funcExpr.As<MemberExpressionSyntaxNode>())
+                    if(auto memberExpr = funcExpr.As<MemberExpr>())
                     {
 
                         Emit("(");
@@ -2182,7 +2182,7 @@ struct EmitVisitor
         if(needClose) Emit(")");
     }
 
-    void visitMemberExpressionSyntaxNode(MemberExpressionSyntaxNode* memberExpr, ExprEmitArg const& arg)
+    void visitMemberExpr(MemberExpr* memberExpr, ExprEmitArg const& arg)
     {
         auto prec = kEOp_Postfix;
         auto outerPrec = arg.outerPrec;
@@ -2238,7 +2238,7 @@ struct EmitVisitor
         if(needClose) Emit(")");
     }
 
-    void visitIndexExpressionSyntaxNode(IndexExpressionSyntaxNode* subscriptExpr, ExprEmitArg const& arg)
+    void visitIndexExpr(IndexExpr* subscriptExpr, ExprEmitArg const& arg)
     {
         auto prec = kEOp_Postfix;
         auto outerPrec = arg.outerPrec;
@@ -2260,7 +2260,7 @@ struct EmitVisitor
         emitName(expr->lookupResult2.getName());
     }
 
-    void visitVarExpressionSyntaxNode(VarExpressionSyntaxNode* varExpr, ExprEmitArg const& arg)
+    void visitVarExpr(VarExpr* varExpr, ExprEmitArg const& arg)
     {
         auto prec = kEOp_Atomic;
         auto outerPrec = arg.outerPrec;
@@ -2297,16 +2297,16 @@ struct EmitVisitor
         ExprVisitorWithArg::dispatch(derefExpr->base, arg);
     }
 
-    void visitConstantExpressionSyntaxNode(ConstantExpressionSyntaxNode* litExpr, ExprEmitArg const& arg)
+    void visitConstantExpr(ConstantExpr* litExpr, ExprEmitArg const& arg)
     {
         auto outerPrec = arg.outerPrec;
         bool needClose = MaybeEmitParens(outerPrec, kEOp_Atomic);
 
         char const* suffix = "";
-        auto type = litExpr->Type.type;
+        auto type = litExpr->type.type;
         switch (litExpr->ConstType)
         {
-        case ConstantExpressionSyntaxNode::ConstantType::Int:
+        case ConstantExpr::ConstantType::Int:
             if(!type)
             {
                 // Special case for "rewrite" mode
@@ -2328,7 +2328,7 @@ struct EmitVisitor
             break;
 
 
-        case ConstantExpressionSyntaxNode::ConstantType::Float:
+        case ConstantExpr::ConstantType::Float:
             if(!type)
             {
                 // Special case for "rewrite" mode
@@ -2349,10 +2349,10 @@ struct EmitVisitor
             Emit(suffix);
             break;
 
-        case ConstantExpressionSyntaxNode::ConstantType::Bool:
+        case ConstantExpr::ConstantType::Bool:
             Emit(litExpr->integerValue ? "true" : "false");
             break;
-        case ConstantExpressionSyntaxNode::ConstantType::String:
+        case ConstantExpr::ConstantType::String:
             emitStringLiteral(litExpr->stringValue);
             break;
         default:
@@ -2369,14 +2369,14 @@ struct EmitVisitor
         ExprVisitorWithArg::dispatch(castExpr->Expression, arg);
     }
 
-    void visitTypeCastExpressionSyntaxNode(TypeCastExpressionSyntaxNode* castExpr, ExprEmitArg const& arg)
+    void visitTypeCastExpr(TypeCastExpr* castExpr, ExprEmitArg const& arg)
     {
         bool needClose = false;
         switch(context->shared->target)
         {
         case CodeGenTarget::GLSL:
             // GLSL requires constructor syntax for all conversions
-            EmitType(castExpr->Type);
+            EmitType(castExpr->type);
             Emit("(");
             EmitExpr(castExpr->Expression);
             Emit(")");
@@ -2391,7 +2391,7 @@ struct EmitVisitor
                 needClose = MaybeEmitParens(outerPrec, prec);
 
                 Emit("(");
-                EmitType(castExpr->Type);
+                EmitType(castExpr->type);
                 Emit(")(");
                 EmitExpr(castExpr->Expression);
                 Emit(")");
@@ -2418,7 +2418,7 @@ struct EmitVisitor
 
     // Emit a statement as a `{}`-enclosed block statement, but avoid adding redundant
     // curly braces if the statement is itself a block statement.
-    void EmitBlockStmt(RefPtr<StatementSyntaxNode> stmt)
+    void EmitBlockStmt(RefPtr<Stmt> stmt)
     {
         // TODO(tfoley): support indenting
         Emit("{\n");
@@ -2433,7 +2433,7 @@ struct EmitVisitor
         Emit("}\n");
     }
 
-    void EmitLoopAttributes(RefPtr<StatementSyntaxNode> decl)
+    void EmitLoopAttributes(RefPtr<Stmt> decl)
     {
         // Don't emit these attributes for GLSL, because it doesn't understand them
         if (context->shared->target == CodeGenTarget::GLSL)
@@ -2467,7 +2467,7 @@ struct EmitVisitor
         Emit("}\n");
     }
 
-    void EmitStmt(RefPtr<StatementSyntaxNode> stmt)
+    void EmitStmt(RefPtr<Stmt> stmt)
     {
         // TODO(tfoley): this shouldn't occur, but sometimes
         // lowering will get confused by an empty function body...
@@ -2495,13 +2495,13 @@ struct EmitVisitor
             EmitUnparsedStmt(unparsedStmt);
             return;
         }
-        else if (auto exprStmt = stmt.As<ExpressionStatementSyntaxNode>())
+        else if (auto exprStmt = stmt.As<ExpressionStmt>())
         {
             EmitExpr(exprStmt->Expression);
             Emit(";\n");
             return;
         }
-        else if (auto returnStmt = stmt.As<ReturnStatementSyntaxNode>())
+        else if (auto returnStmt = stmt.As<ReturnStmt>())
         {
             Emit("return");
             if (auto expr = returnStmt->Expression)
@@ -2512,12 +2512,12 @@ struct EmitVisitor
             Emit(";\n");
             return;
         }
-        else if (auto declStmt = stmt.As<VarDeclrStatementSyntaxNode>())
+        else if (auto declStmt = stmt.As<DeclStmt>())
         {
             EmitDecl(declStmt->decl);
             return;
         }
-        else if (auto ifStmt = stmt.As<IfStatementSyntaxNode>())
+        else if (auto ifStmt = stmt.As<IfStmt>())
         {
             Emit("if(");
             EmitExpr(ifStmt->Predicate);
@@ -2530,7 +2530,7 @@ struct EmitVisitor
             }
             return;
         }
-        else if (auto forStmt = stmt.As<ForStatementSyntaxNode>())
+        else if (auto forStmt = stmt.As<ForStmt>())
         {
             // We are going to always take a `for` loop like:
             //
@@ -2587,7 +2587,7 @@ struct EmitVisitor
 
             return;
         }
-        else if (auto whileStmt = stmt.As<WhileStatementSyntaxNode>())
+        else if (auto whileStmt = stmt.As<WhileStmt>())
         {
             EmitLoopAttributes(whileStmt);
 
@@ -2597,7 +2597,7 @@ struct EmitVisitor
             EmitBlockStmt(whileStmt->Statement);
             return;
         }
-        else if (auto doWhileStmt = stmt.As<DoWhileStatementSyntaxNode>())
+        else if (auto doWhileStmt = stmt.As<DoWhileStmt>())
         {
             EmitLoopAttributes(doWhileStmt);
 
@@ -2608,12 +2608,12 @@ struct EmitVisitor
             Emit(")\n");
             return;
         }
-        else if (auto discardStmt = stmt.As<DiscardStatementSyntaxNode>())
+        else if (auto discardStmt = stmt.As<DiscardStmt>())
         {
             Emit("discard;\n");
             return;
         }
-        else if (auto emptyStmt = stmt.As<EmptyStatementSyntaxNode>())
+        else if (auto emptyStmt = stmt.As<EmptyStmt>())
         {
             return;
         }
@@ -2637,12 +2637,12 @@ struct EmitVisitor
             Emit("default:{}\n");
             return;
         }
-        else if (auto breakStmt = stmt.As<BreakStatementSyntaxNode>())
+        else if (auto breakStmt = stmt.As<BreakStmt>())
         {
             Emit("break;\n");
             return;
         }
-        else if (auto continueStmt = stmt.As<ContinueStatementSyntaxNode>())
+        else if (auto continueStmt = stmt.As<ContinueStmt>())
         {
             Emit("continue;\n");
             return;
@@ -2659,7 +2659,7 @@ struct EmitVisitor
 
     void EmitVal(RefPtr<Val> val)
     {
-        if (auto type = val.As<ExpressionType>())
+        if (auto type = val.As<Type>())
         {
             EmitType(type);
         }
@@ -2745,7 +2745,7 @@ struct EmitVisitor
     IGNORED(GenericTypeParamDecl)
 
     // Not epected to appear (probably dead code)
-    IGNORED(ClassSyntaxNode)
+    IGNORED(ClassDecl)
 
     // Not semantically meaningful for emit, or expected
     // to be lowered out of existence before we get here
@@ -2759,7 +2759,7 @@ struct EmitVisitor
     IGNORED(AggTypeDeclBase)
 
     // Should not appear nested inside other decls
-    IGNORED(ProgramSyntaxNode)
+    IGNORED(ModuleDecl)
 
 #undef IGNORED
 
@@ -2778,7 +2778,7 @@ struct EmitVisitor
         SLANG_RELEASE_ASSERT(context->shared->target != CodeGenTarget::GLSL);
 
         Emit("typedef ");
-        EmitType(decl->Type, decl->Name.Content);
+        EmitType(decl->type, decl->Name.Content);
         Emit(";\n");
     }
 
@@ -2863,7 +2863,7 @@ struct EmitVisitor
             }
 
             emit(mod->nameToken.Content);
-            if(mod->valToken.Type != TokenType::Unknown)
+            if(mod->valToken.type != TokenType::Unknown)
             {
                 Emit(" = ");
                 emit(mod->valToken.Content);
@@ -3000,7 +3000,7 @@ struct EmitVisitor
     #if 0
             Emit(": register(");
             Emit(registerSemantic->registerName.Content);
-            if(registerSemantic->componentMask.Type != TokenType::Unknown)
+            if(registerSemantic->componentMask.type != TokenType::Unknown)
             {
                 Emit(".");
                 Emit(registerSemantic->componentMask.Content);
@@ -3017,7 +3017,7 @@ struct EmitVisitor
 
             Emit(": packoffset(");
             Emit(packOffsetSemantic->registerName.Content);
-            if(packOffsetSemantic->componentMask.Type != TokenType::Unknown)
+            if(packOffsetSemantic->componentMask.type != TokenType::Unknown)
             {
                 Emit(".");
                 Emit(packOffsetSemantic->componentMask.Content);
@@ -3081,7 +3081,7 @@ struct EmitVisitor
         }
     }
 
-    void visitStructSyntaxNode(RefPtr<StructSyntaxNode> decl, DeclEmitArg const&)
+    void visitStructDecl(RefPtr<StructDecl> decl, DeclEmitArg const&)
     {
         // Don't emit a declaration that was only generated implicitly, for
         // the purposes of semantic checking.
@@ -3106,7 +3106,7 @@ struct EmitVisitor
         auto type = GetType(declRef);
         if (!type || type->As<ErrorType>())
         {
-            EmitType(declRef.getDecl()->Type, declRef.getDecl()->getNameToken());
+            EmitType(declRef.getDecl()->type, declRef.getDecl()->getNameToken());
         }
         else
         {
@@ -3116,9 +3116,9 @@ struct EmitVisitor
         EmitSemantics(declRef.getDecl());
 
         // TODO(tfoley): technically have to apply substitution here too...
-        if (auto initExpr = declRef.getDecl()->Expr)
+        if (auto initExpr = declRef.getDecl()->initExpr)
         {
-            if (declRef.As<ParameterSyntaxNode>()
+            if (declRef.As<ParamDecl>()
                 && context->shared->target == CodeGenTarget::GLSL)
             {
                 // Don't emit default parameter values when lowering to GLSL
@@ -3263,7 +3263,7 @@ struct EmitVisitor
         RefPtr<VarLayout>               layout)
     {
         // The data type that describes where stuff in the constant buffer should go
-        RefPtr<ExpressionType> dataType = parameterBlockType->elementType;
+        RefPtr<Type> dataType = parameterBlockType->elementType;
 
         // We expect/require the data type to be a user-defined `struct` type
         auto declRefType = dataType->As<DeclRefType>();
@@ -3302,7 +3302,7 @@ struct EmitVisitor
         emitHLSLRegisterSemantic(*info);
 
         Emit("\n{\n");
-        if (auto structRef = declRefType->declRef.As<StructSyntaxNode>())
+        if (auto structRef = declRefType->declRef.As<StructDecl>())
         {
             int fieldCounter = 0;
 
@@ -3427,7 +3427,7 @@ struct EmitVisitor
         RefPtr<VarLayout>               layout)
     {
         // The data type that describes where stuff in the constant buffer should go
-        RefPtr<ExpressionType> dataType = parameterBlockType->elementType;
+        RefPtr<Type> dataType = parameterBlockType->elementType;
 
         // We expect/require the data type to be a user-defined `struct` type
         auto declRefType = dataType->As<DeclRefType>();
@@ -3483,7 +3483,7 @@ struct EmitVisitor
         }
 
         Emit("\n{\n");
-        if (auto structRef = declRefType->declRef.As<StructSyntaxNode>())
+        if (auto structRef = declRefType->declRef.As<StructDecl>())
         {
             for (auto field : getMembersOfType<StructField>(structRef))
             {
@@ -3505,7 +3505,7 @@ struct EmitVisitor
         }
         Emit("}");
 
-        if( varDecl->Name.Type != TokenType::Unknown )
+        if( varDecl->Name.type != TokenType::Unknown )
         {
             Emit(" ");
             emitName(varDecl->Name);
@@ -3559,7 +3559,7 @@ struct EmitVisitor
         //
         // TODO(tfoley): there might be a better way to detect this, e.g.,
         // with an attribute that gets attached to the variable declaration.
-        if (auto parameterBlockType = decl->Type->As<ParameterBlockType>())
+        if (auto parameterBlockType = decl->type->As<ParameterBlockType>())
         {
             emitParameterBlockDecl(decl, parameterBlockType, layout);
             return;
@@ -3600,12 +3600,12 @@ struct EmitVisitor
         Emit(";\n");
     }
 
-    void EmitParamDecl(RefPtr<ParameterSyntaxNode> decl)
+    void EmitParamDecl(RefPtr<ParamDecl> decl)
     {
         EmitVarDeclCommon(decl);
     }
 
-    void visitFunctionSyntaxNode(RefPtr<FunctionSyntaxNode> decl, DeclEmitArg const&)
+    void visitFuncDecl(RefPtr<FuncDecl> decl, DeclEmitArg const&)
     {
         EmitModifiers(decl);
 
@@ -3617,7 +3617,7 @@ struct EmitVisitor
 
         Emit("(");
         bool first = true;
-        for (auto paramDecl : decl->getMembersOfType<ParameterSyntaxNode>())
+        for (auto paramDecl : decl->getMembersOfType<ParamDecl>())
         {
             if (!first) Emit(", ");
             EmitParamDecl(paramDecl);
@@ -3638,7 +3638,7 @@ struct EmitVisitor
     }
 
     void emitGLSLVersionDirective(
-        ProgramSyntaxNode*  program)
+        ModuleDecl*  program)
     {
         // Did the user provide an explicit `#version` directive in their code?
         if( auto versionDirective = program->FindModifier<GLSLVersionDirective>() )
@@ -3647,7 +3647,7 @@ struct EmitVisitor
 
             Emit("#version ");
             emit(versionDirective->versionNumberToken.Content);
-            if(versionDirective->glslProfileToken.Type != TokenType::Unknown)
+            if(versionDirective->glslProfileToken.type != TokenType::Unknown)
             {
                 Emit(" ");
                 emit(versionDirective->glslProfileToken.Content);
@@ -3700,7 +3700,7 @@ struct EmitVisitor
     }
 
     void emitGLSLPreprocessorDirectives(
-        RefPtr<ProgramSyntaxNode>   program)
+        RefPtr<ModuleDecl>   program)
     {
         switch(context->shared->target)
         {

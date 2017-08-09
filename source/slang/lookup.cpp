@@ -8,7 +8,7 @@ namespace Slang {
 DeclRef<ExtensionDecl> ApplyExtensionToType(
     SemanticsVisitor*       semantics,
     ExtensionDecl*          extDecl,
-    RefPtr<ExpressionType>  type);
+    RefPtr<Type>  type);
 
 //
 
@@ -74,11 +74,11 @@ bool DeclPassesLookupMask(Decl* decl, LookupMask mask)
     // type declarations
     if(auto aggTypeDecl = dynamic_cast<AggTypeDecl*>(decl))
     {
-        return int(mask) & int(LookupMask::Type);
+        return int(mask) & int(LookupMask::type);
     }
     else if(auto simpleTypeDecl = dynamic_cast<SimpleTypeDecl*>(decl))
     {
-        return int(mask) & int(LookupMask::Type);
+        return int(mask) & int(LookupMask::type);
     }
     // function declarations
     else if(auto funcDecl = dynamic_cast<FunctionDeclBase*>(decl))
@@ -154,7 +154,7 @@ LookupResultItem CreateLookupResultItem(
 void DoMemberLookupImpl(
     Session*                session,
     String const&			name,
-    RefPtr<ExpressionType>	baseType,
+    RefPtr<Type>	baseType,
     LookupRequest const&    request,
     LookupResult&			ioResult,
     BreadcrumbInfo*			breadcrumbs)
@@ -270,7 +270,7 @@ void DoLocalLookupImpl(
     // Consider lookup via extension
     if( auto aggTypeDeclRef = containerDeclRef.As<AggTypeDecl>() )
     {
-        RefPtr<ExpressionType> type = DeclRefType::Create(
+        RefPtr<Type> type = DeclRefType::Create(
             session,
             aggTypeDeclRef);
 

@@ -16,7 +16,7 @@ typedef uintptr_t UInt;
 // Forward declarations
 
 enum class BaseType;
-class ExpressionType;
+class Type;
 
 //
 
@@ -154,8 +154,8 @@ class TypeLayout : public Layout
 {
 public:
     // The type that was laid out
-    RefPtr<ExpressionType>  type;
-    ExpressionType* getType() { return type.Ptr(); }
+    RefPtr<Type>  type;
+    Type* getType() { return type.Ptr(); }
 
     // The layout rules that were used to produce this type
     LayoutRulesImpl*        rules;
@@ -287,14 +287,14 @@ public:
     }
 };
 
-// Type layout for a variable that has a constant-buffer type
+// type layout for a variable that has a constant-buffer type
 class ParameterBlockTypeLayout : public TypeLayout
 {
 public:
     RefPtr<TypeLayout> elementTypeLayout;
 };
 
-// Type layout for a variable that has a constant-buffer type
+// type layout for a variable that has a constant-buffer type
 class StructuredBufferTypeLayout : public TypeLayout
 {
 public:
@@ -345,7 +345,7 @@ class EntryPointLayout : public StructTypeLayout
 {
 public:
     // The corresponding function declaration
-    RefPtr<FunctionSyntaxNode> entryPoint;
+    RefPtr<FuncDecl> entryPoint;
 
     // The shader profile that was used to compile the entry point
     Profile profile;
@@ -532,12 +532,12 @@ LayoutRulesImpl* GetLayoutRulesImpl(LayoutRule rule);
 LayoutRulesFamilyImpl* GetLayoutRulesFamilyImpl(LayoutRulesFamily rule);
 LayoutRulesFamilyImpl* GetLayoutRulesFamilyImpl(CodeGenTarget target);
 
-SimpleLayoutInfo GetLayout(ExpressionType* type, LayoutRulesImpl* rules);
+SimpleLayoutInfo GetLayout(Type* type, LayoutRulesImpl* rules);
 
-SimpleLayoutInfo GetLayout(ExpressionType* type, LayoutRule rule = LayoutRule::Std430);
+SimpleLayoutInfo GetLayout(Type* type, LayoutRule rule = LayoutRule::Std430);
 
-RefPtr<TypeLayout> CreateTypeLayout(ExpressionType* type, LayoutRulesImpl* rules);
-RefPtr<TypeLayout> CreateTypeLayout(ExpressionType* type, LayoutRulesImpl* rules, SimpleLayoutInfo offset);
+RefPtr<TypeLayout> CreateTypeLayout(Type* type, LayoutRulesImpl* rules);
+RefPtr<TypeLayout> CreateTypeLayout(Type* type, LayoutRulesImpl* rules, SimpleLayoutInfo offset);
 
 //
 
@@ -551,7 +551,7 @@ RefPtr<ParameterBlockTypeLayout>
 createParameterBlockTypeLayout(
     RefPtr<ParameterBlockType>  parameterBlockType,
     LayoutRulesImpl*            parameterBlockRules,
-    RefPtr<ExpressionType>      elementType,
+    RefPtr<Type>      elementType,
     LayoutRulesImpl*            elementTypeRules);
 
 RefPtr<ParameterBlockTypeLayout>
@@ -565,8 +565,8 @@ createParameterBlockTypeLayout(
 RefPtr<StructuredBufferTypeLayout>
 createStructuredBufferTypeLayout(
     ShaderParameterKind     kind,
-    RefPtr<ExpressionType>  structuredBufferType,
-    RefPtr<ExpressionType>  elementType,
+    RefPtr<Type>  structuredBufferType,
+    RefPtr<Type>  elementType,
     LayoutRulesImpl*        rules);
 
 

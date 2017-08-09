@@ -162,7 +162,7 @@ namespace Slang
         SlangCompileFlags compileFlags = 0;
 
         // The parsed syntax for the translation unit
-        RefPtr<ProgramSyntaxNode>   SyntaxNode;
+        RefPtr<ModuleDecl>   SyntaxNode;
 
         // The resulting output for the translation unit
         //
@@ -241,13 +241,13 @@ namespace Slang
         // Modules that have been dynamically loaded via `import`
         //
         // This is a list of unique modules loaded, in the order they were encountered.
-        List<RefPtr<ProgramSyntaxNode> > loadedModulesList;
+        List<RefPtr<ModuleDecl> > loadedModulesList;
 
         // Map from the logical name of a module to its definition
-        Dictionary<String, RefPtr<ProgramSyntaxNode>> mapPathToLoadedModule;
+        Dictionary<String, RefPtr<ModuleDecl>> mapPathToLoadedModule;
 
         // Map from the path of a module file to its definition
-        Dictionary<String, RefPtr<ProgramSyntaxNode>> mapNameToLoadedModules;
+        Dictionary<String, RefPtr<ModuleDecl>> mapNameToLoadedModules;
 
 
         CompileRequest(Session* session)
@@ -281,7 +281,7 @@ namespace Slang
             String const&           name,
             Profile                 profile);
 
-        RefPtr<ProgramSyntaxNode> loadModule(
+        RefPtr<ModuleDecl> loadModule(
             String const&       name,
             String const&       path,
             String const&       source,
@@ -291,7 +291,7 @@ namespace Slang
             String const&       path,
             TokenList const&    tokens);
 
-        RefPtr<ProgramSyntaxNode> findOrImportModule(
+        RefPtr<ModuleDecl> findOrImportModule(
             String const&       name,
             CodePosition const& loc);
     };
@@ -322,7 +322,7 @@ namespace Slang
         RefPtr<Scope>   slangLanguageScope;
         RefPtr<Scope>   glslLanguageScope;
 
-        List<RefPtr<ProgramSyntaxNode>> loadedModuleCode;
+        List<RefPtr<ModuleDecl>> loadedModuleCode;
 
 
         //
@@ -340,27 +340,27 @@ namespace Slang
         String getGLSLLibraryCode();
 
         // Basic types that we don't want to re-create all the time
-        RefPtr<ExpressionType> errorType;
-        RefPtr<ExpressionType> initializerListType;
-        RefPtr<ExpressionType> overloadedType;
+        RefPtr<Type> errorType;
+        RefPtr<Type> initializerListType;
+        RefPtr<Type> overloadedType;
 
-        Dictionary<int, RefPtr<ExpressionType>> builtinTypes;
+        Dictionary<int, RefPtr<Type>> builtinTypes;
         Dictionary<String, Decl*> magicDecls;
-        List<RefPtr<ExpressionType>> canonicalTypes;
+        List<RefPtr<Type>> canonicalTypes;
 
         void initializeTypes();
 
-        ExpressionType* getBoolType();
-        ExpressionType* getFloatType();
-        ExpressionType* getDoubleType();
-        ExpressionType* getIntType();
-        ExpressionType* getUIntType();
-        ExpressionType* getVoidType();
-        ExpressionType* getBuiltinType(BaseType flavor);
+        Type* getBoolType();
+        Type* getFloatType();
+        Type* getDoubleType();
+        Type* getIntType();
+        Type* getUIntType();
+        Type* getVoidType();
+        Type* getBuiltinType(BaseType flavor);
 
-        ExpressionType* getInitializerListType();
-        ExpressionType* getOverloadedType();
-        ExpressionType* getErrorType();
+        Type* getInitializerListType();
+        Type* getOverloadedType();
+        Type* getErrorType();
 
         //
 

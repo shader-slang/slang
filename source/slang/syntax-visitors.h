@@ -23,7 +23,7 @@ namespace Slang
     // Needed by import declaration checking.
     //
     // TODO: need a better location to declare this.
-    RefPtr<ProgramSyntaxNode> findOrImportModule(
+    RefPtr<ModuleDecl> findOrImportModule(
         CompileRequest*     request,
         String const&       name,
         CodePosition const& loc);

@@ -18,7 +18,7 @@ namespace Slang
     Token* TokenList::end() const
     {
         SLANG_ASSERT(mTokens.Count());
-        SLANG_ASSERT(mTokens[mTokens.Count()-1].Type == TokenType::EndOfFile);
+        SLANG_ASSERT(mTokens[mTokens.Count()-1].type == TokenType::EndOfFile);
         return &mTokens[mTokens.Count() - 1];
     }
 
@@ -40,7 +40,7 @@ namespace Slang
 
         Token token = *mCursor;
         if (mCursor == mEnd)
-            token.Type = TokenType::EndOfFile;
+            token.type = TokenType::EndOfFile;
         return token;
     }
 
@@ -49,7 +49,7 @@ namespace Slang
         if (mCursor == mEnd)
             return TokenType::EndOfFile;
         SLANG_ASSERT(mCursor);
-        return mCursor->Type;
+        return mCursor->type;
     }
 
     CodePosition TokenReader::PeekLoc() const
@@ -67,7 +67,7 @@ namespace Slang
 
         Token token = *mCursor;
         if (mCursor == mEnd)
-            token.Type = TokenType::EndOfFile;
+            token.type = TokenType::EndOfFile;
         else
             mCursor++;
         return token;
@@ -774,8 +774,8 @@ namespace Slang
 
     String getStringLiteralTokenValue(Token const& token)
     {
-        SLANG_ASSERT(token.Type == TokenType::StringLiteral
-            || token.Type == TokenType::CharLiteral);
+        SLANG_ASSERT(token.type == TokenType::StringLiteral
+            || token.type == TokenType::CharLiteral);
 
         char const* cursor = token.Content.begin();
         char const* end = token.Content.end();
@@ -1244,7 +1244,7 @@ namespace Slang
                 break;
             }
 
-            token.Type =  tokenType;
+            token.type =  tokenType;
 
             char const* textEnd = cursor;
 
@@ -1303,7 +1303,7 @@ namespace Slang
             Token token = lexToken();
             tokenList.mTokens.Add(token);
 
-            if(token.Type == TokenType::EndOfFile)
+            if(token.type == TokenType::EndOfFile)
                 return tokenList;
         }
     }

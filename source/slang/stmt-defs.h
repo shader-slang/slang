@@ -2,39 +2,39 @@
 
 // Syntax class definitions for statements.
 
-ABSTRACT_SYNTAX_CLASS(ScopeStmt, StatementSyntaxNode)
+ABSTRACT_SYNTAX_CLASS(ScopeStmt, Stmt)
     SYNTAX_FIELD(RefPtr<ScopeDecl>, scopeDecl)
 END_SYNTAX_CLASS()
 
 // A sequence of statements, treated as a single statement
-SYNTAX_CLASS(SeqStmt, StatementSyntaxNode)
-    SYNTAX_FIELD(List<RefPtr<StatementSyntaxNode>>, stmts)
+SYNTAX_CLASS(SeqStmt, Stmt)
+    SYNTAX_FIELD(List<RefPtr<Stmt>>, stmts)
 END_SYNTAX_CLASS()
 
 // The simplest kind of scope statement: just a `{...}` block
 SYNTAX_CLASS(BlockStmt, ScopeStmt)
-    SYNTAX_FIELD(RefPtr<StatementSyntaxNode>, body);
+    SYNTAX_FIELD(RefPtr<Stmt>, body);
 END_SYNTAX_CLASS()
 
 // A statement that we aren't going to parse or check, because
 // we want to let a downstream compiler handle any issues
-SYNTAX_CLASS(UnparsedStmt, StatementSyntaxNode)
+SYNTAX_CLASS(UnparsedStmt, Stmt)
     // The tokens that were contained between `{` and `}`
     FIELD(List<Token>, tokens)
 END_SYNTAX_CLASS()
 
-SIMPLE_SYNTAX_CLASS(EmptyStatementSyntaxNode, StatementSyntaxNode)
+SIMPLE_SYNTAX_CLASS(EmptyStmt, Stmt)
 
-SIMPLE_SYNTAX_CLASS(DiscardStatementSyntaxNode, StatementSyntaxNode)
+SIMPLE_SYNTAX_CLASS(DiscardStmt, Stmt)
 
-SYNTAX_CLASS(VarDeclrStatementSyntaxNode, StatementSyntaxNode)
+SYNTAX_CLASS(DeclStmt, Stmt)
     SYNTAX_FIELD(RefPtr<DeclBase>, decl)
 END_SYNTAX_CLASS()
 
-SYNTAX_CLASS(IfStatementSyntaxNode, StatementSyntaxNode)
-    SYNTAX_FIELD(RefPtr<ExpressionSyntaxNode>, Predicate)
-    SYNTAX_FIELD(RefPtr<StatementSyntaxNode>, PositiveStatement)
-    SYNTAX_FIELD(RefPtr<StatementSyntaxNode>, NegativeStatement)
+SYNTAX_CLASS(IfStmt, Stmt)
+    SYNTAX_FIELD(RefPtr<Expr>, Predicate)
+    SYNTAX_FIELD(RefPtr<Stmt>, PositiveStatement)
+    SYNTAX_FIELD(RefPtr<Stmt>, NegativeStatement)
 END_SYNTAX_CLASS()
 
 // A statement that can be escaped with a `break`
@@ -42,15 +42,15 @@ ABSTRACT_SYNTAX_CLASS(BreakableStmt, ScopeStmt)
 END_SYNTAX_CLASS()
 
 SYNTAX_CLASS(SwitchStmt, BreakableStmt)
-    SYNTAX_FIELD(RefPtr<ExpressionSyntaxNode>, condition)
-    SYNTAX_FIELD(RefPtr<StatementSyntaxNode>, body)
+    SYNTAX_FIELD(RefPtr<Expr>, condition)
+    SYNTAX_FIELD(RefPtr<Stmt>, body)
 END_SYNTAX_CLASS()
 
 // A statement that is expected to appear lexically nested inside
 // some other construct, and thus needs to keep track of the
 // outer statement that it is associated with...
-ABSTRACT_SYNTAX_CLASS(ChildStmt, StatementSyntaxNode)
-    DECL_FIELD(StatementSyntaxNode*, parentStmt RAW(= nullptr))
+ABSTRACT_SYNTAX_CLASS(ChildStmt, Stmt)
+    DECL_FIELD(Stmt*, parentStmt RAW(= nullptr))
 END_SYNTAX_CLASS()
 
 // a `case` or `default` statement inside a `switch`
@@ -63,7 +63,7 @@ END_SYNTAX_CLASS()
 
 // a `case` statement inside a `switch`
 SYNTAX_CLASS(CaseStmt, CaseStmtBase)
-    SYNTAX_FIELD(RefPtr<ExpressionSyntaxNode>, expr)
+    SYNTAX_FIELD(RefPtr<Expr>, expr)
 END_SYNTAX_CLASS()
 
 // a `default` statement inside a `switch`
@@ -74,34 +74,34 @@ ABSTRACT_SYNTAX_CLASS(LoopStmt, BreakableStmt)
 END_SYNTAX_CLASS()
 
 // A `for` statement
-SYNTAX_CLASS(ForStatementSyntaxNode, LoopStmt)
-    SYNTAX_FIELD(RefPtr<StatementSyntaxNode>, InitialStatement)
-    SYNTAX_FIELD(RefPtr<ExpressionSyntaxNode>, SideEffectExpression)
-    SYNTAX_FIELD(RefPtr<ExpressionSyntaxNode>, PredicateExpression)
-    SYNTAX_FIELD(RefPtr<StatementSyntaxNode>, Statement)
+SYNTAX_CLASS(ForStmt, LoopStmt)
+    SYNTAX_FIELD(RefPtr<Stmt>, InitialStatement)
+    SYNTAX_FIELD(RefPtr<Expr>, SideEffectExpression)
+    SYNTAX_FIELD(RefPtr<Expr>, PredicateExpression)
+    SYNTAX_FIELD(RefPtr<Stmt>, Statement)
 END_SYNTAX_CLASS()
 
 // A `for` statement in a language that doesn't restrict the scope
 // of the loop variable to the body.
-SYNTAX_CLASS(UnscopedForStmt, ForStatementSyntaxNode);
+SYNTAX_CLASS(UnscopedForStmt, ForStmt);
 END_SYNTAX_CLASS()
 
-SYNTAX_CLASS(WhileStatementSyntaxNode, LoopStmt)
-    SYNTAX_FIELD(RefPtr<ExpressionSyntaxNode>, Predicate)
-    SYNTAX_FIELD(RefPtr<StatementSyntaxNode>, Statement)
+SYNTAX_CLASS(WhileStmt, LoopStmt)
+    SYNTAX_FIELD(RefPtr<Expr>, Predicate)
+    SYNTAX_FIELD(RefPtr<Stmt>, Statement)
 END_SYNTAX_CLASS()
 
-SYNTAX_CLASS(DoWhileStatementSyntaxNode, LoopStmt)
-    SYNTAX_FIELD(RefPtr<StatementSyntaxNode>, Statement)
-    SYNTAX_FIELD(RefPtr<ExpressionSyntaxNode>, Predicate)
+SYNTAX_CLASS(DoWhileStmt, LoopStmt)
+    SYNTAX_FIELD(RefPtr<Stmt>, Statement)
+    SYNTAX_FIELD(RefPtr<Expr>, Predicate)
 END_SYNTAX_CLASS()
 
 // A compile-time, range-based `for` loop, which will not appear in the output code
 SYNTAX_CLASS(CompileTimeForStmt, ScopeStmt)
     SYNTAX_FIELD(RefPtr<Variable>, varDecl)
-    SYNTAX_FIELD(RefPtr<ExpressionSyntaxNode>, rangeBeginExpr)
-    SYNTAX_FIELD(RefPtr<ExpressionSyntaxNode>, rangeEndExpr)
-    SYNTAX_FIELD(RefPtr<StatementSyntaxNode>, body)
+    SYNTAX_FIELD(RefPtr<Expr>, rangeBeginExpr)
+    SYNTAX_FIELD(RefPtr<Expr>, rangeEndExpr)
+    SYNTAX_FIELD(RefPtr<Stmt>, body)
     SYNTAX_FIELD(RefPtr<IntVal>, rangeBeginVal)
     SYNTAX_FIELD(RefPtr<IntVal>, rangeEndVal)
 END_SYNTAX_CLASS()
@@ -111,14 +111,14 @@ END_SYNTAX_CLASS()
 ABSTRACT_SYNTAX_CLASS(JumpStmt, ChildStmt)
 END_SYNTAX_CLASS()
 
-SIMPLE_SYNTAX_CLASS(BreakStatementSyntaxNode, JumpStmt)
+SIMPLE_SYNTAX_CLASS(BreakStmt, JumpStmt)
 
-SIMPLE_SYNTAX_CLASS(ContinueStatementSyntaxNode, JumpStmt)
+SIMPLE_SYNTAX_CLASS(ContinueStmt, JumpStmt)
 
-SYNTAX_CLASS(ReturnStatementSyntaxNode, StatementSyntaxNode)
-    SYNTAX_FIELD(RefPtr<ExpressionSyntaxNode>, Expression)
+SYNTAX_CLASS(ReturnStmt, Stmt)
+    SYNTAX_FIELD(RefPtr<Expr>, Expression)
 END_SYNTAX_CLASS()
 
-SYNTAX_CLASS(ExpressionStatementSyntaxNode, StatementSyntaxNode)
-    SYNTAX_FIELD(RefPtr<ExpressionSyntaxNode>, Expression)
+SYNTAX_CLASS(ExpressionStmt, Stmt)
+    SYNTAX_FIELD(RefPtr<Expr>, Expression)
 END_SYNTAX_CLASS()

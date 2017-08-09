@@ -68,8 +68,8 @@ namespace Slang
     };
 
     class Decl;
+    class type;
     class Type;
-    class ExpressionType;
     class ILType;
     class StageAttribute;
     struct TypeExp;
@@ -80,8 +80,8 @@ namespace Slang
     void printDiagnosticArg(StringBuilder& sb, UInt val);
     void printDiagnosticArg(StringBuilder& sb, Slang::String const& str);
     void printDiagnosticArg(StringBuilder& sb, Decl* decl);
+    void printDiagnosticArg(StringBuilder& sb, type* type);
     void printDiagnosticArg(StringBuilder& sb, Type* type);
-    void printDiagnosticArg(StringBuilder& sb, ExpressionType* type);
     void printDiagnosticArg(StringBuilder& sb, TypeExp const& type);
     void printDiagnosticArg(StringBuilder& sb, QualType const& type);
     void printDiagnosticArg(StringBuilder& sb, TokenType tokenType);

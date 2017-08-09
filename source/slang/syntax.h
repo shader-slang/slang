@@ -14,7 +14,7 @@ namespace Slang
     class Session;
     class Substitutions;
     class SyntaxVisitor;
-    class FunctionSyntaxNode;
+    class FuncDecl;
     class Layout;
 
     struct IExprVisitor;
@@ -214,22 +214,22 @@ namespace Slang
 
     struct QualType
     {
-        RefPtr<ExpressionType>	type;
+        RefPtr<Type>	type;
         bool					IsLeftValue;
 
         QualType()
             : IsLeftValue(false)
         {}
 
-        QualType(ExpressionType* type)
+        QualType(Type* type)
             : type(type)
             , IsLeftValue(false)
         {}
 
-        ExpressionType* Ptr() { return type.Ptr(); }
+        Type* Ptr() { return type.Ptr(); }
 
-        operator RefPtr<ExpressionType>() { return type; }
-        RefPtr<ExpressionType> operator->() { return type; }
+        operator RefPtr<Type>() { return type; }
+        RefPtr<Type> operator->() { return type; }
     };
 
     // A reference to a class of syntax node, that can be
@@ -314,12 +314,12 @@ namespace Slang
         {}
 
         // Apply substitutions to a type or ddeclaration
-        RefPtr<ExpressionType> Substitute(RefPtr<ExpressionType> type) const;
+        RefPtr<Type> Substitute(RefPtr<Type> type) const;
 
         DeclRefBase Substitute(DeclRefBase declRef) const;
 
         // Apply substitutions to an expression
-        RefPtr<ExpressionSyntaxNode> Substitute(RefPtr<ExpressionSyntaxNode> expr) const;
+        RefPtr<Expr> Substitute(RefPtr<Expr> expr) const;
 
         // Apply substitutions to this declaration reference
         DeclRefBase SubstituteImpl(Substitutions* subst, int* ioDiff);
@@ -383,11 +383,11 @@ namespace Slang
             return DeclRef<T>((T*) declRef.decl, declRef.substitutions);
         }
 
-        RefPtr<ExpressionType> Substitute(RefPtr<ExpressionType> type) const
+        RefPtr<Type> Substitute(RefPtr<Type> type) const
         {
             return DeclRefBase::Substitute(type);
         }
-        RefPtr<ExpressionSyntaxNode> Substitute(RefPtr<ExpressionSyntaxNode> expr) const
+        RefPtr<Expr> Substitute(RefPtr<Expr> expr) const
         {
             return DeclRefBase::Substitute(expr);
         }
@@ -590,7 +590,7 @@ namespace Slang
     };
 
     //
-    // Type Expressions
+    // type Expressions
     //
 
     // A "type expression" is a term that we expect to resolve to a type during checking.
@@ -602,35 +602,35 @@ namespace Slang
             : exp(other.exp)
             , type(other.type)
         {}
-        explicit TypeExp(RefPtr<ExpressionSyntaxNode> exp)
+        explicit TypeExp(RefPtr<Expr> exp)
             : exp(exp)
         {}
-        TypeExp(RefPtr<ExpressionSyntaxNode> exp, RefPtr<ExpressionType> type)
+        TypeExp(RefPtr<Expr> exp, RefPtr<Type> type)
             : exp(exp)
             , type(type)
         {}
 
-        RefPtr<ExpressionSyntaxNode> exp;
-        RefPtr<ExpressionType> type;
+        RefPtr<Expr> exp;
+        RefPtr<Type> type;
 
-        bool Equals(ExpressionType* other);
+        bool Equals(Type* other);
 #if 0
         {
             return type->Equals(other);
         }
 #endif
-        bool Equals(RefPtr<ExpressionType> other);
+        bool Equals(RefPtr<Type> other);
 #if 0
         {
             return type->Equals(other.Ptr());
         }
 #endif
-        ExpressionType* Ptr() { return type.Ptr(); }
-        operator ExpressionType*()
+        Type* Ptr() { return type.Ptr(); }
+        operator Type*()
         {
             return type;
         }
-        ExpressionType* operator->() { return Ptr(); }
+        Type* operator->() { return Ptr(); }
 
         TypeExp Accept(SyntaxVisitor* visitor);
     };
@@ -656,11 +656,11 @@ namespace Slang
     // Masks to be applied when lookup up declarations
     enum class LookupMask : uint8_t
     {
-        Type = 0x1,
+        type = 0x1,
         Function = 0x2,
         Value = 0x4,
 
-        All = Type | Function | Value,
+        All = type | Function | Value,
     };
 
     // Represents one item found during lookup
@@ -780,297 +780,17 @@ namespace Slang
 
 #include "object-meta-end.h"
 
-    inline RefPtr<ExpressionType> GetSub(DeclRef<GenericTypeConstraintDecl> const& declRef)
+    inline RefPtr<Type> GetSub(DeclRef<GenericTypeConstraintDecl> const& declRef)
     {
         return declRef.Substitute(declRef.getDecl()->sub.Ptr());
     }
 
-    inline RefPtr<ExpressionType> GetSup(DeclRef<GenericTypeConstraintDecl> const& declRef)
+    inline RefPtr<Type> GetSup(DeclRef<GenericTypeConstraintDecl> const& declRef)
     {
         return declRef.Substitute(declRef.getDecl()->sup.Ptr());
     }
 
-    //
-#if 0
-
-    class SyntaxVisitor : public RefObject
-    {
-    protected:
-        DiagnosticSink * sink = nullptr;
-        DiagnosticSink* getSink() { return sink; }
-
-        SourceLanguage sourceLanguage = SourceLanguage::Unknown;
-    public:
-        void setSourceLanguage(SourceLanguage language)
-        {
-            sourceLanguage = language;
-        }
-
-        SyntaxVisitor(DiagnosticSink * sink)
-            : sink(sink)
-        {}
-        virtual ~SyntaxVisitor()
-        {
-        }
-
-        virtual RefPtr<ProgramSyntaxNode> VisitProgram(ProgramSyntaxNode* program)
-        {
-            for (auto & m : program->Members)
-                m = m->Accept(this).As<Decl>();
-            return program;
-        }
-
-        virtual void visitImportDecl(ImportDecl * decl) = 0;
-
-        virtual RefPtr<FunctionSyntaxNode> VisitFunction(FunctionSyntaxNode* func)
-        {
-            func->ReturnType = func->ReturnType.Accept(this);
-            for (auto & member : func->Members)
-                member = member->Accept(this).As<Decl>();
-            if (func->Body)
-                func->Body = func->Body->Accept(this).As<BlockStatementSyntaxNode>();
-            return func;
-        }
-        virtual RefPtr<ScopeDecl> VisitScopeDecl(ScopeDecl* decl)
-        {
-            // By default don't visit children, because they will always
-            // be encountered in the ordinary flow of the corresponding statement.
-            return decl;
-        }
-        virtual RefPtr<StructSyntaxNode> VisitStruct(StructSyntaxNode * s)
-        {
-            for (auto & f : s->Members)
-                f = f->Accept(this).As<Decl>();
-            return s;
-        }
-        virtual RefPtr<ClassSyntaxNode> VisitClass(ClassSyntaxNode * s)
-        {
-            for (auto & f : s->Members)
-                f = f->Accept(this).As<Decl>();
-            return s;
-        }
-        virtual RefPtr<GenericDecl> VisitGenericDecl(GenericDecl * decl)
-        {
-            for (auto & m : decl->Members)
-                m = m->Accept(this).As<Decl>();
-            decl->inner = decl->inner->Accept(this).As<Decl>();
-            return decl;
-        }
-        virtual RefPtr<TypeDefDecl> VisitTypeDefDecl(TypeDefDecl* decl)
-        {
-            decl->Type = decl->Type.Accept(this);
-            return decl;
-        }
-        virtual RefPtr<StatementSyntaxNode> VisitDiscardStatement(DiscardStatementSyntaxNode * stmt)
-        {
-            return stmt;
-        }
-        virtual RefPtr<StructField> VisitStructField(StructField * f)
-        {
-            f->Type = f->Type.Accept(this);
-            return f;
-        }
-        virtual RefPtr<StatementSyntaxNode> VisitBlockStatement(BlockStatementSyntaxNode* stmt)
-        {
-            for (auto & s : stmt->Statements)
-                s = s->Accept(this).As<StatementSyntaxNode>();
-            return stmt;
-        }
-        virtual RefPtr<StatementSyntaxNode> VisitBreakStatement(BreakStatementSyntaxNode* stmt)
-        {
-            return stmt;
-        }
-        virtual RefPtr<StatementSyntaxNode> VisitContinueStatement(ContinueStatementSyntaxNode* stmt)
-        {
-            return stmt;
-        }
-
-        virtual RefPtr<StatementSyntaxNode> VisitDoWhileStatement(DoWhileStatementSyntaxNode* stmt)
-        {
-            if (stmt->Predicate)
-                stmt->Predicate = stmt->Predicate->Accept(this).As<ExpressionSyntaxNode>();
-            if (stmt->Statement)
-                stmt->Statement = stmt->Statement->Accept(this).As<StatementSyntaxNode>();
-            return stmt;
-        }
-        virtual RefPtr<StatementSyntaxNode> VisitEmptyStatement(EmptyStatementSyntaxNode* stmt)
-        {
-            return stmt;
-        }
-        virtual RefPtr<StatementSyntaxNode> VisitForStatement(ForStatementSyntaxNode* stmt)
-        {
-            if (stmt->InitialStatement)
-                stmt->InitialStatement = stmt->InitialStatement->Accept(this).As<StatementSyntaxNode>();
-            if (stmt->PredicateExpression)
-                stmt->PredicateExpression = stmt->PredicateExpression->Accept(this).As<ExpressionSyntaxNode>();
-            if (stmt->SideEffectExpression)
-                stmt->SideEffectExpression = stmt->SideEffectExpression->Accept(this).As<ExpressionSyntaxNode>();
-            if (stmt->Statement)
-                stmt->Statement = stmt->Statement->Accept(this).As<StatementSyntaxNode>();
-            return stmt;
-        }
-        virtual RefPtr<StatementSyntaxNode> VisitIfStatement(IfStatementSyntaxNode* stmt)
-        {
-            if (stmt->Predicate)
-                stmt->Predicate = stmt->Predicate->Accept(this).As<ExpressionSyntaxNode>();
-            if (stmt->PositiveStatement)
-                stmt->PositiveStatement = stmt->PositiveStatement->Accept(this).As<StatementSyntaxNode>();
-            if (stmt->NegativeStatement)
-                stmt->NegativeStatement = stmt->NegativeStatement->Accept(this).As<StatementSyntaxNode>();
-            return stmt;
-        }
-        virtual RefPtr<SwitchStmt> VisitSwitchStmt(SwitchStmt* stmt)
-        {
-            if (stmt->condition)
-                stmt->condition = stmt->condition->Accept(this).As<ExpressionSyntaxNode>();
-            if (stmt->body)
-                stmt->body = stmt->body->Accept(this).As<BlockStatementSyntaxNode>();
-            return stmt;
-        }
-        virtual RefPtr<CaseStmt> VisitCaseStmt(CaseStmt* stmt)
-        {
-            if (stmt->expr)
-                stmt->expr = stmt->expr->Accept(this).As<ExpressionSyntaxNode>();
-            return stmt;
-        }
-        virtual RefPtr<DefaultStmt> VisitDefaultStmt(DefaultStmt* stmt)
-        {
-            return stmt;
-        }
-        virtual RefPtr<StatementSyntaxNode> VisitReturnStatement(ReturnStatementSyntaxNode* stmt)
-        {
-            if (stmt->Expression)
-                stmt->Expression = stmt->Expression->Accept(this).As<ExpressionSyntaxNode>();
-            return stmt;
-        }
-        virtual RefPtr<StatementSyntaxNode> VisitVarDeclrStatement(VarDeclrStatementSyntaxNode* stmt)
-        {
-            stmt->decl = stmt->decl->Accept(this).As<DeclBase>();
-            return stmt;
-        }
-        virtual RefPtr<StatementSyntaxNode> VisitWhileStatement(WhileStatementSyntaxNode* stmt)
-        {
-            if (stmt->Predicate)
-                stmt->Predicate = stmt->Predicate->Accept(this).As<ExpressionSyntaxNode>();
-            if (stmt->Statement)
-                stmt->Statement = stmt->Statement->Accept(this).As<StatementSyntaxNode>();
-            return stmt;
-        }
-        virtual RefPtr<StatementSyntaxNode> VisitExpressionStatement(ExpressionStatementSyntaxNode* stmt)
-        {
-            if (stmt->Expression)
-                stmt->Expression = stmt->Expression->Accept(this).As<ExpressionSyntaxNode>();
-            return stmt;
-        }
-
-        virtual RefPtr<ExpressionSyntaxNode> VisitOperatorExpression(OperatorExpressionSyntaxNode* expr)
-        {
-            for (auto && child : expr->Arguments)
-                child->Accept(this);
-            return expr;
-        }
-        virtual RefPtr<ExpressionSyntaxNode> VisitConstantExpression(ConstantExpressionSyntaxNode* expr)
-        {
-            return expr;
-        }
-        virtual RefPtr<ExpressionSyntaxNode> VisitIndexExpression(IndexExpressionSyntaxNode* expr)
-        {
-            if (expr->BaseExpression)
-                expr->BaseExpression = expr->BaseExpression->Accept(this).As<ExpressionSyntaxNode>();
-            if (expr->IndexExpression)
-                expr->IndexExpression = expr->IndexExpression->Accept(this).As<ExpressionSyntaxNode>();
-            return expr;
-        }
-        virtual RefPtr<ExpressionSyntaxNode> VisitMemberExpression(MemberExpressionSyntaxNode * stmt)
-        {
-            if (stmt->BaseExpression)
-                stmt->BaseExpression = stmt->BaseExpression->Accept(this).As<ExpressionSyntaxNode>();
-            return stmt;
-        }
-        virtual RefPtr<ExpressionSyntaxNode> VisitSwizzleExpression(SwizzleExpr * expr)
-        {
-            if (expr->base)
-                expr->base->Accept(this);
-            return expr;
-        }
-        virtual RefPtr<ExpressionSyntaxNode> VisitInvokeExpression(InvokeExpressionSyntaxNode* stmt)
-        {
-            stmt->FunctionExpr->Accept(this);
-            for (auto & arg : stmt->Arguments)
-                arg = arg->Accept(this).As<ExpressionSyntaxNode>();
-            return stmt;
-        }
-        virtual RefPtr<ExpressionSyntaxNode> VisitTypeCastExpression(TypeCastExpressionSyntaxNode * stmt)
-        {
-            if (stmt->Expression)
-                stmt->Expression = stmt->Expression->Accept(this).As<ExpressionSyntaxNode>();
-            return stmt->Expression;
-        }
-        virtual RefPtr<ExpressionSyntaxNode> VisitVarExpression(VarExpressionSyntaxNode* expr)
-        {
-            return expr;
-        }
-
-        virtual RefPtr<ParameterSyntaxNode> VisitParameter(ParameterSyntaxNode* param)
-        {
-            return param;
-        }
-        virtual RefPtr<ExpressionSyntaxNode> VisitGenericApp(GenericAppExpr* type)
-        {
-            return type;
-        }
-
-        virtual RefPtr<Variable> VisitDeclrVariable(Variable* dclr)
-        {
-            if (dclr->Expr)
-                dclr->Expr = dclr->Expr->Accept(this).As<ExpressionSyntaxNode>();
-            return dclr;
-        }
-
-        virtual TypeExp VisitTypeExp(TypeExp const& typeExp)
-        {
-            TypeExp result = typeExp;
-            result.exp = typeExp.exp->Accept(this).As<ExpressionSyntaxNode>();
-            if (auto typeType = result.exp->Type.type.As<TypeType>())
-            {
-                result.type = typeType->type;
-            }
-            return result;
-        }
-
-        virtual void VisitExtensionDecl(ExtensionDecl* /*decl*/)
-        {}
-
-        virtual void VisitConstructorDecl(ConstructorDecl* /*decl*/)
-        {}
-
-        virtual void visitSubscriptDecl(SubscriptDecl* decl) = 0;
-
-        virtual void visitAccessorDecl(AccessorDecl* decl) = 0;
-
-        virtual void visitInterfaceDecl(InterfaceDecl* /*decl*/) = 0;
-
-        virtual void visitInheritanceDecl(InheritanceDecl* /*decl*/) = 0;
-
-        virtual RefPtr<ExpressionSyntaxNode> VisitSharedTypeExpr(SharedTypeExpr* typeExpr)
-        {
-            return typeExpr;
-        }
-
-        virtual void VisitDeclGroup(DeclGroup* declGroup)
-        {
-            for (auto decl : declGroup->decls)
-            {
-                decl->Accept(this);
-            }
-        }
-
-        virtual RefPtr<ExpressionSyntaxNode> visitInitializerListExpr(InitializerListExpr* expr) = 0;
-    };
-
-#endif
-
-    // Note(tfoley): These logically belong to `ExpressionType`,
+    // Note(tfoley): These logically belong to `Type`,
     // but order-of-declaration stuff makes that tricky
     //
     // TODO(tfoley): These should really belong to the compilation context!
@@ -1123,17 +843,17 @@ namespace Slang
         return FilteredMemberRefList<T>(declRef.getDecl()->Members, declRef.substitutions);
     }
 
-    inline RefPtr<ExpressionType> GetType(DeclRef<VarDeclBase> const& declRef)
+    inline RefPtr<Type> GetType(DeclRef<VarDeclBase> const& declRef)
     {
-        return declRef.Substitute(declRef.getDecl()->Type.Ptr());
+        return declRef.Substitute(declRef.getDecl()->type.Ptr());
     }
 
-    inline RefPtr<ExpressionSyntaxNode> getInitExpr(DeclRef<VarDeclBase> const& declRef)
+    inline RefPtr<Expr> getInitExpr(DeclRef<VarDeclBase> const& declRef)
     {
-        return declRef.Substitute(declRef.getDecl()->Expr);
+        return declRef.Substitute(declRef.getDecl()->initExpr);
     }
 
-    inline RefPtr<ExpressionType> GetTargetType(DeclRef<ExtensionDecl> const& declRef)
+    inline RefPtr<Type> GetTargetType(DeclRef<ExtensionDecl> const& declRef)
     {
         return declRef.Substitute(declRef.getDecl()->targetType.Ptr());
     }
@@ -1143,29 +863,29 @@ namespace Slang
         return declRef.getDecl()->candidateExtensions;
     }
 
-    inline FilteredMemberRefList<StructField> GetFields(DeclRef<StructSyntaxNode> const& declRef)
+    inline FilteredMemberRefList<StructField> GetFields(DeclRef<StructDecl> const& declRef)
     {
         return getMembersOfType<StructField>(declRef);
     }
 
-    inline RefPtr<ExpressionType> getBaseType(DeclRef<InheritanceDecl> const& declRef)
+    inline RefPtr<Type> getBaseType(DeclRef<InheritanceDecl> const& declRef)
     {
         return declRef.Substitute(declRef.getDecl()->base.type);
     }
 
-    inline RefPtr<ExpressionType> GetType(DeclRef<TypeDefDecl> const& declRef)
+    inline RefPtr<Type> GetType(DeclRef<TypeDefDecl> const& declRef)
     {
-        return declRef.Substitute(declRef.getDecl()->Type.Ptr());
+        return declRef.Substitute(declRef.getDecl()->type.Ptr());
     }
 
-    inline RefPtr<ExpressionType> GetResultType(DeclRef<CallableDecl> const& declRef)
+    inline RefPtr<Type> GetResultType(DeclRef<CallableDecl> const& declRef)
     {
         return declRef.Substitute(declRef.getDecl()->ReturnType.type.Ptr());
     }
 
-    inline FilteredMemberRefList<ParameterSyntaxNode> GetParameters(DeclRef<CallableDecl> const& declRef)
+    inline FilteredMemberRefList<ParamDecl> GetParameters(DeclRef<CallableDecl> const& declRef)
     {
-        return getMembersOfType<ParameterSyntaxNode>(declRef);
+        return getMembersOfType<ParamDecl>(declRef);
     }
 
     inline Decl* GetInner(DeclRef<GenericDecl> const& declRef)
@@ -1179,18 +899,18 @@ namespace Slang
     //
 
     RefPtr<ArrayExpressionType> getArrayType(
-        ExpressionType* elementType,
+        Type* elementType,
         IntVal*         elementCount);
 
     RefPtr<ArrayExpressionType> getArrayType(
-        ExpressionType* elementType);
+        Type* elementType);
 
     RefPtr<NamedExpressionType> getNamedType(
         Session*                    session,
         DeclRef<TypeDefDecl> const& declRef);
 
     RefPtr<TypeType> getTypeType(
-        ExpressionType* type);
+        Type* type);
 
     RefPtr<FuncType> getFuncType(
         Session*                        session,
