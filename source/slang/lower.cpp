@@ -28,7 +28,7 @@ struct StructuralTransformVisitorBase
 {
     V* visitor;
 
-    RefPtr<StatementSyntaxNode> transformDeclField(StatementSyntaxNode* stmt)
+    RefPtr<Stmt> transformDeclField(Stmt* stmt)
     {
         return visitor->translateStmtRef(stmt);
     }
@@ -58,12 +58,12 @@ struct StructuralTransformVisitorBase
         return result;
     }
 
-    RefPtr<ExpressionSyntaxNode> transformSyntaxField(ExpressionSyntaxNode* expr)
+    RefPtr<Expr> transformSyntaxField(Expr* expr)
     {
         return visitor->transformSyntaxField(expr);
     }
 
-    RefPtr<StatementSyntaxNode> transformSyntaxField(StatementSyntaxNode* stmt)
+    RefPtr<Stmt> transformSyntaxField(Stmt* stmt)
     {
         return visitor->transformSyntaxField(stmt);
     }
@@ -92,8 +92,8 @@ struct StructuralTransformVisitorBase
 };
 
 template<typename V>
-RefPtr<StatementSyntaxNode> structuralTransform(
-    StatementSyntaxNode*    stmt,
+RefPtr<Stmt> structuralTransform(
+    Stmt*    stmt,
     V*                      visitor)
 {
     StructuralTransformStmtVisitor<V> transformer;
@@ -104,16 +104,16 @@ RefPtr<StatementSyntaxNode> structuralTransform(
 template<typename V>
 struct StructuralTransformExprVisitor
     : StructuralTransformVisitorBase<V>
-    , ExprVisitor<StructuralTransformExprVisitor<V>, RefPtr<ExpressionSyntaxNode>>
+    , ExprVisitor<StructuralTransformExprVisitor<V>, RefPtr<Expr>>
 {
-    void transformFields(ExpressionSyntaxNode* result, ExpressionSyntaxNode* obj)
+    void transformFields(Expr* result, Expr* obj)
     {
-        result->Type = transformSyntaxField(obj->Type);
+        result->type = transformSyntaxField(obj->type);
     }
 
 
 #define SYNTAX_CLASS(NAME, BASE, ...)                   \
-    RefPtr<ExpressionSyntaxNode> visit##NAME(NAME* obj) {     \
+    RefPtr<Expr> visit##NAME(NAME* obj) {     \
         RefPtr<NAME> result = new NAME(*obj);           \
         transformFields(result, obj);                   \
         return result;                                  \
@@ -136,8 +136,8 @@ struct StructuralTransformExprVisitor
 
 
 template<typename V>
-RefPtr<ExpressionSyntaxNode> structuralTransform(
-    ExpressionSyntaxNode*   expr,
+RefPtr<Expr> structuralTransform(
+    Expr*   expr,
     V*                      visitor)
 {
     StructuralTransformExprVisitor<V> transformer;
@@ -257,7 +257,7 @@ struct LoweredExpr
         : flavor(Flavor::Expr)
     {}
 
-    LoweredExpr(ExpressionSyntaxNode* expr)
+    LoweredExpr(Expr* expr)
         : value(expr)
         , flavor(Flavor::Expr)
     {}
@@ -274,10 +274,10 @@ struct LoweredExpr
 
     Flavor getFlavor() const { return flavor; }
 
-    ExpressionSyntaxNode* getExpr() const
+    Expr* getExpr() const
     {
         assert(getFlavor() == Flavor::Expr);
-        return (ExpressionSyntaxNode*)value.Ptr();
+        return (Expr*)value.Ptr();
     }
 
     TupleExpr* getTupleExpr() const
@@ -293,7 +293,7 @@ struct LoweredExpr
         return (VaryingTupleExpr*)value.Ptr();
     }
 
-    ExpressionSyntaxNode* asExpr() const
+    Expr* asExpr() const
     {
         return (getFlavor() == Flavor::Expr) ? getExpr() : nullptr;
     }
@@ -319,7 +319,7 @@ class PseudoVarDecl : public RefObject
 public:
     Token Name;
     CodePosition Position;
-    TypeExp Type;
+    TypeExp type;
 };
 
 class TupleVarDecl : public PseudoVarDecl
@@ -340,7 +340,7 @@ class PseudoExpr : public RefObject
 {
 public:
     CodePosition Position;
-    QualType Type;
+    QualType type;
 };
 
 // Pseudo-syntax used during lowering:
@@ -356,7 +356,7 @@ public:
 
     // Optional reference to the "primary" value of the tuple,
     // in the case of a tuple type with "orinary" fields
-    RefPtr<ExpressionSyntaxNode>    primaryExpr;
+    RefPtr<Expr>    primaryExpr;
 
     // Additional fields to store values for any non-ordinary fields
     // (or fields that aren't exclusively orginary)
@@ -418,14 +418,14 @@ struct SharedLoweringContext
     Dictionary<String, String> reservedWords;
 
 
-    RefPtr<ProgramSyntaxNode>   loweredProgram;
+    RefPtr<ModuleDecl>   loweredProgram;
 
     Dictionary<Decl*, LoweredDecl> loweredDecls;
     Dictionary<RefObject*, Decl*> mapLoweredDeclToOriginal;
 
     // Work to be done at the very start and end of the entry point
-    RefPtr<StatementSyntaxNode> entryPointInitializeStmt;
-    RefPtr<StatementSyntaxNode> entryPointFinalizeStmt;
+    RefPtr<Stmt> entryPointInitializeStmt;
+    RefPtr<Stmt> entryPointFinalizeStmt;
 
     // Counter used for generating unique temporary names
     int nameCounter = 0;
@@ -452,14 +452,14 @@ struct LoweringVisitor
     : ExprVisitor<LoweringVisitor, LoweredExpr>
     , StmtVisitor<LoweringVisitor, void>
     , DeclVisitor<LoweringVisitor, LoweredDecl>
-    , ValVisitor<LoweringVisitor, RefPtr<Val>, RefPtr<ExpressionType>>
+    , ValVisitor<LoweringVisitor, RefPtr<Val>, RefPtr<Type>>
 {
     //
     SharedLoweringContext*      shared;
     RefPtr<Substitutions>       substitutions;
 
     bool                        isBuildingStmt = false;
-    RefPtr<StatementSyntaxNode> stmtBeingBuilt;
+    RefPtr<Stmt> stmtBeingBuilt;
 
     // If we *aren't* building a statement, then this
     // is the container we should be adding declarations to
@@ -660,8 +660,8 @@ struct LoweringVisitor
     // Types
     //
 
-    RefPtr<ExpressionType> lowerType(
-        ExpressionType* type)
+    RefPtr<Type> lowerType(
+        Type* type)
     {
         if (!type) return nullptr;
         return TypeVisitor::dispatch(type);
@@ -676,29 +676,29 @@ struct LoweringVisitor
         return result;
     }
 
-    RefPtr<ExpressionType> visitErrorType(ErrorType* type)
+    RefPtr<Type> visitErrorType(ErrorType* type)
     {
         return type;
     }
 
-    RefPtr<ExpressionType> visitOverloadGroupType(OverloadGroupType* type)
+    RefPtr<Type> visitOverloadGroupType(OverloadGroupType* type)
     {
         return type;
     }
 
-    RefPtr<ExpressionType> visitInitializerListType(InitializerListType* type)
+    RefPtr<Type> visitInitializerListType(InitializerListType* type)
     {
         return type;
     }
 
-    RefPtr<ExpressionType> visitGenericDeclRefType(GenericDeclRefType* type)
+    RefPtr<Type> visitGenericDeclRefType(GenericDeclRefType* type)
     {
         return getGenericDeclRefType(
             type->getSession(),
             translateDeclRef(DeclRef<Decl>(type->declRef)).As<GenericDecl>());
     }
 
-    RefPtr<ExpressionType> visitFuncType(FuncType* type)
+    RefPtr<Type> visitFuncType(FuncType* type)
     {
         RefPtr<FuncType> loweredType = getFuncType(
             getSession(),
@@ -706,7 +706,7 @@ struct LoweringVisitor
         return loweredType;
     }
 
-    RefPtr<ExpressionType> visitDeclRefType(DeclRefType* type)
+    RefPtr<Type> visitDeclRefType(DeclRefType* type)
     {
         auto loweredDeclRef = translateDeclRef(type->declRef);
         return DeclRefType::Create(
@@ -714,7 +714,7 @@ struct LoweringVisitor
             loweredDeclRef.As<Decl>());
     }
 
-    RefPtr<ExpressionType> visitNamedExpressionType(NamedExpressionType* type)
+    RefPtr<Type> visitNamedExpressionType(NamedExpressionType* type)
     {
         if (shared->target == CodeGenTarget::GLSL)
         {
@@ -727,12 +727,12 @@ struct LoweringVisitor
             translateDeclRef(DeclRef<Decl>(type->declRef)).As<TypeDefDecl>());
     }
 
-    RefPtr<ExpressionType> visitTypeType(TypeType* type)
+    RefPtr<Type> visitTypeType(TypeType* type)
     {
         return getTypeType(lowerType(type->type));
     }
 
-    RefPtr<ExpressionType> visitArrayExpressionType(ArrayExpressionType* type)
+    RefPtr<Type> visitArrayExpressionType(ArrayExpressionType* type)
     {
         RefPtr<ArrayExpressionType> loweredType = Slang::getArrayType(
             lowerType(type->BaseType),
@@ -740,7 +740,7 @@ struct LoweringVisitor
         return loweredType;
     }
 
-    RefPtr<ExpressionType> transformSyntaxField(ExpressionType* type)
+    RefPtr<Type> transformSyntaxField(Type* type)
     {
         return lowerType(type);
     }
@@ -750,14 +750,14 @@ struct LoweringVisitor
     //
 
     LoweredExpr lowerExprOrTuple(
-        ExpressionSyntaxNode* expr)
+        Expr* expr)
     {
         if (!expr) return LoweredExpr();
         return ExprVisitor::dispatch(expr);
     }
 
-    RefPtr<ExpressionSyntaxNode> lowerExpr(
-        ExpressionSyntaxNode* expr)
+    RefPtr<Expr> lowerExpr(
+        Expr* expr)
     {
         if (!expr) return nullptr;
 
@@ -766,28 +766,28 @@ struct LoweringVisitor
     }
 
     // catch-all
-    RefPtr<ExpressionSyntaxNode> visitExpressionSyntaxNode(
-        ExpressionSyntaxNode* expr)
+    LoweredExpr visitExpr(
+        Expr* expr)
     {
-        return structuralTransform(expr, this);
+        return LoweredExpr(structuralTransform(expr, this));
     }
 
-    RefPtr<ExpressionSyntaxNode> transformSyntaxField(ExpressionSyntaxNode* expr)
+    RefPtr<Expr> transformSyntaxField(Expr* expr)
     {
         return lowerExpr(expr);
     }
 
     void lowerExprCommon(
-        ExpressionSyntaxNode*    loweredExpr,
-        ExpressionSyntaxNode*    expr)
+        Expr*    loweredExpr,
+        Expr*    expr)
     {
         loweredExpr->Position = expr->Position;
-        loweredExpr->Type.type = lowerType(expr->Type.type);
+        loweredExpr->type.type = lowerType(expr->type.type);
     }
 
     void lowerExprCommon(
         LoweredExpr const&      loweredExpr,
-        ExpressionSyntaxNode*   expr)
+        Expr*   expr)
     {
         if (auto simpleExpr = loweredExpr.asExpr())
         {
@@ -795,21 +795,21 @@ struct LoweringVisitor
         }
     }
 
-    RefPtr<ExpressionSyntaxNode> createUncheckedVarRef(
+    RefPtr<Expr> createUncheckedVarRef(
         char const* name)
     {
-        RefPtr<VarExpressionSyntaxNode> result = new VarExpressionSyntaxNode();
+        RefPtr<VarExpr> result = new VarExpr();
         result->name = name;
         return result;
     }
 
-    RefPtr<ExpressionSyntaxNode> createSimpleVarRef(
+    RefPtr<Expr> createSimpleVarRef(
         CodePosition const& loc,
         VarDeclBase*        decl)
     {
-        RefPtr<VarExpressionSyntaxNode> result = new VarExpressionSyntaxNode();
+        RefPtr<VarExpr> result = new VarExpr();
         result->Position = loc;
-        result->Type.type = decl->Type.type;
+        result->type.type = decl->type.type;
         result->declRef = makeDeclRef(decl);
         result->name = decl->getName();
         return result;
@@ -843,7 +843,7 @@ struct LoweringVisitor
     {
         RefPtr<TupleExpr> result = new TupleExpr();
         result->Position = loc;
-        result->Type.type = decl->Type.type;
+        result->type.type = decl->type.type;
 
         if (auto primaryDecl = decl->primaryDecl)
         {
@@ -874,8 +874,8 @@ struct LoweringVisitor
         return decl->expr;
     }
 
-    LoweredExpr visitVarExpressionSyntaxNode(
-        VarExpressionSyntaxNode* expr)
+    LoweredExpr visitVarExpr(
+        VarExpr* expr)
     {
         doSampleRateInputCheck(expr->name);
 
@@ -898,7 +898,7 @@ struct LoweringVisitor
             return createVaryingTupleRef(expr->Position, varyingTupleVarDecl);
         }
 
-        RefPtr<VarExpressionSyntaxNode> loweredExpr = new VarExpressionSyntaxNode();
+        RefPtr<VarExpr> loweredExpr = new VarExpr();
         lowerExprCommon(loweredExpr, expr);
         loweredExpr->declRef = loweredDeclRef.As<Decl>();
         loweredExpr->name = expr->name;
@@ -915,12 +915,12 @@ struct LoweringVisitor
         return result;
     }
 
-    RefPtr<ExpressionSyntaxNode> moveTemp(RefPtr<ExpressionSyntaxNode> expr)
+    RefPtr<Expr> moveTemp(RefPtr<Expr> expr)
     {
         RefPtr<Variable> varDecl = new Variable();
         varDecl->Name.Content = generateName();
-        varDecl->Type.type = expr->Type.type;
-        varDecl->Expr = expr;
+        varDecl->type.type = expr->type.type;
+        varDecl->initExpr = expr;
 
         addDecl(varDecl);
 
@@ -931,16 +931,16 @@ struct LoweringVisitor
     // use/evaluate more than once, and if needed replace it with a
     // reference to a temporary (initialized with the expr) so that it
     // can safely be re-evaluated.
-    RefPtr<ExpressionSyntaxNode> maybeMoveTemp(
-        ExpressionSyntaxNode* expr)
+    RefPtr<Expr> maybeMoveTemp(
+        Expr* expr)
     {
         // TODO: actually implement this properly!
 
         // Certain expressions are already in a form we can directly re-use,
         // so  there is no reason to move them.
-        if (dynamic_cast<VarExpressionSyntaxNode*>(expr))
+        if (dynamic_cast<VarExpr*>(expr))
             return expr;
-        if (dynamic_cast<ConstantExpressionSyntaxNode*>(expr))
+        if (dynamic_cast<ConstantExpr*>(expr))
             return expr;
 
         // In the general case, though, we need to introduce a temporary
@@ -954,7 +954,7 @@ struct LoweringVisitor
         {
             RefPtr<TupleExpr> resultExpr = new TupleExpr();
             resultExpr->Position = tupleExpr->Position;
-            resultExpr->Type = tupleExpr->Type;
+            resultExpr->type = tupleExpr->type;
             if (tupleExpr->primaryExpr)
             {
                 resultExpr->primaryExpr = maybeMoveTemp(tupleExpr->primaryExpr);
@@ -974,7 +974,7 @@ struct LoweringVisitor
         {
             RefPtr<VaryingTupleExpr> resultExpr = new VaryingTupleExpr();
             resultExpr->Position = varyingTupleExpr->Position;
-            resultExpr->Type = varyingTupleExpr->Type;
+            resultExpr->type = varyingTupleExpr->type;
             for (auto ee : varyingTupleExpr->elements)
             {
                 VaryingTupleExpr::Element elem;
@@ -995,8 +995,8 @@ struct LoweringVisitor
     // Similar to the above, this ensures that an l-value expression
     // is safe to re-evaluate, by recursively moving things off
     // to temporaries where needed.
-    RefPtr<ExpressionSyntaxNode> ensureSimpleLValue(
-        ExpressionSyntaxNode* expr)
+    RefPtr<Expr> ensureSimpleLValue(
+        Expr* expr)
     {
         // TODO: actually implement this properly!
 
@@ -1021,22 +1021,22 @@ struct LoweringVisitor
         WithFixups,
     };
 
-    RefPtr<ExpressionSyntaxNode> createSimpleAssignExpr(
-        RefPtr<ExpressionSyntaxNode>    leftExpr,
-        RefPtr<ExpressionSyntaxNode>    rightExpr)
+    RefPtr<Expr> createSimpleAssignExpr(
+        RefPtr<Expr>    leftExpr,
+        RefPtr<Expr>    rightExpr)
     {
         RefPtr<AssignExpr> loweredExpr = new AssignExpr();
-        loweredExpr->Type = leftExpr->Type;
+        loweredExpr->type = leftExpr->type;
         loweredExpr->left = leftExpr;
         loweredExpr->right = rightExpr;
         return loweredExpr;
     }
 
-    RefPtr<ExpressionSyntaxNode> convertExprForAssignmentWithFixups(
-        RefPtr<ExpressionType>          leftType,
-        RefPtr<ExpressionSyntaxNode>    rightExpr)
+    RefPtr<Expr> convertExprForAssignmentWithFixups(
+        RefPtr<Type>          leftType,
+        RefPtr<Expr>    rightExpr)
     {
-        auto rightType = rightExpr->Type.type;
+        auto rightType = rightExpr->type.type;
         if (auto leftArrayType = leftType->As<ArrayExpressionType>())
         {
             // LHS type was an array
@@ -1058,7 +1058,7 @@ struct LoweringVisitor
 
                     RefPtr<AggTypeCtorExpr> ctorExpr = new AggTypeCtorExpr();
                     ctorExpr->Position = rightExpr->Position;
-                    ctorExpr->Type.type = leftType;
+                    ctorExpr->type.type = leftType;
                     ctorExpr->base.type = leftType;
 
                     int elementCount = (int) GetIntVal(rightVecType->elementCount);
@@ -1066,7 +1066,7 @@ struct LoweringVisitor
                     {
                         RefPtr<SwizzleExpr> swizzleExpr = new SwizzleExpr();
                         swizzleExpr->Position = rightExpr->Position;
-                        swizzleExpr->Type.type = rightVecType->elementType;
+                        swizzleExpr->type.type = rightVecType->elementType;
                         swizzleExpr->base = rightExpr;
                         swizzleExpr->elementCount = 1;
                         swizzleExpr->elementIndices[0] = ee;
@@ -1089,42 +1089,42 @@ struct LoweringVisitor
 
     }
 
-    RefPtr<ExpressionSyntaxNode> createConstIntExpr(IntegerLiteralValue value)
+    RefPtr<Expr> createConstIntExpr(IntegerLiteralValue value)
     {
-        RefPtr<ConstantExpressionSyntaxNode> expr = new ConstantExpressionSyntaxNode();
-        expr->Type.type = getIntType();
-        expr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Int;
+        RefPtr<ConstantExpr> expr = new ConstantExpr();
+        expr->type.type = getIntType();
+        expr->ConstType = ConstantExpr::ConstantType::Int;
         expr->integerValue = value;
         return expr;
     }
 
     struct SeqExprBuilder
     {
-        RefPtr<ExpressionSyntaxNode> expr;
-        RefPtr<ExpressionSyntaxNode>* link = nullptr;
+        RefPtr<Expr> expr;
+        RefPtr<Expr>* link = nullptr;
     };
 
-    RefPtr<ExpressionSyntaxNode> createSimpleVarExpr(char const* name)
+    RefPtr<Expr> createSimpleVarExpr(char const* name)
     {
-        RefPtr<VarExpressionSyntaxNode> varExpr = new VarExpressionSyntaxNode();
+        RefPtr<VarExpr> varExpr = new VarExpr();
         varExpr->name = name;
         return varExpr;
     }
 
-    RefPtr<InvokeExpressionSyntaxNode> createSeqExpr(
-        RefPtr<ExpressionSyntaxNode>    left,
-        RefPtr<ExpressionSyntaxNode>    right)
+    RefPtr<InvokeExpr> createSeqExpr(
+        RefPtr<Expr>    left,
+        RefPtr<Expr>    right)
     {
         RefPtr<InfixExpr> seqExpr = new InfixExpr();
         seqExpr->Position = left->Position;
-        seqExpr->Type = right->Type;
+        seqExpr->type = right->type;
         seqExpr->FunctionExpr = createSimpleVarExpr(",");
         seqExpr->Arguments.Add(left);
         seqExpr->Arguments.Add(right);
         return seqExpr;
     }
 
-    void addExpr(SeqExprBuilder* builder, RefPtr<ExpressionSyntaxNode> expr)
+    void addExpr(SeqExprBuilder* builder, RefPtr<Expr> expr)
     {
         // No expression to add? Do nothing.
         if (!expr) return;
@@ -1159,12 +1159,12 @@ struct LoweringVisitor
         builder->link = &seqExpr->Arguments[1];
     }
 
-    RefPtr<ExpressionSyntaxNode> createSimpleAssignExprWithFixups(
-        RefPtr<ExpressionSyntaxNode>    leftExpr,
-        RefPtr<ExpressionSyntaxNode>    rightExpr)
+    RefPtr<Expr> createSimpleAssignExprWithFixups(
+        RefPtr<Expr>    leftExpr,
+        RefPtr<Expr>    rightExpr)
     {
-        auto leftType = leftExpr->Type.type;
-        auto rightType = rightExpr->Type.type;
+        auto leftType = leftExpr->type.type;
+        auto rightType = rightExpr->type.type;
 
         // If types are unknown, or match, then just do
         // things the ordinary way.
@@ -1206,16 +1206,16 @@ struct LoweringVisitor
                     for (int ee = 0; ee < elementCount; ++ee)
                     {
                         // LHS array element
-                        RefPtr<IndexExpressionSyntaxNode> arrayElemExpr = new IndexExpressionSyntaxNode();
+                        RefPtr<IndexExpr> arrayElemExpr = new IndexExpr();
                         arrayElemExpr->Position = leftExpr->Position;
-                        arrayElemExpr->Type.type = leftArrayType->BaseType;
+                        arrayElemExpr->type.type = leftArrayType->BaseType;
                         arrayElemExpr->BaseExpression = leftExpr;
                         arrayElemExpr->IndexExpression = createConstIntExpr(ee);
 
                         // RHS swizzle
                         RefPtr<SwizzleExpr> swizzleExpr = new SwizzleExpr();
                         swizzleExpr->Position = rightExpr->Position;
-                        swizzleExpr->Type.type = rightVecType->elementType;
+                        swizzleExpr->type.type = rightVecType->elementType;
                         swizzleExpr->base = rightExpr;
                         swizzleExpr->elementCount = 1;
                         swizzleExpr->elementIndices[0] = ee;
@@ -1243,9 +1243,9 @@ struct LoweringVisitor
         return createSimpleAssignExpr(leftExpr, convertedRightExpr);
     }
 
-    RefPtr<ExpressionSyntaxNode> createSimpleAssignExpr(
-        ExpressionSyntaxNode*   leftExpr,
-        ExpressionSyntaxNode*   rightExpr,
+    RefPtr<Expr> createSimpleAssignExpr(
+        Expr*   leftExpr,
+        Expr*   rightExpr,
         AssignMode              mode)
     {
         switch (mode)
@@ -1268,7 +1268,7 @@ struct LoweringVisitor
         if (leftTuple && rightTuple)
         {
             RefPtr<TupleExpr> resultTuple = new TupleExpr();
-            resultTuple->Type = leftTuple->Type;
+            resultTuple->type = leftTuple->type;
 
             if (leftTuple->primaryExpr)
             {
@@ -1308,16 +1308,16 @@ struct LoweringVisitor
         auto leftVaryingTuple = leftExpr.asVaryingTuple();
         auto rightVaryingTuple = rightExpr.asVaryingTuple();
 
-        RefPtr<ExpressionSyntaxNode> leftSimpleExpr = leftExpr.asExpr();
-        RefPtr<ExpressionSyntaxNode> rightSimpleExpr = rightExpr.asExpr();
+        RefPtr<Expr> leftSimpleExpr = leftExpr.asExpr();
+        RefPtr<Expr> rightSimpleExpr = rightExpr.asExpr();
 
         if (leftVaryingTuple && rightVaryingTuple)
         {
             RefPtr<VaryingTupleExpr> resultTuple = new VaryingTupleExpr();
-            resultTuple->Type.type = leftVaryingTuple->Type.type;
+            resultTuple->type.type = leftVaryingTuple->type.type;
             resultTuple->Position = leftVaryingTuple->Position;
 
-            SLANG_RELEASE_ASSERT(resultTuple->Type.type);
+            SLANG_RELEASE_ASSERT(resultTuple->type.type);
 
             UInt elementCount = leftVaryingTuple->elements.Count();
             SLANG_RELEASE_ASSERT(elementCount == rightVaryingTuple->elements.Count());
@@ -1343,10 +1343,10 @@ struct LoweringVisitor
             // This will naturally yield a tuple expression.
 
             RefPtr<VaryingTupleExpr> resultTuple = new VaryingTupleExpr();
-            resultTuple->Type.type = leftVaryingTuple->Type.type;
+            resultTuple->type.type = leftVaryingTuple->type.type;
             resultTuple->Position = leftVaryingTuple->Position;
 
-            SLANG_RELEASE_ASSERT(resultTuple->Type.type);
+            SLANG_RELEASE_ASSERT(resultTuple->type.type);
 
             UInt elementCount = leftVaryingTuple->elements.Count();
 
@@ -1365,9 +1365,9 @@ struct LoweringVisitor
                 auto leftElem = leftVaryingTuple->elements[ee];
 
 
-                RefPtr<MemberExpressionSyntaxNode> rightElemExpr = new MemberExpressionSyntaxNode();
+                RefPtr<MemberExpr> rightElemExpr = new MemberExpr();
                 rightElemExpr->Position = rightSimpleExpr->Position;
-                rightElemExpr->Type.type = GetType(leftElem.originalFieldDeclRef);
+                rightElemExpr->type.type = GetType(leftElem.originalFieldDeclRef);
                 rightElemExpr->declRef = leftElem.originalFieldDeclRef;
                 rightElemExpr->name = leftElem.originalFieldDeclRef.GetName();
                 rightElemExpr->BaseExpression = rightSimpleExpr;
@@ -1391,10 +1391,10 @@ struct LoweringVisitor
 
 
             RefPtr<VaryingTupleExpr> resultTuple = new VaryingTupleExpr();
-            resultTuple->Type.type = leftSimpleExpr->Type.type;
+            resultTuple->type.type = leftSimpleExpr->type.type;
             resultTuple->Position = leftSimpleExpr->Position;
 
-            SLANG_RELEASE_ASSERT(resultTuple->Type.type);
+            SLANG_RELEASE_ASSERT(resultTuple->type.type);
 
             UInt elementCount = rightVaryingTuple->elements.Count();
 
@@ -1412,9 +1412,9 @@ struct LoweringVisitor
                 auto rightElem = rightVaryingTuple->elements[ee];
 
 
-                RefPtr<MemberExpressionSyntaxNode> leftElemExpr = new MemberExpressionSyntaxNode();
+                RefPtr<MemberExpr> leftElemExpr = new MemberExpr();
                 leftElemExpr->Position = leftSimpleExpr->Position;
-                leftElemExpr->Type.type = GetType(rightElem.originalFieldDeclRef);
+                leftElemExpr->type.type = GetType(rightElem.originalFieldDeclRef);
                 leftElemExpr->declRef = rightElem.originalFieldDeclRef;
                 leftElemExpr->name = rightElem.originalFieldDeclRef.GetName();
                 leftElemExpr->BaseExpression = leftSimpleExpr;
@@ -1455,8 +1455,8 @@ struct LoweringVisitor
         return loweredExpr;
     }
 
-    RefPtr<ExpressionType> getSubscripResultType(
-        RefPtr<ExpressionType>  type)
+    RefPtr<Type> getSubscripResultType(
+        RefPtr<Type>  type)
     {
         if (auto arrayType = type->As<ArrayExpressionType>())
         {
@@ -1465,14 +1465,14 @@ struct LoweringVisitor
         return nullptr;
     }
 
-    RefPtr<ExpressionSyntaxNode> createSimpleSubscriptExpr(
-        RefPtr<ExpressionSyntaxNode>    baseExpr,
-        RefPtr<ExpressionSyntaxNode>    indexExpr)
+    RefPtr<Expr> createSimpleSubscriptExpr(
+        RefPtr<Expr>    baseExpr,
+        RefPtr<Expr>    indexExpr)
     {
         // Default case: just reconstrut a subscript expr
-        auto loweredExpr = new IndexExpressionSyntaxNode();
+        auto loweredExpr = new IndexExpr();
 
-        loweredExpr->Type.type = getSubscripResultType(baseExpr->Type.type);
+        loweredExpr->type.type = getSubscripResultType(baseExpr->type.type);
 
         loweredExpr->BaseExpression = baseExpr;
         loweredExpr->IndexExpression = indexExpr;
@@ -1481,7 +1481,7 @@ struct LoweringVisitor
 
     LoweredExpr createSubscriptExpr(
         LoweredExpr                     baseExpr,
-        RefPtr<ExpressionSyntaxNode>    indexExpr)
+        RefPtr<Expr>    indexExpr)
     {
         // TODO: This logic ends up duplicating the `indexExpr`
         // that was given, without worrying about any side
@@ -1492,7 +1492,7 @@ struct LoweringVisitor
             indexExpr = maybeMoveTemp(indexExpr);
 
             auto loweredExpr = new TupleExpr();
-            loweredExpr->Type.type = getSubscripResultType(baseTuple->Type.type);
+            loweredExpr->type.type = getSubscripResultType(baseTuple->type.type);
 
             if (auto basePrimary = baseTuple->primaryExpr)
             {
@@ -1518,9 +1518,9 @@ struct LoweringVisitor
             indexExpr = maybeMoveTemp(indexExpr);
 
             auto loweredExpr = new VaryingTupleExpr();
-            loweredExpr->Type.type = getSubscripResultType(baseVaryingTuple->Type.type);
+            loweredExpr->type.type = getSubscripResultType(baseVaryingTuple->type.type);
 
-            SLANG_RELEASE_ASSERT(loweredExpr->Type.type);
+            SLANG_RELEASE_ASSERT(loweredExpr->type.type);
 
             for (auto elem : baseVaryingTuple->elements)
             {
@@ -1541,8 +1541,8 @@ struct LoweringVisitor
         }
     }
 
-    LoweredExpr visitIndexExpressionSyntaxNode(
-        IndexExpressionSyntaxNode* subscriptExpr)
+    LoweredExpr visitIndexExpr(
+        IndexExpr* subscriptExpr)
     {
         auto baseExpr = lowerExprOrTuple(subscriptExpr->BaseExpression);
         auto indexExpr = lowerExpr(subscriptExpr->IndexExpression);
@@ -1560,7 +1560,7 @@ struct LoweringVisitor
         else
         {
             // Default case: just reconstrut a subscript expr
-            RefPtr<IndexExpressionSyntaxNode> loweredExpr = new IndexExpressionSyntaxNode();
+            RefPtr<IndexExpr> loweredExpr = new IndexExpr();
             lowerExprCommon(loweredExpr, subscriptExpr);
             loweredExpr->BaseExpression = baseExpr.getExpr();
             loweredExpr->IndexExpression = indexExpr;
@@ -1568,7 +1568,7 @@ struct LoweringVisitor
         }
     }
 
-    RefPtr<ExpressionSyntaxNode> maybeReifyTuple(
+    RefPtr<Expr> maybeReifyTuple(
         LoweredExpr expr)
     {
         if (auto tupleExpr = expr.asTuple())
@@ -1586,9 +1586,9 @@ struct LoweringVisitor
             // to handle that case...
 
             RefPtr<AggTypeCtorExpr> resultExpr = new AggTypeCtorExpr();
-            resultExpr->Type = varyingTupleExpr->Type;
-            resultExpr->base.type = varyingTupleExpr->Type.type;
-            SLANG_RELEASE_ASSERT(resultExpr->Type.type);
+            resultExpr->type = varyingTupleExpr->type;
+            resultExpr->base.type = varyingTupleExpr->type.type;
+            SLANG_RELEASE_ASSERT(resultExpr->type.type);
 
             for (auto elem : varyingTupleExpr->elements)
             {
@@ -1603,7 +1603,7 @@ struct LoweringVisitor
     }
 
     bool needGlslangBug988Workaround(
-        RefPtr<ExpressionSyntaxNode> inExpr)
+        RefPtr<Expr> inExpr)
     {
         switch (getTarget())
         {
@@ -1622,7 +1622,7 @@ struct LoweringVisitor
 
         // Issue (1): is the type of the expression something that needs the WAR?
 
-        auto exprType = inExpr->Type.type;
+        auto exprType = inExpr->type.type;
         exprType = unwrapArray(exprType);
 
         if (!isStructType(exprType))
@@ -1634,7 +1634,7 @@ struct LoweringVisitor
         auto expr = inExpr;
         for (;;)
         {
-            if (auto memberRefExpr = expr.As<MemberExpressionSyntaxNode>())
+            if (auto memberRefExpr = expr.As<MemberExpr>())
             {
                 expr = memberRefExpr->BaseExpression;
                 continue;
@@ -1646,7 +1646,7 @@ struct LoweringVisitor
                 continue;
             }
 
-            if (auto subscriptExpr = expr.As<IndexExpressionSyntaxNode>())
+            if (auto subscriptExpr = expr.As<IndexExpr>())
             {
                 expr = subscriptExpr->BaseExpression;
                 continue;
@@ -1655,7 +1655,7 @@ struct LoweringVisitor
             break;
         }
 
-        if (auto varExpr = expr.As<VarExpressionSyntaxNode>())
+        if (auto varExpr = expr.As<VarExpr>())
         {
             auto declRef = varExpr->declRef;
             if (!declRef)
@@ -1682,7 +1682,7 @@ struct LoweringVisitor
 
     void addArg(
         ExprWithArgsBase*               callExpr,
-        RefPtr<ExpressionSyntaxNode>    argExpr)
+        RefPtr<Expr>    argExpr)
     {
         // This should be the default case where we have a perfectly
         // ordinary expression, but we need to work around a glslang
@@ -1726,9 +1726,9 @@ struct LoweringVisitor
         }
     }
 
-    RefPtr<ExpressionSyntaxNode> lowerCallExpr(
-        RefPtr<InvokeExpressionSyntaxNode>  loweredExpr,
-        InvokeExpressionSyntaxNode*         expr)
+    RefPtr<Expr> lowerCallExpr(
+        RefPtr<InvokeExpr>  loweredExpr,
+        InvokeExpr*         expr)
     {
         lowerExprCommon(loweredExpr, expr);
 
@@ -1743,10 +1743,10 @@ struct LoweringVisitor
         return loweredExpr;
     }
 
-    LoweredExpr visitInvokeExpressionSyntaxNode(
-        InvokeExpressionSyntaxNode* expr)
+    LoweredExpr visitInvokeExpr(
+        InvokeExpr* expr)
     {
-        return LoweredExpr(lowerCallExpr(new InvokeExpressionSyntaxNode(), expr));
+        return LoweredExpr(lowerCallExpr(new InvokeExpr(), expr));
     }
 
     LoweredExpr visitInfixExpr(
@@ -1761,12 +1761,12 @@ struct LoweringVisitor
         return LoweredExpr(lowerCallExpr(new PrefixExpr(), expr));
     }
 
-    LoweredExpr visitSelectExpressionSyntaxNode(
-        SelectExpressionSyntaxNode* expr)
+    LoweredExpr visitSelectExpr(
+        SelectExpr* expr)
     {
         // TODO: A tuple needs to be special-cased here
 
-        return LoweredExpr(lowerCallExpr(new SelectExpressionSyntaxNode(), expr));
+        return LoweredExpr(lowerCallExpr(new SelectExpr(), expr));
     }
 
     LoweredExpr visitPostfixExpr(
@@ -1827,8 +1827,8 @@ struct LoweringVisitor
         return &shared->compileRequest->mSink;
     }
 
-    LoweredExpr visitMemberExpressionSyntaxNode(
-        MemberExpressionSyntaxNode* expr)
+    LoweredExpr visitMemberExpr(
+        MemberExpr* expr)
     {
         auto loweredBase = lowerExprOrTuple(expr->BaseExpression);
 
@@ -1862,7 +1862,7 @@ struct LoweringVisitor
                 SLANG_RELEASE_ASSERT(!tupleFieldTupleExpr->primaryExpr);
 
 
-                RefPtr<MemberExpressionSyntaxNode> loweredPrimaryExpr = new MemberExpressionSyntaxNode();
+                RefPtr<MemberExpr> loweredPrimaryExpr = new MemberExpr();
                 lowerExprCommon(loweredPrimaryExpr, expr);
                 loweredPrimaryExpr->BaseExpression = baseTuple->primaryExpr;
                 loweredPrimaryExpr->declRef = loweredDeclRef.As<Decl>();
@@ -1893,7 +1893,7 @@ struct LoweringVisitor
 
         // Default handling:
 
-        RefPtr<MemberExpressionSyntaxNode> loweredExpr = new MemberExpressionSyntaxNode();
+        RefPtr<MemberExpr> loweredExpr = new MemberExpr();
         lowerExprCommon(loweredExpr, expr);
         loweredExpr->BaseExpression = loweredBase.getExpr();
         loweredExpr->declRef = loweredDeclRef.As<Decl>();
@@ -1911,8 +1911,8 @@ struct LoweringVisitor
     // (or event to none), and in such a case this function wraps
     // the result up as a `SeqStmt` or `EmptyStmt` as appropriate.
     //
-    RefPtr<StatementSyntaxNode> lowerStmt(
-        StatementSyntaxNode* stmt)
+    RefPtr<Stmt> lowerStmt(
+        Stmt* stmt)
     {
         if (!stmt)
             return nullptr;
@@ -1924,7 +1924,7 @@ struct LoweringVisitor
 
         if (!subVisitor.stmtBeingBuilt)
         {
-            return new EmptyStatementSyntaxNode();
+            return new EmptyStmt();
         }
         else
         {
@@ -1940,14 +1940,14 @@ struct LoweringVisitor
         StmtLoweringState*      parent = nullptr;
 
         // The outer statement (both lowered and original)
-        StatementSyntaxNode*    loweredStmt = nullptr;
-        StatementSyntaxNode*    originalStmt = nullptr;
+        Stmt*    loweredStmt = nullptr;
+        Stmt*    originalStmt = nullptr;
     };
     StmtLoweringState stmtLoweringState;
 
     // Translate a reference from one statement to an outer statement
-    StatementSyntaxNode* translateStmtRef(
-        StatementSyntaxNode* originalStmt)
+    Stmt* translateStmtRef(
+        Stmt* originalStmt)
     {
         if (!originalStmt) return nullptr;
 
@@ -1964,7 +1964,7 @@ struct LoweringVisitor
 
     // Expand a statement to be lowered into one or more statements
     void lowerStmtImpl(
-        StatementSyntaxNode* stmt)
+        Stmt* stmt)
     {
         StmtVisitor::dispatch(stmt);
     }
@@ -1993,8 +1993,8 @@ struct LoweringVisitor
     }
 
     void addStmtImpl(
-        RefPtr<StatementSyntaxNode>&    dest,
-        StatementSyntaxNode*            stmt)
+        RefPtr<Stmt>&    dest,
+        Stmt*            stmt)
     {
         // add a statement to the code we are building...
         if (!dest)
@@ -2026,17 +2026,17 @@ struct LoweringVisitor
     }
 
     void addStmt(
-        StatementSyntaxNode* stmt)
+        Stmt* stmt)
     {
         addStmtImpl(stmtBeingBuilt, stmt);
     }
 
     void addSimpleExprStmt(
-        RefPtr<ExpressionSyntaxNode>    expr)
+        RefPtr<Expr>    expr)
     {
         if (auto infixExpr = expr.As<InfixExpr>())
         {
-            if (auto varExpr = infixExpr->FunctionExpr.As<VarExpressionSyntaxNode>())
+            if (auto varExpr = infixExpr->FunctionExpr.As<VarExpr>())
             {
                 if (varExpr->name == ",")
                 {
@@ -2049,13 +2049,13 @@ struct LoweringVisitor
                 }
             }
         }
-        else if (auto varExpr = expr.As<VarExpressionSyntaxNode>())
+        else if (auto varExpr = expr.As<VarExpr>())
         {
             // Skip an expression that is just a reference to a single variable
             return;
         }
 
-        RefPtr<ExpressionStatementSyntaxNode> stmt = new ExpressionStatementSyntaxNode();
+        RefPtr<ExpressionStmt> stmt = new ExpressionStmt();
         stmt->Expression = expr;
         addStmt(stmt);
     }
@@ -2110,19 +2110,19 @@ struct LoweringVisitor
         }
     }
 
-    void visitExpressionStatementSyntaxNode(ExpressionStatementSyntaxNode* stmt)
+    void visitExpressionStmt(ExpressionStmt* stmt)
     {
         addExprStmt(lowerExprOrTuple(stmt->Expression));
     }
 
-    void visitVarDeclrStatementSyntaxNode(VarDeclrStatementSyntaxNode* stmt)
+    void visitDeclStmt(DeclStmt* stmt)
     {
         DeclVisitor::dispatch(stmt->decl);
     }
 
     void lowerStmtFields(
-        StatementSyntaxNode* loweredStmt,
-        StatementSyntaxNode* originalStmt)
+        Stmt* loweredStmt,
+        Stmt* originalStmt)
     {
         loweredStmt->Position = originalStmt->Position;
         loweredStmt->modifiers = originalStmt->modifiers;
@@ -2147,16 +2147,16 @@ struct LoweringVisitor
         loweredStmt->parentStmt = translateStmtRef(originalStmt->parentStmt);
     }
 
-    void visitContinueStatementSyntaxNode(ContinueStatementSyntaxNode* stmt)
+    void visitContinueStmt(ContinueStmt* stmt)
     {
-        RefPtr<ContinueStatementSyntaxNode> loweredStmt = new ContinueStatementSyntaxNode();
+        RefPtr<ContinueStmt> loweredStmt = new ContinueStmt();
         lowerChildStmtFields(loweredStmt, stmt);
         addStmt(loweredStmt);
     }
 
-    void visitBreakStatementSyntaxNode(BreakStatementSyntaxNode* stmt)
+    void visitBreakStmt(BreakStmt* stmt)
     {
-        RefPtr<BreakStatementSyntaxNode> loweredStmt = new BreakStatementSyntaxNode();
+        RefPtr<BreakStmt> loweredStmt = new BreakStmt();
         lowerChildStmtFields(loweredStmt, stmt);
         addStmt(loweredStmt);
     }
@@ -2168,16 +2168,16 @@ struct LoweringVisitor
         addStmt(loweredStmt);
     }
 
-    void visitDiscardStatementSyntaxNode(DiscardStatementSyntaxNode* stmt)
+    void visitDiscardStmt(DiscardStmt* stmt)
     {
-        RefPtr<DiscardStatementSyntaxNode> loweredStmt = new DiscardStatementSyntaxNode();
+        RefPtr<DiscardStmt> loweredStmt = new DiscardStmt();
         lowerStmtFields(loweredStmt, stmt);
         addStmt(loweredStmt);
     }
 
-    void visitEmptyStatementSyntaxNode(EmptyStatementSyntaxNode* stmt)
+    void visitEmptyStmt(EmptyStmt* stmt)
     {
-        RefPtr<EmptyStatementSyntaxNode> loweredStmt = new EmptyStatementSyntaxNode();
+        RefPtr<EmptyStmt> loweredStmt = new EmptyStmt();
         lowerStmtFields(loweredStmt, stmt);
         addStmt(loweredStmt);
     }
@@ -2189,7 +2189,7 @@ struct LoweringVisitor
 
         for (auto token : stmt->tokens)
         {
-            if (token.Type == TokenType::Identifier)
+            if (token.type == TokenType::Identifier)
                 doSampleRateInputCheck(token.Content);
         }
 
@@ -2208,9 +2208,9 @@ struct LoweringVisitor
         addStmt(loweredStmt);
     }
 
-    void visitIfStatementSyntaxNode(IfStatementSyntaxNode* stmt)
+    void visitIfStmt(IfStmt* stmt)
     {
-        RefPtr<IfStatementSyntaxNode> loweredStmt = new IfStatementSyntaxNode();
+        RefPtr<IfStmt> loweredStmt = new IfStmt();
         lowerStmtFields(loweredStmt, stmt);
 
         loweredStmt->Predicate = lowerExpr(stmt->Predicate);
@@ -2234,8 +2234,8 @@ struct LoweringVisitor
     }
 
     void lowerForStmtCommon(
-        RefPtr<ForStatementSyntaxNode>  loweredStmt,
-        ForStatementSyntaxNode*         stmt)
+        RefPtr<ForStmt>  loweredStmt,
+        ForStmt*         stmt)
     {
         lowerScopeStmtFields(loweredStmt, stmt);
 
@@ -2249,9 +2249,9 @@ struct LoweringVisitor
         addStmt(loweredStmt);
     }
 
-    void visitForStatementSyntaxNode(ForStatementSyntaxNode* stmt)
+    void visitForStmt(ForStmt* stmt)
     {
-        lowerForStmtCommon(new ForStatementSyntaxNode(), stmt);
+        lowerForStmtCommon(new ForStmt(), stmt);
     }
 
     void visitUnscopedForStmt(UnscopedForStmt* stmt)
@@ -2274,18 +2274,18 @@ struct LoweringVisitor
 
         auto varDecl = stmt->varDecl;
 
-        auto varType = lowerType(varDecl->Type);
+        auto varType = lowerType(varDecl->type);
 
         for (IntegerLiteralValue ii = rangeBeginVal; ii < rangeEndVal; ++ii)
         {
-            RefPtr<ConstantExpressionSyntaxNode> constExpr = new ConstantExpressionSyntaxNode();
-            constExpr->Type.type = varType.type;
-            constExpr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Int;
+            RefPtr<ConstantExpr> constExpr = new ConstantExpr();
+            constExpr->type.type = varType.type;
+            constExpr->ConstType = ConstantExpr::ConstantType::Int;
             constExpr->integerValue = ii;
 
             RefPtr<VaryingTupleVarDecl> loweredVarDecl = new VaryingTupleVarDecl();
             loweredVarDecl->Position = varDecl->Position;
-            loweredVarDecl->Type = varType;
+            loweredVarDecl->type = varType;
             loweredVarDecl->expr = LoweredExpr(constExpr);
 
             shared->loweredDecls[varDecl] = LoweredDecl(loweredVarDecl);
@@ -2294,9 +2294,9 @@ struct LoweringVisitor
         }
     }
 
-    void visitWhileStatementSyntaxNode(WhileStatementSyntaxNode* stmt)
+    void visitWhileStmt(WhileStmt* stmt)
     {
-        RefPtr<WhileStatementSyntaxNode> loweredStmt = new WhileStatementSyntaxNode();
+        RefPtr<WhileStmt> loweredStmt = new WhileStmt();
         lowerScopeStmtFields(loweredStmt, stmt);
 
         LoweringVisitor subVisitor = pushScope(loweredStmt, stmt);
@@ -2307,9 +2307,9 @@ struct LoweringVisitor
         addStmt(loweredStmt);
     }
 
-    void visitDoWhileStatementSyntaxNode(DoWhileStatementSyntaxNode* stmt)
+    void visitDoWhileStmt(DoWhileStmt* stmt)
     {
-        RefPtr<DoWhileStatementSyntaxNode> loweredStmt = new DoWhileStatementSyntaxNode();
+        RefPtr<DoWhileStmt> loweredStmt = new DoWhileStmt();
         lowerScopeStmtFields(loweredStmt, stmt);
 
         LoweringVisitor subVisitor = pushScope(loweredStmt, stmt);
@@ -2320,12 +2320,12 @@ struct LoweringVisitor
         addStmt(loweredStmt);
     }
 
-    RefPtr<StatementSyntaxNode> transformSyntaxField(StatementSyntaxNode* stmt)
+    RefPtr<Stmt> transformSyntaxField(Stmt* stmt)
     {
         return lowerStmt(stmt);
     }
 
-    void lowerStmtCommon(StatementSyntaxNode* loweredStmt, StatementSyntaxNode* stmt)
+    void lowerStmtCommon(Stmt* loweredStmt, Stmt* stmt)
     {
         loweredStmt->modifiers = stmt->modifiers;
     }
@@ -2349,13 +2349,13 @@ struct LoweringVisitor
         assign(expr, LoweredExpr(createVarRef(getPosition(expr), varDecl)));
     }
 
-    RefPtr<ExpressionSyntaxNode> createCastExpr(
-        RefPtr<ExpressionType>          type,
-        RefPtr<ExpressionSyntaxNode>    expr)
+    RefPtr<Expr> createCastExpr(
+        RefPtr<Type>          type,
+        RefPtr<Expr>    expr)
     {
         RefPtr<ExplicitCastExpr> castExpr = new ExplicitCastExpr();
         castExpr->Position = expr->Position;
-        castExpr->Type.type = type;
+        castExpr->type.type = type;
         castExpr->TargetType.type = type;
         castExpr->Expression = expr;
         return castExpr;
@@ -2381,9 +2381,9 @@ struct LoweringVisitor
         assignWithFixups(expr, LoweredExpr(createVarRef(getPosition(expr), varDecl)));
     }
 
-    void visitReturnStatementSyntaxNode(ReturnStatementSyntaxNode* stmt)
+    void visitReturnStmt(ReturnStmt* stmt)
     {
-        auto loweredStmt = new ReturnStatementSyntaxNode();
+        auto loweredStmt = new ReturnStmt();
         lowerStmtCommon(loweredStmt, stmt);
 
         if (stmt->Expression)
@@ -2409,7 +2409,7 @@ struct LoweringVisitor
 
     RefPtr<Val> translateVal(Val* val)
     {
-        if (auto type = dynamic_cast<ExpressionType*>(val))
+        if (auto type = dynamic_cast<Type*>(val))
             return lowerType(type);
 
         if (auto litVal = dynamic_cast<ConstantIntVal*>(val))
@@ -2520,7 +2520,7 @@ struct LoweringVisitor
 
         if (isBuildingStmt)
         {
-            RefPtr<VarDeclrStatementSyntaxNode> declStmt = new VarDeclrStatementSyntaxNode();
+            RefPtr<DeclStmt> declStmt = new DeclStmt();
             declStmt->Position = decl->Position;
             declStmt->decl = decl;
             addStmt(declStmt);
@@ -2659,7 +2659,7 @@ struct LoweringVisitor
         SLANG_UNEXPECTED("generics should be lowered to specialized decls");
     }
 
-    LoweredDecl visitProgramSyntaxNode(ProgramSyntaxNode*)
+    LoweredDecl visitModuleDecl(ModuleDecl*)
     {
         SLANG_UNEXPECTED("module decls should be lowered explicitly");
     }
@@ -2696,7 +2696,7 @@ struct LoweringVisitor
         RefPtr<TypeDefDecl> loweredDecl = new TypeDefDecl();
         lowerDeclCommon(loweredDecl, decl);
 
-        loweredDecl->Type = lowerType(decl->Type);
+        loweredDecl->type = lowerType(decl->type);
 
         addMember(shared->loweredProgram, loweredDecl);
         return LoweredDecl(loweredDecl);
@@ -2741,7 +2741,7 @@ struct LoweringVisitor
         return LoweredDecl(loweredDecl);
     }
 
-    TupleTypeModifier* isTupleType(ExpressionType* type)
+    TupleTypeModifier* isTupleType(Type* type)
     {
         if (auto declRefType = type->As<DeclRefType>())
         {
@@ -2754,7 +2754,7 @@ struct LoweringVisitor
         return nullptr;
     }
 
-    ExpressionType* unwrapArray(ExpressionType* inType)
+    Type* unwrapArray(Type* inType)
     {
         auto type = inType;
         while (auto arrayType = type->As<ArrayExpressionType>())
@@ -2764,12 +2764,12 @@ struct LoweringVisitor
         return type;
     }
 
-    TupleTypeModifier* isTupleTypeOrArrayOfTupleType(ExpressionType* type)
+    TupleTypeModifier* isTupleTypeOrArrayOfTupleType(Type* type)
     {
         return isTupleType(unwrapArray(type));
     }
 
-    bool isResourceType(ExpressionType* type)
+    bool isResourceType(Type* type)
     {
         while (auto arrayType = type->As<ArrayExpressionType>())
         {
@@ -2790,7 +2790,7 @@ struct LoweringVisitor
         return false;
     }
 
-    RefPtr<Decl> visitAggTypeDecl(AggTypeDecl* decl)
+    LoweredDecl visitAggTypeDecl(AggTypeDecl* decl)
     {
         // We want to lower any aggregate type declaration
         // to just a `struct` type that contains its fields.
@@ -2798,7 +2798,7 @@ struct LoweringVisitor
         // Any non-field members (e.g., methods) will be
         // lowered separately.
 
-        RefPtr<StructSyntaxNode> loweredDecl = new StructSyntaxNode();
+        RefPtr<StructDecl> loweredDecl = new StructDecl();
         lowerDeclCommon(loweredDecl, decl);
 
         // We need to be ready to turn this type into a "tuple" type,
@@ -2842,7 +2842,7 @@ struct LoweringVisitor
 
             // If the field is of a type that requires special handling,
             // we need to make a note of it.
-            auto loweredFieldType = loweredField->Type.type;
+            auto loweredFieldType = loweredField->type.type;
             bool isTupleField = false;
             bool fieldHasAnyNonTupleFields = false;
             bool fieldHasTupleType = false;
@@ -2911,7 +2911,7 @@ struct LoweringVisitor
         }
 
 
-        return loweredDecl;
+        return LoweredDecl(loweredDecl);
     }
 
     RefPtr<VarDeclBase> lowerSimpleVarDeclCommon(
@@ -2921,8 +2921,8 @@ struct LoweringVisitor
     {
         lowerDeclCommon(loweredDecl, decl);
 
-        loweredDecl->Type = loweredType;
-        loweredDecl->Expr = lowerExpr(decl->Expr);
+        loweredDecl->type = loweredType;
+        loweredDecl->initExpr = lowerExpr(decl->initExpr);
 
         return loweredDecl;
     }
@@ -2931,7 +2931,7 @@ struct LoweringVisitor
         RefPtr<VarDeclBase> loweredDecl,
         VarDeclBase*        decl)
     {
-        auto loweredType = lowerType(decl->Type);
+        auto loweredType = lowerType(decl->type);
         return lowerSimpleVarDeclCommon(loweredDecl, decl, loweredType);
     }
 
@@ -2953,13 +2953,13 @@ struct LoweringVisitor
         String                      name;
 
         // The parent tuple type (or array thereof) we are scalarizing
-        RefPtr<ExpressionType>  tupleType;
+        RefPtr<Type>  tupleType;
 
         // The actual declaration of the tuple type (which will give us the fields)
         DeclRef<AggTypeDecl>    tupleTypeDecl;
 
         // An initializer expression to use for the tuple members
-        RefPtr<ExpressionSyntaxNode>    initExpr;
+        RefPtr<Expr>    initExpr;
 
         // The original layout given to the top-level variable
         RefPtr<VarLayout>               primaryVarLayout;
@@ -2999,7 +2999,7 @@ struct LoweringVisitor
 
             // TODO: need to extract the initializer for this field
             SLANG_RELEASE_ASSERT(!info.initExpr);
-            RefPtr<ExpressionSyntaxNode> fieldInitExpr;
+            RefPtr<Expr> fieldInitExpr;
 
             String fieldName = info.name + "_" + dd.GetName();
 
@@ -3092,7 +3092,7 @@ struct LoweringVisitor
             {
                 // Otherwise the field has a simple type, and we just need to declare the variable here
 
-                RefPtr<ExpressionType> fieldVarType = fieldType;
+                RefPtr<Type> fieldVarType = fieldType;
                 for (auto aa = info.arraySpecs; aa; aa = aa->next)
                 {
                     RefPtr<ArrayExpressionType> arrayType = Slang::getArrayType(
@@ -3104,7 +3104,7 @@ struct LoweringVisitor
 
                 RefPtr<VarDeclBase> fieldVarDecl = info.varDeclClass.createInstance();
                 fieldVarDecl->Name.Content = fieldName;
-                fieldVarDecl->Type.type = fieldVarType;
+                fieldVarDecl->type.type = fieldVarType;
 
                 addDecl(fieldVarDecl);
 
@@ -3133,10 +3133,10 @@ struct LoweringVisitor
         SyntaxClass<VarDeclBase>        varDeclClass,
         RefPtr<VarDeclBase>             originalVarDecl,
         String const&                   name,
-        RefPtr<ExpressionType>          tupleType,
+        RefPtr<Type>          tupleType,
         DeclRef<AggTypeDecl>            tupleTypeDecl,
         TupleTypeModifier*              tupleTypeMod,
-        RefPtr<ExpressionSyntaxNode>    initExpr,
+        RefPtr<Expr>    initExpr,
         RefPtr<VarLayout>               primaryVarLayout,
         RefPtr<StructTypeLayout>        tupleTypeLayout)
     {
@@ -3153,7 +3153,7 @@ struct LoweringVisitor
         {
             RefPtr<VarDeclBase> primaryVarDecl = varDeclClass.createInstance();
             primaryVarDecl->Name.Content = name;
-            primaryVarDecl->Type.type = tupleType;
+            primaryVarDecl->type.type = tupleType;
 
             primaryVarDecl->modifiers = originalVarDecl->modifiers;
 
@@ -3211,9 +3211,9 @@ struct LoweringVisitor
         SyntaxClass<VarDeclBase>        varDeclClass,
         RefPtr<VarDeclBase>             originalVarDecl,
         String const&                   name,
-        RefPtr<ExpressionType>          tupleType,
+        RefPtr<Type>          tupleType,
         TupleTypeModifier*              tupleTypeMod,
-        RefPtr<ExpressionSyntaxNode>    initExpr,
+        RefPtr<Expr>    initExpr,
         RefPtr<VarLayout>               primaryVarLayout)
     {
         RefPtr<StructTypeLayout> tupleTypeLayout;
@@ -3239,7 +3239,7 @@ struct LoweringVisitor
         VarDeclBase*                decl,
         SyntaxClass<VarDeclBase>    loweredDeclClass)
     {
-        auto loweredType = lowerType(decl->Type);
+        auto loweredType = lowerType(decl->type);
 
         if (auto tupleTypeMod = isTupleTypeOrArrayOfTupleType(loweredType))
         {
@@ -3251,7 +3251,7 @@ struct LoweringVisitor
 
             // If the variable had an initializer, we expect it
             // to resolve to a tuple *value*
-            auto loweredInit = lowerExpr(decl->Expr);
+            auto loweredInit = lowerExpr(decl->initExpr);
 
             // TODO: need to extract layout here and propagate it down!
 
@@ -3311,7 +3311,7 @@ struct LoweringVisitor
         // If this is a global variable (program scope), then add it
         // to the global scope.
         RefPtr<ContainerDecl> pp = decl->ParentDecl;
-        if (auto parentModuleDecl = pp.As<ProgramSyntaxNode>())
+        if (auto parentModuleDecl = pp.As<ModuleDecl>())
         {
             LoweringVisitor subVisitor = *this;
             subVisitor.parentDecl = translateDeclRef(parentModuleDecl);
@@ -3328,7 +3328,7 @@ struct LoweringVisitor
         }
     }
 
-    SourceLanguage getSourceLanguage(ProgramSyntaxNode* moduleDecl)
+    SourceLanguage getSourceLanguage(ModuleDecl* moduleDecl)
     {
         for (auto translationUnit : shared->compileRequest->translationUnits)
         {
@@ -3366,7 +3366,7 @@ struct LoweringVisitor
         }
     }
 
-    AggTypeDecl* isStructType(RefPtr<ExpressionType> type)
+    AggTypeDecl* isStructType(RefPtr<Type> type)
     {
         if (type->As<BasicExpressionType>()) return nullptr;
         else if (type->As<VectorExpressionType>()) return nullptr;
@@ -3384,7 +3384,7 @@ struct LoweringVisitor
         return nullptr;
     }
 
-    bool isImportedStructType(RefPtr<ExpressionType> type)
+    bool isImportedStructType(RefPtr<Type> type)
     {
         // TODO: make this use `isStructType` above
 
@@ -3416,7 +3416,7 @@ struct LoweringVisitor
         Variable* decl)
     {
         // Global variable? Check if it is a sample-rate input.
-        if (dynamic_cast<ProgramSyntaxNode*>(decl->ParentDecl))
+        if (dynamic_cast<ModuleDecl*>(decl->ParentDecl))
         {
             if (decl->HasModifier<InModifier>())
             {
@@ -3429,7 +3429,7 @@ struct LoweringVisitor
                 auto inRes = varLayout->FindResourceInfo(LayoutResourceKind::VertexInput);
                 auto outRes = varLayout->FindResourceInfo(LayoutResourceKind::FragmentOutput);
 
-                if( (inRes || outRes) && isImportedStructType(decl->Type.type))
+                if( (inRes || outRes) && isImportedStructType(decl->type.type))
                 {
                     // We are seemingly looking at a GLSL global-scope varying
                     // of an aggregate type which was imported from library
@@ -3480,10 +3480,10 @@ struct LoweringVisitor
         return LoweredDecl(lowerSimpleVarDeclCommon(new StructField(), decl));
     }
 
-    LoweredDecl visitParameterSyntaxNode(
-        ParameterSyntaxNode* decl)
+    LoweredDecl visitParamDecl(
+        ParamDecl* decl)
     {
-        auto loweredDecl = lowerVarDeclCommon(decl, getClass<ParameterSyntaxNode>());
+        auto loweredDecl = lowerVarDeclCommon(decl, getClass<ParamDecl>());
         return loweredDecl;
     }
 
@@ -3508,7 +3508,7 @@ struct LoweringVisitor
     {
         // TODO: need to generate a name
 
-        RefPtr<FunctionSyntaxNode> loweredDecl = new FunctionSyntaxNode();
+        RefPtr<FuncDecl> loweredDecl = new FuncDecl();
         lowerDeclCommon(loweredDecl, decl);
 
         // TODO: push scope for parent decl here...
@@ -3612,18 +3612,18 @@ struct LoweringVisitor
         VaryingParameterVarChain*   varChain = nullptr;
     };
 
-    RefPtr<ExpressionSyntaxNode> createGLSLBuiltinRef(
+    RefPtr<Expr> createGLSLBuiltinRef(
         char const*             name,
-        RefPtr<ExpressionType>  type)
+        RefPtr<Type>  type)
     {
-        RefPtr<VarExpressionSyntaxNode> globalVarRef = new VarExpressionSyntaxNode();
+        RefPtr<VarExpr> globalVarRef = new VarExpr();
         globalVarRef->name = name;
-        globalVarRef->Type.type = type;
+        globalVarRef->type.type = type;
         return globalVarRef;
     }
 
     bool isIntegralType(
-        ExpressionType* type)
+        Type* type)
     {
         if (auto baseType = type->As<BasicExpressionType>())
         {
@@ -3659,28 +3659,28 @@ struct LoweringVisitor
         Slang::requireGLSLVersion(entryPoint, version);
     }
 
-    RefPtr<ExpressionType> getFloatType()
+    RefPtr<Type> getFloatType()
     {
         return getSession()->getFloatType();
     }
 
-    RefPtr<ExpressionType> getIntType()
+    RefPtr<Type> getIntType()
     {
         return getSession()->getIntType();
     }
 
-    RefPtr<ExpressionType> getUIntType()
+    RefPtr<Type> getUIntType()
     {
         return getSession()->getUIntType();
     }
 
-    RefPtr<ExpressionType> getBoolType()
+    RefPtr<Type> getBoolType()
     {
         return getSession()->getBoolType();
     }
 
     RefPtr<VectorExpressionType> getVectorType(
-        RefPtr<ExpressionType>  elementType,
+        RefPtr<Type>  elementType,
         RefPtr<IntVal>          elementCount)
     {
         auto session = getSession();
@@ -3709,21 +3709,21 @@ struct LoweringVisitor
     }
 
     RefPtr<VectorExpressionType> getVectorType(
-        RefPtr<ExpressionType>  elementType,
+        RefPtr<Type>  elementType,
         int                     elementCount)
     {
         return getVectorType(elementType, getConstantIntVal(elementCount));
     }
 
     RefPtr<ArrayExpressionType> getUnsizedArrayType(
-        RefPtr<ExpressionType>  elementType)
+        RefPtr<Type>  elementType)
     {
         RefPtr<ArrayExpressionType> arrayType = Slang::getArrayType(elementType);
         return arrayType;
     }
 
     RefPtr<ArrayExpressionType> getArrayType(
-        RefPtr<ExpressionType>  elementType,
+        RefPtr<Type>  elementType,
         IntegerLiteralValue     elementCount)
     {
         return Slang::getArrayType(elementType, getConstantIntVal(elementCount));
@@ -3731,10 +3731,10 @@ struct LoweringVisitor
 
     LoweredExpr lowerSimpleShaderParameterToGLSLGlobal(
         VaryingParameterInfo const&     info,
-        RefPtr<ExpressionType>          varType,
+        RefPtr<Type>          varType,
         RefPtr<VarLayout>               varLayout)
     {
-        RefPtr<ExpressionType> type = varType;
+        RefPtr<Type> type = varType;
 
         for (auto aa = info.arraySpecs; aa; aa = aa->next)
         {
@@ -3750,7 +3750,7 @@ struct LoweringVisitor
         // We need to create a reference to the global-scope declaration
         // of the proper GLSL input/output variable. This might
         // be a user-defined input/output, or a system-defined `gl_` one.
-        RefPtr<ExpressionSyntaxNode> globalVarExpr;
+        RefPtr<Expr> globalVarExpr;
 
         // Handle system-value inputs/outputs
         SLANG_RELEASE_ASSERT(varLayout);
@@ -3941,7 +3941,7 @@ struct LoweringVisitor
         {
             RefPtr<Variable> globalVarDecl = new Variable();
             globalVarDecl->Name.Content = info.name;
-            globalVarDecl->Type.type = type;
+            globalVarDecl->type.type = type;
 
             ensureDeclHasAValidName(globalVarDecl);
 
@@ -3998,9 +3998,9 @@ struct LoweringVisitor
             }
 
 
-            RefPtr<VarExpressionSyntaxNode> globalVarRef = new VarExpressionSyntaxNode();
+            RefPtr<VarExpr> globalVarRef = new VarExpr();
             globalVarRef->Position = globalVarDecl->Position;
-            globalVarRef->Type.type = globalVarDecl->Type.type;
+            globalVarRef->type.type = globalVarDecl->type.type;
             globalVarRef->declRef = makeDeclRef(globalVarDecl.Ptr());
             globalVarRef->name = globalVarDecl->getName();
 
@@ -4012,7 +4012,7 @@ struct LoweringVisitor
 
     LoweredExpr lowerShaderParameterToGLSLGLobalsRec(
         VaryingParameterInfo const&     info,
-        RefPtr<ExpressionType>          varType,
+        RefPtr<Type>          varType,
         RefPtr<VarLayout>               varLayout)
     {
         SLANG_RELEASE_ASSERT(varLayout);
@@ -4063,9 +4063,9 @@ struct LoweringVisitor
                 // to destructure it into its constituent fields
 
                 RefPtr<VaryingTupleExpr> tupleExpr = new VaryingTupleExpr();
-                tupleExpr->Type.type = varType;
+                tupleExpr->type.type = varType;
 
-                SLANG_RELEASE_ASSERT(tupleExpr->Type.type);
+                SLANG_RELEASE_ASSERT(tupleExpr->type.type);
 
                 for (auto fieldDeclRef : getMembersOfType<VarDeclBase>(aggTypeDeclRef))
                 {
@@ -4143,7 +4143,7 @@ struct LoweringVisitor
             break;
         }
 
-        auto loweredType = lowerType(originalVarDecl->Type);
+        auto loweredType = lowerType(originalVarDecl->type);
 
         auto loweredExpr = lowerShaderParameterToGLSLGLobalsRec(
             info,
@@ -4170,7 +4170,7 @@ struct LoweringVisitor
     {
         RefPtr<VaryingTupleVarDecl> loweredDecl = new VaryingTupleVarDecl();
         loweredDecl->Name = originalVarDecl->Name;
-        loweredDecl->Type = loweredType;
+        loweredDecl->type = loweredType;
         loweredDecl->expr = loweredExpr;
 
         return loweredDecl;
@@ -4180,26 +4180,26 @@ struct LoweringVisitor
         RefPtr<VarDeclBase>     originalVarDecl,
         LoweredExpr             loweredExpr)
     {
-        auto loweredType = lowerType(originalVarDecl->Type);
+        auto loweredType = lowerType(originalVarDecl->type);
         return createVaryingTupleVarDecl(originalVarDecl, loweredType, loweredExpr);
     }
 
     struct EntryPointParamPair
     {
-        RefPtr<ParameterSyntaxNode> original;
+        RefPtr<ParamDecl> original;
         RefPtr<VarLayout>           layout;
         RefPtr<Variable>            lowered;
     };
 
-    RefPtr<FunctionSyntaxNode> lowerEntryPointToGLSL(
-        FunctionSyntaxNode*         entryPointDecl,
+    RefPtr<FuncDecl> lowerEntryPointToGLSL(
+        FuncDecl*         entryPointDecl,
         RefPtr<EntryPointLayout>    entryPointLayout)
     {
         // First, loer the entry-point function as an ordinary function:
         auto loweredEntryPointFunc = visitFunctionDeclBase(entryPointDecl).getDecl()->As<FunctionDeclBase>();
 
         // Now we will generate a `void main() { ... }` function to call the lowered code.
-        RefPtr<FunctionSyntaxNode> mainDecl = new FunctionSyntaxNode();
+        RefPtr<FuncDecl> mainDecl = new FuncDecl();
         mainDecl->ReturnType.type = getSession()->getVoidType();
         mainDecl->Name.Content = "main";
 
@@ -4232,7 +4232,7 @@ struct LoweringVisitor
             RefPtr<Variable> localVarDecl = new Variable();
             localVarDecl->Position = paramDecl->Position;
             localVarDecl->Name.Content = paramDecl->getName();
-            localVarDecl->Type = lowerType(paramDecl->Type);
+            localVarDecl->type = lowerType(paramDecl->type);
 
             ensureDeclHasAValidName(localVarDecl);
 
@@ -4270,7 +4270,7 @@ struct LoweringVisitor
             resultVarDecl = new Variable();
             resultVarDecl->Position = loweredEntryPointFunc->Position;
             resultVarDecl->Name.Content = "main_result";
-            resultVarDecl->Type = TypeExp(loweredEntryPointFunc->ReturnType);
+            resultVarDecl->type = TypeExp(loweredEntryPointFunc->ReturnType);
 
             ensureDeclHasAValidName(resultVarDecl);
 
@@ -4284,24 +4284,24 @@ struct LoweringVisitor
             getSession(),
             entryPointDeclRef);
 
-        RefPtr<VarExpressionSyntaxNode> entryPointRef = new VarExpressionSyntaxNode();
+        RefPtr<VarExpr> entryPointRef = new VarExpr();
         entryPointRef->name = loweredEntryPointFunc->getName();
         entryPointRef->declRef = entryPointDeclRef;
-        entryPointRef->Type = QualType(entryPointType);
+        entryPointRef->type = QualType(entryPointType);
 
-        RefPtr<InvokeExpressionSyntaxNode> callExpr = new InvokeExpressionSyntaxNode();
+        RefPtr<InvokeExpr> callExpr = new InvokeExpr();
         callExpr->FunctionExpr = entryPointRef;
-        callExpr->Type = QualType(loweredEntryPointFunc->ReturnType);
+        callExpr->type = QualType(loweredEntryPointFunc->ReturnType);
 
         //
         for (auto paramPair : params)
         {
             auto localVarDecl = paramPair.lowered;
 
-            RefPtr<VarExpressionSyntaxNode> varRef = new VarExpressionSyntaxNode();
+            RefPtr<VarExpr> varRef = new VarExpr();
             varRef->name = localVarDecl->getName();
             varRef->declRef = makeDeclRef(localVarDecl.Ptr());
-            varRef->Type = QualType(localVarDecl->getType());
+            varRef->type = QualType(localVarDecl->getType());
 
             callExpr->Arguments.Add(varRef);
         }
@@ -4342,7 +4342,7 @@ struct LoweringVisitor
 
             auto loweredExpr = lowerShaderParameterToGLSLGLobalsRec(
                 info,
-                resultVarDecl->Type.type,
+                resultVarDecl->type.type,
                 entryPointLayout->resultLayout);
 
             subVisitor.assignWithFixups(loweredExpr, resultVarDecl);
@@ -4364,7 +4364,7 @@ struct LoweringVisitor
         return mainDecl;
 
 #if 0
-        RefPtr<FunctionSyntaxNode> loweredDecl = new FunctionSyntaxNode();
+        RefPtr<FuncDecl> loweredDecl = new FuncDecl();
         lowerDeclCommon(loweredDecl, entryPointDecl);
 
         // We create a sub-context appropriate for lowering the function body
@@ -4389,7 +4389,7 @@ struct LoweringVisitor
             resultGlobal = new Variable();
             // TODO: need a scheme for generating unique names
             resultGlobal->Name.Content = "_main_result";
-            resultGlobal->Type = loweredReturnType;
+            resultGlobal->type = loweredReturnType;
 
             addMember(shared->loweredProgram, resultGlobal);
         }
@@ -4414,15 +4414,15 @@ struct LoweringVisitor
 #endif
     }
 
-    RefPtr<FunctionSyntaxNode> lowerEntryPoint(
-        FunctionSyntaxNode*         entryPointDecl,
+    RefPtr<FuncDecl> lowerEntryPoint(
+        FuncDecl*         entryPointDecl,
         RefPtr<EntryPointLayout>    entryPointLayout)
     {
         switch( getTarget() )
         {
         // Default case: lower an entry point just like any other function
         default:
-            return visitFunctionDeclBase(entryPointDecl).getDecl()->As<FunctionSyntaxNode>();
+            return visitFunctionDeclBase(entryPointDecl).getDecl()->As<FuncDecl>();
 
         // For Slang->GLSL translation, we need to lower things from HLSL-style
         // declarations over to GLSL conventions
@@ -4431,7 +4431,7 @@ struct LoweringVisitor
         }
     }
 
-    RefPtr<FunctionSyntaxNode> lowerEntryPoint(
+    RefPtr<FuncDecl> lowerEntryPoint(
         EntryPointRequest*  entryPointRequest)
     {
         auto entryPointLayout = findEntryPointLayout(entryPointRequest);
@@ -4533,7 +4533,7 @@ LoweredEntryPoint lowerEntryPoint(
     // Create a single module/program to hold all the lowered code
     // (with the exception of instrinsic/stdlib declarations, which
     // will be remain where they are)
-    RefPtr<ProgramSyntaxNode> loweredProgram = new ProgramSyntaxNode();
+    RefPtr<ModuleDecl> loweredProgram = new ModuleDecl();
     sharedContext.loweredProgram = loweredProgram;
 
     LoweringVisitor visitor;

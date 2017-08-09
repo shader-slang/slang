@@ -624,7 +624,7 @@ bool IsResourceKind(LayoutResourceKind kind)
 
 SimpleLayoutInfo GetSimpleLayoutImpl(
     SimpleLayoutInfo        info,
-    RefPtr<ExpressionType>  type,
+    RefPtr<Type>  type,
     LayoutRulesImpl*        rules,
     RefPtr<TypeLayout>*     outTypeLayout)
 {
@@ -740,7 +740,7 @@ RefPtr<ParameterBlockTypeLayout>
 createParameterBlockTypeLayout(
     RefPtr<ParameterBlockType>  parameterBlockType,
     LayoutRulesImpl*            parameterBlockRules,
-    RefPtr<ExpressionType>      elementType,
+    RefPtr<Type>      elementType,
     LayoutRulesImpl*            elementTypeRules)
 {
     // First compute resource usage of the block itself.
@@ -832,7 +832,7 @@ createParameterBlockTypeLayout(
 RefPtr<StructuredBufferTypeLayout>
 createStructuredBufferTypeLayout(
     ShaderParameterKind     kind,
-    RefPtr<ExpressionType>  structuredBufferType,
+    RefPtr<Type>  structuredBufferType,
     RefPtr<TypeLayout>      elementTypeLayout,
     LayoutRulesImpl*        rules)
 {
@@ -865,8 +865,8 @@ createStructuredBufferTypeLayout(
 RefPtr<StructuredBufferTypeLayout>
 createStructuredBufferTypeLayout(
     ShaderParameterKind     kind,
-    RefPtr<ExpressionType>  structuredBufferType,
-    RefPtr<ExpressionType>  elementType,
+    RefPtr<Type>  structuredBufferType,
+    RefPtr<Type>  elementType,
     LayoutRulesImpl*        rules)
 {
     // TODO(tfoley): need to compute the layout for the constant
@@ -888,13 +888,13 @@ createStructuredBufferTypeLayout(
 }
 
 SimpleLayoutInfo GetLayoutImpl(
-    ExpressionType*     type,
+    Type*     type,
     LayoutRulesImpl*    rules,
     RefPtr<TypeLayout>* outTypeLayout,
     SimpleLayoutInfo    offset);
 
 SimpleLayoutInfo GetLayoutImpl(
-    ExpressionType*     type,
+    Type*     type,
     LayoutRulesImpl*    rules,
     RefPtr<TypeLayout>* outTypeLayout)
 {
@@ -902,7 +902,7 @@ SimpleLayoutInfo GetLayoutImpl(
 }
 
 SimpleLayoutInfo GetLayoutImpl(
-    ExpressionType*     type,
+    Type*     type,
     LayoutRulesImpl*    rules,
     RefPtr<TypeLayout>* outTypeLayout,
     SimpleLayoutInfo    offset)
@@ -1154,7 +1154,7 @@ SimpleLayoutInfo GetLayoutImpl(
     {
         auto declRef = declRefType->declRef;
 
-        if (auto structDeclRef = declRef.As<StructSyntaxNode>())
+        if (auto structDeclRef = declRef.As<StructDecl>())
         {
             RefPtr<StructTypeLayout> typeLayout;
             if (outTypeLayout)
@@ -1270,24 +1270,24 @@ SimpleLayoutInfo GetLayoutImpl(
         outTypeLayout);
 }
 
-SimpleLayoutInfo GetLayout(ExpressionType* inType, LayoutRulesImpl* rules)
+SimpleLayoutInfo GetLayout(Type* inType, LayoutRulesImpl* rules)
 {
     return GetLayoutImpl(inType, rules, nullptr);
 }
 
-RefPtr<TypeLayout> CreateTypeLayout(ExpressionType* type, LayoutRulesImpl* rules, SimpleLayoutInfo offset)
+RefPtr<TypeLayout> CreateTypeLayout(Type* type, LayoutRulesImpl* rules, SimpleLayoutInfo offset)
 {
     RefPtr<TypeLayout> typeLayout;
     GetLayoutImpl(type, rules, &typeLayout, offset);
     return typeLayout;
 }
 
-RefPtr<TypeLayout> CreateTypeLayout(ExpressionType* type, LayoutRulesImpl* rules)
+RefPtr<TypeLayout> CreateTypeLayout(Type* type, LayoutRulesImpl* rules)
 {
     return CreateTypeLayout(type, rules, SimpleLayoutInfo());
 }
 
-SimpleLayoutInfo GetLayout(ExpressionType* type, LayoutRule rule)
+SimpleLayoutInfo GetLayout(Type* type, LayoutRule rule)
 {
     LayoutRulesImpl* rulesImpl = GetLayoutRulesImpl(rule);
     return GetLayout(type, rulesImpl);

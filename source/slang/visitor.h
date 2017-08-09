@@ -10,7 +10,7 @@
 namespace Slang {
 
 //
-// Type Visitors
+// type Visitors
 //
 
 struct ITypeVisitor
@@ -27,7 +27,7 @@ struct ITypeVisitor
 template<typename Derived, typename Result = void, typename Base = ITypeVisitor>
 struct TypeVisitor : Base
 {
-    Result dispatch(ExpressionType* type)
+    Result dispatch(Type* type)
     {
         Result result;
         type->accept(this, &result);
@@ -56,7 +56,7 @@ struct TypeVisitor : Base
 template<typename Derived, typename Base>
 struct TypeVisitor<Derived,void,Base> : Base
 {
-    void dispatch(ExpressionType* type)
+    void dispatch(Type* type)
     {
         type->accept(this, 0);
     }
@@ -83,7 +83,7 @@ struct TypeVisitor<Derived,void,Base> : Base
 template<typename Derived, typename Arg, typename Base = ITypeVisitor>
 struct TypeVisitorWithArg : Base
 {
-    void dispatch(ExpressionType* type, Arg const& arg)
+    void dispatch(Type* type, Arg const& arg)
     {
         type->accept(this, (void*)&arg);
     }
@@ -125,7 +125,7 @@ struct IExprVisitor
 template<typename Derived, typename Result = void>
 struct ExprVisitor : IExprVisitor
 {
-    Result dispatch(ExpressionSyntaxNode* expr)
+    Result dispatch(Expr* expr)
     {
         Result result;
         expr->accept(this, &result);
@@ -154,7 +154,7 @@ struct ExprVisitor : IExprVisitor
 template<typename Derived>
 struct ExprVisitor<Derived,void> : IExprVisitor
 {
-    void dispatch(ExpressionSyntaxNode* expr)
+    void dispatch(Expr* expr)
     {
         expr->accept(this, 0);
     }
@@ -181,7 +181,7 @@ struct ExprVisitor<Derived,void> : IExprVisitor
 template<typename Derived, typename Arg>
 struct ExprVisitorWithArg : IExprVisitor
 {
-    void dispatch(ExpressionSyntaxNode* obj, Arg const& arg)
+    void dispatch(Expr* obj, Arg const& arg)
     {
         obj->accept(this, (void*)&arg);
     }
@@ -223,7 +223,7 @@ struct IStmtVisitor
 template<typename Derived, typename Result = void>
 struct StmtVisitor : IStmtVisitor
 {
-    Result dispatch(StatementSyntaxNode* stmt)
+    Result dispatch(Stmt* stmt)
     {
         Result result;
         stmt->accept(this, &result);
@@ -252,7 +252,7 @@ struct StmtVisitor : IStmtVisitor
 template<typename Derived>
 struct StmtVisitor<Derived,void> : IStmtVisitor
 {
-    void dispatch(StatementSyntaxNode* stmt)
+    void dispatch(Stmt* stmt)
     {
         stmt->accept(this, 0);
     }

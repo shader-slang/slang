@@ -265,7 +265,7 @@ SIMPLE_SYNTAX_CLASS(HLSLVolatileModifier, Modifier)
 // An HLSL `[name(arg0, ...)]` style attribute.
 SYNTAX_CLASS(HLSLAttribute, Modifier)
     FIELD(Token, nameToken)
-    SYNTAX_FIELD(List<RefPtr<ExpressionSyntaxNode>>, args)
+    SYNTAX_FIELD(List<RefPtr<Expr>>, args)
 END_SYNTAX_CLASS()
 
 // An HLSL `[name(...)]` attribute that hasn't undergone

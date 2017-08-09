@@ -175,7 +175,7 @@ struct Preprocessor
         return translationUnit;
     }
 
-    ProgramSyntaxNode* getSyntax()
+    ModuleDecl* getSyntax()
     {
         return getTranslationUnit()->SyntaxNode.Ptr();
     }
@@ -411,7 +411,7 @@ static CodePosition PeekLoc(Preprocessor* preprocessor)
 // Get the `TokenType` of the current (raw) token
 static TokenType PeekRawTokenType(Preprocessor* preprocessor)
 {
-    return PeekRawToken(preprocessor).Type;
+    return PeekRawToken(preprocessor).type;
 }
 
 //
@@ -546,7 +546,7 @@ static void AddEndOfStreamToken(
     PreprocessorMacro*  macro)
 {
     Token token = PeekRawToken(preprocessor);
-    token.Type = TokenType::EndOfFile;
+    token.type = TokenType::EndOfFile;
     macro->tokens.mTokens.Add(token);
 }
 
@@ -564,7 +564,7 @@ static void MaybeBeginMacroExpansion(
         Token const& token = PeekRawToken(preprocessor);
 
         // Not an identifier? Can't be a macro.
-        if (token.Type != TokenType::Identifier)
+        if (token.type != TokenType::Identifier)
             return;
 
         // Look for a macro with the given name.
@@ -795,7 +795,7 @@ static Token PeekToken(Preprocessor* preprocessor)
 // Peek the type of the next token, including macro expansion.
 static TokenType PeekTokenType(Preprocessor* preprocessor)
 {
-    return PeekToken(preprocessor).Type;
+    return PeekToken(preprocessor).type;
 }
 
 //
@@ -865,7 +865,7 @@ static PreprocessorMacro* LookupMacro(PreprocessorDirectiveContext* context, Str
 // Determine if we have read everthing on the directive's line.
 static bool IsEndOfLine(PreprocessorDirectiveContext* context)
 {
-    return PeekRawToken(context->preprocessor).Type == TokenType::EndOfDirective;
+    return PeekRawToken(context->preprocessor).type == TokenType::EndOfDirective;
 }
 
 // Peek one raw token in a directive, without going past the end of the line.
@@ -1108,7 +1108,7 @@ static PreprocessorExpressionValue ParseAndEvaluateUnaryExpression(PreprocessorD
                 String name = nameToken.Content;
 
                 // If we saw an opening `(`, then expect one to close
-                if (leftParen.Type != TokenType::Unknown)
+                if (leftParen.type != TokenType::Unknown)
                 {
                     if(!ExpectRaw(context, TokenType::RParent, Diagnostics::expectedTokenInDefinedExpression))
                     {
@@ -1143,7 +1143,7 @@ static int GetInfixOpPrecedence(Token const& opToken)
 
     // otherwise we look at the token type to figure
     // out what precednece it should be parse with
-    switch (opToken.Type)
+    switch (opToken.type)
     {
     default:
         // tokens that aren't infix operators should
@@ -1184,7 +1184,7 @@ static PreprocessorExpressionValue EvaluateInfixOp(
     PreprocessorExpressionValue     left,
     PreprocessorExpressionValue     right)
 {
-    switch (opToken.Type)
+    switch (opToken.type)
     {
     default:
 //        SLANG_INTERNAL_ERROR(getSink(preprocessor), opToken);
@@ -1356,7 +1356,7 @@ static void HandleElseDirective(PreprocessorDirectiveContext* context)
     }
 
     // if we've already seen a `#else`, then it is an error
-    if (conditional->elseToken.Type != TokenType::Unknown)
+    if (conditional->elseToken.type != TokenType::Unknown)
     {
         GetSink(context)->diagnose(GetDirectiveLoc(context), Diagnostics::directiveAfterElse, GetDirectiveName(context));
         GetSink(context)->diagnose(conditional->elseToken.Position, Diagnostics::seeDirective);
@@ -1410,7 +1410,7 @@ static void HandleElifDirective(PreprocessorDirectiveContext* context)
     }
 
     // if we've already seen a `#else`, then it is an error
-    if (conditional->elseToken.Type != TokenType::Unknown)
+    if (conditional->elseToken.type != TokenType::Unknown)
     {
         GetSink(context)->diagnose(GetDirectiveLoc(context), Diagnostics::directiveAfterElse, GetDirectiveName(context));
         GetSink(context)->diagnose(conditional->elseToken.Position, Diagnostics::seeDirective);
@@ -1597,11 +1597,11 @@ static void HandleDefineDirective(PreprocessorDirectiveContext* context)
     for(;;)
     {
         Token token = AdvanceRawToken(context);
-        if( token.Type == TokenType::EndOfDirective )
+        if( token.type == TokenType::EndOfDirective )
         {
             // Last token on line will be turned into a conceptual end-of-file
             // token for the sub-stream that the macro expands into.
-            token.Type = TokenType::EndOfFile;
+            token.type = TokenType::EndOfFile;
             macro->tokens.mTokens.Add(token);
             break;
         }
@@ -1876,7 +1876,7 @@ static void HandleDirective(PreprocessorDirectiveContext* context)
     // Try to read the directive name.
     context->directiveToken = PeekRawToken(context);
 
-    TokenType directiveTokenType = GetDirective(context).Type;
+    TokenType directiveTokenType = GetDirective(context).type;
 
     // An empty directive is allowed, and ignored.
     if (directiveTokenType == TokenType::EndOfDirective)
@@ -1920,12 +1920,12 @@ static Token ReadToken(Preprocessor* preprocessor)
     {
         // Look at the next raw token in the input.
         Token const& token = PeekRawToken(preprocessor);
-        if (token.Type == TokenType::EndOfFile)
+        if (token.type == TokenType::EndOfFile)
             return token;
 
 
         // If we have a directive (`#` at start of line) then handle it
-        if ((token.Type == TokenType::Pound) && (token.flags & TokenFlag::AtStartOfLine))
+        if ((token.type == TokenType::Pound) && (token.flags & TokenFlag::AtStartOfLine))
         {
             // Skip the `#`
             AdvanceRawToken(preprocessor);
@@ -1960,7 +1960,7 @@ static void InitializePreprocessor(
 {
     preprocessor->sink = sink;
     preprocessor->includeHandler = NULL;
-    preprocessor->endOfFileToken.Type = TokenType::EndOfFile;
+    preprocessor->endOfFileToken.type = TokenType::EndOfFile;
     preprocessor->endOfFileToken.flags = TokenFlag::AtStartOfLine;
 }
 
@@ -2032,7 +2032,7 @@ static TokenList ReadAllTokens(
 
         // Note: we include the EOF token in the list,
         // since that is expected by the `TokenList` type.
-        if (token.Type == TokenType::EndOfFile)
+        if (token.type == TokenType::EndOfFile)
             break;
     }
     return tokens;
@@ -2183,14 +2183,14 @@ static void HandleImportDirective(PreprocessorDirectiveContext* context)
     SourceTextInputStream* inputStream = new SourceTextInputStream();
  
     Token token;
-    token.Type = TokenType::PoundImport;
+    token.type = TokenType::PoundImport;
     token.Position = GetDirectiveLoc(context);
     token.flags = 0;
     token.Content = foundPath;
  
     inputStream->lexedTokens.mTokens.Add(token);
  
-    token.Type = TokenType::EndOfFile;
+    token.type = TokenType::EndOfFile;
     token.flags = TokenFlag::AfterWhitespace | TokenFlag::AtStartOfLine;
     inputStream->lexedTokens.mTokens.Add(token);
  

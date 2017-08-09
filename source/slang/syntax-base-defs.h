@@ -2,7 +2,7 @@
 
 // This file defines the primary base classes for the hierarchy of
 // AST nodes and related objects. For example, this is where the
-// basic `Decl`, `Stmt`, `Expr`, `Type`, etc. definitions come from.
+// basic `Decl`, `Stmt`, `Expr`, `type`, etc. definitions come from.
 
 // Base class for all nodes representing actual syntax
 // (thus having a location in the source code)
@@ -64,7 +64,7 @@ END_SYNTAX_CLASS()
 // "canonical" type. The reprsentation caches a pointer to
 // a canonical type on every type, so we can easily
 // operate on the raw representation when needed.
-ABSTRACT_SYNTAX_CLASS(ExpressionType, Val)
+ABSTRACT_SYNTAX_CLASS(Type, Val)
     RAW(typedef ITypeVisitor Visitor;)
 
     RAW(virtual void accept(IValVisitor* visitor, void* extra) override;)
@@ -77,8 +77,8 @@ public:
 
     virtual String ToString() = 0;
 
-    bool Equals(ExpressionType * type);
-    bool Equals(RefPtr<ExpressionType> type);
+    bool Equals(Type * type);
+    bool Equals(RefPtr<Type> type);
 
     bool IsVectorType() { return As<VectorExpressionType>() != nullptr; }
     bool IsArray() { return As<ArrayExpressionType>() != nullptr; }
@@ -105,16 +105,16 @@ public:
     bool IsSampler() { return As<SamplerStateType>() != nullptr; }
     bool IsStruct();
     bool IsClass();
-    ExpressionType* GetCanonicalType();
+    Type* GetCanonicalType();
 
     virtual RefPtr<Val> SubstituteImpl(Substitutions* subst, int* ioDiff) override;
 
     virtual bool EqualsVal(Val* val) override;
 protected:
-    virtual bool EqualsImpl(ExpressionType * type) = 0;
+    virtual bool EqualsImpl(Type * type) = 0;
 
-    virtual ExpressionType* CreateCanonicalType() = 0;
-    ExpressionType* canonicalType = nullptr;
+    virtual Type* CreateCanonicalType() = 0;
+    Type* canonicalType = nullptr;
 
     Session* session = nullptr;
     )
@@ -234,16 +234,16 @@ ABSTRACT_SYNTAX_CLASS(Decl, DeclBase)
     )
 END_SYNTAX_CLASS()
 
-ABSTRACT_SYNTAX_CLASS(ExpressionSyntaxNode, SyntaxNode)
+ABSTRACT_SYNTAX_CLASS(Expr, SyntaxNode)
     RAW(typedef IExprVisitor Visitor;)
 
-    FIELD(QualType, Type)
+    FIELD(QualType, type)
 
     RAW(virtual void accept(IExprVisitor* visitor, void* extra) = 0;)
 
 END_SYNTAX_CLASS()
 
-ABSTRACT_SYNTAX_CLASS(StatementSyntaxNode, ModifiableSyntaxNode)
+ABSTRACT_SYNTAX_CLASS(Stmt, ModifiableSyntaxNode)
     RAW(typedef IStmtVisitor Visitor;)
 
     RAW(virtual void accept(IStmtVisitor* visitor, void* extra) = 0;)

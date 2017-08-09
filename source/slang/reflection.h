@@ -24,12 +24,12 @@ String emitReflectionJSON(
 
 //
 
-SlangTypeKind getReflectionTypeKind(ExpressionType* type);
+SlangTypeKind getReflectionTypeKind(Type* type);
 
 SlangTypeKind getReflectionParameterCategory(TypeLayout* typeLayout);
 
-UInt getReflectionFieldCount(ExpressionType* type);
-UInt getReflectionFieldByIndex(ExpressionType* type, UInt index);
+UInt getReflectionFieldCount(Type* type);
+UInt getReflectionFieldByIndex(Type* type, UInt index);
 UInt getReflectionFieldByIndex(TypeLayout* typeLayout, UInt index);
 
 }

@@ -38,7 +38,7 @@ QualType getTypeForDeclRef(
     SemanticsVisitor*       sema,
     DiagnosticSink*         sink,
     DeclRef<Decl>           declRef,
-    RefPtr<ExpressionType>* outTypeResult);
+    RefPtr<Type>* outTypeResult);
 
 QualType getTypeForDeclRef(
     Session*        session,

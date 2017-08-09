@@ -36,15 +36,15 @@ END_SYNTAX_CLASS()
 // Base class for all variable-like declarations
 ABSTRACT_SYNTAX_CLASS(VarDeclBase, Decl)
 
-    // Type of the variable
-    SYNTAX_FIELD(TypeExp, Type)
+    // type of the variable
+    SYNTAX_FIELD(TypeExp, type)
 
     RAW(
-    ExpressionType* getType() { return Type.type.Ptr(); }
+    Type* getType() { return type.type.Ptr(); }
     )
 
     // Initializer expression (optional)
-    SYNTAX_FIELD(RefPtr<ExpressionSyntaxNode>, Expr)
+    SYNTAX_FIELD(RefPtr<Expr>, initExpr)
 END_SYNTAX_CLASS()
 
 
@@ -103,9 +103,9 @@ RAW(
     )
 END_SYNTAX_CLASS()
 
-SIMPLE_SYNTAX_CLASS(StructSyntaxNode, AggTypeDecl)
+SIMPLE_SYNTAX_CLASS(StructDecl, AggTypeDecl)
 
-SIMPLE_SYNTAX_CLASS(ClassSyntaxNode, AggTypeDecl)
+SIMPLE_SYNTAX_CLASS(ClassDecl, AggTypeDecl)
 
 // An interface which other types can conform to
 SIMPLE_SYNTAX_CLASS(InterfaceDecl, AggTypeDecl)
@@ -130,20 +130,20 @@ END_SYNTAX_CLASS()
 
 // A `typedef` declaration
 SYNTAX_CLASS(TypeDefDecl, SimpleTypeDecl)
-    SYNTAX_FIELD(TypeExp, Type)
+    SYNTAX_FIELD(TypeExp, type)
 END_SYNTAX_CLASS()
 
 // A scope for local declarations (e.g., as part of a statement)
 SIMPLE_SYNTAX_CLASS(ScopeDecl, ContainerDecl)
 
-SIMPLE_SYNTAX_CLASS(ParameterSyntaxNode, VarDeclBase)
+SIMPLE_SYNTAX_CLASS(ParamDecl, VarDeclBase)
 
 // Base class for things that have parameter lists and can thus be applied to arguments ("called")
 ABSTRACT_SYNTAX_CLASS(CallableDecl, ContainerDecl)
     RAW(
-    FilteredMemberList<ParameterSyntaxNode> GetParameters()
+    FilteredMemberList<ParamDecl> GetParameters()
     {
-        return getMembersOfType<ParameterSyntaxNode>();
+        return getMembersOfType<ParamDecl>();
     })
 
     SYNTAX_FIELD(TypeExp, ReturnType)
@@ -151,7 +151,7 @@ END_SYNTAX_CLASS()
 
 // Base class for callable things that may also have a body that is evaluated to produce their result
 ABSTRACT_SYNTAX_CLASS(FunctionDeclBase, CallableDecl)
-    SYNTAX_FIELD(RefPtr<StatementSyntaxNode>, Body)
+    SYNTAX_FIELD(RefPtr<Stmt>, Body)
 END_SYNTAX_CLASS()
 
 // A constructor/initializer to create instances of a type
@@ -166,13 +166,13 @@ SIMPLE_SYNTAX_CLASS(AccessorDecl, FunctionDeclBase)
 SIMPLE_SYNTAX_CLASS(GetterDecl, AccessorDecl)
 SIMPLE_SYNTAX_CLASS(SetterDecl, AccessorDecl)
 
-SIMPLE_SYNTAX_CLASS(FunctionSyntaxNode, FunctionDeclBase)
+SIMPLE_SYNTAX_CLASS(FuncDecl, FunctionDeclBase)
 
 SIMPLE_SYNTAX_CLASS(Variable, VarDeclBase);
 
 // A "module" of code (essentiately, a single translation unit)
 // that provides a scope for some number of declarations.
-SIMPLE_SYNTAX_CLASS(ProgramSyntaxNode, ContainerDecl)
+SIMPLE_SYNTAX_CLASS(ModuleDecl, ContainerDecl)
 
 SYNTAX_CLASS(ImportDecl, Decl)
     // The name of the module we are trying to import
@@ -182,7 +182,7 @@ SYNTAX_CLASS(ImportDecl, Decl)
     FIELD(RefPtr<Scope>, scope)
 
     // The module that actually got imported
-    DECL_FIELD(RefPtr<ProgramSyntaxNode>, importedModuleDecl)
+    DECL_FIELD(RefPtr<ModuleDecl>, importedModuleDecl)
 END_SYNTAX_CLASS()
 
 // A generic declaration, parameterized on types/values

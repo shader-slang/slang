@@ -3,46 +3,46 @@
 // Syntax class definitions for types.
 
 // The type of a reference to an overloaded name
-SYNTAX_CLASS(OverloadGroupType, ExpressionType)
+SYNTAX_CLASS(OverloadGroupType, Type)
 RAW(
 public:
     virtual String ToString() override;
 
 protected:
-    virtual bool EqualsImpl(ExpressionType * type) override;
-    virtual ExpressionType* CreateCanonicalType() override;
+    virtual bool EqualsImpl(Type * type) override;
+    virtual Type* CreateCanonicalType() override;
     virtual int GetHashCode() override;
 )
 END_SYNTAX_CLASS()
 
 // The type of an initializer-list expression (before it has
 // been coerced to some other type)
-SYNTAX_CLASS(InitializerListType, ExpressionType)
+SYNTAX_CLASS(InitializerListType, Type)
 RAW(
     virtual String ToString() override;
 
 protected:
-    virtual bool EqualsImpl(ExpressionType * type) override;
-    virtual ExpressionType* CreateCanonicalType() override;
+    virtual bool EqualsImpl(Type * type) override;
+    virtual Type* CreateCanonicalType() override;
     virtual int GetHashCode() override;
 )
 END_SYNTAX_CLASS()
 
 // The type of an expression that was erroneous
-SYNTAX_CLASS(ErrorType, ExpressionType)
+SYNTAX_CLASS(ErrorType, Type)
 RAW(
 public:
     virtual String ToString() override;
 
 protected:
-    virtual bool EqualsImpl(ExpressionType * type) override;
-    virtual ExpressionType* CreateCanonicalType() override;
+    virtual bool EqualsImpl(Type * type) override;
+    virtual Type* CreateCanonicalType() override;
     virtual int GetHashCode() override;
 )
 END_SYNTAX_CLASS()
 
 // A type that takes the form of a reference to some declaration
-SYNTAX_CLASS(DeclRefType, ExpressionType)
+SYNTAX_CLASS(DeclRefType, Type)
     DECL_FIELD(DeclRef<Decl>, declRef)
 
 RAW(
@@ -61,8 +61,8 @@ RAW(
     {}
 protected:
     virtual int GetHashCode() override;
-    virtual bool EqualsImpl(ExpressionType * type) override;
-    virtual ExpressionType* CreateCanonicalType() override;
+    virtual bool EqualsImpl(Type * type) override;
+    virtual Type* CreateCanonicalType() override;
 )
 END_SYNTAX_CLASS()
 
@@ -88,8 +88,8 @@ RAW(
     virtual Slang::String ToString() override;
 protected:
     virtual BasicExpressionType* GetScalarType() override;
-    virtual bool EqualsImpl(ExpressionType * type) override;
-    virtual ExpressionType* CreateCanonicalType() override;
+    virtual bool EqualsImpl(Type * type) override;
+    virtual Type* CreateCanonicalType() override;
 )
 END_SYNTAX_CLASS()
 
@@ -150,7 +150,7 @@ END_SYNTAX_CLASS()
 // Resources that contain "elements" that can be fetched
 ABSTRACT_SYNTAX_CLASS(ResourceType, ResourceTypeBase)
     // The type that results from fetching an element from this resource
-    SYNTAX_FIELD(RefPtr<ExpressionType>, elementType)
+    SYNTAX_FIELD(RefPtr<Type>, elementType)
 END_SYNTAX_CLASS()
 
 ABSTRACT_SYNTAX_CLASS(TextureTypeBase, ResourceType)
@@ -159,7 +159,7 @@ RAW(
     {}
     TextureTypeBase(
         Flavor flavor,
-        RefPtr<ExpressionType> elementType)
+        RefPtr<Type> elementType)
     {
         this->elementType = elementType;
         this->flavor = flavor;
@@ -173,7 +173,7 @@ RAW(
     {}
     TextureType(
         Flavor flavor,
-        RefPtr<ExpressionType> elementType)
+        RefPtr<Type> elementType)
         : TextureTypeBase(flavor, elementType)
     {}
 )
@@ -187,7 +187,7 @@ RAW(
     {}
     TextureSamplerType(
         Flavor flavor,
-        RefPtr<ExpressionType> elementType)
+        RefPtr<Type> elementType)
         : TextureTypeBase(flavor, elementType)
     {}
 )
@@ -200,7 +200,7 @@ RAW(
     {}
     GLSLImageType(
         Flavor flavor,
-        RefPtr<ExpressionType> elementType)
+        RefPtr<Type> elementType)
         : TextureTypeBase(flavor, elementType)
     {}
 )
@@ -221,7 +221,7 @@ END_SYNTAX_CLASS()
 
 // Other cases of generic types known to the compiler
 SYNTAX_CLASS(BuiltinGenericType, DeclRefType)
-    SYNTAX_FIELD(RefPtr<ExpressionType>, elementType)
+    SYNTAX_FIELD(RefPtr<Type>, elementType)
 END_SYNTAX_CLASS()
 
 // Types that behave like pointers, in that they can be
@@ -243,7 +243,7 @@ SIMPLE_SYNTAX_CLASS(HLSLConsumeStructuredBufferType, BuiltinGenericType)
 
 SYNTAX_CLASS(HLSLPatchType, DeclRefType)
 RAW(
-    ExpressionType* getElementType();
+    Type* getElementType();
     IntVal*         getElementCount();
 )
 END_SYNTAX_CLASS()
@@ -268,30 +268,30 @@ SIMPLE_SYNTAX_CLASS(ParameterBlockType, PointerLikeType)
 SIMPLE_SYNTAX_CLASS(UniformParameterBlockType, ParameterBlockType)
 SIMPLE_SYNTAX_CLASS(VaryingParameterBlockType, ParameterBlockType)
 
-// Type for HLSL `cbuffer` declarations, and `ConstantBuffer<T>`
+// type for HLSL `cbuffer` declarations, and `ConstantBuffer<T>`
 // ALso used for GLSL `uniform` blocks.
 SIMPLE_SYNTAX_CLASS(ConstantBufferType, UniformParameterBlockType)
 
-// Type for HLSL `tbuffer` declarations, and `TextureBuffer<T>`
+// type for HLSL `tbuffer` declarations, and `TextureBuffer<T>`
 SIMPLE_SYNTAX_CLASS(TextureBufferType, UniformParameterBlockType)
 
-// Type for GLSL `in` and `out` blocks
+// type for GLSL `in` and `out` blocks
 SIMPLE_SYNTAX_CLASS(GLSLInputParameterBlockType, VaryingParameterBlockType)
 SIMPLE_SYNTAX_CLASS(GLSLOutputParameterBlockType, VaryingParameterBlockType)
 
-// Type for GLLSL `buffer` blocks
+// type for GLLSL `buffer` blocks
 SIMPLE_SYNTAX_CLASS(GLSLShaderStorageBufferType, UniformParameterBlockType)
 
-SYNTAX_CLASS(ArrayExpressionType, ExpressionType)
-    SYNTAX_FIELD(RefPtr<ExpressionType>, BaseType)
+SYNTAX_CLASS(ArrayExpressionType, Type)
+    SYNTAX_FIELD(RefPtr<Type>, BaseType)
     SYNTAX_FIELD(RefPtr<IntVal>, ArrayLength)
 
 RAW(
     virtual Slang::String ToString() override;
 
 protected:
-    virtual bool EqualsImpl(ExpressionType * type) override;
-    virtual ExpressionType* CreateCanonicalType() override;
+    virtual bool EqualsImpl(Type * type) override;
+    virtual Type* CreateCanonicalType() override;
     virtual int GetHashCode() override;
 )
 END_SYNTAX_CLASS()
@@ -299,23 +299,23 @@ END_SYNTAX_CLASS()
 // The "type" of an expression that resolves to a type.
 // For example, in the expression `float(2)` the sub-expression,
 // `float` would have the type `TypeType(float)`.
-SYNTAX_CLASS(TypeType, ExpressionType)
+SYNTAX_CLASS(TypeType, Type)
     // The type that this is the type of...
-    SYNTAX_FIELD(RefPtr<ExpressionType>, type)
+    SYNTAX_FIELD(RefPtr<Type>, type)
 
 RAW(
 public:
     TypeType()
     {}
-    TypeType(RefPtr<ExpressionType> type)
+    TypeType(RefPtr<Type> type)
         : type(type)
     {}
 
     virtual String ToString() override;
 
 protected:
-    virtual bool EqualsImpl(ExpressionType * type) override;
-    virtual ExpressionType* CreateCanonicalType() override;
+    virtual bool EqualsImpl(Type * type) override;
+    virtual Type* CreateCanonicalType() override;
     virtual int GetHashCode() override;
 )
 END_SYNTAX_CLASS()
@@ -325,7 +325,7 @@ SYNTAX_CLASS(VectorExpressionType, ArithmeticExpressionType)
 
     // The type of vector elements.
     // As an invariant, this should be a basic type or an alias.
-    SYNTAX_FIELD(RefPtr<ExpressionType>, elementType)
+    SYNTAX_FIELD(RefPtr<Type>, elementType)
 
     // The number of elements
     SYNTAX_FIELD(RefPtr<IntVal>, elementCount)
@@ -342,7 +342,7 @@ END_SYNTAX_CLASS()
 SYNTAX_CLASS(MatrixExpressionType, ArithmeticExpressionType)
 RAW(
 
-    ExpressionType* getElementType();
+    Type* getElementType();
     IntVal*         getRowCount();
     IntVal*         getColumnCount();
 
@@ -355,7 +355,7 @@ protected:
 END_SYNTAX_CLASS()
 
 // A type alias of some kind (e.g., via `typedef`)
-SYNTAX_CLASS(NamedExpressionType, ExpressionType)
+SYNTAX_CLASS(NamedExpressionType, Type)
     DECL_FIELD(DeclRef<TypeDefDecl>, declRef)
 
 RAW(
@@ -370,8 +370,8 @@ RAW(
     virtual String ToString() override;
 
 protected:
-    virtual bool EqualsImpl(ExpressionType * type) override;
-    virtual ExpressionType* CreateCanonicalType() override;
+    virtual bool EqualsImpl(Type * type) override;
+    virtual Type* CreateCanonicalType() override;
     virtual int GetHashCode() override;
 )
 END_SYNTAX_CLASS()
@@ -380,7 +380,7 @@ END_SYNTAX_CLASS()
 // either ordinary functions, or "component functions."
 // We do not directly store a representation of the type, and instead
 // use a reference to the symbol to stand in for its logical type
-SYNTAX_CLASS(FuncType, ExpressionType)
+SYNTAX_CLASS(FuncType, Type)
     DECL_FIELD(DeclRef<CallableDecl>, declRef)
 
 RAW(
@@ -389,14 +389,14 @@ RAW(
 
     virtual String ToString() override;
 protected:
-    virtual bool EqualsImpl(ExpressionType * type) override;
-    virtual ExpressionType* CreateCanonicalType() override;
+    virtual bool EqualsImpl(Type * type) override;
+    virtual Type* CreateCanonicalType() override;
     virtual int GetHashCode() override;
 )
 END_SYNTAX_CLASS()
 
 // The "type" of an expression that names a generic declaration.
-SYNTAX_CLASS(GenericDeclRefType, ExpressionType)
+SYNTAX_CLASS(GenericDeclRefType, Type)
 
     DECL_FIELD(DeclRef<GenericDecl>, declRef)
 
@@ -414,9 +414,9 @@ SYNTAX_CLASS(GenericDeclRefType, ExpressionType)
     virtual String ToString() override;
 
 protected:
-    virtual bool EqualsImpl(ExpressionType * type) override;
+    virtual bool EqualsImpl(Type * type) override;
     virtual int GetHashCode() override;
-    virtual ExpressionType* CreateCanonicalType() override;
+    virtual Type* CreateCanonicalType() override;
 )
 END_SYNTAX_CLASS()
 

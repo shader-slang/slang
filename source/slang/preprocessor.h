@@ -8,7 +8,7 @@
 namespace Slang {
 
 class DiagnosticSink;
-class ProgramSyntaxNode;
+class ModuleDecl;
 class TranslationUnitRequest;
 
 enum class IncludeResult

@@ -19,12 +19,12 @@ using namespace Slang;
 
 // Conversion routines to help with strongly-typed reflection API
 
-static inline ExpressionType* convert(SlangReflectionType* type)
+static inline Type* convert(SlangReflectionType* type)
 {
-    return (ExpressionType*) type;
+    return (Type*) type;
 }
 
-static inline SlangReflectionType* convert(ExpressionType* type)
+static inline SlangReflectionType* convert(Type* type)
 {
     return (SlangReflectionType*) type;
 }
@@ -80,7 +80,7 @@ static inline SlangReflection* convert(ProgramLayout* program)
     return (SlangReflection*) program;
 }
 
-// Type Reflection
+// type Reflection
 
 
 SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
@@ -145,7 +145,7 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
     else if( auto declRefType = type->As<DeclRefType>() )
     {
         auto declRef = declRefType->declRef;
-        if( auto structDeclRef = declRef.As<StructSyntaxNode>() )
+        if( auto structDeclRef = declRef.As<StructDecl>() )
         {
             return SLANG_TYPE_KIND_STRUCT;
         }
@@ -170,7 +170,7 @@ SLANG_API unsigned int spReflectionType_GetFieldCount(SlangReflectionType* inTyp
     if(auto declRefType = dynamic_cast<DeclRefType*>(type))
     {
         auto declRef = declRefType->declRef;
-        if( auto structDeclRef = declRef.As<StructSyntaxNode>())
+        if( auto structDeclRef = declRef.As<StructDecl>())
         {
             return GetFields(structDeclRef).Count();
         }
@@ -189,7 +189,7 @@ SLANG_API SlangReflectionVariable* spReflectionType_GetFieldByIndex(SlangReflect
     if(auto declRefType = dynamic_cast<DeclRefType*>(type))
     {
         auto declRef = declRefType->declRef;
-        if( auto structDeclRef = declRef.As<StructSyntaxNode>())
+        if( auto structDeclRef = declRef.As<StructDecl>())
         {
             auto fieldDeclRef = GetFields(structDeclRef).ToArray()[index];
             return (SlangReflectionVariable*) fieldDeclRef.getDecl();
@@ -424,7 +424,7 @@ SLANG_API SlangReflectionType* spReflectionType_GetResourceResultType(SlangRefle
     return nullptr;
 }
 
-// Type Layout Reflection
+// type Layout Reflection
 
 SLANG_API SlangReflectionType* spReflectionTypeLayout_GetType(SlangReflectionTypeLayout* inTypeLayout)
 {
@@ -754,7 +754,7 @@ SLANG_API void spReflectionEntryPoint_getComputeThreadGroupSize(
     {
         // Fall back to the GLSL case, which requires a search over global-scope declarations
         // to look for anything with the `local_size_*` qualifier
-        auto module = dynamic_cast<ProgramSyntaxNode*>(entryPointFunc->ParentDecl);
+        auto module = dynamic_cast<ModuleDecl*>(entryPointFunc->ParentDecl);
         if (module)
         {
             for (auto dd : module->Members)

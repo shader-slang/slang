@@ -42,7 +42,7 @@ void printDiagnosticArg(StringBuilder& sb, Decl* decl)
     sb << decl->Name.Content;
 }
 
-void printDiagnosticArg(StringBuilder& sb, ExpressionType* type)
+void printDiagnosticArg(StringBuilder& sb, Type* type)
 {
     sb << type->ToString();
 }

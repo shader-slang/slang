@@ -10,7 +10,7 @@ namespace Slang
 {
     // BasicExpressionType
 
-    bool BasicExpressionType::EqualsImpl(ExpressionType * type)
+    bool BasicExpressionType::EqualsImpl(Type * type)
     {
         auto basicType = dynamic_cast<const BasicExpressionType*>(type);
         if (basicType == nullptr)
@@ -18,7 +18,7 @@ namespace Slang
         return basicType->BaseType == BaseType;
     }
 
-    ExpressionType* BasicExpressionType::CreateCanonicalType()
+    Type* BasicExpressionType::CreateCanonicalType()
     {
         // A basic type is already canonical, in our setup
         return this;
@@ -76,19 +76,19 @@ namespace Slang
 
 #include "object-meta-end.h"
 
-void ExpressionType::accept(IValVisitor* visitor, void* extra)
+void Type::accept(IValVisitor* visitor, void* extra)
 {
     accept((ITypeVisitor*)visitor, extra);
 }
 
     // TypeExp
 
-    bool TypeExp::Equals(ExpressionType* other)
+    bool TypeExp::Equals(Type* other)
     {
         return type->Equals(other);
     }
 
-    bool TypeExp::Equals(RefPtr<ExpressionType> other)
+    bool TypeExp::Equals(RefPtr<Type> other)
     {
         return type->Equals(other.Ptr());
     }
@@ -102,29 +102,29 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
 
     //
 
-    bool ExpressionType::Equals(ExpressionType * type)
+    bool Type::Equals(Type * type)
     {
         return GetCanonicalType()->EqualsImpl(type->GetCanonicalType());
     }
 
-    bool ExpressionType::Equals(RefPtr<ExpressionType> type)
+    bool Type::Equals(RefPtr<Type> type)
     {
         return Equals(type.Ptr());
     }
 
-    bool ExpressionType::EqualsVal(Val* val)
+    bool Type::EqualsVal(Val* val)
     {
-        if (auto type = dynamic_cast<ExpressionType*>(val))
-            return const_cast<ExpressionType*>(this)->Equals(type);
+        if (auto type = dynamic_cast<Type*>(val))
+            return const_cast<Type*>(this)->Equals(type);
         return false;
     }
 
-    NamedExpressionType* ExpressionType::AsNamedType()
+    NamedExpressionType* Type::AsNamedType()
     {
         return dynamic_cast<NamedExpressionType*>(this);
     }
 
-    RefPtr<Val> ExpressionType::SubstituteImpl(Substitutions* subst, int* ioDiff)
+    RefPtr<Val> Type::SubstituteImpl(Substitutions* subst, int* ioDiff)
     {
         int diff = 0;
         auto canSubst = GetCanonicalType()->SubstituteImpl(subst, &diff);
@@ -140,10 +140,10 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
     }
 
 
-    ExpressionType* ExpressionType::GetCanonicalType()
+    Type* Type::GetCanonicalType()
     {
         if (!this) return nullptr;
-        ExpressionType* et = const_cast<ExpressionType*>(this);
+        Type* et = const_cast<Type*>(this);
         if (!et->canonicalType)
         {
             // TODO(tfoley): worry about thread safety here?
@@ -153,15 +153,15 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
         return et->canonicalType;
     }
 
-    bool ExpressionType::IsTextureOrSampler()
+    bool Type::IsTextureOrSampler()
     {
         return IsTexture() || IsSampler();
     }
-    bool ExpressionType::IsStruct()
+    bool Type::IsStruct()
     {
         auto declRefType = AsDeclRefType();
         if (!declRefType) return false;
-        auto structDeclRef = declRefType->declRef.As<StructSyntaxNode>();
+        auto structDeclRef = declRefType->declRef.As<StructDecl>();
         if (!structDeclRef) return false;
         return true;
     }
@@ -178,65 +178,65 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
         overloadedType->setSession(this);
     }
 
-    ExpressionType* Session::getBoolType()
+    Type* Session::getBoolType()
     {
         return getBuiltinType(BaseType::Bool);
     }
 
-    ExpressionType* Session::getFloatType()
+    Type* Session::getFloatType()
     {
         return getBuiltinType(BaseType::Float);
     }
 
-    ExpressionType* Session::getDoubleType()
+    Type* Session::getDoubleType()
     {
         return getBuiltinType(BaseType::Double);
     }
 
-    ExpressionType* Session::getIntType()
+    Type* Session::getIntType()
     {
         return getBuiltinType(BaseType::Int);
     }
 
-    ExpressionType* Session::getUIntType()
+    Type* Session::getUIntType()
     {
         return getBuiltinType(BaseType::UInt);
     }
 
-    ExpressionType* Session::getVoidType()
+    Type* Session::getVoidType()
     {
         return getBuiltinType(BaseType::Void);
     }
 
-    ExpressionType* Session::getBuiltinType(BaseType flavor)
+    Type* Session::getBuiltinType(BaseType flavor)
     {
-        return RefPtr<ExpressionType>(builtinTypes[(int)flavor]);
+        return RefPtr<Type>(builtinTypes[(int)flavor]);
     }
 
-    ExpressionType* Session::getInitializerListType()
+    Type* Session::getInitializerListType()
     {
         return initializerListType;
     }
 
-    ExpressionType* Session::getOverloadedType()
+    Type* Session::getOverloadedType()
     {
         return overloadedType;
     }
 
-    ExpressionType* Session::getErrorType()
+    Type* Session::getErrorType()
     {
         return errorType;
     }
 
 
-    bool ArrayExpressionType::EqualsImpl(ExpressionType * type)
+    bool ArrayExpressionType::EqualsImpl(Type * type)
     {
         auto arrType = type->AsArrayType();
         if (!arrType)
             return false;
         return (ArrayLength == arrType->ArrayLength && BaseType->Equals(arrType->BaseType.Ptr()));
     }
-    ExpressionType* ArrayExpressionType::CreateCanonicalType()
+    Type* ArrayExpressionType::CreateCanonicalType()
     {
         auto canonicalElementType = BaseType->GetCanonicalType();
         auto canonicalArrayType = getArrayType(
@@ -272,7 +272,7 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
         return (declRef.GetHashCode() * 16777619) ^ (int)(typeid(this).hash_code());
     }
 
-    bool DeclRefType::EqualsImpl(ExpressionType * type)
+    bool DeclRefType::EqualsImpl(Type * type)
     {
         if (auto declRefType = type->AsDeclRefType())
         {
@@ -281,7 +281,7 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
         return false;
     }
 
-    ExpressionType* DeclRefType::CreateCanonicalType()
+    Type* DeclRefType::CreateCanonicalType()
     {
         // A declaration reference is already canonical
         return this;
@@ -343,9 +343,9 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
         return DeclRefType::Create(getSession(), substDeclRef);
     }
 
-    static RefPtr<ExpressionType> ExtractGenericArgType(RefPtr<Val> val)
+    static RefPtr<Type> ExtractGenericArgType(RefPtr<Val> val)
     {
-        auto type = val.As<ExpressionType>();
+        auto type = val.As<Type>();
         SLANG_RELEASE_ASSERT(type.Ptr());
         return type;
     }
@@ -512,12 +512,12 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
         return "overload group";
     }
 
-    bool OverloadGroupType::EqualsImpl(ExpressionType * /*type*/)
+    bool OverloadGroupType::EqualsImpl(Type * /*type*/)
     {
         return false;
     }
 
-    ExpressionType* OverloadGroupType::CreateCanonicalType()
+    Type* OverloadGroupType::CreateCanonicalType()
     {
         return this;
     }
@@ -534,12 +534,12 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
         return "initializer list";
     }
 
-    bool InitializerListType::EqualsImpl(ExpressionType * /*type*/)
+    bool InitializerListType::EqualsImpl(Type * /*type*/)
     {
         return false;
     }
 
-    ExpressionType* InitializerListType::CreateCanonicalType()
+    Type* InitializerListType::CreateCanonicalType()
     {
         return this;
     }
@@ -556,14 +556,14 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
         return "error";
     }
 
-    bool ErrorType::EqualsImpl(ExpressionType* type)
+    bool ErrorType::EqualsImpl(Type* type)
     {
         if (auto errorType = type->As<ErrorType>())
             return true;
         return false;
     }
 
-    ExpressionType* ErrorType::CreateCanonicalType()
+    Type* ErrorType::CreateCanonicalType()
     {
         return  this;
     }
@@ -581,13 +581,13 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
         return declRef.GetName();
     }
 
-    bool NamedExpressionType::EqualsImpl(ExpressionType * /*type*/)
+    bool NamedExpressionType::EqualsImpl(Type * /*type*/)
     {
         SLANG_UNEXPECTED("unreachable");
         return false;
     }
 
-    ExpressionType* NamedExpressionType::CreateCanonicalType()
+    Type* NamedExpressionType::CreateCanonicalType()
     {
         return GetType(declRef)->GetCanonicalType();
     }
@@ -609,7 +609,7 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
             return "/* unknown FuncType */";
     }
 
-    bool FuncType::EqualsImpl(ExpressionType * type)
+    bool FuncType::EqualsImpl(Type * type)
     {
         if (auto funcType = type->As<FuncType>())
         {
@@ -618,7 +618,7 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
         return false;
     }
 
-    ExpressionType* FuncType::CreateCanonicalType()
+    Type* FuncType::CreateCanonicalType()
     {
         return this;
     }
@@ -637,7 +637,7 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
         return sb.ProduceString();
     }
 
-    bool TypeType::EqualsImpl(ExpressionType * t)
+    bool TypeType::EqualsImpl(Type * t)
     {
         if (auto typeType = t->As<TypeType>())
         {
@@ -646,7 +646,7 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
         return false;
     }
 
-    ExpressionType* TypeType::CreateCanonicalType()
+    Type* TypeType::CreateCanonicalType()
     {
         auto canType = getTypeType(type->GetCanonicalType());
         session->canonicalTypes.Add(canType);
@@ -667,7 +667,7 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
         return "<DeclRef<GenericDecl>>";
     }
 
-    bool GenericDeclRefType::EqualsImpl(ExpressionType * type)
+    bool GenericDeclRefType::EqualsImpl(Type * type)
     {
         if (auto genericDeclRefType = type->As<GenericDeclRefType>())
         {
@@ -681,7 +681,7 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
         return declRef.GetHashCode();
     }
 
-    ExpressionType* GenericDeclRefType::CreateCanonicalType()
+    Type* GenericDeclRefType::CreateCanonicalType()
     {
         return this;
     }
@@ -716,9 +716,9 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
         return getElementType()->AsBasicType();
     }
 
-    ExpressionType* MatrixExpressionType::getElementType()
+    Type* MatrixExpressionType::getElementType()
     {
-        return this->declRef.substitutions->args[0].As<ExpressionType>().Ptr();
+        return this->declRef.substitutions->args[0].As<Type>().Ptr();
     }
 
     IntVal* MatrixExpressionType::getRowCount()
@@ -840,7 +840,7 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
 
     // DeclRefBase
 
-    RefPtr<ExpressionType> DeclRefBase::Substitute(RefPtr<ExpressionType> type) const
+    RefPtr<Type> DeclRefBase::Substitute(RefPtr<Type> type) const
     {
         // No substitutions? Easy.
         if (!substitutions)
@@ -849,7 +849,7 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
         // Otherwise we need to recurse on the type structure
         // and apply substitutions where it makes sense
 
-        return type->Substitute(substitutions.Ptr()).As<ExpressionType>();
+        return type->Substitute(substitutions.Ptr()).As<Type>();
     }
 
     DeclRefBase DeclRefBase::Substitute(DeclRefBase declRef) const
@@ -861,7 +861,7 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
         return declRef.SubstituteImpl(substitutions.Ptr(), &diff);
     }
 
-    RefPtr<ExpressionSyntaxNode> DeclRefBase::Substitute(RefPtr<ExpressionSyntaxNode> expr) const
+    RefPtr<Expr> DeclRefBase::Substitute(RefPtr<Expr> expr) const
     {
         // No substitutions? Easy.
         if (!substitutions)
@@ -1063,9 +1063,9 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
 
     // HLSLPatchType
 
-    ExpressionType* HLSLPatchType::getElementType()
+    Type* HLSLPatchType::getElementType()
     {
-        return this->declRef.substitutions->args[0].As<ExpressionType>().Ptr();
+        return this->declRef.substitutions->args[0].As<Type>().Ptr();
     }
 
     IntVal* HLSLPatchType::getElementCount()
@@ -1076,7 +1076,7 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
     // Constructors for types
 
     RefPtr<ArrayExpressionType> getArrayType(
-        ExpressionType* elementType,
+        Type* elementType,
         IntVal*         elementCount)
     {
         auto session = elementType->getSession();
@@ -1088,7 +1088,7 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
     }
 
     RefPtr<ArrayExpressionType> getArrayType(
-        ExpressionType* elementType)
+        Type* elementType)
     {
         auto session = elementType->getSession();
         auto arrayType = new ArrayExpressionType();
@@ -1107,7 +1107,7 @@ void ExpressionType::accept(IValVisitor* visitor, void* extra)
     }
 
     RefPtr<TypeType> getTypeType(
-        ExpressionType* type)
+        Type* type)
     {
         auto session = type->getSession();
         auto typeType = new TypeType(type);
