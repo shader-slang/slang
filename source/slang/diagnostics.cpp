@@ -1,7 +1,8 @@
-// Diagnostics.cpp
-#include "Diagnostics.h"
+// diagnostics.cpp
+#include "diagnostics.h"
 
-#include "Syntax.h"
+#include "compiler.h"
+#include "syntax.h"
 
 #include <assert.h>
 
@@ -67,17 +68,17 @@ void printDiagnosticArg(StringBuilder& sb, Token const& token)
     sb << token.Content;
 }
 
-CodePosition const& getDiagnosticPos(SyntaxNode const* syntax)
+SourceLoc const& getDiagnosticPos(SyntaxNode const* syntax)
 {
     return syntax->Position;
 }
 
-CodePosition const& getDiagnosticPos(Token const& token)
+SourceLoc const& getDiagnosticPos(Token const& token)
 {
     return token.Position;
 }
 
-CodePosition const& getDiagnosticPos(TypeExp const& typeExp)
+SourceLoc const& getDiagnosticPos(TypeExp const& typeExp)
 {
     return typeExp.exp->Position;
 }
@@ -140,12 +141,18 @@ static void formatDiagnosticMessage(StringBuilder& sb, char const* format, int a
 }
 
 static void formatDiagnostic(
+    DiagnosticSink*     sink,
     StringBuilder&      sb,
     Diagnostic const&   diagnostic)
 {
-    sb << diagnostic.Position.FileName;
+    auto sourceManager = sink->sourceManager;
+
+    auto expandedLoc = sourceManager->expandSourceLoc(diagnostic.Position);
+    auto humaneLoc = sourceManager->getHumaneLoc(expandedLoc);
+
+    sb << humaneLoc.getPath();
     sb << "(";
-    sb << diagnostic.Position.Line;
+    sb << humaneLoc.line;
     sb << "): ";
     sb << getSeverityName(diagnostic.severity);
     sb << " ";
@@ -155,7 +162,7 @@ static void formatDiagnostic(
     sb << "\n";
 }
 
-void DiagnosticSink::diagnoseImpl(CodePosition const& pos, DiagnosticInfo const& info, int argCount, DiagnosticArg const* const* args)
+void DiagnosticSink::diagnoseImpl(SourceLoc const& pos, DiagnosticInfo const& info, int argCount, DiagnosticArg const* const* args)
 {
     StringBuilder sb;
     formatDiagnosticMessage(sb, info.messageFormat, argCount, args);
@@ -176,7 +183,7 @@ void DiagnosticSink::diagnoseImpl(CodePosition const& pos, DiagnosticInfo const&
     {
         // If so, pass the error string along to them
         StringBuilder messageBuilder;
-        formatDiagnostic(messageBuilder, diagnostic);
+        formatDiagnostic(this, messageBuilder, diagnostic);
 
         callback(messageBuilder.ProduceString().begin(), callbackUserData);
     }
@@ -184,7 +191,7 @@ void DiagnosticSink::diagnoseImpl(CodePosition const& pos, DiagnosticInfo const&
     {
         // If the user doesn't have a callback, then just
         // collect our diagnostic messages into a buffer
-        formatDiagnostic(outputBuffer, diagnostic);
+        formatDiagnostic(this, outputBuffer, diagnostic);
     }
 
     if (diagnostic.severity >= Severity::Fatal)

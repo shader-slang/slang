@@ -1,0 +1,11 @@
+result code = -1
+standard error = {
+tests/preprocessor/line.slang(4): error 30015: undefined identifier 'FooA'.
+b.slang(99): error 30015: undefined identifier 'FooB'.
+tests/preprocessor/line.slang(10): error 30015: undefined identifier 'FooC'.
+d.slang(603): error 30015: undefined identifier 'FooD'.
+d.slang(40): error 30015: undefined identifier 'FooE'.
+tests/preprocessor/line.slang(19): error 30015: undefined identifier 'FooF'.
+}
+standard output = {
+}

@@ -58,8 +58,8 @@ struct SharedEmitContext
     StringBuilder sb;
 
     // Current source position for tracking purposes...
-    CodePosition loc;
-    CodePosition nextSourceLocation;
+    HumaneSourceLoc loc;
+    HumaneSourceLoc nextSourceLocation;
     bool needToUpdateSourceLocation;
 
     // For GLSL output, we can't emit traidtional `#line` directives
@@ -344,7 +344,7 @@ struct EDeclarator
 
     // Used for `Flavor::Name`
     String name;
-    CodePosition loc;
+    SourceLoc loc;
 
     // Used for `Flavor::Array`
     IntVal* elementCount;
@@ -407,7 +407,7 @@ struct EmitVisitor
         // Update our logical position
         // TODO(tfoley): Need to make "corelib" not use `int` for pointer-sized things...
         auto len = int(textEnd - textBegin);
-        context->shared->loc.Col += len;
+        context->shared->loc.column += len;
     }
 
     void Emit(char const* textBegin, char const* textEnd)
@@ -431,8 +431,8 @@ struct EmitVisitor
                 // At the end of a line, we need to update our tracking
                 // information on code positions
                 emitTextSpan(spanBegin, spanEnd);
-                context->shared->loc.Line++;
-                context->shared->loc.Col = 1;
+                context->shared->loc.line++;
+                context->shared->loc.column = 1;
 
                 // Start a new span for emit purposes
                 spanBegin = spanEnd;
@@ -452,7 +452,7 @@ struct EmitVisitor
 
     void emitName(
         String const&       inName,
-        CodePosition const& loc)
+        SourceLoc const& loc)
     {
         String name = inName;
 
@@ -467,7 +467,7 @@ struct EmitVisitor
 
     void emitName(String const& name)
     {
-        emitName(name, CodePosition());
+        emitName(name, SourceLoc());
     }
 
     void Emit(IntegerLiteralValue value)
@@ -504,12 +504,12 @@ struct EmitVisitor
     // Emit a `#line` directive to the output.
     // Doesn't udpate state of source-location tracking.
     void emitLineDirective(
-        CodePosition const& sourceLocation)
+        HumaneSourceLoc const& sourceLocation)
     {
         emitRawText("\n#line ");
 
         char buffer[16];
-        sprintf(buffer, "%d", sourceLocation.Line);
+        sprintf(buffer, "%d", sourceLocation.line);
         emitRawText(buffer);
 
         emitRawText(" ");
@@ -547,7 +547,7 @@ struct EmitVisitor
 
         if(shouldUseGLSLStyleLineDirective)
         {
-            auto path = sourceLocation.FileName;
+            auto path = sourceLocation.getPath();
 
             // GLSL doesn't support the traditional form of a `#line` directive without
             // an extension. Rather than depend on that extension we will output
@@ -578,7 +578,7 @@ struct EmitVisitor
             // in a module that tracks source files.
 
             emitRawText("\"");
-            for(auto c : sourceLocation.FileName)
+            for(auto c : sourceLocation.getPath())
             {
                 char charBuffer[] = { c, 0 };
                 switch(c)
@@ -607,17 +607,18 @@ struct EmitVisitor
     // ensure that source location tracking information
     // is correct based on the directive we just output.
     void emitLineDirectiveAndUpdateSourceLocation(
-        CodePosition const& sourceLocation)
+        HumaneSourceLoc const& sourceLocation)
     {
         emitLineDirective(sourceLocation);
-    
-        context->shared->loc.FileName = sourceLocation.FileName;
-        context->shared->loc.Line = sourceLocation.Line;
-        context->shared->loc.Col = 1;
+
+        HumaneSourceLoc newLoc = sourceLocation;
+        newLoc.column = 1;
+
+        context->shared->loc = newLoc;
     }
 
     void emitLineDirectiveIfNeeded(
-        CodePosition const& sourceLocation)
+        HumaneSourceLoc const& sourceLocation)
     {
         // Don't do any of this work if the user has requested that we
         // not emit line directives.
@@ -626,31 +627,31 @@ struct EmitVisitor
             return;
 
         // Ignore invalid source locations
-        if(sourceLocation.Line <= 0)
+        if(sourceLocation.line <= 0)
             return;
 
         // If we are currently emitting code at a source location with
         // a differnet file or line, *or* if the source location is
         // somehow later on the line than what we want to emit,
         // then we need to emit a new `#line` directive.
-        if(sourceLocation.FileName != context->shared->loc.FileName
-            || sourceLocation.Line != context->shared->loc.Line
-            || sourceLocation.Col < context->shared->loc.Col)
+        if(sourceLocation.path != context->shared->loc.path
+            || sourceLocation.line != context->shared->loc.line
+            || sourceLocation.column < context->shared->loc.column)
         {
             // Special case: if we are in the same file, and within a small number
             // of lines of the target location, then go ahead and output newlines
             // to get us caught up.
             enum { kSmallLineCount = 3 };
-            auto lineDiff = sourceLocation.Line - context->shared->loc.Line;
-            if(sourceLocation.FileName == context->shared->loc.FileName
-                && sourceLocation.Line > context->shared->loc.Line
+            auto lineDiff = sourceLocation.line - context->shared->loc.line;
+            if(sourceLocation.path == context->shared->loc.path
+                && sourceLocation.line > context->shared->loc.line
                 && lineDiff <= kSmallLineCount)
             {
                 for(int ii = 0; ii < lineDiff; ++ii )
                 {
                     Emit("\n");
                 }
-                SLANG_RELEASE_ASSERT(sourceLocation.Line == context->shared->loc.Line);
+                SLANG_RELEASE_ASSERT(sourceLocation.line == context->shared->loc.line);
             }
             else
             {
@@ -666,26 +667,37 @@ struct EmitVisitor
         // came in as spaces or tabs, so there is necessarily going to be
         // coupling between how the downstream compiler counts columns,
         // and how we do.
-        if(sourceLocation.Col > context->shared->loc.Col)
+        if(sourceLocation.column > context->shared->loc.column)
         {
-            int delta = sourceLocation.Col - context->shared->loc.Col;
+            int delta = sourceLocation.column - context->shared->loc.column;
             for( int ii = 0; ii < delta; ++ii )
             {
                 emitRawText(" ");
             }
-            context->shared->loc.Col = sourceLocation.Col;
+            context->shared->loc.column = sourceLocation.column;
         }
     }
 
     void advanceToSourceLocation(
-        CodePosition const& sourceLocation)
+        HumaneSourceLoc const& sourceLocation)
     {
         // Skip invalid locations
-        if(sourceLocation.Line <= 0)
+        if(sourceLocation.line <= 0)
             return;
 
         context->shared->needToUpdateSourceLocation = true;
         context->shared->nextSourceLocation = sourceLocation;
+    }
+
+    SourceManager* getSourceManager()
+    {
+        return context->shared->entryPoint->compileRequest->getSourceManager();
+    }
+
+    void advanceToSourceLocation(
+        SourceLoc const& sourceLocation)
+    {
+        advanceToSourceLocation(getSourceManager()->getHumaneLoc(sourceLocation));
     }
 
     void flushSourceLocationChange()
@@ -707,9 +719,8 @@ struct EmitVisitor
         if (mode == LineDirectiveMode::None)
             return;
 
-
         if ((mode == LineDirectiveMode::None)
-            || token.Position.FileName.Length() == 0)
+            || !token.Position.isValid())
         {
             // If we don't have the original position info, or we are in the
             // mode where the user didn't want line directives, we need to play
@@ -755,7 +766,7 @@ struct EmitVisitor
         }
         else
         {
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), CodePosition(), "unknown type of integer constant value");
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unknown type of integer constant value");
         }
     }
 
@@ -787,7 +798,7 @@ struct EmitVisitor
             break;
 
         default:
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), CodePosition(), "unknown declarator flavor");
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unknown declarator flavor");
             break;
         }
     }
@@ -808,7 +819,7 @@ struct EmitVisitor
             case BaseType::Bool:	Emit("b");		break;
             case BaseType::Double:	Emit("d");		break;
             default:
-                SLANG_DIAGNOSE_UNEXPECTED(getSink(), CodePosition(), "unhandled GLSL type prefix");
+                SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled GLSL type prefix");
                 break;
             }
         }
@@ -822,7 +833,7 @@ struct EmitVisitor
         }
         else
         {
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), CodePosition(), "unhandled GLSL type prefix");
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled GLSL type prefix");
         }
     }
 
@@ -851,7 +862,7 @@ struct EmitVisitor
             break;
 
         default:
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), CodePosition(), "unhandled resource access mode");
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource access mode");
             break;
         }
 
@@ -863,7 +874,7 @@ struct EmitVisitor
         case TextureType::ShapeCube:	Emit("TextureCube");	break;
         case TextureType::ShapeBuffer:  Emit("Buffer");         break;
         default:
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), CodePosition(), "unhandled resource shape");
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource shape");
             break;
         }
 
@@ -895,7 +906,7 @@ struct EmitVisitor
         case TextureType::ShapeCube:	Emit("Cube");	break;
         case TextureType::ShapeBuffer:	Emit("Buffer");	break;
         default:
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), CodePosition(), "unhandled resource shape");
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource shape");
             break;
         }
 
@@ -941,7 +952,7 @@ struct EmitVisitor
             break;
 
         default:
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), CodePosition(), "unhandled code generation target");
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled code generation target");
             break;
         }
     }
@@ -956,7 +967,7 @@ struct EmitVisitor
             break;
 
         default:
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), CodePosition(), "this target should see combined texture-sampler types");
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "this target should see combined texture-sampler types");
             break;
         }
     }
@@ -975,7 +986,7 @@ struct EmitVisitor
             break;
 
         default:
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), CodePosition(), "this target should see GLSL image types");
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "this target should see GLSL image types");
             break;
         }
     }
@@ -1026,7 +1037,7 @@ struct EmitVisitor
         case BaseType::Bool:	Emit("bool");		break;
         case BaseType::Double:	Emit("double");		break;
         default:
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), CodePosition(), "unhandled scalar type");
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled scalar type");
             break;
         }
 
@@ -1058,7 +1069,7 @@ struct EmitVisitor
             break;
 
         default:
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), CodePosition(), "unhandled code generation target");
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled code generation target");
             break;
         }
 
@@ -1096,7 +1107,7 @@ struct EmitVisitor
             break;
 
         default:
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), CodePosition(), "unhandled code generation target");
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled code generation target");
             break;
         }
 
@@ -1136,7 +1147,7 @@ struct EmitVisitor
             case SamplerStateType::Flavor::SamplerState:			Emit("SamplerState");			break;
             case SamplerStateType::Flavor::SamplerComparisonState:	Emit("SamplerComparisonState");	break;
             default:
-                SLANG_DIAGNOSE_UNEXPECTED(getSink(), CodePosition(), "unhandled sampler state flavor");
+                SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled sampler state flavor");
                 break;
             }
             break;
@@ -1147,7 +1158,7 @@ struct EmitVisitor
             case SamplerStateType::Flavor::SamplerState:			Emit("sampler");		break;
             case SamplerStateType::Flavor::SamplerComparisonState:	Emit("samplerShadow");	break;
             default:
-                SLANG_DIAGNOSE_UNEXPECTED(getSink(), CodePosition(), "unhandled sampler state flavor");
+                SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled sampler state flavor");
                 break;
             }
             break;
@@ -1187,9 +1198,9 @@ struct EmitVisitor
 
     void EmitType(
         RefPtr<Type>  type,
-        CodePosition const&     typeLoc,
+        SourceLoc const&     typeLoc,
         String const&           name,
-        CodePosition const&     nameLoc)
+        SourceLoc const&     nameLoc)
     {
         advanceToSourceLocation(typeLoc);
 
@@ -1203,7 +1214,7 @@ struct EmitVisitor
 
     void EmitType(RefPtr<Type> type, Token const& nameToken)
     {
-        EmitType(type, CodePosition(), nameToken.Content, nameToken.Position);
+        EmitType(type, SourceLoc(), nameToken.Content, nameToken.Position);
     }
 
     void EmitType(RefPtr<Type> type)
@@ -1232,13 +1243,13 @@ struct EmitVisitor
         }
     }
 
-    void EmitType(TypeExp const& typeExp, String const& name, CodePosition const& nameLoc)
+    void EmitType(TypeExp const& typeExp, String const& name, SourceLoc const& nameLoc)
     {
         if (!typeExp.type || typeExp.type->As<ErrorType>())
         {
             if (!typeExp.exp)
             {
-                SLANG_DIAGNOSE_UNEXPECTED(getSink(), CodePosition(), "unresolved type expression should have expression part");
+                SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unresolved type expression should have expression part");
             }
 
             EDeclarator nameDeclarator;
@@ -1251,7 +1262,7 @@ struct EmitVisitor
         else
         {
             EmitType(typeExp.type,
-                typeExp.exp ? typeExp.exp->Position : CodePosition(),
+                typeExp.exp ? typeExp.exp->Position : SourceLoc(),
                 name, nameLoc);
         }
     }
@@ -1263,7 +1274,7 @@ struct EmitVisitor
 
     void EmitType(TypeExp const& typeExp, String const& name)
     {
-        EmitType(typeExp, name, CodePosition());
+        EmitType(typeExp, name, SourceLoc());
     }
 
     void emitTypeExp(TypeExp const& typeExp)
@@ -1463,7 +1474,7 @@ struct EmitVisitor
         switch(context->shared->target)
         {
         default:
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), CodePosition(), "unhandled code generation target");
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled code generation target");
             return false;
 
         case CodeGenTarget::GLSL: return targetName == "glsl";
@@ -3203,7 +3214,7 @@ struct EmitVisitor
                 Emit("s");
                 break;
             default:
-                SLANG_DIAGNOSE_UNEXPECTED(getSink(), CodePosition(), "unhandled HLSL register type");
+                SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled HLSL register type");
                 break;
             }
             Emit(info.index);

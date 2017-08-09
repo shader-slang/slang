@@ -318,7 +318,7 @@ class PseudoVarDecl : public RefObject
 {
 public:
     Token Name;
-    CodePosition Position;
+    SourceLoc Position;
     TypeExp type;
 };
 
@@ -339,7 +339,7 @@ public:
 class PseudoExpr : public RefObject
 {
 public:
-    CodePosition Position;
+    SourceLoc Position;
     QualType type;
 };
 
@@ -384,7 +384,7 @@ public:
     List<Element>   elements;
 };
 
-static CodePosition getPosition(LoweredExpr const& expr)
+static SourceLoc getPosition(LoweredExpr const& expr)
 {
     switch (expr.getFlavor())
     {
@@ -393,7 +393,7 @@ static CodePosition getPosition(LoweredExpr const& expr)
     case LoweredExpr::Flavor::VaryingTuple: return expr.getVaryingTupleExpr()->Position;
     default:
         SLANG_UNREACHABLE("all cases handled");
-        return CodePosition();
+        return SourceLoc();
     }
 }
 
@@ -804,7 +804,7 @@ struct LoweringVisitor
     }
 
     RefPtr<Expr> createSimpleVarRef(
-        CodePosition const& loc,
+        SourceLoc const& loc,
         VarDeclBase*        decl)
     {
         RefPtr<VarExpr> result = new VarExpr();
@@ -816,7 +816,7 @@ struct LoweringVisitor
     }
 
     LoweredExpr createVarRef(
-        CodePosition const& loc,
+        SourceLoc const& loc,
         LoweredDecl const&  decl)
     {
         switch (decl.getFlavor())
@@ -838,7 +838,7 @@ struct LoweringVisitor
 
 
     LoweredExpr createTupleRef(
-        CodePosition const&     loc,
+        SourceLoc const&     loc,
         TupleVarDecl*           decl)
     {
         RefPtr<TupleExpr> result = new TupleExpr();
@@ -868,7 +868,7 @@ struct LoweringVisitor
     }
 
     LoweredExpr createVaryingTupleRef(
-        CodePosition const&     /*loc*/,
+        SourceLoc const&     /*loc*/,
         VaryingTupleVarDecl*    decl)
     {
         return decl->expr;

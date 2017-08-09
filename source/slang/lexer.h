@@ -47,7 +47,7 @@ namespace Slang
         bool IsAtEnd() const { return mCursor == mEnd; }
         Token PeekToken() const;
         TokenType PeekTokenType() const;
-        CodePosition PeekLoc() const;
+        SourceLoc PeekLoc() const;
 
         Token AdvanceToken();
 
@@ -66,9 +66,8 @@ namespace Slang
 
     struct Lexer
     {
-        Lexer(
-            String const&   path,
-            String const&   content,
+        void initialize(
+            SourceFile*     sourceFile,
             DiagnosticSink* sink);
 
         ~Lexer();
@@ -77,13 +76,30 @@ namespace Slang
 
         TokenList lexAllTokens();
 
-        String          path;
-        String          content;
+        // Begin overriding the reported locations of tokens,
+        // based on a `#line` directives
+        void startOverridingSourceLocations(SourceLoc loc);
+
+        // Stop overriding source locations, and go back
+        // to reporting source locations in the original file
+        void stopOverridingSourceLocations();
+
+        SourceFile*     sourceFile;
         DiagnosticSink* sink;
 
         char const*     cursor;
+
+        char const*     begin;
         char const*     end;
-        CodePosition    loc;
+
+        // The starting source location for the code as written,
+        // which cannot be overridden.
+        SourceLoc       spellingStartLoc;
+
+        // The nominal starting location for the file, taking
+        // any active `#line` directive into account.
+        SourceLoc       presumedStartLoc;
+
         TokenFlags      tokenFlags;
         LexerFlags      lexerFlags;
     };

@@ -46,7 +46,7 @@ namespace Slang
     {
     public:
         String Message;
-        CodePosition Position;
+        SourceLoc Position;
         int ErrorID;
         Severity severity;
 
@@ -57,7 +57,7 @@ namespace Slang
         Diagnostic(
             const String & msg,
             int id,
-            const CodePosition & pos,
+            const SourceLoc & pos,
             Severity severity)
             : severity(severity)
         {
@@ -93,16 +93,16 @@ namespace Slang
         printDiagnosticArg(sb, ptr.Ptr());
     }
 
-    inline CodePosition const& getDiagnosticPos(CodePosition const& pos) { return pos;  }
+    inline SourceLoc const& getDiagnosticPos(SourceLoc const& pos) { return pos;  }
 
     class SyntaxNode;
     class ShaderClosure;
-    CodePosition const& getDiagnosticPos(SyntaxNode const* syntax);
-    CodePosition const& getDiagnosticPos(Token const& token);
-    CodePosition const& getDiagnosticPos(TypeExp const& typeExp);
+    SourceLoc const& getDiagnosticPos(SyntaxNode const* syntax);
+    SourceLoc const& getDiagnosticPos(Token const& token);
+    SourceLoc const& getDiagnosticPos(TypeExp const& typeExp);
 
     template<typename T>
-    CodePosition getDiagnosticPos(RefPtr<T> const& ptr)
+    SourceLoc getDiagnosticPos(RefPtr<T> const& ptr)
     {
         return getDiagnosticPos(ptr.Ptr());
     }
@@ -128,6 +128,9 @@ namespace Slang
     class DiagnosticSink
     {
     public:
+        // The source manager to use when mapping source locations to file+line info
+        SourceManager*  sourceManager;
+
         StringBuilder outputBuffer;
 //            List<Diagnostic> diagnostics;
         int errorCount = 0;
@@ -136,43 +139,43 @@ namespace Slang
         void*                   callbackUserData    = nullptr;
 
 /*
-        void Error(int id, const String & msg, const CodePosition & pos)
+        void Error(int id, const String & msg, const SourceLoc & pos)
         {
             diagnostics.Add(Diagnostic(msg, id, pos, Severity::Error));
             errorCount++;
         }
 
-        void Warning(int id, const String & msg, const CodePosition & pos)
+        void Warning(int id, const String & msg, const SourceLoc & pos)
         {
             diagnostics.Add(Diagnostic(msg, id, pos, Severity::Warning));
         }
 */
         int GetErrorCount() { return errorCount; }
 
-        void diagnoseDispatch(CodePosition const& pos, DiagnosticInfo const& info)
+        void diagnoseDispatch(SourceLoc const& pos, DiagnosticInfo const& info)
         {
             diagnoseImpl(pos, info, 0, NULL);
         }
 
-        void diagnoseDispatch(CodePosition const& pos, DiagnosticInfo const& info, DiagnosticArg const& arg0)
+        void diagnoseDispatch(SourceLoc const& pos, DiagnosticInfo const& info, DiagnosticArg const& arg0)
         {
             DiagnosticArg const* args[] = { &arg0 };
             diagnoseImpl(pos, info, 1, args);
         }
 
-        void diagnoseDispatch(CodePosition const& pos, DiagnosticInfo const& info, DiagnosticArg const& arg0, DiagnosticArg const& arg1)
+        void diagnoseDispatch(SourceLoc const& pos, DiagnosticInfo const& info, DiagnosticArg const& arg0, DiagnosticArg const& arg1)
         {
             DiagnosticArg const* args[] = { &arg0, &arg1 };
             diagnoseImpl(pos, info, 2, args);
         }
 
-        void diagnoseDispatch(CodePosition const& pos, DiagnosticInfo const& info, DiagnosticArg const& arg0, DiagnosticArg const& arg1, DiagnosticArg const& arg2)
+        void diagnoseDispatch(SourceLoc const& pos, DiagnosticInfo const& info, DiagnosticArg const& arg0, DiagnosticArg const& arg1, DiagnosticArg const& arg2)
         {
             DiagnosticArg const* args[] = { &arg0, &arg1, &arg2 };
             diagnoseImpl(pos, info, 3, args);
         }
 
-        void diagnoseDispatch(CodePosition const& pos, DiagnosticInfo const& info, DiagnosticArg const& arg0, DiagnosticArg const& arg1, DiagnosticArg const& arg2, DiagnosticArg const& arg3)
+        void diagnoseDispatch(SourceLoc const& pos, DiagnosticInfo const& info, DiagnosticArg const& arg0, DiagnosticArg const& arg1, DiagnosticArg const& arg2, DiagnosticArg const& arg3)
         {
             DiagnosticArg const* args[] = { &arg0, &arg1, &arg2, &arg3 };
             diagnoseImpl(pos, info, 4, args);
@@ -184,7 +187,7 @@ namespace Slang
             diagnoseDispatch(getDiagnosticPos(pos), info, args...);
         }
 
-        void diagnoseImpl(CodePosition const& pos, DiagnosticInfo const& info, int argCount, DiagnosticArg const* const* args);
+        void diagnoseImpl(SourceLoc const& pos, DiagnosticInfo const& info, int argCount, DiagnosticArg const* const* args);
 
         // Add a diagnostic with raw text
         // (used when we get errors from a downstream compiler)
@@ -202,9 +205,9 @@ namespace Slang
 
 #ifdef _DEBUG
 #define SLANG_INTERNAL_ERROR(sink, pos) \
-    (sink)->diagnose(Slang::CodePosition(__LINE__, 0, 0, __FILE__), Slang::Diagnostics::internalCompilerError)
+    (sink)->diagnose(Slang::SourceLoc(__LINE__, 0, 0, __FILE__), Slang::Diagnostics::internalCompilerError)
 #define SLANG_UNIMPLEMENTED(sink, pos, what) \
-    (sink)->diagnose(Slang::CodePosition(__LINE__, 0, 0, __FILE__), Slang::Diagnostics::unimplemented, what)
+    (sink)->diagnose(Slang::SourceLoc(__LINE__, 0, 0, __FILE__), Slang::Diagnostics::unimplemented, what)
 
 #else
 #define SLANG_INTERNAL_ERROR(sink, pos) \

@@ -596,7 +596,7 @@ struct OptionsParser
             else if (rawOutputPaths.Count() > rawEntryPoints.Count())
             {
                 requestImpl->mSink.diagnose(
-                    CodePosition(),
+                    SourceLoc(),
                     Diagnostics::tooManyOutputPathsSpecified,
                     rawOutputPaths.Count(),
                     rawEntryPoints.Count());
@@ -611,7 +611,7 @@ struct OptionsParser
                     if (entryPoint.outputPathIndex < 0)
                     {
                         requestImpl->mSink.diagnose(
-                            CodePosition(),
+                            SourceLoc(),
                             Diagnostics::noOutputPathSpecifiedForEntryPoint,
                             entryPoint.name);
 
@@ -639,7 +639,7 @@ struct OptionsParser
                             // This file didn't imply a target, and that
                             // needs to be an error:
                             requestImpl->mSink.diagnose(
-                                CodePosition(),
+                                SourceLoc(),
                                 Diagnostics::cannotDeduceOutputFormatFromPath,
                                 rawOutputPath.path);
 
@@ -669,7 +669,7 @@ struct OptionsParser
                                 // This file didn't imply a target, and that
                                 // needs to be an error:
                                 requestImpl->mSink.diagnose(
-                                    CodePosition(),
+                                    SourceLoc(),
                                     Diagnostics::outputPathsImplyDifferentFormats,
                                     rawOutputPaths[0].path,
                                     rawOutputPath.path);

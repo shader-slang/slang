@@ -196,7 +196,7 @@ namespace Slang
         HMODULE d3dCompiler =  LoadLibraryA(libraryName);
         if (!d3dCompiler)
         {
-            request->mSink.diagnose(CodePosition(), Diagnostics::failedToLoadDynamicLibrary, libraryName);
+            request->mSink.diagnose(SourceLoc(), Diagnostics::failedToLoadDynamicLibrary, libraryName);
         }
         return d3dCompiler;
     }
@@ -373,7 +373,7 @@ namespace Slang
         HMODULE glslCompiler =  LoadLibraryA(libraryName);
         if (!glslCompiler)
         {
-            request->mSink.diagnose(CodePosition(), Diagnostics::failedToLoadDynamicLibrary, libraryName);
+            request->mSink.diagnose(SourceLoc(), Diagnostics::failedToLoadDynamicLibrary, libraryName);
         }
         return glslCompiler;
     }
@@ -611,7 +611,7 @@ namespace Slang
         if (count != 1)
         {
             compileRequest->mSink.diagnose(
-                CodePosition(),
+                SourceLoc(),
                 Diagnostics::cannotWriteOutputFile,
                 path);
         }
@@ -630,7 +630,7 @@ namespace Slang
         if (!file)
         {
             compileRequest->mSink.diagnose(
-                CodePosition(),
+                SourceLoc(),
                 Diagnostics::cannotWriteOutputFile,
                 path);
             return;

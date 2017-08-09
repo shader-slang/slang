@@ -984,6 +984,7 @@ namespace slang
 #include "source/slang/check.cpp"
 #include "source/slang/compiler.cpp"
 #include "source/slang/slang-stdlib.cpp"
+#include "source/slang/source-loc.cpp"
 #include "source/slang/syntax.cpp"
 #include "source/slang/token.cpp"
 #include "source/slang/type-layout.cpp"

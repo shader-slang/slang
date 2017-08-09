@@ -155,6 +155,8 @@ namespace Slang
     public:
         StringSlice();
 
+        StringSlice(String const& str);
+
         StringSlice(String const& str, UInt beginIndex, UInt endIndex);
 
         UInt getLength() const
