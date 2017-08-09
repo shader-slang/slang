@@ -10,6 +10,16 @@ ABSTRACT_SYNTAX_CLASS(SyntaxNodeBase, RefObject)
 
     // The primary source location associated with this AST node
     FIELD(CodePosition, Position)
+
+    RAW(
+    // Allow dynamic casting with a convenient syntax
+    template<typename T>
+    T* As()
+    {
+        return dynamic_cast<T*>(this);
+    }
+    )
+
 END_SYNTAX_CLASS()
 
 // Base class for compile-time values (most often a type).
