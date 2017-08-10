@@ -9,7 +9,7 @@
 ABSTRACT_SYNTAX_CLASS(SyntaxNodeBase, RefObject)
 
     // The primary source location associated with this AST node
-    FIELD(CodePosition, Position)
+    FIELD(SourceLoc, Position)
 
     RAW(
     // Allow dynamic casting with a convenient syntax

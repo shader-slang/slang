@@ -18,8 +18,9 @@ char const* TokenTypeToString(TokenType type);
 
 enum TokenFlag : unsigned int
 {
-    AtStartOfLine   = 1 << 0,
-    AfterWhitespace = 1 << 1,
+    AtStartOfLine           = 1 << 0,
+    AfterWhitespace         = 1 << 1,
+    SuppressMacroExpansion  = 1 << 2,
 };
 typedef unsigned int TokenFlags;
 
@@ -28,15 +29,21 @@ class Token
 public:
 	TokenType type = TokenType::Unknown;
 	String Content;
-	CodePosition Position;
+	SourceLoc Position;
     TokenFlags flags = 0;
+
 	Token() = default;
-	Token(TokenType type, const String & content, int line, int col, int pos, String fileName, TokenFlags flags = 0)
+
+    Token(
+        TokenType type,
+        const String & content,
+        SourceLoc loc,
+        TokenFlags flags = 0)
         : flags(flags)
 	{
 		type = type;
 		Content = content;
-		Position = CodePosition(line, col, pos, fileName);
+        Position = loc;
 	}
 };
 

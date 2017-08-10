@@ -20,6 +20,9 @@ namespace Slang {
 
 Session::Session()
 {
+    // Make sure our source manager is initialized
+    builtinSourceManager.initialize(nullptr);
+
     // Initialize representations of some very basic types:
     initializeTypes();
 
@@ -82,6 +85,16 @@ struct IncludeHandlerImpl : IncludeHandler
     }
 };
 
+CompileRequest::CompileRequest(Session* session)
+    : mSession(session)
+{
+    setSourceManager(&sourceManagerStorage);
+
+    sourceManager->initialize(session->getBuiltinSourceManager());
+}
+
+CompileRequest::~CompileRequest()
+{}
 
 void CompileRequest::parseTranslationUnit(
     TranslationUnitRequest* translationUnit)
@@ -117,12 +130,8 @@ void CompileRequest::parseTranslationUnit(
 
     for (auto sourceFile : translationUnit->sourceFiles)
     {
-        auto sourceFilePath = sourceFile->path;
-        String source = sourceFile->content;
-
         auto tokens = preprocessSource(
-            source,
-            sourceFilePath,
+            sourceFile,
             &mSink,
             &includeHandler,
             combinedPreprocessorDefinitions,
@@ -132,7 +141,6 @@ void CompileRequest::parseTranslationUnit(
             translationUnit,
             tokens,
             &mSink,
-            sourceFilePath,
             languageScope);
     }
 }
@@ -297,16 +305,21 @@ int CompileRequest::addTranslationUnit(SourceLanguage language, String const&)
     return (int) result;
 }
 
+void CompileRequest::addTranslationUnitSourceFile(
+    int             translationUnitIndex,
+    SourceFile*     sourceFile)
+{
+    translationUnits[translationUnitIndex]->sourceFiles.Add(sourceFile);
+}
+
 void CompileRequest::addTranslationUnitSourceString(
     int             translationUnitIndex,
     String const&   path,
     String const&   source)
 {
-    RefPtr<SourceFile> sourceFile = new SourceFile();
-    sourceFile->path = path;
-    sourceFile->content = source;
+    RefPtr<SourceFile> sourceFile = getSourceManager()->allocateSourceFile(path, source);
 
-    translationUnits[translationUnitIndex]->sourceFiles.Add(sourceFile);
+    addTranslationUnitSourceFile(translationUnitIndex, sourceFile);
 }
 
 void CompileRequest::addTranslationUnitSourceFile(
@@ -322,7 +335,7 @@ void CompileRequest::addTranslationUnitSourceFile(
     {
         // Emit a diagnostic!
         mSink.diagnose(
-            CodePosition(0, 0, 0, path),
+            SourceLoc(),
             Diagnostics::cannotOpenFile,
             path);
         return;
@@ -359,7 +372,7 @@ RefPtr<ModuleDecl> CompileRequest::loadModule(
     String const&       name,
     String const&       path,
     String const&       source,
-    CodePosition const&)
+    SourceLoc const&)
 {
     RefPtr<TranslationUnitRequest> translationUnit = new TranslationUnitRequest();
     translationUnit->compileRequest = this;
@@ -370,9 +383,7 @@ RefPtr<ModuleDecl> CompileRequest::loadModule(
     //
     // TODO: decide which options, if any, should be inherited.
 
-    RefPtr<SourceFile> sourceFile = new SourceFile();
-    sourceFile->path = path;
-    sourceFile->content = source;
+    RefPtr<SourceFile> sourceFile = getSourceManager()->allocateSourceFile(path, source);
 
     translationUnit->sourceFiles.Add(sourceFile);
 
@@ -413,7 +424,6 @@ void CompileRequest::handlePoundImport(
         translationUnit.Ptr(),
         tokens,
         &mSink,
-        path,
         languageScope);
 
     // TODO: handle errors
@@ -438,7 +448,7 @@ void CompileRequest::handlePoundImport(
 
 RefPtr<ModuleDecl> CompileRequest::findOrImportModule(
     String const&       name,
-    CodePosition const& loc)
+    SourceLoc const& loc)
 {
     // Have we already loaded a module matching this name?
     // If so, return it.
@@ -470,7 +480,9 @@ RefPtr<ModuleDecl> CompileRequest::findOrImportModule(
     IncludeHandlerImpl includeHandler;
     includeHandler.request = this;
 
-    String pathIncludedFrom = loc.FileName;
+    auto expandedLoc = getSourceManager()->expandSourceLoc(loc);
+
+    String pathIncludedFrom = expandedLoc.getSpellingPath();
 
     String foundPath;
     String foundSource;
@@ -508,7 +520,7 @@ RefPtr<ModuleDecl> CompileRequest::findOrImportModule(
 RefPtr<ModuleDecl> findOrImportModule(
     CompileRequest*     request,
     String const&       name,
-    CodePosition const& loc)
+    SourceLoc const& loc)
 {
     return request->findOrImportModule(name, loc);
 }
@@ -519,8 +531,11 @@ void Session::addBuiltinSource(
     String const&           source)
 {
     RefPtr<CompileRequest> compileRequest = new CompileRequest(this);
+    compileRequest->setSourceManager(getBuiltinSourceManager());
 
     auto translationUnitIndex = compileRequest->addTranslationUnit(SourceLanguage::Slang, path);
+
+    RefPtr<SourceFile> sourceFile = builtinSourceManager.allocateSourceFile(path, source);
 
     compileRequest->addTranslationUnitSourceString(
         translationUnitIndex,
@@ -818,7 +833,7 @@ SLANG_API int spCompile(
     }
     catch (...)
     {
-        req->mSink.diagnose(Slang::CodePosition(), Slang::Diagnostics::compilationAborted);
+        req->mSink.diagnose(Slang::SourceLoc(), Slang::Diagnostics::compilationAborted);
         return 1;
     }
 }

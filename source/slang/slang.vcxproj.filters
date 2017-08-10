@@ -56,5 +56,6 @@
     <ClCompile Include="type-layout.cpp" />
     <ClCompile Include="options.cpp" />
     <ClCompile Include="lower.cpp" />
+    <ClCompile Include="source-loc.cpp" />
   </ItemGroup>
 </Project>

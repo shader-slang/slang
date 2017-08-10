@@ -1,4 +1,12 @@
-#include "Lexer.h"
+// lexer.cpp
+#include "lexer.h"
+
+// This file implements the lexer/scanner, which is responsible for taking a raw stream of
+// input bytes and turning it into semantically useful tokens.
+//
+
+#include "compiler.h"
+#include "source-loc.h"
 
 #include <assert.h>
 
@@ -6,7 +14,7 @@ namespace Slang
 {
     static Token GetEndOfFileToken()
     {
-        return Token(TokenType::EndOfFile, "", 0, 0, 0, "");
+        return Token(TokenType::EndOfFile, "", SourceLoc());
     }
 
     Token* TokenList::begin() const
@@ -52,10 +60,10 @@ namespace Slang
         return mCursor->type;
     }
 
-    CodePosition TokenReader::PeekLoc() const
+    SourceLoc TokenReader::PeekLoc() const
     {
         if (!mCursor)
-            return CodePosition();
+            return SourceLoc();
         SLANG_ASSERT(mCursor);
         return mCursor->Position;
     }
@@ -75,18 +83,22 @@ namespace Slang
 
     // Lexer
 
-    Lexer::Lexer(
-        String const&   path,
-        String const&   content,
-        DiagnosticSink* sink)
-        : path(path)
-        , content(content)
-        , sink(sink)
+    void Lexer::initialize(
+        SourceFile*     inSourceFile,
+        DiagnosticSink* inSink)
     {
+        sourceFile = inSourceFile;
+        sink = inSink;
+
+        auto content = inSourceFile->content;
+
+        begin   = content.begin();
         cursor  = content.begin();
         end     = content.end();
 
-        loc = CodePosition(1, 1, 0, path);
+        spellingStartLoc = inSourceFile->sourceRange.begin;
+        presumedStartLoc = spellingStartLoc;
+
         tokenFlags = TokenFlag::AtStartOfLine | TokenFlag::AfterWhitespace;
         lexerFlags = 0;
     }
@@ -142,9 +154,6 @@ namespace Slang
         {
             advanceRaw(lexer);
         }
-
-        lexer->loc.Line++;
-        lexer->loc.Col = 1;
     }
 
     // Look ahead one code point, dealing with complications like
@@ -224,12 +233,7 @@ namespace Slang
 
             // TODO: Need to handle non-ASCII code points.
 
-            // Default case is to advance by one location
-            // and return the raw byte we saw.
-
-            lexer->loc.Col++;
-            lexer->loc.Pos++;
-
+            // Default case is to return the raw byte we saw.
             return c;
         }
     }
@@ -323,6 +327,27 @@ namespace Slang
         }
     }
 
+    static SourceLoc getSourceLoc(Lexer* lexer)
+    {
+        return lexer->presumedStartLoc + (lexer->cursor - lexer->begin);
+    }
+
+    // Begin overriding the reported locations of tokens,
+    // based on a `#line` directives
+    void Lexer::startOverridingSourceLocations(
+        SourceLoc loc)
+    {
+        if(loc.isValid())
+        {
+            presumedStartLoc = loc;
+        }
+    }
+
+    void Lexer::stopOverridingSourceLocations()
+    {
+        presumedStartLoc = spellingStartLoc;
+    }
+
     static void lexDigits(Lexer* lexer, int base)
     {
         for(;;)
@@ -355,7 +380,7 @@ namespace Slang
             if(digitVal >= base)
             {
                 char buffer[] = { (char) c, 0 };
-                lexer->sink->diagnose(lexer->loc, Diagnostics::invalidDigitForBase, buffer, base);
+                lexer->sink->diagnose(getSourceLoc(lexer), Diagnostics::invalidDigitForBase, buffer, base);
             }
 
             advance(lexer);
@@ -695,11 +720,11 @@ namespace Slang
             switch(c)
             {
             case kEOF:
-                lexer->sink->diagnose(lexer->loc, Diagnostics::endOfFileInLiteral);
+                lexer->sink->diagnose(getSourceLoc(lexer), Diagnostics::endOfFileInLiteral);
                 return;
 
             case '\n': case '\r':
-                lexer->sink->diagnose(lexer->loc, Diagnostics::newlineInLiteral);
+                lexer->sink->diagnose(getSourceLoc(lexer), Diagnostics::newlineInLiteral);
                 return;
 
             case '\\':
@@ -952,7 +977,7 @@ namespace Slang
 
         case '0':
             {
-                auto loc = lexer->loc;
+                auto loc = getSourceLoc(lexer);
                 advance(lexer);
                 switch(peek(lexer))
                 {
@@ -1170,7 +1195,7 @@ namespace Slang
             // If none of the above cases matched, then we have an
             // unexpected/invalid character.
 
-            auto loc = lexer->loc;
+            auto loc = getSourceLoc(lexer);
             auto sink = lexer->sink;
             int c = advance(lexer);
             if(c >= 0x20 && c <=  0x7E)
@@ -1194,7 +1219,7 @@ namespace Slang
         for(;;)
         {
             Token token;
-            token.Position = loc;
+            token.Position = getSourceLoc(this);
 
             char const* textBegin = cursor;
 
@@ -1314,7 +1339,7 @@ namespace Slang
     TokenList Lexer::Parse(const String & fileName, const String & str, DiagnosticSink * sink)
     {
         TokenList tokenList;
-        tokenList.mTokens = TokenizeText(fileName, str, [&](TokenizeErrorType errType, CodePosition pos)
+        tokenList.mTokens = TokenizeText(fileName, str, [&](TokenizeErrorType errType, SourceLoc pos)
         {
             auto curChar = str[pos.Pos];
             switch (errType)

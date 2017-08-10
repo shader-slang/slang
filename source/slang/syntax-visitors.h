@@ -26,7 +26,7 @@ namespace Slang
     RefPtr<ModuleDecl> findOrImportModule(
         CompileRequest*     request,
         String const&       name,
-        CodePosition const& loc);
+        SourceLoc const& loc);
 }
 
 #endif

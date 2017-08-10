@@ -31,8 +31,7 @@ struct IncludeHandler
 
 // Take a string of source code and preprocess it into a list of tokens.
 TokenList preprocessSource(
-    String const&               source,
-    String const&               fileName,
+    SourceFile*                 file,
     DiagnosticSink*             sink,
     IncludeHandler*             includeHandler,
     Dictionary<String, String>  defines,

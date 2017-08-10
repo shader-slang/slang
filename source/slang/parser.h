@@ -12,7 +12,6 @@ namespace Slang
         TranslationUnitRequest*         translationUnit,
         TokenSpan const&                tokens,
         DiagnosticSink*                 sink,
-        String const&                   fileName,
         RefPtr<Scope> const&            outerScope);
 ;
 }

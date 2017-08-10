@@ -51,6 +51,12 @@ namespace Slang
         , endIndex(0)
     {}
 
+    StringSlice::StringSlice(String const& str)
+        : representation(str.buffer)
+        , beginIndex(0)
+        , endIndex(str.Length())
+    {}
+
     StringSlice::StringSlice(String const& str, UInt beginIndex, UInt endIndex)
         : representation(str.buffer)
         , beginIndex(beginIndex)

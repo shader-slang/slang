@@ -41,7 +41,6 @@ namespace Slang
 
         TokenReader tokenReader;
         DiagnosticSink * sink;
-        String fileName;
         int genericDepth = 0;
 
         // Have we seen any `import` declarations? If so, we need
@@ -73,11 +72,9 @@ namespace Slang
         Parser(
             TokenSpan const& _tokens,
             DiagnosticSink * sink,
-            String _fileName,
             RefPtr<Scope> const& outerScope)
             : tokenReader(_tokens)
             , sink(sink)
-            , fileName(_fileName)
             , outerScope(outerScope)
         {}
 
@@ -614,7 +611,7 @@ namespace Slang
         RefPtr<Modifier>* modifierLink = &modifiers.first;
         for (;;)
         {
-            CodePosition loc = parser->tokenReader.PeekLoc();
+            SourceLoc loc = parser->tokenReader.PeekLoc();
 
             if (0) {}
 
@@ -1003,7 +1000,7 @@ namespace Slang
     struct PointerDeclarator : Declarator
     {
         // location of the `*` token
-        CodePosition starLoc;
+        SourceLoc starLoc;
 
         RefPtr<Declarator>				inner;
     };
@@ -1014,7 +1011,7 @@ namespace Slang
         RefPtr<Declarator>				inner;
 
         // location of the `[` token
-        CodePosition openBracketLoc;
+        SourceLoc openBracketLoc;
 
         // The expression that yields the element count, or NULL
         RefPtr<Expr>	elementCountExpr;
@@ -1377,7 +1374,7 @@ namespace Slang
     // Either a single declaration, or a group of them
     struct DeclGroupBuilder
     {
-        CodePosition        startPosition;
+        SourceLoc        startPosition;
         RefPtr<Decl>        decl;
         RefPtr<DeclGroup>   group;
 
@@ -1546,7 +1543,7 @@ namespace Slang
         Parser*         parser,
         ContainerDecl*  containerDecl)
     {
-        CodePosition startPosition = parser->tokenReader.PeekLoc();
+        SourceLoc startPosition = parser->tokenReader.PeekLoc();
 
         auto typeSpec = parseTypeSpec(parser);
 
@@ -1780,7 +1777,7 @@ namespace Slang
         // We first look at the declaration keywrod to determine
         // the type of buffer to declare:
         String bufferWrapperTypeName;
-        CodePosition bufferWrapperTypeNamePos = parser->tokenReader.PeekLoc();
+        SourceLoc bufferWrapperTypeNamePos = parser->tokenReader.PeekLoc();
         if (AdvanceIf(parser, "cbuffer"))
         {
             bufferWrapperTypeName = "ConstantBuffer";
@@ -1914,7 +1911,7 @@ namespace Slang
         // will see through it to the members inside.
 
 
-        CodePosition pos = parser->tokenReader.PeekLoc();
+        SourceLoc pos = parser->tokenReader.PeekLoc();
 
         // The initial name before the `{` is only supposed
         // to be made visible to reflection
@@ -2446,7 +2443,7 @@ namespace Slang
         }
 
         PushScope(program);
-        program->Position = CodePosition(0, 0, 0, fileName);
+        program->Position = tokenReader.PeekLoc();
         ParseDeclBody(this, program, TokenType::EndOfFile);
         PopScope();
 
@@ -3853,10 +3850,9 @@ namespace Slang
         TranslationUnitRequest*         translationUnit,
         TokenSpan const&                tokens,
         DiagnosticSink*                 sink,
-        String const&                   fileName,
         RefPtr<Scope> const&            outerScope)
     {
-        Parser parser(tokens, sink, fileName, outerScope);
+        Parser parser(tokens, sink, outerScope);
 
         parser.translationUnit = translationUnit;
 

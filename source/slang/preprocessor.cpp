@@ -60,45 +60,61 @@ struct PreprocessorEnvironment
 // In general, input streams can be nested, so we have to keep a conceptual
 // stack of input.
 
+struct PrimaryInputStream;
+
 // A stream of input tokens to be consumed
 struct PreprocessorInputStream
 {
+    // The primary input stream that is the parent to this one,
+    // or NULL if this stream is itself a primary stream.
+    PrimaryInputStream*             primaryStream;
+
     // The next input stream up the stack, if any.
     PreprocessorInputStream*        parent;
 
-    // The deepest preprocessor conditional active for this stream.
-    PreprocessorConditional*        conditional;
-
     // Environment to use when looking up macros
     PreprocessorEnvironment*        environment;
-
-    // Reader for pre-tokenized input
-    TokenReader                     tokenReader;
-
-    // If we are clobbering source locations with `#line`, then
-    // the state is tracked here:
-
-    // Are we overriding source locations?
-    bool                            isOverridingSourceLoc;
-
-    // What is the file name we are overriding to?
-    String                          overrideFileName;
-
-    // What is the relative offset to apply to any line numbers?
-    int                             overrideLineOffset;
 
     // Destructor is virtual so that we can clean up
     // after concrete subtypes.
     virtual ~PreprocessorInputStream() = default;
 };
 
-struct SourceTextInputStream : PreprocessorInputStream
+// A "primary" input stream represents the top-level context of a file
+// being parsed, and tracks things like preprocessor conditional state
+struct PrimaryInputStream : PreprocessorInputStream
 {
-    // The pre-tokenized input
-    TokenList           lexedTokens;
+    // The next *primary* input stream up the stack
+    PrimaryInputStream*             parentPrimaryInputStream;
+
+    // The deepest preprocessor conditional active for this stream.
+    PreprocessorConditional*        conditional;
+
+    // The lexer state that will provide input
+    Lexer lexer;
+
+    // One token of lookahead
+    Token token;
 };
 
-struct MacroExpansion : PreprocessorInputStream
+// A "secondary" input stream represents code that is being expanded
+// into the current scope, but which had already been tokenized before.
+//
+struct PretokenizedInputStream : PreprocessorInputStream
+{
+    // Reader for pre-tokenized input
+    TokenReader                     tokenReader;
+};
+
+// A pre-tokenized input stream that will only be used once, and which
+// therefore owns the memory for its tokens.
+struct SimpleTokenInputStream : PretokenizedInputStream
+{
+    // A list of raw tokens that will provide input
+    TokenList lexedTokens;
+};
+
+struct MacroExpansion : PretokenizedInputStream
 {
     // The macro we will expand
     PreprocessorMacro*  macro;
@@ -204,39 +220,55 @@ static void DestroyMacro(Preprocessor* preprocessor, PreprocessorMacro* macro);
 //
 
 // Create a fresh input stream
-static void  InitializeInputStream(Preprocessor* preprocessor, PreprocessorInputStream* inputStream)
+static void  initializeInputStream(Preprocessor* preprocessor, PreprocessorInputStream* inputStream)
 {
     inputStream->parent = NULL;
-    inputStream->conditional = NULL;
     inputStream->environment = &preprocessor->globalEnv;
 }
 
+static void initializePrimaryInputStream(Preprocessor* preprocessor, PrimaryInputStream* inputStream)
+{
+    initializeInputStream(preprocessor, inputStream);
+    inputStream->primaryStream = inputStream;
+    inputStream->conditional = NULL;
+}
+
 // Destroy an input stream
-static void DestroyInputStream(Preprocessor* /*preprocessor*/, PreprocessorInputStream* inputStream)
+static void destroyInputStream(Preprocessor* /*preprocessor*/, PreprocessorInputStream* inputStream)
 {
     delete inputStream;
 }
 
 // Create an input stream to represent a pre-tokenized input file.
 // TODO(tfoley): pre-tokenizing files isn't going to work in the long run.
-static PreprocessorInputStream* CreateInputStreamForSource(Preprocessor* preprocessor, String const& source, String const& fileName)
+static PreprocessorInputStream* CreateInputStreamForSource(
+    Preprocessor*   preprocessor,
+    SourceFile*     sourceFile)
 {
-    SourceTextInputStream* inputStream = new SourceTextInputStream();
-    InitializeInputStream(preprocessor, inputStream);
+    PrimaryInputStream* inputStream = new PrimaryInputStream();
+    initializePrimaryInputStream(preprocessor, inputStream);
 
-    // Use existing `Lexer` to generate a token stream.
-    Lexer lexer(fileName, source, GetSink(preprocessor));
-    inputStream->lexedTokens = lexer.lexAllTokens();
-    inputStream->tokenReader = TokenReader(inputStream->lexedTokens);
+    // initialize the embedded lexer so that it can generate a token stream
+    inputStream->lexer.initialize(sourceFile, GetSink(preprocessor));
+    inputStream->token = inputStream->lexer.lexToken();
 
     return inputStream;
 }
 
+static PrimaryInputStream* asPrimaryInputStream(PreprocessorInputStream* inputStream)
+{
+    auto primaryStream = inputStream->primaryStream;
+    if(primaryStream == inputStream)
+        return primaryStream;
+    return nullptr;
+}
 
 
 static void PushInputStream(Preprocessor* preprocessor, PreprocessorInputStream* inputStream)
 {
     inputStream->parent = preprocessor->inputStream;
+    if(!asPrimaryInputStream(inputStream))
+        inputStream->primaryStream = preprocessor->inputStream->primaryStream;
     preprocessor->inputStream = inputStream;
 }
 
@@ -244,52 +276,69 @@ static void PushInputStream(Preprocessor* preprocessor, PreprocessorInputStream*
 // Performs some validation and then destroys the input stream if required.
 static void EndInputStream(Preprocessor* preprocessor, PreprocessorInputStream* inputStream)
 {
-    // If there are any conditionals that weren't completed, then it is an error
-    if (inputStream->conditional)
+    if(auto primaryStream = asPrimaryInputStream(inputStream))
     {
-        PreprocessorConditional* conditional = inputStream->conditional;
-
-        GetSink(preprocessor)->diagnose(conditional->ifToken.Position, Diagnostics::endOfFileInPreprocessorConditional);
-
-        while (conditional)
+        // If there are any conditionals that weren't completed, then it is an error
+        if (primaryStream->conditional)
         {
-            PreprocessorConditional* parent = conditional->parent;
-            DestroyConditional(conditional);
-            conditional = parent;
+            PreprocessorConditional* conditional = primaryStream->conditional;
+
+            GetSink(preprocessor)->diagnose(conditional->ifToken.Position, Diagnostics::endOfFileInPreprocessorConditional);
+
+            while (conditional)
+            {
+                PreprocessorConditional* parent = conditional->parent;
+                DestroyConditional(conditional);
+                conditional = parent;
+            }
         }
     }
 
-    DestroyInputStream(preprocessor, inputStream);
-}
-
-// Potentially clobber source location information based on `#line`
-static Token PossiblyOverrideSourceLoc(PreprocessorInputStream* inputStream, Token const& token)
-{
-    Token result = token;
-    if( inputStream->isOverridingSourceLoc )
-    {
-        result.Position.FileName = inputStream->overrideFileName;
-        result.Position.Line += inputStream->overrideLineOffset;
-    }
-    return result;
+    destroyInputStream(preprocessor, inputStream);
 }
 
 // Consume one token from an input stream
 static Token AdvanceRawToken(PreprocessorInputStream* inputStream)
 {
-    return PossiblyOverrideSourceLoc(inputStream, inputStream->tokenReader.AdvanceToken());
+    if( auto primaryStream = asPrimaryInputStream(inputStream) )
+    {
+        auto result = primaryStream->token;
+        primaryStream->token = primaryStream->lexer.lexToken();
+        return result;
+    }
+    else
+    {
+        PretokenizedInputStream* pretokenized = (PretokenizedInputStream*) inputStream;
+        return pretokenized->tokenReader.AdvanceToken();
+    }
 }
 
 // Peek one token from an input stream
 static Token PeekRawToken(PreprocessorInputStream* inputStream)
 {
-    return PossiblyOverrideSourceLoc(inputStream, inputStream->tokenReader.PeekToken());
+    if( auto primaryStream = asPrimaryInputStream(inputStream) )
+    {
+        return primaryStream->token;
+    }
+    else
+    {
+        PretokenizedInputStream* pretokenized = (PretokenizedInputStream*) inputStream;
+        return pretokenized->tokenReader.PeekToken();
+    }
 }
 
 // Peek one token type from an input stream
 static TokenType PeekRawTokenType(PreprocessorInputStream* inputStream)
 {
-    return inputStream->tokenReader.PeekTokenType();
+    if( auto primaryStream = asPrimaryInputStream(inputStream) )
+    {
+        return primaryStream->token.type;
+    }
+    else
+    {
+        PretokenizedInputStream* pretokenized = (PretokenizedInputStream*) inputStream;
+        return pretokenized->tokenReader.PeekTokenType();
+    }
 }
 
 
@@ -355,55 +404,8 @@ static Token PeekRawToken(Preprocessor* preprocessor)
     }
 }
 
-// Without advancing preprocessor state, look *two* raw tokens ahead
-// (This is only needed in order to determine when we are possibly
-// expanding a function-style macro)
-TokenType PeekSecondRawTokenType(Preprocessor* preprocessor)
-{
-    // We need to find the strema that `advanceRawToken` would read from.
-    PreprocessorInputStream* inputStream = preprocessor->inputStream;
-    int count = 1;
-    for (;;)
-    {
-        if (!inputStream)
-        {
-            // No more input streams left to read
-            return TokenType::EndOfFile;
-        }
-
-        // The top-most input stream may be at its end, so
-        // look one entry up the stack (don't actually pop
-        // here, since we are just peeking)
-
-        TokenReader reader = inputStream->tokenReader;
-        if (reader.PeekTokenType() == TokenType::EndOfFile)
-        {
-            inputStream = inputStream->parent;
-            continue;
-        }
-
-        if (count)
-        {
-            count--;
-
-            // Note: we are advancing our temporary
-            // copy of the token reader
-            reader.AdvanceToken();
-            if (reader.PeekTokenType() == TokenType::EndOfFile)
-            {
-                inputStream = inputStream->parent;
-                continue;
-            }
-        }
-
-        // Everything worked, so peek a token from the top-most stream
-        return reader.PeekTokenType();
-    }
-}
-
-
 // Get the location of the current (raw) token
-static CodePosition PeekLoc(Preprocessor* preprocessor)
+static SourceLoc PeekLoc(Preprocessor* preprocessor)
 {
     return PeekRawToken(preprocessor).Position;
 }
@@ -471,7 +473,7 @@ static PreprocessorEnvironment* GetCurrentEnvironment(Preprocessor* preprocessor
 
         // If the current input stream is at its end, then
         // fall back to its parent stream.
-        if (inputStream->tokenReader.PeekTokenType() == TokenType::EndOfFile)
+        if (PeekRawTokenType(inputStream) == TokenType::EndOfFile)
         {
             inputStream = inputStream->parent;
             continue;
@@ -528,7 +530,11 @@ static void InitializeMacroExpansion(
     MacroExpansion*     expansion,
     PreprocessorMacro*  macro)
 {
-    InitializeInputStream(preprocessor, expansion);
+    initializeInputStream(preprocessor, expansion);
+
+    expansion->parent = preprocessor->inputStream;
+    expansion->primaryStream = preprocessor->inputStream->primaryStream;
+
     expansion->environment = macro->environment;
     expansion->macro = macro;
     expansion->tokenReader = TokenReader(macro->tokens);
@@ -550,6 +556,26 @@ static void AddEndOfStreamToken(
     macro->tokens.mTokens.Add(token);
 }
 
+static SimpleTokenInputStream* createSimpleInputStream(
+    Preprocessor*   preprocessor,
+    Token const&    token)
+{
+    SimpleTokenInputStream* inputStream = new SimpleTokenInputStream();
+    initializeInputStream(preprocessor, inputStream);
+
+    inputStream->lexedTokens.mTokens.Add(token);
+
+    Token eofToken;
+    eofToken.type = TokenType::EndOfFile;
+    eofToken.Position = token.Position;
+    eofToken.flags = TokenFlag::AfterWhitespace | TokenFlag::AtStartOfLine;
+    inputStream->lexedTokens.mTokens.Add(eofToken);
+ 
+    inputStream->tokenReader = TokenReader(inputStream->lexedTokens);
+
+    return inputStream;
+}
+
 // Check whether the current token on the given input stream should be
 // treated as a macro invocation, and if so set up state for expanding
 // that macro.
@@ -561,7 +587,7 @@ static void MaybeBeginMacroExpansion(
     for (;;)
     {
         // Look at the next token ahead of us
-        Token const& token = PeekRawToken(preprocessor);
+        Token token = PeekRawToken(preprocessor);
 
         // Not an identifier? Can't be a macro.
         if (token.type != TokenType::Identifier)
@@ -585,11 +611,28 @@ static void MaybeBeginMacroExpansion(
         // requires more lookahead than we usually have/need
         if (macro->flavor == PreprocessorMacroFlavor::FunctionLike)
         {
-            if(PeekSecondRawTokenType(preprocessor) != TokenType::LParent)
-                return;
-
-            // Consume the token that triggered macro expansion
+            // Consume the token that (possibly) triggered macro expansion
             AdvanceRawToken(preprocessor);
+
+            // Look at the next token, and see if it is an opening `(`
+            // that indicates we should actually expand a macro.
+            if(PeekRawTokenType(preprocessor) != TokenType::LParent)
+            {
+                // In this case, we are in a bit of a mess, because we have
+                // consumed the token that named the macro, but we need to
+                // make sure that token (and not whatever came after it)
+                // gets returned to the user.
+                //
+                // To work around this we will construct a short-lived input
+                // stream just to handle that one token, and also set
+                // a flag on the token to keep us from doing this logic again.
+
+                token.flags |= TokenFlag::SuppressMacroExpansion;
+
+                SimpleTokenInputStream* simpleStream = createSimpleInputStream(preprocessor, token);
+                PushInputStream(preprocessor, simpleStream);
+                return;
+            }
 
             // Consume the opening `(`
             Token leftParen = AdvanceRawToken(preprocessor);
@@ -762,8 +805,22 @@ top:
         }
 
         // Now re-lex the input
-        PreprocessorInputStream* inputStream = CreateInputStreamForSource(preprocessor, sb.ProduceString(), "token paste");
-        if (inputStream->tokenReader.GetCount() != 1)
+
+        // We create a dummy file to represent the token-paste operation
+        SourceFile* sourceFile = preprocessor->getCompileRequest()->getSourceManager()->allocateSourceFile("token paste", sb.ProduceString());
+
+        Lexer lexer;
+        lexer.initialize(sourceFile, GetSink(preprocessor));
+
+        SimpleTokenInputStream* inputStream = new SimpleTokenInputStream();
+        initializeInputStream(preprocessor, inputStream);
+
+        inputStream->lexedTokens = lexer.lexAllTokens();
+        inputStream->tokenReader = TokenReader(inputStream->lexedTokens);
+
+        // We expect the reuslt of lexing to be two tokens: one for the actual value,
+        // and one for the end-of-input marker.
+        if (inputStream->tokenReader.GetCount() != 2)
         {
             // We expect a token paste to produce a single token
             // TODO(tfoley): emit a diagnostic here
@@ -839,7 +896,7 @@ inline String const& GetDirectiveName(PreprocessorDirectiveContext* context)
 }
 
 // Get the location of the directive being parsed.
-inline CodePosition const& GetDirectiveLoc(PreprocessorDirectiveContext* context)
+inline SourceLoc const& GetDirectiveLoc(PreprocessorDirectiveContext* context)
 {
     return context->directiveToken.Position;
 }
@@ -851,7 +908,7 @@ static inline DiagnosticSink* GetSink(PreprocessorDirectiveContext* context)
 }
 
 // Wrapper to get a "current" location when parsing a directive
-static CodePosition PeekLoc(PreprocessorDirectiveContext* context)
+static SourceLoc PeekLoc(PreprocessorDirectiveContext* context)
 {
     return PeekLoc(context->preprocessor);
 }
@@ -970,8 +1027,11 @@ static bool IsSkipping(Preprocessor* preprocessor)
     PreprocessorInputStream* inputStream = preprocessor->inputStream;
     if (!inputStream) return false;
 
+    PrimaryInputStream* primaryStream = inputStream->primaryStream;
+    if(!primaryStream) return false;
+
     // If we are not inside a preprocessor conditional, then don't skip
-    PreprocessorConditional* conditional = inputStream->conditional;
+    PreprocessorConditional* conditional = primaryStream->conditional;
     if (!conditional) return false;
 
     // skip tokens unless the conditional is inside its `true` case
@@ -1032,8 +1092,9 @@ static void beginConditional(
     conditional->state = state;
 
     // Push conditional onto the stack
-    conditional->parent = inputStream->conditional;
-    inputStream->conditional = conditional;
+    auto primaryStream = inputStream->primaryStream;
+    conditional->parent = primaryStream->conditional;
+    primaryStream->conditional = conditional;
 }
 
 // Start a preprocessor conditional, with an initial enable/disable state.
@@ -1348,7 +1409,7 @@ static void HandleElseDirective(PreprocessorDirectiveContext* context)
     SLANG_ASSERT(inputStream);
 
     // if we aren't inside a conditional, then error
-    PreprocessorConditional* conditional = inputStream->conditional;
+    PreprocessorConditional* conditional = inputStream->primaryStream->conditional;
     if (!conditional)
     {
         GetSink(context)->diagnose(GetDirectiveLoc(context), Diagnostics::directiveWithoutIf, GetDirectiveName(context));
@@ -1402,7 +1463,7 @@ static void HandleElifDirective(PreprocessorDirectiveContext* context)
     PreprocessorExpressionValue value = ParseAndEvaluateExpression(context);
 
     // if we aren't inside a conditional, then error
-    PreprocessorConditional* conditional = inputStream->conditional;
+    PreprocessorConditional* conditional = inputStream->primaryStream->conditional;
     if (!conditional)
     {
         GetSink(context)->diagnose(GetDirectiveLoc(context), Diagnostics::directiveWithoutIf, GetDirectiveName(context));
@@ -1440,14 +1501,14 @@ static void HandleEndIfDirective(PreprocessorDirectiveContext* context)
     SLANG_ASSERT(inputStream);
 
     // if we aren't inside a conditional, then error
-    PreprocessorConditional* conditional = inputStream->conditional;
+    PreprocessorConditional* conditional = inputStream->primaryStream->conditional;
     if (!conditional)
     {
         GetSink(context)->diagnose(GetDirectiveLoc(context), Diagnostics::directiveWithoutIf, GetDirectiveName(context));
         return;
     }
 
-    inputStream->conditional = conditional->parent;
+    inputStream->primaryStream->conditional = conditional->parent;
     DestroyConditional(conditional);
 }
 
@@ -1492,8 +1553,9 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
 
     String path = getFileNameTokenValue(pathToken);
 
-    // TODO(tfoley): make this robust in presence of `#line`
-    String pathIncludedFrom = GetDirectiveLoc(context).FileName;
+    auto directiveLoc = GetDirectiveLoc(context);
+    auto expandedDirectiveLoc = context->preprocessor->translationUnit->compileRequest->getSourceManager()->expandSourceLoc(directiveLoc);
+    String pathIncludedFrom = expandedDirectiveLoc.getSpellingPath();
     String foundPath;
     String foundSource;
 
@@ -1524,7 +1586,10 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
 
     // Push the new file onto our stack of input streams
     // TODO(tfoley): check if we have made our include stack too deep
-    PreprocessorInputStream* inputStream = CreateInputStreamForSource(context->preprocessor, foundSource, foundPath);
+
+    SourceFile* sourceFile = context->preprocessor->getCompileRequest()->getSourceManager()->allocateSourceFile(foundPath, foundSource);
+
+    PreprocessorInputStream* inputStream = CreateInputStreamForSource(context->preprocessor, sourceFile);
     inputStream->parent = context->preprocessor->inputStream;
     context->preprocessor->inputStream = inputStream;
 }
@@ -1654,18 +1719,26 @@ static void HandleErrorDirective(PreprocessorDirectiveContext* context)
 // Handle a `#line` directive
 static void HandleLineDirective(PreprocessorDirectiveContext* context)
 {
+    auto inputStream = context->preprocessor->inputStream;
+
     int line = 0;
+
+    // `#line <integer-literal> ...`
     if (PeekTokenType(context) == TokenType::IntegerLiteral)
     {
         line = StringToInt(AdvanceToken(context).Content);
     }
-    else if (PeekTokenType(context) == TokenType::Identifier
-        && PeekToken(context).Content == "default")
+    // `#line`
+    // `#line default`
+    else if (
+        PeekTokenType(context) == TokenType::EndOfDirective
+        || (PeekTokenType(context) == TokenType::Identifier
+            && PeekToken(context).Content == "default"))
     {
         AdvanceToken(context);
 
         // Stop overiding soure locations.
-        context->preprocessor->inputStream->isOverridingSourceLoc = false;
+        inputStream->primaryStream->lexer.stopOverridingSourceLocations();
         return;
     }
     else
@@ -1678,16 +1751,19 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
         return;
     }
 
-    CodePosition directiveLoc = GetDirectiveLoc(context);
+    SourceLoc directiveLoc = GetDirectiveLoc(context);
+
+    auto sourceManager = context->preprocessor->translationUnit->compileRequest->getSourceManager();
+    auto expandedDirectiveLoc = sourceManager->expandSourceLoc(directiveLoc);
 
     String file;
     if (PeekTokenType(context) == TokenType::EndOfDirective)
     {
-        file = directiveLoc.FileName;
+        file = expandedDirectiveLoc.getPath();
     }
     else if (PeekTokenType(context) == TokenType::StringLiteral)
     {
-        file = AdvanceToken(context).Content;
+        file = getStringLiteralTokenValue(AdvanceToken(context));
     }
     else if (PeekTokenType(context) == TokenType::IntegerLiteral)
     {
@@ -1701,11 +1777,9 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
         return;
     }
 
-    PreprocessorInputStream* inputStream = context->preprocessor->inputStream;
+    SourceLoc newLoc = sourceManager->allocateSourceFileForLineDirective(expandedDirectiveLoc, file, line);
 
-    inputStream->isOverridingSourceLoc = true;
-    inputStream->overrideFileName = file;
-    inputStream->overrideLineOffset = line - (directiveLoc.Line + 1);
+    inputStream->primaryStream->lexer.startOverridingSourceLocations(newLoc);
 }
 
 // Handle a `#pragma` directive
@@ -2005,10 +2079,14 @@ static void DefineMacro(
     String fileName = "command line";
     PreprocessorMacro* macro = CreateMacro(preprocessor);
 
+    SourceFile* keyFile = preprocessor->translationUnit->compileRequest->getSourceManager()->allocateSourceFile(fileName, key);
+    SourceFile* valueFile = preprocessor->translationUnit->compileRequest->getSourceManager()->allocateSourceFile(fileName, value);
+
     // Use existing `Lexer` to generate a token stream.
-    Lexer lexer(fileName, value, GetSink(preprocessor));
+    Lexer lexer;
+    lexer.initialize(valueFile, GetSink(preprocessor));
     macro->tokens = lexer.lexAllTokens();
-    macro->nameToken = Token(TokenType::Identifier, key, 0, 0, 0, fileName);
+    macro->nameToken = Token(TokenType::Identifier, key, keyFile->sourceRange.begin);
 
     PreprocessorMacro* oldMacro = NULL;
     if (preprocessor->globalEnv.macros.TryGetValue(key, oldMacro))
@@ -2039,8 +2117,7 @@ static TokenList ReadAllTokens(
 }
 
 TokenList preprocessSource(
-    String const&               source,
-    String const&               fileName,
+    SourceFile*                 file,
     DiagnosticSink*             sink,
     IncludeHandler*             includeHandler,
     Dictionary<String, String>  defines,
@@ -2057,7 +2134,7 @@ TokenList preprocessSource(
     }
 
     // create an initial input stream based on the provided buffer
-    preprocessor.inputStream = CreateInputStreamForSource(&preprocessor, source, fileName);
+    preprocessor.inputStream = CreateInputStreamForSource(&preprocessor, file);
 
     TokenList tokens = ReadAllTokens(&preprocessor);
 
@@ -2097,8 +2174,9 @@ static void HandleImportDirective(PreprocessorDirectiveContext* context)
 
     String path = getFileNameTokenValue(pathToken);
 
-    // TODO(tfoley): make this robust in presence of `#line`
-    String pathIncludedFrom = GetDirectiveLoc(context).FileName;
+    auto directiveLoc = GetDirectiveLoc(context);
+    auto expandedDirectiveLoc = context->preprocessor->translationUnit->compileRequest->getSourceManager()->expandSourceLoc(directiveLoc);
+    String pathIncludedFrom = expandedDirectiveLoc.getSpellingPath();
     String foundPath;
     String foundSource;
 
@@ -2162,7 +2240,8 @@ static void HandleImportDirective(PreprocessorDirectiveContext* context)
             PreprocessorInputStream* savedStream = preprocessor->inputStream;
 
             // Create an input stream for reading from the imported file
-            PreprocessorInputStream* subInputStream = CreateInputStreamForSource(preprocessor, foundSource, foundPath);
+            SourceFile* sourceFile = context->preprocessor->getCompileRequest()->getSourceManager()->allocateSourceFile(foundPath, foundSource);
+            PreprocessorInputStream* subInputStream = CreateInputStreamForSource(preprocessor, sourceFile);
 
             // Now preprocess that stream
             preprocessor->inputStream = subInputStream;
@@ -2180,24 +2259,18 @@ static void HandleImportDirective(PreprocessorDirectiveContext* context)
  
     // Now create a dummy token stream to represent the import request,
     // so that it can be manifest in the user's program
-    SourceTextInputStream* inputStream = new SourceTextInputStream();
- 
+
     Token token;
     token.type = TokenType::PoundImport;
     token.Position = GetDirectiveLoc(context);
     token.flags = 0;
     token.Content = foundPath;
- 
-    inputStream->lexedTokens.mTokens.Add(token);
- 
-    token.type = TokenType::EndOfFile;
-    token.flags = TokenFlag::AfterWhitespace | TokenFlag::AtStartOfLine;
-    inputStream->lexedTokens.mTokens.Add(token);
- 
-    inputStream->tokenReader = TokenReader(inputStream->lexedTokens);
- 
-    inputStream->parent = context->preprocessor->inputStream;
-    context->preprocessor->inputStream = inputStream;
+
+    SimpleTokenInputStream* inputStream = createSimpleInputStream(
+        context->preprocessor,
+        token);
+
+    PushInputStream(context->preprocessor, inputStream);
 }
 
 

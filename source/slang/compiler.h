@@ -122,17 +122,7 @@ namespace Slang
 //			GLSL,	// pass through GLSL to `glslang` library
     };
 
-    // Represents a single source file (either an on-disk file, or a
-    // "virtual" file passed in as a string)
-    class SourceFile : public RefObject
-    {
-    public:
-        // The file path for a real file, or the nominal path for a virtual file
-        String path;
-
-        // The actual contents of the file
-        String content;
-    };
+    class SourceFile;
 
     // A single translation unit requested to be compiled.
     //
@@ -228,6 +218,10 @@ namespace Slang
         // Are we being driven by the command-line `slangc`, and should act accordingly?
         bool isCommandLineCompile = false;
 
+        // Source manager to help track files loaded
+        SourceManager sourceManagerStorage;
+        SourceManager* sourceManager;
+
         // Output stuff
         DiagnosticSink mSink;
         String mDiagnosticOutput;
@@ -250,12 +244,9 @@ namespace Slang
         Dictionary<String, RefPtr<ModuleDecl>> mapNameToLoadedModules;
 
 
-        CompileRequest(Session* session)
-            : mSession(session)
-        {}
+        CompileRequest(Session* session);
 
-        ~CompileRequest()
-        {}
+        ~CompileRequest();
 
         void parseTranslationUnit(
             TranslationUnitRequest* translationUnit);
@@ -266,6 +257,10 @@ namespace Slang
         int executeActions();
 
         int addTranslationUnit(SourceLanguage language, String const& name);
+
+        void addTranslationUnitSourceFile(
+            int             translationUnitIndex,
+            SourceFile*     sourceFile);
 
         void addTranslationUnitSourceString(
             int             translationUnitIndex,
@@ -285,7 +280,7 @@ namespace Slang
             String const&       name,
             String const&       path,
             String const&       source,
-            CodePosition const& loc);
+            SourceLoc const& loc);
 
         void handlePoundImport(
             String const&       path,
@@ -293,7 +288,18 @@ namespace Slang
 
         RefPtr<ModuleDecl> findOrImportModule(
             String const&       name,
-            CodePosition const& loc);
+            SourceLoc const& loc);
+
+        SourceManager* getSourceManager()
+        {
+            return sourceManager;
+        }
+
+        void setSourceManager(SourceManager* sm)
+        {
+            sourceManager = sm;
+            mSink.sourceManager = sm;
+        }
     };
 
     void generateOutput(
@@ -324,6 +330,9 @@ namespace Slang
 
         List<RefPtr<ModuleDecl>> loadedModuleCode;
 
+        SourceManager   builtinSourceManager;
+
+        SourceManager* getBuiltinSourceManager() { return &builtinSourceManager; }
 
         //
 

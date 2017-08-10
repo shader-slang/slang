@@ -213,6 +213,7 @@
     <ClCompile Include="reflection.cpp" />
     <ClCompile Include="slang-stdlib.cpp" />
     <ClCompile Include="slang.cpp" />
+    <ClCompile Include="source-loc.cpp" />
     <ClCompile Include="syntax.cpp" />
     <ClCompile Include="token.cpp" />
     <ClCompile Include="type-layout.cpp" />
