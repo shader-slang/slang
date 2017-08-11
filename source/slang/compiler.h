@@ -323,6 +323,7 @@ namespace Slang
     public:
         //
 
+        RefPtr<Scope>   baseLanguageScope;
         RefPtr<Scope>   coreLanguageScope;
         RefPtr<Scope>   hlslLanguageScope;
         RefPtr<Scope>   slangLanguageScope;

@@ -13,7 +13,10 @@ namespace Slang
         TokenSpan const&                tokens,
         DiagnosticSink*                 sink,
         RefPtr<Scope> const&            outerScope);
-;
+
+    RefPtr<ModuleDecl> populateBaseLanguageModule(
+        Session*        session,
+        RefPtr<Scope>   scope);
 }
 
 #endif

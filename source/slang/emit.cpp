@@ -2747,6 +2747,7 @@ struct EmitVisitor
 
     // Only used by stdlib
     IGNORED(ModifierDecl)
+    IGNORED(SyntaxDecl)
 
     // Don't emit generic decls directly; we will only
     // ever emit particular instantiations of them.

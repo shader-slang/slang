@@ -31,7 +31,15 @@ Session::Session()
     // TODO: load these on-demand to avoid parsing
     // stdlib code for languages the user won't use.
 
+    baseLanguageScope = new Scope();
+
+    auto baseModuleDecl = populateBaseLanguageModule(
+        this,
+        baseLanguageScope);
+    loadedModuleCode.Add(baseModuleDecl);
+
     coreLanguageScope = new Scope();
+    coreLanguageScope->nextSibling = baseLanguageScope;
 
     hlslLanguageScope = new Scope();
     hlslLanguageScope->nextSibling = coreLanguageScope;

@@ -230,3 +230,14 @@ END_SYNTAX_CLASS()
 //     layout(local_size_x = 16) in;
 //
 SIMPLE_SYNTAX_CLASS(EmptyDecl, Decl)
+
+// A declaration used by the implementation to put syntax keywords
+// into the current scope.
+//
+SYNTAX_CLASS(SyntaxDecl, Decl)
+    // What type of syntax node will be produced when parsing with this keyword?
+    FIELD(SyntaxClass<SyntaxNode>, syntaxClass)
+
+    // Callback to invoke in order to parse syntax with this keyword.
+    FIELD(SyntaxParseCallback, parserCallback)
+END_SYNTAX_CLASS()

@@ -2633,6 +2633,11 @@ struct LoweringVisitor
 
     // Catch-all
 
+    LoweredDecl visitSyntaxDecl(SyntaxDecl*)
+    {
+        return LoweredDecl();
+    }
+
     LoweredDecl visitModifierDecl(ModifierDecl*)
     {
         // should not occur in user code

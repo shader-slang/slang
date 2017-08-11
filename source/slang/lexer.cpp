@@ -833,7 +833,7 @@ namespace Slang
             // Now we look at another character to figure out the kind of
             // escape sequence we are dealing with:
 
-            int d = *cursor++;
+            char d = *cursor++;
 
             switch(d)
             {
