@@ -24,6 +24,10 @@ namespace Slang
     struct ITypeVisitor;
     struct IValVisitor;
 
+    class Parser;
+    class SyntaxNode;
+    typedef RefPtr<SyntaxNode> (*SyntaxParseCallback)(Parser* parser);
+
     // Forward-declare all syntax classes
 #define SYNTAX_CLASS(NAME, BASE, ...) class NAME;
 #include "object-meta-begin.h"
@@ -238,24 +242,46 @@ namespace Slang
     {
         typedef void* (*CreateFunc)();
 
+        // Run-time type representation for syntax nodes
+        struct ClassInfo
+        {
+            // Textual class name, for debugging
+            char const* name;
+
+            // Base class for runtime queries
+            ClassInfo const*  baseClass;
+
+            // Callback to use when creating instances
+            CreateFunc createFunc;
+        };
+
         SyntaxClassBase()
         {}
 
-        SyntaxClassBase(CreateFunc createFunc)
-            : createFunc(createFunc)
+        SyntaxClassBase(ClassInfo const* classInfo)
+            : classInfo(classInfo)
         {}
 
         void* createInstanceImpl() const
         {
-            return createFunc ? createFunc() : nullptr;
+            auto ci = classInfo;
+            if (!ci) return nullptr;
+
+            auto cf = ci->createFunc;
+            if (!cf) return nullptr;
+
+            return cf();
         }
 
-        CreateFunc createFunc = nullptr;
+        bool isSubClassOfImpl(SyntaxClassBase const& super) const;
+
+        ClassInfo const* classInfo = nullptr;
 
         template<typename T>
         struct Impl
         {
             static void* createFunc();
+            static const ClassInfo kClassInfo;
         };
     };
 
@@ -268,7 +294,7 @@ namespace Slang
         template <typename U>
         SyntaxClass(SyntaxClass<U> const& other,
             typename EnableIf<IsConvertible<T*, U*>::Value, void>::type* = 0)
-            : SyntaxClassBase(other.createFunc)
+            : SyntaxClassBase(other.classInfo)
         {
         }
 
@@ -280,8 +306,20 @@ namespace Slang
         static SyntaxClass<T> getClass()
         {
             SyntaxClass<T> result;
-            result.createFunc = &SyntaxClass::Impl<T>::createFunc;
+            result.classInfo = &SyntaxClass::Impl<T>::kClassInfo;
             return result;
+        }
+
+        template<typename U>
+        bool isSubClassOf(SyntaxClass<U> super)
+        {
+            return isSubClassOfImpl(super);
+        }
+
+        template<typename U>
+        bool isSubClassOf()
+        {
+            return isSubClassOf(SyntaxClass<U>::getClass());
         }
     };
 

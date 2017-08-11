@@ -1197,6 +1197,11 @@ namespace Slang
             return constIntVal;
         }
 
+        void visitSyntaxDecl(SyntaxDecl*)
+        {
+            // These are only used in the stdlib, so no checking is needed
+        }
+
         void visitModifierDecl(ModifierDecl*)
         {
             // These are only used in the stdlib, so no checking is needed

@@ -528,18 +528,15 @@ namespace Slang
         return ParseProgram();
     }
 
-    RefPtr<TypeDefDecl> ParseTypeDef(Parser* parser)
+    RefPtr<SyntaxNode> ParseTypeDef(Parser* parser)
     {
         RefPtr<TypeDefDecl> typeDefDecl = new TypeDefDecl();
-        typeDefDecl->Position = parser->tokenReader.PeekLoc();
-
-        // Consume the `typedef` keyword
-        parser->ReadToken("typedef");
 
         // TODO(tfoley): parse an actual declarator
         auto type = parser->ParseTypeExp();
 
         auto nameToken = parser->ReadToken(TokenType::Identifier);
+        typeDefDecl->Position = nameToken.Position;
 
         typeDefDecl->Name = nameToken;
         typeDefDecl->type = type;
@@ -871,12 +868,10 @@ namespace Slang
         return parser->tokenReader.PeekTokenType();
     }
 
-    static RefPtr<Decl> parseImportDecl(
+    static RefPtr<SyntaxNode> parseImportDecl(
         Parser* parser)
     {
         parser->haveSeenAnyImportDecls = true;
-
-        parser->ReadToken("__import");
 
         auto decl = new ImportDecl();
         decl->scope = parser->currentScope;
@@ -1758,7 +1753,8 @@ namespace Slang
     }
 
     static RefPtr<Decl> ParseHLSLBufferDecl(
-        Parser*	parser)
+        Parser*	parser,
+        String  bufferWrapperTypeName)
     {
         // An HLSL declaration of a constant buffer like this:
         //
@@ -1774,22 +1770,7 @@ namespace Slang
         // declaration is made to be "transparent" so that lookup
         // will see through it to the members inside.
 
-        // We first look at the declaration keywrod to determine
-        // the type of buffer to declare:
-        String bufferWrapperTypeName;
-        SourceLoc bufferWrapperTypeNamePos = parser->tokenReader.PeekLoc();
-        if (AdvanceIf(parser, "cbuffer"))
-        {
-            bufferWrapperTypeName = "ConstantBuffer";
-        }
-        else if (AdvanceIf(parser, "tbuffer"))
-        {
-            bufferWrapperTypeName = "TextureBuffer";
-        }
-        else
-        {
-            Unexpected(parser);
-        }
+        auto bufferWrapperTypeNamePos = parser->tokenReader.PeekLoc();
 
         // We are going to represent each buffer as a pair of declarations.
         // The first is a type declaration that holds all the members, while
@@ -1872,7 +1853,19 @@ namespace Slang
 
         return bufferVarDecl;
     }
-        
+
+    static RefPtr<SyntaxNode> parseHLSLCBufferDecl(
+        Parser*	parser)
+    {
+        return ParseHLSLBufferDecl(parser, "ConstantBuffer");
+    }
+
+    static RefPtr<SyntaxNode> parseHLSLTBufferDecl(
+        Parser*	parser)
+    {
+        return ParseHLSLBufferDecl(parser, "TextureBuffer");
+    }
+
     static void removeModifier(
         Modifiers&          modifiers,
         RefPtr<Modifier>    modifier)
@@ -2098,13 +2091,13 @@ namespace Slang
         }
     }
 
-    static RefPtr<Decl> ParseGenericDecl(
+    static RefPtr<SyntaxNode> ParseGenericDecl(
         Parser* parser)
     {
         RefPtr<GenericDecl> decl = new GenericDecl();
         parser->FillPosition(decl.Ptr());
         parser->PushScope(decl.Ptr());
-        parser->ReadToken("__generic");
+
         parser->ReadToken(TokenType::OpLess);
         parser->genericDepth++;
         while (!parser->LookAheadToken(TokenType::OpGreater))
@@ -2123,17 +2116,20 @@ namespace Slang
 
         // A generic decl hijacks the name of the declaration
         // it wraps, so that lookup can find it.
-        decl->Name = decl->inner->Name;
+        if (decl->inner)
+        {
+            decl->Name = decl->inner->Name;
+            decl->Position = decl->inner->Position;
+        }
 
         parser->PopScope();
         return decl;
     }
 
-    static RefPtr<ExtensionDecl> ParseExtensionDecl(Parser* parser)
+    static RefPtr<SyntaxNode> ParseExtensionDecl(Parser* parser)
     {
         RefPtr<ExtensionDecl> decl = new ExtensionDecl();
         parser->FillPosition(decl.Ptr());
-        parser->ReadToken("__extension");
         decl->targetType = parser->ParseTypeExp();
 
         parseAggTypeDeclBody(parser, decl.Ptr());
@@ -2159,11 +2155,10 @@ namespace Slang
         }
     }
 
-    static RefPtr<InterfaceDecl> parseInterfaceDecl(Parser* parser)
+    static RefPtr<SyntaxNode> parseInterfaceDecl(Parser* parser)
     {
         RefPtr<InterfaceDecl> decl = new InterfaceDecl();
         parser->FillPosition(decl.Ptr());
-        parser->ReadToken("interface");
         decl->Name = parser->ReadToken(TokenType::Identifier);
 
         parseOptionalInheritanceClause(parser, decl.Ptr());
@@ -2173,11 +2168,10 @@ namespace Slang
         return decl;
     }
 
-    static RefPtr<ConstructorDecl> ParseConstructorDecl(Parser* parser)
+    static RefPtr<SyntaxNode> ParseConstructorDecl(Parser* parser)
     {
         RefPtr<ConstructorDecl> decl = new ConstructorDecl();
         parser->FillPosition(decl.Ptr());
-        parser->ReadToken("__init");
 
         parseParameterList(parser, decl);
 
@@ -2221,11 +2215,10 @@ namespace Slang
         return decl;
     }
 
-    static RefPtr<SubscriptDecl> ParseSubscriptDecl(Parser* parser)
+    static RefPtr<SyntaxNode> ParseSubscriptDecl(Parser* parser)
     {
         RefPtr<SubscriptDecl> decl = new SubscriptDecl();
         parser->FillPosition(decl.Ptr());
-        parser->ReadToken("__subscript");
 
         // TODO: the use of this name here is a bit magical...
         decl->Name.Content = "operator[]";
@@ -2257,12 +2250,9 @@ namespace Slang
     }
 
     // Parse a declaration of a new modifier keyword
-    static RefPtr<ModifierDecl> parseModifierDecl(Parser* parser)
+    static RefPtr<SyntaxNode> parseModifierDecl(Parser* parser)
     {
         RefPtr<ModifierDecl> decl = new ModifierDecl();
-
-        // read the `__modifier` keyword
-        parser->ReadToken(TokenType::Identifier);
 
         parser->ReadToken(TokenType::LParent);
         decl->classNameToken = parser->ReadToken(TokenType::Identifier);
@@ -2293,6 +2283,44 @@ namespace Slang
         }
     }
 
+    static Token advanceToken(Parser* parser)
+    {
+        return parser->ReadToken();
+    }
+
+    static Token peekToken(Parser* parser)
+    {
+        return parser->tokenReader.PeekToken();
+    }
+
+    static SyntaxDecl* tryLookUpSyntaxDecl(
+        Parser*         parser,
+        String const&   name)
+    {
+        // Let's look up the name and see what we find.
+
+        auto lookupResult = LookUp(
+            parser->getSession(),
+            nullptr, // no semantics visitor available yet
+            name,
+            parser->currentScope);
+
+        // If we didn't find anything, or the result was overloaded,
+        // then we aren't going to be able to extract a single decl.
+        if(!lookupResult.isValid() || lookupResult.isOverloaded())
+            return nullptr;
+
+        auto decl = lookupResult.item.declRef.getDecl();
+        if( auto syntaxDecl = dynamic_cast<SyntaxDecl*>(decl) )
+        {
+            return syntaxDecl;
+        }
+        else
+        {
+            return nullptr;
+        }
+    }
+
     static RefPtr<DeclBase> ParseDeclWithModifiers(
         Parser*             parser,
         ContainerDecl*      containerDecl,
@@ -2302,47 +2330,105 @@ namespace Slang
 
         auto loc = parser->tokenReader.PeekLoc();
 
-        // TODO: actual dispatch!
-        if (parser->LookAheadToken("struct"))
-            decl = ParseDeclaratorDecl(parser, containerDecl);
-        else if (parser->LookAheadToken("class"))
-            decl = ParseDeclaratorDecl(parser, containerDecl);
-        else if (parser->LookAheadToken("typedef"))
-            decl = ParseTypeDef(parser);
-        else if (parser->LookAheadToken("cbuffer") || parser->LookAheadToken("tbuffer"))
-            decl = ParseHLSLBufferDecl(parser);
-        else if (parser->LookAheadToken("__generic"))
-            decl = ParseGenericDecl(parser);
-        else if (parser->LookAheadToken("__extension"))
-            decl = ParseExtensionDecl(parser);
-        else if (parser->LookAheadToken("__init"))
-            decl = ParseConstructorDecl(parser);
-        else if (parser->LookAheadToken("__subscript"))
-            decl = ParseSubscriptDecl(parser);
-        else if (parser->LookAheadToken("interface"))
-            decl = parseInterfaceDecl(parser);
-        else if(parser->LookAheadToken("__modifier"))
-            decl = parseModifierDecl(parser);
-        else if(parser->LookAheadToken("__import"))
-            decl = parseImportDecl(parser);
-        else if(parser->LookAheadToken(TokenType::PoundImport))
+        switch (peekTokenType(parser))
+        {
+        case TokenType::Identifier:
+            {
+                // A declaration that starts with an identifier might be:
+                //
+                // - A keyword-based declaration (e.g., `cbuffer ...`)
+                // - The begining of a type in a declarator-based declaration (e.g., `int ...`)
+                // - A GLSL block declaration (e.g., `uniform Foo { ... }`)
+
+                // Let's deal with the GLSL block case first. This is something like:
+                //
+                //     uniform Foo { ... };
+                //
+                // The `uniform` keyword has already been parsed as a modifier,
+                // so the identifier we are looking at is `Foo`. If the token
+                // after that is `{`, we assume this is a block.
+                //
+                // Of course, we only want to allow this syntax when parsing GLSL...
+                if (parser->translationUnit->sourceLanguage == SourceLanguage::GLSL)
+                {
+                    if( parser->LookAheadToken(TokenType::LBrace, 1) )
+                    {
+                        decl = parseGLSLBlockDecl(parser, modifiers);
+                        break;
+                    }
+                }
+
+                // We will look up the name that was given, and try to see
+                // if it names a syntactic keyword that will tell us how to parse
+                // things.
+                auto nameToken = peekToken(parser);
+                auto name = nameToken.Content;
+                auto syntaxDecl = tryLookUpSyntaxDecl(parser, name);
+
+                // TODO: confirm that the syntax is for a declaration?
+                if (syntaxDecl && syntaxDecl->syntaxClass.isSubClassOf<Decl>())
+                {
+                    // Consume the keyword token, so that the callback doesn't
+                    // need to deal with it.
+                    advanceToken(parser);
+
+                    auto parsedSyntax = syntaxDecl->parserCallback(parser);
+                    if (parsedSyntax)
+                    {
+                        if (!parsedSyntax->Position.isValid())
+                        {
+                            parsedSyntax->Position = nameToken.Position;
+                        }
+
+                        auto parsedDecl = parsedSyntax->As<Decl>();
+                        if (parsedDecl)
+                        {
+                            decl = parsedDecl;
+                        }
+                        else
+                        {
+                            // TODO: diagnose!
+                        }
+                    }
+
+                }
+                else
+                {
+                    // If the idenfier given doesn't name a declaration keyword,
+                    // then we will try to parse things as a declarator decl.
+
+                    decl = ParseDeclaratorDecl(parser, containerDecl);
+                    break;
+                }
+
+            }
+            break;
+
+        // It is valid in HLSL/GLSL to have an "empty" declaration
+        // that consists of just a semicolon. In particular, this
+        // gets used a lot in GLSL to attach custom semantics to
+        // shader input or output.
+        //
+        case TokenType::Semicolon:
+            {
+                advanceToken(parser);
+
+                decl = new EmptyDecl();
+                decl->Position = loc;
+            }
+            break;
+
+        // The preprocessor will generate a custom token to represent
+        // the site of a `#import` directive, so that we can catch
+        // it downstream in the parser, here.
+        case TokenType::PoundImport:
             decl = parsePoundImportDecl(parser);
-        else if (AdvanceIf(parser, TokenType::Semicolon))
-        {
-            decl = new EmptyDecl();
-            decl->Position = loc;
-        }
-        // GLSL requires that we be able to parse "block" declarations,
-        // which look superficially similar to declarator declarations
-        else if( parser->LookAheadToken(TokenType::Identifier)
-            && parser->LookAheadToken(TokenType::LBrace, 1) )
-        {
-            decl = parseGLSLBlockDecl(parser, modifiers);
-        }
-        else
-        {
-            // Default case: just parse a declarator-based declaration
+            break;
+
+        // If nothing else matched, we try to parse an "ordinary" declarator-based declaration
+        default:
             decl = ParseDeclaratorDecl(parser, containerDecl);
+            break;
         }
 
         if (decl)
@@ -3669,180 +3755,6 @@ namespace Slang
     RefPtr<Expr> Parser::ParseLeafExpression()
     {
         return parsePrefixExpr(this);
-
-#if 0
-        RefPtr<Expr> rs;
-        if (LookAheadToken(TokenType::OpInc) ||
-            LookAheadToken(TokenType::OpDec) ||
-            LookAheadToken(TokenType::OpNot) ||
-            LookAheadToken(TokenType::OpBitNot) ||
-            LookAheadToken(TokenType::OpSub))
-        {
-            RefPtr<OperatorExpr> unaryExpr = new PrefixExpr();
-            FillPosition(unaryExpr.Ptr());
-            unaryExpr->FunctionExpr = parseOperator(this);
-            unaryExpr->Arguments.Add(ParseLeafExpression());
-            rs = unaryExpr;
-            return rs;
-        }
-
-        if (LookAheadToken(TokenType::LParent))
-        {
-            ReadToken(TokenType::LParent);
-            RefPtr<Expr> expr;
-            if (peekTypeName(this) && LookAheadToken(TokenType::RParent, 1))
-            {
-                RefPtr<TypeCastExpr> tcexpr = new TypeCastExpr();
-                FillPosition(tcexpr.Ptr());
-                tcexpr->TargetType = ParseTypeExp();
-                ReadToken(TokenType::RParent);
-                tcexpr->Expression = ParseExpression(Precedence::Multiplicative); // Note(tfoley): need to double-check this
-                expr = tcexpr;
-            }
-            else
-            {
-                expr = ParseExpression();
-                ReadToken(TokenType::RParent);
-            }
-            rs = expr;
-        }
-        else if( LookAheadToken(TokenType::LBrace) )
-        {
-            RefPtr<InitializerListExpr> initExpr = new InitializerListExpr();
-            FillPosition(initExpr.Ptr());
-
-            // Initializer list
-            ReadToken(TokenType::LBrace);
-
-            List<RefPtr<Expr>> exprs;
-
-            for(;;)
-            {
-                if(AdvanceIfMatch(this, TokenType::RBrace))
-                    break;
-
-                auto expr = ParseArgExpr();
-                if( expr )
-                {
-                    initExpr->args.Add(expr);
-                }
-
-                if(AdvanceIfMatch(this, TokenType::RBrace))
-                    break;
-
-                ReadToken(TokenType::Comma);
-            }
-            rs = initExpr;
-        }
-
-        else if (LookAheadToken(TokenType::IntegerLiteral) ||
-            LookAheadToken(TokenType::FloatingPointLiteral))
-        {
-            RefPtr<ConstantExpr> constExpr = new ConstantExpr();
-            auto token = tokenReader.AdvanceToken();
-            FillPosition(constExpr.Ptr());
-            if (token.type == TokenType::IntegerLiteral)
-            {
-                constExpr->ConstType = ConstantExpr::ConstantType::Int;
-                constExpr->IntValue = StringToInt(token.Content);
-            }
-            else if (token.type == TokenType::FloatingPointLiteral)
-            {
-                constExpr->ConstType = ConstantExpr::ConstantType::Float;
-                constExpr->FloatValue = (FloatingPointLiteralValue) StringToDouble(token.Content);
-            }
-            rs = constExpr;
-        }
-        else if (LookAheadToken("true") || LookAheadToken("false"))
-        {
-            RefPtr<ConstantExpr> constExpr = new ConstantExpr();
-            auto token = tokenReader.AdvanceToken();
-            FillPosition(constExpr.Ptr());
-            constExpr->ConstType = ConstantExpr::ConstantType::Bool;
-            constExpr->IntValue = token.Content == "true" ? 1 : 0;
-            rs = constExpr;
-        }
-        else if (LookAheadToken(TokenType::Identifier))
-        {
-            RefPtr<VarExpr> varExpr = new VarExpr();
-            varExpr->scope = currentScope.Ptr();
-            FillPosition(varExpr.Ptr());
-            auto token = ReadToken(TokenType::Identifier);
-            varExpr->name = token.Content;
-            rs = varExpr;
-        }
-
-        while (!tokenReader.IsAtEnd() &&
-            (LookAheadToken(TokenType::OpInc) ||
-            LookAheadToken(TokenType::OpDec) ||
-            LookAheadToken(TokenType::Dot) ||
-            LookAheadToken(TokenType::LBracket) ||
-            LookAheadToken(TokenType::LParent)))
-        {
-            if (LookAheadToken(TokenType::OpInc))
-            {
-                RefPtr<OperatorExpr> unaryExpr = new PostfixExpr();
-                FillPosition(unaryExpr.Ptr());
-                unaryExpr->FunctionExpr = parseOperator(this);
-                unaryExpr->Arguments.Add(rs);
-                rs = unaryExpr;
-            }
-            else if (LookAheadToken(TokenType::OpDec))
-            {
-                RefPtr<OperatorExpr> unaryExpr = new PostfixExpr();
-                FillPosition(unaryExpr.Ptr());
-                unaryExpr->FunctionExpr = parseOperator(this);
-                unaryExpr->Arguments.Add(rs);
-                rs = unaryExpr;
-            }
-            else if (LookAheadToken(TokenType::LBracket))
-            {
-                RefPtr<IndexExpr> indexExpr = new IndexExpr();
-                indexExpr->BaseExpression = rs;
-                FillPosition(indexExpr.Ptr());
-                ReadToken(TokenType::LBracket);
-                indexExpr->IndexExpression = ParseExpression();
-                ReadToken(TokenType::RBracket);
-                rs = indexExpr;
-            }
-            else if (LookAheadToken(TokenType::LParent))
-            {
-                RefPtr<InvokeExpr> invokeExpr = new InvokeExpr();
-                invokeExpr->FunctionExpr = rs;
-                FillPosition(invokeExpr.Ptr());
-                ReadToken(TokenType::LParent);
-                while (!tokenReader.IsAtEnd())
-                {
-                    if (!LookAheadToken(TokenType::RParent))
-                        invokeExpr->Arguments.Add(ParseArgExpr());
-                    else
-                    {
-                        break;
-                    }
-                    if (!LookAheadToken(TokenType::Comma))
-                        break;
-                    ReadToken(TokenType::Comma);
-                }
-                ReadToken(TokenType::RParent);
-                rs = invokeExpr;
-            }
-            else if (LookAheadToken(TokenType::Dot))
-            {
-                RefPtr<MemberExpr> memberExpr = new MemberExpr();
-                memberExpr->scope = currentScope.Ptr();
-                FillPosition(memberExpr.Ptr());
-                memberExpr->BaseExpression = rs;
-                ReadToken(TokenType::Dot); 
-                memberExpr->name = ReadToken(TokenType::Identifier).Content;
-                rs = memberExpr;
-            }
-        }
-        if (!rs)
-        {
-            sink->diagnose(tokenReader.PeekLoc(), Diagnostics::syntaxError);
-        }
-        return rs;
-#endif
     }
 
     // Parse a source file into an existing translation unit
@@ -3858,4 +3770,76 @@ namespace Slang
 
         return parser.parseSourceFile(translationUnit->SyntaxNode.Ptr());
     }
+
+    static void addBuiltinSyntaxImpl(
+        Session*                    /*session*/,
+        Scope*                      scope,
+        char const*                 nameText,
+        SyntaxParseCallback         callback,
+        SyntaxClass<SyntaxNode>     syntaxClass)
+    {
+        String name(nameText);
+
+        RefPtr<SyntaxDecl> syntaxDecl = new SyntaxDecl();
+        syntaxDecl->Name.Content = name;
+        syntaxDecl->syntaxClass = syntaxClass;
+        syntaxDecl->parserCallback = callback;
+
+        AddMember(scope, syntaxDecl);
+    }
+
+    template<typename T>
+    static void addBuiltinSyntax(
+        Session*            session,
+        Scope*              scope,
+        char const*         name,
+        SyntaxParseCallback callback)
+    {
+        addBuiltinSyntaxImpl(session, scope, name, callback, getClass<T>());
+    }
+
+    RefPtr<ModuleDecl> populateBaseLanguageModule(
+        Session*        session,
+        RefPtr<Scope>   scope)
+    {
+        RefPtr<ModuleDecl> moduleDecl = new ModuleDecl();
+        scope->containerDecl = moduleDecl;
+
+        addBuiltinSyntax<Decl>(session, scope, "typedef",     &ParseTypeDef);
+        addBuiltinSyntax<Decl>(session, scope, "cbuffer",     &parseHLSLCBufferDecl);
+        addBuiltinSyntax<Decl>(session, scope, "tbuffer",     &parseHLSLTBufferDecl);
+        addBuiltinSyntax<Decl>(session, scope, "__generic",   &ParseGenericDecl);
+        addBuiltinSyntax<Decl>(session, scope, "__extension", &ParseExtensionDecl);
+        addBuiltinSyntax<Decl>(session, scope, "__init",      &ParseConstructorDecl);
+        addBuiltinSyntax<Decl>(session, scope, "__subscript", &ParseSubscriptDecl);
+        addBuiltinSyntax<Decl>(session, scope, "interface",   &parseInterfaceDecl);
+        addBuiltinSyntax<Decl>(session, scope, "__modifier",  &parseModifierDecl);
+        addBuiltinSyntax<Decl>(session, scope, "__import",    &parseImportDecl);
+
+#if 0
+        // TODO: actual dispatch!
+        if (parser->LookAheadToken("struct"))
+            decl = ParseDeclaratorDecl(parser, containerDecl);
+        else if (parser->LookAheadToken("class"))
+            decl = ParseDeclaratorDecl(parser, containerDecl);
+        else if (parser->LookAheadToken("__generic"))
+            decl = ParseGenericDecl(parser);
+        else if (parser->LookAheadToken("__extension"))
+            decl = ParseExtensionDecl(parser);
+        else if (parser->LookAheadToken("__init"))
+            decl = ParseConstructorDecl(parser);
+        else if (parser->LookAheadToken("__subscript"))
+            decl = ParseSubscriptDecl(parser);
+        else if (parser->LookAheadToken("interface"))
+            decl = parseInterfaceDecl(parser);
+        else if(parser->LookAheadToken("__modifier"))
+            decl = parseModifierDecl(parser);
+        else if(parser->LookAheadToken("__import"))
+            decl = parseImportDecl(parser);
+#endif
+
+
+        return moduleDecl;
+    }
+
 }
