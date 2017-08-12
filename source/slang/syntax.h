@@ -26,7 +26,8 @@ namespace Slang
 
     class Parser;
     class SyntaxNode;
-    typedef RefPtr<SyntaxNode> (*SyntaxParseCallback)(Parser* parser);
+
+    typedef RefPtr<RefObject> (*SyntaxParseCallback)(Parser* parser, void* userData);
 
     // Forward-declare all syntax classes
 #define SYNTAX_CLASS(NAME, BASE, ...) class NAME;

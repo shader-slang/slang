@@ -1202,11 +1202,6 @@ namespace Slang
             // These are only used in the stdlib, so no checking is needed
         }
 
-        void visitModifierDecl(ModifierDecl*)
-        {
-            // These are only used in the stdlib, so no checking is needed
-        }
-
         void visitGenericTypeParamDecl(GenericTypeParamDecl*)
         {
             // These are only used in the stdlib, so no checking is needed for now

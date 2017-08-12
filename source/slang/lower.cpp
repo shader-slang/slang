@@ -2638,12 +2638,6 @@ struct LoweringVisitor
         return LoweredDecl();
     }
 
-    LoweredDecl visitModifierDecl(ModifierDecl*)
-    {
-        // should not occur in user code
-        SLANG_UNEXPECTED("modifiers shouldn't occur in user code");
-    }
-
     LoweredDecl visitGenericValueParamDecl(GenericValueParamDecl*)
     {
         SLANG_UNEXPECTED("generics should be lowered to specialized decls");

@@ -20,6 +20,20 @@ namespace Slang {
 
 Session::Session()
 {
+    // Initialize the lookup table of syntax classes:
+
+    #define SYNTAX_CLASS(NAME, BASE) mapNameToSyntaxClass.Add(#NAME, getClass<NAME>());
+
+#include "object-meta-begin.h"
+#include "syntax-base-defs.h"
+#include "expr-defs.h"
+#include "decl-defs.h"
+#include "modifier-defs.h"
+#include "stmt-defs.h"
+#include "type-defs.h"
+#include "val-defs.h"
+#include "object-meta-end.h"
+
     // Make sure our source manager is initialized
     builtinSourceManager.initialize(nullptr);
 

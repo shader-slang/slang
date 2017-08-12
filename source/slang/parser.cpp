@@ -528,7 +528,7 @@ namespace Slang
         return ParseProgram();
     }
 
-    RefPtr<SyntaxNode> ParseTypeDef(Parser* parser)
+    RefPtr<RefObject> ParseTypeDef(Parser* parser, void* /*userData*/)
     {
         RefPtr<TypeDefDecl> typeDefDecl = new TypeDefDecl();
 
@@ -602,6 +602,103 @@ namespace Slang
         }
     }
 
+    static TokenType peekTokenType(Parser* parser)
+    {
+        return parser->tokenReader.PeekTokenType();
+    }
+
+    static Token advanceToken(Parser* parser)
+    {
+        return parser->ReadToken();
+    }
+
+    static Token peekToken(Parser* parser)
+    {
+        return parser->tokenReader.PeekToken();
+    }
+
+    static SyntaxDecl* tryLookUpSyntaxDecl(
+        Parser*         parser,
+        String const&   name)
+    {
+        // Let's look up the name and see what we find.
+
+        auto lookupResult = LookUp(
+            parser->getSession(),
+            nullptr, // no semantics visitor available yet
+            name,
+            parser->currentScope);
+
+        // If we didn't find anything, or the result was overloaded,
+        // then we aren't going to be able to extract a single decl.
+        if(!lookupResult.isValid() || lookupResult.isOverloaded())
+            return nullptr;
+
+        auto decl = lookupResult.item.declRef.getDecl();
+        if( auto syntaxDecl = dynamic_cast<SyntaxDecl*>(decl) )
+        {
+            return syntaxDecl;
+        }
+        else
+        {
+            return nullptr;
+        }
+    }
+
+    template<typename T>
+    bool tryParseUsingSyntaxDecl(
+        Parser*     parser,
+        SyntaxDecl* syntaxDecl,
+        RefPtr<T>*  outSyntax)
+    {
+        if (!syntaxDecl)
+            return false;
+
+        if (!syntaxDecl->syntaxClass.isSubClassOf<T>())
+            return false;
+
+        // Consume the token that specified the keyword
+        auto keywordToken = advanceToken(parser);
+
+        RefPtr<RefObject> parsedObject = syntaxDecl->parseCallback(parser, syntaxDecl->parseUserData);
+        auto syntax = parsedObject.As<T>();
+
+        if (syntax)
+        {
+            if (!syntax->Position.isValid())
+            {
+                syntax->Position = keywordToken.Position;
+            }
+        }
+        else if (parsedObject)
+        {
+            // Something was parsed, but it didn't have the expected type!
+            SLANG_DIAGNOSE_UNEXPECTED(parser->sink, keywordToken, "parser callback did not return the expected type");
+        }
+
+        *outSyntax = syntax;
+        return true;
+    }
+
+    template<typename T>
+    bool tryParseUsingSyntaxDecl(
+        Parser*     parser,
+        RefPtr<T>*  outSyntax)
+    {
+        if (peekTokenType(parser) != TokenType::Identifier)
+            return false;
+
+        auto nameToken = peekToken(parser);
+        auto name = nameToken.Content;
+
+        auto syntaxDecl = tryLookUpSyntaxDecl(parser, name);
+
+        if (!syntaxDecl)
+            return false;
+
+        return tryParseUsingSyntaxDecl(parser, syntaxDecl, outSyntax);
+    }
+
     static Modifiers ParseModifiers(Parser* parser)
     {
         Modifiers modifiers;
@@ -610,266 +707,50 @@ namespace Slang
         {
             SourceLoc loc = parser->tokenReader.PeekLoc();
 
-            if (0) {}
-
-        #define CASE(KEYWORD, TYPE)						\
-            else if(AdvanceIf(parser, #KEYWORD)) do {		\
-                RefPtr<TYPE> modifier = new TYPE();		\
-                modifier->Position = loc;				\
-                AddModifier(&modifierLink, modifier);	\
-            } while(0)
-
-            CASE(in, InModifier);
-            CASE(input, InputModifier);
-            CASE(out, OutModifier);
-            CASE(inout, InOutModifier);
-            CASE(const, ConstModifier);
-            CASE(instance, InstanceModifier);
-            CASE(__builtin, BuiltinModifier);
-
-            CASE(inline, InlineModifier);
-            CASE(public, PublicModifier);
-            CASE(require, RequireModifier);
-            CASE(param, ParamModifier);
-            CASE(extern, ExternModifier);
-
-            CASE(row_major, HLSLRowMajorLayoutModifier);
-            CASE(column_major, HLSLColumnMajorLayoutModifier);
-
-            CASE(nointerpolation, HLSLNoInterpolationModifier);
-            CASE(linear, HLSLLinearModifier);
-            CASE(sample, HLSLSampleModifier);
-            CASE(centroid, HLSLCentroidModifier);
-            CASE(precise, HLSLPreciseModifier);
-            CASE(shared, HLSLEffectSharedModifier);
-            CASE(groupshared, HLSLGroupSharedModifier);
-            CASE(static, HLSLStaticModifier);
-            CASE(uniform, HLSLUniformModifier);
-            CASE(volatile, HLSLVolatileModifier);
-
-            // Modifiers for geometry shader input
-            CASE(point,         HLSLPointModifier);
-            CASE(line,          HLSLLineModifier);
-            CASE(triangle,      HLSLTriangleModifier);
-            CASE(lineadj,       HLSLLineAdjModifier);
-            CASE(triangleadj,   HLSLTriangleAdjModifier);
-
-            // Modifiers for unary operator declarations
-            CASE(__prefix,   PrefixModifier);
-            CASE(__postfix,  PostfixModifier);
-
-            // Modifier to apply to `import` that should be re-exported
-            CASE(__exported,  ExportedModifier);
-
-            #undef CASE
-
-            else if (AdvanceIf(parser, "__intrinsic_op"))
+            switch (peekTokenType(parser))
             {
-                auto modifier = new IntrinsicOpModifier();
-                modifier->Position = loc;
-
-                parser->ReadToken(TokenType::LParent);
-                if (parser->LookAheadToken(TokenType::IntegerLiteral))
-                {
-                    modifier->op = (IntrinsicOp)StringToInt(parser->ReadToken().Content);
-                }
-                else
-                {
-                    modifier->opToken = parser->ReadToken(TokenType::Identifier);
-
-                    modifier->op = findIntrinsicOp(modifier->opToken.Content.Buffer());
-
-                    if (modifier->op == IntrinsicOp::Unknown)
-                    {
-                        parser->sink->diagnose(loc, Diagnostics::unimplemented, "unknown intrinsic op");
-                    }
-                }
-
-                parser->ReadToken(TokenType::RParent);
-
-                AddModifier(&modifierLink, modifier);
-            }
-
-            else if (AdvanceIf(parser, "__intrinsic"))
-            {
-                auto modifier = new TargetIntrinsicModifier();
-                modifier->Position = loc;
-
-                if (AdvanceIf(parser, TokenType::LParent))
-                {
-                    modifier->targetToken = parser->ReadToken(TokenType::Identifier);
-
-                    if( AdvanceIf(parser, TokenType::Comma) )
-                    {
-                        if( parser->LookAheadToken(TokenType::StringLiteral) )
-                        {
-                            modifier->definitionToken = parser->ReadToken();
-                        }
-                        else
-                        {
-                            modifier->definitionToken = parser->ReadToken(TokenType::Identifier);
-                        }
-                    }
-
-                    parser->ReadToken(TokenType::RParent);
-                }
-
-                AddModifier(&modifierLink, modifier);
-            }
-
-            else if (AdvanceIf(parser, "__glsl_extension"))
-            {
-                auto modifier = new RequiredGLSLExtensionModifier();
-                modifier->Position = loc;
-
-                parser->ReadToken(TokenType::LParent);
-                modifier->extensionNameToken = parser->ReadToken(TokenType::Identifier);
-                parser->ReadToken(TokenType::RParent);
-
-                AddModifier(&modifierLink, modifier);
-            }
-
-            else if (AdvanceIf(parser, "__glsl_version"))
-            {
-                auto modifier = new RequiredGLSLVersionModifier();
-                modifier->Position = loc;
-
-                parser->ReadToken(TokenType::LParent);
-                modifier->versionNumberToken = parser->ReadToken(TokenType::IntegerLiteral);
-                parser->ReadToken(TokenType::RParent);
-
-                AddModifier(&modifierLink, modifier);
-            }
-
-
-            else if (AdvanceIf(parser, "layout"))
-            {
-                parser->ReadToken(TokenType::LParent);
-                while (!AdvanceIfMatch(parser, TokenType::RParent))
-                {
-                    auto nameToken = parser->ReadToken(TokenType::Identifier);
-
-                    RefPtr<GLSLLayoutModifier> modifier;
-
-                    // TODO: better handling of this choise (e.g., lookup in scope)
-                    if(0) {}
-                #define CASE(KEYWORD, CLASS) \
-                    else if(nameToken.Content == #KEYWORD) modifier = new CLASS()
-
-                    CASE(constant_id,   GLSLConstantIDLayoutModifier);
-                    CASE(binding,       GLSLBindingLayoutModifier);
-                    CASE(set,           GLSLSetLayoutModifier);
-                    CASE(location,      GLSLLocationLayoutModifier);
-                    CASE(push_constant, GLSLPushConstantLayoutModifier);
-                    CASE(local_size_x,  GLSLLocalSizeXLayoutModifier);
-                    CASE(local_size_y,  GLSLLocalSizeYLayoutModifier);
-                    CASE(local_size_z,  GLSLLocalSizeZLayoutModifier);
-
-                #undef CASE
-                    else
-                    {
-                        modifier = new GLSLUnparsedLayoutModifier();
-                    }
-
-                    modifier->nameToken = nameToken;
-
-                    if(AdvanceIf(parser, TokenType::OpAssign))
-                    {
-                        modifier->valToken = parser->ReadToken(TokenType::IntegerLiteral);
-                    }
-
-                    AddModifier(&modifierLink, modifier);
-
-                    if (AdvanceIf(parser, TokenType::RParent))
-                        break;
-                    parser->ReadToken(TokenType::Comma);
-                }
-            }
-            else if (parser->tokenReader.PeekTokenType() == TokenType::LBracket)
-            {
-                ParseSquareBracketAttributes(parser, &modifierLink);
-            }
-            else if (AdvanceIf(parser,"__builtin_type"))
-            {
-                RefPtr<BuiltinTypeModifier> modifier = new BuiltinTypeModifier();
-                parser->ReadToken(TokenType::LParent);
-                modifier->tag = BaseType(StringToInt(parser->ReadToken(TokenType::IntegerLiteral).Content));
-                parser->ReadToken(TokenType::RParent);
-
-                AddModifier(&modifierLink, modifier);
-            }
-            else if (AdvanceIf(parser,"__magic_type"))
-            {
-                RefPtr<MagicTypeModifier> modifier = new MagicTypeModifier();
-                parser->ReadToken(TokenType::LParent);
-                modifier->name = parser->ReadToken(TokenType::Identifier).Content;
-                if (AdvanceIf(parser, TokenType::Comma))
-                {
-                    modifier->tag = uint32_t(StringToInt(parser->ReadToken(TokenType::IntegerLiteral).Content));
-                }
-                parser->ReadToken(TokenType::RParent);
-
-                AddModifier(&modifierLink, modifier);
-            }
-            else
-            {
-                // Fallback case if none of the above explicit cases matched.
-
-                // If we are looking at an identifier, then it may map to a
-                // modifier declaration visible in the current scope
-                if( parser->LookAheadToken(TokenType::Identifier) )
-                {
-                    LookupResult lookupResult = LookUp(
-                        parser->getSession(),
-                        nullptr, // No semantics visitor available yet!
-                        parser->tokenReader.PeekToken().Content,
-                        parser->currentScope);
-
-                    if( lookupResult.isValid() && !lookupResult.isOverloaded() )
-                    {
-                        auto& item = lookupResult.item;
-                        auto decl = item.declRef.getDecl();
-
-                        if( auto modifierDecl = dynamic_cast<ModifierDecl*>(decl) )
-                        {
-                            // We found a declaration for some modifier syntax,
-                            // so lets create an instance of the type it names
-                            // here.
-
-                            auto syntax = createInstanceOfSyntaxClassByName(modifierDecl->classNameToken.Content);
-                            auto modifier = dynamic_cast<Modifier*>(syntax);
-
-                            if( modifier )
-                            {
-                                modifier->Position = parser->tokenReader.PeekLoc();
-                                modifier->nameToken = parser->ReadToken(TokenType::Identifier);
-
-                                AddModifier(&modifierLink, modifier);
-                                continue;
-                            }
-                            else
-                            {
-                                SLANG_DIAGNOSE_UNEXPECTED(parser->sink, parser->tokenReader.PeekLoc(), "needed a modifier");
-
-                                parser->ReadToken(TokenType::Identifier);
-                            }
-                        }
-                    }
-                }
-
-                // Done with modifier list
+            default:
+                // If we don't see a token type that we recognize, then
+                // assume we are done with the modifier sequence.
                 return modifiers;
+
+            case TokenType::Identifier:
+                {
+                    // We see an identifier ahead, and it might be the name
+                    // of a modifier keyword of some kind.
+
+                    Token nameToken = peekToken(parser);
+
+                    RefPtr<Modifier> parsedModifier;
+                    if (tryParseUsingSyntaxDecl<Modifier>(parser, &parsedModifier))
+                    {
+                        parsedModifier->nameToken = nameToken;
+                        if (!parsedModifier->Position.isValid())
+                        {
+                            parsedModifier->Position = nameToken.Position;
+                        }
+
+                        AddModifier(&modifierLink, parsedModifier);
+                        continue;
+                    }
+
+                    // If there was no match for a modifier keyword, then we
+                    // must be at the end of the modifier sequence
+                    return modifiers;
+                }
+                break;
+
+            // HLSL uses `[attributeName]` style for its modifiers, which closely
+            // matches the C++ `[[attributeName]]` style.
+            case TokenType::LBracket:
+                ParseSquareBracketAttributes(parser, &modifierLink);
+                break;
             }
         }
     }
 
-    static TokenType peekTokenType(Parser* parser)
-    {
-        return parser->tokenReader.PeekTokenType();
-    }
-
-    static RefPtr<SyntaxNode> parseImportDecl(
-        Parser* parser)
+    static RefPtr<RefObject> parseImportDecl(
+        Parser* parser, void* /*userData*/)
     {
         parser->haveSeenAnyImportDecls = true;
 
@@ -1854,14 +1735,14 @@ namespace Slang
         return bufferVarDecl;
     }
 
-    static RefPtr<SyntaxNode> parseHLSLCBufferDecl(
-        Parser*	parser)
+    static RefPtr<RefObject> parseHLSLCBufferDecl(
+        Parser*	parser, void* /*userData*/)
     {
         return ParseHLSLBufferDecl(parser, "ConstantBuffer");
     }
 
-    static RefPtr<SyntaxNode> parseHLSLTBufferDecl(
-        Parser*	parser)
+    static RefPtr<RefObject> parseHLSLTBufferDecl(
+        Parser*	parser, void* /*userData*/)
     {
         return ParseHLSLBufferDecl(parser, "TextureBuffer");
     }
@@ -2091,8 +1972,8 @@ namespace Slang
         }
     }
 
-    static RefPtr<SyntaxNode> ParseGenericDecl(
-        Parser* parser)
+    static RefPtr<RefObject> ParseGenericDecl(
+        Parser* parser, void* /*userData*/)
     {
         RefPtr<GenericDecl> decl = new GenericDecl();
         parser->FillPosition(decl.Ptr());
@@ -2126,7 +2007,7 @@ namespace Slang
         return decl;
     }
 
-    static RefPtr<SyntaxNode> ParseExtensionDecl(Parser* parser)
+    static RefPtr<RefObject> ParseExtensionDecl(Parser* parser, void* /*userData*/)
     {
         RefPtr<ExtensionDecl> decl = new ExtensionDecl();
         parser->FillPosition(decl.Ptr());
@@ -2155,7 +2036,7 @@ namespace Slang
         }
     }
 
-    static RefPtr<SyntaxNode> parseInterfaceDecl(Parser* parser)
+    static RefPtr<RefObject> parseInterfaceDecl(Parser* parser, void* /*userData*/)
     {
         RefPtr<InterfaceDecl> decl = new InterfaceDecl();
         parser->FillPosition(decl.Ptr());
@@ -2168,7 +2049,7 @@ namespace Slang
         return decl;
     }
 
-    static RefPtr<SyntaxNode> ParseConstructorDecl(Parser* parser)
+    static RefPtr<RefObject> ParseConstructorDecl(Parser* parser, void* /*userData*/)
     {
         RefPtr<ConstructorDecl> decl = new ConstructorDecl();
         parser->FillPosition(decl.Ptr());
@@ -2215,7 +2096,7 @@ namespace Slang
         return decl;
     }
 
-    static RefPtr<SyntaxNode> ParseSubscriptDecl(Parser* parser)
+    static RefPtr<RefObject> ParseSubscriptDecl(Parser* parser, void* /*userData*/)
     {
         RefPtr<SubscriptDecl> decl = new SubscriptDecl();
         parser->FillPosition(decl.Ptr());
@@ -2249,20 +2130,106 @@ namespace Slang
         return decl;
     }
 
-    // Parse a declaration of a new modifier keyword
-    static RefPtr<SyntaxNode> parseModifierDecl(Parser* parser)
+    static Token expect(Parser* parser, TokenType tokenType)
     {
-        RefPtr<ModifierDecl> decl = new ModifierDecl();
+        return parser->ReadToken(tokenType);
+    }
 
-        parser->ReadToken(TokenType::LParent);
-        decl->classNameToken = parser->ReadToken(TokenType::Identifier);
-        parser->ReadToken(TokenType::RParent);
+    static Token expectIdentifier(Parser* parser)
+    {
+        return parser->ReadToken(TokenType::Identifier);
+    }
 
-        parser->FillPosition(decl.Ptr());
-        decl->Name = parser->ReadToken(TokenType::Identifier);
+    // This is a catch-all syntax-construction callback to handle cases where
+    // a piece of syntax is fully defined by the keyword to use, along with
+    // the class of AST node to construct.
+    static RefPtr<RefObject> parseSimpleSyntax(Parser* parser, void* userData)
+    {
+        SyntaxClassBase syntaxClass((SyntaxClassBase::ClassInfo*) userData);
+        return (RefObject*) syntaxClass.createInstanceImpl();
+    }
 
-        parser->ReadToken(TokenType::Semicolon);
-        return decl;
+    // Parse a declaration of a keyword that can be used to define further syntax.
+    static RefPtr<RefObject> parseSyntaxDecl(Parser* parser, void* /*userData*/)
+    {
+        // Right now the basic form is:
+        //
+        // syntax <name:id> [: <syntaxClass:id>] [= <existingKeyword:id>];
+        //
+        // - `name` gives the name of the keyword to define.
+        // - `syntaxClass` is the name of an AST node class that we expect
+        //   this syntax to construct when parsed.
+        // - `existingKeyword` is the name of an existing keyword that
+        //   the new syntax should be an alias for.
+
+        // First we parse the keyword name.
+        auto nameToken = expectIdentifier(parser);
+
+        // Next we look for a clause that specified the AST node class.
+        SyntaxClass<RefObject> syntaxClass;
+        if (AdvanceIf(parser, TokenType::Colon))
+        {
+            // User is specifying the class that should be construted
+            auto classNameToken = expectIdentifier(parser);
+
+            syntaxClass = parser->getSession()->findSyntaxClass(classNameToken.Content);
+        }
+
+        // If the user specified a syntax class, then we will default
+        // to the `parseSimpleSyntax` callback that will just construct
+        // an instance of that type to represent the keyword in the AST.
+        SyntaxParseCallback parseCallback = &parseSimpleSyntax;
+        void* parseUserData = (void*) syntaxClass.classInfo;
+
+        // Next we look for an initializer that will make this keyword
+        // an alias for some existing keyword.
+        if (AdvanceIf(parser, TokenType::OpAssign))
+        {
+            auto existingKeywordToken = expectIdentifier(parser);
+
+            auto existingSyntax = tryLookUpSyntaxDecl(parser, existingKeywordToken.Content);
+            if (!existingSyntax)
+            {
+                // TODO: diagnose: keyword did not name syntax
+            }
+            else
+            {
+                // The user is expecting us to parse our new syntax like
+                // the existing syntax given, so we need to override
+                // the callback.
+                parseCallback = existingSyntax->parseCallback;
+                parseUserData = existingSyntax->parseUserData;
+
+                // If we don't already have a syntax class specified, then
+                // we will crib the one from the existing syntax, to ensure
+                // that we are creating a drop-in alias.
+                if (!syntaxClass.classInfo)
+                    syntaxClass = existingSyntax->syntaxClass;
+            }
+        }
+
+        // It is an error if the user didn't give us either an existing keyword
+        // to use to the define the callback, or a valid AST node class to construct.
+        //
+        // TODO: down the line this should be expanded so that the user can reference
+        // an existing *function* to use to parse the chosen syntax.
+        if (!syntaxClass.classInfo)
+        {
+            // TODO: diagnose: either a type or an existing keyword needs to be specified
+        }
+
+        expect(parser, TokenType::Semicolon);
+
+        // TODO: skip creating the declaration if anything failed, just to not screw things
+        // up for downstream code?
+
+        RefPtr<SyntaxDecl> syntaxDecl = new SyntaxDecl();
+        syntaxDecl->Name = nameToken;
+        syntaxDecl->Position = nameToken.Position;
+        syntaxDecl->syntaxClass = syntaxClass;
+        syntaxDecl->parseCallback = parseCallback;
+        syntaxDecl->parseUserData = parseUserData;
+        return syntaxDecl;
     }
 
     // Finish up work on a declaration that was parsed
@@ -2280,44 +2247,6 @@ namespace Slang
         if (containerDecl)
         {
             AddMember(containerDecl, decl);
-        }
-    }
-
-    static Token advanceToken(Parser* parser)
-    {
-        return parser->ReadToken();
-    }
-
-    static Token peekToken(Parser* parser)
-    {
-        return parser->tokenReader.PeekToken();
-    }
-
-    static SyntaxDecl* tryLookUpSyntaxDecl(
-        Parser*         parser,
-        String const&   name)
-    {
-        // Let's look up the name and see what we find.
-
-        auto lookupResult = LookUp(
-            parser->getSession(),
-            nullptr, // no semantics visitor available yet
-            name,
-            parser->currentScope);
-
-        // If we didn't find anything, or the result was overloaded,
-        // then we aren't going to be able to extract a single decl.
-        if(!lookupResult.isValid() || lookupResult.isOverloaded())
-            return nullptr;
-
-        auto decl = lookupResult.item.declRef.getDecl();
-        if( auto syntaxDecl = dynamic_cast<SyntaxDecl*>(decl) )
-        {
-            return syntaxDecl;
-        }
-        else
-        {
-            return nullptr;
         }
     }
 
@@ -2358,49 +2287,20 @@ namespace Slang
                     }
                 }
 
-                // We will look up the name that was given, and try to see
-                // if it names a syntactic keyword that will tell us how to parse
-                // things.
-                auto nameToken = peekToken(parser);
-                auto name = nameToken.Content;
-                auto syntaxDecl = tryLookUpSyntaxDecl(parser, name);
-
-                // TODO: confirm that the syntax is for a declaration?
-                if (syntaxDecl && syntaxDecl->syntaxClass.isSubClassOf<Decl>())
+                // Next we will check whether we can use the identifier token
+                // as a declaration keyword and parse a declaration using
+                // its associated callback:
+                RefPtr<Decl> parsedDecl;
+                if (tryParseUsingSyntaxDecl<Decl>(parser, &parsedDecl))
                 {
-                    // Consume the keyword token, so that the callback doesn't
-                    // need to deal with it.
-                    advanceToken(parser);
-
-                    auto parsedSyntax = syntaxDecl->parserCallback(parser);
-                    if (parsedSyntax)
-                    {
-                        if (!parsedSyntax->Position.isValid())
-                        {
-                            parsedSyntax->Position = nameToken.Position;
-                        }
-
-                        auto parsedDecl = parsedSyntax->As<Decl>();
-                        if (parsedDecl)
-                        {
-                            decl = parsedDecl;
-                        }
-                        else
-                        {
-                            // TODO: diagnose!
-                        }
-                    }
-
-                }
-                else
-                {
-                    // If the idenfier given doesn't name a declaration keyword,
-                    // then we will try to parse things as a declarator decl.
-
-                    decl = ParseDeclaratorDecl(parser, containerDecl);
+                    decl = parsedDecl;
                     break;
                 }
 
+                // Our final fallback case is to assume that the user is
+                // probably writing a C-style declarator-based declaration.
+                decl = ParseDeclaratorDecl(parser, containerDecl);
+                break;
             }
             break;
 
@@ -3776,14 +3676,16 @@ namespace Slang
         Scope*                      scope,
         char const*                 nameText,
         SyntaxParseCallback         callback,
-        SyntaxClass<SyntaxNode>     syntaxClass)
+        void*                       userData,
+        SyntaxClass<RefObject>      syntaxClass)
     {
         String name(nameText);
 
         RefPtr<SyntaxDecl> syntaxDecl = new SyntaxDecl();
         syntaxDecl->Name.Content = name;
         syntaxDecl->syntaxClass = syntaxClass;
-        syntaxDecl->parserCallback = callback;
+        syntaxDecl->parseCallback = callback;
+        syntaxDecl->parseUserData = userData;
 
         AddMember(scope, syntaxDecl);
     }
@@ -3793,10 +3695,176 @@ namespace Slang
         Session*            session,
         Scope*              scope,
         char const*         name,
-        SyntaxParseCallback callback)
+        SyntaxParseCallback callback,
+        void*               userData = nullptr)
     {
-        addBuiltinSyntaxImpl(session, scope, name, callback, getClass<T>());
+        addBuiltinSyntaxImpl(session, scope, name, callback, userData, getClass<T>());
     }
+
+    template<typename T>
+    static void addSimpleModifierSyntax(
+        Session*        session,
+        Scope*          scope,
+        char const*     name)
+    {
+        auto syntaxClass = getClass<T>();
+        addBuiltinSyntaxImpl(session, scope, name, &parseSimpleSyntax, (void*) syntaxClass.classInfo, getClass<T>());
+    }
+
+    static RefPtr<RefObject> parseIntrinsicOpModifier(Parser* parser, void* /*userData*/)
+    {
+        RefPtr<IntrinsicOpModifier> modifier = new IntrinsicOpModifier();
+
+        parser->ReadToken(TokenType::LParent);
+        if (parser->LookAheadToken(TokenType::IntegerLiteral))
+        {
+            modifier->op = (IntrinsicOp)StringToInt(parser->ReadToken().Content);
+        }
+        else
+        {
+            modifier->opToken = parser->ReadToken(TokenType::Identifier);
+
+            modifier->op = findIntrinsicOp(modifier->opToken.Content.Buffer());
+
+            if (modifier->op == IntrinsicOp::Unknown)
+            {
+                parser->sink->diagnose(modifier->opToken, Diagnostics::unimplemented, "unknown intrinsic op");
+            }
+        }
+
+        parser->ReadToken(TokenType::RParent);
+
+        return modifier;
+    }
+
+    static RefPtr<RefObject> parseIntrinsicModifier(Parser* parser, void* /*userData*/)
+    {
+        auto modifier = new TargetIntrinsicModifier();
+
+        if (AdvanceIf(parser, TokenType::LParent))
+        {
+            modifier->targetToken = parser->ReadToken(TokenType::Identifier);
+
+            if( AdvanceIf(parser, TokenType::Comma) )
+            {
+                if( parser->LookAheadToken(TokenType::StringLiteral) )
+                {
+                    modifier->definitionToken = parser->ReadToken();
+                }
+                else
+                {
+                    modifier->definitionToken = parser->ReadToken(TokenType::Identifier);
+                }
+            }
+
+            parser->ReadToken(TokenType::RParent);
+        }
+
+        return modifier;
+    }
+
+    static RefPtr<RefObject> parseGLSLExtensionModifier(Parser* parser, void* /*userData*/)
+    {
+        auto modifier = new RequiredGLSLExtensionModifier();
+
+        parser->ReadToken(TokenType::LParent);
+        modifier->extensionNameToken = parser->ReadToken(TokenType::Identifier);
+        parser->ReadToken(TokenType::RParent);
+
+        return modifier;
+    }
+
+    static RefPtr<RefObject> parseGLSLVersionModifier(Parser* parser, void* /*userData*/)
+    {
+        auto modifier = new RequiredGLSLVersionModifier();
+
+        parser->ReadToken(TokenType::LParent);
+        modifier->versionNumberToken = parser->ReadToken(TokenType::IntegerLiteral);
+        parser->ReadToken(TokenType::RParent);
+
+        return modifier;
+    }
+
+    static RefPtr<RefObject> parseLayoutModifier(Parser* parser, void* /*userData*/)
+    {
+        Modifiers modifiers;
+        RefPtr<Modifier>* modifierLink = &modifiers.first;
+
+        auto beginMarker = new GLSLLayoutModifierGroupBegin();
+        AddModifier(&modifierLink, beginMarker);
+
+        parser->ReadToken(TokenType::LParent);
+        while (!AdvanceIfMatch(parser, TokenType::RParent))
+        {
+            auto nameToken = parser->ReadToken(TokenType::Identifier);
+
+            RefPtr<GLSLLayoutModifier> modifier;
+
+            // TODO: better handling of this choise (e.g., lookup in scope)
+            if(0) {}
+        #define CASE(KEYWORD, CLASS) \
+            else if(nameToken.Content == #KEYWORD) modifier = new CLASS()
+
+            CASE(constant_id,   GLSLConstantIDLayoutModifier);
+            CASE(binding,       GLSLBindingLayoutModifier);
+            CASE(set,           GLSLSetLayoutModifier);
+            CASE(location,      GLSLLocationLayoutModifier);
+            CASE(push_constant, GLSLPushConstantLayoutModifier);
+            CASE(local_size_x,  GLSLLocalSizeXLayoutModifier);
+            CASE(local_size_y,  GLSLLocalSizeYLayoutModifier);
+            CASE(local_size_z,  GLSLLocalSizeZLayoutModifier);
+
+        #undef CASE
+            else
+            {
+                modifier = new GLSLUnparsedLayoutModifier();
+            }
+
+            modifier->nameToken = nameToken;
+
+            if(AdvanceIf(parser, TokenType::OpAssign))
+            {
+                modifier->valToken = parser->ReadToken(TokenType::IntegerLiteral);
+            }
+
+            AddModifier(&modifierLink, modifier);
+
+            if (AdvanceIf(parser, TokenType::RParent))
+                break;
+            parser->ReadToken(TokenType::Comma);
+        }
+
+        auto endMarker = new GLSLLayoutModifierGroupEnd();
+        AddModifier(&modifierLink, endMarker);
+
+        return modifiers.first;
+    }
+
+    static RefPtr<RefObject> parseBuiltinTypeModifier(Parser* parser, void* /*userData*/)
+    {
+        RefPtr<BuiltinTypeModifier> modifier = new BuiltinTypeModifier();
+        parser->ReadToken(TokenType::LParent);
+        modifier->tag = BaseType(StringToInt(parser->ReadToken(TokenType::IntegerLiteral).Content));
+        parser->ReadToken(TokenType::RParent);
+
+        return modifier;
+    }
+
+    static RefPtr<RefObject> parseMagicTypeModifier(Parser* parser, void* /*userData*/)
+    {
+        RefPtr<MagicTypeModifier> modifier = new MagicTypeModifier();
+        parser->ReadToken(TokenType::LParent);
+        modifier->name = parser->ReadToken(TokenType::Identifier).Content;
+        if (AdvanceIf(parser, TokenType::Comma))
+        {
+            modifier->tag = uint32_t(StringToInt(parser->ReadToken(TokenType::IntegerLiteral).Content));
+        }
+        parser->ReadToken(TokenType::RParent);
+
+        return modifier;
+    }
+
+
 
     RefPtr<ModuleDecl> populateBaseLanguageModule(
         Session*        session,
@@ -3805,39 +3873,91 @@ namespace Slang
         RefPtr<ModuleDecl> moduleDecl = new ModuleDecl();
         scope->containerDecl = moduleDecl;
 
-        addBuiltinSyntax<Decl>(session, scope, "typedef",     &ParseTypeDef);
-        addBuiltinSyntax<Decl>(session, scope, "cbuffer",     &parseHLSLCBufferDecl);
-        addBuiltinSyntax<Decl>(session, scope, "tbuffer",     &parseHLSLTBufferDecl);
-        addBuiltinSyntax<Decl>(session, scope, "__generic",   &ParseGenericDecl);
-        addBuiltinSyntax<Decl>(session, scope, "__extension", &ParseExtensionDecl);
-        addBuiltinSyntax<Decl>(session, scope, "__init",      &ParseConstructorDecl);
-        addBuiltinSyntax<Decl>(session, scope, "__subscript", &ParseSubscriptDecl);
-        addBuiltinSyntax<Decl>(session, scope, "interface",   &parseInterfaceDecl);
-        addBuiltinSyntax<Decl>(session, scope, "__modifier",  &parseModifierDecl);
-        addBuiltinSyntax<Decl>(session, scope, "__import",    &parseImportDecl);
+        // Add syntax for declaration keywords
+    #define DECL(KEYWORD, CALLBACK) \
+        addBuiltinSyntax<Decl>(session, scope, #KEYWORD, &CALLBACK)
 
-#if 0
-        // TODO: actual dispatch!
-        if (parser->LookAheadToken("struct"))
-            decl = ParseDeclaratorDecl(parser, containerDecl);
-        else if (parser->LookAheadToken("class"))
-            decl = ParseDeclaratorDecl(parser, containerDecl);
-        else if (parser->LookAheadToken("__generic"))
-            decl = ParseGenericDecl(parser);
-        else if (parser->LookAheadToken("__extension"))
-            decl = ParseExtensionDecl(parser);
-        else if (parser->LookAheadToken("__init"))
-            decl = ParseConstructorDecl(parser);
-        else if (parser->LookAheadToken("__subscript"))
-            decl = ParseSubscriptDecl(parser);
-        else if (parser->LookAheadToken("interface"))
-            decl = parseInterfaceDecl(parser);
-        else if(parser->LookAheadToken("__modifier"))
-            decl = parseModifierDecl(parser);
-        else if(parser->LookAheadToken("__import"))
-            decl = parseImportDecl(parser);
-#endif
+        DECL(typedef,       ParseTypeDef);
+        DECL(cbuffer,       parseHLSLCBufferDecl);
+        DECL(tbuffer,       parseHLSLTBufferDecl);
+        DECL(__generic,     ParseGenericDecl);
+        DECL(__extension,   ParseExtensionDecl);
+        DECL(__init,        ParseConstructorDecl);
+        DECL(__subscript,   ParseSubscriptDecl);
+        DECL(interface,     parseInterfaceDecl);
+        DECL(syntax,        parseSyntaxDecl);
+        DECL(__import,      parseImportDecl);
 
+    #undef DECL
+
+        // Add syntax for "simple" modifier keywords.
+        // These are the ones that just appear as a single
+        // keyword (no further tokens expected/allowed),
+        // and which can be represented just by creating
+        // a new AST node of the corresponding type.
+    #define MODIFIER(KEYWORD, CLASS) \
+        addSimpleModifierSyntax<CLASS>(session, scope, #KEYWORD)
+
+        MODIFIER(in,        InModifier);
+        MODIFIER(input,     InputModifier);
+        MODIFIER(out,       OutModifier);
+        MODIFIER(inout,     InOutModifier);
+        MODIFIER(const,     ConstModifier);
+        MODIFIER(instance,  InstanceModifier);
+        MODIFIER(__builtin, BuiltinModifier);
+
+        MODIFIER(inline,    InlineModifier);
+        MODIFIER(public,    PublicModifier);
+        MODIFIER(require,   RequireModifier);
+        MODIFIER(param,     ParamModifier);
+        MODIFIER(extern,    ExternModifier);
+
+        MODIFIER(row_major,     HLSLRowMajorLayoutModifier);
+        MODIFIER(column_major,  HLSLColumnMajorLayoutModifier);
+
+        MODIFIER(nointerpolation,   HLSLNoInterpolationModifier);
+        MODIFIER(linear,            HLSLLinearModifier);
+        MODIFIER(sample,            HLSLSampleModifier);
+        MODIFIER(centroid,          HLSLCentroidModifier);
+        MODIFIER(precise,           HLSLPreciseModifier);
+        MODIFIER(shared,            HLSLEffectSharedModifier);
+        MODIFIER(groupshared,       HLSLGroupSharedModifier);
+        MODIFIER(static,            HLSLStaticModifier);
+        MODIFIER(uniform,           HLSLUniformModifier);
+        MODIFIER(volatile,          HLSLVolatileModifier);
+
+        // Modifiers for geometry shader input
+        MODIFIER(point,         HLSLPointModifier);
+        MODIFIER(line,          HLSLLineModifier);
+        MODIFIER(triangle,      HLSLTriangleModifier);
+        MODIFIER(lineadj,       HLSLLineAdjModifier);
+        MODIFIER(triangleadj,   HLSLTriangleAdjModifier);
+
+        // Modifiers for unary operator declarations
+        MODIFIER(__prefix,   PrefixModifier);
+        MODIFIER(__postfix,  PostfixModifier);
+
+        // Modifier to apply to `import` that should be re-exported
+        MODIFIER(__exported,  ExportedModifier);
+
+    #undef MODIFIER
+
+        // Add syntax for more complex modifiers, which allow
+        // or expect more tokens after the initial keyword.
+    #define MODIFIER(KEYWORD, CALLBACK) \
+        addBuiltinSyntax<Modifier>(session, scope, #KEYWORD, &CALLBACK)
+
+        MODIFIER(layout,            parseLayoutModifier);
+
+        MODIFIER(__intrinsic_op,    parseIntrinsicOpModifier);
+        MODIFIER(__intrinsic,       parseIntrinsicModifier);
+        MODIFIER(__glsl_extension,  parseGLSLExtensionModifier);
+        MODIFIER(__glsl_version,    parseGLSLVersionModifier);
+
+        MODIFIER(__builtin_type,    parseBuiltinTypeModifier);
+        MODIFIER(__magic_type,      parseMagicTypeModifier);
+
+#undef MODIFIER
 
         return moduleDecl;
     }

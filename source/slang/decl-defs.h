@@ -212,14 +212,6 @@ END_SYNTAX_CLASS()
 
 SIMPLE_SYNTAX_CLASS(GenericValueParamDecl, VarDeclBase)
 
-// Declaration of a user-defined modifier
-SYNTAX_CLASS(ModifierDecl, Decl)
-    // The name of the C++ class to instantiate
-    // (this is a reference to a class in the compiler source code,
-    // and not the user's source code)
-    FIELD(Token, classNameToken)
-END_SYNTAX_CLASS()
-
 // An empty declaration (which might still have modifiers attached).
 //
 // An empty declaration is uncommon in HLSL, but
@@ -236,8 +228,9 @@ SIMPLE_SYNTAX_CLASS(EmptyDecl, Decl)
 //
 SYNTAX_CLASS(SyntaxDecl, Decl)
     // What type of syntax node will be produced when parsing with this keyword?
-    FIELD(SyntaxClass<SyntaxNode>, syntaxClass)
+    FIELD(SyntaxClass<RefObject>, syntaxClass)
 
     // Callback to invoke in order to parse syntax with this keyword.
-    FIELD(SyntaxParseCallback, parserCallback)
+    FIELD(SyntaxParseCallback,  parseCallback)
+    FIELD(void*,                parseUserData)
 END_SYNTAX_CLASS()

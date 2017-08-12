@@ -2746,7 +2746,6 @@ struct EmitVisitor
     void visit##NAME(NAME*, DeclEmitArg const&) {}
 
     // Only used by stdlib
-    IGNORED(ModifierDecl)
     IGNORED(SyntaxDecl)
 
     // Don't emit generic decls directly; we will only
