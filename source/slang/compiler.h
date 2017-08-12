@@ -372,6 +372,10 @@ namespace Slang
         Type* getOverloadedType();
         Type* getErrorType();
 
+        SyntaxClass<RefObject> findSyntaxClass(String const& name);
+
+        Dictionary<String, SyntaxClass<RefObject> > mapNameToSyntaxClass;
+
         //
 
         Session();

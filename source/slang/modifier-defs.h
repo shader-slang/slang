@@ -35,34 +35,34 @@ END_SYNTAX_CLASS()
 // directly.
 SYNTAX_CLASS(IntrinsicOpModifier, IntrinsicModifierBase)
 
-    // token that names the intrinsic op
-    FIELD(Token, opToken)
+// token that names the intrinsic op
+FIELD(Token, opToken)
 
-    // The opcode for the intrinsic operation
-    FIELD_INIT(IntrinsicOp, op, IntrinsicOp::Unknown)
+// The opcode for the intrinsic operation
+FIELD_INIT(IntrinsicOp, op, IntrinsicOp::Unknown)
 END_SYNTAX_CLASS()
 
 // A modifier that marks something as an intrinsic function,
 // for some subset of targets.
 SYNTAX_CLASS(TargetIntrinsicModifier, IntrinsicModifierBase)
-    // Token that names the target that the operation
-    // is an intrisic for.
-    FIELD(Token, targetToken)
+// Token that names the target that the operation
+// is an intrisic for.
+FIELD(Token, targetToken)
 
-    // A custom definition for the operation
-    FIELD(Token, definitionToken)
+// A custom definition for the operation
+FIELD(Token, definitionToken)
 END_SYNTAX_CLASS()
 
 // A modifier to tag something as an intrinsic that requires
 // a certain GLSL extension to be enabled when used
 SYNTAX_CLASS(RequiredGLSLExtensionModifier, Modifier)
-    FIELD(Token, extensionNameToken)
+FIELD(Token, extensionNameToken)
 END_SYNTAX_CLASS()
 
 // A modifier to tag something as an intrinsic that requires
 // a certain GLSL version to be enabled when used
 SYNTAX_CLASS(RequiredGLSLVersionModifier, Modifier)
-    FIELD(Token, versionNumberToken)
+FIELD(Token, versionNumberToken)
 END_SYNTAX_CLASS()
 
 SIMPLE_SYNTAX_CLASS(InOutModifier, OutModifier)
@@ -95,12 +95,18 @@ SIMPLE_SYNTAX_CLASS(SharedModifiers, Modifier)
 // different constructs.
 ABSTRACT_SYNTAX_CLASS(GLSLLayoutModifier, Modifier)
 
-    // The token used to introduce the modifier is stored
-    // as the `nameToken` field.
+// The token used to introduce the modifier is stored
+// as the `nameToken` field.
 
-    // TODO: may want to accept a full expression here
-    FIELD(Token, valToken)
+// TODO: may want to accept a full expression here
+FIELD(Token, valToken)
 END_SYNTAX_CLASS()
+
+// AST nodes to represent the begin/end of a `layout` modifier group
+ABSTRACT_SYNTAX_CLASS(GLSLLayoutModifierGroupMarker, Modifier)
+END_SYNTAX_CLASS()
+SIMPLE_SYNTAX_CLASS(GLSLLayoutModifierGroupBegin, GLSLLayoutModifierGroupMarker)
+SIMPLE_SYNTAX_CLASS(GLSLLayoutModifierGroupEnd, GLSLLayoutModifierGroupMarker)
 
 // We divide GLSL `layout` modifiers into those we have parsed
 // (in the sense of having some notion of their semantics), and

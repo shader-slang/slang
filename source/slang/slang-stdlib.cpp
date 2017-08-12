@@ -2232,19 +2232,19 @@ namespace Slang
 
         // Define additional keywords
 
-        sb << "__modifier(GLSLBufferModifier)       buffer;\n";
+        sb << "syntax buffer : GLSLBufferModifier;\n";
 
         // [GLSL 4.3] Storage Qualifiers
 
         // TODO: need to support `shared` here with its GLSL meaning
 
-        sb << "__modifier(GLSLPatchModifier)        patch;\n";
+        sb << "syntax patch : GLSLPatchModifier;\n";
         // `centroid` and `sample` handled centrally
 
         // [GLSL 4.5] Interpolation Qualifiers
-        sb << "__modifier(SimpleModifier)   smooth;\n";
-        sb << "__modifier(SimpleModifier)   flat;\n";
-        sb << "__modifier(SimpleModifier)   noperspective;\n";
+        sb << "syntax smooth : SimpleModifier;\n";
+        sb << "syntax flat : SimpleModifier;\n";
+        sb << "syntax noperspectie : SimpleModifier;\n";
 
 
         // [GLSL 4.3.2] Constant Qualifier
@@ -2253,24 +2253,24 @@ namespace Slang
         // since they mean such different things.
 
         // [GLSL 4.7.2] Precision Qualifiers
-        sb << "__modifier(SimpleModifier)   highp;\n";
-        sb << "__modifier(SimpleModifier)   mediump;\n";
-        sb << "__modifier(SimpleModifier)   lowp;\n";
+        sb << "syntax highp : SimpleModifier;\n";
+        sb << "syntax mediump : SimpleModifier;\n";
+        sb << "syntax lowp : SimpleModifier;\n";
 
         // [GLSL 4.8.1] The Invariant Qualifier
 
-        sb << "__modifier(GLSLWriteOnlyModifier)    invariant;\n";
+        sb << "syntax invariant : SimpleModifier;\n";
 
         // [GLSL 4.10] Memory Qualifiers
 
-        sb << "__modifier(SimpleModifier)           coherent;\n";
-        sb << "__modifier(SimpleModifier)           volatile;\n";
-        sb << "__modifier(SimpleModifier)           restrict;\n";
-        sb << "__modifier(GLSLReadOnlyModifier)     readonly;\n";
-        sb << "__modifier(GLSLWriteOnlyModifier)    writeonly;\n";
+        sb << "syntax coherent : SimpleModifier;\n";
+        sb << "syntax volatile : SimpleModifier;\n";
+        sb << "syntax restrict : SimpleModifier;\n";
+        sb << "syntax readonly : GLSLReadOnlyModifier;\n";
+        sb << "syntax writeonly : GLSLWriteOnlyModifier;\n";
 
-        // We will treat `subroutine` as a qualifier
-        sb << "__modifier(SimpleModifier)   subroutine;\n";
+        // We will treat `subroutine` as a qualifier for now
+        sb << "syntax subroutine : SimpleModifier;\n";
 
         glslLibraryCode = sb.ProduceString();
         return glslLibraryCode;

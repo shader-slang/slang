@@ -90,6 +90,8 @@ ABSTRACT_SYNTAX_CLASS(Type, Val);
 ABSTRACT_SYNTAX_CLASS(Modifier, SyntaxNodeBase);
 ABSTRACT_SYNTAX_CLASS(Expr, SyntaxNode);
 
+ABSTRACT_SYNTAX_CLASS(Substitutions, SyntaxNode);
+
 #include "object-meta-end.h"
 
 bool SyntaxClassBase::isSubClassOfImpl(SyntaxClassBase const& super) const
@@ -257,6 +259,16 @@ void Type::accept(IValVisitor* visitor, void* extra)
     {
         return errorType;
     }
+
+    SyntaxClass<RefObject> Session::findSyntaxClass(String const& name)
+    {
+        SyntaxClass<RefObject> syntaxClass;
+        if (mapNameToSyntaxClass.TryGetValue(name, syntaxClass))
+            return syntaxClass;
+
+        return SyntaxClass<RefObject>();
+    }
+
 
 
     bool ArrayExpressionType::EqualsImpl(Type * type)
