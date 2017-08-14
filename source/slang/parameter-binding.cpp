@@ -1688,7 +1688,7 @@ void generateParameterBindings(
         programLayout->bindingForHackSampler = (int)binding;
 
         RefPtr<Variable> var = new Variable();
-        var->Name.Content = "SLANG_hack_samplerForTexelFetch";
+        var->name.Content = "SLANG_hack_samplerForTexelFetch";
         var->type.type = getSamplerStateType(request->mSession);
 
         auto typeLayout = new TypeLayout();

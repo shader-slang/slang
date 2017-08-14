@@ -42,7 +42,7 @@ void buildMemberDictionary(ContainerDecl* decl)
 
     for (auto m : decl->Members)
     {
-        auto name = m->Name.Content;
+        auto name = m->name.Content;
 
         // Add any transparent members to a separate list for lookup
         if (m->HasModifier<TransparentModifier>())

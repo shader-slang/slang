@@ -949,7 +949,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
     // Convenience accessors for common properties of declarations
     String const& DeclRefBase::GetName() const
     {
-        return decl->Name.Content;
+        return decl->name.Content;
     }
 
     DeclRefBase DeclRefBase::GetParent() const

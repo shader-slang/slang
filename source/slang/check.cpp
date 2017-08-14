@@ -1619,15 +1619,15 @@ namespace Slang
             {
                 checkDecl(para);
 
-                if (paraNames.Contains(para->Name.Content))
+                if (paraNames.Contains(para->name.Content))
                 {
                     if (!isRewriteMode())
                     {
-                        getSink()->diagnose(para, Diagnostics::parameterAlreadyDefined, para->Name);
+                        getSink()->diagnose(para, Diagnostics::parameterAlreadyDefined, para->name);
                     }
                 }
                 else
-                    paraNames.Add(para->Name.Content);
+                    paraNames.Add(para->name.Content);
             }
             this->function = NULL;
             functionNode->SetCheckState(DeclCheckState::CheckedHeader);
@@ -4559,7 +4559,7 @@ namespace Slang
                                 {
                                     if (!isRewriteMode())
                                     {
-                                        getSink()->diagnose(expr->Arguments[i], Diagnostics::argumentExpectedLValue, (*params)[i]->Name);
+                                        getSink()->diagnose(expr->Arguments[i], Diagnostics::argumentExpectedLValue, (*params)[i]->name);
                                     }
                                 }
                             }

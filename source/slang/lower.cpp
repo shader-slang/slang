@@ -317,7 +317,7 @@ private:
 class PseudoVarDecl : public RefObject
 {
 public:
-    Token Name;
+    Token name;
     SourceLoc Position;
     TypeExp type;
 };
@@ -918,7 +918,7 @@ struct LoweringVisitor
     RefPtr<Expr> moveTemp(RefPtr<Expr> expr)
     {
         RefPtr<Variable> varDecl = new Variable();
-        varDecl->Name.Content = generateName();
+        varDecl->name.Content = generateName();
         varDecl->type.type = expr->type.type;
         varDecl->initExpr = expr;
 
@@ -2575,7 +2575,7 @@ struct LoweringVisitor
 
         if (isReservedWord(decl->getName()))
         {
-            decl->Name.Content.append("_");
+            decl->name.Content.append("_");
         }
     }
 
@@ -2611,7 +2611,7 @@ struct LoweringVisitor
         registerLoweredDecl(loweredDecl, decl);
 
         loweredDecl->Position = decl->Position;
-        loweredDecl->Name = decl->getNameToken();
+        loweredDecl->name = decl->getNameToken();
 
         // Deal with renaming - we shouldn't allow decls with names that are reserved words
         ensureDeclHasAValidName(loweredDecl);
@@ -2948,7 +2948,7 @@ struct LoweringVisitor
         // Syntax class for declarations to create
         SyntaxClass<VarDeclBase>    varDeclClass;
 
-        // Name "stem" to use for any actual variables we create
+        // name "stem" to use for any actual variables we create
         String                      name;
 
         // The parent tuple type (or array thereof) we are scalarizing
@@ -3102,7 +3102,7 @@ struct LoweringVisitor
                 }
 
                 RefPtr<VarDeclBase> fieldVarDecl = info.varDeclClass.createInstance();
-                fieldVarDecl->Name.Content = fieldName;
+                fieldVarDecl->name.Content = fieldName;
                 fieldVarDecl->type.type = fieldVarType;
 
                 addDecl(fieldVarDecl);
@@ -3144,14 +3144,14 @@ struct LoweringVisitor
 
         // We'll need a placeholder declaration to wrap the whole thing up:
         RefPtr<TupleVarDecl> tupleDecl = new TupleVarDecl();
-        tupleDecl->Name.Content = name;
+        tupleDecl->name.Content = name;
 
         // First, if the tuple type had any "ordinary" data,
         // then we go ahead and create a declaration for that stuff
         if (tupleTypeMod->hasAnyNonTupleFields)
         {
             RefPtr<VarDeclBase> primaryVarDecl = varDeclClass.createInstance();
-            primaryVarDecl->Name.Content = name;
+            primaryVarDecl->name.Content = name;
             primaryVarDecl->type.type = tupleType;
 
             primaryVarDecl->modifiers = originalVarDecl->modifiers;
@@ -3939,7 +3939,7 @@ struct LoweringVisitor
         if (!globalVarExpr)
         {
             RefPtr<Variable> globalVarDecl = new Variable();
-            globalVarDecl->Name.Content = info.name;
+            globalVarDecl->name.Content = info.name;
             globalVarDecl->type.type = type;
 
             ensureDeclHasAValidName(globalVarDecl);
@@ -4168,7 +4168,7 @@ struct LoweringVisitor
         LoweredExpr         loweredExpr)
     {
         RefPtr<VaryingTupleVarDecl> loweredDecl = new VaryingTupleVarDecl();
-        loweredDecl->Name = originalVarDecl->Name;
+        loweredDecl->name = originalVarDecl->name;
         loweredDecl->type = loweredType;
         loweredDecl->expr = loweredExpr;
 
@@ -4200,11 +4200,11 @@ struct LoweringVisitor
         // Now we will generate a `void main() { ... }` function to call the lowered code.
         RefPtr<FuncDecl> mainDecl = new FuncDecl();
         mainDecl->ReturnType.type = getSession()->getVoidType();
-        mainDecl->Name.Content = "main";
+        mainDecl->name.Content = "main";
 
         // If the user's entry point was called `main` then rename it here
         if (loweredEntryPointFunc->getName() == "main")
-            loweredEntryPointFunc->Name.Content = "main_";
+            loweredEntryPointFunc->name.Content = "main_";
 
         RefPtr<BlockStmt> bodyStmt = new BlockStmt();
         bodyStmt->scopeDecl = new ScopeDecl();
@@ -4230,7 +4230,7 @@ struct LoweringVisitor
 
             RefPtr<Variable> localVarDecl = new Variable();
             localVarDecl->Position = paramDecl->Position;
-            localVarDecl->Name.Content = paramDecl->getName();
+            localVarDecl->name.Content = paramDecl->getName();
             localVarDecl->type = lowerType(paramDecl->type);
 
             ensureDeclHasAValidName(localVarDecl);
@@ -4268,7 +4268,7 @@ struct LoweringVisitor
         {
             resultVarDecl = new Variable();
             resultVarDecl->Position = loweredEntryPointFunc->Position;
-            resultVarDecl->Name.Content = "main_result";
+            resultVarDecl->name.Content = "main_result";
             resultVarDecl->type = TypeExp(loweredEntryPointFunc->ReturnType);
 
             ensureDeclHasAValidName(resultVarDecl);
@@ -4387,13 +4387,13 @@ struct LoweringVisitor
         {
             resultGlobal = new Variable();
             // TODO: need a scheme for generating unique names
-            resultGlobal->Name.Content = "_main_result";
+            resultGlobal->name.Content = "_main_result";
             resultGlobal->type = loweredReturnType;
 
             addMember(shared->loweredProgram, resultGlobal);
         }
 
-        loweredDecl->Name.Content = "main";
+        loweredDecl->name.Content = "main";
         loweredDecl->ReturnType.type = getSession()->getVoidType();
 
         // We will emit the body statement in a context where

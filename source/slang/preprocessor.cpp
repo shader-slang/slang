@@ -1885,7 +1885,7 @@ enum PreprocessorDirectiveFlag : unsigned int
 // Information about a specific directive
 struct PreprocessorDirective
 {
-    // Name of the directive
+    // name of the directive
     char const*                     name;
 
     // Callback to handle the directive

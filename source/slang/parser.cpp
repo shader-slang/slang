@@ -538,7 +538,7 @@ namespace Slang
         auto nameToken = parser->ReadToken(TokenType::Identifier);
         typeDefDecl->Position = nameToken.Position;
 
-        typeDefDecl->Name = nameToken;
+        typeDefDecl->name = nameToken;
         typeDefDecl->type = type;
 
         return typeDefDecl;
@@ -859,7 +859,7 @@ namespace Slang
         // Different cases of declarator appear as "flavors" here
         enum class Flavor
         {
-            Name,
+            name,
             Pointer,
             Array,
         };
@@ -961,7 +961,7 @@ namespace Slang
         parser->FillPosition(decl.Ptr());
         decl->Position = declaratorInfo.nameToken.Position;
 
-        decl->Name = declaratorInfo.nameToken;
+        decl->name = declaratorInfo.nameToken;
         decl->ReturnType = TypeExp(declaratorInfo.typeSpec);
         parseParameterList(parser, decl);
         ParseOptSemantics(parser, decl.Ptr());
@@ -1043,12 +1043,12 @@ namespace Slang
         if( declaratorInfo.nameToken.type == TokenType::Unknown )
         {
             // HACK(tfoley): we always give a name, even if the declarator didn't include one... :(
-            decl->Name.Content = generateName(parser);
+            decl->name.Content = generateName(parser);
         }
         else
         {
             decl->Position = declaratorInfo.nameToken.Position;
-            decl->Name = declaratorInfo.nameToken;
+            decl->name = declaratorInfo.nameToken;
         }
         decl->type = TypeExp(declaratorInfo.typeSpec);
 
@@ -1068,7 +1068,7 @@ namespace Slang
         case TokenType::Identifier:
             {
                 auto nameDeclarator = new NameDeclarator();
-                nameDeclarator->flavor = Declarator::Flavor::Name;
+                nameDeclarator->flavor = Declarator::Flavor::name;
                 nameDeclarator->nameToken = ParseDeclName(parser);
                 declarator = nameDeclarator;
             }
@@ -1197,7 +1197,7 @@ namespace Slang
         {
             switch(declarator->flavor)
             {
-            case Declarator::Flavor::Name:
+            case Declarator::Flavor::name:
                 {
                     auto nameDeclarator = (NameDeclarator*) declarator.Ptr();
                     ioInfo->nameToken = nameDeclarator->nameToken;
@@ -1671,8 +1671,8 @@ namespace Slang
         addModifier(bufferVarDecl, reflectionNameModifier);
 
         // Both the buffer variable and its type need to have names generated
-        bufferVarDecl->Name.Content = generateName(parser, "parameterBlock_" + reflectionNameToken.Content);
-        bufferDataTypeDecl->Name.Content = generateName(parser, "ParameterBlock_" + reflectionNameToken.Content);
+        bufferVarDecl->name.Content = generateName(parser, "parameterBlock_" + reflectionNameToken.Content);
+        bufferDataTypeDecl->name.Content = generateName(parser, "ParameterBlock_" + reflectionNameToken.Content);
 
         addModifier(bufferDataTypeDecl, new ImplicitParameterBlockElementTypeModifier());
         addModifier(bufferVarDecl, new ImplicitParameterBlockVariableModifier());
@@ -1685,7 +1685,7 @@ namespace Slang
         // Construct a type expression to reference the buffer data type
         auto bufferDataTypeExpr = new VarExpr();
         bufferDataTypeExpr->Position = bufferDataTypeDecl->Position;
-        bufferDataTypeExpr->name = bufferDataTypeDecl->Name.Content;
+        bufferDataTypeExpr->name = bufferDataTypeDecl->name.Content;
         bufferDataTypeExpr->scope = parser->currentScope.Ptr();
 
         // Construct a type exrpession to reference the type constructor
@@ -1840,7 +1840,7 @@ namespace Slang
         parser->FillPosition(blockVarDecl.Ptr());
 
         // Generate a unique name for the data type
-        blockDataTypeDecl->Name.Content = generateName(parser, "ParameterBlock_" + reflectionNameToken.Content);
+        blockDataTypeDecl->name.Content = generateName(parser, "ParameterBlock_" + reflectionNameToken.Content);
 
         // TODO(tfoley): We end up constructing unchecked syntax here that
         // is expected to type check into the right form, but it might be
@@ -1850,7 +1850,7 @@ namespace Slang
         // Construct a type expression to reference the buffer data type
         auto blockDataTypeExpr = new VarExpr();
         blockDataTypeExpr->Position = blockDataTypeDecl->Position;
-        blockDataTypeExpr->name = blockDataTypeDecl->Name.Content;
+        blockDataTypeExpr->name = blockDataTypeDecl->name.Content;
         blockDataTypeExpr->scope = parser->currentScope.Ptr();
 
         // Construct a type exrpession to reference the type constructor
@@ -1877,7 +1877,7 @@ namespace Slang
         {
             // The user gave an explicit name to the block,
             // so we need to use that as our variable name
-            blockVarDecl->Name = parser->ReadToken(TokenType::Identifier);
+            blockVarDecl->name = parser->ReadToken(TokenType::Identifier);
 
             // TODO: in this case we make actually have a more complex
             // declarator, including `[]` brackets.
@@ -1885,7 +1885,7 @@ namespace Slang
         else
         {
             // synthesize a dummy name
-            blockVarDecl->Name.Content = generateName(parser, "parameterBlock_" + reflectionNameToken.Content);
+            blockVarDecl->name.Content = generateName(parser, "parameterBlock_" + reflectionNameToken.Content);
 
             // Otherwise we have a transparent declaration, similar
             // to an HLSL `cbuffer`
@@ -1924,7 +1924,7 @@ namespace Slang
         {
             // default case is a type parameter
             auto paramDecl = new GenericValueParamDecl();
-            paramDecl->Name = parser->ReadToken(TokenType::Identifier);
+            paramDecl->name = parser->ReadToken(TokenType::Identifier);
             if (AdvanceIf(parser, TokenType::Colon))
             {
                 paramDecl->type = parser->ParseTypeExp();
@@ -1940,7 +1940,7 @@ namespace Slang
             // default case is a type parameter
             auto paramDecl = new GenericTypeParamDecl();
             parser->FillPosition(paramDecl);
-            paramDecl->Name = parser->ReadToken(TokenType::Identifier);
+            paramDecl->name = parser->ReadToken(TokenType::Identifier);
             if (AdvanceIf(parser, TokenType::Colon))
             {
                 // The user is apply a constraint to this type parameter...
@@ -1999,7 +1999,7 @@ namespace Slang
         // it wraps, so that lookup can find it.
         if (decl->inner)
         {
-            decl->Name = decl->inner->Name;
+            decl->name = decl->inner->name;
             decl->Position = decl->inner->Position;
         }
 
@@ -2040,7 +2040,7 @@ namespace Slang
     {
         RefPtr<InterfaceDecl> decl = new InterfaceDecl();
         parser->FillPosition(decl.Ptr());
-        decl->Name = parser->ReadToken(TokenType::Identifier);
+        decl->name = parser->ReadToken(TokenType::Identifier);
 
         parseOptionalInheritanceClause(parser, decl.Ptr());
 
@@ -2102,7 +2102,7 @@ namespace Slang
         parser->FillPosition(decl.Ptr());
 
         // TODO: the use of this name here is a bit magical...
-        decl->Name.Content = "operator[]";
+        decl->name.Content = "operator[]";
 
         parseParameterList(parser, decl);
 
@@ -2224,7 +2224,7 @@ namespace Slang
         // up for downstream code?
 
         RefPtr<SyntaxDecl> syntaxDecl = new SyntaxDecl();
-        syntaxDecl->Name = nameToken;
+        syntaxDecl->name = nameToken;
         syntaxDecl->Position = nameToken.Position;
         syntaxDecl->syntaxClass = syntaxClass;
         syntaxDecl->parseCallback = parseCallback;
@@ -2453,7 +2453,7 @@ namespace Slang
         ReadToken("struct");
 
         // TODO: support `struct` declaration without tag
-        rs->Name = ReadToken(TokenType::Identifier);
+        rs->name = ReadToken(TokenType::Identifier);
 
         // We allow for an inheritance clause on a `struct`
         // so that it can conform to interfaces.
@@ -2469,7 +2469,7 @@ namespace Slang
         RefPtr<ClassDecl> rs = new ClassDecl();
         FillPosition(rs.Ptr());
         ReadToken("class");
-        rs->Name = ReadToken(TokenType::Identifier);
+        rs->name = ReadToken(TokenType::Identifier);
         ReadToken(TokenType::LBrace);
         parseOptionalInheritanceClause(this, rs.Ptr());
         parseAggTypeDeclBody(this, rs.Ptr());
@@ -2576,7 +2576,7 @@ namespace Slang
 
         Token varNameToken = parser->ReadToken(TokenType::Identifier);
         RefPtr<Variable> varDecl = new Variable();
-        varDecl->Name = varNameToken;
+        varDecl->name = varNameToken;
         varDecl->Position = varNameToken.Position;
 
         stmt->varDecl = varDecl;
@@ -3682,7 +3682,7 @@ namespace Slang
         String name(nameText);
 
         RefPtr<SyntaxDecl> syntaxDecl = new SyntaxDecl();
-        syntaxDecl->Name.Content = name;
+        syntaxDecl->name.Content = name;
         syntaxDecl->syntaxClass = syntaxClass;
         syntaxDecl->parseCallback = callback;
         syntaxDecl->parseUserData = userData;

@@ -84,7 +84,7 @@ RAW(
     {
         for (auto field : GetFields())
         {
-            if (field->Name.Content == name)
+            if (field->name.Content == name)
                 return field.Ptr();
         }
         return nullptr;
@@ -94,7 +94,7 @@ RAW(
         int index = 0;
         for (auto field : GetFields())
         {
-            if (field->Name.Content == name)
+            if (field->name.Content == name)
                 return index;
             index++;
         }

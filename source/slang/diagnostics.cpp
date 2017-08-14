@@ -40,7 +40,7 @@ void printDiagnosticArg(StringBuilder& sb, Slang::String const& str)
 
 void printDiagnosticArg(StringBuilder& sb, Decl* decl)
 {
-    sb << decl->Name.Content;
+    sb << decl->name.Content;
 }
 
 void printDiagnosticArg(StringBuilder& sb, Type* type)

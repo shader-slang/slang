@@ -335,14 +335,14 @@ struct EDeclarator
 {
     enum class Flavor
     {
-        Name,
+        name,
         Array,
         UnsizedArray,
     };
     Flavor flavor;
     EDeclarator* next = nullptr;
 
-    // Used for `Flavor::Name`
+    // Used for `Flavor::name`
     String name;
     SourceLoc loc;
 
@@ -778,7 +778,7 @@ struct EmitVisitor
 
         switch (declarator->flavor)
         {
-        case EDeclarator::Flavor::Name:
+        case EDeclarator::Flavor::name:
             emitName(declarator->name, declarator->loc);
             break;
 
@@ -1205,7 +1205,7 @@ struct EmitVisitor
         advanceToSourceLocation(typeLoc);
 
         EDeclarator nameDeclarator;
-        nameDeclarator.flavor = EDeclarator::Flavor::Name;
+        nameDeclarator.flavor = EDeclarator::Flavor::name;
         nameDeclarator.name = name;
         nameDeclarator.loc = nameLoc;
         emitTypeImpl(type, &nameDeclarator);
@@ -1253,7 +1253,7 @@ struct EmitVisitor
             }
 
             EDeclarator nameDeclarator;
-            nameDeclarator.flavor = EDeclarator::Flavor::Name;
+            nameDeclarator.flavor = EDeclarator::Flavor::name;
             nameDeclarator.name = name;
             nameDeclarator.loc = nameLoc;
 
@@ -2789,7 +2789,7 @@ struct EmitVisitor
         SLANG_RELEASE_ASSERT(context->shared->target != CodeGenTarget::GLSL);
 
         Emit("typedef ");
-        EmitType(decl->type, decl->Name.Content);
+        EmitType(decl->type, decl->name.Content);
         Emit(";\n");
     }
 
@@ -3100,7 +3100,7 @@ struct EmitVisitor
             return;
 
         Emit("struct ");
-        emitName(decl->Name);
+        emitName(decl->name);
         Emit("\n{\n");
 
         // TODO(tfoley): Need to hoist members functions, etc. out to global scope
@@ -3516,10 +3516,10 @@ struct EmitVisitor
         }
         Emit("}");
 
-        if( varDecl->Name.type != TokenType::Unknown )
+        if( varDecl->name.type != TokenType::Unknown )
         {
             Emit(" ");
-            emitName(varDecl->Name);
+            emitName(varDecl->name);
         }
 
         Emit(";\n");
@@ -3624,7 +3624,7 @@ struct EmitVisitor
         // isn't allowed by declarator syntax and/or language rules, we could
         // hypothetically wrap things in a `typedef` and work around it.
 
-        EmitType(decl->ReturnType, decl->Name);
+        EmitType(decl->ReturnType, decl->name);
 
         Emit("(");
         bool first = true;

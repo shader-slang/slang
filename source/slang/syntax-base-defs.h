@@ -211,11 +211,11 @@ END_SYNTAX_CLASS()
 ABSTRACT_SYNTAX_CLASS(Decl, DeclBase)
     DECL_FIELD(ContainerDecl*, ParentDecl RAW(=nullptr))
 
-    FIELD(Token, Name)
+    FIELD(Token, name)
 
     RAW(
-    String const& getName() { return Name.Content; }
-    Token const& getNameToken() { return Name; }
+    String const& getName() { return name.Content; }
+    Token const& getNameToken() { return name; }
     )
 
 
