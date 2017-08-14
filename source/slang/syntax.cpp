@@ -260,7 +260,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         return errorType;
     }
 
-    SyntaxClass<RefObject> Session::findSyntaxClass(String const& name)
+    SyntaxClass<RefObject> Session::findSyntaxClass(Name* name)
     {
         SyntaxClass<RefObject> syntaxClass;
         if (mapNameToSyntaxClass.TryGetValue(name, syntaxClass))
@@ -306,7 +306,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     String DeclRefType::ToString()
     {
-        return declRef.GetName();
+        return getText(declRef.GetName());
     }
 
     int DeclRefType::GetHashCode()
@@ -620,7 +620,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     String NamedExpressionType::ToString()
     {
-        return declRef.GetName();
+        return getText(declRef.GetName());
     }
 
     bool NamedExpressionType::EqualsImpl(Type * /*type*/)
@@ -646,7 +646,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
     {
         // TODO: a better approach than this
         if (declRef)
-            return declRef.GetName();
+            return getText(declRef.GetName());
         else
             return "/* unknown FuncType */";
     }
@@ -786,7 +786,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     String GenericParamIntVal::ToString()
     {
-        return declRef.GetName();
+        return getText(declRef.GetName());
     }
 
     int GenericParamIntVal::GetHashCode()
@@ -947,9 +947,9 @@ void Type::accept(IValVisitor* visitor, void* extra)
     }
 
     // Convenience accessors for common properties of declarations
-    String const& DeclRefBase::GetName() const
+    Name* DeclRefBase::GetName() const
     {
-        return decl->name.Content;
+        return decl->nameAndLoc.name;
     }
 
     DeclRefBase DeclRefBase::GetParent() const

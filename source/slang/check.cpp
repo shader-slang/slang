@@ -147,7 +147,7 @@ namespace Slang
             if (baseExpr)
             {
                 auto expr = new MemberExpr();
-                expr->Position = originalExpr->Position;
+                expr->loc = originalExpr->loc;
                 expr->BaseExpression = baseExpr;
                 expr->name = declRef.GetName();
                 expr->type = GetTypeForDeclRef(declRef);
@@ -157,7 +157,7 @@ namespace Slang
             else
             {
                 auto expr = new VarExpr();
-                expr->Position = originalExpr->Position;
+                expr->loc = originalExpr->loc;
                 expr->name = declRef.GetName();
                 expr->type = GetTypeForDeclRef(declRef);
                 expr->declRef = declRef;
@@ -173,7 +173,7 @@ namespace Slang
             SLANG_ASSERT(ptrLikeType);
 
             auto derefExpr = new DerefExpr();
-            derefExpr->Position = originalExpr->Position;
+            derefExpr->loc = originalExpr->loc;
             derefExpr->base = base;
             derefExpr->type = QualType(ptrLikeType->elementType);
 
@@ -217,7 +217,7 @@ namespace Slang
             if (lookupResult.isOverloaded())
             {
                 auto overloadedExpr = new OverloadedExpr();
-                overloadedExpr->Position = originalExpr->Position;
+                overloadedExpr->loc = originalExpr->loc;
                 overloadedExpr->type = QualType(
                     getSession()->getOverloadedType());
                 overloadedExpr->base = baseExpr;
@@ -823,7 +823,7 @@ namespace Slang
                 if(outToExpr)
                 {
                     auto toInitializerListExpr = new InitializerListExpr();
-                    toInitializerListExpr->Position = fromInitializerListExpr->Position;
+                    toInitializerListExpr->loc = fromInitializerListExpr->loc;
                     toInitializerListExpr->type = QualType(toType);
                     toInitializerListExpr->args = coercedArgs;
 
@@ -1007,7 +1007,7 @@ namespace Slang
                 castExpr = new ImplicitCastExpr();
             }
 
-            castExpr->Position = fromExpr->Position;
+            castExpr->loc = fromExpr->loc;
             castExpr->TargetType.type = toType;
             castExpr->type = QualType(toType);
             castExpr->Expression = fromExpr;
@@ -1042,7 +1042,7 @@ namespace Slang
             {
                 if(!isRewriteMode())
                 {
-                    getSink()->diagnose(fromExpr->Position, Diagnostics::typeMismatch, toType, fromExpr->type);
+                    getSink()->diagnose(fromExpr->loc, Diagnostics::typeMismatch, toType, fromExpr->type);
                 }
 
                 // Note(tfoley): We don't call `CreateErrorExpr` here, because that would
@@ -1190,7 +1190,7 @@ namespace Slang
             {
                 if (!isRewriteMode())
                 {
-                    getSink()->diagnose(expr->Position, Diagnostics::expectedIntegerConstantNotLiteral);
+                    getSink()->diagnose(expr->loc, Diagnostics::expectedIntegerConstantNotLiteral);
                 }
                 return nullptr;
             }
@@ -1234,7 +1234,7 @@ namespace Slang
                 // For now we will do this in a completely ad hoc fashion,
                 // but it would be nice to have some generic routine to
                 // do the needed type checking/coercion.
-                if(hlslUncheckedAttribute->nameToken.Content == "numthreads")
+                if(getText(hlslUncheckedAttribute->getName()) == "numthreads")
                 {
                     if(hlslUncheckedAttribute->args.Count() != 3)
                         return m;
@@ -1249,8 +1249,8 @@ namespace Slang
 
                     auto hlslNumThreadsAttribute = new HLSLNumThreadsAttribute();
 
-                    hlslNumThreadsAttribute->Position   = hlslUncheckedAttribute->Position;
-                    hlslNumThreadsAttribute->nameToken  = hlslUncheckedAttribute->nameToken;
+                    hlslNumThreadsAttribute->loc   = hlslUncheckedAttribute->loc;
+                    hlslNumThreadsAttribute->name       = hlslUncheckedAttribute->getName();
                     hlslNumThreadsAttribute->args       = hlslUncheckedAttribute->args;
                     hlslNumThreadsAttribute->x          = (int32_t) xVal->value;
                     hlslNumThreadsAttribute->y          = (int32_t) yVal->value;
@@ -1614,20 +1614,20 @@ namespace Slang
             this->function = functionNode;
             auto returnType = CheckProperType(functionNode->ReturnType);
             functionNode->ReturnType = returnType;
-            HashSet<String> paraNames;
+            HashSet<Name*> paraNames;
             for (auto & para : functionNode->GetParameters())
             {
                 checkDecl(para);
 
-                if (paraNames.Contains(para->name.Content))
+                if (paraNames.Contains(para->getName()))
                 {
                     if (!isRewriteMode())
                     {
-                        getSink()->diagnose(para, Diagnostics::parameterAlreadyDefined, para->name);
+                        getSink()->diagnose(para, Diagnostics::parameterAlreadyDefined, para->getName());
                     }
                 }
                 else
-                    paraNames.Add(para->name.Content);
+                    paraNames.Add(para->getName());
             }
             this->function = NULL;
             functionNode->SetCheckState(DeclCheckState::CheckedHeader);
@@ -2062,6 +2062,11 @@ namespace Slang
             return new ConstantIntVal(expr->integerValue);
         }
 
+        Name* getName(String const& text)
+        {
+            return getCompileRequest()->getNamePool()->getName(text);
+        }
+
         RefPtr<IntVal> TryConstantFoldExpr(
             InvokeExpr* invokeExpr)
         {
@@ -2127,7 +2132,7 @@ namespace Slang
             auto opName = funcDeclRef.GetName();
 
             // handle binary operators
-            if (opName == "-")
+            if (opName == getName("-"))
             {
                 if (argCount == 1)
                 {
@@ -2140,8 +2145,8 @@ namespace Slang
             }
 
             // simple binary operators
-#define CASE(OP)                                                        \
-            else if(opName == #OP) do {                             \
+#define CASE(OP)                                                    \
+            else if(opName == getName(#OP)) do {                    \
                 if(argCount != 2) return nullptr;                   \
                 resultValue = constArgVals[0] OP constArgVals[1];   \
             } while(0)
@@ -2152,8 +2157,8 @@ namespace Slang
 
             // binary operators with chance of divide-by-zero
             // TODO: issue a suitable error in that case
-#define CASE(OP)                                                        \
-            else if(opName == #OP) do {                             \
+#define CASE(OP)                                                    \
+            else if(opName == getName(#OP)) do {                    \
                 if(argCount != 2) return nullptr;                   \
                 if(!constArgVals[1]) return nullptr;                \
                 resultValue = constArgVals[0] OP constArgVals[1];   \
@@ -2445,7 +2450,7 @@ namespace Slang
                     // it must match what the parser installed in subscript declarations.
                     LookupResult lookupResult = LookUpLocal(
                         getSession(),
-                        this, "operator[]", aggTypeDeclRef);
+                        this, getName("operator[]"), aggTypeDeclRef);
                     if (!lookupResult.isValid())
                     {
                         goto fail;
@@ -2458,7 +2463,7 @@ namespace Slang
                     // we will construct a reference to it and try to call it
 
                     RefPtr<InvokeExpr> subscriptCallExpr = new InvokeExpr();
-                    subscriptCallExpr->Position = subscriptExpr->Position;
+                    subscriptCallExpr->loc = subscriptExpr->loc;
                     subscriptCallExpr->FunctionExpr = subscriptFuncExpr;
 
                     // TODO(tfoley): This path can support multiple arguments easily
@@ -4126,7 +4131,7 @@ namespace Slang
                 sb << ".";
             }
 
-            sb << declRef.GetName();
+            sb << getText(declRef.GetName());
 
             // If the parent declaration is a generic, then we need to print out its
             // signature
@@ -4179,7 +4184,7 @@ namespace Slang
                         if (!first) sb << ", ";
                         first = false;
 
-                        sb << genericTypeParam.GetName();
+                        sb << getText(genericTypeParam.GetName());
                     }
                     else if(auto genericValParam = paramDeclRef.As<GenericValueParamDecl>())
                     {
@@ -4188,7 +4193,7 @@ namespace Slang
 
                         formatType(sb, GetType(genericValParam));
                         sb << " ";
-                        sb << genericValParam.GetName();
+                        sb << getText(genericValParam.GetName());
                     }
                     else
                     {}
@@ -4286,7 +4291,7 @@ namespace Slang
                     }
                 }
 
-                String funcName;
+                Name* funcName = nullptr;
                 if (auto baseVar = funcExpr.As<VarExpr>())
                     funcName = baseVar->name;
                 else if(auto baseMemberRef = funcExpr.As<MemberExpr>())
@@ -4298,7 +4303,7 @@ namespace Slang
                 {
                     // There were multple equally-good candidates, but none actually usable.
                     // We will construct a diagnostic message to help out.
-                    if (funcName.Length() != 0)
+                    if (funcName)
                     {
                         if (!isRewriteMode())
                         {
@@ -4317,7 +4322,7 @@ namespace Slang
                 {
                     // There were multiple applicable candidates, so we need to report them.
 
-                    if (funcName.Length() != 0)
+                    if (funcName)
                     {
                         if (!isRewriteMode())
                         {
@@ -4559,7 +4564,7 @@ namespace Slang
                                 {
                                     if (!isRewriteMode())
                                     {
-                                        getSink()->diagnose(expr->Arguments[i], Diagnostics::argumentExpectedLValue, (*params)[i]->name);
+                                        getSink()->diagnose(expr->Arguments[i], Diagnostics::argumentExpectedLValue, (*params)[i]->getName());
                                     }
                                 }
                             }
@@ -4732,7 +4737,7 @@ namespace Slang
             IntegerLiteralValue         baseElementCount)
         {
             RefPtr<SwizzleExpr> swizExpr = new SwizzleExpr();
-            swizExpr->Position = memberRefExpr->Position;
+            swizExpr->loc = memberRefExpr->loc;
             swizExpr->base = memberRefExpr->BaseExpression;
 
             IntegerLiteralValue limitElement = baseElementCount;
@@ -4744,9 +4749,11 @@ namespace Slang
             bool anyDuplicates = false;
             bool anyError = false;
 
-            for (UInt i = 0; i < memberRefExpr->name.Length(); i++)
+            auto swizzleText = getText(memberRefExpr->name);
+
+            for (UInt i = 0; i < swizzleText.Length(); i++)
             {
-                auto ch = memberRefExpr->name[i];
+                auto ch = swizzleText[i];
                 int elementIndex = -1;
                 switch (ch)
                 {
@@ -5014,11 +5021,11 @@ namespace Slang
             // be loaded), and then put its declarations into
             // the current scope.
 
-            auto name = decl->nameToken.Content;
+            auto name = decl->moduleNameAndLoc.name;
             auto scope = decl->scope;
 
             // Try to load a module matching the name
-            auto importedModuleDecl = findOrImportModule(request, name, decl->nameToken.Position);
+            auto importedModuleDecl = findOrImportModule(request, name, decl->moduleNameAndLoc.loc);
 
             // If we didn't find a matching module, then bail out
             if (!importedModuleDecl)

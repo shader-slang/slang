@@ -4,6 +4,7 @@
 #include "../core/basic.h"
 
 #include "diagnostics.h"
+#include "name.h"
 #include "profile.h"
 #include "syntax.h"
 
@@ -90,7 +91,7 @@ namespace Slang
         CompileRequest* compileRequest = nullptr;
 
         // The name of the entry point function (e.g., `main`)
-        String name;
+        Name* name;
 
         // The profile that the entry point will be compiled for
         // (this is a combination of the target state, and also
@@ -222,6 +223,11 @@ namespace Slang
         SourceManager sourceManagerStorage;
         SourceManager* sourceManager;
 
+        // Name pool for looking up names
+        NamePool namePool;
+
+        NamePool* getNamePool() { return &namePool; }
+
         // Output stuff
         DiagnosticSink mSink;
         String mDiagnosticOutput;
@@ -241,7 +247,7 @@ namespace Slang
         Dictionary<String, RefPtr<ModuleDecl>> mapPathToLoadedModule;
 
         // Map from the path of a module file to its definition
-        Dictionary<String, RefPtr<ModuleDecl>> mapNameToLoadedModules;
+        Dictionary<Name*, RefPtr<ModuleDecl>> mapNameToLoadedModules;
 
 
         CompileRequest(Session* session);
@@ -277,7 +283,7 @@ namespace Slang
             Profile                 profile);
 
         RefPtr<ModuleDecl> loadModule(
-            String const&       name,
+            Name*               name,
             String const&       path,
             String const&       source,
             SourceLoc const& loc);
@@ -287,8 +293,8 @@ namespace Slang
             TokenList const&    tokens);
 
         RefPtr<ModuleDecl> findOrImportModule(
-            String const&       name,
-            SourceLoc const& loc);
+            Name*               name,
+            SourceLoc const&    loc);
 
         SourceManager* getSourceManager()
         {
@@ -335,6 +341,14 @@ namespace Slang
 
         SourceManager* getBuiltinSourceManager() { return &builtinSourceManager; }
 
+        // Name pool stuff for unique-ing identifiers
+
+        RootNamePool rootNamePool;
+        NamePool namePool;
+
+        RootNamePool* getRootNamePool() { return &rootNamePool; }
+        NamePool* getNamePool() { return &namePool; }
+
         //
 
         // Generated code for stdlib, etc.
@@ -372,9 +386,9 @@ namespace Slang
         Type* getOverloadedType();
         Type* getErrorType();
 
-        SyntaxClass<RefObject> findSyntaxClass(String const& name);
+        SyntaxClass<RefObject> findSyntaxClass(Name* name);
 
-        Dictionary<String, SyntaxClass<RefObject> > mapNameToSyntaxClass;
+        Dictionary<Name*, SyntaxClass<RefObject> > mapNameToSyntaxClass;
 
         //
 

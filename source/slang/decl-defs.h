@@ -21,7 +21,7 @@ ABSTRACT_SYNTAX_CLASS(ContainerDecl, Decl)
 
     // Dictionary for looking up members by name.
     // This is built on demand before performing lookup.
-    Dictionary<String, Decl*> memberDictionary;
+    Dictionary<Name*, Decl*> memberDictionary;
 
     // Whether the `memberDictionary` is valid.
     // Should be set to `false` if any members get added/remoed.
@@ -79,26 +79,6 @@ RAW(
     FilteredMemberList<StructField> GetFields()
     {
         return getMembersOfType<StructField>();
-    }
-    StructField* FindField(String name)
-    {
-        for (auto field : GetFields())
-        {
-            if (field->name.Content == name)
-                return field.Ptr();
-        }
-        return nullptr;
-    }
-    int FindFieldIndex(String name)
-    {
-        int index = 0;
-        for (auto field : GetFields())
-        {
-            if (field->name.Content == name)
-                return index;
-            index++;
-        }
-        return -1;
     }
     )
 END_SYNTAX_CLASS()
@@ -176,7 +156,7 @@ SIMPLE_SYNTAX_CLASS(ModuleDecl, ContainerDecl)
 
 SYNTAX_CLASS(ImportDecl, Decl)
     // The name of the module we are trying to import
-    FIELD(Token, nameToken)
+    FIELD(NameLoc, moduleNameAndLoc)
 
     // The scope that we want to import into
     FIELD(RefPtr<Scope>, scope)

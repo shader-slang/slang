@@ -20,7 +20,7 @@ void buildMemberDictionary(ContainerDecl* decl);
 LookupResult LookUp(
     Session*            session,
     SemanticsVisitor*   semantics,
-    String const&       name,
+    Name*               name,
     RefPtr<Scope>       scope);
 
 // perform lookup within the context of a particular container declaration,
@@ -28,7 +28,7 @@ LookupResult LookUp(
 LookupResult LookUpLocal(
     Session*                session,
     SemanticsVisitor*       semantics,
-    String const&           name,
+    Name*                   name,
     DeclRef<ContainerDecl>  containerDeclRef);
 
 // TODO: this belongs somewhere else

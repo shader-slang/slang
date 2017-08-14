@@ -226,7 +226,7 @@ struct ParameterBindingContext
     LayoutRulesFamilyImpl* layoutRules;
 
     // A dictionary to accellerate looking up parameters by name
-    Dictionary<String, ParameterInfo*> mapNameToParameterInfo;
+    Dictionary<Name*, ParameterInfo*> mapNameToParameterInfo;
 
     // What stage (if any) are we compiling for?
     Stage stage;
@@ -377,17 +377,17 @@ static bool findLayoutArg(
 
 //
 
-static String getReflectionName(VarDeclBase* varDecl)
+static Name* getReflectionName(VarDeclBase* varDecl)
 {
     if (auto reflectionNameModifier = varDecl->FindModifier<ParameterBlockReflectionName>())
-        return reflectionNameModifier->nameToken.Content;
+        return reflectionNameModifier->nameAndLoc.name;
 
     return varDecl->getName();
 }
 
 static bool isGLSLBuiltinName(VarDeclBase* varDecl)
 {
-    return getReflectionName(varDecl).StartsWith("gl_");
+    return getText(getReflectionName(varDecl)).StartsWith("gl_");
 }
 
 RefPtr<Type> tryGetEffectiveTypeForGLSLVaryingInput(
@@ -1688,7 +1688,7 @@ void generateParameterBindings(
         programLayout->bindingForHackSampler = (int)binding;
 
         RefPtr<Variable> var = new Variable();
-        var->name.Content = "SLANG_hack_samplerForTexelFetch";
+        var->nameAndLoc.name = request->getNamePool()->getName("SLANG_hack_samplerForTexelFetch");
         var->type.type = getSamplerStateType(request->mSession);
 
         auto typeLayout = new TypeLayout();

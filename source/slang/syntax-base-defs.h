@@ -9,7 +9,7 @@
 ABSTRACT_SYNTAX_CLASS(SyntaxNodeBase, RefObject)
 
     // The primary source location associated with this AST node
-    FIELD(SourceLoc, Position)
+    FIELD(SourceLoc, loc)
 
     RAW(
     // Allow dynamic casting with a convenient syntax
@@ -173,8 +173,13 @@ ABSTRACT_SYNTAX_CLASS(Modifier, SyntaxNodeBase)
     // Next modifier in linked list of modifiers on same piece of syntax
     SYNTAX_FIELD(RefPtr<Modifier>, next)
 
-    // The token that was used to name this modifier.
-    FIELD(Token, nameToken)
+    // The keyword that was used to introduce t that was used to name this modifier.
+    FIELD(Name*, name)
+
+    RAW(
+        Name* getName() { return name; }
+        NameLoc getNameAndLoc() { return NameLoc(name, loc); }
+    )
 END_SYNTAX_CLASS()
 
 // A syntax node which can have modifiers appled
@@ -211,11 +216,12 @@ END_SYNTAX_CLASS()
 ABSTRACT_SYNTAX_CLASS(Decl, DeclBase)
     DECL_FIELD(ContainerDecl*, ParentDecl RAW(=nullptr))
 
-    FIELD(Token, name)
+    FIELD(NameLoc, nameAndLoc)
 
     RAW(
-    String const& getName() { return name.Content; }
-    Token const& getNameToken() { return name; }
+    Name*     getName()       { return nameAndLoc.name; }
+    SourceLoc getNameLoc()    { return nameAndLoc.loc ; }
+    NameLoc   getNameAndLoc() { return nameAndLoc     ; }
     )
 
 

@@ -55,7 +55,7 @@ namespace Slang
 
         void FillPosition(SyntaxNode * node)
         {
-            node->Position = tokenReader.PeekLoc();
+            node->loc = tokenReader.PeekLoc();
         }
         void PushScope(ContainerDecl* containerDecl)
         {
@@ -536,9 +536,9 @@ namespace Slang
         auto type = parser->ParseTypeExp();
 
         auto nameToken = parser->ReadToken(TokenType::Identifier);
-        typeDefDecl->Position = nameToken.Position;
+        typeDefDecl->loc = nameToken.loc;
 
-        typeDefDecl->name = nameToken;
+        typeDefDecl->nameAndLoc = NameLoc(nameToken);
         typeDefDecl->type = type;
 
         return typeDefDecl;
@@ -572,7 +572,8 @@ namespace Slang
         {
             auto nameToken = parser->ReadToken(TokenType::Identifier);
             RefPtr<HLSLUncheckedAttribute> modifier = new HLSLUncheckedAttribute();
-            modifier->nameToken = nameToken;
+            modifier->name = nameToken.getName();
+            modifier->loc = nameToken.getLoc();
 
             if (AdvanceIf(parser, TokenType::LParent))
             {
@@ -618,8 +619,8 @@ namespace Slang
     }
 
     static SyntaxDecl* tryLookUpSyntaxDecl(
-        Parser*         parser,
-        String const&   name)
+        Parser* parser,
+        Name*   name)
     {
         // Let's look up the name and see what we find.
 
@@ -665,9 +666,9 @@ namespace Slang
 
         if (syntax)
         {
-            if (!syntax->Position.isValid())
+            if (!syntax->loc.isValid())
             {
-                syntax->Position = keywordToken.Position;
+                syntax->loc = keywordToken.loc;
             }
         }
         else if (parsedObject)
@@ -689,7 +690,7 @@ namespace Slang
             return false;
 
         auto nameToken = peekToken(parser);
-        auto name = nameToken.Content;
+        auto name = nameToken.getName();
 
         auto syntaxDecl = tryLookUpSyntaxDecl(parser, name);
 
@@ -724,10 +725,10 @@ namespace Slang
                     RefPtr<Modifier> parsedModifier;
                     if (tryParseUsingSyntaxDecl<Modifier>(parser, &parsedModifier))
                     {
-                        parsedModifier->nameToken = nameToken;
-                        if (!parsedModifier->Position.isValid())
+                        parsedModifier->name = nameToken.getName();
+                        if (!parsedModifier->loc.isValid())
                         {
-                            parsedModifier->Position = nameToken.Position;
+                            parsedModifier->loc = nameToken.loc;
                         }
 
                         AddModifier(&modifierLink, parsedModifier);
@@ -749,6 +750,17 @@ namespace Slang
         }
     }
 
+    static Name* getName(Parser* parser, String const& text)
+    {
+        return parser->translationUnit->compileRequest->getNamePool()->getName(text);
+    }
+
+    static NameLoc expectIdentifier(Parser* parser)
+    {
+        return NameLoc(parser->ReadToken(TokenType::Identifier));
+    }
+
+
     static RefPtr<RefObject> parseImportDecl(
         Parser* parser, void* /*userData*/)
     {
@@ -760,28 +772,30 @@ namespace Slang
         if (peekTokenType(parser) == TokenType::StringLiteral)
         {
             auto nameToken = parser->ReadToken(TokenType::StringLiteral);
-            nameToken.Content = getStringLiteralTokenValue(nameToken);
-            decl->nameToken = nameToken;
+            auto nameString = getStringLiteralTokenValue(nameToken);
+            auto moduleName = getName(parser, nameString);
+
+            decl->moduleNameAndLoc = NameLoc(moduleName, nameToken.loc);
         }
         else
         {
-            auto nameToken = parser->ReadToken(TokenType::Identifier);
+            auto moduleNameAndLoc = expectIdentifier(parser);
 
             // We allow a dotted format for the name, as sugar
             if (peekTokenType(parser) == TokenType::Dot)
             {
                 StringBuilder sb;
-                sb << nameToken.Content;
+                sb << getText(moduleNameAndLoc.name);
                 while (AdvanceIf(parser, TokenType::Dot))
                 {
                     sb << "/";
                     sb << parser->ReadToken(TokenType::Identifier).Content;
                 }
 
-                nameToken.Content = sb.ProduceString();
+                moduleNameAndLoc.name = getName(parser, sb.ProduceString());
             }
 
-            decl->nameToken = nameToken;
+            decl->moduleNameAndLoc = moduleNameAndLoc;
         }
 
         parser->ReadToken(TokenType::Semicolon);
@@ -796,21 +810,25 @@ namespace Slang
 
         Token importToken = parser->ReadToken(TokenType::PoundImport);
 
+        NameLoc nameAndLoc;
+        nameAndLoc.name = getName(parser, importToken.Content);
+        nameAndLoc.loc = importToken.loc;
+
         auto decl = new ImportDecl();
-        decl->nameToken = importToken;
+        decl->moduleNameAndLoc = nameAndLoc;
         decl->scope = parser->currentScope;
 
         return decl;
     }
 
-    static Token ParseDeclName(
+    static NameLoc ParseDeclName(
         Parser* parser)
     {
-        Token name;
+        Token nameToken;
         if (AdvanceIf(parser, "operator"))
         {
-            name = parser->ReadToken();
-            switch (name.type)
+            nameToken = parser->ReadToken();
+            switch (nameToken.type)
             {
             case TokenType::OpAdd: case TokenType::OpSub: case TokenType::OpMul: case TokenType::OpDiv:
             case TokenType::OpMod: case TokenType::OpNot: case TokenType::OpBitNot: case TokenType::OpLsh: case TokenType::OpRsh:
@@ -837,20 +855,24 @@ namespace Slang
             case TokenType::QuestionMark:
                 if (AdvanceIf(parser, TokenType::Colon))
                 {
-                    name.Content = name.Content + ":";
+                    nameToken.Content = nameToken.Content + ":";
                     break;
                 }
 
             default:
-                parser->sink->diagnose(name.Position, Diagnostics::invalidOperator, name.Content);
+                parser->sink->diagnose(nameToken.loc, Diagnostics::invalidOperator, nameToken);
                 break;
             }
+
+            return NameLoc(
+                getName(parser, nameToken.Content),
+                nameToken.loc);
         }
         else
         {
-            name = parser->ReadToken(TokenType::Identifier);
+            nameToken = parser->ReadToken(TokenType::Identifier);
+            return NameLoc(nameToken);
         }
-        return name;
     }
 
     // A "declarator" as used in C-style languages
@@ -869,7 +891,7 @@ namespace Slang
     // The most common case of declarator uses a simple name
     struct NameDeclarator : Declarator
     {
-        Token nameToken;
+        NameLoc nameAndLoc;
     };
 
     // A declarator that declares a pointer type
@@ -896,10 +918,10 @@ namespace Slang
     // "Unwrapped" information about a declarator
     struct DeclaratorInfo
     {
-        RefPtr<Expr>	typeSpec;
-        Token							nameToken;
-        RefPtr<Modifier>				semantics;
-        RefPtr<Expr>	initializer;
+        RefPtr<Expr>	    typeSpec;
+        NameLoc             nameAndLoc;
+        RefPtr<Modifier>	semantics;
+        RefPtr<Expr>	    initializer;
     };
 
     // Add a member declaration to its container, and ensure that its
@@ -959,9 +981,9 @@ namespace Slang
         parser->PushScope(decl.Ptr());
 
         parser->FillPosition(decl.Ptr());
-        decl->Position = declaratorInfo.nameToken.Position;
+        decl->loc = declaratorInfo.nameAndLoc.loc;
 
-        decl->name = declaratorInfo.nameToken;
+        decl->nameAndLoc = declaratorInfo.nameAndLoc;
         decl->ReturnType = TypeExp(declaratorInfo.typeSpec);
         parseParameterList(parser, decl);
         ParseOptSemantics(parser, decl.Ptr());
@@ -1019,14 +1041,13 @@ namespace Slang
         *link = modifiers;
     }
 
-
-    static String generateName(Parser* /*parser*/, String const& base)
+    static Name* generateName(Parser* parser, String const& base)
     {
         // TODO: somehow mangle the name to avoid clashes
-        return "SLANG_" + base;
+        return getName(parser, "SLANG_" + base);
     }
 
-    static String generateName(Parser* parser)
+    static Name* generateName(Parser* parser)
     {
         return generateName(parser, "anonymous_" + String(parser->anonymousCounter++));
     }
@@ -1040,15 +1061,15 @@ namespace Slang
     {
         parser->FillPosition(decl.Ptr());
 
-        if( declaratorInfo.nameToken.type == TokenType::Unknown )
+        if( !declaratorInfo.nameAndLoc.name )
         {
             // HACK(tfoley): we always give a name, even if the declarator didn't include one... :(
-            decl->name.Content = generateName(parser);
+            decl->nameAndLoc = NameLoc(generateName(parser));
         }
         else
         {
-            decl->Position = declaratorInfo.nameToken.Position;
-            decl->name = declaratorInfo.nameToken;
+            decl->loc = declaratorInfo.nameAndLoc.loc;
+            decl->nameAndLoc = declaratorInfo.nameAndLoc;
         }
         decl->type = TypeExp(declaratorInfo.typeSpec);
 
@@ -1069,7 +1090,7 @@ namespace Slang
             {
                 auto nameDeclarator = new NameDeclarator();
                 nameDeclarator->flavor = Declarator::Flavor::name;
-                nameDeclarator->nameToken = ParseDeclName(parser);
+                nameDeclarator->nameAndLoc = ParseDeclName(parser);
                 declarator = nameDeclarator;
             }
             break;
@@ -1200,7 +1221,7 @@ namespace Slang
             case Declarator::Flavor::name:
                 {
                     auto nameDeclarator = (NameDeclarator*) declarator.Ptr();
-                    ioInfo->nameToken = nameDeclarator->nameToken;
+                    ioInfo->nameAndLoc = nameDeclarator->nameAndLoc;
                     return;
                 }
                 break;
@@ -1222,7 +1243,7 @@ namespace Slang
                     auto arrayDeclarator = (ArrayDeclarator*) declarator.Ptr();
 
                     auto arrayTypeExpr = new IndexExpr();
-                    arrayTypeExpr->Position = arrayDeclarator->openBracketLoc;
+                    arrayTypeExpr->loc = arrayDeclarator->openBracketLoc;
                     arrayTypeExpr->BaseExpression = ioInfo->typeSpec;
                     arrayTypeExpr->IndexExpression = arrayDeclarator->elementCountExpr;
                     ioInfo->typeSpec = arrayTypeExpr;
@@ -1263,7 +1284,7 @@ namespace Slang
             if( decl )
             {
                 group = new DeclGroup();
-                group->Position = startPosition;
+                group->loc = startPosition;
                 group->decls.Add(decl);
                 decl = nullptr;
             }
@@ -1302,7 +1323,7 @@ namespace Slang
 
         auto expr = new VarExpr();
         expr->scope = parser->currentScope.Ptr();
-        expr->Position = decl->getNameToken().Position;
+        expr->loc = decl->getNameLoc();
         expr->name = decl->getName();
         return expr;
     }
@@ -1353,7 +1374,7 @@ namespace Slang
         while (parser->LookAheadToken(TokenType::LBracket))
         {
             RefPtr<IndexExpr> arrType = new IndexExpr();
-            arrType->Position = typeExpr->Position;
+            arrType->loc = typeExpr->loc;
             arrType->BaseExpression = typeExpr;
             parser->ReadToken(TokenType::LBracket);
             if (!parser->LookAheadToken(TokenType::RBracket))
@@ -1395,8 +1416,8 @@ namespace Slang
 
         auto basicType = new VarExpr();
         basicType->scope = parser->currentScope.Ptr();
-        basicType->Position = typeName.Position;
-        basicType->name = typeName.Content;
+        basicType->loc = typeName.loc;
+        basicType->name = typeName.getNameOrNull();
 
         RefPtr<Expr> typeExpr = basicType;
 
@@ -1492,7 +1513,7 @@ namespace Slang
         // clone syntax.
 
         auto sharedTypeSpec = new SharedTypeExpr();
-        sharedTypeSpec->Position = typeSpec.expr->Position;
+        sharedTypeSpec->loc = typeSpec.expr->loc;
         sharedTypeSpec->base = TypeExp(typeSpec.expr);
 
         for(;;)
@@ -1667,12 +1688,12 @@ namespace Slang
 
         // Attach the reflection name to the block so we can use it
         auto reflectionNameModifier = new ParameterBlockReflectionName();
-        reflectionNameModifier->nameToken = reflectionNameToken;
+        reflectionNameModifier->nameAndLoc = NameLoc(reflectionNameToken);
         addModifier(bufferVarDecl, reflectionNameModifier);
 
         // Both the buffer variable and its type need to have names generated
-        bufferVarDecl->name.Content = generateName(parser, "parameterBlock_" + reflectionNameToken.Content);
-        bufferDataTypeDecl->name.Content = generateName(parser, "ParameterBlock_" + reflectionNameToken.Content);
+        bufferVarDecl->nameAndLoc.name = generateName(parser, "parameterBlock_" + reflectionNameToken.Content);
+        bufferDataTypeDecl->nameAndLoc.name = generateName(parser, "ParameterBlock_" + reflectionNameToken.Content);
 
         addModifier(bufferDataTypeDecl, new ImplicitParameterBlockElementTypeModifier());
         addModifier(bufferVarDecl, new ImplicitParameterBlockVariableModifier());
@@ -1684,14 +1705,14 @@ namespace Slang
 
         // Construct a type expression to reference the buffer data type
         auto bufferDataTypeExpr = new VarExpr();
-        bufferDataTypeExpr->Position = bufferDataTypeDecl->Position;
-        bufferDataTypeExpr->name = bufferDataTypeDecl->name.Content;
+        bufferDataTypeExpr->loc = bufferDataTypeDecl->loc;
+        bufferDataTypeExpr->name = bufferDataTypeDecl->nameAndLoc.name;
         bufferDataTypeExpr->scope = parser->currentScope.Ptr();
 
         // Construct a type exrpession to reference the type constructor
         auto bufferWrapperTypeExpr = new VarExpr();
-        bufferWrapperTypeExpr->Position = bufferWrapperTypeNamePos;
-        bufferWrapperTypeExpr->name = bufferWrapperTypeName;
+        bufferWrapperTypeExpr->loc = bufferWrapperTypeNamePos;
+        bufferWrapperTypeExpr->name = getName(parser, bufferWrapperTypeName);
 
         // Always need to look this up in the outer scope,
         // so that it won't collide with, e.g., a local variable called `ConstantBuffer`
@@ -1700,7 +1721,7 @@ namespace Slang
         // Construct a type expression that represents the type for the variable,
         // which is the wrapper type applied to the data type
         auto bufferVarTypeExpr = new GenericAppExpr();
-        bufferVarTypeExpr->Position = bufferVarDecl->Position;
+        bufferVarTypeExpr->loc = bufferVarDecl->loc;
         bufferVarTypeExpr->FunctionExpr = bufferWrapperTypeExpr;
         bufferVarTypeExpr->Arguments.Add(bufferDataTypeExpr);
 
@@ -1832,7 +1853,7 @@ namespace Slang
 
         // Attach the reflection name to the block so we can use it
         auto reflectionNameModifier = new ParameterBlockReflectionName();
-        reflectionNameModifier->nameToken = reflectionNameToken;
+        reflectionNameModifier->nameAndLoc = NameLoc(reflectionNameToken);
         addModifier(blockVarDecl, reflectionNameModifier);
 
         // Both declarations will have a location that points to the name
@@ -1840,7 +1861,7 @@ namespace Slang
         parser->FillPosition(blockVarDecl.Ptr());
 
         // Generate a unique name for the data type
-        blockDataTypeDecl->name.Content = generateName(parser, "ParameterBlock_" + reflectionNameToken.Content);
+        blockDataTypeDecl->nameAndLoc.name = generateName(parser, "ParameterBlock_" + reflectionNameToken.Content);
 
         // TODO(tfoley): We end up constructing unchecked syntax here that
         // is expected to type check into the right form, but it might be
@@ -1849,14 +1870,14 @@ namespace Slang
 
         // Construct a type expression to reference the buffer data type
         auto blockDataTypeExpr = new VarExpr();
-        blockDataTypeExpr->Position = blockDataTypeDecl->Position;
-        blockDataTypeExpr->name = blockDataTypeDecl->name.Content;
+        blockDataTypeExpr->loc = blockDataTypeDecl->loc;
+        blockDataTypeExpr->name = blockDataTypeDecl->getName();
         blockDataTypeExpr->scope = parser->currentScope.Ptr();
 
         // Construct a type exrpession to reference the type constructor
         auto blockWrapperTypeExpr = new VarExpr();
-        blockWrapperTypeExpr->Position = pos;
-        blockWrapperTypeExpr->name = blockWrapperTypeName;
+        blockWrapperTypeExpr->loc = pos;
+        blockWrapperTypeExpr->name = getName(parser, blockWrapperTypeName);
         // Always need to look this up in the outer scope,
         // so that it won't collide with, e.g., a local variable called `ConstantBuffer`
         blockWrapperTypeExpr->scope = parser->outerScope;
@@ -1864,7 +1885,7 @@ namespace Slang
         // Construct a type expression that represents the type for the variable,
         // which is the wrapper type applied to the data type
         auto blockVarTypeExpr = new GenericAppExpr();
-        blockVarTypeExpr->Position = blockVarDecl->Position;
+        blockVarTypeExpr->loc = blockVarDecl->loc;
         blockVarTypeExpr->FunctionExpr = blockWrapperTypeExpr;
         blockVarTypeExpr->Arguments.Add(blockDataTypeExpr);
 
@@ -1877,7 +1898,7 @@ namespace Slang
         {
             // The user gave an explicit name to the block,
             // so we need to use that as our variable name
-            blockVarDecl->name = parser->ReadToken(TokenType::Identifier);
+            blockVarDecl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
 
             // TODO: in this case we make actually have a more complex
             // declarator, including `[]` brackets.
@@ -1885,12 +1906,12 @@ namespace Slang
         else
         {
             // synthesize a dummy name
-            blockVarDecl->name.Content = generateName(parser, "parameterBlock_" + reflectionNameToken.Content);
+            blockVarDecl->nameAndLoc.name = generateName(parser, "parameterBlock_" + reflectionNameToken.Content);
 
             // Otherwise we have a transparent declaration, similar
             // to an HLSL `cbuffer`
             auto transparentModifier = new TransparentModifier();
-            transparentModifier->Position = pos;
+            transparentModifier->loc = pos;
             addModifier(blockVarDecl, transparentModifier);
         }
 
@@ -1924,7 +1945,7 @@ namespace Slang
         {
             // default case is a type parameter
             auto paramDecl = new GenericValueParamDecl();
-            paramDecl->name = parser->ReadToken(TokenType::Identifier);
+            paramDecl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
             if (AdvanceIf(parser, TokenType::Colon))
             {
                 paramDecl->type = parser->ParseTypeExp();
@@ -1940,7 +1961,7 @@ namespace Slang
             // default case is a type parameter
             auto paramDecl = new GenericTypeParamDecl();
             parser->FillPosition(paramDecl);
-            paramDecl->name = parser->ReadToken(TokenType::Identifier);
+            paramDecl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
             if (AdvanceIf(parser, TokenType::Colon))
             {
                 // The user is apply a constraint to this type parameter...
@@ -1953,7 +1974,7 @@ namespace Slang
                     DeclRef<Decl>(paramDecl, nullptr));
 
                 auto paramTypeExpr = new SharedTypeExpr();
-                paramTypeExpr->Position = paramDecl->Position;
+                paramTypeExpr->loc = paramDecl->loc;
                 paramTypeExpr->base.type = paramType;
                 paramTypeExpr->type = QualType(getTypeType(paramType));
 
@@ -1999,8 +2020,8 @@ namespace Slang
         // it wraps, so that lookup can find it.
         if (decl->inner)
         {
-            decl->name = decl->inner->name;
-            decl->Position = decl->inner->Position;
+            decl->nameAndLoc = decl->inner->nameAndLoc;
+            decl->loc = decl->inner->loc;
         }
 
         parser->PopScope();
@@ -2027,7 +2048,7 @@ namespace Slang
                 auto base = parser->ParseTypeExp();
 
                 auto inheritanceDecl = new InheritanceDecl();
-                inheritanceDecl->Position = base.exp->Position;
+                inheritanceDecl->loc = base.exp->loc;
                 inheritanceDecl->base = base;
 
                 AddMember(decl, inheritanceDecl);
@@ -2040,7 +2061,7 @@ namespace Slang
     {
         RefPtr<InterfaceDecl> decl = new InterfaceDecl();
         parser->FillPosition(decl.Ptr());
-        decl->name = parser->ReadToken(TokenType::Identifier);
+        decl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
 
         parseOptionalInheritanceClause(parser, decl.Ptr());
 
@@ -2102,7 +2123,7 @@ namespace Slang
         parser->FillPosition(decl.Ptr());
 
         // TODO: the use of this name here is a bit magical...
-        decl->name.Content = "operator[]";
+        decl->nameAndLoc.name = getName(parser, "operator[]");
 
         parseParameterList(parser, decl);
 
@@ -2135,15 +2156,10 @@ namespace Slang
         return parser->ReadToken(tokenType);
     }
 
-    static Token expectIdentifier(Parser* parser)
-    {
-        return parser->ReadToken(TokenType::Identifier);
-    }
-
     // This is a catch-all syntax-construction callback to handle cases where
     // a piece of syntax is fully defined by the keyword to use, along with
     // the class of AST node to construct.
-    static RefPtr<RefObject> parseSimpleSyntax(Parser* parser, void* userData)
+    static RefPtr<RefObject> parseSimpleSyntax(Parser* /*parser*/, void* userData)
     {
         SyntaxClassBase syntaxClass((SyntaxClassBase::ClassInfo*) userData);
         return (RefObject*) syntaxClass.createInstanceImpl();
@@ -2163,16 +2179,16 @@ namespace Slang
         //   the new syntax should be an alias for.
 
         // First we parse the keyword name.
-        auto nameToken = expectIdentifier(parser);
+        auto nameAndLoc = expectIdentifier(parser);
 
         // Next we look for a clause that specified the AST node class.
         SyntaxClass<RefObject> syntaxClass;
         if (AdvanceIf(parser, TokenType::Colon))
         {
             // User is specifying the class that should be construted
-            auto classNameToken = expectIdentifier(parser);
+            auto classNameAndLoc = expectIdentifier(parser);
 
-            syntaxClass = parser->getSession()->findSyntaxClass(classNameToken.Content);
+            syntaxClass = parser->getSession()->findSyntaxClass(classNameAndLoc.name);
         }
 
         // If the user specified a syntax class, then we will default
@@ -2185,9 +2201,9 @@ namespace Slang
         // an alias for some existing keyword.
         if (AdvanceIf(parser, TokenType::OpAssign))
         {
-            auto existingKeywordToken = expectIdentifier(parser);
+            auto existingKeywordNameAndLoc = expectIdentifier(parser);
 
-            auto existingSyntax = tryLookUpSyntaxDecl(parser, existingKeywordToken.Content);
+            auto existingSyntax = tryLookUpSyntaxDecl(parser, existingKeywordNameAndLoc.name);
             if (!existingSyntax)
             {
                 // TODO: diagnose: keyword did not name syntax
@@ -2224,8 +2240,8 @@ namespace Slang
         // up for downstream code?
 
         RefPtr<SyntaxDecl> syntaxDecl = new SyntaxDecl();
-        syntaxDecl->name = nameToken;
-        syntaxDecl->Position = nameToken.Position;
+        syntaxDecl->nameAndLoc = nameAndLoc;
+        syntaxDecl->loc = nameAndLoc.loc;
         syntaxDecl->syntaxClass = syntaxClass;
         syntaxDecl->parseCallback = parseCallback;
         syntaxDecl->parseUserData = parseUserData;
@@ -2314,7 +2330,7 @@ namespace Slang
                 advanceToken(parser);
 
                 decl = new EmptyDecl();
-                decl->Position = loc;
+                decl->loc = loc;
             }
             break;
 
@@ -2383,7 +2399,7 @@ namespace Slang
             }
         }
 
-        parser->sink->diagnose(declBase->Position, Diagnostics::unimplemented, "didn't expect multiple declarations here");
+        parser->sink->diagnose(declBase->loc, Diagnostics::unimplemented, "didn't expect multiple declarations here");
         return nullptr;
     }
 
@@ -2429,7 +2445,7 @@ namespace Slang
         }
 
         PushScope(program);
-        program->Position = tokenReader.PeekLoc();
+        program->loc = tokenReader.PeekLoc();
         ParseDeclBody(this, program, TokenType::EndOfFile);
         PopScope();
 
@@ -2453,7 +2469,7 @@ namespace Slang
         ReadToken("struct");
 
         // TODO: support `struct` declaration without tag
-        rs->name = ReadToken(TokenType::Identifier);
+        rs->nameAndLoc = expectIdentifier(this);
 
         // We allow for an inheritance clause on a `struct`
         // so that it can conform to interfaces.
@@ -2469,7 +2485,7 @@ namespace Slang
         RefPtr<ClassDecl> rs = new ClassDecl();
         FillPosition(rs.Ptr());
         ReadToken("class");
-        rs->name = ReadToken(TokenType::Identifier);
+        rs->nameAndLoc = expectIdentifier(this);
         ReadToken(TokenType::LBrace);
         parseOptionalInheritanceClause(this, rs.Ptr());
         parseAggTypeDeclBody(this, rs.Ptr());
@@ -2507,7 +2523,7 @@ namespace Slang
         return stmt;
     }
 
-    static bool isGenericName(Parser* parser, String const& name)
+    static bool isGenericName(Parser* parser, Name* name)
     {
         auto lookupResult = LookUp(
             parser->getSession(),
@@ -2529,7 +2545,7 @@ namespace Slang
     }
 
 
-    static bool isTypeName(Parser* parser, String const& name)
+    static bool isTypeName(Parser* parser, Name* name)
     {
         auto lookupResult = LookUp(
             parser->getSession(),
@@ -2559,7 +2575,7 @@ namespace Slang
         if(!parser->LookAheadToken(TokenType::Identifier))
             return false;
 
-        auto name = parser->tokenReader.PeekToken().Content;
+        auto name = parser->tokenReader.PeekToken().getName();
         return isTypeName(parser, name);
     }
 
@@ -2574,10 +2590,10 @@ namespace Slang
         parser->ReadToken("for");
         parser->ReadToken(TokenType::LParent);
 
-        Token varNameToken = parser->ReadToken(TokenType::Identifier);
+        NameLoc varNameAndLoc = expectIdentifier(parser);
         RefPtr<Variable> varDecl = new Variable();
-        varDecl->name = varNameToken;
-        varDecl->Position = varNameToken.Position;
+        varDecl->nameAndLoc = varNameAndLoc;
+        varDecl->loc = varNameAndLoc.loc;
 
         stmt->varDecl = varDecl;
 
@@ -2804,7 +2820,7 @@ namespace Slang
                 else
                 {
                     RefPtr<SeqStmt> newBody = new SeqStmt();
-                    newBody->Position = blockStatement->Position;
+                    newBody->loc = blockStatement->loc;
                     newBody->stmts.Add(body);
                     newBody->stmts.Add(stmt);
 
@@ -3102,9 +3118,9 @@ namespace Slang
         }
 
         auto opExpr = new VarExpr();
-        opExpr->name = opToken.Content;
+        opExpr->name = getName(parser, opToken.Content);
         opExpr->scope = parser->currentScope;
-        opExpr->Position = opToken.Position;
+        opExpr->loc = opToken.loc;
 
         return opExpr;
 
@@ -3117,7 +3133,7 @@ namespace Slang
         RefPtr<Expr>    right)
     {
         RefPtr<InfixExpr> expr = new InfixExpr();
-        expr->Position = op->Position;
+        expr->loc = op->loc;
         expr->FunctionExpr = op;
         expr->Arguments.Add(left);
         expr->Arguments.Add(right);
@@ -3144,7 +3160,7 @@ namespace Slang
             if(opTokenType == TokenType::QuestionMark)
             {
                 RefPtr<SelectExpr> select = new SelectExpr();
-                select->Position = op->Position;
+                select->loc = op->loc;
                 select->FunctionExpr = op;
 
                 select->Arguments.Add(expr);
@@ -3172,7 +3188,7 @@ namespace Slang
             if (opTokenType == TokenType::OpAssign)
             {
                 RefPtr<AssignExpr> assignExpr = new AssignExpr();
-                assignExpr->Position = op->Position;
+                assignExpr->loc = op->loc;
                 assignExpr->left = expr;
                 assignExpr->right = right;
 
@@ -3305,7 +3321,7 @@ namespace Slang
                     parser->ReadToken(TokenType::RParent);
 
                     RefPtr<ParenExpr> parenExpr = new ParenExpr();
-                    parenExpr->Position = openParen.Position;
+                    parenExpr->loc = openParen.loc;
                     parenExpr->base = base;
                     return parenExpr;
                 }
@@ -3529,8 +3545,9 @@ namespace Slang
                 RefPtr<VarExpr> varExpr = new VarExpr();
                 varExpr->scope = parser->currentScope.Ptr();
                 parser->FillPosition(varExpr.Ptr());
-                auto token = parser->ReadToken(TokenType::Identifier);
-                varExpr->name = token.Content;
+
+                auto nameAndLoc = expectIdentifier(parser);
+                varExpr->name = nameAndLoc.name;
 
                 if(peekTokenType(parser) == TokenType::OpLess)
                 {
@@ -3619,7 +3636,7 @@ namespace Slang
                     parser->FillPosition(memberExpr.Ptr());
                     memberExpr->BaseExpression = expr;
                     parser->ReadToken(TokenType::Dot); 
-                    memberExpr->name = parser->ReadToken(TokenType::Identifier).Content;
+                    memberExpr->name = expectIdentifier(parser).name;
 
                     expr = memberExpr;
                 }
@@ -3672,17 +3689,17 @@ namespace Slang
     }
 
     static void addBuiltinSyntaxImpl(
-        Session*                    /*session*/,
+        Session*                    session,
         Scope*                      scope,
         char const*                 nameText,
         SyntaxParseCallback         callback,
         void*                       userData,
         SyntaxClass<RefObject>      syntaxClass)
     {
-        String name(nameText);
+        Name* name = session->getNamePool()->getName(nameText);
 
         RefPtr<SyntaxDecl> syntaxDecl = new SyntaxDecl();
-        syntaxDecl->name.Content = name;
+        syntaxDecl->nameAndLoc = NameLoc(name);
         syntaxDecl->syntaxClass = syntaxClass;
         syntaxDecl->parseCallback = callback;
         syntaxDecl->parseUserData = userData;
@@ -3796,14 +3813,14 @@ namespace Slang
         parser->ReadToken(TokenType::LParent);
         while (!AdvanceIfMatch(parser, TokenType::RParent))
         {
-            auto nameToken = parser->ReadToken(TokenType::Identifier);
+            auto nameAndLoc = expectIdentifier(parser);
 
             RefPtr<GLSLLayoutModifier> modifier;
 
             // TODO: better handling of this choise (e.g., lookup in scope)
             if(0) {}
         #define CASE(KEYWORD, CLASS) \
-            else if(nameToken.Content == #KEYWORD) modifier = new CLASS()
+            else if(getText(nameAndLoc.name) == #KEYWORD) modifier = new CLASS()
 
             CASE(constant_id,   GLSLConstantIDLayoutModifier);
             CASE(binding,       GLSLBindingLayoutModifier);
@@ -3820,7 +3837,8 @@ namespace Slang
                 modifier = new GLSLUnparsedLayoutModifier();
             }
 
-            modifier->nameToken = nameToken;
+            modifier->name = nameAndLoc.name;
+            modifier->loc = nameAndLoc.loc;
 
             if(AdvanceIf(parser, TokenType::OpAssign))
             {

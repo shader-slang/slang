@@ -36,6 +36,7 @@
     <ClInclude Include="val-defs.h" />
     <ClInclude Include="visitor.h" />
     <ClInclude Include="lower.h" />
+    <ClInclude Include="name.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="check.cpp" />
@@ -57,5 +58,6 @@
     <ClCompile Include="options.cpp" />
     <ClCompile Include="lower.cpp" />
     <ClCompile Include="source-loc.cpp" />
+    <ClCompile Include="name.cpp" />
   </ItemGroup>
 </Project>

@@ -570,9 +570,9 @@ SLANG_API char const* spReflectionVariable_GetName(SlangReflectionVariable* inVa
     // If the variable is one that has an "external" name that is supposed
     // to be exposed for reflection, then report it here
     if(auto reflectionNameMod = var->FindModifier<ParameterBlockReflectionName>())
-        return reflectionNameMod->nameToken.Content.Buffer();
+        return getText(reflectionNameMod->nameAndLoc.name).Buffer();
 
-    return var->getName().Buffer();
+    return getText(var->getName()).Buffer();
 }
 
 SLANG_API SlangReflectionType* spReflectionVariable_GetType(SlangReflectionVariable* inVar)
@@ -695,7 +695,7 @@ SLANG_API char const* spReflectionEntryPoint_getName(
     auto entryPointLayout = convert(inEntryPoint);
     if(!entryPointLayout) return 0;
 
-    return entryPointLayout->entryPoint->getName().begin();
+    return getText(entryPointLayout->entryPoint->getName()).begin();
 }
 
 SLANG_API unsigned spReflectionEntryPoint_getParameterCount(

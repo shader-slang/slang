@@ -51,7 +51,7 @@ struct PreprocessorEnvironment
     PreprocessorEnvironment*                parent = NULL;
 
     // Macros defined in this environment
-    Dictionary<String, PreprocessorMacro*>  macros;
+    Dictionary<Name*, PreprocessorMacro*>  macros;
 
     ~PreprocessorEnvironment();
 };
@@ -145,10 +145,10 @@ enum class PreprocessorMacroFlavor
 struct PreprocessorMacro
 {
     // The name under which the macro was `#define`d
-    Token                       nameToken;
+    NameLoc                     nameAndLoc;
 
     // Parameters of the macro, in case of a function-like macro
-    List<Token>                 params;
+    List<NameLoc>               params;
 
     // The tokens that make up the macro body
     TokenList                   tokens;
@@ -161,6 +161,17 @@ struct PreprocessorMacro
     // while for function-like macro arguments, it will be
     // the environment of the macro invocation.
     PreprocessorEnvironment*    environment;
+
+    //
+    Name* getName()
+    {
+        return nameAndLoc.name;
+    }
+
+    SourceLoc getLoc()
+    {
+        return nameAndLoc.loc;
+    }
 };
 
 // State of the preprocessor
@@ -239,6 +250,11 @@ static void destroyInputStream(Preprocessor* /*preprocessor*/, PreprocessorInput
     delete inputStream;
 }
 
+static NamePool* getNamePool(Preprocessor* preprocessor)
+{
+    return preprocessor->translationUnit->compileRequest->getNamePool();
+}
+
 // Create an input stream to represent a pre-tokenized input file.
 // TODO(tfoley): pre-tokenizing files isn't going to work in the long run.
 static PreprocessorInputStream* CreateInputStreamForSource(
@@ -249,7 +265,7 @@ static PreprocessorInputStream* CreateInputStreamForSource(
     initializePrimaryInputStream(preprocessor, inputStream);
 
     // initialize the embedded lexer so that it can generate a token stream
-    inputStream->lexer.initialize(sourceFile, GetSink(preprocessor));
+    inputStream->lexer.initialize(sourceFile, GetSink(preprocessor), getNamePool(preprocessor));
     inputStream->token = inputStream->lexer.lexToken();
 
     return inputStream;
@@ -283,7 +299,7 @@ static void EndInputStream(Preprocessor* preprocessor, PreprocessorInputStream* 
         {
             PreprocessorConditional* conditional = primaryStream->conditional;
 
-            GetSink(preprocessor)->diagnose(conditional->ifToken.Position, Diagnostics::endOfFileInPreprocessorConditional);
+            GetSink(preprocessor)->diagnose(conditional->ifToken.loc, Diagnostics::endOfFileInPreprocessorConditional);
 
             while (conditional)
             {
@@ -407,7 +423,7 @@ static Token PeekRawToken(Preprocessor* preprocessor)
 // Get the location of the current (raw) token
 static SourceLoc PeekLoc(Preprocessor* preprocessor)
 {
-    return PeekRawToken(preprocessor).Position;
+    return PeekRawToken(preprocessor).loc;
 }
 
 // Get the `TokenType` of the current (raw) token
@@ -440,7 +456,7 @@ static void DestroyMacro(Preprocessor* /*preprocessor*/, PreprocessorMacro* macr
 
 
 // Find the currently-defined macro of the given name, or return NULL
-static PreprocessorMacro* LookupMacro(PreprocessorEnvironment* environment, String const& name)
+static PreprocessorMacro* LookupMacro(PreprocessorEnvironment* environment, Name* name)
 {
     for(PreprocessorEnvironment* e = environment; e; e = e->parent)
     {
@@ -485,7 +501,7 @@ static PreprocessorEnvironment* GetCurrentEnvironment(Preprocessor* preprocessor
     }
 }
 
-static PreprocessorMacro* LookupMacro(Preprocessor* preprocessor, String const& name)
+static PreprocessorMacro* LookupMacro(Preprocessor* preprocessor, Name* name)
 {
     return LookupMacro(GetCurrentEnvironment(preprocessor), name);
 }
@@ -567,7 +583,7 @@ static SimpleTokenInputStream* createSimpleInputStream(
 
     Token eofToken;
     eofToken.type = TokenType::EndOfFile;
-    eofToken.Position = token.Position;
+    eofToken.loc = token.loc;
     eofToken.flags = TokenFlag::AfterWhitespace | TokenFlag::AtStartOfLine;
     inputStream->lexedTokens.mTokens.Add(eofToken);
  
@@ -594,7 +610,7 @@ static void MaybeBeginMacroExpansion(
             return;
 
         // Look for a macro with the given name.
-        String name = token.Content;
+        Name* name = token.getName();
         PreprocessorMacro* macro = LookupMacro(preprocessor, name);
 
         // Not a macro? Can't be an invocation.
@@ -604,6 +620,11 @@ static void MaybeBeginMacroExpansion(
         // If the macro is busy (already being expanded),
         // don't try to trigger recursive expansion
         if (IsMacroBusy(macro))
+            return;
+
+        // We might already have looked at this token,
+        // and need to suppress expansion
+        if (token.flags & TokenFlag::SuppressMacroExpansion)
             return;
 
         // A function-style macro invocation should only match
@@ -665,9 +686,9 @@ static void MaybeBeginMacroExpansion(
                     arg->environment = GetCurrentEnvironment(preprocessor);
 
                     // Associate the new macro with its parameter name
-                    Token paramToken = macro->params[argIndex];
-                    String const& paramName = paramToken.Content;
-                    arg->nameToken = paramToken;
+                    NameLoc paramNameAndLoc = macro->params[argIndex];
+                    Name* paramName = paramNameAndLoc.name;
+                    arg->nameAndLoc = paramNameAndLoc;
                     expansion->argumentEnvironment.macros[paramName] = arg;
                     argIndex++;
 
@@ -810,7 +831,7 @@ top:
         SourceFile* sourceFile = preprocessor->getCompileRequest()->getSourceManager()->allocateSourceFile("token paste", sb.ProduceString());
 
         Lexer lexer;
-        lexer.initialize(sourceFile, GetSink(preprocessor));
+        lexer.initialize(sourceFile, GetSink(preprocessor), getNamePool(preprocessor));
 
         SimpleTokenInputStream* inputStream = new SimpleTokenInputStream();
         initializeInputStream(preprocessor, inputStream);
@@ -898,7 +919,7 @@ inline String const& GetDirectiveName(PreprocessorDirectiveContext* context)
 // Get the location of the directive being parsed.
 inline SourceLoc const& GetDirectiveLoc(PreprocessorDirectiveContext* context)
 {
-    return context->directiveToken.Position;
+    return context->directiveToken.loc;
 }
 
 // Wrapper to get the diagnostic sink in the context of a directive.
@@ -914,7 +935,7 @@ static SourceLoc PeekLoc(PreprocessorDirectiveContext* context)
 }
 
 // Wrapper to look up a macro in the context of a directive.
-static PreprocessorMacro* LookupMacro(PreprocessorDirectiveContext* context, String const& name)
+static PreprocessorMacro* LookupMacro(PreprocessorDirectiveContext* context, Name* name)
 {
     return LookupMacro(context->preprocessor, name);
 }
@@ -1138,7 +1159,7 @@ static PreprocessorExpressionValue ParseAndEvaluateUnaryExpression(PreprocessorD
             PreprocessorExpressionValue value = ParseAndEvaluateExpression(context);
             if (!Expect(context, TokenType::RParent, Diagnostics::expectedTokenInPreprocessorExpression))
             {
-                GetSink(context)->diagnose(leftParen.Position, Diagnostics::seeOpeningToken, leftParen);
+                GetSink(context)->diagnose(leftParen.loc, Diagnostics::seeOpeningToken, leftParen);
             }
             return value;
         }
@@ -1166,14 +1187,14 @@ static PreprocessorExpressionValue ParseAndEvaluateUnaryExpression(PreprocessorD
                 {
                     return 0;
                 }
-                String name = nameToken.Content;
+                Name* name = nameToken.getName();
 
                 // If we saw an opening `(`, then expect one to close
                 if (leftParen.type != TokenType::Unknown)
                 {
                     if(!ExpectRaw(context, TokenType::RParent, Diagnostics::expectedTokenInDefinedExpression))
                     {
-                        GetSink(context)->diagnose(leftParen.Position, Diagnostics::seeOpeningToken, leftParen);
+                        GetSink(context)->diagnose(leftParen.loc, Diagnostics::seeOpeningToken, leftParen);
                         return 0;
                     }
                 }
@@ -1259,7 +1280,7 @@ static PreprocessorExpressionValue EvaluateInfixOp(
         {
             if (!context->parseError)
             {
-                GetSink(context)->diagnose(opToken.Position, Diagnostics::divideByZeroInPreprocessorExpression);
+                GetSink(context)->diagnose(opToken.loc, Diagnostics::divideByZeroInPreprocessorExpression);
             }
             return 0;
         }
@@ -1271,7 +1292,7 @@ static PreprocessorExpressionValue EvaluateInfixOp(
         {
             if (!context->parseError)
             {
-                GetSink(context)->diagnose(opToken.Position, Diagnostics::divideByZeroInPreprocessorExpression);
+                GetSink(context)->diagnose(opToken.loc, Diagnostics::divideByZeroInPreprocessorExpression);
             }
             return 0;
         }
@@ -1383,7 +1404,7 @@ static void HandleIfDefDirective(PreprocessorDirectiveContext* context)
     Token nameToken;
     if(!ExpectRaw(context, TokenType::Identifier, Diagnostics::expectedTokenInPreprocessorDirective, &nameToken))
         return;
-    String name = nameToken.Content;
+    Name* name = nameToken.getName();
 
     // Check if the name is defined.
     beginConditional(context, LookupMacro(context, name) != NULL);
@@ -1396,7 +1417,7 @@ static void HandleIfNDefDirective(PreprocessorDirectiveContext* context)
     Token nameToken;
     if(!ExpectRaw(context, TokenType::Identifier, Diagnostics::expectedTokenInPreprocessorDirective, &nameToken))
         return;
-    String name = nameToken.Content;
+    Name* name = nameToken.getName();
 
     // Check if the name is defined.
     beginConditional(context, LookupMacro(context, name) == NULL);
@@ -1420,7 +1441,7 @@ static void HandleElseDirective(PreprocessorDirectiveContext* context)
     if (conditional->elseToken.type != TokenType::Unknown)
     {
         GetSink(context)->diagnose(GetDirectiveLoc(context), Diagnostics::directiveAfterElse, GetDirectiveName(context));
-        GetSink(context)->diagnose(conditional->elseToken.Position, Diagnostics::seeDirective);
+        GetSink(context)->diagnose(conditional->elseToken.loc, Diagnostics::seeDirective);
         return;
     }
     conditional->elseToken = context->directiveToken;
@@ -1474,7 +1495,7 @@ static void HandleElifDirective(PreprocessorDirectiveContext* context)
     if (conditional->elseToken.type != TokenType::Unknown)
     {
         GetSink(context)->diagnose(GetDirectiveLoc(context), Diagnostics::directiveAfterElse, GetDirectiveName(context));
-        GetSink(context)->diagnose(conditional->elseToken.Position, Diagnostics::seeDirective);
+        GetSink(context)->diagnose(conditional->elseToken.loc, Diagnostics::seeDirective);
         return;
     }
 
@@ -1562,8 +1583,8 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
     IncludeHandler* includeHandler = context->preprocessor->includeHandler;
     if (!includeHandler)
     {
-        GetSink(context)->diagnose(pathToken.Position, Diagnostics::includeFailed, path);
-        GetSink(context)->diagnose(pathToken.Position, Diagnostics::noIncludeHandlerSpecified);
+        GetSink(context)->diagnose(pathToken.loc, Diagnostics::includeFailed, path);
+        GetSink(context)->diagnose(pathToken.loc, Diagnostics::noIncludeHandlerSpecified);
         return;
     }
     auto includeResult = includeHandler->TryToFindIncludeFile(path, pathIncludedFrom, &foundPath, &foundSource);
@@ -1572,7 +1593,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
     {
     case IncludeResult::NotFound:
     case IncludeResult::Error:
-        GetSink(context)->diagnose(pathToken.Position, Diagnostics::includeFailed, path);
+        GetSink(context)->diagnose(pathToken.loc, Diagnostics::includeFailed, path);
         return;
 
     case IncludeResult::Found:
@@ -1600,16 +1621,16 @@ static void HandleDefineDirective(PreprocessorDirectiveContext* context)
     Token nameToken;
     if (!Expect(context, TokenType::Identifier, Diagnostics::expectedTokenInPreprocessorDirective, &nameToken))
         return;
-    String name = nameToken.Content;
+    Name* name = nameToken.getName();
 
     PreprocessorMacro* macro = CreateMacro(context->preprocessor);
-    macro->nameToken = nameToken;
+    macro->nameAndLoc = NameLoc(nameToken);
 
     PreprocessorMacro* oldMacro = LookupMacro(&context->preprocessor->globalEnv, name);
     if (oldMacro)
     {
-        GetSink(context)->diagnose(nameToken.Position, Diagnostics::macroRedefinition, name);
-        GetSink(context)->diagnose(oldMacro->nameToken.Position, Diagnostics::seePreviousDefinitionOf, name);
+        GetSink(context)->diagnose(nameToken.loc, Diagnostics::macroRedefinition, name);
+        GetSink(context)->diagnose(oldMacro->getLoc(), Diagnostics::seePreviousDefinitionOf, name);
 
         DestroyMacro(context->preprocessor, oldMacro);
     }
@@ -1682,7 +1703,7 @@ static void HandleUndefDirective(PreprocessorDirectiveContext* context)
     Token nameToken;
     if (!Expect(context, TokenType::Identifier, Diagnostics::expectedTokenInPreprocessorDirective, &nameToken))
         return;
-    String name = nameToken.Content;
+    Name* name = nameToken.getName();
 
     PreprocessorEnvironment* env = &context->preprocessor->globalEnv;
     PreprocessorMacro* macro = LookupMacro(env, name);
@@ -1696,7 +1717,7 @@ static void HandleUndefDirective(PreprocessorDirectiveContext* context)
     else
     {
         // name wasn't defined
-        GetSink(context)->diagnose(nameToken.Position, Diagnostics::macroNotDefined, name);
+        GetSink(context)->diagnose(nameToken.loc, Diagnostics::macroNotDefined, name);
     }
 }
 
@@ -2084,17 +2105,21 @@ static void DefineMacro(
 
     // Use existing `Lexer` to generate a token stream.
     Lexer lexer;
-    lexer.initialize(valueFile, GetSink(preprocessor));
+    lexer.initialize(valueFile, GetSink(preprocessor), getNamePool(preprocessor));
     macro->tokens = lexer.lexAllTokens();
-    macro->nameToken = Token(TokenType::Identifier, key, keyFile->sourceRange.begin);
+
+    Name* keyName = preprocessor->translationUnit->compileRequest->getNamePool()->getName(key);
+
+    macro->nameAndLoc.name = keyName;
+    macro->nameAndLoc.loc = keyFile->sourceRange.begin;
 
     PreprocessorMacro* oldMacro = NULL;
-    if (preprocessor->globalEnv.macros.TryGetValue(key, oldMacro))
+    if (preprocessor->globalEnv.macros.TryGetValue(keyName, oldMacro))
     {
         DestroyMacro(preprocessor, oldMacro);
     }
 
-    preprocessor->globalEnv.macros[key] = macro;
+    preprocessor->globalEnv.macros[keyName] = macro;
 }
 
 // read the entire input into tokens
@@ -2183,8 +2208,8 @@ static void HandleImportDirective(PreprocessorDirectiveContext* context)
     IncludeHandler* includeHandler = context->preprocessor->includeHandler;
     if (!includeHandler)
     {
-        GetSink(context)->diagnose(pathToken.Position, Diagnostics::importFailed, path);
-        GetSink(context)->diagnose(pathToken.Position, Diagnostics::noIncludeHandlerSpecified);
+        GetSink(context)->diagnose(pathToken.loc, Diagnostics::importFailed, path);
+        GetSink(context)->diagnose(pathToken.loc, Diagnostics::noIncludeHandlerSpecified);
         return;
     }
     auto includeResult = includeHandler->TryToFindIncludeFile(path, pathIncludedFrom, &foundPath, &foundSource);
@@ -2193,7 +2218,7 @@ static void HandleImportDirective(PreprocessorDirectiveContext* context)
     {
     case IncludeResult::NotFound:
     case IncludeResult::Error:
-        GetSink(context)->diagnose(pathToken.Position, Diagnostics::importFailed, path);
+        GetSink(context)->diagnose(pathToken.loc, Diagnostics::importFailed, path);
         return;
 
     case IncludeResult::Found:
@@ -2262,7 +2287,7 @@ static void HandleImportDirective(PreprocessorDirectiveContext* context)
 
     Token token;
     token.type = TokenType::PoundImport;
-    token.Position = GetDirectiveLoc(context);
+    token.loc = GetDirectiveLoc(context);
     token.flags = 0;
     token.Content = foundPath;
 

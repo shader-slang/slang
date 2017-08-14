@@ -2,6 +2,7 @@
 #include "diagnostics.h"
 
 #include "compiler.h"
+#include "name.h"
 #include "syntax.h"
 
 #include <assert.h>
@@ -38,9 +39,15 @@ void printDiagnosticArg(StringBuilder& sb, Slang::String const& str)
     sb << str;
 }
 
+void printDiagnosticArg(StringBuilder& sb, Name* name)
+{
+    sb << getText(name);
+}
+
+
 void printDiagnosticArg(StringBuilder& sb, Decl* decl)
 {
-    sb << decl->name.Content;
+    sb << getText(decl->getName());
 }
 
 void printDiagnosticArg(StringBuilder& sb, Type* type)
@@ -70,17 +77,17 @@ void printDiagnosticArg(StringBuilder& sb, Token const& token)
 
 SourceLoc const& getDiagnosticPos(SyntaxNode const* syntax)
 {
-    return syntax->Position;
+    return syntax->loc;
 }
 
 SourceLoc const& getDiagnosticPos(Token const& token)
 {
-    return token.Position;
+    return token.loc;
 }
 
 SourceLoc const& getDiagnosticPos(TypeExp const& typeExp)
 {
-    return typeExp.exp->Position;
+    return typeExp.exp->loc;
 }
 
 // Take the format string for a diagnostic message, along with its arguments, and turn it into a
@@ -147,7 +154,7 @@ static void formatDiagnostic(
 {
     auto sourceManager = sink->sourceManager;
 
-    auto expandedLoc = sourceManager->expandSourceLoc(diagnostic.Position);
+    auto expandedLoc = sourceManager->expandSourceLoc(diagnostic.loc);
     auto humaneLoc = sourceManager->getHumaneLoc(expandedLoc);
 
     sb << humaneLoc.getPath();
@@ -170,7 +177,7 @@ void DiagnosticSink::diagnoseImpl(SourceLoc const& pos, DiagnosticInfo const& in
     Diagnostic diagnostic;
     diagnostic.ErrorID = info.id;
     diagnostic.Message = sb.ProduceString();
-    diagnostic.Position = pos;
+    diagnostic.loc = pos;
     diagnostic.severity = info.severity;
 
     if (diagnostic.severity >= Severity::Error)

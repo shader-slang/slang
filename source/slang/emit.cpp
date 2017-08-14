@@ -2,6 +2,7 @@
 #include "emit.h"
 
 #include "lower.h"
+#include "name.h"
 #include "syntax.h"
 #include "type-layout.h"
 #include "visitor.h"
@@ -343,8 +344,8 @@ struct EDeclarator
     EDeclarator* next = nullptr;
 
     // Used for `Flavor::name`
-    String name;
-    SourceLoc loc;
+    Name*       name;
+    SourceLoc   loc;
 
     // Used for `Flavor::Array`
     IntVal* elementCount;
@@ -450,22 +451,31 @@ struct EmitVisitor
         Emit(text.begin(), text.end());
     }
 
-    void emitName(
-        String const&       inName,
-        SourceLoc const& loc)
+    void emit(Name* name)
     {
-        String name = inName;
+        emit(getText(name));
+    }
 
+    void emit(NameLoc const& nameAndLoc)
+    {
+        advanceToSourceLocation(nameAndLoc.loc);
+        emit(getText(nameAndLoc.name));
+    }
+
+    void emitName(
+        Name*               name,
+        SourceLoc const&    loc)
+    {
         advanceToSourceLocation(loc);
         emit(name);
     }
 
-    void emitName(Token const& nameToken)
+    void emitName(NameLoc const& nameAndLoc)
     {
-        emitName(nameToken.Content, nameToken.Position);
+        emitName(nameAndLoc.name, nameAndLoc.loc);
     }
 
-    void emitName(String const& name)
+    void emitName(Name* name)
     {
         emitName(name, SourceLoc());
     }
@@ -720,7 +730,7 @@ struct EmitVisitor
             return;
 
         if ((mode == LineDirectiveMode::None)
-            || !token.Position.isValid())
+            || !token.loc.isValid())
         {
             // If we don't have the original position info, or we are in the
             // mode where the user didn't want line directives, we need to play
@@ -738,7 +748,7 @@ struct EmitVisitor
             // If location information is available, and we are emitting
             // such information, then just advance our tracking location
             // to the right place.
-            advanceToSourceLocation(token.Position);
+            advanceToSourceLocation(token.loc);
         }
 
         // Emit the raw textual content of the token
@@ -1197,10 +1207,10 @@ struct EmitVisitor
     }
 
     void EmitType(
-        RefPtr<Type>  type,
-        SourceLoc const&     typeLoc,
-        String const&           name,
-        SourceLoc const&     nameLoc)
+        RefPtr<Type>        type,
+        SourceLoc const&    typeLoc,
+        Name*               name,
+        SourceLoc const&    nameLoc)
     {
         advanceToSourceLocation(typeLoc);
 
@@ -1211,10 +1221,9 @@ struct EmitVisitor
         emitTypeImpl(type, &nameDeclarator);
     }
 
-
-    void EmitType(RefPtr<Type> type, Token const& nameToken)
+    void EmitType(RefPtr<Type> type, Name* name)
     {
-        EmitType(type, SourceLoc(), nameToken.Content, nameToken.Position);
+        EmitType(type, SourceLoc(), name, SourceLoc());
     }
 
     void EmitType(RefPtr<Type> type)
@@ -1243,7 +1252,7 @@ struct EmitVisitor
         }
     }
 
-    void EmitType(TypeExp const& typeExp, String const& name, SourceLoc const& nameLoc)
+    void EmitType(TypeExp const& typeExp, Name* name, SourceLoc const& nameLoc)
     {
         if (!typeExp.type || typeExp.type->As<ErrorType>())
         {
@@ -1262,17 +1271,17 @@ struct EmitVisitor
         else
         {
             EmitType(typeExp.type,
-                typeExp.exp ? typeExp.exp->Position : SourceLoc(),
+                typeExp.exp ? typeExp.exp->loc : SourceLoc(),
                 name, nameLoc);
         }
     }
 
-    void EmitType(TypeExp const& typeExp, Token const& nameToken)
+    void EmitType(TypeExp const& typeExp, NameLoc const& nameAndLoc)
     {
-        EmitType(typeExp, nameToken.Content, nameToken.Position);
+        EmitType(typeExp, nameAndLoc.name, nameAndLoc.loc);
     }
 
-    void EmitType(TypeExp const& typeExp, String const& name)
+    void EmitType(TypeExp const& typeExp, Name* name)
     {
         EmitType(typeExp, name, SourceLoc());
     }
@@ -1674,11 +1683,13 @@ struct EmitVisitor
 
     void emitUncheckedCallExpr(
         RefPtr<InvokeExpr>  callExpr,
-        String const&                       funcName,
-        ExprEmitArg const&                  arg)
+        Name*               funcName,
+        ExprEmitArg const&  arg)
     {
         auto outerPrec = arg.outerPrec;
         auto funcExpr = callExpr->FunctionExpr;
+
+        auto funcNameText = getText(funcName);
 
         // This can occur when we are dealing with unchecked input syntax,
         // because we are in "rewriter" mode. In this case we should go
@@ -1688,7 +1699,7 @@ struct EmitVisitor
             auto prec = kEOp_Comma;
             for (auto opInfo : kInfixOpInfos)
             {
-                if (funcName == opInfo->op)
+                if (funcNameText == opInfo->op)
                 {
                     prec = *opInfo;
                     break;
@@ -1698,7 +1709,7 @@ struct EmitVisitor
             EmitBinExpr(
                 outerPrec,
                 prec,
-                funcName.Buffer(),
+                funcNameText.Buffer(),
                 callExpr);
         }
         else if( auto prefixExpr = callExpr.As<PrefixExpr>() )
@@ -1706,7 +1717,7 @@ struct EmitVisitor
             EmitUnaryExpr(
                 outerPrec,
                 kEOp_Prefix,
-                funcName.Buffer(),
+                funcNameText.Buffer(),
                 "",
                 callExpr);
         }
@@ -1716,7 +1727,7 @@ struct EmitVisitor
                 outerPrec,
                 kEOp_Postfix,
                 "",
-                funcName.Buffer(),
+                funcNameText.Buffer(),
                 callExpr);
         }
         else
@@ -2279,7 +2290,7 @@ struct EmitVisitor
 
         // TODO: This won't be valid if we had to generate a qualified
         // reference for some reason.
-        advanceToSourceLocation(varExpr->Position);
+        advanceToSourceLocation(varExpr->loc);
 
         // Because of the "rewriter" use case, it is possible that we will
         // be trying to emit an expression that hasn't been wired up to
@@ -2456,11 +2467,11 @@ struct EmitVisitor
 
         for(auto attr : decl->GetModifiersOfType<HLSLUncheckedAttribute>())
         {
-            if(attr->nameToken.Content == "loop")
+            if(getText(attr->getName()) == "loop")
             {
                 Emit("[loop]");
             }
-            else if(attr->nameToken.Content == "unroll")
+            else if(getText(attr->getName()) == "unroll")
             {
                 Emit("[unroll]");
             }
@@ -2486,7 +2497,7 @@ struct EmitVisitor
             return;
 
         // Try to ensure that debugging can find the right location
-        advanceToSourceLocation(stmt->Position);
+        advanceToSourceLocation(stmt->loc);
 
         if (auto blockStmt = stmt.As<BlockStmt>())
         {
@@ -2734,7 +2745,7 @@ struct EmitVisitor
             return;
 
         // Try to ensure that debugging can find the right location
-        advanceToSourceLocation(decl->Position);
+        advanceToSourceLocation(decl->loc);
 
         DeclEmitArg arg;
         arg.layout = layout;
@@ -2789,7 +2800,7 @@ struct EmitVisitor
         SLANG_RELEASE_ASSERT(context->shared->target != CodeGenTarget::GLSL);
 
         Emit("typedef ");
-        EmitType(decl->type, decl->name.Content);
+        EmitType(decl->type, decl->getNameAndLoc());
         Emit(";\n");
     }
 
@@ -2873,7 +2884,7 @@ struct EmitVisitor
                 Emit(", ");
             }
 
-            emit(mod->nameToken.Content);
+            emit(mod->getNameAndLoc());
             if(mod->valToken.type != TokenType::Unknown)
             {
                 Emit(" = ");
@@ -2890,7 +2901,7 @@ struct EmitVisitor
             if (shouldSkipModifierForDecl(mod, decl))
                 continue;
 
-            advanceToSourceLocation(mod->Position);
+            advanceToSourceLocation(mod->loc);
 
             if (0) {}
 
@@ -2958,7 +2969,7 @@ struct EmitVisitor
             else if (auto uncheckedAttr = mod.As<HLSLAttribute>())
             {
                 Emit("[");
-                emit(uncheckedAttr->nameToken.Content);
+                emit(uncheckedAttr->getNameAndLoc());
                 auto& args = uncheckedAttr->args;
                 auto argCount = args.Count();
                 if (argCount != 0)
@@ -2976,7 +2987,7 @@ struct EmitVisitor
 
             else if(auto simpleModifier = mod.As<SimpleModifier>())
             {
-                emit(simpleModifier->nameToken.Content);
+                emit(simpleModifier->getNameAndLoc());
                 Emit(" ");
             }
 
@@ -3038,7 +3049,7 @@ struct EmitVisitor
         }
         else
         {
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), semantic->Position, "unhandled kind of semantic");
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), semantic->loc, "unhandled kind of semantic");
         }
     }
 
@@ -3100,7 +3111,7 @@ struct EmitVisitor
             return;
 
         Emit("struct ");
-        emitName(decl->name);
+        emitName(decl->getNameAndLoc());
         Emit("\n{\n");
 
         // TODO(tfoley): Need to hoist members functions, etc. out to global scope
@@ -3117,11 +3128,11 @@ struct EmitVisitor
         auto type = GetType(declRef);
         if (!type || type->As<ErrorType>())
         {
-            EmitType(declRef.getDecl()->type, declRef.getDecl()->getNameToken());
+            EmitType(declRef.getDecl()->type, declRef.getDecl()->getName());
         }
         else
         {
-            EmitType(GetType(declRef), declRef.getDecl()->getNameToken());
+            EmitType(GetType(declRef), declRef.getDecl()->getName());
         }
 
         EmitSemantics(declRef.getDecl());
@@ -3303,7 +3314,7 @@ struct EmitVisitor
         if( auto reflectionNameModifier = varDecl->FindModifier<ParameterBlockReflectionName>() )
         {
             Emit(" ");
-            emitName(reflectionNameModifier->nameToken);
+            emitName(reflectionNameModifier->nameAndLoc);
         }
 
         EmitSemantics(varDecl, kESemanticMask_None);
@@ -3490,7 +3501,7 @@ struct EmitVisitor
         if( auto reflectionNameModifier = varDecl->FindModifier<ParameterBlockReflectionName>() )
         {
             Emit(" ");
-            emitName(reflectionNameModifier->nameToken);
+            emitName(reflectionNameModifier->nameAndLoc);
         }
 
         Emit("\n{\n");
@@ -3516,10 +3527,10 @@ struct EmitVisitor
         }
         Emit("}");
 
-        if( varDecl->name.type != TokenType::Unknown )
+        if( varDecl->getNameLoc().isValid() )
         {
             Emit(" ");
-            emitName(varDecl->name);
+            emitName(varDecl->getName());
         }
 
         Emit(";\n");
@@ -3624,7 +3635,7 @@ struct EmitVisitor
         // isn't allowed by declarator syntax and/or language rules, we could
         // hypothetically wrap things in a `typedef` and work around it.
 
-        EmitType(decl->ReturnType, decl->name);
+        EmitType(decl->ReturnType, decl->getNameAndLoc());
 
         Emit("(");
         bool first = true;

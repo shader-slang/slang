@@ -974,6 +974,7 @@ namespace slang
 #include "source/slang/diagnostics.cpp"
 #include "source/slang/emit.cpp"
 #include "source/slang/lexer.cpp"
+#include "source/slang/name.cpp"
 #include "source/slang/options.cpp"
 #include "source/slang/parameter-binding.cpp"
 #include "source/slang/parser.cpp"

@@ -23,7 +23,7 @@ struct BreadcrumbInfo
 
 void DoLocalLookupImpl(
     Session*                session,
-    String const&		    name,
+    Name*                   name,
     DeclRef<ContainerDecl>  containerDeclRef,
     LookupRequest const&    request,
     LookupResult&		    result,
@@ -42,7 +42,7 @@ void buildMemberDictionary(ContainerDecl* decl)
 
     for (auto m : decl->Members)
     {
-        auto name = m->name.Content;
+        auto name = m->getName();
 
         // Add any transparent members to a separate list for lookup
         if (m->HasModifier<TransparentModifier>())
@@ -52,8 +52,8 @@ void buildMemberDictionary(ContainerDecl* decl)
             decl->transparentMembers.Add(info);
         }
 
-        // Ignore members with an empty name
-        if (name.Length() == 0)
+        // Ignore members with no name
+        if (!name)
             continue;
 
         m->nextInContainerWithSameName = nullptr;
@@ -153,11 +153,11 @@ LookupResultItem CreateLookupResultItem(
 
 void DoMemberLookupImpl(
     Session*                session,
-    String const&			name,
-    RefPtr<Type>	baseType,
+    Name*                   name,
+    RefPtr<Type>            baseType,
     LookupRequest const&    request,
-    LookupResult&			ioResult,
-    BreadcrumbInfo*			breadcrumbs)
+    LookupResult&           ioResult,
+    BreadcrumbInfo*         breadcrumbs)
 {
     // If the type was pointer-like, then dereference it
     // automatically here.
@@ -192,7 +192,7 @@ void DoMemberLookupImpl(
 
 void DoMemberLookupImpl(
     Session*                session,
-    String const&           name,
+    Name*                   name,
     DeclRef<Decl>           baseDeclRef,
     LookupRequest const&    request,
     LookupResult&	        ioResult,
@@ -209,7 +209,7 @@ void DoMemberLookupImpl(
 // Look for members of the given name in the given container for declarations
 void DoLocalLookupImpl(
     Session*                session,
-    String const&		    name,
+    Name*                   name,
     DeclRef<ContainerDecl>	containerDeclRef,
     LookupRequest const&    request,
     LookupResult&		    result,
@@ -293,7 +293,7 @@ void DoLocalLookupImpl(
 
 void DoLookupImpl(
     Session*                session,
-    String const&           name,
+    Name*                   name,
     LookupRequest const&    request,
     LookupResult&           result)
 {
@@ -353,9 +353,9 @@ void DoLookupImpl(
 }
 
 LookupResult DoLookup(
-    Session*    session,
-    String const& name,
-    LookupRequest const& request)
+    Session*                session,
+    Name*                   name,
+    LookupRequest const&    request)
 {
     LookupResult result;
     DoLookupImpl(session, name, request, result);
@@ -365,7 +365,7 @@ LookupResult DoLookup(
 LookupResult LookUp(
     Session*            session,
     SemanticsVisitor*   semantics,
-    String const&       name,
+    Name*               name,
     RefPtr<Scope>       scope)
 {
     LookupRequest request;
@@ -379,7 +379,7 @@ LookupResult LookUp(
 LookupResult LookUpLocal(
     Session*                session,
     SemanticsVisitor*       semantics,
-    String const&           name,
+    Name*                   name,
     DeclRef<ContainerDecl>  containerDeclRef)
 {
     LookupRequest request;

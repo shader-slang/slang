@@ -13,7 +13,7 @@ ABSTRACT_SYNTAX_CLASS(DeclRefExpr, Expr)
     DECL_FIELD(DeclRef<Decl>, declRef)
 
     // The name of the symbol being referenced
-    FIELD(String, name)
+    FIELD(Name*, name)
 END_SYNTAX_CLASS()
 
 SIMPLE_SYNTAX_CLASS(VarExpr, DeclRefExpr)
