@@ -648,7 +648,7 @@ SLANG_API void spAddBuiltins(
     s->addBuiltinSource(
 
         // TODO(tfoley): Add ability to directly new builtins to the approriate scope
-        s->slangLanguageScope,
+        s->coreLanguageScope,
 
         sourcePath,
         sourceString);
