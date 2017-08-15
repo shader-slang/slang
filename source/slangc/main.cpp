@@ -34,6 +34,11 @@ int MAIN(int argc, char** argv)
     SlangSession* session = spCreateSession(nullptr);
     SlangCompileRequest* compileRequest = spCreateCompileRequest(session);
 
+    spSetDiagnosticCallback(
+        compileRequest,
+        &diagnosticCallback,
+        nullptr);
+
     spSetCommandLineCompilerMode(compileRequest);
 
     char const* appName = "slangc";
@@ -45,11 +50,6 @@ int MAIN(int argc, char** argv)
         // TODO: print usage message
         exit(1);
     }
-
-    spSetDiagnosticCallback(
-        compileRequest,
-        &diagnosticCallback,
-        nullptr);
 
     // Invoke the compiler
 
