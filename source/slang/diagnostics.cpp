@@ -162,8 +162,13 @@ static void formatDiagnostic(
     sb << humaneLoc.line;
     sb << "): ";
     sb << getSeverityName(diagnostic.severity);
-    sb << " ";
-    sb << diagnostic.ErrorID;
+
+    if( diagnostic.ErrorID >= 0 )
+    {
+        sb << " ";
+        sb << diagnostic.ErrorID;
+    }
+
     sb << ": ";
     sb << diagnostic.Message;
     sb << "\n";

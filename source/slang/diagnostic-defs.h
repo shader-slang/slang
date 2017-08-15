@@ -39,6 +39,10 @@ DIAGNOSTIC(-1, Note, seePreviousDefinition, "see previous definition")
 DIAGNOSTIC(-1, Note, seePreviousDefinitionOf, "see previous definition of '$0'")
 DIAGNOSTIC(-1, Note, seeRequirementDeclaration, "see requirement declaration")
 DIAGNOSTIC(-1, Note, doYouForgetToMakeComponentAccessible, "do you forget to make component '$0' acessible from '$1' (missing public qualifier)?")
+
+DIAGNOSTIC(-1, Note, seeDeclarationOf, "see declaration of '$0'")
+DIAGNOSTIC(-1, Note, seeOtherDeclarationOf, "see other declaration of '$0'")
+
 //
 // 0xxxx -  Command line and interaction with host platform APIs.
 //
@@ -301,8 +305,8 @@ DIAGNOSTIC(39999, Error, tooManyArguments, "too many arguments to call (got $0, 
 DIAGNOSTIC(39999, Error, invalidIntegerLiteralSuffix, "invalid suffix '$0' on integer literal")
 DIAGNOSTIC(39999, Error, invalidFloatingPOintLiteralSuffix, "invalid suffix '$0' on floating-point literal")
 
-DIAGNOSTIC(39999, Error, conflictingExplicitBindingsForParameter, "conflicting explicit bindings for parameter '$0'")
-DIAGNOSTIC(39999, Error, parameterBindingsOverlap, "explicit parameter bindings overlap for parameters '$0' and '$1'")
+DIAGNOSTIC(39999, Error,    conflictingExplicitBindingsForParameter, "conflicting explicit bindings for parameter '$0'")
+DIAGNOSTIC(39999, Warning,  parameterBindingsOverlap, "explicit binding for parameter '$0' overlaps with parameter '$1'")
 
 //
 // 4xxxx - IL code generation.

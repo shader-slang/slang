@@ -735,6 +735,7 @@ static RefPtr<UsedRangeSet> findUsedRangeSetForTranslationUnit(
 static void addExplicitParameterBinding(
     ParameterBindingContext*    context,
     RefPtr<ParameterInfo>       parameterInfo,
+    VarDeclBase*                varDecl,
     LayoutSemanticInfo const&   semanticInfo,
     UInt                        count,
     RefPtr<UsedRangeSet>        usedRangeSet = nullptr)
@@ -751,8 +752,13 @@ static void addExplicitParameterBinding(
             || bindingInfo.index != semanticInfo.index
             || bindingInfo.space != semanticInfo.space )
         {
+            getSink(context)->diagnose(varDecl, Diagnostics::conflictingExplicitBindingsForParameter, getReflectionName(varDecl));
+
             auto firstVarDecl = parameterInfo->varLayouts[0]->varDecl.getDecl();
-            getSink(context)->diagnose(firstVarDecl, Diagnostics::conflictingExplicitBindingsForParameter, getReflectionName(firstVarDecl));
+            if( firstVarDecl != varDecl )
+            {
+                getSink(context)->diagnose(firstVarDecl, Diagnostics::seeOtherDeclarationOf, getReflectionName(firstVarDecl));
+            }
         }
 
         // TODO(tfoley): `register` semantics can technically be
@@ -781,6 +787,8 @@ static void addExplicitParameterBinding(
             getSink(context)->diagnose(paramA, Diagnostics::parameterBindingsOverlap,
                 getReflectionName(paramA),
                 getReflectionName(paramB));
+
+            getSink(context)->diagnose(paramB, Diagnostics::seeDeclarationOf, getReflectionName(paramB));
         }
     }
 }
@@ -822,7 +830,7 @@ static void addExplicitParameterBindings_HLSL(
             // TODO: warning here!
         }
 
-        addExplicitParameterBinding(context, parameterInfo, semanticInfo, count);
+        addExplicitParameterBinding(context, parameterInfo, varDecl, semanticInfo, count);
     }
 }
 
@@ -888,7 +896,7 @@ static void addExplicitParameterBindings_GLSL(
     auto count = resInfo->count;
     semanticInfo.kind = kind;
 
-    addExplicitParameterBinding(context, parameterInfo, semanticInfo, int(count), usedRangeSet);
+    addExplicitParameterBinding(context, parameterInfo, varDecl, semanticInfo, int(count), usedRangeSet);
 }
 
 // Given a single parameter, collect whatever information we have on
