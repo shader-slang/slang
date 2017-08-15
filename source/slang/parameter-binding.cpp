@@ -1253,15 +1253,18 @@ static RefPtr<TypeLayout> processEntryPointParameter(
                     state,
                     fieldVarLayout);
 
-                fieldVarLayout->typeLayout = fieldTypeLayout;
-
-                for (auto rr : fieldTypeLayout->resourceInfos)
+                if(fieldTypeLayout)
                 {
-                    SLANG_RELEASE_ASSERT(rr.count != 0);
+                    fieldVarLayout->typeLayout = fieldTypeLayout;
 
-                    auto structRes = structLayout->findOrAddResourceInfo(rr.kind);
-                    fieldVarLayout->findOrAddResourceInfo(rr.kind)->index = structRes->count;
-                    structRes->count += rr.count;
+                    for (auto rr : fieldTypeLayout->resourceInfos)
+                    {
+                        SLANG_RELEASE_ASSERT(rr.count != 0);
+
+                        auto structRes = structLayout->findOrAddResourceInfo(rr.kind);
+                        fieldVarLayout->findOrAddResourceInfo(rr.kind)->index = structRes->count;
+                        structRes->count += rr.count;
+                    }
                 }
 
                 structLayout->fields.Add(fieldVarLayout);
@@ -1404,13 +1407,16 @@ static void collectEntryPointParameters(
             state,
             resultLayout);
 
-        resultLayout->typeLayout = resultTypeLayout;
-
-        for (auto rr : resultTypeLayout->resourceInfos)
+        if( resultTypeLayout )
         {
-            auto entryPointRes = entryPointLayout->findOrAddResourceInfo(rr.kind);
-            resultLayout->findOrAddResourceInfo(rr.kind)->index = entryPointRes->count;
-            entryPointRes->count += rr.count;
+            resultLayout->typeLayout = resultTypeLayout;
+
+            for (auto rr : resultTypeLayout->resourceInfos)
+            {
+                auto entryPointRes = entryPointLayout->findOrAddResourceInfo(rr.kind);
+                resultLayout->findOrAddResourceInfo(rr.kind)->index = entryPointRes->count;
+                entryPointRes->count += rr.count;
+            }
         }
 
         entryPointLayout->resultLayout = resultLayout;
