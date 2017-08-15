@@ -37,6 +37,8 @@
     <ClInclude Include="visitor.h" />
     <ClInclude Include="lower.h" />
     <ClInclude Include="name.h" />
+    <ClInclude Include="ir.h" />
+    <ClInclude Include="lower-to-ir.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="check.cpp" />
@@ -59,5 +61,7 @@
     <ClCompile Include="lower.cpp" />
     <ClCompile Include="source-loc.cpp" />
     <ClCompile Include="name.cpp" />
+    <ClCompile Include="ir.cpp" />
+    <ClCompile Include="lower-to-ir.cpp" />
   </ItemGroup>
 </Project>
