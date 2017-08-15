@@ -329,7 +329,7 @@ DIAGNOSTIC(50020, Error, invalidPrimitiveIdType,        "PrimitiveId must have i
 DIAGNOSTIC(50020, Error, invalidPatchVertexCountType,    "PatchVertexCount must have int type.")
 DIAGNOSTIC(50022, Error, worldIsNotDefined, "world '$0' is not defined.");
 DIAGNOSTIC(50023, Error, stageShouldProvideWorldAttribute, "'$0' should provide 'World' attribute.");
-DIAGNOSTIC(50040, Error, componentHasInvalidTypeForPositionOutput, "'$0': component used as 'Position' output must be of vec4 type.")
+DIAGNOSTIC(50040, Error, componentHasInvalidTypeForPositionOutput, "'$0': component used as 'loc' output must be of vec4 type.")
 DIAGNOSTIC(50041, Error, componentNotDefined, "'$0': component not defined.")
 
 DIAGNOSTIC(50052, Error, domainShaderRequiresControlPointCount, "'DomainShader' requires attribute 'ControlPointCount'.");

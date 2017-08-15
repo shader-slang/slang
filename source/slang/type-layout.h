@@ -228,7 +228,7 @@ public:
     DeclRef<VarDeclBase>          varDecl;
     VarDeclBase* getVariable() { return varDecl.getDecl(); }
 
-    String const& getName() { return getVariable()->getName(); }
+    Name* getName() { return getVariable()->getName(); }
 
     // The result of laying out the variable's type
     RefPtr<TypeLayout>      typeLayout;

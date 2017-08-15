@@ -317,8 +317,8 @@ private:
 class PseudoVarDecl : public RefObject
 {
 public:
-    Token Name;
-    SourceLoc Position;
+    NameLoc nameAndLoc;
+    SourceLoc loc;
     TypeExp type;
 };
 
@@ -339,7 +339,7 @@ public:
 class PseudoExpr : public RefObject
 {
 public:
-    SourceLoc Position;
+    SourceLoc loc;
     QualType type;
 };
 
@@ -388,9 +388,9 @@ static SourceLoc getPosition(LoweredExpr const& expr)
 {
     switch (expr.getFlavor())
     {
-    case LoweredExpr::Flavor::Expr:         return expr.getExpr()            ->Position;
-    case LoweredExpr::Flavor::Tuple:        return expr.getTupleExpr()       ->Position;
-    case LoweredExpr::Flavor::VaryingTuple: return expr.getVaryingTupleExpr()->Position;
+    case LoweredExpr::Flavor::Expr:         return expr.getExpr()            ->loc;
+    case LoweredExpr::Flavor::Tuple:        return expr.getTupleExpr()       ->loc;
+    case LoweredExpr::Flavor::VaryingTuple: return expr.getVaryingTupleExpr()->loc;
     default:
         SLANG_UNREACHABLE("all cases handled");
         return SourceLoc();
@@ -415,7 +415,7 @@ struct SharedLoweringContext
     CodeGenTarget   target;
 
     // A set of words reserved by the target
-    Dictionary<String, String> reservedWords;
+    HashSet<Name*> reservedWords;
 
 
     RefPtr<ModuleDecl>   loweredProgram;
@@ -477,15 +477,16 @@ struct LoweringVisitor
 
     CodeGenTarget getTarget() { return shared->target; }
 
-    bool isReservedWord(String const& name)
+    bool isReservedWord(Name* name)
     {
-        return shared->reservedWords.TryGetValue(name) != nullptr;
+        return shared->reservedWords.Contains(name);
     }
 
     void registerReservedWord(
-        String const&   name)
+        String const&   text)
     {
-        shared->reservedWords.Add(name, name);
+        Name* name = shared->compileRequest->getNamePool()->getName(text);
+        shared->reservedWords.Add(name);
     }
 
     void registerReservedWords()
@@ -781,7 +782,7 @@ struct LoweringVisitor
         Expr*    loweredExpr,
         Expr*    expr)
     {
-        loweredExpr->Position = expr->Position;
+        loweredExpr->loc = expr->loc;
         loweredExpr->type.type = lowerType(expr->type.type);
     }
 
@@ -796,11 +797,19 @@ struct LoweringVisitor
     }
 
     RefPtr<Expr> createUncheckedVarRef(
-        char const* name)
+        Name* name)
     {
         RefPtr<VarExpr> result = new VarExpr();
         result->name = name;
         return result;
+    }
+
+
+    RefPtr<Expr> createUncheckedVarRef(
+        char const* name)
+    {
+        return createUncheckedVarRef(
+            shared->compileRequest->getNamePool()->getName(name));
     }
 
     RefPtr<Expr> createSimpleVarRef(
@@ -808,7 +817,7 @@ struct LoweringVisitor
         VarDeclBase*        decl)
     {
         RefPtr<VarExpr> result = new VarExpr();
-        result->Position = loc;
+        result->loc = loc;
         result->type.type = decl->type.type;
         result->declRef = makeDeclRef(decl);
         result->name = decl->getName();
@@ -842,7 +851,7 @@ struct LoweringVisitor
         TupleVarDecl*           decl)
     {
         RefPtr<TupleExpr> result = new TupleExpr();
-        result->Position = loc;
+        result->loc = loc;
         result->type.type = decl->type.type;
 
         if (auto primaryDecl = decl->primaryDecl)
@@ -891,11 +900,11 @@ struct LoweringVisitor
             // If we are referencing a declaration that got tuple-ified,
             // then we need to produce a tuple expression as well.
 
-            return createTupleRef(expr->Position, tupleVarDecl);
+            return createTupleRef(expr->loc, tupleVarDecl);
         }
         else if (auto varyingTupleVarDecl = loweredDecl.asVaryingTupleDecl())
         {
-            return createVaryingTupleRef(expr->Position, varyingTupleVarDecl);
+            return createVaryingTupleRef(expr->loc, varyingTupleVarDecl);
         }
 
         RefPtr<VarExpr> loweredExpr = new VarExpr();
@@ -905,26 +914,31 @@ struct LoweringVisitor
         return LoweredExpr(loweredExpr);
     }
 
-    String generateName()
+    Name* getName(String const& text)
+    {
+        return shared->compileRequest->getNamePool()->getName(text);
+    }
+
+    Name* generateName()
     {
         int id = shared->nameCounter++;
 
         String result;
         result.append("SLANG_tmp_");
         result.append(id);
-        return result;
+        return getName(result);
     }
 
     RefPtr<Expr> moveTemp(RefPtr<Expr> expr)
     {
         RefPtr<Variable> varDecl = new Variable();
-        varDecl->Name.Content = generateName();
+        varDecl->nameAndLoc.name = generateName();
         varDecl->type.type = expr->type.type;
         varDecl->initExpr = expr;
 
         addDecl(varDecl);
 
-        return createSimpleVarRef(expr->Position, varDecl);
+        return createSimpleVarRef(expr->loc, varDecl);
     }
 
     // The idea of this function is to take an expression that we plan to
@@ -953,7 +967,7 @@ struct LoweringVisitor
         if (auto tupleExpr = expr.asTuple())
         {
             RefPtr<TupleExpr> resultExpr = new TupleExpr();
-            resultExpr->Position = tupleExpr->Position;
+            resultExpr->loc = tupleExpr->loc;
             resultExpr->type = tupleExpr->type;
             if (tupleExpr->primaryExpr)
             {
@@ -973,7 +987,7 @@ struct LoweringVisitor
         else if (auto varyingTupleExpr = expr.asVaryingTuple())
         {
             RefPtr<VaryingTupleExpr> resultExpr = new VaryingTupleExpr();
-            resultExpr->Position = varyingTupleExpr->Position;
+            resultExpr->loc = varyingTupleExpr->loc;
             resultExpr->type = varyingTupleExpr->type;
             for (auto ee : varyingTupleExpr->elements)
             {
@@ -1057,7 +1071,7 @@ struct LoweringVisitor
                     rightExpr = maybeMoveTemp(rightExpr);
 
                     RefPtr<AggTypeCtorExpr> ctorExpr = new AggTypeCtorExpr();
-                    ctorExpr->Position = rightExpr->Position;
+                    ctorExpr->loc = rightExpr->loc;
                     ctorExpr->type.type = leftType;
                     ctorExpr->base.type = leftType;
 
@@ -1065,7 +1079,7 @@ struct LoweringVisitor
                     for (int ee = 0; ee < elementCount; ++ee)
                     {
                         RefPtr<SwizzleExpr> swizzleExpr = new SwizzleExpr();
-                        swizzleExpr->Position = rightExpr->Position;
+                        swizzleExpr->loc = rightExpr->loc;
                         swizzleExpr->type.type = rightVecType->elementType;
                         swizzleExpr->base = rightExpr;
                         swizzleExpr->elementCount = 1;
@@ -1104,11 +1118,16 @@ struct LoweringVisitor
         RefPtr<Expr>* link = nullptr;
     };
 
-    RefPtr<Expr> createSimpleVarExpr(char const* name)
+    RefPtr<Expr> createSimpleVarExpr(Name* name)
     {
         RefPtr<VarExpr> varExpr = new VarExpr();
         varExpr->name = name;
         return varExpr;
+    }
+
+    RefPtr<Expr> createSimpleVarExpr(char const* name)
+    {
+        return createSimpleVarExpr(getName(name));
     }
 
     RefPtr<InvokeExpr> createSeqExpr(
@@ -1116,7 +1135,7 @@ struct LoweringVisitor
         RefPtr<Expr>    right)
     {
         RefPtr<InfixExpr> seqExpr = new InfixExpr();
-        seqExpr->Position = left->Position;
+        seqExpr->loc = left->loc;
         seqExpr->type = right->type;
         seqExpr->FunctionExpr = createSimpleVarExpr(",");
         seqExpr->Arguments.Add(left);
@@ -1207,14 +1226,14 @@ struct LoweringVisitor
                     {
                         // LHS array element
                         RefPtr<IndexExpr> arrayElemExpr = new IndexExpr();
-                        arrayElemExpr->Position = leftExpr->Position;
+                        arrayElemExpr->loc = leftExpr->loc;
                         arrayElemExpr->type.type = leftArrayType->BaseType;
                         arrayElemExpr->BaseExpression = leftExpr;
                         arrayElemExpr->IndexExpression = createConstIntExpr(ee);
 
                         // RHS swizzle
                         RefPtr<SwizzleExpr> swizzleExpr = new SwizzleExpr();
-                        swizzleExpr->Position = rightExpr->Position;
+                        swizzleExpr->loc = rightExpr->loc;
                         swizzleExpr->type.type = rightVecType->elementType;
                         swizzleExpr->base = rightExpr;
                         swizzleExpr->elementCount = 1;
@@ -1315,7 +1334,7 @@ struct LoweringVisitor
         {
             RefPtr<VaryingTupleExpr> resultTuple = new VaryingTupleExpr();
             resultTuple->type.type = leftVaryingTuple->type.type;
-            resultTuple->Position = leftVaryingTuple->Position;
+            resultTuple->loc = leftVaryingTuple->loc;
 
             SLANG_RELEASE_ASSERT(resultTuple->type.type);
 
@@ -1344,7 +1363,7 @@ struct LoweringVisitor
 
             RefPtr<VaryingTupleExpr> resultTuple = new VaryingTupleExpr();
             resultTuple->type.type = leftVaryingTuple->type.type;
-            resultTuple->Position = leftVaryingTuple->Position;
+            resultTuple->loc = leftVaryingTuple->loc;
 
             SLANG_RELEASE_ASSERT(resultTuple->type.type);
 
@@ -1366,7 +1385,7 @@ struct LoweringVisitor
 
 
                 RefPtr<MemberExpr> rightElemExpr = new MemberExpr();
-                rightElemExpr->Position = rightSimpleExpr->Position;
+                rightElemExpr->loc = rightSimpleExpr->loc;
                 rightElemExpr->type.type = GetType(leftElem.originalFieldDeclRef);
                 rightElemExpr->declRef = leftElem.originalFieldDeclRef;
                 rightElemExpr->name = leftElem.originalFieldDeclRef.GetName();
@@ -1392,7 +1411,7 @@ struct LoweringVisitor
 
             RefPtr<VaryingTupleExpr> resultTuple = new VaryingTupleExpr();
             resultTuple->type.type = leftSimpleExpr->type.type;
-            resultTuple->Position = leftSimpleExpr->Position;
+            resultTuple->loc = leftSimpleExpr->loc;
 
             SLANG_RELEASE_ASSERT(resultTuple->type.type);
 
@@ -1413,7 +1432,7 @@ struct LoweringVisitor
 
 
                 RefPtr<MemberExpr> leftElemExpr = new MemberExpr();
-                leftElemExpr->Position = leftSimpleExpr->Position;
+                leftElemExpr->loc = leftSimpleExpr->loc;
                 leftElemExpr->type.type = GetType(rightElem.originalFieldDeclRef);
                 leftElemExpr->declRef = rightElem.originalFieldDeclRef;
                 leftElemExpr->name = rightElem.originalFieldDeclRef.GetName();
@@ -2038,7 +2057,7 @@ struct LoweringVisitor
         {
             if (auto varExpr = infixExpr->FunctionExpr.As<VarExpr>())
             {
-                if (varExpr->name == ",")
+                if (getText(varExpr->name) == ",")
                 {
                     // Call to "operator comma"
                     for (auto aa : infixExpr->Arguments)
@@ -2124,7 +2143,7 @@ struct LoweringVisitor
         Stmt* loweredStmt,
         Stmt* originalStmt)
     {
-        loweredStmt->Position = originalStmt->Position;
+        loweredStmt->loc = originalStmt->loc;
         loweredStmt->modifiers = originalStmt->modifiers;
     }
 
@@ -2190,7 +2209,9 @@ struct LoweringVisitor
         for (auto token : stmt->tokens)
         {
             if (token.type == TokenType::Identifier)
-                doSampleRateInputCheck(token.Content);
+            {
+                doSampleRateInputCheck(token.getName());
+            }
         }
 
         loweredStmt->tokens = stmt->tokens;
@@ -2284,7 +2305,7 @@ struct LoweringVisitor
             constExpr->integerValue = ii;
 
             RefPtr<VaryingTupleVarDecl> loweredVarDecl = new VaryingTupleVarDecl();
-            loweredVarDecl->Position = varDecl->Position;
+            loweredVarDecl->loc = varDecl->loc;
             loweredVarDecl->type = varType;
             loweredVarDecl->expr = LoweredExpr(constExpr);
 
@@ -2354,7 +2375,7 @@ struct LoweringVisitor
         RefPtr<Expr>    expr)
     {
         RefPtr<ExplicitCastExpr> castExpr = new ExplicitCastExpr();
-        castExpr->Position = expr->Position;
+        castExpr->loc = expr->loc;
         castExpr->type.type = type;
         castExpr->TargetType.type = type;
         castExpr->Expression = expr;
@@ -2521,7 +2542,7 @@ struct LoweringVisitor
         if (isBuildingStmt)
         {
             RefPtr<DeclStmt> declStmt = new DeclStmt();
-            declStmt->Position = decl->Position;
+            declStmt->loc = decl->loc;
             declStmt->decl = decl;
             addStmt(declStmt);
         }
@@ -2573,9 +2594,13 @@ struct LoweringVisitor
         // and ad hoc fashion, but longer term we'll want to do
         // something sytematic.
 
-        if (isReservedWord(decl->getName()))
+        auto name = decl->getName();
+        if (isReservedWord(name))
         {
-            decl->Name.Content.append("_");
+            auto nameText = getText(name);
+            nameText.append("_");
+
+            decl->nameAndLoc.name = getName(nameText);
         }
     }
 
@@ -2610,8 +2635,8 @@ struct LoweringVisitor
     {
         registerLoweredDecl(loweredDecl, decl);
 
-        loweredDecl->Position = decl->Position;
-        loweredDecl->Name = decl->getNameToken();
+        loweredDecl->loc = decl->loc;
+        loweredDecl->nameAndLoc = decl->nameAndLoc;
 
         // Deal with renaming - we shouldn't allow decls with names that are reserved words
         ensureDeclHasAValidName(loweredDecl);
@@ -2948,7 +2973,7 @@ struct LoweringVisitor
         // Syntax class for declarations to create
         SyntaxClass<VarDeclBase>    varDeclClass;
 
-        // Name "stem" to use for any actual variables we create
+        // name "stem" to use for any actual variables we create
         String                      name;
 
         // The parent tuple type (or array thereof) we are scalarizing
@@ -3000,7 +3025,7 @@ struct LoweringVisitor
             SLANG_RELEASE_ASSERT(!info.initExpr);
             RefPtr<Expr> fieldInitExpr;
 
-            String fieldName = info.name + "_" + dd.GetName();
+            String fieldName = info.name + "_" + getText(dd.GetName());
 
             auto fieldType = GetType(dd);
 
@@ -3102,7 +3127,7 @@ struct LoweringVisitor
                 }
 
                 RefPtr<VarDeclBase> fieldVarDecl = info.varDeclClass.createInstance();
-                fieldVarDecl->Name.Content = fieldName;
+                fieldVarDecl->nameAndLoc = NameLoc(getName(fieldName));
                 fieldVarDecl->type.type = fieldVarType;
 
                 addDecl(fieldVarDecl);
@@ -3132,10 +3157,10 @@ struct LoweringVisitor
         SyntaxClass<VarDeclBase>        varDeclClass,
         RefPtr<VarDeclBase>             originalVarDecl,
         String const&                   name,
-        RefPtr<Type>          tupleType,
+        RefPtr<Type>                    tupleType,
         DeclRef<AggTypeDecl>            tupleTypeDecl,
         TupleTypeModifier*              tupleTypeMod,
-        RefPtr<Expr>    initExpr,
+        RefPtr<Expr>                    initExpr,
         RefPtr<VarLayout>               primaryVarLayout,
         RefPtr<StructTypeLayout>        tupleTypeLayout)
     {
@@ -3144,14 +3169,14 @@ struct LoweringVisitor
 
         // We'll need a placeholder declaration to wrap the whole thing up:
         RefPtr<TupleVarDecl> tupleDecl = new TupleVarDecl();
-        tupleDecl->Name.Content = name;
+        tupleDecl->nameAndLoc = NameLoc(getName(name));
 
         // First, if the tuple type had any "ordinary" data,
         // then we go ahead and create a declaration for that stuff
         if (tupleTypeMod->hasAnyNonTupleFields)
         {
             RefPtr<VarDeclBase> primaryVarDecl = varDeclClass.createInstance();
-            primaryVarDecl->Name.Content = name;
+            primaryVarDecl->nameAndLoc.name = getName(name);
             primaryVarDecl->type.type = tupleType;
 
             primaryVarDecl->modifiers = originalVarDecl->modifiers;
@@ -3257,7 +3282,7 @@ struct LoweringVisitor
             auto tupleDecl = createTupleTypeVarDecls(
                 loweredDeclClass,
                 decl,
-                decl->getName(),
+                getText(decl->getName()),
                 loweredType.type,
                 tupleTypeMod,
                 loweredInit,
@@ -3276,7 +3301,7 @@ struct LoweringVisitor
                 auto tupleDecl = createTupleTypeVarDecls(
                     loweredDeclClass,
                     decl,
-                    decl->getName(),
+                    getText(decl->getName()),
                     loweredType.type,
                     elementTupleTypeMod,
                     nullptr,
@@ -3357,9 +3382,10 @@ struct LoweringVisitor
         }
     }
 
-    void doSampleRateInputCheck(String const& name)
+    void doSampleRateInputCheck(Name* name)
     {
-        if (name == "gl_SampleIndex")
+        auto text = getText(name);
+        if (text == "gl_SampleIndex")
         {
             setSampleRateFlag();
         }
@@ -3616,7 +3642,7 @@ struct LoweringVisitor
         RefPtr<Type>  type)
     {
         RefPtr<VarExpr> globalVarRef = new VarExpr();
-        globalVarRef->name = name;
+        globalVarRef->name = getName(name);
         globalVarRef->type.type = type;
         return globalVarRef;
     }
@@ -3939,7 +3965,7 @@ struct LoweringVisitor
         if (!globalVarExpr)
         {
             RefPtr<Variable> globalVarDecl = new Variable();
-            globalVarDecl->Name.Content = info.name;
+            globalVarDecl->nameAndLoc.name = getName(info.name);
             globalVarDecl->type.type = type;
 
             ensureDeclHasAValidName(globalVarDecl);
@@ -3998,7 +4024,7 @@ struct LoweringVisitor
 
 
             RefPtr<VarExpr> globalVarRef = new VarExpr();
-            globalVarRef->Position = globalVarDecl->Position;
+            globalVarRef->loc = globalVarDecl->loc;
             globalVarRef->type.type = globalVarDecl->type.type;
             globalVarRef->declRef = makeDeclRef(globalVarDecl.Ptr());
             globalVarRef->name = globalVarDecl->getName();
@@ -4077,7 +4103,7 @@ struct LoweringVisitor
                     fieldVarChain.varDecl = fieldDeclRef.getDecl();
 
                     VaryingParameterInfo fieldInfo = info;
-                    fieldInfo.name = info.name + "_" + fieldDeclRef.GetName();
+                    fieldInfo.name = info.name + "_" + getText(fieldDeclRef.GetName());
                     fieldInfo.varChain = &fieldVarChain;
 
                     // Need to find the layout for the given field...
@@ -4119,6 +4145,7 @@ struct LoweringVisitor
         VaryingParameterDirection   direction)
     {
         auto name = originalVarDecl->getName();
+        auto nameText = getText(name);
         auto declRef = makeDeclRef(originalVarDecl.Ptr());
 
         VaryingParameterVarChain varChain;
@@ -4126,7 +4153,7 @@ struct LoweringVisitor
         varChain.varDecl = originalVarDecl;
 
         VaryingParameterInfo info;
-        info.name = name;
+        info.name = nameText;
         info.direction = direction;
         info.varChain = &varChain;
 
@@ -4134,11 +4161,11 @@ struct LoweringVisitor
         switch (direction)
         {
         case VaryingParameterDirection::Input:
-            info.name = "SLANG_in_" + name;
+            info.name = "SLANG_in_" + nameText;
             break;
 
         case VaryingParameterDirection::Output:
-            info.name = "SLANG_out_" + name;
+            info.name = "SLANG_out_" + nameText;
             break;
         }
 
@@ -4168,7 +4195,7 @@ struct LoweringVisitor
         LoweredExpr         loweredExpr)
     {
         RefPtr<VaryingTupleVarDecl> loweredDecl = new VaryingTupleVarDecl();
-        loweredDecl->Name = originalVarDecl->Name;
+        loweredDecl->nameAndLoc = originalVarDecl->nameAndLoc;
         loweredDecl->type = loweredType;
         loweredDecl->expr = loweredExpr;
 
@@ -4197,14 +4224,18 @@ struct LoweringVisitor
         // First, loer the entry-point function as an ordinary function:
         auto loweredEntryPointFunc = visitFunctionDeclBase(entryPointDecl).getDecl()->As<FunctionDeclBase>();
 
+        auto mainName = getName("main");
+
         // Now we will generate a `void main() { ... }` function to call the lowered code.
         RefPtr<FuncDecl> mainDecl = new FuncDecl();
         mainDecl->ReturnType.type = getSession()->getVoidType();
-        mainDecl->Name.Content = "main";
+
+
+        mainDecl->nameAndLoc = NameLoc(mainName);
 
         // If the user's entry point was called `main` then rename it here
-        if (loweredEntryPointFunc->getName() == "main")
-            loweredEntryPointFunc->Name.Content = "main_";
+        if (loweredEntryPointFunc->getName() == mainName)
+            loweredEntryPointFunc->nameAndLoc = NameLoc(getName("main_"));
 
         RefPtr<BlockStmt> bodyStmt = new BlockStmt();
         bodyStmt->scopeDecl = new ScopeDecl();
@@ -4229,8 +4260,8 @@ struct LoweringVisitor
             SLANG_RELEASE_ASSERT(paramLayout);
 
             RefPtr<Variable> localVarDecl = new Variable();
-            localVarDecl->Position = paramDecl->Position;
-            localVarDecl->Name.Content = paramDecl->getName();
+            localVarDecl->loc = paramDecl->loc;
+            localVarDecl->nameAndLoc = paramDecl->getNameAndLoc();
             localVarDecl->type = lowerType(paramDecl->type);
 
             ensureDeclHasAValidName(localVarDecl);
@@ -4267,8 +4298,8 @@ struct LoweringVisitor
         if (!loweredEntryPointFunc->ReturnType->Equals(getSession()->getVoidType()))
         {
             resultVarDecl = new Variable();
-            resultVarDecl->Position = loweredEntryPointFunc->Position;
-            resultVarDecl->Name.Content = "main_result";
+            resultVarDecl->loc = loweredEntryPointFunc->loc;
+            resultVarDecl->nameAndLoc = NameLoc(getName("main_result"));
             resultVarDecl->type = TypeExp(loweredEntryPointFunc->ReturnType);
 
             ensureDeclHasAValidName(resultVarDecl);
@@ -4335,7 +4366,7 @@ struct LoweringVisitor
         if (resultVarDecl)
         {
             VaryingParameterInfo info;
-            info.name = "SLANG_out_" + resultVarDecl->getName();
+            info.name = "SLANG_out_" + getText(resultVarDecl->getName());
             info.direction = VaryingParameterDirection::Output;
             info.varChain = nullptr;
 
@@ -4387,13 +4418,13 @@ struct LoweringVisitor
         {
             resultGlobal = new Variable();
             // TODO: need a scheme for generating unique names
-            resultGlobal->Name.Content = "_main_result";
+            resultGlobal->name.Content = "_main_result";
             resultGlobal->type = loweredReturnType;
 
             addMember(shared->loweredProgram, resultGlobal);
         }
 
-        loweredDecl->Name.Content = "main";
+        loweredDecl->name.Content = "main";
         loweredDecl->ReturnType.type = getSession()->getVoidType();
 
         // We will emit the body statement in a context where

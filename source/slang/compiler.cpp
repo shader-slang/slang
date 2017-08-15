@@ -234,7 +234,7 @@ namespace Slang
             "slang",
             nullptr,
             nullptr,
-            entryPoint->name.begin(),
+            getText(entryPoint->name).begin(),
             GetHLSLProfileName(entryPoint->profile),
             0,
             0,

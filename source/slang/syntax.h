@@ -11,6 +11,7 @@
 
 namespace Slang
 {
+    class Name;
     class Session;
     class Substitutions;
     class SyntaxVisitor;
@@ -43,6 +44,32 @@ namespace Slang
     };
 
     IntrinsicOp findIntrinsicOp(char const* name);
+
+    // Helper type for pairing up a name and the location where it appeared
+    struct NameLoc
+    {
+        Name*       name;
+        SourceLoc   loc;
+
+        NameLoc()
+            : name(nullptr)
+        {}
+
+        explicit NameLoc(Name* name)
+            : name(name)
+        {}
+
+
+        NameLoc(Name* name, SourceLoc loc)
+            : name(name)
+            , loc(loc)
+        {}
+
+        NameLoc(Token const& token)
+            : name(token.getNameOrNull())
+            , loc(token.getLoc())
+        {}
+    };
 
     // Helper class for iterating over a list of heap-allocated modifiers
     struct ModifierList
@@ -371,7 +398,7 @@ namespace Slang
         }
 
         // Convenience accessors for common properties of declarations
-        String const& GetName() const;
+        Name* GetName() const;
         DeclRefBase GetParent() const;
 
         int GetHashCode() const;
@@ -772,7 +799,7 @@ namespace Slang
 
         bool isOverloaded() const { return items.Count() > 1; }
 
-        String const& getName() const
+        Name* getName() const
         {
             return items.Count() > 1 ? items[0].declRef.GetName() : item.declRef.GetName();
         }

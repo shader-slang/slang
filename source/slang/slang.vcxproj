@@ -175,6 +175,7 @@
     <ClInclude Include="lexer.h" />
     <ClInclude Include="lookup.h" />
     <ClInclude Include="modifier-defs.h" />
+    <ClInclude Include="name.h" />
     <ClInclude Include="object-meta-begin.h" />
     <ClInclude Include="object-meta-end.h" />
     <ClInclude Include="lower.h" />
@@ -205,6 +206,7 @@
     <ClCompile Include="lexer.cpp" />
     <ClCompile Include="lookup.cpp" />
     <ClCompile Include="lower.cpp" />
+    <ClCompile Include="name.cpp" />
     <ClCompile Include="options.cpp" />
     <ClCompile Include="parameter-binding.cpp" />
     <ClCompile Include="parser.cpp" />

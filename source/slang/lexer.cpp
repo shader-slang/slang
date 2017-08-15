@@ -65,7 +65,7 @@ namespace Slang
         if (!mCursor)
             return SourceLoc();
         SLANG_ASSERT(mCursor);
-        return mCursor->Position;
+        return mCursor->loc;
     }
 
     Token TokenReader::AdvanceToken()
@@ -85,10 +85,12 @@ namespace Slang
 
     void Lexer::initialize(
         SourceFile*     inSourceFile,
-        DiagnosticSink* inSink)
+        DiagnosticSink* inSink,
+        NamePool*       inNamePool)
     {
-        sourceFile = inSourceFile;
-        sink = inSink;
+        sourceFile  = inSourceFile;
+        sink        = inSink;
+        namePool    = inNamePool;
 
         auto content = inSourceFile->content;
 
@@ -221,6 +223,8 @@ namespace Slang
                     // handle the end-of-line for our source location tracking
                     lexer->cursor++;
                     handleNewLineInner(lexer, d);
+
+                    lexer->tokenFlags |= TokenFlag::ScrubbingNeeded;
 
                     // Now try again, looking at the character after the
                     // escaped nmewline.
@@ -1215,11 +1219,11 @@ namespace Slang
 
     Token Lexer::lexToken()
     {
-        auto flags = this->tokenFlags;
+        auto& flags = this->tokenFlags;
         for(;;)
         {
             Token token;
-            token.Position = getSourceLoc(this);
+            token.loc = getSourceLoc(this);
 
             char const* textBegin = cursor;
 
@@ -1246,7 +1250,7 @@ namespace Slang
             // We don't want to skip the end-of-file token, but we *do*
             // want to make sure it has appropriate flags to make our life easier
             case TokenType::EndOfFile:
-                flags = TokenFlag::AtStartOfLine | TokenFlag::AfterWhitespace;
+                flags |= TokenFlag::AtStartOfLine | TokenFlag::AfterWhitespace;
                 break;
 
             // We will also do some book-keeping around preprocessor directives here:
@@ -1316,6 +1320,11 @@ namespace Slang
 
             this->tokenFlags = 0;
 
+            if (tokenType == TokenType::Identifier)
+            {
+                token.ptrValue = this->namePool->getName(token.Content);
+            }
+
             return token;
         }
     }
@@ -1332,42 +1341,4 @@ namespace Slang
                 return tokenList;
         }
     }
-
-
-
-#if 0
-    TokenList Lexer::Parse(const String & fileName, const String & str, DiagnosticSink * sink)
-    {
-        TokenList tokenList;
-        tokenList.mTokens = TokenizeText(fileName, str, [&](TokenizeErrorType errType, SourceLoc pos)
-        {
-            auto curChar = str[pos.Pos];
-            switch (errType)
-            {
-            case TokenizeErrorType::InvalidCharacter:
-                // Check if inside the ASCII "printable" range
-                if(curChar >= 0x20 && curChar <=  0x7E)
-                {
-                    char buffer[] = { curChar, 0 };
-                    sink->diagnose(pos, Diagnostics::illegalCharacterPrint, buffer);
-                }
-                else
-                {
-                    // Fallback: print as hexadecimal
-                    sink->diagnose(pos, Diagnostics::illegalCharacterHex, String((unsigned char)curChar, 16));
-                }
-                break;
-            case TokenizeErrorType::InvalidEscapeSequence:
-                sink->diagnose(pos, Diagnostics::illegalCharacterLiteral);
-                break;
-            default:
-                break;
-            }
-        });
-
-        // Add an end-of-file token so that we can reference it in diagnostic messages
-        tokenList.mTokens.Add(Token(TokenType::EndOfFile, "", 0, 0, 0, fileName, TokenFlag::AtStartOfLine | TokenFlag::AfterWhitespace));
-        return tokenList;
-    }
-#endif
 }

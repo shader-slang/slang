@@ -20,9 +20,13 @@ namespace Slang {
 
 Session::Session()
 {
+    // Initialize name pool
+    getNamePool()->setRootNamePool(getRootNamePool());
+
     // Initialize the lookup table of syntax classes:
 
-    #define SYNTAX_CLASS(NAME, BASE) mapNameToSyntaxClass.Add(#NAME, getClass<NAME>());
+    #define SYNTAX_CLASS(NAME, BASE) \
+        mapNameToSyntaxClass.Add(getNamePool()->getName(#NAME), getClass<NAME>());
 
 #include "object-meta-begin.h"
 #include "syntax-base-defs.h"
@@ -110,6 +114,8 @@ struct IncludeHandlerImpl : IncludeHandler
 CompileRequest::CompileRequest(Session* session)
     : mSession(session)
 {
+    getNamePool()->setRootNamePool(session->getRootNamePool());
+
     setSourceManager(&sourceManagerStorage);
 
     sourceManager->initialize(session->getBuiltinSourceManager());
@@ -378,7 +384,7 @@ int CompileRequest::addEntryPoint(
 {
     RefPtr<EntryPointRequest> entryPoint = new EntryPointRequest();
     entryPoint->compileRequest = this;
-    entryPoint->name = name;
+    entryPoint->name = getNamePool()->getName(name);
     entryPoint->profile = entryPointProfile;
     entryPoint->translationUnitIndex = translationUnitIndex;
 
@@ -391,7 +397,7 @@ int CompileRequest::addEntryPoint(
 }
 
 RefPtr<ModuleDecl> CompileRequest::loadModule(
-    String const&       name,
+    Name*               name,
     String const&       path,
     String const&       source,
     SourceLoc const&)
@@ -462,15 +468,20 @@ void CompileRequest::handlePoundImport(
     // as the "name" when registering things, but this saves
     // us the trouble of trying to special-case things when
     // checking an `import` down the road.
-    mapNameToLoadedModules.Add(path, moduleDecl);
+    //
+    // Ideally we'd construct a suitable name by effectively
+    // running the name->path logic in reverse (e.g., replacing
+    // `-` with `_` and `/` with `.`).
+    Name* name = getNamePool()->getName(path);
+    mapNameToLoadedModules.Add(name, moduleDecl);
 
     mapPathToLoadedModule.Add(path, moduleDecl);
     loadedModulesList.Add(moduleDecl);
 }
 
 RefPtr<ModuleDecl> CompileRequest::findOrImportModule(
-    String const&       name,
-    SourceLoc const& loc)
+    Name*               name,
+    SourceLoc const&    loc)
 {
     // Have we already loaded a module matching this name?
     // If so, return it.
@@ -485,7 +496,7 @@ RefPtr<ModuleDecl> CompileRequest::findOrImportModule(
     // For example, `foo_bar` becomes `foo-bar.slang`.
 
     StringBuilder sb;
-    for (auto c : name)
+    for (auto c : getText(name))
     {
         if (c == '_')
             c = '-';
@@ -541,8 +552,8 @@ RefPtr<ModuleDecl> CompileRequest::findOrImportModule(
 
 RefPtr<ModuleDecl> findOrImportModule(
     CompileRequest*     request,
-    String const&       name,
-    SourceLoc const& loc)
+    Name*               name,
+    SourceLoc const&    loc)
 {
     return request->findOrImportModule(name, loc);
 }

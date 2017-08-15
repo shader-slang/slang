@@ -193,7 +193,7 @@ SYNTAX_CLASS(GLSLExtensionDirective, GLSLPreprocessorDirective)
 END_SYNTAX_CLASS()
 
 SYNTAX_CLASS(ParameterBlockReflectionName, Modifier)
-    FIELD(Token, nameToken)
+    FIELD(NameLoc, nameAndLoc)
 END_SYNTAX_CLASS()
 
 // A modifier that indicates a built-in base type (e.g., `float`)
@@ -270,7 +270,6 @@ SIMPLE_SYNTAX_CLASS(HLSLVolatileModifier, Modifier)
 
 // An HLSL `[name(arg0, ...)]` style attribute.
 SYNTAX_CLASS(HLSLAttribute, Modifier)
-    FIELD(Token, nameToken)
     SYNTAX_FIELD(List<RefPtr<Expr>>, args)
 END_SYNTAX_CLASS()
 

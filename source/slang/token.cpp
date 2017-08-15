@@ -5,6 +5,24 @@
 
 namespace Slang {
 
+
+Name* Token::getName() const
+{
+    return getNameOrNull();
+}
+
+Name* Token::getNameOrNull() const
+{
+    switch (type)
+    {
+    default:
+        return nullptr;
+
+    case TokenType::Identifier:
+        return (Name*) ptrValue;
+    }
+}
+
 char const* TokenTypeToString(TokenType type)
 {
     switch( type )

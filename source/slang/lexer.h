@@ -6,6 +6,10 @@
 
 namespace Slang
 {
+    struct NamePool;
+
+    //
+
     struct TokenList
     {
         Token* begin() const;
@@ -60,15 +64,16 @@ namespace Slang
     typedef unsigned int LexerFlags;
     enum
     {
-        kLexerFlag_InDirective = 1 << 0,
-        kLexerFlag_ExpectFileName = 2 << 0,
+        kLexerFlag_InDirective      = 1 << 0,
+        kLexerFlag_ExpectFileName   = 1 << 1,
     };
 
     struct Lexer
     {
         void initialize(
             SourceFile*     sourceFile,
-            DiagnosticSink* sink);
+            DiagnosticSink* sink,
+            NamePool*       namePool);
 
         ~Lexer();
 
@@ -86,6 +91,7 @@ namespace Slang
 
         SourceFile*     sourceFile;
         DiagnosticSink* sink;
+        NamePool*       namePool;
 
         char const*     cursor;
 
