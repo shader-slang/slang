@@ -19,7 +19,7 @@ namespace Slang
 
     struct ExtensionUsageTracker;
 
-    void lowerEntryPointToIR(
+    IRModule* lowerEntryPointToIR(
         EntryPointRequest*  entryPoint,
         ProgramLayout*      programLayout,
         CodeGenTarget       target);

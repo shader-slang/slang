@@ -2,6 +2,7 @@
 #include "emit.h"
 
 #include "lower.h"
+#include "lower-to-ir.h"
 #include "name.h"
 #include "syntax.h"
 #include "type-layout.h"
@@ -519,7 +520,7 @@ struct EmitVisitor
         emitRawText("\n#line ");
 
         char buffer[16];
-        sprintf(buffer, "%d", sourceLocation.line);
+        sprintf(buffer, "%llu", (unsigned long long)sourceLocation.line);
         emitRawText(buffer);
 
         emitRawText(" ");
@@ -679,7 +680,7 @@ struct EmitVisitor
         // and how we do.
         if(sourceLocation.column > context->shared->loc.column)
         {
-            int delta = sourceLocation.column - context->shared->loc.column;
+            Slang::Int delta = sourceLocation.column - context->shared->loc.column;
             for( int ii = 0; ii < delta; ++ii )
             {
                 emitRawText(" ");
@@ -3756,7 +3757,7 @@ struct EmitVisitor
 
     void EmitDecl(RefPtr<Decl> decl)
     {
-        emitDeclImpl(decl, nullptr);
+emitDeclImpl(decl, nullptr);
     }
 
     void EmitDeclUsingLayout(RefPtr<Decl> decl, RefPtr<VarLayout> layout)
@@ -3770,9 +3771,9 @@ struct EmitVisitor
         {
             EmitDecl(decl);
         }
-        else if(auto declGroup = declBase.As<DeclGroup>())
+        else if( auto declGroup = declBase.As<DeclGroup>() )
         {
-            for(auto d : declGroup->decls)
+            for( auto d : declGroup->decls )
                 EmitDecl(d);
         }
         else
@@ -3805,7 +3806,7 @@ String emitEntryPoint(
     {
         globalStructLayout = gs.Ptr();
     }
-    else if(auto globalConstantBufferLayout = globalScopeLayout.As<ParameterBlockTypeLayout>())
+    else if( auto globalConstantBufferLayout = globalScopeLayout.As<ParameterBlockTypeLayout>() )
     {
         // TODO: the `cbuffer` case really needs to be emitted very
         // carefully, but that is beyond the scope of what a simple rewriter
@@ -3837,31 +3838,94 @@ String emitEntryPoint(
     }
     sharedContext.globalStructLayout = globalStructLayout;
 
+    auto translationUnitSyntax = translationUnit->SyntaxNode.Ptr();
+
     EmitContext context;
     context.shared = &sharedContext;
 
     EmitVisitor visitor(&context);
 
-    auto translationUnitSyntax = translationUnit->SyntaxNode.Ptr();
-
-    // We perform lowering of the program before emitting *anything*,
-    // because the lowering process might change how we emit some
-    // boilerplate at the start of the ouput for GLSL (e.g., what
-    // version we require).
-    auto lowered = lowerEntryPoint(entryPoint, programLayout, target, &sharedContext.extensionUsageTracker);
-    sharedContext.program = lowered.program;
-
-    // Note that we emit the main body code of the program *before*
-    // we emit any leading preprocessor directives for GLSL.
-    // This is to give the emit logic a change to make last-minute
-    // adjustments like changing the required GLSL version.
+    // Depending on how the compiler was invoked, we may need to perform
+    // some amount of preocessing on the code before we can emit it.
     //
-    // TODO: All such adjustments would be better handled during
-    // lowering, but that requires having a semantic rather than
-    // textual format for the HLSL->GLSL mapping.
-    visitor.EmitDeclsInContainer(lowered.program.Ptr());
+    // For our purposes, there are basically three different "modes" we
+    // care about:
+    //
+    // 1. "Full rewriter" mode, where the user provides HLSL/GLSL, and
+    //    doesn't make use of any Slang code via `import`.
+    //
+    // 2. "Partial rewriter" mode, where the user starts with HLSL/GLSL,
+    //    but also imports some Slang code, and may need us to rewrite
+    //    their HLSL/GLSL function bodies to make things work.
+    //
+    // 3. "Full" mode, where all of the input code is in Slang (and/or
+    //    the subset of HLSL we can fully type-check).
+    //
+    // We'll try to detect the cases here:
+    //
+#if 0
+    if(!(translationUnit->compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING ))
+    {
+        // This seems to be case (3), because the user is asking for full
+        // checking, and so we can assume we understand the code fully.
+        //
+        // In this case we want to translate to our intermediate representation
+        // and do optimizations/transformations there before we emit final code.
+        //
+
+        auto lowered = lowerEntryPointToIR(entryPoint, programLayout, target);
+
+        dumpIR(lowered);
+
+        throw 99;
+
+    }
+    else if(translationUnit->compileRequest->loadedModulesList.Count() != 0)
+#else
+    if(!(translationUnit->compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING )
+        || translationUnit->compileRequest->loadedModulesList.Count() != 0)
+#endif
+    {
+        // The user has `import`ed some Slang modules, and so we are in case (2)
+        //
+        // We need to apply a "rewriting" pass to the code the user wrote,
+        // and then emit the result.
+
+        // We perform lowering of the program before emitting *anything*,
+        // because the lowering process might change how we emit some
+        // boilerplate at the start of the ouput for GLSL (e.g., what
+        // version we require).
+        auto lowered = lowerEntryPoint(entryPoint, programLayout, target, &sharedContext.extensionUsageTracker);
+        sharedContext.program = lowered.program;
+
+        // Note that we emit the main body code of the program *before*
+        // we emit any leading preprocessor directives for GLSL.
+        // This is to give the emit logic a change to make last-minute
+        // adjustments like changing the required GLSL version.
+        //
+        // TODO: All such adjustments would be better handled during
+        // lowering, but that requires having a semantic rather than
+        // textual format for the HLSL->GLSL mapping.
+        visitor.EmitDeclsInContainer(lowered.program.Ptr());
+    }
+    else
+    {
+        // We are in case (1).
+        //
+        // We should be able to just emit the AST we parsed right back out,
+        // along with whatever annotations we added along the way.
+
+        sharedContext.program = translationUnitSyntax;
+        visitor.EmitDeclsInContainer(translationUnitSyntax);
+    }
+
     String code = sharedContext.sb.ProduceString();
     sharedContext.sb.Clear();
+
+    // Now that we've emitted the code for all the declaratiosn in the file,
+    // it is time to stich together the final output.
+
+
 
     // There may be global-scope modifiers that we should emit now
     visitor.emitGLSLPreprocessorDirectives(translationUnitSyntax);
