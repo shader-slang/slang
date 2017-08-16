@@ -886,8 +886,6 @@ struct LoweringVisitor
     LoweredExpr visitVarExpr(
         VarExpr* expr)
     {
-        doSampleRateInputCheck(expr->name);
-
         // If the expression didn't get resolved, we can leave it as-is
         if (!expr->declRef)
             return expr;
@@ -2206,14 +2204,6 @@ struct LoweringVisitor
         RefPtr<UnparsedStmt> loweredStmt = new UnparsedStmt();
         lowerStmtFields(loweredStmt, stmt);
 
-        for (auto token : stmt->tokens)
-        {
-            if (token.type == TokenType::Identifier)
-            {
-                doSampleRateInputCheck(token.getName());
-            }
-        }
-
         loweredStmt->tokens = stmt->tokens;
 
         addStmt(loweredStmt);
@@ -3369,28 +3359,6 @@ struct LoweringVisitor
         return SourceLanguage::Unknown;
     }
 
-    void setSampleRateFlag()
-    {
-        shared->entryPointLayout->flags |= EntryPointLayout::Flag::usesAnySampleRateInput;
-    }
-
-    void doSampleRateInputCheck(VarDeclBase* decl)
-    {
-        if (decl->HasModifier<HLSLSampleModifier>())
-        {
-            setSampleRateFlag();
-        }
-    }
-
-    void doSampleRateInputCheck(Name* name)
-    {
-        auto text = getText(name);
-        if (text == "gl_SampleIndex")
-        {
-            setSampleRateFlag();
-        }
-    }
-
     AggTypeDecl* isStructType(RefPtr<Type> type)
     {
         if (type->As<BasicExpressionType>()) return nullptr;
@@ -3440,14 +3408,8 @@ struct LoweringVisitor
     LoweredDecl visitVariable(
         Variable* decl)
     {
-        // Global variable? Check if it is a sample-rate input.
         if (dynamic_cast<ModuleDecl*>(decl->ParentDecl))
         {
-            if (decl->HasModifier<InModifier>())
-            {
-                doSampleRateInputCheck(decl);
-            }
-
             auto varLayout = tryToFindLayout(decl);
             if (varLayout)
             {
@@ -3902,7 +3864,6 @@ struct LoweringVisitor
             }
             else if (ns == "sv_sampleindex")
             {
-                setSampleRateFlag();
                 globalVarExpr = createGLSLBuiltinRef("gl_SampleID", getIntType());
             }
             else if (ns == "sv_stencilref")

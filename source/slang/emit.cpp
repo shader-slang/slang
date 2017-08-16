@@ -48,6 +48,9 @@ struct SharedEmitContext
     // The entry point we are being asked to compile
     EntryPointRequest* entryPoint;
 
+    // The layout for the entry point
+    EntryPointLayout*   entryPointLayout;
+
     // The target language we want to generate code for
     CodeGenTarget target;
 
@@ -2283,8 +2286,32 @@ struct EmitVisitor
         emitName(expr->lookupResult2.getName());
     }
 
+    void setSampleRateFlag()
+    {
+        context->shared->entryPointLayout->flags |= EntryPointLayout::Flag::usesAnySampleRateInput;
+    }
+
+    void doSampleRateInputCheck(VarDeclBase* decl)
+    {
+        if (decl->HasModifier<HLSLSampleModifier>())
+        {
+            setSampleRateFlag();
+        }
+    }
+
+    void doSampleRateInputCheck(Name* name)
+    {
+        auto text = getText(name);
+        if (text == "gl_SampleID")
+        {
+            setSampleRateFlag();
+        }
+    }
+
     void visitVarExpr(VarExpr* varExpr, ExprEmitArg const& arg)
     {
+        doSampleRateInputCheck(varExpr->name);
+
         auto prec = kEOp_Atomic;
         auto outerPrec = arg.outerPrec;
         bool needClose = MaybeEmitParens(outerPrec, kEOp_Atomic);
@@ -2485,6 +2512,11 @@ struct EmitVisitor
         Emit("{\n");
         for( auto& token : stmt->tokens )
         {
+            if (token.type == TokenType::Identifier)
+            {
+                doSampleRateInputCheck(token.getName());
+            }
+
             emitTokenWithLocation(token);
         }
         Emit("}\n");
@@ -3560,6 +3592,15 @@ struct EmitVisitor
 
     void visitVarDeclBase(RefPtr<VarDeclBase> decl, DeclEmitArg const& arg)
     {
+        // Global variable? Check if it is a sample-rate input.
+        if (dynamic_cast<ModuleDecl*>(decl->ParentDecl))
+        {
+            if (decl->HasModifier<InModifier>())
+            {
+                doSampleRateInputCheck(decl);
+            }
+        }
+
         // Skip fields that have been tuple-ified and don't contribute
         // any fields of "ordinary" type.
         if (auto tupleFieldMod = decl->FindModifier<TupleFieldModifier>())
@@ -3783,6 +3824,29 @@ emitDeclImpl(decl, nullptr);
     }
 };
 
+
+EntryPointLayout* findEntryPointLayout(
+    ProgramLayout*      programLayout,
+    EntryPointRequest*  entryPointRequest)
+{
+    for( auto entryPointLayout : programLayout->entryPoints )
+    {
+        if(entryPointLayout->entryPoint->getName() != entryPointRequest->name)
+            continue;
+
+        if(entryPointLayout->profile != entryPointRequest->profile)
+            continue;
+
+        // TODO: can't easily filter on translation unit here...
+        // Ideally the `EntryPointRequest` should get filled in with a pointer
+        // the specific function declaration that represents the entry point.
+
+        return entryPointLayout.Ptr();
+    }
+
+    return nullptr;
+}
+
 String emitEntryPoint(
     EntryPointRequest*  entryPoint,
     ProgramLayout*      programLayout,
@@ -3794,6 +3858,13 @@ String emitEntryPoint(
     sharedContext.target = target;
     sharedContext.finalTarget = entryPoint->compileRequest->Target;
     sharedContext.entryPoint = entryPoint;
+
+    if (entryPoint)
+    {
+        sharedContext.entryPointLayout = findEntryPointLayout(
+            programLayout,
+            entryPoint);
+    }
 
     sharedContext.programLayout = programLayout;
 
@@ -3916,7 +3987,9 @@ String emitEntryPoint(
         // along with whatever annotations we added along the way.
 
         sharedContext.program = translationUnitSyntax;
-        visitor.EmitDeclsInContainer(translationUnitSyntax);
+        visitor.EmitDeclsInContainerUsingLayout(
+            translationUnitSyntax,
+            globalStructLayout);
     }
 
     String code = sharedContext.sb.ProduceString();
