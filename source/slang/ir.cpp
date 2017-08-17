@@ -622,19 +622,22 @@ namespace Slang
             getTypeType());
     }
 
-    IRType* IRBuilder::getStructType(
-        UInt            fieldCount,
-        IRType* const*  fieldTypes)
+    IRStructDecl* IRBuilder::createStructType()
     {
-        auto inst = createInstWithTrailingArgs<IRStructType>(
+        return createInst<IRStructDecl>(
             this,
             kIROp_StructType,
-            getTypeType(),
-            fieldCount,
-            (IRValue* const*)fieldTypes);
-        addInst(inst);
-        return inst;
+            getTypeType());
     }
+
+    IRStructField* IRBuilder::createStructField(IRType* fieldType)
+    {
+        return createInst<IRStructField>(
+            this,
+            kIROp_StructField,
+            fieldType);
+    }
+
 
     IRType* IRBuilder::getFuncType(
         UInt            paramCount,
@@ -753,17 +756,16 @@ namespace Slang
     }
 
     IRInst* IRBuilder::emitFieldExtract(
-        IRType*     type,
-        IRValue*    base,
-        UInt        fieldIndex)
+        IRType*         type,
+        IRValue*        base,
+        IRStructField*  field)
     {
         auto inst = createInst<IRFieldExtract>(
             this,
             kIROp_FieldExtract,
             type,
-            base);
-
-        inst->fieldIndex = fieldIndex;
+            base,
+            field);
 
         addInst(inst);
         return inst;

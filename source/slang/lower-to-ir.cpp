@@ -394,7 +394,7 @@ struct ExprLoweringVisitor : ExprVisitor<ExprLoweringVisitor, LoweredValInfo>
     LoweredValInfo extractField(
         LoweredTypeInfo fieldType,
         LoweredValInfo  base,
-        UInt            fieldIndex)
+        LoweredValInfo  field)
     {
         switch (base.flavor)
         {
@@ -405,7 +405,7 @@ struct ExprLoweringVisitor : ExprVisitor<ExprLoweringVisitor, LoweredValInfo>
                     getBuilder()->emitFieldExtract(
                         getSimpleType(fieldType),
                         irBase,
-                        fieldIndex));
+                        (IRStructField*) getSimpleVal(field)));
             }
             break;
 
@@ -424,22 +424,8 @@ struct ExprLoweringVisitor : ExprVisitor<ExprLoweringVisitor, LoweredValInfo>
         {
             // Okay, easy enough: we have a reference to a field of a struct type...
 
-            // HACK: for now just scan the decl to find the right index.
-            // TODO: we need to deal with the fact that the struct might get
-            // tuple-ified.
-            //
-            UInt index = 0;
-            for (auto fieldDecl : getMembersOfType<StructField>(fieldDeclRef.GetParent().As<AggTypeDecl>()))
-            {
-                if (fieldDecl == fieldDeclRef.getDecl())
-                {
-                    break;
-                }
-
-                index++;
-            }
-
-            return extractField(loweredType, loweredBase, index);
+            auto loweredField = ensureDecl(context, fieldDeclRef);
+            return extractField(loweredType, loweredBase, loweredField);
         }
 
         SLANG_UNIMPLEMENTED_X("codegen for subscript expression");
@@ -559,20 +545,27 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // User-defined aggregate type: need to translate into
         // a corresponding IR aggregate type.
 
-        List<LoweredTypeInfo>   fieldTypes;
-        List<IRType*>           irFieldTypes;
+        auto builder = getBuilder();
+        IRStructDecl* irStruct = builder->createStructType();
 
         for (auto fieldDecl : decl->GetFields())
         {
+            // TODO: need to track relationship to original fields...
+
             // TODO: need to be prepared to deal with tuple-ness of fields here
             auto fieldType = lowerType(context, fieldDecl->getType());
-
-            fieldTypes.Add(fieldType);
 
             switch (fieldType.flavor)
             {
             case LoweredTypeInfo::Flavor::Simple:
-                irFieldTypes.Add(fieldType.type);
+                {
+                    auto irField = builder->createStructField(getSimpleType(fieldType));
+                    builder->addInst(irStruct, irField);
+
+                    context->shared->declValues.Add(
+                        DeclRef<StructField>(fieldDecl, nullptr),
+                        LoweredValInfo::simple(irField));
+                }
                 break;
 
             default:
@@ -580,13 +573,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
         }
 
-        // TODO: need to track relationship to original fields...
 
-        IRType* irStructType = getBuilder()->getStructType(
-            irFieldTypes.Count(),
-            &irFieldTypes[0]);
+        builder->addInst(irStruct);
 
-        return LoweredValInfo::simple(irStructType);
+        return LoweredValInfo::simple(irStruct);
     }
 
     LoweredValInfo visitFunctionDeclBase(FunctionDeclBase* decl)

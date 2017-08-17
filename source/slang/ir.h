@@ -153,13 +153,6 @@ struct IRVectorType : IRType
     IRInst* getElementCount() { return elementCount.usedValue; }
 };
 
-struct IRStructType : IRType
-{
-
-    UInt getFieldCount() { return getArgCount() - 1; }
-    IRType* getFieldType(UInt index) { return (IRType*) getArg(index + 1); }
-};
-
 struct IRFuncType : IRType
 {
     IRUse resultType;
@@ -176,12 +169,14 @@ struct IRFuncType : IRType
     }
 };
 
+struct IRStructField;
 struct IRFieldExtract : IRInst
 {
     IRUse   base;
-    UInt    fieldIndex;
+    IRUse   field;
 
     IRInst* getBase() { return base.usedValue; }
+    IRStructField* getField() { return (IRStructField*) field.usedValue; }
 };
 
 // A instruction that ends a basic block (usually because of control flow)
@@ -211,6 +206,20 @@ struct IRParentInst : IRInst
     IRInst* firstChild;
     IRInst* lastChild;
 };
+
+struct IRStructField : IRInst
+{
+    IRType* getFieldType() { return (IRType*) type.usedValue; }
+
+    IRStructField* getNextField() { return (IRStructField*) nextInst; }
+};
+
+struct IRStructDecl : IRParentInst
+{
+    IRStructField* getFirstField() { return (IRStructField*) firstChild; }
+    IRStructField* getLastField() { return (IRStructField*) lastChild; }
+};
+
 
 // A basic block is a parent instruction that adds the constraint
 // that all the children need to be "ordinary" instructions (so
@@ -308,9 +317,9 @@ struct IRBuilder
     IRType* getTypeType();
     IRType* getVoidType();
     IRType* getBlockType();
-    IRType* getStructType(
-        UInt            fieldCount,
-        IRType* const*  fieldTypes);
+
+    IRStructDecl* createStructType();
+    IRStructField* createStructField(IRType* fieldType);
 
     IRType* getFuncType(
         UInt            paramCount,
@@ -343,9 +352,9 @@ struct IRBuilder
         IRType* type);
 
     IRInst* emitFieldExtract(
-        IRType*     type,
-        IRValue*    base,
-        UInt        fieldIndex);
+        IRType*         type,
+        IRValue*        base,
+        IRStructField*  field);
 
     IRInst* emitReturn(
         IRValue*    val);

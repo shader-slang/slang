@@ -4016,8 +4016,8 @@ emitDeclImpl(decl, nullptr);
 
                 emitIRInstResultDecl(context, inst);
                 emitIROperand(context, fieldExtract->getBase());
-                emit(".field");
-                emit(fieldExtract->fieldIndex);
+                emit(".");
+                emit(getName(fieldExtract->getField()));
                 emit(";\n");
             }
             break;
@@ -4087,20 +4087,16 @@ emitDeclImpl(decl, nullptr);
 
     void emitIRStruct(
         EmitContext*    context,
-        IRStructType*   structType)
+        IRStructDecl*   structType)
     {
         emit("struct ");
         emit(getName(structType));
         emit("\n{\n");
-        auto fieldCount = structType->getFieldCount();
-        for( UInt ff = 0; ff < fieldCount; ++ff )
+
+        for(auto ff = structType->getFirstField(); ff; ff = ff->getNextField())
         {
-            auto fieldType = structType->getFieldType(ff);
-
-            String fieldName = "field";
-            fieldName.append(ff);
-
-            emitIRType(context, fieldType, fieldName);
+            auto fieldType = ff->getFieldType();
+            emitIRType(context, fieldType, getName(ff));
             emit(";\n");
         }
         emit("};\n");
@@ -4119,7 +4115,7 @@ emitDeclImpl(decl, nullptr);
             break;
 
         case kIROp_StructType:
-            emitIRStruct(context, (IRStructType*) inst);
+            emitIRStruct(context, (IRStructDecl*) inst);
             break;
 
         default:
@@ -4254,7 +4250,7 @@ String emitEntryPoint(
     //
     // We'll try to detect the cases here:
     //
-#if 0
+#if 1
     if(!(translationUnit->compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING ))
     {
         // This seems to be case (3), because the user is asking for full
