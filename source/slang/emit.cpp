@@ -3951,11 +3951,11 @@ String emitEntryPoint(
         throw 99;
 
     }
-    else if(translationUnit->compileRequest->loadedModulesList.Count() != 0)
+    else if(
 #else
-    if(!(translationUnit->compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING )
-        || translationUnit->compileRequest->loadedModulesList.Count() != 0)
+    if(!(translationUnit->compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING ) ||
 #endif
+        translationUnit->compileRequest->loadedModulesList.Count() != 0)
     {
         // The user has `import`ed some Slang modules, and so we are in case (2)
         //

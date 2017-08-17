@@ -60,6 +60,8 @@ struct IRUse
     void init(IRInst* user, IRInst* usedValue);
 };
 
+typedef uint32_t IRInstID;
+
 // In the IR, almost *everything* is an instruction,
 // in order to make the representation as uniform as possible.
 struct IRInst
@@ -70,7 +72,11 @@ struct IRInst
     // A unique ID to represent the op when printing
     // (or zero to indicate that the value of this
     // op isn't special).
-    UInt id;
+    IRInstID id;
+
+    // The total number of arguments of this instruction
+    // (including the type)
+    uint32_t argCount;
 
     // The parent of this instruction.
     // This will often be a basic block, but we
@@ -95,14 +101,16 @@ typedef IRInst IRValue;
 typedef long long IRIntegerValue;
 typedef double IRFloatingPointValue;
 
-struct IRIntLit : IRInst
+struct IRConstant : IRInst
 {
-    IRIntegerValue value;
-};
+    union
+    {
+        IRIntegerValue          intVal;
+        IRFloatingPointValue    floatVal;
 
-struct IRFloatLit : IRInst
-{
-    IRFloatingPointValue value;
+        // HACK: allows us to hash the value easily
+        void*                   ptrData[2];
+    } u;
 };
 
 // Representation of a type at the IR level.
@@ -188,19 +196,51 @@ struct IRFunc : IRParentInst
 struct IRModule : IRParentInst
 {
     // The designated entry-point function, if any
-    IRFunc* entryPoint;
+    IRFunc*     entryPoint;
 
     // A special counter used to assign logical ids to instructions in this module.
-    UInt    idCounter;
+    IRInstID    idCounter;
 };
 
-struct IRBuilder
+// Description of an instruction to be used for global value numbering
+struct IRInstKey
+{
+    IRInst* inst;
+
+    int GetHashCode();
+};
+
+bool operator==(IRInstKey const& left, IRInstKey const& right);
+
+struct IRConstantKey
+{
+    IRConstant* inst;
+
+    int GetHashCode();
+};
+bool operator==(IRConstantKey const& left, IRConstantKey const& right);
+
+struct SharedIRBuilder
 {
     // The module that will own all of the IR
     IRModule*       module;
 
+    Dictionary<IRInstKey,       IRInst*>    globalValueNumberingMap;
+    Dictionary<IRConstantKey,   IRConstant*>    constantMap;
+};
+
+struct IRBuilder
+{
+    // Shared state for all IR builders working on the same module
+    SharedIRBuilder*    shared;
+
+    IRModule* getModule() { return shared->module; }
+
     // The parent instruction to add children to.
     IRParentInst*   parentInst;
+
+    void addInst(IRParentInst* parent, IRInst* inst);
+    void addInst(IRInst* inst);
 
     IRType* getBaseType(BaseType flavor);
     IRType* getBoolType();
@@ -232,19 +272,20 @@ struct IRBuilder
     IRFunc* createFunc();
 
     IRBlock* createBlock();
+    IRBlock* emitBlock();
 
-    IRParam* createParam(
+    IRParam* emitParam(
         IRType* type);
 
-    IRInst* createFieldExtract(
+    IRInst* emitFieldExtract(
         IRType*     type,
         IRValue*    base,
         UInt        fieldIndex);
 
-    IRInst* createReturn(
+    IRInst* emitReturn(
         IRValue*    val);
 
-    IRInst* createReturn();
+    IRInst* emitReturn();
 };
 
 void dumpIR(IRModule* module);

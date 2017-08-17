@@ -95,7 +95,10 @@ namespace Slang
 		return PointerHash<std::is_pointer<TKey>::value>::GetHashCode(key);
 	}
 
-		
+    inline int combineHash(int left, int right)
+    {
+        return (left * 16777619) ^ right;
+    }
 }
 
 #endif

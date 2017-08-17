@@ -80,15 +80,9 @@ namespace Slang
 
     //
 
-    // Add an instruction into the current scope
-    static void addInst(
-        IRBuilder*  builder,
-        IRInst*     inst)
+    // Add an instruction to a specific parent
+    void IRBuilder::addInst(IRParentInst* parent, IRInst* inst)
     {
-        auto parent = builder->parentInst;
-        if (!parent)
-            return;
-
         inst->parent = parent;
 
         if (!parent->firstChild)
@@ -111,6 +105,17 @@ namespace Slang
         }
     }
 
+    // Add an instruction into the current scope
+    void IRBuilder::addInst(
+        IRInst*     inst)
+    {
+        auto parent = parentInst;
+        if (!parent)
+            return;
+
+        addInst(parent, inst);
+    }
+
     // Create an IR instruction/value and initialize it.
     //
     // In this case `argCount` and `args` represnt the
@@ -129,7 +134,7 @@ namespace Slang
 
         IRUse* instArgs = inst->getArgs();
 
-        auto module = builder->module;
+        auto module = builder->getModule();
         if (!module || (type && type->op == &kIROpInfo_VoidType))
         {
             // Can't or shouldn't assign an ID to this op
@@ -138,6 +143,7 @@ namespace Slang
         {
             inst->id = ++module->idCounter;
         }
+        inst->argCount = argCount + 1;
 
         inst->op = op;
 
@@ -147,8 +153,6 @@ namespace Slang
         {
             instArgs[aa+1].init(inst, args[aa]);
         }
-
-        addInst(builder, inst);
 
         return inst;
     }
@@ -241,7 +245,7 @@ namespace Slang
     }
 
     template<typename T>
-    static T* createValueWithTrailingArgs(
+    static T* createInstWithTrailingArgs(
         IRBuilder*      builder,
         IROpInfo const* op,
         IRType*         type,
@@ -257,16 +261,283 @@ namespace Slang
             args);
     }
 
+    //
+
+    bool operator==(IRInstKey const& left, IRInstKey const& right)
+    {
+        if(left.inst->op != right.inst->op) return false;
+        if(left.inst->parent != right.inst->parent) return false;
+        if(left.inst->argCount != right.inst->argCount) return false;
+
+        auto argCount = left.inst->argCount;
+        auto leftArgs = left.inst->getArgs();
+        auto rightArgs = right.inst->getArgs();
+        for( UInt aa = 0; aa < argCount; ++aa )
+        {
+            if(leftArgs[aa].usedValue != rightArgs[aa].usedValue)
+                return false;
+        }
+
+        return true;
+    }
+
+    int IRInstKey::GetHashCode()
+    {
+        auto code = Slang::GetHashCode(inst->op);
+        code = combineHash(code, Slang::GetHashCode(inst->parent));
+        code = combineHash(code, Slang::GetHashCode(inst->argCount));
+
+        auto argCount = inst->argCount;
+        auto args = inst->getArgs();
+        for( UInt aa = 0; aa < argCount; ++aa )
+        {
+            code = combineHash(code, Slang::GetHashCode(args[aa].usedValue));
+        }
+        return code;
+    }
+
+    static IRParentInst* joinParentInstsForInsertion(
+        IRParentInst*   left,
+        IRParentInst*   right)
+    {
+        // Are they the same? Easy.
+        if(left == right) return left;
+
+        // Have we already failed to find a location? Then bail.
+        if(!left) return nullptr;
+        if(!right) return nullptr;
+
+        // Is one inst a parent of the other? Pick the child.
+        for( auto ll = left; ll; ll = ll->parent )
+        {
+            // Did we find the right node in the parent list of the left?
+            if(ll == right) return left;
+        }
+        for( auto rr = right; rr; rr = rr->parent )
+        {
+            // Did we find the left node in the parent list of the right?
+            if(rr == left) return right;
+        }
+
+        // Seems like they are unrelated, so we should play it safe
+        return nullptr;
+    }
+
+
+    static IRInst* findOrEmitInstImpl(
+        IRBuilder*      builder,
+        UInt            size,
+        IROpInfo const* op,
+        IRType*         type,
+        UInt            argCount,
+        IRValue* const* args)
+    {
+        // First, we need to pick a good insertion point
+        // for the instruction, which we do by looking
+        // at its operands.
+        //
+
+        IRParentInst* parent = builder->shared->module;
+        if( type )
+        {
+            parent = joinParentInstsForInsertion(parent, type->parent);
+        }
+        for( UInt aa = 0; aa < argCount; ++aa )
+        {
+            auto arg = args[aa];
+            parent = joinParentInstsForInsertion(parent, arg->parent);
+        }
+
+        // If we failed to find a good insertion point, then insert locally.
+        if( !parent )
+        {
+            parent = builder->parentInst;
+        }
+
+        if( parent->op == &kIROpInfo_Func )
+        {
+            // We are trying to insert into a function, and we should really
+            // be inserting into its entry block.
+            assert(parent->firstChild);
+            parent = (IRBlock*) ((IRFunc*) parent)->firstChild;
+        }
+
+        // We now know where we want to insert, but there might
+        // already be an equivalent instruction in that block.
+        //
+        // We will check for such an instruction in a slightly hacky
+        // way: we will construct a temporary instruction and
+        // then use it to look up in a cache of instructions.
+
+        IRInst* keyInst = createInstImpl(builder, size, op, type, argCount ,args);
+        keyInst->parent = parent;
+
+        IRInstKey key;
+        key.inst = keyInst;
+
+        IRInst* inst = nullptr;
+        if( builder->shared->globalValueNumberingMap.TryGetValue(key, inst) )
+        {
+            // We found a match, so just use that.
+
+            free(keyInst);
+            return inst;
+        }
+
+        // No match, so use our "key" instruction for real.
+        inst = keyInst;
+
+        builder->shared->globalValueNumberingMap.Add(key, inst);
+
+        keyInst->parent = nullptr;
+        builder->addInst(parent, inst);
+
+        return inst;
+    }
+
+    template<typename T>
+    static T* findOrEmitInst(
+        IRBuilder*      builder,
+        IROpInfo const* op,
+        IRType*         type,
+        UInt            argCount,
+        IRValue* const* args)
+    {
+        return (T*) findOrEmitInstImpl(
+            builder,
+            sizeof(T),
+            op,
+            type,
+            argCount,
+            args);
+    }
+
+    template<typename T>
+    static T* findOrEmitInst(
+        IRBuilder*      builder,
+        IROpInfo const* op,
+        IRType*         type)
+    {
+        return (T*) findOrEmitInstImpl(
+            builder,
+            sizeof(T),
+            op,
+            type,
+            0,
+            nullptr);
+    }
+
+    template<typename T>
+    static T* findOrEmitInst(
+        IRBuilder*      builder,
+        IROpInfo const* op,
+        IRType*         type,
+        IRInst*         arg)
+    {
+        return (T*) findOrEmitInstImpl(
+            builder,
+            sizeof(T),
+            op,
+            type,
+            1,
+            &arg);
+    }
+
+    template<typename T>
+    static T* findOrEmitInst(
+        IRBuilder*      builder,
+        IROpInfo const* op,
+        IRType*         type,
+        IRInst*         arg1,
+        IRInst*         arg2)
+    {
+        IRInst* args[] = { arg1, arg2 };
+        return (T*) findOrEmitInstImpl(
+            builder,
+            sizeof(T),
+            op,
+            type,
+            2,
+            &args[0]);
+    }
+
+    //
+
+    bool operator==(IRConstantKey const& left, IRConstantKey const& right)
+    {
+        if(left.inst->op             != right.inst->op)             return false;
+        if(left.inst->type.usedValue != right.inst->type.usedValue) return false;
+        if(left.inst->u.ptrData[0]   != right.inst->u.ptrData[0])   return false;
+        if(left.inst->u.ptrData[1]   != right.inst->u.ptrData[1])   return false;
+        return true;
+    }
+
+    int IRConstantKey::GetHashCode()
+    {
+        auto code = Slang::GetHashCode(inst->op);
+        code = combineHash(code, Slang::GetHashCode(inst->type.usedValue));
+        code = combineHash(code, Slang::GetHashCode(inst->u.ptrData[0]));
+        code = combineHash(code, Slang::GetHashCode(inst->u.ptrData[1]));
+        return code;
+    }
+
+    static IRConstant* findOrEmitConstant(
+        IRBuilder*              builder,
+        IROpInfo const*         op,
+        IRType*                 type,
+        UInt                    valueSize,
+        void const*             value)
+    {
+        // First, we need to pick a good insertion point
+        // for the instruction, which we do by looking
+        // at its operands.
+        //
+
+        IRParentInst* parent = builder->shared->module;
+
+        IRConstant keyInst;
+        keyInst.op = op;
+        keyInst.type.usedValue = type;
+        memcpy(&keyInst.u, value, valueSize);
+
+        IRConstantKey key;
+        key.inst = &keyInst;
+
+        IRConstant* inst = nullptr;
+        if( builder->shared->constantMap.TryGetValue(key, inst) )
+        {
+            // We found a match, so just use that.
+            return inst;
+        }
+
+        // We now know where we want to insert, but there might
+        // already be an equivalent instruction in that block.
+        //
+        // We will check for such an instruction in a slightly hacky
+        // way: we will construct a temporary instruction and
+        // then use it to look up in a cache of instructions.
+
+        inst = createInst<IRConstant>(builder, op, type);
+        memcpy(&inst->u, value, valueSize);
+
+        key.inst = inst;
+        builder->shared->constantMap.Add(key, inst);
+
+        builder->addInst(parent, inst);
+
+        return inst;
+    }
 
 
     //
 
     static IRType* getBaseTypeImpl(IRBuilder* builder, IROpInfo const* op)
     {
-        return createInst<IRType>(
+        auto inst = findOrEmitInst<IRType>(
             builder,
             op,
             builder->getTypeType());
+        return inst;
     }
 
     IRType* IRBuilder::getBaseType(BaseType flavor)
@@ -291,8 +562,7 @@ namespace Slang
 
     IRType* IRBuilder::getVectorType(IRType* elementType, IRValue* elementCount)
     {
-        // TODO: should unique things
-         return createInst<IRVectorType>(
+        return findOrEmitInst<IRVectorType>(
             this,
             &kIROpInfo_VectorType,
             getTypeType(),
@@ -302,22 +572,15 @@ namespace Slang
 
     IRType* IRBuilder::getTypeType()
     {
-        // TODO: should unique things
-        IRType* type = createInst<IRType>(
+        return findOrEmitInst<IRType>(
             this,
             &kIROpInfo_TypeType,
             nullptr);
-
-        // TODO: we need some way to stop this recursion,
-        // but just saying that `Type isa Type` is unfounded.
-        type->type.init(type, type);
-
-        return type;
     }
 
     IRType* IRBuilder::getVoidType()
     {
-        return createInst<IRType>(
+        return findOrEmitInst<IRType>(
             this,
             &kIROpInfo_VoidType,
             getTypeType());
@@ -325,7 +588,7 @@ namespace Slang
 
     IRType* IRBuilder::getBlockType()
     {
-        return createInst<IRType>(
+        return findOrEmitInst<IRType>(
             this,
             &kIROpInfo_BlockType,
             getTypeType());
@@ -335,12 +598,14 @@ namespace Slang
         UInt            fieldCount,
         IRType* const*  fieldTypes)
     {
-        return createValueWithTrailingArgs<IRStructType>(
+        auto inst = createInstWithTrailingArgs<IRStructType>(
             this,
             &kIROpInfo_StructType,
             getTypeType(),
             fieldCount,
             (IRValue* const*)fieldTypes);
+        addInst(inst);
+        return inst;
     }
 
     IRValue* IRBuilder::getBoolValue(bool value)
@@ -350,19 +615,22 @@ namespace Slang
 
     IRValue* IRBuilder::getIntValue(IRType* type, IRIntegerValue value)
     {
-        IRIntLit* val = createInst<IRIntLit>(
+        return findOrEmitConstant(
             this,
             &kIROpInfo_IntLit,
-            type);
-
-        val->value = value;
-
-        return val;
+            type,
+            sizeof(value),
+            &value);
     }
 
     IRValue* IRBuilder::getFloatValue(IRType* type, IRFloatingPointValue value)
     {
-        SLANG_UNIMPLEMENTED_X("IR");
+        return findOrEmitConstant(
+            this,
+            &kIROpInfo_FloatLit,
+            type,
+            sizeof(value),
+            &value);
     }
 
     IRInst* IRBuilder::emitIntrinsicInst(
@@ -371,12 +639,14 @@ namespace Slang
         UInt            argCount,
         IRValue* const* args)
     {
-        return createValueWithTrailingArgs<IRInst>(
+        auto inst = createInstWithTrailingArgs<IRInst>(
             this,
             kIRIntrinsicOpInfos[(int)intrinsicOp],
             type,
             argCount,
             args);
+        addInst(inst);
+        return inst;
     }
 
     IRInst* IRBuilder::emitConstructorInst(
@@ -384,12 +654,14 @@ namespace Slang
         UInt            argCount,
         IRValue* const* args)
     {
-        return createValueWithTrailingArgs<IRInst>(
+        auto inst = createInstWithTrailingArgs<IRInst>(
             this,
             &kIROpInfo_Construct,
             type,
             argCount,
             args);
+        addInst(inst);
+        return inst;
     }
 
     IRModule* IRBuilder::createModule()
@@ -417,47 +689,61 @@ namespace Slang
             getBlockType());
     }
 
-    IRParam* IRBuilder::createParam(
+    IRBlock* IRBuilder::emitBlock()
+    {
+        auto inst = createBlock();
+        addInst(inst);
+        return inst;
+    }
+
+    IRParam* IRBuilder::emitParam(
         IRType* type)
     {
-        return createInst<IRParam>(
+        auto inst = createInst<IRParam>(
             this,
             &kIROpInfo_Param,
             type);
+        addInst(inst);
+        return inst;
     }
 
-    IRInst* IRBuilder::createFieldExtract(
+    IRInst* IRBuilder::emitFieldExtract(
         IRType*     type,
         IRValue*    base,
         UInt        fieldIndex)
     {
-        IRFieldExtract* irInst = createInst<IRFieldExtract>(
+        auto inst = createInst<IRFieldExtract>(
             this,
             &kIROpInfo_FieldExtract,
             type,
             base);
 
-        irInst->fieldIndex = fieldIndex;
+        inst->fieldIndex = fieldIndex;
 
-        return irInst;
+        addInst(inst);
+        return inst;
     }
 
-    IRInst* IRBuilder::createReturn(
+    IRInst* IRBuilder::emitReturn(
         IRValue*    val)
     {
-        return createInst<IRReturnVal>(
+        auto inst = createInst<IRReturnVal>(
             this,
             &kIROpInfo_ReturnVal,
             getVoidType(),
             val);
+        addInst(inst);
+        return inst;
     }
 
-    IRInst* IRBuilder::createReturn()
+    IRInst* IRBuilder::emitReturn()
     {
-        return createInst<IRReturnVoid>(
+        auto inst = createInst<IRReturnVoid>(
             this,
             &kIROpInfo_ReturnVoid,
             getVoidType());
+        addInst(inst);
+        return inst;
     }
 
     struct IRDumpContext
@@ -527,8 +813,8 @@ namespace Slang
         dump(context, op->name);
 
         // TODO: dump operands
-        unsigned argCount = op->fixedArgCount + 1;
-        for (unsigned ii = 0; ii < argCount; ++ii)
+        uint32_t argCount = inst->argCount;
+        for (uint32_t ii = 0; ii < argCount; ++ii)
         {
             if (ii != 0)
                 dump(context, ", ");

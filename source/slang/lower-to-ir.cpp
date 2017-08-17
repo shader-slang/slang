@@ -402,7 +402,7 @@ struct ExprLoweringVisitor : ExprVisitor<ExprLoweringVisitor, LoweredValInfo>
             {
                 IRValue* irBase = base.val;
                 return LoweredValInfo::simple(
-                    getBuilder()->createFieldExtract(
+                    getBuilder()->emitFieldExtract(
                         getSimpleType(fieldType),
                         irBase,
                         fieldIndex));
@@ -517,11 +517,11 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         {
             auto loweredExpr = lowerExpr(context, expr);
 
-            getBuilder()->createReturn(getSimpleVal(loweredExpr));
+            getBuilder()->emitReturn(getSimpleVal(loweredExpr));
         }
         else
         {
-            getBuilder()->createReturn();
+            getBuilder()->emitReturn();
         }
     }
 };
@@ -599,7 +599,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         IRFunc* irFunc = subBuilder->createFunc();
         subBuilder->parentInst = irFunc;
 
-        IRBlock* entryBlock = subBuilder->createBlock();
+        IRBlock* entryBlock = subBuilder->emitBlock();
         subBuilder->parentInst = entryBlock;
 
         IRGenContext subContextStorage = *context;
@@ -611,7 +611,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         for( auto paramDecl : decl->GetParameters() )
         {
             IRType* irParamType = lowerSimpleType(context, paramDecl->getType());
-            IRParam* irParam = subBuilder->createParam(irParamType);
+            IRParam* irParam = subBuilder->emitParam(irParamType);
 
             DeclRef<ParamDecl> paramDeclRef = makeDeclRef(paramDecl.Ptr());
 
@@ -624,6 +624,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
 
         lowerStmt(subContext, decl->Body);
+
+        getBuilder()->addInst(irFunc);
 
         return LoweredValInfo::simple(irFunc);
     }
@@ -713,13 +715,17 @@ IRModule* lowerEntryPointToIR(
 
     context->shared = sharedContext;
 
+    SharedIRBuilder sharedBuilderStorage;
+    SharedIRBuilder* sharedBuilder = &sharedBuilderStorage;
+    sharedBuilder->module = nullptr;
+
     IRBuilder builderStorage;
     IRBuilder* builder = &builderStorage;
-    builder->module = nullptr;
+    builder->shared = sharedBuilder;
     builder->parentInst = nullptr;
 
     IRModule* module = builder->createModule();
-    builder->module = module;
+    sharedBuilder->module = module;
     builder->parentInst = module;
 
     context->irBuilder = builder;
