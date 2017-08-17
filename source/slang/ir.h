@@ -27,6 +27,15 @@ enum : IROpFlags
     kIROpFlag_Parent = 1 << 0,
 };
 
+enum IROp : uint16_t
+{
+    
+#define INST(ID, MNEMONIC, ARG_COUNT, FLAGS)  \
+    kIROp_##ID,
+
+#include "ir-inst-defs.h"
+};
+
 // A logical operation/opcode in the IR
 struct IROpInfo
 {
@@ -67,7 +76,7 @@ typedef uint32_t IRInstID;
 struct IRInst
 {
     // The operation that this value represents
-    IROpInfo const* op;
+    IROp op;
 
     // A unique ID to represent the op when printing
     // (or zero to indicate that the value of this
@@ -93,7 +102,19 @@ struct IRInst
     // The type of this value
     IRUse       type;
 
+    IRType* getType() { return (IRType*) type.usedValue; }
+
+    UInt getArgCount()
+    {
+        return argCount;
+    }
+
     IRUse*      getArgs();
+
+    IRInst* getArg(UInt index)
+    {
+        return getArgs()[index].usedValue;
+    }
 };
 
 typedef IRInst IRValue;
@@ -127,15 +148,40 @@ struct IRVectorType : IRType
 {
     IRUse   elementType;
     IRUse   elementCount;
+
+    IRType* getElementType() { return (IRType*) elementType.usedValue; }
+    IRInst* getElementCount() { return elementCount.usedValue; }
 };
 
 struct IRStructType : IRType
-{};
+{
+
+    UInt getFieldCount() { return getArgCount() - 1; }
+    IRType* getFieldType(UInt index) { return (IRType*) getArg(index + 1); }
+};
+
+struct IRFuncType : IRType
+{
+    IRUse resultType;
+    // parameter tyeps are varargs...
+
+    IRType* getResultType() { return (IRType*) resultType.usedValue; }
+    UInt getParamCount()
+    {
+        return getArgCount() - 2;
+    }
+    IRType* getParamType(UInt index)
+    {
+        return (IRType*) getArg(2 + index);
+    }
+};
 
 struct IRFieldExtract : IRInst
 {
     IRUse   base;
     UInt    fieldIndex;
+
+    IRInst* getBase() { return base.usedValue; }
 };
 
 // A instruction that ends a basic block (usually because of control flow)
@@ -148,6 +194,8 @@ struct IRReturn : IRTerminatorInst
 struct IRReturnVal : IRReturn
 {
     IRUse val;
+
+    IRInst* getVal() { return val.usedValue; }
 };
 
 struct IRReturnVoid : IRReturn
@@ -174,14 +222,16 @@ struct IRBlock : IRParentInst
     // Note that in a valid program, every block must end with
     // a "terminator" instruction, so these should be non-NULL,
     // and `last` should actually be an `IRTerminatorInst`.
-    IRInst* firstChild;
-    IRInst* lastChild;
+
+    IRBlock* getPrevBlock() { return (IRBlock*) prevInst; }
+    IRBlock* getNextBlock() { return (IRBlock*) nextInst; }
 };
 
 // A function parameter is represented by an instruction
 // in the entry block of a function.
 struct IRParam : IRInst
 {
+    IRParam* getNextParam();
 };
 
 // A function is a parent to zero or more blocks of instructions.
@@ -190,6 +240,16 @@ struct IRParam : IRInst
 // an instruction (e.g., a call).
 struct IRFunc : IRParentInst
 {
+    IRFuncType* getType() { return (IRFuncType*) type.usedValue; }
+
+    IRType* getResultType() { return getType()->getResultType(); }
+    UInt getParamCount() { return getType()->getParamCount(); }
+    IRType* getParamType(UInt index) { return getType()->getParamType(index); }
+
+    IRBlock* getFirstBlock() { return (IRBlock*) firstChild; }
+    IRBlock* getLastBlock() { return (IRBlock*) lastChild; }
+
+    IRParam* getFirstParam();
 };
 
 // A module is a parent to functions, global variables, types, etc.
@@ -251,6 +311,11 @@ struct IRBuilder
     IRType* getStructType(
         UInt            fieldCount,
         IRType* const*  fieldTypes);
+
+    IRType* getFuncType(
+        UInt            paramCount,
+        IRType* const*  paramTypes,
+        IRType*         resultType);
 
     IRValue* getBoolValue(bool value);
     IRValue* getIntValue(IRType* type, IRIntegerValue value);

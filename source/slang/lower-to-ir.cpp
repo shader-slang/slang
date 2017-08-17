@@ -608,9 +608,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // set up sub context for generating our new function
 
+        List<IRType*> paramTypes;
+
         for( auto paramDecl : decl->GetParameters() )
         {
             IRType* irParamType = lowerSimpleType(context, paramDecl->getType());
+            paramTypes.Add(irParamType);
+
             IRParam* irParam = subBuilder->emitParam(irParamType);
 
             DeclRef<ParamDecl> paramDeclRef = makeDeclRef(paramDecl.Ptr());
@@ -620,8 +624,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             subContext->shared->declValues.Add(paramDeclRef, irParamVal);
         }
 
-        auto irResultType = lowerType(context, decl->ReturnType);
+        auto irResultType = lowerSimpleType(context, decl->ReturnType);
 
+        auto irFuncType = getBuilder()->getFuncType(
+            paramTypes.Count(),
+            &paramTypes[0],
+            irResultType);
+        irFunc->type.init(irFunc, irFuncType);
 
         lowerStmt(subContext, decl->Body);
 

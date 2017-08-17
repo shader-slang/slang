@@ -172,6 +172,7 @@
     <ClInclude Include="emit.h" />
     <ClInclude Include="expr-defs.h" />
     <ClInclude Include="intrinsic-defs.h" />
+    <ClInclude Include="ir-inst-defs.h" />
     <ClInclude Include="ir.h" />
     <ClInclude Include="lexer.h" />
     <ClInclude Include="lookup.h" />
