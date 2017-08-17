@@ -3822,8 +3822,346 @@ emitDeclImpl(decl, nullptr);
             SLANG_UNEXPECTED("unhandled declaration kind");
         }
     }
+
+    // IR-level emit logc
+
+    String getName(IRInst* inst)
+    {
+        if(auto decoration = inst->findDecoration<IRHighLevelDeclDecoration>())
+        {
+            return getText(decoration->decl->getName());
+        }
+
+        StringBuilder sb;
+        sb << "_S";
+        sb << inst->id;
+        return sb.ProduceString();
+    }
+
+    struct IRDeclaratorInfo
+    {
+        enum class Flavor
+        {
+            Simple,
+        };
+
+        Flavor flavor;
+        String const* name;
+    };
+
+    void emitDeclarator(
+        EmitContext*    context,
+        IRDeclaratorInfo*   declarator)
+    {
+        if(!declarator)
+            return;
+
+        switch( declarator->flavor )
+        {
+        case IRDeclaratorInfo::Flavor::Simple:
+            emit(" ");
+            emit(*declarator->name);
+            break;
+        }
+    }
+
+    void emitIRSimpleType(
+        EmitContext*    context,
+        IRType*         type)
+    {
+        switch(type->op)
+        {
+    #define CASE(ID, NAME) \
+        case kIROp_##ID: emit(#NAME); break
+
+        CASE(Float32Type,   float);
+        CASE(Int32Type,     int);
+        CASE(UInt32Type,    uint);
+
+    #undef CASE
+
+        default:
+            SLANG_UNIMPLEMENTED_X("type case for emit");
+            break;
+        }
+
+    }
+
+    void emitIRSimpleValue(
+        EmitContext*    context,
+        IRInst*         inst)
+    {
+        switch(inst->op)
+        {
+        case kIROp_IntLit:
+            emit(((IRConstant*) inst)->u.intVal);
+            break;
+
+        case kIROp_FloatLit:
+            emit(((IRConstant*) inst)->u.floatVal);
+            break;
+
+        default:
+            SLANG_UNIMPLEMENTED_X("val case for emit");
+            break;
+        }
+
+    }
+
+
+    void emitIRVectorType(
+        EmitContext*    context,
+        IRVectorType*   type)
+    {
+        // TODO: this is a GLSL-vs-HLSL decision point
+
+        emitIRSimpleType(context, type->getElementType());
+        emitIRSimpleValue(context, type->getElementCount());
+    }
+
+    void emitIRType(
+        EmitContext*        context,
+        IRType*             type,
+        IRDeclaratorInfo*   declarator)
+    {
+        switch( type->op )
+        {
+        case kIROp_VectorType:
+            emitIRVectorType(context, (IRVectorType*) type);
+            emitDeclarator(context, declarator);
+            break;
+
+        case kIROp_StructType:
+            emit(getName(type));
+            emitDeclarator(context, declarator);
+            break;
+
+        default:
+            emitIRSimpleType(context, type);
+            emitDeclarator(context, declarator);
+            break;
+        }
+    }
+
+    void emitIRType(
+        EmitContext*    context,
+        IRType*         type,
+        String const&   name)
+    {
+        IRDeclaratorInfo declarator;
+        declarator.flavor = IRDeclaratorInfo::Flavor::Simple;
+        declarator.name = &name;
+
+        emitIRType(context, type, &declarator);
+    }
+
+    void emitIRType(
+        EmitContext*    context,
+        IRType*         type)
+    {
+        emitIRType(context, type, (IRDeclaratorInfo*) nullptr);
+    }
+
+    void emitIROperand(
+        EmitContext*    context,
+        IRInst*         inst)
+    {
+        emit(getName(inst));
+    }
+
+    void emitIRArgs(
+        EmitContext*    context,
+        IRInst*         inst)
+    {
+        UInt argCount = inst->argCount - 1;
+        IRUse* args = inst->getArgs() + 1;
+
+        emit("(");
+        for(UInt aa = 0; aa < argCount; ++aa)
+        {
+            if(aa != 0) emit(", ");
+            emitIROperand(context, args[aa].usedValue);
+        }
+        emit(")");
+    }
+
+    void emitIRInstResultDecl(
+        EmitContext*    context,
+        IRInst*         inst)
+    {
+        emitIRType(context, inst->getType(), getName(inst));
+        emit(" = ");
+    }
+
+    void emitIRInst(
+        EmitContext*    context,
+        IRInst*         inst)
+    {
+        // TODO: need to be able to `switch` on the IR opcode here,
+        // so there is some work to be done.
+        switch(inst->op)
+        {
+        case kIROp_Param:
+            // Don't emit parameters, since they are declared as part of the function.
+            break;
+
+        case kIROp_Construct:
+            // Simple constructor call
+            emitIRInstResultDecl(context, inst);
+            emitIRType(context, inst->getType());
+            emitIRArgs(context, inst);
+            emit(";\n");
+            break;
+
+        case kIROp_FieldExtract:
+            {
+                // Extract field from aggregate
+
+                IRFieldExtract* fieldExtract = (IRFieldExtract*) inst;
+
+                emitIRInstResultDecl(context, inst);
+                emitIROperand(context, fieldExtract->getBase());
+                emit(".");
+                emit(getName(fieldExtract->getField()));
+                emit(";\n");
+            }
+            break;
+
+        case kIROp_ReturnVoid:
+            emit("return;\n");
+            break;
+
+        case kIROp_ReturnVal:
+            emit("return ");
+            emitIROperand(context, ((IRReturnVal*) inst)->getVal());
+            emit(";\n");
+            break;
+
+        default:
+            emit("// uhandled\n");
+            break;
+        }
+    }
+
+    void emitIRSemantics(
+        EmitContext*    context,
+        IRInst*         inst)
+    {
+        auto decoration = inst->findDecoration<IRHighLevelDeclDecoration>();
+        if( decoration )
+        {
+            EmitSemantics(decoration->decl);
+        }
+    }
+
+    void emitIRFunc(
+        EmitContext*    context,
+        IRFunc*         func)
+    {
+        auto funcType = func->getType();
+        auto resultType = func->getResultType();
+
+        auto name = getName(func);
+
+        emitIRType(context, resultType, name);
+
+        emit("(");
+        auto firstParam = func->getFirstParam();
+        for( auto pp = firstParam; pp; pp = pp->getNextParam() )
+        {
+            if(pp != firstParam)
+                emit(", ");
+
+            auto paramName = getName(pp);
+            emitIRType(context, pp->getType(), paramName);
+        }
+        emit(")");
+
+
+        emitIRSemantics(context, func);
+
+        // TODO: encode declaration vs. definition
+        bool isDefinition = true;
+        if(isDefinition)
+        {
+            emit("\n{\n");
+
+            // Need to emit the operations in the blocks of the function
+            for( auto bb = func->getFirstBlock(); bb; bb = bb->getNextBlock() )
+            {
+                // TODO: need to handle control flow and so forth...
+                for( auto ii = bb->firstChild; ii; ii = ii->nextInst )
+                {
+                    emitIRInst(context, ii);
+                }
+            }
+
+            emit("}\n");
+        }
+        else
+        {
+            emit(";\n");
+        }
+    }
+
+    void emitIRStruct(
+        EmitContext*    context,
+        IRStructDecl*   structType)
+    {
+        emit("struct ");
+        emit(getName(structType));
+        emit("\n{\n");
+
+        for(auto ff = structType->getFirstField(); ff; ff = ff->getNextField())
+        {
+            auto fieldType = ff->getFieldType();
+            emitIRType(context, fieldType, getName(ff));
+
+            emitIRSemantics(context, ff);
+
+            emit(";\n");
+        }
+        emit("};\n");
+    }
+
+    void emitIRGlobalInst(
+        EmitContext*    context,
+        IRInst*         inst)
+    {
+        // TODO: need to be able to `switch` on the IR opcode here,
+        // so there is some work to be done.
+        switch(inst->op)
+        {
+        case kIROp_Func:
+            emitIRFunc(context, (IRFunc*) inst);
+            break;
+
+        case kIROp_StructType:
+            emitIRStruct(context, (IRStructDecl*) inst);
+            break;
+
+        default:
+            break;
+        }
+    }
+
+    void emitIRModule(
+        EmitContext*    context,
+        IRModule*       module)
+    {
+        for(auto ii = module->firstChild; ii; ii = ii->nextInst )
+        {
+            emitIRGlobalInst(context, ii);
+        }
+    }
+
+
 };
 
+//
+
+
+//
 
 EntryPointLayout* findEntryPointLayout(
     ProgramLayout*      programLayout,
@@ -3947,6 +4285,11 @@ String emitEntryPoint(
         auto lowered = lowerEntryPointToIR(entryPoint, programLayout, target);
 
         dumpIR(lowered);
+
+        // TODO: do we want to emit directly from IR, or translate the
+        // IR back into AST for emission?
+
+        visitor.emitIRModule(&context, lowered);
 
         throw 99;
 

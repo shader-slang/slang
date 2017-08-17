@@ -39,6 +39,7 @@
     <ClInclude Include="name.h" />
     <ClInclude Include="ir.h" />
     <ClInclude Include="lower-to-ir.h" />
+    <ClInclude Include="ir-inst-defs.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="check.cpp" />
