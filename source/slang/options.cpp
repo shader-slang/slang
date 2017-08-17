@@ -254,6 +254,10 @@ struct OptionsParser
                 //else
                 if (argStr == "-no-checking")
                     flags |= SLANG_COMPILE_FLAG_NO_CHECKING;
+                else if(argStr == "-split-mixed-types" )
+                {
+                    flags |= SLANG_COMPILE_FLAG_SPLIT_MIXED_TYPES;
+                }
                 else if (argStr == "-backend" || argStr == "-target")
                 {
                     String name = tryReadCommandLineArgument(arg, &argCursor, argEnd);

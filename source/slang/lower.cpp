@@ -2833,6 +2833,17 @@ struct LoweringVisitor
             // due to, e.g., bindless textures.
             shouldDesugarTupleTypes = true;
         }
+        else if( shared->compileRequest->compileFlags & SLANG_COMPILE_FLAG_SPLIT_MIXED_TYPES )
+        {
+            // If the user is directly asking us to do this transformation,
+            // then obviously we need to do it.
+            //
+            // TODO: The way this is defined here means it will even apply to user
+            // HLSL code (not just code written in Slang). We may want to
+            // reconsider that choice, and only split things that originated in Slang.
+            //
+            shouldDesugarTupleTypes = true;
+        }
 
         bool isResultATupleType = false;
         bool hasAnyNonTupleFields = false;
