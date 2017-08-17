@@ -562,6 +562,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     auto irField = builder->createStructField(getSimpleType(fieldType));
                     builder->addInst(irStruct, irField);
 
+                    builder->addHighLevelDeclDecoration(irField, fieldDecl);
+
                     context->shared->declValues.Add(
                         DeclRef<StructField>(fieldDecl, nullptr),
                         LoweredValInfo::simple(irField));
@@ -573,6 +575,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
         }
 
+        builder->addHighLevelDeclDecoration(irStruct, decl);
 
         builder->addInst(irStruct);
 
@@ -623,6 +626,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         irFunc->type.init(irFunc, irFuncType);
 
         lowerStmt(subContext, decl->Body);
+
+        getBuilder()->addHighLevelDeclDecoration(irFunc, decl);
 
         getBuilder()->addInst(irFunc);
 

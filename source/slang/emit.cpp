@@ -3827,6 +3827,11 @@ emitDeclImpl(decl, nullptr);
 
     String getName(IRInst* inst)
     {
+        if(auto decoration = inst->findDecoration<IRHighLevelDeclDecoration>())
+        {
+            return getText(decoration->decl->getName());
+        }
+
         StringBuilder sb;
         sb << "_S";
         sb << inst->id;
@@ -4038,6 +4043,17 @@ emitDeclImpl(decl, nullptr);
         }
     }
 
+    void emitIRSemantics(
+        EmitContext*    context,
+        IRInst*         inst)
+    {
+        auto decoration = inst->findDecoration<IRHighLevelDeclDecoration>();
+        if( decoration )
+        {
+            EmitSemantics(decoration->decl);
+        }
+    }
+
     void emitIRFunc(
         EmitContext*    context,
         IRFunc*         func)
@@ -4060,6 +4076,9 @@ emitDeclImpl(decl, nullptr);
             emitIRType(context, pp->getType(), paramName);
         }
         emit(")");
+
+
+        emitIRSemantics(context, func);
 
         // TODO: encode declaration vs. definition
         bool isDefinition = true;
@@ -4097,6 +4116,9 @@ emitDeclImpl(decl, nullptr);
         {
             auto fieldType = ff->getFieldType();
             emitIRType(context, fieldType, getName(ff));
+
+            emitIRSemantics(context, ff);
+
             emit(";\n");
         }
         emit("};\n");
@@ -4250,7 +4272,7 @@ String emitEntryPoint(
     //
     // We'll try to detect the cases here:
     //
-#if 1
+#if 0
     if(!(translationUnit->compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING ))
     {
         // This seems to be case (3), because the user is asking for full

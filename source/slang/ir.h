@@ -69,6 +69,22 @@ struct IRUse
     void init(IRInst* user, IRInst* usedValue);
 };
 
+enum IRDecorationOp : uint16_t
+{
+    kIRDecorationOp_HighLevelDecl,
+};
+
+// A "decoration" that gets applied to an instruction.
+// These usually don't affect semantics, but are useful
+// for preserving high-level source information.
+struct IRDecoration
+{
+    // Next decoration attached to the same instruction
+    IRDecoration* next;
+
+    IRDecorationOp op;
+};
+
 typedef uint32_t IRInstID;
 
 // In the IR, almost *everything* is an instruction,
@@ -99,6 +115,18 @@ struct IRInst
     // The first use of this value (start of a linked list)
     IRUse*      firstUse;
 
+    // The linked list of decorations attached to this instruction
+    IRDecoration* firstDecoration;
+
+    IRDecoration* findDecorationImpl(IRDecorationOp op);
+
+    template<typename T>
+    T* findDecoration()
+    {
+        return (T*) findDecorationImpl(IRDecorationOp(T::kDecorationOp));
+    }
+
+
     // The type of this value
     IRUse       type;
 
@@ -117,7 +145,21 @@ struct IRInst
     }
 };
 
+// This type alias exists because I waffled on the name for a bit.
+// All existing uses of `IRValue` should move to `IRInst`
 typedef IRInst IRValue;
+
+class Decl;
+
+// Associates an IR-level decoration with a source declaration
+// in the high-level AST, that can be used to extract
+// additional information that informs code emission.
+struct IRHighLevelDeclDecoration : IRDecoration
+{
+    enum { kDecorationOp = kIRDecorationOp_HighLevelDecl };
+
+    Decl* decl;
+};
 
 typedef long long IRIntegerValue;
 typedef double IRFloatingPointValue;
@@ -360,6 +402,19 @@ struct IRBuilder
         IRValue*    val);
 
     IRInst* emitReturn();
+
+    IRDecoration* addDecorationImpl(
+        IRInst*         inst,
+        UInt            decorationSize,
+        IRDecorationOp  op);
+
+    template<typename T>
+    T* addDecoration(IRInst* inst, IRDecorationOp op)
+    {
+        return (T*) addDecorationImpl(inst, sizeof(T), op);
+    }
+
+    IRHighLevelDeclDecoration* addHighLevelDeclDecoration(IRInst* inst, Decl* decl);
 };
 
 void dumpIR(IRModule* module);

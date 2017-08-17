@@ -46,6 +46,16 @@ namespace Slang
         return &type;
     }
 
+    IRDecoration* IRInst::findDecorationImpl(IRDecorationOp decorationOp)
+    {
+        for( auto dd = firstDecoration; dd; dd = dd->next )
+        {
+            if(dd->op == decorationOp)
+                return dd;
+        }
+        return nullptr;
+    }
+
     //
 
     IRParam* IRFunc::getFirstParam()
@@ -128,8 +138,6 @@ namespace Slang
     {
         IRValue* inst = (IRInst*) malloc(size);
         memset(inst, 0, size);
-
-        IRUse* instArgs = inst->getArgs();
 
         auto module = builder->getModule();
         if (!module || (type && type->op == kIROp_VoidType))
@@ -792,6 +800,32 @@ namespace Slang
         addInst(inst);
         return inst;
     }
+
+    IRDecoration* IRBuilder::addDecorationImpl(
+        IRInst*         inst,
+        UInt            decorationSize,
+        IRDecorationOp  op)
+    {
+        auto decoration = (IRDecoration*) malloc(decorationSize);
+        memset(decoration, 0, decorationSize);
+
+        decoration->op = op;
+
+        decoration->next = inst->firstDecoration;
+        inst->firstDecoration = decoration;
+
+        return decoration;
+    }
+
+    IRHighLevelDeclDecoration* IRBuilder::addHighLevelDeclDecoration(IRInst* inst, Decl* decl)
+    {
+        auto decoration = addDecoration<IRHighLevelDeclDecoration>(inst, kIRDecorationOp_HighLevelDecl);
+        decoration->decl = decl;
+        return decoration;
+    }
+
+    //
+
 
     struct IRDumpContext
     {
