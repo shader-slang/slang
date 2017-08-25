@@ -549,9 +549,30 @@ namespace Slang
     {
         RefPtr<Modifier>*& modifierLink = *ioModifierLink;
 
-        while(*modifierLink)
-            modifierLink = &(*modifierLink)->next;
+        // We'd like to add the modifier to the end of the list,
+        // but we need to be careful, in case there is a "shared"
+        // section of modifiers for multiple declarations.
+        //
+        // TODO: This whole approach is a mess because we are "accidentally quadratic"
+        // when adding many modifiers.
+        for(;;)
+        {
+            // At end of the chain? Done.
+            if(!*modifierLink)
+                break;
 
+            // About to look at shared modifiers? Done.
+            RefPtr<Modifier> linkMod = *modifierLink;
+            if(linkMod.As<SharedModifiers>())
+                break;
+
+            // Otherwise: keep traversing the modifier list.
+            modifierLink = &(*modifierLink)->next;
+        }
+
+        // Splice the modifier into the linked list
+
+        modifier->next = *modifierLink;
         *modifierLink = modifier;
         modifierLink = &modifier->next;
     }
