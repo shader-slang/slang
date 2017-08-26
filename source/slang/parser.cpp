@@ -572,7 +572,17 @@ namespace Slang
 
         // Splice the modifier into the linked list
 
-        modifier->next = *modifierLink;
+        // We need to deal with the case where the modifeir to
+        // be spliced in might actually be a modifier *list*,
+        // so that we actually want to splice in at the
+        // end of the new list...
+        auto spliceLink = &modifier->next;
+        while(*spliceLink)
+            spliceLink = &(*spliceLink)->next;
+
+        // Do the splice.
+        *spliceLink = *modifierLink;
+
         *modifierLink = modifier;
         modifierLink = &modifier->next;
     }
