@@ -873,6 +873,16 @@ TestResult runHLSLComparisonTest(TestInput& input)
     {
         String actualOutputPath = outputStem + ".actual";
         Slang::File::WriteAllText(actualOutputPath, actualOutput);
+
+        if (options.outputMode == kOutputMode_AppVeyor)
+        {
+            fprintf(stderr, "ERROR:\n"
+                "EXPECTED{{{\n%s}}}\n"
+                "ACTUAL{{{\n%s}}}\n",
+                expectedOutput.Buffer(),
+                actualOutput.Buffer());
+            fflush(stderr);
+        }
     }
 
     return result;

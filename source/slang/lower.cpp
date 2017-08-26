@@ -308,6 +308,11 @@ struct LoweredExpr
         return (getFlavor() == Flavor::VaryingTuple) ? getVaryingTupleExpr() : nullptr;
     }
 
+    bool operator!()
+    {
+        return !value;
+    }
+
 private:
     RefPtr<RefObject>   value;
     Flavor              flavor;
@@ -1820,6 +1825,12 @@ struct LoweringVisitor
                 baseTuple->primaryExpr = loweredPrimary;
                 return baseTuple;
             }
+            else
+            {
+                // No primary expression? Then there is nothing
+                // to dereference.
+                return baseTuple;
+            }
         }
         else if (auto baseVaryingTuple = loweredBase.asVaryingTuple())
         {
@@ -1847,7 +1858,15 @@ struct LoweringVisitor
     LoweredExpr visitMemberExpr(
         MemberExpr* expr)
     {
+        assert(expr->BaseExpression);
         auto loweredBase = lowerExprOrTuple(expr->BaseExpression);
+
+        if( !loweredBase )
+        {
+            loweredBase = lowerExprOrTuple(expr->BaseExpression);
+        }
+
+        assert(loweredBase);
 
         auto loweredDeclRef = translateDeclRef(expr->declRef);
 
@@ -1872,7 +1891,11 @@ struct LoweringVisitor
                 }
 
                 if (!tupleFieldMod->hasAnyNonTupleFields)
+                {
+                    // We need to have found something!
+                    assert(tupleFieldExpr);
                     return tupleFieldExpr;
+                }
 
                 auto tupleFieldTupleExpr = tupleFieldExpr.asTuple();
                 SLANG_RELEASE_ASSERT(tupleFieldTupleExpr);
@@ -1885,6 +1908,8 @@ struct LoweringVisitor
                 loweredPrimaryExpr->declRef = loweredDeclRef.As<Decl>();
                 loweredPrimaryExpr->name = expr->name;
 
+                assert(loweredPrimaryExpr->BaseExpression);
+
                 tupleFieldTupleExpr->primaryExpr = loweredPrimaryExpr;
                 return tupleFieldTupleExpr;
             }
@@ -1892,6 +1917,7 @@ struct LoweringVisitor
             // If the field was a non-tuple field, then we can
             // simply fall through to the ordinary case below.
             loweredBase = LoweredExpr(baseTuple->primaryExpr);
+            assert(baseTuple->primaryExpr);
         }
         else if (auto baseVaryingTuple = loweredBase.asVaryingTuple())
         {
@@ -1901,6 +1927,7 @@ struct LoweringVisitor
                 if (expr->declRef.getDecl() == elem.originalFieldDeclRef.getDecl())
                 {
                     // We found the field!
+                    assert(elem.expr);
                     return elem.expr;
                 }
             }
@@ -1915,6 +1942,8 @@ struct LoweringVisitor
         loweredExpr->BaseExpression = loweredBase.getExpr();
         loweredExpr->declRef = loweredDeclRef.As<Decl>();
         loweredExpr->name = expr->name;
+
+        assert(loweredExpr->BaseExpression);
 
         return LoweredExpr(loweredExpr);
     }
