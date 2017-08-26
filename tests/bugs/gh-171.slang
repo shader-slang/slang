@@ -17,10 +17,6 @@ float4 main(float2 uv: UV) : SV_Target
 
 #else
 
-cbuffer C : register(b0)
-{
-};
-
 Texture2D SLANG_parameterBlock_C_t : register(t0);
 SamplerState SLANG_parameterBlock_C_s : register(s0);
 
