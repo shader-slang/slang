@@ -859,6 +859,16 @@ SLANG_API int spCompile(
 {
     auto req = REQ(request);
 
+#if 1
+    // By default we'd like to catch as many internal errors as possible,
+    // and report them to the user nicely (rather than just crash their
+    // application). Internally Slang currently uses exceptions for this.
+    //
+    // TODO: Consider using `setjmp()`-style escape so that we can work
+    // with applications that disable exceptions.
+    //
+    // TODO: Consider supporting Windows "Structured Exception Handling"
+    // so that we can also recover from a wider class of crashes.
     try
     {
         int anyErrors = req->executeActions();
@@ -869,6 +879,14 @@ SLANG_API int spCompile(
         req->mSink.diagnose(Slang::SourceLoc(), Slang::Diagnostics::compilationAborted);
         return 1;
     }
+#else
+    // When debugging, we probably don't want to filter out any errors, since
+    // we are probably trying to root-cause and *fix* those errors.
+    {
+        int anyErrors = req->executeActions();
+        return anyErrors;
+    }
+#endif
 }
 
 SLANG_API int
