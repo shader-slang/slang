@@ -98,6 +98,9 @@ extern "C"
 
         /* Split apart types that contain a mix of resource and non-resource data */
         SLANG_COMPILE_FLAG_SPLIT_MIXED_TYPES    = 1 << 1,
+
+        /* Use new IR-based code generation path (unstable pre-release feature)*/
+        SLANG_COMPILE_FLAG_USE_IR               = 1 << 2,
     };
 
     /*!

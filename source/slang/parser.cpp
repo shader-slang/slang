@@ -3916,6 +3916,20 @@ namespace Slang
         return modifier;
     }
 
+    static RefPtr<RefObject> parseIntrinsicTypeModifier(Parser* parser, void* /*userData*/)
+    {
+        RefPtr<IntrinsicTypeModifier> modifier = new IntrinsicTypeModifier();
+        parser->ReadToken(TokenType::LParent);
+        modifier->irOp = uint32_t(StringToInt(parser->ReadToken(TokenType::IntegerLiteral).Content));
+        while( AdvanceIf(parser, TokenType::Comma) )
+        {
+            auto operand = uint32_t(StringToInt(parser->ReadToken(TokenType::IntegerLiteral).Content));
+            modifier->irOperands.Add(operand);
+        }
+        parser->ReadToken(TokenType::RParent);
+
+        return modifier;
+    }
     static RefPtr<RefObject> parseImplicitConversionModifier(Parser* parser, void* /*userData*/)
     {
         RefPtr<ImplicitConversionModifier> modifier = new ImplicitConversionModifier();
@@ -4020,6 +4034,7 @@ namespace Slang
 
         MODIFIER(__builtin_type,    parseBuiltinTypeModifier);
         MODIFIER(__magic_type,      parseMagicTypeModifier);
+        MODIFIER(__intrinsic_type,    parseIntrinsicTypeModifier);
         MODIFIER(__implicit_conversion,     parseImplicitConversionModifier);
 
 #undef MODIFIER

@@ -1,6 +1,7 @@
 // slang-stdlib.cpp
 
 #include "compiler.h"
+#include "ir.h"
 #include "syntax.h"
 
 #define STRINGIZE(x) STRINGIZE2(x)
@@ -1393,8 +1394,15 @@ namespace Slang
 
         // Declare additional built-in generic types
 //        EMIT_LINE_DIRECTIVE();
-        sb << "__generic<T> __magic_type(ConstantBuffer) struct ConstantBuffer {};\n";
-        sb << "__generic<T> __magic_type(TextureBuffer) struct TextureBuffer {};\n";
+
+
+        sb << "__generic<T>\n";
+        sb << "__intrinsic_type(" << kIROp_ConstantBufferType << ")\n";
+        sb << "__magic_type(ConstantBuffer) struct ConstantBuffer {};\n";
+
+        sb << "__generic<T>\n";
+        sb << "__intrinsic_type(" << kIROp_TextureBufferType << ")\n";
+        sb << "__magic_type(TextureBuffer) struct TextureBuffer {};\n";
 
 
         static const char* kComponentNames[]{ "x", "y", "z", "w" };
@@ -1527,8 +1535,15 @@ namespace Slang
 
         // Declare built-in texture and sampler types
 
-        sb << "__magic_type(SamplerState," << int(SamplerStateType::Flavor::SamplerState) << ") struct SamplerState {};";
-        sb << "__magic_type(SamplerState," << int(SamplerStateType::Flavor::SamplerComparisonState) << ") struct SamplerComparisonState {};";
+
+
+        sb << "__magic_type(SamplerState," << int(SamplerStateType::Flavor::SamplerState) << ")\n";
+        sb << "__intrinsic_type(" << kIROp_SamplerType << ", " << int(SamplerStateType::Flavor::SamplerState) << ")\n";
+        sb << "struct SamplerState {};";
+        
+        sb << "__magic_type(SamplerState," << int(SamplerStateType::Flavor::SamplerComparisonState) << ")\n";
+        sb << "__intrinsic_type(" << kIROp_SamplerType << ", " << int(SamplerStateType::Flavor::SamplerComparisonState) << ")\n";
+        sb << "struct SamplerComparisonState {};";
 
         // TODO(tfoley): Need to handle `RW*` variants of texture types as well...
         static const struct {
@@ -1582,7 +1597,9 @@ namespace Slang
                     // TODO: allow for multisample count to come in as well...
                     sb << "__generic<T = float4> ";
 
-                    sb << "__magic_type(Texture," << int(flavor) << ") struct ";
+                    sb << "__magic_type(Texture," << int(flavor) << ")\n";
+                    sb << "__intrinsic_type(" << kIROp_TextureType << ", " << flavor << ")\n";
+                    sb << "struct ";
                     sb << kBaseTextureAccessLevels[accessLevel].name;
                     sb << name;
                     if (isMultisample) sb << "MS";
@@ -1787,6 +1804,10 @@ namespace Slang
                         // `Sample()`
 
                         sb << "__intrinsic(glsl, \"texture($p, $1)\")\n";
+
+                        // TODO: only enable if IR is being used?
+                        sb << "__intrinsic_op(sample_t_s_u)\n";
+
                         sb << "__intrinsic\n";
                         sb << "T Sample(SamplerState s, ";
                         sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location);\n";

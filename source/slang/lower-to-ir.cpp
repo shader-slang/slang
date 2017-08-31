@@ -14,6 +14,7 @@ struct LoweredValInfo
     {
         None,
         Simple,
+        Ptr,
     };
 
     union
@@ -35,7 +36,14 @@ struct LoweredValInfo
         info.val = v;
         return info;
     }
-};
+
+    static LoweredValInfo ptr(IRValue* v)
+    {
+        LoweredValInfo info;
+        info.flavor = Flavor::Ptr;
+        info.val = v;
+        return info;
+    }};
 
 struct SharedIRGenContext
 {
@@ -63,6 +71,25 @@ IRValue* getSimpleVal(LoweredValInfo lowered)
 
     case LoweredValInfo::Flavor::Simple:
         return lowered.val;
+
+    default:
+        SLANG_UNEXPECTED("unhandled value flavor");
+        return nullptr;
+    }
+}
+
+IRValue* getSimpleVal(IRGenContext* context, LoweredValInfo lowered)
+{
+    switch(lowered.flavor)
+    {
+    case LoweredValInfo::Flavor::None:
+        return nullptr;
+
+    case LoweredValInfo::Flavor::Simple:
+        return lowered.val;
+
+    case LoweredValInfo::Flavor::Ptr:
+        return context->irBuilder->emitLoad(lowered.val);
 
     default:
         SLANG_UNEXPECTED("unhandled value flavor");
@@ -192,8 +219,46 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         SLANG_UNIMPLEMENTED_X("type lowering");
     }
 
+    LoweredTypeInfo visitFuncType(FuncType* type)
+    {
+        LoweredValInfo loweredFunc = ensureDecl(context, type->declRef);
+        return getSimpleVal(loweredFunc)->getType();
+    }
+
+    void addGenericArgs(List<IRValue*>* ioArgs, DeclRefBase declRef)
+    {
+        auto subs = declRef.substitutions;
+        while(subs)
+        {
+            for(auto aa : subs->args)
+            {
+                (*ioArgs).Add(getSimpleVal(lowerVal(context, aa)));
+            }
+            subs = subs->outer;
+        }
+    }
+
     LoweredTypeInfo visitDeclRefType(DeclRefType* type)
     {
+        // We need to detect builtin/intrinsic types here, since they should map to custom modifiers
+        // We need to catch builtin/intrinsic types here
+        if( auto intrinsicTypeMod = type->declRef.getDecl()->FindModifier<IntrinsicTypeModifier>() )
+        {
+            auto builder = getBuilder();
+            auto intType = builder->getBaseType(BaseType::Int);
+            //
+            List<IRValue*> irArgs;
+            for( auto val : intrinsicTypeMod->irOperands )
+            {
+                irArgs.Add(builder->getIntValue(intType, val));
+            }
+
+            addGenericArgs(&irArgs, type->declRef);
+
+            auto irType = getBuilder()->getIntrinsicType(IROp(intrinsicTypeMod->irOp), irArgs.Count(), irArgs.Buffer());
+            return LoweredTypeInfo(irType);
+        }
+
         // Catch-all for user-defined type references
         LoweredValInfo loweredDeclRef = ensureDecl(context, type->declRef);
 
@@ -222,7 +287,6 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
         return getBuilder()->getVectorType(irElementType, irElementCount);
     }
-
 };
 
 LoweredValInfo lowerVal(
@@ -306,12 +370,38 @@ struct ExprLoweringVisitor : ExprVisitor<ExprLoweringVisitor, LoweredValInfo>
         switch( argInfo.flavor )
         {
         case LoweredValInfo::Flavor::Simple:
-            args.Add(getSimpleVal(argInfo));
+        case LoweredValInfo::Flavor::Ptr:
+            args.Add(getSimpleVal(context, argInfo));
             break;
 
         default:
             SLANG_UNIMPLEMENTED_X("addArgs case");
             break;
+        }
+    }
+
+    // Collect the lowered arguments for a call expression
+    void addCallArgs(
+        InvokeExpr*     expr,
+        List<IRValue*>* ioArgs)
+    {
+        auto& irArgs = *ioArgs;
+
+        // TODO: should unwrap any layers of identity expressions around this...
+        if( auto baseMemberExpr = expr->FunctionExpr.As<MemberExpr>() )
+        {
+            // This call took the form of a member function call, so
+            // we need to correctly add the `this` argument as
+            // an explicit argument.
+            //
+            auto loweredBase = lowerExpr(context, baseMemberExpr->BaseExpression);
+            addArgs(&irArgs, loweredBase);
+        }
+
+        for( auto arg : expr->Arguments )
+        {
+            auto loweredArg = lowerExpr(context, arg);
+            addArgs(&irArgs, loweredArg);
         }
     }
 
@@ -322,12 +412,7 @@ struct ExprLoweringVisitor : ExprVisitor<ExprLoweringVisitor, LoweredValInfo>
         auto type = lowerSimpleType(context, expr->type);
 
         List<IRValue*>  irArgs;
-        for( auto arg : expr->Arguments )
-        {
-            auto loweredArg = lowerExpr(context, arg);
-            addArgs(&irArgs, loweredArg);
-        }
-
+        addCallArgs(expr, &irArgs);
         UInt argCount = irArgs.Count();
 
         return LoweredValInfo::simple(getBuilder()->emitIntrinsicInst(type, intrinsicOp, argCount, &irArgs[0]));
@@ -335,14 +420,15 @@ struct ExprLoweringVisitor : ExprVisitor<ExprLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo lowerSimpleCall(InvokeExpr* expr)
     {
+        auto type = lowerSimpleType(context, expr->type);
+
         auto loweredFunc = lowerExpr(context, expr->FunctionExpr);
 
-        for( auto arg : expr->Arguments )
-        {
-            auto loweredArg = lowerExpr(context, arg);
-        }
+        List<IRValue*> irArgs;
+        addCallArgs(expr, &irArgs);
+        UInt argCount = irArgs.Count();
 
-        SLANG_UNIMPLEMENTED_X("codegen for invoke expression");
+        return LoweredValInfo::simple(getBuilder()->emitCallInst(type, getSimpleVal(loweredFunc), argCount, irArgs.Buffer()));
     }
 
     LoweredValInfo visitInvokeExpr(InvokeExpr* expr)
@@ -409,6 +495,19 @@ struct ExprLoweringVisitor : ExprVisitor<ExprLoweringVisitor, LoweredValInfo>
             }
             break;
 
+        case LoweredValInfo::Flavor::Ptr:
+            {
+                // We are "extracting" a field from an lvalue address,
+                // which means we should just compute an lvalue
+                // representing the field address.
+                IRValue* irBasePtr = base.val;
+                return LoweredValInfo::ptr(
+                    getBuilder()->emitFieldAddress(
+                        getBuilder()->getPtrType(getSimpleType(fieldType)),
+                        irBasePtr,
+                        (IRStructField*) getSimpleVal(field)));
+            }
+            break;
         default:
             SLANG_UNIMPLEMENTED_X("codegen for field extract");
         }
@@ -438,7 +537,39 @@ struct ExprLoweringVisitor : ExprVisitor<ExprLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitDerefExpr(DerefExpr* expr)
     {
-        SLANG_UNIMPLEMENTED_X("codegen for deref expression");
+        auto loweredType = lowerType(context, expr->type);
+        auto loweredBase = lowerExpr(context, expr->base);
+
+        // TODO: handle tupel-type for `base`
+
+        // The type of the lowered base must by some kind of pointer,
+        // in order for a dereference to make senese, so we just
+        // need to extract the value type from that pointer here.
+        //
+        auto loweredBaseVal = getSimpleVal(context, loweredBase);
+        auto loweredBaseType = loweredBaseVal->getType();
+        switch( loweredBaseType->op )
+        {
+        case kIROp_PtrType:
+        // TODO: should we enumerate these explicitly?
+        case kIROp_ConstantBufferType:
+        case kIROp_TextureBufferType:
+            // Note that we do *not* perform an actual `load` operation
+            // here, but rather just use the pointer value to construct
+            // an appropriate `LoweredValInfo` representing the underlying
+            // dereference.
+            //
+            // This is important so that an expression like `&((*foo).bar)`
+            // (which is desugared from `&foo->bar`) can be handled; such
+            // an expression does *not* perform a dereference at runtime,
+            // and is just a bit of pointer math.
+            //
+            return LoweredValInfo::ptr(loweredBaseVal);
+
+        default:
+            SLANG_UNIMPLEMENTED_X("codegen for deref expression");
+            return LoweredValInfo();
+        }
     }
 
     LoweredValInfo visitTypeCastExpr(TypeCastExpr* expr)
@@ -521,13 +652,27 @@ void lowerStmt(
     return visitor.dispatch(stmt);
 }
 
+void assign(
+    IRGenContext*           context,
+    LoweredValInfo const&   left,
+    LoweredValInfo const&   right)
+{
+    SLANG_UNIMPLEMENTED_X("assignment");
+}
+
 struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 {
-    IRGenContext* context;
+    IRGenContext*   context;
+    Layout*         layout;
 
     IRBuilder* getBuilder()
     {
         return context->irBuilder;
+    }
+
+    Layout* getLayout()
+    {
+        return layout;
     }
 
     LoweredValInfo visitDeclBase(DeclBase* decl)
@@ -538,6 +683,59 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     LoweredValInfo visitDecl(Decl* decl)
     {
         SLANG_UNIMPLEMENTED_X("decl catch-all");
+    }
+
+    LoweredValInfo visitVarDeclBase(VarDeclBase* decl)
+    {
+        // A user-defined variable declaration will usually turn into
+        // an `alloca` operation for the variable's storage,
+        // plus some code to initialize it and then store to the variable.
+        //
+        // TODO: we may want to special-case things when the variable's
+        // type, qualifiers, or context mark it as something that can't
+        // be mutable (or even do some limited dataflow pass to check
+        // which variables ever get assigned) so that we can directly
+        // emit an SSA value in this common case.
+        //
+
+        auto varType = lowerType(context, decl->getType());
+
+        LoweredValInfo varVal;
+
+        switch( varType.flavor )
+        {
+        case LoweredTypeInfo::Flavor::Simple:
+            {
+                auto irAlloc = getBuilder()->emitVar(getSimpleType(varType));
+
+                getBuilder()->addHighLevelDeclDecoration(irAlloc, decl);
+
+                if (getLayout())
+                {
+                    getBuilder()->addLayoutDecoration(irAlloc, getLayout());
+                }
+
+
+                varVal = LoweredValInfo::ptr(irAlloc);
+            }
+            break;
+
+        default:
+            SLANG_UNIMPLEMENTED_X("struct field type");
+        }
+
+        if( auto initExpr = decl->initExpr )
+        {
+            auto initVal = lowerExpr(context, initExpr);
+
+            assign(context, varVal, initVal);
+        }
+
+        context->shared->declValues.Add(
+            DeclRef<VarDeclBase>(decl, nullptr),
+            varVal);
+
+        return varVal;
     }
 
     LoweredValInfo visitAggTypeDecl(AggTypeDecl* decl)
@@ -621,7 +819,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         auto irFuncType = getBuilder()->getFuncType(
             paramTypes.Count(),
-            &paramTypes[0],
+            paramTypes.Buffer(),
             irResultType);
         irFunc->type.init(irFunc, irFuncType);
 
@@ -637,9 +835,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
 LoweredValInfo lowerDecl(
     IRGenContext*   context,
-    Decl*           decl)
+    Decl*           decl,
+    Layout*         layout)
 {
     DeclLoweringVisitor visitor;
+    visitor.layout = layout;
     visitor.context = context;
     return visitor.dispatch(decl);
 }
@@ -658,9 +858,26 @@ LoweredValInfo ensureDecl(
     // from the declaration reference, so that they can be
     // applied correctly to the declaration itself...
 
+    IRBuilder subIRBuilder;
+    subIRBuilder.shared = context->irBuilder->shared;
+    subIRBuilder.parentInst = subIRBuilder.shared->module;
+
     IRGenContext subContext = *context;
 
-    result = lowerDecl(context, declRef.getDecl());
+    subContext.irBuilder = &subIRBuilder;
+
+    RefPtr<VarLayout> layout;
+    auto globalScopeLayout = shared->programLayout->globalScopeLayout;
+    if (auto globalParameterBlockLayout = globalScopeLayout.As<ParameterBlockTypeLayout>())
+    {
+        globalScopeLayout = globalParameterBlockLayout->elementTypeLayout;
+    }
+    if (auto globalStructTypeLayout = globalScopeLayout.As<StructTypeLayout>())
+    {
+        globalStructTypeLayout->mapVarToLayout.TryGetValue(declRef.getDecl(), layout);
+    }
+
+    result = lowerDecl(&subContext, declRef.getDecl(), layout);
 
     shared->declValues[declRef] = result;
 
@@ -699,7 +916,7 @@ static void lowerEntryPointToIR(
 
     // TODO: entry point lowering is probably *not* just like lowering a function...
 
-    lowerDecl(context, entryPointFunc);
+    lowerDecl(context, entryPointFunc, entryPointLayout);
 }
 
 IRModule* lowerEntryPointToIR(

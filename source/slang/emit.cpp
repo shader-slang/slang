@@ -1845,106 +1845,28 @@ struct EmitVisitor
         {
             auto funcDeclRef = funcDeclRefExpr->declRef;
             auto funcDecl = funcDeclRef.getDecl();
-            if(!funcDecl)
+            if (!funcDecl)
             {
                 emitUncheckedCallExpr(callExpr, funcDeclRefExpr->name, arg);
                 return;
             }
-            else if (auto intrinsicOpModifier = funcDecl->FindModifier<IntrinsicOpModifier>())
-            {
-                switch (intrinsicOpModifier->op)
-                {
-    #define CASE(NAME, OP) case IntrinsicOp::NAME: EmitBinExpr(outerPrec, kEOp_##NAME, #OP, callExpr); return
-                CASE(Mul, *);
-                CASE(Div, / );
-                CASE(Mod, %);
-                CASE(Add, +);
-                CASE(Sub, -);
-                CASE(Lsh, << );
-                CASE(Rsh, >> );
-                CASE(Eql, == );
-                CASE(Neq, != );
-                CASE(Greater, >);
-                CASE(Less, <);
-                CASE(Geq, >= );
-                CASE(Leq, <= );
-                CASE(BitAnd, &);
-                CASE(BitXor, ^);
-                CASE(BitOr, | );
-                CASE(And, &&);
-                CASE(Or, || );
-    #undef CASE
-
-    #define CASE(NAME, OP) case IntrinsicOp::NAME: EmitBinAssignExpr(outerPrec, kEOp_##NAME, #OP, callExpr); return
-                CASE(Assign, =);
-                CASE(AddAssign, +=);
-                CASE(SubAssign, -=);
-                CASE(MulAssign, *=);
-                CASE(DivAssign, /=);
-                CASE(ModAssign, %=);
-                CASE(LshAssign, <<=);
-                CASE(RshAssign, >>=);
-                CASE(OrAssign, |=);
-                CASE(AndAssign, &=);
-                CASE(XorAssign, ^=);
-    #undef CASE
-
-            case IntrinsicOp::Sequence: EmitBinExpr(outerPrec, kEOp_Comma, ",", callExpr); return;
-
-    #define CASE(NAME, OP) case IntrinsicOp::NAME: EmitUnaryExpr(outerPrec, kEOp_Prefix, #OP, "", callExpr); return
-                CASE(Pos, +);
-                CASE(Neg, -);
-                CASE(Not, !);
-                CASE(BitNot, ~);
-    #undef CASE
-
-    #define CASE(NAME, OP) case IntrinsicOp::NAME: EmitUnaryAssignExpr(outerPrec, kEOp_Prefix, #OP, "", callExpr); return
-                CASE(PreInc, ++);
-                CASE(PreDec, --);
-    #undef CASE
-
-    #define CASE(NAME, OP) case IntrinsicOp::NAME: EmitUnaryAssignExpr(outerPrec, kEOp_Postfix, "", #OP, callExpr); return
-                CASE(PostInc, ++);
-                CASE(PostDec, --);
-    #undef CASE
-
-                case IntrinsicOp::InnerProduct_Vector_Vector:
-                    // HLSL allows `mul()` to be used as a synonym for `dot()`,
-                    // so we need to translate to `dot` for GLSL
-                    if (context->shared->target == CodeGenTarget::GLSL)
-                    {
-                        Emit("dot(");
-                        EmitExpr(callExpr->Arguments[0]);
-                        Emit(", ");
-                        EmitExpr(callExpr->Arguments[1]);
-                        Emit(")");
-                        return;
-                    }
-                    break;
-
-                case IntrinsicOp::InnerProduct_Matrix_Matrix:
-                case IntrinsicOp::InnerProduct_Matrix_Vector:
-                case IntrinsicOp::InnerProduct_Vector_Matrix:
-                    // HLSL exposes these with the `mul()` function, while GLSL uses ordinary
-                    // `operator*`.
-                    //
-                    // The other critical detail here is that the way we handle matrix
-                    // conventions requires that the operands to the product be swapped.
-                    if (context->shared->target == CodeGenTarget::GLSL)
-                    {
-                        Emit("((");
-                        EmitExpr(callExpr->Arguments[1]);
-                        Emit(") * (");
-                        EmitExpr(callExpr->Arguments[0]);
-                        Emit("))");
-                        return;
-                    }
-                    break;
-
-                default:
-                    break;
-                }
-            }
+            // Note: We check for a "target intrinsic" modifier that flags the
+            // operation as having a custom elaboration for a specific target
+            // *before* we check for an "intrinsic op." The basic problem is
+            // that a single operation could have both finds of modifiers on it.
+            // The "target" intrinsic modifier tags something expansion during
+            // our current source-to-source translation approach, while an
+            // intrinsic op is needed for helping things lower to our IR.
+            //
+            // We need to check for this case first to make sure that when a
+            // function gets an intrinsic op added it doesn't break existing
+            // cross-compilation logic.
+            //
+            // The long term fix will be to not use the AST-based cross-compilation
+            // logic (which has all kinds of problems) and instead use the IR
+            // exclusively, at which point the notion of a "target intrinsic" modifier
+            // goes away (although we may have something similar to express how
+            // a particular op should lower/expand for a given target).
             else if(auto targetIntrinsicModifier = findTargetIntrinsicModifier(funcDecl))
             {
                 if (context->shared->target == CodeGenTarget::GLSL)
@@ -2218,6 +2140,101 @@ struct EmitVisitor
                         Emit("]");
                         return;
                     }
+                }
+            }
+            else if (auto intrinsicOpModifier = funcDecl->FindModifier<IntrinsicOpModifier>())
+            {
+                switch (intrinsicOpModifier->op)
+                {
+#define CASE(NAME, OP) case IntrinsicOp::NAME: EmitBinExpr(outerPrec, kEOp_##NAME, #OP, callExpr); return
+                    CASE(Mul, *);
+                    CASE(Div, / );
+                    CASE(Mod, %);
+                    CASE(Add, +);
+                    CASE(Sub, -);
+                    CASE(Lsh, << );
+                    CASE(Rsh, >> );
+                    CASE(Eql, == );
+                    CASE(Neq, != );
+                    CASE(Greater, > );
+                    CASE(Less, < );
+                    CASE(Geq, >= );
+                    CASE(Leq, <= );
+                    CASE(BitAnd, &);
+                    CASE(BitXor, ^);
+                    CASE(BitOr, | );
+                    CASE(And, &&);
+                    CASE(Or, || );
+#undef CASE
+
+#define CASE(NAME, OP) case IntrinsicOp::NAME: EmitBinAssignExpr(outerPrec, kEOp_##NAME, #OP, callExpr); return
+                    CASE(Assign, =);
+                    CASE(AddAssign, +=);
+                    CASE(SubAssign, -=);
+                    CASE(MulAssign, *=);
+                    CASE(DivAssign, /=);
+                    CASE(ModAssign, %=);
+                    CASE(LshAssign, <<=);
+                    CASE(RshAssign, >>=);
+                    CASE(OrAssign, |=);
+                    CASE(AndAssign, &=);
+                    CASE(XorAssign, ^=);
+#undef CASE
+
+                case IntrinsicOp::Sequence: EmitBinExpr(outerPrec, kEOp_Comma, ",", callExpr); return;
+
+#define CASE(NAME, OP) case IntrinsicOp::NAME: EmitUnaryExpr(outerPrec, kEOp_Prefix, #OP, "", callExpr); return
+                    CASE(Pos, +);
+                    CASE(Neg, -);
+                    CASE(Not, !);
+                    CASE(BitNot, ~);
+#undef CASE
+
+#define CASE(NAME, OP) case IntrinsicOp::NAME: EmitUnaryAssignExpr(outerPrec, kEOp_Prefix, #OP, "", callExpr); return
+                    CASE(PreInc, ++);
+                    CASE(PreDec, --);
+#undef CASE
+
+#define CASE(NAME, OP) case IntrinsicOp::NAME: EmitUnaryAssignExpr(outerPrec, kEOp_Postfix, "", #OP, callExpr); return
+                    CASE(PostInc, ++);
+                    CASE(PostDec, --);
+#undef CASE
+
+                case IntrinsicOp::InnerProduct_Vector_Vector:
+                    // HLSL allows `mul()` to be used as a synonym for `dot()`,
+                    // so we need to translate to `dot` for GLSL
+                    if (context->shared->target == CodeGenTarget::GLSL)
+                    {
+                        Emit("dot(");
+                        EmitExpr(callExpr->Arguments[0]);
+                        Emit(", ");
+                        EmitExpr(callExpr->Arguments[1]);
+                        Emit(")");
+                        return;
+                    }
+                    break;
+
+                case IntrinsicOp::InnerProduct_Matrix_Matrix:
+                case IntrinsicOp::InnerProduct_Matrix_Vector:
+                case IntrinsicOp::InnerProduct_Vector_Matrix:
+                    // HLSL exposes these with the `mul()` function, while GLSL uses ordinary
+                    // `operator*`.
+                    //
+                    // The other critical detail here is that the way we handle matrix
+                    // conventions requires that the operands to the product be swapped.
+                    if (context->shared->target == CodeGenTarget::GLSL)
+                    {
+                        Emit("((");
+                        EmitExpr(callExpr->Arguments[1]);
+                        Emit(") * (");
+                        EmitExpr(callExpr->Arguments[0]);
+                        Emit("))");
+                        return;
+                    }
+                    break;
+
+                default:
+                    break;
                 }
             }
         }
@@ -3877,7 +3894,13 @@ emitDeclImpl(decl, nullptr);
     {
         if(auto decoration = inst->findDecoration<IRHighLevelDeclDecoration>())
         {
-            return getText(decoration->decl->getName());
+            auto decl = decoration->decl;
+            if (auto reflectionNameMod = decl->FindModifier<ParameterBlockReflectionName>())
+            {
+                return getText(reflectionNameMod->nameAndLoc.name);
+            }
+
+            return getText(decl->getName());
         }
 
         StringBuilder sb;
@@ -3891,9 +3914,11 @@ emitDeclImpl(decl, nullptr);
         enum class Flavor
         {
             Simple,
+            Ptr,
         };
 
         Flavor flavor;
+        IRDeclaratorInfo*   next;
         String const* name;
     };
 
@@ -3910,29 +3935,12 @@ emitDeclImpl(decl, nullptr);
             emit(" ");
             emit(*declarator->name);
             break;
-        }
-    }
 
-    void emitIRSimpleType(
-        EmitContext*    context,
-        IRType*         type)
-    {
-        switch(type->op)
-        {
-    #define CASE(ID, NAME) \
-        case kIROp_##ID: emit(#NAME); break
-
-        CASE(Float32Type,   float);
-        CASE(Int32Type,     int);
-        CASE(UInt32Type,    uint);
-
-    #undef CASE
-
-        default:
-            SLANG_UNIMPLEMENTED_X("type case for emit");
+        case IRDeclaratorInfo::Flavor::Ptr:
+            emit("*");
+            emitDeclarator(context, declarator->next);
             break;
         }
-
     }
 
     void emitIRSimpleValue(
@@ -3957,6 +3965,77 @@ emitDeclImpl(decl, nullptr);
     }
 
 
+    void emitIRSimpleType(
+        EmitContext*    context,
+        IRType*         type)
+    {
+        switch(type->op)
+        {
+    #define CASE(ID, NAME) \
+        case kIROp_##ID: emit(#NAME); break
+
+        CASE(Float32Type,   float);
+        CASE(Int32Type,     int);
+        CASE(UInt32Type,    uint);
+
+    #undef CASE
+
+
+        case kIROp_VectorType:
+            emitIRVectorType(context, (IRVectorType*) type);
+            break;
+
+        case kIROp_StructType:
+            emit(getName(type));
+            break;
+
+        case kIROp_TextureType:
+            {
+                auto textureType = (IRTextureType*) type;
+
+                // TODO: actually look at the flavor and emit the right name
+                emit("Texture2D");
+
+                emit("<");
+                emitIRType(context, textureType->getElementType(), nullptr);
+                emit(">");
+            }
+            break;
+
+        case kIROp_ConstantBufferType:
+            {
+                auto tt = (IRConstantBufferType*) type;
+                emit("ConstantBuffer<");
+                emitIRType(context, tt->getElementType(), nullptr);
+                emit(">");
+            }
+            break;
+
+        case kIROp_TextureBufferType:
+            {
+                auto tt = (IRTextureBufferType*) type;
+                emit("ConstantBuffer<");
+                emitIRType(context, tt->getElementType(), nullptr);
+                emit(">");
+            }
+            break;
+
+        case kIROp_SamplerType:
+            {
+                // TODO: actually look at the flavor and emit the right name
+                emit("SamplerState");
+            }
+            break;
+
+
+        default:
+            SLANG_UNIMPLEMENTED_X("type case for emit");
+            break;
+        }
+
+    }
+
+
     void emitIRVectorType(
         EmitContext*    context,
         IRVectorType*   type)
@@ -3974,14 +4053,15 @@ emitDeclImpl(decl, nullptr);
     {
         switch( type->op )
         {
-        case kIROp_VectorType:
-            emitIRVectorType(context, (IRVectorType*) type);
-            emitDeclarator(context, declarator);
-            break;
+        case kIROp_PtrType:
+            {
+                auto ptrType = (IRPtrType*) type;
 
-        case kIROp_StructType:
-            emit(getName(type));
-            emitDeclarator(context, declarator);
+                IRDeclaratorInfo ptrDeclarator;
+                ptrDeclarator.flavor = IRDeclaratorInfo::Flavor::Ptr;
+                ptrDeclarator.next = declarator;
+                emitIRType(context, ptrType->getValueType(), &ptrDeclarator);
+            }
             break;
 
         default:
@@ -4010,11 +4090,82 @@ emitDeclImpl(decl, nullptr);
         emitIRType(context, type, (IRDeclaratorInfo*) nullptr);
     }
 
+    bool shouldFoldIRInstIntoUseSites(
+        EmitContext*    context,
+        IRInst*         inst)
+    {
+        // Certain opcodes should always be folded in
+        switch( inst->op )
+        {
+        default:
+            break;
+
+        case kIROp_IntLit:
+        case kIROp_FloatLit:
+        case kIROp_FieldAddress:
+            return true;
+        }
+
+        // Certain *types* will usually want to be folded in
+        auto type = inst->getType();
+        switch (type->op)
+        {
+        case kIROp_ConstantBufferType:
+        case kIROp_TextureBufferType:
+            // TODO: we need to be careful here, because
+            // HLSL shader model 6 allows these as explicit
+            // types.
+            return true;
+
+        default:
+            break;
+        }
+
+        // By default we will *not* fold things into their use sites.
+        return false;
+    }
+
+    bool isDerefBaseImplicit(
+        EmitContext*    context,
+        IRInst*         inst)
+    {
+        auto type = inst->getType();
+        switch (type->op)
+        {
+        case kIROp_ConstantBufferType:
+        case kIROp_TextureBufferType:
+            // TODO: we need to be careful here, because
+            // HLSL shader model 6 allows these as explicit
+            // types.
+            return true;
+
+        default:
+            break;
+        }
+
+        return false;
+    }
+
+
+
     void emitIROperand(
         EmitContext*    context,
         IRInst*         inst)
     {
-        emit(getName(inst));
+        if( shouldFoldIRInstIntoUseSites(context, inst) )
+        {
+            emit("(");
+            emitIRInstExpr(context, inst);
+            emit(")");
+            return;
+        }
+
+        switch(inst->op)
+        {
+        default:
+            emit(getName(inst));
+            break;
+        }
     }
 
     void emitIRArgs(
@@ -4037,28 +4188,49 @@ emitDeclImpl(decl, nullptr);
         EmitContext*    context,
         IRInst*         inst)
     {
-        emitIRType(context, inst->getType(), getName(inst));
+        auto type = inst->getType();
+        if(!type || type->op == kIROp_VoidType)
+            return;
+
+        emitIRType(context, type, getName(inst));
         emit(" = ");
     }
 
-    void emitIRInst(
+    void emitIRInstExpr(
         EmitContext*    context,
         IRInst*         inst)
     {
-        // TODO: need to be able to `switch` on the IR opcode here,
-        // so there is some work to be done.
         switch(inst->op)
         {
-        case kIROp_Param:
-            // Don't emit parameters, since they are declared as part of the function.
+        case kIROp_IntLit:
+            {
+                auto irConst = (IRConstant*) inst;
+                emit(irConst->u.intVal);
+            }
+            break;
+
+        case kIROp_FloatLit:
+            {
+                auto irConst = (IRConstant*) inst;
+                emit(irConst->u.floatVal);
+            }
             break;
 
         case kIROp_Construct:
             // Simple constructor call
-            emitIRInstResultDecl(context, inst);
-            emitIRType(context, inst->getType());
-            emitIRArgs(context, inst);
-            emit(";\n");
+            if( inst->getArgCount() == 2 )
+            {
+                // Need to emit as cast for HLSL
+                emit("(");
+                emitIRType(context, inst->getType());
+                emit(") ");
+                emitIROperand(context, inst->getArg(1));
+            }
+            else
+            {
+                emitIRType(context, inst->getType());
+                emitIRArgs(context, inst);
+            }
             break;
 
         case kIROp_FieldExtract:
@@ -4067,12 +4239,93 @@ emitDeclImpl(decl, nullptr);
 
                 IRFieldExtract* fieldExtract = (IRFieldExtract*) inst;
 
-                emitIRInstResultDecl(context, inst);
                 emitIROperand(context, fieldExtract->getBase());
                 emit(".");
                 emit(getName(fieldExtract->getField()));
-                emit(";\n");
             }
+            break;
+
+        case kIROp_FieldAddress:
+            {
+                // Extract field "address" from aggregate
+
+                IRFieldAddress* ii = (IRFieldAddress*) inst;
+
+                if (!isDerefBaseImplicit(context, ii->getBase()))
+                {
+                    emitIROperand(context, ii->getBase());
+                    emit(".");
+                }
+
+                emit(getName(ii->getField()));
+            }
+            break;
+
+        case kIROp_Intrinsic_Add:
+            emitIROperand(context, inst->getArg(1));
+            emit(" + ");
+            emitIROperand(context, inst->getArg(2));
+            break;
+
+
+        case kIROp_Intrinsic_sample_t_s_u:
+            emitIROperand(context, inst->getArg(1));
+            emit(".Sample(");
+            emitIROperand(context, inst->getArg(2));
+            emit(", ");
+            emitIROperand(context, inst->getArg(3));
+            emit(")");
+            break;
+
+        case kIROp_Load:
+            // TODO: this logic will really only work for a simple variable reference...
+            emitIROperand(context, inst->getArg(1));
+            break;
+
+        case kIROp_Call:
+            {
+                emitIROperand(context, inst->getArg(1));
+                emit("(");
+                UInt argCount = inst->getArgCount() - 2;
+                for( UInt aa = 0; aa < argCount; ++aa )
+                {
+                    if(aa != 0) emit(", ");
+                    emitIROperand(context, inst->getArg(aa + 2));
+                }
+                emit(")");
+            }
+            break;
+
+        default:
+            emit("/* uhandled */");
+            break;
+        }
+    }
+
+    void emitIRInst(
+        EmitContext*    context,
+        IRInst*         inst)
+    {
+        if (shouldFoldIRInstIntoUseSites(context, inst))
+        {
+            return;
+        }
+
+        switch(inst->op)
+        {
+        default:
+            emitIRInstResultDecl(context, inst);
+            emitIRInstExpr(context, inst);
+            emit(";\n");
+            break;
+
+        case kIROp_Param:
+            // Don't emit parameters, since they are declared as part of the function.
+            break;
+
+        case kIROp_FieldAddress:
+            // skip during code emit, since it should be
+            // folded into use site(s)
             break;
 
         case kIROp_ReturnVoid:
@@ -4083,10 +4336,6 @@ emitDeclImpl(decl, nullptr);
             emit("return ");
             emitIROperand(context, ((IRReturnVal*) inst)->getVal());
             emit(";\n");
-            break;
-
-        default:
-            emit("// uhandled\n");
             break;
         }
     }
@@ -4099,6 +4348,17 @@ emitDeclImpl(decl, nullptr);
         if( decoration )
         {
             EmitSemantics(decoration->decl);
+        }
+    }
+
+    void emitIRLayoutSemantics(
+        EmitContext*    context,
+        IRInst*         inst)
+    {
+        auto decoration = inst->findDecoration<IRLayoutDecoration>();
+        if (decoration)
+        {
+            emitHLSLRegisterSemantics((VarLayout*) decoration->layout);
         }
     }
 
@@ -4172,6 +4432,70 @@ emitDeclImpl(decl, nullptr);
         emit("};\n");
     }
 
+    void emitIRParameterBlock(
+        EmitContext*            context,
+        IRVar*                  varDecl,
+        IRUniformBufferType*    type)
+    {
+        emit("cbuffer ");
+        emit(getName(varDecl));
+        emitIRLayoutSemantics(context, varDecl);
+        emit("\n{\n");
+
+        auto elementType = type->getElementType();
+        switch( elementType->op )
+        {
+        case kIROp_StructType:
+            {
+                auto structType = (IRStructDecl*) elementType;
+                for(auto ff = structType->getFirstField(); ff; ff = ff->getNextField())
+                {
+                    auto fieldType = ff->getFieldType();
+                    emitIRType(context, fieldType, getName(ff));
+
+                    emitIRSemantics(context, ff);
+
+                    emit(";\n");
+                }
+            }
+            break;
+
+        default:
+            emit("/* unexpected */");
+            break;
+        }
+
+        emit("}\n");
+    }
+
+    void emitIRVar(
+        EmitContext*    context,
+        IRVar*          varDecl)
+    {
+        auto allocatedType = varDecl->getType();
+        auto varType = ((IRPtrType*) allocatedType)->getValueType();
+
+        switch( varType->op )
+        {
+        case kIROp_ConstantBufferType:
+        case kIROp_TextureBufferType:
+            emitIRParameterBlock(context, varDecl, (IRUniformBufferType*) varType);
+            return;
+
+        default:
+            break;
+        }
+
+
+        emitIRType(context, varType, getName(varDecl));
+
+        emitIRSemantics(context, varDecl);
+
+        emitIRLayoutSemantics(context, varDecl);
+
+        emit(";\n");
+    }
+
     void emitIRGlobalInst(
         EmitContext*    context,
         IRInst*         inst)
@@ -4186,6 +4510,10 @@ emitDeclImpl(decl, nullptr);
 
         case kIROp_StructType:
             emitIRStruct(context, (IRStructDecl*) inst);
+            break;
+
+        case kIROp_Var:
+            emitIRVar(context, (IRVar*) inst);
             break;
 
         default:
@@ -4320,8 +4648,8 @@ String emitEntryPoint(
     //
     // We'll try to detect the cases here:
     //
-#if 0
-    if(!(translationUnit->compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING ))
+    if((translationUnit->compileRequest->compileFlags & SLANG_COMPILE_FLAG_USE_IR)
+        && !(translationUnit->compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING ))
     {
         // This seems to be case (3), because the user is asking for full
         // checking, and so we can assume we understand the code fully.
@@ -4332,20 +4660,14 @@ String emitEntryPoint(
 
         auto lowered = lowerEntryPointToIR(entryPoint, programLayout, target);
 
-        dumpIR(lowered);
+//        dumpIR(lowered);
 
         // TODO: do we want to emit directly from IR, or translate the
         // IR back into AST for emission?
 
         visitor.emitIRModule(&context, lowered);
-
-        throw 99;
-
     }
-    else if(
-#else
-    if(!(translationUnit->compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING ) ||
-#endif
+    else if(!(translationUnit->compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING ) ||
         translationUnit->compileRequest->loadedModulesList.Count() != 0)
     {
         // The user has `import`ed some Slang modules, and so we are in case (2)
