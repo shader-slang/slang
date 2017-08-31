@@ -102,9 +102,9 @@ SYNTAX_CLASS(DerefExpr, Expr)
 END_SYNTAX_CLASS()
 
 // Any operation that performs type-casting
-SYNTAX_CLASS(TypeCastExpr, Expr)
-    SYNTAX_FIELD(TypeExp, TargetType)
-    SYNTAX_FIELD(RefPtr<Expr>, Expression)
+SYNTAX_CLASS(TypeCastExpr, InvokeExpr)
+//    SYNTAX_FIELD(TypeExp, TargetType)
+//    SYNTAX_FIELD(RefPtr<Expr>, Expression)
 END_SYNTAX_CLASS()
 
 // An explicit type-cast that appear in the user's code with `(type) expr` syntax

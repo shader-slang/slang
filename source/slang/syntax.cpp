@@ -69,6 +69,7 @@ namespace Slang
     void NAME::accept(NAME::Visitor* visitor, void* extra)                  \
     { visitor->dispatch_##NAME(this, extra); }                              \
     void* SyntaxClassBase::Impl<NAME>::createFunc() { return new NAME(); }  \
+    SyntaxClass<NodeBase> NAME::getClass() { return Slang::getClass<NAME>(); }   \
     SyntaxClassBase::ClassInfo const SyntaxClassBase::Impl<NAME>::kClassInfo = { #NAME, &SyntaxClassBase::Impl<BASE>::kClassInfo, &SyntaxClassBase::Impl<NAME>::createFunc };
 #include "expr-defs.h"
 #include "decl-defs.h"
@@ -79,13 +80,14 @@ namespace Slang
 
 SyntaxClassBase::ClassInfo const SyntaxClassBase::Impl<RefObject>::kClassInfo = { "RefObject", nullptr, nullptr };
 
-ABSTRACT_SYNTAX_CLASS(SyntaxNodeBase, RefObject);
+ABSTRACT_SYNTAX_CLASS(NodeBase, RefObject);
+ABSTRACT_SYNTAX_CLASS(SyntaxNodeBase, NodeBase);
 ABSTRACT_SYNTAX_CLASS(SyntaxNode, SyntaxNodeBase);
 ABSTRACT_SYNTAX_CLASS(ModifiableSyntaxNode, SyntaxNode);
 ABSTRACT_SYNTAX_CLASS(DeclBase, ModifiableSyntaxNode);
 ABSTRACT_SYNTAX_CLASS(Decl, DeclBase);
 ABSTRACT_SYNTAX_CLASS(Stmt, ModifiableSyntaxNode);
-ABSTRACT_SYNTAX_CLASS(Val, RefObject);
+ABSTRACT_SYNTAX_CLASS(Val, NodeBase);
 ABSTRACT_SYNTAX_CLASS(Type, Val);
 ABSTRACT_SYNTAX_CLASS(Modifier, SyntaxNodeBase);
 ABSTRACT_SYNTAX_CLASS(Expr, SyntaxNode);

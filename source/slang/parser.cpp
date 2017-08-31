@@ -3341,9 +3341,12 @@ namespace Slang
                 {
                     RefPtr<TypeCastExpr> tcexpr = new ExplicitCastExpr();
                     parser->FillPosition(tcexpr.Ptr());
-                    tcexpr->TargetType = parser->ParseTypeExp();
+                    tcexpr->FunctionExpr = parser->ParseType();
                     parser->ReadToken(TokenType::RParent);
-                    tcexpr->Expression = parser->ParseExpression(Precedence::Multiplicative); // Note(tfoley): need to double-check this
+
+                    auto arg = parser->ParseExpression(Precedence::Multiplicative); // Note(tfoley): need to double-check this
+                    tcexpr->Arguments.Add(arg);
+
                     return tcexpr;
                 }
                 else
@@ -3913,7 +3916,19 @@ namespace Slang
         return modifier;
     }
 
+    static RefPtr<RefObject> parseImplicitConversionModifier(Parser* parser, void* /*userData*/)
+    {
+        RefPtr<ImplicitConversionModifier> modifier = new ImplicitConversionModifier();
 
+        ConversionCost cost = kConversionCost_Default;
+        if( AdvanceIf(parser, TokenType::LParent) )
+        {
+            cost = ConversionCost(StringToInt(parser->ReadToken(TokenType::IntegerLiteral).Content));
+            parser->ReadToken(TokenType::RParent);
+        }
+        modifier->cost = cost;
+        return modifier;
+    }
 
     RefPtr<ModuleDecl> populateBaseLanguageModule(
         Session*        session,
@@ -4005,6 +4020,7 @@ namespace Slang
 
         MODIFIER(__builtin_type,    parseBuiltinTypeModifier);
         MODIFIER(__magic_type,      parseMagicTypeModifier);
+        MODIFIER(__implicit_conversion,     parseImplicitConversionModifier);
 
 #undef MODIFIER
 

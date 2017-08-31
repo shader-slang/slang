@@ -30,6 +30,50 @@ namespace Slang
 
     typedef RefPtr<RefObject> (*SyntaxParseCallback)(Parser* parser, void* userData);
 
+    typedef unsigned int ConversionCost;
+    enum : ConversionCost
+    {
+        // No conversion at all
+        kConversionCost_None = 0,
+
+        // Conversions based on explicit sub-typing relationships are the cheapest
+        //
+        // TODO(tfoley): We will eventually need a discipline for ranking
+        // when two up-casts are comparable.
+        kConversionCost_CastToInterface = 50,
+
+        // Conversion that is lossless and keeps the "kind" of the value the same
+        kConversionCost_RankPromotion = 100,
+
+        // Conversions that are lossless, but change "kind"
+        kConversionCost_UnsignedToSignedPromotion = 200,
+
+        // Conversion from signed->unsigned integer of same or greater size
+        kConversionCost_SignedToUnsignedConversion = 300,
+
+        // Cost of converting an integer to a floating-point type
+        kConversionCost_IntegerToFloatConversion = 400,
+
+        // Default case (usable for user-defined conversions)
+        kConversionCost_Default = 500,
+
+        // Catch-all for conversions that should be discouraged
+        // (i.e., that really shouldn't be made implicitly)
+        //
+        // TODO: make these conversions not be allowed implicitly in "Slang mode"
+        kConversionCost_GeneralConversion = 900,
+
+        // This is the cost of an explicit conversion, which should
+        // not actually be performed.
+        kConversionCost_Explicit = 90000,
+
+        // Additional conversion cost to add when promoting from a scalar to
+        // a vector (this will be added to the cost, if any, of converting
+        // the element type of the vector)
+        kConversionCost_ScalarToVector = 1,
+    };
+
+
     // Forward-declare all syntax classes
 #define SYNTAX_CLASS(NAME, BASE, ...) class NAME;
 #include "object-meta-begin.h"
@@ -836,6 +880,7 @@ namespace Slang
 #define SYNTAX_CLASS(NAME, BASE, ...)                                   \
     class NAME : public BASE {                                          \
     virtual void accept(NAME::Visitor* visitor, void* extra) override;  \
+    public: virtual SyntaxClass<NodeBase> getClass() override;          \
     public: /* ... */
 #include "expr-defs.h"
 #include "decl-defs.h"

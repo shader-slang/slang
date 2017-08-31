@@ -1367,7 +1367,7 @@ struct EmitVisitor
         {
             if(auto typeCastExpr = expr.As<TypeCastExpr>())
             {
-                expr = typeCastExpr->Expression;
+                expr = typeCastExpr->Arguments[0];
             }
             // TODO: any other cases?
             else
@@ -1519,36 +1519,9 @@ struct EmitVisitor
         return bestModifier;
     }
 
-    // Emit a call expression that doesn't involve any special cases,
-    // just an expression of the form `f(a0, a1, ...)`
-    void emitSimpleCallExpr(
-        RefPtr<InvokeExpr>  callExpr,
-        EOpInfo                             outerPrec)
+    void emitSimpleCallArgs(
+        RefPtr<InvokeExpr>  callExpr)
     {
-        auto prec = kEOp_Postfix;
-        bool needClose = MaybeEmitParens(outerPrec, prec);
-
-        auto funcExpr = callExpr->FunctionExpr;
-        if (auto funcDeclRefExpr = funcExpr.As<DeclRefExpr>())
-        {
-            auto declRef = funcDeclRefExpr->declRef;
-            if (auto ctorDeclRef = declRef.As<ConstructorDecl>())
-            {
-                // We really want to emit a reference to the type begin constructed
-                EmitType(callExpr->type);
-            }
-            else
-            {
-                // default case: just emit the decl ref
-                EmitExprWithPrecedence(funcExpr, leftSide(outerPrec, prec));
-            }
-        }
-        else
-        {
-            // default case: just emit the expression
-            EmitExprWithPrecedence(funcExpr, leftSide(outerPrec, prec));
-        }
-
         Emit("(");
         UInt argCount = callExpr->Arguments.Count();
         for (UInt aa = 0; aa < argCount; ++aa)
@@ -1557,6 +1530,76 @@ struct EmitVisitor
             EmitExpr(callExpr->Arguments[aa]);
         }
         Emit(")");
+    }
+
+    void emitSimpleConstructorCallExpr(
+        RefPtr<InvokeExpr>  callExpr,
+        EOpInfo             outerPrec)
+    {
+        if(context->shared->target == CodeGenTarget::HLSL)
+        {
+            // HLSL needs to special-case a constructor call with a single argument.
+            if(callExpr->Arguments.Count() == 1)
+            {
+                auto prec = kEOp_Prefix;
+                bool needClose = MaybeEmitParens(outerPrec, prec);
+
+                Emit("(");
+                EmitType(callExpr->type);
+                Emit(") ");
+
+                EmitExprWithPrecedence(callExpr->Arguments[0], rightSide(outerPrec, prec));
+
+                if(needClose) Emit(")");
+                return;
+            }
+        }
+
+
+        // Default handling is to emit what amounts to an ordinary call,
+        // but using the type of the expression directly as the "function" to call.
+        auto prec = kEOp_Postfix;
+        bool needClose = MaybeEmitParens(outerPrec, prec);
+
+        EmitType(callExpr->type);
+
+        emitSimpleCallArgs(callExpr);
+
+        if (needClose)
+        {
+            Emit(")");
+        }
+    }
+
+    // Emit a call expression that doesn't involve any special cases,
+    // just an expression of the form `f(a0, a1, ...)`
+    void emitSimpleCallExpr(
+        RefPtr<InvokeExpr>  callExpr,
+        EOpInfo                             outerPrec)
+    {
+        // We will first check if this represents a constructor call,
+        // since those may need to be handled differently.
+
+        auto funcExpr = callExpr->FunctionExpr;
+        if (auto funcDeclRefExpr = funcExpr.As<DeclRefExpr>())
+        {
+            auto declRef = funcDeclRefExpr->declRef;
+            if (auto ctorDeclRef = declRef.As<ConstructorDecl>())
+            {
+                emitSimpleConstructorCallExpr(callExpr, outerPrec);
+                return;
+            }
+        }
+
+        // Once we've ruled out constructor calls, we can move on
+        // to just emitting an ordinary calll expression.
+
+        auto prec = kEOp_Postfix;
+        bool needClose = MaybeEmitParens(outerPrec, prec);
+
+        EmitExprWithPrecedence(funcExpr, leftSide(outerPrec, prec));
+
+        emitSimpleCallArgs(callExpr);
 
         if (needClose)
         {
@@ -2416,11 +2459,15 @@ struct EmitVisitor
     {
         // This was an implicit cast inserted in code parsed in "rewriter" mode,
         // so we don't want to output it and change what the user's code looked like.
-        ExprVisitorWithArg::dispatch(castExpr->Expression, arg);
+        ExprVisitorWithArg::dispatch(castExpr->Arguments[0], arg);
     }
 
     void visitTypeCastExpr(TypeCastExpr* castExpr, ExprEmitArg const& arg)
     {
+        // We emit a type cast expression as a constructor call
+        emitSimpleConstructorCallExpr(castExpr, arg.outerPrec);
+
+#if 0
         bool needClose = false;
         switch(context->shared->target)
         {
@@ -2449,6 +2496,7 @@ struct EmitVisitor
             break;
         }
         if(needClose) Emit(")");
+#endif
     }
 
     void visitInitializerListExpr(InitializerListExpr* expr, ExprEmitArg const&)
