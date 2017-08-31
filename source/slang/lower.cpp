@@ -5,6 +5,19 @@
 #include "type-layout.h"
 #include "visitor.h"
 
+// DEBUGGING
+#if 0
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <Windows.h>
+#undef WIN32_LEAN_AND_MEAN
+#undef NOMINMAX
+#endif
+#endif
+
+
+
 namespace Slang
 {
 
@@ -2166,12 +2179,22 @@ struct LoweringVisitor
         DeclVisitor::dispatch(stmt->decl);
     }
 
+    Modifiers shallowCloneModifiers(Modifiers const& oldModifiers)
+    {
+        RefPtr<SharedModifiers> shared = new SharedModifiers();
+        shared->next = oldModifiers.first;
+
+        Modifiers newModifiers;
+        newModifiers.first = shared;
+        return newModifiers;
+    }
+
     void lowerStmtFields(
         Stmt* loweredStmt,
         Stmt* originalStmt)
     {
         loweredStmt->loc = originalStmt->loc;
-        loweredStmt->modifiers = originalStmt->modifiers;
+        loweredStmt->modifiers = shallowCloneModifiers(originalStmt->modifiers);
     }
 
     void lowerScopeStmtFields(
@@ -2367,7 +2390,7 @@ struct LoweringVisitor
 
     void lowerStmtCommon(Stmt* loweredStmt, Stmt* stmt)
     {
-        loweredStmt->modifiers = stmt->modifiers;
+        loweredStmt->modifiers = shallowCloneModifiers(stmt->modifiers);
     }
 
     void assign(
@@ -2665,7 +2688,7 @@ struct LoweringVisitor
         // HACK: just doing a shallow copy of modifiers, which will
         // suffice for most of them, but we need to do something
         // better soon.
-        loweredDecl->modifiers = decl->modifiers;
+        loweredDecl->modifiers = shallowCloneModifiers(decl->modifiers);
 
         // deal with layout stuff
 
@@ -2964,7 +2987,6 @@ struct LoweringVisitor
                 loweredDecl);
         }
 
-
         return LoweredDecl(loweredDecl);
     }
 
@@ -3209,7 +3231,7 @@ struct LoweringVisitor
             primaryVarDecl->nameAndLoc.name = getName(name);
             primaryVarDecl->type.type = tupleType;
 
-            primaryVarDecl->modifiers = originalVarDecl->modifiers;
+            primaryVarDecl->modifiers = shallowCloneModifiers(originalVarDecl->modifiers);
 
             tupleDecl->primaryDecl = primaryVarDecl;
 

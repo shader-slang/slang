@@ -49,6 +49,11 @@ namespace Slang
             SLANG_ASSERT(referenceCount != 0);
             return referenceCount == 1;
         }
+
+        UInt debugGetReferenceCount()
+        {
+            return referenceCount;
+        }
     };
 
     inline void addReference(RefObject* obj)
