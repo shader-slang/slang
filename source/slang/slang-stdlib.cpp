@@ -1066,6 +1066,13 @@ namespace Slang
         return stdlibPath;
     }
 
+    // We are going to generate the stdlib source code from a more compact
+    // description. For example, we need to generate all the `operator`
+    // declarations for the basic unary and binary math operations on
+    // builtin types. To do this, we will make a big array of all these
+    // types, and associate them with data on their categories/capabilities
+    // so that we generate only the correct operations.
+    //
     enum
     {
         SINT_MASK   = 1 << 0,
@@ -1082,20 +1089,141 @@ namespace Slang
         ANY_MASK = INT_MASK | FLOAT_MASK | BOOL_MASK,
     };
 
-    static const struct {
+    // We are going to declare initializers that allow for conversion between
+    // all of our base types, and we need a way to priotize those conversion
+    // by giving them different costs. Rather than maintain a hard-coded table
+    // of N^2 costs for N basic types, we are going to try to do things a bit
+    // more systematically.
+    //
+    // Every base type will be given a "kind" and a "rank" for conversion.
+    // The kind will classify it as signed/unsigned/float, and the rank will
+    // classify it by its logical bit size (with a distinct rank for pointer-sized
+    // types that logically sits between 32- and 64-bit types).
+    //
+    enum BaseTypeConversionKind : uint8_t
+    {
+        kBaseTypeConversionKind_Signed,
+        kBaseTypeConversionKind_Unsigned,
+        kBaseTypeConversionKind_Float,
+        kBaseTypeConversionKind_Error,
+    };
+    enum BaseTypeConversionRank : uint8_t
+    {
+        kBaseTypeConversionRank_Bool,
+        kBaseTypeConversionRank_Int8,
+        kBaseTypeConversionRank_Int16,
+        kBaseTypeConversionRank_Int32,
+        kBaseTypeConversionRank_IntPtr,
+        kBaseTypeConversionRank_Int64,
+        kBaseTypeConversionRank_Error,
+    };
+
+    // Here we declare the table of all our builtin types, so that we can generate all the relevant declarations.
+    //
+    struct BaseTypeInfo
+    {
         char const* name;
         BaseType	tag;
         unsigned    flags;
-    } kBaseTypes[] = {
-        { "void",	BaseType::Void,     0 },
-        { "int",	BaseType::Int,      SINT_MASK },
-        { "half",	BaseType::Half,     FLOAT_MASK },
-        { "float",	BaseType::Float,    FLOAT_MASK },
-        { "double",	BaseType::Double,   FLOAT_MASK },
-        { "uint",	BaseType::UInt,     UINT_MASK },
-        { "bool",	BaseType::Bool,     BOOL_MASK },
-        { "uint64_t", BaseType::UInt64, UINT_MASK },
+        BaseTypeConversionKind conversionKind;
+        BaseTypeConversionRank conversionRank;
     };
+    static const BaseTypeInfo kBaseTypes[] = {
+        // TODO: `void` really shouldn't be in the `BaseType` enumeration, since it behaves so differently across the board
+        { "void",	BaseType::Void,     0,          kBaseTypeConversionKind_Error,      kBaseTypeConversionRank_Error},
+
+        { "bool",	BaseType::Bool,     BOOL_MASK,  kBaseTypeConversionKind_Unsigned,   kBaseTypeConversionRank_Bool },
+
+        // TODO: should declare explicit types for 8-, 16-, 32- and 64-bit integers
+        { "int",	BaseType::Int,      SINT_MASK,  kBaseTypeConversionKind_Signed,     kBaseTypeConversionRank_Int32},
+
+        { "half",	BaseType::Half,     FLOAT_MASK, kBaseTypeConversionKind_Float,      kBaseTypeConversionRank_Int16},
+        { "float",	BaseType::Float,    FLOAT_MASK, kBaseTypeConversionKind_Float,      kBaseTypeConversionRank_Int32},
+        { "double",	BaseType::Double,   FLOAT_MASK, kBaseTypeConversionKind_Float,      kBaseTypeConversionRank_Int64},
+
+        { "uint",	BaseType::UInt,     UINT_MASK,  kBaseTypeConversionKind_Unsigned,   kBaseTypeConversionRank_Int32},
+        { "uint64_t", BaseType::UInt64, UINT_MASK,  kBaseTypeConversionKind_Unsigned,   kBaseTypeConversionRank_Int64},
+    };
+
+    // Given two base types, we need to be able to compute the cost of converting between them.
+    ConversionCost getBaseTypeConversionCost(
+        BaseTypeInfo const& toInfo,
+        BaseTypeInfo const& fromInfo)
+    {
+        if(toInfo.conversionKind == fromInfo.conversionKind
+            && toInfo.conversionRank == fromInfo.conversionRank)
+        {
+            // Thse should represent the exact same type.
+            return kConversionCost_None;
+        }
+
+        // Conversions within the same kind are easist to handle
+        if (toInfo.conversionKind == fromInfo.conversionKind)
+        {
+            // If we are converting to a "larger" type, then
+            // we are doing a lossless promotion, and otherwise
+            // we are doing a demotion.
+            if( toInfo.conversionRank > fromInfo.conversionRank)
+                return kConversionCost_RankPromotion;
+            else
+                return kConversionCost_GeneralConversion;
+        }
+
+        // If we are converting from an unsigned integer type to
+        // a signed integer type that is guaranteed to be larger,
+        // then that is also a lossless promotion.
+        //
+        // There is one additional wrinkle here, which is that
+        // a conversion from a 32-bit unsigned integer to a
+        // "pointer-sized" signed integer should be treated
+        // as unsafe, because the pointer size might also be
+        // 32 bits.
+        //
+        // The same basic exemption applied when converting
+        // *from* a pointer-sized unsigned integer.
+        else if(toInfo.conversionKind == kBaseTypeConversionKind_Signed
+            && fromInfo.conversionKind == kBaseTypeConversionKind_Unsigned
+            && toInfo.conversionRank > fromInfo.conversionRank
+            && toInfo.conversionRank != kBaseTypeConversionRank_IntPtr
+            && fromInfo.conversionRank != kBaseTypeConversionRank_IntPtr)
+        {
+            return kConversionCost_UnsignedToSignedPromotion;
+        }
+
+        // Conversion from signed to unsigned is always lossy,
+        // but it is preferred over conversions from unsigned
+        // to signed, for same-size types.
+        else if(toInfo.conversionKind == kBaseTypeConversionKind_Unsigned
+            && fromInfo.conversionKind == kBaseTypeConversionKind_Signed
+            && toInfo.conversionRank >= fromInfo.conversionRank)
+        {
+            return kConversionCost_SignedToUnsignedConversion;
+        }
+
+        // Conversion from an integer to a floating-point type
+        // is never considered a promotion (even when the value
+        // would fit in the available mantissa bits).
+        // If the destination type is at least 32 bits we consider
+        // this a reasonably good conversion, though.
+        //
+        // Note that this means we do *not* consider implicit
+        // conversion to `half` as a good conversion, even for small
+        // types. This makes sense because we relaly want to prefer
+        // conversion to `float` as the default.
+        else if (toInfo.conversionKind == kBaseTypeConversionKind_Float
+            && toInfo.conversionRank >= kBaseTypeConversionRank_Int32)
+        {
+            return kConversionCost_IntegerToFloatConversion;
+        }
+
+        // All other cases are considered as "general" conversions,
+        // where we don't consider any one conversion better than
+        // any others.
+        else
+        {
+            return kConversionCost_GeneralConversion;
+        }
+    }
 
     struct OpInfo { IntrinsicOp opCode; char const* opName; unsigned flags; };
 
@@ -1146,7 +1274,6 @@ namespace Slang
         { IntrinsicOp::LshAssign,     "<<=",   ASSIGNMENT | INT_MASK },
         { IntrinsicOp::RshAssign,     ">>=",   ASSIGNMENT | INT_MASK },
     };
-
 
     String Session::getCoreLibraryCode()
     {
@@ -1201,8 +1328,19 @@ namespace Slang
             // Declare initializers to convert from various other types
             for (int ss = 0; ss < kBaseTypeCount; ++ss)
             {
+                // Don't allow conversion from `void`
                 if (kBaseTypes[ss].tag == BaseType::Void)
                     continue;
+
+                // We need to emit a modifier so that the semantic-checking
+                // layer will know it can use these operations for implicit
+                // conversion.
+                ConversionCost conversionCost = getBaseTypeConversionCost(
+                    kBaseTypes[tt],
+                    kBaseTypes[ss]);
+
+                EMIT_LINE_DIRECTIVE();
+                sb << "__implicit_conversion(" << conversionCost << ")\n";
 
                 EMIT_LINE_DIRECTIVE();
                 sb << "__init(" << kBaseTypes[ss].name << " value);\n";
@@ -1215,8 +1353,14 @@ namespace Slang
 
         sb << "__generic<T = float, let N : int = 4> __magic_type(Vector) struct vector\n{\n";
         sb << "    typedef T Element;\n";
-        sb << "    __init(T value);\n"; // initialize from single scalar
+
+        // Declare initializer taking a single scalar of the elemnt type
+        sb << "    __implicit_conversion(" << kConversionCost_ScalarToVector << ")\n";
+        sb << "    __init(T value);\n";
+
         sb << "};\n";
+
+        // TODO: Probably need to do similar
         sb << "__generic<T = float, let R : int = 4, let C : int = 4> __magic_type(Matrix) struct matrix {};\n";
 
         static const struct {
@@ -1306,6 +1450,39 @@ namespace Slang
             sb << "}\n";
         }
 
+        // The above extension was generic in the *type* of the vector,
+        // but explicit in the *size*. We will now declare an extension
+        // for each builtin type that is generic in the size.
+        //
+        for (int tt = 0; tt < kBaseTypeCount; ++tt)
+        {
+            if(kBaseTypes[tt].tag == BaseType::Void) continue;
+
+            sb << "__generic<let N : int> __extension vector<"
+                << kBaseTypes[tt].name << ",N>\n{\n";
+
+            for (int ff = 0; ff < kBaseTypeCount; ++ff)
+            {
+                if(kBaseTypes[ff].tag == BaseType::Void) continue;
+
+                // We need a constructor to make a vector from a scalar
+                // of another type.
+
+                if( tt != ff )
+                {
+                    auto cost = getBaseTypeConversionCost(
+                        kBaseTypes[tt],
+                        kBaseTypes[ff]);
+                    cost += kConversionCost_ScalarToVector;
+
+                    sb << "    __implicit_conversion(" << cost << ")\n";
+                    sb << "    __init(" << kBaseTypes[ff].name << " value);\n";
+                }
+            }
+
+            sb << "}\n";
+        }
+
         for( int R = 2; R <= 4; ++R )
         for( int C = 2; C <= 4; ++C )
         {
@@ -1336,6 +1513,14 @@ namespace Slang
             // TODO(tfoley): See comment about how this overlaps
             // with implicit conversion, in the `vector` case above
             sb << "__generic<U> __init(matrix<U," << R << ", " << C << ">);\n";
+
+            // initialize from a matrix of larger size
+            for(int rr = R; rr <= 4; ++rr)
+            for( int cc = C; cc <= 4; ++cc )
+            {
+                if(rr == R && cc == C) continue;
+                sb << "__init(matrix<T," << rr << "," << cc << "> value);\n";
+            }
 
             sb << "}\n";
         }

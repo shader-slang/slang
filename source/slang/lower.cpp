@@ -1781,19 +1781,9 @@ struct LoweringVisitor
     LoweredExpr visitInvokeExpr(
         InvokeExpr* expr)
     {
-        return LoweredExpr(lowerCallExpr(new InvokeExpr(), expr));
-    }
-
-    LoweredExpr visitInfixExpr(
-        InfixExpr* expr)
-    {
-        return LoweredExpr(lowerCallExpr(new InfixExpr(), expr));
-    }
-
-    LoweredExpr visitPrefixExpr(
-        PrefixExpr* expr)
-    {
-        return LoweredExpr(lowerCallExpr(new PrefixExpr(), expr));
+        // Create a clone with the same class
+        InvokeExpr* loweredExpr = (InvokeExpr*) expr->getClass().createInstance();
+        return LoweredExpr(lowerCallExpr(loweredExpr, expr));
     }
 
     LoweredExpr visitSelectExpr(
@@ -1802,12 +1792,6 @@ struct LoweringVisitor
         // TODO: A tuple needs to be special-cased here
 
         return LoweredExpr(lowerCallExpr(new SelectExpr(), expr));
-    }
-
-    LoweredExpr visitPostfixExpr(
-        PostfixExpr* expr)
-    {
-        return LoweredExpr(lowerCallExpr(new PostfixExpr(), expr));
     }
 
     LoweredExpr visitDerefExpr(
@@ -2412,15 +2396,29 @@ struct LoweringVisitor
         assign(expr, LoweredExpr(createVarRef(getPosition(expr), varDecl)));
     }
 
+    RefPtr<Expr> createTypeExpr(
+        RefPtr<Type>    type)
+    {
+        auto typeType = new TypeType();
+        typeType->type = type;
+
+        auto result = new SharedTypeExpr();
+        result->base.type = type;
+        result->type.type = typeType;
+
+        return result;
+    }
+
     RefPtr<Expr> createCastExpr(
-        RefPtr<Type>          type,
+        RefPtr<Type>    type,
         RefPtr<Expr>    expr)
     {
         RefPtr<ExplicitCastExpr> castExpr = new ExplicitCastExpr();
         castExpr->loc = expr->loc;
         castExpr->type.type = type;
-        castExpr->TargetType.type = type;
-        castExpr->Expression = expr;
+
+        castExpr->FunctionExpr = createTypeExpr(type);
+        castExpr->Arguments.Add(expr);
         return castExpr;
     }
 

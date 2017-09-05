@@ -4,10 +4,16 @@
 // AST nodes and related objects. For example, this is where the
 // basic `Decl`, `Stmt`, `Expr`, `type`, etc. definitions come from.
 
+ABSTRACT_SYNTAX_CLASS(NodeBase, RefObject)
+    // A helper to access the corresponding class on a concrete instance
+    RAW(
+    virtual SyntaxClass<NodeBase> getClass() = 0;
+    )
+END_SYNTAX_CLASS()
+
 // Base class for all nodes representing actual syntax
 // (thus having a location in the source code)
-ABSTRACT_SYNTAX_CLASS(SyntaxNodeBase, RefObject)
-
+ABSTRACT_SYNTAX_CLASS(SyntaxNodeBase, NodeBase)
     // The primary source location associated with this AST node
     FIELD(SourceLoc, loc)
 
@@ -26,7 +32,7 @@ END_SYNTAX_CLASS()
 // These are *not* syntax nodes, because they do not have
 // a unique location, and any two `Val`s representing
 // the same value should be conceptually equal.
-ABSTRACT_SYNTAX_CLASS(Val, RefObject)
+ABSTRACT_SYNTAX_CLASS(Val, NodeBase)
     RAW(typedef IValVisitor Visitor;)
 
     RAW(virtual void accept(IValVisitor* visitor, void* extra) = 0;)

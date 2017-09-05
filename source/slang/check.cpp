@@ -140,14 +140,14 @@ namespace Slang
         }
 
         RefPtr<Expr> ConstructDeclRefExpr(
-            DeclRef<Decl>                     declRef,
+            DeclRef<Decl>   declRef,
             RefPtr<Expr>    baseExpr,
-            RefPtr<Expr>    originalExpr)
+            SourceLoc       loc)
         {
             if (baseExpr)
             {
                 auto expr = new MemberExpr();
-                expr->loc = originalExpr->loc;
+                expr->loc = loc;
                 expr->BaseExpression = baseExpr;
                 expr->name = declRef.GetName();
                 expr->type = GetTypeForDeclRef(declRef);
@@ -157,7 +157,7 @@ namespace Slang
             else
             {
                 auto expr = new VarExpr();
-                expr->loc = originalExpr->loc;
+                expr->loc = loc;
                 expr->name = declRef.GetName();
                 expr->type = GetTypeForDeclRef(declRef);
                 expr->declRef = declRef;
@@ -166,14 +166,14 @@ namespace Slang
         }
 
         RefPtr<Expr> ConstructDerefExpr(
-            RefPtr<Expr> base,
-            RefPtr<Expr> originalExpr)
+            RefPtr<Expr>    base,
+            SourceLoc       loc)
         {
             auto ptrLikeType = base->type->As<PointerLikeType>();
             SLANG_ASSERT(ptrLikeType);
 
             auto derefExpr = new DerefExpr();
-            derefExpr->loc = originalExpr->loc;
+            derefExpr->loc = loc;
             derefExpr->base = base;
             derefExpr->type = QualType(ptrLikeType->elementType);
 
@@ -183,9 +183,9 @@ namespace Slang
         }
 
         RefPtr<Expr> ConstructLookupResultExpr(
-            LookupResultItem const&			item,
-            RefPtr<Expr>	baseExpr,
-            RefPtr<Expr>	originalExpr)
+            LookupResultItem const& item,
+            RefPtr<Expr>            baseExpr,
+            SourceLoc               loc)
         {
             // If we collected any breadcrumbs, then these represent
             // additional segments of the lookup path that we need
@@ -196,28 +196,28 @@ namespace Slang
                 switch (breadcrumb->kind)
                 {
                 case LookupResultItem::Breadcrumb::Kind::Member:
-                    bb = ConstructDeclRefExpr(breadcrumb->declRef, bb, originalExpr);
+                    bb = ConstructDeclRefExpr(breadcrumb->declRef, bb, loc);
                     break;
                 case LookupResultItem::Breadcrumb::Kind::Deref:
-                    bb = ConstructDerefExpr(bb, originalExpr);
+                    bb = ConstructDerefExpr(bb, loc);
                     break;
                 default:
                     SLANG_UNREACHABLE("all cases handle");
                 }
             }
 
-            return ConstructDeclRefExpr(item.declRef, bb, originalExpr);
+            return ConstructDeclRefExpr(item.declRef, bb, loc);
         }
 
         RefPtr<Expr> createLookupResultExpr(
-            LookupResult const&             lookupResult,
-            RefPtr<Expr>    baseExpr,
-            RefPtr<Expr>    originalExpr)
+            LookupResult const&     lookupResult,
+            RefPtr<Expr>            baseExpr,
+            SourceLoc               loc)
         {
             if (lookupResult.isOverloaded())
             {
                 auto overloadedExpr = new OverloadedExpr();
-                overloadedExpr->loc = originalExpr->loc;
+                overloadedExpr->loc = loc;
                 overloadedExpr->type = QualType(
                     getSession()->getOverloadedType());
                 overloadedExpr->base = baseExpr;
@@ -226,7 +226,7 @@ namespace Slang
             }
             else
             {
-                return ConstructLookupResultExpr(lookupResult.item, baseExpr, originalExpr);
+                return ConstructLookupResultExpr(lookupResult.item, baseExpr, loc);
             }
         }
 
@@ -264,7 +264,7 @@ namespace Slang
             }
 
             // otherwise, we had a single decl and it was valid, hooray!
-            return ConstructLookupResultExpr(lookupResult.item, overloadedExpr->base, overloadedExpr);
+            return ConstructLookupResultExpr(lookupResult.item, overloadedExpr->base, overloadedExpr->loc);
         }
 
         RefPtr<Expr> ExpectATypeRepr(RefPtr<Expr> expr)
@@ -583,90 +583,6 @@ namespace Slang
 
     public:
 
-        typedef unsigned int ConversionCost;
-        enum : ConversionCost
-        {
-            // No conversion at all
-            kConversionCost_None = 0,
-
-            // Conversions based on explicit sub-typing relationships are the cheapest
-            //
-            // TODO(tfoley): We will eventually need a discipline for ranking
-            // when two up-casts are comparable.
-            kConversionCost_CastToInterface = 50,
-
-            // Conversion that is lossless and keeps the "kind" of the value the same
-            kConversionCost_RankPromotion = 100,
-
-            // Conversions that are lossless, but change "kind"
-            kConversionCost_UnsignedToSignedPromotion = 200,
-
-            // Conversion from signed->unsigned integer of same or greater size
-            kConversionCost_SignedToUnsignedConversion = 300,
-
-            // Cost of converting an integer to a floating-point type
-            kConversionCost_IntegerToFloatConversion = 400,
-
-            // Catch-all for conversions that should be discouraged
-            // (i.e., that really shouldn't be made implicitly)
-            //
-            // TODO: make these conversions not be allowed implicitly in "Slang mode"
-            kConversionCost_GeneralConversion = 900,
-
-            // Additional conversion cost to add when promoting from a scalar to
-            // a vector (this will be added to the cost, if any, of converting
-            // the element type of the vector)
-            kConversionCost_ScalarToVector = 1,
-        };
-
-        enum BaseTypeConversionKind : uint8_t
-        {
-            kBaseTypeConversionKind_Signed,
-            kBaseTypeConversionKind_Unsigned,
-            kBaseTypeConversionKind_Float,
-            kBaseTypeConversionKind_Error,
-        };
-
-        enum BaseTypeConversionRank : uint8_t
-        {
-            kBaseTypeConversionRank_Bool,
-            kBaseTypeConversionRank_Int8,
-            kBaseTypeConversionRank_Int16,
-            kBaseTypeConversionRank_Int32,
-            kBaseTypeConversionRank_IntPtr,
-            kBaseTypeConversionRank_Int64,
-            kBaseTypeConversionRank_Error,
-        };
-
-        struct BaseTypeConversionInfo
-        {
-            BaseTypeConversionKind	kind;
-            BaseTypeConversionRank	rank;
-        };
-        static BaseTypeConversionInfo GetBaseTypeConversionInfo(BaseType baseType)
-        {
-            switch (baseType)
-            {
-            #define CASE(TAG, KIND, RANK) \
-                case BaseType::TAG: { BaseTypeConversionInfo info = {kBaseTypeConversionKind_##KIND, kBaseTypeConversionRank_##RANK}; return info; } break
-
-                CASE(Bool, Unsigned, Bool);
-                CASE(Int, Signed, Int32);
-                CASE(UInt, Unsigned, Int32);
-                CASE(UInt64, Unsigned, Int64);
-                CASE(Half, Float, Int16);
-                CASE(Float, Float, Int32);
-                CASE(Double, Float, Int64);
-                CASE(Void, Error, Error);
-
-            #undef CASE
-
-            default:
-                break;
-            }
-            SLANG_UNREACHABLE("all cases handled");
-        }
-
         bool ValuesAreEqual(
             RefPtr<IntVal> left,
             RefPtr<IntVal> right)
@@ -690,6 +606,19 @@ namespace Slang
             }
 
             return false;
+        }
+
+        // Compute the cost of using a particular declaration to
+        // perform implicit type conversion.
+        ConversionCost getImplicitConversionCost(
+            Decl* decl)
+        {
+            if(auto modifier = decl->FindModifier<ImplicitConversionModifier>())
+            {
+                return modifier->cost;
+            }
+
+            return kConversionCost_Explicit;
         }
 
         // Central engine for implementing implicit coercion logic
@@ -836,6 +765,7 @@ namespace Slang
 
             //
 
+#if 0
             if (auto toBasicType = toType->AsBasicType())
             {
                 if (auto fromBasicType = fromType->AsBasicType())
@@ -951,6 +881,7 @@ namespace Slang
                     }
                 }
             }
+#endif
 
             if (auto toDeclRefType = toType->As<DeclRefType>())
             {
@@ -971,7 +902,97 @@ namespace Slang
                 }
             }
 
-            // TODO: more cases!
+            // Look for an initializer/constructor declaration in the target type,
+            // which is marked as usable for implicit conversion, and which takes
+            // the source type as an argument.
+
+            OverloadResolveContext overloadContext;
+
+            List<RefPtr<Expr>> args;
+            args.Add(fromExpr);
+
+            overloadContext.disallowNestedConversions = true;
+            overloadContext.argCount = 1;
+            overloadContext.argTypes = &fromType;
+
+            overloadContext.originalExpr = nullptr;
+            if(fromExpr)
+            {
+                overloadContext.loc = fromExpr->loc;
+                overloadContext.funcLoc = fromExpr->loc;
+                overloadContext.args = &fromExpr;
+            }
+
+            overloadContext.baseExpr = nullptr;
+            overloadContext.mode = OverloadResolveContext::Mode::JustTrying;
+            
+            AddTypeOverloadCandidates(toType, overloadContext);
+
+            if(overloadContext.bestCandidates.Count() != 0)
+            {
+                // There were multiple candidates that were equally good.
+
+                // First, we will check if these candidates are even applicable.
+                // If they aren't, then they can't be used for conversion.
+                if(overloadContext.bestCandidates[0].status != OverloadCandidate::Status::Appicable)
+                    return false;
+
+                // If we reach this point, then we have multiple candidates which are
+                // all equally applicable, which means we have an ambiguity.
+                // If the user is just querying whether a conversion is possible, we
+                // will tell them it is, because ambiguity should trigger an ambiguity
+                // error, and not a "no conversion possible" error.
+
+                // We will compute a nominal conversion cost as the minimum over
+                // all the conversions available.
+                ConversionCost cost = kConversionCost_GeneralConversion;
+                for(auto candidate : overloadContext.bestCandidates)
+                {
+                    ConversionCost candidateCost = getImplicitConversionCost(
+                        candidate.item.declRef.getDecl());
+
+                    if(candidateCost < cost)
+                        cost = candidateCost;
+                }
+
+                if(outCost)
+                    *outCost = cost;
+
+                if(outToExpr)
+                {
+                    // The user is asking for us to actually perform the conversion,
+                    // so we need to generate an appropriate expression here.
+                    
+                    throw "foo bar baz";
+                }
+
+                return true;
+            }
+            else if(overloadContext.bestCandidate)
+            {
+                // There is a single best candidate for conversion.
+
+                // It might not actually be usable, so let's check that first.
+                if(overloadContext.bestCandidate->status != OverloadCandidate::Status::Appicable)
+                    return false;
+
+                // Okay, it is applicable, and we just need to let the user
+                // know about it, and optionally construct a call.
+
+                // We need to extract the conversion cost from the candidate we found.
+                ConversionCost cost = getImplicitConversionCost(
+                        overloadContext.bestCandidate->item.declRef.getDecl());;
+
+                if(outCost)
+                    *outCost = cost;
+
+                if(outToExpr)
+                {
+                    *outToExpr = CompleteOverloadCandidate(overloadContext, *overloadContext.bestCandidate);
+                }
+
+                return true;
+            }
 
             return false;
         }
@@ -991,7 +1012,7 @@ namespace Slang
         }
 
         RefPtr<Expr> CreateImplicitCastExpr(
-            RefPtr<Type>			toType,
+            RefPtr<Type>	toType,
             RefPtr<Expr>	fromExpr)
         {
             // In "rewrite" mode, we will generate a different syntax node
@@ -1007,10 +1028,17 @@ namespace Slang
                 castExpr = new ImplicitCastExpr();
             }
 
+            auto typeType = new TypeType();
+            typeType->type = toType;
+
+            auto typeExpr = new SharedTypeExpr();
+            typeExpr->type.type = typeType;
+            typeExpr->base.type = toType;
+
             castExpr->loc = fromExpr->loc;
-            castExpr->TargetType.type = toType;
+            castExpr->FunctionExpr = typeExpr;
             castExpr->type = QualType(toType);
-            castExpr->Expression = fromExpr;
+            castExpr->Arguments.Add(fromExpr);
             return castExpr;
         }
 
@@ -2272,7 +2300,7 @@ namespace Slang
             }
             else if(auto castExpr = dynamic_cast<TypeCastExpr*>(expr))
             {
-                auto val = TryConstantFoldExpr(castExpr->Expression.Ptr());
+                auto val = TryConstantFoldExpr(castExpr->Arguments[0].Ptr());
                 if(val)
                     return val;
             }
@@ -2457,7 +2485,7 @@ namespace Slang
                     }
 
                     RefPtr<Expr> subscriptFuncExpr = createLookupResultExpr(
-                        lookupResult, subscriptExpr->BaseExpression, subscriptExpr);
+                        lookupResult, subscriptExpr->BaseExpression, subscriptExpr->loc);
 
                     // Now that we know there is at least one subscript member,
                     // we will construct a reference to it and try to call it
@@ -2982,7 +3010,32 @@ namespace Slang
                 ForReal,
             };
 
-            RefPtr<AppExprBase> appExpr;
+            // Location to use when reporting overload-resolution errors.
+            SourceLoc loc;
+
+            // The original expression (if any) that triggered things
+            RefPtr<Expr> originalExpr;
+
+            // Source location of the "function" part of the expression, if any
+            SourceLoc       funcLoc;
+
+            // The original arguments to the call
+            UInt argCount = 0;
+            RefPtr<Expr>* args = nullptr;
+            RefPtr<Type>* argTypes = nullptr;
+
+            UInt getArgCount() { return argCount; }
+            RefPtr<Expr>& getArg(UInt index) { return args[index]; }
+            RefPtr<Type>& getArgType(UInt index)
+            {
+                if(argTypes)
+                    return argTypes[index];
+                else
+                    return getArg(index)->type.type;
+            }
+
+            bool disallowNestedConversions = false;
+
             RefPtr<Expr> baseExpr;
 
             // Are we still trying out candidates, or are we
@@ -3060,7 +3113,7 @@ namespace Slang
             OverloadResolveContext&		context,
             OverloadCandidate const&	candidate)
         {
-            UInt argCount = context.appExpr->Arguments.Count();
+            UInt argCount = context.getArgCount();
             ParamCounts paramCounts = { 0, 0 };
             switch (candidate.flavor)
             {
@@ -3087,7 +3140,7 @@ namespace Slang
                 {
                     if (!isRewriteMode())
                     {
-                        getSink()->diagnose(context.appExpr, Diagnostics::notEnoughArguments, argCount, paramCounts.required);
+                        getSink()->diagnose(context.loc, Diagnostics::notEnoughArguments, argCount, paramCounts.required);
                     }
                 }
                 else
@@ -3095,7 +3148,7 @@ namespace Slang
                     SLANG_ASSERT(argCount > paramCounts.allowed);
                     if (!isRewriteMode())
                     {
-                        getSink()->diagnose(context.appExpr, Diagnostics::tooManyArguments, argCount, paramCounts.allowed);
+                        getSink()->diagnose(context.loc, Diagnostics::tooManyArguments, argCount, paramCounts.allowed);
                     }
                 }
             }
@@ -3107,7 +3160,7 @@ namespace Slang
             OverloadResolveContext&		context,
             OverloadCandidate const&	candidate)
         {
-            auto expr = context.appExpr;
+            auto expr = context.originalExpr;
 
             auto decl = candidate.item.declRef.decl;
 
@@ -3120,7 +3173,7 @@ namespace Slang
                 {
                     if (!isRewriteMode())
                     {
-                        getSink()->diagnose(context.appExpr, Diagnostics::expectedPrefixOperator);
+                        getSink()->diagnose(context.loc, Diagnostics::expectedPrefixOperator);
                         getSink()->diagnose(decl, Diagnostics::seeDefinitionOf, decl->getName());
                     }
                 }
@@ -3136,7 +3189,7 @@ namespace Slang
                 {
                     if (!isRewriteMode())
                     {
-                        getSink()->diagnose(context.appExpr, Diagnostics::expectedPostfixOperator);
+                        getSink()->diagnose(context.loc, Diagnostics::expectedPostfixOperator);
                         getSink()->diagnose(decl, Diagnostics::seeDefinitionOf, decl->getName());
                     }
                 }
@@ -3155,8 +3208,6 @@ namespace Slang
             OverloadResolveContext&	context,
             OverloadCandidate&		candidate)
         {
-            auto& args = context.appExpr->Arguments;
-
             auto genericDeclRef = candidate.item.declRef.As<GenericDecl>();
 
             int aa = 0;
@@ -3164,7 +3215,7 @@ namespace Slang
             {
                 if (auto typeParamRef = memberRef.As<GenericTypeParamDecl>())
                 {
-                    auto arg = args[aa++];
+                    auto arg = context.getArg(aa++);
 
                     if (context.mode == OverloadResolveContext::Mode::JustTrying)
                     {
@@ -3180,7 +3231,7 @@ namespace Slang
                 }
                 else if (auto valParamRef = memberRef.As<GenericValueParamDecl>())
                 {
-                    auto arg = args[aa++];
+                    auto arg = context.getArg(aa++);
 
                     if (context.mode == OverloadResolveContext::Mode::JustTrying)
                     {
@@ -3210,8 +3261,7 @@ namespace Slang
             OverloadResolveContext&	context,
             OverloadCandidate&		candidate)
         {
-            auto& args = context.appExpr->Arguments;
-            UInt argCount = args.Count();
+            UInt argCount = context.getArgCount();
 
             List<DeclRef<ParamDecl>> params;
             switch (candidate.flavor)
@@ -3234,13 +3284,20 @@ namespace Slang
 
             for (UInt ii = 0; ii < argCount; ++ii)
             {
-                auto& arg = args[ii];
+                auto& arg = context.getArg(ii);
+                auto argType = context.getArgType(ii);
                 auto param = params[ii];
 
                 if (context.mode == OverloadResolveContext::Mode::JustTrying)
                 {
                     ConversionCost cost = kConversionCost_None;
-                    if (!CanCoerce(GetType(param), arg->type, &cost))
+                    if( context.disallowNestedConversions )
+                    {
+                        // We need an exact match in this case.
+                        if(!GetType(param)->Equals(argType))
+                            return false;
+                    }
+                    else if (!CanCoerce(GetType(param), argType, &cost))
                     {
                         return false;
                     }
@@ -3288,28 +3345,31 @@ namespace Slang
 
         // Create the representation of a given generic applied to some arguments
         RefPtr<Expr> CreateGenericDeclRef(
-            RefPtr<Expr>	baseExpr,
-            RefPtr<AppExprBase>				appExpr)
+            RefPtr<Expr>        baseExpr,
+            RefPtr<Expr>        originalExpr,
+            UInt                argCount,
+            RefPtr<Expr> const* args)
         {
             auto baseDeclRefExpr = baseExpr.As<DeclRefExpr>();
             if (!baseDeclRefExpr)
             {
                 SLANG_DIAGNOSE_UNEXPECTED(getSink(), baseExpr, "expected a reference to a generic declaration");
-                return CreateErrorExpr(appExpr.Ptr());
+                return CreateErrorExpr(originalExpr);
             }
             auto baseGenericRef = baseDeclRefExpr->declRef.As<GenericDecl>();
             if (!baseGenericRef)
             {
                 SLANG_DIAGNOSE_UNEXPECTED(getSink(), baseExpr, "expected a reference to a generic declaration");
-                return CreateErrorExpr(appExpr.Ptr());
+                return CreateErrorExpr(originalExpr);
             }
 
             RefPtr<Substitutions> subst = new Substitutions();
             subst->genericDecl = baseGenericRef.getDecl();
             subst->outer = baseGenericRef.substitutions;
 
-            for (auto arg : appExpr->Arguments)
+            for(UInt aa = 0; aa < argCount; ++aa)
             {
+                auto arg = args[aa];
                 subst->args.Add(ExtractGenericArgVal(arg));
             }
 
@@ -3318,7 +3378,7 @@ namespace Slang
             return ConstructDeclRefExpr(
                 innerDeclRef,
                 nullptr,
-                appExpr);
+                originalExpr->loc);
         }
 
         // Take an overload candidate that previously got through
@@ -3334,11 +3394,11 @@ namespace Slang
             // special case for generic argument inference failure
             if (candidate.status == OverloadCandidate::Status::GenericArgumentInferenceFailed)
             {
-                String callString = GetCallSignatureString(context.appExpr);
+                String callString = getCallSignatureString(context);
                 if (!isRewriteMode())
                 {
                     getSink()->diagnose(
-                        context.appExpr,
+                        context.loc,
                         Diagnostics::genericArgumentInferenceFailed,
                         callString);
 
@@ -3349,7 +3409,6 @@ namespace Slang
             }
 
             context.mode = OverloadResolveContext::Mode::ForReal;
-            context.appExpr->type = QualType(getSession()->getErrorType());
 
             if (!TryCheckOverloadCandidateArity(context, candidate))
                 goto error;
@@ -3365,41 +3424,66 @@ namespace Slang
 
             {
                 auto baseExpr = ConstructLookupResultExpr(
-                    candidate.item, context.baseExpr, context.appExpr->FunctionExpr);
+                    candidate.item, context.baseExpr, context.funcLoc);
 
                 switch(candidate.flavor)
                 {
                 case OverloadCandidate::Flavor::Func:
-                    context.appExpr->FunctionExpr = baseExpr;
-                    context.appExpr->type = QualType(candidate.resultType);
-
-                    // A call may yield an l-value, and we should take a look at the candidate to be sure
-                    if(auto subscriptDeclRef = candidate.item.declRef.As<SubscriptDecl>())
                     {
-                        for(auto setter : subscriptDeclRef.getDecl()->getMembersOfType<SetterDecl>())
+                        RefPtr<AppExprBase> callExpr = context.originalExpr.As<InvokeExpr>();
+                        if(!callExpr)
                         {
-                            context.appExpr->type.IsLeftValue = true;
+                            callExpr = new InvokeExpr();
+                            callExpr->loc = context.loc;
+
+                            for(UInt aa = 0; aa < context.argCount; ++aa)
+                                callExpr->Arguments.Add(context.getArg(aa));
                         }
+
+
+                        callExpr->FunctionExpr = baseExpr;
+                        callExpr->type = QualType(candidate.resultType);
+
+                        // A call may yield an l-value, and we should take a look at the candidate to be sure
+                        if(auto subscriptDeclRef = candidate.item.declRef.As<SubscriptDecl>())
+                        {
+                            for(auto setter : subscriptDeclRef.getDecl()->getMembersOfType<SetterDecl>())
+                            {
+                                callExpr->type.IsLeftValue = true;
+                            }
+                        }
+
+                        // TODO: there may be other cases that confer l-value-ness
+
+                        return callExpr;
                     }
 
-                    // TODO: there may be other cases that confer l-value-ness
-
-                    return context.appExpr;
                     break;
 
                 case OverloadCandidate::Flavor::Generic:
-                    return CreateGenericDeclRef(baseExpr, context.appExpr);
+                    return CreateGenericDeclRef(baseExpr, context.originalExpr,
+                        context.argCount,
+                        context.args);
                     break;
 
                 default:
-                    SLANG_DIAGNOSE_UNEXPECTED(getSink(), context.appExpr, "unknown overload candidate flavor");
+                    SLANG_DIAGNOSE_UNEXPECTED(getSink(), context.loc, "unknown overload candidate flavor");
                     break;
                 }
             }
 
 
         error:
-            return CreateErrorExpr(context.appExpr.Ptr());
+
+            if(context.originalExpr)
+            {
+                return CreateErrorExpr(context.originalExpr.Ptr());
+            }
+            else
+            {
+                SLANG_DIAGNOSE_UNEXPECTED(getSink(), context.loc, "no original expression for overload result");
+                return nullptr;
+            }
         }
 
         // Implement a comparison operation between overload candidates,
@@ -3859,6 +3943,7 @@ namespace Slang
             }
         }
 
+#if 0
         bool TryUnifyArgAndParamTypes(
             ConstraintSystem&				system,
             RefPtr<Expr>	argExpr,
@@ -3869,6 +3954,7 @@ namespace Slang
             // an overload group...
             return TryUnifyTypes(system, argExpr->type, GetType(paramDeclRef));
         }
+#endif
 
         // Take a generic declaration and try to specialize its parameters
         // so that the resulting inner declaration can be applicable in
@@ -3889,10 +3975,9 @@ namespace Slang
             // to match it up with the arguments accordingly...
             if (auto funcDeclRef = unspecializedInnerRef.As<CallableDecl>())
             {
-                auto& args = context.appExpr->Arguments;
                 auto params = GetParameters(funcDeclRef).ToArray();
 
-                UInt argCount = args.Count();
+                UInt argCount = context.getArgCount();
                 UInt paramCount = params.Count();
 
                 // Bail out on mismatch.
@@ -3926,7 +4011,7 @@ namespace Slang
                     // So the question is then whether a mismatch during the
                     // unification step should be taken as an immediate failure...
 
-                    TryUnifyArgAndParamTypes(constraints, args[aa], params[aa]);
+                    TryUnifyTypes(constraints, context.getArgType(aa), GetType(params[aa]));
 #endif
                 }
             }
@@ -4225,21 +4310,28 @@ namespace Slang
             return getDeclSignatureString(item.declRef);
         }
 
-        String GetCallSignatureString(RefPtr<AppExprBase> expr)
+        String getCallSignatureString(
+            OverloadResolveContext&     context)
         {
-                StringBuilder argsListBuilder;
+            StringBuilder argsListBuilder;
             argsListBuilder << "(";
-            bool first = true;
-            for (auto a : expr->Arguments)
+
+            UInt argCount = context.getArgCount();
+            for( UInt aa = 0; aa < argCount; ++aa )
             {
-                if (!first) argsListBuilder << ", ";
-                argsListBuilder << a->type->ToString();
-                first = false;
+                if(aa != 0) argsListBuilder << ", ";
+                argsListBuilder << context.getArgType(aa)->ToString();
             }
             argsListBuilder << ")";
             return argsListBuilder.ProduceString();
         }
 
+#if 0
+        String GetCallSignatureString(RefPtr<AppExprBase> expr)
+        {
+            return getCallSignatureString(expr->Arguments);
+        }
+#endif
 
         RefPtr<Expr> ResolveInvoke(InvokeExpr * expr)
         {
@@ -4262,7 +4354,14 @@ namespace Slang
             }
 
             OverloadResolveContext context;
-            context.appExpr = expr;
+
+            context.originalExpr = expr;
+            context.funcLoc = funcExpr->loc;
+
+            context.argCount = expr->Arguments.Count();
+            context.args = expr->Arguments.Buffer();
+            context.loc = expr->loc;
+
             if (auto funcMemberExpr = funcExpr.As<MemberExpr>())
             {
                 context.baseExpr = funcMemberExpr->BaseExpression;
@@ -4297,7 +4396,7 @@ namespace Slang
                 else if(auto baseMemberRef = funcExpr.As<MemberExpr>())
                     funcName = baseMemberRef->name;
 
-                String argsList = GetCallSignatureString(expr);
+                String argsList = getCallSignatureString(context);
 
                 if (context.bestCandidates[0].status != OverloadCandidate::Status::Appicable)
                 {
@@ -4457,7 +4556,12 @@ namespace Slang
             // Otherwise, let's start looking at how to find an overload...
 
             OverloadResolveContext context;
-            context.appExpr = genericAppExpr;
+            context.originalExpr = genericAppExpr;
+            context.funcLoc = baseExpr->loc;
+            context.argCount = args.Count();
+            context.args = args.Buffer();
+            context.loc = genericAppExpr->loc;
+
             context.baseExpr = GetBaseExpr(baseExpr);
 
             AddGenericOverloadCandidates(baseExpr, context);
@@ -4606,7 +4710,7 @@ namespace Slang
                 return createLookupResultExpr(
                     lookupResult,
                     nullptr,
-                    expr);
+                    expr->loc);
             }
 
             if (!isRewriteMode())
@@ -4619,6 +4723,29 @@ namespace Slang
 
         RefPtr<Expr> visitTypeCastExpr(TypeCastExpr * expr)
         {
+            // Check the term we are applying first
+            auto funcExpr = expr->FunctionExpr;
+            funcExpr = CheckTerm(funcExpr);
+
+            // Now ensure that the term represnets a (proper) type.
+            TypeExp typeExp;
+            typeExp.exp = funcExpr;
+            typeExp = CheckProperType(typeExp);
+
+            expr->FunctionExpr = typeExp.exp;
+            expr->type.type = typeExp.type;
+
+            // Next check the argument expression (there should be only one)
+            for (auto & arg : expr->Arguments)
+            {
+                arg = CheckExpr(arg);
+            }
+
+            // Now process this like any other explicit call (so casts
+            // and constructor calls are semantically equivalent).
+            return CheckInvokeExprWithCheckedOperands(expr);
+
+#if 0
             expr->Expression = CheckTerm(expr->Expression);
             auto targetType = CheckProperType(expr->TargetType);
             expr->TargetType = targetType;
@@ -4659,6 +4786,7 @@ namespace Slang
             }
             expr->type = QualType(getSession()->getErrorType());
             return expr;
+#endif
         }
 
         // Get the type to use when referencing a declaration
@@ -4906,7 +5034,7 @@ namespace Slang
                         return createLookupResultExpr(
                             lookupResult,
                             expr->BaseExpression,
-                            expr);
+                            expr->loc);
                     }
                 }
             }
@@ -4928,7 +5056,7 @@ namespace Slang
                     return createLookupResultExpr(
                         lookupResult,
                         expr->BaseExpression,
-                        expr);
+                        expr->loc);
                 }
 
                 // catch-all

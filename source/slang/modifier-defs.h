@@ -315,3 +315,11 @@ END_SYNTAX_CLASS()
 SYNTAX_CLASS(TupleVarModifier, Modifier)
     FIELD_INIT(TupleFieldModifier*, tupleField, nullptr)
 END_SYNTAX_CLASS()
+
+// A modifier to indicate that a constructor/initializer can be used
+// to perform implicit type conversion, and to specify the cost of
+// the conversion, if applied.
+SYNTAX_CLASS(ImplicitConversionModifier, Modifier)
+    // The conversion cost, used to rank conversions
+    FIELD(ConversionCost, cost)
+END_SYNTAX_CLASS()
