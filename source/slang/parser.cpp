@@ -3766,29 +3766,51 @@ namespace Slang
     {
         RefPtr<IntrinsicOpModifier> modifier = new IntrinsicOpModifier();
 
-        parser->ReadToken(TokenType::LParent);
-        if (parser->LookAheadToken(TokenType::IntegerLiteral))
+        // We allow a few difference forms here:
+        //
+        // First, we can specify the intrinsic op `enum` value directly:
+        //
+        //     __intrinsic_op(<integer literal>)
+        //
+        // Second, we can specify the operation by name:
+        //
+        //     __intrinsic_op(<identifier>)
+        //
+        // Finally, we can leave off the specification, so that the
+        // op name will be derived fromthe function name:
+        //
+        //     __intrinsic_op
+        //
+        if (AdvanceIf(parser, TokenType::LParent))
         {
-            modifier->op = (IntrinsicOp)StringToInt(parser->ReadToken().Content);
-        }
-        else
-        {
-            modifier->opToken = parser->ReadToken(TokenType::Identifier);
-
-            modifier->op = findIntrinsicOp(modifier->opToken.Content.Buffer());
-
-            if (modifier->op == IntrinsicOp::Unknown)
+            if (AdvanceIf(parser, TokenType::OpSub))
             {
-                parser->sink->diagnose(modifier->opToken, Diagnostics::unimplemented, "unknown intrinsic op");
+                modifier->op = IROp(-StringToInt(parser->ReadToken().Content));
             }
+            else if (parser->LookAheadToken(TokenType::IntegerLiteral))
+            {
+                modifier->op = IROp(StringToInt(parser->ReadToken().Content));
+            }
+            else
+            {
+                modifier->opToken = parser->ReadToken(TokenType::Identifier);
+
+                modifier->op = findIROp(modifier->opToken.Content.Buffer());
+
+                if (modifier->op == kIROp_Invalid)
+                {
+                    parser->sink->diagnose(modifier->opToken, Diagnostics::unimplemented, "unknown intrinsic op");
+                }
+            }
+
+            parser->ReadToken(TokenType::RParent);
         }
 
-        parser->ReadToken(TokenType::RParent);
 
         return modifier;
     }
 
-    static RefPtr<RefObject> parseIntrinsicModifier(Parser* parser, void* /*userData*/)
+    static RefPtr<RefObject> parseTargetIntrinsicModifier(Parser* parser, void* /*userData*/)
     {
         auto modifier = new TargetIntrinsicModifier();
 
@@ -4027,8 +4049,8 @@ namespace Slang
 
         MODIFIER(layout,            parseLayoutModifier);
 
-        MODIFIER(__intrinsic_op,    parseIntrinsicOpModifier);
-        MODIFIER(__intrinsic,       parseIntrinsicModifier);
+        MODIFIER(__intrinsic_op,        parseIntrinsicOpModifier);
+        MODIFIER(__target_intrinsic,    parseTargetIntrinsicModifier);
         MODIFIER(__glsl_extension,  parseGLSLExtensionModifier);
         MODIFIER(__glsl_version,    parseGLSLVersionModifier);
 

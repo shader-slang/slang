@@ -25,32 +25,28 @@ SIMPLE_MODIFIER(Exported);
 
 #undef SIMPLE_MODIFIER
 
-// Base class for modifiers that mark something as "intrinsic"
-// and thus lacking a direct implementation in the language.
-ABSTRACT_SYNTAX_CLASS(IntrinsicModifierBase, Modifier)
-END_SYNTAX_CLASS()
+// A modifier that marks something as an operation that
+// has a one-to-one translation to the IR, and thus
+// has no direct definition in the high-level language.
+//
+SYNTAX_CLASS(IntrinsicOpModifier, Modifier)
 
-// A modifier that marks something as one of a small set of
-// truly intrinsic operations that the compiler knows about
-// directly.
-SYNTAX_CLASS(IntrinsicOpModifier, IntrinsicModifierBase)
+    // token that names the intrinsic op
+    FIELD(Token, opToken)
 
-// token that names the intrinsic op
-FIELD(Token, opToken)
-
-// The opcode for the intrinsic operation
-FIELD_INIT(IntrinsicOp, op, IntrinsicOp::Unknown)
+    // The opcode for the intrinsic operation
+    FIELD_INIT(IROp, op, kIROp_Nop)
 END_SYNTAX_CLASS()
 
 // A modifier that marks something as an intrinsic function,
 // for some subset of targets.
-SYNTAX_CLASS(TargetIntrinsicModifier, IntrinsicModifierBase)
-// Token that names the target that the operation
-// is an intrisic for.
-FIELD(Token, targetToken)
+SYNTAX_CLASS(TargetIntrinsicModifier, Modifier)
+    // Token that names the target that the operation
+    // is an intrisic for.
+    FIELD(Token, targetToken)
 
-// A custom definition for the operation
-FIELD(Token, definitionToken)
+    // A custom definition for the operation
+    FIELD(Token, definitionToken)
 END_SYNTAX_CLASS()
 
 // A modifier to tag something as an intrinsic that requires

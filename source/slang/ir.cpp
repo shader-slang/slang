@@ -13,15 +13,24 @@ namespace Slang
 #include "ir-inst-defs.h"
     };
 
+    //
 
-    static const IROp kIRIntrinsicOps[] =
+    IROp findIROp(char const* name)
     {
-        (IROp) 0,
+        // TODO: need to make this faster by using a dictionary...
 
-#define INTRINSIC(NAME) kIROp_Intrinsic_##NAME,
-#include "intrinsic-defs.h"
+        if (0) {}
 
-    };
+#define INST(ID, MNEMONIC, ARG_COUNT, FLAGS)  \
+    else if(strcmp(name, #MNEMONIC) == 0) return kIROp_##ID;
+
+#define PSEUDO_INST(ID)  \
+    else if(strcmp(name, #ID) == 0) return kIRPseudoOp_##ID;
+
+#include "ir-inst-defs.h"
+
+        return IROp(kIROp_Invalid);
+    }
 
     //
 
@@ -767,13 +776,13 @@ namespace Slang
 
     IRInst* IRBuilder::emitIntrinsicInst(
         IRType*         type,
-        IntrinsicOp     intrinsicOp,
+        IROp            op,
         UInt            argCount,
         IRValue* const* args)
     {
         auto inst = createInstWithTrailingArgs<IRInst>(
             this,
-            kIRIntrinsicOps[(int)intrinsicOp],
+            op,
             type,
             argCount,
             args);

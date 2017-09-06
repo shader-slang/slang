@@ -1092,17 +1092,6 @@ void Type::accept(IValVisitor* visitor, void* extra)
         }
     }
 
-    IntrinsicOp findIntrinsicOp(char const* name)
-    {
-        // TODO: need to make this faster by using a dictionary...
-
-        if (0) {}
-#define INTRINSIC(NAME) else if(strcmp(name, #NAME) == 0) return IntrinsicOp::NAME;
-#include "intrinsic-defs.h"
-
-        return IntrinsicOp::Unknown;
-    }
-
     //
 
     // HLSLPatchType

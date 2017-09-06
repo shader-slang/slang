@@ -2117,36 +2117,13 @@ struct EmitVisitor
                     return;
                 }
 
-                // TODO: emit as approperiate for this target
-
-                // We might be calling an intrinsic subscript operation,
-                // and should desugar it accordingly
-                if(auto subscriptDeclRef = funcDeclRef.As<SubscriptDecl>())
-                {
-                    // We expect any subscript operation to be invoked as a member,
-                    // so the function expression had better be in the correct form.
-                    if(auto memberExpr = funcExpr.As<MemberExpr>())
-                    {
-
-                        Emit("(");
-                        EmitExpr(memberExpr->BaseExpression);
-                        Emit(")[");
-                        UInt argCount = callExpr->Arguments.Count();
-                        for (UInt aa = 0; aa < argCount; ++aa)
-                        {
-                            if (aa != 0) Emit(", ");
-                            EmitExpr(callExpr->Arguments[aa]);
-                        }
-                        Emit("]");
-                        return;
-                    }
-                }
+                // If we fall through here, we will treat the call like any other.
             }
             else if (auto intrinsicOpModifier = funcDecl->FindModifier<IntrinsicOpModifier>())
             {
                 switch (intrinsicOpModifier->op)
                 {
-#define CASE(NAME, OP) case IntrinsicOp::NAME: EmitBinExpr(outerPrec, kEOp_##NAME, #OP, callExpr); return
+#define CASE(NAME, OP) case kIROp_##NAME: EmitBinExpr(outerPrec, kEOp_##NAME, #OP, callExpr); return
                     CASE(Mul, *);
                     CASE(Div, / );
                     CASE(Mod, %);
@@ -2167,7 +2144,7 @@ struct EmitVisitor
                     CASE(Or, || );
 #undef CASE
 
-#define CASE(NAME, OP) case IntrinsicOp::NAME: EmitBinAssignExpr(outerPrec, kEOp_##NAME, #OP, callExpr); return
+#define CASE(NAME, OP) case kIRPseudoOp_##NAME: EmitBinAssignExpr(outerPrec, kEOp_##NAME, #OP, callExpr); return
                     CASE(Assign, =);
                     CASE(AddAssign, +=);
                     CASE(SubAssign, -=);
@@ -2181,26 +2158,26 @@ struct EmitVisitor
                     CASE(XorAssign, ^=);
 #undef CASE
 
-                case IntrinsicOp::Sequence: EmitBinExpr(outerPrec, kEOp_Comma, ",", callExpr); return;
+                case kIRPseudoOp_Sequence: EmitBinExpr(outerPrec, kEOp_Comma, ",", callExpr); return;
 
-#define CASE(NAME, OP) case IntrinsicOp::NAME: EmitUnaryExpr(outerPrec, kEOp_Prefix, #OP, "", callExpr); return
-                    CASE(Pos, +);
-                    CASE(Neg, -);
-                    CASE(Not, !);
-                    CASE(BitNot, ~);
+#define CASE(NAME, OP) case NAME: EmitUnaryExpr(outerPrec, kEOp_Prefix, #OP, "", callExpr); return
+                    CASE(kIRPseudoOp_Pos, +);
+                    CASE(kIROp_Neg, -);
+                    CASE(kIROp_Not, !);
+                    CASE(kIRPseudoOp_BitNot, ~);
 #undef CASE
 
-#define CASE(NAME, OP) case IntrinsicOp::NAME: EmitUnaryAssignExpr(outerPrec, kEOp_Prefix, #OP, "", callExpr); return
+#define CASE(NAME, OP) case kIRPseudoOp_##NAME: EmitUnaryAssignExpr(outerPrec, kEOp_Prefix, #OP, "", callExpr); return
                     CASE(PreInc, ++);
                     CASE(PreDec, --);
 #undef CASE
 
-#define CASE(NAME, OP) case IntrinsicOp::NAME: EmitUnaryAssignExpr(outerPrec, kEOp_Postfix, "", #OP, callExpr); return
+#define CASE(NAME, OP) case kIRPseudoOp_##NAME: EmitUnaryAssignExpr(outerPrec, kEOp_Postfix, "", #OP, callExpr); return
                     CASE(PostInc, ++);
                     CASE(PostDec, --);
 #undef CASE
 
-                case IntrinsicOp::InnerProduct_Vector_Vector:
+                case kIROp_Dot:
                     // HLSL allows `mul()` to be used as a synonym for `dot()`,
                     // so we need to translate to `dot` for GLSL
                     if (context->shared->target == CodeGenTarget::GLSL)
@@ -2214,9 +2191,9 @@ struct EmitVisitor
                     }
                     break;
 
-                case IntrinsicOp::InnerProduct_Matrix_Matrix:
-                case IntrinsicOp::InnerProduct_Matrix_Vector:
-                case IntrinsicOp::InnerProduct_Vector_Matrix:
+                case kIROp_Mul_Matrix_Matrix:
+                case kIROp_Mul_Vector_Matrix:
+                case kIROp_Mul_Matrix_Vector:
                     // HLSL exposes these with the `mul()` function, while GLSL uses ordinary
                     // `operator*`.
                     //
@@ -2236,6 +2213,35 @@ struct EmitVisitor
                 default:
                     break;
                 }
+
+                // If none of the above matched, then we don't have a specific
+                // case implemented to handle the opcode on the callee.
+                //
+                // We do one more special-case check here, in case the operation
+                // is a "subscript" (array indexing) operation, because we'd
+                // generally like to reproduce those as array indexing operations
+                // in the output if that is how they were written in the input.
+                if(auto subscriptDeclRef = funcDeclRef.As<SubscriptDecl>())
+                {
+                    // We expect any subscript operation to be invoked as a member,
+                    // so the function expression had better be in the correct form.
+                    if(auto memberExpr = funcExpr.As<MemberExpr>())
+                    {
+
+                        Emit("(");
+                        EmitExpr(memberExpr->BaseExpression);
+                        Emit(")[");
+                        UInt argCount = callExpr->Arguments.Count();
+                        for (UInt aa = 0; aa < argCount; ++aa)
+                        {
+                            if (aa != 0) Emit(", ");
+                            EmitExpr(callExpr->Arguments[aa]);
+                        }
+                        Emit("]");
+                        return;
+                    }
+                }
+
             }
         }
         else if (auto overloadedExpr = funcExpr.As<OverloadedExpr>())
@@ -3377,6 +3383,36 @@ struct EmitVisitor
         return varLayout;
     }
 
+    void emitHLSLParameterBlockFieldLayoutSemantics(
+        RefPtr<VarLayout>   layout,
+        RefPtr<VarLayout>   fieldLayout)
+    {
+        for( auto rr : fieldLayout->resourceInfos )
+        {
+            auto kind = rr.kind;
+
+            auto offsetResource = rr;
+
+            if(kind != LayoutResourceKind::Uniform)
+            {
+                // Add the base index from the cbuffer into the index of the field
+                //
+                // TODO(tfoley): consider maybe not doing this, since it actually
+                // complicates logic around constant buffers...
+
+                // If the member of the cbuffer uses a resource, it had better
+                // appear as part of the cubffer layout as well.
+                auto cbufferResource = layout->FindResourceInfo(kind);
+                SLANG_RELEASE_ASSERT(cbufferResource);
+
+                offsetResource.index += cbufferResource->index;
+                offsetResource.space += cbufferResource->space;
+            }
+
+            emitHLSLRegisterSemantic(offsetResource, "packoffset");
+        }
+    }
+
     void emitHLSLParameterBlockDecl(
         RefPtr<VarDeclBase>             varDecl,
         RefPtr<ParameterBlockType>      parameterBlockType,
@@ -3436,30 +3472,7 @@ struct EmitVisitor
                 SLANG_RELEASE_ASSERT(fieldLayout->varDecl.GetName() == field.GetName());
 
                 // Emit explicit layout annotations for every field
-                for( auto rr : fieldLayout->resourceInfos )
-                {
-                    auto kind = rr.kind;
-
-                    auto offsetResource = rr;
-
-                    if(kind != LayoutResourceKind::Uniform)
-                    {
-                        // Add the base index from the cbuffer into the index of the field
-                        //
-                        // TODO(tfoley): consider maybe not doing this, since it actually
-                        // complicates logic around constant buffers...
-
-                        // If the member of the cbuffer uses a resource, it had better
-                        // appear as part of the cubffer layout as well.
-                        auto cbufferResource = layout->FindResourceInfo(kind);
-                        SLANG_RELEASE_ASSERT(cbufferResource);
-
-                        offsetResource.index += cbufferResource->index;
-                        offsetResource.space += cbufferResource->space;
-                    }
-
-                    emitHLSLRegisterSemantic(offsetResource, "packoffset");
-                }
+                emitHLSLParameterBlockFieldLayoutSemantics(layout, fieldLayout);
 
                 Emit(";\n");
             }
@@ -4261,19 +4274,32 @@ emitDeclImpl(decl, nullptr);
             }
             break;
 
-        case kIROp_Intrinsic_Add:
+        case kIROp_Add:
             emitIROperand(context, inst->getArg(1));
             emit(" + ");
             emitIROperand(context, inst->getArg(2));
             break;
 
 
-        case kIROp_Intrinsic_sample_t_s_u:
+        case kIROp_Sample:
             emitIROperand(context, inst->getArg(1));
             emit(".Sample(");
             emitIROperand(context, inst->getArg(2));
             emit(", ");
             emitIROperand(context, inst->getArg(3));
+            emit(")");
+            break;
+
+        case kIROp_SampleGrad:
+            emitIROperand(context, inst->getArg(1));
+            emit(".SampleGrad(");
+            emitIROperand(context, inst->getArg(2));
+            emit(", ");
+            emitIROperand(context, inst->getArg(3));
+            emit(", ");
+            emitIROperand(context, inst->getArg(4));
+            emit(", ");
+            emitIROperand(context, inst->getArg(5));
             emit(")");
             break;
 
@@ -4351,14 +4377,26 @@ emitDeclImpl(decl, nullptr);
         }
     }
 
+    VarLayout* getVarLayout(
+        EmitContext*    context,
+        IRInst*          var)
+    {
+        auto decoration = var->findDecoration<IRLayoutDecoration>();
+        if (!decoration)
+            return nullptr;
+
+        return (VarLayout*) decoration->layout;
+    }
+
     void emitIRLayoutSemantics(
         EmitContext*    context,
-        IRInst*         inst)
+        IRInst*         inst,
+        char const*     uniformSemanticSpelling = "register")
     {
-        auto decoration = inst->findDecoration<IRLayoutDecoration>();
-        if (decoration)
+        auto layout = getVarLayout(context, inst);
+        if (layout)
         {
-            emitHLSLRegisterSemantics((VarLayout*) decoration->layout);
+            emitHLSLRegisterSemantics(layout, uniformSemanticSpelling);
         }
     }
 
@@ -4439,21 +4477,54 @@ emitDeclImpl(decl, nullptr);
     {
         emit("cbuffer ");
         emit(getName(varDecl));
-        emitIRLayoutSemantics(context, varDecl);
+
+        auto layout = getVarLayout(context, varDecl);
+        assert(layout);
+
+        auto info = layout->FindResourceInfo(LayoutResourceKind::ConstantBuffer);
+        SLANG_RELEASE_ASSERT(info);
+        emitHLSLRegisterSemantic(*info);
+
         emit("\n{\n");
 
         auto elementType = type->getElementType();
+
+        auto typeLayout = layout->typeLayout;
+        if( auto parameterBlockTypeLayout = typeLayout.As<ParameterBlockTypeLayout>() )
+        {
+            typeLayout = parameterBlockTypeLayout->elementTypeLayout;
+        }
+
         switch( elementType->op )
         {
         case kIROp_StructType:
             {
                 auto structType = (IRStructDecl*) elementType;
+
+                auto structTypeLayout = typeLayout.As<StructTypeLayout>();
+                assert(structTypeLayout);
+
+                UInt fieldIndex = 0;
                 for(auto ff = structType->getFirstField(); ff; ff = ff->getNextField())
                 {
+                    // TODO: need a plan to deal with the case where the IR-level
+                    // `struct` type might not match the high-level type, so that
+                    // the numbering of fields is different.
+                    //
+                    // The right plan is probably to require that the lowering pass
+                    // create a fresh layout for any type/variable that it splits
+                    // in this fashion, so that the layout information it attaches
+                    // can always be assumed to apply to the actual instruciton.
+                    //
+
+                    auto fieldLayout = structTypeLayout->fields[fieldIndex++];
+
+
+
                     auto fieldType = ff->getFieldType();
                     emitIRType(context, fieldType, getName(ff));
 
-                    emitIRSemantics(context, ff);
+                    emitHLSLParameterBlockFieldLayoutSemantics(layout, fieldLayout);
 
                     emit(";\n");
                 }

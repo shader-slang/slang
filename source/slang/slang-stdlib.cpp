@@ -31,8 +31,8 @@ interface __BuiltinFloatingPointType : __BuiltinRealType, __BuiltinSignedArithme
 
 __generic<T,U> __intrinsic_op(Sequence) U operator,(T left, U right);
 
-__generic<T> __intrinsic_op(Select) T operator?:(bool condition, T ifTrue, T ifFalse);
-__generic<T, let N : int> __intrinsic_op(Select) vector<T,N> operator?:(vector<bool,N> condition, vector<T,N> ifTrue, vector<T,N> ifFalse);
+__generic<T> __intrinsic_op(select) T operator?:(bool condition, T ifTrue, T ifFalse);
+__generic<T, let N : int> __intrinsic_op(select) vector<T,N> operator?:(vector<bool,N> condition, vector<T,N> ifTrue, vector<T,N> ifFalse);
 
 )=" };
 
@@ -44,60 +44,60 @@ typedef uint UINT;
 
 __generic<T> __magic_type(HLSLAppendStructuredBufferType) struct AppendStructuredBuffer
 {
-    __intrinsic void Append(T value);
+    __intrinsic_op void Append(T value);
 
-    __intrinsic void GetDimensions(
+    __intrinsic_op void GetDimensions(
         out uint numStructs,
         out uint stride);
 };
 
 __magic_type(HLSLByteAddressBufferType) struct ByteAddressBuffer
 {
-    __intrinsic void GetDimensions(
+    __intrinsic_op void GetDimensions(
         out uint dim);
 
-    __intrinsic uint Load(int location);
-    __intrinsic uint Load(int location, out uint status);
+    __intrinsic_op uint Load(int location);
+    __intrinsic_op uint Load(int location, out uint status);
 
-    __intrinsic uint2 Load2(int location);
-    __intrinsic uint2 Load2(int location, out uint status);
+    __intrinsic_op uint2 Load2(int location);
+    __intrinsic_op uint2 Load2(int location, out uint status);
 
-    __intrinsic uint3 Load3(int location);
-    __intrinsic uint3 Load3(int location, out uint status);
+    __intrinsic_op uint3 Load3(int location);
+    __intrinsic_op uint3 Load3(int location, out uint status);
 
-    __intrinsic uint4 Load4(int location);
-    __intrinsic uint4 Load4(int location, out uint status);
+    __intrinsic_op uint4 Load4(int location);
+    __intrinsic_op uint4 Load4(int location, out uint status);
 };
 
 __generic<T> __magic_type(HLSLStructuredBufferType) struct StructuredBuffer
 {
-    __intrinsic void GetDimensions(
+    __intrinsic_op void GetDimensions(
         out uint numStructs,
         out uint stride);
 
-    __intrinsic T Load(int location);
-    __intrinsic T Load(int location, out uint status);
+    __intrinsic_op T Load(int location);
+    __intrinsic_op T Load(int location, out uint status);
 
-    __intrinsic __subscript(uint index) -> T;
+    __intrinsic_op __subscript(uint index) -> T;
 };
 
 __generic<T> __magic_type(HLSLConsumeStructuredBufferType) struct ConsumeStructuredBuffer
 {
-    __intrinsic T Consume();
+    __intrinsic_op T Consume();
 
-    __intrinsic void GetDimensions(
+    __intrinsic_op void GetDimensions(
         out uint numStructs,
         out uint stride);
 };
 
 __generic<T, let N : int> __magic_type(HLSLInputPatchType) struct InputPatch
 {
-    __intrinsic __subscript(uint index) -> T;
+    __intrinsic_op __subscript(uint index) -> T;
 };
 
 __generic<T, let N : int> __magic_type(HLSLOutputPatchType) struct OutputPatch
 {
-    __intrinsic __subscript(uint index) -> T { set; }
+    __intrinsic_op __subscript(uint index) -> T { set; }
 };
 
 __magic_type(HLSLRWByteAddressBufferType) struct RWByteAddressBuffer
@@ -105,128 +105,128 @@ __magic_type(HLSLRWByteAddressBufferType) struct RWByteAddressBuffer
     // Note(tfoley): supports alll operations from `ByteAddressBuffer`
     // TODO(tfoley): can this be made a sub-type?
 
-    __intrinsic void GetDimensions(
+    __intrinsic_op void GetDimensions(
         out uint dim);
 
-    __intrinsic uint Load(int location);
-    __intrinsic uint Load(int location, out uint status);
+    __intrinsic_op uint Load(int location);
+    __intrinsic_op uint Load(int location, out uint status);
 
-    __intrinsic uint2 Load2(int location);
-    __intrinsic uint2 Load2(int location, out uint status);
+    __intrinsic_op uint2 Load2(int location);
+    __intrinsic_op uint2 Load2(int location, out uint status);
 
-    __intrinsic uint3 Load3(int location);
-    __intrinsic uint3 Load3(int location, out uint status);
+    __intrinsic_op uint3 Load3(int location);
+    __intrinsic_op uint3 Load3(int location, out uint status);
 
-    __intrinsic uint4 Load4(int location);
-    __intrinsic uint4 Load4(int location, out uint status);
+    __intrinsic_op uint4 Load4(int location);
+    __intrinsic_op uint4 Load4(int location, out uint status);
 
     // Added operations:
 
-    __intrinsic void InterlockedAdd(
+    __intrinsic_op void InterlockedAdd(
         UINT dest,
         UINT value,
         out UINT original_value);
-    __intrinsic void InterlockedAdd(
+    __intrinsic_op void InterlockedAdd(
         UINT dest,
         UINT value);
 
-    __intrinsic void InterlockedAnd(
+    __intrinsic_op void InterlockedAnd(
         UINT dest,
         UINT value,
         out UINT original_value);
-    __intrinsic void InterlockedAnd(
+    __intrinsic_op void InterlockedAnd(
         UINT dest,
         UINT value);
 
-    __intrinsic void InterlockedCompareExchange(
+    __intrinsic_op void InterlockedCompareExchange(
         UINT dest,
         UINT compare_value,
         UINT value,
         out UINT original_value);
-    __intrinsic void InterlockedCompareExchange(
+    __intrinsic_op void InterlockedCompareExchange(
         UINT dest,
         UINT compare_value,
         UINT value);
 
-    __intrinsic void InterlockedCompareStore(
+    __intrinsic_op void InterlockedCompareStore(
         UINT dest,
         UINT compare_value,
         UINT value);
-    __intrinsic void InterlockedCompareStore(
+    __intrinsic_op void InterlockedCompareStore(
         UINT dest,
         UINT compare_value);
 
-    __intrinsic void InterlockedExchange(
+    __intrinsic_op void InterlockedExchange(
         UINT dest,
         UINT value,
         out UINT original_value);
-    __intrinsic void InterlockedExchange(
+    __intrinsic_op void InterlockedExchange(
         UINT dest,
         UINT value);
 
-    __intrinsic void InterlockedMax(
+    __intrinsic_op void InterlockedMax(
         UINT dest,
         UINT value,
         out UINT original_value);
-    __intrinsic void InterlockedMax(
+    __intrinsic_op void InterlockedMax(
         UINT dest,
         UINT value);
 
-    __intrinsic void InterlockedMin(
+    __intrinsic_op void InterlockedMin(
         UINT dest,
         UINT value,
         out UINT original_value);
-    __intrinsic void InterlockedMin(
+    __intrinsic_op void InterlockedMin(
         UINT dest,
         UINT value);
 
-    __intrinsic void InterlockedOr(
+    __intrinsic_op void InterlockedOr(
         UINT dest,
         UINT value,
         out UINT original_value);
-    __intrinsic void InterlockedOr(
+    __intrinsic_op void InterlockedOr(
         UINT dest,
         UINT value);
 
-    __intrinsic void InterlockedXor(
+    __intrinsic_op void InterlockedXor(
         UINT dest,
         UINT value,
         out UINT original_value);
-    __intrinsic void InterlockedXor(
+    __intrinsic_op void InterlockedXor(
         UINT dest,
         UINT value);
 
-    __intrinsic void Store(
+    __intrinsic_op void Store(
         uint address,
         uint value);
 
-    __intrinsic void Store2(
+    __intrinsic_op void Store2(
         uint address,
         uint2 value);
 
-    __intrinsic void Store3(
+    __intrinsic_op void Store3(
         uint address,
         uint3 value);
 
-    __intrinsic void Store4(
+    __intrinsic_op void Store4(
         uint address,
         uint4 value);
 };
 
 __generic<T> __magic_type(HLSLRWStructuredBufferType) struct RWStructuredBuffer
 {
-    __intrinsic uint DecrementCounter();
+    __intrinsic_op uint DecrementCounter();
 
-    __intrinsic void GetDimensions(
+    __intrinsic_op void GetDimensions(
         out uint numStructs,
         out uint stride);
 
-    __intrinsic void IncrementCounter();
+    __intrinsic_op void IncrementCounter();
 
-    __intrinsic T Load(int location);
-    __intrinsic T Load(int location, out uint status);
+    __intrinsic_op T Load(int location);
+    __intrinsic_op T Load(int location, out uint status);
 
-    __intrinsic __subscript(uint index) -> T { get; set; }
+    __intrinsic_op __subscript(uint index) -> T { get; set; }
 };
 
 __generic<T> __magic_type(HLSLPointStreamType) struct PointStream
@@ -252,566 +252,566 @@ __generic<T> __magic_type(HLSLTriangleStreamType) struct TriangleStream
 // Note(tfoley): Trying to systematically add all the HLSL builtins
 
 // Try to terminate the current draw or dispatch call (HLSL SM 4.0)
-__intrinsic void abort();
+__intrinsic_op void abort();
 
 // Absolute value (HLSL SM 1.0)
-__generic<T : __BuiltinSignedArithmeticType> __intrinsic T abs(T x);
-__generic<T : __BuiltinSignedArithmeticType, let N : int> __intrinsic vector<T,N> abs(vector<T,N> x);
-__generic<T : __BuiltinSignedArithmeticType, let N : int, let M : int> __intrinsic matrix<T,N,M> abs(matrix<T,N,M> x);
+__generic<T : __BuiltinSignedArithmeticType> __intrinsic_op T abs(T x);
+__generic<T : __BuiltinSignedArithmeticType, let N : int> __intrinsic_op vector<T,N> abs(vector<T,N> x);
+__generic<T : __BuiltinSignedArithmeticType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> abs(matrix<T,N,M> x);
 
 // Inverse cosine (HLSL SM 1.0)
-__generic<T : __BuiltinFloatingPointType> __intrinsic T acos(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> acos(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> acos(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType> __intrinsic_op T acos(T x);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op vector<T,N> acos(vector<T,N> x);
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> acos(matrix<T,N,M> x);
 
 // Test if all components are non-zero (HLSL SM 1.0)
-__generic<T : __BuiltinType> __intrinsic T all(T x);
-__generic<T : __BuiltinType, let N : int> __intrinsic vector<T,N> all(vector<T,N> x);
-__generic<T : __BuiltinType, let N : int, let M : int> __intrinsic matrix<T,N,M> all(matrix<T,N,M> x);
+__generic<T : __BuiltinType> __intrinsic_op T all(T x);
+__generic<T : __BuiltinType, let N : int> __intrinsic_op vector<T,N> all(vector<T,N> x);
+__generic<T : __BuiltinType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> all(matrix<T,N,M> x);
 
 // Barrier for writes to all memory spaces (HLSL SM 5.0)
-__intrinsic void AllMemoryBarrier();
+__intrinsic_op void AllMemoryBarrier();
 
 // Thread-group sync and barrier for writes to all memory spaces (HLSL SM 5.0)
-__intrinsic void AllMemoryBarrierWithGroupSync();
+__intrinsic_op void AllMemoryBarrierWithGroupSync();
 
 // Test if any components is non-zero (HLSL SM 1.0)
-__generic<T : __BuiltinType> __intrinsic T any(T x);
-__generic<T : __BuiltinType, let N : int> __intrinsic vector<T,N> any(vector<T,N> x);
-__generic<T : __BuiltinType, let N : int, let M : int> __intrinsic matrix<T,N,M> any(matrix<T,N,M> x);
+__generic<T : __BuiltinType> __intrinsic_op T any(T x);
+__generic<T : __BuiltinType, let N : int> __intrinsic_op vector<T,N> any(vector<T,N> x);
+__generic<T : __BuiltinType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> any(matrix<T,N,M> x);
 
 
 // Reinterpret bits as a double (HLSL SM 5.0)
-__intrinsic double asdouble(uint lowbits, uint highbits);
+__intrinsic_op double asdouble(uint lowbits, uint highbits);
 
 // Reinterpret bits as a float (HLSL SM 4.0)
-__intrinsic float asfloat( int x);
-__intrinsic float asfloat(uint x);
-__generic<let N : int> __intrinsic vector<float,N> asfloat(vector< int,N> x);
-__generic<let N : int> __intrinsic vector<float,N> asfloat(vector<uint,N> x);
-__generic<let N : int, let M : int> __intrinsic matrix<float,N,M> asfloat(matrix< int,N,M> x);
-__generic<let N : int, let M : int> __intrinsic matrix<float,N,M> asfloat(matrix<uint,N,M> x);
+__intrinsic_op float asfloat( int x);
+__intrinsic_op float asfloat(uint x);
+__generic<let N : int> __intrinsic_op vector<float,N> asfloat(vector< int,N> x);
+__generic<let N : int> __intrinsic_op vector<float,N> asfloat(vector<uint,N> x);
+__generic<let N : int, let M : int> __intrinsic_op matrix<float,N,M> asfloat(matrix< int,N,M> x);
+__generic<let N : int, let M : int> __intrinsic_op matrix<float,N,M> asfloat(matrix<uint,N,M> x);
 
 
 // Inverse sine (HLSL SM 1.0)
-__generic<T : __BuiltinFloatingPointType> __intrinsic T asin(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> asin(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> asin(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType> __intrinsic_op T asin(T x);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op vector<T,N> asin(vector<T,N> x);
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> asin(matrix<T,N,M> x);
 
 // Reinterpret bits as an int (HLSL SM 4.0)
-__intrinsic int asint(float x);
-__intrinsic int asint(uint x);
-__generic<let N : int> __intrinsic vector<int,N> asint(vector<float,N> x);
-__generic<let N : int> __intrinsic vector<int,N> asint(vector<uint,N> x);
-__generic<let N : int, let M : int> __intrinsic matrix<int,N,M> asint(matrix<float,N,M> x);
-__generic<let N : int, let M : int> __intrinsic matrix<int,N,M> asint(matrix<uint,N,M> x);
+__intrinsic_op int asint(float x);
+__intrinsic_op int asint(uint x);
+__generic<let N : int> __intrinsic_op vector<int,N> asint(vector<float,N> x);
+__generic<let N : int> __intrinsic_op vector<int,N> asint(vector<uint,N> x);
+__generic<let N : int, let M : int> __intrinsic_op matrix<int,N,M> asint(matrix<float,N,M> x);
+__generic<let N : int, let M : int> __intrinsic_op matrix<int,N,M> asint(matrix<uint,N,M> x);
 
 // Reinterpret bits of double as a uint (HLSL SM 5.0)
-__intrinsic void asuint(double value, out uint lowbits, out uint highbits);
+__intrinsic_op void asuint(double value, out uint lowbits, out uint highbits);
 
 // Reinterpret bits as a uint (HLSL SM 4.0)
-__intrinsic uint asuint(float x);
-__intrinsic uint asuint(int x);
-__generic<let N : int> __intrinsic vector<uint,N> asuint(vector<float,N> x);
-__generic<let N : int> __intrinsic vector<uint,N> asuint(vector<int,N> x);
-__generic<let N : int, let M : int> __intrinsic matrix<uint,N,M> asuint(matrix<float,N,M> x);
-__generic<let N : int, let M : int> __intrinsic matrix<uint,N,M> asuint(matrix<int,N,M> x);
+__intrinsic_op uint asuint(float x);
+__intrinsic_op uint asuint(int x);
+__generic<let N : int> __intrinsic_op vector<uint,N> asuint(vector<float,N> x);
+__generic<let N : int> __intrinsic_op vector<uint,N> asuint(vector<int,N> x);
+__generic<let N : int, let M : int> __intrinsic_op matrix<uint,N,M> asuint(matrix<float,N,M> x);
+__generic<let N : int, let M : int> __intrinsic_op matrix<uint,N,M> asuint(matrix<int,N,M> x);
 
 // Inverse tangent (HLSL SM 1.0)
-__generic<T : __BuiltinFloatingPointType> __intrinsic T atan(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> atan(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> atan(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType> __intrinsic_op T atan(T x);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op vector<T,N> atan(vector<T,N> x);
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> atan(matrix<T,N,M> x);
 
 __generic<T : __BuiltinFloatingPointType>
-__intrinsic(glsl,"atan($0,$1)")
-__intrinsic
+__target_intrinsic(glsl,"atan($0,$1)")
+__intrinsic_op
 T atan2(T y, T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
-__intrinsic(glsl,"atan($0,$1)")
-__intrinsic
+__target_intrinsic(glsl,"atan($0,$1)")
+__intrinsic_op
 vector<T,N> atan2(vector<T,N> y, vector<T,N> x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
-__intrinsic(glsl,"atan($0,$1)")
-__intrinsic
+__target_intrinsic(glsl,"atan($0,$1)")
+__intrinsic_op
 matrix<T,N,M> atan2(matrix<T,N,M> y, matrix<T,N,M> x);
 
 // Ceiling (HLSL SM 1.0)
-__generic<T : __BuiltinFloatingPointType> __intrinsic T ceil(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> ceil(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> ceil(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType> __intrinsic_op T ceil(T x);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op vector<T,N> ceil(vector<T,N> x);
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> ceil(matrix<T,N,M> x);
 
 
 // Check access status to tiled resource
-__intrinsic bool CheckAccessFullyMapped(uint status);
+__intrinsic_op bool CheckAccessFullyMapped(uint status);
 
 // Clamp (HLSL SM 1.0)
-__generic<T : __BuiltinArithmeticType> __intrinsic T clamp(T x, T min, T max);
-__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic vector<T,N> clamp(vector<T,N> x, vector<T,N> min, vector<T,N> max);
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic matrix<T,N,M> clamp(matrix<T,N,M> x, matrix<T,N,M> min, matrix<T,N,M> max);
+__generic<T : __BuiltinArithmeticType> __intrinsic_op T clamp(T x, T min, T max);
+__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic_op vector<T,N> clamp(vector<T,N> x, vector<T,N> min, vector<T,N> max);
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> clamp(matrix<T,N,M> x, matrix<T,N,M> min, matrix<T,N,M> max);
 
 // Clip (discard) fragment conditionally
-__generic<T : __BuiltinFloatingPointType> __intrinsic void clip(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic void clip(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic void clip(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType> __intrinsic_op void clip(T x);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op void clip(vector<T,N> x);
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_op void clip(matrix<T,N,M> x);
 
 // Cosine
-__generic<T : __BuiltinFloatingPointType> __intrinsic T cos(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> cos(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> cos(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType> __intrinsic_op T cos(T x);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op vector<T,N> cos(vector<T,N> x);
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> cos(matrix<T,N,M> x);
 
 // Hyperbolic cosine
-__generic<T : __BuiltinFloatingPointType> __intrinsic T cosh(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> cosh(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> cosh(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType> __intrinsic_op T cosh(T x);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op vector<T,N> cosh(vector<T,N> x);
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> cosh(matrix<T,N,M> x);
 
 // Population count
-__intrinsic uint countbits(uint value);
+__intrinsic_op uint countbits(uint value);
 
 // Cross product
-__generic<T : __BuiltinArithmeticType> __intrinsic vector<T,3> cross(vector<T,3> x, vector<T,3> y);
+__generic<T : __BuiltinArithmeticType> __intrinsic_op vector<T,3> cross(vector<T,3> x, vector<T,3> y);
 
 // Convert encoded color
-__intrinsic int4 D3DCOLORtoUBYTE4(float4 x);
+__intrinsic_op int4 D3DCOLORtoUBYTE4(float4 x);
 
 // Partial-difference derivatives
 __generic<T : __BuiltinFloatingPointType>
-__intrinsic(glsl, dFdx)
-__intrinsic
+__target_intrinsic(glsl, dFdx)
+__intrinsic_op
 T ddx(T x);
 __generic<T : __BuiltinFloatingPointType, let N : int>
-__intrinsic(glsl, dFdx)
-__intrinsic
+__target_intrinsic(glsl, dFdx)
+__intrinsic_op
 vector<T,N> ddx(vector<T,N> x);
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
-__intrinsic(glsl, dFdx)
-__intrinsic
+__target_intrinsic(glsl, dFdx)
+__intrinsic_op
 matrix<T,N,M> ddx(matrix<T,N,M> x);
 
 __generic<T : __BuiltinFloatingPointType>
 __glsl_extension(GL_ARB_derivative_control)
-__intrinsic(glsl, dFdxCoarse)
-__intrinsic
+__target_intrinsic(glsl, dFdxCoarse)
+__intrinsic_op
 T ddx_coarse(T x);
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __glsl_extension(GL_ARB_derivative_control)
-__intrinsic(glsl, dFdxCoarse)
-__intrinsic
+__target_intrinsic(glsl, dFdxCoarse)
+__intrinsic_op
 vector<T,N> ddx_coarse(vector<T,N> x);
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __glsl_extension(GL_ARB_derivative_control)
-__intrinsic(glsl, dFdxCoarse)
-__intrinsic
+__target_intrinsic(glsl, dFdxCoarse)
+__intrinsic_op
 matrix<T,N,M> ddx_coarse(matrix<T,N,M> x);
 
 __generic<T : __BuiltinFloatingPointType>
 __glsl_extension(GL_ARB_derivative_control)
-__intrinsic(glsl, dFdxFine)
-__intrinsic
+__target_intrinsic(glsl, dFdxFine)
+__intrinsic_op
 T ddx_fine(T x);
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __glsl_extension(GL_ARB_derivative_control)
-__intrinsic(glsl, dFdxFine)
-__intrinsic
+__target_intrinsic(glsl, dFdxFine)
+__intrinsic_op
 vector<T,N> ddx_fine(vector<T,N> x);
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __glsl_extension(GL_ARB_derivative_control)
-__intrinsic(glsl, dFdxFine)
-__intrinsic
+__target_intrinsic(glsl, dFdxFine)
+__intrinsic_op
 matrix<T,N,M> ddx_fine(matrix<T,N,M> x);
 
 __generic<T : __BuiltinFloatingPointType>
-__intrinsic(glsl, dFdy)
-__intrinsic
+__target_intrinsic(glsl, dFdy)
+__intrinsic_op
 T ddy(T x);
 __generic<T : __BuiltinFloatingPointType, let N : int>
-__intrinsic(glsl, dFdy)
-__intrinsic
+__target_intrinsic(glsl, dFdy)
+__intrinsic_op
 vector<T,N> ddy(vector<T,N> x);
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
-__intrinsic(glsl, dFdy)
-__intrinsic
+__target_intrinsic(glsl, dFdy)
+__intrinsic_op
  matrix<T,N,M> ddy(matrix<T,N,M> x);
 
 __generic<T : __BuiltinFloatingPointType>
 __glsl_extension(GL_ARB_derivative_control)
-__intrinsic(glsl, dFdyCoarse)
-__intrinsic
+__target_intrinsic(glsl, dFdyCoarse)
+__intrinsic_op
 T ddy_coarse(T x);
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __glsl_extension(GL_ARB_derivative_control)
-__intrinsic(glsl, dFdyCoarse)
-__intrinsic
+__target_intrinsic(glsl, dFdyCoarse)
+__intrinsic_op
 vector<T,N> ddy_coarse(vector<T,N> x);
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __glsl_extension(GL_ARB_derivative_control)
-__intrinsic(glsl, dFdyCoarse)
-__intrinsic
+__target_intrinsic(glsl, dFdyCoarse)
+__intrinsic_op
 matrix<T,N,M> ddy_coarse(matrix<T,N,M> x);
 
 __generic<T : __BuiltinFloatingPointType>
 __glsl_extension(GL_ARB_derivative_control)
-__intrinsic(glsl, dFdyFine)
-__intrinsic
+__target_intrinsic(glsl, dFdyFine)
+__intrinsic_op
 T ddy_fine(T x);
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __glsl_extension(GL_ARB_derivative_control)
-__intrinsic(glsl, dFdyFine)
-__intrinsic
+__target_intrinsic(glsl, dFdyFine)
+__intrinsic_op
 vector<T,N> ddy_fine(vector<T,N> x);
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __glsl_extension(GL_ARB_derivative_control)
-__intrinsic(glsl, dFdyFine)
-__intrinsic
+__target_intrinsic(glsl, dFdyFine)
+__intrinsic_op
 matrix<T,N,M> ddy_fine(matrix<T,N,M> x);
 
 
 // Radians to degrees
-__generic<T : __BuiltinFloatingPointType> __intrinsic T degrees(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> degrees(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> degrees(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType> __intrinsic_op T degrees(T x);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op vector<T,N> degrees(vector<T,N> x);
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> degrees(matrix<T,N,M> x);
 
 // Matrix determinant
 
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic T determinant(matrix<T,N,N> m);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op T determinant(matrix<T,N,N> m);
 
 // Barrier for device memory
-__intrinsic void DeviceMemoryBarrier();
-__intrinsic void DeviceMemoryBarrierWithGroupSync();
+__intrinsic_op void DeviceMemoryBarrier();
+__intrinsic_op void DeviceMemoryBarrierWithGroupSync();
 
 // Vector distance
 
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic T distance(vector<T,N> x, vector<T,N> y);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op T distance(vector<T,N> x, vector<T,N> y);
 
 // Vector dot product
 
-__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic T dot(vector<T,N> x, vector<T,N> y);
+__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic_op T dot(vector<T,N> x, vector<T,N> y);
 
 // Helper for computing distance terms for lighting (obsolete)
 
-__generic<T : __BuiltinFloatingPointType> __intrinsic vector<T,4> dst(vector<T,4> x, vector<T,4> y);
+__generic<T : __BuiltinFloatingPointType> __intrinsic_op vector<T,4> dst(vector<T,4> x, vector<T,4> y);
 
 // Error message
 
-// __intrinsic void errorf( string format, ... );
+// __intrinsic_op void errorf( string format, ... );
 
 // Attribute evaluation
 
-__generic<T : __BuiltinArithmeticType> __intrinsic T EvaluateAttributeAtCentroid(T x);
-__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic vector<T,N> EvaluateAttributeAtCentroid(vector<T,N> x);
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic matrix<T,N,M> EvaluateAttributeAtCentroid(matrix<T,N,M> x);
+__generic<T : __BuiltinArithmeticType> __intrinsic_op T EvaluateAttributeAtCentroid(T x);
+__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic_op vector<T,N> EvaluateAttributeAtCentroid(vector<T,N> x);
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> EvaluateAttributeAtCentroid(matrix<T,N,M> x);
 
-__generic<T : __BuiltinArithmeticType> __intrinsic T EvaluateAttributeAtSample(T x, uint sampleindex);
-__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic vector<T,N> EvaluateAttributeAtSample(vector<T,N> x, uint sampleindex);
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic matrix<T,N,M> EvaluateAttributeAtSample(matrix<T,N,M> x, uint sampleindex);
+__generic<T : __BuiltinArithmeticType> __intrinsic_op T EvaluateAttributeAtSample(T x, uint sampleindex);
+__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic_op vector<T,N> EvaluateAttributeAtSample(vector<T,N> x, uint sampleindex);
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> EvaluateAttributeAtSample(matrix<T,N,M> x, uint sampleindex);
 
-__generic<T : __BuiltinArithmeticType> __intrinsic T EvaluateAttributeSnapped(T x, int2 offset);
-__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic vector<T,N> EvaluateAttributeSnapped(vector<T,N> x, int2 offset);
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic matrix<T,N,M> EvaluateAttributeSnapped(matrix<T,N,M> x, int2 offset);
+__generic<T : __BuiltinArithmeticType> __intrinsic_op T EvaluateAttributeSnapped(T x, int2 offset);
+__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic_op vector<T,N> EvaluateAttributeSnapped(vector<T,N> x, int2 offset);
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> EvaluateAttributeSnapped(matrix<T,N,M> x, int2 offset);
 
 // Base-e exponent
-__generic<T : __BuiltinFloatingPointType> __intrinsic T exp(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> exp(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> exp(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType> __intrinsic_op T exp(T x);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op vector<T,N> exp(vector<T,N> x);
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> exp(matrix<T,N,M> x);
 
 // Base-2 exponent
-__generic<T : __BuiltinFloatingPointType> __intrinsic T exp2(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> exp2(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> exp2(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType> __intrinsic_op T exp2(T x);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op vector<T,N> exp2(vector<T,N> x);
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> exp2(matrix<T,N,M> x);
 
 // Convert 16-bit float stored in low bits of integer
-__intrinsic float f16tof32(uint value);
-__generic<let N : int> __intrinsic vector<float,N> f16tof32(vector<uint,N> value);
+__intrinsic_op float f16tof32(uint value);
+__generic<let N : int> __intrinsic_op vector<float,N> f16tof32(vector<uint,N> value);
 
 // Convert to 16-bit float stored in low bits of integer
-__intrinsic uint f32tof16(float value);
-__generic<let N : int> __intrinsic vector<uint,N> f32tof16(vector<float,N> value);
+__intrinsic_op uint f32tof16(float value);
+__generic<let N : int> __intrinsic_op vector<uint,N> f32tof16(vector<float,N> value);
 
 // Flip surface normal to face forward, if needed
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> faceforward(vector<T,N> n, vector<T,N> i, vector<T,N> ng);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op vector<T,N> faceforward(vector<T,N> n, vector<T,N> i, vector<T,N> ng);
 
 // Find first set bit starting at high bit and working down
-__intrinsic int firstbithigh(int value);
-__generic<let N : int> __intrinsic vector<int,N> firstbithigh(vector<int,N> value);
+__intrinsic_op int firstbithigh(int value);
+__generic<let N : int> __intrinsic_op vector<int,N> firstbithigh(vector<int,N> value);
 
-__intrinsic uint firstbithigh(uint value);
-__generic<let N : int> __intrinsic vector<uint,N> firstbithigh(vector<uint,N> value);
+__intrinsic_op uint firstbithigh(uint value);
+__generic<let N : int> __intrinsic_op vector<uint,N> firstbithigh(vector<uint,N> value);
 
 // Find first set bit starting at low bit and working up
-__intrinsic int firstbitlow(int value);
-__generic<let N : int> __intrinsic vector<int,N> firstbitlow(vector<int,N> value);
+__intrinsic_op int firstbitlow(int value);
+__generic<let N : int> __intrinsic_op vector<int,N> firstbitlow(vector<int,N> value);
 
-__intrinsic uint firstbitlow(uint value);
-__generic<let N : int> __intrinsic vector<uint,N> firstbitlow(vector<uint,N> value);
+__intrinsic_op uint firstbitlow(uint value);
+__generic<let N : int> __intrinsic_op vector<uint,N> firstbitlow(vector<uint,N> value);
 
 // Floor (HLSL SM 1.0)
-__generic<T : __BuiltinFloatingPointType> __intrinsic T floor(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> floor(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> floor(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType> __intrinsic_op T floor(T x);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op vector<T,N> floor(vector<T,N> x);
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> floor(matrix<T,N,M> x);
 
 // Fused multiply-add for doubles
-__intrinsic double fma(double a, double b, double c);
-__generic<let N : int> __intrinsic vector<double, N> fma(vector<double, N> a, vector<double, N> b, vector<double, N> c);
-__generic<let N : int, let M : int> __intrinsic matrix<double,N,M> fma(matrix<double,N,M> a, matrix<double,N,M> b, matrix<double,N,M> c);
+__intrinsic_op double fma(double a, double b, double c);
+__generic<let N : int> __intrinsic_op vector<double, N> fma(vector<double, N> a, vector<double, N> b, vector<double, N> c);
+__generic<let N : int, let M : int> __intrinsic_op matrix<double,N,M> fma(matrix<double,N,M> a, matrix<double,N,M> b, matrix<double,N,M> c);
 
 // Floating point remainder of x/y
-__generic<T : __BuiltinFloatingPointType> __intrinsic T fmod(T x, T y);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> fmod(vector<T,N> x, vector<T,N> y);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> fmod(matrix<T,N,M> x, matrix<T,N,M> y);
+__generic<T : __BuiltinFloatingPointType> __intrinsic_op T fmod(T x, T y);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op vector<T,N> fmod(vector<T,N> x, vector<T,N> y);
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> fmod(matrix<T,N,M> x, matrix<T,N,M> y);
 
 // Fractional part
 __generic<T : __BuiltinFloatingPointType>
-__intrinsic(glsl, fract)
-__intrinsic
+__target_intrinsic(glsl, fract)
+__intrinsic_op
 T frac(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
-__intrinsic(glsl, fract)
-__intrinsic
+__target_intrinsic(glsl, fract)
+__intrinsic_op
 vector<T,N> frac(vector<T,N> x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
-__intrinsic(glsl, fract)
-__intrinsic
+__target_intrinsic(glsl, fract)
+__intrinsic_op
 matrix<T,N,M> frac(matrix<T,N,M> x);
 
 // Split float into mantissa and exponent
-__generic<T : __BuiltinFloatingPointType> __intrinsic T frexp(T x, out T exp);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> frexp(vector<T,N> x, out vector<T,N> exp);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> frexp(matrix<T,N,M> x, out matrix<T,N,M> exp);
+__generic<T : __BuiltinFloatingPointType> __intrinsic_op T frexp(T x, out T exp);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op vector<T,N> frexp(vector<T,N> x, out vector<T,N> exp);
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> frexp(matrix<T,N,M> x, out matrix<T,N,M> exp);
 
 // Texture filter width
-__generic<T : __BuiltinFloatingPointType> __intrinsic T fwidth(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> fwidth(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> fwidth(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType> __intrinsic_op T fwidth(T x);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op vector<T,N> fwidth(vector<T,N> x);
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> fwidth(matrix<T,N,M> x);
 
 )=", R"=(
 
 // Get number of samples in render target
-__intrinsic uint GetRenderTargetSampleCount();
+__intrinsic_op uint GetRenderTargetSampleCount();
 
 // Get position of given sample
-__intrinsic float2 GetRenderTargetSamplePosition(int Index);
+__intrinsic_op float2 GetRenderTargetSamplePosition(int Index);
 
 // Group memory barrier
-__intrinsic void GroupMemoryBarrier();
-__intrinsic void GroupMemoryBarrierWithGroupSync();
+__intrinsic_op void GroupMemoryBarrier();
+__intrinsic_op void GroupMemoryBarrierWithGroupSync();
 
 // Atomics
-__intrinsic void InterlockedAdd(in out  int dest,  int value, out  int original_value);
-__intrinsic void InterlockedAdd(in out uint dest, uint value, out uint original_value);
+__intrinsic_op void InterlockedAdd(in out  int dest,  int value, out  int original_value);
+__intrinsic_op void InterlockedAdd(in out uint dest, uint value, out uint original_value);
 
-__intrinsic void InterlockedAnd(in out  int dest,  int value, out  int original_value);
-__intrinsic void InterlockedAnd(in out uint dest, uint value, out uint original_value);
+__intrinsic_op void InterlockedAnd(in out  int dest,  int value, out  int original_value);
+__intrinsic_op void InterlockedAnd(in out uint dest, uint value, out uint original_value);
 
-__intrinsic void InterlockedCompareExchange(in out  int dest,  int compare_value,  int value, out  int original_value);
-__intrinsic void InterlockedCompareExchange(in out uint dest, uint compare_value, uint value, out uint original_value);
+__intrinsic_op void InterlockedCompareExchange(in out  int dest,  int compare_value,  int value, out  int original_value);
+__intrinsic_op void InterlockedCompareExchange(in out uint dest, uint compare_value, uint value, out uint original_value);
 
-__intrinsic void InterlockedCompareStore(in out  int dest,  int compare_value,  int value);
-__intrinsic void InterlockedCompareStore(in out uint dest, uint compare_value, uint value);
+__intrinsic_op void InterlockedCompareStore(in out  int dest,  int compare_value,  int value);
+__intrinsic_op void InterlockedCompareStore(in out uint dest, uint compare_value, uint value);
 
-__intrinsic void InterlockedExchange(in out  int dest,  int value, out  int original_value);
-__intrinsic void InterlockedExchange(in out uint dest, uint value, out uint original_value);
+__intrinsic_op void InterlockedExchange(in out  int dest,  int value, out  int original_value);
+__intrinsic_op void InterlockedExchange(in out uint dest, uint value, out uint original_value);
 
-__intrinsic void InterlockedMax(in out  int dest,  int value, out  int original_value);
-__intrinsic void InterlockedMax(in out uint dest, uint value, out uint original_value);
+__intrinsic_op void InterlockedMax(in out  int dest,  int value, out  int original_value);
+__intrinsic_op void InterlockedMax(in out uint dest, uint value, out uint original_value);
 
-__intrinsic void InterlockedMin(in out  int dest,  int value, out  int original_value);
-__intrinsic void InterlockedMin(in out uint dest, uint value, out uint original_value);
+__intrinsic_op void InterlockedMin(in out  int dest,  int value, out  int original_value);
+__intrinsic_op void InterlockedMin(in out uint dest, uint value, out uint original_value);
 
-__intrinsic void InterlockedOr(in out  int dest,  int value, out  int original_value);
-__intrinsic void InterlockedOr(in out uint dest, uint value, out uint original_value);
+__intrinsic_op void InterlockedOr(in out  int dest,  int value, out  int original_value);
+__intrinsic_op void InterlockedOr(in out uint dest, uint value, out uint original_value);
 
-__intrinsic void InterlockedXor(in out  int dest,  int value, out  int original_value);
-__intrinsic void InterlockedXor(in out uint dest, uint value, out uint original_value);
+__intrinsic_op void InterlockedXor(in out  int dest,  int value, out  int original_value);
+__intrinsic_op void InterlockedXor(in out uint dest, uint value, out uint original_value);
 
 // Is floating-point value finite?
-__generic<T : __BuiltinFloatingPointType> __intrinsic bool isfinite(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<bool,N> isfinite(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<bool,N,M> isfinite(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType> __intrinsic_op bool isfinite(T x);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op vector<bool,N> isfinite(vector<T,N> x);
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_op matrix<bool,N,M> isfinite(matrix<T,N,M> x);
 
 // Is floating-point value infinite?
-__generic<T : __BuiltinFloatingPointType> __intrinsic bool isinf(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<bool,N> isinf(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<bool,N,M> isinf(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType> __intrinsic_op bool isinf(T x);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op vector<bool,N> isinf(vector<T,N> x);
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_op matrix<bool,N,M> isinf(matrix<T,N,M> x);
 
 // Is floating-point value not-a-number?
-__generic<T : __BuiltinFloatingPointType> __intrinsic bool isnan(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<bool,N> isnan(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<bool,N,M> isnan(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType> __intrinsic_op bool isnan(T x);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op vector<bool,N> isnan(vector<T,N> x);
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_op matrix<bool,N,M> isnan(matrix<T,N,M> x);
 
 // Construct float from mantissa and exponent
-__generic<T : __BuiltinFloatingPointType> __intrinsic T ldexp(T x, T exp);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> ldexp(vector<T,N> x, vector<T,N> exp);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> ldexp(matrix<T,N,M> x, matrix<T,N,M> exp);
+__generic<T : __BuiltinFloatingPointType> __intrinsic_op T ldexp(T x, T exp);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op vector<T,N> ldexp(vector<T,N> x, vector<T,N> exp);
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> ldexp(matrix<T,N,M> x, matrix<T,N,M> exp);
 
 // Vector length
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic T length(vector<T,N> x);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op T length(vector<T,N> x);
 
 // Linear interpolation
 __generic<T : __BuiltinFloatingPointType>
-__intrinsic(glsl, mix)
-__intrinsic
+__target_intrinsic(glsl, mix)
+__intrinsic_op
 T lerp(T x, T y, T s);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
-__intrinsic(glsl, mix)
-__intrinsic
+__target_intrinsic(glsl, mix)
+__intrinsic_op
 vector<T,N> lerp(vector<T,N> x, vector<T,N> y, vector<T,N> s);
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
-__intrinsic(glsl, mix)
-__intrinsic
+__target_intrinsic(glsl, mix)
+__intrinsic_op
 matrix<T,N,M> lerp(matrix<T,N,M> x, matrix<T,N,M> y, matrix<T,N,M> s);
 
 // Legacy lighting function (obsolete)
-__intrinsic float4 lit(float n_dot_l, float n_dot_h, float m);
+__intrinsic_op float4 lit(float n_dot_l, float n_dot_h, float m);
 
 // Base-e logarithm
-__generic<T : __BuiltinFloatingPointType> __intrinsic T log(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> log(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> log(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType> __intrinsic_op T log(T x);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op vector<T,N> log(vector<T,N> x);
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> log(matrix<T,N,M> x);
 
 // Base-10 logarithm
-__generic<T : __BuiltinFloatingPointType> __intrinsic T log10(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> log10(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> log10(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType> __intrinsic_op T log10(T x);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op vector<T,N> log10(vector<T,N> x);
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> log10(matrix<T,N,M> x);
 
 // Base-2 logarithm
-__generic<T : __BuiltinFloatingPointType> __intrinsic T log2(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> log2(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> log2(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType> __intrinsic_op T log2(T x);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op vector<T,N> log2(vector<T,N> x);
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> log2(matrix<T,N,M> x);
 
 // multiply-add
-__generic<T : __BuiltinArithmeticType> __intrinsic T mad(T mvalue, T avalue, T bvalue);
-__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic vector<T,N> mad(vector<T,N> mvalue, vector<T,N> avalue, vector<T,N> bvalue);
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic matrix<T,N,M> mad(matrix<T,N,M> mvalue, matrix<T,N,M> avalue, matrix<T,N,M> bvalue);
+__generic<T : __BuiltinArithmeticType> __intrinsic_op T mad(T mvalue, T avalue, T bvalue);
+__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic_op vector<T,N> mad(vector<T,N> mvalue, vector<T,N> avalue, vector<T,N> bvalue);
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> mad(matrix<T,N,M> mvalue, matrix<T,N,M> avalue, matrix<T,N,M> bvalue);
 
 // maximum
-__generic<T : __BuiltinArithmeticType> __intrinsic T max(T x, T y);
-__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic vector<T,N> max(vector<T,N> x, vector<T,N> y);
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic matrix<T,N,M> max(matrix<T,N,M> x, matrix<T,N,M> y);
+__generic<T : __BuiltinArithmeticType> __intrinsic_op T max(T x, T y);
+__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic_op vector<T,N> max(vector<T,N> x, vector<T,N> y);
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> max(matrix<T,N,M> x, matrix<T,N,M> y);
 
 // minimum
-__generic<T : __BuiltinArithmeticType> __intrinsic T min(T x, T y);
-__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic vector<T,N> min(vector<T,N> x, vector<T,N> y);
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y);
+__generic<T : __BuiltinArithmeticType> __intrinsic_op T min(T x, T y);
+__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic_op vector<T,N> min(vector<T,N> x, vector<T,N> y);
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y);
 
 // split into integer and fractional parts (both with same sign)
-__generic<T : __BuiltinFloatingPointType> __intrinsic T modf(T x, out T ip);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> modf(vector<T,N> x, out vector<T,N> ip);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> modf(matrix<T,N,M> x, out matrix<T,N,M> ip);
+__generic<T : __BuiltinFloatingPointType> __intrinsic_op T modf(T x, out T ip);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op vector<T,N> modf(vector<T,N> x, out vector<T,N> ip);
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> modf(matrix<T,N,M> x, out matrix<T,N,M> ip);
 
 // msad4 (whatever that is)
-__intrinsic uint4 msad4(uint reference, uint2 source, uint4 accum);
+__intrinsic_op uint4 msad4(uint reference, uint2 source, uint4 accum);
 
 // General inner products
 
 // scalar-scalar
-__generic<T : __BuiltinArithmeticType> __intrinsic_op(Mul_Scalar_Scalar) T mul(T x, T y);
+__generic<T : __BuiltinArithmeticType> __intrinsic_op T mul(T x, T y);
 
 // scalar-vector and vector-scalar
-__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic_op(Mul_Vector_Scalar) vector<T,N> mul(vector<T,N> x, T y);
-__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic_op(Mul_Scalar_Vector) vector<T,N> mul(T x, vector<T,N> y);
+__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic_op vector<T,N> mul(vector<T,N> x, T y);
+__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic_op vector<T,N> mul(T x, vector<T,N> y);
 
 // scalar-matrix and matrix-scalar
-__generic<T : __BuiltinArithmeticType, let N : int, let M :int> __intrinsic_op(Mul_Matrix_Scalar) matrix<T,N,M> mul(matrix<T,N,M> x, T y);
-__generic<T : __BuiltinArithmeticType, let N : int, let M :int> __intrinsic_op(Mul_Scalar_Matrix) matrix<T,N,M> mul(T x, matrix<T,N,M> y);
+__generic<T : __BuiltinArithmeticType, let N : int, let M :int> __intrinsic_op matrix<T,N,M> mul(matrix<T,N,M> x, T y);
+__generic<T : __BuiltinArithmeticType, let N : int, let M :int> __intrinsic_op matrix<T,N,M> mul(T x, matrix<T,N,M> y);
 
 // vector-vector (dot product)
-__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic_op(InnerProduct_Vector_Vector) T mul(vector<T,N> x, vector<T,N> y);
+__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic_op(dot) T mul(vector<T,N> x, vector<T,N> y);
 
 // vector-matrix
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic_op(InnerProduct_Vector_Matrix) vector<T,M> mul(vector<T,N> x, matrix<T,N,M> y);
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic_op(mulVectorMatrix) vector<T,M> mul(vector<T,N> x, matrix<T,N,M> y);
 
 // matrix-vector
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic_op(InnerProduct_Matrix_Vector) vector<T,N> mul(matrix<T,N,M> x, vector<T,M> y);
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic_op(mulMatrixVector) vector<T,N> mul(matrix<T,N,M> x, vector<T,M> y);
 
 // matrix-matrix
-__generic<T : __BuiltinArithmeticType, let R : int, let N : int, let C : int> __intrinsic_op(InnerProduct_Matrix_Matrix) matrix<T,R,C> mul(matrix<T,R,N> x, matrix<T,N,C> y);
+__generic<T : __BuiltinArithmeticType, let R : int, let N : int, let C : int> __intrinsic_op(mulMatrixMatrix) matrix<T,R,C> mul(matrix<T,R,N> x, matrix<T,N,C> y);
 
 // noise (deprecated)
-__intrinsic float noise(float x);
-__generic<let N : int> __intrinsic float noise(vector<float, N> x);
+__intrinsic_op float noise(float x);
+__generic<let N : int> __intrinsic_op float noise(vector<float, N> x);
 
 // Normalize a vector
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> normalize(vector<T,N> x);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op vector<T,N> normalize(vector<T,N> x);
 
 // Raise to a power
-__generic<T : __BuiltinFloatingPointType> __intrinsic T pow(T x, T y);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> pow(vector<T,N> x, vector<T,N> y);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> pow(matrix<T,N,M> x, matrix<T,N,M> y);
+__generic<T : __BuiltinFloatingPointType> __intrinsic_op T pow(T x, T y);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op vector<T,N> pow(vector<T,N> x, vector<T,N> y);
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> pow(matrix<T,N,M> x, matrix<T,N,M> y);
 
 // Output message
 
-// __intrinsic void printf( string format, ... );
+// __intrinsic_op void printf( string format, ... );
 
 // Tessellation factor fixup routines
 
-__intrinsic void Process2DQuadTessFactorsAvg(
+__intrinsic_op void Process2DQuadTessFactorsAvg(
     in  float4 RawEdgeFactors,
     in  float2 InsideScale,
     out float4 RoundedEdgeTessFactors,
     out float2 RoundedInsideTessFactors,
     out float2 UnroundedInsideTessFactors);
 
-__intrinsic void Process2DQuadTessFactorsMax(
+__intrinsic_op void Process2DQuadTessFactorsMax(
     in  float4 RawEdgeFactors,
     in  float2 InsideScale,
     out float4 RoundedEdgeTessFactors,
     out float2 RoundedInsideTessFactors,
     out float2 UnroundedInsideTessFactors);
 
-__intrinsic void Process2DQuadTessFactorsMin(
+__intrinsic_op void Process2DQuadTessFactorsMin(
     in  float4 RawEdgeFactors,
     in  float2 InsideScale,
     out float4 RoundedEdgeTessFactors,
     out float2 RoundedInsideTessFactors,
     out float2 UnroundedInsideTessFactors);
 
-__intrinsic void ProcessIsolineTessFactors(
+__intrinsic_op void ProcessIsolineTessFactors(
     in  float RawDetailFactor,
     in  float RawDensityFactor,
     out float RoundedDetailFactor,
     out float RoundedDensityFactor);
 
-__intrinsic void ProcessQuadTessFactorsAvg(
+__intrinsic_op void ProcessQuadTessFactorsAvg(
     in  float4 RawEdgeFactors,
     in  float InsideScale,
     out float4 RoundedEdgeTessFactors,
     out float2 RoundedInsideTessFactors,
     out float2 UnroundedInsideTessFactors);
 
-__intrinsic void ProcessQuadTessFactorsMax(
+__intrinsic_op void ProcessQuadTessFactorsMax(
     in  float4 RawEdgeFactors,
     in  float InsideScale,
     out float4 RoundedEdgeTessFactors,
     out float2 RoundedInsideTessFactors,
     out float2 UnroundedInsideTessFactors);
 
-__intrinsic void ProcessQuadTessFactorsMin(
+__intrinsic_op void ProcessQuadTessFactorsMin(
     in  float4 RawEdgeFactors,
     in  float InsideScale,
     out float4 RoundedEdgeTessFactors,
     out float2 RoundedInsideTessFactors,
     out float2 UnroundedInsideTessFactors);
 
-__intrinsic void ProcessTriTessFactorsAvg(
+__intrinsic_op void ProcessTriTessFactorsAvg(
     in  float3 RawEdgeFactors,
     in  float InsideScale,
     out float3 RoundedEdgeTessFactors,
     out float RoundedInsideTessFactor,
     out float UnroundedInsideTessFactor);
 
-__intrinsic void ProcessTriTessFactorsMax(
+__intrinsic_op void ProcessTriTessFactorsMax(
     in  float3 RawEdgeFactors,
     in  float InsideScale,
     out float3 RoundedEdgeTessFactors,
     out float RoundedInsideTessFactor,
     out float UnroundedInsideTessFactor);
 
-__intrinsic void ProcessTriTessFactorsMin(
+__intrinsic_op void ProcessTriTessFactorsMin(
     in  float3 RawEdgeFactors,
     in  float InsideScale,
     out float3 RoundedEdgeTessFactors,
@@ -819,191 +819,191 @@ __intrinsic void ProcessTriTessFactorsMin(
     out float UnroundedInsideTessFactors);
 
 // Degrees to radians
-__generic<T : __BuiltinFloatingPointType> __intrinsic T radians(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> radians(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> radians(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType> __intrinsic_op T radians(T x);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op vector<T,N> radians(vector<T,N> x);
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> radians(matrix<T,N,M> x);
 
 // Approximate reciprocal
-__generic<T : __BuiltinFloatingPointType> __intrinsic T rcp(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> rcp(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> rcp(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType> __intrinsic_op T rcp(T x);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op vector<T,N> rcp(vector<T,N> x);
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> rcp(matrix<T,N,M> x);
 
 // Reflect incident vector across plane with given normal
 __generic<T : __BuiltinFloatingPointType, let N : int>
-__intrinsic
+__intrinsic_op
 vector<T,N> reflect(vector<T,N> i, vector<T,N> n);
 
 // Refract incident vector given surface normal and index of refraction
 __generic<T : __BuiltinFloatingPointType, let N : int>
-__intrinsic
+__intrinsic_op
 vector<T,N> refract(vector<T,N> i, vector<T,N> n, float eta);
 
 // Reverse order of bits
-__intrinsic uint reversebits(uint value);
+__intrinsic_op uint reversebits(uint value);
 __generic<let N : int> vector<uint,N> reversebits(vector<uint,N> value);
 
 // Round-to-nearest
-__generic<T : __BuiltinFloatingPointType> __intrinsic T round(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> round(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> round(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType> __intrinsic_op T round(T x);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op vector<T,N> round(vector<T,N> x);
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> round(matrix<T,N,M> x);
 
 // Reciprocal of square root
-__generic<T : __BuiltinFloatingPointType> __intrinsic T rsqrt(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> rsqrt(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> rsqrt(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType> __intrinsic_op T rsqrt(T x);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op vector<T,N> rsqrt(vector<T,N> x);
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> rsqrt(matrix<T,N,M> x);
 
 // Clamp value to [0,1] range
 __generic<T : __BuiltinFloatingPointType>
-__intrinsic(glsl, "clamp($0, 0, 1)") __intrinsic
+__target_intrinsic(glsl, "clamp($0, 0, 1)") __intrinsic_op
 T saturate(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
-__intrinsic(glsl, "clamp($0, 0, 1)") __intrinsic
+__target_intrinsic(glsl, "clamp($0, 0, 1)") __intrinsic_op
 vector<T,N> saturate(vector<T,N> x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
-__intrinsic(glsl, "clamp($0, 0, 1)") __intrinsic
+__target_intrinsic(glsl, "clamp($0, 0, 1)") __intrinsic_op
 matrix<T,N,M> saturate(matrix<T,N,M> x);
 
 
 // Extract sign of value
-__generic<T : __BuiltinSignedArithmeticType> __intrinsic int sign(T x);
-__generic<T : __BuiltinSignedArithmeticType, let N : int> __intrinsic vector<int,N> sign(vector<T,N> x);
-__generic<T : __BuiltinSignedArithmeticType, let N : int, let M : int> __intrinsic matrix<int,N,M> sign(matrix<T,N,M> x);
+__generic<T : __BuiltinSignedArithmeticType> __intrinsic_op int sign(T x);
+__generic<T : __BuiltinSignedArithmeticType, let N : int> __intrinsic_op vector<int,N> sign(vector<T,N> x);
+__generic<T : __BuiltinSignedArithmeticType, let N : int, let M : int> __intrinsic_op matrix<int,N,M> sign(matrix<T,N,M> x);
 
 )=", R"=(
 
 
 // Sine
-__generic<T : __BuiltinFloatingPointType> __intrinsic T sin(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> sin(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> sin(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType> __intrinsic_op T sin(T x);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op vector<T,N> sin(vector<T,N> x);
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> sin(matrix<T,N,M> x);
 
 // Sine and cosine
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic void sincos(T x, out T s, out T c);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic void sincos(vector<T,N> x, out vector<T,N> s, out vector<T,N> c);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic void sincos(matrix<T,N,M> x, out matrix<T,N,M> s, out matrix<T,N,M> c);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op void sincos(T x, out T s, out T c);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op void sincos(vector<T,N> x, out vector<T,N> s, out vector<T,N> c);
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_op void sincos(matrix<T,N,M> x, out matrix<T,N,M> s, out matrix<T,N,M> c);
 
 // Hyperbolic Sine
-__generic<T : __BuiltinFloatingPointType> __intrinsic T sinh(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> sinh(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> sinh(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType> __intrinsic_op T sinh(T x);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op vector<T,N> sinh(vector<T,N> x);
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> sinh(matrix<T,N,M> x);
 
 // Smooth step (Hermite interpolation)
-__generic<T : __BuiltinFloatingPointType> __intrinsic T smoothstep(T min, T max, T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> smoothstep(vector<T,N> min, vector<T,N> max, vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> smoothstep(matrix<T,N,M> min, matrix<T,N,M> max, matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType> __intrinsic_op T smoothstep(T min, T max, T x);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op vector<T,N> smoothstep(vector<T,N> min, vector<T,N> max, vector<T,N> x);
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> smoothstep(matrix<T,N,M> min, matrix<T,N,M> max, matrix<T,N,M> x);
 
 // Square root
-__generic<T : __BuiltinFloatingPointType> __intrinsic T sqrt(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> sqrt(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> sqrt(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType> __intrinsic_op T sqrt(T x);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op vector<T,N> sqrt(vector<T,N> x);
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> sqrt(matrix<T,N,M> x);
 
 // Step function
-__generic<T : __BuiltinFloatingPointType> __intrinsic T step(T y, T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> step(vector<T,N> y, vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> step(matrix<T,N,M> y, matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType> __intrinsic_op T step(T y, T x);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op vector<T,N> step(vector<T,N> y, vector<T,N> x);
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> step(matrix<T,N,M> y, matrix<T,N,M> x);
 
 // Tangent
-__generic<T : __BuiltinFloatingPointType> __intrinsic T tan(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> tan(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> tan(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType> __intrinsic_op T tan(T x);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op vector<T,N> tan(vector<T,N> x);
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> tan(matrix<T,N,M> x);
 
 // Hyperbolic tangent
-__generic<T : __BuiltinFloatingPointType> __intrinsic T tanh(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> tanh(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> tanh(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType> __intrinsic_op T tanh(T x);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op vector<T,N> tanh(vector<T,N> x);
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> tanh(matrix<T,N,M> x);
 
 // Legacy texture-fetch operations
 
 /*
-__intrinsic float4 tex1D(sampler1D s, float t);
-__intrinsic float4 tex1D(sampler1D s, float t, float ddx, float ddy);
-__intrinsic float4 tex1Dbias(sampler1D s, float4 t);
-__intrinsic float4 tex1Dgrad(sampler1D s, float t, float ddx, float ddy);
-__intrinsic float4 tex1Dlod(sampler1D s, float4 t);
-__intrinsic float4 tex1Dproj(sampler1D s, float4 t);
+__intrinsic_op float4 tex1D(sampler1D s, float t);
+__intrinsic_op float4 tex1D(sampler1D s, float t, float ddx, float ddy);
+__intrinsic_op float4 tex1Dbias(sampler1D s, float4 t);
+__intrinsic_op float4 tex1Dgrad(sampler1D s, float t, float ddx, float ddy);
+__intrinsic_op float4 tex1Dlod(sampler1D s, float4 t);
+__intrinsic_op float4 tex1Dproj(sampler1D s, float4 t);
 
-__intrinsic float4 tex2D(sampler2D s, float2 t);
-__intrinsic float4 tex2D(sampler2D s, float2 t, float2 ddx, float2 ddy);
-__intrinsic float4 tex2Dbias(sampler2D s, float4 t);
-__intrinsic float4 tex2Dgrad(sampler2D s, float2 t, float2 ddx, float2 ddy);
-__intrinsic float4 tex2Dlod(sampler2D s, float4 t);
-__intrinsic float4 tex2Dproj(sampler2D s, float4 t);
+__intrinsic_op float4 tex2D(sampler2D s, float2 t);
+__intrinsic_op float4 tex2D(sampler2D s, float2 t, float2 ddx, float2 ddy);
+__intrinsic_op float4 tex2Dbias(sampler2D s, float4 t);
+__intrinsic_op float4 tex2Dgrad(sampler2D s, float2 t, float2 ddx, float2 ddy);
+__intrinsic_op float4 tex2Dlod(sampler2D s, float4 t);
+__intrinsic_op float4 tex2Dproj(sampler2D s, float4 t);
 
-__intrinsic float4 tex3D(sampler3D s, float3 t);
-__intrinsic float4 tex3D(sampler3D s, float3 t, float3 ddx, float3 ddy);
-__intrinsic float4 tex3Dbias(sampler3D s, float4 t);
-__intrinsic float4 tex3Dgrad(sampler3D s, float3 t, float3 ddx, float3 ddy);
-__intrinsic float4 tex3Dlod(sampler3D s, float4 t);
-__intrinsic float4 tex3Dproj(sampler3D s, float4 t);
+__intrinsic_op float4 tex3D(sampler3D s, float3 t);
+__intrinsic_op float4 tex3D(sampler3D s, float3 t, float3 ddx, float3 ddy);
+__intrinsic_op float4 tex3Dbias(sampler3D s, float4 t);
+__intrinsic_op float4 tex3Dgrad(sampler3D s, float3 t, float3 ddx, float3 ddy);
+__intrinsic_op float4 tex3Dlod(sampler3D s, float4 t);
+__intrinsic_op float4 tex3Dproj(sampler3D s, float4 t);
 
-__intrinsic float4 texCUBE(samplerCUBE s, float3 t);
-__intrinsic float4 texCUBE(samplerCUBE s, float3 t, float3 ddx, float3 ddy);
-__intrinsic float4 texCUBEbias(samplerCUBE s, float4 t);
-__intrinsic float4 texCUBEgrad(samplerCUBE s, float3 t, float3 ddx, float3 ddy);
-__intrinsic float4 texCUBElod(samplerCUBE s, float4 t);
-__intrinsic float4 texCUBEproj(samplerCUBE s, float4 t);
+__intrinsic_op float4 texCUBE(samplerCUBE s, float3 t);
+__intrinsic_op float4 texCUBE(samplerCUBE s, float3 t, float3 ddx, float3 ddy);
+__intrinsic_op float4 texCUBEbias(samplerCUBE s, float4 t);
+__intrinsic_op float4 texCUBEgrad(samplerCUBE s, float3 t, float3 ddx, float3 ddy);
+__intrinsic_op float4 texCUBElod(samplerCUBE s, float4 t);
+__intrinsic_op float4 texCUBEproj(samplerCUBE s, float4 t);
 */
 
 // Matrix transpose
-__generic<T : __BuiltinType, let N : int, let M : int> __intrinsic matrix<T,M,N> transpose(matrix<T,N,M> x);
+__generic<T : __BuiltinType, let N : int, let M : int> __intrinsic_op matrix<T,M,N> transpose(matrix<T,N,M> x);
 
 // Truncate to integer
-__generic<T : __BuiltinFloatingPointType> __intrinsic T trunc(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic vector<T,N> trunc(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic matrix<T,N,M> trunc(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType> __intrinsic_op T trunc(T x);
+__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op vector<T,N> trunc(vector<T,N> x);
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> trunc(matrix<T,N,M> x);
 
 
 )=", R"=(
 
 // Shader model 6.0 stuff
 
-__intrinsic uint GlobalOrderedCountIncrement(uint countToAppendForThisLane);
+__intrinsic_op uint GlobalOrderedCountIncrement(uint countToAppendForThisLane);
 
-__generic<T : __BuiltinType> __intrinsic T QuadReadLaneAt(T sourceValue, int quadLaneID);
-__generic<T : __BuiltinType, let N : int> __intrinsic vector<T,N> QuadReadLaneAt(vector<T,N> sourceValue, int quadLaneID);
-__generic<T : __BuiltinType, let N : int, let M : int> __intrinsic matrix<T,N,M> QuadReadLaneAt(matrix<T,N,M> sourceValue, int quadLaneID);
+__generic<T : __BuiltinType> __intrinsic_op T QuadReadLaneAt(T sourceValue, int quadLaneID);
+__generic<T : __BuiltinType, let N : int> __intrinsic_op vector<T,N> QuadReadLaneAt(vector<T,N> sourceValue, int quadLaneID);
+__generic<T : __BuiltinType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> QuadReadLaneAt(matrix<T,N,M> sourceValue, int quadLaneID);
 
-__generic<T : __BuiltinType> __intrinsic T QuadSwapX(T localValue);
-__generic<T : __BuiltinType, let N : int> __intrinsic vector<T,N> QuadSwapX(vector<T,N> localValue);
-__generic<T : __BuiltinType, let N : int, let M : int> __intrinsic matrix<T,N,M> QuadSwapX(matrix<T,N,M> localValue);
+__generic<T : __BuiltinType> __intrinsic_op T QuadSwapX(T localValue);
+__generic<T : __BuiltinType, let N : int> __intrinsic_op vector<T,N> QuadSwapX(vector<T,N> localValue);
+__generic<T : __BuiltinType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> QuadSwapX(matrix<T,N,M> localValue);
 
-__generic<T : __BuiltinType> __intrinsic T QuadSwapY(T localValue);
-__generic<T : __BuiltinType, let N : int> __intrinsic vector<T,N> QuadSwapY(vector<T,N> localValue);
-__generic<T : __BuiltinType, let N : int, let M : int> __intrinsic matrix<T,N,M> QuadSwapY(matrix<T,N,M> localValue);
+__generic<T : __BuiltinType> __intrinsic_op T QuadSwapY(T localValue);
+__generic<T : __BuiltinType, let N : int> __intrinsic_op vector<T,N> QuadSwapY(vector<T,N> localValue);
+__generic<T : __BuiltinType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> QuadSwapY(matrix<T,N,M> localValue);
 
-__generic<T : __BuiltinIntegerType> __intrinsic T WaveAllBitAnd(T expr);
-__generic<T : __BuiltinIntegerType, let N : int> __intrinsic vector<T,N> WaveAllBitAnd(vector<T,N> expr);
-__generic<T : __BuiltinIntegerType, let N : int, let M : int> __intrinsic matrix<T,N,M> WaveAllBitAnd(matrix<T,N,M> expr);
+__generic<T : __BuiltinIntegerType> __intrinsic_op T WaveAllBitAnd(T expr);
+__generic<T : __BuiltinIntegerType, let N : int> __intrinsic_op vector<T,N> WaveAllBitAnd(vector<T,N> expr);
+__generic<T : __BuiltinIntegerType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> WaveAllBitAnd(matrix<T,N,M> expr);
 
-__generic<T : __BuiltinIntegerType> __intrinsic T WaveAllBitOr(T expr);
-__generic<T : __BuiltinIntegerType, let N : int> __intrinsic vector<T,N> WaveAllBitOr(vector<T,N> expr);
-__generic<T : __BuiltinIntegerType, let N : int, let M : int> __intrinsic matrix<T,N,M> WaveAllBitOr(matrix<T,N,M> expr);
+__generic<T : __BuiltinIntegerType> __intrinsic_op T WaveAllBitOr(T expr);
+__generic<T : __BuiltinIntegerType, let N : int> __intrinsic_op vector<T,N> WaveAllBitOr(vector<T,N> expr);
+__generic<T : __BuiltinIntegerType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> WaveAllBitOr(matrix<T,N,M> expr);
 
-__generic<T : __BuiltinIntegerType> __intrinsic T WaveAllBitXor(T expr);
-__generic<T : __BuiltinIntegerType, let N : int> __intrinsic vector<T,N> WaveAllBitXor(vector<T,N> expr);
-__generic<T : __BuiltinIntegerType, let N : int, let M : int> __intrinsic matrix<T,N,M> WaveAllBitXor(matrix<T,N,M> expr);
+__generic<T : __BuiltinIntegerType> __intrinsic_op T WaveAllBitXor(T expr);
+__generic<T : __BuiltinIntegerType, let N : int> __intrinsic_op vector<T,N> WaveAllBitXor(vector<T,N> expr);
+__generic<T : __BuiltinIntegerType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> WaveAllBitXor(matrix<T,N,M> expr);
 
-__generic<T : __BuiltinArithmeticType> __intrinsic T WaveAllMax(T expr);
-__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic vector<T,N> WaveAllMax(vector<T,N> expr);
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic matrix<T,N,M> WaveAllMax(matrix<T,N,M> expr);
+__generic<T : __BuiltinArithmeticType> __intrinsic_op T WaveAllMax(T expr);
+__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic_op vector<T,N> WaveAllMax(vector<T,N> expr);
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> WaveAllMax(matrix<T,N,M> expr);
 
-__generic<T : __BuiltinArithmeticType> __intrinsic T WaveAllMin(T expr);
-__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic vector<T,N> WaveAllMin(vector<T,N> expr);
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic matrix<T,N,M> WaveAllMin(matrix<T,N,M> expr);
+__generic<T : __BuiltinArithmeticType> __intrinsic_op T WaveAllMin(T expr);
+__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic_op vector<T,N> WaveAllMin(vector<T,N> expr);
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> WaveAllMin(matrix<T,N,M> expr);
 
-__generic<T : __BuiltinArithmeticType> __intrinsic T WaveAllProduct(T expr);
-__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic vector<T,N> WaveAllProduct(vector<T,N> expr);
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic matrix<T,N,M> WaveAllProduct(matrix<T,N,M> expr);
+__generic<T : __BuiltinArithmeticType> __intrinsic_op T WaveAllProduct(T expr);
+__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic_op vector<T,N> WaveAllProduct(vector<T,N> expr);
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> WaveAllProduct(matrix<T,N,M> expr);
 
-__generic<T : __BuiltinArithmeticType> __intrinsic T WaveAllSum(T expr);
-__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic vector<T,N> WaveAllSum(vector<T,N> expr);
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic matrix<T,N,M> WaveAllSum(matrix<T,N,M> expr);
+__generic<T : __BuiltinArithmeticType> __intrinsic_op T WaveAllSum(T expr);
+__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic_op vector<T,N> WaveAllSum(vector<T,N> expr);
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> WaveAllSum(matrix<T,N,M> expr);
 
-__intrinsic bool WaveAllEqual(bool expr);
-__intrinsic bool WaveAllTrue(bool expr);
-__intrinsic bool WaveAnyTrue(bool expr);
+__intrinsic_op bool WaveAllEqual(bool expr);
+__intrinsic_op bool WaveAllTrue(bool expr);
+__intrinsic_op bool WaveAnyTrue(bool expr);
 
 uint64_t WaveBallot(bool expr);
 
@@ -1015,21 +1015,21 @@ bool WaveIsHelperLane();
 
 bool WaveOnce();
 
-__generic<T : __BuiltinArithmeticType> __intrinsic T WavePrefixProduct(T expr);
-__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic vector<T,N> WavePrefixProduct(vector<T,N> expr);
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic matrix<T,N,M> WavePrefixProduct(matrix<T,N,M> expr);
+__generic<T : __BuiltinArithmeticType> __intrinsic_op T WavePrefixProduct(T expr);
+__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic_op vector<T,N> WavePrefixProduct(vector<T,N> expr);
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> WavePrefixProduct(matrix<T,N,M> expr);
 
-__generic<T : __BuiltinArithmeticType> __intrinsic T WavePrefixSum(T expr);
-__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic vector<T,N> WavePrefixSum(vector<T,N> expr);
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic matrix<T,N,M> WavePrefixSum(matrix<T,N,M> expr);
+__generic<T : __BuiltinArithmeticType> __intrinsic_op T WavePrefixSum(T expr);
+__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic_op vector<T,N> WavePrefixSum(vector<T,N> expr);
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> WavePrefixSum(matrix<T,N,M> expr);
 
-__generic<T : __BuiltinType> __intrinsic T WaveReadFirstLane(T expr);
-__generic<T : __BuiltinType, let N : int> __intrinsic vector<T,N> WaveReadFirstLane(vector<T,N> expr);
-__generic<T : __BuiltinType, let N : int, let M : int> __intrinsic matrix<T,N,M> WaveReadFirstLane(matrix<T,N,M> expr);
+__generic<T : __BuiltinType> __intrinsic_op T WaveReadFirstLane(T expr);
+__generic<T : __BuiltinType, let N : int> __intrinsic_op vector<T,N> WaveReadFirstLane(vector<T,N> expr);
+__generic<T : __BuiltinType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> WaveReadFirstLane(matrix<T,N,M> expr);
 
-__generic<T : __BuiltinType> __intrinsic T WaveReadLaneAt(T expr, int laneIndex);
-__generic<T : __BuiltinType, let N : int> __intrinsic vector<T,N> WaveReadLaneAt(vector<T,N> expr, int laneIndex);
-__generic<T : __BuiltinType, let N : int, let M : int> __intrinsic matrix<T,N,M> WaveReadLaneAt(matrix<T,N,M> expr, int laneIndex);
+__generic<T : __BuiltinType> __intrinsic_op T WaveReadLaneAt(T expr, int laneIndex);
+__generic<T : __BuiltinType, let N : int> __intrinsic_op vector<T,N> WaveReadLaneAt(vector<T,N> expr, int laneIndex);
+__generic<T : __BuiltinType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> WaveReadLaneAt(matrix<T,N,M> expr, int laneIndex);
 
 
 )=", R"=(
@@ -1226,54 +1226,48 @@ namespace Slang
         }
     }
 
-    struct OpInfo { IntrinsicOp opCode; char const* opName; unsigned flags; };
+    struct OpInfo { int32_t opCode; char const* opName; unsigned flags; };
 
     static const OpInfo unaryOps[] = {
-        { IntrinsicOp::Pos,     "+",    ARITHMETIC_MASK },
-        { IntrinsicOp::Neg,     "-",    ARITHMETIC_MASK },
-        { IntrinsicOp::Not,     "!",    ANY_MASK        },
-        { IntrinsicOp::BitNot,  "~",    INT_MASK        },
-        { IntrinsicOp::PreInc,  "++",   ARITHMETIC_MASK | ASSIGNMENT },
-        { IntrinsicOp::PreDec,  "--",   ARITHMETIC_MASK | ASSIGNMENT },
-        { IntrinsicOp::PostInc, "++",   ARITHMETIC_MASK | ASSIGNMENT | POSTFIX },
-        { IntrinsicOp::PostDec, "--",   ARITHMETIC_MASK | ASSIGNMENT | POSTFIX },
+        { kIRPseudoOp_Pos,     "+",    ARITHMETIC_MASK },
+        { kIROp_Neg,     "-",    ARITHMETIC_MASK },
+        { kIROp_Not,     "!",    ANY_MASK        },
+        { kIRPseudoOp_BitNot,    "~",    INT_MASK        },
+        { kIRPseudoOp_PreInc,  "++",   ARITHMETIC_MASK | ASSIGNMENT },
+        { kIRPseudoOp_PreDec,  "--",   ARITHMETIC_MASK | ASSIGNMENT },
+        { kIRPseudoOp_PostInc, "++",   ARITHMETIC_MASK | ASSIGNMENT | POSTFIX },
+        { kIRPseudoOp_PostDec, "--",   ARITHMETIC_MASK | ASSIGNMENT | POSTFIX },
     };
 
     static const OpInfo binaryOps[] = {
-        { IntrinsicOp::Add,     "+",    ARITHMETIC_MASK },
-        { IntrinsicOp::Sub,     "-",    ARITHMETIC_MASK },
-        { IntrinsicOp::Mul,     "*",    ARITHMETIC_MASK },
-        { IntrinsicOp::Div,     "/",    ARITHMETIC_MASK },
-        { IntrinsicOp::Mod,     "%",    INT_MASK },
-
-        { IntrinsicOp::And,     "&&",   LOGICAL_MASK },
-        { IntrinsicOp::Or,      "||",   LOGICAL_MASK },
-
-        { IntrinsicOp::BitAnd,  "&",    LOGICAL_MASK },
-        { IntrinsicOp::BitOr,   "|",    LOGICAL_MASK },
-        { IntrinsicOp::BitXor,  "^",    LOGICAL_MASK },
-
-        { IntrinsicOp::Lsh,     "<<",   INT_MASK },
-        { IntrinsicOp::Rsh,     ">>",   INT_MASK },
-
-        { IntrinsicOp::Eql,     "==",   ANY_MASK | COMPARISON },
-        { IntrinsicOp::Neq,     "!=",   ANY_MASK | COMPARISON },
-
-        { IntrinsicOp::Greater, ">",    ARITHMETIC_MASK | COMPARISON },
-        { IntrinsicOp::Less,    "<",    ARITHMETIC_MASK | COMPARISON },
-        { IntrinsicOp::Geq,     ">=",   ARITHMETIC_MASK | COMPARISON },
-        { IntrinsicOp::Leq,     "<=",   ARITHMETIC_MASK | COMPARISON },
-
-        { IntrinsicOp::AddAssign,     "+=",    ASSIGNMENT | ARITHMETIC_MASK },
-        { IntrinsicOp::SubAssign,     "-=",    ASSIGNMENT | ARITHMETIC_MASK },
-        { IntrinsicOp::MulAssign,     "*=",    ASSIGNMENT | ARITHMETIC_MASK },
-        { IntrinsicOp::DivAssign,     "/=",    ASSIGNMENT | ARITHMETIC_MASK },
-        { IntrinsicOp::ModAssign,     "%=",    ASSIGNMENT | ARITHMETIC_MASK },
-        { IntrinsicOp::AndAssign,     "&=",    ASSIGNMENT | LOGICAL_MASK },
-        { IntrinsicOp::OrAssign,      "|=",    ASSIGNMENT | LOGICAL_MASK },
-        { IntrinsicOp::XorAssign,     "^=",    ASSIGNMENT | LOGICAL_MASK },
-        { IntrinsicOp::LshAssign,     "<<=",   ASSIGNMENT | INT_MASK },
-        { IntrinsicOp::RshAssign,     ">>=",   ASSIGNMENT | INT_MASK },
+        { kIROp_Add,     "+",    ARITHMETIC_MASK },
+        { kIROp_Sub,     "-",    ARITHMETIC_MASK },
+        { kIROp_Mul,     "*",    ARITHMETIC_MASK },
+        { kIROp_Div,     "/",    ARITHMETIC_MASK },
+        { kIROp_Mod,     "%",    INT_MASK },
+        { kIROp_And,     "&&",   LOGICAL_MASK },
+        { kIROp_Or,      "||",   LOGICAL_MASK },
+        { kIROp_BitAnd,  "&",    LOGICAL_MASK },
+        { kIROp_BitOr,   "|",    LOGICAL_MASK },
+        { kIROp_BitXor,  "^",    LOGICAL_MASK },
+        { kIROp_Lsh,     "<<",   INT_MASK },
+        { kIROp_Rsh,     ">>",   INT_MASK },
+        { kIROp_Eql,     "==",   ANY_MASK | COMPARISON },
+        { kIROp_Neq,     "!=",   ANY_MASK | COMPARISON },
+        { kIROp_Greater, ">",    ARITHMETIC_MASK | COMPARISON },
+        { kIROp_Less,    "<",    ARITHMETIC_MASK | COMPARISON },
+        { kIROp_Geq,     ">=",   ARITHMETIC_MASK | COMPARISON },
+        { kIROp_Leq,     "<=",   ARITHMETIC_MASK | COMPARISON },
+        { kIRPseudoOp_AddAssign,     "+=",    ASSIGNMENT | ARITHMETIC_MASK },
+        { kIRPseudoOp_SubAssign,     "-=",    ASSIGNMENT | ARITHMETIC_MASK },
+        { kIRPseudoOp_MulAssign,     "*=",    ASSIGNMENT | ARITHMETIC_MASK },
+        { kIRPseudoOp_DivAssign,     "/=",    ASSIGNMENT | ARITHMETIC_MASK },
+        { kIRPseudoOp_ModAssign,     "%=",    ASSIGNMENT | ARITHMETIC_MASK },
+        { kIRPseudoOp_AndAssign,     "&=",    ASSIGNMENT | LOGICAL_MASK },
+        { kIRPseudoOp_OrAssign,      "|=",    ASSIGNMENT | LOGICAL_MASK },
+        { kIRPseudoOp_XorAssign,     "^=",    ASSIGNMENT | LOGICAL_MASK },
+        { kIRPseudoOp_LshAssign,     "<<=",   ASSIGNMENT | INT_MASK },
+        { kIRPseudoOp_RshAssign,     ">>=",   ASSIGNMENT | INT_MASK },
     };
 
     String Session::getCoreLibraryCode()
@@ -1623,7 +1617,7 @@ namespace Slang
                     {
                         {
                             sb << "__glsl_version(450)\n";
-                            sb << "__intrinsic(glsl, \"(";
+                            sb << "__target_intrinsic(glsl, \"(";
 
                             int aa = 0;
                             String lodStr = "0";
@@ -1679,7 +1673,7 @@ namespace Slang
 
 
                             sb << ")\")\n";
-                            sb << "__intrinsic\n";
+                            sb << "__intrinsic_op\n";
 
                         }
 
@@ -1748,13 +1742,13 @@ namespace Slang
 
                         if (isMultisample)
                         {
-                            sb << "__intrinsic(glsl, \"texelFetch($P, $0, $1)\")\n";
+                            sb << "__target_intrinsic(glsl, \"texelFetch($P, $0, $1)\")\n";
                         }
                         else
                         {
-                            sb << "__intrinsic(glsl, \"texelFetch($P, ($0)." << kGLSLLoadCoordsSwizzle[loadCoordCount] << ", ($0)." << kGLSLLoadLODSwizzle[loadCoordCount] << ")\")\n";
+                            sb << "__target_intrinsic(glsl, \"texelFetch($P, ($0)." << kGLSLLoadCoordsSwizzle[loadCoordCount] << ", ($0)." << kGLSLLoadLODSwizzle[loadCoordCount] << ")\")\n";
                         }
-                        sb << "__intrinsic\n";
+                        sb << "__intrinsic_op\n";
                         sb << "T Load(";
                         sb << "int" << loadCoordCount << " location";
                         if(isMultisample)
@@ -1765,13 +1759,13 @@ namespace Slang
 
                         if (isMultisample)
                         {
-                            sb << "__intrinsic(glsl, \"texelFetchOffset($P, $0, $1, $2)\")\n";
+                            sb << "__target_intrinsic(glsl, \"texelFetchOffset($P, $0, $1, $2)\")\n";
                         }
                         else
                         {
-                            sb << "__intrinsic(glsl, \"texelFetch($P, ($0)." << kGLSLLoadCoordsSwizzle[loadCoordCount] << ", ($0)." << kGLSLLoadLODSwizzle[loadCoordCount] << ", $1)\")\n";
+                            sb << "__target_intrinsic(glsl, \"texelFetch($P, ($0)." << kGLSLLoadCoordsSwizzle[loadCoordCount] << ", ($0)." << kGLSLLoadLODSwizzle[loadCoordCount] << ", $1)\")\n";
                         }
-                        sb << "__intrinsic\n";
+                        sb << "__intrinsic_op\n";
                         sb << "T Load(";
                         sb << "int" << loadCoordCount << " location";
                         if(isMultisample)
@@ -1796,26 +1790,26 @@ namespace Slang
                     if(baseShape != TextureType::ShapeCube)
                     {
                         // subscript operator
-                        sb << "__intrinsic __subscript(uint" << kBaseTextureTypes[tt].coordCount + isArray << " location) -> T;\n";
+                        sb << "__intrinsic_op __subscript(uint" << kBaseTextureTypes[tt].coordCount + isArray << " location) -> T;\n";
                     }
 
                     if( !isMultisample )
                     {
                         // `Sample()`
 
-                        sb << "__intrinsic(glsl, \"texture($p, $1)\")\n";
+                        sb << "__target_intrinsic(glsl, \"texture($p, $1)\")\n";
 
                         // TODO: only enable if IR is being used?
-                        sb << "__intrinsic_op(sample_t_s_u)\n";
+                        sb << "__intrinsic_op(sample)\n";
 
-                        sb << "__intrinsic\n";
+                        sb << "__intrinsic_op\n";
                         sb << "T Sample(SamplerState s, ";
                         sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location);\n";
 
                         if( baseShape != TextureType::ShapeCube )
                         {
-                            sb << "__intrinsic(glsl, \"textureOffset($p, $1, $2)\")\n";
-                            sb << "__intrinsic\n";
+                            sb << "__target_intrinsic(glsl, \"textureOffset($p, $1, $2)\")\n";
+                            sb << "__intrinsic_op\n";
                             sb << "T Sample(SamplerState s, ";
                             sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                             sb << "int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
@@ -1839,15 +1833,15 @@ namespace Slang
 
 
                         // `SampleBias()`
-                        sb << "__intrinsic(glsl, \"texture($p, $1, $2)\")\n";
-                        sb << "__intrinsic\n";
+                        sb << "__target_intrinsic(glsl, \"texture($p, $1, $2)\")\n";
+                        sb << "__intrinsic_op\n";
                         sb << "T SampleBias(SamplerState s, ";
                         sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, float bias);\n";
 
                         if( baseShape != TextureType::ShapeCube )
                         {
-                            sb << "__intrinsic(glsl, \"textureOffset($p, $1, $2, $3)\")\n";
-                            sb << "__intrinsic\n";
+                            sb << "__target_intrinsic(glsl, \"textureOffset($p, $1, $2, $3)\")\n";
+                            sb << "__intrinsic_op\n";
                             sb << "T SampleBias(SamplerState s, ";
                             sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, float bias, ";
                             sb << "int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
@@ -1868,7 +1862,7 @@ namespace Slang
                             if (extCoordCount < 3)
                                 extCoordCount = 3;
 
-                            sb << "__intrinsic(glsl, \"textureLod($p, ";
+                            sb << "__target_intrinsic(glsl, \"textureLod($p, ";
 
                             sb << "vec" << extCoordCount << "($1,";
                             for (int ii = arrCoordCount; ii < extCoordCount - 1; ++ii)
@@ -1886,7 +1880,7 @@ namespace Slang
                             if (extCoordCount < 3)
                                 extCoordCount = 3;
 
-                            sb << "__intrinsic(glsl, \"textureGrad($p, ";
+                            sb << "__target_intrinsic(glsl, \"textureGrad($p, ";
 
                             sb << "vec" << extCoordCount << "($1,";
                             for (int ii = arrCoordCount; ii < extCoordCount - 1; ++ii)
@@ -1900,7 +1894,7 @@ namespace Slang
                             sb << ", vec" << baseCoordCount << "(0.0)";
                             sb << ")\")\n";
                         }
-                        sb << "__intrinsic\n";
+                        sb << "__intrinsic_op\n";
                         sb << "T SampleCmpLevelZero(SamplerComparisonState s, ";
                         sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                         sb << "float compareValue";
@@ -1927,8 +1921,8 @@ namespace Slang
                         }
 
 
-                        sb << "__intrinsic(glsl, \"textureGrad($p, $1, $2, $3)\")\n";
-                        sb << "__intrinsic\n";
+                        sb << "__target_intrinsic(glsl, \"textureGrad($p, $1, $2, $3)\")\n";
+                        sb << "__intrinsic_op(sampleGrad)\n";
                         sb << "T SampleGrad(SamplerState s, ";
                         sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                         sb << "float" << kBaseTextureTypes[tt].coordCount << " gradX, ";
@@ -1937,8 +1931,8 @@ namespace Slang
 
                         if( baseShape != TextureType::ShapeCube )
                         {
-                            sb << "__intrinsic(glsl, \"textureGradOffset($p, $1, $2, $3, $4)\")\n";
-                            sb << "__intrinsic\n";
+                            sb << "__target_intrinsic(glsl, \"textureGradOffset($p, $1, $2, $3, $4)\")\n";
+                            sb << "__intrinsic_op(sampleGrad)\n";
                             sb << "T SampleGrad(SamplerState s, ";
                             sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                             sb << "float" << kBaseTextureTypes[tt].coordCount << " gradX, ";
@@ -1948,16 +1942,16 @@ namespace Slang
 
                         // `SampleLevel`
 
-                        sb << "__intrinsic(glsl, \"textureLod($p, $1, $2)\")\n";
-                        sb << "__intrinsic\n";
+                        sb << "__target_intrinsic(glsl, \"textureLod($p, $1, $2)\")\n";
+                        sb << "__intrinsic_op\n";
                         sb << "T SampleLevel(SamplerState s, ";
                         sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                         sb << "float level);\n";
 
                         if( baseShape != TextureType::ShapeCube )
                         {
-                            sb << "__intrinsic(glsl, \"textureLodOffset($p, $1, $2, $3)\")\n";
-                            sb << "__intrinsic\n";
+                            sb << "__target_intrinsic(glsl, \"textureLodOffset($p, $1, $2, $3)\")\n";
+                            sb << "__intrinsic_op\n";
                             sb << "T SampleLevel(SamplerState s, ";
                             sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                             sb << "float level, ";
@@ -2024,14 +2018,14 @@ namespace Slang
 
                             EMIT_LINE_DIRECTIVE();
                             
-                            sb << "__intrinsic(glsl, \"textureGather($p, $1, " << componentIndex << ")\")\n";
-                            sb << "__intrinsic\n";
+                            sb << "__target_intrinsic(glsl, \"textureGather($p, $1, " << componentIndex << ")\")\n";
+                            sb << "__intrinsic_op\n";
                             sb << "vector<T, 4> Gather" << componentName << "(SamplerState s, ";
                             sb << "float" << kBaseTextureTypes[tt].coordCount << " location);\n";
 
                             EMIT_LINE_DIRECTIVE();
-                            sb << "__intrinsic(glsl, \"textureGatherOffset($p, $1, $2, " << componentIndex << ")\")\n";
-                            sb << "__intrinsic\n";
+                            sb << "__target_intrinsic(glsl, \"textureGatherOffset($p, $1, $2, " << componentIndex << ")\")\n";
+                            sb << "__intrinsic_op\n";
                             sb << "vector<T, 4> Gather" << componentName << "(SamplerState s, ";
                             sb << "float" << kBaseTextureTypes[tt].coordCount << " location, ";
                             sb << "int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
@@ -2043,8 +2037,8 @@ namespace Slang
                             sb << "out uint status);\n";
 
                             EMIT_LINE_DIRECTIVE();
-                            sb << "__intrinsic(glsl, \"textureGatherOffsets($p, $1, int" << kBaseTextureTypes[tt].coordCount << "[]($2, $3, $4, $5), " << componentIndex << ")\")\n";
-                            sb << "__intrinsic\n";
+                            sb << "__target_intrinsic(glsl, \"textureGatherOffsets($p, $1, int" << kBaseTextureTypes[tt].coordCount << "[]($2, $3, $4, $5), " << componentIndex << ")\")\n";
+                            sb << "__intrinsic_op\n";
                             sb << "vector<T, 4> Gather" << componentName << "(SamplerState s, ";
                             sb << "float" << kBaseTextureTypes[tt].coordCount << " location, ";
                             sb << "int" << kBaseTextureTypes[tt].coordCount << " offset1, ";
@@ -2126,8 +2120,8 @@ namespace Slang
                 // skip matrix-matrix multiply operations here, so that GLSL doesn't see them
                 switch (op.opCode)
                 {
-                case IntrinsicOp::Mul:
-                case IntrinsicOp::MulAssign:
+                case kIROp_Mul:
+                case kIRPseudoOp_MulAssign:
                     break;
 
                 default:
@@ -2188,8 +2182,8 @@ namespace Slang
             default:
                 continue;
 
-            case IntrinsicOp::Mul:
-            case IntrinsicOp::MulAssign:
+            case kIROp_Mul:
+            case kIRPseudoOp_MulAssign:
                 break;
             }
 
@@ -2233,15 +2227,15 @@ namespace Slang
             sb << kBaseBufferAccessLevels[aa].name;
             sb << "Buffer {\n";
 
-            sb << "__intrinsic void GetDimensions(out uint dim);\n";
+            sb << "__intrinsic_op void GetDimensions(out uint dim);\n";
 
-            sb << "__intrinsic(glsl, \"texelFetch($P, $0)$z\")\n";
-            sb << "__intrinsic T Load(int location);\n";
+            sb << "__target_intrinsic(glsl, \"texelFetch($P, $0)$z\")\n";
+            sb << "__intrinsic_op T Load(int location);\n";
 
-            sb << "__intrinsic T Load(int location, out uint status);\n";
+            sb << "__intrinsic_op T Load(int location, out uint status);\n";
 
-            sb << "__intrinsic(glsl, \"texelFetch($P, int($0))$z\")\n";
-            sb << "__intrinsic __subscript(uint index) -> T";
+            sb << "__target_intrinsic(glsl, \"texelFetch($P, int($0))$z\")\n";
+            sb << "__intrinsic_op __subscript(uint index) -> T";
 
             if (kBaseBufferAccessLevels[aa].access != SLANG_RESOURCE_ACCESS_READ)
             {
@@ -2310,24 +2304,24 @@ namespace Slang
         // Multiplication operations for vectors + matrices
 
         // scalar-vector and vector-scalar
-        sb << "__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic_op(Mul) vector<T,N> operator*(vector<T,N> x, T y);\n";
-        sb << "__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic_op(Mul) vector<T,N> operator*(T x, vector<T,N> y);\n";
+        sb << "__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic_op(mul) vector<T,N> operator*(vector<T,N> x, T y);\n";
+        sb << "__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic_op(mul) vector<T,N> operator*(T x, vector<T,N> y);\n";
 
         // scalar-matrix and matrix-scalar
-        sb << "__generic<T : __BuiltinArithmeticType, let N : int, let M :int> __intrinsic_op(Mul) matrix<T,N,M> operator*(matrix<T,N,M> x, T y);\n";
-        sb << "__generic<T : __BuiltinArithmeticType, let N : int, let M :int> __intrinsic_op(Mul) matrix<T,N,M> operator*(T x, matrix<T,N,M> y);\n";
+        sb << "__generic<T : __BuiltinArithmeticType, let N : int, let M :int> __intrinsic_op(mul) matrix<T,N,M> operator*(matrix<T,N,M> x, T y);\n";
+        sb << "__generic<T : __BuiltinArithmeticType, let N : int, let M :int> __intrinsic_op(mul) matrix<T,N,M> operator*(T x, matrix<T,N,M> y);\n";
 
         // vector-vector (dot product)
-        sb << "__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic_op(Mul) T operator*(vector<T,N> x, vector<T,N> y);\n";
+        sb << "__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic_op(dot) T operator*(vector<T,N> x, vector<T,N> y);\n";
 
         // vector-matrix
-        sb << "__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic_op(Mul) vector<T,M> operator*(vector<T,N> x, matrix<T,N,M> y);\n";
+        sb << "__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic_op(mulVectorMatrix) vector<T,M> operator*(vector<T,N> x, matrix<T,N,M> y);\n";
 
         // matrix-vector
-        sb << "__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic_op(Mul) vector<T,N> operator*(matrix<T,N,M> x, vector<T,M> y);\n";
+        sb << "__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic_op(mulMatrixVector) vector<T,N> operator*(matrix<T,N,M> x, vector<T,M> y);\n";
 
         // matrix-matrix
-        sb << "__generic<T : __BuiltinArithmeticType, let R : int, let N : int, let C : int> __intrinsic_op(Mul) matrix<T,R,C> operator*(matrix<T,R,N> x, matrix<T,N,C> y);\n";
+        sb << "__generic<T : __BuiltinArithmeticType, let R : int, let N : int, let C : int> __intrinsic_op(mulMatrixMatrix) matrix<T,R,C> operator*(matrix<T,R,N> x, matrix<T,N,C> y);\n";
 
 
 

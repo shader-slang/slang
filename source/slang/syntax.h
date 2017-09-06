@@ -2,10 +2,11 @@
 #define RASTER_RENDERER_SYNTAX_H
 
 #include "../core/basic.h"
-#include "Lexer.h"
-#include "Profile.h"
+#include "ir.h"
+#include "lexer.h"
+#include "profile.h"
 
-#include "../../Slang.h"
+#include "../../slang.h"
 
 #include <assert.h>
 
@@ -79,15 +80,6 @@ namespace Slang
 #include "object-meta-begin.h"
 #include "syntax-defs.h"
 #include "object-meta-end.h"
-
-    enum class IntrinsicOp
-    {
-        Unknown = 0,
-#define INTRINSIC(NAME) NAME,
-#include "intrinsic-defs.h"
-    };
-
-    IntrinsicOp findIntrinsicOp(char const* name);
 
     // Helper type for pairing up a name and the location where it appeared
     struct NameLoc
@@ -241,21 +233,6 @@ namespace Slang
 
         FilteredModifierList<Modifier>::Iterator begin() { return FilteredModifierList<Modifier>::Iterator(first.Ptr()); }
         FilteredModifierList<Modifier>::Iterator end() { return FilteredModifierList<Modifier>::Iterator(nullptr); }
-    };
-
-
-    enum class BaseType
-    {
-        // Note(tfoley): These are ordered in terms of promotion rank, so be vareful when messing with this
-
-        Void = 0,
-        Bool,
-        Int,
-        UInt,
-        UInt64,
-        Half,
-        Float,
-        Double,
     };
 
     class NamedExpressionType;
