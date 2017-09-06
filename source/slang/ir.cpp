@@ -365,8 +365,10 @@ namespace Slang
         UInt            size,
         IROp            op,
         IRType*         type,
-        UInt            argCount,
-        IRValue* const* args)
+        UInt            fixedArgCount,
+        IRValue* const* fixedArgs,
+        UInt            varArgCount = 0,
+        IRValue* const* varArgs     = nullptr)
     {
         // First, we need to pick a good insertion point
         // for the instruction, which we do by looking
@@ -378,9 +380,14 @@ namespace Slang
         {
             parent = joinParentInstsForInsertion(parent, type->parent);
         }
-        for( UInt aa = 0; aa < argCount; ++aa )
+        for( UInt aa = 0; aa < fixedArgCount; ++aa )
         {
-            auto arg = args[aa];
+            auto arg = fixedArgs[aa];
+            parent = joinParentInstsForInsertion(parent, arg->parent);
+        }
+        for( UInt aa = 0; aa < varArgCount; ++aa )
+        {
+            auto arg = varArgs[aa];
             parent = joinParentInstsForInsertion(parent, arg->parent);
         }
 
@@ -405,7 +412,7 @@ namespace Slang
         // way: we will construct a temporary instruction and
         // then use it to look up in a cache of instructions.
 
-        IRInst* keyInst = createInstImpl(builder, size, op, type, argCount ,args);
+        IRInst* keyInst = createInstImpl(builder, size, op, type, fixedArgCount, fixedArgs, varArgCount, varArgs);
         keyInst->parent = parent;
 
         IRInstKey key;
@@ -446,6 +453,27 @@ namespace Slang
             type,
             argCount,
             args);
+    }
+
+    template<typename T>
+    static T* findOrEmitInst(
+        IRBuilder*      builder,
+        IROp            op,
+        IRType*         type,
+        UInt            fixedArgCount,
+        IRValue* const* fixedArgs,
+        UInt            varArgCount,
+        IRValue* const* varArgs)
+    {
+        return (T*) findOrEmitInstImpl(
+            builder,
+            sizeof(T) + varArgCount * sizeof(IRUse),
+            op,
+            type,
+            fixedArgCount,
+            fixedArgs,
+            varArgCount,
+            varArgs);
     }
 
     template<typename T>
@@ -630,6 +658,22 @@ namespace Slang
             getTypeType());
     }
 
+    IRType* IRBuilder::getIntrinsicType(
+        IROp op,
+        UInt argCount,
+        IRValue* const* args)
+    {
+        return findOrEmitInst<IRType>(
+            this,
+            op,
+            getTypeType(),
+            0,
+            nullptr,
+            argCount,
+            args);
+    }
+
+
     IRStructDecl* IRBuilder::createStructType()
     {
         return createInst<IRStructDecl>(
@@ -652,6 +696,7 @@ namespace Slang
         IRType* const*  paramTypes,
         IRType*         resultType)
     {
+        // TODO: need to unique things here!
         auto inst = createInstWithTrailingArgs<IRFuncType>(
             this,
             kIROp_FuncType,
@@ -663,6 +708,19 @@ namespace Slang
         addInst(inst);
         return inst;
     }
+
+    IRType* IRBuilder::getPtrType(
+        IRType* valueType)
+    {
+        auto inst = findOrEmitInst<IRPtrType>(
+            this,
+            kIROp_PtrType,
+            getTypeType(),
+            1,
+            (IRValue* const*) &valueType);
+        return inst;
+    }
+
 
     IRValue* IRBuilder::getBoolValue(bool value)
     {
@@ -687,6 +745,24 @@ namespace Slang
             type,
             sizeof(value),
             &value);
+    }
+
+    IRInst* IRBuilder::emitCallInst(
+        IRType*         type,
+        IRValue*        func,
+        UInt            argCount,
+        IRValue* const* args)
+    {
+        auto inst = createInstWithTrailingArgs<IRCall>(
+            this,
+            kIROp_Call,
+            type,
+            1,
+            &func,
+            argCount,
+            args);
+        addInst(inst);
+        return inst;
     }
 
     IRInst* IRBuilder::emitIntrinsicInst(
@@ -763,6 +839,40 @@ namespace Slang
         return inst;
     }
 
+    IRVar* IRBuilder::emitVar(
+        IRType* type)
+    {
+        auto allocatedType = getPtrType(type);
+        auto inst = createInst<IRVar>(
+            this,
+            kIROp_Var,
+            allocatedType);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitLoad(
+        IRValue*    ptr)
+    {
+        auto ptrType = ptr->getType();
+        if( ptrType->op != kIROp_PtrType )
+        {
+            // Bad!
+            return nullptr;
+        }
+
+        auto valueType = ((IRPtrType*) ptrType)->getValueType();
+
+        auto inst = createInst<IRLoad>(
+            this,
+            kIROp_Load,
+            valueType,
+            ptr);
+
+        addInst(inst);
+        return inst;
+    }
+
     IRInst* IRBuilder::emitFieldExtract(
         IRType*         type,
         IRValue*        base,
@@ -771,6 +881,22 @@ namespace Slang
         auto inst = createInst<IRFieldExtract>(
             this,
             kIROp_FieldExtract,
+            type,
+            base,
+            field);
+
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitFieldAddress(
+        IRType*         type,
+        IRValue*        base,
+        IRStructField*  field)
+    {
+        auto inst = createInst<IRFieldAddress>(
+            this,
+            kIROp_FieldAddress,
             type,
             base,
             field);
@@ -821,6 +947,13 @@ namespace Slang
     {
         auto decoration = addDecoration<IRHighLevelDeclDecoration>(inst, kIRDecorationOp_HighLevelDecl);
         decoration->decl = decl;
+        return decoration;
+    }
+
+    IRLayoutDecoration* IRBuilder::addLayoutDecoration(IRInst* inst, Layout* layout)
+    {
+        auto decoration = addDecoration<IRLayoutDecoration>(inst);
+        decoration->layout = layout;
         return decoration;
     }
 

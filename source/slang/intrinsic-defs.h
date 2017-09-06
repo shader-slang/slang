@@ -68,6 +68,10 @@ INTRINSIC(InnerProduct_Vector_Matrix)
 INTRINSIC(InnerProduct_Matrix_Vector)
 INTRINSIC(InnerProduct_Matrix_Matrix)
 
+// Texture sampling operation of the form `t.Sample(s,u)`
+INTRINSIC(sample_t_s_u)
+
+
 
 
 

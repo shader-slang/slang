@@ -7,6 +7,8 @@
 // similar in spirit to LLVM (but much simpler).
 //
 
+#include "type-layout.h"
+
 // We need the definition of `BaseType` which currently belongs to the AST
 #include "syntax.h"
 
@@ -72,6 +74,7 @@ struct IRUse
 enum IRDecorationOp : uint16_t
 {
     kIRDecorationOp_HighLevelDecl,
+    kIRDecorationOp_Layout,
 };
 
 // A "decoration" that gets applied to an instruction.
@@ -161,6 +164,15 @@ struct IRHighLevelDeclDecoration : IRDecoration
     Decl* decl;
 };
 
+// Associates an IR-level decoration with a source layout
+struct IRLayoutDecoration : IRDecoration
+{
+    enum { kDecorationOp = kIRDecorationOp_Layout };
+
+    Layout* layout;
+};
+
+
 typedef long long IRIntegerValue;
 typedef double IRFloatingPointValue;
 
@@ -211,6 +223,41 @@ struct IRFuncType : IRType
     }
 };
 
+struct IRPtrType : IRType
+{
+    IRUse valueType;
+
+    IRType* getValueType() { return (IRType*) valueType.usedValue; }
+};
+
+struct IRTextureType : IRType
+{
+    IRUse flavor;
+    IRUse elementType;
+
+    IRIntegerValue getFlavor() { return ((IRConstant*) flavor.usedValue)->u.intVal; }
+    IRType* getElementType() { return (IRType*) elementType.usedValue; }
+};
+
+struct IRUniformBufferType : IRType
+{
+    IRUse elementType;
+    IRType* getElementType() { return (IRType*) elementType.usedValue; }
+};
+
+struct IRConstantBufferType : IRUniformBufferType {};
+struct IRTextureBufferType : IRUniformBufferType {};
+
+struct IRCall : IRInst
+{
+    IRUse func;
+};
+
+struct IRLoad : IRInst
+{
+    IRUse ptr;
+};
+
 struct IRStructField;
 struct IRFieldExtract : IRInst
 {
@@ -220,6 +267,16 @@ struct IRFieldExtract : IRInst
     IRInst* getBase() { return base.usedValue; }
     IRStructField* getField() { return (IRStructField*) field.usedValue; }
 };
+
+struct IRFieldAddress : IRInst
+{
+    IRUse   base;
+    IRUse   field;
+
+    IRInst* getBase() { return base.usedValue; }
+    IRStructField* getField() { return (IRStructField*) field.usedValue; }
+};
+
 
 // A instruction that ends a basic block (usually because of control flow)
 struct IRTerminatorInst : IRInst
@@ -284,6 +341,9 @@ struct IRParam : IRInst
 {
     IRParam* getNextParam();
 };
+
+struct IRVar : IRInst
+{};
 
 // A function is a parent to zero or more blocks of instructions.
 //
@@ -360,6 +420,11 @@ struct IRBuilder
     IRType* getVoidType();
     IRType* getBlockType();
 
+    IRType* getIntrinsicType(
+        IROp op,
+        UInt argCount,
+        IRValue* const* args);
+
     IRStructDecl* createStructType();
     IRStructField* createStructField(IRType* fieldType);
 
@@ -368,9 +433,18 @@ struct IRBuilder
         IRType* const*  paramTypes,
         IRType*         resultType);
 
+    IRType* getPtrType(
+        IRType* valueType);
+
     IRValue* getBoolValue(bool value);
     IRValue* getIntValue(IRType* type, IRIntegerValue value);
     IRValue* getFloatValue(IRType* type, IRFloatingPointValue value);
+
+    IRInst* emitCallInst(
+        IRType*         type,
+        IRValue*        func,
+        UInt            argCount,
+        IRValue* const* args);
 
     IRInst* emitIntrinsicInst(
         IRType*         type,
@@ -393,9 +467,20 @@ struct IRBuilder
     IRParam* emitParam(
         IRType* type);
 
+    IRVar* emitVar(
+        IRType* type);
+
+    IRInst* emitLoad(
+        IRValue*    ptr);
+
     IRInst* emitFieldExtract(
         IRType*         type,
         IRValue*        base,
+        IRStructField*  field);
+
+    IRInst* emitFieldAddress(
+        IRType*         type,
+        IRValue*        basePtr,
         IRStructField*  field);
 
     IRInst* emitReturn(
@@ -414,7 +499,14 @@ struct IRBuilder
         return (T*) addDecorationImpl(inst, sizeof(T), op);
     }
 
+    template<typename T>
+    T* addDecoration(IRInst* inst)
+    {
+        return (T*) addDecorationImpl(inst, sizeof(T), IRDecorationOp(T::kDecorationOp));
+    }
+
     IRHighLevelDeclDecoration* addHighLevelDeclDecoration(IRInst* inst, Decl* decl);
+    IRLayoutDecoration* addLayoutDecoration(IRInst* inst, Layout* layout);
 };
 
 void dumpIR(IRModule* module);

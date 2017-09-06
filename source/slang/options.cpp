@@ -258,6 +258,10 @@ struct OptionsParser
                 {
                     flags |= SLANG_COMPILE_FLAG_SPLIT_MIXED_TYPES;
                 }
+                else if(argStr == "-use-ir" )
+                {
+                    flags |= SLANG_COMPILE_FLAG_USE_IR;
+                }
                 else if (argStr == "-backend" || argStr == "-target")
                 {
                     String name = tryReadCommandLineArgument(arg, &argCursor, argEnd);

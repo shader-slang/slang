@@ -209,6 +209,20 @@ SYNTAX_CLASS(MagicTypeModifier, Modifier)
     FIELD(uint32_t, tag)
 END_SYNTAX_CLASS()
 
+// A modifier applied to declarations of builtin types to indicate how they
+// should be lowered to the IR.
+//
+// TODO: This should really subsume `BuiltinTypeModifier` and
+// `MagicTypeModifier` so that we don't have to apply all of them.
+SYNTAX_CLASS(IntrinsicTypeModifier, Modifier)
+    // The IR opcode to use when constructing a type
+    FIELD(uint32_t, irOp)
+
+    // Additional literal opreands to provide when creating instances.
+    // (e.g., for a texture type this passes in shape/mutability info)
+    FIELD(List<uint32_t>, irOperands)
+END_SYNTAX_CLASS()
+
 // Modifiers that affect the storage layout for matrices
 SIMPLE_SYNTAX_CLASS(MatrixLayoutModifier, Modifier)
 
