@@ -569,6 +569,7 @@ namespace Slang
         IRParentInst* parent = builder->shared->module;
 
         IRConstant keyInst;
+        memset(&keyInst, 0, sizeof(keyInst));
         keyInst.op = op;
         keyInst.type.usedValue = type;
         memcpy(&keyInst.u, value, valueSize);
