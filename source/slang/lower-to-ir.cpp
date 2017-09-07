@@ -407,7 +407,7 @@ struct ExprLoweringVisitor : ExprVisitor<ExprLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo lowerIntrinsicCall(
         InvokeExpr* expr,
-        IntrinsicOp intrinsicOp)
+        IROp intrinsicOp)
     {
         auto type = lowerSimpleType(context, expr->type);
 
@@ -431,6 +431,24 @@ struct ExprLoweringVisitor : ExprVisitor<ExprLoweringVisitor, LoweredValInfo>
         return LoweredValInfo::simple(getBuilder()->emitCallInst(type, getSimpleVal(loweredFunc), argCount, irArgs.Buffer()));
     }
 
+    IROp getIntrinsicOp(
+        Decl*                   decl,
+        IntrinsicOpModifier*    intrinsicOpMod)
+    {
+        if (int(intrinsicOpMod->op) != 0)
+            return intrinsicOpMod->op;
+
+        // No specified modifier? Then we need to look it up
+        // based on the name of the declaration...
+
+        auto name = decl->getName();
+        auto nameText = getText(name);
+
+        IROp op = findIROp(nameText.Buffer());
+        assert(op != kIROp_Invalid);
+        return op;
+    }
+
     LoweredValInfo visitInvokeExpr(InvokeExpr* expr)
     {
         // TODO: need to detect calls to builtins here, so that we can expand
@@ -443,7 +461,8 @@ struct ExprLoweringVisitor : ExprVisitor<ExprLoweringVisitor, LoweredValInfo>
             auto funcDecl = funcDeclRef.getDecl();
             if(auto intrinsicOpModifier = funcDecl->FindModifier<IntrinsicOpModifier>())
             {
-                return lowerIntrinsicCall(expr, intrinsicOpModifier->op);
+                auto op = getIntrinsicOp(funcDecl, intrinsicOpModifier);
+                return lowerIntrinsicCall(expr, op);
                 // 
             }
             // TODO: handle target intrinsic modifier too...

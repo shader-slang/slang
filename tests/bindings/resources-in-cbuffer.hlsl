@@ -1,4 +1,4 @@
-//TEST:COMPARE_HLSL: -target dxbc-assembly -profile ps_4_0 -entry main
+//TEST:COMPARE_HLSL: -use-ir -target dxbc-assembly -profile ps_4_0 -entry main
 
 // Confirm that resources inside constant buffers get correct locations,
 // including the case where there are *multiple* constant buffers

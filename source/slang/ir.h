@@ -7,12 +7,35 @@
 // similar in spirit to LLVM (but much simpler).
 //
 
-#include "type-layout.h"
+#include "../core/basic.h"
 
-// We need the definition of `BaseType` which currently belongs to the AST
-#include "syntax.h"
 
 namespace Slang {
+
+// TODO(tfoley): We should ditch this enumeration
+// and just use the IR opcodes that represent these
+// types directly. The one major complication there
+// is that the order of the enum values currently
+// matters, since it determines promotion rank.
+// We either need to keep that restriction, or
+// look up promotion rank by some other means.
+//
+enum class BaseType
+{
+    // Note(tfoley): These are ordered in terms of promotion rank, so be vareful when messing with this
+
+    Void = 0,
+    Bool,
+    Int,
+    UInt,
+    UInt64,
+    Half,
+    Float,
+    Double,
+};
+
+
+class Layout;
 
 struct IRFunc;
 struct IRInst;
@@ -29,14 +52,59 @@ enum : IROpFlags
     kIROpFlag_Parent = 1 << 0,
 };
 
-enum IROp : uint16_t
+enum IROp : int16_t
 {
-    
 #define INST(ID, MNEMONIC, ARG_COUNT, FLAGS)  \
     kIROp_##ID,
 
 #include "ir-inst-defs.h"
+
+    kIROpCount,
+
+    // We use the negative range of opcode values
+    // to encode "pseudo" instructions that should
+    // not appear in valid IR.
+
+    kIRPseduoOp_FirstPseudo = -1000,
+
+#define INST(ID, MNEMONIC, ARG_COUNT, FLAGS) /* empty */
+#define PSEUDO_INST(ID) kIRPseudoOp_##ID,
+
+#include "ir-inst-defs.h"
+
+    kIROp_Invalid = -1,
+
 };
+
+#if 0
+enum IRPseudoOp
+{
+    kIRPseudoOp_Pos         = -1000,
+    kIRPseudoOp_PreInc,
+    kIRPseudoOp_PreDec,
+    kIRPseudoOp_PostInc,
+    kIRPseudoOp_PostDec,
+    kIRPseudoOp_Sequence,
+    kIRPseudoOp_AddAssign,
+    kIRPseudoOp_SubAssign,
+    kIRPseudoOp_MulAssign,
+    kIRPseudoOp_DivAssign,
+    kIRPseudoOp_ModAssign,
+    kIRPseudoOp_AndAssign,
+    kIRPseudoOp_OrAssign,
+    kIRPseudoOp_XorAssign ,
+    kIRPseudoOp_LshAssign,
+    kIRPseudoOp_RshAssign,
+    kIRPseudoOp_Assign,
+    kIRPseudoOp_BitNot,
+    kIRPseudoOp_And,
+    kIRPseudoOp_Or,
+
+    kIROp_Invalid = -1,
+};
+#endif
+
+IROp findIROp(char const* name);
 
 // A logical operation/opcode in the IR
 struct IROpInfo
@@ -448,7 +516,7 @@ struct IRBuilder
 
     IRInst* emitIntrinsicInst(
         IRType*         type,
-        IntrinsicOp     intrinsicOp,
+        IROp            op,
         UInt            argCount,
         IRValue* const* args);
 

@@ -8,7 +8,6 @@
     <ClInclude Include="diagnostic-defs.h" />
     <ClInclude Include="diagnostics.h" />
     <ClInclude Include="emit.h" />
-    <ClInclude Include="intrinsic-defs.h" />
     <ClInclude Include="lexer.h" />
     <ClInclude Include="lookup.h" />
     <ClInclude Include="parameter-binding.h" />
