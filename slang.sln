@@ -11,6 +11,9 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{74C5F0DC-93BB-4BF3-AC65-8C65491570F7}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang", "source\slang\slang.vcxproj", "{DB00DA62-0533-4AFD-B59F-A67D5B3A0808}"
+	ProjectSection(ProjectDependencies) = postProject
+		{66174227-8541-41FC-A6DF-4764FC66F78E} = {66174227-8541-41FC-A6DF-4764FC66F78E}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slangc", "source\slangc\slangc.vcxproj", "{D56CBCEB-1EB5-4CA8-AEC4-48EA35ED61C7}"
 	ProjectSection(ProjectDependencies) = postProject
@@ -22,6 +25,8 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "render-test", "tools\render-test\render-test.vcxproj", "{96610759-07B9-4EEB-A974-5C634A2E742B}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang-glslang", "source\slang-glslang\slang-glslang.vcxproj", "{C495878A-832C-485B-B347-0998A90CC936}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang-generate", "tools\slang-generate\slang-generate.vcxproj", "{66174227-8541-41FC-A6DF-4764FC66F78E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -87,6 +92,14 @@ Global
 		{C495878A-832C-485B-B347-0998A90CC936}.Release|Win32.Build.0 = Release|Win32
 		{C495878A-832C-485B-B347-0998A90CC936}.Release|x64.ActiveCfg = Release|x64
 		{C495878A-832C-485B-B347-0998A90CC936}.Release|x64.Build.0 = Release|x64
+		{66174227-8541-41FC-A6DF-4764FC66F78E}.Debug|Win32.ActiveCfg = Debug|Win32
+		{66174227-8541-41FC-A6DF-4764FC66F78E}.Debug|Win32.Build.0 = Debug|Win32
+		{66174227-8541-41FC-A6DF-4764FC66F78E}.Debug|x64.ActiveCfg = Debug|x64
+		{66174227-8541-41FC-A6DF-4764FC66F78E}.Debug|x64.Build.0 = Debug|x64
+		{66174227-8541-41FC-A6DF-4764FC66F78E}.Release|Win32.ActiveCfg = Release|Win32
+		{66174227-8541-41FC-A6DF-4764FC66F78E}.Release|Win32.Build.0 = Release|Win32
+		{66174227-8541-41FC-A6DF-4764FC66F78E}.Release|x64.ActiveCfg = Release|x64
+		{66174227-8541-41FC-A6DF-4764FC66F78E}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -95,5 +108,6 @@ Global
 		{E6385042-1649-4803-9EBD-168F8B7EF131} = {B625E3E2-3B0B-4A01-9D10-957F84092E10}
 		{0C768A18-1D25-4000-9F37-DA5FE99E3B64} = {74C5F0DC-93BB-4BF3-AC65-8C65491570F7}
 		{96610759-07B9-4EEB-A974-5C634A2E742B} = {74C5F0DC-93BB-4BF3-AC65-8C65491570F7}
+		{66174227-8541-41FC-A6DF-4764FC66F78E} = {74C5F0DC-93BB-4BF3-AC65-8C65491570F7}
 	EndGlobalSection
 EndGlobal

@@ -64,4 +64,9 @@
     <ClCompile Include="ir.cpp" />
     <ClCompile Include="lower-to-ir.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="core.meta.slang" />
+    <None Include="glsl.meta.slang" />
+    <None Include="hlsl.meta.slang" />
+  </ItemGroup>
 </Project>
