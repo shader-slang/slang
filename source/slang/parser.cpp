@@ -2121,6 +2121,8 @@ namespace Slang
 
     static RefPtr<AccessorDecl> parseAccessorDecl(Parser* parser)
     {
+        Modifiers modifiers = ParseModifiers(parser);
+
         RefPtr<AccessorDecl> decl;
         if( AdvanceIf(parser, "get") )
         {
@@ -2135,6 +2137,8 @@ namespace Slang
             Unexpected(parser);
             return nullptr;
         }
+
+        AddModifiers(decl, modifiers.first);
 
         if( parser->tokenReader.PeekTokenType() == TokenType::LBrace )
         {

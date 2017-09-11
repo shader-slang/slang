@@ -307,6 +307,13 @@ struct IRTextureType : IRType
     IRType* getElementType() { return (IRType*) elementType.usedValue; }
 };
 
+struct IRBufferType : IRType
+{
+    IRUse elementType;
+    IRType* getElementType() { return (IRType*) elementType.usedValue; }
+};
+
+
 struct IRUniformBufferType : IRType
 {
     IRUse elementType;
@@ -324,6 +331,12 @@ struct IRCall : IRInst
 struct IRLoad : IRInst
 {
     IRUse ptr;
+};
+
+struct IRStore : IRInst
+{
+    IRUse ptr;
+    IRUse val;
 };
 
 struct IRStructField;
@@ -540,6 +553,10 @@ struct IRBuilder
 
     IRInst* emitLoad(
         IRValue*    ptr);
+
+    IRInst* emitStore(
+        IRValue*    dstPtr,
+        IRValue*    srcVal);
 
     IRInst* emitFieldExtract(
         IRType*         type,

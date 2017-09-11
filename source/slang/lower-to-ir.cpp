@@ -8,6 +8,20 @@
 namespace Slang
 {
 
+struct BoundMemberInfo;
+
+struct SubscriptInfo : RefObject
+{
+    DeclRef<SubscriptDecl> declRef;
+};
+
+struct BoundSubscriptInfo : RefObject
+{
+    DeclRef<SubscriptDecl>  declRef;
+    IRType*                 type;
+    List<IRValue*>          args;
+};
+
 struct LoweredValInfo
 {
     enum class Flavor
@@ -15,11 +29,17 @@ struct LoweredValInfo
         None,
         Simple,
         Ptr,
+        BoundMember,
+        Subscript,
+        BoundSubscript,
     };
 
     union
     {
-        IRValue*    val;
+        IRValue*            val;
+        BoundMemberInfo*    boundMemberInfo;
+        SubscriptInfo*      subscriptInfo;
+        BoundSubscriptInfo* boundSubscriptInfo;
     };
     Flavor flavor;
 
@@ -43,7 +63,57 @@ struct LoweredValInfo
         info.flavor = Flavor::Ptr;
         info.val = v;
         return info;
-    }};
+    }
+
+    static LoweredValInfo boundMember(
+        LoweredValInfo const& base,
+        LoweredValInfo const& member);
+
+    static LoweredValInfo subscript(
+        SubscriptInfo* subscriptInfo);
+
+    static LoweredValInfo boundSubscript(
+        BoundSubscriptInfo* boundSubscriptInfo);
+};
+
+struct BoundMemberInfo
+{
+    LoweredValInfo  base;
+    LoweredValInfo  member;
+};
+
+LoweredValInfo LoweredValInfo::boundMember(
+    LoweredValInfo const& base,
+    LoweredValInfo const& member)
+{
+    BoundMemberInfo* boundMember = new BoundMemberInfo();
+    boundMember->base = base;
+    boundMember->member = member;
+
+    LoweredValInfo info;
+    info.flavor = Flavor::BoundMember;
+    info.boundMemberInfo = boundMember;
+    return info;
+}
+
+LoweredValInfo LoweredValInfo::subscript(
+    SubscriptInfo* subscriptInfo)
+{
+    LoweredValInfo info;
+    info.flavor = Flavor::Subscript;
+    info.subscriptInfo = subscriptInfo;
+    return info;
+}
+
+LoweredValInfo LoweredValInfo::boundSubscript(
+    BoundSubscriptInfo* boundSubscriptInfo)
+{
+    LoweredValInfo info;
+    info.flavor = Flavor::BoundSubscript;
+    info.boundSubscriptInfo = boundSubscriptInfo;
+    return info;
+}
+
 
 struct SharedIRGenContext
 {
@@ -52,6 +122,9 @@ struct SharedIRGenContext
     CodeGenTarget       target;
 
     Dictionary<DeclRef<Decl>, LoweredValInfo> declValues;
+
+    // Arrays we keep around strictly for memory-management purposes
+    List<RefPtr<BoundSubscriptInfo>> boundSubscripts;
 };
 
 
@@ -62,24 +135,149 @@ struct IRGenContext
     IRBuilder* irBuilder;
 };
 
-IRValue* getSimpleVal(LoweredValInfo lowered)
+LoweredValInfo ensureDecl(
+    IRGenContext*           context,
+    DeclRef<Decl> const&    declRef);
+
+
+IRValue* getSimpleVal(IRGenContext* context, LoweredValInfo lowered);
+
+IROp getIntrinsicOp(
+    Decl*                   decl,
+    IntrinsicOpModifier*    intrinsicOpMod)
 {
-    switch(lowered.flavor)
+    if (int(intrinsicOpMod->op) != 0)
+        return intrinsicOpMod->op;
+
+    // No specified modifier? Then we need to look it up
+    // based on the name of the declaration...
+
+    auto name = decl->getName();
+    auto nameText = getText(name);
+
+    IROp op = findIROp(nameText.Buffer());
+    assert(op != kIROp_Invalid);
+    return op;
+}
+
+// Given a `LoweredValInfo` for something callable, along with a
+// bunch of arguments, emit an appropriate call to it.
+LoweredValInfo emitCallToVal(
+    IRGenContext*   context,
+    IRType*         type,
+    LoweredValInfo  funcVal,
+    UInt            argCount,
+    IRValue* const* args)
+{
+    auto builder = context->irBuilder;
+    switch (funcVal.flavor)
     {
-    case LoweredValInfo::Flavor::None:
-        return nullptr;
-
-    case LoweredValInfo::Flavor::Simple:
-        return lowered.val;
-
     default:
-        SLANG_UNEXPECTED("unhandled value flavor");
-        return nullptr;
+        return LoweredValInfo::simple(
+            builder->emitCallInst(type, getSimpleVal(context, funcVal), argCount, args));
     }
+}
+
+// Given a `DeclRef` for something callable, along with a bunch of
+// arguments, emit an appropriate call to it.
+LoweredValInfo emitCallToDeclRef(
+    IRGenContext*   context,
+    IRType*         type,
+    DeclRef<Decl>   funcDeclRef,
+    UInt            argCount,
+    IRValue* const* args)
+{
+    auto builder = context->irBuilder;
+
+
+    if (auto subscriptDeclRef = funcDeclRef.As<SubscriptDecl>())
+    {
+        // A reference to a subscript declaration is potentially a
+        // special case, if we have more than just a getter.
+
+        DeclRef<GetterDecl> getterDeclRef;
+        bool justAGetter = true;
+        for (auto accessorDeclRef : getMembersOfType<AccessorDecl>(subscriptDeclRef))
+        {
+            if (auto foundGetterDeclRef = accessorDeclRef.As<GetterDecl>())
+            {
+                getterDeclRef = foundGetterDeclRef;
+            }
+            else
+            {
+                justAGetter = false;
+                break;
+            }
+        }
+
+        if (!justAGetter)
+        {
+            // We can't perform an actual call right now, because
+            // this expression might appear in an r-value or l-value
+            // position (or *both* if it is being passed as an argument
+            // for an `in out` parameter!).
+            //
+            // Instead, we will construct a special-case value to
+            // represent the latent subscript operation (abstractly
+            // this is a reference to a storage location).
+
+            // The abstract storage location will need to include
+            // all the arguments being passed to the subscript operation.
+
+            RefPtr<BoundSubscriptInfo> boundSubscript = new BoundSubscriptInfo();
+            boundSubscript->declRef = subscriptDeclRef;
+            boundSubscript->type = type;
+            boundSubscript->args.AddRange(args, argCount);
+
+            context->shared->boundSubscripts.Add(boundSubscript);
+
+            return LoweredValInfo::boundSubscript(boundSubscript);
+        }
+
+        // Otherwise we are just call the getter, and so that
+        // is what we need to be emitting a call to...
+        if (getterDeclRef)
+            funcDeclRef = getterDeclRef;
+    }
+
+    auto funcDecl = funcDeclRef.getDecl();
+    if(auto intrinsicOpModifier = funcDecl->FindModifier<IntrinsicOpModifier>())
+    {
+        auto op = getIntrinsicOp(funcDecl, intrinsicOpModifier);
+
+        return LoweredValInfo::simple(builder->emitIntrinsicInst(
+            type,
+            op,
+            argCount,
+            args));
+    }
+    // TODO: handle target intrinsic modifier too...
+
+    if( auto ctorDeclRef = funcDeclRef.As<ConstructorDecl>() )
+    {
+        // HACK: we know all constructors are builtins for now,
+        // so we need to emit them as a call to the corresponding
+        // builtin operation.
+        return LoweredValInfo::simple(builder->emitConstructorInst(type, argCount, args));
+    }
+
+    // Fallback case is to emit an actual call.
+    LoweredValInfo funcVal = ensureDecl(context, funcDeclRef);
+    return emitCallToVal(context, type, funcVal, argCount, args);
+}
+
+LoweredValInfo emitCallToDeclRef(
+    IRGenContext*           context,
+    IRType*                 type,
+    DeclRef<Decl>           funcDeclRef,
+    List<IRValue*> const&   args)
+{
+    return emitCallToDeclRef(context, type, funcDeclRef, args.Count(), args.Buffer());
 }
 
 IRValue* getSimpleVal(IRGenContext* context, LoweredValInfo lowered)
 {
+top:
     switch(lowered.flavor)
     {
     case LoweredValInfo::Flavor::None:
@@ -90,6 +288,26 @@ IRValue* getSimpleVal(IRGenContext* context, LoweredValInfo lowered)
 
     case LoweredValInfo::Flavor::Ptr:
         return context->irBuilder->emitLoad(lowered.val);
+
+    case LoweredValInfo::Flavor::BoundSubscript:
+        {
+            auto boundSubscriptInfo = lowered.boundSubscriptInfo;
+            auto builder = context->irBuilder;
+
+            for (auto getter : getMembersOfType<GetterDecl>(boundSubscriptInfo->declRef))
+            {
+                lowered = emitCallToDeclRef(
+                    context,
+                    boundSubscriptInfo->type,
+                    getter,
+                    boundSubscriptInfo->args);
+                goto top;
+            }
+
+            SLANG_UNEXPECTED("subscript had no getter");
+            return nullptr;
+        }
+        break;
 
     default:
         SLANG_UNEXPECTED("unhandled value flavor");
@@ -148,7 +366,7 @@ IRValue* lowerSimpleVal(
     Val*            val)
 {
     auto lowered = lowerVal(context, val);
-    return getSimpleVal(lowered);
+    return getSimpleVal(context, lowered);
 }
 
 LoweredTypeInfo lowerType(
@@ -184,13 +402,19 @@ LoweredValInfo lowerExpr(
     IRGenContext*   context,
     Expr*           expr);
 
+void assign(
+    IRGenContext*           context,
+    LoweredValInfo const&   left,
+    LoweredValInfo const&   right);
+
 void lowerStmt(
     IRGenContext*   context,
     Stmt*           stmt);
 
-LoweredValInfo ensureDecl(
-    IRGenContext*           context,
-    DeclRef<Decl> const&    declRef);
+LoweredValInfo lowerDecl(
+    IRGenContext*   context,
+    DeclBase*       decl,
+    Layout*         layout);
 
 //
 
@@ -222,7 +446,15 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     LoweredTypeInfo visitFuncType(FuncType* type)
     {
         LoweredValInfo loweredFunc = ensureDecl(context, type->declRef);
-        return getSimpleVal(loweredFunc)->getType();
+        auto loweredFuncVal = getSimpleVal(context, loweredFunc);
+
+        // HACK: deal with the case where the decl might not
+        // lower to anything, and so we don't have a type to
+        // work with.
+        if (!loweredFuncVal)
+            return LoweredTypeInfo();
+
+        return loweredFuncVal->getType();
     }
 
     void addGenericArgs(List<IRValue*>* ioArgs, DeclRefBase declRef)
@@ -232,7 +464,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         {
             for(auto aa : subs->args)
             {
-                (*ioArgs).Add(getSimpleVal(lowerVal(context, aa)));
+                (*ioArgs).Add(getSimpleVal(context, lowerVal(context, aa)));
             }
             subs = subs->outer;
         }
@@ -380,7 +612,25 @@ struct ExprLoweringVisitor : ExprVisitor<ExprLoweringVisitor, LoweredValInfo>
         }
     }
 
-    // Collect the lowered arguments for a call expression
+
+    // Add arguments that appeared directly in an argument list
+    // to the list of argument values for a call.
+    void addDirectCallArgs(
+        InvokeExpr*     expr,
+        List<IRValue*>* ioArgs)
+    {
+        auto& irArgs = *ioArgs;
+
+        for( auto arg : expr->Arguments )
+        {
+            auto loweredArg = lowerExpr(context, arg);
+            addArgs(&irArgs, loweredArg);
+        }
+    }
+
+    // Try to add "all" the arguments for a call to the argument list,
+    // including implicit arguments that come from (e.g.,) a member
+    // expression used to form the call.
     void addCallArgs(
         InvokeExpr*     expr,
         List<IRValue*>* ioArgs)
@@ -398,11 +648,7 @@ struct ExprLoweringVisitor : ExprVisitor<ExprLoweringVisitor, LoweredValInfo>
             addArgs(&irArgs, loweredBase);
         }
 
-        for( auto arg : expr->Arguments )
-        {
-            auto loweredArg = lowerExpr(context, arg);
-            addArgs(&irArgs, loweredArg);
-        }
+        addDirectCallArgs(expr, ioArgs);
     }
 
     LoweredValInfo lowerIntrinsicCall(
@@ -418,77 +664,78 @@ struct ExprLoweringVisitor : ExprVisitor<ExprLoweringVisitor, LoweredValInfo>
         return LoweredValInfo::simple(getBuilder()->emitIntrinsicInst(type, intrinsicOp, argCount, &irArgs[0]));
     }
 
-    LoweredValInfo lowerSimpleCall(InvokeExpr* expr)
+    void addFuncBaseArgs(
+        LoweredValInfo funcVal,
+        List<IRValue*>* ioArgs)
     {
-        auto type = lowerSimpleType(context, expr->type);
-
-        auto loweredFunc = lowerExpr(context, expr->FunctionExpr);
-
-        List<IRValue*> irArgs;
-        addCallArgs(expr, &irArgs);
-        UInt argCount = irArgs.Count();
-
-        return LoweredValInfo::simple(getBuilder()->emitCallInst(type, getSimpleVal(loweredFunc), argCount, irArgs.Buffer()));
+        switch (funcVal.flavor)
+        {
+        default:
+            return;
+        }
     }
 
-    IROp getIntrinsicOp(
-        Decl*                   decl,
-        IntrinsicOpModifier*    intrinsicOpMod)
+    LoweredValInfo lowerSimpleCall(InvokeExpr* expr)
     {
-        if (int(intrinsicOpMod->op) != 0)
-            return intrinsicOpMod->op;
 
-        // No specified modifier? Then we need to look it up
-        // based on the name of the declaration...
-
-        auto name = decl->getName();
-        auto nameText = getText(name);
-
-        IROp op = findIROp(nameText.Buffer());
-        assert(op != kIROp_Invalid);
-        return op;
     }
 
     LoweredValInfo visitInvokeExpr(InvokeExpr* expr)
     {
-        // TODO: need to detect calls to builtins here, so that we can expand
-        // them as their own special opcodes...
+        auto type = lowerSimpleType(context, expr->type);
+
+        // We are going to look at the syntactic form of
+        // the "function" expression, so that we can avoid
+        // a lot of complexity that would come from lowering
+        // it as a general expression first, and then trying
+        // to apply it. For example, given `obj.f(a,b)` we
+        // will try to detect that we are trying to compute
+        // something like `ObjType::f(obj, a, b)` (in pseudo-code),
+        // rather than trying to construct a meaningful
+        // intermediate value for `obj.f` first.
+        //
+        // Note that this doe not preclude having support
+        // for directly generating code from `obj.f` - it
+        // just may be that such usage is more complicated.
+
+        // Along the way, we may end up collecting additional
+        // arguments that will be part of the call.
+        List<IRValue*> irArgs;
+
 
         auto funcExpr = expr->FunctionExpr;
-        if( auto funcDeclRefExpr = funcExpr.As<DeclRefExpr>() )
+        if (auto memberFuncExpr = funcExpr.As<MemberExpr>())
         {
-            auto funcDeclRef = funcDeclRefExpr->declRef;
-            auto funcDecl = funcDeclRef.getDecl();
-            if(auto intrinsicOpModifier = funcDecl->FindModifier<IntrinsicOpModifier>())
-            {
-                auto op = getIntrinsicOp(funcDecl, intrinsicOpModifier);
-                return lowerIntrinsicCall(expr, op);
-                // 
-            }
-            // TODO: handle target intrinsic modifier too...
+            auto loweredBaseVal = lowerExpr(context, memberFuncExpr->BaseExpression);
+            addArgs(&irArgs, loweredBaseVal);
 
-            if( auto ctorDeclRef = funcDeclRef.As<ConstructorDecl>() )
-            {
-                // HACK: we know all constructors are builtins for now,
-                // so we need to emit them as a call to the corresponding
-                // builtin operation.
+            auto funcDeclRef = memberFuncExpr->declRef;
 
-                auto type = lowerSimpleType(context, expr->type);
-
-                List<IRValue*>  irArgs;
-                for( auto arg : expr->Arguments )
-                {
-                    auto loweredArg = lowerExpr(context, arg);
-                    addArgs(&irArgs, loweredArg);
-                }
-
-                UInt argCount = irArgs.Count();
-
-                return LoweredValInfo::simple(getBuilder()->emitConstructorInst(type, argCount, &irArgs[0]));
-            }
+            addDirectCallArgs(expr, &irArgs);
+            return emitCallToDeclRef(context, type, funcDeclRef, irArgs);
+        }
+        else if (auto staticMemberFuncExpr = funcExpr.As<StaticMemberExpr>())
+        {
+            auto funcDeclRef = staticMemberFuncExpr->declRef;
+            addDirectCallArgs(expr, &irArgs);
+            return emitCallToDeclRef(context, type, funcDeclRef, irArgs);
+        }
+        else if (auto varExpr = funcExpr.As<VarExpr>())
+        {
+            auto funcDeclRef = varExpr->declRef;
+            addDirectCallArgs(expr, &irArgs);
+            return emitCallToDeclRef(context, type, funcDeclRef, irArgs);
         }
 
-        return lowerSimpleCall(expr);
+        // The default case is to assume that we just have
+        // an ordinary expression, and can lower it as such.
+        LoweredValInfo funcVal = lowerExpr(context, expr->FunctionExpr);
+
+        // Now we add any direct arguments from the call expression itself.
+        addDirectCallArgs(expr, &irArgs);
+
+        // Delegate to the logic for invoking a value.
+        return emitCallToVal(context, type, funcVal, irArgs.Count(), irArgs.Buffer());
     }
 
     LoweredValInfo visitIndexExpr(IndexExpr* expr)
@@ -503,14 +750,14 @@ struct ExprLoweringVisitor : ExprVisitor<ExprLoweringVisitor, LoweredValInfo>
     {
         switch (base.flavor)
         {
-        case LoweredValInfo::Flavor::Simple:
+        default:
             {
-                IRValue* irBase = base.val;
+                IRValue* irBase = getSimpleVal(context, base);
                 return LoweredValInfo::simple(
                     getBuilder()->emitFieldExtract(
                         getSimpleType(fieldType),
                         irBase,
-                        (IRStructField*) getSimpleVal(field)));
+                        (IRStructField*) getSimpleVal(context, field)));
             }
             break;
 
@@ -524,12 +771,15 @@ struct ExprLoweringVisitor : ExprVisitor<ExprLoweringVisitor, LoweredValInfo>
                     getBuilder()->emitFieldAddress(
                         getBuilder()->getPtrType(getSimpleType(fieldType)),
                         irBasePtr,
-                        (IRStructField*) getSimpleVal(field)));
+                        (IRStructField*) getSimpleVal(context, field)));
             }
             break;
-        default:
-            SLANG_UNIMPLEMENTED_X("codegen for field extract");
         }
+    }
+
+    LoweredValInfo visitStaticMemberExpr(StaticMemberExpr* expr)
+    {
+        return ensureDecl(context, expr->declRef);
     }
 
     LoweredValInfo visitMemberExpr(MemberExpr* expr)
@@ -544,6 +794,11 @@ struct ExprLoweringVisitor : ExprVisitor<ExprLoweringVisitor, LoweredValInfo>
 
             auto loweredField = ensureDecl(context, fieldDeclRef);
             return extractField(loweredType, loweredBase, loweredField);
+        }
+        else if (auto callableDeclRef = declRef.As<CallableDecl>())
+        {
+            auto loweredFunc = ensureDecl(context, callableDeclRef);
+            return LoweredValInfo::boundMember(loweredBase, loweredFunc);
         }
 
         SLANG_UNIMPLEMENTED_X("codegen for subscript expression");
@@ -613,7 +868,20 @@ struct ExprLoweringVisitor : ExprVisitor<ExprLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitAssignExpr(AssignExpr* expr)
     {
-        SLANG_UNIMPLEMENTED_X("shared type expression during code generation");
+        // Because our representation of lowered "values"
+        // can encompass l-values explicitly, we can
+        // lower assignment easily. We just lower the left-
+        // and right-hand sides, and then peform an assignment
+        // based on the resulting values.
+        //
+        auto leftVal = lowerExpr(context, expr->left);
+        auto rightVal = lowerExpr(context, expr->right);
+        assign(context, leftVal, rightVal);
+
+        // The result value of the assignment expression is
+        // the value of the left-hand side (and it is expected
+        // to be an l-value).
+        return leftVal;
     }
 
     LoweredValInfo visitParenExpr(ParenExpr* expr)
@@ -642,18 +910,61 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         SLANG_UNIMPLEMENTED_X("stmt catch-all");
     }
 
+    void visitExpressionStmt(ExpressionStmt* stmt)
+    {
+        // The statement evaluates an expression
+        // (for side effects, one assumes) and then
+        // discards the result. As such, we simply
+        // lower the expression, and don't use
+        // the result.
+        //
+        lowerExpr(context, stmt->Expression);
+    }
+
+    void visitDeclStmt(DeclStmt* stmt)
+    {
+        // For now, we lower a declaration directly
+        // into the current context.
+        //
+        // TODO: We may want to consider whether
+        // nested type/function declarations should
+        // be lowered into the global scope during
+        // IR generation, or whether they should
+        // be lifted later (pushing capture analysis
+        // down to the IR).
+        //
+        lowerDecl(context, stmt->decl, nullptr);
+    }
+
+    void visitSeqStmt(SeqStmt* stmt)
+    {
+        // To lower a sequence of statements,
+        // just lower each in order
+        for (auto ss : stmt->stmts)
+        {
+            lowerStmt(context, ss);
+        }
+    }
+
     void visitBlockStmt(BlockStmt* stmt)
     {
+        // To lower a block (scope) statement,
+        // just lower its body. The IR doesn't
+        // need to reflect the scoping of the AST.
         lowerStmt(context, stmt->body);
     }
 
     void visitReturnStmt(ReturnStmt* stmt)
     {
+        // A `return` statement turns into a return
+        // instruction. If the statement had an argument
+        // expression, then we need to lower that to
+        // a value first, and then emit the resulting value.
         if( auto expr = stmt->Expression )
         {
             auto loweredExpr = lowerExpr(context, expr);
 
-            getBuilder()->emitReturn(getSimpleVal(loweredExpr));
+            getBuilder()->emitReturn(getSimpleVal(context, loweredExpr));
         }
         else
         {
@@ -676,7 +987,31 @@ void assign(
     LoweredValInfo const&   left,
     LoweredValInfo const&   right)
 {
-    SLANG_UNIMPLEMENTED_X("assignment");
+    switch (left.flavor)
+    {
+    case LoweredValInfo::Flavor::Ptr:
+        switch (right.flavor)
+        {
+        case LoweredValInfo::Flavor::Simple:
+        case LoweredValInfo::Flavor::Ptr:
+            {
+                auto builder = context->irBuilder;
+                builder->emitStore(
+                    left.val,
+                    getSimpleVal(context, right));
+            }
+            break;
+
+        default:
+            SLANG_UNIMPLEMENTED_X("assignment");
+            break;
+        }
+        break;
+
+    default:
+        SLANG_UNIMPLEMENTED_X("assignment");
+        break;
+    }
 }
 
 struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
@@ -702,6 +1037,30 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     LoweredValInfo visitDecl(Decl* decl)
     {
         SLANG_UNIMPLEMENTED_X("decl catch-all");
+    }
+
+    LoweredValInfo visitSubscriptDecl(SubscriptDecl* decl)
+    {
+        // A subscript operation may encompass one or more
+        // accessors, and these are what should actually
+        // get lowered (they are effectively functions).
+
+        for (auto accessor : decl->getMembersOfType<AccessorDecl>())
+        {
+            if (accessor->HasModifier<IntrinsicOpModifier>())
+                continue;
+
+            ensureDecl(context, makeDeclRef(accessor.Ptr()));
+        }
+
+        // The subscript declaration itself won't correspond
+        // to anything in the lowered program, so we don't
+        // bother creating a representation here.
+        //
+        // Note: We may want to have a specific lowered value
+        // that can represent the combination of callables
+        // that make up the subscript operation.
+        return LoweredValInfo();
     }
 
     LoweredValInfo visitVarDeclBase(VarDeclBase* decl)
@@ -818,9 +1177,22 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // set up sub context for generating our new function
 
+        CallableDecl* declForParameters = decl;
+        CallableDecl* declForReturnType = decl;
+        if (auto accessorDecl = dynamic_cast<AccessorDecl*>(decl))
+        {
+            auto parentDecl = accessorDecl->ParentDecl;
+            if (auto subscriptDecl = dynamic_cast<SubscriptDecl*>(parentDecl))
+            {
+                declForParameters = subscriptDecl;
+                declForReturnType = subscriptDecl;
+            }
+        }
+
+
         List<IRType*> paramTypes;
 
-        for( auto paramDecl : decl->GetParameters() )
+        for( auto paramDecl : declForParameters->GetParameters() )
         {
             IRType* irParamType = lowerSimpleType(context, paramDecl->getType());
             paramTypes.Add(irParamType);
@@ -834,7 +1206,27 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             subContext->shared->declValues.Add(paramDeclRef, irParamVal);
         }
 
-        auto irResultType = lowerSimpleType(context, decl->ReturnType);
+        auto irResultType = lowerSimpleType(context, declForReturnType->ReturnType);
+
+        if (auto setterDecl = dynamic_cast<SetterDecl*>(decl))
+        {
+            // We are lowering a "setter" accessor inside a subscript
+            // declaration, which means we don't want to *return* the
+            // stated return type of the subscript, but instead take
+            // it as a parameter.
+            //
+            IRType* irParamType = irResultType;
+            paramTypes.Add(irParamType);
+            IRParam* irParam = subBuilder->emitParam(irParamType);
+
+            // TODO: we need some way to wire this up to the `newValue`
+            // or whatever name we give for that parameter inside
+            // the setter body.
+
+            // Instead, a setter always returns `void`
+            //
+            irResultType = getBuilder()->getVoidType();
+        }
 
         auto irFuncType = getBuilder()->getFuncType(
             paramTypes.Count(),
@@ -854,7 +1246,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
 LoweredValInfo lowerDecl(
     IRGenContext*   context,
-    Decl*           decl,
+    DeclBase*       decl,
     Layout*         layout)
 {
     DeclLoweringVisitor visitor;
