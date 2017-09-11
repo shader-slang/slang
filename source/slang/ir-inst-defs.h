@@ -28,6 +28,7 @@ INST(TextureType, texture_type, 2, 0)
 INST(SamplerType, sampler_type, 1, 0)
 INST(ConstantBufferType, constant_buffer_type, 1, 0)
 INST(TextureBufferType, texture_buffer_type, 1, 0)
+INST(readWriteStructuredBufferType, readWriteStructuredBufferType, 1, 0)
 
 INST(IntLit, integer_constant, 0, 0)
 INST(FloatLit, float_constant, 0, 0)
@@ -45,6 +46,9 @@ INST(Var, var, 0, 0)
 
 INST(Load, load, 1, 0)
 INST(Store, store, 2, 0)
+
+INST(BufferLoad, bufferLoad, 2, 0)
+INST(BufferStore, bufferStore, 3, 0)
 
 INST(FieldExtract, get_field, 2, 0)
 INST(FieldAddress, get_field_addr, 2, 0)

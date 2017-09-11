@@ -90,6 +90,11 @@ SYNTAX_CLASS(MemberExpr, DeclRefExpr)
     SYNTAX_FIELD(RefPtr<Expr>, BaseExpression)
 END_SYNTAX_CLASS()
 
+// Member looked up on a type, rather than a value
+SYNTAX_CLASS(StaticMemberExpr, DeclRefExpr)
+    SYNTAX_FIELD(RefPtr<Expr>, BaseExpression)
+END_SYNTAX_CLASS()
+
 SYNTAX_CLASS(SwizzleExpr, Expr)
     SYNTAX_FIELD(RefPtr<Expr>, base)
     FIELD(int, elementCount)

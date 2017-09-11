@@ -38,7 +38,8 @@ __generic<T> __magic_type(HLSLStructuredBufferType) struct StructuredBuffer
     __intrinsic_op T Load(int location);
     __intrinsic_op T Load(int location, out uint status);
 
-    __intrinsic_op __subscript(uint index) -> T;
+    __intrinsic_op(bufferLoad)
+    __subscript(uint index) -> T;
 };
 
 __generic<T> __magic_type(HLSLConsumeStructuredBufferType) struct ConsumeStructuredBuffer
@@ -173,7 +174,13 @@ __magic_type(HLSLRWByteAddressBufferType) struct RWByteAddressBuffer
         uint4 value);
 };
 
-__generic<T> __magic_type(HLSLRWStructuredBufferType) struct RWStructuredBuffer
+__generic<T>
+__magic_type(HLSLRWStructuredBufferType)
+__intrinsic_type(${{
+	// TODO: we really need a simple way to write an "expression splice"
+	sb << kIROp_readWriteStructuredBufferType;
+}})
+struct RWStructuredBuffer
 {
     __intrinsic_op uint DecrementCounter();
 
@@ -186,7 +193,15 @@ __generic<T> __magic_type(HLSLRWStructuredBufferType) struct RWStructuredBuffer
     __intrinsic_op T Load(int location);
     __intrinsic_op T Load(int location, out uint status);
 
-    __intrinsic_op __subscript(uint index) -> T { get; set; }
+	__intrinsic_op
+	__subscript(uint index) -> T
+	{
+		__intrinsic_op(bufferLoad)
+		get;
+
+		__intrinsic_op(bufferStore)
+		set;
+	}
 };
 
 __generic<T> __magic_type(HLSLPointStreamType) struct PointStream

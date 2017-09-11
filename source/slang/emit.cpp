@@ -2274,6 +2274,44 @@ struct EmitVisitor
         if(needClose) Emit(")");
     }
 
+    void visitStaticMemberExpr(StaticMemberExpr* memberExpr, ExprEmitArg const& arg)
+    {
+        auto prec = kEOp_Postfix;
+        auto outerPrec = arg.outerPrec;
+        bool needClose = MaybeEmitParens(outerPrec, prec);
+
+        // TODO(tfoley): figure out a good way to reference
+        // declarations that might be generic and/or might
+        // not be generated as lexically nested declarations...
+
+        // TODO(tfoley): also, probably need to special case
+        // this for places where we are using a built-in...
+
+        auto base = memberExpr->BaseExpression;
+        if (IsBaseExpressionImplicit(base))
+        {
+            // don't emit the base expression
+        }
+        else
+        {
+            EmitExprWithPrecedence(memberExpr->BaseExpression, leftSide(outerPrec, prec));
+            Emit(".");
+        }
+
+        if (!memberExpr->declRef)
+        {
+            // This case arises when checking didn't find anything, but we were
+            // in "rewrite" mode so we blazed ahead anyway.
+            emitName(memberExpr->name);
+        }
+        else
+        {
+            emit(memberExpr->declRef.GetName());
+        }
+
+        if(needClose) Emit(")");
+    }
+
     void visitMemberExpr(MemberExpr* memberExpr, ExprEmitArg const& arg)
     {
         auto prec = kEOp_Postfix;
@@ -4033,6 +4071,15 @@ emitDeclImpl(decl, nullptr);
             }
             break;
 
+        case kIROp_readWriteStructuredBufferType:
+            {
+                auto tt = (IRBufferType*) type;
+                emit("RWStructuredBuffer<");
+                emitIRType(context, tt->getElementType(), nullptr);
+                emit(">");
+            }
+            break;
+
         case kIROp_SamplerType:
             {
                 // TODO: actually look at the flavor and emit the right name
@@ -4308,6 +4355,13 @@ emitDeclImpl(decl, nullptr);
             emitIROperand(context, inst->getArg(1));
             break;
 
+        case kIROp_Store:
+            // TODO: this logic will really only work for a simple variable reference...
+            emitIROperand(context, inst->getArg(1));
+            emit(" = ");
+            emitIROperand(context, inst->getArg(2));
+            break;
+
         case kIROp_Call:
             {
                 emitIROperand(context, inst->getArg(1));
@@ -4320,6 +4374,13 @@ emitDeclImpl(decl, nullptr);
                 }
                 emit(")");
             }
+            break;
+
+        case kIROp_BufferLoad:
+            emitIROperand(context, inst->getArg(1));
+            emit("[");
+            emitIROperand(context, inst->getArg(2));
+            emit("]");
             break;
 
         default:
@@ -4343,6 +4404,17 @@ emitDeclImpl(decl, nullptr);
             emitIRInstResultDecl(context, inst);
             emitIRInstExpr(context, inst);
             emit(";\n");
+            break;
+
+        case kIROp_Var:
+            {
+                auto ptrType = inst->getType();
+                auto valType = ((IRPtrType*)ptrType)->getValueType();
+
+                auto name = getName(inst);
+                emitIRType(context, valType, name);
+                emit(";\n");
+            }
             break;
 
         case kIROp_Param:

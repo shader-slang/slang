@@ -1852,17 +1852,28 @@ struct LoweringVisitor
         return &shared->compileRequest->mSink;
     }
 
+    LoweredExpr visitStaticMemberExpr(
+        StaticMemberExpr* expr)
+    {
+        auto loweredBase = lowerExprOrTuple(expr->BaseExpression);
+        auto loweredDeclRef = translateDeclRef(expr->declRef);
+
+        // TODO: we should probably support type-type members here.
+
+        RefPtr<StaticMemberExpr> loweredExpr = new StaticMemberExpr();
+        lowerExprCommon(loweredExpr, expr);
+        loweredExpr->BaseExpression = loweredBase.getExpr();
+        loweredExpr->declRef = loweredDeclRef.As<Decl>();
+        loweredExpr->name = expr->name;
+
+        return LoweredExpr(loweredExpr);
+    }
+
     LoweredExpr visitMemberExpr(
         MemberExpr* expr)
     {
         assert(expr->BaseExpression);
         auto loweredBase = lowerExprOrTuple(expr->BaseExpression);
-
-        if( !loweredBase )
-        {
-            loweredBase = lowerExprOrTuple(expr->BaseExpression);
-        }
-
         assert(loweredBase);
 
         auto loweredDeclRef = translateDeclRef(expr->declRef);

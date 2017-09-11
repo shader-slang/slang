@@ -883,6 +883,22 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitStore(
+        IRValue*    dstPtr,
+        IRValue*    srcVal)
+    {
+        auto type = getVoidType();
+        auto inst = createInst<IRStore>(
+            this,
+            kIROp_Store,
+            type,
+            dstPtr,
+            srcVal);
+
+        addInst(inst);
+        return inst;
+    }
+
     IRInst* IRBuilder::emitFieldExtract(
         IRType*         type,
         IRValue*        base,

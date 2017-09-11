@@ -146,13 +146,26 @@ namespace Slang
         {
             if (baseExpr)
             {
-                auto expr = new MemberExpr();
-                expr->loc = loc;
-                expr->BaseExpression = baseExpr;
-                expr->name = declRef.GetName();
-                expr->type = GetTypeForDeclRef(declRef);
-                expr->declRef = declRef;
-                return expr;
+                if (baseExpr->type->As<TypeType>())
+                {
+                    auto expr = new StaticMemberExpr();
+                    expr->loc = loc;
+                    expr->BaseExpression = baseExpr;
+                    expr->name = declRef.GetName();
+                    expr->type = GetTypeForDeclRef(declRef);
+                    expr->declRef = declRef;
+                    return expr;
+                }
+                else
+                {
+                    auto expr = new MemberExpr();
+                    expr->loc = loc;
+                    expr->BaseExpression = baseExpr;
+                    expr->name = declRef.GetName();
+                    expr->type = GetTypeForDeclRef(declRef);
+                    expr->declRef = declRef;
+                    return expr;
+                }
             }
             else
             {
@@ -4978,6 +4991,11 @@ namespace Slang
             }
         }
 
+        RefPtr<Expr> visitStaticMemberExpr(StaticMemberExpr* expr)
+        {
+            SLANG_UNEXPECTED("should not occur in unchecked AST");
+            return expr;
+        }
 
         RefPtr<Expr> visitMemberExpr(MemberExpr * expr)
         {
