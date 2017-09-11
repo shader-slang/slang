@@ -519,6 +519,15 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
         return getBuilder()->getVectorType(irElementType, irElementCount);
     }
+
+    LoweredTypeInfo visitMatrixExpressionType(MatrixExpressionType* type)
+    {
+        auto irElementType = lowerSimpleType(context, type->getElementType());
+        auto irRowCount = lowerSimpleVal(context, type->getRowCount());
+        auto irColumnCount = lowerSimpleVal(context, type->getColumnCount());
+
+        return getBuilder()->getMatrixType(irElementType, irRowCount, irColumnCount);
+    }
 };
 
 LoweredValInfo lowerVal(
@@ -738,9 +747,42 @@ struct ExprLoweringVisitor : ExprVisitor<ExprLoweringVisitor, LoweredValInfo>
         return emitCallToVal(context, type, funcVal, irArgs.Count(), irArgs.Buffer());
     }
 
+    LoweredValInfo subscriptValue(
+        LoweredTypeInfo type,
+        LoweredValInfo  baseVal,
+        IRValue*        indexVal)
+    {
+        auto builder = getBuilder();
+        switch (baseVal.flavor)
+        {
+        case LoweredValInfo::Flavor::Simple:
+            return LoweredValInfo::simple(
+                builder->emitElementExtract(
+                    getSimpleType(type),
+                    getSimpleVal(context, baseVal),
+                    indexVal));
+
+        case LoweredValInfo::Flavor::Ptr:
+            return LoweredValInfo::ptr(
+                builder->emitElementAddress(
+                    builder->getPtrType(getSimpleType(type)),
+                    baseVal.val,
+                    indexVal));
+
+        default:
+            SLANG_UNIMPLEMENTED_X("subscript expr");
+            return LoweredValInfo();
+        }
+
+    }
+
     LoweredValInfo visitIndexExpr(IndexExpr* expr)
     {
-        SLANG_UNIMPLEMENTED_X("codegen for subscript expression");
+        auto type = lowerType(context, expr->type);
+        auto baseVal = lowerExpr(context, expr->BaseExpression);
+        auto indexVal = getSimpleVal(context, lowerExpr(context, expr->IndexExpression));
+
+        return subscriptValue(type, baseVal, indexVal);
     }
 
     LoweredValInfo extractField(

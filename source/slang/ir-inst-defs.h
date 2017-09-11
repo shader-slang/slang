@@ -17,6 +17,7 @@ INST(TypeType,    type.type,      0, 0)
 INST(VoidType,    type.void,      0, 0)
 INST(BlockType,   type.block,     0, 0)
 INST(VectorType,  type.vector,    2, 0)
+INST(MatrixType,  matrixType,     3, 0)
 INST(BoolType,    type.bool,      0, 0)
 INST(Float32Type, type.f32,       0, 0)
 INST(Int32Type,   type.i32,       0, 0)
@@ -52,6 +53,9 @@ INST(BufferStore, bufferStore, 3, 0)
 
 INST(FieldExtract, get_field, 2, 0)
 INST(FieldAddress, get_field_addr, 2, 0)
+
+INST(getElement, getElement, 2, 0)
+INST(getElementPtr, getElementPtr, 2, 0)
 
 INST(ReturnVal, return_val, 1, 0)
 INST(ReturnVoid, return_void, 1, 0)
