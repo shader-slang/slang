@@ -499,25 +499,14 @@ namespace Slang
     }
 #endif
 
-#if 0
-    String emitSPIRVAssembly(
-        ExtraContext&				context)
+    List<uint8_t> emitSlangIRForEntryPoint(
+        EntryPointRequest*  entryPoint)
     {
-        if(context.getTranslationUnitOptions().entryPoints.Count() == 0)
-        {
-            // TODO(tfoley): need to write diagnostics into this whole thing...
-            fprintf(stderr, "no entry point specified\n");
-            return "";
-        }
-
-        StringBuilder sb;
-        for (auto entryPoint : context.getTranslationUnitOptions().entryPoints)
-        {
-            sb << emitSPIRVAssemblyForEntryPoint(context, entryPoint);
-        }
-        return sb.ProduceString();
+        SLANG_UNIMPLEMENTED_X("Slang IR Binary Generation");
     }
-#endif
+
+    String emitSlangIRAssemblyForEntryPoint(
+        EntryPointRequest*  entryPoint);
 
     // Do emit logic for a single entry point
     CompileResult emitEntryPoint(
@@ -573,6 +562,22 @@ namespace Slang
         case CodeGenTarget::SPIRVAssembly:
             {
                 String code = emitSPIRVAssemblyForEntryPoint(entryPoint);
+                maybeDumpIntermediate(compileRequest, code.Buffer(), target);
+                result = CompileResult(code);
+            }
+            break;
+
+        case CodeGenTarget::SlangIR:
+            {
+                List<uint8_t> code = emitSlangIRForEntryPoint(entryPoint);
+                maybeDumpIntermediate(compileRequest, code.Buffer(), code.Count(), target);
+                result = CompileResult(code);
+            }
+            break;
+
+        case CodeGenTarget::SlangIRAssembly:
+            {
+                String code = emitSlangIRAssemblyForEntryPoint(entryPoint);
                 maybeDumpIntermediate(compileRequest, code.Buffer(), target);
                 result = CompileResult(code);
             }
@@ -957,6 +962,10 @@ namespace Slang
             dumpIntermediateText(compileRequest, data, size, ".dxbc.asm");
             break;
 
+        case CodeGenTarget::SlangIRAssembly:
+            dumpIntermediateText(compileRequest, data, size, ".slang-ir.asm");
+            break;
+
         case CodeGenTarget::SPIRV:
             dumpIntermediateBinary(compileRequest, data, size, ".spv");
             {
@@ -970,6 +979,15 @@ namespace Slang
             {
                 String dxbcAssembly = dissassembleDXBC(compileRequest, data, size);
                 dumpIntermediateText(compileRequest, dxbcAssembly.begin(), dxbcAssembly.Length(), ".dxbc.asm");
+            }
+            break;
+
+        case CodeGenTarget::SlangIR:
+            dumpIntermediateBinary(compileRequest, data, size, ".slang-ir");
+            {
+                // TODO: need to support dissassembly from Slang IR binary
+//                String slangIRAssembly = dissassembleSlangIR(compileRequest, data, size);
+//                dumpIntermediateText(compileRequest, slangIRAssembly.begin(), slangIRAssembly.Length(), ".slang-ir.asm");
             }
             break;
         }

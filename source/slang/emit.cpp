@@ -1,6 +1,7 @@
 // emit.cpp
 #include "emit.h"
 
+#include "ir-insts.h"
 #include "lower.h"
 #include "lower-to-ir.h"
 #include "name.h"
@@ -3966,11 +3967,16 @@ emitDeclImpl(decl, nullptr);
         {
             Simple,
             Ptr,
+            Array,
         };
 
         Flavor flavor;
         IRDeclaratorInfo*   next;
-        String const* name;
+        union
+        {
+            String const* name;
+            IRInst* elementCount;
+        };
     };
 
     void emitDeclarator(
@@ -3991,6 +3997,13 @@ emitDeclImpl(decl, nullptr);
             emit("*");
             emitDeclarator(context, declarator->next);
             break;
+
+        case IRDeclaratorInfo::Flavor::Array:
+            emitDeclarator(context, declarator->next);
+            emit("[");
+            emitIROperand(context, declarator->elementCount);
+            emit("]");
+            break;
         }
     }
 
@@ -4006,6 +4019,13 @@ emitDeclImpl(decl, nullptr);
 
         case kIROp_FloatLit:
             emit(((IRConstant*) inst)->u.floatVal);
+            break;
+
+        case kIROp_boolConst:
+            {
+                bool val = ((IRConstant*)inst)->u.intVal != 0;
+                emit(val ? "true" : "false");
+            }
             break;
 
         default:
@@ -4028,6 +4048,8 @@ emitDeclImpl(decl, nullptr);
         CASE(Float32Type,   float);
         CASE(Int32Type,     int);
         CASE(UInt32Type,    uint);
+        CASE(VoidType,      void);
+        CASE(BoolType,      bool);
 
     #undef CASE
 
@@ -4084,6 +4106,15 @@ emitDeclImpl(decl, nullptr);
             }
             break;
 
+        case kIROp_structuredBufferType:
+            {
+                auto tt = (IRBufferType*) type;
+                emit("StructuredBuffer<");
+                emitIRType(context, tt->getElementType(), nullptr);
+                emit(">");
+            }
+            break;
+
         case kIROp_SamplerType:
             {
                 // TODO: actually look at the flavor and emit the right name
@@ -4127,16 +4158,28 @@ emitDeclImpl(decl, nullptr);
         IRType*             type,
         IRDeclaratorInfo*   declarator)
     {
-        switch( type->op )
+        switch (type->op)
         {
         case kIROp_PtrType:
             {
-                auto ptrType = (IRPtrType*) type;
+                auto ptrType = (IRPtrType*)type;
 
                 IRDeclaratorInfo ptrDeclarator;
                 ptrDeclarator.flavor = IRDeclaratorInfo::Flavor::Ptr;
                 ptrDeclarator.next = declarator;
                 emitIRType(context, ptrType->getValueType(), &ptrDeclarator);
+            }
+            break;
+
+        case kIROp_arrayType:
+            {
+                auto arrayType = (IRArrayType*)type;
+
+                IRDeclaratorInfo arrayDeclarator;
+                arrayDeclarator.flavor = IRDeclaratorInfo::Flavor::Array;
+                arrayDeclarator.elementCount = arrayType->getElementCount();
+                arrayDeclarator.next = declarator;
+                emitIRType(context, arrayType->getElementType(), &arrayDeclarator);
             }
             break;
 
@@ -4178,6 +4221,7 @@ emitDeclImpl(decl, nullptr);
 
         case kIROp_IntLit:
         case kIROp_FloatLit:
+        case kIROp_boolConst:
         case kIROp_FieldAddress:
         case kIROp_getElementPtr:
             return true;
@@ -4280,17 +4324,9 @@ emitDeclImpl(decl, nullptr);
         switch(inst->op)
         {
         case kIROp_IntLit:
-            {
-                auto irConst = (IRConstant*) inst;
-                emit(irConst->u.intVal);
-            }
-            break;
-
         case kIROp_FloatLit:
-            {
-                auto irConst = (IRConstant*) inst;
-                emit(irConst->u.floatVal);
-            }
+        case kIROp_boolConst:
+            emitIRSimpleValue(context, inst);
             break;
 
         case kIROp_Construct:
@@ -4351,7 +4387,38 @@ emitDeclImpl(decl, nullptr);
         CASE(kIROp_Div, /);
         CASE(kIROp_Mod, %);
 
+        CASE(kIROp_Lsh, <<);
+        CASE(kIROp_Rsh, >>);
+
+        CASE(kIROp_Eql, ==);
+        CASE(kIROp_Neq, !=);
+        CASE(kIROp_Greater, >);
+        CASE(kIROp_Less, <);
+        CASE(kIROp_Geq, >=);
+        CASE(kIROp_Leq, <=);
+
+        CASE(kIROp_BitAnd, &);
+        CASE(kIROp_BitXor, ^);
+        CASE(kIROp_BitOr, |);
+
+        CASE(kIROp_And, &&);
+        CASE(kIROp_Or, ||);
+
 #undef CASE
+
+        case kIROp_Not:
+            {
+                if (inst->getType()->op == kIROp_BoolType)
+                {
+                    emit("!");
+                }
+                else
+                {
+                    emit("~");
+                }
+                emitIROperand(context, inst->getArg(1));
+            }
+            break;
 
         case kIROp_Sample:
             emitIROperand(context, inst->getArg(1));
@@ -4408,6 +4475,18 @@ emitDeclImpl(decl, nullptr);
             emit("]");
             break;
 
+        case kIROp_BufferStore:
+            emitIROperand(context, inst->getArg(1));
+            emit("[");
+            emitIROperand(context, inst->getArg(2));
+            emit("] = ");
+            emitIROperand(context, inst->getArg(3));
+            break;
+
+        case kIROp_GroupMemoryBarrierWithGroupSync:
+            emit("GroupMemoryBarrierWithGroupSync()");
+            break;
+
         case kIROp_getElement:
         case kIROp_getElementPtr:
             emitIROperand(context, inst->getArg(1));
@@ -4424,10 +4503,30 @@ emitDeclImpl(decl, nullptr);
             emit(", ");
             emitIROperand(context, inst->getArg(2));
             emit(")");
+
+        case kIROp_swizzle:
+            {
+                auto ii = (IRSwizzle*)inst;
+                emitIROperand(context, ii->getBase());
+                emit(".");
+                UInt elementCount = ii->getElementCount();
+                for (UInt ee = 0; ee < elementCount; ++ee)
+                {
+                    IRInst* irElementIndex = ii->getElementIndex(ee);
+                    assert(irElementIndex->op == kIROp_IntLit);
+                    IRConstant* irConst = (IRConstant*)irElementIndex;
+
+                    UInt elementIndex = (UInt)irConst->u.intVal;
+                    assert(elementIndex < 4);
+
+                    char const* kComponents[] = { "x", "y", "z", "w" };
+                    emit(kComponents[elementIndex]);
+                }
+            }
             break;
 
         default:
-            emit("/* uhandled */");
+            emit("/* unhandled */");
             break;
         }
     }
@@ -4478,6 +4577,51 @@ emitDeclImpl(decl, nullptr);
             emitIROperand(context, ((IRReturnVal*) inst)->getVal());
             emit(";\n");
             break;
+
+        case kIROp_swizzleSet:
+            {
+                auto ii = (IRSwizzleSet*)inst;
+                emitIRInstResultDecl(context, inst);
+                emitIROperand(context, inst->getArg(1));
+                emit(";\n");
+                emitIROperand(context, inst);
+                emit(".");
+                UInt elementCount = ii->getElementCount();
+                for (UInt ee = 0; ee < elementCount; ++ee)
+                {
+                    IRInst* irElementIndex = ii->getElementIndex(ee);
+                    assert(irElementIndex->op == kIROp_IntLit);
+                    IRConstant* irConst = (IRConstant*)irElementIndex;
+
+                    UInt elementIndex = (UInt)irConst->u.intVal;
+                    assert(elementIndex < 4);
+
+                    char const* kComponents[] = { "x", "y", "z", "w" };
+                    emit(kComponents[elementIndex]);
+                }
+                emit(" = ");
+                emitIROperand(context, inst->getArg(2));
+                emit(";\n");
+            }
+            break;
+
+#if 0
+        case kIROp_unconditionalBranch:
+            emit("// unconditionalBranch ");
+            emitIROperand(context, inst->getArg(1));
+            emit("\n");
+            break;
+
+        case kIROp_conditionalBranch:
+            emit("// conditionalBranch ");
+            emitIROperand(context, inst->getArg(1));
+            emit(" ");
+            emitIROperand(context, inst->getArg(2));
+            emit(" ");
+            emitIROperand(context, inst->getArg(3));
+            emit("\n");
+            break;
+#endif
         }
     }
 
@@ -4515,12 +4659,257 @@ emitDeclImpl(decl, nullptr);
         }
     }
 
+    // We want to emit a range of code in the IR, represented
+    // by the blocks that are logically in the interval [begin, end)
+    // which we consider as a single-entry multiple-exit region.
+    //
+    // Note: because there are multiple exists, control flow
+    // may exit this region with operations that do *not* branch
+    // to `end`, but such non-local control flow will hopefully
+    // be captured.
+    // 
+    void emitIRStmtsForBlocks(
+        EmitContext*    context,
+        IRBlock*        begin,
+        IRBlock*        end)
+    {
+        IRBlock* block = begin;
+        while(block != end)
+        {
+            // Start by emitting the non-terminator instructions in the block.
+            auto terminator = block->lastChild;
+            assert(isTerminatorInst(terminator));
+            for (auto inst = block->firstChild; inst != terminator; inst = inst->nextInst)
+            {
+                emitIRInst(context, inst);
+            }
+
+            // Now look at the terminator instruction, which will tell us what we need to emit next.
+
+            switch (terminator->op)
+            {
+            default:
+                SLANG_UNEXPECTED("terminator inst");
+                return;
+
+            case kIROp_ReturnVal:
+            case kIROp_ReturnVoid:
+                emitIRInst(context, terminator);
+                return;
+
+            case kIROp_if:
+                {
+                    // One-sided `if` statement
+                    auto t = (IRIf*)terminator;
+
+                    auto trueBlock = t->getTrueBlock();
+                    auto afterBlock = t->getAfterBlock();
+
+                    emit("if(");
+                    emitIROperand(context, t->getCondition());
+                    emit(")\n{\n");
+                    emitIRStmtsForBlocks(
+                        context,
+                        trueBlock,
+                        afterBlock);
+                    emit("}\n");
+
+                    // Continue with the block after the `if`
+                    block = afterBlock;
+                }
+                break;
+
+            case kIROp_ifElse:
+                {
+                    // Two-sided `if` statement
+                    auto t = (IRIfElse*)terminator;
+
+                    auto trueBlock = t->getTrueBlock();
+                    auto falseBlock = t->getFalseBlock();
+                    auto afterBlock = t->getAfterBlock();
+
+                    emit("if(");
+                    emitIROperand(context, t->getCondition());
+                    emit(")\n{\n");
+                    emitIRStmtsForBlocks(
+                        context,
+                        trueBlock,
+                        afterBlock);
+                    emit("}\nelse\n{\n");
+                    emitIRStmtsForBlocks(
+                        context,
+                        falseBlock,
+                        afterBlock);
+                    emit("}\n");
+
+                    // Continue with the block after the `if`
+                    block = afterBlock;
+                }
+                break;
+
+            case kIROp_loop:
+                {
+                    // Header for a `while` or `for` loop
+                    auto t = (IRLoop*)terminator;
+
+                    auto targetBlock = t->getTargetBlock();
+                    auto breakBlock = t->getBreakBlock();
+                    auto continueBlock = t->getContinueBlock();
+
+                    if (auto loopControlDecoration = t->findDecoration<IRLoopControlDecoration>())
+                    {
+                        switch (loopControlDecoration->mode)
+                        {
+                        case kIRLoopControl_Unroll:
+                            emit("[unroll]\n");
+                            break;
+
+                        default:
+                            break;
+                        }
+                    }
+
+                    // The challenging case for a loop is when
+                    // there is a `continue` block that we
+                    // need to deal with.
+                    //
+                    if (continueBlock == targetBlock)
+                    {
+                        // There is no continue block, so
+                        // we only need to emit an endless
+                        // loop and then manually `break`
+                        // out of it in the right place(s)
+                        emit("for(;;)\n{\n");
+
+                        emitIRStmtsForBlocks(
+                            context,
+                            targetBlock,
+                            nullptr);
+
+                        emit("}\n");
+                    }
+                    else
+                    {
+                        // Okay, we've got a `continue` block,
+                        // which means we really want to emit
+                        // something akin to:
+                        //
+                        //     for(;; <continueBlock>) { <bodyBlock> }
+                        //
+                        // In principle this isn't so bad, since the
+                        // first case is just interVal [`continueBlock`, `targetBlock`)
+                        // and the latter is the interval [`targetBlock`, `continueBlock`).
+                        //
+                        // The challenge of course is that a `for` statement
+                        // only supports *expressions* in the continue part,
+                        // and we might have expanded things into multiple
+                        // instructions (especially if we inlined or desugared anything).
+                        //
+                        // There are a variety of ways we can support lowering this,
+                        // but for now we are going to do something expedient
+                        // that mimics what `fxc` seems to do:
+                        //
+                        // - Output loop body as `for(;;) { <bodyBlock> <continueBlock> }`
+                        // - At any `continue` site, output `{ <continueBlock>; continue; }`
+                        //
+                        // This isn't ideal because it leads to code duplication, but
+                        // it matches what `fxc` does so hopefully it will be the
+                        // best option for our tests.
+                        //
+
+                        emit("for(;;)\n{\n");
+
+                        // TODO: Okay, we *said* we'd do this special
+                        // handling of the `continue` sites, but
+                        // we aren't actually setting anything up here...
+                        //
+
+                        emitIRStmtsForBlocks(
+                            context,
+                            targetBlock,
+                            nullptr);
+
+                        emit("}\n");
+
+                    }
+
+                    // Continue with the block after the loop
+                    block = breakBlock;
+                }
+                break;
+
+            case kIROp_break:
+                emit("break;\n");
+                return;
+
+            case kIROp_continue:
+                emit("continue;\n");
+                return;
+
+            case kIROp_loopTest:
+                {
+                    // Loop condition being tested
+                    auto t = (IRLoopTest*)terminator;
+
+                    auto afterBlock = t->getTrueBlock();
+
+                    emit("if(");
+                    emitIROperand(context, t->getCondition());
+                    emit(")\n{} else break;\n");
+
+                    // Continue with the block after the test
+                    block = afterBlock;
+                }
+                break;
+
+            case kIROp_unconditionalBranch:
+                {
+                    // Unconditional branch as part of normal
+                    // control flow. This is either a forward
+                    // edge to the "next" block in an ordinary
+                    // block, or a backward edge to the top
+                    // of a loop.
+                    auto t = (IRUnconditionalBranch*)terminator;
+                    block = t->getTargetBlock();
+                }
+                break;
+
+            case kIROp_conditionalBranch:
+                SLANG_UNEXPECTED("terminator inst");
+                return;
+            }
+
+            // If we reach this point, then we've emitted
+            // one block, and we have a new block where
+            // control flow continues.
+            //
+            // We need to handle a special case here,
+            // when control flow jumps back to the
+            // starting block of the range we were
+            // asked to work with:
+            if (block == begin) return;
+        }
+    }
+
     void emitIRFunc(
         EmitContext*    context,
         IRFunc*         func)
     {
         auto funcType = func->getType();
         auto resultType = func->getResultType();
+
+        // Deal with decorations that need
+        // to be emitted as attributes
+        if (auto threadGroupSizeDecoration = func->findDecoration<IRComputeThreadGroupSizeDecoration>())
+        {
+            emit("[numthreads(");
+            for (int ii = 0; ii < 3; ++ii)
+            {
+                if (ii != 0) emit(", ");
+                emit(threadGroupSizeDecoration->sizeAlongAxis[ii]);
+            }
+            emit(")]\n");
+        }
 
         auto name = getName(func);
 
@@ -4535,6 +4924,8 @@ emitDeclImpl(decl, nullptr);
 
             auto paramName = getName(pp);
             emitIRType(context, pp->getType(), paramName);
+
+            emitIRSemantics(context, pp);
         }
         emit(")");
 
@@ -4548,6 +4939,10 @@ emitDeclImpl(decl, nullptr);
             emit("\n{\n");
 
             // Need to emit the operations in the blocks of the function
+
+            emitIRStmtsForBlocks(context, func->getFirstBlock(), nullptr);
+
+#if 0
             for( auto bb = func->getFirstBlock(); bb; bb = bb->getNextBlock() )
             {
                 // TODO: need to handle control flow and so forth...
@@ -4556,6 +4951,7 @@ emitDeclImpl(decl, nullptr);
                     emitIRInst(context, ii);
                 }
             }
+#endif
 
             emit("}\n");
         }
@@ -4687,7 +5083,8 @@ emitDeclImpl(decl, nullptr);
         IRVar*          varDecl)
     {
         auto allocatedType = varDecl->getType();
-        auto varType = ((IRPtrType*) allocatedType)->getValueType();
+        auto varType = allocatedType->getValueType();
+        auto addressSpace = allocatedType->getAddressSpace();
 
         switch( varType->op )
         {
@@ -4705,6 +5102,16 @@ emitDeclImpl(decl, nullptr);
         auto layout = getVarLayout(context, varDecl);
         
         emitIRVarModifiers(context, layout);
+
+        switch (addressSpace)
+        {
+        default:
+            break;
+
+        case kIRAddressSpace_GroupShared:
+            emit("groupshared ");
+            break;
+        }
 
         emitIRType(context, varType, getName(varDecl));
 

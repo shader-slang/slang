@@ -9,7 +9,6 @@
 
 #include "../core/basic.h"
 
-
 namespace Slang {
 
 // TODO(tfoley): We should ditch this enumeration
@@ -143,6 +142,9 @@ enum IRDecorationOp : uint16_t
 {
     kIRDecorationOp_HighLevelDecl,
     kIRDecorationOp_Layout,
+    kIRDecorationOp_EntryPoint,
+    kIRDecorationOp_ComputeThreadGroupSize,
+    kIRDecorationOp_LoopControl,
 };
 
 // A "decoration" that gets applied to an instruction.
@@ -220,27 +222,6 @@ struct IRInst
 // All existing uses of `IRValue` should move to `IRInst`
 typedef IRInst IRValue;
 
-class Decl;
-
-// Associates an IR-level decoration with a source declaration
-// in the high-level AST, that can be used to extract
-// additional information that informs code emission.
-struct IRHighLevelDeclDecoration : IRDecoration
-{
-    enum { kDecorationOp = kIRDecorationOp_HighLevelDecl };
-
-    Decl* decl;
-};
-
-// Associates an IR-level decoration with a source layout
-struct IRLayoutDecoration : IRDecoration
-{
-    enum { kDecorationOp = kIRDecorationOp_Layout };
-
-    Layout* layout;
-};
-
-
 typedef long long IRIntegerValue;
 typedef double IRFloatingPointValue;
 
@@ -266,126 +247,13 @@ struct IRType : IRInst
 {
 };
 
-struct IRVectorType : IRType
-{
-    IRUse   elementType;
-    IRUse   elementCount;
-
-    IRType* getElementType() { return (IRType*) elementType.usedValue; }
-    IRInst* getElementCount() { return elementCount.usedValue; }
-};
-
-struct IRMatrixType : IRType
-{
-    IRUse   elementType;
-    IRUse   rowCount;
-    IRUse   columnCount;
-
-    IRType* getElementType() { return (IRType*) elementType.usedValue; }
-    IRInst* getRowCount() { return rowCount.usedValue; }
-    IRInst* getColumnCount() { return columnCount.usedValue; }
-};
-
-struct IRFuncType : IRType
-{
-    IRUse resultType;
-    // parameter tyeps are varargs...
-
-    IRType* getResultType() { return (IRType*) resultType.usedValue; }
-    UInt getParamCount()
-    {
-        return getArgCount() - 2;
-    }
-    IRType* getParamType(UInt index)
-    {
-        return (IRType*) getArg(2 + index);
-    }
-};
-
-struct IRPtrType : IRType
-{
-    IRUse valueType;
-
-    IRType* getValueType() { return (IRType*) valueType.usedValue; }
-};
-
-struct IRTextureType : IRType
-{
-    IRUse flavor;
-    IRUse elementType;
-
-    IRIntegerValue getFlavor() { return ((IRConstant*) flavor.usedValue)->u.intVal; }
-    IRType* getElementType() { return (IRType*) elementType.usedValue; }
-};
-
-struct IRBufferType : IRType
-{
-    IRUse elementType;
-    IRType* getElementType() { return (IRType*) elementType.usedValue; }
-};
-
-
-struct IRUniformBufferType : IRType
-{
-    IRUse elementType;
-    IRType* getElementType() { return (IRType*) elementType.usedValue; }
-};
-
-struct IRConstantBufferType : IRUniformBufferType {};
-struct IRTextureBufferType : IRUniformBufferType {};
-
-struct IRCall : IRInst
-{
-    IRUse func;
-};
-
-struct IRLoad : IRInst
-{
-    IRUse ptr;
-};
-
-struct IRStore : IRInst
-{
-    IRUse ptr;
-    IRUse val;
-};
-
-struct IRStructField;
-struct IRFieldExtract : IRInst
-{
-    IRUse   base;
-    IRUse   field;
-
-    IRInst* getBase() { return base.usedValue; }
-    IRStructField* getField() { return (IRStructField*) field.usedValue; }
-};
-
-struct IRFieldAddress : IRInst
-{
-    IRUse   base;
-    IRUse   field;
-
-    IRInst* getBase() { return base.usedValue; }
-    IRStructField* getField() { return (IRStructField*) field.usedValue; }
-};
-
-
 // A instruction that ends a basic block (usually because of control flow)
 struct IRTerminatorInst : IRInst
 {};
 
-struct IRReturn : IRTerminatorInst
-{};
+bool isTerminatorInst(IROp op);
+bool isTerminatorInst(IRInst* inst);
 
-struct IRReturnVal : IRReturn
-{
-    IRUse val;
-
-    IRInst* getVal() { return val.usedValue; }
-};
-
-struct IRReturnVoid : IRReturn
-{};
 
 // A parent instruction contains a sequence of other instructions
 //
@@ -397,20 +265,6 @@ struct IRParentInst : IRInst
     IRInst* firstChild;
     IRInst* lastChild;
 };
-
-struct IRStructField : IRInst
-{
-    IRType* getFieldType() { return (IRType*) type.usedValue; }
-
-    IRStructField* getNextField() { return (IRStructField*) nextInst; }
-};
-
-struct IRStructDecl : IRParentInst
-{
-    IRStructField* getFirstField() { return (IRStructField*) firstChild; }
-    IRStructField* getLastField() { return (IRStructField*) lastChild; }
-};
-
 
 // A basic block is a parent instruction that adds the constraint
 // that all the children need to be "ordinary" instructions (so
@@ -425,6 +279,8 @@ struct IRBlock : IRParentInst
 
     IRBlock* getPrevBlock() { return (IRBlock*) prevInst; }
     IRBlock* getNextBlock() { return (IRBlock*) nextInst; }
+
+    IRFunc* getParent() { return (IRFunc*)parent; }
 };
 
 // A function parameter is represented by an instruction
@@ -434,8 +290,7 @@ struct IRParam : IRInst
     IRParam* getNextParam();
 };
 
-struct IRVar : IRInst
-{};
+struct IRFuncType;
 
 // A function is a parent to zero or more blocks of instructions.
 //
@@ -445,9 +300,9 @@ struct IRFunc : IRParentInst
 {
     IRFuncType* getType() { return (IRFuncType*) type.usedValue; }
 
-    IRType* getResultType() { return getType()->getResultType(); }
-    UInt getParamCount() { return getType()->getParamCount(); }
-    IRType* getParamType(UInt index) { return getType()->getParamType(index); }
+    IRType* getResultType();
+    UInt getParamCount();
+    IRType* getParamType(UInt index);
 
     IRBlock* getFirstBlock() { return (IRBlock*) firstChild; }
     IRBlock* getLastBlock() { return (IRBlock*) lastChild; }
@@ -465,163 +320,10 @@ struct IRModule : IRParentInst
     IRInstID    idCounter;
 };
 
-// Description of an instruction to be used for global value numbering
-struct IRInstKey
-{
-    IRInst* inst;
-
-    int GetHashCode();
-};
-
-bool operator==(IRInstKey const& left, IRInstKey const& right);
-
-struct IRConstantKey
-{
-    IRConstant* inst;
-
-    int GetHashCode();
-};
-bool operator==(IRConstantKey const& left, IRConstantKey const& right);
-
-struct SharedIRBuilder
-{
-    // The module that will own all of the IR
-    IRModule*       module;
-
-    Dictionary<IRInstKey,       IRInst*>    globalValueNumberingMap;
-    Dictionary<IRConstantKey,   IRConstant*>    constantMap;
-};
-
-struct IRBuilder
-{
-    // Shared state for all IR builders working on the same module
-    SharedIRBuilder*    shared;
-
-    IRModule* getModule() { return shared->module; }
-
-    // The parent instruction to add children to.
-    IRParentInst*   parentInst;
-
-    void addInst(IRParentInst* parent, IRInst* inst);
-    void addInst(IRInst* inst);
-
-    IRType* getBaseType(BaseType flavor);
-    IRType* getBoolType();
-    IRType* getVectorType(IRType* elementType, IRValue* elementCount);
-    IRType* getMatrixType(
-        IRType* elementType,
-        IRValue* rowCount,
-        IRValue* columnCount);
-    IRType* getTypeType();
-    IRType* getVoidType();
-    IRType* getBlockType();
-
-    IRType* getIntrinsicType(
-        IROp op,
-        UInt argCount,
-        IRValue* const* args);
-
-    IRStructDecl* createStructType();
-    IRStructField* createStructField(IRType* fieldType);
-
-    IRType* getFuncType(
-        UInt            paramCount,
-        IRType* const*  paramTypes,
-        IRType*         resultType);
-
-    IRType* getPtrType(
-        IRType* valueType);
-
-    IRValue* getBoolValue(bool value);
-    IRValue* getIntValue(IRType* type, IRIntegerValue value);
-    IRValue* getFloatValue(IRType* type, IRFloatingPointValue value);
-
-    IRInst* emitCallInst(
-        IRType*         type,
-        IRValue*        func,
-        UInt            argCount,
-        IRValue* const* args);
-
-    IRInst* emitIntrinsicInst(
-        IRType*         type,
-        IROp            op,
-        UInt            argCount,
-        IRValue* const* args);
-
-    IRInst* emitConstructorInst(
-        IRType*         type,
-        UInt            argCount,
-        IRValue* const* args);
-
-    IRModule* createModule();
-
-    IRFunc* createFunc();
-
-    IRBlock* createBlock();
-    IRBlock* emitBlock();
-
-    IRParam* emitParam(
-        IRType* type);
-
-    IRVar* emitVar(
-        IRType* type);
-
-    IRInst* emitLoad(
-        IRValue*    ptr);
-
-    IRInst* emitStore(
-        IRValue*    dstPtr,
-        IRValue*    srcVal);
-
-    IRInst* emitFieldExtract(
-        IRType*         type,
-        IRValue*        base,
-        IRStructField*  field);
-
-    IRInst* emitFieldAddress(
-        IRType*         type,
-        IRValue*        basePtr,
-        IRStructField*  field);
-
-    IRInst* emitElementExtract(
-        IRType*     type,
-        IRValue*    base,
-        IRValue*    index);
-
-    IRInst* emitElementAddress(
-        IRType*     type,
-        IRValue*    basePtr,
-        IRValue*    index);
-
-
-    IRInst* emitReturn(
-        IRValue*    val);
-
-    IRInst* emitReturn();
-
-    IRDecoration* addDecorationImpl(
-        IRInst*         inst,
-        UInt            decorationSize,
-        IRDecorationOp  op);
-
-    template<typename T>
-    T* addDecoration(IRInst* inst, IRDecorationOp op)
-    {
-        return (T*) addDecorationImpl(inst, sizeof(T), op);
-    }
-
-    template<typename T>
-    T* addDecoration(IRInst* inst)
-    {
-        return (T*) addDecorationImpl(inst, sizeof(T), IRDecorationOp(T::kDecorationOp));
-    }
-
-    IRHighLevelDeclDecoration* addHighLevelDeclDecoration(IRInst* inst, Decl* decl);
-    IRLayoutDecoration* addLayoutDecoration(IRInst* inst, Layout* layout);
-};
-
-void dumpIR(IRModule* module);
+void printSlangIRAssembly(StringBuilder& builder, IRModule* module);
+String getSlangIRAssembly(IRModule* module);
 
 }
+
 
 #endif

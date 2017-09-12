@@ -29,7 +29,13 @@ __magic_type(HLSLByteAddressBufferType) struct ByteAddressBuffer
     __intrinsic_op uint4 Load4(int location, out uint status);
 };
 
-__generic<T> __magic_type(HLSLStructuredBufferType) struct StructuredBuffer
+__generic<T>
+__magic_type(HLSLStructuredBufferType)
+__intrinsic_type(${{
+	// TODO: we really need a simple way to write an "expression splice"
+	sb << kIROp_structuredBufferType;
+}})
+struct StructuredBuffer
 {
     __intrinsic_op void GetDimensions(
         out uint numStructs,
