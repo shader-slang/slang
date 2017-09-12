@@ -534,6 +534,25 @@ namespace Slang
             &args[0]);
     }
 
+    template<typename T>
+    static T* findOrEmitInst(
+        IRBuilder*      builder,
+        IROp            op,
+        IRType*         type,
+        IRInst*         arg1,
+        IRInst*         arg2,
+        IRInst*         arg3)
+    {
+        IRInst* args[] = { arg1, arg2, arg3 };
+        return (T*) findOrEmitInstImpl(
+            builder,
+            sizeof(T),
+            op,
+            type,
+            3,
+            &args[0]);
+    }
+
     //
 
     bool operator==(IRConstantKey const& left, IRConstantKey const& right)
@@ -642,6 +661,20 @@ namespace Slang
             getTypeType(),
             elementType,
             elementCount);
+    }
+
+    IRType* IRBuilder::getMatrixType(
+        IRType* elementType,
+        IRValue* rowCount,
+        IRValue* columnCount)
+    {
+        return findOrEmitInst<IRMatrixType>(
+            this,
+            kIROp_MatrixType,
+            getTypeType(),
+            elementType,
+            rowCount,
+            columnCount);
     }
 
     IRType* IRBuilder::getTypeType()
@@ -926,6 +959,38 @@ namespace Slang
             type,
             base,
             field);
+
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitElementExtract(
+        IRType*     type,
+        IRValue*    base,
+        IRValue*    index)
+    {
+        auto inst = createInst<IRFieldAddress>(
+            this,
+            kIROp_getElement,
+            type,
+            base,
+            index);
+
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitElementAddress(
+        IRType*     type,
+        IRValue*    basePtr,
+        IRValue*    index)
+    {
+        auto inst = createInst<IRFieldAddress>(
+            this,
+            kIROp_getElementPtr,
+            type,
+            basePtr,
+            index);
 
         addInst(inst);
         return inst;

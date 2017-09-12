@@ -275,6 +275,17 @@ struct IRVectorType : IRType
     IRInst* getElementCount() { return elementCount.usedValue; }
 };
 
+struct IRMatrixType : IRType
+{
+    IRUse   elementType;
+    IRUse   rowCount;
+    IRUse   columnCount;
+
+    IRType* getElementType() { return (IRType*) elementType.usedValue; }
+    IRInst* getRowCount() { return rowCount.usedValue; }
+    IRInst* getColumnCount() { return columnCount.usedValue; }
+};
+
 struct IRFuncType : IRType
 {
     IRUse resultType;
@@ -497,6 +508,10 @@ struct IRBuilder
     IRType* getBaseType(BaseType flavor);
     IRType* getBoolType();
     IRType* getVectorType(IRType* elementType, IRValue* elementCount);
+    IRType* getMatrixType(
+        IRType* elementType,
+        IRValue* rowCount,
+        IRValue* columnCount);
     IRType* getTypeType();
     IRType* getVoidType();
     IRType* getBlockType();
@@ -567,6 +582,17 @@ struct IRBuilder
         IRType*         type,
         IRValue*        basePtr,
         IRStructField*  field);
+
+    IRInst* emitElementExtract(
+        IRType*     type,
+        IRValue*    base,
+        IRValue*    index);
+
+    IRInst* emitElementAddress(
+        IRType*     type,
+        IRValue*    basePtr,
+        IRValue*    index);
+
 
     IRInst* emitReturn(
         IRValue*    val);

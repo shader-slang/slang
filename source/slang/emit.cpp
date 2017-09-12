@@ -4036,6 +4036,10 @@ emitDeclImpl(decl, nullptr);
             emitIRVectorType(context, (IRVectorType*) type);
             break;
 
+        case kIROp_MatrixType:
+            emitIRMatrixType(context, (IRMatrixType*) type);
+            break;
+
         case kIROp_StructType:
             emit(getName(type));
             break;
@@ -4106,6 +4110,18 @@ emitDeclImpl(decl, nullptr);
         emitIRSimpleValue(context, type->getElementCount());
     }
 
+    void emitIRMatrixType(
+        EmitContext*    context,
+        IRMatrixType*   type)
+    {
+        // TODO: this is a GLSL-vs-HLSL decision point
+
+        emitIRSimpleType(context, type->getElementType());
+        emitIRSimpleValue(context, type->getRowCount());
+        emit("x");
+        emitIRSimpleValue(context, type->getColumnCount());
+    }
+
     void emitIRType(
         EmitContext*        context,
         IRType*             type,
@@ -4163,6 +4179,7 @@ emitDeclImpl(decl, nullptr);
         case kIROp_IntLit:
         case kIROp_FloatLit:
         case kIROp_FieldAddress:
+        case kIROp_getElementPtr:
             return true;
         }
 
@@ -4321,12 +4338,20 @@ emitDeclImpl(decl, nullptr);
             }
             break;
 
-        case kIROp_Add:
-            emitIROperand(context, inst->getArg(1));
-            emit(" + ");
-            emitIROperand(context, inst->getArg(2));
-            break;
+#define CASE(OPCODE, OP)                                \
+        case OPCODE:                                    \
+            emitIROperand(context, inst->getArg(1));    \
+            emit("" #OP " ");                           \
+            emitIROperand(context, inst->getArg(2));    \
+            break
 
+        CASE(kIROp_Add, +);
+        CASE(kIROp_Sub, -);
+        CASE(kIROp_Mul, *);
+        CASE(kIROp_Div, /);
+        CASE(kIROp_Mod, %);
+
+#undef CASE
 
         case kIROp_Sample:
             emitIROperand(context, inst->getArg(1));
@@ -4377,6 +4402,14 @@ emitDeclImpl(decl, nullptr);
             break;
 
         case kIROp_BufferLoad:
+            emitIROperand(context, inst->getArg(1));
+            emit("[");
+            emitIROperand(context, inst->getArg(2));
+            emit("]");
+            break;
+
+        case kIROp_getElement:
+        case kIROp_getElementPtr:
             emitIROperand(context, inst->getArg(1));
             emit("[");
             emitIROperand(context, inst->getArg(2));
