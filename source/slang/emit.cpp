@@ -4416,6 +4416,16 @@ emitDeclImpl(decl, nullptr);
             emit("]");
             break;
 
+        case kIROp_Mul_Vector_Matrix:
+        case kIROp_Mul_Matrix_Vector:
+        case kIROp_Mul_Matrix_Matrix:
+            emit("mul(");
+            emitIROperand(context, inst->getArg(1));
+            emit(", ");
+            emitIROperand(context, inst->getArg(2));
+            emit(")");
+            break;
+
         default:
             emit("/* uhandled */");
             break;
@@ -4575,6 +4585,34 @@ emitDeclImpl(decl, nullptr);
         emit("};\n");
     }
 
+    void emitIRVarModifiers(
+        EmitContext*    context,
+        VarLayout*      layout)
+    {
+        if (!layout)
+            return;
+
+        // We need to handle the case where the variable has
+        // a matrix type, and has been given a non-standard
+        // layout attribute (for HLSL, `row_major` is the
+        // non-standard layout).
+        //
+        if (auto matrixTypeLayout = layout->typeLayout.As<MatrixTypeLayout>())
+        {
+            switch (matrixTypeLayout->mode)
+            {
+            case kMatrixLayoutMode_ColumnMajor:
+                emit("column_major ");
+                break;
+
+            case kMatrixLayoutMode_RowMajor:
+                emit("row_major ");
+                break;
+            }
+
+        }
+    }
+
     void emitIRParameterBlock(
         EmitContext*            context,
         IRVar*                  varDecl,
@@ -4624,7 +4662,7 @@ emitDeclImpl(decl, nullptr);
 
                     auto fieldLayout = structTypeLayout->fields[fieldIndex++];
 
-
+                    emitIRVarModifiers(context, fieldLayout);
 
                     auto fieldType = ff->getFieldType();
                     emitIRType(context, fieldType, getName(ff));
@@ -4662,6 +4700,11 @@ emitDeclImpl(decl, nullptr);
             break;
         }
 
+        // Need to emit appropriate modifiers here.
+
+        auto layout = getVarLayout(context, varDecl);
+        
+        emitIRVarModifiers(context, layout);
 
         emitIRType(context, varType, getName(varDecl));
 

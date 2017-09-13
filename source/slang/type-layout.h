@@ -313,6 +313,22 @@ public:
     size_t              uniformStride;
 };
 
+// When storing the layout for a matrix-type
+// value, we need to know whether it has been
+// laid ot with row-major or column-major
+// storage.
+//
+enum MatrixLayoutMode
+{
+    kMatrixLayoutMode_RowMajor,
+    kMatrixLayoutMode_ColumnMajor,
+};
+class MatrixTypeLayout : public TypeLayout
+{
+public:
+    MatrixLayoutMode    mode;
+};
+
 // Specific case of type layout for a struct
 class StructTypeLayout : public TypeLayout
 {
@@ -515,6 +531,8 @@ struct LayoutRulesImpl
     //
 
     LayoutRulesFamilyImpl* getLayoutRulesFamily() { return family; }
+
+    MatrixLayoutMode getDefaultMatrixLayoutMode();
 };
 
 struct LayoutRulesFamilyImpl
@@ -526,6 +544,7 @@ struct LayoutRulesFamilyImpl
     virtual LayoutRulesImpl* getVaryingOutputRules()        = 0;
     virtual LayoutRulesImpl* getSpecializationConstantRules()   = 0;
     virtual LayoutRulesImpl* getShaderStorageBufferRules()      = 0;
+    virtual MatrixLayoutMode getDefaultMatrixLayoutMode() = 0;
 };
 
 LayoutRulesImpl* GetLayoutRulesImpl(LayoutRule rule);
@@ -541,18 +560,27 @@ RefPtr<TypeLayout> CreateTypeLayout(Type* type, LayoutRulesImpl* rules, SimpleLa
 
 //
 
+struct TypeLayoutContext;
+
 // Create a type layout for a parameter block type.
 RefPtr<ParameterBlockTypeLayout>
 createParameterBlockTypeLayout(
-    RefPtr<ParameterBlockType>  parameterBlockType,
-    LayoutRulesImpl*            rules);
+    TypeLayoutContext*          context,
+    RefPtr<ParameterBlockType>  parameterBlockType);
 
 RefPtr<ParameterBlockTypeLayout>
 createParameterBlockTypeLayout(
+    TypeLayoutContext*          context,
     RefPtr<ParameterBlockType>  parameterBlockType,
-    LayoutRulesImpl*            parameterBlockRules,
-    RefPtr<Type>      elementType,
+    RefPtr<Type>                elementType,
     LayoutRulesImpl*            elementTypeRules);
+
+RefPtr<ParameterBlockTypeLayout>
+createParameterBlockTypeLayout(
+    TypeLayoutContext*          context,
+    RefPtr<ParameterBlockType>  parameterBlockType,
+    SimpleLayoutInfo            parameterBlockInfo,
+    RefPtr<TypeLayout>          elementTypeLayout);
 
 RefPtr<ParameterBlockTypeLayout>
 createParameterBlockTypeLayout(

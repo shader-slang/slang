@@ -25,6 +25,14 @@ static size_t RoundUpToPowerOfTwo( size_t value )
     return result;
 }
 
+//
+
+MatrixLayoutMode LayoutRulesImpl::getDefaultMatrixLayoutMode() {
+    return family->getDefaultMatrixLayoutMode();
+}
+
+//
+
 struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
 {
     // Get size and alignment for a single value of base type.
@@ -95,6 +103,15 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
 
     SimpleLayoutInfo GetMatrixLayout(SimpleLayoutInfo elementInfo, size_t rowCount, size_t columnCount) override
     {
+        // The default behavior here is to lay out a matrix
+        // as an array of column vectors (that is column-major).
+        // That is because this is the default convention
+        // used by HLSL.
+        //
+        // In practice, the code that calls `GetMatrixLayout` will
+        // potentially transpose the row/column counts in order
+        // to get layouts with a different convention.
+        //
         return GetArrayLayout(
             GetVectorLayout(elementInfo, columnCount),
             rowCount);
@@ -412,6 +429,25 @@ struct GLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     virtual LayoutRulesImpl* getVaryingOutputRules() override;
     virtual LayoutRulesImpl* getSpecializationConstantRules() override;
     virtual LayoutRulesImpl* getShaderStorageBufferRules() override;
+
+    virtual MatrixLayoutMode getDefaultMatrixLayoutMode() override
+    {
+        // The default matrix layout mode in GLSL is specified
+        // to be "column major" but what GLSL calls a "column"
+        // is actually what HLSL (and hence Slang) calls a row.
+        //
+        // That is, an HLSL `float3x4` has 3 rows and 4 columns,
+        // and indexing yields a `float4`.
+        //
+        // A GLSL `mat3x4` has 3 "columns" and 4 "rows", and
+        // indexing into it yields a `vec4`.
+        //
+        // The Slang compiler needs to be consistent about this mess,
+        // and so when the GLSL spec says that "column"-major is
+        // the default, we know that they actually mean what we
+        // call row-major.
+        return kMatrixLayoutMode_RowMajor;
+    }
 };
 
 struct HLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
@@ -423,6 +459,11 @@ struct HLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     virtual LayoutRulesImpl* getVaryingOutputRules() override;
     virtual LayoutRulesImpl* getSpecializationConstantRules() override;
     virtual LayoutRulesImpl* getShaderStorageBufferRules() override;
+
+    virtual MatrixLayoutMode getDefaultMatrixLayoutMode() override
+    {
+        return kMatrixLayoutMode_ColumnMajor;
+    }
 };
 
 GLSLLayoutRulesFamilyImpl kGLSLLayoutRulesFamilyImpl;
@@ -678,14 +719,32 @@ static SimpleLayoutInfo getParameterBlockLayoutInfo(
     }
 }
 
+struct TypeLayoutContext
+{
+    // The layout rules to use (e.g., we compute
+    // layout differently in a `cbuffer` vs. the
+    // parameter list of a fragment shader).
+    LayoutRulesImpl*    rules;
+
+    // Whether to lay out matrices column-major
+    // or row-major.
+    MatrixLayoutMode    matrixLayoutMode;
+};
+
+RefPtr<TypeLayout> createTypeLayout(
+    TypeLayoutContext*  context,
+    Type*               type,
+    SimpleLayoutInfo    offset);
 
 RefPtr<ParameterBlockTypeLayout>
 createParameterBlockTypeLayout(
+    TypeLayoutContext*          context,
     RefPtr<ParameterBlockType>  parameterBlockType,
-    LayoutRulesImpl*            parameterBlockRules,
     SimpleLayoutInfo            parameterBlockInfo,
     RefPtr<TypeLayout>          elementTypeLayout)
 {
+    auto parameterBlockRules = context->rules;
+
     auto typeLayout = new ParameterBlockTypeLayout();
 
     typeLayout->type = parameterBlockType;
@@ -740,9 +799,29 @@ RefPtr<ParameterBlockTypeLayout>
 createParameterBlockTypeLayout(
     RefPtr<ParameterBlockType>  parameterBlockType,
     LayoutRulesImpl*            parameterBlockRules,
-    RefPtr<Type>      elementType,
+    SimpleLayoutInfo            parameterBlockInfo,
+    RefPtr<TypeLayout>          elementTypeLayout)
+{
+    TypeLayoutContext context;
+    context.rules = parameterBlockRules;
+    context.matrixLayoutMode = parameterBlockRules->getDefaultMatrixLayoutMode();
+
+    return createParameterBlockTypeLayout(
+        &context,
+        parameterBlockType,
+        parameterBlockInfo,
+        elementTypeLayout);
+}
+
+RefPtr<ParameterBlockTypeLayout>
+createParameterBlockTypeLayout(
+    TypeLayoutContext*          context,
+    RefPtr<ParameterBlockType>  parameterBlockType,
+    RefPtr<Type>                elementType,
     LayoutRulesImpl*            elementTypeRules)
 {
+    auto parameterBlockRules = context->rules;
+
     // First compute resource usage of the block itself.
     // For now we assume that the layout of the block can
     // always be described in a `SimpleLayoutInfo` (only
@@ -766,14 +845,16 @@ createParameterBlockTypeLayout(
     // the elements of the block use the same resource kind consumed
     // by the block itself.
 
-    auto elementTypeLayout = CreateTypeLayout(
+    TypeLayoutContext elementContext = *context;
+    elementContext.rules = elementTypeRules;
+    auto elementTypeLayout = createTypeLayout(
+        &elementContext,
         elementType,
-        elementTypeRules,
         info);
 
     return createParameterBlockTypeLayout(
+        context,
         parameterBlockType,
-        parameterBlockRules,
         info,
         elementTypeLayout);
 }
@@ -811,9 +892,11 @@ LayoutRulesImpl* getParameterBufferElementTypeLayoutRules(
 
 RefPtr<ParameterBlockTypeLayout>
 createParameterBlockTypeLayout(
-    RefPtr<ParameterBlockType>  parameterBlockType,
-    LayoutRulesImpl*            parameterBlockRules)
+    TypeLayoutContext*          context,
+    RefPtr<ParameterBlockType>  parameterBlockType)
 {
+    auto parameterBlockRules = context->rules;
+
     // Determine the layout rules to use for the contents of the block
     auto elementTypeRules = getParameterBufferElementTypeLayoutRules(
         parameterBlockType,
@@ -822,8 +905,8 @@ createParameterBlockTypeLayout(
     auto elementType = parameterBlockType->elementType;
 
     return createParameterBlockTypeLayout(
+        context,
         parameterBlockType,
-        parameterBlockRules,
         elementType,
         elementTypeRules);
 }
@@ -888,25 +971,50 @@ createStructuredBufferTypeLayout(
 }
 
 SimpleLayoutInfo GetLayoutImpl(
-    Type*     type,
-    LayoutRulesImpl*    rules,
+    TypeLayoutContext*  context,
+    Type*               type,
     RefPtr<TypeLayout>* outTypeLayout,
     SimpleLayoutInfo    offset);
 
 SimpleLayoutInfo GetLayoutImpl(
-    Type*     type,
-    LayoutRulesImpl*    rules,
+    TypeLayoutContext*  context,
+    Type*               type,
     RefPtr<TypeLayout>* outTypeLayout)
 {
-    return GetLayoutImpl(type, rules, outTypeLayout, SimpleLayoutInfo());
+    return GetLayoutImpl(context, type, outTypeLayout, SimpleLayoutInfo());
 }
 
 SimpleLayoutInfo GetLayoutImpl(
-    Type*     type,
-    LayoutRulesImpl*    rules,
+    TypeLayoutContext*  context,
+    Type*               type,
+    RefPtr<TypeLayout>* outTypeLayout,
+    Decl*               declForModifiers)
+{
+    TypeLayoutContext subContext = *context;
+
+    if (declForModifiers)
+    {
+        if (declForModifiers->HasModifier<RowMajorLayoutModifier>())
+            subContext.matrixLayoutMode = kMatrixLayoutMode_RowMajor;
+
+        if (declForModifiers->HasModifier<ColumnMajorLayoutModifier>())
+            subContext.matrixLayoutMode = kMatrixLayoutMode_ColumnMajor;
+
+        // TODO: really need to look for other modifiers that affect
+        // layout, such as GLSL `std140`.
+    }
+
+    return GetLayoutImpl(&subContext, type, outTypeLayout, SimpleLayoutInfo());
+}
+
+SimpleLayoutInfo GetLayoutImpl(
+    TypeLayoutContext*  context,
+    Type*               type,
     RefPtr<TypeLayout>* outTypeLayout,
     SimpleLayoutInfo    offset)
 {
+    auto rules = context->rules;
+
     if (auto parameterBlockType = type->As<ParameterBlockType>())
     {
         // If the user is just interested in uniform layout info,
@@ -930,8 +1038,8 @@ SimpleLayoutInfo GetLayoutImpl(
         if (outTypeLayout)
         {
             *outTypeLayout = createParameterBlockTypeLayout(
-                parameterBlockType,
-                rules);
+                context,
+                parameterBlockType);
         }
 
         return info;
@@ -1075,21 +1183,51 @@ SimpleLayoutInfo GetLayoutImpl(
     }
     else if(auto matType = type->As<MatrixExpressionType>())
     {
-        return GetSimpleLayoutImpl(
-            rules->GetMatrixLayout(
-                GetLayout(matType->getElementType(), rules),
-                (size_t) GetIntVal(matType->getRowCount()),
-                (size_t) GetIntVal(matType->getColumnCount())),
-            type,
-            rules,
-            outTypeLayout);
+        // The `GetMatrixLayout` implementation in the layout rules
+        // currently defaults to assuming column-major layout,
+        // so if we want row-major layout we achieve it here by
+        // transposing the row/column counts.
+        //
+        // TODO: If it is really a universal convention that matrices
+        // are laid out just like arrays of vectors, when we can
+        // probably eliminate the `virtual` `GetLayout` method entirely,
+        // and have the code here be responsible for the layout choice.
+        //
+        size_t rowCount = (size_t) GetIntVal(matType->getRowCount());
+        size_t colCount = (size_t) GetIntVal(matType->getColumnCount());
+        if (context->matrixLayoutMode == kMatrixLayoutMode_ColumnMajor)
+        {
+            size_t tmp = rowCount;
+            rowCount = colCount;
+            colCount = tmp;
+        }
+
+        auto info = rules->GetMatrixLayout(
+            GetLayout(matType->getElementType(), rules),
+            rowCount,
+            colCount);
+
+        if (outTypeLayout)
+        {
+            RefPtr<MatrixTypeLayout> typeLayout = new MatrixTypeLayout();
+            *outTypeLayout = typeLayout;
+
+            typeLayout->type = type;
+            typeLayout->rules = rules;
+            typeLayout->uniformAlignment = info.alignment;
+            typeLayout->mode = context->matrixLayoutMode;
+
+            typeLayout->addResourceUsage(info.kind, info.size);
+        }
+
+        return info;
     }
     else if (auto arrayType = type->As<ArrayExpressionType>())
     {
         RefPtr<TypeLayout> elementTypeLayout;
         auto elementInfo = GetLayoutImpl(
+            context,
             arrayType->BaseType.Ptr(),
-            rules,
             outTypeLayout ? &elementTypeLayout : nullptr);
 
         // For layout purposes, we treat an unsized array as an array of zero elements.
@@ -1171,9 +1309,10 @@ SimpleLayoutInfo GetLayoutImpl(
             {
                 RefPtr<TypeLayout> fieldTypeLayout;
                 UniformLayoutInfo fieldInfo = GetLayoutImpl(
+                    context,
                     GetType(field).Ptr(),
-                    rules,
-                    outTypeLayout ? &fieldTypeLayout : nullptr).getUniformLayout();
+                    outTypeLayout ? &fieldTypeLayout : nullptr,
+                    field.getDecl()).getUniformLayout();
 
                 // Note: we don't add any zero-size fields
                 // when computing structure layout, just
@@ -1272,13 +1411,43 @@ SimpleLayoutInfo GetLayoutImpl(
 
 SimpleLayoutInfo GetLayout(Type* inType, LayoutRulesImpl* rules)
 {
-    return GetLayoutImpl(inType, rules, nullptr);
+    TypeLayoutContext context;
+    context.rules = rules;
+    context.matrixLayoutMode = rules->getDefaultMatrixLayoutMode();
+
+    return GetLayoutImpl(&context, inType, nullptr);
 }
 
-RefPtr<TypeLayout> CreateTypeLayout(Type* type, LayoutRulesImpl* rules, SimpleLayoutInfo offset)
+RefPtr<TypeLayout> createTypeLayout(
+    TypeLayoutContext*  context,
+    Type*               type,
+    SimpleLayoutInfo    offset)
 {
     RefPtr<TypeLayout> typeLayout;
-    GetLayoutImpl(type, rules, &typeLayout, offset);
+    GetLayoutImpl(context, type, &typeLayout, offset);
+    return typeLayout;
+}
+
+RefPtr<TypeLayout> createTypeLayout(
+    TypeLayoutContext*  context,
+    Type*               type)
+{
+    RefPtr<TypeLayout> typeLayout;
+    GetLayoutImpl(context, type, &typeLayout, SimpleLayoutInfo());
+    return typeLayout;
+}
+
+RefPtr<TypeLayout> CreateTypeLayout(
+    Type* type,
+    LayoutRulesImpl* rules,
+    SimpleLayoutInfo offset)
+{
+    TypeLayoutContext context;
+    context.rules = rules;
+    context.matrixLayoutMode = rules->getDefaultMatrixLayoutMode();
+
+    RefPtr<TypeLayout> typeLayout;
+    GetLayoutImpl(&context, type, &typeLayout, offset);
     return typeLayout;
 }
 
