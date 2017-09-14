@@ -13,24 +13,29 @@
 // Invalid operation: should not appear in valid code
 INST(Nop, nop, 0, 0)
 
-INST(TypeType,    type.type,      0, 0)
-INST(VoidType,    type.void,      0, 0)
-INST(BlockType,   type.block,     0, 0)
-INST(VectorType,  type.vector,    2, 0)
-INST(MatrixType,  matrixType,     3, 0)
-INST(BoolType,    type.bool,      0, 0)
-INST(Float32Type, type.f32,       0, 0)
-INST(Int32Type,   type.i32,       0, 0)
-INST(UInt32Type,  type.u32,       0, 0)
-INST(StructType,  type.struct,    0, PARENT)
-INST(FuncType, func_type, 0, 0)
-INST(PtrType, ptr_type, 1, 0)
-INST(TextureType, texture_type, 2, 0)
-INST(SamplerType, sampler_type, 1, 0)
-INST(ConstantBufferType, constant_buffer_type, 1, 0)
-INST(TextureBufferType, texture_buffer_type, 1, 0)
-INST(readWriteStructuredBufferType, readWriteStructuredBufferType, 1, 0)
+INST(TypeType, Type, 0, 0)
+INST(VoidType, Void, 0, 0)
+INST(BlockType, Block, 0, 0)
+INST(VectorType, Vec, 2, 0)
+INST(MatrixType, Mat, 3, 0)
+INST(arrayType, Array, 2, 0)
 
+INST(BoolType, Bool, 0, 0)
+INST(Float32Type, Float32, 0, 0)
+INST(Int32Type, Int32, 0, 0)
+INST(UInt32Type, UInt32, 0, 0)
+INST(StructType, Struct, 0, PARENT)
+INST(FuncType, Func, 0, 0)
+INST(PtrType, Ptr, 1, 0)
+INST(TextureType, Texture, 2, 0)
+INST(SamplerType, SamplerState, 1, 0)
+INST(ConstantBufferType, ConstantBuffer, 1, 0)
+INST(TextureBufferType, TextureBuffer, 1, 0)
+
+INST(structuredBufferType, StructuredBuffer, 1, 0)
+INST(readWriteStructuredBufferType, RWStructuredBuffer, 1, 0)
+
+INST(boolConst, boolConst, 0, 0)
 INST(IntLit, integer_constant, 0, 0)
 INST(FloatLit, float_constant, 0, 0)
 
@@ -57,9 +62,48 @@ INST(FieldAddress, get_field_addr, 2, 0)
 INST(getElement, getElement, 2, 0)
 INST(getElementPtr, getElementPtr, 2, 0)
 
+// A swizzle of a vector:
+//
+// %dst = swizzle %src %idx0 %idx1 ...
+//
+// where:
+// - `src` is a vector<T,N>
+// - `dst` is a vector<T,M>
+// - `idx0` through `idx[M-1]` are literal integers
+//
+INST(swizzle, swizzle, 1, 0)
+
+// Setting a vector via swizzle
+//
+// %dst = swizzle %base %src %idx0 %idx1 ...
+//
+// where:
+// - `base` is a vector<T,N>
+// - `dst` is a vector<T,N>
+// - `src` is a vector<T,M>
+// - `idx0` through `idx[M-1]` are literal integers
+//
+// The semantics of the op is:
+//
+//     dst = base;
+//     for(ii : 0 ... M-1 )
+//         dst[ii] = src[idx[ii]];
+//
+INST(swizzleSet, swizzleSet, 2, 0)
+
+
 INST(ReturnVal, return_val, 1, 0)
 INST(ReturnVoid, return_void, 1, 0)
 
+INST(unconditionalBranch, unconditionalBranch, 1, 0)
+INST(break, break, 1, 0)
+INST(continue, continue, 1, 0)
+INST(loop, loop, 3, 0)
+
+INST(conditionalBranch, conditionalBranch, 1, 0)
+INST(if, if, 3, 0)
+INST(ifElse, ifElse, 4, 0)
+INST(loopTest, loopTest, 3, 0)
 
 INST(Add, add, 2, 0)
 INST(Sub, sub, 2, 0)
@@ -138,6 +182,8 @@ INTRINSIC(InnerProduct_Matrix_Matrix)
 INST(Sample, sample, 3, 0)
 
 INST(SampleGrad, sampleGrad, 4, 0)
+
+INST(GroupMemoryBarrierWithGroupSync, GroupMemoryBarrierWithGroupSync, 0, 0)
 
 PSEUDO_INST(Pos)
 PSEUDO_INST(PreInc)

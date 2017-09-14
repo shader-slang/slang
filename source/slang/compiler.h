@@ -47,6 +47,8 @@ namespace Slang
         DXBytecode          = SLANG_DXBC,
         DXBytecodeAssembly  = SLANG_DXBC_ASM,
         ReflectionJSON      = SLANG_REFLECTION_JSON,
+        SlangIR             = SLANG_IR,
+        SlangIRAssembly     = SLANG_IR_ASM,
     };
 
     enum class LineDirectiveMode : SlangLineDirectiveMode

@@ -257,9 +257,10 @@ namespace Slang
 			return getData() + getLength();
 		}
 
-        void append(int value, int radix = 10);
-        void append(unsigned int value, int radix = 10);
-        void append(long long value, int radix = 10);
+        void append(int32_t value, int radix = 10);
+        void append(uint32_t value, int radix = 10);
+        void append(int64_t value, int radix = 10);
+        void append(uint64_t value, int radix = 10);
         void append(float val, const char * format = "%g");
         void append(double val, const char * format = "%g");
 

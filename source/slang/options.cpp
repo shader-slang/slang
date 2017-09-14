@@ -300,6 +300,8 @@ struct OptionsParser
 
                     CASE(spirv, SPIRV);
                     CASE(spirv-assembly, SPIRV_ASM);
+                    CASE(slang-ir, IR);
+                    CASE(slang-ir-assembly, IR_ASM);
                     CASE(none, TARGET_NONE);
 
                 #undef CASE

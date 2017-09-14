@@ -29,7 +29,14 @@ sb << "    __intrinsic_op uint4 Load4(int location);\n";
 sb << "    __intrinsic_op uint4 Load4(int location, out uint status);\n";
 sb << "};\n";
 sb << "\n";
-sb << "__generic<T> __magic_type(HLSLStructuredBufferType) struct StructuredBuffer\n";
+sb << "__generic<T>\n";
+sb << "__magic_type(HLSLStructuredBufferType)\n";
+sb << "__intrinsic_type(";
+
+	// TODO: we really need a simple way to write an "expression splice"
+	sb << kIROp_structuredBufferType;
+sb << ")\n";
+sb << "struct StructuredBuffer\n";
 sb << "{\n";
 sb << "    __intrinsic_op void GetDimensions(\n";
 sb << "        out uint numStructs,\n";

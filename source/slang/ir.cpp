@@ -1,5 +1,6 @@
 // ir.cpp
 #include "ir.h"
+#include "ir-insts.h"
 
 #include "../core/basic.h"
 
@@ -65,7 +66,12 @@ namespace Slang
         return nullptr;
     }
 
-    //
+    // IRFunc
+
+    IRType* IRFunc::getResultType() { return getType()->getResultType(); }
+    UInt IRFunc::getParamCount() { return getType()->getParamCount(); }
+    IRType* IRFunc::getParamType(UInt index) { return getType()->getParamType(index); }
+
 
     IRParam* IRFunc::getFirstParam()
     {
@@ -81,6 +87,8 @@ namespace Slang
         return (IRParam*) firstInst;
     }
 
+    // IRParam
+
     IRParam* IRParam::getNextParam()
     {
         auto next = nextInst;
@@ -91,6 +99,36 @@ namespace Slang
 
         return (IRParam*) next;
     }
+
+    //
+
+    bool isTerminatorInst(IROp op)
+    {
+        switch (op)
+        {
+        default:
+            return false;
+
+        case kIROp_ReturnVal:
+        case kIROp_ReturnVoid:
+        case kIROp_unconditionalBranch:
+        case kIROp_conditionalBranch:
+        case kIROp_break:
+        case kIROp_continue:
+        case kIROp_loop:
+        case kIROp_if:
+        case kIROp_ifElse:
+        case kIROp_loopTest:
+            return true;
+        }
+    }
+
+    bool isTerminatorInst(IRInst* inst)
+    {
+        if (!inst) return false;
+        return isTerminatorInst(inst->op);
+    }
+
 
     //
 
@@ -306,6 +344,28 @@ namespace Slang
             varArgs);
     }
 
+    template<typename T>
+    static T* createInstWithTrailingArgs(
+        IRBuilder*      builder,
+        IROp            op,
+        IRType*         type,
+        IRValue*        arg1,
+        UInt            varArgCount,
+        IRValue* const* varArgs)
+    {
+        IRValue* fixedArgs[] = { arg1 };
+        UInt fixedArgCount = sizeof(fixedArgs) / sizeof(fixedArgs[0]);
+
+        return (T*)createInstImpl(
+            builder,
+            sizeof(T) + varArgCount * sizeof(IRUse),
+            op,
+            type,
+            fixedArgCount,
+            fixedArgs,
+            varArgCount,
+            varArgs);
+    }
     //
 
     bool operator==(IRInstKey const& left, IRInstKey const& right)
@@ -637,6 +697,8 @@ namespace Slang
     {
         switch( flavor )
         {
+        case BaseType::Void:    return getVoidType();
+
         case BaseType::Bool:    return getBaseTypeImpl(this, kIROp_BoolType);
         case BaseType::Float:   return getBaseTypeImpl(this, kIROp_Float32Type);
         case BaseType::Int:     return getBaseTypeImpl(this, kIROp_Int32Type);
@@ -676,6 +738,34 @@ namespace Slang
             rowCount,
             columnCount);
     }
+
+    IRType* IRBuilder::getArrayType(IRType* elementType, IRValue* elementCount)
+    {
+        // The client requests an unsized array by passing `nullptr` for
+        // the `elementCount`.
+        //
+        // We currently encode an unsized array as an ordinary array with
+        // zero elements. TODO: carefully consider this choice.
+        if (!elementCount)
+        {
+            elementCount = getIntValue(
+                getBaseType(BaseType::Int),
+                0);
+        }
+
+        return findOrEmitInst<IRArrayType>(
+            this,
+            kIROp_arrayType,
+            getTypeType(),
+            elementType,
+            elementCount);
+    }
+
+    IRType* IRBuilder::getArrayType(IRType* elementType)
+    {
+        return getArrayType(elementType, nullptr);
+    }
+
 
     IRType* IRBuilder::getTypeType()
     {
@@ -753,21 +843,38 @@ namespace Slang
     }
 
     IRType* IRBuilder::getPtrType(
-        IRType* valueType)
+        IRType*         valueType,
+        IRAddressSpace  addressSpace)
     {
+        auto uintType = getBaseType(BaseType::UInt);
+        auto irAddressSpace = getIntValue(uintType, addressSpace);
+
         auto inst = findOrEmitInst<IRPtrType>(
             this,
             kIROp_PtrType,
             getTypeType(),
-            1,
-            (IRValue* const*) &valueType);
+            valueType,
+            irAddressSpace);
         return inst;
     }
 
 
-    IRValue* IRBuilder::getBoolValue(bool value)
+    IRType* IRBuilder::getPtrType(
+        IRType* valueType)
     {
-        SLANG_UNIMPLEMENTED_X("IR");
+        return getPtrType(valueType, kIRAddressSpace_Default);
+    }
+
+
+    IRValue* IRBuilder::getBoolValue(bool inValue)
+    {
+        IRIntegerValue value = inValue;
+        return findOrEmitConstant(
+            this,
+            kIROp_boolConst,
+            getBoolType(),
+            sizeof(value),
+            &value);
     }
 
     IRValue* IRBuilder::getIntValue(IRType* type, IRIntegerValue value)
@@ -883,15 +990,23 @@ namespace Slang
     }
 
     IRVar* IRBuilder::emitVar(
-        IRType* type)
+        IRType*         type,
+        IRAddressSpace  addressSpace)
     {
-        auto allocatedType = getPtrType(type);
+        auto allocatedType = getPtrType(type, addressSpace);
         auto inst = createInst<IRVar>(
             this,
             kIROp_Var,
             allocatedType);
         addInst(inst);
         return inst;
+    }
+
+
+    IRVar* IRBuilder::emitVar(
+        IRType* type)
+    {
+        return emitVar(type, kIRAddressSpace_Default);
     }
 
     IRInst* IRBuilder::emitLoad(
@@ -996,6 +1111,83 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitSwizzle(
+        IRType*         type,
+        IRValue*        base,
+        UInt            elementCount,
+        IRValue* const* elementIndices)
+    {
+        auto inst = createInstWithTrailingArgs<IRSwizzle>(
+            this,
+            kIROp_swizzle,
+            type,
+            base,
+            elementCount,
+            elementIndices);
+
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitSwizzle(
+        IRType*         type,
+        IRValue*        base,
+        UInt            elementCount,
+        UInt const*     elementIndices)
+    {
+        auto intType = getBaseType(BaseType::Int);
+
+        IRValue* irElementIndices[4];
+        for (UInt ii = 0; ii < elementCount; ++ii)
+        {
+            irElementIndices[ii] = getIntValue(intType, elementIndices[ii]);
+        }
+
+        return emitSwizzle(type, base, elementCount, irElementIndices);
+    }
+
+
+    IRInst* IRBuilder::emitSwizzleSet(
+        IRType*         type,
+        IRValue*        base,
+        IRValue*        source,
+        UInt            elementCount,
+        IRValue* const* elementIndices)
+    {
+        IRValue* fixedArgs[] = { base, source };
+        UInt fixedArgCount = sizeof(fixedArgs) / sizeof(fixedArgs[0]);
+
+        auto inst = createInstWithTrailingArgs<IRSwizzleSet>(
+            this,
+            kIROp_swizzleSet,
+            type,
+            fixedArgCount,
+            fixedArgs,
+            elementCount,
+            elementIndices);
+
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitSwizzleSet(
+        IRType*         type,
+        IRValue*        base,
+        IRValue*        source,
+        UInt            elementCount,
+        UInt const*     elementIndices)
+    {
+        auto intType = getBaseType(BaseType::Int);
+
+        IRValue* irElementIndices[4];
+        for (UInt ii = 0; ii < elementCount; ++ii)
+        {
+            irElementIndices[ii] = getIntValue(intType, elementIndices[ii]);
+        }
+
+        return emitSwizzleSet(type, base, source, elementCount, irElementIndices);
+    }
+
     IRInst* IRBuilder::emitReturn(
         IRValue*    val)
     {
@@ -1014,6 +1206,133 @@ namespace Slang
             this,
             kIROp_ReturnVoid,
             getVoidType());
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitBranch(
+        IRBlock*    block)
+    {
+        auto inst = createInst<IRUnconditionalBranch>(
+            this,
+            kIROp_unconditionalBranch,
+            getVoidType(),
+            block);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitBreak(
+        IRBlock*    target)
+    {
+        auto inst = createInst<IRBreak>(
+            this,
+            kIROp_break,
+            getVoidType(),
+            target);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitContinue(
+        IRBlock*    target)
+    {
+        auto inst = createInst<IRContinue>(
+            this,
+            kIROp_continue,
+            getVoidType(),
+            target);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitLoop(
+        IRBlock*    target,
+        IRBlock*    breakBlock,
+        IRBlock*    continueBlock)
+    {
+        IRInst* args[] = { target, breakBlock, continueBlock };
+        UInt argCount = sizeof(args) / sizeof(args[0]);
+
+        auto inst = createInst<IRLoop>(
+            this,
+            kIROp_loop,
+            getVoidType(),
+            argCount,
+            args);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitBranch(
+        IRValue*    val,
+        IRBlock*    trueBlock,
+        IRBlock*    falseBlock)
+    {
+        IRInst* args[] = { val, trueBlock, falseBlock };
+        UInt argCount = sizeof(args) / sizeof(args[0]);
+
+        auto inst = createInst<IRConditionalBranch>(
+            this,
+            kIROp_conditionalBranch,
+            getVoidType(),
+            argCount,
+            args);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitIf(
+        IRValue*    val,
+        IRBlock*    trueBlock,
+        IRBlock*    afterBlock)
+    {
+        IRInst* args[] = { val, trueBlock, afterBlock };
+        UInt argCount = sizeof(args) / sizeof(args[0]);
+
+        auto inst = createInst<IRIf>(
+            this,
+            kIROp_if,
+            getVoidType(),
+            argCount,
+            args);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitIfElse(
+        IRValue*    val,
+        IRBlock*    trueBlock,
+        IRBlock*    falseBlock,
+        IRBlock*    afterBlock)
+    {
+        IRInst* args[] = { val, trueBlock, falseBlock, afterBlock };
+        UInt argCount = sizeof(args) / sizeof(args[0]);
+
+        auto inst = createInst<IRIfElse>(
+            this,
+            kIROp_ifElse,
+            getVoidType(),
+            argCount,
+            args);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitLoopTest(
+        IRValue*    val,
+        IRBlock*    bodyBlock,
+        IRBlock*    breakBlock)
+    {
+        IRInst* args[] = { val, bodyBlock, breakBlock };
+        UInt argCount = sizeof(args) / sizeof(args[0]);
+
+        auto inst = createInst<IRLoopTest>(
+            this,
+            kIROp_loopTest,
+            getVoidType(),
+            argCount,
+            args);
         addInst(inst);
         return inst;
     }
@@ -1053,7 +1372,7 @@ namespace Slang
 
     struct IRDumpContext
     {
-        FILE*   file;
+        StringBuilder* builder;
         int     indent;
     };
 
@@ -1061,14 +1380,16 @@ namespace Slang
         IRDumpContext*  context,
         char const*     text)
     {
-        fprintf(context->file, "%s", text);
+        context->builder->append(text);
     }
 
     static void dump(
         IRDumpContext*  context,
         UInt            val)
     {
-        fprintf(context->file, "%llu", (unsigned long long)val);
+        context->builder->append(val);
+
+//        fprintf(context->file, "%llu", (unsigned long long)val);
     }
 
     static void dumpIndent(
@@ -1076,7 +1397,7 @@ namespace Slang
     {
         for (int ii = 0; ii < context->indent; ++ii)
         {
-            dump(context, "  ");
+            dump(context, "\t");
         }
     }
 
@@ -1088,79 +1409,318 @@ namespace Slang
         {
             dump(context, "<null>");
         }
-        else
+        else if(inst->id)
         {
             dump(context, "%");
             dump(context, inst->id);
         }
+        else
+        {
+            dump(context, "_");
+        }
+    }
+
+    static void dumpType(
+        IRDumpContext*  context,
+        IRType*         type);
+
+    static void dumpOperand(
+        IRDumpContext*  context,
+        IRInst*         inst)
+    {
+        if (!inst)
+        {
+            dump(context, "undef");
+            return;
+        }
+
+        switch (inst->op)
+        {
+        case kIROp_IntLit:
+            dump(context, ((IRConstant*)inst)->u.intVal);
+            return;
+
+        case kIROp_FloatLit:
+            dump(context, ((IRConstant*)inst)->u.floatVal);
+            return;
+
+        case kIROp_boolConst:
+            dump(context, ((IRConstant*)inst)->u.intVal ? "true" : "false");
+            return;
+
+        case kIROp_TypeType:
+            dumpType(context, (IRType*)inst);
+            return;
+
+        default:
+            break;
+        }
+
+        auto type = inst->getType();
+        if (type)
+        {
+            switch (type->op)
+            {
+            case kIROp_TypeType:
+                dumpType(context, (IRType*)inst);
+                return;
+
+            default:
+                break;
+            }
+        }
+
+
+        dumpID(context, inst);
+    }
+
+    static void dumpType(
+        IRDumpContext*  context,
+        IRType*         type)
+    {
+        if (!type)
+        {
+            dumpID(context, type);
+            return;
+        }
+
+        auto op = type->op;
+        auto opInfo = kIROpInfos[op];
+
+        switch (op)
+        {
+        case kIROp_StructType:
+            dumpID(context, type);
+            break;
+
+        default:
+            {
+                dump(context, opInfo.name);
+                UInt argCount = type->getArgCount();
+
+                if (argCount > 1)
+                {
+                    dump(context, "<");
+                    for (UInt aa = 1; aa < argCount; ++aa)
+                    {
+                        if (aa != 1) dump(context, ",");
+                        dumpOperand(context, type->getArg(aa));
+
+                    }
+                    dump(context, ">");
+                }
+            }
+            break;
+        }
+    }
+
+    static void dumpInstTypeClause(
+        IRDumpContext*  context,
+        IRType*         type)
+    {
+        dump(context, "\t: ");
+        dumpType(context, type);
+
     }
 
     static void dumpInst(
         IRDumpContext*  context,
+        IRInst*         inst);
+
+    static void dumpChildrenRaw(
+        IRDumpContext*  context,
+        IRParentInst*   parent)
+    {
+        for (auto ii = parent->firstChild; ii; ii = ii->nextInst)
+        {
+            dumpInst(context, ii);
+        }
+    }
+
+    static void dumpChildren(
+        IRDumpContext*  context,
         IRInst*         inst)
     {
-        dumpIndent(context);
-        if (!inst)
-        {
-            dump(context, "<null>");
-        }
-
-        // TODO: need to display a name for the result...
-
         auto op = inst->op;
         auto opInfo = &kIROpInfos[op];
-
-        if (inst->id)
-        {
-            dumpID(context, inst);
-            dump(context, " = ");
-        }
-
-        dump(context, opInfo->name);
-
-        // TODO: dump operands
-        uint32_t argCount = inst->argCount;
-        for (uint32_t ii = 0; ii < argCount; ++ii)
-        {
-            if (ii != 0)
-                dump(context, ", ");
-            else
-            {
-                dump(context, " ");
-            }
-
-            auto argVal = inst->getArgs()[ii].usedValue;
-
-            // TODO: actually print the damn operand...
-
-            dumpID(context, argVal);
-        }
-
-        dump(context, "\n");
-
         if (opInfo->flags & kIROpFlag_Parent)
         {
             dumpIndent(context);
             dump(context, "{\n");
             context->indent++;
             auto parent = (IRParentInst*)inst;
-            for (auto ii = parent->firstChild; ii; ii = ii->nextInst)
-            {
-                dumpInst(context, ii);
-            }
+            dumpChildrenRaw(context, parent);
             context->indent--;
             dumpIndent(context);
             dump(context, "}\n");
         }
     }
+    static void dumpInst(
+        IRDumpContext*  context,
+        IRInst*         inst)
+    {
+        if (!inst)
+        {
+            dumpIndent(context);
+            dump(context, "<null>");
+            return;
+        }
 
-    void dumpIR(IRModule* module)
+        auto op = inst->op;
+
+        // There are several ops we want to special-case here,
+        // so that they will be more pleasant to look at.
+        //
+        switch (op)
+        {
+        case kIROp_Module:
+            dumpIndent(context);
+            dump(context, "module\n");
+            dumpChildren(context, inst);
+            return;
+
+        case kIROp_Func:
+            {
+                IRFunc* func = (IRFunc*)inst;
+                dump(context, "\n");
+                dumpIndent(context);
+                dump(context, "func ");
+                dumpID(context, func);
+                dump(context, "(\n");
+                context->indent++;
+                for (auto pp = func->getFirstParam(); pp; pp = pp->getNextParam())
+                {
+                    if (pp != func->getFirstParam())
+                        dump(context, ",\n");
+
+                    dumpIndent(context);
+                    dump(context, "param ");
+                    dumpID(context, pp);
+                    dumpInstTypeClause(context, pp->getType());
+                }
+                context->indent--;
+                dump(context, ")\n");
+
+                dumpIndent(context);
+                dump(context, "{\n");
+                context->indent++;
+
+                for (auto bb = func->getFirstBlock(); bb; bb = bb->getNextBlock())
+                {
+                    if (bb != func->getFirstBlock())
+                        dump(context, "\n");
+                    dumpInst(context, bb);
+                }
+
+                context->indent--;
+                dump(context, "}\n");
+            }
+            return;
+
+        case kIROp_TypeType:
+        case kIROp_Param:
+        case kIROp_IntLit:
+        case kIROp_FloatLit:
+        case kIROp_boolConst:
+            // Don't dump here
+            return;
+
+        case kIROp_Block:
+            {
+                IRBlock* block = (IRBlock*)inst;
+
+                context->indent--;
+                dump(context, "block ");
+                dumpID(context, block);
+                dump(context, ":\n");
+                context->indent++;
+
+                dumpChildrenRaw(context, block);
+            }
+            return;
+
+        default:
+            break;
+        }
+
+        // We also want to special-case based on the *type*
+        // of the instruction
+        auto type = inst->getType();
+        if (type && type->op == kIROp_TypeType)
+        {
+            // We probably don't want to print most types
+            // when producing "friendly" output.
+            switch (type->op)
+            {
+            case kIROp_StructType:
+                break;
+
+            default:
+                return;
+            }
+        }
+
+
+        // Okay, we have a seemingly "ordinary" op now
+        dumpIndent(context);
+
+        auto opInfo = &kIROpInfos[op];
+
+        if (type && type->op == kIROp_TypeType)
+        {
+            dump(context, "type ");
+            dumpID(context, inst);
+            dump(context, "\t= ");
+        }
+        else if (type && type->op == kIROp_VoidType)
+        {
+        }
+        else
+        {
+            dump(context, "let  ");
+            dumpID(context, inst);
+            dumpInstTypeClause(context, type);
+            dump(context, "\t= ");
+        }
+
+
+        dump(context, opInfo->name);
+
+        uint32_t argCount = inst->argCount;
+        dump(context, "(");
+        for (uint32_t ii = 1; ii < argCount; ++ii)
+        {
+            if (ii != 1)
+                dump(context, ", ");
+
+            auto argVal = inst->getArgs()[ii].usedValue;
+
+            dumpOperand(context, argVal);
+        }
+        dump(context, ")");
+
+        dump(context, "\n");
+
+        // The instruction might have children,
+        // so we need to handle those here
+        dumpChildren(context, inst);
+    }
+
+    void printSlangIRAssembly(StringBuilder& builder, IRModule* module)
     {
         IRDumpContext context;
-        context.file = stderr;
+        context.builder = &builder;
         context.indent = 0;
 
-        dumpInst(&context, module);
+        dumpChildrenRaw(&context, module);
     }
+
+    String getSlangIRAssembly(IRModule* module)
+    {
+        StringBuilder sb;
+        printSlangIRAssembly(sb, module);
+        return sb;
+    }
+
 
 }

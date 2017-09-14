@@ -39,6 +39,7 @@
     <ClInclude Include="ir.h" />
     <ClInclude Include="lower-to-ir.h" />
     <ClInclude Include="ir-inst-defs.h" />
+    <ClInclude Include="ir-insts.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="check.cpp" />
@@ -65,8 +66,8 @@
     <ClCompile Include="lower-to-ir.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="core.meta.slang" />
-    <None Include="glsl.meta.slang" />
-    <None Include="hlsl.meta.slang" />
+    <CustomBuild Include="core.meta.slang" />
+    <CustomBuild Include="glsl.meta.slang" />
+    <CustomBuild Include="hlsl.meta.slang" />
   </ItemGroup>
 </Project>
