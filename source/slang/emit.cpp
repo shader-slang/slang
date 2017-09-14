@@ -4906,7 +4906,7 @@ emitDeclImpl(decl, nullptr);
             for (int ii = 0; ii < 3; ++ii)
             {
                 if (ii != 0) emit(", ");
-                emit(threadGroupSizeDecoration->sizeAlongAxis[ii]);
+                Emit(threadGroupSizeDecoration->sizeAlongAxis[ii]);
             }
             emit(")]\n");
         }

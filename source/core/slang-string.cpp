@@ -266,7 +266,7 @@ namespace Slang
         append(slice.begin(), slice.end());
     }
 
-    void String::append(int value, int radix)
+    void String::append(int32_t value, int radix)
     {
         enum { kCount = 33 };
         char* data = prepareForAppend(kCount);
@@ -275,7 +275,7 @@ namespace Slang
         buffer->length += count;
     }
 
-    void String::append(unsigned int value, int radix)
+    void String::append(uint32_t value, int radix)
     {
         enum { kCount = 33 };
         char* data = prepareForAppend(kCount);
@@ -284,7 +284,7 @@ namespace Slang
         buffer->length += count;
     }
 
-    void String::append(long long value, int radix)
+    void String::append(int64_t value, int radix)
     {
         enum { kCount = 65 };
         char* data = prepareForAppend(kCount);
@@ -293,6 +293,14 @@ namespace Slang
         buffer->length += count;
     }
 
+    void String::append(uint64_t value, int radix)
+    {
+        enum { kCount = 65 };
+        char* data = prepareForAppend(kCount);
+        auto count = IntToAscii(data, value, radix);
+        ReverseInternalAscii(data, count);
+        buffer->length += count;
+    }
 
     void String::append(float val, const char * format)
     {
