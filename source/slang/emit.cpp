@@ -4503,6 +4503,7 @@ emitDeclImpl(decl, nullptr);
             emit(", ");
             emitIROperand(context, inst->getArg(2));
             emit(")");
+            break;
 
         case kIROp_swizzle:
             {
