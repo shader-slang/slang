@@ -1,6 +1,8 @@
 // lower.cpp
 #include "lower-to-ir.h"
 
+#include "../../slang.h"
+
 #include "ir.h"
 #include "ir-insts.h"
 #include "type-layout.h"
@@ -354,6 +356,73 @@ LoweredValInfo emitCompoundAssignOp(
     return LoweredValInfo::ptr(leftPtr);
 }
 
+IRInst* getOneValOfType(
+    IRGenContext*   context,
+    IRType*         type)
+{
+    switch(type->op)
+    {
+    case kIROp_Int32Type:
+    case kIROp_UInt32Type:
+        return context->irBuilder->getIntValue(type, 1);
+
+    case kIROp_Float32Type:
+        return context->irBuilder->getFloatValue(type, 1.0);
+
+    default:
+        SLANG_UNEXPECTED("inc/dec type");
+        return nullptr;
+    }
+}
+
+LoweredValInfo emitPreOp(
+    IRGenContext*   context,
+    IRType*         type,
+    IROp            op,
+    UInt            argCount,
+    IRValue* const* args)
+{
+    auto builder = context->irBuilder;
+
+    assert(argCount == 1);
+    auto argPtr = args[0];
+
+    auto preVal = builder->emitLoad(argPtr);
+
+    IRInst* oneVal = getOneValOfType(context, type);
+
+    IRInst* innerArgs[] = { preVal, oneVal };
+    auto innerOp = builder->emitIntrinsicInst(type, op, 2, innerArgs);
+
+    builder->emitStore(argPtr, innerOp);
+
+    return LoweredValInfo::simple(preVal);
+}
+
+LoweredValInfo emitPostOp(
+    IRGenContext*   context,
+    IRType*         type,
+    IROp            op,
+    UInt            argCount,
+    IRValue* const* args)
+{
+    auto builder = context->irBuilder;
+
+    assert(argCount == 1);
+    auto argPtr = args[0];
+
+    auto preVal = builder->emitLoad(argPtr);
+
+    IRInst* oneVal = getOneValOfType(context, type);
+
+    IRInst* innerArgs[] = { preVal, oneVal };
+    auto innerOp = builder->emitIntrinsicInst(type, op, 2, innerArgs);
+
+    builder->emitStore(argPtr, innerOp);
+
+    return LoweredValInfo::ptr(argPtr);
+}
+
 // Given a `DeclRef` for something callable, along with a bunch of
 // arguments, emit an appropriate call to it.
 LoweredValInfo emitCallToDeclRef(
@@ -442,6 +511,18 @@ LoweredValInfo emitCallToDeclRef(
             CASE(kIRPseudoOp_LshAssign, kIROp_Lsh);
             CASE(kIRPseudoOp_RshAssign, kIROp_Rsh);
 
+#undef CASE
+
+#define CASE(COMPOUND, OP)  \
+            case COMPOUND: return emitPreOp(context, type, OP, argCount, args)
+            CASE(kIRPseudoOp_PreInc, kIROp_Add);
+            CASE(kIRPseudoOp_PreDec, kIROp_Sub);
+#undef CASE
+
+#define CASE(COMPOUND, OP)  \
+            case COMPOUND: return emitPostOp(context, type, OP, argCount, args)
+            CASE(kIRPseudoOp_PostInc, kIROp_Add);
+            CASE(kIRPseudoOp_PostDec, kIROp_Sub);
 #undef CASE
 
             default:
@@ -1603,6 +1684,65 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         insertBlock(breakLabel);
     }
 
+    void visitWhileStmt(WhileStmt* stmt)
+    {
+        // Generating IR for `while` statement is similar to a
+        // `for` statement, but without a lot of the complications.
+
+        auto builder = getBuilder();
+
+        // We will create blocks for the various places
+        // we need to jump to inside the control flow,
+        // including the blocks that will be referenced
+        // by `continue` or `break` statements.
+        auto loopHead = createBlock();
+        auto bodyLabel = createBlock();
+        auto breakLabel = createBlock();
+
+        // A `continue` inside a `while` loop always
+        // jumps to the head of hte loop.
+        auto continueLabel = loopHead;
+
+        // TODO: register appropriate targets for
+        // break/continue statements.
+
+        // Emit the branch that will start out loop,
+        // and then insert the block for the head.
+
+        auto loopInst = builder->emitLoop(
+            loopHead,
+            breakLabel,
+            continueLabel);
+
+        addLoopDecorations(loopInst, stmt);
+
+        insertBlock(loopHead);
+
+        // Now that we are within the header block, we
+        // want to emit the expression for the loop condition:
+        if (auto condExpr = stmt->Predicate)
+        {
+            auto irCondition = getSimpleVal(context,
+                lowerRValueExpr(context, condExpr));
+
+            // Now we want to `break` if the loop condition is false.
+            builder->emitLoopTest(
+                irCondition,
+                bodyLabel,
+                breakLabel);
+        }
+
+        // Emit the body of the loop
+        insertBlock(bodyLabel);
+        lowerStmt(context, stmt->Statement);
+
+        // At the end of the body we need to jump back to the top.
+        builder->emitBranch(loopHead);
+
+        // Finally we insert the label that a `break` will jump to
+        insertBlock(breakLabel);
+    }
+
     void visitExpressionStmt(ExpressionStmt* stmt)
     {
         // The statement evaluates an expression
@@ -1993,17 +2133,61 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         for( auto paramDecl : declForParameters->GetParameters() )
         {
             IRType* irParamType = lowerSimpleType(context, paramDecl->getType());
-            paramTypes.Add(irParamType);
 
-            IRParam* irParam = subBuilder->emitParam(irParamType);
+            LoweredValInfo paramVal;
 
-            subBuilder->addHighLevelDeclDecoration(irParam, paramDecl);
+            if (paramDecl->HasModifier<OutModifier>()
+                || paramDecl->HasModifier<InOutModifier>())
+            {
+                // The parameter is being used for input/output purposes,
+                // so it will lower to an actual parameter with a pointer type.
+                //
+                // TODO: Is this the best representation we can use?
+
+                auto irPtrType = subBuilder->getPtrType(irParamType);
+                paramTypes.Add(irPtrType);
+
+                IRParam* irParamPtr = subBuilder->emitParam(irPtrType);
+                subBuilder->addHighLevelDeclDecoration(irParamPtr, paramDecl);
+
+                paramVal = LoweredValInfo::ptr(irParamPtr);
+
+                // TODO: We might want to copy the pointed-to value into
+                // a temporary at the start of the function, and then copy
+                // back out at the end, so that we don't have to worry
+                // about things like aliasing in the function body.
+                //
+                // For now we will just use the storage that was passed
+                // in by the caller, knowing that our current lowering
+                // at call sites will guarantee a fresh/unique location.
+            }
+            else
+            {
+                // Simple case of a by-value input parameter.
+                // But note that HLSL allows an input parameter
+                // to be used as a local variable inside of a
+                // function body, so we need to introduce a temporary
+                // and then copy over to it...
+                //
+                // TODO: we could skip this step if we knew
+                // the parameter was marked `const` or similar.
+
+                paramTypes.Add(irParamType);
+
+                IRParam* irParam = subBuilder->emitParam(irParamType);
+                subBuilder->addHighLevelDeclDecoration(irParam, paramDecl);
+                paramVal = LoweredValInfo::simple(irParam);
+
+                auto irLocal = subBuilder->emitVar(irParamType);
+                auto localVal = LoweredValInfo::ptr(irLocal);
+
+                assign(subContext, localVal, paramVal);
+
+                paramVal = localVal;
+            }
 
             DeclRef<ParamDecl> paramDeclRef = makeDeclRef(paramDecl.Ptr());
-
-            LoweredValInfo irParamVal = LoweredValInfo::simple(irParam);
-
-            subContext->shared->declValues.Add(paramDeclRef, irParamVal);
+            subContext->shared->declValues.Add(paramDeclRef, paramVal);
         }
 
         auto irResultType = lowerSimpleType(context, declForReturnType->ReturnType);
@@ -2235,4 +2419,5 @@ String emitSlangIRAssemblyForEntryPoint(
     return getSlangIRAssembly(irModule);
 }
 
-}
+
+} // namespace Slang

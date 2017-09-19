@@ -1,14 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?> 
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
-  <type Name="Slang::CFGNode">
-    <DisplayString>{{CFG Basic Block}}</DisplayString>
+
+  <Type Name="Slang::BCPtr&lt;*&gt;">
+    <SmartPointer Usage="Minimal">rawVal ? ($T1*)((char*)this + rawVal) : ($T1*)0</SmartPointer>
+    <DisplayString Condition="rawVal == 0">BCPtr nullptr</DisplayString>
+    <DisplayString Condition="rawVal != 0">BCPtr {*($T1*)((char*)this + rawVal)}</DisplayString>
     <Expand>
-      <LinkedListItems>
-        <Size>kvPairs.FCount</Size>
-        <HeadPointer>kvPairs.FHead</HeadPointer>
-        <NextPointer>pNext</NextPointer>
-        <ValueNode>Value</ValueNode>
-      </LinkedListItems>
+      <ExpandedItem>rawVal ? ($T1*)((char*)this + rawVal) : ($T1*)0</ExpandedItem>
     </Expand>
-  </type>
+  </Type>
+  
 </AutoVisualizer>

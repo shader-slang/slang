@@ -374,6 +374,37 @@ extern "C"
         int                     entryPointIndex,
         size_t*                 outSize);
 
+    typedef struct SlangVM          SlangVM;
+    typedef struct SlangVMModule    SlangVMModule;
+    typedef struct SlangVMFunc      SlangVMFunc;
+    typedef struct SlangVMThread    SlangVMThread;
+
+    SLANG_API SlangVM* SlangVM_create();
+
+    SLANG_API SlangVMModule* SlangVMModule_load(
+        SlangVM*    vm,
+        void const* bytecode,
+        size_t      bytecodeSize);
+
+    SLANG_API void* SlangVMModule_findGlobalSymbolPtr(
+        SlangVMModule*  module,
+        char const*     name);
+
+    SLANG_API SlangVMThread* SlangVMThread_create(
+        SlangVM*    vm);
+
+    SLANG_API void SlangVMThread_beginCall(
+        SlangVMThread*  thread,
+        SlangVMFunc*    func);
+
+    SLANG_API void SlangVMThread_setArg(
+        SlangVMThread*  thread,
+        SlangUInt       argIndex,
+        void const*     data,
+        size_t          size);
+
+    SLANG_API void SlangVMThread_resume(
+        SlangVMThread*  thread);
 
     /* Note(tfoley): working on new reflection interface...
     */
@@ -980,6 +1011,7 @@ namespace slang
 #include "source/core/slang-string.cpp"
 #include "source/core/stream.cpp"
 #include "source/core/text-io.cpp"
+#include "source/slang/bytecode.cpp"
 #include "source/slang/diagnostics.cpp"
 #include "source/slang/emit.cpp"
 #include "source/slang/ir.cpp"
@@ -1002,7 +1034,7 @@ namespace slang
 #include "source/slang/type-layout.cpp"
 #include "source/slang/reflection.cpp"
 #include "source/slang/slang.cpp"
-
+#include "source/slang/vm.cpp"
 
 #endif
 

@@ -165,6 +165,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\slang.h" />
+    <ClInclude Include="bytecode.h" />
     <ClInclude Include="compiler.h" />
     <ClInclude Include="decl-defs.h" />
     <ClInclude Include="diagnostic-defs.h" />
@@ -200,8 +201,10 @@
     <ClInclude Include="type-layout.h" />
     <ClInclude Include="val-defs.h" />
     <ClInclude Include="visitor.h" />
+    <ClInclude Include="vm.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="bytecode.cpp" />
     <ClCompile Include="check.cpp" />
     <ClCompile Include="compiler.cpp" />
     <ClCompile Include="diagnostics.cpp" />
@@ -224,6 +227,7 @@
     <ClCompile Include="syntax.cpp" />
     <ClCompile Include="token.cpp" />
     <ClCompile Include="type-layout.cpp" />
+    <ClCompile Include="vm.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\core\core.vcxproj">

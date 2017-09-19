@@ -671,6 +671,78 @@ TestResult runSimpleTest(TestInput& input)
     return result;
 }
 
+TestResult runEvalTest(TestInput& input)
+{
+    // We are going to load and evaluate the code
+
+    auto filePath = input.filePath;
+    auto outputStem = input.outputStem;
+
+    OSProcessSpawner spawner;
+
+    spawner.pushExecutablePath(String(options.binDir) + "slang-eval-test.exe");
+    spawner.pushArgument(filePath);
+
+    for( auto arg : input.testOptions->args )
+    {
+        spawner.pushArgument(arg);
+    }
+
+    if (spawnAndWait(outputStem, spawner) != kOSError_None)
+    {
+        return kTestResult_Fail;
+    }
+
+    String actualOutput = getOutput(spawner);
+
+    String expectedOutputPath = outputStem + ".expected";
+    String expectedOutput;
+    try
+    {
+        expectedOutput = Slang::File::ReadAllText(expectedOutputPath);
+    }
+    catch (Slang::IOException)
+    {
+    }
+
+    // If no expected output file was found, then we
+    // expect everything to be empty
+    if (expectedOutput.Length() == 0)
+    {
+        expectedOutput = "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n";
+    }
+
+    TestResult result = kTestResult_Pass;
+
+    // Otherwise we compare to the expected output
+    if (actualOutput != expectedOutput)
+    {
+        result = kTestResult_Fail;
+    }
+
+    // If the test failed, then we write the actual output to a file
+    // so that we can easily diff it from the command line and
+    // diagnose the problem.
+    if (result == kTestResult_Fail)
+    {
+        String actualOutputPath = outputStem + ".actual";
+        Slang::File::WriteAllText(actualOutputPath, actualOutput);
+
+        if (options.outputMode == kOutputMode_AppVeyor)
+        {
+            fprintf(stderr, "ERROR:\n"
+                "EXPECTED{{{\n%s}}}\n"
+                "ACTUAL{{{\n%s}}}\n",
+                expectedOutput.Buffer(),
+                actualOutput.Buffer());
+            fflush(stderr);
+        }
+    }
+
+    return result;
+}
+
+
 TestResult runCrossCompilerTest(TestInput& input)
 {
     // need to execute the stand-alone Slang compiler on the file
@@ -1164,6 +1236,7 @@ TestResult runTest(
         { "COMPARE_HLSL_GLSL_RENDER", &runHLSLAndGLSLComparisonTest },
         { "COMPARE_GLSL", &runGLSLComparisonTest },
         { "CROSS_COMPILE", &runCrossCompilerTest },
+        { "EVAL", &runEvalTest },
         { nullptr, nullptr },
     };
 

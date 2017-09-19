@@ -5287,6 +5287,7 @@ String emitEntryPoint(
 
         auto lowered = lowerEntryPointToIR(entryPoint, programLayout, target);
 
+        // debugging:
 //        dumpIR(lowered);
 
         // TODO: do we want to emit directly from IR, or translate the
