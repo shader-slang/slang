@@ -1,4 +1,4 @@
-//TEST(smoke,render):COMPARE_HLSL_RENDER:
+//TEST(smoke):COMPARE_HLSL_RENDER:
 // Starting with a basic test for the ability to render stuff...
 
 cbuffer Uniforms

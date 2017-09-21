@@ -430,8 +430,11 @@ static HRESULT captureTextureToFile(
     dxTexture->GetDesc(&dxTextureDesc);
 
     // Don't bother supporing MSAA for right now
-    if(dxTextureDesc.SampleDesc.Count > 1)
+    if( dxTextureDesc.SampleDesc.Count > 1 )
+    {
+        fprintf(stderr, "ERROR: cannot capture multisample texture\n");
         return E_INVALIDARG;
+    }
 
     HRESULT hr = S_OK;
     ID3D11Texture2D* dxStagingTexture = nullptr;
@@ -445,13 +448,16 @@ static HRESULT captureTextureToFile(
     {
         // Modify the descriptor to give us a staging texture
         dxTextureDesc.BindFlags = 0;
-        dxTextureDesc.MiscFlags &= D3D11_RESOURCE_MISC_TEXTURECUBE;
+        dxTextureDesc.MiscFlags &= ~D3D11_RESOURCE_MISC_TEXTURECUBE;
         dxTextureDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
         dxTextureDesc.Usage = D3D11_USAGE_STAGING;
 
         hr = dxDevice->CreateTexture2D(&dxTextureDesc, 0, &dxStagingTexture);
-        if(FAILED(hr))
+        if( FAILED(hr) )
+        {
+            fprintf(stderr, "ERROR: failed to create staging texture\n");
             return hr;
+        }
     
         dxContext->CopyResource(dxStagingTexture, dxTexture);
     }
@@ -460,8 +466,11 @@ static HRESULT captureTextureToFile(
 
     D3D11_MAPPED_SUBRESOURCE dxMappedResource;
     hr = dxContext->Map(dxStagingTexture, 0, D3D11_MAP_READ, 0, &dxMappedResource);
-    if(FAILED(hr))
+    if( FAILED(hr) )
+    {
+        fprintf(stderr, "ERROR: failed to map texture for read\n");
         return hr;
+    }
 
     int stbResult = stbi_write_png(
         outputPath,
@@ -472,6 +481,7 @@ static HRESULT captureTextureToFile(
         dxMappedResource.RowPitch);
     if( !stbResult )
     {
+        fprintf(stderr, "ERROR: failed to write texture to file\n");
         return E_UNEXPECTED;
     }
 
@@ -566,7 +576,10 @@ public:
         {
             hr = D3D11CreateDeviceAndSwapChain_(
                 NULL,                    // adapter (use default)
-                D3D_DRIVER_TYPE_HARDWARE,
+
+                D3D_DRIVER_TYPE_WARP,
+//                D3D_DRIVER_TYPE_HARDWARE,
+
                 NULL,                    // software
                 deviceFlags,
                 &featureLevels[ii],
@@ -674,6 +687,9 @@ public:
             break;
 
         case BufferFlavor::Vertex:
+            dxBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+            dxBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+            dxBufferDesc.CPUAccessFlags = 0;
             break;
 
         default:
