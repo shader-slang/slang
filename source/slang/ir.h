@@ -119,6 +119,9 @@ struct IROpInfo
     IROpFlags       flags;
 };
 
+// Look up the info for an op
+IROpInfo getIROpInfo(IROp op);
+
 // A use of another value/inst within an IR operation
 struct IRUse
 {
@@ -322,6 +325,8 @@ struct IRModule : IRParentInst
 
 void printSlangIRAssembly(StringBuilder& builder, IRModule* module);
 String getSlangIRAssembly(IRModule* module);
+
+void dumpIR(IRModule* module);
 
 }
 

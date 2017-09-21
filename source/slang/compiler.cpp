@@ -500,10 +500,7 @@ namespace Slang
 #endif
 
     List<uint8_t> emitSlangIRForEntryPoint(
-        EntryPointRequest*  entryPoint)
-    {
-        SLANG_UNIMPLEMENTED_X("Slang IR Binary Generation");
-    }
+        EntryPointRequest*  entryPoint);
 
     String emitSlangIRAssemblyForEntryPoint(
         EntryPointRequest*  entryPoint);

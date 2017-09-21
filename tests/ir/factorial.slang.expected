@@ -1,0 +1,13 @@
+result code = 0
+standard error = {
+}
+standard output = {
+outputData[0] = 1
+outputData[1] = 1
+outputData[2] = 2
+outputData[3] = 6
+outputData[4] = 24
+outputData[5] = 120
+outputData[6] = 720
+outputData[7] = 5040
+}

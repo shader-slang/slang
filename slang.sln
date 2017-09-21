@@ -28,6 +28,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang-glslang", "source\sla
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang-generate", "tools\slang-generate\slang-generate.vcxproj", "{66174227-8541-41FC-A6DF-4764FC66F78E}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "eval-test", "tools\eval-test\eval-test.vcxproj", "{205FCAB9-A13F-4980-86FA-F6221A7095EE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -100,6 +102,14 @@ Global
 		{66174227-8541-41FC-A6DF-4764FC66F78E}.Release|Win32.Build.0 = Release|Win32
 		{66174227-8541-41FC-A6DF-4764FC66F78E}.Release|x64.ActiveCfg = Release|x64
 		{66174227-8541-41FC-A6DF-4764FC66F78E}.Release|x64.Build.0 = Release|x64
+		{205FCAB9-A13F-4980-86FA-F6221A7095EE}.Debug|Win32.ActiveCfg = Debug|Win32
+		{205FCAB9-A13F-4980-86FA-F6221A7095EE}.Debug|Win32.Build.0 = Debug|Win32
+		{205FCAB9-A13F-4980-86FA-F6221A7095EE}.Debug|x64.ActiveCfg = Debug|x64
+		{205FCAB9-A13F-4980-86FA-F6221A7095EE}.Debug|x64.Build.0 = Debug|x64
+		{205FCAB9-A13F-4980-86FA-F6221A7095EE}.Release|Win32.ActiveCfg = Release|Win32
+		{205FCAB9-A13F-4980-86FA-F6221A7095EE}.Release|Win32.Build.0 = Release|Win32
+		{205FCAB9-A13F-4980-86FA-F6221A7095EE}.Release|x64.ActiveCfg = Release|x64
+		{205FCAB9-A13F-4980-86FA-F6221A7095EE}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -109,5 +119,6 @@ Global
 		{0C768A18-1D25-4000-9F37-DA5FE99E3B64} = {74C5F0DC-93BB-4BF3-AC65-8C65491570F7}
 		{96610759-07B9-4EEB-A974-5C634A2E742B} = {74C5F0DC-93BB-4BF3-AC65-8C65491570F7}
 		{66174227-8541-41FC-A6DF-4764FC66F78E} = {74C5F0DC-93BB-4BF3-AC65-8C65491570F7}
+		{205FCAB9-A13F-4980-86FA-F6221A7095EE} = {74C5F0DC-93BB-4BF3-AC65-8C65491570F7}
 	EndGlobalSection
 EndGlobal

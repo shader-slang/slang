@@ -33,6 +33,11 @@ namespace Slang
         return IROp(kIROp_Invalid);
     }
 
+    IROpInfo getIROpInfo(IROp op)
+    {
+        return kIROpInfos[op];
+    }
+
     //
 
     void IRUse::init(IRValue* u, IRValue* v)
@@ -91,13 +96,23 @@ namespace Slang
 
     IRParam* IRParam::getNextParam()
     {
+        // TODO: this is written as a search because we don't
+        // currently do the careful thing and emit parameters
+        // before any other members of a block.
+        //
+        // This should change on the emit side, instead.
+
         auto next = nextInst;
-        if(!next) return nullptr;
 
-        if(next->op != kIROp_Param)
-            return nullptr;
+        for (;;)
+        {
+            if (!next) return nullptr;
 
-        return (IRParam*) next;
+            if(next->op == kIROp_Param)
+                return (IRParam*) next;
+
+            next = next->nextInst;
+        }
     }
 
     //
@@ -1392,6 +1407,24 @@ namespace Slang
 //        fprintf(context->file, "%llu", (unsigned long long)val);
     }
 
+    static void dump(
+        IRDumpContext*          context,
+        IntegerLiteralValue     val)
+    {
+        context->builder->append(val);
+
+//        fprintf(context->file, "%llu", (unsigned long long)val);
+    }
+
+    static void dump(
+        IRDumpContext*              context,
+        FloatingPointLiteralValue   val)
+    {
+        context->builder->append(val);
+
+//        fprintf(context->file, "%llu", (unsigned long long)val);
+    }
+
     static void dumpIndent(
         IRDumpContext*  context)
     {
@@ -1412,7 +1445,7 @@ namespace Slang
         else if(inst->id)
         {
             dump(context, "%");
-            dump(context, inst->id);
+            dump(context, (UInt) inst->id);
         }
         else
         {
@@ -1720,6 +1753,13 @@ namespace Slang
         StringBuilder sb;
         printSlangIRAssembly(sb, module);
         return sb;
+    }
+
+    void dumpIR(IRModule* module)
+    {
+        String ir = getSlangIRAssembly(module);
+        fprintf(stderr, "%s\n", ir.Buffer());
+        fflush(stderr);
     }
 
 

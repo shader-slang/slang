@@ -40,6 +40,8 @@
     <ClInclude Include="lower-to-ir.h" />
     <ClInclude Include="ir-inst-defs.h" />
     <ClInclude Include="ir-insts.h" />
+    <ClInclude Include="bytecode.h" />
+    <ClInclude Include="vm.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="check.cpp" />
@@ -64,6 +66,8 @@
     <ClCompile Include="name.cpp" />
     <ClCompile Include="ir.cpp" />
     <ClCompile Include="lower-to-ir.cpp" />
+    <ClCompile Include="bytecode.cpp" />
+    <ClCompile Include="vm.cpp" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="core.meta.slang" />
