@@ -5,6 +5,7 @@
 
 #include "ir.h"
 #include "ir-insts.h"
+#include "mangle.h"
 #include "type-layout.h"
 #include "visitor.h"
 
@@ -80,6 +81,7 @@ struct BoundSubscriptInfo : ExtendedValueInfo
     DeclRef<SubscriptDecl>  declRef;
     IRType*                 type;
     List<IRValue*>          args;
+    UInt                    genericArgCount;
 };
 
 // Some cases of `ExtendedValueInfo` need to
@@ -288,6 +290,11 @@ struct IRGenContext
     SharedIRGenContext* shared;
 
     IRBuilder* irBuilder;
+
+    Session* getSession()
+    {
+        return shared->entryPoint->compileRequest->mSession;
+    }
 };
 
 LoweredValInfo ensureDecl(
@@ -430,7 +437,9 @@ LoweredValInfo emitCallToDeclRef(
     IRType*         type,
     DeclRef<Decl>   funcDeclRef,
     UInt            argCount,
-    IRValue* const* args)
+    IRValue* const* args,
+    // How many of the arguments are generic args?
+    UInt            genericArgCount)
 {
     auto builder = context->irBuilder;
 
@@ -473,6 +482,7 @@ LoweredValInfo emitCallToDeclRef(
             boundSubscript->declRef = subscriptDeclRef;
             boundSubscript->type = type;
             boundSubscript->args.AddRange(args, argCount);
+            boundSubscript->genericArgCount = genericArgCount;
 
             context->shared->extValues.Add(boundSubscript);
 
@@ -488,6 +498,12 @@ LoweredValInfo emitCallToDeclRef(
     auto funcDecl = funcDeclRef.getDecl();
     if(auto intrinsicOpModifier = funcDecl->FindModifier<IntrinsicOpModifier>())
     {
+        // We don't want to include generic arguments when calling an
+        // intrinsic for now, because we assume that they already
+        // handle the parameterization internally.
+        args += genericArgCount;
+        argCount -= genericArgCount;
+
         auto op = getIntrinsicOp(funcDecl, intrinsicOpModifier);
 
         if (Int(op) < 0)
@@ -544,6 +560,14 @@ LoweredValInfo emitCallToDeclRef(
         // HACK: we know all constructors are builtins for now,
         // so we need to emit them as a call to the corresponding
         // builtin operation.
+        //
+        // TODO: these should all either be intrinsic operations,
+        // or calls to library functions.
+
+        // Skip the generic arguments, so they don't screw up
+        // other logic.
+        args += genericArgCount;
+        argCount -= genericArgCount;
         return LoweredValInfo::simple(builder->emitConstructorInst(type, argCount, args));
     }
 
@@ -556,9 +580,10 @@ LoweredValInfo emitCallToDeclRef(
     IRGenContext*           context,
     IRType*                 type,
     DeclRef<Decl>           funcDeclRef,
-    List<IRValue*> const&   args)
+    List<IRValue*> const&   args,
+    UInt                    genericArgCount)
 {
-    return emitCallToDeclRef(context, type, funcDeclRef, args.Count(), args.Buffer());
+    return emitCallToDeclRef(context, type, funcDeclRef, args.Count(), args.Buffer(), genericArgCount);
 }
 
 IRValue* getSimpleVal(IRGenContext* context, LoweredValInfo lowered)
@@ -587,7 +612,8 @@ top:
                     context,
                     boundSubscriptInfo->type,
                     getter,
-                    boundSubscriptInfo->args);
+                    boundSubscriptInfo->args,
+                    boundSubscriptInfo->genericArgCount);
                 goto top;
             }
 
@@ -1096,6 +1122,53 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         }
     }
 
+    // In the context of a call, we need to add the generic
+    // arguments to the call to the list of IR-level arguments
+    // we are going to pass through. We do that by looking
+    // at the specializations attached to the declaration
+    // reference itself.
+    //
+    void addGenericArgs(
+        InvokeExpr*     expr,
+        DeclRef<Decl>   declRef,
+        List<IRValue*>* ioArgs)
+    {
+        auto subst = declRef.substitutions;
+        if(!subst)
+            return;
+
+        auto genericDecl = subst->genericDecl;
+
+        // If there is an outer layer of generic arguments
+        // (e.g., we are calling a generic method nested
+        // inside a generic type) then we need to add
+        // the outer arguments *before* those from  the
+        // inner context.
+        //
+        DeclRef<Decl> outerDeclRef;
+        outerDeclRef.decl = genericDecl;
+        outerDeclRef.substitutions = subst->outer;
+        addGenericArgs(expr, outerDeclRef, ioArgs);
+
+        // Okay, now we can process the argument list at this
+        // level.
+        //
+        // TODO: there could be a sticking point here because
+        // this logic needs to agree with the logic that adds
+        // generic *parameters* to the callee, and right now
+        // we have a mismatch that constraint witnesses are
+        // explicit in the parmaeter list, but not in
+        // declaration references as currently constructed
+        // inside the front-end.
+        //
+        for(auto arg : subst->args)
+        {
+            auto loweredVal = lowerVal(context, arg);
+            addArgs(context, ioArgs, loweredVal);
+        }
+    }
+
+
     // After a call to a function with `out` or `in out`
     // parameters, we may need to copy data back into
     // the l-value locations used for output arguments.
@@ -1233,6 +1306,74 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         }
     }
 
+    struct ResolvedCallInfo
+    {
+        DeclRef<Decl>   funcDeclRef;
+        Expr*           baseExpr = nullptr;
+    };
+
+    // Try to resolve a the function expression for a call
+    // into a reference to a specific declaration, along
+    // with some contextual information about the declaration
+    // we are calling.
+    bool tryResolveDeclRefForCall(
+        RefPtr<Expr>        funcExpr,
+        ResolvedCallInfo*   outInfo)
+    {
+        // TODO: unwrap any "identity" expressions that might
+        // be wrapping the callee.
+
+        // First look to see if the expression references a
+        // declaration at all.
+        auto declRefExpr = funcExpr.As<DeclRefExpr>();
+        if(!declRefExpr)
+            return false;
+
+        // A little bit of future proofing here: if we ever
+        // allow higher-order functions, then we might be
+        // calling through a variable/field that has a function
+        // type, but is not itself a function.
+        // In such a case we should be careful to not statically
+        // resolve things.
+        //
+        if(auto callableDecl = dynamic_cast<CallableDecl*>(declRefExpr->declRef.getDecl()))
+        {
+            // Okay, the declaration is directly callable, so we can continue.
+        }
+        else
+        {
+            // The callee declaration isn't itself a callable (it must have
+            // a funciton type, though).
+            return false;
+        }
+
+        // Now we can look at the specific kinds of declaration references,
+        // and try to tease them apart.
+        if (auto memberFuncExpr = funcExpr.As<MemberExpr>())
+        {
+            outInfo->funcDeclRef = memberFuncExpr->declRef;
+            outInfo->baseExpr = memberFuncExpr->BaseExpression;
+            return true;
+        }
+        else if (auto staticMemberFuncExpr = funcExpr.As<StaticMemberExpr>())
+        {
+            outInfo->funcDeclRef = staticMemberFuncExpr->declRef;
+            return true;
+        }
+        else if (auto varExpr = funcExpr.As<VarExpr>())
+        {
+            outInfo->funcDeclRef = varExpr->declRef;
+            return true;
+        }
+        else
+        {
+            // Seems to be a case of declaration-reference we don't know about.
+            SLANG_UNEXPECTED("unknown declaration reference kind");
+            return false;
+        }
+    }
+
+
     LoweredValInfo visitInvokeExpr(InvokeExpr* expr)
     {
         auto type = lowerSimpleType(context, expr->type);
@@ -1262,31 +1403,33 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         List<OutArgumentFixup> argFixups;
 
         auto funcExpr = expr->FunctionExpr;
-        if (auto memberFuncExpr = funcExpr.As<MemberExpr>())
+        ResolvedCallInfo resolvedInfo;
+        if( tryResolveDeclRefForCall(funcExpr, &resolvedInfo) )
         {
-            auto loweredBaseVal = lowerRValueExpr(context, memberFuncExpr->BaseExpression);
-            addArgs(context, &irArgs, loweredBaseVal);
+            // In this case we know exaclty what declaration we
+            // are going to call, and so we can resolve things
+            // appropriately.
+            auto funcDeclRef = resolvedInfo.funcDeclRef;
+            auto baseExpr = resolvedInfo.baseExpr;
 
-            auto funcDeclRef = memberFuncExpr->declRef;
+            // First come any generic arguments:
+            addGenericArgs(expr, funcDeclRef, &irArgs);
+            UInt genericArgCount = irArgs.Count();
 
+            // Next comes the `this` argument if we are calling
+            // a member function:
+            if( baseExpr )
+            {
+                auto loweredBaseVal = lowerRValueExpr(context, baseExpr);
+                addArgs(context, &irArgs, loweredBaseVal);
+            }
+
+            // Then we have the "direct" arguments to the call.
+            // These may include `out` and `inout` arguments that
+            // require "fixup" work on the other side.
+            //
             addDirectCallArgs(expr, funcDeclRef, &irArgs, &argFixups);
-            auto result = emitCallToDeclRef(context, type, funcDeclRef, irArgs);
-            applyOutArgumentFixups(argFixups);
-            return result;
-        }
-        else if (auto staticMemberFuncExpr = funcExpr.As<StaticMemberExpr>())
-        {
-            auto funcDeclRef = staticMemberFuncExpr->declRef;
-            addDirectCallArgs(expr, funcDeclRef, &irArgs, &argFixups);
-            auto result = emitCallToDeclRef(context, type, funcDeclRef, irArgs);
-            applyOutArgumentFixups(argFixups);
-            return result;
-        }
-        else if (auto varExpr = funcExpr.As<VarExpr>())
-        {
-            auto funcDeclRef = varExpr->declRef;
-            addDirectCallArgs(expr, funcDeclRef, &irArgs, &argFixups);
-            auto result = emitCallToDeclRef(context, type, funcDeclRef, irArgs);
+            auto result = emitCallToDeclRef(context, type, funcDeclRef, irArgs, genericArgCount);
             applyOutArgumentFixups(argFixups);
             return result;
         }
@@ -1925,7 +2068,8 @@ top:
                     context,
                     builder->getVoidType(),
                     setterDeclRef,
-                    allArgs);
+                    allArgs,
+                    subscriptInfo->genericArgCount);
                 return;
             }
 
@@ -1964,6 +2108,25 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     LoweredValInfo visitDecl(Decl* decl)
     {
         SLANG_UNIMPLEMENTED_X("decl catch-all");
+    }
+
+    LoweredValInfo visitDeclGroup(DeclGroup* declGroup)
+    {
+        // To lowere a group of declarations, we just
+        // lower each one individually.
+        //
+        for (auto decl : declGroup->decls)
+        {
+            // Note: I am directly invoking `dispatch` here,
+            // instead of `ensureDecl` just to try and
+            // make sure that we don't accidentally
+            // emit things to an outer context.
+            //
+            // TODO: make sure that can't happen anyway.
+            dispatch(decl);
+        }
+
+        return LoweredValInfo();
     }
 
     LoweredValInfo visitSubscriptDecl(SubscriptDecl* decl)
@@ -2096,49 +2259,443 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return LoweredValInfo::simple(irStruct);
     }
 
+    // Sometimes we need to refer to a declaration the way that it would be specialized
+    // inside the context where it is declared (e.g., with generic parameters filled in
+    // using their archetypes).
+    //
+    RefPtr<Substitutions> createDefaultSubstitutions(Decl* decl)
+    {
+        auto dd = decl->ParentDecl;
+        while( dd )
+        {
+            if( auto genericDecl = dynamic_cast<GenericDecl*>(dd) )
+            {
+                auto session = context->getSession();
+
+                RefPtr<Substitutions> subst = new Substitutions();
+                subst->genericDecl = genericDecl;
+                subst->outer = createDefaultSubstitutions(genericDecl);
+
+                for( auto mm : genericDecl->Members )
+                {
+                    if( auto genericTypeParamDecl = mm.As<GenericTypeParamDecl>() )
+                    {
+                        subst->args.Add(DeclRefType::Create(session, makeDeclRef(genericTypeParamDecl.Ptr())));
+                    }
+                    else if( auto genericValueParamDecl = mm.As<GenericValueParamDecl>() )
+                    {
+                        subst->args.Add(new GenericParamIntVal(makeDeclRef(genericValueParamDecl.Ptr())));
+                    }
+                }
+
+                return subst;
+            }
+            dd = dd->ParentDecl;
+        }
+        return nullptr;
+    }
+    DeclRef<Decl> createDefaultSpecializedDeclRefImpl(Decl* decl)
+    {
+        DeclRef<Decl> declRef;
+        declRef.decl = decl;
+        declRef.substitutions = createDefaultSubstitutions(decl);
+        return declRef;
+    }
+    //
+    // The client should actually call the templated wrapper, to preserve type information.
+    template<typename D>
+    DeclRef<D> createDefaultSpecializedDeclRef(D* decl)
+    {
+        return createDefaultSpecializedDeclRefImpl(decl).As<D>();
+    }
+
+
+    // When lowering something callable (most commonly a function declaration),
+    // we need to construct an appropriate parameter list for the IR function
+    // that folds in any contributions from both the declaration itself *and*
+    // its parent declaration(s).
+    //
+    // For example, given code like:
+    //
+    //     struct Foo { int bar(float y) { ... } };
+    //
+    // we need to generate IR-level code something like:
+    //
+    //     func Foo_bar(Foo this, float y) -> int;
+    //
+    // that is, the `this` parameter has become explicit.
+    //
+    // The same applies to generic parameters, and these
+    // should apply even if the nested declaration is `static`:
+    //
+    //     struct Foo<T> { static int bar(T y) { ... } };
+    //
+    // becomes:
+    //
+    //     func Foo_bar<T>(T y) -> int;
+    //
+    // In order to implement this, we are going to do a recursive
+    // walk over a declaration and its parents, collecting separate
+    // lists of ordinary and generic parameters that will need
+    // to be included in the final declaration's parameter list.
+    //
+    // When doing code generation for an ordinary value parameter,
+    // we mostly care about its type, and then also its "direction"
+    // (`in`, `out`, `in out`). We sometimes need acess to the
+    // original declaration so that we can inspect it for meta-data,
+    // but in some cases there is no such declaration (e.g., a `this`
+    // parameter doesn't get an explicit declaration in the AST).
+    // To handle this we break out the relevant data into derived
+    // structures:
+    //
+    enum ParameterDirection
+    {
+        kParameterDirection_In,
+        kParameterDirection_Out,
+        kParameterDirection_InOut,
+    };
+    struct ParameterInfo
+    {
+        Type*               type;
+        ParameterDirection  direction;
+        VarDeclBase*        decl;
+    };
+    //
+    // We need a way to compute the appropriate `ParameterDirection` for a
+    // declared parameter:
+    //
+    ParameterDirection getParameterDirection(VarDeclBase* paramDecl)
+    {
+        if( paramDecl->HasModifier<InOutModifier>() )
+        {
+            // The AST specified `inout`:
+            return kParameterDirection_InOut;
+        }
+        if (paramDecl->HasModifier<OutModifier>())
+        {
+            // We saw an `out` modifier, so now we need
+            // to check if there was a paired `in`.
+            if(paramDecl->HasModifier<InModifier>())
+                return kParameterDirection_InOut;
+            else
+                return kParameterDirection_Out;
+        }
+        else
+        {
+            // No direction modifier, or just `in`:
+            return kParameterDirection_In;
+        }
+    }
+    // We need a way to be able to create a `ParameterInfo` given the declaration
+    // of a parameter:
+    //
+    ParameterInfo getParameterInfo(VarDeclBase* paramDecl)
+    {
+        ParameterInfo info;
+        info.type = paramDecl->getType();
+        info.decl = paramDecl;
+        info.direction = getParameterDirection(paramDecl);
+        return info;
+    }
+    //
+
+    // Here's the declaration for the type to hold the lists:
+    struct ParameterLists
+    {
+        List<ParameterInfo> params;
+        List<Decl*>         genericParams;
+    };
+    //
+    // Because there might be a `static` declaration somewhere
+    // along the lines, we need to be careful to prohibit adding
+    // non-generic parameters in some cases.
+    enum ParameterListCollectMode
+    {
+        // Collect everything: ordinary and generic parameters.
+        kParameterListCollectMode_Default,
+
+
+        // Only collect generic parameters.
+        kParameterListCollectMode_Static,
+    };
+    //
+    // We also need to be able to detect whether a declaration is
+    // either explicitly or implicitly treated as `static`:
+    bool isMemberDeclarationEffectivelyStatic(
+        Decl*           decl,
+        ContainerDecl*  parentDecl)
+    {
+        // Anything explicitly marked `static` counts.
+        //
+        // There is a subtle detail here with a global-scope `static`
+        // variable not really meaning `static` in the same way, but
+        // it doesn't matter because the module shouldn't introduce
+        // any parameters we care about.
+        if(decl->HasModifier<HLSLStaticModifier>())
+            return true;
+
+        // Next we need to deal with cases where a declaration is
+        // effectively `static` even if the language doesn't make
+        // the user say so. Most languages make the default assumption
+        // that nested types are `static` even if they don't say
+        // so (Java is an exception here, perhaps due to some
+        // includence from the Scandanavian OOP tradition).
+        if(dynamic_cast<AggTypeDecl*>(decl))
+            return true;
+
+        // Things nested inside functions may have dependencies
+        // on values from the enclosing scope, but this needs to
+        // be dealt with via "capture" so they are also effectively
+        // `static`
+        if(dynamic_cast<FunctionDeclBase*>(parentDecl))
+            return true;
+
+        return false;
+    }
+    // We also need to be able to detect whether a declaration is
+    // either explicitly or implicitly treated as `static`:
+    ParameterListCollectMode getModeForCollectingParentParameters(
+        Decl*           decl,
+        ContainerDecl*  parentDecl)
+    {
+        // If we have a `static` parameter, then it is obvious
+        // that we should use the `static` mode
+        if(isMemberDeclarationEffectivelyStatic(decl, parentDecl))
+            return kParameterListCollectMode_Static;
+
+        // Otherwise, let's default to collecting everything
+        return kParameterListCollectMode_Default;
+    }
+    //
+    // When dealing with a member function, we need to be able to add the `this`
+    // parameter for the enclosing type:
+    //
+    void addThisParameter(
+        Type*               type,
+        ParameterLists*     ioParameterLists)
+    {
+        // For now we make any `this` parameter default to `in`. Eventually
+        // we should add a way for the user to opt in to mutability of `this`
+        // in cases where they really want it.
+        //
+        // Note: an alternative here might be to have the built-in types like
+        // `Texture2D` actually use `class` declarations and say that the
+        // `this` parameter for a class type is always `in`, while `struct`
+        // types can default to `in out`.
+        ParameterDirection direction = kParameterDirection_In;
+
+        ParameterInfo info;
+        info.type = type;
+        info.decl = nullptr;
+        info.direction = direction;
+
+        ioParameterLists->params.Add(info);
+    }
+    void addThisParameter(
+        AggTypeDecl*        typeDecl,
+        ParameterLists*     ioParameterLists)
+    {
+        // We need to construct an appopriate declaration-reference
+        // for the type declaration we were given. In particular,
+        // we need to specialize it for any generic parameters
+        // that are in scope here.
+        auto declRef = createDefaultSpecializedDeclRef(typeDecl);
+        auto type = DeclRefType::Create(context->getSession(), declRef);
+        addThisParameter(
+            type,
+            ioParameterLists);
+    }
+    //
+    // And here is our function that will do the recursive walk:
+    void collectParameterLists(
+        Decl*                       decl,
+        ParameterLists*             ioParameterLists,
+        ParameterListCollectMode    mode)
+    {
+        // The parameters introduced by any "parent" declarations
+        // will need to come first, so we'll deal with that
+        // logic here.
+        if( auto parentDecl = decl->ParentDecl )
+        {
+            // Compute the mode to use when collecting parameters from
+            // the outer declaration. The most important question here
+            // is whether parameters of the outer declaration should
+            // also count as parameters of the inner declaration.
+            ParameterListCollectMode innerMode = getModeForCollectingParentParameters(decl, parentDecl);
+
+            // Don't down-grade our `static`-ness along the chain.
+            if(innerMode < mode)
+                innerMode = mode;
+
+            // Now collect any parameters from the parent declaration itself
+            collectParameterLists(parentDecl, ioParameterLists, innerMode);
+
+            // We also need to consider whether the inner declaration needs to have a `this`
+            // parameter corresponding to the outer declaration.
+            if( innerMode != kParameterListCollectMode_Static )
+            {
+                if( auto aggTypeDecl = dynamic_cast<AggTypeDecl*>(parentDecl) )
+                {
+                    addThisParameter(aggTypeDecl, ioParameterLists);
+                }
+                else if( auto extensionDecl = dynamic_cast<ExtensionDecl*>(parentDecl) )
+                {
+                    addThisParameter(extensionDecl->targetType, ioParameterLists);
+                }
+            }
+        }
+
+        // Once we've added any parameters based on parent declarations,
+        // we can see if this declaration itself introduces parameters.
+        //
+        if( auto callableDecl = dynamic_cast<CallableDecl*>(decl) )
+        {
+            // Don't collect parameters from the outer scope if
+            // we are in a `static` context.
+            if( mode == kParameterListCollectMode_Default )
+            {
+                for( auto paramDecl : callableDecl->GetParameters() )
+                {
+                    ioParameterLists->params.Add(getParameterInfo(paramDecl));
+                }
+            }
+        }
+        else if( auto genericDecl = dynamic_cast<GenericDecl*>(decl) )
+        {
+            for( auto memberDecl : genericDecl->Members )
+            {
+                if( auto genericTypeParamDecl = memberDecl.As<GenericTypeParamDecl>() )
+                {
+                    ioParameterLists->genericParams.Add(genericTypeParamDecl);
+                }
+                else if( auto genericValueParamDecl = memberDecl.As<GenericValueParamDecl>() )
+                {
+                    ioParameterLists->genericParams.Add(genericValueParamDecl);
+                }
+                else if( auto genericConstraintDel = memberDecl.As<GenericTypeConstraintDecl>() )
+                {
+                    // When lowering to the IR we need to reify the constraints on
+                    // a generic parameter as concrete parameters of their own.
+                    // These parameter will usually be satisfied by passing a "witness"
+                    // as the argument to correspond to the parameter.
+                    //
+                    // TODO: it is possible that all witness parameters should come
+                    // after the other generic parameters, and thus should be collected
+                    // in a third list.
+                    //
+                    ioParameterLists->genericParams.Add(genericConstraintDel);
+                }
+            }
+        }
+
+    }
+
+    void trySetMangledName(
+        IRInst* inst,
+        Decl*   decl)
+    {
+        // We want to generate a mangled name for the given declaration and attach
+        // it to the instruction.
+        //
+        // TODO: we probably want to start be doing an early-exit in cases
+        // where it doesn't make sense to attach a mangled name (e.g., because
+        // the declaration in question shouldn't have linkage).
+        //
+
+        String mangledName = getMangledName(decl);
+
+        auto decoration = getBuilder()->addDecoration<IRMangledNameDecoration>(inst);
+        decoration->mangledName = mangledName;
+    }
+
+
     LoweredValInfo visitFunctionDeclBase(FunctionDeclBase* decl)
     {
+        // Collect the parameter lists we will use for our new function.
+        ParameterLists parameterLists;
+        collectParameterLists(decl, &parameterLists, kParameterListCollectMode_Default);
+
+        // TODO: if there are any generic parameters in the collected list, then
+        // we need to output an IR function with generic parameters (or a generic
+        // with a nested function... the exact representation is still TBD).
+
+        // In most cases the return type for a declaration can be read off the declaration
+        // itself, but things get a bit more complicated when we have to deal with
+        // accessors for subscript declarations (and eventually for properties).
+        //
+        // We compute a declaration to use for looking up the return type here:
+        CallableDecl* declForReturnType = decl;
+        if (auto accessorDecl = dynamic_cast<AccessorDecl*>(decl))
+        {
+            // We are some kind of accessor, so the parent declaration should
+            // know the correct return type to expose.
+            //
+            auto parentDecl = accessorDecl->ParentDecl;
+            if (auto subscriptDecl = dynamic_cast<SubscriptDecl*>(parentDecl))
+            {
+                declForReturnType = subscriptDecl;
+            }
+        }
+
+
         IRBuilder subBuilderStorage = *getBuilder();
         IRBuilder* subBuilder = &subBuilderStorage;
+
+        IRGenContext subContextStorage = *context;
+        IRGenContext* subContext = &subContextStorage;
+        subContext->irBuilder = subBuilder;
 
         // need to create an IR function here
 
         IRFunc* irFunc = subBuilder->createFunc();
         subBuilder->parentInst = irFunc;
 
-        IRBlock* entryBlock = subBuilder->emitBlock();
-        subBuilder->parentInst = entryBlock;
-
-        IRGenContext subContextStorage = *context;
-        IRGenContext* subContext = &subContextStorage;
-        subContext->irBuilder = subBuilder;
-
-        // set up sub context for generating our new function
-
-        CallableDecl* declForParameters = decl;
-        CallableDecl* declForReturnType = decl;
-        if (auto accessorDecl = dynamic_cast<AccessorDecl*>(decl))
-        {
-            auto parentDecl = accessorDecl->ParentDecl;
-            if (auto subscriptDecl = dynamic_cast<SubscriptDecl*>(parentDecl))
-            {
-                declForParameters = subscriptDecl;
-                declForReturnType = subscriptDecl;
-            }
-        }
-
+        trySetMangledName(irFunc, decl);
 
         List<IRType*> paramTypes;
 
-        for( auto paramDecl : declForParameters->GetParameters() )
+        // We first need to walk the generic parameters (if any)
+        // because these will influence the declared type of
+        // the function.
+        UInt genericParamCounter = 0;
+        for( auto genericParamDecl : parameterLists.genericParams )
         {
-            IRType* irParamType = lowerSimpleType(context, paramDecl->getType());
-
-            LoweredValInfo paramVal;
-
-            if (paramDecl->HasModifier<OutModifier>()
-                || paramDecl->HasModifier<InOutModifier>())
+            UInt genericParamIndex = genericParamCounter++;
+            if( auto genericTypeParamDecl = dynamic_cast<GenericTypeParamDecl*>(genericParamDecl) )
             {
+                // In the logical type for the function, a generic
+                // type parameter will be represented as a parameter of type `Type`
+
+                IRType* irTypeType = context->irBuilder->getTypeType();
+                paramTypes.Add(irTypeType);
+
+                // Anywhere else in the parameter type list where this type parameter
+                // is referenced, we'll need to substitute in a reference
+                // to the appropriate generic parameter position.
+
+                IRType* irParameterType = context->irBuilder->getGenericParameterType(genericParamIndex);
+                LoweredValInfo LoweredValInfo = LoweredValInfo::simple(irParameterType);
+                subContext->shared->declValues[makeDeclRef(genericTypeParamDecl)] = LoweredValInfo;
+            }
+            else
+            {
+                // TODO: handle the other cases here.
+                SLANG_UNEXPECTED("generic parameter kind");
+            }
+        }
+
+        for( auto paramInfo : parameterLists.params )
+        {
+            IRType* irParamType = lowerSimpleType(context, paramInfo.type);
+
+            switch( paramInfo.direction )
+            {
+            case kParameterDirection_In:
+                // Simple case of a by-value input parameter.
+                paramTypes.Add(irParamType);
+                break;
+
+            default:
                 // The parameter is being used for input/output purposes,
                 // so it will lower to an actual parameter with a pointer type.
                 //
@@ -2146,48 +2703,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
                 auto irPtrType = subBuilder->getPtrType(irParamType);
                 paramTypes.Add(irPtrType);
-
-                IRParam* irParamPtr = subBuilder->emitParam(irPtrType);
-                subBuilder->addHighLevelDeclDecoration(irParamPtr, paramDecl);
-
-                paramVal = LoweredValInfo::ptr(irParamPtr);
-
-                // TODO: We might want to copy the pointed-to value into
-                // a temporary at the start of the function, and then copy
-                // back out at the end, so that we don't have to worry
-                // about things like aliasing in the function body.
-                //
-                // For now we will just use the storage that was passed
-                // in by the caller, knowing that our current lowering
-                // at call sites will guarantee a fresh/unique location.
             }
-            else
-            {
-                // Simple case of a by-value input parameter.
-                // But note that HLSL allows an input parameter
-                // to be used as a local variable inside of a
-                // function body, so we need to introduce a temporary
-                // and then copy over to it...
-                //
-                // TODO: we could skip this step if we knew
-                // the parameter was marked `const` or similar.
-
-                paramTypes.Add(irParamType);
-
-                IRParam* irParam = subBuilder->emitParam(irParamType);
-                subBuilder->addHighLevelDeclDecoration(irParam, paramDecl);
-                paramVal = LoweredValInfo::simple(irParam);
-
-                auto irLocal = subBuilder->emitVar(irParamType);
-                auto localVal = LoweredValInfo::ptr(irLocal);
-
-                assign(subContext, localVal, paramVal);
-
-                paramVal = localVal;
-            }
-
-            DeclRef<ParamDecl> paramDeclRef = makeDeclRef(paramDecl.Ptr());
-            subContext->shared->declValues.Add(paramDeclRef, paramVal);
         }
 
         auto irResultType = lowerSimpleType(context, declForReturnType->ReturnType);
@@ -2218,20 +2734,111 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             irResultType);
         irFunc->type.init(irFunc, irFuncType);
 
-        lowerStmt(subContext, decl->Body);
-
-        // We need to carefully add a terminator instruction to the end
-        // of the body, in case the user didn't do so.
-        if (!isTerminatorInst(subContext->irBuilder->parentInst->lastChild))
+        if (!decl->Body)
         {
-            if (irResultType->op == kIROp_VoidType)
+            // This is a function declaration without a body.
+            // In Slang we currently try not to support forward declarations
+            // (although we might have to give in eventually), so the
+            // only case where this arises is for a function that
+            // needs to be imported from another module.
+
+            // TODO: we may need to attach something to the declaration,
+            // so that later passes don't get confused by it not having
+            // a body.
+
+        }
+        else
+        {
+            // This is a function definition, so we need to actually
+            // construct IR for the body...
+            IRBlock* entryBlock = subBuilder->emitBlock();
+            subBuilder->parentInst = entryBlock;
+
+            UInt paramTypeIndex = 0;
+            for( auto paramInfo : parameterLists.params )
             {
-                subContext->irBuilder->emitReturn();
+                auto irParamType = paramTypes[paramTypeIndex++];
+
+                LoweredValInfo paramVal;
+
+                switch( paramInfo.direction )
+                {
+                default:
+                    {
+                        // The parameter is being used for input/output purposes,
+                        // so it will lower to an actual parameter with a pointer type.
+                        //
+                        // TODO: Is this the best representation we can use?
+
+                        auto irPtrType = (IRPtrType*)irParamType;
+
+                        IRParam* irParamPtr = subBuilder->emitParam(irPtrType);
+                        if(auto paramDecl = paramInfo.decl)
+                            subBuilder->addHighLevelDeclDecoration(irParamPtr, paramDecl);
+
+                        paramVal = LoweredValInfo::ptr(irParamPtr);
+
+                        // TODO: We might want to copy the pointed-to value into
+                        // a temporary at the start of the function, and then copy
+                        // back out at the end, so that we don't have to worry
+                        // about things like aliasing in the function body.
+                        //
+                        // For now we will just use the storage that was passed
+                        // in by the caller, knowing that our current lowering
+                        // at call sites will guarantee a fresh/unique location.
+                    }
+                    break;
+
+                case kParameterDirection_In:
+                    {
+                        // Simple case of a by-value input parameter.
+                        // But note that HLSL allows an input parameter
+                        // to be used as a local variable inside of a
+                        // function body, so we need to introduce a temporary
+                        // and then copy over to it...
+                        //
+                        // TODO: we could skip this step if we knew
+                        // the parameter was marked `const` or similar.
+
+                        paramTypes.Add(irParamType);
+
+                        IRParam* irParam = subBuilder->emitParam(irParamType);
+                        if(auto paramDecl = paramInfo.decl)
+                            subBuilder->addHighLevelDeclDecoration(irParam, paramDecl);
+                        paramVal = LoweredValInfo::simple(irParam);
+
+                        auto irLocal = subBuilder->emitVar(irParamType);
+                        auto localVal = LoweredValInfo::ptr(irLocal);
+
+                        assign(subContext, localVal, paramVal);
+
+                        paramVal = localVal;
+                    }
+                    break;
+                }
+
+                if( auto paramDecl = paramInfo.decl )
+                {
+                    DeclRef<VarDeclBase> paramDeclRef = makeDeclRef(paramDecl);
+                    subContext->shared->declValues.Add(paramDeclRef, paramVal);
+                }
             }
-            else
+
+            lowerStmt(subContext, decl->Body);
+
+            // We need to carefully add a terminator instruction to the end
+            // of the body, in case the user didn't do so.
+            if (!isTerminatorInst(subContext->irBuilder->parentInst->lastChild))
             {
-                SLANG_UNEXPECTED("Needed a return here");
-                subContext->irBuilder->emitReturn();
+                if (irResultType->op == kIROp_VoidType)
+                {
+                    subContext->irBuilder->emitReturn();
+                }
+                else
+                {
+                    SLANG_UNEXPECTED("Needed a return here");
+                    subContext->irBuilder->emitReturn();
+                }
             }
         }
 
@@ -2340,6 +2947,9 @@ static void lowerEntryPointToIR(
 
     auto entryPointDecoration = builder->addDecoration<IREntryPointDecoration>(irFunc);
     entryPointDecoration->profile = profile;
+
+    // Attach layout information here.
+    builder->addLayoutDecoration(irFunc, entryPointLayout);
 
     // Next, we need to start attaching the meta-data that is
     // required based on the particular stage we are targetting:

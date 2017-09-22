@@ -21,10 +21,54 @@ INST(MatrixType, Mat, 3, 0)
 INST(arrayType, Array, 2, 0)
 
 INST(BoolType, Bool, 0, 0)
-INST(Float32Type, Float32, 0, 0)
-INST(Int32Type, Int32, 0, 0)
-INST(UInt32Type, UInt32, 0, 0)
+
+INST(Float16Type,   Float16,    0, 0)
+INST(Float32Type,   Float32,    0, 0)
+INST(Float64Type,   Float64,    0, 0)
+
+// Signed integer types.
+// Note that `IntPtr` represents a pointer-sized integer type,
+// and will end up being equivalent to either `Int32` or `Int64`
+// when it comes time to actually generate code.
+//
+INST(Int8Type,      Int8,       0, 0)
+INST(Int16Type,     Int16,      0, 0)
+INST(Int32Type,     Int32,      0, 0)
+INST(IntPtrType,    IntPtr,     0, 0)
+INST(Int64Type,     Int64,      0, 0)
+
+// Unlike a lot of other IRs, we retain a distinction between
+// signed and unsigned integer types, simply because many of
+// the target languages we need to generate code for also
+// keep this distinction, and it will help us generate variable
+// declarations that will be friendly to debuggers.
+//
+// TODO: We may want to reconsider this choice simply because
+// some targets (e.g., those based on C++) may have undefined
+// behavior around operations on signed integers that are
+// well-defined (two's complement) on unsigned integers. In
+// those cases we either want to default to unsigned integers,
+// and then cast around the few ops that care about the difference,
+// or else we want to keep using the orignal types, but need
+// to cast around any ordinary math operations on signed types.
+//
+INST(UInt8Type,     Int8,       0, 0)
+INST(UInt16Type,    Int16,      0, 0)
+INST(UInt32Type,    Int32,      0, 0)
+INST(UIntPtrType,   IntPtr,     0, 0)
+INST(UInt64Type,    Int64,      0, 0)
+
+// A user-defined structure declaration at the IR level.
+// Unlike in the AST where there is a distinction between
+// a `StructDecl` and a `DeclRefType` that refers to it,
+// at the IR level the struct declaration and the type
+// are the same IR instruction.
+//
+// This is a parent instruction that holds zero or more
+// `field` instructions.
+//
 INST(StructType, Struct, 0, PARENT)
+
 INST(FuncType, Func, 0, 0)
 INST(PtrType, Ptr, 1, 0)
 INST(TextureType, Texture, 2, 0)
@@ -34,6 +78,18 @@ INST(TextureBufferType, TextureBuffer, 1, 0)
 
 INST(structuredBufferType, StructuredBuffer, 1, 0)
 INST(readWriteStructuredBufferType, RWStructuredBuffer, 1, 0)
+
+// A type use to represent an earlier generic parameter in
+// a signature. For example, given an AST declaration like:
+//
+//     func Foo<T, U>(int a, T b) -> U;
+//
+// The lowered function type would be something like:
+//
+//      T     U     a      b
+//     (Type, Type, Int32, GenericParameterType<0>) -> GenericParameterType<1>
+//
+INST(GenericParameterType, GenericParameterType, 1, 0)
 
 INST(boolConst, boolConst, 0, 0)
 INST(IntLit, integer_constant, 0, 0)
@@ -61,6 +117,18 @@ INST(FieldAddress, get_field_addr, 2, 0)
 
 INST(getElement, getElement, 2, 0)
 INST(getElementPtr, getElementPtr, 2, 0)
+
+// Construct a vector from a scalar
+//
+// %dst = constructVectorFromScalar %T %N %val
+//
+// where
+// - `T` is a `Type`
+// - `N` is a (compile-time) `Int`
+// - `val` is a `T`
+// - dst is a `Vec<T,N>`
+//
+INST(constructVectorFromScalar, constructVectorFromScalar, 3, 0)
 
 // A swizzle of a vector:
 //

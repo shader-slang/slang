@@ -95,6 +95,7 @@ sb << "    typedef T Element;\n";
 
 // Declare initializer taking a single scalar of the elemnt type
 sb << "    __implicit_conversion(" << kConversionCost_ScalarToVector << ")\n";
+sb << "    __intrinsic_op(" << kIROp_constructVectorFromScalar << ")\n";
 sb << "    __init(T value);\n";
 
 sb << "};\n";
@@ -426,7 +427,12 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
 
                     sb << ")\")\n";
-                    sb << "__intrinsic_op\n";
+
+
+					// TIM: Making `GetDimensions` *not* be marked as
+					// an intrinsic, just so we can see how defining
+					// things as `extern` functions would work.
+//                    sb << "__intrinsic_op\n";
 
                 }
 

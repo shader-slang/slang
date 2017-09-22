@@ -4070,12 +4070,26 @@ emitDeclImpl(decl, nullptr);
             {
                 auto textureType = (IRTextureType*) type;
 
-                // TODO: actually look at the flavor and emit the right name
-                emit("Texture2D");
+                switch (context->shared->target)
+                {
+                case CodeGenTarget::HLSL:
+                    // TODO: actually look at the flavor and emit the right name
+                    emit("Texture2D");
+                    emit("<");
+                    emitIRType(context, textureType->getElementType(), nullptr);
+                    emit(">");
+                    break;
 
-                emit("<");
-                emitIRType(context, textureType->getElementType(), nullptr);
-                emit(">");
+                case CodeGenTarget::GLSL:
+                    // TODO: actually look at the flavor and emit the right name
+                    // TODO: look at element type to emit the right prefix
+                    emit("texture2D");
+                    break;
+
+                default:
+                    SLANG_UNEXPECTED("codegen target");
+                    break;
+                }
             }
             break;
 
@@ -4122,6 +4136,16 @@ emitDeclImpl(decl, nullptr);
             }
             break;
 
+        case kIROp_TypeType:
+            {
+                // Note: this should actually be an error case, since
+                // type-level operands shouldn't be exposed in generated
+                // code, but I'm allowing this now to make the output
+                // a bit more clear.
+                emit("Type");
+            }
+            break;
+
 
         default:
             SLANG_UNIMPLEMENTED_X("type case for emit");
@@ -4130,15 +4154,70 @@ emitDeclImpl(decl, nullptr);
 
     }
 
+    CodeGenTarget getTarget(EmitContext* context)
+    {
+        return context->shared->target;
+    }
+
+    void emitGLSLTypePrefix(
+        EmitContext*    context,
+        IRType*   type)
+    {
+        switch(type->op)
+        {
+        case kIROp_UInt32Type:
+            emit("u");
+            break;
+
+        case kIROp_Int32Type:
+            emit("i");
+            break;
+
+        case kIROp_BoolType:
+            emit("b");
+            break;
+
+        case kIROp_Float32Type:
+            // no prefix
+            break;
+
+        case kIROp_Float64Type:
+            emit("d");
+            break;
+
+        // TODO: we should handle vector and matrix types here
+        // and recurse into them to find the elemnt type,
+        // just as a convenience.
+
+        default:
+            SLANG_UNEXPECTED("case for GLSL type prefix");
+            break;
+        }
+    }
 
     void emitIRVectorType(
         EmitContext*    context,
         IRVectorType*   type)
     {
-        // TODO: this is a GLSL-vs-HLSL decision point
+        switch(getTarget(context))
+        {
+        case CodeGenTarget::GLSL:
+            // HLSL style: `<elementTypePrefix>vec<elementCount>`
+            // e.g., `ivec4`
+            //
+            emitGLSLTypePrefix(context, type->getElementType());
+            emit("vec");
+            emitIRSimpleValue(context, type->getElementCount());
+            break;
 
-        emitIRSimpleType(context, type->getElementType());
-        emitIRSimpleValue(context, type->getElementCount());
+        default:
+            // HLSL style: `<elementTypeName><elementCount>`
+            // e.g., `int4`
+            //
+            emitIRSimpleType(context, type->getElementType());
+            emitIRSimpleValue(context, type->getElementCount());
+            break;
+        }
     }
 
     void emitIRMatrixType(
@@ -4238,6 +4317,14 @@ emitDeclImpl(decl, nullptr);
             // types.
             return true;
 
+        case kIROp_TextureType:
+            // GLSL doesn't allow texture/resource types to
+            // be used as first-class values, so we need
+            // to fold them into their use sites in all cases
+            if(getTarget(context) == CodeGenTarget::GLSL)
+                return true;
+           break;
+
         default:
             break;
         }
@@ -4331,7 +4418,7 @@ emitDeclImpl(decl, nullptr);
 
         case kIROp_Construct:
             // Simple constructor call
-            if( inst->getArgCount() == 2 )
+            if( inst->getArgCount() == 2 && getTarget(context) == CodeGenTarget::HLSL)
             {
                 // Need to emit as cast for HLSL
                 emit("(");
@@ -4344,6 +4431,23 @@ emitDeclImpl(decl, nullptr);
                 emitIRType(context, inst->getType());
                 emitIRArgs(context, inst);
             }
+            break;
+
+        case kIROp_constructVectorFromScalar:
+            // Simple constructor call
+            if( getTarget(context) == CodeGenTarget::HLSL )
+            {
+                emit("(");
+                emitIRType(context, inst->getType());
+                emit(")");
+            }
+            else
+            {
+                emitIRType(context, inst->getType());
+            }
+            emit("(");
+            emitIROperand(context, inst->getArg(1));
+            emit(")");
             break;
 
         case kIROp_FieldExtract:
@@ -4421,6 +4525,7 @@ emitDeclImpl(decl, nullptr);
             break;
 
         case kIROp_Sample:
+            // argument 0 is the instruction's type
             emitIROperand(context, inst->getArg(1));
             emit(".Sample(");
             emitIROperand(context, inst->getArg(2));
@@ -4430,6 +4535,7 @@ emitDeclImpl(decl, nullptr);
             break;
 
         case kIROp_SampleGrad:
+            // argument 0 is the instruction's type
             emitIROperand(context, inst->getArg(1));
             emit(".SampleGrad(");
             emitIROperand(context, inst->getArg(2));
@@ -4892,7 +4998,15 @@ emitDeclImpl(decl, nullptr);
         }
     }
 
-    void emitIRFunc(
+    // Is an IR function a definition? (otherwise it is a declaration)
+    bool isDefinition(IRFunc* func)
+    {
+        // For now, we use a simple approach: a function is
+        // a definition if it has any blocks, and a declaration otherwise.
+        return func->getFirstBlock() != nullptr;
+    }
+
+    void emitIRSimpleFunc(
         EmitContext*    context,
         IRFunc*         func)
     {
@@ -4934,25 +5048,13 @@ emitDeclImpl(decl, nullptr);
         emitIRSemantics(context, func);
 
         // TODO: encode declaration vs. definition
-        bool isDefinition = true;
-        if(isDefinition)
+        if(isDefinition(func))
         {
             emit("\n{\n");
 
             // Need to emit the operations in the blocks of the function
 
             emitIRStmtsForBlocks(context, func->getFirstBlock(), nullptr);
-
-#if 0
-            for( auto bb = func->getFirstBlock(); bb; bb = bb->getNextBlock() )
-            {
-                // TODO: need to handle control flow and so forth...
-                for( auto ii = bb->firstChild; ii; ii = ii->nextInst )
-                {
-                    emitIRInst(context, ii);
-                }
-            }
-#endif
 
             emit("}\n");
         }
@@ -4961,6 +5063,186 @@ emitDeclImpl(decl, nullptr);
             emit(";\n");
         }
     }
+
+    void emitIRFuncDecl(
+        EmitContext*    context,
+        IRFunc*         func)
+    {
+        // A function declaration doesn't have any IR basic blocks,
+        // and as a result it *also* doesn't have the IR `param` instructions,
+        // so we need to emit a declaration entirely from the type.
+
+        auto funcType = func->getType();
+        auto resultType = func->getResultType();
+
+        auto name = getName(func);
+
+        emitIRType(context, resultType, name);
+
+        emit("(");
+        auto paramCount = funcType->getParamCount();
+        for(UInt pp = 0; pp < paramCount; ++pp)
+        {
+            if(pp != 0)
+                emit(", ");
+
+            String paramName;
+            paramName.append("_");
+            paramName.append(pp);
+            auto paramType = funcType->getParamType(pp);
+
+            // An `out` or `inout` parameter will have been
+            // encoded as a parameter of pointer type, so
+            // we need to decode that here.
+            //
+            if( paramType->op == kIROp_PtrType )
+            {
+                auto ptrType = (IRPtrType*) paramType;
+
+                // TODO: we need a way to distinguish `out`
+                // from `inout`. The easiest way to do
+                // that might be to have each be a distinct
+                // sub-case of `IRPtrType` - this would also
+                // ensure that they can be distinguished from
+                // real pointers when the user means to use
+                // them.
+
+                emit("out ");
+
+                paramType = ptrType->getValueType();
+            }
+
+            emitIRType(context, paramType, paramName);
+        }
+        emit(");\n");
+    }
+
+    EntryPointLayout* getEntryPointLayout(
+        EmitContext*    context,
+        IRFunc*         func)
+    {
+        if( auto layoutDecoration = func->findDecoration<IRLayoutDecoration>() )
+        {
+            return dynamic_cast<EntryPointLayout*>(layoutDecoration->layout);
+        }
+        return nullptr;
+    }
+
+    void emitGLSLEntryPointFunc(
+        EmitContext*    context,
+        IRFunc*         func)
+    {
+        auto funcType = func->getType();
+        auto resultType = func->getResultType();
+
+        auto entryPointLayout = getEntryPointLayout(context, func);
+        assert(entryPointLayout);
+
+        // TODO: need to deal with decorations on the entry point
+        // that should be turned into global-scope `layout` qualifiers.
+
+        // TODO: emit kernel inputs and outputs to globals.
+
+        // Emit a global `out` declaration to hold the output from our shader
+        // kernel.
+        //
+        // TODO: need to generate unique names beter than this
+        //
+        // TODO: need to handle the case where the output is
+        // a structure (should that be fixed up at the IR level,
+        // or here?).
+        // Best option might be to translate the entry-point
+        // result parameter into an `out` parameter, so that
+        // we can handle those uniformly.
+        //
+        String resultName = getName(func) + "_result";
+        emitGLSLLayoutQualifiers(entryPointLayout->resultLayout);
+        emit("out ");
+        emitIRType(context, resultType, resultName);
+        emit(";\n");
+
+        // Emit global `in` and/or `out` declarations for the
+        // parameters of our shader kernel.
+        //
+        // TODO: We need to make sure these names don't collide with anything.
+        //
+        // TODO: We need to handle scalarization here.
+        //
+        auto firstParam = func->getFirstParam();
+        for( auto pp = firstParam; pp; pp = pp->getNextParam() )
+        {
+            // TODO: actually handle `out` parameters here.
+
+            auto paramLayout = getVarLayout(context, pp);
+            auto paramName = getName(pp);
+            emitGLSLLayoutQualifiers(paramLayout);
+            emit("in ");
+            emitIRType(context, pp->getType(), paramName);
+            emit(";\n");
+        }
+
+        // Now that we've emitted our parameter declarations,
+        // we can start to emit the body of the entry point:
+        //
+        emit("void main()\n{\n");
+
+        // We had better not be trying to output an entry
+        // point from a declaration rather than a definition.
+        assert(isDefinition(func));
+
+        // At the most basic, we just want to emit the operations in
+        // the entry point function directly, but with the small catch
+        // that if there was a `return` statement in there somewhere,
+        // we need to turn that into a write to our output variable.
+        //
+        // TODO: yeah, that should get cleared up at the IR level...
+        //
+        emitIRStmtsForBlocks(context, func->getFirstBlock(), nullptr);
+
+        emit("}\n");
+    }
+
+    bool isEntryPoint(IRFunc* func)
+    {
+        if(func->findDecoration<IREntryPointDecoration>())
+            return true;
+
+        return false;
+    }
+
+    void emitIRFunc(
+        EmitContext*    context,
+        IRFunc*         func)
+    {
+        if( getTarget(context) == CodeGenTarget::GLSL
+            && isEntryPoint(func) )
+        {
+            // We have a shader entry point, and that
+            // requires a different strategy for source
+            // code generation in GLSL, because the
+            // parameters/result of the entry point
+            // need to be translated into globals.
+            //
+
+            emitGLSLEntryPointFunc(context, func);
+        }
+        else if(!isDefinition(func))
+        {
+            // This is just a function declaration,
+            // and so we want to emit it as such.
+            // (Or maybe not emit it at all).
+            //
+            emitIRFuncDecl(context, func);
+        }
+        else
+        {
+            // The common case is that what we
+            // have is just an ordinary function,
+            // and we can emit it as such.
+            emitIRSimpleFunc(context, func);
+        }
+    }
+
 
     void emitIRStruct(
         EmitContext*    context,
@@ -5006,7 +5288,31 @@ emitDeclImpl(decl, nullptr);
                 emit("row_major ");
                 break;
             }
+        }
 
+        if (context->shared->target == CodeGenTarget::GLSL)
+        {
+            // Layout-related modifiers need to come before the declaration,
+            // so deal with them here.
+            emitGLSLLayoutQualifiers(layout);
+
+            // try to emit an appropriate leading qualifier
+            for (auto rr : layout->resourceInfos)
+            {
+                switch (rr.kind)
+                {
+                case LayoutResourceKind::Uniform:
+                case LayoutResourceKind::ShaderResource:
+                case LayoutResourceKind::DescriptorTableSlot:
+                    emit("uniform ");
+                    break;
+
+                default:
+                    continue;
+                }
+
+                break;
+            }
         }
     }
 
@@ -5289,6 +5595,11 @@ String emitEntryPoint(
 
         // debugging:
 //        dumpIR(lowered);
+
+        // TODO: depending on the target we are trying to generate code for,
+        // we may need to apply certain transformations, and we may also
+        // need to link in (and then inline) target-specific implementations
+        // for the library functions that the user called.
 
         // TODO: do we want to emit directly from IR, or translate the
         // IR back into AST for emission?

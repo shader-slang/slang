@@ -178,6 +178,7 @@
     <ClInclude Include="lexer.h" />
     <ClInclude Include="lookup.h" />
     <ClInclude Include="lower-to-ir.h" />
+    <ClInclude Include="mangle.h" />
     <ClInclude Include="modifier-defs.h" />
     <ClInclude Include="name.h" />
     <ClInclude Include="object-meta-begin.h" />
@@ -214,6 +215,7 @@
     <ClCompile Include="lookup.cpp" />
     <ClCompile Include="lower-to-ir.cpp" />
     <ClCompile Include="lower.cpp" />
+    <ClCompile Include="mangle.cpp" />
     <ClCompile Include="name.cpp" />
     <ClCompile Include="options.cpp" />
     <ClCompile Include="parameter-binding.cpp" />

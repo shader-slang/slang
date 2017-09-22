@@ -1016,6 +1016,7 @@ namespace slang
 #include "source/slang/emit.cpp"
 #include "source/slang/ir.cpp"
 #include "source/slang/lexer.cpp"
+#include "source/slang/mangle.cpp"
 #include "source/slang/name.cpp"
 #include "source/slang/options.cpp"
 #include "source/slang/parameter-binding.cpp"

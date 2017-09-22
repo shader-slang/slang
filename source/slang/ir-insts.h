@@ -62,6 +62,13 @@ struct IRLoopControlDecoration : IRDecoration
     IRLoopControl mode;
 };
 
+struct IRMangledNameDecoration : IRDecoration
+{
+    enum { kDecorationOp = kIRDecorationOp_MangledName };
+
+    String mangledName;
+};
+
 // Types
 
 struct IRVectorType : IRType
@@ -93,6 +100,10 @@ struct IRArrayType : IRType
     IRInst* getElementCount() { return elementCount.usedValue; }
 };
 
+struct IRGenericParameterType : IRType
+{
+    IRUse   index;
+};
 
 
 struct IRFuncType : IRType
@@ -387,6 +398,7 @@ struct IRBuilder
         IRValue* columnCount);
     IRType* getArrayType(IRType* elementType, IRValue* elementCount);
     IRType* getArrayType(IRType* elementType);
+    IRType* getGenericParameterType(UInt index);
 
     IRType* getTypeType();
     IRType* getVoidType();
