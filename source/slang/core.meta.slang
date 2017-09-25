@@ -94,7 +94,7 @@ sb << "    typedef T Element;\n";
 
 // Declare initializer taking a single scalar of the elemnt type
 sb << "    __implicit_conversion(" << kConversionCost_ScalarToVector << ")\n";
-sb << "    __intrinsic_op(" << kIROp_constructorVectorFromScalar << ")\n";
+sb << "    __intrinsic_op(" << kIROp_constructVectorFromScalar << ")\n";
 sb << "    __init(T value);\n";
 
 sb << "};\n";
