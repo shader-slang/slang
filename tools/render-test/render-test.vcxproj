@@ -164,6 +164,11 @@
     <ClInclude Include="slang-support.h" />
     <ClInclude Include="window.h" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\source\slang\slang.vcxproj">
+      <Project>{db00da62-0533-4afd-b59f-a67d5b3a0808}</Project>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

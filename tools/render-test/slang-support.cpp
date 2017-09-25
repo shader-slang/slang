@@ -1,9 +1,8 @@
 // slang-support.cpp
 
-#define SLANG_INCLUDE_IMPLEMENTATION
-
 #include "slang-support.h"
 
+#include <assert.h>
 #include <stdio.h>
 
 namespace renderer_test {
@@ -133,11 +132,3 @@ ShaderCompiler* createSlangShaderCompiler(
 
 
 } // renderer_test
-
-//
-// In order to actually use Slang in our application, we need to link in its
-// implementation. The easiest way to accomplish this is by directly inlcuding
-// the (concatenated) Slang source code into our app.
-//
-
-#include <slang.h>
