@@ -11,28 +11,43 @@
 namespace Slang
 {
 
-// Representation of a type during VM execution
-struct VMTypeImpl
+struct VMValImpl
 {
+    // opcode used to construct the value
     uint32_t op;
+};
+
+// Representation of a type during VM execution
+struct VMTypeImpl : VMValImpl
+{
+    // number of arguments to the type
+    uint32_t argCount;
 
     // Size and alignment of instances of this
     // type.
     UInt    size;
     UInt    alignment;
-};
-struct VMType
-{
-    VMTypeImpl*     impl;
 
-    UInt getSize() { return impl->size; }
-    UInt getAlignment() { return impl->alignment;  }
+    // operands follow
+};
+
+struct VMVal
+{
+    VMValImpl*  impl;
+
+    VMValImpl* getImpl() { return impl; }
+};
+
+struct VMType : VMVal
+{
+    VMTypeImpl* getImpl() { return (VMTypeImpl*) impl; }
+    UInt getSize() { return getImpl()->size; }
+    UInt getAlignment() { return getImpl()->alignment;  }
 };
 
 struct VMPtrTypeImpl : VMTypeImpl
 {
     VMType base;
-    uint32_t addressSpace;
 };
 
 struct VMReg
@@ -47,20 +62,20 @@ struct VMReg
 struct VMConst
 {
     // Type of the constant
-    VMType type;
+    VMType  type;
 
     // Operand address to use
     void*   ptr;
 };
 
-struct VMFrame;
+struct VMModule;
 
 // Information about a function after it has been
 // loaded into the VM.
 struct VMFunc
 {
     // The parent module that this function belongs to
-    VMFrame*    module;
+    VMModule*   module;
     BCFunc*     bcFunc;
 
     VMReg*      regs;
@@ -84,8 +99,14 @@ struct VMFrame
     // Registers are stored after this point.
 };
 
-struct VMModule : VMFunc
+struct VM;
+
+struct VMModule
 {
+    BCModule*   bcModule;
+    VM*         vm;
+    void**      symbols;
+    VMType*     types;
 };
 
 UInt decodeUInt(BCOp** ioPtr)
@@ -93,13 +114,28 @@ UInt decodeUInt(BCOp** ioPtr)
     BCOp* ptr = *ioPtr;
 
     UInt value = *ptr++;
-    if( value >= 128 )
+    if( value < 128 )
     {
-        SLANG_UNEXPECTED("deal with this later");
+        *ioPtr = ptr;
+        return value;
     }
 
-    *ioPtr = ptr;
-    return value;
+    // Slower path for variable-length encoding
+
+    UInt result = 0;
+    for(;;)
+    {
+        value = value & 0x7F;
+        result = (result << 7) | value;
+
+        if(value < 127)
+        {
+            *ioPtr = ptr;
+            return value;
+        }
+
+        value = *ptr++;
+    }
 }
 
 Int decodeSInt(BCOp** ioPtr)
@@ -194,9 +230,15 @@ T& decodeOperand(VMFrame* frame, BCOp** ioIP)
     return *decodeOperandPtr<T>(frame, ioIP);
 }
 
+VMType decodeType(VMFrame* frame, BCOp** ioIP)
+{
+    UInt id = decodeUInt(ioIP);
+    return frame->func->module->types[id];
+}
+
 VMFunc* loadVMFunc(
     BCFunc*     bcFunc,
-    VMFrame*    vmModuleInstance);
+    VMModule*   vmModule);
 
 struct VMSizeAlign
 {
@@ -231,9 +273,30 @@ VMSizeAlign getVMSymbolSize(BCSymbol* symbol)
     return result;
 }
 
+VMType getType(
+    VMModule*   vmModule,
+    uint32_t    typeID)
+{
+    return vmModule->types[typeID];
+}
+
+void* getGlobalPtr(
+    VMModule*   vmModule,
+    uint32_t    globalID)
+{
+    return vmModule->symbols[globalID];
+}
+
+VMType getGlobalType(
+    VMModule*   vmModule,
+    uint32_t    globalID)
+{
+    return getType(vmModule, vmModule->bcModule->symbols[globalID]->typeID);
+}
+
 VMFunc* loadVMFunc(
     BCFunc*     bcFunc,
-    VMFrame*    vmModuleInstance)
+    VMModule*   vmModule)
 {
     UInt regCount = bcFunc->regCount;
     UInt constCount = bcFunc->constCount;
@@ -245,7 +308,7 @@ VMFunc* loadVMFunc(
     VMReg* vmRegs = (VMReg*) (vmFunc + 1);
     VMConst* vmConsts = (VMConst*) (vmRegs + regCount);
 
-    vmFunc->module = vmModuleInstance;
+    vmFunc->module = vmModule;
     vmFunc->bcFunc = bcFunc;
     vmFunc->regs = vmRegs;
     vmFunc->consts = vmConsts;
@@ -254,31 +317,14 @@ VMFunc* loadVMFunc(
     for( UInt rr = 0; rr < regCount; ++rr )
     {
         BCReg* bcReg = &bcFunc->regs[rr];
-        auto typeGlobalID = bcReg->typeGlobalID;
+        auto bcTypeID = bcReg->typeID;
 
-        // HACK: when we are loading a module itself, we might
-        // not yet know the size for the things it defines
-        // (since the module itself might define the type of
-        // one of its symbols), so for now we hack it and
-        // assume everything at module level is 16 bytes or less.
-        //
-        // TODO: this also seems like it will cause problems
-        // in other contexts (any time the type of a register
-        // would depend on an earlier instruction in the same
-        // scope) so this needs careful thought.
-        VMType vmType = { nullptr };
-        UInt regSize = 16;
-        UInt regAlign = 8;
+        // We expect the type to come from the outer module, so
+        // that we can allocate space for it as we go.
+        auto vmType = getType(vmModule, bcTypeID);
 
-        if (vmModuleInstance)
-        {
-            // We expect the type to come from the outer module, so
-            // that we can allocate space for it as we go.
-            vmType = *(VMType*)getRegPtrImpl(vmModuleInstance, typeGlobalID);
-
-            regSize = vmType.getSize();
-            regAlign = vmType.getAlignment();
-        }
+        auto regSize = vmType.getSize();
+        auto regAlign = vmType.getAlignment();
 
         offset = (offset + (regAlign-1)) & ~(regAlign-1);
 
@@ -292,10 +338,28 @@ VMFunc* loadVMFunc(
 
     for( UInt cc = 0; cc < constCount; ++cc )
     {
-        auto globalID = bcFunc->consts[cc].globalID;
-        auto globalPtr = getRegPtrImpl(vmModuleInstance, globalID);
-        vmFunc->consts[cc].ptr = globalPtr;
-        vmFunc->consts[cc].type = vmModuleInstance->func->regs[globalID].type;
+        BCConst bcConst = bcFunc->consts[cc];
+        switch( bcConst.flavor )
+        {
+        case kBCConstFlavor_GlobalSymbol:
+            {
+                auto globalID = bcConst.id;
+                vmFunc->consts[cc].ptr = &vmModule->symbols[globalID];
+                vmFunc->consts[cc].type = getGlobalType(vmModule, globalID);
+            }
+            break;
+
+        case kBCConstFlavor_Constant:
+            {
+                auto constID = bcConst.id;
+                auto constInfo = vmModule->bcModule->constants[constID];
+                vmFunc->consts[cc].ptr = constInfo.ptr;
+                vmFunc->consts[cc].type = getType(vmModule, constInfo.typeID);
+            }
+            break;
+        }
+
+
     }
 
     return vmFunc;
@@ -416,7 +480,186 @@ struct VMThread
 void resumeThread(
     VMThread*   vmThread);
 
-VMFrame* loadVMModuleInstance(
+void computeTypeSizeAlign(
+    VMTypeImpl* impl)
+{
+    UInt size = 0;
+    UInt alignment = 0;
+    switch(impl->op)
+    {
+    case kIROp_VoidType:
+        size = 0;
+        break;
+
+    case kIROp_BoolType:
+        size = 1;
+        break;
+
+    case kIROp_Int32Type:
+    case kIROp_UInt32Type:
+    case kIROp_Float32Type:
+        size = 4;
+        break;
+
+    case kIROp_FuncType:
+    case kIROp_PtrType:
+    case kIROp_readWriteStructuredBufferType:
+    case kIROp_structuredBufferType:
+        size = sizeof(void*);
+        break;
+
+    default:
+        SLANG_UNIMPLEMENTED_X("type sizing");
+        impl->size = 0;
+        break;
+    }
+
+    if(!alignment)
+        alignment = size;
+    if(!alignment)
+        alignment = 1;
+
+    impl->size = size;
+    impl->alignment = alignment;
+}
+
+VMType getType(
+    VM*         vm,
+    VMTypeImpl* typeImpl)
+{
+    // TODO: need to look up an existing type that matches...
+
+    UInt argCount = typeImpl->argCount;
+    UInt size = sizeof(VMTypeImpl) + argCount*sizeof(VMType);
+
+    VMTypeImpl* impl = (VMTypeImpl*) malloc(size);
+    memcpy(impl, typeImpl, size);
+
+    computeTypeSizeAlign(impl);
+
+    VMType type;
+    type.impl = impl;
+    return type;
+}
+
+VMVal getVal(
+    VMModule*   vmModule,
+    UInt        index)
+{
+    return vmModule->types[index];
+}
+
+VMType loadVMType(
+    VMModule*   vmModule,
+    BCType*     bcType)
+{
+    // Need to load type from BC format to VM
+    IROp op = (IROp) bcType->op;
+    switch(bcType->op)
+    {
+    case kIROp_PtrType:
+        {
+            // TODO: need to do some caching!
+            BCPtrType* bcPtrType = (BCPtrType*) bcType;
+
+            VMPtrTypeImpl vmPtrTypeImpl;
+            vmPtrTypeImpl.op = op;
+            vmPtrTypeImpl.argCount = 1;
+            vmPtrTypeImpl.size = sizeof(void*);
+            vmPtrTypeImpl.alignment = sizeof(void*);
+            vmPtrTypeImpl.base = getType(vmModule, bcPtrType->valueType->id);
+
+            auto vmPtrType = getType(vmModule->vm, &vmPtrTypeImpl);
+            return vmPtrType;
+        }
+        break;
+
+    default:
+        {
+            UInt argCount = bcType->argCount;
+
+            UInt size = sizeof(VMTypeImpl) + argCount * sizeof(VMVal);
+
+            VMTypeImpl* impl = (VMTypeImpl*) alloca(size);
+            memset(impl, 0, size);
+            impl->op = bcType->op;
+            impl->argCount = argCount;
+            
+            VMVal* args = (VMVal*) (impl + 1);
+            for(UInt aa = 0; aa < argCount; ++aa)
+            {
+                args[aa] = getVal(vmModule, bcType->getArg(aa)->id);
+            }
+
+            return getType(vmModule->vm, impl);
+        }
+
+        SLANG_UNEXPECTED("unimplemented");
+        return VMType();
+        break;
+    }
+}
+
+void* allocateImpl(VM* vm, UInt size, UInt align)
+{
+    void* ptr = malloc(size);
+    memset(ptr, 0, size);
+    return ptr;
+}
+
+void* allocate(VM* vm, VMType type)
+{
+    return allocateImpl(vm, type.getSize(), type.getAlignment());
+}
+
+template<typename T>
+T* allocate(VM* vm)
+{
+    return allocateImpl(vm, sizeof(T), alignof(T));
+}
+
+void* loadVMSymbol(
+    VMModule*   vmModule,
+    BCSymbol*   bcSymbol)
+{
+    // Need to load type from BC format to VM
+
+    auto vm = vmModule->vm;
+
+    switch(bcSymbol->op)
+    {
+    case kIROp_global_var:
+        {
+            auto type = getType(vmModule, bcSymbol->typeID);
+            assert(type.impl->op == kIROp_PtrType);
+
+            VMPtrTypeImpl* ptrTypeImpl = (VMPtrTypeImpl*) type.impl;
+            auto valueType = ptrTypeImpl->base;
+
+            void* varValue = allocate(vm, valueType);
+            void** varPtr = (void**) allocate(vm, type);
+
+
+            *varPtr = varValue;
+
+            return varPtr;
+        }
+        break;
+
+    case kIROp_Func:
+        {
+            auto bcFunc = (BCFunc*) bcSymbol;
+            VMFunc* vmFunc = loadVMFunc(bcFunc, vmModule);
+            return vmFunc;
+        }
+        break;
+
+    default:
+        return nullptr;
+    }
+}
+
+VMModule* loadVMModuleInstance(
     VM*         vm,
     void const* bytecode,
     size_t      bytecodeSize)
@@ -425,7 +668,43 @@ VMFrame* loadVMModuleInstance(
 
     BCModule* bcModule = bcHeader->module;
 
-    UInt vmModuleSize = sizeof(VMModule) + bcModule->regCount * sizeof(VMReg);
+    UInt symbolCount = bcModule->symbolCount;
+    UInt typeCount = bcModule->typeCount;
+
+    UInt vmModuleSize = sizeof(VMModule)
+        + symbolCount * sizeof(void*)
+        + typeCount * sizeof(VMType);
+
+#if 1
+    VMModule* vmModule = (VMModule*)malloc(vmModuleSize);
+    memset(vmModule, 0, vmModuleSize);
+
+    void** vmSymbols = (void**)(vmModule + 1);
+    VMType* vmTypes = (VMType*)(vmSymbols + symbolCount);
+
+    vmModule->bcModule = bcModule;
+    vmModule->vm = vm;
+    vmModule->symbols = vmSymbols;
+    vmModule->types = vmTypes;
+
+    // Initialize types before symbols, since the symbols
+    // will all have types...
+    for(UInt tt = 0; tt < typeCount; ++tt)
+    {
+        BCType* bcType = bcModule->types[tt];
+        vmTypes[tt] = loadVMType(vmModule, bcType);
+    }
+
+    // Now we need to initialize all the VM-level symbols
+    // from their BC-level equivalents.
+    for(UInt ss = 0; ss < symbolCount; ++ss)
+    {
+        BCSymbol* bcSymbol = bcModule->symbols[ss];
+        vmSymbols[ss] = loadVMSymbol(vmModule, bcSymbol);
+    }
+
+    return vmModule;
+#else
 
     VMModule* vmModule = (VMModule*) loadVMFunc(bcModule, nullptr);
 
@@ -442,28 +721,29 @@ VMFrame* loadVMModuleInstance(
     resumeThread(&thread);
 
     return vmModuleInstance;
+#endif
 }
 
 void* findGlobalSymbolPtr(
-    VMFrame*    moduleInstance,
+    VMModule*   module,
     char const* name)
 {
     // Okay, we need to search through the available
-    // "registers" looking for one that gives us a
-    // name match.
-    //
-    BCFunc* bcFunc = moduleInstance->func->bcFunc;
-    UInt regCount = bcFunc->regCount;
-    for (UInt rr = 0; rr < regCount; ++rr)
-    {
-        BCReg* bcReg = &bcFunc->regs[rr];
+    // symbols, looking for one that gives us a name
+    // match.
 
-        char const* symbolName = bcReg->name;
+    BCModule* bcModule = module->bcModule;
+    UInt symbolCount = bcModule->symbolCount;
+    for(UInt ss = 0; ss < symbolCount; ++ss)
+    {
+        BCSymbol* bcSymbol = bcModule->symbols[ss];
+
+        char const* symbolName = bcSymbol->name;
         if (!symbolName)
             continue;
 
         if(strcmp(symbolName, name) == 0)
-            return getRegPtrImpl(moduleInstance, rr);
+            return getGlobalPtr(module, ss);
     }
 
     return nullptr;
@@ -516,182 +796,11 @@ void resumeThread(
         auto op = (IROp) decodeUInt(&ip);
         switch( op )
         {
-        case kIROp_TypeType:
-            {
-                // The type of types
-                Int argCount = decodeUInt(&ip);
-                void* arg0Ptr = decodeOperandPtr<void>(frame, &ip);
-                VMType* destPtr = decodeOperandPtr<VMType>(frame, &ip);
-
-                auto typeImpl = new VMTypeImpl();
-                typeImpl->op = op;
-                typeImpl->size = sizeof(VMType);
-                typeImpl->alignment = alignof(VMType);
-
-                VMType type = { typeImpl };
-                *destPtr = type;
-            }
-            break;
-
-        case kIROp_BlockType:
-        case kIROp_Int32Type:
-        case kIROp_UInt32Type:
-        case kIROp_Float32Type:
-        case kIROp_BoolType:
-        case kIROp_VoidType:
-        case kIROp_FuncType: // TODO: we should in principle handle function types here
-            {
-                // Case to handle types without arguments.
-                UInt argCount = decodeUInt(&ip);
-                for( UInt aa = 0; aa < argCount; ++aa )
-                {
-                    void* argPtr = decodeOperandPtr<void>(frame, &ip);
-                }
-                VMType* destPtr = decodeOperandPtr<VMType>(frame, &ip);
-
-                auto typeImpl = new VMTypeImpl();
-                typeImpl->op = op;
-
-                UInt size = 1;
-                UInt align = 0;
-                switch (op)
-                {
-                case kIROp_BlockType:   size = sizeof(void*);       break;
-                case kIROp_Int32Type:   size = sizeof(int32_t);     break;
-                case kIROp_UInt32Type:  size = sizeof(uint32_t);    break;
-                case kIROp_Float32Type: size = sizeof(float);       break;
-                case kIROp_BoolType:    size = sizeof(bool);        break;
-                case kIROp_VoidType:    size = 0; align = 1;        break;
-                default:
-                    break;
-                }
-                if (!align) align = size;
-                typeImpl->size = size;
-                typeImpl->alignment = align;
-
-                VMType type = { typeImpl };
-                *destPtr = type;
-            }
-            break;
-
-        case kIROp_PtrType:
-            {
-                // Case to handle types without arguments.
-                UInt argCount = decodeUInt(&ip);
-                VMType* typeTypePtr = decodeOperandPtr<VMType>(frame, &ip);
-                VMType baseType = decodeOperand<VMType>(frame, &ip);
-                int32_t addressSpace = decodeOperand<int32_t>(frame, &ip);
-                VMType* destPtr = decodeOperandPtr<VMType>(frame, &ip);
-
-
-
-                auto typeImpl = new VMPtrTypeImpl();
-                typeImpl->op = op;
-                typeImpl->size = sizeof(void*);
-                typeImpl->alignment = alignof(void*);
-                typeImpl->base = baseType;
-                typeImpl->addressSpace = addressSpace;
-
-                VMType type = { typeImpl };
-                *destPtr = type;
-            }
-            break;
-
-        case kIROp_readWriteStructuredBufferType:
-        case kIROp_structuredBufferType:
-            {
-                // Case to handle types without arguments.
-                UInt argCount = decodeUInt(&ip);
-                VMType* typeTypePtr = decodeOperandPtr<VMType>(frame, &ip);
-                VMType baseType = decodeOperand<VMType>(frame, &ip);
-                VMType* destPtr = decodeOperandPtr<VMType>(frame, &ip);
-
-
-                // TODO: give these their own representations!
-                auto typeImpl = new VMPtrTypeImpl();
-                typeImpl->op = op;
-                typeImpl->base = baseType;
-                typeImpl->size = sizeof(void*);
-                typeImpl->alignment = sizeof(void*);
-
-                VMType type = { typeImpl };
-                *destPtr = type;
-            }
-            break;
-
-
-        case kIROp_IntLit:
-            {
-                VMType type = decodeOperand<VMType>(frame, &ip);
-                UInt uVal = decodeUInt(&ip);
-                void* destPtr = decodeOperandPtr<void>(frame, &ip);
-
-                switch( type.impl->op )
-                {
-                case kIROp_Int32Type:
-                    *(int32_t*)destPtr = int32_t(uVal);
-                    break;
-
-                case kIROp_UInt32Type:
-                    *(uint32_t*)destPtr = uint32_t(uVal);
-                    break;
-
-                default:
-                    SLANG_UNEXPECTED("integer type");
-                    break;
-                }
-
-            }
-            break;
-
-        case kIROp_FloatLit:
-            {
-                VMType type = decodeOperand<VMType>(frame, &ip);
-
-                static const UInt size = sizeof(IRFloatingPointValue);
-                IRFloatingPointValue value;
-                memcpy(&value, ip, size);
-                ip += size;
-                void* destPtr = decodeOperandPtr<void>(frame, &ip);
-
-                switch( type.impl->op )
-                {
-                case kIROp_Float32Type:
-                    *(float*)destPtr = float(value);
-                    break;
-
-                default:
-                    SLANG_UNEXPECTED("float type");
-                    break;
-                }
-            }
-            break;
-
-        case kIROp_boolConst:
-            {
-                bool val = (*ip++) != 0;
-                bool* destPtr = decodeOperandPtr<bool>(frame, &ip);
-                *destPtr = val;
-            }
-            break;
-
-        case kIROp_Func:
-            {
-                UInt nestedID = decodeUInt(&ip);
-                void* destPtr = decodeOperandPtr<void>(frame, &ip);
-
-                BCSymbol* bcSymbol = frame->func->bcFunc->nestedSymbols[nestedID];
-                BCFunc* bcFunc = (BCFunc*)bcSymbol;
-                VMFunc* vmFunc = loadVMFunc(bcFunc, frame->func->module);
-
-                *(VMFunc**)destPtr = vmFunc;
-            }
-            break;
-
         case kIROp_Var:
             {
                 // This instruction represents the `alloca` for a variable of some type.
 
+                VMType type = decodeType(frame, &ip);
                 UInt argCount = decodeUInt(&ip);
                 void* argPtrs[16] = { 0 };
                 for( UInt aa = 0; aa < argCount; ++aa )
@@ -714,7 +823,7 @@ void resumeThread(
         case kIROp_Store:
             {
                 // An ordinary memory store
-                VMType type = decodeOperand<VMType>(frame, &ip);
+                VMType type = decodeType(frame, &ip);
                 void* dest = decodeOperand<void*>(frame, &ip);
                 void* src = decodeOperandPtr<void>(frame, &ip);
 
@@ -725,7 +834,7 @@ void resumeThread(
         case kIROp_Load:
             {
                 // An ordinary memory store
-                VMType type = decodeOperand<VMType>(frame, &ip);
+                VMType type = decodeType(frame, &ip);
                 void* src = decodeOperand<void*>(frame, &ip);
                 void* dest = decodeOperandPtr<void>(frame, &ip);
 
@@ -735,6 +844,7 @@ void resumeThread(
 
         case kIROp_BufferLoad:
             {
+                VMType type = decodeType(frame, &ip);
                 UInt argCount = decodeUInt(&ip);
                 void* argPtrs[16] = { 0 };
                 for( UInt aa = 0; aa < argCount; ++aa )
@@ -745,9 +855,8 @@ void resumeThread(
 
                 void* dest = decodeOperandPtr<void>(frame, &ip);
 
-                VMType type = *(VMType*)argPtrs[0];
-                char* bufferData = *(char**)argPtrs[1];
-                uint32_t index = *(uint32_t*)argPtrs[2];
+                char* bufferData = *(char**)argPtrs[0];
+                uint32_t index = *(uint32_t*)argPtrs[1];
 
                 auto size = type.getSize();
                 char* elementData = bufferData + index*size;
@@ -757,9 +866,9 @@ void resumeThread(
 
         case kIROp_BufferStore:
             {
+                VMType resultType = decodeType(frame, &ip);
                 UInt argCount = decodeUInt(&ip);
 
-                VMType* resultTypePtr = decodeOperandPtr<VMType>(frame, &ip);
                 char* bufferData = decodeOperand<char*>(frame, &ip);
                 uint32_t index = decodeOperand<uint32_t>(frame, &ip);
 
@@ -774,8 +883,10 @@ void resumeThread(
             break;
         case kIROp_Call:
             {
+                VMType type = decodeType(frame, &ip);
                 UInt operandCount = decodeUInt(&ip);
-                VMType type  = decodeOperand<VMType>(frame, &ip);
+
+                // First operand is the callee function
                 VMFunc* func = decodeOperand<VMFunc*>(frame, &ip);
 
                 // Okay, we need to create a frame to prepare the call
@@ -784,7 +895,7 @@ void resumeThread(
 
                 // Remaining arguments should populate the
                 // first N registers of the callee
-                UInt argCount = operandCount - 2;
+                UInt argCount = operandCount - 1;
                 for( UInt aa = 0; aa < argCount; ++aa )
                 {
                     void* argPtr = decodeOperandPtr<void>(frame, &ip);
@@ -836,8 +947,8 @@ void resumeThread(
 
         case kIROp_ReturnVal:
             {
+                VMType instType = decodeType(frame, &ip);
                 UInt argCount = decodeUInt(&ip);
-                void* typePtr = decodeOperandPtr<void>(frame, &ip);
                 void* argPtr = decodeOperandPtr<void>(frame, &ip);
 
                 VMFrame* oldFrame = frame;
@@ -868,8 +979,8 @@ void resumeThread(
                 // For now our encoding is very regular, so we can decode without
                 // knowing too much about an instruction...
 
+                VMType type = decodeType(frame, &ip);
                 UInt argCount = decodeUInt(&ip);
-                void* typePtr = decodeOperandPtr<void>(frame, &ip);
                 Int destinationBlock = decodeSInt(&ip);
                 for( UInt aa = 2; aa < argCount; ++aa )
                 {
@@ -892,8 +1003,8 @@ void resumeThread(
                 // For now our encoding is very regular, so we can decode without
                 // knowing too much about an instruction...
 
+                VMType type = decodeType(frame, &ip);
                 UInt argCount = decodeUInt(&ip);
-                void* typePtr = decodeOperandPtr<void>(frame, &ip);
                 bool* condition = decodeOperandPtr<bool>(frame, &ip);
                 Int trueBlockID = decodeSInt(&ip);
                 Int falseBlockID = decodeSInt(&ip);
@@ -917,9 +1028,9 @@ void resumeThread(
                 // For now our encoding is very regular, so we can decode without
                 // knowing too much about an instruction...
 
+                VMType resultType = decodeType(frame, &ip);
                 UInt argCount = decodeUInt(&ip);
                 void* argPtrs[16] = { 0 };
-                VMType resultType = decodeOperand<VMType>(frame, &ip);
                 auto leftOpnd = decodeOperandPtrAndType(frame, &ip);
                 auto type = leftOpnd.type;
                 auto leftPtr = leftOpnd.ptr;
@@ -942,8 +1053,8 @@ void resumeThread(
 
         case kIROp_Mul:
             {
+                VMType type = decodeType(frame, &ip);
                 UInt argCount = decodeUInt(&ip);
-                VMType type = decodeOperand<VMType>(frame, &ip);
                 void* leftPtr = decodeOperandPtr<void>(frame, &ip);
                 void* rightPtr = decodeOperandPtr<void>(frame, &ip);
 
@@ -964,8 +1075,8 @@ void resumeThread(
 
         case kIROp_Sub:
             {
+                VMType type = decodeType(frame, &ip);
                 UInt argCount = decodeUInt(&ip);
-                VMType type = decodeOperand<VMType>(frame, &ip);
                 void* leftPtr = decodeOperandPtr<void>(frame, &ip);
                 void* rightPtr = decodeOperandPtr<void>(frame, &ip);
 
@@ -989,6 +1100,7 @@ void resumeThread(
                 // For now our encoding is very regular, so we can decode without
                 // knowing too much about an instruction...
 
+                VMType type = decodeType(frame, &ip);
                 UInt argCount = decodeUInt(&ip);
                 void* argPtrs[16] = { 0 };
                 for( UInt aa = 0; aa < argCount; ++aa )
@@ -1039,7 +1151,7 @@ SLANG_API void* SlangVMModule_findGlobalSymbolPtr(
     char const*     name)
 {
     return (SlangVMFunc*) Slang::findGlobalSymbolPtr(
-        (Slang::VMFrame*) module,
+        (Slang::VMModule*) module,
         name);
 }
 

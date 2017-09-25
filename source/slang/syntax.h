@@ -74,6 +74,29 @@ namespace Slang
         kConversionCost_ScalarToVector = 1,
     };
 
+    // TODO(tfoley): We should ditch this enumeration
+    // and just use the IR opcodes that represent these
+    // types directly. The one major complication there
+    // is that the order of the enum values currently
+    // matters, since it determines promotion rank.
+    // We either need to keep that restriction, or
+    // look up promotion rank by some other means.
+    //
+    enum class BaseType
+    {
+        // Note(tfoley): These are ordered in terms of promotion rank, so be vareful when messing with this
+
+        Void = 0,
+        Bool,
+        Int,
+        UInt,
+        UInt64,
+        Half,
+        Float,
+        Double,
+    };
+
+
 
     // Forward-declare all syntax classes
 #define SYNTAX_CLASS(NAME, BASE, ...) class NAME;

@@ -80,15 +80,15 @@ int main(
         bytecode,
         bytecodeSize);
 
-    SlangVMFunc* vmFunc = *(SlangVMFunc**)SlangVMModule_findGlobalSymbolPtr(
+    SlangVMFunc* vmFunc = (SlangVMFunc*)SlangVMModule_findGlobalSymbolPtr(
         vmModule,
         "main");
 
-    int32_t*& inputArg = **(int32_t***)SlangVMModule_findGlobalSymbolPtr(
+    int32_t*& inputArg = *(int32_t**)SlangVMModule_findGlobalSymbolPtr(
         vmModule,
         "input");
 
-    int32_t*& outputArg = **(int32_t***)SlangVMModule_findGlobalSymbolPtr(
+    int32_t*& outputArg = *(int32_t**)SlangVMModule_findGlobalSymbolPtr(
         vmModule,
         "output");
 

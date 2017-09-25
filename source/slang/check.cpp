@@ -4546,26 +4546,21 @@ namespace Slang
                 // if this is still an invoke expression, test arguments passed to inout/out parameter are LValues
                 if(auto funcType = invoke->FunctionExpr->type->As<FuncType>())
                 {
-                    List<RefPtr<ParamDecl>> paramsStorage;
-                    List<RefPtr<ParamDecl>> * params = nullptr;
-                    if (auto func = funcType->declRef.getDecl())
+                    UInt paramCount = funcType->getParamCount();
+                    for (UInt pp = 0; pp < paramCount; ++pp)
                     {
-                        paramsStorage = func->GetParameters().ToArray();
-                        params = &paramsStorage;
-                    }
-                    if (params)
-                    {
-                        for (UInt i = 0; i < (*params).Count(); i++)
+                        auto paramType = funcType->getParamType(pp);
+                        if (auto outParamType = paramType->As<OutTypeBase>())
                         {
-                            if ((*params)[i]->HasModifier<OutModifier>())
+                            if (pp < expr->Arguments.Count()
+                                && !expr->Arguments[pp]->type.IsLeftValue)
                             {
-                                if (i < expr->Arguments.Count() && expr->Arguments[i]->type->AsBasicType() &&
-                                    !expr->Arguments[i]->type.IsLeftValue)
+                                if (!isRewriteMode())
                                 {
-                                    if (!isRewriteMode())
-                                    {
-                                        getSink()->diagnose(expr->Arguments[i], Diagnostics::argumentExpectedLValue, (*params)[i]->getName());
-                                    }
+                                    getSink()->diagnose(
+                                        expr->Arguments[pp],
+                                        Diagnostics::argumentExpectedLValue,
+                                        pp);
                                 }
                             }
                         }
