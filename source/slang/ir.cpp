@@ -83,7 +83,14 @@ namespace Slang
         auto entryBlock = getFirstBlock();
         if(!entryBlock) return nullptr;
 
-        auto firstInst = entryBlock->firstChild;
+        return entryBlock->getFirstParam();
+    }
+
+    // IRBlock
+
+    IRParam* IRBlock::getFirstParam()
+    {
+        auto firstInst = firstChild;
         if(!firstInst) return nullptr;
 
         if(firstInst->op != kIROp_Param)
@@ -91,6 +98,7 @@ namespace Slang
 
         return (IRParam*) firstInst;
     }
+
 
     // IRParam
 
@@ -781,6 +789,18 @@ namespace Slang
         return getArrayType(elementType, nullptr);
     }
 
+    IRType* IRBuilder::getGenericParameterType(UInt index)
+    {
+        auto indexVal = getIntValue(getBaseType(BaseType::Int), index);
+
+        return findOrEmitInst<IRGenericParameterType>(
+            this,
+            kIROp_GenericParameterType,
+            getTypeType(),
+            indexVal);
+
+    }
+
 
     IRType* IRBuilder::getTypeType()
     {
@@ -1442,6 +1462,11 @@ namespace Slang
         {
             dump(context, "<null>");
         }
+        else if( auto mangled = inst->findDecoration<IRMangledNameDecoration>() )
+        {
+            dump(context, "@");
+            dump(context, mangled->mangledName.Buffer());
+        }
         else if(inst->id)
         {
             dump(context, "%");
@@ -1524,6 +1549,21 @@ namespace Slang
         {
         case kIROp_StructType:
             dumpID(context, type);
+            break;
+
+        case kIROp_FuncType:
+            {
+                auto funcType = (IRFuncType*) type;
+                UInt paramCount = funcType->getParamCount();
+                dump(context, "(");
+                for( UInt pp = 0; pp < paramCount; ++pp )
+                {
+                    if(pp != 0) dump(context, ", ");
+                    dumpType(context, funcType->getParamType(pp));
+                }
+                dump(context, ") -> ");
+                dumpType(context, funcType->getResultType());
+            }
             break;
 
         default:
@@ -1619,20 +1659,8 @@ namespace Slang
                 dumpIndent(context);
                 dump(context, "func ");
                 dumpID(context, func);
-                dump(context, "(\n");
-                context->indent++;
-                for (auto pp = func->getFirstParam(); pp; pp = pp->getNextParam())
-                {
-                    if (pp != func->getFirstParam())
-                        dump(context, ",\n");
-
-                    dumpIndent(context);
-                    dump(context, "param ");
-                    dumpID(context, pp);
-                    dumpInstTypeClause(context, pp->getType());
-                }
-                context->indent--;
-                dump(context, ")\n");
+                dumpInstTypeClause(context, func->getType());
+                dump(context, "\n");
 
                 dumpIndent(context);
                 dump(context, "{\n");
@@ -1665,6 +1693,24 @@ namespace Slang
                 context->indent--;
                 dump(context, "block ");
                 dumpID(context, block);
+
+                if( block->getFirstParam() )
+                {
+                    dump(context, "(");
+                    context->indent++;
+                    for (auto pp = block->getFirstParam(); pp; pp = pp->getNextParam())
+                    {
+                        if (pp != block->getFirstParam())
+                            dump(context, ",\n");
+
+                        dumpIndent(context);
+                        dump(context, "param ");
+                        dumpID(context, pp);
+                        dumpInstTypeClause(context, pp->getType());
+                    }
+                    context->indent--;
+                    dump(context, ")\n");
+                }
                 dump(context, ":\n");
                 context->indent++;
 

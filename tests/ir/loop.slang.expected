@@ -3,76 +3,76 @@ standard error = {
 }
 standard output = {
 let  %63	: Ptr<Array<Vec<Float32,4>,64>,1>	= var()
-let  %90	: Ptr<StructuredBuffer<Vec<Float32,4>>,0>	= var()
-let  %268	: Ptr<RWStructuredBuffer<Vec<Float32,4>>,0>	= var()
+let  %96	: Ptr<StructuredBuffer<Vec<Float32,4>>,0>	= var()
+let  %282	: Ptr<RWStructuredBuffer<Vec<Float32,4>>,0>	= var()
 
-func %1(
-	param %7	: UInt32,
-	param %18	: UInt32,
-	param %28	: UInt32)
+func @_S04mainp3	: (Int32, Int32, Int32) -> Void
 {
-block %4:
-	let  %13	: Ptr<UInt32,0>	= var()
-	store(%13, %7)
-	let  %23	: Ptr<UInt32,0>	= var()
-	store(%23, %18)
-	let  %33	: Ptr<UInt32,0>	= var()
-	store(%33, %28)
-	let  %64	: UInt32	= load(%23)
+block %14(	param %15	: Int32,
+	param %24	: Int32,
+	param %32	: Int32)
+:
+	let  %21	: Ptr<Int32,0>	= var()
+	store(%21, %15)
+	let  %29	: Ptr<Int32,0>	= var()
+	store(%29, %24)
+	let  %37	: Ptr<Int32,0>	= var()
+	store(%37, %32)
+	let  %64	: Int32	= load(%29)
 	let  %69	: Ptr<Vec<Float32,4>,0>	= getElementPtr(%63, %64)
-	let  %91	: StructuredBuffer<Vec<Float32,4>>	= load(%90)
-	let  %94	: UInt32	= load(%13)
-	let  %95	: Vec<Float32,4>	= bufferLoad(%91, %94)
-	store(%69, %95)
-	let  %104	: Ptr<UInt32,0>	= var()
-	let  %112	: UInt32	= construct(1)
-	store(%104, %112)
-	loop(%117, %123, %126)
-
-block %117:
-	let  %133	: UInt32	= load(%104)
-	let  %142	: UInt32	= construct(64)
-	let  %143	: Bool	= cmpLT(%133, %142)
-	loopTest(%143, %120, %123)
-
-block %120:
-	GroupMemoryBarrierWithGroupSync()
-	let  %166	: UInt32	= load(%23)
-	let  %171	: Ptr<Vec<Float32,4>,0>	= getElementPtr(%63, %166)
-	let  %176	: Ptr<Vec<Float32,4>,0>	= var()
-	let  %177	: Vec<Float32,4>	= load(%171)
-	store(%176, %177)
-	let  %196	: UInt32	= load(%23)
-	let  %199	: UInt32	= load(%104)
-	let  %200	: UInt32	= sub(%196, %199)
-	let  %205	: Ptr<Vec<Float32,4>,0>	= getElementPtr(%63, %200)
-	let  %206	: Vec<Float32,4>	= load(%205)
-	let  %207	: Vec<Float32,4>	= load(%176)
-	let  %208	: Vec<Float32,4>	= add(%207, %206)
-	store(%176, %208)
-	let  %211	: Vec<Float32,4>	= load(%176)
-	store(%171, %211)
-	unconditionalBranch(%126)
-
-block %126:
-	let  %224	: Ptr<UInt32,0>	= var()
-	let  %225	: UInt32	= load(%104)
-	store(%224, %225)
-	let  %236	: UInt32	= construct(1)
-	let  %237	: UInt32	= load(%224)
-	let  %238	: UInt32	= shl(%237, %236)
-	store(%224, %238)
-	let  %241	: UInt32	= load(%224)
-	store(%104, %241)
-	unconditionalBranch(%117)
+	let  %97	: StructuredBuffer<Vec<Float32,4>>	= load(%96)
+	let  %100	: Int32	= load(%21)
+	let  %101	: Vec<Float32,4>	= bufferLoad(%97, %100)
+	store(%69, %101)
+	let  %110	: Ptr<Int32,0>	= var()
+	let  %118	: Int32	= construct(1)
+	store(%110, %118)
+	loop(%123, %129, %132)
 
 block %123:
+	let  %139	: Int32	= load(%110)
+	let  %148	: Int32	= construct(64)
+	let  %149	: Bool	= cmpLT(%139, %148)
+	loopTest(%149, %126, %129)
+
+block %126:
 	GroupMemoryBarrierWithGroupSync()
-	let  %269	: RWStructuredBuffer<Vec<Float32,4>>	= load(%268)
-	let  %272	: UInt32	= load(%13)
-	let  %286	: Ptr<Vec<Float32,4>,0>	= getElementPtr(%63, 0)
-	let  %287	: Vec<Float32,4>	= load(%286)
-	bufferStore(%269, %272, %287)
+	let  %174	: Int32	= load(%29)
+	let  %179	: Ptr<Vec<Float32,4>,0>	= getElementPtr(%63, %174)
+	let  %184	: Ptr<Vec<Float32,4>,0>	= var()
+	let  %185	: Vec<Float32,4>	= load(%179)
+	store(%184, %185)
+	let  %204	: Int32	= load(%29)
+	let  %207	: Int32	= load(%110)
+	let  %208	: Int32	= sub(%204, %207)
+	let  %213	: Ptr<Vec<Float32,4>,0>	= getElementPtr(%63, %208)
+	let  %214	: Vec<Float32,4>	= load(%213)
+	let  %215	: Vec<Float32,4>	= load(%184)
+	let  %216	: Vec<Float32,4>	= add(%215, %214)
+	store(%184, %216)
+	let  %219	: Vec<Float32,4>	= load(%184)
+	store(%179, %219)
+	unconditionalBranch(%132)
+
+block %132:
+	let  %232	: Ptr<Int32,0>	= var()
+	let  %233	: Int32	= load(%110)
+	store(%232, %233)
+	let  %244	: Int32	= construct(1)
+	let  %245	: Int32	= load(%232)
+	let  %246	: Int32	= shl(%245, %244)
+	store(%232, %246)
+	let  %249	: Int32	= load(%232)
+	store(%110, %249)
+	unconditionalBranch(%123)
+
+block %129:
+	GroupMemoryBarrierWithGroupSync()
+	let  %283	: RWStructuredBuffer<Vec<Float32,4>>	= load(%282)
+	let  %286	: Int32	= load(%21)
+	let  %300	: Ptr<Vec<Float32,4>,0>	= getElementPtr(%63, 0)
+	let  %301	: Vec<Float32,4>	= load(%300)
+	bufferStore(%283, %286, %301)
 	return_void()
 }
 }

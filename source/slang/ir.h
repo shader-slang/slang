@@ -148,6 +148,7 @@ enum IRDecorationOp : uint16_t
     kIRDecorationOp_EntryPoint,
     kIRDecorationOp_ComputeThreadGroupSize,
     kIRDecorationOp_LoopControl,
+    kIRDecorationOp_MangledName,
 };
 
 // A "decoration" that gets applied to an instruction.
@@ -269,6 +270,13 @@ struct IRParentInst : IRInst
     IRInst* lastChild;
 };
 
+// A function parameter is represented by an instruction
+// in the entry block of a function.
+struct IRParam : IRInst
+{
+    IRParam* getNextParam();
+};
+
 // A basic block is a parent instruction that adds the constraint
 // that all the children need to be "ordinary" instructions (so
 // no function declarations, or nested blocks). We also expect
@@ -284,13 +292,8 @@ struct IRBlock : IRParentInst
     IRBlock* getNextBlock() { return (IRBlock*) nextInst; }
 
     IRFunc* getParent() { return (IRFunc*)parent; }
-};
 
-// A function parameter is represented by an instruction
-// in the entry block of a function.
-struct IRParam : IRInst
-{
-    IRParam* getNextParam();
+    IRParam* getFirstParam();
 };
 
 struct IRFuncType;
