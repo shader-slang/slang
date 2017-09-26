@@ -2,6 +2,7 @@
 #ifndef CORE_LIB_SECURE_CRT_H
 #define CORE_LIB_SECURE_CRT_H
 #include <stdarg.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <wchar.h>

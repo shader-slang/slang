@@ -332,7 +332,7 @@ void dumpVMFrame(VMFrame* vmFrame)
 
         fprintf(stderr, "0x%p: ", regData);
 
-        fprintf(stderr, "%%%u ", rr);
+        fprintf(stderr, "%%%u ", (unsigned int) rr);
         if (name)
         {
             fprintf(stderr, "\"%s\" ", name);

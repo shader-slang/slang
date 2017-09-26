@@ -222,7 +222,7 @@ namespace Slang
 
         char* getData() const
         {
-            return buffer ? buffer->getData() : "";
+            return buffer ? buffer->getData() : (char*)"";
         }
 
         UInt getLength() const
@@ -270,50 +270,29 @@ namespace Slang
         void append(String const& str);
         void append(StringSlice const& slice);
 
-		String(int val, int radix = 10)
+		String(int32_t val, int radix = 10)
 		{
             append(val, radix);
-#if 0
-            buffer = StringRepresentation::createWithLength(33);
-			buffer->length = IntToAscii(getData(), val, radix);
-			ReverseInternalAscii(getData(), getLength());
-#endif
 		}
-		String(unsigned int val, int radix = 10)
+		String(uint32_t val, int radix = 10)
 		{
             append(val, radix);
-#if 0
-            buffer = StringRepresentation::createWithLength(33);
-			buffer->length = IntToAscii(getData(), val, radix);
-			ReverseInternalAscii(getData(), getLength());
-#endif
 		}
-		String(long long val, int radix = 10)
+		String(int64_t val, int radix = 10)
 		{
             append(val, radix);
-#if 0
-            buffer = StringRepresentation::createWithLength(65);
-			buffer->length = IntToAscii(getData(), val, radix);
-			ReverseInternalAscii(getData(), getLength());
-#endif
+		}
+		String(uint64_t val, int radix = 10)
+		{
+            append(val, radix);
 		}
 		String(float val, const char * format = "%g")
 		{
             append(val, format);
-#if 0
-            buffer = StringRepresentation::createWithLength(128);
-			sprintf_s(getData(), 128, format, val);
-			buffer->length = (int)strnlen_s(begin(), 128);
-#endif
 		}
 		String(double val, const char * format = "%g")
 		{
             append(val, format);
-#if 0
-            buffer = StringRepresentation::createWithLength(128);
-			sprintf_s(getData(), 128, format, val);
-			buffer->length = (int)strnlen_s(begin(), 128);
-#endif
 		}
 		String(const char * str)
 		{
@@ -656,17 +635,22 @@ namespace Slang
 			Append(&ch, 1);
 			return *this;
 		}
-		StringBuilder & operator << (int val)
+		StringBuilder & operator << (Int32 val)
 		{
 			Append(val);
 			return *this;
 		}
-		StringBuilder & operator << (unsigned int val)
+		StringBuilder & operator << (UInt32 val)
 		{
 			Append(val);
 			return *this;
 		}
-		StringBuilder & operator << (long long val)
+		StringBuilder & operator << (Int64 val)
+		{
+			Append(val);
+			return *this;
+		}
+		StringBuilder & operator << (UInt64 val)
 		{
 			Append(val);
 			return *this;
@@ -714,21 +698,28 @@ namespace Slang
 			int len = (int)strnlen_s(buf, 128);
 			Append(buf, len);
 		}
-		void Append(unsigned int value, int radix = 10)
+		void Append(Int32 value, int radix = 10)
 		{
 			char vBuffer[33];
 			int len = IntToAscii(vBuffer, value, radix);
 			ReverseInternalAscii(vBuffer, len);
 			Append(vBuffer);
 		}
-		void Append(int value, int radix = 10)
+		void Append(UInt32 value, int radix = 10)
 		{
 			char vBuffer[33];
 			int len = IntToAscii(vBuffer, value, radix);
 			ReverseInternalAscii(vBuffer, len);
 			Append(vBuffer);
 		}
-		void Append(long long value, int radix = 10)
+		void Append(Int64 value, int radix = 10)
+		{
+			char vBuffer[65];
+			int len = IntToAscii(vBuffer, value, radix);
+			ReverseInternalAscii(vBuffer, len);
+			Append(vBuffer);
+		}
+		void Append(UInt64 value, int radix = 10)
 		{
 			char vBuffer[65];
 			int len = IntToAscii(vBuffer, value, radix);

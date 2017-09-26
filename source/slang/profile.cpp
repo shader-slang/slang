@@ -1,5 +1,5 @@
 // profile.cpp
-#include "Profile.h"
+#include "profile.h"
 
 namespace Slang {
 

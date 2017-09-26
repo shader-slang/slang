@@ -413,7 +413,7 @@ RefPtr<Type> tryGetEffectiveTypeForGLSLVaryingInput(
                 // Unwrap array type, if prsent
                 if( auto arrayType = type->As<ArrayExpressionType>() )
                 {
-                    type = arrayType->BaseType.Ptr();
+                    type = arrayType->baseType.Ptr();
                 }
             }
             break;
@@ -452,7 +452,7 @@ RefPtr<Type> tryGetEffectiveTypeForGLSLVaryingOutput(
                 // Unwrap array type, if prsent
                 if( auto arrayType = type->As<ArrayExpressionType>() )
                 {
-                    type = arrayType->BaseType.Ptr();
+                    type = arrayType->baseType.Ptr();
                 }
             }
             break;
@@ -1213,13 +1213,13 @@ static RefPtr<TypeLayout> processEntryPointParameter(
         auto elementCount = (UInt) GetIntVal(arrayType->ArrayLength);
 
         // We use the first element to derive the layout for the element type
-        auto elementTypeLayout = processEntryPointParameter(context, arrayType->BaseType, state, varLayout);
+        auto elementTypeLayout = processEntryPointParameter(context, arrayType->baseType, state, varLayout);
 
         // We still walk over subsequent elements to make sure they consume resources
         // as needed
         for( UInt ii = 1; ii < elementCount; ++ii )
         {
-            processEntryPointParameter(context, arrayType->BaseType, state, nullptr);
+            processEntryPointParameter(context, arrayType->baseType, state, nullptr);
         }
 
         RefPtr<ArrayTypeLayout> arrayTypeLayout = new ArrayTypeLayout();

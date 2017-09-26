@@ -1,7 +1,7 @@
 #ifndef SLANG_LOOKUP_H_INCLUDED
 #define SLANG_LOOKUP_H_INCLUDED
 
-#include "Syntax.h"
+#include "syntax.h"
 
 namespace Slang {
 

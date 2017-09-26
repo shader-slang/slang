@@ -1,7 +1,7 @@
 #ifndef CORE_LIB_ARRAY_VIEW_H
 #define CORE_LIB_ARRAY_VIEW_H
 
-#include "Exception.h"
+#include "exception.h"
 
 namespace Slang
 {

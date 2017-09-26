@@ -1,11 +1,11 @@
 ﻿// main.cpp
 
 #define SLANG_DYNAMIC
-#include "../slang.h"
+#include "../../slang.h"
 
 SLANG_API void spSetCommandLineCompilerMode(SlangCompileRequest* request);
 
-#include "core/slang-io.h"
+#include "../core/slang-io.h"
 
 using namespace Slang;
 

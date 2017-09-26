@@ -127,7 +127,7 @@ namespace Slang
 
         template <typename U>
         typename EnableIf<IsConvertible<T*, U*>::value, void>::type
-            operator=(RefPtr<U> const& ptr)
+            operator=(RefPtr<U> const& p)
         {
             T* old = pointer;
             addReference(p.pointer);

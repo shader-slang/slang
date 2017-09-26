@@ -415,7 +415,7 @@ int main(
     Node* node = readInput(input, inputEnd);
 
     char outputPath[1024];
-    sprintf(outputPath, "%s.cpp", inputPath);
+    sprintf(outputPath, "%s.h", inputPath);
 
     FILE* outputStream = fopen(outputPath, "w");
 

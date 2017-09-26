@@ -226,7 +226,7 @@ struct IRInst
 // All existing uses of `IRValue` should move to `IRInst`
 typedef IRInst IRValue;
 
-typedef long long IRIntegerValue;
+typedef int64_t IRIntegerValue;
 typedef double IRFloatingPointValue;
 
 struct IRConstant : IRInst

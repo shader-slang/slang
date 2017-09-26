@@ -6,7 +6,7 @@
 
 // In order to use the Slang API, we need to include its header
 
-#include <Slang.h>
+#include <slang.h>
 
 #ifdef _MSC_VER
 #pragma warning(disable: 4996)

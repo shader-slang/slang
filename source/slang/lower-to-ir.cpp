@@ -836,7 +836,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     LoweredTypeInfo visitBasicExpressionType(BasicExpressionType* type)
     {
-        return getBuilder()->getBaseType(type->BaseType);
+        return getBuilder()->getBaseType(type->baseType);
     }
 
     LoweredTypeInfo visitVectorExpressionType(VectorExpressionType* type)
@@ -876,7 +876,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     LoweredTypeInfo visitArrayExpressionType(ArrayExpressionType* type)
     {
-        auto loweredElementType = lowerType(context, type->BaseType);
+        auto loweredElementType = lowerType(context, type->baseType);
         if (auto elementCount = type->ArrayLength)
         {
             auto irElementCount = lowerSimpleVal(context, elementCount);
@@ -984,7 +984,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     // as the visitor itself.
     LoweredValInfo lowerSubExpr(Expr* expr)
     {
-        return dispatch(expr);
+        return this->dispatch(expr);
     }
 
 
@@ -2306,7 +2306,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     template<typename D>
     DeclRef<D> createDefaultSpecializedDeclRef(D* decl)
     {
-        return createDefaultSpecializedDeclRefImpl(decl).As<D>();
+        DeclRef<Decl> declRef = createDefaultSpecializedDeclRefImpl(decl);
+        return declRef.As<D>();
     }
 
 

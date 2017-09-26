@@ -13,13 +13,15 @@
 
 namespace Slang
 {
+	typedef int32_t Int32;
+	typedef uint32_t UInt32;
+
 	typedef int64_t Int64;
-	typedef unsigned short Word;
-#ifdef _M_X64
-	typedef int64_t PtrInt;
-#else
-	typedef int PtrInt;
-#endif
+	typedef uint64_t UInt64;
+
+//	typedef unsigned short Word;
+
+	typedef intptr_t PtrInt;
 
 	template <typename T>
 	inline T&& _Move(T & obj)
@@ -38,7 +40,7 @@ namespace Slang
 #ifdef _MSC_VER
 #define SLANG_RETURN_NEVER __declspec(noreturn)
 #else
-#efine SLANG_RETURN_NEVER /* empty */
+#define SLANG_RETURN_NEVER /* empty */
 #endif
 
     SLANG_RETURN_NEVER void signalUnexpectedError(char const* message);
