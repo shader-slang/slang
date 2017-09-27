@@ -40,7 +40,7 @@ namespace Slang
 	{
 #ifdef _WIN32
 		{
-			UnloadLibrary(
+			FreeLibrary(
 				(HMODULE) handle);
 		}
 #else
