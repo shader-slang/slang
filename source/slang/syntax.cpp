@@ -74,12 +74,6 @@ namespace Slang
     SyntaxClass<NodeBase> NAME::getClass() { return Slang::getClass<NAME>(); }  \
     template<>                                                                  \
     SyntaxClassBase::ClassInfo const SyntaxClassBase::Impl<NAME>::kClassInfo = { #NAME, &SyntaxClassBase::Impl<BASE>::kClassInfo, &SyntaxClassBase::Impl<NAME>::createFunc };
-#include "expr-defs.h"
-#include "decl-defs.h"
-#include "modifier-defs.h"
-#include "stmt-defs.h"
-#include "type-defs.h"
-#include "val-defs.h"
 
 template<>
 SyntaxClassBase::ClassInfo const SyntaxClassBase::Impl<RefObject>::kClassInfo = { "RefObject", nullptr, nullptr };
@@ -97,6 +91,14 @@ ABSTRACT_SYNTAX_CLASS(Modifier, SyntaxNodeBase);
 ABSTRACT_SYNTAX_CLASS(Expr, SyntaxNode);
 
 ABSTRACT_SYNTAX_CLASS(Substitutions, SyntaxNode);
+
+#include "expr-defs.h"
+#include "decl-defs.h"
+#include "modifier-defs.h"
+#include "stmt-defs.h"
+#include "type-defs.h"
+#include "val-defs.h"
+
 
 #include "object-meta-end.h"
 
