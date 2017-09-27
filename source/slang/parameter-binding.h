@@ -4,7 +4,7 @@
 #include "../core/basic.h"
 #include "syntax.h"
 
-#include "../../Slang.h"
+#include "../../slang.h"
 
 namespace Slang {
 

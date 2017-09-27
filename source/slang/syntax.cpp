@@ -15,7 +15,7 @@ namespace Slang
         auto basicType = dynamic_cast<const BasicExpressionType*>(type);
         if (basicType == nullptr)
             return false;
-        return basicType->BaseType == BaseType;
+        return basicType->baseType == this->baseType;
     }
 
     Type* BasicExpressionType::CreateCanonicalType()
@@ -28,7 +28,7 @@ namespace Slang
     {
         Slang::StringBuilder res;
 
-        switch (BaseType)
+        switch (this->baseType)
         {
         case Slang::BaseType::Int:
             res.Append("int");
@@ -63,21 +63,19 @@ namespace Slang
 #undef ABSTRACT_SYNTAX_CLASS
 
 #define ABSTRACT_SYNTAX_CLASS(NAME, BASE)   \
+    template<>                              \
     SyntaxClassBase::ClassInfo const SyntaxClassBase::Impl<NAME>::kClassInfo = { #NAME, &SyntaxClassBase::Impl<BASE>::kClassInfo, nullptr };
 
-#define SYNTAX_CLASS(NAME, BASE)                                            \
-    void NAME::accept(NAME::Visitor* visitor, void* extra)                  \
-    { visitor->dispatch_##NAME(this, extra); }                              \
-    void* SyntaxClassBase::Impl<NAME>::createFunc() { return new NAME(); }  \
-    SyntaxClass<NodeBase> NAME::getClass() { return Slang::getClass<NAME>(); }   \
+#define SYNTAX_CLASS(NAME, BASE)                                                \
+    void NAME::accept(NAME::Visitor* visitor, void* extra)                      \
+    { visitor->dispatch_##NAME(this, extra); }                                  \
+    template<>                                                                  \
+    void* SyntaxClassBase::Impl<NAME>::createFunc() { return new NAME(); }      \
+    SyntaxClass<NodeBase> NAME::getClass() { return Slang::getClass<NAME>(); }  \
+    template<>                                                                  \
     SyntaxClassBase::ClassInfo const SyntaxClassBase::Impl<NAME>::kClassInfo = { #NAME, &SyntaxClassBase::Impl<BASE>::kClassInfo, &SyntaxClassBase::Impl<NAME>::createFunc };
-#include "expr-defs.h"
-#include "decl-defs.h"
-#include "modifier-defs.h"
-#include "stmt-defs.h"
-#include "type-defs.h"
-#include "val-defs.h"
 
+template<>
 SyntaxClassBase::ClassInfo const SyntaxClassBase::Impl<RefObject>::kClassInfo = { "RefObject", nullptr, nullptr };
 
 ABSTRACT_SYNTAX_CLASS(NodeBase, RefObject);
@@ -93,6 +91,14 @@ ABSTRACT_SYNTAX_CLASS(Modifier, SyntaxNodeBase);
 ABSTRACT_SYNTAX_CLASS(Expr, SyntaxNode);
 
 ABSTRACT_SYNTAX_CLASS(Substitutions, SyntaxNode);
+
+#include "expr-defs.h"
+#include "decl-defs.h"
+#include "modifier-defs.h"
+#include "stmt-defs.h"
+#include "type-defs.h"
+#include "val-defs.h"
+
 
 #include "object-meta-end.h"
 
@@ -278,11 +284,12 @@ void Type::accept(IValVisitor* visitor, void* extra)
         auto arrType = type->AsArrayType();
         if (!arrType)
             return false;
-        return (ArrayLength == arrType->ArrayLength && BaseType->Equals(arrType->BaseType.Ptr()));
+        return (ArrayLength == arrType->ArrayLength && baseType->Equals(arrType->baseType.Ptr()));
     }
+
     Type* ArrayExpressionType::CreateCanonicalType()
     {
-        auto canonicalElementType = BaseType->GetCanonicalType();
+        auto canonicalElementType = baseType->GetCanonicalType();
         auto canonicalArrayType = getArrayType(
             canonicalElementType,
             ArrayLength);
@@ -292,16 +299,16 @@ void Type::accept(IValVisitor* visitor, void* extra)
     int ArrayExpressionType::GetHashCode()
     {
         if (ArrayLength)
-            return (BaseType->GetHashCode() * 16777619) ^ ArrayLength->GetHashCode();
+            return (baseType->GetHashCode() * 16777619) ^ ArrayLength->GetHashCode();
         else
-            return BaseType->GetHashCode();
+            return baseType->GetHashCode();
     }
     Slang::String ArrayExpressionType::ToString()
     {
         if (ArrayLength)
-            return BaseType->ToString() + "[" + ArrayLength->ToString() + "]";
+            return baseType->ToString() + "[" + ArrayLength->ToString() + "]";
         else
-            return BaseType->ToString() + "[]";
+            return baseType->ToString() + "[]";
     }
 
     // DeclRefType
@@ -1115,7 +1122,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         auto session = elementType->getSession();
         auto arrayType = new ArrayExpressionType();
         arrayType->setSession(session);
-        arrayType->BaseType = elementType;
+        arrayType->baseType = elementType;
         arrayType->ArrayLength = elementCount;
         return arrayType;
     }
@@ -1126,7 +1133,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         auto session = elementType->getSession();
         auto arrayType = new ArrayExpressionType();
         arrayType->setSession(session);
-        arrayType->BaseType = elementType;
+        arrayType->baseType = elementType;
         return arrayType;
     }
 

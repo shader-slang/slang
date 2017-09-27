@@ -223,7 +223,7 @@ SLANG_API SlangReflectionType* spReflectionType_GetElementType(SlangReflectionTy
 
     if(auto arrayType = dynamic_cast<ArrayExpressionType*>(type))
     {
-        return (SlangReflectionType*) arrayType->BaseType.Ptr();
+        return (SlangReflectionType*) arrayType->baseType.Ptr();
     }
     else if( auto constantBufferType = dynamic_cast<ConstantBufferType*>(type))
     {
@@ -299,7 +299,7 @@ SLANG_API SlangScalarType spReflectionType_GetScalarType(SlangReflectionType* in
 
     if(auto basicType = dynamic_cast<BasicExpressionType*>(type))
     {
-        switch (basicType->BaseType)
+        switch (basicType->baseType)
         {
 #define CASE(BASE, TAG) \
         case BaseType::BASE: return SLANG_SCALAR_TYPE_##TAG
@@ -330,7 +330,7 @@ SLANG_API SlangResourceShape spReflectionType_GetResourceShape(SlangReflectionTy
 
     while(auto arrayType = type->As<ArrayExpressionType>())
     {
-        type = arrayType->BaseType.Ptr();
+        type = arrayType->baseType.Ptr();
     }
 
     if(auto textureType = type->As<TextureTypeBase>())
@@ -363,7 +363,7 @@ SLANG_API SlangResourceAccess spReflectionType_GetResourceAccess(SlangReflection
 
     while(auto arrayType = type->As<ArrayExpressionType>())
     {
-        type = arrayType->BaseType.Ptr();
+        type = arrayType->baseType.Ptr();
     }
 
     if(auto textureType = type->As<TextureTypeBase>())
@@ -399,7 +399,7 @@ SLANG_API SlangReflectionType* spReflectionType_GetResourceResultType(SlangRefle
 
     while(auto arrayType = type->As<ArrayExpressionType>())
     {
-        type = arrayType->BaseType.Ptr();
+        type = arrayType->baseType.Ptr();
     }
 
     if (auto textureType = type->As<TextureTypeBase>())
@@ -1100,11 +1100,11 @@ static void emitReflectionTypeInfoJSON(
 {
     switch( type->getKind() )
     {
-    case SLANG_TYPE_KIND_SAMPLER_STATE:
+    case slang::TypeReflection::Kind::SamplerState:
         write(writer, "\"kind\": \"samplerState\"");
         break;
 
-    case SLANG_TYPE_KIND_RESOURCE:
+    case slang::TypeReflection::Kind::Resource:
         {
             auto shape  = type->getResourceShape();
             auto access = type->getResourceAccess();
@@ -1163,7 +1163,7 @@ static void emitReflectionTypeInfoJSON(
         }
         break;
 
-    case SLANG_TYPE_KIND_CONSTANT_BUFFER:
+    case slang::TypeReflection::Kind::ConstantBuffer:
         write(writer, "\"kind\": \"constantBuffer\"");
         write(writer, ",\n");
         write(writer, "\"elementType\": ");
@@ -1172,7 +1172,7 @@ static void emitReflectionTypeInfoJSON(
             type->getElementType());
         break;
 
-    case SLANG_TYPE_KIND_TEXTURE_BUFFER:
+    case slang::TypeReflection::Kind::TextureBuffer:
         write(writer, "\"kind\": \"textureBuffer\"");
         write(writer, ",\n");
         write(writer, "\"elementType\": ");
@@ -1181,7 +1181,7 @@ static void emitReflectionTypeInfoJSON(
             type->getElementType());
         break;
 
-    case SLANG_TYPE_KIND_SHADER_STORAGE_BUFFER:
+    case slang::TypeReflection::Kind::ShaderStorageBuffer:
         write(writer, "\"kind\": \"shaderStorageBuffer\"");
         write(writer, ",\n");
         write(writer, "\"elementType\": ");
@@ -1190,7 +1190,7 @@ static void emitReflectionTypeInfoJSON(
             type->getElementType());
         break;
 
-    case SLANG_TYPE_KIND_SCALAR:
+    case slang::TypeReflection::Kind::Scalar:
         write(writer, "\"kind\": \"scalar\"");
         write(writer, ",\n");
         emitReflectionScalarTypeInfoJSON(
@@ -1198,7 +1198,7 @@ static void emitReflectionTypeInfoJSON(
             type->getScalarType());
         break;
 
-    case SLANG_TYPE_KIND_VECTOR:
+    case slang::TypeReflection::Kind::Vector:
         write(writer, "\"kind\": \"vector\"");
         write(writer, ",\n");
         write(writer, "\"elementCount\": ");
@@ -1210,7 +1210,7 @@ static void emitReflectionTypeInfoJSON(
             type->getElementType());
         break;
 
-    case SLANG_TYPE_KIND_MATRIX:
+    case slang::TypeReflection::Kind::Matrix:
         write(writer, "\"kind\": \"matrix\"");
         write(writer, ",\n");
         write(writer, "\"rowCount\": ");
@@ -1225,7 +1225,7 @@ static void emitReflectionTypeInfoJSON(
             type->getElementType());
         break;
 
-    case SLANG_TYPE_KIND_ARRAY:
+    case slang::TypeReflection::Kind::Array:
         {
             auto arrayType = type;
             write(writer, "\"kind\": \"array\"");
@@ -1238,7 +1238,7 @@ static void emitReflectionTypeInfoJSON(
         }
         break;
 
-    case SLANG_TYPE_KIND_STRUCT:
+    case slang::TypeReflection::Kind::Struct:
         {
             write(writer, "\"kind\": \"struct\",\n");
             write(writer, "\"fields\": [\n");
@@ -1274,7 +1274,7 @@ static void emitReflectionTypeLayoutInfoJSON(
         emitReflectionTypeInfoJSON(writer, typeLayout->getType());
         break;
 
-    case SLANG_TYPE_KIND_ARRAY:
+    case slang::TypeReflection::Kind::Array:
         {
             auto arrayTypeLayout = typeLayout;
             auto elementTypeLayout = arrayTypeLayout->getElementTypeLayout();
@@ -1296,7 +1296,7 @@ static void emitReflectionTypeLayoutInfoJSON(
         }
         break;
 
-    case SLANG_TYPE_KIND_STRUCT:
+    case slang::TypeReflection::Kind::Struct:
         {
             write(writer, "\"kind\": \"struct\",\n");
             write(writer, "\"fields\": [\n");
@@ -1316,7 +1316,7 @@ static void emitReflectionTypeLayoutInfoJSON(
         }
         break;
 
-    case SLANG_TYPE_KIND_CONSTANT_BUFFER:
+    case slang::TypeReflection::Kind::ConstantBuffer:
         write(writer, "\"kind\": \"constantBuffer\"");
         write(writer, ",\n");
         write(writer, "\"elementType\": ");
@@ -1325,7 +1325,7 @@ static void emitReflectionTypeLayoutInfoJSON(
             typeLayout->getElementTypeLayout());
         break;
 
-    case SLANG_TYPE_KIND_TEXTURE_BUFFER:
+    case slang::TypeReflection::Kind::TextureBuffer:
         write(writer, "\"kind\": \"textureBuffer\"");
         write(writer, ",\n");
         write(writer, "\"elementType\": ");
@@ -1334,7 +1334,7 @@ static void emitReflectionTypeLayoutInfoJSON(
             typeLayout->getElementTypeLayout());
         break;
 
-    case SLANG_TYPE_KIND_SHADER_STORAGE_BUFFER:
+    case slang::TypeReflection::Kind::ShaderStorageBuffer:
         write(writer, "\"kind\": \"shaderStorageBuffer\"");
         write(writer, ",\n");
         write(writer, "\"elementType\": ");

@@ -12,7 +12,7 @@
 #include "SPIRV/doc.h"
 #include "SPIRV/disassemble.h"
 
-#include "../../Slang.h"
+#include "../../slang.h"
 
 #if 0
 #include <cstring>

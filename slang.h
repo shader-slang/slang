@@ -1,17 +1,28 @@
 #ifndef SLANG_H
 #define SLANG_H
 
-#ifdef _MSC_VER
-#ifdef SLANG_DYNAMIC_EXPORT
-#define SLANG_API __declspec(dllexport)
-#else
-#ifdef SLANG_DYNAMIC
-#define SLANG_API __declspec(dllimport)
-#else
-#define SLANG_API
+#if defined(SLANG_DYNAMIC_EXPORT)
+    #if !defined(SLANG_DYNAMIC)
+        #define SLANG_DYNAMIC
+    #endif
 #endif
+
+#if defined(SLANG_DYNAMIC)
+    #if defined(_MSC_VER)
+        #ifdef SLANG_DYNAMIC_EXPORT
+            #define SLANG_API __declspec(dllexport)
+        #else
+            #define SLANG_API __declspec(dllimport)
+        #endif
+    #else
+        // TODO: need to consider compiler capabilities
+//        #ifdef SLANG_DYNAMIC_EXPORT
+            #define SLANG_API __attribute__((__visibility__("default")))
+//        #endif
+    #endif
 #endif
-#else
+
+#ifndef SLANG_API
 #define SLANG_API
 #endif
 
@@ -19,6 +30,9 @@
 #include <inttypes.h>
 #endif // ! SLANG_NO_INTTYPES
 
+#ifndef  SLANG_NO_STDDEF
+#include <stddef.h>
+#endif // ! SLANG_NO_STDDEF
 
 #ifdef __cplusplus  
 extern "C"
@@ -1007,6 +1021,7 @@ namespace slang
 
 #ifdef SLANG_INCLUDE_IMPLEMENTATION
 
+#include "source/core/platform.cpp"
 #include "source/core/slang-io.cpp"
 #include "source/core/slang-string.cpp"
 #include "source/core/stream.cpp"

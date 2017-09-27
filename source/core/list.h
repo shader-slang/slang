@@ -525,7 +525,7 @@ namespace Slang
 
 		void Sort()
 		{
-			Sort([](T& t1, T& t2){return t1<t2;});
+			Sort([](T const& t1, T const& t2){return t1<t2;});
 		}
 
 		bool Contains(const T & val)

@@ -538,7 +538,7 @@ namespace Slang
             if (auto basicType = type->As<BasicExpressionType>())
             {
                 // TODO: `void` shouldn't be a basic type, to make this easier to avoid
-                if (basicType->BaseType == BaseType::Void)
+                if (basicType->baseType == BaseType::Void)
                 {
                     // TODO(tfoley): pick the right diagnostic message
                     if (!isRewriteMode())
@@ -723,7 +723,7 @@ namespace Slang
                     // TODO(tfoley): If we can compute the size of the array statically,
                     // then we want to check that there aren't too many initializers present
 
-                    auto toElementType = toArrayType->BaseType;
+                    auto toElementType = toArrayType->baseType;
 
                     for(auto& arg : fromInitializerListExpr->args)
                     {
@@ -778,123 +778,6 @@ namespace Slang
 
             //
 
-#if 0
-            if (auto toBasicType = toType->AsBasicType())
-            {
-                if (auto fromBasicType = fromType->AsBasicType())
-                {
-                    // Conversions between base types are always allowed,
-                    // and the only question is what the cost will be.
-
-                    auto toInfo = GetBaseTypeConversionInfo(toBasicType->BaseType);
-                    auto fromInfo = GetBaseTypeConversionInfo(fromBasicType->BaseType);
-
-                    // We expect identical types to have been dealt with already.
-                    SLANG_ASSERT(toInfo.kind != fromInfo.kind || toInfo.rank != fromInfo.rank);
-
-                    if (outToExpr)
-                        *outToExpr = CreateImplicitCastExpr(toType, fromExpr);
-
-
-                    if (outCost)
-                    {
-                        // Conversions within the same kind are easist to handle
-                        if (toInfo.kind == fromInfo.kind)
-                        {
-                            // If we are converting to a "larger" type, then
-                            // we are doing a lossless promotion, and otherwise
-                            // we are doing a demotion.
-                            if( toInfo.rank > fromInfo.rank)
-                                *outCost = kConversionCost_RankPromotion;
-                            else
-                                *outCost = kConversionCost_GeneralConversion;
-                        }
-                        // If we are converting from an unsigned integer type to
-                        // a signed integer type that is guaranteed to be larger,
-                        // then that is also a lossless promotion.
-                        else if(toInfo.kind == kBaseTypeConversionKind_Signed
-                            && fromInfo.kind == kBaseTypeConversionKind_Unsigned
-                            && toInfo.rank > fromInfo.rank)
-                        {
-                            // TODO: probably need to weed out cases involving
-                            // "pointer-sized" integers if these are treated
-                            // as distinct from 32- and 64-bit types.
-                            // E.g., there is no guarantee that conversion
-                            // from 32-bit unsigned to pointer-sized signed
-                            // is lossless, because pointers could be 32-bit,
-                            // and the same applies for conversion from
-                            // `uintptr` to `uint64`.
-                            *outCost = kConversionCost_UnsignedToSignedPromotion;
-                        }
-                        // Conversion from signed to unsigned is always lossy,
-                        // but it is preferred over conversions from unsigned
-                        // to signed, for same-size types.
-                        else if(toInfo.kind == kBaseTypeConversionKind_Unsigned
-                            && fromInfo.kind == kBaseTypeConversionKind_Signed
-                            && toInfo.rank >= fromInfo.rank)
-                        {
-                            *outCost = kConversionCost_SignedToUnsignedConversion;
-                        }
-                        // Conversion from an integer to a floating-point type
-                        // is never considered a promotion (even when the value
-                        // would fit in the available bits).
-                        // If the destination type is at least 32 bits we consider
-                        // this a reasonably good conversion, though.
-                        else if (toInfo.kind == kBaseTypeConversionKind_Float
-                            && toInfo.rank >= kBaseTypeConversionRank_Int32)
-                        {
-                            *outCost = kConversionCost_IntegerToFloatConversion;
-                        }
-                        // All other cases are considered as "general" conversions,
-                        // where we don't consider any one conversion better than
-                        // any others.
-                        else
-                        {
-                            *outCost = kConversionCost_GeneralConversion;
-                        }
-                    }
-
-                    return true;
-                }
-            }
-
-            if (auto toVectorType = toType->AsVectorType())
-            {
-                if (auto fromVectorType = fromType->AsVectorType())
-                {
-                    // Conversion between vector types.
-
-                    // If element counts don't match, then bail:
-                    if (!ValuesAreEqual(toVectorType->elementCount, fromVectorType->elementCount))
-                        return false;
-
-                    // Otherwise, if we can convert the element types, we are golden
-                    ConversionCost elementCost;
-                    if (CanCoerce(toVectorType->elementType, fromVectorType->elementType, &elementCost))
-                    {
-                        if (outToExpr)
-                            *outToExpr = CreateImplicitCastExpr(toType, fromExpr);
-                        if (outCost)
-                            *outCost = elementCost;
-                        return true;
-                    }
-                }
-                else if (auto fromScalarType = fromType->AsBasicType())
-                {
-                    // Conversion from scalar to vector.
-                    // Should allow as long as we can coerce the scalar to our element type.
-                    ConversionCost elementCost;
-                    if (CanCoerce(toVectorType->elementType, fromScalarType, &elementCost))
-                    {
-                        if (outToExpr)
-                            *outToExpr = CreateImplicitCastExpr(toType, fromExpr);
-                        if (outCost)
-                            *outCost = elementCost + kConversionCost_ScalarToVector;
-                        return true;
-                    }
-                }
-            }
-#endif
 
             if (auto toDeclRefType = toType->As<DeclRefType>())
             {
@@ -1973,7 +1856,7 @@ namespace Slang
             // Create a new array type based on the size we found,
             // and install it into our type.
             varDecl->type.type = getArrayType(
-                arrayType->BaseType,
+                arrayType->baseType,
                 elementCount);
         }
 
@@ -2456,7 +2339,7 @@ namespace Slang
             {
                 return CheckSimpleSubscriptExpr(
                     subscriptExpr,
-                    baseArrayType->BaseType);
+                    baseArrayType->baseType);
             }
             else if (auto vecType = baseType->As<VectorExpressionType>())
             {
@@ -2769,8 +2652,8 @@ namespace Slang
             {
                 if (auto rightBasic = right->As<BasicExpressionType>())
                 {
-                    auto leftFlavor = leftBasic->BaseType;
-                    auto rightFlavor = rightBasic->BaseType;
+                    auto leftFlavor = leftBasic->baseType;
+                    auto rightFlavor = rightBasic->baseType;
 
                     // TODO(tfoley): Need a special-case rule here that if
                     // either operand is of type `half`, then we promote
@@ -4779,8 +4662,8 @@ namespace Slang
                     auto targetScalarType = targetArithType->GetScalarType();
                     auto exprScalarType = exprArithType->GetScalarType();
 
-                    if (!IsNumeric(exprScalarType->BaseType)) goto fail;
-                    if (!IsNumeric(targetScalarType->BaseType)) goto fail;
+                    if (!IsNumeric(exprScalarType->baseType)) goto fail;
+                    if (!IsNumeric(targetScalarType->baseType)) goto fail;
 
                     // TODO(tfoley): this checking is incomplete here, and could
                     // lead to downstream compilation failures
@@ -4997,6 +4880,19 @@ namespace Slang
             return expr;
         }
 
+        RefPtr<Expr> lookupResultFailure(
+            MemberExpr*     expr,
+            QualType const& baseType)
+        {
+            if (!isRewriteMode())
+            {
+                getSink()->diagnose(expr, Diagnostics::noMemberOfNameInType, expr->name, baseType);
+            }
+            expr->type = QualType(getSession()->getErrorType());
+            return expr;
+
+        }
+
         RefPtr<Expr> visitMemberExpr(MemberExpr * expr)
         {
             expr->BaseExpression = CheckExpr(expr->BaseExpression);
@@ -5043,7 +4939,7 @@ namespace Slang
                             this, expr->name, aggTypeDeclRef);
                         if (!lookupResult.isValid())
                         {
-                            goto fail;
+                            return lookupResultFailure(expr, baseType);
                         }
 
                         // TODO: need to filter for declarations that are valid to refer
@@ -5068,7 +4964,7 @@ namespace Slang
                         this, expr->name, aggTypeDeclRef);
                     if (!lookupResult.isValid())
                     {
-                        goto fail;
+                        return lookupResultFailure(expr, baseType);
                     }
 
                     return createLookupResultExpr(
@@ -5078,13 +4974,7 @@ namespace Slang
                 }
 
                 // catch-all
-            fail:
-                if (!isRewriteMode())
-                {
-                    getSink()->diagnose(expr, Diagnostics::noMemberOfNameInType, expr->name, baseType);
-                }
-                expr->type = QualType(getSession()->getErrorType());
-                return expr;
+                return lookupResultFailure(expr, baseType);
             }
             // All remaining cases assume we have a `BasicType`
             else if (!baseType->AsBasicType())

@@ -61,7 +61,7 @@ struct BytecodeGenerationPtr
 
     T& operator*()
     {
-        return *getPtr()
+        return *getPtr();
     }
 
     T& operator[](UInt index)

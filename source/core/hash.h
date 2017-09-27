@@ -3,6 +3,7 @@
 
 #include "slang-math.h"
 #include <string.h>
+#include <type_traits>
 
 namespace Slang
 {

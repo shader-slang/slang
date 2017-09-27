@@ -488,7 +488,7 @@ struct EmitVisitor
     void Emit(IntegerLiteralValue value)
     {
         char buffer[32];
-        sprintf(buffer, "%lld", value);
+        sprintf(buffer, "%lld", (long long int)value);
         Emit(buffer);
     }
 
@@ -823,7 +823,7 @@ struct EmitVisitor
     {
         if(auto basicElementType = type->As<BasicExpressionType>())
         {
-            switch (basicElementType->BaseType)
+            switch (basicElementType->baseType)
             {
             case BaseType::Float:
                 // no prefix
@@ -1043,7 +1043,7 @@ struct EmitVisitor
     void visitBasicExpressionType(BasicExpressionType* basicType, TypeEmitArg const& arg)
     {
         auto declarator = arg.declarator;
-        switch (basicType->BaseType)
+        switch (basicType->baseType)
         {
         case BaseType::Void:	Emit("void");		break;
         case BaseType::Int:		Emit("int");		break;
@@ -1208,7 +1208,7 @@ struct EmitVisitor
         }
 
 
-        emitTypeImpl(arrayType->BaseType, &arrayDeclarator);
+        emitTypeImpl(arrayType->baseType, &arrayDeclarator);
     }
 
     void EmitType(

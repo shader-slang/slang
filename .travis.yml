@@ -1,0 +1,20 @@
+# .travis.yml
+#
+# This is the configuration file to drive Travis CI for Slang.
+
+language: cpp
+
+# Let's test against both major compilers just to be sure.
+compiler:
+  - clang
+  - gcc
+
+matrix:
+  include:
+    - os: linux
+
+# Travis wants to default to a build script that invokes
+# `./configure && make && make test` which is appropriate
+# for autoconf, but I don't want to get into that mess..
+#
+script: make && make test

@@ -1168,7 +1168,7 @@ SimpleLayoutInfo GetLayoutImpl(
     else if(auto basicType = type->As<BasicExpressionType>())
     {
         return GetSimpleLayoutImpl(
-            rules->GetScalarLayout(basicType->BaseType),
+            rules->GetScalarLayout(basicType->baseType),
             type,
             rules,
             outTypeLayout);
@@ -1229,7 +1229,7 @@ SimpleLayoutInfo GetLayoutImpl(
         RefPtr<TypeLayout> elementTypeLayout;
         auto elementInfo = GetLayoutImpl(
             context,
-            arrayType->BaseType.Ptr(),
+            arrayType->baseType.Ptr(),
             outTypeLayout ? &elementTypeLayout : nullptr);
 
         // For layout purposes, we treat an unsized array as an array of zero elements.

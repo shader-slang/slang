@@ -76,15 +76,14 @@ END_SYNTAX_CLASS()
 
 SYNTAX_CLASS(BasicExpressionType, ArithmeticExpressionType)
 
-    FIELD(BaseType, BaseType)
+    FIELD(BaseType, baseType)
 
 RAW(
     BasicExpressionType() {}
     BasicExpressionType(
         Slang::BaseType baseType)
-    {
-        BaseType = baseType;
-    }
+        : baseType(baseType)
+    {}
     virtual Slang::String ToString() override;
 protected:
     virtual BasicExpressionType* GetScalarType() override;
@@ -283,7 +282,7 @@ SIMPLE_SYNTAX_CLASS(GLSLOutputParameterBlockType, VaryingParameterBlockType)
 SIMPLE_SYNTAX_CLASS(GLSLShaderStorageBufferType, UniformParameterBlockType)
 
 SYNTAX_CLASS(ArrayExpressionType, Type)
-    SYNTAX_FIELD(RefPtr<Type>, BaseType)
+    SYNTAX_FIELD(RefPtr<Type>, baseType)
     SYNTAX_FIELD(RefPtr<IntVal>, ArrayLength)
 
 RAW(

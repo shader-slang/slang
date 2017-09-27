@@ -168,10 +168,12 @@ namespace Slang
                 return (T*)current;
             }
 
-            void operator++()
+            void operator++();
+            #if 0
             {
                 current = Adjust(current->next.Ptr());
             }
+            #endif
 
             bool operator!=(Iterator other)
             {
@@ -198,7 +200,8 @@ namespace Slang
         Iterator begin() { return Iterator(modifiers); }
         Iterator end() { return Iterator(nullptr); }
 
-        static Modifier* Adjust(Modifier* modifier)
+        static Modifier* Adjust(Modifier* modifier);
+        #if 0
         {
             Modifier* m = modifier;
             for (;;)
@@ -208,6 +211,7 @@ namespace Slang
                 m = m->next.Ptr();
             }
         }
+        #endif
 
         Modifier* modifiers;
     };
@@ -445,11 +449,11 @@ namespace Slang
         }
 
         // "dynamic cast" to a more specific declaration reference type
-        template<typename T>
-        DeclRef<T> As() const
+        template<typename U>
+        DeclRef<U> As() const
         {
-            DeclRef<T> result;
-            result.decl = dynamic_cast<T*>(decl);
+            DeclRef<U> result;
+            result.decl = dynamic_cast<U*>(decl);
             result.substitutions = substitutions;
             return result;
         }
@@ -904,7 +908,7 @@ namespace Slang
     //
 
     inline BaseType GetVectorBaseType(VectorExpressionType* vecType) {
-        return vecType->elementType->AsBasicType()->BaseType;
+        return vecType->elementType->AsBasicType()->baseType;
     }
 
     inline int GetVectorSize(VectorExpressionType* vecType)
@@ -1010,6 +1014,28 @@ namespace Slang
 
     RefPtr<SamplerStateType> getSamplerStateType(
         Session*        session);
+
+
+    // Definitions that can't come earlier despite
+    // being in templates, because gcc/clang get angry.
+    //
+    template<typename T>
+    void FilteredModifierList<T>::Iterator::operator++()
+    {
+        current = Adjust(current->next.Ptr());
+    }
+    //
+    template<typename T>
+    Modifier* FilteredModifierList<T>::Adjust(Modifier* modifier)
+    {
+        Modifier* m = modifier;
+        for (;;)
+        {
+            if (!m) return m;
+            if (dynamic_cast<T*>(m)) return m;
+            m = m->next.Ptr();
+        }        
+    }
 
 } // namespace Slang
 

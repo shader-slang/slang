@@ -1,6 +1,7 @@
 // Compiler.cpp : Defines the entry point for the console application.
 //
 #include "../core/basic.h"
+#include "../core/platform.h"
 #include "../core/slang-io.h"
 #include "compiler.h"
 #include "lexer.h"
@@ -12,21 +13,43 @@
 #include "reflection.h"
 #include "emit.h"
 
-// Utilities for pass-through modes
-#include "../slang-glslang/slang-glslang.h"
-
-
+// Enable calling through to `fxc` to
+// generate code on Windows.
 #ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <Windows.h>
-#undef WIN32_LEAN_AND_MEAN
-#undef NOMINMAX
-#include <d3dcompiler.h>
+    #define WIN32_LEAN_AND_MEAN
+    #define NOMINMAX
+    #include <Windows.h>
+    #undef WIN32_LEAN_AND_MEAN
+    #undef NOMINMAX
+    #include <d3dcompiler.h>
+    #ifndef SLANG_ENABLE_DXBC_SUPPORT
+        #define SLANG_ENABLE_DXBC_SUPPORT 1
+    #endif
+#endif
+//
+// Otherwise, don't enable DXBC by default:
+#ifndef SLANG_ENABLE_DXBC_SUPPORT
+    #define SLANG_ENABLE_DXBC_SUPPORT 0
 #endif
 
-#include <io.h>
+// Enable calling through to `glslang` on
+// all platforms.
+#ifndef SLANG_ENABLE_GLSLANG_SUPPORT
+    #define SLANG_ENABLE_GLSLANG_SUPPORT 1
+#endif
+
+#if SLANG_ENABLE_GLSLANG_SUPPORT
+#include "../slang-glslang/slang-glslang.h"
+#endif
+
+// Includes to allow us to control console
+// output when writing assembly dumps.
 #include <fcntl.h> 
+#ifdef _WIN32
+#include <io.h>
+#else
+#include <unistd.h>
+#endif
 
 #ifdef _MSC_VER
 #pragma warning(disable: 4996)
@@ -189,7 +212,7 @@ namespace Slang
         }
     }
 
-#ifdef _WIN32
+#if SLANG_ENABLE_DXBC_SUPPORT
     HMODULE loadD3DCompilerDLL(CompileRequest* request)
     {
         char const* libraryName = "d3dcompiler_47";
@@ -264,28 +287,6 @@ namespace Slang
         return data;
     }
 
-#if 0
-    List<uint8_t> EmitDXBytecode(
-        ExtraContext&				context)
-    {
-        if(context.getTranslationUnitOptions().entryPoints.Count() != 1)
-        {
-            if(context.getTranslationUnitOptions().entryPoints.Count() == 0)
-            {
-                // TODO(tfoley): need to write diagnostics into this whole thing...
-                fprintf(stderr, "no entry point specified\n");
-            }
-            else
-            {
-                fprintf(stderr, "multiple entry points specified\n");
-            }
-            return List<uint8_t>();
-        }
-
-        return EmitDXBytecodeForEntryPoint(context, context.getTranslationUnitOptions().entryPoints[0]);
-    }
-#endif
-
     String dissassembleDXBC(
         CompileRequest*     compileRequest,
         void const*         data,
@@ -345,32 +346,16 @@ namespace Slang
 
         return result;
     }
-
-#if 0
-    String EmitDXBytecodeAssembly(
-        ExtraContext&				context)
-    {
-        if(context.getTranslationUnitOptions().entryPoints.Count() == 0)
-        {
-            // TODO(tfoley): need to write diagnostics into this whole thing...
-            fprintf(stderr, "no entry point specified\n");
-            return "";
-        }
-
-        StringBuilder sb;
-        for (auto entryPoint : context.getTranslationUnitOptions().entryPoints)
-        {
-            sb << EmitDXBytecodeAssemblyForEntryPoint(context, entryPoint);
-        }
-        return sb.ProduceString();
-    }
 #endif
 
-    HMODULE loadGLSLCompilerDLL(CompileRequest* request)
+#if SLANG_ENABLE_GLSLANG_SUPPORT
+
+    SharedLibrary loadGLSLCompilerDLL(CompileRequest* request)
     {
         char const* libraryName = "slang-glslang";
         // TODO(tfoley): let user specify version of glslang DLL to use.
-        HMODULE glslCompiler =  LoadLibraryA(libraryName);
+
+        SharedLibrary glslCompiler = SharedLibrary::load(libraryName);
         if (!glslCompiler)
         {
             request->mSink.diagnose(SourceLoc(), Diagnostics::failedToLoadDynamicLibrary, libraryName);
@@ -378,9 +363,9 @@ namespace Slang
         return glslCompiler;
     }
 
-    HMODULE getGLSLCompilerDLL(CompileRequest* request)
+    SharedLibrary getGLSLCompilerDLL(CompileRequest* request)
     {
-        static HMODULE glslCompiler =  loadGLSLCompilerDLL(request);
+        static SharedLibrary glslCompiler =  loadGLSLCompilerDLL(request);
         return glslCompiler;
     }
 
@@ -393,11 +378,11 @@ namespace Slang
         static glslang_CompileFunc glslang_compile = nullptr;
         if (!glslang_compile)
         {
-            HMODULE glslCompiler = getGLSLCompilerDLL(slangCompileRequest);
+            SharedLibrary glslCompiler = getGLSLCompilerDLL(slangCompileRequest);
             if (!glslCompiler)
                 return 1;
 
-            glslang_compile = (glslang_CompileFunc)GetProcAddress(glslCompiler, "glslang_compile");
+            glslang_compile = (glslang_CompileFunc) glslCompiler.findFuncByName("glslang_compile");
             if (!glslang_compile)
                 return 1;
         }
@@ -532,6 +517,7 @@ namespace Slang
             }
             break;
 
+#if SLANG_ENABLE_DXBC_SUPPORT
         case CodeGenTarget::DXBytecode:
             {
                 List<uint8_t> code = EmitDXBytecodeForEntryPoint(entryPoint);
@@ -547,6 +533,7 @@ namespace Slang
                 result = CompileResult(code);
             }
             break;
+#endif
 
         case CodeGenTarget::SPIRV:
             {
@@ -712,6 +699,7 @@ namespace Slang
 
                     switch (compileRequest->Target)
                     {
+                #if SLANG_ENABLE_DXBC_SUPPORT
                     case CodeGenTarget::DXBytecode:
                         {
                             String assembly = dissassembleDXBC(compileRequest,
@@ -720,6 +708,7 @@ namespace Slang
                             writeOutputToConsole(compileRequest, assembly);
                         }
                         break;
+                #endif
 
                     case CodeGenTarget::SPIRV:
                         {
@@ -738,7 +727,9 @@ namespace Slang
                 else
                 {
                     // Redirecting stdout to a file, so do the usual thing
+                #ifdef _WIN32
                     _setmode(stdoutFileDesc, _O_BINARY);
+                #endif
                     writeOutputFile(
                         compileRequest,
                         stdout,
@@ -955,10 +946,6 @@ namespace Slang
             dumpIntermediateText(compileRequest, data, size, ".spv.asm");
             break;
 
-        case CodeGenTarget::DXBytecodeAssembly:
-            dumpIntermediateText(compileRequest, data, size, ".dxbc.asm");
-            break;
-
         case CodeGenTarget::SlangIRAssembly:
             dumpIntermediateText(compileRequest, data, size, ".slang-ir.asm");
             break;
@@ -971,6 +958,11 @@ namespace Slang
             }
             break;
 
+    #if SLANG_ENABLE_DXBC_SUPPORT
+        case CodeGenTarget::DXBytecodeAssembly:
+            dumpIntermediateText(compileRequest, data, size, ".dxbc.asm");
+            break;
+
         case CodeGenTarget::DXBytecode:
             dumpIntermediateBinary(compileRequest, data, size, ".dxbc");
             {
@@ -978,6 +970,7 @@ namespace Slang
                 dumpIntermediateText(compileRequest, dxbcAssembly.begin(), dxbcAssembly.Length(), ".dxbc.asm");
             }
             break;
+    #endif
 
         case CodeGenTarget::SlangIR:
             dumpIntermediateBinary(compileRequest, data, size, ".slang-ir");

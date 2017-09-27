@@ -36,128 +36,6 @@ struct CloneVisitor
 
 //
 
-template<typename V>
-struct StructuralTransformVisitorBase
-{
-    V* visitor;
-
-    RefPtr<Stmt> transformDeclField(Stmt* stmt)
-    {
-        return visitor->translateStmtRef(stmt);
-    }
-
-    RefPtr<Decl> transformDeclField(Decl* decl)
-    {
-        return visitor->translateDeclRef(decl);
-    }
-
-    template<typename T>
-    DeclRef<T> transformDeclField(DeclRef<T> const& decl)
-    {
-        return visitor->translateDeclRef(decl).As<T>();
-    }
-
-    TypeExp transformSyntaxField(TypeExp const& typeExp)
-    {
-        TypeExp result;
-        result.type = visitor->transformSyntaxField(typeExp.type);
-        return result;
-    }
-
-    QualType transformSyntaxField(QualType const& qualType)
-    {
-        QualType result = qualType;
-        result.type = visitor->transformSyntaxField(qualType.type);
-        return result;
-    }
-
-    RefPtr<Expr> transformSyntaxField(Expr* expr)
-    {
-        return visitor->transformSyntaxField(expr);
-    }
-
-    RefPtr<Stmt> transformSyntaxField(Stmt* stmt)
-    {
-        return visitor->transformSyntaxField(stmt);
-    }
-
-    RefPtr<DeclBase> transformSyntaxField(DeclBase* decl)
-    {
-        return visitor->transformSyntaxField(decl);
-    }
-
-    RefPtr<ScopeDecl> transformSyntaxField(ScopeDecl* decl)
-    {
-        if(!decl) return nullptr;
-        return visitor->transformSyntaxField(decl).As<ScopeDecl>();
-    }
-
-    template<typename T>
-    List<T> transformSyntaxField(List<T> const& list)
-    {
-        List<T> result;
-        for (auto item : list)
-        {
-            result.Add(transformSyntaxField(item));
-        }
-        return result;
-    }
-};
-
-template<typename V>
-RefPtr<Stmt> structuralTransform(
-    Stmt*    stmt,
-    V*                      visitor)
-{
-    StructuralTransformStmtVisitor<V> transformer;
-    transformer.visitor = visitor;
-    return transformer.dispatch(stmt);
-}
-
-template<typename V>
-struct StructuralTransformExprVisitor
-    : StructuralTransformVisitorBase<V>
-    , ExprVisitor<StructuralTransformExprVisitor<V>, RefPtr<Expr>>
-{
-    void transformFields(Expr* result, Expr* obj)
-    {
-        result->type = transformSyntaxField(obj->type);
-    }
-
-
-#define SYNTAX_CLASS(NAME, BASE, ...)                   \
-    RefPtr<Expr> visit##NAME(NAME* obj) {     \
-        RefPtr<NAME> result = new NAME(*obj);           \
-        transformFields(result, obj);                   \
-        return result;                                  \
-    }                                                   \
-    void transformFields(NAME* result, NAME* obj) {     \
-        transformFields((BASE*) result, (BASE*) obj);   \
-
-#define SYNTAX_FIELD(TYPE, NAME)    result->NAME = transformSyntaxField(obj->NAME);
-#define DECL_FIELD(TYPE, NAME)      result->NAME = transformDeclField(obj->NAME);
-
-#define FIELD(TYPE, NAME) /* empty */
-
-#define END_SYNTAX_CLASS()  \
-    }
-
-#include "object-meta-begin.h"
-#include "expr-defs.h"
-#include "object-meta-end.h"
-};
-
-
-template<typename V>
-RefPtr<Expr> structuralTransform(
-    Expr*   expr,
-    V*                      visitor)
-{
-    StructuralTransformExprVisitor<V> transformer;
-    transformer.visitor = visitor;
-    return transformer.dispatch(expr);
-}
-
 //
 
 class TupleExpr;
@@ -253,6 +131,140 @@ public:
     }
 };
 
+//
+
+template<typename V>
+struct StructuralTransformVisitorBase
+{
+    V* visitor;
+
+    RefPtr<Stmt> transformDeclField(Stmt* stmt)
+    {
+        return visitor->translateStmtRef(stmt);
+    }
+
+    RefPtr<Decl> transformDeclField(Decl* decl)
+    {
+        return visitor->translateDeclRef(decl);
+    }
+
+    template<typename T>
+    DeclRef<T> transformDeclField(DeclRef<T> const& decl)
+    {
+        LoweredDeclRef declRef = visitor->translateDeclRef(decl);
+        return declRef.As<T>();
+    }
+
+    TypeExp transformSyntaxField(TypeExp const& typeExp)
+    {
+        TypeExp result;
+        result.type = visitor->transformSyntaxField(typeExp.type);
+        return result;
+    }
+
+    QualType transformSyntaxField(QualType const& qualType)
+    {
+        QualType result = qualType;
+        result.type = visitor->transformSyntaxField(qualType.type);
+        return result;
+    }
+
+    RefPtr<Expr> transformSyntaxField(Expr* expr)
+    {
+        return visitor->transformSyntaxField(expr);
+    }
+
+    RefPtr<Stmt> transformSyntaxField(Stmt* stmt)
+    {
+        return visitor->transformSyntaxField(stmt);
+    }
+
+    RefPtr<DeclBase> transformSyntaxField(DeclBase* decl)
+    {
+        return visitor->transformSyntaxField(decl);
+    }
+
+    RefPtr<ScopeDecl> transformSyntaxField(ScopeDecl* decl)
+    {
+        if(!decl) return nullptr;
+        RefPtr<Decl> transformed = visitor->transformSyntaxField(decl);
+        return transformed.As<ScopeDecl>();
+    }
+
+    template<typename T>
+    List<T> transformSyntaxField(List<T> const& list)
+    {
+        List<T> result;
+        for (auto item : list)
+        {
+            result.Add(transformSyntaxField(item));
+        }
+        return result;
+    }
+};
+
+#if 0
+template<typename V>
+RefPtr<Stmt> structuralTransform(
+    Stmt*    stmt,
+    V*                      visitor)
+{
+    StructuralTransformStmtVisitor<V> transformer;
+    transformer.visitor = visitor;
+    return transformer.dispatch(stmt);
+}
+#endif
+
+template<typename V>
+struct StructuralTransformExprVisitor
+    : StructuralTransformVisitorBase<V>
+    , ExprVisitor<StructuralTransformExprVisitor<V>, RefPtr<Expr>>
+{
+    void transformFields(Expr* result, Expr* obj)
+    {
+        result->type = this->transformSyntaxField(obj->type);
+    }
+
+#define ABSTRACT_SYNTAX_CLASS(NAME, BASE, ...)              \
+    void transformFields(NAME* result, NAME* obj) {         \
+        this->transformFields((BASE*) result, (BASE*) obj); \
+    /* end */
+
+
+#define SYNTAX_CLASS(NAME, BASE, ...)                   \
+    RefPtr<Expr> visit##NAME(NAME* obj) {               \
+        RefPtr<NAME> result = new NAME(*obj);           \
+        transformFields(result, obj);                   \
+        return result;                                  \
+    }                                                   \
+    ABSTRACT_SYNTAX_CLASS(NAME, BASE)                   \
+    /* end */
+
+#define SYNTAX_FIELD(TYPE, NAME)    result->NAME = this->transformSyntaxField(obj->NAME);
+#define DECL_FIELD(TYPE, NAME)      result->NAME = this->transformDeclField(obj->NAME);
+
+#define FIELD(TYPE, NAME) /* empty */
+
+#define END_SYNTAX_CLASS()  \
+    }
+
+#include "object-meta-begin.h"
+#include "expr-defs.h"
+#include "object-meta-end.h"
+};
+
+
+template<typename V>
+RefPtr<Expr> structuralTransform(
+    Expr*   expr,
+    V*                      visitor)
+{
+    StructuralTransformExprVisitor<V> transformer;
+    transformer.visitor = visitor;
+    return transformer.dispatch(expr);
+}
+
+
 
 // The result of lowering an exrpession will usually be just a single
 // expression, but it might also be a "tuple" expression that encodes
@@ -321,9 +333,10 @@ struct LoweredExpr
         return (getFlavor() == Flavor::VaryingTuple) ? getVaryingTupleExpr() : nullptr;
     }
 
-    bool operator!()
+    // Allow use in boolean contexts
+    operator void*()
     {
-        return !value;
+        return value.Ptr();
     }
 
 private:
@@ -754,7 +767,7 @@ struct LoweringVisitor
     RefPtr<Type> visitArrayExpressionType(ArrayExpressionType* type)
     {
         RefPtr<ArrayExpressionType> loweredType = Slang::getArrayType(
-            lowerType(type->BaseType),
+            lowerType(type->baseType),
             lowerVal(type->ArrayLength).As<IntVal>());
         return loweredType;
     }
@@ -1074,7 +1087,7 @@ struct LoweringVisitor
             if (auto rightVecType = rightType->As<VectorExpressionType>())
             {
                 // RHS type was a vector
-                if (auto leftElemVecType = leftArrayType->BaseType->As<VectorExpressionType>())
+                if (auto leftElemVecType = leftArrayType->baseType->As<VectorExpressionType>())
                 {
                     // LHS element type was also a vector, so this is a "scalar splat
                     // to array" case.
@@ -1102,7 +1115,7 @@ struct LoweringVisitor
                         swizzleExpr->elementIndices[0] = ee;
 
                         auto convertedArgExpr = convertExprForAssignmentWithFixups(
-                            leftArrayType->BaseType,
+                            leftArrayType->baseType,
                             swizzleExpr);
 
                         ctorExpr->Arguments.Add(convertedArgExpr);
@@ -1222,7 +1235,7 @@ struct LoweringVisitor
             if (auto rightVecType = rightType->As<VectorExpressionType>())
             {
                 // RHS type was a vector
-                if (auto leftElemVecType = leftArrayType->BaseType->As<VectorExpressionType>())
+                if (auto leftElemVecType = leftArrayType->baseType->As<VectorExpressionType>())
                 {
                     // LHS element type was also a vector, so this is a "scalar splat
                     // to array" case.
@@ -1243,7 +1256,7 @@ struct LoweringVisitor
                         // LHS array element
                         RefPtr<IndexExpr> arrayElemExpr = new IndexExpr();
                         arrayElemExpr->loc = leftExpr->loc;
-                        arrayElemExpr->type.type = leftArrayType->BaseType;
+                        arrayElemExpr->type.type = leftArrayType->baseType;
                         arrayElemExpr->BaseExpression = leftExpr;
                         arrayElemExpr->IndexExpression = createConstIntExpr(ee);
 
@@ -1495,7 +1508,7 @@ struct LoweringVisitor
     {
         if (auto arrayType = type->As<ArrayExpressionType>())
         {
-            return arrayType->BaseType;
+            return arrayType->baseType;
         }
         return nullptr;
     }
@@ -1702,7 +1715,7 @@ struct LoweringVisitor
 
                 while (auto arrayType = varType->As<ArrayExpressionType>())
                 {
-                    varType = arrayType->BaseType;
+                    varType = arrayType->baseType;
                 }
 
                 if (auto constantBufferType = varType->As<ConstantBufferType>())
@@ -2834,7 +2847,7 @@ struct LoweringVisitor
         auto type = inType;
         while (auto arrayType = type->As<ArrayExpressionType>())
         {
-            type = arrayType->BaseType;
+            type = arrayType->baseType;
         }
         return type;
     }
@@ -2848,7 +2861,7 @@ struct LoweringVisitor
     {
         while (auto arrayType = type->As<ArrayExpressionType>())
         {
-            type = arrayType->BaseType;
+            type = arrayType->baseType;
         }
 
         if (auto textureTypeBase = type->As<TextureTypeBase>())
@@ -3065,7 +3078,7 @@ struct LoweringVisitor
             arraySpec.elementCount = arrayType->ArrayLength;
 
             TupleSecondaryVarInfo subInfo = info;
-            subInfo.tupleType = arrayType->BaseType;
+            subInfo.tupleType = arrayType->baseType;
             subInfo.arraySpecs = &arraySpec;
             createTupleTypeSecondaryVarDecls(subInfo);
             return;
@@ -3685,7 +3698,7 @@ struct LoweringVisitor
     {
         if (auto baseType = type->As<BasicExpressionType>())
         {
-            switch (baseType->BaseType)
+            switch (baseType->baseType)
             {
             default:
                 return false;
@@ -4108,7 +4121,7 @@ struct LoweringVisitor
             // heterogeneous stuff...
             return lowerShaderParameterToGLSLGLobalsRec(
                 arrayInfo,
-                arrayType->BaseType,
+                arrayType->baseType,
                 varLayout);
         }
         else if (auto declRefType = varType->As<DeclRefType>())

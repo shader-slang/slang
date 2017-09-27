@@ -39,6 +39,7 @@
     <ClInclude Include="type-traits.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="platform.cpp" />
     <ClCompile Include="slang-io.cpp" />
     <ClCompile Include="slang-string.cpp" />
     <ClCompile Include="stream.cpp" />

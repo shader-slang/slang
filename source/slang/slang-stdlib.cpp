@@ -248,7 +248,7 @@ namespace Slang
 
 #define EMIT_LINE_DIRECTIVE() sb << "#line " << (__LINE__+1) << " \"" << path << "\"\n"
 
-        #include "core.meta.slang.cpp"
+        #include "core.meta.slang.h"
 
         coreLibraryCode = sb.ProduceString();
         return coreLibraryCode;
@@ -261,7 +261,7 @@ namespace Slang
 
         StringBuilder sb;
 
-        #include "hlsl.meta.slang.cpp"
+        #include "hlsl.meta.slang.h"
 
         hlslLibraryCode = sb.ProduceString();
         return hlslLibraryCode;
@@ -279,7 +279,7 @@ namespace Slang
 
         StringBuilder sb;
 
-        #include "glsl.meta.slang.cpp"
+        #include "glsl.meta.slang.h"
 
         glslLibraryCode = sb.ProduceString();
         return glslLibraryCode;
