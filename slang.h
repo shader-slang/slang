@@ -1021,6 +1021,7 @@ namespace slang
 
 #ifdef SLANG_INCLUDE_IMPLEMENTATION
 
+#include "source/core/platform.cpp"
 #include "source/core/slang-io.cpp"
 #include "source/core/slang-string.cpp"
 #include "source/core/stream.cpp"
