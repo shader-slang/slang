@@ -8,6 +8,7 @@
 	#undef WIN32_LEAN_AND_MEAN
 	#undef NOMINMAX
 #else
+	#include "slang-string.h"
 	#include <dlfcn.h>
 #endif
 
@@ -27,7 +28,19 @@ namespace Slang
 		}
 #else
 		{
-			void* h = dlopen(name, RTLD_LOCAL);
+			String fullName;
+			fullName.append("lib");
+			fullName.append(name);
+			fullName.append(".so");
+
+			void* h = dlopen(fullName.Buffer(), RTLD_NOW|RTLD_LOCAL);
+			if(!h)
+			{
+				if(auto msg = dlerror())
+				{
+					fprintf(stderr, "error: %s\n", msg);
+				}
+			}
 			result.handle = (Handle) h;
 
 		}

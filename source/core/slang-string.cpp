@@ -172,14 +172,26 @@ namespace Slang
 		else
 		{
 			List<char> buf;
-			Slang::Encoding::UTF16->GetBytes(buf, *this);
+            switch(sizeof(wchar_t))
+            {
+            case 2:
+                Slang::Encoding::UTF16->GetBytes(buf, *this);                
+                break;
+
+            case 4:
+                Slang::Encoding::UTF32->GetBytes(buf, *this);                
+                break;
+
+            default:
+                break;
+            }
 
             auto length = buf.Count() / sizeof(wchar_t);
 			if (outLength)
 				*outLength = length;
 
-			buf.Add(0);
-			buf.Add(0);
+            for(int ii = 0; ii < sizeof(wchar_t); ++ii)
+    			buf.Add(0);
 
             wchar_t* beginData = (wchar_t*)buf.Buffer();
             wchar_t* endData = beginData + length;

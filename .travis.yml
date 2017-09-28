@@ -4,17 +4,52 @@
 
 language: cpp
 
-# Let's test against both major compilers just to be sure.
-compiler:
-  - clang
-  - gcc
-
+# Build and test (clang, gcc) x (debug, release)
+#
+# We customize the set of tests run per-target to
+# avoid having the build take too long.
 matrix:
   include:
     - os: linux
+      compiler: gcc
+      env: CONFIGURATION=debug
+      env: SLANG_TEST_CATEGORY=smoke
+    - os: linux
+      compiler: clang
+      env: CONFIGURATION=debug
+      env: SLANG_TEST_CATEGORY=smoke
+    - os: linux
+      compiler: clang
+      env: CONFIGURATION=release
+      env: SLANG_TEST_CATEGORY=smoke
+    - os: linux
+      compiler: gcc
+      env: CONFIGURATION=release
+      env: SLANG_TEST_CATEGORY=smoke
+      env: SLANG_DEPLOY=true
 
 # Travis wants to default to a build script that invokes
 # `./configure && make && make test` which is appropriate
 # for autoconf, but I don't want to get into that mess..
 #
 script: make && make test
+
+before_deploy: |
+  export SLANG_OS_NAME=$(TRAVIS_OS_NAME)
+  export SLANG_ARCH_NAME=`uname -p`
+  export SLANG_TAG=${TRAVIS_TAG#v}
+  export SLANG_BINARY_ARCHIVE=slang-$(SLANG_OS_NAME)-$(SLANG_ARCH_NAME)-$(SLANG_TAG).zip
+  zip -r $(SLANG_BINARY_ARCHIVE) bin/*/*/slangc bin/*/*/libslang.so bin/*/*/libslang-glslang.so docs/*.md README.md LICENSE slang.h
+
+# We are going to deploy to GitHub Releases
+# on a successful build from a tag, but only
+# on the one target in the build matrix that set
+# `SLANG_DEPLOY`
+deploy:
+  provider: releases
+  api_key: "$GITHUB_RELEASE_TOKEN"
+  file: "$SLANG_BINARY_ARCHIVE"
+  skip_cleanup: true
+  on:
+    condition: "$SLANG_DEPLOY =  true"
+    tags: true

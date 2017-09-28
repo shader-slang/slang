@@ -18,6 +18,14 @@
 #undef NOMINMAX
 
 #else
+
+#include <dirent.h>
+#include <errno.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
 #endif
 
 // A simple set of error codes for possible runtime failures
@@ -41,6 +49,8 @@ struct OSFindFilesResult
     DWORD				disallowedMask_;
     OSError				error_;
 #else
+    DIR*         directory_;
+    dirent*      entry_;
 #endif
 
     bool findNextFile();
@@ -68,6 +78,7 @@ struct OSFindFilesResult
 #ifdef WIN32
         Iterator result = { findHandle_ ? this : NULL };
 #else
+        Iterator result = { entry_ ? this : NULL };
 #endif
         return result;
     }
@@ -138,6 +149,10 @@ struct OSProcessSpawner
     void pushArgument(
         Slang::String argument);
 
+    // Get a printable version of the command line
+    // that will be run (can be used for debugging)
+    Slang::String getCommandLine();
+
     // Attempt to spawn the process, and wait for it to complete.
     // Returns an error if the attempt to spawn and/or wait fails,
     // but returns `kOSError_None` if the process is run to completion,
@@ -157,12 +172,15 @@ struct OSProcessSpawner
     Slang::String standardOutput_;
     Slang::String standardError_;
     ResultCode resultCode_;
-#ifdef WIN32
     Slang::String executableName_;
+#ifdef WIN32
     Slang::StringBuilder commandLine_;
+#else
+    Slang::List<Slang::String>  arguments_;
 
+#endif
     // Is the executable specified by path, rather than just by name?
     bool isExecutablePath_;
-#else
-#endif
 };
+
+char const* osGetExecutableSuffix();

@@ -1,4 +1,4 @@
-//TEST:SIMPLE:-profile ps_4_0 -entry mainFS -target reflection-json tests/reflection/multi-file-extra.hlsl -profile vs_4_0 -entry mainVS
+//TEST:SIMPLE:-profile ps_4_0 -entry mainFS -target hlsl -target reflection-json tests/reflection/multi-file-extra.hlsl -profile vs_4_0 -entry mainVS
 
 // Here we are testing the case where multiple translation units are provided
 // at once, so that we want combined reflection information for the resulting
