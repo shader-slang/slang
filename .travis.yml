@@ -29,7 +29,7 @@ matrix:
       compiler: gcc
       env:
         - CONFIGURATION=release
-        - SLANG_TEST_CATEGORY=smoke
+        - SLANG_TEST_CATEGORY=full
         - SLANG_DEPLOY=true
 
 # Travis wants to default to a build script that invokes
