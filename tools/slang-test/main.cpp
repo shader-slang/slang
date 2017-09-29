@@ -1360,7 +1360,7 @@ void handleTestResult(
 
             if( err != kOSError_None )
             {
-                error("failed to add appveyor test results for '%S'\n", testName.ToWString().Buffer());
+                error("failed to add appveyor test results for '%S'\n", testName.ToWString().begin());
 
 #if 0
                 fprintf(stderr, "[%d] TEST RESULT: %s {%d} {%s} {%s}\n", err, spawner.commandLine_.Buffer(),
