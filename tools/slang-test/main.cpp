@@ -179,7 +179,7 @@ void parseOptions(int* argc, char** argv)
     }
     
     // any arguments left over were positional arguments
-    argCount = (int)(writeCursor - argv);
+    argCount = (int)((char**)writeCursor - argv);
     argCursor = argv;
     argEnd = argCursor + argCount;
 
@@ -548,14 +548,15 @@ OSError spawnAndWait(String	testPath, OSProcessSpawner& spawner)
 {
     if( options.shouldBeVerbose )
     {
-        fprintf(stderr, "%s\n", spawner.commandLine_.ToString().begin());
+        String commandLine = spawner.getCommandLine();
+        fprintf(stderr, "%s\n", commandLine.begin());
     }
 
     OSError err = spawner.spawnAndWaitForCompletion();
     if (err != kOSError_None)
     {
 //        fprintf(stderr, "failed to run test '%S'\n", testPath.ToWString());
-        error("failed to run test '%S'", testPath.ToWString());
+        error("failed to run test '%S'", testPath.ToWString().begin());
     }
     return err;
 }
@@ -579,6 +580,8 @@ String getOutput(OSProcessSpawner& spawner)
 
     return actualOutputBuilder.ProduceString();
 }
+
+List<String> gFailedTests;
 
 struct TestInput
 {
@@ -609,7 +612,7 @@ TestResult runSimpleTest(TestInput& input)
 
     OSProcessSpawner spawner;
 
-    spawner.pushExecutablePath(String(options.binDir) + "slangc.exe");
+    spawner.pushExecutablePath(String(options.binDir) + "slangc" + osGetExecutableSuffix());
     spawner.pushArgument(filePath999);
 
     for( auto arg : input.testOptions->args )
@@ -680,7 +683,7 @@ TestResult runEvalTest(TestInput& input)
 
     OSProcessSpawner spawner;
 
-    spawner.pushExecutablePath(String(options.binDir) + "slang-eval-test.exe");
+    spawner.pushExecutablePath(String(options.binDir) + "slang-eval-test" + osGetExecutableSuffix());
     spawner.pushArgument(filePath);
 
     for( auto arg : input.testOptions->args )
@@ -754,8 +757,8 @@ TestResult runCrossCompilerTest(TestInput& input)
     OSProcessSpawner actualSpawner;
     OSProcessSpawner expectedSpawner;
 
-    actualSpawner.pushExecutablePath(String(options.binDir) + "slangc.exe");
-    expectedSpawner.pushExecutablePath(String(options.binDir) + "slangc.exe");
+    actualSpawner.pushExecutablePath(String(options.binDir) + "slangc" + osGetExecutableSuffix());
+    expectedSpawner.pushExecutablePath(String(options.binDir) + "slangc" + osGetExecutableSuffix());
 
     actualSpawner.pushArgument(filePath);
     expectedSpawner.pushArgument(filePath + ".glsl");
@@ -827,7 +830,7 @@ TestResult generateHLSLBaseline(TestInput& input)
     auto outputStem = input.outputStem;
 
     OSProcessSpawner spawner;
-    spawner.pushExecutablePath(String(options.binDir) + "slangc.exe");
+    spawner.pushExecutablePath(String(options.binDir) + "slangc" + osGetExecutableSuffix());
     spawner.pushArgument(filePath999);
 
     for( auto arg : input.testOptions->args )
@@ -873,7 +876,7 @@ TestResult runHLSLComparisonTest(TestInput& input)
 
     OSProcessSpawner spawner;
 
-    spawner.pushExecutablePath(String(options.binDir) + "slangc.exe");
+    spawner.pushExecutablePath(String(options.binDir) + "slangc" + osGetExecutableSuffix());
     spawner.pushArgument(filePath999);
 
     for( auto arg : input.testOptions->args )
@@ -973,7 +976,7 @@ TestResult doGLSLComparisonTestRun(
 
     OSProcessSpawner spawner;
 
-    spawner.pushExecutablePath(String(options.binDir) + "slangc.exe");
+    spawner.pushExecutablePath(String(options.binDir) + "slangc" + osGetExecutableSuffix());
     spawner.pushArgument(filePath999);
 
     if( langDefine )
@@ -1062,7 +1065,7 @@ TestResult doRenderComparisonTestRun(TestInput& input, char const* langOption, c
 
     OSProcessSpawner spawner;
 
-    spawner.pushExecutablePath(String(options.binDir) + "render-test.exe");
+    spawner.pushExecutablePath(String(options.binDir) + "render-test" + osGetExecutableSuffix());
     spawner.pushArgument(filePath999);
 
     for( auto arg : input.testOptions->args )
@@ -1217,6 +1220,11 @@ TestResult runHLSLAndGLSLComparisonTest(TestInput& input)
     return runHLSLRenderComparisonTestImpl(input, "-hlsl-rewrite", "-glsl-rewrite");
 }
 
+TestResult skipTest(TestInput& input)
+{
+    return kTestResult_Ignored;
+}
+
 TestResult runTest(
     String const&       filePath,
     String const&       outputStem,
@@ -1230,10 +1238,17 @@ TestResult runTest(
         TestCallback    callback;
     } kTestCommands[] = {
         { "SIMPLE", &runSimpleTest },
+#if SLANG_TEST_SUPPORT_HLSL
         { "COMPARE_HLSL", &runHLSLComparisonTest },
         { "COMPARE_HLSL_RENDER", &runHLSLRenderComparisonTest },
         { "COMPARE_HLSL_CROSS_COMPILE_RENDER", &runHLSLCrossCompileRenderComparisonTest},
         { "COMPARE_HLSL_GLSL_RENDER", &runHLSLAndGLSLComparisonTest },
+#else
+        { "COMPARE_HLSL",                       &skipTest },
+        { "COMPARE_HLSL_RENDER",                &skipTest },
+        { "COMPARE_HLSL_CROSS_COMPILE_RENDER",  &skipTest},
+        { "COMPARE_HLSL_GLSL_RENDER",           &skipTest },
+#endif
         { "COMPARE_GLSL", &runGLSLComparisonTest },
         { "CROSS_COMPILE", &runCrossCompilerTest },
         { "EVAL", &runEvalTest },
@@ -1265,6 +1280,7 @@ struct TestContext
     int totalTestCount;
     int passedTestCount;
     int failedTestCount;
+    int ignoredTestCount;
 };
 
 // deal with the fallout of a test having completed, whether
@@ -1278,6 +1294,7 @@ void handleTestResult(
     {
     case kTestResult_Fail:
         context->failedTestCount++;
+        gFailedTests.Add(testName);
         break;
 
     case kTestResult_Pass:
@@ -1285,8 +1302,7 @@ void handleTestResult(
         break;
 
     case kTestResult_Ignored:
-        // Note that we don't currently add ignored tests into
-        // the totals, which is kind of inaccurate.
+        context->ignoredTestCount++;
         break;
 
     default:
@@ -1344,7 +1360,7 @@ void handleTestResult(
 
             if( err != kOSError_None )
             {
-                error("failed to add appveyor test results for '%S'\n", testName.ToWString());
+                error("failed to add appveyor test results for '%S'\n", testName.ToWString().begin());
 
 #if 0
                 fprintf(stderr, "[%d] TEST RESULT: %s {%d} {%s} {%s}\n", err, spawner.commandLine_.Buffer(),
@@ -1512,6 +1528,7 @@ void runTestsInDirectory(
     {
         if( shouldRunTest(context, file) )
         {
+//            fprintf(stderr, "slang-test: found '%s'\n", file.Buffer());
             runTestsOnFile(context, file);
         }
     }
@@ -1571,6 +1588,30 @@ int main(
         return 0;
     }
 
-    printf("\n===\n%d%% of tests passed (%d/%d)\n===\n\n", (context.passedTestCount*100) / context.totalTestCount, context.passedTestCount, context.totalTestCount);
-    return context.passedTestCount == context.totalTestCount ? 0 : 1;
+
+    auto passCount = context.passedTestCount;
+    auto rawTotal = context.totalTestCount;
+    auto ignoredCount = context.ignoredTestCount;
+
+    auto runTotal = rawTotal - ignoredCount;
+
+    printf("\n===\n%d%% of tests passed (%d/%d)", (passCount*100) / runTotal, passCount, runTotal);
+    if(ignoredCount)
+    {
+        printf(", %d tests ingored", ignoredCount);
+    }
+    printf("\n===\n\n");
+
+    if(context.failedTestCount)
+    {
+        printf("failing tests:\n");
+        printf("---\n");
+        for(auto name : gFailedTests)
+        {
+            printf("%s\n", name.Buffer());
+        }
+        printf("---\n");
+    }
+
+    return passCount == runTotal ? 0 : 1;
 }

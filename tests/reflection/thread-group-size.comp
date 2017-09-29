@@ -1,4 +1,4 @@
-//TEST:SIMPLE:-no-checking -target reflection-json
+//TEST:SIMPLE:-no-checking -target glsl -target reflection-json
 
 // Confirm that we provide reflection data for the `local_size_*` attributes
 

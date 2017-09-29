@@ -2,6 +2,8 @@
 #ifndef SLANG_GLSLANG_H_INCLUDED
 #define SLANG_GLSLANG_H_INCLUDED
 
+#include <stddef.h>
+
 typedef void (*glslang_OutputFunc)(void const* data, size_t size, void* userData);
 
 enum

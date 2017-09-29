@@ -224,6 +224,11 @@ void OSProcessSpawner::pushArgument(
     commandLine_.Append(argument);
 }
 
+Slang::String OSProcessSpawner::getCommandLine()
+{
+    return commandLine_;
+}
+
 OSError OSProcessSpawner::spawnAndWaitForCompletion()
 {
     SECURITY_ATTRIBUTES securityAttributes;
@@ -372,8 +377,263 @@ OSError OSProcessSpawner::spawnAndWaitForCompletion()
     return kOSError_None;
 }
 
+char const* osGetExecutableSuffix()
+{
+    return ".exe";
+}
+
 #else
 
-// TODO(tfoley): write a default POSIX implementation
+static bool advance(OSFindFilesResult& result)
+{
+    result.entry_ = readdir(result.directory_);
+    return result.entry_ != NULL;
+}
+
+static bool checkValidResult(OSFindFilesResult& result)
+{
+//    fprintf(stderr, "checkValidResullt(%s)\n", result.entry_->d_name);
+
+    if (strcmp(result.entry_->d_name, ".") == 0)
+        return false;
+
+    if (strcmp(result.entry_->d_name, "..") == 0)
+        return false;
+
+    String path = result.directoryPath_
+        + String(result.entry_->d_name);
+
+//    fprintf(stderr, "stat(%s)\n", path.Buffer());
+    struct stat fileInfo;
+    if(stat(path.Buffer(), &fileInfo) != 0)
+        return false;
+
+    if(S_ISDIR(fileInfo.st_mode))
+        path = path + "/";
+
+
+    result.filePath_ = path;
+    return true;    
+}
+
+static bool adjustToValidResult(OSFindFilesResult& result)
+{
+    for (;;)
+    {
+        if(checkValidResult(result))
+            return true;
+
+        if (!advance(result))
+            return false;
+    }
+}
+
+
+bool OSFindFilesResult::findNextFile()
+{
+//    fprintf(stderr, "OSFindFilesResult::findNextFile()\n");
+    if (!advance(*this)) return false;
+    return adjustToValidResult(*this);
+}
+
+OSFindFilesResult osFindFilesInDirectory(
+    Slang::String directoryPath)
+{
+    OSFindFilesResult result;
+
+//    fprintf(stderr, "osFindFilesInDirectory(%s)\n", directoryPath.Buffer());
+
+    result.directory_ = opendir(directoryPath.Buffer());
+    if(!result.directory_)
+    {
+        result.entry_ = NULL;
+        return result;
+    }
+
+    result.directoryPath_ = directoryPath;
+    result.findNextFile();
+    return result;
+}
+
+OSFindFilesResult osFindChildDirectories(
+    Slang::String directoryPath)
+{
+    OSFindFilesResult result;
+
+    result.directory_ = opendir(directoryPath.Buffer());
+    if(!result.directory_)
+    {
+        result.entry_ = NULL;
+        return result;
+    }
+
+    // TODO: Set attributes to ignore everything but directories
+
+    result.directoryPath_ = directoryPath;
+    result.findNextFile();
+    return result;
+}
+
+// OSProcessSpawner
+
+void OSProcessSpawner::pushExecutableName(
+    Slang::String executableName)
+{
+    executableName_ = executableName;
+    pushArgument(executableName);
+    isExecutablePath_ = false;
+}
+
+void OSProcessSpawner::pushExecutablePath(
+    Slang::String executablePath)
+{
+    executableName_ = executablePath;
+    pushArgument(executablePath);
+    isExecutablePath_ = true;
+}
+
+void OSProcessSpawner::pushArgument(
+    Slang::String argument)
+{
+    arguments_.Add(argument);
+}
+
+Slang::String OSProcessSpawner::getCommandLine()
+{
+    Slang::UInt argCount = arguments_.Count();
+
+    Slang::StringBuilder sb;
+    for(Slang::UInt ii = 0; ii < argCount;  ++ii)
+    {
+        if(ii != 0) sb << " ";
+        sb << arguments_[ii];
+
+    }
+    return sb.ProduceString();
+}
+
+OSError OSProcessSpawner::spawnAndWaitForCompletion()
+{
+    List<char const*> argPtrs;
+    for(auto arg : arguments_)
+    {
+        argPtrs.Add(arg.Buffer());
+    }
+    argPtrs.Add(NULL);
+
+    int stdoutPipe[2];
+    int stderrPipe[2];
+
+    if(pipe(stdoutPipe) == -1)
+        return kOSError_OperationFailed;
+
+    if(pipe(stderrPipe) == -1)
+        return kOSError_OperationFailed;
+
+    pid_t childProcessID = fork();
+    if(childProcessID  == 0)
+    {
+        // We are the child process.
+
+        dup2(stdoutPipe[1], STDOUT_FILENO);
+        dup2(stderrPipe[1], STDERR_FILENO);
+
+        close(stdoutPipe[0]);
+        close(stdoutPipe[1]);
+
+        close(stderrPipe[0]);
+        close(stderrPipe[1]);
+
+        execvp(
+            argPtrs[0],
+            (char* const*) &argPtrs[0]);
+
+        // If we get here, then `exec` failed
+        fprintf(stderr, "error: `exec` failed\n");
+        exit(1);
+    }
+    else
+    {
+        // We are the parent process
+
+        close(stdoutPipe[1]);
+        close(stderrPipe[1]);
+
+        int stdoutFD = stdoutPipe[0];
+        int stderrFD = stderrPipe[0];
+
+        int maxFD = stdoutFD > stderrFD ? stdoutFD : stderrFD;
+
+        fd_set readSet;
+        int result;
+
+        int remainingCount =  2;
+        while(remainingCount)
+        {
+            FD_ZERO(&readSet);
+            FD_SET(stdoutFD, &readSet);
+            FD_SET(stderrFD, &readSet);
+
+            result = select(maxFD + 1, &readSet, NULL, NULL, NULL);
+
+            if(result == -1 || errno == EINTR)
+                continue;
+
+            enum { kBufferSize = 1024 };
+            char buffer[kBufferSize];
+
+            if(FD_ISSET(stdoutFD, &readSet))
+            {
+                auto count = read(stdoutFD, buffer, kBufferSize);
+                if(count == 0)
+                    remainingCount--;
+
+                standardOutput_.append(
+                    buffer, buffer + count);
+            }
+
+            if(FD_ISSET(stderrFD, &readSet))
+            {
+                auto count = read(stderrFD, buffer, kBufferSize);
+                if(count == 0)
+                    remainingCount--;
+
+                standardError_.append(
+                    buffer, buffer + count);
+            }
+        }
+
+        int childStatus = 0;
+        for(;;)
+        {
+            pid_t terminatedProcessID = wait(&childStatus);
+            if(terminatedProcessID == childProcessID)
+            {
+                if(WIFEXITED(childStatus))
+                {
+                    resultCode_ = (int)(int8_t)WEXITSTATUS(childStatus);
+
+                }
+                else
+                {
+                    resultCode_ = 1;
+                }
+
+                close(stdoutPipe[0]);
+                close(stderrPipe[0]);
+
+                return kOSError_None;
+            }
+        }
+
+    }
+
+    return kOSError_OperationFailed;
+}
+
+char const* osGetExecutableSuffix()
+{
+    return "";
+}
 
 #endif

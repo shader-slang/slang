@@ -28,6 +28,7 @@
 #include <Windows.h>
 #endif
 
+#include <memory>
 #include <sstream>
 
 // This is a wrapper to allow us to run the `glslang` compiler
@@ -67,7 +68,11 @@ static void dump(
 
         // also output it for debug purposes
         std::string str((char const*)data, size);
+    #ifdef _WIN32
         OutputDebugStringA(str.c_str());
+    #else
+        fprintf(stderr, "%s\n", str.c_str());;
+    #endif
     }
 }
 
@@ -177,7 +182,11 @@ static int glslang_dissassembleSPIRV(glslang_CompileRequest* request)
 }
 
 extern "C"
+#ifdef _MSC_VER
 _declspec(dllexport)
+#else
+__attribute__((__visibility__("default")))
+#endif
 int glslang_compile(glslang_CompileRequest* request)
 {
     glslang::InitializeProcess();

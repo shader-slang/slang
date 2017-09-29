@@ -1,4 +1,4 @@
-//TEST:SIMPLE:-profile cs_5_0 -target reflection-json
+//TEST:SIMPLE:-profile cs_5_0 -target hlsl -target reflection-json
 
 // Confirm that we provide reflection data for the `numthreads` attribute
 
