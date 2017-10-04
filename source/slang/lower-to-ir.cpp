@@ -1043,8 +1043,8 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         // in order for a dereference to make senese, so we just
         // need to extract the value type from that pointer here.
         //
-        auto loweredBaseVal = getSimpleVal(context, loweredBase);
-        auto loweredBaseType = loweredBaseVal->getType();
+        IRValue* loweredBaseVal = getSimpleVal(context, loweredBase);
+        RefPtr<Type> loweredBaseType = loweredBaseVal->getType();
 
         if (loweredBaseType->As<PointerLikeType>()
             || loweredBaseType->As<PtrType>())
