@@ -352,9 +352,13 @@ VMFunc* loadVMFunc(
         case kBCConstFlavor_Constant:
             {
                 auto constID = bcConst.id;
-                auto constInfo = vmModule->bcModule->constants[constID];
-                vmFunc->consts[cc].ptr = constInfo.ptr;
-                vmFunc->consts[cc].type = getType(vmModule, constInfo.typeID);
+                auto constInfo = &vmModule->bcModule->constants[constID];
+                vmFunc->consts[cc].ptr = constInfo->ptr;
+            #if 0
+                fprintf(stderr, "CONSANT[%d] : [%p]\n", (int)cc, vmFunc->consts[cc].ptr);
+                fprintf(stderr, "BC [%p] : %d\n", &constInfo->ptr, (int)constInfo->ptr.rawVal);
+            #endif
+                vmFunc->consts[cc].type = getType(vmModule, constInfo->typeID);
             }
             break;
         }
@@ -432,7 +436,7 @@ void dumpVMFrame(VMFrame* vmFrame)
 
             case kIROp_PtrType:
                 {
-                    fprintf(stderr, ": Ptr<???> = 0x%p", *(void**)regData);
+                    fprintf(stderr, ": Ptr<?> = [%p]", *(void**)regData);
                 }
                 break;
 
@@ -675,7 +679,6 @@ VMModule* loadVMModuleInstance(
         + symbolCount * sizeof(void*)
         + typeCount * sizeof(VMType);
 
-#if 1
     VMModule* vmModule = (VMModule*)malloc(vmModuleSize);
     memset(vmModule, 0, vmModuleSize);
 
@@ -704,24 +707,6 @@ VMModule* loadVMModuleInstance(
     }
 
     return vmModule;
-#else
-
-    VMModule* vmModule = (VMModule*) loadVMFunc(bcModule, nullptr);
-
-    // Create a frame to store the loaded symbols, and execute it
-    // to initialize them.
-    VMFrame* vmModuleInstance = createFrame(vmModule);
-    vmModuleInstance->parent = nullptr;
-    vmModule->module = vmModuleInstance;
-
-
-    VMThread thread;
-    thread.frame = vmModuleInstance;
-
-    resumeThread(&thread);
-
-    return vmModuleInstance;
-#endif
 }
 
 void* findGlobalSymbolPtr(
@@ -826,6 +811,13 @@ void resumeThread(
                 VMType type = decodeType(frame, &ip);
                 void* dest = decodeOperand<void*>(frame, &ip);
                 void* src = decodeOperandPtr<void>(frame, &ip);
+
+#if 0
+                fprintf(stderr, "STORE *[%p] = [%p] // size: %d\n",
+                    dest,
+                    src,
+                    (int) type.getSize());
+#endif
 
                 memcpy(dest, src, type.getSize());
             }
