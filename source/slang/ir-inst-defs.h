@@ -22,20 +22,20 @@ INST(arrayType, Array, 2, 0)
 
 INST(BoolType, Bool, 0, 0)
 
-INST(Float16Type,   Float16,    0, 0)
-INST(Float32Type,   Float32,    0, 0)
-INST(Float64Type,   Float64,    0, 0)
+INST(Float16Type, Float16, 0, 0)
+INST(Float32Type, Float32, 0, 0)
+INST(Float64Type, Float64, 0, 0)
 
 // Signed integer types.
 // Note that `IntPtr` represents a pointer-sized integer type,
 // and will end up being equivalent to either `Int32` or `Int64`
 // when it comes time to actually generate code.
 //
-INST(Int8Type,      Int8,       0, 0)
-INST(Int16Type,     Int16,      0, 0)
-INST(Int32Type,     Int32,      0, 0)
-INST(IntPtrType,    IntPtr,     0, 0)
-INST(Int64Type,     Int64,      0, 0)
+INST(Int8Type, Int8, 0, 0)
+INST(Int16Type, Int16, 0, 0)
+INST(Int32Type, Int32, 0, 0)
+INST(IntPtrType, IntPtr, 0, 0)
+INST(Int64Type, Int64, 0, 0)
 
 // Unlike a lot of other IRs, we retain a distinction between
 // signed and unsigned integer types, simply because many of
@@ -52,11 +52,11 @@ INST(Int64Type,     Int64,      0, 0)
 // or else we want to keep using the orignal types, but need
 // to cast around any ordinary math operations on signed types.
 //
-INST(UInt8Type,     Int8,       0, 0)
-INST(UInt16Type,    Int16,      0, 0)
-INST(UInt32Type,    Int32,      0, 0)
-INST(UIntPtrType,   IntPtr,     0, 0)
-INST(UInt64Type,    Int64,      0, 0)
+INST(UInt8Type, Int8, 0, 0)
+INST(UInt16Type, Int16, 0, 0)
+INST(UInt32Type, Int32, 0, 0)
+INST(UIntPtrType, IntPtr, 0, 0)
+INST(UInt64Type, Int64, 0, 0)
 
 // A user-defined structure declaration at the IR level.
 // Unlike in the AST where there is a distinction between
@@ -94,6 +94,7 @@ INST(GenericParameterType, GenericParameterType, 1, 0)
 INST(boolConst, boolConst, 0, 0)
 INST(IntLit, integer_constant, 0, 0)
 INST(FloatLit, float_constant, 0, 0)
+INST(decl_ref, decl_ref, 0, 0)
 
 INST(Construct, construct, 0, 0)
 INST(Call, call, 1, 0)
@@ -101,6 +102,8 @@ INST(Call, call, 1, 0)
 INST(Module, module, 0, PARENT)
 INST(Func, func, 0, PARENT)
 INST(Block, block, 0, PARENT)
+
+INST(global_var, global_var, 0, 0)
 
 INST(Param, param, 0, 0)
 INST(StructField, field, 0, 0)

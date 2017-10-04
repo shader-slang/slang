@@ -65,6 +65,7 @@ struct BCPtr
     }
 
     operator T*() const { return getPtr(); }
+    T* operator->() const { return getPtr(); }
 
     T* getPtr() const
     {
@@ -73,9 +74,52 @@ struct BCPtr
     }
 };
 
-struct BCType
+// Representation of a "type-level" value in
+// the bytecode fiel. This corresponds to
+// the AST-level notion of a `Val`
+struct BCVal
 {
+    // The opcode used to define this value
     uint32_t op;
+
+    // The ID of the type within its module
+    uint32_t id;
+};
+
+struct BCType : BCVal
+{
+    // TODO: avoid having to encode this?
+    uint32_t argCount;
+
+    // type-specific operands follow
+
+    //
+
+    BCPtr<BCVal>* getArgs() { return (BCPtr<BCVal>*) (this +1); }
+
+    BCVal* getArg(UInt index) { return getArgs()[index]; }
+};
+
+struct BCPtrType : BCType
+{
+    BCPtr<BCType>   valueType;
+};
+
+struct BCFuncType : BCType
+{
+    BCPtr<BCType>   resultType;
+    BCPtr<BCType>   paramTypes[1];
+
+    BCType* getResultType() { return resultType; }
+
+    UInt getParamCount() { return argCount - 1; }
+    BCType* getParamType(UInt index) { return paramTypes[index]; }
+};
+
+struct BCConstant : BCVal
+{
+    uint32_t        typeID;
+    BCPtr<uint8_t>  ptr;
 };
 
 struct BCSymbol
@@ -84,15 +128,9 @@ struct BCSymbol
     // this symbol; used to categorize things
     uint32_t op;
 
-    // The type of the symbol is represent
-    // as an index into the global-scope symbol
-    // list of the module.
-    //
-    // Note: This currently precludes having
-    // a register with a type that is not
-    // statically determined, but that is
-    // probably okay.
-    uint32_t   typeGlobalID;
+    // The index (in the module's type table)
+    // of the type of the symbol:
+    uint32_t typeID;
 
     // The name of this symbol (which might
     // be a mangled name at some point,
@@ -111,17 +149,18 @@ struct BCReg : BCSymbol
     uint32_t    previousVarIndexPlusOne;
 };
 
+enum BCConstFlavor
+{
+    kBCConstFlavor_GlobalSymbol,
+    kBCConstFlavor_Constant,
+};
+
 struct BCConst
 {
-    // The ID of the symbol in the global
-    // scope that we are trying to refer
-    // to.
-    //
-    // TODO: eventually, if we have general
-    // nesting, then this might be the
-    // entry in the outer scope that
-    // is being referenced.
-    uint32_t    globalID;
+    // The flavor of bytecode constant we
+    // are dealing with.
+    uint32_t flavor;
+    uint32_t id;
 };
 
 struct BCBlock
@@ -153,16 +192,27 @@ struct BCFunc : BCSymbol
     // but this would make the encoding less dense.
     uint32_t        constCount;
     BCPtr<BCConst>  consts;
-
-    // Data for "nested" symbols (e.g., a function
-    // nested inside this function).
-    uint32_t                    nestedSymbolCount;
-    BCPtr<BCPtr<BCSymbol>>      nestedSymbols;
 };
 
-// A module is encoded more or less like a function.
-struct BCModule : BCFunc
+struct BCModule
 {
+    // The symbols (functions, global variables, etc.)
+    // that have been declared in the module.
+    uint32_t                symbolCount;
+    BCPtr<BCPtr<BCSymbol>>  symbols;
+
+    // The types that are used by this module, stored
+    // in a single array so that they can be conveniently
+    // mapped to another representation in one go.
+    //
+    // Instructions in a bytecode instruction sequence
+    // might reference these types by index.
+    uint32_t                typeCount;
+    BCPtr<BCPtr<BCType>>    types;
+
+    // True compile-time constants go here:
+    uint32_t                constantCount;
+    BCPtr<BCConstant>       constants;
 };
 
 struct BCHeader

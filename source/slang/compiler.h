@@ -15,6 +15,7 @@ namespace Slang
     struct IncludeHandler;
     class CompileRequest;
     class ProgramLayout;
+    class PtrType;
 
     enum class CompilerMode
     {
@@ -369,6 +370,7 @@ namespace Slang
         RefPtr<Type> errorType;
         RefPtr<Type> initializerListType;
         RefPtr<Type> overloadedType;
+        RefPtr<Type> irBasicBlockType;
 
         Dictionary<int, RefPtr<Type>> builtinTypes;
         Dictionary<String, Decl*> magicDecls;
@@ -387,6 +389,12 @@ namespace Slang
         Type* getInitializerListType();
         Type* getOverloadedType();
         Type* getErrorType();
+
+        // Should not be used in front-end code
+        Type* getIRBasicBlockType();
+
+        // Construct pointer types on-demand
+        RefPtr<PtrType> getPtrType(RefPtr<Type> valueType);
 
         SyntaxClass<RefObject> findSyntaxClass(Name* name);
 

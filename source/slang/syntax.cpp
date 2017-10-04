@@ -216,6 +216,9 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
         overloadedType = new OverloadGroupType();
         overloadedType->setSession(this);
+
+        irBasicBlockType = new IRBasicBlockType();
+        irBasicBlockType->setSession(this);
     }
 
     Type* Session::getBoolType()
@@ -266,6 +269,29 @@ void Type::accept(IValVisitor* visitor, void* extra)
     Type* Session::getErrorType()
     {
         return errorType;
+    }
+
+    Type* Session::getIRBasicBlockType()
+    {
+        return irBasicBlockType;
+    }
+
+    RefPtr<PtrType> Session::getPtrType(
+        RefPtr<Type>    valueType)
+    {
+        auto genericDecl = findMagicDecl(
+            this, "PtrType").As<GenericDecl>();
+        auto typeDecl = genericDecl->inner;
+               
+        auto substitutions = new Substitutions();
+        substitutions->genericDecl = genericDecl.Ptr();
+        substitutions->args.Add(valueType);
+
+        auto declRef = DeclRef<Decl>(typeDecl.Ptr(), substitutions);
+
+        return DeclRefType::Create(
+            this,
+            declRef)->As<PtrType>();
     }
 
     SyntaxClass<RefObject> Session::findSyntaxClass(Name* name)
@@ -545,7 +571,26 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
             else
             {
-                SLANG_UNEXPECTED("unhandled type");
+                auto classInfo = session->findSyntaxClass(
+                    session->getNamePool()->getName(magicMod->name));
+                if (!classInfo.classInfo)
+                {
+                    SLANG_UNEXPECTED("unhandled type");
+                }
+
+                auto type = classInfo.createInstance();
+                if (!type)
+                {
+                    SLANG_UNEXPECTED("constructor failure");
+                }
+
+                auto declRefType = dynamic_cast<DeclRefType*>(type);
+                if (!declRefType)
+                {
+                    SLANG_UNEXPECTED("expected a declaration reference type");
+                }
+                declRefType->declRef = declRef;
+                return declRefType;
             }
         }
         else
@@ -574,6 +619,28 @@ void Type::accept(IValVisitor* visitor, void* extra)
     }
 
     int OverloadGroupType::GetHashCode()
+    {
+        return (int)(int64_t)(void*)this;
+    }
+
+    // IRBasicBlockType
+
+    String IRBasicBlockType::ToString()
+    {
+        return "Block";
+    }
+
+    bool IRBasicBlockType::EqualsImpl(Type * /*type*/)
+    {
+        return false;
+    }
+
+    Type* IRBasicBlockType::CreateCanonicalType()
+    {
+        return this;
+    }
+
+    int IRBasicBlockType::GetHashCode()
     {
         return (int)(int64_t)(void*)this;
     }
@@ -653,18 +720,43 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     String FuncType::ToString()
     {
-        // TODO: a better approach than this
-        if (declRef)
-            return getText(declRef.GetName());
-        else
-            return "/* unknown FuncType */";
+        StringBuilder sb;
+        sb << "(";
+        UInt paramCount = getParamCount();
+        for (UInt pp = 0; pp < paramCount; ++pp)
+        {
+            if (pp != 0) sb << ", ";
+            sb << getParamType(pp)->ToString();
+        }
+        sb << ") -> ";
+        sb << getResultType()->ToString();
+        return sb.ProduceString();
     }
 
     bool FuncType::EqualsImpl(Type * type)
     {
         if (auto funcType = type->As<FuncType>())
         {
-            return declRef == funcType->declRef;
+            auto paramCount = getParamCount();
+            auto otherParamCount = funcType->getParamCount();
+            if (paramCount != otherParamCount)
+                return false;
+
+            for (UInt pp = 0; pp < paramCount; ++pp)
+            {
+                auto paramType = getParamType(pp);
+                auto otherParamType = funcType->getParamType(pp);
+                if (!paramType->Equals(otherParamType))
+                    return false;
+            }
+
+            if(!resultType->Equals(funcType->resultType))
+                return false;
+
+            // TODO: if we ever introduce other kinds
+            // of qualification on function types, we'd
+            // want to consider it here.
+            return true;
         }
         return false;
     }
@@ -676,7 +768,16 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     int FuncType::GetHashCode()
     {
-        return declRef.GetHashCode();
+        int hashCode = getResultType()->GetHashCode();
+        UInt paramCount = getParamCount();
+        hashCode = combineHash(hashCode, Slang::GetHashCode(paramCount));
+        for (UInt pp = 0; pp < paramCount; ++pp)
+        {
+            hashCode = combineHash(
+                hashCode,
+                getParamType(pp)->GetHashCode());
+        }
+        return hashCode;
     }
 
     // TypeType
@@ -780,6 +881,13 @@ void Type::accept(IValVisitor* visitor, void* extra)
     IntVal* MatrixExpressionType::getColumnCount()
     {
         return this->declRef.substitutions->args[2].As<IntVal>().Ptr();
+    }
+
+    // PtrTypeBase
+
+    Type* PtrTypeBase::getValueType()
+    {
+        return this->declRef.substitutions->args[0].As<Type>().Ptr();
     }
 
     // GenericParamIntVal
@@ -1161,7 +1269,13 @@ void Type::accept(IValVisitor* visitor, void* extra)
     {
         auto funcType = new FuncType();
         funcType->setSession(session);
-        funcType->declRef = declRef;
+
+        funcType->resultType = GetResultType(declRef);
+        for (auto pp : GetParameters(declRef))
+        {
+            funcType->paramTypes.Add(GetType(pp));
+        }
+
         return funcType;
     }
 

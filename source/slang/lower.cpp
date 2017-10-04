@@ -708,6 +708,12 @@ struct LoweringVisitor
         return result;
     }
 
+    RefPtr<Type> visitIRBasicBlockType(IRBasicBlockType* type)
+    {
+        return type;
+    }
+
+
     RefPtr<Type> visitErrorType(ErrorType* type)
     {
         return type;
@@ -732,9 +738,16 @@ struct LoweringVisitor
 
     RefPtr<Type> visitFuncType(FuncType* type)
     {
-        RefPtr<FuncType> loweredType = getFuncType(
-            getSession(),
-            translateDeclRef(DeclRef<Decl>(type->declRef)).As<CallableDecl>());
+        RefPtr<FuncType> loweredType = new FuncType();
+        loweredType->resultType = lowerType(type->resultType);
+        for (auto paramType : type->paramTypes)
+        {
+            auto loweredParamType = lowerType(paramType);
+
+            // TODO: it seems like this step needs to scalarize
+            // in the case where a parameter type is a tuple...
+            loweredType->paramTypes.Add(loweredParamType);
+        }
         return loweredType;
     }
 

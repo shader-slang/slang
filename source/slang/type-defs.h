@@ -41,6 +41,20 @@ protected:
 )
 END_SYNTAX_CLASS()
 
+// The type of a reference to a basic block
+// in our IR
+SYNTAX_CLASS(IRBasicBlockType, Type)
+RAW(
+public:
+    virtual String ToString() override;
+
+protected:
+    virtual bool EqualsImpl(Type * type) override;
+    virtual Type* CreateCanonicalType() override;
+    virtual int GetHashCode() override;
+)
+END_SYNTAX_CLASS()
+
 // A type that takes the form of a reference to some declaration
 SYNTAX_CLASS(DeclRefType, Type)
     DECL_FIELD(DeclRef<Decl>, declRef)
@@ -221,6 +235,8 @@ END_SYNTAX_CLASS()
 // Other cases of generic types known to the compiler
 SYNTAX_CLASS(BuiltinGenericType, DeclRefType)
     SYNTAX_FIELD(RefPtr<Type>, elementType)
+
+    RAW(Type* getElementType() { return elementType; })
 END_SYNTAX_CLASS()
 
 // Types that behave like pointers, in that they can be
@@ -353,6 +369,33 @@ protected:
 )
 END_SYNTAX_CLASS()
 
+// Base class for types that map down to
+// simple pointers as part of code generation.
+SYNTAX_CLASS(PtrTypeBase, DeclRefType)
+RAW(
+    // Get the type of the pointed-to value.
+    Type*   getValueType();
+)
+END_SYNTAX_CLASS()
+
+// A true (user-visible) pointer type, e.g., `T*`
+SYNTAX_CLASS(PtrType, PtrTypeBase)
+END_SYNTAX_CLASS()
+
+// A type that represents the behind-the-scenes
+// logical pointer that is passed for an `out`
+// or `in out` parameter
+SYNTAX_CLASS(OutTypeBase, PtrTypeBase)
+END_SYNTAX_CLASS()
+
+// The type for an `out` parameter, e.g., `out T`
+SYNTAX_CLASS(OutType, OutTypeBase)
+END_SYNTAX_CLASS()
+
+// The type for an `in out` parameter, e.g., `in out T`
+SYNTAX_CLASS(InOutType, OutTypeBase)
+END_SYNTAX_CLASS()
+
 // A type alias of some kind (e.g., via `typedef`)
 SYNTAX_CLASS(NamedExpressionType, Type)
     DECL_FIELD(DeclRef<TypeDefDecl>, declRef)
@@ -375,16 +418,26 @@ protected:
 )
 END_SYNTAX_CLASS()
 
-// Function types are currently used for references to symbols that name
-// either ordinary functions, or "component functions."
-// We do not directly store a representation of the type, and instead
-// use a reference to the symbol to stand in for its logical type
+// A function type is defined by its parameter types
+// and its result type.
 SYNTAX_CLASS(FuncType, Type)
-    DECL_FIELD(DeclRef<CallableDecl>, declRef)
+
+    // TODO: We may want to preserve parameter names
+    // in the list here, just so that we can print
+    // out friendly names when printing a function
+    // type, even if they don't affect the actual
+    // semantic type underneath.
+
+    FIELD(List<RefPtr<Type>>, paramTypes)
+    FIELD(RefPtr<Type>, resultType)
 
 RAW(
     FuncType()
     {}
+
+    UInt getParamCount() { return paramTypes.Count(); }
+    Type* getParamType(UInt index) { return paramTypes[index]; }
+    Type* getResultType() { return resultType; }
 
     virtual String ToString() override;
 protected:

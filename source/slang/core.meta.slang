@@ -85,6 +85,17 @@ for (int tt = 0; tt < kBaseTypeCount; ++tt)
     sb << "};\n";
 }
 
+// Declare built-in pointer type
+// (eventually we can have the traditional syntax sugar for this)
+
+}}}}
+
+__generic<T>
+__magic_type(PtrType)
+struct Ptr
+{};
+
+${{{{
 
 
 // Declare vector and matrix types

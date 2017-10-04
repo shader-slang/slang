@@ -93,6 +93,10 @@ struct SharedEmitContext
     bool                needHackSamplerForTexelFetch = false;
 
     ExtensionUsageTracker extensionUsageTracker;
+
+    Dictionary<IRValue*, UInt> mapIRValueToID;
+
+    HashSet<Decl*> irDeclsVisited;
 };
 
 struct EmitContext
@@ -1025,6 +1029,9 @@ struct EmitVisitor
     UNEXPECTED(GenericDeclRefType);
     UNEXPECTED(InitializerListType);
 
+    UNEXPECTED(IRBasicBlockType);
+    UNEXPECTED(PtrType);
+
 #undef UNEXPECTED
 
     void visitNamedExpressionType(NamedExpressionType* type, TypeEmitArg const& arg)
@@ -1230,6 +1237,17 @@ struct EmitVisitor
     {
         EmitType(type, SourceLoc(), name, SourceLoc());
     }
+
+    void EmitType(RefPtr<Type> type, String const& name)
+    {
+        // HACK: the rest of the code wants a `Name`,
+        // so we'll create one for a bit...
+        Name tempName;
+        tempName.text = name;
+
+        EmitType(type, SourceLoc(), &tempName, SourceLoc());
+    }
+
 
     void EmitType(RefPtr<Type> type)
     {
@@ -3942,8 +3960,34 @@ emitDeclImpl(decl, nullptr);
 
     // IR-level emit logc
 
-    String getName(IRInst* inst)
+    UInt getID(IRValue* value)
     {
+        auto& mapIRValueToID = context->shared->mapIRValueToID;
+
+        UInt id = 0;
+        if (mapIRValueToID.TryGetValue(value, id))
+            return id;
+
+        id = mapIRValueToID.Count() + 1;
+        mapIRValueToID.Add(value, id);
+        return id;
+    }
+
+    String getName(IRValue* inst)
+    {
+        switch(inst->op)
+        {
+        case kIROp_decl_ref:
+            {
+                auto irDeclRef = (IRDeclRef*) inst;
+                return getText(irDeclRef->declRef.GetName());
+            }
+            break;
+
+        default:
+            break;
+        }
+
         if(auto decoration = inst->findDecoration<IRHighLevelDeclDecoration>())
         {
             auto decl = decoration->decl;
@@ -3957,7 +4001,7 @@ emitDeclImpl(decl, nullptr);
 
         StringBuilder sb;
         sb << "_S";
-        sb << inst->id;
+        sb << getID(inst);
         return sb.ProduceString();
     }
 
@@ -4035,7 +4079,7 @@ emitDeclImpl(decl, nullptr);
 
     }
 
-
+#if 0
     void emitIRSimpleType(
         EmitContext*    context,
         IRType*         type)
@@ -4153,12 +4197,14 @@ emitDeclImpl(decl, nullptr);
         }
 
     }
+#endif
 
     CodeGenTarget getTarget(EmitContext* context)
     {
         return context->shared->target;
     }
 
+#if 0
     void emitGLSLTypePrefix(
         EmitContext*    context,
         IRType*   type)
@@ -4194,44 +4240,9 @@ emitDeclImpl(decl, nullptr);
             break;
         }
     }
+#endif
 
-    void emitIRVectorType(
-        EmitContext*    context,
-        IRVectorType*   type)
-    {
-        switch(getTarget(context))
-        {
-        case CodeGenTarget::GLSL:
-            // HLSL style: `<elementTypePrefix>vec<elementCount>`
-            // e.g., `ivec4`
-            //
-            emitGLSLTypePrefix(context, type->getElementType());
-            emit("vec");
-            emitIRSimpleValue(context, type->getElementCount());
-            break;
-
-        default:
-            // HLSL style: `<elementTypeName><elementCount>`
-            // e.g., `int4`
-            //
-            emitIRSimpleType(context, type->getElementType());
-            emitIRSimpleValue(context, type->getElementCount());
-            break;
-        }
-    }
-
-    void emitIRMatrixType(
-        EmitContext*    context,
-        IRMatrixType*   type)
-    {
-        // TODO: this is a GLSL-vs-HLSL decision point
-
-        emitIRSimpleType(context, type->getElementType());
-        emitIRSimpleValue(context, type->getRowCount());
-        emit("x");
-        emitIRSimpleValue(context, type->getColumnCount());
-    }
-
+#if 0
     void emitIRType(
         EmitContext*        context,
         IRType*             type,
@@ -4287,10 +4298,11 @@ emitDeclImpl(decl, nullptr);
     {
         emitIRType(context, type, (IRDeclaratorInfo*) nullptr);
     }
+#endif
 
     bool shouldFoldIRInstIntoUseSites(
         EmitContext*    context,
-        IRInst*         inst)
+        IRValue*        inst)
     {
         // Certain opcodes should always be folded in
         switch( inst->op )
@@ -4306,27 +4318,24 @@ emitDeclImpl(decl, nullptr);
             return true;
         }
 
-        // Certain *types* will usually want to be folded in
+        // Certain *types* will usually want to be folded in,
+        // because they aren't allowed as types for temporary
+        // variables.
         auto type = inst->getType();
-        switch (type->op)
+        if(type->As<UniformParameterBlockType>())
         {
-        case kIROp_ConstantBufferType:
-        case kIROp_TextureBufferType:
             // TODO: we need to be careful here, because
             // HLSL shader model 6 allows these as explicit
             // types.
             return true;
-
-        case kIROp_TextureType:
+        }
+        else if(type->As<TextureTypeBase>())
+        {
             // GLSL doesn't allow texture/resource types to
             // be used as first-class values, so we need
             // to fold them into their use sites in all cases
             if(getTarget(context) == CodeGenTarget::GLSL)
                 return true;
-           break;
-
-        default:
-            break;
         }
 
         // By default we will *not* fold things into their use sites.
@@ -4335,20 +4344,16 @@ emitDeclImpl(decl, nullptr);
 
     bool isDerefBaseImplicit(
         EmitContext*    context,
-        IRInst*         inst)
+        IRValue*        inst)
     {
         auto type = inst->getType();
-        switch (type->op)
+
+        if(type->As<UniformParameterBlockType>())
         {
-        case kIROp_ConstantBufferType:
-        case kIROp_TextureBufferType:
             // TODO: we need to be careful here, because
             // HLSL shader model 6 allows these as explicit
             // types.
             return true;
-
-        default:
-            break;
         }
 
         return false;
@@ -4358,7 +4363,7 @@ emitDeclImpl(decl, nullptr);
 
     void emitIROperand(
         EmitContext*    context,
-        IRInst*         inst)
+        IRValue*         inst)
     {
         if( shouldFoldIRInstIntoUseSites(context, inst) )
         {
@@ -4380,8 +4385,8 @@ emitDeclImpl(decl, nullptr);
         EmitContext*    context,
         IRInst*         inst)
     {
-        UInt argCount = inst->argCount - 1;
-        IRUse* args = inst->getArgs() + 1;
+        UInt argCount = inst->argCount;
+        IRUse* args = inst->getArgs();
 
         emit("(");
         for(UInt aa = 0; aa < argCount; ++aa)
@@ -4392,12 +4397,35 @@ emitDeclImpl(decl, nullptr);
         emit(")");
     }
 
+    void emitIRType(
+        EmitContext*    context,
+        IRType*         type,
+        String const&   name)
+    {
+        EmitType(type, name);
+    }
+
+    void emitIRType(
+        EmitContext*    context,
+        IRType*         type,
+        Name*           name)
+    {
+        EmitType(type, name);
+    }
+
+    void emitIRType(
+        EmitContext*    context,
+        IRType*         type)
+    {
+        EmitType(type);
+    }
+
     void emitIRInstResultDecl(
         EmitContext*    context,
         IRInst*         inst)
     {
         auto type = inst->getType();
-        if(!type || type->op == kIROp_VoidType)
+        if(!type)
             return;
 
         emitIRType(context, type, getName(inst));
@@ -4406,9 +4434,10 @@ emitDeclImpl(decl, nullptr);
 
     void emitIRInstExpr(
         EmitContext*    context,
-        IRInst*         inst)
+        IRValue*        value)
     {
-        switch(inst->op)
+        IRInst* inst = (IRInst*) value;
+        switch(value->op)
         {
         case kIROp_IntLit:
         case kIROp_FloatLit:
@@ -4418,13 +4447,13 @@ emitDeclImpl(decl, nullptr);
 
         case kIROp_Construct:
             // Simple constructor call
-            if( inst->getArgCount() == 2 && getTarget(context) == CodeGenTarget::HLSL)
+            if( inst->getArgCount() == 1 && getTarget(context) == CodeGenTarget::HLSL)
             {
                 // Need to emit as cast for HLSL
                 emit("(");
                 emitIRType(context, inst->getType());
                 emit(") ");
-                emitIROperand(context, inst->getArg(1));
+                emitIROperand(context, inst->getArg(0));
             }
             else
             {
@@ -4446,7 +4475,7 @@ emitDeclImpl(decl, nullptr);
                 emitIRType(context, inst->getType());
             }
             emit("(");
-            emitIROperand(context, inst->getArg(1));
+            emitIROperand(context, inst->getArg(0));
             emit(")");
             break;
 
@@ -4480,9 +4509,9 @@ emitDeclImpl(decl, nullptr);
 
 #define CASE(OPCODE, OP)                                \
         case OPCODE:                                    \
-            emitIROperand(context, inst->getArg(1));    \
+            emitIROperand(context, inst->getArg(0));    \
             emit("" #OP " ");                           \
-            emitIROperand(context, inst->getArg(2));    \
+            emitIROperand(context, inst->getArg(1));    \
             break
 
         CASE(kIROp_Add, +);
@@ -4512,7 +4541,7 @@ emitDeclImpl(decl, nullptr);
 
         case kIROp_Not:
             {
-                if (inst->getType()->op == kIROp_BoolType)
+                if (inst->getType()->Equals(getSession()->getBoolType()))
                 {
                     emit("!");
                 }
@@ -4520,73 +4549,72 @@ emitDeclImpl(decl, nullptr);
                 {
                     emit("~");
                 }
-                emitIROperand(context, inst->getArg(1));
+                emitIROperand(context, inst->getArg(0));
             }
             break;
 
         case kIROp_Sample:
-            // argument 0 is the instruction's type
-            emitIROperand(context, inst->getArg(1));
+            emitIROperand(context, inst->getArg(0));
             emit(".Sample(");
-            emitIROperand(context, inst->getArg(2));
+            emitIROperand(context, inst->getArg(1));
             emit(", ");
-            emitIROperand(context, inst->getArg(3));
+            emitIROperand(context, inst->getArg(2));
             emit(")");
             break;
 
         case kIROp_SampleGrad:
             // argument 0 is the instruction's type
-            emitIROperand(context, inst->getArg(1));
+            emitIROperand(context, inst->getArg(0));
             emit(".SampleGrad(");
+            emitIROperand(context, inst->getArg(1));
+            emit(", ");
             emitIROperand(context, inst->getArg(2));
             emit(", ");
             emitIROperand(context, inst->getArg(3));
             emit(", ");
             emitIROperand(context, inst->getArg(4));
-            emit(", ");
-            emitIROperand(context, inst->getArg(5));
             emit(")");
             break;
 
         case kIROp_Load:
             // TODO: this logic will really only work for a simple variable reference...
-            emitIROperand(context, inst->getArg(1));
+            emitIROperand(context, inst->getArg(0));
             break;
 
         case kIROp_Store:
             // TODO: this logic will really only work for a simple variable reference...
-            emitIROperand(context, inst->getArg(1));
+            emitIROperand(context, inst->getArg(0));
             emit(" = ");
-            emitIROperand(context, inst->getArg(2));
+            emitIROperand(context, inst->getArg(1));
             break;
 
         case kIROp_Call:
             {
-                emitIROperand(context, inst->getArg(1));
+                emitIROperand(context, inst->getArg(0));
                 emit("(");
-                UInt argCount = inst->getArgCount() - 2;
+                UInt argCount = inst->getArgCount() - 1;
                 for( UInt aa = 0; aa < argCount; ++aa )
                 {
                     if(aa != 0) emit(", ");
-                    emitIROperand(context, inst->getArg(aa + 2));
+                    emitIROperand(context, inst->getArg(aa + 1));
                 }
                 emit(")");
             }
             break;
 
         case kIROp_BufferLoad:
-            emitIROperand(context, inst->getArg(1));
+            emitIROperand(context, inst->getArg(0));
             emit("[");
-            emitIROperand(context, inst->getArg(2));
+            emitIROperand(context, inst->getArg(1));
             emit("]");
             break;
 
         case kIROp_BufferStore:
-            emitIROperand(context, inst->getArg(1));
+            emitIROperand(context, inst->getArg(0));
             emit("[");
-            emitIROperand(context, inst->getArg(2));
+            emitIROperand(context, inst->getArg(1));
             emit("] = ");
-            emitIROperand(context, inst->getArg(3));
+            emitIROperand(context, inst->getArg(2));
             break;
 
         case kIROp_GroupMemoryBarrierWithGroupSync:
@@ -4595,9 +4623,9 @@ emitDeclImpl(decl, nullptr);
 
         case kIROp_getElement:
         case kIROp_getElementPtr:
-            emitIROperand(context, inst->getArg(1));
+            emitIROperand(context, inst->getArg(0));
             emit("[");
-            emitIROperand(context, inst->getArg(2));
+            emitIROperand(context, inst->getArg(1));
             emit("]");
             break;
 
@@ -4605,9 +4633,9 @@ emitDeclImpl(decl, nullptr);
         case kIROp_Mul_Matrix_Vector:
         case kIROp_Mul_Matrix_Matrix:
             emit("mul(");
-            emitIROperand(context, inst->getArg(1));
+            emitIROperand(context, inst->getArg(0));
             emit(", ");
-            emitIROperand(context, inst->getArg(2));
+            emitIROperand(context, inst->getArg(1));
             emit(")");
             break;
 
@@ -4619,7 +4647,7 @@ emitDeclImpl(decl, nullptr);
                 UInt elementCount = ii->getElementCount();
                 for (UInt ee = 0; ee < elementCount; ++ee)
                 {
-                    IRInst* irElementIndex = ii->getElementIndex(ee);
+                    IRValue* irElementIndex = ii->getElementIndex(ee);
                     assert(irElementIndex->op == kIROp_IntLit);
                     IRConstant* irConst = (IRConstant*)irElementIndex;
 
@@ -4658,7 +4686,7 @@ emitDeclImpl(decl, nullptr);
         case kIROp_Var:
             {
                 auto ptrType = inst->getType();
-                auto valType = ((IRPtrType*)ptrType)->getValueType();
+                auto valType = ((PtrType*)ptrType)->getValueType();
 
                 auto name = getName(inst);
                 emitIRType(context, valType, name);
@@ -4689,14 +4717,14 @@ emitDeclImpl(decl, nullptr);
             {
                 auto ii = (IRSwizzleSet*)inst;
                 emitIRInstResultDecl(context, inst);
-                emitIROperand(context, inst->getArg(1));
+                emitIROperand(context, inst->getArg(0));
                 emit(";\n");
                 emitIROperand(context, inst);
                 emit(".");
                 UInt elementCount = ii->getElementCount();
                 for (UInt ee = 0; ee < elementCount; ++ee)
                 {
-                    IRInst* irElementIndex = ii->getElementIndex(ee);
+                    IRValue* irElementIndex = ii->getElementIndex(ee);
                     assert(irElementIndex->op == kIROp_IntLit);
                     IRConstant* irConst = (IRConstant*)irElementIndex;
 
@@ -4707,34 +4735,16 @@ emitDeclImpl(decl, nullptr);
                     emit(kComponents[elementIndex]);
                 }
                 emit(" = ");
-                emitIROperand(context, inst->getArg(2));
+                emitIROperand(context, inst->getArg(1));
                 emit(";\n");
             }
             break;
-
-#if 0
-        case kIROp_unconditionalBranch:
-            emit("// unconditionalBranch ");
-            emitIROperand(context, inst->getArg(1));
-            emit("\n");
-            break;
-
-        case kIROp_conditionalBranch:
-            emit("// conditionalBranch ");
-            emitIROperand(context, inst->getArg(1));
-            emit(" ");
-            emitIROperand(context, inst->getArg(2));
-            emit(" ");
-            emitIROperand(context, inst->getArg(3));
-            emit("\n");
-            break;
-#endif
         }
     }
 
     void emitIRSemantics(
         EmitContext*    context,
-        IRInst*         inst)
+        IRValue*         inst)
     {
         auto decoration = inst->findDecoration<IRHighLevelDeclDecoration>();
         if( decoration )
@@ -4745,7 +4755,7 @@ emitDeclImpl(decl, nullptr);
 
     VarLayout* getVarLayout(
         EmitContext*    context,
-        IRInst*          var)
+        IRValue*        var)
     {
         auto decoration = var->findDecoration<IRLayoutDecoration>();
         if (!decoration)
@@ -4756,7 +4766,7 @@ emitDeclImpl(decl, nullptr);
 
     void emitIRLayoutSemantics(
         EmitContext*    context,
-        IRInst*         inst,
+        IRValue*        inst,
         char const*     uniformSemanticSpelling = "register")
     {
         auto layout = getVarLayout(context, inst);
@@ -4784,9 +4794,9 @@ emitDeclImpl(decl, nullptr);
         while(block != end)
         {
             // Start by emitting the non-terminator instructions in the block.
-            auto terminator = block->lastChild;
+            auto terminator = block->getLastInst();
             assert(isTerminatorInst(terminator));
-            for (auto inst = block->firstChild; inst != terminator; inst = inst->nextInst)
+            for (auto inst = block->getFirstInst(); inst != terminator; inst = inst->nextInst)
             {
                 emitIRInst(context, inst);
             }
@@ -5095,10 +5105,8 @@ emitDeclImpl(decl, nullptr);
             // encoded as a parameter of pointer type, so
             // we need to decode that here.
             //
-            if( paramType->op == kIROp_PtrType )
+            if( auto ptrType = paramType->As<PtrType>() )
             {
-                auto ptrType = (IRPtrType*) paramType;
-
                 // TODO: we need a way to distinguish `out`
                 // from `inout`. The easiest way to do
                 // that might be to have each be a distinct
@@ -5243,7 +5251,7 @@ emitDeclImpl(decl, nullptr);
         }
     }
 
-
+#if 0
     void emitIRStruct(
         EmitContext*    context,
         IRStructDecl*   structType)
@@ -5263,6 +5271,7 @@ emitDeclImpl(decl, nullptr);
         }
         emit("};\n");
     }
+#endif
 
     void emitIRVarModifiers(
         EmitContext*    context,
@@ -5317,9 +5326,9 @@ emitDeclImpl(decl, nullptr);
     }
 
     void emitIRParameterBlock(
-        EmitContext*            context,
-        IRVar*                  varDecl,
-        IRUniformBufferType*    type)
+        EmitContext*                context,
+        IRGlobalVar*                varDecl,
+        UniformParameterBlockType*  type)
     {
         emit("cbuffer ");
         emit(getName(varDecl));
@@ -5341,17 +5350,15 @@ emitDeclImpl(decl, nullptr);
             typeLayout = parameterBlockTypeLayout->elementTypeLayout;
         }
 
-        switch( elementType->op )
+        if(auto declRefType = elementType->As<DeclRefType>())
         {
-        case kIROp_StructType:
+            if(auto structDeclRef = declRefType->declRef.As<StructDecl>())
             {
-                auto structType = (IRStructDecl*) elementType;
-
                 auto structTypeLayout = typeLayout.As<StructTypeLayout>();
                 assert(structTypeLayout);
 
                 UInt fieldIndex = 0;
-                for(auto ff = structType->getFirstField(); ff; ff = ff->getNextField())
+                for(auto ff : GetFields(structDeclRef))
                 {
                     // TODO: need a plan to deal with the case where the IR-level
                     // `struct` type might not match the high-level type, so that
@@ -5367,19 +5374,18 @@ emitDeclImpl(decl, nullptr);
 
                     emitIRVarModifiers(context, fieldLayout);
 
-                    auto fieldType = ff->getFieldType();
-                    emitIRType(context, fieldType, getName(ff));
+                    auto fieldType = GetType(ff);
+                    emitIRType(context, fieldType, ff.GetName());
 
                     emitHLSLParameterBlockFieldLayoutSemantics(layout, fieldLayout);
 
                     emit(";\n");
                 }
             }
-            break;
-
-        default:
+        }
+        else
+        {
             emit("/* unexpected */");
-            break;
         }
 
         emit("}\n");
@@ -5391,8 +5397,9 @@ emitDeclImpl(decl, nullptr);
     {
         auto allocatedType = varDecl->getType();
         auto varType = allocatedType->getValueType();
-        auto addressSpace = allocatedType->getAddressSpace();
+//        auto addressSpace = allocatedType->getAddressSpace();
 
+#if 0
         switch( varType->op )
         {
         case kIROp_ConstantBufferType:
@@ -5403,6 +5410,7 @@ emitDeclImpl(decl, nullptr);
         default:
             break;
         }
+#endif
 
         // Need to emit appropriate modifiers here.
 
@@ -5410,6 +5418,7 @@ emitDeclImpl(decl, nullptr);
         
         emitIRVarModifiers(context, layout);
 
+#if 0
         switch (addressSpace)
         {
         default:
@@ -5419,6 +5428,51 @@ emitDeclImpl(decl, nullptr);
             emit("groupshared ");
             break;
         }
+#endif
+
+        emitIRType(context, varType, getName(varDecl));
+
+        emitIRSemantics(context, varDecl);
+
+        emitIRLayoutSemantics(context, varDecl);
+
+        emit(";\n");
+    }
+
+    void emitIRGlobalVar(
+        EmitContext*    context,
+        IRGlobalVar*    varDecl)
+    {
+        auto allocatedType = varDecl->getType();
+        auto varType = allocatedType->getValueType();
+//        auto addressSpace = allocatedType->getAddressSpace();
+
+        if (auto paramBlockType = varType->As<UniformParameterBlockType>())
+        {
+            emitIRParameterBlock(
+                context,
+                varDecl,
+                paramBlockType);
+            return;
+        }
+
+        // Need to emit appropriate modifiers here.
+
+        auto layout = getVarLayout(context, varDecl);
+        
+        emitIRVarModifiers(context, layout);
+
+#if 0
+        switch (addressSpace)
+        {
+        default:
+            break;
+
+        case kIRAddressSpace_GroupShared:
+            emit("groupshared ");
+            break;
+        }
+#endif
 
         emitIRType(context, varType, getName(varDecl));
 
@@ -5431,7 +5485,7 @@ emitDeclImpl(decl, nullptr);
 
     void emitIRGlobalInst(
         EmitContext*    context,
-        IRInst*         inst)
+        IRGlobalValue*  inst)
     {
         // TODO: need to be able to `switch` on the IR opcode here,
         // so there is some work to be done.
@@ -5441,9 +5495,15 @@ emitDeclImpl(decl, nullptr);
             emitIRFunc(context, (IRFunc*) inst);
             break;
 
+        case kIROp_global_var:
+            emitIRGlobalVar(context, (IRGlobalVar*) inst);
+            break;
+
+#if 0
         case kIROp_StructType:
             emitIRStruct(context, (IRStructDecl*) inst);
             break;
+#endif
 
         case kIROp_Var:
             emitIRVar(context, (IRVar*) inst);
@@ -5454,13 +5514,154 @@ emitDeclImpl(decl, nullptr);
         }
     }
 
+    void ensureStructDecl(
+        EmitContext*        context,
+        DeclRef<StructDecl> declRef)
+    {
+        // TODO: Eventually need to deal with the case where
+        // we have user-defined generic types.
+        //
+        auto decl = declRef.getDecl();
+
+        if(context->shared->irDeclsVisited.Contains(decl))
+            return;
+
+        context->shared->irDeclsVisited.Add(decl);
+
+        // First emit any types used by fields of this type
+        for( auto ff : GetFields(declRef) )
+        {
+            if(ff.getDecl()->HasModifier<HLSLStaticModifier>())
+                continue;
+
+            auto fieldType = GetType(ff);
+            emitIRUsedType(context, fieldType);
+        }
+
+        Emit("struct ");
+        emit(declRef.GetName());
+        Emit("\n{\n");
+        for( auto ff : GetFields(declRef) )
+        {
+            if(ff.getDecl()->HasModifier<HLSLStaticModifier>())
+                continue;
+
+            auto fieldType = GetType(ff);
+            emitIRType(context, fieldType, ff.GetName());
+
+            EmitSemantics(ff.getDecl());
+
+            emit(";\n");
+        }
+        Emit("};\n");
+    }
+
+    // A type is going to be used by the IR, so
+    // make sure that we have emitted whatever
+    // it needs.
+    void emitIRUsedType(
+        EmitContext*    context,
+        Type*           type)
+    {
+        if(type->As<BasicExpressionType>())
+        {}
+        else if(type->As<VectorExpressionType>())
+        {}
+        else if(type->As<MatrixExpressionType>())
+        {}
+        else if(auto arrayType = type->As<ArrayExpressionType>())
+        {
+            emitIRUsedType(context, arrayType->baseType);
+        }
+        else if( auto textureType = type->As<TextureTypeBase>() )
+        {
+            emitIRUsedType(context, textureType->elementType);
+        }
+        else if( auto genericType = type->As<BuiltinGenericType>() )
+        {
+            emitIRUsedType(context, genericType->elementType);
+        }
+        else if( auto ptrType = type->As<PtrType>() )
+        {
+            emitIRUsedType(context, ptrType->getValueType());
+        }
+        else if(type->As<SamplerStateType>() )
+        {
+        }
+        else if( auto declRefType = type->As<DeclRefType>() )
+        {
+            auto declRef = declRefType->declRef;
+            auto decl = declRef.getDecl();
+
+            if(decl->HasModifier<BuiltinTypeModifier>()
+                || decl->HasModifier<MagicTypeModifier>())
+            {
+                return;
+            }
+
+            if( auto structDeclRef = declRef.As<StructDecl>() )
+            {
+                //
+                ensureStructDecl(context, structDeclRef);
+            }
+        }
+        else
+        {}
+    }
+
+    void emitIRUsedTypesForValue(
+        EmitContext*    context,
+        IRValue*        value)
+    {
+        if(!value) return;
+        switch( value->op )
+        {
+        case kIROp_Func:
+            {
+                auto irFunc = (IRFunc*) value;
+                emitIRUsedType(context, irFunc->getResultType());
+                for( auto bb = irFunc->getFirstBlock(); bb; bb = bb->getNextBlock() )
+                {
+                    for( auto pp = bb->getFirstParam(); pp; pp = pp->getNextParam() )
+                    {
+                        emitIRUsedTypesForValue(context, pp);
+                    }
+
+                    for( auto ii = bb->getFirstInst(); ii; ii = ii->nextInst )
+                    {
+                        emitIRUsedTypesForValue(context, ii);
+                    }
+                }
+            }
+            break;
+
+        default:
+            {
+                emitIRUsedType(context, value->type);
+            }
+            break;
+        }
+    }
+
+    void emitIRUsedTypesForModule(
+        EmitContext*    context,
+        IRModule*       module)
+    {
+        for (auto gv : module->globalValues)
+        {
+            emitIRUsedTypesForValue(context, gv);
+        }
+    }
+
     void emitIRModule(
         EmitContext*    context,
         IRModule*       module)
     {
-        for(auto ii = module->firstChild; ii; ii = ii->nextInst )
+        emitIRUsedTypesForModule(context, module);
+
+        for (auto gv : module->globalValues)
         {
-            emitIRGlobalInst(context, ii);
+            emitIRGlobalInst(context, gv);
         }
     }
 
