@@ -585,7 +585,7 @@ BytecodeGenerationPtr<BCType> emitBCType(
     Type*                       type)
 {
     auto canonical = type->GetCanonicalType();
-    uint32_t id = 0;
+    UInt id = 0;
     if(context->shared->mapTypeToID.TryGetValue(canonical, id))
     {
         return context->shared->bcTypes[id];
