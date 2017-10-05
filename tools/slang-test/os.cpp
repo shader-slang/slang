@@ -583,7 +583,7 @@ OSError OSProcessSpawner::spawnAndWaitForCompletion()
             iterations++;
             if (iterations > 10000)
             {
-                fprintf(stderr, "select(): %d iterations, iterations", iterations);
+                fprintf(stderr, "select(): %d iterations\n", iterations);
                 return kOSError_OperationFailed;
             }
 
@@ -595,7 +595,7 @@ OSError OSProcessSpawner::spawnAndWaitForCompletion()
             {
                 // If there was a signal that got in
                 // the way, then retry...
-                if(pollResult == 0 || errno == EINTR)
+                if(pollResult == -1 && errno == EINTR)
                     continue;
 
                 // timeout or error...
@@ -644,7 +644,7 @@ OSError OSProcessSpawner::spawnAndWaitForCompletion()
             iterations++;
             if (iterations > 10000)
             {
-                fprintf(stderr, "waitpid(): %d iterations", iterations);
+                fprintf(stderr, "waitpid(): %d iterations\n", iterations);
                 return kOSError_OperationFailed;
             }
 
