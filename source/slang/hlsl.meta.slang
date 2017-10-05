@@ -336,9 +336,9 @@ __generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op void clip(
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_op void clip(matrix<T,N,M> x);
 
 // Cosine
-__generic<T : __BuiltinFloatingPointType> __intrinsic_op T cos(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op vector<T,N> cos(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> cos(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType> T cos(T x);
+__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> cos(vector<T,N> x);
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> cos(matrix<T,N,M> x);
 
 // Hyperbolic cosine
 __generic<T : __BuiltinFloatingPointType> __intrinsic_op T cosh(T x);
@@ -831,15 +831,15 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_
 
 // Clamp value to [0,1] range
 __generic<T : __BuiltinFloatingPointType>
-__target_intrinsic(glsl, "clamp($0, 0, 1)") __intrinsic_op
+__target_intrinsic(glsl, "clamp($0, 0, 1)")
 T saturate(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
-__target_intrinsic(glsl, "clamp($0, 0, 1)") __intrinsic_op
+__target_intrinsic(glsl, "clamp($0, 0, 1)")
 vector<T,N> saturate(vector<T,N> x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
-__target_intrinsic(glsl, "clamp($0, 0, 1)") __intrinsic_op
+__target_intrinsic(glsl, "clamp($0, 0, 1)")
 matrix<T,N,M> saturate(matrix<T,N,M> x);
 
 
@@ -850,9 +850,9 @@ __generic<T : __BuiltinSignedArithmeticType, let N : int, let M : int> __intrins
 
 
 // Sine
-__generic<T : __BuiltinFloatingPointType> __intrinsic_op T sin(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op vector<T,N> sin(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> sin(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType> T sin(T x);
+__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> sin(vector<T,N> x);
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> sin(matrix<T,N,M> x);
 
 // Sine and cosine
 __generic<T : __BuiltinFloatingPointType, let N : int> __intrinsic_op void sincos(T x, out T s, out T c);

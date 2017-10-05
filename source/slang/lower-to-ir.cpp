@@ -81,7 +81,6 @@ struct BoundSubscriptInfo : ExtendedValueInfo
     DeclRef<SubscriptDecl>  declRef;
     RefPtr<Type>            type;
     List<IRValue*>          args;
-    UInt                    genericArgCount;
 };
 
 // Some cases of `ExtendedValueInfo` need to
@@ -445,9 +444,7 @@ LoweredValInfo emitCallToDeclRef(
     IRType*         type,
     DeclRef<Decl>   funcDeclRef,
     UInt            argCount,
-    IRValue* const* args,
-    // How many of the arguments are generic args?
-    UInt            genericArgCount)
+    IRValue* const* args)
 {
     auto builder = context->irBuilder;
 
@@ -490,7 +487,6 @@ LoweredValInfo emitCallToDeclRef(
             boundSubscript->declRef = subscriptDeclRef;
             boundSubscript->type = type;
             boundSubscript->args.AddRange(args, argCount);
-            boundSubscript->genericArgCount = genericArgCount;
 
             context->shared->extValues.Add(boundSubscript);
 
@@ -506,12 +502,6 @@ LoweredValInfo emitCallToDeclRef(
     auto funcDecl = funcDeclRef.getDecl();
     if(auto intrinsicOpModifier = funcDecl->FindModifier<IntrinsicOpModifier>())
     {
-        // We don't want to include generic arguments when calling an
-        // intrinsic for now, because we assume that they already
-        // handle the parameterization internally.
-        args += genericArgCount;
-        argCount -= genericArgCount;
-
         auto op = getIntrinsicOp(funcDecl, intrinsicOpModifier);
 
         if (Int(op) < 0)
@@ -572,10 +562,6 @@ LoweredValInfo emitCallToDeclRef(
         // TODO: these should all either be intrinsic operations,
         // or calls to library functions.
 
-        // Skip the generic arguments, so they don't screw up
-        // other logic.
-        args += genericArgCount;
-        argCount -= genericArgCount;
         return LoweredValInfo::simple(builder->emitConstructorInst(type, argCount, args));
     }
 
@@ -588,10 +574,9 @@ LoweredValInfo emitCallToDeclRef(
     IRGenContext*           context,
     IRType*                 type,
     DeclRef<Decl>           funcDeclRef,
-    List<IRValue*> const&   args,
-    UInt                    genericArgCount)
+    List<IRValue*> const&   args)
 {
-    return emitCallToDeclRef(context, type, funcDeclRef, args.Count(), args.Buffer(), genericArgCount);
+    return emitCallToDeclRef(context, type, funcDeclRef, args.Count(), args.Buffer());
 }
 
 IRValue* getSimpleVal(IRGenContext* context, LoweredValInfo lowered)
@@ -620,8 +605,7 @@ top:
                     context,
                     boundSubscriptInfo->type,
                     getter,
-                    boundSubscriptInfo->args,
-                    boundSubscriptInfo->genericArgCount);
+                    boundSubscriptInfo->args);
                 goto top;
             }
 
@@ -1119,53 +1103,6 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         }
     }
 
-    // In the context of a call, we need to add the generic
-    // arguments to the call to the list of IR-level arguments
-    // we are going to pass through. We do that by looking
-    // at the specializations attached to the declaration
-    // reference itself.
-    //
-    void addGenericArgs(
-        InvokeExpr*     expr,
-        DeclRef<Decl>   declRef,
-        List<IRValue*>* ioArgs)
-    {
-        auto subst = declRef.substitutions;
-        if(!subst)
-            return;
-
-        auto genericDecl = subst->genericDecl;
-
-        // If there is an outer layer of generic arguments
-        // (e.g., we are calling a generic method nested
-        // inside a generic type) then we need to add
-        // the outer arguments *before* those from  the
-        // inner context.
-        //
-        DeclRef<Decl> outerDeclRef;
-        outerDeclRef.decl = genericDecl;
-        outerDeclRef.substitutions = subst->outer;
-        addGenericArgs(expr, outerDeclRef, ioArgs);
-
-        // Okay, now we can process the argument list at this
-        // level.
-        //
-        // TODO: there could be a sticking point here because
-        // this logic needs to agree with the logic that adds
-        // generic *parameters* to the callee, and right now
-        // we have a mismatch that constraint witnesses are
-        // explicit in the parmaeter list, but not in
-        // declaration references as currently constructed
-        // inside the front-end.
-        //
-        for(auto arg : subst->args)
-        {
-            auto loweredVal = lowerVal(context, arg);
-            addArgs(context, ioArgs, loweredVal);
-        }
-    }
-
-
     // After a call to a function with `out` or `in out`
     // parameters, we may need to copy data back into
     // the l-value locations used for output arguments.
@@ -1409,11 +1346,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             auto funcDeclRef = resolvedInfo.funcDeclRef;
             auto baseExpr = resolvedInfo.baseExpr;
 
-            // First come any generic arguments:
-            addGenericArgs(expr, funcDeclRef, &irArgs);
-            UInt genericArgCount = irArgs.Count();
-
-            // Next comes the `this` argument if we are calling
+            // First comes the `this` argument if we are calling
             // a member function:
             if( baseExpr )
             {
@@ -1426,7 +1359,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             // require "fixup" work on the other side.
             //
             addDirectCallArgs(expr, funcDeclRef, &irArgs, &argFixups);
-            auto result = emitCallToDeclRef(context, type, funcDeclRef, irArgs, genericArgCount);
+            auto result = emitCallToDeclRef(context, type, funcDeclRef, irArgs);
             applyOutArgumentFixups(argFixups);
             return result;
         }
@@ -2053,8 +1986,7 @@ top:
                     context,
                     context->getSession()->getVoidType(),
                     setterDeclRef,
-                    allArgs,
-                    subscriptInfo->genericArgCount);
+                    allArgs);
                 return;
             }
 
@@ -2709,8 +2641,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         UInt genericParamCounter = 0;
         for( auto genericParamDecl : parameterLists.genericParams )
         {
-            UInt genericParamIndex = genericParamCounter++;
+            irFunc->genericParams.Add(genericParamDecl);
+
 #if 0
+            UInt genericParamIndex = genericParamCounter++;
             if( auto genericTypeParamDecl = dynamic_cast<GenericTypeParamDecl*>(genericParamDecl) )
             {
                 // In the logical type for the function, a generic
@@ -2728,11 +2662,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 subContext->shared->declValues[makeDeclRef(genericTypeParamDecl)] = LoweredValInfo;
             }
             else
-#endif
             {
                 // TODO: handle the other cases here.
                 SLANG_UNEXPECTED("generic parameter kind");
             }
+#endif
         }
 
         for( auto paramInfo : parameterLists.params )

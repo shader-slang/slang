@@ -262,6 +262,10 @@ struct OptionsParser
                 {
                     flags |= SLANG_COMPILE_FLAG_USE_IR;
                 }
+                else if(argStr == "-no-mangle" )
+                {
+                    flags |= SLANG_COMPILE_FLAG_NO_MANGLING;
+                }
                 else if (argStr == "-backend" || argStr == "-target")
                 {
                     String name = tryReadCommandLineArgument(arg, &argCursor, argEnd);
