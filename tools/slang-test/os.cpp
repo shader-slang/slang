@@ -531,7 +531,10 @@ OSError OSProcessSpawner::spawnAndWaitForCompletion()
         return kOSError_OperationFailed;
 
     pid_t childProcessID = fork();
-    if(childProcessID  == 0)
+    if (childProcessID == -1)
+        return kOSError_OperationFailed;
+
+    if(childProcessID == 0)
     {
         // We are the child process.
 
@@ -568,8 +571,17 @@ OSError OSProcessSpawner::spawnAndWaitForCompletion()
         int result;
 
         int remainingCount =  2;
+        int iterations = 0;
         while(remainingCount)
         {
+            // Safeguard against infinite loop:
+            iterations++;
+            if (iterations > 10000)
+            {
+                fprintf(stderr, "select(): %d iterations, iterations");
+                return kOSError_OperationFailed;
+            }
+
             FD_ZERO(&readSet);
             FD_SET(stdoutFD, &readSet);
             FD_SET(stderrFD, &readSet);
@@ -604,15 +616,32 @@ OSError OSProcessSpawner::spawnAndWaitForCompletion()
         }
 
         int childStatus = 0;
+        iterations = 0;
         for(;;)
         {
-            pid_t terminatedProcessID = wait(&childStatus);
+            // Safeguard against infinite loop:
+            iterations++;
+            if (iterations > 10000)
+            {
+                fprintf(stderr, "waitpid(): %d iterations", iterations);
+                return kOSError_OperationFailed;
+            }
+
+
+            pid_t terminatedProcessID = waitpid(
+                childProcessID,
+                &childStatus,
+                0);
+            if (terminatedProcessID == -1)
+            {
+                return kOSError_OperationFailed;
+            }
+
             if(terminatedProcessID == childProcessID)
             {
                 if(WIFEXITED(childStatus))
                 {
                     resultCode_ = (int)(int8_t)WEXITSTATUS(childStatus);
-
                 }
                 else
                 {
