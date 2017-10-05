@@ -583,7 +583,7 @@ OSError OSProcessSpawner::spawnAndWaitForCompletion()
             iterations++;
             if (iterations > 10000)
             {
-                fprintf(stderr, "select(): %d iterations\n", iterations);
+                fprintf(stderr, "poll(): %d iterations\n", iterations);
                 return kOSError_OperationFailed;
             }
 
@@ -605,10 +605,10 @@ OSError OSProcessSpawner::spawnAndWaitForCompletion()
             enum { kBufferSize = 1024 };
             char buffer[kBufferSize];
 
-            if(pollInfos[0].revents & POLLIN)
+            if(pollInfos[0].revents)
             {
                 auto count = read(stdoutFD, buffer, kBufferSize);
-                if (count == 0)
+                if (count <= 0)
                 {
                     // end-of-file
                     close(stdoutFD);
@@ -620,10 +620,10 @@ OSError OSProcessSpawner::spawnAndWaitForCompletion()
                     buffer, buffer + count);
             }
 
-            if(pollInfos[1].revents & POLLIN)
+            if(pollInfos[1].revents)
             {
                 auto count = read(stderrFD, buffer, kBufferSize);
-                if (count == 0)
+                if (count <= 0)
                 {
                     // end-of-file
                     close(stderrFD);
