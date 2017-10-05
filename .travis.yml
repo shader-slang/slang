@@ -4,6 +4,9 @@
 
 language: cpp
 
+env:
+  - SLANG_TEST_FLAGS=-travis
+
 # Build and test (clang, gcc) x (debug, release)
 #
 # We customize the set of tests run per-target to

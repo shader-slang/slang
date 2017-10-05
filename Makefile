@@ -168,7 +168,7 @@ $(OUTPUTDIR):
 	mkdir -p $(OUTPUTDIR)
 
 test: $(SLANG_TEST) $(SLANG_EVAL_TEST)
-	$(SLANG_TEST) -bindir $(OUTPUTDIR) -category $(SLANG_TEST_CATEGORY)
+	$(SLANG_TEST) -bindir $(OUTPUTDIR) -category $(SLANG_TEST_CATEGORY) $(SLANG_TEST_FLAGS)
 
 clean:
 	rm -rf $(OUTPUTDIR)
