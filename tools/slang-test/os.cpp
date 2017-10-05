@@ -565,10 +565,15 @@ OSError OSProcessSpawner::spawnAndWaitForCompletion()
         int stdoutFD = stdoutPipe[0];
         int stderrFD = stderrPipe[0];
 
-        int maxFD = stdoutFD > stderrFD ? stdoutFD : stderrFD;
+        pollfd pollInfos[2];
+        nfds_t pollInfoCount = 2;
 
-        fd_set readSet;
-        int result;
+        pollInfos[0].fd = stdoutFD;
+        pollInfos[0].events = POLLIN;
+        pollInfos[0].revents = 0;
+        pollInfos[1].fd = stderrFD;
+        pollInfos[1].events = POLLIN;
+        pollInfos[1].revents = 0;
 
         int remainingCount =  2;
         int iterations = 0;
@@ -578,37 +583,53 @@ OSError OSProcessSpawner::spawnAndWaitForCompletion()
             iterations++;
             if (iterations > 10000)
             {
-                fprintf(stderr, "select(): %d iterations, iterations");
+                fprintf(stderr, "select(): %d iterations, iterations", iterations);
                 return kOSError_OperationFailed;
             }
 
-            FD_ZERO(&readSet);
-            FD_SET(stdoutFD, &readSet);
-            FD_SET(stderrFD, &readSet);
+            // Set a timeout of ten seconds;
+            // we really shouldn't wait too long...
+            int pollTimeout = 10000;
+            int pollResult = poll(pollInfos, pollInfoCount, pollTimeout);
+            if (pollResult <= 0)
+            {
+                // If there was a signal that got in
+                // the way, then retry...
+                if(pollResult == 0 || errno == EINTR)
+                    continue;
 
-            result = select(maxFD + 1, &readSet, NULL, NULL, NULL);
-
-            if(result == -1 || errno == EINTR)
-                continue;
+                // timeout or error...
+                return kOSError_OperationFailed;
+            }
 
             enum { kBufferSize = 1024 };
             char buffer[kBufferSize];
 
-            if(FD_ISSET(stdoutFD, &readSet))
+            if(pollInfos[0].revents & POLLIN)
             {
                 auto count = read(stdoutFD, buffer, kBufferSize);
-                if(count == 0)
+                if (count == 0)
+                {
+                    // end-of-file
+                    close(stdoutFD);
+                    pollInfos[0].fd = -1;
                     remainingCount--;
+                }
 
                 standardOutput_.append(
                     buffer, buffer + count);
             }
 
-            if(FD_ISSET(stderrFD, &readSet))
+            if(pollInfos[1].revents & POLLIN)
             {
                 auto count = read(stderrFD, buffer, kBufferSize);
-                if(count == 0)
+                if (count == 0)
+                {
+                    // end-of-file
+                    close(stderrFD);
+                    pollInfos[1].fd = -1;
                     remainingCount--;
+                }
 
                 standardError_.append(
                     buffer, buffer + count);
@@ -647,9 +668,6 @@ OSError OSProcessSpawner::spawnAndWaitForCompletion()
                 {
                     resultCode_ = 1;
                 }
-
-                close(stdoutPipe[0]);
-                close(stderrPipe[0]);
 
                 return kOSError_None;
             }
