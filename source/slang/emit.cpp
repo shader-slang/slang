@@ -2877,6 +2877,9 @@ struct EmitVisitor
             }
 
             Substitutions* subst = declRef.substitutions.Ptr();
+            if (!subst)
+                return;
+
             Emit("<");
             UInt argCount = subst->args.Count();
             for (UInt aa = 0; aa < argCount; ++aa)
@@ -3973,14 +3976,45 @@ emitDeclImpl(decl, nullptr);
         return id;
     }
 
-    String getName(IRValue* inst)
+    String getIRName(Decl* decl)
+    {
+        // It is a bit ugly, but we need a deterministic way
+        // to get a name for things when emitting from the IR
+        // that won't conflict with any keywords, builtins, etc.
+        // in the target language.
+        //
+        // Eventually we should accomplish this by using
+        // mangled names everywhere, but that complicates things
+        // when we are also using direct comparison to fxc/glslang
+        // output for some of our tests.
+        //
+        // TODO: need a flag to get rid of the step that adds
+        // a prefix here, so that we can get "clean" output
+        // when needed.
+        //
+
+        String name;
+        if (!(context->shared->entryPoint->compileRequest->compileFlags & SLANG_COMPILE_FLAG_NO_MANGLING))
+        {
+            name.append("_s");
+        }
+        name.append(getText(decl->getName()));
+        return name;
+    }
+
+    String getIRName(DeclRefBase const& declRef)
+    {
+        return getIRName(declRef.decl);
+    }
+
+    String getIRName(IRValue* inst)
     {
         switch(inst->op)
         {
         case kIROp_decl_ref:
             {
                 auto irDeclRef = (IRDeclRef*) inst;
-                return getText(irDeclRef->declRef.GetName());
+                return getIRName(irDeclRef->declRef);
             }
             break;
 
@@ -3996,7 +4030,7 @@ emitDeclImpl(decl, nullptr);
                 return getText(reflectionNameMod->nameAndLoc.name);
             }
 
-            return getText(decl->getName());
+            return getIRName(decl);
         }
 
         StringBuilder sb;
@@ -4376,7 +4410,7 @@ emitDeclImpl(decl, nullptr);
         switch(inst->op)
         {
         default:
-            emit(getName(inst));
+            emit(getIRName(inst));
             break;
         }
     }
@@ -4428,7 +4462,7 @@ emitDeclImpl(decl, nullptr);
         if(!type)
             return;
 
-        emitIRType(context, type, getName(inst));
+        emitIRType(context, type, getIRName(inst));
         emit(" = ");
     }
 
@@ -4487,7 +4521,7 @@ emitDeclImpl(decl, nullptr);
 
                 emitIROperand(context, fieldExtract->getBase());
                 emit(".");
-                emit(getName(fieldExtract->getField()));
+                emit(getIRName(fieldExtract->getField()));
             }
             break;
 
@@ -4503,7 +4537,7 @@ emitDeclImpl(decl, nullptr);
                     emit(".");
                 }
 
-                emit(getName(ii->getField()));
+                emit(getIRName(ii->getField()));
             }
             break;
 
@@ -4592,11 +4626,11 @@ emitDeclImpl(decl, nullptr);
             {
                 emitIROperand(context, inst->getArg(0));
                 emit("(");
-                UInt argCount = inst->getArgCount() - 1;
-                for( UInt aa = 0; aa < argCount; ++aa )
+                UInt argCount = inst->getArgCount();
+                for( UInt aa = 1; aa < argCount; ++aa )
                 {
-                    if(aa != 0) emit(", ");
-                    emitIROperand(context, inst->getArg(aa + 1));
+                    if(aa != 1) emit(", ");
+                    emitIROperand(context, inst->getArg(aa));
                 }
                 emit(")");
             }
@@ -4688,7 +4722,7 @@ emitDeclImpl(decl, nullptr);
                 auto ptrType = inst->getType();
                 auto valType = ((PtrType*)ptrType)->getValueType();
 
-                auto name = getName(inst);
+                auto name = getIRName(inst);
                 emitIRType(context, valType, name);
                 emit(";\n");
             }
@@ -5016,6 +5050,37 @@ emitDeclImpl(decl, nullptr);
         return func->getFirstBlock() != nullptr;
     }
 
+    String getIRFuncName(
+        IRFunc* func)
+    {
+        if (isEntryPoint(func))
+        {
+            // GLSL will always need to use `main` as the
+            // name for an entry-point function, but other
+            // targets should try to use the original name.
+            //
+            // TODO: always use `main`, and have any code
+            // that wraps this know to use `main` instead
+            // of the original entry-point name...
+            //
+            if (getTarget(context) != CodeGenTarget::GLSL)
+            {
+                if (auto highLevelDeclDecoration = func->findDecoration<IRHighLevelDeclDecoration>())
+                {
+                    return getText(highLevelDeclDecoration->decl->getName());
+                }
+            }
+
+            // 
+
+            return "main";
+        }
+        else
+        {
+            return getIRName(func);
+        }
+    }
+
     void emitIRSimpleFunc(
         EmitContext*    context,
         IRFunc*         func)
@@ -5036,7 +5101,7 @@ emitDeclImpl(decl, nullptr);
             emit(")]\n");
         }
 
-        auto name = getName(func);
+        auto name = getIRFuncName(func);
 
         emitIRType(context, resultType, name);
 
@@ -5047,7 +5112,7 @@ emitDeclImpl(decl, nullptr);
             if(pp != firstParam)
                 emit(", ");
 
-            auto paramName = getName(pp);
+            auto paramName = getIRName(pp);
             emitIRType(context, pp->getType(), paramName);
 
             emitIRSemantics(context, pp);
@@ -5085,7 +5150,7 @@ emitDeclImpl(decl, nullptr);
         auto funcType = func->getType();
         auto resultType = func->getResultType();
 
-        auto name = getName(func);
+        auto name = getIRFuncName(func);
 
         emitIRType(context, resultType, name);
 
@@ -5163,7 +5228,7 @@ emitDeclImpl(decl, nullptr);
         // result parameter into an `out` parameter, so that
         // we can handle those uniformly.
         //
-        String resultName = getName(func) + "_result";
+        String resultName = getIRName(func) + "_result";
         emitGLSLLayoutQualifiers(entryPointLayout->resultLayout);
         emit("out ");
         emitIRType(context, resultType, resultName);
@@ -5182,7 +5247,7 @@ emitDeclImpl(decl, nullptr);
             // TODO: actually handle `out` parameters here.
 
             auto paramLayout = getVarLayout(context, pp);
-            auto paramName = getName(pp);
+            auto paramName = getIRName(pp);
             emitGLSLLayoutQualifiers(paramLayout);
             emit("in ");
             emitIRType(context, pp->getType(), paramName);
@@ -5218,6 +5283,19 @@ emitDeclImpl(decl, nullptr);
         return false;
     }
 
+    // Detect if the given IR function represents a
+    // declaration of an intrinsic/builtin for the
+    // current code-generation target.
+    bool isTargetIntrinsic(
+        EmitContext*    ctxt,
+        IRFunc*         func)
+    {
+        // For now we do this in an overly simplistic
+        // fashion: we say that *any* function declaration
+        // (rather then definition) must be an intrinsic:
+        return !isDefinition(func);
+    }
+
     void emitIRFunc(
         EmitContext*    context,
         IRFunc*         func)
@@ -5239,7 +5317,13 @@ emitDeclImpl(decl, nullptr);
             // This is just a function declaration,
             // and so we want to emit it as such.
             // (Or maybe not emit it at all).
-            //
+
+            // We do not emit the declaration for
+            // functions that appear to be intrinsics/builtins
+            // in the target langugae.
+            if (isTargetIntrinsic(context, func))
+                return;
+
             emitIRFuncDecl(context, func);
         }
         else
@@ -5280,6 +5364,8 @@ emitDeclImpl(decl, nullptr);
         if (!layout)
             return;
 
+        auto target = context->shared->target;
+
         // We need to handle the case where the variable has
         // a matrix type, and has been given a non-standard
         // layout attribute (for HLSL, `row_major` is the
@@ -5287,16 +5373,45 @@ emitDeclImpl(decl, nullptr);
         //
         if (auto matrixTypeLayout = layout->typeLayout.As<MatrixTypeLayout>())
         {
-            switch (matrixTypeLayout->mode)
+            switch (target)
             {
-            case kMatrixLayoutMode_ColumnMajor:
-                emit("column_major ");
+            case CodeGenTarget::HLSL:
+                switch (matrixTypeLayout->mode)
+                {
+                case kMatrixLayoutMode_ColumnMajor:
+                    if(target == CodeGenTarget::GLSL)
+                    emit("column_major ");
+                    break;
+
+                case kMatrixLayoutMode_RowMajor:
+                    emit("row_major ");
+                    break;
+                }
                 break;
 
-            case kMatrixLayoutMode_RowMajor:
-                emit("row_major ");
+            case CodeGenTarget::GLSL:
+                // Reminder: the meaning of row/column major layout
+                // in our semantics is the *opposite* of what GLSL
+                // calls them, because what they call "columns"
+                // are what we call "rows."
+                //
+                switch (matrixTypeLayout->mode)
+                {
+                case kMatrixLayoutMode_ColumnMajor:
+                    if(target == CodeGenTarget::GLSL)
+                    emit("layout(row_major)\n");
+                    break;
+
+                case kMatrixLayoutMode_RowMajor:
+                    emit("layout(column_major)\n");
+                    break;
+                }
+                break;
+
+            default:
                 break;
             }
+            
         }
 
         if (context->shared->target == CodeGenTarget::GLSL)
@@ -5325,13 +5440,13 @@ emitDeclImpl(decl, nullptr);
         }
     }
 
-    void emitIRParameterBlock(
+    void emitHLSLParameterBlock(
         EmitContext*                context,
         IRGlobalVar*                varDecl,
         UniformParameterBlockType*  type)
     {
         emit("cbuffer ");
-        emit(getName(varDecl));
+        emit(getIRName(varDecl));
 
         auto layout = getVarLayout(context, varDecl);
         assert(layout);
@@ -5375,7 +5490,7 @@ emitDeclImpl(decl, nullptr);
                     emitIRVarModifiers(context, fieldLayout);
 
                     auto fieldType = GetType(ff);
-                    emitIRType(context, fieldType, ff.GetName());
+                    emitIRType(context, fieldType, getIRName(ff));
 
                     emitHLSLParameterBlockFieldLayoutSemantics(layout, fieldLayout);
 
@@ -5389,6 +5504,96 @@ emitDeclImpl(decl, nullptr);
         }
 
         emit("}\n");
+    }
+
+    void emitGLSLParameterBlock(
+        EmitContext*                context,
+        IRGlobalVar*                varDecl,
+        UniformParameterBlockType*  type)
+    {
+        auto layout = getVarLayout(context, varDecl);
+        assert(layout);
+
+        auto info = layout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot);
+        if (info)
+        {
+            emitGLSLLayoutQualifier(*info);
+        }
+
+        emit("uniform ");
+        emit(getIRName(varDecl));
+
+        emit("\n{\n");
+
+        auto elementType = type->getElementType();
+
+        auto typeLayout = layout->typeLayout;
+        if( auto parameterBlockTypeLayout = typeLayout.As<ParameterBlockTypeLayout>() )
+        {
+            typeLayout = parameterBlockTypeLayout->elementTypeLayout;
+        }
+
+        if(auto declRefType = elementType->As<DeclRefType>())
+        {
+            if(auto structDeclRef = declRefType->declRef.As<StructDecl>())
+            {
+                auto structTypeLayout = typeLayout.As<StructTypeLayout>();
+                assert(structTypeLayout);
+
+                UInt fieldIndex = 0;
+                for(auto ff : GetFields(structDeclRef))
+                {
+                    // TODO: need a plan to deal with the case where the IR-level
+                    // `struct` type might not match the high-level type, so that
+                    // the numbering of fields is different.
+                    //
+                    // The right plan is probably to require that the lowering pass
+                    // create a fresh layout for any type/variable that it splits
+                    // in this fashion, so that the layout information it attaches
+                    // can always be assumed to apply to the actual instruciton.
+                    //
+
+                    auto fieldLayout = structTypeLayout->fields[fieldIndex++];
+
+                    emitIRVarModifiers(context, fieldLayout);
+
+                    auto fieldType = GetType(ff);
+                    emitIRType(context, fieldType, getIRName(ff));
+
+//                    emitHLSLParameterBlockFieldLayoutSemantics(layout, fieldLayout);
+
+                    emit(";\n");
+                }
+            }
+        }
+        else
+        {
+            emit("/* unexpected */");
+        }
+
+        // TODO: we should consider always giving parameter blocks
+        // names when outputting GLSL, since that shouldn't affect
+        // the semantics of things, and will reduce the risk of
+        // collisions in the global namespace...
+
+        emit("};\n");
+    }
+
+    void emitIRParameterBlock(
+        EmitContext*                context,
+        IRGlobalVar*                varDecl,
+        UniformParameterBlockType*  type)
+    {
+        switch (context->shared->target)
+        {
+        case CodeGenTarget::HLSL:
+            emitHLSLParameterBlock(context, varDecl, type);
+            break;
+
+        case CodeGenTarget::GLSL:
+            emitGLSLParameterBlock(context, varDecl, type);
+            break;
+        }
     }
 
     void emitIRVar(
@@ -5430,7 +5635,7 @@ emitDeclImpl(decl, nullptr);
         }
 #endif
 
-        emitIRType(context, varType, getName(varDecl));
+        emitIRType(context, varType, getIRName(varDecl));
 
         emitIRSemantics(context, varDecl);
 
@@ -5474,7 +5679,7 @@ emitDeclImpl(decl, nullptr);
         }
 #endif
 
-        emitIRType(context, varType, getName(varDecl));
+        emitIRType(context, varType, getIRName(varDecl));
 
         emitIRSemantics(context, varDecl);
 
@@ -5547,7 +5752,7 @@ emitDeclImpl(decl, nullptr);
                 continue;
 
             auto fieldType = GetType(ff);
-            emitIRType(context, fieldType, ff.GetName());
+            emitIRType(context, fieldType, getIRName(ff));
 
             EmitSemantics(ff.getDecl());
 

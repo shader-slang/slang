@@ -117,6 +117,9 @@ extern "C"
 
         /* Use new IR-based code generation path (unstable pre-release feature)*/
         SLANG_COMPILE_FLAG_USE_IR               = 1 << 2,
+
+        /* Do as little mangling of names as possible, to try to preserve original names */
+        SLANG_COMPILE_FLAG_NO_MANGLING          = 1 << 3,
     };
 
     /*!

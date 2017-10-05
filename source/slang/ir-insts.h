@@ -233,11 +233,11 @@ struct IRSwizzle : IRReturn
     IRValue* getBase() { return base.usedValue; }
     UInt getElementCount()
     {
-        return getArgCount() - 2;
+        return getArgCount() - 1;
     }
     IRValue* getElementIndex(UInt index)
     {
-        return getArg(index + 2);
+        return getArg(index + 1);
     }
 };
 
@@ -250,11 +250,11 @@ struct IRSwizzleSet : IRReturn
     IRValue* getSource() { return source.usedValue; }
     UInt getElementCount()
     {
-        return getArgCount() - 3;
+        return getArgCount() - 2;
     }
     IRValue* getElementIndex(UInt index)
     {
-        return getArg(index + 3);
+        return getArg(index + 2);
     }
 };
 

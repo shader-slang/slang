@@ -11,6 +11,7 @@
 
 namespace Slang {
 
+class   Decl;
 class   FuncType;
 class   Layout;
 class   Type;
@@ -281,6 +282,9 @@ struct IRFunc : IRGlobalValue
     // The mangled name, for a function
     // that should have linkage.
     String mangledName;
+
+    // Any generic parameters this function has
+    List<RefPtr<Decl>> genericParams;
 
     // Convenience accessors for working with the 
     // function's type.
