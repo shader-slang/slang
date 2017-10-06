@@ -460,6 +460,12 @@ struct EmitVisitor
         Emit(text.begin(), text.end());
     }
 
+    void emit(UnownedStringSlice const& text)
+    {
+        Emit(text.begin(), text.end());
+    }
+
+
     void emit(Name* name)
     {
         emit(getText(name));
@@ -3546,6 +3552,14 @@ struct EmitVisitor
         switch(info.kind)
         {
         case LayoutResourceKind::Uniform:
+            // Explicit offsets require a GLSL extension.
+            //
+            // TODO: We really need to fix this so that we
+            // only output an explicit offset for things
+            // that are layed out differently than they
+            // would normally be...
+            requireGLSLExtension("GL_ARB_enhanced_layouts");
+
             Emit("layout(offset = ");
             Emit(info.index);
             Emit(")\n");
@@ -4466,6 +4480,165 @@ emitDeclImpl(decl, nullptr);
         emit(" = ");
     }
 
+    class UnmangleContext
+    {
+    private:
+        char const* cursor_  = nullptr;
+        char const* begin_   = nullptr;
+        char const* end_     = nullptr;
+
+        bool isDigit(char c)
+        {
+            return (c >= '0') && (c <= '9');
+        }
+
+        char peek()
+        {
+            return *cursor_;
+        }
+
+        char get()
+        {
+            return *cursor_++;
+        }
+
+        void expect(char c)
+        {
+            if(peek() == c)
+            {
+                get();
+            }
+            else
+            {
+                // ERROR!
+                SLANG_UNEXPECTED("mangled name error");
+            }
+        }
+
+        void expect(char const* str)
+        {
+            while(char c = *str++)
+                expect(c);
+        }
+
+    public:
+        UnmangleContext()
+        {}
+
+        UnmangleContext(String const& str)
+            : cursor_(str.begin())
+            , begin_(str.begin())
+            , end_(str.end())
+        {}
+
+        // Call at the beginning of a mangled name,
+        // to strip off the main prefix
+        void startUnmangling()
+        {
+            expect("_S");
+        }
+
+        int readCount()
+        {
+            int c = peek();
+            if(!isDigit(c))
+            {
+                SLANG_UNEXPECTED("bad name mangling");
+                return 0;
+            }
+            get();
+
+            if(c == '0')
+                return 0;
+
+            int count = 0;
+            for(;;)
+            {
+                count = count*10 + c - '0';
+                c = peek();
+                if(!isDigit(c))
+                    return count;
+
+                get();
+            }
+        }
+
+        UnownedStringSlice readSimpleName()
+        {
+            UnownedStringSlice result;
+            for(;;)
+            {
+                int c = peek();
+                if(!isDigit(c))
+                    return result;
+
+                // Read the length part
+                int count = readCount();
+                if(count > (end_ - cursor_))
+                {
+                    SLANG_UNEXPECTED("bad name mangling");
+                    return result;
+                }
+
+                result = UnownedStringSlice(cursor_, cursor_ + count);
+                cursor_ += count;
+            }
+        }
+    };
+
+    void emitIntrinsicCallExpr(
+        EmitContext*    context,
+        IRCall*         inst,
+        IRFunc*         func)
+    {
+        // TODO: we need to inspect the mangled name,
+        // and construct a suitable expression from it...
+
+        UnmangleContext um(func->mangledName);
+
+        um.startUnmangling();
+
+        auto name = um.readSimpleName();
+
+        // TODO: need to detect if name represents
+        // a member function, etc.
+
+        emit(name);
+        emit("(");
+        UInt argCount = inst->getArgCount();
+        for( UInt aa = 1; aa < argCount; ++aa )
+        {
+            if(aa != 1) emit(", ");
+            emitIROperand(context, inst->getArg(aa));
+        }
+        emit(")");
+    }
+
+    void emitIRCallExpr(
+        EmitContext*    context,
+        IRCall*         inst)
+    {
+        // We want to detect any call to an intrinsic operation,
+        // that we can emit it directly without mangling, etc.
+        auto funcValue = inst->getArg(0);
+        if(auto irFunc = asTargetIntrinsic(context, funcValue))
+        {
+            emitIntrinsicCallExpr(context, inst, irFunc);
+        }
+        else
+        {
+            emitIROperand(context, funcValue);
+            emit("(");
+            UInt argCount = inst->getArgCount();
+            for( UInt aa = 1; aa < argCount; ++aa )
+            {
+                if(aa != 1) emit(", ");
+                emitIROperand(context, inst->getArg(aa));
+            }
+            emit(")");
+        }
+    }
+
     void emitIRInstExpr(
         EmitContext*    context,
         IRValue*        value)
@@ -4544,19 +4717,20 @@ emitDeclImpl(decl, nullptr);
 #define CASE(OPCODE, OP)                                \
         case OPCODE:                                    \
             emitIROperand(context, inst->getArg(0));    \
-            emit("" #OP " ");                           \
+            emit(" " #OP " ");                          \
             emitIROperand(context, inst->getArg(1));    \
             break
 
         CASE(kIROp_Add, +);
         CASE(kIROp_Sub, -);
-        CASE(kIROp_Mul, *);
         CASE(kIROp_Div, /);
         CASE(kIROp_Mod, %);
 
         CASE(kIROp_Lsh, <<);
         CASE(kIROp_Rsh, >>);
 
+        // TODO: Need to pull out component-wise
+        // comparison cases for matrices/vectors
         CASE(kIROp_Eql, ==);
         CASE(kIROp_Neq, !=);
         CASE(kIROp_Greater, >);
@@ -4572,6 +4746,30 @@ emitDeclImpl(decl, nullptr);
         CASE(kIROp_Or, ||);
 
 #undef CASE
+
+        // Component-wise ultiplication needs to be special cased,
+        // because GLSL uses infix `*` to express inner product
+        // when working with matrices.
+        case kIROp_Mul:
+            // Are we targetting GLSL, and is this a matrix product?
+            if(getTarget(context) == CodeGenTarget::GLSL
+                && inst->type->As<MatrixExpressionType>())
+            {
+                emit("matrixCompMult(");
+                emitIROperand(context, inst->getArg(0));
+                emit(", ");
+                emitIROperand(context, inst->getArg(1));
+                emit(")");
+            }
+            else
+            {
+                // Default handling is to just rely on infix
+                // `operator*`.
+                emitIROperand(context, inst->getArg(0));
+                emit(" * ");
+                emitIROperand(context, inst->getArg(1));
+            }
+            break;
 
         case kIROp_Not:
             {
@@ -4624,15 +4822,7 @@ emitDeclImpl(decl, nullptr);
 
         case kIROp_Call:
             {
-                emitIROperand(context, inst->getArg(0));
-                emit("(");
-                UInt argCount = inst->getArgCount();
-                for( UInt aa = 1; aa < argCount; ++aa )
-                {
-                    if(aa != 1) emit(", ");
-                    emitIROperand(context, inst->getArg(aa));
-                }
-                emit(")");
+                emitIRCallExpr(context, (IRCall*)inst);
             }
             break;
 
@@ -4666,11 +4856,28 @@ emitDeclImpl(decl, nullptr);
         case kIROp_Mul_Vector_Matrix:
         case kIROp_Mul_Matrix_Vector:
         case kIROp_Mul_Matrix_Matrix:
-            emit("mul(");
-            emitIROperand(context, inst->getArg(0));
-            emit(", ");
-            emitIROperand(context, inst->getArg(1));
-            emit(")");
+            if(getTarget(context) == CodeGenTarget::GLSL)
+            {
+                // GLSL expresses inner-product multiplications
+                // with the ordinary infix `*` operator.
+                //
+                // Note that the order of the operands is reversed
+                // compared to HLSL (and Slang's internal representation)
+                // because the notion of what is a "row" vs. a "column"
+                // is reversed between HLSL/Slang and GLSL.
+                //
+                emitIROperand(context, inst->getArg(1));
+                emit(" * ");
+                emitIROperand(context, inst->getArg(0));
+            }
+            else
+            {
+                emit("mul(");
+                emitIROperand(context, inst->getArg(0));
+                emit(", ");
+                emitIROperand(context, inst->getArg(1));
+                emit(")");
+            }
             break;
 
         case kIROp_swizzle:
@@ -5201,6 +5408,7 @@ emitDeclImpl(decl, nullptr);
         return nullptr;
     }
 
+#if 0
     void emitGLSLEntryPointFunc(
         EmitContext*    context,
         IRFunc*         func)
@@ -5274,6 +5482,7 @@ emitDeclImpl(decl, nullptr);
 
         emit("}\n");
     }
+#endif
 
     bool isEntryPoint(IRFunc* func)
     {
@@ -5296,10 +5505,31 @@ emitDeclImpl(decl, nullptr);
         return !isDefinition(func);
     }
 
+    // Check whether a given value names a target intrinsic,
+    // and return the IR function representing the instrinsic
+    // if it does.
+    IRFunc* asTargetIntrinsic(
+        EmitContext*    ctxt,
+        IRValue*        value)
+    {
+        if(!value)
+            return nullptr;
+
+        if(value->op != kIROp_Func)
+            return nullptr;
+
+        IRFunc* func = (IRFunc*) value;
+        if(!isTargetIntrinsic(ctxt, func))
+            return nullptr;
+
+        return func;
+    }
+
     void emitIRFunc(
         EmitContext*    context,
         IRFunc*         func)
     {
+#if 0
         if( getTarget(context) == CodeGenTarget::GLSL
             && isEntryPoint(func) )
         {
@@ -5312,7 +5542,9 @@ emitDeclImpl(decl, nullptr);
 
             emitGLSLEntryPointFunc(context, func);
         }
-        else if(!isDefinition(func))
+        else
+#endif
+        if(!isDefinition(func))
         {
             // This is just a function declaration,
             // and so we want to emit it as such.
@@ -5431,6 +5663,14 @@ emitDeclImpl(decl, nullptr);
                     emit("uniform ");
                     break;
 
+                case LayoutResourceKind::VertexInput:
+                    emit("in ");
+                    break;
+
+                case LayoutResourceKind::FragmentOutput:
+                    emit("out ");
+                    break;
+
                 default:
                     continue;
                 }
@@ -5520,7 +5760,16 @@ emitDeclImpl(decl, nullptr);
             emitGLSLLayoutQualifier(*info);
         }
 
-        emit("uniform ");
+        if(type->As<GLSLShaderStorageBufferType>())
+        {
+            emit("layout(std430) buffer ");
+        }
+        // TODO: what to do with HLSL `tbuffer` style buffers?
+        else
+        {
+            emit("layout(std140) uniform ");
+        }
+
         emit(getIRName(varDecl));
 
         emit("\n{\n");
@@ -5852,7 +6101,7 @@ emitDeclImpl(decl, nullptr);
         EmitContext*    context,
         IRModule*       module)
     {
-        for (auto gv : module->globalValues)
+        for( auto gv = module->getFirstGlobalValue(); gv; gv = gv->getNextValue() )
         {
             emitIRUsedTypesForValue(context, gv);
         }
@@ -5864,7 +6113,7 @@ emitDeclImpl(decl, nullptr);
     {
         emitIRUsedTypesForModule(context, module);
 
-        for (auto gv : module->globalValues)
+        for( auto gv = module->getFirstGlobalValue(); gv; gv = gv->getNextValue() )
         {
             emitIRGlobalInst(context, gv);
         }
@@ -5906,6 +6155,7 @@ String emitEntryPoint(
     CodeGenTarget       target)
 {
     auto translationUnit = entryPoint->getTranslationUnit();
+    auto session = entryPoint->compileRequest->mSession;
 
     SharedEmitContext sharedContext;
     sharedContext.target = target;
@@ -6006,6 +6256,14 @@ String emitEntryPoint(
         // we may need to apply certain transformations, and we may also
         // need to link in (and then inline) target-specific implementations
         // for the library functions that the user called.
+
+        switch(target)
+        {
+        case CodeGenTarget::GLSL:
+            legalizeEntryPointsForGLSL(session, lowered);
+            break;
+        }
+
 
         // TODO: do we want to emit directly from IR, or translate the
         // IR back into AST for emission?

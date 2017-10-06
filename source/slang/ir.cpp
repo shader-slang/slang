@@ -600,26 +600,172 @@ namespace Slang
 
     IRModule* IRBuilder::createModule()
     {
-        return new IRModule();
+        auto module = new IRModule();
+        module->session = getSession();
+        return module;
+    }
+
+    void IRGlobalValue::insertBefore(IRGlobalValue* other)
+    {
+        assert(other);
+        insertBefore(other, other->parentModule);
+    }
+
+    void IRGlobalValue::insertBefore(IRGlobalValue* other, IRModule* module)
+    {
+        assert(other || module);
+
+        if(!other) other = module->firstGlobalValue;
+        if(!module) module = other->parentModule;
+
+        assert(module);
+
+        auto nn = other;
+        auto pp = other ? other->prevGlobalValue : nullptr;
+
+        if(pp)
+        {
+            pp->nextGlobalValue = this;
+        }
+        else
+        {
+            module->firstGlobalValue = this;
+        }
+
+        if(nn)
+        {
+            nn->prevGlobalValue = this;
+        }
+        else
+        {
+            module->lastGlobalValue = this;
+        }
+
+        this->prevGlobalValue = pp;
+        this->nextGlobalValue = nn;
+        this->parentModule = module;
+    }
+
+    void IRGlobalValue::insertAtStart(IRModule* module)
+    {
+        insertBefore(module->firstGlobalValue, module);
+    }
+
+    void IRGlobalValue::insertAfter(IRGlobalValue* other)
+    {
+        assert(other);
+        insertAfter(other, other->parentModule);
+    }
+
+    void IRGlobalValue::insertAfter(IRGlobalValue* other, IRModule* module)
+    {
+        assert(other || module);
+
+        if(!other) other = module->lastGlobalValue;
+        if(!module) module = other->parentModule;
+
+        assert(module);
+
+        auto pp = other;
+        auto nn = other ? other->nextGlobalValue : nullptr;
+
+        if(pp)
+        {
+            pp->nextGlobalValue = this;
+        }
+        else
+        {
+            module->firstGlobalValue = this;
+        }
+
+        if(nn)
+        {
+            nn->prevGlobalValue = this;
+        }
+        else
+        {
+            module->lastGlobalValue = this;
+        }
+
+        this->prevGlobalValue = pp;
+        this->nextGlobalValue = nn;
+        this->parentModule = module;
+    }
+
+    void IRGlobalValue::insertAtEnd(IRModule* module)
+    {
+        assert(module);
+        insertAfter(module->lastGlobalValue, module);
+    }
+
+    void IRGlobalValue::removeFromParent()
+    {
+        auto module = parentModule;
+        if(!module)
+            return;
+
+        auto pp = this->prevGlobalValue;
+        auto nn = this->nextGlobalValue;
+
+        if(pp)
+        {
+            pp->nextGlobalValue = nn;
+        }
+        else
+        {
+            module->firstGlobalValue = nn;
+        }
+
+        if( nn )
+        {
+            nn->prevGlobalValue = pp;
+        }
+        else
+        {
+            module->lastGlobalValue = pp;
+        }
+    }
+
+    void IRGlobalValue::moveToEnd()
+    {
+        auto module = parentModule;
+        removeFromParent();
+        insertAtEnd(module);
     }
 
 
+
+    void addGlobalValue(
+        IRModule*   module,
+        IRGlobalValue*  value)
+    {
+        if(!module)
+            return;
+
+        value->parentModule = module;
+        value->insertAfter(module->lastGlobalValue, module);
+    }
+
     IRFunc* IRBuilder::createFunc()
     {
-        return createValue<IRFunc>(
+        IRFunc* func = createValue<IRFunc>(
             this,
             kIROp_Func,
             nullptr);
+        addGlobalValue(getModule(), func);
+        return func;
     }
 
     IRGlobalVar* IRBuilder::createGlobalVar(
         IRType* valueType)
     {
         auto ptrType = getSession()->getPtrType(valueType);
-        return createValue<IRGlobalVar>(
+        IRGlobalVar* globalVar = createValue<IRGlobalVar>(
             this,
             kIROp_global_var,
             ptrType);
+        addGlobalValue(getModule(), globalVar);
+        return globalVar;
     }
 
     IRBlock* IRBuilder::createBlock()
@@ -1646,7 +1792,7 @@ namespace Slang
         IRDumpContext*  context,
         IRModule*       module)
     {
-        for (auto gv : module->globalValues)
+        for( auto gv = module->getFirstGlobalValue(); gv; gv = gv->getNextValue() )
         {
             dumpIRGlobalValue(context, gv);
         }
@@ -1673,6 +1819,447 @@ namespace Slang
         String ir = getSlangIRAssembly(module);
         fprintf(stderr, "%s\n", ir.Buffer());
         fflush(stderr);
+    }
+
+
+    //
+    //
+    //
+
+    void IRValue::replaceUsesWith(IRValue* other)
+    {
+        // We will walk through the list of uses for the current
+        // instruction, and make them point to the other inst.
+        IRUse* ff = firstUse;
+
+        // No uses? Nothing to do.
+        if(!ff)
+            return;
+
+        IRUse* uu = ff;
+        for(;;)
+        {
+            // The uses had better all be uses of this
+            // instruction, or invariants are broken.
+            assert(uu->usedValue == this);
+
+            // Swap this use over to use the other value.
+            uu->usedValue = other;
+
+            // Try to move to the next use, but bail
+            // out if we are at the last one.
+            IRUse* next = uu->nextUse;
+            if( !next )
+                break;
+
+            uu = next;
+        }
+
+        // We are at the last use (and there must
+        // be at least one, because we handled
+        // the case of an empty list earlier).
+        assert(uu);
+
+        // Our job at this point is to splice
+        // our list of uses onto the other
+        // value's uses.
+        //
+        // If the value already had uses, then
+        // we need to patch our new list onto
+        // the front.
+        if( auto nn = other->firstUse )
+        {
+            uu->nextUse = nn;
+            nn->prevLink = &uu->nextUse;
+        }
+
+        // No matter what, our list of
+        // uses will become the start
+        // of the list of uses for
+        // `other`
+        other->firstUse = ff;
+        ff->prevLink = &other->firstUse;
+
+        // And `this` will have no uses any more.
+        this->firstUse = nullptr;
+    }
+
+    void IRValue::deallocate()
+    {
+        // Run destructor to be sure...
+        this->~IRValue();
+
+        // And then free the memory
+        free((void*) this);
+    }
+
+    // Insert this instruction into the same basic block
+    // as `other`, right before it.
+    void IRInst::insertBefore(IRInst* other)
+    {
+        // Make sure this instruction has been removed from any previous parent
+        this->removeFromParent();
+
+        auto bb = other->parentBlock;
+        assert(bb);
+
+        auto pp = other->prevInst;
+        if( pp )
+        {
+            pp->nextInst = this;
+        }
+        else
+        {
+            bb->firstInst = this;
+        }
+
+        this->prevInst = pp;
+        this->nextInst = other;
+        this->parentBlock = bb;
+
+        other->prevInst = this;
+    }
+
+    // Remove this instruction from its parent block,
+    // and then destroy it (it had better have no uses!)
+    void IRInst::removeFromParent()
+    {
+        // If we don't currently have a parent, then
+        // we are doing fine.
+        if(!parentBlock)
+            return;
+
+        auto bb = parentBlock;
+        auto pp = prevInst;
+        auto nn = nextInst;
+
+        if(pp)
+        {
+            SLANG_ASSERT(pp->parentBlock == bb);
+            pp->nextInst = nn;
+        }
+        else
+        {
+            bb->firstInst = nn;
+        }
+
+        if(nn)
+        {
+            SLANG_ASSERT(nn->parentBlock == bb);
+            nn->prevInst = pp;
+        }
+        else
+        {
+            bb->lastInst = pp;
+        }
+
+        prevInst = nullptr;
+        nextInst = nullptr;
+        parentBlock = nullptr;
+    }
+
+    // Remove this instruction from its parent block,
+    // and then destroy it (it had better have no uses!)
+    void IRInst::removeAndDeallocate()
+    {
+        removeFromParent();
+        deallocate();
+    }
+
+
+    //
+    // Legalization of entry points for GLSL:
+    //
+
+    IRGlobalVar* addGlobalVariable(
+        IRModule*   module,
+        Type*       valueType)
+    {
+        auto session = module->session;
+
+        SharedIRBuilder shared;
+        shared.module = module;
+        shared.session = session;
+
+        IRBuilder builder;
+        builder.shared = &shared;
+
+        RefPtr<PtrType> ptrType = session->getPtrType(valueType);
+
+        return builder.createGlobalVar(valueType);
+    }
+
+    void moveValueBefore(
+        IRGlobalValue*  valueToMove,
+        IRGlobalValue*  placeBefore)
+    {
+        valueToMove->removeFromParent();
+        valueToMove->insertBefore(placeBefore);
+    }
+
+    void legalizeEntryPointForGLSL(
+        Session*                session,
+        IRFunc*                 func,
+        IREntryPointDecoration* entryPointInfo)
+    {
+        auto module = func->parentModule;
+
+        auto entryPointLayout = entryPointInfo->layout;
+
+        // We require that the entry-point function has no uses,
+        // because otherwise we'd invalidate the signature
+        // at all existing call sites.
+        //
+        // TODO: the right thing to do here is to split any
+        // function that both gets called as an entry point
+        // and as an ordinary function.
+        assert(!func->firstUse);
+
+        // We create a dummy IR builder, since some of
+        // the functions require it.
+        //
+        // TODO: make some of these free functions...
+        //
+        SharedIRBuilder shared;
+        shared.module = module;
+        shared.session = session;
+        IRBuilder builder;
+        builder.shared = &shared;
+
+        // We will start by looking at the return type of the
+        // function, because that will enable us to do an
+        // early-out check to avoid more work.
+        //
+        // Specifically, we need to check if the function has
+        // a `void` return type, because there is no work
+        // to be done on its return value in that case.
+        auto resultType = func->getResultType();
+        if( resultType->Equals(session->getVoidType()) )
+        {
+            // In this case, the function doesn't return a value
+            // so we don't need to transform its `return` sites.
+            //
+            // We can also use this opportunity to quickly
+            // check if the function has any parameters, and if
+            // it doesn't use the chance to bail out immediately.
+            if( func->getParamCount() == 0 )
+            {
+                // This function is already legal for GLSL
+                // (at least in terms of parameter/result signature),
+                // so we won't bother doing anything at all.
+                return;
+            }
+
+            // If the function does have parameters, then we need
+            // to let the logic later in this function handle them.
+        }
+        else
+        {
+            // Function returns a value, so we need
+            // to introduce a new global variable
+            // to hold that value, and then replace
+            // any `returnVal` instructions with
+            // code to write to that variable.
+
+            auto resultVariable = addGlobalVariable(module, resultType);
+            moveValueBefore(resultVariable, func);
+
+            // We need to transfer layout information from the entry point
+            // down to the variable:
+            builder.addLayoutDecoration(resultVariable, entryPointLayout->resultLayout);
+
+            for( auto bb = func->getFirstBlock(); bb; bb = bb->getNextBlock() )
+            {
+                for( auto ii = bb->getFirstInst(); ii; ii = ii->nextInst )
+                {
+                    if(ii->op != kIROp_ReturnVal)
+                        continue;
+
+                    IRReturnVal* returnInst = (IRReturnVal*) ii;
+                    IRValue* resultValue = returnInst->getVal();
+
+
+
+                    // `store <resultVariable> <resultValue>`
+                    IRStore* storeInst = createInst<IRStore>(
+                        &builder,
+                        kIROp_Store,
+                        nullptr,
+                        resultVariable,
+                        resultValue);
+
+                    // `returnVoid`
+                    IRReturnVoid* returnVoid = createInst<IRReturnVoid>(
+                        &builder,
+                        kIROp_ReturnVoid,
+                        nullptr);
+
+                    // Put the two new instructions before the old one
+                    storeInst->insertBefore(returnInst);
+                    returnVoid->insertBefore(returnInst);
+
+                    // and then remove the old one.
+                    returnInst->removeAndDeallocate();
+
+                    // Make sure to resume our iteration at an
+                    // appropriate instruciton, since we deleted
+                    // the one we had been using.
+                    ii = returnVoid;
+                }
+            }
+        }
+
+        // Next we will walk through any parameters of the entry-point function,
+        // and turn them into global variables.
+        if( auto firstBlock = func->getFirstBlock() )
+        {
+            IRInst* insertBeforeInst = firstBlock->getFirstInst();
+
+            UInt paramCounter = 0;
+            for( auto pp = firstBlock->getFirstParam(); pp; pp = pp->getNextParam() )
+            {
+                UInt paramIndex = paramCounter++;
+
+                // We assume that the entry-point layout includes information
+                // on each parameter, and that these arrays are kept aligned.
+                // Note that this means that any transformations that mess
+                // with function signatures will need to also update layout info...
+                //
+                assert(entryPointLayout->fields.Count() > paramIndex);
+                auto paramLayout = entryPointLayout->fields[paramIndex];
+
+                // We need to create a global variable that will replace the parameter.
+                // It seems superficially obvious that the variable should have
+                // the same type as the parameter.
+                // However, if the parameter was a pointer, in order to
+                // support `out` or `in out` parameter passing, we need
+                // to be sure to allocate a variable of the pointed-to
+                // type instead.
+                //
+                // We also need to replace uses of the parameter with
+                // uses of the variable, and the exact logic there
+                // will differ a bit between the pointer and non-pointer
+                // cases.
+                auto paramType = pp->getType();
+
+                // TODO: We need to distinguish any true pointers in the
+                // user's code from pointers that only exist for
+                // parameter-passing. This `PtrType` here should actually
+                // be `OutTypeBase`, but I'm not confident that all
+                // the other code is handling that correctly...
+                if(auto paramPtrType = paramType->As<PtrType>() )
+                {
+                    // Okay, we have the more interesting case here,
+                    // where the parameter was being passed by reference.
+                    // This actually makes our life pretty easy, though,
+                    // since we can simply replace any uses of the existing
+                    // pointer with the global variable (since it will
+                    // be a pointer to storage).
+
+                    // We start by creating the global variable, using
+                    // the pointed-to type:
+                    auto valueType = paramPtrType->getValueType();
+                    auto paramVariable = addGlobalVariable(module, paramType);
+                    moveValueBefore(paramVariable, func);
+
+                    // TODO: We need to special-case `in out` variables here,
+                    // because they actually need to be lowered to *two*
+                    // global variables, not just one. We then need
+                    // to emit logic to initialize the output variable
+                    // based on the input at the start of the entry point,
+                    // and then use the output variable thereafter.
+                    //
+                    // TODO: Actually, I need to double-check that it is
+                    // legal in GLSL to use shader input/output parameters
+                    // as temporaries in general; if not then we'd need
+                    // to introduce a temporary no matter what.
+
+                    // Next we attach the layout information from the
+                    // original parameter to the new global variable,
+                    // so that we can lay it out correctly when generating
+                    // target code:
+                    builder.addLayoutDecoration(paramVariable, paramLayout);
+
+                    // And finally, we go ahead and replace all the
+                    // uses of the parameter (which was a pointer) with
+                    // uses of the new global variable's address.
+                    pp->replaceUsesWith(paramVariable);
+                }
+                else
+                {
+                    // This is the "easy" case where the parameter wasn't
+                    // being passed by reference. We start by just creating
+                    // a variable of the appropriate type, and attaching
+                    // the required layout information to it.
+                    auto paramVariable = addGlobalVariable(module, paramType);
+                    moveValueBefore(paramVariable, func);
+                    builder.addLayoutDecoration(paramVariable, paramLayout);
+
+                    // Next we need to replace uses of the parameter with
+                    // references to the variable. We are going to do that
+                    // somewhat naively, by simply loading the variable
+                    // at the start.
+
+                    IRInst* loadInst = builder.emitLoad(paramVariable);
+                    loadInst->insertBefore(insertBeforeInst);
+
+                    pp->replaceUsesWith(loadInst);
+                }
+            }
+
+            // At this point we should have eliminated all uses of the
+            // parameters of the entry block. Also, our control-flow
+            // rules mean that the entry block cannot be the target
+            // of any branches in the code, so there can't be
+            // any control-flow ops that try to match the parameter
+            // list.
+            //
+            // We can safely go through and destroy the parameters
+            // themselves, and then clear out the parameter list.
+            for( auto pp = firstBlock->getFirstParam(); pp; )
+            {
+                auto next = pp->getNextParam();
+                pp->deallocate();
+                pp = next;
+            }
+            firstBlock->firstParam = nullptr;
+            firstBlock->lastParam = nullptr;
+        }
+
+        // Finally, we need to patch up the type of the entry point,
+        // because it is no longer accurate.
+
+        auto voidFuncType = new FuncType();
+        voidFuncType->resultType = session->getVoidType();
+        func->type = voidFuncType;
+
+        // TODO: we should technically be constructing
+        // a new `EntryPointLayout` here to reflect
+        // the way that things have been moved around.
+    }
+
+    void legalizeEntryPointsForGLSL(
+        Session*    session,
+        IRModule*   module)
+    {
+        // We need to walk through all the global entry point
+        // declarations, and transform them to comply with
+        // GLSL rules.
+        for( auto globalValue = module->getFirstGlobalValue(); globalValue; globalValue = globalValue->getNextValue())
+        {
+            // Is the global value a function?
+            if(globalValue->op != kIROp_Func)
+                continue;
+            IRFunc* func = (IRFunc*) globalValue;
+
+            // Is the function an entry point?
+            IREntryPointDecoration* entryPointDecoration = func->findDecoration<IREntryPointDecoration>();
+            if(!entryPointDecoration)
+                continue;
+
+            // Okay, we need to legalize this one.
+            legalizeEntryPointForGLSL(session, func, entryPointDecoration);
+        }
     }
 
 

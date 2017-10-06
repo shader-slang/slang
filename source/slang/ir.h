@@ -15,6 +15,7 @@ class   Decl;
 class   FuncType;
 class   Layout;
 class   Type;
+class   Session;
 
 struct  IRFunc;
 struct  IRInst;
@@ -133,7 +134,7 @@ struct IRValue
     Type* getType() { return type; }
 
     // The linked list of decorations attached to this value
-    IRDecoration* firstDecoration;
+    IRDecoration* firstDecoration = nullptr;
 
     // Look up a decoration in the list of decorations
     IRDecoration* findDecorationImpl(IRDecorationOp op);
@@ -144,9 +145,16 @@ struct IRValue
     }
 
     // The first use of this value (start of a linked list)
-    IRUse*      firstUse;
+    IRUse*      firstUse = nullptr;
 
 
+    // Replace all uses of this value with `other`, so
+    // that this value will now have no uses.
+    void replaceUsesWith(IRValue* other);
+
+    // Free a value (which needs to have been removed
+    // from its parent, had its uses eliminated, etc.)
+    void deallocate();
 };
 
 // Instructions are values that can be executed,
@@ -180,6 +188,18 @@ struct IRInst : IRValue
     {
         return getArgs()[index].usedValue;
     }
+
+    // Insert this instruction into the same basic block
+    // as `other`, right before it.
+    void insertBefore(IRInst* other);
+
+    // Remove this instruction from its parent block,
+    // but don't delete it, or replace uses.
+    void removeFromParent();
+
+    // Remove this instruction from its parent block,
+    // and then destroy it (it had better have no uses!)
+    void removeAndDeallocate();
 };
 
 typedef int64_t IRIntegerValue;
@@ -268,7 +288,27 @@ struct IRBlock : IRValue
 typedef FuncType IRFuncType;
 
 struct IRGlobalValue : IRValue
-{};
+{
+    IRModule*   parentModule;
+
+    IRGlobalValue*  nextGlobalValue;
+    IRGlobalValue*  prevGlobalValue;
+
+    IRGlobalValue*  getNextValue() { return nextGlobalValue; }
+    IRGlobalValue*  getPrevValue() { return prevGlobalValue; }
+
+    void insertBefore(IRGlobalValue* other);
+    void insertBefore(IRGlobalValue* other, IRModule* module);
+    void insertAtStart(IRModule* module);
+
+    void insertAfter(IRGlobalValue* other);
+    void insertAfter(IRGlobalValue* other, IRModule* module);
+    void insertAtEnd(IRModule* module);
+
+    void removeFromParent();
+
+    void moveToEnd();
+};
 
 // A function is a parent to zero or more blocks of instructions.
 //
@@ -311,20 +351,29 @@ struct IRFunc : IRGlobalValue
 // A module is a parent to functions, global variables, types, etc.
 struct IRModule : RefObject
 {
-    // The designated entry-point function, if any
-    IRFunc*     entryPoint;
+    // The compilation session in use.
+    Session*    session;
 
     // A list of all the functions and other
     // global values declared in this module.
-    List<IRGlobalValue*> globalValues;
+    IRGlobalValue*  firstGlobalValue = nullptr;
+    IRGlobalValue*  lastGlobalValue = nullptr;
 
-    // TODO: need a symbol of all the global variables too
+    IRGlobalValue*  getFirstGlobalValue() { return firstGlobalValue; }
+    IRGlobalValue*  getlastGlobalValue() { return lastGlobalValue; }
 };
 
 void printSlangIRAssembly(StringBuilder& builder, IRModule* module);
 String getSlangIRAssembly(IRModule* module);
 
 void dumpIR(IRModule* module);
+
+// IR transformations
+
+// Transform shader entry points so that they conform to GLSL rules.
+void legalizeEntryPointsForGLSL(
+        Session*    session,
+        IRModule*   module);
 
 }
 
