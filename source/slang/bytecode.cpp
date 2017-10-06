@@ -956,7 +956,7 @@ BytecodeGenerationPtr<BCModule> generateBytecodeForModule(
     // for the module, where the registers represent the
     // values being computed at the global scope.
     UInt symbolCount = 0;
-    for( auto gv : irModule->globalValues )
+    for( auto gv = irModule->getFirstGlobalValue(); gv; gv = gv->getNextValue() )
     {
         Int globalID = Int(symbolCount++);
 
@@ -975,7 +975,7 @@ BytecodeGenerationPtr<BCModule> generateBytecodeForModule(
     bcModule->symbolCount = symbolCount;
     bcModule->symbols = bcSymbols;
 
-    for( auto gv : irModule->globalValues )
+    for( auto gv = irModule->getFirstGlobalValue(); gv; gv = gv->getNextValue() )
     {
         UInt symbolIndex = *context->mapInstToLocalID.TryGetValue(gv);
 

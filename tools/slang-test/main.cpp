@@ -54,7 +54,7 @@ struct Options
     // Dump expected/actual output on failures, for debugging.
     // This is especially intended for use in continuous
     // integration builds.
-    bool dumpOutputOnFailure = true;
+    bool dumpOutputOnFailure = false;
 
     // kind of output to generate
     OutputMode outputMode = kOutputMode_Default;

@@ -11,6 +11,7 @@
 #include "compiler.h"
 #include "ir.h"
 #include "syntax.h"
+#include "type-layout.h"
 
 namespace Slang {
 
@@ -40,6 +41,7 @@ struct IREntryPointDecoration : IRDecoration
     enum { kDecorationOp = kIRDecorationOp_EntryPoint };
 
     Profile profile;
+    EntryPointLayout* layout;
 };
 
 // Associates a compute-shader entry point function

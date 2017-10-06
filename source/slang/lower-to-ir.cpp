@@ -2117,8 +2117,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // TODO: need to handle global with initializer!
         }
 
-        getBuilder()->getModule()->globalValues.Add(irGlobal);
-
         return globalVal;
     }
 
@@ -2837,7 +2835,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         getBuilder()->addHighLevelDeclDecoration(irFunc, decl);
 
-        getBuilder()->getModule()->globalValues.Add(irFunc);
+        // For convenience, ensure that any additional global
+        // values that were emitted while outputting the function
+        // body appear before the function itself in the list
+        // of global values.
+        irFunc->moveToEnd();
 
         return LoweredValInfo::simple(irFunc);
     }
@@ -2939,6 +2941,7 @@ static void lowerEntryPointToIR(
 
     auto entryPointDecoration = builder->addDecoration<IREntryPointDecoration>(irFunc);
     entryPointDecoration->profile = profile;
+    entryPointDecoration->layout = entryPointLayout;
 
     // Attach layout information here.
     builder->addLayoutDecoration(irFunc, entryPointLayout);
