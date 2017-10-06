@@ -51,6 +51,11 @@ struct Options
     // force generation of baselines for HLSL tests
     bool generateHLSLBaselines = false;
 
+    // Dump expected/actual output on failures, for debugging.
+    // This is especially intended for use in continuous
+    // integration builds.
+    bool dumpOutputOnFailure = true;
+
     // kind of output to generate
     OutputMode outputMode = kOutputMode_Default;
 
@@ -144,6 +149,11 @@ void parseOptions(int* argc, char** argv)
         else if( strcmp(arg, "-appveyor") == 0 )
         {
             options.outputMode = kOutputMode_AppVeyor;
+            options.dumpOutputOnFailure = true;
+        }
+        else if( strcmp(arg, "-travis") == 0 )
+        {
+            options.dumpOutputOnFailure = true;
         }
         else if( strcmp(arg, "-category") == 0 )
         {
@@ -603,6 +613,21 @@ struct TestInput
 
 typedef TestResult (*TestCallback)(TestInput& input);
 
+void maybeDumpOutput(
+    String const& expectedOutput,
+    String const& actualOutput)
+{
+    if (!options.dumpOutputOnFailure)
+        return;
+
+    fprintf(stderr, "ERROR:\n"
+        "EXPECTED{{{\n%s}}}\n"
+        "ACTUAL{{{\n%s}}}\n",
+        expectedOutput.Buffer(),
+        actualOutput.Buffer());
+    fflush(stderr);
+}
+
 TestResult runSimpleTest(TestInput& input)
 {
     // need to execute the stand-alone Slang compiler on the file, and compare its output to what we expect
@@ -660,15 +685,7 @@ TestResult runSimpleTest(TestInput& input)
         String actualOutputPath = outputStem + ".actual";
         Slang::File::WriteAllText(actualOutputPath, actualOutput);
 
-        if (options.outputMode == kOutputMode_AppVeyor)
-        {
-            fprintf(stderr, "ERROR:\n"
-                "EXPECTED{{{\n%s}}}\n"
-                "ACTUAL{{{\n%s}}}\n",
-                expectedOutput.Buffer(),
-                actualOutput.Buffer());
-            fflush(stderr);
-        }
+        maybeDumpOutput(expectedOutput, actualOutput);
     }
 
     return result;
@@ -731,15 +748,7 @@ TestResult runEvalTest(TestInput& input)
         String actualOutputPath = outputStem + ".actual";
         Slang::File::WriteAllText(actualOutputPath, actualOutput);
 
-        if (options.outputMode == kOutputMode_AppVeyor)
-        {
-            fprintf(stderr, "ERROR:\n"
-                "EXPECTED{{{\n%s}}}\n"
-                "ACTUAL{{{\n%s}}}\n",
-                expectedOutput.Buffer(),
-                actualOutput.Buffer());
-            fflush(stderr);
-        }
+        maybeDumpOutput(expectedOutput, actualOutput);
     }
 
     return result;
@@ -808,15 +817,7 @@ TestResult runCrossCompilerTest(TestInput& input)
         String actualOutputPath = outputStem + ".actual";
         Slang::File::WriteAllText(actualOutputPath, actualOutput);
 
-        if (options.outputMode == kOutputMode_AppVeyor)
-        {
-            fprintf(stderr, "ERROR:\n"
-                "EXPECTED{{{\n%s}}}\n"
-                "ACTUAL{{{\n%s}}}\n",
-                expectedOutput.Buffer(),
-                actualOutput.Buffer());
-            fflush(stderr);
-        }
+        maybeDumpOutput(expectedOutput, actualOutput);
     }
 
     return result;
@@ -949,15 +950,7 @@ TestResult runHLSLComparisonTest(TestInput& input)
         String actualOutputPath = outputStem + ".actual";
         Slang::File::WriteAllText(actualOutputPath, actualOutput);
 
-        if (options.outputMode == kOutputMode_AppVeyor)
-        {
-            fprintf(stderr, "ERROR:\n"
-                "EXPECTED{{{\n%s}}}\n"
-                "ACTUAL{{{\n%s}}}\n",
-                expectedOutput.Buffer(),
-                actualOutput.Buffer());
-            fflush(stderr);
-        }
+        maybeDumpOutput(expectedOutput, actualOutput);
     }
 
     return result;
@@ -1048,6 +1041,8 @@ TestResult runGLSLComparisonTest(TestInput& input)
 
     if (actualOutput != expectedOutput)
     {
+        maybeDumpOutput(expectedOutput, actualOutput);
+
         return kTestResult_Fail;
     }
 
@@ -1193,6 +1188,8 @@ TestResult runHLSLRenderComparisonTestImpl(
 
     if (actualOutput != expectedOutput)
     {
+        maybeDumpOutput(expectedOutput, actualOutput);
+
         return kTestResult_Fail;
     }
 

@@ -531,7 +531,10 @@ OSError OSProcessSpawner::spawnAndWaitForCompletion()
         return kOSError_OperationFailed;
 
     pid_t childProcessID = fork();
-    if(childProcessID  == 0)
+    if (childProcessID == -1)
+        return kOSError_OperationFailed;
+
+    if(childProcessID == 0)
     {
         // We are the child process.
 
@@ -562,41 +565,71 @@ OSError OSProcessSpawner::spawnAndWaitForCompletion()
         int stdoutFD = stdoutPipe[0];
         int stderrFD = stderrPipe[0];
 
-        int maxFD = stdoutFD > stderrFD ? stdoutFD : stderrFD;
+        pollfd pollInfos[2];
+        nfds_t pollInfoCount = 2;
 
-        fd_set readSet;
-        int result;
+        pollInfos[0].fd = stdoutFD;
+        pollInfos[0].events = POLLIN;
+        pollInfos[0].revents = 0;
+        pollInfos[1].fd = stderrFD;
+        pollInfos[1].events = POLLIN;
+        pollInfos[1].revents = 0;
 
         int remainingCount =  2;
+        int iterations = 0;
         while(remainingCount)
         {
-            FD_ZERO(&readSet);
-            FD_SET(stdoutFD, &readSet);
-            FD_SET(stderrFD, &readSet);
+            // Safeguard against infinite loop:
+            iterations++;
+            if (iterations > 10000)
+            {
+                fprintf(stderr, "poll(): %d iterations\n", iterations);
+                return kOSError_OperationFailed;
+            }
 
-            result = select(maxFD + 1, &readSet, NULL, NULL, NULL);
+            // Set a timeout of ten seconds;
+            // we really shouldn't wait too long...
+            int pollTimeout = 10000;
+            int pollResult = poll(pollInfos, pollInfoCount, pollTimeout);
+            if (pollResult <= 0)
+            {
+                // If there was a signal that got in
+                // the way, then retry...
+                if(pollResult == -1 && errno == EINTR)
+                    continue;
 
-            if(result == -1 || errno == EINTR)
-                continue;
+                // timeout or error...
+                return kOSError_OperationFailed;
+            }
 
             enum { kBufferSize = 1024 };
             char buffer[kBufferSize];
 
-            if(FD_ISSET(stdoutFD, &readSet))
+            if(pollInfos[0].revents)
             {
                 auto count = read(stdoutFD, buffer, kBufferSize);
-                if(count == 0)
+                if (count <= 0)
+                {
+                    // end-of-file
+                    close(stdoutFD);
+                    pollInfos[0].fd = -1;
                     remainingCount--;
+                }
 
                 standardOutput_.append(
                     buffer, buffer + count);
             }
 
-            if(FD_ISSET(stderrFD, &readSet))
+            if(pollInfos[1].revents)
             {
                 auto count = read(stderrFD, buffer, kBufferSize);
-                if(count == 0)
+                if (count <= 0)
+                {
+                    // end-of-file
+                    close(stderrFD);
+                    pollInfos[1].fd = -1;
                     remainingCount--;
+                }
 
                 standardError_.append(
                     buffer, buffer + count);
@@ -604,23 +637,37 @@ OSError OSProcessSpawner::spawnAndWaitForCompletion()
         }
 
         int childStatus = 0;
+        iterations = 0;
         for(;;)
         {
-            pid_t terminatedProcessID = wait(&childStatus);
+            // Safeguard against infinite loop:
+            iterations++;
+            if (iterations > 10000)
+            {
+                fprintf(stderr, "waitpid(): %d iterations\n", iterations);
+                return kOSError_OperationFailed;
+            }
+
+
+            pid_t terminatedProcessID = waitpid(
+                childProcessID,
+                &childStatus,
+                0);
+            if (terminatedProcessID == -1)
+            {
+                return kOSError_OperationFailed;
+            }
+
             if(terminatedProcessID == childProcessID)
             {
                 if(WIFEXITED(childStatus))
                 {
                     resultCode_ = (int)(int8_t)WEXITSTATUS(childStatus);
-
                 }
                 else
                 {
                     resultCode_ = 1;
                 }
-
-                close(stdoutPipe[0]);
-                close(stderrPipe[0]);
 
                 return kOSError_None;
             }
