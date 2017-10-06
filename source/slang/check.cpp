@@ -3033,7 +3033,7 @@ namespace Slang
             RefPtr<Type>	resultType;
 
             // A system for tracking constraints introduced on generic parameters
-            ConstraintSystem constraintSystem;
+//            ConstraintSystem constraintSystem;
 
             // How much conversion cost should be considered for this overload,
             // when ranking candidates.
@@ -3752,13 +3752,18 @@ namespace Slang
                     auto fstParam = fstInt.As<GenericParamIntVal>();
                     auto sndParam = sndInt.As<GenericParamIntVal>();
 
+                    bool okay = false;
                     if (fstParam)
-                        TryUnifyIntParam(constraints, fstParam->declRef, sndInt);
+                    {
+                        if(TryUnifyIntParam(constraints, fstParam->declRef, sndInt))
+                            okay = true;
+                    }
                     if (sndParam)
-                        TryUnifyIntParam(constraints, sndParam->declRef, fstInt);
-
-                    if (fstParam || sndParam)
-                        return true;
+                    {
+                        if(TryUnifyIntParam(constraints, sndParam->declRef, fstInt))
+                            okay = true;
+                    }
+                    return okay;
                 }
             }
 
@@ -3818,6 +3823,14 @@ namespace Slang
             RefPtr<GenericValueParamDecl>	paramDecl,
             RefPtr<IntVal>                  val)
         {
+            // We only want to accumulate constraints on
+            // the parameters of the declarations being
+            // specialized (don't accidentially constrain
+            // parameters of a generic function based on
+            // calls in its body).
+            if(paramDecl->ParentDecl != constraints.genericDecl)
+                return false;
+
             // We want to constrain the given parameter to equal the given value.
             Constraint constraint;
             constraint.decl = paramDecl.Ptr();
@@ -3967,6 +3980,7 @@ namespace Slang
             if (auto extGenericDecl = GetOuterGeneric(extDecl))
             {
                 ConstraintSystem constraints;
+                constraints.genericDecl = extGenericDecl;
 
                 if (!TryUnifyTypes(constraints, extDecl->targetType.Ptr(), type))
                     return DeclRef<Decl>().As<ExtensionDecl>();
@@ -4243,9 +4257,7 @@ namespace Slang
             }
             else if( auto typeDefDeclRef = item.declRef.As<TypeDefDecl>() )
             {
-                auto type = DeclRefType::Create(
-                    getSession(),
-                    typeDefDeclRef);
+                auto type = getNamedType(getSession(), typeDefDeclRef);
                 AddTypeOverloadCandidates(GetType(typeDefDeclRef), context, type);
             }
             else if( auto genericTypeParamDeclRef = item.declRef.As<GenericTypeParamDecl>() )
