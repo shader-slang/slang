@@ -872,7 +872,7 @@ namespace Slang
             overloadContext.baseExpr = nullptr;
             overloadContext.mode = OverloadResolveContext::Mode::JustTrying;
             
-            AddTypeOverloadCandidates(toType, overloadContext);
+            AddTypeOverloadCandidates(toType, overloadContext, toType);
 
             if(overloadContext.bestCandidates.Count() != 0)
             {
@@ -2673,6 +2673,12 @@ namespace Slang
         // in order for checking to suceed.
         struct ConstraintSystem
         {
+            // The generic declaration whose parameters we
+            // are trying to solve for.
+            RefPtr<GenericDecl> genericDecl;
+
+            // Constraints we have accumulated, which constrain
+            // the possible arguments for those parameters.
             List<Constraint> constraints;
         };
 
@@ -2702,17 +2708,58 @@ namespace Slang
             // for now look up a conformance member...
             if(auto declRefType = type->As<DeclRefType>())
             {
-                if( auto aggTypeDeclRef = declRefType->declRef.As<AggTypeDecl>() )
+                auto declRef = declRefType->declRef;
+
+                // Easy case: a type conforms to itself.
+                //
+                // TODO: This is actually a bit more complicated, as
+                // the interface needs to be "object-safe" for us to
+                // really make this determination...
+                if(declRef == interfaceDeclRef)
+                    return true;
+
+                if( auto aggTypeDeclRef = declRef.As<AggTypeDecl>() )
                 {
                     for( auto inheritanceDeclRef : getMembersOfType<InheritanceDecl>(aggTypeDeclRef))
                     {
                         EnsureDecl(inheritanceDeclRef.getDecl());
 
-                        auto inheritedDeclRefType = getBaseType(inheritanceDeclRef)->As<DeclRefType>();
-                        if (!inheritedDeclRefType)
+                        // Here we will recursively look up conformance on the type
+                        // that is being inherited from. This is dangerous because
+                        // it might lead to infinite loops.
+                        //
+                        // TODO: A better appraoch would be to create a linearized list
+                        // of all the interfaces that a given type direclty or indirectly
+                        // inheirts, and store it with the type, so that we don't have
+                        // to recurse in places like this (and can maybe catch infinite
+                        // loops better). This would also help avoid checking multiply-inherited
+                        // conformances multiple times.
+
+                        auto inheritedType = getBaseType(inheritanceDeclRef);
+                        if(DoesTypeConformToInterface(inheritedType, interfaceDeclRef))
+                            return true;
+                    }
+                }
+                else if( auto genericTypeParamDeclRef = declRef.As<GenericTypeParamDecl>() )
+                {
+                    // We need to enumerate the constraints placed on this type by its outer
+                    // generic declaration, and see if any of them guarantees that we
+                    // satisfy the given interface..
+                    auto genericDeclRef = genericTypeParamDeclRef.GetParent().As<GenericDecl>();
+                    SLANG_ASSERT(genericDeclRef);
+
+                    for( auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(genericDeclRef) )
+                    {
+                        auto sub = GetSub(constraintDeclRef);
+                        auto sup = GetSup(constraintDeclRef);
+
+                        auto subDeclRef = sub->As<DeclRefType>();
+                        if(!subDeclRef)
+                            continue;
+                        if(subDeclRef->declRef != genericTypeParamDeclRef)
                             continue;
 
-                        if(interfaceDeclRef.Equals(inheritedDeclRefType->declRef))
+                        if(DoesTypeConformToInterface(sup, interfaceDeclRef))
                             return true;
                     }
                 }
@@ -3635,11 +3682,14 @@ namespace Slang
 #endif
         }
 
+        // Add a candidate callee for overload resolution, based on
+        // calling a particular `ConstructorDecl`.
         void AddCtorOverloadCandidate(
-            LookupResultItem		typeItem,
-            RefPtr<Type>	type,
-            DeclRef<ConstructorDecl>		ctorDeclRef,
-            OverloadResolveContext&	context)
+            LookupResultItem            typeItem,
+            RefPtr<Type>                type,
+            DeclRef<ConstructorDecl>    ctorDeclRef,
+            OverloadResolveContext&     context,
+            RefPtr<Type>                resultType)
         {
             EnsureDecl(ctorDeclRef.getDecl());
 
@@ -3654,7 +3704,7 @@ namespace Slang
             OverloadCandidate candidate;
             candidate.flavor = OverloadCandidate::Flavor::Func;
             candidate.item = ctorItem;
-            candidate.resultType = type;
+            candidate.resultType = resultType;
 
             AddOverloadCandidate(context, candidate);
         }
@@ -3856,7 +3906,10 @@ namespace Slang
                 auto fstDeclRef = fstDeclRefType->declRef;
 
                 if (auto typeParamDecl = dynamic_cast<GenericTypeParamDecl*>(fstDeclRef.getDecl()))
-                    return TryUnifyTypeParam(constraints, typeParamDecl, snd);
+                {
+                    if(typeParamDecl->ParentDecl == constraints.genericDecl )
+                        return TryUnifyTypeParam(constraints, typeParamDecl, snd);
+                }
             }
 
             if (auto sndDeclRefType = snd->As<DeclRefType>())
@@ -3864,7 +3917,10 @@ namespace Slang
                 auto sndDeclRef = sndDeclRefType->declRef;
 
                 if (auto typeParamDecl = dynamic_cast<GenericTypeParamDecl*>(sndDeclRef.getDecl()))
-                    return TryUnifyTypeParam(constraints, typeParamDecl, fst);
+                {
+                    if(typeParamDecl->ParentDecl == constraints.genericDecl )
+                        return TryUnifyTypeParam(constraints, typeParamDecl, fst);
+                }
             }
 
             // If we can unify the types structurally, then we are golden
@@ -3962,6 +4018,7 @@ namespace Slang
             OverloadResolveContext&	context)
         {
             ConstraintSystem constraints;
+            constraints.genericDecl = genericDeclRef.getDecl();
 
             // Construct a reference to the inner declaration that has any generic
             // parameter substitutions in place already, but *not* any substutions
@@ -4032,15 +4089,16 @@ namespace Slang
         }
 
         void AddAggTypeOverloadCandidates(
-            LookupResultItem		typeItem,
-            RefPtr<Type>	type,
-            DeclRef<AggTypeDecl>			aggTypeDeclRef,
-            OverloadResolveContext&	context)
+            LookupResultItem        typeItem,
+            RefPtr<Type>            type,
+            DeclRef<AggTypeDecl>    aggTypeDeclRef,
+            OverloadResolveContext& context,
+            RefPtr<Type>            resultType)
         {
             for (auto ctorDeclRef : getMembersOfType<ConstructorDecl>(aggTypeDeclRef))
             {
                 // now work through this candidate...
-                AddCtorOverloadCandidate(typeItem, type, ctorDeclRef, context);
+                AddCtorOverloadCandidate(typeItem, type, ctorDeclRef, context, resultType);
             }
 
             // Now walk through any extensions we can find for this types
@@ -4055,7 +4113,7 @@ namespace Slang
                     // TODO(tfoley): `typeItem` here should really reference the extension...
 
                     // now work through this candidate...
-                    AddCtorOverloadCandidate(typeItem, type, ctorDeclRef, context);
+                    AddCtorOverloadCandidate(typeItem, type, ctorDeclRef, context, resultType);
                 }
 
                 // Also check for generic constructors
@@ -4069,7 +4127,7 @@ namespace Slang
 
                         DeclRef<ConstructorDecl> innerCtorRef = innerRef.As<ConstructorDecl>();
 
-                        AddCtorOverloadCandidate(typeItem, type, innerCtorRef, context);
+                        AddCtorOverloadCandidate(typeItem, type, innerCtorRef, context, resultType);
 
                         // TODO(tfoley): need a way to do the solving step for the constraint system
                     }
@@ -4077,15 +4135,62 @@ namespace Slang
             }
         }
 
+        void addGenericTypeParamOverloadCandidates(
+            DeclRef<GenericTypeParamDecl>   typeDeclRef,
+            OverloadResolveContext&         context,
+            RefPtr<Type>                    resultType)
+        {
+            // We need to look for any constraints placed on the generic
+            // type parameter, since they will give us information on
+            // interfaces that the type must conform to.
+
+            // We expect the parent of the generic type parameter to be a generic...
+            auto genericDeclRef = typeDeclRef.GetParent().As<GenericDecl>();
+            assert(genericDeclRef);
+
+            for(auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(genericDeclRef))
+            {
+                // Does this constraint pertain to the type we are working on?
+                //
+                // We want constraints of the form `T : Foo` where `T` is the
+                // generic parameter in question, and `Foo` is whatever we are
+                // constraining it to.
+                auto subType = GetSub(constraintDeclRef);
+                auto subDeclRefType = subType->As<DeclRefType>();
+                if(!subDeclRefType)
+                    continue;
+                if(!subDeclRefType->declRef.Equals(typeDeclRef))
+                    continue;
+
+                // The super-type in the constraint (e.g., `Foo` in `T : Foo`)
+                // will tell us a type we should use for lookup.
+                auto bound = GetSup(constraintDeclRef);
+
+                // Go ahead and use the target type:
+                //
+                // TODO: Need to consider case where this might recurse infinitely.
+                AddTypeOverloadCandidates(bound, context, resultType);
+            }
+        }
+
         void AddTypeOverloadCandidates(
-            RefPtr<Type>	type,
-            OverloadResolveContext&	context)
+            RefPtr<Type>	        type,
+            OverloadResolveContext&	context,
+            RefPtr<Type>            resultType)
         {
             if (auto declRefType = type->As<DeclRefType>())
             {
-                if (auto aggTypeDeclRef = declRefType->declRef.As<AggTypeDecl>())
+                auto declRef = declRefType->declRef;
+                if (auto aggTypeDeclRef = declRef.As<AggTypeDecl>())
                 {
-                    AddAggTypeOverloadCandidates(LookupResultItem(aggTypeDeclRef), type, aggTypeDeclRef, context);
+                    AddAggTypeOverloadCandidates(LookupResultItem(aggTypeDeclRef), type, aggTypeDeclRef, context, resultType);
+                }
+                else if(auto genericTypeParamDeclRef = declRef.As<GenericTypeParamDecl>())
+                {
+                    addGenericTypeParamOverloadCandidates(
+                        genericTypeParamDeclRef,
+                        context,
+                        resultType);
                 }
             }
         }
@@ -4105,7 +4210,7 @@ namespace Slang
                 auto type = DeclRefType::Create(
                     getSession(),
                     aggTypeDeclRef);
-                AddAggTypeOverloadCandidates(item, type, aggTypeDeclRef, context);
+                AddAggTypeOverloadCandidates(item, type, aggTypeDeclRef, context, type);
             }
             else if (auto genericDeclRef = item.declRef.As<GenericDecl>())
             {
@@ -4138,7 +4243,17 @@ namespace Slang
             }
             else if( auto typeDefDeclRef = item.declRef.As<TypeDefDecl>() )
             {
-                AddTypeOverloadCandidates(GetType(typeDefDeclRef), context);
+                auto type = DeclRefType::Create(
+                    getSession(),
+                    typeDefDeclRef);
+                AddTypeOverloadCandidates(GetType(typeDefDeclRef), context, type);
+            }
+            else if( auto genericTypeParamDeclRef = item.declRef.As<GenericTypeParamDecl>() )
+            {
+                auto type = DeclRefType::Create(
+                    getSession(),
+                    genericTypeParamDeclRef);
+                addGenericTypeParamOverloadCandidates(genericTypeParamDeclRef, context, type);
             }
             else
             {
@@ -4152,10 +4267,12 @@ namespace Slang
         {
             auto funcExprType = funcExpr->type;
 
-            if (auto funcDeclRefExpr = funcExpr.As<DeclRefExpr>())
+            if (auto declRefExpr = funcExpr.As<DeclRefExpr>())
             {
-                // The expression referenced a function declaration
-                AddDeclRefOverloadCandidates(LookupResultItem(funcDeclRefExpr->declRef), context);
+                // The expression directly referenced a declaration,
+                // so we can use that declaration directly to look
+                // for anything applicable.
+                AddDeclRefOverloadCandidates(LookupResultItem(declRefExpr->declRef), context);
             }
             else if (auto funcType = funcExprType->As<FuncType>())
             {
@@ -4179,7 +4296,8 @@ namespace Slang
                 //
                 // TODO(tfoley): are there any meaningful types left
                 // that aren't declaration references?
-                AddTypeOverloadCandidates(typeType->type, context);
+                auto type = typeType->type;
+                AddTypeOverloadCandidates(type, context, type);
                 return;
             }
         }
@@ -4400,6 +4518,11 @@ namespace Slang
                 {
                     // There were multple equally-good candidates, but none actually usable.
                     // We will construct a diagnostic message to help out.
+
+
+                    // DEBUG:
+                    AddOverloadCandidates(funcExpr, context);
+
                     if (funcName)
                     {
                         if (!isRewriteMode())
@@ -4444,7 +4567,7 @@ namespace Slang
                     {
                         String declString = getDeclSignatureString(candidate.item);
 
-                        declString = declString + "[" + String(candidate.conversionCostSum) + "]";
+//                        declString = declString + "[" + String(candidate.conversionCostSum) + "]";
 
                         getSink()->diagnose(candidate.item.declRef, Diagnostics::overloadCandidate, declString);
 

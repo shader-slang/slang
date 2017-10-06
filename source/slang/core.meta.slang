@@ -10,13 +10,19 @@ interface __BuiltinArithmeticType : __BuiltinType {}
 interface __BuiltinSignedArithmeticType : __BuiltinArithmeticType {}
 
 // A type that can represent integers
-interface __BuiltinIntegerType : __BuiltinArithmeticType {}
+interface __BuiltinIntegerType : __BuiltinArithmeticType
+{}
 
 // A type that can represent non-integers
 interface __BuiltinRealType : __BuiltinArithmeticType {}
 
 // A type that uses a floating-point representation
-interface __BuiltinFloatingPointType : __BuiltinRealType, __BuiltinSignedArithmeticType {}
+interface __BuiltinFloatingPointType : __BuiltinRealType, __BuiltinSignedArithmeticType
+{
+    // A builtin floating-point type must have an initializer that takes
+    // a floating-point value...
+    __init(float value);
+}
 
 __generic<T,U> __intrinsic_op(Sequence) U operator,(T left, U right);
 

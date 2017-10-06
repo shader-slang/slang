@@ -842,6 +842,37 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(glsl, "clamp($0, 0, 1)")
 matrix<T,N,M> saturate(matrix<T,N,M> x);
 
+__generic<T : __BuiltinFloatingPointType>
+__specialized_for_target(glsl)
+T saturate(T x)
+{
+    return clamp(x, T(0), T(1));
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__specialized_for_target(glsl)
+vector<T,N> saturate(vector<T,N> x)
+{
+    return clamp(x,
+        vector<T,N>(T(0)),
+        vector<T,N>(T(1)));
+}
+
+// HACK: need a helper to turn a scalar into a matrix,
+// because GLSL and HLSL disagree on the semantics of
+// constructing a matrix from a single scalar.
+__generic<T, let N : int, let M : int>
+matrix<T,N,M> __scalarToMatrix(T value);
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__specialized_for_target(glsl)
+matrix<T,N,M> saturate(matrix<T,N,M> x)
+{
+    return clamp(x,
+        __scalarToMatrix<T,N,M>(T(0)),
+        __scalarToMatrix<T,N,M>(T(1)));
+}
+
 
 // Extract sign of value
 __generic<T : __BuiltinSignedArithmeticType> __intrinsic_op int sign(T x);

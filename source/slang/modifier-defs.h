@@ -49,6 +49,15 @@ SYNTAX_CLASS(TargetIntrinsicModifier, Modifier)
     FIELD(Token, definitionToken)
 END_SYNTAX_CLASS()
 
+// A modifier that marks a declaration as representing a
+// specialization that should be preferred on a particular
+// target.
+SYNTAX_CLASS(SpecializedForTargetModifier, Modifier)
+    // Token that names the target that the operation
+    // has been specialized for.
+    FIELD(Token, targetToken)
+END_SYNTAX_CLASS()
+
 // A modifier to tag something as an intrinsic that requires
 // a certain GLSL extension to be enabled when used
 SYNTAX_CLASS(RequiredGLSLExtensionModifier, Modifier)
