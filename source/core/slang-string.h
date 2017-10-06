@@ -134,6 +134,15 @@ namespace Slang
     struct UnownedStringSlice
     {
     public:
+        UnownedStringSlice()
+            : beginData(0)
+            , endData(0)
+        {}
+
+        UnownedStringSlice(char const* b, char const* e)
+            : beginData(b)
+            , endData(e)
+        {}
 
         char const* begin() const
         {
