@@ -1619,7 +1619,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
 static void HandleDefineDirective(PreprocessorDirectiveContext* context)
 {
     Token nameToken;
-    if (!Expect(context, TokenType::Identifier, Diagnostics::expectedTokenInPreprocessorDirective, &nameToken))
+    if (!ExpectRaw(context, TokenType::Identifier, Diagnostics::expectedTokenInPreprocessorDirective, &nameToken))
         return;
     Name* name = nameToken.getName();
 
@@ -1701,7 +1701,7 @@ static void HandleDefineDirective(PreprocessorDirectiveContext* context)
 static void HandleUndefDirective(PreprocessorDirectiveContext* context)
 {
     Token nameToken;
-    if (!Expect(context, TokenType::Identifier, Diagnostics::expectedTokenInPreprocessorDirective, &nameToken))
+    if (!ExpectRaw(context, TokenType::Identifier, Diagnostics::expectedTokenInPreprocessorDirective, &nameToken))
         return;
     Name* name = nameToken.getName();
 
