@@ -3321,6 +3321,8 @@ namespace Slang
         return parseGenericApp(parser, base);
     }
 
+    static RefPtr<Expr> parsePrefixExpr(Parser* parser);
+
     static RefPtr<Expr> parseAtomicExpr(Parser* parser)
     {
         switch( peekTokenType(parser) )
@@ -3348,7 +3350,7 @@ namespace Slang
                     tcexpr->FunctionExpr = parser->ParseType();
                     parser->ReadToken(TokenType::RParent);
 
-                    auto arg = parser->ParseExpression(Precedence::Multiplicative); // Note(tfoley): need to double-check this
+                    auto arg = parsePrefixExpr(parser);
                     tcexpr->Arguments.Add(arg);
 
                     return tcexpr;
