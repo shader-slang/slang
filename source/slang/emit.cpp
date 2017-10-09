@@ -3291,7 +3291,8 @@ struct EmitVisitor
     }
 
     // Shared emit logic for variable declarations (used for parameters, locals, globals, fields)
-    void EmitVarDeclCommon(DeclRef<VarDeclBase> declRef)
+
+    void emitVarDeclHead(DeclRef<VarDeclBase> declRef)
     {
         EmitModifiers(declRef.getDecl());
 
@@ -3306,7 +3307,10 @@ struct EmitVisitor
         }
 
         EmitSemantics(declRef.getDecl());
+    }
 
+    void emitVarDeclInit(DeclRef<VarDeclBase> declRef)
+    {
         // TODO(tfoley): technically have to apply substitution here too...
         if (auto initExpr = declRef.getDecl()->initExpr)
         {
@@ -3321,6 +3325,12 @@ struct EmitVisitor
                 EmitExpr(initExpr);
             }
         }
+    }
+
+    void EmitVarDeclCommon(DeclRef<VarDeclBase> declRef)
+    {
+        emitVarDeclHead(declRef);
+        emitVarDeclInit(declRef);
     }
 
     // Shared emit logic for variable declarations (used for parameters, locals, globals, fields)
@@ -3532,13 +3542,15 @@ struct EmitVisitor
             {
                 int fieldIndex = fieldCounter++;
 
-                EmitVarDeclCommon(field);
+                emitVarDeclHead(field);
 
                 RefPtr<VarLayout> fieldLayout = structTypeLayout->fields[fieldIndex];
                 SLANG_RELEASE_ASSERT(fieldLayout->varDecl.GetName() == field.GetName());
 
                 // Emit explicit layout annotations for every field
                 emitHLSLParameterBlockFieldLayoutSemantics(layout, fieldLayout);
+
+                emitVarDeclInit(field);
 
                 Emit(";\n");
             }
@@ -3809,9 +3821,9 @@ struct EmitVisitor
             }
         }
 
-        EmitVarDeclCommon(decl);
-
+        emitVarDeclHead(makeDeclRef(decl.Ptr()));
         emitHLSLRegisterSemantics(layout);
+        emitVarDeclInit(makeDeclRef(decl.Ptr()));
 
         Emit(";\n");
     }
