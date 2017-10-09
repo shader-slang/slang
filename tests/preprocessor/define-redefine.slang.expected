@@ -1,0 +1,7 @@
+result code = 0
+standard error = {
+tests/preprocessor/define-redefine.slang(10): warning 15400: redefinition of macro 'FOO'
+tests/preprocessor/define-redefine.slang(6): note: see previous definition of 'FOO'
+}
+standard output = {
+}
