@@ -671,6 +671,59 @@ namespace Slang
                 // we will collect the new arguments here
                 List<RefPtr<Expr>> coercedArgs;
 
+                if (auto toVecType = toType->As<VectorExpressionType>())
+                {
+                    auto toElementCount = toVecType->elementCount;
+                    auto toElementType = toVecType->elementType;
+
+                    UInt elementCount = 0;
+                    if (auto constElementCount = toElementCount.As<ConstantIntVal>())
+                    {
+                        elementCount = (UInt) constElementCount->value;
+                    }
+                    else
+                    {
+                        // We don't know the element count statically,
+                        // so what are we supposed to be doing?
+                        elementCount = fromInitializerListExpr->args.Count();
+                    }
+
+                    // TODO: need to check that the element count
+                    // for the vector type matches the argument
+                    // count for the initializer list, or else
+                    // fix them up to match.
+
+                    for(auto arg : fromInitializerListExpr->args)
+                    {
+                        RefPtr<Expr> coercedArg;
+                        ConversionCost argCost;
+
+                        bool argResult = TryCoerceImpl(
+                            toElementType,
+                            outToExpr ? &coercedArg : nullptr,
+                            arg->type,
+                            arg,
+                            outCost ? &argCost : nullptr);
+
+                        // No point in trying further if any argument fails
+                        if(!argResult)
+                            return false;
+
+                        // TODO(tfoley): what to do with cost?
+                        // This only matters if/when we allow an initializer list as an argument to
+                        // an overloaded call.
+
+                        if( outToExpr )
+                        {
+                            coercedArgs.Add(coercedArg);
+                        }
+                    }
+                }
+                //
+                // TODO(tfoley): How to handle matrices here?
+                // Should they expect individual scalars, or support
+                // vectors for the rows?
+                //
                 if(auto toDeclRefType = toType->As<DeclRefType>())
                 {
                     auto toTypeDeclRef = toDeclRefType->declRef;
