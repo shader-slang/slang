@@ -108,6 +108,9 @@ sb << "    __implicit_conversion(" << kConversionCost_ScalarToVector << ")\n";
 sb << "    __intrinsic_op(" << kIROp_constructVectorFromScalar << ")\n";
 sb << "    __init(T value);\n";
 
+// Allow initialization from same type
+sb << "    __init(vector<T,N> value);\n";
+
 sb << "};\n";
 
 // TODO: Probably need to do similar
@@ -190,13 +193,6 @@ for (int N = 2; N <= 4; ++N)
         sb << ");\n";
     }
 
-    // initialize from another vector of the same size
-    //
-    // TODO(tfoley): this overlaps with implicit conversions.
-    // We should look for a way that we can define implicit
-    // conversions directly in the stdlib instead...
-    sb << "__generic<U> __init(vector<U," << N << ">);\n";
-
     // Initialize from two vectors, of size M and N-M
     for(int M = 2; M <= (N-2); ++M)
     {
@@ -230,16 +226,20 @@ for (int tt = 0; tt < kBaseTypeCount; ++tt)
     {
         if(kBaseTypes[ff].tag == BaseType::Void) continue;
 
-        // We need a constructor to make a vector from a scalar
-        // of another type.
 
         if( tt != ff )
         {
             auto cost = getBaseTypeConversionCost(
                 kBaseTypes[tt],
                 kBaseTypes[ff]);
-            cost += kConversionCost_ScalarToVector;
 
+			// Implicit conversion from a vector of the same
+			// size, but different element type.
+            sb << "    __implicit_conversion(" << cost << ")\n";
+            sb << "    __init(vector<" << kBaseTypes[ff].name << ",N> value);\n";
+
+			// Constructor to make a vector from a scalar of another type.
+            cost += kConversionCost_ScalarToVector;
             sb << "    __implicit_conversion(" << cost << ")\n";
             sb << "    __init(" << kBaseTypes[ff].name << " value);\n";
         }
