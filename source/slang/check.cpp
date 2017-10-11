@@ -671,6 +671,59 @@ namespace Slang
                 // we will collect the new arguments here
                 List<RefPtr<Expr>> coercedArgs;
 
+                if (auto toVecType = toType->As<VectorExpressionType>())
+                {
+                    auto toElementCount = toVecType->elementCount;
+                    auto toElementType = toVecType->elementType;
+
+                    UInt elementCount = 0;
+                    if (auto constElementCount = toElementCount.As<ConstantIntVal>())
+                    {
+                        elementCount = (UInt) constElementCount->value;
+                    }
+                    else
+                    {
+                        // We don't know the element count statically,
+                        // so what are we supposed to be doing?
+                        elementCount = fromInitializerListExpr->args.Count();
+                    }
+
+                    // TODO: need to check that the element count
+                    // for the vector type matches the argument
+                    // count for the initializer list, or else
+                    // fix them up to match.
+
+                    for(auto arg : fromInitializerListExpr->args)
+                    {
+                        RefPtr<Expr> coercedArg;
+                        ConversionCost argCost;
+
+                        bool argResult = TryCoerceImpl(
+                            toElementType,
+                            outToExpr ? &coercedArg : nullptr,
+                            arg->type,
+                            arg,
+                            outCost ? &argCost : nullptr);
+
+                        // No point in trying further if any argument fails
+                        if(!argResult)
+                            return false;
+
+                        // TODO(tfoley): what to do with cost?
+                        // This only matters if/when we allow an initializer list as an argument to
+                        // an overloaded call.
+
+                        if( outToExpr )
+                        {
+                            coercedArgs.Add(coercedArg);
+                        }
+                    }
+                }
+                //
+                // TODO(tfoley): How to handle matrices here?
+                // Should they expect individual scalars, or support
+                // vectors for the rows?
+                //
                 if(auto toDeclRefType = toType->As<DeclRefType>())
                 {
                     auto toTypeDeclRef = toDeclRefType->declRef;
@@ -804,9 +857,6 @@ namespace Slang
 
             OverloadResolveContext overloadContext;
 
-            List<RefPtr<Expr>> args;
-            args.Add(fromExpr);
-
             overloadContext.disallowNestedConversions = true;
             overloadContext.argCount = 1;
             overloadContext.argTypes = &fromType;
@@ -884,7 +934,45 @@ namespace Slang
 
                 if(outToExpr)
                 {
+                    // The logic here is a bit ugly, to deal with the fact that
+                    // `CompleteOverloadCandidate` will, left to its own devices,
+                    // construct a vanilla `InvokeExpr` to represent the call
+                    // to the initializer we found, while we *want* it to
+                    // create some variety of `ImplicitCastExpr`.
+                    //
+                    // Now, it just so happens that `CompleteOverloadCandidate`
+                    // will use the "original" expression if one is available,
+                    // so we'll create one and initialize it here.
+                    // We fill in the location and arguments, but not the
+                    // base expression (the callee), since that will come
+                    // from the selected overload candidate.
+                    //
+                    auto castExpr = createImplicitCastExpr();
+                    castExpr->loc = fromExpr->loc;
+                    castExpr->Arguments.Add(fromExpr);
+                    //
+                    // Next we need to set our cast expression as the "original"
+                    // expression and then complete the overload process.
+                    //
+                    overloadContext.originalExpr = castExpr;
                     *outToExpr = CompleteOverloadCandidate(overloadContext, *overloadContext.bestCandidate);
+                    //
+                    // However, the above isn't *quite* enough, because
+                    // the process of completing the overload candidate
+                    // might overwrite the argument list that was passed
+                    // in to overload resolution, and in this case that
+                    // "argument list" was just a pointer to `fromExpr`.
+                    //
+                    // That means we need to clear the argument list and
+                    // reload it from `fromExpr` to make sure that we
+                    // got the arguments *after* any transformations
+                    // were applied.
+                    // For right now this probably doesn't matter,
+                    // because we don't allow nested implicit conversions,
+                    // but I'd rather play it safe.
+                    //
+                    castExpr->Arguments.Clear();
+                    castExpr->Arguments.Add(fromExpr);
                 }
 
                 return true;
@@ -907,22 +995,26 @@ namespace Slang
                 outCost);
         }
 
+        RefPtr<TypeCastExpr> createImplicitCastExpr()
+        {
+            if (isRewriteMode())
+            {
+                // In "rewrite" mode, we will generate a different syntax node
+                // to indicate that this type-cast was implicitly generated
+                // by the compiler, and shouldn't appear in the output code.
+                return new HiddenImplicitCastExpr();
+            }
+            else
+            {
+                return new ImplicitCastExpr();
+            }
+        }
+
         RefPtr<Expr> CreateImplicitCastExpr(
             RefPtr<Type>	toType,
             RefPtr<Expr>	fromExpr)
         {
-            // In "rewrite" mode, we will generate a different syntax node
-            // to indicate that this type-cast was implicitly generated
-            // by the compiler, and shouldn't appear in the output code.
-            RefPtr<TypeCastExpr> castExpr;
-            if (isRewriteMode())
-            {
-                castExpr = new HiddenImplicitCastExpr();
-            }
-            else
-            {
-                castExpr = new ImplicitCastExpr();
-            }
+            RefPtr<TypeCastExpr> castExpr = createImplicitCastExpr();
 
             auto typeType = new TypeType();
             typeType->type = toType;
@@ -2005,7 +2097,17 @@ namespace Slang
 
             auto funcDeclRef = funcDeclRefExpr->declRef;
             auto intrinsicMod = funcDeclRef.getDecl()->FindModifier<IntrinsicOpModifier>();
-            if (!intrinsicMod) return nullptr;
+            if (!intrinsicMod)
+            {
+                // We can't constant fold anything that doesn't map to a builtin
+                // operation right now.
+                //
+                // TODO: we should really allow constant-folding for anything
+                // that can be lowerd to our bytecode...
+                return nullptr;
+            }
+
+
 
             // Let's not constant-fold operations with more than a certain number of arguments, for simplicity
             static const int kMaxArgs = 8;
@@ -2188,16 +2290,16 @@ namespace Slang
                 }
             }
 
-            if (auto invokeExpr = dynamic_cast<InvokeExpr*>(expr))
-            {
-                auto val = TryConstantFoldExpr(invokeExpr);
-                if (val)
-                    return val;
-            }
-            else if(auto castExpr = dynamic_cast<TypeCastExpr*>(expr))
+            if(auto castExpr = dynamic_cast<TypeCastExpr*>(expr))
             {
                 auto val = TryConstantFoldExpr(castExpr->Arguments[0].Ptr());
                 if(val)
+                    return val;
+            }
+            else if (auto invokeExpr = dynamic_cast<InvokeExpr*>(expr))
+            {
+                auto val = TryConstantFoldExpr(invokeExpr);
+                if (val)
                     return val;
             }
 

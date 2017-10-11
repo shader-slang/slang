@@ -40,6 +40,9 @@ void buildMemberDictionary(ContainerDecl* decl)
     decl->memberDictionary.Clear();
     decl->transparentMembers.Clear();
 
+    // are we a generic?
+    GenericDecl* genericDecl = dynamic_cast<GenericDecl*>(decl);
+
     for (auto m : decl->Members)
     {
         auto name = m->getName();
@@ -55,6 +58,11 @@ void buildMemberDictionary(ContainerDecl* decl)
         // Ignore members with no name
         if (!name)
             continue;
+
+        // Ignore the "inner" member of a generic declaration
+        if (genericDecl && m == genericDecl->inner)
+            continue;
+
 
         m->nextInContainerWithSameName = nullptr;
 

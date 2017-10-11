@@ -1452,11 +1452,6 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         return ensureDecl(context, expr->declRef);
     }
 
-    LoweredValInfo visitTypeCastExpr(TypeCastExpr* expr)
-    {
-        SLANG_UNIMPLEMENTED_X("codegen for type cast expression");
-    }
-
     LoweredValInfo visitSelectExpr(SelectExpr* expr)
     {
         SLANG_UNIMPLEMENTED_X("codegen for select expression");
