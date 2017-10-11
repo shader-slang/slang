@@ -857,9 +857,6 @@ namespace Slang
 
             OverloadResolveContext overloadContext;
 
-            List<RefPtr<Expr>> args;
-            args.Add(fromExpr);
-
             overloadContext.disallowNestedConversions = true;
             overloadContext.argCount = 1;
             overloadContext.argTypes = &fromType;
@@ -937,7 +934,45 @@ namespace Slang
 
                 if(outToExpr)
                 {
+                    // The logic here is a bit ugly, to deal with the fact that
+                    // `CompleteOverloadCandidate` will, left to its own devices,
+                    // construct a vanilla `InvokeExpr` to represent the call
+                    // to the initializer we found, while we *want* it to
+                    // create some variety of `ImplicitCastExpr`.
+                    //
+                    // Now, it just so happens that `CompleteOverloadCandidate`
+                    // will use the "original" expression if one is available,
+                    // so we'll create one and initialize it here.
+                    // We fill in the location and arguments, but not the
+                    // base expression (the callee), since that will come
+                    // from the selected overload candidate.
+                    //
+                    auto castExpr = createImplicitCastExpr();
+                    castExpr->loc = fromExpr->loc;
+                    castExpr->Arguments.Add(fromExpr);
+                    //
+                    // Next we need to set our cast expression as the "original"
+                    // expression and then complete the overload process.
+                    //
+                    overloadContext.originalExpr = castExpr;
                     *outToExpr = CompleteOverloadCandidate(overloadContext, *overloadContext.bestCandidate);
+                    //
+                    // However, the above isn't *quite* enough, because
+                    // the process of completing the overload candidate
+                    // might overwrite the argument list that was passed
+                    // in to overload resolution, and in this case that
+                    // "argument list" was just a pointer to `fromExpr`.
+                    //
+                    // That means we need to clear the argument list and
+                    // reload it from `fromExpr` to make sure that we
+                    // got the arguments *after* any transformations
+                    // were applied.
+                    // For right now this probably doesn't matter,
+                    // because we don't allow nested implicit conversions,
+                    // but I'd rather play it safe.
+                    //
+                    castExpr->Arguments.Clear();
+                    castExpr->Arguments.Add(fromExpr);
                 }
 
                 return true;
@@ -960,22 +995,26 @@ namespace Slang
                 outCost);
         }
 
+        RefPtr<TypeCastExpr> createImplicitCastExpr()
+        {
+            if (isRewriteMode())
+            {
+                // In "rewrite" mode, we will generate a different syntax node
+                // to indicate that this type-cast was implicitly generated
+                // by the compiler, and shouldn't appear in the output code.
+                return new HiddenImplicitCastExpr();
+            }
+            else
+            {
+                return new ImplicitCastExpr();
+            }
+        }
+
         RefPtr<Expr> CreateImplicitCastExpr(
             RefPtr<Type>	toType,
             RefPtr<Expr>	fromExpr)
         {
-            // In "rewrite" mode, we will generate a different syntax node
-            // to indicate that this type-cast was implicitly generated
-            // by the compiler, and shouldn't appear in the output code.
-            RefPtr<TypeCastExpr> castExpr;
-            if (isRewriteMode())
-            {
-                castExpr = new HiddenImplicitCastExpr();
-            }
-            else
-            {
-                castExpr = new ImplicitCastExpr();
-            }
+            RefPtr<TypeCastExpr> castExpr = createImplicitCastExpr();
 
             auto typeType = new TypeType();
             typeType->type = toType;
