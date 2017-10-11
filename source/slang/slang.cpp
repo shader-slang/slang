@@ -859,7 +859,7 @@ SLANG_API int spCompile(
 {
     auto req = REQ(request);
 
-#if 0
+#if 1
     // By default we'd like to catch as many internal errors as possible,
     // and report them to the user nicely (rather than just crash their
     // application). Internally Slang currently uses exceptions for this.
