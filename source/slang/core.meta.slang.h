@@ -560,8 +560,16 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
             if(baseShape != TextureType::ShapeCube)
             {
+				// TODO: In the case where `access` includes writeability,
+				// this should have both `get` and `set` accessors.
+
                 // subscript operator
-                sb << "__intrinsic_op __subscript(uint" << kBaseTextureTypes[tt].coordCount + isArray << " location) -> T;\n";
+                sb << "__intrinsic_op __subscript(uint";
+				if(kBaseTextureTypes[tt].coordCount + isArray > 1)
+				{
+					sb << kBaseTextureTypes[tt].coordCount + isArray;
+				}
+				sb << " location) -> T;\n";
             }
 
             if( !isMultisample )
