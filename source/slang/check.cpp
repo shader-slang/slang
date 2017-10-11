@@ -2097,7 +2097,17 @@ namespace Slang
 
             auto funcDeclRef = funcDeclRefExpr->declRef;
             auto intrinsicMod = funcDeclRef.getDecl()->FindModifier<IntrinsicOpModifier>();
-            if (!intrinsicMod) return nullptr;
+            if (!intrinsicMod)
+            {
+                // We can't constant fold anything that doesn't map to a builtin
+                // operation right now.
+                //
+                // TODO: we should really allow constant-folding for anything
+                // that can be lowerd to our bytecode...
+                return nullptr;
+            }
+
+
 
             // Let's not constant-fold operations with more than a certain number of arguments, for simplicity
             static const int kMaxArgs = 8;
@@ -2280,16 +2290,16 @@ namespace Slang
                 }
             }
 
-            if (auto invokeExpr = dynamic_cast<InvokeExpr*>(expr))
-            {
-                auto val = TryConstantFoldExpr(invokeExpr);
-                if (val)
-                    return val;
-            }
-            else if(auto castExpr = dynamic_cast<TypeCastExpr*>(expr))
+            if(auto castExpr = dynamic_cast<TypeCastExpr*>(expr))
             {
                 auto val = TryConstantFoldExpr(castExpr->Arguments[0].Ptr());
                 if(val)
+                    return val;
+            }
+            else if (auto invokeExpr = dynamic_cast<InvokeExpr*>(expr))
+            {
+                auto val = TryConstantFoldExpr(invokeExpr);
+                if (val)
                     return val;
             }
 
