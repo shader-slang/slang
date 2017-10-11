@@ -956,6 +956,23 @@ struct LoweringVisitor
         return LoweredExpr(loweredExpr);
     }
 
+    LoweredExpr visitOverloadedExpr(
+        OverloadedExpr* expr)
+    {
+        // The presence of an overloaded expression in the output
+        // means that some amount of semantic checking failed.
+        // Thus we don't need to worry about semantically transforming
+        // the expression itself, but we *do* want to ensure that any
+        // of the declarations that the user might have been referring
+        // to get lowered so they will appear in the output.
+        for (auto item : expr->lookupResult2.items)
+        {
+            translateDeclRef(item.declRef);
+        }
+
+        return expr;
+    }
+
     Name* getName(String const& text)
     {
         return shared->compileRequest->getNamePool()->getName(text);
