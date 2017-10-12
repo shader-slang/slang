@@ -196,7 +196,7 @@ sb << "    __intrinsic_op void GetDimensions(\n";
 sb << "        out uint numStructs,\n";
 sb << "        out uint stride);\n";
 sb << "\n";
-sb << "    __intrinsic_op void IncrementCounter();\n";
+sb << "    __intrinsic_op uint IncrementCounter();\n";
 sb << "\n";
 sb << "    __intrinsic_op T Load(int location);\n";
 sb << "    __intrinsic_op T Load(int location, out uint status);\n";

@@ -2637,6 +2637,10 @@ struct EmitVisitor
             {
                 Emit("[unroll]");
             }
+            else if(getText(attr->getName()) == "allow_uav_condition")
+            {
+                Emit("[allow_uav_condition]");
+            }
         }
     }
 
