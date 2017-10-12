@@ -872,7 +872,7 @@ namespace Slang
             overloadContext.baseExpr = nullptr;
             overloadContext.mode = OverloadResolveContext::Mode::JustTrying;
             
-            AddTypeOverloadCandidates(toType, overloadContext);
+            AddTypeOverloadCandidates(toType, overloadContext, toType);
 
             if(overloadContext.bestCandidates.Count() != 0)
             {
@@ -1491,18 +1491,133 @@ namespace Slang
             }
         }
 
+        void getGenericParams(
+            GenericDecl*                        decl,
+            List<Decl*>&                        outParams,
+            List<GenericTypeConstraintDecl*>    outConstraints)
+        {
+            for (auto dd : decl->Members)
+            {
+                if (dd == decl->inner)
+                    continue;
+
+                if (auto typeParamDecl = dd.As<GenericTypeParamDecl>())
+                    outParams.Add(typeParamDecl);
+                else if (auto valueParamDecl = dd.As<GenericValueParamDecl>())
+                    outParams.Add(valueParamDecl);
+                else if (auto constraintDecl = dd.As<GenericTypeConstraintDecl>())
+                    outConstraints.Add(constraintDecl);
+            }
+        }
+
+        bool doGenericSignaturesMatch(
+            GenericDecl*    fst,
+            GenericDecl*    snd)
+        {
+            // First we'll extract the parameters and constraints
+            // in each generic signature. We will consider parameters
+            // and constraints separately so that we are independent
+            // of the order in which constraints are given (that is,
+            // a constraint like `<T : IFoo>` whould be considered
+            // the same as `<T>` with a later `where T : IFoo`.
+
+            List<Decl*> fstParams;
+            List<GenericTypeConstraintDecl*> fstConstraints;
+            getGenericParams(fst, fstParams, fstConstraints);
+
+            List<Decl*> sndParams;
+            List<GenericTypeConstraintDecl*> sndConstraints;
+            getGenericParams(snd, sndParams, sndConstraints);
+
+            // For there to be any hope of a match, the
+            // two need to have the same number of parameters.
+            UInt paramCount = fstParams.Count();
+            if (paramCount != sndParams.Count())
+                return false;
+
+            // Now we'll walk through the parameters.
+            for (UInt pp = 0; pp < paramCount; ++pp)
+            {
+                Decl* fstParam = fstParams[pp];
+                Decl* sndParam = sndParams[pp];
+
+                if (auto fstTypeParam = dynamic_cast<GenericTypeParamDecl*>(fstParam))
+                {
+                    if (auto sndTypeParam = dynamic_cast<GenericTypeParamDecl*>(sndParam))
+                    {
+                        // TODO: is there any validation that needs to be peformed here?
+                    }
+                    else
+                    {
+                        // Type and non-type parameters can't match.
+                        return false;
+                    }
+                }
+                else if (auto fstValueParam = dynamic_cast<GenericValueParamDecl*>(fstParam))
+                {
+                    if (auto sndValueParam = dynamic_cast<GenericValueParamDecl*>(sndParam))
+                    {
+                        // Need to check that the parameters have the same type.
+                        //
+                        // Note: We are assuming here that the type of a value
+                        // parameter cannot be dependent on any of the type
+                        // parameters in the same signature. This is a reasonable
+                        // assumption for now, but could get thorny down the road.
+                        if (!fstValueParam->getType()->Equals(sndValueParam->getType()))
+                        {
+                            // Type mismatch.
+                            return false;
+                        }
+
+                        // TODO: This is not the right place to check on default
+                        // values for the parameter, because they won't affect
+                        // the signature, but we should make sure to do validation
+                        // later on (e.g., that only one declaration can/should
+                        // be allowed to provide a default).
+                    }
+                    else
+                    {
+                        // Value and non-value parameters can't match.
+                        return false;
+                    }
+                }
+            }
+
+            // If we got this far, then it means the parameter signatures *seem*
+            // to match up all right, but now we need to check that the constraints
+            // placed on those parameters are also consistent.
+            //
+            // For now I'm going to assume/require that all declarations must
+            // declare the signature in a way that matches exactly.
+            UInt constraintCount = fstConstraints.Count();
+            if(constraintCount != sndConstraints.Count())
+                return false;
+
+            for (UInt cc = 0; cc < constraintCount; ++cc)
+            {
+                auto fstConstraint = fstConstraints[cc];
+                auto sndConstraint = sndConstraints[cc];
+
+                // TODO: the challenge here is that the
+                // constraints are going to be expressed
+                // in terms of the parameters, which means
+                // we need to be doing substitution here.
+            }
+
+            // HACK: okay, we'll just assume things match for now.
+            return true;
+        }
+
         // Check if two functions have the same signature for the purposes
         // of overload resolution.
-        bool DoFunctionSignaturesMatch(
-            FuncDecl* fst,
-            FuncDecl* snd)
+        bool doFunctionSignaturesMatch(
+            DeclRef<FuncDecl> fst,
+            DeclRef<FuncDecl> snd)
         {
-            // TODO(tfoley): This function won't do anything sensible for generics,
-            // so we need to figure out a plan for that...
 
             // TODO(tfoley): This copies the parameter array, which is bad for performance.
-            auto fstParams = fst->GetParameters().ToArray();
-            auto sndParams = snd->GetParameters().ToArray();
+            auto fstParams = GetParameters(fst).ToArray();
+            auto sndParams = GetParameters(snd).ToArray();
 
             // If the functions have different numbers of parameters, then
             // their signatures trivially don't match.
@@ -1517,14 +1632,14 @@ namespace Slang
                 auto sndParam = sndParams[ii];
 
                 // If a given parameter type doesn't match, then signatures don't match
-                if (!fstParam->type.Equals(sndParam->type))
+                if (!GetType(fstParam)->Equals(GetType(sndParam)))
                     return false;
 
                 // If one parameter is `out` and the other isn't, then they don't match
                 //
                 // Note(tfoley): we don't consider `out` and `inout` as distinct here,
                 // because there is no way for overload resolution to pick between them.
-                if (fstParam->HasModifier<OutModifier>() != sndParam->HasModifier<OutModifier>())
+                if (fstParam.getDecl()->HasModifier<OutModifier>() != sndParam.getDecl()->HasModifier<OutModifier>())
                     return false;
             }
 
@@ -1534,18 +1649,66 @@ namespace Slang
             return true;
         }
 
+        RefPtr<Substitutions> createDummySubstitutions(
+            GenericDecl* genericDecl)
+        {
+            RefPtr<Substitutions> subst = new Substitutions();
+            subst->genericDecl = genericDecl;
+            for (auto dd : genericDecl->Members)
+            {
+                if (dd == genericDecl->inner)
+                    continue;
+
+                if (auto typeParam = dd.As<GenericTypeParamDecl>())
+                {
+                    auto type = DeclRefType::Create(getSession(),
+                        makeDeclRef(typeParam.Ptr()));
+                    subst->args.Add(type);
+                }
+                else if (auto valueParam = dd.As<GenericValueParamDecl>())
+                {
+                    auto val = new GenericParamIntVal(
+                        makeDeclRef(valueParam.Ptr()));
+                    subst->args.Add(val);
+                }
+                // TODO: need to handle constraints here?
+            }
+            return subst;
+        }
+
         void ValidateFunctionRedeclaration(FuncDecl* funcDecl)
         {
             auto parentDecl = funcDecl->ParentDecl;
             SLANG_RELEASE_ASSERT(parentDecl);
             if (!parentDecl) return;
 
+            Decl* childDecl = funcDecl;
+
+            // If this is a generic function (that is, its parent
+            // declaration is a generic), then we need to look
+            // for sibling declarations of the parent.
+            auto genericDecl = dynamic_cast<GenericDecl*>(parentDecl);
+            if (genericDecl)
+            {
+                parentDecl = genericDecl->ParentDecl;
+                childDecl = genericDecl;
+            }
+
             // Look at previously-declared functions with the same name,
             // in the same container
+            //
+            // Note: there is an assumption here that declarations that
+            // occur earlier in the program  text will be *later* in
+            // the linked list of declarations with the same name.
+            // We are also assuming/requiring that the check here is
+            // symmetric, in that it is okay to test (A,B) or (B,A),
+            // and there is no need to test both.
+            //
             buildMemberDictionary(parentDecl);
-
-            for (auto prevDecl = funcDecl->nextInContainerWithSameName; prevDecl; prevDecl = prevDecl->nextInContainerWithSameName)
+            for (auto pp = childDecl->nextInContainerWithSameName; pp; pp = pp->nextInContainerWithSameName)
             {
+                auto prevDecl = pp;
+
                 // Look through generics to the declaration underneath
                 auto prevGenericDecl = dynamic_cast<GenericDecl*>(prevDecl);
                 if (prevGenericDecl)
@@ -1558,18 +1721,121 @@ namespace Slang
                 if (!prevFuncDecl)
                     continue;
 
+                // If one declaration is a prefix/postfix operator, and the
+                // other is not a matching operator, then don't consider these
+                // to be redeclarations.
+                //
+                // Note(tfoley): Any attempt to call such an operator using
+                // ordinary function-call syntax (if we decided to allow it)
+                // would be ambiguous in such a case, of course.
+                //
+                if (funcDecl->HasModifier<PrefixModifier>() != prevDecl->HasModifier<PrefixModifier>())
+                    continue;
+                if (funcDecl->HasModifier<PostfixModifier>() != prevDecl->HasModifier<PostfixModifier>())
+                    continue;
+
+                // If one is generic and the other isn't, then there is no match.
+                if ((genericDecl != nullptr) != (prevGenericDecl != nullptr))
+                    continue;
+
+                // We are going to be comparing the signatures of the
+                // two functions, but if they are *generic* functions
+                // then we will need to compare them with consistent
+                // specializations in place.
+                //
+                // We'll go ahead and create some (unspecialized) declaration
+                // references here, just to be prepared.
+                DeclRef<FuncDecl> funcDeclRef(funcDecl, nullptr);
+                DeclRef<FuncDecl> prevFuncDeclRef(prevFuncDecl, nullptr);
+
+                // If we are working with generic functions, then we need to
+                // consider if their generic signatures match.
+                if (genericDecl)
+                {
+                    assert(prevGenericDecl);
+                    if (!doGenericSignaturesMatch(genericDecl, prevGenericDecl))
+                        continue;
+
+                    // Now we need specialize the declaration references
+                    // consistently, so that we can compare.
+                    //
+                    // First we create a "dummy" set of substitutions that
+                    // just reference the parameters of the first generic.
+                    auto subst = createDummySubstitutions(genericDecl);
+                    //
+                    // Then we use those parameters to specialize the *other*
+                    // generic.
+                    //
+                    subst->genericDecl = prevGenericDecl;
+                    prevFuncDeclRef.substitutions = subst;
+                    //
+                    // One way to think about it is that if we have these
+                    // declarations (ignore the name differences...):
+                    //
+                    //     // prevFuncDecl:
+                    //     void foo1<T>(T x);
+                    //
+                    //     // funcDecl:
+                    //     void foo2<U>(U x);
+                    //
+                    // Then we will compare `foo2` against `foo1<U>`.
+                }
+
                 // If the parameter signatures don't match, then don't worry
-                if (!DoFunctionSignaturesMatch(funcDecl, prevFuncDecl))
+                if (!doFunctionSignaturesMatch(funcDeclRef, prevFuncDeclRef))
                     continue;
 
                 // If we get this far, then we've got two declarations in the same
-                // scope, with the same name and signature.
+                // scope, with the same name and signature, so they appear
+                // to be redeclarations.
                 //
-                // They might just be redeclarations, which we would want to allow.
+                // We will track that redeclaration occured, so that we can
+                // take it into account for overload resolution.
+                //
+                // A huge complication that we'll need to deal with is that
+                // multiple declarations might introduce default values for
+                // (different) parameters, and we might need to merge across
+                // all of them (which could get complicated if defaults for
+                // parameters can reference earlier parameters).
 
-                // First, check if the return types match.
-                // TODO(tfolye): this code won't work for generics
-                if (!funcDecl->ReturnType.Equals(prevFuncDecl->ReturnType))
+                // If the previous declaration wasn't already recorded
+                // as being part of a redeclaration family, then make
+                // it the primary declaration of a new family.
+                if (!prevFuncDecl->primaryDecl)
+                {
+                    prevFuncDecl->primaryDecl = prevFuncDecl;
+                }
+
+                // The new declaration will belong to the family of
+                // the previous one, and so it will share the same
+                // primary declaration.
+                funcDecl->primaryDecl = prevFuncDecl->primaryDecl;
+                funcDecl->nextDecl = nullptr;
+
+                // Next we want to chain the new declaration onto
+                // the linked list of redeclarations.
+                auto link = &prevFuncDecl->nextDecl;
+                while (*link)
+                    link = &(*link)->nextDecl;
+                *link = funcDecl;
+
+                // Now that we've added things to a group of redeclarations,
+                // we can do some additional validation.
+
+                // First, we will ensure that the return types match
+                // between the declarations, so that they are truly
+                // interchangeable.
+                //
+                // Note(tfoley): If we ever decide to add a beefier type
+                // system to Slang, we might allow overloads like this,
+                // so long as the desired result type can be disambiguated
+                // based on context at the call type. In that case we would
+                // consider result types earlier, as part of the signature
+                // matching step.
+                //
+                auto resultType = GetResultType(funcDeclRef);
+                auto prevResultType = GetResultType(prevFuncDeclRef);
+                if (!resultType->Equals(prevResultType))
                 {
                     // Bad dedeclaration
                     if (!isRewriteMode())
@@ -1581,11 +1847,28 @@ namespace Slang
                     break;
                 }
 
-                // TODO(tfoley): track the fact that there is redeclaration going on,
-                // so that we can detect it and react accordingly during overload resolution
-                // (e.g., by only considering one declaration as the canonical one...)
+                // Note(tfoley): several of the following checks should
+                // really be looping over all the previous declarations
+                // in the same group, and not just the one previous
+                // declaration we found just now.
 
-                // If both have a body, then there is trouble
+                // TODO: Enforce that the new declaration had better
+                // not specify a default value for any parameter that
+                // already had a default value in a prior declaration.
+
+                // We are going to want to enforce that we cannot have
+                // two declarations of a function both specify bodies.
+                // Before we make that check, however, we need to deal
+                // with the case where the two function declarations
+                // might represent different target-specific versions
+                // of a function.
+                //
+                // TODO: if the two declarations are specialized for
+                // different targets, then skip the body checks below.
+
+                // If both of the declarations have a body, then there
+                // is trouble, because we wouldn't know which one to
+                // use during code generation.
                 if (funcDecl->Body && prevFuncDecl->Body)
                 {
                     // Redefinition
@@ -1598,8 +1881,10 @@ namespace Slang
                     break;
                 }
 
-                // TODO(tfoley): If both specific default argument expressions
-                // for the same value, then that is an error too...
+                // At this point we've processed the redeclaration and
+                // put it into a group, so there is no reason to keep
+                // looping and looking at prior declarations.
+                return;
             }
         }
 
@@ -2673,6 +2958,12 @@ namespace Slang
         // in order for checking to suceed.
         struct ConstraintSystem
         {
+            // The generic declaration whose parameters we
+            // are trying to solve for.
+            RefPtr<GenericDecl> genericDecl;
+
+            // Constraints we have accumulated, which constrain
+            // the possible arguments for those parameters.
             List<Constraint> constraints;
         };
 
@@ -2702,17 +2993,58 @@ namespace Slang
             // for now look up a conformance member...
             if(auto declRefType = type->As<DeclRefType>())
             {
-                if( auto aggTypeDeclRef = declRefType->declRef.As<AggTypeDecl>() )
+                auto declRef = declRefType->declRef;
+
+                // Easy case: a type conforms to itself.
+                //
+                // TODO: This is actually a bit more complicated, as
+                // the interface needs to be "object-safe" for us to
+                // really make this determination...
+                if(declRef == interfaceDeclRef)
+                    return true;
+
+                if( auto aggTypeDeclRef = declRef.As<AggTypeDecl>() )
                 {
                     for( auto inheritanceDeclRef : getMembersOfType<InheritanceDecl>(aggTypeDeclRef))
                     {
                         EnsureDecl(inheritanceDeclRef.getDecl());
 
-                        auto inheritedDeclRefType = getBaseType(inheritanceDeclRef)->As<DeclRefType>();
-                        if (!inheritedDeclRefType)
+                        // Here we will recursively look up conformance on the type
+                        // that is being inherited from. This is dangerous because
+                        // it might lead to infinite loops.
+                        //
+                        // TODO: A better appraoch would be to create a linearized list
+                        // of all the interfaces that a given type direclty or indirectly
+                        // inheirts, and store it with the type, so that we don't have
+                        // to recurse in places like this (and can maybe catch infinite
+                        // loops better). This would also help avoid checking multiply-inherited
+                        // conformances multiple times.
+
+                        auto inheritedType = getBaseType(inheritanceDeclRef);
+                        if(DoesTypeConformToInterface(inheritedType, interfaceDeclRef))
+                            return true;
+                    }
+                }
+                else if( auto genericTypeParamDeclRef = declRef.As<GenericTypeParamDecl>() )
+                {
+                    // We need to enumerate the constraints placed on this type by its outer
+                    // generic declaration, and see if any of them guarantees that we
+                    // satisfy the given interface..
+                    auto genericDeclRef = genericTypeParamDeclRef.GetParent().As<GenericDecl>();
+                    SLANG_ASSERT(genericDeclRef);
+
+                    for( auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(genericDeclRef) )
+                    {
+                        auto sub = GetSub(constraintDeclRef);
+                        auto sup = GetSup(constraintDeclRef);
+
+                        auto subDeclRef = sub->As<DeclRefType>();
+                        if(!subDeclRef)
+                            continue;
+                        if(subDeclRef->declRef != genericTypeParamDeclRef)
                             continue;
 
-                        if(interfaceDeclRef.Equals(inheritedDeclRefType->declRef))
+                        if(DoesTypeConformToInterface(sup, interfaceDeclRef))
                             return true;
                     }
                 }
@@ -2986,7 +3318,7 @@ namespace Slang
             RefPtr<Type>	resultType;
 
             // A system for tracking constraints introduced on generic parameters
-            ConstraintSystem constraintSystem;
+//            ConstraintSystem constraintSystem;
 
             // How much conversion cost should be considered for this overload,
             // when ranking candidates.
@@ -3603,7 +3935,29 @@ namespace Slang
             DeclRef<CallableDecl>             funcDeclRef,
             OverloadResolveContext&		context)
         {
-            EnsureDecl(funcDeclRef.getDecl());
+            auto funcDecl = funcDeclRef.getDecl();
+            EnsureDecl(funcDecl);
+
+            // If this function is a redeclaration,
+            // then we don't want to include it multiple times,
+            // and mistakenly think we have an ambiguous call.
+            //
+            // Instead, we will carefully consider only the
+            // "primary" declaration of any callable.
+            if (auto primaryDecl = funcDecl->primaryDecl)
+            {
+                if (funcDecl != primaryDecl)
+                {
+                    // This is a redeclaration, so we don't
+                    // want to consider it. The primary
+                    // declaration should also get considered
+                    // for the call site and it will match
+                    // anything this declaration would have
+                    // matched.
+                    return;
+                }
+            }
+
 
             OverloadCandidate candidate;
             candidate.flavor = OverloadCandidate::Flavor::Func;
@@ -3635,11 +3989,14 @@ namespace Slang
 #endif
         }
 
+        // Add a candidate callee for overload resolution, based on
+        // calling a particular `ConstructorDecl`.
         void AddCtorOverloadCandidate(
-            LookupResultItem		typeItem,
-            RefPtr<Type>	type,
-            DeclRef<ConstructorDecl>		ctorDeclRef,
-            OverloadResolveContext&	context)
+            LookupResultItem            typeItem,
+            RefPtr<Type>                type,
+            DeclRef<ConstructorDecl>    ctorDeclRef,
+            OverloadResolveContext&     context,
+            RefPtr<Type>                resultType)
         {
             EnsureDecl(ctorDeclRef.getDecl());
 
@@ -3654,7 +4011,7 @@ namespace Slang
             OverloadCandidate candidate;
             candidate.flavor = OverloadCandidate::Flavor::Func;
             candidate.item = ctorItem;
-            candidate.resultType = type;
+            candidate.resultType = resultType;
 
             AddOverloadCandidate(context, candidate);
         }
@@ -3702,13 +4059,18 @@ namespace Slang
                     auto fstParam = fstInt.As<GenericParamIntVal>();
                     auto sndParam = sndInt.As<GenericParamIntVal>();
 
+                    bool okay = false;
                     if (fstParam)
-                        TryUnifyIntParam(constraints, fstParam->declRef, sndInt);
+                    {
+                        if(TryUnifyIntParam(constraints, fstParam->declRef, sndInt))
+                            okay = true;
+                    }
                     if (sndParam)
-                        TryUnifyIntParam(constraints, sndParam->declRef, fstInt);
-
-                    if (fstParam || sndParam)
-                        return true;
+                    {
+                        if(TryUnifyIntParam(constraints, sndParam->declRef, fstInt))
+                            okay = true;
+                    }
+                    return okay;
                 }
             }
 
@@ -3768,6 +4130,14 @@ namespace Slang
             RefPtr<GenericValueParamDecl>	paramDecl,
             RefPtr<IntVal>                  val)
         {
+            // We only want to accumulate constraints on
+            // the parameters of the declarations being
+            // specialized (don't accidentially constrain
+            // parameters of a generic function based on
+            // calls in its body).
+            if(paramDecl->ParentDecl != constraints.genericDecl)
+                return false;
+
             // We want to constrain the given parameter to equal the given value.
             Constraint constraint;
             constraint.decl = paramDecl.Ptr();
@@ -3856,7 +4226,10 @@ namespace Slang
                 auto fstDeclRef = fstDeclRefType->declRef;
 
                 if (auto typeParamDecl = dynamic_cast<GenericTypeParamDecl*>(fstDeclRef.getDecl()))
-                    return TryUnifyTypeParam(constraints, typeParamDecl, snd);
+                {
+                    if(typeParamDecl->ParentDecl == constraints.genericDecl )
+                        return TryUnifyTypeParam(constraints, typeParamDecl, snd);
+                }
             }
 
             if (auto sndDeclRefType = snd->As<DeclRefType>())
@@ -3864,7 +4237,10 @@ namespace Slang
                 auto sndDeclRef = sndDeclRefType->declRef;
 
                 if (auto typeParamDecl = dynamic_cast<GenericTypeParamDecl*>(sndDeclRef.getDecl()))
-                    return TryUnifyTypeParam(constraints, typeParamDecl, fst);
+                {
+                    if(typeParamDecl->ParentDecl == constraints.genericDecl )
+                        return TryUnifyTypeParam(constraints, typeParamDecl, fst);
+                }
             }
 
             // If we can unify the types structurally, then we are golden
@@ -3911,6 +4287,7 @@ namespace Slang
             if (auto extGenericDecl = GetOuterGeneric(extDecl))
             {
                 ConstraintSystem constraints;
+                constraints.genericDecl = extGenericDecl;
 
                 if (!TryUnifyTypes(constraints, extDecl->targetType.Ptr(), type))
                     return DeclRef<Decl>().As<ExtensionDecl>();
@@ -3962,6 +4339,7 @@ namespace Slang
             OverloadResolveContext&	context)
         {
             ConstraintSystem constraints;
+            constraints.genericDecl = genericDeclRef.getDecl();
 
             // Construct a reference to the inner declaration that has any generic
             // parameter substitutions in place already, but *not* any substutions
@@ -4032,15 +4410,16 @@ namespace Slang
         }
 
         void AddAggTypeOverloadCandidates(
-            LookupResultItem		typeItem,
-            RefPtr<Type>	type,
-            DeclRef<AggTypeDecl>			aggTypeDeclRef,
-            OverloadResolveContext&	context)
+            LookupResultItem        typeItem,
+            RefPtr<Type>            type,
+            DeclRef<AggTypeDecl>    aggTypeDeclRef,
+            OverloadResolveContext& context,
+            RefPtr<Type>            resultType)
         {
             for (auto ctorDeclRef : getMembersOfType<ConstructorDecl>(aggTypeDeclRef))
             {
                 // now work through this candidate...
-                AddCtorOverloadCandidate(typeItem, type, ctorDeclRef, context);
+                AddCtorOverloadCandidate(typeItem, type, ctorDeclRef, context, resultType);
             }
 
             // Now walk through any extensions we can find for this types
@@ -4055,7 +4434,7 @@ namespace Slang
                     // TODO(tfoley): `typeItem` here should really reference the extension...
 
                     // now work through this candidate...
-                    AddCtorOverloadCandidate(typeItem, type, ctorDeclRef, context);
+                    AddCtorOverloadCandidate(typeItem, type, ctorDeclRef, context, resultType);
                 }
 
                 // Also check for generic constructors
@@ -4069,7 +4448,7 @@ namespace Slang
 
                         DeclRef<ConstructorDecl> innerCtorRef = innerRef.As<ConstructorDecl>();
 
-                        AddCtorOverloadCandidate(typeItem, type, innerCtorRef, context);
+                        AddCtorOverloadCandidate(typeItem, type, innerCtorRef, context, resultType);
 
                         // TODO(tfoley): need a way to do the solving step for the constraint system
                     }
@@ -4077,15 +4456,62 @@ namespace Slang
             }
         }
 
+        void addGenericTypeParamOverloadCandidates(
+            DeclRef<GenericTypeParamDecl>   typeDeclRef,
+            OverloadResolveContext&         context,
+            RefPtr<Type>                    resultType)
+        {
+            // We need to look for any constraints placed on the generic
+            // type parameter, since they will give us information on
+            // interfaces that the type must conform to.
+
+            // We expect the parent of the generic type parameter to be a generic...
+            auto genericDeclRef = typeDeclRef.GetParent().As<GenericDecl>();
+            assert(genericDeclRef);
+
+            for(auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(genericDeclRef))
+            {
+                // Does this constraint pertain to the type we are working on?
+                //
+                // We want constraints of the form `T : Foo` where `T` is the
+                // generic parameter in question, and `Foo` is whatever we are
+                // constraining it to.
+                auto subType = GetSub(constraintDeclRef);
+                auto subDeclRefType = subType->As<DeclRefType>();
+                if(!subDeclRefType)
+                    continue;
+                if(!subDeclRefType->declRef.Equals(typeDeclRef))
+                    continue;
+
+                // The super-type in the constraint (e.g., `Foo` in `T : Foo`)
+                // will tell us a type we should use for lookup.
+                auto bound = GetSup(constraintDeclRef);
+
+                // Go ahead and use the target type:
+                //
+                // TODO: Need to consider case where this might recurse infinitely.
+                AddTypeOverloadCandidates(bound, context, resultType);
+            }
+        }
+
         void AddTypeOverloadCandidates(
-            RefPtr<Type>	type,
-            OverloadResolveContext&	context)
+            RefPtr<Type>	        type,
+            OverloadResolveContext&	context,
+            RefPtr<Type>            resultType)
         {
             if (auto declRefType = type->As<DeclRefType>())
             {
-                if (auto aggTypeDeclRef = declRefType->declRef.As<AggTypeDecl>())
+                auto declRef = declRefType->declRef;
+                if (auto aggTypeDeclRef = declRef.As<AggTypeDecl>())
                 {
-                    AddAggTypeOverloadCandidates(LookupResultItem(aggTypeDeclRef), type, aggTypeDeclRef, context);
+                    AddAggTypeOverloadCandidates(LookupResultItem(aggTypeDeclRef), type, aggTypeDeclRef, context, resultType);
+                }
+                else if(auto genericTypeParamDeclRef = declRef.As<GenericTypeParamDecl>())
+                {
+                    addGenericTypeParamOverloadCandidates(
+                        genericTypeParamDeclRef,
+                        context,
+                        resultType);
                 }
             }
         }
@@ -4105,7 +4531,7 @@ namespace Slang
                 auto type = DeclRefType::Create(
                     getSession(),
                     aggTypeDeclRef);
-                AddAggTypeOverloadCandidates(item, type, aggTypeDeclRef, context);
+                AddAggTypeOverloadCandidates(item, type, aggTypeDeclRef, context, type);
             }
             else if (auto genericDeclRef = item.declRef.As<GenericDecl>())
             {
@@ -4138,7 +4564,15 @@ namespace Slang
             }
             else if( auto typeDefDeclRef = item.declRef.As<TypeDefDecl>() )
             {
-                AddTypeOverloadCandidates(GetType(typeDefDeclRef), context);
+                auto type = getNamedType(getSession(), typeDefDeclRef);
+                AddTypeOverloadCandidates(GetType(typeDefDeclRef), context, type);
+            }
+            else if( auto genericTypeParamDeclRef = item.declRef.As<GenericTypeParamDecl>() )
+            {
+                auto type = DeclRefType::Create(
+                    getSession(),
+                    genericTypeParamDeclRef);
+                addGenericTypeParamOverloadCandidates(genericTypeParamDeclRef, context, type);
             }
             else
             {
@@ -4152,10 +4586,12 @@ namespace Slang
         {
             auto funcExprType = funcExpr->type;
 
-            if (auto funcDeclRefExpr = funcExpr.As<DeclRefExpr>())
+            if (auto declRefExpr = funcExpr.As<DeclRefExpr>())
             {
-                // The expression referenced a function declaration
-                AddDeclRefOverloadCandidates(LookupResultItem(funcDeclRefExpr->declRef), context);
+                // The expression directly referenced a declaration,
+                // so we can use that declaration directly to look
+                // for anything applicable.
+                AddDeclRefOverloadCandidates(LookupResultItem(declRefExpr->declRef), context);
             }
             else if (auto funcType = funcExprType->As<FuncType>())
             {
@@ -4179,7 +4615,8 @@ namespace Slang
                 //
                 // TODO(tfoley): are there any meaningful types left
                 // that aren't declaration references?
-                AddTypeOverloadCandidates(typeType->type, context);
+                auto type = typeType->type;
+                AddTypeOverloadCandidates(type, context, type);
                 return;
             }
         }
@@ -4400,6 +4837,7 @@ namespace Slang
                 {
                     // There were multple equally-good candidates, but none actually usable.
                     // We will construct a diagnostic message to help out.
+
                     if (funcName)
                     {
                         if (!isRewriteMode())
@@ -4444,7 +4882,17 @@ namespace Slang
                     {
                         String declString = getDeclSignatureString(candidate.item);
 
-                        declString = declString + "[" + String(candidate.conversionCostSum) + "]";
+//                        declString = declString + "[" + String(candidate.conversionCostSum) + "]";
+
+                        if (auto decl = dynamic_cast<CallableDecl*>(candidate.item.declRef.decl))
+                        {
+                            char buffer[1024];
+                            sprintf(buffer, "[this:%p, primary:%p, next:%p]",
+                                decl,
+                                decl->primaryDecl,
+                                decl->nextDecl);
+                            declString.append(buffer);
+                        }
 
                         getSink()->diagnose(candidate.item.declRef, Diagnostics::overloadCandidate, declString);
 

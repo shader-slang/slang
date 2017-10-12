@@ -127,6 +127,22 @@ ABSTRACT_SYNTAX_CLASS(CallableDecl, ContainerDecl)
     })
 
     SYNTAX_FIELD(TypeExp, ReturnType)
+
+    // Fields related to redeclaration, so that we
+    // can support multiple specialized varaitions
+    // of the "same" logical function.
+    //
+    // This should also help us to support redeclaration
+    // of functions when handling HLSL/GLSL.
+
+    // The "primary" declaration of the function, which will
+    // be used whenever we need to unique things.
+    FIELD_INIT(CallableDecl*, primaryDecl, nullptr)
+
+    // The next declaration of the "same" function (that is,
+    // with the same `primaryDecl`).
+    FIELD_INIT(CallableDecl*, nextDecl, nullptr);
+
 END_SYNTAX_CLASS()
 
 // Base class for callable things that may also have a body that is evaluated to produce their result

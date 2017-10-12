@@ -3842,6 +3842,17 @@ namespace Slang
         return modifier;
     }
 
+    static RefPtr<RefObject> parseSpecializedForTargetModifier(Parser* parser, void* /*userData*/)
+    {
+        auto modifier = new SpecializedForTargetModifier();
+        if (AdvanceIf(parser, TokenType::LParent))
+        {
+            modifier->targetToken = parser->ReadToken(TokenType::Identifier);
+            parser->ReadToken(TokenType::RParent);
+        }
+        return modifier;
+    }
+
     static RefPtr<RefObject> parseGLSLExtensionModifier(Parser* parser, void* /*userData*/)
     {
         auto modifier = new RequiredGLSLExtensionModifier();
@@ -4057,6 +4068,7 @@ namespace Slang
 
         MODIFIER(__intrinsic_op,        parseIntrinsicOpModifier);
         MODIFIER(__target_intrinsic,    parseTargetIntrinsicModifier);
+        MODIFIER(__specialized_for_target,    parseSpecializedForTargetModifier);
         MODIFIER(__glsl_extension,  parseGLSLExtensionModifier);
         MODIFIER(__glsl_version,    parseGLSLVersionModifier);
 
