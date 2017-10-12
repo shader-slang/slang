@@ -2637,6 +2637,10 @@ struct EmitVisitor
             {
                 Emit("[unroll]");
             }
+            else if(getText(attr->getName()) == "allow_uav_condition")
+            {
+                Emit("[allow_uav_condition]");
+            }
         }
     }
 
@@ -2790,11 +2794,11 @@ struct EmitVisitor
         {
             EmitLoopAttributes(doWhileStmt);
 
-            Emit("do(");
+            Emit("do\n");
             EmitBlockStmt(doWhileStmt->Statement);
             Emit(" while(");
             EmitExpr(doWhileStmt->Predicate);
-            Emit(")\n");
+            Emit(");\n");
             return;
         }
         else if (auto discardStmt = stmt.As<DiscardStmt>())

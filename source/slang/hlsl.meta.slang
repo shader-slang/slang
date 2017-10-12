@@ -194,7 +194,7 @@ struct RWStructuredBuffer
         out uint numStructs,
         out uint stride);
 
-    __intrinsic_op void IncrementCounter();
+    __intrinsic_op uint IncrementCounter();
 
     __intrinsic_op T Load(int location);
     __intrinsic_op T Load(int location, out uint status);
