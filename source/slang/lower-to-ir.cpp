@@ -785,7 +785,12 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     LoweredTypeInfo visitType(Type* type)
     {
-        SLANG_UNIMPLEMENTED_X("type lowering");
+        // TODO(tfoley): Now that we use the AST types directly in the IR, there
+        // isn't much to do in the "lowering" step. Still, there might be cases
+        // where certain kinds of legalization need to take place, so this
+        // visitor setup might still be needed in the long run.
+        return LoweredTypeInfo(type);
+//        SLANG_UNIMPLEMENTED_X("type lowering");
     }
 
     LoweredTypeInfo visitFuncType(FuncType* type)
