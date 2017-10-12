@@ -2790,11 +2790,11 @@ struct EmitVisitor
         {
             EmitLoopAttributes(doWhileStmt);
 
-            Emit("do(");
+            Emit("do\n");
             EmitBlockStmt(doWhileStmt->Statement);
             Emit(" while(");
             EmitExpr(doWhileStmt->Predicate);
-            Emit(")\n");
+            Emit(");\n");
             return;
         }
         else if (auto discardStmt = stmt.As<DiscardStmt>())
