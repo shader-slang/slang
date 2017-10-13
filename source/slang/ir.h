@@ -97,10 +97,7 @@ enum IRDecorationOp : uint16_t
 {
     kIRDecorationOp_HighLevelDecl,
     kIRDecorationOp_Layout,
-    kIRDecorationOp_EntryPoint,
-    kIRDecorationOp_ComputeThreadGroupSize,
     kIRDecorationOp_LoopControl,
-    kIRDecorationOp_MangledName,
 };
 
 // A "decoration" that gets applied to an instruction.
@@ -291,6 +288,11 @@ struct IRGlobalValue : IRValue
 {
     IRModule*   parentModule;
 
+    // The mangled name, for a symbol that should have linkage,
+    // or which might have multiple declarations.
+    String mangledName;
+
+
     IRGlobalValue*  nextGlobalValue;
     IRGlobalValue*  prevGlobalValue;
 
@@ -318,10 +320,6 @@ struct IRFunc : IRGlobalValue
 {
     // The type of the IR-level function
     IRFuncType* getType() { return (IRFuncType*) type.Ptr(); }
-
-    // The mangled name, for a function
-    // that should have linkage.
-    String mangledName;
 
     // Any generic parameters this function has
     List<RefPtr<Decl>> genericParams;
@@ -367,14 +365,6 @@ void printSlangIRAssembly(StringBuilder& builder, IRModule* module);
 String getSlangIRAssembly(IRModule* module);
 
 void dumpIR(IRModule* module);
-
-// IR transformations
-
-// Transform shader entry points so that they conform to GLSL rules.
-void legalizeEntryPointsForGLSL(
-        Session*    session,
-        IRModule*   module);
-
 }
 
 

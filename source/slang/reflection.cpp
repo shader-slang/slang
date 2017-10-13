@@ -798,23 +798,22 @@ SLANG_API int spReflectionEntryPoint_usesAnySampleRateInput(
 
 // Shader Reflection
 
+namespace Slang
+{
+    StructTypeLayout* getGlobalStructLayout(
+        ProgramLayout*  programLayout);
+}
+
 SLANG_API unsigned spReflection_GetParameterCount(SlangReflection* inProgram)
 {
     auto program = convert(inProgram);
     if(!program) return 0;
 
-    auto globalLayout = program->globalScopeLayout;
-    if(auto globalConstantBufferLayout = globalLayout.As<ParameterBlockTypeLayout>())
-    {
-        globalLayout = globalConstantBufferLayout->elementTypeLayout;
-    }
+    auto globalStructLayout = getGlobalStructLayout(program);
+    if (!globalStructLayout)
+        return 0;
 
-    if(auto globalStructLayout = globalLayout.As<StructTypeLayout>())
-    {
-        return (unsigned) globalStructLayout->fields.Count();
-    }
-
-    return 0;
+    return (unsigned) globalStructLayout->fields.Count();
 }
 
 SLANG_API SlangReflectionParameter* spReflection_GetParameterByIndex(SlangReflection* inProgram, unsigned index)
@@ -822,18 +821,11 @@ SLANG_API SlangReflectionParameter* spReflection_GetParameterByIndex(SlangReflec
     auto program = convert(inProgram);
     if(!program) return nullptr;
 
-    auto globalLayout = program->globalScopeLayout;
-    if(auto globalConstantBufferLayout = globalLayout.As<ParameterBlockTypeLayout>())
-    {
-        globalLayout = globalConstantBufferLayout->elementTypeLayout;
-    }
+    auto globalStructLayout = getGlobalStructLayout(program);
+    if (!globalStructLayout)
+        return 0;
 
-    if(auto globalStructLayout = globalLayout.As<StructTypeLayout>())
-    {
-        return convert(globalStructLayout->fields[index].Ptr());
-    }
-
-    return nullptr;
+    return convert(globalStructLayout->fields[index].Ptr());
 }
 
 SLANG_API SlangUInt spReflection_getEntryPointCount(SlangReflection* inProgram)

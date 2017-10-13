@@ -89,7 +89,20 @@ extern "C"
         SLANG_SPIRV_ASM,
         SLANG_DXBC,
         SLANG_DXBC_ASM,
-        SLANG_IR,
+    };
+
+    /* A "container format" describes the way that the outputs
+    for multiple files, entry points, targets, etc. should be
+    combined into a single artifact for output. */
+    typedef int SlangContainerFormat;
+    enum
+    {
+        /* Don't generate a container. */
+        SLANG_CONTAINER_FORMAT_NONE,
+
+        /* Generate a container in the `.slang-module` format,
+        which includes reflection information, compiled kernels, etc. */
+        SLANG_CONTAINER_FORMAT_SLANG_MODULE,
     };
 
     typedef int SlangPassThrough;
@@ -230,6 +243,20 @@ extern "C"
     SLANG_API void spSetCodeGenTarget(
         SlangCompileRequest*    request,
         int target);
+
+    /*!
+    @brief Add a code-generation target to be used.
+    */
+    SLANG_API void spAddCodeGenTarget(
+        SlangCompileRequest*    request,
+        SlangCompileTarget      target);
+
+    /*!
+    @brief Set the container format to be used for binary output.
+    */
+    SLANG_API void spSetOutputContainerFormat(
+        SlangCompileRequest*    request,
+        SlangContainerFormat    format);
 
     SLANG_API void spSetPassThrough(
         SlangCompileRequest*    request,
@@ -388,6 +415,16 @@ extern "C"
         SlangCompileRequest*    request,
         int                     entryPointIndex,
         size_t*                 outSize);
+
+    /** Get the output bytecode associated with an entire compile request.
+
+    The lifetime of the output pointer is the same as `request`.
+    */
+    SLANG_API void const* spGetCompileRequestCode(
+        SlangCompileRequest*    request,
+        size_t*                 outSize);
+
+
 
     typedef struct SlangVM          SlangVM;
     typedef struct SlangVMModule    SlangVMModule;

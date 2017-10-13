@@ -22,6 +22,12 @@ namespace Slang
     String emitEntryPoint(
         EntryPointRequest*  entryPoint,
         ProgramLayout*      programLayout,
-        CodeGenTarget       target);
+
+        // The target language to generate code in (e.g., HLSL/GLSL)
+        CodeGenTarget       target,
+
+        // The "final" target that we are being asked to compile for
+        // (e.g., SPIR-V, DXBC, ...).
+        CodeGenTarget       finalTarget);
 }
 #endif

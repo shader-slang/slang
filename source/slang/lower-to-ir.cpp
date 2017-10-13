@@ -268,9 +268,7 @@ LoweredValInfo LoweredValInfo::swizzledLValue(
 
 struct SharedIRGenContext
 {
-    EntryPointRequest*  entryPoint;
-    ProgramLayout*      programLayout;
-    CodeGenTarget       target;
+    CompileRequest* compileRequest;
 
     Dictionary<DeclRef<Decl>, LoweredValInfo> declValues;
 
@@ -292,7 +290,7 @@ struct IRGenContext
 
     Session* getSession()
     {
-        return shared->entryPoint->compileRequest->mSession;
+        return shared->compileRequest->mSession;
     }
 };
 
@@ -729,8 +727,7 @@ void lowerStmt(
 
 LoweredValInfo lowerDecl(
     IRGenContext*   context,
-    DeclBase*       decl,
-    Layout*         layout);
+    DeclBase*       decl);
 
 IRType* getIntType(
     IRGenContext* context)
@@ -907,8 +904,7 @@ struct LoweringVisitor
 LoweredValInfo createVar(
     IRGenContext*   context,
     RefPtr<Type>    type,
-    Decl*           decl = nullptr,
-    Layout*         layout = nullptr)
+    Decl*           decl = nullptr)
 {
     auto builder = context->irBuilder;
     auto irAlloc = builder->emitVar(type);
@@ -916,11 +912,6 @@ LoweredValInfo createVar(
     if (decl)
     {
         builder->addHighLevelDeclDecoration(irAlloc, decl);
-    }
-
-    if (layout)
-    {
-        builder->addLayoutDecoration(irAlloc, layout);
     }
 
     return LoweredValInfo::ptr(irAlloc);
@@ -1817,7 +1808,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // be lifted later (pushing capture analysis
         // down to the IR).
         //
-        lowerDecl(context, stmt->decl, nullptr);
+        lowerDecl(context, stmt->decl);
     }
 
     void visitSeqStmt(SeqStmt* stmt)
@@ -1991,16 +1982,10 @@ top:
 struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 {
     IRGenContext*   context;
-    Layout*         layout;
 
     IRBuilder* getBuilder()
     {
         return context->irBuilder;
-    }
-
-    Layout* getLayout()
-    {
-        return layout;
     }
 
     LoweredValInfo visitDeclBase(DeclBase* decl)
@@ -2086,15 +2071,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         auto builder = getBuilder();
         auto irGlobal = builder->createGlobalVar(varType);
+        irGlobal->mangledName = getMangledName(decl);
 
         if (decl)
         {
             builder->addHighLevelDeclDecoration(irGlobal, decl);
-        }
-
-        if (auto layout = getLayout())
-        {
-            builder->addLayoutDecoration(irGlobal, layout);
         }
 
         // A global variable's SSA value is a *pointer* to
@@ -2168,7 +2149,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             varType = context->getSession()->getGroupSharedType(varType);
         }
 
-        LoweredValInfo varVal = createVar(context, varType, decl, getLayout());
+        LoweredValInfo varVal = createVar(context, varType, decl);
 
         if( auto initExpr = decl->initExpr )
         {
@@ -2840,11 +2821,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
 LoweredValInfo lowerDecl(
     IRGenContext*   context,
-    DeclBase*       decl,
-    Layout*         layout)
+    DeclBase*       decl)
 {
     DeclLoweringVisitor visitor;
-    visitor.layout = layout;
     visitor.context = context;
     return visitor.dispatch(decl);
 }
@@ -2870,100 +2849,31 @@ LoweredValInfo ensureDecl(
 
     subContext.irBuilder = &subIRBuilder;
 
-    RefPtr<VarLayout> layout;
-    auto globalScopeLayout = shared->programLayout->globalScopeLayout;
-    if (auto globalParameterBlockLayout = globalScopeLayout.As<ParameterBlockTypeLayout>())
-    {
-        globalScopeLayout = globalParameterBlockLayout->elementTypeLayout;
-    }
-    if (auto globalStructTypeLayout = globalScopeLayout.As<StructTypeLayout>())
-    {
-        globalStructTypeLayout->mapVarToLayout.TryGetValue(declRef.getDecl(), layout);
-    }
-
-    result = lowerDecl(&subContext, declRef.getDecl(), layout);
+    result = lowerDecl(&subContext, declRef.getDecl());
 
     shared->declValues[declRef] = result;
 
     return result;
 }
 
-
-EntryPointLayout* findEntryPointLayout(
-    SharedIRGenContext* shared,
-    EntryPointRequest*  entryPointRequest)
-{
-    for( auto entryPointLayout : shared->programLayout->entryPoints )
-    {
-        if(entryPointLayout->entryPoint->getName() != entryPointRequest->name)
-            continue;
-
-        if(entryPointLayout->profile != entryPointRequest->profile)
-            continue;
-
-        // TODO: can't easily filter on translation unit here...
-        // Ideally the `EntryPointRequest` should get filled in with a pointer
-        // the specific function declaration that represents the entry point.
-
-        return entryPointLayout.Ptr();
-    }
-
-    return nullptr;
-}
-
 static void lowerEntryPointToIR(
     IRGenContext*       context,
-    EntryPointRequest*  entryPointRequest,
-    EntryPointLayout*   entryPointLayout)
+    EntryPointRequest*  entryPointRequest)
 {
     // First, lower the entry point like an ordinary function
-    auto entryPointFuncDecl = entryPointLayout->entryPoint;
-    auto loweredEntryPointFunc = lowerDecl(context, entryPointFuncDecl, entryPointLayout);
-    auto irFunc = getSimpleVal(context, loweredEntryPointFunc);
-
-    auto builder = context->irBuilder;
-
-    // We are going to attach all the entry-point-specific information
-    // to the declaration as meta-data decorations for now.
-    //
-    // I'm not convinced this is the right way to go, but it is
-    // the easiest and most expedient thing.
-    //
-    auto profile = entryPointRequest->profile;
-    auto stage = profile.GetStage();
-
-    auto entryPointDecoration = builder->addDecoration<IREntryPointDecoration>(irFunc);
-    entryPointDecoration->profile = profile;
-    entryPointDecoration->layout = entryPointLayout;
-
-    // Attach layout information here.
-    builder->addLayoutDecoration(irFunc, entryPointLayout);
-
-    // Next, we need to start attaching the meta-data that is
-    // required based on the particular stage we are targetting:
-    switch (stage)
+    auto entryPointFuncDecl = entryPointRequest->decl;
+    if (!entryPointFuncDecl)
     {
-    case Stage::Compute:
-        {
-            // We need to attach information about the thread group size here.
-            auto threadGroupSizeDecoration = builder->addDecoration<IRComputeThreadGroupSizeDecoration>(irFunc);
-            static const UInt kAxisCount = 3;
-
-            // TODO: this is kind of gross because we are using a public
-            // reflection API function, rather than some kind of internal
-            // utility it forwards to...
-            spReflectionEntryPoint_getComputeThreadGroupSize(
-                (SlangReflectionEntryPoint*)entryPointLayout,
-                kAxisCount,
-                &threadGroupSizeDecoration->sizeAlongAxis[0]);
-        }
-        break;
-
-    default:
-        break;
+        // Something must have gone wrong earlier, if we
+        // weren't able to associate a declaration with
+        // the entry point request.
+        return;
     }
+
+    auto loweredEntryPointFunc = lowerDecl(context, entryPointFuncDecl);
 }
 
+#if 0
 IRModule* lowerEntryPointToIR(
     EntryPointRequest*  entryPoint,
     ProgramLayout*      programLayout,
@@ -3002,7 +2912,55 @@ IRModule* lowerEntryPointToIR(
     return module;
 
 }
+#endif
 
+IRModule* generateIRForTranslationUnit(
+    TranslationUnitRequest* translationUnit)
+{
+    auto compileRequest = translationUnit->compileRequest;
+
+    SharedIRGenContext sharedContextStorage;
+    SharedIRGenContext* sharedContext = &sharedContextStorage;
+
+    sharedContext->compileRequest = compileRequest;
+
+    IRGenContext contextStorage;
+    IRGenContext* context = &contextStorage;
+
+    context->shared = sharedContext;
+
+    SharedIRBuilder sharedBuilderStorage;
+    SharedIRBuilder* sharedBuilder = &sharedBuilderStorage;
+    sharedBuilder->module = nullptr;
+    sharedBuilder->session = compileRequest->mSession;
+
+    IRBuilder builderStorage;
+    IRBuilder* builder = &builderStorage;
+    builder->shared = sharedBuilder;
+
+    IRModule* module = builder->createModule();
+    sharedBuilder->module = module;
+
+    context->irBuilder = builder;
+
+    // We need to emit IR for all public/exported symbols
+    // in the translation unit.
+    for (auto entryPoint : translationUnit->entryPoints)
+    {
+        lowerEntryPointToIR(context, entryPoint);
+    }
+
+    // If we are being sked to dump IR during compilation,
+    // then we can dump the initial IR for the module here.
+    if(compileRequest->shouldDumpIR)
+    {
+        dumpIR(module);
+    }
+
+    return module;
+}
+
+#if 0
 String emitSlangIRAssemblyForEntryPoint(
     EntryPointRequest*  entryPoint)
 {
@@ -3015,6 +2973,7 @@ String emitSlangIRAssemblyForEntryPoint(
 
     return getSlangIRAssembly(irModule);
 }
+#endif
 
 
 } // namespace Slang

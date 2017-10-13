@@ -8,7 +8,7 @@
 
 namespace Slang {
 
-class CompileRequest;
+class TargetRequest;
 
 // The parameter-binding interface is responsible for assigning
 // binding locations/registers to every parameter of a shader
@@ -24,7 +24,7 @@ class CompileRequest;
 // of the program.
 
 void generateParameterBindings(
-    CompileRequest*     compileRequest);
+    TargetRequest*     targetReq);
 
 }
 

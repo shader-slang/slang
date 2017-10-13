@@ -4556,49 +4556,8 @@ struct LoweringVisitor
 
 };
 
-static RefPtr<StructTypeLayout> getGlobalStructLayout(
-    ProgramLayout*      programLayout)
-{
-    // Layout information for the global scope is either an ordinary
-    // `struct` in the common case, or a constant buffer in the case
-    // where there were global-scope uniforms.
-    auto globalScopeLayout = programLayout->globalScopeLayout;
-    StructTypeLayout* globalStructLayout = globalScopeLayout.As<StructTypeLayout>();
-    if(globalStructLayout)
-    { }
-    else if(auto globalConstantBufferLayout = globalScopeLayout.As<ParameterBlockTypeLayout>())
-    {
-        // TODO: the `cbuffer` case really needs to be emitted very
-        // carefully, but that is beyond the scope of what a simple rewriter
-        // can easily do (without semantic analysis, etc.).
-        //
-        // The crux of the problem is that we need to collect all the
-        // global-scope uniforms (but not declarations that don't involve
-        // uniform storage...) and put them in a single `cbuffer` declaration,
-        // so that we can give it an explicit location. The fields in that
-        // declaration might use various type declarations, so we'd really
-        // need to emit all the type declarations first, and that involves
-        // some large scale reorderings.
-        //
-        // For now we will punt and just emit the declarations normally,
-        // and hope that the global-scope block (`$Globals`) gets auto-assigned
-        // the same location that we manually asigned it.
-
-        auto elementTypeLayout = globalConstantBufferLayout->elementTypeLayout;
-        auto elementTypeStructLayout = elementTypeLayout.As<StructTypeLayout>();
-
-        // We expect all constant buffers to contain `struct` types for now
-        SLANG_RELEASE_ASSERT(elementTypeStructLayout);
-
-        globalStructLayout = elementTypeStructLayout.Ptr();
-    }
-    else
-    {
-        SLANG_UNEXPECTED("unhandled type for global-scope parameter layout");
-    }
-    return globalStructLayout;
-}
-
+StructTypeLayout* getGlobalStructLayout(
+    ProgramLayout*  programLayout);
 
 // Determine if the user is just trying to "rewrite" their input file
 // into an output file. This will affect the way we approach code

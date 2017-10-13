@@ -223,6 +223,11 @@ struct OptionsParser
 
 #undef CASE
 
+        else if (path.EndsWith(".slang-module"))
+        {
+            spSetOutputContainerFormat(compileRequest, SLANG_CONTAINER_FORMAT_SLANG_MODULE);
+            requestImpl->containerOutputPath = path;
+        }
         else
         {
             // Allow an unknown-format `-o`, assuming we get a target format
@@ -599,6 +604,16 @@ struct OptionsParser
                 }
             }
         }
+
+        // If the user is requesting multiple targets, *and* is asking
+        // for direct output files for entry points, that is an error.
+        if (rawOutputPaths.Count() != 0 && requestImpl->targets.Count() > 1)
+        {
+            requestImpl->mSink.diagnose(
+                SourceLoc(),
+                Diagnostics::explicitOutputPathsAndMultipleTargets);
+        }
+
 
         // Did the user try to specify output path(s)?
         if (rawOutputPaths.Count() != 0)

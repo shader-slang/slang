@@ -7,6 +7,7 @@
 namespace Slang
 {
     class CompileRequest;
+    class EntryPointRequest;
     class ShaderCompiler;
     class ShaderLinkInfo;
     class ShaderSymbol;

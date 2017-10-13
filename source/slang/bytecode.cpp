@@ -936,6 +936,12 @@ BytecodeGenerationPtr<BCModule> generateBytecodeForModule(
     BytecodeGenerationContext*  context,
     IRModule*                   irModule)
 {
+    if (!irModule)
+    {
+        // Not IR module? Then return a null pointer.
+        return BytecodeGenerationPtr<BCModule>();
+    }
+
     // A module in the bytecode is mostly just a list of the
     // global symbols in the module.
     //
@@ -1032,9 +1038,9 @@ BytecodeGenerationPtr<BCModule> generateBytecodeForModule(
     return bcModule;
 }
 
-void generateBytecodeStream(
+void generateBytecodeContainer(
     BytecodeGenerationContext*  context,
-    IRModule*                   irModule)
+    CompileRequest*             compileReq)
 {
     // Header must be the very first thing in the bytecode stream
     BytecodeGenerationPtr<BCHeader> header = allocate<BCHeader>(context);
@@ -1042,9 +1048,49 @@ void generateBytecodeStream(
     memcpy(header->magic, "slang\0bc", sizeof(header->magic));
     header->version = 0;
 
-    header->module = generateBytecodeForModule(context, irModule);
+    // TODO: Need to generate BC representation of all the public/exported
+    // declrations in the translation units, so that they can be used to
+    // resolve depenencies downstream.
+
+    // TODO: Need to dump BC representation of compiled kernel codes
+    // for each specified code-generation target.
+
+    UInt translationUnitCount = compileReq->translationUnits.Count();
+
+    List<BytecodeGenerationPtr<BCModule>> bcModulesList;
+    for (auto translationUnitReq : compileReq->translationUnits)
+    {
+        auto bcModule = generateBytecodeForModule(context, translationUnitReq->irModule);
+        bcModulesList.Add(bcModule);
+    }
+
+    UInt bcModuleCount = bcModulesList.Count();
+    header->moduleCount = bcModuleCount;
+
+    auto bcModules = allocateArray<BCPtr<BCModule>>(context, bcModuleCount);
+    header->modules = bcModules;
+    for(UInt ii = 0; ii < bcModuleCount; ++ii)
+    {
+        bcModules[ii] = bcModulesList[ii];
+    }
 }
 
+void generateBytecodeForCompileRequest(
+    CompileRequest* compileReq)
+{
+    SharedBytecodeGenerationContext sharedContext;
+
+    BytecodeGenerationContext context;
+    context.shared = &sharedContext;
+
+    generateBytecodeContainer(&context, compileReq);
+
+    compileReq->generatedBytecode = sharedContext.bytecode;
+}
+
+// TODO: Need to support IR emit at the whole-module/compile-request
+// level, and not just for individual entry points.
+#if 0
 List<uint8_t> emitSlangIRForEntryPoint(
     EntryPointRequest*  entryPoint)
 {
@@ -1072,5 +1118,6 @@ List<uint8_t> emitSlangIRForEntryPoint(
 
     return sharedContext.bytecode;
 }
+#endif
 
 } // namespace Slang

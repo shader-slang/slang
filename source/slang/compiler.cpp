@@ -3,8 +3,10 @@
 #include "../core/basic.h"
 #include "../core/platform.h"
 #include "../core/slang-io.h"
+#include "bytecode.h"
 #include "compiler.h"
 #include "lexer.h"
+#include "lower-to-ir.h"
 #include "parameter-binding.h"
 #include "parser.h"
 #include "preprocessor.h"
@@ -110,7 +112,8 @@ namespace Slang
     //
 
     String emitHLSLForEntryPoint(
-        EntryPointRequest*  entryPoint)
+        EntryPointRequest*  entryPoint,
+        TargetRequest*      targetReq)
     {
         auto compileRequest = entryPoint->compileRequest;
         auto translationUnit = entryPoint->getTranslationUnit();
@@ -149,13 +152,15 @@ namespace Slang
         {
             return emitEntryPoint(
                 entryPoint,
-                compileRequest->layout.Ptr(),
-                CodeGenTarget::HLSL);
+                targetReq->layout.Ptr(),
+                CodeGenTarget::HLSL,
+                targetReq->target);
         }
     }
 
     String emitGLSLForEntryPoint(
-        EntryPointRequest*  entryPoint)
+        EntryPointRequest*  entryPoint,
+        TargetRequest*      targetReq)
     {
         auto compileRequest = entryPoint->compileRequest;
         auto translationUnit = entryPoint->getTranslationUnit();
@@ -194,8 +199,9 @@ namespace Slang
             // so that we properly emit it as the `main` function.
             return emitEntryPoint(
                 entryPoint,
-                compileRequest->layout.Ptr(),
-                CodeGenTarget::GLSL);
+                targetReq->layout.Ptr(),
+                CodeGenTarget::GLSL,
+                targetReq->target);
         }
     }
 
@@ -232,7 +238,8 @@ namespace Slang
     }
 
     List<uint8_t> EmitDXBytecodeForEntryPoint(
-        EntryPointRequest*  entryPoint)
+        EntryPointRequest*  entryPoint,
+        TargetRequest*      targetReq)
     {
         static pD3DCompile D3DCompile_ = nullptr;
         if (!D3DCompile_)
@@ -246,7 +253,7 @@ namespace Slang
                 return List<uint8_t>();
         }
 
-        auto hlslCode = emitHLSLForEntryPoint(entryPoint);
+        auto hlslCode = emitHLSLForEntryPoint(entryPoint, targetReq);
         maybeDumpIntermediate(entryPoint->compileRequest, hlslCode.Buffer(), CodeGenTarget::HLSL);
 
         ID3DBlob* codeBlob;
@@ -333,10 +340,11 @@ namespace Slang
     }
 
     String EmitDXBytecodeAssemblyForEntryPoint(
-        EntryPointRequest*  entryPoint)
+        EntryPointRequest*  entryPoint,
+        TargetRequest*      targetReq)
     {
 
-        List<uint8_t> dxbc = EmitDXBytecodeForEntryPoint(entryPoint);
+        List<uint8_t> dxbc = EmitDXBytecodeForEntryPoint(entryPoint, targetReq);
         if (!dxbc.Count())
         {
             return String();
@@ -440,9 +448,10 @@ namespace Slang
     }
 
     List<uint8_t> emitSPIRVForEntryPoint(
-        EntryPointRequest*  entryPoint)
+        EntryPointRequest*  entryPoint,
+        TargetRequest*      targetReq)
     {
-        String rawGLSL = emitGLSLForEntryPoint(entryPoint);
+        String rawGLSL = emitGLSLForEntryPoint(entryPoint, targetReq);
         maybeDumpIntermediate(entryPoint->compileRequest, rawGLSL.Buffer(), CodeGenTarget::GLSL);
 
         List<uint8_t> output;
@@ -473,9 +482,10 @@ namespace Slang
     }
 
     String emitSPIRVAssemblyForEntryPoint(
-        EntryPointRequest*  entryPoint)
+        EntryPointRequest*  entryPoint,
+        TargetRequest*      targetReq)
     {
-        List<uint8_t> spirv = emitSPIRVForEntryPoint(entryPoint);
+        List<uint8_t> spirv = emitSPIRVForEntryPoint(entryPoint, targetReq);
         if (spirv.Count() == 0)
             return String();
 
@@ -484,26 +494,21 @@ namespace Slang
     }
 #endif
 
-    List<uint8_t> emitSlangIRForEntryPoint(
-        EntryPointRequest*  entryPoint);
-
-    String emitSlangIRAssemblyForEntryPoint(
-        EntryPointRequest*  entryPoint);
-
     // Do emit logic for a single entry point
     CompileResult emitEntryPoint(
-        EntryPointRequest*  entryPoint)
+        EntryPointRequest*  entryPoint,
+        TargetRequest*      targetReq)
     {
         CompileResult result;
 
         auto compileRequest = entryPoint->compileRequest;
-        auto target = compileRequest->Target;
+        auto target = targetReq->target;
 
         switch (target)
         {
         case CodeGenTarget::HLSL:
             {
-                String code = emitHLSLForEntryPoint(entryPoint);
+                String code = emitHLSLForEntryPoint(entryPoint, targetReq);
                 maybeDumpIntermediate(compileRequest, code.Buffer(), target);
                 result = CompileResult(code);
             }
@@ -511,7 +516,7 @@ namespace Slang
 
         case CodeGenTarget::GLSL:
             {
-                String code = emitGLSLForEntryPoint(entryPoint);
+                String code = emitGLSLForEntryPoint(entryPoint, targetReq);
                 maybeDumpIntermediate(compileRequest, code.Buffer(), target);
                 result = CompileResult(code);
             }
@@ -520,7 +525,7 @@ namespace Slang
 #if SLANG_ENABLE_DXBC_SUPPORT
         case CodeGenTarget::DXBytecode:
             {
-                List<uint8_t> code = EmitDXBytecodeForEntryPoint(entryPoint);
+                List<uint8_t> code = EmitDXBytecodeForEntryPoint(entryPoint, targetReq);
                 maybeDumpIntermediate(compileRequest, code.Buffer(), code.Count(), target);
                 result = CompileResult(code);
             }
@@ -528,7 +533,7 @@ namespace Slang
 
         case CodeGenTarget::DXBytecodeAssembly:
             {
-                String code = EmitDXBytecodeAssemblyForEntryPoint(entryPoint);
+                String code = EmitDXBytecodeAssemblyForEntryPoint(entryPoint, targetReq);
                 maybeDumpIntermediate(compileRequest, code.Buffer(), target);
                 result = CompileResult(code);
             }
@@ -537,7 +542,7 @@ namespace Slang
 
         case CodeGenTarget::SPIRV:
             {
-                List<uint8_t> code = emitSPIRVForEntryPoint(entryPoint);
+                List<uint8_t> code = emitSPIRVForEntryPoint(entryPoint, targetReq);
                 maybeDumpIntermediate(compileRequest, code.Buffer(), code.Count(), target);
                 result = CompileResult(code);
             }
@@ -545,29 +550,11 @@ namespace Slang
 
         case CodeGenTarget::SPIRVAssembly:
             {
-                String code = emitSPIRVAssemblyForEntryPoint(entryPoint);
+                String code = emitSPIRVAssemblyForEntryPoint(entryPoint, targetReq);
                 maybeDumpIntermediate(compileRequest, code.Buffer(), target);
                 result = CompileResult(code);
             }
             break;
-
-        case CodeGenTarget::SlangIR:
-            {
-                List<uint8_t> code = emitSlangIRForEntryPoint(entryPoint);
-                maybeDumpIntermediate(compileRequest, code.Buffer(), code.Count(), target);
-                result = CompileResult(code);
-            }
-            break;
-
-#if 0
-        case CodeGenTarget::SlangIRAssembly:
-            {
-                String code = emitSlangIRAssemblyForEntryPoint(entryPoint);
-                maybeDumpIntermediate(compileRequest, code.Buffer(), target);
-                result = CompileResult(code);
-            }
-            break;
-#endif
 
         case CodeGenTarget::None:
             // The user requested no output
@@ -632,11 +619,13 @@ namespace Slang
     }
 
     static void writeEntryPointResultToFile(
-        EntryPointRequest*  entryPoint)
+        EntryPointRequest*  entryPoint,
+        TargetRequest*      targetReq,
+        UInt                entryPointIndex)
     {
         auto compileRequest = entryPoint->compileRequest;
         auto outputPath = entryPoint->outputPath;
-        auto result = entryPoint->result;
+        auto result = targetReq->entryPointResults[entryPointIndex];
         switch (result.format)
         {
         case ResultFormat::Text:
@@ -680,10 +669,12 @@ namespace Slang
     }
 
     static void writeEntryPointResultToStandardOutput(
-        EntryPointRequest*  entryPoint)
+        EntryPointRequest*  entryPoint,
+        TargetRequest*      targetReq,
+        UInt                entryPointIndex)
     {
         auto compileRequest = entryPoint->compileRequest;
-        auto result = entryPoint->result;
+        auto& result = targetReq->entryPointResults[entryPointIndex];
 
         switch (result.format)
         {
@@ -699,7 +690,7 @@ namespace Slang
                 {
                     // Writing to console, so we need to generate text output.
 
-                    switch (compileRequest->Target)
+                    switch (targetReq->target)
                     {
                 #if SLANG_ENABLE_DXBC_SUPPORT
                     case CodeGenTarget::DXBytecode:
@@ -750,88 +741,97 @@ namespace Slang
     }
 
     static void writeEntryPointResult(
-        EntryPointRequest*  entryPoint)
+        EntryPointRequest*  entryPoint,
+        TargetRequest*      targetReq,
+        UInt                entryPointIndex)
     {
+        auto& result = targetReq->entryPointResults[entryPointIndex];
+
         // Skip the case with no output
-        if (entryPoint->result.format == ResultFormat::None)
+        if (result.format == ResultFormat::None)
             return;
 
         if (entryPoint->outputPath.Length())
         {
-            writeEntryPointResultToFile(entryPoint);
+            writeEntryPointResultToFile(entryPoint, targetReq, entryPointIndex);
         }
         else
         {
-            writeEntryPointResultToStandardOutput(entryPoint);
+            writeEntryPointResultToStandardOutput(entryPoint, targetReq, entryPointIndex);
         }
     }
 
-    CompileResult emitTranslationUnitEntryPoints(
-        TranslationUnitRequest* translationUnit)
+    void emitEntryPoints(
+        TargetRequest*          targetReq)
     {
-        CompileResult result;
+        CompileRequest* compileReq = targetReq->compileRequest;
 
-        for (auto& entryPoint : translationUnit->entryPoints)
+    }
+
+    void generateOutputForTarget(
+        TargetRequest*  targetReq)
+    {
+        CompileRequest* compileReq = targetReq->compileRequest;
+
+        // Generate target code any entry points that
+        // have been requested for compilation.
+        for (auto& entryPoint : compileReq->entryPoints)
         {
-            CompileResult entryPointResult = emitEntryPoint(entryPoint.Ptr());
-
-            entryPoint->result = entryPointResult;
+            CompileResult entryPointResult = emitEntryPoint(entryPoint, targetReq);
+            targetReq->entryPointResults.Add(entryPointResult);
         }
-
-        // The result for the translation unit will just be the concatenation
-        // of the results for each entry point. This doesn't actually make
-        // much sense, but it is good enough for now.
-        //
-        // TODO: Replace this with a packaged JSON and/or binary format.
-        for (auto& entryPoint : translationUnit->entryPoints)
-        {
-            result.append(entryPoint->result);
-        }
-
-        return result;
     }
-
-    // Do emit logic for an entire translation unit, which might
-    // have zero or more entry points
-    CompileResult emitTranslationUnit(
-        TranslationUnitRequest* translationUnit)
-    {
-        return emitTranslationUnitEntryPoints(translationUnit);
-    }
-
-#if 0
-    TranslationUnitResult generateOutput(ExtraContext& context)
-    {
-        TranslationUnitResult result = emitTranslationUnit(context);
-        return result;
-    }
-#endif
 
     void generateOutput(
         CompileRequest* compileRequest)
     {
-        // Start of with per-translation-unit and per-entry-point lowering
-        for( auto translationUnit : compileRequest->translationUnits )
+        // Go through the code-generation targets that the user
+        // has specified, and generate code for each of them.
+        //
+        for (auto targetReq : compileRequest->targets)
         {
-            CompileResult translationUnitResult = emitTranslationUnit(translationUnit.Ptr());
-            translationUnit->result = translationUnitResult;
+            generateOutputForTarget(targetReq);
+        }
+
+        // If we are being asked to generate code in a container
+        // format, then we are now in a position to do so.
+        switch (compileRequest->containerFormat)
+        {
+        default:
+            break;
+
+        case ContainerFormat::SlangModule:
+            generateBytecodeForCompileRequest(compileRequest);
+            break;
         }
 
         // If we are in command-line mode, we might be expected to actually
         // write output to one or more files here.
 
-        // But don't write any output if we were told to skip it.
-        if (compileRequest->shouldSkipCodegen)
-            return;
-
         if (compileRequest->isCommandLineCompile)
         {
-            for( auto entryPoint : compileRequest->entryPoints )
+            for (auto targetReq : compileRequest->targets)
             {
-                writeEntryPointResult(entryPoint);
+                UInt entryPointCount = compileRequest->entryPoints.Count();
+                for (UInt ee = 0; ee < entryPointCount; ++ee)
+                {
+                    writeEntryPointResult(
+                        compileRequest->entryPoints[ee],
+                        targetReq,
+                        ee);
+                }
+            }
+
+            if (compileRequest->containerOutputPath.Length() != 0)
+            {
+                auto& data = compileRequest->generatedBytecode;
+                writeOutputFile(compileRequest,
+                    compileRequest->containerOutputPath,
+                    data.begin(),
+                    data.end() - data.begin(),
+                    OutputFileKind::Binary);
             }
         }
-
     }
 
     // Debug logic for dumping intermediate outputs
@@ -943,15 +943,6 @@ namespace Slang
             }
             break;
     #endif
-
-        case CodeGenTarget::SlangIR:
-            dumpIntermediateBinary(compileRequest, data, size, ".slang-ir");
-            {
-                // TODO: need to support dissassembly from Slang IR binary
-//                String slangIRAssembly = dissassembleSlangIR(compileRequest, data, size);
-//                dumpIntermediateText(compileRequest, slangIRAssembly.begin(), slangIRAssembly.Length(), ".slang-ir.asm");
-            }
-            break;
         }
     }
 

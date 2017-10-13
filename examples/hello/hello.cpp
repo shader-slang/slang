@@ -100,8 +100,8 @@ HRESULT initialize( ID3D11Device* dxDevice )
     char const* vertexProfileName   = "vs_4_0";
     char const* fragmentProfileName = "ps_4_0";
 
-    spAddEntryPoint(slangRequest, translationUnitIndex, vertexEntryPointName,   spFindProfile(slangSession, vertexProfileName));
-    spAddEntryPoint(slangRequest, translationUnitIndex, fragmentEntryPointName, spFindProfile(slangSession, fragmentProfileName));
+    int vertexIndex = spAddEntryPoint(slangRequest, translationUnitIndex, vertexEntryPointName,   spFindProfile(slangSession, vertexProfileName));
+    int fragmentIndex = spAddEntryPoint(slangRequest, translationUnitIndex, fragmentEntryPointName, spFindProfile(slangSession, fragmentProfileName));
 
     int compileErr = spCompile(slangRequest);
     if(auto diagnostics = spGetDiagnosticOutput(slangRequest))
@@ -114,17 +114,17 @@ HRESULT initialize( ID3D11Device* dxDevice )
         return E_FAIL;
     }
 
-    char const* translatedCode = spGetTranslationUnitSource(slangRequest, translationUnitIndex);
-
+    char const* vertexCode = spGetEntryPointSource(slangRequest, vertexIndex);
+    char const* fragmentCode = spGetEntryPointSource(slangRequest, fragmentIndex);
 
     // TODO(tfoley): Query the required constant-buffer size
     int constantBufferSize = 16 * sizeof(float);
 
     // Compile the generated HLSL code
-    ID3DBlob* dxVertexShaderBlob = compileHLSLShader(translatedCode, vertexEntryPointName, vertexProfileName);
+    ID3DBlob* dxVertexShaderBlob = compileHLSLShader(vertexCode, vertexEntryPointName, vertexProfileName);
     if(!dxVertexShaderBlob) return E_FAIL;
 
-    ID3DBlob* dxPixelShaderBlob = compileHLSLShader(translatedCode, fragmentEntryPointName, fragmentProfileName);
+    ID3DBlob* dxPixelShaderBlob = compileHLSLShader(fragmentCode, fragmentEntryPointName, fragmentProfileName);
     if(!dxPixelShaderBlob) return E_FAIL;
 
     HRESULT hr = S_OK;

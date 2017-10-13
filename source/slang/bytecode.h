@@ -225,11 +225,27 @@ struct BCHeader
     // kinds of data without having to revise
     // the schema here.
 
-    // The bytecode representation of the module
-    BCPtr<BCModule>     module;
+    // TODO: should include AST declaration structure
+    // here, which can be used for refleciton, and
+    // also loaded to resolve dependencies when
+    // compiling other modules.
+
+    // TODO: Include the original entry point requests?
+
+    // Zero or more IR modules, corresponding to
+    // the translation units of the original compile
+    // request.
+    uint32_t                moduleCount;
+    BCPtr<BCPtr<BCModule>>  modules;
+
+    // TODO: should enumerate targets here, and
+    // include reflection layout info + compiled
+    // entry points for each target.
 };
 
-
+struct CompileRequest;
+void generateBytecodeForCompileRequest(
+    CompileRequest* compileReq);
 
 }
 

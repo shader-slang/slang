@@ -4069,6 +4069,17 @@ emitDeclImpl(decl, nullptr);
             return getIRName(decl);
         }
 
+        switch (inst->op)
+        {
+        case kIROp_global_var:
+        case kIROp_Func:
+            return ((IRGlobalValue*)inst)->mangledName;
+            break;
+
+        default:
+            break;
+        }
+
         StringBuilder sb;
         sb << "_S";
         sb << getID(inst);
@@ -5285,7 +5296,7 @@ emitDeclImpl(decl, nullptr);
     String getIRFuncName(
         IRFunc* func)
     {
-        if (isEntryPoint(func))
+        if (auto entryPointLayout = asEntryPoint(func))
         {
             // GLSL will always need to use `main` as the
             // name for an entry-point function, but other
@@ -5297,10 +5308,7 @@ emitDeclImpl(decl, nullptr);
             //
             if (getTarget(context) != CodeGenTarget::GLSL)
             {
-                if (auto highLevelDeclDecoration = func->findDecoration<IRHighLevelDeclDecoration>())
-                {
-                    return getText(highLevelDeclDecoration->decl->getName());
-                }
+                return getText(entryPointLayout->entryPoint->getName());
             }
 
             // 
@@ -5322,15 +5330,41 @@ emitDeclImpl(decl, nullptr);
 
         // Deal with decorations that need
         // to be emitted as attributes
-        if (auto threadGroupSizeDecoration = func->findDecoration<IRComputeThreadGroupSizeDecoration>())
+        auto entryPointLayout = asEntryPoint(func);
+        if (entryPointLayout)
         {
-            emit("[numthreads(");
-            for (int ii = 0; ii < 3; ++ii)
+            auto profile = entryPointLayout->profile;
+            auto stage = profile.GetStage();
+
+            switch (stage)
             {
-                if (ii != 0) emit(", ");
-                Emit(threadGroupSizeDecoration->sizeAlongAxis[ii]);
+            case Stage::Compute:
+                {
+                    static const UInt kAxisCount = 3;
+                    UInt sizeAlongAxis[kAxisCount];
+
+                    // TODO: this is kind of gross because we are using a public
+                    // reflection API function, rather than some kind of internal
+                    // utility it forwards to...
+                    spReflectionEntryPoint_getComputeThreadGroupSize(
+                        (SlangReflectionEntryPoint*)entryPointLayout,
+                        kAxisCount,
+                        &sizeAlongAxis[0]);
+
+                    emit("[numthreads(");
+                    for (int ii = 0; ii < 3; ++ii)
+                    {
+                        if (ii != 0) emit(", ");
+                        Emit(sizeAlongAxis[ii]);
+                    }
+                    emit(")]\n");
+                }
+                break;
+
+            // TODO: There are other stages that will need this kind of handling.
+            default:
+                break;
             }
-            emit(")]\n");
         }
 
         auto name = getIRFuncName(func);
@@ -5509,12 +5543,17 @@ emitDeclImpl(decl, nullptr);
     }
 #endif
 
-    bool isEntryPoint(IRFunc* func)
+    EntryPointLayout* asEntryPoint(IRFunc* func)
     {
-        if(func->findDecoration<IREntryPointDecoration>())
-            return true;
+        if (auto layoutDecoration = func->findDecoration<IRLayoutDecoration>())
+        {
+            if (auto entryPointLayout = dynamic_cast<EntryPointLayout*>(layoutDecoration->layout))
+            {
+                return entryPointLayout;
+            }
+        }
 
-        return false;
+        return nullptr;
     }
 
     // Detect if the given IR function represents a
@@ -6174,36 +6213,21 @@ EntryPointLayout* findEntryPointLayout(
     return nullptr;
 }
 
-String emitEntryPoint(
-    EntryPointRequest*  entryPoint,
-    ProgramLayout*      programLayout,
-    CodeGenTarget       target)
+// Given a layout computed for a whole program, find
+// the corresponding layout to use when looking up
+// variables at the global scope.
+//
+// It might be that the global scope was logically
+// mapped to a constant buffer, so that we need
+// to "unwrap" that declaration to get at the
+// actual struct type inside.
+StructTypeLayout* getGlobalStructLayout(
+    ProgramLayout*  programLayout)
 {
-    auto translationUnit = entryPoint->getTranslationUnit();
-    auto session = entryPoint->compileRequest->mSession;
-
-    SharedEmitContext sharedContext;
-    sharedContext.target = target;
-    sharedContext.finalTarget = entryPoint->compileRequest->Target;
-    sharedContext.entryPoint = entryPoint;
-
-    if (entryPoint)
-    {
-        sharedContext.entryPointLayout = findEntryPointLayout(
-            programLayout,
-            entryPoint);
-    }
-
-    sharedContext.programLayout = programLayout;
-
-    // Layout information for the global scope is either an ordinary
-    // `struct` in the common case, or a constant buffer in the case
-    // where there were global-scope uniforms.
     auto globalScopeLayout = programLayout->globalScopeLayout;
-    StructTypeLayout* globalStructLayout = nullptr;
     if( auto gs = globalScopeLayout.As<StructTypeLayout>() )
     {
-        globalStructLayout = gs.Ptr();
+        return gs.Ptr();
     }
     else if( auto globalConstantBufferLayout = globalScopeLayout.As<ParameterBlockTypeLayout>() )
     {
@@ -6229,12 +6253,42 @@ String emitEntryPoint(
         // We expect all constant buffers to contain `struct` types for now
         SLANG_RELEASE_ASSERT(elementTypeStructLayout);
 
-        globalStructLayout = elementTypeStructLayout.Ptr();
+        return elementTypeStructLayout.Ptr();
     }
     else
     {
         SLANG_UNEXPECTED("uhandled global-scope binding layout");
+        return nullptr;
     }
+}
+
+String emitEntryPoint(
+    EntryPointRequest*  entryPoint,
+    ProgramLayout*      programLayout,
+    CodeGenTarget       target,
+    CodeGenTarget       finalTarget)
+{
+    auto translationUnit = entryPoint->getTranslationUnit();
+    auto session = entryPoint->compileRequest->mSession;
+
+    SharedEmitContext sharedContext;
+    sharedContext.target = target;
+    sharedContext.finalTarget = finalTarget;
+    sharedContext.entryPoint = entryPoint;
+
+    if (entryPoint)
+    {
+        sharedContext.entryPointLayout = findEntryPointLayout(
+            programLayout,
+            entryPoint);
+    }
+
+    sharedContext.programLayout = programLayout;
+
+    // Layout information for the global scope is either an ordinary
+    // `struct` in the common case, or a constant buffer in the case
+    // where there were global-scope uniforms.
+    StructTypeLayout* globalStructLayout = getGlobalStructLayout(programLayout);
     sharedContext.globalStructLayout = globalStructLayout;
 
     auto translationUnitSyntax = translationUnit->SyntaxNode.Ptr();
@@ -6268,11 +6322,14 @@ String emitEntryPoint(
         // This seems to be case (3), because the user is asking for full
         // checking, and so we can assume we understand the code fully.
         //
-        // In this case we want to translate to our intermediate representation
-        // and do optimizations/transformations there before we emit final code.
+        // The IR code for the module should already have been generated,
+        // so that we "just" need to specialize it as needed for the
+        // specific target and entry point in use.
         //
-
-        auto lowered = lowerEntryPointToIR(entryPoint, programLayout, target);
+        auto lowered = specializeIRForEntryPoint(
+            entryPoint,
+            programLayout,
+            target);
 
         // debugging:
         if (translationUnit->compileRequest->shouldDumpIR)
@@ -6280,18 +6337,12 @@ String emitEntryPoint(
             dumpIR(lowered);
         }
 
-        // TODO: depending on the target we are trying to generate code for,
-        // we may need to apply certain transformations, and we may also
-        // need to link in (and then inline) target-specific implementations
-        // for the library functions that the user called.
-
-        switch(target)
-        {
-        case CodeGenTarget::GLSL:
-            legalizeEntryPointsForGLSL(session, lowered);
-            break;
-        }
-
+        // TODO: we should apply some guaranteed transformations here,
+        // to eliminate constructs that aren't legal downstream (e.g. generics).
+        //
+        // TODO: Need to decide whether to do these before or after
+        // target-specific legalization steps. Currently I've folded
+        // legalization into the specialization above.
 
         // TODO: do we want to emit directly from IR, or translate the
         // IR back into AST for emission?

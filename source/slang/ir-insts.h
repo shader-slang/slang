@@ -35,24 +35,6 @@ struct IRLayoutDecoration : IRDecoration
     Layout* layout;
 };
 
-// Identifies a function as an entry point for some stage
-struct IREntryPointDecoration : IRDecoration
-{
-    enum { kDecorationOp = kIRDecorationOp_EntryPoint };
-
-    Profile profile;
-    EntryPointLayout* layout;
-};
-
-// Associates a compute-shader entry point function
-// with a thread-group size.
-struct IRComputeThreadGroupSizeDecoration : IRDecoration
-{
-    enum { kDecorationOp = kIRDecorationOp_ComputeThreadGroupSize };
-
-    UInt sizeAlongAxis[3];
-};
-
 enum IRLoopControl
 {
     kIRLoopControl_Unroll,
@@ -467,6 +449,15 @@ struct IRBuilder
     IRHighLevelDeclDecoration* addHighLevelDeclDecoration(IRValue* value, Decl* decl);
     IRLayoutDecoration* addLayoutDecoration(IRValue* value, Layout* layout);
 };
+
+// Generate a clone of an IR module that is specialized for
+// a particular entry point, target, etc.
+
+IRModule* specializeIRForEntryPoint(
+    EntryPointRequest*  entryPointRequest,
+    ProgramLayout*      programLayout,
+    CodeGenTarget       target);
+
 
 }
 

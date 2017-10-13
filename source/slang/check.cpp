@@ -5622,6 +5622,115 @@ namespace Slang
         }
     };
 
+    bool isPrimaryDecl(
+        CallableDecl*   decl)
+    {
+        assert(decl);
+        return (!decl->primaryDecl) || (decl == decl->primaryDecl);
+    }
+
+    void validateEntryPoint(
+        EntryPointRequest*  entryPoint)
+    {
+        // The first step in validating the entry point is to find
+        // the (unique) function declaration that matches its name.
+
+        auto translationUnit = entryPoint->getTranslationUnit();
+        auto sink = &entryPoint->compileRequest->mSink;
+        auto translationUnitSyntax = translationUnit->SyntaxNode;
+
+
+        // Make sure we've got a query-able member dictionary
+        buildMemberDictionary(translationUnitSyntax);
+
+        // We will look up any global-scope declarations in the translation
+        // unit that match the name of our entry point.
+        Decl* firstDeclWithName = nullptr;
+        if( !translationUnitSyntax->memberDictionary.TryGetValue(entryPoint->name, firstDeclWithName) )
+        {
+            // If there doesn't appear to be any such declaration, then
+            // we need to diagnose it as an error, and then bail out.
+            sink->diagnose(translationUnitSyntax, Diagnostics::entryPointFunctionNotFound, entryPoint->name);
+            return;
+        }
+
+        // We found at least one global-scope declaration with the right name,
+        // but (1) it might not be a function, and (2) there might be
+        // more than one function.
+        //
+        // We'll walk the linked list of declarations with the same name,
+        // to see what we find. Along the way we'll keep track of the
+        // first function declaration we find, if any:
+        FuncDecl* entryPointFuncDecl = nullptr;
+        for(auto ee = firstDeclWithName; ee; ee = ee->nextInContainerWithSameName)
+        {
+            // Is this declaration a function?
+            if (auto funcDecl = dynamic_cast<FuncDecl*>(ee))
+            {
+                // Skip non-primary declarations, so that
+                // we don't give an error when an entry
+                // point is forward-declared.
+                if (!isPrimaryDecl(funcDecl))
+                    continue;
+
+                // is this the first one we've seen?
+                if (!entryPointFuncDecl)
+                {
+                    // If so, this is a candidate to be
+                    // the entry point function.
+                    entryPointFuncDecl = funcDecl;
+                }
+                else
+                {
+                    // Uh-oh! We've already seen a function declaration with this
+                    // name before, so the whole thing is ambiguous. We need
+                    // to diagnose and bail out.
+
+                    sink->diagnose(translationUnitSyntax, Diagnostics::ambiguousEntryPoint, entryPoint->name);
+
+                    // List all of the declarations that the user *might* mean
+                    for (auto ff = firstDeclWithName; ff; ff = ff->nextInContainerWithSameName)
+                    {
+                        if (auto candidate = dynamic_cast<FuncDecl*>(ff))
+                        {
+                            sink->diagnose(candidate, Diagnostics::entryPointCandidate, candidate->getName());
+                        }
+                    }
+
+                    // Bail out.
+                    return;
+                }
+            }
+        }
+
+        // Did we find a function declaration in our search?
+        if(!entryPointFuncDecl)
+        {
+            // If not, then we need to diagnose the error.
+            // For convenience, we will point to the first
+            // declaration with the right name, that wasn't a function.
+            sink->diagnose(firstDeclWithName, Diagnostics::entryPointSymbolNotAFunction, entryPoint->name);
+            return;
+        }
+
+        // TODO: it is possible that the entry point was declared with
+        // profile or target overloading. Is there anything that we need
+        // to do at this point to filter out declarations that aren't
+        // relevant to the selected profile for the entry point?
+
+        // Phew, we have at least found a suitable decl.
+        // Let's record that in the entry-point request so
+        // that we don't have to re-do this effort again later.
+        entryPoint->decl = entryPointFuncDecl;
+
+        // TODO: after all that work, we are now in a position to start
+        // validating the declaration itself. E.g., we should check if
+        // the declared input/output parameters have suitable semantics,
+        // if they are of types that are appropriate to the stage, etc.
+    }
+
+
+
     void checkTranslationUnit(
         TranslationUnitRequest* translationUnit)
     {
@@ -5630,8 +5739,27 @@ namespace Slang
             translationUnit->compileRequest,
             translationUnit);
 
+        // Apply the visitor to do the main semantic
+        // checking that is required on all declarations
+        // in the translation unit.
         visitor.checkDecl(translationUnit->SyntaxNode);
+
+        // Next, do follow-up validation on any entry
+        // points that the user declared via API or
+        // command line, to ensure that they meet
+        // requirements.
+        //
+        // Note: We may eventually have syntax to
+        // identify entry points via a modifier on
+        // declarations, and in this case they should
+        // probably get validated as part of orindary
+        // checking above.
+        for (auto entryPoint : translationUnit->entryPoints)
+        {
+            validateEntryPoint(entryPoint);
+        }
     }
+
 
     //
 
