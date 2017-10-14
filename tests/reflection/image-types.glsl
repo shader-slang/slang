@@ -1,4 +1,4 @@
-//TEST(smoke):SIMPLE:-profile ps_4_0 -target glsl -target reflection-json
+//TEST(smoke):REFLECTION:-profile ps_4_0 -target glsl
 
 // Confirm that we expose GLSL `image` types through reflection
 

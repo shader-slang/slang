@@ -89,7 +89,6 @@ extern "C"
         SLANG_SPIRV_ASM,
         SLANG_DXBC,
         SLANG_DXBC_ASM,
-        SLANG_REFLECTION_JSON,
         SLANG_IR,
         SLANG_IR_ASM,
     };

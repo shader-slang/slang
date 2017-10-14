@@ -1,4 +1,4 @@
-//TEST(smoke):SIMPLE:-profile ps_4_0 -target hlsl -target reflection-json
+//TEST(smoke):REFLECTION:-profile ps_4_0 -target hlsl
 
 // Confirm that we can generate reflection
 // information for resources nested inside

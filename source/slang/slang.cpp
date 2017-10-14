@@ -708,17 +708,7 @@ SLANG_API void spSetCodeGenTarget(
         SlangCompileRequest*    request,
         int target)
 {
-    if (target == SLANG_REFLECTION_JSON)
-    {
-        // HACK: We special case this because reflection JSON is actually
-        // an additional output step that layers on top of an existing
-        // target
-        REQ(request)->extraTarget = Slang::CodeGenTarget::ReflectionJSON;
-    }
-    else
-    {
-        REQ(request)->Target = (Slang::CodeGenTarget)target;
-    }
+    REQ(request)->Target = (Slang::CodeGenTarget)target;
 }
 
 SLANG_API void spSetPassThrough(

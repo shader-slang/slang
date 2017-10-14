@@ -106,6 +106,9 @@ SLANG_GLSLANG_HEADERS := source/slang-glslang/*.h
 SLANG_EVAL_TEST_SOURCES := tools/eval-test/*.cpp
 SLANG_EVAL_TEST_HEADERS :=
 
+SLANG_REFLECTION_TEST_SOURCES := tools/slang-reflection-test/*.cpp
+SLANG_REFLECTION_TEST_HEADERS :=
+
 # Add `glslang` sources to the build or `slang-glslang`
 #
 # Note: We aren't going to wasttte time trying to work with
@@ -135,10 +138,11 @@ SLANGC := $(OUTPUTDIR)slangc$(BIN_SUFFIX)
 SLANG_GLSLANG := $(OUTPUTDIR)$(SHARED_LIB_PREFIX)slang-glslang$(SHARED_LIB_SUFFIX)
 SLANG_TEST := $(OUTPUTDIR)slang-test$(BIN_SUFFIX)
 SLANG_EVAL_TEST := $(OUTPUTDIR)slang-eval-test$(BIN_SUFFIX)
+SLANG_REFLECTION_TEST := $(OUTPUTDIR)slang-reflection-test$(BIN_SUFFIX)
 
 # By default, when the user invokes `make`, we will build the
 # `slang` shared library, and the `slangc` front-end application.
-all: slang slang-glslang slangc slang-test slang-eval-test
+all: slang slang-glslang slangc slang-test slang-eval-test slang-reflection-test
 
 mkdirs: $(OUTPUTDIR)
 
@@ -148,6 +152,7 @@ slangc: mkdirs $(SLANGC)
 slang-glslang: mkdirs $(SLANG_GLSLANG)
 slang-test: mkdirs $(SLANG_TEST)
 slang-eval-test: mkdirs $(SLANG_EVAL_TEST)
+slang-reflection-test: mkdirs $(SLANG_REFLECTION_TEST)
 
 $(SLANG): $(SLANG_SOURCES) $(SLANG_HEADERS)
 	$(CXX) $(SHARED_LIB_LDFLAGS) -o $@ -DSLANG_DYNAMIC_EXPORT $(SHARED_LIB_CFLAGS) $(SLANG_SOURCES) -ldl $(RELATIVE_RPATH_INCANTATION)
@@ -164,10 +169,13 @@ $(SLANG_TEST): $(SLANG_TEST_SOURCES) $(SLANG_TEST_HEADERS) $(SLANG)
 $(SLANG_EVAL_TEST): $(SLANG_EVAL_TEST_SOURCES) $(SLANG)
 	$(CXX) $(LDFLAGS) -o $@ $(CFLAGS) $(SLANG_EVAL_TEST_SOURCES) $(RELATIVE_RPATH_INCANTATION) -lslang
 
+$(SLANG_REFLECTION_TEST): $(SLANG_REFLECTION_TEST_SOURCES) $(SLANG)
+	$(CXX) $(LDFLAGS) -o $@ $(CFLAGS) $(SLANG_REFLECTION_TEST_SOURCES) $(RELATIVE_RPATH_INCANTATION) -lslang
+
 $(OUTPUTDIR):
 	mkdir -p $(OUTPUTDIR)
 
-test: $(SLANG_TEST) $(SLANG_EVAL_TEST)
+test: $(SLANG_TEST) $(SLANG_EVAL_TEST) $(SLANG_REFLECTION_TEST)
 	$(SLANG_TEST) -bindir $(OUTPUTDIR) -category $(SLANG_TEST_CATEGORY) $(SLANG_TEST_FLAGS)
 
 clean:

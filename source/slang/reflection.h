@@ -19,9 +19,6 @@ typedef uint64_t    UInt64;
 class ProgramLayout;
 class TypeLayout;
 
-String emitReflectionJSON(
-    ProgramLayout* programLayout);
-
 //
 
 SlangTypeKind getReflectionTypeKind(Type* type);

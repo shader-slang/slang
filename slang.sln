@@ -28,7 +28,9 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang-glslang", "source\sla
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang-generate", "tools\slang-generate\slang-generate.vcxproj", "{66174227-8541-41FC-A6DF-4764FC66F78E}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "eval-test", "tools\eval-test\eval-test.vcxproj", "{205FCAB9-A13F-4980-86FA-F6221A7095EE}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang-eval-test", "tools\eval-test\eval-test.vcxproj", "{205FCAB9-A13F-4980-86FA-F6221A7095EE}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang-reflection-test", "tools\slang-reflection-test\slang-reflection-test.vcxproj", "{22C45F4F-FB6B-4535-BED1-D3F5D0C71047}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -110,6 +112,14 @@ Global
 		{205FCAB9-A13F-4980-86FA-F6221A7095EE}.Release|Win32.Build.0 = Release|Win32
 		{205FCAB9-A13F-4980-86FA-F6221A7095EE}.Release|x64.ActiveCfg = Release|x64
 		{205FCAB9-A13F-4980-86FA-F6221A7095EE}.Release|x64.Build.0 = Release|x64
+		{22C45F4F-FB6B-4535-BED1-D3F5D0C71047}.Debug|Win32.ActiveCfg = Debug|Win32
+		{22C45F4F-FB6B-4535-BED1-D3F5D0C71047}.Debug|Win32.Build.0 = Debug|Win32
+		{22C45F4F-FB6B-4535-BED1-D3F5D0C71047}.Debug|x64.ActiveCfg = Debug|x64
+		{22C45F4F-FB6B-4535-BED1-D3F5D0C71047}.Debug|x64.Build.0 = Debug|x64
+		{22C45F4F-FB6B-4535-BED1-D3F5D0C71047}.Release|Win32.ActiveCfg = Release|Win32
+		{22C45F4F-FB6B-4535-BED1-D3F5D0C71047}.Release|Win32.Build.0 = Release|Win32
+		{22C45F4F-FB6B-4535-BED1-D3F5D0C71047}.Release|x64.ActiveCfg = Release|x64
+		{22C45F4F-FB6B-4535-BED1-D3F5D0C71047}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -120,5 +130,6 @@ Global
 		{96610759-07B9-4EEB-A974-5C634A2E742B} = {74C5F0DC-93BB-4BF3-AC65-8C65491570F7}
 		{66174227-8541-41FC-A6DF-4764FC66F78E} = {74C5F0DC-93BB-4BF3-AC65-8C65491570F7}
 		{205FCAB9-A13F-4980-86FA-F6221A7095EE} = {74C5F0DC-93BB-4BF3-AC65-8C65491570F7}
+		{22C45F4F-FB6B-4535-BED1-D3F5D0C71047} = {74C5F0DC-93BB-4BF3-AC65-8C65491570F7}
 	EndGlobalSection
 EndGlobal

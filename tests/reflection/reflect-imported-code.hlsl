@@ -1,4 +1,4 @@
-//TEST:SIMPLE:-profile ps_4_0  -target hlsl -target reflection-json
+//TEST:REFLECTION:-profile ps_4_0  -target hlsl
 
 // Confirm that shader parameters in imported modules get reflected properly.
 
