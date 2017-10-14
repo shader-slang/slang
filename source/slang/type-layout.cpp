@@ -622,7 +622,6 @@ LayoutRulesFamilyImpl* GetLayoutRulesFamilyImpl(CodeGenTarget target)
     case CodeGenTarget::DXBytecode:
     case CodeGenTarget::DXBytecodeAssembly:
     case CodeGenTarget::SlangIR:
-    case CodeGenTarget::SlangIRAssembly:
         return &kHLSLLayoutRulesFamilyImpl;
 
     case CodeGenTarget::GLSL:

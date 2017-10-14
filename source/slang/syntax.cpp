@@ -294,6 +294,15 @@ void Type::accept(IValVisitor* visitor, void* extra)
             declRef)->As<PtrType>();
     }
 
+    RefPtr<GroupSharedType> Session::getGroupSharedType(RefPtr<Type> valueType)
+    {
+        RefPtr<GroupSharedType> groupSharedType = new GroupSharedType();
+        groupSharedType->setSession(this);
+        groupSharedType->valueType = valueType;
+        return groupSharedType;
+    }
+
+
     SyntaxClass<RefObject> Session::findSyntaxClass(Name* name)
     {
         SyntaxClass<RefObject> syntaxClass;
@@ -335,6 +344,36 @@ void Type::accept(IValVisitor* visitor, void* extra)
             return baseType->ToString() + "[" + ArrayLength->ToString() + "]";
         else
             return baseType->ToString() + "[]";
+    }
+
+    // GroupSharedType
+
+    Slang::String GroupSharedType::ToString()
+    {
+        return "@ThreadGroup " + valueType->ToString();
+    }
+
+    bool GroupSharedType::EqualsImpl(Type * type)
+    {
+        auto t = type->As<GroupSharedType>();
+        if (!t)
+            return false;
+        return valueType->Equals(t->valueType);
+    }
+
+    Type* GroupSharedType::CreateCanonicalType()
+    {
+        auto canonicalValueType = valueType->GetCanonicalType();
+        auto canonicalGroupSharedType = getSession()->getGroupSharedType(canonicalValueType);
+        session->canonicalTypes.Add(canonicalGroupSharedType);
+        return canonicalGroupSharedType;
+    }
+
+    int GroupSharedType::GetHashCode()
+    {
+        return combineHash(
+            valueType->GetHashCode(),
+            (int)(typeid(this).hash_code()));
     }
 
     // DeclRefType

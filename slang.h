@@ -90,7 +90,6 @@ extern "C"
         SLANG_DXBC,
         SLANG_DXBC_ASM,
         SLANG_IR,
-        SLANG_IR_ASM,
     };
 
     typedef int SlangPassThrough;

@@ -266,6 +266,14 @@ struct OptionsParser
                 {
                     flags |= SLANG_COMPILE_FLAG_NO_MANGLING;
                 }
+                else if(argStr == "-dump-ir" )
+                {
+                    requestImpl->shouldDumpIR = true;
+                }
+                else if(argStr == "-skip-codegen" )
+                {
+                    requestImpl->shouldSkipCodegen = true;
+                }
                 else if (argStr == "-backend" || argStr == "-target")
                 {
                     String name = tryReadCommandLineArgument(arg, &argCursor, argEnd);
@@ -304,8 +312,6 @@ struct OptionsParser
 
                     CASE(spirv, SPIRV);
                     CASE(spirv-assembly, SPIRV_ASM);
-                    CASE(slang-ir, IR);
-                    CASE(slang-ir-assembly, IR_ASM);
                     CASE(none, TARGET_NONE);
 
                 #undef CASE

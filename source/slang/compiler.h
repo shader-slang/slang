@@ -48,7 +48,6 @@ namespace Slang
         DXBytecode          = SLANG_DXBC,
         DXBytecodeAssembly  = SLANG_DXBC_ASM,
         SlangIR             = SLANG_IR,
-        SlangIRAssembly     = SLANG_IR_ASM,
     };
 
     enum class LineDirectiveMode : SlangLineDirectiveMode
@@ -210,6 +209,9 @@ namespace Slang
 
         // Should we dump intermediate results along the way, for debugging?
         bool shouldDumpIntermediates = false;
+
+        bool shouldDumpIR = false;
+        bool shouldSkipCodegen = false;
 
         // How should `#line` directives be emitted (if at all)?
         LineDirectiveMode lineDirectiveMode = LineDirectiveMode::Default;
@@ -390,6 +392,8 @@ namespace Slang
 
         // Construct pointer types on-demand
         RefPtr<PtrType> getPtrType(RefPtr<Type> valueType);
+
+        RefPtr<GroupSharedType> getGroupSharedType(RefPtr<Type> valueType);
 
         SyntaxClass<RefObject> findSyntaxClass(Name* name);
 

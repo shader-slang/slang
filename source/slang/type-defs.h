@@ -308,7 +308,27 @@ protected:
     virtual bool EqualsImpl(Type * type) override;
     virtual Type* CreateCanonicalType() override;
     virtual int GetHashCode() override;
-)
+    )
+END_SYNTAX_CLASS()
+
+// The effective type of a variable declared with `groupshared` storage qualifier.
+SYNTAX_CLASS(GroupSharedType, Type)
+    SYNTAX_FIELD(RefPtr<Type>, valueType);
+
+RAW(
+    virtual ~GroupSharedType()
+    {
+    int f = 0;
+    }
+
+    virtual Slang::String ToString() override;
+
+protected:
+    virtual bool EqualsImpl(Type * type) override;
+    virtual Type* CreateCanonicalType() override;
+    virtual int GetHashCode() override;
+    )
+
 END_SYNTAX_CLASS()
 
 // The "type" of an expression that resolves to a type.
