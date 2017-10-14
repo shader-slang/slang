@@ -25,7 +25,7 @@ static void writeRaw(PrettyWriter& writer, char const* begin)
 
 static void writeRawChar(PrettyWriter& writer, int c)
 {
-    char buffer[] = { c, 0 };
+    char buffer[] = { (char) c, 0 };
     writeRaw(writer, buffer);
 }
 
