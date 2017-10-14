@@ -1,4 +1,4 @@
-//TEST:SIMPLE:-use-ir -dump-ir -skip-codegen -target dxbc -profile cs_5_0 -entry main
+//TEST:SIMPLE:-use-ir -dump-ir -skip-codegen -target hlsl -profile cs_5_0 -entry main
 
 #define GROUP_THREAD_COUNT 64
 
