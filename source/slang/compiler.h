@@ -47,7 +47,6 @@ namespace Slang
         SPIRVAssembly       = SLANG_SPIRV_ASM,
         DXBytecode          = SLANG_DXBC,
         DXBytecodeAssembly  = SLANG_DXBC_ASM,
-        ReflectionJSON      = SLANG_REFLECTION_JSON,
         SlangIR             = SLANG_IR,
         SlangIRAssembly     = SLANG_IR_ASM,
     };
@@ -186,10 +185,6 @@ namespace Slang
 
         // What target language are we compiling to?
         CodeGenTarget Target = CodeGenTarget::Unknown;
-
-        // An "extra" target that might override the first one
-        // when it comes to deciding output format, etc.
-        CodeGenTarget extraTarget = CodeGenTarget::Unknown;
 
         // Directories to search for `#include` files or `import`ed modules
         List<SearchDirectory> searchDirectories;

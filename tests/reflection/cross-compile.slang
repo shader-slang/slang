@@ -1,4 +1,4 @@
-//TEST(smoke):SIMPLE:-profile glsl_fragment -target glsl -target reflection-json
+//TEST(smoke):REFLECTION:-profile glsl_fragment -target glsl
 
 // Confirm that when targetting GLSL via cross compilation,
 // we use the Vulkan layout rules instead of HLSL ones

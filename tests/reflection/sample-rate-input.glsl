@@ -1,4 +1,4 @@
-//TEST(smoke):SIMPLE:-profile ps_4_0 -no-checking -target reflection-json
+//TEST(smoke):REFLECTION:-profile ps_4_0 -no-checking
 
 // Check that we report sample-rate entry point input correctly
 

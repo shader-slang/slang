@@ -691,6 +691,67 @@ TestResult runSimpleTest(TestInput& input)
     return result;
 }
 
+TestResult runReflectionTest(TestInput& input)
+{
+    auto filePath = input.filePath;
+    auto outputStem = input.outputStem;
+
+    OSProcessSpawner spawner;
+
+    spawner.pushExecutablePath(String(options.binDir) + "slang-reflection-test" + osGetExecutableSuffix());
+    spawner.pushArgument(filePath);
+
+    for( auto arg : input.testOptions->args )
+    {
+        spawner.pushArgument(arg);
+    }
+
+    if (spawnAndWait(outputStem, spawner) != kOSError_None)
+    {
+        return kTestResult_Fail;
+    }
+
+    String actualOutput = getOutput(spawner);
+
+    String expectedOutputPath = outputStem + ".expected";
+    String expectedOutput;
+    try
+    {
+        expectedOutput = Slang::File::ReadAllText(expectedOutputPath);
+    }
+    catch (Slang::IOException)
+    {
+    }
+
+    // If no expected output file was found, then we
+    // expect everything to be empty
+    if (expectedOutput.Length() == 0)
+    {
+        expectedOutput = "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n";
+    }
+
+    TestResult result = kTestResult_Pass;
+
+    // Otherwise we compare to the expected output
+    if (actualOutput != expectedOutput)
+    {
+        result = kTestResult_Fail;
+    }
+
+    // If the test failed, then we write the actual output to a file
+    // so that we can easily diff it from the command line and
+    // diagnose the problem.
+    if (result == kTestResult_Fail)
+    {
+        String actualOutputPath = outputStem + ".actual";
+        Slang::File::WriteAllText(actualOutputPath, actualOutput);
+
+        maybeDumpOutput(expectedOutput, actualOutput);
+    }
+
+    return result;
+}
+
 TestResult runEvalTest(TestInput& input)
 {
     // We are going to load and evaluate the code
@@ -1235,6 +1296,7 @@ TestResult runTest(
         TestCallback    callback;
     } kTestCommands[] = {
         { "SIMPLE", &runSimpleTest },
+        { "REFLECTION", &runReflectionTest },
 #if SLANG_TEST_SUPPORT_HLSL
         { "COMPARE_HLSL", &runHLSLComparisonTest },
         { "COMPARE_HLSL_RENDER", &runHLSLRenderComparisonTest },

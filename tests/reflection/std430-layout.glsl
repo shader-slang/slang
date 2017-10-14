@@ -1,5 +1,5 @@
 #version 450
-//TEST(smoke):SIMPLE:-profile ps_4_0 -target glsl -target reflection-json
+//TEST(smoke):REFLECTION:-profile ps_4_0 -target glsl
 
 // Confirm fix for GitHub issue #55
 

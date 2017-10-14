@@ -815,50 +815,14 @@ namespace Slang
             translationUnit->result = translationUnitResult;
         }
 
-
-        // Allow for an "extra" target to verride things before we finish.
-        String extraResult;
-        switch (compileRequest->extraTarget)
-        {
-        case CodeGenTarget::ReflectionJSON:
-            {
-                String reflectionJSON = emitReflectionJSON(compileRequest->layout.Ptr());
-
-                // Clobber existing output so we don't have to deal with it
-                for( auto translationUnit : compileRequest->translationUnits )
-                {
-                    translationUnit->result = CompileResult();
-                }
-                for( auto entryPoint : compileRequest->entryPoints )
-                {
-                    entryPoint->result = CompileResult();
-                }
-
-                extraResult = reflectionJSON;
-            }
-            break;
-
-        default:
-            break;
-        }
-
         // If we are in command-line mode, we might be expected to actually
         // write output to one or more files here.
 
         if (compileRequest->isCommandLineCompile)
         {
-            switch (compileRequest->extraTarget)
+            for( auto entryPoint : compileRequest->entryPoints )
             {
-            case CodeGenTarget::ReflectionJSON:
-                fprintf(stdout, "%s", extraResult.begin());
-                break;
-
-            default:
-                for( auto entryPoint : compileRequest->entryPoints )
-                {
-                    writeEntryPointResult(entryPoint);
-                }
-                break;
+                writeEntryPointResult(entryPoint);
             }
         }
 

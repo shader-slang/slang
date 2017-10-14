@@ -310,10 +310,6 @@ struct OptionsParser
 
                 #undef CASE
 
-                    else if (name == "reflection-json")
-                    {
-                        target = SLANG_REFLECTION_JSON;
-                    }
                     else
                     {
                         fprintf(stderr, "unknown code generation target '%S'\n", name.ToWString().begin());
