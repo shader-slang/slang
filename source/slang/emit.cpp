@@ -1224,6 +1224,12 @@ struct EmitVisitor
         emitTypeImpl(arrayType->baseType, &arrayDeclarator);
     }
 
+    void visitGroupSharedType(GroupSharedType* type, TypeEmitArg const& arg)
+    {
+        Emit("groupshared ");
+        emitTypeImpl(type->valueType, arg.declarator);
+    }
+
     void EmitType(
         RefPtr<Type>        type,
         SourceLoc const&    typeLoc,
@@ -4492,6 +4498,9 @@ emitDeclImpl(decl, nullptr);
         if(!type)
             return;
 
+        if (type->Equals(getSession()->getVoidType()))
+            return;
+
         emitIRType(context, type, getIRName(inst));
         emit(" = ");
     }
@@ -6266,7 +6275,10 @@ String emitEntryPoint(
         auto lowered = lowerEntryPointToIR(entryPoint, programLayout, target);
 
         // debugging:
-//        dumpIR(lowered);
+        if (translationUnit->compileRequest->shouldDumpIR)
+        {
+            dumpIR(lowered);
+        }
 
         // TODO: depending on the target we are trying to generate code for,
         // we may need to apply certain transformations, and we may also

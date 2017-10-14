@@ -1,4 +1,4 @@
-//TEST:SIMPLE:-target slang-ir-assembly -profile cs_4_0 -entry main
+//TEST:SIMPLE:-use-ir -dump-ir -skip-codegen -target dxbc -profile cs_5_0 -entry main
 
 #define GROUP_THREAD_COUNT 64
 
@@ -9,8 +9,8 @@ groupshared float4 s[GROUP_THREAD_COUNT];
 
 [numthreads(GROUP_THREAD_COUNT, 1, 1)]
 void main(
-    uint dispatchThreadID   : SV_DispatchThreadIndex,
-    uint groupThreadID      : SV_GroupThreadIndex,
+    uint dispatchThreadID   : SV_DispatchThreadID,
+    uint groupThreadID      : SV_GroupThreadID,
     uint groupID            : SV_GroupIndex )
 {
     // the actual algorithm being done here is bogus

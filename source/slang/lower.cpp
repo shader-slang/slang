@@ -785,6 +785,12 @@ struct LoweringVisitor
         return loweredType;
     }
 
+    RefPtr<Type> visitGroupSharedType(GroupSharedType* type)
+    {
+        return getSession()->getGroupSharedType(
+            lowerType(type->valueType));
+    }
+
     RefPtr<Type> transformSyntaxField(Type* type)
     {
         return lowerType(type);

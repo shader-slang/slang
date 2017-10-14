@@ -559,6 +559,7 @@ namespace Slang
             }
             break;
 
+#if 0
         case CodeGenTarget::SlangIRAssembly:
             {
                 String code = emitSlangIRAssemblyForEntryPoint(entryPoint);
@@ -566,6 +567,7 @@ namespace Slang
                 result = CompileResult(code);
             }
             break;
+#endif
 
         case CodeGenTarget::None:
             // The user requested no output
@@ -818,6 +820,10 @@ namespace Slang
         // If we are in command-line mode, we might be expected to actually
         // write output to one or more files here.
 
+        // But don't write any output if we were told to skip it.
+        if (compileRequest->shouldSkipCodegen)
+            return;
+
         if (compileRequest->isCommandLineCompile)
         {
             for( auto entryPoint : compileRequest->entryPoints )
@@ -910,9 +916,11 @@ namespace Slang
             dumpIntermediateText(compileRequest, data, size, ".spv.asm");
             break;
 
+#if 0
         case CodeGenTarget::SlangIRAssembly:
             dumpIntermediateText(compileRequest, data, size, ".slang-ir.asm");
             break;
+#endif
 
         case CodeGenTarget::SPIRV:
             dumpIntermediateBinary(compileRequest, data, size, ".spv");

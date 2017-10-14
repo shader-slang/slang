@@ -76,38 +76,6 @@ struct IRDeclRef : IRValue
 
 //
 
-// TODO(tfoley): the IR-level representation of
-// pointers had an "address space" field that the
-// current AST level lacks. This capability was
-// used to represent `groupshared` allocation,
-// so we probably need to find an alternative.
-
-// Address spaces for IR pointers
-enum IRAddressSpace : UInt
-{
-    // A default address space for things like local variables
-    kIRAddressSpace_Default,
-
-    // Address space for HLSL `groupshared` allocations
-    kIRAddressSpace_GroupShared,
-};
-
-#if 0
-struct IRPtrType : IRType
-{
-    IRUse valueType;
-    IRUse addressSpace;
-
-    IRType* getValueType() { return (IRType*) valueType.usedValue; }
-
-    IRAddressSpace getAddressSpace()
-    {
-        return IRAddressSpace(
-            ((IRConstant*)addressSpace.usedValue)->u.intVal);
-    }
-};
-#endif
-
 struct IRCall : IRInst
 {
     IRUse func;
@@ -382,10 +350,6 @@ struct IRBuilder
 
     IRParam* emitParam(
         IRType* type);
-
-    IRVar* emitVar(
-        IRType*         type,
-        IRAddressSpace  addressSpace);
 
     IRVar* emitVar(
         IRType* type);

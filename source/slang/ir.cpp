@@ -805,8 +805,7 @@ namespace Slang
     }
 
     IRVar* IRBuilder::emitVar(
-        IRType*         type,
-        IRAddressSpace  addressSpace)
+        IRType*         type)
     {
         auto allocatedType = getSession()->getPtrType(type);
         auto inst = createInst<IRVar>(
@@ -815,13 +814,6 @@ namespace Slang
             allocatedType);
         addInst(inst);
         return inst;
-    }
-
-
-    IRVar* IRBuilder::emitVar(
-        IRType* type)
-    {
-        return emitVar(type, kIRAddressSpace_Default);
     }
 
     IRInst* IRBuilder::emitLoad(
@@ -1450,6 +1442,11 @@ namespace Slang
         else if(auto declRefType = type->As<DeclRefType>())
         {
             dumpDeclRef(context, declRefType->declRef);
+        }
+        else if(auto groupSharedType = type->As<GroupSharedType>())
+        {
+            dump(context, "@ThreadGroup ");
+            dumpType(context, groupSharedType->valueType);
         }
         else
         {

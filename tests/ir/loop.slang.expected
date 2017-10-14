@@ -1,9 +1,7 @@
 result code = 0
 standard error = {
-}
-standard output = {
 
-ir_global_var %1	: Ptr<vector<float,4>[64]>;
+ir_global_var %1	: Ptr<@ThreadGroup vector<float,4>[64]>;
 
 ir_global_var %2	: Ptr<StructuredBuffer<vector<float,4>>>;
 
@@ -78,4 +76,7 @@ block %19:
 	bufferStore(%43, %44, %46)
 	return_void()
 }
+
+}
+standard output = {
 }

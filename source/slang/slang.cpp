@@ -301,6 +301,11 @@ int CompileRequest::executeActionsInner()
         if (mSink.GetErrorCount() != 0)
             return 1;
     }
+    
+    // If command line specifies to skip codegen, we exit here.
+    // Note: this is a debugging option.
+//    if (shouldSkipCodegen)
+//        return 0;
 
     // Generate output code, in whatever format was requested
     generateOutput(this);

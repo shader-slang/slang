@@ -906,38 +906,24 @@ struct LoweringVisitor
 
 LoweredValInfo createVar(
     IRGenContext*   context,
-    LoweredTypeInfo type,
+    RefPtr<Type>    type,
     Decl*           decl = nullptr,
-    Layout*         layout = nullptr,
-    IRAddressSpace  addressSpace = kIRAddressSpace_Default)
+    Layout*         layout = nullptr)
 {
     auto builder = context->irBuilder;
-    switch( type.flavor )
+    auto irAlloc = builder->emitVar(type);
+
+    if (decl)
     {
-    case LoweredTypeInfo::Flavor::Simple:
-        {
-            auto irAlloc = builder->emitVar(getSimpleType(type), addressSpace);
-
-            if (decl)
-            {
-                builder->addHighLevelDeclDecoration(irAlloc, decl);
-            }
-
-            if (layout)
-            {
-                builder->addLayoutDecoration(irAlloc, layout);
-            }
-
-
-            return LoweredValInfo::ptr(irAlloc);
-        }
-        break;
-
-    default:
-        SLANG_UNIMPLEMENTED_X("var type");
-        return LoweredValInfo();
+        builder->addHighLevelDeclDecoration(irAlloc, decl);
     }
 
+    if (layout)
+    {
+        builder->addLayoutDecoration(irAlloc, layout);
+    }
+
+    return LoweredValInfo::ptr(irAlloc);
 }
 
 void addArgs(
@@ -1140,7 +1126,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             }
 
             auto paramDecl = paramDeclRef.getDecl();
-            auto paramType = lowerType(context, GetType(paramDeclRef));
+            RefPtr<Type> paramType = lowerSimpleType(context, GetType(paramDeclRef));
             auto argExpr = expr->Arguments[argIndex++];
 
             if (paramDecl->HasModifier<OutModifier>()
@@ -2084,13 +2070,19 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo lowerGlobalVarDecl(VarDeclBase* decl)
     {
-        auto varType = lowerSimpleType(context, decl->getType());
+        RefPtr<Type> varType = lowerSimpleType(context, decl->getType());
 
-        IRAddressSpace addressSpace = kIRAddressSpace_Default;
         if (decl->HasModifier<HLSLGroupSharedModifier>())
         {
-            addressSpace = kIRAddressSpace_GroupShared;
+            varType = context->getSession()->getGroupSharedType(varType);
         }
+        // TODO: There might be other cases of storage qualifiers
+        // that should translate into "rate-qualified" types
+        // for the variable's storage.
+        //
+        // TODO: Also worth asking whether we should have semantic
+        // checking be responsible for applying qualifiers applied
+        // to a variable over to its type, when it makes sense.
 
         auto builder = getBuilder();
         auto irGlobal = builder->createGlobalVar(varType);
@@ -2140,7 +2132,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // emit an SSA value in this common case.
         //
 
-        auto varType = lowerType(context, decl->getType());
+        RefPtr<Type> varType = lowerSimpleType(context, decl->getType());
 
         // TODO: If the variable is marked `static` then we need to
         // deal with it specially: we should move its allocation out
@@ -2169,13 +2161,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // For now we might do the expedient thing and handle this
         // via a notion of an "address space."
 
-        IRAddressSpace addressSpace = kIRAddressSpace_Default;
         if (decl->HasModifier<HLSLGroupSharedModifier>())
         {
-            addressSpace = kIRAddressSpace_GroupShared;
+            // TODO: This logic is duplicated with the global-variable
+            // case. We should seek to share it.
+            varType = context->getSession()->getGroupSharedType(varType);
         }
 
-        LoweredValInfo varVal = createVar(context, varType, decl, getLayout(), addressSpace);
+        LoweredValInfo varVal = createVar(context, varType, decl, getLayout());
 
         if( auto initExpr = decl->initExpr )
         {
