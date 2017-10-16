@@ -270,7 +270,7 @@ struct SharedIRGenContext
 {
     CompileRequest* compileRequest;
 
-    Dictionary<DeclRef<Decl>, LoweredValInfo> declValues;
+    Dictionary<Decl*, LoweredValInfo> declValues;
 
     // Arrays we keep around strictly for memory-management purposes:
 
@@ -294,9 +294,16 @@ struct IRGenContext
     }
 };
 
+// Ensure that a version of the given declaration has been emitted to the IR
 LoweredValInfo ensureDecl(
-    IRGenContext*           context,
-    DeclRef<Decl> const&    declRef);
+    IRGenContext*   context,
+    Decl*           decl);
+
+// Emit code as needed to construct a reference to the given declaration with
+// any needed specializations in place.
+LoweredValInfo emitDeclRef(
+    IRGenContext*   context,
+    DeclRef<Decl>   declRef);
 
 
 IRValue* getSimpleVal(IRGenContext* context, LoweredValInfo lowered);
@@ -564,7 +571,7 @@ LoweredValInfo emitCallToDeclRef(
     }
 
     // Fallback case is to emit an actual call.
-    LoweredValInfo funcVal = ensureDecl(context, funcDeclRef);
+    LoweredValInfo funcVal = emitDeclRef(context, funcDeclRef);
     return emitCallToVal(context, type, funcVal, argCount, args);
 }
 
@@ -750,6 +757,7 @@ RefPtr<IRFuncType> getFuncType(
     IRType*                 resultType)
 {
     RefPtr<FuncType> funcType = new FuncType();
+    funcType->setSession(context->getSession());
     funcType->resultType = resultType;
     for (UInt pp = 0; pp < paramCount; ++pp)
     {
@@ -810,43 +818,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     LoweredTypeInfo visitDeclRefType(DeclRefType* type)
     {
-#if 1
         // TODO: is there actually anything to be done at this point?
         return LoweredTypeInfo(type);
-#else
-        // We need to detect builtin/intrinsic types here, since they should map to custom modifiers
-        // We need to catch builtin/intrinsic types here
-        if( auto intrinsicTypeMod = type->declRef.getDecl()->FindModifier<IntrinsicTypeModifier>() )
-        {
-            auto builder = getBuilder();
-            auto intType = getIntType(context);
-            //
-            List<IRValue*> irArgs;
-            for( auto val : intrinsicTypeMod->irOperands )
-            {
-                irArgs.Add(builder->getIntValue(intType, val));
-            }
-
-            addGenericArgs(&irArgs, type->declRef);
-
-            auto irType = getBuilder()->getIntrinsicType(IROp(intrinsicTypeMod->irOp), irArgs.Count(), irArgs.Buffer());
-            return LoweredTypeInfo(irType);
-        }
-
-        // Catch-all for user-defined type references
-        LoweredValInfo loweredDeclRef = ensureDecl(context, type->declRef);
-
-        // TODO: make sure that the value is actually a type...
-
-        switch (loweredDeclRef.flavor)
-        {
-        case LoweredValInfo::Flavor::Simple:
-            return LoweredTypeInfo((IRType*)loweredDeclRef.val);
-
-        default:
-            SLANG_UNIMPLEMENTED_X("type lowering");
-        }
-#endif
     }
 
     LoweredTypeInfo visitBasicExpressionType(BasicExpressionType* type)
@@ -956,7 +929,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitVarExpr(VarExpr* expr)
     {
-        LoweredValInfo info = ensureDecl(context, expr->declRef);
+        LoweredValInfo info = emitDeclRef(context, expr->declRef);
         return info;
     }
 
@@ -1431,7 +1404,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitStaticMemberExpr(StaticMemberExpr* expr)
     {
-        return ensureDecl(context, expr->declRef);
+        return emitDeclRef(context, expr->declRef);
     }
 
     LoweredValInfo visitSelectExpr(SelectExpr* expr)
@@ -2028,7 +2001,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             if (accessor->HasModifier<IntrinsicOpModifier>())
                 continue;
 
-            ensureDecl(context, makeDeclRef(accessor.Ptr()));
+            ensureDecl(context, accessor);
         }
 
         // The subscript declaration itself won't correspond
@@ -2561,8 +2534,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         irFunc->mangledName = mangledName;
     }
 
-
-    LoweredValInfo visitFunctionDeclBase(FunctionDeclBase* decl)
+    LoweredValInfo lowerFuncDecl(FunctionDeclBase* decl)
     {
         // Collect the parameter lists we will use for our new function.
         ParameterLists parameterLists;
@@ -2610,35 +2582,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // We first need to walk the generic parameters (if any)
         // because these will influence the declared type of
         // the function.
-        UInt genericParamCounter = 0;
-        for( auto genericParamDecl : parameterLists.genericParams )
+
+        for(auto pp = decl->ParentDecl; pp; pp = pp->ParentDecl)
         {
-            irFunc->genericParams.Add(genericParamDecl);
-
-#if 0
-            UInt genericParamIndex = genericParamCounter++;
-            if( auto genericTypeParamDecl = dynamic_cast<GenericTypeParamDecl*>(genericParamDecl) )
+            if(auto genericAncestor = dynamic_cast<GenericDecl*>(pp))
             {
-                // In the logical type for the function, a generic
-                // type parameter will be represented as a parameter of type `Type`
-
-                IRType* irTypeType = context->irBuilder->getTypeType();
-                paramTypes.Add(irTypeType);
-
-                // Anywhere else in the parameter type list where this type parameter
-                // is referenced, we'll need to substitute in a reference
-                // to the appropriate generic parameter position.
-
-                IRType* irParameterType = context->irBuilder->getGenericParameterType(genericParamIndex);
-                LoweredValInfo LoweredValInfo = LoweredValInfo::type(irParameterType);
-                subContext->shared->declValues[makeDeclRef(genericTypeParamDecl)] = LoweredValInfo;
+                irFunc->genericDecl = genericAncestor;
+                break;
             }
-            else
-            {
-                // TODO: handle the other cases here.
-                SLANG_UNEXPECTED("generic parameter kind");
-            }
-#endif
         }
 
         for( auto paramInfo : parameterLists.params )
@@ -2809,6 +2760,18 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         getBuilder()->addHighLevelDeclDecoration(irFunc, decl);
 
+        // If this declaration was marked as being an intrinsic for a particular
+        // target, then we should reflect that here.
+        for( auto targetMod : decl->GetModifiersOfType<SpecializedForTargetModifier>() )
+        {
+            // `targetMod` indicates that this particular declaration represents
+            // a specialized definition of the particular function for the given
+            // target, and we need to reflect that at the IR level.
+
+            auto decoration = getBuilder()->addDecoration<IRTargetDecoration>(irFunc);
+            decoration->targetName = targetMod->targetToken.Content;
+        }
+
         // For convenience, ensure that any additional global
         // values that were emitted while outputting the function
         // body appear before the function itself in the list
@@ -2816,6 +2779,43 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         irFunc->moveToEnd();
 
         return LoweredValInfo::simple(irFunc);
+    }
+
+
+    LoweredValInfo visitFunctionDeclBase(FunctionDeclBase* decl)
+    {
+        // A function declaration may have multiple, target-specific
+        // overloads, and we need to emit an IR version of each of these.
+
+        // The front end will form a linked list of declaratiosn with
+        // the same signature, whenever there is any kind of redeclaration.
+        // We will look to see if that linked list has been formed.
+        auto primaryDecl = decl->primaryDecl;
+
+        if (!primaryDecl)
+        {
+            // If there is no linked list then we are in the ordinary
+            // case with a single declaration, and no special handling
+            // is needed.
+            return lowerFuncDecl(decl);
+        }
+
+        // Otherwise, we need to walk the linked list of declarations
+        // and make sure to emit IR code for any targets that need it.
+
+        // TODO: Need to be careful about how this is approached,
+        // to avoid emitting a bunch of extra definitions in the IR.
+
+        auto primaryFuncDecl = dynamic_cast<FunctionDeclBase*>(primaryDecl);
+        assert(primaryFuncDecl);
+        LoweredValInfo result = lowerFuncDecl(primaryFuncDecl);
+        for (auto dd = primaryDecl->nextDecl; dd; dd = dd->nextDecl)
+        {
+            auto funcDecl = dynamic_cast<FunctionDeclBase*>(dd);
+            assert(funcDecl);
+            lowerFuncDecl(funcDecl);
+        }
+        return result;
     }
 };
 
@@ -2828,19 +2828,16 @@ LoweredValInfo lowerDecl(
     return visitor.dispatch(decl);
 }
 
+// Ensure that a version of the given declaration has been emitted to the IR
 LoweredValInfo ensureDecl(
-    IRGenContext*           context,
-    DeclRef<Decl> const&    declRef)
+    IRGenContext*   context,
+    Decl*           decl)
 {
     auto shared = context->shared;
 
     LoweredValInfo result;
-    if(shared->declValues.TryGetValue(declRef, result))
+    if(shared->declValues.TryGetValue(decl, result))
         return result;
-
-    // TODO: this is where we need to apply any specializations
-    // from the declaration reference, so that they can be
-    // applied correctly to the declaration itself...
 
     IRBuilder subIRBuilder;
     subIRBuilder.shared = context->irBuilder->shared;
@@ -2849,11 +2846,40 @@ LoweredValInfo ensureDecl(
 
     subContext.irBuilder = &subIRBuilder;
 
-    result = lowerDecl(&subContext, declRef.getDecl());
+    result = lowerDecl(&subContext, decl);
 
-    shared->declValues[declRef] = result;
+    shared->declValues[decl] = result;
 
     return result;
+}
+
+LoweredValInfo emitDeclRef(
+    IRGenContext*   context,
+    DeclRef<Decl>   declRef)
+{
+    // First we need to construct an IR value representing the
+    // unspecialized declaration.
+    LoweredValInfo loweredDecl = ensureDecl(context, declRef.getDecl());
+
+    // If this declaration reference doesn't involve any specializations,
+    // then we are done at this point.
+    if(!declRef.substitutions)
+        return loweredDecl;
+
+    auto val = getSimpleVal(context, loweredDecl);
+
+    RefPtr<Type> type;
+    if(auto declType = val->getType())
+    {
+        type = declType->Substitute(declRef.substitutions).As<Type>();
+    }
+
+    // Otherwise, we need to construct a specialization of the
+    // given declaration.
+    return LoweredValInfo::simple(context->irBuilder->emitSpecializeInst(
+        type,
+        val,
+        declRef));
 }
 
 static void lowerEntryPointToIR(

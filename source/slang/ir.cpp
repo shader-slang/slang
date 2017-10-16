@@ -531,8 +531,39 @@ namespace Slang
             this,
             kIROp_decl_ref,
             nullptr);
-        irValue->declRef = declRef;
+        irValue->declRef = DeclRef<Decl>(declRef.decl, declRef.substitutions);
         return irValue;
+    }
+
+    IRValue* IRBuilder::emitSpecializeInst(
+        Type*       type,
+        IRValue*    genericVal,
+        IRValue*    specDeclRef)
+    {
+        auto inst = createInst<IRSpecialize>(
+            this,
+            kIROp_specialize,
+            type,
+            genericVal,
+            specDeclRef);
+        addInst(inst);
+        return inst;
+    }
+
+    IRValue* IRBuilder::emitSpecializeInst(
+        Type*           type,
+        IRValue*        genericVal,
+        DeclRef<Decl>   specDeclRef)
+    {
+        auto specDeclRefVal = getDeclRefVal(specDeclRef);
+        auto inst = createInst<IRSpecialize>(
+            this,
+            kIROp_specialize,
+            type,
+            genericVal,
+            specDeclRefVal);
+        addInst(inst);
+        return inst;
     }
 
     IRInst* IRBuilder::emitCallInst(
@@ -1352,12 +1383,23 @@ namespace Slang
 
         auto parentDeclRef = declRef.GetParent();
         auto genericParentDeclRef = parentDeclRef.As<GenericDecl>();
-        if(genericParentDeclRef)
+        if (genericParentDeclRef)
         {
-            parentDeclRef = genericParentDeclRef.GetParent();
+            if (genericParentDeclRef.getDecl()->inner.Ptr() == decl)
+            {
+                parentDeclRef = genericParentDeclRef.GetParent();
+            }
+            else
+            {
+                genericParentDeclRef = DeclRef<GenericDecl>();
+            }
         }
 
         if(parentDeclRef.As<ModuleDecl>())
+        {
+            parentDeclRef = DeclRef<ContainerDecl>();
+        }
+        else if(parentDeclRef.As<GenericDecl>())
         {
             parentDeclRef = DeclRef<ContainerDecl>();
         }
@@ -1709,15 +1751,97 @@ namespace Slang
         dump(context, "\n");
     }
 
+    void dumpGenericSignature(
+        IRDumpContext*  context,
+        GenericDecl*    genericDecl)
+    {
+        for( auto pp = genericDecl->ParentDecl; pp; pp = pp->ParentDecl )
+        {
+            if( auto genericAncestor = dynamic_cast<GenericDecl*>(pp) )
+            {
+                dumpGenericSignature(context, genericAncestor);
+                break;
+            }
+        }
+
+        dump(context, " <");
+        bool first = true;
+        for (auto mm : genericDecl->Members)
+        {
+            if (!first) dump(context, ", ");
+
+            if( auto typeParamDecl = mm.As<GenericTypeParamDecl>() )
+            {
+                dumpDeclRef(context, makeDeclRef(typeParamDecl.Ptr()));
+                first = false;
+            }
+            else if( auto valueParamDecl = mm.As<GenericTypeParamDecl>() )
+            {
+                dumpDeclRef(context, makeDeclRef(valueParamDecl.Ptr()));
+                first = false;
+            }
+        }
+        first = true;
+        for (auto mm : genericDecl->Members)
+        {
+            if (!first) dump(context, ", ");
+            else dump(context, " where ");
+
+            if( auto constraintDecl = mm.As<GenericTypeConstraintDecl>() )
+            {
+                dumpType(context, constraintDecl->sub);
+                dump(context, " : ");
+                dumpType(context, constraintDecl->sup);
+                first = false;
+            }
+        }
+        dump(context, ">");
+    }
+
     void dumpIRFunc(
         IRDumpContext*  context,
         IRFunc*         func)
     {
+
+        for( auto dd = func->firstDecoration; dd; dd = dd->next )
+        {
+            switch( dd->op )
+            {
+            case kIRDecorationOp_Target:
+                {
+                    auto decoration = (IRTargetDecoration*) dd;
+
+                    dump(context, "\n");
+                    dumpIndent(context);
+                    dump(context, "[target(");
+                    dump(context, decoration->targetName.Buffer());
+                    dump(context, ")]");
+                }
+                break;
+
+            }
+        }
+
         dump(context, "\n");
         dumpIndent(context);
         dump(context, "ir_func ");
         dumpID(context, func);
+
+        if (func->genericDecl)
+        {
+            dump(context, " ");
+            dumpGenericSignature(context, func->genericDecl);
+        }
+
         dumpInstTypeClause(context, func->getType());
+
+        if (!func->getFirstBlock())
+        {
+            // Just a declaration.
+            dump(context, ";\n");
+            return;
+        }
+
         dump(context, "\n");
 
         dumpIndent(context);
@@ -1941,11 +2065,30 @@ namespace Slang
         parentBlock = nullptr;
     }
 
+    void IRInst::removeArguments()
+    {
+        UInt argCount = this->argCount;
+        for( UInt aa = 0; aa < argCount; ++aa )
+        {
+            IRUse& use = getArgs()[aa];
+
+            if(!use.usedValue)
+                continue;
+
+            // Need to unlink this use from the appropriate linked list.
+            use.usedValue = nullptr;
+            *use.prevLink = use.nextUse;
+            use.prevLink = nullptr;
+            use.nextUse = nullptr;
+        }
+    }
+
     // Remove this instruction from its parent block,
     // and then destroy it (it had better have no uses!)
     void IRInst::removeAndDeallocate()
     {
         removeFromParent();
+        removeArguments();
         deallocate();
     }
 
@@ -2211,6 +2354,7 @@ namespace Slang
         // because it is no longer accurate.
 
         auto voidFuncType = new FuncType();
+        voidFuncType->setSession(session);
         voidFuncType->resultType = session->getVoidType();
         func->type = voidFuncType;
 
@@ -2233,7 +2377,7 @@ namespace Slang
         RefPtr<IRSpecSymbol>    nextWithSameName;
     };
 
-    struct IRSpecContext
+    struct IRSharedSpecContext
     {
         // The specialized module we are building
         IRModule*   module;
@@ -2241,33 +2385,63 @@ namespace Slang
         // The original, unspecialized module we are copying
         IRModule*   originalModule;
 
-        // The IR builder to use for creating nodes
-        IRBuilder*  builder;
-
         // A map from mangled symbol names to zero or
         // more global IR values that have that name,
         // in the *original* module.
-        Dictionary<String, RefPtr<IRSpecSymbol>> symbols;
-
-        // A map from the mangled name of a global variable
-        // to the layout to use for it.
-        Dictionary<String, VarLayout*> globalVarLayouts;
+        typedef Dictionary<String, RefPtr<IRSpecSymbol>> SymbolDictionary;
+        SymbolDictionary symbols;
 
         // A map from values in the original IR module
         // to their equivalent in the cloned module.
-        Dictionary<IRValue*, IRValue*> clonedValues;
+        typedef Dictionary<IRValue*, IRValue*> ClonedValueDictionary;
+        ClonedValueDictionary clonedValues;
+
+        SharedIRBuilder sharedBuilderStorage;
+        IRBuilder builderStorage;
+    };
+
+    struct IRSpecContextBase
+    {
+        IRSharedSpecContext* shared;
+
+        IRSharedSpecContext* getShared() { return shared; }
+
+        IRModule* getModule() { return getShared()->module; }
+
+        IRModule* getOriginalModule() { return getShared()->originalModule; }
+
+        IRSharedSpecContext::SymbolDictionary& getSymbols() { return getShared()->symbols; }
+
+        IRSharedSpecContext::ClonedValueDictionary& getClonedValues() { return getShared()->clonedValues; }
+
+        // The IR builder to use for creating nodes
+        IRBuilder*  builder;
+
+        // A callback to be used when a value that is not registerd in `clonedValues`
+        // is needed during cloning. This gives the subtype a chance to intercept
+        // the operation and clone (or not) as needed.
+        virtual IRValue* maybeCloneValue(IRValue* originalVal)
+        {
+            return originalVal;
+        }
+
+        // A callback used to clone (or not) types.
+        virtual RefPtr<Type> maybeCloneType(Type* originalType)
+        {
+            return originalType;
+        }
     };
 
     void registerClonedValue(
-        IRSpecContext*  context,
+        IRSpecContextBase*  context,
         IRValue*    clonedValue,
         IRValue*    originalValue)
     {
-        context->clonedValues.Add(originalValue, clonedValue);
+        context->getClonedValues().Add(originalValue, clonedValue);
     }
 
     void cloneDecorations(
-        IRSpecContext*  context,
+        IRSpecContextBase*  context,
         IRValue*        clonedValue,
         IRValue*        originalValue)
     {
@@ -2292,31 +2466,39 @@ namespace Slang
         // TODO: implement this
     }
 
+    struct IRSpecContext : IRSpecContextBase
+    {
+        // The code-generation target in use
+        CodeGenTarget target;
+
+        // A map from the mangled name of a global variable
+        // to the layout to use for it.
+        Dictionary<String, VarLayout*> globalVarLayouts;
+
+        // Override the "maybe clone" logic so that we always clone
+        virtual IRValue* maybeCloneValue(IRValue* originalVal) override;
+    };
+
+
     IRGlobalVar* cloneGlobalVar(IRSpecContext* context, IRGlobalVar* originalVar);
     IRFunc* cloneFunc(IRSpecContext* context, IRFunc* originalFunc);
 
-    IRValue* cloneValue(
-        IRSpecContext*  context,
-        IRValue*        originalValue)
+    IRValue* IRSpecContext::maybeCloneValue(IRValue* originalValue)
     {
-        IRValue* clonedValue = nullptr;
-        if (context->clonedValues.TryGetValue(originalValue, clonedValue))
-            return clonedValue;
-
         switch (originalValue->op)
         {
         case kIROp_global_var:
-            return cloneGlobalVar(context, (IRGlobalVar*)originalValue);
+            return cloneGlobalVar(this, (IRGlobalVar*)originalValue);
             break;
 
         case kIROp_Func:
-            return cloneFunc(context, (IRFunc*)originalValue);
+            return cloneFunc(this, (IRFunc*)originalValue);
             break;
 
         case kIROp_boolConst:
             {
                 IRConstant* c = (IRConstant*)originalValue;
-                return context->builder->getBoolValue(c->u.intVal != 0);
+                return builder->getBoolValue(c->u.intVal != 0);
             }
             break;
 
@@ -2324,21 +2506,21 @@ namespace Slang
         case kIROp_IntLit:
             {
                 IRConstant* c = (IRConstant*)originalValue;
-                return context->builder->getIntValue(c->type, c->u.intVal);
+                return builder->getIntValue(c->type, c->u.intVal);
             }
             break;
 
         case kIROp_FloatLit:
             {
                 IRConstant* c = (IRConstant*)originalValue;
-                return context->builder->getFloatValue(c->type, c->u.floatVal);
+                return builder->getFloatValue(c->type, c->u.floatVal);
             }
             break;
 
         case kIROp_decl_ref:
             {
                 IRDeclRef* od = (IRDeclRef*)originalValue;
-                return context->builder->getDeclRefVal(od->declRef);
+                return builder->getDeclRefVal(od->declRef);
             }
             break;
 
@@ -2348,8 +2530,19 @@ namespace Slang
         }
     }
 
+    IRValue* cloneValue(
+        IRSpecContextBase*  context,
+        IRValue*        originalValue)
+    {
+        IRValue* clonedValue = nullptr;
+        if (context->getClonedValues().TryGetValue(originalValue, clonedValue))
+            return clonedValue;
+
+        return context->maybeCloneValue(originalValue);
+    }
+
     void cloneInst(
-        IRSpecContext*  context,
+        IRSpecContextBase*  context,
         IRBuilder*      builder,
         IRInst*         originalInst)
     {
@@ -2366,7 +2559,8 @@ namespace Slang
                 // it, and then add it to the sequence.
                 UInt argCount = originalInst->getArgCount();
                 IRInst* clonedInst = createInstWithTrailingArgs<IRInst>(
-                    builder, originalInst->op, originalInst->type,
+                    builder, originalInst->op,
+                    context->maybeCloneType(originalInst->type),
                     0, nullptr,
                     argCount, nullptr);
                 builder->addInst(clonedInst);
@@ -2410,14 +2604,14 @@ namespace Slang
     }
 
     void cloneFunctionCommon(
-        IRSpecContext*  context,
+        IRSpecContextBase*  context,
         IRFunc*         clonedFunc,
         IRFunc*         originalFunc)
     {
         // First clone all the simple properties.
         clonedFunc->mangledName = originalFunc->mangledName;
-        clonedFunc->genericParams = originalFunc->genericParams;
-        clonedFunc->type = originalFunc->type;
+        clonedFunc->genericDecl = originalFunc->genericDecl;
+        clonedFunc->type = context->maybeCloneType(originalFunc->type);
 
         cloneDecorations(context, clonedFunc, originalFunc);
 
@@ -2445,7 +2639,9 @@ namespace Slang
                 originalParam;
                 originalParam = originalParam->getNextParam())
             {
-                IRParam* clonedParam = builder->emitParam(originalParam->getType());
+                IRParam* clonedParam = builder->emitParam(
+                    context->maybeCloneType(
+                        originalParam->getType()));
                 registerClonedValue(context, clonedParam, originalParam);
             }
         }
@@ -2475,7 +2671,7 @@ namespace Slang
         //
         // TODO: This isn't really a good requirement to place on the IR...
         clonedFunc->removeFromParent();
-        clonedFunc->insertAtEnd(context->module);
+        clonedFunc->insertAtEnd(context->getModule());
     }
 
     IRFunc* specializeIRForEntryPoint(
@@ -2486,7 +2682,7 @@ namespace Slang
         // Look up the IR symbol by name
         String mangledName = getMangledName(entryPointRequest->decl);
         RefPtr<IRSpecSymbol> sym;
-        if (!context->symbols.TryGetValue(mangledName, sym))
+        if (!context->getSymbols().TryGetValue(mangledName, sym))
         {
             SLANG_UNEXPECTED("no matching IR symbol");
             return nullptr;
@@ -2534,22 +2730,223 @@ namespace Slang
         return clonedFunc;
     }
 
-    // The case for functions that are not the entry point is
-    // strictly simpler, so that is nice.
-    IRFunc* cloneFunc(IRSpecContext* context, IRFunc* originalFunc)
+    IRFunc* cloneSimpleFunc(IRSpecContextBase* context, IRFunc* originalFunc)
     {
-        // TODO: We really need to scan through all the various
-        // global function symbols that have the same mangled name,
-        // and pick the correct one to lower for the target.
-
         auto clonedFunc = context->builder->createFunc();
         registerClonedValue(context, clonedFunc, originalFunc);
         cloneFunctionCommon(context, clonedFunc, originalFunc);
         return clonedFunc;
     }
 
+    // Get a string form of the target so that we can
+    // use it to match against target-specialization modifiers
+    //
+    // TODO: We shouldn't be using strings for this.
+    String getTargetName(IRSpecContext* context)
+    {
+        switch( context->target )
+        {
+        case CodeGenTarget::HLSL:
+            return "hlsl";
+
+        case CodeGenTarget::GLSL:
+            return "glsl";
+
+        default:
+            SLANG_UNEXPECTED("unhandled case");
+            return "unknown";
+        }
+    }
+
+    // How specialized is a given declaration for the chosen target?
+    enum class TargetSpecializationLevel
+    {
+        specializedForOtherTarget = 0,
+        notSpecialized,
+        specializedForTarget,
+    };
+
+    TargetSpecializationLevel getTargetSpecialiationLevel(
+        IRGlobalValue*  val,
+        String const&   targetName)
+    {
+        TargetSpecializationLevel result = TargetSpecializationLevel::notSpecialized;
+        for( auto dd = val->firstDecoration; dd; dd = dd->next )
+        {
+            if(dd->op != kIRDecorationOp_Target)
+                continue;
+
+            auto decoration = (IRTargetDecoration*) dd;
+            if(decoration->targetName == targetName)
+                return TargetSpecializationLevel::specializedForTarget;
+
+            result = TargetSpecializationLevel::specializedForOtherTarget;
+        }
+
+        return result;
+    }
+
+    // Is `newVal` marked as being a better match for our
+    // chosen code-generation target?
+    //
+    // TODO: there is a missing step here where we need
+    // to check if things are even available in the first place...
+    bool isBetterForTarget(
+        IRSpecContext*  context,
+        IRGlobalValue*  newVal,
+        IRGlobalValue*  oldVal)
+    {
+        String targetName = getTargetName(context);
+
+        // For right now every declaration might have zero or more
+        // modifiers, representing the targets for which it is specialized.
+        // Each modifier has a single string "tag" to represent a target.
+        // We thus decide that a declaration is "more specialized" by:
+        //
+        // - Does it have a modifier with a tag with the string for the current target?
+        //   If yes, it is the most specialized it can be.
+        //
+        // - Does it have a no tags? Then it is "unspecialized" and that is okay.
+        //
+        // - Does it have a modifier with a tag for a *different* target?
+        //   If yes, then it shouldn't even be usable on this target.
+        //
+        // Longer term a better approach is to think of this in terms
+        // of a "disjunction of conjunctions" that is:
+        //
+        //     (A and B and C) or (A and D) or (E) or (F and G) ...
+        //
+        // A code generation target would then consist of a
+        // conjunction of invidual tags:
+        //
+        //    (HLSL and SM_4_0 and Vertex and ...)
+        //
+        // A declaration is *applicable* on a target if one of
+        // its conjunctions of tags is a subset of the target's.
+        //
+        // One declaration is *better* than another on a target
+        // if it is applicable and its tags are a superset
+        // of the other's.
+
+        auto newLevel = getTargetSpecialiationLevel(newVal, targetName);
+        auto oldLevel = getTargetSpecialiationLevel(oldVal, targetName);
+        return UInt(newLevel) > UInt(oldLevel);
+    }
+
+    IRFunc* cloneFunc(IRSpecContext* context, IRFunc* originalFunc)
+    {
+        // We are being asked to clone a particular function, but in
+        // the IR that comes out of the front-end there could still
+        // be multiple, target-specific, declarations of any given
+        // function, all of which share the same mangled name.
+        auto mangledName = originalFunc->mangledName;
+
+        if(mangledName.Length() == 0)
+        {
+            return cloneSimpleFunc(context, originalFunc);
+        }
+
+        //
+        // We will scan through all of the available function declarations
+        // with the same mangled name as `originalFunc` and try
+        // to pick the "best" one for our target.
+
+        RefPtr<IRSpecSymbol> sym;
+        if( !context->getSymbols().TryGetValue(originalFunc->mangledName, sym) )
+        {
+            // This shouldn't happen!
+            SLANG_UNEXPECTED("no matching function registered");
+            return cloneSimpleFunc(context, originalFunc);
+        }
+
+        // We will try to track the "best" definition we can find.
+        IRFunc* bestFunc = (IRFunc*) sym->irGlobalValue;
+
+        for( auto ss = sym->nextWithSameName; ss; ss = ss->nextWithSameName )
+        {
+            IRFunc* newFunc = (IRFunc*) ss->irGlobalValue;
+            if(isBetterForTarget(context, newFunc, bestFunc))
+                bestFunc = newFunc;
+        }
+
+        // All right, we are now in a position to clone the "best"
+        // definition that was found.
+        auto clonedFunc = context->builder->createFunc();
+
+        // The resulting function will be used as the cloned version
+        // of every declaration/definition in the original IR.
+        for( auto ss = sym; ss; ss = ss->nextWithSameName )
+        {
+            registerClonedValue(context, clonedFunc, ss->irGlobalValue);
+        }
+
+        // Clone the "best" definition into our context
+        cloneFunctionCommon(context, clonedFunc, bestFunc);
+
+        return clonedFunc;
+    }
+
     StructTypeLayout* getGlobalStructLayout(
         ProgramLayout*  programLayout);
+
+    void insertGlobalValueSymbol(
+        IRSharedSpecContext*    sharedContext,
+        IRGlobalValue*          gv)
+    {
+        String mangledName = gv->mangledName;
+
+        // Don't try to register a symbol for global values
+        // with no mangled name, since these represent symbols
+        // that shouldn't get "linkage"
+        if (mangledName == "")
+            return;
+
+        RefPtr<IRSpecSymbol> sym = new IRSpecSymbol();
+        sym->irGlobalValue = gv;
+
+        RefPtr<IRSpecSymbol> prev;
+        if (sharedContext->symbols.TryGetValue(mangledName, prev))
+        {
+            sym->nextWithSameName = prev->nextWithSameName;
+            prev->nextWithSameName = sym;
+        }
+        else
+        {
+            sharedContext->symbols.Add(mangledName, sym);
+        }
+    }
+
+    void initializeSharedSpecContext(
+        IRSharedSpecContext*    sharedContext,
+        Session*                session,
+        IRModule*               module,
+        IRModule*               originalModule)
+    {
+
+        SharedIRBuilder* sharedBuilder = &sharedContext->sharedBuilderStorage;
+        sharedBuilder->module = nullptr;
+        sharedBuilder->session = session;
+
+        IRBuilder* builder = &sharedContext->builderStorage;
+        builder->shared = sharedBuilder;
+
+        if( !module )
+        {
+            module = builder->createModule();
+            sharedBuilder->module = module;
+        }
+
+        sharedContext->module = module;
+        sharedContext->originalModule = originalModule;
+
+        // First, we will populate a map with all of the IR values
+        // that use the same mangled name, to make lookup easier
+        // in other steps.
+        for (auto gv = originalModule->firstGlobalValue; gv; gv = gv->nextGlobalValue)
+        {
+            insertGlobalValueSymbol(sharedContext, gv);
+        }
+    }
 
     IRModule* specializeIRForEntryPoint(
         EntryPointRequest*  entryPointRequest,
@@ -2580,52 +2977,24 @@ namespace Slang
         //    we need to pick the "best" one for the chosen code generation target.
         //
 
-        SharedIRBuilder sharedBuilderStorage;
-        SharedIRBuilder* sharedBuilder = &sharedBuilderStorage;
-        sharedBuilder->module = nullptr;
-        sharedBuilder->session = compileRequest->mSession;
+        IRSharedSpecContext sharedContextStorage;
 
-        IRBuilder builderStorage;
-        IRBuilder* builder = &builderStorage;
-        builder->shared = sharedBuilder;
-
-        IRModule* module = builder->createModule();
-        sharedBuilder->module = module;
-
-        //
+        initializeSharedSpecContext(
+            &sharedContextStorage,
+            compileRequest->mSession,
+            nullptr,
+            originalIRModule);
 
         IRSpecContext contextStorage;
         IRSpecContext*  context = &contextStorage;
+        context->shared = &sharedContextStorage;
+        context->builder = &sharedContextStorage.builderStorage;
+        context->target = target;
 
-        context->builder = builder;
-        context->module = module;
-        context->originalModule = originalIRModule;
 
-        // First, we will populate a map with all of the IR values
-        // that use the same mangled name, to make lookup easier
-        // in other steps.
-        for (auto gv = originalIRModule->firstGlobalValue; gv; gv = gv->nextGlobalValue)
-        {
-            String mangledName = gv->mangledName;
-            if (mangledName == "")
-                continue;
-
-            RefPtr<IRSpecSymbol> sym = new IRSpecSymbol();
-            sym->irGlobalValue = gv;
-
-            RefPtr<IRSpecSymbol> prev;
-            if (context->symbols.TryGetValue(mangledName, prev))
-            {
-                sym->nextWithSameName = prev->nextWithSameName;
-                prev->nextWithSameName = sym;
-            }
-            else
-            {
-                context->symbols.Add(mangledName, sym);
-            }
-        }
-
-        // Next, we want to optimize lookup over
+        // Next, we want to optimize lookup for layout infromation
+        // associated with global declarations, so that we can 
+        // look things up based on the IR values (using mangled names)
         auto globalStructLayout = getGlobalStructLayout(programLayout);
         for (auto globalVarLayout : globalStructLayout->fields)
         {
@@ -2659,8 +3028,230 @@ namespace Slang
             break;
         }
 
-        return module;
+        return sharedContextStorage.module;
     }
 
+    //
+
+    struct IRSharedGenericSpecContext : IRSharedSpecContext
+    {
+        // Non-generic functions to be processed
+        List<IRFunc*> workList;
+    };
+
+    struct IRGenericSpecContext : IRSpecContextBase
+    {
+        IRSharedGenericSpecContext* getShared() { return (IRSharedGenericSpecContext*) shared; }
+
+        // The substutions to apply
+        RefPtr<Substitutions>   subst;
+
+        // Override the "maybe clone" logic so that we always clone
+        virtual IRValue* maybeCloneValue(IRValue* originalVal) override;
+
+        virtual RefPtr<Type> maybeCloneType(Type* originalType) override;
+    };
+
+    IRValue* IRGenericSpecContext::maybeCloneValue(IRValue* originalVal)
+    {
+        switch( originalVal->op )
+        {
+        case kIROp_decl_ref:
+            {
+                auto declRefVal = (IRDeclRef*) originalVal;
+                int diff = 0;
+                auto substDeclRef = declRefVal->declRef.SubstituteImpl(subst, &diff);
+                if(!diff)
+                    return originalVal;
+
+                return builder->getDeclRefVal(substDeclRef);
+            }
+            break;
+
+        default:
+            return originalVal;
+        }
+    }
+
+    RefPtr<Type> IRGenericSpecContext::maybeCloneType(Type* originalType)
+    {
+        return originalType->Substitute(subst).As<Type>();
+    }
+
+
+    IRFunc* getSpecializedFunc(
+        IRSharedGenericSpecContext* sharedContext,
+        IRFunc*                     genericFunc,
+        DeclRef<Decl>               specDeclRef)
+    {
+        // First, we want to see if an existing specialization
+        // has already been made. To do that we will need to
+        // compute the mangled name of the specialized function,
+        // so that we can look for existing declarations.
+
+        String specMangledName = getMangledName(specDeclRef);
+
+        // TODO: This is a terrible linear search, and we should
+        // avoid it by building a dictionary ahead of time,
+        // as is being done for the `IRSpecContext` used above.
+        // We can probalby use the same basic context, actually.
+        auto module = genericFunc->parentModule;
+        for(auto gv = module->getFirstGlobalValue(); gv; gv = gv->getNextValue())
+        {
+            if(gv->mangledName == specMangledName)
+                return (IRFunc*) gv;
+        }
+
+        // If we get to this point, then we need to construct a
+        // new `IRFunc` to represent the result of specialization.
+
+        // The substitutions we are applying might have been created
+        // using a different overload of a target-specific function,
+        // so we need to create a dummy substitution here, to make
+        // sure it used the correct generic.
+        RefPtr<Substitutions> newSubst = new Substitutions();
+        newSubst->genericDecl = genericFunc->genericDecl;
+        newSubst->args = specDeclRef.substitutions->args;
+
+        IRGenericSpecContext context;
+        context.shared = sharedContext;
+        context.builder = &sharedContext->builderStorage;
+        context.subst = newSubst;
+
+        // TODO: other initialization is needed here...
+
+        auto specFunc = cloneSimpleFunc(&context, genericFunc);
+
+        // Set up the clone to recognize that it is no longer generic
+        specFunc->mangledName = specMangledName;
+        specFunc->genericDecl = nullptr;
+
+        // Put the function into the global sequence right after
+        // the function it specializes.
+        //
+        // TODO: This shouldn't be needed, if we introduce a sorting
+        // step before we emit code.
+        specFunc->removeFromParent();
+        specFunc->insertAfter(genericFunc);
+
+        // At this point we've created a new non-generic function,
+        // which means we should add it to our work list for
+        // subsequent processing.
+        sharedContext->workList.Add(specFunc);
+
+        // We also need to make sure that we register this specialized
+        // function under its mangled name, so that later lookup
+        // steps will find it.
+        insertGlobalValueSymbol(sharedContext, specFunc);
+
+        return specFunc;
+    }
+
+    void specializeGenerics(
+        IRModule*   module)
+    {
+        IRSharedGenericSpecContext sharedContextStorage;
+        auto sharedContext = &sharedContextStorage;
+
+        initializeSharedSpecContext(
+            sharedContext,
+            module->session,
+            module,
+            module);
+
+        // Our goal here is to find `specialize` instructions that
+        // can be replaced with references to a suitably sepcialized
+        // funciton. As a simplification, we will only consider `specialize`
+        // calls that are inside of non-generic functions, since we assume
+        // that these will allow us to fully specialize the referenced
+        // function.
+        //
+        // We start by building up a work list of non-generic functions.
+        for( auto gv = module->getFirstGlobalValue();
+            gv;
+            gv = gv->getNextValue() )
+        {
+            // Is it a function? If not, skip.
+            if(gv->op != kIROp_Func)
+                continue;
+            auto func = (IRFunc*) gv;
+
+            // Is it generic? If so, skip.
+            if(func->genericDecl)
+                continue;
+
+            sharedContext->workList.Add(func);
+        }
+
+        // Now that we have our work list, we are going to
+        // process it until it goes empty. Along the way
+        // we may specialize a function and thus create
+        // a new non-generic function, and in that case
+        // we will add the new function to the work list.
+        auto& workList = sharedContext->workList;
+        while( auto count = workList.Count() )
+        {
+            // We will process the last entry in the
+            // work list, which amounts to treating
+            // it like a stack when we have recursive
+            // specialization to perform.
+            auto func = workList[count-1];
+            workList.RemoveAt(count-1);
+
+            // We are going to go ahead and walk through
+            // all the instructions in this function,
+            // and look for `specialize` operations.
+            for( auto bb = func->getFirstBlock(); bb; bb = bb->getNextBlock() )
+            {
+                // We need to be careful when iterating over the instructions,
+                // because we might end up removing the "current" instruction,
+                // so that accessing `ii->next` would crash.
+                IRInst* nextInst = nullptr;
+                for( auto ii = bb->getFirstInst(); ii; ii = nextInst )
+                {
+                    nextInst = ii->nextInst;
+
+                    // We only care about `specialize` instructions.
+                    if(ii->op != kIROp_specialize)
+                        continue;
+
+                    IRSpecialize* specInst = (IRSpecialize*) ii;
+
+                    // We need to check that the value being specialized is
+                    // a generic function.
+                    auto genericVal = specInst->genericVal.usedValue;
+                    if(genericVal->op != kIROp_Func)
+                        continue;
+                    auto genericFunc = (IRFunc*) genericVal;
+                    if(!genericFunc->genericDecl)
+                        continue;
+
+                    // Now we extract the specialized decl-ref that will
+                    // tell us how to specialize things.
+                    auto specDeclRefVal = (IRDeclRef*) specInst->specDeclRefVal.usedValue;
+                    auto specDeclRef = specDeclRefVal->declRef;
+
+                    // Okay, we have a candidate for specialization here.
+                    //
+                    // We will first find or construct a specialized version
+                    // of the callee funciton/
+                    auto specFunc = getSpecializedFunc(sharedContext, genericFunc, specDeclRef);
+                    //
+                    // Then we will replace the use sites for the `specialize`
+                    // instruction with uses of the specialized function.
+                    //
+                    specInst->replaceUsesWith(specFunc);
+
+                    specInst->removeAndDeallocate();
+                }
+            }
+        }
+
+        // Once the work list has gone dry, we should have the invariant
+        // that there are no `specialize` instructions inside of non-generic
+        // functions that in turn reference a generic function.
+    }
+
+    //
 
 }

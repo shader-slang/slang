@@ -12,6 +12,7 @@
 namespace Slang {
 
 class   Decl;
+class   GenericDecl;
 class   FuncType;
 class   Layout;
 class   Type;
@@ -98,6 +99,7 @@ enum IRDecorationOp : uint16_t
     kIRDecorationOp_HighLevelDecl,
     kIRDecorationOp_Layout,
     kIRDecorationOp_LoopControl,
+    kIRDecorationOp_Target,
 };
 
 // A "decoration" that gets applied to an instruction.
@@ -197,6 +199,11 @@ struct IRInst : IRValue
     // Remove this instruction from its parent block,
     // and then destroy it (it had better have no uses!)
     void removeAndDeallocate();
+
+    // Clear out the arguments of this instruction,
+    // so that we don't appear on the list of uses
+    // for those values.
+    void removeArguments();
 };
 
 typedef int64_t IRIntegerValue;
@@ -321,8 +328,10 @@ struct IRFunc : IRGlobalValue
     // The type of the IR-level function
     IRFuncType* getType() { return (IRFuncType*) type.Ptr(); }
 
-    // Any generic parameters this function has
-    List<RefPtr<Decl>> genericParams;
+    // If this function is generic, then we store a reference
+    // to the AST-level generic that defines its parameters
+    // and their constraints.
+    RefPtr<GenericDecl> genericDecl;
 
     // Convenience accessors for working with the 
     // function's type.

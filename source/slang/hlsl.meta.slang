@@ -326,9 +326,9 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic_
 __intrinsic_op bool CheckAccessFullyMapped(uint status);
 
 // Clamp (HLSL SM 1.0)
-__generic<T : __BuiltinArithmeticType> __intrinsic_op T clamp(T x, T min, T max);
-__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic_op vector<T,N> clamp(vector<T,N> x, vector<T,N> min, vector<T,N> max);
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic_op matrix<T,N,M> clamp(matrix<T,N,M> x, matrix<T,N,M> min, matrix<T,N,M> max);
+__generic<T : __BuiltinArithmeticType> T clamp(T x, T min, T max);
+__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> clamp(vector<T,N> x, vector<T,N> min, vector<T,N> max);
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> clamp(matrix<T,N,M> x, matrix<T,N,M> min, matrix<T,N,M> max);
 
 // Clip (discard) fragment conditionally
 __generic<T : __BuiltinFloatingPointType> __intrinsic_op void clip(T x);

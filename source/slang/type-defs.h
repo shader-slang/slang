@@ -461,6 +461,7 @@ RAW(
 
     virtual String ToString() override;
 protected:
+    virtual RefPtr<Val> SubstituteImpl(Substitutions* subst, int* ioDiff) override;
     virtual bool EqualsImpl(Type * type) override;
     virtual Type* CreateCanonicalType() override;
     virtual int GetHashCode() override;

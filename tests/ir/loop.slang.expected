@@ -7,7 +7,7 @@ ir_global_var %2	: Ptr<StructuredBuffer<vector<float,4>>>;
 
 ir_global_var %3	: Ptr<RWStructuredBuffer<vector<float,4>>>;
 
-ir_func @_S04mainp3	: (uint, uint, uint) -> void
+ir_func @_S04mainp3uuuV	: (uint, uint, uint) -> void
 {
 block %4(
 		param %5	: uint,
