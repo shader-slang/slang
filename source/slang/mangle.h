@@ -7,7 +7,7 @@
 
 namespace Slang
 {
-    struct Decl;
+    class Decl;
 
     String getMangledName(Decl* decl);
 }

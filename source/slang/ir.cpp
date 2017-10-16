@@ -3,6 +3,7 @@
 #include "ir-insts.h"
 
 #include "../core/basic.h"
+#include "mangle.h"
 
 namespace Slang
 {
@@ -244,38 +245,23 @@ namespace Slang
 
         for( UInt aa = 0; aa < fixedArgCount; ++aa )
         {
-            operand->init(inst, fixedArgs[aa]);
+            if (fixedArgs)
+            {
+                operand->init(inst, fixedArgs[aa]);
+            }
             operand++;
         }
 
         for( UInt aa = 0; aa < varArgCount; ++aa )
         {
-            operand->init(inst, varArgs[aa]);
+            if (varArgs)
+            {
+                operand->init(inst, varArgs[aa]);
+            }
             operand++;
         }
 
         return inst;
-    }
-
-    // Create an IR instruction/value and initialize it.
-    //
-    // For this overload, the type of the instruction is
-    // folded into the argument list (so `args[0]` needs
-    // to be the type of the instruction)
-    static IRValue* createInstImpl(
-        IRBuilder*      builder,
-        UInt            size,
-        IROp            op,
-        UInt            argCount,
-        IRValue* const* args)
-    {
-        return createInstImpl(
-            builder,
-            size,
-            op,
-            (IRType*) args[0],
-            argCount - 1,
-            args + 1);
     }
 
     template<typename T>
@@ -1997,11 +1983,9 @@ namespace Slang
     void legalizeEntryPointForGLSL(
         Session*                session,
         IRFunc*                 func,
-        IREntryPointDecoration* entryPointInfo)
+        EntryPointLayout*       entryPointLayout)
     {
         auto module = func->parentModule;
-
-        auto entryPointLayout = entryPointInfo->layout;
 
         // We require that the entry-point function has no uses,
         // because otherwise we'd invalidate the signature
@@ -2235,28 +2219,447 @@ namespace Slang
         // the way that things have been moved around.
     }
 
-    void legalizeEntryPointsForGLSL(
-        Session*    session,
-        IRModule*   module)
+    // Needed for lookup up entry-point layouts.
+    //
+    // TODO: maybe arrange so that codegen is driven from the layout layer
+    // instead of the input/request layer.
+    EntryPointLayout* findEntryPointLayout(
+        ProgramLayout*      programLayout,
+        EntryPointRequest*  entryPointRequest);
+
+    struct IRSpecSymbol : RefObject
     {
-        // We need to walk through all the global entry point
-        // declarations, and transform them to comply with
-        // GLSL rules.
-        for( auto globalValue = module->getFirstGlobalValue(); globalValue; globalValue = globalValue->getNextValue())
+        IRGlobalValue*          irGlobalValue;
+        RefPtr<IRSpecSymbol>    nextWithSameName;
+    };
+
+    struct IRSpecContext
+    {
+        // The specialized module we are building
+        IRModule*   module;
+
+        // The original, unspecialized module we are copying
+        IRModule*   originalModule;
+
+        // The IR builder to use for creating nodes
+        IRBuilder*  builder;
+
+        // A map from mangled symbol names to zero or
+        // more global IR values that have that name,
+        // in the *original* module.
+        Dictionary<String, RefPtr<IRSpecSymbol>> symbols;
+
+        // A map from the mangled name of a global variable
+        // to the layout to use for it.
+        Dictionary<String, VarLayout*> globalVarLayouts;
+
+        // A map from values in the original IR module
+        // to their equivalent in the cloned module.
+        Dictionary<IRValue*, IRValue*> clonedValues;
+    };
+
+    void registerClonedValue(
+        IRSpecContext*  context,
+        IRValue*    clonedValue,
+        IRValue*    originalValue)
+    {
+        context->clonedValues.Add(originalValue, clonedValue);
+    }
+
+    void cloneDecorations(
+        IRSpecContext*  context,
+        IRValue*        clonedValue,
+        IRValue*        originalValue)
+    {
+        for (auto dd = originalValue->firstDecoration; dd; dd = dd->next)
         {
-            // Is the global value a function?
-            if(globalValue->op != kIROp_Func)
-                continue;
-            IRFunc* func = (IRFunc*) globalValue;
+            switch (dd->op)
+            {
+            case kIRDecorationOp_HighLevelDecl:
+                {
+                    auto originalDecoration = (IRHighLevelDeclDecoration*)dd;
 
-            // Is the function an entry point?
-            IREntryPointDecoration* entryPointDecoration = func->findDecoration<IREntryPointDecoration>();
-            if(!entryPointDecoration)
-                continue;
+                    context->builder->addHighLevelDeclDecoration(clonedValue, originalDecoration->decl);
+                }
+                break;
 
-            // Okay, we need to legalize this one.
-            legalizeEntryPointForGLSL(session, func, entryPointDecoration);
+            default:
+                // Don't clone any decorations we don't understand.
+                break;
+            }
         }
+
+        // TODO: implement this
+    }
+
+    IRGlobalVar* cloneGlobalVar(IRSpecContext* context, IRGlobalVar* originalVar);
+    IRFunc* cloneFunc(IRSpecContext* context, IRFunc* originalFunc);
+
+    IRValue* cloneValue(
+        IRSpecContext*  context,
+        IRValue*        originalValue)
+    {
+        IRValue* clonedValue = nullptr;
+        if (context->clonedValues.TryGetValue(originalValue, clonedValue))
+            return clonedValue;
+
+        switch (originalValue->op)
+        {
+        case kIROp_global_var:
+            return cloneGlobalVar(context, (IRGlobalVar*)originalValue);
+            break;
+
+        case kIROp_Func:
+            return cloneFunc(context, (IRFunc*)originalValue);
+            break;
+
+        case kIROp_boolConst:
+            {
+                IRConstant* c = (IRConstant*)originalValue;
+                return context->builder->getBoolValue(c->u.intVal != 0);
+            }
+            break;
+
+
+        case kIROp_IntLit:
+            {
+                IRConstant* c = (IRConstant*)originalValue;
+                return context->builder->getIntValue(c->type, c->u.intVal);
+            }
+            break;
+
+        case kIROp_FloatLit:
+            {
+                IRConstant* c = (IRConstant*)originalValue;
+                return context->builder->getFloatValue(c->type, c->u.floatVal);
+            }
+            break;
+
+        case kIROp_decl_ref:
+            {
+                IRDeclRef* od = (IRDeclRef*)originalValue;
+                return context->builder->getDeclRefVal(od->declRef);
+            }
+            break;
+
+        default:
+            SLANG_UNEXPECTED("no value registered for IR value");
+            return nullptr;
+        }
+    }
+
+    void cloneInst(
+        IRSpecContext*  context,
+        IRBuilder*      builder,
+        IRInst*         originalInst)
+    {
+        switch (originalInst->op)
+        {
+        // TODO: are there any instruction types that need to be handled
+        // specially here? That would be anything that has more state
+        // than is visible in its operand list...
+
+        default:
+            {
+                // The common case is that we just need to construct a cloned
+                // instruction with the right number of operands, intialize
+                // it, and then add it to the sequence.
+                UInt argCount = originalInst->getArgCount();
+                IRInst* clonedInst = createInstWithTrailingArgs<IRInst>(
+                    builder, originalInst->op, originalInst->type,
+                    0, nullptr,
+                    argCount, nullptr);
+                builder->addInst(clonedInst);
+                registerClonedValue(context, clonedInst, originalInst);
+
+                cloneDecorations(context, clonedInst, originalInst);
+
+                for (UInt aa = 0; aa < argCount; ++aa)
+                {
+                    IRValue* originalArg = originalInst->getArg(aa);
+                    IRValue* clonedArg = cloneValue(context, originalArg);
+
+                    clonedInst->getArgs()[aa].init(clonedInst, clonedArg);
+                }
+            }
+
+            break;
+        }
+    }
+
+    IRGlobalVar* cloneGlobalVar(IRSpecContext* context, IRGlobalVar* originalVar)
+    {
+        auto clonedVar = context->builder->createGlobalVar(originalVar->getType()->getValueType());
+        registerClonedValue(context, clonedVar, originalVar);
+
+        auto mangledName = originalVar->mangledName;
+        clonedVar->mangledName = mangledName;
+
+        cloneDecorations(context, clonedVar, originalVar);
+
+        VarLayout* layout = nullptr;
+        if (context->globalVarLayouts.TryGetValue(mangledName, layout))
+        {
+            context->builder->addLayoutDecoration(clonedVar, layout);
+        }
+
+        // TODO: once we support initializers on global variables,
+        // we'll need to handle cloning it here.
+
+        return clonedVar;
+    }
+
+    void cloneFunctionCommon(
+        IRSpecContext*  context,
+        IRFunc*         clonedFunc,
+        IRFunc*         originalFunc)
+    {
+        // First clone all the simple properties.
+        clonedFunc->mangledName = originalFunc->mangledName;
+        clonedFunc->genericParams = originalFunc->genericParams;
+        clonedFunc->type = originalFunc->type;
+
+        cloneDecorations(context, clonedFunc, originalFunc);
+
+        // Next we are going to clone the actual code.
+        IRBuilder builderStorage = *context->builder;
+        IRBuilder* builder = &builderStorage;
+        builder->func = clonedFunc;
+
+        // We will walk through the blocks of the function, and clone each of them.
+        //
+        // We need to create the cloned blocks first, and then walk through them,
+        // because blocks might be forward referenced (this is not possible
+        // for other cases of instructions).
+        for (auto originalBlock = originalFunc->getFirstBlock();
+            originalBlock;
+            originalBlock = originalBlock->getNextBlock())
+        {
+            IRBlock* clonedBlock = builder->createBlock();
+            clonedFunc->addBlock(clonedBlock);
+            registerClonedValue(context, clonedBlock, originalBlock);
+
+            // We can go ahead and clone parameters here, while we are at it.
+            builder->block = clonedBlock;
+            for (auto originalParam = originalBlock->getFirstParam();
+                originalParam;
+                originalParam = originalParam->getNextParam())
+            {
+                IRParam* clonedParam = builder->emitParam(originalParam->getType());
+                registerClonedValue(context, clonedParam, originalParam);
+            }
+        }
+
+        // Okay, now we are in a good position to start cloning
+        // the instructions inside the blocks.
+        {
+            IRBlock* ob = originalFunc->getFirstBlock();
+            IRBlock* cb = clonedFunc->getFirstBlock();
+            while (ob)
+            {
+                assert(cb);
+
+                builder->block = cb;
+                for (auto oi = ob->getFirstInst(); oi; oi = oi->nextInst)
+                {
+                    cloneInst(context, builder, oi);
+                }
+
+                ob = ob->getNextBlock();
+                cb = cb->getNextBlock();
+            }
+        }
+
+        // Shuffle the function to the end of the list, because
+        // it needs to follow its dependencies.
+        //
+        // TODO: This isn't really a good requirement to place on the IR...
+        clonedFunc->removeFromParent();
+        clonedFunc->insertAtEnd(context->module);
+    }
+
+    IRFunc* specializeIRForEntryPoint(
+        IRSpecContext*  context,
+        EntryPointRequest*  entryPointRequest,
+        EntryPointLayout*   entryPointLayout)
+    {
+        // Look up the IR symbol by name
+        String mangledName = getMangledName(entryPointRequest->decl);
+        RefPtr<IRSpecSymbol> sym;
+        if (!context->symbols.TryGetValue(mangledName, sym))
+        {
+            SLANG_UNEXPECTED("no matching IR symbol");
+            return nullptr;
+        }
+
+        // TODO: deal with the case where we might
+        // have multiple versions...
+
+        auto globalValue = sym->irGlobalValue;
+        if (globalValue->op != kIROp_Func)
+        {
+            SLANG_UNEXPECTED("expected an IR function");
+            return nullptr;
+        }
+        auto originalFunc = (IRFunc*)globalValue;
+
+        // Create a clone for the IR function
+        auto clonedFunc = context->builder->createFunc();
+
+        // Note: we do *not* register this cloned declaration
+        // as the cloned value for the original symbol.
+        // This is kind of a kludge, but it ensures that
+        // in the unlikely case that the function is both
+        // used as an entry point and a callable function
+        // (yes, this would imply recursion...) we actually
+        // have two copies, which lets us arbitrarily
+        // transform the entry point to meet target requirements.
+        //
+        // TODO: The above statement is kind of bunk, though,
+        // because both versions of the function would have
+        // the same mangled name... :(
+
+        // We need to clone all the properties of the original
+        // function, including any blocks, their parameters,
+        // and their instructions.
+        cloneFunctionCommon(context, clonedFunc, originalFunc);
+
+        // We need to attach the layout information for
+        // the entry point to this declaration, so that
+        // we can use it to inform downstream code emit.
+        context->builder->addLayoutDecoration(
+            clonedFunc,
+            entryPointLayout);
+
+        return clonedFunc;
+    }
+
+    // The case for functions that are not the entry point is
+    // strictly simpler, so that is nice.
+    IRFunc* cloneFunc(IRSpecContext* context, IRFunc* originalFunc)
+    {
+        // TODO: We really need to scan through all the various
+        // global function symbols that have the same mangled name,
+        // and pick the correct one to lower for the target.
+
+        auto clonedFunc = context->builder->createFunc();
+        registerClonedValue(context, clonedFunc, originalFunc);
+        cloneFunctionCommon(context, clonedFunc, originalFunc);
+        return clonedFunc;
+    }
+
+    StructTypeLayout* getGlobalStructLayout(
+        ProgramLayout*  programLayout);
+
+    IRModule* specializeIRForEntryPoint(
+        EntryPointRequest*  entryPointRequest,
+        ProgramLayout*      programLayout,
+        CodeGenTarget       target)
+    {
+        auto compileRequest = entryPointRequest->compileRequest;
+        auto session = compileRequest->mSession;
+        auto translationUnit = entryPointRequest->getTranslationUnit();
+        auto originalIRModule = translationUnit->irModule;
+        if (!originalIRModule)
+        {
+            // We should already have emitted IR for the original
+            // translation unit, and it we don't have it, then
+            // we are now in trouble.
+            return nullptr;
+        }
+
+        auto entryPointLayout = findEntryPointLayout(programLayout, entryPointRequest);
+
+        // We now need to start cloning IR symbols from `originalIRModule`
+        // into a fresh IR module for this entry point. Along the way we need to:
+        //
+        // 1. Attach layout information from `programLayout` and/or `entryPointLayout`
+        //    onto the cloned IR symbols, to drive later code generation.
+        //
+        // 2. In cases where a function might have multiple target-specific definitions,
+        //    we need to pick the "best" one for the chosen code generation target.
+        //
+
+        SharedIRBuilder sharedBuilderStorage;
+        SharedIRBuilder* sharedBuilder = &sharedBuilderStorage;
+        sharedBuilder->module = nullptr;
+        sharedBuilder->session = compileRequest->mSession;
+
+        IRBuilder builderStorage;
+        IRBuilder* builder = &builderStorage;
+        builder->shared = sharedBuilder;
+
+        IRModule* module = builder->createModule();
+        sharedBuilder->module = module;
+
+        //
+
+        IRSpecContext contextStorage;
+        IRSpecContext*  context = &contextStorage;
+
+        context->builder = builder;
+        context->module = module;
+        context->originalModule = originalIRModule;
+
+        // First, we will populate a map with all of the IR values
+        // that use the same mangled name, to make lookup easier
+        // in other steps.
+        for (auto gv = originalIRModule->firstGlobalValue; gv; gv = gv->nextGlobalValue)
+        {
+            String mangledName = gv->mangledName;
+            if (mangledName == "")
+                continue;
+
+            RefPtr<IRSpecSymbol> sym = new IRSpecSymbol();
+            sym->irGlobalValue = gv;
+
+            RefPtr<IRSpecSymbol> prev;
+            if (context->symbols.TryGetValue(mangledName, prev))
+            {
+                sym->nextWithSameName = prev->nextWithSameName;
+                prev->nextWithSameName = sym;
+            }
+            else
+            {
+                context->symbols.Add(mangledName, sym);
+            }
+        }
+
+        // Next, we want to optimize lookup over
+        auto globalStructLayout = getGlobalStructLayout(programLayout);
+        for (auto globalVarLayout : globalStructLayout->fields)
+        {
+            String mangledName = getMangledName(globalVarLayout->varDecl);
+            context->globalVarLayouts.AddIfNotExists(mangledName, globalVarLayout);
+        }
+
+        // Next, we make sure to clone the global value for
+        // the entry point function itself, and rely on
+        // this step to recursively copy over anything else
+        // it might reference.
+        auto irEntryPoint = specializeIRForEntryPoint(context, entryPointRequest, entryPointLayout);
+
+        // TODO: *technically* we should consider the case where
+        // we have global variables with initializers, since
+        // these should get run whether or not the entry point
+        // references them.
+
+        // Depending on the downstream target, we may need to apply some
+        // guaranteed transformations to legalize things. We will go
+        // ahead and apply there here for now.
+        switch (target)
+        {
+        case CodeGenTarget::GLSL:
+            {
+                legalizeEntryPointForGLSL(session, irEntryPoint, entryPointLayout);
+            }
+            break;
+
+        default:
+            break;
+        }
+
+        return module;
     }
 
 

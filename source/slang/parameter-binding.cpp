@@ -1298,30 +1298,14 @@ static RefPtr<TypeLayout> processEntryPointParameter(
 
 static void collectEntryPointParameters(
     ParameterBindingContext*        context,
-    EntryPointRequest*              entryPoint,
-    ModuleDecl*              translationUnitSyntax)
+    EntryPointRequest*              entryPoint)
 {
-    // First, look for the entry point with the specified name
-
-    // Make sure we've got a query-able member dictionary
-    buildMemberDictionary(translationUnitSyntax);
-
-    Decl* entryPointDecl;
-    if( !translationUnitSyntax->memberDictionary.TryGetValue(entryPoint->name, entryPointDecl) )
+    FuncDecl* entryPointFuncDecl = entryPoint->decl;
+    if (!entryPointFuncDecl)
     {
-        // No such entry point!
-        return;
-    }
-    if( entryPointDecl->nextInContainerWithSameName )
-    {
-        // Not the only decl of that name!
-        return;
-    }
-
-    FuncDecl* entryPointFuncDecl = dynamic_cast<FuncDecl*>(entryPointDecl);
-    if( !entryPointFuncDecl )
-    {
-        // Not a function!
+        // Something must have failed earlier, so that
+        // we didn't find a declaration to match this
+        // entry point request.
         return;
     }
 
@@ -1504,7 +1488,7 @@ static void collectParameters(
         for( auto& entryPoint : translationUnit->entryPoints )
         {
             context->stage = entryPoint->profile.GetStage();
-            collectEntryPointParameters(context, entryPoint.Ptr(), translationUnit->SyntaxNode.Ptr());
+            collectEntryPointParameters(context, entryPoint.Ptr());
         }
     }
 
@@ -1515,9 +1499,14 @@ static void collectParameters(
     }
 }
 
-static bool isGLSLCrossCompilerNeeded(CompileRequest* request)
+static bool isGLSLCrossCompilerNeeded(
+    TargetRequest*  targetReq)
 {
-    switch (request->Target)
+    auto compileReq = targetReq->compileRequest;
+
+    // We only need cross-compilation if we
+    // are targetting something GLSL-based.
+    switch (targetReq->target)
     {
     default:
         return false;
@@ -1528,23 +1517,33 @@ static bool isGLSLCrossCompilerNeeded(CompileRequest* request)
         break;
     }
 
-    if (request->loadedModulesList.Count() != 0)
+    // If we `import`ed any Slang code, then the
+    // cross compiler is definitely needed, to
+    // translate that Slang over to GLSL.
+    if (compileReq->loadedModulesList.Count() != 0)
         return true;
 
-    for (auto tu : request->translationUnits)
+    // If there are any non-GLSL translation units,
+    // then we need to cross compile those...
+    for (auto tu : compileReq->translationUnits)
     {
         if (tu->sourceLanguage != SourceLanguage::GLSL)
             return true;
     }
 
+    // If we get to this point, then we have plain vanilla
+    // GLSL input, with no `import` declarations, so we
+    // are able to output GLSL without cross compilation.
     return false;
 }
 
 void generateParameterBindings(
-    CompileRequest*                 request)
+    TargetRequest*     targetReq)
 {
+    CompileRequest* compileReq = targetReq->compileRequest;
+
     // Try to find rules based on the selected code-generation target
-    auto rules = GetLayoutRulesFamilyImpl(request->Target);
+    auto rules = GetLayoutRulesFamilyImpl(targetReq->target);
 
     // If there was no target, or there are no rules for the target,
     // then bail out here.
@@ -1556,7 +1555,7 @@ void generateParameterBindings(
     // Create a context to hold shared state during the process
     // of generating parameter bindings
     SharedParameterBindingContext sharedContext;
-    sharedContext.compileRequest = request;
+    sharedContext.compileRequest = compileReq;
     sharedContext.defaultLayoutRules = rules;
     sharedContext.programLayout = programLayout;
 
@@ -1568,7 +1567,7 @@ void generateParameterBindings(
     context.layoutRules = sharedContext.defaultLayoutRules;
 
     // Walk through AST to discover all the parameters
-    collectParameters(&context, request);
+    collectParameters(&context, compileReq);
 
     // Now walk through the parameters to generate initial binding information
     for( auto& parameter : sharedContext.parameters )
@@ -1692,7 +1691,7 @@ void generateParameterBindings(
     //
     // We only want to do this if the GLSL cross-compilation support is
     // being invoked, so that we don't gum up other shaders.
-    if(isGLSLCrossCompilerNeeded(request))
+    if(isGLSLCrossCompilerNeeded(targetReq))
     {
         UInt space = 0;
         auto hackSamplerUsedRanges = findUsedRangeSetForSpace(&context, space);
@@ -1702,8 +1701,8 @@ void generateParameterBindings(
         programLayout->bindingForHackSampler = (int)binding;
 
         RefPtr<Variable> var = new Variable();
-        var->nameAndLoc.name = request->getNamePool()->getName("SLANG_hack_samplerForTexelFetch");
-        var->type.type = getSamplerStateType(request->mSession);
+        var->nameAndLoc.name = compileReq->getNamePool()->getName("SLANG_hack_samplerForTexelFetch");
+        var->type.type = getSamplerStateType(compileReq->mSession);
 
         auto typeLayout = new TypeLayout();
         typeLayout->type = var->type.type;
@@ -1724,7 +1723,7 @@ void generateParameterBindings(
     // We now have a bunch of layout information, which we should
     // record into a suitable object that represents the program
     programLayout->globalScopeLayout = globalScopeLayout;
-    request->layout = programLayout;
+    targetReq->layout = programLayout;
 }
 
 }

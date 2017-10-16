@@ -2,6 +2,7 @@
 
 #include "../core/slang-io.h"
 #include "parameter-binding.h"
+#include "lower-to-ir.h"
 #include "../slang/parser.h"
 #include "../slang/preprocessor.h"
 #include "../slang/reflection.h"
@@ -175,11 +176,46 @@ void CompileRequest::parseTranslationUnit(
 
 void CompileRequest::checkAllTranslationUnits()
 {
+    // Iterate over all translation units and
+    // apply the semantic checking logic.
     for( auto& translationUnit : translationUnits )
     {
         checkTranslationUnit(translationUnit.Ptr());
     }
 }
+
+void CompileRequest::generateIR()
+{
+    // Our task in this function is to generate IR code
+    // for all of the declarations in the translation
+    // units that were loaded.
+
+    // At the moment, use of the IR is not enabled by
+    // default, so we will skip this step unless
+    // the flag was set to op in.
+    if (!(compileFlags & SLANG_COMPILE_FLAG_USE_IR))
+        return;
+
+    // Each translation unit is its own little world
+    // for code generation (we are not trying to
+    // replicate the GLSL linkage model), and so
+    // we will generate IR for each (if needed)
+    // in isolation.
+    for( auto& translationUnit : translationUnits )
+    {
+        // If the user opted out of semantic checking for
+        // the translation unit, then IR code generation
+        // is not in general even possible; there might
+        // be semantics errors (diagnosed or not) in the
+        // code, and we don't want to deal with those.
+        if (translationUnit->compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING)
+            continue;
+
+        // Okay, we seem to be in the clear now.
+        translationUnit->irModule = generateIRForTranslationUnit(translationUnit);
+    }
+}
+
 // Try to infer a single common source language for a request
 static SourceLanguage inferSourceLanguage(CompileRequest* request)
 {
@@ -223,58 +259,24 @@ int CompileRequest::executeActionsInner()
     }
 
     // If no code-generation target was specified, then try to infer one from the source language,
-    // just to make sure we can do something reasonable when `reflection-json` is specified
-    if (Target == CodeGenTarget::Unknown)
+    // just to make sure we can do something reasonable when invoked from the command line.
+    if (targets.Count() == 0)
     {
         auto language = inferSourceLanguage(this);
         switch (language)
         {
         case SourceLanguage::HLSL:
-            Target = CodeGenTarget::DXBytecodeAssembly;
+            addTarget(CodeGenTarget::DXBytecode);
             break;
 
         case SourceLanguage::GLSL:
-            Target = CodeGenTarget::SPIRVAssembly;
+            addTarget(CodeGenTarget::SPIRV);
             break;
 
         default:
             break;
         }
     }
-
-#if 0
-    // If we are being asked to do pass-through, then we need to do that here...
-    if (passThrough != PassThroughMode::None)
-    {
-        for (auto& translationUnitOptions : Options.translationUnits)
-        {
-            switch (translationUnitOptions.sourceLanguage)
-            {
-                // We can pass-through code written in a native shading language
-            case SourceLanguage::GLSL:
-            case SourceLanguage::HLSL:
-                break;
-
-                // All other translation units need to be skipped
-            default:
-                continue;
-            }
-
-            auto sourceFile = translationUnitOptions.sourceFiles[0];
-            auto sourceFilePath = sourceFile->path;
-            String source = sourceFile->content;
-
-            auto translationUnitResult = passThrough(
-                source,
-                sourceFilePath,
-                Options,
-                translationUnitOptions);
-
-            mResult.translationUnits.Add(translationUnitResult);
-        }
-        return 0;
-    }
-#endif
 
     // We only do parsing and semantic checking if we *aren't* doing
     // a pass-through compilation.
@@ -295,17 +297,29 @@ int CompileRequest::executeActionsInner()
         if (mSink.GetErrorCount() != 0)
             return 1;
 
-        // Now do shader parameter binding generation, which
-        // needs to be performed globally.
-        generateParameterBindings(this);
+        // Generate initial IR for all the translation
+        // units, if we are in a mode where IR is called for.
+        generateIR();
         if (mSink.GetErrorCount() != 0)
             return 1;
+
+        // For each code generation target generate
+        // parameter binding information.
+        // This step is done globaly, because all translation
+        // units and entry points need to agree on where
+        // parameters are allocated.
+        for (auto targetReq : targets)
+        {
+            generateParameterBindings(targetReq);
+            if (mSink.GetErrorCount() != 0)
+                return 1;
+        }
     }
     
     // If command line specifies to skip codegen, we exit here.
     // Note: this is a debugging option.
-//    if (shouldSkipCodegen)
-//        return 0;
+    if (shouldSkipCodegen)
+        return 0;
 
     // Generate output code, in whatever format was requested
     generateOutput(this);
@@ -400,6 +414,19 @@ int CompileRequest::addEntryPoint(
     entryPoints.Add(entryPoint);
     return (int) result;
 }
+
+UInt CompileRequest::addTarget(
+    CodeGenTarget   target)
+{
+    RefPtr<TargetRequest> targetReq = new TargetRequest();
+    targetReq->compileRequest = this;
+    targetReq->target = target;
+
+    UInt result = targets.Count();
+    targets.Add(targetReq);
+    return (int) result;
+}
+
 
 RefPtr<ModuleDecl> CompileRequest::loadModule(
     Name*               name,
@@ -713,8 +740,27 @@ SLANG_API void spSetCodeGenTarget(
         SlangCompileRequest*    request,
         int target)
 {
-    REQ(request)->Target = (Slang::CodeGenTarget)target;
+    auto req = REQ(request);
+    req->targets.Clear();
+    req->addTarget(Slang::CodeGenTarget(target));
 }
+
+SLANG_API void spAddCodeGenTarget(
+    SlangCompileRequest*    request,
+    SlangCompileTarget      target)
+{
+    auto req = REQ(request);
+    req->addTarget(Slang::CodeGenTarget(target));
+}
+
+SLANG_API void spSetOutputContainerFormat(
+    SlangCompileRequest*    request,
+    SlangContainerFormat    format)
+{
+    auto req = REQ(request);
+    req->containerFormat = Slang::ContainerFormat(format);
+}
+
 
 SLANG_API void spSetPassThrough(
     SlangCompileRequest*    request,
@@ -918,16 +964,8 @@ SLANG_API char const* spGetTranslationUnitSource(
     SlangCompileRequest*    request,
     int                     translationUnitIndex)
 {
-    auto req = REQ(request);
-    return req->translationUnits[translationUnitIndex]->result.outputString.Buffer();
-}
-
-SLANG_API char const* spGetEntryPointSource(
-    SlangCompileRequest*    request,
-    int                     entryPointIndex)
-{
-    auto req = REQ(request);
-    return req->entryPoints[entryPointIndex]->result.outputString.Buffer();
+    fprintf(stderr, "DEPRECATED: spGetTranslationUnitSource()\n");
+    return nullptr;
 }
 
 SLANG_API void const* spGetEntryPointCode(
@@ -936,7 +974,14 @@ SLANG_API void const* spGetEntryPointCode(
     size_t*                 outSize)
 {
     auto req = REQ(request);
-    Slang::CompileResult& result = req->entryPoints[entryPointIndex]->result;
+
+    // TODO: We should really accept a target index in this API
+    auto targetCount = req->targets.Count();
+    if (targetCount == 0)
+        return nullptr;
+    auto targetReq = req->targets[0];
+
+    Slang::CompileResult& result = targetReq->entryPointResults[entryPointIndex];
 
     void const* data = nullptr;
     size_t size = 0;
@@ -962,15 +1007,48 @@ SLANG_API void const* spGetEntryPointCode(
     return data;
 }
 
+SLANG_API char const* spGetEntryPointSource(
+    SlangCompileRequest*    request,
+    int                     entryPointIndex)
+{
+    return (char const*) spGetEntryPointCode(request, entryPointIndex, nullptr);
+}
+
+SLANG_API void const* spGetCompileRequestCode(
+    SlangCompileRequest*    request,
+    size_t*                 outSize)
+{
+    auto req = REQ(request);
+
+    void const* data = req->generatedBytecode.Buffer();
+    size_t size = req->generatedBytecode.Count();
+
+    if(outSize) *outSize = size;
+    return data;
+}
+
 // Reflection API
 
 SLANG_API SlangReflection* spGetReflection(
     SlangCompileRequest*    request)
 {
     if( !request ) return 0;
-
     auto req = REQ(request);
-    return (SlangReflection*) req->layout.Ptr();
+
+    // Note(tfoley): The API signature doesn't let the client
+    // specify which target they want to access reflection
+    // information for, so for now we default to the first one.
+    //
+    // TODO: Add a new `spGetReflectionForTarget(req, targetIndex)`
+    // so that we can do this better, and make it clear that
+    // `spGetReflection()` is shorthand for `targetIndex == 0`.
+    //
+    auto targetCount = req->targets.Count();
+    if (targetCount == 0)
+        return 0;
+    auto targetReq = req->targets[0];
+
+    return (SlangReflection*) targetReq->layout.Ptr();
 }
 
 // ... rest of reflection API implementation is in `Reflection.cpp`

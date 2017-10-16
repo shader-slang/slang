@@ -37,9 +37,13 @@ int main(
     SlangSession* session = spCreateSession(nullptr);
     SlangCompileRequest* request = spCreateCompileRequest(session);
 
-    spSetCodeGenTarget(
+    spSetCompileFlags(
         request,
-        SLANG_IR);
+        SLANG_COMPILE_FLAG_USE_IR);
+
+    spSetOutputContainerFormat(
+        request,
+        SLANG_CONTAINER_FORMAT_SLANG_MODULE);
 
     int translationUnitIndex = spAddTranslationUnit(
         request,
@@ -69,7 +73,7 @@ int main(
 
     // Extract the bytecode
     size_t bytecodeSize = 0;
-    void const* bytecode = spGetEntryPointCode(request, entryPointIndex, &bytecodeSize);
+    void const* bytecode = spGetCompileRequestCode(request, &bytecodeSize);
 
     // Now we need to create an execution context to go and run the bytecode we got
 

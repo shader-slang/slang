@@ -47,8 +47,6 @@ LANGUAGE(GLSL_ES,			glsl_es)
 LANGUAGE(GLSL_VK,			glsl_vk)
 LANGUAGE(SPIRV,				spirv)
 LANGUAGE(SPIRV_GL,			spirv_gl)
-LANGUAGE(SlangIR,           slang_ir)
-LANGUAGE(SlangIRAssembly,   slang_ir_assembly)
 
 LANGUAGE_ALIAS(GLSL,		glsl_gl)
 LANGUAGE_ALIAS(SPIRV,		spirv_vk)

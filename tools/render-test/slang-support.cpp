@@ -38,6 +38,8 @@ struct SlangShaderCompilerWrapper : public ShaderCompiler
 
         int vertexTranslationUnit = 0;
         int fragmentTranslationUnit = 0;
+        char const* vertexEntryPointName = request.vertexShader.name;
+        char const* fragmentEntryPointName = request.fragmentShader.name;
         if( sourceLanguage == SLANG_SOURCE_LANGUAGE_GLSL )
         {
             // GLSL presents unique challenges because, frankly, it got the whole
@@ -48,13 +50,13 @@ struct SlangShaderCompilerWrapper : public ShaderCompiler
 
             vertexTranslationUnit = spAddTranslationUnit(slangRequest, sourceLanguage, nullptr);
             spAddTranslationUnitSourceString(slangRequest, vertexTranslationUnit, request.source.path, request.source.text);
-
             spTranslationUnit_addPreprocessorDefine(slangRequest, vertexTranslationUnit, "__GLSL_VERTEX__", "1");
+            vertexEntryPointName = "main";
 
             fragmentTranslationUnit = spAddTranslationUnit(slangRequest, sourceLanguage, nullptr);
             spAddTranslationUnitSourceString(slangRequest, fragmentTranslationUnit, request.source.path, request.source.text);
-
             spTranslationUnit_addPreprocessorDefine(slangRequest, fragmentTranslationUnit, "__GLSL_FRAGMENT__", "1");
+            fragmentEntryPointName = "main";
         }
         else
         {
@@ -72,8 +74,8 @@ struct SlangShaderCompilerWrapper : public ShaderCompiler
             spSetCompileFlags(slangRequest, SLANG_COMPILE_FLAG_NO_CHECKING);
         }
 
-        int vertexEntryPoint = spAddEntryPoint(slangRequest, vertexTranslationUnit, request.vertexShader.name,   spFindProfile(slangSession, request.vertexShader.profile));
-        int fragmentEntryPoint = spAddEntryPoint(slangRequest, fragmentTranslationUnit, request.fragmentShader.name, spFindProfile(slangSession, request.fragmentShader.profile));
+        int vertexEntryPoint = spAddEntryPoint(slangRequest, vertexTranslationUnit, vertexEntryPointName,   spFindProfile(slangSession, request.vertexShader.profile));
+        int fragmentEntryPoint = spAddEntryPoint(slangRequest, fragmentTranslationUnit, fragmentEntryPointName, spFindProfile(slangSession, request.fragmentShader.profile));
 
         int compileErr = spCompile(slangRequest);
         if(auto diagnostics = spGetDiagnosticOutput(slangRequest))
@@ -89,12 +91,6 @@ struct SlangShaderCompilerWrapper : public ShaderCompiler
 
 
         ShaderCompileRequest innerRequest = request;
-
-        if( sourceLanguage != SLANG_SOURCE_LANGUAGE_GLSL )
-        {
-            char const* translatedCode = spGetTranslationUnitSource(slangRequest, 0);
-            innerRequest.source.text = translatedCode;
-        }
 
         char const* vertexCode = spGetEntryPointSource(slangRequest, vertexEntryPoint);
         char const* fragmentCode = spGetEntryPointSource(slangRequest, fragmentEntryPoint);

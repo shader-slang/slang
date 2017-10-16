@@ -66,25 +66,6 @@ int MAIN(int argc, char** argv)
             exit(-1);
         }
 
-#if 0
-        // Produce output as the command-line compiler driver should.
-
-        // Now dump the output from the compilation to stdout.
-        //
-        // TODO: Need a way to control where output goes so that
-        // we can actually use the standalone compiler as something
-        // more than a testing tool.
-        //
-
-        int translationUnitCount = spGetTranslationUnitCount(compileRequest);
-        for(int tt = 0; tt < translationUnitCount; ++tt)
-        {
-            auto output = spGetTranslationUnitSource(compileRequest, tt);
-            fputs(output, stdout);
-        }
-        fflush(stdout);
-#endif
-
         // Now that we are done, clean up after ourselves
 
         spDestroyCompileRequest(compileRequest);

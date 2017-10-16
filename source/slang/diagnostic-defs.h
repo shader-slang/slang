@@ -65,6 +65,9 @@ DIAGNOSTIC(    6, Error, outputPathsImplyDifferentFormats,
 DIAGNOSTIC(    6, Error, cannotDeduceOutputFormatFromPath,
     "cannot deduce an output format from the output path '$0'")
 
+DIAGNOSTIC(    6, Error, explicitOutputPathsAndMultipleTargets,
+    "canot use both explicit output paths ('-o') and multiple targets ('-target')")
+
 //
 // 1xxxx - Lexical anaylsis
 //
@@ -307,6 +310,11 @@ DIAGNOSTIC(39999, Error, invalidFloatingPOintLiteralSuffix, "invalid suffix '$0'
 
 DIAGNOSTIC(39999, Error,    conflictingExplicitBindingsForParameter, "conflicting explicit bindings for parameter '$0'")
 DIAGNOSTIC(39999, Warning,  parameterBindingsOverlap, "explicit binding for parameter '$0' overlaps with parameter '$1'")
+
+DIAGNOSTIC(38000, Error,    entryPointFunctionNotFound,     "no function found matching entry point name '$0'")
+DIAGNOSTIC(38001, Error,    ambiguousEntryPoint,            "more than one function matches entry point name '$0'")
+DIAGNOSTIC(38002, Note,     entryPointCandidate,            "see candidate declaration for entry point '$0'")
+DIAGNOSTIC(38003, Error,    entryPointSymbolNotAFunction,   "entry point '$0' must be declared as a function")
 
 //
 // 4xxxx - IL code generation.

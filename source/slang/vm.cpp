@@ -670,7 +670,11 @@ VMModule* loadVMModuleInstance(
 {
     BCHeader* bcHeader = (BCHeader*) bytecode;
 
-    BCModule* bcModule = bcHeader->module;
+    UInt bcModuleCount = bcHeader->moduleCount;
+    if (bcModuleCount == 0)
+        return nullptr;
+
+    BCModule* bcModule = bcHeader->modules[0];
 
     UInt symbolCount = bcModule->symbolCount;
     UInt typeCount = bcModule->typeCount;

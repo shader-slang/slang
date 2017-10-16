@@ -13,15 +13,14 @@
 
 namespace Slang
 {
+    class CompileRequest;
     class EntryPointRequest;
     class ProgramLayout;
     class TranslationUnitRequest;
 
     struct ExtensionUsageTracker;
 
-    IRModule* lowerEntryPointToIR(
-        EntryPointRequest*  entryPoint,
-        ProgramLayout*      programLayout,
-        CodeGenTarget       target);
+    IRModule* generateIRForTranslationUnit(
+        TranslationUnitRequest* translationUnit);
 }
 #endif
