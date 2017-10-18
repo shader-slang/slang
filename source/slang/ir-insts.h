@@ -32,7 +32,7 @@ struct IRLayoutDecoration : IRDecoration
 {
     enum { kDecorationOp = kIRDecorationOp_Layout };
 
-    Layout* layout;
+    RefPtr<Layout>  layout;
 };
 
 enum IRLoopControl
@@ -304,10 +304,8 @@ struct IRBuilder
     IRFunc*     func = nullptr;
     IRBlock*    block = nullptr;
     //
-    // TODO: we eventually also want an `IRInst*` for
-    // an instruction to insert before, so that we
-    // can also use the builder to insert inside
-    // an existing block.
+    // An instruction in the current block that we should insert before
+    IRInst*     insertBeforeInst = nullptr;
 
     IRFunc*     getFunc() { return func; }
     IRBlock*    getBlock() { return block; }

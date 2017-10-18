@@ -4060,7 +4060,29 @@ emitDeclImpl(decl, nullptr);
         return getIRName(declRef.decl);
     }
 
-    String getIRName(IRValue* inst)
+    String getGLSLSystemValueName(
+        VarLayout*  varLayout)
+    {
+        auto semanticName = varLayout->systemValueSemantic;
+        semanticName = semanticName.ToLower();
+        auto semanticIndex = varLayout->systemValueSemanticIndex;
+
+        if(semanticName == "sv_position")
+        {
+            return "gl_Position";
+        }
+        else if(semanticName == "sv_target")
+        {
+            return "";
+        }
+        else
+        {
+            return "gl_Unknown";
+        }
+    }
+
+    String getIRName(
+        IRValue*        inst)
     {
         switch(inst->op)
         {
@@ -4073,6 +4095,23 @@ emitDeclImpl(decl, nullptr);
 
         default:
             break;
+        }
+
+        if(getTarget(context) == CodeGenTarget::GLSL)
+        {
+            if(auto layoutMod = inst->findDecoration<IRLayoutDecoration>())
+            {
+                auto layout = layoutMod->layout;
+                if(auto varLayout = layout.As<VarLayout>())
+                {
+                    if(varLayout->systemValueSemantic.Length() != 0)
+                    {
+                        auto translated = getGLSLSystemValueName(varLayout);
+                        if(translated.Length())
+                            return translated;
+                    }
+                }
+            }
         }
 
         if(auto decoration = inst->findDecoration<IRHighLevelDeclDecoration>())
@@ -5066,7 +5105,7 @@ emitDeclImpl(decl, nullptr);
         if (!decoration)
             return nullptr;
 
-        return (VarLayout*) decoration->layout;
+        return (VarLayout*) decoration->layout.Ptr();
     }
 
     void emitIRLayoutSemantics(
@@ -5490,7 +5529,7 @@ emitDeclImpl(decl, nullptr);
     {
         if( auto layoutDecoration = func->findDecoration<IRLayoutDecoration>() )
         {
-            return dynamic_cast<EntryPointLayout*>(layoutDecoration->layout);
+            return layoutDecoration->layout.As<EntryPointLayout>();
         }
         return nullptr;
     }
@@ -5575,7 +5614,7 @@ emitDeclImpl(decl, nullptr);
     {
         if (auto layoutDecoration = func->findDecoration<IRLayoutDecoration>())
         {
-            if (auto entryPointLayout = dynamic_cast<EntryPointLayout*>(layoutDecoration->layout))
+            if (auto entryPointLayout = layoutDecoration->layout.As<EntryPointLayout>())
             {
                 return entryPointLayout;
             }

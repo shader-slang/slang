@@ -186,6 +186,13 @@ namespace Slang
     void IRBuilder::addInst(
         IRInst*     inst)
     {
+        auto insertBefore = insertBeforeInst;
+        if(insertBeforeInst)
+        {
+            inst->insertBefore(insertBeforeInst);
+            return;
+        }
+
         auto parent = block;
         if (!parent)
             return;
@@ -2123,6 +2130,354 @@ namespace Slang
         valueToMove->insertBefore(placeBefore);
     }
 
+    // When scalarizing shader inputs/outputs for GLSL, we need a way
+    // to refer to a conceptual "value" that might comprise multiple
+    // IR-level values. We could in principle introduce tuple types
+    // into the IR so that everything stays at the IR level, but
+    // it seems easier to just layer it over the top for now.
+    //
+    // The `ScalarizedVal` type deals with the "tuple or single value?"
+    // question, and also the "l-value or r-value?" question.
+    struct ScalarizedValImpl : RefObject
+    {};
+    struct ScalarizedTupleValImpl;
+    struct ScalarizedVal
+    {
+        enum class Flavor
+        {
+            // no value (null pointer)
+            none,
+
+            // A simple `IRValue*` that represents the actual value
+            value,
+
+            // An `IRValue*` that represents the address of the actual value
+            address,
+
+            // A `TupleValImpl` that represents zero or more `ScalarizedVal`s
+            tuple,
+        };
+
+        // Create a value representing a simple value
+        static ScalarizedVal value(IRValue* irValue)
+        {
+            ScalarizedVal result;
+            result.flavor = Flavor::value;
+            result.irValue = irValue;
+            return result;
+        }
+
+
+        // Create a value representing an address
+        static ScalarizedVal address(IRValue* irValue)
+        {
+            ScalarizedVal result;
+            result.flavor = Flavor::address;
+            result.irValue = irValue;
+            return result;
+        }
+
+        static ScalarizedVal tuple(ScalarizedTupleValImpl* impl)
+        {
+            ScalarizedVal result;
+            result.flavor = Flavor::tuple;
+            result.impl = (ScalarizedValImpl*)impl;
+            return result;
+        }
+
+        Flavor                      flavor = Flavor::none;
+        IRValue*                    irValue = nullptr;
+        RefPtr<ScalarizedValImpl>   impl;
+    };
+
+    // This is the case for a value that is a "tuple" of other values
+    struct ScalarizedTupleValImpl : ScalarizedValImpl
+    {
+        struct Element
+        {
+            ScalarizedVal   val;
+            DeclRef<Decl>   declRef;
+        };
+
+        RefPtr<Type>    type;
+        List<Element>   elements;
+    };
+
+    struct GlobalVaryingDeclarator
+    {
+        enum class Flavor
+        {
+            array,
+        };
+
+        Flavor                      flavor;
+        Val*                        elementCount;
+        GlobalVaryingDeclarator*    next;
+    };
+
+    ScalarizedVal createSimpleGLSLGlobalVarying(
+        IRBuilder*                  builder,
+        Type*                       type,
+        VarLayout*                  varLayout,
+        TypeLayout*                 typeLayout,
+        LayoutResourceKind          kind,
+        GlobalVaryingDeclarator*    declarator)
+    {
+        // TODO: We might be creating an `in` or `out` variable based on
+        // an `in out` function parameter. In this case we should
+        // rewrite the `typeLayout` to only include the information
+        // for the appropriate `kind`.
+        //
+        // TODO: actually, we should *always* be re-creating the layout,
+        // because we need to apply any offsets from the parent...
+
+        // TODO: If there are any `declarator`s, we need to unwrap
+        // them here, and allow them to modify the type of the
+        // variable that we declare.
+        //
+        // They should probably also affect how we return the
+        // `ScalarizedVal`, since we need to reflect the AOS->SOA conversion.
+
+        // TODO: detect when the layout represents a system input/output
+        if( varLayout->systemValueSemantic.Length() != 0 )
+        {
+            // This variable represents a system input/output,
+            // and we should probably handle that differently, right?
+        }
+
+        // Simple case: just create a global variable of the matching type,
+        // and then use the value of the global as a replacement for the
+        // value of the original parameter.
+        //
+        auto globalVariable = addGlobalVariable(builder->getModule(), type);
+        moveValueBefore(globalVariable, builder->getFunc());
+        builder->addLayoutDecoration(globalVariable, varLayout);
+        return ScalarizedVal::address(globalVariable);
+    }
+
+    ScalarizedVal createGLSLGlobalVaryingsImpl(
+        IRBuilder*                  builder,
+        Type*                       type,
+        VarLayout*                  varLayout,
+        TypeLayout*                 typeLayout,
+        LayoutResourceKind          kind,
+        GlobalVaryingDeclarator*    declarator)
+    {
+        if( type->As<BasicExpressionType>() )
+        {
+            return createSimpleGLSLGlobalVarying(builder, type, varLayout, typeLayout, kind, declarator);
+        }
+        else if( type->As<VectorExpressionType>() )
+        {
+            return createSimpleGLSLGlobalVarying(builder, type, varLayout, typeLayout, kind, declarator);
+        }
+        else if( type->As<MatrixExpressionType>() )
+        {
+            // TODO: a matrix-type varying should probably be handled like an array of rows
+            return createSimpleGLSLGlobalVarying(builder, type, varLayout, typeLayout, kind, declarator);
+        }
+        else if( auto arrayType = type->As<ArrayExpressionType>() )
+        {
+            // We will need to SOA-ize any nested types.
+
+            auto elementType = arrayType->baseType;
+            auto elementCount = arrayType->ArrayLength;
+            auto arrayLayout = dynamic_cast<ArrayTypeLayout*>(typeLayout);
+            SLANG_ASSERT(arrayLayout);
+            auto elementTypeLayout = arrayLayout->elementTypeLayout;
+
+            GlobalVaryingDeclarator arrayDeclarator;
+            arrayDeclarator.flavor = GlobalVaryingDeclarator::Flavor::array;
+            arrayDeclarator.elementCount = elementCount;
+            arrayDeclarator.next = declarator;
+
+            return createGLSLGlobalVaryingsImpl(
+                builder,
+                elementType,
+                varLayout,
+                elementTypeLayout,
+                kind,
+                &arrayDeclarator);
+        }
+        else if( auto declRefType = type->As<DeclRefType>() )
+        {
+            auto declRef = declRefType->declRef;
+            if( auto structDeclRef = declRef.As<StructDecl>() )
+            {
+                // This is either a user-defined struct, or a builtin type.
+                // TODO: exclude resource types here.
+
+                // We need to recurse down into the individual fields,
+                // and generate a variable for each of them.
+
+                // Note: we can use the presence of a `StructTypeLayout` as
+                // a quick way to reject a bunch of types that aren't actually `struct`s
+                auto structTypeLayout = dynamic_cast<StructTypeLayout*>(typeLayout);
+                if( structTypeLayout )
+                {
+                    RefPtr<ScalarizedTupleValImpl> tupleValImpl = new ScalarizedTupleValImpl();
+                    tupleValImpl->type = type;
+
+                    // Okay, we want to walk through the fields here, and
+                    // generate one variable for each.
+                    for( auto ff : structTypeLayout->fields )
+                    {
+                        auto fieldVal = createGLSLGlobalVaryingsImpl(
+                            builder,
+                            ff->typeLayout->type,
+                            ff,
+                            ff->typeLayout,
+                            kind,
+                            declarator);
+
+                        ScalarizedTupleValImpl::Element element;
+                        element.val = fieldVal;
+                        element.declRef = ff->varDecl;
+
+                        tupleValImpl->elements.Add(element);
+                    }
+
+                    return ScalarizedVal::tuple(tupleValImpl);
+                }
+            }
+        }
+
+        // Default case is to fall back on the simple behavior
+        return createSimpleGLSLGlobalVarying(builder, type, varLayout, typeLayout, kind, declarator);
+    }
+
+    ScalarizedVal createGLSLGlobalVaryings(
+        IRBuilder*          builder,
+        Type*               type,
+        VarLayout*          layout,
+        LayoutResourceKind  kind)
+    {
+        return createGLSLGlobalVaryingsImpl(builder, type, layout, layout->typeLayout, kind, nullptr);
+    }
+
+    ScalarizedVal extractField(
+        IRBuilder*              builder,
+        ScalarizedVal const&    val,
+        UInt                    fieldIndex,
+        DeclRef<Decl>           fieldDeclRef)
+    {
+        switch( val.flavor )
+        {
+        case ScalarizedVal::Flavor::value:
+            return ScalarizedVal::value(
+                builder->emitFieldExtract(
+                    GetType(fieldDeclRef.As<VarDeclBase>()),
+                    val.irValue,
+                    builder->getDeclRefVal(fieldDeclRef)));
+
+        case ScalarizedVal::Flavor::address:
+            return ScalarizedVal::address(
+                builder->emitFieldAddress(
+                    GetType(fieldDeclRef.As<VarDeclBase>()),
+                    val.irValue,
+                    builder->getDeclRefVal(fieldDeclRef)));
+
+        case ScalarizedVal::Flavor::tuple:
+            {
+                auto tupleVal = val.impl.As<ScalarizedTupleValImpl>();
+                return tupleVal->elements[fieldIndex].val;
+            }
+
+        default:
+            SLANG_UNEXPECTED("unimplemented");
+            return ScalarizedVal();
+        }
+
+    }
+
+    void assign(
+        IRBuilder*              builder,
+        ScalarizedVal const&    left,
+        ScalarizedVal const&    right)
+    {
+        switch( left.flavor )
+        {
+        case ScalarizedVal::Flavor::address:
+            switch( right.flavor )
+            {
+            case ScalarizedVal::Flavor::value:
+                {
+                    builder->emitStore(left.irValue, right.irValue);
+                }
+                break;
+
+            default:
+                SLANG_UNEXPECTED("unimplemented");
+                break;
+            }
+            break;
+
+        case ScalarizedVal::Flavor::tuple:
+            {
+                // We have a tuple, so we are going to need to try and assign
+                // to each of its constituent fields.
+                auto leftTupleVal = left.impl.As<ScalarizedTupleValImpl>();
+                UInt elementCount = leftTupleVal->elements.Count();
+
+                for( UInt ee = 0; ee < elementCount; ++ee )
+                {
+                    auto rightElementVal = extractField(
+                        builder,
+                        right,
+                        ee,
+                        leftTupleVal->elements[ee].declRef);
+                    assign(builder, leftTupleVal->elements[ee].val, rightElementVal);
+                }
+            }
+            break;
+
+        default:
+            SLANG_UNEXPECTED("unimplemented");
+            break;
+        }
+    }
+
+    IRValue* materializeValue(
+        IRBuilder*              builder,
+        ScalarizedVal const&    val)
+    {
+        switch( val.flavor )
+        {
+        case ScalarizedVal::Flavor::value:
+            return val.irValue;
+
+        case ScalarizedVal::Flavor::address:
+            {
+                auto loadInst = builder->emitLoad(val.irValue);
+                return loadInst;
+            }
+            break;
+
+        case ScalarizedVal::Flavor::tuple:
+            {
+                auto tupleVal = val.impl.As<ScalarizedTupleValImpl>();
+                UInt elementCount = tupleVal->elements.Count();
+
+                List<IRValue*> elementVals;
+                for( UInt ee = 0; ee < elementCount; ++ee )
+                {
+                    auto elementVal = materializeValue(builder, tupleVal->elements[ee].val);
+                    elementVals.Add(elementVal);
+                }
+
+                return builder->emitConstructorInst(
+                    tupleVal->type,
+                    elementVals.Count(),
+                    elementVals.Buffer());
+            }
+            break;
+
+        default:
+            SLANG_UNEXPECTED("unimplemented");
+            break;
+        }
+    }
+
     void legalizeEntryPointForGLSL(
         Session*                session,
         IRFunc*                 func,
@@ -2149,6 +2504,7 @@ namespace Slang
         shared.session = session;
         IRBuilder builder;
         builder.shared = &shared;
+        builder.func = func;
 
         // We will start by looking at the return type of the
         // function, because that will enable us to do an
@@ -2185,44 +2541,35 @@ namespace Slang
             // any `returnVal` instructions with
             // code to write to that variable.
 
-            auto resultVariable = addGlobalVariable(module, resultType);
-            moveValueBefore(resultVariable, func);
-
-            // We need to transfer layout information from the entry point
-            // down to the variable:
-            builder.addLayoutDecoration(resultVariable, entryPointLayout->resultLayout);
+            auto resultGlobal = createGLSLGlobalVaryings(
+                &builder,
+                resultType,
+                entryPointLayout->resultLayout,
+                LayoutResourceKind::FragmentOutput);
 
             for( auto bb = func->getFirstBlock(); bb; bb = bb->getNextBlock() )
             {
+                // TODO: This is silly, because we are looking at every instruction,
+                // when we know that a `returnVal` should only ever appear as a
+                // terminator...
                 for( auto ii = bb->getFirstInst(); ii; ii = ii->nextInst )
                 {
                     if(ii->op != kIROp_ReturnVal)
                         continue;
 
                     IRReturnVal* returnInst = (IRReturnVal*) ii;
-                    IRValue* resultValue = returnInst->getVal();
+                    IRValue* returnValue = returnInst->getVal();
 
+                    // Make sure we add these instructions to the right block
+                    builder.block = bb;
 
+                    // Write to our global variable(s) from the value being returned.
+                    assign(&builder, resultGlobal, ScalarizedVal::value(returnValue));
 
-                    // `store <resultVariable> <resultValue>`
-                    IRStore* storeInst = createInst<IRStore>(
-                        &builder,
-                        kIROp_Store,
-                        nullptr,
-                        resultVariable,
-                        resultValue);
+                    // Emit a `returnVoid` to end the block
+                    auto returnVoid = builder.emitReturn();
 
-                    // `returnVoid`
-                    IRReturnVoid* returnVoid = createInst<IRReturnVoid>(
-                        &builder,
-                        kIROp_ReturnVoid,
-                        nullptr);
-
-                    // Put the two new instructions before the old one
-                    storeInst->insertBefore(returnInst);
-                    returnVoid->insertBefore(returnInst);
-
-                    // and then remove the old one.
+                    // Remove the old `returnVal` instruction.
                     returnInst->removeAndDeallocate();
 
                     // Make sure to resume our iteration at an
@@ -2237,8 +2584,6 @@ namespace Slang
         // and turn them into global variables.
         if( auto firstBlock = func->getFirstBlock() )
         {
-            IRInst* insertBeforeInst = firstBlock->getFirstInst();
-
             UInt paramCounter = 0;
             for( auto pp = firstBlock->getFirstParam(); pp; pp = pp->getNextParam() )
             {
@@ -2266,6 +2611,11 @@ namespace Slang
                 // cases.
                 auto paramType = pp->getType();
 
+                // Any initialization code we insert nees to be at the start
+                // of the block:
+                builder.block = firstBlock;
+                builder.insertBeforeInst = firstBlock->getFirstInst();
+
                 // TODO: We need to distinguish any true pointers in the
                 // user's code from pointers that only exist for
                 // parameter-passing. This `PtrType` here should actually
@@ -2275,59 +2625,76 @@ namespace Slang
                 {
                     // Okay, we have the more interesting case here,
                     // where the parameter was being passed by reference.
-                    // This actually makes our life pretty easy, though,
-                    // since we can simply replace any uses of the existing
-                    // pointer with the global variable (since it will
-                    // be a pointer to storage).
+                    // We are going to create a local variable of the appropriate
+                    // type, which will replace the parameter, along with
+                    // one or more global variables for the actual input/output.
 
-                    // We start by creating the global variable, using
-                    // the pointed-to type:
                     auto valueType = paramPtrType->getValueType();
-                    auto paramVariable = addGlobalVariable(module, paramType);
-                    moveValueBefore(paramVariable, func);
 
-                    // TODO: We need to special-case `in out` variables here,
-                    // because they actually need to be lowered to *two*
-                    // global variables, not just one. We then need
-                    // to emit logic to initialize the output variable
-                    // based on the input at the start of the entry point,
-                    // and then use the output variable thereafter.
-                    //
-                    // TODO: Actually, I need to double-check that it is
-                    // legal in GLSL to use shader input/output parameters
-                    // as temporaries in general; if not then we'd need
-                    // to introduce a temporary no matter what.
+                    auto localVariable = builder.emitVar(valueType);
+                    auto localVal = ScalarizedVal::address(localVariable);
 
-                    // Next we attach the layout information from the
-                    // original parameter to the new global variable,
-                    // so that we can lay it out correctly when generating
-                    // target code:
-                    builder.addLayoutDecoration(paramVariable, paramLayout);
+                    if( auto inOutType = paramPtrType->As<InOutType>() )
+                    {
+                        // In the `in out` case we need to declare two
+                        // sets of global variables: one for the `in`
+                        // side and one for the `out` side.
+                        auto globalInputVal = createGLSLGlobalVaryings(&builder, valueType, paramLayout, LayoutResourceKind::VertexInput);
 
-                    // And finally, we go ahead and replace all the
-                    // uses of the parameter (which was a pointer) with
-                    // uses of the new global variable's address.
-                    pp->replaceUsesWith(paramVariable);
+                        assign(&builder, localVal, globalInputVal);
+                    }
+
+                    // Any places where the original parameter was used inside
+                    // the function body should instead use the new local variable.
+                    // Since the parameter was a pointer, we use the variable instruction
+                    // itself (which is an `alloca`d pointer) directly:
+                    pp->replaceUsesWith(localVariable);
+
+                    // We also need one or more global variabels to write the output to
+                    // when the function is done. We create them here.
+                    auto globalOutputVal = createGLSLGlobalVaryings(&builder, valueType, paramLayout, LayoutResourceKind::FragmentOutput);
+
+                    // Now we need to iterate over all the blocks in the function looking
+                    // for any `return*` instructions, so that we can write to the output variable
+                    for( auto bb = func->getFirstBlock(); bb; bb = bb->getNextBlock() )
+                    {
+                        auto terminatorInst = bb->getLastInst();
+                        if(!terminatorInst)
+                            continue;
+
+                        switch( terminatorInst->op )
+                        {
+                        default:
+                            continue;
+
+                        case kIROp_ReturnVal:
+                        case kIROp_ReturnVoid:
+                            break;
+                        }
+
+                        builder.block = bb;
+                        builder.insertBeforeInst = terminatorInst;
+
+                        assign(&builder, globalOutputVal, localVal);
+                    }
                 }
                 else
                 {
                     // This is the "easy" case where the parameter wasn't
                     // being passed by reference. We start by just creating
-                    // a variable of the appropriate type, and attaching
-                    // the required layout information to it.
-                    auto paramVariable = addGlobalVariable(module, paramType);
-                    moveValueBefore(paramVariable, func);
-                    builder.addLayoutDecoration(paramVariable, paramLayout);
+                    // one or more global variables to represent the parameter,
+                    // and attach the required layout information to it along
+                    // the way.
+
+                    auto globalValue = createGLSLGlobalVaryings(&builder, paramType, paramLayout, LayoutResourceKind::VertexInput);
 
                     // Next we need to replace uses of the parameter with
-                    // references to the variable. We are going to do that
-                    // somewhat naively, by simply loading the variable
-                    // at the start.
+                    // references to the variable(s). We are going to do that
+                    // somewhat naively, by simply materializing the
+                    // variables at the start.
+                    IRValue* materialized = materializeValue(&builder, globalValue);
 
-                    IRInst* loadInst = builder.emitLoad(paramVariable);
-                    loadInst->insertBefore(insertBeforeInst);
-
-                    pp->replaceUsesWith(loadInst);
+                    pp->replaceUsesWith(materialized);
                 }
             }
 
