@@ -1205,9 +1205,10 @@ TestResult doImageComparison(String const& filePath)
             continue;
         }
 
+        float relativeDiff = 0.0f;
         if( expectedVal != 0 )
         {
-            float relativeDiff = fabsf(float(actualVal) - float(expectedVal)) / float(expectedVal);
+            relativeDiff = fabsf(float(actualVal) - float(expectedVal)) / float(expectedVal);
 
             if( relativeDiff < kRelativeDiffCutoff )
             {
@@ -1219,6 +1220,13 @@ TestResult doImageComparison(String const& filePath)
         // TODO: may need to do some local search sorts of things, to deal with
         // cases where vertex shader results lead to rendering that is off
         // by one pixel...
+
+        fprintf(stderr, "image compare failure at (%d,%d) channel %d. expected %d got %d (absolute error: %d, relative error: %f)\n",
+            x, y, n,
+            expectedVal,
+            actualVal,
+            absoluteDiff,
+            relativeDiff);
 
         // There was a difference we couldn't excuse!
         return kTestResult_Fail;

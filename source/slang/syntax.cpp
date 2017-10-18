@@ -628,6 +628,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
                 {
                     SLANG_UNEXPECTED("expected a declaration reference type");
                 }
+                declRefType->session = session;
                 declRefType->declRef = declRef;
                 return declRefType;
             }
@@ -800,9 +801,52 @@ void Type::accept(IValVisitor* visitor, void* extra)
         return false;
     }
 
+    RefPtr<Val> FuncType::SubstituteImpl(Substitutions* subst, int* ioDiff)
+    {
+        int diff = 0;
+
+        // result type
+        RefPtr<Type> substResultType = resultType->SubstituteImpl(subst, &diff).As<Type>();
+
+        // parameter types
+        List<RefPtr<Type>> substParamTypes;
+        for( auto pp : paramTypes )
+        {
+            substParamTypes.Add(pp->SubstituteImpl(subst, &diff).As<Type>());
+        }
+
+        // early exit for no change...
+        if(!diff)
+            return this;
+
+        (*ioDiff)++;
+        RefPtr<FuncType> substType = new FuncType();
+        substType->session = session;
+        substType->resultType = substResultType;
+        substType->paramTypes = substParamTypes;
+        return substType;
+    }
+
     Type* FuncType::CreateCanonicalType()
     {
-        return this;
+        // result type
+        RefPtr<Type> canResultType = resultType->GetCanonicalType();
+
+        // parameter types
+        List<RefPtr<Type>> canParamTypes;
+        for( auto pp : paramTypes )
+        {
+            canParamTypes.Add(pp->GetCanonicalType());
+        }
+
+        RefPtr<FuncType> canType = new FuncType();
+        canType->session = session;
+        canType->resultType = resultType;
+        canType->paramTypes = canParamTypes;
+
+        session->canonicalTypes.Add(canType);
+
+        return canType;
     }
 
     int FuncType::GetHashCode()

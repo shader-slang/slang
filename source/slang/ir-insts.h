@@ -47,13 +47,31 @@ struct IRLoopControlDecoration : IRDecoration
     IRLoopControl mode;
 };
 
+struct IRTargetDecoration : IRDecoration
+{
+    enum { kDecorationOp = kIRDecorationOp_Target };
+
+    // TODO: have a more structured representation of target specifiers
+    String targetName;
+};
+
 //
 
 // An IR node to represent a reference to an AST-level
 // declaration.
 struct IRDeclRef : IRValue
 {
-    DeclRefBase declRef;
+    DeclRef<Decl> declRef;
+};
+
+// An instruction that specializes another IR value
+// (representing a generic) to a particular set of
+// generic arguments (encoded via an `IRDeclRef`)
+//
+struct IRSpecialize : IRInst
+{
+    IRUse genericVal;
+    IRUse specDeclRefVal;
 };
 
 //
@@ -304,6 +322,16 @@ struct IRBuilder
     IRValue* getDeclRefVal(
         DeclRefBase const&  declRef);
 
+    IRValue* emitSpecializeInst(
+        IRType*     type,
+        IRValue*    genericVal,
+        IRValue*    specDeclRef);
+
+    IRValue* emitSpecializeInst(
+        IRType*         type,
+        IRValue*        genericVal,
+        DeclRef<Decl>   specDeclRef);
+
     IRInst* emitCallInst(
         IRType*         type,
         IRValue*        func,
@@ -452,12 +480,15 @@ struct IRBuilder
 
 // Generate a clone of an IR module that is specialized for
 // a particular entry point, target, etc.
-
 IRModule* specializeIRForEntryPoint(
     EntryPointRequest*  entryPointRequest,
     ProgramLayout*      programLayout,
     CodeGenTarget       target);
 
+// Find suitable uses of the `specialize` instruction that
+// can be replaced with references to specialized functions.
+void specializeGenerics(
+    IRModule*   module);
 
 }
 

@@ -739,6 +739,7 @@ struct LoweringVisitor
     RefPtr<Type> visitFuncType(FuncType* type)
     {
         RefPtr<FuncType> loweredType = new FuncType();
+        loweredType->setSession(getSession());
         loweredType->resultType = lowerType(type->resultType);
         for (auto paramType : type->paramTypes)
         {

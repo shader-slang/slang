@@ -4,12 +4,13 @@
 // This file implements the name mangling scheme for the Slang language.
 
 #include "../core/basic.h"
+#include "syntax.h"
 
 namespace Slang
 {
-    class Decl;
-
     String getMangledName(Decl* decl);
+    String getMangledName(DeclRef<Decl> const & declRef);
+    String getMangledName(DeclRefBase const & declRef);
 }
 
 #endif

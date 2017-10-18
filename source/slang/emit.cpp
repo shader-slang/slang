@@ -3574,17 +3574,34 @@ struct EmitVisitor
         switch(info.kind)
         {
         case LayoutResourceKind::Uniform:
-            // Explicit offsets require a GLSL extension.
-            //
-            // TODO: We really need to fix this so that we
-            // only output an explicit offset for things
-            // that are layed out differently than they
-            // would normally be...
-            requireGLSLExtension("GL_ARB_enhanced_layouts");
+            {
+                // Explicit offsets require a GLSL extension (which
+                // is not universally supported, it seems) or a new
+                // enough GLSL version (which we don't want to
+                // universall require), so for right now we
+                // won't actually output explicit offsets for uniform
+                // shader parameters.
+                //
+                // TODO: We should fix this so that we skip any
+                // extra work for parameters that are laid out as
+                // expected by the default rules, but do *something*
+                // for parameters that need non-default layout.
+                //
+                // Using the `GL_ARB_enhanced_layouts` feature is one
+                // option, but we should also be able to do some
+                // things by introducing padding into the declaration
+                // (padding insertion would probably be best done at
+                // the IR level).
+                bool useExplicitOffsets = false;
+                if (useExplicitOffsets)
+                {
+                    requireGLSLExtension("GL_ARB_enhanced_layouts");
 
-            Emit("layout(offset = ");
-            Emit(info.index);
-            Emit(")\n");
+                    Emit("layout(offset = ");
+                    Emit(info.index);
+                    Emit(")\n");
+                }
+            }
             break;
 
         case LayoutResourceKind::VertexInput:
@@ -4073,7 +4090,11 @@ emitDeclImpl(decl, nullptr);
         {
         case kIROp_global_var:
         case kIROp_Func:
-            return ((IRGlobalValue*)inst)->mangledName;
+            {
+                auto& mangledName = ((IRGlobalValue*)inst)->mangledName;
+                if(mangledName.Length() != 0)
+                    return mangledName;
+            }
             break;
 
         default:
@@ -4396,6 +4417,7 @@ emitDeclImpl(decl, nullptr);
         case kIROp_boolConst:
         case kIROp_FieldAddress:
         case kIROp_getElementPtr:
+        case kIROp_specialize:
             return true;
         }
 
@@ -4934,6 +4956,12 @@ emitDeclImpl(decl, nullptr);
                     char const* kComponents[] = { "x", "y", "z", "w" };
                     emit(kComponents[elementIndex]);
                 }
+            }
+            break;
+
+        case kIROp_specialize:
+            {
+                emitIROperand(context, inst->getArg(0));
             }
             break;
 
@@ -5579,6 +5607,11 @@ emitDeclImpl(decl, nullptr);
         if(!value)
             return nullptr;
 
+        if(value->op == kIROp_specialize)
+        {
+            value = ((IRSpecialize*) value)->genericVal.usedValue;
+        }
+
         if(value->op != kIROp_Func)
             return nullptr;
 
@@ -5608,6 +5641,14 @@ emitDeclImpl(decl, nullptr);
         }
         else
 #endif
+        if(func->genericDecl)
+        {
+            Emit("/* ");
+            emitIRFuncDecl(context, func);
+            Emit(" */");
+            return;
+        }
+
         if(!isDefinition(func))
         {
             // This is just a function declaration,
@@ -6339,6 +6380,13 @@ String emitEntryPoint(
 
         // TODO: we should apply some guaranteed transformations here,
         // to eliminate constructs that aren't legal downstream (e.g. generics).
+
+        specializeGenerics(lowered);
+
+//        fprintf(stderr, "###\n");
+//        dumpIR(lowered);
+//        fprintf(stderr, "###\n");
+
         //
         // TODO: Need to decide whether to do these before or after
         // target-specific legalization steps. Currently I've folded
@@ -6348,6 +6396,8 @@ String emitEntryPoint(
         // IR back into AST for emission?
 
         visitor.emitIRModule(&context, lowered);
+
+        // TODO: need to clean up the IR module here
     }
     else if(!(translationUnit->compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING ) ||
         translationUnit->compileRequest->loadedModulesList.Count() != 0)

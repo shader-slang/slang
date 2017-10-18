@@ -96,6 +96,8 @@ INST(IntLit, integer_constant, 0, 0)
 INST(FloatLit, float_constant, 0, 0)
 INST(decl_ref, decl_ref, 0, 0)
 
+INST(specialize, specialize, 2, 0)
+
 INST(Construct, construct, 0, 0)
 INST(Call, call, 1, 0)
 
