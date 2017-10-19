@@ -1,4 +1,4 @@
-// render-d3d11.cpp
+﻿// render-d3d11.cpp
 #include "render-d3d11.h"
 
 #include "options.h"
@@ -418,6 +418,12 @@ public:
         return this;
     }
 
+	struct D3DBuffer
+	{
+		ID3D11UnorderedAccessView * view = nullptr;
+		ID3D11Buffer * buffer = nullptr;
+	};
+
     virtual Buffer* createBuffer(BufferDesc const& desc) override
     {
         D3D11_BUFFER_DESC dxBufferDesc = { 0 };
@@ -437,6 +443,14 @@ public:
             dxBufferDesc.CPUAccessFlags = 0;
             break;
 
+		case BufferFlavor::Storage:
+			dxBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+			dxBufferDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
+			dxBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
+			dxBufferDesc.StructureByteStride = sizeof(float);
+			dxBufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+			break;
+
         default:
             return nullptr;
         }
@@ -452,7 +466,20 @@ public:
             &dxBuffer);
         if(FAILED(hr)) return nullptr;
 
-        return (Buffer*) dxBuffer;
+		D3DBuffer * rs = new D3DBuffer();
+		rs->buffer = dxBuffer;
+		if (desc.flavor == BufferFlavor::Storage)
+		{
+			D3D11_UNORDERED_ACCESS_VIEW_DESC viewDesc;
+			memset(&viewDesc, 0, sizeof(viewDesc));
+			viewDesc.Buffer.FirstElement = 0;
+			viewDesc.Buffer.NumElements = 512;
+			viewDesc.Buffer.Flags = 0;
+			viewDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
+			viewDesc.Format = DXGI_FORMAT_UNKNOWN;
+			dxDevice->CreateUnorderedAccessView(dxBuffer, &viewDesc, &rs->view);
+		}
+        return (Buffer*) rs;
     }
 
     static DXGI_FORMAT mapFormat(Format format)
@@ -535,7 +562,7 @@ public:
     {
         auto dxContext = dxImmediateContext;
 
-        auto dxBuffer = (ID3D11Buffer*) buffer;
+        auto dxBuffer = ((D3DBuffer*)buffer)->buffer;
 
         D3D11_MAP dxMapFlavor;
         switch( flavor )
@@ -543,7 +570,12 @@ public:
         case MapFlavor::WriteDiscard:
             dxMapFlavor = D3D11_MAP_WRITE_DISCARD;
             break;
-
+		case MapFlavor::HostWrite:
+			dxMapFlavor = D3D11_MAP_WRITE;
+			break;
+		case MapFlavor::HostRead:
+			dxMapFlavor = D3D11_MAP_READ;
+			break;
         default:
             return nullptr;
         }
@@ -563,7 +595,7 @@ public:
     {
         auto dxContext = dxImmediateContext;
 
-        auto dxBuffer = (ID3D11Buffer*) buffer;
+        auto dxBuffer = ((D3DBuffer*)buffer)->buffer;
 
         dxContext->Unmap(dxBuffer, 0);
     }
@@ -609,11 +641,11 @@ public:
             dxVertexOffsets[ii] = (UINT) offsets[ii];
         }
 
-        auto dxVertexBuffers = (ID3D11Buffer* const*) buffers;
+        auto dxVertexBuffers = (D3DBuffer* const*) buffers;
 
         dxContext->IASetVertexBuffers(
             (UINT) startSlot,
-            (UINT) slotCount, &dxVertexBuffers[0], &dxVertexStrides[0], &dxVertexOffsets[0]);
+            (UINT) slotCount, &(dxVertexBuffers[0])->buffer, &dxVertexStrides[0], &dxVertexOffsets[0]);
     }
 
     virtual void setShaderProgram(ShaderProgram* inProgram) override
@@ -621,7 +653,7 @@ public:
         auto dxContext = dxImmediateContext;
         
         auto program = (D3D11ShaderProgram*) inProgram;
-
+		dxContext->CSSetShader(program->dxComputeShader, NULL, 0);
         dxContext->VSSetShader(program->dxVertexShader, NULL, 0);
         dxContext->PSSetShader(program->dxPixelShader,  NULL, 0);
     }
@@ -632,13 +664,23 @@ public:
 
         // TODO: actually use those offsets
 
-        auto dxConstantBuffers = (ID3D11Buffer* const*) buffers;
-
+        auto dxConstantBuffers = (D3DBuffer* const*) buffers;
         dxContext->VSSetConstantBuffers(
-            (UINT) startSlot, (UINT) slotCount, &dxConstantBuffers[0]);
+            (UINT) startSlot, (UINT) slotCount, &dxConstantBuffers[0]->buffer);
         dxContext->VSSetConstantBuffers(
-            (UINT) startSlot, (UINT) slotCount, &dxConstantBuffers[0]);
+            (UINT) startSlot, (UINT) slotCount, &dxConstantBuffers[0]->buffer);
     }
+
+	virtual void setStorageBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* offsets) override
+	{
+		auto dxContext = dxImmediateContext;
+
+		// TODO: actually use those offsets
+
+		auto dxStorageBuffers = (D3DBuffer* const*)buffers;
+		dxContext->CSSetUnorderedAccessViews(
+			(UINT)startSlot, (UINT)slotCount, &dxStorageBuffers[0]->view, 0);
+	}
 
 
     virtual void draw(UInt vertexCount, UInt startVertex) override
@@ -653,35 +695,62 @@ public:
 
     struct D3D11ShaderProgram
     {
-        ID3D11VertexShader* dxVertexShader;
-        ID3D11PixelShader*  dxPixelShader;
+        ID3D11VertexShader* dxVertexShader = nullptr;
+        ID3D11PixelShader*  dxPixelShader = nullptr;
+		ID3D11ComputeShader* dxComputeShader = nullptr;
     };
 
     virtual ShaderProgram* compileProgram(ShaderCompileRequest const& request) override
     {
-        auto dxVertexShaderBlob     = compileHLSLShader(request.vertexShader.source.path, request.vertexShader.source.text, request.vertexShader    .name,  request.vertexShader    .profile);
-        if(!dxVertexShaderBlob)     return nullptr;
+		if (request.computeShader.name)
+		{
+			auto dxComputeShaderBlob = compileHLSLShader(request.computeShader.source.path, request.computeShader.source.text, request.computeShader.name, request.computeShader.profile);
+			if (!dxComputeShaderBlob)     return nullptr;
 
-        auto dxFragmentShaderBlob   = compileHLSLShader(request.fragmentShader.source.path, request.fragmentShader.source.text, request.fragmentShader  .name,  request.fragmentShader  .profile);
-        if(!dxFragmentShaderBlob)   return nullptr;
+			ID3D11ComputeShader* dxComputeShader;
 
-        ID3D11VertexShader* dxVertexShader;
-        ID3D11PixelShader*  dxPixelShader;
+			HRESULT csResult = dxDevice->CreateComputeShader(dxComputeShaderBlob->GetBufferPointer(), dxComputeShaderBlob->GetBufferSize(), nullptr, &dxComputeShader);
 
-        HRESULT vsResult = dxDevice->CreateVertexShader(  dxVertexShaderBlob  ->GetBufferPointer(),   dxVertexShaderBlob  ->GetBufferSize(), nullptr, &dxVertexShader);
-        HRESULT psResult = dxDevice->CreatePixelShader(   dxFragmentShaderBlob->GetBufferPointer(),   dxFragmentShaderBlob->GetBufferSize(), nullptr, &dxPixelShader);
+			dxComputeShaderBlob->Release();
 
-        dxVertexShaderBlob  ->Release();
-        dxFragmentShaderBlob->Release();
+			if (FAILED(csResult)) return nullptr;
 
-        if(FAILED(vsResult)) return nullptr;
-        if(FAILED(psResult)) return nullptr;
+			D3D11ShaderProgram* shaderProgram = new D3D11ShaderProgram();
+			shaderProgram->dxComputeShader = dxComputeShader;
+			return (ShaderProgram*)shaderProgram;
+		}
+		else
+		{
+			auto dxVertexShaderBlob = compileHLSLShader(request.vertexShader.source.path, request.vertexShader.source.text, request.vertexShader.name, request.vertexShader.profile);
+			if (!dxVertexShaderBlob)     return nullptr;
 
-        D3D11ShaderProgram* shaderProgram = new D3D11ShaderProgram();
-        shaderProgram->dxVertexShader   = dxVertexShader;
-        shaderProgram->dxPixelShader    = dxPixelShader;
-        return (ShaderProgram*) shaderProgram;
+			auto dxFragmentShaderBlob = compileHLSLShader(request.fragmentShader.source.path, request.fragmentShader.source.text, request.fragmentShader.name, request.fragmentShader.profile);
+			if (!dxFragmentShaderBlob)   return nullptr;
+
+			ID3D11VertexShader* dxVertexShader;
+			ID3D11PixelShader*  dxPixelShader;
+
+			HRESULT vsResult = dxDevice->CreateVertexShader(dxVertexShaderBlob->GetBufferPointer(), dxVertexShaderBlob->GetBufferSize(), nullptr, &dxVertexShader);
+			HRESULT psResult = dxDevice->CreatePixelShader(dxFragmentShaderBlob->GetBufferPointer(), dxFragmentShaderBlob->GetBufferSize(), nullptr, &dxPixelShader);
+
+			dxVertexShaderBlob->Release();
+			dxFragmentShaderBlob->Release();
+
+			if (FAILED(vsResult)) return nullptr;
+			if (FAILED(psResult)) return nullptr;
+
+			D3D11ShaderProgram* shaderProgram = new D3D11ShaderProgram();
+			shaderProgram->dxVertexShader = dxVertexShader;
+			shaderProgram->dxPixelShader = dxPixelShader;
+			return (ShaderProgram*)shaderProgram;
+		}
     }
+
+	virtual void dispatchCompute(int x, int y, int z) override
+	{
+		auto dxContext = dxImmediateContext;
+		dxContext->Dispatch(x, y, z);
+	}
 };
 
 

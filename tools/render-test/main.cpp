@@ -49,21 +49,24 @@ static const Vertex kVertexData[kVertexCount] = {
 
 // Global variables for state to be used for rendering...
 
-uintptr_t gConstantBufferSize;
+uintptr_t gConstantBufferSize, gComputeResultBufferSize;
 
 Buffer*         gConstantBuffer;
 InputLayout*    gInputLayout;
 Buffer*         gVertexBuffer;
+Buffer*         gComputeResultBuffer;
 ShaderProgram*  gShaderProgram;
 
 // Entry point name to use for vertex/fragment shader
 static char const* vertexEntryPointName    = "vertexMain";
 static char const* fragmentEntryPointName  = "fragmentMain";
+static char const* computeEntryPointName = "computeMain";
 
 // "Profile" to use when compiling for HLSL targets
 // TODO: does this belong here?
 static char const* vertexProfileName   = "vs_4_0";
 static char const* fragmentProfileName = "ps_4_0";
+static char const* computeProfileName = "cs_4_0";
 
 Error initializeShaders(
     ShaderCompiler* shaderCompiler)
@@ -95,13 +98,21 @@ Error initializeShaders(
 
     ShaderCompileRequest compileRequest;
     compileRequest.source                   = sourceInfo;
-    compileRequest.vertexShader.source      = sourceInfo;
-    compileRequest.vertexShader.name        = vertexEntryPointName;
-    compileRequest.vertexShader.profile     = vertexProfileName;
-    compileRequest.fragmentShader.source    = sourceInfo;
-    compileRequest.fragmentShader.name      = fragmentEntryPointName;
-    compileRequest.fragmentShader.profile   = fragmentProfileName;
-
+	if (gOptions.shaderType == ShaderProgramType::Graphics)
+	{
+		compileRequest.vertexShader.source = sourceInfo;
+		compileRequest.vertexShader.name = vertexEntryPointName;
+		compileRequest.vertexShader.profile = vertexProfileName;
+		compileRequest.fragmentShader.source = sourceInfo;
+		compileRequest.fragmentShader.name = fragmentEntryPointName;
+		compileRequest.fragmentShader.profile = fragmentProfileName;
+	}
+	else
+	{
+		compileRequest.computeShader.source = sourceInfo;
+		compileRequest.computeShader.name = computeEntryPointName;
+		compileRequest.computeShader.profile = computeProfileName;
+	}
     gShaderProgram = shaderCompiler->compileProgram(compileRequest);
     if( !gShaderProgram )
     {
@@ -109,6 +120,15 @@ Error initializeShaders(
     }
 
     return Error::None;
+}
+
+void outputComputeResult(Renderer* renderer, const char * fileName)
+{
+	float* data = (float*)renderer->map(gComputeResultBuffer, MapFlavor::HostRead);
+	FILE* f = fopen(fileName, "wt");
+	for (auto i = 0u; i < gComputeResultBufferSize / sizeof(UInt); i++)
+		fprintf(f, "%.9g\n", data[i]);
+	fclose(f);
 }
 
 //
@@ -137,6 +157,19 @@ Error initializeInner(
     gConstantBuffer = renderer->createBuffer(constantBufferDesc);
     if(!gConstantBuffer)
         return Error::Unexpected;
+
+	gComputeResultBufferSize = 512 * sizeof(float);
+	BufferDesc computeResultBufferDesc;
+	computeResultBufferDesc.size = gComputeResultBufferSize;
+	computeResultBufferDesc.flavor = BufferFlavor::Storage;
+	gComputeResultBuffer = renderer->createBuffer(computeResultBufferDesc);
+	if (!gComputeResultBufferSize)
+		return Error::Unexpected;
+	// initialize buffer to 0
+	char * ptr = (char*)renderer->map(gComputeResultBuffer, MapFlavor::HostWrite);
+	for (auto i = 0u; i < gComputeResultBufferSize; i++)
+		ptr[i] = 0;
+	renderer->unmap(gComputeResultBuffer);
 
     // Input Assembler (IA)
 
@@ -193,6 +226,13 @@ void renderFrameInner(
     //
 
     renderer->draw(3);
+}
+
+void runCompute(Renderer * renderer)
+{
+	renderer->setShaderProgram(gShaderProgram);
+	renderer->setStorageBuffer(0, gComputeResultBuffer);
+	renderer->dispatchCompute(1, 1, 1);
 }
 
 void finalize()
@@ -352,44 +392,52 @@ int main(
 
     // Once initialization is all complete, we show the window...
     ShowWindow(windowHandle, showCommand);
+	
+	// ... and enter the event loop:
+	for (;;)
+	{
+		MSG message;
 
-    // ... and enter the event loop:
-    for(;;)
-    {
-        MSG message;
+		int result = PeekMessageW(&message, NULL, 0, 0, PM_REMOVE);
+		if (result != 0)
+		{
+			if (message.message == WM_QUIT)
+			{
+				return (int)message.wParam;
+			}
 
-        int result = PeekMessageW(&message, NULL, 0, 0, PM_REMOVE);
-        if (result != 0)
-        {
-            if (message.message == WM_QUIT)
-            {
-                return (int)message.wParam;
-            }
+			TranslateMessage(&message);
+			DispatchMessageW(&message);
+		}
+		else
+		{
+			// Whenver we don't have Windows events to process,
+			// we render a frame.
+			static const float kClearColor[] = { 0.25, 0.25, 0.25, 1.0 };
+			renderer->setClearColor(kClearColor);
+			renderer->clearFrame();
 
-            TranslateMessage(&message);
-            DispatchMessageW(&message);
-        }
-        else
-        {
-            // Whenver we don't have Windows events to process,
-            // we render a frame.
+			if (gOptions.shaderType == ShaderProgramType::Compute)
+			{
+				runCompute(renderer);
+			}
+			else
+			{
+				renderFrameInner(renderer);
+			}
+			// If we are in a mode where output is requested, we need to snapshot the back buffer here
+			if (gOptions.outputPath)
+			{
+				if (gOptions.shaderType == ShaderProgramType::Compute)
+					outputComputeResult(renderer, gOptions.outputPath);
+				else
+					renderer->captureScreenShot(gOptions.outputPath);
+				return 0;
+			}
 
-            static const float kClearColor[] = { 0.25, 0.25, 0.25, 1.0 };
-            renderer->setClearColor(kClearColor);
-            renderer->clearFrame();
-
-            renderFrameInner(renderer);
-
-            // If we are in a mode where output is requested, we need to snapshot the back buffer here
-            if( gOptions.outputPath )
-            {
-                renderer->captureScreenShot(gOptions.outputPath);
-                return 0;
-            }
-
-            renderer->presentFrame();
-        }
-    }
+			renderer->presentFrame();
+		}
+	}
 
     return 0;
 }
