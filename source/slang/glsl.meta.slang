@@ -172,7 +172,7 @@ sb << "syntax patch : GLSLPatchModifier;\n";
 // [GLSL 4.5] Interpolation Qualifiers
 sb << "syntax smooth : SimpleModifier;\n";
 sb << "syntax flat : SimpleModifier;\n";
-sb << "syntax noperspectie : SimpleModifier;\n";
+sb << "syntax noperspective : SimpleModifier;\n";
 
 
 // [GLSL 4.3.2] Constant Qualifier
