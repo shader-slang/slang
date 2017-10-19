@@ -31,11 +31,18 @@ enum
     kMaxSlangArgs = 16,
 };
 
+enum class ShaderProgramType
+{
+	Graphics,
+	Compute
+};
+
 struct Options
 {
     char const* appName = "render-test";
     char const* sourcePath = nullptr;
     char const* outputPath = nullptr;
+	ShaderProgramType shaderType = ShaderProgramType::Graphics;
     Mode mode = Mode::Slang;
 
     char const* slangArgs[kMaxSlangArgs];

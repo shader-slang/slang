@@ -311,6 +311,28 @@ namespace Slang
             stream = 0;
         }
 	};
+
+	inline List<String> Split(String text, char c)
+	{
+		List<String> result;
+		StringBuilder sb;
+		for (int i = 0; i < text.Length(); i++)
+		{
+			if (text[i] == c)
+			{
+				auto str = sb.ToString();
+				if (str.Length() != 0)
+					result.Add(str);
+				sb.Clear();
+			}
+			else
+				sb << text[i];
+		}
+		auto lastStr = sb.ToString();
+		if (lastStr.Length())
+			result.Add(lastStr);
+		return result;
+	}
 }
 
 #endif

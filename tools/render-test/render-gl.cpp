@@ -58,6 +58,7 @@
     F(glEnableVertexAttribArray,    PFNGLENABLEVERTEXATTRIBARRAYPROC)   \
     F(glDisableVertexAttribArray,   PFNGLDISABLEVERTEXATTRIBARRAYPROC)  \
     F(glDebugMessageCallback,       PFNGLDEBUGMESSAGECALLBACKPROC)      \
+	F(glDispatchCompute,            PFNGLDISPATCHCOMPUTEPROC) \
     /* end */
 
 namespace renderer_test {
@@ -311,8 +312,12 @@ public:
         switch (flavor)
         {
         case MapFlavor::WriteDiscard:
+		case MapFlavor::HostWrite:
             access = GL_WRITE_ONLY;
             break;
+		case MapFlavor::HostRead:
+			access = GL_READ_ONLY;
+			break;
         }
 
         auto bufferID = (GLuint)(uintptr_t)buffer;
@@ -377,20 +382,31 @@ public:
         glUseProgram(programID);
     }
 
+	void bindBufferImpl(int target, UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* offsets)
+	{
+		for (UInt ii = 0; ii < slotCount; ++ii)
+		{
+			UInt slot = startSlot + ii;
+
+			Buffer* buffer = buffers[ii];
+			GLuint bufferID = (GLuint)(uintptr_t)buffer;
+
+			assert(!offsets || !offsets[ii]);
+
+			glBindBufferBase(target, (GLuint)slot, bufferID);
+		}
+	}
+
     virtual void setConstantBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* offsets) override
     {
-        for (UInt ii = 0; ii < slotCount; ++ii)
-        {
-            UInt slot = startSlot + ii;
-
-            Buffer* buffer = buffers[ii];
-            GLuint bufferID = (GLuint)(uintptr_t)buffer;
-
-            assert(!offsets || !offsets[ii]);
-
-            glBindBufferBase(GL_UNIFORM_BUFFER, (GLuint) slot, bufferID);
-        }
+		bindBufferImpl(GL_UNIFORM_BUFFER, startSlot, slotCount, buffers, offsets);
     }
+
+
+	virtual void setStorageBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* offsets) override
+	{
+		bindBufferImpl(GL_SHADER_STORAGE_BUFFER, startSlot, slotCount, buffers, offsets);
+	}
 
     void flushStateForDraw()
     {
@@ -432,18 +448,31 @@ public:
     virtual ShaderProgram* compileProgram(ShaderCompileRequest const& request) override
     {
         auto programID = glCreateProgram();
+		if (request.computeShader.name)
+		{
+			auto computeShaderID = loadShader(GL_COMPUTE_SHADER, request.computeShader.source.text);
 
-        auto vertexShaderID   = loadShader(GL_VERTEX_SHADER,   request.vertexShader  .source.text);
-        auto fragmentShaderID = loadShader(GL_FRAGMENT_SHADER, request.fragmentShader.source.text);
+			glAttachShader(programID, computeShaderID);
 
-        glAttachShader(programID, vertexShaderID);
-        glAttachShader(programID, fragmentShaderID);
 
-        glLinkProgram(programID);
+			glLinkProgram(programID);
 
-        glDeleteShader(vertexShaderID);
-        glDeleteShader(fragmentShaderID);
+			glDeleteShader(computeShaderID);
+		}
+		else
+		{
+			auto vertexShaderID = loadShader(GL_VERTEX_SHADER, request.vertexShader.source.text);
+			auto fragmentShaderID = loadShader(GL_FRAGMENT_SHADER, request.fragmentShader.source.text);
 
+			glAttachShader(programID, vertexShaderID);
+			glAttachShader(programID, fragmentShaderID);
+
+
+			glLinkProgram(programID);
+
+			glDeleteShader(vertexShaderID);
+			glDeleteShader(fragmentShaderID);
+		}
         GLint success = GL_FALSE;
         glGetProgramiv(programID, GL_LINK_STATUS, &success);
         if( !success )
@@ -579,6 +608,11 @@ public:
 
         return shaderID;
     }
+
+	virtual void dispatchCompute(int x, int y, int z) override
+	{
+		glDispatchCompute(x, y, z);
+	}
 };
 
 

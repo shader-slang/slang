@@ -1110,7 +1110,55 @@ TestResult runGLSLComparisonTest(TestInput& input)
     return kTestResult_Pass;
 }
 
+TestResult doComputeComparisonTestRunImpl(TestInput& input, const char * langOption, String referenceOutput)
+{
+	// TODO: delete any existing files at the output path(s) to avoid stale outputs leading to a false pass
+	auto filePath999 = input.filePath;
+	auto outputStem = input.outputStem;
 
+	OSProcessSpawner spawner;
+
+	spawner.pushExecutablePath(String(options.binDir) + "render-test" + osGetExecutableSuffix());
+	spawner.pushArgument(filePath999);
+
+	for (auto arg : input.testOptions->args)
+	{
+		spawner.pushArgument(arg);
+	}
+
+	spawner.pushArgument(langOption);
+	spawner.pushArgument("-o");
+	spawner.pushArgument(outputStem + ".actual.txt");
+
+	if (spawnAndWait(outputStem, spawner) != kOSError_None)
+	{
+		return kTestResult_Fail;
+	}
+
+	// check against reference output
+	if (!File::Exists(outputStem + ".actual.txt"))
+		return kTestResult_Fail;
+	if (!File::Exists(referenceOutput))
+		return kTestResult_Fail;
+
+	auto actualProgramOutput = Split(File::ReadAllText(outputStem + ".actual.txt"), '\n');
+	auto referenceProgramOutput = Split(File::ReadAllText(referenceOutput), '\n');
+	if (actualProgramOutput.Count() < referenceProgramOutput.Count())
+		return kTestResult_Fail;
+	for (int i = 0; i < referenceProgramOutput.Count(); i++)
+	{
+		auto reference = StringToFloat(referenceProgramOutput[i]);
+		auto actual = StringToFloat(actualProgramOutput[i]);
+		if (abs(actual - reference) > 1e-7f)
+			return kTestResult_Fail;
+	}
+	return kTestResult_Pass;
+}
+
+TestResult doSlangComputeComparisonTest(TestInput& input)
+{
+	return doComputeComparisonTestRunImpl(input, "-slang -compute", input.outputStem + ".expected.txt");
+}
 
 TestResult doRenderComparisonTestRun(TestInput& input, char const* langOption, char const* outputKind, String* outOutput)
 {
@@ -1317,6 +1365,8 @@ TestResult runTest(
         { "COMPARE_HLSL_GLSL_RENDER",           &skipTest },
 #endif
         { "COMPARE_GLSL", &runGLSLComparisonTest },
+		{ "COMPARE_COMPUTE", &doSlangComputeComparisonTest},
+
         { "CROSS_COMPILE", &runCrossCompilerTest },
         { "EVAL", &runEvalTest },
         { nullptr, nullptr },
@@ -1620,6 +1670,9 @@ int main(
     auto smokeTestCategory = addTestCategory("smoke", quickTestCategory);
 
     auto renderTestCategory = addTestCategory("render", fullTestCategory);
+
+	auto computeTestCategory = addTestCategory("compute", fullTestCategory);
+
 
     // An un-categorized test will always belong to the `full` category
     defaultTestCategory = fullTestCategory;

@@ -92,6 +92,14 @@ void parseOptions(int* argc, char** argv)
             }
             gOptions.slangArgs[gOptions.slangArgCount++] = *argCursor++;
         }
+		else if (strcmp(arg, "-compute") == 0)
+		{
+			gOptions.shaderType = ShaderProgramType::Compute;
+		}
+		else if (strcmp(arg, "-graphics") == 0)
+		{
+			gOptions.shaderType = ShaderProgramType::Graphics;
+		}
         else
         {
             fprintf(stderr, "unknown option '%s'\n", arg);
