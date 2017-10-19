@@ -1,0 +1,152 @@
+result code = 0
+standard error = {
+}
+standard output = {
+{
+    "parameters": [
+
+    ],
+    "entryPoints": [
+        {
+            "name": "main",
+            "stage:": "vertex",
+            "parameters": [
+                {
+                    "name": "a",
+                    "binding": {"kind": "vertexInput", "index": 0},
+                    "semanticName": "A",
+                    "type": {
+                        "kind": "vector",
+                        "elementCount": 4,
+                        "elementType": {
+                            "kind": "scalar",
+                            "scalarType": "float32"
+                        }
+                    }
+                },
+                {
+                    "name": "b",
+                    "binding": {"kind": "vertexInput", "index": 1, "count": 3},
+                    "semanticName": "B",
+                    "type": {
+                        "kind": "struct",
+                        "fields": [
+                            {
+                                "name": "b0",
+                                "type": {
+                                    "kind": "vector",
+                                    "elementCount": 4,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "int32"
+                                    }
+                                },
+                                "binding": {"kind": "vertexInput", "index": 0},
+                                "semanticName": "B"
+                            },
+                            {
+                                "name": "b1",
+                                "type": {
+                                    "kind": "struct",
+                                    "fields": [
+                                        {
+                                            "name": "x0",
+                                            "type": {
+                                                "kind": "vector",
+                                                "elementCount": 4,
+                                                "elementType": {
+                                                    "kind": "scalar",
+                                                    "scalarType": "float32"
+                                                }
+                                            },
+                                            "binding": {"kind": "vertexInput", "index": 0},
+                                            "semanticName": "B",
+                                            "semanticIndex": 1
+                                        },
+                                        {
+                                            "name": "x1",
+                                            "type": {
+                                                "kind": "vector",
+                                                "elementCount": 4,
+                                                "elementType": {
+                                                    "kind": "scalar",
+                                                    "scalarType": "float32"
+                                                }
+                                            },
+                                            "binding": {"kind": "vertexInput", "index": 1},
+                                            "semanticName": "B",
+                                            "semanticIndex": 2
+                                        }
+                                    ]
+                                },
+                                "binding": {"kind": "vertexInput", "index": 1, "count": 2},
+                                "semanticName": "B",
+                                "semanticIndex": 1
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "c",
+                    "binding": {"kind": "vertexInput", "index": 4, "count": 3},
+                    "type": {
+                        "kind": "struct",
+                        "fields": [
+                            {
+                                "name": "c0",
+                                "type": {
+                                    "kind": "struct",
+                                    "fields": [
+                                        {
+                                            "name": "x0",
+                                            "type": {
+                                                "kind": "vector",
+                                                "elementCount": 4,
+                                                "elementType": {
+                                                    "kind": "scalar",
+                                                    "scalarType": "float32"
+                                                }
+                                            },
+                                            "binding": {"kind": "vertexInput", "index": 0},
+                                            "semanticName": "CX"
+                                        },
+                                        {
+                                            "name": "x1",
+                                            "type": {
+                                                "kind": "vector",
+                                                "elementCount": 4,
+                                                "elementType": {
+                                                    "kind": "scalar",
+                                                    "scalarType": "float32"
+                                                }
+                                            },
+                                            "binding": {"kind": "vertexInput", "index": 1},
+                                            "semanticName": "CX",
+                                            "semanticIndex": 1
+                                        }
+                                    ]
+                                },
+                                "binding": {"kind": "vertexInput", "index": 0, "count": 2},
+                                "semanticName": "CX"
+                            },
+                            {
+                                "name": "c1",
+                                "type": {
+                                    "kind": "vector",
+                                    "elementCount": 4,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "int32"
+                                    }
+                                },
+                                "binding": {"kind": "vertexInput", "index": 2},
+                                "semanticName": "CY"
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+    ]
+}
+}

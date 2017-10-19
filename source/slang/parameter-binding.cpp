@@ -1190,6 +1190,27 @@ static RefPtr<TypeLayout> processEntryPointParameter(
     EntryPointParameterState const& state,
     RefPtr<VarLayout>               varLayout)
 {
+    // If there is an available semantic name and index,
+    // then we should apply it to this parameter unconditionally
+    // (that is, not just if it is a leaf parameter).
+    auto optSemanticName    =  state.optSemanticName;
+    if (optSemanticName && varLayout)
+    {
+        // Always store semantics in upper-case for
+        // reflection information, since they are
+        // supposed to be case-insensitive and
+        // upper-case is the dominant convention.
+        String semanticName = *optSemanticName;
+        String sn = semanticName.ToUpper();
+
+        auto semanticIndex      = *state.ioSemanticIndex;
+
+        varLayout->semanticName = sn;
+        varLayout->semanticIndex = semanticIndex;
+        varLayout->flags |= VarLayoutFlag::HasSemantic;
+    }
+
+
     // Scalar and vector types are treated as outputs directly
     if(auto basicType = type->As<BasicExpressionType>())
     {
