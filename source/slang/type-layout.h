@@ -218,6 +218,7 @@ typedef unsigned int VarLayoutFlags;
 enum VarLayoutFlag : VarLayoutFlags
 {
     IsRedeclaration = 1 << 0, ///< This is a redeclaration of some shader parameter
+    HasSemantic = 1 << 1,
 };
 
 // A reified layout for a particular variable, field, etc.
@@ -240,6 +241,13 @@ public:
     // System-value semantic (and index) if this is a system value
     String  systemValueSemantic;
     int     systemValueSemanticIndex;
+
+    // General cse semantic name and index
+    // TODO: this and the system-value field are redundant
+    // TODO: the `VarLayout` type is getting bloated; we need to not store this
+    // information unless actually required.
+    String  semanticName;
+    int     semanticIndex;
 
     // The start register(s) for any resources
     struct ResourceInfo

@@ -627,6 +627,9 @@ extern "C"
     SLANG_API size_t spReflectionVariableLayout_GetOffset(SlangReflectionVariableLayout* var, SlangParameterCategory category);
     SLANG_API size_t spReflectionVariableLayout_GetSpace(SlangReflectionVariableLayout* var, SlangParameterCategory category);
 
+    SLANG_API char const* spReflectionVariableLayout_GetSemanticName(SlangReflectionVariableLayout* var);
+    SLANG_API size_t spReflectionVariableLayout_GetSemanticIndex(SlangReflectionVariableLayout* var);
+
     // Shader Parameter Reflection
 
     typedef SlangReflectionVariableLayout SlangReflectionParameter;
@@ -988,6 +991,16 @@ namespace slang
         size_t getBindingSpace(SlangParameterCategory category)
         {
             return spReflectionVariableLayout_GetSpace((SlangReflectionVariableLayout*) this, category);
+        }
+
+        char const* getSemanticName()
+        {
+            return spReflectionVariableLayout_GetSemanticName((SlangReflectionVariableLayout*) this);
+        }
+
+        size_t getSemanticIndex()
+        {
+            return spReflectionVariableLayout_GetSemanticIndex((SlangReflectionVariableLayout*) this);
         }
     };
 

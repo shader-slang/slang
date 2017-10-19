@@ -24,6 +24,7 @@ standard output = {
                     "bindings": [
 
                     ],
+                    "semanticName": "SV_DISPATCHTHREADID",
                     "type": {
                         "kind": "vector",
                         "elementCount": 3,

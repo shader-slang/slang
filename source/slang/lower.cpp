@@ -3183,6 +3183,8 @@ struct LoweringVisitor
                     newFieldLayout->varDecl = fieldLayout->varDecl;
                     newFieldLayout->systemValueSemantic = fieldLayout->systemValueSemantic;
                     newFieldLayout->systemValueSemanticIndex = fieldLayout->systemValueSemanticIndex;
+                    newFieldLayout->semanticName = fieldLayout->semanticName;
+                    newFieldLayout->semanticIndex = fieldLayout->semanticIndex;
 
                     for (auto resInfo : fieldLayout->resourceInfos)
                     {

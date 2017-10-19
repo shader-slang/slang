@@ -623,6 +623,28 @@ SLANG_API size_t spReflectionVariableLayout_GetSpace(SlangReflectionVariableLayo
     return info->space;
 }
 
+SLANG_API char const* spReflectionVariableLayout_GetSemanticName(SlangReflectionVariableLayout* inVarLayout)
+{
+    auto varLayout = convert(inVarLayout);
+    if(!varLayout) return 0;
+
+    if (!(varLayout->flags & Slang::VarLayoutFlag::HasSemantic))
+        return 0;
+
+    return varLayout->semanticName.Buffer();
+}
+
+SLANG_API size_t spReflectionVariableLayout_GetSemanticIndex(SlangReflectionVariableLayout* inVarLayout)
+{
+    auto varLayout = convert(inVarLayout);
+    if(!varLayout) return 0;
+
+    if (!(varLayout->flags & Slang::VarLayoutFlag::HasSemantic))
+        return 0;
+
+    return varLayout->semanticIndex;
+}
+
 
 // Shader Parameter Reflection
 

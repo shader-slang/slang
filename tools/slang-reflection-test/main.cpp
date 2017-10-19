@@ -183,6 +183,21 @@ static void emitReflectionVarBindingInfoJSON(
     {
         write(writer,"\n]");
     }
+
+    if (auto semanticName = var->getSemanticName())
+    {
+        write(writer, ",\n");
+        write(writer,"\"semanticName\": \"");
+        write(writer, semanticName);
+        write(writer, "\"");
+
+        if (auto semanticIndex = var->getSemanticIndex())
+        {
+            write(writer, ",\n");
+            write(writer,"\"semanticIndex\": ");
+            write(writer, semanticIndex);
+        }
+    }
 }
 
 static void emitReflectionNameInfoJSON(
