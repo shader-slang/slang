@@ -752,6 +752,28 @@ TestResult runReflectionTest(TestInput& input)
     return result;
 }
 
+String getExpectedOutput(String const& outputStem)
+{
+    String expectedOutputPath = outputStem + ".expected";
+    String expectedOutput;
+    try
+    {
+        expectedOutput = Slang::File::ReadAllText(expectedOutputPath);
+    }
+    catch (Slang::IOException)
+    {
+    }
+
+    // If no expected output file was found, then we
+    // expect everything to be empty
+    if (expectedOutput.Length() == 0)
+    {
+        expectedOutput = "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n";
+    }
+
+    return expectedOutput;
+}
+
 TestResult runEvalTest(TestInput& input)
 {
     // We are going to load and evaluate the code
@@ -775,23 +797,7 @@ TestResult runEvalTest(TestInput& input)
     }
 
     String actualOutput = getOutput(spawner);
-
-    String expectedOutputPath = outputStem + ".expected";
-    String expectedOutput;
-    try
-    {
-        expectedOutput = Slang::File::ReadAllText(expectedOutputPath);
-    }
-    catch (Slang::IOException)
-    {
-    }
-
-    // If no expected output file was found, then we
-    // expect everything to be empty
-    if (expectedOutput.Length() == 0)
-    {
-        expectedOutput = "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n";
-    }
+    String expectedOutput = getExpectedOutput(outputStem);
 
     TestResult result = kTestResult_Pass;
 
@@ -1134,6 +1140,19 @@ TestResult doComputeComparisonTestRunImpl(TestInput& input, const char * langOpt
 	{
 		return kTestResult_Fail;
 	}
+
+    auto actualOutput = getOutput(spawner);
+    auto expectedOutput = getExpectedOutput(outputStem);
+    if(actualOutput != expectedOutput)
+    {
+        String actualOutputPath = outputStem + ".actual";
+        Slang::File::WriteAllText(actualOutputPath, actualOutput);
+
+        maybeDumpOutput(expectedOutput, actualOutput);
+
+        return kTestResult_Fail;
+    }
+
 
 	// check against reference output
 	if (!File::Exists(outputStem + ".actual.txt"))

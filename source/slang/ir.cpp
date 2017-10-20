@@ -3094,6 +3094,31 @@ namespace Slang
             clonedFunc,
             entryPointLayout);
 
+        // We will also go on and attach layout information
+        // to the function parameters, so that we have it
+        // available directly on the parameters, rather
+        // than having to look it up on the original entry-point layout.
+        if( auto firstBlock = clonedFunc->getFirstBlock() )
+        {
+            UInt paramLayoutCount = entryPointLayout->fields.Count();
+            UInt paramCounter = 0;
+            for( auto pp = firstBlock->getFirstParam(); pp; pp = pp->getNextParam() )
+            {
+                UInt paramIndex = paramCounter++;
+                if( paramIndex < paramLayoutCount )
+                {
+                    auto paramLayout = entryPointLayout->fields[paramIndex];
+                    context->builder->addLayoutDecoration(
+                        pp,
+                        paramLayout);
+                }
+                else
+                {
+                    SLANG_UNEXPECTED("too many parameters");
+                }
+            }
+        }
+
         return clonedFunc;
     }
 
