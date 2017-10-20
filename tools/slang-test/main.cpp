@@ -1377,14 +1377,15 @@ TestResult runTest(
         { "COMPARE_HLSL_RENDER", &runHLSLRenderComparisonTest },
         { "COMPARE_HLSL_CROSS_COMPILE_RENDER", &runHLSLCrossCompileRenderComparisonTest},
         { "COMPARE_HLSL_GLSL_RENDER", &runHLSLAndGLSLComparisonTest },
+        { "COMPARE_COMPUTE", &doSlangComputeComparisonTest},
 #else
         { "COMPARE_HLSL",                       &skipTest },
         { "COMPARE_HLSL_RENDER",                &skipTest },
         { "COMPARE_HLSL_CROSS_COMPILE_RENDER",  &skipTest},
         { "COMPARE_HLSL_GLSL_RENDER",           &skipTest },
+        { "COMPARE_COMPUTE",                    &skipTest},
 #endif
         { "COMPARE_GLSL", &runGLSLComparisonTest },
-		{ "COMPARE_COMPUTE", &doSlangComputeComparisonTest},
 
         { "CROSS_COMPILE", &runCrossCompilerTest },
         { "EVAL", &runEvalTest },
