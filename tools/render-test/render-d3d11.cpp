@@ -36,6 +36,7 @@
 #endif
 #endif
 //
+using namespace Slang;
 
 namespace renderer_test {
 
@@ -751,6 +752,16 @@ public:
 		auto dxContext = dxImmediateContext;
 		dxContext->Dispatch(x, y, z);
 	}
+
+    struct D3DBinding
+    {
+        ID3D11ShaderResourceView * resourceView;
+
+    };
+    struct D3DBindingState
+    {
+        List<D3DBinding> bindings;
+    };
 
     virtual BindingState * createBindingState(const ShaderInputLayout & layout)
     {
