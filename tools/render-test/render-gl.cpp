@@ -613,6 +613,16 @@ public:
 	{
 		glDispatchCompute(x, y, z);
 	}
+
+    virtual BindingState * createBindingState(const ShaderInputLayout & layout)
+    {
+        return nullptr;
+    }
+
+    virtual void setBindingState(BindingState * state)
+    {
+
+    }
 };
 
 

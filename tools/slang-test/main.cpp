@@ -1,6 +1,7 @@
 // main.cpp
 
 #include "../../source/core/slang-io.h"
+#include "../../source/core/token-reader.h"
 
 using namespace Slang;
 
@@ -20,7 +21,6 @@ using namespace Slang;
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
-
 enum OutputMode
 {
     // Default mode is to write test results to the console
@@ -1145,7 +1145,7 @@ TestResult doComputeComparisonTestRunImpl(TestInput& input, const char * langOpt
 	auto referenceProgramOutput = Split(File::ReadAllText(referenceOutput), '\n');
 	if (actualProgramOutput.Count() < referenceProgramOutput.Count())
 		return kTestResult_Fail;
-	for (int i = 0; i < referenceProgramOutput.Count(); i++)
+	for (int i = 0; i < (int)referenceProgramOutput.Count(); i++)
 	{
 		auto reference = StringToFloat(referenceProgramOutput[i]);
 		auto actual = StringToFloat(actualProgramOutput[i]);

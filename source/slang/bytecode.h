@@ -243,7 +243,7 @@ struct BCHeader
     // entry points for each target.
 };
 
-struct CompileRequest;
+class CompileRequest;
 void generateBytecodeForCompileRequest(
     CompileRequest* compileReq);
 

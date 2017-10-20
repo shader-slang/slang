@@ -5,7 +5,7 @@
 #include "render-d3d11.h"
 #include "render-gl.h"
 #include "slang-support.h"
-
+#include "shader-input-layout.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -55,7 +55,9 @@ Buffer*         gConstantBuffer;
 InputLayout*    gInputLayout;
 Buffer*         gVertexBuffer;
 Buffer*         gComputeResultBuffer;
-ShaderProgram*  gShaderProgram;
+ShaderProgram*      gShaderProgram;
+BindingState*       gBindingState;
+ShaderInputLayout   gShaderInputLayout;
 
 // Entry point name to use for vertex/fragment shader
 static char const* vertexEntryPointName    = "vertexMain";
@@ -91,6 +93,8 @@ Error initializeShaders(
     fread(sourceText, sourceSize, 1, sourceFile);
     fclose(sourceFile);
     sourceText[sourceSize] = 0;
+
+    gShaderInputLayout.Parse(sourceText);
 
     ShaderCompileRequest::SourceInfo sourceInfo;
     sourceInfo.path = sourcePath;
@@ -144,6 +148,7 @@ Error initializeInner(
     err = initializeShaders(shaderCompiler);
     if(err != Error::None) return err;
 
+    gBindingState = renderer->createBindingState(gShaderInputLayout);
 
     // Do other initialization that doesn't depend on the source language.
 
@@ -222,7 +227,7 @@ void renderFrameInner(
 
     renderer->setShaderProgram(gShaderProgram);
     renderer->setConstantBuffer(0, gConstantBuffer);
-
+    renderer->setBindingState(gBindingState);
     //
 
     renderer->draw(3);
@@ -232,6 +237,7 @@ void runCompute(Renderer * renderer)
 {
 	renderer->setShaderProgram(gShaderProgram);
 	renderer->setStorageBuffer(0, gComputeResultBuffer);
+    renderer->setBindingState(gBindingState);
 	renderer->dispatchCompute(1, 1, 1);
 }
 

@@ -751,6 +751,16 @@ public:
 		auto dxContext = dxImmediateContext;
 		dxContext->Dispatch(x, y, z);
 	}
+
+    virtual BindingState * createBindingState(const ShaderInputLayout & layout)
+    {
+        return nullptr;
+    }
+
+    virtual void setBindingState(BindingState * state)
+    {
+
+    }
 };
 
 
