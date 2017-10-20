@@ -918,6 +918,7 @@ SLANG_API int spCompile(
     catch (...)
     {
         req->mSink.diagnose(Slang::SourceLoc(), Slang::Diagnostics::compilationAborted);
+        req->mDiagnosticOutput = req->mSink.outputBuffer.ProduceString();
         return 1;
     }
 #else
