@@ -490,7 +490,7 @@ namespace Slang
                 else
                 {
                     //do token analyze
-                    ParseOperators(tokenBuilder.ToString(), tokenList, tokenFlags, tokenLine, tokenCol, pos - tokenBuilder.Length(), file);
+                    ParseOperators(tokenBuilder.ToString(), tokenList, tokenFlags, tokenLine, tokenCol, (int)(pos - tokenBuilder.Length()), file);
                     tokenBuilder.Clear();
                     state = State::Start;
                 }
@@ -754,110 +754,6 @@ namespace Slang
                 sb << str[i];
         }
         return sb.ProduceString();
-    }
-
-
-    String TokenTypeToString(TokenType type)
-    {
-        switch (type)
-        {
-        case TokenType::EndOfFile:
-            return "end of file";
-        case TokenType::Unknown:
-            return "UnknownToken";
-        case TokenType::Identifier:
-            return "identifier";
-        case TokenType::IntLiteral:
-            return "integer literal";
-        case TokenType::DoubleLiteral:
-            return "floating-point literal";
-        case TokenType::StringLiteral:
-            return "string literal";
-        case TokenType::CharLiteral:
-            return "character literal";
-        case TokenType::QuestionMark:
-            return "'?'";
-        case TokenType::Colon:
-            return "':'";
-        case TokenType::Semicolon:
-            return "';'";
-        case TokenType::Comma:
-            return "','";
-        case TokenType::LBrace:
-            return "'{'";
-        case TokenType::RBrace:
-            return "'}'";
-        case TokenType::LBracket:
-            return "'['";
-        case TokenType::RBracket:
-            return "']'";
-        case TokenType::LParent:
-            return "'('";
-        case TokenType::RParent:
-            return "')'";
-        case TokenType::At:
-            return "'@'";
-        case TokenType::OpAssign:
-            return "'='";
-        case TokenType::OpAdd:
-            return "'+'";
-        case TokenType::OpSub:
-            return "'-'";
-        case TokenType::OpMul:
-            return "'*'";
-        case TokenType::OpDiv:
-            return "'/'";
-        case TokenType::OpMod:
-            return "'%'";
-        case TokenType::OpNot:
-            return "'!'";
-        case TokenType::OpLsh:
-            return "'<<'";
-        case TokenType::OpRsh:
-            return "'>>'";
-        case TokenType::OpAddAssign:
-            return "'+='";
-        case TokenType::OpSubAssign:
-            return "'-='";
-        case TokenType::OpMulAssign:
-            return "'*='";
-        case TokenType::OpDivAssign:
-            return "'/='";
-        case TokenType::OpModAssign:
-            return "'%='";
-        case TokenType::OpEql:
-            return "'=='";
-        case TokenType::OpNeq:
-            return "'!='";
-        case TokenType::OpGreater:
-            return "'>'";
-        case TokenType::OpLess:
-            return "'<'";
-        case TokenType::OpGeq:
-            return "'>='";
-        case TokenType::OpLeq:
-            return "'<='";
-        case TokenType::OpAnd:
-            return "'&&'";
-        case TokenType::OpOr:
-            return "'||'";
-        case TokenType::OpBitXor:
-            return "'^'";
-        case TokenType::OpBitAnd:
-            return "'&'";
-        case TokenType::OpBitOr:
-            return "'|'";
-        case TokenType::OpInc:
-            return "'++'";
-        case TokenType::OpDec:
-            return "'--'";
-        case TokenType::Pound:
-            return "'#'";
-        case TokenType::PoundPound:
-            return "'##'";
-        default:
-            return "";
-        }
     }
 
     TokenReader::TokenReader(String text)
