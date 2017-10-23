@@ -43,13 +43,13 @@ sb << "__generic<T : __BuiltinArithmeticType, let N : int, let M :int> __intrins
 sb << "__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic_op(dot) T operator*(vector<T,N> x, vector<T,N> y);\n";
 
 // vector-matrix
-sb << "__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic_op(mulVectorMatrix) vector<T,M> operator*(vector<T,N> x, matrix<T,N,M> y);\n";
+sb << "__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic_op(mul) vector<T,M> operator*(vector<T,N> x, matrix<T,N,M> y);\n";
 
 // matrix-vector
-sb << "__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic_op(mulMatrixVector) vector<T,N> operator*(matrix<T,N,M> x, vector<T,M> y);\n";
+sb << "__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic_op(mul) vector<T,N> operator*(matrix<T,N,M> x, vector<T,M> y);\n";
 
 // matrix-matrix
-sb << "__generic<T : __BuiltinArithmeticType, let R : int, let N : int, let C : int> __intrinsic_op(mulMatrixMatrix) matrix<T,R,C> operator*(matrix<T,R,N> x, matrix<T,N,C> y);\n";
+sb << "__generic<T : __BuiltinArithmeticType, let R : int, let N : int, let C : int> __intrinsic_op(mul) matrix<T,R,C> operator*(matrix<T,R,N> x, matrix<T,N,C> y);\n";
 
 
 
