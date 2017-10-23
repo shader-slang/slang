@@ -54,7 +54,6 @@ uintptr_t gConstantBufferSize, gComputeResultBufferSize;
 Buffer*         gConstantBuffer;
 InputLayout*    gInputLayout;
 Buffer*         gVertexBuffer;
-Buffer*         gComputeResultBuffer;
 ShaderProgram*      gShaderProgram;
 BindingState*       gBindingState;
 ShaderInputLayout   gShaderInputLayout;
@@ -125,16 +124,6 @@ Error initializeShaders(
 
     return Error::None;
 }
-
-void outputComputeResult(Renderer* renderer, const char * fileName)
-{
-	float* data = (float*)renderer->map(gComputeResultBuffer, MapFlavor::HostRead);
-	FILE* f = fopen(fileName, "wt");
-	for (auto i = 0u; i < gComputeResultBufferSize / sizeof(UInt); i++)
-		fprintf(f, "%.9g\n", data[i]);
-	fclose(f);
-}
-
 //
 // At initialization time, we are going to load and compile our Slang shader
 // code, and then create the D3D11 API objects we need for rendering.
@@ -162,20 +151,7 @@ Error initializeInner(
     gConstantBuffer = renderer->createBuffer(constantBufferDesc);
     if(!gConstantBuffer)
         return Error::Unexpected;
-
-	gComputeResultBufferSize = 512 * sizeof(float);
-	BufferDesc computeResultBufferDesc;
-	computeResultBufferDesc.size = gComputeResultBufferSize;
-	computeResultBufferDesc.flavor = BufferFlavor::Storage;
-	gComputeResultBuffer = renderer->createBuffer(computeResultBufferDesc);
-	if (!gComputeResultBufferSize)
-		return Error::Unexpected;
-	// initialize buffer to 0
-	char * ptr = (char*)renderer->map(gComputeResultBuffer, MapFlavor::HostWrite);
-	for (auto i = 0u; i < gComputeResultBufferSize; i++)
-		ptr[i] = 0;
-	renderer->unmap(gComputeResultBuffer);
-
+    
     // Input Assembler (IA)
 
     InputElementDesc inputElements[] = {
@@ -236,7 +212,6 @@ void renderFrameInner(
 void runCompute(Renderer * renderer)
 {
 	renderer->setShaderProgram(gShaderProgram);
-	renderer->setStorageBuffer(0, gComputeResultBuffer);
     renderer->setBindingState(gBindingState);
 	renderer->dispatchCompute(1, 1, 1);
 }
@@ -434,10 +409,10 @@ int main(
 			// If we are in a mode where output is requested, we need to snapshot the back buffer here
 			if (gOptions.outputPath)
 			{
-				if (gOptions.shaderType == ShaderProgramType::Compute)
-					outputComputeResult(renderer, gOptions.outputPath);
-				else
-					renderer->captureScreenShot(gOptions.outputPath);
+                if (gOptions.shaderType == ShaderProgramType::Compute)
+                    renderer->serializeOutput(gBindingState, gOptions.outputPath);
+                else
+				    renderer->captureScreenShot(gOptions.outputPath);
 				return 0;
 			}
 

@@ -9,12 +9,19 @@ namespace renderer_test
     {
         Buffer, Texture, Sampler, CombinedTextureSampler
     };
+    enum class InputTextureContent
+    {
+        Zero, One, ChessBoard, Gradient
+    };
     struct InputTextureDesc
     {
         int dimension = 2;
         int arrayLength = 0;
         bool isCube = false;
         bool isDepthTexture = false;
+        bool isRWTexture = false;
+        int size = 4;
+        InputTextureContent content = InputTextureContent::One;
     };
     enum class InputBufferType
     {
@@ -37,7 +44,8 @@ namespace renderer_test
         InputTextureDesc textureDesc;
         InputBufferDesc bufferDesc;
         InputSamplerDesc samplerDesc;
-        int hlslRegister = -1;
+        bool isOutput = false;
+        int hlslBinding = -1;
         int glslBinding = -1;
         int glslLocation = -1;
     };
@@ -45,6 +53,7 @@ namespace renderer_test
     {
     public:
         Slang::List<ShaderInputLayoutEntry> entries;
+        int numRenderTargets = 1;
         void Parse(const char * source);
     };
 }

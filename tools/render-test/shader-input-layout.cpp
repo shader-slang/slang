@@ -49,6 +49,31 @@ namespace renderer_test
                         entry.textureDesc.dimension = 2;
                         entry.textureDesc.isCube = true;
                     }
+                    else if (parser.LookAhead("RWTexture1D"))
+                    {
+                        entry.type = ShaderInputType::Texture;
+                        entry.textureDesc.dimension = 1;
+                        entry.textureDesc.isRWTexture = true;
+                    }
+                    else if (parser.LookAhead("RWTexture2D"))
+                    {
+                        entry.type = ShaderInputType::Texture;
+                        entry.textureDesc.dimension = 2;
+                        entry.textureDesc.isRWTexture = true;
+                    }
+                    else if (parser.LookAhead("RWTexture3D"))
+                    {
+                        entry.type = ShaderInputType::Texture;
+                        entry.textureDesc.dimension = 3;
+                        entry.textureDesc.isRWTexture = true;
+                    }
+                    else if (parser.LookAhead("RWTextureCube"))
+                    {
+                        entry.type = ShaderInputType::Texture;
+                        entry.textureDesc.dimension = 2;
+                        entry.textureDesc.isCube = true;
+                        entry.textureDesc.isRWTexture = true;
+                    }
                     else if (parser.LookAhead("Sampler"))
                     {
                         entry.type = ShaderInputType::Sampler;
@@ -73,6 +98,11 @@ namespace renderer_test
                         entry.type = ShaderInputType::CombinedTextureSampler;
                         entry.textureDesc.dimension = 2;
                         entry.textureDesc.isCube = true;
+                    }
+                    else if (parser.LookAhead("render_targets"))
+                    {
+                        numRenderTargets = parser.ReadInt();
+                        continue;
                     }
                     parser.ReadToken();
                     // parse options
@@ -100,6 +130,11 @@ namespace renderer_test
                                 parser.Read("=");
                                 entry.bufferDesc.stride = parser.ReadInt();
                             }
+                            else if (word == "size")
+                            {
+                                parser.Read("=");
+                                entry.textureDesc.size = parser.ReadInt();
+                            }
                             else if (word == "data")
                             {
                                 parser.Read("=");
@@ -118,55 +153,61 @@ namespace renderer_test
                                 }
                                 parser.Read("]");
                             }
+                            else if (word == "content")
+                            {
+                                parser.Read("=");
+                                auto contentWord = parser.ReadWord();
+                                if (contentWord == "zero")
+                                    entry.textureDesc.content = InputTextureContent::Zero;
+                                else if (contentWord == "one")
+                                    entry.textureDesc.content = InputTextureContent::One;
+                                else if (contentWord == "chessboard")
+                                    entry.textureDesc.content = InputTextureContent::ChessBoard;
+                                else
+                                    entry.textureDesc.content = InputTextureContent::Gradient;
+                            }
                             if (parser.LookAhead(","))
                                 parser.Read(",");
                             else
                                 break;
                         }
-                        parser.Read(")");
-                        // parse bindings
-                        if (parser.LookAhead(":"))
+                    }
+                    parser.Read(")");
+                    // parse bindings
+                    if (parser.LookAhead(":"))
+                    {
+                        parser.Read(":");
+                        while (!parser.IsEnd())
                         {
-                            parser.Read(":");
-                            while (!parser.IsEnd())
+                            if (parser.LookAhead("dxbinding"))
                             {
-                                if (parser.LookAhead("register"))
-                                {
-                                    parser.ReadToken();
-                                    parser.Read("(");
-                                    auto reg = parser.ReadWord();
-                                    entry.hlslRegister = parser.ReadInt();
-                                    parser.Read(")");
-                                }
-                                else if (parser.LookAhead("layout"))
-                                {
-                                    parser.ReadToken();
-                                    parser.Read("(");
-                                    while (!parser.IsEnd() && !parser.LookAhead(")"))
-                                    {
-                                        auto word = parser.ReadWord();
-                                        if (word == "binding")
-                                        {
-                                            parser.Read("=");
-                                            entry.glslBinding = parser.ReadInt();
-                                        }
-                                        else if (word == "location")
-                                        {
-                                            parser.Read("=");
-                                            entry.glslLocation = parser.ReadInt();
-                                        }
-                                        if (parser.LookAhead(","))
-                                            parser.Read(",");
-                                        else
-                                            break;
-                                    }
-                                    parser.Read(")");
-                                }
-                                if (parser.LookAhead(","))
-                                    parser.Read(",");
+                                parser.ReadToken();
+                                parser.Read("(");
+                                entry.hlslBinding = parser.ReadInt();
+                                parser.Read(")");
                             }
+                            else if (parser.LookAhead("glbinding"))
+                            {
+                                parser.ReadToken();
+                                parser.Read("(");
+                                entry.glslBinding = entry.glslLocation = parser.ReadInt();
+                                if (parser.LookAhead(","))
+                                {
+                                    parser.Read(",");
+                                    entry.glslLocation = parser.ReadInt();
+                                }
+                                parser.Read(")");
+                            }
+                            else if (parser.LookAhead("out"))
+                            {
+                                parser.ReadToken();
+                                entry.isOutput = true;
+                            }
+                            if (parser.LookAhead(","))
+                                parser.Read(",");
                         }
                     }
+                    entries.Add(entry);
                 }
                 catch (TextFormatException)
                 {

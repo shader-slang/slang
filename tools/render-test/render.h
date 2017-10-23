@@ -90,7 +90,7 @@ public:
     virtual void presentFrame() = 0;
 
     virtual void captureScreenShot(char const* outputPath) = 0;
-
+    virtual void serializeOutput(BindingState * state, char const* outputPath) = 0;
     virtual Buffer* createBuffer(BufferDesc const& desc) = 0;
 
     virtual InputLayout* createInputLayout(InputElementDesc const* inputElements, UInt inputElementCount) = 0;

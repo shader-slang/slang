@@ -1147,9 +1147,9 @@ TestResult doComputeComparisonTestRunImpl(TestInput& input, const char * langOpt
 		return kTestResult_Fail;
 	for (int i = 0; i < (int)referenceProgramOutput.Count(); i++)
 	{
-		auto reference = StringToFloat(referenceProgramOutput[i]);
-		auto actual = StringToFloat(actualProgramOutput[i]);
-		if (abs(actual - reference) > 1e-7f)
+		auto reference = referenceProgramOutput[i];
+		auto actual = actualProgramOutput[i];
+		if (actual != reference)
 			return kTestResult_Fail;
 	}
 	return kTestResult_Pass;

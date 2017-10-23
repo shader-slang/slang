@@ -623,6 +623,11 @@ public:
     {
 
     }
+
+    virtual void serializeOutput(BindingState* state, const char * fileName)
+    {
+
+    }
 };
 
 
