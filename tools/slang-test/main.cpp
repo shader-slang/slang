@@ -1168,8 +1168,16 @@ TestResult doComputeComparisonTestRunImpl(TestInput& input, const char * langOpt
 	{
 		auto reference = referenceProgramOutput[i];
 		auto actual = actualProgramOutput[i];
-		if (actual != reference)
-			return kTestResult_Fail;
+        if (actual != reference)
+        {
+            // try to parse reference as float, and compare again
+            auto val = StringToFloat(reference);
+            auto uval = String((unsigned int)FloatAsInt(val), 16).ToUpper();
+            if (actual != uval)
+			    return kTestResult_Fail;
+            else
+                return kTestResult_Pass;
+        }
 	}
 	return kTestResult_Pass;
 }
