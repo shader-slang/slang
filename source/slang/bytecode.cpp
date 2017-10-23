@@ -728,7 +728,7 @@ BytecodeGenerationPtr<BCSymbol> generateBytecodeSymbolForInst(
                     paramCount++;
                 }
 
-                for( auto ii = bb->getFirstInst(); ii; ii = ii->nextInst )
+                for( auto ii = bb->getFirstInst(); ii; ii = ii->getNextInst() )
                 {
                     switch( ii->op )
                     {
@@ -792,7 +792,7 @@ BytecodeGenerationPtr<BCSymbol> generateBytecodeSymbolForInst(
 
                 // Now loop over the non-parameter instructions and
                 // allocate actual register locations to them.
-                for( auto ii = bb->getFirstInst(); ii; ii = ii->nextInst )
+                for( auto ii = bb->getFirstInst(); ii; ii = ii->getNextInst() )
                 {
                     switch(ii->op)
                     {
@@ -857,7 +857,7 @@ BytecodeGenerationPtr<BCSymbol> generateBytecodeSymbolForInst(
                 UInt blockOffset = subContext->currentBytecode.Count();
                 blockOffsets.Add( blockOffset );
 
-                for( auto ii = bb->getFirstInst(); ii; ii = ii->nextInst )
+                for( auto ii = bb->getFirstInst(); ii; ii = ii->getNextInst() )
                 {
                     // What we do with each instruction depends a bit on the
                     // kind of instruction it is.

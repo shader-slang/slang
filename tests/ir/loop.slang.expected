@@ -1,79 +1,79 @@
 result code = 0
 standard error = {
 
-ir_global_var %1	: Ptr<@ThreadGroup vector<float,4>[64]>;
+ir_global_var @_SV01s	: Ptr<@ThreadGroup vector<float,4>[64]>;
 
-ir_global_var %2	: Ptr<StructuredBuffer<vector<float,4>>>;
+ir_global_var @_SV05input	: Ptr<StructuredBuffer<vector<float,4>>>;
 
-ir_global_var %3	: Ptr<RWStructuredBuffer<vector<float,4>>>;
+ir_global_var @_SV06output	: Ptr<RWStructuredBuffer<vector<float,4>>>;
 
 ir_func @_S04mainp3uuuV	: (uint, uint, uint) -> void
 {
-block %4(
-		param %5	: uint,
-		param %6	: uint,
-		param %7	: uint):
-	let  %8	: Ptr<uint>	= var()
-	store(%8, %5)
-	let  %9	: Ptr<uint>	= var()
-	store(%9, %6)
-	let  %10	: Ptr<uint>	= var()
-	store(%10, %7)
-	let  %11	: uint	= load(%9)
-	let  %12	: Ptr<vector<float,4>>	= getElementPtr(%1, %11)
-	let  %13	: StructuredBuffer<vector<float,4>>	= load(%2)
-	let  %14	: uint	= load(%8)
-	let  %15	: vector<float,4>	= bufferLoad(%13, %14)
-	store(%12, %15)
-	let  %16	: Ptr<uint>	= var()
-	let  %17	: uint	= construct(1)
-	store(%16, %17)
-	loop(%18, %19, %20)
+block %1(
+		param %2	: uint,
+		param %3	: uint,
+		param %4	: uint):
+	let  %5	: Ptr<uint>	= var()
+	store(%5, %2)
+	let  %6	: Ptr<uint>	= var()
+	store(%6, %3)
+	let  %7	: Ptr<uint>	= var()
+	store(%7, %4)
+	let  %8	: uint	= load(%6)
+	let  %9	: Ptr<vector<float,4>>	= getElementPtr(@_SV01s, %8)
+	let  %10	: StructuredBuffer<vector<float,4>>	= load(@_SV05input)
+	let  %11	: uint	= load(%5)
+	let  %12	: vector<float,4>	= bufferLoad(%10, %11)
+	store(%9, %12)
+	let  %13	: Ptr<uint>	= var()
+	let  %14	: uint	= construct(1)
+	store(%13, %14)
+	loop(%15, %16, %17)
 
-block %18:
-	let  %21	: uint	= load(%16)
-	let  %22	: uint	= construct(64)
-	let  %23	: bool	= cmpLT(%21, %22)
-	loopTest(%23, %24, %19)
+block %15:
+	let  %18	: uint	= load(%13)
+	let  %19	: uint	= construct(64)
+	let  %20	: bool	= cmpLT(%18, %19)
+	loopTest(%20, %21, %16)
 
-block %24:
+block %21:
 	GroupMemoryBarrierWithGroupSync()
-	let  %25	: uint	= load(%9)
-	let  %26	: Ptr<vector<float,4>>	= getElementPtr(%1, %25)
-	let  %27	: Ptr<vector<float,4>>	= var()
-	let  %28	: vector<float,4>	= load(%26)
-	store(%27, %28)
-	let  %29	: uint	= load(%9)
-	let  %30	: uint	= load(%16)
-	let  %31	: uint	= sub(%29, %30)
-	let  %32	: Ptr<vector<float,4>>	= getElementPtr(%1, %31)
-	let  %33	: vector<float,4>	= load(%32)
-	let  %34	: vector<float,4>	= load(%27)
-	let  %35	: vector<float,4>	= add(%34, %33)
-	store(%27, %35)
-	let  %36	: vector<float,4>	= load(%27)
-	store(%26, %36)
-	unconditionalBranch(%20)
+	let  %22	: uint	= load(%6)
+	let  %23	: Ptr<vector<float,4>>	= getElementPtr(@_SV01s, %22)
+	let  %24	: Ptr<vector<float,4>>	= var()
+	let  %25	: vector<float,4>	= load(%23)
+	store(%24, %25)
+	let  %26	: uint	= load(%6)
+	let  %27	: uint	= load(%13)
+	let  %28	: uint	= sub(%26, %27)
+	let  %29	: Ptr<vector<float,4>>	= getElementPtr(@_SV01s, %28)
+	let  %30	: vector<float,4>	= load(%29)
+	let  %31	: vector<float,4>	= load(%24)
+	let  %32	: vector<float,4>	= add(%31, %30)
+	store(%24, %32)
+	let  %33	: vector<float,4>	= load(%24)
+	store(%23, %33)
+	unconditionalBranch(%17)
 
-block %20:
-	let  %37	: Ptr<uint>	= var()
-	let  %38	: uint	= load(%16)
-	store(%37, %38)
-	let  %39	: uint	= construct(1)
-	let  %40	: uint	= load(%37)
-	let  %41	: uint	= shl(%40, %39)
-	store(%37, %41)
-	let  %42	: uint	= load(%37)
-	store(%16, %42)
-	unconditionalBranch(%18)
+block %17:
+	let  %34	: Ptr<uint>	= var()
+	let  %35	: uint	= load(%13)
+	store(%34, %35)
+	let  %36	: uint	= construct(1)
+	let  %37	: uint	= load(%34)
+	let  %38	: uint	= shl(%37, %36)
+	store(%34, %38)
+	let  %39	: uint	= load(%34)
+	store(%13, %39)
+	unconditionalBranch(%15)
 
-block %19:
+block %16:
 	GroupMemoryBarrierWithGroupSync()
-	let  %43	: RWStructuredBuffer<vector<float,4>>	= load(%3)
-	let  %44	: uint	= load(%8)
-	let  %45	: Ptr<vector<float,4>>	= getElementPtr(%1, 0)
-	let  %46	: vector<float,4>	= load(%45)
-	bufferStore(%43, %44, %46)
+	let  %40	: RWStructuredBuffer<vector<float,4>>	= load(@_SV06output)
+	let  %41	: uint	= load(%5)
+	let  %42	: Ptr<vector<float,4>>	= getElementPtr(@_SV01s, 0)
+	let  %43	: vector<float,4>	= load(%42)
+	bufferStore(%40, %41, %43)
 	return_void()
 }
 

@@ -17,7 +17,7 @@ void buildMemberDictionary(ContainerDecl* decl);
 
 // Look up a name in the given scope, proceeding up through
 // parent scopes as needed.
-LookupResult LookUp(
+LookupResult lookUp(
     Session*            session,
     SemanticsVisitor*   semantics,
     Name*               name,
@@ -25,11 +25,18 @@ LookupResult LookUp(
 
 // perform lookup within the context of a particular container declaration,
 // and do *not* look further up the chain
-LookupResult LookUpLocal(
+LookupResult lookUpLocal(
     Session*                session,
     SemanticsVisitor*       semantics,
     Name*                   name,
     DeclRef<ContainerDecl>  containerDeclRef);
+
+// Perform member lookup in the context of a type
+LookupResult lookUpMember(
+    Session*            session,
+    SemanticsVisitor*   semantics,
+    Name*               name,
+    Type*               type);
 
 // TODO: this belongs somewhere else
 

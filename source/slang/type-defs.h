@@ -492,4 +492,3 @@ protected:
     virtual Type* CreateCanonicalType() override;
 )
 END_SYNTAX_CLASS()
-

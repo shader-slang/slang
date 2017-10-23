@@ -74,6 +74,16 @@ struct IRSpecialize : IRInst
     IRUse specDeclRefVal;
 };
 
+// An instruction that looks up the implementation
+// of an interface operation identified by `requirementDeclRef`
+// in the witness table `witnessTable` which should
+// hold the conformance information for a specific type.
+struct IRLookupWitnessMethod : IRInst
+{
+    IRUse witnessTable;
+    IRUse requirementDeclRef;
+};
+
 //
 
 struct IRCall : IRInst
@@ -251,6 +261,26 @@ struct IRGlobalVar : IRGlobalValue
     PtrType* getType() { return type.As<PtrType>(); }
 };
 
+// An entry in a witness table (see below)
+struct IRWitnessTableEntry : IRUser
+{
+    // The AST-level requirement
+    IRUse requirementKey;
+
+    // The IR-level value that satisfies the requirement
+    IRUse satisfyingVal;
+};
+
+// A witness table is a global value that stores
+// information about how a type conforms to some
+// interface. It basically takes the form of a
+// map from the required members of the interface
+// to the IR values that satisfy those requirements.
+struct IRWitnessTable : IRGlobalValue
+{
+    IRValueList<IRWitnessTableEntry> entries;
+};
+
 
 
 // Description of an instruction to be used for global value numbering
@@ -330,6 +360,16 @@ struct IRBuilder
         IRValue*        genericVal,
         DeclRef<Decl>   specDeclRef);
 
+    IRValue* emitLookupInterfaceMethodInst(
+        IRType*     type,
+        IRValue*    witnessTableVal,
+        IRValue*    interfaceMethodVal);
+
+    IRValue* emitLookupInterfaceMethodInst(
+        IRType*         type,
+        DeclRef<Decl>   witnessTableDeclRef,
+        DeclRef<Decl>   interfaceMethodDeclRef);
+
     IRInst* emitCallInst(
         IRType*         type,
         IRValue*        func,
@@ -352,6 +392,11 @@ struct IRBuilder
     IRFunc* createFunc();
     IRGlobalVar* createGlobalVar(
         IRType* valueType);
+    IRWitnessTable* createWitnessTable();
+    IRWitnessTableEntry* createWitnessTableEntry(
+        IRWitnessTable* witnessTable,
+        IRValue*        requirementKey,
+        IRValue*        satisfyingVal);
 
     IRBlock* createBlock();
     IRBlock* emitBlock();

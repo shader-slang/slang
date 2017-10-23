@@ -479,6 +479,25 @@ void Type::accept(IValVisitor* visitor, void* extra)
         Session*        session,
         DeclRef<Decl>   declRef)
     {
+        // It is possible that `declRef` refers to a generic type,
+        // but does not specify arguments for its generic parameters.
+        // (E.g., this happens when referring to a generic type from
+        // within its own member functions). To handle this case,
+        // we will construct a default specialization at the use
+        // site if needed.
+
+        if( auto genericParent = declRef.GetParent().As<GenericDecl>() )
+        {
+            auto subst = declRef.substitutions;
+            if( !subst || subst->genericDecl != genericParent.decl )
+            {
+                declRef.substitutions = createDefaultSubstitutions(
+                    session,
+                    declRef.decl,
+                    subst);
+            }
+        }
+
         if (auto builtinMod = declRef.getDecl()->FindModifier<BuiltinTypeModifier>())
         {
             auto type = new BasicExpressionType(builtinMod->tag);
@@ -1155,6 +1174,9 @@ void Type::accept(IValVisitor* visitor, void* extra)
     DeclRefBase DeclRefBase::GetParent() const
     {
         auto parentDecl = decl->ParentDecl;
+        if (!parentDecl)
+            return DeclRefBase();
+
         if (auto parentGeneric = dynamic_cast<GenericDecl*>(parentDecl))
         {
             if (substitutions && substitutions->genericDecl == parentDecl)
@@ -1350,7 +1372,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         Session*                        session,
         DeclRef<CallableDecl> const&    declRef)
     {
-        auto funcType = new FuncType();
+        RefPtr<FuncType> funcType = new FuncType();
         funcType->setSession(session);
 
         funcType->resultType = GetResultType(declRef);
@@ -1378,5 +1400,73 @@ void Type::accept(IValVisitor* visitor, void* extra)
         samplerStateType->setSession(session);
         return samplerStateType;
     }
+
+    // TODO: should really have a `type.cpp` and a `witness.cpp`
+
+    bool DeclaredSubtypeWitness::EqualsVal(Val* val)
+    {
+        auto otherWitness = dynamic_cast<DeclaredSubtypeWitness*>(val);
+        if(!otherWitness)
+            return false;
+
+        return sub->Equals(otherWitness->sub)
+            && sup->Equals(otherWitness->sup)
+            && declRef.Equals(otherWitness->declRef);
+    }
+
+    String DeclaredSubtypeWitness::ToString()
+    {
+        StringBuilder sb;
+        sb << "DeclaredSubtypeWitness(";
+        sb << this->sub->ToString();
+        sb << ", ";
+        sb << this->sup->ToString();
+        sb << ", ";
+        sb << this->declRef.toString();
+        sb << ")";
+        return sb.ProduceString();
+    }
+
+    int DeclaredSubtypeWitness::GetHashCode()
+    {
+        auto hash = sub->GetHashCode();
+        hash = combineHash(hash, sup->GetHashCode());
+        hash = combineHash(hash, declRef.GetHashCode());
+        return hash;
+    }
+
+    // IRProxyVal
+
+    bool IRProxyVal::EqualsVal(Val* val)
+    {
+        auto otherProxy = dynamic_cast<IRProxyVal*>(val);
+        if(!otherProxy)
+            return false;
+
+        return this->inst == otherProxy->inst;
+    }
+
+    String IRProxyVal::ToString()
+    {
+        return "IRProxyVal(...)";
+    }
+
+    int IRProxyVal::GetHashCode()
+    {
+        auto hash = Slang::GetHashCode(inst);
+        return hash;
+    }
+
+    //
+
+    String DeclRefBase::toString() const
+    {
+        StringBuilder sb;
+        sb << this->getDecl()->getName()->text;
+        // TODO: need to print out substitutions too!
+        return sb.ProduceString();
+    }
+
+
 
 }

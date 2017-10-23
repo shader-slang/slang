@@ -96,6 +96,15 @@ SIMPLE_SYNTAX_CLASS(InterfaceDecl, AggTypeDecl)
 SYNTAX_CLASS(InheritanceDecl, Decl)
     // The type expression as written
     SYNTAX_FIELD(TypeExp, base)
+
+RAW(
+    // After checking, this dictionary will map members
+    // required by the base type to their concrete
+    // implementations in the type that contains
+    // this inheritance declaration.
+    Dictionary<DeclRef<Decl>, Decl*> requirementWitnesses;
+)
+
 END_SYNTAX_CLASS()
 
 // TODO: may eventually need sub-classes for explicit/direct vs. implicit/indirect inheritance

@@ -5171,7 +5171,7 @@ emitDeclImpl(decl, nullptr);
             // Start by emitting the non-terminator instructions in the block.
             auto terminator = block->getLastInst();
             assert(isTerminatorInst(terminator));
-            for (auto inst = block->getFirstInst(); inst != terminator; inst = inst->nextInst)
+            for (auto inst = block->getFirstInst(); inst != terminator; inst = inst->getNextInst())
             {
                 emitIRInst(context, inst);
             }
@@ -5507,6 +5507,26 @@ emitDeclImpl(decl, nullptr);
         EmitContext*    context,
         IRFunc*         func)
     {
+        // We don't want to declare generic functions,
+        // because none of our targets actually support them.
+        if(func->genericDecl)
+            return;
+
+        // We also don't want to emit declarations for operations
+        // that only appear in the IR as stand-ins for built-in
+        // operations on that target.
+        if (isTargetIntrinsic(context, func))
+            return;
+
+        // Finally, don't emit a declaration for an entry point,
+        // because it might need meta-data attributes attached
+        // to it, and the HLSL compiler will get upset if the
+        // forward declaration doesn't *also* have those
+        // attributes.
+        if(asEntryPoint(func))
+            return;
+
+
         // A function declaration doesn't have any IR basic blocks,
         // and as a result it *also* doesn't have the IR `param` instructions,
         // so we need to emit a declaration entirely from the type.
@@ -5565,82 +5585,6 @@ emitDeclImpl(decl, nullptr);
         return nullptr;
     }
 
-#if 0
-    void emitGLSLEntryPointFunc(
-        EmitContext*    context,
-        IRFunc*         func)
-    {
-        auto funcType = func->getType();
-        auto resultType = func->getResultType();
-
-        auto entryPointLayout = getEntryPointLayout(context, func);
-        assert(entryPointLayout);
-
-        // TODO: need to deal with decorations on the entry point
-        // that should be turned into global-scope `layout` qualifiers.
-
-        // TODO: emit kernel inputs and outputs to globals.
-
-        // Emit a global `out` declaration to hold the output from our shader
-        // kernel.
-        //
-        // TODO: need to generate unique names beter than this
-        //
-        // TODO: need to handle the case where the output is
-        // a structure (should that be fixed up at the IR level,
-        // or here?).
-        // Best option might be to translate the entry-point
-        // result parameter into an `out` parameter, so that
-        // we can handle those uniformly.
-        //
-        String resultName = getIRName(func) + "_result";
-        emitGLSLLayoutQualifiers(entryPointLayout->resultLayout);
-        emit("out ");
-        emitIRType(context, resultType, resultName);
-        emit(";\n");
-
-        // Emit global `in` and/or `out` declarations for the
-        // parameters of our shader kernel.
-        //
-        // TODO: We need to make sure these names don't collide with anything.
-        //
-        // TODO: We need to handle scalarization here.
-        //
-        auto firstParam = func->getFirstParam();
-        for( auto pp = firstParam; pp; pp = pp->getNextParam() )
-        {
-            // TODO: actually handle `out` parameters here.
-
-            auto paramLayout = getVarLayout(context, pp);
-            auto paramName = getIRName(pp);
-            emitGLSLLayoutQualifiers(paramLayout);
-            emit("in ");
-            emitIRType(context, pp->getType(), paramName);
-            emit(";\n");
-        }
-
-        // Now that we've emitted our parameter declarations,
-        // we can start to emit the body of the entry point:
-        //
-        emit("void main()\n{\n");
-
-        // We had better not be trying to output an entry
-        // point from a declaration rather than a definition.
-        assert(isDefinition(func));
-
-        // At the most basic, we just want to emit the operations in
-        // the entry point function directly, but with the small catch
-        // that if there was a `return` statement in there somewhere,
-        // we need to turn that into a write to our output variable.
-        //
-        // TODO: yeah, that should get cleared up at the IR level...
-        //
-        emitIRStmtsForBlocks(context, func->getFirstBlock(), nullptr);
-
-        emit("}\n");
-    }
-#endif
-
     EntryPointLayout* asEntryPoint(IRFunc* func)
     {
         if (auto layoutDecoration = func->findDecoration<IRLayoutDecoration>())
@@ -5696,26 +5640,11 @@ emitDeclImpl(decl, nullptr);
         EmitContext*    context,
         IRFunc*         func)
     {
-#if 0
-        if( getTarget(context) == CodeGenTarget::GLSL
-            && isEntryPoint(func) )
-        {
-            // We have a shader entry point, and that
-            // requires a different strategy for source
-            // code generation in GLSL, because the
-            // parameters/result of the entry point
-            // need to be translated into globals.
-            //
-
-            emitGLSLEntryPointFunc(context, func);
-        }
-        else
-#endif
         if(func->genericDecl)
         {
             Emit("/* ");
             emitIRFuncDecl(context, func);
-            Emit(" */");
+            Emit(" */\n");
             return;
         }
 
@@ -6128,12 +6057,6 @@ emitDeclImpl(decl, nullptr);
             emitIRGlobalVar(context, (IRGlobalVar*) inst);
             break;
 
-#if 0
-        case kIROp_StructType:
-            emitIRStruct(context, (IRStructDecl*) inst);
-            break;
-#endif
-
         case kIROp_Var:
             emitIRVar(context, (IRVar*) inst);
             break;
@@ -6256,7 +6179,7 @@ emitDeclImpl(decl, nullptr);
                         emitIRUsedTypesForValue(context, pp);
                     }
 
-                    for( auto ii = bb->getFirstInst(); ii; ii = ii->nextInst )
+                    for( auto ii = bb->getFirstInst(); ii; ii = ii->getNextInst() )
                     {
                         emitIRUsedTypesForValue(context, ii);
                     }
@@ -6287,6 +6210,20 @@ emitDeclImpl(decl, nullptr);
         IRModule*       module)
     {
         emitIRUsedTypesForModule(context, module);
+
+        // Before we emit code, we need to forward-declare
+        // all of our functions so that we don't have to
+        // sort them by dependencies.
+        for( auto gv = module->getFirstGlobalValue(); gv; gv = gv->getNextValue() )
+        {
+            if(gv->op != kIROp_Func)
+                continue;
+
+            auto func = (IRFunc*) gv;
+            emitIRFuncDecl(context, func);
+        }
+
+
 
         for( auto gv = module->getFirstGlobalValue(); gv; gv = gv->getNextValue() )
         {
@@ -6453,9 +6390,12 @@ String emitEntryPoint(
 
         specializeGenerics(lowered);
 
-//        fprintf(stderr, "###\n");
-//        dumpIR(lowered);
-//        fprintf(stderr, "###\n");
+        // Debugging code for IR transformations...
+#if 0
+        fprintf(stderr, "###\n");
+        dumpIR(lowered);
+        fprintf(stderr, "###\n");
+#endif
 
         //
         // TODO: Need to decide whether to do these before or after

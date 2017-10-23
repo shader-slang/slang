@@ -323,6 +323,11 @@ void DoLookupImpl(
             // at the parameters themselves, so provide a fully-resolved
             // declaration reference for lookup.
             RefPtr<Substitutions> subst = nullptr;
+#if 1
+            // Actually, the above rationale seems bogus. If we are looking
+            // up from "inside" a generic declaration, we don't want to
+            // get its members pre-specialized, right?
+#else
             if(auto parentGenericDecl = dynamic_cast<GenericDecl*>(containerDecl->ParentDecl))
             {
                 subst = new Substitutions();
@@ -342,6 +347,7 @@ void DoLookupImpl(
                     }
                 }
             }
+#endif
 
             DeclRef<ContainerDecl> containerRef = DeclRef<Decl>(containerDecl, subst).As<ContainerDecl>();
             DoLocalLookupImpl(
@@ -370,7 +376,7 @@ LookupResult DoLookup(
     return result;
 }
 
-LookupResult LookUp(
+LookupResult lookUp(
     Session*            session,
     SemanticsVisitor*   semantics,
     Name*               name,
@@ -384,7 +390,7 @@ LookupResult LookUp(
 
 // perform lookup within the context of a particular container declaration,
 // and do *not* look further up the chain
-LookupResult LookUpLocal(
+LookupResult lookUpLocal(
     Session*                session,
     SemanticsVisitor*       semantics,
     Name*                   name,
@@ -397,5 +403,73 @@ LookupResult LookUpLocal(
     DoLocalLookupImpl(session, name, containerDeclRef, request, result, nullptr);
     return result;
 }
+
+void lookUpMemberImpl(
+    Session* session,
+    SemanticsVisitor*   semantics,
+    Name*               name,
+    Type*               type,
+    LookupResult&       ioResult,
+    BreadcrumbInfo*     inBreadcrumbs)
+{
+    if (auto declRefType = type->As<DeclRefType>())
+    {
+        auto declRef = declRefType->declRef;
+        if (auto aggTypeDeclRef = declRef.As<AggTypeDecl>())
+        {
+            LookupRequest request;
+            request.semantics = semantics;
+
+            DoLocalLookupImpl(session, name, aggTypeDeclRef, request, ioResult, inBreadcrumbs);
+        }
+        else if (auto genericTypeParamDeclRef = declRef.As<GenericTypeParamDecl>())
+        {
+            auto genericDeclRef = genericTypeParamDeclRef.GetParent().As<GenericDecl>();
+            assert(genericDeclRef);
+
+            for(auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(genericDeclRef))
+            {
+                // Does this constraint pertain to the type we are working on?
+                //
+                // We want constraints of the form `T : Foo` where `T` is the
+                // generic parameter in question, and `Foo` is whatever we are
+                // constraining it to.
+                auto subType = GetSub(constraintDeclRef);
+                auto subDeclRefType = subType->As<DeclRefType>();
+                if(!subDeclRefType)
+                    continue;
+                if(!subDeclRefType->declRef.Equals(genericTypeParamDeclRef))
+                    continue;
+
+                // The super-type in the constraint (e.g., `Foo` in `T : Foo`)
+                // will tell us a type we should use for lookup.
+                auto bound = GetSup(constraintDeclRef);
+
+                // Go ahead and use the target type, with an appropriate breadcrumb
+                // to indicate that we indirected through a type constraint.
+
+                BreadcrumbInfo breadcrumb;
+                breadcrumb.prev = inBreadcrumbs;
+                breadcrumb.kind = LookupResultItem::Breadcrumb::Kind::Constraint;
+                breadcrumb.declRef = constraintDeclRef;
+
+                // TODO: Need to consider case where this might recurse infinitely.
+                lookUpMemberImpl(session, semantics, name, bound, ioResult, &breadcrumb);
+            }
+        }
+    }
+}
+
+LookupResult lookUpMember(
+    Session*            session,
+    SemanticsVisitor*   semantics,
+    Name*               name,
+    Type*               type)
+{
+    LookupResult result;
+    lookUpMemberImpl(session, semantics, name, type, result, nullptr);
+    return result;
+}
+
 
 }
