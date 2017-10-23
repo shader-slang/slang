@@ -1,5 +1,5 @@
 //TEST(smoke,compute):COMPARE_COMPUTE:-xslang -use-ir
-
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out
 // Confirm that generics syntax can be used in user
 // code and generates valid output.
 
