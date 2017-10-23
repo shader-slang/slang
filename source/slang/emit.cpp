@@ -5091,6 +5091,37 @@ emitDeclImpl(decl, nullptr);
         EmitContext*    context,
         IRValue*         inst)
     {
+        // Don't emit semantics if we aren't translating down to HLSL
+        switch (context->shared->target)
+        {
+        case CodeGenTarget::HLSL:
+            break;
+
+        default:
+            return;
+        }
+
+        if(auto layoutDecoration = inst->findDecoration<IRLayoutDecoration>())
+        {
+            if(auto varLayout = layoutDecoration->layout.As<VarLayout>())
+            {
+                if(varLayout->flags & VarLayoutFlag::HasSemantic)
+                {
+                    Emit(" : ");
+                    emit(varLayout->semanticName);
+                    if(varLayout->semanticIndex)
+                    {
+                        Emit(varLayout->semanticIndex);
+                    }
+
+                    return;
+                }
+            }
+        }
+
+        // TODO(tfoley): should we ever need to use the high-level declaration
+        // for this? It seems like the wrong approach...
+
         auto decoration = inst->findDecoration<IRHighLevelDeclDecoration>();
         if( decoration )
         {
