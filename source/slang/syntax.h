@@ -12,6 +12,7 @@
 
 namespace Slang
 {
+    struct IRValue;
     class Name;
     class Session;
     class Substitutions;
@@ -450,6 +451,9 @@ namespace Slang
         DeclRefBase GetParent() const;
 
         int GetHashCode() const;
+
+        // Debugging:
+        String toString() const;
     };
 
     template<typename T>
@@ -787,17 +791,92 @@ namespace Slang
         //
         // We build up a list of these "breadcrumbs" while doing
         // lookup, and store them alongside each item found.
+        //
+        // As an example, suppose we have an HLSL `cbuffer` declaration:
+        //
+        //     cbuffer C { float4 f; }
+        //
+        // This is syntax sugar for a global-scope variable of
+        // type `ConstantBuffer<T>` where `T` is a `struct` containing
+        // all the members:
+        //
+        //     struct Anon0 { float4 f; };
+        //     __transparent ConstantBuffer<Anon0> anon1;
+        //
+        // The `__transparent` modifier there captures the fact that
+        // when somebody writes `f` in their code, they expect it to
+        // "see through" the `cbuffer` declaration (or the global variable,
+        // in this case) and find the member inside.
+        //
+        // But when the user writes `f` we can't just create a simple
+        // `VarExpr` that refers directly to that field, because that
+        // doesn't actually reflect the required steps in a way that
+        // code generation can use.
+        //
+        // Instead we need to construct an expression like `(*anon1).f`,
+        // where there is are two additional steps in the process:
+        //
+        // 1. We needed to dereference the pointer-like type `ConstantBuffer<Anon0>`
+        //    to get at a value of type `Anon0`
+        // 2. We needed to access a sub-field of the aggregate type `Anon0`
+        //
+        // We *could* just create these full-formed expressions during
+        // lookup, but this might mean creating a large number of
+        // AST nodes in cases where the user calls an overloaded function.
+        // At the very least we'd rather not heap-allocate in the common
+        // case where no "extra" steps need to be performed to get to
+        // the declarations.
+        //
+        // This is where "breadcrumbs" come in. A breadcrumb represents
+        // an extra "step" that must be performed to turn a declaration
+        // found by lookup into a valid expression to splice into the
+        // AST. Most of the time lookup result items don't have any
+        // breadcrumbs, so that no extra heap allocation takes place.
+        // When an item does have breadcrumbs, and it is chosen as
+        // the unique result (perhaps by overload resolution), then
+        // we can walk the list of breadcrumbs to create a full
+        // expression.
         class Breadcrumb : public RefObject
         {
         public:
             enum class Kind
             {
-                Member, // A member was references
-                Deref, // A value with pointer(-like) type was dereferenced
+                // The lookup process looked "through" an in-scope
+                // declaration to the fields inside of it, so that
+                // even if lookup started with a simple name `f`,
+                // it needs to result in a member expression `obj.f`.
+                Member,
+
+                // The lookup process took a pointer(-like) value, and then
+                // proceeded to derefence it and look at the thing(s)
+                // it points to instead, so that the final expression
+                // needs to have `(*obj)`
+                Deref,
+
+                // The lookup process saw a value `obj` of type `T` and
+                // took into account an in-scope constraint that says
+                // `T` is a subtype of some other type `U`, so that
+                // lookup was able to find a member through type `U`
+                // instead.
+                Constraint,
             };
 
+            // The kind of lookup step that was performed
             Kind kind;
+
+            // As needed, a reference to the declaration that faciliated
+            // the lookup step.
+            //
+            // For a `Member` lookup step, this is the declaration whose
+            // members were implicitly pulled into scope.
+            //
+            // For a `Constraint` lookup step, this is the `ConstraintDecl`
+            // that serves to witness the subtype relationship.
+            //
             DeclRef<Decl> declRef;
+
+            // The next implicit step that the lookup process took to
+            // arrive at a final value.
             RefPtr<Breadcrumb> next;
 
             Breadcrumb(Kind kind, DeclRef<Decl> declRef, RefPtr<Breadcrumb> next)
@@ -1059,6 +1138,16 @@ namespace Slang
             m = m->next.Ptr();
         }        
     }
+
+    // TODO: where should this live?
+    RefPtr<Substitutions> createDefaultSubstitutions(
+        Session*        session,
+        Decl*           decl,
+        Substitutions*  parentSubst);
+
+    RefPtr<Substitutions> createDefaultSubstitutions(
+        Session* session,
+        Decl*   decl);
 
 } // namespace Slang
 

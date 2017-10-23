@@ -97,6 +97,7 @@ INST(FloatLit, float_constant, 0, 0)
 INST(decl_ref, decl_ref, 0, 0)
 
 INST(specialize, specialize, 2, 0)
+INST(lookup_interface_method, lookup_interface_method, 2, 0)
 
 INST(Construct, construct, 0, 0)
 INST(Call, call, 1, 0)
@@ -106,6 +107,8 @@ INST(Func, func, 0, PARENT)
 INST(Block, block, 0, PARENT)
 
 INST(global_var, global_var, 0, 0)
+INST(witness_table, witness_table, 0, 0)
+INST(witness_table_entry, witness_table_entry, 2, 0)
 
 INST(Param, param, 0, 0)
 INST(StructField, field, 0, 0)
