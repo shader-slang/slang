@@ -384,7 +384,7 @@ int main(
 		{
 			if (message.message == WM_QUIT)
 			{
-                return (int)12345;// message.wParam;
+                return (int)message.wParam;
 			}
 
 			TranslateMessage(&message);

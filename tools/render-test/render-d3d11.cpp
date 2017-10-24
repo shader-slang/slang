@@ -403,7 +403,7 @@ public:
         // We immediately bind the back-buffer render target view, and we aren't
         // going to switch. We don't bother with a depth buffer.
         dxImmediateContext->OMSetRenderTargets(
-            dxRenderTargetViews.Count(),
+            1, //dxRenderTargetViews.Count(),
             dxRenderTargetViews.Buffer(),
             NULL);
 
@@ -427,7 +427,7 @@ public:
 
     virtual void clearFrame() override
     {
-        for (auto i = 0u; i < dxRenderTargetViews.Count(); i++)
+        for (auto i = 0u; i < 1; i++)
             dxImmediateContext->ClearRenderTargetView(
                 dxRenderTargetViews[i],
                 clearColor);
@@ -1055,8 +1055,6 @@ public:
     }
     virtual BindingState * createBindingState(const ShaderInputLayout & layout)
     {
-        fprintf(stderr, "pre-create binding state\n");
-
         D3DBindingState * rs = new D3DBindingState();
         for (auto & entry : layout.entries)
         {
