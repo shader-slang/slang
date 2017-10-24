@@ -263,7 +263,6 @@ public:
     ID3D11Device* dxDevice = NULL;
     ID3D11DeviceContext* dxImmediateContext = NULL;
     ID3D11Texture2D* dxBackBufferTexture = NULL;
-    ID3D11RenderTargetView* dxBackBufferRTV = NULL;
     List<ID3D11RenderTargetView*> dxRenderTargetViews;
     List<ID3D11Texture2D *> dxRenderTargetTextures;
     D3DBindingState * currentBindings = nullptr;
@@ -339,10 +338,8 @@ public:
         {
             hr = D3D11CreateDeviceAndSwapChain_(
                 NULL,                    // adapter (use default)
-
                 D3D_DRIVER_TYPE_WARP,
-//                D3D_DRIVER_TYPE_HARDWARE,
-
+//              D3D_DRIVER_TYPE_HARDWARE,
                 NULL,                    // software
                 deviceFlags,
                 &featureLevels[ii],
@@ -370,16 +367,12 @@ public:
         static const IID kIID_ID3D11Texture2D = {
             0x6f15aaf2, 0xd208, 0x4e89, 0x9a, 0xb4, 0x48,
             0x95, 0x35, 0xd3, 0x4f, 0x9c };
+
         dxSwapChain->GetBuffer(
             0,
             kIID_ID3D11Texture2D,
             (void**)&dxBackBufferTexture);
 
-        dxDevice->CreateRenderTargetView(
-            dxBackBufferTexture,
-            NULL,
-            &dxBackBufferRTV);
-        //dxRenderTargetViews.Add(dxBackBufferRTV);
         for (int i = 0; i < 8; i++)
         {
             ID3D11Texture2D* texture;
@@ -398,8 +391,7 @@ public:
             dxRenderTargetViews.Add(rtv);
             dxRenderTargetTextures.Add(texture);
         }
-        dxBackBufferRTV = dxRenderTargetViews[0];
-        dxBackBufferTexture = dxRenderTargetTextures[0];
+
         // We immediately bind the back-buffer render target view, and we aren't
         // going to switch. We don't bother with a depth buffer.
         dxImmediateContext->OMSetRenderTargets(
@@ -427,7 +419,7 @@ public:
 
     virtual void clearFrame() override
     {
-        for (auto i = 0u; i < 1; i++)
+        for (auto i = 0u; i < dxRenderTargetViews.Count(); i++)
             dxImmediateContext->ClearRenderTargetView(
                 dxRenderTargetViews[i],
                 clearColor);
@@ -435,6 +427,7 @@ public:
 
     virtual void presentFrame() override
     {
+        dxImmediateContext->CopyResource(dxBackBufferTexture, dxRenderTargetTextures[0]);
         dxSwapChain->Present(0, 0);
     }
 
@@ -443,7 +436,7 @@ public:
         HRESULT hr = captureTextureToFile(
             dxDevice,
             dxImmediateContext,
-            dxBackBufferTexture,
+            dxRenderTargetTextures[0],
             outputPath);
         if( FAILED(hr) )
         {
