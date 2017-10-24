@@ -270,7 +270,6 @@ public:
     virtual void initialize(void* inWindowHandle) override
     {
         auto windowHandle = (HWND) inWindowHandle;
-
         // Rather than statically link against D3D, we load it dynamically.
 
         HMODULE d3d11 = LoadLibraryA("d3d11.dll");
@@ -832,6 +831,8 @@ public:
                 desc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS;
             }
         }
+        fprintf(stderr, "buffer created\n");
+
         D3D11_SUBRESOURCE_DATA data = {0};
         data.pSysMem = bufferData.Buffer();
         dxDevice->CreateBuffer(&desc, &data, &bufferOut);
@@ -846,6 +847,8 @@ public:
             viewDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
             viewDesc.Format = DXGI_FORMAT_UNKNOWN;
             dxDevice->CreateUnorderedAccessView(bufferOut, &viewDesc, &viewOut);
+            fprintf(stderr, "uav created\n");
+
         }
         D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
         memset(&srvDesc, 0, sizeof(srvDesc));
@@ -856,6 +859,8 @@ public:
         srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
         srvDesc.Format = DXGI_FORMAT_UNKNOWN;
         dxDevice->CreateShaderResourceView(bufferOut, &srvDesc, &srvOut);
+        fprintf(stderr, "srv created\n");
+
     }
 
     void createInputTexture(const InputTextureDesc & inputDesc, ID3D11ShaderResourceView * &viewOut)
@@ -1050,6 +1055,8 @@ public:
     }
     virtual BindingState * createBindingState(const ShaderInputLayout & layout)
     {
+        fprintf(stderr, "pre-create binding state\n");
+
         D3DBindingState * rs = new D3DBindingState();
         for (auto & entry : layout.entries)
         {
@@ -1083,10 +1090,12 @@ public:
             }
             rs->bindings.Add(rsEntry);
         }
+        fprintf(stderr, "post-create binding state\n");
+
         return (BindingState*)rs;
     }
 
-    bool applyBindingState(bool isCompute)
+    void applyBindingState(bool isCompute)
     {
         auto dxContext = dxImmediateContext;
         for (auto & binding : currentBindings->bindings)
