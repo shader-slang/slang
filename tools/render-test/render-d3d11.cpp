@@ -379,8 +379,8 @@ public:
             dxBackBufferTexture,
             NULL,
             &dxBackBufferRTV);
-        dxRenderTargetViews.Add(dxBackBufferRTV);
-        for (int i = 0; i < 7; i++)
+        //dxRenderTargetViews.Add(dxBackBufferRTV);
+        for (int i = 0; i < 8; i++)
         {
             ID3D11Texture2D* texture;
             D3D11_TEXTURE2D_DESC textureDesc;
@@ -388,7 +388,7 @@ public:
             textureDesc.ArraySize = 1;
             textureDesc.BindFlags = D3D11_BIND_RENDER_TARGET;
             textureDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
-            textureDesc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+            textureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
             textureDesc.Usage = D3D11_USAGE_DEFAULT;
             textureDesc.MiscFlags = 0;
             dxDevice->CreateTexture2D(&textureDesc, nullptr, &texture);
@@ -400,10 +400,12 @@ public:
             dxRenderTargetViews.Add(rtv);
             dxRenderTargetTextures.Add(texture);
         }
+        dxBackBufferRTV = dxRenderTargetViews[0];
+        dxBackBufferTexture = dxRenderTargetTextures[0];
         // We immediately bind the back-buffer render target view, and we aren't
         // going to switch. We don't bother with a depth buffer.
         dxImmediateContext->OMSetRenderTargets(
-            1, //dxRenderTargetViews.Count(),
+            dxRenderTargetViews.Count(),
             dxRenderTargetViews.Buffer(),
             NULL);
 
@@ -427,7 +429,7 @@ public:
 
     virtual void clearFrame() override
     {
-        for (auto i = 0u; i < 1; i++)
+        for (auto i = 0u; i < dxRenderTargetViews.Count(); i++)
             dxImmediateContext->ClearRenderTargetView(
                 dxRenderTargetViews[i],
                 clearColor);
@@ -942,7 +944,7 @@ public:
             D3D11_TEXTURE1D_DESC desc = { 0 };
             desc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET | D3D11_BIND_UNORDERED_ACCESS;
             desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
-            desc.Format = DXGI_FORMAT_R8G8B8A8_SNORM;
+            desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
             desc.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
             desc.MipLevels = textureMipLevels;
             desc.ArraySize = arraySize;
@@ -970,7 +972,7 @@ public:
             D3D11_TEXTURE2D_DESC desc = { 0 };
             desc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET | D3D11_BIND_UNORDERED_ACCESS;
             desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
-            desc.Format = DXGI_FORMAT_R8G8B8A8_SNORM;
+            desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
             desc.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
             desc.MipLevels = textureMipLevels;
             desc.ArraySize = arraySize;
@@ -1012,7 +1014,7 @@ public:
             D3D11_TEXTURE3D_DESC desc = { 0 };
             desc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET | D3D11_BIND_UNORDERED_ACCESS;
             desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
-            desc.Format = DXGI_FORMAT_R8G8B8A8_SNORM;
+            desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
             desc.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
             desc.MipLevels = textureMipLevels;
             viewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE3D;
