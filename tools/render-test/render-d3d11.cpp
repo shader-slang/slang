@@ -1090,7 +1090,6 @@ public:
             }
             rs->bindings.Add(rsEntry);
         }
-        fprintf(stderr, "post-create binding state\n");
 
         return (BindingState*)rs;
     }
@@ -1104,15 +1103,11 @@ public:
             {
                 if (binding.uav)
                 {
-                    fprintf(stderr, "begin bind buffer\n");
-
                     if (isCompute)
                         dxContext->CSSetUnorderedAccessViews(binding.binding, 1, &binding.uav, nullptr);
                     else
                         dxContext->OMSetRenderTargetsAndUnorderedAccessViews(D3D11_KEEP_RENDER_TARGETS_AND_DEPTH_STENCIL,
                             nullptr, nullptr, binding.binding, 1, &binding.uav, nullptr);
-                    fprintf(stderr, "end bind buffer\n");
-
                 }
                 else
                 {
@@ -1182,7 +1177,6 @@ public:
                     for (auto i = 0u; i < binding.bufferLength / sizeof(unsigned int); i++)
                         fprintf(f, "%X\n", ptr[i]);
                     unmap(binding.buffer);
-                    fprintf(stderr, "output[1] is %X\n", ptr[1]);
                 }
                 else
                 {
