@@ -831,8 +831,6 @@ public:
                 desc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS;
             }
         }
-        fprintf(stderr, "buffer created\n");
-
         D3D11_SUBRESOURCE_DATA data = {0};
         data.pSysMem = bufferData.Buffer();
         dxDevice->CreateBuffer(&desc, &data, &bufferOut);
@@ -847,8 +845,6 @@ public:
             viewDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
             viewDesc.Format = DXGI_FORMAT_UNKNOWN;
             dxDevice->CreateUnorderedAccessView(bufferOut, &viewDesc, &viewOut);
-            fprintf(stderr, "uav created\n");
-
         }
         D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
         memset(&srvDesc, 0, sizeof(srvDesc));
@@ -859,8 +855,6 @@ public:
         srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
         srvDesc.Format = DXGI_FORMAT_UNKNOWN;
         dxDevice->CreateShaderResourceView(bufferOut, &srvDesc, &srvOut);
-        fprintf(stderr, "srv created\n");
-
     }
 
     void createInputTexture(const InputTextureDesc & inputDesc, ID3D11ShaderResourceView * &viewOut)
