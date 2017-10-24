@@ -386,8 +386,9 @@ public:
             D3D11_TEXTURE2D_DESC textureDesc;
             dxBackBufferTexture->GetDesc(&textureDesc);
             textureDesc.ArraySize = 1;
+            textureDesc.MipLevels = 1;
             textureDesc.BindFlags = D3D11_BIND_RENDER_TARGET;
-            textureDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
+            textureDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
             textureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
             textureDesc.Usage = D3D11_USAGE_DEFAULT;
             textureDesc.MiscFlags = 0;
@@ -429,7 +430,7 @@ public:
 
     virtual void clearFrame() override
     {
-        for (auto i = 0u; i < dxRenderTargetViews.Count(); i++)
+        for (auto i = 0u; i < 1; i++)
             dxImmediateContext->ClearRenderTargetView(
                 dxRenderTargetViews[i],
                 clearColor);
