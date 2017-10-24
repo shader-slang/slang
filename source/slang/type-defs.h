@@ -318,7 +318,6 @@ SYNTAX_CLASS(GroupSharedType, Type)
 RAW(
     virtual ~GroupSharedType()
     {
-    int f = 0;
     }
 
     virtual Slang::String ToString() override;

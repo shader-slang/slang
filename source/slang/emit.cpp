@@ -4517,6 +4517,7 @@ emitDeclImpl(decl, nullptr);
 
         switch(inst->op)
         {
+        case 0: // nothing yet
         default:
             emit(getIRName(inst));
             break;

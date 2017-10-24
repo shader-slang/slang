@@ -4,6 +4,7 @@
 #include "compiler.h"
 #include "visitor.h"
 
+#include "../core/secure-crt.h"
 #include <assert.h>
 
 namespace Slang
@@ -4887,7 +4888,7 @@ namespace Slang
                         if (auto decl = dynamic_cast<CallableDecl*>(candidate.item.declRef.decl))
                         {
                             char buffer[1024];
-                            sprintf(buffer, "[this:%p, primary:%p, next:%p]",
+                            sprintf_s(buffer, sizeof(buffer), "[this:%p, primary:%p, next:%p]",
                                 decl,
                                 decl->primaryDecl,
                                 decl->nextDecl);

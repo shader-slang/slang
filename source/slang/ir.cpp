@@ -1614,9 +1614,9 @@ namespace Slang
         // There are several ops we want to special-case here,
         // so that they will be more pleasant to look at.
         //
+#if 0
         switch (op)
         {
-#if 0
         case kIROp_Module:
             dumpIndent(context);
             dump(context, "module\n");
@@ -1688,11 +1688,11 @@ namespace Slang
                 dumpChildrenRaw(context, block);
             }
             return;
-#endif
 
         default:
             break;
         }
+#endif
 
 #if 0
         // We also want to special-case based on the *type*
@@ -2918,7 +2918,7 @@ namespace Slang
         // TODO: are there any instruction types that need to be handled
         // specially here? That would be anything that has more state
         // than is visible in its operand list...
-
+        case 0: // nothing yet
         default:
             {
                 // The common case is that we just need to construct a cloned

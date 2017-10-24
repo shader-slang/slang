@@ -1,6 +1,7 @@
 // main.cpp
 
 #include "../../source/core/slang-io.h"
+#include "../../source/core/token-reader.h"
 
 using namespace Slang;
 
@@ -20,7 +21,6 @@ using namespace Slang;
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
-
 enum OutputMode
 {
     // Default mode is to write test results to the console
@@ -1164,12 +1164,20 @@ TestResult doComputeComparisonTestRunImpl(TestInput& input, const char * langOpt
 	auto referenceProgramOutput = Split(File::ReadAllText(referenceOutput), '\n');
 	if (actualProgramOutput.Count() < referenceProgramOutput.Count())
 		return kTestResult_Fail;
-	for (int i = 0; i < referenceProgramOutput.Count(); i++)
+	for (int i = 0; i < (int)referenceProgramOutput.Count(); i++)
 	{
-		auto reference = StringToFloat(referenceProgramOutput[i]);
-		auto actual = StringToFloat(actualProgramOutput[i]);
-		if (abs(actual - reference) > 1e-7f)
-			return kTestResult_Fail;
+		auto reference = referenceProgramOutput[i];
+		auto actual = actualProgramOutput[i];
+        if (actual != reference)
+        {
+            // try to parse reference as float, and compare again
+            auto val = StringToFloat(reference);
+            auto uval = String((unsigned int)FloatAsInt(val), 16).ToUpper();
+            if (actual != uval)
+			    return kTestResult_Fail;
+            else
+                return kTestResult_Pass;
+        }
 	}
 	return kTestResult_Pass;
 }
