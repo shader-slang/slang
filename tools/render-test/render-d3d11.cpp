@@ -384,9 +384,13 @@ public:
         {
             ID3D11Texture2D* texture;
             D3D11_TEXTURE2D_DESC textureDesc;
-            dxBackBufferTexture->GetDesc(&textureDesc);
+            //dxBackBufferTexture->GetDesc(&textureDesc);
             textureDesc.ArraySize = 1;
             textureDesc.MipLevels = 1;
+            textureDesc.SampleDesc.Count = 1;
+            textureDesc.SampleDesc.Quality = 0;
+            textureDesc.Width = gWindowWidth;
+            textureDesc.Height = gWindowHeight;
             textureDesc.BindFlags = D3D11_BIND_RENDER_TARGET;
             textureDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
             textureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
