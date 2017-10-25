@@ -339,7 +339,7 @@ public:
             hr = D3D11CreateDeviceAndSwapChain_(
                 NULL,                    // adapter (use default)
                 D3D_DRIVER_TYPE_WARP,
-//              D3D_DRIVER_TYPE_HARDWARE,
+              //D3D_DRIVER_TYPE_HARDWARE,
                 NULL,                    // software
                 deviceFlags,
                 &featureLevels[ii],
@@ -520,7 +520,8 @@ public:
         {
         case Format::RGB_Float32:
             return DXGI_FORMAT_R32G32B32_FLOAT;
-
+        case Format::RG_Float32:
+            return DXGI_FORMAT_R32G32_FLOAT;
         default:
             return DXGI_FORMAT_UNKNOWN;
         }
@@ -556,7 +557,9 @@ public:
             case Format::RGB_Float32:
                 typeName = "float3";
                 break;
-
+            case Format::RG_Float32:
+                typeName = "float2";
+                break;
             default:
                 return nullptr;
             }
@@ -570,7 +573,7 @@ public:
 
         hlslCursor += sprintf(hlslCursor, "\n) : SV_Position { return 0; }");
 
-        auto dxVertexShaderBlob = compileHLSLShader("inputLayout", hlslBuffer, "main", "vs_4_0");
+        auto dxVertexShaderBlob = compileHLSLShader("inputLayout", hlslBuffer, "main", "vs_5_0");
         if(!dxVertexShaderBlob)
             return nullptr;
 
@@ -894,6 +897,7 @@ public:
             viewDesc.Texture1DArray.FirstArraySlice = 0;
             viewDesc.Texture1DArray.MipLevels = texData.mipLevels;
             viewDesc.Texture1DArray.MostDetailedMip = 0;
+            viewDesc.Format = desc.Format;
             dxDevice->CreateShaderResourceView(texture, &viewDesc, &viewOut);
         }
         else if (inputDesc.dimension == 2)
@@ -934,6 +938,7 @@ public:
             desc.Usage = D3D11_USAGE_DEFAULT;
             desc.SampleDesc.Count = 1;
             desc.SampleDesc.Quality = 0;
+            viewDesc.Format = desc.Format;
             ID3D11Texture2D * texture;
             dxDevice->CreateTexture2D(&desc, subRes.Buffer(), &texture);
             dxDevice->CreateShaderResourceView(texture, &viewDesc, &viewOut);
@@ -946,7 +951,7 @@ public:
             desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
             desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
             desc.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
-            desc.MipLevels = texData.mipLevels;
+            desc.MipLevels = 1;
             viewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE3D;
             desc.Width = texData.textureSize;
             desc.Height = texData.textureSize;
@@ -956,8 +961,9 @@ public:
             dxDevice->CreateTexture3D(&desc, subRes.Buffer(), &texture);
             if (inputDesc.arrayLength != 0)
                 viewDesc.ViewDimension = (D3D11_SRV_DIMENSION)(int)(viewDesc.ViewDimension + 1);
-            viewDesc.Texture3D.MipLevels = texData.mipLevels;
+            viewDesc.Texture3D.MipLevels = 1;
             viewDesc.Texture3D.MostDetailedMip = 0;
+            viewDesc.Format = desc.Format;
             dxDevice->CreateShaderResourceView(texture, &viewDesc, &viewOut);
         }
     }

@@ -37,13 +37,14 @@ struct Vertex
 {
     float position[3];
     float color[3];
+    float uv[2];
 };
 
 static const int kVertexCount = 3;
 static const Vertex kVertexData[kVertexCount] = {
-    { { 0,  0, 0.5 }, {1, 0, 0} },
-    { { 0,  1, 0.5 }, {0, 0, 1} },
-    { { 1,  0, 0.5 }, {0, 1, 0} },
+    { { 0,  0, 0.5 }, {1, 0, 0} , {0, 0} },
+    { { 0,  1, 0.5 }, {0, 0, 1} , {1, 0} },
+    { { 1,  0, 0.5 }, {0, 1, 0} , {1, 1} },
 };
 
 
@@ -65,9 +66,9 @@ static char const* computeEntryPointName = "computeMain";
 
 // "Profile" to use when compiling for HLSL targets
 // TODO: does this belong here?
-static char const* vertexProfileName   = "vs_4_0";
-static char const* fragmentProfileName = "ps_4_0";
-static char const* computeProfileName = "cs_4_0";
+static char const* vertexProfileName   = "vs_5_0";
+static char const* fragmentProfileName = "ps_5_0";
+static char const* computeProfileName = "cs_5_0";
 
 Error initializeShaders(
     ShaderCompiler* shaderCompiler)
@@ -101,7 +102,7 @@ Error initializeShaders(
 
     ShaderCompileRequest compileRequest;
     compileRequest.source                   = sourceInfo;
-	if (gOptions.shaderType == ShaderProgramType::Graphics)
+	if (gOptions.shaderType == ShaderProgramType::Graphics || gOptions.shaderType == ShaderProgramType::GraphicsCompute)
 	{
 		compileRequest.vertexShader.source = sourceInfo;
 		compileRequest.vertexShader.name = vertexEntryPointName;
@@ -157,9 +158,10 @@ Error initializeInner(
     InputElementDesc inputElements[] = {
         { "A", 0, Format::RGB_Float32, offsetof(Vertex, position) },
         { "A", 1, Format::RGB_Float32, offsetof(Vertex, color) },
+        { "A", 2, Format::RG_Float32, offsetof(Vertex, uv) },
     };
 
-    gInputLayout = renderer->createInputLayout(&inputElements[0], 2);
+    gInputLayout = renderer->createInputLayout(&inputElements[0], sizeof(inputElements)/sizeof(inputElements[0]));
     if(!gInputLayout)
         return Error::Unexpected;
 
@@ -409,7 +411,7 @@ int main(
 			// If we are in a mode where output is requested, we need to snapshot the back buffer here
 			if (gOptions.outputPath)
 			{
-                if (gOptions.shaderType == ShaderProgramType::Compute)
+                if (gOptions.shaderType == ShaderProgramType::Compute || gOptions.shaderType == ShaderProgramType::GraphicsCompute)
                     renderer->serializeOutput(gBindingState, gOptions.outputPath);
                 else
 				    renderer->captureScreenShot(gOptions.outputPath);

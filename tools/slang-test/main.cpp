@@ -1187,6 +1187,11 @@ TestResult doSlangComputeComparisonTest(TestInput& input)
 	return doComputeComparisonTestRunImpl(input, "-slang -compute", input.outputStem + ".expected.txt");
 }
 
+TestResult doSlangRenderComputeComparisonTest(TestInput& input)
+{
+    return doComputeComparisonTestRunImpl(input, "-slang -gcompute", input.outputStem + ".expected.txt");
+}
+
 TestResult doRenderComparisonTestRun(TestInput& input, char const* langOption, char const* outputKind, String* outOutput)
 {
     // TODO: delete any existing files at the output path(s) to avoid stale outputs leading to a false pass
@@ -1386,6 +1391,8 @@ TestResult runTest(
         { "COMPARE_HLSL_CROSS_COMPILE_RENDER", &runHLSLCrossCompileRenderComparisonTest},
         { "COMPARE_HLSL_GLSL_RENDER", &runHLSLAndGLSLComparisonTest },
         { "COMPARE_COMPUTE", &doSlangComputeComparisonTest},
+        { "COMPARE_RENDER_COMPUTE", &doSlangRenderComputeComparisonTest },
+
 #else
         { "COMPARE_HLSL",                       &skipTest },
         { "COMPARE_HLSL_RENDER",                &skipTest },

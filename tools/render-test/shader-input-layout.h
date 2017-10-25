@@ -46,8 +46,8 @@ namespace renderer_test
         InputSamplerDesc samplerDesc;
         bool isOutput = false;
         int hlslBinding = -1;
-        int glslBinding = -1;
-        int glslLocation = -1;
+        Slang::List<int> glslBinding;
+       
     };
 
     struct TextureData

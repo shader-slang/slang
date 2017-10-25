@@ -34,7 +34,8 @@ enum
 enum class ShaderProgramType
 {
 	Graphics,
-	Compute
+	Compute,
+    GraphicsCompute
 };
 
 struct Options

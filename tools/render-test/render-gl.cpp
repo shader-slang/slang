@@ -287,6 +287,7 @@ public:
         case Format::NAME: do { VertexAttributeFormat result = {COUNT, TYPE, NORMALIZED}; return result; } while (0)
 
         CASE(RGB_Float32, 3, GL_FLOAT, GL_FALSE);
+        CASE(RG_Float32, 2, GL_FLOAT, GL_FALSE);
 
     #undef CASE
 
@@ -625,7 +626,7 @@ public:
     {
         ShaderInputType type;
         GLuint handle;
-        int binding;
+        List<int> binding;
         int bindTarget;
         int bufferSize;
         bool isOutput = false;
@@ -789,14 +790,15 @@ public:
             switch (entry.type)
             {
             case ShaderInputType::Buffer:
-                glBindBufferBase(entry.bindTarget, entry.binding, entry.handle);
+                glBindBufferBase(entry.bindTarget, entry.binding[0], entry.handle);
                 break;
             case ShaderInputType::Sampler:
-                glBindSampler(entry.binding, entry.handle);
+                for (auto b : entry.binding)
+                    glBindSampler(b, entry.handle);
                 break;
             case ShaderInputType::Texture:
             case ShaderInputType::CombinedTextureSampler:
-                glActiveTexture(GL_TEXTURE0 + entry.binding);
+                glActiveTexture(GL_TEXTURE0 + entry.binding[0]);
                 glBindTexture(entry.bindTarget, entry.handle);
                 break;
             }

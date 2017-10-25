@@ -171,8 +171,8 @@ namespace renderer_test
                             else
                                 break;
                         }
+                        parser.Read(")");
                     }
-                    parser.Read(")");
                     // parse bindings
                     if (parser.LookAhead(":"))
                     {
@@ -190,11 +190,13 @@ namespace renderer_test
                             {
                                 parser.ReadToken();
                                 parser.Read("(");
-                                entry.glslBinding = entry.glslLocation = parser.ReadInt();
-                                if (parser.LookAhead(","))
+                                while (!parser.IsEnd() && !parser.LookAhead(")"))
                                 {
-                                    parser.Read(",");
-                                    entry.glslLocation = parser.ReadInt();
+                                    entry.glslBinding.Add(parser.ReadInt());
+                                    if (parser.LookAhead(","))
+                                        parser.Read(",");
+                                    else
+                                        break;
                                 }
                                 parser.Read(")");
                             }
@@ -223,7 +225,7 @@ namespace renderer_test
         int arrLen = inputDesc.arrayLength;
         if (arrLen == 0)
             arrLen = 1;
-        List<List<unsigned int>> dataBuffer;
+        List<List<unsigned int>> & dataBuffer = output.dataBuffer;
         int arraySize = arrLen;
         if (inputDesc.isCube)
             arraySize *= 6;

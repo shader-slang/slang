@@ -43,6 +43,7 @@ enum class Format
 {
     Unknown,
     RGB_Float32,
+    RG_Float32,
 };
 
 enum class BufferFlavor

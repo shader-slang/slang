@@ -100,6 +100,10 @@ void parseOptions(int* argc, char** argv)
 		{
 			gOptions.shaderType = ShaderProgramType::Graphics;
 		}
+        else if (strcmp(arg, "-gcompute") == 0)
+        {
+            gOptions.shaderType = ShaderProgramType::GraphicsCompute;
+        }
         else
         {
             fprintf(stderr, "unknown option '%s'\n", arg);
