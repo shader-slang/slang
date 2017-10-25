@@ -49,6 +49,16 @@ namespace renderer_test
         int glslBinding = -1;
         int glslLocation = -1;
     };
+
+    struct TextureData
+    {
+        Slang::List<Slang::List<unsigned int>> dataBuffer;
+        int textureSize;
+        int mipLevels;
+        int arraySize;
+    };
+    void generateTextureData(TextureData & output, const InputTextureDesc & desc);
+
     class ShaderInputLayout
     {
     public:

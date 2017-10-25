@@ -852,81 +852,20 @@ public:
 
     void createInputTexture(const InputTextureDesc & inputDesc, ID3D11ShaderResourceView * &viewOut)
     {
-        int arrLen = inputDesc.arrayLength;
-        if (arrLen == 0)
-            arrLen = 1;
+        TextureData texData;
+        generateTextureData(texData, inputDesc);
         List<D3D11_SUBRESOURCE_DATA> subRes;
-        List<List<unsigned int>> dataBuffer;
-        int arraySize = arrLen;
-        if (inputDesc.isCube)
-            arraySize *= 6;
-        int textureSize = inputDesc.size;
-        int textureMipLevels = Math::Log2Floor(textureSize) + 1;
-        subRes.SetSize(textureMipLevels * arraySize);
-        dataBuffer.SetSize(subRes.Count());
-
-        auto iteratePixels = [&](int dimension, int size, unsigned int * buffer, auto f)
+        for (int i = 0; i < texData.arraySize; i++)
         {
-            if (dimension == 1)
-                for (int i = 0; i < size; i++)
-                    buffer[i] = f(i, 0, 0);
-            else if (dimension == 2)
-                for (int i = 0; i < size; i++)
-                    for (int j = 0; j < size; j++)
-                        buffer[i*size + j] = f(j, i, 0);
-            else if (dimension == 3)
-                for (int i = 0; i < size; i++)
-                    for (int j = 0; j < size; j++)
-                        for (int k = 0; k < size; k++)
-                            buffer[i*size*size + j*size + k] = f(k, j, i);
-        };
-
-        int slice = 0;
-        for (int i = 0; i < arraySize; i++)
-        {
-            for (int j = 0; j < textureMipLevels; j++)
+            int slice = 0;
+            for (int j = 0; j < texData.mipLevels; j++)
             {
-                int size = textureSize >> j;
-                int bufferLen = size;
-                if (inputDesc.dimension == 2)
-                    bufferLen *= size;
-                else if (inputDesc.dimension == 3)
-                    bufferLen *= size*size;
-                dataBuffer[slice].SetSize(bufferLen);
-                subRes[slice].pSysMem = dataBuffer[slice].Buffer();
-                subRes[slice].SysMemPitch = sizeof(unsigned int) * size;
-                subRes[slice].SysMemSlicePitch = sizeof(unsigned int) * size * size;
-                
-                iteratePixels(inputDesc.dimension, size, dataBuffer[slice].Buffer(), [&](int x, int y, int z) -> unsigned int
-                {
-                    if (inputDesc.content == InputTextureContent::Zero)
-                    {
-                        return 0x0;
-                    }
-                    else if (inputDesc.content == InputTextureContent::One)
-                    {
-                        return 0xFFFFFFFF;
-                    }
-                    else if (inputDesc.content == InputTextureContent::Gradient)
-                    {
-                        unsigned char r = (unsigned char)(x / (float)(size - 1) * 255.0f);
-                        unsigned char g = (unsigned char)(y / (float)(size - 1) * 255.0f);
-                        unsigned char b = (unsigned char)(z / (float)(size - 1) * 255.0f);
-                        return 0xFF000000 + r + (g << 8) + (b << 16);
-                    }
-                    else if (inputDesc.content == InputTextureContent::ChessBoard)
-                    {
-                        unsigned int xSig = x < (size >> 1) ? 1 : 0;
-                        unsigned int ySig = y < (size >> 1) ? 1 : 0;
-                        unsigned int zSig = z < (size >> 1) ? 1 : 0;
-                        auto sig = xSig ^ ySig ^ zSig;
-                        if (sig)
-                            return 0xFFFFFFFF;
-                        else
-                            return 0xFF808080;
-                    }
-                    return 0x0;
-                });
+                int size = texData.textureSize >> j;
+                D3D11_SUBRESOURCE_DATA res;
+                res.pSysMem = texData.dataBuffer[slice].Buffer();
+                res.SysMemPitch = sizeof(unsigned int) * size;
+                res.SysMemSlicePitch = sizeof(unsigned int) * size * size;
+                subRes.Add(res);
                 slice++;
             }
         }
@@ -937,9 +876,9 @@ public:
             desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
             desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
             desc.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
-            desc.MipLevels = textureMipLevels;
-            desc.ArraySize = arraySize;
-            desc.Width = textureSize;
+            desc.MipLevels = texData.mipLevels;
+            desc.ArraySize = texData.arraySize;
+            desc.Width = texData.textureSize;
             desc.Usage = D3D11_USAGE_DEFAULT;
             
             ID3D11Texture1D * texture;
@@ -949,11 +888,11 @@ public:
             viewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE1D;
             if (inputDesc.arrayLength != 0)
                 viewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE1DARRAY;
-            viewDesc.Texture1D.MipLevels = textureMipLevels;
+            viewDesc.Texture1D.MipLevels = texData.mipLevels;
             viewDesc.Texture1D.MostDetailedMip = 0;
-            viewDesc.Texture1DArray.ArraySize = arraySize;
+            viewDesc.Texture1DArray.ArraySize = texData.arraySize;
             viewDesc.Texture1DArray.FirstArraySlice = 0;
-            viewDesc.Texture1DArray.MipLevels = textureMipLevels;
+            viewDesc.Texture1DArray.MipLevels = texData.mipLevels;
             viewDesc.Texture1DArray.MostDetailedMip = 0;
             dxDevice->CreateShaderResourceView(texture, &viewDesc, &viewOut);
         }
@@ -965,15 +904,15 @@ public:
             desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
             desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
             desc.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
-            desc.MipLevels = textureMipLevels;
-            desc.ArraySize = arraySize;
+            desc.MipLevels = texData.mipLevels;
+            desc.ArraySize = texData.arraySize;
             if (inputDesc.isCube)
             {
                 desc.MiscFlags |= D3D11_RESOURCE_MISC_TEXTURECUBE;
                 viewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURECUBE;
-                viewDesc.TextureCube.MipLevels = textureMipLevels;
+                viewDesc.TextureCube.MipLevels = texData.mipLevels;
                 viewDesc.TextureCube.MostDetailedMip = 0;
-                viewDesc.TextureCubeArray.MipLevels = textureMipLevels;
+                viewDesc.TextureCubeArray.MipLevels = texData.mipLevels;
                 viewDesc.TextureCubeArray.MostDetailedMip = 0;
                 viewDesc.TextureCubeArray.First2DArrayFace = 0;
                 viewDesc.TextureCubeArray.NumCubes = inputDesc.arrayLength;
@@ -981,17 +920,17 @@ public:
             else
             {
                 viewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-                viewDesc.Texture2D.MipLevels = textureMipLevels;
+                viewDesc.Texture2D.MipLevels = texData.mipLevels;
                 viewDesc.Texture2D.MostDetailedMip = 0;
-                viewDesc.Texture2DArray.ArraySize = arraySize;
+                viewDesc.Texture2DArray.ArraySize = texData.arraySize;
                 viewDesc.Texture2DArray.FirstArraySlice = 0;
-                viewDesc.Texture2DArray.MipLevels = textureMipLevels;
+                viewDesc.Texture2DArray.MipLevels = texData.mipLevels;
                 viewDesc.Texture2DArray.MostDetailedMip = 0;
             }
             if (inputDesc.arrayLength != 0)
                 viewDesc.ViewDimension = (D3D11_SRV_DIMENSION)(int)(viewDesc.ViewDimension + 1);
-            desc.Width = textureSize;
-            desc.Height = textureSize;
+            desc.Width = texData.textureSize;
+            desc.Height = texData.textureSize;
             desc.Usage = D3D11_USAGE_DEFAULT;
             desc.SampleDesc.Count = 1;
             desc.SampleDesc.Quality = 0;
@@ -1007,17 +946,17 @@ public:
             desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
             desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
             desc.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
-            desc.MipLevels = textureMipLevels;
+            desc.MipLevels = texData.mipLevels;
             viewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE3D;
-            desc.Width = textureSize;
-            desc.Height = textureSize;
-            desc.Depth = textureSize;
+            desc.Width = texData.textureSize;
+            desc.Height = texData.textureSize;
+            desc.Depth = texData.textureSize;
             desc.Usage = D3D11_USAGE_DEFAULT;
             ID3D11Texture3D * texture;
             dxDevice->CreateTexture3D(&desc, subRes.Buffer(), &texture);
             if (inputDesc.arrayLength != 0)
                 viewDesc.ViewDimension = (D3D11_SRV_DIMENSION)(int)(viewDesc.ViewDimension + 1);
-            viewDesc.Texture3D.MipLevels = textureMipLevels;
+            viewDesc.Texture3D.MipLevels = texData.mipLevels;
             viewDesc.Texture3D.MostDetailedMip = 0;
             dxDevice->CreateShaderResourceView(texture, &viewDesc, &viewOut);
         }
@@ -1032,12 +971,15 @@ public:
         {
             desc.ComparisonFunc = D3D11_COMPARISON_LESS_EQUAL;
             desc.Filter = D3D11_FILTER_MIN_LINEAR_MAG_MIP_POINT;
+            desc.MinLOD = desc.MaxLOD = 0.0f;
         }
         else
+        {
             desc.Filter = D3D11_FILTER_ANISOTROPIC;
-        desc.MaxAnisotropy = 16;
-        desc.MinLOD = 0.0f;
-        desc.MaxLOD = 100.0f;
+            desc.MaxAnisotropy = 8;
+            desc.MinLOD = 0.0f;
+            desc.MaxLOD = 100.0f;
+        }
         dxDevice->CreateSamplerState(&desc, &stateOut);
     }
     virtual BindingState * createBindingState(const ShaderInputLayout & layout)

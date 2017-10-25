@@ -7,7 +7,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-
+#include "core/basic.h"
 #include "external/stb/stb_image_write.h"
 
 // TODO(tfoley): eventually we should be able to run these
@@ -59,7 +59,14 @@
     F(glDisableVertexAttribArray,   PFNGLDISABLEVERTEXATTRIBARRAYPROC)  \
     F(glDebugMessageCallback,       PFNGLDEBUGMESSAGECALLBACKPROC)      \
 	F(glDispatchCompute,            PFNGLDISPATCHCOMPUTEPROC) \
+	F(glActiveTexture,              PFNGLACTIVETEXTUREPROC) \
+    F(glCreateSamplers,             PFNGLCREATESAMPLERSPROC) \
+    F(glBindSampler,                PFNGLBINDSAMPLERPROC) \
+    F(glTexImage3D,                 PFNGLTEXIMAGE3DPROC) \
+    F(glSamplerParameteri,          PFNGLSAMPLERPARAMETERIPROC) \
     /* end */
+
+using namespace Slang;
 
 namespace renderer_test {
 
@@ -614,19 +621,204 @@ public:
 		glDispatchCompute(x, y, z);
 	}
 
+    struct GLBindingEntry
+    {
+        ShaderInputType type;
+        GLuint handle;
+        int binding;
+        int bindTarget;
+        int bufferSize;
+        bool isOutput = false;
+    };
+    struct GLBindingState
+    {
+        List<GLBindingEntry> entries;
+    };
+
+    void createInputBuffer(GLBindingEntry & rs, InputBufferDesc bufDesc, List<unsigned int> & bufferData)
+    {
+        rs.bindTarget = (bufDesc.type == InputBufferType::StorageBuffer ? GL_SHADER_STORAGE_BUFFER : GL_UNIFORM_BUFFER);
+        glGenBuffers(1, &rs.handle);
+        glBindBuffer(rs.bindTarget, rs.handle);
+        glBufferData(rs.bindTarget, bufferData.Count() * sizeof(unsigned int), bufferData.Buffer(), GL_STATIC_READ);
+        glBindBuffer(rs.bindTarget, 0);
+    }
+
+    void createInputTexture(GLBindingEntry & rs, InputTextureDesc texDesc, InputSamplerDesc samplerDesc)
+    {
+        TextureData texData;
+        generateTextureData(texData, texDesc);
+        glGenTextures(1, &rs.handle);
+        switch (texDesc.dimension)
+        {
+        case 1:
+            if (texDesc.arrayLength > 0)
+            {
+                rs.bindTarget = GL_TEXTURE_1D_ARRAY;
+                glBindTexture(rs.bindTarget, rs.handle);
+                int slice = 0;
+                for (int i = 0; i < texData.arraySize; i++)
+                    for (int j = 0; j < texData.mipLevels; j++)
+                    {
+                        glTexImage2D(rs.bindTarget, j, GL_RGBA8, texData.textureSize, i, 0, GL_RGBA, GL_UNSIGNED_BYTE, texData.dataBuffer[slice].Buffer());
+                        slice++;
+                    }
+            }
+            else
+            {
+                rs.bindTarget = GL_TEXTURE_1D;
+                glBindTexture(rs.bindTarget, rs.handle);
+                for (int i = 0; i < texData.mipLevels; i++)
+                    glTexImage1D(rs.bindTarget, i, GL_RGBA8, texData.textureSize, 0, GL_RGBA, GL_UNSIGNED_BYTE, texData.dataBuffer[i].Buffer());
+            }
+            break;
+        case 2:
+            if (texDesc.arrayLength > 0)
+            {
+                if (texDesc.isCube)
+                    rs.bindTarget = GL_TEXTURE_CUBE_MAP_ARRAY;
+                else
+                    rs.bindTarget = GL_TEXTURE_2D_ARRAY;
+                glBindTexture(rs.bindTarget, rs.handle);
+                for (auto i = 0u; i < texData.dataBuffer.Count(); i++)
+                    glTexImage3D(rs.bindTarget, i % texData.mipLevels, GL_RGBA8, texData.textureSize, texData.textureSize, i, 0, GL_RGBA, GL_UNSIGNED_BYTE, texData.dataBuffer[i].Buffer());
+            }
+            else
+            {
+                if (texDesc.isCube)
+                {
+                    rs.bindTarget = GL_TEXTURE_CUBE_MAP;
+                    glBindTexture(rs.bindTarget, rs.handle);
+                    for (int j = 0; j < 6; j++)
+                    {
+                        for (int i = 0; i < texData.mipLevels; i++)
+                            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + j, i, GL_RGBA8, texData.textureSize, texData.textureSize, 0, GL_RGBA, GL_UNSIGNED_BYTE, texData.dataBuffer[i + j*texData.mipLevels].Buffer());
+                    }
+                }
+                else
+                {
+                    rs.bindTarget = GL_TEXTURE_2D;
+                    glBindTexture(rs.bindTarget, rs.handle);
+                    for (int i = 0; i < texData.mipLevels; i++)
+                        glTexImage2D(rs.bindTarget, i, GL_RGBA8, texData.textureSize, texData.textureSize, 0, GL_RGBA, GL_UNSIGNED_BYTE, texData.dataBuffer[i].Buffer());
+                }
+            }
+            break;
+        case 3:
+            rs.bindTarget = GL_TEXTURE_3D;
+            glBindTexture(rs.bindTarget, rs.handle);
+            for (int i = 0; i < texData.mipLevels; i++)
+                glTexImage3D(rs.bindTarget, i, GL_RGBA8, texData.textureSize, texData.textureSize, texData.textureSize, 0, GL_RGBA, GL_UNSIGNED_BYTE, texData.dataBuffer[i].Buffer());
+            break;
+        }
+        glTexParameteri(rs.bindTarget, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(rs.bindTarget, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(rs.bindTarget, GL_TEXTURE_WRAP_R, GL_REPEAT);
+
+        if (samplerDesc.isCompareSampler)
+        {
+            glTexParameteri(rs.bindTarget, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+            glTexParameteri(rs.bindTarget, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameterf(rs.bindTarget, GL_TEXTURE_MAX_ANISOTROPY_EXT, 8.0f);
+        }
+        else
+        {
+            glTexParameteri(rs.bindTarget, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(rs.bindTarget, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(rs.bindTarget, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+            glTexParameteri(rs.bindTarget, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+        }
+    }
+
+    void createInputSampler(GLBindingEntry & rs, InputSamplerDesc samplerDesc)
+    {
+        glCreateSamplers(1, &rs.handle);
+        glSamplerParameteri(rs.handle, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glSamplerParameteri(rs.handle, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glSamplerParameteri(rs.handle, GL_TEXTURE_WRAP_R, GL_REPEAT);
+
+        if (samplerDesc.isCompareSampler)
+        {
+            glSamplerParameteri(rs.handle, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+            glSamplerParameteri(rs.handle, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glSamplerParameteri(rs.handle, GL_TEXTURE_MAX_ANISOTROPY_EXT, 8.0f);
+        }
+        else
+        {
+            glSamplerParameteri(rs.handle, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glSamplerParameteri(rs.handle, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glSamplerParameteri(rs.handle, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+            glSamplerParameteri(rs.handle, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+        }
+    }
+
     virtual BindingState * createBindingState(const ShaderInputLayout & layout)
     {
-        return nullptr;
+        GLBindingState * rs = new GLBindingState();
+        for (auto & entry : layout.entries)
+        {
+            GLBindingEntry rsEntry;
+            rsEntry.isOutput = entry.isOutput;
+            rsEntry.binding = entry.glslBinding;
+            rsEntry.type = entry.type;
+            switch (entry.type)
+            {
+            case ShaderInputType::Buffer:
+                createInputBuffer(rsEntry, entry.bufferDesc, entry.bufferData);
+                break;
+            case ShaderInputType::Texture:
+                createInputTexture(rsEntry, entry.textureDesc, InputSamplerDesc());
+                break;
+            case ShaderInputType::CombinedTextureSampler:
+                createInputTexture(rsEntry, entry.textureDesc, entry.samplerDesc);
+                break;
+            case ShaderInputType::Sampler:
+                createInputSampler(rsEntry, entry.samplerDesc);
+                break;
+            }
+            rs->entries.Add(rsEntry);
+        }
+        return (BindingState*)rs;
     }
 
     virtual void setBindingState(BindingState * state)
     {
-
+        GLBindingState * glState = (GLBindingState*)state;
+        for (auto & entry : glState->entries)
+        {
+            switch (entry.type)
+            {
+            case ShaderInputType::Buffer:
+                glBindBufferBase(entry.bindTarget, entry.binding, entry.handle);
+                break;
+            case ShaderInputType::Sampler:
+                glBindSampler(entry.binding, entry.handle);
+                break;
+            case ShaderInputType::Texture:
+            case ShaderInputType::CombinedTextureSampler:
+                glActiveTexture(GL_TEXTURE0 + entry.binding);
+                glBindTexture(entry.bindTarget, entry.handle);
+                break;
+            }
+        }
     }
 
     virtual void serializeOutput(BindingState* state, const char * fileName)
     {
-
+        GLBindingState * glState = (GLBindingState*)state;
+        FILE * f = fopen(fileName, "wt");
+        for (auto & entry : glState->entries)
+        {
+            if (entry.isOutput)
+            {
+                glBindBuffer(entry.bindTarget, entry.handle);
+                auto ptr = (unsigned int *)glMapBuffer(entry.bindTarget, GL_READ_ONLY);
+                for (auto i = 0u; i < entry.bufferSize / sizeof(unsigned int); i++)
+                    fprintf(f, "%X\n", ptr[i]);
+                glUnmapBuffer(entry.bindTarget);
+            }
+        }
+        fclose(f);
     }
 };
 
