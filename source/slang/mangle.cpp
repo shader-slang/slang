@@ -131,6 +131,27 @@ namespace Slang
         {
             emitType(context, type);
         }
+        else if( auto witness = dynamic_cast<Witness*>(val) )
+        {
+            // We don't emit witnesses as part of a mangled
+            // name, because the way that the front-end
+            // arrived at the witness is not important;
+            // what matters is that the type constraint
+            // was satisfied.
+            //
+            // TODO: make sure we can't get name collisions
+            // between specializations of declarations
+            // with the same numbers of generic parameters,
+            // but different constraints. We might have
+            // to mangle in the constraints even when
+            // the whole thing is specialized...
+        }
+        else if (auto proxyVal = dynamic_cast<IRProxyVal*>(val))
+        {
+            // This is a proxy standing in for some IR-level
+            // value, so we certainly don't want to include
+            // it in the mangling.
+        }
         else
         {
             SLANG_UNEXPECTED("unimplemented case in mangling");
@@ -316,4 +337,21 @@ namespace Slang
     {
         return getMangledName(makeDeclRef(decl));
     }
+
+    String getMangledNameForConformanceWitness(
+        Type* sub,
+        Type* sup)
+    {
+        // The mangled form for a witness that `sub`
+        // conforms to `sup` will be named:
+        //
+        //     {Conforms(sub,sup)} => _SW{sub}{sup}
+        //
+        ManglingContext context;
+        emitRaw(&context, "_SW");
+        emitType(&context, sub);
+        emitType(&context, sup);
+        return context.sb.ProduceString();
+    }
+
 }

@@ -21,6 +21,7 @@ class   Session;
 struct  IRFunc;
 struct  IRInst;
 struct  IRModule;
+struct  IRUser;
 struct  IRValue;
 
 typedef unsigned int IROpFlags;
@@ -82,7 +83,7 @@ struct IRUse
     IRValue* usedValue;
 
     // The value that is doing the using.
-    IRInst* user;
+    IRUser* user;
 
     // The next use of the same value
     IRUse*  nextUse;
@@ -91,7 +92,7 @@ struct IRUse
     // so that we can simplify updates.
     IRUse** prevLink;
 
-    void init(IRInst* user, IRValue* usedValue);
+    void init(IRUser* user, IRValue* usedValue);
 };
 
 enum IRDecorationOp : uint16_t
@@ -156,9 +157,83 @@ struct IRValue
     void deallocate();
 };
 
-// Instructions are values that can be executed,
-// and which take other values as operands
-struct IRInst : IRValue
+// Values that are contained in a doubly-linked
+// list inside of some parent.
+//
+// TODO: consider merging this into `IRValue` so
+// that *all* values have a parent.
+struct IRChildValue : IRValue
+{
+    // The parent of this value.
+    IRValue*        parent;
+
+    // The next and previous values in the same
+    // list on teh same parent.
+    IRChildValue*   next;
+    IRChildValue*   prev;
+};
+
+// Helper for storing linked lists of child values.
+struct IRValueListBase
+{
+    IRChildValue* first = 0;
+    IRChildValue* last = 0;
+
+protected:
+    void addImpl(IRValue* parent, IRChildValue* val);
+};
+template<typename T>
+struct IRValueList : IRValueListBase
+{
+    T* getFirst() { return (T*)first; }
+    T* getLast() { return (T*)last; }
+
+    void add(IRValue* parent, T* val)
+    {
+        addImpl(parent, val);
+    }
+
+    struct Iterator
+    {
+        T* val;
+
+        Iterator() : val(0) {}
+        Iterator(T* val) : val(val) {}
+
+        void operator++()
+        {
+            if (val)
+            {
+                val = (T*)val->next;
+            }
+        }
+
+        T* operator*()
+        {
+            return val;
+        }
+
+        bool operator!=(Iterator const& i)
+        {
+            return val != i.val;
+        }
+    };
+
+    Iterator begin() { return Iterator(getFirst()); }
+    Iterator end() { return Iterator(nullptr); }
+};
+
+// Values that can use other values. These always
+// have their operands "tail allocated" after
+// the fields of this type, so derived types must
+// either:
+//
+// - Add no new fields, or
+// - Add only fields that represent the `IRUse` operands
+// - Add a fixed number of `IRUse` operand fields and
+//   then any additional data after them.
+//
+struct IRUser : IRChildValue
 {
     // The total number of arguments of this instruction.
     //
@@ -168,13 +243,6 @@ struct IRInst : IRValue
     // allocate this field ahead of the `this`
     // pointer.
     uint32_t argCount;
-
-    // The basic block that contains this instruction.
-    IRBlock*    parentBlock;
-
-    // The next and previous instructions in the same parent block
-    IRInst*     nextInst;
-    IRInst*     prevInst;
 
     UInt getArgCount()
     {
@@ -187,6 +255,17 @@ struct IRInst : IRValue
     {
         return getArgs()[index].usedValue;
     }
+};
+
+// Instructions are values that are children of a basic block,
+// and can actually be executed.
+struct IRInst : IRUser
+{
+    IRBlock* getParentBlock() { return (IRBlock*)parent; }
+
+    IRInst* getPrevInst() { return (IRInst*)prev; }
+    IRInst* getNextInst() { return (IRInst*)next; }
+
 
     // Insert this instruction into the same basic block
     // as `other`, right before it.

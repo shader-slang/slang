@@ -688,6 +688,11 @@ struct LoweringVisitor
         return val;
     }
 
+    RefPtr<Witness> visitWitness(Witness* witness)
+    {
+        return witness;
+    }
+
     //
     // Types
     //
@@ -795,6 +800,11 @@ struct LoweringVisitor
     RefPtr<Type> transformSyntaxField(Type* type)
     {
         return lowerType(type);
+    }
+
+    RefPtr<Val> visitIRProxyVal(IRProxyVal* val)
+    {
+        return val;
     }
 
     //
