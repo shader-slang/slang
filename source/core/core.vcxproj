@@ -36,6 +36,7 @@
     <ClInclude Include="smart-pointer.h" />
     <ClInclude Include="stream.h" />
     <ClInclude Include="text-io.h" />
+    <ClInclude Include="token-reader.h" />
     <ClInclude Include="type-traits.h" />
   </ItemGroup>
   <ItemGroup>
@@ -44,6 +45,7 @@
     <ClCompile Include="slang-string.cpp" />
     <ClCompile Include="stream.cpp" />
     <ClCompile Include="text-io.cpp" />
+    <ClCompile Include="token-reader.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="core.natvis" />

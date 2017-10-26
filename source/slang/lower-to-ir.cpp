@@ -338,6 +338,7 @@ LoweredValInfo emitCallToVal(
     auto builder = context->irBuilder;
     switch (funcVal.flavor)
     {
+    case LoweredValInfo::Flavor::None:
     default:
         return LoweredValInfo::simple(
             builder->emitCallInst(type, getSimpleVal(context, funcVal), argCount, args));
