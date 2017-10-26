@@ -1138,7 +1138,7 @@ TestResult runComputeComparisonImpl(TestInput& input, const char * langOption, S
 
 	if (spawnAndWait(outputStem, spawner) != kOSError_None)
 	{
-        fprintf(stderr, "error spawning render-test\n");
+        printf("error spawning render-test\n");
 		return kTestResult_Fail;
 	}
 
@@ -1147,13 +1147,13 @@ TestResult runComputeComparisonImpl(TestInput& input, const char * langOption, S
 	// check against reference output
     if (!File::Exists(outputStem + ".actual.txt"))
     {
-        fprintf(stderr, "render-test not producing expected outputs.\n");
-        fprintf(stderr, "render-test output:\n%s\n", actualOutput.Buffer());
+        printf("render-test not producing expected outputs.\n");
+        printf("render-test output:\n%s\n", actualOutput.Buffer());
 		return kTestResult_Fail;
     }
     if (!File::Exists(referenceOutput))
     {
-        fprintf(stderr, "referenceOutput %s not found.\n", referenceOutput.Buffer());
+        printf("referenceOutput %s not found.\n", referenceOutput.Buffer());
 		return kTestResult_Fail;
     }
     auto actualOutputContent = File::ReadAllText(outputStem + ".actual.txt");
@@ -1161,7 +1161,7 @@ TestResult runComputeComparisonImpl(TestInput& input, const char * langOption, S
 	auto referenceProgramOutput = Split(File::ReadAllText(referenceOutput), '\n');
     auto printOutput = [&]()
     {
-        fprintf(stderr, "output mismatch! actual output: {\n%s\n}, \n%s\n", actualOutputContent.Buffer(), actualOutput.Buffer());
+        printf("output mismatch! actual output: {\n%s\n}, \n%s\n", actualOutputContent.Buffer(), actualOutput.Buffer());
     };
     if (actualProgramOutput.Count() < referenceProgramOutput.Count())
     {
