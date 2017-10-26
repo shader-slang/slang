@@ -1099,7 +1099,7 @@ public:
     {
         auto dxContext = dxImmediateContext;
         auto dxBindingState = (D3DBindingState*)state;
-        FILE * f = fopen(fileName, "wt");
+        FILE * f = fopen(fileName, "wb");
         for (auto & binding : dxBindingState->bindings)
         {
             if (binding.isOutput)
@@ -1117,6 +1117,7 @@ public:
                 }
             }
         }
+        fprintf(f, "test result. \n");
         fclose(f);
     }
 };
