@@ -1100,6 +1100,7 @@ public:
         auto dxContext = dxImmediateContext;
         auto dxBindingState = (D3DBindingState*)state;
         FILE * f = fopen(fileName, "wb");
+        int id = 0;
         for (auto & binding : dxBindingState->bindings)
         {
             if (binding.isOutput)
@@ -1113,9 +1114,10 @@ public:
                 }
                 else
                 {
-                    throw "not implemented";
+                    printf("invalid output type at %d.\n");
                 }
             }
+            id++;
         }
         fprintf(f, "test result. \n");
         fclose(f);
