@@ -49,8 +49,7 @@ enum class Format
 enum class BufferFlavor
 {
     Constant,
-    Vertex,
-	Storage,
+    Vertex
 };
 
 struct BufferDesc
@@ -114,15 +113,10 @@ public:
     virtual void setShaderProgram(ShaderProgram* program) = 0;
 
     virtual void setConstantBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* offsets) = 0;
-	virtual void setStorageBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* offsets) = 0;
     inline void setConstantBuffer(UInt slot, Buffer* buffer, UInt offset = 0)
     {
         setConstantBuffers(slot, 1, &buffer, &offset);
     }
-	inline void setStorageBuffer(UInt slot, Buffer* buffer, UInt offset = 0)
-	{
-		setStorageBuffers(slot, 1, &buffer, &offset);
-	}
     virtual void draw(UInt vertexCount, UInt startVertex = 0) = 0;
 	virtual void dispatchCompute(int x, int y, int z) = 0;
 };

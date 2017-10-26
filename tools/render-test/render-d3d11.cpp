@@ -54,6 +54,7 @@ struct D3DBinding
 struct D3DBindingState
 {
     List<D3DBinding> bindings;
+    int numRenderTargets = 0;
 };
 
 //
@@ -452,7 +453,6 @@ public:
 
 	struct D3DBuffer
 	{
-		ID3D11UnorderedAccessView * view = nullptr;
 		ID3D11Buffer * buffer = nullptr;
 	};
 
@@ -470,19 +470,10 @@ public:
             break;
 
         case BufferFlavor::Vertex:
-            dxBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+            dxBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
             dxBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-            dxBufferDesc.CPUAccessFlags = 0;
+            dxBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
             break;
-
-		case BufferFlavor::Storage:
-			dxBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-			dxBufferDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
-			dxBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
-			dxBufferDesc.StructureByteStride = sizeof(float);
-			dxBufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-			break;
-
         default:
             return nullptr;
         }
@@ -500,17 +491,6 @@ public:
 
 		D3DBuffer * rs = new D3DBuffer();
 		rs->buffer = dxBuffer;
-		if (desc.flavor == BufferFlavor::Storage)
-		{
-			D3D11_UNORDERED_ACCESS_VIEW_DESC viewDesc;
-			memset(&viewDesc, 0, sizeof(viewDesc));
-			viewDesc.Buffer.FirstElement = 0;
-			viewDesc.Buffer.NumElements = 512;
-			viewDesc.Buffer.Flags = 0;
-			viewDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
-			viewDesc.Format = DXGI_FORMAT_UNKNOWN;
-			dxDevice->CreateUnorderedAccessView(dxBuffer, &viewDesc, &rs->view);
-		}
         return (Buffer*) rs;
     }
 
@@ -714,18 +694,6 @@ public:
             (UINT) startSlot, (UINT) slotCount, &dxConstantBuffers[0]->buffer);
     }
 
-	virtual void setStorageBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* offsets) override
-	{
-		auto dxContext = dxImmediateContext;
-
-		// TODO: actually use those offsets
-
-		auto dxStorageBuffers = (D3DBuffer* const*)buffers;
-		dxContext->CSSetUnorderedAccessViews(
-			(UINT)startSlot, (UINT)slotCount, &dxStorageBuffers[0]->view, 0);
-	}
-
-
     virtual void draw(UInt vertexCount, UInt startVertex) override
     {
         auto dxContext = dxImmediateContext;
@@ -808,15 +776,13 @@ public:
         desc.ByteWidth = bufferData.Count() * sizeof(unsigned int);
         if (bufferDesc.type == InputBufferType::ConstantBuffer)
         {
-            desc.Usage = D3D11_USAGE_DYNAMIC;
+            desc.Usage = D3D11_USAGE_DEFAULT;
             desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER | D3D11_BIND_SHADER_RESOURCE;
-            desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
         }
         else
         {
             desc.Usage = D3D11_USAGE_DEFAULT;
             desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
-            desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
             if (bufferDesc.stride != 0)
             {
                 desc.StructureByteStride = bufferDesc.stride;
@@ -876,7 +842,7 @@ public:
         {
             D3D11_TEXTURE1D_DESC desc = { 0 };
             desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-            desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+            desc.CPUAccessFlags = 0;
             desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
             desc.MiscFlags = 0;
             desc.MipLevels = texData.mipLevels;
@@ -905,7 +871,7 @@ public:
             D3D11_SHADER_RESOURCE_VIEW_DESC viewDesc;
             D3D11_TEXTURE2D_DESC desc = { 0 };
             desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-            desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+            desc.CPUAccessFlags = 0;
             desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
             desc.MiscFlags = 0;
             desc.MipLevels = texData.mipLevels;
@@ -948,7 +914,7 @@ public:
             D3D11_SHADER_RESOURCE_VIEW_DESC viewDesc;
             D3D11_TEXTURE3D_DESC desc = { 0 };
             desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-            desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+            desc.CPUAccessFlags = 0;
             desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
             desc.MiscFlags = 0;
             desc.MipLevels = 1;
@@ -989,6 +955,7 @@ public:
     virtual BindingState * createBindingState(const ShaderInputLayout & layout)
     {
         D3DBindingState * rs = new D3DBindingState();
+        rs->numRenderTargets = layout.numRenderTargets;
         for (auto & entry : layout.entries)
         {
             D3DBinding rsEntry;
@@ -1037,8 +1004,8 @@ public:
                     if (isCompute)
                         dxContext->CSSetUnorderedAccessViews(binding.binding, 1, &binding.uav, nullptr);
                     else
-                        dxContext->OMSetRenderTargetsAndUnorderedAccessViews(D3D11_KEEP_RENDER_TARGETS_AND_DEPTH_STENCIL,
-                            nullptr, nullptr, binding.binding, 1, &binding.uav, nullptr);
+                        dxContext->OMSetRenderTargetsAndUnorderedAccessViews(currentBindings->numRenderTargets,
+                            dxRenderTargetViews.Buffer(), nullptr, binding.binding, 1, &binding.uav, nullptr);
                 }
                 else
                 {
@@ -1105,10 +1072,21 @@ public:
             {
                 if (binding.buffer)
                 {
-                    auto ptr = (unsigned int *)map(binding.buffer, MapFlavor::HostRead);
+                    // create staging buffer
+                    ID3D11Buffer* stageBuf;
+                    D3D11_BUFFER_DESC bufDesc;
+                    memset(&bufDesc, 0, sizeof(bufDesc));
+                    bufDesc.BindFlags = 0;
+                    bufDesc.ByteWidth = binding.bufferLength;
+                    bufDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+                    bufDesc.Usage = D3D11_USAGE_STAGING;
+                    dxDevice->CreateBuffer(&bufDesc, nullptr, &stageBuf);
+                    dxContext->CopyResource(stageBuf, binding.buffer);
+                    auto ptr = (unsigned int *)map(stageBuf, MapFlavor::HostRead);
                     for (auto i = 0u; i < binding.bufferLength / sizeof(unsigned int); i++)
                         fprintf(f, "%X\n", ptr[i]);
-                    unmap(binding.buffer);
+                    unmap(stageBuf);
+                    stageBuf->Release();
                 }
                 else
                 {
@@ -1121,8 +1099,6 @@ public:
         fclose(f);
     }
 };
-
-
 
 Renderer* createD3D11Renderer()
 {

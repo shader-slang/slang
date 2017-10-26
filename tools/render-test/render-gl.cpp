@@ -410,12 +410,6 @@ public:
 		bindBufferImpl(GL_UNIFORM_BUFFER, startSlot, slotCount, buffers, offsets);
     }
 
-
-	virtual void setStorageBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* offsets) override
-	{
-		bindBufferImpl(GL_SHADER_STORAGE_BUFFER, startSlot, slotCount, buffers, offsets);
-	}
-
     void flushStateForDraw()
     {
         auto layout = this->boundInputLayout;
