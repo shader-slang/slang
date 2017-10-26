@@ -875,10 +875,10 @@ public:
         if (inputDesc.dimension == 1)
         {
             D3D11_TEXTURE1D_DESC desc = { 0 };
-            desc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET | D3D11_BIND_UNORDERED_ACCESS;
-            desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
+            desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+            desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
             desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-            desc.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
+            desc.MiscFlags = 0;
             desc.MipLevels = texData.mipLevels;
             desc.ArraySize = texData.arraySize;
             desc.Width = texData.textureSize;
@@ -904,10 +904,10 @@ public:
         {
             D3D11_SHADER_RESOURCE_VIEW_DESC viewDesc;
             D3D11_TEXTURE2D_DESC desc = { 0 };
-            desc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET | D3D11_BIND_UNORDERED_ACCESS;
-            desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
+            desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+            desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
             desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-            desc.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
+            desc.MiscFlags = 0;
             desc.MipLevels = texData.mipLevels;
             desc.ArraySize = texData.arraySize;
             if (inputDesc.isCube)
@@ -947,10 +947,10 @@ public:
         {
             D3D11_SHADER_RESOURCE_VIEW_DESC viewDesc;
             D3D11_TEXTURE3D_DESC desc = { 0 };
-            desc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET | D3D11_BIND_UNORDERED_ACCESS;
-            desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
+            desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+            desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
             desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-            desc.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
+            desc.MiscFlags = 0;
             desc.MipLevels = 1;
             viewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE3D;
             desc.Width = texData.textureSize;
@@ -959,8 +959,6 @@ public:
             desc.Usage = D3D11_USAGE_DEFAULT;
             ID3D11Texture3D * texture;
             dxDevice->CreateTexture3D(&desc, subRes.Buffer(), &texture);
-            if (inputDesc.arrayLength != 0)
-                viewDesc.ViewDimension = (D3D11_SRV_DIMENSION)(int)(viewDesc.ViewDimension + 1);
             viewDesc.Texture3D.MipLevels = 1;
             viewDesc.Texture3D.MostDetailedMip = 0;
             viewDesc.Format = desc.Format;

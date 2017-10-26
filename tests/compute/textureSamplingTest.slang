@@ -92,12 +92,12 @@ FragmentStageOutput fragmentMain(FragmentStageInput input)
 
     float4 val = 0.0;
     val += t1D.Sample(samplerState, uv.x);
-    val += t2D.Sample(samplerState, uv);
+    //val += t2D.Sample(samplerState, uv);
     //val += t3D.Sample (samplerState, float3(uv, 0.5));
     //val += t1dArray.Sample(samplerState, float2(uv.x, 0.0));
     //val += t2dArray.Sample(samplerState, float3(uv, 0.0));
     //val += tCubeArray.Sample(samplerState, float4(uv, 0.5, 0.0));
     //val += tCube.Sample(samplerState, float3(uv, 0.5));
-    outputBuffer[0] = 5.0 + val.x;
+    outputBuffer[0] = 6.0 + val.x;
 	return output;
 }
