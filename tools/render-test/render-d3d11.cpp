@@ -54,6 +54,7 @@ struct D3DBinding
 struct D3DBindingState
 {
     List<D3DBinding> bindings;
+    int numRenderTargets = 0;
 };
 
 //
@@ -338,8 +339,8 @@ public:
         {
             hr = D3D11CreateDeviceAndSwapChain_(
                 NULL,                    // adapter (use default)
-                D3D_DRIVER_TYPE_WARP,
-//              D3D_DRIVER_TYPE_HARDWARE,
+                D3D_DRIVER_TYPE_REFERENCE,
+              //D3D_DRIVER_TYPE_HARDWARE,
                 NULL,                    // software
                 deviceFlags,
                 &featureLevels[ii],
@@ -392,8 +393,6 @@ public:
             dxRenderTargetTextures.Add(texture);
         }
 
-        // We immediately bind the back-buffer render target view, and we aren't
-        // going to switch. We don't bother with a depth buffer.
         dxImmediateContext->OMSetRenderTargets(
             dxRenderTargetViews.Count(),
             dxRenderTargetViews.Buffer(),
@@ -452,7 +451,6 @@ public:
 
 	struct D3DBuffer
 	{
-		ID3D11UnorderedAccessView * view = nullptr;
 		ID3D11Buffer * buffer = nullptr;
 	};
 
@@ -470,19 +468,10 @@ public:
             break;
 
         case BufferFlavor::Vertex:
-            dxBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+            dxBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
             dxBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-            dxBufferDesc.CPUAccessFlags = 0;
+            dxBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
             break;
-
-		case BufferFlavor::Storage:
-			dxBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-			dxBufferDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
-			dxBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
-			dxBufferDesc.StructureByteStride = sizeof(float);
-			dxBufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-			break;
-
         default:
             return nullptr;
         }
@@ -500,17 +489,6 @@ public:
 
 		D3DBuffer * rs = new D3DBuffer();
 		rs->buffer = dxBuffer;
-		if (desc.flavor == BufferFlavor::Storage)
-		{
-			D3D11_UNORDERED_ACCESS_VIEW_DESC viewDesc;
-			memset(&viewDesc, 0, sizeof(viewDesc));
-			viewDesc.Buffer.FirstElement = 0;
-			viewDesc.Buffer.NumElements = 512;
-			viewDesc.Buffer.Flags = 0;
-			viewDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
-			viewDesc.Format = DXGI_FORMAT_UNKNOWN;
-			dxDevice->CreateUnorderedAccessView(dxBuffer, &viewDesc, &rs->view);
-		}
         return (Buffer*) rs;
     }
 
@@ -520,7 +498,8 @@ public:
         {
         case Format::RGB_Float32:
             return DXGI_FORMAT_R32G32B32_FLOAT;
-
+        case Format::RG_Float32:
+            return DXGI_FORMAT_R32G32_FLOAT;
         default:
             return DXGI_FORMAT_UNKNOWN;
         }
@@ -556,7 +535,9 @@ public:
             case Format::RGB_Float32:
                 typeName = "float3";
                 break;
-
+            case Format::RG_Float32:
+                typeName = "float2";
+                break;
             default:
                 return nullptr;
             }
@@ -570,7 +551,7 @@ public:
 
         hlslCursor += sprintf(hlslCursor, "\n) : SV_Position { return 0; }");
 
-        auto dxVertexShaderBlob = compileHLSLShader("inputLayout", hlslBuffer, "main", "vs_4_0");
+        auto dxVertexShaderBlob = compileHLSLShader("inputLayout", hlslBuffer, "main", "vs_5_0");
         if(!dxVertexShaderBlob)
             return nullptr;
 
@@ -711,18 +692,6 @@ public:
             (UINT) startSlot, (UINT) slotCount, &dxConstantBuffers[0]->buffer);
     }
 
-	virtual void setStorageBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* offsets) override
-	{
-		auto dxContext = dxImmediateContext;
-
-		// TODO: actually use those offsets
-
-		auto dxStorageBuffers = (D3DBuffer* const*)buffers;
-		dxContext->CSSetUnorderedAccessViews(
-			(UINT)startSlot, (UINT)slotCount, &dxStorageBuffers[0]->view, 0);
-	}
-
-
     virtual void draw(UInt vertexCount, UInt startVertex) override
     {
         auto dxContext = dxImmediateContext;
@@ -805,15 +774,13 @@ public:
         desc.ByteWidth = bufferData.Count() * sizeof(unsigned int);
         if (bufferDesc.type == InputBufferType::ConstantBuffer)
         {
-            desc.Usage = D3D11_USAGE_DYNAMIC;
+            desc.Usage = D3D11_USAGE_DEFAULT;
             desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER | D3D11_BIND_SHADER_RESOURCE;
-            desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
         }
         else
         {
             desc.Usage = D3D11_USAGE_DEFAULT;
             desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
-            desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
             if (bufferDesc.stride != 0)
             {
                 desc.StructureByteStride = bufferDesc.stride;
@@ -852,94 +819,33 @@ public:
 
     void createInputTexture(const InputTextureDesc & inputDesc, ID3D11ShaderResourceView * &viewOut)
     {
-        int arrLen = inputDesc.arrayLength;
-        if (arrLen == 0)
-            arrLen = 1;
+        TextureData texData;
+        generateTextureData(texData, inputDesc);
         List<D3D11_SUBRESOURCE_DATA> subRes;
-        List<List<unsigned int>> dataBuffer;
-        int arraySize = arrLen;
-        if (inputDesc.isCube)
-            arraySize *= 6;
-        int textureSize = inputDesc.size;
-        int textureMipLevels = Math::Log2Floor(textureSize) + 1;
-        subRes.SetSize(textureMipLevels * arraySize);
-        dataBuffer.SetSize(subRes.Count());
-
-        auto iteratePixels = [&](int dimension, int size, unsigned int * buffer, auto f)
+        for (int i = 0; i < texData.arraySize; i++)
         {
-            if (dimension == 1)
-                for (int i = 0; i < size; i++)
-                    buffer[i] = f(i, 0, 0);
-            else if (dimension == 2)
-                for (int i = 0; i < size; i++)
-                    for (int j = 0; j < size; j++)
-                        buffer[i*size + j] = f(j, i, 0);
-            else if (dimension == 3)
-                for (int i = 0; i < size; i++)
-                    for (int j = 0; j < size; j++)
-                        for (int k = 0; k < size; k++)
-                            buffer[i*size*size + j*size + k] = f(k, j, i);
-        };
-
-        int slice = 0;
-        for (int i = 0; i < arraySize; i++)
-        {
-            for (int j = 0; j < textureMipLevels; j++)
+            int slice = 0;
+            for (int j = 0; j < texData.mipLevels; j++)
             {
-                int size = textureSize >> j;
-                int bufferLen = size;
-                if (inputDesc.dimension == 2)
-                    bufferLen *= size;
-                else if (inputDesc.dimension == 3)
-                    bufferLen *= size*size;
-                dataBuffer[slice].SetSize(bufferLen);
-                subRes[slice].pSysMem = dataBuffer[slice].Buffer();
-                subRes[slice].SysMemPitch = sizeof(unsigned int) * size;
-                subRes[slice].SysMemSlicePitch = sizeof(unsigned int) * size * size;
-                
-                iteratePixels(inputDesc.dimension, size, dataBuffer[slice].Buffer(), [&](int x, int y, int z) -> unsigned int
-                {
-                    if (inputDesc.content == InputTextureContent::Zero)
-                    {
-                        return 0x0;
-                    }
-                    else if (inputDesc.content == InputTextureContent::One)
-                    {
-                        return 0xFFFFFFFF;
-                    }
-                    else if (inputDesc.content == InputTextureContent::Gradient)
-                    {
-                        unsigned char r = (unsigned char)(x / (float)(size - 1) * 255.0f);
-                        unsigned char g = (unsigned char)(y / (float)(size - 1) * 255.0f);
-                        unsigned char b = (unsigned char)(z / (float)(size - 1) * 255.0f);
-                        return 0xFF000000 + r + (g << 8) + (b << 16);
-                    }
-                    else if (inputDesc.content == InputTextureContent::ChessBoard)
-                    {
-                        unsigned int xSig = x < (size >> 1) ? 1 : 0;
-                        unsigned int ySig = y < (size >> 1) ? 1 : 0;
-                        unsigned int zSig = z < (size >> 1) ? 1 : 0;
-                        auto sig = xSig ^ ySig ^ zSig;
-                        if (sig)
-                            return 0xFFFFFFFF;
-                        else
-                            return 0xFF808080;
-                    }
-                    return 0x0;
-                });
+                int size = texData.textureSize >> j;
+                D3D11_SUBRESOURCE_DATA res;
+                res.pSysMem = texData.dataBuffer[slice].Buffer();
+                res.SysMemPitch = sizeof(unsigned int) * size;
+                res.SysMemSlicePitch = sizeof(unsigned int) * size * size;
+                subRes.Add(res);
                 slice++;
             }
         }
         if (inputDesc.dimension == 1)
         {
             D3D11_TEXTURE1D_DESC desc = { 0 };
-            desc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET | D3D11_BIND_UNORDERED_ACCESS;
-            desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
+            desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+            desc.CPUAccessFlags = 0;
             desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-            desc.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
-            desc.MipLevels = textureMipLevels;
-            desc.ArraySize = arraySize;
-            desc.Width = textureSize;
+            desc.MiscFlags = 0;
+            desc.MipLevels = texData.mipLevels;
+            desc.ArraySize = texData.arraySize;
+            desc.Width = texData.textureSize;
             desc.Usage = D3D11_USAGE_DEFAULT;
             
             ID3D11Texture1D * texture;
@@ -949,31 +855,32 @@ public:
             viewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE1D;
             if (inputDesc.arrayLength != 0)
                 viewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE1DARRAY;
-            viewDesc.Texture1D.MipLevels = textureMipLevels;
+            viewDesc.Texture1D.MipLevels = texData.mipLevels;
             viewDesc.Texture1D.MostDetailedMip = 0;
-            viewDesc.Texture1DArray.ArraySize = arraySize;
+            viewDesc.Texture1DArray.ArraySize = texData.arraySize;
             viewDesc.Texture1DArray.FirstArraySlice = 0;
-            viewDesc.Texture1DArray.MipLevels = textureMipLevels;
+            viewDesc.Texture1DArray.MipLevels = texData.mipLevels;
             viewDesc.Texture1DArray.MostDetailedMip = 0;
+            viewDesc.Format = desc.Format;
             dxDevice->CreateShaderResourceView(texture, &viewDesc, &viewOut);
         }
         else if (inputDesc.dimension == 2)
         {
             D3D11_SHADER_RESOURCE_VIEW_DESC viewDesc;
             D3D11_TEXTURE2D_DESC desc = { 0 };
-            desc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET | D3D11_BIND_UNORDERED_ACCESS;
-            desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
+            desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+            desc.CPUAccessFlags = 0;
             desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-            desc.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
-            desc.MipLevels = textureMipLevels;
-            desc.ArraySize = arraySize;
+            desc.MiscFlags = 0;
+            desc.MipLevels = texData.mipLevels;
+            desc.ArraySize = texData.arraySize;
             if (inputDesc.isCube)
             {
                 desc.MiscFlags |= D3D11_RESOURCE_MISC_TEXTURECUBE;
                 viewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURECUBE;
-                viewDesc.TextureCube.MipLevels = textureMipLevels;
+                viewDesc.TextureCube.MipLevels = texData.mipLevels;
                 viewDesc.TextureCube.MostDetailedMip = 0;
-                viewDesc.TextureCubeArray.MipLevels = textureMipLevels;
+                viewDesc.TextureCubeArray.MipLevels = texData.mipLevels;
                 viewDesc.TextureCubeArray.MostDetailedMip = 0;
                 viewDesc.TextureCubeArray.First2DArrayFace = 0;
                 viewDesc.TextureCubeArray.NumCubes = inputDesc.arrayLength;
@@ -981,20 +888,21 @@ public:
             else
             {
                 viewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-                viewDesc.Texture2D.MipLevels = textureMipLevels;
+                viewDesc.Texture2D.MipLevels = texData.mipLevels;
                 viewDesc.Texture2D.MostDetailedMip = 0;
-                viewDesc.Texture2DArray.ArraySize = arraySize;
+                viewDesc.Texture2DArray.ArraySize = texData.arraySize;
                 viewDesc.Texture2DArray.FirstArraySlice = 0;
-                viewDesc.Texture2DArray.MipLevels = textureMipLevels;
+                viewDesc.Texture2DArray.MipLevels = texData.mipLevels;
                 viewDesc.Texture2DArray.MostDetailedMip = 0;
             }
             if (inputDesc.arrayLength != 0)
                 viewDesc.ViewDimension = (D3D11_SRV_DIMENSION)(int)(viewDesc.ViewDimension + 1);
-            desc.Width = textureSize;
-            desc.Height = textureSize;
+            desc.Width = texData.textureSize;
+            desc.Height = texData.textureSize;
             desc.Usage = D3D11_USAGE_DEFAULT;
             desc.SampleDesc.Count = 1;
             desc.SampleDesc.Quality = 0;
+            viewDesc.Format = desc.Format;
             ID3D11Texture2D * texture;
             dxDevice->CreateTexture2D(&desc, subRes.Buffer(), &texture);
             dxDevice->CreateShaderResourceView(texture, &viewDesc, &viewOut);
@@ -1003,22 +911,21 @@ public:
         {
             D3D11_SHADER_RESOURCE_VIEW_DESC viewDesc;
             D3D11_TEXTURE3D_DESC desc = { 0 };
-            desc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET | D3D11_BIND_UNORDERED_ACCESS;
-            desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
+            desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+            desc.CPUAccessFlags = 0;
             desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-            desc.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
-            desc.MipLevels = textureMipLevels;
+            desc.MiscFlags = 0;
+            desc.MipLevels = 1;
             viewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE3D;
-            desc.Width = textureSize;
-            desc.Height = textureSize;
-            desc.Depth = textureSize;
+            desc.Width = texData.textureSize;
+            desc.Height = texData.textureSize;
+            desc.Depth = texData.textureSize;
             desc.Usage = D3D11_USAGE_DEFAULT;
             ID3D11Texture3D * texture;
             dxDevice->CreateTexture3D(&desc, subRes.Buffer(), &texture);
-            if (inputDesc.arrayLength != 0)
-                viewDesc.ViewDimension = (D3D11_SRV_DIMENSION)(int)(viewDesc.ViewDimension + 1);
-            viewDesc.Texture3D.MipLevels = textureMipLevels;
+            viewDesc.Texture3D.MipLevels = 1;
             viewDesc.Texture3D.MostDetailedMip = 0;
+            viewDesc.Format = desc.Format;
             dxDevice->CreateShaderResourceView(texture, &viewDesc, &viewOut);
         }
     }
@@ -1032,17 +939,21 @@ public:
         {
             desc.ComparisonFunc = D3D11_COMPARISON_LESS_EQUAL;
             desc.Filter = D3D11_FILTER_MIN_LINEAR_MAG_MIP_POINT;
+            desc.MinLOD = desc.MaxLOD = 0.0f;
         }
         else
+        {
             desc.Filter = D3D11_FILTER_ANISOTROPIC;
-        desc.MaxAnisotropy = 16;
-        desc.MinLOD = 0.0f;
-        desc.MaxLOD = 100.0f;
+            desc.MaxAnisotropy = 8;
+            desc.MinLOD = 0.0f;
+            desc.MaxLOD = 100.0f;
+        }
         dxDevice->CreateSamplerState(&desc, &stateOut);
     }
     virtual BindingState * createBindingState(const ShaderInputLayout & layout)
     {
         D3DBindingState * rs = new D3DBindingState();
+        rs->numRenderTargets = layout.numRenderTargets;
         for (auto & entry : layout.entries)
         {
             D3DBinding rsEntry;
@@ -1091,8 +1002,8 @@ public:
                     if (isCompute)
                         dxContext->CSSetUnorderedAccessViews(binding.binding, 1, &binding.uav, nullptr);
                     else
-                        dxContext->OMSetRenderTargetsAndUnorderedAccessViews(D3D11_KEEP_RENDER_TARGETS_AND_DEPTH_STENCIL,
-                            nullptr, nullptr, binding.binding, 1, &binding.uav, nullptr);
+                        dxContext->OMSetRenderTargetsAndUnorderedAccessViews(currentBindings->numRenderTargets,
+                            dxRenderTargetViews.Buffer(), nullptr, binding.binding, 1, &binding.uav, nullptr);
                 }
                 else
                 {
@@ -1151,29 +1062,40 @@ public:
     {
         auto dxContext = dxImmediateContext;
         auto dxBindingState = (D3DBindingState*)state;
-        FILE * f = fopen(fileName, "wt");
+        FILE * f = fopen(fileName, "wb");
+        int id = 0;
         for (auto & binding : dxBindingState->bindings)
         {
             if (binding.isOutput)
             {
                 if (binding.buffer)
                 {
-                    auto ptr = (unsigned int *)map(binding.buffer, MapFlavor::HostRead);
+                    // create staging buffer
+                    ID3D11Buffer* stageBuf;
+                    D3D11_BUFFER_DESC bufDesc;
+                    memset(&bufDesc, 0, sizeof(bufDesc));
+                    bufDesc.BindFlags = 0;
+                    bufDesc.ByteWidth = binding.bufferLength;
+                    bufDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+                    bufDesc.Usage = D3D11_USAGE_STAGING;
+                    dxDevice->CreateBuffer(&bufDesc, nullptr, &stageBuf);
+                    dxContext->CopyResource(stageBuf, binding.buffer);
+                    auto ptr = (unsigned int *)map(stageBuf, MapFlavor::HostRead);
                     for (auto i = 0u; i < binding.bufferLength / sizeof(unsigned int); i++)
                         fprintf(f, "%X\n", ptr[i]);
-                    unmap(binding.buffer);
+                    unmap(stageBuf);
+                    stageBuf->Release();
                 }
                 else
                 {
-                    throw "not implemented";
+                    printf("invalid output type at %d.\n");
                 }
             }
+            id++;
         }
         fclose(f);
     }
 };
-
-
 
 Renderer* createD3D11Renderer()
 {

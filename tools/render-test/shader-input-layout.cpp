@@ -171,8 +171,8 @@ namespace renderer_test
                             else
                                 break;
                         }
+                        parser.Read(")");
                     }
-                    parser.Read(")");
                     // parse bindings
                     if (parser.LookAhead(":"))
                     {
@@ -190,11 +190,13 @@ namespace renderer_test
                             {
                                 parser.ReadToken();
                                 parser.Read("(");
-                                entry.glslBinding = entry.glslLocation = parser.ReadInt();
-                                if (parser.LookAhead(","))
+                                while (!parser.IsEnd() && !parser.LookAhead(")"))
                                 {
-                                    parser.Read(",");
-                                    entry.glslLocation = parser.ReadInt();
+                                    entry.glslBinding.Add(parser.ReadInt());
+                                    if (parser.LookAhead(","))
+                                        parser.Read(",");
+                                    else
+                                        break;
                                 }
                                 parser.Read(")");
                             }
@@ -217,5 +219,81 @@ namespace renderer_test
         }
         
         
+    }
+    void generateTextureData(TextureData & output, const InputTextureDesc & inputDesc)
+    {
+        int arrLen = inputDesc.arrayLength;
+        if (arrLen == 0)
+            arrLen = 1;
+        List<List<unsigned int>> & dataBuffer = output.dataBuffer;
+        int arraySize = arrLen;
+        if (inputDesc.isCube)
+            arraySize *= 6;
+        output.arraySize = arraySize;
+        output.textureSize = inputDesc.size;
+        output.mipLevels = Math::Log2Floor(output.textureSize) + 1;
+        output.dataBuffer.SetSize(output.mipLevels * output.arraySize);
+        auto iteratePixels = [&](int dimension, int size, unsigned int * buffer, auto f)
+        {
+            if (dimension == 1)
+                for (int i = 0; i < size; i++)
+                    buffer[i] = f(i, 0, 0);
+            else if (dimension == 2)
+                for (int i = 0; i < size; i++)
+                    for (int j = 0; j < size; j++)
+                        buffer[i*size + j] = f(j, i, 0);
+            else if (dimension == 3)
+                for (int i = 0; i < size; i++)
+                    for (int j = 0; j < size; j++)
+                        for (int k = 0; k < size; k++)
+                            buffer[i*size*size + j*size + k] = f(k, j, i);
+        };
+
+        int slice = 0;
+        for (int i = 0; i < arraySize; i++)
+        {
+            for (int j = 0; j < output.mipLevels; j++)
+            {
+                int size = output.textureSize >> j;
+                int bufferLen = size;
+                if (inputDesc.dimension == 2)
+                    bufferLen *= size;
+                else if (inputDesc.dimension == 3)
+                    bufferLen *= size*size;
+                dataBuffer[slice].SetSize(bufferLen);
+
+                iteratePixels(inputDesc.dimension, size, dataBuffer[slice].Buffer(), [&](int x, int y, int z) -> unsigned int
+                {
+                    if (inputDesc.content == InputTextureContent::Zero)
+                    {
+                        return 0x0;
+                    }
+                    else if (inputDesc.content == InputTextureContent::One)
+                    {
+                        return 0xFFFFFFFF;
+                    }
+                    else if (inputDesc.content == InputTextureContent::Gradient)
+                    {
+                        unsigned char r = (unsigned char)(x / (float)(size - 1) * 255.0f);
+                        unsigned char g = (unsigned char)(y / (float)(size - 1) * 255.0f);
+                        unsigned char b = (unsigned char)(z / (float)(size - 1) * 255.0f);
+                        return 0xFF000000 + r + (g << 8) + (b << 16);
+                    }
+                    else if (inputDesc.content == InputTextureContent::ChessBoard)
+                    {
+                        unsigned int xSig = x < (size >> 1) ? 1 : 0;
+                        unsigned int ySig = y < (size >> 1) ? 1 : 0;
+                        unsigned int zSig = z < (size >> 1) ? 1 : 0;
+                        auto sig = xSig ^ ySig ^ zSig;
+                        if (sig)
+                            return 0xFFFFFFFF;
+                        else
+                            return 0xFF808080;
+                    }
+                    return 0x0;
+                });
+                slice++;
+            }
+        }
     }
 }

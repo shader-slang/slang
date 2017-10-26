@@ -46,9 +46,19 @@ namespace renderer_test
         InputSamplerDesc samplerDesc;
         bool isOutput = false;
         int hlslBinding = -1;
-        int glslBinding = -1;
-        int glslLocation = -1;
+        Slang::List<int> glslBinding;
+       
     };
+
+    struct TextureData
+    {
+        Slang::List<Slang::List<unsigned int>> dataBuffer;
+        int textureSize;
+        int mipLevels;
+        int arraySize;
+    };
+    void generateTextureData(TextureData & output, const InputTextureDesc & desc);
+
     class ShaderInputLayout
     {
     public:
