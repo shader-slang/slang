@@ -393,8 +393,6 @@ public:
             dxRenderTargetTextures.Add(texture);
         }
 
-        // We immediately bind the back-buffer render target view, and we aren't
-        // going to switch. We don't bother with a depth buffer.
         dxImmediateContext->OMSetRenderTargets(
             dxRenderTargetViews.Count(),
             dxRenderTargetViews.Buffer(),
@@ -1095,7 +1093,6 @@ public:
             }
             id++;
         }
-        fprintf(f, "test result. \n");
         fclose(f);
     }
 };
