@@ -1116,7 +1116,7 @@ TestResult runGLSLComparisonTest(TestInput& input)
     return kTestResult_Pass;
 }
 
-TestResult doComputeComparisonTestRunImpl(TestInput& input, const char * langOption, String referenceOutput)
+TestResult runComputeComparisonImpl(TestInput& input, const char * langOption, String referenceOutput)
 {
 	// TODO: delete any existing files at the output path(s) to avoid stale outputs leading to a false pass
 	auto filePath999 = input.filePath;
@@ -1138,32 +1138,36 @@ TestResult doComputeComparisonTestRunImpl(TestInput& input, const char * langOpt
 
 	if (spawnAndWait(outputStem, spawner) != kOSError_None)
 	{
+        fprintf(stderr, "error spawning render-test\n");
 		return kTestResult_Fail;
 	}
 
     auto actualOutput = getOutput(spawner);
-    auto expectedOutput = getExpectedOutput(outputStem);
-    if(actualOutput != expectedOutput)
-    {
-        String actualOutputPath = outputStem + ".actual";
-        Slang::File::WriteAllText(actualOutputPath, actualOutput);
-
-        maybeDumpOutput(expectedOutput, actualOutput);
-
-        return kTestResult_Fail;
-    }
-
 
 	// check against reference output
-	if (!File::Exists(outputStem + ".actual.txt"))
+    if (!File::Exists(outputStem + ".actual.txt"))
+    {
+        fprintf(stderr, "render-test not producing expected outputs.\n");
+        fprintf(stderr, "render-test output:\n%s\n", actualOutput.Buffer());
 		return kTestResult_Fail;
-	if (!File::Exists(referenceOutput))
+    }
+    if (!File::Exists(referenceOutput))
+    {
+        fprintf(stderr, "referenceOutput %s not found.\n", referenceOutput.Buffer());
 		return kTestResult_Fail;
-
-	auto actualProgramOutput = Split(File::ReadAllText(outputStem + ".actual.txt"), '\n');
+    }
+    auto actualOutputContent = File::ReadAllText(outputStem + ".actual.txt");
+	auto actualProgramOutput = Split(actualOutputContent, '\n');
 	auto referenceProgramOutput = Split(File::ReadAllText(referenceOutput), '\n');
-	if (actualProgramOutput.Count() < referenceProgramOutput.Count())
+    auto printOutput = [&]()
+    {
+        fprintf(stderr, "output mismatch! actual output: {\n%s\n}, \n%s\n", actualOutputContent.Buffer(), actualOutput.Buffer());
+    };
+    if (actualProgramOutput.Count() < referenceProgramOutput.Count())
+    {
+        printOutput();
 		return kTestResult_Fail;
+    }
 	for (int i = 0; i < (int)referenceProgramOutput.Count(); i++)
 	{
 		auto reference = referenceProgramOutput[i];
@@ -1174,7 +1178,10 @@ TestResult doComputeComparisonTestRunImpl(TestInput& input, const char * langOpt
             auto val = StringToFloat(reference);
             auto uval = String((unsigned int)FloatAsInt(val), 16).ToUpper();
             if (actual != uval)
+            {
+                printOutput();
 			    return kTestResult_Fail;
+            }
             else
                 return kTestResult_Pass;
         }
@@ -1182,14 +1189,14 @@ TestResult doComputeComparisonTestRunImpl(TestInput& input, const char * langOpt
 	return kTestResult_Pass;
 }
 
-TestResult doSlangComputeComparisonTest(TestInput& input)
+TestResult runSlangComputeComparisonTest(TestInput& input)
 {
-	return doComputeComparisonTestRunImpl(input, "-slang -compute", input.outputStem + ".expected.txt");
+	return runComputeComparisonImpl(input, "-slang -compute", input.outputStem + ".expected.txt");
 }
 
-TestResult doSlangRenderComputeComparisonTest(TestInput& input)
+TestResult runSlangRenderComputeComparisonTest(TestInput& input)
 {
-    return doComputeComparisonTestRunImpl(input, "-slang -gcompute", input.outputStem + ".expected.txt");
+    return runComputeComparisonImpl(input, "-slang -gcompute", input.outputStem + ".expected.txt");
 }
 
 TestResult doRenderComparisonTestRun(TestInput& input, char const* langOption, char const* outputKind, String* outOutput)
@@ -1390,8 +1397,8 @@ TestResult runTest(
         { "COMPARE_HLSL_RENDER", &runHLSLRenderComparisonTest },
         { "COMPARE_HLSL_CROSS_COMPILE_RENDER", &runHLSLCrossCompileRenderComparisonTest},
         { "COMPARE_HLSL_GLSL_RENDER", &runHLSLAndGLSLComparisonTest },
-        { "COMPARE_COMPUTE", &doSlangComputeComparisonTest},
-        { "COMPARE_RENDER_COMPUTE", &doSlangRenderComputeComparisonTest },
+        { "COMPARE_COMPUTE", runSlangComputeComparisonTest},
+        { "COMPARE_RENDER_COMPUTE", &runSlangRenderComputeComparisonTest },
 
 #else
         { "COMPARE_HLSL",                       &skipTest },

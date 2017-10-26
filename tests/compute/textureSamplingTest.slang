@@ -1,4 +1,4 @@
-//TEST(smoke,compute):COMPARE_RENDER_COMPUTE:
+//TEST(compute):COMPARE_RENDER_COMPUTE:
 //TEST_INPUT: Texture1D(size=4, content = one) : dxbinding(0),glbinding(0)
 //TEST_INPUT: Texture2D(size=4, content = one) : dxbinding(1),glbinding(1)
 //TEST_INPUT: Texture3D(size=4, content = one) : dxbinding(2),glbinding(2)
