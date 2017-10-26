@@ -338,7 +338,7 @@ public:
         {
             hr = D3D11CreateDeviceAndSwapChain_(
                 NULL,                    // adapter (use default)
-                D3D_DRIVER_TYPE_WARP,
+                D3D_DRIVER_TYPE_REFERENCE,
               //D3D_DRIVER_TYPE_HARDWARE,
                 NULL,                    // software
                 deviceFlags,
