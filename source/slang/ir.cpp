@@ -41,7 +41,7 @@ namespace Slang
 
     //
 
-    void IRUse::init(IRInst* u, IRValue* v)
+    void IRUse::init(IRUser* u, IRValue* v)
     {
         user = u;
         usedValue = v;
@@ -57,7 +57,7 @@ namespace Slang
 
     //
 
-    IRUse* IRInst::getArgs()
+    IRUse* IRUser::getArgs()
     {
         // We assume that *all* instructions are laid out
         // in memory such that their arguments come right
@@ -154,18 +154,38 @@ namespace Slang
         return isTerminatorInst(inst->op);
     }
 
+    //
+
+    void IRValueListBase::addImpl(IRValue* parent, IRChildValue* val)
+    {
+        val->parent = parent;
+        val->prev = last;
+        val->next = nullptr;
+
+        if (last)
+        {
+            last->next = val;
+        }
+        else
+        {
+            first = val;
+        }
+
+        last = val;
+    }
+
 
     //
 
     // Add an instruction to a specific parent
     void IRBuilder::addInst(IRBlock* block, IRInst* inst)
     {
-        inst->parentBlock = block;
+        inst->parent = block;
 
         if (!block->firstInst)
         {
-            inst->prevInst = nullptr;
-            inst->nextInst = nullptr;
+            inst->prev = nullptr;
+            inst->next = nullptr;
 
             block->firstInst = inst;
             block->lastInst = inst;
@@ -174,10 +194,10 @@ namespace Slang
         {
             auto prev = block->lastInst;
 
-            inst->prevInst = prev;
-            inst->nextInst = nullptr;
+            inst->prev = prev;
+            inst->next = nullptr;
 
-            prev->nextInst = inst;
+            prev->next = inst;
             block->lastInst = inst;
         }
     }
@@ -402,7 +422,7 @@ namespace Slang
     bool operator==(IRInstKey const& left, IRInstKey const& right)
     {
         if(left.inst->op != right.inst->op) return false;
-        if(left.inst->parentBlock != right.inst->parentBlock) return false;
+        if(left.inst->parent != right.inst->parent) return false;
         if(left.inst->argCount != right.inst->argCount) return false;
 
         auto argCount = left.inst->argCount;
@@ -420,7 +440,7 @@ namespace Slang
     int IRInstKey::GetHashCode()
     {
         auto code = Slang::GetHashCode(inst->op);
-        code = combineHash(code, Slang::GetHashCode(inst->parentBlock));
+        code = combineHash(code, Slang::GetHashCode(inst->parent));
         code = combineHash(code, Slang::GetHashCode(inst->argCount));
 
         auto argCount = inst->argCount;
@@ -487,7 +507,7 @@ namespace Slang
         // way: we will construct a temporary instruction and
         // then use it to look up in a cache of instructions.
 
-        irValue = createInst<IRConstant>(builder, op, type);
+        irValue = createValue<IRConstant>(builder, op, type);
         memcpy(&irValue->u, value, valueSize);
 
         key.inst = irValue;
@@ -534,7 +554,7 @@ namespace Slang
         DeclRefBase const&  declRef)
     {
         // TODO: we should cache these...
-        auto irValue = createInst<IRDeclRef>(
+        auto irValue = createValue<IRDeclRef>(
             this,
             kIROp_decl_ref,
             nullptr);
@@ -572,6 +592,33 @@ namespace Slang
         addInst(inst);
         return inst;
     }
+
+    IRValue* IRBuilder::emitLookupInterfaceMethodInst(
+        IRType*     type,
+        IRValue*    witnessTableVal,
+        IRValue*    interfaceMethodVal)
+    {
+        auto inst = createInst<IRLookupWitnessMethod>(
+            this,
+            kIROp_lookup_interface_method,
+            type,
+            witnessTableVal,
+            interfaceMethodVal);
+        addInst(inst);
+        return inst;
+    }
+
+    IRValue* IRBuilder::emitLookupInterfaceMethodInst(
+        IRType*         type,
+        DeclRef<Decl>   witnessTableDeclRef,
+        DeclRef<Decl>   interfaceMethodDeclRef)
+    {
+        auto witnessTableVal = getDeclRefVal(witnessTableDeclRef);
+        auto interfaceMethodVal = getDeclRefVal(interfaceMethodDeclRef);
+        return emitLookupInterfaceMethodInst(type, witnessTableVal, interfaceMethodVal);
+    }
+
+
 
     IRInst* IRBuilder::emitCallInst(
         IRType*         type,
@@ -791,6 +838,37 @@ namespace Slang
         addGlobalValue(getModule(), globalVar);
         return globalVar;
     }
+
+    IRWitnessTable* IRBuilder::createWitnessTable()
+    {
+        IRWitnessTable* witnessTable = createValue<IRWitnessTable>(
+            this,
+            kIROp_witness_table,
+            nullptr);
+        addGlobalValue(getModule(), witnessTable);
+        return witnessTable;
+    }
+
+    IRWitnessTableEntry* IRBuilder::createWitnessTableEntry(
+        IRWitnessTable* witnessTable,
+        IRValue*        requirementKey,
+        IRValue*        satisfyingVal)
+    {
+        IRWitnessTableEntry* entry = createInst<IRWitnessTableEntry>(
+            this,
+            kIROp_witness_table_entry,
+            nullptr,
+            requirementKey,
+            satisfyingVal);
+
+        if (witnessTable)
+        {
+            witnessTable->entries.add(witnessTable, entry);
+        }
+
+        return entry;
+    }
+
 
     IRBlock* IRBuilder::createBlock()
     {
@@ -1284,6 +1362,8 @@ namespace Slang
         switch(inst->op)
         {
         case kIROp_Func:
+        case kIROp_global_var:
+        case kIROp_witness_table:
             {
                 auto irFunc = (IRFunc*) inst;
                 dump(context, "@");
@@ -1311,6 +1391,10 @@ namespace Slang
     static void dumpType(
         IRDumpContext*  context,
         IRType*         type);
+
+    static void dumpDeclRef(
+        IRDumpContext*          context,
+        DeclRef<Decl> const&    declRef);
 
     static void dumpOperand(
         IRDumpContext*  context,
@@ -1341,6 +1425,12 @@ namespace Slang
             dumpType(context, (IRType*)inst);
             return;
 
+        case kIROp_decl_ref:
+            dump(context, "$\"");
+            dumpDeclRef(context, ((IRDeclRef*)inst)->declRef);
+            dump(context, "\"");
+            return;
+
         default:
             break;
         }
@@ -1354,11 +1444,6 @@ namespace Slang
     {
         dump(context, getText(name).Buffer());
     }
-
-
-    static void dumpDeclRef(
-        IRDumpContext*          context,
-        DeclRef<Decl> const&    declRef);
 
     static void dumpVal(
         IRDumpContext*  context,
@@ -1375,6 +1460,20 @@ namespace Slang
         else if(auto genericParamVal = dynamic_cast<GenericParamIntVal*>(val))
         {
             dumpDeclRef(context, genericParamVal->declRef);
+        }
+        else if(auto declaredSubtypeWitness = dynamic_cast<DeclaredSubtypeWitness*>(val))
+        {
+            dump(context, "DeclaredSubtypeWitness(");
+            dumpType(context, declaredSubtypeWitness->sub);
+            dump(context, ", ");
+            dumpType(context, declaredSubtypeWitness->sup);
+            dump(context, ", ");
+            dumpDeclRef(context, declaredSubtypeWitness->declRef);
+            dump(context, ")");
+        }
+        else if (auto proxyVal = dynamic_cast<IRProxyVal*>(val))
+        {
+            dumpOperand(context, proxyVal->inst);
         }
         else
         {
@@ -1417,6 +1516,20 @@ namespace Slang
             dump(context, ".");
         }
         dump(context, decl->getName());
+        if (auto genericTypeConstraintDecl = dynamic_cast<GenericTypeConstraintDecl*>(decl))
+        {
+            dump(context, "{");
+            dumpType(context, genericTypeConstraintDecl->sub);
+            dump(context, " : ");
+            dumpType(context, genericTypeConstraintDecl->sup);
+            dump(context, "}");
+        }
+        else if (auto inheritanceDecl = dynamic_cast<InheritanceDecl*>(decl))
+        {
+            dump(context, "{ _ : ");
+            dumpType(context, inheritanceDecl->base);
+            dump(context, "}");
+        }
 
         if(genericParentDeclRef)
         {
@@ -1538,7 +1651,7 @@ namespace Slang
         IRDumpContext*  context,
         IRBlock*        block)
     {
-        for (auto ii = block->firstInst; ii; ii = ii->nextInst)
+        for (auto ii = block->firstInst; ii; ii = ii->getNextInst())
         {
             dumpInst(context, ii);
         }
@@ -1775,15 +1888,16 @@ namespace Slang
         bool first = true;
         for (auto mm : genericDecl->Members)
         {
-            if (!first) dump(context, ", ");
 
             if( auto typeParamDecl = mm.As<GenericTypeParamDecl>() )
             {
+                if (!first) dump(context, ", ");
                 dumpDeclRef(context, makeDeclRef(typeParamDecl.Ptr()));
                 first = false;
             }
             else if( auto valueParamDecl = mm.As<GenericTypeParamDecl>() )
             {
+                if (!first) dump(context, ", ");
                 dumpDeclRef(context, makeDeclRef(valueParamDecl.Ptr()));
                 first = false;
             }
@@ -1791,11 +1905,11 @@ namespace Slang
         first = true;
         for (auto mm : genericDecl->Members)
         {
-            if (!first) dump(context, ", ");
-            else dump(context, " where ");
-
             if( auto constraintDecl = mm.As<GenericTypeConstraintDecl>() )
             {
+                if (!first) dump(context, ", ");
+                else dump(context, " where ");
+
                 dumpType(context, constraintDecl->sub);
                 dump(context, " : ");
                 dumpType(context, constraintDecl->sup);
@@ -1882,6 +1996,37 @@ namespace Slang
         dump(context, ";\n");
     }
 
+    void dumpIRWitnessTableEntry(
+        IRDumpContext*          context,
+        IRWitnessTableEntry*    entry)
+    {
+        dump(context, "witness_table_entry(");
+        dumpOperand(context, entry->requirementKey.usedValue);
+        dump(context, ",");
+        dumpOperand(context, entry->satisfyingVal.usedValue);
+        dump(context, ")\n");
+    }
+
+    void dumpIRWitnessTable(
+        IRDumpContext*  context,
+        IRWitnessTable* witnessTable)
+    {
+        dump(context, "\n");
+        dumpIndent(context);
+        dump(context, "ir_witness_table ");
+        dumpID(context, witnessTable);
+        dump(context, "\n{\n");
+        context->indent++;
+
+        for (auto entry : witnessTable->entries)
+        {
+            dumpIRWitnessTableEntry(context, entry);
+        }
+
+        context->indent--;
+        dump(context, "}\n");
+    }
+
     void dumpIRGlobalValue(
         IRDumpContext*  context,
         IRGlobalValue*  value)
@@ -1894,6 +2039,10 @@ namespace Slang
 
         case kIROp_global_var:
             dumpIRGlobalVar(context, (IRGlobalVar*)value);
+            break;
+
+        case kIROp_witness_table:
+            dumpIRWitnessTable(context, (IRWitnessTable*)value);
             break;
 
         default:
@@ -2000,11 +2149,17 @@ namespace Slang
 
     void IRValue::deallocate()
     {
+#if 0
+        // I'm going to intentionally leak here,
+        // just to test that this is the source
+        // of my heap-corruption crashes.
+#else
         // Run destructor to be sure...
         this->~IRValue();
 
         // And then free the memory
         free((void*) this);
+#endif
     }
 
     // Insert this instruction into the same basic block
@@ -2014,24 +2169,24 @@ namespace Slang
         // Make sure this instruction has been removed from any previous parent
         this->removeFromParent();
 
-        auto bb = other->parentBlock;
+        auto bb = other->getParentBlock();
         assert(bb);
 
-        auto pp = other->prevInst;
+        auto pp = other->getPrevInst();
         if( pp )
         {
-            pp->nextInst = this;
+            pp->next = this;
         }
         else
         {
             bb->firstInst = this;
         }
 
-        this->prevInst = pp;
-        this->nextInst = other;
-        this->parentBlock = bb;
+        this->prev = pp;
+        this->next = other;
+        this->parent = bb;
 
-        other->prevInst = this;
+        other->prev = this;
     }
 
     // Remove this instruction from its parent block,
@@ -2040,17 +2195,17 @@ namespace Slang
     {
         // If we don't currently have a parent, then
         // we are doing fine.
-        if(!parentBlock)
+        if(!getParentBlock())
             return;
 
-        auto bb = parentBlock;
-        auto pp = prevInst;
-        auto nn = nextInst;
+        auto bb = getParentBlock();
+        auto pp = getPrevInst();
+        auto nn = getNextInst();
 
         if(pp)
         {
-            SLANG_ASSERT(pp->parentBlock == bb);
-            pp->nextInst = nn;
+            SLANG_ASSERT(pp->getParentBlock() == bb);
+            pp->next = nn;
         }
         else
         {
@@ -2059,17 +2214,17 @@ namespace Slang
 
         if(nn)
         {
-            SLANG_ASSERT(nn->parentBlock == bb);
-            nn->prevInst = pp;
+            SLANG_ASSERT(nn->getParentBlock() == bb);
+            nn->prev = pp;
         }
         else
         {
             bb->lastInst = pp;
         }
 
-        prevInst = nullptr;
-        nextInst = nullptr;
-        parentBlock = nullptr;
+        prev = nullptr;
+        next = nullptr;
+        parent = nullptr;
     }
 
     void IRInst::removeArguments()
@@ -2552,7 +2707,7 @@ namespace Slang
                 // TODO: This is silly, because we are looking at every instruction,
                 // when we know that a `returnVal` should only ever appear as a
                 // terminator...
-                for( auto ii = bb->getFirstInst(); ii; ii = ii->nextInst )
+                for( auto ii = bb->getFirstInst(); ii; ii = ii->getNextInst() )
                 {
                     if(ii->op != kIROp_ReturnVal)
                         continue;
@@ -2720,7 +2875,7 @@ namespace Slang
         // Finally, we need to patch up the type of the entry point,
         // because it is no longer accurate.
 
-        auto voidFuncType = new FuncType();
+        RefPtr<FuncType> voidFuncType = new FuncType();
         voidFuncType->setSession(session);
         voidFuncType->resultType = session->getVoidType();
         func->type = voidFuncType;
@@ -2797,6 +2952,12 @@ namespace Slang
         {
             return originalType;
         }
+
+        // A callback used to clone (or not) a declaration reference
+        virtual DeclRef<Decl> maybeCloneDeclRef(DeclRef<Decl> const& declRef)
+        {
+            return declRef;
+        }
     };
 
     void registerClonedValue(
@@ -2844,11 +3005,16 @@ namespace Slang
 
         // Override the "maybe clone" logic so that we always clone
         virtual IRValue* maybeCloneValue(IRValue* originalVal) override;
+
+        // Override teh "maybe clone" logic so that we carefully
+        // clone any IR proxy values inside substitutions
+        virtual DeclRef<Decl> maybeCloneDeclRef(DeclRef<Decl> const& declRef) override;
     };
 
 
     IRGlobalVar* cloneGlobalVar(IRSpecContext* context, IRGlobalVar* originalVar);
     IRFunc* cloneFunc(IRSpecContext* context, IRFunc* originalFunc);
+    IRWitnessTable* cloneWitnessTable(IRSpecContext* context, IRWitnessTable* originalVar);
 
     IRValue* IRSpecContext::maybeCloneValue(IRValue* originalValue)
     {
@@ -2860,6 +3026,10 @@ namespace Slang
 
         case kIROp_Func:
             return cloneFunc(this, (IRFunc*)originalValue);
+            break;
+
+        case kIROp_witness_table:
+            return cloneWitnessTable(this, (IRWitnessTable*)originalValue);
             break;
 
         case kIROp_boolConst:
@@ -2887,7 +3057,8 @@ namespace Slang
         case kIROp_decl_ref:
             {
                 IRDeclRef* od = (IRDeclRef*)originalValue;
-                return builder->getDeclRefVal(od->declRef);
+                auto declRef = maybeCloneDeclRef(od->declRef);
+                return builder->getDeclRefVal(declRef);
             }
             break;
 
@@ -2896,6 +3067,66 @@ namespace Slang
             return nullptr;
         }
     }
+
+    RefPtr<Val> cloneSubstitutionArg(
+        IRSpecContext*  context,
+        Val*            val)
+    {
+        if (auto proxyVal = dynamic_cast<IRProxyVal*>(val))
+        {
+            auto newIRVal = context->maybeCloneValue(proxyVal->inst);
+
+            RefPtr<IRProxyVal> newProxyVal = new IRProxyVal();
+            newProxyVal->inst = newIRVal;
+            return newProxyVal;
+        }
+        else if (auto type = dynamic_cast<Type*>(val))
+        {
+            return context->maybeCloneType(type);
+        }
+        else
+        {
+            return val;
+        }
+    }
+
+    RefPtr<Substitutions> cloneSubstitutions(
+        IRSpecContext*  context,
+        Substitutions*  subst)
+    {
+        if (!subst)
+            return nullptr;
+
+        RefPtr<Substitutions> newSubst = new Substitutions();
+        newSubst->outer = cloneSubstitutions(context, subst->outer);
+        newSubst->genericDecl = subst->genericDecl;
+
+        for (auto arg : subst->args)
+        {
+            auto newArg = cloneSubstitutionArg(context, arg);
+            newSubst->args.Add(arg);
+        }
+
+        return newSubst;
+    }
+
+    DeclRef<Decl> IRSpecContext::maybeCloneDeclRef(DeclRef<Decl> const& declRef)
+    {
+        // Un-specialized decl? Nothing to do.
+        if (!declRef.substitutions)
+            return declRef;
+
+        DeclRef<Decl> newDeclRef = declRef;
+
+        // Scan through substitutions and clone as needed.
+        //
+        // TODO: this is wasteful since we clone *everything*
+        newDeclRef.substitutions = cloneSubstitutions(this, declRef.substitutions);
+
+        return newDeclRef;
+
+    }
+
 
     IRValue* cloneValue(
         IRSpecContextBase*  context,
@@ -2970,6 +3201,30 @@ namespace Slang
         return clonedVar;
     }
 
+    IRWitnessTable* cloneWitnessTable(IRSpecContext* context, IRWitnessTable* originalTable)
+    {
+        auto clonedTable = context->builder->createWitnessTable();
+        registerClonedValue(context, clonedTable, originalTable);
+
+        auto mangledName = originalTable->mangledName;
+        clonedTable->mangledName = mangledName;
+
+        cloneDecorations(context, clonedTable, originalTable);
+
+        // Clone the entries in the witness table as well
+        for( auto originalEntry : originalTable->entries )
+        {
+            auto clonedKey = context->maybeCloneValue(originalEntry->requirementKey.usedValue);
+            auto clonedVal = context->maybeCloneValue(originalEntry->satisfyingVal.usedValue);
+            auto clonedEntry = context->builder->createWitnessTableEntry(
+                clonedTable,
+                clonedKey,
+                clonedVal);
+        }
+
+        return clonedTable;
+    }
+
     void cloneFunctionCommon(
         IRSpecContextBase*  context,
         IRFunc*         clonedFunc,
@@ -3023,7 +3278,7 @@ namespace Slang
                 assert(cb);
 
                 builder->block = cb;
-                for (auto oi = ob->getFirstInst(); oi; oi = oi->nextInst)
+                for (auto oi = ob->getFirstInst(); oi; oi = oi->getNextInst())
                 {
                     cloneInst(context, builder, oi);
                 }
@@ -3444,6 +3699,90 @@ namespace Slang
         virtual RefPtr<Type> maybeCloneType(Type* originalType) override;
     };
 
+    // Convert a type-level value into an IR-level equivalent.
+    IRValue* getIRValue(
+        IRGenericSpecContext*   context,
+        Val*                    val)
+    {
+        if( auto subtypeWitness = dynamic_cast<SubtypeWitness*>(val) )
+        {
+            // We need to look up the IR value that represents the
+            // given subtype witness.
+            String mangledName = getMangledNameForConformanceWitness(
+                subtypeWitness->sub,
+                subtypeWitness->sup);
+            RefPtr<IRSpecSymbol> symbol;
+
+            if( !context->getSymbols().TryGetValue(mangledName, symbol) )
+            {
+                SLANG_UNEXPECTED("couldn't find symbol for conformance!");
+                return nullptr;
+            }
+
+            return symbol->irGlobalValue;
+        }
+        else if (auto proxyVal = dynamic_cast<IRProxyVal*>(val))
+        {
+            // The type-level value actually references an IR-level value,
+            // so we need to make sure to emit as if we were referencing
+            // the pointed-to value and not the proxy type-level `Val`
+            // instead.
+
+            return context->maybeCloneValue(proxyVal->inst);
+        }
+        else
+        {
+            SLANG_UNEXPECTED("unimplemented");
+            return nullptr;
+        }
+    }
+
+    IRValue* getSubstValue(
+        IRGenericSpecContext*   context,
+        DeclRef<Decl>           declRef)
+    {
+        auto subst = context->subst;
+        auto genericDecl = subst->genericDecl;
+
+        UInt orinaryParamCount = 0;
+        for( auto mm : genericDecl->Members )
+        {
+            if(mm.As<GenericTypeParamDecl>())
+                orinaryParamCount++;
+            else if(mm.As<GenericValueParamDecl>())
+                orinaryParamCount++;
+        }
+
+        if( auto constraintDeclRef = declRef.As<GenericTypeConstraintDecl>() )
+        {
+            // We have a constraint, but we need to find its index in the
+            // argument list of the substitutions.
+            UInt constraintIndex = 0;
+            bool found = false;
+            for( auto cd : genericDecl->getMembersOfType<GenericTypeConstraintDecl>() )
+            {
+                if( cd.Ptr() == constraintDeclRef.getDecl() )
+                {
+                    found = true;
+                    break;
+                }
+
+                constraintIndex++;
+            }
+            assert(found);
+
+            UInt argIndex = orinaryParamCount + constraintIndex;
+            assert(argIndex < subst->args.Count());
+
+            return getIRValue(context, subst->args[argIndex]);
+        }
+        else
+        {
+            SLANG_UNEXPECTED("unhandled case");
+            return nullptr;
+        }
+    }
+
     IRValue* IRGenericSpecContext::maybeCloneValue(IRValue* originalVal)
     {
         switch( originalVal->op )
@@ -3451,6 +3790,17 @@ namespace Slang
         case kIROp_decl_ref:
             {
                 auto declRefVal = (IRDeclRef*) originalVal;
+                auto declRef = declRefVal->declRef;
+
+                // We may have a direct reference to one of the parameters
+                // of the generic we are specializing, and in that case
+                // we nee to translate it over to the equiavalent of
+                // the `Val` we have been given.
+                if(declRef.getDecl()->ParentDecl == subst->genericDecl)
+                {
+                    return getSubstValue(this, declRef);
+                }
+
                 int diff = 0;
                 auto substDeclRef = declRefVal->declRef.SubstituteImpl(subst, &diff);
                 if(!diff)
@@ -3539,6 +3889,41 @@ namespace Slang
         return specFunc;
     }
 
+    // Find the value in the given witness table that
+    // satisfies the given requirement (or return
+    // null if not found).
+    IRValue* findWitnessVal(
+        IRWitnessTable*         witnessTable,
+        DeclRef<Decl> const&    requirementDeclRef)
+    {
+        // For now we will do a dumb linear search
+        for( auto entry : witnessTable->entries )
+        {
+            // We expect the key on the entry to be a decl-ref,
+            // but lets go ahead and check, just to be sure.
+            auto requirementKey = entry->requirementKey.usedValue;
+            if(requirementKey->op != kIROp_decl_ref)
+                continue;
+            auto keyDeclRef = ((IRDeclRef*) requirementKey)->declRef;
+
+            // If the keys don't match, continue with the next entry.
+            if(!keyDeclRef.Equals(requirementDeclRef))
+                continue;
+
+            // If the keys matched, then we use the value from
+            // this entry.
+            auto satisfyingVal = entry->satisfyingVal.usedValue;
+            return satisfyingVal;
+        }
+
+        // No matching entry found.
+        return nullptr;
+    }
+
+    // Go through the code in the module and try to identify
+    // calls to generic functions where the generic arguments
+    // are known, and specialize the callee based on those
+    // known values.
     void specializeGenerics(
         IRModule*   module)
     {
@@ -3601,40 +3986,100 @@ namespace Slang
                 IRInst* nextInst = nullptr;
                 for( auto ii = bb->getFirstInst(); ii; ii = nextInst )
                 {
-                    nextInst = ii->nextInst;
+                    nextInst = ii->getNextInst();
+
+                    // We want to handle both `specialize` instructions,
+                    // which trigger specialization, and also `lookup_interface_method`
+                    // instructions, which may allow us to "de-virtualize"
+                    // calls.
+
+                    switch( ii->op )
+                    {
+                    default:
+                        // Most instructions are ones we don't care about here.
+                        continue;
+
+                    case kIROp_specialize:
+                        {
+                            // We have a `specialize` instruction, so lets see
+                            // whether we have an opportunity to perform the
+                            // specialization here and now.
+                            IRSpecialize* specInst = (IRSpecialize*) ii;
+
+                            // We need to check that the value being specialized is
+                            // a generic function.
+                            auto genericVal = specInst->genericVal.usedValue;
+                            if(genericVal->op != kIROp_Func)
+                                continue;
+                            auto genericFunc = (IRFunc*) genericVal;
+                            if(!genericFunc->genericDecl)
+                                continue;
+
+                            // Now we extract the specialized decl-ref that will
+                            // tell us how to specialize things.
+                            auto specDeclRefVal = (IRDeclRef*) specInst->specDeclRefVal.usedValue;
+                            auto specDeclRef = specDeclRefVal->declRef;
+
+                            // Okay, we have a candidate for specialization here.
+                            //
+                            // We will first find or construct a specialized version
+                            // of the callee funciton/
+                            auto specFunc = getSpecializedFunc(sharedContext, genericFunc, specDeclRef);
+                            //
+                            // Then we will replace the use sites for the `specialize`
+                            // instruction with uses of the specialized function.
+                            //
+                            specInst->replaceUsesWith(specFunc);
+
+                            specInst->removeAndDeallocate();
+                        }
+                        break;
+
+                    case kIROp_lookup_interface_method:
+                        {
+                            // We have a `lookup_interface_method` instruction,
+                            // so let's see whether it is a lookup in a known
+                            // witness table.
+                            IRLookupWitnessMethod* lookupInst = (IRLookupWitnessMethod*) ii;
+
+                            // We only want to deal with the case where the witness-table
+                            // argument points to a concrete global table.
+                            auto witnessTableArg = lookupInst->witnessTable.usedValue;
+                            if(witnessTableArg->op != kIROp_witness_table)
+                                continue;
+                            IRWitnessTable* witnessTable = (IRWitnessTable*)witnessTableArg;
+
+                            // We also need to be sure that the requirement we
+                            // are trying to look up is identified via a decl-ref:
+                            auto requirementArg = lookupInst->requirementDeclRef.usedValue;
+                            if(requirementArg->op != kIROp_decl_ref)
+                                continue;
+                            auto requirementDeclRef = ((IRDeclRef*) requirementArg)->declRef;
+
+                            // Use the witness table to look up the value that
+                            // satisfies the requirement.
+                            auto satisfyingVal = findWitnessVal(witnessTable, requirementDeclRef);
+
+                            // We expect to always find something, but lets just
+                            // be careful here.
+                            if(!satisfyingVal)
+                                continue;
+
+                            // If we get through all of the above checks, then we
+                            // have a (more) concrete method that implements the interface,
+                            // and so we should dispatch to that directly, rather than
+                            // use the `lookup_interface_method` instruction.
+                            lookupInst->replaceUsesWith(satisfyingVal);
+                            lookupInst->removeAndDeallocate();
+                        }
+                        break;
+                    }
+
 
                     // We only care about `specialize` instructions.
                     if(ii->op != kIROp_specialize)
                         continue;
 
-                    IRSpecialize* specInst = (IRSpecialize*) ii;
-
-                    // We need to check that the value being specialized is
-                    // a generic function.
-                    auto genericVal = specInst->genericVal.usedValue;
-                    if(genericVal->op != kIROp_Func)
-                        continue;
-                    auto genericFunc = (IRFunc*) genericVal;
-                    if(!genericFunc->genericDecl)
-                        continue;
-
-                    // Now we extract the specialized decl-ref that will
-                    // tell us how to specialize things.
-                    auto specDeclRefVal = (IRDeclRef*) specInst->specDeclRefVal.usedValue;
-                    auto specDeclRef = specDeclRefVal->declRef;
-
-                    // Okay, we have a candidate for specialization here.
-                    //
-                    // We will first find or construct a specialized version
-                    // of the callee funciton/
-                    auto specFunc = getSpecializedFunc(sharedContext, genericFunc, specDeclRef);
-                    //
-                    // Then we will replace the use sites for the `specialize`
-                    // instruction with uses of the specialized function.
-                    //
-                    specInst->replaceUsesWith(specFunc);
-
-                    specInst->removeAndDeallocate();
                 }
             }
         }

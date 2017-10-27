@@ -316,6 +316,8 @@ DIAGNOSTIC(38001, Error,    ambiguousEntryPoint,            "more than one funct
 DIAGNOSTIC(38002, Note,     entryPointCandidate,            "see candidate declaration for entry point '$0'")
 DIAGNOSTIC(38003, Error,    entryPointSymbolNotAFunction,   "entry point '$0' must be declared as a function")
 
+DIAGNOSTIC(38100, Error, typeDoesntImplementInterfaceRequirement, "type '$0' does not provide required interface member '$1'")
+
 //
 // 4xxxx - IL code generation.
 //

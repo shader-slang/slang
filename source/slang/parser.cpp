@@ -655,7 +655,7 @@ namespace Slang
     {
         // Let's look up the name and see what we find.
 
-        auto lookupResult = LookUp(
+        auto lookupResult = lookUp(
             parser->getSession(),
             nullptr, // no semantics visitor available yet
             name,
@@ -2080,6 +2080,7 @@ namespace Slang
 
                 auto inheritanceDecl = new InheritanceDecl();
                 inheritanceDecl->loc = base.exp->loc;
+                inheritanceDecl->nameAndLoc.name = getName(parser, "$inheritance");
                 inheritanceDecl->base = base;
 
                 AddMember(decl, inheritanceDecl);
@@ -2105,6 +2106,16 @@ namespace Slang
     {
         RefPtr<ConstructorDecl> decl = new ConstructorDecl();
         parser->FillPosition(decl.Ptr());
+
+        // TODO: we need to make sure that all initializers have
+        // the same name, but that this name doesn't conflict
+        // with any user-defined names.
+        // Giving them a name (rather than leaving it null)
+        // ensures that we can use name-based lookup to find
+        // all of the initializers on a type (and has
+        // the potential to unify initializer lookup with
+        // ordinary member lookup).
+        decl->nameAndLoc.name = getName(parser, "$init");
 
         parseParameterList(parser, decl);
 
@@ -2560,7 +2571,7 @@ namespace Slang
 
     static bool isGenericName(Parser* parser, Name* name)
     {
-        auto lookupResult = LookUp(
+        auto lookupResult = lookUp(
             parser->getSession(),
             nullptr, // no semantics visitor available yet
             name,
@@ -2582,7 +2593,7 @@ namespace Slang
 
     static bool isTypeName(Parser* parser, Name* name)
     {
-        auto lookupResult = LookUp(
+        auto lookupResult = lookUp(
             parser->getSession(),
             nullptr, // no semantics visitor available yet
             name,
