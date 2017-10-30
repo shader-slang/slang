@@ -1563,6 +1563,20 @@ struct EmitVisitor
         Emit(")");
     }
 
+    void emitTypeOrExpr(
+        Type*   type,
+        Expr*   expr)
+    {
+        if (type && !type->As<ErrorType>())
+        {
+            EmitType(type);
+        }
+        else
+        {
+            emitTypeBasedOnExpr(expr, nullptr);
+        }
+    }
+
     void emitSimpleConstructorCallExpr(
         RefPtr<InvokeExpr>  callExpr,
         EOpInfo             outerPrec)
@@ -1576,7 +1590,7 @@ struct EmitVisitor
                 bool needClose = MaybeEmitParens(outerPrec, prec);
 
                 Emit("(");
-                EmitType(callExpr->type);
+                emitTypeOrExpr(callExpr->type.type, callExpr->FunctionExpr);
                 Emit(") ");
 
                 EmitExprWithPrecedence(callExpr->Arguments[0], rightSide(outerPrec, prec));
@@ -1592,7 +1606,7 @@ struct EmitVisitor
         auto prec = kEOp_Postfix;
         bool needClose = MaybeEmitParens(outerPrec, prec);
 
-        EmitType(callExpr->type);
+        emitTypeOrExpr(callExpr->type.type, callExpr->FunctionExpr);
 
         emitSimpleCallArgs(callExpr);
 
