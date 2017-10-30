@@ -196,6 +196,16 @@ namespace Slang
             return derefExpr;
         }
 
+        RefPtr<Expr> createImplicitThisMemberExpr(
+            Type*       type,
+            SourceLoc   loc)
+        {
+            RefPtr<ThisExpr> expr = new ThisExpr();
+            expr->type = type;
+            expr->loc = loc;
+            return expr;
+        }
+
         RefPtr<Expr> ConstructLookupResultExpr(
             LookupResultItem const& item,
             RefPtr<Expr>            baseExpr,
@@ -225,6 +235,30 @@ namespace Slang
                             breadcrumb->declRef,
                             bb,
                             loc);
+                    }
+                    break;
+
+                case LookupResultItem::Breadcrumb::Kind::This:
+                    {
+                        // We expect a `this` to always come
+                        // at the start of a chain.
+                        SLANG_ASSERT(bb == nullptr);
+
+                        // The member was looked up via a `this` expression,
+                        // so we need to create one here.
+                        if (auto extensionDeclRef = breadcrumb->declRef.As<ExtensionDecl>())
+                        {
+                            bb = createImplicitThisMemberExpr(
+                                GetTargetType(extensionDeclRef),
+                                loc);
+                        }
+                        else
+                        {
+                            auto type = DeclRefType::Create(getSession(), breadcrumb->declRef);
+                            bb = createImplicitThisMemberExpr(
+                                type,
+                                loc);
+                        }
                     }
                     break;
 
