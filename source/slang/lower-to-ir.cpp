@@ -288,6 +288,15 @@ struct IRGenContext
 
     IRBuilder* irBuilder;
 
+    // The value to use for any `this` expressions
+    // that appear in the current context.
+    //
+    // TODO: If we ever allow nesting of (non-static)
+    // types, then we may need to support references
+    // to an "outer `this`", and this representation
+    // might be insufficient.
+    LoweredValInfo thisVal;
+
     Session* getSession()
     {
         return shared->compileRequest->mSession;
@@ -1006,6 +1015,11 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         auto indexVal = getSimpleVal(context, lowerRValueExpr(context, expr->IndexExpression));
 
         return subscriptValue(type, baseVal, indexVal);
+    }
+
+    LoweredValInfo visitThisExpr(ThisExpr* expr)
+    {
+        return context->thisVal;
     }
 
     LoweredValInfo visitMemberExpr(MemberExpr* expr)
@@ -2360,9 +2374,18 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     };
     struct ParameterInfo
     {
+        // This AST-level type of the parameter
         Type*               type;
+
+        // The direction (`in` vs `out` vs `in out`)
         ParameterDirection  direction;
+
+        // The variable/parameter declaration for
+        // this parameter (if any)
         VarDeclBase*        decl;
+
+        // Is this the representation of a `this` parameter?
+        bool                isThisParam = false;
     };
     //
     // We need a way to compute the appropriate `ParameterDirection` for a
@@ -2399,6 +2422,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         info.type = paramDecl->getType();
         info.decl = paramDecl;
         info.direction = getParameterDirection(paramDecl);
+        info.isThisParam = false;
         return info;
     }
     //
@@ -2492,6 +2516,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         info.type = type;
         info.decl = nullptr;
         info.direction = direction;
+        info.isThisParam = true;
 
         ioParameterLists->params.Add(info);
     }
@@ -2807,6 +2832,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 {
                     DeclRef<VarDeclBase> paramDeclRef = makeDeclRef(paramDecl);
                     subContext->shared->declValues.Add(paramDeclRef, paramVal);
+                }
+
+                if (paramInfo.isThisParam)
+                {
+                    subContext->thisVal = paramVal;
                 }
             }
 

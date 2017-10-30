@@ -859,6 +859,12 @@ namespace Slang
                 // lookup was able to find a member through type `U`
                 // instead.
                 Constraint,
+
+                // The lookup process considered a member of an
+                // enclosing type as being in scope, so that any
+                // reference to that member needs to use a `this`
+                // expression as appropriate.
+                This,
             };
 
             // The kind of lookup step that was performed

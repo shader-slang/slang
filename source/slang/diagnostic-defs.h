@@ -308,15 +308,16 @@ DIAGNOSTIC(39999, Error, tooManyArguments, "too many arguments to call (got $0, 
 DIAGNOSTIC(39999, Error, invalidIntegerLiteralSuffix, "invalid suffix '$0' on integer literal")
 DIAGNOSTIC(39999, Error, invalidFloatingPOintLiteralSuffix, "invalid suffix '$0' on floating-point literal")
 
-DIAGNOSTIC(39999, Error,    conflictingExplicitBindingsForParameter, "conflicting explicit bindings for parameter '$0'")
-DIAGNOSTIC(39999, Warning,  parameterBindingsOverlap, "explicit binding for parameter '$0' overlaps with parameter '$1'")
+DIAGNOSTIC(39999, Error, conflictingExplicitBindingsForParameter, "conflicting explicit bindings for parameter '$0'")
+DIAGNOSTIC(39999, Warning, parameterBindingsOverlap, "explicit binding for parameter '$0' overlaps with parameter '$1'")
 
-DIAGNOSTIC(38000, Error,    entryPointFunctionNotFound,     "no function found matching entry point name '$0'")
-DIAGNOSTIC(38001, Error,    ambiguousEntryPoint,            "more than one function matches entry point name '$0'")
-DIAGNOSTIC(38002, Note,     entryPointCandidate,            "see candidate declaration for entry point '$0'")
-DIAGNOSTIC(38003, Error,    entryPointSymbolNotAFunction,   "entry point '$0' must be declared as a function")
+DIAGNOSTIC(38000, Error, entryPointFunctionNotFound, "no function found matching entry point name '$0'")
+DIAGNOSTIC(38001, Error, ambiguousEntryPoint, "more than one function matches entry point name '$0'")
+DIAGNOSTIC(38002, Note, entryPointCandidate, "see candidate declaration for entry point '$0'")
+DIAGNOSTIC(38003, Error, entryPointSymbolNotAFunction, "entry point '$0' must be declared as a function")
 
 DIAGNOSTIC(38100, Error, typeDoesntImplementInterfaceRequirement, "type '$0' does not provide required interface member '$1'")
+DIAGNOSTIC(38101, Error, thisExpressionOutsideOfTypeDecl, "'this' expression can only be used in members of an aggregate type")
 
 //
 // 4xxxx - IL code generation.

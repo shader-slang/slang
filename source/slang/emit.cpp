@@ -2395,6 +2395,17 @@ struct EmitVisitor
         if(needClose) Emit(")");
     }
 
+    void visitThisExpr(ThisExpr* expr, ExprEmitArg const& arg)
+    {
+        auto prec = kEOp_Atomic;
+        auto outerPrec = arg.outerPrec;
+        bool needClose = MaybeEmitParens(outerPrec, prec);
+
+        Emit("this");
+
+        if(needClose) Emit(")");
+    }
+
     void visitSwizzleExpr(SwizzleExpr* swizExpr, ExprEmitArg const& arg)
     {
         auto prec = kEOp_Postfix;

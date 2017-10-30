@@ -319,40 +319,35 @@ void DoLookupImpl(
             if(!containerDecl)
                 continue;
 
-            // If the container is a generic, then we need to instantiate it
-            // at the parameters themselves, so provide a fully-resolved
-            // declaration reference for lookup.
-            RefPtr<Substitutions> subst = nullptr;
-#if 1
-            // Actually, the above rationale seems bogus. If we are looking
-            // up from "inside" a generic declaration, we don't want to
-            // get its members pre-specialized, right?
-#else
-            if(auto parentGenericDecl = dynamic_cast<GenericDecl*>(containerDecl->ParentDecl))
+            DeclRef<ContainerDecl> containerDeclRef =
+                DeclRef<Decl>(containerDecl, nullptr).As<ContainerDecl>();
+
+            BreadcrumbInfo breadcrumb;
+            BreadcrumbInfo* breadcrumbs = nullptr;
+
+            // Depending on the kind of container we are looking into,
+            // we may need to insert something like a `this` expression
+            // to resolve the lookup result.
+            //
+            // Note: We are checking for `AggTypeDeclBase` here, and not
+            // just `AggTypeDecl`, because we want to catch `extension`
+            // declarations as well.
+            //
+            if (auto aggTypeDeclRef = containerDeclRef.As<AggTypeDeclBase>())
             {
-                subst = new Substitutions();
-                subst->genericDecl = parentGenericDecl;
+                breadcrumb.kind = LookupResultItem::Breadcrumb::Kind::This;
+                breadcrumb.declRef = aggTypeDeclRef;
+                breadcrumb.prev = nullptr;
 
-                for( auto pp : parentGenericDecl->Members )
-                {
-                    if( auto genericTypeParam = pp.As<GenericTypeParamDecl>() )
-                    {
-                        subst->args.Add(DeclRefType::Create(
-                            session,
-                            DeclRef<GenericTypeParamDecl>(genericTypeParam.Ptr(), nullptr)));
-                    }
-                    else if( auto genericValParam = pp.As<GenericValueParamDecl>() )
-                    {
-                        subst->args.Add(new GenericParamIntVal(DeclRef<GenericValueParamDecl>(genericValParam.Ptr(), nullptr)));
-                    }
-                }
+                breadcrumbs = &breadcrumb;
             }
-#endif
 
-            DeclRef<ContainerDecl> containerRef = DeclRef<Decl>(containerDecl, subst).As<ContainerDecl>();
+            // Now perform "local" lookup in the context of the container,
+            // as if we were looking up a member directly.
+            //
             DoLocalLookupImpl(
                 session,
-                name, containerRef, request, result, nullptr);
+                name, containerDeclRef, request, result, breadcrumbs);
         }
 
         if (result.isValid())

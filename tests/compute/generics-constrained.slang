@@ -17,9 +17,7 @@ struct A : Helper
 		// TODO: we should be able to reference a member variable here,
 		// but the front-end isn't handling references through `this`
 		// properly yet.
-//		return a;
-
-		return 1.0f;
+		return a;
 	}	
 };
 
