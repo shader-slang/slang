@@ -148,3 +148,10 @@ END_SYNTAX_CLASS()
 SYNTAX_CLASS(ParenExpr, Expr)
     SYNTAX_FIELD(RefPtr<Expr>, base);
 END_SYNTAX_CLASS()
+
+// An object-oriented `this` expression, used to
+// refer to the current instance of an enclosing type.
+SYNTAX_CLASS(ThisExpr, Expr)
+    FIELD(RefPtr<Scope>, scope);
+END_SYNTAX_CLASS()
+

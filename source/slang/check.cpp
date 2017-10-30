@@ -5970,6 +5970,11 @@ namespace Slang
                 // We need to fix that.
                 auto type = typeType->type;
 
+                if (type->As<ErrorType>())
+                {
+                    return CreateErrorExpr(expr);
+                }
+
                 LookupResult lookupResult = lookUpMember(
                     getSession(),
                     this,
@@ -5987,6 +5992,10 @@ namespace Slang
                     lookupResult,
                     expr->BaseExpression,
                     expr->loc);
+            }
+            else if (baseType->As<ErrorType>())
+            {
+                return CreateErrorExpr(expr);
             }
             else
             {
@@ -6092,6 +6101,54 @@ namespace Slang
             importModuleIntoScope(scope.Ptr(), importedModuleDecl.Ptr());
 
             decl->SetCheckState(DeclCheckState::Checked);
+        }
+
+        // Perform semantic checking of an object-oriented `this`
+        // expression.
+        RefPtr<Expr> visitThisExpr(ThisExpr* expr)
+        {
+            // We will do an upwards search starting in the current
+            // scope, looking for a surrounding type (or `extension`)
+            // declaration that could be the referrant of the expression.
+            auto scope = expr->scope;
+            while (scope)
+            {
+                auto containerDecl = scope->containerDecl;
+                if (auto aggTypeDecl = containerDecl->As<AggTypeDecl>())
+                {
+                    EnsureDecl(aggTypeDecl);
+
+                    // Okay, we are using `this` in the context of an
+                    // aggregate type, so the expression should be
+                    // of the corresponding type.
+                    expr->type = DeclRefType::Create(
+                        getSession(),
+                        makeDeclRef(aggTypeDecl));
+                    return expr;
+                }
+                else if (auto extensionDecl = containerDecl->As<ExtensionDecl>())
+                {
+                    EnsureDecl(extensionDecl);
+
+                    // When `this` is used in the context of an `extension`
+                    // declaration, then it should refer to an instance of
+                    // the type being extended.
+                    //
+                    // TODO: There is potentially a small gotcha here that
+                    // lookup through such a `this` expression should probably
+                    // prioritize members declared in the current extension
+                    // if there are multiple extensions in scope that add
+                    // members with the same name...
+                    //
+                    expr->type = QualType(extensionDecl->targetType.type);
+                    return expr;
+                }
+
+                scope = scope->parent;
+            }
+
+            getSink()->diagnose(expr, Diagnostics::thisExpressionOutsideOfTypeDecl);
+            return CreateErrorExpr(expr);
         }
     };
 

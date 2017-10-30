@@ -3334,6 +3334,32 @@ namespace Slang
 
     static RefPtr<Expr> parsePrefixExpr(Parser* parser);
 
+    // Parse OOP `this` expression syntax
+    static RefPtr<RefObject> parseThisExpr(Parser* parser, void* /*userData*/)
+    {
+        RefPtr<ThisExpr> expr = new ThisExpr();
+        expr->scope = parser->currentScope;
+        return expr;
+    }
+
+    static RefPtr<Expr> parseBoolLitExpr(Parser* parser, bool value)
+    {
+        RefPtr<ConstantExpr> constExpr = new ConstantExpr();
+        constExpr->ConstType = ConstantExpr::ConstantType::Bool;
+        constExpr->integerValue = value ? 1 : 0;
+        return constExpr;
+    }
+
+    static RefPtr<RefObject> parseTrueExpr(Parser* parser, void* /*userData*/)
+    {
+        return parseBoolLitExpr(parser, true);
+    }
+
+    static RefPtr<RefObject> parseFalseExpr(Parser* parser, void* /*userData*/)
+    {
+        return parseBoolLitExpr(parser, false);
+    }
+
     static RefPtr<Expr> parseAtomicExpr(Parser* parser)
     {
         switch( peekTokenType(parser) )
@@ -3577,19 +3603,18 @@ namespace Slang
 
         case TokenType::Identifier:
             {
-                // TODO(tfoley): Need a name-lookup step here to resolve
-                // syntactic keywords in expression context.
+                // We will perform name lookup here so that we can find syntax
+                // keywords registered for use as expressions.
+                Token nameToken = peekToken(parser);
 
-                if (parser->LookAheadToken("true") || parser->LookAheadToken("false"))
+                RefPtr<Expr> parsedExpr;
+                if (tryParseUsingSyntaxDecl<Expr>(parser, &parsedExpr))
                 {
-                    RefPtr<ConstantExpr> constExpr = new ConstantExpr();
-                    auto token = parser->tokenReader.AdvanceToken();
-                    constExpr->token = token;
-                    parser->FillPosition(constExpr.Ptr());
-                    constExpr->ConstType = ConstantExpr::ConstantType::Bool;
-                    constExpr->integerValue = token.Content == "true" ? 1 : 0;
-
-                    return constExpr;
+                    if (!parsedExpr->loc.isValid())
+                    {
+                        parsedExpr->loc = nameToken.loc;
+                    }
+                    return parsedExpr;
                 }
 
                 // Default behavior is just to create a name expression
@@ -4089,6 +4114,16 @@ namespace Slang
         MODIFIER(__implicit_conversion,     parseImplicitConversionModifier);
 
 #undef MODIFIER
+
+        // Add syntax for expression keywords
+    #define EXPR(KEYWORD, CALLBACK) \
+        addBuiltinSyntax<Expr>(session, scope, #KEYWORD, &CALLBACK)
+
+        EXPR(this,  parseThisExpr);
+        EXPR(true,  parseTrueExpr);
+        EXPR(false, parseFalseExpr);
+
+    #undef EXPR
 
         return moduleDecl;
     }
