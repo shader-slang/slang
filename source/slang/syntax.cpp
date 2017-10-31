@@ -940,6 +940,33 @@ void Type::accept(IValVisitor* visitor, void* extra)
         return this;
     }
 
+    // AssocTypeDeclRefType
+
+    String AssocTypeDeclRefType::ToString()
+    {
+        // TODO: what is appropriate here?
+        return "<AssocType>";
+    }
+
+    bool AssocTypeDeclRefType::EqualsImpl(Type * type)
+    {
+        if (auto assocTypeDeclRefType = type->As<AssocTypeDeclRefType>())
+        {
+            return declRef.Equals(assocTypeDeclRefType->declRef);
+        }
+        return false;
+    }
+
+    int AssocTypeDeclRefType::GetHashCode()
+    {
+        return declRef.GetHashCode();
+    }
+
+    Type* AssocTypeDeclRefType::CreateCanonicalType()
+    {
+        return this;
+    }
+
     // ArithmeticExpressionType
 
     // VectorExpressionType

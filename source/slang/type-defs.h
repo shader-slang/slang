@@ -491,3 +491,26 @@ protected:
     virtual Type* CreateCanonicalType() override;
 )
 END_SYNTAX_CLASS()
+
+// The "type" of an expression that references a asscoiated type decl (via 'assoctype' keyword).
+SYNTAX_CLASS(AssocTypeDeclRefType, Type)
+    DECL_FIELD(DeclRef<AssocTypeDecl>, declRef)
+    RAW(
+    AssocTypeDeclRefType()
+    {}
+    AssocTypeDeclRefType(
+        DeclRef<AssocTypeDecl> declRef)
+        : declRef(declRef)
+    {}
+
+
+    DeclRef<AssocTypeDecl> const& GetDeclRef() const { return declRef; }
+
+    virtual String ToString() override;
+
+    protected:
+        virtual bool EqualsImpl(Type * type) override;
+        virtual int GetHashCode() override;
+        virtual Type* CreateCanonicalType() override;
+    )
+END_SYNTAX_CLASS()

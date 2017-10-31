@@ -544,6 +544,21 @@ namespace Slang
         return typeDefDecl;
     }
 
+    RefPtr<RefObject> ParseAssocType(Parser * parser, void *)
+    {
+        RefPtr<AssocTypeDecl> assocTypeDecl = new AssocTypeDecl();
+
+        auto nameToken = parser->ReadToken(TokenType::Identifier);
+        assocTypeDecl->nameAndLoc = NameLoc(nameToken);
+        assocTypeDecl->loc = nameToken.loc;
+        if (parser->LookAheadToken(TokenType::Colon))
+        {
+            auto type = parser->ParseTypeExp();
+            assocTypeDecl->constraint = type;
+        }
+        return assocTypeDecl;
+    }
+
     // Add a modifier to a list of modifiers being built
     static void AddModifier(RefPtr<Modifier>** ioModifierLink, RefPtr<Modifier> modifier)
     {
@@ -1396,6 +1411,16 @@ namespace Slang
         return genericApp;
     }
 
+    static RefPtr<Expr> parseMemberType(Parser * parser, RefPtr<Expr> base)
+    {
+        RefPtr<MemberExpr> memberExpr = new MemberExpr();
+        parser->ReadToken(TokenType::Dot);
+        parser->FillPosition(memberExpr.Ptr());
+        memberExpr->BaseExpression = base;
+        memberExpr->name = expectIdentifier(parser).name;
+        return memberExpr;
+    }
+
     // Parse option `[]` braces after a type expression, that indicate an array type
     static RefPtr<Expr> parsePostfixTypeSuffix(
         Parser* parser,
@@ -1452,9 +1477,16 @@ namespace Slang
 
         RefPtr<Expr> typeExpr = basicType;
 
-        if (parser->LookAheadToken(TokenType::OpLess))
+        while (parser->LookAheadToken(TokenType::OpLess) || parser->LookAheadToken(TokenType::Dot))
         {
-            typeExpr = parseGenericApp(parser, typeExpr);
+            if (parser->LookAheadToken(TokenType::OpLess))
+            {
+                typeExpr = parseGenericApp(parser, typeExpr);
+            }
+            else
+            {
+                typeExpr = parseMemberType(parser, typeExpr);
+            }
         }
 
         // GLSL allows `[]` directly in a type specifier
@@ -4029,8 +4061,8 @@ namespace Slang
         // Add syntax for declaration keywords
     #define DECL(KEYWORD, CALLBACK) \
         addBuiltinSyntax<Decl>(session, scope, #KEYWORD, &CALLBACK)
-
         DECL(typedef,       ParseTypeDef);
+        DECL(assoctype,     ParseAssocType);
         DECL(cbuffer,       parseHLSLCBufferDecl);
         DECL(tbuffer,       parseHLSLTBufferDecl);
         DECL(__generic,     ParseGenericDecl);
