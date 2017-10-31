@@ -317,6 +317,8 @@ struct OptionsParser
 
                     CASE(spirv, SPIRV);
                     CASE(spirv-assembly, SPIRV_ASM);
+                    CASE(dxil, DXIL);
+                    CASE(dxil-assembly, DXIL_ASM);
                     CASE(none, TARGET_NONE);
 
                 #undef CASE
@@ -390,6 +392,7 @@ struct OptionsParser
                     String name = tryReadCommandLineArgument(arg, &argCursor, argEnd);
                     SlangPassThrough passThrough = SLANG_PASS_THROUGH_NONE;
                     if (name == "fxc") { passThrough = SLANG_PASS_THROUGH_FXC; }
+                    else if (name == "dxc") { passThrough = SLANG_PASS_THROUGH_DXC; }
                     else if (name == "glslang") { passThrough = SLANG_PASS_THROUGH_GLSLANG; }
                     else
                     {

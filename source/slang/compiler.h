@@ -47,6 +47,8 @@ namespace Slang
         SPIRVAssembly       = SLANG_SPIRV_ASM,
         DXBytecode          = SLANG_DXBC,
         DXBytecodeAssembly  = SLANG_DXBC_ASM,
+        DXIL                = SLANG_DXIL,
+        DXILAssembly        = SLANG_DXIL_ASM,
     };
 
     enum class ContainerFormat
@@ -126,8 +128,9 @@ namespace Slang
     enum class PassThroughMode : SlangPassThrough
     {
         None = SLANG_PASS_THROUGH_NONE,	// don't pass through: use Slang compiler
-        HLSL = SLANG_PASS_THROUGH_FXC,	// pass through HLSL to `D3DCompile` API
-//			GLSL,	// pass through GLSL to `glslang` library
+        fxc = SLANG_PASS_THROUGH_FXC,	// pass through HLSL to `D3DCompile` API
+        dxc = SLANG_PASS_THROUGH_DXC,	// pass through HLSL to `IDxcCompiler` API
+        glslang = SLANG_PASS_THROUGH_GLSLANG,	// pass through GLSL to `glslang` library
     };
 
     class SourceFile;
