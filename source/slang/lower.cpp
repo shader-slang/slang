@@ -765,6 +765,7 @@ struct LoweringVisitor
             loweredDeclRef.As<Decl>());
     }
 
+
     RefPtr<Type> visitNamedExpressionType(NamedExpressionType* type)
     {
         if (shared->target == CodeGenTarget::GLSL)
@@ -776,6 +777,13 @@ struct LoweringVisitor
         return getNamedType(
             type->getSession(),
             translateDeclRef(DeclRef<Decl>(type->declRef)).As<TypeDefDecl>());
+    }
+
+    RefPtr<Type> visitAssocTypeDeclRefType(AssocTypeDeclRefType* type)
+    {
+        // not supported by lowering
+        SLANG_UNREACHABLE("visitAssocTypeDeclRefType in LowerVisitor");
+        return nullptr;
     }
 
     RefPtr<Type> visitTypeType(TypeType* type)
@@ -2817,6 +2825,13 @@ struct LoweringVisitor
     {
         // Extensions won't exist in the lowered code: their members
         // will turn into ordinary functions that get called explicitly
+        return LoweredDecl();
+    }
+
+    LoweredDecl visitAssocTypeDecl(AssocTypeDecl * /*assocType*/)
+    {
+        // not supported
+        SLANG_UNREACHABLE("visitAssocTypeDecl in LowerVisitor");
         return LoweredDecl();
     }
 

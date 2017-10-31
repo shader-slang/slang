@@ -957,6 +957,20 @@ void Type::accept(IValVisitor* visitor, void* extra)
         return false;
     }
 
+    RefPtr<Val> AssocTypeDeclRefType::SubstituteImpl(Substitutions* subst, int* ioDiff)
+    {
+        auto parentType = this->GetDeclRef().GetParent().SubstituteImpl(subst, ioDiff);
+        if (auto aggDeclRef = parentType.As<AggTypeDecl>())
+        {
+            Decl* targetTypeDecl = nullptr;
+            if (aggDeclRef.getDecl()->memberDictionary.TryGetValue(this->GetDeclRef().decl->getName(), targetTypeDecl))
+            {
+                return DeclRefType::Create(this->session, DeclRef<Decl>(targetTypeDecl, parentType.substitutions));
+            }
+        }
+        return this;
+    }
+
     int AssocTypeDeclRefType::GetHashCode()
     {
         return declRef.GetHashCode();

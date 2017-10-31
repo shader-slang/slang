@@ -7,21 +7,21 @@ RWStructuredBuffer<float> outputBuffer;
 
 interface ISimple
 {
-    assoctype T;
-    T add(T v0, T v1);
+    associatedtype U;
+    U add(U v0, U v1);
 }
 
 struct Simple : ISimple
 {
-    typedef float T;
-    T add(T v0, float v1)
+    typedef float U;
+    U add(U v0, float v1)
     {
         return v0 + v1;
     }
 };
 
 __generic<T:ISimple>
-T.T test(T simple, T.T v0, T.T v1)
+T.U test(T simple, T.U v0, T.U v1)
 {
     return simple.add(v0, v1);
 }
@@ -29,6 +29,7 @@ T.T test(T simple, T.T v0, T.T v1)
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-	float outVal = test<Simple>(Simple(), 2.0, 1.0); // == 3.0
+    Simple s;
+	float outVal = test<Simple>(s, 2.0, 1.0); // == 3.0
 	outputBuffer[tid] = outVal;
 }

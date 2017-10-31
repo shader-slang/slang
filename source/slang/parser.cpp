@@ -544,21 +544,6 @@ namespace Slang
         return typeDefDecl;
     }
 
-    RefPtr<RefObject> ParseAssocType(Parser * parser, void *)
-    {
-        RefPtr<AssocTypeDecl> assocTypeDecl = new AssocTypeDecl();
-
-        auto nameToken = parser->ReadToken(TokenType::Identifier);
-        assocTypeDecl->nameAndLoc = NameLoc(nameToken);
-        assocTypeDecl->loc = nameToken.loc;
-        if (parser->LookAheadToken(TokenType::Colon))
-        {
-            auto type = parser->ParseTypeExp();
-            assocTypeDecl->constraint = type;
-        }
-        return assocTypeDecl;
-    }
-
     // Add a modifier to a list of modifiers being built
     static void AddModifier(RefPtr<Modifier>** ioModifierLink, RefPtr<Modifier> modifier)
     {
@@ -2102,7 +2087,7 @@ namespace Slang
         return decl;
     }
 
-    static void parseOptionalInheritanceClause(Parser* parser, AggTypeDecl* decl)
+    static void parseOptionalInheritanceClause(Parser* parser, ContainerDecl* decl)
     {
         if( AdvanceIf(parser, TokenType::Colon) )
         {
@@ -2119,6 +2104,18 @@ namespace Slang
 
             } while( AdvanceIf(parser, TokenType::Comma) );
         }
+    }
+
+    RefPtr<RefObject> ParseAssocType(Parser * parser, void *)
+    {
+        RefPtr<AssocTypeDecl> assocTypeDecl = new AssocTypeDecl();
+
+        auto nameToken = parser->ReadToken(TokenType::Identifier);
+        assocTypeDecl->nameAndLoc = NameLoc(nameToken);
+        assocTypeDecl->loc = nameToken.loc;
+        parseOptionalInheritanceClause(parser, assocTypeDecl.Ptr());
+        parser->ReadToken(TokenType::Semicolon);
+        return assocTypeDecl;
     }
 
     static RefPtr<RefObject> parseInterfaceDecl(Parser* parser, void* /*userData*/)
@@ -4062,7 +4059,7 @@ namespace Slang
     #define DECL(KEYWORD, CALLBACK) \
         addBuiltinSyntax<Decl>(session, scope, #KEYWORD, &CALLBACK)
         DECL(typedef,       ParseTypeDef);
-        DECL(assoctype,     ParseAssocType);
+        DECL(associatedtype,ParseAssocType);
         DECL(cbuffer,       parseHLSLCBufferDecl);
         DECL(tbuffer,       parseHLSLTBufferDecl);
         DECL(__generic,     ParseGenericDecl);

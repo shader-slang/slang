@@ -1039,7 +1039,6 @@ struct EmitVisitor
     UNEXPECTED(PtrType);
 
 #undef UNEXPECTED
-
     void visitNamedExpressionType(NamedExpressionType* type, TypeEmitArg const& arg)
     {
         // Named types are valid for GLSL
@@ -1051,6 +1050,11 @@ struct EmitVisitor
 
         EmitDeclRef(type->declRef);
         EmitDeclarator(arg.declarator);
+    }
+
+    void visitAssocTypeDeclRefType(AssocTypeDeclRefType* /*type*/, TypeEmitArg const& /*arg*/)
+    {
+        SLANG_UNREACHABLE("visitAssocTypeDeclRefType in EmitVisitor");
     }
 
     void visitBasicExpressionType(BasicExpressionType* basicType, TypeEmitArg const& arg)
@@ -3008,6 +3012,12 @@ struct EmitVisitor
         EmitType(decl->type, decl->getNameAndLoc());
         Emit(";\n");
     }
+
+    void visitAssocTypeDecl(AssocTypeDecl * /*assocType*/, DeclEmitArg const&)
+    {
+        SLANG_UNREACHABLE("visitAssocTypeDecl in EmitVisitor");
+    }
+
 
     void visitImportDecl(ImportDecl* decl, DeclEmitArg const&)
     {

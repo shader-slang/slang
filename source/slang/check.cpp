@@ -1538,7 +1538,48 @@ namespace Slang
                         requiredInitDecl);
                 }
             }
+            else if (auto subStructTypeDecl = dynamic_cast<AggTypeDecl*>(memberDecl))
+            {
+                // this is a sub type (e.g. nested struct declaration) in an aggregate type
+                // check if this sub type declaration satisfies the constraints defined by the associated type
+                if (auto requiredTypeDecl = requiredMemberDeclRef.As<AssocTypeDecl>())
+                {
+                    bool conformance = true;
+                    for (auto & inheritanceDecl : requiredTypeDecl.getDecl()->getMembersOfType<InheritanceDecl>())
+                    {
+                        conformance = conformance && checkConformance(subStructTypeDecl, inheritanceDecl.Ptr());
+                    }
+                    return conformance;
+                }
+            }
+            else if (auto typedefDecl = dynamic_cast<TypeDefDecl*>(memberDecl))
+            {
+                // this is a type-def decl in an aggregate type
+                // check if the specified type satisfies the constraints defined by the associated type
+                if (auto requiredTypeDecl = requiredMemberDeclRef.As<AssocTypeDecl>())
+                {
+                    auto constraintList = requiredTypeDecl.getDecl()->getMembersOfType<InheritanceDecl>();
+                    if (constraintList.Count())
+                    {
+                        auto declRefType = typedefDecl->type->AsDeclRefType();
+                        if (!declRefType)
+                            return false;
 
+                        auto subStructTypeDecl = declRefType->declRef.getDecl()->As<AggTypeDecl>();
+                        //TODO: What do we do if type is a generic specialization?
+                        // i.e. if the struct defines typedef Generic<float> T; 
+                        // how to check if T satisfies the associatedtype constraints?
+                        // the code below will only work when T is defined to be a simple aggregated type (no generics).
+                        bool conformance = true;
+                        for (auto & inheritanceDecl : constraintList)
+                        {
+                            conformance = conformance && checkConformance(subStructTypeDecl, inheritanceDecl.Ptr());
+                        }
+                        return conformance;
+                    }
+                    return true;
+                }
+            }
             // Default: just assume that thing aren't being satisfied.
             return false;
         }
@@ -1623,11 +1664,13 @@ namespace Slang
         // declares conformance to the interface `interfaceDeclRef`,
         // (via the given `inheritanceDecl`) actually provides
         // members to satisfy all the requirements in the interface.
-        void checkInterfaceConformance(
+        bool checkInterfaceConformance(
             AggTypeDecl*        typeDecl,
             InheritanceDecl*    inheritanceDecl,
             DeclRef<InterfaceDecl>  interfaceDeclRef)
         {
+            bool result = true;
+
             // We need to check the declaration of the interface
             // before we can check that we conform to it.
             EnsureDecl(interfaceDeclRef.getDecl());
@@ -1654,7 +1697,7 @@ namespace Slang
                     // to the inherited interface.
                     //
                     // TODO: we *really* need a linearization step here!!!!
-                    checkConformanceToType(
+                    result = result && checkConformanceToType(
                         typeDecl,
                         inheritanceDecl,
                         getBaseType(requiredInheritanceDeclRef));
@@ -1670,16 +1713,20 @@ namespace Slang
                     requiredMemberDeclRef);
 
                 if (!conformanceWitness)
+                {
+                    result = false;
                     continue;
+                }
 
                 // Store that witness into a table stored on the `inheritnaceDecl`
                 // so that it can be used for downstream code generation.
 
                 inheritanceDecl->requirementWitnesses.Add(requiredMemberDeclRef, conformanceWitness);
             }
+            return result;
         }
 
-        void checkConformanceToType(
+        bool checkConformanceToType(
             AggTypeDecl*        typeDecl,
             InheritanceDecl*    inheritanceDecl,
             Type*               baseType)
@@ -1692,29 +1739,29 @@ namespace Slang
                     // The type is stating that it conforms to an interface.
                     // We need to check that it provides all of the members
                     // required by that interface.
-                    checkInterfaceConformance(
+                    return checkInterfaceConformance(
                         typeDecl,
                         inheritanceDecl,
                         baseInterfaceDeclRef);
-                    return;
                 }
             }
 
             getSink()->diagnose(inheritanceDecl, Diagnostics::unimplemented, "type not supported for inheritance");
+            return false;
         }
 
         // Check that the type declaration `typeDecl`, which
         // declares that it inherits from another type via
         // `inheritanceDecl` actually does what it needs to
         // for that inheritance to be valid.
-        void checkConformance(
+        bool checkConformance(
             AggTypeDecl*        typeDecl,
             InheritanceDecl*    inheritanceDecl)
         {
             // Look at the type being inherited from, and validate
             // appropriately.
             auto baseType = inheritanceDecl->base.type;
-            checkConformanceToType(typeDecl, inheritanceDecl, baseType);
+            return checkConformanceToType(typeDecl, inheritanceDecl, baseType);
         }
 
         void visitAggTypeDecl(AggTypeDecl* decl)
@@ -1758,6 +1805,11 @@ namespace Slang
                 // Don't check that an interface conforms to the
                 // things it inherits from.
             }
+            else if (auto assocTypeDecl = dynamic_cast<AssocTypeDecl*>(decl))
+            {
+                // Don't check that an associated type decl conforms to the
+                // things it inherits from.
+            }
             else
             {
                 // For non-interface types we need to check conformance.
@@ -1791,6 +1843,24 @@ namespace Slang
 
             decl->SetCheckState(DeclCheckState::CheckingHeader);
             decl->type = CheckProperType(decl->type);
+            decl->SetCheckState(DeclCheckState::Checked);
+        }
+
+        void visitAssocTypeDecl(AssocTypeDecl* decl)
+        {
+            if (decl->IsChecked(DeclCheckState::Checked)) return;
+            decl->SetCheckState(DeclCheckState::CheckedHeader);
+
+            // assoctype only allowed in an interface
+            auto interfaceDecl = decl->ParentDecl->As<InterfaceDecl>();
+            if (!interfaceDecl)
+                getSink()->diagnose(decl, Slang::Diagnostics::assocTypeInInterfaceOnly);
+
+            // Now check all of the member declarations.
+            for (auto member : decl->Members)
+            {
+                checkDecl(member);
+            }
             decl->SetCheckState(DeclCheckState::Checked);
         }
 
@@ -5647,8 +5717,13 @@ namespace Slang
 
         RefPtr<Expr> visitInvokeExpr(InvokeExpr *expr)
         {
+            if (auto appExpr = expr->FunctionExpr->As<GenericAppExpr>())
+                if (auto varExpr = appExpr->FunctionExpr->As<VarExpr>())
+                    if (varExpr->name->text == "test")
+                        printf("break");
             // check the base expression first
             expr->FunctionExpr = CheckExpr(expr->FunctionExpr);
+     
 
             // Next check the argument expressions
             for (auto & arg : expr->Arguments)
@@ -6386,7 +6461,12 @@ namespace Slang
             auto type = getFuncType(session, funcDeclRef);
             return QualType(type);
         }
-
+        else if (auto assocTypeDeclRef = declRef.As<AssocTypeDecl>())
+        {
+            auto type = DeclRefType::Create(session, assocTypeDeclRef);
+            *outTypeResult = type;
+            return QualType(getTypeType(type));
+        }
         if( sink )
         {
             sink->diagnose(declRef, Diagnostics::unimplemented, "cannot form reference to this kind of declaration");

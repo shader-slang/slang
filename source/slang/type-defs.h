@@ -495,6 +495,7 @@ END_SYNTAX_CLASS()
 // The "type" of an expression that references a asscoiated type decl (via 'assoctype' keyword).
 SYNTAX_CLASS(AssocTypeDeclRefType, Type)
     DECL_FIELD(DeclRef<AssocTypeDecl>, declRef)
+
     RAW(
     AssocTypeDeclRefType()
     {}
@@ -509,6 +510,7 @@ SYNTAX_CLASS(AssocTypeDeclRefType, Type)
     virtual String ToString() override;
 
     protected:
+        virtual RefPtr<Val> SubstituteImpl(Substitutions* subst, int* ioDiff) override;
         virtual bool EqualsImpl(Type * type) override;
         virtual int GetHashCode() override;
         virtual Type* CreateCanonicalType() override;
