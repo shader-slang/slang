@@ -1134,7 +1134,11 @@ TestResult runComputeComparisonImpl(TestInput& input, const char * langOption, S
 
 	spawner.pushArgument(langOption);
 	spawner.pushArgument("-o");
-	spawner.pushArgument(outputStem + ".actual.txt");
+    auto actualOutputFile = outputStem + ".actual.txt";
+	spawner.pushArgument(actualOutputFile);
+
+    // clear the stale actual output file first. This will allow us to detect error if render-test fails and outputs nothing.
+    File::WriteAllText(actualOutputFile, "");
 
 	if (spawnAndWait(outputStem, spawner) != kOSError_None)
 	{
@@ -1145,7 +1149,7 @@ TestResult runComputeComparisonImpl(TestInput& input, const char * langOption, S
     auto actualOutput = getOutput(spawner);
 
 	// check against reference output
-    if (!File::Exists(outputStem + ".actual.txt"))
+    if (!File::Exists(actualOutputFile))
     {
         printf("render-test not producing expected outputs.\n");
         printf("render-test output:\n%s\n", actualOutput.Buffer());
@@ -1156,7 +1160,7 @@ TestResult runComputeComparisonImpl(TestInput& input, const char * langOption, S
         printf("referenceOutput %s not found.\n", referenceOutput.Buffer());
 		return kTestResult_Fail;
     }
-    auto actualOutputContent = File::ReadAllText(outputStem + ".actual.txt");
+    auto actualOutputContent = File::ReadAllText(actualOutputFile);
 	auto actualProgramOutput = Split(actualOutputContent, '\n');
 	auto referenceProgramOutput = Split(File::ReadAllText(referenceOutput), '\n');
     auto printOutput = [&]()
