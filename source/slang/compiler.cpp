@@ -15,7 +15,7 @@
 #include "reflection.h"
 #include "emit.h"
 
-// Enable calling through to `fxc` to
+// Enable calling through to `fxc` or `dxc` to
 // generate code on Windows.
 #ifdef _WIN32
     #define WIN32_LEAN_AND_MEAN
@@ -27,11 +27,17 @@
     #ifndef SLANG_ENABLE_DXBC_SUPPORT
         #define SLANG_ENABLE_DXBC_SUPPORT 1
     #endif
+    #ifndef SLANG_ENABLE_DXIL_SUPPORT
+        #define SLANG_ENABLE_DXIL_SUPPORT 1
+    #endif
 #endif
 //
-// Otherwise, don't enable DXBC by default:
+// Otherwise, don't enable DXBC/DXIL by default:
 #ifndef SLANG_ENABLE_DXBC_SUPPORT
     #define SLANG_ENABLE_DXBC_SUPPORT 0
+#endif
+#ifndef SLANG_ENABLE_DXIL_SUPPORT
+    #define SLANG_ENABLE_DXIL_SUPPORT 0
 #endif
 
 // Enable calling through to `glslang` on
@@ -356,6 +362,22 @@ namespace Slang
     }
 #endif
 
+#if SLANG_ENABLE_DXIL_SUPPORT
+
+// Implementations in `dxc-support.cpp`
+
+int emitDXILForEntryPointUsingDXC(
+    EntryPointRequest*  entryPoint,
+    TargetRequest*      targetReq,
+    List<uint8_t>&      outCode);
+
+String dissassembleDXILUsingDXC(
+    CompileRequest*     compileRequest,
+    void const*         data,
+    size_t              size);
+
+#endif
+
 #if SLANG_ENABLE_GLSLANG_SUPPORT
 
     SharedLibrary loadGLSLCompilerDLL(CompileRequest* request)
@@ -540,6 +562,38 @@ namespace Slang
             break;
 #endif
 
+#if SLANG_ENABLE_DXIL_SUPPORT
+        case CodeGenTarget::DXIL:
+            {
+                List<uint8_t> code;
+                int err = emitDXILForEntryPointUsingDXC(entryPoint, targetReq, code);
+                if (!err)
+                {
+                    maybeDumpIntermediate(compileRequest, code.Buffer(), code.Count(), target);
+                    result = CompileResult(code);
+                }
+            }
+            break;
+
+        case CodeGenTarget::DXILAssembly:
+            {
+                List<uint8_t> code;
+                int err = emitDXILForEntryPointUsingDXC(entryPoint, targetReq, code);
+                if (!err)
+                {
+                    String assembly = dissassembleDXILUsingDXC(
+                        compileRequest,
+                        code.Buffer(),
+                        code.Count());
+
+                    maybeDumpIntermediate(compileRequest, assembly.Buffer(), target);
+
+                    result = CompileResult(assembly);
+                }
+            }
+            break;
+#endif
+
         case CodeGenTarget::SPIRV:
             {
                 List<uint8_t> code = emitSPIRVForEntryPoint(entryPoint, targetReq);
@@ -696,6 +750,17 @@ namespace Slang
                     case CodeGenTarget::DXBytecode:
                         {
                             String assembly = dissassembleDXBC(compileRequest,
+                                data.begin(),
+                                data.end() - data.begin());
+                            writeOutputToConsole(compileRequest, assembly);
+                        }
+                        break;
+                #endif
+
+                #if SLANG_ENABLE_DXIL_SUPPORT
+                    case CodeGenTarget::DXIL:
+                        {
+                            String assembly = dissassembleDXILUsingDXC(compileRequest,
                                 data.begin(),
                                 data.end() - data.begin());
                             writeOutputToConsole(compileRequest, assembly);
@@ -940,6 +1005,20 @@ namespace Slang
             {
                 String dxbcAssembly = dissassembleDXBC(compileRequest, data, size);
                 dumpIntermediateText(compileRequest, dxbcAssembly.begin(), dxbcAssembly.Length(), ".dxbc.asm");
+            }
+            break;
+    #endif
+
+    #if SLANG_ENABLE_DXIL_SUPPORT
+        case CodeGenTarget::DXILAssembly:
+            dumpIntermediateText(compileRequest, data, size, ".dxil.asm");
+            break;
+
+        case CodeGenTarget::DXIL:
+            dumpIntermediateBinary(compileRequest, data, size, ".dxil");
+            {
+                String dxilAssembly = dissassembleDXILUsingDXC(compileRequest, data, size);
+                dumpIntermediateText(compileRequest, dxilAssembly.begin(), dxilAssembly.Length(), ".dxil.asm");
             }
             break;
     #endif
