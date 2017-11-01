@@ -433,6 +433,10 @@ namespace Slang
         // Construct pointer types on-demand
         RefPtr<PtrType> getPtrType(RefPtr<Type> valueType);
 
+        RefPtr<ArrayExpressionType> getArrayType(
+            Type*   elementType,
+            IntVal* elementCount);
+
         RefPtr<GroupSharedType> getGroupSharedType(RefPtr<Type> valueType);
 
         SyntaxClass<RefObject> findSyntaxClass(Name* name);

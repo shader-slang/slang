@@ -3595,6 +3595,505 @@ namespace Slang
         }
     }
 
+    typedef unsigned int TypeScalarizationFlags;
+    enum TypeScalarizationFlag
+    {
+        anyResource     = 0x1,
+        anyNonResource  = 0x2,
+        anyAggregate    = 0x4,
+    };
+
+    bool isResourceType(Type* type)
+    {
+        while (auto arrayType = type->As<ArrayExpressionType>())
+        {
+            type = arrayType->baseType;
+        }
+
+        if (auto textureTypeBase = type->As<TextureTypeBase>())
+        {
+            return true;
+        }
+        else if (auto samplerType = type->As<SamplerStateType>())
+        {
+            return true;
+        }
+
+        // TODO: need more comprehensive coverage here
+
+        return false;
+    }
+
+    TypeScalarizationFlags getTypeScalarizationFlags(
+        Session*    session,
+        Type*       type)
+    {
+        // TODO: we should probably cache flags once
+        // they are computed, to avoid O(N^2) sorts
+        // of behavior.
+
+        if (isResourceType(type))
+            return TypeScalarizationFlag::anyNonResource;
+
+        if(type->As<BasicExpressionType>())
+        {
+            return TypeScalarizationFlag::anyNonResource;
+        }
+        if(type->As<VectorExpressionType>())
+        {
+            return TypeScalarizationFlag::anyNonResource;
+        }
+        if(type->As<MatrixExpressionType>())
+        {
+            return TypeScalarizationFlag::anyNonResource;
+        }
+        else if (auto declRefType = type->As<DeclRefType>())
+        {
+            auto declRef = declRefType->declRef;
+            if (auto structDeclRef = declRef.As<StructDecl>())
+            {
+                TypeScalarizationFlags flags = TypeScalarizationFlag::anyAggregate;
+
+                // For structure types, the basic rule will be
+                // that if the type contains *any* resource-type
+                // fields, then it needs to be scalarized.
+                // If it contains any non-resource-type fields,
+                // then we should aggregate these into a single
+                // new `struct` type with just the non-resource
+                // fields.
+                for (auto fieldDeclRef : getMembersOfType<StructField>(structDeclRef))
+                {
+                    auto fieldType = GetType(fieldDeclRef);
+
+                    // TODO: we are making a recursive call here, so
+                    // this will break if/when we ever allowed a recursive type!
+                    auto fieldFlags = getTypeScalarizationFlags(session, fieldType);
+                    flags |= fieldFlags;
+
+                }
+
+                return flags;
+            }
+        }
+        else if (auto arrayType = type->As<ArrayExpressionType>())
+        {
+            return getTypeScalarizationFlags(
+                session,
+                arrayType->baseType);
+        }
+
+        // Default behavior: assume we have a non-resource type
+        return TypeScalarizationFlag::anyNonResource;
+    }
+
+    struct ArrayScalarizationInfo
+    {
+        ArrayScalarizationInfo* next;
+        RefPtr<IntVal>          elementCount;
+        RefPtr<ArrayTypeLayout> typeLayout;
+    };
+
+    struct SharedScalarizationContext
+    {
+
+    };
+
+    struct ScalarizationContext
+    {
+        SharedScalarizationContext* shared;
+
+        IRBuilder*              builder;
+        IRGlobalVar*            globalVar;
+        VarLayout*              globalVarLayout;
+
+        IRGlobalValue*          valueToInsertAfter;
+    };
+
+    IRValue* emitSimpleScalarizedField(
+        ScalarizationContext*   context,
+        Type*                   inType,
+        VarLayout*              fieldLayout,
+        TypeLayout*             inTypeLayout,
+        ArrayScalarizationInfo* arrayInfo)
+    {
+        auto builder = context->builder;
+        auto globalVar = context->globalVar;
+        auto globalVarLayout = context->globalVarLayout;
+        auto valueToInsertAfter = context->valueToInsertAfter;
+
+        RefPtr<Type> type = inType;
+        RefPtr<TypeLayout> typeLayout = inTypeLayout;
+
+        // If we are turning an array-of-structs into
+        // a struct-of-arrays, then we need to apply
+        // all the appropriate array dimensions here.
+        for (auto aa = arrayInfo; aa; aa = aa->next)
+        {
+            type = builder->getSession()->getArrayType(type, aa->elementCount);
+
+            if (typeLayout)
+            {
+                RefPtr<ArrayTypeLayout> arrayTypeLayout = new ArrayTypeLayout();
+                arrayTypeLayout->elementTypeLayout = typeLayout;
+
+                // TODO: fill in the other fields!
+
+                typeLayout = arrayTypeLayout;
+            }
+        }
+
+        RefPtr<VarLayout> newVarLayout;
+        if (typeLayout)
+        {
+            newVarLayout = new VarLayout();
+            newVarLayout->typeLayout = typeLayout;
+
+            if (fieldLayout)
+            {
+                for (auto fieldResourceInfo : fieldLayout->resourceInfos)
+                {
+                    auto newResourceInfo = newVarLayout->findOrAddResourceInfo(fieldResourceInfo.kind);
+
+                    if (globalVarLayout)
+                    {
+                        if (auto globalResourceInfo = globalVarLayout->FindResourceInfo(fieldResourceInfo.kind))
+                        {
+                            newResourceInfo->index += globalResourceInfo->index;
+                            newResourceInfo->space += globalResourceInfo->space;
+                        }
+                    }
+
+                    newResourceInfo->index += fieldResourceInfo.index;
+                    newResourceInfo->space += fieldResourceInfo.space;
+                }
+            }
+        }
+
+        auto newGlobalVar = addGlobalVariable(builder->getModule(), type);
+        builder->addLayoutDecoration(newGlobalVar, newVarLayout);
+
+        newGlobalVar->removeFromParent();
+        newGlobalVar->insertAfter(valueToInsertAfter);
+
+        context->valueToInsertAfter = newGlobalVar;
+
+        return newGlobalVar;
+    }
+
+    void scalarizeGlobalVariable(
+        ScalarizationContext*   context,
+        Type*                   valueType,
+        TypeLayout*             valueTypeLayout,
+        ArrayScalarizationInfo* arrayInfo)
+    {
+        if (auto arrayType = valueType->As<ArrayExpressionType>())
+        {
+            // Okay, we need to recurse down and scalarize the
+            // array element type, wrapping up each field in
+            // an array declarator as needed.
+
+            ArrayScalarizationInfo newArrayInfo;
+            newArrayInfo.next = arrayInfo;
+            newArrayInfo.elementCount = arrayType->ArrayLength;
+
+            RefPtr<TypeLayout> elementTypeLayout;
+            if (auto arrayTypeLayout = dynamic_cast<ArrayTypeLayout*>(valueTypeLayout))
+            {
+                newArrayInfo.typeLayout = arrayTypeLayout;
+                elementTypeLayout = arrayTypeLayout->elementTypeLayout;
+            }
+
+            scalarizeGlobalVariable(
+                context,
+                arrayType->baseType,
+                elementTypeLayout,
+                &newArrayInfo);
+
+            // Now we need to look at all uses of the variable,
+            // and properly rework element-index operations
+            // to instead index into the sub-arrays...
+        }
+        else if (auto declRefType = valueType->As<DeclRefType>())
+        {
+            auto declRef = declRefType->declRef;
+            if (auto aggTypeDeclRef = declRef.As<AggTypeDecl>())
+            {
+                RefPtr<StructTypeLayout> structTypeLayout = dynamic_cast<StructTypeLayout*>(valueTypeLayout);
+
+                // Okay, we need to look through the fields, and
+                // create a new variable for each of them.
+                Dictionary<Decl*, IRValue*> fieldMap;
+                UInt fieldCounter = 0;
+                for (auto fieldDeclRef : getMembersOfType<StructField>(aggTypeDeclRef))
+                {
+                    UInt fieldIndex = fieldCounter++;
+
+                    RefPtr<VarLayout> fieldLayout;
+                    RefPtr<TypeLayout> fieldTypeLayout;
+                    if (structTypeLayout)
+                    {
+                        fieldLayout = structTypeLayout->fields[fieldIndex];
+                        fieldTypeLayout = fieldLayout->typeLayout;
+                    }
+
+                    // Note: we do *not* try to deal with recursive
+                    // expansion of the fields here, and instead
+                    // prefer to handle those in further
+                    // simplification passes.
+
+                    auto fieldGlobalVar = emitSimpleScalarizedField(
+                        context,
+                        GetType(fieldDeclRef),
+                        fieldLayout,
+                        fieldTypeLayout,
+                        arrayInfo);
+
+                    fieldMap.Add(fieldDeclRef.getDecl(), fieldGlobalVar);
+                }
+
+                // Now we need to scan for uses of the original variable,
+                // and replace them with uses of the individual fields.
+                auto globalVar = context->globalVar;
+                IRUse* nextUse = nullptr;
+                for (IRUse* use = globalVar->firstUse; use; use = nextUse)
+                {
+                    nextUse = use->nextUse;
+
+                    IRUser* user = use->user;
+                    switch (user->op)
+                    {
+                    case kIROp_FieldAddress:
+                        {
+                            // This should be the easy case: we are taking
+                            // the address of a field inside this global
+                            // value, so we can just return the adress
+                            // of the global value that replaced that field.
+                            IRFieldAddress* fieldAddressInst = (IRFieldAddress*)user;
+
+                            IRValue* fieldOperand = fieldAddressInst->getField();
+                            assert(fieldOperand->op == kIROp_decl_ref);
+                            auto fieldDeclRef = ((IRDeclRef*)fieldOperand)->declRef;
+                            auto fieldDecl = fieldDeclRef.getDecl();
+
+                            IRValue* fieldVar = *fieldMap.TryGetValue(fieldDecl);
+
+                            fieldAddressInst->replaceUsesWith(fieldVar);
+                        }
+                        break;
+
+                    default:
+                        SLANG_UNEXPECTED("what to do?");
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                SLANG_UNEXPECTED("not handled");
+            }
+        }
+        else
+        {
+            SLANG_UNEXPECTED("not handled");
+        }
+    }
+
+    void scalarizeGlobalVariable(
+        SharedScalarizationContext* sharedContext,
+        IRBuilder*              builder,
+        IRGlobalVar*            globalVar,
+        VarLayout*              globalVarLayout,
+        Type*                   valueType,
+        TypeLayout*             valueTypeLayout)
+    {
+        ScalarizationContext contextStorage;
+        auto context = &contextStorage;
+
+        context->shared = sharedContext;
+        context->builder = builder;
+        context->globalVar = globalVar;
+        context->globalVarLayout = globalVarLayout;
+        context->valueToInsertAfter = globalVar;
+
+        scalarizeGlobalVariable(
+            context,
+            valueType,
+            valueTypeLayout,
+            nullptr);
+    }
+
+    RefPtr<VarLayout> findVarLayout(IRValue* value)
+    {
+        if (auto layoutDecoration = value->findDecoration<IRLayoutDecoration>())
+            return layoutDecoration->layout.As<VarLayout>();
+        return nullptr;
+    }
+
+    void scalarizeMixedResourceTypes(
+        Session*    session,
+        IRModule*   module)
+    {
+        SharedIRBuilder sharedBuilderStorage;
+        auto sharedBuilder = &sharedBuilderStorage;
+
+        sharedBuilder->session = session;
+        sharedBuilder->module = module;
+
+        IRBuilder builderStorage;
+        auto builder = &builderStorage;
+
+        builder->shared = sharedBuilder;
+
+        SharedScalarizationContext sharedContextStorage;
+        auto sharedContext = &sharedContextStorage;
+
+
+        List<IRValue*> workList;
+        for (auto gv = module->getFirstGlobalValue(); gv; gv = gv->getNextValue())
+        {
+            workList.Add(gv);
+        }
+
+        while (workList.Count())
+        {
+            IRValue* value = workList[0];
+            workList.FastRemoveAt(0);
+
+            switch (value->op)
+            {
+            case kIROp_Func:
+                {
+                    // TODO: need to iterate over parameters of
+                    // the function (and its blocks) to make
+                    // sure that any types that need scalarization
+                    // are properly handled.
+                }
+                break;
+
+            case kIROp_global_var:
+                {
+                    IRGlobalVar* globalVar = (IRGlobalVar*)value;
+                    auto valueType = globalVar->getType()->getValueType();
+
+                    auto flags = getTypeScalarizationFlags(session, valueType);
+                    if (!(flags & (TypeScalarizationFlag::anyNonResource | TypeScalarizationFlag::anyAggregate)))
+                        continue;
+
+                    auto varLayout = findVarLayout(globalVar);
+                    RefPtr<TypeLayout> typeLayout = varLayout ? varLayout->typeLayout : nullptr;
+
+                    // Okay, we have a variable of some composite type
+                    // that we need to scalarize. Since this is a global,
+                    // we also need to be careful to deal with any
+                    // layout information that has been attached.
+
+                    scalarizeGlobalVariable(
+                        sharedContext,
+                        builder,
+                        globalVar,
+                        varLayout,
+                        valueType,
+                        typeLayout);
+
+                    globalVar->removeFromParent();
+                    // TODO: need to destroy this global!
+                }
+                break;
+
+            default:
+                {
+                    // TODO: look at the type of the value,
+                    // and if it needs scalarization, replace
+                    // it with a tuple here.
+                }
+                break;
+            }
+        }
+    }
+
+    void desugarParameterBlocks(
+        Session*    session,
+        IRModule*   module)
+    {
+        SharedIRBuilder sharedBuilderStorage;
+        auto sharedBuilder = &sharedBuilderStorage;
+
+        sharedBuilder->session = session;
+        sharedBuilder->module = module;
+
+        IRBuilder builderStorage;
+        auto builder = &builderStorage;
+
+        builder->shared = sharedBuilder;
+
+        for (auto gv = module->getFirstGlobalValue(); gv; gv = gv->getNextValue())
+        {
+            // Look for global variables with `ParameterBlock` type
+            if (gv->op != kIROp_global_var)
+                continue;
+
+            IRGlobalVar* globalVar = (IRGlobalVar*)gv;
+            auto valueType = globalVar->getType()->getValueType();
+            auto parameterBlockType = valueType->As<ParameterBlockType>();
+            if (!parameterBlockType)
+                continue;
+
+            auto layoutDecoration = globalVar->findDecoration<IRLayoutDecoration>();
+            auto layout = layoutDecoration ? layoutDecoration->layout : nullptr;
+            auto varLayout = layout.As<VarLayout>();
+            auto parameterBlockLayout = varLayout->typeLayout.As<ParameterGroupTypeLayout>();
+            auto elementTypeLayout = parameterBlockLayout->elementTypeLayout;
+            auto elementType = elementTypeLayout->type;
+
+            // We are not going to deal with scalarization here, and instead
+            // we will only deal with replacing the `ParameterBlock<T>` variable
+            // with a variable of type `T` instead.
+
+            auto newGlobalVar = addGlobalVariable(module, elementType);
+            newGlobalVar->removeFromParent();
+            newGlobalVar->insertAfter(globalVar);
+
+            // Clone the layout of the parameter-block variable over to the new variable
+            RefPtr<VarLayout> newVarLayout = new VarLayout();
+            newVarLayout->flags = varLayout->flags;
+            newVarLayout->typeLayout = elementTypeLayout;
+            for (auto rr : varLayout->resourceInfos)
+            {
+                auto newResourceInfo = newVarLayout->AddResourceInfo(rr.kind);
+                newResourceInfo->index = rr.index;
+                newResourceInfo->space = rr.space;
+            }
+            builder->addLayoutDecoration(newGlobalVar, newVarLayout);
+
+            IRUse* nextUse = nullptr;
+            for (auto use = globalVar->firstUse; use; use = nextUse)
+            {
+                nextUse = use->nextUse;
+                assert(use->usedValue == globalVar);
+
+                // We expect all uses of the parameter block to be `load`
+                // instructions, because the parameter block value is
+                // logically a pointer.
+                IRUser* user = use->user;
+                if (user->op != kIROp_Load)
+                {
+                    SLANG_UNEXPECTED("expected a `load`");
+                    continue;
+                }
+
+                IRLoad* loadInst = (IRLoad*)user;
+                assert(loadInst->ptr.usedValue == globalVar);
+
+                loadInst->replaceUsesWith(newGlobalVar);
+                loadInst->removeAndDeallocate();
+            }
+
+            globalVar->removeFromParent();
+
+            // TODO: need to clean up global var here...
+        }
+    }
+
     IRModule* specializeIRForEntryPoint(
         EntryPointRequest*  entryPointRequest,
         ProgramLayout*      programLayout,
@@ -3663,6 +4162,17 @@ namespace Slang
         // Depending on the downstream target, we may need to apply some
         // guaranteed transformations to legalize things. We will go
         // ahead and apply there here for now.
+
+        // For all targets, we will need to desugar any `ParameterBlock<T>`
+        // types into a tuple of their constituent fields.
+        desugarParameterBlocks(session, context->shared->module);
+
+        // Also go ahead and scalarize all uses of aggregate types that
+        // contain resource-type fields.
+        scalarizeMixedResourceTypes(session, context->shared->module);
+
+        // For GLSL only, we will need to perform "legalization" of
+        // the entry point and any entry-point parameters.
         switch (target)
         {
         case CodeGenTarget::GLSL:

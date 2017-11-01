@@ -297,6 +297,9 @@ SIMPLE_SYNTAX_CLASS(GLSLOutputParameterGroupType, VaryingParameterGroupType)
 // type for GLLSL `buffer` blocks
 SIMPLE_SYNTAX_CLASS(GLSLShaderStorageBufferType, UniformParameterGroupType)
 
+// type for Slang `ParameterBlock<T>` type
+SIMPLE_SYNTAX_CLASS(ParameterBlockType, ParameterGroupType)
+
 SYNTAX_CLASS(ArrayExpressionType, Type)
     SYNTAX_FIELD(RefPtr<Type>, baseType)
     SYNTAX_FIELD(RefPtr<IntVal>, ArrayLength)

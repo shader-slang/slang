@@ -173,6 +173,8 @@ sb << "__generic<T>\n";
 sb << "__intrinsic_type(" << kIROp_TextureBufferType << ")\n";
 sb << "__magic_type(TextureBuffer) struct TextureBuffer {};\n";
 
+sb << "__generic<T>\n";
+sb << "__magic_type(ParameterBlockType) struct ParameterBlock {};\n";
 
 static const char* kComponentNames[]{ "x", "y", "z", "w" };
 static const char* kVectorNames[]{ "", "x", "xy", "xyz", "xyzw" };

@@ -450,6 +450,8 @@ enum class ShaderParameterKind
 
     Image,
     MutableImage,
+
+    RegisterSpace,
 };
 
 struct SimpleLayoutRulesImpl
@@ -550,8 +552,10 @@ struct LayoutRulesFamilyImpl
     virtual LayoutRulesImpl* getTextureBufferRules()        = 0;
     virtual LayoutRulesImpl* getVaryingInputRules()         = 0;
     virtual LayoutRulesImpl* getVaryingOutputRules()        = 0;
-    virtual LayoutRulesImpl* getSpecializationConstantRules()   = 0;
-    virtual LayoutRulesImpl* getShaderStorageBufferRules()      = 0;
+    virtual LayoutRulesImpl* getSpecializationConstantRules()= 0;
+    virtual LayoutRulesImpl* getShaderStorageBufferRules()  = 0;
+    virtual LayoutRulesImpl* getParameterBlockRules()       = 0;
+
     virtual MatrixLayoutMode getDefaultMatrixLayoutMode() = 0;
 };
 

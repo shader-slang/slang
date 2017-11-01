@@ -429,6 +429,7 @@ struct GLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     virtual LayoutRulesImpl* getVaryingOutputRules() override;
     virtual LayoutRulesImpl* getSpecializationConstantRules() override;
     virtual LayoutRulesImpl* getShaderStorageBufferRules() override;
+    virtual LayoutRulesImpl* getParameterBlockRules() override;
 
     virtual MatrixLayoutMode getDefaultMatrixLayoutMode() override
     {
@@ -459,6 +460,7 @@ struct HLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     virtual LayoutRulesImpl* getVaryingOutputRules() override;
     virtual LayoutRulesImpl* getSpecializationConstantRules() override;
     virtual LayoutRulesImpl* getShaderStorageBufferRules() override;
+    virtual LayoutRulesImpl* getParameterBlockRules() override;
 
     virtual MatrixLayoutMode getDefaultMatrixLayoutMode() override
     {
@@ -521,6 +523,12 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getConstantBufferRules()
     return &kStd140LayoutRulesImpl_;
 }
 
+LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getParameterBlockRules()
+{
+    // TODO: actually pick something appropriate
+    return &kStd140LayoutRulesImpl_;
+}
+
 LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getPushConstantBufferRules()
 {
     return &kGLSLPushConstantLayoutRulesImpl_;
@@ -557,6 +565,13 @@ LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getConstantBufferRules()
 {
     return &kHLSLConstantBufferLayoutRulesImpl_;
 }
+
+LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getParameterBlockRules()
+{
+    // TODO: actually pick something appropriate...
+    return &kHLSLConstantBufferLayoutRulesImpl_;
+}
+
 
 LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getPushConstantBufferRules()
 {
@@ -703,6 +718,11 @@ static SimpleLayoutInfo getParameterGroupLayoutInfo(
     {
         return rules->GetObjectLayout(ShaderParameterKind::ShaderStorageBuffer);
     }
+    else if (type->As<ParameterBlockType>())
+    {
+        return SimpleLayoutInfo(LayoutResourceKind::ParameterBlock, 0);
+    }
+
     // TODO: the vertex-input and fragment-output cases should
     // only actually apply when we are at the appropriate stage in
     // the pipeline...
@@ -884,6 +904,10 @@ LayoutRulesImpl* getParameterBufferElementTypeLayoutRules(
     else if( parameterGroupType->As<GLSLShaderStorageBufferType>() )
     {
         return rules->getLayoutRulesFamily()->getShaderStorageBufferRules();
+    }
+    else if (parameterGroupType->As<ParameterBlockType>())
+    {
+        return rules->getLayoutRulesFamily()->getParameterBlockRules();
     }
     else
     {
