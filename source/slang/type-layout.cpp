@@ -621,6 +621,8 @@ LayoutRulesFamilyImpl* GetLayoutRulesFamilyImpl(CodeGenTarget target)
     case CodeGenTarget::HLSL:
     case CodeGenTarget::DXBytecode:
     case CodeGenTarget::DXBytecodeAssembly:
+    case CodeGenTarget::DXIL:
+    case CodeGenTarget::DXILAssembly:
         return &kHLSLLayoutRulesFamilyImpl;
 
     case CodeGenTarget::GLSL:

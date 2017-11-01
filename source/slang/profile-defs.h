@@ -77,6 +77,9 @@ PROFILE_VERSION(DX_4_0_Level_9_1,	DX)
 PROFILE_VERSION(DX_4_0_Level_9_3,	DX)
 PROFILE_VERSION(DX_4_1,				DX)
 PROFILE_VERSION(DX_5_0,				DX)
+PROFILE_VERSION(DX_6_0,				DX)
+PROFILE_VERSION(DX_6_1,				DX)
+PROFILE_VERSION(DX_6_2,				DX)
 
 PROFILE_VERSION(GLSL_110,           GLSL)
 PROFILE_VERSION(GLSL_120,           GLSL)
@@ -97,23 +100,49 @@ PROFILE_VERSION(GLSL_450,           GLSL)
 PROFILE(DX_Compute_4_0,				cs_4_0,				Compute,	DX_4_0)
 PROFILE(DX_Compute_4_1,				cs_4_1,				Compute,	DX_4_1)
 PROFILE(DX_Compute_5_0,				cs_5_0,				Compute,	DX_5_0)
+PROFILE(DX_Compute_6_0,				cs_6_0,				Compute,	DX_6_0)
+PROFILE(DX_Compute_6_1,				cs_6_1,				Compute,	DX_6_1)
+PROFILE(DX_Compute_6_2,				cs_6_2,				Compute,	DX_6_2)
+
 PROFILE(DX_Domain_5_0,				ds_5_0,				Domain,		DX_5_0)
+PROFILE(DX_Domain_6_0,				ds_6_0,				Domain,		DX_6_0)
+PROFILE(DX_Domain_6_1,				ds_6_1,				Domain,		DX_6_1)
+PROFILE(DX_Domain_6_2,				ds_6_2,				Domain,		DX_6_2)
+
 PROFILE(DX_Geometry_4_0,			gs_4_0,				Geometry,	DX_4_0)
 PROFILE(DX_Geometry_4_1,			gs_4_1,				Geometry,	DX_4_1)
 PROFILE(DX_Geometry_5_0,			gs_5_0,				Geometry,	DX_5_0)
+PROFILE(DX_Geometry_6_0,			gs_6_0,				Geometry,	DX_6_0)
+PROFILE(DX_Geometry_6_1,			gs_6_1,				Geometry,	DX_6_1)
+PROFILE(DX_Geometry_6_2,			gs_6_2,				Geometry,	DX_6_2)
+
+
 PROFILE(DX_Hull_5_0,				hs_5_0,				Hull,		DX_5_0)
+PROFILE(DX_Hull_6_0,			    hs_6_0,				Hull,   	DX_6_0)
+PROFILE(DX_Hull_6_1,			    hs_6_1,				Hull,   	DX_6_1)
+PROFILE(DX_Hull_6_2,			    hs_6_2,				Hull,   	DX_6_2)
+
+
 PROFILE(DX_Fragment_4_0,			ps_4_0,				Fragment,	DX_4_0)
 PROFILE(DX_Fragment_4_0_Level_9_0,	ps_4_0_level_9_0,	Fragment,	DX_4_0_Level_9_0)
 PROFILE(DX_Fragment_4_0_Level_9_1,	ps_4_0_level_9_1,	Fragment,	DX_4_0_Level_9_1)
 PROFILE(DX_Fragment_4_0_Level_9_3,	ps_4_0_level_9_3,	Fragment,	DX_4_0_Level_9_3)
 PROFILE(DX_Fragment_4_1,			ps_4_1,				Fragment,	DX_4_1)
 PROFILE(DX_Fragment_5_0,			ps_5_0,				Fragment,	DX_5_0)
+PROFILE(DX_Fragment_6_0,			ps_6_0,				Fragment,	DX_6_0)
+PROFILE(DX_Fragment_6_1,			ps_6_1,				Fragment,	DX_6_1)
+PROFILE(DX_Fragment_6_2,			ps_6_2,				Fragment,	DX_6_2)
+
+
 PROFILE(DX_Vertex_4_0,				vs_4_0,				Vertex,		DX_4_0)
 PROFILE(DX_Vertex_4_0_Level_9_0,	vs_4_0_level_9_0,	Vertex,		DX_4_0_Level_9_0)
 PROFILE(DX_Vertex_4_0_Level_9_1,	vs_4_0_level_9_1,	Vertex,		DX_4_0_Level_9_1)
 PROFILE(DX_Vertex_4_0_Level_9_3,	vs_4_0_level_9_3,	Vertex,		DX_4_0_Level_9_3)
 PROFILE(DX_Vertex_4_1,				vs_4_1,				Vertex,		DX_4_1)
 PROFILE(DX_Vertex_5_0,				vs_5_0,				Vertex,		DX_5_0)
+PROFILE(DX_Vertex_6_0,			    vs_6_0,				Vertex,	DX_6_0)
+PROFILE(DX_Vertex_6_1,			    vs_6_1,				Vertex,	DX_6_1)
+PROFILE(DX_Vertex_6_2,			    vs_6_2,				Vertex,	DX_6_2)
 
 // Define all the GLSL profiles
 

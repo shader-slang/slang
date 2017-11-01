@@ -89,6 +89,8 @@ extern "C"
         SLANG_SPIRV_ASM,
         SLANG_DXBC,
         SLANG_DXBC_ASM,
+        SLANG_DXIL,
+        SLANG_DXIL_ASM,
     };
 
     /* A "container format" describes the way that the outputs
@@ -1079,6 +1081,7 @@ namespace slang
 #include "source/core/text-io.cpp"
 #include "source/slang/bytecode.cpp"
 #include "source/slang/diagnostics.cpp"
+#include "source/slang/dxc-support.cpp"
 #include "source/slang/emit.cpp"
 #include "source/slang/ir.cpp"
 #include "source/slang/lexer.cpp"

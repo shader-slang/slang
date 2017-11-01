@@ -209,6 +209,7 @@
     <ClCompile Include="check.cpp" />
     <ClCompile Include="compiler.cpp" />
     <ClCompile Include="diagnostics.cpp" />
+    <ClCompile Include="dxc-support.cpp" />
     <ClCompile Include="emit.cpp" />
     <ClCompile Include="ir.cpp" />
     <ClCompile Include="lexer.cpp" />
