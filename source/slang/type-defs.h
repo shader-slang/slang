@@ -278,24 +278,24 @@ SIMPLE_SYNTAX_CLASS(GLSLInputAttachmentType, DeclRefType)
 
 // Base class for types used when desugaring parameter block
 // declarations, includeing HLSL `cbuffer` or GLSL `uniform` blocks.
-SIMPLE_SYNTAX_CLASS(ParameterBlockType, PointerLikeType)
+SIMPLE_SYNTAX_CLASS(ParameterGroupType, PointerLikeType)
 
-SIMPLE_SYNTAX_CLASS(UniformParameterBlockType, ParameterBlockType)
-SIMPLE_SYNTAX_CLASS(VaryingParameterBlockType, ParameterBlockType)
+SIMPLE_SYNTAX_CLASS(UniformParameterGroupType, ParameterGroupType)
+SIMPLE_SYNTAX_CLASS(VaryingParameterGroupType, ParameterGroupType)
 
 // type for HLSL `cbuffer` declarations, and `ConstantBuffer<T>`
 // ALso used for GLSL `uniform` blocks.
-SIMPLE_SYNTAX_CLASS(ConstantBufferType, UniformParameterBlockType)
+SIMPLE_SYNTAX_CLASS(ConstantBufferType, UniformParameterGroupType)
 
 // type for HLSL `tbuffer` declarations, and `TextureBuffer<T>`
-SIMPLE_SYNTAX_CLASS(TextureBufferType, UniformParameterBlockType)
+SIMPLE_SYNTAX_CLASS(TextureBufferType, UniformParameterGroupType)
 
 // type for GLSL `in` and `out` blocks
-SIMPLE_SYNTAX_CLASS(GLSLInputParameterBlockType, VaryingParameterBlockType)
-SIMPLE_SYNTAX_CLASS(GLSLOutputParameterBlockType, VaryingParameterBlockType)
+SIMPLE_SYNTAX_CLASS(GLSLInputParameterGroupType, VaryingParameterGroupType)
+SIMPLE_SYNTAX_CLASS(GLSLOutputParameterGroupType, VaryingParameterGroupType)
 
 // type for GLLSL `buffer` blocks
-SIMPLE_SYNTAX_CLASS(GLSLShaderStorageBufferType, UniformParameterBlockType)
+SIMPLE_SYNTAX_CLASS(GLSLShaderStorageBufferType, UniformParameterGroupType)
 
 SYNTAX_CLASS(ArrayExpressionType, Type)
     SYNTAX_FIELD(RefPtr<Type>, baseType)

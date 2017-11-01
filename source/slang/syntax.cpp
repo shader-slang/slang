@@ -595,8 +595,8 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
             CASE(ConstantBuffer, ConstantBufferType)
             CASE(TextureBuffer, TextureBufferType)
-            CASE(GLSLInputParameterBlockType, GLSLInputParameterBlockType)
-            CASE(GLSLOutputParameterBlockType, GLSLOutputParameterBlockType)
+            CASE(GLSLInputParameterGroupType, GLSLInputParameterGroupType)
+            CASE(GLSLOutputParameterGroupType, GLSLOutputParameterGroupType)
             CASE(GLSLShaderStorageBufferType, GLSLShaderStorageBufferType)
 
             CASE(HLSLStructuredBufferType, HLSLStructuredBufferType)

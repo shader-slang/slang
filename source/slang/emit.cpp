@@ -3312,7 +3312,7 @@ struct EmitVisitor
     {
         // Don't emit a declaration that was only generated implicitly, for
         // the purposes of semantic checking.
-        if(decl->HasModifier<ImplicitParameterBlockElementTypeModifier>())
+        if(decl->HasModifier<ImplicitParameterGroupElementTypeModifier>())
             return;
 
         Emit("struct ");
@@ -3494,7 +3494,7 @@ struct EmitVisitor
         return varLayout;
     }
 
-    void emitHLSLParameterBlockFieldLayoutSemantics(
+    void emitHLSLParameterGroupFieldLayoutSemantics(
         RefPtr<VarLayout>   layout,
         RefPtr<VarLayout>   fieldLayout)
     {
@@ -3524,13 +3524,13 @@ struct EmitVisitor
         }
     }
 
-    void emitHLSLParameterBlockDecl(
+    void emitHLSLParameterGroupDecl(
         RefPtr<VarDeclBase>             varDecl,
-        RefPtr<ParameterBlockType>      parameterBlockType,
+        RefPtr<ParameterGroupType>      parameterGroupType,
         RefPtr<VarLayout>               layout)
     {
         // The data type that describes where stuff in the constant buffer should go
-        RefPtr<Type> dataType = parameterBlockType->elementType;
+        RefPtr<Type> dataType = parameterGroupType->elementType;
 
         // We expect/require the data type to be a user-defined `struct` type
         auto declRefType = dataType->As<DeclRefType>();
@@ -3541,22 +3541,22 @@ struct EmitVisitor
         SLANG_RELEASE_ASSERT(layout);
 
         // We expect the layout to be for a structured type...
-        RefPtr<ParameterBlockTypeLayout> bufferLayout = layout->typeLayout.As<ParameterBlockTypeLayout>();
+        RefPtr<ParameterGroupTypeLayout> bufferLayout = layout->typeLayout.As<ParameterGroupTypeLayout>();
         SLANG_RELEASE_ASSERT(bufferLayout);
 
         RefPtr<StructTypeLayout> structTypeLayout = bufferLayout->elementTypeLayout.As<StructTypeLayout>();
         SLANG_RELEASE_ASSERT(structTypeLayout);
 
-        if( auto constantBufferType = parameterBlockType->As<ConstantBufferType>() )
+        if( auto constantBufferType = parameterGroupType->As<ConstantBufferType>() )
         {
             Emit("cbuffer ");
         }
-        else if( auto textureBufferType = parameterBlockType->As<TextureBufferType>() )
+        else if( auto textureBufferType = parameterGroupType->As<TextureBufferType>() )
         {
             Emit("tbuffer ");
         }
 
-        if( auto reflectionNameModifier = varDecl->FindModifier<ParameterBlockReflectionName>() )
+        if( auto reflectionNameModifier = varDecl->FindModifier<ParameterGroupReflectionName>() )
         {
             Emit(" ");
             emitName(reflectionNameModifier->nameAndLoc);
@@ -3583,7 +3583,7 @@ struct EmitVisitor
                 SLANG_RELEASE_ASSERT(fieldLayout->varDecl.GetName() == field.GetName());
 
                 // Emit explicit layout annotations for every field
-                emitHLSLParameterBlockFieldLayoutSemantics(layout, fieldLayout);
+                emitHLSLParameterGroupFieldLayoutSemantics(layout, fieldLayout);
 
                 emitVarDeclInit(field);
 
@@ -3692,13 +3692,13 @@ struct EmitVisitor
         }
     }
 
-    void emitGLSLParameterBlockDecl(
+    void emitGLSLParameterGroupDecl(
         RefPtr<VarDeclBase>             varDecl,
-        RefPtr<ParameterBlockType>      parameterBlockType,
+        RefPtr<ParameterGroupType>      parameterGroupType,
         RefPtr<VarLayout>               layout)
     {
         // The data type that describes where stuff in the constant buffer should go
-        RefPtr<Type> dataType = parameterBlockType->elementType;
+        RefPtr<Type> dataType = parameterGroupType->elementType;
 
         // We expect/require the data type to be a user-defined `struct` type
         auto declRefType = dataType->As<DeclRefType>();
@@ -3710,7 +3710,7 @@ struct EmitVisitor
         {
 
             auto typeLayout = layout->typeLayout;
-            if (auto bufferLayout = typeLayout.As<ParameterBlockTypeLayout>())
+            if (auto bufferLayout = typeLayout.As<ParameterGroupTypeLayout>())
             {
                 typeLayout = bufferLayout->elementTypeLayout;
             }
@@ -3725,19 +3725,19 @@ struct EmitVisitor
         EmitModifiers(varDecl);
 
         // Emit an apprpriate declaration keyword based on the kind of block
-        if (parameterBlockType->As<ConstantBufferType>())
+        if (parameterGroupType->As<ConstantBufferType>())
         {
             Emit("uniform");
         }
-        else if (parameterBlockType->As<GLSLInputParameterBlockType>())
+        else if (parameterGroupType->As<GLSLInputParameterGroupType>())
         {
             Emit("in");
         }
-        else if (parameterBlockType->As<GLSLOutputParameterBlockType>())
+        else if (parameterGroupType->As<GLSLOutputParameterGroupType>())
         {
             Emit("out");
         }
-        else if (parameterBlockType->As<GLSLShaderStorageBufferType>())
+        else if (parameterGroupType->As<GLSLShaderStorageBufferType>())
         {
             Emit("buffer");
         }
@@ -3747,7 +3747,7 @@ struct EmitVisitor
             Emit("uniform");
         }
 
-        if( auto reflectionNameModifier = varDecl->FindModifier<ParameterBlockReflectionName>() )
+        if( auto reflectionNameModifier = varDecl->FindModifier<ParameterGroupReflectionName>() )
         {
             Emit(" ");
             emitName(reflectionNameModifier->nameAndLoc);
@@ -3785,19 +3785,19 @@ struct EmitVisitor
         Emit(";\n");
     }
 
-    void emitParameterBlockDecl(
+    void emitParameterGroupDecl(
         RefPtr<VarDeclBase>			varDecl,
-        RefPtr<ParameterBlockType>  parameterBlockType,
+        RefPtr<ParameterGroupType>  parameterGroupType,
         RefPtr<VarLayout>           layout)
     {
         switch(context->shared->target)
         {
         case CodeGenTarget::HLSL:
-            emitHLSLParameterBlockDecl(varDecl, parameterBlockType, layout);
+            emitHLSLParameterGroupDecl(varDecl, parameterGroupType, layout);
             break;
 
         case CodeGenTarget::GLSL:
-            emitGLSLParameterBlockDecl(varDecl, parameterBlockType, layout);
+            emitGLSLParameterGroupDecl(varDecl, parameterGroupType, layout);
             break;
 
         default:
@@ -3839,9 +3839,9 @@ struct EmitVisitor
         //
         // TODO(tfoley): there might be a better way to detect this, e.g.,
         // with an attribute that gets attached to the variable declaration.
-        if (auto parameterBlockType = decl->type->As<ParameterBlockType>())
+        if (auto parameterGroupType = decl->type->As<ParameterGroupType>())
         {
-            emitParameterBlockDecl(decl, parameterBlockType, layout);
+            emitParameterGroupDecl(decl, parameterGroupType, layout);
             return;
         }
 
@@ -4142,7 +4142,7 @@ emitDeclImpl(decl, nullptr);
         if(auto decoration = inst->findDecoration<IRHighLevelDeclDecoration>())
         {
             auto decl = decoration->decl;
-            if (auto reflectionNameMod = decl->FindModifier<ParameterBlockReflectionName>())
+            if (auto reflectionNameMod = decl->FindModifier<ParameterGroupReflectionName>())
             {
                 return getText(reflectionNameMod->nameAndLoc.name);
             }
@@ -4489,7 +4489,7 @@ emitDeclImpl(decl, nullptr);
         // because they aren't allowed as types for temporary
         // variables.
         auto type = inst->getType();
-        if(type->As<UniformParameterBlockType>())
+        if(type->As<UniformParameterGroupType>())
         {
             // TODO: we need to be careful here, because
             // HLSL shader model 6 allows these as explicit
@@ -4515,7 +4515,7 @@ emitDeclImpl(decl, nullptr);
     {
         auto type = inst->getType();
 
-        if(type->As<UniformParameterBlockType>())
+        if(type->As<UniformParameterGroupType>())
         {
             // TODO: we need to be careful here, because
             // HLSL shader model 6 allows these as explicit
@@ -5810,10 +5810,10 @@ emitDeclImpl(decl, nullptr);
         }
     }
 
-    void emitHLSLParameterBlock(
+    void emitHLSLParameterGroup(
         EmitContext*                context,
         IRGlobalVar*                varDecl,
-        UniformParameterBlockType*  type)
+        UniformParameterGroupType*  type)
     {
         emit("cbuffer ");
         emit(getIRName(varDecl));
@@ -5830,9 +5830,9 @@ emitDeclImpl(decl, nullptr);
         auto elementType = type->getElementType();
 
         auto typeLayout = layout->typeLayout;
-        if( auto parameterBlockTypeLayout = typeLayout.As<ParameterBlockTypeLayout>() )
+        if( auto parameterGroupTypeLayout = typeLayout.As<ParameterGroupTypeLayout>() )
         {
-            typeLayout = parameterBlockTypeLayout->elementTypeLayout;
+            typeLayout = parameterGroupTypeLayout->elementTypeLayout;
         }
 
         if(auto declRefType = elementType->As<DeclRefType>())
@@ -5862,7 +5862,7 @@ emitDeclImpl(decl, nullptr);
                     auto fieldType = GetType(ff);
                     emitIRType(context, fieldType, getIRName(ff));
 
-                    emitHLSLParameterBlockFieldLayoutSemantics(layout, fieldLayout);
+                    emitHLSLParameterGroupFieldLayoutSemantics(layout, fieldLayout);
 
                     emit(";\n");
                 }
@@ -5876,10 +5876,10 @@ emitDeclImpl(decl, nullptr);
         emit("}\n");
     }
 
-    void emitGLSLParameterBlock(
+    void emitGLSLParameterGroup(
         EmitContext*                context,
         IRGlobalVar*                varDecl,
-        UniformParameterBlockType*  type)
+        UniformParameterGroupType*  type)
     {
         auto layout = getVarLayout(context, varDecl);
         assert(layout);
@@ -5907,9 +5907,9 @@ emitDeclImpl(decl, nullptr);
         auto elementType = type->getElementType();
 
         auto typeLayout = layout->typeLayout;
-        if( auto parameterBlockTypeLayout = typeLayout.As<ParameterBlockTypeLayout>() )
+        if( auto parameterGroupTypeLayout = typeLayout.As<ParameterGroupTypeLayout>() )
         {
-            typeLayout = parameterBlockTypeLayout->elementTypeLayout;
+            typeLayout = parameterGroupTypeLayout->elementTypeLayout;
         }
 
         if(auto declRefType = elementType->As<DeclRefType>())
@@ -5939,7 +5939,7 @@ emitDeclImpl(decl, nullptr);
                     auto fieldType = GetType(ff);
                     emitIRType(context, fieldType, getIRName(ff));
 
-//                    emitHLSLParameterBlockFieldLayoutSemantics(layout, fieldLayout);
+//                    emitHLSLParameterGroupFieldLayoutSemantics(layout, fieldLayout);
 
                     emit(";\n");
                 }
@@ -5958,19 +5958,19 @@ emitDeclImpl(decl, nullptr);
         emit("};\n");
     }
 
-    void emitIRParameterBlock(
+    void emitIRParameterGroup(
         EmitContext*                context,
         IRGlobalVar*                varDecl,
-        UniformParameterBlockType*  type)
+        UniformParameterGroupType*  type)
     {
         switch (context->shared->target)
         {
         case CodeGenTarget::HLSL:
-            emitHLSLParameterBlock(context, varDecl, type);
+            emitHLSLParameterGroup(context, varDecl, type);
             break;
 
         case CodeGenTarget::GLSL:
-            emitGLSLParameterBlock(context, varDecl, type);
+            emitGLSLParameterGroup(context, varDecl, type);
             break;
         }
     }
@@ -5988,7 +5988,7 @@ emitDeclImpl(decl, nullptr);
         {
         case kIROp_ConstantBufferType:
         case kIROp_TextureBufferType:
-            emitIRParameterBlock(context, varDecl, (IRUniformBufferType*) varType);
+            emitIRParameterGroup(context, varDecl, (IRUniformBufferType*) varType);
             return;
 
         default:
@@ -6031,9 +6031,9 @@ emitDeclImpl(decl, nullptr);
         auto varType = allocatedType->getValueType();
 //        auto addressSpace = allocatedType->getAddressSpace();
 
-        if (auto paramBlockType = varType->As<UniformParameterBlockType>())
+        if (auto paramBlockType = varType->As<UniformParameterGroupType>())
         {
-            emitIRParameterBlock(
+            emitIRParameterGroup(
                 context,
                 varDecl,
                 paramBlockType);
@@ -6303,7 +6303,7 @@ StructTypeLayout* getGlobalStructLayout(
     {
         return gs.Ptr();
     }
-    else if( auto globalConstantBufferLayout = globalScopeLayout.As<ParameterBlockTypeLayout>() )
+    else if( auto globalConstantBufferLayout = globalScopeLayout.As<ParameterGroupTypeLayout>() )
     {
         // TODO: the `cbuffer` case really needs to be emitted very
         // carefully, but that is beyond the scope of what a simple rewriter

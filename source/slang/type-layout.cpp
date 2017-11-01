@@ -687,8 +687,8 @@ SimpleLayoutInfo GetSimpleLayoutImpl(
     return info;
 }
 
-static SimpleLayoutInfo getParameterBlockLayoutInfo(
-    RefPtr<ParameterBlockType>  type,
+static SimpleLayoutInfo getParameterGroupLayoutInfo(
+    RefPtr<ParameterGroupType>  type,
     LayoutRulesImpl*            rules)
 {
     if( type->As<ConstantBufferType>() )
@@ -706,11 +706,11 @@ static SimpleLayoutInfo getParameterBlockLayoutInfo(
     // TODO: the vertex-input and fragment-output cases should
     // only actually apply when we are at the appropriate stage in
     // the pipeline...
-    else if( type->As<GLSLInputParameterBlockType>() )
+    else if( type->As<GLSLInputParameterGroupType>() )
     {
         return SimpleLayoutInfo(LayoutResourceKind::VertexInput, 0);
     }
-    else if( type->As<GLSLOutputParameterBlockType>() )
+    else if( type->As<GLSLOutputParameterGroupType>() )
     {
         return SimpleLayoutInfo(LayoutResourceKind::FragmentOutput, 0);
     }
@@ -738,19 +738,19 @@ RefPtr<TypeLayout> createTypeLayout(
     Type*               type,
     SimpleLayoutInfo    offset);
 
-RefPtr<ParameterBlockTypeLayout>
-createParameterBlockTypeLayout(
+RefPtr<ParameterGroupTypeLayout>
+createParameterGroupTypeLayout(
     TypeLayoutContext*          context,
-    RefPtr<ParameterBlockType>  parameterBlockType,
-    SimpleLayoutInfo            parameterBlockInfo,
+    RefPtr<ParameterGroupType>  parameterGroupType,
+    SimpleLayoutInfo            parameterGroupInfo,
     RefPtr<TypeLayout>          elementTypeLayout)
 {
-    auto parameterBlockRules = context->rules;
+    auto parameterGroupRules = context->rules;
 
-    auto typeLayout = new ParameterBlockTypeLayout();
+    auto typeLayout = new ParameterGroupTypeLayout();
 
-    typeLayout->type = parameterBlockType;
-    typeLayout->rules = parameterBlockRules;
+    typeLayout->type = parameterGroupType;
+    typeLayout->rules = parameterGroupRules;
 
     typeLayout->elementTypeLayout = elementTypeLayout;
 
@@ -759,7 +759,7 @@ createParameterBlockTypeLayout(
     // originally (which should be a single binding "slot"
     // and hence no uniform data).
     // 
-    typeLayout->uniformAlignment = parameterBlockInfo.alignment;
+    typeLayout->uniformAlignment = parameterGroupInfo.alignment;
     SLANG_RELEASE_ASSERT(!typeLayout->FindResourceInfo(LayoutResourceKind::Uniform));
     SLANG_RELEASE_ASSERT(typeLayout->uniformAlignment == 1);
 
@@ -773,11 +773,11 @@ createParameterBlockTypeLayout(
 
     // Make sure that we allocate resource usage for the
     // parameter block itself.
-    if( parameterBlockInfo.size )
+    if( parameterGroupInfo.size )
     {
         typeLayout->addResourceUsage(
-            parameterBlockInfo.kind,
-            parameterBlockInfo.size);
+            parameterGroupInfo.kind,
+            parameterGroupInfo.size);
     }
 
     // Now, if the element type itself had any resources, then
@@ -797,49 +797,49 @@ createParameterBlockTypeLayout(
     return typeLayout;
 }
 
-RefPtr<ParameterBlockTypeLayout>
-createParameterBlockTypeLayout(
-    RefPtr<ParameterBlockType>  parameterBlockType,
-    LayoutRulesImpl*            parameterBlockRules,
-    SimpleLayoutInfo            parameterBlockInfo,
+RefPtr<ParameterGroupTypeLayout>
+createParameterGroupTypeLayout(
+    RefPtr<ParameterGroupType>  parameterGroupType,
+    LayoutRulesImpl*            parameterGroupRules,
+    SimpleLayoutInfo            parameterGroupInfo,
     RefPtr<TypeLayout>          elementTypeLayout)
 {
     TypeLayoutContext context;
-    context.rules = parameterBlockRules;
-    context.matrixLayoutMode = parameterBlockRules->getDefaultMatrixLayoutMode();
+    context.rules = parameterGroupRules;
+    context.matrixLayoutMode = parameterGroupRules->getDefaultMatrixLayoutMode();
 
-    return createParameterBlockTypeLayout(
+    return createParameterGroupTypeLayout(
         &context,
-        parameterBlockType,
-        parameterBlockInfo,
+        parameterGroupType,
+        parameterGroupInfo,
         elementTypeLayout);
 }
 
-RefPtr<ParameterBlockTypeLayout>
-createParameterBlockTypeLayout(
+RefPtr<ParameterGroupTypeLayout>
+createParameterGroupTypeLayout(
     TypeLayoutContext*          context,
-    RefPtr<ParameterBlockType>  parameterBlockType,
+    RefPtr<ParameterGroupType>  parameterGroupType,
     RefPtr<Type>                elementType,
     LayoutRulesImpl*            elementTypeRules)
 {
-    auto parameterBlockRules = context->rules;
+    auto parameterGroupRules = context->rules;
 
     // First compute resource usage of the block itself.
     // For now we assume that the layout of the block can
     // always be described in a `SimpleLayoutInfo` (only
     // a single resource kind consumed).
     SimpleLayoutInfo info;
-    if (parameterBlockType)
+    if (parameterGroupType)
     {
-        info = getParameterBlockLayoutInfo(
-            parameterBlockType,
-            parameterBlockRules);
+        info = getParameterGroupLayoutInfo(
+            parameterGroupType,
+            parameterGroupRules);
     }
     else
     {
         // If there is no concrete type, then it seems like we are
         // being asked to compute layout for the global scope
-        info = parameterBlockRules->GetObjectLayout(ShaderParameterKind::ConstantBuffer);
+        info = parameterGroupRules->GetObjectLayout(ShaderParameterKind::ConstantBuffer);
     }
 
     // Now compute a layout for the elements of the parameter block.
@@ -854,34 +854,34 @@ createParameterBlockTypeLayout(
         elementType,
         info);
 
-    return createParameterBlockTypeLayout(
+    return createParameterGroupTypeLayout(
         context,
-        parameterBlockType,
+        parameterGroupType,
         info,
         elementTypeLayout);
 }
 
 LayoutRulesImpl* getParameterBufferElementTypeLayoutRules(
-    RefPtr<ParameterBlockType>  parameterBlockType,
+    RefPtr<ParameterGroupType>  parameterGroupType,
     LayoutRulesImpl*            rules)
 {
-    if( parameterBlockType->As<ConstantBufferType>() )
+    if( parameterGroupType->As<ConstantBufferType>() )
     {
         return rules->getLayoutRulesFamily()->getConstantBufferRules();
     }
-    else if( parameterBlockType->As<TextureBufferType>() )
+    else if( parameterGroupType->As<TextureBufferType>() )
     {
         return rules->getLayoutRulesFamily()->getTextureBufferRules();
     }
-    else if( parameterBlockType->As<GLSLInputParameterBlockType>() )
+    else if( parameterGroupType->As<GLSLInputParameterGroupType>() )
     {
         return rules->getLayoutRulesFamily()->getVaryingInputRules();
     }
-    else if( parameterBlockType->As<GLSLOutputParameterBlockType>() )
+    else if( parameterGroupType->As<GLSLOutputParameterGroupType>() )
     {
         return rules->getLayoutRulesFamily()->getVaryingOutputRules();
     }
-    else if( parameterBlockType->As<GLSLShaderStorageBufferType>() )
+    else if( parameterGroupType->As<GLSLShaderStorageBufferType>() )
     {
         return rules->getLayoutRulesFamily()->getShaderStorageBufferRules();
     }
@@ -892,23 +892,23 @@ LayoutRulesImpl* getParameterBufferElementTypeLayoutRules(
     }
 }
 
-RefPtr<ParameterBlockTypeLayout>
-createParameterBlockTypeLayout(
+RefPtr<ParameterGroupTypeLayout>
+createParameterGroupTypeLayout(
     TypeLayoutContext*          context,
-    RefPtr<ParameterBlockType>  parameterBlockType)
+    RefPtr<ParameterGroupType>  parameterGroupType)
 {
-    auto parameterBlockRules = context->rules;
+    auto parameterGroupRules = context->rules;
 
     // Determine the layout rules to use for the contents of the block
     auto elementTypeRules = getParameterBufferElementTypeLayoutRules(
-        parameterBlockType,
-        parameterBlockRules);
+        parameterGroupType,
+        parameterGroupRules);
 
-    auto elementType = parameterBlockType->elementType;
+    auto elementType = parameterGroupType->elementType;
 
-    return createParameterBlockTypeLayout(
+    return createParameterGroupTypeLayout(
         context,
-        parameterBlockType,
+        parameterGroupType,
         elementType,
         elementTypeRules);
 }
@@ -1017,14 +1017,14 @@ SimpleLayoutInfo GetLayoutImpl(
 {
     auto rules = context->rules;
 
-    if (auto parameterBlockType = type->As<ParameterBlockType>())
+    if (auto parameterGroupType = type->As<ParameterGroupType>())
     {
         // If the user is just interested in uniform layout info,
         // then this is easy: a `ConstantBuffer<T>` is really no
         // different from a `Texture2D<U>` in terms of how it
         // should be handled as a member of a container.
         //
-        auto info = getParameterBlockLayoutInfo(parameterBlockType, rules);
+        auto info = getParameterGroupLayoutInfo(parameterGroupType, rules);
 
         // The more interesting case, though, is when the user
         // is requesting us to actually create a `TypeLayout`,
@@ -1039,9 +1039,9 @@ SimpleLayoutInfo GetLayoutImpl(
         //
         if (outTypeLayout)
         {
-            *outTypeLayout = createParameterBlockTypeLayout(
+            *outTypeLayout = createParameterGroupTypeLayout(
                 context,
-                parameterBlockType);
+                parameterGroupType);
         }
 
         return info;

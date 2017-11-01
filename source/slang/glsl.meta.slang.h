@@ -151,8 +151,8 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
     }
 }
 
-sb << "__generic<T> __magic_type(GLSLInputParameterBlockType) struct __GLSLInputParameterBlock {};\n";
-sb << "__generic<T> __magic_type(GLSLOutputParameterBlockType) struct __GLSLOutputParameterBlock {};\n";
+sb << "__generic<T> __magic_type(GLSLInputParameterGroupType) struct __GLSLInputParameterGroup {};\n";
+sb << "__generic<T> __magic_type(GLSLOutputParameterGroupType) struct __GLSLOutputParameterGroup {};\n";
 sb << "__generic<T> __magic_type(GLSLShaderStorageBufferType) struct __GLSLShaderStorageBuffer {};\n";
 
 sb << "__magic_type(SamplerState," << int(SamplerStateType::Flavor::SamplerState) << ") struct sampler {};";

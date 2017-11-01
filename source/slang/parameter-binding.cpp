@@ -379,7 +379,7 @@ static bool findLayoutArg(
 
 static Name* getReflectionName(VarDeclBase* varDecl)
 {
-    if (auto reflectionNameModifier = varDecl->FindModifier<ParameterBlockReflectionName>())
+    if (auto reflectionNameModifier = varDecl->FindModifier<ParameterGroupReflectionName>())
         return reflectionNameModifier->nameAndLoc.name;
 
     return varDecl->getName();
@@ -398,7 +398,7 @@ RefPtr<Type> tryGetEffectiveTypeForGLSLVaryingInput(
         return nullptr;
 
     auto type = varDecl->getType();
-    if( varDecl->HasModifier<InModifier>() || type->As<GLSLInputParameterBlockType>())
+    if( varDecl->HasModifier<InModifier>() || type->As<GLSLInputParameterGroupType>())
     {
         // Special case to handle "arrayed" shader inputs, as used
         // for Geometry and Hull input
@@ -436,7 +436,7 @@ RefPtr<Type> tryGetEffectiveTypeForGLSLVaryingOutput(
         return nullptr;
 
     auto type = varDecl->getType();
-    if( varDecl->HasModifier<OutModifier>() || type->As<GLSLOutputParameterBlockType>())
+    if( varDecl->HasModifier<OutModifier>() || type->As<GLSLOutputParameterGroupType>())
     {
         // Special case to handle "arrayed" shader outputs, as used
         // for Hull Shader output
@@ -1699,7 +1699,7 @@ void generateParameterBindings(
     // up a global constant buffer type layout to hold them
     if( anyGlobalUniforms )
     {
-        auto globalConstantBufferLayout = createParameterBlockTypeLayout(
+        auto globalConstantBufferLayout = createParameterGroupTypeLayout(
             nullptr,
             globalScopeRules,
             globalScopeRules->GetObjectLayout(ShaderParameterKind::ConstantBuffer),

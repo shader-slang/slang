@@ -26,14 +26,14 @@ cbuffer C : register(b0)
 	float2 uv;
 };
 
-Texture2D SLANG_parameterBlock_C_t0 : register(t0);
-Texture2D SLANG_parameterBlock_C_t1 : register(t1);
-SamplerState SLANG_parameterBlock_C_s : register(s0);
+Texture2D SLANG_parameterGroup_C_t0 : register(t0);
+Texture2D SLANG_parameterGroup_C_t1 : register(t1);
+SamplerState SLANG_parameterGroup_C_s : register(s0);
 
 float4 main() : SV_Target
 {
-	return SLANG_parameterBlock_C_t0.Sample(SLANG_parameterBlock_C_s, uv)
-	     + SLANG_parameterBlock_C_t1.Sample(SLANG_parameterBlock_C_s, uv);
+	return SLANG_parameterGroup_C_t0.Sample(SLANG_parameterGroup_C_s, uv)
+	     + SLANG_parameterGroup_C_t1.Sample(SLANG_parameterGroup_C_s, uv);
 }
 
 #endif
