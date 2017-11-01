@@ -1054,7 +1054,11 @@ struct EmitVisitor
 
     void visitAssocTypeDeclRefType(AssocTypeDeclRefType* /*type*/, TypeEmitArg const& /*arg*/)
     {
-        SLANG_UNREACHABLE("visitAssocTypeDeclRefType in EmitVisitor");
+        //SLANG_UNREACHABLE("visitAssocTypeDeclRefType in EmitVisitor");
+    }
+    void visitGenericConstraintDeclRefType(GenericConstraintDeclRefType* /*type*/, TypeEmitArg const& /*arg*/)
+    {
+        //SLANG_UNREACHABLE("visitGenericConstraintDeclRefType in EmitVisitor");
     }
 
     void visitBasicExpressionType(BasicExpressionType* basicType, TypeEmitArg const& arg)

@@ -449,7 +449,6 @@ SYNTAX_CLASS(FuncType, Type)
 
     FIELD(List<RefPtr<Type>>, paramTypes)
     FIELD(RefPtr<Type>, resultType)
-
 RAW(
     FuncType()
     {}
@@ -495,7 +494,7 @@ END_SYNTAX_CLASS()
 // The "type" of an expression that references a asscoiated type decl (via 'assoctype' keyword).
 SYNTAX_CLASS(AssocTypeDeclRefType, Type)
     DECL_FIELD(DeclRef<AssocTypeDecl>, declRef)
-
+    DECL_FIELD(RefPtr<Type>, sourceType)
     RAW(
     AssocTypeDeclRefType()
     {}
@@ -515,4 +514,34 @@ SYNTAX_CLASS(AssocTypeDeclRefType, Type)
         virtual int GetHashCode() override;
         virtual Type* CreateCanonicalType() override;
     )
+END_SYNTAX_CLASS()
+
+// The "type" of an generic constraint, which wraps both the sub and sup (interface) type
+// the sub type can be used in associated type substitution in later type evaluation
+SYNTAX_CLASS(GenericConstraintDeclRefType, Type)
+    DECL_FIELD(RefPtr<Type>, subType)
+    DECL_FIELD(RefPtr<Type>, supType)
+RAW(
+    GenericConstraintDeclRefType()
+    {}
+    GenericConstraintDeclRefType(Session* session, 
+        RefPtr<Type> sub,
+        RefPtr<Type> sup)
+        : subType(sub), supType(sup)
+    {
+        setSession(session);
+    }
+
+
+    RefPtr<Type> const& GetSupType() const { return supType; }
+    RefPtr<Type> const& GetSubType() const { return subType; }
+
+    virtual String ToString() override;
+
+    protected:
+        virtual RefPtr<Val> SubstituteImpl(Substitutions* subst, int* ioDiff) override;
+        virtual bool EqualsImpl(Type * type) override;
+        virtual int GetHashCode() override;
+        virtual Type* CreateCanonicalType() override;
+)
 END_SYNTAX_CLASS()

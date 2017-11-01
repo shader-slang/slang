@@ -2062,6 +2062,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         SLANG_UNIMPLEMENTED_X("decl catch-all");
     }
 
+    LoweredValInfo visitTypeDefDecl(TypeDefDecl * decl)
+    {
+        return LoweredValInfo::simple(context->irBuilder->getTypeVal(decl->type.type));
+    }
+
     LoweredValInfo visitGenericTypeParamDecl(GenericTypeParamDecl* decl)
     {
         return LoweredValInfo();
@@ -2307,7 +2312,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // For now, we don't have an IR-level representation
         // for the type itself.
-        return LoweredValInfo();
+        return LoweredValInfo::simple(context->irBuilder->getTypeVal(DeclRefType::Create(context->getSession(), 
+            DeclRef<Decl>(decl, nullptr))));
     }
 
 

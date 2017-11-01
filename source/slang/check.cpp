@@ -147,26 +147,64 @@ namespace Slang
         {
             if (baseExpr)
             {
+                RefPtr<Expr> expr;
+                
                 if (baseExpr->type->As<TypeType>())
                 {
-                    auto expr = new StaticMemberExpr();
-                    expr->loc = loc;
-                    expr->BaseExpression = baseExpr;
-                    expr->name = declRef.GetName();
-                    expr->type = GetTypeForDeclRef(declRef);
-                    expr->declRef = declRef;
-                    return expr;
+                    auto sexpr = new StaticMemberExpr();
+                    sexpr->loc = loc;
+                    sexpr->BaseExpression = baseExpr;
+                    sexpr->name = declRef.GetName();
+                    sexpr->type = GetTypeForDeclRef(declRef);
+                    sexpr->declRef = declRef;
+                    expr = sexpr;
                 }
                 else
                 {
-                    auto expr = new MemberExpr();
-                    expr->loc = loc;
-                    expr->BaseExpression = baseExpr;
-                    expr->name = declRef.GetName();
-                    expr->type = GetTypeForDeclRef(declRef);
-                    expr->declRef = declRef;
-                    return expr;
+                    auto sexpr = new MemberExpr();
+                    sexpr->loc = loc;
+                    sexpr->BaseExpression = baseExpr;
+                    sexpr->name = declRef.GetName();
+                    sexpr->type = GetTypeForDeclRef(declRef);
+                    sexpr->declRef = declRef;
+                    expr = sexpr;
                 }
+                if (auto assocTypeDeclRef = declRef.As<AssocTypeDecl>())
+                {
+                    if (auto genConstraintType = baseExpr->type->As<GenericConstraintDeclRefType>())
+                    {
+                        // if this is a reference from a generic parameter, we need to generate a AssocTypeDeclRefType type.
+                        // for example, if we have an expression T.U where T:ISimple, and U is an associated type defined in ISimple.
+                        // then this expression should evaluate to AssocTypeDeclRefType(T, U).
+                        auto assocTypeDeclType = new AssocTypeDeclRefType();
+                        assocTypeDeclType->declRef = assocTypeDeclRef;
+                        assocTypeDeclType->sourceType = genConstraintType->subType;
+                        assocTypeDeclType->setSession(getSession());
+                        expr->type = QualType(getTypeType(assocTypeDeclType));
+                    }
+                }
+                else if (auto funcDeclRef = declRef.As<CallableDecl>())
+                {
+                    if (auto genConstraintType = baseExpr->type->As<GenericConstraintDeclRefType>())
+                    {
+                        // if this is call expression, propagate the source associated type to the result type
+                        auto funcType = expr->type->As<FuncType>();
+                        if (auto assocRsType = funcType->resultType.As<AssocTypeDeclRefType>())
+                        {
+                            RefPtr<FuncType> newFuncType = new FuncType();
+                            newFuncType->paramTypes = funcType->paramTypes;
+                            RefPtr<AssocTypeDeclRefType> newRsType = new AssocTypeDeclRefType();
+                            newRsType->declRef = assocRsType->declRef;
+                            newRsType->sourceType = genConstraintType->subType;
+                            newRsType->setSession(getSession());
+                            newFuncType->resultType = newRsType;
+                            newFuncType->setSession(funcType->getSession());
+                            expr->type = QualType(newFuncType);
+                        }
+                       
+                    }
+                }
+                return expr;
             }
             else
             {
@@ -1878,7 +1916,6 @@ namespace Slang
             VisitFunctionDeclaration(functionNode);
             // TODO: This should really onlye set "checked header"
             functionNode->SetCheckState(DeclCheckState::Checked);
-
             // TODO: should put the checking of the body onto a "work list"
             // to avoid recursion here.
             if (functionNode->Body)
@@ -2309,7 +2346,6 @@ namespace Slang
         {
             if (functionNode->IsChecked(DeclCheckState::CheckedHeader)) return;
             functionNode->SetCheckState(DeclCheckState::CheckingHeader);
-
             this->function = functionNode;
             auto returnType = CheckProperType(functionNode->ReturnType);
             functionNode->ReturnType = returnType;
@@ -4366,7 +4402,7 @@ namespace Slang
 
 
                         callExpr->FunctionExpr = baseExpr;
-                        callExpr->type = QualType(candidate.resultType);
+                        callExpr->type = QualType(candidate.resultType);// QualType(baseExpr->type->As<FuncType>()->resultType);
 
                         // A call may yield an l-value, and we should take a look at the candidate to be sure
                         if(auto subscriptDeclRef = candidate.item.declRef.As<SubscriptDecl>())
@@ -4557,7 +4593,9 @@ namespace Slang
             OverloadCandidate candidate;
             candidate.flavor = OverloadCandidate::Flavor::Func;
             candidate.item = item;
-            candidate.resultType = GetResultType(funcDeclRef);
+            auto baseExpr = ConstructLookupResultExpr(
+                item, context.baseExpr, context.funcLoc);
+            candidate.resultType = baseExpr->type->As<FuncType>()->resultType; // GetResultType(funcDeclRef);
 
             AddOverloadCandidate(context, candidate);
         }
@@ -5717,10 +5755,6 @@ namespace Slang
 
         RefPtr<Expr> visitInvokeExpr(InvokeExpr *expr)
         {
-            if (auto appExpr = expr->FunctionExpr->As<GenericAppExpr>())
-                if (auto varExpr = appExpr->FunctionExpr->As<VarExpr>())
-                    if (varExpr->name->text == "test")
-                        printf("break");
             // check the base expression first
             expr->FunctionExpr = CheckExpr(expr->FunctionExpr);
      
@@ -6453,7 +6487,7 @@ namespace Slang
             // When we access a constraint or an inheritance decl (as a member),
             // we are conceptually performing a "cast" to the given super-type,
             // with the declaration showing that such a cast is legal.
-            auto type = GetSup(constraintDeclRef);
+            auto type = new GenericConstraintDeclRefType(session, GetSub(constraintDeclRef), GetSup(constraintDeclRef));
             return QualType(type);
         }
         else if (auto funcDeclRef = declRef.As<CallableDecl>())
@@ -6463,7 +6497,8 @@ namespace Slang
         }
         else if (auto assocTypeDeclRef = declRef.As<AssocTypeDecl>())
         {
-            auto type = DeclRefType::Create(session, assocTypeDeclRef);
+            auto type = new AssocTypeDeclRefType(assocTypeDeclRef);
+            type->setSession(session);
             *outTypeResult = type;
             return QualType(getTypeType(type));
         }

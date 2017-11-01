@@ -117,6 +117,10 @@ namespace Slang
         {
             emitQualifiedName(context, declRefType->declRef);
         }
+        else if (auto assocTypeDeclRefType = dynamic_cast<AssocTypeDeclRefType*>(type))
+        {
+            emitQualifiedName(context, assocTypeDeclRefType->declRef);
+        }
         else
         {
             SLANG_UNEXPECTED("unimplemented case in mangling");

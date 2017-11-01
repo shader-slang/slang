@@ -959,15 +959,60 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     RefPtr<Val> AssocTypeDeclRefType::SubstituteImpl(Substitutions* subst, int* ioDiff)
     {
-        auto parentType = this->GetDeclRef().GetParent().SubstituteImpl(subst, ioDiff);
-        if (auto aggDeclRef = parentType.As<AggTypeDecl>())
+        if (!sourceType)
+            return this;
+        if (auto parentDeclRefType = sourceType->As<DeclRefType>())
         {
-            Decl* targetTypeDecl = nullptr;
-            if (aggDeclRef.getDecl()->memberDictionary.TryGetValue(this->GetDeclRef().decl->getName(), targetTypeDecl))
+            auto parentDeclRef = parentDeclRefType->declRef;
+            DeclRef<AggTypeDecl> newParentDeclRef = parentDeclRef.As<AggTypeDecl>();
+            // search for a substitution that might apply to us
+            for (auto s = subst; s; s = s->outer.Ptr())
             {
-                return DeclRefType::Create(this->session, DeclRef<Decl>(targetTypeDecl, parentType.substitutions));
+                // the generic decl associated with the substitution list must be
+                // the generic decl that declared this parameter
+                auto genericDecl = s->genericDecl;
+                if (genericDecl != parentDeclRef.getDecl()->ParentDecl)
+                    continue;
+                int index = 0;
+                for (auto m : genericDecl->Members)
+                {
+                    if (m.Ptr() == parentDeclRef.getDecl())
+                    {
+                        // We've found it, so return the corresponding specialization argument
+                        (*ioDiff)++;
+                        if (auto declRef = s->args[index].As<DeclRefType>())
+                        {
+                            newParentDeclRef = (*declRef).declRef.As<AggTypeDecl>();
+                            goto searchEnd;
+                        }
+                    }
+                    else if (auto typeParam = m.As<GenericTypeParamDecl>())
+                    {
+                        index++;
+                    }
+                    else if (auto valParam = m.As<GenericValueParamDecl>())
+                    {
+                        index++;
+                    }
+                    else
+                    {
+                    }
+                }
+            }
+        searchEnd:
+            if (newParentDeclRef)
+            {
+                Decl* targetTypeDecl = nullptr;
+                if (newParentDeclRef.getDecl()->memberDictionary.TryGetValue(this->GetDeclRef().decl->getName(), targetTypeDecl))
+                {
+                    if (auto typeDefDecl = targetTypeDecl->As<TypeDefDecl>())
+                        return GetType(DeclRef<TypeDefDecl>(typeDefDecl, subst));
+                    else
+                        return DeclRefType::Create(this->getSession(), DeclRef<Decl>(targetTypeDecl, subst));
+                }
             }
         }
+       
         return this;
     }
 
@@ -977,6 +1022,69 @@ void Type::accept(IValVisitor* visitor, void* extra)
     }
 
     Type* AssocTypeDeclRefType::CreateCanonicalType()
+    {
+        return this;
+    }
+
+    // GenericConstraintDeclRefType
+
+    String GenericConstraintDeclRefType::ToString()
+    {
+        // TODO: what is appropriate here?
+        return "<GenericConstraintType>";
+    }
+
+    bool GenericConstraintDeclRefType::EqualsImpl(Type * type)
+    {
+        if (auto other = type->As<GenericConstraintDeclRefType>())
+        {
+            return supType->Equals(other->supType) && subType->Equals(other->subType);
+        }
+        return false;
+    }
+
+    RefPtr<Val> GenericConstraintDeclRefType::SubstituteImpl(Substitutions* subst, int* ioDiff)
+    {
+        auto genParamDecl = subType.As<DeclRefType>()->declRef.As<GenericTypeParamDecl>();
+        // search for a substitution that might apply to us
+        for (auto s = subst; s; s = s->outer.Ptr())
+        {
+            // the generic decl associated with the substitution list must be
+            // the generic decl that declared this parameter
+            auto genericDecl = s->genericDecl;
+            if (genericDecl != genParamDecl.getDecl()->ParentDecl)
+                continue;
+            int index = 0;
+            for (auto m : genericDecl->Members)
+            {
+                if (m.Ptr() == genParamDecl.getDecl())
+                {
+                    // We've found it, so return the corresponding specialization argument
+                    (*ioDiff)++;
+                    return s->args[index];
+                }
+                else if (auto typeParam = m.As<GenericTypeParamDecl>())
+                {
+                    index++;
+                }
+                else if (auto valParam = m.As<GenericValueParamDecl>())
+                {
+                    index++;
+                }
+                else
+                {
+                }
+            }
+        }
+        return this;
+    }
+
+    int GenericConstraintDeclRefType::GetHashCode()
+    {
+        return combineHash(subType.GetHashCode(), supType.GetHashCode());
+    }
+
+    Type* GenericConstraintDeclRefType::CreateCanonicalType()
     {
         return this;
     }

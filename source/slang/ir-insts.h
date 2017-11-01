@@ -346,10 +346,9 @@ struct IRBuilder
     IRValue* getBoolValue(bool value);
     IRValue* getIntValue(IRType* type, IRIntegerValue value);
     IRValue* getFloatValue(IRType* type, IRFloatingPointValue value);
-
     IRValue* getDeclRefVal(
         DeclRefBase const&  declRef);
-
+    IRValue* getTypeVal(IRType* type); // create an IR value that represents a type
     IRValue* emitSpecializeInst(
         IRType*     type,
         IRValue*    genericVal,

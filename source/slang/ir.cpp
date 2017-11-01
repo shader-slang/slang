@@ -562,6 +562,16 @@ namespace Slang
         return irValue;
     }
 
+    IRValue * IRBuilder::getTypeVal(IRType * type)
+    {
+        auto irValue = createValue<IRDeclRef>(
+            this,
+            kIROp_TypeType,
+            nullptr);
+        irValue->type = type;
+        return irValue;
+    }
+
     IRValue* IRBuilder::emitSpecializeInst(
         Type*       type,
         IRValue*    genericVal,
@@ -3061,7 +3071,12 @@ namespace Slang
                 return builder->getDeclRefVal(declRef);
             }
             break;
-
+        case kIROp_TypeType:
+            {
+                IRValue* od = (IRValue*)originalValue;
+                return builder->getTypeVal(od->type);
+            }
+            break;
         default:
             SLANG_UNEXPECTED("no value registered for IR value");
             return nullptr;

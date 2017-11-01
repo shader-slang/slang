@@ -779,6 +779,13 @@ struct LoweringVisitor
             translateDeclRef(DeclRef<Decl>(type->declRef)).As<TypeDefDecl>());
     }
 
+    RefPtr<Type> visitGenericConstraintDeclRefType(GenericConstraintDeclRefType* type)
+    {
+        // not supported by lowering
+        SLANG_UNREACHABLE("visitGenericConstraintDeclRefType in LowerVisitor");
+        return nullptr;
+    }
+
     RefPtr<Type> visitAssocTypeDeclRefType(AssocTypeDeclRefType* type)
     {
         // not supported by lowering

@@ -31,5 +31,5 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     Simple s;
 	float outVal = test<Simple>(s, 2.0, 1.0); // == 3.0
-	outputBuffer[tid] = outVal;
+	outputBuffer[dispatchThreadID.x] = outVal;
 }
