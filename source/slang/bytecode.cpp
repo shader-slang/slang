@@ -651,7 +651,7 @@ BytecodeGenerationPtr<char> tryGenerateNameForSymbol(
     if (auto highLevelDeclDecoration = inst->findDecoration<IRHighLevelDeclDecoration>())
     {
         auto decl = highLevelDeclDecoration->decl;
-        if (auto reflectionNameMod = decl->FindModifier<ParameterBlockReflectionName>())
+        if (auto reflectionNameMod = decl->FindModifier<ParameterGroupReflectionName>())
         {
             return allocateString(context, reflectionNameMod->name);
         }

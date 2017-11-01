@@ -296,7 +296,7 @@ public:
 };
 
 // type layout for a variable that has a constant-buffer type
-class ParameterBlockTypeLayout : public TypeLayout
+class ParameterGroupTypeLayout : public TypeLayout
 {
 public:
     RefPtr<TypeLayout> elementTypeLayout;
@@ -391,7 +391,7 @@ public:
     // We store a layout for the declarations at the global
     // scope. Note that this will *either* be a single
     // `StructTypeLayout` with the fields stored directly,
-    // or it will be a single `ParameterBlockTypeLayout`,
+    // or it will be a single `ParameterGroupTypeLayout`,
     // where the global-scope fields are the members of
     // that constant buffer.
     //
@@ -571,30 +571,30 @@ RefPtr<TypeLayout> CreateTypeLayout(Type* type, LayoutRulesImpl* rules, SimpleLa
 struct TypeLayoutContext;
 
 // Create a type layout for a parameter block type.
-RefPtr<ParameterBlockTypeLayout>
-createParameterBlockTypeLayout(
+RefPtr<ParameterGroupTypeLayout>
+createParameterGroupTypeLayout(
     TypeLayoutContext*          context,
-    RefPtr<ParameterBlockType>  parameterBlockType);
+    RefPtr<ParameterGroupType>  parameterGroupType);
 
-RefPtr<ParameterBlockTypeLayout>
-createParameterBlockTypeLayout(
+RefPtr<ParameterGroupTypeLayout>
+createParameterGroupTypeLayout(
     TypeLayoutContext*          context,
-    RefPtr<ParameterBlockType>  parameterBlockType,
+    RefPtr<ParameterGroupType>  parameterGroupType,
     RefPtr<Type>                elementType,
     LayoutRulesImpl*            elementTypeRules);
 
-RefPtr<ParameterBlockTypeLayout>
-createParameterBlockTypeLayout(
+RefPtr<ParameterGroupTypeLayout>
+createParameterGroupTypeLayout(
     TypeLayoutContext*          context,
-    RefPtr<ParameterBlockType>  parameterBlockType,
-    SimpleLayoutInfo            parameterBlockInfo,
+    RefPtr<ParameterGroupType>  parameterGroupType,
+    SimpleLayoutInfo            parameterGroupInfo,
     RefPtr<TypeLayout>          elementTypeLayout);
 
-RefPtr<ParameterBlockTypeLayout>
-createParameterBlockTypeLayout(
-    RefPtr<ParameterBlockType>  parameterBlockType,
-    LayoutRulesImpl*            parameterBlockRules,
-    SimpleLayoutInfo            parameterBlockInfo,
+RefPtr<ParameterGroupTypeLayout>
+createParameterGroupTypeLayout(
+    RefPtr<ParameterGroupType>  parameterGroupType,
+    LayoutRulesImpl*            parameterGroupRules,
+    SimpleLayoutInfo            parameterGroupInfo,
     RefPtr<TypeLayout>          elementTypeLayout);
 
 // Create a type layout for a structured buffer type.
