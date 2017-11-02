@@ -169,23 +169,18 @@ namespace Slang
                     sexpr->declRef = declRef;
                     expr = sexpr;
                 }
-                if (auto assocTypeDeclRef = declRef.As<AssocTypeDecl>())
+                if (auto constraintType = expr->type->As<GenericConstraintDeclRefType>())
                 {
-                    if (auto genConstraintType = baseExpr->type->As<GenericConstraintDeclRefType>())
-                    {
-                        // if this is a reference from a generic parameter, we need to generate a AssocTypeDeclRefType type.
-                        // for example, if we have an expression T.U where T:ISimple, and U is an associated type defined in ISimple.
-                        // then this expression should evaluate to AssocTypeDeclRefType(T, U).
-                        auto assocTypeDeclType = new AssocTypeDeclRefType();
-                        assocTypeDeclType->declRef = assocTypeDeclRef;
-                        assocTypeDeclType->sourceType = genConstraintType->subType;
-                        assocTypeDeclType->setSession(getSession());
-                        expr->type = QualType(getTypeType(assocTypeDeclType));
-                    }
+                    if (baseExpr->type->As<TypeType>())
+                        constraintType->subType = baseExpr->type->As<TypeType>()->type;
+                    else
+                        constraintType->subType = baseExpr->type;
+
                 }
-                else if (auto funcDeclRef = declRef.As<CallableDecl>())
+                
+                if (auto genConstraintType = baseExpr->type->As<GenericConstraintDeclRefType>())
                 {
-                    if (auto genConstraintType = baseExpr->type->As<GenericConstraintDeclRefType>())
+                    if (auto funcDeclRef = declRef.As<CallableDecl>())
                     {
                         // if this is call expression, propagate the source associated type to the result type
                         auto funcType = expr->type->As<FuncType>();
@@ -201,8 +196,23 @@ namespace Slang
                             newFuncType->setSession(funcType->getSession());
                             expr->type = QualType(newFuncType);
                         }
-                       
                     }
+                    else if (auto assocTypeDeclRef = declRef.As<AssocTypeDecl>())
+                    {
+                        auto assocTypeDeclType = new AssocTypeDeclRefType();
+                        assocTypeDeclType->declRef = assocTypeDeclRef;
+                        assocTypeDeclType->sourceType = genConstraintType->subType;
+                        assocTypeDeclType->setSession(getSession());
+                        expr->type = QualType(getTypeType(assocTypeDeclType));
+                    }
+                }
+                else if (auto assocTypeDeclRef = declRef.As<AssocTypeDecl>())
+                {
+                    auto assocTypeDeclType = new AssocTypeDeclRefType();
+                    assocTypeDeclType->declRef = assocTypeDeclRef;
+                    assocTypeDeclType->sourceType = baseExpr->type;
+                    assocTypeDeclType->setSession(getSession());
+                    expr->type = QualType(getTypeType(assocTypeDeclType));
                 }
                 return expr;
             }
@@ -1262,6 +1272,14 @@ namespace Slang
             checkDecl(genericDecl->inner);
         }
 
+        void visitGenericTypeConstraintDecl(GenericTypeConstraintDecl * genericConstraintDecl)
+        {
+            // check the type being inherited from
+            auto base = genericConstraintDecl->sup;
+            base = TranslateTypeNode(base);
+            genericConstraintDecl->sup = base;
+        }
+
         void visitInheritanceDecl(InheritanceDecl* inheritanceDecl)
         {
             // check the type being inherited from
@@ -1321,11 +1339,6 @@ namespace Slang
         }
 
         void visitGenericValueParamDecl(GenericValueParamDecl*)
-        {
-            // These are only used in the stdlib, so no checking is needed for now
-        }
-
-        void visitGenericTypeConstraintDecl(GenericTypeConstraintDecl*)
         {
             // These are only used in the stdlib, so no checking is needed for now
         }

@@ -453,6 +453,27 @@ void lookUpMemberImpl(
             }
         }
     }
+    else if (auto assocTypeDeclRefType = type->As<AssocTypeDeclRefType>())
+    {
+        auto assocTypeDeclRef = assocTypeDeclRefType->declRef;
+        for (auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(assocTypeDeclRef))
+        {
+            // The super-type in the constraint (e.g., `Foo` in `T : Foo`)
+            // will tell us a type we should use for lookup.
+            auto bound = GetSup(constraintDeclRef);
+
+            // Go ahead and use the target type, with an appropriate breadcrumb
+            // to indicate that we indirected through a type constraint.
+
+            BreadcrumbInfo breadcrumb;
+            breadcrumb.prev = inBreadcrumbs;
+            breadcrumb.kind = LookupResultItem::Breadcrumb::Kind::Constraint;
+            breadcrumb.declRef = constraintDeclRef;
+
+            // TODO: Need to consider case where this might recurse infinitely.
+            lookUpMemberImpl(session, semantics, name, bound, ioResult, &breadcrumb);
+        }
+    }
 }
 
 LookupResult lookUpMember(

@@ -961,7 +961,8 @@ void Type::accept(IValVisitor* visitor, void* extra)
     {
         if (!sourceType)
             return this;
-        if (auto parentDeclRefType = sourceType->As<DeclRefType>())
+        auto substSourceType = sourceType->SubstituteImpl(subst, ioDiff);
+        if (auto parentDeclRefType = substSourceType.As<DeclRefType>())
         {
             auto parentDeclRef = parentDeclRefType->declRef;
             DeclRef<AggTypeDecl> newParentDeclRef = parentDeclRef.As<AggTypeDecl>();
@@ -1045,38 +1046,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     RefPtr<Val> GenericConstraintDeclRefType::SubstituteImpl(Substitutions* subst, int* ioDiff)
     {
-        auto genParamDecl = subType.As<DeclRefType>()->declRef.As<GenericTypeParamDecl>();
-        // search for a substitution that might apply to us
-        for (auto s = subst; s; s = s->outer.Ptr())
-        {
-            // the generic decl associated with the substitution list must be
-            // the generic decl that declared this parameter
-            auto genericDecl = s->genericDecl;
-            if (genericDecl != genParamDecl.getDecl()->ParentDecl)
-                continue;
-            int index = 0;
-            for (auto m : genericDecl->Members)
-            {
-                if (m.Ptr() == genParamDecl.getDecl())
-                {
-                    // We've found it, so return the corresponding specialization argument
-                    (*ioDiff)++;
-                    return s->args[index];
-                }
-                else if (auto typeParam = m.As<GenericTypeParamDecl>())
-                {
-                    index++;
-                }
-                else if (auto valParam = m.As<GenericValueParamDecl>())
-                {
-                    index++;
-                }
-                else
-                {
-                }
-            }
-        }
-        return this;
+        return subType->SubstituteImpl(subst, ioDiff);
     }
 
     int GenericConstraintDeclRefType::GetHashCode()

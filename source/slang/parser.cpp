@@ -2113,7 +2113,30 @@ namespace Slang
         auto nameToken = parser->ReadToken(TokenType::Identifier);
         assocTypeDecl->nameAndLoc = NameLoc(nameToken);
         assocTypeDecl->loc = nameToken.loc;
-        parseOptionalInheritanceClause(parser, assocTypeDecl.Ptr());
+        if (AdvanceIf(parser, TokenType::Colon))
+        {
+            while (!parser->tokenReader.IsAtEnd())
+            {
+                auto paramConstraint = new GenericTypeConstraintDecl();
+                parser->FillPosition(paramConstraint);
+
+                auto paramType = DeclRefType::Create(
+                    parser->getSession(),
+                    DeclRef<Decl>(assocTypeDecl, nullptr));
+
+                auto paramTypeExpr = new SharedTypeExpr();
+                paramTypeExpr->loc = assocTypeDecl->loc;
+                paramTypeExpr->base.type = paramType;
+                paramTypeExpr->type = QualType(getTypeType(paramType));
+
+                paramConstraint->sub = TypeExp(paramTypeExpr);
+                paramConstraint->sup = parser->ParseTypeExp();
+
+                AddMember(assocTypeDecl, paramConstraint);
+                if (!AdvanceIf(parser, TokenType::Comma))
+                    break;
+            }
+        }
         parser->ReadToken(TokenType::Semicolon);
         return assocTypeDecl;
     }

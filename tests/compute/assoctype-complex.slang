@@ -1,3 +1,6 @@
+//TEST(smoke, compute):COMPARE_COMPUTE:-xslang -use-ir
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out
+
 RWStructuredBuffer<float> outputBuffer;
 interface IBase
 {
@@ -27,18 +30,30 @@ struct Simple : ISimple
         return v0.sub(4, v1.sub(1,2));
     }
 };
-
+/*
 __generic<T:ISimple>
 T.U.V test(T simple, T.U v0, T.U v1)
 {
     return simple.add(v0, v1);
 }
 
+__generic<T:__BuiltinArithmeticType>
+T test(T v0, T v1)
+{
+    return v0 + v1;
+}
+*/
+__generic<T:__BuiltinFloatingPointType>
+T test(T v0, T v1)
+{
+    return T(3.0);
+}
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    Simple s;
-    Val v0, v1;
-	float outVal = test<Simple>(s, v0, v1); // == 1.0
-	outputBuffer[0] = outVal;
+    //Simple s;
+    //Val v0, v1;
+	//float outVal = test(s, v0, v1); // == 1.0
+    float outVal = test<float>(1.0, 2.0);
+	outputBuffer[dispatchThreadID.x] = outVal;
 }
