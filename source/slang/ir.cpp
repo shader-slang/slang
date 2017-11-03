@@ -178,27 +178,27 @@ namespace Slang
     //
 
     // Add an instruction to a specific parent
-    void IRBuilder::addInst(IRBlock* block, IRInst* inst)
+    void IRBuilder::addInst(IRBlock* pblock, IRInst* inst)
     {
-        inst->parent = block;
+        inst->parent = pblock;
 
-        if (!block->firstInst)
+        if (!pblock->firstInst)
         {
             inst->prev = nullptr;
             inst->next = nullptr;
 
-            block->firstInst = inst;
-            block->lastInst = inst;
+            pblock->firstInst = inst;
+            pblock->lastInst = inst;
         }
         else
         {
-            auto prev = block->lastInst;
+            auto prev = pblock->lastInst;
 
             inst->prev = prev;
             inst->next = nullptr;
 
             prev->next = inst;
-            block->lastInst = inst;
+            pblock->lastInst = inst;
         }
     }
 
@@ -206,7 +206,6 @@ namespace Slang
     void IRBuilder::addInst(
         IRInst*     inst)
     {
-        auto insertBefore = insertBeforeInst;
         if(insertBeforeInst)
         {
             inst->insertBefore(insertBeforeInst);
@@ -221,7 +220,7 @@ namespace Slang
     }
 
     static IRValue* createValueImpl(
-        IRBuilder*  builder,
+        IRBuilder*  /*builder*/,
         UInt        size,
         IROp        op,
         IRType*     type)
@@ -249,7 +248,7 @@ namespace Slang
     // arguments *after* the type (which is a mandatory
     // argument for all instructions).
     static IRInst* createInstImpl(
-        IRBuilder*      builder,
+        IRBuilder*      /*builder*/,
         UInt            size,
         IROp            op,
         IRType*         type,
@@ -261,8 +260,7 @@ namespace Slang
         IRInst* inst = (IRInst*) malloc(size);
         memset(inst, 0, size);
 
-        auto module = builder->getModule();
-        inst->argCount = fixedArgCount + varArgCount;
+        inst->argCount = (uint32_t)(fixedArgCount + varArgCount);
 
         inst->op = op;
 
@@ -632,7 +630,7 @@ namespace Slang
 
     IRInst* IRBuilder::emitCallInst(
         IRType*         type,
-        IRValue*        func,
+        IRValue*        pFunc,
         UInt            argCount,
         IRValue* const* args)
     {
@@ -641,7 +639,7 @@ namespace Slang
             kIROp_Call,
             type,
             1,
-            &func,
+            &pFunc,
             argCount,
             args);
         addInst(inst);
@@ -829,12 +827,12 @@ namespace Slang
 
     IRFunc* IRBuilder::createFunc()
     {
-        IRFunc* func = createValue<IRFunc>(
+        IRFunc* rsFunc = createValue<IRFunc>(
             this,
             kIROp_Func,
             nullptr);
-        addGlobalValue(getModule(), func);
-        return func;
+        addGlobalValue(getModule(), rsFunc);
+        return rsFunc;
     }
 
     IRGlobalVar* IRBuilder::createGlobalVar(
@@ -1129,13 +1127,13 @@ namespace Slang
     }
 
     IRInst* IRBuilder::emitBranch(
-        IRBlock*    block)
+        IRBlock*    pBlock)
     {
         auto inst = createInst<IRUnconditionalBranch>(
             this,
             kIROp_unconditionalBranch,
             nullptr,
-            block);
+            pBlock);
         addInst(inst);
         return inst;
     }
@@ -1543,7 +1541,7 @@ namespace Slang
 
         if(genericParentDeclRef)
         {
-            auto subst = declRef.substitutions;
+            auto subst = declRef.substitutions.As<GenericSubstitution>();
             if( !subst || subst->genericDecl != genericParentDeclRef.getDecl() )
             {
                 // No actual substitutions in place here
@@ -1698,6 +1696,7 @@ namespace Slang
         dumpChildrenRaw(context, block);
     }
 
+#if 0
     static void dumpChildrenRaw(
         IRDumpContext*  context,
         IRFunc*         func)
@@ -1720,6 +1719,7 @@ namespace Slang
         dumpIndent(context);
         dump(context, "}\n");
     }
+#endif
 
     static void dumpInst(
         IRDumpContext*  context,
@@ -2239,8 +2239,8 @@ namespace Slang
 
     void IRInst::removeArguments()
     {
-        UInt argCount = this->argCount;
-        for( UInt aa = 0; aa < argCount; ++aa )
+        UInt oldArgCount = this->argCount;
+        for( UInt aa = 0; aa < oldArgCount; ++aa )
         {
             IRUse& use = getArgs()[aa];
 
@@ -2384,9 +2384,9 @@ namespace Slang
         IRBuilder*                  builder,
         Type*                       type,
         VarLayout*                  varLayout,
-        TypeLayout*                 typeLayout,
-        LayoutResourceKind          kind,
-        GlobalVaryingDeclarator*    declarator)
+        TypeLayout*                 /*typeLayout*/,
+        LayoutResourceKind          /*kind*/,
+        GlobalVaryingDeclarator*    /*declarator*/)
     {
         // TODO: We might be creating an `in` or `out` variable based on
         // an `in out` function parameter. In this case we should
@@ -2550,7 +2550,6 @@ namespace Slang
 
         default:
             SLANG_UNEXPECTED("unimplemented");
-            return ScalarizedVal();
         }
 
     }
@@ -3079,7 +3078,6 @@ namespace Slang
             break;
         default:
             SLANG_UNEXPECTED("no value registered for IR value");
-            return nullptr;
         }
     }
 
@@ -3111,18 +3109,27 @@ namespace Slang
     {
         if (!subst)
             return nullptr;
-
-        RefPtr<Substitutions> newSubst = new Substitutions();
-        newSubst->outer = cloneSubstitutions(context, subst->outer);
-        newSubst->genericDecl = subst->genericDecl;
-
-        for (auto arg : subst->args)
+        if (auto genSubst = dynamic_cast<GenericSubstitution*>(subst))
         {
-            auto newArg = cloneSubstitutionArg(context, arg);
-            newSubst->args.Add(arg);
-        }
+            RefPtr<GenericSubstitution> newSubst = new GenericSubstitution();
+            newSubst->outer = cloneSubstitutions(context, subst->outer);
+            newSubst->genericDecl = genSubst->genericDecl;
 
-        return newSubst;
+            for (auto arg : genSubst->args)
+            {
+                auto newArg = cloneSubstitutionArg(context, arg);
+                newSubst->args.Add(arg);
+            }
+            return newSubst;
+        }
+        else if (auto thisSubst = dynamic_cast<ThisTypeSubstitution*>(subst))
+        {
+            RefPtr<ThisTypeSubstitution> newSubst = new ThisTypeSubstitution();
+            newSubst->sourceType = thisSubst->sourceType;
+            newSubst->outer = cloneSubstitutions(context, subst->outer);
+            return newSubst;
+        }
+        return nullptr;
     }
 
     DeclRef<Decl> IRSpecContext::maybeCloneDeclRef(DeclRef<Decl> const& declRef)
@@ -3231,7 +3238,7 @@ namespace Slang
         {
             auto clonedKey = context->maybeCloneValue(originalEntry->requirementKey.usedValue);
             auto clonedVal = context->maybeCloneValue(originalEntry->satisfyingVal.usedValue);
-            auto clonedEntry = context->builder->createWitnessTableEntry(
+            context->builder->createWitnessTableEntry(
                 clonedTable,
                 clonedKey,
                 clonedVal);
@@ -3416,7 +3423,6 @@ namespace Slang
 
         default:
             SLANG_UNEXPECTED("unhandled case");
-            return "unknown";
         }
     }
 
@@ -3518,7 +3524,6 @@ namespace Slang
         {
             // This shouldn't happen!
             SLANG_UNEXPECTED("no matching function registered");
-            return cloneSimpleFunc(context, originalFunc);
         }
 
         // We will try to track the "best" definition we can find.
@@ -3748,7 +3753,6 @@ namespace Slang
         else
         {
             SLANG_UNEXPECTED("unimplemented");
-            return nullptr;
         }
     }
 
@@ -3756,7 +3760,8 @@ namespace Slang
         IRGenericSpecContext*   context,
         DeclRef<Decl>           declRef)
     {
-        auto subst = context->subst;
+        auto subst = context->subst.As<GenericSubstitution>();
+        SLANG_ASSERT(subst);
         auto genericDecl = subst->genericDecl;
 
         UInt orinaryParamCount = 0;
@@ -3806,12 +3811,13 @@ namespace Slang
             {
                 auto declRefVal = (IRDeclRef*) originalVal;
                 auto declRef = declRefVal->declRef;
-
+                auto genSubst = subst.As<GenericSubstitution>();
+                SLANG_ASSERT(genSubst);
                 // We may have a direct reference to one of the parameters
                 // of the generic we are specializing, and in that case
                 // we nee to translate it over to the equiavalent of
                 // the `Val` we have been given.
-                if(declRef.getDecl()->ParentDecl == subst->genericDecl)
+                if(declRef.getDecl()->ParentDecl == genSubst->genericDecl)
                 {
                     return getSubstValue(this, declRef);
                 }
@@ -3866,9 +3872,10 @@ namespace Slang
         // using a different overload of a target-specific function,
         // so we need to create a dummy substitution here, to make
         // sure it used the correct generic.
-        RefPtr<Substitutions> newSubst = new Substitutions();
+        RefPtr<GenericSubstitution> newSubst = new GenericSubstitution();
         newSubst->genericDecl = genericFunc->genericDecl;
-        newSubst->args = specDeclRef.substitutions->args;
+        auto specDeclRefSubst = specDeclRef.substitutions.As<GenericSubstitution>();
+        newSubst->args = specDeclRefSubst->args;
 
         IRGenericSpecContext context;
         context.shared = sharedContext;

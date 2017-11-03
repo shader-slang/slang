@@ -870,9 +870,12 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto subs = declRef.substitutions;
         while(subs)
         {
-            for(auto aa : subs->args)
+            if (auto genSubst = subs.As<GenericSubstitution>())
             {
-                (*ioArgs).Add(getSimpleVal(context, lowerVal(context, aa)));
+                for (auto aa : genSubst->args)
+                {
+                    (*ioArgs).Add(getSimpleVal(context, lowerVal(context, aa)));
+                }
             }
             subs = subs->outer;
         }
@@ -3037,24 +3040,33 @@ RefPtr<Substitutions> lowerSubstitutions(
 {
     if(!subst)
         return nullptr;
+    RefPtr<Substitutions> result;
+    if (auto genSubst = dynamic_cast<GenericSubstitution*>(subst))
+    {
+        RefPtr<GenericSubstitution> newSubst = new GenericSubstitution();
+        newSubst->genericDecl = genSubst->genericDecl;
 
-    RefPtr<Substitutions> newSubst = new Substitutions();
+        for (auto arg : genSubst->args)
+        {
+            auto newArg = lowerSubstitutionArg(context, arg);
+            newSubst->args.Add(newArg);
+        }
+
+        result = newSubst;
+    }
+    else if (auto thisSubst = dynamic_cast<ThisTypeSubstitution*>(subst))
+    {
+        RefPtr<ThisTypeSubstitution> newSubst = new ThisTypeSubstitution();
+        newSubst->sourceType = lowerSubstitutionArg(context, thisSubst->sourceType);
+        result = newSubst;
+    }
     if (subst->outer)
     {
-        newSubst->outer = lowerSubstitutions(
+        result->outer = lowerSubstitutions(
             context,
             subst->outer);
     }
-
-    newSubst->genericDecl = subst->genericDecl;
-
-    for (auto arg : subst->args)
-    {
-        auto newArg = lowerSubstitutionArg(context, arg);
-        newSubst->args.Add(newArg);
-    }
-
-    return newSubst;
+    return result;
 }
 
 LoweredValInfo emitDeclRef(

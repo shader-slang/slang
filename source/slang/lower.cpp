@@ -779,20 +779,6 @@ struct LoweringVisitor
             translateDeclRef(DeclRef<Decl>(type->declRef)).As<TypeDefDecl>());
     }
 
-    RefPtr<Type> visitGenericConstraintDeclRefType(GenericConstraintDeclRefType* type)
-    {
-        // not supported by lowering
-        SLANG_UNREACHABLE("visitGenericConstraintDeclRefType in LowerVisitor");
-        return nullptr;
-    }
-
-    RefPtr<Type> visitAssocTypeDeclRefType(AssocTypeDeclRefType* type)
-    {
-        // not supported by lowering
-        SLANG_UNREACHABLE("visitAssocTypeDeclRefType in LowerVisitor");
-        return nullptr;
-    }
-
     RefPtr<Type> visitTypeType(TypeType* type)
     {
         return getTypeType(lowerType(type->type));
@@ -2569,14 +2555,23 @@ struct LoweringVisitor
         Substitutions*  inSubstitutions)
     {
         if (!inSubstitutions) return nullptr;
-
-        RefPtr<Substitutions> result = new Substitutions();
-        result->genericDecl = translateDeclRef(inSubstitutions->genericDecl).As<GenericDecl>();
-        for (auto arg : inSubstitutions->args)
+        if (auto genSubst = dynamic_cast<GenericSubstitution*>(inSubstitutions))
         {
-            result->args.Add(translateVal(arg));
+            RefPtr<GenericSubstitution> result = new GenericSubstitution();
+            result->genericDecl = translateDeclRef(genSubst->genericDecl).As<GenericDecl>();
+            for (auto arg : genSubst->args)
+            {
+                result->args.Add(translateVal(arg));
+            }
+            return result;
         }
-        return result;
+        else if (auto thisSubst = dynamic_cast<ThisTypeSubstitution*>(inSubstitutions))
+        {
+            RefPtr<ThisTypeSubstitution> result = new ThisTypeSubstitution();
+            result->sourceType = translateVal(result->sourceType);
+            return result;
+        }
+        return nullptr;
     }
 
     static Decl* getModifiedDecl(Decl* decl)
@@ -2733,7 +2728,11 @@ struct LoweringVisitor
     RefPtr<VarLayout> tryToFindLayout(
         Decl* decl)
     {
-        auto loweredParent = translateDeclRef(decl->ParentDecl);
+        RefPtr<Decl> loweredParent;
+        if (auto genericParentDecl = decl->ParentDecl->As<GenericDecl>())
+            loweredParent = translateDeclRef(genericParentDecl->ParentDecl);
+        else
+            loweredParent = translateDeclRef(decl->ParentDecl);
         if (loweredParent)
         {
             auto layoutMod = loweredParent->FindModifier<ComputedLayoutModifier>();
@@ -3831,7 +3830,7 @@ struct LoweringVisitor
             "Vector").As<GenericDecl>();
         auto vectorTypeDecl = vectorGenericDecl->inner;
                
-        auto substitutions = new Substitutions();
+        auto substitutions = new GenericSubstitution();
         substitutions->genericDecl = vectorGenericDecl.Ptr();
         substitutions->args.Add(elementType);
         substitutions->args.Add(elementCount);

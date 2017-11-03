@@ -56,7 +56,7 @@ struct BCPtr
     {
         if (ptr)
         {
-            rawVal = (char*)ptr - (char*)this;
+            rawVal = (RawVal)((char*)ptr - (char*)this);
         }
         else
         {

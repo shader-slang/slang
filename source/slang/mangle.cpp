@@ -117,10 +117,6 @@ namespace Slang
         {
             emitQualifiedName(context, declRefType->declRef);
         }
-        else if (auto assocTypeDeclRefType = dynamic_cast<AssocTypeDeclRefType*>(type))
-        {
-            emitQualifiedName(context, assocTypeDeclRefType->declRef);
-        }
         else
         {
             SLANG_UNEXPECTED("unimplemented case in mangling");
@@ -199,7 +195,7 @@ namespace Slang
             // There are two cases here: either we have specializations
             // in place for the parent generic declaration, or we don't.
 
-            auto subst = declRef.substitutions;
+            auto subst = declRef.substitutions.As<GenericSubstitution>();
             if( subst && subst->genericDecl == parentGenericDeclRef.getDecl() )
             {
                 // This is the case where we *do* have substitutions.

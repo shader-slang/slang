@@ -126,31 +126,44 @@ protected:
     )
 END_SYNTAX_CLASS()
 
+
 // A substitution represents a binding of certain
 // type-level variables to concrete argument values
-SYNTAX_CLASS(Substitutions, RefObject)
-
-    // The generic declaration that defines the
-    // parametesr we are binding to arguments
-    DECL_FIELD(GenericDecl*,  genericDecl)
-
-    // The actual values of the arguments
-    SYNTAX_FIELD(List<RefPtr<Val>>, args)
+ABSTRACT_SYNTAX_CLASS(Substitutions, RefObject)
 
     // Any further substitutions, relating to outer generic declarations
     SYNTAX_FIELD(RefPtr<Substitutions>, outer)
 
     RAW(
     // Apply a set of substitutions to the bindings in this substitution
-    RefPtr<Substitutions> SubstituteImpl(Substitutions* subst, int* ioDiff);
+    virtual RefPtr<Substitutions> SubstituteImpl(Substitutions* subst, int* ioDiff) = 0;
 
     // Check if these are equivalent substitutiosn to another set
-    bool Equals(Substitutions* subst);
-    bool operator == (const Substitutions & subst)
+    virtual bool Equals(Substitutions* subst) = 0;
+    virtual bool operator == (const Substitutions & subst) = 0;
+    virtual int GetHashCode() const = 0;
+    )
+END_SYNTAX_CLASS()
+
+SYNTAX_CLASS(GenericSubstitution, Substitutions)
+    // The generic declaration that defines the
+    // parametesr we are binding to arguments
+    DECL_FIELD(GenericDecl*, genericDecl)
+
+    // The actual values of the arguments
+    SYNTAX_FIELD(List<RefPtr<Val>>, args)
+    
+    RAW(
+    // Apply a set of substitutions to the bindings in this substitution
+    virtual RefPtr<Substitutions> SubstituteImpl(Substitutions* subst, int* ioDiff) override;
+
+    // Check if these are equivalent substitutiosn to another set
+    virtual bool Equals(Substitutions* subst) override;
+    virtual bool operator == (const Substitutions & subst) override
     {
         return Equals(const_cast<Substitutions*>(&subst));
     }
-    int GetHashCode() const
+    virtual int GetHashCode() const override
     {
         int rs = 0;
         for (auto && v : args)
@@ -159,6 +172,27 @@ SYNTAX_CLASS(Substitutions, RefObject)
             rs *= 16777619;
         }
         return rs;
+    }
+    )
+END_SYNTAX_CLASS()
+
+SYNTAX_CLASS(ThisTypeSubstitution, Substitutions)
+    // The actual type that provides the lookup scope for an associated type
+    SYNTAX_FIELD(RefPtr<Val>, sourceType)
+
+    RAW(
+    // Apply a set of substitutions to the bindings in this substitution
+    virtual RefPtr<Substitutions> SubstituteImpl(Substitutions* subst, int* ioDiff) override;
+
+    // Check if these are equivalent substitutiosn to another set
+    virtual bool Equals(Substitutions* subst) override;
+    virtual bool operator == (const Substitutions & subst) override
+    {
+        return Equals(const_cast<Substitutions*>(&subst));
+    }
+    virtual int GetHashCode() const override
+    {
+        return sourceType->GetHashCode();
     }
     )
 END_SYNTAX_CLASS()

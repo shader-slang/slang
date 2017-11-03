@@ -148,15 +148,13 @@ namespace Slang
             if (baseExpr)
             {
                 RefPtr<Expr> expr;
-                
+
                 if (baseExpr->type->As<TypeType>())
                 {
                     auto sexpr = new StaticMemberExpr();
                     sexpr->loc = loc;
                     sexpr->BaseExpression = baseExpr;
                     sexpr->name = declRef.GetName();
-                    sexpr->type = GetTypeForDeclRef(declRef);
-                    sexpr->declRef = declRef;
                     expr = sexpr;
                 }
                 else
@@ -165,54 +163,24 @@ namespace Slang
                     sexpr->loc = loc;
                     sexpr->BaseExpression = baseExpr;
                     sexpr->name = declRef.GetName();
-                    sexpr->type = GetTypeForDeclRef(declRef);
                     sexpr->declRef = declRef;
                     expr = sexpr;
                 }
-                if (auto constraintType = expr->type->As<GenericConstraintDeclRefType>())
+                if (auto assocTypeDecl = declRef.As<AssocTypeDecl>())
                 {
-                    if (baseExpr->type->As<TypeType>())
-                        constraintType->subType = baseExpr->type->As<TypeType>()->type;
-                    else
-                        constraintType->subType = baseExpr->type;
-
+                    RefPtr<ThisTypeSubstitution> subst = new ThisTypeSubstitution();
+                    subst->sourceType = baseExpr->type.type;
+                    if (auto typeType = subst->sourceType.As<TypeType>())
+                        subst->sourceType = typeType->type;
+                    expr->type = GetTypeForDeclRef(DeclRef<AssocTypeDecl>(assocTypeDecl.getDecl(), subst));
                 }
-                
-                if (auto genConstraintType = baseExpr->type->As<GenericConstraintDeclRefType>())
+                else if (auto constraintDecl = declRef.As<GenericTypeConstraintDecl>())
                 {
-                    if (auto funcDeclRef = declRef.As<CallableDecl>())
-                    {
-                        // if this is call expression, propagate the source associated type to the result type
-                        auto funcType = expr->type->As<FuncType>();
-                        if (auto assocRsType = funcType->resultType.As<AssocTypeDeclRefType>())
-                        {
-                            RefPtr<FuncType> newFuncType = new FuncType();
-                            newFuncType->paramTypes = funcType->paramTypes;
-                            RefPtr<AssocTypeDeclRefType> newRsType = new AssocTypeDeclRefType();
-                            newRsType->declRef = assocRsType->declRef;
-                            newRsType->sourceType = genConstraintType->subType;
-                            newRsType->setSession(getSession());
-                            newFuncType->resultType = newRsType;
-                            newFuncType->setSession(funcType->getSession());
-                            expr->type = QualType(newFuncType);
-                        }
-                    }
-                    else if (auto assocTypeDeclRef = declRef.As<AssocTypeDecl>())
-                    {
-                        auto assocTypeDeclType = new AssocTypeDeclRefType();
-                        assocTypeDeclType->declRef = assocTypeDeclRef;
-                        assocTypeDeclType->sourceType = genConstraintType->subType;
-                        assocTypeDeclType->setSession(getSession());
-                        expr->type = QualType(getTypeType(assocTypeDeclType));
-                    }
+                    expr->type = baseExpr->type;
                 }
-                else if (auto assocTypeDeclRef = declRef.As<AssocTypeDecl>())
+                else
                 {
-                    auto assocTypeDeclType = new AssocTypeDeclRefType();
-                    assocTypeDeclType->declRef = assocTypeDeclRef;
-                    assocTypeDeclType->sourceType = baseExpr->type;
-                    assocTypeDeclType->setSession(getSession());
-                    expr->type = QualType(getTypeType(assocTypeDeclType));
+                    expr->type = GetTypeForDeclRef(declRef);
                 }
                 return expr;
             }
@@ -449,7 +417,7 @@ namespace Slang
             DeclRef<GenericDecl>						genericDeclRef,
             List<RefPtr<Expr>> const&	args)
         {
-            RefPtr<Substitutions> subst = new Substitutions();
+            RefPtr<GenericSubstitution> subst = new GenericSubstitution();
             subst->genericDecl = genericDeclRef.getDecl();
             subst->outer = genericDeclRef.substitutions;
 
@@ -2097,10 +2065,10 @@ namespace Slang
             return true;
         }
 
-        RefPtr<Substitutions> createDummySubstitutions(
+        RefPtr<GenericSubstitution> createDummySubstitutions(
             GenericDecl* genericDecl)
         {
-            RefPtr<Substitutions> subst = new Substitutions();
+            RefPtr<GenericSubstitution> subst = new GenericSubstitution();
             subst->genericDecl = genericDecl;
             for (auto dd : genericDecl->Members)
             {
@@ -3115,7 +3083,7 @@ namespace Slang
                 session, "Vector").As<GenericDecl>();
             auto vectorTypeDecl = vectorGenericDecl->inner;
                
-            auto substitutions = new Substitutions();
+            auto substitutions = new GenericSubstitution();
             substitutions->genericDecl = vectorGenericDecl.Ptr();
             substitutions->args.Add(elementType);
             substitutions->args.Add(elementCount);
@@ -3447,7 +3415,7 @@ namespace Slang
                 // to `interfaceDeclRef`.
                 //
                 SLANG_UNEXPECTED("reflexive type witness");
-                return nullptr;
+                //return nullptr;
             }
 
             auto breadcrumbs = inBreadcrumbs;
@@ -3462,7 +3430,7 @@ namespace Slang
                 // because `A : B` and `B : C` then `A : C`
                 //
                 SLANG_UNEXPECTED("transitive type witness");
-                return nullptr;
+                //return nullptr;
             }
 
             // Simple case: we have a single declaration
@@ -3815,7 +3783,7 @@ namespace Slang
 
             // Consruct a reference to the extension with our constraint variables
             // as the 
-            RefPtr<Substitutions> solvedSubst = new Substitutions();
+            RefPtr<GenericSubstitution> solvedSubst = new GenericSubstitution();
             solvedSubst->genericDecl = genericDeclRef.getDecl();
             solvedSubst->outer = genericDeclRef.substitutions;
             solvedSubst->args = args;
@@ -4084,8 +4052,9 @@ namespace Slang
             // We will go ahead and hang onto the arguments that we've
             // already checked, since downstream validation might need
             // them.
-            candidate.subst = new Substitutions();
-            auto& checkedArgs = candidate.subst->args;
+            auto genSubst = new GenericSubstitution();
+            candidate.subst = genSubst;
+            auto& checkedArgs = genSubst->args;
 
             int aa = 0;
             for (auto memberRef : getMembers(genericDeclRef))
@@ -4202,7 +4171,7 @@ namespace Slang
         // Create a witness that attests to the fact that `type`
         // is equal to itself.
         RefPtr<Val> createTypeEqualityWitness(
-            Type*   type)
+            Type*   /*type*/)
         {
             SLANG_UNEXPECTED("unimplemented");
         }
@@ -4258,7 +4227,7 @@ namespace Slang
             // We should have the existing arguments to the generic
             // handy, so that we can construct a substitution list.
 
-            RefPtr<Substitutions> subst = candidate.subst;
+            RefPtr<GenericSubstitution> subst = candidate.subst.As<GenericSubstitution>();
             assert(subst);
 
             subst->genericDecl = genericDeclRef.getDecl();
@@ -4325,7 +4294,7 @@ namespace Slang
         RefPtr<Expr> createGenericDeclRef(
             RefPtr<Expr>            baseExpr,
             RefPtr<Expr>            originalExpr,
-            RefPtr<Substitutions>   subst)
+            RefPtr<GenericSubstitution>   subst)
         {
             auto baseDeclRefExpr = baseExpr.As<DeclRefExpr>();
             if (!baseDeclRefExpr)
@@ -4437,7 +4406,7 @@ namespace Slang
                     return createGenericDeclRef(
                         baseExpr,
                         context.originalExpr,
-                        candidate.subst);
+                        candidate.subst.As<GenericSubstitution>());
                     break;
 
                 default:
@@ -4734,22 +4703,23 @@ namespace Slang
             // They must both be NULL or non-NULL
             if (!fst || !snd)
                 return fst == snd;
-
+            auto fstGen = fst.As<GenericSubstitution>();
+            auto sndGen = snd.As<GenericSubstitution>();
             // They must be specializing the same generic
-            if (fst->genericDecl != snd->genericDecl)
+            if (fstGen->genericDecl != sndGen->genericDecl)
                 return false;
 
             // Their arguments must unify
-            SLANG_RELEASE_ASSERT(fst->args.Count() == snd->args.Count());
-            UInt argCount = fst->args.Count();
+            SLANG_RELEASE_ASSERT(fstGen->args.Count() == sndGen->args.Count());
+            UInt argCount = fstGen->args.Count();
             for (UInt aa = 0; aa < argCount; ++aa)
             {
-                if (!TryUnifyVals(constraints, fst->args[aa], snd->args[aa]))
+                if (!TryUnifyVals(constraints, fstGen->args[aa], sndGen->args[aa]))
                     return false;
             }
 
             // Their "base" specializations must unify
-            if (!TryUnifySubstitutions(constraints, fst->outer, snd->outer))
+            if (!TryUnifySubstitutions(constraints, fstGen->outer, sndGen->outer))
                 return false;
 
             return true;
@@ -5304,11 +5274,12 @@ namespace Slang
             if( parentGenericDeclRef )
             {
                 SLANG_RELEASE_ASSERT(declRef.substitutions);
-                SLANG_RELEASE_ASSERT(declRef.substitutions->genericDecl == parentGenericDeclRef.getDecl());
+                auto genSubst = declRef.substitutions.As<GenericSubstitution>();
+                SLANG_RELEASE_ASSERT(genSubst->genericDecl == parentGenericDeclRef.getDecl());
 
                 sb << "<";
                 bool first = true;
-                for(auto arg : declRef.substitutions->args)
+                for(auto arg : genSubst->args)
                 {
                     if(!first) sb << ", ";
                     formatVal(sb, arg);
@@ -6069,7 +6040,7 @@ namespace Slang
         RefPtr<Expr> visitStaticMemberExpr(StaticMemberExpr* expr)
         {
             SLANG_UNEXPECTED("should not occur in unchecked AST");
-            return expr;
+            //return expr;
         }
 
         RefPtr<Expr> lookupResultFailure(
@@ -6495,25 +6466,10 @@ namespace Slang
             *outTypeResult = type;
             return QualType(getTypeType(type));
         }
-        else if (auto constraintDeclRef = declRef.As<GenericTypeConstraintDecl>())
-        {
-            // When we access a constraint or an inheritance decl (as a member),
-            // we are conceptually performing a "cast" to the given super-type,
-            // with the declaration showing that such a cast is legal.
-            auto type = new GenericConstraintDeclRefType(session, GetSub(constraintDeclRef), GetSup(constraintDeclRef));
-            return QualType(type);
-        }
         else if (auto funcDeclRef = declRef.As<CallableDecl>())
         {
             auto type = getFuncType(session, funcDeclRef);
             return QualType(type);
-        }
-        else if (auto assocTypeDeclRef = declRef.As<AssocTypeDecl>())
-        {
-            auto type = new AssocTypeDeclRefType(assocTypeDeclRef);
-            type->setSession(session);
-            *outTypeResult = type;
-            return QualType(getTypeType(type));
         }
         if( sink )
         {
@@ -6558,7 +6514,7 @@ namespace Slang
             if(decl != genericDecl->inner)
                 return parentSubst;
 
-            RefPtr<Substitutions> subst = new Substitutions();
+            RefPtr<GenericSubstitution> subst = new GenericSubstitution();
             subst->genericDecl = genericDecl;
             subst->outer = parentSubst;
 

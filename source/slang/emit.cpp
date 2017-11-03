@@ -1052,15 +1052,6 @@ struct EmitVisitor
         EmitDeclarator(arg.declarator);
     }
 
-    void visitAssocTypeDeclRefType(AssocTypeDeclRefType* /*type*/, TypeEmitArg const& /*arg*/)
-    {
-        //SLANG_UNREACHABLE("visitAssocTypeDeclRefType in EmitVisitor");
-    }
-    void visitGenericConstraintDeclRefType(GenericConstraintDeclRefType* /*type*/, TypeEmitArg const& /*arg*/)
-    {
-        //SLANG_UNREACHABLE("visitGenericConstraintDeclRefType in EmitVisitor");
-    }
-
     void visitBasicExpressionType(BasicExpressionType* basicType, TypeEmitArg const& arg)
     {
         auto declarator = arg.declarator;
@@ -2925,7 +2916,7 @@ struct EmitVisitor
                 return;
             }
 
-            Substitutions* subst = declRef.substitutions.Ptr();
+            GenericSubstitution* subst = declRef.substitutions.As<GenericSubstitution>().Ptr();
             if (!subst)
                 return;
 
