@@ -211,6 +211,7 @@
     <ClCompile Include="diagnostics.cpp" />
     <ClCompile Include="dxc-support.cpp" />
     <ClCompile Include="emit.cpp" />
+    <ClCompile Include="ir-legalize-types.cpp" />
     <ClCompile Include="ir.cpp" />
     <ClCompile Include="lexer.cpp" />
     <ClCompile Include="lookup.cpp" />

@@ -6336,6 +6336,9 @@ StructTypeLayout* getGlobalStructLayout(
     }
 }
 
+void legalizeTypes(
+    IRModule*   module);
+
 String emitEntryPoint(
     EntryPointRequest*  entryPoint,
     ProgramLayout*      programLayout,
@@ -6400,20 +6403,37 @@ String emitEntryPoint(
         // so that we "just" need to specialize it as needed for the
         // specific target and entry point in use.
         //
+        // The first pass is to extract the IR code of the entry point,
+        // and any other symbols it references. At the same time,
+        // we go ahead and select the target-specific version of
+        // any such functions if they are available. We also go
+        // ahead and apply the layout information (from `programLayout`)
+        // to the IR code (which previously had no layout).
+        //
+        // Note: it is important that we extract a *copy* of all the
+        // relevant IR, so that transformations we make for one
+        // entry point (or target) don't mess up the IR used for other
+        // entry points (targets).
+        //
         auto lowered = specializeIRForEntryPoint(
             entryPoint,
             programLayout,
             target);
 
-        // debugging:
+        // If the user specified the flag that they want us to dump
+        // IR, then do it here, for the target-specific, but
+        // un-specialized IR.
         if (translationUnit->compileRequest->shouldDumpIR)
         {
             dumpIR(lowered);
         }
 
-        // TODO: we should apply some guaranteed transformations here,
-        // to eliminate constructs that aren't legal downstream (e.g. generics).
-
+        // Next, we need to ensure that the code we emit for
+        // the target doesn't contain any operations that would
+        // be illegal on the target platform. For example,
+        // none of our target supports generics, or interfaces,
+        // so we need to specialize those away.
+        //
         specializeGenerics(lowered);
 
         // Debugging code for IR transformations...
@@ -6423,10 +6443,12 @@ String emitEntryPoint(
         fprintf(stderr, "###\n");
 #endif
 
-        //
-        // TODO: Need to decide whether to do these before or after
-        // target-specific legalization steps. Currently I've folded
-        // legalization into the specialization above.
+        // After we've fully specialized all generics, and
+        // "devirtualized" all the calls through interfaces,
+        // we need to ensure that the code only uses types
+        // that are legal on the chosen target.
+        // 
+        legalizeTypes(lowered);
 
         // TODO: do we want to emit directly from IR, or translate the
         // IR back into AST for emission?

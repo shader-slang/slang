@@ -71,6 +71,7 @@
     <ClCompile Include="vm.cpp" />
     <ClCompile Include="mangle.cpp" />
     <ClCompile Include="dxc-support.cpp" />
+    <ClCompile Include="ir-legalize-types.cpp" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="core.meta.slang" />
