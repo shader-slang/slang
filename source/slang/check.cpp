@@ -3228,6 +3228,46 @@ namespace Slang
             decl->SetCheckState(DeclCheckState::Checked);
         }
 
+        // Figure out what type an initializer/constructor declaration
+        // is supposed to return. In most cases this is just the type
+        // declaration that its declaration is nested inside.
+        RefPtr<Type> findResultTypeForConstructorDecl(ConstructorDecl* decl)
+        {
+            // We want to look at the parent of the declaration,
+            // but if the declaration is generic, the parent will be
+            // the `GenericDecl` and we need to skip past that to
+            // the grandparent.
+            //
+            auto parent = decl->ParentDecl;
+            auto genericParent = dynamic_cast<GenericDecl*>(parent);
+            if (genericParent)
+            {
+                parent = genericParent->ParentDecl;
+            }
+
+            // Now look at the type of the parent (or grandparent).
+            if (auto aggTypeDecl = dynamic_cast<AggTypeDecl*>(parent))
+            {
+                // We are nested in an aggregate type declaration,
+                // so the result type of the initializer will just
+                // be the surrounding type.
+                return DeclRefType::Create(
+                    getSession(),
+                    makeDeclRef(aggTypeDecl));
+            }
+            else if (auto extDecl = dynamic_cast<ExtensionDecl*>(parent))
+            {
+                // We are nested inside an extension, so the result
+                // type needs to be the type being extended.
+                return extDecl->targetType.type;
+            }
+            else
+            {
+                getSink()->diagnose(decl, Diagnostics::initializerNotInsideType);
+                return nullptr;
+            }
+        }
+
         void visitConstructorDecl(ConstructorDecl* decl)
         {
             if (decl->IsChecked(DeclCheckState::Checked)) return;
@@ -3237,6 +3277,12 @@ namespace Slang
             {
                 paramDecl->type = CheckUsableType(paramDecl->type);
             }
+
+            // We need to compute the result tyep for this declaration,
+            // since it wasn't filled in for us.
+            decl->ReturnType.type = findResultTypeForConstructorDecl(decl);
+
+
             decl->SetCheckState(DeclCheckState::CheckedHeader);
 
             // TODO(tfoley): check body

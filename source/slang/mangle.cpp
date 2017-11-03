@@ -275,7 +275,12 @@ namespace Slang
                 emitType(context, GetType(paramDeclRef));
             }
 
-            emitType(context, GetResultType(callableDeclRef));
+            // Don't print result type for an initializer/constructor,
+            // since it is implicit in the qualified name.
+            if (!callableDeclRef.As<ConstructorDecl>())
+            {
+                emitType(context, GetResultType(callableDeclRef));
+            }
         }
     }
 
