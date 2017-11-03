@@ -9,5 +9,30 @@
       <ExpandedItem>rawVal ? ($T1*)((char*)this + rawVal) : ($T1*)0</ExpandedItem>
     </Expand>
   </Type>
-  
+  <Type Name="Slang::DeclRef&lt;*&gt;">
+    <SmartPointer Usage="Minimal">decl ? ($T1*)(decl) : ($T1*)0</SmartPointer>
+    <DisplayString Condition="decl == 0">DeclRef nullptr</DisplayString>
+    <DisplayString Condition="decl != 0">DeclRef {(*(*(Slang::DeclRefBase*)this).decl).nameAndLoc}</DisplayString>
+    <Expand>
+      <ExpandedItem>decl ? ($T1*)(decl) : ($T1*)0</ExpandedItem>
+      <Item Name="[Substitutions]:">"========================="</Item>
+      <LinkedListItems>
+        <HeadPointer>substitutions.pointer</HeadPointer>
+        <NextPointer>outer.pointer</NextPointer>
+        <ValueNode>this</ValueNode>
+      </LinkedListItems>
+    </Expand>
+  </Type>
+  <Type Name="Slang::DeclRefType">
+    <DisplayString>DeclRefType {declRef}</DisplayString>
+    <Expand>
+      <ExpandedItem>declRef</ExpandedItem>
+    </Expand>
+  </Type>
+  <Type Name="Slang::Name">
+    <DisplayString>{{name={(char*)(text.buffer.pointer+1), s}}}</DisplayString>
+  </Type>
+  <Type Name="Slang::NameLoc">
+    <DisplayString>{{name={(char*)((*name).text.buffer.pointer+1), s} loc={loc.raw}}}</DisplayString>
+  </Type>
 </AutoVisualizer>
