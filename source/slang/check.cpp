@@ -148,13 +148,15 @@ namespace Slang
             if (baseExpr)
             {
                 RefPtr<Expr> expr;
-
+                DeclRef<Decl> *declRefOut;
                 if (baseExpr->type->As<TypeType>())
                 {
                     auto sexpr = new StaticMemberExpr();
                     sexpr->loc = loc;
                     sexpr->BaseExpression = baseExpr;
                     sexpr->name = declRef.GetName();
+                    sexpr->declRef = declRef;
+                    declRefOut = &sexpr->declRef;
                     expr = sexpr;
                 }
                 else
@@ -164,24 +166,88 @@ namespace Slang
                     sexpr->BaseExpression = baseExpr;
                     sexpr->name = declRef.GetName();
                     sexpr->declRef = declRef;
+                    declRefOut = &sexpr->declRef;
                     expr = sexpr;
                 }
                 if (auto assocTypeDecl = declRef.As<AssocTypeDecl>())
                 {
                     RefPtr<ThisTypeSubstitution> subst = new ThisTypeSubstitution();
-                    subst->sourceType = baseExpr->type.type;
+                    auto baseDeclRefType = baseExpr->type.type.As<DeclRefType>();
+                    if (baseDeclRefType && !baseDeclRefType->declRef.getDecl()->As<InterfaceDecl>())
+                    {
+                        // if base type is not an interface, insert a non-trivial this_type substitution
+                        subst->sourceType = baseExpr->type.type;
+                    }
+                    else
+                    {
+                        // otherwise, insert a null this type substitution, indicating that "this_type" is currently a free variable
+                        subst->sourceType = nullptr;
+                    }
                     if (auto typeType = subst->sourceType.As<TypeType>())
                         subst->sourceType = typeType->type;
                     expr->type = GetTypeForDeclRef(DeclRef<AssocTypeDecl>(assocTypeDecl.getDecl(), subst));
+                    declRefOut->substitutions = subst;
+                    return expr;
                 }
                 else if (auto constraintDecl = declRef.As<GenericTypeConstraintDecl>())
                 {
-                    expr->type = baseExpr->type;
+                    expr = baseExpr;
+                    if (auto declRefExpr = expr.As<DeclRefExpr>())
+                        declRefOut = &declRefExpr->declRef;
+                    else
+                        return expr;
+                    RefPtr<DeclRefType> declRefType;
+                    if (auto typeType = baseExpr->type.type.As<TypeType>())
+                        declRefType = typeType->type->As<DeclRefType>();
+                    else
+                        declRefType = baseExpr->type.type.As<DeclRefType>();
+
+                    if (declRefType)
+                    {
+                        RefPtr<ThisTypeSubstitution> subst = new ThisTypeSubstitution();
+                        subst->sourceType = declRefType;
+                        auto exprType = DeclRefType::Create(getSession(), DeclRef<Decl>(declRefType->declRef.decl, declRef.substitutions));
+                        subst->outer = declRef.substitutions;
+                        exprType->declRef.substitutions = subst;
+                        declRefOut->substitutions = subst;
+                        expr->type = exprType;
+                        return expr;
+                    }
                 }
-                else
+                else if (auto callableDeclRef = declRef.As<CallableDecl>())
                 {
+                    // propagate ThisTypeSubstitution
+                    RefPtr<DeclRefType> declRefType;
+                    if (auto typeType = baseExpr->type.type.As<TypeType>())
+                        declRefType = typeType->type->As<DeclRefType>();
+                    else
+                        declRefType = baseExpr->type.type.As<DeclRefType>();
+                    RefPtr<ThisTypeSubstitution> thisSubst;
+                    if (declRefType)
+                    {
+                        auto subst = declRefType->declRef.substitutions;
+                        while (subst)
+                        {
+                            thisSubst = subst.As<ThisTypeSubstitution>();
+                            if (thisSubst)
+                            {
+                                break;
+                            }
+                            subst = subst->outer;
+                        }
+                    }
+                    if (thisSubst)
+                    {
+                        auto newThisSubst = new ThisTypeSubstitution();
+                        newThisSubst->sourceType = thisSubst->sourceType;
+                        newThisSubst->outer = declRefType->declRef.substitutions;
+                        declRef.substitutions = thisSubst;
+                    }
                     expr->type = GetTypeForDeclRef(declRef);
+                    *declRefOut = declRef;
                 }
+
+                expr->type = GetTypeForDeclRef(declRef);
                 return expr;
             }
             else
@@ -908,12 +974,36 @@ namespace Slang
             }
 
             //
-
-
             if (auto toDeclRefType = toType->As<DeclRefType>())
             {
                 auto toTypeDeclRef = toDeclRefType->declRef;
-                if (auto interfaceDeclRef = toTypeDeclRef.As<InterfaceDecl>())
+                if (auto assocDeclRef = toTypeDeclRef.As<AssocTypeDecl>())
+                {
+                    if (auto fromTypeDeclRefType = fromType->As<DeclRefType>())
+                    {
+                        if (auto thisSubst = assocDeclRef.substitutions.As<ThisTypeSubstitution>())
+                        {
+                            if (auto fromThisSubst = fromTypeDeclRefType->declRef.substitutions.As<ThisTypeSubstitution>())
+                            {
+                                if (!thisSubst->sourceType || !fromThisSubst->sourceType)
+                                    return true;
+                                if (CanCoerce(thisSubst->sourceType.As<Type>(), fromThisSubst->sourceType.As<Type>(), outCost))
+                                {
+                                    if (outCost)
+                                        *outCost = kConversionCost_CastToInterface;
+                                    if (outToExpr)
+                                        *outToExpr = fromExpr;
+                                    return true;
+                                }
+                            }
+                            else
+                                return true;
+                        }
+                        else
+                            return true;
+                    }
+                }
+                else if (auto interfaceDeclRef = toTypeDeclRef.As<InterfaceDecl>())
                 {
                     // Trying to convert to an interface type.
                     //
@@ -927,8 +1017,42 @@ namespace Slang
                         return true;
                     }
                 }
-            }
+                else if (auto genParamDeclRef = toTypeDeclRef.As<GenericTypeParamDecl>())
+                {
+                    // We need to enumerate the constraints placed on this type by its outer
+                    // generic declaration, and see if any of them guarantees that we
+                    // satisfy the given interface..
+                    auto genericDeclRef = genParamDeclRef.GetParent().As<GenericDecl>();
+                    SLANG_ASSERT(genericDeclRef);
 
+                    for (auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(genericDeclRef))
+                    {
+                        auto sub = GetSub(constraintDeclRef);
+                        auto sup = GetSup(constraintDeclRef);
+
+                        auto subDeclRef = sub->As<DeclRefType>();
+                        if (!subDeclRef)
+                            continue;
+                        if (subDeclRef->declRef != genParamDeclRef)
+                            continue;
+                        auto supDeclRefType = sup->As<DeclRefType>();
+                        if (supDeclRefType)
+                        {
+                            auto toInterfaceDeclRef = supDeclRefType->declRef.As<InterfaceDecl>();
+                            if (DoesTypeConformToInterface(fromType, toInterfaceDeclRef))
+                            {
+                                if (outToExpr)
+                                    *outToExpr = CreateImplicitCastExpr(toType, fromExpr);
+                                if (outCost)
+                                    *outCost = kConversionCost_CastToInterface;
+                                return true;
+                            }
+                        }
+                    }
+
+                }
+
+            }
             // Look for an initializer/constructor declaration in the target type,
             // which is marked as usable for implicit conversion, and which takes
             // the source type as an argument.
@@ -1891,6 +2015,8 @@ namespace Slang
 
         void visitFuncDecl(FuncDecl *functionNode)
         {
+            if (functionNode->nameAndLoc.name->text == "test")
+                printf("break");
             if (functionNode->IsChecked(DeclCheckState::Checked))
                 return;
 
@@ -4384,7 +4510,7 @@ namespace Slang
 
 
                         callExpr->FunctionExpr = baseExpr;
-                        callExpr->type = QualType(candidate.resultType);// QualType(baseExpr->type->As<FuncType>()->resultType);
+                        callExpr->type = QualType(candidate.resultType);
 
                         // A call may yield an l-value, and we should take a look at the candidate to be sure
                         if(auto subscriptDeclRef = candidate.item.declRef.As<SubscriptDecl>())
@@ -4575,9 +4701,7 @@ namespace Slang
             OverloadCandidate candidate;
             candidate.flavor = OverloadCandidate::Flavor::Func;
             candidate.item = item;
-            auto baseExpr = ConstructLookupResultExpr(
-                item, context.baseExpr, context.funcLoc);
-            candidate.resultType = baseExpr->type->As<FuncType>()->resultType; // GetResultType(funcDeclRef);
+            candidate.resultType = GetResultType(funcDeclRef);
 
             AddOverloadCandidate(context, candidate);
         }
@@ -5739,6 +5863,9 @@ namespace Slang
 
         RefPtr<Expr> visitInvokeExpr(InvokeExpr *expr)
         {
+            if (auto mbrExpr = expr->FunctionExpr->As<MemberExpr>())
+                if (mbrExpr->name->text == "add")
+                    printf("break");
             // check the base expression first
             expr->FunctionExpr = CheckExpr(expr->FunctionExpr);
      
@@ -6470,6 +6597,12 @@ namespace Slang
         {
             auto type = getFuncType(session, funcDeclRef);
             return QualType(type);
+        }
+        else if (auto constraintDeclRef = declRef.As<GenericTypeConstraintDecl>())
+        {
+            auto type = DeclRefType::Create(session, constraintDeclRef);
+            *outTypeResult = type;
+            return QualType(getTypeType(type));
         }
         if( sink )
         {

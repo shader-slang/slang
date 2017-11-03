@@ -35,4 +35,25 @@
   <Type Name="Slang::NameLoc">
     <DisplayString>{{name={(char*)((*name).text.buffer.pointer+1), s} loc={loc.raw}}}</DisplayString>
   </Type>
+  
+  <Type Name="Slang::IRInst">
+    <DisplayString>{{{op}}}</DisplayString>
+    <Expand>
+      <Item Name="[OpCode]">op</Item>
+      <Item Name="[ArgCount]">argCount</Item>
+      <ArrayItems>
+        <Size>argCount</Size>
+        <ValuePointer>(IRUse*)(this + 1)</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+  <Type Name="Slang::IRBlock">
+    <Expand>
+      <LinkedListItems>
+        <HeadPointer>firstInst</HeadPointer>
+        <NextPointer>(Slang::IRInst*)next</NextPointer>
+        <ValueNode>this</ValueNode>
+      </LinkedListItems>
+    </Expand>
+  </Type>
 </AutoVisualizer>

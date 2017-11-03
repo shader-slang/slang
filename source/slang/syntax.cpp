@@ -376,6 +376,85 @@ void Type::accept(IValVisitor* visitor, void* extra)
             (int)(typeid(this).hash_code()));
     }
 
+    // ThisType
+
+    String ThisType::ToString()
+    {
+        return "<this_type>";
+    }
+
+    int ThisType::GetHashCode()
+    {
+        return 0;
+    }
+
+    bool ThisType::EqualsImpl(Type * type)
+    {
+        return true;
+    }
+
+    Type* ThisType::CreateCanonicalType()
+    {
+        // A declaration reference is already canonical
+        return this;
+    }
+
+    RefPtr<Val> ThisType::SubstituteImpl(Substitutions* subst, int* ioDiff)
+    {
+        while (subst)
+        {
+            if (auto thisTypeSubst = dynamic_cast<ThisTypeSubstitution*>(subst))
+            {
+                return thisTypeSubst->sourceType;
+            }
+            subst = subst->outer;
+        }
+        return this;
+    }
+
+    // MemberType
+    /*
+    String MemberType::ToString()
+    {
+        return objectType->ToString() + "::" + declRef.toString();
+    }
+
+    int MemberType::GetHashCode()
+    {
+        return combineHash(objectType->GetHashCode(), declRef.GetHashCode());
+    }
+
+    bool MemberType::EqualsImpl(Type * type)
+    {
+        if (auto memberType = dynamic_cast<MemberType*>(type))
+            return objectType->Equals(memberType->objectType.Ptr()) && declRef.Equals(memberType->declRef);
+        return false;
+    }
+
+    Type* MemberType::CreateCanonicalType()
+    {
+        if (auto declRefType = objectType->As<DeclRefType>())
+        {
+            if (auto aggDeclRef = declRefType->declRef.As<AggTypeDecl>())
+            {
+                Decl* targetDecl = nullptr;
+                if (aggDeclRef.getDecl()->memberDictionary.TryGetValue(declRef.getDecl()->nameAndLoc.name, targetDecl))
+                {
+                    if (auto typeDefDecl = dynamic_cast<TypeDefDecl*>(targetDecl))
+                        return typeDefDecl->type.type;
+                    else
+                        return DeclRefType::Create(getSession(), DeclRef<Decl>(targetDecl, aggDeclRef.substitutions));
+                }
+            }
+        }
+        return this;
+    }
+
+    RefPtr<Val> MemberType::SubstituteImpl(Substitutions* subst, int* ioDiff)
+    {
+        return this;
+    }
+    */
     // DeclRefType
 
     String DeclRefType::ToString()
@@ -451,16 +530,21 @@ void Type::accept(IValVisitor* visitor, void* extra)
         // we want to replace it with the actual associated type
         else if (auto assocTypeDecl = dynamic_cast<AssocTypeDecl*>(declRef.getDecl()))
         {
-            // search for a substitution that might apply to us
-            for (auto s = subst; s; s = s->outer.Ptr())
+            auto newSubst = declRef.substitutions->SubstituteImpl(subst, ioDiff);
+            if (auto thisTypeSubst = newSubst.As<ThisTypeSubstitution>())
             {
-                if (auto thisTypeSubst = dynamic_cast<ThisTypeSubstitution*>(s))
+                if (thisTypeSubst->sourceType)
                 {
                     if (auto aggTypeDeclRef = thisTypeSubst->sourceType.As<DeclRefType>()->declRef.As<AggTypeDecl>())
                     {
                         Decl * targetType = nullptr;
                         if (aggTypeDeclRef.getDecl()->memberDictionary.TryGetValue(assocTypeDecl->getName(), targetType))
-                            return DeclRefType::Create(this->getSession(), DeclRef<Decl>(targetType, aggTypeDeclRef.substitutions));
+                        {
+                            if (auto typeDefDecl = dynamic_cast<TypeDefDecl*>(targetType))
+                                return typeDefDecl->type.type;
+                            else
+                                return DeclRefType::Create(getSession(), DeclRef<Decl>(targetType, aggTypeDeclRef.substitutions));
+                        }
                     }
                 }
             }
@@ -1142,9 +1226,27 @@ void Type::accept(IValVisitor* visitor, void* extra)
         if (!this) return nullptr;
 
         int diff = 0;
-        auto outerSubst = outer->SubstituteImpl(subst, &diff);
-        
-        auto newSourceType = sourceType->SubstituteImpl(subst, ioDiff);
+        RefPtr<Substitutions> outerSubst;
+        if (outer)
+            outerSubst = outer->SubstituteImpl(subst, &diff);
+        RefPtr<Val> newSourceType;
+        if (sourceType)
+            newSourceType = sourceType->SubstituteImpl(subst, &diff);
+        else
+        {
+            // this_type is a free variable, use this_type from subst
+            auto psubst = subst;
+            while (psubst)
+            {
+                if (auto pthisSubst = dynamic_cast<ThisTypeSubstitution*>(subst))
+                {
+                    diff++;
+                    newSourceType = pthisSubst->sourceType;
+                    break;
+                }
+                psubst = psubst->outer;
+            }
+        }
         if (!diff) return this;
 
         (*ioDiff)++;
@@ -1162,7 +1264,9 @@ void Type::accept(IValVisitor* visitor, void* extra)
         auto thisSubst = dynamic_cast<ThisTypeSubstitution*>(subst);
         if (!thisSubst)
             return false;
-        if (!thisSubst->sourceType->EqualsVal(sourceType))
+        if (!sourceType && thisSubst->sourceType || sourceType && !thisSubst->sourceType)
+            return false;
+        if (thisSubst->sourceType && !thisSubst->sourceType->EqualsVal(sourceType))
             return false;
         if (!outer->Equals(subst->outer.Ptr()))
             return false;

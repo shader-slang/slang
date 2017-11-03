@@ -881,6 +881,11 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         }
     }
 
+    LoweredTypeInfo visitThisType(ThisType* type)
+    {
+        return LoweredTypeInfo();
+    }
+
     LoweredTypeInfo visitDeclRefType(DeclRefType* type)
     {
         // If the type in question comes from the module we are
@@ -2647,6 +2652,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo lowerFuncDecl(FunctionDeclBase* decl)
     {
+        if (decl->getName()->text == "test")
+            printf("break");
         // Collect the parameter lists we will use for our new function.
         ParameterLists parameterLists;
         collectParameterLists(decl, &parameterLists, kParameterListCollectMode_Default);

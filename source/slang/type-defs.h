@@ -55,6 +55,38 @@ protected:
 )
 END_SYNTAX_CLASS()
 
+SYNTAX_CLASS(ThisType, Type)
+RAW(
+    virtual String ToString() override;
+    virtual RefPtr<Val> SubstituteImpl(Substitutions* subst, int* ioDiff) override;
+    
+    ThisType()
+    {}
+    protected:
+        virtual int GetHashCode() override;
+        virtual bool EqualsImpl(Type * type) override;
+        virtual Type* CreateCanonicalType() override;
+    )
+END_SYNTAX_CLASS()
+
+/*
+SYNTAX_CLASS(MemberType, Type)
+    FIELD(RefPtr<Type>, objectType)
+    DECL_FIELD(DeclRef<Decl>, declRef)
+    RAW(
+    virtual String ToString() override;
+    virtual RefPtr<Val> SubstituteImpl(Substitutions* subst, int* ioDiff) override;
+
+    MemberType()
+    {}
+    protected:
+        virtual int GetHashCode() override;
+        virtual bool EqualsImpl(Type * type) override;
+        virtual Type* CreateCanonicalType() override;
+    )
+END_SYNTAX_CLASS()
+*/
+
 // A type that takes the form of a reference to some declaration
 SYNTAX_CLASS(DeclRefType, Type)
     DECL_FIELD(DeclRef<Decl>, declRef)
