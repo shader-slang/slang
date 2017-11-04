@@ -882,7 +882,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         }
     }
 
-    LoweredTypeInfo visitThisType(ThisType* type)
+    LoweredTypeInfo visitThisType(ThisType* /*type*/)
     {
         return LoweredTypeInfo();
     }

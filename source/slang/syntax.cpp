@@ -388,7 +388,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         return 0;
     }
 
-    bool ThisType::EqualsImpl(Type * type)
+    bool ThisType::EqualsImpl(Type * /*type*/)
     {
         return true;
     }
@@ -399,7 +399,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         return this;
     }
 
-    RefPtr<Val> ThisType::SubstituteImpl(Substitutions* subst, int* ioDiff)
+    RefPtr<Val> ThisType::SubstituteImpl(Substitutions* subst, int* /*ioDiff*/)
     {
         while (subst)
         {

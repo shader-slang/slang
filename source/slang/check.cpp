@@ -1661,7 +1661,7 @@ namespace Slang
                         if (!declRefType)
                             return false;
 
-                        auto subStructTypeDecl = declRefType->declRef.getDecl()->As<AggTypeDecl>();
+                        auto structTypeDecl = declRefType->declRef.getDecl()->As<AggTypeDecl>();
                         //TODO: What do we do if type is a generic specialization?
                         // i.e. if the struct defines typedef Generic<float> T; 
                         // how to check if T satisfies the associatedtype constraints?
@@ -1669,7 +1669,7 @@ namespace Slang
                         bool conformance = true;
                         for (auto & inheritanceDecl : constraintList)
                         {
-                            conformance = conformance && checkConformance(subStructTypeDecl, inheritanceDecl.Ptr());
+                            conformance = conformance && checkConformance(structTypeDecl, inheritanceDecl.Ptr());
                         }
                         return conformance;
                     }

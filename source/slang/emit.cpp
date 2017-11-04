@@ -1194,7 +1194,7 @@ struct EmitVisitor
         EmitDeclarator(declarator);
     }
 
-    void visitThisType(ThisType* type, TypeEmitArg const&)
+    void visitThisType(ThisType* /*type*/, TypeEmitArg const&)
     {
         return;
     }

@@ -2843,7 +2843,7 @@ struct LoweringVisitor
     {
         // not supported
         SLANG_UNREACHABLE("visitAssocTypeDecl in LowerVisitor");
-        return LoweredDecl();
+        UNREACHABLE_RETURN(LoweredDecl());
     }
 
     LoweredDecl visitTypeDefDecl(TypeDefDecl* decl)
