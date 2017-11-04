@@ -401,7 +401,7 @@ IRValue* getOneValOfType(
     // TODO: should make sure to handle vector and matrix types here
 
     SLANG_UNEXPECTED("inc/dec type");
-    return nullptr;
+    UNREACHABLE_RETURN(nullptr);
 }
 
 LoweredValInfo emitPreOp(
@@ -665,8 +665,10 @@ top:
         {
             auto boundSubscriptInfo = lowered.getBoundSubscriptInfo();
 
-            for (auto getter : getMembersOfType<GetterDecl>(boundSubscriptInfo->declRef))
+            auto getters = getMembersOfType<GetterDecl>(boundSubscriptInfo->declRef);
+            if (getters.Count())
             {
+                auto& getter = *getters.begin();
                 lowered = emitCallToDeclRef(
                     context,
                     boundSubscriptInfo->type,
@@ -677,7 +679,7 @@ top:
             }
 
             SLANG_UNEXPECTED("subscript had no getter");
-            return nullptr;
+            UNREACHABLE_RETURN(nullptr);
         }
         break;
 
@@ -694,7 +696,7 @@ top:
 
     default:
         SLANG_UNEXPECTED("unhandled value flavor");
-        return nullptr;
+        UNREACHABLE_RETURN(nullptr);
     }
 }
 
@@ -733,7 +735,7 @@ RefPtr<Type> getSimpleType(LoweredTypeInfo lowered)
 
     default:
         SLANG_UNEXPECTED("unhandled value flavor");
-        return nullptr;
+        UNREACHABLE_RETURN(nullptr);
     }
 }
 
@@ -1088,7 +1090,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         else
         {
             SLANG_UNIMPLEMENTED_X("codegen for deref expression");
-            return LoweredValInfo();
+            UNREACHABLE_RETURN(LoweredValInfo());
         }
     }
 
@@ -1257,7 +1259,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         else
         {
             SLANG_UNEXPECTED("shouldn't relaly happen");
-            addDirectCallArgs(expr, ioArgs);
+            UNREACHABLE(addDirectCallArgs(expr, ioArgs));
         }
     }
 
@@ -1453,7 +1455,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
         default:
             SLANG_UNIMPLEMENTED_X("subscript expr");
-            return LoweredValInfo();
+            UNREACHABLE_RETURN(LoweredValInfo());
         }
 
     }
@@ -2016,7 +2018,8 @@ top:
             auto type = subscriptInfo->type;
 
             // Search for an appropriate "setter" declaration
-            for (auto setterDeclRef : getMembersOfType<SetterDecl>(subscriptInfo->declRef))
+            auto setters = getMembersOfType<SetterDecl>(subscriptInfo->declRef);
+            if (setters.Count())
             {
                 auto allArgs = subscriptInfo->args;
                 
@@ -2025,7 +2028,7 @@ top:
                 emitCallToDeclRef(
                     context,
                     context->getSession()->getVoidType(),
-                    setterDeclRef,
+                    *setters.begin(),
                     nullptr,
                     allArgs);
                 return;
@@ -2860,7 +2863,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     // and then emit a dataflow error if this block
                     // can't be eliminated.
                     SLANG_UNEXPECTED("Needed a return here");
-                    subContext->irBuilder->emitReturn();
+                    UNREACHABLE(subContext->irBuilder->emitReturn());
                 }
             }
         }

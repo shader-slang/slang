@@ -271,9 +271,9 @@ BCConst getGlobalValue(
     }
 
     SLANG_UNEXPECTED("no ID for inst");
-    bcConst.flavor = (BCConstFlavor) -1;
-    bcConst.id = -9999;
-    return bcConst;
+    UNREACHABLE(bcConst.flavor = (BCConstFlavor) -1);
+    UNREACHABLE(bcConst.id = -9999);
+    UNREACHABLE_RETURN(bcConst);
 }
 
 Int getLocalID(
@@ -577,7 +577,7 @@ BytecodeGenerationPtr<BCType> emitBCTypeImpl(
 
 
     SLANG_UNEXPECTED("unimplemented");
-    return BytecodeGenerationPtr<BCType>();
+    UNREACHABLE_RETURN(BytecodeGenerationPtr<BCType>());
 }
 
 BytecodeGenerationPtr<BCType> emitBCType(

@@ -424,7 +424,7 @@ static SourceLoc getPosition(LoweredExpr const& expr)
     case LoweredExpr::Flavor::VaryingTuple: return expr.getVaryingTupleExpr()->loc;
     default:
         SLANG_UNREACHABLE("all cases handled");
-        return SourceLoc();
+        UNREACHABLE_RETURN(SourceLoc());
     }
 }
 
@@ -902,7 +902,7 @@ struct LoweringVisitor
 
         default:
             SLANG_UNREACHABLE("all cases handled");
-            return LoweredExpr();
+            UNREACHABLE_RETURN(LoweredExpr());
         }
     }
 

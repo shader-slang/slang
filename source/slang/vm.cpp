@@ -514,7 +514,7 @@ void computeTypeSizeAlign(
 
     default:
         SLANG_UNIMPLEMENTED_X("type sizing");
-        impl->size = 0;
+        UNREACHABLE(impl->size = 0);
         break;
     }
 
@@ -598,8 +598,8 @@ VMType loadVMType(
             return getType(vmModule->vm, impl);
         }
 
-        SLANG_UNEXPECTED("unimplemented");
-        return VMType();
+        UNREACHABLE(SLANG_UNEXPECTED("unimplemented"));
+        UNREACHABLE_RETURN(VMType());
         break;
     }
 }

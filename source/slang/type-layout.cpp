@@ -51,7 +51,7 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
 
         default:
             SLANG_UNEXPECTED("uhandled scalar type");
-            return SimpleLayoutInfo( LayoutResourceKind::Uniform, 0, 1 );
+            UNREACHABLE_RETURN(SimpleLayoutInfo( LayoutResourceKind::Uniform, 0, 1 ));
         }
     }
 
@@ -76,7 +76,7 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
 
         default:
             SLANG_UNEXPECTED("unhandled scalar type");
-            return SimpleLayoutInfo();
+            UNREACHABLE_RETURN(SimpleLayoutInfo());
         }
     }
 
@@ -364,8 +364,6 @@ struct GLSLPushConstantBufferObjectLayoutRulesImpl : GLSLObjectLayoutRulesImpl
         // Special-case the layout for a constant-buffer, because we don't
         // want it to allocate a descriptor-table slot
         return SimpleLayoutInfo(LayoutResourceKind::PushConstantBuffer, 1);
-
-        return GLSLObjectLayoutRulesImpl::GetObjectLayout(kind);
     }
 };
 GLSLPushConstantBufferObjectLayoutRulesImpl kGLSLPushConstantBufferObjectLayoutRulesImpl_;
@@ -401,7 +399,7 @@ struct HLSLObjectLayoutRulesImpl : ObjectLayoutRulesImpl
             // TODO: how to handle these?
         default:
             SLANG_UNEXPECTED("unhandled shader parameter kind");
-            return SimpleLayoutInfo();
+            UNREACHABLE_RETURN(SimpleLayoutInfo());
         }
     }
 };
@@ -717,7 +715,7 @@ static SimpleLayoutInfo getParameterBlockLayoutInfo(
     else
     {
         SLANG_UNEXPECTED("unhandled parameter block type");
-        return SimpleLayoutInfo();
+        UNREACHABLE_RETURN(SimpleLayoutInfo());
     }
 }
 

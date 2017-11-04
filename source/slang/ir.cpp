@@ -2540,7 +2540,7 @@ namespace Slang
 
         default:
             SLANG_UNEXPECTED("unimplemented");
-            return ScalarizedVal();
+            UNREACHABLE_RETURN(ScalarizedVal());
         }
 
     }
@@ -3064,7 +3064,7 @@ namespace Slang
 
         default:
             SLANG_UNEXPECTED("no value registered for IR value");
-            return nullptr;
+            UNREACHABLE_RETURN(nullptr);
         }
     }
 
@@ -3401,7 +3401,7 @@ namespace Slang
 
         default:
             SLANG_UNEXPECTED("unhandled case");
-            return "unknown";
+            UNREACHABLE_RETURN("unknown");
         }
     }
 
@@ -3503,7 +3503,7 @@ namespace Slang
         {
             // This shouldn't happen!
             SLANG_UNEXPECTED("no matching function registered");
-            return cloneSimpleFunc(context, originalFunc);
+            UNREACHABLE_RETURN(cloneSimpleFunc(context, originalFunc));
         }
 
         // We will try to track the "best" definition we can find.
@@ -3733,7 +3733,7 @@ namespace Slang
         else
         {
             SLANG_UNEXPECTED("unimplemented");
-            return nullptr;
+            UNREACHABLE_RETURN(nullptr);
         }
     }
 

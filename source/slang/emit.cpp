@@ -4667,7 +4667,7 @@ emitDeclImpl(decl, nullptr);
             if(!isDigit(c))
             {
                 SLANG_UNEXPECTED("bad name mangling");
-                return 0;
+                UNREACHABLE_RETURN(0);
             }
             get();
 
@@ -4700,7 +4700,7 @@ emitDeclImpl(decl, nullptr);
                 if(count > (end_ - cursor_))
                 {
                     SLANG_UNEXPECTED("bad name mangling");
-                    return result;
+                    UNREACHABLE_RETURN(result);
                 }
 
                 result = UnownedStringSlice(cursor_, cursor_ + count);

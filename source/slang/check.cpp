@@ -3328,7 +3328,7 @@ namespace Slang
                 // to `interfaceDeclRef`.
                 //
                 SLANG_UNEXPECTED("reflexive type witness");
-                return nullptr;
+                UNREACHABLE_RETURN(nullptr);
             }
 
             auto breadcrumbs = inBreadcrumbs;
@@ -3343,7 +3343,7 @@ namespace Slang
                 // because `A : B` and `B : C` then `A : C`
                 //
                 SLANG_UNEXPECTED("transitive type witness");
-                return nullptr;
+                UNREACHABLE_RETURN(nullptr);
             }
 
             // Simple case: we have a single declaration
@@ -5947,7 +5947,7 @@ namespace Slang
         RefPtr<Expr> visitStaticMemberExpr(StaticMemberExpr* expr)
         {
             SLANG_UNEXPECTED("should not occur in unchecked AST");
-            return expr;
+            UNREACHABLE_RETURN(expr);
         }
 
         RefPtr<Expr> lookupResultFailure(
