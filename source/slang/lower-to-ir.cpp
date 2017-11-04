@@ -362,7 +362,7 @@ LoweredValInfo emitCompoundAssignOp(
     IRValue* const* args)
 {
     auto builder = context->irBuilder;
-
+    SLANG_UNREFERENCED_PARAMETER(argCount);
     assert(argCount == 2);
     auto leftPtr = args[0];
     auto rightVal = args[1];
@@ -412,7 +412,7 @@ LoweredValInfo emitPreOp(
     IRValue* const* args)
 {
     auto builder = context->irBuilder;
-
+    SLANG_UNREFERENCED_PARAMETER(argCount);
     assert(argCount == 1);
     auto argPtr = args[0];
 
@@ -436,7 +436,7 @@ LoweredValInfo emitPostOp(
     IRValue* const* args)
 {
     auto builder = context->irBuilder;
-
+    SLANG_UNREFERENCED_PARAMETER(argCount);
     assert(argCount == 1);
     auto argPtr = args[0];
 

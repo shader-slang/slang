@@ -808,6 +808,7 @@ namespace Slang
 
         char const* cursor = token.Content.begin();
         char const* end = token.Content.end();
+        SLANG_UNREFERENCED_VARIABLE(end);
 
         auto quote = *cursor++;
         SLANG_ASSERT(quote == '\'' || quote == '"');
