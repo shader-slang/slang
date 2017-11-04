@@ -1213,7 +1213,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         }
 
         if (!outer)
-            return !subst->outer;
+            return !subst->outer || subst->outer.As<ThisTypeSubstitution>();
 
         if (!outer->Equals(subst->outer.Ptr()))
             return false;
@@ -1258,19 +1258,9 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     bool ThisTypeSubstitution::Equals(Substitutions* subst)
     {
-        // both must be NULL, or non-NULL
-        if (!this || !subst)
-            return !this && !subst;
-        auto thisSubst = dynamic_cast<ThisTypeSubstitution*>(subst);
-        if (!thisSubst)
-            return false;
-        if (!sourceType && thisSubst->sourceType || sourceType && !thisSubst->sourceType)
-            return false;
-        if (thisSubst->sourceType && !thisSubst->sourceType->EqualsVal(sourceType))
-            return false;
-        if (!outer->Equals(subst->outer.Ptr()))
-            return false;
-        return true;
+        if (subst && dynamic_cast<ThisTypeSubstitution*>(subst))
+            return true;
+        return false;
     }
 
 

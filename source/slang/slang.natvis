@@ -56,4 +56,13 @@
       </LinkedListItems>
     </Expand>
   </Type>
+  <Type Name="Slang::IRFunc">
+    <DisplayString>{{{mangledName}}}</DisplayString>
+    <Expand>
+      <Item Name="[Name]">mangledName</Item>
+      <Item Name="[ResultType]">(*(IRFuncType*)(type.pointer)).resultType</Item>
+      <Item Name="[ParameterTypes]">(*(IRFuncType*)(type.pointer)).paramTypes</Item>
+      <Item Name="[FirstBlock]">firstBlock</Item>
+    </Expand>
+  </Type>
 </AutoVisualizer>
