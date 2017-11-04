@@ -77,7 +77,6 @@ struct BytecodeGenerationPtr
 
     BytecodeGenerationPtr<T> operator+(Int index) const
     {
-        UInt size = sizeof(T);
         Int delta = index * sizeof(T);
         UInt newOffset = offset + delta;
         return BytecodeGenerationPtr<T>(
@@ -196,7 +195,7 @@ void encodeUInt(
 {
     if( value < 128 )
     {
-        encodeUInt8(context, value);
+        encodeUInt8(context, (uint8_t)value);
         return;
     }
 
@@ -242,10 +241,11 @@ BCConst getGlobalValue(
     BytecodeGenerationContext*  context,
     IRValue*                    value)
 {
-    BCConst bcConst;
-    if( context->shared->mapValueToGlobal.TryGetValue(value, bcConst) )
-        return bcConst;
-
+    {
+        BCConst bcConst;
+        if (context->shared->mapValueToGlobal.TryGetValue(value, bcConst))
+            return bcConst;
+    }
     // Next we need to check for things that can be mapped to
     // global IDs on the fly.
 
@@ -348,7 +348,6 @@ void generateBytecodeForInst(
             //
 
             auto argCount = inst->getArgCount();
-            auto type = inst->getType();
             encodeUInt(context, inst->op);
             encodeOperand(context, inst->getType());
             encodeUInt(context, argCount);
@@ -392,13 +391,13 @@ void generateBytecodeForInst(
 
     case kIROp_FloatLit:
         {
-            auto ii = (IRConstant*) inst;
-            encodeUInt(context, ii->op);
-            encodeOperand(context, ii->getType());
+            auto cInst = (IRConstant*) inst;
+            encodeUInt(context, cInst->op);
+            encodeOperand(context, cInst->getType());
 
             static const UInt size = sizeof(IRFloatingPointValue);
             unsigned char buffer[size];
-            memcpy(buffer, &ii->u.floatVal, sizeof(buffer));
+            memcpy(buffer, &cInst->u.floatVal, sizeof(buffer));
 
             for(UInt ii = 0; ii < size; ++ii)
             {
@@ -840,7 +839,7 @@ BytecodeGenerationPtr<BCSymbol> generateBytecodeSymbolForInst(
                     }
                 }
             }
-            assert(regCounter == regCount);
+            assert((UInt)regCounter == regCount);
 
             // Now that we've allocated our blocks and our registers
             // we can go through the actual process of emitting instructions. Hooray!
@@ -851,7 +850,7 @@ BytecodeGenerationPtr<BCSymbol> generateBytecodeSymbolForInst(
             List<UInt> blockOffsets;
             for( auto bb = irFunc->getFirstBlock(); bb; bb = bb->getNextBlock() )
             {
-                UInt blockID = blockCounter++;
+                blockCounter++;
 
                 // Get local bytecode offset for current block.
                 UInt blockOffset = subContext->currentBytecode.Count();
@@ -1054,8 +1053,6 @@ void generateBytecodeContainer(
 
     // TODO: Need to dump BC representation of compiled kernel codes
     // for each specified code-generation target.
-
-    UInt translationUnitCount = compileReq->translationUnits.Count();
 
     List<BytecodeGenerationPtr<BCModule>> bcModulesList;
     for (auto translationUnitReq : compileReq->translationUnits)

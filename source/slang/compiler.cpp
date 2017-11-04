@@ -827,10 +827,9 @@ String dissassembleDXILUsingDXC(
     }
 
     void emitEntryPoints(
-        TargetRequest*          targetReq)
+        TargetRequest*          /*targetReq*/)
     {
-        CompileRequest* compileReq = targetReq->compileRequest;
-
+        
     }
 
     void generateOutputForTarget(

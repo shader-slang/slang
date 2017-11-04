@@ -359,7 +359,7 @@ GLSLObjectLayoutRulesImpl kGLSLObjectLayoutRulesImpl;
 
 struct GLSLPushConstantBufferObjectLayoutRulesImpl : GLSLObjectLayoutRulesImpl
 {
-    virtual SimpleLayoutInfo GetObjectLayout(ShaderParameterKind kind) override
+    virtual SimpleLayoutInfo GetObjectLayout(ShaderParameterKind /*kind*/) override
     {
         // Special-case the layout for a constant-buffer, because we don't
         // want it to allocate a descriptor-table slot

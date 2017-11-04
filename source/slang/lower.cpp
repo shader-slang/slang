@@ -2236,11 +2236,11 @@ struct LoweringVisitor
 
     Modifiers shallowCloneModifiers(Modifiers const& oldModifiers)
     {
-        RefPtr<SharedModifiers> shared = new SharedModifiers();
-        shared->next = oldModifiers.first;
+        RefPtr<SharedModifiers> sharedModifiers = new SharedModifiers();
+        sharedModifiers->next = oldModifiers.first;
 
         Modifiers newModifiers;
-        newModifiers.first = shared;
+        newModifiers.first = sharedModifiers;
         return newModifiers;
     }
 
@@ -3809,12 +3809,12 @@ struct LoweringVisitor
             "Vector").As<GenericDecl>();
         auto vectorTypeDecl = vectorGenericDecl->inner;
                
-        auto substitutions = new Substitutions();
-        substitutions->genericDecl = vectorGenericDecl.Ptr();
-        substitutions->args.Add(elementType);
-        substitutions->args.Add(elementCount);
+        auto substs = new Substitutions();
+        substs->genericDecl = vectorGenericDecl.Ptr();
+        substs->args.Add(elementType);
+        substs->args.Add(elementCount);
 
-        auto declRef = DeclRef<Decl>(vectorTypeDecl.Ptr(), substitutions);
+        auto declRef = DeclRef<Decl>(vectorTypeDecl.Ptr(), substs);
 
         return DeclRefType::Create(
             session,

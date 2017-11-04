@@ -475,7 +475,7 @@ namespace Slang
         bool CoerceToProperTypeImpl(
             TypeExp const&  typeExp,
             RefPtr<Type>*   outProperType,
-            DiagnosticSink* sink)
+            DiagnosticSink* diagSink)
         {
             Type* type = typeExp.type.Ptr();
             if(!type && typeExp.exp)
@@ -505,11 +505,11 @@ namespace Slang
                     {
                         if (!typeParam->initType.exp)
                         {
-                            if (sink)
+                            if (diagSink)
                             {
                                 if (!isRewriteMode())
                                 {
-                                    sink->diagnose(typeExp.exp.Ptr(), Diagnostics::unimplemented, "can't fill in default for generic type parameter");
+                                    diagSink->diagnose(typeExp.exp.Ptr(), Diagnostics::unimplemented, "can't fill in default for generic type parameter");
                                 }
                                 *outProperType = getSession()->getErrorType();
                             }
@@ -524,11 +524,11 @@ namespace Slang
                     {
                         if (!valParam->initExpr)
                         {
-                            if (sink)
+                            if (diagSink)
                             {
                                 if (!isRewriteMode())
                                 {
-                                    sink->diagnose(typeExp.exp.Ptr(), Diagnostics::unimplemented, "can't fill in default for generic type parameter");
+                                    diagSink->diagnose(typeExp.exp.Ptr(), Diagnostics::unimplemented, "can't fill in default for generic type parameter");
                                 }
                                 *outProperType = getSession()->getErrorType();
                             }
@@ -1484,7 +1484,7 @@ namespace Slang
         }
 
         bool doesSignatureMatchRequirement(
-            CallableDecl*           memberDecl,
+            CallableDecl*           /*memberDecl*/,
             DeclRef<CallableDecl>   requiredMemberDeclRef)
         {
             // TODO: actually implement matching here. For now we'll
@@ -1923,8 +1923,8 @@ namespace Slang
 
             for (UInt cc = 0; cc < constraintCount; ++cc)
             {
-                auto fstConstraint = fstConstraints[cc];
-                auto sndConstraint = sndConstraints[cc];
+                //auto fstConstraint = fstConstraints[cc];
+                //auto sndConstraint = sndConstraints[cc];
 
                 // TODO: the challenge here is that the
                 // constraints are going to be expressed
@@ -4083,7 +4083,7 @@ namespace Slang
         // Create a witness that attests to the fact that `type`
         // is equal to itself.
         RefPtr<Val> createTypeEqualityWitness(
-            Type*   type)
+            Type*   /*type*/)
         {
             SLANG_UNEXPECTED("unimplemented");
         }
@@ -5944,7 +5944,7 @@ namespace Slang
             }
         }
 
-        RefPtr<Expr> visitStaticMemberExpr(StaticMemberExpr* expr)
+        RefPtr<Expr> visitStaticMemberExpr(StaticMemberExpr* /*expr*/)
         {
             SLANG_UNEXPECTED("should not occur in unchecked AST");
             UNREACHABLE_RETURN(expr);

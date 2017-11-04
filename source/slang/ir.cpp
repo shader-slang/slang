@@ -206,14 +206,13 @@ namespace Slang
     void IRBuilder::addInst(
         IRInst*     inst)
     {
-        auto insertBefore = insertBeforeInst;
         if(insertBeforeInst)
         {
             inst->insertBefore(insertBeforeInst);
             return;
         }
 
-        auto parent = block;
+        auto parent = curBlock;
         if (!parent)
             return;
 
@@ -221,7 +220,7 @@ namespace Slang
     }
 
     static IRValue* createValueImpl(
-        IRBuilder*  builder,
+        IRBuilder*  /*builder*/,
         UInt        size,
         IROp        op,
         IRType*     type)
@@ -249,7 +248,7 @@ namespace Slang
     // arguments *after* the type (which is a mandatory
     // argument for all instructions).
     static IRInst* createInstImpl(
-        IRBuilder*      builder,
+        IRBuilder*      /*builder*/,
         UInt            size,
         IROp            op,
         IRType*         type,
@@ -261,7 +260,6 @@ namespace Slang
         IRInst* inst = (IRInst*) malloc(size);
         memset(inst, 0, size);
 
-        auto module = builder->getModule();
         inst->argCount = fixedArgCount + varArgCount;
 
         inst->op = op;
@@ -494,7 +492,7 @@ namespace Slang
         key.inst = &keyInst;
 
         IRConstant* irValue = nullptr;
-        if( builder->shared->constantMap.TryGetValue(key, irValue) )
+        if( builder->sharedBuilder->constantMap.TryGetValue(key, irValue) )
         {
             // We found a match, so just use that.
             return irValue;
@@ -511,7 +509,7 @@ namespace Slang
         memcpy(&irValue->u, value, valueSize);
 
         key.inst = irValue;
-        builder->shared->constantMap.Add(key, irValue);
+        builder->sharedBuilder->constantMap.Add(key, irValue);
 
         return irValue;
     }
@@ -819,12 +817,12 @@ namespace Slang
 
     IRFunc* IRBuilder::createFunc()
     {
-        IRFunc* func = createValue<IRFunc>(
+        IRFunc* rsFunc = createValue<IRFunc>(
             this,
             kIROp_Func,
             nullptr);
-        addGlobalValue(getModule(), func);
-        return func;
+        addGlobalValue(getModule(), rsFunc);
+        return rsFunc;
     }
 
     IRGlobalVar* IRBuilder::createGlobalVar(
@@ -882,11 +880,11 @@ namespace Slang
     {
         auto bb = createBlock();
 
-        auto f = this->func;
+        auto f = this->curFunc;
         if (f)
         {
             f->addBlock(bb);
-            this->block = bb;
+            this->curBlock = bb;
         }
         return bb;
     }
@@ -899,7 +897,7 @@ namespace Slang
             kIROp_Param,
             type);
 
-        if (auto bb = block)
+        if (auto bb = curBlock)
         {
             bb->addParam(param);
         }
@@ -1119,13 +1117,13 @@ namespace Slang
     }
 
     IRInst* IRBuilder::emitBranch(
-        IRBlock*    block)
+        IRBlock*    pBlock)
     {
         auto inst = createInst<IRUnconditionalBranch>(
             this,
             kIROp_unconditionalBranch,
             nullptr,
-            block);
+            pBlock);
         addInst(inst);
         return inst;
     }
@@ -1687,7 +1685,7 @@ namespace Slang
 
         dumpChildrenRaw(context, block);
     }
-
+#if 0
     static void dumpChildrenRaw(
         IRDumpContext*  context,
         IRFunc*         func)
@@ -1710,7 +1708,7 @@ namespace Slang
         dumpIndent(context);
         dump(context, "}\n");
     }
-
+#endif
     static void dumpInst(
         IRDumpContext*  context,
         IRInst*         inst)
@@ -2229,7 +2227,6 @@ namespace Slang
 
     void IRInst::removeArguments()
     {
-        UInt argCount = this->argCount;
         for( UInt aa = 0; aa < argCount; ++aa )
         {
             IRUse& use = getArgs()[aa];
@@ -2270,7 +2267,7 @@ namespace Slang
         shared.session = session;
 
         IRBuilder builder;
-        builder.shared = &shared;
+        builder.sharedBuilder = &shared;
 
         RefPtr<PtrType> ptrType = session->getPtrType(valueType);
 
@@ -2374,9 +2371,9 @@ namespace Slang
         IRBuilder*                  builder,
         Type*                       type,
         VarLayout*                  varLayout,
-        TypeLayout*                 typeLayout,
-        LayoutResourceKind          kind,
-        GlobalVaryingDeclarator*    declarator)
+        TypeLayout*                 /*typeLayout*/,
+        LayoutResourceKind          /*kind*/,
+        GlobalVaryingDeclarator*    /*declarator*/)
     {
         // TODO: We might be creating an `in` or `out` variable based on
         // an `in out` function parameter. In this case we should
@@ -2658,8 +2655,8 @@ namespace Slang
         shared.module = module;
         shared.session = session;
         IRBuilder builder;
-        builder.shared = &shared;
-        builder.func = func;
+        builder.sharedBuilder = &shared;
+        builder.curFunc = func;
 
         // We will start by looking at the return type of the
         // function, because that will enable us to do an
@@ -2716,7 +2713,7 @@ namespace Slang
                     IRValue* returnValue = returnInst->getVal();
 
                     // Make sure we add these instructions to the right block
-                    builder.block = bb;
+                    builder.curBlock = bb;
 
                     // Write to our global variable(s) from the value being returned.
                     assign(&builder, resultGlobal, ScalarizedVal::value(returnValue));
@@ -2768,7 +2765,7 @@ namespace Slang
 
                 // Any initialization code we insert nees to be at the start
                 // of the block:
-                builder.block = firstBlock;
+                builder.curBlock = firstBlock;
                 builder.insertBeforeInst = firstBlock->getFirstInst();
 
                 // TODO: We need to distinguish any true pointers in the
@@ -2827,7 +2824,7 @@ namespace Slang
                             break;
                         }
 
-                        builder.block = bb;
+                        builder.curBlock = bb;
                         builder.insertBeforeInst = terminatorInst;
 
                         assign(&builder, globalOutputVal, localVal);
@@ -3216,7 +3213,7 @@ namespace Slang
         {
             auto clonedKey = context->maybeCloneValue(originalEntry->requirementKey.usedValue);
             auto clonedVal = context->maybeCloneValue(originalEntry->satisfyingVal.usedValue);
-            auto clonedEntry = context->builder->createWitnessTableEntry(
+            /*auto clonedEntry = */context->builder->createWitnessTableEntry(
                 clonedTable,
                 clonedKey,
                 clonedVal);
@@ -3240,7 +3237,7 @@ namespace Slang
         // Next we are going to clone the actual code.
         IRBuilder builderStorage = *context->builder;
         IRBuilder* builder = &builderStorage;
-        builder->func = clonedFunc;
+        builder->curFunc = clonedFunc;
 
         // We will walk through the blocks of the function, and clone each of them.
         //
@@ -3256,7 +3253,7 @@ namespace Slang
             registerClonedValue(context, clonedBlock, originalBlock);
 
             // We can go ahead and clone parameters here, while we are at it.
-            builder->block = clonedBlock;
+            builder->curBlock = clonedBlock;
             for (auto originalParam = originalBlock->getFirstParam();
                 originalParam;
                 originalParam = originalParam->getNextParam())
@@ -3277,7 +3274,7 @@ namespace Slang
             {
                 assert(cb);
 
-                builder->block = cb;
+                builder->curBlock = cb;
                 for (auto oi = ob->getFirstInst(); oi; oi = oi->getNextInst())
                 {
                     cloneInst(context, builder, oi);
@@ -3575,7 +3572,7 @@ namespace Slang
         sharedBuilder->session = session;
 
         IRBuilder* builder = &sharedContext->builderStorage;
-        builder->shared = sharedBuilder;
+        builder->sharedBuilder = sharedBuilder;
 
         if( !module )
         {

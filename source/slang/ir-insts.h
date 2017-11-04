@@ -320,25 +320,25 @@ struct SharedIRBuilder
 struct IRBuilder
 {
     // Shared state for all IR builders working on the same module
-    SharedIRBuilder*    shared;
+    SharedIRBuilder*    sharedBuilder;
 
     Session* getSession()
     {
-        return shared->getSession();
+        return sharedBuilder->getSession();
     }
 
-    IRModule* getModule() { return shared->module; }
+    IRModule* getModule() { return sharedBuilder->module; }
 
     // The current function and block being inserted into
     // (or `null` if we aren't inserting).
-    IRFunc*     func = nullptr;
-    IRBlock*    block = nullptr;
+    IRFunc*     curFunc = nullptr;
+    IRBlock*    curBlock = nullptr;
     //
     // An instruction in the current block that we should insert before
     IRInst*     insertBeforeInst = nullptr;
 
-    IRFunc*     getFunc() { return func; }
-    IRBlock*    getBlock() { return block; }
+    IRFunc*     getFunc() { return curFunc; }
+    IRBlock*    getBlock() { return curBlock; }
 
     void addInst(IRBlock* block, IRInst* inst);
     void addInst(IRInst* inst);

@@ -167,7 +167,6 @@ namespace Slang
             IDxcBlobEncoding* dxcErrorBlob = nullptr;
             if (!FAILED(dxcResult->GetErrorBuffer(&dxcErrorBlob)))
             {
-                void* data = dxcErrorBlob->GetBufferPointer();
                 compileRequest->mSink.diagnoseRaw(
                     FAILED(resultCode) ? Severity::Error : Severity::Warning,
                     (char const*)dxcErrorBlob->GetBufferPointer());

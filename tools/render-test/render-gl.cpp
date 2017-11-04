@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "core/basic.h"
+#include "core/secure-crt.h"
 #include "external/stb/stb_image_write.h"
 
 // TODO(tfoley): eventually we should be able to run these
@@ -736,7 +737,7 @@ public:
         {
             glSamplerParameteri(rs.handle, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
             glSamplerParameteri(rs.handle, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-            glSamplerParameteri(rs.handle, GL_TEXTURE_MAX_ANISOTROPY_EXT, 8.0f);
+            glSamplerParameteri(rs.handle, GL_TEXTURE_MAX_ANISOTROPY_EXT, 8);
         }
         else
         {
@@ -802,7 +803,8 @@ public:
     virtual void serializeOutput(BindingState* state, const char * fileName)
     {
         GLBindingState * glState = (GLBindingState*)state;
-        FILE * f = fopen(fileName, "wt");
+        FILE * f;
+        fopen_s(&f, fileName, "wt");
         for (auto & entry : glState->entries)
         {
             if (entry.isOutput)

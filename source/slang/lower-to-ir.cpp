@@ -668,11 +668,10 @@ top:
             auto getters = getMembersOfType<GetterDecl>(boundSubscriptInfo->declRef);
             if (getters.Count())
             {
-                auto& getter = *getters.begin();
                 lowered = emitCallToDeclRef(
                     context,
                     boundSubscriptInfo->type,
-                    getter,
+                    *getters.begin(),
                     nullptr,
                     boundSubscriptInfo->args);
                 goto top;
@@ -838,7 +837,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     IRBuilder* getBuilder() { return context->irBuilder; }
 
-    LoweredValInfo visitVal(Val* val)
+    LoweredValInfo visitVal(Val* /*val*/)
     {
         SLANG_UNIMPLEMENTED_X("value lowering");
     }
@@ -1005,7 +1004,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         return info;
     }
 
-    LoweredValInfo visitOverloadedExpr(OverloadedExpr* expr)
+    LoweredValInfo visitOverloadedExpr(OverloadedExpr* /*expr*/)
     {
         SLANG_UNEXPECTED("overloaded expressions should not occur in checked AST");
     }
@@ -1019,7 +1018,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         return subscriptValue(type, baseVal, indexVal);
     }
 
-    LoweredValInfo visitThisExpr(ThisExpr* expr)
+    LoweredValInfo visitThisExpr(ThisExpr* /*expr*/)
     {
         return context->thisVal;
     }
@@ -1099,7 +1098,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         return lowerSubExpr(expr->base);
     }
 
-    LoweredValInfo visitInitializerListExpr(InitializerListExpr* expr)
+    LoweredValInfo visitInitializerListExpr(InitializerListExpr* /*expr*/)
     {
         SLANG_UNIMPLEMENTED_X("codegen for initializer list expression");
     }
@@ -1123,7 +1122,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         SLANG_UNEXPECTED("unexpected constant type");
     }
 
-    LoweredValInfo visitAggTypeCtorExpr(AggTypeCtorExpr* expr)
+    LoweredValInfo visitAggTypeCtorExpr(AggTypeCtorExpr* /*expr*/)
     {
         SLANG_UNIMPLEMENTED_X("codegen for aggregate type constructor expression");
     }
@@ -1134,8 +1133,6 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         InvokeExpr*     expr,
         List<IRValue*>* ioArgs)
     {
-        auto& irArgs = *ioArgs;
-
         for( auto arg : expr->Arguments )
         {
             // TODO: Need to handle case of l-value arguments,
@@ -1164,8 +1161,6 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         List<IRValue*>*         ioArgs,
         List<OutArgumentFixup>* ioFixups)
     {
-        auto funcDecl = funcDeclRef.getDecl();
-        auto& args = expr->Arguments;
         UInt argCount = expr->Arguments.Count();
         UInt argIndex = 0;
         for (auto paramDeclRef : getMembersOfType<ParamDecl>(funcDeclRef))
@@ -1499,17 +1494,17 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         return emitDeclRef(context, expr->declRef);
     }
 
-    LoweredValInfo visitSelectExpr(SelectExpr* expr)
+    LoweredValInfo visitSelectExpr(SelectExpr* /*expr*/)
     {
         SLANG_UNIMPLEMENTED_X("codegen for select expression");
     }
 
-    LoweredValInfo visitGenericAppExpr(GenericAppExpr* expr)
+    LoweredValInfo visitGenericAppExpr(GenericAppExpr* /*expr*/)
     {
         SLANG_UNIMPLEMENTED_X("generic application expression during code generation");
     }
 
-    LoweredValInfo visitSharedTypeExpr(SharedTypeExpr* expr)
+    LoweredValInfo visitSharedTypeExpr(SharedTypeExpr* /*expr*/)
     {
         SLANG_UNIMPLEMENTED_X("shared type expression during code generation");
     }
@@ -1615,7 +1610,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
     IRBuilder* getBuilder() { return context->irBuilder; }
 
-    void visitStmt(Stmt* stmt)
+    void visitStmt(Stmt* /*stmt*/)
     {
         SLANG_UNIMPLEMENTED_X("stmt catch-all");
     }
@@ -1634,7 +1629,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     {
         auto builder = getBuilder();
 
-        auto prevBlock = builder->block;
+        auto prevBlock = builder->curBlock;
         auto parentFunc = prevBlock->parentFunc;
 
         // If the previous block doesn't already have
@@ -1647,8 +1642,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         parentFunc->addBlock(block);
 
-        builder->func = parentFunc;
-        builder->block = block;
+        builder->curFunc = parentFunc;
+        builder->curBlock = block;
     }
 
     // Start a new block at the current location.
@@ -2055,17 +2050,17 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return context->irBuilder;
     }
 
-    LoweredValInfo visitDeclBase(DeclBase* decl)
+    LoweredValInfo visitDeclBase(DeclBase* /*decl*/)
     {
         SLANG_UNIMPLEMENTED_X("decl catch-all");
     }
 
-    LoweredValInfo visitDecl(Decl* decl)
+    LoweredValInfo visitDecl(Decl* /*decl*/)
     {
         SLANG_UNIMPLEMENTED_X("decl catch-all");
     }
 
-    LoweredValInfo visitGenericTypeParamDecl(GenericTypeParamDecl* decl)
+    LoweredValInfo visitGenericTypeParamDecl(GenericTypeParamDecl* /*decl*/)
     {
         return LoweredValInfo();
     }
@@ -2116,7 +2111,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             auto irRequirement = context->irBuilder->getDeclRefVal(requiredMemberDeclRef);
             auto irSatisfyingVal = getSimpleVal(context, ensureDecl(context, satisfyingMemberDecl));
 
-            auto witnessTableEntry = context->irBuilder->createWitnessTableEntry(
+            context->irBuilder->createWitnessTableEntry(
                 witnessTable,
                 irRequirement,
                 irSatisfyingVal);
@@ -2678,7 +2673,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // need to create an IR function here
 
         IRFunc* irFunc = subBuilder->createFunc();
-        subBuilder->func = irFunc;
+        subBuilder->curFunc = irFunc;
 
         trySetMangledName(irFunc, decl);
 
@@ -2730,7 +2725,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             //
             IRType* irParamType = irResultType;
             paramTypes.Add(irParamType);
-            IRParam* irParam = subBuilder->emitParam(irParamType);
+            subBuilder->emitParam(irParamType);
 
             // TODO: we need some way to wire this up to the `newValue`
             // or whatever name we give for that parameter inside
@@ -2766,7 +2761,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // This is a function definition, so we need to actually
             // construct IR for the body...
             IRBlock* entryBlock = subBuilder->emitBlock();
-            subBuilder->block = entryBlock;
+            subBuilder->curBlock = entryBlock;
 
             UInt paramTypeIndex = 0;
             for( auto paramInfo : parameterLists.params )
@@ -2847,7 +2842,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
             // We need to carefully add a terminator instruction to the end
             // of the body, in case the user didn't do so.
-            if (!isTerminatorInst(subContext->irBuilder->block->lastInst))
+            if (!isTerminatorInst(subContext->irBuilder->curBlock->lastInst))
             {
                 if (irResultType->Equals(context->getSession()->getVoidType()))
                 {
@@ -2950,7 +2945,7 @@ LoweredValInfo ensureDecl(
         return result;
 
     IRBuilder subIRBuilder;
-    subIRBuilder.shared = context->irBuilder->shared;
+    subIRBuilder.sharedBuilder = context->irBuilder->sharedBuilder;
 
     IRGenContext subContext = *context;
 
@@ -3171,7 +3166,7 @@ IRModule* generateIRForTranslationUnit(
 
     IRBuilder builderStorage;
     IRBuilder* builder = &builderStorage;
-    builder->shared = sharedBuilder;
+    builder->sharedBuilder = sharedBuilder;
 
     IRModule* module = builder->createModule();
     sharedBuilder->module = module;
