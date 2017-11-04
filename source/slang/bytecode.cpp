@@ -271,9 +271,12 @@ BCConst getGlobalValue(
     }
 
     SLANG_UNEXPECTED("no ID for inst");
-    UNREACHABLE(bcConst.flavor = (BCConstFlavor) -1);
-    UNREACHABLE(bcConst.id = -9999);
-    UNREACHABLE_RETURN(bcConst);
+    {
+        UNREACHABLE(BCConst bcConst);
+        UNREACHABLE(bcConst.flavor = (BCConstFlavor)-1);
+        UNREACHABLE(bcConst.id = -9999);
+        UNREACHABLE_RETURN(bcConst);
+    }
 }
 
 Int getLocalID(

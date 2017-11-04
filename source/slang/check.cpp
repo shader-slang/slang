@@ -5993,7 +5993,7 @@ namespace Slang
         RefPtr<Expr> visitStaticMemberExpr(StaticMemberExpr* /*expr*/)
         {
             SLANG_UNEXPECTED("should not occur in unchecked AST");
-            UNREACHABLE_RETURN(expr);
+            UNREACHABLE_RETURN(nullptr);
         }
 
         RefPtr<Expr> lookupResultFailure(
