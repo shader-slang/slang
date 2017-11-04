@@ -156,7 +156,7 @@ BCPtr<void>::RawVal allocateRaw(
     for(size_t ii = currentOffset; ii < endOffset; ++ii)
         context->shared->bytecode.Add(0);
 
-    return beginOffset;
+    return (BCPtr<void>::RawVal)beginOffset;
 }
 
 template<typename T>
@@ -258,7 +258,7 @@ BCConst getGlobalValue(
 
             BCConst bcConst;
             bcConst.flavor = kBCConstFlavor_Constant;
-            bcConst.id = constID;
+            bcConst.id = (uint32_t)constID;
 
             context->shared->mapValueToGlobal.Add(value, bcConst);
 
@@ -481,7 +481,7 @@ BytecodeGenerationPtr<BCType> emitBCType(
     auto bcArgs = (bcType + 1).bitCast<BCPtr<uint8_t>>();
 
     bcType->op = op;
-    bcType->argCount = argCount;
+    bcType->argCount = (uint32_t)argCount;
 
     for(UInt aa = 0; aa < argCount; ++aa)
     {
@@ -491,7 +491,7 @@ BytecodeGenerationPtr<BCType> emitBCType(
     UInt id = context->shared->bcTypes.Count();
     context->shared->mapTypeToID.Add(type, id);
     context->shared->bcTypes.Add(bcType);
-    bcType->id = id;
+    bcType->id = (uint32_t)id;
 
     return bcType;
 }
@@ -705,7 +705,7 @@ BytecodeGenerationPtr<BCSymbol> generateBytecodeSymbolForInst(
             // Allocate the array of block objects to be stored in the
             // bytecode file.
             auto bcBlocks = allocateArray<BCBlock>(context, blockCount);
-            bcFunc->blockCount = blockCount;
+            bcFunc->blockCount = (uint32_t)blockCount;
             bcFunc->blocks = bcBlocks;
 
             // Now loop through the blocks again, and allocate the storage
@@ -752,7 +752,7 @@ BytecodeGenerationPtr<BCSymbol> generateBytecodeSymbolForInst(
                     }
                 }
 
-                bcBlocks[blockID].paramCount = paramCount;
+                bcBlocks[blockID].paramCount = (uint32_t)paramCount;
             }
 
             // Okay, we've counted how many registers we need for each block,
@@ -760,7 +760,7 @@ BytecodeGenerationPtr<BCSymbol> generateBytecodeSymbolForInst(
             UInt regCount = regCounter;
             auto bcRegs = allocateArray<BCReg>(context, regCount);
 
-            bcFunc->regCount = regCount;
+            bcFunc->regCount = (uint32_t)regCount;
             bcFunc->regs = bcRegs;
 
             // Now we will loop over things again to fill in the information
@@ -788,7 +788,7 @@ BytecodeGenerationPtr<BCSymbol> generateBytecodeSymbolForInst(
 #if 0
                     bcRegs[localID].name = tryGenerateNameForSymbol(context, pp);
 #endif
-                    bcRegs[localID].previousVarIndexPlusOne = localID;
+                    bcRegs[localID].previousVarIndexPlusOne = (uint32_t)localID;
                     bcRegs[localID].typeID = getTypeIDForGlobalSymbol(context, pp);
                 }
 
@@ -810,7 +810,7 @@ BytecodeGenerationPtr<BCSymbol> generateBytecodeSymbolForInst(
 #if 0
                             bcRegs[localID].name = tryGenerateNameForSymbol(context, ii);
 #endif
-                            bcRegs[localID].previousVarIndexPlusOne = localID;
+                            bcRegs[localID].previousVarIndexPlusOne = (uint32_t)localID;
                             bcRegs[localID].typeID = getTypeIDForGlobalSymbol(context, ii);
                         }
                         break;
@@ -830,11 +830,11 @@ BytecodeGenerationPtr<BCSymbol> generateBytecodeSymbolForInst(
 #if 0
                             bcRegs[localID].name = tryGenerateNameForSymbol(context, ii);
 #endif
-                            bcRegs[localID].previousVarIndexPlusOne = localID;
+                            bcRegs[localID].previousVarIndexPlusOne = (uint32_t)localID;
                             bcRegs[localID].typeID = getTypeIDForGlobalSymbol(context, ii);
 
                             bcRegs[localID+1].op = ii->op;
-                            bcRegs[localID+1].previousVarIndexPlusOne = localID+1;
+                            bcRegs[localID+1].previousVarIndexPlusOne = (uint32_t)localID+1;
                             bcRegs[localID+1].typeID = getTypeID(context,
                                 (ii->getType()->As<PtrType>())->getValueType());
                         }
@@ -905,7 +905,7 @@ BytecodeGenerationPtr<BCSymbol> generateBytecodeSymbolForInst(
             UInt constCount = subContext->remappedGlobalSymbols.Count();
             auto bcConsts = allocateArray<BCConst>(context, constCount);
 
-            bcFunc->constCount = constCount;
+            bcFunc->constCount = (uint32_t)constCount;
             bcFunc->consts = bcConsts;
 
             for( UInt cc = 0; cc < constCount; ++cc )
@@ -971,7 +971,7 @@ BytecodeGenerationPtr<BCModule> generateBytecodeForModule(
         // Ensure that local code inside functions can see these symbols
         BCConst bcConst;
         bcConst.flavor = kBCConstFlavor_GlobalSymbol;
-        bcConst.id = globalID;
+        bcConst.id = (uint32_t)globalID;
         context->shared->mapValueToGlobal.Add(gv, bcConst);
 
         // In the global scope, global IDs are also the local IDs
@@ -980,7 +980,7 @@ BytecodeGenerationPtr<BCModule> generateBytecodeForModule(
 
     auto bcSymbols = allocateArray<BCPtr<BCSymbol>>(context, symbolCount);
 
-    bcModule->symbolCount = symbolCount;
+    bcModule->symbolCount = (uint32_t)symbolCount;
     bcModule->symbols = bcSymbols;
 
     for( auto gv = irModule->getFirstGlobalValue(); gv; gv = gv->getNextValue() )
@@ -1000,7 +1000,7 @@ BytecodeGenerationPtr<BCModule> generateBytecodeForModule(
     // At this point we should have identified all the literals we need:
     UInt constantCount = context->shared->constants.Count();
     auto bcConstants = allocateArray<BCConstant>(context, constantCount);
-    bcModule->constantCount = constantCount;
+    bcModule->constantCount = (uint32_t)constantCount;
     bcModule->constants = bcConstants;
 
     for(UInt cc = 0; cc < constantCount; ++cc)
@@ -1028,7 +1028,7 @@ BytecodeGenerationPtr<BCModule> generateBytecodeForModule(
     // At this point we should have collected all the types we need:
     UInt typeCount = context->shared->bcTypes.Count();
     auto bcTypes = allocateArray<BCPtr<BCType>>(context, typeCount);
-    bcModule->typeCount = typeCount;
+    bcModule->typeCount = (uint32_t)typeCount;
     bcModule->types = bcTypes;
 
     for(UInt tt = 0; tt < typeCount; ++tt)
@@ -1065,7 +1065,7 @@ void generateBytecodeContainer(
     }
 
     UInt bcModuleCount = bcModulesList.Count();
-    header->moduleCount = bcModuleCount;
+    header->moduleCount = (uint32_t)bcModuleCount;
 
     auto bcModules = allocateArray<BCPtr<BCModule>>(context, bcModuleCount);
     header->modules = bcModules;

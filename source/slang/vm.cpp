@@ -587,7 +587,7 @@ VMType loadVMType(
             VMTypeImpl* impl = (VMTypeImpl*) alloca(size);
             memset(impl, 0, size);
             impl->op = bcType->op;
-            impl->argCount = argCount;
+            impl->argCount = (uint32_t)argCount;
             
             VMVal* args = (VMVal*) (impl + 1);
             for(UInt aa = 0; aa < argCount; ++aa)
@@ -732,7 +732,7 @@ void* findGlobalSymbolPtr(
             continue;
 
         if(strcmp(symbolName, name) == 0)
-            return getGlobalPtr(module, ss);
+            return getGlobalPtr(module, (uint32_t)ss);
     }
 
     return nullptr;

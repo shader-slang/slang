@@ -394,7 +394,7 @@ public:
         }
 
         dxImmediateContext->OMSetRenderTargets(
-            dxRenderTargetViews.Count(),
+            (UINT)dxRenderTargetViews.Count(),
             dxRenderTargetViews.Buffer(),
             NULL);
 
@@ -771,7 +771,7 @@ public:
     {
         auto dxContext = dxImmediateContext;
         D3D11_BUFFER_DESC desc = {0};
-        desc.ByteWidth = bufferData.Count() * sizeof(unsigned int);
+        desc.ByteWidth = (UINT)(bufferData.Count() * sizeof(unsigned int));
         if (bufferDesc.type == InputBufferType::ConstantBuffer)
         {
             desc.Usage = D3D11_USAGE_DEFAULT;
@@ -965,7 +965,7 @@ public:
             case ShaderInputType::Buffer:
             {
                 createInputBuffer(entry.bufferDesc, entry.bufferData, rsEntry.buffer, rsEntry.uav, rsEntry.srv);
-                rsEntry.bufferLength = entry.bufferData.Count() * sizeof(unsigned int);
+                rsEntry.bufferLength = (int)(entry.bufferData.Count() * sizeof(unsigned int));
             }
             break;
             case ShaderInputType::Texture:
