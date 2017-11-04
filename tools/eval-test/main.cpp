@@ -3,7 +3,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-
+#include "../../source/core/secure-crt.h"
 #include <slang.h>
 
 int main(
