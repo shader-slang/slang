@@ -74,5 +74,8 @@ namespace Slang
 #define SLANG_RELEASE_ASSERT(VALUE) if(VALUE) {} else Slang::signalUnexpectedError("assertion failed")
 #define SLANG_RELEASE_EXPECT(VALUE, WHAT) if(VALUE) {} else SLANG_UNEXPECTED(WHAT)
 
+template<typename T> void slang_use_obj(T&) {}
 
+#define SLANG_UNREFERENCED_PARAMETER(P) slang_use_obj(P)
+#define SLANG_UNREFERENCED_VARIABLE(P) slang_use_obj(P)
 #endif
