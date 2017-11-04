@@ -3835,10 +3835,10 @@ struct LoweringVisitor
             "Vector").As<GenericDecl>();
         auto vectorTypeDecl = vectorGenericDecl->inner;
                
-        auto substitutions = new GenericSubstitution();
-        substitutions->genericDecl = vectorGenericDecl.Ptr();
-        substitutions->args.Add(elementType);
-        substitutions->args.Add(elementCount);
+        auto substs = new GenericSubstitution();
+        substs->genericDecl = vectorGenericDecl.Ptr();
+        substs->args.Add(elementType);
+        substs->args.Add(elementCount);
 
         auto declRef = DeclRef<Decl>(vectorTypeDecl.Ptr(), substs);
 
