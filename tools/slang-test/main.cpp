@@ -674,6 +674,7 @@ TestResult runSimpleTest(TestInput& input)
     // Otherwise we compare to the expected output
     if (actualOutput != expectedOutput)
     {
+        maybeDumpOutput(expectedOutput, actualOutput);
         result = kTestResult_Fail;
     }
 
@@ -1147,6 +1148,14 @@ TestResult runComputeComparisonImpl(TestInput& input, const char * langOption, S
 	}
 
     auto actualOutput = getOutput(spawner);
+    auto expectedOutput = getExpectedOutput(outputStem);
+    if (actualOutput != expectedOutput)
+    {
+        String actualOutputPath = outputStem + ".actual";
+        Slang::File::WriteAllText(actualOutputPath, actualOutput);
+
+        return kTestResult_Fail;
+    }
 
 	// check against reference output
     if (!File::Exists(actualOutputFile))

@@ -245,6 +245,7 @@ DIAGNOSTIC(38003, Error, entryPointSymbolNotAFunction, "entry point '$0' must be
 
 DIAGNOSTIC(38100, Error, typeDoesntImplementInterfaceRequirement, "type '$0' does not provide required interface member '$1'")
 DIAGNOSTIC(38101, Error, thisExpressionOutsideOfTypeDecl, "'this' expression can only be used in members of an aggregate type")
+DIAGNOSTIC(38102, Error, initializerNotInsideType, "an 'init' declaration is only allowed inside a type or 'extension' declaration")
 
 //
 // 4xxxx - IL code generation.
