@@ -2572,7 +2572,8 @@ struct LoweringVisitor
         else if (auto thisSubst = dynamic_cast<ThisTypeSubstitution*>(inSubstitutions))
         {
             RefPtr<ThisTypeSubstitution> result = new ThisTypeSubstitution();
-            result->sourceType = translateVal(result->sourceType);
+            if (result->sourceType)
+                result->sourceType = translateVal(result->sourceType);
             return result;
         }
         return nullptr;
