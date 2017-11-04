@@ -260,7 +260,7 @@ namespace Slang
         IRInst* inst = (IRInst*) malloc(size);
         memset(inst, 0, size);
 
-        inst->argCount = fixedArgCount + varArgCount;
+        inst->argCount = (uint32_t)(fixedArgCount + varArgCount);
 
         inst->op = op;
 
