@@ -3,7 +3,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-
+#include "../../source/core/secure-crt.h"
 #include <slang.h>
 
 int main(
@@ -16,7 +16,8 @@ int main(
     char const* inputPath = argv[1];
 
     // Slurp in the input file, so that we can compile and run it
-    FILE* inputFile = fopen(inputPath, "rb");
+    FILE* inputFile;
+    fopen_s(&inputFile, inputPath, "rb");
     assert(inputFile);
 
     fseek(inputFile, 0, SEEK_END);

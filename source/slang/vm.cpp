@@ -513,8 +513,8 @@ void computeTypeSizeAlign(
         break;
 
     default:
-        impl->size = 0;
         SLANG_UNIMPLEMENTED_X("type sizing");
+        UNREACHABLE(impl->size = 0);
         break;
     }
 
@@ -597,6 +597,9 @@ VMType loadVMType(
 
             return getType(vmModule->vm, impl);
         }
+
+        UNREACHABLE(SLANG_UNEXPECTED("unimplemented"));
+        UNREACHABLE_RETURN(VMType());
         break;
     }
 }
@@ -860,7 +863,7 @@ void resumeThread(
         case kIROp_BufferStore:
             {
                 VMType resultType = decodeType(frame, &ip);
-                /*UInt argCount =*/ decodeUInt(&ip);
+                /*UInt argCount = */decodeUInt(&ip);
 
                 char* bufferData = decodeOperand<char*>(frame, &ip);
                 uint32_t index = decodeOperand<uint32_t>(frame, &ip);
@@ -1021,7 +1024,7 @@ void resumeThread(
                 // knowing too much about an instruction...
 
                 VMType resultType = decodeType(frame, &ip);
-                /*UInt argCount =*/ decodeUInt(&ip);
+                /*UInt argCount = */decodeUInt(&ip);
                 void* argPtrs[16] = { 0 };
                 auto leftOpnd = decodeOperandPtrAndType(frame, &ip);
                 auto type = leftOpnd.type;
@@ -1046,7 +1049,7 @@ void resumeThread(
         case kIROp_Mul:
             {
                 VMType type = decodeType(frame, &ip);
-                /*UInt argCount =*/ decodeUInt(&ip);
+                /*UInt argCount = */decodeUInt(&ip);
                 void* leftPtr = decodeOperandPtr<void>(frame, &ip);
                 void* rightPtr = decodeOperandPtr<void>(frame, &ip);
 
@@ -1068,7 +1071,7 @@ void resumeThread(
         case kIROp_Sub:
             {
                 VMType type = decodeType(frame, &ip);
-                /*UInt argCount =*/ decodeUInt(&ip);
+                /*UInt argCount = */decodeUInt(&ip);
                 void* leftPtr = decodeOperandPtr<void>(frame, &ip);
                 void* rightPtr = decodeOperandPtr<void>(frame, &ip);
 

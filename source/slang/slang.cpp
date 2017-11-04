@@ -963,8 +963,8 @@ spGetTranslationUnitCount(
 
 // Get the output code associated with a specific translation unit
 SLANG_API char const* spGetTranslationUnitSource(
-    SlangCompileRequest*    request,
-    int                     translationUnitIndex)
+    SlangCompileRequest*    /*request*/,
+    int                     /*translationUnitIndex*/)
 {
     fprintf(stderr, "DEPRECATED: spGetTranslationUnitSource()\n");
     return nullptr;

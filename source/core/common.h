@@ -43,6 +43,14 @@ namespace Slang
 #define SLANG_RETURN_NEVER /* empty */
 #endif
 
+#ifdef _MSC_VER
+#define UNREACHABLE_RETURN(x)
+#define UNREACHABLE(x)
+#else
+#define UNREACHABLE_RETURN(x) return x;
+#define UNREACHABLE(x) x;
+#endif
+
     SLANG_RETURN_NEVER void signalUnexpectedError(char const* message);
 }
 

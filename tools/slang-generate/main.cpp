@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "../../source/core/secure-crt.h"
 
 struct StringSpan
 {
@@ -401,7 +402,8 @@ int main(
 
     // Read the contents o the file and translate it into a "template" file
 
-    FILE* inputStream = fopen(inputPath, "rb");
+    FILE* inputStream;
+    fopen_s(&inputStream, inputPath, "rb");
     fseek(inputStream, 0, SEEK_END);
     size_t inputSize = ftell(inputStream);
     fseek(inputStream, 0, SEEK_SET);
@@ -415,9 +417,10 @@ int main(
     Node* node = readInput(input, inputEnd);
 
     char outputPath[1024];
-    sprintf(outputPath, "%s.h", inputPath);
+    sprintf_s(outputPath, "%s.h", inputPath);
 
-    FILE* outputStream = fopen(outputPath, "w");
+    FILE* outputStream;
+    fopen_s(&outputStream, outputPath, "w");
 
     emitBody(outputStream, node);
 

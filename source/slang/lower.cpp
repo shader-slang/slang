@@ -424,7 +424,7 @@ static SourceLoc getPosition(LoweredExpr const& expr)
     case LoweredExpr::Flavor::VaryingTuple: return expr.getVaryingTupleExpr()->loc;
     default:
         SLANG_UNREACHABLE("all cases handled");
-        return SourceLoc();
+        UNREACHABLE_RETURN(SourceLoc());
     }
 }
 
@@ -907,7 +907,7 @@ struct LoweringVisitor
 
         default:
             SLANG_UNREACHABLE("all cases handled");
-            return LoweredExpr();
+            UNREACHABLE_RETURN(LoweredExpr());
         }
     }
 
@@ -2241,11 +2241,11 @@ struct LoweringVisitor
 
     Modifiers shallowCloneModifiers(Modifiers const& oldModifiers)
     {
-        RefPtr<SharedModifiers> shared = new SharedModifiers();
-        shared->next = oldModifiers.first;
+        RefPtr<SharedModifiers> sharedModifiers = new SharedModifiers();
+        sharedModifiers->next = oldModifiers.first;
 
         Modifiers newModifiers;
-        newModifiers.first = shared;
+        newModifiers.first = sharedModifiers;
         return newModifiers;
     }
 
@@ -3840,7 +3840,7 @@ struct LoweringVisitor
         substitutions->args.Add(elementType);
         substitutions->args.Add(elementCount);
 
-        auto declRef = DeclRef<Decl>(vectorTypeDecl.Ptr(), substitutions);
+        auto declRef = DeclRef<Decl>(vectorTypeDecl.Ptr(), substs);
 
         return DeclRefType::Create(
             session,

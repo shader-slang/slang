@@ -58,10 +58,10 @@ namespace Slang
     {
         if( auto constVal = dynamic_cast<ConstantIntVal*>(val) )
         {
-            auto val = constVal->value;
-            if( val >= 0 && val <= 9 )
+            auto cVal = constVal->value;
+            if(cVal >= 0 && cVal <= 9 )
             {
-                emit(context, (UInt) val);
+                emit(context, (UInt)cVal);
                 return;
             }
         }

@@ -3394,7 +3394,7 @@ namespace Slang
         return expr;
     }
 
-    static RefPtr<Expr> parseBoolLitExpr(Parser* parser, bool value)
+    static RefPtr<Expr> parseBoolLitExpr(Parser* /*parser*/, bool value)
     {
         RefPtr<ConstantExpr> constExpr = new ConstantExpr();
         constExpr->ConstType = ConstantExpr::ConstantType::Bool;

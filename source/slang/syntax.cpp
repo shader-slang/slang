@@ -886,6 +886,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
     bool NamedExpressionType::EqualsImpl(Type * /*type*/)
     {
         SLANG_UNEXPECTED("unreachable");
+        UNREACHABLE_RETURN(false);
     }
 
     Type* NamedExpressionType::CreateCanonicalType()
@@ -896,6 +897,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
     int NamedExpressionType::GetHashCode()
     {
         SLANG_UNEXPECTED("unreachable");
+        UNREACHABLE_RETURN(0);
     }
 
     // FuncType
@@ -1033,6 +1035,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
     int TypeType::GetHashCode()
     {
         SLANG_UNEXPECTED("unreachable");
+        UNREACHABLE_RETURN(0);
     }
 
     // GenericDeclRefType
@@ -1304,6 +1307,8 @@ void Type::accept(IValVisitor* visitor, void* extra)
             return expr;
 
         SLANG_UNIMPLEMENTED_X("generic substitution into expressions");
+
+        UNREACHABLE_RETURN(expr);
     }
 
 
@@ -1483,6 +1488,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         else
         {
             SLANG_UNEXPECTED("unhandled syntax class name");
+            UNREACHABLE_RETURN(nullptr);
         }
     }
 

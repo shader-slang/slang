@@ -1089,7 +1089,7 @@ public:
                 }
                 else
                 {
-                    printf("invalid output type at %d.\n");
+                    printf("invalid output type at %d.\n", id);
                 }
             }
             id++;
