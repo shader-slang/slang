@@ -765,11 +765,6 @@ struct LoweringVisitor
             loweredDeclRef.As<Decl>());
     }
 
-    RefPtr<Type> visitThisType(ThisType* type)
-    {
-        return type;
-    }
-
     RefPtr<Type> visitNamedExpressionType(NamedExpressionType* type)
     {
         if (shared->target == CodeGenTarget::GLSL)

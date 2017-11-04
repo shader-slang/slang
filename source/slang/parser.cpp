@@ -2087,7 +2087,7 @@ namespace Slang
         return decl;
     }
 
-    static void parseOptionalInheritanceClause(Parser* parser, ContainerDecl* decl)
+    static void parseOptionalInheritanceClause(Parser* parser, AggTypeDecl* decl)
     {
         if( AdvanceIf(parser, TokenType::Colon) )
         {

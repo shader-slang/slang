@@ -1194,11 +1194,6 @@ struct EmitVisitor
         EmitDeclarator(declarator);
     }
 
-    void visitThisType(ThisType* /*type*/, TypeEmitArg const&)
-    {
-        return;
-    }
-
     void visitDeclRefType(DeclRefType* declRefType, TypeEmitArg const& arg)
     {
         auto declarator = arg.declarator;

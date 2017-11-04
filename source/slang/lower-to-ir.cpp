@@ -882,11 +882,6 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         }
     }
 
-    LoweredTypeInfo visitThisType(ThisType* /*type*/)
-    {
-        return LoweredTypeInfo();
-    }
-
     LoweredTypeInfo visitDeclRefType(DeclRefType* type)
     {
         // If the type in question comes from the module we are
