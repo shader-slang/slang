@@ -1155,7 +1155,12 @@ namespace Slang
     RefPtr<Substitutions> createDefaultSubstitutions(
         Session* session,
         Decl*   decl);
-    
+
+    RefPtr<ThisTypeSubstitution> getNewThisTypeSubst(DeclRefBase & declRef);
+    RefPtr<ThisTypeSubstitution> getThisTypeSubst(DeclRefBase & declRef, bool insertSubstEntry);
+    void removeSubstitution(DeclRefBase & declRef, RefPtr<Substitutions> subst);
+    bool hasGenericSubstitutions(RefPtr<Substitutions> subst);
+
 } // namespace Slang
 
 #endif

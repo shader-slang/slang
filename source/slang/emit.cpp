@@ -395,8 +395,7 @@ struct EmitVisitor
     void emitRawTextSpan(char const* textBegin, char const* textEnd)
     {
         // TODO(tfoley): Need to make "corelib" not use `int` for pointer-sized things...
-        auto len = int(textEnd - textBegin);
-
+        auto len = textEnd - textBegin;
         context->shared->sb.Append(textBegin, len);
     }
 

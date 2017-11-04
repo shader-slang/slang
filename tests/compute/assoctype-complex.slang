@@ -1,7 +1,7 @@
 //TEST(smoke, compute):COMPARE_COMPUTE:-xslang -use-ir
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out
 
-RWStructuredBuffer<float> outputBuffer;
+RWStructuredBuffer<int> outputBuffer;
 interface IBase
 {
      associatedtype V;
@@ -16,9 +16,10 @@ interface ISimple
 struct Val : IBase
 {
     typedef int V;
+    int base;
     V sub(V a0, V a1)
     {
-        return a0-a1;
+        return a0 - a1 + base;
     }
 };
 
@@ -42,6 +43,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     Simple s;
     Val v0, v1;
-	float outVal = test(s, v0, v1); // == 1.0
+    v0.base = 1;
+    v1.base = 2;
+	int outVal = test<Simple>(s, v0, v1); // == 4.0
 	outputBuffer[dispatchThreadID.x] = outVal;
 }

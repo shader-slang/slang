@@ -2652,8 +2652,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo lowerFuncDecl(FunctionDeclBase* decl)
     {
-        if (decl->getName()->text == "test")
-            printf("break");
         // Collect the parameter lists we will use for our new function.
         ParameterLists parameterLists;
         collectParameterLists(decl, &parameterLists, kParameterListCollectMode_Default);
@@ -3086,7 +3084,7 @@ LoweredValInfo emitDeclRef(
 
     // If this declaration reference doesn't involve any specializations,
     // then we are done at this point.
-    if(!declRef.substitutions)
+    if(!hasGenericSubstitutions(declRef.substitutions))
         return loweredDecl;
 
     auto val = getSimpleVal(context, loweredDecl);

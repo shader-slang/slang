@@ -530,7 +530,14 @@ void Type::accept(IValVisitor* visitor, void* extra)
         // we want to replace it with the actual associated type
         else if (auto assocTypeDecl = dynamic_cast<AssocTypeDecl*>(declRef.getDecl()))
         {
+            auto thisSubst = getThisTypeSubst(declRef, false);
+            auto oldSubstSrc = thisSubst ? thisSubst->sourceType : nullptr;
+            bool restore = false;
+            if (thisSubst && thisSubst->sourceType.Ptr() == dynamic_cast<Val*>(this))
+                thisSubst->sourceType = nullptr;
             auto newSubst = declRef.substitutions->SubstituteImpl(subst, ioDiff);
+            if (restore)
+                thisSubst->sourceType = oldSubstSrc;
             if (auto thisTypeSubst = newSubst.As<ThisTypeSubstitution>())
             {
                 if (thisTypeSubst->sourceType)
@@ -1258,6 +1265,8 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     bool ThisTypeSubstitution::Equals(Substitutions* subst)
     {
+        if (!subst)
+            return true;
         if (subst && dynamic_cast<ThisTypeSubstitution*>(subst))
             return true;
         return false;
@@ -1323,7 +1332,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         if (decl != declRef.decl)
             return false;
         if (!substitutions)
-            return !declRef.substitutions;
+            return !declRef.substitutions || declRef.substitutions.As<ThisTypeSubstitution>();
         if (!substitutions->Equals(declRef.substitutions.Ptr()))
             return false;
 
@@ -1633,5 +1642,78 @@ void Type::accept(IValVisitor* visitor, void* extra)
     }
 
 
+
+    void insertSubstAtTop(DeclRefBase & declRef, RefPtr<Substitutions> substToInsert)
+    {
+        substToInsert->outer = declRef.substitutions;
+        declRef.substitutions = substToInsert;
+    }
+
+    RefPtr<ThisTypeSubstitution> getThisTypeSubst(DeclRefBase & declRef, bool insertSubstEntry)
+    {
+        RefPtr<ThisTypeSubstitution> thisSubst;
+        auto subst = declRef.substitutions;
+        while (subst)
+        {
+            if (auto s = subst.As<ThisTypeSubstitution>())
+            {
+                thisSubst = s;
+                break;
+            }
+            subst = subst->outer;
+        }
+        if (!thisSubst)
+        {
+            thisSubst = new ThisTypeSubstitution();
+            if (insertSubstEntry)
+            {
+                insertSubstAtTop(declRef, thisSubst);
+            }
+        }
+        return thisSubst;
+    }
+
+    RefPtr<ThisTypeSubstitution> getNewThisTypeSubst(DeclRefBase & declRef)
+    {
+        auto oldSubst = getThisTypeSubst(declRef, false);
+        if (oldSubst)
+            removeSubstitution(declRef, oldSubst);
+        return getThisTypeSubst(declRef, true);
+    }
+
+    void removeSubstitution(DeclRefBase & declRef, RefPtr<Substitutions> toRemove)
+    {
+        if (!declRef.substitutions)
+            return;
+        if (toRemove == declRef.substitutions)
+        {
+            declRef.substitutions = declRef.substitutions->outer;
+            return;
+        }
+        auto prev = declRef.substitutions;
+        auto subst = prev->outer;
+        while (subst)
+        {
+            if (subst == toRemove)
+            {
+                prev->outer = subst->outer;
+                break;
+            }
+            prev = subst;
+            subst = subst->outer;
+        }
+    }
+
+    bool hasGenericSubstitutions(RefPtr<Substitutions> subst)
+    {
+        auto p = subst.Ptr();
+        while (p)
+        {
+            if (dynamic_cast<GenericSubstitution*>(p))
+                return true;
+            p = p->outer.Ptr();
+        }
+        return false;
+    }
 
 }
