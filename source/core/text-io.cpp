@@ -196,8 +196,11 @@ namespace Slang
 
     bool HasNullBytes(char * str, int len)
     {
-        for (int i = 0; i < len; i++)
-            if (str[len] == 0)
+        bool hasSeenNull = false;
+        for (int i = 0; i < len - 1; i++)
+            if (str[i] == 0)
+                hasSeenNull = true;
+            else if (hasSeenNull)
                 return true;
         return false;
     }
@@ -223,7 +226,9 @@ namespace Slang
 		{
             // find null bytes
             if (HasNullBytes(buffer.Buffer(), (int)buffer.Count()))
+            {
                 return Encoding::UTF16;
+            }
 			return Encoding::UTF8;
 		}
 	}
@@ -231,6 +236,7 @@ namespace Slang
 	void StreamReader::ReadBuffer()
 	{
 		buffer.SetSize(4096);
+        memset(buffer.Buffer(), 0, buffer.Count() * sizeof(buffer[0]));
 		auto len = stream->Read(buffer.Buffer(), buffer.Count());
 		buffer.SetSize((int)len);
 		ptr = 0;
