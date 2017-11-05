@@ -871,9 +871,12 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto subs = declRef.substitutions;
         while(subs)
         {
-            for(auto aa : subs->args)
+            if (auto genSubst = subs.As<GenericSubstitution>())
             {
-                (*ioArgs).Add(getSimpleVal(context, lowerVal(context, aa)));
+                for (auto aa : genSubst->args)
+                {
+                    (*ioArgs).Add(getSimpleVal(context, lowerVal(context, aa)));
+                }
             }
             subs = subs->outer;
         }
@@ -2060,6 +2063,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         SLANG_UNIMPLEMENTED_X("decl catch-all");
     }
 
+    LoweredValInfo visitTypeDefDecl(TypeDefDecl * decl)
+    {
+        return LoweredValInfo::simple(context->irBuilder->getTypeVal(decl->type.type));
+    }
+
     LoweredValInfo visitGenericTypeParamDecl(GenericTypeParamDecl* /*decl*/)
     {
         return LoweredValInfo();
@@ -2303,9 +2311,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             ensureDecl(context, inheritanceDecl);
         }
 
-        // For now, we don't have an IR-level representation
-        // for the type itself.
-        return LoweredValInfo();
+        // TODO: we currently store a Decl* in the witness table, which causes this function
+        // being invoked to translate the witness table entry into an IRValue.
+        // We should really allow a witness table entry to represent a type and not having to
+        // construct the type here. The current implementation will not work when the struct type
+        // is defined in a generic parent (we lose the environmental substitutions).
+        return LoweredValInfo::simple(context->irBuilder->getTypeVal(DeclRefType::Create(context->getSession(), 
+            DeclRef<Decl>(decl, nullptr))));
     }
 
 
@@ -3029,24 +3041,33 @@ RefPtr<Substitutions> lowerSubstitutions(
 {
     if(!subst)
         return nullptr;
+    RefPtr<Substitutions> result;
+    if (auto genSubst = dynamic_cast<GenericSubstitution*>(subst))
+    {
+        RefPtr<GenericSubstitution> newSubst = new GenericSubstitution();
+        newSubst->genericDecl = genSubst->genericDecl;
 
-    RefPtr<Substitutions> newSubst = new Substitutions();
+        for (auto arg : genSubst->args)
+        {
+            auto newArg = lowerSubstitutionArg(context, arg);
+            newSubst->args.Add(newArg);
+        }
+
+        result = newSubst;
+    }
+    else if (auto thisSubst = dynamic_cast<ThisTypeSubstitution*>(subst))
+    {
+        RefPtr<ThisTypeSubstitution> newSubst = new ThisTypeSubstitution();
+        newSubst->sourceType = lowerSubstitutionArg(context, thisSubst->sourceType);
+        result = newSubst;
+    }
     if (subst->outer)
     {
-        newSubst->outer = lowerSubstitutions(
+        result->outer = lowerSubstitutions(
             context,
             subst->outer);
     }
-
-    newSubst->genericDecl = subst->genericDecl;
-
-    for (auto arg : subst->args)
-    {
-        auto newArg = lowerSubstitutionArg(context, arg);
-        newSubst->args.Add(newArg);
-    }
-
-    return newSubst;
+    return result;
 }
 
 LoweredValInfo emitDeclRef(
@@ -3059,7 +3080,7 @@ LoweredValInfo emitDeclRef(
 
     // If this declaration reference doesn't involve any specializations,
     // then we are done at this point.
-    if(!declRef.substitutions)
+    if(!hasGenericSubstitutions(declRef.substitutions))
         return loweredDecl;
 
     auto val = getSimpleVal(context, loweredDecl);

@@ -35,4 +35,66 @@
   <Type Name="Slang::NameLoc">
     <DisplayString>{{name={(char*)((*name).text.buffer.pointer+1), s} loc={loc.raw}}}</DisplayString>
   </Type>
+  <Type Name="Slang::IRValue">
+    <DisplayString>{{{op}}}</DisplayString>
+    <Expand>
+      <Item Name="[OpCode]">op</Item>
+      <Item Name="[Type]">type</Item>
+      <Item Name="[IRInst]">(Slang::IRInst*)this</Item>
+      <ExpandedItem Condition="op==kIROp_decl_ref">(Slang::IRDeclRef*)this</ExpandedItem>
+      <ExpandedItem Condition="op==kIROp_Func">(Slang::IRFunc*)this</ExpandedItem>
+      <ExpandedItem Condition="op==kIROp_Block">(Slang::IRBlock*)this</ExpandedItem>
+      <Item Name="====Uses====">"-------"</Item>
+      <LinkedListItems>
+        <HeadPointer>firstUse</HeadPointer>
+        <NextPointer>nextUse</NextPointer>
+        <ValueNode>usedValue</ValueNode>
+      </LinkedListItems> 
+    
+  </Expand>
+  </Type>
+  <Type Name="Slang::IRUser">
+    <DisplayString>{{{op}}}</DisplayString>
+    <Expand>
+      <Item Name="[OpCode]">op</Item>
+      <Item Name="[ArgCount]">argCount</Item>
+      <ArrayItems>
+        <Size>argCount</Size>
+        <ValuePointer>(IRUse*)(this + 1)</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+  <Type Name="Slang::IRBlock">
+    <Expand>
+      <LinkedListItems>
+        <HeadPointer>firstInst</HeadPointer>
+        <NextPointer>(Slang::IRInst*)next</NextPointer>
+        <ValueNode>this</ValueNode>
+      </LinkedListItems>
+    </Expand>
+  </Type>
+  <Type Name="Slang::IRFunc">
+    <DisplayString>{{{mangledName}}}</DisplayString>
+    <Expand>
+      <Item Name="[Name]">mangledName</Item>
+      <Item Name="[ResultType]">(*(IRFuncType*)(type.pointer)).resultType</Item>
+      <Item Name="[ParameterTypes]">(*(IRFuncType*)(type.pointer)).paramTypes</Item>
+      <Item Name="[FirstBlock]">firstBlock</Item>
+    </Expand>
+  </Type>
+  
+  <Type Name="Slang::IRDeclRef">
+    <DisplayString>{{IRDeclRef {declRef}}}</DisplayString>
+    <Expand>
+      <Item Name="[OpCode]">op</Item>
+      <ExpandedItem>declRef</ExpandedItem>
+    </Expand>
+  </Type>
+  <Type Name="Slang::IRUse">
+    <DisplayString>{{IRUse {usedValue}}}</DisplayString>
+    <Expand>
+      <Item Name="[NextUse]">nextUse</Item>
+      <ExpandedItem>usedValue</ExpandedItem>
+    </Expand>
+  </Type>
 </AutoVisualizer>

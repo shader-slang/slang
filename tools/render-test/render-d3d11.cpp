@@ -714,7 +714,8 @@ public:
 		if (request.computeShader.name)
 		{
 			auto dxComputeShaderBlob = compileHLSLShader(request.computeShader.source.path, request.computeShader.source.text, request.computeShader.name, request.computeShader.profile);
-			if (!dxComputeShaderBlob)     return nullptr;
+			if (!dxComputeShaderBlob) 
+                return nullptr;
 
 			ID3D11ComputeShader* dxComputeShader;
 

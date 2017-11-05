@@ -395,8 +395,7 @@ struct EmitVisitor
     void emitRawTextSpan(char const* textBegin, char const* textEnd)
     {
         // TODO(tfoley): Need to make "corelib" not use `int` for pointer-sized things...
-        auto len = int(textEnd - textBegin);
-
+        auto len = textEnd - textBegin;
         context->shared->sb.Append(textBegin, len);
     }
 
@@ -1039,7 +1038,6 @@ struct EmitVisitor
     UNEXPECTED(PtrType);
 
 #undef UNEXPECTED
-
     void visitNamedExpressionType(NamedExpressionType* type, TypeEmitArg const& arg)
     {
         // Named types are valid for GLSL
@@ -2917,7 +2915,7 @@ struct EmitVisitor
                 return;
             }
 
-            Substitutions* subst = declRef.substitutions.Ptr();
+            GenericSubstitution* subst = declRef.substitutions.As<GenericSubstitution>().Ptr();
             if (!subst)
                 return;
 
@@ -3008,6 +3006,12 @@ struct EmitVisitor
         EmitType(decl->type, decl->getNameAndLoc());
         Emit(";\n");
     }
+
+    void visitAssocTypeDecl(AssocTypeDecl * /*assocType*/, DeclEmitArg const&)
+    {
+        SLANG_UNREACHABLE("visitAssocTypeDecl in EmitVisitor");
+    }
+
 
     void visitImportDecl(ImportDecl* decl, DeclEmitArg const&)
     {

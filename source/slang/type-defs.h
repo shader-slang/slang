@@ -449,7 +449,6 @@ SYNTAX_CLASS(FuncType, Type)
 
     FIELD(List<RefPtr<Type>>, paramTypes)
     FIELD(RefPtr<Type>, resultType)
-
 RAW(
     FuncType()
     {}

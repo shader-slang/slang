@@ -300,6 +300,7 @@ int CompileRequest::executeActionsInner()
         // Generate initial IR for all the translation
         // units, if we are in a mode where IR is called for.
         generateIR();
+
         if (mSink.GetErrorCount() != 0)
             return 1;
 

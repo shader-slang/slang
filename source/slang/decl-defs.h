@@ -122,6 +122,10 @@ SYNTAX_CLASS(TypeDefDecl, SimpleTypeDecl)
     SYNTAX_FIELD(TypeExp, type)
 END_SYNTAX_CLASS()
 
+// An 'assoctype' declaration, it is a container of inheritance clauses
+SYNTAX_CLASS(AssocTypeDecl, AggTypeDecl)
+END_SYNTAX_CLASS()
+
 // A scope for local declarations (e.g., as part of a statement)
 SIMPLE_SYNTAX_CLASS(ScopeDecl, ContainerDecl)
 
