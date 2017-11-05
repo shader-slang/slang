@@ -562,11 +562,13 @@ namespace Slang
 
     IRValue * IRBuilder::getTypeVal(IRType * type)
     {
-        auto irValue = createValue<IRDeclRef>(
+        auto irValue = createValue<IRValue>(
             this,
             kIROp_TypeType,
             nullptr);
         irValue->type = type;
+        if (auto typetype = dynamic_cast<TypeType*>(type))
+            irValue->type = typetype->type;
         return irValue;
     }
 

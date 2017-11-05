@@ -2311,8 +2311,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             ensureDecl(context, inheritanceDecl);
         }
 
-        // For now, we don't have an IR-level representation
-        // for the type itself.
+        // TODO: we currently store a Decl* in the witness table, which causes this function
+        // being invoked to translate the witness table entry into an IRValue.
+        // We should really allow a witness table entry to represent a type and not having to
+        // construct the type here. The current implementation will not work when the struct type
+        // is defined in a generic parent (we lose the environmental substitutions).
         return LoweredValInfo::simple(context->irBuilder->getTypeVal(DeclRefType::Create(context->getSession(), 
             DeclRef<Decl>(decl, nullptr))));
     }

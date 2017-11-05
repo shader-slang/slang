@@ -1662,6 +1662,8 @@ namespace Slang
                             return false;
 
                         auto structTypeDecl = declRefType->declRef.getDecl()->As<AggTypeDecl>();
+                        if (!structTypeDecl)
+                            return false;
                         //TODO: What do we do if type is a generic specialization?
                         // i.e. if the struct defines typedef Generic<float> T; 
                         // how to check if T satisfies the associatedtype constraints?
