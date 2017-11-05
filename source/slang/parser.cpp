@@ -1428,8 +1428,7 @@ namespace Slang
         return typeExpr;
     }
 
-    static TypeSpec
-    parseTypeSpec(Parser* parser)
+    static TypeSpec parseTypeSpec(Parser* parser)
     {
         TypeSpec typeSpec;
 
@@ -1462,15 +1461,19 @@ namespace Slang
 
         RefPtr<Expr> typeExpr = basicType;
 
-        while (parser->LookAheadToken(TokenType::OpLess) || parser->LookAheadToken(TokenType::Dot))
+        bool shouldLoop = true;
+        while (shouldLoop)
         {
-            if (parser->LookAheadToken(TokenType::OpLess))
+            switch (peekTokenType(parser))
             {
+            case TokenType::OpLess:
                 typeExpr = parseGenericApp(parser, typeExpr);
-            }
-            else
-            {
+                break;
+            case TokenType::Dot:
                 typeExpr = parseMemberType(parser, typeExpr);
+                break;
+            default:
+                shouldLoop = false;
             }
         }
 

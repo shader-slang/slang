@@ -1972,8 +1972,9 @@ namespace Slang
                 return;
 
             VisitFunctionDeclaration(functionNode);
-            // TODO: This should really onlye set "checked header"
+            // TODO: This should really only set "checked header"
             functionNode->SetCheckState(DeclCheckState::Checked);
+
             // TODO: should put the checking of the body onto a "work list"
             // to avoid recursion here.
             if (functionNode->Body)
