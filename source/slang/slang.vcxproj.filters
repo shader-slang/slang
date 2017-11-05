@@ -77,7 +77,4 @@
     <CustomBuild Include="glsl.meta.slang" />
     <CustomBuild Include="hlsl.meta.slang" />
   </ItemGroup>
-  <ItemGroup>
-    <None Include="slang.natstepfilter" />
-  </ItemGroup>
 </Project>

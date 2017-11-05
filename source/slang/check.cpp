@@ -1638,10 +1638,10 @@ namespace Slang
             {
                 // this is a sub type (e.g. nested struct declaration) in an aggregate type
                 // check if this sub type declaration satisfies the constraints defined by the associated type
-                if (auto requiredTypeDecl = requiredMemberDeclRef.As<AssocTypeDecl>())
+                if (auto requiredTypeDeclRef = requiredMemberDeclRef.As<AssocTypeDecl>())
                 {
                     bool conformance = true;
-                    for (auto & inheritanceDecl : requiredTypeDecl.getDecl()->getMembersOfType<InheritanceDecl>())
+                    for (auto & inheritanceDecl : requiredTypeDeclRef.getDecl()->getMembersOfType<InheritanceDecl>())
                     {
                         conformance = conformance && checkConformance(subStructTypeDecl, inheritanceDecl.Ptr());
                     }
