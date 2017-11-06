@@ -121,6 +121,17 @@ namespace Slang
 		{
 		}
 	};
+
+    class AbortCompilationException : public Exception
+    {
+    public:
+        AbortCompilationException()
+        {}
+        AbortCompilationException(const String & message)
+            : Exception(message)
+        {
+        }
+    };
 }
 
 #endif

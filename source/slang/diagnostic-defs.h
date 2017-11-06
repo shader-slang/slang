@@ -191,6 +191,7 @@ DIAGNOSTIC(30035, Error, componentOverloadTypeMismatch, "'$0': type of overloade
 DIAGNOSTIC(30041, Error, bitOperationNonIntegral, "bit operation: operand must be integral type.")
 DIAGNOSTIC(30047, Error, argumentExpectedLValue, "argument passed to parameter '$0' must be l-value.")
 DIAGNOSTIC(30051, Error, invalidValueForArgument, "invalid value for argument '$0'")
+DIAGNOSTIC(30052, Error, invalidSwizzleExpr, "invalid swizzle string '$0' on type '$1'")
 DIAGNOSTIC(33070, Error, expectedFunction, "expression preceding parenthesis of apparent call must have function type.")
 
 // 303xx: interfaces and associated types
