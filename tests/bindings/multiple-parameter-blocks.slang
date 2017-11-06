@@ -33,16 +33,16 @@ Texture2D _S1 : register(t0, space0);
 Texture2D _S2[4] : register(t1, space0);
 SamplerState _S3 : register(s0, space0);
 
-Texture2D _S4 : register(t0, space1);
-Texture2D _S5[4] : register(t1, space1);
-SamplerState _S6 : register(s0, space1);
+Texture2D _S12 : register(t0, space1);
+Texture2D _S13[4] : register(t1, space1);
+SamplerState _S14 : register(s0, space1);
 
 float4 main(float v : V) : SV_Target
 {
 	return use(_S1, _S3)
 		+ use(_S2[int(v)], _S3)
-		+ use(_S4, _S6)
-		+ use(_S5[int(v)], _S6);
+		+ use(_S12, _S14)
+		+ use(_S13[int(v)], _S14);
 }
 
 #endif

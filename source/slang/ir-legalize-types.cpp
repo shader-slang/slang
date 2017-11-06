@@ -154,6 +154,9 @@ struct LegalVal
         assert(flavor == Flavor::tuple);
         return obj.As<TupleVal>();
     }
+
+    static LegalVal implicitDeref(LegalVal const& val);
+    LegalVal getImplicitDeref();
 };
 
 struct TupleVal : LegalValImpl
@@ -174,6 +177,29 @@ LegalVal LegalVal::tuple(RefPtr<TupleVal> tupleVal)
     result.obj = tupleVal;
     return result;
 }
+
+struct ImplicitDerefVal : LegalValImpl
+{
+    LegalVal val;
+};
+
+LegalVal LegalVal::implicitDeref(LegalVal const& val)
+{
+    RefPtr<ImplicitDerefVal> implicitDerefVal = new ImplicitDerefVal();
+    implicitDerefVal->val = val;
+
+    LegalVal result;
+    result.flavor = LegalVal::Flavor::implicitDeref;
+    result.obj = implicitDerefVal;
+    return result;
+}
+
+LegalVal LegalVal::getImplicitDeref()
+{
+    assert(flavor == Flavor::implicitDeref);
+    return obj.As<ImplicitDerefVal>()->val;
+}
+
 
 struct TypeLegalizationContext
 {
@@ -374,6 +400,12 @@ static LegalVal legalizeLoad(
                 context->builder->emitLoad(legalPtrVal.getSimple()));
         }
         break;
+
+    case LegalVal::Flavor::implicitDeref:
+        // We have turne a pointer(-like) type into its pointed-to (value)
+        // type, and so the operation of loading goes away; we just use
+        // the underlying value.
+        return legalPtrVal.getImplicitDeref();
 
     case LegalVal::Flavor::tuple:
         {
@@ -580,16 +612,72 @@ static void legalizeFunc(
             registerLegalizedValue(context, ii, legalVal);
         }
     }
-
-
-
 }
+
+// Represents the "chain" of declarations that
+// were followed to get to a variable that we
+// are now declaring as a leaf variable.
+struct LegalVarChain
+{
+    LegalVarChain*  next;
+    VarLayout*      varLayout;
+};
 
 static LegalVal declareSimpleVar(
     TypeLegalizationContext*    context,
     IROp                        op,
-    Type*                       type)
+    Type*                       type,
+    TypeLayout*                 typeLayout,
+    LegalVarChain*              varChain)
 {
+    RefPtr<VarLayout> varLayout;
+    if (typeLayout)
+    {
+        // We need to construct a layout for the new variable
+        // that reflects both the type we have given it, as
+        // well as all the offset information that has accumulated
+        // along the chain of parent variables.
+
+        varLayout = new VarLayout();
+        varLayout->typeLayout = typeLayout;
+
+        for (auto rr : typeLayout->resourceInfos)
+        {
+            auto resInfo = varLayout->findOrAddResourceInfo(rr.kind);
+
+            for (auto vv = varChain; vv; vv = vv->next)
+            {
+                if (auto parentResInfo = vv->varLayout->FindResourceInfo(rr.kind))
+                {
+                    resInfo->index += parentResInfo->index;
+                    resInfo->space += parentResInfo->space;
+                }
+            }
+        }
+
+        // Some of the parent variables might actually contain offsets
+        // to the `space` or `set` of the field, and we need to apply
+        // those to all the nested resource infos.
+        for (auto vv = varChain; vv; vv = vv->next)
+        {
+            auto parentSpaceInfo = vv->varLayout->findOrAddResourceInfo(LayoutResourceKind::ParameterBlock);
+            if (!parentSpaceInfo)
+                continue;
+
+            for (auto& rr : varLayout->resourceInfos)
+            {
+                if (rr.kind == LayoutResourceKind::ParameterBlock)
+                {
+                    rr.index += parentSpaceInfo->index;
+                }
+                else
+                {
+                    rr.space += parentSpaceInfo->index;
+                }
+            }
+        }
+    }
+
     switch (op)
     {
     case kIROp_global_var:
@@ -599,6 +687,12 @@ static LegalVal declareSimpleVar(
             auto globalVar = builder->createGlobalVar(type);
             globalVar->removeFromParent();
             globalVar->insertBefore(context->insertBeforeGlobal);
+
+            if (varLayout)
+            {
+                builder->addLayoutDecoration(globalVar, varLayout);
+            }
+
             return LegalVal::simple(globalVar);
         }
         break;
@@ -609,22 +703,62 @@ static LegalVal declareSimpleVar(
     }
 }
 
+static RefPtr<TypeLayout> getDerefTypeLayout(
+    TypeLayout* typeLayout)
+{
+    if (!typeLayout)
+        return nullptr;
+
+    if (auto parameterGroupTypeLayout = dynamic_cast<ParameterGroupTypeLayout*>(typeLayout))
+    {
+        return parameterGroupTypeLayout->elementTypeLayout;
+    }
+
+    return typeLayout;
+}
+
+static RefPtr<VarLayout> getFieldLayout(
+    TypeLayout*             typeLayout,
+    DeclRef<VarDeclBase>    fieldDeclRef)
+{
+    if (!typeLayout)
+        return nullptr;
+
+    if (auto structTypeLayout = dynamic_cast<StructTypeLayout*>(typeLayout))
+    {
+        RefPtr<VarLayout> fieldLayout;
+        if (structTypeLayout->mapVarToLayout.TryGetValue(fieldDeclRef.getDecl(), fieldLayout))
+            return fieldLayout;
+    }
+
+    return nullptr;
+}
+
 static LegalVal declareVars(
     TypeLegalizationContext*    context,
     IROp                        op,
-    LegalType                   type)
+    LegalType                   type,
+    TypeLayout*                 typeLayout,
+    LegalVarChain*              varChain)
 {
     switch (type.flavor)
     {
     case LegalType::Flavor::simple:
-        return declareSimpleVar(context, op, type.getSimple());
+        return declareSimpleVar(context, op, type.getSimple(), typeLayout, varChain);
         break;
 
     case LegalType::Flavor::implicitDeref:
         {
             // Just declare a variable of the pointed-to type,
             // since we are removing the indirection.
-            declareVars(context, op, type.getImplicitDeref()->valueType);
+
+            auto val = declareVars(
+                context,
+                op,
+                type.getImplicitDeref()->valueType,
+                getDerefTypeLayout(typeLayout),
+                varChain);
+            return LegalVal::implicitDeref(val);
         }
         break;
 
@@ -637,12 +771,30 @@ static LegalVal declareVars(
 
             for (auto ee : tupleType->elements)
             {
+                auto fieldLayout = getFieldLayout(typeLayout, ee.fieldDeclRef);
+                RefPtr<TypeLayout> fieldTypeLayout = fieldLayout ? fieldLayout->typeLayout : nullptr;
+
+                // If we are processing layout information, then
+                // we need to create a new link in the chain
+                // of variables that will determine offsets
+                // for the eventual leaf fields...
+                LegalVarChain newVarChainStorage;
+                LegalVarChain* newVarChain = varChain;
+                if (fieldLayout)
+                {
+                    newVarChainStorage.next = varChain;
+                    newVarChainStorage.varLayout = fieldLayout;
+                    newVarChain = &newVarChainStorage;
+                }
+
                 TupleVal::Element element;
                 element.fieldDeclRef = ee.fieldDeclRef;
                 element.val = declareVars(
                     context,
                     op,
-                    ee.type);
+                    ee.type,
+                    fieldTypeLayout,
+                    newVarChain);
                 tupleVal->elements.Add(element);
             }
 
@@ -656,6 +808,13 @@ static LegalVal declareVars(
     }
 }
 
+RefPtr<VarLayout> findVarLayout(IRValue* value)
+{
+    if (auto layoutDecoration = value->findDecoration<IRLayoutDecoration>())
+        return layoutDecoration->layout.As<VarLayout>();
+    return nullptr;
+}
+
 static void legalizeGlobalVar(
     TypeLegalizationContext*    context,
     IRGlobalVar*                irGlobalVar)
@@ -665,27 +824,40 @@ static void legalizeGlobalVar(
         context,
         irGlobalVar->getType()->getValueType());
 
+    RefPtr<VarLayout> varLayout = findVarLayout(irGlobalVar);
+    RefPtr<TypeLayout> typeLayout = varLayout ? varLayout->typeLayout : nullptr;
+
     // If we've decided to do implicit deref on the type,
     // then go ahead and declare a value of the pointed-to type.
-    while (legalValueType.flavor == LegalType::Flavor::implicitDeref)
+    LegalType maybeSimpleType = legalValueType;
+    while (maybeSimpleType.flavor == LegalType::Flavor::implicitDeref)
     {
-        legalValueType = legalValueType.getImplicitDeref()->valueType;
+        maybeSimpleType = maybeSimpleType.getImplicitDeref()->valueType;
     }
 
-    switch (legalValueType.flavor)
+    switch (maybeSimpleType.flavor)
     {
     case LegalType::Flavor::simple:
         // Easy case: the type is usable as-is, and we
         // should just do that.
         irGlobalVar->type = context->session->getPtrType(
-            legalValueType.getSimple());
+            maybeSimpleType.getSimple());
         break;
 
     default:
         {
             context->insertBeforeGlobal = irGlobalVar->getNextValue();
 
-            LegalVal newVal = declareVars(context, kIROp_global_var, legalValueType);
+            LegalVarChain* varChain = nullptr;
+            LegalVarChain varChainStorage;
+            if (varLayout)
+            {
+                varChainStorage.next = nullptr;
+                varChainStorage.varLayout = varLayout;
+                varChain = &varChainStorage;
+            }
+
+            LegalVal newVal = declareVars(context, kIROp_global_var, legalValueType, typeLayout, varChain);
 
             // Register the new value as the replacement for the old
             registerLegalizedValue(context, irGlobalVar, newVal);

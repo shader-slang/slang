@@ -720,7 +720,10 @@ static SimpleLayoutInfo getParameterGroupLayoutInfo(
     }
     else if (type->As<ParameterBlockType>())
     {
-        return SimpleLayoutInfo(LayoutResourceKind::ParameterBlock, 0);
+        // TODO(tfoley): Should a parameter block *always* consume at least
+        // one `set`/`space`, or should we hold back and just allocate this
+        // if it actually contains anything?
+        return SimpleLayoutInfo(LayoutResourceKind::ParameterBlock, 1);
     }
 
     // TODO: the vertex-input and fragment-output cases should
@@ -800,19 +803,42 @@ createParameterGroupTypeLayout(
             parameterGroupInfo.size);
     }
 
-    // Now, if the element type itself had any resources, then
-    // we need to make these part of the layout for our block
+    // The layout rules for a constant buffer, vs. a "parameter block"
+    // are different, with respect to how they expose layout information
+    // for underlying resources.
     //
-    // TODO: re-consider this decision, since it creates
-    // complications...
-    for( auto elementResourceInfo : elementTypeLayout->resourceInfos )
+    // A parameter block should *not* expose the fine-grained resource
+    // prameters it contains, and should only expose a total number
+    // of `space`s or `set`s that it consumes.
+    if (parameterGroupInfo.kind == LayoutResourceKind::ParameterBlock)
     {
-        // Skip uniform data, since that is encapsualted behind the constant buffer
-        if(elementResourceInfo.kind == LayoutResourceKind::Uniform)
-            break;
+        // Iterate over element types, but *only* accumulate usage
+        // info for types that consume whole register sets/spaces.
+        for( auto elementResourceInfo : elementTypeLayout->resourceInfos )
+        {
+            if(elementResourceInfo.kind != LayoutResourceKind::ParameterBlock)
+                break;
 
-        typeLayout->addResourceUsage(elementResourceInfo);
+            typeLayout->addResourceUsage(elementResourceInfo);
+        }
     }
+    else
+    {
+        // In the ordinary case (e.g., a constant buffer) then we need
+        // to make sure that any resources nested in the element type
+        // get counted against the container type, so that we can
+        // allocate registers to it directly.
+        for( auto elementResourceInfo : elementTypeLayout->resourceInfos )
+        {
+            // Skip uniform data, since that is encapsualted behind the constant buffer
+            if(elementResourceInfo.kind == LayoutResourceKind::Uniform)
+                break;
+
+            typeLayout->addResourceUsage(elementResourceInfo);
+        }
+    }
+
+
 
     return typeLayout;
 }
