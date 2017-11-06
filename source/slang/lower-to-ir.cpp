@@ -2898,6 +2898,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return LoweredValInfo::simple(irFunc);
     }
 
+    LoweredValInfo visitGenericDecl(GenericDecl * genDecl)
+    {
+        if (auto innerFuncDecl = genDecl->inner->As<FuncDecl>())
+            return lowerFuncDecl(innerFuncDecl);
+        SLANG_ASSERT(false);
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
 
     LoweredValInfo visitFunctionDeclBase(FunctionDeclBase* decl)
     {
