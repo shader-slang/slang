@@ -17,12 +17,12 @@ float4 main(float2 uv: UV) : SV_Target
 
 #else
 
-Texture2D SLANG_parameterBlock_C_t : register(t0);
-SamplerState SLANG_parameterBlock_C_s : register(s0);
+Texture2D SLANG_parameterGroup_C_t : register(t0);
+SamplerState SLANG_parameterGroup_C_s : register(s0);
 
 float4 main(float2 uv: UV) : SV_Target
 {
-	return SLANG_parameterBlock_C_t.Sample(SLANG_parameterBlock_C_s, uv);
+	return SLANG_parameterGroup_C_t.Sample(SLANG_parameterGroup_C_s, uv);
 }
 
 #endif

@@ -205,6 +205,9 @@ struct SharedParameterBindingContext
     // This is only used for varying input/output.
     //
     Dictionary<TranslationUnitRequest*, RefPtr<UsedRangeSet>> translationUnitUsedRangeSets;
+
+    // Which register spaces have been claimed so far?
+    UsedRanges usedSpaces;
 };
 
 static DiagnosticSink* getSink(SharedParameterBindingContext* shared)
@@ -379,7 +382,7 @@ static bool findLayoutArg(
 
 static Name* getReflectionName(VarDeclBase* varDecl)
 {
-    if (auto reflectionNameModifier = varDecl->FindModifier<ParameterBlockReflectionName>())
+    if (auto reflectionNameModifier = varDecl->FindModifier<ParameterGroupReflectionName>())
         return reflectionNameModifier->nameAndLoc.name;
 
     return varDecl->getName();
@@ -398,7 +401,7 @@ RefPtr<Type> tryGetEffectiveTypeForGLSLVaryingInput(
         return nullptr;
 
     auto type = varDecl->getType();
-    if( varDecl->HasModifier<InModifier>() || type->As<GLSLInputParameterBlockType>())
+    if( varDecl->HasModifier<InModifier>() || type->As<GLSLInputParameterGroupType>())
     {
         // Special case to handle "arrayed" shader inputs, as used
         // for Geometry and Hull input
@@ -436,7 +439,7 @@ RefPtr<Type> tryGetEffectiveTypeForGLSLVaryingOutput(
         return nullptr;
 
     auto type = varDecl->getType();
-    if( varDecl->HasModifier<OutModifier>() || type->As<GLSLOutputParameterBlockType>())
+    if( varDecl->HasModifier<OutModifier>() || type->As<GLSLOutputParameterGroupType>())
     {
         // Special case to handle "arrayed" shader outputs, as used
         // for Hull Shader output
@@ -716,6 +719,24 @@ static RefPtr<UsedRangeSet> findUsedRangeSetForSpace(
     return usedRangeSet;
 }
 
+// Record that a particular register space (or set, in the GLSL case)
+// has been used in at least one binding, and so it should not
+// be used by auto-generated bindings that need to claim entire
+// spaces.
+static void markSpaceUsed(
+    ParameterBindingContext*    context,
+    UInt                        space)
+{
+    context->shared->usedSpaces.Add(nullptr, space, space+1);
+}
+
+static UInt allocateUnusedSpaces(
+    ParameterBindingContext*    context,
+    UInt                        count)
+{
+    return context->shared->usedSpaces.Allocate(nullptr, count);
+}
+
 static RefPtr<UsedRangeSet> findUsedRangeSetForTranslationUnit(
     ParameterBindingContext*    context,
     TranslationUnitRequest*     translationUnit)
@@ -773,6 +794,12 @@ static void addExplicitParameterBinding(
         if (!usedRangeSet)
         {
             usedRangeSet = findUsedRangeSetForSpace(context, semanticInfo.space);
+
+            // Record that the particular binding space was
+            // used by an explicit binding, so that we don't
+            // claim it for auto-generated bindings that
+            // need to grab a full space
+            markSpaceUsed(context, semanticInfo.space);
         }
         auto overlappedParameterInfo = usedRangeSet->usedResourceRanges[(int)semanticInfo.kind].Add(
             parameterInfo,
@@ -950,6 +977,26 @@ static void completeBindingsForParameter(
             continue;
         }
 
+        auto count = typeRes.count;
+
+        // We need to special-case the scenario where
+        // a parameter wants to claim an entire register
+        // space to itself (for a parameter block), since
+        // that can't be handled like other resources.
+        if (kind == LayoutResourceKind::ParameterBlock)
+        {
+            // We need to snag a register space of our own.
+
+            UInt space = allocateUnusedSpaces(context, count);
+
+            bindingInfo.count = count;
+            bindingInfo.index = space;
+            bindingInfo.space = 0;
+
+            continue;
+        }
+
+
         // For now we only auto-generate bindings in space zero
         //
         // TODO: we may want to support searching for a space with
@@ -970,7 +1017,6 @@ static void completeBindingsForParameter(
             break;
         }
 
-        auto count = typeRes.count;
         bindingInfo.count = count;
         bindingInfo.index = usedRangeSet->usedResourceRanges[(int)kind].Allocate(parameterInfo, (int) count);
 
@@ -1699,7 +1745,7 @@ void generateParameterBindings(
     // up a global constant buffer type layout to hold them
     if( anyGlobalUniforms )
     {
-        auto globalConstantBufferLayout = createParameterBlockTypeLayout(
+        auto globalConstantBufferLayout = createParameterGroupTypeLayout(
             nullptr,
             globalScopeRules,
             globalScopeRules->GetObjectLayout(ShaderParameterKind::ConstantBuffer),

@@ -502,7 +502,7 @@ SLANG_API SlangReflectionTypeLayout* spReflectionTypeLayout_GetElementTypeLayout
     {
         return (SlangReflectionTypeLayout*) arrayTypeLayout->elementTypeLayout.Ptr();
     }
-    else if( auto constantBufferTypeLayout = dynamic_cast<ParameterBlockTypeLayout*>(typeLayout))
+    else if( auto constantBufferTypeLayout = dynamic_cast<ParameterGroupTypeLayout*>(typeLayout))
     {
         return convert(constantBufferTypeLayout->elementTypeLayout.Ptr());
     }
@@ -569,7 +569,7 @@ SLANG_API char const* spReflectionVariable_GetName(SlangReflectionVariable* inVa
 
     // If the variable is one that has an "external" name that is supposed
     // to be exposed for reflection, then report it here
-    if(auto reflectionNameMod = var->FindModifier<ParameterBlockReflectionName>())
+    if(auto reflectionNameMod = var->FindModifier<ParameterGroupReflectionName>())
         return getText(reflectionNameMod->nameAndLoc.name).Buffer();
 
     return getText(var->getName()).Buffer();
@@ -680,9 +680,9 @@ namespace Slang
 {
     static unsigned getParameterCount(RefPtr<TypeLayout> typeLayout)
     {
-        if(auto parameterBlockLayout = typeLayout.As<ParameterBlockTypeLayout>())
+        if(auto parameterGroupLayout = typeLayout.As<ParameterGroupTypeLayout>())
         {
-            typeLayout = parameterBlockLayout->elementTypeLayout;
+            typeLayout = parameterGroupLayout->elementTypeLayout;
         }
 
         if(auto structLayout = typeLayout.As<StructTypeLayout>())
@@ -695,9 +695,9 @@ namespace Slang
 
     static VarLayout* getParameterByIndex(RefPtr<TypeLayout> typeLayout, unsigned index)
     {
-        if(auto parameterBlockLayout = typeLayout.As<ParameterBlockTypeLayout>())
+        if(auto parameterGroupLayout = typeLayout.As<ParameterGroupTypeLayout>())
         {
-            typeLayout = parameterBlockLayout->elementTypeLayout;
+            typeLayout = parameterGroupLayout->elementTypeLayout;
         }
 
         if(auto structLayout = typeLayout.As<StructTypeLayout>())

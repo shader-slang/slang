@@ -3357,9 +3357,9 @@ struct LoweringVisitor
         if (!typeLayout)
             return nullptr;
 
-        while (auto parameterBlockTypeLayout = typeLayout.As<ParameterBlockTypeLayout>())
+        while (auto parameterGroupTypeLayout = typeLayout.As<ParameterGroupTypeLayout>())
         {
-            typeLayout = parameterBlockTypeLayout->elementTypeLayout;
+            typeLayout = parameterGroupTypeLayout->elementTypeLayout;
         }
 
         while (auto arrayTypeLayout = typeLayout.As<ArrayTypeLayout>())
@@ -3435,7 +3435,7 @@ struct LoweringVisitor
             shared->loweredDecls.Add(decl, tupleDecl);
             return tupleDecl;
         }
-        if (auto bufferType = loweredType->As<UniformParameterBlockType>())
+        if (auto bufferType = loweredType->As<UniformParameterGroupType>())
         {
             auto varLayout = tryToFindLayout(decl).As<VarLayout>();
 

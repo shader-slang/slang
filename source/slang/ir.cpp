@@ -55,6 +55,28 @@ namespace Slang
         }
     }
 
+    void IRUse::set(IRValue* usedValue)
+    {
+        // clear out the old value
+        if (usedValue)
+        {
+            *prevLink = nextUse;
+        }
+
+        init(user, usedValue);
+    }
+
+    void IRUse::clear()
+    {
+        if (usedValue)
+        {
+            *prevLink = nextUse;
+        }
+
+        user = nullptr;
+        usedValue = nullptr;
+    }
+
     //
 
     IRUse* IRUser::getArgs()
@@ -3683,9 +3705,8 @@ namespace Slang
         // these should get run whether or not the entry point
         // references them.
 
-        // Depending on the downstream target, we may need to apply some
-        // guaranteed transformations to legalize things. We will go
-        // ahead and apply there here for now.
+        // For GLSL only, we will need to perform "legalization" of
+        // the entry point and any entry-point parameters.
         switch (target)
         {
         case CodeGenTarget::GLSL:
