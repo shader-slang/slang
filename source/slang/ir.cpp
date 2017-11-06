@@ -200,27 +200,27 @@ namespace Slang
     //
 
     // Add an instruction to a specific parent
-    void IRBuilder::addInst(IRBlock* block, IRInst* inst)
+    void IRBuilder::addInst(IRBlock* pblock, IRInst* inst)
     {
-        inst->parent = block;
+        inst->parent = pblock;
 
-        if (!block->firstInst)
+        if (!pblock->firstInst)
         {
             inst->prev = nullptr;
             inst->next = nullptr;
 
-            block->firstInst = inst;
-            block->lastInst = inst;
+            pblock->firstInst = inst;
+            pblock->lastInst = inst;
         }
         else
         {
-            auto prev = block->lastInst;
+            auto prev = pblock->lastInst;
 
             inst->prev = prev;
             inst->next = nullptr;
 
             prev->next = inst;
-            block->lastInst = inst;
+            pblock->lastInst = inst;
         }
     }
 
@@ -228,14 +228,13 @@ namespace Slang
     void IRBuilder::addInst(
         IRInst*     inst)
     {
-        auto insertBefore = insertBeforeInst;
         if(insertBeforeInst)
         {
             inst->insertBefore(insertBeforeInst);
             return;
         }
 
-        auto parent = block;
+        auto parent = curBlock;
         if (!parent)
             return;
 
@@ -243,7 +242,7 @@ namespace Slang
     }
 
     static IRValue* createValueImpl(
-        IRBuilder*  builder,
+        IRBuilder*  /*builder*/,
         UInt        size,
         IROp        op,
         IRType*     type)
@@ -271,7 +270,7 @@ namespace Slang
     // arguments *after* the type (which is a mandatory
     // argument for all instructions).
     static IRInst* createInstImpl(
-        IRBuilder*      builder,
+        IRBuilder*      /*builder*/,
         UInt            size,
         IROp            op,
         IRType*         type,
@@ -283,8 +282,7 @@ namespace Slang
         IRInst* inst = (IRInst*) malloc(size);
         memset(inst, 0, size);
 
-        auto module = builder->getModule();
-        inst->argCount = fixedArgCount + varArgCount;
+        inst->argCount = (uint32_t)(fixedArgCount + varArgCount);
 
         inst->op = op;
 
@@ -516,7 +514,7 @@ namespace Slang
         key.inst = &keyInst;
 
         IRConstant* irValue = nullptr;
-        if( builder->shared->constantMap.TryGetValue(key, irValue) )
+        if( builder->sharedBuilder->constantMap.TryGetValue(key, irValue) )
         {
             // We found a match, so just use that.
             return irValue;
@@ -533,7 +531,7 @@ namespace Slang
         memcpy(&irValue->u, value, valueSize);
 
         key.inst = irValue;
-        builder->shared->constantMap.Add(key, irValue);
+        builder->sharedBuilder->constantMap.Add(key, irValue);
 
         return irValue;
     }
@@ -581,6 +579,18 @@ namespace Slang
             kIROp_decl_ref,
             nullptr);
         irValue->declRef = DeclRef<Decl>(declRef.decl, declRef.substitutions);
+        return irValue;
+    }
+
+    IRValue * IRBuilder::getTypeVal(IRType * type)
+    {
+        auto irValue = createValue<IRValue>(
+            this,
+            kIROp_TypeType,
+            nullptr);
+        irValue->type = type;
+        if (auto typetype = dynamic_cast<TypeType*>(type))
+            irValue->type = typetype->type;
         return irValue;
     }
 
@@ -644,7 +654,7 @@ namespace Slang
 
     IRInst* IRBuilder::emitCallInst(
         IRType*         type,
-        IRValue*        func,
+        IRValue*        pFunc,
         UInt            argCount,
         IRValue* const* args)
     {
@@ -653,7 +663,7 @@ namespace Slang
             kIROp_Call,
             type,
             1,
-            &func,
+            &pFunc,
             argCount,
             args);
         addInst(inst);
@@ -841,12 +851,12 @@ namespace Slang
 
     IRFunc* IRBuilder::createFunc()
     {
-        IRFunc* func = createValue<IRFunc>(
+        IRFunc* rsFunc = createValue<IRFunc>(
             this,
             kIROp_Func,
             nullptr);
-        addGlobalValue(getModule(), func);
-        return func;
+        addGlobalValue(getModule(), rsFunc);
+        return rsFunc;
     }
 
     IRGlobalVar* IRBuilder::createGlobalVar(
@@ -904,11 +914,11 @@ namespace Slang
     {
         auto bb = createBlock();
 
-        auto f = this->func;
+        auto f = this->curFunc;
         if (f)
         {
             f->addBlock(bb);
-            this->block = bb;
+            this->curBlock = bb;
         }
         return bb;
     }
@@ -921,7 +931,7 @@ namespace Slang
             kIROp_Param,
             type);
 
-        if (auto bb = block)
+        if (auto bb = curBlock)
         {
             bb->addParam(param);
         }
@@ -1141,13 +1151,13 @@ namespace Slang
     }
 
     IRInst* IRBuilder::emitBranch(
-        IRBlock*    block)
+        IRBlock*    pBlock)
     {
         auto inst = createInst<IRUnconditionalBranch>(
             this,
             kIROp_unconditionalBranch,
             nullptr,
-            block);
+            pBlock);
         addInst(inst);
         return inst;
     }
@@ -1555,7 +1565,7 @@ namespace Slang
 
         if(genericParentDeclRef)
         {
-            auto subst = declRef.substitutions;
+            auto subst = declRef.substitutions.As<GenericSubstitution>();
             if( !subst || subst->genericDecl != genericParentDeclRef.getDecl() )
             {
                 // No actual substitutions in place here
@@ -1709,7 +1719,7 @@ namespace Slang
 
         dumpChildrenRaw(context, block);
     }
-
+#if 0
     static void dumpChildrenRaw(
         IRDumpContext*  context,
         IRFunc*         func)
@@ -1732,7 +1742,7 @@ namespace Slang
         dumpIndent(context);
         dump(context, "}\n");
     }
-
+#endif
     static void dumpInst(
         IRDumpContext*  context,
         IRInst*         inst)
@@ -2251,7 +2261,6 @@ namespace Slang
 
     void IRInst::removeArguments()
     {
-        UInt argCount = this->argCount;
         for( UInt aa = 0; aa < argCount; ++aa )
         {
             IRUse& use = getArgs()[aa];
@@ -2292,7 +2301,7 @@ namespace Slang
         shared.session = session;
 
         IRBuilder builder;
-        builder.shared = &shared;
+        builder.sharedBuilder = &shared;
 
         RefPtr<PtrType> ptrType = session->getPtrType(valueType);
 
@@ -2396,9 +2405,9 @@ namespace Slang
         IRBuilder*                  builder,
         Type*                       type,
         VarLayout*                  varLayout,
-        TypeLayout*                 typeLayout,
-        LayoutResourceKind          kind,
-        GlobalVaryingDeclarator*    declarator)
+        TypeLayout*                 /*typeLayout*/,
+        LayoutResourceKind          /*kind*/,
+        GlobalVaryingDeclarator*    /*declarator*/)
     {
         // TODO: We might be creating an `in` or `out` variable based on
         // an `in out` function parameter. In this case we should
@@ -2562,7 +2571,7 @@ namespace Slang
 
         default:
             SLANG_UNEXPECTED("unimplemented");
-            return ScalarizedVal();
+            UNREACHABLE_RETURN(ScalarizedVal());
         }
 
     }
@@ -2680,8 +2689,8 @@ namespace Slang
         shared.module = module;
         shared.session = session;
         IRBuilder builder;
-        builder.shared = &shared;
-        builder.func = func;
+        builder.sharedBuilder = &shared;
+        builder.curFunc = func;
 
         // We will start by looking at the return type of the
         // function, because that will enable us to do an
@@ -2738,7 +2747,7 @@ namespace Slang
                     IRValue* returnValue = returnInst->getVal();
 
                     // Make sure we add these instructions to the right block
-                    builder.block = bb;
+                    builder.curBlock = bb;
 
                     // Write to our global variable(s) from the value being returned.
                     assign(&builder, resultGlobal, ScalarizedVal::value(returnValue));
@@ -2790,7 +2799,7 @@ namespace Slang
 
                 // Any initialization code we insert nees to be at the start
                 // of the block:
-                builder.block = firstBlock;
+                builder.curBlock = firstBlock;
                 builder.insertBeforeInst = firstBlock->getFirstInst();
 
                 // TODO: We need to distinguish any true pointers in the
@@ -2849,7 +2858,7 @@ namespace Slang
                             break;
                         }
 
-                        builder.block = bb;
+                        builder.curBlock = bb;
                         builder.insertBeforeInst = terminatorInst;
 
                         assign(&builder, globalOutputVal, localVal);
@@ -3083,10 +3092,15 @@ namespace Slang
                 return builder->getDeclRefVal(declRef);
             }
             break;
-
+        case kIROp_TypeType:
+            {
+                IRValue* od = (IRValue*)originalValue;
+                return builder->getTypeVal(od->type);
+            }
+            break;
         default:
             SLANG_UNEXPECTED("no value registered for IR value");
-            return nullptr;
+            UNREACHABLE_RETURN(nullptr);
         }
     }
 
@@ -3118,18 +3132,27 @@ namespace Slang
     {
         if (!subst)
             return nullptr;
-
-        RefPtr<Substitutions> newSubst = new Substitutions();
-        newSubst->outer = cloneSubstitutions(context, subst->outer);
-        newSubst->genericDecl = subst->genericDecl;
-
-        for (auto arg : subst->args)
+        if (auto genSubst = dynamic_cast<GenericSubstitution*>(subst))
         {
-            auto newArg = cloneSubstitutionArg(context, arg);
-            newSubst->args.Add(arg);
-        }
+            RefPtr<GenericSubstitution> newSubst = new GenericSubstitution();
+            newSubst->outer = cloneSubstitutions(context, subst->outer);
+            newSubst->genericDecl = genSubst->genericDecl;
 
-        return newSubst;
+            for (auto arg : genSubst->args)
+            {
+                auto newArg = cloneSubstitutionArg(context, arg);
+                newSubst->args.Add(arg);
+            }
+            return newSubst;
+        }
+        else if (auto thisSubst = dynamic_cast<ThisTypeSubstitution*>(subst))
+        {
+            RefPtr<ThisTypeSubstitution> newSubst = new ThisTypeSubstitution();
+            newSubst->sourceType = thisSubst->sourceType;
+            newSubst->outer = cloneSubstitutions(context, subst->outer);
+            return newSubst;
+        }
+        return nullptr;
     }
 
     DeclRef<Decl> IRSpecContext::maybeCloneDeclRef(DeclRef<Decl> const& declRef)
@@ -3238,7 +3261,7 @@ namespace Slang
         {
             auto clonedKey = context->maybeCloneValue(originalEntry->requirementKey.usedValue);
             auto clonedVal = context->maybeCloneValue(originalEntry->satisfyingVal.usedValue);
-            auto clonedEntry = context->builder->createWitnessTableEntry(
+            /*auto clonedEntry = */context->builder->createWitnessTableEntry(
                 clonedTable,
                 clonedKey,
                 clonedVal);
@@ -3262,7 +3285,7 @@ namespace Slang
         // Next we are going to clone the actual code.
         IRBuilder builderStorage = *context->builder;
         IRBuilder* builder = &builderStorage;
-        builder->func = clonedFunc;
+        builder->curFunc = clonedFunc;
 
         // We will walk through the blocks of the function, and clone each of them.
         //
@@ -3278,7 +3301,7 @@ namespace Slang
             registerClonedValue(context, clonedBlock, originalBlock);
 
             // We can go ahead and clone parameters here, while we are at it.
-            builder->block = clonedBlock;
+            builder->curBlock = clonedBlock;
             for (auto originalParam = originalBlock->getFirstParam();
                 originalParam;
                 originalParam = originalParam->getNextParam())
@@ -3299,7 +3322,7 @@ namespace Slang
             {
                 assert(cb);
 
-                builder->block = cb;
+                builder->curBlock = cb;
                 for (auto oi = ob->getFirstInst(); oi; oi = oi->getNextInst())
                 {
                     cloneInst(context, builder, oi);
@@ -3423,7 +3446,7 @@ namespace Slang
 
         default:
             SLANG_UNEXPECTED("unhandled case");
-            return "unknown";
+            UNREACHABLE_RETURN("unknown");
         }
     }
 
@@ -3525,7 +3548,7 @@ namespace Slang
         {
             // This shouldn't happen!
             SLANG_UNEXPECTED("no matching function registered");
-            return cloneSimpleFunc(context, originalFunc);
+            UNREACHABLE_RETURN(cloneSimpleFunc(context, originalFunc));
         }
 
         // We will try to track the "best" definition we can find.
@@ -3597,7 +3620,7 @@ namespace Slang
         sharedBuilder->session = session;
 
         IRBuilder* builder = &sharedContext->builderStorage;
-        builder->shared = sharedBuilder;
+        builder->sharedBuilder = sharedBuilder;
 
         if( !module )
         {
@@ -3754,7 +3777,7 @@ namespace Slang
         else
         {
             SLANG_UNEXPECTED("unimplemented");
-            return nullptr;
+            UNREACHABLE_RETURN(nullptr);
         }
     }
 
@@ -3762,7 +3785,8 @@ namespace Slang
         IRGenericSpecContext*   context,
         DeclRef<Decl>           declRef)
     {
-        auto subst = context->subst;
+        auto subst = context->subst.As<GenericSubstitution>();
+        SLANG_ASSERT(subst);
         auto genericDecl = subst->genericDecl;
 
         UInt orinaryParamCount = 0;
@@ -3812,12 +3836,13 @@ namespace Slang
             {
                 auto declRefVal = (IRDeclRef*) originalVal;
                 auto declRef = declRefVal->declRef;
-
+                auto genSubst = subst.As<GenericSubstitution>();
+                SLANG_ASSERT(genSubst);
                 // We may have a direct reference to one of the parameters
                 // of the generic we are specializing, and in that case
                 // we nee to translate it over to the equiavalent of
                 // the `Val` we have been given.
-                if(declRef.getDecl()->ParentDecl == subst->genericDecl)
+                if(declRef.getDecl()->ParentDecl == genSubst->genericDecl)
                 {
                     return getSubstValue(this, declRef);
                 }
@@ -3872,9 +3897,10 @@ namespace Slang
         // using a different overload of a target-specific function,
         // so we need to create a dummy substitution here, to make
         // sure it used the correct generic.
-        RefPtr<Substitutions> newSubst = new Substitutions();
+        RefPtr<GenericSubstitution> newSubst = new GenericSubstitution();
         newSubst->genericDecl = genericFunc->genericDecl;
-        newSubst->args = specDeclRef.substitutions->args;
+        auto specDeclRefSubst = specDeclRef.substitutions.As<GenericSubstitution>();
+        newSubst->args = specDeclRefSubst->args;
 
         IRGenericSpecContext context;
         context.shared = sharedContext;

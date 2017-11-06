@@ -194,6 +194,17 @@ namespace Slang
 			this->encoding = determinedEncoding;
 	}
 
+    bool HasNullBytes(char * str, int len)
+    {
+        bool hasSeenNull = false;
+        for (int i = 0; i < len - 1; i++)
+            if (str[i] == 0)
+                hasSeenNull = true;
+            else if (hasSeenNull)
+                return true;
+        return false;
+    }
+
 	Encoding * StreamReader::DetermineEncoding()
 	{
 		if (buffer.Count() >= 3 && (unsigned char)(buffer[0]) == 0xEF && (unsigned char)(buffer[1]) == 0xBB && (unsigned char)(buffer[2]) == 0xBF)
@@ -213,19 +224,11 @@ namespace Slang
 		}
 		else
 		{
-#ifdef _WIN32
-			int flag = IS_TEXT_UNICODE_SIGNATURE | IS_TEXT_UNICODE_REVERSE_SIGNATURE | IS_TEXT_UNICODE_STATISTICS | IS_TEXT_UNICODE_ASCII16;
-			int rs = IsTextUnicode(buffer.Buffer(), (int) buffer.Count(), &flag);
-			if (rs)
-			{
-				if (flag & (IS_TEXT_UNICODE_SIGNATURE | IS_TEXT_UNICODE_STATISTICS))
-					return Encoding::UTF16;
-				else if (flag & (IS_TEXT_UNICODE_SIGNATURE | IS_TEXT_UNICODE_STATISTICS))
-					return Encoding::UTF16Reversed;
-				else if (flag & IS_TEXT_UNICODE_ASCII16)
-					return Encoding::UTF8;
-			}
-#endif 
+            // find null bytes
+            if (HasNullBytes(buffer.Buffer(), (int)buffer.Count()))
+            {
+                return Encoding::UTF16;
+            }
 			return Encoding::UTF8;
 		}
 	}
@@ -233,6 +236,7 @@ namespace Slang
 	void StreamReader::ReadBuffer()
 	{
 		buffer.SetSize(4096);
+        memset(buffer.Buffer(), 0, buffer.Count() * sizeof(buffer[0]));
 		auto len = stream->Read(buffer.Buffer(), buffer.Count());
 		buffer.SetSize((int)len);
 		ptr = 0;

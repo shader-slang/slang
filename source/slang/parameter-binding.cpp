@@ -570,7 +570,7 @@ getTypeLayoutForGlobalShaderParameter(
 
     default:
         SLANG_UNEXPECTED("unhandled source language");
-        return nullptr;
+        UNREACHABLE_RETURN(nullptr);
     }
 }
 
@@ -1360,7 +1360,7 @@ static RefPtr<TypeLayout> processEntryPointParameter(
     }
 
     SLANG_UNEXPECTED("unhandled type kind");
-    return nullptr;
+    UNREACHABLE_RETURN(nullptr);
 }
 
 static void collectEntryPointParameters(

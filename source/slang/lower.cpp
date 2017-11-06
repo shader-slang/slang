@@ -424,7 +424,7 @@ static SourceLoc getPosition(LoweredExpr const& expr)
     case LoweredExpr::Flavor::VaryingTuple: return expr.getVaryingTupleExpr()->loc;
     default:
         SLANG_UNREACHABLE("all cases handled");
-        return SourceLoc();
+        UNREACHABLE_RETURN(SourceLoc());
     }
 }
 
@@ -902,7 +902,7 @@ struct LoweringVisitor
 
         default:
             SLANG_UNREACHABLE("all cases handled");
-            return LoweredExpr();
+            UNREACHABLE_RETURN(LoweredExpr());
         }
     }
 
@@ -2236,11 +2236,11 @@ struct LoweringVisitor
 
     Modifiers shallowCloneModifiers(Modifiers const& oldModifiers)
     {
-        RefPtr<SharedModifiers> shared = new SharedModifiers();
-        shared->next = oldModifiers.first;
+        RefPtr<SharedModifiers> sharedModifiers = new SharedModifiers();
+        sharedModifiers->next = oldModifiers.first;
 
         Modifiers newModifiers;
-        newModifiers.first = shared;
+        newModifiers.first = sharedModifiers;
         return newModifiers;
     }
 
@@ -2554,14 +2554,24 @@ struct LoweringVisitor
         Substitutions*  inSubstitutions)
     {
         if (!inSubstitutions) return nullptr;
-
-        RefPtr<Substitutions> result = new Substitutions();
-        result->genericDecl = translateDeclRef(inSubstitutions->genericDecl).As<GenericDecl>();
-        for (auto arg : inSubstitutions->args)
+        if (auto genSubst = dynamic_cast<GenericSubstitution*>(inSubstitutions))
         {
-            result->args.Add(translateVal(arg));
+            RefPtr<GenericSubstitution> result = new GenericSubstitution();
+            result->genericDecl = translateDeclRef(genSubst->genericDecl).As<GenericDecl>();
+            for (auto arg : genSubst->args)
+            {
+                result->args.Add(translateVal(arg));
+            }
+            return result;
         }
-        return result;
+        else if (auto thisSubst = dynamic_cast<ThisTypeSubstitution*>(inSubstitutions))
+        {
+            RefPtr<ThisTypeSubstitution> result = new ThisTypeSubstitution();
+            if (result->sourceType)
+                result->sourceType = translateVal(result->sourceType);
+            return result;
+        }
+        return nullptr;
     }
 
     static Decl* getModifiedDecl(Decl* decl)
@@ -2718,7 +2728,11 @@ struct LoweringVisitor
     RefPtr<VarLayout> tryToFindLayout(
         Decl* decl)
     {
-        auto loweredParent = translateDeclRef(decl->ParentDecl);
+        RefPtr<Decl> loweredParent;
+        if (auto genericParentDecl = decl->ParentDecl->As<GenericDecl>())
+            loweredParent = translateDeclRef(genericParentDecl->ParentDecl);
+        else
+            loweredParent = translateDeclRef(decl->ParentDecl);
         if (loweredParent)
         {
             auto layoutMod = loweredParent->FindModifier<ComputedLayoutModifier>();
@@ -2818,6 +2832,13 @@ struct LoweringVisitor
         // Extensions won't exist in the lowered code: their members
         // will turn into ordinary functions that get called explicitly
         return LoweredDecl();
+    }
+
+    LoweredDecl visitAssocTypeDecl(AssocTypeDecl * /*assocType*/)
+    {
+        // not supported
+        SLANG_UNREACHABLE("visitAssocTypeDecl in LowerVisitor");
+        UNREACHABLE_RETURN(LoweredDecl());
     }
 
     LoweredDecl visitTypeDefDecl(TypeDefDecl* decl)
@@ -3809,12 +3830,12 @@ struct LoweringVisitor
             "Vector").As<GenericDecl>();
         auto vectorTypeDecl = vectorGenericDecl->inner;
                
-        auto substitutions = new Substitutions();
-        substitutions->genericDecl = vectorGenericDecl.Ptr();
-        substitutions->args.Add(elementType);
-        substitutions->args.Add(elementCount);
+        auto substs = new GenericSubstitution();
+        substs->genericDecl = vectorGenericDecl.Ptr();
+        substs->args.Add(elementType);
+        substs->args.Add(elementCount);
 
-        auto declRef = DeclRef<Decl>(vectorTypeDecl.Ptr(), substitutions);
+        auto declRef = DeclRef<Decl>(vectorTypeDecl.Ptr(), substs);
 
         return DeclRefType::Create(
             session,

@@ -43,6 +43,14 @@ namespace Slang
 #define SLANG_RETURN_NEVER /* empty */
 #endif
 
+#ifdef _MSC_VER
+#define UNREACHABLE_RETURN(x)
+#define UNREACHABLE(x)
+#else
+#define UNREACHABLE_RETURN(x) return x;
+#define UNREACHABLE(x) x;
+#endif
+
     SLANG_RETURN_NEVER void signalUnexpectedError(char const* message);
 }
 
@@ -66,5 +74,8 @@ namespace Slang
 #define SLANG_RELEASE_ASSERT(VALUE) if(VALUE) {} else Slang::signalUnexpectedError("assertion failed")
 #define SLANG_RELEASE_EXPECT(VALUE, WHAT) if(VALUE) {} else SLANG_UNEXPECTED(WHAT)
 
+template<typename T> void slang_use_obj(T&) {}
 
+#define SLANG_UNREFERENCED_PARAMETER(P) slang_use_obj(P)
+#define SLANG_UNREFERENCED_VARIABLE(P) slang_use_obj(P)
 #endif

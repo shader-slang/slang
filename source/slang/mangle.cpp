@@ -58,10 +58,10 @@ namespace Slang
     {
         if( auto constVal = dynamic_cast<ConstantIntVal*>(val) )
         {
-            auto val = constVal->value;
-            if( val >= 0 && val <= 9 )
+            auto cVal = constVal->value;
+            if(cVal >= 0 && cVal <= 9 )
             {
-                emit(context, (UInt) val);
+                emit(context, (UInt)cVal);
                 return;
             }
         }
@@ -195,7 +195,7 @@ namespace Slang
             // There are two cases here: either we have specializations
             // in place for the parent generic declaration, or we don't.
 
-            auto subst = declRef.substitutions;
+            auto subst = declRef.substitutions.As<GenericSubstitution>();
             if( subst && subst->genericDecl == parentGenericDeclRef.getDecl() )
             {
                 // This is the case where we *do* have substitutions.
@@ -275,7 +275,12 @@ namespace Slang
                 emitType(context, GetType(paramDeclRef));
             }
 
-            emitType(context, GetResultType(callableDeclRef));
+            // Don't print result type for an initializer/constructor,
+            // since it is implicit in the qualified name.
+            if (!callableDeclRef.As<ConstructorDecl>())
+            {
+                emitType(context, GetResultType(callableDeclRef));
+            }
         }
     }
 

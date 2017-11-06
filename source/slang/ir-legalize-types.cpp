@@ -544,7 +544,7 @@ static LegalVal legalizeInst(
     // instructions generated will be placed after
     // the location of the original instruct.
     auto builder = context->builder;
-    builder->block = inst->getParentBlock();
+    builder->curBlock = inst->getParentBlock();
     builder->insertBeforeInst = inst->getNextInst();
 
     LegalVal legalVal = legalizeInst(
@@ -919,7 +919,7 @@ void legalizeTypes(
     IRBuilder builderStorage;
     auto builder = &builderStorage;
 
-    builder->shared = sharedBuilder;
+    builder->sharedBuilder = sharedBuilder;
 
 
     TypeLegalizationContext contextStorage;

@@ -523,7 +523,7 @@ namespace Slang
 
 		UInt IndexOf(const char * str, UInt id) const // String str
 		{
-			if (id < 0 || id >= getLength())
+			if (id >= getLength())
 				return UInt(-1);
 			auto findRs = strstr(begin() + id, str);
 			UInt res = findRs ? findRs - begin() : -1;
@@ -612,7 +612,7 @@ namespace Slang
 		{
 			if (!buffer)
 				return false;
-			return (IndexOf(str) >= 0) ? true : false;
+			return (IndexOf(str) != UInt(-1)) ? true : false;
 		}
 
 		bool Contains(const String & str) const

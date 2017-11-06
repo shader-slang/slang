@@ -439,6 +439,7 @@ namespace Slang
         // Apply substitutions to this declaration reference
         DeclRefBase SubstituteImpl(Substitutions* subst, int* ioDiff);
 
+
         // Check if this is an equivalent declaration reference to another
         bool Equals(DeclRefBase const& declRef) const;
         bool operator == (const DeclRefBase& other) const
@@ -1154,6 +1155,11 @@ namespace Slang
     RefPtr<Substitutions> createDefaultSubstitutions(
         Session* session,
         Decl*   decl);
+
+    RefPtr<ThisTypeSubstitution> getNewThisTypeSubst(DeclRefBase & declRef);
+    RefPtr<ThisTypeSubstitution> getThisTypeSubst(DeclRefBase & declRef, bool insertSubstEntry);
+    void removeSubstitution(DeclRefBase & declRef, RefPtr<Substitutions> subst);
+    bool hasGenericSubstitutions(RefPtr<Substitutions> subst);
 
 } // namespace Slang
 

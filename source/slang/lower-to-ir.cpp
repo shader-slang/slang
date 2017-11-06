@@ -362,7 +362,7 @@ LoweredValInfo emitCompoundAssignOp(
     IRValue* const* args)
 {
     auto builder = context->irBuilder;
-
+    SLANG_UNREFERENCED_PARAMETER(argCount);
     assert(argCount == 2);
     auto leftPtr = args[0];
     auto rightVal = args[1];
@@ -401,7 +401,7 @@ IRValue* getOneValOfType(
     // TODO: should make sure to handle vector and matrix types here
 
     SLANG_UNEXPECTED("inc/dec type");
-    return nullptr;
+    UNREACHABLE_RETURN(nullptr);
 }
 
 LoweredValInfo emitPreOp(
@@ -412,7 +412,7 @@ LoweredValInfo emitPreOp(
     IRValue* const* args)
 {
     auto builder = context->irBuilder;
-
+    SLANG_UNREFERENCED_PARAMETER(argCount);
     assert(argCount == 1);
     auto argPtr = args[0];
 
@@ -436,7 +436,7 @@ LoweredValInfo emitPostOp(
     IRValue* const* args)
 {
     auto builder = context->irBuilder;
-
+    SLANG_UNREFERENCED_PARAMETER(argCount);
     assert(argCount == 1);
     auto argPtr = args[0];
 
@@ -665,19 +665,20 @@ top:
         {
             auto boundSubscriptInfo = lowered.getBoundSubscriptInfo();
 
-            for (auto getter : getMembersOfType<GetterDecl>(boundSubscriptInfo->declRef))
+            auto getters = getMembersOfType<GetterDecl>(boundSubscriptInfo->declRef);
+            if (getters.Count())
             {
                 lowered = emitCallToDeclRef(
                     context,
                     boundSubscriptInfo->type,
-                    getter,
+                    *getters.begin(),
                     nullptr,
                     boundSubscriptInfo->args);
                 goto top;
             }
 
             SLANG_UNEXPECTED("subscript had no getter");
-            return nullptr;
+            UNREACHABLE_RETURN(nullptr);
         }
         break;
 
@@ -694,7 +695,7 @@ top:
 
     default:
         SLANG_UNEXPECTED("unhandled value flavor");
-        return nullptr;
+        UNREACHABLE_RETURN(nullptr);
     }
 }
 
@@ -733,7 +734,7 @@ RefPtr<Type> getSimpleType(LoweredTypeInfo lowered)
 
     default:
         SLANG_UNEXPECTED("unhandled value flavor");
-        return nullptr;
+        UNREACHABLE_RETURN(nullptr);
     }
 }
 
@@ -836,7 +837,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     IRBuilder* getBuilder() { return context->irBuilder; }
 
-    LoweredValInfo visitVal(Val* val)
+    LoweredValInfo visitVal(Val* /*val*/)
     {
         SLANG_UNIMPLEMENTED_X("value lowering");
     }
@@ -870,9 +871,12 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto subs = declRef.substitutions;
         while(subs)
         {
-            for(auto aa : subs->args)
+            if (auto genSubst = subs.As<GenericSubstitution>())
             {
-                (*ioArgs).Add(getSimpleVal(context, lowerVal(context, aa)));
+                for (auto aa : genSubst->args)
+                {
+                    (*ioArgs).Add(getSimpleVal(context, lowerVal(context, aa)));
+                }
             }
             subs = subs->outer;
         }
@@ -1003,7 +1007,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         return info;
     }
 
-    LoweredValInfo visitOverloadedExpr(OverloadedExpr* expr)
+    LoweredValInfo visitOverloadedExpr(OverloadedExpr* /*expr*/)
     {
         SLANG_UNEXPECTED("overloaded expressions should not occur in checked AST");
     }
@@ -1017,7 +1021,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         return subscriptValue(type, baseVal, indexVal);
     }
 
-    LoweredValInfo visitThisExpr(ThisExpr* expr)
+    LoweredValInfo visitThisExpr(ThisExpr* /*expr*/)
     {
         return context->thisVal;
     }
@@ -1088,7 +1092,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         else
         {
             SLANG_UNIMPLEMENTED_X("codegen for deref expression");
-            return LoweredValInfo();
+            UNREACHABLE_RETURN(LoweredValInfo());
         }
     }
 
@@ -1097,7 +1101,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         return lowerSubExpr(expr->base);
     }
 
-    LoweredValInfo visitInitializerListExpr(InitializerListExpr* expr)
+    LoweredValInfo visitInitializerListExpr(InitializerListExpr* /*expr*/)
     {
         SLANG_UNIMPLEMENTED_X("codegen for initializer list expression");
     }
@@ -1121,7 +1125,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         SLANG_UNEXPECTED("unexpected constant type");
     }
 
-    LoweredValInfo visitAggTypeCtorExpr(AggTypeCtorExpr* expr)
+    LoweredValInfo visitAggTypeCtorExpr(AggTypeCtorExpr* /*expr*/)
     {
         SLANG_UNIMPLEMENTED_X("codegen for aggregate type constructor expression");
     }
@@ -1132,8 +1136,6 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         InvokeExpr*     expr,
         List<IRValue*>* ioArgs)
     {
-        auto& irArgs = *ioArgs;
-
         for( auto arg : expr->Arguments )
         {
             // TODO: Need to handle case of l-value arguments,
@@ -1162,8 +1164,6 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         List<IRValue*>*         ioArgs,
         List<OutArgumentFixup>* ioFixups)
     {
-        auto funcDecl = funcDeclRef.getDecl();
-        auto& args = expr->Arguments;
         UInt argCount = expr->Arguments.Count();
         UInt argIndex = 0;
         for (auto paramDeclRef : getMembersOfType<ParamDecl>(funcDeclRef))
@@ -1257,7 +1257,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         else
         {
             SLANG_UNEXPECTED("shouldn't relaly happen");
-            addDirectCallArgs(expr, ioArgs);
+            UNREACHABLE(addDirectCallArgs(expr, ioArgs));
         }
     }
 
@@ -1453,7 +1453,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
         default:
             SLANG_UNIMPLEMENTED_X("subscript expr");
-            return LoweredValInfo();
+            UNREACHABLE_RETURN(LoweredValInfo());
         }
 
     }
@@ -1497,17 +1497,17 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         return emitDeclRef(context, expr->declRef);
     }
 
-    LoweredValInfo visitSelectExpr(SelectExpr* expr)
+    LoweredValInfo visitSelectExpr(SelectExpr* /*expr*/)
     {
         SLANG_UNIMPLEMENTED_X("codegen for select expression");
     }
 
-    LoweredValInfo visitGenericAppExpr(GenericAppExpr* expr)
+    LoweredValInfo visitGenericAppExpr(GenericAppExpr* /*expr*/)
     {
         SLANG_UNIMPLEMENTED_X("generic application expression during code generation");
     }
 
-    LoweredValInfo visitSharedTypeExpr(SharedTypeExpr* expr)
+    LoweredValInfo visitSharedTypeExpr(SharedTypeExpr* /*expr*/)
     {
         SLANG_UNIMPLEMENTED_X("shared type expression during code generation");
     }
@@ -1613,7 +1613,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
     IRBuilder* getBuilder() { return context->irBuilder; }
 
-    void visitStmt(Stmt* stmt)
+    void visitStmt(Stmt* /*stmt*/)
     {
         SLANG_UNIMPLEMENTED_X("stmt catch-all");
     }
@@ -1632,7 +1632,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     {
         auto builder = getBuilder();
 
-        auto prevBlock = builder->block;
+        auto prevBlock = builder->curBlock;
         auto parentFunc = prevBlock->parentFunc;
 
         // If the previous block doesn't already have
@@ -1645,8 +1645,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         parentFunc->addBlock(block);
 
-        builder->func = parentFunc;
-        builder->block = block;
+        builder->curFunc = parentFunc;
+        builder->curBlock = block;
     }
 
     // Start a new block at the current location.
@@ -2016,7 +2016,8 @@ top:
             auto type = subscriptInfo->type;
 
             // Search for an appropriate "setter" declaration
-            for (auto setterDeclRef : getMembersOfType<SetterDecl>(subscriptInfo->declRef))
+            auto setters = getMembersOfType<SetterDecl>(subscriptInfo->declRef);
+            if (setters.Count())
             {
                 auto allArgs = subscriptInfo->args;
                 
@@ -2025,7 +2026,7 @@ top:
                 emitCallToDeclRef(
                     context,
                     context->getSession()->getVoidType(),
-                    setterDeclRef,
+                    *setters.begin(),
                     nullptr,
                     allArgs);
                 return;
@@ -2052,17 +2053,22 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return context->irBuilder;
     }
 
-    LoweredValInfo visitDeclBase(DeclBase* decl)
+    LoweredValInfo visitDeclBase(DeclBase* /*decl*/)
     {
         SLANG_UNIMPLEMENTED_X("decl catch-all");
     }
 
-    LoweredValInfo visitDecl(Decl* decl)
+    LoweredValInfo visitDecl(Decl* /*decl*/)
     {
         SLANG_UNIMPLEMENTED_X("decl catch-all");
     }
 
-    LoweredValInfo visitGenericTypeParamDecl(GenericTypeParamDecl* decl)
+    LoweredValInfo visitTypeDefDecl(TypeDefDecl * decl)
+    {
+        return LoweredValInfo::simple(context->irBuilder->getTypeVal(decl->type.type));
+    }
+
+    LoweredValInfo visitGenericTypeParamDecl(GenericTypeParamDecl* /*decl*/)
     {
         return LoweredValInfo();
     }
@@ -2113,7 +2119,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             auto irRequirement = context->irBuilder->getDeclRefVal(requiredMemberDeclRef);
             auto irSatisfyingVal = getSimpleVal(context, ensureDecl(context, satisfyingMemberDecl));
 
-            auto witnessTableEntry = context->irBuilder->createWitnessTableEntry(
+            context->irBuilder->createWitnessTableEntry(
                 witnessTable,
                 irRequirement,
                 irSatisfyingVal);
@@ -2305,9 +2311,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             ensureDecl(context, inheritanceDecl);
         }
 
-        // For now, we don't have an IR-level representation
-        // for the type itself.
-        return LoweredValInfo();
+        // TODO: we currently store a Decl* in the witness table, which causes this function
+        // being invoked to translate the witness table entry into an IRValue.
+        // We should really allow a witness table entry to represent a type and not having to
+        // construct the type here. The current implementation will not work when the struct type
+        // is defined in a generic parent (we lose the environmental substitutions).
+        return LoweredValInfo::simple(context->irBuilder->getTypeVal(DeclRefType::Create(context->getSession(), 
+            DeclRef<Decl>(decl, nullptr))));
     }
 
 
@@ -2675,7 +2685,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // need to create an IR function here
 
         IRFunc* irFunc = subBuilder->createFunc();
-        subBuilder->func = irFunc;
+        subBuilder->curFunc = irFunc;
 
         trySetMangledName(irFunc, decl);
 
@@ -2727,7 +2737,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             //
             IRType* irParamType = irResultType;
             paramTypes.Add(irParamType);
-            IRParam* irParam = subBuilder->emitParam(irParamType);
+            subBuilder->emitParam(irParamType);
 
             // TODO: we need some way to wire this up to the `newValue`
             // or whatever name we give for that parameter inside
@@ -2763,7 +2773,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // This is a function definition, so we need to actually
             // construct IR for the body...
             IRBlock* entryBlock = subBuilder->emitBlock();
-            subBuilder->block = entryBlock;
+            subBuilder->curBlock = entryBlock;
 
             UInt paramTypeIndex = 0;
             for( auto paramInfo : parameterLists.params )
@@ -2844,7 +2854,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
             // We need to carefully add a terminator instruction to the end
             // of the body, in case the user didn't do so.
-            if (!isTerminatorInst(subContext->irBuilder->block->lastInst))
+            if (!isTerminatorInst(subContext->irBuilder->curBlock->lastInst))
             {
                 if (irResultType->Equals(context->getSession()->getVoidType()))
                 {
@@ -2860,7 +2870,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     // and then emit a dataflow error if this block
                     // can't be eliminated.
                     SLANG_UNEXPECTED("Needed a return here");
-                    subContext->irBuilder->emitReturn();
+                    UNREACHABLE(subContext->irBuilder->emitReturn());
                 }
             }
         }
@@ -2947,7 +2957,7 @@ LoweredValInfo ensureDecl(
         return result;
 
     IRBuilder subIRBuilder;
-    subIRBuilder.shared = context->irBuilder->shared;
+    subIRBuilder.sharedBuilder = context->irBuilder->sharedBuilder;
 
     IRGenContext subContext = *context;
 
@@ -3031,24 +3041,33 @@ RefPtr<Substitutions> lowerSubstitutions(
 {
     if(!subst)
         return nullptr;
+    RefPtr<Substitutions> result;
+    if (auto genSubst = dynamic_cast<GenericSubstitution*>(subst))
+    {
+        RefPtr<GenericSubstitution> newSubst = new GenericSubstitution();
+        newSubst->genericDecl = genSubst->genericDecl;
 
-    RefPtr<Substitutions> newSubst = new Substitutions();
+        for (auto arg : genSubst->args)
+        {
+            auto newArg = lowerSubstitutionArg(context, arg);
+            newSubst->args.Add(newArg);
+        }
+
+        result = newSubst;
+    }
+    else if (auto thisSubst = dynamic_cast<ThisTypeSubstitution*>(subst))
+    {
+        RefPtr<ThisTypeSubstitution> newSubst = new ThisTypeSubstitution();
+        newSubst->sourceType = lowerSubstitutionArg(context, thisSubst->sourceType);
+        result = newSubst;
+    }
     if (subst->outer)
     {
-        newSubst->outer = lowerSubstitutions(
+        result->outer = lowerSubstitutions(
             context,
             subst->outer);
     }
-
-    newSubst->genericDecl = subst->genericDecl;
-
-    for (auto arg : subst->args)
-    {
-        auto newArg = lowerSubstitutionArg(context, arg);
-        newSubst->args.Add(newArg);
-    }
-
-    return newSubst;
+    return result;
 }
 
 LoweredValInfo emitDeclRef(
@@ -3061,7 +3080,7 @@ LoweredValInfo emitDeclRef(
 
     // If this declaration reference doesn't involve any specializations,
     // then we are done at this point.
-    if(!declRef.substitutions)
+    if(!hasGenericSubstitutions(declRef.substitutions))
         return loweredDecl;
 
     auto val = getSimpleVal(context, loweredDecl);
@@ -3168,7 +3187,7 @@ IRModule* generateIRForTranslationUnit(
 
     IRBuilder builderStorage;
     IRBuilder* builder = &builderStorage;
-    builder->shared = sharedBuilder;
+    builder->sharedBuilder = sharedBuilder;
 
     IRModule* module = builder->createModule();
     sharedBuilder->module = module;

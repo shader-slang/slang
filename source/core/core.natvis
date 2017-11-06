@@ -54,7 +54,7 @@
     </Expand>
 </Type>
 
-<Type Name="Slang::RefPtrImpl&lt;*,*,*&gt;">
+<Type Name="Slang::RefPtr&lt;*&gt;">
     <SmartPointer Usage="Minimal">pointer</SmartPointer>
     <DisplayString Condition="pointer == 0">empty</DisplayString>
     <DisplayString Condition="pointer != 0">RefPtr {*pointer}</DisplayString>

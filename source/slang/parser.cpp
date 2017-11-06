@@ -1396,6 +1396,16 @@ namespace Slang
         return genericApp;
     }
 
+    static RefPtr<Expr> parseMemberType(Parser * parser, RefPtr<Expr> base)
+    {
+        RefPtr<MemberExpr> memberExpr = new MemberExpr();
+        parser->ReadToken(TokenType::Dot);
+        parser->FillPosition(memberExpr.Ptr());
+        memberExpr->BaseExpression = base;
+        memberExpr->name = expectIdentifier(parser).name;
+        return memberExpr;
+    }
+
     // Parse option `[]` braces after a type expression, that indicate an array type
     static RefPtr<Expr> parsePostfixTypeSuffix(
         Parser* parser,
@@ -1418,8 +1428,7 @@ namespace Slang
         return typeExpr;
     }
 
-    static TypeSpec
-    parseTypeSpec(Parser* parser)
+    static TypeSpec parseTypeSpec(Parser* parser)
     {
         TypeSpec typeSpec;
 
@@ -1452,9 +1461,20 @@ namespace Slang
 
         RefPtr<Expr> typeExpr = basicType;
 
-        if (parser->LookAheadToken(TokenType::OpLess))
+        bool shouldLoop = true;
+        while (shouldLoop)
         {
-            typeExpr = parseGenericApp(parser, typeExpr);
+            switch (peekTokenType(parser))
+            {
+            case TokenType::OpLess:
+                typeExpr = parseGenericApp(parser, typeExpr);
+                break;
+            case TokenType::Dot:
+                typeExpr = parseMemberType(parser, typeExpr);
+                break;
+            default:
+                shouldLoop = false;
+            }
         }
 
         // GLSL allows `[]` directly in a type specifier
@@ -2087,6 +2107,41 @@ namespace Slang
 
             } while( AdvanceIf(parser, TokenType::Comma) );
         }
+    }
+
+    RefPtr<RefObject> ParseAssocType(Parser * parser, void *)
+    {
+        RefPtr<AssocTypeDecl> assocTypeDecl = new AssocTypeDecl();
+
+        auto nameToken = parser->ReadToken(TokenType::Identifier);
+        assocTypeDecl->nameAndLoc = NameLoc(nameToken);
+        assocTypeDecl->loc = nameToken.loc;
+        if (AdvanceIf(parser, TokenType::Colon))
+        {
+            while (!parser->tokenReader.IsAtEnd())
+            {
+                auto paramConstraint = new GenericTypeConstraintDecl();
+                parser->FillPosition(paramConstraint);
+
+                auto paramType = DeclRefType::Create(
+                    parser->getSession(),
+                    DeclRef<Decl>(assocTypeDecl, nullptr));
+
+                auto paramTypeExpr = new SharedTypeExpr();
+                paramTypeExpr->loc = assocTypeDecl->loc;
+                paramTypeExpr->base.type = paramType;
+                paramTypeExpr->type = QualType(getTypeType(paramType));
+
+                paramConstraint->sub = TypeExp(paramTypeExpr);
+                paramConstraint->sup = parser->ParseTypeExp();
+
+                AddMember(assocTypeDecl, paramConstraint);
+                if (!AdvanceIf(parser, TokenType::Comma))
+                    break;
+            }
+        }
+        parser->ReadToken(TokenType::Semicolon);
+        return assocTypeDecl;
     }
 
     static RefPtr<RefObject> parseInterfaceDecl(Parser* parser, void* /*userData*/)
@@ -3342,7 +3397,7 @@ namespace Slang
         return expr;
     }
 
-    static RefPtr<Expr> parseBoolLitExpr(Parser* parser, bool value)
+    static RefPtr<Expr> parseBoolLitExpr(Parser* /*parser*/, bool value)
     {
         RefPtr<ConstantExpr> constExpr = new ConstantExpr();
         constExpr->ConstType = ConstantExpr::ConstantType::Bool;
@@ -4029,8 +4084,8 @@ namespace Slang
         // Add syntax for declaration keywords
     #define DECL(KEYWORD, CALLBACK) \
         addBuiltinSyntax<Decl>(session, scope, #KEYWORD, &CALLBACK)
-
         DECL(typedef,       ParseTypeDef);
+        DECL(associatedtype,ParseAssocType);
         DECL(cbuffer,       parseHLSLCBufferDecl);
         DECL(tbuffer,       parseHLSLTBufferDecl);
         DECL(__generic,     ParseGenericDecl);

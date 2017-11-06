@@ -514,7 +514,7 @@ void computeTypeSizeAlign(
 
     default:
         SLANG_UNIMPLEMENTED_X("type sizing");
-        impl->size = 0;
+        UNREACHABLE(impl->size = 0);
         break;
     }
 
@@ -528,7 +528,7 @@ void computeTypeSizeAlign(
 }
 
 VMType getType(
-    VM*         vm,
+    VM*         /*vm*/,
     VMTypeImpl* typeImpl)
 {
     // TODO: need to look up an existing type that matches...
@@ -587,7 +587,7 @@ VMType loadVMType(
             VMTypeImpl* impl = (VMTypeImpl*) alloca(size);
             memset(impl, 0, size);
             impl->op = bcType->op;
-            impl->argCount = argCount;
+            impl->argCount = (uint32_t)argCount;
             
             VMVal* args = (VMVal*) (impl + 1);
             for(UInt aa = 0; aa < argCount; ++aa)
@@ -598,13 +598,13 @@ VMType loadVMType(
             return getType(vmModule->vm, impl);
         }
 
-        SLANG_UNEXPECTED("unimplemented");
-        return VMType();
+        UNREACHABLE(SLANG_UNEXPECTED("unimplemented"));
+        UNREACHABLE_RETURN(VMType());
         break;
     }
 }
 
-void* allocateImpl(VM* vm, UInt size, UInt align)
+void* allocateImpl(VM* /*vm*/, UInt size, UInt /*align*/)
 {
     void* ptr = malloc(size);
     memset(ptr, 0, size);
@@ -666,7 +666,7 @@ void* loadVMSymbol(
 VMModule* loadVMModuleInstance(
     VM*         vm,
     void const* bytecode,
-    size_t      bytecodeSize)
+    size_t      /*bytecodeSize*/)
 {
     BCHeader* bcHeader = (BCHeader*) bytecode;
 
@@ -732,14 +732,14 @@ void* findGlobalSymbolPtr(
             continue;
 
         if(strcmp(symbolName, name) == 0)
-            return getGlobalPtr(module, ss);
+            return getGlobalPtr(module, (uint32_t)ss);
     }
 
     return nullptr;
 }
 
 VMThread* createThread(
-    VM* vm)
+    VM* /*vm*/)
 {
     VMThread* thread = new VMThread();
     thread->frame = nullptr;
@@ -863,7 +863,7 @@ void resumeThread(
         case kIROp_BufferStore:
             {
                 VMType resultType = decodeType(frame, &ip);
-                UInt argCount = decodeUInt(&ip);
+                /*UInt argCount = */decodeUInt(&ip);
 
                 char* bufferData = decodeOperand<char*>(frame, &ip);
                 uint32_t index = decodeOperand<uint32_t>(frame, &ip);
@@ -944,10 +944,9 @@ void resumeThread(
         case kIROp_ReturnVal:
             {
                 VMType instType = decodeType(frame, &ip);
-                UInt argCount = decodeUInt(&ip);
+                /*UInt argCount =*/ decodeUInt(&ip);
                 void* argPtr = decodeOperandPtr<void>(frame, &ip);
 
-                VMFrame* oldFrame = frame;
                 VMFrame* newFrame = frame->parent;
                 vmThread->frame = newFrame;
 
@@ -980,7 +979,7 @@ void resumeThread(
                 Int destinationBlock = decodeSInt(&ip);
                 for( UInt aa = 2; aa < argCount; ++aa )
                 {
-                    void* argPtr = decodeOperandPtr<void>(frame, &ip);
+                    decodeOperandPtr<void>(frame, &ip);
                 }
 
                 // TODO: we need to deal with the case of
@@ -1006,7 +1005,7 @@ void resumeThread(
                 Int falseBlockID = decodeSInt(&ip);
                 for( UInt aa = 4; aa < argCount; ++aa )
                 {
-                    void* argPtr = decodeOperandPtr<void>(frame, &ip);
+                    decodeOperandPtr<void>(frame, &ip);
                 }
 
                 Int destinationBlock = *condition ? trueBlockID : falseBlockID;
@@ -1025,7 +1024,7 @@ void resumeThread(
                 // knowing too much about an instruction...
 
                 VMType resultType = decodeType(frame, &ip);
-                UInt argCount = decodeUInt(&ip);
+                /*UInt argCount = */decodeUInt(&ip);
                 void* argPtrs[16] = { 0 };
                 auto leftOpnd = decodeOperandPtrAndType(frame, &ip);
                 auto type = leftOpnd.type;
@@ -1050,7 +1049,7 @@ void resumeThread(
         case kIROp_Mul:
             {
                 VMType type = decodeType(frame, &ip);
-                UInt argCount = decodeUInt(&ip);
+                /*UInt argCount = */decodeUInt(&ip);
                 void* leftPtr = decodeOperandPtr<void>(frame, &ip);
                 void* rightPtr = decodeOperandPtr<void>(frame, &ip);
 
@@ -1072,7 +1071,7 @@ void resumeThread(
         case kIROp_Sub:
             {
                 VMType type = decodeType(frame, &ip);
-                UInt argCount = decodeUInt(&ip);
+                /*UInt argCount = */decodeUInt(&ip);
                 void* leftPtr = decodeOperandPtr<void>(frame, &ip);
                 void* rightPtr = decodeOperandPtr<void>(frame, &ip);
 
