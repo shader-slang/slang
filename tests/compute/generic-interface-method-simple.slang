@@ -30,7 +30,7 @@ struct MaterialPattern1 : IBRDFPattern
     }
 };
 
-__generic<TPattern : IBRDFPattern, TInterpolant: IBRDFPattern>
+__generic<TPattern : IBRDFPattern, TInterpolant: IVertexInterpolant>
 float test(TPattern pattern, TInterpolant vertInterps)
 {
     float rs = pattern.evalPattern<TInterpolant>(vertInterps);    
