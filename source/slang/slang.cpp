@@ -243,102 +243,91 @@ static SourceLanguage inferSourceLanguage(CompileRequest* request)
 
 int CompileRequest::executeActionsInner()
 {
-    try
+    // Do some cleanup on settings specified by user.
+    // In particular, we want to propagate flags from the overall request down to
+    // each translation unit.
+    for (auto& translationUnit : translationUnits)
     {
-        // Do some cleanup on settings specified by user.
-        // In particular, we want to propagate flags from the overall request down to
-        // each translation unit.
+        translationUnit->compileFlags |= compileFlags;
+
+        // However, the "no checking" flag shouldn't be applied to
+        // any translation unit that is native Slang code.
+        if (translationUnit->sourceLanguage == SourceLanguage::Slang)
+        {
+            translationUnit->compileFlags &= ~SLANG_COMPILE_FLAG_NO_CHECKING;
+        }
+    }
+
+    // If no code-generation target was specified, then try to infer one from the source language,
+    // just to make sure we can do something reasonable when invoked from the command line.
+    if (targets.Count() == 0)
+    {
+        auto language = inferSourceLanguage(this);
+        switch (language)
+        {
+        case SourceLanguage::HLSL:
+            addTarget(CodeGenTarget::DXBytecode);
+            break;
+
+        case SourceLanguage::GLSL:
+            addTarget(CodeGenTarget::SPIRV);
+            break;
+
+        default:
+            break;
+        }
+    }
+
+    // We only do parsing and semantic checking if we *aren't* doing
+    // a pass-through compilation.
+    //
+    // Note that we *do* perform output generation as normal in pass-through mode.
+    if (passThrough == PassThroughMode::None)
+    {
+        // Parse everything from the input files requested
         for (auto& translationUnit : translationUnits)
         {
-            translationUnit->compileFlags |= compileFlags;
-
-            // However, the "no checking" flag shouldn't be applied to
-            // any translation unit that is native Slang code.
-            if (translationUnit->sourceLanguage == SourceLanguage::Slang)
-            {
-                translationUnit->compileFlags &= ~SLANG_COMPILE_FLAG_NO_CHECKING;
-            }
+            parseTranslationUnit(translationUnit.Ptr());
         }
-
-        // If no code-generation target was specified, then try to infer one from the source language,
-        // just to make sure we can do something reasonable when invoked from the command line.
-        if (targets.Count() == 0)
-        {
-            auto language = inferSourceLanguage(this);
-            switch (language)
-            {
-            case SourceLanguage::HLSL:
-                addTarget(CodeGenTarget::DXBytecode);
-                break;
-
-            case SourceLanguage::GLSL:
-                addTarget(CodeGenTarget::SPIRV);
-                break;
-
-            default:
-                break;
-            }
-        }
-
-        // We only do parsing and semantic checking if we *aren't* doing
-        // a pass-through compilation.
-        //
-        // Note that we *do* perform output generation as normal in pass-through mode.
-        if (passThrough == PassThroughMode::None)
-        {
-            // Parse everything from the input files requested
-            for (auto& translationUnit : translationUnits)
-            {
-                parseTranslationUnit(translationUnit.Ptr());
-            }
-            if (mSink.GetErrorCount() != 0)
-                return 1;
-
-            // Perform semantic checking on the whole collection
-            checkAllTranslationUnits();
-            if (mSink.GetErrorCount() != 0)
-                return 1;
-
-            // Generate initial IR for all the translation
-            // units, if we are in a mode where IR is called for.
-            generateIR();
-
-            if (mSink.GetErrorCount() != 0)
-                return 1;
-
-            // For each code generation target generate
-            // parameter binding information.
-            // This step is done globaly, because all translation
-            // units and entry points need to agree on where
-            // parameters are allocated.
-            for (auto targetReq : targets)
-            {
-                generateParameterBindings(targetReq);
-                if (mSink.GetErrorCount() != 0)
-                    return 1;
-            }
-        }
-
-        // If command line specifies to skip codegen, we exit here.
-        // Note: this is a debugging option.
-        if (shouldSkipCodegen)
-            return 0;
-
-        // Generate output code, in whatever format was requested
-        generateOutput(this);
         if (mSink.GetErrorCount() != 0)
             return 1;
 
+        // Perform semantic checking on the whole collection
+        checkAllTranslationUnits();
+        if (mSink.GetErrorCount() != 0)
+            return 1;
+
+        // Generate initial IR for all the translation
+        // units, if we are in a mode where IR is called for.
+        generateIR();
+
+        if (mSink.GetErrorCount() != 0)
+            return 1;
+
+        // For each code generation target generate
+        // parameter binding information.
+        // This step is done globaly, because all translation
+        // units and entry points need to agree on where
+        // parameters are allocated.
+        for (auto targetReq : targets)
+        {
+            generateParameterBindings(targetReq);
+            if (mSink.GetErrorCount() != 0)
+                return 1;
+        }
+    }
+
+    // If command line specifies to skip codegen, we exit here.
+    // Note: this is a debugging option.
+    if (shouldSkipCodegen)
         return 0;
-    }
-    catch (InternalError)
-    {
+
+    // Generate output code, in whatever format was requested
+    generateOutput(this);
+    if (mSink.GetErrorCount() != 0)
         return 1;
-    }
-    catch (AbortCompilationException)
-    {
-        return 1;
-    }
+
+    return 0;
 }
 
 // Act as expected of the API-based compiler
@@ -912,7 +901,7 @@ SLANG_API int spCompile(
 {
     auto req = REQ(request);
 
-#if 0
+#if !defined(SPIRE_DEBUG_INTERNAL_ERROR)
     // By default we'd like to catch as many internal errors as possible,
     // and report them to the user nicely (rather than just crash their
     // application). Internally Slang currently uses exceptions for this.
