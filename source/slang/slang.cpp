@@ -901,7 +901,7 @@ SLANG_API int spCompile(
 {
     auto req = REQ(request);
 
-#if !defined(SPIRE_DEBUG_INTERNAL_ERROR)
+#if !defined(SLANG_DEBUG_INTERNAL_ERROR)
     // By default we'd like to catch as many internal errors as possible,
     // and report them to the user nicely (rather than just crash their
     // application). Internally Slang currently uses exceptions for this.
