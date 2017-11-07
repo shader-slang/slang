@@ -1801,16 +1801,16 @@ namespace Slang
         auto reflectionNameToken = parser->ReadToken(TokenType::Identifier);
 
         // Attach the reflection name to the block so we can use it
-        auto reflectionNameModifier = new ParameterBlockReflectionName();
+        auto reflectionNameModifier = new ParameterGroupReflectionName();
         reflectionNameModifier->nameAndLoc = NameLoc(reflectionNameToken);
         addModifier(bufferVarDecl, reflectionNameModifier);
 
         // Both the buffer variable and its type need to have names generated
-        bufferVarDecl->nameAndLoc.name = generateName(parser, "parameterBlock_" + reflectionNameToken.Content);
-        bufferDataTypeDecl->nameAndLoc.name = generateName(parser, "ParameterBlock_" + reflectionNameToken.Content);
+        bufferVarDecl->nameAndLoc.name = generateName(parser, "parameterGroup_" + reflectionNameToken.Content);
+        bufferDataTypeDecl->nameAndLoc.name = generateName(parser, "ParameterGroup_" + reflectionNameToken.Content);
 
-        addModifier(bufferDataTypeDecl, new ImplicitParameterBlockElementTypeModifier());
-        addModifier(bufferVarDecl, new ImplicitParameterBlockVariableModifier());
+        addModifier(bufferDataTypeDecl, new ImplicitParameterGroupElementTypeModifier());
+        addModifier(bufferVarDecl, new ImplicitParameterGroupVariableModifier());
 
         // TODO(tfoley): We end up constructing unchecked syntax here that
         // is expected to type check into the right form, but it might be
@@ -1938,12 +1938,12 @@ namespace Slang
         else if( auto inMod = modifiers.findModifier<InModifier>() )
         {
             removeModifier(modifiers, inMod);
-            blockWrapperTypeName = "__GLSLInputParameterBlock";
+            blockWrapperTypeName = "__GLSLInputParameterGroup";
         }
         else if( auto outMod = modifiers.findModifier<OutModifier>() )
         {
             removeModifier(modifiers, outMod);
-            blockWrapperTypeName = "__GLSLOutputParameterBlock";
+            blockWrapperTypeName = "__GLSLOutputParameterGroup";
         }
         else if( auto bufferMod = modifiers.findModifier<GLSLBufferModifier>() )
         {
@@ -1962,11 +1962,11 @@ namespace Slang
         RefPtr<StructDecl> blockDataTypeDecl = new StructDecl();
         RefPtr<Variable> blockVarDecl = new Variable();
 
-        addModifier(blockDataTypeDecl, new ImplicitParameterBlockElementTypeModifier());
-        addModifier(blockVarDecl, new ImplicitParameterBlockVariableModifier());
+        addModifier(blockDataTypeDecl, new ImplicitParameterGroupElementTypeModifier());
+        addModifier(blockVarDecl, new ImplicitParameterGroupVariableModifier());
 
         // Attach the reflection name to the block so we can use it
-        auto reflectionNameModifier = new ParameterBlockReflectionName();
+        auto reflectionNameModifier = new ParameterGroupReflectionName();
         reflectionNameModifier->nameAndLoc = NameLoc(reflectionNameToken);
         addModifier(blockVarDecl, reflectionNameModifier);
 
@@ -1975,7 +1975,7 @@ namespace Slang
         parser->FillPosition(blockVarDecl.Ptr());
 
         // Generate a unique name for the data type
-        blockDataTypeDecl->nameAndLoc.name = generateName(parser, "ParameterBlock_" + reflectionNameToken.Content);
+        blockDataTypeDecl->nameAndLoc.name = generateName(parser, "ParameterGroup_" + reflectionNameToken.Content);
 
         // TODO(tfoley): We end up constructing unchecked syntax here that
         // is expected to type check into the right form, but it might be
@@ -2020,7 +2020,7 @@ namespace Slang
         else
         {
             // synthesize a dummy name
-            blockVarDecl->nameAndLoc.name = generateName(parser, "parameterBlock_" + reflectionNameToken.Content);
+            blockVarDecl->nameAndLoc.name = generateName(parser, "parameterGroup_" + reflectionNameToken.Content);
 
             // Otherwise we have a transparent declaration, similar
             // to an HLSL `cbuffer`

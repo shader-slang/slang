@@ -144,11 +144,11 @@ SIMPLE_SYNTAX_CLASS(GLSLPatchModifier    , SimpleModifier)
 
 // Indicates that this is a variable declaration that corresponds to
 // a parameter block declaration in the source program.
-SIMPLE_SYNTAX_CLASS(ImplicitParameterBlockVariableModifier   , Modifier)
+SIMPLE_SYNTAX_CLASS(ImplicitParameterGroupVariableModifier   , Modifier)
 
 // Indicates that this is a type that corresponds to the element
 // type of a parameter block declaration in the source program.
-SIMPLE_SYNTAX_CLASS(ImplicitParameterBlockElementTypeModifier, Modifier)
+SIMPLE_SYNTAX_CLASS(ImplicitParameterGroupElementTypeModifier, Modifier)
 
 // An HLSL semantic
 ABSTRACT_SYNTAX_CLASS(HLSLSemantic, Modifier)
@@ -197,7 +197,7 @@ SYNTAX_CLASS(GLSLExtensionDirective, GLSLPreprocessorDirective)
     FIELD(Token, dispositionToken)
 END_SYNTAX_CLASS()
 
-SYNTAX_CLASS(ParameterBlockReflectionName, Modifier)
+SYNTAX_CLASS(ParameterGroupReflectionName, Modifier)
     FIELD(NameLoc, nameAndLoc)
 END_SYNTAX_CLASS()
 

@@ -42,10 +42,10 @@ uniform U
 };
 
 layout(binding = 1)
-uniform texture2D SLANG_parameterBlock_U_m_t;
+uniform texture2D SLANG_parameterGroup_U_m_t;
 
 layout(binding = 2)
-uniform sampler SLANG_parameterBlock_U_m_s;
+uniform sampler SLANG_parameterGroup_U_m_s;
 
 layout(location = 0)
 in vec2 uv;
@@ -58,8 +58,8 @@ void main()
 	Material SLANG_tmp_0 = m;
 	color = evaluateMaterial(
 		SLANG_tmp_0,
-		SLANG_parameterBlock_U_m_t,
-		SLANG_parameterBlock_U_m_s, uv);
+		SLANG_parameterGroup_U_m_t,
+		SLANG_parameterGroup_U_m_s, uv);
 }
 
 #endif

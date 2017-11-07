@@ -1614,6 +1614,32 @@ struct EmitVisitor
         }
     }
 
+    void emitSimpleSubscriptCallExpr(
+        RefPtr<InvokeExpr>  callExpr,
+        EOpInfo             /*outerPrec*/)
+    {
+        auto funcExpr = callExpr->FunctionExpr;
+
+        // We expect any subscript operation to be invoked as a member,
+        // so the function expression had better be in the correct form.
+        auto memberExpr = funcExpr.As<MemberExpr>();
+        if(!memberExpr)
+        {
+            SLANG_UNEXPECTED("subscript needs base expression");
+        }
+
+        Emit("(");
+        EmitExpr(memberExpr->BaseExpression);
+        Emit(")[");
+        UInt argCount = callExpr->Arguments.Count();
+        for (UInt aa = 0; aa < argCount; ++aa)
+        {
+            if (aa != 0) Emit(", ");
+            EmitExpr(callExpr->Arguments[aa]);
+        }
+        Emit("]");
+    }
+
     // Emit a call expression that doesn't involve any special cases,
     // just an expression of the form `f(a0, a1, ...)`
     void emitSimpleCallExpr(
@@ -1632,6 +1658,18 @@ struct EmitVisitor
                 emitSimpleConstructorCallExpr(callExpr, outerPrec);
                 return;
             }
+
+            if(auto acessorDeclRef = declRef.As<AccessorDecl>())
+            {
+                declRef = acessorDeclRef.GetParent();
+            }
+
+            if(auto subscriptDeclRef = declRef.As<SubscriptDecl>())
+            {
+                emitSimpleSubscriptCallExpr(callExpr, outerPrec);
+                return;
+            }
+
         }
 
         // Once we've ruled out constructor calls, we can move on
@@ -3316,7 +3354,7 @@ struct EmitVisitor
     {
         // Don't emit a declaration that was only generated implicitly, for
         // the purposes of semantic checking.
-        if(decl->HasModifier<ImplicitParameterBlockElementTypeModifier>())
+        if(decl->HasModifier<ImplicitParameterGroupElementTypeModifier>())
             return;
 
         Emit("struct ");
@@ -3498,7 +3536,7 @@ struct EmitVisitor
         return varLayout;
     }
 
-    void emitHLSLParameterBlockFieldLayoutSemantics(
+    void emitHLSLParameterGroupFieldLayoutSemantics(
         RefPtr<VarLayout>   layout,
         RefPtr<VarLayout>   fieldLayout)
     {
@@ -3528,13 +3566,13 @@ struct EmitVisitor
         }
     }
 
-    void emitHLSLParameterBlockDecl(
+    void emitHLSLParameterGroupDecl(
         RefPtr<VarDeclBase>             varDecl,
-        RefPtr<ParameterBlockType>      parameterBlockType,
+        RefPtr<ParameterGroupType>      parameterGroupType,
         RefPtr<VarLayout>               layout)
     {
         // The data type that describes where stuff in the constant buffer should go
-        RefPtr<Type> dataType = parameterBlockType->elementType;
+        RefPtr<Type> dataType = parameterGroupType->elementType;
 
         // We expect/require the data type to be a user-defined `struct` type
         auto declRefType = dataType->As<DeclRefType>();
@@ -3545,22 +3583,22 @@ struct EmitVisitor
         SLANG_RELEASE_ASSERT(layout);
 
         // We expect the layout to be for a structured type...
-        RefPtr<ParameterBlockTypeLayout> bufferLayout = layout->typeLayout.As<ParameterBlockTypeLayout>();
+        RefPtr<ParameterGroupTypeLayout> bufferLayout = layout->typeLayout.As<ParameterGroupTypeLayout>();
         SLANG_RELEASE_ASSERT(bufferLayout);
 
         RefPtr<StructTypeLayout> structTypeLayout = bufferLayout->elementTypeLayout.As<StructTypeLayout>();
         SLANG_RELEASE_ASSERT(structTypeLayout);
 
-        if( auto constantBufferType = parameterBlockType->As<ConstantBufferType>() )
+        if( auto constantBufferType = parameterGroupType->As<ConstantBufferType>() )
         {
             Emit("cbuffer ");
         }
-        else if( auto textureBufferType = parameterBlockType->As<TextureBufferType>() )
+        else if( auto textureBufferType = parameterGroupType->As<TextureBufferType>() )
         {
             Emit("tbuffer ");
         }
 
-        if( auto reflectionNameModifier = varDecl->FindModifier<ParameterBlockReflectionName>() )
+        if( auto reflectionNameModifier = varDecl->FindModifier<ParameterGroupReflectionName>() )
         {
             Emit(" ");
             emitName(reflectionNameModifier->nameAndLoc);
@@ -3587,7 +3625,7 @@ struct EmitVisitor
                 SLANG_RELEASE_ASSERT(fieldLayout->varDecl.GetName() == field.GetName());
 
                 // Emit explicit layout annotations for every field
-                emitHLSLParameterBlockFieldLayoutSemantics(layout, fieldLayout);
+                emitHLSLParameterGroupFieldLayoutSemantics(layout, fieldLayout);
 
                 emitVarDeclInit(field);
 
@@ -3696,13 +3734,13 @@ struct EmitVisitor
         }
     }
 
-    void emitGLSLParameterBlockDecl(
+    void emitGLSLParameterGroupDecl(
         RefPtr<VarDeclBase>             varDecl,
-        RefPtr<ParameterBlockType>      parameterBlockType,
+        RefPtr<ParameterGroupType>      parameterGroupType,
         RefPtr<VarLayout>               layout)
     {
         // The data type that describes where stuff in the constant buffer should go
-        RefPtr<Type> dataType = parameterBlockType->elementType;
+        RefPtr<Type> dataType = parameterGroupType->elementType;
 
         // We expect/require the data type to be a user-defined `struct` type
         auto declRefType = dataType->As<DeclRefType>();
@@ -3714,7 +3752,7 @@ struct EmitVisitor
         {
 
             auto typeLayout = layout->typeLayout;
-            if (auto bufferLayout = typeLayout.As<ParameterBlockTypeLayout>())
+            if (auto bufferLayout = typeLayout.As<ParameterGroupTypeLayout>())
             {
                 typeLayout = bufferLayout->elementTypeLayout;
             }
@@ -3729,19 +3767,19 @@ struct EmitVisitor
         EmitModifiers(varDecl);
 
         // Emit an apprpriate declaration keyword based on the kind of block
-        if (parameterBlockType->As<ConstantBufferType>())
+        if (parameterGroupType->As<ConstantBufferType>())
         {
             Emit("uniform");
         }
-        else if (parameterBlockType->As<GLSLInputParameterBlockType>())
+        else if (parameterGroupType->As<GLSLInputParameterGroupType>())
         {
             Emit("in");
         }
-        else if (parameterBlockType->As<GLSLOutputParameterBlockType>())
+        else if (parameterGroupType->As<GLSLOutputParameterGroupType>())
         {
             Emit("out");
         }
-        else if (parameterBlockType->As<GLSLShaderStorageBufferType>())
+        else if (parameterGroupType->As<GLSLShaderStorageBufferType>())
         {
             Emit("buffer");
         }
@@ -3751,7 +3789,7 @@ struct EmitVisitor
             Emit("uniform");
         }
 
-        if( auto reflectionNameModifier = varDecl->FindModifier<ParameterBlockReflectionName>() )
+        if( auto reflectionNameModifier = varDecl->FindModifier<ParameterGroupReflectionName>() )
         {
             Emit(" ");
             emitName(reflectionNameModifier->nameAndLoc);
@@ -3789,19 +3827,19 @@ struct EmitVisitor
         Emit(";\n");
     }
 
-    void emitParameterBlockDecl(
+    void emitParameterGroupDecl(
         RefPtr<VarDeclBase>			varDecl,
-        RefPtr<ParameterBlockType>  parameterBlockType,
+        RefPtr<ParameterGroupType>  parameterGroupType,
         RefPtr<VarLayout>           layout)
     {
         switch(context->shared->target)
         {
         case CodeGenTarget::HLSL:
-            emitHLSLParameterBlockDecl(varDecl, parameterBlockType, layout);
+            emitHLSLParameterGroupDecl(varDecl, parameterGroupType, layout);
             break;
 
         case CodeGenTarget::GLSL:
-            emitGLSLParameterBlockDecl(varDecl, parameterBlockType, layout);
+            emitGLSLParameterGroupDecl(varDecl, parameterGroupType, layout);
             break;
 
         default:
@@ -3843,9 +3881,9 @@ struct EmitVisitor
         //
         // TODO(tfoley): there might be a better way to detect this, e.g.,
         // with an attribute that gets attached to the variable declaration.
-        if (auto parameterBlockType = decl->type->As<ParameterBlockType>())
+        if (auto parameterGroupType = decl->type->As<ParameterGroupType>())
         {
-            emitParameterBlockDecl(decl, parameterBlockType, layout);
+            emitParameterGroupDecl(decl, parameterGroupType, layout);
             return;
         }
 
@@ -4145,7 +4183,7 @@ emitDeclImpl(decl, nullptr);
         if(auto decoration = inst->findDecoration<IRHighLevelDeclDecoration>())
         {
             auto decl = decoration->decl;
-            if (auto reflectionNameMod = decl->FindModifier<ParameterBlockReflectionName>())
+            if (auto reflectionNameMod = decl->FindModifier<ParameterGroupReflectionName>())
             {
                 return getText(reflectionNameMod->nameAndLoc.name);
             }
@@ -4492,7 +4530,7 @@ emitDeclImpl(decl, nullptr);
         // because they aren't allowed as types for temporary
         // variables.
         auto type = inst->getType();
-        if(type->As<UniformParameterBlockType>())
+        if(type->As<UniformParameterGroupType>())
         {
             // TODO: we need to be careful here, because
             // HLSL shader model 6 allows these as explicit
@@ -4518,7 +4556,7 @@ emitDeclImpl(decl, nullptr);
     {
         auto type = inst->getType();
 
-        if(type->As<UniformParameterBlockType>())
+        if(type->As<UniformParameterGroupType>())
         {
             // TODO: we need to be careful here, because
             // HLSL shader model 6 allows these as explicit
@@ -4664,7 +4702,7 @@ emitDeclImpl(decl, nullptr);
             expect("_S");
         }
 
-        int readCount()
+        UInt readCount()
         {
             int c = peek();
             if(!isDigit((char)c))
@@ -4677,7 +4715,7 @@ emitDeclImpl(decl, nullptr);
             if(c == '0')
                 return 0;
 
-            int count = 0;
+            UInt count = 0;
             for(;;)
             {
                 count = count*10 + c - '0';
@@ -4689,18 +4727,117 @@ emitDeclImpl(decl, nullptr);
             }
         }
 
+        void readGenericParam()
+        {
+            switch(peek())
+            {
+            case 'T':
+                get();
+                break;
+
+            default:
+                SLANG_UNEXPECTED("bad name mangling");
+                break;
+            }
+        }
+
+        void readGenericParams()
+        {
+            expect("g");
+            UInt paramCount = readCount();
+            for(UInt pp = 0; pp < paramCount; pp++)
+            {
+                readGenericParam();
+            }
+        }
+
+        void readSimpleIntVal()
+        {
+            int c = peek();
+            if(isDigit(c))
+            {
+                get();
+            }
+            else
+            {
+                readVal();
+            }
+        }
+
+        void readType()
+        {
+            int c = peek();
+            switch(c)
+            {
+            case 'V':
+            case 'b':
+            case 'i':
+            case 'u':
+            case 'U':
+            case 'h':
+            case 'f':
+            case 'd':
+                get();
+                break;
+
+            case 'v':
+                get();
+                readSimpleIntVal();
+                readType();
+                break;
+
+            default:
+                // TODO: need to read a named type
+                // here...
+                break;
+            }
+        }
+
+        void readVal()
+        {
+            // TODO: handle other cases here
+            readType();
+        }
+
+        void readGenericArg()
+        {
+            readVal();
+        }
+
+        void readGenericArgs()
+        {
+            expect("G");
+            UInt argCount = readCount();
+            for(UInt aa = 0; aa < argCount; aa++)
+            {
+                readGenericArg();
+            }
+        }
+
         UnownedStringSlice readSimpleName()
         {
             UnownedStringSlice result;
             for(;;)
             {
                 int c = peek();
+
+                if(c == 'g')
+                {
+                    readGenericParams();
+                    continue;
+                }
+                else if(c == 'G')
+                {
+                    readGenericArgs();
+                    continue;
+                }
+
                 if(!isDigit((char)c))
                     return result;
 
                 // Read the length part
-                int count = readCount();
-                if(count > (end_ - cursor_))
+                UInt count = readCount();
+                if(count > UInt(end_ - cursor_))
                 {
                     SLANG_UNEXPECTED("bad name mangling");
                     UNREACHABLE_RETURN(result);
@@ -4710,6 +4847,12 @@ emitDeclImpl(decl, nullptr);
                 cursor_ += count;
             }
         }
+
+        UInt readParamCount()
+        {
+            expect("p");
+            return readCount();
+        }
     };
 
     void emitIntrinsicCallExpr(
@@ -4717,25 +4860,75 @@ emitDeclImpl(decl, nullptr);
         IRCall*         inst,
         IRFunc*         func)
     {
-        // TODO: we need to inspect the mangled name,
-        // and construct a suitable expression from it...
+        // For a call with N arguments, the instruction will
+        // have N+1 operands. We will start consuming operands
+        // starting at the index 1.
+        UInt operandCount = inst->getArgCount();
+        UInt argCount = operandCount - 1;
+        UInt operandIndex = 1;
+
+        // Our current strategy for dealing with intrinsic
+        // calls is to "un-mangle" the mangled name, in
+        // order to figure out what the user was originally
+        // calling. This is a bit messy, and there might
+        // be better strategies (including just stuffing
+        // a pointer to the original decl onto the callee).
 
         UnmangleContext um(func->mangledName);
-
         um.startUnmangling();
 
+        // We'll read through the qualified name of the
+        // symbol (e.g., `Texture2D<T>.Sample`) and then
+        // only keep the last segment of the name (e.g.,
+        // the `Sample` part).
         auto name = um.readSimpleName();
 
-        // TODO: need to detect if name represents
-        // a member function, etc.
+        // We will special-case some names here, that
+        // represent callable declarations that aren't
+        // ordinary functions, and thus may use different
+        // syntax.
+        if(name == "operator[]")
+        {
+            // The user is invoking a built-in subscript operator
+            emit("(");
+            emitIROperand(ctx, inst->getArg(operandIndex++));
+            emit(")[");
+            emitIROperand(ctx, inst->getArg(operandIndex++));
+            emit("]");
+
+            if(operandIndex < operandCount)
+            {
+                emit(" = ");
+                emitIROperand(ctx, inst->getArg(operandIndex++));
+            }
+            return;
+        }
+
+        // The mangled function name currently records
+        // the number of explicit parameters, and thus
+        // doesn't include the implicit `this` parameter.
+        // We can compare the argument and parameter counts
+        // to figure out whether we have a member function call.
+        UInt paramCount = um.readParamCount();
+
+        if(argCount != paramCount)
+        {
+            // Looks like a member function call
+            emit("(");
+            emitIROperand(ctx, inst->getArg(operandIndex));
+            emit(").");
+
+            operandIndex++;
+        }
 
         emit(name);
         emit("(");
-        UInt argCount = inst->getArgCount();
-        for( UInt aa = 1; aa < argCount; ++aa )
+        bool first = true;
+        for(; operandIndex < operandCount; ++operandIndex )
         {
-            if(aa != 1) emit(", ");
-            emitIROperand(ctx, inst->getArg(aa));
+            if(!first) emit(", ");
+            emitIROperand(ctx, inst->getArg(operandIndex));
+            first = false;
         }
         emit(")");
     }
@@ -4911,6 +5104,13 @@ emitDeclImpl(decl, nullptr);
             }
             break;
 
+        case kIROp_Neg:
+            {
+                emit("-");
+                emitIROperand(ctx, inst->getArg(0));
+            }
+            break;
+
         case kIROp_Sample:
             emitIROperand(ctx, inst->getArg(0));
             emit(".Sample(");
@@ -5030,6 +5230,16 @@ emitDeclImpl(decl, nullptr);
         case kIROp_specialize:
             {
                 emitIROperand(ctx, inst->getArg(0));
+            }
+            break;
+
+        case kIROp_Select:
+            {
+                emitIROperand(ctx, inst->getArg(0));
+                emit(" ? ");
+                emitIROperand(ctx, inst->getArg(1));
+                emit(" : ");
+                emitIROperand(ctx, inst->getArg(2));
             }
             break;
 
@@ -5505,7 +5715,8 @@ emitDeclImpl(decl, nullptr);
                 emit(", ");
 
             auto paramName = getIRName(pp);
-            emitIRType(ctx, pp->getType(), paramName);
+            auto paramType = pp->getType();
+            emitIRParamType(ctx, paramType, paramName);
 
             emitIRSemantics(ctx, pp);
         }
@@ -5529,6 +5740,33 @@ emitDeclImpl(decl, nullptr);
         {
             emit(";\n");
         }
+    }
+
+    void emitIRParamType(
+        EmitContext*    ctx,
+        Type*           type,
+        String const&   name)
+    {
+        // An `out` or `inout` parameter will have been
+        // encoded as a parameter of pointer type, so
+        // we need to decode that here.
+        //
+        if( auto ptrType = type->As<PtrType>() )
+        {
+            // TODO: we need a way to distinguish `out`
+            // from `inout`. The easiest way to do
+            // that might be to have each be a distinct
+            // sub-case of `IRPtrType` - this would also
+            // ensure that they can be distinguished from
+            // real pointers when the user means to use
+            // them.
+
+            emit("out ");
+
+            type = ptrType->getValueType();
+        }
+
+        emitIRType(ctx, type, name);
     }
 
     void emitIRFuncDecl(
@@ -5578,26 +5816,7 @@ emitDeclImpl(decl, nullptr);
             paramName.append(pp);
             auto paramType = funcType->getParamType(pp);
 
-            // An `out` or `inout` parameter will have been
-            // encoded as a parameter of pointer type, so
-            // we need to decode that here.
-            //
-            if( auto ptrType = paramType->As<PtrType>() )
-            {
-                // TODO: we need a way to distinguish `out`
-                // from `inout`. The easiest way to do
-                // that might be to have each be a distinct
-                // sub-case of `IRPtrType` - this would also
-                // ensure that they can be distinguished from
-                // real pointers when the user means to use
-                // them.
-
-                emit("out ");
-
-                paramType = ptrType->getValueType();
-            }
-
-            emitIRType(ctx, paramType, paramName);
+            emitIRParamType(ctx, paramType, paramName);
         }
         emit(");\n");
     }
@@ -5812,10 +6031,10 @@ emitDeclImpl(decl, nullptr);
         }
     }
 
-    void emitHLSLParameterBlock(
+    void emitHLSLParameterGroup(
         EmitContext*                ctx,
         IRGlobalVar*                varDecl,
-        UniformParameterBlockType*  type)
+        UniformParameterGroupType*  type)
     {
         emit("cbuffer ");
         emit(getIRName(varDecl));
@@ -5832,9 +6051,9 @@ emitDeclImpl(decl, nullptr);
         auto elementType = type->getElementType();
 
         auto typeLayout = layout->typeLayout;
-        if( auto parameterBlockTypeLayout = typeLayout.As<ParameterBlockTypeLayout>() )
+        if( auto parameterGroupTypeLayout = typeLayout.As<ParameterGroupTypeLayout>() )
         {
-            typeLayout = parameterBlockTypeLayout->elementTypeLayout;
+            typeLayout = parameterGroupTypeLayout->elementTypeLayout;
         }
 
         if(auto declRefType = elementType->As<DeclRefType>())
@@ -5864,7 +6083,7 @@ emitDeclImpl(decl, nullptr);
                     auto fieldType = GetType(ff);
                     emitIRType(ctx, fieldType, getIRName(ff));
 
-                    emitHLSLParameterBlockFieldLayoutSemantics(layout, fieldLayout);
+                    emitHLSLParameterGroupFieldLayoutSemantics(layout, fieldLayout);
 
                     emit(";\n");
                 }
@@ -5878,10 +6097,10 @@ emitDeclImpl(decl, nullptr);
         emit("}\n");
     }
 
-    void emitGLSLParameterBlock(
+    void emitGLSLParameterGroup(
         EmitContext*                ctx,
         IRGlobalVar*                varDecl,
-        UniformParameterBlockType*  type)
+        UniformParameterGroupType*  type)
     {
         auto layout = getVarLayout(ctx, varDecl);
         assert(layout);
@@ -5909,9 +6128,9 @@ emitDeclImpl(decl, nullptr);
         auto elementType = type->getElementType();
 
         auto typeLayout = layout->typeLayout;
-        if( auto parameterBlockTypeLayout = typeLayout.As<ParameterBlockTypeLayout>() )
+        if( auto parameterGroupTypeLayout = typeLayout.As<ParameterGroupTypeLayout>() )
         {
-            typeLayout = parameterBlockTypeLayout->elementTypeLayout;
+            typeLayout = parameterGroupTypeLayout->elementTypeLayout;
         }
 
         if(auto declRefType = elementType->As<DeclRefType>())
@@ -5941,7 +6160,7 @@ emitDeclImpl(decl, nullptr);
                     auto fieldType = GetType(ff);
                     emitIRType(ctx, fieldType, getIRName(ff));
 
-//                    emitHLSLParameterBlockFieldLayoutSemantics(layout, fieldLayout);
+//                    emitHLSLParameterGroupFieldLayoutSemantics(layout, fieldLayout);
 
                     emit(";\n");
                 }
@@ -5960,19 +6179,19 @@ emitDeclImpl(decl, nullptr);
         emit("};\n");
     }
 
-    void emitIRParameterBlock(
+    void emitIRParameterGroup(
         EmitContext*                ctx,
         IRGlobalVar*                varDecl,
-        UniformParameterBlockType*  type)
+        UniformParameterGroupType*  type)
     {
         switch (ctx->shared->target)
         {
         case CodeGenTarget::HLSL:
-            emitHLSLParameterBlock(ctx, varDecl, type);
+            emitHLSLParameterGroup(ctx, varDecl, type);
             break;
 
         case CodeGenTarget::GLSL:
-            emitGLSLParameterBlock(ctx, varDecl, type);
+            emitGLSLParameterGroup(ctx, varDecl, type);
             break;
         }
     }
@@ -5990,7 +6209,7 @@ emitDeclImpl(decl, nullptr);
         {
         case kIROp_ConstantBufferType:
         case kIROp_TextureBufferType:
-            emitIRParameterBlock(ctx, varDecl, (IRUniformBufferType*) varType);
+            emitIRParameterGroup(ctx, varDecl, (IRUniformBufferType*) varType);
             return;
 
         default:
@@ -6033,9 +6252,9 @@ emitDeclImpl(decl, nullptr);
         auto varType = allocatedType->getValueType();
 //        auto addressSpace = allocatedType->getAddressSpace();
 
-        if (auto paramBlockType = varType->As<UniformParameterBlockType>())
+        if (auto paramBlockType = varType->As<UniformParameterGroupType>())
         {
-            emitIRParameterBlock(
+            emitIRParameterGroup(
                 ctx,
                 varDecl,
                 paramBlockType);
@@ -6305,7 +6524,7 @@ StructTypeLayout* getGlobalStructLayout(
     {
         return gs.Ptr();
     }
-    else if( auto globalConstantBufferLayout = globalScopeLayout.As<ParameterBlockTypeLayout>() )
+    else if( auto globalConstantBufferLayout = globalScopeLayout.As<ParameterGroupTypeLayout>() )
     {
         // TODO: the `cbuffer` case really needs to be emitted very
         // carefully, but that is beyond the scope of what a simple rewriter
@@ -6337,6 +6556,9 @@ StructTypeLayout* getGlobalStructLayout(
         return nullptr;
     }
 }
+
+void legalizeTypes(
+    IRModule*   module);
 
 String emitEntryPoint(
     EntryPointRequest*  entryPoint,
@@ -6401,20 +6623,37 @@ String emitEntryPoint(
         // so that we "just" need to specialize it as needed for the
         // specific target and entry point in use.
         //
+        // The first pass is to extract the IR code of the entry point,
+        // and any other symbols it references. At the same time,
+        // we go ahead and select the target-specific version of
+        // any such functions if they are available. We also go
+        // ahead and apply the layout information (from `programLayout`)
+        // to the IR code (which previously had no layout).
+        //
+        // Note: it is important that we extract a *copy* of all the
+        // relevant IR, so that transformations we make for one
+        // entry point (or target) don't mess up the IR used for other
+        // entry points (targets).
+        //
         auto lowered = specializeIRForEntryPoint(
             entryPoint,
             programLayout,
             target);
 
-        // debugging:
+        // If the user specified the flag that they want us to dump
+        // IR, then do it here, for the target-specific, but
+        // un-specialized IR.
         if (translationUnit->compileRequest->shouldDumpIR)
         {
             dumpIR(lowered);
         }
 
-        // TODO: we should apply some guaranteed transformations here,
-        // to eliminate constructs that aren't legal downstream (e.g. generics).
-
+        // Next, we need to ensure that the code we emit for
+        // the target doesn't contain any operations that would
+        // be illegal on the target platform. For example,
+        // none of our target supports generics, or interfaces,
+        // so we need to specialize those away.
+        //
         specializeGenerics(lowered);
 
         // Debugging code for IR transformations...
@@ -6424,10 +6663,12 @@ String emitEntryPoint(
         fprintf(stderr, "###\n");
 #endif
 
-        //
-        // TODO: Need to decide whether to do these before or after
-        // target-specific legalization steps. Currently I've folded
-        // legalization into the specialization above.
+        // After we've fully specialized all generics, and
+        // "devirtualized" all the calls through interfaces,
+        // we need to ensure that the code only uses types
+        // that are legal on the chosen target.
+        // 
+        legalizeTypes(lowered);
 
         // TODO: do we want to emit directly from IR, or translate the
         // IR back into AST for emission?

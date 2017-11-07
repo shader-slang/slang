@@ -294,6 +294,17 @@ void Type::accept(IValVisitor* visitor, void* extra)
             declRef)->As<PtrType>();
     }
 
+    RefPtr<ArrayExpressionType> Session::getArrayType(
+        Type*   elementType,
+        IntVal* elementCount)
+    {
+        RefPtr<ArrayExpressionType> arrayType = new ArrayExpressionType();
+        arrayType->baseType = elementType;
+        arrayType->ArrayLength = elementCount;
+        return arrayType;
+    }
+
+
     RefPtr<GroupSharedType> Session::getGroupSharedType(RefPtr<Type> valueType)
     {
         RefPtr<GroupSharedType> groupSharedType = new GroupSharedType();
@@ -641,8 +652,9 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
             CASE(ConstantBuffer, ConstantBufferType)
             CASE(TextureBuffer, TextureBufferType)
-            CASE(GLSLInputParameterBlockType, GLSLInputParameterBlockType)
-            CASE(GLSLOutputParameterBlockType, GLSLOutputParameterBlockType)
+            CASE(ParameterBlockType, ParameterBlockType)
+            CASE(GLSLInputParameterGroupType, GLSLInputParameterGroupType)
+            CASE(GLSLOutputParameterGroupType, GLSLOutputParameterGroupType)
             CASE(GLSLShaderStorageBufferType, GLSLShaderStorageBufferType)
 
             CASE(HLSLStructuredBufferType, HLSLStructuredBufferType)

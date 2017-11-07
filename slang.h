@@ -564,6 +564,7 @@ extern "C"
         SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT,
         SLANG_PARAMETER_CATEGORY_SPECIALIZATION_CONSTANT,
         SLANG_PARAMETER_CATEGORY_PUSH_CONSTANT_BUFFER,
+        SLANG_PAREMTER_CATEGORY_PARAMETER_BLOCK,
 
         //
         SLANG_PARAMETER_CATEGORY_COUNT,
@@ -817,6 +818,7 @@ namespace slang
         DescriptorTableSlot = SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT,
         SpecializationConstant = SLANG_PARAMETER_CATEGORY_SPECIALIZATION_CONSTANT,
         PushConstantBuffer = SLANG_PARAMETER_CATEGORY_PUSH_CONSTANT_BUFFER,
+        ParameterBlock = SLANG_PAREMTER_CATEGORY_PARAMETER_BLOCK,
     };
 
     struct TypeLayoutReflection
@@ -1084,6 +1086,7 @@ namespace slang
 #include "source/slang/dxc-support.cpp"
 #include "source/slang/emit.cpp"
 #include "source/slang/ir.cpp"
+#include "source/slang/ir-legalize-types.cpp"
 #include "source/slang/lexer.cpp"
 #include "source/slang/mangle.cpp"
 #include "source/slang/name.cpp"

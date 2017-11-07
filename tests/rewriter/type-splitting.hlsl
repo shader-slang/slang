@@ -47,12 +47,12 @@ cbuffer C
 	Foo foo;
 }
 
-Texture2D    SLANG_parameterBlock_C_foo_t;
-SamplerState SLANG_parameterBlock_C_foo_s;
+Texture2D    SLANG_parameterGroup_C_foo_t;
+SamplerState SLANG_parameterGroup_C_foo_s;
 
 float4 main() : SV_Target
 {
-	return SLANG_parameterBlock_C_foo_t.Sample(SLANG_parameterBlock_C_foo_s, foo.u);	
+	return SLANG_parameterGroup_C_foo_t.Sample(SLANG_parameterGroup_C_foo_s, foo.u);	
 }
 
 #endif

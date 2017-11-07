@@ -93,6 +93,8 @@ struct IRUse
     IRUse** prevLink;
 
     void init(IRUser* user, IRValue* usedValue);
+    void set(IRValue* usedValue);
+    void clear();
 };
 
 enum IRDecorationOp : uint16_t
@@ -254,6 +256,11 @@ struct IRUser : IRChildValue
     IRValue* getArg(UInt index)
     {
         return getArgs()[index].usedValue;
+    }
+
+    void setArg(UInt index, IRValue* value)
+    {
+        getArgs()[index].set(value);
     }
 };
 

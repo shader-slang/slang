@@ -154,6 +154,22 @@ namespace Slang
             return endData;
         }
 
+        UInt size() const
+        {
+            return endData - beginData;
+        }
+
+        bool operator==(UnownedStringSlice const& other)
+        {
+            return size() == other.size()
+                && memcmp(begin(), other.begin(), size()) == 0;
+        }
+
+        bool operator==(char const* str)
+        {
+            return (*this) == UnownedStringSlice(str, str + strlen(str));
+        }
+
     private:
         char const* beginData;
         char const* endData;
