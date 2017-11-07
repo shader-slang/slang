@@ -4664,7 +4664,7 @@ emitDeclImpl(decl, nullptr);
             expect("_S");
         }
 
-        int readCount()
+        UInt readCount()
         {
             int c = peek();
             if(!isDigit((char)c))
@@ -4822,14 +4822,49 @@ emitDeclImpl(decl, nullptr);
         IRCall*         inst,
         IRFunc*         func)
     {
-        // TODO: we need to inspect the mangled name,
-        // and construct a suitable expression from it...
+        // For a call with N arguments, the instruction will
+        // have N+1 operands. We will start consuming operands
+        // starting at the index 1.
+        UInt operandCount = inst->getArgCount();
+        UInt argCount = operandCount - 1;
+        UInt operandIndex = 1;
+
+        // Our current strategy for dealing with intrinsic
+        // calls is to "un-mangle" the mangled name, in
+        // order to figure out what the user was originally
+        // calling. This is a bit messy, and there might
+        // be better strategies (including just stuffing
+        // a pointer to the original decl onto the callee).
 
         UnmangleContext um(func->mangledName);
-
         um.startUnmangling();
 
+        // We'll read through the qualified name of the
+        // symbol (e.g., `Texture2D<T>.Sample`) and then
+        // only keep the last segment of the name (e.g.,
+        // the `Sample` part).
         auto name = um.readSimpleName();
+
+        // We will special-case some names here, that
+        // represent callable declarations that aren't
+        // ordinary functions, and thus may use different
+        // syntax.
+        if(name == "operator[]")
+        {
+            // The user is invoking a built-in subscript operator
+            emit("(");
+            emitIROperand(ctx, inst->getArg(operandIndex++));
+            emit(")[");
+            emitIROperand(ctx, inst->getArg(operandIndex++));
+            emit("]");
+
+            if(operandIndex < operandCount)
+            {
+                emit(" = ");
+                emitIROperand(ctx, inst->getArg(operandIndex++));
+            }
+            return;
+        }
 
         // The mangled function name currently records
         // the number of explicit parameters, and thus
@@ -4837,12 +4872,6 @@ emitDeclImpl(decl, nullptr);
         // We can compare the argument and parameter counts
         // to figure out whether we have a member function call.
         UInt paramCount = um.readParamCount();
-
-        // For a call with N arguments, the instruction will
-        // have N+1 operands.
-        UInt operandCount = inst->getArgCount();
-        UInt argCount = operandCount - 1;
-        UInt operandIndex = 1;
 
         if(argCount != paramCount)
         {
