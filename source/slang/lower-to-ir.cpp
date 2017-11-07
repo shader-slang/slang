@@ -2910,7 +2910,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     {
         if (auto innerFuncDecl = genDecl->inner->As<FuncDecl>())
             return lowerFuncDecl(innerFuncDecl);
-        SLANG_ASSERT(false);
+        SLANG_RELEASE_ASSERT(false);
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
