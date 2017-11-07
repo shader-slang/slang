@@ -460,11 +460,17 @@ static void emitReflectionTypeLayoutInfoJSON(
 
     case slang::TypeReflection::Kind::Struct:
         {
+            auto structTypeLayout = typeLayout;
+
             write(writer, "\"kind\": \"struct\",\n");
+            if( auto name = structTypeLayout->getName() )
+            {
+                emitReflectionNameInfoJSON(writer, structTypeLayout->getName());
+                write(writer, ",\n");
+            }
             write(writer, "\"fields\": [\n");
             indent(writer);
 
-            auto structTypeLayout = typeLayout;
             auto fieldCount = structTypeLayout->getFieldCount();
             for( uint32_t ff = 0; ff < fieldCount; ++ff )
             {

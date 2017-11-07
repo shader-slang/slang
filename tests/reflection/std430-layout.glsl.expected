@@ -61,6 +61,7 @@ standard output = {
                             "name": "e",
                             "type": {
                                 "kind": "struct",
+                                "name": "Foo",
                                 "fields": [
                                     {
                                         "name": "f",

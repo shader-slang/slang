@@ -601,6 +601,8 @@ extern "C"
     SLANG_API SlangResourceAccess spReflectionType_GetResourceAccess(SlangReflectionType* type);
     SLANG_API SlangReflectionType* spReflectionType_GetResourceResultType(SlangReflectionType* type);
 
+    SLANG_API char const* spReflectionType_GetName(SlangReflectionType* type);
+
     // Type Layout Reflection
 
     SLANG_API SlangReflectionType* spReflectionTypeLayout_GetType(SlangReflectionTypeLayout* type);
@@ -801,6 +803,11 @@ namespace slang
         {
             return spReflectionType_GetResourceAccess((SlangReflectionType*) this);
         }
+
+        char const* getName()
+        {
+            return spReflectionType_GetName((SlangReflectionType*) this);
+        }
     };
 
     enum ParameterCategory : SlangParameterCategory
@@ -924,6 +931,10 @@ namespace slang
             return getType()->getResourceAccess();
         }
 
+        char const* getName()
+        {
+            return getType()->getName();
+        }
     };
 
     struct VariableReflection
