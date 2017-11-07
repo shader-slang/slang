@@ -55,15 +55,15 @@ namespace Slang
         }
     }
 
-    void IRUse::set(IRValue* usedValue)
+    void IRUse::set(IRValue* usedVal)
     {
         // clear out the old value
-        if (usedValue)
+        if (usedVal)
         {
             *prevLink = nextUse;
         }
 
-        init(user, usedValue);
+        init(user, usedVal);
     }
 
     void IRUse::clear()

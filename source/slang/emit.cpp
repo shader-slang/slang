@@ -4754,7 +4754,7 @@ emitDeclImpl(decl, nullptr);
         void readSimpleIntVal()
         {
             int c = peek();
-            if(isDigit(c))
+            if(isDigit((char)c))
             {
                 get();
             }
