@@ -3899,8 +3899,8 @@ namespace Slang
         //
         // TODO: This shouldn't be needed, if we introduce a sorting
         // step before we emit code.
-        specFunc->removeFromParent();
-        specFunc->insertAfter(genericFunc);
+        //specFunc->removeFromParent();
+        //specFunc->insertAfter(genericFunc);
 
         // At this point we've created a new non-generic function,
         // which means we should add it to our work list for
