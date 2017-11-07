@@ -1435,7 +1435,7 @@ namespace Slang
         DiagnosticSink newSink;
         newSink.sourceManager = parser->sink->sourceManager;
         Parser newParser(*parser);
-        parser->sink = &newSink;
+        newParser.sink = &newSink;
         auto speculateParseRs = parseGenericApp(&newParser, base);
         if (newSink.errorCount == 0)
         {
