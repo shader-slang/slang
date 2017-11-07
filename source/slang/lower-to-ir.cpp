@@ -314,6 +314,13 @@ LoweredValInfo emitDeclRef(
     IRGenContext*   context,
     DeclRef<Decl>   declRef);
 
+// Emit necessary `specialize` instruction needed by a declRef.
+// This is currently used by emitDeclRef() and emitFuncRef()
+LoweredValInfo maybeEmitSpecializeInst(IRGenContext*   context, 
+    LoweredValInfo loweredDecl,  // the lowered value of the inner decl
+    DeclRef<Decl>   declRef      // the full decl ref containing substitutions
+);
+
 
 IRValue* getSimpleVal(IRGenContext* context, LoweredValInfo lowered);
 
@@ -488,10 +495,11 @@ LoweredValInfo emitFuncRef(
 
                 RefPtr<Type> type = funcExpr->type;
 
-                return LoweredValInfo::simple(context->irBuilder->emitLookupInterfaceMethodInst(
+                auto loweredVal = LoweredValInfo::simple(context->irBuilder->emitLookupInterfaceMethodInst(
                     type,
                     baseMemberDeclRef,
                     funcDeclRef));
+                return maybeEmitSpecializeInst(context, loweredVal, funcDeclRef);
             }
         }
     }
@@ -3090,9 +3098,16 @@ LoweredValInfo emitDeclRef(
     // unspecialized declaration.
     LoweredValInfo loweredDecl = ensureDecl(context, declRef.getDecl());
 
+    return maybeEmitSpecializeInst(context, loweredDecl, declRef);
+}
+
+LoweredValInfo maybeEmitSpecializeInst(IRGenContext*   context,
+    LoweredValInfo loweredDecl,
+    DeclRef<Decl>   declRef)
+{
     // If this declaration reference doesn't involve any specializations,
     // then we are done at this point.
-    if(!hasGenericSubstitutions(declRef.substitutions))
+    if (!hasGenericSubstitutions(declRef.substitutions))
         return loweredDecl;
 
     auto val = getSimpleVal(context, loweredDecl);
@@ -3106,7 +3121,7 @@ LoweredValInfo emitDeclRef(
 
 
     RefPtr<Type> type;
-    if(auto declType = val->getType())
+    if (auto declType = val->getType())
     {
         type = declType->Substitute(declRef.substitutions).As<Type>();
     }
@@ -3118,6 +3133,7 @@ LoweredValInfo emitDeclRef(
         val,
         declRef));
 }
+
 
 static void lowerEntryPointToIR(
     IRGenContext*       context,
