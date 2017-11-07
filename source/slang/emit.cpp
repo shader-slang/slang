@@ -4677,7 +4677,7 @@ emitDeclImpl(decl, nullptr);
             if(c == '0')
                 return 0;
 
-            int count = 0;
+            UInt count = 0;
             for(;;)
             {
                 count = count*10 + c - '0';
@@ -4689,18 +4689,117 @@ emitDeclImpl(decl, nullptr);
             }
         }
 
+        void readGenericParam()
+        {
+            switch(peek())
+            {
+            case 'T':
+                get();
+                break;
+
+            default:
+                SLANG_UNEXPECTED("bad name mangling");
+                break;
+            }
+        }
+
+        void readGenericParams()
+        {
+            expect("g");
+            UInt paramCount = readCount();
+            for(UInt pp = 0; pp < paramCount; pp++)
+            {
+                readGenericParam();
+            }
+        }
+
+        void readSimpleIntVal()
+        {
+            int c = peek();
+            if(isDigit(c))
+            {
+                get();
+            }
+            else
+            {
+                readVal();
+            }
+        }
+
+        void readType()
+        {
+            int c = peek();
+            switch(c)
+            {
+            case 'V':
+            case 'b':
+            case 'i':
+            case 'u':
+            case 'U':
+            case 'h':
+            case 'f':
+            case 'd':
+                get();
+                break;
+
+            case 'v':
+                get();
+                readSimpleIntVal();
+                readType();
+                break;
+
+            default:
+                // TODO: need to read a named type
+                // here...
+                break;
+            }
+        }
+
+        void readVal()
+        {
+            // TODO: handle other cases here
+            readType();
+        }
+
+        void readGenericArg()
+        {
+            readVal();
+        }
+
+        void readGenericArgs()
+        {
+            expect("G");
+            UInt argCount = readCount();
+            for(UInt aa = 0; aa < argCount; aa++)
+            {
+                readGenericArg();
+            }
+        }
+
         UnownedStringSlice readSimpleName()
         {
             UnownedStringSlice result;
             for(;;)
             {
                 int c = peek();
+
+                if(c == 'g')
+                {
+                    readGenericParams();
+                    continue;
+                }
+                else if(c == 'G')
+                {
+                    readGenericArgs();
+                    continue;
+                }
+
                 if(!isDigit((char)c))
                     return result;
 
                 // Read the length part
-                int count = readCount();
-                if(count > (end_ - cursor_))
+                UInt count = readCount();
+                if(count > UInt(end_ - cursor_))
                 {
                     SLANG_UNEXPECTED("bad name mangling");
                     UNREACHABLE_RETURN(result);
@@ -4709,6 +4808,12 @@ emitDeclImpl(decl, nullptr);
                 result = UnownedStringSlice(cursor_, cursor_ + count);
                 cursor_ += count;
             }
+        }
+
+        UInt readParamCount()
+        {
+            expect("p");
+            return readCount();
         }
     };
 
@@ -4726,16 +4831,37 @@ emitDeclImpl(decl, nullptr);
 
         auto name = um.readSimpleName();
 
-        // TODO: need to detect if name represents
-        // a member function, etc.
+        // The mangled function name currently records
+        // the number of explicit parameters, and thus
+        // doesn't include the implicit `this` parameter.
+        // We can compare the argument and parameter counts
+        // to figure out whether we have a member function call.
+        UInt paramCount = um.readParamCount();
+
+        // For a call with N arguments, the instruction will
+        // have N+1 operands.
+        UInt operandCount = inst->getArgCount();
+        UInt argCount = operandCount - 1;
+        UInt operandIndex = 1;
+
+        if(argCount != paramCount)
+        {
+            // Looks like a member function call
+            emit("(");
+            emitIROperand(ctx, inst->getArg(operandIndex));
+            emit(").");
+
+            operandIndex++;
+        }
 
         emit(name);
         emit("(");
-        UInt argCount = inst->getArgCount();
-        for( UInt aa = 1; aa < argCount; ++aa )
+        bool first = true;
+        for(; operandIndex < operandCount; ++operandIndex )
         {
-            if(aa != 1) emit(", ");
-            emitIROperand(ctx, inst->getArg(aa));
+            if(!first) emit(", ");
+            emitIROperand(ctx, inst->getArg(operandIndex));
+            first = false;
         }
         emit(")");
     }
