@@ -152,6 +152,18 @@ namespace Slang
             // value, so we certainly don't want to include
             // it in the mangling.
         }
+        else if( auto genericParamIntVal = dynamic_cast<GenericParamIntVal*>(val) )
+        {
+            // TODO: we shouldn't be including the names of generic parameters
+            // anywhere in mangled names, since changing parameter names
+            // shouldn't break binary compatibility.
+            //
+            // The right solution in the long term is for generic parameters
+            // (both types and values) to be mangled in terms of their
+            // "depth" (how many outer generics) and "index" (which
+            // parameter are they at the specified depth).
+            emitName(context, genericParamIntVal->declRef.GetName());
+        }
         else
         {
             SLANG_UNEXPECTED("unimplemented case in mangling");
