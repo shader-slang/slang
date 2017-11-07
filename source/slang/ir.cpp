@@ -3878,6 +3878,78 @@ namespace Slang
         return originalType->Substitute(subst).As<Type>();
     }
 
+    // Given a list of substitutions, return the inner-most
+    // generic substitution in the list, or NULL if there
+    // are no generic substitutions.
+    RefPtr<GenericSubstitution> getInnermostGenericSubst(
+        Substitutions*  inSubst)
+    {
+        auto subst = inSubst;
+        while( subst )
+        {
+            GenericSubstitution* genericSubst = dynamic_cast<GenericSubstitution*>(subst);
+            if(genericSubst)
+                return genericSubst;
+
+            subst = subst->outer;
+        }
+        return nullptr;
+    }
+
+    RefPtr<GenericDecl> getInnermostGenericDecl(
+        Decl*   inDecl)
+    {
+        auto decl = inDecl;
+        while( decl )
+        {
+            GenericDecl* genericDecl = dynamic_cast<GenericDecl*>(decl);
+            if(genericDecl)
+                return genericDecl;
+
+            decl = decl->ParentDecl;
+        }
+        return nullptr;
+    }
+
+    // This function takes a list of substitutions that we'd
+    // like to apply, but which (1) might apply to a different
+    // declaration in cases where we have got target-specific
+    // overloads in the mix, and (2) might include some `ThisType`
+    // substitutions, which we don't care about in this context,
+    // and produces a new set of substitutiosn without these
+    // two issues.
+    RefPtr<Substitutions> cloneSubstitutionsForSpecialization(
+        IRSharedGenericSpecContext* sharedContext,
+        Substitutions*              oldSubst,
+        Decl*                       newDecl)
+    {
+        // We will "peel back" layers of substitutions until
+        // we find our first generic subsitution.
+        auto oldGenericSubst = getInnermostGenericSubst(oldSubst);
+        if(!oldGenericSubst)
+            return nullptr;
+
+        // We will also peel back layers of declarations until
+        // we find our first generic decl.
+        auto newGenericDecl = getInnermostGenericDecl(newDecl);
+        if( !newGenericDecl )
+        {
+//            SLANG_UNEXPECTED("generic subst without generic decl");
+            return nullptr;
+        }
+
+        RefPtr<GenericSubstitution> newSubst = new GenericSubstitution();
+        newSubst->genericDecl = newGenericDecl;
+        newSubst->args = oldGenericSubst->args;
+
+        newSubst->outer = cloneSubstitutionsForSpecialization(
+            sharedContext,
+            oldGenericSubst->outer,
+            newGenericDecl->ParentDecl);
+
+        return newSubst;
+    }
+
 
     IRFunc* getSpecializedFunc(
         IRSharedGenericSpecContext* sharedContext,
@@ -3909,10 +3981,10 @@ namespace Slang
         // using a different overload of a target-specific function,
         // so we need to create a dummy substitution here, to make
         // sure it used the correct generic.
-        RefPtr<GenericSubstitution> newSubst = new GenericSubstitution();
-        newSubst->genericDecl = genericFunc->genericDecl;
-        auto specDeclRefSubst = specDeclRef.substitutions.As<GenericSubstitution>();
-        newSubst->args = specDeclRefSubst->args;
+        RefPtr<Substitutions> newSubst = cloneSubstitutionsForSpecialization(
+            sharedContext,
+            specDeclRef.substitutions,
+            genericFunc->genericDecl);
 
         IRGenericSpecContext context;
         context.shared = sharedContext;

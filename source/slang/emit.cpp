@@ -1614,6 +1614,32 @@ struct EmitVisitor
         }
     }
 
+    void emitSimpleSubscriptCallExpr(
+        RefPtr<InvokeExpr>  callExpr,
+        EOpInfo             /*outerPrec*/)
+    {
+        auto funcExpr = callExpr->FunctionExpr;
+
+        // We expect any subscript operation to be invoked as a member,
+        // so the function expression had better be in the correct form.
+        auto memberExpr = funcExpr.As<MemberExpr>();
+        if(!memberExpr)
+        {
+            SLANG_UNEXPECTED("subscript needs base expression");
+        }
+
+        Emit("(");
+        EmitExpr(memberExpr->BaseExpression);
+        Emit(")[");
+        UInt argCount = callExpr->Arguments.Count();
+        for (UInt aa = 0; aa < argCount; ++aa)
+        {
+            if (aa != 0) Emit(", ");
+            EmitExpr(callExpr->Arguments[aa]);
+        }
+        Emit("]");
+    }
+
     // Emit a call expression that doesn't involve any special cases,
     // just an expression of the form `f(a0, a1, ...)`
     void emitSimpleCallExpr(
@@ -1632,6 +1658,18 @@ struct EmitVisitor
                 emitSimpleConstructorCallExpr(callExpr, outerPrec);
                 return;
             }
+
+            if(auto acessorDeclRef = declRef.As<AccessorDecl>())
+            {
+                declRef = acessorDeclRef.GetParent();
+            }
+
+            if(auto subscriptDeclRef = declRef.As<SubscriptDecl>())
+            {
+                emitSimpleSubscriptCallExpr(callExpr, outerPrec);
+                return;
+            }
+
         }
 
         // Once we've ruled out constructor calls, we can move on
@@ -4664,7 +4702,7 @@ emitDeclImpl(decl, nullptr);
             expect("_S");
         }
 
-        int readCount()
+        UInt readCount()
         {
             int c = peek();
             if(!isDigit((char)c))
@@ -4677,7 +4715,7 @@ emitDeclImpl(decl, nullptr);
             if(c == '0')
                 return 0;
 
-            int count = 0;
+            UInt count = 0;
             for(;;)
             {
                 count = count*10 + c - '0';
@@ -4689,18 +4727,117 @@ emitDeclImpl(decl, nullptr);
             }
         }
 
+        void readGenericParam()
+        {
+            switch(peek())
+            {
+            case 'T':
+                get();
+                break;
+
+            default:
+                SLANG_UNEXPECTED("bad name mangling");
+                break;
+            }
+        }
+
+        void readGenericParams()
+        {
+            expect("g");
+            UInt paramCount = readCount();
+            for(UInt pp = 0; pp < paramCount; pp++)
+            {
+                readGenericParam();
+            }
+        }
+
+        void readSimpleIntVal()
+        {
+            int c = peek();
+            if(isDigit(c))
+            {
+                get();
+            }
+            else
+            {
+                readVal();
+            }
+        }
+
+        void readType()
+        {
+            int c = peek();
+            switch(c)
+            {
+            case 'V':
+            case 'b':
+            case 'i':
+            case 'u':
+            case 'U':
+            case 'h':
+            case 'f':
+            case 'd':
+                get();
+                break;
+
+            case 'v':
+                get();
+                readSimpleIntVal();
+                readType();
+                break;
+
+            default:
+                // TODO: need to read a named type
+                // here...
+                break;
+            }
+        }
+
+        void readVal()
+        {
+            // TODO: handle other cases here
+            readType();
+        }
+
+        void readGenericArg()
+        {
+            readVal();
+        }
+
+        void readGenericArgs()
+        {
+            expect("G");
+            UInt argCount = readCount();
+            for(UInt aa = 0; aa < argCount; aa++)
+            {
+                readGenericArg();
+            }
+        }
+
         UnownedStringSlice readSimpleName()
         {
             UnownedStringSlice result;
             for(;;)
             {
                 int c = peek();
+
+                if(c == 'g')
+                {
+                    readGenericParams();
+                    continue;
+                }
+                else if(c == 'G')
+                {
+                    readGenericArgs();
+                    continue;
+                }
+
                 if(!isDigit((char)c))
                     return result;
 
                 // Read the length part
-                int count = readCount();
-                if(count > (end_ - cursor_))
+                UInt count = readCount();
+                if(count > UInt(end_ - cursor_))
                 {
                     SLANG_UNEXPECTED("bad name mangling");
                     UNREACHABLE_RETURN(result);
@@ -4710,6 +4847,12 @@ emitDeclImpl(decl, nullptr);
                 cursor_ += count;
             }
         }
+
+        UInt readParamCount()
+        {
+            expect("p");
+            return readCount();
+        }
     };
 
     void emitIntrinsicCallExpr(
@@ -4717,25 +4860,75 @@ emitDeclImpl(decl, nullptr);
         IRCall*         inst,
         IRFunc*         func)
     {
-        // TODO: we need to inspect the mangled name,
-        // and construct a suitable expression from it...
+        // For a call with N arguments, the instruction will
+        // have N+1 operands. We will start consuming operands
+        // starting at the index 1.
+        UInt operandCount = inst->getArgCount();
+        UInt argCount = operandCount - 1;
+        UInt operandIndex = 1;
+
+        // Our current strategy for dealing with intrinsic
+        // calls is to "un-mangle" the mangled name, in
+        // order to figure out what the user was originally
+        // calling. This is a bit messy, and there might
+        // be better strategies (including just stuffing
+        // a pointer to the original decl onto the callee).
 
         UnmangleContext um(func->mangledName);
-
         um.startUnmangling();
 
+        // We'll read through the qualified name of the
+        // symbol (e.g., `Texture2D<T>.Sample`) and then
+        // only keep the last segment of the name (e.g.,
+        // the `Sample` part).
         auto name = um.readSimpleName();
 
-        // TODO: need to detect if name represents
-        // a member function, etc.
+        // We will special-case some names here, that
+        // represent callable declarations that aren't
+        // ordinary functions, and thus may use different
+        // syntax.
+        if(name == "operator[]")
+        {
+            // The user is invoking a built-in subscript operator
+            emit("(");
+            emitIROperand(ctx, inst->getArg(operandIndex++));
+            emit(")[");
+            emitIROperand(ctx, inst->getArg(operandIndex++));
+            emit("]");
+
+            if(operandIndex < operandCount)
+            {
+                emit(" = ");
+                emitIROperand(ctx, inst->getArg(operandIndex++));
+            }
+            return;
+        }
+
+        // The mangled function name currently records
+        // the number of explicit parameters, and thus
+        // doesn't include the implicit `this` parameter.
+        // We can compare the argument and parameter counts
+        // to figure out whether we have a member function call.
+        UInt paramCount = um.readParamCount();
+
+        if(argCount != paramCount)
+        {
+            // Looks like a member function call
+            emit("(");
+            emitIROperand(ctx, inst->getArg(operandIndex));
+            emit(").");
+
+            operandIndex++;
+        }
 
         emit(name);
         emit("(");
-        UInt argCount = inst->getArgCount();
-        for( UInt aa = 1; aa < argCount; ++aa )
+        bool first = true;
+        for(; operandIndex < operandCount; ++operandIndex )
         {
-            if(aa != 1) emit(", ");
-            emitIROperand(ctx, inst->getArg(aa));
+            if(!first) emit(", ");
+            emitIROperand(ctx, inst->getArg(operandIndex));
+            first = false;
         }
         emit(")");
     }
@@ -5527,7 +5720,8 @@ emitDeclImpl(decl, nullptr);
                 emit(", ");
 
             auto paramName = getIRName(pp);
-            emitIRType(ctx, pp->getType(), paramName);
+            auto paramType = pp->getType();
+            emitIRParamType(ctx, paramType, paramName);
 
             emitIRSemantics(ctx, pp);
         }
@@ -5551,6 +5745,33 @@ emitDeclImpl(decl, nullptr);
         {
             emit(";\n");
         }
+    }
+
+    void emitIRParamType(
+        EmitContext*    ctx,
+        Type*           type,
+        String const&   name)
+    {
+        // An `out` or `inout` parameter will have been
+        // encoded as a parameter of pointer type, so
+        // we need to decode that here.
+        //
+        if( auto ptrType = type->As<PtrType>() )
+        {
+            // TODO: we need a way to distinguish `out`
+            // from `inout`. The easiest way to do
+            // that might be to have each be a distinct
+            // sub-case of `IRPtrType` - this would also
+            // ensure that they can be distinguished from
+            // real pointers when the user means to use
+            // them.
+
+            emit("out ");
+
+            type = ptrType->getValueType();
+        }
+
+        emitIRType(ctx, type, name);
     }
 
     void emitIRFuncDecl(
@@ -5600,26 +5821,7 @@ emitDeclImpl(decl, nullptr);
             paramName.append(pp);
             auto paramType = funcType->getParamType(pp);
 
-            // An `out` or `inout` parameter will have been
-            // encoded as a parameter of pointer type, so
-            // we need to decode that here.
-            //
-            if( auto ptrType = paramType->As<PtrType>() )
-            {
-                // TODO: we need a way to distinguish `out`
-                // from `inout`. The easiest way to do
-                // that might be to have each be a distinct
-                // sub-case of `IRPtrType` - this would also
-                // ensure that they can be distinguished from
-                // real pointers when the user means to use
-                // them.
-
-                emit("out ");
-
-                paramType = ptrType->getValueType();
-            }
-
-            emitIRType(ctx, paramType, paramName);
+            emitIRParamType(ctx, paramType, paramName);
         }
         emit(");\n");
     }

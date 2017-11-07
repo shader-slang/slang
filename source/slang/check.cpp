@@ -3471,11 +3471,33 @@ namespace Slang
 
             decl->SetCheckState(DeclCheckState::CheckedHeader);
 
+            for(auto mm : decl->Members)
+            {
+                checkDecl(mm);
+            }
+
             decl->SetCheckState(DeclCheckState::Checked);
         }
 
         void visitAccessorDecl(AccessorDecl* decl)
         {
+            // An acessor must appear nested inside a subscript declaration (today),
+            // or a property declaration (when we add them). It will derive
+            // its return type from the outer declaration, so we handle both
+            // of these checks at the same place.
+            auto parent = decl->ParentDecl;
+            if(auto parentSubscript = dynamic_cast<SubscriptDecl*>(parent))
+            {
+                decl->ReturnType = parentSubscript->ReturnType;
+            }
+            // TODO: when we add "property" declarations, check for them here
+            else
+            {
+                getSink()->diagnose(decl, Diagnostics::accessorMustBeInsideSubscriptOrProperty);
+            }
+
+            decl->SetCheckState(DeclCheckState::CheckedHeader);
+
             // TODO: check the body!
 
             decl->SetCheckState(DeclCheckState::Checked);
