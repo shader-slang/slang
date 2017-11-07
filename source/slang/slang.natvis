@@ -97,4 +97,17 @@
       <ExpandedItem>usedValue</ExpandedItem>
     </Expand>
   </Type>
+  <Type Name="Slang::IRModule">
+    <Expand>
+      <Item Name="session">session</Item>
+      <LinkedListItems>
+        <HeadPointer>firstGlobalValue</HeadPointer>
+        <NextPointer>nextGlobalValue</NextPointer>
+        <ValueNode>this</ValueNode>
+      </LinkedListItems>
+    </Expand>
+  </Type>
+  <Type Name="Slang::IRGlobalValue">
+    <DisplayString>{{IRGlobalValue {op} {mangledName}}}</DisplayString>
+  </Type>
 </AutoVisualizer>

@@ -3843,7 +3843,6 @@ namespace Slang
         return originalType->Substitute(subst).As<Type>();
     }
 
-
     IRFunc* getSpecializedFunc(
         IRSharedGenericSpecContext* sharedContext,
         IRFunc*                     genericFunc,
@@ -3853,8 +3852,11 @@ namespace Slang
         // has already been made. To do that we will need to
         // compute the mangled name of the specialized function,
         // so that we can look for existing declarations.
-
-        String specMangledName = getMangledName(specDeclRef);
+        String specMangledName;
+        if (genericFunc->genericDecl == specDeclRef.decl)
+            specMangledName = getMangledName(specDeclRef);
+        else
+            specMangledName = mangleSpecializedFuncName(genericFunc->mangledName, specDeclRef.substitutions);
 
         // TODO: This is a terrible linear search, and we should
         // avoid it by building a dictionary ahead of time,
@@ -3931,8 +3933,20 @@ namespace Slang
             auto keyDeclRef = ((IRDeclRef*) requirementKey)->declRef;
 
             // If the keys don't match, continue with the next entry.
-            if(!keyDeclRef.Equals(requirementDeclRef))
-                continue;
+            if (!keyDeclRef.Equals(requirementDeclRef))
+            {
+                // requirementDeclRef may be pointing to the inner decl of a generic decl
+                // in this case we compare keyDeclRef against the parent decl of requiredDeclRef
+                if (auto genRequiredDeclRef = requirementDeclRef.GetParent().As<GenericDecl>())
+                {
+                    if (!keyDeclRef.Equals(genRequiredDeclRef))
+                    {
+                        continue;
+                    }
+                }
+                else
+                    continue;
+            }
 
             // If the keys matched, then we use the value from
             // this entry.
@@ -4083,7 +4097,6 @@ namespace Slang
                             // Use the witness table to look up the value that
                             // satisfies the requirement.
                             auto satisfyingVal = findWitnessVal(witnessTable, requirementDeclRef);
-
                             // We expect to always find something, but lets just
                             // be careful here.
                             if(!satisfyingVal)

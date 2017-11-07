@@ -338,6 +338,24 @@ namespace Slang
             DeclRef<Decl>(declRef.decl, declRef.substitutions));
     }
 
+    String mangleSpecializedFuncName(String baseName, RefPtr<Substitutions> subst)
+    {
+        ManglingContext context;
+        emitRaw(&context, baseName.Buffer());
+        emitRaw(&context, "_G");
+        while (subst)
+        {
+            if (auto genSubst = subst.As<GenericSubstitution>())
+            {
+                for (auto a : genSubst->args)
+                    emitVal(&context, a);
+                break;
+            }
+            subst = subst->outer;
+        }
+        return context.sb.ProduceString();
+    }
+
     String getMangledName(Decl* decl)
     {
         return getMangledName(makeDeclRef(decl));
