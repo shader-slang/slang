@@ -5698,7 +5698,8 @@ emitDeclImpl(decl, nullptr);
                 emit(", ");
 
             auto paramName = getIRName(pp);
-            emitIRType(ctx, pp->getType(), paramName);
+            auto paramType = pp->getType();
+            emitIRParamType(ctx, paramType, paramName);
 
             emitIRSemantics(ctx, pp);
         }
@@ -5722,6 +5723,33 @@ emitDeclImpl(decl, nullptr);
         {
             emit(";\n");
         }
+    }
+
+    void emitIRParamType(
+        EmitContext*    ctx,
+        Type*           type,
+        String const&   name)
+    {
+        // An `out` or `inout` parameter will have been
+        // encoded as a parameter of pointer type, so
+        // we need to decode that here.
+        //
+        if( auto ptrType = type->As<PtrType>() )
+        {
+            // TODO: we need a way to distinguish `out`
+            // from `inout`. The easiest way to do
+            // that might be to have each be a distinct
+            // sub-case of `IRPtrType` - this would also
+            // ensure that they can be distinguished from
+            // real pointers when the user means to use
+            // them.
+
+            emit("out ");
+
+            type = ptrType->getValueType();
+        }
+
+        emitIRType(ctx, type, name);
     }
 
     void emitIRFuncDecl(
@@ -5771,26 +5799,7 @@ emitDeclImpl(decl, nullptr);
             paramName.append(pp);
             auto paramType = funcType->getParamType(pp);
 
-            // An `out` or `inout` parameter will have been
-            // encoded as a parameter of pointer type, so
-            // we need to decode that here.
-            //
-            if( auto ptrType = paramType->As<PtrType>() )
-            {
-                // TODO: we need a way to distinguish `out`
-                // from `inout`. The easiest way to do
-                // that might be to have each be a distinct
-                // sub-case of `IRPtrType` - this would also
-                // ensure that they can be distinguished from
-                // real pointers when the user means to use
-                // them.
-
-                emit("out ");
-
-                paramType = ptrType->getValueType();
-            }
-
-            emitIRType(ctx, paramType, paramName);
+            emitIRParamType(ctx, paramType, paramName);
         }
         emit(");\n");
     }
