@@ -5103,6 +5103,10 @@ emitDeclImpl(decl, nullptr);
             emit(";\n");
             break;
 
+        case kIROp_discard:
+            emit("discard;\n");
+            break;
+
         case kIROp_swizzleSet:
             {
                 auto ii = (IRSwizzleSet*)inst;
@@ -5232,6 +5236,7 @@ emitDeclImpl(decl, nullptr);
 
             case kIROp_ReturnVal:
             case kIROp_ReturnVoid:
+            case kIROp_discard:
                 emitIRInst(ctx, terminator);
                 return;
 
