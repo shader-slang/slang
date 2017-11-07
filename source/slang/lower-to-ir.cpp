@@ -3009,6 +3009,11 @@ RefPtr<Val> lowerSubstitutionArg(
     }
     else if (auto declaredSubtypeWitness = dynamic_cast<DeclaredSubtypeWitness*>(val))
     {
+        // We do not have a concrete witness table yet for a GenericTypeConstraintDecl witness
+
+        if (declaredSubtypeWitness->declRef.As<GenericTypeConstraintDecl>())
+            return val;
+
         // We need to look up the IR-level representation of the witness
         // (which is a witness table).
 

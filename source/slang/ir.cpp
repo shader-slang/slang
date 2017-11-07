@@ -3729,8 +3729,6 @@ namespace Slang
     {
         if( auto subtypeWitness = dynamic_cast<SubtypeWitness*>(val) )
         {
-            // We need to look up the IR value that represents the
-            // given subtype witness.
             String mangledName = getMangledNameForConformanceWitness(
                 subtypeWitness->sub,
                 subtypeWitness->sup);
