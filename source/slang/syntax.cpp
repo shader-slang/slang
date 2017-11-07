@@ -1560,13 +1560,14 @@ void Type::accept(IValVisitor* visitor, void* extra)
                 }
                 if (found)
                 {
-                    int ordinaryParamCount = genericDecl->getMembersOfType<GenericTypeParamDecl>().Count() +
+                    auto ordinaryParamCount = genericDecl->getMembersOfType<GenericTypeParamDecl>().Count() +
                         genericDecl->getMembersOfType<GenericValueParamDecl>().Count();
                     SLANG_ASSERT(ordinaryParamCount + index < genericSubst->args.Count());
                     return genericSubst->args[ordinaryParamCount + index];
                 }
             }
         }
+        return this;
     }
 
     String DeclaredSubtypeWitness::ToString()
@@ -1695,6 +1696,18 @@ void Type::accept(IValVisitor* visitor, void* extra)
             p = p->outer.Ptr();
         }
         return false;
+    }
+
+    RefPtr<GenericSubstitution> getGenericSubstitution(RefPtr<Substitutions> subst)
+    {
+        auto p = subst.Ptr();
+        while (p)
+        {
+            if (auto genSubst = dynamic_cast<GenericSubstitution*>(p))
+                return genSubst;
+            p = p->outer.Ptr();
+        }
+        return nullptr;
     }
 
 }

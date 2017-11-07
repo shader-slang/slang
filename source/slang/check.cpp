@@ -4485,9 +4485,13 @@ namespace Slang
 
             DeclRef<Decl> innerDeclRef(GetInner(baseGenericRef), subst);
 
+            RefPtr<Expr> base;
+            if (auto mbrExpr = baseExpr.As<MemberExpr>())
+                base = mbrExpr->BaseExpression;
+
             return ConstructDeclRefExpr(
                 innerDeclRef,
-                nullptr,
+                base,
                 originalExpr->loc);
         }
 
@@ -5760,7 +5764,9 @@ namespace Slang
             // We are applying a generic to arguments, but there might be multiple generic
             // declarations with the same name, so this becomes a specialized case of
             // overload resolution.
-
+            if (auto mbrExpr = genericAppExpr->FunctionExpr.As<MemberExpr>())
+                if (mbrExpr->name->text == "eval")
+                    printf("break");
 
             // Start by checking the base expression and arguments.
             auto& baseExpr = genericAppExpr->FunctionExpr;

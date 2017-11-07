@@ -3876,7 +3876,7 @@ namespace Slang
         // sure it used the correct generic.
         RefPtr<GenericSubstitution> newSubst = new GenericSubstitution();
         newSubst->genericDecl = genericFunc->genericDecl;
-        auto specDeclRefSubst = specDeclRef.substitutions.As<GenericSubstitution>();
+        auto specDeclRefSubst = getGenericSubstitution(specDeclRef.substitutions);
         newSubst->args = specDeclRefSubst->args;
 
         IRGenericSpecContext context;
