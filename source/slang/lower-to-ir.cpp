@@ -1497,11 +1497,6 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         return emitDeclRef(context, expr->declRef);
     }
 
-    LoweredValInfo visitSelectExpr(SelectExpr* /*expr*/)
-    {
-        SLANG_UNIMPLEMENTED_X("codegen for select expression");
-    }
-
     LoweredValInfo visitGenericAppExpr(GenericAppExpr* /*expr*/)
     {
         SLANG_UNIMPLEMENTED_X("generic application expression during code generation");

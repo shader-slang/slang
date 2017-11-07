@@ -5104,6 +5104,13 @@ emitDeclImpl(decl, nullptr);
             }
             break;
 
+        case kIROp_Neg:
+            {
+                emit("-");
+                emitIROperand(ctx, inst->getArg(0));
+            }
+            break;
+
         case kIROp_Sample:
             emitIROperand(ctx, inst->getArg(0));
             emit(".Sample(");
@@ -5223,6 +5230,16 @@ emitDeclImpl(decl, nullptr);
         case kIROp_specialize:
             {
                 emitIROperand(ctx, inst->getArg(0));
+            }
+            break;
+
+        case kIROp_Select:
+            {
+                emitIROperand(ctx, inst->getArg(0));
+                emit(" ? ");
+                emitIROperand(ctx, inst->getArg(1));
+                emit(" : ");
+                emitIROperand(ctx, inst->getArg(2));
             }
             break;
 
