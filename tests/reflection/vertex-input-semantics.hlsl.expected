@@ -30,6 +30,7 @@ standard output = {
                     "semanticName": "B",
                     "type": {
                         "kind": "struct",
+                        "name": "B",
                         "fields": [
                             {
                                 "name": "b0",
@@ -48,6 +49,7 @@ standard output = {
                                 "name": "b1",
                                 "type": {
                                     "kind": "struct",
+                                    "name": "X",
                                     "fields": [
                                         {
                                             "name": "x0",
@@ -91,11 +93,13 @@ standard output = {
                     "binding": {"kind": "vertexInput", "index": 4, "count": 3},
                     "type": {
                         "kind": "struct",
+                        "name": "C",
                         "fields": [
                             {
                                 "name": "c0",
                                 "type": {
                                     "kind": "struct",
+                                    "name": "X",
                                     "fields": [
                                         {
                                             "name": "x0",
