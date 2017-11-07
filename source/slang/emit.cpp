@@ -1614,6 +1614,32 @@ struct EmitVisitor
         }
     }
 
+    void emitSimpleSubscriptCallExpr(
+        RefPtr<InvokeExpr>  callExpr,
+        EOpInfo             /*outerPrec*/)
+    {
+        auto funcExpr = callExpr->FunctionExpr;
+
+        // We expect any subscript operation to be invoked as a member,
+        // so the function expression had better be in the correct form.
+        auto memberExpr = funcExpr.As<MemberExpr>();
+        if(!memberExpr)
+        {
+            SLANG_UNEXPECTED("subscript needs base expression");
+        }
+
+        Emit("(");
+        EmitExpr(memberExpr->BaseExpression);
+        Emit(")[");
+        UInt argCount = callExpr->Arguments.Count();
+        for (UInt aa = 0; aa < argCount; ++aa)
+        {
+            if (aa != 0) Emit(", ");
+            EmitExpr(callExpr->Arguments[aa]);
+        }
+        Emit("]");
+    }
+
     // Emit a call expression that doesn't involve any special cases,
     // just an expression of the form `f(a0, a1, ...)`
     void emitSimpleCallExpr(
@@ -1632,6 +1658,18 @@ struct EmitVisitor
                 emitSimpleConstructorCallExpr(callExpr, outerPrec);
                 return;
             }
+
+            if(auto acessorDeclRef = declRef.As<AccessorDecl>())
+            {
+                declRef = acessorDeclRef.GetParent();
+            }
+
+            if(auto subscriptDeclRef = declRef.As<SubscriptDecl>())
+            {
+                emitSimpleSubscriptCallExpr(callExpr, outerPrec);
+                return;
+            }
+
         }
 
         // Once we've ruled out constructor calls, we can move on
