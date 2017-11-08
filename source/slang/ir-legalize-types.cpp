@@ -469,12 +469,12 @@ static LegalVal legalizeFieldAddress(
                 }
             }
             SLANG_UNEXPECTED("didn't find tuple element");
-            return LegalVal();
+            UNREACHABLE_RETURN(LegalVal());
         }
 
     default:
         SLANG_UNEXPECTED("unhandled");
-        return LegalVal();
+        UNREACHABLE_RETURN(LegalVal());
     }
 }
 

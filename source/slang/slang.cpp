@@ -246,13 +246,13 @@ int CompileRequest::executeActionsInner()
     // Do some cleanup on settings specified by user.
     // In particular, we want to propagate flags from the overall request down to
     // each translation unit.
-    for( auto& translationUnit : translationUnits )
+    for (auto& translationUnit : translationUnits)
     {
         translationUnit->compileFlags |= compileFlags;
 
         // However, the "no checking" flag shouldn't be applied to
         // any translation unit that is native Slang code.
-        if( translationUnit->sourceLanguage == SourceLanguage::Slang )
+        if (translationUnit->sourceLanguage == SourceLanguage::Slang)
         {
             translationUnit->compileFlags &= ~SLANG_COMPILE_FLAG_NO_CHECKING;
         }
@@ -282,7 +282,7 @@ int CompileRequest::executeActionsInner()
     // a pass-through compilation.
     //
     // Note that we *do* perform output generation as normal in pass-through mode.
-    if( passThrough == PassThroughMode::None )
+    if (passThrough == PassThroughMode::None)
     {
         // Parse everything from the input files requested
         for (auto& translationUnit : translationUnits)
@@ -316,7 +316,7 @@ int CompileRequest::executeActionsInner()
                 return 1;
         }
     }
-    
+
     // If command line specifies to skip codegen, we exit here.
     // Note: this is a debugging option.
     if (shouldSkipCodegen)
@@ -901,7 +901,7 @@ SLANG_API int spCompile(
 {
     auto req = REQ(request);
 
-#if 0
+#if !defined(SLANG_DEBUG_INTERNAL_ERROR)
     // By default we'd like to catch as many internal errors as possible,
     // and report them to the user nicely (rather than just crash their
     // application). Internally Slang currently uses exceptions for this.

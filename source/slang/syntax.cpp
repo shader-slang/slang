@@ -1527,6 +1527,61 @@ void Type::accept(IValVisitor* visitor, void* extra)
             && declRef.Equals(otherWitness->declRef);
     }
 
+    RefPtr<Val> DeclaredSubtypeWitness::SubstituteImpl(Substitutions* subst, int * ioDiff)
+    {
+        DeclRef<GenericTypeParamDecl> genParamDeclRef;
+        if (auto subDeclRefType = this->sub.As<DeclRefType>())
+        {
+            genParamDeclRef = subDeclRefType->declRef.As<GenericTypeParamDecl>();
+        }
+        if (!genParamDeclRef)
+            return this;
+        auto genParamDecl = genParamDeclRef.getDecl();
+        // search for a substitution that might apply to us
+        for (auto s = subst; s; s = s->outer.Ptr())
+        {
+            if (auto genericSubst = dynamic_cast<GenericSubstitution*>(s))
+            {
+                // the generic decl associated with the substitution list must be
+                // the generic decl that declared this parameter
+                auto genericDecl = genericSubst->genericDecl;
+                if (genericDecl != genParamDecl->ParentDecl)
+                    continue;
+                bool found = false;
+                int index = 0;
+                for (auto m : genericDecl->Members)
+                {
+                    if (m.Ptr() == genParamDecl)
+                    {
+                        // We've found it, so return the corresponding specialization argument
+                        (*ioDiff)++;
+                        found = true;
+                        break;
+                    }
+                    else if (auto typeParam = m.As<GenericTypeParamDecl>())
+                    {
+                        index++;
+                    }
+                    else if (auto valParam = m.As<GenericValueParamDecl>())
+                    {
+                        index++;
+                    }
+                    else
+                    {
+                    }
+                }
+                if (found)
+                {
+                    auto ordinaryParamCount = genericDecl->getMembersOfType<GenericTypeParamDecl>().Count() +
+                        genericDecl->getMembersOfType<GenericValueParamDecl>().Count();
+                    SLANG_ASSERT(ordinaryParamCount + index < genericSubst->args.Count());
+                    return genericSubst->args[ordinaryParamCount + index];
+                }
+            }
+        }
+        return this;
+    }
+
     String DeclaredSubtypeWitness::ToString()
     {
         StringBuilder sb;
@@ -1653,6 +1708,18 @@ void Type::accept(IValVisitor* visitor, void* extra)
             p = p->outer.Ptr();
         }
         return false;
+    }
+
+    RefPtr<GenericSubstitution> getGenericSubstitution(RefPtr<Substitutions> subst)
+    {
+        auto p = subst.Ptr();
+        while (p)
+        {
+            if (auto genSubst = dynamic_cast<GenericSubstitution*>(p))
+                return genSubst;
+            p = p->outer.Ptr();
+        }
+        return nullptr;
     }
 
 }

@@ -1160,7 +1160,7 @@ namespace Slang
     RefPtr<ThisTypeSubstitution> getThisTypeSubst(DeclRefBase & declRef, bool insertSubstEntry);
     void removeSubstitution(DeclRefBase & declRef, RefPtr<Substitutions> subst);
     bool hasGenericSubstitutions(RefPtr<Substitutions> subst);
-
+    RefPtr<GenericSubstitution> getGenericSubstitution(RefPtr<Substitutions> subst);
 } // namespace Slang
 
 #endif
