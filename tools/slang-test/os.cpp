@@ -185,7 +185,7 @@ static DWORD WINAPI osReaderThreadProc(LPVOID threadParam)
                 break;
             }
 
-            *writeCursor++ = c;
+            *writeCursor++ = (char)c;
         }
         bytesRead = (DWORD)(writeCursor - buffer);
 
