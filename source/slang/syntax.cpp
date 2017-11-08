@@ -1529,53 +1529,40 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     RefPtr<Val> DeclaredSubtypeWitness::SubstituteImpl(Substitutions* subst, int * ioDiff)
     {
-        DeclRef<GenericTypeParamDecl> genParamDeclRef;
-        if (auto subDeclRefType = this->sub.As<DeclRefType>())
+        if (auto genConstraintDecl = declRef.As<GenericTypeConstraintDecl>())
         {
-            genParamDeclRef = subDeclRefType->declRef.As<GenericTypeParamDecl>();
-        }
-        if (!genParamDeclRef)
-            return this;
-        auto genParamDecl = genParamDeclRef.getDecl();
-        // search for a substitution that might apply to us
-        for (auto s = subst; s; s = s->outer.Ptr())
-        {
-            if (auto genericSubst = dynamic_cast<GenericSubstitution*>(s))
+            // search for a substitution that might apply to us
+            for (auto s = subst; s; s = s->outer.Ptr())
             {
-                // the generic decl associated with the substitution list must be
-                // the generic decl that declared this parameter
-                auto genericDecl = genericSubst->genericDecl;
-                if (genericDecl != genParamDecl->ParentDecl)
-                    continue;
-                bool found = false;
-                int index = 0;
-                for (auto m : genericDecl->Members)
+                if (auto genericSubst = dynamic_cast<GenericSubstitution*>(s))
                 {
-                    if (m.Ptr() == genParamDecl)
+                    // the generic decl associated with the substitution list must be
+                    // the generic decl that declared this parameter
+                    auto genericDecl = genericSubst->genericDecl;
+                    if (genericDecl != genConstraintDecl.getDecl()->ParentDecl)
+                        continue;
+                    bool found = false;
+                    UInt index = 0;
+                    for (auto m : genericDecl->Members)
                     {
-                        // We've found it, so return the corresponding specialization argument
+                        if (auto constraintParam = m.As<GenericTypeConstraintDecl>())
+                        {
+                            if (constraintParam.Ptr() == declRef.getDecl())
+                            {
+                                found = true;
+                                break;
+                            }
+                            index++;
+                        }
+                    }
+                    if (found)
+                    {
                         (*ioDiff)++;
-                        found = true;
-                        break;
+                        auto ordinaryParamCount = genericDecl->getMembersOfType<GenericTypeParamDecl>().Count() +
+                            genericDecl->getMembersOfType<GenericValueParamDecl>().Count();
+                        SLANG_ASSERT(index + ordinaryParamCount < genericSubst->args.Count());
+                        return genericSubst->args[index + ordinaryParamCount];
                     }
-                    else if (auto typeParam = m.As<GenericTypeParamDecl>())
-                    {
-                        index++;
-                    }
-                    else if (auto valParam = m.As<GenericValueParamDecl>())
-                    {
-                        index++;
-                    }
-                    else
-                    {
-                    }
-                }
-                if (found)
-                {
-                    auto ordinaryParamCount = genericDecl->getMembersOfType<GenericTypeParamDecl>().Count() +
-                        genericDecl->getMembersOfType<GenericValueParamDecl>().Count();
-                    SLANG_ASSERT(ordinaryParamCount + index < genericSubst->args.Count());
-                    return genericSubst->args[ordinaryParamCount + index];
                 }
             }
         }
