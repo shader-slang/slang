@@ -1912,6 +1912,11 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             getBuilder()->emitReturn();
         }
     }
+
+    void visitDiscardStmt(DiscardStmt* /*stmt*/)
+    {
+        getBuilder()->emitDiscard();
+    }
 };
 
 void lowerStmt(
