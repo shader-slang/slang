@@ -166,6 +166,7 @@ namespace Slang
         case kIROp_if:
         case kIROp_ifElse:
         case kIROp_loopTest:
+        case kIROp_discard:
             return true;
         }
     }
@@ -1149,6 +1150,17 @@ namespace Slang
         addInst(inst);
         return inst;
     }
+
+    IRInst* IRBuilder::emitDiscard()
+    {
+        auto inst = createInst<IRDiscard>(
+            this,
+            kIROp_discard,
+            nullptr);
+        addInst(inst);
+        return inst;
+    }
+
 
     IRInst* IRBuilder::emitBranch(
         IRBlock*    pBlock)
