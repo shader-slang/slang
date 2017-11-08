@@ -77,7 +77,7 @@ namespace Slang
             , sink(sink)
             , outerScope(outerScope)
         {}
-
+        Parser(const Parser & other) = default;
         Session* getSession()
         {
             return translationUnit->compileRequest->mSession;
@@ -1396,6 +1396,69 @@ namespace Slang
         return genericApp;
     }
 
+    static bool isGenericName(Parser* parser, Name* name)
+    {
+        auto lookupResult = lookUp(
+            parser->getSession(),
+            nullptr, // no semantics visitor available yet
+            name,
+            parser->currentScope);
+        if (!lookupResult.isValid() || lookupResult.isOverloaded())
+            return false;
+
+        auto decl = lookupResult.item.declRef.getDecl();
+        if (auto genericDecl = dynamic_cast<GenericDecl*>(decl))
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+    static RefPtr<Expr> tryParseGenericApp(
+        Parser*                         parser,
+        RefPtr<Expr>    base)
+    {
+        Name * baseName = nullptr;
+        if (auto varExpr = base->As<VarExpr>())
+            baseName = varExpr->name;
+        // if base is a known generics, parse as generics
+        if (baseName && isGenericName(parser, baseName))
+            return parseGenericApp(parser, base);
+
+        // otherwise, we speculate as generics, and fallback to comparison when parsing failed
+        TokenSpan tokenSpan;
+        tokenSpan.mBegin = parser->tokenReader.mCursor;
+        tokenSpan.mEnd = parser->tokenReader.mEnd;
+        DiagnosticSink newSink;
+        newSink.sourceManager = parser->sink->sourceManager;
+        Parser newParser(*parser);
+        newParser.sink = &newSink;
+        auto speculateParseRs = parseGenericApp(&newParser, base);
+        if (newSink.errorCount == 0)
+        {
+            // disambiguate based on FOLLOW set
+            switch (peekTokenType(&newParser))
+            {
+            case TokenType::Dot:
+            case TokenType::LParent:
+            case TokenType::RParent:
+            case TokenType::RBracket:
+            case TokenType::Colon:
+            case TokenType::Comma:
+            case TokenType::QuestionMark:
+            case TokenType::Semicolon:
+            case TokenType::OpEql:
+            case TokenType::OpNeq:
+            {
+                return parseGenericApp(parser, base);
+            }
+            }
+        }
+        return base;
+    }
     static RefPtr<Expr> parseMemberType(Parser * parser, RefPtr<Expr> base)
     {
         RefPtr<MemberExpr> memberExpr = new MemberExpr();
@@ -2624,28 +2687,6 @@ namespace Slang
         return stmt;
     }
 
-    static bool isGenericName(Parser* parser, Name* name)
-    {
-        auto lookupResult = lookUp(
-            parser->getSession(),
-            nullptr, // no semantics visitor available yet
-            name,
-            parser->currentScope);
-        if(!lookupResult.isValid() || lookupResult.isOverloaded())
-            return false;
-
-        auto decl = lookupResult.item.declRef.getDecl();
-        if( auto genericDecl = dynamic_cast<GenericDecl*>(decl) )
-        {
-            return true;
-        }
-        else
-        {
-            return false;
-        }
-    }
-
-
     static bool isTypeName(Parser* parser, Name* name)
     {
         auto lookupResult = lookUp(
@@ -3367,24 +3408,18 @@ namespace Slang
         }
 #endif
     }
-
+    
     // We *might* be looking at an application of a generic to arguments,
     // but we need to disambiguate to make sure.
     static RefPtr<Expr> maybeParseGenericApp(
         Parser*                             parser,
 
         // TODO: need to support more general expressions here
-        RefPtr<VarExpr>     base)
+        RefPtr<Expr>     base)
     {
         if(peekTokenType(parser) != TokenType::OpLess)
             return base;
-
-        if(!isGenericName(parser, base->name))
-            return base;
-
-        // Okay, seems likely that we are looking at a generic app
-
-        return parseGenericApp(parser, base);
+        return tryParseGenericApp(parser, base);
     }
 
     static RefPtr<Expr> parsePrefixExpr(Parser* parser);
@@ -3769,7 +3804,10 @@ namespace Slang
                     parser->ReadToken(TokenType::Dot); 
                     memberExpr->name = expectIdentifier(parser).name;
 
-                    expr = memberExpr;
+                    if (peekTokenType(parser) == TokenType::OpLess)
+                        expr = maybeParseGenericApp(parser, memberExpr);
+                    else
+                        expr = memberExpr;
                 }
                 break;
             }
