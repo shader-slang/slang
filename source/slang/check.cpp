@@ -1609,6 +1609,15 @@ namespace Slang
                     else
                         return false;
                 }
+                else if (auto genValMbr = genMbr.As<GenericValueParamDecl>())
+                {
+                    if (auto requiredGenValMbr = requiredGenMbr.As<GenericValueParamDecl>())
+                    {
+                        return genValMbr->type->Equals(requiredGenValMbr->type);
+                    }
+                    else
+                        return false;
+                }
                 else if (auto genTypeConstraintMbr = genMbr.As<GenericTypeConstraintDecl>())
                 {
                     if (auto requiredTypeConstraintMbr = requiredGenMbr.As<GenericTypeConstraintDecl>())
