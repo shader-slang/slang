@@ -135,6 +135,9 @@ struct IRReturnVal : IRReturn
 struct IRReturnVoid : IRReturn
 {};
 
+struct IRDiscard : IRTerminatorInst
+{};
+
 struct IRBlock;
 
 struct IRUnconditionalBranch : IRTerminatorInst
@@ -463,6 +466,8 @@ struct IRBuilder
         IRValue*    val);
 
     IRInst* emitReturn();
+
+    IRInst* emitDiscard();
 
     IRInst* emitBranch(
         IRBlock*    block);
