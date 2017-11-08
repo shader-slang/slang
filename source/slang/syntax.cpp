@@ -1579,7 +1579,11 @@ void Type::accept(IValVisitor* visitor, void* extra)
                 }
             }
         }
-        return this;
+        RefPtr<DeclaredSubtypeWitness> rs = new DeclaredSubtypeWitness();
+        rs->sub = sub->SubstituteImpl(subst, ioDiff).As<Type>();
+        rs->sup = sup->SubstituteImpl(subst, ioDiff).As<Type>();
+        rs->declRef = declRef.SubstituteImpl(subst, ioDiff);
+        return rs;
     }
 
     String DeclaredSubtypeWitness::ToString()
