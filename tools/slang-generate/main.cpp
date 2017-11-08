@@ -370,6 +370,42 @@ void usage(char const* appName)
     fprintf(stderr, "usage: %s <input>\n", appName);
 }
 
+char* readAllText(char const * fileName)
+{
+    FILE * f;
+    fopen_s(&f, fileName, "rb");
+    if (!f)
+    {
+        return "";
+    }
+    else
+    {
+        fseek(f, 0, SEEK_END);
+        auto size = ftell(f);
+        char * buffer = new char[size + 1];
+        memset(buffer, 0, size + 1);
+        fseek(f, 0, SEEK_SET);
+        fread(buffer, sizeof(char), size, f);
+        fclose(f);
+        return buffer;
+    }
+}
+
+void writeAllText(char const *srcFileName, char const* fileName, char* content)
+{
+    FILE * f = nullptr;
+    fopen_s(&f, fileName, "wb");
+    if (!f)
+    {
+        printf("%s(0): error G0001: cannot write file %s\n", srcFileName, fileName);
+    }
+    else
+    {
+        fwrite(content, 1, strlen(content), f);
+        fclose(f);
+    }
+}
+
 int main(
     int     argc,
     char**  argv)
@@ -416,8 +452,9 @@ int main(
 
     Node* node = readInput(input, inputEnd);
 
+    // write output to a temporary file first
     char outputPath[1024];
-    sprintf_s(outputPath, "%s.h", inputPath);
+    sprintf_s(outputPath, "%s.temp.h", inputPath);
 
     FILE* outputStream;
     fopen_s(&outputStream, outputPath, "w");
@@ -425,6 +462,18 @@ int main(
     emitBody(outputStream, node);
 
     fclose(outputStream);
+
+    // update final output only when content has changed
+    char outputPathFinal[1024];
+    sprintf_s(outputPathFinal, "%s.h", inputPath);
+
+    char * allTextOld = readAllText(outputPathFinal);
+    char * allTextNew = readAllText(outputPath);
+    if (strcmp(allTextNew, allTextOld) != 0)
+    {
+        writeAllText(inputPath, outputPathFinal, allTextNew);
+    }
+    remove(outputPath);
 
     return 0;
 }
