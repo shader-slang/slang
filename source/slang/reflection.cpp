@@ -392,6 +392,27 @@ SLANG_API SlangResourceAccess spReflectionType_GetResourceAccess(SlangReflection
     return SLANG_RESOURCE_ACCESS_NONE;
 }
 
+SLANG_API char const* spReflectionType_GetName(SlangReflectionType* inType)
+{
+    auto type = convert(inType);
+
+    if( auto declRefType = type->As<DeclRefType>() )
+    {
+        auto declRef = declRefType->declRef;
+
+        // Don't return a name for auto-generated anonymous types
+        // that represent `cbuffer` members, etc.
+        auto decl = declRef.getDecl();
+        if(decl->HasModifier<ImplicitParameterGroupElementTypeModifier>())
+            return nullptr;
+
+        return getText(declRef.GetName()).begin();
+    }
+
+    return nullptr;
+}
+
+
 SLANG_API SlangReflectionType* spReflectionType_GetResourceResultType(SlangReflectionType* inType)
 {
     auto type = convert(inType);
