@@ -55,15 +55,15 @@ namespace Slang
         }
     }
 
-    void IRUse::set(IRValue* usedValue)
+    void IRUse::set(IRValue* usedVal)
     {
         // clear out the old value
-        if (usedValue)
+        if (usedVal)
         {
             *prevLink = nextUse;
         }
 
-        init(user, usedValue);
+        init(user, usedVal);
     }
 
     void IRUse::clear()
@@ -166,6 +166,7 @@ namespace Slang
         case kIROp_if:
         case kIROp_ifElse:
         case kIROp_loopTest:
+        case kIROp_discard:
             return true;
         }
     }
@@ -1149,6 +1150,17 @@ namespace Slang
         addInst(inst);
         return inst;
     }
+
+    IRInst* IRBuilder::emitDiscard()
+    {
+        auto inst = createInst<IRDiscard>(
+            this,
+            kIROp_discard,
+            nullptr);
+        addInst(inst);
+        return inst;
+    }
+
 
     IRInst* IRBuilder::emitBranch(
         IRBlock*    pBlock)
@@ -3750,8 +3762,6 @@ namespace Slang
     {
         if( auto subtypeWitness = dynamic_cast<SubtypeWitness*>(val) )
         {
-            // We need to look up the IR value that represents the
-            // given subtype witness.
             String mangledName = getMangledNameForConformanceWitness(
                 subtypeWitness->sub,
                 subtypeWitness->sup);
@@ -3948,8 +3958,11 @@ namespace Slang
         // has already been made. To do that we will need to
         // compute the mangled name of the specialized function,
         // so that we can look for existing declarations.
-
-        String specMangledName = getMangledName(specDeclRef);
+        String specMangledName;
+        if (genericFunc->genericDecl == specDeclRef.decl)
+            specMangledName = getMangledName(specDeclRef);
+        else
+            specMangledName = mangleSpecializedFuncName(genericFunc->mangledName, specDeclRef.substitutions);
 
         // TODO: This is a terrible linear search, and we should
         // avoid it by building a dictionary ahead of time,
@@ -3992,8 +4005,8 @@ namespace Slang
         //
         // TODO: This shouldn't be needed, if we introduce a sorting
         // step before we emit code.
-        specFunc->removeFromParent();
-        specFunc->insertAfter(genericFunc);
+        //specFunc->removeFromParent();
+        //specFunc->insertAfter(genericFunc);
 
         // At this point we've created a new non-generic function,
         // which means we should add it to our work list for
@@ -4026,8 +4039,20 @@ namespace Slang
             auto keyDeclRef = ((IRDeclRef*) requirementKey)->declRef;
 
             // If the keys don't match, continue with the next entry.
-            if(!keyDeclRef.Equals(requirementDeclRef))
-                continue;
+            if (!keyDeclRef.Equals(requirementDeclRef))
+            {
+                // requirementDeclRef may be pointing to the inner decl of a generic decl
+                // in this case we compare keyDeclRef against the parent decl of requiredDeclRef
+                if (auto genRequiredDeclRef = requirementDeclRef.GetParent().As<GenericDecl>())
+                {
+                    if (!keyDeclRef.Equals(genRequiredDeclRef))
+                    {
+                        continue;
+                    }
+                }
+                else
+                    continue;
+            }
 
             // If the keys matched, then we use the value from
             // this entry.
@@ -4178,7 +4203,6 @@ namespace Slang
                             // Use the witness table to look up the value that
                             // satisfies the requirement.
                             auto satisfyingVal = findWitnessVal(witnessTable, requirementDeclRef);
-
                             // We expect to always find something, but lets just
                             // be careful here.
                             if(!satisfyingVal)

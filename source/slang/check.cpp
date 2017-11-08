@@ -1588,6 +1588,44 @@ namespace Slang
             return true;
         }
 
+        bool doesGenericSignatureMatchRequirement(
+            GenericDecl * genDecl,
+            DeclRef<GenericDecl> requirementGenDecl)
+        {
+            // TODO: genDecl should be a DeclRef to capture the environment generic variables needed to get 
+            // a concrete type for a generic constraint super type (e.g. when this member belongs to a generic type)
+
+            if (genDecl->Members.Count() != requirementGenDecl.getDecl()->Members.Count())
+                return false;
+            for (UInt i = 0; i < genDecl->Members.Count(); i++)
+            {
+                auto genMbr = genDecl->Members[i];
+                auto requiredGenMbr = genDecl->Members[i];
+                if (auto genTypeMbr = genMbr.As<GenericTypeParamDecl>())
+                {
+                    if (auto requiredGenTypeMbr = requiredGenMbr.As<GenericTypeParamDecl>())
+                    {
+                    }
+                    else
+                        return false;
+                }
+                else if (auto genTypeConstraintMbr = genMbr.As<GenericTypeConstraintDecl>())
+                {
+                    if (auto requiredTypeConstraintMbr = requiredGenMbr.As<GenericTypeConstraintDecl>())
+                    {
+                        if (!genTypeConstraintMbr->sup->Equals(requiredTypeConstraintMbr->sup))
+                        {
+                            return false;
+                        }
+                    }
+                    else
+                        return false;
+                }
+            }
+            return doesMemberSatisfyRequirement(genDecl->inner.Ptr(),
+                DeclRef<Decl>(requirementGenDecl.getDecl()->inner.Ptr(), requirementGenDecl.substitutions));
+        }
+
         // Does the given `memberDecl` work as an implementation
         // to satisfy the requirement `requiredMemberDeclRef`
         // from an interface?
@@ -1632,6 +1670,13 @@ namespace Slang
                     return doesSignatureMatchRequirement(
                         memberInitDecl,
                         requiredInitDecl);
+                }
+            }
+            else if (auto genDecl = dynamic_cast<GenericDecl*>(memberDecl))
+            {
+                if (auto requiredGenDeclRef = requiredMemberDeclRef.As<GenericDecl>())
+                {
+                    return doesGenericSignatureMatchRequirement(genDecl, requiredGenDeclRef);
                 }
             }
             else if (auto subStructTypeDecl = dynamic_cast<AggTypeDecl*>(memberDecl))
@@ -4462,9 +4507,13 @@ namespace Slang
 
             DeclRef<Decl> innerDeclRef(GetInner(baseGenericRef), subst);
 
+            RefPtr<Expr> base;
+            if (auto mbrExpr = baseExpr.As<MemberExpr>())
+                base = mbrExpr->BaseExpression;
+
             return ConstructDeclRefExpr(
                 innerDeclRef,
-                nullptr,
+                base,
                 originalExpr->loc);
         }
 
@@ -5738,7 +5787,6 @@ namespace Slang
             // declarations with the same name, so this becomes a specialized case of
             // overload resolution.
 
-
             // Start by checking the base expression and arguments.
             auto& baseExpr = genericAppExpr->FunctionExpr;
             baseExpr = CheckTerm(baseExpr);
@@ -6095,9 +6143,9 @@ namespace Slang
                 case 'w': case 'a': elementIndex = 3; break;
                 default:
                     // An invalid character in the swizzle is an error
-                    if (!isRewriteMode())
+                    if (!isRewriteMode() && !anyError)
                     {
-                        getSink()->diagnose(swizExpr, Diagnostics::unimplemented, "invalid component name for swizzle");
+                        getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->ToString());
                     }
                     anyError = true;
                     continue;
@@ -6109,9 +6157,9 @@ namespace Slang
                 // Make sure the index is in range for the source type
                 if (elementIndex >= limitElement)
                 {
-                    if (!isRewriteMode())
+                    if (!isRewriteMode() && !anyError)
                     {
-                        getSink()->diagnose(swizExpr, Diagnostics::unimplemented, "swizzle component out of range for type");
+                        getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->ToString());
                     }
                     anyError = true;
                     continue;

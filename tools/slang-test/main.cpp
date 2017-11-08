@@ -95,8 +95,8 @@ void parseOptions(int* argc, char** argv)
         {
             while(argCursor != argEnd)
             {
-                char const* arg = *argCursor++;
-                *writeCursor++ = arg;
+                char const* nxtArg = *argCursor++;
+                *writeCursor++ = nxtArg;
             }
             break;
         }
@@ -1387,7 +1387,7 @@ TestResult runHLSLAndGLSLComparisonTest(TestInput& input)
     return runHLSLRenderComparisonTestImpl(input, "-hlsl-rewrite", "-glsl-rewrite");
 }
 
-TestResult skipTest(TestInput& input)
+TestResult skipTest(TestInput& /*input*/)
 {
     return kTestResult_Ignored;
 }
@@ -1579,7 +1579,7 @@ bool testCategoryMatches(
 }
 
 bool testPassesCategoryMask(
-    TestContext*        context,
+    TestContext*        /*context*/,
     TestOptions const&  test)
 {
     // Don't include a test we should filter out
@@ -1650,7 +1650,7 @@ void runTestsOnFile(
 
 
 static bool endsWithAllowedExtension(
-    TestContext*    context,
+    TestContext*    /*context*/,
     String          filePath)
 {
     char const* allowedExtensions[] = {
@@ -1723,12 +1723,11 @@ int main(
 
     auto quickTestCategory = addTestCategory("quick", fullTestCategory);
 
-    auto smokeTestCategory = addTestCategory("smoke", quickTestCategory);
+    /*auto smokeTestCategory = */addTestCategory("smoke", quickTestCategory);
 
     auto renderTestCategory = addTestCategory("render", fullTestCategory);
 
-	auto computeTestCategory = addTestCategory("compute", fullTestCategory);
-
+	/*auto computeTestCategory = */addTestCategory("compute", fullTestCategory);
 
     // An un-categorized test will always belong to the `full` category
     defaultTestCategory = fullTestCategory;

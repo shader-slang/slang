@@ -95,6 +95,7 @@ RAW(
     virtual bool EqualsVal(Val* val) override;
     virtual String ToString() override;
     virtual int GetHashCode() override;
+    virtual RefPtr<Val> SubstituteImpl(Substitutions * subst, int * ioDiff) override;
 )
 END_SYNTAX_CLASS()
 

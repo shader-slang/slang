@@ -209,7 +209,7 @@ void DiagnosticSink::diagnoseImpl(SourceLoc const& pos, DiagnosticInfo const& in
     if (diagnostic.severity >= Severity::Fatal)
     {
         // TODO: figure out a better policy for aborting compilation
-        throw InvalidOperationException();
+        throw AbortCompilationException();
     }
 }
 
