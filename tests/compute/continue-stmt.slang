@@ -13,8 +13,9 @@ int test(int inVal)
 		    ii++;
 			continue;
 		}
+		break;
 	}
-	while(false);
+	while(true);
 
 	return -ii;
 }

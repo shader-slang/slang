@@ -1869,11 +1869,12 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // including the blocks that will be referenced
         // by `continue` or `break` statements.
         auto loopHead = createBlock();
+        auto testLabel = createBlock();
         auto breakLabel = createBlock();
 
-        // A `continue` inside a `do { ... } while` loop always
-        // jumps to the head of the loop.
-        auto continueLabel = loopHead;
+        // A `continue` inside a `do { ... } while ( ... )` loop always
+        // jumps to the loop test.
+        auto continueLabel = testLabel;
 
         // Register the `break` and `continue` labels so
         // that we can find them for nested statements.
@@ -1894,6 +1895,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Emit the body of the loop
         lowerStmt(context, stmt->Statement);
+
+        insertBlock(testLabel);
 
         // Now that we are within the header block, we
         // want to emit the expression for the loop condition:
