@@ -279,6 +279,12 @@ struct SharedIRGenContext
     // to reference-count these along the way because
     // they need to get stored into a `union` inside `LoweredValInfo`
     List<RefPtr<ExtendedValueInfo>> extValues;
+
+    // Map from an AST-level statement that can be
+    // used as the target of a `break` or `continue`
+    // to the appropriate basic block to jump to.
+    Dictionary<Stmt*, IRBlock*> breakLabels;
+    Dictionary<Stmt*, IRBlock*> continueLabels;
 };
 
 
@@ -1741,8 +1747,10 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         auto breakLabel = createBlock();
         auto continueLabel = createBlock();
 
-        // TODO: register `loopHead` as the target for a
-        // `continue` statement.
+        // Register the `break` and `continue` labels so
+        // that we can find them for nested statements.
+        context->shared->breakLabels.Add(stmt, breakLabel);
+        context->shared->continueLabels.Add(stmt, continueLabel);
 
         // Emit the branch that will start out loop,
         // and then insert the block for the head.
@@ -1807,8 +1815,10 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // jumps to the head of hte loop.
         auto continueLabel = loopHead;
 
-        // TODO: register appropriate targets for
-        // break/continue statements.
+        // Register the `break` and `continue` labels so
+        // that we can find them for nested statements.
+        context->shared->breakLabels.Add(stmt, breakLabel);
+        context->shared->continueLabels.Add(stmt, continueLabel);
 
         // Emit the branch that will start out loop,
         // and then insert the block for the head.
@@ -1842,6 +1852,66 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // At the end of the body we need to jump back to the top.
         builder->emitBranch(loopHead);
+
+        // Finally we insert the label that a `break` will jump to
+        insertBlock(breakLabel);
+    }
+
+    void visitDoWhileStmt(DoWhileStmt* stmt)
+    {
+        // Generating IR for `do {...} while` statement is similar to a
+        // `while` statement, just with the test in a different place
+
+        auto builder = getBuilder();
+
+        // We will create blocks for the various places
+        // we need to jump to inside the control flow,
+        // including the blocks that will be referenced
+        // by `continue` or `break` statements.
+        auto loopHead = createBlock();
+        auto testLabel = createBlock();
+        auto breakLabel = createBlock();
+
+        // A `continue` inside a `do { ... } while ( ... )` loop always
+        // jumps to the loop test.
+        auto continueLabel = testLabel;
+
+        // Register the `break` and `continue` labels so
+        // that we can find them for nested statements.
+        context->shared->breakLabels.Add(stmt, breakLabel);
+        context->shared->continueLabels.Add(stmt, continueLabel);
+
+        // Emit the branch that will start out loop,
+        // and then insert the block for the head.
+
+        auto loopInst = builder->emitLoop(
+            loopHead,
+            breakLabel,
+            continueLabel);
+
+        addLoopDecorations(loopInst, stmt);
+
+        insertBlock(loopHead);
+
+        // Emit the body of the loop
+        lowerStmt(context, stmt->Statement);
+
+        insertBlock(testLabel);
+
+        // Now that we are within the header block, we
+        // want to emit the expression for the loop condition:
+        if (auto condExpr = stmt->Predicate)
+        {
+            auto irCondition = getSimpleVal(context,
+                lowerRValueExpr(context, condExpr));
+
+            // Now we want to `break` if the loop condition is false,
+            // otherwise we will jump back to the head of the loop.
+            builder->emitLoopTest(
+                irCondition,
+                loopHead,
+                breakLabel);
+        }
 
         // Finally we insert the label that a `break` will jump to
         insertBlock(breakLabel);
@@ -1917,6 +1987,39 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     {
         getBuilder()->emitDiscard();
     }
+
+    void visitBreakStmt(BreakStmt* stmt)
+    {
+        // Semantic checking is responsible for finding
+        // the statement taht this `break` breaks out of
+        auto parentStmt = stmt->parentStmt;
+        SLANG_ASSERT(parentStmt);
+
+        // We just need to look up the basic block that
+        // corresponds to the break label for that statement,
+        // and then emit an instruction to jump to it.
+        IRBlock* targetBlock;
+        context->shared->breakLabels.TryGetValue(parentStmt, targetBlock);
+        SLANG_ASSERT(targetBlock);
+        getBuilder()->emitBreak(targetBlock);
+    }
+
+    void visitContinueStmt(ContinueStmt* stmt)
+    {
+        // Semantic checking is responsible for finding
+        // the loop that this `continue` statement continues
+        auto parentStmt = stmt->parentStmt;
+        SLANG_ASSERT(parentStmt);
+
+
+        // We just need to look up the basic block that
+        // corresponds to the continue label for that statement,
+        // and then emit an instruction to jump to it.
+        IRBlock* targetBlock;
+        context->shared->continueLabels.TryGetValue(parentStmt, targetBlock);
+        SLANG_ASSERT(targetBlock);
+        getBuilder()->emitContinue(targetBlock);
+    }
 };
 
 void lowerStmt(
@@ -1947,6 +2050,7 @@ top:
         case LoweredValInfo::Flavor::Simple:
         case LoweredValInfo::Flavor::Ptr:
         case LoweredValInfo::Flavor::SwizzledLValue:
+        case LoweredValInfo::Flavor::BoundSubscript:
             {
                 builder->emitStore(
                     left.val,
