@@ -1137,7 +1137,6 @@ TestResult runComputeComparisonImpl(TestInput& input, const char * langOption, S
 	spawner.pushArgument("-o");
     auto actualOutputFile = outputStem + ".actual.txt";
 	spawner.pushArgument(actualOutputFile);
-    spawner.pushArgument("-xslang -use-ir");
 
     // clear the stale actual output file first. This will allow us to detect error if render-test fails and outputs nothing.
     File::WriteAllText(actualOutputFile, "");
