@@ -176,8 +176,10 @@ namespace Slang
     class TargetRequest : public RefObject
     {
     public:
-        CompileRequest* compileRequest;
-        CodeGenTarget   target;
+        CompileRequest*     compileRequest;
+        CodeGenTarget       target;
+        SlangTargetFlags    targetFlags = 0;
+        Slang::Profile      targetProfile = Slang::Profile::Unknown;
 
         // The resulting reflection layout information
         RefPtr<ProgramLayout> layout;

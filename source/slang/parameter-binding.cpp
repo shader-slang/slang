@@ -188,6 +188,13 @@ struct SharedParameterBindingContext
     // The base compile request
     CompileRequest* compileRequest;
 
+    // The target request that is triggering layout
+    //
+    // TODO: We should eventually strip this down to
+    // just the subset of fields on the target that
+    // can influence layout decisions.
+    TargetRequest*  targetRequest;
+
     LayoutRulesFamilyImpl* defaultLayoutRules;
 
     // All shader parameters we've discovered so far, and started to lay out...
@@ -208,6 +215,8 @@ struct SharedParameterBindingContext
 
     // Which register spaces have been claimed so far?
     UsedRanges usedSpaces;
+
+    TargetRequest* getTargetRequest() { return targetRequest; }
 };
 
 static DiagnosticSink* getSink(SharedParameterBindingContext* shared)
@@ -225,8 +234,9 @@ struct ParameterBindingContext
     // All the shared state needs to be available
     SharedParameterBindingContext* shared;
 
-    // The layout rules to use while computing usage...
-    LayoutRulesFamilyImpl* layoutRules;
+    // The type layout context to use when computing
+    // the resource usage of shader parameters.
+    TypeLayoutContext layoutContext;
 
     // A dictionary to accellerate looking up parameters by name
     Dictionary<Name*, ParameterInfo*> mapNameToParameterInfo;
@@ -236,6 +246,9 @@ struct ParameterBindingContext
 
     // The source language we are trying to use
     SourceLanguage sourceLanguage;
+
+    TargetRequest* getTargetRequest() { return shared->getTargetRequest(); }
+    LayoutRulesFamilyImpl* getRulesFamily() { return layoutContext.getRulesFamily(); }
 };
 
 static DiagnosticSink* getSink(ParameterBindingContext* context)
@@ -475,7 +488,8 @@ getTypeLayoutForGlobalShaderParameter_GLSL(
     ParameterBindingContext*    context,
     VarDeclBase*                varDecl)
 {
-    auto rules = context->layoutRules;
+    auto layoutContext = context->layoutContext;
+    auto rules = layoutContext.getRulesFamily();
     auto type = varDecl->getType();
 
     // A GLSL shader parameter will be marked with
@@ -489,36 +503,56 @@ getTypeLayoutForGlobalShaderParameter_GLSL(
 
     // We want to check for a constant-buffer type with a `push_constant` layout
     // qualifier before we move on to anything else.
-    if (varDecl->HasModifier<GLSLPushConstantLayoutModifier>() && type->As<ConstantBufferType>())
-        return CreateTypeLayout(type, rules->getPushConstantBufferRules());
+    if( varDecl->HasModifier<GLSLPushConstantLayoutModifier>() && type->As<ConstantBufferType>() )
+    {
+        return CreateTypeLayout(
+            layoutContext.with(rules->getPushConstantBufferRules()),
+            type);
+    }
 
     // TODO(tfoley): We have multiple variations of
     // the `uniform` modifier right now, and that
     // needs to get fixed...
-    if(varDecl->HasModifier<HLSLUniformModifier>() || type->As<ConstantBufferType>())
-        return CreateTypeLayout(type, rules->getConstantBufferRules());
+    if( varDecl->HasModifier<HLSLUniformModifier>() || type->As<ConstantBufferType>() )
+    {
+        return CreateTypeLayout(
+            layoutContext.with(rules->getConstantBufferRules()),
+            type);
+    }
 
-    if(varDecl->HasModifier<GLSLBufferModifier>() || type->As<GLSLShaderStorageBufferType>())
-        return CreateTypeLayout(type, rules->getShaderStorageBufferRules());
+    if( varDecl->HasModifier<GLSLBufferModifier>() || type->As<GLSLShaderStorageBufferType>() )
+    {
+        return CreateTypeLayout(
+            layoutContext.with(rules->getShaderStorageBufferRules()),
+            type);
+    }
 
     if (auto effectiveVaryingInputType = tryGetEffectiveTypeForGLSLVaryingInput(context, varDecl))
     {
         // We expect to handle these elsewhere
         SLANG_DIAGNOSE_UNEXPECTED(getSink(context), varDecl, "GLSL varying input");
-        return CreateTypeLayout(effectiveVaryingInputType, rules->getVaryingInputRules());
+        return CreateTypeLayout(
+            layoutContext.with(rules->getVaryingInputRules()),
+            effectiveVaryingInputType);
     }
 
     if (auto effectiveVaryingOutputType = tryGetEffectiveTypeForGLSLVaryingOutput(context, varDecl))
     {
         // We expect to handle these elsewhere
         SLANG_DIAGNOSE_UNEXPECTED(getSink(context), varDecl, "GLSL varying output");
-        return CreateTypeLayout(effectiveVaryingOutputType, rules->getVaryingOutputRules());
+        return CreateTypeLayout(
+            layoutContext.with(rules->getVaryingOutputRules()),
+            effectiveVaryingOutputType);
     }
 
     // A `const` global with a `layout(constant_id = ...)` modifier
     // is a declaration of a specialization constant.
-    if(varDecl->HasModifier<GLSLConstantIDLayoutModifier>())
-        return CreateTypeLayout(type, rules->getSpecializationConstantRules());
+    if( varDecl->HasModifier<GLSLConstantIDLayoutModifier>() )
+    {
+        return CreateTypeLayout(
+            layoutContext.with(rules->getSpecializationConstantRules()),
+            type);
+    }
 
     // GLSL says that an "ordinary" global  variable
     // is just a (thread local) global and not a
@@ -531,7 +565,8 @@ getTypeLayoutForGlobalShaderParameter_HLSL(
     ParameterBindingContext*    context,
     VarDeclBase*                varDecl)
 {
-    auto rules = context->layoutRules;
+    auto layoutContext = context->layoutContext;
+    auto rules = layoutContext.getRulesFamily();
     auto type = varDecl->getType();
 
     // HLSL `static` modifier indicates "thread local"
@@ -546,7 +581,9 @@ getTypeLayoutForGlobalShaderParameter_HLSL(
 
     // An "ordinary" global variable is implicitly a uniform
     // shader parameter.
-    return CreateTypeLayout(type, rules->getConstantBufferRules());
+    return CreateTypeLayout(
+        layoutContext.with(rules->getConstantBufferRules()),
+        type);
 }
 
 // Determine how to lay out a global variable that might be
@@ -983,7 +1020,7 @@ static void completeBindingsForParameter(
         // a parameter wants to claim an entire register
         // space to itself (for a parameter block), since
         // that can't be handled like other resources.
-        if (kind == LayoutResourceKind::ParameterBlock)
+        if (kind == LayoutResourceKind::RegisterSpace)
         {
             // We need to snag a register space of our own.
 
@@ -991,6 +1028,11 @@ static void completeBindingsForParameter(
 
             bindingInfo.count = count;
             bindingInfo.index = space;
+
+            // TODO: what should we store as the "space" for
+            // an allocation of register spaces? Either zero
+            // or `space` makes sense, but it isn't clear
+            // which is a better choice.
             bindingInfo.space = 0;
 
             continue;
@@ -1158,8 +1200,10 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
 
                 // We also need to track this as an ordinary varying output from the stage,
                 // since that is how GLSL will want to see it.
-                auto rules = context->layoutRules->getVaryingOutputRules();
-                SimpleLayoutInfo layout = GetLayout(type, rules);
+                auto rules = context->getRulesFamily()->getVaryingOutputRules();
+                SimpleLayoutInfo layout = GetLayout(
+                    context->layoutContext.with(rules),
+                    type);
                 typeLayout->addResourceUsage(layout.kind, layout.size);
             }
         }
@@ -1179,15 +1223,19 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
 
         if (state.directionMask & kEntryPointParameterDirection_Input)
         {
-            auto rules = context->layoutRules->getVaryingInputRules();
-            SimpleLayoutInfo layout = GetLayout(type, rules);
+            auto rules = context->getRulesFamily()->getVaryingInputRules();
+            SimpleLayoutInfo layout = GetLayout(
+                context->layoutContext.with(rules),
+                type);
             typeLayout->addResourceUsage(layout.kind, layout.size);
         }
 
         if (state.directionMask & kEntryPointParameterDirection_Output)
         {
-            auto rules = context->layoutRules->getVaryingOutputRules();
-            SimpleLayoutInfo layout = GetLayout(type, rules);
+            auto rules = context->getRulesFamily()->getVaryingOutputRules();
+            SimpleLayoutInfo layout = GetLayout(
+                context->layoutContext.with(rules),
+                type);
             typeLayout->addResourceUsage(layout.kind, layout.size);
         }
     }
@@ -1610,11 +1658,11 @@ void generateParameterBindings(
     CompileRequest* compileReq = targetReq->compileRequest;
 
     // Try to find rules based on the selected code-generation target
-    auto rules = GetLayoutRulesFamilyImpl(targetReq->target);
+    auto layoutContext = getInitialLayoutContextForTarget(targetReq);
 
     // If there was no target, or there are no rules for the target,
     // then bail out here.
-    if (!rules)
+    if (!layoutContext.rules)
         return;
 
     RefPtr<ProgramLayout> programLayout = new ProgramLayout;
@@ -1623,7 +1671,7 @@ void generateParameterBindings(
     // of generating parameter bindings
     SharedParameterBindingContext sharedContext;
     sharedContext.compileRequest = compileReq;
-    sharedContext.defaultLayoutRules = rules;
+    sharedContext.defaultLayoutRules = layoutContext.getRulesFamily();
     sharedContext.programLayout = programLayout;
 
     // Create a sub-context to collect parameters that get
@@ -1631,7 +1679,7 @@ void generateParameterBindings(
     ParameterBindingContext context;
     context.shared = &sharedContext;
     context.translationUnit = nullptr;
-    context.layoutRules = sharedContext.defaultLayoutRules;
+    context.layoutContext = layoutContext;
 
     // Walk through AST to discover all the parameters
     collectParameters(&context, compileReq);
@@ -1698,7 +1746,7 @@ void generateParameterBindings(
     // For legacy GLSL targets, we'd probably need a distinct resource
     // kind and set of rules here, since legacy uniforms are not the
     // same as the contents of a constant buffer.
-    auto globalScopeRules = context.layoutRules->getConstantBufferRules();
+    auto globalScopeRules = context.getRulesFamily()->getConstantBufferRules();
 
     RefPtr<StructTypeLayout> globalScopeStructLayout = new StructTypeLayout();
     globalScopeStructLayout->rules = globalScopeRules;
@@ -1746,6 +1794,7 @@ void generateParameterBindings(
     if( anyGlobalUniforms )
     {
         auto globalConstantBufferLayout = createParameterGroupTypeLayout(
+            layoutContext,
             nullptr,
             globalScopeRules,
             globalScopeRules->GetObjectLayout(ShaderParameterKind::ConstantBuffer),

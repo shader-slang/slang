@@ -797,6 +797,20 @@ struct LoweringVisitor
             lowerType(type->valueType));
     }
 
+    RefPtr<Type> visitParameterBlockType(ParameterBlockType* type)
+    {
+        // TODO: When doing AST-to-AST lowering, we want to lower
+        // a `ParameterBlock<T>` just like a `ConstantBuffer<T>`.
+        //
+        // HACK: for now we will try to simply lower the type
+        // directly to its stated element type, and see how
+        // that works.
+
+        return lowerType(type->getElementType());
+//        return getSession()->getConstantBufferType(
+//            lowerType(type->getElementType());
+    }
+
     RefPtr<Type> transformSyntaxField(Type* type)
     {
         return lowerType(type);

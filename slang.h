@@ -136,6 +136,16 @@ extern "C"
     };
 
     /*!
+    @brief Flags to control code generation behavior of a compilation target */
+    typedef unsigned int SlangTargetFlags;
+    enum
+    {
+        /* When compiling for a D3D Shader Model 5.1 or higher target, allocate
+           distinct register spaces for parameter blocks. */
+        SLANG_TARGET_FLAG_PARAMETER_BLOCKS_USE_REGISTER_SPACES = 1 << 4,
+    };
+
+    /*!
     @brief Options to control emission of `#line` directives
     */
     typedef unsigned int SlangLineDirectiveMode;
@@ -249,9 +259,19 @@ extern "C"
     /*!
     @brief Add a code-generation target to be used.
     */
-    SLANG_API void spAddCodeGenTarget(
+    SLANG_API int spAddCodeGenTarget(
         SlangCompileRequest*    request,
         SlangCompileTarget      target);
+
+    SLANG_API void spSetTargetProfile(
+        SlangCompileRequest*    request,
+        int                     targetIndex,
+        SlangProfileID          profile);
+
+    SLANG_API void spSetTargetFlags(
+        SlangCompileRequest*    request,
+        int                     targetIndex,
+        SlangTargetFlags        flags);
 
     /*!
     @brief Set the container format to be used for binary output.
@@ -564,7 +584,9 @@ extern "C"
         SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT,
         SLANG_PARAMETER_CATEGORY_SPECIALIZATION_CONSTANT,
         SLANG_PARAMETER_CATEGORY_PUSH_CONSTANT_BUFFER,
-        SLANG_PAREMTER_CATEGORY_PARAMETER_BLOCK,
+
+        // HLSL register `space`, Vulkan GLSL `set`
+        SLANG_PARAMETER_CATEGORY_REGISTER_SPACE,
 
         //
         SLANG_PARAMETER_CATEGORY_COUNT,
@@ -825,7 +847,7 @@ namespace slang
         DescriptorTableSlot = SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT,
         SpecializationConstant = SLANG_PARAMETER_CATEGORY_SPECIALIZATION_CONSTANT,
         PushConstantBuffer = SLANG_PARAMETER_CATEGORY_PUSH_CONSTANT_BUFFER,
-        ParameterBlock = SLANG_PAREMTER_CATEGORY_PARAMETER_BLOCK,
+        RegisterSpace = SLANG_PARAMETER_CATEGORY_REGISTER_SPACE,
     };
 
     struct TypeLayoutReflection
