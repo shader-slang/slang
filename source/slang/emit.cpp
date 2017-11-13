@@ -5567,8 +5567,9 @@ emitDeclImpl(decl, nullptr);
                         emit("for(;;)\n{\n");
 
                         // Register information so that `continue` sites
-                        // can do the right thing: 
+                        // can do the right thing:
                         ctx->shared->irMapContinueTargetToLoopHead.Add(continueBlock, targetBlock);
+
 
                         emitIRStmtsForBlocks(
                             ctx,
@@ -5589,18 +5590,18 @@ emitDeclImpl(decl, nullptr);
                 return;
 
             case kIROp_continue:
-                // With out current strategy for outputting loops, 
-                // just outputting an AST-level `continue` here won't 
-                // actually execute the statements in the continue block. 
-                // 
-                // Instead, we have to manually output those statements 
-                // directly here, and *then* do an AST-level `continue`. 
-                // 
-                // This leads to code duplication when we have multiple 
-                // `continue` sites in the original program, but it avoids 
-                // introducing additional temporaries for control flow. 
+                // With out current strategy for outputting loops,
+                // just outputting an AST-level `continue` here won't
+                // actually execute the statements in the continue block.
+                //
+                // Instead, we have to manually output those statements
+                // directly here, and *then* do an AST-level `continue`.
+                //
+                // This leads to code duplication when we have multiple
+                // `continue` sites in the original program, but it avoids
+                // introducing additional temporaries for control flow.
                 {
-                    auto continueInst = (IRContinue*)terminator;
+                    auto continueInst = (IRContinue*) terminator;
                     auto targetBlock = continueInst->getTargetBlock();
                     IRBlock* loopHead = nullptr;
                     ctx->shared->irMapContinueTargetToLoopHead.TryGetValue(targetBlock, loopHead);
