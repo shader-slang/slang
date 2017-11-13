@@ -210,7 +210,15 @@ struct TypeLegalizationContext
     // When inserting new globals, put them before this one.
     IRGlobalValue* insertBeforeGlobal = nullptr;
 
+    // When inserting new parameters, put them before this one.
+    IRParam* insertBeforeParam = nullptr;
+
     Dictionary<IRValue*, LegalVal> mapValToLegalVal;
+
+    IRVar* insertBeforeLocalVar = nullptr;
+    // store local var instructions that have been replaced here, so we can free them
+    // when legalization has done
+    List<IRInst*> oldLocalVars;
 };
 
 static void registerLegalizedValue(
@@ -353,6 +361,22 @@ static LegalType legalizeType(
     return LegalType::simple(type);
 }
 
+// Represents the "chain" of declarations that
+// were followed to get to a variable that we
+// are now declaring as a leaf variable.
+struct LegalVarChain
+{
+    LegalVarChain*  next;
+    VarLayout*      varLayout;
+};
+
+static LegalVal declareVars(
+    TypeLegalizationContext*    context,
+    IROp                        op,
+    LegalType                   type,
+    TypeLayout*                 typeLayout,
+    LegalVarChain*              varChain);
+
 // Legalize a type, and then expect it to
 // result in a simple type.
 static RefPtr<Type> legalizeSimpleType(
@@ -386,6 +410,42 @@ static LegalVal legalizeOperand(
     // by the mapping is legal as-is.
 
     return LegalVal::simple(irValue);
+}
+
+static void getArgumentValues(
+    List<IRValue*> & instArgs, 
+    LegalVal val)
+{
+    switch (val.flavor)
+    {
+    case LegalVal::Flavor::simple:
+        instArgs.Add(val.getSimple());
+        break;
+    case LegalVal::Flavor::implicitDeref:
+        getArgumentValues(instArgs, val.getImplicitDeref());
+        break;
+    case LegalVal::Flavor::tuple:
+        {
+            for (auto elem : val.getTuple()->elements)
+                getArgumentValues(instArgs, elem.val);
+        }
+        break;
+    }
+}
+
+static LegalVal legalizeCall(
+    TypeLegalizationContext*    context,
+    IRCall* callInst)
+{
+    // TODO: implement legalization of non-simple return types
+    auto retType = legalizeType(context, callInst->type);
+    SLANG_ASSERT(retType.flavor == LegalType::Flavor::simple);
+    
+    List<IRValue*> instArgs;
+    for (auto i = 1u; i < callInst->argCount; i++)
+        getArgumentValues(instArgs, legalizeOperand(context, callInst->getArg(i)));
+
+    return LegalVal::simple(context->builder->emitCallInst(callInst->type, callInst->func.usedValue, instArgs.Count(), instArgs.Buffer()));
 }
 
 static LegalVal legalizeLoad(
@@ -424,6 +484,48 @@ static LegalVal legalizeLoad(
             return LegalVal::tuple(tupleVal);
         }
         break;
+
+    default:
+        SLANG_UNEXPECTED("unhandled case");
+        break;
+    }
+}
+
+static LegalVal legalizeStore(
+    TypeLegalizationContext*    context,
+    LegalVal                    legalPtrVal,
+    LegalVal                    legalVal)
+{
+    switch (legalPtrVal.flavor)
+    {
+    case LegalVal::Flavor::simple:
+    {
+        context->builder->emitStore(legalPtrVal.getSimple(), legalVal.getSimple());
+        return legalVal;
+    }
+    break;
+
+    case LegalVal::Flavor::implicitDeref:
+        // TODO: what is the right behavior here?
+        if (legalVal.flavor == LegalVal::Flavor::implicitDeref)
+            return legalizeStore(context, legalPtrVal.getImplicitDeref(), legalVal.getImplicitDeref());
+        else
+            return legalizeStore(context, legalPtrVal.getImplicitDeref(), legalVal);
+
+    case LegalVal::Flavor::tuple:
+    {
+        // We need to emit a store for each element of
+        // the tuple.
+        auto destTuple = legalPtrVal.getTuple();
+        auto valTuple = legalVal.getTuple();
+        SLANG_ASSERT(destTuple->elements.Count() == valTuple->elements.Count());
+        for (UInt i = 0; i < valTuple->elements.Count(); i++)
+        {
+            legalizeStore(context, destTuple->elements[i].val, valTuple->elements[i].val);
+        }
+        return legalVal;
+    }
+    break;
 
     default:
         SLANG_UNEXPECTED("unhandled case");
@@ -492,6 +594,12 @@ static LegalVal legalizeInst(
     case kIROp_FieldAddress:
         return legalizeFieldAddress(context, type, args[0], args[1]);
 
+    case kIROp_Store:
+        return legalizeStore(context, args[0], args[1]);
+
+    case kIROp_Call:
+        return legalizeCall(context, (IRCall*)inst);
+
     default:
         // TODO: produce a user-visible diagnostic here
         SLANG_UNEXPECTED("non-simple operand(s)!");
@@ -499,10 +607,74 @@ static LegalVal legalizeInst(
     }
 }
 
+RefPtr<VarLayout> findVarLayout(IRValue* value)
+{
+    if (auto layoutDecoration = value->findDecoration<IRLayoutDecoration>())
+        return layoutDecoration->layout.As<VarLayout>();
+    return nullptr;
+}
+
+static LegalVal legalizeLocalVar(
+    TypeLegalizationContext*    context,
+    IRVar*                irLocalVar)
+{
+    // Legalize the type for the variable's value
+    auto legalValueType = legalizeType(
+        context,
+        irLocalVar->getType()->getValueType());
+
+    RefPtr<VarLayout> varLayout = findVarLayout(irLocalVar);
+    RefPtr<TypeLayout> typeLayout = varLayout ? varLayout->typeLayout : nullptr;
+
+    // If we've decided to do implicit deref on the type,
+    // then go ahead and declare a value of the pointed-to type.
+    LegalType maybeSimpleType = legalValueType;
+    while (maybeSimpleType.flavor == LegalType::Flavor::implicitDeref)
+    {
+        maybeSimpleType = maybeSimpleType.getImplicitDeref()->valueType;
+    }
+
+    switch (maybeSimpleType.flavor)
+    {
+    case LegalType::Flavor::simple:
+        // Easy case: the type is usable as-is, and we
+        // should just do that.
+        irLocalVar->type = context->session->getPtrType(
+            maybeSimpleType.getSimple());
+        return LegalVal::simple(irLocalVar);
+
+    default:
+    {
+        context->insertBeforeLocalVar = irLocalVar;
+
+        LegalVarChain* varChain = nullptr;
+        LegalVarChain varChainStorage;
+        if (varLayout)
+        {
+            varChainStorage.next = nullptr;
+            varChainStorage.varLayout = varLayout;
+            varChain = &varChainStorage;
+        }
+
+        LegalVal newVal = declareVars(context, kIROp_Var, legalValueType, typeLayout, varChain);
+
+        // Remove the old local var.
+        irLocalVar->removeFromParent();
+        // add old local var to list
+        context->oldLocalVars.Add(irLocalVar);
+        return newVal;
+    }
+    break;
+    }
+}
+
 static LegalVal legalizeInst(
     TypeLegalizationContext*    context,
     IRInst*                     inst)
 {
+    if (inst->op == kIROp_Var)
+        return legalizeLocalVar(context, (IRVar*)inst);
+
     // Need to legalize all the operands.
     auto argCount = inst->getArgCount();
     List<LegalVal> legalArgs;
@@ -567,39 +739,86 @@ static LegalVal legalizeInst(
     return legalVal;
 }
 
+static void addParamType(IRFuncType * ftype, LegalType t)
+{
+    switch (t.flavor)
+    {
+    case LegalType::Flavor::simple:
+        ftype->paramTypes.Add(t.obj.As<Type>());
+        break;
+    case LegalType::Flavor::implicitDeref:
+    {
+        auto imp = t.obj.As<ImplicitDerefType>();
+        addParamType(ftype, imp->valueType);
+        break;
+    }
+    case LegalType::Flavor::tuple:
+    {
+        auto tup = t.obj.As<TupleType>();
+        for (auto & elem : tup->elements)
+            addParamType(ftype, elem.type);
+    }
+    break;
+    default:
+        SLANG_ASSERT(false);
+    }
+}
+
 static void legalizeFunc(
     TypeLegalizationContext*    context,
     IRFunc*                     irFunc)
 {
     // Overwrite the function's type with
     // the result of legalization.
-    irFunc->type = legalizeSimpleType(context, irFunc->type);
+    auto newFuncType = new IRFuncType();
+    newFuncType->setSession(context->session);
+    auto oldFuncType = irFunc->type.As<IRFuncType>();
+    newFuncType->resultType = legalizeSimpleType(context, oldFuncType->resultType);
+    for (auto & paramType : oldFuncType->paramTypes)
+    {
+        auto legalParamType = legalizeType(context, paramType);
+        addParamType(newFuncType, legalParamType);
+    }
+    irFunc->type = newFuncType;
+    List<LegalVal> paramVals;
+    List<IRValue*> oldParams;
 
+    // we use this list to store replaced local var insts.
+    // these old instructions will be freed when we are done.
+    context->oldLocalVars.Clear();
+    
     // Go through the blocks of the function
     for (auto bb = irFunc->getFirstBlock(); bb; bb = bb->getNextBlock())
     {
         // Legalize the parameters of the block, which may
         // involve increasing the number of parameters
-        for (auto pp = bb->getFirstParam(); pp; pp = pp->getNextParam())
+        for (auto pp = bb->getFirstParam(); pp; pp = pp->nextParam)
         {
             auto legalParamType = legalizeType(context, pp->getType());
-
-            switch (legalParamType.flavor)
+            if (legalParamType.flavor != LegalType::Flavor::simple)
             {
-            case LegalType::Flavor::simple:
-                // The type is simple, so we can just rewrite it in place
-                pp->type = legalParamType.getSimple();
-                break;
+                context->insertBeforeParam = pp;
+                context->builder->curBlock = nullptr;
 
-            default:
-                // We have something like a tuple, and will need
-                // to expand into multiple parameters now.
-                SLANG_UNEXPECTED("need to handle it!");
-                break;
+                auto paramVal = declareVars(context, kIROp_Param, legalParamType, nullptr, nullptr);
+                paramVals.Add(paramVal);
+                if (pp == bb->getFirstParam())
+                {
+                    bb->firstParam = pp;
+                    while (bb->firstParam->prevParam)
+                        bb->firstParam = bb->firstParam->prevParam;
+                }
+                bb->lastParam = pp->prevParam;
+                if (pp->prevParam)
+                    pp->prevParam->nextParam = pp->nextParam;
+                if (pp->nextParam)
+                    pp->nextParam->prevParam = pp->prevParam;
+                auto oldParam = pp;
+                oldParams.Add(oldParam);
+                registerLegalizedValue(context, oldParam, paramVal);
             }
-
+           
         }
-
 
         // Now legalize the instructions inside the block
         IRInst* nextInst = nullptr;
@@ -611,17 +830,16 @@ static void legalizeFunc(
 
             registerLegalizedValue(context, ii, legalVal);
         }
-    }
-}
 
-// Represents the "chain" of declarations that
-// were followed to get to a variable that we
-// are now declaring as a leaf variable.
-struct LegalVarChain
-{
-    LegalVarChain*  next;
-    VarLayout*      varLayout;
-};
+    }
+    for (auto & op : oldParams)
+    {
+        SLANG_ASSERT(op->firstUse == nullptr || op->firstUse->nextUse == nullptr);
+        op->deallocate();
+    }
+    for (auto & lv : context->oldLocalVars)
+        lv->deallocate();
+}
 
 static LegalVal declareSimpleVar(
     TypeLegalizationContext*    context,
@@ -696,7 +914,37 @@ static LegalVal declareSimpleVar(
             return LegalVal::simple(globalVar);
         }
         break;
+    case kIROp_Var:
+    {
+        IRBuilder* builder = context->builder;
 
+        auto localVar = builder->emitVar(type);
+        localVar->removeFromParent();
+        localVar->insertBefore(context->insertBeforeLocalVar);
+        if (varLayout)
+        {
+            builder->addLayoutDecoration(localVar, varLayout);
+        }
+        return LegalVal::simple(localVar);
+    }
+    break;
+    case kIROp_Param:
+        {
+            IRBuilder* builder = context->builder;
+            auto param = builder->emitParam(type);
+            if (context->insertBeforeParam->prevParam)
+                context->insertBeforeParam->prevParam->nextParam = param;
+            param->prevParam = context->insertBeforeParam->prevParam;
+            param->nextParam = context->insertBeforeParam;
+            context->insertBeforeParam->prevParam = param;
+            if (varLayout)
+            {
+                builder->addLayoutDecoration(param, varLayout);
+            }
+
+            return LegalVal::simple(param);
+        }
+        break;
     default:
         SLANG_UNEXPECTED("unexpected IR opcode");
         break;
@@ -806,13 +1054,6 @@ static LegalVal declareVars(
         SLANG_UNEXPECTED("unhandled");
         break;
     }
-}
-
-RefPtr<VarLayout> findVarLayout(IRValue* value)
-{
-    if (auto layoutDecoration = value->findDecoration<IRLayoutDecoration>())
-        return layoutDecoration->layout.As<VarLayout>();
-    return nullptr;
 }
 
 static void legalizeGlobalVar(
