@@ -2850,6 +2850,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             IRType* irParamType = irResultType;
             paramTypes.Add(irParamType);
             subBuilder->emitParam(irParamType);
+
             // TODO: we need some way to wire this up to the `newValue`
             // or whatever name we give for that parameter inside
             // the setter body.
