@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_RENDER_COMPUTE:
+//TEST(compute):COMPARE_RENDER_COMPUTE:-xslang -use-ir
 //TEST_INPUT: Texture2D(size=4, content = one) : dxbinding(0),glbinding(0)
 //TEST_INPUT: Sampler : dxbinding(0),glbinding(0)
 //TEST_INPUT: ubuffer(data=[0 0], stride=4):dxbinding(1),glbinding(0),out

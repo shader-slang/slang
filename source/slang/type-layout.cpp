@@ -616,20 +616,9 @@ LayoutRulesImpl* GetLayoutRulesImpl(LayoutRule rule)
     }
 }
 
-LayoutRulesFamilyImpl* GetLayoutRulesFamilyImpl(LayoutRulesFamily rule)
+LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targetReq)
 {
-    switch (rule)
-    {
-    case LayoutRulesFamily::HLSL:   return &kHLSLLayoutRulesFamilyImpl;
-    case LayoutRulesFamily::GLSL:   return &kGLSLLayoutRulesFamilyImpl;
-    default:
-        return nullptr;
-    }
-}
-
-LayoutRulesFamilyImpl* GetLayoutRulesFamilyImpl(CodeGenTarget target)
-{
-    switch (target)
+    switch (targetReq->target)
     {
     case CodeGenTarget::HLSL:
     case CodeGenTarget::DXBytecode:
@@ -646,6 +635,24 @@ LayoutRulesFamilyImpl* GetLayoutRulesFamilyImpl(CodeGenTarget target)
     default:
         return nullptr;
     }
+}
+
+TypeLayoutContext getInitialLayoutContextForTarget(TargetRequest* targetReq)
+{
+    LayoutRulesFamilyImpl* rulesFamily = getDefaultLayoutRulesFamilyForTarget(targetReq);
+
+    TypeLayoutContext context;
+    context.targetReq = targetReq;
+    context.rules = nullptr;
+    context.matrixLayoutMode = MatrixLayoutMode::kMatrixLayoutMode_RowMajor;
+
+    if( rulesFamily )
+    {
+        context.rules = rulesFamily->getConstantBufferRules();
+        context.matrixLayoutMode = rulesFamily->getDefaultMatrixLayoutMode();
+    }
+
+    return context;
 }
 
 
@@ -718,10 +725,17 @@ static SimpleLayoutInfo getParameterGroupLayoutInfo(
     }
     else if (type->As<ParameterBlockType>())
     {
-        // TODO(tfoley): Should a parameter block *always* consume at least
-        // one `set`/`space`, or should we hold back and just allocate this
-        // if it actually contains anything?
-        return SimpleLayoutInfo(LayoutResourceKind::ParameterBlock, 1);
+        // Note: we default to consuming zero register spces here, because
+        // a parameter block might not contain anything (or all it contains
+        // is other blocks), and so it won't get a space allocated.
+        //
+        // This choice *also* means that in the case where we don't actually
+        // want to allocate register spaces to blocks at all, we haven't
+        // committed to that choice here.
+        //
+        // TODO: wouldn't it be any different to just allocate this
+        // as an empty `SimpleLayoutInfo` of any other kind?
+        return SimpleLayoutInfo(LayoutResourceKind::RegisterSpace, 0);
     }
 
     // TODO: the vertex-input and fragment-output cases should
@@ -742,31 +756,118 @@ static SimpleLayoutInfo getParameterGroupLayoutInfo(
     }
 }
 
-struct TypeLayoutContext
-{
-    // The layout rules to use (e.g., we compute
-    // layout differently in a `cbuffer` vs. the
-    // parameter list of a fragment shader).
-    LayoutRulesImpl*    rules;
-
-    // Whether to lay out matrices column-major
-    // or row-major.
-    MatrixLayoutMode    matrixLayoutMode;
-};
-
 RefPtr<TypeLayout> createTypeLayout(
-    TypeLayoutContext*  context,
-    Type*               type,
-    SimpleLayoutInfo    offset);
+    TypeLayoutContext const&    context,
+    Type*                       type,
+    SimpleLayoutInfo            offset);
+
+static bool isOpenGLTarget(TargetRequest*)
+{
+    // We aren't officially supporting OpenGL right now
+    return false;
+}
+
+static bool isD3DTarget(TargetRequest* targetReq)
+{
+    switch( targetReq->target )
+    {
+    case CodeGenTarget::HLSL:
+    case CodeGenTarget::DXBytecode:
+    case CodeGenTarget::DXBytecodeAssembly:
+    case CodeGenTarget::DXIL:
+    case CodeGenTarget::DXILAssembly:
+        return true;
+
+    default:
+        return false;
+    }
+}
+
+static bool isD3D11Target(TargetRequest*)
+{
+    // We aren't officially supporting D3D11 right now
+    return false;
+}
+
+static bool isD3D12Target(TargetRequest* targetReq)
+{
+    // We are currently only officially supporting D3D12
+    return isD3DTarget(targetReq);
+}
+
+
+static bool isSM5OrEarlier(TargetRequest* targetReq)
+{
+    if(!isD3DTarget(targetReq))
+        return false;
+
+    auto profile = targetReq->targetProfile;
+
+    if(profile.getFamily() == ProfileFamily::DX)
+    {
+        if(profile.GetVersion() <= ProfileVersion::DX_5_0)
+            return true;
+    }
+
+    return false;
+}
+
+static bool isVulkanTarget(TargetRequest* targetReq)
+{
+    switch( targetReq->target )
+    {
+    default:
+        return false;
+
+    case CodeGenTarget::GLSL:
+    case CodeGenTarget::SPIRV:
+    case CodeGenTarget::SPIRVAssembly:
+        break;
+    }
+
+    // For right now, any GLSL-related target is assumed
+    // to be a Vulkan target.
+
+    return true;
+}
+
+static bool shouldAllocateRegisterSpaceForParameterBlock(
+    TypeLayoutContext const&  context)
+{
+    auto targetReq = context.targetReq;
+
+    // We *never* want to use register spaces/sets under
+    // OpenGL, D3D11, or for Shader Model 5.0 or earlier.
+    if(isOpenGLTarget(targetReq) || isD3D11Target(targetReq) || isSM5OrEarlier(targetReq))
+        return false;
+
+    // If we know that we are targetting Vulkan, then
+    // the only way to effectively use parameter blocks
+    // is by using descriptor sets.
+    if(isVulkanTarget(targetReq))
+        return true;
+
+    // If none of the above passed, then it seems like we
+    // are generating code for D3D12, and using SM5.1 or later.
+    // We will use a register space for parameter blocks *if*
+    // the target options tell us to:
+    if( isD3D12Target(targetReq) )
+    {
+        if(targetReq->targetFlags & SLANG_TARGET_FLAG_PARAMETER_BLOCKS_USE_REGISTER_SPACES)
+            return true;
+    }
+
+    return false;
+}
 
 RefPtr<ParameterGroupTypeLayout>
 createParameterGroupTypeLayout(
-    TypeLayoutContext*          context,
+    TypeLayoutContext const&    context,
     RefPtr<ParameterGroupType>  parameterGroupType,
     SimpleLayoutInfo            parameterGroupInfo,
     RefPtr<TypeLayout>          elementTypeLayout)
 {
-    auto parameterGroupRules = context->rules;
+    auto parameterGroupRules = context.rules;
 
     auto typeLayout = new ParameterGroupTypeLayout();
 
@@ -780,9 +881,8 @@ createParameterGroupTypeLayout(
     // originally (which should be a single binding "slot"
     // and hence no uniform data).
     // 
-    typeLayout->uniformAlignment = parameterGroupInfo.alignment;
-    SLANG_RELEASE_ASSERT(!typeLayout->FindResourceInfo(LayoutResourceKind::Uniform));
-    SLANG_RELEASE_ASSERT(typeLayout->uniformAlignment == 1);
+    SLANG_RELEASE_ASSERT(parameterGroupInfo.kind != LayoutResourceKind::Uniform);
+    typeLayout->uniformAlignment = 1;
 
     // TODO(tfoley): There is a subtle question here of whether
     // a constant buffer declaration that then contains zero
@@ -801,59 +901,125 @@ createParameterGroupTypeLayout(
             parameterGroupInfo.size);
     }
 
-    // The layout rules for a constant buffer, vs. a "parameter block"
-    // are different, with respect to how they expose layout information
-    // for underlying resources.
-    //
-    // A parameter block should *not* expose the fine-grained resource
-    // prameters it contains, and should only expose a total number
-    // of `space`s or `set`s that it consumes.
-    if (parameterGroupInfo.kind == LayoutResourceKind::ParameterBlock)
-    {
-        // Iterate over element types, but *only* accumulate usage
-        // info for types that consume whole register sets/spaces.
-        for( auto elementResourceInfo : elementTypeLayout->resourceInfos )
-        {
-            if(elementResourceInfo.kind != LayoutResourceKind::ParameterBlock)
-                break;
+    // There are several different cases that need to be handled here,
+    // depending on whether we have a `ParameterBlock`, a `ConstantBuffer`,
+    // or some other kind of parameter group. Furthermore, in the
+    // `ParameterBlock` case, we need to deal with differnet layout
+    // rules depending on whether a block should map to a register `space`
+    // in HLSL or not.
 
-            typeLayout->addResourceUsage(elementResourceInfo);
+    // Check if we are working with a parameter block...
+    auto parameterBlockType = parameterGroupType->As<ParameterBlockType>();
+
+    // Check if we have a parameter block *and* it should be
+    // allocated into its own register space(s)
+    bool ownRegisterSpace = false;
+    if (parameterBlockType)
+    {
+        if( shouldAllocateRegisterSpaceForParameterBlock(context) )
+        {
+            ownRegisterSpace = true;
+        }
+
+        // If the parameter block contains any uniform data, then we
+        // had better allocate a constant buffer for it.
+        bool anyUniformData = false;
+        if(auto elementUniformInfo = elementTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform) )
+        {
+            if( elementUniformInfo->count != 0 )
+            {
+                // We have a non-zero number of bytes of uniform data here.
+                anyUniformData = true;
+            }
+        }
+
+        if( anyUniformData )
+        {
+            typeLayout->addResourceUsage(LayoutResourceKind::ConstantBuffer, 1);
+        }
+
+        // Next, if we are going to allocate whole register space(s) to the
+        // parameter block, check if it actually needs one (it might be empty,
+        // or only contain other parameter blocks).
+        if( ownRegisterSpace )
+        {
+            bool needsARegisterSpace = false;
+            for( auto elementResourceInfo : elementTypeLayout->resourceInfos )
+            {
+                if(elementResourceInfo.kind != LayoutResourceKind::RegisterSpace)
+                {
+                    needsARegisterSpace = true;
+                    break;
+                }
+            }
+
+            if( needsARegisterSpace )
+            {
+                typeLayout->addResourceUsage(LayoutResourceKind::RegisterSpace, 1);
+            }
         }
     }
-    else
-    {
-        // In the ordinary case (e.g., a constant buffer) then we need
-        // to make sure that any resources nested in the element type
-        // get counted against the container type, so that we can
-        // allocate registers to it directly.
-        for( auto elementResourceInfo : elementTypeLayout->resourceInfos )
-        {
-            // Skip uniform data, since that is encapsualted behind the constant buffer
-            if(elementResourceInfo.kind == LayoutResourceKind::Uniform)
-                break;
 
+    // The layout for the element type was computed without any knowledge
+    // of what resources the parent type was going to consume; we now
+    // need to go through and offset that any starting locations (e.g.,
+    // in nested `StructTypeLayout`s) based on what we allocated to
+    // the parent.
+
+    // TODO(tfoley): actually implement that!
+
+
+    // Now we will (possibly) accumulate the resources used by the element
+    // type into the resources used by the parameter group. The reason
+    // this is "possibly" is because, e.g., a `ConstantBuffer<Foo>` should
+    // not report itself as consuming `sizeof(Foo)` bytes of uniform data,
+    // or else it would mess up layout for any type that contains the
+    // constant buffer. Similarly, a parameter block that consumes whole
+    // register `space`s shouldn't report its fine-grained resource
+    // usage inside those spces.
+    for( auto elementResourceInfo : elementTypeLayout->resourceInfos )
+    {
+        switch( elementResourceInfo.kind )
+        {
+        case LayoutResourceKind::RegisterSpace:
+            // Register spaces consumed by the element type should be
+            // reflected in the resource usage of the parent type.
             typeLayout->addResourceUsage(elementResourceInfo);
+            break;
+
+        case LayoutResourceKind::Uniform:
+            // Uniform resource usages will always be hidden.
+            break;
+
+        default:
+            // All other register types should be hidden *if* we
+            // are allocating a whole register space, and exposed
+            // otherwise.
+            if( ownRegisterSpace )
+            {
+                // don't expose internal register/binding use outside
+            }
+            else
+            {
+                typeLayout->addResourceUsage(elementResourceInfo);
+            }
+            break;
         }
     }
-
-
 
     return typeLayout;
 }
 
 RefPtr<ParameterGroupTypeLayout>
 createParameterGroupTypeLayout(
+    TypeLayoutContext const&    context,
     RefPtr<ParameterGroupType>  parameterGroupType,
     LayoutRulesImpl*            parameterGroupRules,
     SimpleLayoutInfo            parameterGroupInfo,
     RefPtr<TypeLayout>          elementTypeLayout)
 {
-    TypeLayoutContext context;
-    context.rules = parameterGroupRules;
-    context.matrixLayoutMode = parameterGroupRules->getDefaultMatrixLayoutMode();
-
     return createParameterGroupTypeLayout(
-        &context,
+        context.with(parameterGroupRules).with(parameterGroupRules->getDefaultMatrixLayoutMode()),
         parameterGroupType,
         parameterGroupInfo,
         elementTypeLayout);
@@ -861,12 +1027,12 @@ createParameterGroupTypeLayout(
 
 RefPtr<ParameterGroupTypeLayout>
 createParameterGroupTypeLayout(
-    TypeLayoutContext*          context,
+    TypeLayoutContext const&    context,
     RefPtr<ParameterGroupType>  parameterGroupType,
     RefPtr<Type>                elementType,
     LayoutRulesImpl*            elementTypeRules)
 {
-    auto parameterGroupRules = context->rules;
+    auto parameterGroupRules = context.rules;
 
     // First compute resource usage of the block itself.
     // For now we assume that the layout of the block can
@@ -891,10 +1057,8 @@ createParameterGroupTypeLayout(
     // the elements of the block use the same resource kind consumed
     // by the block itself.
 
-    TypeLayoutContext elementContext = *context;
-    elementContext.rules = elementTypeRules;
     auto elementTypeLayout = createTypeLayout(
-        &elementContext,
+        context.with(elementTypeRules),
         elementType,
         info);
 
@@ -942,10 +1106,10 @@ LayoutRulesImpl* getParameterBufferElementTypeLayoutRules(
 
 RefPtr<ParameterGroupTypeLayout>
 createParameterGroupTypeLayout(
-    TypeLayoutContext*          context,
+    TypeLayoutContext const&    context,
     RefPtr<ParameterGroupType>  parameterGroupType)
 {
-    auto parameterGroupRules = context->rules;
+    auto parameterGroupRules = context.rules;
 
     // Determine the layout rules to use for the contents of the block
     auto elementTypeRules = getParameterBufferElementTypeLayoutRules(
@@ -964,11 +1128,12 @@ createParameterGroupTypeLayout(
 // Create a type layout for a structured buffer type.
 RefPtr<StructuredBufferTypeLayout>
 createStructuredBufferTypeLayout(
-    ShaderParameterKind     kind,
-    RefPtr<Type>  structuredBufferType,
-    RefPtr<TypeLayout>      elementTypeLayout,
-    LayoutRulesImpl*        rules)
+    TypeLayoutContext const&    context,
+    ShaderParameterKind         kind,
+    RefPtr<Type>                structuredBufferType,
+    RefPtr<TypeLayout>          elementTypeLayout)
 {
+    auto rules = context.rules;
     auto info = rules->GetObjectLayout(kind);
 
     auto typeLayout = new StructuredBufferTypeLayout();
@@ -997,50 +1162,50 @@ createStructuredBufferTypeLayout(
 // Create a type layout for a structured buffer type.
 RefPtr<StructuredBufferTypeLayout>
 createStructuredBufferTypeLayout(
-    ShaderParameterKind     kind,
-    RefPtr<Type>  structuredBufferType,
-    RefPtr<Type>  elementType,
-    LayoutRulesImpl*        rules)
+    TypeLayoutContext const&    context,
+    ShaderParameterKind         kind,
+    RefPtr<Type>                structuredBufferType,
+    RefPtr<Type>                elementType)
 {
-    // TODO(tfoley): need to compute the layout for the constant
-    // buffer's contents...
+    // TODO(tfoley): we should be looking up the appropriate rules
+    // via the `LayoutRulesFamily` in use here...
     auto structuredBufferLayoutRules = GetLayoutRulesImpl(
         LayoutRule::HLSLStructuredBuffer);
 
     // Create and save type layout for the buffer contents.
     auto elementTypeLayout = CreateTypeLayout(
-        elementType.Ptr(),
-        structuredBufferLayoutRules);
+        context.with(structuredBufferLayoutRules),
+        elementType.Ptr());
 
     return createStructuredBufferTypeLayout(
+        context,
         kind,
         structuredBufferType,
-        elementTypeLayout,
-        rules);
+        elementTypeLayout);
 
 }
 
 SimpleLayoutInfo GetLayoutImpl(
-    TypeLayoutContext*  context,
-    Type*               type,
-    RefPtr<TypeLayout>* outTypeLayout,
-    SimpleLayoutInfo    offset);
+    TypeLayoutContext const&    context,
+    Type*                       type,
+    RefPtr<TypeLayout>*         outTypeLayout,
+    SimpleLayoutInfo            offset);
 
 SimpleLayoutInfo GetLayoutImpl(
-    TypeLayoutContext*  context,
-    Type*               type,
-    RefPtr<TypeLayout>* outTypeLayout)
+    TypeLayoutContext const&    context,
+    Type*                       type,
+    RefPtr<TypeLayout>*         outTypeLayout)
 {
     return GetLayoutImpl(context, type, outTypeLayout, SimpleLayoutInfo());
 }
 
 SimpleLayoutInfo GetLayoutImpl(
-    TypeLayoutContext*  context,
-    Type*               type,
-    RefPtr<TypeLayout>* outTypeLayout,
-    Decl*               declForModifiers)
+    TypeLayoutContext const&    context,
+    Type*                       type,
+    RefPtr<TypeLayout>*         outTypeLayout,
+    Decl*                       declForModifiers)
 {
-    TypeLayoutContext subContext = *context;
+    TypeLayoutContext subContext = context;
 
     if (declForModifiers)
     {
@@ -1054,16 +1219,16 @@ SimpleLayoutInfo GetLayoutImpl(
         // layout, such as GLSL `std140`.
     }
 
-    return GetLayoutImpl(&subContext, type, outTypeLayout, SimpleLayoutInfo());
+    return GetLayoutImpl(subContext, type, outTypeLayout, SimpleLayoutInfo());
 }
 
 SimpleLayoutInfo GetLayoutImpl(
-    TypeLayoutContext*  context,
-    Type*               type,
-    RefPtr<TypeLayout>* outTypeLayout,
-    SimpleLayoutInfo    offset)
+    TypeLayoutContext const&    context,
+    Type*                       type,
+    RefPtr<TypeLayout>*         outTypeLayout,
+    SimpleLayoutInfo            offset)
 {
-    auto rules = context->rules;
+    auto rules = context.rules;
 
     if (auto parameterGroupType = type->As<ParameterGroupType>())
     {
@@ -1176,10 +1341,10 @@ SimpleLayoutInfo GetLayoutImpl(
         if (outTypeLayout)                                              \
         {                                                               \
             *outTypeLayout = createStructuredBufferTypeLayout(          \
+                context,                                                \
                 ShaderParameterKind::KIND,                              \
                 type_##TYPE,                                            \
-                type_##TYPE->elementType.Ptr(),                         \
-                rules);                                                 \
+                type_##TYPE->elementType.Ptr());                        \
         }                                                               \
         return info;                                                    \
     } while(0)
@@ -1225,7 +1390,7 @@ SimpleLayoutInfo GetLayoutImpl(
     {
         return GetSimpleLayoutImpl(
             rules->GetVectorLayout(
-                GetLayout(vecType->elementType.Ptr(), rules),
+                GetLayout(context, vecType->elementType.Ptr()),
                 (size_t) GetIntVal(vecType->elementCount)),
             type,
             rules,
@@ -1245,7 +1410,7 @@ SimpleLayoutInfo GetLayoutImpl(
         //
         size_t rowCount = (size_t) GetIntVal(matType->getRowCount());
         size_t colCount = (size_t) GetIntVal(matType->getColumnCount());
-        if (context->matrixLayoutMode == kMatrixLayoutMode_ColumnMajor)
+        if (context.matrixLayoutMode == kMatrixLayoutMode_ColumnMajor)
         {
             size_t tmp = rowCount;
             rowCount = colCount;
@@ -1253,7 +1418,7 @@ SimpleLayoutInfo GetLayoutImpl(
         }
 
         auto info = rules->GetMatrixLayout(
-            GetLayout(matType->getElementType(), rules),
+            GetLayout(context, matType->getElementType()),
             rowCount,
             colCount);
 
@@ -1265,7 +1430,7 @@ SimpleLayoutInfo GetLayoutImpl(
             typeLayout->type = type;
             typeLayout->rules = rules;
             typeLayout->uniformAlignment = info.alignment;
-            typeLayout->mode = context->matrixLayoutMode;
+            typeLayout->mode = context.matrixLayoutMode;
 
             typeLayout->addResourceUsage(info.kind, info.size);
         }
@@ -1459,19 +1624,17 @@ SimpleLayoutInfo GetLayoutImpl(
         outTypeLayout);
 }
 
-SimpleLayoutInfo GetLayout(Type* inType, LayoutRulesImpl* rules)
+SimpleLayoutInfo GetLayout(
+    TypeLayoutContext const&    context,
+    Type*                       inType)
 {
-    TypeLayoutContext context;
-    context.rules = rules;
-    context.matrixLayoutMode = rules->getDefaultMatrixLayoutMode();
-
-    return GetLayoutImpl(&context, inType, nullptr);
+    return GetLayoutImpl(context, inType, nullptr);
 }
 
 RefPtr<TypeLayout> createTypeLayout(
-    TypeLayoutContext*  context,
-    Type*               type,
-    SimpleLayoutInfo    offset)
+    TypeLayoutContext const&    context,
+    Type*                       type,
+    SimpleLayoutInfo            offset)
 {
     RefPtr<TypeLayout> typeLayout;
     GetLayoutImpl(context, type, &typeLayout, offset);
@@ -1479,8 +1642,8 @@ RefPtr<TypeLayout> createTypeLayout(
 }
 
 RefPtr<TypeLayout> createTypeLayout(
-    TypeLayoutContext*  context,
-    Type*               type)
+    TypeLayoutContext const&    context,
+    Type*                       type)
 {
     RefPtr<TypeLayout> typeLayout;
     GetLayoutImpl(context, type, &typeLayout, SimpleLayoutInfo());
@@ -1488,28 +1651,20 @@ RefPtr<TypeLayout> createTypeLayout(
 }
 
 RefPtr<TypeLayout> CreateTypeLayout(
-    Type* type,
-    LayoutRulesImpl* rules,
-    SimpleLayoutInfo offset)
+    TypeLayoutContext const&    context,
+    Type*                       type,
+    SimpleLayoutInfo            offset)
 {
-    TypeLayoutContext context;
-    context.rules = rules;
-    context.matrixLayoutMode = rules->getDefaultMatrixLayoutMode();
-
     RefPtr<TypeLayout> typeLayout;
-    GetLayoutImpl(&context, type, &typeLayout, offset);
+    GetLayoutImpl(context, type, &typeLayout, offset);
     return typeLayout;
 }
 
-RefPtr<TypeLayout> CreateTypeLayout(Type* type, LayoutRulesImpl* rules)
+RefPtr<TypeLayout> CreateTypeLayout(
+    TypeLayoutContext const&    context,
+    Type* type)
 {
-    return CreateTypeLayout(type, rules, SimpleLayoutInfo());
-}
-
-SimpleLayoutInfo GetLayout(Type* type, LayoutRule rule)
-{
-    LayoutRulesImpl* rulesImpl = GetLayoutRulesImpl(rule);
-    return GetLayout(type, rulesImpl);
+    return CreateTypeLayout(context, type, SimpleLayoutInfo());
 }
 
 } // namespace Slang

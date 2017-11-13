@@ -746,12 +746,30 @@ SLANG_API void spSetCodeGenTarget(
     req->addTarget(Slang::CodeGenTarget(target));
 }
 
-SLANG_API void spAddCodeGenTarget(
+SLANG_API int spAddCodeGenTarget(
     SlangCompileRequest*    request,
     SlangCompileTarget      target)
 {
     auto req = REQ(request);
-    req->addTarget(Slang::CodeGenTarget(target));
+    return (int) req->addTarget(Slang::CodeGenTarget(target));
+}
+
+SLANG_API void spSetTargetProfile(
+    SlangCompileRequest*    request,
+    int                     targetIndex,
+    SlangProfileID          profile)
+{
+    auto req = REQ(request);
+    req->targets[targetIndex]->targetProfile = profile;
+}
+
+SLANG_API void spSetTargetFlags(
+    SlangCompileRequest*    request,
+    int                     targetIndex,
+    SlangTargetFlags        flags)
+{
+    auto req = REQ(request);
+    req->targets[targetIndex]->targetFlags = flags;
 }
 
 SLANG_API void spSetOutputContainerFormat(

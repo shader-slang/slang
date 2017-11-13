@@ -660,13 +660,13 @@ static LegalVal declareSimpleVar(
         // those to all the nested resource infos.
         for (auto vv = varChain; vv; vv = vv->next)
         {
-            auto parentSpaceInfo = vv->varLayout->findOrAddResourceInfo(LayoutResourceKind::ParameterBlock);
+            auto parentSpaceInfo = vv->varLayout->findOrAddResourceInfo(LayoutResourceKind::RegisterSpace);
             if (!parentSpaceInfo)
                 continue;
 
             for (auto& rr : varLayout->resourceInfos)
             {
-                if (rr.kind == LayoutResourceKind::ParameterBlock)
+                if (rr.kind == LayoutResourceKind::RegisterSpace)
                 {
                     rr.index += parentSpaceInfo->index;
                 }
@@ -827,21 +827,13 @@ static void legalizeGlobalVar(
     RefPtr<VarLayout> varLayout = findVarLayout(irGlobalVar);
     RefPtr<TypeLayout> typeLayout = varLayout ? varLayout->typeLayout : nullptr;
 
-    // If we've decided to do implicit deref on the type,
-    // then go ahead and declare a value of the pointed-to type.
-    LegalType maybeSimpleType = legalValueType;
-    while (maybeSimpleType.flavor == LegalType::Flavor::implicitDeref)
-    {
-        maybeSimpleType = maybeSimpleType.getImplicitDeref()->valueType;
-    }
-
-    switch (maybeSimpleType.flavor)
+    switch (legalValueType.flavor)
     {
     case LegalType::Flavor::simple:
         // Easy case: the type is usable as-is, and we
         // should just do that.
         irGlobalVar->type = context->session->getPtrType(
-            maybeSimpleType.getSimple());
+            legalValueType.getSimple());
         break;
 
     default:

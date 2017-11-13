@@ -80,6 +80,7 @@ struct OptionsParser
     int profileOptionCount = 0;
 
     SlangCompileFlags flags = 0;
+    SlangTargetFlags targetFlags = 0;
 
     struct RawOutputPath
     {
@@ -278,6 +279,10 @@ struct OptionsParser
                 else if(argStr == "-skip-codegen" )
                 {
                     requestImpl->shouldSkipCodegen = true;
+                }
+                else if(argStr == "-parameter-blocks-use-register-spaces" )
+                {
+                    targetFlags |= SLANG_TARGET_FLAG_PARAMETER_BLOCKS_USE_REGISTER_SPACES;
                 }
                 else if (argStr == "-backend" || argStr == "-target")
                 {
@@ -727,6 +732,13 @@ struct OptionsParser
                 break;
 
             }
+        }
+
+        // If the user specifed and per-compilation-target flags, make sure
+        // to apply them here.
+        if(targetFlags)
+        {
+            spSetTargetFlags(compileRequest, 0, targetFlags);
         }
 
         // Next, we want to make sure that entry points get attached to the appropriate translation

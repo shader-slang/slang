@@ -28,11 +28,13 @@ enum class LayoutRule
     HLSLStructuredBuffer,
 };
 
+#if 0
 enum class LayoutRulesFamily
 {
     HLSL,
     GLSL,
 };
+#endif
 
 // Layout appropriate to "just memory" scenarios,
 // such as laying out the members of a constant buffer.
@@ -559,43 +561,92 @@ struct LayoutRulesFamilyImpl
     virtual MatrixLayoutMode getDefaultMatrixLayoutMode() = 0;
 };
 
-LayoutRulesImpl* GetLayoutRulesImpl(LayoutRule rule);
-LayoutRulesFamilyImpl* GetLayoutRulesFamilyImpl(LayoutRulesFamily rule);
-LayoutRulesFamilyImpl* GetLayoutRulesFamilyImpl(CodeGenTarget target);
+struct TypeLayoutContext
+{
+    // The layout rules to use (e.g., we compute
+    // layout differently in a `cbuffer` vs. the
+    // parameter list of a fragment shader).
+    LayoutRulesImpl*    rules;
 
-SimpleLayoutInfo GetLayout(Type* type, LayoutRulesImpl* rules);
+    // The target request that is triggering layout
+    TargetRequest*      targetReq;
 
-SimpleLayoutInfo GetLayout(Type* type, LayoutRule rule = LayoutRule::Std430);
+    // Whether to lay out matrices column-major
+    // or row-major.
+    MatrixLayoutMode    matrixLayoutMode;
 
-RefPtr<TypeLayout> CreateTypeLayout(Type* type, LayoutRulesImpl* rules);
-RefPtr<TypeLayout> CreateTypeLayout(Type* type, LayoutRulesImpl* rules, SimpleLayoutInfo offset);
+    LayoutRulesImpl* getRules() { return rules; }
+    LayoutRulesFamilyImpl* getRulesFamily() { return rules->getLayoutRulesFamily(); }
+
+    TypeLayoutContext with(LayoutRulesImpl* inRules) const
+    {
+        TypeLayoutContext result = *this;
+        result.rules = inRules;
+        return result;
+    }
+
+    TypeLayoutContext with(MatrixLayoutMode inMatrixLayoutMode) const
+    {
+        TypeLayoutContext result = *this;
+        result.matrixLayoutMode = inMatrixLayoutMode;
+        return result;
+    }
+};
+
+
+// Get an appropriate set of layout rules (packaged up
+// as a `TypeLayoutContext`) to perform type layout
+// for the given target.
+TypeLayoutContext getInitialLayoutContextForTarget(
+    TargetRequest* targetReq);
+
+// Get the "simple" layout for a type accordinging to a given set of layout
+// rules. Note that a "simple" layout can only consume one `LayoutResourceKind`,
+// and so this operation may not correctly capture the full resource usage
+// of a type.
+SimpleLayoutInfo GetLayout(
+    TypeLayoutContext const&    context,
+    Type*                       type);
+
+// Create a full type-layout object for a type,
+// according to the layout rules in `context`.
+RefPtr<TypeLayout> CreateTypeLayout(
+    TypeLayoutContext const&    context,
+    Type*                       type);
+
+// Create a full type layout for a type, while applying the given "simple"
+// layout information as an offset to any `VarLayout`s created along
+// the way.
+RefPtr<TypeLayout> CreateTypeLayout(
+    TypeLayoutContext const&    context,
+    Type*                       type,
+    SimpleLayoutInfo            offset);
 
 //
-
-struct TypeLayoutContext;
 
 // Create a type layout for a parameter block type.
 RefPtr<ParameterGroupTypeLayout>
 createParameterGroupTypeLayout(
-    TypeLayoutContext*          context,
+    TypeLayoutContext const&    context,
     RefPtr<ParameterGroupType>  parameterGroupType);
 
 RefPtr<ParameterGroupTypeLayout>
 createParameterGroupTypeLayout(
-    TypeLayoutContext*          context,
+    TypeLayoutContext const&    context,
     RefPtr<ParameterGroupType>  parameterGroupType,
     RefPtr<Type>                elementType,
     LayoutRulesImpl*            elementTypeRules);
 
 RefPtr<ParameterGroupTypeLayout>
 createParameterGroupTypeLayout(
-    TypeLayoutContext*          context,
+    TypeLayoutContext const&    context,
     RefPtr<ParameterGroupType>  parameterGroupType,
     SimpleLayoutInfo            parameterGroupInfo,
     RefPtr<TypeLayout>          elementTypeLayout);
 
 RefPtr<ParameterGroupTypeLayout>
 createParameterGroupTypeLayout(
+    TypeLayoutContext const&    context,
     RefPtr<ParameterGroupType>  parameterGroupType,
     LayoutRulesImpl*            parameterGroupRules,
     SimpleLayoutInfo            parameterGroupInfo,
@@ -604,10 +655,10 @@ createParameterGroupTypeLayout(
 // Create a type layout for a structured buffer type.
 RefPtr<StructuredBufferTypeLayout>
 createStructuredBufferTypeLayout(
-    ShaderParameterKind     kind,
-    RefPtr<Type>  structuredBufferType,
-    RefPtr<Type>  elementType,
-    LayoutRulesImpl*        rules);
+    TypeLayoutContext const&    context,
+    ShaderParameterKind         kind,
+    RefPtr<Type>                structuredBufferType,
+    RefPtr<Type>                elementType);
 
 
 //

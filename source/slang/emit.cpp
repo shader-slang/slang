@@ -3425,75 +3425,84 @@ struct EmitVisitor
         // Keyword to use in the uniform case (`register` for globals, `packoffset` inside a `cbuffer`)
         char const* uniformSemanticSpelling = "register")
     {
-        if( info.kind == LayoutResourceKind::Uniform )
+        switch(info.kind)
         {
-            size_t offset = info.index;
-
-            // The HLSL `c` register space is logically grouped in 16-byte registers,
-            // while we try to traffic in byte offsets. That means we need to pick
-            // a register number, based on the starting offset in 16-byte register
-            // units, and then a "component" within that register, based on 4-byte
-            // offsets from there. We cannot support more fine-grained offsets than that.
-
-            Emit(": ");
-            Emit(uniformSemanticSpelling);
-            Emit("(c");
-
-            // Size of a logical `c` register in bytes
-            auto registerSize = 16;
-
-            // Size of each component of a logical `c` register, in bytes
-            auto componentSize = 4;
-
-            size_t startRegister = offset / registerSize;
-            Emit(int(startRegister));
-
-            size_t byteOffsetInRegister = offset % registerSize;
-
-            // If this field doesn't start on an even register boundary,
-            // then we need to emit additional information to pick the
-            // right component to start from
-            if (byteOffsetInRegister != 0)
+        case LayoutResourceKind::Uniform:
             {
-                // The value had better occupy a whole number of components.
-                SLANG_RELEASE_ASSERT(byteOffsetInRegister % componentSize == 0);
+                size_t offset = info.index;
 
-                size_t startComponent = byteOffsetInRegister / componentSize;
+                // The HLSL `c` register space is logically grouped in 16-byte registers,
+                // while we try to traffic in byte offsets. That means we need to pick
+                // a register number, based on the starting offset in 16-byte register
+                // units, and then a "component" within that register, based on 4-byte
+                // offsets from there. We cannot support more fine-grained offsets than that.
 
-                static const char* kComponentNames[] = {"x", "y", "z", "w"};
-                Emit(".");
-                Emit(kComponentNames[startComponent]);
+                Emit(": ");
+                Emit(uniformSemanticSpelling);
+                Emit("(c");
+
+                // Size of a logical `c` register in bytes
+                auto registerSize = 16;
+
+                // Size of each component of a logical `c` register, in bytes
+                auto componentSize = 4;
+
+                size_t startRegister = offset / registerSize;
+                Emit(int(startRegister));
+
+                size_t byteOffsetInRegister = offset % registerSize;
+
+                // If this field doesn't start on an even register boundary,
+                // then we need to emit additional information to pick the
+                // right component to start from
+                if (byteOffsetInRegister != 0)
+                {
+                    // The value had better occupy a whole number of components.
+                    SLANG_RELEASE_ASSERT(byteOffsetInRegister % componentSize == 0);
+
+                    size_t startComponent = byteOffsetInRegister / componentSize;
+
+                    static const char* kComponentNames[] = {"x", "y", "z", "w"};
+                    Emit(".");
+                    Emit(kComponentNames[startComponent]);
+                }
+                Emit(")");
             }
-            Emit(")");
-        }
-        else
-        {
-            Emit(": register(");
-            switch( info.kind )
+            break;
+
+        case LayoutResourceKind::RegisterSpace:
+            // ignore
+            break;
+
+        default:
             {
-            case LayoutResourceKind::ConstantBuffer:
-                Emit("b");
-                break;
-            case LayoutResourceKind::ShaderResource:
-                Emit("t");
-                break;
-            case LayoutResourceKind::UnorderedAccess:
-                Emit("u");
-                break;
-            case LayoutResourceKind::SamplerState:
-                Emit("s");
-                break;
-            default:
-                SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled HLSL register type");
-                break;
+                Emit(": register(");
+                switch( info.kind )
+                {
+                case LayoutResourceKind::ConstantBuffer:
+                    Emit("b");
+                    break;
+                case LayoutResourceKind::ShaderResource:
+                    Emit("t");
+                    break;
+                case LayoutResourceKind::UnorderedAccess:
+                    Emit("u");
+                    break;
+                case LayoutResourceKind::SamplerState:
+                    Emit("s");
+                    break;
+                default:
+                    SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled HLSL register type");
+                    break;
+                }
+                Emit(info.index);
+                if(info.space)
+                {
+                    Emit(", space");
+                    Emit(info.space);
+                }
+                Emit(")");
             }
-            Emit(info.index);
-            if(info.space)
-            {
-                Emit(", space");
-                Emit(info.space);
-            }
-            Emit(")");
         }
     }
 

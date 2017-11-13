@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE:
+//TEST(compute):COMPARE_COMPUTE:-xslang -use-ir
 //TEST_INPUT:ubuffer(data=[0 1 2 3], stride=4):dxbinding(0),glbinding(0),out
 
 // Test that `break` from a loop works.
