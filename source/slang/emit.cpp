@@ -2896,7 +2896,7 @@ struct EmitVisitor
         }
         else if (auto defaultStmt = stmt.As<DefaultStmt>())
         {
-            Emit("default:{}\n");
+            Emit("default:\n");
             return;
         }
         else if (auto breakStmt = stmt.As<BreakStmt>())
@@ -5643,8 +5643,142 @@ emitDeclImpl(decl, nullptr);
                 break;
 
             case kIROp_conditionalBranch:
+                // Note: We currently do not generate any plain
+                // `conditionalBranch` instructions when lowering
+                // to IR, because these would not have the annotations
+                // needed to be able to emit high-level control
+                // flow from them.
                 SLANG_UNEXPECTED("terminator inst");
                 return;
+
+
+            case kIROp_switch:
+                {
+                    // A `switch` instruction will always translate
+                    // to a `switch` statement, but we need to
+                    // take some care to emit the `case`s in ways
+                    // that avoid code duplication.
+
+                    // TODO: Eventually, the "right" way to handle `switch`
+                    // statements while being more robust about Duff's Device, etc.
+                    // would be to register each of the case labels in a lookup
+                    // table, and then walk the blocks in the region between
+                    // the `switch` and the `break` and then whenever we see a block
+                    // that matches one of the registered labels, emit the appropriate
+                    // `case ...:` or `default:` label.
+
+                    auto t = (IRSwitch*) terminator;
+
+                    // Extract the fixed arguments.
+                    auto conditionVal = t->getCondition();
+                    auto breakLabel = t->getBreakLabel();
+                    auto defaultLabel = t->getDefaultLabel();
+
+                    // We need to track whether we've dealt with
+                    // the `default` case already.
+                    bool defaultLabelHandled = false;
+
+                    // If the `default` case just branches to
+                    // the join point, then we don't need to
+                    // do anything with it.
+                    if(defaultLabel == breakLabel)
+                        defaultLabelHandled = true;
+
+                    // Emit the start of our statement.
+                    emit("switch(");
+                    emitIROperand(ctx, conditionVal);
+                    emit(")\n{\n");
+
+                    // Now iterate over the `case`s of the branch
+                    UInt caseIndex = 0;
+                    UInt caseCount = t->getCaseCount();
+                    while(caseIndex < caseCount)
+                    {
+                        // We are going to extract one case here,
+                        // but we might need to fold additional
+                        // cases into it, if they share the
+                        // same label.
+                        //
+                        // Note: this makes assumptions that the
+                        // IR code generator orders cases such
+                        // that: (1) cases with the same label
+                        // are consecutive, and (2) any case
+                        // that "falls through" to another must
+                        // come right before it in the list.
+                        auto caseVal = t->getCaseValue(caseIndex);
+                        auto caseLabel = t->getCaseLabel(caseIndex);
+                        caseIndex++;
+
+                        // Emit the `case ...:` for this case, and any
+                        // others that share the same label
+                        for(;;)
+                        {
+                            emit("case ");
+                            emitIROperand(ctx, caseVal);
+                            emit(":\n");
+
+                            if(caseIndex >= caseCount)
+                                break;
+
+                            auto nextCaseLabel = t->getCaseLabel(caseIndex);
+                            if(nextCaseLabel != caseLabel)
+                                break;
+
+                            caseVal = t->getCaseValue(caseIndex);
+                            caseIndex++;
+                        }
+
+                        // The label for the current `case` might also
+                        // be the label used by the `default` case, so
+                        // check for that here.
+                        if(caseLabel == defaultLabel)
+                        {
+                            emit("default:\n");
+                            defaultLabelHandled = true;
+                        }
+
+                        // Now we need to emit the statements that make
+                        // up this case. The 99% case will be that it
+                        // will terminate with a `break` (or a `return`,
+                        // `continue`, etc.) and so we can pass in
+                        // `nullptr` for the ending block.
+                        IRBlock* caseEndLabel = nullptr;
+
+                        // However, there is also the possibility that
+                        // this case will fall through to the next, and
+                        // so we need to prepare for that possibility here.
+                        //
+                        // If there is a next case, then we will set its
+                        // label up as the "end" label when emitting
+                        // the statements inside the block.
+                        if(caseIndex < caseCount)
+                        {
+                            caseEndLabel = t->getCaseLabel(caseIndex);
+                        }
+
+                        // Now emit the statements for this case.
+                        emit("{\n");
+                        emitIRStmtsForBlocks(ctx, caseLabel, caseEndLabel);
+                        emit("}\n");
+                    }
+
+                    // If we've gone through all the cases and haven't
+                    // managed to encounter the `default:` label,
+                    // then assume it is a distinct case and handle it here.
+                    if(!defaultLabelHandled)
+                    {
+                        emit("default:\n");
+                        emit("{\n");
+                        emitIRStmtsForBlocks(ctx, defaultLabel, breakLabel);
+                        emit("break;\n");
+                        emit("}\n");
+                    }
+
+                    emit("}\n");
+                    block = breakLabel;
+
+                }
+                break;
             }
 
             // If we reach this point, then we've emitted

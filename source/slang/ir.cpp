@@ -167,6 +167,7 @@ namespace Slang
         case kIROp_ifElse:
         case kIROp_loopTest:
         case kIROp_discard:
+        case kIROp_switch:
             return true;
         }
     }
@@ -1285,6 +1286,28 @@ namespace Slang
             nullptr,
             argCount,
             args);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitSwitch(
+        IRValue*        val,
+        IRBlock*        breakLabel,
+        IRBlock*        defaultLabel,
+        UInt            caseArgCount,
+        IRValue* const* caseArgs)
+    {
+        IRValue* fixedArgs[] = { val, breakLabel, defaultLabel };
+        UInt fixedArgCount = sizeof(fixedArgs) / sizeof(fixedArgs[0]);
+
+        auto inst = createInstWithTrailingArgs<IRSwitch>(
+            this,
+            kIROp_switch,
+            nullptr,
+            fixedArgCount,
+            fixedArgs,
+            caseArgCount,
+            caseArgs);
         addInst(inst);
         return inst;
     }
