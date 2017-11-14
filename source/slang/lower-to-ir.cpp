@@ -1622,9 +1622,24 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
     IRBuilder* getBuilder() { return context->irBuilder; }
 
-    void visitStmt(Stmt* /*stmt*/)
+    void visitEmptyStmt(EmptyStmt*)
     {
-        SLANG_UNIMPLEMENTED_X("stmt catch-all");
+        // Nothing to do.
+    }
+
+    void visitUnparsedStmt(UnparsedStmt*)
+    {
+        SLANG_UNEXPECTED("UnparsedStmt not supported by IR");
+    }
+
+    void visitCaseStmtBase(CaseStmtBase*)
+    {
+        SLANG_UNEXPECTED("`case` or `default` not under `switch`");
+    }
+
+    void visitCompileTimeForStmt(CompileTimeForStmt*)
+    {
+        SLANG_UNIMPLEMENTED_X("IR lowering of CompileTimeForStmt");
     }
 
     // Create a basic block in the current function,
@@ -1642,12 +1657,12 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         auto builder = getBuilder();
 
         auto prevBlock = builder->curBlock;
-        auto parentFunc = prevBlock->parentFunc;
+        auto parentFunc = prevBlock ? prevBlock->parentFunc : builder->curFunc;
 
         // If the previous block doesn't already have
         // a terminator instruction, then be sure to
         // emit a branch to the new block.
-        if (!isTerminatorInst(prevBlock->lastInst))
+        if (prevBlock && !isTerminatorInst(prevBlock->lastInst))
         {
             builder->emitBranch(block);
         }
@@ -2019,6 +2034,252 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         context->shared->continueLabels.TryGetValue(parentStmt, targetBlock);
         SLANG_ASSERT(targetBlock);
         getBuilder()->emitContinue(targetBlock);
+    }
+
+    // Lowering a `switch` statement can get pretty involved,
+    // so we need to track a bit of extra data:
+    struct SwitchStmtInfo
+    {
+        // The label for the `default` case, if any.
+        IRBlock*    defaultLabel = nullptr;
+
+        // The label of the current "active" case block.
+        IRBlock*    currentCaseLabel = nullptr;
+
+        // Has anything been emitted to the current "active" case block?
+        bool anythingEmittedToCurrentCaseBlock = false;
+
+        // The collected (value, label) pairs for
+        // all the `case` statements.
+        List<IRValue*>  cases;
+    };
+
+    // We need a label to use for a `case` or `default` statement,
+    // so either create one here, or re-use the current one if
+    // that is okay.
+    IRBlock* getLabelForCase(SwitchStmtInfo* info)
+    {
+        // Look at the "current" label we are working with.
+        auto currentCaseLabel = info->currentCaseLabel;
+
+        // If there is a current block, and it is empty,
+        // then it is still a viable target (we are in
+        // a case of "trivial fall-through" from the previous
+        // block).
+        if(currentCaseLabel && !info->anythingEmittedToCurrentCaseBlock)
+        {
+            return currentCaseLabel;
+        }
+
+        // Othwerise, we need to start a new block and use that.
+        IRBlock* newCaseLabel = createBlock();
+
+        // Note: if the previous block failed
+        // to end with a `break`, then inserting
+        // this block will append an unconditional
+        // branch to the end of it that will target
+        // this block.
+        insertBlock(newCaseLabel);
+
+        info->currentCaseLabel = newCaseLabel;
+        info->anythingEmittedToCurrentCaseBlock = false;
+        return newCaseLabel;
+    }
+
+    // Given a statement that appears as (or in) the body
+    // of a `switch` statement
+    void lowerSwitchCases(Stmt* inStmt, SwitchStmtInfo* info)
+    {
+        // TODO: in the general case (e.g., if we were going
+        // to eventual lower to an unstructured format like LLVM),
+        // the Right Way to handle C-style `switch` statements
+        // is just to emit the body directly as "normal" statements,
+        // and then treat `case` and `default` as special statements
+        // that start a new block and register a label with the
+        // enclosing `switch`.
+        //
+        // For now we will assume that any `case` and `default`
+        // statements need to be direclty nested under the `switch`,
+        // and so we can find them with a simpler walk.
+
+        Stmt* stmt = inStmt;
+
+        // Unwrap any surrounding `{ ... }` so we can look
+        // at the statement inside.
+        while(auto blockStmt = dynamic_cast<BlockStmt*>(stmt))
+        {
+            stmt = blockStmt->body;
+            continue;
+        }
+
+        if(auto seqStmt = dynamic_cast<SeqStmt*>(stmt))
+        {
+            // Walk through teh children and process each.
+            for(auto childStmt : seqStmt->stmts)
+            {
+                lowerSwitchCases(childStmt, info);
+            }
+        }
+        else if(auto caseStmt = dynamic_cast<CaseStmt*>(stmt))
+        {
+            // A full `case` statement has a value we need
+            // to test against. It is expected to be a
+            // compile-time constant, so we will emit
+            // it like an expression here, and then hope
+            // for the best.
+            //
+            // TODO: figure out something cleaner.
+            auto caseVal = getSimpleVal(context, lowerRValueExpr(context, caseStmt->expr));
+
+            // Figure out where we are branching to.
+            auto label = getLabelForCase(info);
+
+
+            // Add this `case` to the list for the enclosing `switch`.
+            info->cases.Add(caseVal);
+            info->cases.Add(label);
+        }
+        else if(auto defaultStmt = dynamic_cast<DefaultStmt*>(stmt))
+        {
+            auto label = getLabelForCase(info);
+
+            // We expect to only find a single `default` stmt.
+            SLANG_ASSERT(!info->defaultLabel);
+
+            info->defaultLabel = label;
+        }
+        else if(auto emptyStmt = dynamic_cast<EmptyStmt*>(stmt))
+        {
+            // Special-case empty statements so they don't
+            // mess up our "trivial fall-through" optimization.
+        }
+        else
+        {
+            // We have an ordinary statement, that needs to get
+            // emitted to the currrent case block.
+            if(!info->currentCaseLabel)
+            {
+                // It possible in full C/C++ to have statements
+                // before the first `case`. Usually these are
+                // unreachable, unless they start with a label.
+                //
+                // We'll ignore them here, figuring they are
+                // dead. If we ever add `LabelStmt` then we'd
+                // need to emit these statements to a dummy
+                // block just in case.
+            }
+            else
+            {
+                // Emit the code to our current case block,
+                // and record that we've done so.
+                lowerStmt(context, stmt);
+                info->anythingEmittedToCurrentCaseBlock = true;
+            }
+        }
+    }
+
+    void visitSwitchStmt(SwitchStmt* stmt)
+    {
+        auto builder = getBuilder();
+
+        // Given a statement:
+        //
+        //      switch( CONDITION )
+        //      {
+        //      case V0:
+        //          S0;
+        //          break;
+        //
+        //      case V1:
+        //      default:
+        //          S1;
+        //          break;
+        //      }
+        //
+        // we want to generate IR like:
+        //
+        //      let %c = <CONDITION>;
+        //      switch %c,          // value to switch on
+        //          %breakLabel,    // join point (and break target)
+        //          %s1,            // default label
+        //          %v0,            // first case value
+        //          %s0,            // first case label
+        //          %v1,            // second case value
+        //          %s1             // second case label
+        //  s0:
+        //      <S0>
+        //      break %breakLabel
+        //  s1:
+        //      <S1>
+        //      break %breakLabel
+        //  breakLabel:
+        //
+
+        // First emit code to compute the condition:
+        auto conditionVal = getSimpleVal(context, lowerRValueExpr(context, stmt->condition));
+
+        // Remember the initial block so that we can add to it
+        // after we've collected all the `case`s
+        auto initialBlock = builder->curBlock;
+
+        // Next, create a block to use as the target for any `break` statements
+        auto breakLabel = createBlock();
+
+        // Register the `break` label so
+        // that we can find it for nested statements.
+        context->shared->breakLabels.Add(stmt, breakLabel);
+
+        builder->curFunc = initialBlock->parentFunc;
+        builder->curBlock = nullptr;
+
+        // Iterate over the body of the statement, looking
+        // for `case` or `default` statements:
+        SwitchStmtInfo info;
+        info.defaultLabel = nullptr;
+        lowerSwitchCases(stmt->body, &info);
+
+        // TODO: once we've discovered the cases, we should
+        // be able to make a quick pass over the list and eliminate
+        // any cases that have the exact same label as the `default`
+        // case, since these don't actually need to be represented.
+
+        // If the current block (the end of the last
+        // `case`) is not terminated, then terminate with a
+        // `break` operation.
+        //
+        // Double check that we aren't in the initial
+        // block, so we don't get tripped up on an
+        // empty `switch`.
+        if(builder->curBlock != initialBlock)
+        {
+            // Is the block already terminated?
+            auto lastInst = builder->curBlock->lastInst;
+            if(!lastInst || !isTerminatorInst(lastInst))
+            {
+                // Not terminated, so add one.
+                builder->emitBreak(breakLabel);
+            }
+        }
+
+        // If there was no `default` statement, then the
+        // default case will just branch directly to the end.
+        auto defaultLabel = info.defaultLabel ? info.defaultLabel : breakLabel;
+
+        // Now that we've collected the cases, we are
+        // prepared to emit the `switch` instruction
+        // itself.
+        builder->curBlock = initialBlock;
+        builder->emitSwitch(
+            conditionVal,
+            breakLabel,
+            defaultLabel,
+            info.cases.Count(),
+            info.cases.Buffer());
+
+        // Finally we insert the label that a `break` will jump to
+        // (and that control flow will fall through to otherwise).
+        // This is the block that subsequent code will go into.
+        insertBlock(breakLabel);
     }
 };
 
