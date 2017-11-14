@@ -19,6 +19,7 @@ int test(int inVal)
 		break;
 
 	case 4:
+		{}
 		break;		
 
 	default:

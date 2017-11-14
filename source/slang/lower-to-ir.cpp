@@ -1622,9 +1622,24 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
     IRBuilder* getBuilder() { return context->irBuilder; }
 
-    void visitStmt(Stmt* /*stmt*/)
+    void visitEmptyStmt(EmptyStmt*)
     {
-        SLANG_UNIMPLEMENTED_X("stmt catch-all");
+        // Nothing to do.
+    }
+
+    void visitUnparsedStmt(UnparsedStmt*)
+    {
+        SLANG_UNEXPECTED("UnparsedStmt not supported by IR");
+    }
+
+    void visitCaseStmtBase(CaseStmtBase*)
+    {
+        SLANG_UNEXPECTED("`case` or `default` not under `switch`");
+    }
+
+    void visitCompileTimeForStmt(CompileTimeForStmt*)
+    {
+        SLANG_UNIMPLEMENTED_X("IR lowering of CompileTimeForStmt");
     }
 
     // Create a basic block in the current function,

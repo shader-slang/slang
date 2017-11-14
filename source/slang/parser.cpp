@@ -2973,6 +2973,12 @@ namespace Slang
         }
         PopScope();
 
+        if(!body)
+        {
+            body = new EmptyStmt();
+            body->loc = blockStatement->loc;
+        }
+
         blockStatement->body = body;
         return blockStatement;
     }
