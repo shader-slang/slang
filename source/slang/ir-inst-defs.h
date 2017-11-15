@@ -184,6 +184,7 @@ INST(loopTest, loopTest, 3, 0)
 INST(switch, switch, 3, 0)
 
 INST(discard, discard, 0, 0)
+INST(unreachable, unreachable, 0, 0)
 
 INST(Add, add, 2, 0)
 INST(Sub, sub, 2, 0)

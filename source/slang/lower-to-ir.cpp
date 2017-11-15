@@ -3242,8 +3242,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     // this by putting an `unreachable` terminator here,
                     // and then emit a dataflow error if this block
                     // can't be eliminated.
-                    SLANG_UNEXPECTED("Needed a return here");
-                    UNREACHABLE(subContext->irBuilder->emitReturn());
+                    subContext->irBuilder->emitUnreachable();
                 }
             }
         }

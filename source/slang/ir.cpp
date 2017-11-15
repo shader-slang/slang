@@ -168,6 +168,7 @@ namespace Slang
         case kIROp_loopTest:
         case kIROp_discard:
         case kIROp_switch:
+        case kIROp_unreachable:
             return true;
         }
     }
@@ -1147,6 +1148,16 @@ namespace Slang
         auto inst = createInst<IRReturnVoid>(
             this,
             kIROp_ReturnVoid,
+            nullptr);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitUnreachable()
+    {
+        auto inst = createInst<IRUnreachable>(
+            this,
+            kIROp_unreachable,
             nullptr);
         addInst(inst);
         return inst;
@@ -3457,6 +3468,14 @@ namespace Slang
         return clonedFunc;
     }
 
+    IRFunc* cloneSimpleFuncWithoutRegistering(IRSpecContextBase* context, IRFunc* originalFunc)
+    {
+        auto clonedFunc = context->builder->createFunc();
+        cloneFunctionCommon(context, clonedFunc, originalFunc);
+        return clonedFunc;
+    }
+
+
     IRFunc* cloneSimpleFunc(IRSpecContextBase* context, IRFunc* originalFunc)
     {
         auto clonedFunc = context->builder->createFunc();
@@ -4017,7 +4036,7 @@ namespace Slang
 
         // TODO: other initialization is needed here...
 
-        auto specFunc = cloneSimpleFunc(&context, genericFunc);
+        auto specFunc = cloneSimpleFuncWithoutRegistering(&context, genericFunc);
 
         // Set up the clone to recognize that it is no longer generic
         specFunc->mangledName = specMangledName;

@@ -164,6 +164,13 @@ namespace Slang
             // parameter are they at the specified depth).
             emitName(context, genericParamIntVal->declRef.GetName());
         }
+        else if( auto constantIntVal = dynamic_cast<ConstantIntVal*>(val) )
+        {
+            // TODO: need to figure out what prefix/suffix is needed
+            // to allow demangling later.
+            emitRaw(context, "k");
+            emit(context, (UInt) constantIntVal->value);
+        }
         else
         {
             SLANG_UNEXPECTED("unimplemented case in mangling");
@@ -277,11 +284,13 @@ namespace Slang
         //
         if( auto callableDeclRef = declRef.As<CallableDecl>())
         {
-            emitRaw(context, "p");
-
             auto parameters = GetParameters(callableDeclRef);
             UInt parameterCount = parameters.Count();
+
+            emitRaw(context, "p");
             emit(context, parameterCount);
+            emitRaw(context, "p");
+
             for(auto paramDeclRef : parameters)
             {
                 emitType(context, GetType(paramDeclRef));

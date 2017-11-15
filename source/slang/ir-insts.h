@@ -138,6 +138,13 @@ struct IRReturnVoid : IRReturn
 struct IRDiscard : IRTerminatorInst
 {};
 
+// Signals that this point in the code should be unreachable.
+// We can/should emit a dataflow error if we can ever determine
+// that a block ending in one of these can actually be
+// executed.
+struct IRUnreachable : IRTerminatorInst
+{};
+
 struct IRBlock;
 
 struct IRUnconditionalBranch : IRTerminatorInst
@@ -486,6 +493,8 @@ struct IRBuilder
     IRInst* emitReturn();
 
     IRInst* emitDiscard();
+
+    IRInst* emitUnreachable();
 
     IRInst* emitBranch(
         IRBlock*    block);
