@@ -4743,7 +4743,13 @@ emitDeclImpl(decl, nullptr);
             switch(peek())
             {
             case 'T':
+            case 'C':
                 get();
+                break;
+
+            case 'v':
+                get();
+                readType();
                 break;
 
             default:
@@ -4862,7 +4868,9 @@ emitDeclImpl(decl, nullptr);
         UInt readParamCount()
         {
             expect("p");
-            return readCount();
+            UInt count = readCount();
+            expect("p");
+            return count;
         }
     };
 
@@ -5436,6 +5444,9 @@ emitDeclImpl(decl, nullptr);
             {
             default:
                 SLANG_UNEXPECTED("terminator inst");
+                return;
+
+            case kIROp_unreachable:
                 return;
 
             case kIROp_ReturnVal:
