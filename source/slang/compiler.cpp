@@ -11,7 +11,7 @@
 #include "parser.h"
 #include "preprocessor.h"
 #include "syntax-visitors.h"
-
+#include "type-layout.h"
 #include "reflection.h"
 #include "emit.h"
 

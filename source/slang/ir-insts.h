@@ -394,6 +394,7 @@ struct IRBuilder
     IRFunc* createFunc();
     IRGlobalVar* createGlobalVar(
         IRType* valueType);
+    IRWitnessTable* createWitnessTable(Dictionary<DeclRef<Decl>, Decl*> & witnesses);
     IRWitnessTable* createWitnessTable();
     IRWitnessTableEntry* createWitnessTableEntry(
         IRWitnessTable* witnessTable,

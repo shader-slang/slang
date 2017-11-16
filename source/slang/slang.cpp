@@ -400,14 +400,16 @@ void CompileRequest::addTranslationUnitSourceFile(
 int CompileRequest::addEntryPoint(
     int                     translationUnitIndex,
     String const&           name,
-    Profile                 entryPointProfile)
+    Profile                 entryPointProfile,
+    List<String> const &    genericTypeNames)
 {
     RefPtr<EntryPointRequest> entryPoint = new EntryPointRequest();
     entryPoint->compileRequest = this;
     entryPoint->name = getNamePool()->getName(name);
     entryPoint->profile = entryPointProfile;
     entryPoint->translationUnitIndex = translationUnitIndex;
-
+    for (auto typeName : genericTypeNames)
+        entryPoint->genericParameterTypeNames.Add(getNamePool()->getName(typeName));
     auto translationUnit = translationUnits[translationUnitIndex].Ptr();
     translationUnit->entryPoints.Add(entryPoint);
 
@@ -909,7 +911,31 @@ SLANG_API int spAddEntryPoint(
     return req->addEntryPoint(
         translationUnitIndex,
         name,
-        Slang::Profile(Slang::Profile::RawVal(profile)));
+        Slang::Profile(Slang::Profile::RawVal(profile)),
+        Slang::List<Slang::String>());
+}
+
+SLANG_API int spAddEntryPointEx(
+    SlangCompileRequest*    request,
+    int                     translationUnitIndex,
+    char const*             name,
+    SlangProfileID          profile,
+    int                     genericParamTypeNameCount,
+    char const **           genericParamTypeNames)
+{
+    if (!request) return -1;
+    auto req = REQ(request);
+    if (!name) return -1;
+    if (translationUnitIndex < 0) return -1;
+    if (Slang::UInt(translationUnitIndex) >= req->translationUnits.Count()) return -1;
+    Slang::List<Slang::String> typeNames;
+    for (int i = 0; i < genericParamTypeNameCount; i++)
+        typeNames.Add(genericParamTypeNames[i]);
+    return req->addEntryPoint(
+        translationUnitIndex,
+        name,
+        Slang::Profile(Slang::Profile::RawVal(profile)),
+        typeNames);
 }
 
 

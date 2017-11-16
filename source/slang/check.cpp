@@ -148,7 +148,6 @@ namespace Slang
                 return expr->type->As<DeclRefType>();
         }
 
-
         RefPtr<Expr> ConstructDeclRefExpr(
             DeclRef<Decl>   declRef,
             RefPtr<Expr>    baseExpr,
@@ -1998,6 +1997,22 @@ namespace Slang
             decl->SetCheckState(DeclCheckState::Checked);
         }
 
+        void visitGlobalGenericParamDecl(GlobalGenericParamDecl * decl)
+        {
+            if (decl->IsChecked(DeclCheckState::Checked)) return;
+            decl->SetCheckState(DeclCheckState::CheckedHeader);
+            // global generic param only allowed in global scope
+            auto program = decl->ParentDecl->As<ModuleDecl>();
+            if (!program)
+                getSink()->diagnose(decl, Slang::Diagnostics::globalGenParamInGlobalScopeOnly);
+            // Now check all of the member declarations.
+            for (auto member : decl->Members)
+            {
+                checkDecl(member);
+            }
+            decl->SetCheckState(DeclCheckState::Checked);
+        }
+
         void visitAssocTypeDecl(AssocTypeDecl* decl)
         {
             if (decl->IsChecked(DeclCheckState::Checked)) return;
@@ -3699,6 +3714,19 @@ namespace Slang
                         breadcrumb.declRef = inheritanceDeclRef;
 
                         if(doesTypeConformToInterfaceImpl(originalType, inheritedType, interfaceDeclRef, outWitness, &breadcrumb))
+                        {
+                            return true;
+                        }
+                    }
+                    // if an inheritance decl is not found, try to find a GenericTypeConstraintDecl
+                    for (auto genConstraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(aggTypeDeclRef))
+                    {
+                        EnsureDecl(genConstraintDeclRef.getDecl());
+                        auto inheritedType = GetSup(genConstraintDeclRef);
+                        TypeWitnessBreadcrumb breadcrumb;
+                        breadcrumb.prev = inBreadcrumbs;
+                        breadcrumb.declRef = genConstraintDeclRef;
+                        if (doesTypeConformToInterfaceImpl(originalType, inheritedType, interfaceDeclRef, outWitness, &breadcrumb))
                         {
                             return true;
                         }
@@ -6582,6 +6610,63 @@ namespace Slang
         // that we don't have to re-do this effort again later.
         entryPoint->decl = entryPointFuncDecl;
 
+        // Lookup generic parameter types in global scope
+        for (auto name : entryPoint->genericParameterTypeNames)
+        {
+            if (!translationUnitSyntax->memberDictionary.TryGetValue(name, firstDeclWithName))
+            {
+                // If there doesn't appear to be any such declaration, then
+                // we need to diagnose it as an error, and then bail out.
+                sink->diagnose(translationUnitSyntax, Diagnostics::entryPointTypeParameterNotFound, name);
+                return;
+            }
+            RefPtr<Type> type;
+            if (auto aggType = firstDeclWithName->As<AggTypeDecl>())
+            {
+                type = DeclRefType::Create(entryPoint->compileRequest->mSession, DeclRef<Decl>(aggType, nullptr));
+            }
+            else if (auto typeDefDecl = firstDeclWithName->As<TypeDefDecl>())
+            {
+                type = GetType(DeclRef<TypeDefDecl>(typeDefDecl, nullptr));
+            }
+            else
+            {
+                sink->diagnose(firstDeclWithName, Diagnostics::entryPointTypeSymbolNotAType, name);
+                return;
+            }
+            entryPoint->genericParameterTypes.Add(type);
+        }
+        // check that user-provioded type arguments conforms to the generic type
+        // parameter declaration of this translation unit
+        auto globalGenParams = translationUnitSyntax->getMembersOfType<GlobalGenericParamDecl>();
+        if (globalGenParams.Count() != entryPoint->genericParameterTypes.Count())
+        {
+            sink->diagnose(entryPoint->decl, Diagnostics::mismatchEntryPointTypeArgument, globalGenParams.Count(),
+                    entryPoint->genericParameterTypes.Count());
+            return;
+        }
+        // if number of entry-point type arguments matches parameters, try find
+        // SubtypeWitness for each argument
+        int index = 0;
+        for (auto & gParam : globalGenParams)
+        {
+            for (auto constraint : gParam->getMembersOfType<GenericTypeConstraintDecl>())
+            {
+                auto interfaceType = GetSup(DeclRef<GenericTypeConstraintDecl>(constraint, nullptr));
+                SemanticsVisitor visitor(sink, entryPoint->compileRequest, translationUnit);
+                auto witness = visitor.tryGetSubtypeWitness(entryPoint->genericParameterTypes[index], interfaceType);
+                if (!witness)
+                {
+                    sink->diagnose(gParam,
+                        Diagnostics::typeArgumentDoesNotConformToInterface, gParam->nameAndLoc.name, entryPoint->genericParameterTypes[index],
+                        interfaceType);
+                }
+                entryPoint->genericParameterWitnesses.Add(witness);
+            }
+            index++;
+        }
+        if (sink->errorCount != 0)
+            return;
         // TODO: after all that work, we are now in a position to start
         // validating the declaration itself. E.g., we should check if
         // the declared input/output parameters have suitable semantics,

@@ -1073,7 +1073,7 @@ namespace Slang
     {
         return declRef.Substitute(declRef.getDecl()->base.type);
     }
-
+    
     inline RefPtr<Type> GetType(DeclRef<TypeDefDecl> const& declRef)
     {
         return declRef.Substitute(declRef.getDecl()->type.Ptr());

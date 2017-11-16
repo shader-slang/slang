@@ -2181,16 +2181,16 @@ namespace Slang
         assocTypeDecl->loc = nameToken.loc;
         if (AdvanceIf(parser, TokenType::Colon))
         {
-            while (!parser->tokenReader.IsAtEnd())
+            do
             {
-                auto paramConstraint = new GenericTypeConstraintDecl();
+                RefPtr<GenericTypeConstraintDecl> paramConstraint = new GenericTypeConstraintDecl();
                 parser->FillPosition(paramConstraint);
 
-                auto paramType = DeclRefType::Create(
+                RefPtr<DeclRefType> paramType = DeclRefType::Create(
                     parser->getSession(),
                     DeclRef<Decl>(assocTypeDecl, nullptr));
 
-                auto paramTypeExpr = new SharedTypeExpr();
+                RefPtr<SharedTypeExpr> paramTypeExpr = new SharedTypeExpr();
                 paramTypeExpr->loc = assocTypeDecl->loc;
                 paramTypeExpr->base.type = paramType;
                 paramTypeExpr->type = QualType(getTypeType(paramType));
@@ -2199,12 +2199,42 @@ namespace Slang
                 paramConstraint->sup = parser->ParseTypeExp();
 
                 AddMember(assocTypeDecl, paramConstraint);
-                if (!AdvanceIf(parser, TokenType::Comma))
-                    break;
-            }
+            } while (AdvanceIf(parser, TokenType::Comma));
         }
         parser->ReadToken(TokenType::Semicolon);
         return assocTypeDecl;
+    }
+
+    RefPtr<RefObject> ParseGlobalGenericParamDecl(Parser * parser, void *)
+    {
+        RefPtr<GlobalGenericParamDecl> genParamDecl = new GlobalGenericParamDecl();
+        auto nameToken = parser->ReadToken(TokenType::Identifier);
+        genParamDecl->nameAndLoc = NameLoc(nameToken);
+        genParamDecl->loc = nameToken.loc;
+        if (AdvanceIf(parser, TokenType::Colon))
+        {
+            do
+            {
+                RefPtr<GenericTypeConstraintDecl> paramConstraint = new GenericTypeConstraintDecl();
+                parser->FillPosition(paramConstraint);
+
+                RefPtr<DeclRefType> paramType = DeclRefType::Create(
+                    parser->getSession(),
+                    DeclRef<Decl>(genParamDecl, nullptr));
+
+                RefPtr<SharedTypeExpr> paramTypeExpr = new SharedTypeExpr();
+                paramTypeExpr->loc = genParamDecl->loc;
+                paramTypeExpr->base.type = paramType;
+                paramTypeExpr->type = QualType(getTypeType(paramType));
+
+                paramConstraint->sub = TypeExp(paramTypeExpr);
+                paramConstraint->sup = parser->ParseTypeExp();
+
+                AddMember(genParamDecl, paramConstraint);
+            } while (AdvanceIf(parser, TokenType::Comma));
+        }
+        parser->ReadToken(TokenType::Semicolon);
+        return genParamDecl;
     }
 
     static RefPtr<RefObject> parseInterfaceDecl(Parser* parser, void* /*userData*/)
@@ -4122,17 +4152,18 @@ namespace Slang
         // Add syntax for declaration keywords
     #define DECL(KEYWORD, CALLBACK) \
         addBuiltinSyntax<Decl>(session, scope, #KEYWORD, &CALLBACK)
-        DECL(typedef,       ParseTypeDef);
-        DECL(associatedtype,ParseAssocType);
-        DECL(cbuffer,       parseHLSLCBufferDecl);
-        DECL(tbuffer,       parseHLSLTBufferDecl);
-        DECL(__generic,     ParseGenericDecl);
-        DECL(__extension,   ParseExtensionDecl);
-        DECL(__init,        ParseConstructorDecl);
-        DECL(__subscript,   ParseSubscriptDecl);
-        DECL(interface,     parseInterfaceDecl);
-        DECL(syntax,        parseSyntaxDecl);
-        DECL(__import,      parseImportDecl);
+        DECL(typedef,         ParseTypeDef);
+        DECL(associatedtype,  ParseAssocType);
+        DECL(__generic_param, ParseGlobalGenericParamDecl);
+        DECL(cbuffer,         parseHLSLCBufferDecl);
+        DECL(tbuffer,         parseHLSLTBufferDecl);
+        DECL(__generic,       ParseGenericDecl);
+        DECL(__extension,     ParseExtensionDecl);
+        DECL(__init,          ParseConstructorDecl);
+        DECL(__subscript,     ParseSubscriptDecl);
+        DECL(interface,       parseInterfaceDecl);
+        DECL(syntax,          parseSyntaxDecl);
+        DECL(__import,        parseImportDecl);
 
     #undef DECL
 

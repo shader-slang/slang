@@ -3252,7 +3252,9 @@ static void lowerEntryPointToIR(
         // the entry point request.
         return;
     }
-
+    // we need to lower all global type arguments as well
+    for (auto arg : entryPointRequest->genericParameterTypes)
+        lowerType(context, arg);
     auto loweredEntryPointFunc = lowerDecl(context, entryPointFuncDecl);
 }
 

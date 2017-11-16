@@ -377,6 +377,18 @@ extern "C"
         char const*             name,
         SlangProfileID          profile);
 
+    /** Add an entry point in a particular translation unit,
+        with additional arguments that specify the concrete
+        type names for global generic type parameters.
+    */
+    SLANG_API int spAddEntryPointEx(
+        SlangCompileRequest*    request,
+        int                     translationUnitIndex,
+        char const*             name,
+        SlangProfileID          profile,
+        int                     genericTypeNameCount,
+        char const**            genericTypeNames);
+
     /** Execute the compilation request.
 
     Returns zero on success, non-zero on failure.
@@ -587,6 +599,9 @@ extern "C"
 
         // HLSL register `space`, Vulkan GLSL `set`
         SLANG_PARAMETER_CATEGORY_REGISTER_SPACE,
+
+        // A generic-typed entry-point parameter
+        SLANG_PARAMETER_CATEGORY_GENERIC,
 
         //
         SLANG_PARAMETER_CATEGORY_COUNT,
@@ -848,6 +863,7 @@ namespace slang
         SpecializationConstant = SLANG_PARAMETER_CATEGORY_SPECIALIZATION_CONSTANT,
         PushConstantBuffer = SLANG_PARAMETER_CATEGORY_PUSH_CONSTANT_BUFFER,
         RegisterSpace = SLANG_PARAMETER_CATEGORY_REGISTER_SPACE,
+        GenericResource = SLANG_PARAMETER_CATEGORY_GENERIC,
     };
 
     struct TypeLayoutReflection

@@ -667,6 +667,17 @@ static void collectGlobalScopeGLSLVaryingParameter(
 }
 
 // Collect a single declaration into our set of parameters
+static void collectGlobalGenericParameter(
+    ParameterBindingContext*    context,
+    RefPtr<GlobalGenericParamDecl>         paramDecl)
+{
+    RefPtr<GenericParamLayout> layout = new GenericParamLayout();
+    layout->decl = paramDecl;
+    layout->index = context->shared->programLayout->genericEntryPointParams.Count();
+    context->shared->programLayout->genericEntryPointParams.Add(layout);
+}
+
+// Collect a single declaration into our set of parameters
 static void collectGlobalScopeParameter(
     ParameterBindingContext*    context,
     RefPtr<VarDeclBase>         varDecl)
@@ -1093,15 +1104,22 @@ static void collectGlobalScopeParameters(
     ModuleDecl*          program)
 {
     // First enumerate parameters at global scope
-    for( auto decl : program->Members )
+    // We collect two things here:
+    // 1. A shader parameter, which is always a variable
+    // 2. A global entry-point generic parameter type (`__generic_param`),
+    //    which is a GlobalGenericParamDecl
+    // We collect global generic type parameters in the first pass,
+    // So we can fill in the correct index into ordinary type layouts 
+    // for generic types in the second pass.
+    for (auto decl : program->Members)
     {
-        // A shader parameter is always a variable,
-        // so skip declarations that aren't variables.
-        auto varDecl = decl.As<VarDeclBase>();
-        if (!varDecl)
-            continue;
-
-        collectGlobalScopeParameter(context, varDecl);
+        if (auto genParamDecl = decl.As<GlobalGenericParamDecl>())
+            collectGlobalGenericParameter(context, genParamDecl);
+    }
+    for (auto decl : program->Members)
+    {
+        if (auto varDecl = decl.As<VarDeclBase>())
+            collectGlobalScopeParameter(context, varDecl);
     }
 
     // Next, we need to enumerate the parameters of
@@ -1665,7 +1683,8 @@ void generateParameterBindings(
     if (!layoutContext.rules)
         return;
 
-    RefPtr<ProgramLayout> programLayout = new ProgramLayout;
+    RefPtr<ProgramLayout> programLayout = new ProgramLayout();
+    targetReq->layout = programLayout;
 
     // Create a context to hold shared state during the process
     // of generating parameter bindings
@@ -1680,7 +1699,6 @@ void generateParameterBindings(
     context.shared = &sharedContext;
     context.translationUnit = nullptr;
     context.layoutContext = layoutContext;
-
     // Walk through AST to discover all the parameters
     collectParameters(&context, compileReq);
 
@@ -1839,7 +1857,6 @@ void generateParameterBindings(
     // We now have a bunch of layout information, which we should
     // record into a suitable object that represents the program
     programLayout->globalScopeLayout = globalScopeLayout;
-    targetReq->layout = programLayout;
 }
 
 }

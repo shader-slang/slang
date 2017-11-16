@@ -220,7 +220,7 @@ typedef unsigned int VarLayoutFlags;
 enum VarLayoutFlag : VarLayoutFlags
 {
     IsRedeclaration = 1 << 0, ///< This is a redeclaration of some shader parameter
-    HasSemantic = 1 << 1,
+    HasSemantic = 1 << 1
 };
 
 // A reified layout for a particular variable, field, etc.
@@ -358,6 +358,13 @@ public:
     Dictionary<Decl*, RefPtr<VarLayout>> mapVarToLayout;
 };
 
+class GenericParamTypeLayout : public TypeLayout
+{
+public:
+    RefPtr<GlobalGenericParamDecl> decl;
+    int paramIndex = 0;
+};
+
 // Layout information for a single shader entry point
 // within a program
 //
@@ -386,6 +393,13 @@ public:
     unsigned flags = 0;
 };
 
+class GenericParamLayout : public Layout
+{
+public:
+    RefPtr<GlobalGenericParamDecl> decl;
+    int index;
+};
+
 // Layout information for the global scope of a program
 class ProgramLayout : public Layout
 {
@@ -409,6 +423,8 @@ public:
     // and any entry-point-specific parameter data
     // will (eventually) belong there...
     List<RefPtr<EntryPointLayout>> entryPoints;
+
+    List<RefPtr<GenericParamLayout>> genericEntryPointParams;
 
     // HACK: binding to use when we have to create
     // a dummy sampler just to appease glslang

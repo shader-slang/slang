@@ -3474,6 +3474,9 @@ struct EmitVisitor
             // ignore
             break;
 
+        case LayoutResourceKind::GenericResource:
+            // ignore
+            break;
         default:
             {
                 Emit(": register(");
