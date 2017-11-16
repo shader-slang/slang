@@ -646,7 +646,7 @@ struct TupleTypeBuilder
 
 };
 
-static RefPtr<Type> createBuitlinGenericType(
+static RefPtr<Type> createBuiltinGenericType(
     TypeLegalizationContext*    context,
     DeclRef<Decl> const&        typeDeclRef,
     RefPtr<Type>                elementType)
@@ -693,7 +693,7 @@ static LegalType createLegalUniformBufferType(
         {
             // Easy case: we just have a simple element type,
             // so we want to create a uniform buffer that wraps it.
-            return LegalType::simple(createBuitlinGenericType(
+            return LegalType::simple(createBuiltinGenericType(
                 context,
                 typeDeclRef,
                 legalElementType.getSimple()));
@@ -731,7 +731,7 @@ static LegalType createLegalUniformBufferType(
             // with an `implicitDeref`.
             auto pairType = legalElementType.getPair();
 
-            auto ordinaryType = createBuitlinGenericType(
+            auto ordinaryType = createBuiltinGenericType(
                 context,
                 typeDeclRef,
                 pairType->ordinaryType);
@@ -796,7 +796,7 @@ static LegalType createLegalPtrType(
         {
             // Easy case: we just have a simple element type,
             // so we want to create a uniform buffer that wraps it.
-            return LegalType::simple(createBuitlinGenericType(
+            return LegalType::simple(createBuiltinGenericType(
                 context,
                 typeDeclRef,
                 legalValueType.getSimple()));
@@ -831,7 +831,7 @@ static LegalType createLegalPtrType(
             // We just need to pointer-ify both sides of the pair.
             auto pairType = legalValueType.getPair();
 
-            auto ordinaryType = createBuitlinGenericType(
+            auto ordinaryType = createBuiltinGenericType(
                 context,
                 typeDeclRef,
                 pairType->ordinaryType);
