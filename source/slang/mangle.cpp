@@ -24,6 +24,13 @@ namespace Slang
         context->sb.append(value);
     }
 
+    void emit(
+        ManglingContext*    context,
+        String const&       value)
+    {
+        context->sb.append(value);
+    }
+
     void emitName(
         ManglingContext*    context,
         Name*               name)
@@ -116,6 +123,14 @@ namespace Slang
         else if( auto declRefType = dynamic_cast<DeclRefType*>(type) )
         {
             emitQualifiedName(context, declRefType->declRef);
+        }
+        else if (auto tupleType = dynamic_cast<FilteredTupleType*>(type))
+        {
+            // TODO: this doesn't handle the possibility of multiple different
+            // filtered versions of the same type...
+            emitRaw(context, "t");
+            emitType(context, tupleType->originalType);
+            emitRaw(context, "_");
         }
         else
         {
@@ -397,5 +412,13 @@ namespace Slang
         emitType(&context, sup);
         return context.sb.ProduceString();
     }
+
+    String getMangledTypeName(Type* type)
+    {
+        ManglingContext context;
+        emitType(&context, type);
+        return context.sb.ProduceString();
+    }
+
 
 }

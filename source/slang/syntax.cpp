@@ -1713,4 +1713,117 @@ void Type::accept(IValVisitor* visitor, void* extra)
         return nullptr;
     }
 
+    // FilteredTupleType
+
+    String FilteredTupleType::ToString()
+    {
+        StringBuilder sb;
+        sb.append(originalType->ToString());
+        sb.append("{");
+        bool first = true;
+        for (auto ee : elements)
+        {
+            if (!ee.type)
+                continue;
+
+            if (!first) sb.append(", ");
+
+            sb.append(ee.fieldDeclRef.GetName()->text);
+            sb.append(":");
+            sb.append(ee.type->ToString());
+
+            first = false;
+        }
+        sb.append("}");
+        return sb.ProduceString();
+    }
+
+    RefPtr<Val> FilteredTupleType::SubstituteImpl(Substitutions* subst, int* ioDiff)
+    {
+        int diff = 0;
+        auto substOriginalType = originalType->SubstituteImpl(subst, &diff).As<Type>();
+
+        List<Element> substElements;
+        for (auto ee : elements)
+        {
+            Element substElement;
+            substElement.fieldDeclRef = ee.fieldDeclRef.SubstituteImpl(subst, &diff);
+            substElement.type = ee.type->SubstituteImpl(subst, &diff).As<Type>();
+            substElements.Add(substElement);
+        }
+
+        if (!diff)
+            return this;
+
+        (*ioDiff)++;
+        RefPtr<FilteredTupleType> substType = new FilteredTupleType();
+        substType->setSession(session);
+        substType->originalType = substOriginalType;
+        substType->elements = substElements;
+        return substType;
+    }
+
+    bool FilteredTupleType::EqualsImpl(Type * type)
+    {
+        auto tupleType = type->As<FilteredTupleType>();
+        if (!tupleType)
+            return false;
+
+        if (!originalType->Equals(tupleType->originalType))
+            return false;
+
+        auto elementCount = elements.Count();
+        if (tupleType->elements.Count() != elementCount)
+            return false;
+
+        for (UInt ee = 0; ee < elementCount; ee++)
+        {
+            if (!elements[ee].type || !tupleType->elements[ee].type)
+            {
+                if (!elements[ee].type != !tupleType->elements[ee].type)
+                    return false;
+
+                continue;
+            }
+
+            if (!elements[ee].fieldDeclRef.Equals(tupleType->elements[ee].fieldDeclRef))
+                return false;
+
+            if (!elements[ee].type->Equals(tupleType->elements[ee].type))
+                return false;
+        }
+        return true;
+    }
+
+    int FilteredTupleType::GetHashCode()
+    {
+        int hash = (int)(typeid(this).hash_code());
+        hash = combineHash(hash,
+            originalType->GetHashCode());
+        for (auto ee : elements)
+        {
+            hash = combineHash(hash,
+                ee.fieldDeclRef.GetHashCode());
+            hash = combineHash(hash,
+                ee.type->GetHashCode());
+        }
+        return hash;
+    }
+
+    Type* FilteredTupleType::CreateCanonicalType()
+    {
+        RefPtr<FilteredTupleType> canTupleType = new FilteredTupleType();
+        canTupleType->setSession(session);
+        canTupleType->originalType = originalType->GetCanonicalType();
+        for (auto ee : elements)
+        {
+            Element element;
+            element.fieldDeclRef = ee.fieldDeclRef;
+            element.type = ee.type ? ee.type->GetCanonicalType() : nullptr;
+
+            canTupleType->elements.Add(element);
+        }
+        getSession()->canonicalTypes.Add(canTupleType);
+        return canTupleType;
+    }
 }
