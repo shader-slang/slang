@@ -195,6 +195,38 @@ SYNTAX_CLASS(ThisTypeSubstitution, Substitutions)
         return sourceType->GetHashCode();
     }
     )
+    END_SYNTAX_CLASS()
+
+SYNTAX_CLASS(GlobalGenericParamSubstitution, Substitutions)
+    // the __generic_param decl to be substituted
+    DECL_FIELD(GlobalGenericParamDecl*, paramDecl)
+    // the actual type to substitute in
+    SYNTAX_FIELD(RefPtr<Val>, actualType)
+
+RAW(
+    // Apply a set of substitutions to the bindings in this substitution
+    virtual RefPtr<Substitutions> SubstituteImpl(Substitutions* subst, int* ioDiff) override;
+
+    // Check if these are equivalent substitutiosn to another set
+    virtual bool Equals(Substitutions* subst) override;
+    virtual bool operator == (const Substitutions & subst) override
+    {
+        return Equals(const_cast<Substitutions*>(&subst));
+    }
+    virtual int GetHashCode() const override
+    {
+        int rs = actualType->GetHashCode();
+        for (auto && v : witnessTables)
+        {
+            rs = combineHash(rs, v.Key->GetHashCode());
+            rs = combineHash(rs, v.Value->GetHashCode());
+        }
+        return rs;
+    }
+    typedef List<KeyValuePair<RefPtr<Type>, RefPtr<Val>>> WitnessTableLookupTable;
+)
+    // The witness tables for each interface this actual type implements
+    SYNTAX_FIELD(WitnessTableLookupTable, witnessTables)
 END_SYNTAX_CLASS()
 
 ABSTRACT_SYNTAX_CLASS(SyntaxNode, SyntaxNodeBase)

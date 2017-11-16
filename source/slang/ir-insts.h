@@ -419,6 +419,7 @@ struct IRBuilder
     IRFunc* createFunc();
     IRGlobalVar* createGlobalVar(
         IRType* valueType);
+    IRWitnessTable* createWitnessTable(Dictionary<DeclRef<Decl>, Decl*> & witnesses);
     IRWitnessTable* createWitnessTable();
     IRWitnessTableEntry* createWitnessTableEntry(
         IRWitnessTable* witnessTable,
@@ -565,7 +566,8 @@ struct IRBuilder
 IRModule* specializeIRForEntryPoint(
     EntryPointRequest*  entryPointRequest,
     ProgramLayout*      programLayout,
-    CodeGenTarget       target);
+    CodeGenTarget       target,
+    TargetRequest*      targetReq);
 
 // Find suitable uses of the `specialize` instruction that
 // can be replaced with references to specialized functions.

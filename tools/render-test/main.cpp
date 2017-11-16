@@ -117,6 +117,7 @@ Error initializeShaders(
 		compileRequest.computeShader.name = computeEntryPointName;
 		compileRequest.computeShader.profile = computeProfileName;
 	}
+    compileRequest.entryPointTypeArguments = gShaderInputLayout.globalTypeArguments;
     gShaderProgram = shaderCompiler->compileProgram(compileRequest);
     if( !gShaderProgram )
     {

@@ -1222,6 +1222,11 @@ SimpleLayoutInfo GetLayoutImpl(
     return GetLayoutImpl(subContext, type, outTypeLayout, SimpleLayoutInfo());
 }
 
+int findGenericParam(List<RefPtr<GenericParamLayout>> & genericParameters, GlobalGenericParamDecl * decl)
+{
+    return (int)genericParameters.FindFirst([=](RefPtr<GenericParamLayout> & x) {return x->decl.Ptr() == decl; });
+}
+
 SimpleLayoutInfo GetLayoutImpl(
     TypeLayoutContext const&    context,
     Type*                       type,
@@ -1597,6 +1602,26 @@ SimpleLayoutInfo GetLayoutImpl(
                 typeLayout->addResourceUsage(LayoutResourceKind::Uniform, info.size);
             }
 
+            return info;
+        }
+        else if (auto globalGenParam = declRef.As<GlobalGenericParamDecl>())
+        {
+            SimpleLayoutInfo info;
+            info.alignment = 0;
+            info.size = 0;
+            info.kind = LayoutResourceKind::GenericResource;
+            if (outTypeLayout)
+            {
+                auto genParamTypeLayout = new GenericParamTypeLayout();
+                genParamTypeLayout->decl = globalGenParam.getDecl();
+                // we should have already populated ProgramLayout::genericEntryPointParams list at this point,
+                // so we can find the index of this generic param decl in the list
+                genParamTypeLayout->paramIndex = findGenericParam(context.targetReq->layout->genericEntryPointParams, genParamTypeLayout->decl);
+                genParamTypeLayout->type = type;
+                genParamTypeLayout->rules = rules;
+                genParamTypeLayout->findOrAddResourceInfo(LayoutResourceKind::GenericResource)->count++;
+                *outTypeLayout = genParamTypeLayout;
+            }
             return info;
         }
     }
