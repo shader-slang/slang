@@ -960,6 +960,7 @@ namespace Slang
         if( !ptrType )
         {
             // Bad!
+            SLANG_ASSERT(ptrType);
             return nullptr;
         }
 

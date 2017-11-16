@@ -4,6 +4,7 @@
 #include "ir-insts.h"
 #include "lower.h"
 #include "lower-to-ir.h"
+#include "mangle.h"
 #include "name.h"
 #include "syntax.h"
 #include "type-layout.h"
@@ -99,6 +100,8 @@ struct SharedEmitContext
     HashSet<Decl*> irDeclsVisited;
 
     Dictionary<IRBlock*, IRBlock*> irMapContinueTargetToLoopHead;
+
+    HashSet<String> irTupleTypes;
 };
 
 struct EmitContext
@@ -1228,6 +1231,13 @@ struct EmitVisitor
     {
         Emit("groupshared ");
         emitTypeImpl(type->valueType, arg.declarator);
+    }
+
+    void visitFilteredTupleType(FilteredTupleType* type, TypeEmitArg const& arg)
+    {
+        auto declarator = arg.declarator;
+        emit(getMangledTypeName(type));
+        EmitDeclarator(declarator);
     }
 
     void EmitType(
@@ -4199,7 +4209,10 @@ emitDeclImpl(decl, nullptr);
                 return getText(reflectionNameMod->nameAndLoc.name);
             }
 
-            return getIRName(decl);
+            if ((context->shared->entryPoint->compileRequest->compileFlags & SLANG_COMPILE_FLAG_NO_MANGLING))
+            {
+                return getIRName(decl);
+            }
         }
 
         switch (inst->op)
@@ -6271,6 +6284,26 @@ emitDeclImpl(decl, nullptr);
                 }
             }
         }
+        else if (auto filteredTupleType = elementType->As<FilteredTupleType>())
+        {
+            auto structTypeLayout = typeLayout.As<StructTypeLayout>();
+            assert(structTypeLayout);
+
+            for (auto ee : filteredTupleType->elements)
+            {
+                RefPtr<VarLayout> fieldLayout;
+                structTypeLayout->mapVarToLayout.TryGetValue(ee.fieldDeclRef, fieldLayout);
+
+                emitIRVarModifiers(ctx, fieldLayout);
+
+                auto fieldType = ee.type;
+                emitIRType(ctx, fieldType, getIRName(ee.fieldDeclRef));
+
+                emitHLSLParameterGroupFieldLayoutSemantics(layout, fieldLayout);
+
+                emit(";\n");
+            }
+        }
         else
         {
             emit("/* unexpected */");
@@ -6586,6 +6619,43 @@ emitDeclImpl(decl, nullptr);
                 ensureStructDecl(ctx, structDeclRef);
             }
         }
+        else if (auto filteredTupleType = type->As<FilteredTupleType>())
+        {
+            // First, ensure that the element types are ready:
+            for (auto ee : filteredTupleType->elements)
+            {
+                if (ee.type)
+                {
+                    emitIRUsedType(ctx, ee.type);
+                }
+            }
+
+            // Now, we want to ensure we've emitted a
+            // matching `struct` type declaration.
+
+            String mangledName = getMangledTypeName(filteredTupleType);
+            if (!ctx->shared->irTupleTypes.Contains(mangledName))
+            {
+                ctx->shared->irTupleTypes.Add(mangledName);
+
+                // Emit the damn `struct` decl...
+
+                Emit("struct ");
+                emit(mangledName);
+                Emit("\n{\n");
+                for( auto ee : filteredTupleType->elements )
+                {
+                    if (!ee.type)
+                        continue;
+
+                    emitIRType(ctx, ee.type, getIRName(ee.fieldDeclRef));
+
+                    emit(";\n");
+                }
+                Emit("};\n");
+
+            }
+        }
         else
         {}
     }
@@ -6840,7 +6910,7 @@ String emitEntryPoint(
 
         // Debugging code for IR transformations...
 #if 0
-        fprintf(stderr, "###\n");
+        fprintf(stderr, "### SPECIALIZED:\n");
         dumpIR(lowered);
         fprintf(stderr, "###\n");
 #endif
@@ -6851,6 +6921,13 @@ String emitEntryPoint(
         // that are legal on the chosen target.
         // 
         legalizeTypes(lowered);
+
+        //  Debugging output of legalization
+#if 0
+        fprintf(stderr, "### LEGALIZED:\n");
+        dumpIR(lowered);
+        fprintf(stderr, "###\n");
+#endif
 
         // TODO: do we want to emit directly from IR, or translate the
         // IR back into AST for emission?

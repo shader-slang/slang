@@ -11,10 +11,13 @@ namespace Slang
     String getMangledName(Decl* decl);
     String getMangledName(DeclRef<Decl> const & declRef);
     String getMangledName(DeclRefBase const & declRef);
+
     String mangleSpecializedFuncName(String baseName, RefPtr<Substitutions> subst);
     String getMangledNameForConformanceWitness(
         Type* sub,
         Type* sup);
+
+    String getMangledTypeName(Type* type);
 }
 
 #endif
