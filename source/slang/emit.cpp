@@ -4209,7 +4209,10 @@ emitDeclImpl(decl, nullptr);
                 return getText(reflectionNameMod->nameAndLoc.name);
             }
 
-            return getIRName(decl);
+            if ((context->shared->entryPoint->compileRequest->compileFlags & SLANG_COMPILE_FLAG_NO_MANGLING))
+            {
+                return getIRName(decl);
+            }
         }
 
         switch (inst->op)

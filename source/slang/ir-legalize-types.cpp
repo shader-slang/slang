@@ -1660,59 +1660,75 @@ static LegalVal declareSimpleVar(
         }
     }
 
+    DeclRef<VarDeclBase> varDeclRef;
+    if (varChain)
+    {
+        varDeclRef = varChain->varLayout->varDecl;
+    }
+
+    IRBuilder* builder = context->builder;
+
+    IRValue*    irVar = nullptr;
+    LegalVal    legalVarVal;
+
     switch (op)
     {
     case kIROp_global_var:
         {
-            IRBuilder* builder = context->builder;
-
             auto globalVar = builder->createGlobalVar(type);
             globalVar->removeFromParent();
             globalVar->insertBefore(context->insertBeforeGlobal);
 
-            if (varLayout)
-            {
-                builder->addLayoutDecoration(globalVar, varLayout);
-            }
-
-            return LegalVal::simple(globalVar);
+            irVar = globalVar;
+            legalVarVal = LegalVal::simple(irVar);
         }
         break;
-    case kIROp_Var:
-    {
-        IRBuilder* builder = context->builder;
 
-        auto localVar = builder->emitVar(type);
-        localVar->removeFromParent();
-        localVar->insertBefore(context->insertBeforeLocalVar);
-        if (varLayout)
+    case kIROp_Var:
         {
-            builder->addLayoutDecoration(localVar, varLayout);
+            auto localVar = builder->emitVar(type);
+            localVar->removeFromParent();
+            localVar->insertBefore(context->insertBeforeLocalVar);
+
+            irVar = localVar;
+            legalVarVal = LegalVal::simple(irVar);
+
         }
-        return LegalVal::simple(localVar);
-    }
-    break;
+        break;
+
     case kIROp_Param:
         {
-            IRBuilder* builder = context->builder;
             auto param = builder->emitParam(type);
             if (context->insertBeforeParam->prevParam)
                 context->insertBeforeParam->prevParam->nextParam = param;
             param->prevParam = context->insertBeforeParam->prevParam;
             param->nextParam = context->insertBeforeParam;
             context->insertBeforeParam->prevParam = param;
-            if (varLayout)
-            {
-                builder->addLayoutDecoration(param, varLayout);
-            }
 
-            return LegalVal::simple(param);
+            irVar = param;
+            legalVarVal = LegalVal::simple(irVar);
         }
         break;
+
     default:
         SLANG_UNEXPECTED("unexpected IR opcode");
         break;
     }
+
+    if (irVar)
+    {
+        if (varLayout)
+        {
+            builder->addLayoutDecoration(irVar, varLayout);
+        }
+
+        if (varDeclRef)
+        {
+            builder->addHighLevelDeclDecoration(irVar, varDeclRef.getDecl());
+        }
+    }
+
+    return legalVarVal;
 }
 
 static RefPtr<TypeLayout> getDerefTypeLayout(
