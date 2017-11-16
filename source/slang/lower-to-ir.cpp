@@ -1637,9 +1637,37 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         SLANG_UNEXPECTED("`case` or `default` not under `switch`");
     }
 
-    void visitCompileTimeForStmt(CompileTimeForStmt*)
+    void visitCompileTimeForStmt(CompileTimeForStmt* stmt)
     {
-        SLANG_UNIMPLEMENTED_X("IR lowering of CompileTimeForStmt");
+        // The user is asking us to emit code for the loop
+        // body for each value in the given integer range.
+        // For now, we will handle this by repeatedly lowering
+        // the body statement, with the loop variable bound
+        // to a different integer literal value each time.
+        //
+        // TODO: eventually we might handle this as just an
+        // ordinary loop, with an `[unroll]` attribute on
+        // it that we would respect.
+
+        auto rangeBeginVal = GetIntVal(stmt->rangeBeginVal);
+        auto rangeEndVal = GetIntVal(stmt->rangeEndVal);
+
+        if (rangeBeginVal >= rangeEndVal)
+            return;
+
+        auto varDecl = stmt->varDecl;
+        auto varType = varDecl->type;
+
+        for (IntegerLiteralValue ii = rangeBeginVal; ii < rangeEndVal; ++ii)
+        {
+            auto constVal = getBuilder()->getIntValue(
+                varType,
+                ii);
+
+            context->shared->declValues[varDecl] = LoweredValInfo::simple(constVal);
+
+            lowerStmt(context, stmt->body);
+        }
     }
 
     // Create a basic block in the current function,
@@ -2590,9 +2618,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // A global variable's SSA value is a *pointer* to
         // the underlying storage.
         auto globalVal = LoweredValInfo::ptr(irGlobal);
-        context->shared->declValues.Add(
-            DeclRef<VarDeclBase>(decl, nullptr),
-            globalVal);
+        context->shared->declValues[
+            DeclRef<VarDeclBase>(decl, nullptr)] = globalVal;
 
         if( auto initExpr = decl->initExpr )
         {
@@ -2667,9 +2694,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             assign(context, varVal, initVal);
         }
 
-        context->shared->declValues.Add(
-            DeclRef<VarDeclBase>(decl, nullptr),
-            varVal);
+        context->shared->declValues[
+            DeclRef<VarDeclBase>(decl, nullptr)] = varVal;
 
         return varVal;
     }
@@ -3214,7 +3240,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 if( auto paramDecl = paramInfo.decl )
                 {
                     DeclRef<VarDeclBase> paramDeclRef = makeDeclRef(paramDecl);
-                    subContext->shared->declValues.Add(paramDeclRef, paramVal);
+                    subContext->shared->declValues[paramDeclRef] = paramVal;
                 }
 
                 if (paramInfo.isThisParam)
