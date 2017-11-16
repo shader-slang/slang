@@ -5,11 +5,11 @@ ir_global_var @_SV01s	: Ptr<@ThreadGroup vector<float,4>[64]>;
 
 ir_global_var @_SV05input	: Ptr<StructuredBuffer<vector<float,4>>>;
 
-ir_func @_S031GroupMemoryBarrierWithGroupSyncp0V	: () -> void;
+ir_func @_S031GroupMemoryBarrierWithGroupSyncp0pV	: () -> void;
 
 ir_global_var @_SV06output	: Ptr<RWStructuredBuffer<vector<float,4>>>;
 
-ir_func @_S04mainp3uuuV	: (uint, uint, uint) -> void
+ir_func @_S04mainp3puuuV	: (uint, uint, uint) -> void
 {
 block %1(
 		param %2	: uint,
@@ -39,7 +39,7 @@ block %15:
 	loopTest(%20, %21, %16)
 
 block %21:
-	call(@_S031GroupMemoryBarrierWithGroupSyncp0V)
+	call(@_S031GroupMemoryBarrierWithGroupSyncp0pV)
 	let  %22	: uint	= load(%6)
 	let  %23	: Ptr<vector<float,4>>	= getElementPtr(@_SV01s, %22)
 	let  %24	: Ptr<vector<float,4>>	= var()
@@ -70,7 +70,7 @@ block %17:
 	unconditionalBranch(%15)
 
 block %16:
-	call(@_S031GroupMemoryBarrierWithGroupSyncp0V)
+	call(@_S031GroupMemoryBarrierWithGroupSyncp0pV)
 	let  %40	: RWStructuredBuffer<vector<float,4>>	= load(@_SV06output)
 	let  %41	: uint	= load(%5)
 	let  %42	: Ptr<vector<float,4>>	= getElementPtr(@_SV01s, 0)

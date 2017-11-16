@@ -24,6 +24,13 @@ namespace Slang
         context->sb.append(value);
     }
 
+    void emit(
+        ManglingContext*    context,
+        String const&       value)
+    {
+        context->sb.append(value);
+    }
+
     void emitName(
         ManglingContext*    context,
         Name*               name)
@@ -117,6 +124,14 @@ namespace Slang
         {
             emitQualifiedName(context, declRefType->declRef);
         }
+        else if (auto tupleType = dynamic_cast<FilteredTupleType*>(type))
+        {
+            // TODO: this doesn't handle the possibility of multiple different
+            // filtered versions of the same type...
+            emitRaw(context, "t");
+            emitType(context, tupleType->originalType);
+            emitRaw(context, "_");
+        }
         else
         {
             SLANG_UNEXPECTED("unimplemented case in mangling");
@@ -163,6 +178,13 @@ namespace Slang
             // "depth" (how many outer generics) and "index" (which
             // parameter are they at the specified depth).
             emitName(context, genericParamIntVal->declRef.GetName());
+        }
+        else if( auto constantIntVal = dynamic_cast<ConstantIntVal*>(val) )
+        {
+            // TODO: need to figure out what prefix/suffix is needed
+            // to allow demangling later.
+            emitRaw(context, "k");
+            emit(context, (UInt) constantIntVal->value);
         }
         else
         {
@@ -277,11 +299,13 @@ namespace Slang
         //
         if( auto callableDeclRef = declRef.As<CallableDecl>())
         {
-            emitRaw(context, "p");
-
             auto parameters = GetParameters(callableDeclRef);
             UInt parameterCount = parameters.Count();
+
+            emitRaw(context, "p");
             emit(context, parameterCount);
+            emitRaw(context, "p");
+
             for(auto paramDeclRef : parameters)
             {
                 emitType(context, GetType(paramDeclRef));
@@ -388,5 +412,13 @@ namespace Slang
         emitType(&context, sup);
         return context.sb.ProduceString();
     }
+
+    String getMangledTypeName(Type* type)
+    {
+        ManglingContext context;
+        emitType(&context, type);
+        return context.sb.ProduceString();
+    }
+
 
 }

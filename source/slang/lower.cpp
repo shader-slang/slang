@@ -778,6 +778,21 @@ struct LoweringVisitor
             translateDeclRef(DeclRef<Decl>(type->declRef)).As<TypeDefDecl>());
     }
 
+    RefPtr<Type> visitFilteredTupleType(FilteredTupleType* type)
+    {
+        RefPtr<FilteredTupleType> loweredType = new FilteredTupleType();
+        loweredType->setSession(type->getSession());
+        loweredType->originalType = lowerType(type->originalType);
+        for (auto ee : type->elements)
+        {
+            FilteredTupleType::Element element;
+            element.fieldDeclRef = ee.fieldDeclRef;
+            element.type = lowerType(ee.type);
+            loweredType->elements.Add(element);
+        }
+        return loweredType;
+    }
+
     RefPtr<Type> visitTypeType(TypeType* type)
     {
         return getTypeType(lowerType(type->type));

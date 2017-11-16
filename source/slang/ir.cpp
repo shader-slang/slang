@@ -167,6 +167,8 @@ namespace Slang
         case kIROp_ifElse:
         case kIROp_loopTest:
         case kIROp_discard:
+        case kIROp_switch:
+        case kIROp_unreachable:
             return true;
         }
     }
@@ -958,6 +960,7 @@ namespace Slang
         if( !ptrType )
         {
             // Bad!
+            SLANG_ASSERT(ptrType);
             return nullptr;
         }
 
@@ -1151,6 +1154,16 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitUnreachable()
+    {
+        auto inst = createInst<IRUnreachable>(
+            this,
+            kIROp_unreachable,
+            nullptr);
+        addInst(inst);
+        return inst;
+    }
+
     IRInst* IRBuilder::emitDiscard()
     {
         auto inst = createInst<IRDiscard>(
@@ -1285,6 +1298,28 @@ namespace Slang
             nullptr,
             argCount,
             args);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitSwitch(
+        IRValue*        val,
+        IRBlock*        breakLabel,
+        IRBlock*        defaultLabel,
+        UInt            caseArgCount,
+        IRValue* const* caseArgs)
+    {
+        IRValue* fixedArgs[] = { val, breakLabel, defaultLabel };
+        UInt fixedArgCount = sizeof(fixedArgs) / sizeof(fixedArgs[0]);
+
+        auto inst = createInstWithTrailingArgs<IRSwitch>(
+            this,
+            kIROp_switch,
+            nullptr,
+            fixedArgCount,
+            fixedArgs,
+            caseArgCount,
+            caseArgs);
         addInst(inst);
         return inst;
     }
@@ -3474,6 +3509,14 @@ namespace Slang
         return clonedFunc;
     }
 
+    IRFunc* cloneSimpleFuncWithoutRegistering(IRSpecContextBase* context, IRFunc* originalFunc)
+    {
+        auto clonedFunc = context->builder->createFunc();
+        cloneFunctionCommon(context, clonedFunc, originalFunc);
+        return clonedFunc;
+    }
+
+
     IRFunc* cloneSimpleFunc(IRSpecContextBase* context, IRFunc* originalFunc)
     {
         auto clonedFunc = context->builder->createFunc();
@@ -4089,7 +4132,7 @@ namespace Slang
 
         // TODO: other initialization is needed here...
 
-        auto specFunc = cloneSimpleFunc(&context, genericFunc);
+        auto specFunc = cloneSimpleFuncWithoutRegistering(&context, genericFunc);
 
         // Set up the clone to recognize that it is no longer generic
         specFunc->mangledName = specMangledName;

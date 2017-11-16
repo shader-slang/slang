@@ -43,6 +43,7 @@ namespace renderer_test {
 struct D3DBinding
 {
     ShaderInputType type;
+    InputBufferType bufferType; // Only valid if `type` is `Buffer`
     ID3D11ShaderResourceView * srv = nullptr;
     ID3D11UnorderedAccessView * uav = nullptr;
     ID3D11Buffer * buffer = nullptr;
@@ -776,7 +777,7 @@ public:
         if (bufferDesc.type == InputBufferType::ConstantBuffer)
         {
             desc.Usage = D3D11_USAGE_DEFAULT;
-            desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER | D3D11_BIND_SHADER_RESOURCE;
+            desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
         }
         else
         {
@@ -807,15 +808,18 @@ public:
             viewDesc.Format = DXGI_FORMAT_UNKNOWN;
             dxDevice->CreateUnorderedAccessView(bufferOut, &viewDesc, &viewOut);
         }
-        D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
-        memset(&srvDesc, 0, sizeof(srvDesc));
-        srvDesc.Buffer.FirstElement = 0;
-        srvDesc.Buffer.ElementWidth = elemSize;
-        srvDesc.Buffer.NumElements = (UINT)(bufferData.Count() * sizeof(unsigned int) / elemSize);
-        srvDesc.Buffer.ElementOffset = 0;
-        srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
-        srvDesc.Format = DXGI_FORMAT_UNKNOWN;
-        dxDevice->CreateShaderResourceView(bufferOut, &srvDesc, &srvOut);
+        if (bufferDesc.type != InputBufferType::ConstantBuffer)
+        {
+            D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
+            memset(&srvDesc, 0, sizeof(srvDesc));
+            srvDesc.Buffer.FirstElement = 0;
+            srvDesc.Buffer.ElementWidth = elemSize;
+            srvDesc.Buffer.NumElements = (UINT)(bufferData.Count() * sizeof(unsigned int) / elemSize);
+            srvDesc.Buffer.ElementOffset = 0;
+            srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
+            srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+            dxDevice->CreateShaderResourceView(bufferOut, &srvDesc, &srvOut);
+        }
     }
 
     void createInputTexture(const InputTextureDesc & inputDesc, ID3D11ShaderResourceView * &viewOut)
@@ -967,6 +971,7 @@ public:
             {
                 createInputBuffer(entry.bufferDesc, entry.bufferData, rsEntry.buffer, rsEntry.uav, rsEntry.srv);
                 rsEntry.bufferLength = (int)(entry.bufferData.Count() * sizeof(unsigned int));
+                rsEntry.bufferType = entry.bufferDesc.type;
             }
             break;
             case ShaderInputType::Texture:
@@ -998,7 +1003,17 @@ public:
         {
             if (binding.type == ShaderInputType::Buffer)
             {
-                if (binding.uav)
+                if (binding.bufferType == InputBufferType::ConstantBuffer)
+                {
+                    if (isCompute)
+                        dxContext->CSSetConstantBuffers(binding.binding, 1, &binding.buffer);
+                    else
+                    {
+                        dxContext->VSSetConstantBuffers(binding.binding, 1, &binding.buffer);
+                        dxContext->PSSetConstantBuffers(binding.binding, 1, &binding.buffer);
+                    }
+                }
+                else if (binding.uav)
                 {
                     if (isCompute)
                         dxContext->CSSetUnorderedAccessViews(binding.binding, 1, &binding.uav, nullptr);

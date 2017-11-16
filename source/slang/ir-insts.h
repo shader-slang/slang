@@ -138,6 +138,13 @@ struct IRReturnVoid : IRReturn
 struct IRDiscard : IRTerminatorInst
 {};
 
+// Signals that this point in the code should be unreachable.
+// We can/should emit a dataflow error if we can ever determine
+// that a block ending in one of these can actually be
+// executed.
+struct IRUnreachable : IRTerminatorInst
+{};
+
 struct IRBlock;
 
 struct IRUnconditionalBranch : IRTerminatorInst
@@ -207,6 +214,24 @@ struct IRIfElse : IRConditionalBranch
     IRUse afterBlock;
 
     IRBlock* getAfterBlock() { return (IRBlock*)afterBlock.usedValue; }
+};
+
+// A multi-way branch that represents a source-level `switch`
+struct IRSwitch : IRTerminatorInst
+{
+    IRUse condition;
+    IRUse breakLabel;
+    IRUse defaultLabel;
+
+    IRValue* getCondition() { return condition.usedValue; }
+    IRBlock* getBreakLabel() { return (IRBlock*) breakLabel.usedValue; }
+    IRBlock* getDefaultLabel() { return (IRBlock*) defaultLabel.usedValue; }
+
+    // remaining args are: caseVal, caseLabel, ...
+
+    UInt getCaseCount() { return (getArgCount() - 3) / 2; }
+    IRValue* getCaseValue(UInt index) { return            getArg(3 + index*2 + 0); }
+    IRBlock* getCaseLabel(UInt index) { return (IRBlock*) getArg(3 + index*2 + 1); }
 };
 
 struct IRSwizzle : IRReturn
@@ -470,6 +495,8 @@ struct IRBuilder
 
     IRInst* emitDiscard();
 
+    IRInst* emitUnreachable();
+
     IRInst* emitBranch(
         IRBlock*    block);
 
@@ -504,6 +531,14 @@ struct IRBuilder
         IRValue*    val,
         IRBlock*    bodyBlock,
         IRBlock*    breakBlock);
+
+    IRInst* emitSwitch(
+        IRValue*        val,
+        IRBlock*        breakLabel,
+        IRBlock*        defaultLabel,
+        UInt            caseArgCount,
+        IRValue* const* caseArgs);
+
 
     IRDecoration* addDecorationImpl(
         IRValue*        value,
