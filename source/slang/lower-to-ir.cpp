@@ -1118,7 +1118,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitInitializerListExpr(InitializerListExpr* expr)
     {
         // Allocate a temporary of the given type
-        auto type = lowerSimpleType(context, expr->type);
+        RefPtr<Type> type = lowerSimpleType(context, expr->type);
         LoweredValInfo val = createVar(context, type);
 
         UInt argCount = expr->args.Count();
@@ -1154,7 +1154,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         }
         else if (auto declRefType = type->As<DeclRefType>())
         {
-            auto declRef = declRefType->declRef;
+            DeclRef<Decl> declRef = declRefType->declRef;
             if (auto aggTypeDeclRef = declRef.As<AggTypeDecl>())
             {
                 UInt argCounter = 0;
