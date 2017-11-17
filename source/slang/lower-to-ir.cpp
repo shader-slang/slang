@@ -1115,9 +1115,87 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         return lowerSubExpr(expr->base);
     }
 
-    LoweredValInfo visitInitializerListExpr(InitializerListExpr* /*expr*/)
+    LoweredValInfo visitInitializerListExpr(InitializerListExpr* expr)
     {
-        SLANG_UNIMPLEMENTED_X("codegen for initializer list expression");
+        // Allocate a temporary of the given type
+        auto type = lowerSimpleType(context, expr->type);
+        LoweredValInfo val = createVar(context, type);
+
+        UInt argCount = expr->args.Count();
+
+        // Now for each argument in the initializer list,
+        // fill in the appropriate field of the result
+        if (auto arrayType = type->As<ArrayExpressionType>())
+        {
+            UInt elementCount = (UInt) GetIntVal(arrayType->ArrayLength);
+            auto elementType = lowerType(context, arrayType->baseType);
+            for (UInt ee = 0; ee < elementCount; ++ee)
+            {
+                IRValue* indexVal = context->irBuilder->getIntValue(
+                        getIntType(context),
+                        ee);
+                LoweredValInfo elemVal = subscriptValue(
+                    elementType,
+                    val,
+                    indexVal);
+
+                if (ee < argCount)
+                {
+                    auto argExpr = expr->args[ee];
+                    LoweredValInfo argVal = lowerRValueExpr(context, argExpr);
+
+                    assign(context, elemVal, argVal);
+                }
+                else
+                {
+                    SLANG_UNEXPECTED("need to default-initialize array elements");
+                }
+            }
+        }
+        else if (auto declRefType = type->As<DeclRefType>())
+        {
+            auto declRef = declRefType->declRef;
+            if (auto aggTypeDeclRef = declRef.As<AggTypeDecl>())
+            {
+                UInt argCounter = 0;
+                for (auto ff : getMembersOfType<StructField>(aggTypeDeclRef))
+                {
+                    if (ff.getDecl()->HasModifier<HLSLStaticModifier>())
+                        continue;
+
+                    auto loweredFieldType = lowerType(
+                        context,
+                        GetType(ff));
+                    LoweredValInfo fieldVal = extractField(
+                        loweredFieldType,
+                        val,
+                        ff);
+
+                    UInt argIndex = argCounter++;
+                    if (argIndex < argCount)
+                    {
+                        auto argExpr = expr->args[argIndex];
+                        LoweredValInfo argVal = lowerRValueExpr(context, argExpr);
+                        assign(context, fieldVal, argVal);
+                    }
+                    else
+                    {
+                        SLANG_UNEXPECTED("need to default-initialize struct fields");
+                    }
+                }
+            }
+            else
+            {
+                SLANG_UNEXPECTED("not sure how to initialize this type");
+            }
+        }
+        else
+        {
+            SLANG_UNEXPECTED("not sure how to initialize this type");
+        }
+
+
+        return val;
     }
 
     LoweredValInfo visitConstantExpr(ConstantExpr* expr)
