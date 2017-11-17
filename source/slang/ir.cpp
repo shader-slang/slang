@@ -3063,6 +3063,14 @@ namespace Slang
                 }
                 break;
 
+            case kIRDecorationOp_LoopControl:
+                {
+                    auto originalDecoration = (IRLoopControlDecoration*)dd;
+                    auto newDecoration = context->builder->addDecoration<IRLoopControlDecoration>(clonedValue);
+                    newDecoration->mode = originalDecoration->mode;
+                }
+                break;
+
             default:
                 // Don't clone any decorations we don't understand.
                 break;
