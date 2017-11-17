@@ -956,7 +956,7 @@ namespace Slang
     IRInst* IRBuilder::emitLoad(
         IRValue*    ptr)
     {
-        auto ptrType = ptr->getType()->As<PtrType>();
+        auto ptrType = ptr->getType()->As<PtrTypeBase>();
         if( !ptrType )
         {
             // Bad!
@@ -2849,12 +2849,10 @@ namespace Slang
                 builder.curBlock = firstBlock;
                 builder.insertBeforeInst = firstBlock->getFirstInst();
 
-                // TODO: We need to distinguish any true pointers in the
-                // user's code from pointers that only exist for
-                // parameter-passing. This `PtrType` here should actually
-                // be `OutTypeBase`, but I'm not confident that all
-                // the other code is handling that correctly...
-                if(auto paramPtrType = paramType->As<PtrType>() )
+                // Is the parameter type a special pointer type
+                // that indicates the parameter is used for `out`
+                // or `inout` access?
+                if(auto paramPtrType = paramType->As<OutTypeBase>() )
                 {
                     // Okay, we have the more interesting case here,
                     // where the parameter was being passed by reference.

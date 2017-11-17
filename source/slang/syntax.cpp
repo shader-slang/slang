@@ -279,19 +279,40 @@ void Type::accept(IValVisitor* visitor, void* extra)
     RefPtr<PtrType> Session::getPtrType(
         RefPtr<Type>    valueType)
     {
+        return getPtrType(valueType, "PtrType").As<PtrType>();
+    }
+
+        // Construct the type `Out<valueType>`
+    RefPtr<OutType> Session::getOutType(RefPtr<Type> valueType)
+    {
+        return getPtrType(valueType, "OutType").As<OutType>();
+    }
+
+    RefPtr<InOutType> Session::getInOutType(RefPtr<Type> valueType)
+    {
+        return getPtrType(valueType, "InOutType").As<InOutType>();
+    }
+
+    RefPtr<PtrTypeBase> Session::getPtrType(RefPtr<Type> valueType, char const* ptrTypeName)
+    {
         auto genericDecl = findMagicDecl(
-            this, "PtrType").As<GenericDecl>();
+            this, ptrTypeName).As<GenericDecl>();
+        return getPtrType(valueType, genericDecl);
+    }
+
+    RefPtr<PtrTypeBase> Session::getPtrType(RefPtr<Type> valueType, GenericDecl* genericDecl)
+    {
         auto typeDecl = genericDecl->inner;
-               
+
         auto substitutions = new GenericSubstitution();
-        substitutions->genericDecl = genericDecl.Ptr();
+        substitutions->genericDecl = genericDecl;
         substitutions->args.Add(valueType);
 
         auto declRef = DeclRef<Decl>(typeDecl.Ptr(), substitutions);
 
         return DeclRefType::Create(
             this,
-            declRef)->As<PtrType>();
+            declRef)->As<PtrTypeBase>();
     }
 
     RefPtr<ArrayExpressionType> Session::getArrayType(

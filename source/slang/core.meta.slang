@@ -101,6 +101,16 @@ __magic_type(PtrType)
 struct Ptr
 {};
 
+__generic<T>
+__magic_type(OutType)
+struct Out
+{};
+
+__generic<T>
+__magic_type(InOutType)
+struct InOut
+{};
+
 ${{{{
 
 

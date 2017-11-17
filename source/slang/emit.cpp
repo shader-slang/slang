@@ -5946,19 +5946,15 @@ emitDeclImpl(decl, nullptr);
         // encoded as a parameter of pointer type, so
         // we need to decode that here.
         //
-        if( auto ptrType = type->As<PtrType>() )
+        if( auto outType = type->As<OutType>() )
         {
-            // TODO: we need a way to distinguish `out`
-            // from `inout`. The easiest way to do
-            // that might be to have each be a distinct
-            // sub-case of `IRPtrType` - this would also
-            // ensure that they can be distinguished from
-            // real pointers when the user means to use
-            // them.
-
             emit("out ");
-
-            type = ptrType->getValueType();
+            type = outType->getValueType();
+        }
+        else if( auto inOutType = type->As<InOutType>() )
+        {
+            emit("inout ");
+            type = inOutType->getValueType();
         }
 
         emitIRType(ctx, type, name);
@@ -6595,7 +6591,7 @@ emitDeclImpl(decl, nullptr);
         {
             emitIRUsedType(ctx, genericType->elementType);
         }
-        else if( auto ptrType = type->As<PtrType>() )
+        else if( auto ptrType = type->As<PtrTypeBase>() )
         {
             emitIRUsedType(ctx, ptrType->getValueType());
         }

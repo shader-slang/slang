@@ -432,8 +432,23 @@ namespace Slang
         // Should not be used in front-end code
         Type* getIRBasicBlockType();
 
-        // Construct pointer types on-demand
+        // Construct the type `Ptr<valueType>`, where `Ptr`
+        // is looked up as a builtin type.
         RefPtr<PtrType> getPtrType(RefPtr<Type> valueType);
+
+        // Construct the type `Out<valueType>`
+        RefPtr<OutType> getOutType(RefPtr<Type> valueType);
+
+        // Construct the type `InOut<valueType>`
+        RefPtr<InOutType> getInOutType(RefPtr<Type> valueType);
+
+        // Construct a pointer type like `Ptr<valueType>`, but where
+        // the actual type name for the pointer type is given by `ptrTypeName`
+        RefPtr<PtrTypeBase> getPtrType(RefPtr<Type> valueType, char const* ptrTypeName);
+
+        // Construct a pointer type like `Ptr<valueType>`, but where
+        // the generic declaration for the pointer type is `genericDecl`
+        RefPtr<PtrTypeBase> getPtrType(RefPtr<Type> valueType, GenericDecl* genericDecl);
 
         RefPtr<ArrayExpressionType> getArrayType(
             Type*   elementType,
