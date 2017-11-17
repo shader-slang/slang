@@ -673,7 +673,7 @@ static void collectGlobalGenericParameter(
 {
     RefPtr<GenericParamLayout> layout = new GenericParamLayout();
     layout->decl = paramDecl;
-    layout->index = context->shared->programLayout->genericEntryPointParams.Count();
+    layout->index = (int)context->shared->programLayout->genericEntryPointParams.Count();
     context->shared->programLayout->genericEntryPointParams.Add(layout);
 }
 
@@ -1048,7 +1048,13 @@ static void completeBindingsForParameter(
 
             continue;
         }
-
+        else if (kind == LayoutResourceKind::GenericResource)
+        {
+            bindingInfo.space = (size_t)-1;
+            bindingInfo.count = 0;
+            bindingInfo.index = 0;
+            continue;
+        }
 
         // For now we only auto-generate bindings in space zero
         //
@@ -1074,6 +1080,11 @@ static void completeBindingsForParameter(
         bindingInfo.index = usedRangeSet->usedResourceRanges[(int)kind].Allocate(parameterInfo, (int) count);
 
         bindingInfo.space = space;
+    }
+
+    if (firstTypeLayout->FindResourceInfo(LayoutResourceKind::GenericResource))
+    {
+
     }
 
     // At this point we should have explicit binding locations chosen for
