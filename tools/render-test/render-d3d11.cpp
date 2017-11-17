@@ -455,10 +455,18 @@ public:
 		ID3D11Buffer * buffer = nullptr;
 	};
 
+    UInt RoundUpToAlignment(UInt size, UInt alignment)
+    {
+        if (size % alignment)
+            return (size / alignment + 1) * alignment;
+        else
+            return Math::Max(size, alignment);
+    }
+
     virtual Buffer* createBuffer(BufferDesc const& desc) override
     {
         D3D11_BUFFER_DESC dxBufferDesc = { 0 };
-        dxBufferDesc.ByteWidth = (UINT) desc.size;
+        dxBufferDesc.ByteWidth = (UINT)RoundUpToAlignment(desc.size, 256);
 
         switch( desc.flavor )
         {
@@ -773,7 +781,11 @@ public:
     {
         auto dxContext = dxImmediateContext;
         D3D11_BUFFER_DESC desc = {0};
-        desc.ByteWidth = (UINT)(bufferData.Count() * sizeof(unsigned int));
+        List<unsigned int> newBuffer;
+        desc.ByteWidth = (UINT)RoundUpToAlignment((bufferData.Count() * sizeof(unsigned int)), 256);
+        newBuffer.SetSize(desc.ByteWidth / sizeof(unsigned int));
+        for (UInt i = 0; i < bufferData.Count(); i++)
+            newBuffer[i] = bufferData[i];
         if (bufferDesc.type == InputBufferType::ConstantBuffer)
         {
             desc.Usage = D3D11_USAGE_DEFAULT;
@@ -794,7 +806,7 @@ public:
             }
         }
         D3D11_SUBRESOURCE_DATA data = {0};
-        data.pSysMem = bufferData.Buffer();
+        data.pSysMem = newBuffer.Buffer();
         dxDevice->CreateBuffer(&desc, &data, &bufferOut);
         int elemSize = bufferDesc.stride <= 0 ? 1 : bufferDesc.stride;
         if (bufferDesc.type == InputBufferType::StorageBuffer)
@@ -1091,7 +1103,7 @@ public:
                     D3D11_BUFFER_DESC bufDesc;
                     memset(&bufDesc, 0, sizeof(bufDesc));
                     bufDesc.BindFlags = 0;
-                    bufDesc.ByteWidth = binding.bufferLength;
+                    bufDesc.ByteWidth = (UINT)RoundUpToAlignment(binding.bufferLength, 256);
                     bufDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
                     bufDesc.Usage = D3D11_USAGE_STAGING;
                     dxDevice->CreateBuffer(&bufDesc, nullptr, &stageBuf);
