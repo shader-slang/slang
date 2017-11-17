@@ -1736,6 +1736,7 @@ void generateParameterBindings(
     // If there are any global-scope uniforms, then we need to
     // allocate a constant-buffer binding for them here.
     ParameterBindingInfo globalConstantBufferBinding;
+    globalConstantBufferBinding.index = 0;
     if( anyGlobalUniforms )
     {
         // TODO: this logic is only correct for D3D targets, where
@@ -1867,9 +1868,19 @@ void generateParameterBindings(
 
     // We now have a bunch of layout information, which we should
     // record into a suitable object that represents the program
-    programLayout->globalScopeLayout = globalScopeLayout;
+    RefPtr<VarLayout> globalVarLayout = new VarLayout();
+    globalVarLayout->typeLayout = globalScopeLayout;
+    if (anyGlobalUniforms)
+    {
+        auto cbInfo = globalVarLayout->findOrAddResourceInfo(LayoutResourceKind::ConstantBuffer);
+        cbInfo->space = 0;
+        cbInfo->index = globalConstantBufferBinding.index;
+    }
+    programLayout->globalScopeLayout = globalVarLayout;
 }
 
+StructTypeLayout* getGlobalStructLayout(
+    ProgramLayout*  programLayout);
 
 RefPtr<ProgramLayout> specializeProgramLayout(
     TargetRequest * targetReq,
@@ -1889,12 +1900,7 @@ RefPtr<ProgramLayout> specializeProgramLayout(
     }
 
     List<RefPtr<TypeLayout>> paramTypeLayouts;
-    auto globalStructLayout = programLayout->globalScopeLayout.As<StructTypeLayout>();
-    if (!globalStructLayout)
-    {
-        if (auto paramGroup = programLayout->globalScopeLayout.As<ParameterGroupTypeLayout>())
-            globalStructLayout = paramGroup->elementTypeLayout.As<StructTypeLayout>();
-    }
+    auto globalStructLayout = getGlobalStructLayout(programLayout);
     SLANG_ASSERT(globalStructLayout);
     RefPtr<StructTypeLayout> structLayout = new StructTypeLayout();
     RefPtr<TypeLayout> globalScopeLayout = structLayout;
@@ -1924,11 +1930,6 @@ RefPtr<ProgramLayout> specializeProgramLayout(
     
     auto constantBufferRules = context.getRulesFamily()->getConstantBufferRules();
     structLayout->rules = constantBufferRules;
-
-    ParameterBindingInfo globalConstantBufferBinding;
-    globalConstantBufferBinding.count = 1;
-    globalConstantBufferBinding.index = 0;
-    globalConstantBufferBinding.space = 0;
 
     UniformLayoutInfo structLayoutInfo;
     structLayoutInfo.alignment = globalStructLayout->uniformAlignment;
@@ -1965,8 +1966,17 @@ RefPtr<ProgramLayout> specializeProgramLayout(
         structLayout->fields.Add(varLayout);
         varLayoutMapping[varLayout] = varLayout;
     }
-    bool hasAllocatedGlobalUniformBufferSlot = anyUniforms;
-    
+    auto originalGlobalCBufferInfo = programLayout->globalScopeLayout->FindResourceInfo(LayoutResourceKind::ConstantBuffer);
+    VarLayout::ResourceInfo globalCBufferInfo;
+    globalCBufferInfo.kind = LayoutResourceKind::None;
+    globalCBufferInfo.space = 0;
+    globalCBufferInfo.index = 0;
+    if (originalGlobalCBufferInfo)
+    {
+        globalCBufferInfo.kind = LayoutResourceKind::ConstantBuffer;
+        globalCBufferInfo.space = originalGlobalCBufferInfo->space;
+        globalCBufferInfo.index = originalGlobalCBufferInfo->index;
+    }
     // we have the context restored, can continue to layout the generic variables now
     for (auto & varLayout : globalStructLayout->fields)
     {
@@ -1976,13 +1986,21 @@ RefPtr<ProgramLayout> specializeProgramLayout(
             RefPtr<TypeLayout> newTypeLayout = CreateTypeLayout(
                 layoutContext.with(constantBufferRules),
                 newType);
-            if (newTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform))
+            auto layoutInfo = newTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform);
+            size_t uniformSize = layoutInfo ? layoutInfo->count : 0;
+            if (uniformSize)
             {
-                if (!hasAllocatedGlobalUniformBufferSlot)
+                if (globalCBufferInfo.kind == LayoutResourceKind::None)
                 {
                     // user defined a uniform via a global generic type argument
                     // but we have not reserved a binding for the global uniform buffer
-                    // so we are screwed.
+                    UInt space = 0;
+                    auto usedRangeSet = findUsedRangeSetForSpace(&context, space);
+                    globalCBufferInfo.kind = LayoutResourceKind::ConstantBuffer;
+                    globalCBufferInfo.index =
+                        usedRangeSet->usedResourceRanges[
+                            (int)LayoutResourceKind::ConstantBuffer].Allocate(nullptr, 1);
+                    globalCBufferInfo.space = space;
                 }
             }
             RefPtr<VarLayout> newVarLayout = new VarLayout();
@@ -1992,8 +2010,7 @@ RefPtr<ProgramLayout> specializeProgramLayout(
             paramInfo->varLayouts.Add(newVarLayout);
             completeBindingsForParameter(&context, paramInfo);
             // update uniform layout
-            auto layoutInfo = newTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform);
-            size_t uniformSize = layoutInfo ? layoutInfo->count : 0;
+            
             if (uniformSize != 0)
             {
                 // Make sure uniform fields get laid out properly...
@@ -2012,11 +2029,14 @@ RefPtr<ProgramLayout> specializeProgramLayout(
     }
     for (auto mapping : globalStructLayout->mapVarToLayout)
     {
-        structLayout->mapVarToLayout[mapping.Key] = varLayoutMapping[mapping.Value]();
+        RefPtr<VarLayout> updatedVarLayout = mapping.Value;
+        varLayoutMapping.TryGetValue(updatedVarLayout, updatedVarLayout);
+        structLayout->mapVarToLayout[mapping.Key] = updatedVarLayout;
     }
 
     // If there are global-scope uniforms, then we need to wrap
     // up a global constant buffer type layout to hold them
+    RefPtr<VarLayout> globalVarLayout = new VarLayout();
     if (anyUniforms)
     {
         auto globalConstantBufferLayout = createParameterGroupTypeLayout(
@@ -2027,8 +2047,12 @@ RefPtr<ProgramLayout> specializeProgramLayout(
             structLayout);
 
         globalScopeLayout = globalConstantBufferLayout;
+        auto cbInfo = globalVarLayout->findOrAddResourceInfo(LayoutResourceKind::ConstantBuffer);
+        *cbInfo = globalCBufferInfo;
     }
-    newProgramLayout->globalScopeLayout = globalScopeLayout;
+    globalVarLayout->typeLayout = globalScopeLayout;
+    programLayout->globalScopeLayout = globalVarLayout;
+    newProgramLayout->globalScopeLayout = globalVarLayout;
     return newProgramLayout;
 }
 }

@@ -6774,7 +6774,7 @@ EntryPointLayout* findEntryPointLayout(
 StructTypeLayout* getGlobalStructLayout(
     ProgramLayout*  programLayout)
 {
-    auto globalScopeLayout = programLayout->globalScopeLayout;
+    auto globalScopeLayout = programLayout->globalScopeLayout->typeLayout;
     if( auto gs = globalScopeLayout.As<StructTypeLayout>() )
     {
         return gs.Ptr();

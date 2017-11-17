@@ -417,7 +417,7 @@ public:
     // (since a constant buffer will have to be allocated
     // to store them).
     //
-    RefPtr<TypeLayout> globalScopeLayout;
+    RefPtr<VarLayout> globalScopeLayout;
 
     // We catalog the requested entry points here,
     // and any entry-point-specific parameter data

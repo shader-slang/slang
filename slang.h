@@ -710,6 +710,8 @@ extern "C"
     SLANG_API SlangUInt spReflection_getEntryPointCount(SlangReflection* reflection);
 
     SLANG_API SlangReflectionEntryPoint* spReflection_getEntryPointByIndex(SlangReflection* reflection, SlangUInt index);
+    SLANG_API SlangUInt spReflection_getGlobalConstantBufferBinding(SlangReflection* reflection);
+    SLANG_API size_t spReflection_getGlobalConstantBufferSize(SlangReflection* reflection);
 
 #ifdef __cplusplus  
 }
@@ -1117,6 +1119,16 @@ namespace slang
         EntryPointReflection* getEntryPointByIndex(SlangUInt index)
         {
             return (EntryPointReflection*) spReflection_getEntryPointByIndex((SlangReflection*) this, index);
+        }
+
+        SlangUInt getGlobalConstantBufferBinding()
+        {
+            return spReflection_getGlobalConstantBufferBinding((SlangReflection*)this);
+        }
+
+        size_t getGlobalConstantBufferSize()
+        {
+            return spReflection_getGlobalConstantBufferSize((SlangReflection*)this);
         }
     };
 }
