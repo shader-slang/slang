@@ -3481,9 +3481,9 @@ struct EmitVisitor
             break;
 
         case LayoutResourceKind::RegisterSpace:
+        case LayoutResourceKind::GenericResource:
             // ignore
             break;
-
         default:
             {
                 Emit(": register(");
@@ -6767,7 +6767,7 @@ EntryPointLayout* findEntryPointLayout(
 StructTypeLayout* getGlobalStructLayout(
     ProgramLayout*  programLayout)
 {
-    auto globalScopeLayout = programLayout->globalScopeLayout;
+    auto globalScopeLayout = programLayout->globalScopeLayout->typeLayout;
     if( auto gs = globalScopeLayout.As<StructTypeLayout>() )
     {
         return gs.Ptr();
@@ -6812,13 +6812,13 @@ String emitEntryPoint(
     EntryPointRequest*  entryPoint,
     ProgramLayout*      programLayout,
     CodeGenTarget       target,
-    CodeGenTarget       finalTarget)
+    TargetRequest*      targetRequest)
 {
     auto translationUnit = entryPoint->getTranslationUnit();
    
     SharedEmitContext sharedContext;
     sharedContext.target = target;
-    sharedContext.finalTarget = finalTarget;
+    sharedContext.finalTarget = targetRequest->target;
     sharedContext.entryPoint = entryPoint;
 
     if (entryPoint)
@@ -6886,7 +6886,8 @@ String emitEntryPoint(
         auto lowered = specializeIRForEntryPoint(
             entryPoint,
             programLayout,
-            target);
+            target, 
+            targetRequest);
 
         // If the user specified the flag that they want us to dump
         // IR, then do it here, for the target-specific, but

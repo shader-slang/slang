@@ -487,7 +487,7 @@ namespace Slang
 				if (predicate(buffer[i]))
 					return i;
 			}
-			return -1;
+			return (UInt)-1;
 		}
 
 		template<typename Func>
@@ -498,7 +498,7 @@ namespace Slang
 				if (predicate(buffer[i-1]))
 					return i-1;
 			}
-			return -1;
+			return (UInt)-1;
 		}
 
 		template<typename T2>
@@ -509,7 +509,7 @@ namespace Slang
 				if (buffer[i] == val)
 					return i;
 			}
-			return -1;
+			return (UInt)-1;
 		}
 
 		template<typename T2>
@@ -520,7 +520,7 @@ namespace Slang
 				if(buffer[i-1] == val)
 					return i-1;
 			}
-			return -1;
+			return (UInt)-1;
 		}
 
 		void Sort()

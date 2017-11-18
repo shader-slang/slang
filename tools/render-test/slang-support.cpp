@@ -84,7 +84,14 @@ struct SlangShaderCompilerWrapper : public ShaderCompiler
 		ShaderProgram * result = nullptr;
 		if (request.computeShader.name)
 		{
-			int computeEntryPoint = spAddEntryPoint(slangRequest, computeTranslationUnit, computeEntryPointName, spFindProfile(slangSession, request.computeShader.profile));
+            Slang::List<const char*> rawTypeNames;
+            for (auto typeName : request.entryPointTypeArguments)
+                rawTypeNames.Add(typeName.Buffer());
+			int computeEntryPoint = spAddEntryPointEx(slangRequest, computeTranslationUnit, 
+                computeEntryPointName, 
+                spFindProfile(slangSession, request.computeShader.profile),
+                (int)rawTypeNames.Count(),
+                rawTypeNames.Buffer());
 			int compileErr = spCompile(slangRequest);
 			if (auto diagnostics = spGetDiagnosticOutput(slangRequest))
 			{

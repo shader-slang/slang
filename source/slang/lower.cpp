@@ -2870,6 +2870,13 @@ struct LoweringVisitor
         UNREACHABLE_RETURN(LoweredDecl());
     }
 
+    LoweredDecl visitGlobalGenericParamDecl(GlobalGenericParamDecl * /*decl*/)
+    {
+        // not supported
+        SLANG_UNREACHABLE("visitGlobalGenericParamDecl in LowerVisitor");
+        UNREACHABLE_RETURN(LoweredDecl());
+    }
+
     LoweredDecl visitTypeDefDecl(TypeDefDecl* decl)
     {
         if (shared->target == CodeGenTarget::GLSL)

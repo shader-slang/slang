@@ -377,6 +377,18 @@ extern "C"
         char const*             name,
         SlangProfileID          profile);
 
+    /** Add an entry point in a particular translation unit,
+        with additional arguments that specify the concrete
+        type names for global generic type parameters.
+    */
+    SLANG_API int spAddEntryPointEx(
+        SlangCompileRequest*    request,
+        int                     translationUnitIndex,
+        char const*             name,
+        SlangProfileID          profile,
+        int                     genericTypeNameCount,
+        char const**            genericTypeNames);
+
     /** Execute the compilation request.
 
     Returns zero on success, non-zero on failure.
@@ -588,6 +600,9 @@ extern "C"
         // HLSL register `space`, Vulkan GLSL `set`
         SLANG_PARAMETER_CATEGORY_REGISTER_SPACE,
 
+        // A parameter whose type is to be specialized by a global generic type argument
+        SLANG_PARAMETER_CATEGORY_GENERIC,
+
         //
         SLANG_PARAMETER_CATEGORY_COUNT,
     };
@@ -695,6 +710,8 @@ extern "C"
     SLANG_API SlangUInt spReflection_getEntryPointCount(SlangReflection* reflection);
 
     SLANG_API SlangReflectionEntryPoint* spReflection_getEntryPointByIndex(SlangReflection* reflection, SlangUInt index);
+    SLANG_API SlangUInt spReflection_getGlobalConstantBufferBinding(SlangReflection* reflection);
+    SLANG_API size_t spReflection_getGlobalConstantBufferSize(SlangReflection* reflection);
 
 #ifdef __cplusplus  
 }
@@ -848,6 +865,7 @@ namespace slang
         SpecializationConstant = SLANG_PARAMETER_CATEGORY_SPECIALIZATION_CONSTANT,
         PushConstantBuffer = SLANG_PARAMETER_CATEGORY_PUSH_CONSTANT_BUFFER,
         RegisterSpace = SLANG_PARAMETER_CATEGORY_REGISTER_SPACE,
+        GenericResource = SLANG_PARAMETER_CATEGORY_GENERIC,
     };
 
     struct TypeLayoutReflection
@@ -1101,6 +1119,16 @@ namespace slang
         EntryPointReflection* getEntryPointByIndex(SlangUInt index)
         {
             return (EntryPointReflection*) spReflection_getEntryPointByIndex((SlangReflection*) this, index);
+        }
+
+        SlangUInt getGlobalConstantBufferBinding()
+        {
+            return spReflection_getGlobalConstantBufferBinding((SlangReflection*)this);
+        }
+
+        size_t getGlobalConstantBufferSize()
+        {
+            return spReflection_getGlobalConstantBufferSize((SlangReflection*)this);
         }
     };
 }

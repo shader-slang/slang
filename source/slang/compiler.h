@@ -100,6 +100,10 @@ namespace Slang
 
         // The name of the entry point function (e.g., `main`)
         Name* name;
+        
+        // The type names we want to substitute into the 
+        // global generic type parameters
+        List<Name*> genericParameterTypeNames;
 
         // The profile that the entry point will be compiled for
         // (this is a combination of the target state, and also
@@ -123,6 +127,11 @@ namespace Slang
         // it should not be assumed to be available in cases
         // where any errors were diagnosed.
         RefPtr<FuncDecl> decl;
+
+        // The declaration of the global generic parameter types
+        // This will be filled in as part of semantic analysis.
+        List<RefPtr<Type>> genericParameterTypes;
+        List<RefPtr<Val>> genericParameterWitnesses;
     };
 
     enum class PassThroughMode : SlangPassThrough
@@ -319,7 +328,8 @@ namespace Slang
         int addEntryPoint(
             int                     translationUnitIndex,
             String const&           name,
-            Profile                 profile);
+            Profile                 profile,
+            List<String> const &    genericTypeNames);
 
         UInt addTarget(
             CodeGenTarget   target);
