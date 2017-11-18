@@ -196,7 +196,7 @@ DIAGNOSTIC(33070, Error, expectedFunction, "expression preceding parenthesis of 
 
 // 303xx: interfaces and associated types
 DIAGNOSTIC(30300, Error, assocTypeInInterfaceOnly, "'associatedtype' can only be defined in an 'interface'.")
-
+DIAGNOSTIC(30301, Error, globalGenParamInGlobalScopeOnly, "'__generic_param' can only be defined global scope.")
 // TODO: need to assign numbers to all these extra diagnostics...
 
 DIAGNOSTIC(39999, Error, expectedIntegerConstantWrongType, "expected integer constant (found: '$0')")
@@ -244,10 +244,16 @@ DIAGNOSTIC(38001, Error, ambiguousEntryPoint, "more than one function matches en
 DIAGNOSTIC(38002, Note, entryPointCandidate, "see candidate declaration for entry point '$0'")
 DIAGNOSTIC(38003, Error, entryPointSymbolNotAFunction, "entry point '$0' must be declared as a function")
 
+DIAGNOSTIC(38004, Error, entryPointTypeParameterNotFound, "no type found matching entry-point type parameter name '$0'")
+DIAGNOSTIC(38005, Error, entryPointTypeSymbolNotAType, "entry-point type parameter '$0' must be declared as a type")
+
 DIAGNOSTIC(38100, Error, typeDoesntImplementInterfaceRequirement, "type '$0' does not provide required interface member '$1'")
 DIAGNOSTIC(38101, Error, thisExpressionOutsideOfTypeDecl, "'this' expression can only be used in members of an aggregate type")
 DIAGNOSTIC(38102, Error, initializerNotInsideType, "an 'init' declaration is only allowed inside a type or 'extension' declaration")
 DIAGNOSTIC(38102, Error, accessorMustBeInsideSubscriptOrProperty, "an accessor declaration is only allowed inside a subscript or property declaration")
+
+DIAGNOSTIC(38020, Error, mismatchEntryPointTypeArgument, "expecting $0 entry-point type arguments, provided $1.")
+DIAGNOSTIC(38021, Error, typeArgumentDoesNotConformToInterface, "type argument `$1` for generic parameter `$0` does not conform to interface `$1`.")
 
 //
 // 4xxxx - IL code generation.
@@ -264,7 +270,6 @@ DIAGNOSTIC(49999, Error, unknownSystemValueSemantic, "unknown system-value seman
 //
 // 5xxxx - Target code generation.
 //
-
 DIAGNOSTIC(50020, Error, unknownStageType,              "Unknown stage type '$0'.")
 DIAGNOSTIC(50020, Error, invalidTessCoordType,          "TessCoord must have vec2 or vec3 type.")
 DIAGNOSTIC(50020, Error, invalidFragCoordType,          "FragCoord must be a vec4.")

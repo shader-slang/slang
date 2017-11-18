@@ -3089,18 +3089,27 @@ namespace Slang
         // to the layout to use for it.
         Dictionary<String, VarLayout*> globalVarLayouts;
 
+        RefPtr<GlobalGenericParamSubstitution> subst;
+
         // Override the "maybe clone" logic so that we always clone
         virtual IRValue* maybeCloneValue(IRValue* originalVal) override;
 
         // Override teh "maybe clone" logic so that we carefully
         // clone any IR proxy values inside substitutions
         virtual DeclRef<Decl> maybeCloneDeclRef(DeclRef<Decl> const& declRef) override;
+
+        virtual RefPtr<Type> maybeCloneType(Type* originalType) override;
     };
 
 
     IRGlobalVar* cloneGlobalVar(IRSpecContext* context, IRGlobalVar* originalVar);
     IRFunc* cloneFunc(IRSpecContext* context, IRFunc* originalFunc);
     IRWitnessTable* cloneWitnessTable(IRSpecContext* context, IRWitnessTable* originalVar);
+
+    RefPtr<Type> IRSpecContext::maybeCloneType(Type* originalType)
+    {
+        return originalType->Substitute(subst).As<Type>();
+    }
 
     IRValue* IRSpecContext::maybeCloneValue(IRValue* originalValue)
     {
@@ -3143,6 +3152,33 @@ namespace Slang
         case kIROp_decl_ref:
             {
                 IRDeclRef* od = (IRDeclRef*)originalValue;
+
+                // if the declRef is one of the __generic_param decl being substituted by subst
+                // return the substituted decl
+                if (subst)
+                {
+                    if (od->declRef.getDecl() == subst->paramDecl)
+                        return builder->getTypeVal(subst->actualType.As<Type>());
+                    else if (auto genConstraint = od->declRef.As<GenericTypeConstraintDecl>())
+                    {
+                        // a decl-ref to GenericTypeConstraintDecl as a result of
+                        // referencing a generic parameter type should be replaced with
+                        // the actual witness table
+                        if (genConstraint.getDecl()->ParentDecl == subst->paramDecl)
+                        {
+                            // find the witness table from subst
+                            for (auto witness : subst->witnessTables)
+                            {
+                                if (witness.Key->EqualsVal(GetSup(genConstraint)))
+                                {
+                                    auto proxyVal = witness.Value.As<IRProxyVal>();
+                                    SLANG_ASSERT(proxyVal);
+                                    return proxyVal->inst;
+                                }
+                            }
+                        }
+                    }
+                }
                 auto declRef = maybeCloneDeclRef(od->declRef);
                 return builder->getDeclRefVal(declRef);
             }
@@ -3150,7 +3186,9 @@ namespace Slang
         case kIROp_TypeType:
             {
                 IRValue* od = (IRValue*)originalValue;
-                return builder->getTypeVal(od->type);
+                int ioDiff = 0;
+                auto newType = od->type->SubstituteImpl(subst, &ioDiff);
+                return builder->getTypeVal(newType.As<Type>());
             }
             break;
         default:
@@ -3207,7 +3245,9 @@ namespace Slang
             newSubst->outer = cloneSubstitutions(context, subst->outer);
             return newSubst;
         }
-        return nullptr;
+        else
+            SLANG_UNREACHABLE("unimplemented cloneSubstitution");
+        UNREACHABLE_RETURN(nullptr);
     }
 
     DeclRef<Decl> IRSpecContext::maybeCloneDeclRef(DeclRef<Decl> const& declRef)
@@ -3281,7 +3321,7 @@ namespace Slang
 
     IRGlobalVar* cloneGlobalVar(IRSpecContext* context, IRGlobalVar* originalVar)
     {
-        auto clonedVar = context->builder->createGlobalVar(originalVar->getType()->getValueType());
+        auto clonedVar = context->builder->createGlobalVar(context->maybeCloneType(originalVar->getType()->getValueType()));
         registerClonedValue(context, clonedVar, originalVar);
 
         auto mangledName = originalVar->mangledName;
@@ -3703,10 +3743,67 @@ namespace Slang
         }
     }
 
+    // implementation provided in parameter-binding.cpp
+    RefPtr<ProgramLayout> specializeProgramLayout(
+        TargetRequest * targetReq,
+        ProgramLayout* programLayout,
+        Substitutions * typeSubst);
+
+    RefPtr<GlobalGenericParamSubstitution> createGlobalGenericParamSubstitution(
+        EntryPointRequest * entryPointRequest, 
+        ProgramLayout * programLayout,
+        IRSpecContext*  context,
+        IRModule* originalIRModule)
+    {
+        RefPtr<GlobalGenericParamSubstitution> globalParamSubst;
+        Substitutions * curTailSubst = nullptr;
+        for (auto param : programLayout->globalGenericParams)
+        {
+            auto paramSubst = new GlobalGenericParamSubstitution();
+            if (!globalParamSubst)
+                globalParamSubst = paramSubst;
+            if (curTailSubst)
+                curTailSubst->outer = paramSubst;
+            curTailSubst = paramSubst;
+            paramSubst->paramDecl = param->decl;
+            SLANG_ASSERT((UInt)param->index < entryPointRequest->genericParameterTypes.Count());
+            paramSubst->actualType = entryPointRequest->genericParameterTypes[param->index];
+            // find witness tables
+            for (auto witness : entryPointRequest->genericParameterWitnesses)
+            {
+                if (auto subtypeWitness = witness.As<SubtypeWitness>())
+                {
+                    if (subtypeWitness->sub->EqualsVal(paramSubst->actualType))
+                    {
+                        auto witnessTableName = getMangledNameForConformanceWitness(subtypeWitness->sub, subtypeWitness->sup);
+                        auto globalVar = originalIRModule->getFirstGlobalValue();
+                        IRGlobalValue * table = nullptr;
+                        while (globalVar)
+                        {
+                            if (globalVar->mangledName == witnessTableName)
+                            {
+                                table = globalVar;
+                                break;
+                            }
+                            globalVar = globalVar->getNextValue();
+                        }
+                        SLANG_ASSERT(table);
+                        table = cloneWitnessTable(context, (IRWitnessTable*)(table));
+                        IRProxyVal * tableVal = new IRProxyVal();
+                        tableVal->inst = table;
+                        paramSubst->witnessTables.Add(KeyValuePair<RefPtr<Type>, RefPtr<Val>>(subtypeWitness->sup, tableVal));
+                    }
+                }
+            }
+        }
+        return globalParamSubst;
+    }
+
     IRModule* specializeIRForEntryPoint(
         EntryPointRequest*  entryPointRequest,
         ProgramLayout*      programLayout,
-        CodeGenTarget       target)
+        CodeGenTarget       target,
+        TargetRequest*      targetReq)
     {
         auto compileRequest = entryPointRequest->compileRequest;
         auto session = compileRequest->mSession;
@@ -3719,8 +3816,6 @@ namespace Slang
             // we are now in trouble.
             return nullptr;
         }
-
-        auto entryPointLayout = findEntryPointLayout(programLayout, entryPointRequest);
 
         // We now need to start cloning IR symbols from `originalIRModule`
         // into a fresh IR module for this entry point. Along the way we need to:
@@ -3746,11 +3841,21 @@ namespace Slang
         context->builder = &sharedContextStorage.builderStorage;
         context->target = target;
 
+        // Create the GlobalGenericParamSubstitution for substituting global generic types
+        // into user-provided type arguments
+        auto globalParamSubst = createGlobalGenericParamSubstitution(entryPointRequest, programLayout, context, originalIRModule);
+
+        context->subst = globalParamSubst;
+        
+        // now specailize the program layout using the substitution
+        RefPtr<ProgramLayout> newProgramLayout = specializeProgramLayout(targetReq, programLayout, globalParamSubst);
+
+        auto entryPointLayout = findEntryPointLayout(newProgramLayout, entryPointRequest);
 
         // Next, we want to optimize lookup for layout infromation
         // associated with global declarations, so that we can 
         // look things up based on the IR values (using mangled names)
-        auto globalStructLayout = getGlobalStructLayout(programLayout);
+        auto globalStructLayout = getGlobalStructLayout(newProgramLayout);
         for (auto globalVarLayout : globalStructLayout->fields)
         {
             String mangledName = getMangledName(globalVarLayout->varDecl);

@@ -63,6 +63,7 @@ namespace renderer_test
     {
     public:
         Slang::List<ShaderInputLayoutEntry> entries;
+        Slang::List<Slang::String> globalTypeArguments;
         int numRenderTargets = 1;
         void Parse(const char * source);
     };
