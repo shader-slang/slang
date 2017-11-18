@@ -361,7 +361,7 @@ public:
 class GenericParamTypeLayout : public TypeLayout
 {
 public:
-    RefPtr<GlobalGenericParamDecl> decl;
+    RefPtr<GlobalGenericParamDecl> getGlobalGenericParamDecl();
     int paramIndex = 0;
 };
 
@@ -424,7 +424,7 @@ public:
     // will (eventually) belong there...
     List<RefPtr<EntryPointLayout>> entryPoints;
 
-    List<RefPtr<GenericParamLayout>> genericEntryPointParams;
+    List<RefPtr<GenericParamLayout>> globalGenericParams;
 
     // HACK: binding to use when we have to create
     // a dummy sampler just to appease glslang

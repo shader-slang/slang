@@ -600,7 +600,7 @@ extern "C"
         // HLSL register `space`, Vulkan GLSL `set`
         SLANG_PARAMETER_CATEGORY_REGISTER_SPACE,
 
-        // A generic-typed entry-point parameter
+        // A parameter whose type is to be specialized by a global generic type argument
         SLANG_PARAMETER_CATEGORY_GENERIC,
 
         //

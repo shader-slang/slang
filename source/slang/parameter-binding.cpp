@@ -673,8 +673,8 @@ static void collectGlobalGenericParameter(
 {
     RefPtr<GenericParamLayout> layout = new GenericParamLayout();
     layout->decl = paramDecl;
-    layout->index = (int)context->shared->programLayout->genericEntryPointParams.Count();
-    context->shared->programLayout->genericEntryPointParams.Add(layout);
+    layout->index = (int)context->shared->programLayout->globalGenericParams.Count();
+    context->shared->programLayout->globalGenericParams.Add(layout);
 }
 
 // Collect a single declaration into our set of parameters

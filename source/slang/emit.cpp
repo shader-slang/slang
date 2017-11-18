@@ -3481,9 +3481,6 @@ struct EmitVisitor
             break;
 
         case LayoutResourceKind::RegisterSpace:
-            // ignore
-            break;
-
         case LayoutResourceKind::GenericResource:
             // ignore
             break;

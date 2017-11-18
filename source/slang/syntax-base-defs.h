@@ -195,7 +195,7 @@ SYNTAX_CLASS(ThisTypeSubstitution, Substitutions)
         return sourceType->GetHashCode();
     }
     )
-    END_SYNTAX_CLASS()
+END_SYNTAX_CLASS()
 
 SYNTAX_CLASS(GlobalGenericParamSubstitution, Substitutions)
     // the __generic_param decl to be substituted

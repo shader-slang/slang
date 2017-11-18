@@ -1613,10 +1613,9 @@ SimpleLayoutInfo GetLayoutImpl(
             if (outTypeLayout)
             {
                 auto genParamTypeLayout = new GenericParamTypeLayout();
-                genParamTypeLayout->decl = globalGenParam.getDecl();
                 // we should have already populated ProgramLayout::genericEntryPointParams list at this point,
                 // so we can find the index of this generic param decl in the list
-                genParamTypeLayout->paramIndex = findGenericParam(context.targetReq->layout->genericEntryPointParams, genParamTypeLayout->decl);
+                genParamTypeLayout->paramIndex = findGenericParam(context.targetReq->layout->globalGenericParams, genParamTypeLayout->getGlobalGenericParamDecl());
                 genParamTypeLayout->type = type;
                 genParamTypeLayout->rules = rules;
                 genParamTypeLayout->findOrAddResourceInfo(LayoutResourceKind::GenericResource)->count++;
@@ -1690,6 +1689,14 @@ RefPtr<TypeLayout> CreateTypeLayout(
     Type* type)
 {
     return CreateTypeLayout(context, type, SimpleLayoutInfo());
+}
+
+RefPtr<GlobalGenericParamDecl> GenericParamTypeLayout::getGlobalGenericParamDecl()
+{
+    auto declRefType = type->AsDeclRefType();
+    SLANG_ASSERT(declRefType);
+    auto rsDeclRef = declRefType->declRef.As<GlobalGenericParamDecl>();
+    return rsDeclRef.getDecl();
 }
 
 } // namespace Slang

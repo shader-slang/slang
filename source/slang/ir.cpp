@@ -3757,7 +3757,7 @@ namespace Slang
     {
         RefPtr<GlobalGenericParamSubstitution> globalParamSubst;
         Substitutions * curTailSubst = nullptr;
-        for (auto param : programLayout->genericEntryPointParams)
+        for (auto param : programLayout->globalGenericParams)
         {
             auto paramSubst = new GlobalGenericParamSubstitution();
             if (!globalParamSubst)
