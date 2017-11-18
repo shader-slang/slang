@@ -1615,8 +1615,8 @@ SimpleLayoutInfo GetLayoutImpl(
                 auto genParamTypeLayout = new GenericParamTypeLayout();
                 // we should have already populated ProgramLayout::genericEntryPointParams list at this point,
                 // so we can find the index of this generic param decl in the list
-                genParamTypeLayout->paramIndex = findGenericParam(context.targetReq->layout->globalGenericParams, genParamTypeLayout->getGlobalGenericParamDecl());
                 genParamTypeLayout->type = type;
+                genParamTypeLayout->paramIndex = findGenericParam(context.targetReq->layout->globalGenericParams, genParamTypeLayout->getGlobalGenericParamDecl());
                 genParamTypeLayout->rules = rules;
                 genParamTypeLayout->findOrAddResourceInfo(LayoutResourceKind::GenericResource)->count++;
                 *outTypeLayout = genParamTypeLayout;
