@@ -102,6 +102,16 @@ sb << "__magic_type(PtrType)\n";
 sb << "struct Ptr\n";
 sb << "{};\n";
 sb << "\n";
+sb << "__generic<T>\n";
+sb << "__magic_type(OutType)\n";
+sb << "struct Out\n";
+sb << "{};\n";
+sb << "\n";
+sb << "__generic<T>\n";
+sb << "__magic_type(InOutType)\n";
+sb << "struct InOut\n";
+sb << "{};\n";
+sb << "\n";
 sb << "";
 
 

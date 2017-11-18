@@ -31,6 +31,7 @@ struct ShaderCompileRequest
     EntryPoint vertexShader;
     EntryPoint fragmentShader;
 	EntryPoint computeShader;
+    Slang::List<Slang::String> entryPointTypeArguments;
 };
 
 class ShaderCompiler

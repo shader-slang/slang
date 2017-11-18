@@ -93,6 +93,7 @@ ABSTRACT_SYNTAX_CLASS(Expr, SyntaxNode);
 ABSTRACT_SYNTAX_CLASS(Substitutions, SyntaxNode);
 ABSTRACT_SYNTAX_CLASS(GenericSubstitution, Substitutions);
 ABSTRACT_SYNTAX_CLASS(ThisTypeSubstitution, Substitutions);
+ABSTRACT_SYNTAX_CLASS(GlobalGenericParamSubstitution, Substitutions);
 
 #include "expr-defs.h"
 #include "decl-defs.h"
@@ -279,19 +280,40 @@ void Type::accept(IValVisitor* visitor, void* extra)
     RefPtr<PtrType> Session::getPtrType(
         RefPtr<Type>    valueType)
     {
+        return getPtrType(valueType, "PtrType").As<PtrType>();
+    }
+
+        // Construct the type `Out<valueType>`
+    RefPtr<OutType> Session::getOutType(RefPtr<Type> valueType)
+    {
+        return getPtrType(valueType, "OutType").As<OutType>();
+    }
+
+    RefPtr<InOutType> Session::getInOutType(RefPtr<Type> valueType)
+    {
+        return getPtrType(valueType, "InOutType").As<InOutType>();
+    }
+
+    RefPtr<PtrTypeBase> Session::getPtrType(RefPtr<Type> valueType, char const* ptrTypeName)
+    {
         auto genericDecl = findMagicDecl(
-            this, "PtrType").As<GenericDecl>();
+            this, ptrTypeName).As<GenericDecl>();
+        return getPtrType(valueType, genericDecl);
+    }
+
+    RefPtr<PtrTypeBase> Session::getPtrType(RefPtr<Type> valueType, GenericDecl* genericDecl)
+    {
         auto typeDecl = genericDecl->inner;
-               
+
         auto substitutions = new GenericSubstitution();
-        substitutions->genericDecl = genericDecl.Ptr();
+        substitutions->genericDecl = genericDecl;
         substitutions->args.Add(valueType);
 
         auto declRef = DeclRef<Decl>(typeDecl.Ptr(), substitutions);
 
         return DeclRefType::Create(
             this,
-            declRef)->As<PtrType>();
+            declRef)->As<PtrTypeBase>();
     }
 
     RefPtr<ArrayExpressionType> Session::getArrayType(
@@ -484,6 +506,20 @@ void Type::accept(IValVisitor* visitor, void* extra)
                             else
                                 return DeclRefType::Create(getSession(), DeclRef<Decl>(targetType, aggTypeDeclRef.substitutions));
                         }
+                    }
+                }
+            }
+        }
+        else if (auto globalGenParam = dynamic_cast<GlobalGenericParamDecl*>(declRef.getDecl()))
+        {
+            // search for a substitution that might apply to us
+            for (auto s = subst; s; s = s->outer.Ptr())
+            {
+                if (auto genericSubst = dynamic_cast<GlobalGenericParamSubstitution*>(s))
+                {
+                    if (genericSubst->paramDecl == globalGenParam)
+                    {
+                        return genericSubst->actualType;
                     }
                 }
             }
@@ -1208,6 +1244,35 @@ void Type::accept(IValVisitor* visitor, void* extra)
         return false;
     }
 
+    RefPtr<Substitutions> GlobalGenericParamSubstitution::SubstituteImpl(Substitutions* /*subst*/, int* /*ioDiff*/)
+    {
+        // we will never replace values for this type of substitution
+        return this;
+    }
+
+    bool GlobalGenericParamSubstitution::Equals(Substitutions* subst)
+    {
+        if (!subst)
+            return false;
+        if (auto genSubst = dynamic_cast<GlobalGenericParamSubstitution*>(subst))
+        {
+            if (paramDecl != genSubst->paramDecl)
+                return false;
+            if (!actualType->EqualsVal(genSubst->actualType))
+                return false;
+            if (witnessTables.Count() != genSubst->witnessTables.Count())
+                return false;
+            for (UInt i = 0; i < witnessTables.Count(); i++)
+            {
+                if (!witnessTables[i].Key->Equals(genSubst->witnessTables[i].Key))
+                    return false;
+                if (!witnessTables[i].Value->EqualsVal(genSubst->witnessTables[i].Value))
+                    return false;
+            }
+            return true;
+        }
+        return false;
+    }
 
 
     // DeclRefBase
@@ -1563,6 +1628,24 @@ void Type::accept(IValVisitor* visitor, void* extra)
                         SLANG_ASSERT(index + ordinaryParamCount < genericSubst->args.Count());
                         return genericSubst->args[index + ordinaryParamCount];
                     }
+                }
+                else if (auto globalGenParamSubst = dynamic_cast<GlobalGenericParamSubstitution*>(s))
+                {
+                    // we have a GlobalGenericParamSubstitution, this substitution will provide
+                    // a concrete IRWitnessTable for a generic global variable
+                    auto supType = GetSup(genConstraintDecl);
+
+                    // check if the substitution is really about this global generic type parameter
+                    if (globalGenParamSubst->paramDecl != genConstraintDecl.getDecl()->ParentDecl)
+                        continue;
+
+                    // find witness table for the required interface
+                    for (auto witness : globalGenParamSubst->witnessTables)
+                        if (witness.Key->EqualsVal(supType))
+                        {
+                            (*ioDiff)++;
+                            return witness.Value;
+                        }
                 }
             }
         }

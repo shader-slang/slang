@@ -100,6 +100,10 @@ namespace Slang
 
         // The name of the entry point function (e.g., `main`)
         Name* name;
+        
+        // The type names we want to substitute into the 
+        // global generic type parameters
+        List<Name*> genericParameterTypeNames;
 
         // The profile that the entry point will be compiled for
         // (this is a combination of the target state, and also
@@ -123,6 +127,11 @@ namespace Slang
         // it should not be assumed to be available in cases
         // where any errors were diagnosed.
         RefPtr<FuncDecl> decl;
+
+        // The declaration of the global generic parameter types
+        // This will be filled in as part of semantic analysis.
+        List<RefPtr<Type>> genericParameterTypes;
+        List<RefPtr<Val>> genericParameterWitnesses;
     };
 
     enum class PassThroughMode : SlangPassThrough
@@ -319,7 +328,8 @@ namespace Slang
         int addEntryPoint(
             int                     translationUnitIndex,
             String const&           name,
-            Profile                 profile);
+            Profile                 profile,
+            List<String> const &    genericTypeNames);
 
         UInt addTarget(
             CodeGenTarget   target);
@@ -432,8 +442,23 @@ namespace Slang
         // Should not be used in front-end code
         Type* getIRBasicBlockType();
 
-        // Construct pointer types on-demand
+        // Construct the type `Ptr<valueType>`, where `Ptr`
+        // is looked up as a builtin type.
         RefPtr<PtrType> getPtrType(RefPtr<Type> valueType);
+
+        // Construct the type `Out<valueType>`
+        RefPtr<OutType> getOutType(RefPtr<Type> valueType);
+
+        // Construct the type `InOut<valueType>`
+        RefPtr<InOutType> getInOutType(RefPtr<Type> valueType);
+
+        // Construct a pointer type like `Ptr<valueType>`, but where
+        // the actual type name for the pointer type is given by `ptrTypeName`
+        RefPtr<PtrTypeBase> getPtrType(RefPtr<Type> valueType, char const* ptrTypeName);
+
+        // Construct a pointer type like `Ptr<valueType>`, but where
+        // the generic declaration for the pointer type is `genericDecl`
+        RefPtr<PtrTypeBase> getPtrType(RefPtr<Type> valueType, GenericDecl* genericDecl);
 
         RefPtr<ArrayExpressionType> getArrayType(
             Type*   elementType,

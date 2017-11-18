@@ -95,9 +95,9 @@ namespace Slang
         RefPtr<StructDecl>					ParseStruct();
         RefPtr<ClassDecl>					    ParseClass();
         RefPtr<Stmt>					ParseStatement();
-        RefPtr<Stmt>			        ParseBlockStatement();
-        RefPtr<DeclStmt>			ParseVarDeclrStatement(Modifiers modifiers);
-        RefPtr<IfStmt>				ParseIfStatement();
+        RefPtr<Stmt>			        parseBlockStatement();
+        RefPtr<DeclStmt>			parseVarDeclrStatement(Modifiers modifiers);
+        RefPtr<IfStmt>				parseIfStatement();
         RefPtr<ForStmt>				ParseForStatement();
         RefPtr<WhileStmt>			ParseWhileStatement();
         RefPtr<DoWhileStmt>			ParseDoWhileStatement();
@@ -1034,7 +1034,7 @@ namespace Slang
         }
         else
         {
-            decl->Body = parser->ParseBlockStatement();
+            decl->Body = parser->parseBlockStatement();
         }
 
         parser->PopScope();
@@ -2172,39 +2172,53 @@ namespace Slang
         }
     }
 
-    RefPtr<RefObject> ParseAssocType(Parser * parser, void *)
+    void parseOptionalGenericConstraints(Parser * parser, ContainerDecl* decl)
     {
-        RefPtr<AssocTypeDecl> assocTypeDecl = new AssocTypeDecl();
-
-        auto nameToken = parser->ReadToken(TokenType::Identifier);
-        assocTypeDecl->nameAndLoc = NameLoc(nameToken);
-        assocTypeDecl->loc = nameToken.loc;
         if (AdvanceIf(parser, TokenType::Colon))
         {
-            while (!parser->tokenReader.IsAtEnd())
+            do
             {
-                auto paramConstraint = new GenericTypeConstraintDecl();
+                RefPtr<GenericTypeConstraintDecl> paramConstraint = new GenericTypeConstraintDecl();
                 parser->FillPosition(paramConstraint);
 
-                auto paramType = DeclRefType::Create(
+                RefPtr<DeclRefType> paramType = DeclRefType::Create(
                     parser->getSession(),
-                    DeclRef<Decl>(assocTypeDecl, nullptr));
+                    DeclRef<Decl>(decl, nullptr));
 
-                auto paramTypeExpr = new SharedTypeExpr();
-                paramTypeExpr->loc = assocTypeDecl->loc;
+                RefPtr<SharedTypeExpr> paramTypeExpr = new SharedTypeExpr();
+                paramTypeExpr->loc = decl->loc;
                 paramTypeExpr->base.type = paramType;
                 paramTypeExpr->type = QualType(getTypeType(paramType));
 
                 paramConstraint->sub = TypeExp(paramTypeExpr);
                 paramConstraint->sup = parser->ParseTypeExp();
 
-                AddMember(assocTypeDecl, paramConstraint);
-                if (!AdvanceIf(parser, TokenType::Comma))
-                    break;
-            }
+                AddMember(decl, paramConstraint);
+            } while (AdvanceIf(parser, TokenType::Comma));
         }
+    }
+
+    RefPtr<RefObject> parseAssocType(Parser * parser, void *)
+    {
+        RefPtr<AssocTypeDecl> assocTypeDecl = new AssocTypeDecl();
+
+        auto nameToken = parser->ReadToken(TokenType::Identifier);
+        assocTypeDecl->nameAndLoc = NameLoc(nameToken);
+        assocTypeDecl->loc = nameToken.loc;
+        parseOptionalGenericConstraints(parser, assocTypeDecl);
         parser->ReadToken(TokenType::Semicolon);
         return assocTypeDecl;
+    }
+
+    RefPtr<RefObject> parseGlobalGenericParamDecl(Parser * parser, void *)
+    {
+        RefPtr<GlobalGenericParamDecl> genParamDecl = new GlobalGenericParamDecl();
+        auto nameToken = parser->ReadToken(TokenType::Identifier);
+        genParamDecl->nameAndLoc = NameLoc(nameToken);
+        genParamDecl->loc = nameToken.loc;
+        parseOptionalGenericConstraints(parser, genParamDecl);
+        parser->ReadToken(TokenType::Semicolon);
+        return genParamDecl;
     }
 
     static RefPtr<RefObject> parseInterfaceDecl(Parser* parser, void* /*userData*/)
@@ -2220,7 +2234,7 @@ namespace Slang
         return decl;
     }
 
-    static RefPtr<RefObject> ParseConstructorDecl(Parser* parser, void* /*userData*/)
+    static RefPtr<RefObject> parseConstructorDecl(Parser* parser, void* /*userData*/)
     {
         RefPtr<ConstructorDecl> decl = new ConstructorDecl();
         parser->FillPosition(decl.Ptr());
@@ -2243,7 +2257,7 @@ namespace Slang
         }
         else
         {
-            decl->Body = parser->ParseBlockStatement();
+            decl->Body = parser->parseBlockStatement();
         }
         return decl;
     }
@@ -2271,7 +2285,7 @@ namespace Slang
 
         if( parser->tokenReader.PeekTokenType() == TokenType::LBrace )
         {
-            decl->Body = parser->ParseBlockStatement();
+            decl->Body = parser->parseBlockStatement();
         }
         else
         {
@@ -2664,7 +2678,7 @@ namespace Slang
         parser->ReadToken(TokenType::LParent);
         stmt->condition = parser->ParseExpression();
         parser->ReadToken(TokenType::RParent);
-        stmt->body = parser->ParseBlockStatement();
+        stmt->body = parser->parseBlockStatement();
         return stmt;
     }
 
@@ -2788,11 +2802,11 @@ namespace Slang
 
         RefPtr<Stmt> statement;
         if (LookAheadToken(TokenType::LBrace))
-            statement = ParseBlockStatement();
+            statement = parseBlockStatement();
         else if (peekTypeName(this))
-            statement = ParseVarDeclrStatement(modifiers);
+            statement = parseVarDeclrStatement(modifiers);
         else if (LookAheadToken("if"))
-            statement = ParseIfStatement();
+            statement = parseIfStatement();
         else if (LookAheadToken("for"))
             statement = ParseForStatement();
         else if (LookAheadToken("while"))
@@ -2852,7 +2866,7 @@ namespace Slang
                 // Note: the declaration will consume any modifiers
                 // that had been in place on the statement.
                 tokenReader.mCursor = startPos;
-                statement = ParseVarDeclrStatement(modifiers);
+                statement = parseVarDeclrStatement(modifiers);
                 return statement;
             }
 
@@ -2885,7 +2899,7 @@ namespace Slang
         return statement;
     }
 
-    RefPtr<Stmt> Parser::ParseBlockStatement()
+    RefPtr<Stmt> Parser::parseBlockStatement()
     {
         // If we are being asked not to check things *and* we haven't
         // seen any `import` declarations yet, then we can safely assume
@@ -2983,7 +2997,7 @@ namespace Slang
         return blockStatement;
     }
 
-    RefPtr<DeclStmt> Parser::ParseVarDeclrStatement(
+    RefPtr<DeclStmt> Parser::parseVarDeclrStatement(
         Modifiers modifiers)
     {
         RefPtr<DeclStmt>varDeclrStatement = new DeclStmt();
@@ -2994,7 +3008,7 @@ namespace Slang
         return varDeclrStatement;
     }
 
-    RefPtr<IfStmt> Parser::ParseIfStatement()
+    RefPtr<IfStmt> Parser::parseIfStatement()
     {
         RefPtr<IfStmt> ifStatement = new IfStmt();
         FillPosition(ifStatement.Ptr());
@@ -3045,7 +3059,7 @@ namespace Slang
         ReadToken(TokenType::LParent);
         if (peekTypeName(this))
         {
-            stmt->InitialStatement = ParseVarDeclrStatement(Modifiers());
+            stmt->InitialStatement = parseVarDeclrStatement(Modifiers());
         }
         else
         {
@@ -3107,7 +3121,7 @@ namespace Slang
         return breakStatement;
     }
 
-    RefPtr<ContinueStmt>	Parser::ParseContinueStatement()
+    RefPtr<ContinueStmt> Parser::ParseContinueStatement()
     {
         RefPtr<ContinueStmt> continueStatement = new ContinueStmt();
         FillPosition(continueStatement.Ptr());
@@ -4128,17 +4142,18 @@ namespace Slang
         // Add syntax for declaration keywords
     #define DECL(KEYWORD, CALLBACK) \
         addBuiltinSyntax<Decl>(session, scope, #KEYWORD, &CALLBACK)
-        DECL(typedef,       ParseTypeDef);
-        DECL(associatedtype,ParseAssocType);
-        DECL(cbuffer,       parseHLSLCBufferDecl);
-        DECL(tbuffer,       parseHLSLTBufferDecl);
-        DECL(__generic,     ParseGenericDecl);
-        DECL(__extension,   ParseExtensionDecl);
-        DECL(__init,        ParseConstructorDecl);
-        DECL(__subscript,   ParseSubscriptDecl);
-        DECL(interface,     parseInterfaceDecl);
-        DECL(syntax,        parseSyntaxDecl);
-        DECL(__import,      parseImportDecl);
+        DECL(typedef,         ParseTypeDef);
+        DECL(associatedtype,  parseAssocType);
+        DECL(__generic_param, parseGlobalGenericParamDecl);
+        DECL(cbuffer,         parseHLSLCBufferDecl);
+        DECL(tbuffer,         parseHLSLTBufferDecl);
+        DECL(__generic,       ParseGenericDecl);
+        DECL(__extension,     ParseExtensionDecl);
+        DECL(__init,          parseConstructorDecl);
+        DECL(__subscript,     ParseSubscriptDecl);
+        DECL(interface,       parseInterfaceDecl);
+        DECL(syntax,          parseSyntaxDecl);
+        DECL(__import,        parseImportDecl);
 
     #undef DECL
 

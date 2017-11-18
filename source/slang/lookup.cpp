@@ -410,9 +410,9 @@ void lookUpMemberImpl(
     if (auto declRefType = type->As<DeclRefType>())
     {
         auto declRef = declRefType->declRef;
-        if (auto assocTypeDeclRef = declRef.As<AssocTypeDecl>())
+        if (declRef.As<AssocTypeDecl>() || declRef.As<GlobalGenericParamDecl>())
         {
-            for (auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(assocTypeDeclRef))
+            for (auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(declRef.As<ContainerDecl>()))
             {
                 // The super-type in the constraint (e.g., `Foo` in `T : Foo`)
                 // will tell us a type we should use for lookup.
@@ -487,6 +487,5 @@ LookupResult lookUpMember(
     lookUpMemberImpl(session, semantics, name, type, result, nullptr);
     return result;
 }
-
 
 }

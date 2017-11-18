@@ -819,14 +819,6 @@ IRType* getIntType(
     return context->getSession()->getBuiltinType(BaseType::Int);
 }
 
-// Get a pointer type to the given element type
-RefPtr<PtrType> getPtrType(
-    IRGenContext*   context,
-    IRType*         valueType)
-{
-    return context->getSession()->getPtrType(valueType);
-}
-
 RefPtr<IRFuncType> getFuncType(
     IRGenContext*           context,
     UInt                    paramCount,
@@ -1089,7 +1081,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         RefPtr<Type> loweredBaseType = loweredBaseVal->getType();
 
         if (loweredBaseType->As<PointerLikeType>()
-            || loweredBaseType->As<PtrType>())
+            || loweredBaseType->As<PtrTypeBase>())
         {
             // Note that we do *not* perform an actual `load` operation
             // here, but rather just use the pointer value to construct
@@ -1539,7 +1531,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         case LoweredValInfo::Flavor::Ptr:
             return LoweredValInfo::ptr(
                 builder->emitElementAddress(
-                    getPtrType(context, getSimpleType(type)),
+                    context->getSession()->getPtrType(getSimpleType(type)),
                     baseVal.val,
                     indexVal));
 
@@ -1576,7 +1568,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                 IRValue* irBasePtr = base.val;
                 return LoweredValInfo::ptr(
                     getBuilder()->emitFieldAddress(
-                        getPtrType(context, getSimpleType(fieldType)),
+                        context->getSession()->getPtrType(getSimpleType(fieldType)),
                         irBasePtr,
                         getBuilder()->getDeclRefVal(field)));
             }
@@ -3192,14 +3184,22 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 paramTypes.Add(irParamType);
                 break;
 
-            default:
-                // The parameter is being used for input/output purposes,
-                // so it will lower to an actual parameter with a pointer type.
-                //
-                // TODO: Is this the best representation we can use?
+            // If the parameter is declared `out` or `inout`,
+            // then we will represent it with a pointer type in
+            // the IR, but we will use a specialized pointer
+            // type that encodes the parameter direction information.
+            case kParameterDirection_Out:
+                paramTypes.Add(
+                    context->getSession()->getOutType(irParamType));
+                break;
+            case kParameterDirection_InOut:
+                paramTypes.Add(
+                    context->getSession()->getInOutType(irParamType));
+                break;
 
-                auto irPtrType = getPtrType(context, irParamType);
-                paramTypes.Add(irPtrType);
+            default:
+                SLANG_UNEXPECTED("unknown parameter direction");
+                break;
             }
         }
 
@@ -3268,7 +3268,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         //
                         // TODO: Is this the best representation we can use?
 
-                        auto irPtrType = irParamType.As<PtrType>();
+                        auto irPtrType = irParamType.As<PtrTypeBase>();
 
                         IRParam* irParamPtr = subBuilder->emitParam(irPtrType);
                         if(auto paramDecl = paramInfo.decl)
@@ -3616,7 +3616,9 @@ static void lowerEntryPointToIR(
         // the entry point request.
         return;
     }
-
+    // we need to lower all global type arguments as well
+    for (auto arg : entryPointRequest->genericParameterTypes)
+        lowerType(context, arg);
     auto loweredEntryPointFunc = lowerDecl(context, entryPointFuncDecl);
 }
 

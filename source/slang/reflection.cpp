@@ -886,3 +886,22 @@ SLANG_API SlangReflectionEntryPoint* spReflection_getEntryPointByIndex(SlangRefl
 
     return convert(program->entryPoints[(int) index].Ptr());
 }
+
+SLANG_API SlangUInt spReflection_getGlobalConstantBufferBinding(SlangReflection* inProgram)
+{
+    auto program = convert(inProgram);
+    if (!program) return 0;
+    auto cb = program->globalScopeLayout->FindResourceInfo(LayoutResourceKind::ConstantBuffer);
+    if (!cb) return 0;
+    return cb->index;
+}
+
+SLANG_API size_t spReflection_getGlobalConstantBufferSize(SlangReflection* inProgram)
+{
+    auto program = convert(inProgram);
+    if (!program) return 0;
+    auto structLayout = getGlobalStructLayout(program);
+    auto uniform = structLayout->FindResourceInfo(LayoutResourceKind::Uniform);
+    if (!uniform) return 0;
+    return uniform->count;
+}
