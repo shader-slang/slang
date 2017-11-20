@@ -276,16 +276,14 @@ struct IRVar : IRInst
     }
 };
 
-struct IRGlobalVar : IRGlobalValue
+/// @brief A global variable.
+///
+/// Represents a global variable in the IR.
+/// If the variable has an initializer, then
+/// it is represented by the code in the basic
+/// blocks nested inside this value.
+struct IRGlobalVar : IRGlobalValueWithCode
 {
-    // TODO: should contain information
-    // for use in initializing the variable
-    // (e.g., a reference to a function
-    // that is to be evaluated to provide
-    // the initial value, or a basic block
-    // that defines a DAG of constant
-    // values to use as initial values...)
-
     PtrType* getType() { return type.As<PtrType>(); }
 };
 
@@ -359,14 +357,14 @@ struct IRBuilder
 
     // The current function and block being inserted into
     // (or `null` if we aren't inserting).
-    IRFunc*     curFunc = nullptr;
-    IRBlock*    curBlock = nullptr;
+    IRGlobalValueWithCode*  curFunc = nullptr;
+    IRBlock*                curBlock = nullptr;
     //
     // An instruction in the current block that we should insert before
     IRInst*     insertBeforeInst = nullptr;
 
-    IRFunc*     getFunc() { return curFunc; }
-    IRBlock*    getBlock() { return curBlock; }
+    IRGlobalValueWithCode*  getFunc() { return curFunc; }
+    IRBlock*                getBlock() { return curBlock; }
 
     void addInst(IRBlock* block, IRInst* inst);
     void addInst(IRInst* inst);

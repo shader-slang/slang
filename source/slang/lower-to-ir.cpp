@@ -2693,7 +2693,23 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         if( auto initExpr = decl->initExpr )
         {
-            // TODO: need to handle global with initializer!
+            IRBuilder subBuilderStorage = *getBuilder();
+            IRBuilder* subBuilder = &subBuilderStorage;
+
+            subBuilder->curFunc = irGlobal;
+
+            IRGenContext subContextStorage = *context;
+            IRGenContext* subContext = &subContextStorage;
+
+            subContext->irBuilder = subBuilder;
+
+            // TODO: set up a parent IR decl to put the instructions into
+
+            IRBlock* entryBlock = subBuilder->emitBlock();
+            subBuilder->curBlock = entryBlock;
+
+            LoweredValInfo initVal = lowerLValueExpr(subContext, initExpr);
+            subContext->irBuilder->emitReturn(getSimpleVal(subContext, initVal));
         }
 
         return globalVal;
