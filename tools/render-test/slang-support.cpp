@@ -107,8 +107,8 @@ struct SlangShaderCompilerWrapper : public ShaderCompiler
 		}
 		else
 		{
-			int vertexEntryPoint = spAddEntryPointEx(slangRequest, vertexTranslationUnit, vertexEntryPointName, spFindProfile(slangSession, request.vertexShader.profile), rawTypeNames.Count(), rawTypeNames.Buffer());
-			int fragmentEntryPoint = spAddEntryPointEx(slangRequest, fragmentTranslationUnit, fragmentEntryPointName, spFindProfile(slangSession, request.fragmentShader.profile), rawTypeNames.Count(), rawTypeNames.Buffer());
+			int vertexEntryPoint = spAddEntryPointEx(slangRequest, vertexTranslationUnit, vertexEntryPointName, spFindProfile(slangSession, request.vertexShader.profile), (int)rawTypeNames.Count(), rawTypeNames.Buffer());
+			int fragmentEntryPoint = spAddEntryPointEx(slangRequest, fragmentTranslationUnit, fragmentEntryPointName, spFindProfile(slangSession, request.fragmentShader.profile), (int)rawTypeNames.Count(), rawTypeNames.Buffer());
 
 			int compileErr = spCompile(slangRequest);
 			if (auto diagnostics = spGetDiagnosticOutput(slangRequest))
