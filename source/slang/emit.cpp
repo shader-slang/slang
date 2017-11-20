@@ -6461,7 +6461,23 @@ emitDeclImpl(decl, nullptr);
     {
         auto allocatedType = varDecl->getType();
         auto varType = allocatedType->getValueType();
-//        auto addressSpace = allocatedType->getAddressSpace();
+
+        String initFuncName;
+        if (varDecl->firstBlock)
+        {
+            // A global variable with code means it has an initializer
+            // associated with it. Eventually we'd like to emit that
+            // initializer directly as an expression here, but for
+            // now we'll emit it as a separate function.
+
+            initFuncName = getIRName(varDecl);
+            initFuncName.append("_init");
+            emitIRType(ctx, varType, initFuncName);
+            Emit("()\n{\n");
+            emitIRStmtsForBlocks(ctx, varDecl->firstBlock, nullptr);
+            Emit("}\n");
+        }
+
 
         if (auto paramBlockType = varType->As<UniformParameterGroupType>())
         {
@@ -6475,26 +6491,40 @@ emitDeclImpl(decl, nullptr);
         // Need to emit appropriate modifiers here.
 
         auto layout = getVarLayout(ctx, varDecl);
-        
-        emitIRVarModifiers(ctx, layout);
 
-#if 0
-        switch (addressSpace)
+        if (!layout)
         {
-        default:
-            break;
+            // A global variable without a layout is just an
+            // ordinary global variable, and may need special
+            // modifiers to indicate it as such.
+            switch (getTarget(ctx))
+            {
+            case CodeGenTarget::HLSL:
+                // HLSL requires the `static` modifier on any
+                // global variables; otherwise they are assumed
+                // to be uniforms.
+                Emit("static ");
+                break;
 
-        case kIRAddressSpace_GroupShared:
-            emit("groupshared ");
-            break;
+            default:
+                break;
+            }
         }
-#endif
+
+        emitIRVarModifiers(ctx, layout);
 
         emitIRType(ctx, varType, getIRName(varDecl));
 
         emitIRSemantics(ctx, varDecl);
 
         emitIRLayoutSemantics(ctx, varDecl);
+
+        if (varDecl->firstBlock)
+        {
+            Emit(" = ");
+            emit(initFuncName);
+            Emit("()");
+        }
 
         emit(";\n");
     }
