@@ -676,7 +676,7 @@ createStructuredBufferTypeLayout(
     RefPtr<Type>                structuredBufferType,
     RefPtr<Type>                elementType);
 
-
+int findGenericParam(List<RefPtr<GenericParamLayout>> & genericParameters, GlobalGenericParamDecl * decl);
 //
 
 }

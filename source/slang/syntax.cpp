@@ -1709,7 +1709,22 @@ void Type::accept(IValVisitor* visitor, void* extra)
         return sb.ProduceString();
     }
 
-
+    void insertSubstAtBottom(RefPtr<Substitutions> & substHead, RefPtr<Substitutions> substToInsert)
+    {
+        if (!substHead)
+        {
+            substHead = substToInsert;
+            return;
+        }
+        auto subst = substHead;
+        RefPtr<Substitutions> lastSubst = subst;
+        while (subst->outer)
+        {
+            lastSubst = subst;
+            subst = subst->outer;
+        }
+        lastSubst->outer = substToInsert;
+    }
 
     void insertSubstAtTop(DeclRefBase & declRef, RefPtr<Substitutions> substToInsert)
     {

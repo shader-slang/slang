@@ -1156,6 +1156,7 @@ namespace Slang
         Session* session,
         Decl*   decl);
 
+    void insertSubstAtBottom(RefPtr<Substitutions> & substHead, RefPtr<Substitutions> substToInsert);
     RefPtr<ThisTypeSubstitution> getNewThisTypeSubst(DeclRefBase & declRef);
     RefPtr<ThisTypeSubstitution> getThisTypeSubst(DeclRefBase & declRef, bool insertSubstEntry);
     void removeSubstitution(DeclRefBase & declRef, RefPtr<Substitutions> subst);

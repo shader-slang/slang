@@ -1425,6 +1425,16 @@ static RefPtr<TypeLayout> processEntryPointParameter(
 
             return structLayout;
         }
+        else if (auto globalGenericParam = declRef.As<GlobalGenericParamDecl>())
+        {
+            auto genParamTypeLayout = new GenericParamTypeLayout();
+            // we should have already populated ProgramLayout::genericEntryPointParams list at this point,
+            // so we can find the index of this generic param decl in the list
+            genParamTypeLayout->type = type;
+            genParamTypeLayout->paramIndex = findGenericParam(context->shared->programLayout->globalGenericParams, globalGenericParam.getDecl());
+            genParamTypeLayout->findOrAddResourceInfo(LayoutResourceKind::GenericResource)->count++;
+            return genParamTypeLayout;
+        }
         else
         {
             SLANG_UNEXPECTED("unhandled type kind");
@@ -1442,7 +1452,8 @@ static RefPtr<TypeLayout> processEntryPointParameter(
 
 static void collectEntryPointParameters(
     ParameterBindingContext*        context,
-    EntryPointRequest*              entryPoint)
+    EntryPointRequest*              entryPoint,
+    Substitutions*                  typeSubst)
 {
     FuncDecl* entryPointFuncDecl = entryPoint->decl;
     if (!entryPointFuncDecl)
@@ -1507,7 +1518,7 @@ static void collectEntryPointParameters(
         auto paramTypeLayout = processEntryPointParameterWithPossibleSemantic(
             context,
             paramDecl.Ptr(),
-            paramDecl->type.type,
+            paramDecl->type.type->Substitute(typeSubst).As<Type>(),
             state,
             paramVarLayout);
 
@@ -1539,7 +1550,7 @@ static void collectEntryPointParameters(
         auto resultTypeLayout = processEntryPointParameterWithPossibleSemantic(
             context,
             entryPointFuncDecl,
-            resultType,
+            resultType->Substitute(typeSubst).As<Type>(),
             state,
             resultLayout);
 
@@ -1632,7 +1643,7 @@ static void collectParameters(
         for( auto& entryPoint : translationUnit->entryPoints )
         {
             context->stage = entryPoint->profile.GetStage();
-            collectEntryPointParameters(context, entryPoint.Ptr());
+            collectEntryPointParameters(context, entryPoint.Ptr(), nullptr);
         }
     }
 
@@ -1891,13 +1902,7 @@ RefPtr<ProgramLayout> specializeProgramLayout(
     newProgramLayout = new ProgramLayout();
     newProgramLayout->bindingForHackSampler = programLayout->bindingForHackSampler;
     newProgramLayout->hackSamplerVar = programLayout->hackSamplerVar;
-    for (auto & entryPoint : programLayout->entryPoints)
-    {
-        RefPtr<EntryPointLayout> newEntryPoint = new EntryPointLayout(*entryPoint);
-        // TODO: for now just copy existing entry point layouts, but we eventually need to
-        // specialize these as well...
-        newProgramLayout->entryPoints.Add(newEntryPoint);
-    }
+    newProgramLayout->globalGenericParams = programLayout->globalGenericParams;
 
     List<RefPtr<TypeLayout>> paramTypeLayouts;
     auto globalStructLayout = getGlobalStructLayout(programLayout);
@@ -1919,7 +1924,7 @@ RefPtr<ProgramLayout> specializeProgramLayout(
     SharedParameterBindingContext sharedContext;
     sharedContext.compileRequest = targetReq->compileRequest;
     sharedContext.defaultLayoutRules = layoutContext.getRulesFamily();
-    sharedContext.programLayout = programLayout;
+    sharedContext.programLayout = newProgramLayout;
 
     // Create a sub-context to collect parameters that get
     // declared into the global scope
@@ -1928,6 +1933,15 @@ RefPtr<ProgramLayout> specializeProgramLayout(
     context.translationUnit = nullptr;
     context.layoutContext = layoutContext;
     
+    
+    for (auto & translationUnit : targetReq->compileRequest->translationUnits)
+    {
+        for (auto & entryPoint : translationUnit->entryPoints)
+        {
+            collectEntryPointParameters(&context, entryPoint, typeSubst);
+        }
+    }
+
     auto constantBufferRules = context.getRulesFamily()->getConstantBufferRules();
     structLayout->rules = constantBufferRules;
 

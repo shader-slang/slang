@@ -457,10 +457,7 @@ public:
 
     UInt RoundUpToAlignment(UInt size, UInt alignment)
     {
-        if (size % alignment)
-            return (size / alignment + 1) * alignment;
-        else
-            return Math::Max(size, alignment);
+        return ((size + alignment - 1) / alignment) * alignment;
     }
 
     virtual Buffer* createBuffer(BufferDesc const& desc) override
