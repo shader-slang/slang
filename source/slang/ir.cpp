@@ -131,7 +131,7 @@ namespace Slang
         return entryBlock->getFirstParam();
     }
 
-    void IRFunc::addBlock(IRBlock* block)
+    void IRGlobalValueWithCode::addBlock(IRBlock* block)
     {
         block->parentFunc = this;
 
@@ -3346,6 +3346,11 @@ namespace Slang
         }
     }
 
+    void cloneGlobalValueWithCodeCommon(
+        IRSpecContextBase*      context,
+        IRGlobalValueWithCode*  clonedValue,
+        IRGlobalValueWithCode*  originalValue);
+
     IRGlobalVar* cloneGlobalVar(IRSpecContext* context, IRGlobalVar* originalVar)
     {
         auto clonedVar = context->builder->createGlobalVar(context->maybeCloneType(originalVar->getType()->getValueType()));
@@ -3362,8 +3367,12 @@ namespace Slang
             context->builder->addLayoutDecoration(clonedVar, layout);
         }
 
-        // TODO: once we support initializers on global variables,
-        // we'll need to handle cloning it here.
+        // Clone any code in the body of the variable, since this
+        // represents the initializer.
+        cloneGlobalValueWithCodeCommon(
+            context,
+            clonedVar,
+            originalVar);
 
         return clonedVar;
     }
@@ -3392,34 +3401,28 @@ namespace Slang
         return clonedTable;
     }
 
-    void cloneFunctionCommon(
-        IRSpecContextBase*  context,
-        IRFunc*         clonedFunc,
-        IRFunc*         originalFunc)
+    void cloneGlobalValueWithCodeCommon(
+        IRSpecContextBase*      context,
+        IRGlobalValueWithCode*  clonedValue,
+        IRGlobalValueWithCode*  originalValue)
     {
-        // First clone all the simple properties.
-        clonedFunc->mangledName = originalFunc->mangledName;
-        clonedFunc->genericDecl = originalFunc->genericDecl;
-        clonedFunc->type = context->maybeCloneType(originalFunc->type);
-
-        cloneDecorations(context, clonedFunc, originalFunc);
-
         // Next we are going to clone the actual code.
         IRBuilder builderStorage = *context->builder;
         IRBuilder* builder = &builderStorage;
-        builder->curFunc = clonedFunc;
+        builder->curFunc = clonedValue;
+
 
         // We will walk through the blocks of the function, and clone each of them.
         //
         // We need to create the cloned blocks first, and then walk through them,
         // because blocks might be forward referenced (this is not possible
         // for other cases of instructions).
-        for (auto originalBlock = originalFunc->getFirstBlock();
+        for (auto originalBlock = originalValue->getFirstBlock();
             originalBlock;
             originalBlock = originalBlock->getNextBlock())
         {
             IRBlock* clonedBlock = builder->createBlock();
-            clonedFunc->addBlock(clonedBlock);
+            clonedValue->addBlock(clonedBlock);
             registerClonedValue(context, clonedBlock, originalBlock);
 
             // We can go ahead and clone parameters here, while we are at it.
@@ -3438,8 +3441,8 @@ namespace Slang
         // Okay, now we are in a good position to start cloning
         // the instructions inside the blocks.
         {
-            IRBlock* ob = originalFunc->getFirstBlock();
-            IRBlock* cb = clonedFunc->getFirstBlock();
+            IRBlock* ob = originalValue->getFirstBlock();
+            IRBlock* cb = clonedValue->getFirstBlock();
             while (ob)
             {
                 assert(cb);
@@ -3454,6 +3457,25 @@ namespace Slang
                 cb = cb->getNextBlock();
             }
         }
+
+    }
+
+    void cloneFunctionCommon(
+        IRSpecContextBase*  context,
+        IRFunc*         clonedFunc,
+        IRFunc*         originalFunc)
+    {
+        // First clone all the simple properties.
+        clonedFunc->mangledName = originalFunc->mangledName;
+        clonedFunc->genericDecl = originalFunc->genericDecl;
+        clonedFunc->type = context->maybeCloneType(originalFunc->type);
+
+        cloneDecorations(context, clonedFunc, originalFunc);
+
+        cloneGlobalValueWithCodeCommon(
+            context,
+            clonedFunc,
+            originalFunc);
 
         // Shuffle the function to the end of the list, because
         // it needs to follow its dependencies.

@@ -19,6 +19,7 @@ class   Type;
 class   Session;
 
 struct  IRFunc;
+struct  IRGlobalValueWithCode;
 struct  IRInst;
 struct  IRModule;
 struct  IRUser;
@@ -364,9 +365,9 @@ struct IRBlock : IRValue
     void addParam(IRParam* param);
 
     // The parent function that contains this block
-    IRFunc* parentFunc;
+    IRGlobalValueWithCode* parentFunc;
 
-    IRFunc* getParent() { return parentFunc; }
+    IRGlobalValueWithCode* getParent() { return parentFunc; }
 
 };
 
@@ -405,11 +406,26 @@ struct IRGlobalValue : IRValue
     void moveToEnd();
 };
 
+/// @brief A global value that potentially holds executable code.
+///
+struct IRGlobalValueWithCode : IRGlobalValue
+{
+    // The list of basic blocks in this function
+    IRBlock*    firstBlock = nullptr;
+    IRBlock*    lastBlock = nullptr;
+
+    IRBlock* getFirstBlock() { return firstBlock; }
+    IRBlock* getLastBlock() { return lastBlock; }
+
+    // Add a block to the end of this function.
+    void addBlock(IRBlock* block);
+};
+
 // A function is a parent to zero or more blocks of instructions.
 //
 // A function is itself a value, so that it can be a direct operand of
 // an instruction (e.g., a call).
-struct IRFunc : IRGlobalValue
+struct IRFunc : IRGlobalValueWithCode
 {
     // The type of the IR-level function
     IRFuncType* getType() { return (IRFuncType*) type.Ptr(); }
@@ -424,16 +440,6 @@ struct IRFunc : IRGlobalValue
     Type* getResultType();
     UInt getParamCount();
     Type* getParamType(UInt index);
-
-    // The list of basic blocks in this function
-    IRBlock*    firstBlock = nullptr;
-    IRBlock*    lastBlock = nullptr;
-
-    IRBlock* getFirstBlock() { return firstBlock; }
-    IRBlock* getLastBlock() { return lastBlock; }
-
-    // Add a block to the end of this function.
-    void addBlock(IRBlock* block);
 
     // Convenience accessor for the IR parameters,
     // which are actually the parameters of the first
