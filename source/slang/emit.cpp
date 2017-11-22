@@ -2708,18 +2708,12 @@ struct EmitVisitor
 
         for(auto attr : decl->GetModifiersOfType<HLSLUncheckedAttribute>())
         {
-            if(getText(attr->getName()) == "loop")
-            {
-                Emit("[loop]");
-            }
-            else if(getText(attr->getName()) == "unroll")
-            {
-                Emit("[unroll]");
-            }
-            else if(getText(attr->getName()) == "allow_uav_condition")
-            {
-                Emit("[allow_uav_condition]");
-            }
+            // Emit whatever attributes the user might have attached,
+            // whether or not we think they make semantic sense.
+            //
+            Emit("[");
+            emit(attr->getName());
+            Emit("]");
         }
     }
 
