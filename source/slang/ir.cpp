@@ -3109,7 +3109,7 @@ namespace Slang
 
     RefPtr<Type> IRSpecContext::maybeCloneType(Type* originalType)
     {
-        auto rsType = originalType->Substitute(subst).As<Type>();
+        auto rsType = originalType->GetCanonicalType()->Substitute(subst).As<Type>();
         if (auto declRefType = rsType.As<DeclRefType>())
         {
             if (subst)
@@ -3117,6 +3117,14 @@ namespace Slang
                 auto newSubst = cloneSubstitutions(this, subst);
                 insertSubstAtBottom(declRefType->declRef.substitutions, newSubst);
             }
+        }
+        else if (auto funcType = rsType.As<FuncType>())
+        {
+            RefPtr<FuncType> newFuncType = new FuncType();
+            newFuncType->setSession(funcType->getSession());
+            newFuncType->resultType = maybeCloneType(funcType->resultType);
+            for (auto paramType : funcType->paramTypes)
+                newFuncType->paramTypes.Add(maybeCloneType(paramType));
         }
         return rsType;
     }

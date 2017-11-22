@@ -1309,9 +1309,39 @@ void Type::accept(IValVisitor* visitor, void* extra)
         UNREACHABLE_RETURN(expr);
     }
 
+    bool hasGlobalGenericSubst(Substitutions * destSubst, GlobalGenericParamSubstitution * genSubst)
+    {
+        while (destSubst)
+        {
+            if (auto globalParamSubst = dynamic_cast<GlobalGenericParamSubstitution*>(destSubst))
+            {
+                if (globalParamSubst->paramDecl == genSubst->paramDecl)
+                    return true;
+            }
+            destSubst = destSubst->outer;
+        }
+        return false;
+    }
+    void insertGlobalGenericSubstitutions(RefPtr<Substitutions> & destSubst, Substitutions * srcSubst)
+    {
+        while (srcSubst)
+        {
+            if (auto globalGenSubst = dynamic_cast<GlobalGenericParamSubstitution*>(srcSubst))
+            {
+                if (!hasGlobalGenericSubst(destSubst, globalGenSubst))
+                {
+                    RefPtr<GlobalGenericParamSubstitution> cpyGlobalGenSubst = new GlobalGenericParamSubstitution(*globalGenSubst);
+                    cpyGlobalGenSubst->outer = nullptr;
+                    insertSubstAtBottom(destSubst, cpyGlobalGenSubst);
+                }
+            }
+            srcSubst = srcSubst->outer;
+        }
+    }
 
     DeclRefBase DeclRefBase::SubstituteImpl(Substitutions* subst, int* ioDiff)
     {
+        insertGlobalGenericSubstitutions(substitutions, subst);
         if (!substitutions) return *this;
 
         int diff = 0;
