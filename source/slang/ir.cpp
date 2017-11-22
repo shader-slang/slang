@@ -3103,10 +3103,30 @@ namespace Slang
     IRGlobalVar* cloneGlobalVar(IRSpecContext* context, IRGlobalVar* originalVar);
     IRFunc* cloneFunc(IRSpecContext* context, IRFunc* originalFunc);
     IRWitnessTable* cloneWitnessTable(IRSpecContext* context, IRWitnessTable* originalVar);
+    RefPtr<Substitutions> cloneSubstitutions(
+        IRSpecContext*  context,
+        Substitutions*  subst);
 
     RefPtr<Type> IRSpecContext::maybeCloneType(Type* originalType)
     {
-        return originalType->Substitute(subst).As<Type>();
+        auto rsType = originalType->GetCanonicalType()->Substitute(subst).As<Type>();
+        if (auto declRefType = rsType.As<DeclRefType>())
+        {
+            if (subst)
+            {
+                auto newSubst = cloneSubstitutions(this, subst);
+                insertSubstAtBottom(declRefType->declRef.substitutions, newSubst);
+            }
+        }
+        else if (auto funcType = rsType.As<FuncType>())
+        {
+            RefPtr<FuncType> newFuncType = new FuncType();
+            newFuncType->setSession(funcType->getSession());
+            newFuncType->resultType = maybeCloneType(funcType->resultType);
+            for (auto paramType : funcType->paramTypes)
+                newFuncType->paramTypes.Add(maybeCloneType(paramType));
+        }
+        return rsType;
     }
 
     IRValue* IRSpecContext::maybeCloneValue(IRValue* originalValue)
@@ -3240,6 +3260,15 @@ namespace Slang
         {
             RefPtr<ThisTypeSubstitution> newSubst = new ThisTypeSubstitution();
             newSubst->sourceType = thisSubst->sourceType;
+            newSubst->outer = cloneSubstitutions(context, subst->outer);
+            return newSubst;
+        }
+        else if (auto genTypeSubst = dynamic_cast<GlobalGenericParamSubstitution*>(subst))
+        {
+            RefPtr<GlobalGenericParamSubstitution> newSubst = new GlobalGenericParamSubstitution();
+            newSubst->actualType = genTypeSubst->actualType;
+            newSubst->paramDecl = genTypeSubst->paramDecl;
+            newSubst->witnessTables = genTypeSubst->witnessTables;
             newSubst->outer = cloneSubstitutions(context, subst->outer);
             return newSubst;
         }

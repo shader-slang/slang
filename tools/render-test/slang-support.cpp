@@ -82,12 +82,12 @@ struct SlangShaderCompilerWrapper : public ShaderCompiler
 			spSetCompileFlags(slangRequest, SLANG_COMPILE_FLAG_NO_CHECKING);
 		}
 		ShaderProgram * result = nullptr;
+        Slang::List<const char*> rawTypeNames;
+        for (auto typeName : request.entryPointTypeArguments)
+            rawTypeNames.Add(typeName.Buffer());
 		if (request.computeShader.name)
 		{
-            Slang::List<const char*> rawTypeNames;
-            for (auto typeName : request.entryPointTypeArguments)
-                rawTypeNames.Add(typeName.Buffer());
-			int computeEntryPoint = spAddEntryPointEx(slangRequest, computeTranslationUnit, 
+		    int computeEntryPoint = spAddEntryPointEx(slangRequest, computeTranslationUnit, 
                 computeEntryPointName, 
                 spFindProfile(slangSession, request.computeShader.profile),
                 (int)rawTypeNames.Count(),
@@ -107,8 +107,8 @@ struct SlangShaderCompilerWrapper : public ShaderCompiler
 		}
 		else
 		{
-			int vertexEntryPoint = spAddEntryPoint(slangRequest, vertexTranslationUnit, vertexEntryPointName, spFindProfile(slangSession, request.vertexShader.profile));
-			int fragmentEntryPoint = spAddEntryPoint(slangRequest, fragmentTranslationUnit, fragmentEntryPointName, spFindProfile(slangSession, request.fragmentShader.profile));
+			int vertexEntryPoint = spAddEntryPointEx(slangRequest, vertexTranslationUnit, vertexEntryPointName, spFindProfile(slangSession, request.vertexShader.profile), (int)rawTypeNames.Count(), rawTypeNames.Buffer());
+			int fragmentEntryPoint = spAddEntryPointEx(slangRequest, fragmentTranslationUnit, fragmentEntryPointName, spFindProfile(slangSession, request.fragmentShader.profile), (int)rawTypeNames.Count(), rawTypeNames.Buffer());
 
 			int compileErr = spCompile(slangRequest);
 			if (auto diagnostics = spGetDiagnosticOutput(slangRequest))
