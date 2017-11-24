@@ -489,7 +489,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
             bool restore = false;
             if (thisSubst && thisSubst->sourceType.Ptr() == dynamic_cast<Val*>(this))
                 thisSubst->sourceType = nullptr;
-            auto newSubst = declRef.substitutions->SubstituteImpl(subst, ioDiff);
+            auto newSubst = substituteSubstitutions(declRef.substitutions, subst, ioDiff);
             if (restore)
                 thisSubst->sourceType = oldSubstSrc;
             if (auto thisTypeSubst = newSubst.As<ThisTypeSubstitution>())
@@ -1205,9 +1205,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         if (!this) return nullptr;
 
         int diff = 0;
-        RefPtr<Substitutions> outerSubst;
-        if (outer)
-            outerSubst = outer->SubstituteImpl(subst, &diff);
+        RefPtr<Substitutions> outerSubst = outer ? outer->SubstituteImpl(subst, &diff) : nullptr;
         RefPtr<Val> newSourceType;
         if (sourceType)
             newSourceType = sourceType->SubstituteImpl(subst, &diff);
@@ -1244,9 +1242,36 @@ void Type::accept(IValVisitor* visitor, void* extra)
         return false;
     }
 
-    RefPtr<Substitutions> GlobalGenericParamSubstitution::SubstituteImpl(Substitutions* /*subst*/, int* /*ioDiff*/)
+    RefPtr<Substitutions> GlobalGenericParamSubstitution::SubstituteImpl(Substitutions* subst, int* ioDiff)
     {
-        // we will never replace values for this type of substitution
+        // if we find a GlobalGenericParamSubstitution in subst that references the same __generic_param decl
+        // return a copy of that GlobalGenericParamSubstitution
+        int diff = 0;
+        RefPtr<Substitutions> outerSubst = outer ? outer->SubstituteImpl(subst, &diff) : nullptr;
+        while (subst)
+        {
+            if (auto gSubst = dynamic_cast<GlobalGenericParamSubstitution*>(subst))
+            {
+                if (gSubst->paramDecl == paramDecl)
+                {
+                    // substitute only if we are really different
+                    if (!gSubst->actualType->EqualsVal(actualType))
+                    {
+                        RefPtr<GlobalGenericParamSubstitution> rs = new GlobalGenericParamSubstitution(*gSubst);
+                        rs->outer = outerSubst;
+                        return rs;
+                    }
+                }
+            }
+            subst = subst->outer;
+        }
+        if (diff)
+        {
+            *ioDiff++;
+            RefPtr<GlobalGenericParamSubstitution> rs = new GlobalGenericParamSubstitution(*this);
+            rs->outer = outerSubst;
+            return rs;
+        }
         return this;
     }
 
@@ -1322,8 +1347,9 @@ void Type::accept(IValVisitor* visitor, void* extra)
         }
         return false;
     }
-    void insertGlobalGenericSubstitutions(RefPtr<Substitutions> & destSubst, Substitutions * srcSubst)
+    void insertGlobalGenericSubstitutions(RefPtr<Substitutions> & destSubst, Substitutions * srcSubst, int * ioDiff)
     {
+        int diff = 0;
         while (srcSubst)
         {
             if (auto globalGenSubst = dynamic_cast<GlobalGenericParamSubstitution*>(srcSubst))
@@ -1333,19 +1359,18 @@ void Type::accept(IValVisitor* visitor, void* extra)
                     RefPtr<GlobalGenericParamSubstitution> cpyGlobalGenSubst = new GlobalGenericParamSubstitution(*globalGenSubst);
                     cpyGlobalGenSubst->outer = nullptr;
                     insertSubstAtBottom(destSubst, cpyGlobalGenSubst);
+                    diff = 1;
                 }
             }
             srcSubst = srcSubst->outer;
         }
+        *ioDiff += diff;
     }
 
     DeclRefBase DeclRefBase::SubstituteImpl(Substitutions* subst, int* ioDiff)
     {
-        insertGlobalGenericSubstitutions(substitutions, subst);
-        if (!substitutions) return *this;
-
         int diff = 0;
-        RefPtr<Substitutions> substSubst = substitutions->SubstituteImpl(subst, &diff);
+        RefPtr<Substitutions> substSubst = substituteSubstitutions(substitutions, subst, &diff);
 
         if (!diff)
             return *this;
@@ -1839,6 +1864,16 @@ void Type::accept(IValVisitor* visitor, void* extra)
             p = p->outer.Ptr();
         }
         return nullptr;
+    }
+
+    RefPtr<Substitutions> substituteSubstitutions(RefPtr<Substitutions> oldSubst, Substitutions * subst, int * ioDiff)
+    {
+        if (oldSubst)
+            oldSubst = oldSubst->SubstituteImpl(subst, ioDiff);
+
+        RefPtr<Substitutions> newSubst = oldSubst;
+        insertGlobalGenericSubstitutions(newSubst, subst, ioDiff);
+        return newSubst;
     }
 
     // FilteredTupleType

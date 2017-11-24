@@ -1162,6 +1162,23 @@ namespace Slang
     void removeSubstitution(DeclRefBase & declRef, RefPtr<Substitutions> subst);
     bool hasGenericSubstitutions(RefPtr<Substitutions> subst);
     RefPtr<GenericSubstitution> getGenericSubstitution(RefPtr<Substitutions> subst);
+
+    // This function substitutes the type arguments referenced in a linked list of substitutions 
+    // which head is at `substHead` using the substitutions specified by `subst`. If the linked
+    // list `substHead` does not contain `GlobalGenericParamSubstitution` entries, they will be 
+    // added to the bottom(outter most) of the linked list.
+    // Note that this function should be called when `substHead` is known to be the head of 
+    // substitution linked list because the existance of `GlobalGenericPaaramSubstitution` is 
+    // detected assuming the linked lists starts at `substHead`. If a substitution that is not 
+    // the head of a substitution linked list is passed in, duplicate 
+    // `GlobalGenericParamSubstitution`s could be appended to the linked list.
+    // This means that this function should * not* be called in places like 
+    // `GenericSubstitution::SubstitutionImpl()` for its outer substitutions, because `outer` is 
+    // obviously not the head of the linked list. Instead, use this function to substitution the 
+    // substitution lists of `DeclRef` etc. to replace the call of 
+    // `declRef.substitutions->SubstituteImpl()`, because the head to the linked list is known as a 
+    // member of that class there.
+    RefPtr<Substitutions> substituteSubstitutions(RefPtr<Substitutions> oldSubst, Substitutions * subst, int * ioDiff);
 } // namespace Slang
 
 #endif
