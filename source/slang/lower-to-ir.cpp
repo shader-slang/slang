@@ -269,6 +269,7 @@ LoweredValInfo LoweredValInfo::swizzledLValue(
 struct SharedIRGenContext
 {
     CompileRequest* compileRequest;
+    ModuleDecl*     mainModuleDecl;
 
     Dictionary<Decl*, LoweredValInfo> declValues;
 
@@ -2534,6 +2535,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         SLANG_UNIMPLEMENTED_X("decl catch-all");
     }
 
+    LoweredValInfo visitEmptyDecl(EmptyDecl* /*decl*/)
+    {
+        return LoweredValInfo();
+    }
+
     LoweredValInfo visitTypeDefDecl(TypeDefDecl * decl)
     {
         return LoweredValInfo::simple(context->irBuilder->getTypeVal(decl->type.type));
@@ -2691,7 +2697,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         context->shared->declValues[
             DeclRef<VarDeclBase>(decl, nullptr)] = globalVal;
 
-        if( auto initExpr = decl->initExpr )
+        if (isImportedDecl(decl))
+        {
+            // Always emit imported declarations as declarations,
+            // and not definitions.
+        }
+        else if( auto initExpr = decl->initExpr )
         {
             IRBuilder subBuilderStorage = *getBuilder();
             IRBuilder* subBuilder = &subBuilderStorage;
@@ -3131,6 +3142,49 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         irFunc->mangledName = mangledName;
     }
 
+    ModuleDecl* findModuleDecl(Decl* decl)
+    {
+        for (auto dd = decl; dd; dd = dd->ParentDecl)
+        {
+            if (auto moduleDecl = dynamic_cast<ModuleDecl*>(dd))
+                return moduleDecl;
+        }
+        return nullptr;
+    }
+
+    bool isFromStdLib(Decl* decl)
+    {
+        for (auto dd = decl; dd; dd = dd->ParentDecl)
+        {
+            if (dd->HasModifier<FromStdLibModifier>())
+                return true;
+        }
+        return false;
+    }
+
+    bool isImportedDecl(Decl* decl)
+    {
+        ModuleDecl* moduleDecl = findModuleDecl(decl);
+        if (!moduleDecl)
+            return false;
+
+        // HACK: don't treat standard library code as
+        // being imported for right now, just because
+        // we don't load its IR in the same way as
+        // for other imports.
+        //
+        // TODO: Fix this the right way, by having standard
+        // library declarations have IR modules that we link
+        // in via the normal means.
+        if (isFromStdLib(decl))
+            return false;
+
+        if (moduleDecl != this->context->shared->mainModuleDecl)
+            return true;
+
+        return false;
+    }
+
     LoweredValInfo lowerFuncDecl(FunctionDeclBase* decl)
     {
         // Collect the parameter lists we will use for our new function.
@@ -3248,18 +3302,17 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             irResultType);
         irFunc->type = irFuncType;
 
-        if (!decl->Body)
+        if (isImportedDecl(decl))
+        {
+            // Always emit imported declarations as declarations,
+            // and not definitions.
+        }
+        else if (!decl->Body)
         {
             // This is a function declaration without a body.
             // In Slang we currently try not to support forward declarations
-            // (although we might have to give in eventually), so the
-            // only case where this arises is for a function that
-            // needs to be imported from another module.
-
-            // TODO: we may need to attach something to the declaration,
-            // so that later passes don't get confused by it not having
-            // a body.
-
+            // (although we might have to give in eventually), so
+            // this case should really only occur for builtin declarations.
         }
         else
         {
@@ -3594,6 +3647,10 @@ LoweredValInfo maybeEmitSpecializeInst(IRGenContext*   context,
     if (!hasGenericSubstitutions(declRef.substitutions))
         return loweredDecl;
 
+    // There's no reason to specialize something that maps to a NULL pointer.
+    if (loweredDecl.flavor == LoweredValInfo::Flavor::None)
+        return loweredDecl;
+
     auto val = getSimpleVal(context, loweredDecl);
 
     // We have the "raw" substitutions from the AST, but we may
@@ -3635,7 +3692,7 @@ static void lowerEntryPointToIR(
     // we need to lower all global type arguments as well
     for (auto arg : entryPointRequest->genericParameterTypes)
         lowerType(context, arg);
-    auto loweredEntryPointFunc = lowerDecl(context, entryPointFuncDecl);
+    auto loweredEntryPointFunc = ensureDecl(context, entryPointFuncDecl);
 }
 
 #if 0
@@ -3682,12 +3739,18 @@ IRModule* lowerEntryPointToIR(
 IRModule* generateIRForTranslationUnit(
     TranslationUnitRequest* translationUnit)
 {
+    // If the user did not opt into IR usage, then don't compile IR
+    // for the translation unit.
+    if (!(translationUnit->compileFlags & SLANG_COMPILE_FLAG_USE_IR))
+        return nullptr;
+
     auto compileRequest = translationUnit->compileRequest;
 
     SharedIRGenContext sharedContextStorage;
     SharedIRGenContext* sharedContext = &sharedContextStorage;
 
     sharedContext->compileRequest = compileRequest;
+    sharedContext->mainModuleDecl = translationUnit->SyntaxNode;
 
     IRGenContext contextStorage;
     IRGenContext* context = &contextStorage;
@@ -3710,9 +3773,22 @@ IRModule* generateIRForTranslationUnit(
 
     // We need to emit IR for all public/exported symbols
     // in the translation unit.
+    //
+    // For now, we will assume that *all* global-scope declarations
+    // represent public/exported symbols.
+
+    // First, ensure that all entry points have been emitted,
+    // in case they require special handling.
     for (auto entryPoint : translationUnit->entryPoints)
     {
         lowerEntryPointToIR(context, entryPoint);
+    }
+    //
+    // Next, ensure that all other global declarations have
+    // been emitted.
+    for (auto decl : translationUnit->SyntaxNode->Members)
+    {
+        ensureDecl(context, decl);
     }
 
     // If we are being sked to dump IR during compilation,

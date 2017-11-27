@@ -6648,8 +6648,9 @@ namespace Slang
                 globalGenericParams.Add(p);
         }
         // add imported modules
-        for (auto moduleDecl : entryPoint->compileRequest->loadedModulesList)
+        for (auto loadedModule : entryPoint->compileRequest->loadedModulesList)
         {
+            auto moduleDecl = loadedModule->moduleDecl;
             auto globalGenParams = moduleDecl->getMembersOfType<GlobalGenericParamDecl>();
             for (auto p : globalGenParams)
                 globalGenericParams.Add(p);

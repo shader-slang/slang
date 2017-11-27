@@ -211,6 +211,19 @@ namespace Slang
         String  path;
     };
 
+    // Represents a module that has been loaded through the front-end
+    // (up through IR generation).
+    //
+    class LoadedModule : public RefObject
+    {
+    public:
+        // The AST for the module
+        RefPtr<ModuleDecl>  moduleDecl;
+
+        // The IR for the module
+        IRModule* irModule = nullptr;
+    };
+
     class Session;
 
     class CompileRequest : public RefObject
@@ -285,13 +298,13 @@ namespace Slang
         // Modules that have been dynamically loaded via `import`
         //
         // This is a list of unique modules loaded, in the order they were encountered.
-        List<RefPtr<ModuleDecl> > loadedModulesList;
+        List<RefPtr<LoadedModule> > loadedModulesList;
 
         // Map from the path of a module file to its definition
-        Dictionary<String, RefPtr<ModuleDecl>> mapPathToLoadedModule;
+        Dictionary<String, RefPtr<LoadedModule>> mapPathToLoadedModule;
 
         // Map from the logical name of a module to its definition
-        Dictionary<Name*, RefPtr<ModuleDecl>> mapNameToLoadedModules;
+        Dictionary<Name*, RefPtr<LoadedModule>> mapNameToLoadedModules;
 
 
         CompileRequest(Session* session);
@@ -343,6 +356,11 @@ namespace Slang
         void handlePoundImport(
             String const&       path,
             TokenList const&    tokens);
+
+        void loadParsedModule(
+            RefPtr<TranslationUnitRequest> const&   translationUnit,
+            Name*                                   name,
+            String const&                           path);
 
         RefPtr<ModuleDecl> findOrImportModule(
             Name*               name,
