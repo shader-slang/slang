@@ -203,15 +203,11 @@ void CompileRequest::generateIR()
     // in isolation.
     for( auto& translationUnit : translationUnits )
     {
-        // If the user opted out of semantic checking for
-        // the translation unit, then IR code generation
-        // is not in general even possible; there might
-        // be semantics errors (diagnosed or not) in the
-        // code, and we don't want to deal with those.
-        if (translationUnit->compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING)
+        // Also skip IR generation if semantic checking is turned off
+        // for a given translation unit.
+        if(translationUnit->compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING)
             continue;
 
-        // Okay, we seem to be in the clear now.
         translationUnit->irModule = generateIRForTranslationUnit(translationUnit);
     }
 }
@@ -462,6 +458,7 @@ RefPtr<ModuleDecl> CompileRequest::loadModule(
     // semantic checking to be enabled.
     //
     // TODO: decide which options, if any, should be inherited.
+    translationUnit->compileFlags = this->compileFlags & (SLANG_COMPILE_FLAG_USE_IR);
 
     RefPtr<SourceFile> sourceFile = getSourceManager()->allocateSourceFile(path, source);
 
@@ -485,6 +482,8 @@ void CompileRequest::handlePoundImport(
 {
     RefPtr<TranslationUnitRequest> translationUnit = new TranslationUnitRequest();
     translationUnit->compileRequest = this;
+
+    translationUnit->compileFlags = this->compileFlags & (SLANG_COMPILE_FLAG_USE_IR);
 
     // Imported code is always native Slang code
     RefPtr<Scope> languageScope = mSession->slangLanguageScope;

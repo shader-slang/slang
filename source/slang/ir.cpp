@@ -3041,7 +3041,38 @@ namespace Slang
         IRValue*    clonedValue,
         IRValue*    originalValue)
     {
+        if(!originalValue)
+            return;
         context->getClonedValues().Add(originalValue, clonedValue);
+    }
+
+    // Information on values to use when registering a cloned value
+    struct IROriginalValuesForClone
+    {
+        IRValue*        originalVal = nullptr;
+        IRSpecSymbol*   sym = nullptr;
+
+        IROriginalValuesForClone() {}
+
+        IROriginalValuesForClone(IRValue* originalValue)
+            : originalVal(originalValue)
+        {}
+
+        IROriginalValuesForClone(IRSpecSymbol* symbol)
+            : sym(symbol)
+        {}
+    };
+
+    void registerClonedValue(
+        IRSpecContextBase*              context,
+        IRValue*                        clonedValue,
+        IROriginalValuesForClone const& originalValues)
+    {
+        registerClonedValue(context, clonedValue, originalValues.originalVal);
+        for( auto s = originalValues.sym; s; s = s->nextWithSameName )
+        {
+            registerClonedValue(context, clonedValue, s->irGlobalValue);
+        }
     }
 
     void cloneDecorations(
@@ -3100,9 +3131,7 @@ namespace Slang
     };
 
 
-    IRGlobalVar* cloneGlobalVar(IRSpecContext* context, IRGlobalVar* originalVar);
-    IRFunc* cloneFunc(IRSpecContext* context, IRFunc* originalFunc);
-    IRWitnessTable* cloneWitnessTable(IRSpecContext* context, IRWitnessTable* originalVar);
+    IRGlobalValue* cloneGlobalValue(IRSpecContext* context, IRGlobalValue* originalVal);
     RefPtr<Substitutions> cloneSubstitutions(
         IRSpecContext*  context,
         Substitutions*  subst);
@@ -3117,16 +3146,9 @@ namespace Slang
         switch (originalValue->op)
         {
         case kIROp_global_var:
-            return cloneGlobalVar(this, (IRGlobalVar*)originalValue);
-            break;
-
         case kIROp_Func:
-            return cloneFunc(this, (IRFunc*)originalValue);
-            break;
-
         case kIROp_witness_table:
-            return cloneWitnessTable(this, (IRWitnessTable*)originalValue);
-            break;
+            return cloneGlobalValue(this, (IRGlobalValue*) originalValue);
 
         case kIROp_boolConst:
             {
@@ -3334,10 +3356,13 @@ namespace Slang
         IRGlobalValueWithCode*  clonedValue,
         IRGlobalValueWithCode*  originalValue);
 
-    IRGlobalVar* cloneGlobalVar(IRSpecContext* context, IRGlobalVar* originalVar)
+    IRGlobalVar* cloneGlobalVarImpl(
+        IRSpecContext*  context,
+        IRGlobalVar*    originalVar,
+        IROriginalValuesForClone const& originalValues)
     {
         auto clonedVar = context->builder->createGlobalVar(context->maybeCloneType(originalVar->getType()->getValueType()));
-        registerClonedValue(context, clonedVar, originalVar);
+        registerClonedValue(context, clonedVar, originalValues);
 
         auto mangledName = originalVar->mangledName;
         clonedVar->mangledName = mangledName;
@@ -3360,10 +3385,13 @@ namespace Slang
         return clonedVar;
     }
 
-    IRWitnessTable* cloneWitnessTable(IRSpecContext* context, IRWitnessTable* originalTable)
+    IRWitnessTable* cloneWitnessTableImpl(
+        IRSpecContext*  context,
+        IRWitnessTable* originalTable,
+        IROriginalValuesForClone const& originalValues)
     {
         auto clonedTable = context->builder->createWitnessTable();
-        registerClonedValue(context, clonedTable, originalTable);
+        registerClonedValue(context, clonedTable, originalValues);
 
         auto mangledName = originalTable->mangledName;
         clonedTable->mangledName = mangledName;
@@ -3382,6 +3410,13 @@ namespace Slang
         }
 
         return clonedTable;
+    }
+
+    IRWitnessTable* cloneWitnessTableWithoutRegistering(
+        IRSpecContext*  context,
+        IRWitnessTable* originalTable)
+    {
+        return cloneWitnessTableImpl(context, originalTable, IROriginalValuesForClone());
     }
 
     void cloneGlobalValueWithCodeCommon(
@@ -3556,15 +3591,6 @@ namespace Slang
         return clonedFunc;
     }
 
-
-    IRFunc* cloneSimpleFunc(IRSpecContextBase* context, IRFunc* originalFunc)
-    {
-        auto clonedFunc = context->builder->createFunc();
-        registerClonedValue(context, clonedFunc, originalFunc);
-        cloneFunctionCommon(context, clonedFunc, originalFunc);
-        return clonedFunc;
-    }
-
     // Get a string form of the target so that we can
     // use it to match against target-specialization modifiers
     //
@@ -3687,57 +3713,111 @@ namespace Slang
         return false;
     }
 
-    IRFunc* cloneFunc(IRSpecContext* context, IRFunc* originalFunc)
+    IRFunc* cloneFuncImpl(
+        IRSpecContext*  context,
+        IRFunc*         originalFunc,
+        IROriginalValuesForClone const& originalValues)
     {
-        // We are being asked to clone a particular function, but in
-        // the IR that comes out of the front-end there could still
-        // be multiple, target-specific, declarations of any given
-        // function, all of which share the same mangled name.
-        auto mangledName = originalFunc->mangledName;
+        auto clonedFunc = context->builder->createFunc();
+        registerClonedValue(context, clonedFunc, originalValues);
+        cloneFunctionCommon(context, clonedFunc, originalFunc);
+        return clonedFunc;
+    }
 
+    // Directly clone a global value, based on a single definition/declaration, `originalVal`.
+    // The symbol `sym` will thread together other declarations of the same value, and
+    // we will register the new value as the cloned version of all of those.
+    IRGlobalValue* cloneGlobalValueImpl(
+        IRSpecContext*  context,
+        IRGlobalValue*  originalVal,
+        IRSpecSymbol*   sym)
+    {
+        if( !originalVal )
+        {
+            SLANG_UNEXPECTED("cloning a null value");
+            UNREACHABLE_RETURN(nullptr);
+        }
+
+        switch( originalVal->op )
+        {
+        case kIROp_Func:
+            return cloneFuncImpl(context, (IRFunc*) originalVal, sym);
+
+        case kIROp_global_var:
+            return cloneGlobalVarImpl(context, (IRGlobalVar*)originalVal, sym);
+
+        case kIROp_witness_table:
+            return cloneWitnessTableImpl(context, (IRWitnessTable*)originalVal, sym);
+
+        default:
+            SLANG_UNEXPECTED("unknown global value kind");
+            UNREACHABLE_RETURN(nullptr);
+        }
+
+    }
+
+    // Clone a global value, which has the given `mangledName`.
+    // The `originalVal` is a known global IR value with that name, if one is available.
+    // (It is okay for this parameter to be null).
+    IRGlobalValue* cloneGlobalValueWithMangledName(
+        IRSpecContext*  context,
+        String const&   mangledName,
+        IRGlobalValue*  originalVal)
+    {
         if(mangledName.Length() == 0)
         {
-            return cloneSimpleFunc(context, originalFunc);
+            // If there is no mangled name, then we assume this is a local symbol,
+            // and it can't possibly have multiple declarations.
+            return cloneGlobalValueImpl(context, originalVal, nullptr);
         }
 
         //
-        // We will scan through all of the available function declarations
-        // with the same mangled name as `originalFunc` and try
+        // We will scan through all of the available declarations
+        // with the same mangled name as `originalVal` and try
         // to pick the "best" one for our target.
 
         RefPtr<IRSpecSymbol> sym;
-        if( !context->getSymbols().TryGetValue(originalFunc->mangledName, sym) )
+        if( !context->getSymbols().TryGetValue(mangledName, sym) )
         {
             // This shouldn't happen!
-            SLANG_UNEXPECTED("no matching function registered");
-            UNREACHABLE_RETURN(cloneSimpleFunc(context, originalFunc));
+            SLANG_UNEXPECTED("no matching values registered");
+            UNREACHABLE_RETURN(cloneGlobalValueImpl(context, originalVal, nullptr));
         }
 
-        // We will try to track the "best" definition we can find.
-        IRFunc* bestFunc = (IRFunc*) sym->irGlobalValue;
-
+        // We will try to track the "best" declaration we can find.
+        //
+        // Generally, one declaration wil lbe better than another if it is
+        // more specialized for the chosen target. Otherwise, we simply favor
+        // definitions over declarations.
+        //
+        IRGlobalValue* bestVal = sym->irGlobalValue;
         for( auto ss = sym->nextWithSameName; ss; ss = ss->nextWithSameName )
         {
-            IRFunc* newFunc = (IRFunc*) ss->irGlobalValue;
-            if(isBetterForTarget(context, newFunc, bestFunc))
-                bestFunc = newFunc;
+            IRGlobalValue* newVal = ss->irGlobalValue;
+            if(isBetterForTarget(context, newVal, bestVal))
+                bestVal = newVal;
         }
 
-        // All right, we are now in a position to clone the "best"
-        // definition that was found.
-        auto clonedFunc = context->builder->createFunc();
+        return cloneGlobalValueImpl(context, bestVal, sym);
+    }
 
-        // The resulting function will be used as the cloned version
-        // of every declaration/definition in the original IR.
-        for( auto ss = sym; ss; ss = ss->nextWithSameName )
-        {
-            registerClonedValue(context, clonedFunc, ss->irGlobalValue);
-        }
+    IRGlobalValue* cloneGlobalValueWithMangledName(IRSpecContext* context, String const& mangledName)
+    {
+        return cloneGlobalValueWithMangledName(context, mangledName, nullptr);
+    }
 
-        // Clone the "best" definition into our context
-        cloneFunctionCommon(context, clonedFunc, bestFunc);
-
-        return clonedFunc;
+    // Clone a global value, where `originalVal` is one declaration/definition, but we might
+    // have to consider others, in order to find the "best" version of the symbol.
+    IRGlobalValue* cloneGlobalValue(IRSpecContext* context, IRGlobalValue* originalVal)
+    {
+        // We are being asked to clone a particular global value, but in
+        // the IR that comes out of the front-end there could still
+        // be multiple, target-specific, declarations of any given
+        // global value, all of which share the same mangled name.
+        return cloneGlobalValueWithMangledName(
+            context,
+            originalVal->mangledName,
+            originalVal);
     }
 
     StructTypeLayout* getGlobalStructLayout(
@@ -3857,7 +3937,7 @@ namespace Slang
                             globalVar = globalVar->getNextValue();
                         }
                         SLANG_ASSERT(table);
-                        table = cloneWitnessTable(context, (IRWitnessTable*)(table));
+                        table = cloneWitnessTableWithoutRegistering(context, (IRWitnessTable*)(table));
                         IRProxyVal * tableVal = new IRProxyVal();
                         tableVal->inst = table;
                         paramSubst->witnessTables.Add(KeyValuePair<RefPtr<Type>, RefPtr<Val>>(subtypeWitness->sup, tableVal));
@@ -3868,55 +3948,57 @@ namespace Slang
         return globalParamSubst;
     }
 
-    IRModule* specializeIRForEntryPoint(
+    struct IRSpecializationState
+    {
+        ProgramLayout*      programLayout;
+        CodeGenTarget       target;
+        TargetRequest*      targetReq;
+
+        IRModule* irModule = nullptr;
+        RefPtr<ProgramLayout> newProgramLayout;
+
+        IRSharedSpecContext sharedContextStorage;
+        IRSpecContext contextStorage;
+
+        IRSharedSpecContext* getSharedContext() { return &sharedContextStorage; }
+        IRSpecContext* getContext() { return &contextStorage; }
+    };
+
+    IRSpecializationState* createIRSpecializationState(
         EntryPointRequest*  entryPointRequest,
         ProgramLayout*      programLayout,
         CodeGenTarget       target,
         TargetRequest*      targetReq)
     {
+        IRSpecializationState* state = new IRSpecializationState();
+
+        state->programLayout = programLayout;
+        state->target = target;
+        state->targetReq = targetReq;
+
+
         auto compileRequest = entryPointRequest->compileRequest;
-        auto session = compileRequest->mSession;
         auto translationUnit = entryPointRequest->getTranslationUnit();
         auto originalIRModule = translationUnit->irModule;
-        if (!originalIRModule)
-        {
-            // We should already have emitted IR for the original
-            // translation unit, and it we don't have it, then
-            // we are now in trouble.
-            return nullptr;
-        }
 
-        // We now need to start cloning IR symbols from `originalIRModule`
-        // into a fresh IR module for this entry point. Along the way we need to:
-        //
-        // 1. Attach layout information from `programLayout` and/or `entryPointLayout`
-        //    onto the cloned IR symbols, to drive later code generation.
-        //
-        // 2. In cases where a function might have multiple target-specific definitions,
-        //    we need to pick the "best" one for the chosen code generation target.
-        //
-
-        IRSharedSpecContext sharedContextStorage;
-
+        auto sharedContext = state->getSharedContext();
         initializeSharedSpecContext(
-            &sharedContextStorage,
+            sharedContext,
             compileRequest->mSession,
             nullptr,
             originalIRModule);
+        state->irModule = sharedContext->module;
 
         // We also need to attach the IR definitions for symbols from
         // any loaded modules:
         for (auto loadedModule : compileRequest->loadedModulesList)
         {
-            insertGlobalValueSymbols(&sharedContextStorage, loadedModule->irModule);
+            insertGlobalValueSymbols(sharedContext, loadedModule->irModule);
         }
-        // any loaded modules
 
-
-        IRSpecContext contextStorage;
-        IRSpecContext*  context = &contextStorage;
-        context->shared = &sharedContextStorage;
-        context->builder = &sharedContextStorage.builderStorage;
+        auto context = state->getContext();
+        context->shared = sharedContext;
+        context->builder = &sharedContext->builderStorage;
         context->target = target;
 
         // Create the GlobalGenericParamSubstitution for substituting global generic types
@@ -3928,7 +4010,7 @@ namespace Slang
         // now specailize the program layout using the substitution
         RefPtr<ProgramLayout> newProgramLayout = specializeProgramLayout(targetReq, programLayout, globalParamSubst);
 
-        auto entryPointLayout = findEntryPointLayout(newProgramLayout, entryPointRequest);
+        state->newProgramLayout = newProgramLayout;
 
         // Next, we want to optimize lookup for layout infromation
         // associated with global declarations, so that we can 
@@ -3939,6 +4021,69 @@ namespace Slang
             String mangledName = getMangledName(globalVarLayout->varDecl);
             context->globalVarLayouts.AddIfNotExists(mangledName, globalVarLayout);
         }
+
+        return state;
+    }
+
+    void destroyIRSpecializationState(IRSpecializationState* state)
+    {
+        delete state;
+    }
+
+    IRModule* getIRModule(IRSpecializationState* state)
+    {
+        return state->irModule;
+    }
+
+    IRGlobalValue* getSpecializedGlobalValueForDeclRef(
+        IRSpecializationState*  state,
+        DeclRef<Decl> const&    declRef)
+    {
+        // We will start be ensuring that we have code for
+        // the declaration itself.
+        auto decl = declRef.getDecl();
+        auto mangledDeclName = getMangledName(decl);
+
+        IRGlobalValue* irDeclVal = cloneGlobalValueWithMangledName(
+            state->getContext(),
+            mangledDeclName);
+        if(!irDeclVal)
+            return nullptr;
+
+        // Now we need to deal with specializing the given
+        // IR value based on the substitutions applied to
+        // our declaration reference.
+
+        if(!declRef.substitutions)
+            return irDeclVal;
+
+        SLANG_UNEXPECTED("unhandled");
+        UNREACHABLE_RETURN(nullptr);
+    }
+
+    void specializeIRForEntryPoint(
+        IRSpecializationState*  state,
+        EntryPointRequest*  entryPointRequest)
+    {
+        auto target = state->target;
+
+        auto compileRequest = entryPointRequest->compileRequest;
+        auto session = compileRequest->mSession;
+        auto translationUnit = entryPointRequest->getTranslationUnit();
+        auto originalIRModule = translationUnit->irModule;
+        if (!originalIRModule)
+        {
+            // We should already have emitted IR for the original
+            // translation unit, and it we don't have it, then
+            // we are now in trouble.
+            return;
+        }
+
+        auto context = state->getContext();
+        auto newProgramLayout = state->newProgramLayout;
+
+        auto entryPointLayout = findEntryPointLayout(newProgramLayout, entryPointRequest);
+
 
         // Next, we make sure to clone the global value for
         // the entry point function itself, and rely on
@@ -3964,8 +4109,6 @@ namespace Slang
         default:
             break;
         }
-
-        return sharedContextStorage.module;
     }
 
     //

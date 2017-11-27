@@ -2,6 +2,7 @@
 #include "ast-legalize.h"
 
 #include "emit.h"
+#include "ir-insts.h"
 #include "type-layout.h"
 #include "visitor.h"
 
@@ -434,6 +435,10 @@ struct SharedLoweringContext
     CompileRequest*     compileRequest;
     EntryPointRequest*  entryPointRequest;
 
+    // The "main" module that is being translated (as opposed
+    // to any of the modules that might have been imported).
+    ModuleDecl* mainModuleDecl;
+
     ExtensionUsageTracker* extensionUsageTracker;
 
     ProgramLayout*      programLayout;
@@ -463,6 +468,12 @@ struct SharedLoweringContext
 
     bool isRewrite = false;
     bool requiresCopyGLPositionToPositionPerView = false;
+
+    // State for lowering imported declarations to IR as needed
+    IRSpecializationState* irSpecializationState = nullptr;
+
+    // The actual result we want to return
+    LoweredEntryPoint result;
 };
 
 static void attachLayout(
@@ -2123,7 +2134,7 @@ struct LoweringVisitor
         RefPtr<ScopeStmt>   loweredStmt,
         RefPtr<ScopeStmt>   originalStmt)
     {
-        loweredStmt->scopeDecl = translateDeclRef(originalStmt->scopeDecl).As<ScopeDecl>();
+        loweredStmt->scopeDecl = translateDeclRef(originalStmt->scopeDecl).getDecl()->As<ScopeDecl>();
 
         LoweringVisitor subVisitor = *this;
         subVisitor.isBuildingStmt = true;
@@ -2286,7 +2297,7 @@ struct LoweringVisitor
         ScopeStmt* originalStmt)
     {
         lowerStmtFields(loweredStmt, originalStmt);
-        loweredStmt->scopeDecl = translateDeclRef(originalStmt->scopeDecl).As<ScopeDecl>();
+        loweredStmt->scopeDecl = translateDeclRef(originalStmt->scopeDecl).getDecl()->As<ScopeDecl>();
     }
 
     // Child statements reference their parent statement,
@@ -2586,7 +2597,7 @@ struct LoweringVisitor
         if (auto genSubst = dynamic_cast<GenericSubstitution*>(inSubstitutions))
         {
             RefPtr<GenericSubstitution> result = new GenericSubstitution();
-            result->genericDecl = translateDeclRef(genSubst->genericDecl).As<GenericDecl>();
+            result->genericDecl = translateDeclRef(genSubst->genericDecl).getDecl()->As<GenericDecl>();
             for (auto arg : genSubst->args)
             {
                 result->args.Add(translateVal(arg));
@@ -2612,17 +2623,36 @@ struct LoweringVisitor
     }
 
     LoweredDeclRef translateDeclRef(
-        DeclRef<Decl> const& decl)
+        DeclRef<Decl> const& declRef)
     {
         LoweredDeclRef result;
-        result.decl = translateDeclRef(decl.decl);
-        result.substitutions = translateSubstitutions(decl.substitutions);
+        result.decl = translateDeclRefImpl(declRef);
+        result.substitutions = translateSubstitutions(declRef.substitutions);
         return result;
     }
 
     LoweredDecl translateDeclRef(
-        Decl* decl)
+        Decl*   decl)
     {
+        return translateDeclRefImpl(DeclRef<Decl>(decl, nullptr));
+    }
+
+    // Try to find the module that (recursively) contains a given declaration.
+    ModuleDecl* findModuleForDecl(
+        Decl*   decl)
+    {
+        for (auto dd = decl; dd; dd = dd->ParentDecl)
+        {
+            if (auto moduleDecl = dynamic_cast<ModuleDecl*>(dd))
+                return moduleDecl;
+        }
+        return nullptr;
+    }
+
+    LoweredDecl translateDeclRefImpl(
+        DeclRef<Decl>   declRef)
+    {
+        Decl* decl = declRef.getDecl();
         if (!decl) return LoweredDecl();
 
         // We don't want to translate references to built-in declarations,
@@ -2641,6 +2671,38 @@ struct LoweringVisitor
         if (getModifiedDecl(decl)->HasModifier<BuiltinModifier>())
             return decl;
 
+        // If we are using the IR, and the declaration comes from
+        // an imported module (rather than the "rewrite-mode" module
+        // being translated), then we need to ensure that it gets lowered
+        // to IR instead.
+        if (shared->compileRequest->compileFlags & SLANG_COMPILE_FLAG_USE_IR)
+        {
+            auto parentModule = findModuleForDecl(decl);
+            if (parentModule && (parentModule != shared->mainModuleDecl))
+            {
+                // Ensure that the IR code for the given declaration
+                // gets included in the output IR module, and *also*
+                // that we generate a suitable specialization of it
+                // if there are any substitutions in effect.
+
+                getSpecializedGlobalValueForDeclRef(
+                    shared->irSpecializationState,
+                    declRef);
+
+                // Remember that this declaration is handled via IR,
+                // rather than being present in the legalized AST.
+                shared->result.irDecls.Add(declRef.getDecl());
+
+                // We don't actually use the `IRGlobalValue` that the
+                // above operation returns, and instead just keep
+                // using the original declaration in the legalized
+                // AST. The step of mapping that declaration over
+                // to reference the IR symbol will happen later.
+
+                return decl;
+            }
+        }
+
         LoweredDecl loweredDecl;
         if (shared->loweredDecls.TryGetValue(decl, loweredDecl))
             return loweredDecl;
@@ -2649,10 +2711,10 @@ struct LoweringVisitor
         return lowerDecl(decl);
     }
 
-    RefPtr<ContainerDecl> translateDeclRef(
-        ContainerDecl* decl)
+    DeclRef<ContainerDecl> translateDeclRef(
+        DeclRef<ContainerDecl>  declRef)
     {
-        return translateDeclRef((Decl*)decl).getDecl()->As<ContainerDecl>();
+        return translateDeclRef(declRef).As<ContainerDecl>();
     }
 
     LoweredDecl lowerDeclBase(
@@ -2759,9 +2821,9 @@ struct LoweringVisitor
     {
         RefPtr<Decl> loweredParent;
         if (auto genericParentDecl = decl->ParentDecl->As<GenericDecl>())
-            loweredParent = translateDeclRef(genericParentDecl->ParentDecl);
+            loweredParent = translateDeclRef(genericParentDecl->ParentDecl).getDecl();
         else
-            loweredParent = translateDeclRef(decl->ParentDecl);
+            loweredParent = translateDeclRef(decl->ParentDecl).getDecl();
         if (loweredParent)
         {
             auto layoutMod = loweredParent->FindModifier<ComputedLayoutModifier>();
@@ -3518,7 +3580,7 @@ struct LoweringVisitor
         if (auto parentModuleDecl = pp.As<ModuleDecl>())
         {
             LoweringVisitor subVisitor = *this;
-            subVisitor.parentDecl = translateDeclRef(parentModuleDecl);
+            subVisitor.parentDecl = translateDeclRef(parentModuleDecl).getDecl()->As<ContainerDecl>();
             subVisitor.isBuildingStmt = false;
 
             return subVisitor.lowerVarDeclCommonInner(decl, loweredDeclClass);
@@ -4659,7 +4721,8 @@ LoweredEntryPoint lowerEntryPoint(
     EntryPointRequest*      entryPoint,
     ProgramLayout*          programLayout,
     CodeGenTarget           target,
-    ExtensionUsageTracker*  extensionUsageTracker)
+    ExtensionUsageTracker*  extensionUsageTracker,
+    IRSpecializationState*  irSpecializationState)
 {
     SharedLoweringContext sharedContext;
     sharedContext.compileRequest = entryPoint->compileRequest;
@@ -4667,8 +4730,10 @@ LoweredEntryPoint lowerEntryPoint(
     sharedContext.programLayout = programLayout;
     sharedContext.target = target;
     sharedContext.extensionUsageTracker = extensionUsageTracker;
+    sharedContext.irSpecializationState = irSpecializationState;
 
     auto translationUnit = entryPoint->getTranslationUnit();
+    sharedContext.mainModuleDecl = translationUnit->SyntaxNode;
 
     // Create a single module/program to hold all the lowered code
     // (with the exception of instrinsic/stdlib declarations, which
@@ -4711,7 +4776,6 @@ LoweredEntryPoint lowerEntryPoint(
 
     sharedContext.entryPointLayout = visitor.findEntryPointLayout(entryPoint);
 
-    LoweredEntryPoint result;
     if (isRewrite)
     {
         for (auto dd : translationUnit->SyntaxNode->Members)
@@ -4722,11 +4786,11 @@ LoweredEntryPoint lowerEntryPoint(
     else
     {
         auto loweredEntryPoint = visitor.lowerEntryPoint(entryPoint);
-        result.entryPoint = loweredEntryPoint;
+        sharedContext.result.entryPoint = loweredEntryPoint;
     }
 
-    result.program = sharedContext.loweredProgram;
+    sharedContext.result.program = sharedContext.loweredProgram;
 
-    return result;
+    return sharedContext.result;
 }
 }

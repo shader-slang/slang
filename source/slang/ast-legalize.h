@@ -37,11 +37,12 @@
 
 namespace Slang
 {
-    class EntryPointRequest;
-    class ProgramLayout;
-    class TranslationUnitRequest;
-
+    class  EntryPointRequest;
     struct ExtensionUsageTracker;
+    struct IRSpecializationState;
+    class  ProgramLayout;
+    class  TranslationUnitRequest;
+
 
     struct LoweredEntryPoint
     {
@@ -52,6 +53,11 @@ namespace Slang
         // contains the entry point and any
         // other declarations it uses
         RefPtr<ModuleDecl>   program;
+
+        // A set of declarations that are not present
+        // in the generated AST, and are instead stored
+        // in the companion IR module
+        HashSet<Decl*>  irDecls;
     };
 
     // Emit code for a single entry point, based on
@@ -60,6 +66,7 @@ namespace Slang
         EntryPointRequest*      entryPoint,
         ProgramLayout*          programLayout,
         CodeGenTarget           target,
-        ExtensionUsageTracker*  extensionUsageTracker);
+        ExtensionUsageTracker*  extensionUsageTracker,
+        IRSpecializationState*  irSpecializationState);
 }
 #endif
