@@ -1,8 +1,8 @@
 // emit.cpp
 #include "emit.h"
 
+#include "ast-legalize.h"
 #include "ir-insts.h"
-#include "lower.h"
 #include "lower-to-ir.h"
 #include "mangle.h"
 #include "name.h"
