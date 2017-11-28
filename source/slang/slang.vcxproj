@@ -187,7 +187,7 @@
     <ClInclude Include="name.h" />
     <ClInclude Include="object-meta-begin.h" />
     <ClInclude Include="object-meta-end.h" />
-    <ClInclude Include="lower.h" />
+    <ClInclude Include="ast-legalize.h" />
     <ClInclude Include="parameter-binding.h" />
     <ClInclude Include="parser.h" />
     <ClInclude Include="preprocessor.h" />
@@ -220,7 +220,7 @@
     <ClCompile Include="lexer.cpp" />
     <ClCompile Include="lookup.cpp" />
     <ClCompile Include="lower-to-ir.cpp" />
-    <ClCompile Include="lower.cpp" />
+    <ClCompile Include="ast-legalize.cpp" />
     <ClCompile Include="mangle.cpp" />
     <ClCompile Include="name.cpp" />
     <ClCompile Include="options.cpp" />

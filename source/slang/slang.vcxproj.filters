@@ -34,7 +34,6 @@
     <ClInclude Include="type-defs.h" />
     <ClInclude Include="val-defs.h" />
     <ClInclude Include="visitor.h" />
-    <ClInclude Include="lower.h" />
     <ClInclude Include="name.h" />
     <ClInclude Include="ir.h" />
     <ClInclude Include="lower-to-ir.h" />
@@ -43,6 +42,7 @@
     <ClInclude Include="bytecode.h" />
     <ClInclude Include="vm.h" />
     <ClInclude Include="mangle.h" />
+    <ClInclude Include="ast-legalize.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="check.cpp" />
@@ -62,7 +62,6 @@
     <ClCompile Include="token.cpp" />
     <ClCompile Include="type-layout.cpp" />
     <ClCompile Include="options.cpp" />
-    <ClCompile Include="lower.cpp" />
     <ClCompile Include="source-loc.cpp" />
     <ClCompile Include="name.cpp" />
     <ClCompile Include="ir.cpp" />
@@ -72,6 +71,7 @@
     <ClCompile Include="mangle.cpp" />
     <ClCompile Include="dxc-support.cpp" />
     <ClCompile Include="ir-legalize-types.cpp" />
+    <ClCompile Include="ast-legalize.cpp" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="core.meta.slang" />

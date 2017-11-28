@@ -1,4 +1,4 @@
-//TEST(smoke,render):COMPARE_HLSL_GLSL_RENDER:
+//TEST(smoke,render):COMPARE_HLSL_GLSL_RENDER:-xslang -use-ir
 
 // This is a basic test case for cross-compilation behavior.
 //

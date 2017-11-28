@@ -1,5 +1,5 @@
-// lower.cpp
-#include "lower.h"
+// ast-legalize.cpp
+#include "ast-legalize.h"
 
 #include "emit.h"
 #include "type-layout.h"

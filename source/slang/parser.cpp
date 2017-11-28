@@ -4154,6 +4154,7 @@ namespace Slang
         DECL(interface,       parseInterfaceDecl);
         DECL(syntax,          parseSyntaxDecl);
         DECL(__import,        parseImportDecl);
+        DECL(import,          parseImportDecl);
 
     #undef DECL
 
