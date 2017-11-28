@@ -3540,9 +3540,9 @@ struct LoweringVisitor
                 return translationUnit->sourceLanguage;
         }
 
-        for (auto loadedModuleDecl : shared->compileRequest->loadedModulesList)
+        for (auto loadedModule : shared->compileRequest->loadedModulesList)
         {
-            if (moduleDecl == loadedModuleDecl)
+            if (moduleDecl == loadedModule->moduleDecl)
                 return SourceLanguage::Slang;
         }
 
@@ -4696,7 +4696,7 @@ LoweredEntryPoint lowerEntryPoint(
     for (auto rr : entryPoint->compileRequest->loadedModulesList)
     {
         sharedContext.loweredDecls.Add(
-            rr,
+            rr->moduleDecl,
             LoweredDecl(loweredProgram));
     }
 

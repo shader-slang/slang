@@ -3613,6 +3613,23 @@ namespace Slang
         return result;
     }
 
+    bool isDefinition(
+        IRGlobalValue* val)
+    {
+        switch (val->op)
+        {
+        case kIROp_witness_table:
+            return ((IRWitnessTable*)val)->entries.first != nullptr;
+
+        case kIROp_global_var:
+        case kIROp_Func:
+            return ((IRGlobalValueWithCode*)val)->firstBlock != nullptr;
+
+        default:
+            return false;
+        }
+    }
+
     // Is `newVal` marked as being a better match for our
     // chosen code-generation target?
     //
@@ -3657,7 +3674,17 @@ namespace Slang
 
         auto newLevel = getTargetSpecialiationLevel(newVal, targetName);
         auto oldLevel = getTargetSpecialiationLevel(oldVal, targetName);
-        return UInt(newLevel) > UInt(oldLevel);
+        if(newLevel != oldLevel)
+            return UInt(newLevel) > UInt(oldLevel);
+
+        // All other factors being equal, a definition is
+        // better than a declaration.
+        auto newIsDef = isDefinition(newVal);
+        auto oldIsDef = isDefinition(oldVal);
+        if (newIsDef != oldIsDef)
+            return newIsDef;
+
+        return false;
     }
 
     IRFunc* cloneFunc(IRSpecContext* context, IRFunc* originalFunc)
@@ -3743,6 +3770,19 @@ namespace Slang
         }
     }
 
+    void insertGlobalValueSymbols(
+        IRSharedSpecContext*    sharedContext,
+        IRModule*               originalModule)
+    {
+        if (!originalModule)
+            return;
+
+        for (auto gv = originalModule->firstGlobalValue; gv; gv = gv->nextGlobalValue)
+        {
+            insertGlobalValueSymbol(sharedContext, gv);
+        }
+    }
+
     void initializeSharedSpecContext(
         IRSharedSpecContext*    sharedContext,
         Session*                session,
@@ -3766,13 +3806,10 @@ namespace Slang
         sharedContext->module = module;
         sharedContext->originalModule = originalModule;
 
-        // First, we will populate a map with all of the IR values
+        // We will populate a map with all of the IR values
         // that use the same mangled name, to make lookup easier
         // in other steps.
-        for (auto gv = originalModule->firstGlobalValue; gv; gv = gv->nextGlobalValue)
-        {
-            insertGlobalValueSymbol(sharedContext, gv);
-        }
+        insertGlobalValueSymbols(sharedContext, originalModule);
     }
 
     // implementation provided in parameter-binding.cpp
@@ -3866,6 +3903,15 @@ namespace Slang
             compileRequest->mSession,
             nullptr,
             originalIRModule);
+
+        // We also need to attach the IR definitions for symbols from
+        // any loaded modules:
+        for (auto loadedModule : compileRequest->loadedModulesList)
+        {
+            insertGlobalValueSymbols(&sharedContextStorage, loadedModule->irModule);
+        }
+        // any loaded modules
+
 
         IRSpecContext contextStorage;
         IRSpecContext*  context = &contextStorage;

@@ -430,6 +430,23 @@ UInt CompileRequest::addTarget(
     return (int) result;
 }
 
+void CompileRequest::loadParsedModule(
+    RefPtr<TranslationUnitRequest> const&   translationUnit,
+    Name*                                   name,
+    String const&                           path)
+{
+    checkTranslationUnit(translationUnit.Ptr());
+
+    RefPtr<ModuleDecl> moduleDecl = translationUnit->SyntaxNode;
+
+    RefPtr<LoadedModule> loadedModule = new LoadedModule();
+    loadedModule->moduleDecl = moduleDecl;
+    loadedModule->irModule = generateIRForTranslationUnit(translationUnit);
+
+    mapPathToLoadedModule.Add(path, loadedModule);
+    mapNameToLoadedModules.Add(name, loadedModule);
+    loadedModulesList.Add(loadedModule);
+}
 
 RefPtr<ModuleDecl> CompileRequest::loadModule(
     Name*               name,
@@ -454,20 +471,12 @@ RefPtr<ModuleDecl> CompileRequest::loadModule(
 
     // TODO: handle errors
 
-    checkTranslationUnit(translationUnit.Ptr());
+    loadParsedModule(
+        translationUnit,
+        name,
+        path);
 
-    // Skip code generation
-
-    //
-
-    RefPtr<ModuleDecl> moduleDecl = translationUnit->SyntaxNode;
-
-    mapPathToLoadedModule.Add(path, moduleDecl);
-    mapNameToLoadedModules.Add(name, moduleDecl);
-    loadedModulesList.Add(moduleDecl);
-
-    return moduleDecl;
-
+    return translationUnit->SyntaxNode;
 }
 
 void CompileRequest::handlePoundImport(
@@ -491,14 +500,6 @@ void CompileRequest::handlePoundImport(
 
     // TODO: handle errors
 
-    checkTranslationUnit(translationUnit.Ptr());
-
-    // Skip code generation
-
-    //
-
-    RefPtr<ModuleDecl> moduleDecl = translationUnit->SyntaxNode;
-
     // TODO: It is a bit broken here that we use the module path,
     // as the "name" when registering things, but this saves
     // us the trouble of trying to special-case things when
@@ -508,10 +509,11 @@ void CompileRequest::handlePoundImport(
     // running the name->path logic in reverse (e.g., replacing
     // `-` with `_` and `/` with `.`).
     Name* name = getNamePool()->getName(path);
-    mapNameToLoadedModules.Add(name, moduleDecl);
 
-    mapPathToLoadedModule.Add(path, moduleDecl);
-    loadedModulesList.Add(moduleDecl);
+    loadParsedModule(
+        translationUnit,
+        name,
+        path);
 }
 
 RefPtr<ModuleDecl> CompileRequest::findOrImportModule(
@@ -520,9 +522,9 @@ RefPtr<ModuleDecl> CompileRequest::findOrImportModule(
 {
     // Have we already loaded a module matching this name?
     // If so, return it.
-    RefPtr<ModuleDecl> moduleDecl;
-    if (mapNameToLoadedModules.TryGetValue(name, moduleDecl))
-        return moduleDecl;
+    RefPtr<LoadedModule> loadedModule;
+    if (mapNameToLoadedModules.TryGetValue(name, loadedModule))
+        return loadedModule->moduleDecl;
 
     // Derive a file name for the module, by taking the given
     // identifier, replacing all occurences of `_` with `-`,
@@ -572,8 +574,8 @@ RefPtr<ModuleDecl> CompileRequest::findOrImportModule(
     }
 
     // Maybe this was loaded previously via `#import`
-    if (mapPathToLoadedModule.TryGetValue(foundPath, moduleDecl))
-        return moduleDecl;
+    if (mapPathToLoadedModule.TryGetValue(foundPath, loadedModule))
+        return loadedModule->moduleDecl;
 
 
     // We've found a file that we can load for the given module, so

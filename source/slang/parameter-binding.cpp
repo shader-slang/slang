@@ -1648,9 +1648,9 @@ static void collectParameters(
     }
 
     // Now collect parameters from loaded modules
-    for (auto& module : request->loadedModulesList)
+    for (auto& loadedModule : request->loadedModulesList)
     {
-        collectModuleParameters(context, module.Ptr());
+        collectModuleParameters(context, loadedModule->moduleDecl.Ptr());
     }
 }
 
