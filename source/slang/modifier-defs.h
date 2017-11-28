@@ -318,21 +318,9 @@ SYNTAX_CLASS(ComputedLayoutModifier, Modifier)
     FIELD(RefPtr<Layout>, layout)
 END_SYNTAX_CLASS()
 
-// A modifier attached to types during lowering, to indicate that they
-// are logically a "tuple" type
-SYNTAX_CLASS(TupleTypeModifier, Modifier)
-    FIELD_INIT(AggTypeDecl*, decl, nullptr)
-    FIELD_INIT(bool, hasAnyNonTupleFields, false)
-END_SYNTAX_CLASS()
-
-SYNTAX_CLASS(TupleFieldModifier, Modifier)
-    FIELD_INIT(VarDeclBase*, decl, nullptr)
-    FIELD_INIT(bool, hasAnyNonTupleFields, false)
-    FIELD_INIT(bool, isNestedTuple, false)
-END_SYNTAX_CLASS()
 
 SYNTAX_CLASS(TupleVarModifier, Modifier)
-    FIELD_INIT(TupleFieldModifier*, tupleField, nullptr)
+//    FIELD_INIT(TupleFieldModifier*, tupleField, nullptr)
 END_SYNTAX_CLASS()
 
 // A modifier to indicate that a constructor/initializer can be used
@@ -342,3 +330,8 @@ SYNTAX_CLASS(ImplicitConversionModifier, Modifier)
     // The conversion cost, used to rank conversions
     FIELD(ConversionCost, cost)
 END_SYNTAX_CLASS()
+
+// A marker modifier used to indicate that a declaration was created as
+// part of type legalization.
+SIMPLE_SYNTAX_CLASS(LegalizedModifier, Modifier)
+

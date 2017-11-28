@@ -179,6 +179,7 @@
     <ClInclude Include="ir-inst-defs.h" />
     <ClInclude Include="ir-insts.h" />
     <ClInclude Include="ir.h" />
+    <ClInclude Include="legalize-types.h" />
     <ClInclude Include="lexer.h" />
     <ClInclude Include="lookup.h" />
     <ClInclude Include="lower-to-ir.h" />
@@ -217,6 +218,7 @@
     <ClCompile Include="emit.cpp" />
     <ClCompile Include="ir-legalize-types.cpp" />
     <ClCompile Include="ir.cpp" />
+    <ClCompile Include="legalize-types.cpp" />
     <ClCompile Include="lexer.cpp" />
     <ClCompile Include="lookup.cpp" />
     <ClCompile Include="lower-to-ir.cpp" />

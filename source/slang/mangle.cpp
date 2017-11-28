@@ -124,14 +124,6 @@ namespace Slang
         {
             emitQualifiedName(context, declRefType->declRef);
         }
-        else if (auto tupleType = dynamic_cast<FilteredTupleType*>(type))
-        {
-            // TODO: this doesn't handle the possibility of multiple different
-            // filtered versions of the same type...
-            emitRaw(context, "t");
-            emitType(context, tupleType->originalType);
-            emitRaw(context, "_");
-        }
         else
         {
             SLANG_UNEXPECTED("unimplemented case in mangling");

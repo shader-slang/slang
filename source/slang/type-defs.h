@@ -493,37 +493,3 @@ protected:
     virtual Type* CreateCanonicalType() override;
 )
 END_SYNTAX_CLASS()
-
-// A type created to represent the result of filtering
-// the fields of an aggregate type.
-SYNTAX_CLASS(FilteredTupleType, Type)
-RAW(
-    struct Element
-    {
-        // The original field this element represents
-        DeclRef<VarDeclBase>    fieldDeclRef;
-
-        // The type being used for the new field
-        RefPtr<Type>            type;
-    };
-)
-
-    FIELD(RefPtr<Type>, originalType);
-    FIELD(List<Element>, elements);
-
-RAW(
-    FilteredTupleType()
-    {}
-
-    RefPtr<Type> getOriginalType() const { return originalType; }
-    List<Element> const& getElements() const { return elements;  }
-    virtual String ToString() override;
-
-protected:
-    virtual RefPtr<Val> SubstituteImpl(Substitutions* subst, int* ioDiff) override;
-    virtual bool EqualsImpl(Type * type) override;
-    virtual int GetHashCode() override;
-    virtual Type* CreateCanonicalType() override;
-)
-
-END_SYNTAX_CLASS()

@@ -1,254 +1,22 @@
 // ir-legalize-types.cpp
 
-// This file implements a pass that takes IR
-// that has been fully specialized (no more
-// generics/interfaces needing to be specialized
-// away) and replaces any types that can't actually
-// be used as-is on the target.
+// This file implements type legalization for the IR.
+// It uses the core legalization logic in
+// `legalize-types.{h,cpp}` to decide what to do with
+// the types, while this file handles the actual
+// rewriting of the IR to use the new types.
 //
-// The particular case we are focused on is
-// aggregate types (e.g., `struct` types) that
-// contain resources (textures, samplers, etc.)
-// or that mix resources and ordinary "uniform"
-// data.
+// This pass should only be applied to IR that has been
+// fully specialized (no more generics/interfaces), so
+// that the concrete type of everything is known.
 
 #include "ir.h"
 #include "ir-insts.h"
+#include "legalize-types.h"
 
 namespace Slang
 {
 
-struct LegalTypeImpl : RefObject
-{
-};
-struct ImplicitDerefType;
-struct TuplePseudoType;
-struct PairPseudoType;
-struct PairInfo;
-
-struct LegalType
-{
-    enum class Flavor
-    {
-        // Nothing: a NULL type
-        none,
-
-        // A simple type that can be represented directly as a `Type`
-        simple,
-
-        // Logically, we have a pointer-like type, but we are
-        // going to represnet it as the pointed-to type
-        implicitDeref,
-
-        // A compound type was broken apart into its constituent fields,
-        // so a tuple "pseduo-type" is being used to collect
-        // those fields together.
-        tuple,
-
-        // A type has to get split into "ordinary" and "special" parts,
-        // each of which will be represented with its own `LegalType`.
-        pair,
-    };
-
-    Flavor              flavor = Flavor::none;
-    RefPtr<RefObject>   obj;
-
-    static LegalType simple(Type* type)
-    {
-        LegalType result;
-        result.flavor = Flavor::simple;
-        result.obj = type;
-        return result;
-    }
-
-    RefPtr<Type> getSimple()
-    {
-        assert(flavor == Flavor::simple);
-        return obj.As<Type>();
-    }
-
-    static LegalType implicitDeref(
-        LegalType const& valueType);
-
-    RefPtr<ImplicitDerefType> getImplicitDeref()
-    {
-        assert(flavor == Flavor::implicitDeref);
-        return obj.As<ImplicitDerefType>();
-    }
-
-    static LegalType tuple(
-        RefPtr<TuplePseudoType>   tupleType);
-
-    RefPtr<TuplePseudoType> getTuple()
-    {
-        assert(flavor == Flavor::tuple);
-        return obj.As<TuplePseudoType>();
-    }
-
-    static LegalType pair(
-        RefPtr<PairPseudoType>   pairType);
-
-    static LegalType pair(
-        RefPtr<Type>        ordinaryType,
-        LegalType const&    specialType,
-        RefPtr<PairInfo>    pairInfo);
-
-    RefPtr<PairPseudoType> getPair()
-    {
-        assert(flavor == Flavor::pair);
-        return obj.As<PairPseudoType>();
-    }
-};
-
-struct ImplicitDerefType : LegalTypeImpl
-{
-    LegalType valueType;
-};
-
-LegalType LegalType::implicitDeref(
-    LegalType const& valueType)
-{
-    RefPtr<ImplicitDerefType> obj = new ImplicitDerefType();
-    obj->valueType = valueType;
-
-    LegalType result;
-    result.flavor = Flavor::implicitDeref;
-    result.obj = obj;
-    return result;
-}
-
-// Represents the pseudo-type for a compound type
-// that had to be broken apart because it contained
-// one or more fields of types that shouldn't be
-// allowed in aggregates.
-//
-// A tuple pseduo-type will have an element for
-// each field of the original type, that represents
-// the legalization of that field's type.
-//
-// It optionally also contains an "ordinary" type
-// that packs together any per-field data that
-// itself has (or contains) an ordinary type.
-struct TuplePseudoType : LegalTypeImpl
-{
-    // Represents one element of the tuple pseudo-type
-    struct Element
-    {
-        // The field that this element replaces
-        DeclRef<VarDeclBase>    fieldDeclRef;
-
-        // The legalized type of the element
-        LegalType               type;
-    };
-
-    // All of the elements of the tuple pseduo-type.
-    List<Element>   elements;
-};
-
-LegalType LegalType::tuple(
-    RefPtr<TuplePseudoType>   tupleType)
-{
-    LegalType result;
-    result.flavor = Flavor::tuple;
-    result.obj = tupleType;
-    return result;
-}
-
-struct PairInfo : RefObject
-{
-    typedef unsigned int Flags;
-    enum
-    {
-        kFlag_hasOrdinary = 0x1,
-        kFlag_hasSpecial  = 0x2,
-    };
-
-    struct Element
-    {
-        // The field the element represents
-        DeclRef<Decl> fieldDeclRef;
-
-        // The conceptual type of the field.
-        // If both the `hasOrdinary` and
-        // `hasSpecial` bits are set, then
-        // this is expected to be a
-        // `LegalType::Flavor::pair`
-        LegalType   type;
-
-        // Is the value represented on
-        // the ordinary side, the special
-        // side, or both?
-        Flags       flags;
-    };
-
-    // For a pair type or value, we need to track
-    // which fields are on which side(s).
-    List<Element> elements;
-
-    Element* findElement(DeclRef<Decl> const& fieldDeclRef)
-    {
-        for (auto& ee : elements)
-        {
-            if(ee.fieldDeclRef.Equals(fieldDeclRef))
-                return &ee;
-        }
-        return nullptr;
-    }
-};
-
-struct PairPseudoType : LegalTypeImpl
-{
-    // Any field(s) with ordinary types will
-    // get captured here, as a completely
-    // standard AST-level type.
-    RefPtr<Type> ordinaryType;
-
-    // Any fields with "special" (not ordinary)
-    // types will get captured here (usually
-    // with a tuple).
-    LegalType specialType;
-
-    RefPtr<PairInfo> pairInfo;
-};
-
-LegalType LegalType::pair(
-    RefPtr<PairPseudoType>   pairType)
-{
-    LegalType result;
-    result.flavor = Flavor::pair;
-    result.obj = pairType;
-    return result;
-}
-
-LegalType LegalType::pair(
-    RefPtr<Type>        ordinaryType,
-    LegalType const&    specialType,
-    RefPtr<PairInfo>    pairInfo)
-{
-    // Handle some special cases for when
-    // one or the other of the types isn't
-    // actually used.
-
-    if (!ordinaryType)
-    {
-        // There was nothing ordinary.
-        return specialType;
-    }
-
-    if (specialType.flavor == LegalType::Flavor::none)
-    {
-        return LegalType::simple(ordinaryType);
-    }
-
-    // There were both ordinary and special fields,
-    // and so we need to handle them here.
-
-    RefPtr<PairPseudoType> obj = new PairPseudoType();
-    obj->ordinaryType = ordinaryType;
-    obj->specialType = specialType;
-    obj->pairInfo = pairInfo;
-    return LegalType::pair(obj);
-}
 
 
 struct LegalValImpl : RefObject
@@ -390,11 +158,14 @@ LegalVal LegalVal::getImplicitDeref()
 }
 
 
-struct TypeLegalizationContext
+struct IRTypeLegalizationContext
 {
     Session*    session;
     IRModule*   module;
     IRBuilder*  builder;
+
+    /// Context to use for underlying (non-IR) type legalization.
+    TypeLegalizationContext* typeLegalizationContext;
 
     // When inserting new globals, put them before this one.
     IRGlobalValue* insertBeforeGlobal = nullptr;
@@ -411,633 +182,31 @@ struct TypeLegalizationContext
 };
 
 static void registerLegalizedValue(
-    TypeLegalizationContext*    context,
+    IRTypeLegalizationContext*    context,
     IRValue*                    irValue,
     LegalVal const&             legalVal)
 {
     context->mapValToLegalVal.Add(irValue, legalVal);
 }
 
-
-static bool isResourceType(Type* type)
-{
-    while (auto arrayType = type->As<ArrayExpressionType>())
-    {
-        type = arrayType->baseType;
-    }
-
-    if (auto textureTypeBase = type->As<TextureTypeBase>())
-    {
-        return true;
-    }
-    else if (auto samplerType = type->As<SamplerStateType>())
-    {
-        return true;
-    }
-
-    // TODO: need more comprehensive coverage here
-
-    return false;
-}
-
-static LegalType legalizeType(
-    TypeLegalizationContext*    context,
-    Type*                       type);
-
-// Helper type for legalization of aggregate types
-// that might need to be turned into tuple pseudo-types.
-struct TupleTypeBuilder
-{
-    TypeLegalizationContext*    context;
-    RefPtr<Type>                type;
-
-    List<FilteredTupleType::Element> ordinaryElements;
-    List<TuplePseudoType::Element> specialElements;
-
-    List<PairInfo::Element> pairElements;
-
-    // Did we have any fields that forced us to change
-    // the actual type away from the declared type?
-    bool anyComplex = false;
-
-    // Did we have any fields that actually required
-    // storage in the "special" part of things?
-    bool anySpecial = false;
-
-    // Did we have any fields that actually used ordinary storage?
-    bool anyOrdinary = false;
-
-    // Add a field to the (pseudo-)type we are building
-    void addField(
-        DeclRef<VarDeclBase>    fieldDeclRef,
-        LegalType               legalFieldType,
-        LegalType               legalLeafType,
-        bool                    isResource)
-    {
-        RefPtr<Type> ordinaryType;
-        LegalType specialType;
-        RefPtr<PairInfo> elementPairInfo;
-        switch (legalLeafType.flavor)
-        {
-        case LegalType::Flavor::simple:
-            {
-                // We need to add an actual field, but we need
-                // to check if it is a resource type to know
-                // whether it should go in the "ordinary" list or not.
-                if (!isResource)
-                {
-                    ordinaryType = legalLeafType.getSimple();
-                }
-                else
-                {
-                    specialType = legalFieldType;
-                }
-            }
-            break;
-
-        case LegalType::Flavor::implicitDeref:
-            {
-                // TODO: we may want to say that any use
-                // of `implicitDeref` puts the entire thing
-                // into the "special" category, rather than
-                // try to look under the hood...
-
-                anyComplex = true;
-
-                // We want to recursively add data
-                // based on the unwrapped type.
-                //
-                // Note: this assumes we can't have a tuple
-                // or a pair "under" an `implicitDeref`, so
-                // we'll need to ensure that elsewhere.
-                addField(
-                    fieldDeclRef,
-                    legalFieldType,
-                    legalLeafType.getImplicitDeref()->valueType,
-                    isResource);
-                return;
-            }
-            break;
-
-        case LegalType::Flavor::pair:
-            {
-                // The field's type had both special and non-special parts
-                auto pairType = legalLeafType.getPair();
-                ordinaryType = pairType->ordinaryType;
-                specialType = pairType->specialType;
-                elementPairInfo = pairType->pairInfo;
-            }
-            break;
-
-        case LegalType::Flavor::tuple:
-            {
-                // A tuple always represents "special" data
-                specialType = legalFieldType;
-            }
-            break;
-
-        default:
-            SLANG_UNEXPECTED("unknown legal type flavor");
-            break;
-        }
-
-
-        PairInfo::Element pairElement;
-        pairElement.flags = 0;
-        pairElement.fieldDeclRef = fieldDeclRef;
-
-        if (ordinaryType)
-        {
-            anyOrdinary = true;
-            pairElement.flags |= PairInfo::kFlag_hasOrdinary;
-
-            FilteredTupleType::Element ordinaryElement;
-            ordinaryElement.fieldDeclRef = fieldDeclRef;
-            ordinaryElement.type = ordinaryType;
-            ordinaryElements.Add(ordinaryElement);
-        }
-
-        if (specialType.flavor != LegalType::Flavor::none)
-        {
-            anySpecial = true;
-            anyComplex = true;
-            pairElement.flags |= PairInfo::kFlag_hasSpecial;
-
-            TuplePseudoType::Element specialElement;
-            specialElement.fieldDeclRef = fieldDeclRef;
-            specialElement.type = specialType;
-            specialElements.Add(specialElement);
-        }
-
-        pairElement.type = LegalType::pair(ordinaryType, specialType, elementPairInfo);
-        pairElements.Add(pairElement);
-    }
-
-    // Add a field to the (pseudo-)type we are building
-    void addField(
-        DeclRef<VarDeclBase>    fieldDeclRef)
-    {
-        // Skip `static` fields.
-        if (fieldDeclRef.getDecl()->HasModifier<HLSLStaticModifier>())
-            return;
-
-        auto fieldType = GetType(fieldDeclRef);
-
-        bool isResourceField = isResourceType(fieldType);
-
-        auto legalFieldType = legalizeType(context, fieldType);
-        addField(
-            fieldDeclRef,
-            legalFieldType,
-            legalFieldType,
-            isResourceField);
-    }
-
-    LegalType getResult()
-    {
-        // If we didn't see anything "special"
-        // then we can use the type as-is.
-        // we can conceivably just use the type as-is
-        //
-        // TODO: this might be a good place to turn
-        // a reference to a generic `struct` type into
-        // a concrete non-generic type so that downstream
-        // codegen doesn't have to deal with generics...
-        //
-        // TODO: In fact, why not just fully replace
-        // all aggregate types here with some structural
-        // types defined in the IR?
-        if (!anyComplex)
-        {
-            return LegalType::simple(type);
-        }
-
-        // If there were any "ordinary" fields along the way,
-        // then we need to collect them into a type to
-        // represent the ordinary part of things.
-        //
-        RefPtr<Type> ordinaryType;
-        if (anyOrdinary)
-        {
-            RefPtr<FilteredTupleType> ordinaryTypeImpl = new FilteredTupleType();
-            ordinaryTypeImpl->setSession(context->session);
-            ordinaryTypeImpl->originalType = type;
-            ordinaryTypeImpl->elements = ordinaryElements;
-            ordinaryType = ordinaryTypeImpl;
-        }
-
-        LegalType specialType;
-        if (anySpecial)
-        {
-            RefPtr<TuplePseudoType> specialTuple = new TuplePseudoType();
-            specialTuple->elements = specialElements;
-            specialType = LegalType::tuple(specialTuple);
-        }
-
-        RefPtr<PairInfo> pairInfo;
-        if (anyOrdinary && anySpecial)
-        {
-            pairInfo = new PairInfo();
-            pairInfo->elements = pairElements;
-        }
-
-        return LegalType::pair(ordinaryType, specialType, pairInfo);
-    }
-
-};
-
-static RefPtr<Type> createBuiltinGenericType(
-    TypeLegalizationContext*    context,
-    DeclRef<Decl> const&        typeDeclRef,
-    RefPtr<Type>                elementType)
-{
-    // We are going to take the type for the original
-    // decl-ref and construct a new one that uses
-    // our new element type as its parameter.
-    //
-    // TODO: we should have library code to make
-    // manipulations like this way easier.
-
-    RefPtr<GenericSubstitution> oldGenericSubst = getGenericSubstitution(
-        typeDeclRef.substitutions);
-    SLANG_ASSERT(oldGenericSubst);
-
-    RefPtr<GenericSubstitution> newGenericSubst = new GenericSubstitution();
-
-    newGenericSubst->outer = oldGenericSubst->outer;
-    newGenericSubst->genericDecl = oldGenericSubst->genericDecl;
-    newGenericSubst->args = oldGenericSubst->args;
-    newGenericSubst->args[0] = elementType;
-
-    auto newDeclRef = DeclRef<Decl>(
-        typeDeclRef.getDecl(),
-        newGenericSubst);
-
-    auto newType = DeclRefType::Create(
-        context->session,
-        newDeclRef);
-
-    return newType;
-}
-
-// Create a uniform buffer type with a given legalized
-// element type.
-static LegalType createLegalUniformBufferType(
-    TypeLegalizationContext*    context,
-    DeclRef<Decl> const&        typeDeclRef,
-    LegalType                   legalElementType)
-{
-    switch (legalElementType.flavor)
-    {
-    case LegalType::Flavor::simple:
-        {
-            // Easy case: we just have a simple element type,
-            // so we want to create a uniform buffer that wraps it.
-            return LegalType::simple(createBuiltinGenericType(
-                context,
-                typeDeclRef,
-                legalElementType.getSimple()));
-        }
-        break;
-
-    case LegalType::Flavor::implicitDeref:
-        {
-            // This is actually an annoying case, because
-            // we are being asked to convert, e.g.,:
-            //
-            //      cbuffer Foo { ParameterBlock<Bar> bar; }
-            //
-            // into the equivalent of:
-            //
-            //      cbuffer Foo { Bar bar; }
-            //
-            // Which would really require a new `LegalType` that
-            // would reprerent a resource type with a modified
-            // element type.
-            //
-            // I'm going to attempt to hack this for now.
-            return LegalType::implicitDeref(createLegalUniformBufferType(
-                context,
-                typeDeclRef,
-                legalElementType.getImplicitDeref()->valueType));
-        }
-        break;
-
-    case LegalType::Flavor::pair:
-        {
-            // We assume that the "ordinary" part of things
-            // will get wrapped in a constant-buffer type,
-            // and the "special" part needs to be wrapped
-            // with an `implicitDeref`.
-            auto pairType = legalElementType.getPair();
-
-            auto ordinaryType = createBuiltinGenericType(
-                context,
-                typeDeclRef,
-                pairType->ordinaryType);
-            auto specialType = LegalType::implicitDeref(pairType->specialType);
-
-            return LegalType::pair(ordinaryType, specialType, pairType->pairInfo);
-        }
-
-    case LegalType::Flavor::tuple:
-        {
-            // if we have a tuple type, then it must be representing
-            // the fields that can't be stored in a buffer anyway,
-            // so we just need to wrap each of them in an `implicitDeref`
-
-            auto elementPseudoTupleType = legalElementType.getTuple();
-
-            RefPtr<TuplePseudoType> bufferPseudoTupleType = new TuplePseudoType();
-
-            // Wrap all the pseudo-tuple elements with `implicitDeref`,
-            // since they used to be inside a tuple, but aren't any more.
-            for (auto ee : elementPseudoTupleType->elements)
-            {
-                TuplePseudoType::Element newElement;
-
-                newElement.fieldDeclRef = ee.fieldDeclRef;
-                newElement.type = LegalType::implicitDeref(ee.type);
-
-                bufferPseudoTupleType->elements.Add(newElement);
-            }
-
-            return LegalType::tuple(bufferPseudoTupleType);
-        }
-        break;
-
-    default:
-        SLANG_UNEXPECTED("unknown legal type flavor");
-        UNREACHABLE_RETURN(LegalType());
-        break;
-    }
-}
-
-static LegalType createLegalUniformBufferType(
-    TypeLegalizationContext*    context,
-    UniformParameterGroupType*  uniformBufferType,
-    LegalType                   legalElementType)
-{
-    return createLegalUniformBufferType(
-        context,
-        uniformBufferType->declRef,
-        legalElementType);
-}
-
-// Create a pointer type with a given legalized value type.
-static LegalType createLegalPtrType(
-    TypeLegalizationContext*    context,
-    DeclRef<Decl> const&        typeDeclRef,
-    LegalType                   legalValueType)
-{
-    switch (legalValueType.flavor)
-    {
-    case LegalType::Flavor::simple:
-        {
-            // Easy case: we just have a simple element type,
-            // so we want to create a uniform buffer that wraps it.
-            return LegalType::simple(createBuiltinGenericType(
-                context,
-                typeDeclRef,
-                legalValueType.getSimple()));
-        }
-        break;
-
-    case LegalType::Flavor::implicitDeref:
-        {
-            // We are being asked to create a pointer type to something
-            // that is implicitly dereferenced, meaning we had:
-            //
-            //      Ptr(PtrLink(T))
-            //
-            // and now are being asked to make:
-            //
-            //      Ptr(implicitDeref(LegalT))
-            //
-            // So it seems like we can just create:
-            //
-            //      implicitDeref(Ptr(LegalT))
-            //
-            // and nobody should really be able to tell the difference, right?
-            return LegalType::implicitDeref(createLegalPtrType(
-                context,
-                typeDeclRef,
-                legalValueType.getImplicitDeref()->valueType));
-        }
-        break;
-
-    case LegalType::Flavor::pair:
-        {
-            // We just need to pointer-ify both sides of the pair.
-            auto pairType = legalValueType.getPair();
-
-            auto ordinaryType = createBuiltinGenericType(
-                context,
-                typeDeclRef,
-                pairType->ordinaryType);
-            auto specialType = createLegalPtrType(
-                context,
-                typeDeclRef,
-                pairType->specialType);
-
-            return LegalType::pair(ordinaryType, specialType, pairType->pairInfo);
-        }
-
-    case LegalType::Flavor::tuple:
-        {
-            // Wrap each of the tuple elements up as a pointer.
-            auto valuePseudoTupleType = legalValueType.getTuple();
-
-            RefPtr<TuplePseudoType> ptrPseudoTupleType = new TuplePseudoType();
-
-            // Wrap all the pseudo-tuple elements with `implicitDeref`,
-            // since they used to be inside a tuple, but aren't any more.
-            for (auto ee : valuePseudoTupleType->elements)
-            {
-                TuplePseudoType::Element newElement;
-
-                newElement.fieldDeclRef = ee.fieldDeclRef;
-                newElement.type = createLegalPtrType(
-                    context,
-                    typeDeclRef,
-                    ee.type);
-
-                ptrPseudoTupleType->elements.Add(newElement);
-            }
-
-            return LegalType::tuple(ptrPseudoTupleType);
-        }
-        break;
-
-    default:
-        SLANG_UNEXPECTED("unknown legal type flavor");
-        UNREACHABLE_RETURN(LegalType());
-        break;
-    }
-}
-
-// Legalize a type, including any nested types
-// that it transitively contains.
-static LegalType legalizeType(
-    TypeLegalizationContext*    context,
-    Type*                       type)
-{
-    if (auto parameterBlockType = type->As<ParameterBlockType>())
-    {
-        // We basically legalize the `ParameterBlock<T>` type
-        // over to `T`. In order to represent this preoperly,
-        // we need to be careful to wrap it up in a way that
-        // tells us to eliminate downstream deferences...
-
-        auto legalElementType = legalizeType(context,
-            parameterBlockType->getElementType());
-        return LegalType::implicitDeref(legalElementType);
-    }
-    else if (auto uniformBufferType = type->As<UniformParameterGroupType>())
-    {
-        // We have a `ConstantBuffer<T>` or `TextureBuffer<T>` or
-        // other pointer-like type that represents uniform parameters.
-        // We need to pull any resource-type fields out of it, but
-        // leave the non-resource fields where they are.
-
-        // Legalize the element type to see what we are working with.
-        auto legalElementType = legalizeType(context,
-            uniformBufferType->getElementType());
-
-        switch (legalElementType.flavor)
-        {
-        case LegalType::Flavor::simple:
-            return LegalType::simple(type);
-
-        default:
-            return createLegalUniformBufferType(
-                context,
-                uniformBufferType,
-                legalElementType);
-        }
-
-    }
-    else if (isResourceType(type))
-    {
-        // We assume that any resource types not handled above
-        // are legal as-is.
-        return LegalType::simple(type);
-    }
-    else if (type->As<BasicExpressionType>())
-    {
-        return LegalType::simple(type);
-    }
-    else if (type->As<VectorExpressionType>())
-    {
-        return LegalType::simple(type);
-    }
-    else if (type->As<MatrixExpressionType>())
-    {
-        return LegalType::simple(type);
-    }
-    else if (auto ptrType = type->As<PtrTypeBase>())
-    {
-        auto legalValueType = legalizeType(context, ptrType->getValueType());
-        return createLegalPtrType(context, ptrType->declRef, legalValueType);
-    }
-    else if (auto declRefType = type->As<DeclRefType>())
-    {
-        auto declRef = declRefType->declRef;
-        if (auto aggTypeDeclRef = declRef.As<AggTypeDecl>())
-        {
-            // Look at the (non-static) fields, and
-            // see if anything needs to be cleaned up.
-            // The things that need to be "cleaned up" for
-            // our purposes are:
-            //
-            // - Fields of resource type, or any other future
-            //   type we run into that isn't allowed in
-            //   aggregates for at least some targets
-            //
-            // - Fields with types that themselves had to
-            //   get legalized.
-            //
-            // If we don't run into any of these, we
-            // can just use the type as-is. Hooray!
-            //
-            // Otherwise, we are effectively going to split
-            // the type apart and create a `TuplePseudoType`.
-            // Every field of the original type will be
-            // represented as an element of this pseudo-type.
-            // Each element will record its `LegalType`,
-            // and the original field that it was created from.
-            // An element will also track whether it contains
-            // any "ordinary" data, and if so, it will remember
-            // an element index in a real (AST-level, non-pseudo)
-            // `TupleType` that is used to bundle together
-            // such fields.
-            //
-            // Storing all the simple fields together like this
-            // obviously adds complexity to the legalization
-            // pass, but it has important benefits:
-            //
-            // - It avoids creating functions with a very large
-            //   number of parameters (when passing a structure
-            //   with many fields), which might confuse downstream
-            //   compilers.
-            //
-            // - It avoids applying AOS->SOA conversion to fields
-            //   that don't actually need it, which is basically
-            //   required if we want type layout to work.
-            //
-            // - It ensures that we can actually construct a
-            //   constant-buffer type that wraps a legalized
-            //   aggregate type; the ordinary fields will get
-            //   placed inside a new constant-buffer type,
-            //   while the special ones will get left outside.
-            // 
-
-            TupleTypeBuilder builder;
-            builder.context = context;
-            builder.type = type;
-
-
-            for (auto ff : getMembersOfType<StructField>(aggTypeDeclRef))
-            {
-                builder.addField(ff);
-            }
-
-            return builder.getResult();
-        }
-
-        // TODO: for other declaration-reference types, we really
-        // need to legalize the types used in substitutions, and
-        // signal an error if any of them turn out to be non-simple.
-        //
-        // The limited cases of types that can handle having non-simple
-        // types as generic arguments all need to be special-cased here.
-        // (For example, we can't handle `Texture2D<SomeStructWithTexturesInIt>`.
-        // 
-    }
-
-    return LegalType::simple(type);
-}
-
-// Represents the "chain" of declarations that
-// were followed to get to a variable that we
-// are now declaring as a leaf variable.
-struct LegalVarChain
-{
-    LegalVarChain*  next;
-    VarLayout*      varLayout;
-};
-
 static LegalVal declareVars(
-    TypeLegalizationContext*    context,
+    IRTypeLegalizationContext*    context,
     IROp                        op,
     LegalType                   type,
     TypeLayout*                 typeLayout,
     LegalVarChain*              varChain);
 
+static LegalType legalizeType(
+    IRTypeLegalizationContext*  context,
+    Type*                       type)
+{
+    return legalizeType(context->typeLegalizationContext, type);
+}
+
 // Legalize a type, and then expect it to
 // result in a simple type.
 static RefPtr<Type> legalizeSimpleType(
-    TypeLegalizationContext*    context,
+    IRTypeLegalizationContext*    context,
     Type*                       type)
 {
     auto legalType = legalizeType(context, type);
@@ -1056,7 +225,7 @@ static RefPtr<Type> legalizeSimpleType(
 // Take a value that is being used as an operand,
 // and turn it into the equivalent legalized value.
 static LegalVal legalizeOperand(
-    TypeLegalizationContext*    context,
+    IRTypeLegalizationContext*    context,
     IRValue*                    irValue)
 {
     LegalVal legalVal;
@@ -1111,7 +280,7 @@ static void getArgumentValues(
 }
 
 static LegalVal legalizeCall(
-    TypeLegalizationContext*    context,
+    IRTypeLegalizationContext*    context,
     IRCall* callInst)
 {
     // TODO: implement legalization of non-simple return types
@@ -1130,7 +299,7 @@ static LegalVal legalizeCall(
 }
 
 static LegalVal legalizeLoad(
-    TypeLegalizationContext*    context,
+    IRTypeLegalizationContext*    context,
     LegalVal                    legalPtrVal)
 {
     switch (legalPtrVal.flavor)
@@ -1186,7 +355,7 @@ static LegalVal legalizeLoad(
 }
 
 static LegalVal legalizeStore(
-    TypeLegalizationContext*    context,
+    IRTypeLegalizationContext*    context,
     LegalVal                    legalPtrVal,
     LegalVal                    legalVal)
 {
@@ -1241,18 +410,12 @@ static LegalVal legalizeStore(
 }
 
 static LegalVal legalizeFieldAddress(
-    TypeLegalizationContext*    context,
+    IRTypeLegalizationContext*    context,
     LegalType                   type,
     LegalVal                    legalPtrOperand,
-    LegalVal                    legalFieldOperand)
+    DeclRef<Decl>               fieldDeclRef)
 {
     auto builder = context->builder;
-
-    // We don't expect any legalization to affect
-    // the "field" argument.
-    auto fieldOperand = legalFieldOperand.getSimple();
-    assert(fieldOperand->op == kIROp_decl_ref);
-    auto fieldDeclRef = ((IRDeclRef*)fieldOperand)->declRef;
 
     switch (legalPtrOperand.flavor)
     {
@@ -1261,7 +424,7 @@ static LegalVal legalizeFieldAddress(
             builder->emitFieldAddress(
                 type.getSimple(),
                 legalPtrOperand.getSimple(),
-                fieldOperand));
+                builder->getDeclRefVal(fieldDeclRef)));
 
     case LegalVal::Flavor::pair:
         {
@@ -1286,7 +449,7 @@ static LegalVal legalizeFieldAddress(
             {
                 auto fieldPairType = type.getPair();
                 fieldPairInfo = fieldPairType->pairInfo;
-                ordinaryType = LegalType::simple(fieldPairType->ordinaryType);
+                ordinaryType = fieldPairType->ordinaryType;
                 specialType = fieldPairType->specialType;
             }
 
@@ -1295,12 +458,27 @@ static LegalVal legalizeFieldAddress(
 
             if (pairElement->flags & PairInfo::kFlag_hasOrdinary)
             {
-                ordinaryVal = legalizeFieldAddress(context, ordinaryType, pairVal->ordinaryVal, legalFieldOperand);
+                // Note: the ordinary side of the pair is expected
+                // to be a filtered `struct` type, and so it will
+                // have different field declarations than the
+                // oridinal type. The element of the `PairInfo`
+                // structure stores the correct field decl-ref to use
+                // as `ordinaryFieldDeclRef`.
+
+                ordinaryVal = legalizeFieldAddress(
+                    context,
+                    ordinaryType,
+                    pairVal->ordinaryVal,
+                    pairElement->ordinaryFieldDeclRef);
             }
 
             if (pairElement->flags & PairInfo::kFlag_hasSpecial)
             {
-                specialVal = legalizeFieldAddress(context, specialType, pairVal->specialVal, legalFieldOperand);
+                specialVal = legalizeFieldAddress(
+                    context,
+                    specialType,
+                    pairVal->specialVal,
+                    fieldDeclRef);
             }
             return LegalVal::pair(ordinaryVal, specialVal, fieldPairInfo);
         }
@@ -1335,8 +513,27 @@ static LegalVal legalizeFieldAddress(
     }
 }
 
+static LegalVal legalizeFieldAddress(
+    IRTypeLegalizationContext*    context,
+    LegalType                   type,
+    LegalVal                    legalPtrOperand,
+    LegalVal                    legalFieldOperand)
+{
+    // We don't expect any legalization to affect
+    // the "field" argument.
+    auto fieldOperand = legalFieldOperand.getSimple();
+    assert(fieldOperand->op == kIROp_decl_ref);
+    auto fieldDeclRef = ((IRDeclRef*)fieldOperand)->declRef;
+
+    return legalizeFieldAddress(
+        context,
+        type,
+        legalPtrOperand,
+        fieldDeclRef);
+}
+
 static LegalVal legalizeInst(
-    TypeLegalizationContext*    context,
+    IRTypeLegalizationContext*    context,
     IRInst*                     inst,
     LegalType                   type,
     LegalVal const*             args)
@@ -1370,7 +567,7 @@ RefPtr<VarLayout> findVarLayout(IRValue* value)
 }
 
 static LegalVal legalizeLocalVar(
-    TypeLegalizationContext*    context,
+    IRTypeLegalizationContext*    context,
     IRVar*                irLocalVar)
 {
     // Legalize the type for the variable's value
@@ -1424,7 +621,7 @@ static LegalVal legalizeLocalVar(
 }
 
 static LegalVal legalizeInst(
-    TypeLegalizationContext*    context,
+    IRTypeLegalizationContext*    context,
     IRInst*                     inst)
 {
     if (inst->op == kIROp_Var)
@@ -1512,7 +709,7 @@ static void addParamType(IRFuncType * ftype, LegalType t)
     case LegalType::Flavor::pair:
         {
             auto pairInfo = t.getPair();
-            addParamType(ftype, LegalType::simple(pairInfo->ordinaryType));
+            addParamType(ftype, pairInfo->ordinaryType);
             addParamType(ftype, pairInfo->specialType);
         }
         break;
@@ -1529,7 +726,7 @@ static void addParamType(IRFuncType * ftype, LegalType t)
 }
 
 static void legalizeFunc(
-    TypeLegalizationContext*    context,
+    IRTypeLegalizationContext*    context,
     IRFunc*                     irFunc)
 {
     // Overwrite the function's type with
@@ -1606,61 +803,13 @@ static void legalizeFunc(
 }
 
 static LegalVal declareSimpleVar(
-    TypeLegalizationContext*    context,
+    IRTypeLegalizationContext*    context,
     IROp                        op,
     Type*                       type,
     TypeLayout*                 typeLayout,
     LegalVarChain*              varChain)
 {
-    RefPtr<VarLayout> varLayout;
-    if (typeLayout)
-    {
-        // We need to construct a layout for the new variable
-        // that reflects both the type we have given it, as
-        // well as all the offset information that has accumulated
-        // along the chain of parent variables.
-
-        // TODO: this logic needs to propagate through semantics...
-
-        varLayout = new VarLayout();
-        varLayout->typeLayout = typeLayout;
-
-        for (auto rr : typeLayout->resourceInfos)
-        {
-            auto resInfo = varLayout->findOrAddResourceInfo(rr.kind);
-
-            for (auto vv = varChain; vv; vv = vv->next)
-            {
-                if (auto parentResInfo = vv->varLayout->FindResourceInfo(rr.kind))
-                {
-                    resInfo->index += parentResInfo->index;
-                    resInfo->space += parentResInfo->space;
-                }
-            }
-        }
-
-        // Some of the parent variables might actually contain offsets
-        // to the `space` or `set` of the field, and we need to apply
-        // those to all the nested resource infos.
-        for (auto vv = varChain; vv; vv = vv->next)
-        {
-            auto parentSpaceInfo = vv->varLayout->FindResourceInfo(LayoutResourceKind::RegisterSpace);
-            if (!parentSpaceInfo)
-                continue;
-
-            for (auto& rr : varLayout->resourceInfos)
-            {
-                if (rr.kind == LayoutResourceKind::RegisterSpace)
-                {
-                    rr.index += parentSpaceInfo->index;
-                }
-                else
-                {
-                    rr.space += parentSpaceInfo->index;
-                }
-            }
-        }
-    }
+    RefPtr<VarLayout> varLayout = createVarLayout(varChain, typeLayout);
 
     DeclRef<VarDeclBase> varDeclRef;
     if (varChain)
@@ -1733,39 +882,8 @@ static LegalVal declareSimpleVar(
     return legalVarVal;
 }
 
-static RefPtr<TypeLayout> getDerefTypeLayout(
-    TypeLayout* typeLayout)
-{
-    if (!typeLayout)
-        return nullptr;
-
-    if (auto parameterGroupTypeLayout = dynamic_cast<ParameterGroupTypeLayout*>(typeLayout))
-    {
-        return parameterGroupTypeLayout->elementTypeLayout;
-    }
-
-    return typeLayout;
-}
-
-static RefPtr<VarLayout> getFieldLayout(
-    TypeLayout*             typeLayout,
-    DeclRef<VarDeclBase>    fieldDeclRef)
-{
-    if (!typeLayout)
-        return nullptr;
-
-    if (auto structTypeLayout = dynamic_cast<StructTypeLayout*>(typeLayout))
-    {
-        RefPtr<VarLayout> fieldLayout;
-        if (structTypeLayout->mapVarToLayout.TryGetValue(fieldDeclRef.getDecl(), fieldLayout))
-            return fieldLayout;
-    }
-
-    return nullptr;
-}
-
 static LegalVal declareVars(
-    TypeLegalizationContext*    context,
+    IRTypeLegalizationContext*    context,
     IROp                        op,
     LegalType                   type,
     TypeLayout*                 typeLayout,
@@ -1798,7 +916,7 @@ static LegalVal declareVars(
     case LegalType::Flavor::pair:
         {
             auto pairType = type.getPair();
-            auto ordinaryVal = declareVars(context, op, LegalType::simple(pairType->ordinaryType), typeLayout, varChain);
+            auto ordinaryVal = declareVars(context, op, pairType->ordinaryType, typeLayout, varChain);
             auto specialVal = declareVars(context, op, pairType->specialType, typeLayout, varChain);
             return LegalVal::pair(ordinaryVal, specialVal, pairType->pairInfo);
         }
@@ -1852,7 +970,7 @@ static LegalVal declareVars(
 }
 
 static void legalizeGlobalVar(
-    TypeLegalizationContext*    context,
+    IRTypeLegalizationContext*    context,
     IRGlobalVar*                irGlobalVar)
 {
     // Legalize the type for the variable's value
@@ -1899,7 +1017,7 @@ static void legalizeGlobalVar(
 }
 
 static void legalizeGlobalValue(
-    TypeLegalizationContext*    context,
+    IRTypeLegalizationContext*    context,
     IRGlobalValue*              irValue)
 {
     switch (irValue->op)
@@ -1923,7 +1041,7 @@ static void legalizeGlobalValue(
 }
 
 static void legalizeTypes(
-    TypeLegalizationContext*    context)
+    IRTypeLegalizationContext*    context)
 {
     auto module = context->module;
     for (auto gv = module->getFirstGlobalValue(); gv; gv = gv->getNextValue())
@@ -1934,7 +1052,8 @@ static void legalizeTypes(
 
 
 void legalizeTypes(
-    IRModule*   module)
+    TypeLegalizationContext*    typeLegalizationContext,
+    IRModule*                   module)
 {
     auto session = module->session;
 
@@ -1950,12 +1069,14 @@ void legalizeTypes(
     builder->sharedBuilder = sharedBuilder;
 
 
-    TypeLegalizationContext contextStorage;
+    IRTypeLegalizationContext contextStorage;
     auto context = &contextStorage;
 
     context->session = session;
     context->module = module;
     context->builder = builder;
+
+    context->typeLegalizationContext = typeLegalizationContext;
 
     legalizeTypes(context);
 

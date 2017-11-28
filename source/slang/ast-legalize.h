@@ -42,6 +42,7 @@ namespace Slang
     struct IRSpecializationState;
     class  ProgramLayout;
     class  TranslationUnitRequest;
+    struct TypeLegalizationContext;
 
 
     struct LoweredEntryPoint
@@ -63,10 +64,11 @@ namespace Slang
     // Emit code for a single entry point, based on
     // the input translation unit.
     LoweredEntryPoint lowerEntryPoint(
-        EntryPointRequest*      entryPoint,
-        ProgramLayout*          programLayout,
-        CodeGenTarget           target,
-        ExtensionUsageTracker*  extensionUsageTracker,
-        IRSpecializationState*  irSpecializationState);
+        EntryPointRequest*          entryPoint,
+        ProgramLayout*              programLayout,
+        CodeGenTarget               target,
+        ExtensionUsageTracker*      extensionUsageTracker,
+        IRSpecializationState*      irSpecializationState,
+        TypeLegalizationContext*    typeLegalizationContext);
 }
 #endif
