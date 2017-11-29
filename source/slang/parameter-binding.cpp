@@ -627,6 +627,7 @@ struct EntryPointParameterState
     int*                                ioSemanticIndex = nullptr;
     EntryPointParameterDirectionMask    directionMask;
     int                                 semanticSlotCount;
+    Stage                               stage = Stage::Unknown;
 };
 
 
@@ -639,7 +640,7 @@ static RefPtr<TypeLayout> processEntryPointParameter(
 static void collectGlobalScopeGLSLVaryingParameter(
     ParameterBindingContext*        context,
     RefPtr<VarDeclBase>             varDecl,
-    RefPtr<Type>          effectiveType,
+    RefPtr<Type>                    effectiveType,
     EntryPointParameterDirection    direction)
 {
     int defaultSemanticIndex = 0;
@@ -647,6 +648,7 @@ static void collectGlobalScopeGLSLVaryingParameter(
     EntryPointParameterState state;
     state.directionMask = direction;
     state.ioSemanticIndex = &defaultSemanticIndex;
+    state.stage = context->stage;
 
     RefPtr<VarLayout> varLayout = new VarLayout();
     varLayout->varDecl = makeDeclRef(varDecl.Ptr());
@@ -1333,6 +1335,10 @@ static RefPtr<TypeLayout> processEntryPointParameter(
         varLayout->flags |= VarLayoutFlag::HasSemantic;
     }
 
+    if (varLayout)
+    {
+        varLayout->stage = state.stage;
+    }
 
     // Scalar and vector types are treated as outputs directly
     if(auto basicType = type->As<BasicExpressionType>())
@@ -1485,6 +1491,7 @@ static void collectEntryPointParameters(
     state.ioSemanticIndex = &defaultSemanticIndex;
     state.optSemanticName = nullptr;
     state.semanticSlotCount = 0;
+    state.stage = entryPoint->profile.GetStage();
 
     for( auto m : entryPointFuncDecl->Members )
     {
@@ -2020,6 +2027,7 @@ RefPtr<ProgramLayout> specializeProgramLayout(
             RefPtr<VarLayout> newVarLayout = new VarLayout();
             RefPtr<ParameterInfo> paramInfo = new ParameterInfo();
             newVarLayout->varDecl = varLayout->varDecl;
+            newVarLayout->stage = varLayout->stage;
             newVarLayout->typeLayout = newTypeLayout;
             paramInfo->varLayouts.Add(newVarLayout);
             completeBindingsForParameter(&context, paramInfo);

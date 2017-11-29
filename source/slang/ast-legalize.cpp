@@ -3309,6 +3309,7 @@ struct LoweringVisitor
                     RefPtr<VarLayout> newFieldLayout = new VarLayout();
                     newFieldLayout->typeLayout = fieldLayout->typeLayout;
                     newFieldLayout->flags = fieldLayout->flags;
+                    newFieldLayout->stage = fieldLayout->stage;
                     newFieldLayout->varDecl = fieldLayout->varDecl;
                     newFieldLayout->systemValueSemantic = fieldLayout->systemValueSemantic;
                     newFieldLayout->systemValueSemanticIndex = fieldLayout->systemValueSemanticIndex;

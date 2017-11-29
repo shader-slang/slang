@@ -21,7 +21,8 @@ standard output = {
         },
         {
             "name": "uv",
-            "binding": {"kind": "vertexInput", "index": 0},
+            "stage": "fragment",
+            "binding": {"kind": "varyingInput", "index": 0},
             "type": {
                 "kind": "vector",
                 "elementCount": 2,
@@ -33,7 +34,8 @@ standard output = {
         },
         {
             "name": "c",
-            "binding": {"kind": "fragmentOutput", "index": 0},
+            "stage": "fragment",
+            "binding": {"kind": "varyingOutput", "index": 0},
             "type": {
                 "kind": "vector",
                 "elementCount": 4,

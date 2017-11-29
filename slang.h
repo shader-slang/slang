@@ -589,8 +589,8 @@ extern "C"
         SLANG_PARAMETER_CATEGORY_CONSTANT_BUFFER,
         SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE,
         SLANG_PARAMETER_CATEGORY_UNORDERED_ACCESS,
-        SLANG_PARAMETER_CATEGORY_VERTEX_INPUT,
-        SLANG_PARAMETER_CATEGORY_FRAGMENT_OUTPUT,
+        SLANG_PARAMETER_CATEGORY_VARYING_INPUT,
+        SLANG_PARAMETER_CATEGORY_VARYING_OUTPUT,
         SLANG_PARAMETER_CATEGORY_SAMPLER_STATE,
         SLANG_PARAMETER_CATEGORY_UNIFORM,
         SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT,
@@ -605,6 +605,11 @@ extern "C"
 
         //
         SLANG_PARAMETER_CATEGORY_COUNT,
+
+
+        // DEPRECATED:
+        SLANG_PARAMETER_CATEGORY_VERTEX_INPUT = SLANG_PARAMETER_CATEGORY_VARYING_INPUT,
+        SLANG_PARAMETER_CATEGORY_FRAGMENT_OUTPUT = SLANG_PARAMETER_CATEGORY_VARYING_OUTPUT,
     };
 
     typedef SlangUInt32 SlangStage;
@@ -618,6 +623,7 @@ extern "C"
         SLANG_STAGE_FRAGMENT,
         SLANG_STAGE_COMPUTE,
 
+        // alias:
         SLANG_STAGE_PIXEL = SLANG_STAGE_FRAGMENT,
     };
 
@@ -671,6 +677,16 @@ extern "C"
 
     SLANG_API char const* spReflectionVariableLayout_GetSemanticName(SlangReflectionVariableLayout* var);
     SLANG_API size_t spReflectionVariableLayout_GetSemanticIndex(SlangReflectionVariableLayout* var);
+
+    /** Get the stage that a variable belongs to (if any).
+
+    A variable "belongs" to a specific stage when it is a varying input/output
+    parameter either defined as part of the parameter list for an entry
+    point *or* at the global scope of a stage-specific GLSL code file (e.g.,
+    an `in` parameter in a GLSL `.vs` file belongs to the vertex stage).
+    */
+    SLANG_API SlangStage spReflectionVariableLayout_getStage(
+        SlangReflectionVariableLayout* var);
 
     // Shader Parameter Reflection
 
@@ -857,8 +873,8 @@ namespace slang
         ConstantBuffer = SLANG_PARAMETER_CATEGORY_CONSTANT_BUFFER,
         ShaderResource = SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE,
         UnorderedAccess = SLANG_PARAMETER_CATEGORY_UNORDERED_ACCESS,
-        VertexInput = SLANG_PARAMETER_CATEGORY_VERTEX_INPUT,
-        FragmentOutput = SLANG_PARAMETER_CATEGORY_FRAGMENT_OUTPUT,
+        VaryingInput = SLANG_PARAMETER_CATEGORY_VARYING_INPUT,
+        VaryingOutput = SLANG_PARAMETER_CATEGORY_VARYING_OUTPUT,
         SamplerState = SLANG_PARAMETER_CATEGORY_SAMPLER_STATE,
         Uniform = SLANG_PARAMETER_CATEGORY_UNIFORM,
         DescriptorTableSlot = SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT,
@@ -866,6 +882,10 @@ namespace slang
         PushConstantBuffer = SLANG_PARAMETER_CATEGORY_PUSH_CONSTANT_BUFFER,
         RegisterSpace = SLANG_PARAMETER_CATEGORY_REGISTER_SPACE,
         GenericResource = SLANG_PARAMETER_CATEGORY_GENERIC,
+
+        // DEPRECATED:
+        VertexInput = SLANG_PARAMETER_CATEGORY_VERTEX_INPUT,
+        FragmentOutput = SLANG_PARAMETER_CATEGORY_FRAGMENT_OUTPUT,
     };
 
     struct TypeLayoutReflection
@@ -1056,6 +1076,11 @@ namespace slang
         size_t getSemanticIndex()
         {
             return spReflectionVariableLayout_GetSemanticIndex((SlangReflectionVariableLayout*) this);
+        }
+
+        SlangStage getStage()
+        {
+            return spReflectionVariableLayout_getStage((SlangReflectionVariableLayout*) this);
         }
     };
 

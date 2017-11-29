@@ -251,6 +251,12 @@ public:
     String  semanticName;
     int     semanticIndex;
 
+    // The stage this variable belongs to, in case it is
+    // stage-specific.
+    // TODO: This is wasteful to be storing on every single
+    // variable layout.
+    Stage stage = Stage::Unknown;
+
     // The start register(s) for any resources
     struct ResourceInfo
     {

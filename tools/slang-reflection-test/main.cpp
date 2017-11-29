@@ -109,8 +109,8 @@ static void emitReflectionVarBindingInfoJSON(
     CASE(CONSTANT_BUFFER, constantBuffer);
     CASE(SHADER_RESOURCE, shaderResource);
     CASE(UNORDERED_ACCESS, unorderedAccess);
-    CASE(VERTEX_INPUT, vertexInput);
-    CASE(FRAGMENT_OUTPUT, fragmentOutput);
+    CASE(VARYING_INPUT, varyingInput);
+    CASE(VARYING_OUTPUT, varyingOutput);
     CASE(SAMPLER_STATE, samplerState);
     CASE(UNIFORM, uniform);
     CASE(DESCRIPTOR_TABLE_SLOT, descriptorTableSlot);
@@ -146,6 +146,28 @@ static void emitReflectionVarBindingInfoJSON(
     PrettyWriter&                       writer,
     slang::VariableLayoutReflection*    var)
 {
+    auto stage = var->getStage();
+    if (stage != SLANG_STAGE_NONE)
+    {
+        char const* stageName = "UNKNOWN";
+        switch (stage)
+        {
+        case SLANG_STAGE_VERTEX:    stageName = "vertex";   break;
+        case SLANG_STAGE_HULL:      stageName = "hull";     break;
+        case SLANG_STAGE_DOMAIN:    stageName = "domain";   break;
+        case SLANG_STAGE_GEOMETRY:  stageName = "geometry"; break;
+        case SLANG_STAGE_FRAGMENT:  stageName = "fragment"; break;
+        case SLANG_STAGE_COMPUTE:   stageName = "compute";  break;
+
+        default:
+            break;
+        }
+
+        write(writer, "\"stage\": \"");
+        write(writer, stageName);
+        write(writer, "\",\n");
+    }
+
     auto typeLayout = var->getTypeLayout();
     auto categoryCount = var->getCategoryCount();
 

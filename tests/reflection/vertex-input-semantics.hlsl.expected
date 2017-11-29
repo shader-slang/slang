@@ -13,7 +13,8 @@ standard output = {
             "parameters": [
                 {
                     "name": "a",
-                    "binding": {"kind": "vertexInput", "index": 0},
+                    "stage": "vertex",
+                    "binding": {"kind": "varyingInput", "index": 0},
                     "semanticName": "A",
                     "type": {
                         "kind": "vector",
@@ -26,7 +27,8 @@ standard output = {
                 },
                 {
                     "name": "b",
-                    "binding": {"kind": "vertexInput", "index": 1, "count": 3},
+                    "stage": "vertex",
+                    "binding": {"kind": "varyingInput", "index": 1, "count": 3},
                     "semanticName": "B",
                     "type": {
                         "kind": "struct",
@@ -42,7 +44,8 @@ standard output = {
                                         "scalarType": "int32"
                                     }
                                 },
-                                "binding": {"kind": "vertexInput", "index": 0},
+                                "stage": "vertex",
+                                "binding": {"kind": "varyingInput", "index": 0},
                                 "semanticName": "B"
                             },
                             {
@@ -61,7 +64,8 @@ standard output = {
                                                     "scalarType": "float32"
                                                 }
                                             },
-                                            "binding": {"kind": "vertexInput", "index": 0},
+                                            "stage": "vertex",
+                                            "binding": {"kind": "varyingInput", "index": 0},
                                             "semanticName": "B",
                                             "semanticIndex": 1
                                         },
@@ -75,13 +79,15 @@ standard output = {
                                                     "scalarType": "float32"
                                                 }
                                             },
-                                            "binding": {"kind": "vertexInput", "index": 1},
+                                            "stage": "vertex",
+                                            "binding": {"kind": "varyingInput", "index": 1},
                                             "semanticName": "B",
                                             "semanticIndex": 2
                                         }
                                     ]
                                 },
-                                "binding": {"kind": "vertexInput", "index": 1, "count": 2},
+                                "stage": "vertex",
+                                "binding": {"kind": "varyingInput", "index": 1, "count": 2},
                                 "semanticName": "B",
                                 "semanticIndex": 1
                             }
@@ -90,7 +96,8 @@ standard output = {
                 },
                 {
                     "name": "c",
-                    "binding": {"kind": "vertexInput", "index": 4, "count": 3},
+                    "stage": "vertex",
+                    "binding": {"kind": "varyingInput", "index": 4, "count": 3},
                     "type": {
                         "kind": "struct",
                         "name": "C",
@@ -111,7 +118,8 @@ standard output = {
                                                     "scalarType": "float32"
                                                 }
                                             },
-                                            "binding": {"kind": "vertexInput", "index": 0},
+                                            "stage": "vertex",
+                                            "binding": {"kind": "varyingInput", "index": 0},
                                             "semanticName": "CX"
                                         },
                                         {
@@ -124,13 +132,15 @@ standard output = {
                                                     "scalarType": "float32"
                                                 }
                                             },
-                                            "binding": {"kind": "vertexInput", "index": 1},
+                                            "stage": "vertex",
+                                            "binding": {"kind": "varyingInput", "index": 1},
                                             "semanticName": "CX",
                                             "semanticIndex": 1
                                         }
                                     ]
                                 },
-                                "binding": {"kind": "vertexInput", "index": 0, "count": 2},
+                                "stage": "vertex",
+                                "binding": {"kind": "varyingInput", "index": 0, "count": 2},
                                 "semanticName": "CX"
                             },
                             {
@@ -143,7 +153,8 @@ standard output = {
                                         "scalarType": "int32"
                                     }
                                 },
-                                "binding": {"kind": "vertexInput", "index": 2},
+                                "stage": "vertex",
+                                "binding": {"kind": "varyingInput", "index": 2},
                                 "semanticName": "CY"
                             }
                         ]
