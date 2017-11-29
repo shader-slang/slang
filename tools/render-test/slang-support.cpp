@@ -34,7 +34,19 @@ struct SlangShaderCompilerWrapper : public ShaderCompiler
 		}
 		spAddPreprocessorDefine(slangRequest, langDefine, "1");
 
+        // If we aren't dealing with true Slang input, then don't enable checking.
+        //
+        // Note: do this before using command-line arguments to set flags, so
+        // that we don't accidentally clobber other flags.
+        if (sourceLanguage != SLANG_SOURCE_LANGUAGE_SLANG)
+        {
+            spSetCompileFlags(slangRequest, SLANG_COMPILE_FLAG_NO_CHECKING);
+        }
+
+        // Preocess any additional command-line options specified for Slang using
+        // the `-xslang <arg>` option to `render-test`.
 		spProcessCommandLineArguments(slangRequest, &gOptions.slangArgs[0], gOptions.slangArgCount);
+
 		int computeTranslationUnit = 0;
 		int vertexTranslationUnit = 0;
 		int fragmentTranslationUnit = 0;
@@ -76,11 +88,6 @@ struct SlangShaderCompilerWrapper : public ShaderCompiler
 		}
 
 
-		// If we aren't dealing with true Slang input, then don't enable checking.
-		if (sourceLanguage != SLANG_SOURCE_LANGUAGE_SLANG)
-		{
-			spSetCompileFlags(slangRequest, SLANG_COMPILE_FLAG_NO_CHECKING);
-		}
 		ShaderProgram * result = nullptr;
         Slang::List<const char*> rawTypeNames;
         for (auto typeName : request.entryPointTypeArguments)

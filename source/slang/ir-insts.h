@@ -559,18 +559,44 @@ struct IRBuilder
     IRLayoutDecoration* addLayoutDecoration(IRValue* value, Layout* layout);
 };
 
-// Generate a clone of an IR module that is specialized for
-// a particular entry point, target, etc.
-IRModule* specializeIRForEntryPoint(
+//
+
+// Interface to IR specialization for use when cloning target-specific
+// IR as part of compiling an entry point.
+//
+// TODO: we really need to move all of this logic to its own files.
+
+// `IRSpecializationState` is used as an opaque type to wrap up all
+// the data needed to perform IR specialization, without exposing
+// implementation details.
+struct IRSpecializationState;
+IRSpecializationState* createIRSpecializationState(
     EntryPointRequest*  entryPointRequest,
     ProgramLayout*      programLayout,
     CodeGenTarget       target,
     TargetRequest*      targetReq);
+void destroyIRSpecializationState(IRSpecializationState* state);
+IRModule* getIRModule(IRSpecializationState* state);
+
+IRGlobalValue* getSpecializedGlobalValueForDeclRef(
+    IRSpecializationState*  state,
+    DeclRef<Decl> const&    declRef);
+
+// Clone the IR values reachable from the given entry point
+// into the IR module assocaited with the specialization state.
+// When multiple definitions of a symbol are found, the one
+// that is best specialized for the given `targetReq` will be
+// used.
+void specializeIRForEntryPoint(
+    IRSpecializationState*  state,
+    EntryPointRequest*  entryPointRequest);
 
 // Find suitable uses of the `specialize` instruction that
 // can be replaced with references to specialized functions.
 void specializeGenerics(
     IRModule*   module);
+
+//
 
 }
 

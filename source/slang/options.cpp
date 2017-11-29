@@ -241,6 +241,12 @@ struct OptionsParser
         int             argc,
         char const* const*  argv)
     {
+        // Copy some state out of the current request, in case we've been called
+        // after some other initialization has been performed.
+        flags = requestImpl->compileFlags;
+
+        //
+
         char const* const* argCursor = &argv[0];
         char const* const* argEnd = &argv[argc];
         while (argCursor != argEnd)

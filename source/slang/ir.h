@@ -466,6 +466,7 @@ void printSlangIRAssembly(StringBuilder& builder, IRModule* module);
 String getSlangIRAssembly(IRModule* module);
 
 void dumpIR(IRModule* module);
+
 }
 
 
