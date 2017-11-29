@@ -666,6 +666,36 @@ SLANG_API size_t spReflectionVariableLayout_GetSemanticIndex(SlangReflectionVari
     return varLayout->semanticIndex;
 }
 
+SLANG_API SlangStage spReflectionVariableLayout_getStage(
+    SlangReflectionVariableLayout* inVarLayout)
+{
+    auto varLayout = convert(inVarLayout);
+    if(!varLayout) return SLANG_STAGE_NONE;
+
+    // A parameter that is not a varying input or output is
+    // not considered to belong to a single stage.
+    //
+    // TODO: We might need to reconsider this for, e.g., entry
+    // point parameters, where they might be stage-specific even
+    // if they are uniform.
+    if (!varLayout->FindResourceInfo(Slang::LayoutResourceKind::VaryingInput)
+        && !varLayout->FindResourceInfo(Slang::LayoutResourceKind::VaryingOutput))
+    {
+        return SLANG_STAGE_NONE;
+    }
+
+    // TODO: We should find the stage for a variable layout by
+    // walking up the tree of layout information, until we find
+    // something that has a definitive stage attached to it (e.g.,
+    // either an entry point or a GLSL translation unit).
+    //
+    // We don't currently have parent links in the reflection layout
+    // information, so doing that walk would be tricky right now, so
+    // it is easier to just bloat the representation and store yet another
+    // field on every variable layout.
+    return (SlangStage) varLayout->stage;
+}
+
 
 // Shader Parameter Reflection
 

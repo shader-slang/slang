@@ -1620,6 +1620,8 @@ static LegalVal declareSimpleVar(
         // well as all the offset information that has accumulated
         // along the chain of parent variables.
 
+        // TODO: this logic needs to propagate through semantics...
+
         varLayout = new VarLayout();
         varLayout->typeLayout = typeLayout;
 
