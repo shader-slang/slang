@@ -947,14 +947,6 @@ LoweredTypeInfo lowerType(
     return visitor.dispatchType(type);
 }
 
-#if 0
-struct LoweringVisitor
-    : ExprVisitor<LoweringVisitor, LoweredExpr>
-    , StmtVisitor<LoweringVisitor, void>
-    , DeclVisitor<LoweringVisitor, LoweredDecl>
-    , ValVisitor<LoweringVisitor, RefPtr<Val>, RefPtr<Type>>
-#endif
-
 LoweredValInfo createVar(
     IRGenContext*   context,
     RefPtr<Type>    type,
@@ -982,6 +974,8 @@ void addArgs(
     case LoweredValInfo::Flavor::Simple:
     case LoweredValInfo::Flavor::Ptr:
     case LoweredValInfo::Flavor::SwizzledLValue:
+    case LoweredValInfo::Flavor::BoundSubscript:
+    case LoweredValInfo::Flavor::BoundMember:
         args.Add(getSimpleVal(context, argInfo));
         break;
 
@@ -2533,6 +2527,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     LoweredValInfo visitDecl(Decl* /*decl*/)
     {
         SLANG_UNIMPLEMENTED_X("decl catch-all");
+    }
+
+    LoweredValInfo visitImportDecl(ImportDecl* /*decl*/)
+    {
+        return LoweredValInfo();
     }
 
     LoweredValInfo visitEmptyDecl(EmptyDecl* /*decl*/)

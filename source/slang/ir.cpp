@@ -3764,6 +3764,14 @@ namespace Slang
         String const&   mangledName,
         IRGlobalValue*  originalVal)
     {
+        // Check if we've already cloned this value, for the case where
+        // an original value has already been established.
+        IRValue* clonedVal = nullptr;
+        if( originalVal && context->getClonedValues().TryGetValue(originalVal, clonedVal) )
+        {
+            return (IRGlobalValue*) clonedVal;
+        }
+
         if(mangledName.Length() == 0)
         {
             // If there is no mangled name, then we assume this is a local symbol,
@@ -3779,6 +3787,9 @@ namespace Slang
         RefPtr<IRSpecSymbol> sym;
         if( !context->getSymbols().TryGetValue(mangledName, sym) )
         {
+            if(!originalVal)
+                return nullptr;
+
             // This shouldn't happen!
             SLANG_UNEXPECTED("no matching values registered");
             UNREACHABLE_RETURN(cloneGlobalValueImpl(context, originalVal, nullptr));
@@ -3796,6 +3807,14 @@ namespace Slang
             IRGlobalValue* newVal = ss->irGlobalValue;
             if(isBetterForTarget(context, newVal, bestVal))
                 bestVal = newVal;
+        }
+
+        // Check if we've already cloned this value, for the case where
+        // we didn't have an original value (just a name), but we've
+        // now found a representative value.
+        if( !originalVal && context->getClonedValues().TryGetValue(bestVal, clonedVal) )
+        {
+            return (IRGlobalValue*) clonedVal;
         }
 
         return cloneGlobalValueImpl(context, bestVal, sym);

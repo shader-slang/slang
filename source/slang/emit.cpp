@@ -3,6 +3,7 @@
 
 #include "ast-legalize.h"
 #include "ir-insts.h"
+#include "legalize-types.h"
 #include "lower-to-ir.h"
 #include "mangle.h"
 #include "name.h"
@@ -1234,13 +1235,6 @@ struct EmitVisitor
     {
         Emit("groupshared ");
         emitTypeImpl(type->valueType, arg.declarator);
-    }
-
-    void visitFilteredTupleType(FilteredTupleType* type, TypeEmitArg const& arg)
-    {
-        auto declarator = arg.declarator;
-        emit(getMangledTypeName(type));
-        EmitDeclarator(declarator);
     }
 
     void EmitType(
@@ -2952,7 +2946,7 @@ struct EmitVisitor
             Decl* decl = declRef.getDecl();
             if(irDeclSet->Contains(decl))
             {
-                emit(getMangledName(declRef));
+                emit(getIRName(declRef));
                 return;
             }
         }
@@ -3605,10 +3599,6 @@ struct EmitVisitor
         // The data type that describes where stuff in the constant buffer should go
         RefPtr<Type> dataType = parameterGroupType->elementType;
 
-        // We expect/require the data type to be a user-defined `struct` type
-        auto declRefType = dataType->As<DeclRefType>();
-        SLANG_RELEASE_ASSERT(declRefType);
-
         // We expect to always have layout information
         layout = maybeFetchLayout(varDecl, layout);
         SLANG_RELEASE_ASSERT(layout);
@@ -3642,26 +3632,47 @@ struct EmitVisitor
         emitHLSLRegisterSemantic(*info);
 
         Emit("\n{\n");
-        if (auto structRef = declRefType->declRef.As<StructDecl>())
+
+        // We expect the data type to be a user-defined `struct` type,
+        // but it might also be a "filtered" type that represents the
+        // case where only some fields of the original type are valid
+        // to appear inside of a `struct`.
+        if (auto declRefType = dataType->As<DeclRefType>())
         {
-            int fieldCounter = 0;
-
-            for (auto field : getMembersOfType<StructField>(structRef))
+            if (auto structRef = declRefType->declRef.As<StructDecl>())
             {
-                int fieldIndex = fieldCounter++;
+                int fieldCounter = 0;
 
-                emitVarDeclHead(field);
+                for (auto field : getMembersOfType<StructField>(structRef))
+                {
+                    int fieldIndex = fieldCounter++;
 
-                RefPtr<VarLayout> fieldLayout = structTypeLayout->fields[fieldIndex];
-                SLANG_RELEASE_ASSERT(fieldLayout->varDecl.GetName() == field.GetName());
+                    // Skip fields that have `void` type, since these represent
+                    // declarations that got legalized out of existence.
+                    if(GetType(field)->Equals(getSession()->getVoidType()))
+                        continue;
 
-                // Emit explicit layout annotations for every field
-                emitHLSLParameterGroupFieldLayoutSemantics(layout, fieldLayout);
+                    emitVarDeclHead(field);
 
-                emitVarDeclInit(field);
+                    RefPtr<VarLayout> fieldLayout = structTypeLayout->fields[fieldIndex];
+                    SLANG_RELEASE_ASSERT(fieldLayout->varDecl.GetName() == field.GetName());
 
-                Emit(";\n");
+                    // Emit explicit layout annotations for every field
+                    emitHLSLParameterGroupFieldLayoutSemantics(layout, fieldLayout);
+
+                    emitVarDeclInit(field);
+
+                    Emit(";\n");
+                }
             }
+            else
+            {
+                SLANG_UNEXPECTED("unexpected element type for parameter group");
+            }
+        }
+        else
+        {
+            SLANG_UNEXPECTED("unexpected element type for parameter group");
         }
         Emit("}\n");
     }
@@ -3773,10 +3784,6 @@ struct EmitVisitor
         // The data type that describes where stuff in the constant buffer should go
         RefPtr<Type> dataType = parameterGroupType->elementType;
 
-        // We expect/require the data type to be a user-defined `struct` type
-        auto declRefType = dataType->As<DeclRefType>();
-        SLANG_RELEASE_ASSERT(declRefType);
-
         // We expect the layout, if present, to be for a structured type...
         RefPtr<StructTypeLayout> structTypeLayout;
         if (layout)
@@ -3827,26 +3834,54 @@ struct EmitVisitor
         }
 
         Emit("\n{\n");
-        if (auto structRef = declRefType->declRef.As<StructDecl>())
+
+        // We expect the data type to be a user-defined `struct` type,
+        // but it might also be a "filtered" type that represents the
+        // case where only some fields of the original type are valid
+        // to appear inside of a `struct`.
+        if (auto declRefType = dataType->As<DeclRefType>())
         {
-            for (auto field : getMembersOfType<StructField>(structRef))
+
+            if (auto structRef = declRefType->declRef.As<StructDecl>())
             {
-                if (structTypeLayout)
+                int fieldCounter = 0;
+                for (auto field : getMembersOfType<StructField>(structRef))
                 {
-                    RefPtr<VarLayout> fieldLayout;
-                    structTypeLayout->mapVarToLayout.TryGetValue(field.getDecl(), fieldLayout);
-                    //            assert(fieldLayout);
+                    int fieldIndex = fieldCounter++;
 
-                    // TODO(tfoley): We may want to emit *some* of these,
-                    // some of the time...
-        //            emitGLSLLayoutQualifiers(fieldLayout);
+                    // Skip fields that have `void` type, since these represent
+                    // declarations that got legalized out of existence.
+                    if(GetType(field)->Equals(getSession()->getVoidType()))
+                        continue;
+
+                    if (structTypeLayout)
+                    {
+                        RefPtr<VarLayout> fieldLayout = structTypeLayout->fields[fieldIndex];
+                        //            assert(fieldLayout);
+
+                        // TODO(tfoley): We may want to emit *some* of these,
+                        // some of the time...
+            //            emitGLSLLayoutQualifiers(fieldLayout);
+                    }
+
+
+                    EmitVarDeclCommon(field);
+
+                    Emit(";\n");
                 }
-
-                EmitVarDeclCommon(field);
-
-                Emit(";\n");
+            }
+            else
+            {
+                SLANG_UNEXPECTED("unexpected element type for parameter group");
             }
         }
+        else
+        {
+            SLANG_UNEXPECTED("unexpected element type for parameter group");
+        }
+
+
+
         Emit("}");
 
         if( varDecl->getNameLoc().isValid() )
@@ -3890,13 +3925,10 @@ struct EmitVisitor
             }
         }
 
-        // Skip fields that have been tuple-ified and don't contribute
-        // any fields of "ordinary" type.
-        if (auto tupleFieldMod = decl->FindModifier<TupleFieldModifier>())
-        {
-            if (!tupleFieldMod->hasAnyNonTupleFields)
-                return;
-        }
+        // Skip fields that have `void` type, since these may be introduced
+        // as part of type leglaization.
+        if(decl->getType()->Equals(getSession()->getVoidType()))
+            return;
 
         RefPtr<VarLayout> layout = arg.layout;
         layout = maybeFetchLayout(decl, layout);
@@ -4129,16 +4161,6 @@ emitDeclImpl(decl, nullptr);
 
     String getIRName(Decl* decl)
     {
-        // It is a bit ugly, but we need a deterministic way
-        // to get a name for things when emitting from the IR
-        // that won't conflict with any keywords, builtins, etc.
-        // in the target language.
-        //
-        // Eventually we should accomplish this by using
-        // mangled names everywhere, but that complicates things
-        // when we are also using direct comparison to fxc/glslang
-        // output for some of our tests.
-        //
         // TODO: need a flag to get rid of the step that adds
         // a prefix here, so that we can get "clean" output
         // when needed.
@@ -4155,7 +4177,27 @@ emitDeclImpl(decl, nullptr);
 
     String getIRName(DeclRefBase const& declRef)
     {
-        return getIRName(declRef.decl);
+        // It is a bit ugly, but we need a deterministic way
+        // to get a name for things when emitting from the IR
+        // that won't conflict with any keywords, builtins, etc.
+        // in the target language.
+        //
+        // Eventually we should accomplish this by using
+        // mangled names everywhere, but that complicates things
+        // when we are also using direct comparison to fxc/glslang
+        // output for some of our tests.
+        //
+
+        String name;
+        if (context->shared->entryPoint->compileRequest->compileFlags & SLANG_COMPILE_FLAG_NO_MANGLING)
+        {
+            name.append(getText(declRef.GetName()));
+        }
+        else
+        {
+            name.append(getMangledName(declRef));
+        }
+        return name;
     }
 
     String getGLSLSystemValueName(
@@ -6279,35 +6321,18 @@ emitDeclImpl(decl, nullptr);
 
                     auto fieldLayout = structTypeLayout->fields[fieldIndex++];
 
+                    auto fieldType = GetType(ff);
+                    if(fieldType->Equals(getSession()->getVoidType()))
+                        continue;
+
                     emitIRVarModifiers(ctx, fieldLayout);
 
-                    auto fieldType = GetType(ff);
                     emitIRType(ctx, fieldType, getIRName(ff));
 
                     emitHLSLParameterGroupFieldLayoutSemantics(layout, fieldLayout);
 
                     emit(";\n");
                 }
-            }
-        }
-        else if (auto filteredTupleType = elementType->As<FilteredTupleType>())
-        {
-            auto structTypeLayout = typeLayout.As<StructTypeLayout>();
-            assert(structTypeLayout);
-
-            for (auto ee : filteredTupleType->elements)
-            {
-                RefPtr<VarLayout> fieldLayout;
-                structTypeLayout->mapVarToLayout.TryGetValue(ee.fieldDeclRef, fieldLayout);
-
-                emitIRVarModifiers(ctx, fieldLayout);
-
-                auto fieldType = ee.type;
-                emitIRType(ctx, fieldType, getIRName(ee.fieldDeclRef));
-
-                emitHLSLParameterGroupFieldLayoutSemantics(layout, fieldLayout);
-
-                emit(";\n");
             }
         }
         else
@@ -6376,9 +6401,12 @@ emitDeclImpl(decl, nullptr);
 
                     auto fieldLayout = structTypeLayout->fields[fieldIndex++];
 
+                    auto fieldType = GetType(ff);
+                    if(fieldType->Equals(getSession()->getVoidType()))
+                        continue;
+
                     emitIRVarModifiers(ctx, fieldLayout);
 
-                    auto fieldType = GetType(ff);
                     emitIRType(ctx, fieldType, getIRName(ff));
 
 //                    emitHLSLParameterGroupFieldLayoutSemantics(layout, fieldLayout);
@@ -6589,7 +6617,7 @@ emitDeclImpl(decl, nullptr);
         }
 
         Emit("struct ");
-        emit(declRef.GetName());
+        EmitDeclRef(declRef);
         Emit("\n{\n");
         for( auto ff : GetFields(declRef) )
         {
@@ -6597,6 +6625,11 @@ emitDeclImpl(decl, nullptr);
                 continue;
 
             auto fieldType = GetType(ff);
+
+            // Skip `void` fields that might have been created by legalization.
+            if(fieldType->Equals(getSession()->getVoidType()))
+                continue;
+
             emitIRType(ctx, fieldType, getIRName(ff));
 
             EmitSemantics(ff.getDecl());
@@ -6653,43 +6686,6 @@ emitDeclImpl(decl, nullptr);
             {
                 //
                 ensureStructDecl(ctx, structDeclRef);
-            }
-        }
-        else if (auto filteredTupleType = type->As<FilteredTupleType>())
-        {
-            // First, ensure that the element types are ready:
-            for (auto ee : filteredTupleType->elements)
-            {
-                if (ee.type)
-                {
-                    emitIRUsedType(ctx, ee.type);
-                }
-            }
-
-            // Now, we want to ensure we've emitted a
-            // matching `struct` type declaration.
-
-            String mangledName = getMangledTypeName(filteredTupleType);
-            if (!ctx->shared->irTupleTypes.Contains(mangledName))
-            {
-                ctx->shared->irTupleTypes.Add(mangledName);
-
-                // Emit the damn `struct` decl...
-
-                Emit("struct ");
-                emit(mangledName);
-                Emit("\n{\n");
-                for( auto ee : filteredTupleType->elements )
-                {
-                    if (!ee.type)
-                        continue;
-
-                    emitIRType(ctx, ee.type, getIRName(ee.fieldDeclRef));
-
-                    emit(";\n");
-                }
-                Emit("};\n");
-
             }
         }
         else
@@ -6846,7 +6842,8 @@ StructTypeLayout* getGlobalStructLayout(
 }
 
 void legalizeTypes(
-    IRModule*   module);
+    TypeLegalizationContext*    context,
+    IRModule*                   module);
 
 String emitEntryPoint(
     EntryPointRequest*  entryPoint,
@@ -6937,6 +6934,9 @@ String emitEntryPoint(
     // Next we will check for case (2a):
     else if (!(translationUnit->compileRequest->compileFlags & SLANG_COMPILE_FLAG_USE_IR))
     {
+        TypeLegalizationContext typeLegalizationContext;
+        typeLegalizationContext.session = entryPoint->compileRequest->mSession;
+
         // This case means the user has opted out of using the IR (so we can't use the
         // cases below), but they either turned on semantic checking *or* imported some
         // Slang code, so they can't use the case above.
@@ -6958,7 +6958,8 @@ String emitEntryPoint(
             programLayout,
             target,
             &sharedContext.extensionUsageTracker,
-            nullptr);
+            nullptr,
+            &typeLegalizationContext);
         sharedContext.program = lowered.program;
 
         // Note that we emit the main body code of the program *before*
@@ -6976,6 +6977,9 @@ String emitEntryPoint(
     // are certain steps that need to be shared.
     else
     {
+        TypeLegalizationContext typeLegalizationContext;
+        typeLegalizationContext.session = entryPoint->compileRequest->mSession;
+
         // We are going to create a fresh IR module that we will use to
         // clone any code needed by the user's entry point.
         IRSpecializationState* irSpecializationState = createIRSpecializationState(
@@ -6984,6 +6988,8 @@ String emitEntryPoint(
             target,
             targetRequest);
         IRModule* irModule = getIRModule(irSpecializationState);
+
+        typeLegalizationContext.irModule = irModule;
 
         LoweredEntryPoint lowered;
         if(translationUnit->compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING)
@@ -7002,7 +7008,8 @@ String emitEntryPoint(
                 programLayout,
                 target,
                 &sharedContext.extensionUsageTracker,
-                irSpecializationState);
+                irSpecializationState,
+                &typeLegalizationContext);
         }
         else
         {
@@ -7044,7 +7051,9 @@ String emitEntryPoint(
         // we need to ensure that the code only uses types
         // that are legal on the chosen target.
         // 
-        legalizeTypes(irModule);
+        legalizeTypes(
+            &typeLegalizationContext,
+            irModule);
 
         //  Debugging output of legalization
 #if 0
@@ -7052,6 +7061,8 @@ String emitEntryPoint(
         dumpIR(lowered);
         fprintf(stderr, "###\n");
 #endif
+
+        sharedContext.irDeclSetForAST = &lowered.irDecls;
 
         // After all of the required optimization and legalization
         // passes have been performed, we can emit target code from
@@ -7065,7 +7076,6 @@ String emitEntryPoint(
         // that we need to output, we'll do it now.
         if (translationUnit->compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING)
         {
-            sharedContext.irDeclSetForAST = &lowered.irDecls;
             visitor.EmitDeclsInContainer(lowered.program);
         }
 
