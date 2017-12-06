@@ -272,41 +272,6 @@ struct LegalTypeExpr
     }
 };
 
-#if 0
-// Pseudo-syntax used during lowering
-class PseudoVarDecl : public RefObject
-{
-public:
-    Name*           name;
-    SourceLoc       loc;
-    LegalTypeExpr   typeExpr;
-};
-
-class ImplicitDerefPseudoDecl : public PseudoVarDecl
-{
-public:
-    LoweredDecl valueDecl;
-};
-
-class TuplePseudoDecl : public PseudoVarDecl
-{
-public:
-    struct Element
-    {
-        LoweredDecl                 decl;
-    };
-
-    List<Element>           tupleDecls;
-};
-
-class PairPseudoDecl : public PseudoVarDecl
-{
-public:
-    LoweredDecl ordinary;
-    LoweredDecl special;
-};
-#endif
-
 class PseudoExpr : public RefObject
 {
 public:
@@ -2925,14 +2890,14 @@ struct LoweringVisitor
     {
         // not supported
         SLANG_UNREACHABLE("visitAssocTypeDecl in LowerVisitor");
-        UNREACHABLE_RETURN(LoweredDecl());
+        UNREACHABLE_RETURN(nullptr);
     }
 
     RefPtr<Decl> visitGlobalGenericParamDecl(GlobalGenericParamDecl * /*decl*/)
     {
         // not supported
         SLANG_UNREACHABLE("visitGlobalGenericParamDecl in LowerVisitor");
-        UNREACHABLE_RETURN(LoweredDecl());
+        UNREACHABLE_RETURN(nullptr);
     }
 
     RefPtr<Decl> visitTypeDefDecl(TypeDefDecl* decl)
@@ -3378,11 +3343,8 @@ struct LoweringVisitor
                     valueInit,
                     valueType);
 
-                // TODO: should wrap up in a `LoweredDecl::implicitDeref`
-
                 RefPtr<ImplicitDerefPseudoExpr> implicitDerefExpr = new ImplicitDerefPseudoExpr();
                 implicitDerefExpr->valueExpr = valueExpr;
-
                 return LegalExpr(implicitDerefExpr);
             }
             break;
