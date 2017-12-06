@@ -3462,7 +3462,7 @@ struct LoweringVisitor
 
         default:
             SLANG_UNEXPECTED("unhandled legalized type flavor");
-            UNREACHABLE_RETURN(LoweredDecl());
+            UNREACHABLE_RETURN(LegalExpr());
             break;
         }
     }
