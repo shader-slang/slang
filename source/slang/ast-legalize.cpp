@@ -1802,7 +1802,7 @@ struct LoweringVisitor
         // TODO: need to handle array types here...
 
         SLANG_UNEXPECTED("unhandled case");
-        UNREACHABLE_RETURN(legalExpr);
+        UNREACHABLE_RETURN(legalExpr.getSimple());
     }
 
     static LegalExpr maybeReifyTuple(
