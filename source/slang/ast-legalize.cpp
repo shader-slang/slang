@@ -797,24 +797,9 @@ struct LoweringVisitor
             lowerTypeEx(type->valueType));
     }
 
-    RefPtr<Type> visitParameterBlockType(ParameterBlockType* type)
-    {
-        // TODO: When doing AST-to-AST lowering, we want to lower
-        // a `ParameterBlock<T>` just like a `ConstantBuffer<T>`.
-        //
-        // HACK: for now we will try to simply lower the type
-        // directly to its stated element type, and see how
-        // that works.
-
-        return lowerTypeEx(type->getElementType());
-//        return getSession()->getConstantBufferType(
-//            lowerType(type->getElementType());
-    }
-
     RefPtr<Type> transformSyntaxField(Type* type)
     {
-        // TODO: how to handle this...
-        return type;
+        return lowerAndLegalizeSimpleType(type);
     }
 
     RefPtr<Val> visitIRProxyVal(IRProxyVal* val)
@@ -1807,15 +1792,73 @@ struct LoweringVisitor
 
     static LegalExpr maybeReifyTuple(
         LegalExpr       legalExpr,
-        LegalType       expectedType)
+        LegalType       expectedLegalType)
     {
-        if (expectedType.flavor != LegalType::Flavor::simple)
+        if (expectedLegalType.flavor != LegalType::Flavor::simple)
             return legalExpr;
+
+        RefPtr<Type> expectedType = expectedLegalType.getSimple();
+        if(auto errorType = expectedType->As<ErrorType>())
+        {
+            return legalExpr;
+        }
 
         if (legalExpr.getFlavor() == LegalExpr::Flavor::simple)
             return legalExpr;
 
-        return LegalExpr(reifyTuple(legalExpr, expectedType.getSimple()));
+        return LegalExpr(reifyTuple(legalExpr, expectedLegalType.getSimple()));
+    }
+
+    // This function exists to work around cases where `addArgs` gets called
+    // and the structure of the type expected in context (the legalized parameter
+    // type) differs from the structure of the actual argument.
+    //
+    // This function ignores type information and just adds things based on
+    // what is present in the actual expression.
+    void addArgsWorkaround(
+        ExprWithArgsBase*   callExpr,
+        LegalExpr           argExpr)
+    {
+
+        switch (argExpr.getFlavor())
+        {
+        case LegalExpr::Flavor::none:
+            break;
+
+        case LegalExpr::Flavor::simple:
+            addArg(callExpr, argExpr.getSimple());
+            break;
+
+        case LegalExpr::Flavor::tuple:
+            {
+                auto aa = argExpr.getTuple();
+                auto elementCount = aa->elements.Count();
+                for (UInt ee = 0; ee < elementCount; ++ee)
+                {
+                    addArgsWorkaround(callExpr, aa->elements[ee].expr);
+                }
+            }
+            break;
+
+        case LegalExpr::Flavor::pair:
+            {
+                auto aa = argExpr.getPair();
+                addArgsWorkaround(callExpr, aa->ordinary);
+                addArgsWorkaround(callExpr, aa->special);
+            }
+            break;
+
+        case LegalExpr::Flavor::implicitDeref:
+            {
+                auto aa = argExpr.getImplicitDeref();
+                addArgsWorkaround(callExpr, aa->valueExpr);
+            }
+            break;
+
+        default:
+            SLANG_UNEXPECTED("unhandled case");
+            break;
+        }
     }
 
     void addArgs(
@@ -1827,7 +1870,10 @@ struct LoweringVisitor
 
         if (argExpr.getFlavor() != argType.flavor)
         {
-            SLANG_UNEXPECTED("expression and type do not match");
+            // A mismatch may also arise if we are in the `-no-checking` mode,
+            // so that we are making a call that didn't type-check.
+            addArgsWorkaround(callExpr, argExpr);
+            return;
         }
 
         switch (argExpr.getFlavor())
@@ -1898,6 +1944,29 @@ struct LoweringVisitor
         // Create a clone with the same class
         InvokeExpr* loweredExpr = (InvokeExpr*) expr->getClass().createInstance();
         return LegalExpr(lowerCallExpr(loweredExpr, expr));
+    }
+
+    LegalExpr visitHiddenImplicitCastExpr(
+        HiddenImplicitCastExpr* expr)
+    {
+        LegalExpr legalArg = legalizeExpr(expr->Arguments[0]);
+        if(legalArg.getFlavor() == LegalExpr::Flavor::simple)
+        {
+            InvokeExpr* loweredExpr = (InvokeExpr*) expr->getClass().createInstance();
+            lowerExprCommon(loweredExpr, expr);
+            loweredExpr->FunctionExpr = legalizeSimpleExpr(expr->FunctionExpr);
+            addArg(loweredExpr, legalArg.getSimple());
+            return LegalExpr(loweredExpr);
+        }
+        else
+        {
+            // If we hit this case, then there seems to have been a type-checking
+            // error around a type that needed to be desugared. We want to use
+            // the original expression rather than hide it behind a cast, because
+            // it might need to be unpacked into multiple arguments for a call, etc.
+            //
+            return legalArg;
+        }
     }
 
     LegalExpr visitSelectExpr(
@@ -2476,6 +2545,7 @@ struct LoweringVisitor
         RefPtr<Type>    type)
     {
         auto typeType = new TypeType();
+        typeType->setSession(getSession());
         typeType->type = type;
 
         auto result = new SharedTypeExpr();
@@ -3307,30 +3377,40 @@ struct LoweringVisitor
         LegalTypeExpr const&        legalTypeExpr)
     {
         auto& legalType = legalTypeExpr.type;
+        if( legalType.flavor == LegalType::Flavor::simple )
+        {
+            return declareSimpleVar(
+                originalDecl,
+                varChain,
+                loc,
+                name,
+                loweredDeclClass,
+                typeLayout,
+                legalInit,
+                legalTypeExpr);
+        }
+
+        // We might have a variable of type `ConstantBuffer<Foo>` that
+        // is av
+
         switch (legalType.flavor)
         {
-        case LegalType::Flavor::simple:
-            {
-                return declareSimpleVar(
-                    originalDecl,
-                    varChain,
-                    loc,
-                    name,
-                    loweredDeclClass,
-                    typeLayout,
-                    legalInit,
-                    legalTypeExpr);
-
-            }
-            break;
-
         case LegalType::Flavor::implicitDeref:
             {
                 auto implicitDerefType = legalType.getImplicitDeref();
 
                 auto valueType = implicitDerefType->valueType;
-                auto valueTypeLayout = getDerefTypeLayout(typeLayout);
-                SLANG_ASSERT(valueTypeLayout || !typeLayout);
+
+                // Don't apply dereferencing to the type layout, because
+                // other steps will also implicitly remove wrappers (like
+                // parameter groups) and this could mess up the final
+                // type layout for a variable.
+                //
+                // Instead, any other "unwrapping" that needs to occur
+                // when declaring variables should be handled in the
+                // case for the specific type (e.g., when extracting
+                // fields for a tuple, we should auto-dereference).
+                auto valueTypeLayout = typeLayout;
                 auto valueInit = deref(legalInit);
 
                 LegalExpr valueExpr = declareVars(
@@ -3422,6 +3502,7 @@ struct LoweringVisitor
             }
             break;
 
+        case LegalType::Flavor::simple: // This case was handled at the start of the function
         default:
             SLANG_UNEXPECTED("unhandled legalized type flavor");
             UNREACHABLE_RETURN(LegalExpr());

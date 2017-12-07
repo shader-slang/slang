@@ -522,6 +522,7 @@ extern "C"
         SLANG_TYPE_KIND_SAMPLER_STATE,
         SLANG_TYPE_KIND_TEXTURE_BUFFER,
         SLANG_TYPE_KIND_SHADER_STORAGE_BUFFER,
+        SLANG_TYPE_KIND_PARAMETER_BLOCK,
 
         SLANG_TYPE_KIND_COUNT,
     };
@@ -759,6 +760,7 @@ namespace slang
             SamplerState = SLANG_TYPE_KIND_SAMPLER_STATE,
             TextureBuffer = SLANG_TYPE_KIND_TEXTURE_BUFFER,
             ShaderStorageBuffer = SLANG_TYPE_KIND_SHADER_STORAGE_BUFFER,
+            ParameterBlock = SLANG_TYPE_KIND_PARAMETER_BLOCK,
         };
 
         enum ScalarType : SlangScalarType

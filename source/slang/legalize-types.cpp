@@ -194,9 +194,23 @@ struct TupleTypeBuilder
             {
                 // The field's type had both special and non-special parts
                 auto pairType = legalLeafType.getPair();
-                ordinaryType = pairType->ordinaryType;
-                specialType = pairType->specialType;
-                elementPairInfo = pairType->pairInfo;
+
+                // If things originally started as a resource type, then
+                // we want to externalize all the fields that arose, even
+                // if there is (nominally) ordinary data.
+                //
+                // This is because the "ordinary" side of the legalization
+                // of `ConstantBuffer<Foo>` will still be a resource type.
+                if(isResource)
+                {
+                    specialType = legalFieldType;
+                }
+                else
+                {
+                    ordinaryType = pairType->ordinaryType;
+                    specialType = pairType->specialType;
+                    elementPairInfo = pairType->pairInfo;
+                }
             }
             break;
 
@@ -777,23 +791,21 @@ LegalType legalizeType(
     TypeLegalizationContext*    context,
     Type*                       type)
 {
-    if (auto parameterBlockType = type->As<ParameterBlockType>())
+    if (auto uniformBufferType = type->As<UniformParameterGroupType>())
     {
-        // We basically legalize the `ParameterBlock<T>` type
-        // over to `T`. In order to represent this preoperly,
-        // we need to be careful to wrap it up in a way that
-        // tells us to eliminate downstream deferences...
-
-        auto legalElementType = legalizeType(context,
-            parameterBlockType->getElementType());
-        return LegalType::implicitDeref(legalElementType);
-    }
-    else if (auto uniformBufferType = type->As<UniformParameterGroupType>())
-    {
-        // We have a `ConstantBuffer<T>` or `TextureBuffer<T>` or
-        // other pointer-like type that represents uniform parameters.
-        // We need to pull any resource-type fields out of it, but
-        // leave the non-resource fields where they are.
+        // We have one of:
+        //
+        //      ConstantBuffer<T>
+        //      TextureBuffer<T>
+        //      ParameterBlock<T>
+        //
+        // or some other pointer-like type that represents uniform
+        // parameters. We need to pull any resource-type fields out
+        // of it, but leave non-resource fields where they are.
+        //
+        // As a special case, if the type contains *no* uniform data,
+        // we'll want to completely eliminate the uniform/ordinary
+        // part.
 
         // Legalize the element type to see what we are working with.
         auto legalElementType = legalizeType(context,
@@ -973,10 +985,22 @@ RefPtr<VarLayout> getFieldLayout(
     if (!typeLayout)
         return nullptr;
 
-    while(auto arrayTypeLayout = dynamic_cast<ArrayTypeLayout*>(typeLayout))
+    for(;;)
     {
-        typeLayout = arrayTypeLayout->elementTypeLayout;
+        if(auto arrayTypeLayout = dynamic_cast<ArrayTypeLayout*>(typeLayout))
+        {
+            typeLayout = arrayTypeLayout->elementTypeLayout;
+        }
+        else if(auto parameterGroupTypeLayotu = dynamic_cast<ParameterGroupTypeLayout*>(typeLayout))
+        {
+            typeLayout = parameterGroupTypeLayotu->elementTypeLayout;
+        }
+        else
+        {
+            break;
+        }
     }
+
 
     if (auto structTypeLayout = dynamic_cast<StructTypeLayout*>(typeLayout))
     {

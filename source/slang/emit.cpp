@@ -96,7 +96,9 @@ struct SharedEmitContext
 
     ExtensionUsageTracker extensionUsageTracker;
 
+    UInt uniqueIDCounter = 1;
     Dictionary<IRValue*, UInt> mapIRValueToID;
+    Dictionary<Decl*, UInt> mapDeclToID;
 
     HashSet<Decl*> irDeclsVisited;
 
@@ -501,6 +503,23 @@ struct EmitVisitor
     void emitName(Name* name)
     {
         emitName(name, SourceLoc());
+    }
+
+    void emitName(
+        Decl*               decl,
+        SourceLoc const&    loc)
+    {
+        if(auto name = decl->getName())
+            emitName(name, loc);
+
+        Emit("_S");
+        Emit(getID(decl));
+    }
+
+    void emitName(
+        Decl*               decl)
+    {
+        emitName(decl, SourceLoc());
     }
 
     void Emit(IntegerLiteralValue value)
@@ -3571,24 +3590,74 @@ struct EmitVisitor
 
             auto offsetResource = rr;
 
-            if(kind != LayoutResourceKind::Uniform)
+            if(layout
+                && kind != LayoutResourceKind::Uniform)
             {
                 // Add the base index from the cbuffer into the index of the field
                 //
                 // TODO(tfoley): consider maybe not doing this, since it actually
                 // complicates logic around constant buffers...
 
-                // If the member of the cbuffer uses a resource, it had better
-                // appear as part of the cubffer layout as well.
+                // If the member of the cbuffer uses a resource, we would typically
+                // expect to see that the `cbuffer` itself shows up as using that
+                // resource too.
                 auto cbufferResource = layout->FindResourceInfo(kind);
-                SLANG_RELEASE_ASSERT(cbufferResource);
-
-                offsetResource.index += cbufferResource->index;
-                offsetResource.space += cbufferResource->space;
+                if(cbufferResource)
+                {
+                    offsetResource.index += cbufferResource->index;
+                    offsetResource.space += cbufferResource->space;
+                }
             }
 
             emitHLSLRegisterSemantic(offsetResource, "packoffset");
         }
+    }
+
+    void emitHLSLParameterBlockDecl(
+        RefPtr<VarDeclBase>             varDecl,
+        RefPtr<ParameterBlockType>      parameterBlockType,
+        RefPtr<VarLayout>               layout)
+    {
+        Emit("cbuffer ");
+
+        emitName(varDecl);
+
+        // We expect to always have layout information
+        layout = maybeFetchLayout(varDecl, layout);
+        SLANG_RELEASE_ASSERT(layout);
+
+        // We expect the layout to be for a parameter group type...
+        RefPtr<ParameterGroupTypeLayout> bufferLayout = layout->typeLayout.As<ParameterGroupTypeLayout>();
+        SLANG_RELEASE_ASSERT(bufferLayout);
+
+        EmitSemantics(varDecl, kESemanticMask_None);
+
+        auto info = layout->FindResourceInfo(LayoutResourceKind::ConstantBuffer);
+        SLANG_RELEASE_ASSERT(info);
+        emitHLSLRegisterSemantic(*info);
+
+        Emit("\n{\n");
+
+        // The user wrote this declaration as, e.g.:
+        //
+        //      ParameterBlock<Foo> gFoo;
+        //
+        // and we are desugaring it into something like:
+        //
+        //      cbuffer anon0 { Foo gFoo; }
+        //
+
+        RefPtr<Type> elementType = parameterBlockType->elementType;
+        RefPtr<TypeLayout> elementTypeLayout = bufferLayout->elementTypeLayout;
+
+        EmitType(elementType, varDecl->getName());
+
+        // The layout for the field ends up coming from the layout
+        // for the parameter block as a whole.
+        emitHLSLParameterGroupFieldLayoutSemantics(nullptr, layout);
+
+        Emit(";\n");
+        Emit("}\n");
     }
 
     void emitHLSLParameterGroupDecl(
@@ -3596,6 +3665,20 @@ struct EmitVisitor
         RefPtr<ParameterGroupType>      parameterGroupType,
         RefPtr<VarLayout>               layout)
     {
+        if( auto parameterBlockType = parameterGroupType->As<ParameterBlockType>())
+        {
+            emitHLSLParameterBlockDecl(varDecl, parameterBlockType, layout);
+            return;
+        }
+        if( auto textureBufferType = parameterGroupType->As<TextureBufferType>() )
+        {
+            Emit("tbuffer ");
+        }
+        else
+        {
+            Emit("cbuffer ");
+        }
+
         // The data type that describes where stuff in the constant buffer should go
         RefPtr<Type> dataType = parameterGroupType->elementType;
 
@@ -3610,19 +3693,15 @@ struct EmitVisitor
         RefPtr<StructTypeLayout> structTypeLayout = bufferLayout->elementTypeLayout.As<StructTypeLayout>();
         SLANG_RELEASE_ASSERT(structTypeLayout);
 
-        if( auto constantBufferType = parameterGroupType->As<ConstantBufferType>() )
-        {
-            Emit("cbuffer ");
-        }
-        else if( auto textureBufferType = parameterGroupType->As<TextureBufferType>() )
-        {
-            Emit("tbuffer ");
-        }
 
+        Emit(" ");
         if( auto reflectionNameModifier = varDecl->FindModifier<ParameterGroupReflectionName>() )
         {
-            Emit(" ");
             emitName(reflectionNameModifier->nameAndLoc);
+        }
+        else
+        {
+            emitName(varDecl->nameAndLoc);
         }
 
         EmitSemantics(varDecl, kESemanticMask_None);
@@ -4144,6 +4223,28 @@ emitDeclImpl(decl, nullptr);
         }
     }
 
+    // Utility code for generating unique IDs as needed
+    // during the emit process (e.g., for declarations
+    // that didn't origianlly have names, but now need to).
+
+    UInt allocateUniqueID()
+    {
+        return context->shared->uniqueIDCounter++;
+    }
+
+    UInt getID(Decl* decl)
+    {
+        auto& mapDeclToID = context->shared->mapDeclToID;
+
+        UInt id = 0;
+        if(mapDeclToID.TryGetValue(decl, id))
+            return id;
+
+        id = allocateUniqueID();
+        mapDeclToID.Add(decl, id);
+        return id;
+    }
+
     // IR-level emit logc
 
     UInt getID(IRValue* value)
@@ -4154,7 +4255,7 @@ emitDeclImpl(decl, nullptr);
         if (mapIRValueToID.TryGetValue(value, id))
             return id;
 
-        id = mapIRValueToID.Count() + 1;
+        id = allocateUniqueID();
         mapIRValueToID.Add(value, id);
         return id;
     }
@@ -6274,11 +6375,53 @@ emitDeclImpl(decl, nullptr);
         }
     }
 
+    void emitHLSLParameterBlock(
+        EmitContext*        ctx,
+        IRGlobalVar*        varDecl,
+        ParameterBlockType* type)
+    {
+        emit("cbuffer ");
+
+        // Generate a dummy name for the block
+        emit("_S");
+        Emit(ctx->shared->uniqueIDCounter++);
+
+        auto layout = getVarLayout(ctx, varDecl);
+        assert(layout);
+
+        auto info = layout->FindResourceInfo(LayoutResourceKind::ConstantBuffer);
+        SLANG_RELEASE_ASSERT(info);
+        emitHLSLRegisterSemantic(*info);
+
+        emit("\n{\n");
+
+        auto elementType = type->getElementType();
+
+        auto typeLayout = layout->typeLayout;
+        if( auto parameterGroupTypeLayout = typeLayout.As<ParameterGroupTypeLayout>() )
+        {
+            typeLayout = parameterGroupTypeLayout->elementTypeLayout;
+        }
+
+        emitIRType(ctx, elementType, getIRName(varDecl));
+
+        emitHLSLParameterGroupFieldLayoutSemantics(nullptr, layout);
+        emit(";\n");
+
+        emit("}\n");
+    }
+
     void emitHLSLParameterGroup(
         EmitContext*                ctx,
         IRGlobalVar*                varDecl,
         UniformParameterGroupType*  type)
     {
+        if(auto parameterBlockType = type->As<ParameterBlockType>())
+        {
+            emitHLSLParameterBlock(ctx, varDecl, parameterBlockType);
+            return;
+        }
+
         emit("cbuffer ");
         emit(getIRName(varDecl));
 
