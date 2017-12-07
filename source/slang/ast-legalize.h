@@ -69,6 +69,13 @@ namespace Slang
         CodeGenTarget               target,
         ExtensionUsageTracker*      extensionUsageTracker,
         IRSpecializationState*      irSpecializationState,
-        TypeLegalizationContext*    typeLegalizationContext);
+        TypeLegalizationContext*    typeLegalizationContext,
+        List<Decl*>                 astDecls);
+
+     void findDeclsUsedByASTEntryPoint(
+        EntryPointRequest*          entryPoint,
+        CodeGenTarget               target,
+        IRSpecializationState*      irSpecializationState,
+        List<Decl*>&                outASTDecls);
 }
 #endif

@@ -17,78 +17,6 @@
 namespace Slang
 {
 
-
-
-struct LegalValImpl : RefObject
-{
-};
-struct TuplePseudoVal;
-struct PairPseudoVal;
-
-struct LegalVal
-{
-    enum class Flavor
-    {
-        none,
-        simple,
-        implicitDeref,
-        tuple,
-        pair,
-    };
-
-    Flavor              flavor = Flavor::none;
-    RefPtr<RefObject>   obj;
-    IRValue*            irValue = nullptr;
-
-    static LegalVal simple(IRValue* irValue)
-    {
-        LegalVal result;
-        result.flavor = Flavor::simple;
-        result.irValue = irValue;
-        return result;
-    }
-
-    IRValue* getSimple()
-    {
-        assert(flavor == Flavor::simple);
-        return irValue;
-    }
-
-    static LegalVal tuple(RefPtr<TuplePseudoVal> tupleVal);
-
-    RefPtr<TuplePseudoVal> getTuple()
-    {
-        assert(flavor == Flavor::tuple);
-        return obj.As<TuplePseudoVal>();
-    }
-
-    static LegalVal implicitDeref(LegalVal const& val);
-    LegalVal getImplicitDeref();
-
-    static LegalVal pair(RefPtr<PairPseudoVal> pairInfo);
-    static LegalVal pair(
-        LegalVal const&     ordinaryVal,
-        LegalVal const&     specialVal,
-        RefPtr<PairInfo>    pairInfo);
-
-    RefPtr<PairPseudoVal> getPair()
-    {
-        assert(flavor == Flavor::pair);
-        return obj.As<PairPseudoVal>();
-    }
-};
-
-struct TuplePseudoVal : LegalValImpl
-{
-    struct Element
-    {
-        DeclRef<VarDeclBase>            fieldDeclRef;
-        LegalVal                        val;
-    };
-
-    List<Element>   elements;
-};
-
 LegalVal LegalVal::tuple(RefPtr<TuplePseudoVal> tupleVal)
 {
     LegalVal result;
@@ -96,16 +24,6 @@ LegalVal LegalVal::tuple(RefPtr<TuplePseudoVal> tupleVal)
     result.obj = tupleVal;
     return result;
 }
-
-struct PairPseudoVal : LegalValImpl
-{
-    LegalVal ordinaryVal;
-    LegalVal specialVal;
-
-    // The info to tell us which fields
-    // are on which side(s)
-    RefPtr<PairInfo>  pairInfo;
-};
 
 LegalVal LegalVal::pair(RefPtr<PairPseudoVal> pairInfo)
 {
@@ -134,11 +52,6 @@ LegalVal LegalVal::pair(
 
     return LegalVal::pair(obj);
 }
-
-struct ImplicitDerefVal : LegalValImpl
-{
-    LegalVal val;
-};
 
 LegalVal LegalVal::implicitDeref(LegalVal const& val)
 {
@@ -189,12 +102,37 @@ static void registerLegalizedValue(
     context->mapValToLegalVal.Add(irValue, legalVal);
 }
 
+static void maybeRegisterLegalizedGlobal(
+    IRTypeLegalizationContext*  context,
+    IRGlobalVar*                irGlobalVar,
+    LegalVal const&             legalVal)
+{
+    // Check the mangled name of the symbol and don't register
+    // symbols that don't have an external name (currently
+    // indicated by them having an empty name string).
+    String mangledName = irGlobalVar->mangledName;
+    if (mangledName.Length() == 0)
+        return;
+
+    // Otherwise, register the legalized value for this symbol
+    // under its mangled name, so that other code can still
+    // find the right value(s) to use after legalization.
+    context->typeLegalizationContext->mapMangledNameToLegalIRValue.AddIfNotExists(mangledName, legalVal);
+}
+
+struct IRGlobalNameInfo
+{
+    IRGlobalVar*    globalVar;
+    UInt            counter;
+};
+
 static LegalVal declareVars(
     IRTypeLegalizationContext*    context,
     IROp                        op,
     LegalType                   type,
     TypeLayout*                 typeLayout,
-    LegalVarChain*              varChain);
+    LegalVarChain*              varChain,
+    IRGlobalNameInfo*           globalNameInfo);
 
 static LegalType legalizeType(
     IRTypeLegalizationContext*  context,
@@ -608,7 +546,7 @@ static LegalVal legalizeLocalVar(
             varChain = &varChainStorage;
         }
 
-        LegalVal newVal = declareVars(context, kIROp_Var, legalValueType, typeLayout, varChain);
+        LegalVal newVal = declareVars(context, kIROp_Var, legalValueType, typeLayout, varChain, nullptr);
 
         // Remove the old local var.
         irLocalVar->removeFromParent();
@@ -761,7 +699,7 @@ static void legalizeFunc(
                 context->insertBeforeParam = pp;
                 context->builder->curBlock = nullptr;
 
-                auto paramVal = declareVars(context, kIROp_Param, legalParamType, nullptr, nullptr);
+                auto paramVal = declareVars(context, kIROp_Param, legalParamType, nullptr, nullptr, nullptr);
                 paramVals.Add(paramVal);
                 if (pp == bb->getFirstParam())
                 {
@@ -807,7 +745,8 @@ static LegalVal declareSimpleVar(
     IROp                        op,
     Type*                       type,
     TypeLayout*                 typeLayout,
-    LegalVarChain*              varChain)
+    LegalVarChain*              varChain,
+    IRGlobalNameInfo*           globalNameInfo)
 {
     RefPtr<VarLayout> varLayout = createVarLayout(varChain, typeLayout);
 
@@ -829,6 +768,25 @@ static LegalVal declareSimpleVar(
             auto globalVar = builder->createGlobalVar(type);
             globalVar->removeFromParent();
             globalVar->insertBefore(context->insertBeforeGlobal, builder->getModule());
+
+            // The legalization of a global variable with linkage (one that has
+            // a mangled name), must also have an exported name, so that code
+            // can link against it.
+            //
+            // For now we do something *really* simplistic, and just append
+            // a counter to each leaf variable generated from the original
+            if (globalNameInfo)
+            {
+                String mangledName = globalNameInfo->globalVar->mangledName;
+                if (mangledName.Length() != 0)
+                {
+                    mangledName.append("L");
+                    mangledName.append(globalNameInfo->counter++);
+                    globalVar->mangledName = mangledName;
+                }
+            }
+            
+
 
             irVar = globalVar;
             legalVarVal = LegalVal::simple(irVar);
@@ -887,7 +845,8 @@ static LegalVal declareVars(
     IROp                        op,
     LegalType                   type,
     TypeLayout*                 typeLayout,
-    LegalVarChain*              varChain)
+    LegalVarChain*              varChain,
+    IRGlobalNameInfo*           globalNameInfo)
 {
     switch (type.flavor)
     {
@@ -895,7 +854,7 @@ static LegalVal declareVars(
         return LegalVal();
 
     case LegalType::Flavor::simple:
-        return declareSimpleVar(context, op, type.getSimple(), typeLayout, varChain);
+        return declareSimpleVar(context, op, type.getSimple(), typeLayout, varChain, globalNameInfo);
         break;
 
     case LegalType::Flavor::implicitDeref:
@@ -908,7 +867,8 @@ static LegalVal declareVars(
                 op,
                 type.getImplicitDeref()->valueType,
                 getDerefTypeLayout(typeLayout),
-                varChain);
+                varChain,
+                globalNameInfo);
             return LegalVal::implicitDeref(val);
         }
         break;
@@ -916,8 +876,8 @@ static LegalVal declareVars(
     case LegalType::Flavor::pair:
         {
             auto pairType = type.getPair();
-            auto ordinaryVal = declareVars(context, op, pairType->ordinaryType, typeLayout, varChain);
-            auto specialVal = declareVars(context, op, pairType->specialType, typeLayout, varChain);
+            auto ordinaryVal = declareVars(context, op, pairType->ordinaryType, typeLayout, varChain, globalNameInfo);
+            auto specialVal = declareVars(context, op, pairType->specialType, typeLayout, varChain, globalNameInfo);
             return LegalVal::pair(ordinaryVal, specialVal, pairType->pairInfo);
         }
 
@@ -951,7 +911,8 @@ static LegalVal declareVars(
                     op,
                     ee.type,
                     fieldTypeLayout,
-                    newVarChain);
+                    newVarChain,
+                    globalNameInfo);
 
                 TuplePseudoVal::Element element;
                 element.fieldDeclRef = ee.fieldDeclRef;
@@ -1003,10 +964,17 @@ static void legalizeGlobalVar(
                 varChain = &varChainStorage;
             }
 
-            LegalVal newVal = declareVars(context, kIROp_global_var, legalValueType, typeLayout, varChain);
+            IRGlobalNameInfo globalNameInfo;
+            globalNameInfo.globalVar = irGlobalVar;
+            globalNameInfo.counter = 0;
+
+            LegalVal newVal = declareVars(context, kIROp_global_var, legalValueType, typeLayout, varChain, &globalNameInfo);
 
             // Register the new value as the replacement for the old
             registerLegalizedValue(context, irGlobalVar, newVal);
+
+            // Also register the variable according to its mangled name, if any.
+            maybeRegisterLegalizedGlobal(context, irGlobalVar, newVal);
 
             // Remove the old global from the module.
             irGlobalVar->removeFromParent();

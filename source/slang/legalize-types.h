@@ -244,6 +244,106 @@ RefPtr<VarLayout> createVarLayout(
     TypeLayout*     typeLayout);
 
 //
+// The result of legalizing an IR value will be
+// represented with the `LegalVal` type. It is exposed
+// in this header (rather than kept as an implementation
+// detail, because the AST-based legalization logic needs
+// a way to find the post-legalization version of a
+// global name).
+//
+// TODO: We really shouldn't have this structure exposed,
+// and instead should really be constructing AST-side
+// `LegalExpr` values on-demand whenever we legalize something
+// in the IR that will need to be used by the AST, and then
+// store *those* in a map indexed in mangled names.
+//
+
+struct LegalValImpl : RefObject
+{
+};
+struct TuplePseudoVal;
+struct PairPseudoVal;
+
+struct LegalVal
+{
+    enum class Flavor
+    {
+        none,
+        simple,
+        implicitDeref,
+        tuple,
+        pair,
+    };
+
+    Flavor              flavor = Flavor::none;
+    RefPtr<RefObject>   obj;
+    IRValue*            irValue = nullptr;
+
+    static LegalVal simple(IRValue* irValue)
+    {
+        LegalVal result;
+        result.flavor = Flavor::simple;
+        result.irValue = irValue;
+        return result;
+    }
+
+    IRValue* getSimple()
+    {
+        assert(flavor == Flavor::simple);
+        return irValue;
+    }
+
+    static LegalVal tuple(RefPtr<TuplePseudoVal> tupleVal);
+
+    RefPtr<TuplePseudoVal> getTuple()
+    {
+        assert(flavor == Flavor::tuple);
+        return obj.As<TuplePseudoVal>();
+    }
+
+    static LegalVal implicitDeref(LegalVal const& val);
+    LegalVal getImplicitDeref();
+
+    static LegalVal pair(RefPtr<PairPseudoVal> pairInfo);
+    static LegalVal pair(
+        LegalVal const&     ordinaryVal,
+        LegalVal const&     specialVal,
+        RefPtr<PairInfo>    pairInfo);
+
+    RefPtr<PairPseudoVal> getPair()
+    {
+        assert(flavor == Flavor::pair);
+        return obj.As<PairPseudoVal>();
+    }
+};
+
+struct TuplePseudoVal : LegalValImpl
+{
+    struct Element
+    {
+        DeclRef<VarDeclBase>            fieldDeclRef;
+        LegalVal                        val;
+    };
+
+    List<Element>   elements;
+};
+
+struct PairPseudoVal : LegalValImpl
+{
+    LegalVal ordinaryVal;
+    LegalVal specialVal;
+
+    // The info to tell us which fields
+    // are on which side(s)
+    RefPtr<PairInfo>  pairInfo;
+};
+
+struct ImplicitDerefVal : LegalValImpl
+{
+    LegalVal val;
+};
+
+//
 
 struct TypeLegalizationContext
 {
@@ -280,6 +380,9 @@ struct TypeLegalizationContext
     /// emitting declarations of legalized `struct` types
     /// multiple times).
     Dictionary<DeclRef<Decl>, LegalType> mapDeclRefToLegalType;
+
+    //
+    Dictionary<String, LegalVal> mapMangledNameToLegalIRValue;
 };
 
 

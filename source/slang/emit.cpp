@@ -100,7 +100,7 @@ struct SharedEmitContext
     Dictionary<IRValue*, UInt> mapIRValueToID;
     Dictionary<Decl*, UInt> mapDeclToID;
 
-    HashSet<Decl*> irDeclsVisited;
+    HashSet<String> irDeclsVisited;
 
     Dictionary<IRBlock*, IRBlock*> irMapContinueTargetToLoopHead;
 
@@ -2415,7 +2415,8 @@ struct EmitVisitor
         }
         else
         {
-            emit(memberExpr->declRef.GetName());
+            EmitDeclRef(memberExpr->declRef);
+//            emit(memberExpr->declRef.GetName());
         }
 
         if(needClose) Emit(")");
@@ -2453,7 +2454,8 @@ struct EmitVisitor
         }
         else
         {
-            emit(memberExpr->declRef.GetName());
+            EmitDeclRef(memberExpr->declRef);
+//            emit(memberExpr->declRef.GetName());
         }
 
         if(needClose) Emit(")");
@@ -6892,15 +6894,11 @@ emitDeclImpl(decl, nullptr);
         EmitContext*        ctx,
         DeclRef<StructDecl> declRef)
     {
-        // TODO: Eventually need to deal with the case where
-        // we have user-defined generic types.
-        //
-        auto decl = declRef.getDecl();
-
-        if(ctx->shared->irDeclsVisited.Contains(decl))
+        auto mangledName = getMangledName(declRef);
+        if(ctx->shared->irDeclsVisited.Contains(mangledName))
             return;
 
-        ctx->shared->irDeclsVisited.Add(decl);
+        ctx->shared->irDeclsVisited.Add(mangledName);
 
         // First emit any types used by fields of this type
         for( auto ff : GetFields(declRef) )
@@ -6933,6 +6931,25 @@ emitDeclImpl(decl, nullptr);
             emit(";\n");
         }
         Emit("};\n");
+    }
+
+    void emitIRUsedDeclRef(
+        EmitContext*    ctx,
+        DeclRef<Decl>   declRef)
+    {
+        auto decl = declRef.getDecl();
+
+        if(decl->HasModifier<BuiltinTypeModifier>()
+            || decl->HasModifier<MagicTypeModifier>())
+        {
+            return;
+        }
+
+        if( auto structDeclRef = declRef.As<StructDecl>() )
+        {
+            //
+            ensureStructDecl(ctx, structDeclRef);
+        }
     }
 
     // A type is going to be used by the IR, so
@@ -6970,19 +6987,7 @@ emitDeclImpl(decl, nullptr);
         else if( auto declRefType = type->As<DeclRefType>() )
         {
             auto declRef = declRefType->declRef;
-            auto decl = declRef.getDecl();
-
-            if(decl->HasModifier<BuiltinTypeModifier>()
-                || decl->HasModifier<MagicTypeModifier>())
-            {
-                return;
-            }
-
-            if( auto structDeclRef = declRef.As<StructDecl>() )
-            {
-                //
-                ensureStructDecl(ctx, structDeclRef);
-            }
+            emitIRUsedDeclRef(ctx, declRef);
         }
         else
         {}
@@ -7249,13 +7254,21 @@ String emitEntryPoint(
         // boilerplate at the start of the ouput for GLSL (e.g., what
         // version we require).
 
+        List<Decl*> astDecls;
+        findDeclsUsedByASTEntryPoint(
+            entryPoint,
+            target,
+            nullptr,
+            astDecls);
+
         auto lowered = lowerEntryPoint(
             entryPoint,
             programLayout,
             target,
             &sharedContext.extensionUsageTracker,
             nullptr,
-            &typeLegalizationContext);
+            &typeLegalizationContext,
+            astDecls);
         sharedContext.program = lowered.program;
 
         // Note that we emit the main body code of the program *before*
@@ -7287,25 +7300,23 @@ String emitEntryPoint(
 
         typeLegalizationContext.irModule = irModule;
 
-        LoweredEntryPoint lowered;
+        List<Decl*> astDecls;
         if(translationUnit->compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING)
         {
             // We are in case (2b), where the main module is in unchecked
             // HLSL/GLSL that we need to "rewrite," and any library code
             // is in Slang that will need to be cross-compiled via the IR.
 
-            // Initially, we will apply the AST-to-AST pass to legalize
-            // the user's code, much like we would for any other target.
-            // Along the way, this pass will discover any IR declarations
-            // that we use, and try to emit code for them into our IR module.
+            // We first need to walk the AST part of the code to look
+            // for any places where it references declarations that
+            // are implemented in the IR, so that we can be sure to
+            // generate suitable IR code for them.
 
-            lowered = lowerEntryPoint(
+            findDeclsUsedByASTEntryPoint(
                 entryPoint,
-                programLayout,
                 target,
-                &sharedContext.extensionUsageTracker,
                 irSpecializationState,
-                &typeLegalizationContext);
+                astDecls);
         }
         else
         {
@@ -7358,6 +7369,33 @@ String emitEntryPoint(
         fprintf(stderr, "###\n");
 #endif
 
+        LoweredEntryPoint lowered;
+        if(translationUnit->compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING)
+        {
+            // In the (2b) case, once we have legalized the IR code,
+            // we now need to go in and legalize the AST code.
+            // This order is important because when referring to a variable
+            // that is defined in the IR, we need to legalize it first (which
+            // might split it into many decls) before we can legalize an AST
+            // expression that references that decl (which will also need
+            // to get split).
+            //
+            // We don't have to worry about references in the other direction;
+            // we don't allow the user to define something in unchecked AST
+            // code and then use it from the IR shader library.
+
+            lowered = lowerEntryPoint(
+                entryPoint,
+                programLayout,
+                target,
+                &sharedContext.extensionUsageTracker,
+                irSpecializationState,
+                &typeLegalizationContext,
+                astDecls);
+        }
+
+        // When emitting IR-based declarations, we wnat to
+        // track which decls have already been lowered.
         sharedContext.irDeclSetForAST = &lowered.irDecls;
 
         // After all of the required optimization and legalization
@@ -7372,6 +7410,13 @@ String emitEntryPoint(
         // that we need to output, we'll do it now.
         if (translationUnit->compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING)
         {
+            // First make sure that we've emitted any types that were declared
+            // in the IR, but then subsequently only used by the AST
+            for( auto decl : lowered.irDecls )
+            {
+                visitor.emitIRUsedDeclRef(&context, makeDeclRef(decl));
+            }
+
             visitor.EmitDeclsInContainer(lowered.program);
         }
 
