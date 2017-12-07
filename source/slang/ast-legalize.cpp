@@ -3377,24 +3377,22 @@ struct LoweringVisitor
         LegalTypeExpr const&        legalTypeExpr)
     {
         auto& legalType = legalTypeExpr.type;
-        if( legalType.flavor == LegalType::Flavor::simple )
-        {
-            return declareSimpleVar(
-                originalDecl,
-                varChain,
-                loc,
-                name,
-                loweredDeclClass,
-                typeLayout,
-                legalInit,
-                legalTypeExpr);
-        }
-
-        // We might have a variable of type `ConstantBuffer<Foo>` that
-        // is av
-
         switch (legalType.flavor)
         {
+        case LegalType::Flavor::simple:
+            {
+                return declareSimpleVar(
+                    originalDecl,
+                    varChain,
+                    loc,
+                    name,
+                    loweredDeclClass,
+                    typeLayout,
+                    legalInit,
+                    legalTypeExpr);
+            }
+            break;
+
         case LegalType::Flavor::implicitDeref:
             {
                 auto implicitDerefType = legalType.getImplicitDeref();
@@ -3502,7 +3500,6 @@ struct LoweringVisitor
             }
             break;
 
-        case LegalType::Flavor::simple: // This case was handled at the start of the function
         default:
             SLANG_UNEXPECTED("unhandled legalized type flavor");
             UNREACHABLE_RETURN(LegalExpr());
