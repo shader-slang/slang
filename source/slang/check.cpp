@@ -1005,6 +1005,40 @@ namespace Slang
                 }
 
             }
+
+            // Are we converting from a parameter group type to its element type?
+            if(auto fromParameterGroupType = fromType->As<ParameterGroupType>())
+            {
+                auto fromElementType = fromParameterGroupType->getElementType();
+
+                // If we have, e.g., `ConstantBuffer<A>` and we want to convert
+                // to `B`, where conversion from `A` to `B` is possible, then
+                // we will do so here.
+
+                ConversionCost subCost = 0;
+                if(CanCoerce(toType, fromElementType, &subCost))
+                {
+                    if(outCost)
+                        *outCost = subCost + kConversionCost_ImplicitDereference;
+
+                    if(outToExpr)
+                    {
+                        auto derefExpr = new DerefExpr();
+                        derefExpr->base = fromExpr;
+                        derefExpr->type = QualType(fromElementType);
+
+                        return TryCoerceImpl(
+                            toType,
+                            outToExpr,
+                            fromElementType,
+                            derefExpr,
+                            nullptr);
+                    }
+                    return true;
+                }
+            }
+
+
             // Look for an initializer/constructor declaration in the target type,
             // which is marked as usable for implicit conversion, and which takes
             // the source type as an argument.
@@ -1171,6 +1205,7 @@ namespace Slang
             RefPtr<TypeCastExpr> castExpr = createImplicitCastExpr();
 
             auto typeType = new TypeType();
+            typeType->setSession(getSession());
             typeType->type = toType;
 
             auto typeExpr = new SharedTypeExpr();

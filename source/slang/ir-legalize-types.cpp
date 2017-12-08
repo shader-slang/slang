@@ -828,7 +828,7 @@ static LegalVal declareSimpleVar(
         {
             auto globalVar = builder->createGlobalVar(type);
             globalVar->removeFromParent();
-            globalVar->insertBefore(context->insertBeforeGlobal);
+            globalVar->insertBefore(context->insertBeforeGlobal, builder->getModule());
 
             irVar = globalVar;
             legalVarVal = LegalVal::simple(irVar);

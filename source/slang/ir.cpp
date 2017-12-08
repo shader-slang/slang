@@ -956,15 +956,21 @@ namespace Slang
     IRInst* IRBuilder::emitLoad(
         IRValue*    ptr)
     {
-        auto ptrType = ptr->getType()->As<PtrTypeBase>();
-        if( !ptrType )
+        RefPtr<Type> valueType;
+        if(auto ptrType = ptr->getType()->As<PtrTypeBase>())
+        {
+            valueType = ptrType->getValueType();
+        }
+        else if(auto ptrLikeType = ptr->getType()->As<PointerLikeType>())
+        {
+            valueType = ptrLikeType->getElementType();
+        }
+        else
         {
             // Bad!
             SLANG_ASSERT(ptrType);
             return nullptr;
         }
-
-        auto valueType = ptrType->getValueType();
 
         auto inst = createInst<IRLoad>(
             this,

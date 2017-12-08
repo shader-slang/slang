@@ -102,6 +102,10 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
     {
         return SLANG_TYPE_KIND_MATRIX;
     }
+    else if (auto parameterBlockType = type->As<ParameterBlockType>())
+    {
+        return SLANG_TYPE_KIND_PARAMETER_BLOCK;
+    }
     else if (auto constantBufferType = type->As<ConstantBufferType>())
     {
         return SLANG_TYPE_KIND_CONSTANT_BUFFER;

@@ -356,6 +356,15 @@ static void emitReflectionTypeInfoJSON(
             type->getElementType());
         break;
 
+    case slang::TypeReflection::Kind::ParameterBlock:
+        write(writer, "\"kind\": \"parameterBlock\"");
+        write(writer, ",\n");
+        write(writer, "\"elementType\": ");
+        emitReflectionTypeJSON(
+            writer,
+            type->getElementType());
+        break;
+
     case slang::TypeReflection::Kind::TextureBuffer:
         write(writer, "\"kind\": \"textureBuffer\"");
         write(writer, ",\n");
@@ -508,6 +517,15 @@ static void emitReflectionTypeLayoutInfoJSON(
 
     case slang::TypeReflection::Kind::ConstantBuffer:
         write(writer, "\"kind\": \"constantBuffer\"");
+        write(writer, ",\n");
+        write(writer, "\"elementType\": ");
+        emitReflectionTypeLayoutJSON(
+            writer,
+            typeLayout->getElementTypeLayout());
+        break;
+
+    case slang::TypeReflection::Kind::ParameterBlock:
+        write(writer, "\"kind\": \"parameterBlock\"");
         write(writer, ",\n");
         write(writer, "\"elementType\": ");
         emitReflectionTypeLayoutJSON(
