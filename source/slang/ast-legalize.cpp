@@ -3129,7 +3129,7 @@ struct LoweringVisitor
 
         while (auto parameterGroupTypeLayout = typeLayout.As<ParameterGroupTypeLayout>())
         {
-            typeLayout = parameterGroupTypeLayout->elementTypeLayout;
+            typeLayout = parameterGroupTypeLayout->offsetElementTypeLayout;
         }
 
         while (auto arrayTypeLayout = typeLayout.As<ArrayTypeLayout>())

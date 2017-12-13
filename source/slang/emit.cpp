@@ -3454,10 +3454,13 @@ struct EmitVisitor
     // Emit a single `regsiter` semantic, as appropriate for a given resource-type-specific layout info
     void emitHLSLRegisterSemantic(
         VarLayout::ResourceInfo const&  info,
+        UInt                            spaceOffset,
 
         // Keyword to use in the uniform case (`register` for globals, `packoffset` inside a `cbuffer`)
         char const* uniformSemanticSpelling = "register")
     {
+        UInt space = info.space + spaceOffset;
+
         switch(info.kind)
         {
         case LayoutResourceKind::Uniform:
@@ -3529,10 +3532,10 @@ struct EmitVisitor
                     break;
                 }
                 Emit(info.index);
-                if(info.space)
+                if(space)
                 {
                     Emit(", space");
-                    Emit(info.space);
+                    Emit(space);
                 }
                 Emit(")");
             }
@@ -3557,7 +3560,7 @@ struct EmitVisitor
 
         for( auto rr : layout->resourceInfos )
         {
-            emitHLSLRegisterSemantic(rr, uniformSemanticSpelling);
+            emitHLSLRegisterSemantic(rr, getSpaceOffset(layout), uniformSemanticSpelling);
         }
     }
 
@@ -3590,6 +3593,7 @@ struct EmitVisitor
 
             auto offsetResource = rr;
 
+            UInt spaceOffset = 0;
             if(layout
                 && kind != LayoutResourceKind::Uniform)
             {
@@ -3607,9 +3611,11 @@ struct EmitVisitor
                     offsetResource.index += cbufferResource->index;
                     offsetResource.space += cbufferResource->space;
                 }
+
+                spaceOffset = getSpaceOffset(layout);
             }
 
-            emitHLSLRegisterSemantic(offsetResource, "packoffset");
+            emitHLSLRegisterSemantic(offsetResource, spaceOffset, "packoffset");
         }
     }
 
@@ -3634,7 +3640,7 @@ struct EmitVisitor
 
         auto info = layout->FindResourceInfo(LayoutResourceKind::ConstantBuffer);
         SLANG_RELEASE_ASSERT(info);
-        emitHLSLRegisterSemantic(*info);
+        emitHLSLRegisterSemantic(*info, getSpaceOffset(layout));
 
         Emit("\n{\n");
 
@@ -3648,7 +3654,7 @@ struct EmitVisitor
         //
 
         RefPtr<Type> elementType = parameterBlockType->elementType;
-        RefPtr<TypeLayout> elementTypeLayout = bufferLayout->elementTypeLayout;
+        RefPtr<TypeLayout> elementTypeLayout = bufferLayout->offsetElementTypeLayout;
 
         EmitType(elementType, varDecl->getName());
 
@@ -3690,7 +3696,7 @@ struct EmitVisitor
         RefPtr<ParameterGroupTypeLayout> bufferLayout = layout->typeLayout.As<ParameterGroupTypeLayout>();
         SLANG_RELEASE_ASSERT(bufferLayout);
 
-        RefPtr<StructTypeLayout> structTypeLayout = bufferLayout->elementTypeLayout.As<StructTypeLayout>();
+        RefPtr<StructTypeLayout> structTypeLayout = bufferLayout->offsetElementTypeLayout.As<StructTypeLayout>();
         SLANG_RELEASE_ASSERT(structTypeLayout);
 
 
@@ -3708,7 +3714,7 @@ struct EmitVisitor
 
         auto info = layout->FindResourceInfo(LayoutResourceKind::ConstantBuffer);
         SLANG_RELEASE_ASSERT(info);
-        emitHLSLRegisterSemantic(*info);
+        emitHLSLRegisterSemantic(*info, getSpaceOffset(layout));
 
         Emit("\n{\n");
 
@@ -3757,8 +3763,10 @@ struct EmitVisitor
     }
 
     void emitGLSLLayoutQualifier(
-        VarLayout::ResourceInfo const&  info)
+        VarLayout::ResourceInfo const&  info,
+        UInt                            spaceOffset)
     {
+        UInt space = info.space + spaceOffset;
         switch(info.kind)
         {
         case LayoutResourceKind::Uniform:
@@ -3812,10 +3820,10 @@ struct EmitVisitor
         case LayoutResourceKind::DescriptorTableSlot:
             Emit("layout(binding = ");
             Emit(info.index);
-            if(info.space)
+            if(space)
             {
                 Emit(", set = ");
-                Emit(info.space);
+                Emit(space);
             }
             Emit(")\n");
             break;
@@ -3825,6 +3833,13 @@ struct EmitVisitor
             break;
 
         }
+    }
+
+    UInt getSpaceOffset(VarLayout* layout)
+    {
+        if (auto resInfo = layout->FindResourceInfo(LayoutResourceKind::RegisterSpace))
+            return resInfo->index;
+        return 0;
     }
 
     void emitGLSLLayoutQualifiers(
@@ -3842,6 +3857,8 @@ struct EmitVisitor
             break;
         }
 
+        UInt spaceOffset = getSpaceOffset(layout);
+
         for( auto info : layout->resourceInfos )
         {
             // Skip info that doesn't match our filter
@@ -3851,8 +3868,33 @@ struct EmitVisitor
                 continue;
             }
 
-            emitGLSLLayoutQualifier(info);
+            emitGLSLLayoutQualifier(info, spaceOffset);
         }
+    }
+
+    void emitGLSLParameterBlockDecl(
+        RefPtr<VarDeclBase>             varDecl,
+        RefPtr<ParameterBlockType>      parameterBlockType,
+        RefPtr<VarLayout>               layout)
+    {
+        EmitModifiers(varDecl);
+        emitGLSLLayoutQualifiers(layout);
+        Emit("uniform ");
+
+        emitName(varDecl);
+
+        Emit("\n{\n");
+
+        RefPtr<ParameterGroupTypeLayout> bufferLayout = layout->typeLayout.As<ParameterGroupTypeLayout>();
+        SLANG_RELEASE_ASSERT(bufferLayout);
+
+        RefPtr<Type> elementType = parameterBlockType->elementType;
+        RefPtr<TypeLayout> elementTypeLayout = bufferLayout->offsetElementTypeLayout;
+
+        EmitType(elementType, varDecl->getName());
+        Emit(";\n");
+
+        Emit("};\n");
     }
 
     void emitGLSLParameterGroupDecl(
@@ -3860,6 +3902,12 @@ struct EmitVisitor
         RefPtr<ParameterGroupType>      parameterGroupType,
         RefPtr<VarLayout>               layout)
     {
+        if( auto parameterBlockType = parameterGroupType->As<ParameterBlockType>())
+        {
+            emitGLSLParameterBlockDecl(varDecl, parameterBlockType, layout);
+            return;
+        }
+
         // The data type that describes where stuff in the constant buffer should go
         RefPtr<Type> dataType = parameterGroupType->elementType;
 
@@ -3871,7 +3919,7 @@ struct EmitVisitor
             auto typeLayout = layout->typeLayout;
             if (auto bufferLayout = typeLayout.As<ParameterGroupTypeLayout>())
             {
-                typeLayout = bufferLayout->elementTypeLayout;
+                typeLayout = bufferLayout->offsetElementTypeLayout;
             }
 
             structTypeLayout = typeLayout.As<StructTypeLayout>();
@@ -3884,7 +3932,13 @@ struct EmitVisitor
         EmitModifiers(varDecl);
 
         // Emit an apprpriate declaration keyword based on the kind of block
-        if (parameterGroupType->As<ConstantBufferType>())
+        if (parameterGroupType->As<GLSLShaderStorageBufferType>())
+        {
+            Emit("buffer");
+        }
+        // Note: tested `buffer` case before `uniform`, since `GLSLShaderStorageBufferType`
+        // is also a subclass of `UniformParameterGroupType`.
+        else if (parameterGroupType->As<UniformParameterGroupType>())
         {
             Emit("uniform");
         }
@@ -3895,10 +3949,6 @@ struct EmitVisitor
         else if (parameterGroupType->As<GLSLOutputParameterGroupType>())
         {
             Emit("out");
-        }
-        else if (parameterGroupType->As<GLSLShaderStorageBufferType>())
-        {
-            Emit("buffer");
         }
         else
         {
@@ -6391,7 +6441,7 @@ emitDeclImpl(decl, nullptr);
 
         auto info = layout->FindResourceInfo(LayoutResourceKind::ConstantBuffer);
         SLANG_RELEASE_ASSERT(info);
-        emitHLSLRegisterSemantic(*info);
+        emitHLSLRegisterSemantic(*info, getSpaceOffset(layout));
 
         emit("\n{\n");
 
@@ -6400,7 +6450,7 @@ emitDeclImpl(decl, nullptr);
         auto typeLayout = layout->typeLayout;
         if( auto parameterGroupTypeLayout = typeLayout.As<ParameterGroupTypeLayout>() )
         {
-            typeLayout = parameterGroupTypeLayout->elementTypeLayout;
+            typeLayout = parameterGroupTypeLayout->offsetElementTypeLayout;
         }
 
         emitIRType(ctx, elementType, getIRName(varDecl));
@@ -6430,7 +6480,7 @@ emitDeclImpl(decl, nullptr);
 
         auto info = layout->FindResourceInfo(LayoutResourceKind::ConstantBuffer);
         SLANG_RELEASE_ASSERT(info);
-        emitHLSLRegisterSemantic(*info);
+        emitHLSLRegisterSemantic(*info, getSpaceOffset(layout));
 
         emit("\n{\n");
 
@@ -6439,7 +6489,7 @@ emitDeclImpl(decl, nullptr);
         auto typeLayout = layout->typeLayout;
         if( auto parameterGroupTypeLayout = typeLayout.As<ParameterGroupTypeLayout>() )
         {
-            typeLayout = parameterGroupTypeLayout->elementTypeLayout;
+            typeLayout = parameterGroupTypeLayout->offsetElementTypeLayout;
         }
 
         if(auto declRefType = elementType->As<DeclRefType>())
@@ -6497,7 +6547,7 @@ emitDeclImpl(decl, nullptr);
         auto info = layout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot);
         if (info)
         {
-            emitGLSLLayoutQualifier(*info);
+            emitGLSLLayoutQualifier(*info, getSpaceOffset(layout));
         }
 
         if(type->As<GLSLShaderStorageBufferType>())
@@ -6519,7 +6569,7 @@ emitDeclImpl(decl, nullptr);
         auto typeLayout = layout->typeLayout;
         if( auto parameterGroupTypeLayout = typeLayout.As<ParameterGroupTypeLayout>() )
         {
-            typeLayout = parameterGroupTypeLayout->elementTypeLayout;
+            typeLayout = parameterGroupTypeLayout->offsetElementTypeLayout;
         }
 
         if(auto declRefType = elementType->As<DeclRefType>())
@@ -6969,7 +7019,7 @@ StructTypeLayout* getGlobalStructLayout(
         // and hope that the global-scope block (`$Globals`) gets auto-assigned
         // the same location that we manually asigned it.
 
-        auto elementTypeLayout = globalConstantBufferLayout->elementTypeLayout;
+        auto elementTypeLayout = globalConstantBufferLayout->offsetElementTypeLayout;
         auto elementTypeStructLayout = elementTypeLayout.As<StructTypeLayout>();
 
         // We expect all constant buffers to contain `struct` types for now

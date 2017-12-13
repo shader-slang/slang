@@ -972,7 +972,7 @@ RefPtr<TypeLayout> getDerefTypeLayout(
 
     if (auto parameterGroupTypeLayout = dynamic_cast<ParameterGroupTypeLayout*>(typeLayout))
     {
-        return parameterGroupTypeLayout->elementTypeLayout;
+        return parameterGroupTypeLayout->offsetElementTypeLayout;
     }
 
     return typeLayout;
@@ -993,7 +993,7 @@ RefPtr<VarLayout> getFieldLayout(
         }
         else if(auto parameterGroupTypeLayotu = dynamic_cast<ParameterGroupTypeLayout*>(typeLayout))
         {
-            typeLayout = parameterGroupTypeLayotu->elementTypeLayout;
+            typeLayout = parameterGroupTypeLayotu->offsetElementTypeLayout;
         }
         else
         {
@@ -1029,6 +1029,19 @@ RefPtr<VarLayout> createVarLayout(
     RefPtr<VarLayout> varLayout = new VarLayout();
     varLayout->typeLayout = typeLayout;
 
+    // For most resource kinds, the register index/space to use should
+    // be the sum along the entire chain of variables.
+    //
+    // For example, if we had input:
+    //
+    //      struct S { Texture2D a; Texture2D b; };
+    //      S s : register(t10);
+    //
+    // And we were generating a stand-alone variable for `s.b`, then
+    // we'd need to add the offset for `b` (1 texture register), to
+    // the offset for `s` (10 texture registers) to get the final
+    // binding to apply.
+    //
     for (auto rr : typeLayout->resourceInfos)
     {
         auto resInfo = varLayout->findOrAddResourceInfo(rr.kind);
@@ -1043,27 +1056,29 @@ RefPtr<VarLayout> createVarLayout(
         }
     }
 
-    // Some of the parent variables might actually contain offsets
-    // to the `space` or `set` of the field, and we need to apply
-    // those to all the nested resource infos.
-    for (auto vv = varChain; vv; vv = vv->next)
+    // As a special case, if the leaf variable doesn't hold an entry for
+    // `RegisterSpace`, but at least one declaration in the chain *does*,
+    // then we want to make sure that we add such an entry.
+    if (!varLayout->FindResourceInfo(LayoutResourceKind::RegisterSpace))
     {
-        auto parentSpaceInfo = vv->varLayout->FindResourceInfo(LayoutResourceKind::RegisterSpace);
-        if (!parentSpaceInfo)
-            continue;
-
-        for (auto& rr : varLayout->resourceInfos)
+        // Sum up contributions from all parents.
+        UInt space = 0;
+        for (auto vv = varChain; vv; vv = vv->next)
         {
-            if (rr.kind == LayoutResourceKind::RegisterSpace)
+            if (auto parentResInfo = vv->varLayout->FindResourceInfo(LayoutResourceKind::RegisterSpace))
             {
-                rr.index += parentSpaceInfo->index;
-            }
-            else
-            {
-                rr.space += parentSpaceInfo->index;
+                space += parentResInfo->index;
             }
         }
+
+        // If there were non-zero contributions, then add an entry to represent them.
+        if (space)
+        {
+            varLayout->findOrAddResourceInfo(LayoutResourceKind::RegisterSpace)->index = space;
+        }
     }
+
+
 
     return varLayout;
 }

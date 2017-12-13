@@ -307,7 +307,24 @@ public:
 class ParameterGroupTypeLayout : public TypeLayout
 {
 public:
-    RefPtr<TypeLayout> elementTypeLayout;
+    // The layout of the "container" type itself.
+    // E.g., for a constant buffer, this would reflect
+    // the resource usage of the container, without
+    // the element type factored in.
+    RefPtr<TypeLayout>  containerTypeLayout;
+
+    // A variable layout for the element of the container.
+    // The offsets of the variable layout will reflect
+    // the offsets that need to applied to get past the
+    // container types resource usage, while the actual
+    // type layout won't have offsets applied (unlike
+    // `offsetElementTypeLayout` below).
+    RefPtr<VarLayout>   elementVarLayout;
+
+    // The layout of the element type, with offsets applied
+    // so that any fields (if the element type is a `struct`)
+    // will be offset by the resource usage of the container.
+    RefPtr<TypeLayout>  offsetElementTypeLayout;
 };
 
 // type layout for a variable that has a constant-buffer type
