@@ -529,11 +529,24 @@ SLANG_API SlangReflectionTypeLayout* spReflectionTypeLayout_GetElementTypeLayout
     }
     else if( auto constantBufferTypeLayout = dynamic_cast<ParameterGroupTypeLayout*>(typeLayout))
     {
-        return convert(constantBufferTypeLayout->elementTypeLayout.Ptr());
+        return convert(constantBufferTypeLayout->offsetElementTypeLayout.Ptr());
     }
     else if( auto structuredBufferTypeLayout = dynamic_cast<StructuredBufferTypeLayout*>(typeLayout))
     {
         return convert(structuredBufferTypeLayout->elementTypeLayout.Ptr());
+    }
+
+    return nullptr;
+}
+
+SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_GetElementVarLayout(SlangReflectionTypeLayout* inTypeLayout)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return nullptr;
+
+    if( auto constantBufferTypeLayout = dynamic_cast<ParameterGroupTypeLayout*>(typeLayout))
+    {
+        return convert(constantBufferTypeLayout->elementVarLayout.Ptr());
     }
 
     return nullptr;
@@ -566,6 +579,11 @@ SLANG_API SlangParameterCategory spReflectionTypeLayout_GetParameterCategory(Sla
     auto typeLayout = convert(inTypeLayout);
     if(!typeLayout) return SLANG_PARAMETER_CATEGORY_NONE;
 
+    if (auto parameterGroupTypeLayout = dynamic_cast<ParameterGroupTypeLayout*>(typeLayout))
+    {
+        typeLayout = parameterGroupTypeLayout->containerTypeLayout;
+    }
+
     return getParameterCategory(typeLayout);
 }
 
@@ -574,6 +592,11 @@ SLANG_API unsigned spReflectionTypeLayout_GetCategoryCount(SlangReflectionTypeLa
     auto typeLayout = convert(inTypeLayout);
     if(!typeLayout) return 0;
 
+    if (auto parameterGroupTypeLayout = dynamic_cast<ParameterGroupTypeLayout*>(typeLayout))
+    {
+        typeLayout = parameterGroupTypeLayout->containerTypeLayout;
+    }
+
     return (unsigned) typeLayout->resourceInfos.Count();
 }
 
@@ -581,6 +604,11 @@ SLANG_API SlangParameterCategory spReflectionTypeLayout_GetCategoryByIndex(Slang
 {
     auto typeLayout = convert(inTypeLayout);
     if(!typeLayout) return SLANG_PARAMETER_CATEGORY_NONE;
+
+    if (auto parameterGroupTypeLayout = dynamic_cast<ParameterGroupTypeLayout*>(typeLayout))
+    {
+        typeLayout = parameterGroupTypeLayout->containerTypeLayout;
+    }
 
     return typeLayout->resourceInfos[index].kind;
 }
@@ -626,12 +654,68 @@ SLANG_API SlangReflectionTypeLayout* spReflectionVariableLayout_GetTypeLayout(Sl
     return convert(varLayout->getTypeLayout());
 }
 
+namespace Slang
+{
+    // Attempt "do what I mean" remapping from the parameter category the user asked about,
+    // over to a parameter category that they might have meant.
+    static SlangParameterCategory maybeRemapParameterCategory(
+        TypeLayout*             typeLayout,
+        SlangParameterCategory  category)
+    {
+        // Do we have an entry for the category they asked about? Then use that.
+        if (typeLayout->FindResourceInfo(LayoutResourceKind(category)))
+            return category;
+
+        // Do we have an entry for the `DescriptorTableSlot` category?
+        if (typeLayout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot))
+        {
+            // Is the category they were asking about one that makes sense for the type
+            // of this variable?
+            Type* type = typeLayout->getType();
+            while (auto arrayType = type->As<ArrayExpressionType>())
+                type = arrayType->baseType;
+            switch (spReflectionType_GetKind(convert(type)))
+            {
+            case SLANG_TYPE_KIND_CONSTANT_BUFFER:
+                if(category == SLANG_PARAMETER_CATEGORY_CONSTANT_BUFFER)
+                    return SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT;
+                break;
+
+            case SLANG_TYPE_KIND_RESOURCE:
+                if(category == SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE)
+                    return SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT;
+                break;
+
+            case SLANG_TYPE_KIND_SAMPLER_STATE:
+                if(category == SLANG_PARAMETER_CATEGORY_SAMPLER_STATE)
+                    return SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT;
+                break;
+
+            // TODO: implement more helpers here
+
+            default:
+                break;
+            }
+        }
+
+        return category;
+    }
+}
+
 SLANG_API size_t spReflectionVariableLayout_GetOffset(SlangReflectionVariableLayout* inVarLayout, SlangParameterCategory category)
 {
     auto varLayout = convert(inVarLayout);
     if(!varLayout) return 0;
 
     auto info = varLayout->FindResourceInfo(LayoutResourceKind(category));
+
+    if (!info)
+    {
+        // No match with requested category? Try again with one they might have meant...
+        category = maybeRemapParameterCategory(varLayout->getTypeLayout(), category);
+        info = varLayout->FindResourceInfo(LayoutResourceKind(category));
+    }
+
     if(!info) return 0;
 
     return info->index;
@@ -642,10 +726,30 @@ SLANG_API size_t spReflectionVariableLayout_GetSpace(SlangReflectionVariableLayo
     auto varLayout = convert(inVarLayout);
     if(!varLayout) return 0;
 
-    auto info = varLayout->FindResourceInfo(LayoutResourceKind(category));
-    if(!info) return 0;
 
-    return info->space;
+    auto info = varLayout->FindResourceInfo(LayoutResourceKind(category));
+    if (!info)
+    {
+        // No match with requested category? Try again with one they might have meant...
+        category = maybeRemapParameterCategory(varLayout->getTypeLayout(), category);
+        info = varLayout->FindResourceInfo(LayoutResourceKind(category));
+    }
+
+    UInt space = 0;
+
+    // First, deal with any offset applied to the specific resource kind specified
+    if (info)
+    {
+        space += info->space;
+    }
+
+    // Next, deal with any dedicated register-space offset applied to, e.g., a parameter block
+    if (auto spaceInfo = varLayout->FindResourceInfo(LayoutResourceKind::RegisterSpace))
+    {
+        space += spaceInfo->index;
+    }
+
+    return space;
 }
 
 SLANG_API char const* spReflectionVariableLayout_GetSemanticName(SlangReflectionVariableLayout* inVarLayout)
@@ -705,28 +809,20 @@ SLANG_API SlangStage spReflectionVariableLayout_getStage(
 
 SLANG_API unsigned spReflectionParameter_GetBindingIndex(SlangReflectionParameter* inVarLayout)
 {
-    auto varLayout = convert(inVarLayout);
-    if(!varLayout) return 0;
-
-    if(varLayout->resourceInfos.Count() > 0)
-    {
-        return (unsigned) varLayout->resourceInfos[0].index;
-    }
-
-    return 0;
+    SlangReflectionVariableLayout* varLayout = (SlangReflectionVariableLayout*)inVarLayout;
+    return (unsigned) spReflectionVariableLayout_GetOffset(
+        varLayout,
+        spReflectionTypeLayout_GetParameterCategory(
+            spReflectionVariableLayout_GetTypeLayout(varLayout)));
 }
 
 SLANG_API unsigned spReflectionParameter_GetBindingSpace(SlangReflectionParameter* inVarLayout)
 {
-    auto varLayout = convert(inVarLayout);
-    if(!varLayout) return 0;
-
-    if(varLayout->resourceInfos.Count() > 0)
-    {
-        return (unsigned) varLayout->resourceInfos[0].space;
-    }
-
-    return 0;
+    SlangReflectionVariableLayout* varLayout = (SlangReflectionVariableLayout*)inVarLayout;
+    return (unsigned) spReflectionVariableLayout_GetSpace(
+        varLayout,
+        spReflectionTypeLayout_GetParameterCategory(
+            spReflectionVariableLayout_GetTypeLayout(varLayout)));
 }
 
 // Helpers for getting parameter count
@@ -737,7 +833,7 @@ namespace Slang
     {
         if(auto parameterGroupLayout = typeLayout.As<ParameterGroupTypeLayout>())
         {
-            typeLayout = parameterGroupLayout->elementTypeLayout;
+            typeLayout = parameterGroupLayout->offsetElementTypeLayout;
         }
 
         if(auto structLayout = typeLayout.As<StructTypeLayout>())
@@ -752,7 +848,7 @@ namespace Slang
     {
         if(auto parameterGroupLayout = typeLayout.As<ParameterGroupTypeLayout>())
         {
-            typeLayout = parameterGroupLayout->elementTypeLayout;
+            typeLayout = parameterGroupLayout->offsetElementTypeLayout;
         }
 
         if(auto structLayout = typeLayout.As<StructTypeLayout>())

@@ -758,8 +758,7 @@ static SimpleLayoutInfo getParameterGroupLayoutInfo(
 
 RefPtr<TypeLayout> createTypeLayout(
     TypeLayoutContext const&    context,
-    Type*                       type,
-    SimpleLayoutInfo            offset);
+    Type*                       type);
 
 static bool isOpenGLTarget(TargetRequest*)
 {
@@ -860,21 +859,110 @@ static bool shouldAllocateRegisterSpaceForParameterBlock(
     return false;
 }
 
+// Given an existing type layout `oldTypeLayout`, apply offsets
+// to any contained fields based on the resource infos in `offsetTypeLayout`
+// *and* the usage implied by `offsetLayout`
+RefPtr<TypeLayout> applyOffsetToTypeLayout(
+    RefPtr<TypeLayout>  oldTypeLayout,
+    RefPtr<TypeLayout>  offsetTypeLayout)
+{
+    // There is no need to apply offsets if the old type and the offset
+    // don't share any resource infos in common.
+    bool anyHit = false;
+    for (auto oldResInfo : oldTypeLayout->resourceInfos)
+    {
+        if (auto offsetResInfo = offsetTypeLayout->FindResourceInfo(oldResInfo.kind))
+        {
+            anyHit = true;
+            break;
+        }
+    }
+
+    if (!anyHit)
+        return oldTypeLayout;
+
+    RefPtr<TypeLayout> newTypeLayout;
+    if (auto oldStructTypeLayout = oldTypeLayout.As<StructTypeLayout>())
+    {
+        RefPtr<StructTypeLayout> newStructTypeLayout = new StructTypeLayout();
+        newStructTypeLayout->type = oldStructTypeLayout->type;
+        newStructTypeLayout->uniformAlignment = oldStructTypeLayout->uniformAlignment;
+
+        Dictionary<VarLayout*, VarLayout*> mapOldFieldToNew;
+
+        for (auto oldField : oldStructTypeLayout->fields)
+        {
+            RefPtr<VarLayout> newField = new VarLayout();
+            newField->varDecl = oldField->varDecl;
+            newField->typeLayout = oldField->typeLayout;
+            newField->flags = oldField->flags;
+            newField->semanticIndex = oldField->semanticIndex;
+            newField->semanticName = oldField->semanticName;
+            newField->stage = oldField->stage;
+            newField->systemValueSemantic = oldField->systemValueSemantic;
+            newField->systemValueSemanticIndex = oldField->systemValueSemanticIndex;
+
+
+            for (auto oldResInfo : oldField->resourceInfos)
+            {
+                auto newResInfo = newField->findOrAddResourceInfo(oldResInfo.kind);
+                newResInfo->index = oldResInfo.index;
+                newResInfo->space = oldResInfo.space;
+                if (auto offsetResInfo = offsetTypeLayout->FindResourceInfo(oldResInfo.kind))
+                {
+                    newResInfo->index += offsetResInfo->count;
+                }
+            }
+
+            newStructTypeLayout->fields.Add(newField);
+
+            mapOldFieldToNew.Add(oldField.Ptr(), newField.Ptr());
+        }
+
+        for (auto entry : oldStructTypeLayout->mapVarToLayout)
+        {
+            VarLayout* newFieldLayout = nullptr;
+            if (mapOldFieldToNew.TryGetValue(entry.Value.Ptr(), newFieldLayout))
+            {
+                newStructTypeLayout->mapVarToLayout.Add(entry.Key, newFieldLayout);
+            }
+        }
+
+        newTypeLayout = newStructTypeLayout;
+    }
+    else
+    {
+        // TODO: need to handle other cases here
+        return oldTypeLayout;
+    }
+
+    // No matter what replacement we plug in for the element type, we need to copy
+    // over its resource usage:
+    for (auto oldResInfo : oldTypeLayout->resourceInfos)
+    {
+        auto newResInfo = newTypeLayout->findOrAddResourceInfo(oldResInfo.kind);
+        newResInfo->count = oldResInfo.count;
+    }
+
+    return newTypeLayout;
+}
+
 RefPtr<ParameterGroupTypeLayout>
 createParameterGroupTypeLayout(
     TypeLayoutContext const&    context,
     RefPtr<ParameterGroupType>  parameterGroupType,
     SimpleLayoutInfo            parameterGroupInfo,
-    RefPtr<TypeLayout>          elementTypeLayout)
+    RefPtr<TypeLayout>          rawElementTypeLayout)
 {
     auto parameterGroupRules = context.rules;
 
-    auto typeLayout = new ParameterGroupTypeLayout();
-
+    RefPtr<ParameterGroupTypeLayout> typeLayout = new ParameterGroupTypeLayout();
     typeLayout->type = parameterGroupType;
     typeLayout->rules = parameterGroupRules;
 
-    typeLayout->elementTypeLayout = elementTypeLayout;
+    RefPtr<TypeLayout> containerTypeLayout = new TypeLayout();
+    containerTypeLayout->type = parameterGroupType;
+    containerTypeLayout->rules = parameterGroupRules;
 
     // The layout of the constant buffer if it gets stored
     // in another constant buffer is just what we computed
@@ -883,6 +971,7 @@ createParameterGroupTypeLayout(
     // 
     SLANG_RELEASE_ASSERT(parameterGroupInfo.kind != LayoutResourceKind::Uniform);
     typeLayout->uniformAlignment = 1;
+    containerTypeLayout->uniformAlignment = 1;
 
     // TODO(tfoley): There is a subtle question here of whether
     // a constant buffer declaration that then contains zero
@@ -896,7 +985,7 @@ createParameterGroupTypeLayout(
     // parameter block itself.
     if( parameterGroupInfo.size )
     {
-        typeLayout->addResourceUsage(
+        containerTypeLayout->addResourceUsage(
             parameterGroupInfo.kind,
             parameterGroupInfo.size);
     }
@@ -916,35 +1005,22 @@ createParameterGroupTypeLayout(
     bool ownRegisterSpace = false;
     if (parameterBlockType)
     {
+        // Should we allocate this block its own regsiter space?
         if( shouldAllocateRegisterSpaceForParameterBlock(context) )
         {
             ownRegisterSpace = true;
         }
 
-        // If the parameter block contains any uniform data, then we
-        // had better allocate a constant buffer for it.
-        bool anyUniformData = false;
-        if(auto elementUniformInfo = elementTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform) )
-        {
-            if( elementUniformInfo->count != 0 )
-            {
-                // We have a non-zero number of bytes of uniform data here.
-                anyUniformData = true;
-            }
-        }
-
-        if( anyUniformData )
-        {
-            typeLayout->addResourceUsage(LayoutResourceKind::ConstantBuffer, 1);
-        }
-
-        // Next, if we are going to allocate whole register space(s) to the
-        // parameter block, check if it actually needs one (it might be empty,
-        // or only contain other parameter blocks).
+        // If we need a register space, then maybe allocate one.
         if( ownRegisterSpace )
         {
+            // The basic logic here is that if the parameter block only
+            // contains other parameter blocks (which themselves have
+            // their own register spaces), then we don't need to
+            // allocate *yet another* register space for the block.
+
             bool needsARegisterSpace = false;
-            for( auto elementResourceInfo : elementTypeLayout->resourceInfos )
+            for( auto elementResourceInfo : rawElementTypeLayout->resourceInfos )
             {
                 if(elementResourceInfo.kind != LayoutResourceKind::RegisterSpace)
                 {
@@ -953,10 +1029,30 @@ createParameterGroupTypeLayout(
                 }
             }
 
+            // If we determine that a register space is needed, then add one here.
             if( needsARegisterSpace )
             {
                 typeLayout->addResourceUsage(LayoutResourceKind::RegisterSpace, 1);
             }
+        }
+
+        // Next, we check if the parameter block has any uniform data, since
+        // that means we need to allocate a constant-buffer binding for it.
+        bool anyUniformData = false;
+        if(auto elementUniformInfo = rawElementTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform) )
+        {
+            if( elementUniformInfo->count != 0 )
+            {
+                // We have a non-zero number of bytes of uniform data here.
+                anyUniformData = true;
+            }
+        }
+        if( anyUniformData )
+        {
+            // We need to ensure that the block itself consumes at least one "register" for its
+            // constant buffer part.
+            auto cbUsage = parameterGroupRules->GetObjectLayout(ShaderParameterKind::ConstantBuffer);
+            containerTypeLayout->addResourceUsage(cbUsage.kind, cbUsage.size);
         }
     }
 
@@ -965,45 +1061,73 @@ createParameterGroupTypeLayout(
     // need to go through and offset that any starting locations (e.g.,
     // in nested `StructTypeLayout`s) based on what we allocated to
     // the parent.
+    //
+    // Note: at the moment, constant buffers apply their own offsetting
+    // logic elsewhere, so we need to only do this logic for parameter blocks
+    RefPtr<TypeLayout> offsetTypeLayout = applyOffsetToTypeLayout(rawElementTypeLayout, containerTypeLayout);
 
-    // TODO(tfoley): actually implement that!
+    typeLayout->containerTypeLayout = containerTypeLayout;
+    typeLayout->offsetElementTypeLayout = offsetTypeLayout;
 
-
-    // Now we will (possibly) accumulate the resources used by the element
-    // type into the resources used by the parameter group. The reason
-    // this is "possibly" is because, e.g., a `ConstantBuffer<Foo>` should
-    // not report itself as consuming `sizeof(Foo)` bytes of uniform data,
-    // or else it would mess up layout for any type that contains the
-    // constant buffer. Similarly, a parameter block that consumes whole
-    // register `space`s shouldn't report its fine-grained resource
-    // usage inside those spces.
-    for( auto elementResourceInfo : elementTypeLayout->resourceInfos )
+    // We will construct a dummy variable layout to represent the offsettting
+    // that needs to be applied to the element type to put it after the
+    // container.
+    RefPtr<VarLayout> elementVarLayout = new VarLayout();
+    elementVarLayout->typeLayout = rawElementTypeLayout;
+    for (auto containerResourceInfo : containerTypeLayout->resourceInfos)
     {
-        switch( elementResourceInfo.kind )
+        auto kind = containerResourceInfo.kind;
+        if (auto elementResourceInfo = rawElementTypeLayout->FindResourceInfo(kind))
         {
-        case LayoutResourceKind::RegisterSpace:
-            // Register spaces consumed by the element type should be
-            // reflected in the resource usage of the parent type.
-            typeLayout->addResourceUsage(elementResourceInfo);
-            break;
+            auto varResourceInfo = elementVarLayout->findOrAddResourceInfo(kind);
+            varResourceInfo->index += containerResourceInfo.count;
+        }
+    }
+    typeLayout->elementVarLayout = elementVarLayout;
 
-        case LayoutResourceKind::Uniform:
-            // Uniform resource usages will always be hidden.
-            break;
+    if (ownRegisterSpace)
+    {
+        // A parameter block type that gets its own register space will only
+        // include resource usage from the element type when it itself consumes
+        // while register spaces.
+        if (auto elementResInfo = rawElementTypeLayout->FindResourceInfo(LayoutResourceKind::RegisterSpace))
+        {
+            typeLayout->addResourceUsage(*elementResInfo);
+        }
+    }
+    else
+    {
+        // If the parameter block is *not* getting its own regsiter space, then
+        // it needs to include the resource usage from the "container" type, plus
+        // any relevant resource usage for the element type.
 
-        default:
-            // All other register types should be hidden *if* we
-            // are allocating a whole register space, and exposed
-            // otherwise.
-            if( ownRegisterSpace )
+        // We start by accumulating any resource usage from the container.
+        for (auto containerResourceInfo : containerTypeLayout->resourceInfos)
+        {
+            typeLayout->addResourceUsage(containerResourceInfo);
+        }
+
+        // Now we will (possibly) accumulate the resources used by the element
+        // type into the resources used by the parameter group. The reason
+        // this is "possibly" is because, e.g., a `ConstantBuffer<Foo>` should
+        // not report itself as consuming `sizeof(Foo)` bytes of uniform data,
+        // or else it would mess up layout for any type that contains the
+        // constant buffer.
+        for( auto elementResourceInfo : rawElementTypeLayout->resourceInfos )
+        {
+            switch( elementResourceInfo.kind )
             {
-                // don't expose internal register/binding use outside
-            }
-            else
-            {
+            case LayoutResourceKind::Uniform:
+                // Uniform resource usages will always be hidden.
+                break;
+
+            default:
+                // All other register types will not be hidden,
+                // since we aren't in the case where the parameter group
+                // gets its own register space.
                 typeLayout->addResourceUsage(elementResourceInfo);
+                break;
             }
-            break;
         }
     }
 
@@ -1059,8 +1183,7 @@ createParameterGroupTypeLayout(
 
     auto elementTypeLayout = createTypeLayout(
         context.with(elementTypeRules),
-        elementType,
-        info);
+        elementType);
 
     return createParameterGroupTypeLayout(
         context,
@@ -1188,16 +1311,7 @@ createStructuredBufferTypeLayout(
 SimpleLayoutInfo GetLayoutImpl(
     TypeLayoutContext const&    context,
     Type*                       type,
-    RefPtr<TypeLayout>*         outTypeLayout,
-    SimpleLayoutInfo            offset);
-
-SimpleLayoutInfo GetLayoutImpl(
-    TypeLayoutContext const&    context,
-    Type*                       type,
-    RefPtr<TypeLayout>*         outTypeLayout)
-{
-    return GetLayoutImpl(context, type, outTypeLayout, SimpleLayoutInfo());
-}
+    RefPtr<TypeLayout>*         outTypeLayout);
 
 SimpleLayoutInfo GetLayoutImpl(
     TypeLayoutContext const&    context,
@@ -1219,7 +1333,7 @@ SimpleLayoutInfo GetLayoutImpl(
         // layout, such as GLSL `std140`.
     }
 
-    return GetLayoutImpl(subContext, type, outTypeLayout, SimpleLayoutInfo());
+    return GetLayoutImpl(subContext, type, outTypeLayout);
 }
 
 int findGenericParam(List<RefPtr<GenericParamLayout>> & genericParameters, GlobalGenericParamDecl * decl)
@@ -1230,8 +1344,7 @@ int findGenericParam(List<RefPtr<GenericParamLayout>> & genericParameters, Globa
 SimpleLayoutInfo GetLayoutImpl(
     TypeLayoutContext const&    context,
     Type*                       type,
-    RefPtr<TypeLayout>*         outTypeLayout,
-    SimpleLayoutInfo            offset)
+    RefPtr<TypeLayout>*         outTypeLayout)
 {
     auto rules = context.rules;
 
@@ -1583,15 +1696,6 @@ SimpleLayoutInfo GetLayoutImpl(
                         fieldResourceInfo->index = structTypeResourceInfo->count;
                         structTypeResourceInfo->count += fieldTypeResourceInfo.count;
                     }
-
-                    // If the user passed in offset info, then apply it here
-                    if (offset.size)
-                    {
-                        if (auto fieldResInfo = fieldLayout->FindResourceInfo(offset.kind))
-                        {
-                            fieldResInfo->index += offset.size;
-                        }
-                    }
                 }
             }
 
@@ -1657,38 +1761,20 @@ SimpleLayoutInfo GetLayout(
 
 RefPtr<TypeLayout> createTypeLayout(
     TypeLayoutContext const&    context,
-    Type*                       type,
-    SimpleLayoutInfo            offset)
+    Type*                       type)
 {
     RefPtr<TypeLayout> typeLayout;
-    GetLayoutImpl(context, type, &typeLayout, offset);
+    GetLayoutImpl(context, type, &typeLayout);
     return typeLayout;
 }
 
-RefPtr<TypeLayout> createTypeLayout(
+RefPtr<TypeLayout> CreateTypeLayout(
     TypeLayoutContext const&    context,
     Type*                       type)
 {
     RefPtr<TypeLayout> typeLayout;
-    GetLayoutImpl(context, type, &typeLayout, SimpleLayoutInfo());
+    GetLayoutImpl(context, type, &typeLayout);
     return typeLayout;
-}
-
-RefPtr<TypeLayout> CreateTypeLayout(
-    TypeLayoutContext const&    context,
-    Type*                       type,
-    SimpleLayoutInfo            offset)
-{
-    RefPtr<TypeLayout> typeLayout;
-    GetLayoutImpl(context, type, &typeLayout, offset);
-    return typeLayout;
-}
-
-RefPtr<TypeLayout> CreateTypeLayout(
-    TypeLayoutContext const&    context,
-    Type* type)
-{
-    return CreateTypeLayout(context, type, SimpleLayoutInfo());
 }
 
 RefPtr<GlobalGenericParamDecl> GenericParamTypeLayout::getGlobalGenericParamDecl()
