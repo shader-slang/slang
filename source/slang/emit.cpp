@@ -3451,21 +3451,79 @@ struct EmitVisitor
         EmitVarDeclCommon(DeclRef<Decl>(decl.Ptr(), nullptr).As<VarDeclBase>());
     }
 
+    // A chain of variables to use for emitting semantic/layout info
+    struct EmitVarChain
+    {
+        VarLayout*      varLayout;
+        EmitVarChain*   next;
+
+        EmitVarChain()
+            : varLayout(0)
+            , next(0)
+        {}
+
+        EmitVarChain(VarLayout* varLayout)
+            : varLayout(varLayout)
+            , next(0)
+        {}
+
+        EmitVarChain(VarLayout* varLayout, EmitVarChain* next)
+            : varLayout(varLayout)
+            , next(next)
+        {}
+    };
+
+    UInt getBindingOffset(EmitVarChain* chain, LayoutResourceKind kind)
+    {
+        UInt offset = 0;
+        for(auto cc = chain; cc; cc = cc->next)
+        {
+            if(auto resInfo = cc->varLayout->FindResourceInfo(kind))
+            {
+                offset += resInfo->index;
+            }
+        }
+        return offset;
+    }
+
+    UInt getBindingSpace(EmitVarChain* chain, LayoutResourceKind kind)
+    {
+        UInt space = 0;
+        for(auto cc = chain; cc; cc = cc->next)
+        {
+            auto varLayout = cc->varLayout;
+            if(auto resInfo = varLayout->FindResourceInfo(kind))
+            {
+                space += resInfo->space;
+            }
+            if(auto resInfo = varLayout->FindResourceInfo(LayoutResourceKind::RegisterSpace))
+            {
+                space += resInfo->index;
+            }
+        }
+        return space;
+    }
+
     // Emit a single `regsiter` semantic, as appropriate for a given resource-type-specific layout info
     void emitHLSLRegisterSemantic(
-        VarLayout::ResourceInfo const&  info,
-        UInt                            spaceOffset,
-
+        LayoutResourceKind  kind,
+        EmitVarChain*       chain,
         // Keyword to use in the uniform case (`register` for globals, `packoffset` inside a `cbuffer`)
         char const* uniformSemanticSpelling = "register")
     {
-        UInt space = info.space + spaceOffset;
+        if(!chain)
+            return;
+        if(!chain->varLayout->FindResourceInfo(kind))
+            return;
 
-        switch(info.kind)
+        UInt index = getBindingOffset(chain, kind);
+        UInt space = getBindingSpace(chain, kind);
+
+        switch(kind)
         {
         case LayoutResourceKind::Uniform:
             {
-                size_t offset = info.index;
+                UInt offset = index;
 
                 // The HLSL `c` register space is logically grouped in 16-byte registers,
                 // while we try to traffic in byte offsets. That means we need to pick
@@ -3513,7 +3571,7 @@ struct EmitVisitor
         default:
             {
                 Emit(": register(");
-                switch( info.kind )
+                switch( kind )
                 {
                 case LayoutResourceKind::ConstantBuffer:
                     Emit("b");
@@ -3531,7 +3589,7 @@ struct EmitVisitor
                     SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled HLSL register type");
                     break;
                 }
-                Emit(info.index);
+                Emit(index);
                 if(space)
                 {
                     Emit(", space");
@@ -3544,10 +3602,12 @@ struct EmitVisitor
 
     // Emit all the `register` semantics that are appropriate for a particular variable layout
     void emitHLSLRegisterSemantics(
-        RefPtr<VarLayout>   layout,
+        EmitVarChain*       chain,
         char const*         uniformSemanticSpelling = "register")
     {
-        if (!layout) return;
+        if (!chain) return;
+
+        auto layout = chain->varLayout;
 
         switch( context->shared->target )
         {
@@ -3560,8 +3620,19 @@ struct EmitVisitor
 
         for( auto rr : layout->resourceInfos )
         {
-            emitHLSLRegisterSemantic(rr, getSpaceOffset(layout), uniformSemanticSpelling);
+            emitHLSLRegisterSemantic(rr.kind, chain, uniformSemanticSpelling);
         }
+    }
+
+    void emitHLSLRegisterSemantics(
+        VarLayout*  varLayout,
+        char const* uniformSemanticSpelling = "register")
+    {
+        if(!varLayout)
+            return;
+
+        EmitVarChain chain(varLayout);
+        emitHLSLRegisterSemantics(&chain, uniformSemanticSpelling);
     }
 
     static RefPtr<VarLayout> maybeFetchLayout(
@@ -3584,63 +3655,55 @@ struct EmitVisitor
     }
 
     void emitHLSLParameterGroupFieldLayoutSemantics(
-        RefPtr<VarLayout>   layout,
-        RefPtr<VarLayout>   fieldLayout)
+        EmitVarChain*       chain)
     {
-        for( auto rr : fieldLayout->resourceInfos )
+        if(!chain)
+            return;
+
+        auto layout = chain->varLayout;
+        for( auto rr : layout->resourceInfos )
         {
-            auto kind = rr.kind;
-
-            auto offsetResource = rr;
-
-            UInt spaceOffset = 0;
-            if(layout
-                && kind != LayoutResourceKind::Uniform)
-            {
-                // Add the base index from the cbuffer into the index of the field
-                //
-                // TODO(tfoley): consider maybe not doing this, since it actually
-                // complicates logic around constant buffers...
-
-                // If the member of the cbuffer uses a resource, we would typically
-                // expect to see that the `cbuffer` itself shows up as using that
-                // resource too.
-                auto cbufferResource = layout->FindResourceInfo(kind);
-                if(cbufferResource)
-                {
-                    offsetResource.index += cbufferResource->index;
-                    offsetResource.space += cbufferResource->space;
-                }
-
-                spaceOffset = getSpaceOffset(layout);
-            }
-
-            emitHLSLRegisterSemantic(offsetResource, spaceOffset, "packoffset");
+            emitHLSLRegisterSemantic(rr.kind, chain, "packoffset");
         }
+    }
+
+
+    void emitHLSLParameterGroupFieldLayoutSemantics(
+        RefPtr<VarLayout>   fieldLayout,
+        EmitVarChain*       inChain)
+    {
+        EmitVarChain chain(fieldLayout, inChain);
+        emitHLSLParameterGroupFieldLayoutSemantics(&chain);
     }
 
     void emitHLSLParameterBlockDecl(
         RefPtr<VarDeclBase>             varDecl,
         RefPtr<ParameterBlockType>      parameterBlockType,
-        RefPtr<VarLayout>               layout)
+        RefPtr<VarLayout>               varLayout)
     {
+        EmitVarChain blockChain(varLayout);
+
         Emit("cbuffer ");
 
         emitName(varDecl);
 
         // We expect to always have layout information
-        layout = maybeFetchLayout(varDecl, layout);
-        SLANG_RELEASE_ASSERT(layout);
+        varLayout = maybeFetchLayout(varDecl, varLayout);
+        SLANG_RELEASE_ASSERT(varLayout);
 
         // We expect the layout to be for a parameter group type...
-        RefPtr<ParameterGroupTypeLayout> bufferLayout = layout->typeLayout.As<ParameterGroupTypeLayout>();
+        RefPtr<ParameterGroupTypeLayout> bufferLayout = varLayout->typeLayout.As<ParameterGroupTypeLayout>();
         SLANG_RELEASE_ASSERT(bufferLayout);
+
+        RefPtr<VarLayout> containerVarLayout = bufferLayout->containerVarLayout;
+        EmitVarChain containerChain(containerVarLayout, &blockChain);
+
+        RefPtr<VarLayout> elementVarLayout = bufferLayout->elementVarLayout;
+        EmitVarChain elementChain(elementVarLayout, &blockChain);
 
         EmitSemantics(varDecl, kESemanticMask_None);
 
-        auto info = layout->FindResourceInfo(LayoutResourceKind::ConstantBuffer);
-        SLANG_RELEASE_ASSERT(info);
-        emitHLSLRegisterSemantic(*info, getSpaceOffset(layout));
+        emitHLSLRegisterSemantic(LayoutResourceKind::ConstantBuffer, &containerChain);
 
         Emit("\n{\n");
 
@@ -3654,13 +3717,12 @@ struct EmitVisitor
         //
 
         RefPtr<Type> elementType = parameterBlockType->elementType;
-        RefPtr<TypeLayout> elementTypeLayout = bufferLayout->offsetElementTypeLayout;
 
         EmitType(elementType, varDecl->getName());
 
         // The layout for the field ends up coming from the layout
         // for the parameter block as a whole.
-        emitHLSLParameterGroupFieldLayoutSemantics(nullptr, layout);
+        emitHLSLParameterGroupFieldLayoutSemantics(&elementChain);
 
         Emit(";\n");
         Emit("}\n");
@@ -3669,11 +3731,11 @@ struct EmitVisitor
     void emitHLSLParameterGroupDecl(
         RefPtr<VarDeclBase>             varDecl,
         RefPtr<ParameterGroupType>      parameterGroupType,
-        RefPtr<VarLayout>               layout)
+        RefPtr<VarLayout>               varLayout)
     {
         if( auto parameterBlockType = parameterGroupType->As<ParameterBlockType>())
         {
-            emitHLSLParameterBlockDecl(varDecl, parameterBlockType, layout);
+            emitHLSLParameterBlockDecl(varDecl, parameterBlockType, varLayout);
             return;
         }
         if( auto textureBufferType = parameterGroupType->As<TextureBufferType>() )
@@ -3685,18 +3747,26 @@ struct EmitVisitor
             Emit("cbuffer ");
         }
 
+        EmitVarChain blockChain(varLayout);
+
         // The data type that describes where stuff in the constant buffer should go
         RefPtr<Type> dataType = parameterGroupType->elementType;
 
         // We expect to always have layout information
-        layout = maybeFetchLayout(varDecl, layout);
-        SLANG_RELEASE_ASSERT(layout);
+        varLayout = maybeFetchLayout(varDecl, varLayout);
+        SLANG_RELEASE_ASSERT(varLayout);
 
         // We expect the layout to be for a structured type...
-        RefPtr<ParameterGroupTypeLayout> bufferLayout = layout->typeLayout.As<ParameterGroupTypeLayout>();
+        RefPtr<ParameterGroupTypeLayout> bufferLayout = varLayout->typeLayout.As<ParameterGroupTypeLayout>();
         SLANG_RELEASE_ASSERT(bufferLayout);
 
-        RefPtr<StructTypeLayout> structTypeLayout = bufferLayout->offsetElementTypeLayout.As<StructTypeLayout>();
+        auto containerVarLayout = bufferLayout->containerVarLayout;
+        EmitVarChain containerChain(containerVarLayout, &blockChain);
+
+        auto elementVarLayout = bufferLayout->elementVarLayout;
+        EmitVarChain elementChain(elementVarLayout, &blockChain);
+
+        RefPtr<StructTypeLayout> structTypeLayout = bufferLayout->elementVarLayout->typeLayout.As<StructTypeLayout>();
         SLANG_RELEASE_ASSERT(structTypeLayout);
 
 
@@ -3712,9 +3782,7 @@ struct EmitVisitor
 
         EmitSemantics(varDecl, kESemanticMask_None);
 
-        auto info = layout->FindResourceInfo(LayoutResourceKind::ConstantBuffer);
-        SLANG_RELEASE_ASSERT(info);
-        emitHLSLRegisterSemantic(*info, getSpaceOffset(layout));
+        emitHLSLRegisterSemantic(LayoutResourceKind::ConstantBuffer, &containerChain);
 
         Emit("\n{\n");
 
@@ -3743,7 +3811,7 @@ struct EmitVisitor
                     SLANG_RELEASE_ASSERT(fieldLayout->varDecl.GetName() == field.GetName());
 
                     // Emit explicit layout annotations for every field
-                    emitHLSLParameterGroupFieldLayoutSemantics(layout, fieldLayout);
+                    emitHLSLParameterGroupFieldLayoutSemantics(fieldLayout, &elementChain);
 
                     emitVarDeclInit(field);
 
@@ -3763,11 +3831,17 @@ struct EmitVisitor
     }
 
     void emitGLSLLayoutQualifier(
-        VarLayout::ResourceInfo const&  info,
-        UInt                            spaceOffset)
+        LayoutResourceKind  kind,
+        EmitVarChain*       chain)
     {
-        UInt space = info.space + spaceOffset;
-        switch(info.kind)
+        if(!chain)
+            return;
+        if(!chain->varLayout->FindResourceInfo(kind))
+            return;
+
+        UInt index = getBindingOffset(chain, kind);
+        UInt space = getBindingSpace(chain, kind);
+        switch(kind)
         {
         case LayoutResourceKind::Uniform:
             {
@@ -3794,7 +3868,7 @@ struct EmitVisitor
                     requireGLSLExtension("GL_ARB_enhanced_layouts");
 
                     Emit("layout(offset = ");
-                    Emit(info.index);
+                    Emit(index);
                     Emit(")\n");
                 }
             }
@@ -3803,13 +3877,13 @@ struct EmitVisitor
         case LayoutResourceKind::VertexInput:
         case LayoutResourceKind::FragmentOutput:
             Emit("layout(location = ");
-            Emit(info.index);
+            Emit(index);
             Emit(")\n");
             break;
 
         case LayoutResourceKind::SpecializationConstant:
             Emit("layout(constant_id = ");
-            Emit(info.index);
+            Emit(index);
             Emit(")\n");
             break;
 
@@ -3819,7 +3893,7 @@ struct EmitVisitor
         case LayoutResourceKind::SamplerState:
         case LayoutResourceKind::DescriptorTableSlot:
             Emit("layout(binding = ");
-            Emit(info.index);
+            Emit(index);
             if(space)
             {
                 Emit(", set = ");
@@ -3835,15 +3909,9 @@ struct EmitVisitor
         }
     }
 
-    UInt getSpaceOffset(VarLayout* layout)
-    {
-        if (auto resInfo = layout->FindResourceInfo(LayoutResourceKind::RegisterSpace))
-            return resInfo->index;
-        return 0;
-    }
-
     void emitGLSLLayoutQualifiers(
         RefPtr<VarLayout>               layout,
+        EmitVarChain*                   inChain,
         LayoutResourceKind              filter = LayoutResourceKind::None)
     {
         if(!layout) return;
@@ -3857,7 +3925,7 @@ struct EmitVisitor
             break;
         }
 
-        UInt spaceOffset = getSpaceOffset(layout);
+        EmitVarChain chain(layout, inChain);
 
         for( auto info : layout->resourceInfos )
         {
@@ -3868,28 +3936,36 @@ struct EmitVisitor
                 continue;
             }
 
-            emitGLSLLayoutQualifier(info, spaceOffset);
+            emitGLSLLayoutQualifier(info.kind, &chain);
         }
     }
 
     void emitGLSLParameterBlockDecl(
         RefPtr<VarDeclBase>             varDecl,
         RefPtr<ParameterBlockType>      parameterBlockType,
-        RefPtr<VarLayout>               layout)
+        RefPtr<VarLayout>               varLayout)
     {
+        EmitVarChain blockChain(varLayout);
+
+        RefPtr<ParameterGroupTypeLayout> bufferLayout = varLayout->typeLayout.As<ParameterGroupTypeLayout>();
+        SLANG_RELEASE_ASSERT(bufferLayout);
+
+        auto containerVarLayout = bufferLayout->containerVarLayout;
+        EmitVarChain containerChain(containerVarLayout, &blockChain);
+
+        auto elementVarLayout = bufferLayout->elementVarLayout;
+        EmitVarChain elementChain(elementVarLayout, &blockChain);
+
         EmitModifiers(varDecl);
-        emitGLSLLayoutQualifiers(layout);
+        emitGLSLLayoutQualifiers(containerVarLayout, &blockChain);
         Emit("uniform ");
 
         emitName(varDecl);
 
         Emit("\n{\n");
 
-        RefPtr<ParameterGroupTypeLayout> bufferLayout = layout->typeLayout.As<ParameterGroupTypeLayout>();
-        SLANG_RELEASE_ASSERT(bufferLayout);
 
         RefPtr<Type> elementType = parameterBlockType->elementType;
-        RefPtr<TypeLayout> elementTypeLayout = bufferLayout->offsetElementTypeLayout;
 
         EmitType(elementType, varDecl->getName());
         Emit(";\n");
@@ -3900,11 +3976,11 @@ struct EmitVisitor
     void emitGLSLParameterGroupDecl(
         RefPtr<VarDeclBase>             varDecl,
         RefPtr<ParameterGroupType>      parameterGroupType,
-        RefPtr<VarLayout>               layout)
+        RefPtr<VarLayout>               varLayout)
     {
         if( auto parameterBlockType = parameterGroupType->As<ParameterBlockType>())
         {
-            emitGLSLParameterBlockDecl(varDecl, parameterBlockType, layout);
+            emitGLSLParameterBlockDecl(varDecl, parameterBlockType, varLayout);
             return;
         }
 
@@ -3913,19 +3989,28 @@ struct EmitVisitor
 
         // We expect the layout, if present, to be for a structured type...
         RefPtr<StructTypeLayout> structTypeLayout;
-        if (layout)
-        {
 
-            auto typeLayout = layout->typeLayout;
+        EmitVarChain blockChain;
+        if (varLayout)
+        {
+            blockChain = EmitVarChain(varLayout);
+
+            auto typeLayout = varLayout->typeLayout;
             if (auto bufferLayout = typeLayout.As<ParameterGroupTypeLayout>())
             {
-                typeLayout = bufferLayout->offsetElementTypeLayout;
+                typeLayout = bufferLayout->elementVarLayout->getTypeLayout();
+
+                emitGLSLLayoutQualifiers(bufferLayout->containerVarLayout, &blockChain);
+            }
+            else
+            {
+                // Fallback: we somehow have a messed up layout
+                emitGLSLLayoutQualifiers(varLayout, nullptr);
             }
 
+            // We expect the element type to be structured.
             structTypeLayout = typeLayout.As<StructTypeLayout>();
             SLANG_RELEASE_ASSERT(structTypeLayout);
-
-            emitGLSLLayoutQualifiers(layout);
         }
 
 
@@ -4084,15 +4169,15 @@ struct EmitVisitor
         {
             if (decl->HasModifier<InModifier>())
             {
-                emitGLSLLayoutQualifiers(layout, LayoutResourceKind::VertexInput);
+                emitGLSLLayoutQualifiers(layout, nullptr, LayoutResourceKind::VertexInput);
             }
             else if (decl->HasModifier<OutModifier>())
             {
-                emitGLSLLayoutQualifiers(layout, LayoutResourceKind::FragmentOutput);
+                emitGLSLLayoutQualifiers(layout, nullptr, LayoutResourceKind::FragmentOutput);
             }
             else
             {
-                emitGLSLLayoutQualifiers(layout);
+                emitGLSLLayoutQualifiers(layout, nullptr);
             }
 
             // If we have a uniform that wasn't tagged `uniform` in GLSL, then fix that here
@@ -6395,7 +6480,7 @@ emitDeclImpl(decl, nullptr);
         {
             // Layout-related modifiers need to come before the declaration,
             // so deal with them here.
-            emitGLSLLayoutQualifiers(layout);
+            emitGLSLLayoutQualifiers(layout, nullptr);
 
             // try to emit an appropriate leading qualifier
             for (auto rr : layout->resourceInfos)
@@ -6436,26 +6521,33 @@ emitDeclImpl(decl, nullptr);
         emit("_S");
         Emit(ctx->shared->uniqueIDCounter++);
 
-        auto layout = getVarLayout(ctx, varDecl);
-        assert(layout);
+        auto varLayout = getVarLayout(ctx, varDecl);
+        assert(varLayout);
 
-        auto info = layout->FindResourceInfo(LayoutResourceKind::ConstantBuffer);
-        SLANG_RELEASE_ASSERT(info);
-        emitHLSLRegisterSemantic(*info, getSpaceOffset(layout));
+        EmitVarChain blockChain(varLayout);
+
+        EmitVarChain containerChain = blockChain;
+        EmitVarChain elementChain = blockChain;
+
+        auto typeLayout = varLayout->typeLayout;
+        if( auto parameterGroupTypeLayout = typeLayout.As<ParameterGroupTypeLayout>() )
+        {
+            containerChain = EmitVarChain(parameterGroupTypeLayout->containerVarLayout, &blockChain);
+            elementChain = EmitVarChain(parameterGroupTypeLayout->elementVarLayout, &blockChain);
+
+            typeLayout = parameterGroupTypeLayout->elementVarLayout->getTypeLayout();
+        }
+
+        emitHLSLRegisterSemantic(LayoutResourceKind::ConstantBuffer, &containerChain);
 
         emit("\n{\n");
 
         auto elementType = type->getElementType();
 
-        auto typeLayout = layout->typeLayout;
-        if( auto parameterGroupTypeLayout = typeLayout.As<ParameterGroupTypeLayout>() )
-        {
-            typeLayout = parameterGroupTypeLayout->offsetElementTypeLayout;
-        }
 
         emitIRType(ctx, elementType, getIRName(varDecl));
 
-        emitHLSLParameterGroupFieldLayoutSemantics(nullptr, layout);
+        emitHLSLParameterGroupFieldLayoutSemantics(&elementChain);
         emit(";\n");
 
         emit("}\n");
@@ -6475,22 +6567,29 @@ emitDeclImpl(decl, nullptr);
         emit("cbuffer ");
         emit(getIRName(varDecl));
 
-        auto layout = getVarLayout(ctx, varDecl);
-        assert(layout);
+        auto varLayout = getVarLayout(ctx, varDecl);
+        assert(varLayout);
 
-        auto info = layout->FindResourceInfo(LayoutResourceKind::ConstantBuffer);
-        SLANG_RELEASE_ASSERT(info);
-        emitHLSLRegisterSemantic(*info, getSpaceOffset(layout));
+        EmitVarChain blockChain(varLayout);
+
+        EmitVarChain containerChain = blockChain;
+        EmitVarChain elementChain = blockChain;
+
+        auto typeLayout = varLayout->typeLayout;
+        if( auto parameterGroupTypeLayout = typeLayout.As<ParameterGroupTypeLayout>() )
+        {
+            containerChain = EmitVarChain(parameterGroupTypeLayout->containerVarLayout, &blockChain);
+            elementChain = EmitVarChain(parameterGroupTypeLayout->elementVarLayout, &blockChain);
+
+            typeLayout = parameterGroupTypeLayout->elementVarLayout->typeLayout;
+        }
+
+        emitHLSLRegisterSemantic(LayoutResourceKind::ConstantBuffer, &containerChain);
 
         emit("\n{\n");
 
         auto elementType = type->getElementType();
 
-        auto typeLayout = layout->typeLayout;
-        if( auto parameterGroupTypeLayout = typeLayout.As<ParameterGroupTypeLayout>() )
-        {
-            typeLayout = parameterGroupTypeLayout->offsetElementTypeLayout;
-        }
 
         if(auto declRefType = elementType->As<DeclRefType>())
         {
@@ -6522,7 +6621,7 @@ emitDeclImpl(decl, nullptr);
 
                     emitIRType(ctx, fieldType, getIRName(ff));
 
-                    emitHLSLParameterGroupFieldLayoutSemantics(layout, fieldLayout);
+                    emitHLSLParameterGroupFieldLayoutSemantics(fieldLayout, &elementChain);
 
                     emit(";\n");
                 }
@@ -6541,14 +6640,24 @@ emitDeclImpl(decl, nullptr);
         IRGlobalVar*                varDecl,
         UniformParameterGroupType*  type)
     {
-        auto layout = getVarLayout(ctx, varDecl);
-        assert(layout);
+        auto varLayout = getVarLayout(ctx, varDecl);
+        assert(varLayout);
 
-        auto info = layout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot);
-        if (info)
+        EmitVarChain blockChain(varLayout);
+
+        EmitVarChain containerChain = blockChain;
+        EmitVarChain elementChain = blockChain;
+
+        auto typeLayout = varLayout->typeLayout;
+        if( auto parameterGroupTypeLayout = typeLayout.As<ParameterGroupTypeLayout>() )
         {
-            emitGLSLLayoutQualifier(*info, getSpaceOffset(layout));
+            containerChain = EmitVarChain(parameterGroupTypeLayout->containerVarLayout, &blockChain);
+            elementChain = EmitVarChain(parameterGroupTypeLayout->elementVarLayout, &blockChain);
+
+            typeLayout = parameterGroupTypeLayout->elementVarLayout->typeLayout;
         }
+
+        emitGLSLLayoutQualifier(LayoutResourceKind::DescriptorTableSlot, &containerChain);
 
         if(type->As<GLSLShaderStorageBufferType>())
         {
@@ -6565,12 +6674,6 @@ emitDeclImpl(decl, nullptr);
         emit("\n{\n");
 
         auto elementType = type->getElementType();
-
-        auto typeLayout = layout->typeLayout;
-        if( auto parameterGroupTypeLayout = typeLayout.As<ParameterGroupTypeLayout>() )
-        {
-            typeLayout = parameterGroupTypeLayout->offsetElementTypeLayout;
-        }
 
         if(auto declRefType = elementType->As<DeclRefType>())
         {
