@@ -1065,22 +1065,29 @@ createParameterGroupTypeLayout(
     // Note: at the moment, constant buffers apply their own offsetting
     // logic elsewhere, so we need to only do this logic for parameter blocks
     RefPtr<TypeLayout> offsetTypeLayout = applyOffsetToTypeLayout(rawElementTypeLayout, containerTypeLayout);
-
-    typeLayout->containerTypeLayout = containerTypeLayout;
     typeLayout->offsetElementTypeLayout = offsetTypeLayout;
+
+
+    RefPtr<VarLayout> containerVarLayout = new VarLayout();
+    containerVarLayout->typeLayout = containerTypeLayout;
+    for( auto typeResInfo : containerTypeLayout->resourceInfos )
+    {
+        containerVarLayout->findOrAddResourceInfo(typeResInfo.kind);
+    }
+    typeLayout->containerVarLayout = containerVarLayout;
 
     // We will construct a dummy variable layout to represent the offsettting
     // that needs to be applied to the element type to put it after the
     // container.
     RefPtr<VarLayout> elementVarLayout = new VarLayout();
     elementVarLayout->typeLayout = rawElementTypeLayout;
-    for (auto containerResourceInfo : containerTypeLayout->resourceInfos)
+    for( auto elementTypeResInfo : rawElementTypeLayout->resourceInfos )
     {
-        auto kind = containerResourceInfo.kind;
-        if (auto elementResourceInfo = rawElementTypeLayout->FindResourceInfo(kind))
+        auto kind = elementTypeResInfo.kind;
+        auto elementVarResInfo = elementVarLayout->findOrAddResourceInfo(kind);
+        if( auto containerTypeResInfo = containerTypeLayout->FindResourceInfo(kind) )
         {
-            auto varResourceInfo = elementVarLayout->findOrAddResourceInfo(kind);
-            varResourceInfo->index += containerResourceInfo.count;
+            elementVarResInfo->index += containerTypeResInfo->count;
         }
     }
     typeLayout->elementVarLayout = elementVarLayout;

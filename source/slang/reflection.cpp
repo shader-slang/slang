@@ -581,7 +581,7 @@ SLANG_API SlangParameterCategory spReflectionTypeLayout_GetParameterCategory(Sla
 
     if (auto parameterGroupTypeLayout = dynamic_cast<ParameterGroupTypeLayout*>(typeLayout))
     {
-        typeLayout = parameterGroupTypeLayout->containerTypeLayout;
+        typeLayout = parameterGroupTypeLayout->containerVarLayout->typeLayout;
     }
 
     return getParameterCategory(typeLayout);
@@ -594,7 +594,7 @@ SLANG_API unsigned spReflectionTypeLayout_GetCategoryCount(SlangReflectionTypeLa
 
     if (auto parameterGroupTypeLayout = dynamic_cast<ParameterGroupTypeLayout*>(typeLayout))
     {
-        typeLayout = parameterGroupTypeLayout->containerTypeLayout;
+        typeLayout = parameterGroupTypeLayout->containerVarLayout->typeLayout;
     }
 
     return (unsigned) typeLayout->resourceInfos.Count();
@@ -607,7 +607,7 @@ SLANG_API SlangParameterCategory spReflectionTypeLayout_GetCategoryByIndex(Slang
 
     if (auto parameterGroupTypeLayout = dynamic_cast<ParameterGroupTypeLayout*>(typeLayout))
     {
-        typeLayout = parameterGroupTypeLayout->containerTypeLayout;
+        typeLayout = parameterGroupTypeLayout->containerVarLayout->typeLayout;
     }
 
     return typeLayout->resourceInfos[index].kind;

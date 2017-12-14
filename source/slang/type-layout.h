@@ -307,11 +307,13 @@ public:
 class ParameterGroupTypeLayout : public TypeLayout
 {
 public:
-    // The layout of the "container" type itself.
+    // The layout of the "container" part itself.
     // E.g., for a constant buffer, this would reflect
     // the resource usage of the container, without
-    // the element type factored in.
-    RefPtr<TypeLayout>  containerTypeLayout;
+    // the element type factored in. All of the offsets
+    // for this variable should be zero, but it is included
+    // for completeness.
+    RefPtr<VarLayout>  containerVarLayout;
 
     // A variable layout for the element of the container.
     // The offsets of the variable layout will reflect
