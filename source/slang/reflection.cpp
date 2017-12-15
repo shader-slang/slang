@@ -574,15 +574,26 @@ static SlangParameterCategory getParameterCategory(
     return SLANG_PARAMETER_CATEGORY_MIXED;
 }
 
+static TypeLayout* maybeGetContainerLayout(TypeLayout* typeLayout)
+{
+    if (auto parameterGroupTypeLayout = dynamic_cast<ParameterGroupTypeLayout*>(typeLayout))
+    {
+        auto containerTypeLayout = parameterGroupTypeLayout->containerVarLayout->typeLayout;
+        if (containerTypeLayout->resourceInfos.Count() != 0)
+        {
+            return containerTypeLayout;
+        }
+    }
+
+    return typeLayout;
+}
+
 SLANG_API SlangParameterCategory spReflectionTypeLayout_GetParameterCategory(SlangReflectionTypeLayout* inTypeLayout)
 {
     auto typeLayout = convert(inTypeLayout);
     if(!typeLayout) return SLANG_PARAMETER_CATEGORY_NONE;
 
-    if (auto parameterGroupTypeLayout = dynamic_cast<ParameterGroupTypeLayout*>(typeLayout))
-    {
-        typeLayout = parameterGroupTypeLayout->containerVarLayout->typeLayout;
-    }
+    typeLayout = maybeGetContainerLayout(typeLayout);
 
     return getParameterCategory(typeLayout);
 }
@@ -592,10 +603,7 @@ SLANG_API unsigned spReflectionTypeLayout_GetCategoryCount(SlangReflectionTypeLa
     auto typeLayout = convert(inTypeLayout);
     if(!typeLayout) return 0;
 
-    if (auto parameterGroupTypeLayout = dynamic_cast<ParameterGroupTypeLayout*>(typeLayout))
-    {
-        typeLayout = parameterGroupTypeLayout->containerVarLayout->typeLayout;
-    }
+    typeLayout = maybeGetContainerLayout(typeLayout);
 
     return (unsigned) typeLayout->resourceInfos.Count();
 }
@@ -605,10 +613,7 @@ SLANG_API SlangParameterCategory spReflectionTypeLayout_GetCategoryByIndex(Slang
     auto typeLayout = convert(inTypeLayout);
     if(!typeLayout) return SLANG_PARAMETER_CATEGORY_NONE;
 
-    if (auto parameterGroupTypeLayout = dynamic_cast<ParameterGroupTypeLayout*>(typeLayout))
-    {
-        typeLayout = parameterGroupTypeLayout->containerVarLayout->typeLayout;
-    }
+    typeLayout = maybeGetContainerLayout(typeLayout);
 
     return typeLayout->resourceInfos[index].kind;
 }

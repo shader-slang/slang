@@ -116,6 +116,7 @@ static void emitReflectionVarBindingInfoJSON(
     CASE(DESCRIPTOR_TABLE_SLOT, descriptorTableSlot);
     CASE(SPECIALIZATION_CONSTANT, specializationConstant);
     CASE(MIXED, mixed);
+    CASE(REGISTER_SPACE, registerSpace);
     #undef CASE
 
         default:
@@ -124,7 +125,7 @@ static void emitReflectionVarBindingInfoJSON(
             break;
         }
         write(writer, "\"");
-        if( space )
+        if( space && category != SLANG_PARAMETER_CATEGORY_REGISTER_SPACE)
         {
             write(writer, ", ");
             write(writer, "\"space\": ");
@@ -171,39 +172,42 @@ static void emitReflectionVarBindingInfoJSON(
     auto typeLayout = var->getTypeLayout();
     auto categoryCount = var->getCategoryCount();
 
-    if( categoryCount != 1 )
+    if (categoryCount)
     {
-        write(writer,"\"bindings\": [\n");
-    }
-    else
-    {
-        write(writer,"\"binding\": ");
-    }
-    indent(writer);
+        if( categoryCount != 1 )
+        {
+            write(writer,"\"bindings\": [\n");
+        }
+        else
+        {
+            write(writer,"\"binding\": ");
+        }
+        indent(writer);
 
-    for(uint32_t cc = 0; cc < categoryCount; ++cc )
-    {
-        auto category = var->getCategoryByIndex(cc);
-        auto index = var->getOffset(category);
-        auto space = var->getBindingSpace(category);
-        auto count = typeLayout->getSize(category);
+        for(uint32_t cc = 0; cc < categoryCount; ++cc )
+        {
+            auto category = var->getCategoryByIndex(cc);
+            auto index = var->getOffset(category);
+            auto space = var->getBindingSpace(category);
+            auto count = typeLayout->getSize(category);
 
-        if (cc != 0) write(writer, ",\n");
+            if (cc != 0) write(writer, ",\n");
 
-        write(writer,"{");
-        emitReflectionVarBindingInfoJSON(
-            writer,
-            category,
-            index,
-            count,
-            space);
-        write(writer,"}");
-    }
+            write(writer,"{");
+            emitReflectionVarBindingInfoJSON(
+                writer,
+                category,
+                index,
+                count,
+                space);
+            write(writer,"}");
+        }
 
-    dedent(writer);
-    if( categoryCount != 1 )
-    {
-        write(writer,"\n]");
+        dedent(writer);
+        if( categoryCount != 1 )
+        {
+            write(writer,"\n]");
+        }
     }
 
     if (auto semanticName = var->getSemanticName())
