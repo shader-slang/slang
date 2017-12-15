@@ -263,6 +263,9 @@ struct ParameterBindingContext
     // What stage (if any) are we compiling for?
     Stage stage;
 
+    // The entry point that is being processed right now.
+    EntryPointLayout*   entryPointLayout = nullptr;
+
     // The source language we are trying to use
     SourceLanguage sourceLanguage;
 
@@ -647,6 +650,7 @@ struct EntryPointParameterState
     EntryPointParameterDirectionMask    directionMask;
     int                                 semanticSlotCount;
     Stage                               stage = Stage::Unknown;
+    bool                                isSampleRate = false;
 };
 
 
@@ -1276,6 +1280,14 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
             }
         }
 
+        if (state.directionMask & kEntryPointParameterDirection_Input)
+        {
+            if (sn == "sv_sampleindex")
+            {
+                state.isSampleRate = true;
+            }
+        }
+
         // Remember the system-value semantic so that we can query it later
         if (varLayout)
         {
@@ -1308,33 +1320,53 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
         }
     }
 
+    if (state.isSampleRate
+        && (state.directionMask & kEntryPointParameterDirection_Input)
+        && (context->stage == Stage::Fragment))
+    {
+        if (auto entryPointLayout = context->entryPointLayout)
+        {
+            entryPointLayout->flags |= EntryPointLayout::Flag::usesAnySampleRateInput;
+        }
+    }
+
     *state.ioSemanticIndex += state.semanticSlotCount;
     typeLayout->type = type;
 
     return typeLayout;
 }
 
-static RefPtr<TypeLayout> processEntryPointParameterWithPossibleSemantic(
+static RefPtr<TypeLayout> processEntryPointParameterDecl(
     ParameterBindingContext*        context,
-    Decl*                           declForSemantic,
-    RefPtr<Type>          type,
-    EntryPointParameterState const& state,
+    Decl*                           decl,
+    RefPtr<Type>                    type,
+    EntryPointParameterState const& inState,
     RefPtr<VarLayout>               varLayout)
 {
+    SimpleSemanticInfo semanticInfo;
+    int semanticIndex = 0;
+
+    EntryPointParameterState state = inState;
+
     // If there is no explicit semantic already in effect, *and* we find an explicit
     // semantic on the associated declaration, then we'll use it.
     if( !state.optSemanticName )
     {
-        if( auto semantic = declForSemantic->FindModifier<HLSLSimpleSemantic>() )
+        if( auto semantic = decl->FindModifier<HLSLSimpleSemantic>() )
         {
-            auto semanticInfo = decomposeSimpleSemantic(semantic);
-            int semanticIndex = semanticInfo.index;
+            semanticInfo = decomposeSimpleSemantic(semantic);
+            semanticIndex = semanticInfo.index;
 
-            EntryPointParameterState subState = state;
-            subState.optSemanticName = &semanticInfo.name;
-            subState.ioSemanticIndex = &semanticIndex;
+            state.optSemanticName = &semanticInfo.name;
+            state.ioSemanticIndex = &semanticIndex;
+        }
+    }
 
-            return processEntryPointParameter(context, type, subState, varLayout);
+    if (decl)
+    {
+        if (decl->FindModifier<HLSLSampleModifier>())
+        {
+            state.isSampleRate = true;
         }
     }
 
@@ -1441,7 +1473,7 @@ static RefPtr<TypeLayout> processEntryPointParameter(
                 RefPtr<VarLayout> fieldVarLayout = new VarLayout();
                 fieldVarLayout->varDecl = field;
 
-                auto fieldTypeLayout = processEntryPointParameterWithPossibleSemantic(
+                auto fieldTypeLayout = processEntryPointParameterDecl(
                     context,
                     field.getDecl(),
                     GetType(field),
@@ -1512,6 +1544,8 @@ static void collectEntryPointParameters(
     entryPointLayout->profile = entryPoint->profile;
     entryPointLayout->entryPoint = entryPointFuncDecl;
 
+    context->entryPointLayout = entryPointLayout;
+
 
     context->shared->programLayout->entryPoints.Add(entryPointLayout);
 
@@ -1559,7 +1593,7 @@ static void collectEntryPointParameters(
         RefPtr<VarLayout> paramVarLayout = new VarLayout();
         paramVarLayout->varDecl = makeDeclRef(paramDecl.Ptr());
 
-        auto paramTypeLayout = processEntryPointParameterWithPossibleSemantic(
+        auto paramTypeLayout = processEntryPointParameterDecl(
             context,
             paramDecl.Ptr(),
             paramDecl->type.type->Substitute(typeSubst).As<Type>(),
@@ -1591,7 +1625,7 @@ static void collectEntryPointParameters(
 
         RefPtr<VarLayout> resultLayout = new VarLayout();
 
-        auto resultTypeLayout = processEntryPointParameterWithPossibleSemantic(
+        auto resultTypeLayout = processEntryPointParameterDecl(
             context,
             entryPointFuncDecl,
             resultType->Substitute(typeSubst).As<Type>(),
@@ -1689,6 +1723,7 @@ static void collectParameters(
             context->stage = entryPoint->profile.GetStage();
             collectEntryPointParameters(context, entryPoint.Ptr(), nullptr);
         }
+        context->entryPointLayout = nullptr;
     }
 
     // Now collect parameters from loaded modules
@@ -2065,6 +2100,7 @@ RefPtr<ProgramLayout> specializeProgramLayout(
         {
             collectEntryPointParameters(&context, entryPoint, typeSubst);
         }
+        context.entryPointLayout = nullptr;
     }
 
     auto constantBufferRules = context.getRulesFamily()->getConstantBufferRules();
