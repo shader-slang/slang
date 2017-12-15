@@ -21,10 +21,7 @@ standard output = {
                                     "kind": "scalar",
                                     "scalarType": "float32"
                                 }
-                            },
-                            "bindings": [
-
-                            ]
+                            }
                         }
                     ]
                 }

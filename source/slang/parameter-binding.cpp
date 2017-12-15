@@ -99,6 +99,22 @@ struct UsedRanges
         return Add(range);
     }
 
+    bool contains(UInt index)
+    {
+        for (auto rr : ranges)
+        {
+            if (index < rr.begin)
+                return false;
+
+            if (index >= rr.end)
+                continue;
+
+            return true;
+        }
+
+        return false;
+    }
+
 
     // Try to find space for `count` entries
     UInt Allocate(ParameterInfo* param, UInt count)
@@ -215,6 +231,9 @@ struct SharedParameterBindingContext
 
     // Which register spaces have been claimed so far?
     UsedRanges usedSpaces;
+
+    // The space to use for auto-generated bindings.
+    UInt defaultSpace = 0;
 
     TargetRequest* getTargetRequest() { return targetRequest; }
 };
@@ -1058,12 +1077,30 @@ static void completeBindingsForParameter(
             continue;
         }
 
-        // For now we only auto-generate bindings in space zero
+        // Auto-generated bindings will all go in the same space,
+        // which was allocated up front.
         //
-        // TODO: we may want to support searching for a space with
-        // capacity for our resource, just in case somebody has
-        // claimed the entire range...
-        UInt space = 0;
+        // We don't currently worry about running out of room in
+        // this space; if the user declares enough parameters
+        // to overflow the range then we will have other problems
+        // on our hands.
+        //
+        // The one case that might seem like a challenge is unsized
+        // arrays, since these conceptually require a (countably)
+        // infinite register range.
+        //
+        // This turns out not to be a problem that this code
+        // needs to handle, for two reasons:
+        //
+        // 1) In the D3D case, an unbounded-size array should be
+        // computed to require one (or more) whole register spaces,
+        // and so we'd end up in the `RegisterSpace` case above.
+        //
+        // 2) In the Vulkan case, an unbounded-size array of
+        // resources still uses only a single binding, so we
+        // won't run out of space.
+        //
+        UInt space = context->shared->defaultSpace;
 
         RefPtr<UsedRangeSet> usedRangeSet;
         switch (kind)
@@ -1737,7 +1774,12 @@ void generateParameterBindings(
         generateParameterBindings(&context, parameter);
     }
 
-    bool anyGlobalUniforms = false;
+    // Determine if there are any global-scope parameters that use `Uniform`
+    // resources, and thus need to get packaged into a constant buffer.
+    //
+    // Note: this doesn't account for GLSL's support for "legacy" uniforms
+    // at global scope, which don't get assigned a CB.
+    bool needDefaultConstantBuffer = false;
     for( auto& parameterInfo : sharedContext.parameters )
     {
         SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.Count() != 0);
@@ -1746,28 +1788,104 @@ void generateParameterBindings(
         // Does the field have any uniform data?
         if( firstVarLayout->typeLayout->FindResourceInfo(LayoutResourceKind::Uniform) )
         {
-            anyGlobalUniforms = true;
+            needDefaultConstantBuffer = true;
             break;
         }
+    }
+
+    // Next, we want to determine if there are any global-scope parameters
+    // that don't just allocate a whole register space to themselves; these
+    // parameters will need to go into a "default" space, which should always
+    // be the first space we allocate.
+    //
+    // As a starting point, we will definitely need a "default" space if
+    // we are creating a default constant buffer, since it should get
+    // a binding in that "default" space.
+    bool needDefaultSpace = needDefaultConstantBuffer;
+    if (!needDefaultSpace)
+    {
+        for (auto& parameterInfo : sharedContext.parameters)
+        {
+            SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.Count() != 0);
+            auto firstVarLayout = parameterInfo->varLayouts.First();
+
+            // Does the parameter have any resource usage that isn't just
+            // allocating a whole register space?
+            for (auto resInfo : firstVarLayout->typeLayout->resourceInfos)
+            {
+                if (resInfo.kind != LayoutResourceKind::RegisterSpace)
+                {
+                    needDefaultSpace = true;
+                    break;
+                }
+            }
+        }
+    }
+    // If we are having to insert our "hack" default sampler, then
+    // we need to put it in the default space.
+    if (isGLSLCrossCompilerNeeded(targetReq))
+    {
+        needDefaultSpace = true;
+    }
+
+    // If we need a space for default bindings, then allocate it here.
+    if (needDefaultSpace)
+    {
+        UInt defaultSpace = 0;
+
+        // Check if space #0 has been allocated yet. If not, then we'll
+        // want to use it.
+        if (sharedContext.usedSpaces.contains(0))
+        {
+            // Somebody has already put things in space zero.
+            //
+            // TODO: There are two cases to handle here:
+            //
+            // 1) If there is any free register ranges in space #0,
+            // then we should keep using it as the default space.
+            //
+            // 2) If somebody went and put an HLSL unsized array into space #0,
+            // *or* if they manually placed something like a paramter block
+            // there (which should consume whole spaces), then we need to
+            // allocate an unused space instead.
+            //
+            // For now we don't deal with the concept of unsized arrays, or
+            // manually assigning parameter blocks to spaces, so we punt
+            // on this and assume case (1).
+
+            defaultSpace = 0;
+        }
+        else
+        {
+            // Nobody has used space zero yet, so we need
+            // to make sure to reserve it for defaults.
+            defaultSpace = allocateUnusedSpaces(&context, 1);
+
+            // The result of this allocation had better be that
+            // we got space #0, or else something has gone wrong.
+            SLANG_ASSERT(defaultSpace == 0);
+        }
+
+        sharedContext.defaultSpace = defaultSpace;
     }
 
     // If there are any global-scope uniforms, then we need to
     // allocate a constant-buffer binding for them here.
     ParameterBindingInfo globalConstantBufferBinding;
     globalConstantBufferBinding.index = 0;
-    if( anyGlobalUniforms )
+    globalConstantBufferBinding.space = 0;
+    if( needDefaultConstantBuffer )
     {
         // TODO: this logic is only correct for D3D targets, where
         // global-scope uniforms get wrapped into a constant buffer.
 
-        UInt space = 0;
+        UInt space = sharedContext.defaultSpace;
         auto usedRangeSet = findUsedRangeSetForSpace(&context, space);
 
         globalConstantBufferBinding.index =
             usedRangeSet->usedResourceRanges[
                 (int)LayoutResourceKind::ConstantBuffer].Allocate(nullptr, 1);
 
-        // For now we only auto-generate bindings in space zero
         globalConstantBufferBinding.space = space;
     }
 
@@ -1839,7 +1957,7 @@ void generateParameterBindings(
 
     // If there are global-scope uniforms, then we need to wrap
     // up a global constant buffer type layout to hold them
-    if( anyGlobalUniforms )
+    if( needDefaultConstantBuffer )
     {
         auto globalConstantBufferLayout = createParameterGroupTypeLayout(
             layoutContext,
@@ -1857,7 +1975,7 @@ void generateParameterBindings(
     // being invoked, so that we don't gum up other shaders.
     if(isGLSLCrossCompilerNeeded(targetReq))
     {
-        UInt space = 0;
+        UInt space = sharedContext.defaultSpace;
         auto hackSamplerUsedRanges = findUsedRangeSetForSpace(&context, space);
 
         UInt binding = hackSamplerUsedRanges->usedResourceRanges[(int)LayoutResourceKind::DescriptorTableSlot].Allocate(nullptr, 1);
@@ -1888,10 +2006,10 @@ void generateParameterBindings(
     // record into a suitable object that represents the program
     RefPtr<VarLayout> globalVarLayout = new VarLayout();
     globalVarLayout->typeLayout = globalScopeLayout;
-    if (anyGlobalUniforms)
+    if (needDefaultConstantBuffer)
     {
         auto cbInfo = globalVarLayout->findOrAddResourceInfo(LayoutResourceKind::ConstantBuffer);
-        cbInfo->space = 0;
+        cbInfo->space = globalConstantBufferBinding.space;
         cbInfo->index = globalConstantBufferBinding.index;
     }
     programLayout->globalScopeLayout = globalVarLayout;

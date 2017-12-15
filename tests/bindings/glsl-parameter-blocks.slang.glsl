@@ -6,16 +6,16 @@ struct Test
     vec4 a;
 };
 
-layout(binding = 0)
+layout(binding = 0, set = 1)
 uniform gTest_S1
 {
     Test gTest;
 };
 
-layout(binding = 1)
+layout(binding = 1, set = 1)
 uniform texture2D gTest_t;
 
-layout(binding = 2)
+layout(binding = 2, set = 1)
 uniform sampler gTest_s;
 
 vec4 main_(vec2 uv)

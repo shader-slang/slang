@@ -1,0 +1,52 @@
+result code = 0
+standard error = {
+}
+standard output = {
+{
+    "parameters": [
+        {
+            "name": "a",
+            "binding": {"kind": "registerSpace", "index": 1},
+            "type": {
+                "kind": "parameterBlock",
+                "elementType": {
+                    "kind": "struct",
+                    "name": "Helper",
+                    "fields": [
+                        {
+                            "name": "t",
+                            "type": {
+                                "kind": "resource",
+                                "baseShape": "texture2D"
+                            },
+                            "binding": {"kind": "descriptorTableSlot", "index": 0}
+                        },
+                        {
+                            "name": "s",
+                            "type": {
+                                "kind": "samplerState"
+                            },
+                            "binding": {"kind": "descriptorTableSlot", "index": 1}
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "b",
+            "binding": {"kind": "descriptorTableSlot", "index": 0},
+            "type": {
+                "kind": "resource",
+                "baseShape": "texture2D"
+            }
+        },
+        {
+            "name": "SLANG_hack_samplerForTexelFetch",
+            "binding": {"kind": "descriptorTableSlot", "index": 1},
+            "type": {
+                "kind": "samplerState"
+            }
+        }
+    ]
+}
+}
