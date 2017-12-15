@@ -21,9 +21,6 @@ standard output = {
             "parameters": [
                 {
                     "name": "tid",
-                    "bindings": [
-
-                    ],
                     "semanticName": "SV_DISPATCHTHREADID",
                     "type": {
                         "kind": "vector",

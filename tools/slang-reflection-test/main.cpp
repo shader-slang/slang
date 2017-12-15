@@ -150,6 +150,7 @@ static void emitReflectionVarBindingInfoJSON(
     auto stage = var->getStage();
     if (stage != SLANG_STAGE_NONE)
     {
+        write(writer, ",\n");
         char const* stageName = "UNKNOWN";
         switch (stage)
         {
@@ -166,7 +167,7 @@ static void emitReflectionVarBindingInfoJSON(
 
         write(writer, "\"stage\": \"");
         write(writer, stageName);
-        write(writer, "\",\n");
+        write(writer, "\"");
     }
 
     auto typeLayout = var->getTypeLayout();
@@ -174,6 +175,7 @@ static void emitReflectionVarBindingInfoJSON(
 
     if (categoryCount)
     {
+        write(writer, ",\n");
         if( categoryCount != 1 )
         {
             write(writer,"\"bindings\": [\n");
@@ -248,7 +250,6 @@ static void emitReflectionVarLayoutJSON(
 
     write(writer, "\"type\": ");
     emitReflectionTypeLayoutJSON(writer, var->getTypeLayout());
-    write(writer, ",\n");
 
     emitReflectionVarBindingInfoJSON(writer, var);
 
@@ -600,7 +601,6 @@ static void emitReflectionParamJSON(
     indent(writer);
 
     emitReflectionNameInfoJSON(writer, param->getName());
-    write(writer, ",\n");
 
     emitReflectionVarBindingInfoJSON(writer, param);
     write(writer, ",\n");
