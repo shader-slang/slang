@@ -1,0 +1,52 @@
+result code = 0
+standard error = {
+}
+standard output = {
+{
+    "parameters": [
+
+    ],
+    "entryPoints": [
+        {
+            "name": "main",
+            "stage:": "fragment",
+            "parameters": [
+                {
+                    "name": "input",
+                    "stage": "fragment",
+                    "binding": {"kind": "varyingInput", "index": 0},
+                    "type": {
+                        "kind": "struct",
+                        "name": "PSInput",
+                        "fields": [
+                            {
+                                "name": "color",
+                                "type": {
+                                    "kind": "vector",
+                                    "elementCount": 4,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32"
+                                    }
+                                },
+                                "stage": "fragment",
+                                "binding": {"kind": "varyingInput", "index": 0},
+                                "semanticName": "COLOR"
+                            },
+                            {
+                                "name": "sampleIndex",
+                                "type": {
+                                    "kind": "scalar",
+                                    "scalarType": "uint32"
+                                },
+                                "semanticName": "SV_SAMPLEINDEX"
+                            }
+                        ]
+                    }
+                }
+            ],
+            "usesAnySampleRateInput": true
+        }
+    ]
+}
+}
