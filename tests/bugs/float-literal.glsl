@@ -1,17 +1,21 @@
 //TEST:COMPARE_GLSL:-profile glsl_fragment_450 -no-checking
 #version 450
 
-// Confirm that we output floating-point literals in
-// ways that are valid for GLSL syntax, on all platforms.
-
-#ifdef __SLANG__
-__import empty;
-#endif
-
-layout(location = 0)
-out float r;
-
-void main()
+layout(set = 0, binding = 1) cbuffer PerFrameCB : register(b0)
 {
-	r = 1.0;
+	float4x4 gvpTransform;
+	float3 gFontColor[2];
+};
+
+float4 transform(float2 posS)
+{
+	return mul(float4(posS, 0.5f, 1), gvpTransform);
+}
+
+void main(
+	float2 posS : POSITION,
+	inout float2 texC : TEXCOORD,
+	out float4 posSV : SV_POSITION)
+{
+	posSV = transform(posS);
 }
