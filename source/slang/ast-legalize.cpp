@@ -4906,10 +4906,29 @@ struct FindIRDeclUsedByASTVisitor
         StmtVisitor::dispatch(stmt);
     }
 
+    void walkSubst(Substitutions* subst)
+    {
+        if( auto genericSubst = dynamic_cast<GenericSubstitution*>(subst) )
+        {
+            for( auto arg : genericSubst->args )
+            {
+                walkVal(arg);
+            }
+        }
+        // TODO: handle other cases here
+    }
+
     void walkDeclRef(DeclRef<Decl> const& declRef)
     {
         Decl* decl = declRef.getDecl();
         if (!decl) return;
+
+        // If this is a specialized declaration reference, then any
+        // of the arguments also need to be walked.
+        for(auto subst = declRef.substitutions; subst; subst = subst->outer)
+        {
+            walkSubst(subst);
+        }
 
         // If any parent of the declaration was in the stdlib, or
         // is registered as a builtin, then skip it.
