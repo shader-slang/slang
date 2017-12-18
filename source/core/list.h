@@ -381,7 +381,7 @@ namespace Slang
 
 		void Reverse()
 		{
-			for (int i = 0; i < (_count >> 1); i++)
+			for (UInt i = 0; i < (_count >> 1); i++)
 			{
 				Swap(buffer, i, _count - i - 1);
 			}
