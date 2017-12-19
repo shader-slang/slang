@@ -578,6 +578,7 @@ struct EmitVisitor
 
         std::ostringstream stream;
         stream.imbue(std::locale::classic());
+        stream.setf(std::ios::fixed,std::ios::floatfield);
         stream.precision(20);
         stream << value;
 
