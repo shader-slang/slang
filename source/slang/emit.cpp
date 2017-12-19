@@ -1411,7 +1411,7 @@ struct EmitVisitor
         }
 
         // Is the expression referencing a constant buffer?
-        if (auto cbufferType = e->type->As<ConstantBufferType>())
+        if (auto cbufferType = e->type->As<UniformParameterGroupType>())
         {
             return true;
         }

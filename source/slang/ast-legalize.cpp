@@ -2683,7 +2683,10 @@ struct LoweringVisitor
                 String mangledName = globalVar->mangledName;
                 SLANG_ASSERT(mangledName.Length() != 0);
 
-                return LegalExpr(createUncheckedVarRef(mangledName));
+                RefPtr<Expr> varRef = createUncheckedVarRef(mangledName);
+                varRef->type.type = globalVar->getType()->getValueType();
+
+                return LegalExpr(varRef);
             }
             break;
 
