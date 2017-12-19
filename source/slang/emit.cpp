@@ -1410,8 +1410,13 @@ struct EmitVisitor
                 return true;
         }
 
-        // Is the expression referencing a constant buffer?
-        if (auto cbufferType = e->type->As<ConstantBufferType>())
+        // Is the expression referencing a uniform parameter group,
+        // but *not* a `ParameterBlock<T>`?
+        if (auto parameterBlockType = e->type->As<ParameterBlockType>())
+        {
+            return false;
+        }
+        if (auto uniformParameterGroupType = e->type->As<UniformParameterGroupType>())
         {
             return true;
         }
