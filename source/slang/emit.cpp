@@ -13,6 +13,14 @@
 
 #include <assert.h>
 
+// Note: using C++ stdio just to get a locale-independent
+// way to format floating-point values.
+//
+// TODO: Go ahead and implement teh Dragon4 algorithm so
+// that we can print floating-point values to arbitrary
+// precision as needed.
+#include <sstream>
+
 #ifdef _WIN32
 #include <d3dcompiler.h>
 #pragma warning(disable:4996)
@@ -546,10 +554,34 @@ struct EmitVisitor
 
     void Emit(double value)
     {
-        // TODO(tfoley): need to print things in a way that can round-trip
-        char buffer[128];
-        sprintf(buffer, "%.20ff", value);
-        Emit(buffer);
+        // There are a few different requirements here that we need to deal with:
+        //
+        // 1) We need to print somethign that is valid syntax in the target language
+        //    (this means that hex floats are off the table for now)
+        //
+        // 2) We need our printing to be independent of the current global locale in C,
+        //    so that we don't depend on the application leaving it as the default,
+        //    and we also don't revert any changes they make.
+        //    (this means that `sprintf` and friends are off the table)
+        //
+        // 3) We need to be sure that floating-point literals specified by the user will
+        //    "round-trip" and turn into the same value when parsed back in. This means
+        //    that we need to print a reasonable number of digits of precision.
+        //
+        // For right now, the easiest option that can balance these is to use
+        // the C++ standard library `iostream`s, because they support an explicit locale,
+        // and can (hopefully) print floating-point numbers accurately.
+        //
+        // Eventually, the right move here would be to implement proper floating-point
+        // number formatting ourselves, but that would require extensive testing to
+        // make sure we get it right.
+
+        std::ostringstream stream;
+        stream.imbue(std::locale::classic());
+        stream.precision(20);
+        stream << value;
+
+        Emit(stream.str().c_str());
     }
 
 
