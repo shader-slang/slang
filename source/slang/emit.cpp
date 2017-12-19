@@ -5323,6 +5323,9 @@ emitDeclImpl(decl, nullptr);
         IRValue*        value)
     {
         IRInst* inst = (IRInst*) value;
+
+        advanceToSourceLocation(inst->sourceLoc);
+
         switch(value->op)
         {
         case kIROp_IntLit:
@@ -5618,6 +5621,8 @@ emitDeclImpl(decl, nullptr);
             return;
         }
 
+        advanceToSourceLocation(inst->sourceLoc);
+
         switch(inst->op)
         {
         default:
@@ -5780,6 +5785,8 @@ emitDeclImpl(decl, nullptr);
             }
 
             // Now look at the terminator instruction, which will tell us what we need to emit next.
+
+            advanceToSourceLocation(terminator->sourceLoc);
 
             switch (terminator->op)
             {
