@@ -877,6 +877,31 @@ void resumeThread(
                 memcpy(elementData, srcPtr, size);
             }
             break;
+
+        case kIROp_BufferElementRef:
+            {
+                VMType type = decodeType(frame, &ip);
+                UInt argCount = decodeUInt(&ip);
+                void* argPtrs[16] = { 0 };
+                for( UInt aa = 0; aa < argCount; ++aa )
+                {
+                    void* argPtr = decodeOperandPtr<void>(frame, &ip);
+                    argPtrs[aa] = argPtr;
+                }
+
+                void* dest = decodeOperandPtr<void>(frame, &ip);
+
+                char* bufferData = *(char**)argPtrs[0];
+                uint32_t index = *(uint32_t*)argPtrs[1];
+
+                auto size = type.getSize();
+                char* elementData = bufferData + index*size;
+
+                *(void**)dest = elementData;
+            }
+            break;
+
+
         case kIROp_Call:
             {
                 VMType type = decodeType(frame, &ip);

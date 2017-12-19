@@ -3575,6 +3575,32 @@ namespace Slang
 
             decl->SetCheckState(DeclCheckState::CheckedHeader);
 
+            // If we have a subscript declaration with no accessor declarations,
+            // then we should create a single `GetterDecl` to represent
+            // the implicit meaning of their declaration, so:
+            //
+            //      subscript(uint index) -> T;
+            //
+            // becomes:
+            //
+            //      subscript(uint index) -> T { get; }
+            //
+
+            bool anyAccessors = false;
+            for(auto accessorDecl : decl->getMembersOfType<AccessorDecl>())
+            {
+                anyAccessors = true;
+            }
+
+            if(!anyAccessors)
+            {
+                RefPtr<GetterDecl> getterDecl = new GetterDecl();
+                getterDecl->loc = decl->loc;
+
+                getterDecl->ParentDecl = decl;
+                decl->Members.Add(getterDecl);
+            }
+
             for(auto mm : decl->Members)
             {
                 checkDecl(mm);
@@ -4659,6 +4685,10 @@ namespace Slang
                         if(auto subscriptDeclRef = candidate.item.declRef.As<SubscriptDecl>())
                         {
                             for(auto setter : subscriptDeclRef.getDecl()->getMembersOfType<SetterDecl>())
+                            {
+                                callExpr->type.IsLeftValue = true;
+                            }
+                            for(auto refAccessor : subscriptDeclRef.getDecl()->getMembersOfType<RefAccessorDecl>())
                             {
                                 callExpr->type.IsLeftValue = true;
                             }

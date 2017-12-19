@@ -4875,6 +4875,7 @@ emitDeclImpl(decl, nullptr);
         case kIROp_FieldAddress:
         case kIROp_getElementPtr:
         case kIROp_specialize:
+        case kIROp_BufferElementRef:
             return true;
         }
 
@@ -5516,6 +5517,7 @@ emitDeclImpl(decl, nullptr);
             break;
 
         case kIROp_BufferLoad:
+        case kIROp_BufferElementRef:
             emitIROperand(ctx, inst->getArg(0));
             emit("[");
             emitIROperand(ctx, inst->getArg(1));

@@ -179,6 +179,7 @@ SIMPLE_SYNTAX_CLASS(AccessorDecl, FunctionDeclBase)
 
 SIMPLE_SYNTAX_CLASS(GetterDecl, AccessorDecl)
 SIMPLE_SYNTAX_CLASS(SetterDecl, AccessorDecl)
+SIMPLE_SYNTAX_CLASS(RefAccessorDecl, AccessorDecl)
 
 SIMPLE_SYNTAX_CLASS(FuncDecl, FunctionDeclBase)
 

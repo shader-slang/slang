@@ -73,9 +73,10 @@ block %16:
 	call(@_S031GroupMemoryBarrierWithGroupSyncp0pV)
 	let  %40	: RWStructuredBuffer<vector<float,4>>	= load(@_SV06output)
 	let  %41	: uint	= load(%5)
-	let  %42	: Ptr<vector<float,4>>	= getElementPtr(@_SV01s, 0)
-	let  %43	: vector<float,4>	= load(%42)
-	bufferStore(%40, %41, %43)
+	let  %42	: Ptr<vector<float,4>>	= bufferElementRef(%40, %41)
+	let  %43	: Ptr<vector<float,4>>	= getElementPtr(@_SV01s, 0)
+	let  %44	: vector<float,4>	= load(%43)
+	store(%42, %44)
 	return_void()
 }
 

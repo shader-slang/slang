@@ -2313,6 +2313,10 @@ namespace Slang
         {
             decl = new SetterDecl();
         }
+        else if( AdvanceIf(parser, "ref") )
+        {
+            decl = new RefAccessorDecl();
+        }
         else
         {
             Unexpected(parser);
