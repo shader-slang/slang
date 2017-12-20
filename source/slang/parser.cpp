@@ -92,7 +92,7 @@ namespace Slang
         bool LookAheadToken(const char * string, int offset = 0);
         void                                        parseSourceFile(ModuleDecl* program);
         RefPtr<ModuleDecl>					ParseProgram();
-        RefPtr<StructDecl>					ParseStruct();
+        RefPtr<Decl>					ParseStruct();
         RefPtr<ClassDecl>					    ParseClass();
         RefPtr<Stmt>					ParseStatement();
         RefPtr<Stmt>			        parseBlockStatement();
@@ -976,6 +976,101 @@ namespace Slang
         }
     }
 
+    static RefPtr<Decl> ParseGenericParamDecl(
+        Parser*             parser,
+        RefPtr<GenericDecl> genericDecl)
+    {
+        // simple syntax to introduce a value parameter
+        if (AdvanceIf(parser, "let"))
+        {
+            // default case is a type parameter
+            auto paramDecl = new GenericValueParamDecl();
+            paramDecl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
+            if (AdvanceIf(parser, TokenType::Colon))
+            {
+                paramDecl->type = parser->ParseTypeExp();
+            }
+            if (AdvanceIf(parser, TokenType::OpAssign))
+            {
+                paramDecl->initExpr = parser->ParseInitExpr();
+            }
+            return paramDecl;
+        }
+        else
+        {
+            // default case is a type parameter
+            auto paramDecl = new GenericTypeParamDecl();
+            parser->FillPosition(paramDecl);
+            paramDecl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
+            if (AdvanceIf(parser, TokenType::Colon))
+            {
+                // The user is apply a constraint to this type parameter...
+
+                auto paramConstraint = new GenericTypeConstraintDecl();
+                parser->FillPosition(paramConstraint);
+
+                auto paramType = DeclRefType::Create(
+                    parser->getSession(),
+                    DeclRef<Decl>(paramDecl, nullptr));
+
+                auto paramTypeExpr = new SharedTypeExpr();
+                paramTypeExpr->loc = paramDecl->loc;
+                paramTypeExpr->base.type = paramType;
+                paramTypeExpr->type = QualType(getTypeType(paramType));
+
+                paramConstraint->sub = TypeExp(paramTypeExpr);
+                paramConstraint->sup = parser->ParseTypeExp();
+
+                AddMember(genericDecl, paramConstraint);
+
+
+            }
+            if (AdvanceIf(parser, TokenType::OpAssign))
+            {
+                paramDecl->initType = parser->ParseTypeExp();
+            }
+            return paramDecl;
+        }
+    }
+
+    template<typename TFunc>
+    static void ParseGenericDeclImpl(
+        Parser* parser, GenericDecl* decl, const TFunc & parseInnerFunc)
+    {
+        parser->ReadToken(TokenType::OpLess);
+        parser->genericDepth++;
+        while (!parser->LookAheadToken(TokenType::OpGreater))
+        {
+            AddMember(decl, ParseGenericParamDecl(parser, decl));
+
+            if (parser->LookAheadToken(TokenType::OpGreater))
+                break;
+
+            parser->ReadToken(TokenType::Comma);
+        }
+        parser->genericDepth--;
+        parser->ReadToken(TokenType::OpGreater);
+        decl->inner = parseInnerFunc(decl);
+        decl->inner->ParentDecl = decl;
+        // A generic decl hijacks the name of the declaration
+        // it wraps, so that lookup can find it.
+        if (decl->inner)
+        {
+            decl->nameAndLoc = decl->inner->nameAndLoc;
+            decl->loc = decl->inner->loc;
+        }
+    }
+
+    static RefPtr<RefObject> ParseGenericDecl(Parser* parser, void*)
+    {
+        RefPtr<GenericDecl> decl = new GenericDecl();
+        parser->FillPosition(decl.Ptr());
+        parser->PushScope(decl.Ptr());
+        ParseGenericDeclImpl(parser, decl.Ptr(), [=](GenericDecl* genDecl) {return ParseSingleDecl(parser, genDecl); });
+        parser->PopScope();
+        return decl;
+    }
+
     static void parseParameterList(
         Parser*                 parser,
         RefPtr<CallableDecl>    decl)
@@ -1004,29 +1099,62 @@ namespace Slang
         }
     }
 
-    static void ParseFuncDeclHeader(
+    static RefPtr<Decl> ParseFuncDeclHeader(
         Parser*                     parser,
         DeclaratorInfo const&       declaratorInfo,
-        RefPtr<FuncDecl>  decl)
+        RefPtr<FuncDecl>  decl,
+        RefPtr<GenericDecl> genDecl)
     {
-        parser->PushScope(decl.Ptr());
+        RefPtr<Decl> retDecl = decl;
 
         parser->FillPosition(decl.Ptr());
         decl->loc = declaratorInfo.nameAndLoc.loc;
 
         decl->nameAndLoc = declaratorInfo.nameAndLoc;
+
+        // if return type is a DeclRef type, we need to update its scope to use this function decl's scope
+        // so that LookUp can find the generic type parameters declared after the function name
+        if (auto declRefRetType = declaratorInfo.typeSpec.As<DeclRefExpr>())
+            declRefRetType->scope = parser->currentScope;
+
         decl->ReturnType = TypeExp(declaratorInfo.typeSpec);
-        parseParameterList(parser, decl);
-        ParseOptSemantics(parser, decl.Ptr());
+        auto parseFuncDeclHeaderInner = [&](GenericDecl *)
+        {
+            parseParameterList(parser, decl);
+            ParseOptSemantics(parser, decl.Ptr());
+            return decl;
+        };
+
+        if (parser->LookAheadToken(TokenType::OpLess))
+        {
+            // parse generic parameters
+            ParseGenericDeclImpl(parser, genDecl.Ptr(), parseFuncDeclHeaderInner);
+            retDecl = genDecl;
+        }
+        else
+            parseFuncDeclHeaderInner(nullptr);
+        
+        return retDecl;
     }
 
     static RefPtr<Decl> ParseFuncDecl(
         Parser*                 parser,
         ContainerDecl*          /*containerDecl*/,
-        DeclaratorInfo const&   declaratorInfo)
+        DeclaratorInfo const&   declaratorInfo,
+        bool isGeneric)
     {
         RefPtr<FuncDecl> decl = new FuncDecl();
-        ParseFuncDeclHeader(parser, declaratorInfo, decl);
+        RefPtr<Decl> retDecl = decl;
+        RefPtr<GenericDecl> genDecl;
+        if (isGeneric)
+        {
+            genDecl = new GenericDecl();
+            parser->FillPosition(genDecl);
+            parser->PushScope(genDecl);
+            retDecl = genDecl;
+        }
+        parser->PushScope(decl.Ptr());
+        ParseFuncDeclHeader(parser, declaratorInfo, decl, genDecl);
 
         if (AdvanceIf(parser, TokenType::Semicolon))
         {
@@ -1038,7 +1166,11 @@ namespace Slang
         }
 
         parser->PopScope();
-        return decl;
+        if (isGeneric)
+        {
+            parser->PopScope();
+        }
+        return retDecl;
     }
 
     static RefPtr<VarDeclBase> CreateVarDeclForContext(
@@ -1594,7 +1726,8 @@ namespace Slang
         // matter unless we actually decide to support function-type parameters,
         // using C syntax.
         //
-        if( parser->tokenReader.PeekTokenType() == TokenType::LParent
+        if ((parser->tokenReader.PeekTokenType() == TokenType::LParent ||
+            parser->tokenReader.PeekTokenType() == TokenType::OpLess)
 
             // Only parse as a function if we didn't already see mutually-exclusive
             // constructs when parsing the declarator.
@@ -1603,7 +1736,7 @@ namespace Slang
         {
             // Looks like a function, so parse it like one.
             UnwrapDeclarator(initDeclarator, &declaratorInfo);
-            return ParseFuncDecl(parser, containerDecl, declaratorInfo);
+            return ParseFuncDecl(parser, containerDecl, declaratorInfo, parser->tokenReader.PeekTokenType() == TokenType::OpLess);
         }
 
         // Otherwise we are looking at a variable declaration, which could be one in a sequence...
@@ -2045,101 +2178,6 @@ namespace Slang
         AddMember(parser->currentScope, blockDataTypeDecl);
 
         return blockVarDecl;
-    }
-
-
-
-
-    static RefPtr<Decl> ParseGenericParamDecl(
-        Parser*             parser,
-        RefPtr<GenericDecl> genericDecl)
-    {
-        // simple syntax to introduce a value parameter
-        if (AdvanceIf(parser, "let"))
-        {
-            // default case is a type parameter
-            auto paramDecl = new GenericValueParamDecl();
-            paramDecl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
-            if (AdvanceIf(parser, TokenType::Colon))
-            {
-                paramDecl->type = parser->ParseTypeExp();
-            }
-            if (AdvanceIf(parser, TokenType::OpAssign))
-            {
-                paramDecl->initExpr = parser->ParseInitExpr();
-            }
-            return paramDecl;
-        }
-        else
-        {
-            // default case is a type parameter
-            auto paramDecl = new GenericTypeParamDecl();
-            parser->FillPosition(paramDecl);
-            paramDecl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
-            if (AdvanceIf(parser, TokenType::Colon))
-            {
-                // The user is apply a constraint to this type parameter...
-
-                auto paramConstraint = new GenericTypeConstraintDecl();
-                parser->FillPosition(paramConstraint);
-
-                auto paramType = DeclRefType::Create(
-                    parser->getSession(),
-                    DeclRef<Decl>(paramDecl, nullptr));
-
-                auto paramTypeExpr = new SharedTypeExpr();
-                paramTypeExpr->loc = paramDecl->loc;
-                paramTypeExpr->base.type = paramType;
-                paramTypeExpr->type = QualType(getTypeType(paramType));
-
-                paramConstraint->sub = TypeExp(paramTypeExpr);
-                paramConstraint->sup = parser->ParseTypeExp();
-
-                AddMember(genericDecl, paramConstraint);
-
-
-            }
-            if (AdvanceIf(parser, TokenType::OpAssign))
-            {
-                paramDecl->initType = parser->ParseTypeExp();
-            }
-            return paramDecl;
-        }
-    }
-
-    static RefPtr<RefObject> ParseGenericDecl(
-        Parser* parser, void* /*userData*/)
-    {
-        RefPtr<GenericDecl> decl = new GenericDecl();
-        parser->FillPosition(decl.Ptr());
-        parser->PushScope(decl.Ptr());
-
-        parser->ReadToken(TokenType::OpLess);
-        parser->genericDepth++;
-        while (!parser->LookAheadToken(TokenType::OpGreater))
-        {
-            AddMember(decl, ParseGenericParamDecl(parser, decl));
-
-            if( parser->LookAheadToken(TokenType::OpGreater) )
-                break;
-
-            parser->ReadToken(TokenType::Comma);
-        }
-        parser->genericDepth--;
-        parser->ReadToken(TokenType::OpGreater);
-
-        decl->inner = ParseSingleDecl(parser, decl.Ptr());
-
-        // A generic decl hijacks the name of the declaration
-        // it wraps, so that lookup can find it.
-        if (decl->inner)
-        {
-            decl->nameAndLoc = decl->inner->nameAndLoc;
-            decl->loc = decl->inner->loc;
-        }
-
-        parser->PopScope();
-        return decl;
     }
 
     static RefPtr<RefObject> ParseExtensionDecl(Parser* parser, void* /*userData*/)
@@ -2640,22 +2678,39 @@ namespace Slang
         return program;
     }
 
-    RefPtr<StructDecl> Parser::ParseStruct()
+    RefPtr<Decl> Parser::ParseStruct()
     {
         RefPtr<StructDecl> rs = new StructDecl();
+        RefPtr<Decl> retDecl = rs;
         FillPosition(rs.Ptr());
         ReadToken("struct");
 
         // TODO: support `struct` declaration without tag
         rs->nameAndLoc = expectIdentifier(this);
 
-        // We allow for an inheritance clause on a `struct`
-        // so that it can conform to interfaces.
-        parseOptionalInheritanceClause(this, rs.Ptr());
+        auto parseStructInner = [&](GenericDecl*)
+        {
+            // We allow for an inheritance clause on a `struct`
+            // so that it can conform to interfaces.
+            parseOptionalInheritanceClause(this, rs.Ptr());
+            parseAggTypeDeclBody(this, rs.Ptr());
+            return rs;
+        };
 
-        parseAggTypeDeclBody(this, rs.Ptr());
-
-        return rs;
+        if (LookAheadToken(TokenType::OpLess))
+        {
+            RefPtr<GenericDecl> genDecl = new GenericDecl();
+            FillPosition(genDecl.Ptr());
+            PushScope(genDecl);
+            ParseGenericDeclImpl(this, genDecl.Ptr(), parseStructInner);
+            PopScope();
+            retDecl = genDecl;
+        }
+        else
+        {
+            parseStructInner(nullptr);
+        }
+        return retDecl;
     }
 
     RefPtr<ClassDecl> Parser::ParseClass()
