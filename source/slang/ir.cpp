@@ -244,6 +244,32 @@ namespace Slang
         addInst(parent, inst);
     }
 
+    static void maybeSetSourceLoc(
+        IRBuilder*  builder,
+        IRValue*    value)
+    {
+        if(!builder)
+            return;
+
+        auto sourceLocInfo = builder->sourceLocInfo;
+        if(!sourceLocInfo)
+            return;
+
+        // Try to find something with usable location info
+        for(;;)
+        {
+            if(sourceLocInfo->sourceLoc.getRaw())
+                break;
+
+            if(!sourceLocInfo->next)
+                break;
+
+            sourceLocInfo = sourceLocInfo->next;
+        }
+
+        value->sourceLoc = sourceLocInfo->sourceLoc;
+    }
+
     static IRValue* createValueImpl(
         IRBuilder*  /*builder*/,
         UInt        size,
@@ -273,7 +299,7 @@ namespace Slang
     // arguments *after* the type (which is a mandatory
     // argument for all instructions).
     static IRInst* createInstImpl(
-        IRBuilder*      /*builder*/,
+        IRBuilder*      builder,
         UInt            size,
         IROp            op,
         IRType*         type,
@@ -290,6 +316,8 @@ namespace Slang
         inst->op = op;
 
         inst->type = type;
+
+        maybeSetSourceLoc(builder, inst);
 
         auto operand = inst->getArgs();
 
@@ -858,6 +886,7 @@ namespace Slang
             this,
             kIROp_Func,
             nullptr);
+        maybeSetSourceLoc(this, rsFunc);
         addGlobalValue(getModule(), rsFunc);
         return rsFunc;
     }
@@ -870,6 +899,7 @@ namespace Slang
             this,
             kIROp_global_var,
             ptrType);
+        maybeSetSourceLoc(this, globalVar);
         addGlobalValue(getModule(), globalVar);
         return globalVar;
     }
@@ -3112,7 +3142,8 @@ namespace Slang
             }
         }
 
-        // TODO: implement this
+        // We will also clone the location here, just because this is a convenient bottleneck
+        clonedValue->sourceLoc = originalValue->sourceLoc;
     }
 
     struct IRSpecContext : IRSpecContextBase

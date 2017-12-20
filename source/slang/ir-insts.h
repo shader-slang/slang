@@ -343,6 +343,8 @@ struct SharedIRBuilder
     Dictionary<IRConstantKey,   IRConstant*>    constantMap;
 };
 
+struct IRBuilderSourceLocRAII;
+
 struct IRBuilder
 {
     // Shared state for all IR builders working on the same module
@@ -365,6 +367,8 @@ struct IRBuilder
 
     IRGlobalValueWithCode*  getFunc() { return curFunc; }
     IRBlock*                getBlock() { return curBlock; }
+
+    IRBuilderSourceLocRAII* sourceLocInfo = nullptr;
 
     void addInst(IRBlock* block, IRInst* inst);
     void addInst(IRInst* inst);
@@ -558,6 +562,33 @@ struct IRBuilder
     IRHighLevelDeclDecoration* addHighLevelDeclDecoration(IRValue* value, Decl* decl);
     IRLayoutDecoration* addLayoutDecoration(IRValue* value, Layout* layout);
 };
+
+// Helper to establish the source location that will be used
+// by an IRBuilder.
+struct IRBuilderSourceLocRAII
+{
+    IRBuilder*  builder;
+    SourceLoc   sourceLoc;
+    IRBuilderSourceLocRAII* next;
+
+    IRBuilderSourceLocRAII(
+        IRBuilder*  builder,
+        SourceLoc   sourceLoc)
+        : builder(builder)
+        , sourceLoc(sourceLoc)
+        , next(nullptr)
+    {
+        next = builder->sourceLocInfo;
+        builder->sourceLocInfo = this;
+    }
+
+    ~IRBuilderSourceLocRAII()
+    {
+        assert(builder->sourceLocInfo == this);
+        builder->sourceLocInfo = next;
+    }
+};
+
 
 //
 

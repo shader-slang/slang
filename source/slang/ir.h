@@ -9,6 +9,8 @@
 
 #include "../core/basic.h"
 
+#include "source-loc.h"
+
 namespace Slang {
 
 class   Decl;
@@ -135,6 +137,9 @@ struct IRValue
     RefPtr<Type>    type;
 
     Type* getType() { return type; }
+
+    // Source location information for this value, if any
+    SourceLoc sourceLoc;
 
     // The linked list of decorations attached to this value
     IRDecoration* firstDecoration = nullptr;

@@ -998,6 +998,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     // as the visitor itself.
     LoweredValInfo lowerSubExpr(Expr* expr)
     {
+        IRBuilderSourceLocRAII sourceLocInfo(getBuilder(), expr->loc);
         return this->dispatch(expr);
     }
 
@@ -1667,6 +1668,8 @@ LoweredValInfo lowerLValueExpr(
     IRGenContext*   context,
     Expr*           expr)
 {
+    IRBuilderSourceLocRAII sourceLocInfo(context->irBuilder, expr->loc);
+
     LValueExprLoweringVisitor visitor;
     visitor.context = context;
     return visitor.dispatch(expr);
@@ -1676,6 +1679,8 @@ LoweredValInfo lowerRValueExpr(
     IRGenContext*   context,
     Expr*           expr)
 {
+    IRBuilderSourceLocRAII sourceLocInfo(context->irBuilder, expr->loc);
+
     RValueExprLoweringVisitor visitor;
     visitor.context = context;
     return visitor.dispatch(expr);
@@ -2380,6 +2385,8 @@ void lowerStmt(
     IRGenContext*   context,
     Stmt*           stmt)
 {
+    IRBuilderSourceLocRAII sourceLocInfo(context->irBuilder, stmt->loc);
+
     StmtLoweringVisitor visitor;
     visitor.context = context;
     return visitor.dispatch(stmt);
@@ -2617,6 +2624,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         //
         for (auto decl : declGroup->decls)
         {
+            IRBuilderSourceLocRAII sourceLocInfo(context->irBuilder, decl->loc);
+
             // Note: I am directly invoking `dispatch` here,
             // instead of `ensureDecl` just to try and
             // make sure that we don't accidentally
@@ -3493,6 +3502,8 @@ LoweredValInfo lowerDecl(
     IRGenContext*   context,
     DeclBase*       decl)
 {
+    IRBuilderSourceLocRAII sourceLocInfo(context->irBuilder, decl->loc);
+
     DeclLoweringVisitor visitor;
     visitor.context = context;
     return visitor.dispatch(decl);
