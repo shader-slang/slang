@@ -3446,6 +3446,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     {
         if (auto innerFuncDecl = genDecl->inner->As<FuncDecl>())
             return lowerFuncDecl(innerFuncDecl);
+        else if (auto innerStructDecl = genDecl->inner->As<StructDecl>())
+            return LoweredValInfo();
         SLANG_RELEASE_ASSERT(false);
         UNREACHABLE_RETURN(LoweredValInfo());
     }
