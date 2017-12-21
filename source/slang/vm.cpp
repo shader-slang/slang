@@ -880,7 +880,9 @@ void resumeThread(
 
         case kIROp_BufferElementRef:
             {
-                VMType type = decodeType(frame, &ip);
+                VMType ptrType = decodeType(frame, &ip);
+                VMType type = ((VMPtrTypeImpl*)ptrType.getImpl())->base;
+
                 UInt argCount = decodeUInt(&ip);
                 void* argPtrs[16] = { 0 };
                 for( UInt aa = 0; aa < argCount; ++aa )
