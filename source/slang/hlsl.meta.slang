@@ -44,8 +44,7 @@ struct StructuredBuffer
     T Load(int location);
     T Load(int location, out uint status);
 
-    __intrinsic_op(bufferLoad)
-    __subscript(uint index) -> T;
+    __subscript(uint index) -> T { __intrinsic_op(bufferLoad) get; };
 };
 
 __generic<T> __magic_type(HLSLConsumeStructuredBufferType) struct ConsumeStructuredBuffer
@@ -201,11 +200,8 @@ struct RWStructuredBuffer
 
 	__subscript(uint index) -> T
 	{
-		__intrinsic_op(bufferLoad)
-		get;
-
-		__intrinsic_op(bufferStore)
-		set;
+        __intrinsic_op(bufferElementRef)
+        ref;
 	}
 };
 
