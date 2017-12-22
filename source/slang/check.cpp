@@ -3678,8 +3678,23 @@ namespace Slang
         struct TypeWitnessBreadcrumb
         {
             TypeWitnessBreadcrumb*  prev;
+
+            RefPtr<Type>            sub;
+            RefPtr<Type>            sup;
             DeclRef<Decl>           declRef;
         };
+
+        // Crete a subtype witness based on the declared relationship
+        // found in a single breadcrumb
+        RefPtr<SubtypeWitness> createSimplSubtypeWitness(
+            TypeWitnessBreadcrumb*  breadcrumb)
+        {
+            RefPtr<DeclaredSubtypeWitness> witness = new DeclaredSubtypeWitness();
+            witness->sub = breadcrumb->sub;
+            witness->sup = breadcrumb->sup;
+            witness->declRef = breadcrumb->declRef;
+            return witness;
+        }
 
         RefPtr<Val> createTypeWitness(
             RefPtr<Type>            type,
@@ -3696,29 +3711,46 @@ namespace Slang
                 UNREACHABLE_RETURN(nullptr);
             }
 
-            auto breadcrumbs = inBreadcrumbs;
+            // We might have one or more steps in the breadcrumb trail, e.g.:
+            //
+            //      (A : B) (B : C) (C : D)
+            //
+            // The chain is stored as a reversed linked list, so that
+            // the first entry would be the `(C : D)` relationship
+            // above.
+            //
+            // We are going to walk the list and build up a suitable
+            // subtype witness.
+            auto bb = inBreadcrumbs;
 
-            auto bb = breadcrumbs;
-            breadcrumbs = breadcrumbs->prev;
+            // Create a witness for the last step in the chain
+            RefPtr<SubtypeWitness> witness = createSimplSubtypeWitness(bb);
+            bb = bb->prev;
 
-            if(breadcrumbs)
+            // Now, as long as we have more entries to deal with,
+            // we'll be in a situation like:
+            //
+            //      ... (B : C) <witness>
+            //
+            // and we want to wrap up one more link in our chain.
+
+            while (bb)
             {
-                // There are multiple steps in the proof, so
-                // we need a transitive witness to show that
-                // because `A : B` and `B : C` then `A : C`
-                //
-                SLANG_UNEXPECTED("transitive type witness");
-                UNREACHABLE_RETURN(nullptr);
+                // Create simple witness for the step in the chain
+                RefPtr<SubtypeWitness> link = createSimplSubtypeWitness(bb);
+
+                // Now join the link onto the existing chain represented
+                // by `witness`.
+                RefPtr<TransitiveSubtypeWitness> transitiveWitness = new TransitiveSubtypeWitness();
+                transitiveWitness->sub = link->sub;
+                transitiveWitness->sup = witness->sup;
+                transitiveWitness->subToMid = link;
+                transitiveWitness->midToSup = witness;
+
+                witness = transitiveWitness;
+                bb = bb->prev;
             }
 
-            // Simple case: we have a single declaration
-            // that shows that `type` conforms to `interfaceDeclRef`.
-            //
-
-            RefPtr<DeclaredSubtypeWitness> witness = new DeclaredSubtypeWitness();
-            witness->sub = type;
-            witness->sup = DeclRefType::Create(getSession(), interfaceDeclRef);
-            witness->declRef = bb->declRef;
             return witness;
         }
 
@@ -3772,6 +3804,9 @@ namespace Slang
                         // the inheritance declaration.
                         TypeWitnessBreadcrumb breadcrumb;
                         breadcrumb.prev = inBreadcrumbs;
+
+                        breadcrumb.sub = type;
+                        breadcrumb.sup = inheritedType;
                         breadcrumb.declRef = inheritanceDeclRef;
 
                         if(doesTypeConformToInterfaceImpl(originalType, inheritedType, interfaceDeclRef, outWitness, &breadcrumb))
@@ -3786,6 +3821,8 @@ namespace Slang
                         auto inheritedType = GetSup(genConstraintDeclRef);
                         TypeWitnessBreadcrumb breadcrumb;
                         breadcrumb.prev = inBreadcrumbs;
+                        breadcrumb.sub = type;
+                        breadcrumb.sup = inheritedType;
                         breadcrumb.declRef = genConstraintDeclRef;
                         if (doesTypeConformToInterfaceImpl(originalType, inheritedType, interfaceDeclRef, outWitness, &breadcrumb))
                         {
@@ -3818,6 +3855,8 @@ namespace Slang
 
                         TypeWitnessBreadcrumb breadcrumb;
                         breadcrumb.prev = inBreadcrumbs;
+                        breadcrumb.sub = sub;
+                        breadcrumb.sup = sup;
                         breadcrumb.declRef = constraintDeclRef;
 
                         if(doesTypeConformToInterfaceImpl(originalType, sup, interfaceDeclRef, outWitness, &breadcrumb))
