@@ -99,6 +99,21 @@ RAW(
 )
 END_SYNTAX_CLASS()
 
+// A witness that `sub : sup` because `sub : mid` and `mid : sup`
+SYNTAX_CLASS(TransitiveSubtypeWitness, SubtypeWitness)
+    // Witness that `sub : mid`
+    FIELD(RefPtr<SubtypeWitness>, subToMid);
+
+    // Witness that `mid : sup`
+    FIELD(RefPtr<SubtypeWitness>, midToSup);
+RAW(
+    virtual bool EqualsVal(Val* val) override;
+    virtual String ToString() override;
+    virtual int GetHashCode() override;
+    virtual RefPtr<Val> SubstituteImpl(Substitutions * subst, int * ioDiff) override;
+)
+END_SYNTAX_CLASS()
+
 // A value that is used as a proxy when we need to
 // put an IR-level value into AST types
 SYNTAX_CLASS(IRProxyVal, Val)

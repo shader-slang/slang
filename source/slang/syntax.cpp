@@ -1741,6 +1741,84 @@ void Type::accept(IValVisitor* visitor, void* extra)
         return hash;
     }
 
+    // TransitiveSubtypeWitness
+
+    bool TransitiveSubtypeWitness::EqualsVal(Val* val)
+    {
+        auto otherWitness = dynamic_cast<TransitiveSubtypeWitness*>(val);
+        if(!otherWitness)
+            return false;
+
+        return sub->Equals(otherWitness->sub)
+            && sup->Equals(otherWitness->sup)
+            && subToMid->EqualsVal(otherWitness->subToMid)
+            && midToSup->EqualsVal(otherWitness->midToSup);
+    }
+
+    RefPtr<Val> TransitiveSubtypeWitness::SubstituteImpl(Substitutions* subst, int * ioDiff)
+    {
+        int diff = 0;
+
+        RefPtr<Type> substSub = sub->SubstituteImpl(subst, &diff).As<Type>();
+        RefPtr<Type> substSup = sup->SubstituteImpl(subst, &diff).As<Type>();
+        RefPtr<SubtypeWitness> substSubToMid = subToMid->SubstituteImpl(subst, &diff).As<SubtypeWitness>();
+        RefPtr<SubtypeWitness> substMidToSup = midToSup->SubstituteImpl(subst, &diff).As<SubtypeWitness>();
+
+        // If nothing changed, then we can bail out early.
+        if (!diff)
+            return this;
+
+        // Something changes, so let the caller know.
+        (*ioDiff)++;
+
+        // TODO: are there cases where we can simplify?
+        //
+        // In principle, if either `subToMid` or `midToSub` turns into
+        // a reflexive subtype witness, then we could drop that side,
+        // and just return the other one (this would imply that `sub == mid`
+        // or `mid == sup` after substitutions).
+        //
+        // In the long run, is it also possible that if `sub` gets resolved
+        // to a concrete type *and* we decide to flatten out the inheritance
+        // graph into a linearized "class precedence list" stored in any
+        // aggregate type, then we could potentially just redirect to point
+        // to the appropriate inheritance decl in the original type.
+        //
+        // For now I'm going to ignore those possibilities and hope for the best.
+
+        // In the simple case, we just construct a new transitive subtype
+        // witness, and we move on with life.
+        RefPtr<TransitiveSubtypeWitness> result = new TransitiveSubtypeWitness();
+        result->sub = substSub;
+        result->sup = substSup;
+        result->subToMid = substSubToMid;
+        result->midToSup = substMidToSup;
+        return result;
+    }
+
+    String TransitiveSubtypeWitness::ToString()
+    {
+        // Note: we only print the constituent
+        // witnesses, and rely on them to print
+        // the starting and ending types.
+        StringBuilder sb;
+        sb << "TransitiveSubtypeWitness(";
+        sb << this->subToMid->ToString();
+        sb << ", ";
+        sb << this->midToSup->ToString();
+        sb << ")";
+        return sb.ProduceString();
+    }
+
+    int TransitiveSubtypeWitness::GetHashCode()
+    {
+        auto hash = sub->GetHashCode();
+        hash = combineHash(hash, sup->GetHashCode());
+        hash = combineHash(hash, subToMid->GetHashCode());
+        hash = combineHash(hash, midToSup->GetHashCode());
+        return hash;
+    }
+
     // IRProxyVal
 
     bool IRProxyVal::EqualsVal(Val* val)
