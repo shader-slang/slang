@@ -824,14 +824,14 @@ __generic<T : __BuiltinFloatingPointType>
 __specialized_for_target(glsl)
 T saturate(T x)
 {
-    return clamp(x, T(0), T(1));
+    return clamp<T>(x, T(0), T(1));
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __specialized_for_target(glsl)
 vector<T,N> saturate(vector<T,N> x)
 {
-    return clamp(x,
+    return clamp<T>(x,
         vector<T,N>(T(0)),
         vector<T,N>(T(1)));
 }
@@ -846,7 +846,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __specialized_for_target(glsl)
 matrix<T,N,M> saturate(matrix<T,N,M> x)
 {
-    return clamp(x,
+    return clamp<T>(x,
         __scalarToMatrix<T,N,M>(T(0)),
         __scalarToMatrix<T,N,M>(T(1)));
 }
