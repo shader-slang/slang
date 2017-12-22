@@ -3079,7 +3079,20 @@ namespace Slang
     {
         if(!originalValue)
             return;
-        context->getClonedValues().Add(originalValue, clonedValue);
+
+        // Note: setting the entry direclty here rather than
+        // using `Add` or `AddIfNotExists` because we can conceivably
+        // clone the same value (e.g., a basic block inside a generic
+        // function) multiple times, and that is okay, and we really
+        // just need to keep track of the most recent value.
+
+        // TODO: The same thing could potentially be handled more
+        // cleanly by having a notion of scoping for these cloned-value
+        // mappings, so that we register cloned values for things
+        // inside of a function to a temporary mapping that we
+        // throw away after the function is done.
+
+        context->getClonedValues()[originalValue] = clonedValue;
     }
 
     // Information on values to use when registering a cloned value

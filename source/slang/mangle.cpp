@@ -184,6 +184,18 @@ namespace Slang
         }
     }
 
+    // TODO: this needs to be centralized
+    RefPtr<GenericSubstitution> getOutermostGenericSubst(
+        RefPtr<Substitutions> inSubst)
+    {
+        for (auto subst = inSubst; subst; subst = subst->outer)
+        {
+            if (auto genericSubst = subst.As<GenericSubstitution>())
+                return genericSubst;
+        }
+        return nullptr;
+    }
+
     void emitQualifiedName(
         ManglingContext*    context,
         DeclRef<Decl>       declRef)
@@ -221,7 +233,7 @@ namespace Slang
             // There are two cases here: either we have specializations
             // in place for the parent generic declaration, or we don't.
 
-            auto subst = declRef.substitutions.As<GenericSubstitution>();
+            auto subst = getOutermostGenericSubst(declRef.substitutions);
             if( subst && subst->genericDecl == parentGenericDeclRef.getDecl() )
             {
                 // This is the case where we *do* have substitutions.
