@@ -3970,7 +3970,21 @@ namespace Slang
         {
             // For now the "solver" is going to be ridiculously simplistic.
 
-            // The generic itself will have some constraints, so we need to try and solve those too
+            // The generic itself will have some constraints, and for now we add these
+            // to the system of constrains we will use for solving for the type variables.
+            //
+            // TODO: we need to decide whether constraints are used like this to influence
+            // how we solve for type/value variables, or whether constraints in the parameter
+            // list just work as a validation step *after* we've solved for the types.
+            //
+            // That is, should we allow `<T : Int>` to be written, and cause us to "infer"
+            // that `T` should be the type `Int`? That seems a little silly.
+            //
+            // Eventually, though, we may want to support type identity constraints, especially
+            // on associated types, like `<C where C : IContainer && C.IndexType == Int>`
+            // These seem more reasonable to have influence constraint solving, since it could
+            // conceivably let us specialize a `X<T> : IContainer` to `X<Int>` if we find
+            // that `X<T>.IndexType == T`.
             for( auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(genericDeclRef) )
             {
                 if(!TryUnifyTypes(*system, GetSub(constraintDeclRef), GetSup(constraintDeclRef)))
@@ -4062,6 +4076,57 @@ namespace Slang
                 }
             }
 
+            // After we've solved for the explicit arguments, we need to
+            // make a second pass and consider the implicit arguments,
+            // based on what we've already determined to be the values
+            // for the explicit arguments.
+
+            // Before we begin, we are going to go ahead and create the
+            // "solved" substitution that we will return if everything works.
+            // This is because we are going to use this substitution,
+            // partially filled in with the results we know so far,
+            // in order to specialize any constraints on the generic.
+            //
+            // E.g., if the generic parameters were `<T : ISidekick>`, and
+            // we've already decided that `T` is `Robin`, then we want to
+            // search for a conformance `Robin : ISidekick`, which involved
+            // apply the substitutions we already know...
+
+            RefPtr<GenericSubstitution> solvedSubst = new GenericSubstitution();
+            solvedSubst->genericDecl = genericDeclRef.getDecl();
+            solvedSubst->outer = genericDeclRef.substitutions;
+            solvedSubst->args = args;
+
+            for( auto constraintDecl : genericDeclRef.getDecl()->getMembersOfType<GenericTypeConstraintDecl>() )
+            {
+                DeclRef<GenericTypeConstraintDecl> constraintDeclRef(
+                    constraintDecl,
+                    solvedSubst);
+
+                // Extract the (substituted) sub- and super-type from the constraint.
+                auto sub = GetSub(constraintDeclRef);
+                auto sup = GetSup(constraintDeclRef);
+
+                // Search for a witness that shows the constraint is satisfied.
+                auto subTypeWitness = tryGetSubtypeWitness(sub, sup);
+                if(subTypeWitness)
+                {
+                    // We found a witness, so it will become an (implicit) argument.
+                    solvedSubst->args.Add(subTypeWitness);
+                }
+                else
+                {
+                    // No witness was found, so the inference will now fail.
+                    //
+                    // TODO: Ideally we should print an error message in
+                    // this case, to let the user know why things failed.
+                    return nullptr;
+                }
+
+                // TODO: We may need to mark some constrains in our constraint
+                // system as being solved now, as a result of the witness we found.
+            }
+
             // Make sure we haven't constructed any spurious constraints
             // that we aren't able to satisfy:
             for (auto c : system->constraints)
@@ -4071,13 +4136,6 @@ namespace Slang
                     return nullptr;
                 }
             }
-
-            // Consruct a reference to the extension with our constraint variables
-            // as the 
-            RefPtr<GenericSubstitution> solvedSubst = new GenericSubstitution();
-            solvedSubst->genericDecl = genericDeclRef.getDecl();
-            solvedSubst->outer = genericDeclRef.substitutions;
-            solvedSubst->args = args;
 
             return solvedSubst;
         }
