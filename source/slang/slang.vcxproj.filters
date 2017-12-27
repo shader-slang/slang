@@ -74,6 +74,7 @@
     <ClCompile Include="ir-legalize-types.cpp" />
     <ClCompile Include="ast-legalize.cpp" />
     <ClCompile Include="legalize-types.cpp" />
+    <ClCompile Include="val-defs.cpp" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="core.meta.slang" />

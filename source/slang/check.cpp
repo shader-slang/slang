@@ -7003,8 +7003,18 @@ namespace Slang
                 }
             }
 
-            // TODO: need to fill in constraints here...
-
+            // create default substitution arguments for constraints
+            for (auto mm : genericDecl->Members)
+            {
+                if (auto genericTypeConstraintDecl = mm.As<GenericTypeConstraintDecl>())
+                {
+                    RefPtr<DeclaredSubtypeWitness> witness = new DeclaredSubtypeWitness();
+                    witness->declRef = makeDeclRef(genericTypeConstraintDecl.Ptr());
+                    witness->sub = genericTypeConstraintDecl->sub.type;
+                    witness->sup = genericTypeConstraintDecl->sup.type;
+                    subst->args.Add(witness);
+                }
+            }
             return subst;
         }
         return parentSubst;

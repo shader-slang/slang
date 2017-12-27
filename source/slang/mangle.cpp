@@ -400,6 +400,17 @@ namespace Slang
     {
         return getMangledName(makeDeclRef(decl));
     }
+    
+    String getMangledNameForConformanceWitness(
+        DeclRef<Decl> sub,
+        DeclRef<Decl> sup)
+    {
+        ManglingContext context;
+        emitRaw(&context, "_SW");
+        emitQualifiedName(&context, sub);
+        emitQualifiedName(&context, sup);
+        return context.sb.ProduceString();
+    }
 
     String getMangledNameForConformanceWitness(
         Type* sub,

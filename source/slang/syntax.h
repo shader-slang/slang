@@ -1167,7 +1167,7 @@ namespace Slang
     void removeSubstitution(DeclRefBase & declRef, RefPtr<Substitutions> subst);
     bool hasGenericSubstitutions(RefPtr<Substitutions> subst);
     RefPtr<GenericSubstitution> getGenericSubstitution(RefPtr<Substitutions> subst);
-
+    
     // This function substitutes the type arguments referenced in a linked list of substitutions 
     // which head is at `substHead` using the substitutions specified by `subst`. If the linked
     // list `substHead` does not contain `GlobalGenericParamSubstitution` entries, they will be 

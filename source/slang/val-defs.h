@@ -117,11 +117,15 @@ END_SYNTAX_CLASS()
 // A value that is used as a proxy when we need to
 // put an IR-level value into AST types
 SYNTAX_CLASS(IRProxyVal, Val)
-    FIELD(IRValue*, inst)
+    FIELD(IRUse, inst)
 RAW(
     virtual bool EqualsVal(Val* val) override;
     virtual String ToString() override;
     virtual int GetHashCode() override;
+    ~IRProxyVal() override
+    {
+        inst.clear();
+    }
 )
 END_SYNTAX_CLASS()
 

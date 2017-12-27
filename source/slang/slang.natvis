@@ -35,6 +35,12 @@
   <Type Name="Slang::NameLoc">
     <DisplayString>{{name={(char*)((*name).text.buffer.pointer+1), s} loc={loc.raw}}}</DisplayString>
   </Type>
+  <Type Name="Slang::IRWitnessTableEntry">
+    <Expand>
+      <Item Name="[Key]">requirementKey</Item>
+      <Item Name="[Val]">satisfyingVal</Item>
+    </Expand>
+  </Type>
   <Type Name="Slang::IRValue">
     <DisplayString>{{{op}}}</DisplayString>
     <Expand>
@@ -44,11 +50,13 @@
       <ExpandedItem Condition="op==kIROp_decl_ref">(Slang::IRDeclRef*)this</ExpandedItem>
       <ExpandedItem Condition="op==kIROp_Func">(Slang::IRFunc*)this</ExpandedItem>
       <ExpandedItem Condition="op==kIROp_Block">(Slang::IRBlock*)this</ExpandedItem>
+      <ExpandedItem Condition="op==kIROp_witness_table">(Slang::IRWitnessTable*)this</ExpandedItem>
+      <ExpandedItem Condition="op==kIROp_witness_table_entry">(Slang::IRWitnessTableEntry*)this</ExpandedItem>
       <Item Name="====Uses====">"-------"</Item>
       <LinkedListItems>
         <HeadPointer>firstUse</HeadPointer>
         <NextPointer>nextUse</NextPointer>
-        <ValueNode>usedValue</ValueNode>
+        <ValueNode>user</ValueNode>
       </LinkedListItems> 
     
   </Expand>

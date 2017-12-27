@@ -237,6 +237,7 @@
     <ClCompile Include="syntax.cpp" />
     <ClCompile Include="token.cpp" />
     <ClCompile Include="type-layout.cpp" />
+    <ClCompile Include="val-defs.cpp" />
     <ClCompile Include="vm.cpp" />
   </ItemGroup>
   <ItemGroup>
