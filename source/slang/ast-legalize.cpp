@@ -2623,6 +2623,9 @@ struct LoweringVisitor
         if (auto litVal = dynamic_cast<ConstantIntVal*>(val))
             return val;
 
+        // We do not use subtype witness for ast lowering, return it unchanged.
+        if (auto subtypeWitnessVal = dynamic_cast<SubtypeWitness*>(val))
+            return val;
         SLANG_UNEXPECTED("unhandled value kind");
     }
 
