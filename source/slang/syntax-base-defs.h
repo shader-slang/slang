@@ -121,6 +121,7 @@ protected:
 
     virtual Type* CreateCanonicalType() = 0;
     Type* canonicalType = nullptr;
+    RefPtr<Type> canonicalTypeRefPtr;
 
     Session* session = nullptr;
     )

@@ -189,6 +189,8 @@ void Type::accept(IValVisitor* visitor, void* extra)
         {
             // TODO(tfoley): worry about thread safety here?
             et->canonicalType = et->CreateCanonicalType();
+            if (dynamic_cast<Type*>(et->canonicalType) != this)
+                et->canonicalTypeRefPtr = et->canonicalType;
             SLANG_ASSERT(et->canonicalType);
         }
         return et->canonicalType;
@@ -861,7 +863,9 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     Type* NamedExpressionType::CreateCanonicalType()
     {
-        return GetType(declRef)->GetCanonicalType();
+        if (!innerType)
+            innerType = GetType(declRef);
+        return innerType->GetCanonicalType();
     }
 
     int NamedExpressionType::GetHashCode()

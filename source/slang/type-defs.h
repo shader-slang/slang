@@ -420,9 +420,10 @@ END_SYNTAX_CLASS()
 
 // A type alias of some kind (e.g., via `typedef`)
 SYNTAX_CLASS(NamedExpressionType, Type)
-    DECL_FIELD(DeclRef<TypeDefDecl>, declRef)
+DECL_FIELD(DeclRef<TypeDefDecl>, declRef)
 
 RAW(
+    RefPtr<Type> innerType;
     NamedExpressionType()
     {}
     NamedExpressionType(
