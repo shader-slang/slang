@@ -503,7 +503,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
                         if (aggTypeDeclRef.getDecl()->memberDictionary.TryGetValue(assocTypeDecl->getName(), targetType))
                         {
                             if (auto typeDefDecl = dynamic_cast<TypeDefDecl*>(targetType))
-                                return typeDefDecl->type.type;
+                                return typeDefDecl->type.type->Substitute(aggTypeDeclRef.substitutions);
                             else
                                 return DeclRefType::Create(getSession(), DeclRef<Decl>(targetType, aggTypeDeclRef.substitutions));
                         }
