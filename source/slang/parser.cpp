@@ -4,6 +4,7 @@
 
 #include "compiler.h"
 #include "lookup.h"
+#include "visitor.h"
 
 namespace Slang
 {
@@ -1099,6 +1100,40 @@ namespace Slang
         }
     }
 
+    // systematically replace all scopes in an expression tree
+    class ReplaceScopeVisitor : public ExprVisitor<ReplaceScopeVisitor>
+    {
+    public:
+        RefPtr<Scope> scope;
+        void visitDeclRefExpr(DeclRefExpr* expr) 
+        {
+            expr->scope = scope;
+        }
+        void visitGenericAppExpr(GenericAppExpr * expr)
+        {
+            expr->FunctionExpr->accept(this, nullptr);
+            for (auto arg : expr->Arguments)
+                arg->accept(this, nullptr);
+        }
+        void visitIndexExpr(IndexExpr * expr)
+        {
+            expr->BaseExpression->accept(this, nullptr);
+            expr->IndexExpression->accept(this, nullptr);
+        }
+        void visitMemberExpr(MemberExpr * expr)
+        {
+            expr->BaseExpression->accept(this, nullptr);
+            expr->scope = scope;
+        }
+        void visitStaticMemberExpr(StaticMemberExpr * expr)
+        {
+            expr->BaseExpression->accept(this, nullptr);
+            expr->scope = scope;
+        }
+        void visitExpr(Expr* /*expr*/)
+        {}
+    };
+
     static RefPtr<Decl> ParseFuncDeclHeader(
         Parser*                     parser,
         DeclaratorInfo const&       declaratorInfo,
@@ -1114,8 +1149,9 @@ namespace Slang
 
         // if return type is a DeclRef type, we need to update its scope to use this function decl's scope
         // so that LookUp can find the generic type parameters declared after the function name
-        if (auto declRefRetType = declaratorInfo.typeSpec.As<DeclRefExpr>())
-            declRefRetType->scope = parser->currentScope;
+        ReplaceScopeVisitor replaceScopeVisitor;
+        replaceScopeVisitor.scope = parser->currentScope;
+        declaratorInfo.typeSpec->accept(&replaceScopeVisitor, nullptr);
 
         decl->ReturnType = TypeExp(declaratorInfo.typeSpec);
         auto parseFuncDeclHeaderInner = [&](GenericDecl *)
