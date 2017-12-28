@@ -4503,8 +4503,12 @@ emitDeclImpl(decl, nullptr);
             return name;
         }
 
-        // Special case (2): not implemented yet.
-
+        // Special case (2)
+        if (declRef.GetParent().decl->As<AggTypeDecl>())
+        {
+            name.append(declRef.decl->nameAndLoc.name->text);
+            return name;
+        }
         // General case:
         name.append(getMangledName(declRef));
         return name;

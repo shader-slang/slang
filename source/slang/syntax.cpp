@@ -1827,7 +1827,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         if(!otherProxy)
             return false;
 
-        return this->inst == otherProxy->inst;
+        return this->inst.usedValue == otherProxy->inst.usedValue;
     }
 
     String IRProxyVal::ToString()
@@ -1837,7 +1837,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     int IRProxyVal::GetHashCode()
     {
-        auto hash = Slang::GetHashCode(inst);
+        auto hash = Slang::GetHashCode(inst.usedValue);
         return hash;
     }
 

@@ -304,6 +304,8 @@ struct IRWitnessTableEntry : IRUser
 // to the IR values that satisfy those requirements.
 struct IRWitnessTable : IRGlobalValue
 {
+    RefPtr<GenericDecl> genericDecl;
+    DeclRef<Decl> subTypeDeclRef, supTypeDeclRef;
     IRValueList<IRWitnessTableEntry> entries;
 };
 
@@ -341,6 +343,7 @@ struct SharedIRBuilder
 
     Dictionary<IRInstKey,       IRInst*>    globalValueNumberingMap;
     Dictionary<IRConstantKey,   IRConstant*>    constantMap;
+    Dictionary<String, IRWitnessTable*> witnessTableMap;
 };
 
 struct IRBuilderSourceLocRAII;
@@ -417,7 +420,7 @@ struct IRBuilder
         IRValue* const* args);
 
     IRModule* createModule();
-
+    
     IRFunc* createFunc();
     IRGlobalVar* createGlobalVar(
         IRType* valueType);
@@ -427,7 +430,8 @@ struct IRBuilder
         IRWitnessTable* witnessTable,
         IRValue*        requirementKey,
         IRValue*        satisfyingVal);
-
+    IRWitnessTable* lookupWitnessTable(String mangledName);
+    void registerWitnessTable(IRWitnessTable* table);
     IRBlock* createBlock();
     IRBlock* emitBlock();
 

@@ -2740,10 +2740,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             context->getSession(),
             makeDeclRef(parentDecl));
 
-
-        // TODO: if the parent type is generic, then I suppose these
-        // need to be *generic* witness tables?
-
         // What is the super-type that we have declared we inherit from?
         RefPtr<Type> superType = inheritanceDecl->base.type;
 
@@ -2757,6 +2753,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // conformance of the type to its super-type.
         auto witnessTable = context->irBuilder->createWitnessTable();
         witnessTable->mangledName = mangledName;
+
+        if (parentDecl->ParentDecl)
+            witnessTable->genericDecl = dynamic_cast<GenericDecl*>(parentDecl->ParentDecl);
+        witnessTable->subTypeDeclRef = makeDeclRef(parentDecl);
+        witnessTable->supTypeDeclRef = inheritanceDecl->base.type->AsDeclRefType()->declRef;
 
         // Register the value now, rather than later, to avoid
         // infinite recursion.
@@ -3713,7 +3714,7 @@ LoweredValInfo ensureDecl(
     return result;
 }
 
-IRWitnessTable* findWitnessTable(
+IRValue* findWitnessTable(
     IRGenContext*   context,
     DeclRef<Decl>   declRef)
 {
@@ -3724,10 +3725,13 @@ IRWitnessTable* findWitnessTable(
         return nullptr;
     }
 
+    if (irVal->op == kIROp_specialize)
+    {
+        return irVal;
+    }
+
     if (irVal->op != kIROp_witness_table)
     {
-        // TODO: We might eventually have cases of `specialize` called
-        // on a witness table...
         SLANG_UNEXPECTED("expected a witness table");
         return nullptr;
     }
@@ -3764,7 +3768,7 @@ RefPtr<Val> lowerSubstitutionArg(
         // up in a reasonably clean fashion.
         //
         RefPtr<IRProxyVal> proxyVal = new IRProxyVal();
-        proxyVal->inst = irWitnessTable;
+        proxyVal->inst.init(nullptr, irWitnessTable);
         return proxyVal;
     }
     else
@@ -3860,7 +3864,7 @@ LoweredValInfo maybeEmitSpecializeInst(IRGenContext*   context,
 
     // Otherwise, we need to construct a specialization of the
     // given declaration.
-    return LoweredValInfo::simple(context->irBuilder->emitSpecializeInst(
+    return LoweredValInfo::simple((IRInst*)context->irBuilder->emitSpecializeInst(
         type,
         val,
         declRef));
