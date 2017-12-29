@@ -505,9 +505,18 @@ void Type::accept(IValVisitor* visitor, void* extra)
                         if (aggTypeDeclRef.getDecl()->memberDictionary.TryGetValue(assocTypeDecl->getName(), targetType))
                         {
                             if (auto typeDefDecl = dynamic_cast<TypeDefDecl*>(targetType))
-                                return typeDefDecl->type.type->Substitute(aggTypeDeclRef.substitutions);
+                            {
+                                DeclRef<TypeDefDecl> targetTypeDeclRef(typeDefDecl, aggTypeDeclRef.substitutions);
+                                return GetType(targetTypeDeclRef);
+                            }
+                            else if (auto targetAggType = dynamic_cast<AggTypeDecl*>(targetType))
+                            {
+                                return DeclRefType::Create(getSession(), DeclRef<Decl>(targetAggType, aggTypeDeclRef.substitutions));
+                            }
                             else
-                                return DeclRefType::Create(getSession(), DeclRef<Decl>(targetType, aggTypeDeclRef.substitutions));
+                            {
+                                SLANG_UNIMPLEMENTED_X("unknown assoctype implementation type.");
+                            }
                         }
                     }
                 }
