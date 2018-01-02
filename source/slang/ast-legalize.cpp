@@ -4849,15 +4849,27 @@ LoweredEntryPoint lowerEntryPoint(
                 continue;
             visitor.translateDeclRef(dd);
         }
-#if 0
-        for (auto dd : translationUnit->SyntaxNode->Members)
-        {
-            visitor.translateDeclRef(dd);
-        }
-#endif
     }
     else
     {
+        // Emit everything we need other than the entry point first
+        for (auto dd : astDecls)
+        {
+            // Skip non-global decls
+            if (!dd->ParentDecl)
+                continue;
+            if (!dynamic_cast<ModuleDecl*>(dd->ParentDecl))
+                continue;
+
+            // Don't emit the entry point in this pass...
+            if(dd == entryPoint->decl)
+                continue;
+
+            visitor.translateDeclRef(dd);
+        }
+
+        // Now emit the entry point, after all its dependencies have
+        // been emitted.
         auto loweredEntryPoint = visitor.lowerEntryPoint(entryPoint);
         sharedContext.result.entryPoint = loweredEntryPoint;
     }
