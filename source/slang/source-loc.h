@@ -117,9 +117,12 @@ struct ExpandedSourceLoc : public SourceLoc
 
     // Get the original source file that holds this location
     SourceFile* getSourceFile() const;
+
+    // Get a "humane" version of a source location
+    HumaneSourceLoc getHumaneLoc();
 };
 
-
+HumaneSourceLoc getHumaneLoc(ExpandedSourceLoc const& loc);
 
 struct SourceManager
 {
@@ -142,7 +145,6 @@ struct SourceManager
     ExpandedSourceLoc expandSourceLoc(SourceLoc const& loc);
 
     // Get a "humane" version of a source location
-    HumaneSourceLoc getHumaneLoc(ExpandedSourceLoc const& loc);
     HumaneSourceLoc getHumaneLoc(SourceLoc const& loc);
 
 

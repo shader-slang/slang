@@ -197,14 +197,16 @@ ExpandedSourceLoc SourceManager::expandSourceLoc(SourceLoc const& loc)
     return Slang::expandSourceLoc(this, loc);
 }
 
-HumaneSourceLoc SourceManager::getHumaneLoc(ExpandedSourceLoc const& loc)
+HumaneSourceLoc getHumaneLoc(ExpandedSourceLoc const& loc)
 {
     // First check if this location maps to an actual file.
     SourceFile* sourceFile = loc.getSourceFile();
     if(!sourceFile)
         return HumaneSourceLoc();
 
-    auto& entry = sourceFiles[loc.entryIndex];
+    auto sourceManager = loc.sourceManager;
+
+    auto& entry = sourceManager->sourceFiles[loc.entryIndex];
     UInt offset = loc.getRaw() - entry.startLoc.getRaw();
 
     // We now have a raw input file that we can search for line breaks.
@@ -297,10 +299,14 @@ HumaneSourceLoc SourceManager::getHumaneLoc(ExpandedSourceLoc const& loc)
     return humaneLoc;
 }
 
+HumaneSourceLoc ExpandedSourceLoc::getHumaneLoc()
+{
+    return Slang::getHumaneLoc(*this);
+}
+
 HumaneSourceLoc SourceManager::getHumaneLoc(SourceLoc const& loc)
 {
-    return getHumaneLoc(expandSourceLoc(loc));
-
+    return expandSourceLoc(loc).getHumaneLoc();
 }
 
 SourceLoc SourceManager::getSpellingLoc(ExpandedSourceLoc const& loc)
