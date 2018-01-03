@@ -456,6 +456,8 @@ public:
     // a dummy sampler just to appease glslang
     int bindingForHackSampler = 0;
     RefPtr<VarDeclBase> hackSamplerVar;
+
+    TargetRequest* targetRequest = nullptr;
 };
 
 struct LayoutRulesFamilyImpl;

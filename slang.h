@@ -633,6 +633,12 @@ extern "C"
         SLANG_STAGE_PIXEL = SLANG_STAGE_FRAGMENT,
     };
 
+    typedef SlangUInt32 SlangLayoutRules;
+    enum
+    {
+        SLANG_LAYOUT_RULES_DEFAULT,
+    };
+
     // Type Reflection
 
     SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* type);
@@ -738,6 +744,9 @@ extern "C"
     SLANG_API unsigned int spReflection_GetTypeParameterCount(SlangReflection* reflection);
     SLANG_API SlangReflectionTypeParameter* spReflection_GetTypeParameterByIndex(SlangReflection* reflection, unsigned int index);
     SLANG_API SlangReflectionTypeParameter* spReflection_FindTypeParameter(SlangReflection* reflection, char const* name);
+
+    SLANG_API SlangReflectionType* spReflection_FindTypeByName(SlangReflection* reflection, char const* name);
+    SLANG_API SlangReflectionTypeLayout* spReflection_GetTypeLayout(SlangReflection* reflection, SlangReflectionType* reflectionType, SlangLayoutRules rules);
 
     SLANG_API SlangUInt spReflection_getEntryPointCount(SlangReflection* reflection);
 
