@@ -133,6 +133,9 @@ extern "C"
 
         /* Do as little mangling of names as possible, to try to preserve original names */
         SLANG_COMPILE_FLAG_NO_MANGLING          = 1 << 3,
+
+        /* Skip code generation step, just check the code and generate layout */
+        SLANG_COMPILE_FLAG_NO_CODEGEN                = 1 << 4,
     };
 
     /*!
@@ -501,6 +504,7 @@ extern "C"
     typedef struct SlangReflectionTypeLayout        SlangReflectionTypeLayout;
     typedef struct SlangReflectionVariable          SlangReflectionVariable;
     typedef struct SlangReflectionVariableLayout    SlangReflectionVariableLayout;
+    typedef struct SlangReflectionTypeParameter     SlangReflectionTypeParameter;
 
     // get reflection data from a compilation request
     SLANG_API SlangReflection* spGetReflection(
@@ -523,7 +527,8 @@ extern "C"
         SLANG_TYPE_KIND_TEXTURE_BUFFER,
         SLANG_TYPE_KIND_SHADER_STORAGE_BUFFER,
         SLANG_TYPE_KIND_PARAMETER_BLOCK,
-
+        SLANG_TYPE_KIND_GENERIC_TYPE_PARAMETER,
+        SLANG_TYPE_KIND_INTERFACE,
         SLANG_TYPE_KIND_COUNT,
     };
 
@@ -719,11 +724,20 @@ extern "C"
     SLANG_API int spReflectionEntryPoint_usesAnySampleRateInput(
         SlangReflectionEntryPoint* entryPoint);
 
+    // SlangReflectionTypeParameter
+    SLANG_API char const* spReflectionTypeParameter_GetName(SlangReflectionTypeParameter* typeParam);
+    SLANG_API unsigned spReflectionTypeParameter_GetIndex(SlangReflectionTypeParameter* typeParam);
+    SLANG_API unsigned spReflectionTypeParameter_GetConstraintCount(SlangReflectionTypeParameter* typeParam);
+    SLANG_API SlangReflectionType* spReflectionTypeParameter_GetConstraintByIndex(SlangReflectionTypeParameter* typeParam, unsigned int index);
+
     // Shader Reflection
 
     SLANG_API unsigned spReflection_GetParameterCount(SlangReflection* reflection);
     SLANG_API SlangReflectionParameter* spReflection_GetParameterByIndex(SlangReflection* reflection, unsigned index);
 
+    SLANG_API unsigned int spReflection_GetTypeParameterCount(SlangReflection* reflection);
+    SLANG_API SlangReflectionTypeParameter* spReflection_GetTypeParameterByIndex(SlangReflection* reflection, unsigned int index);
+    SLANG_API SlangReflectionTypeParameter* spReflection_FindTypeParameter(SlangReflection* reflection, char const* name);
 
     SLANG_API SlangUInt spReflection_getEntryPointCount(SlangReflection* reflection);
 
@@ -762,6 +776,8 @@ namespace slang
             TextureBuffer = SLANG_TYPE_KIND_TEXTURE_BUFFER,
             ShaderStorageBuffer = SLANG_TYPE_KIND_SHADER_STORAGE_BUFFER,
             ParameterBlock = SLANG_TYPE_KIND_PARAMETER_BLOCK,
+            GenericTypeParameter = SLANG_TYPE_KIND_GENERIC_TYPE_PARAMETER,
+            Interface = SLANG_TYPE_KIND_INTERFACE
         };
 
         enum ScalarType : SlangScalarType
@@ -1103,7 +1119,7 @@ namespace slang
         {
             return spReflectionEntryPoint_getParameterCount((SlangReflectionEntryPoint*) this);
         }
-
+        
         VariableLayoutReflection* getParameterByIndex(unsigned index)
         {
             return (VariableLayoutReflection*) spReflectionEntryPoint_getParameterByIndex((SlangReflectionEntryPoint*) this, index);
@@ -1127,11 +1143,46 @@ namespace slang
         }
     };
 
+    struct TypeParameterReflection
+    {
+        char const* getName()
+        {
+            return spReflectionTypeParameter_GetName((SlangReflectionTypeParameter*) this);
+        }
+        unsigned getIndex()
+        {
+            return spReflectionTypeParameter_GetIndex((SlangReflectionTypeParameter*) this);
+        }
+        unsigned getConstraintCount()
+        {
+            return spReflectionTypeParameter_GetConstraintCount((SlangReflectionTypeParameter*) this);
+        }
+        TypeReflection* getConstraintByIndex(int index)
+        {
+            return (TypeReflection*)spReflectionTypeParameter_GetConstraintByIndex((SlangReflectionTypeParameter*) this, index);
+        }
+    };
+
     struct ShaderReflection
     {
         unsigned getParameterCount()
         {
             return spReflection_GetParameterCount((SlangReflection*) this);
+        }
+        
+        unsigned getTypeParameterCount()
+        {
+            return spReflection_GetTypeParameterCount((SlangReflection*) this);
+        }
+
+        TypeParameterReflection* getTypeParameterByIndex(unsigned index)
+        {
+            return (TypeParameterReflection*)spReflection_GetTypeParameterByIndex((SlangReflection*) this, index);
+        }
+
+        TypeParameterReflection* findTypeParameter(char const* name)
+        {
+            return (TypeParameterReflection*)spReflection_FindTypeParameter((SlangReflection*)this, name);
         }
 
         VariableLayoutReflection* getParameterByIndex(unsigned index)

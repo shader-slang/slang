@@ -700,6 +700,7 @@ static void collectGlobalGenericParameter(
     layout->decl = paramDecl;
     layout->index = (int)context->shared->programLayout->globalGenericParams.Count();
     context->shared->programLayout->globalGenericParams.Add(layout);
+    context->shared->programLayout->globalGenericParamsMap[layout->decl->getName()->text] = layout.Ptr();
 }
 
 // Collect a single declaration into our set of parameters

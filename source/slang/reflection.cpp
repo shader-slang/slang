@@ -39,6 +39,11 @@ static inline SlangReflectionTypeLayout* convert(TypeLayout* type)
     return (SlangReflectionTypeLayout*) type;
 }
 
+static inline GenericParamLayout* convert(SlangReflectionTypeParameter * typeParam)
+{
+    return (GenericParamLayout*)typeParam;
+}
+
 static inline VarDeclBase* convert(SlangReflectionVariable* var)
 {
     return (VarDeclBase*) var;
@@ -126,7 +131,6 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
     {
         return SLANG_TYPE_KIND_RESOURCE;
     }
-
     // TODO: need a better way to handle this stuff...
 #define CASE(TYPE)                          \
     else if(type->As<TYPE>()) do {          \
@@ -152,6 +156,14 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
         if( auto structDeclRef = declRef.As<StructDecl>() )
         {
             return SLANG_TYPE_KIND_STRUCT;
+        }
+        else if (auto genericParamType = declRef.As<GlobalGenericParamDecl>())
+        {
+            return SLANG_TYPE_KIND_GENERIC_TYPE_PARAMETER;
+        }
+        else if (auto interfaceType = declRef.As<InterfaceDecl>())
+        {
+            return SLANG_TYPE_KIND_INTERFACE;
         }
     }
     else if (auto errorType = type->As<ErrorType>())
@@ -848,7 +860,7 @@ namespace Slang
 
         return 0;
     }
-
+    
     static VarLayout* getParameterByIndex(RefPtr<TypeLayout> typeLayout, unsigned index)
     {
         if(auto parameterGroupLayout = typeLayout.As<ParameterGroupTypeLayout>())
@@ -974,6 +986,33 @@ SLANG_API int spReflectionEntryPoint_usesAnySampleRateInput(
     return (entryPointLayout->flags & EntryPointLayout::Flag::usesAnySampleRateInput) != 0;
 }
 
+// SlangReflectionTypeParameter
+SLANG_API char const* spReflectionTypeParameter_GetName(SlangReflectionTypeParameter * inTypeParam)
+{
+    auto typeParam = convert(inTypeParam);
+    return typeParam->decl->getName()->text.Buffer();
+}
+
+SLANG_API unsigned spReflectionTypeParameter_GetIndex(SlangReflectionTypeParameter * inTypeParam)
+{
+    auto typeParam = convert(inTypeParam);
+    return (unsigned)(typeParam->index);
+}
+
+SLANG_API unsigned int spReflectionTypeParameter_GetConstraintCount(SlangReflectionTypeParameter* inTypeParam)
+{
+    auto typeParam = convert(inTypeParam);
+    auto constraints = typeParam->decl->getMembersOfType<GenericTypeConstraintDecl>();
+    return (unsigned int)constraints.Count();
+}
+
+SLANG_API SlangReflectionType* spReflectionTypeParameter_GetConstraintByIndex(SlangReflectionTypeParameter * inTypeParam, unsigned index)
+{
+    auto typeParam = convert(inTypeParam);
+    auto constraints = typeParam->decl->getMembersOfType<GenericTypeConstraintDecl>();
+    return (SlangReflectionType*)constraints.ToArray()[index]->sup.Ptr();
+}
+
 // Shader Reflection
 
 namespace Slang
@@ -1004,6 +1043,27 @@ SLANG_API SlangReflectionParameter* spReflection_GetParameterByIndex(SlangReflec
         return 0;
 
     return convert(globalStructLayout->fields[index].Ptr());
+}
+
+SLANG_API unsigned int spReflection_GetTypeParameterCount(SlangReflection * reflection)
+{
+    auto program = convert(reflection);
+    return (unsigned int)program->globalGenericParams.Count();
+}
+
+SLANG_API SlangReflectionTypeParameter* spReflection_GetTypeParameterByIndex(SlangReflection * reflection, unsigned int index)
+{
+    auto program = convert(reflection);
+    return (SlangReflectionTypeParameter*)program->globalGenericParams[index].Ptr();
+}
+
+SLANG_API SlangReflectionTypeParameter * spReflection_FindTypeParameter(SlangReflection * inProgram, char const * name)
+{
+    auto program = convert(inProgram);
+    if (!program) return nullptr;
+    GenericParamLayout * result = nullptr;
+    program->globalGenericParamsMap.TryGetValue(name, result);
+    return (SlangReflectionTypeParameter*)result;
 }
 
 SLANG_API SlangUInt spReflection_getEntryPointCount(SlangReflection* inProgram)

@@ -6798,50 +6798,55 @@ namespace Slang
             }
             entryPoint->genericParameterTypes.Add(type);
         }
-        // check that user-provioded type arguments conforms to the generic type
-        // parameter declaration of this translation unit
+        
+        // validate global type arguments only when we are generating code
+        if (entryPoint->compileRequest->compileFlags & SLANG_COMPILE_FLAG_NO_CODEGEN)
+        {
+            // check that user-provioded type arguments conforms to the generic type
+            // parameter declaration of this translation unit
 
-        // collect global generic parameters from all imported modules
-        List<RefPtr<GlobalGenericParamDecl>> globalGenericParams;
-        // add current translation unit first
-        {        
-            auto globalGenParams = translationUnit->SyntaxNode->getMembersOfType<GlobalGenericParamDecl>();
-            for (auto p : globalGenParams)
-                globalGenericParams.Add(p);
-        }
-        // add imported modules
-        for (auto loadedModule : entryPoint->compileRequest->loadedModulesList)
-        {
-            auto moduleDecl = loadedModule->moduleDecl;
-            auto globalGenParams = moduleDecl->getMembersOfType<GlobalGenericParamDecl>();
-            for (auto p : globalGenParams)
-                globalGenericParams.Add(p);
-        }
-        if (globalGenericParams.Count() != entryPoint->genericParameterTypes.Count())
-        {
-            sink->diagnose(entryPoint->decl, Diagnostics::mismatchEntryPointTypeArgument, globalGenericParams.Count(),
-                    entryPoint->genericParameterTypes.Count());
-            return;
-        }
-        // if number of entry-point type arguments matches parameters, try find
-        // SubtypeWitness for each argument
-        int index = 0;
-        for (auto & gParam : globalGenericParams)
-        {
-            for (auto constraint : gParam->getMembersOfType<GenericTypeConstraintDecl>())
+            // collect global generic parameters from all imported modules
+            List<RefPtr<GlobalGenericParamDecl>> globalGenericParams;
+            // add current translation unit first
             {
-                auto interfaceType = GetSup(DeclRef<GenericTypeConstraintDecl>(constraint, nullptr));
-                SemanticsVisitor visitor(sink, entryPoint->compileRequest, translationUnit);
-                auto witness = visitor.tryGetSubtypeWitness(entryPoint->genericParameterTypes[index], interfaceType);
-                if (!witness)
-                {
-                    sink->diagnose(gParam,
-                        Diagnostics::typeArgumentDoesNotConformToInterface, gParam->nameAndLoc.name, entryPoint->genericParameterTypes[index],
-                        interfaceType);
-                }
-                entryPoint->genericParameterWitnesses.Add(witness);
+                auto globalGenParams = translationUnit->SyntaxNode->getMembersOfType<GlobalGenericParamDecl>();
+                for (auto p : globalGenParams)
+                    globalGenericParams.Add(p);
             }
-            index++;
+            // add imported modules
+            for (auto loadedModule : entryPoint->compileRequest->loadedModulesList)
+            {
+                auto moduleDecl = loadedModule->moduleDecl;
+                auto globalGenParams = moduleDecl->getMembersOfType<GlobalGenericParamDecl>();
+                for (auto p : globalGenParams)
+                    globalGenericParams.Add(p);
+            }
+            if (globalGenericParams.Count() != entryPoint->genericParameterTypes.Count())
+            {
+                sink->diagnose(entryPoint->decl, Diagnostics::mismatchEntryPointTypeArgument, globalGenericParams.Count(),
+                    entryPoint->genericParameterTypes.Count());
+                return;
+            }
+            // if number of entry-point type arguments matches parameters, try find
+            // SubtypeWitness for each argument
+            int index = 0;
+            for (auto & gParam : globalGenericParams)
+            {
+                for (auto constraint : gParam->getMembersOfType<GenericTypeConstraintDecl>())
+                {
+                    auto interfaceType = GetSup(DeclRef<GenericTypeConstraintDecl>(constraint, nullptr));
+                    SemanticsVisitor visitor(sink, entryPoint->compileRequest, translationUnit);
+                    auto witness = visitor.tryGetSubtypeWitness(entryPoint->genericParameterTypes[index], interfaceType);
+                    if (!witness)
+                    {
+                        sink->diagnose(gParam,
+                            Diagnostics::typeArgumentDoesNotConformToInterface, gParam->nameAndLoc.name, entryPoint->genericParameterTypes[index],
+                            interfaceType);
+                    }
+                    entryPoint->genericParameterWitnesses.Add(witness);
+                }
+                index++;
+            }
         }
         if (sink->errorCount != 0)
             return;
@@ -6850,8 +6855,6 @@ namespace Slang
         // the declared input/output parameters have suitable semantics,
         // if they are of types that are appropriate to the stage, etc.
     }
-
-
 
     void checkTranslationUnit(
         TranslationUnitRequest* translationUnit)

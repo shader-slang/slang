@@ -278,6 +278,10 @@ struct OptionsParser
                 {
                     flags |= SLANG_COMPILE_FLAG_NO_MANGLING;
                 }
+                else if (argStr == "-no-codegen")
+                {
+                    flags |= SLANG_COMPILE_FLAG_NO_CODEGEN;
+                }
                 else if(argStr == "-dump-ir" )
                 {
                     requestImpl->shouldDumpIR = true;
