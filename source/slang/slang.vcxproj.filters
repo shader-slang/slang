@@ -2,6 +2,7 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Natvis Include="slang.natvis" />
+    <Natvis Include="..\core\core.natvis" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="compiler.h" />

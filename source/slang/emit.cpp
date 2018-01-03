@@ -7122,6 +7122,7 @@ emitDeclImpl(decl, nullptr);
         case kIROp_global_var:
             {
                 auto irGlobal = (IRGlobalVar*) value;
+                emitIRUsedType(ctx, irGlobal->type);
                 emitIRUsedTypesForGlobalValueWithCode(ctx, irGlobal);
             }
             break;
