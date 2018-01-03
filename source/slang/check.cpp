@@ -6800,7 +6800,7 @@ namespace Slang
         }
         
         // validate global type arguments only when we are generating code
-        if (entryPoint->compileRequest->compileFlags & SLANG_COMPILE_FLAG_NO_CODEGEN)
+        if ((entryPoint->compileRequest->compileFlags & SLANG_COMPILE_FLAG_NO_CODEGEN) == 0)
         {
             // check that user-provioded type arguments conforms to the generic type
             // parameter declaration of this translation unit
