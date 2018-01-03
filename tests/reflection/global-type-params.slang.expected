@@ -1,0 +1,122 @@
+{
+    "parameters": [
+        {
+            "name": "u",
+            "binding": {"kind": "uniform", "offset": 0, "size": 16},
+            "type": {
+                "kind": "vector",
+                "elementCount": 4,
+                "elementType": {
+                    "kind": "scalar",
+                    "scalarType": "float32"
+                }
+            }
+        },
+        {
+            "name": "arg",
+            "binding": {"kind": "generic", "index": 0},
+            "type": {
+                "kind": "parameterBlock",
+                "elementType": {
+                    "kind": "struct",
+                    "name": "S",
+                    "fields": [
+                        {
+                            "name": "p",
+                            "type": {
+                                "kind": "GenericTypeParameter",
+                                "name": "TParam2"
+                            },
+                            "binding": {"kind": "generic", "index": 0}
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "arg1",
+            "binding": {"kind": "generic", "index": 0},
+            "type": {
+                "kind": "parameterBlock",
+                "elementType": {
+                    "kind": "GenericTypeParameter",
+                    "name": "TParam"
+                }
+            }
+        },
+        {
+            "name": "t",
+            "binding": {"kind": "shaderResource", "index": 0},
+            "type": {
+                "kind": "resource",
+                "baseShape": "texture2D"
+            }
+        },
+        {
+            "name": "s",
+            "binding": {"kind": "samplerState", "index": 0},
+            "type": {
+                "kind": "samplerState"
+            }
+        },
+        {
+            "name": "CB",
+            "binding": {"kind": "constantBuffer", "index": 1},
+            "type": {
+                "kind": "constantBuffer",
+                "elementType": {
+                    "kind": "struct",
+                    "fields": [
+                        {
+                            "name": "v",
+                            "type": {
+                                "kind": "vector",
+                                "elementCount": 4,
+                                "elementType": {
+                                    "kind": "scalar",
+                                    "scalarType": "float32"
+                                }
+                            },
+                            "binding": {"kind": "uniform", "offset": 0, "size": 16}
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "w",
+            "binding": {"kind": "uniform", "offset": 16, "size": 16},
+            "type": {
+                "kind": "vector",
+                "elementCount": 4,
+                "elementType": {
+                    "kind": "scalar",
+                    "scalarType": "float32"
+                }
+            }
+        }
+    ],
+    "typeParams":
+    [
+        {
+            "name": "TParam",
+            constraints:
+            [
+                {
+                    "kind": "Interface",
+                    "name": "IBase"
+                }
+            ]
+        },
+        {
+            "name": "TParam2",
+            constraints:
+            [
+                {
+                    "kind": "Interface",
+                    "name": "IBase"
+                }
+            ]
+        }
+    ]
+}
