@@ -450,6 +450,7 @@ public:
     List<RefPtr<EntryPointLayout>> entryPoints;
 
     List<RefPtr<GenericParamLayout>> globalGenericParams;
+    Dictionary<String, GenericParamLayout*> globalGenericParamsMap;
 
     // HACK: binding to use when we have to create
     // a dummy sampler just to appease glslang

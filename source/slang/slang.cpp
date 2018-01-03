@@ -293,9 +293,12 @@ int CompileRequest::executeActionsInner()
         if (mSink.GetErrorCount() != 0)
             return 1;
 
-        // Generate initial IR for all the translation
-        // units, if we are in a mode where IR is called for.
-        generateIR();
+        if ((compileFlags & SLANG_COMPILE_FLAG_NO_CODEGEN) == 0)
+        {
+            // Generate initial IR for all the translation
+            // units, if we are in a mode where IR is called for.
+            generateIR();
+        }
 
         if (mSink.GetErrorCount() != 0)
             return 1;
@@ -315,7 +318,8 @@ int CompileRequest::executeActionsInner()
 
     // If command line specifies to skip codegen, we exit here.
     // Note: this is a debugging option.
-    if (shouldSkipCodegen)
+    if (shouldSkipCodegen ||
+        ((compileFlags & SLANG_COMPILE_FLAG_NO_CODEGEN) != 0))
         return 0;
 
     // Generate output code, in whatever format was requested

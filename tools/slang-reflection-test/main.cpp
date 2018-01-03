@@ -117,6 +117,7 @@ static void emitReflectionVarBindingInfoJSON(
     CASE(SPECIALIZATION_CONSTANT, specializationConstant);
     CASE(MIXED, mixed);
     CASE(REGISTER_SPACE, registerSpace);
+    CASE(GENERIC, generic);
     #undef CASE
 
         default:
@@ -287,7 +288,8 @@ static void emitReflectionTypeInfoJSON(
     PrettyWriter&           writer,
     slang::TypeReflection*  type)
 {
-    switch( type->getKind() )
+    auto kind = type->getKind();
+    switch(kind)
     {
     case slang::TypeReflection::Kind::SamplerState:
         write(writer, "\"kind\": \"samplerState\"");
@@ -456,6 +458,14 @@ static void emitReflectionTypeInfoJSON(
         }
         break;
 
+    case slang::TypeReflection::Kind::GenericTypeParameter:
+        write(writer, "\"kind\": \"GenericTypeParameter\",\n");
+        emitReflectionNameInfoJSON(writer, type->getName());
+        break;
+    case slang::TypeReflection::Kind::Interface:
+        write(writer, "\"kind\": \"Interface\",\n");
+        emitReflectionNameInfoJSON(writer, type->getName());
+        break;
     default:
         assert(!"unhandled case");
         break;
@@ -554,6 +564,16 @@ static void emitReflectionTypeLayoutInfoJSON(
         emitReflectionTypeLayoutJSON(
             writer,
             typeLayout->getElementTypeLayout());
+        break;
+    case slang::TypeReflection::Kind::GenericTypeParameter:
+        write(writer, "\"kind\": \"GenericTypeParameter\"");
+        write(writer, ",\n");
+        emitReflectionNameInfoJSON(writer, typeLayout->getName());
+        break;
+    case slang::TypeReflection::Kind::Interface:
+        write(writer, "\"kind\": \"Interface\",\n");
+        write(writer, ",\n");
+        emitReflectionNameInfoJSON(writer, typeLayout->getName());
         break;
     }
 
@@ -662,6 +682,33 @@ Range<T> range(T end)
     return Range<T>(T(0), end);
 }
 
+static void emitReflectionTypeParamJSON(
+    PrettyWriter&                   writer,
+    slang::TypeParameterReflection* typeParam)
+{
+    write(writer, "{\n");
+    indent(writer);
+    emitReflectionNameInfoJSON(writer, typeParam->getName());
+    write(writer, ",\n");
+    write(writer, "constraints: \n");
+    write(writer, "[\n");
+    indent(writer);
+    auto constraintCount = typeParam->getConstraintCount();
+    for (auto ee : range(constraintCount))
+    {
+        if (ee != 0) write(writer, ",\n");
+        write(writer, "{\n");
+        indent(writer);
+        emitReflectionTypeInfoJSON(writer, typeParam->getConstraintByIndex(ee));
+        dedent(writer);
+        write(writer, "\n}");
+    }
+    dedent(writer);
+    write(writer, "\n]");
+    dedent(writer);
+    write(writer, "\n}");
+}
+
 static void emitReflectionEntryPointJSON(
     PrettyWriter&                   writer,
     slang::EntryPointReflection*    entryPoint)
@@ -700,7 +747,6 @@ static void emitReflectionEntryPointJSON(
         dedent(writer);
         write(writer, "\n]");
     }
-
     if (entryPoint->usesAnySampleRateInput())
     {
         write(writer, ",\n\"usesAnySampleRateInput\": true");
@@ -763,6 +809,22 @@ static void emitReflectionJSON(
         write(writer, "\n]");
     }
 
+    auto genParamCount = programReflection->getTypeParameterCount();
+    if (genParamCount)
+    {
+        write(writer, ",\n\"typeParams\":\n");
+        write(writer, "[\n");
+        indent(writer);
+        for (auto ee : range(genParamCount))
+        {
+            if (ee != 0) write(writer, ",\n");
+
+            auto typeParam = programReflection->getTypeParameterByIndex(ee);
+            emitReflectionTypeParamJSON(writer, typeParam);
+        }
+        dedent(writer);
+        write(writer, "\n]");
+    }
     dedent(writer);
     write(writer, "\n}\n");
 }
