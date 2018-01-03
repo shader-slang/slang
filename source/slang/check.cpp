@@ -5348,6 +5348,8 @@ namespace Slang
             DeclRef<GenericDecl>			genericDeclRef,
             OverloadResolveContext&	context)
         {
+            EnsureDecl(genericDeclRef.getDecl());
+
             ConstraintSystem constraints;
             constraints.genericDecl = genericDeclRef.getDecl();
 
