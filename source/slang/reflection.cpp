@@ -438,10 +438,15 @@ SLANG_API SlangReflectionType * spReflection_FindTypeByName(SlangReflection * re
         return (SlangReflectionType*)result.Ptr();
 
     Decl* resultDecl = nullptr;
+    auto nameObj = compileRequest->getNamePool()->getName(name);
     for (auto module : compileRequest->loadedModulesList)
     {
-        auto nameObj = compileRequest->getNamePool()->getName(name);
         if (module->moduleDecl->memberDictionary.TryGetValue(nameObj, resultDecl))
+            break;
+    }
+    for (auto transUnit : compileRequest->translationUnits)
+    {
+        if (transUnit->SyntaxNode->memberDictionary.TryGetValue(nameObj, resultDecl))
             break;
     }
     if (resultDecl)
