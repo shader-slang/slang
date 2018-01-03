@@ -340,7 +340,12 @@ public:
 class ArrayTypeLayout : public TypeLayout
 {
 public:
-    // The layout used for the element type
+    // The original type layout for the array elements,
+    // which doesn't include any adjustments based on
+    // resource type splitting.
+    RefPtr<TypeLayout> originalElementTypeLayout;
+
+    // The *adjusted* layout used for the element type
     RefPtr<TypeLayout>  elementTypeLayout;
 
     // the stride between elements when used in
@@ -380,6 +385,9 @@ public:
     // one will appear in `fields`, while all of
     // them will be reflected in `mapVarToLayout`.
     //
+    // TODO: This should map from a declaration to the *index*
+    // in the array above, rather than to the actual pointer,
+    // so that we 
     Dictionary<Decl*, RefPtr<VarLayout>> mapVarToLayout;
 };
 
