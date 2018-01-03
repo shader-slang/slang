@@ -826,7 +826,7 @@ static void emitReflectionJSON(
         write(writer, "\n]");
     }
     dedent(writer);
-    write(writer, "\n}");
+    write(writer, "\n}\n");
 }
 
 void emitReflectionJSON(
