@@ -165,6 +165,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <Natvis Include="..\core\core.natvis" />
     <Natvis Include="slang.natvis" />
   </ItemGroup>
   <ItemGroup>
