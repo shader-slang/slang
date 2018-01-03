@@ -1,3 +1,7 @@
+result code = 0
+standard error = {
+}
+standard output = {
 {
     "parameters": [
         {
@@ -100,7 +104,7 @@
     [
         {
             "name": "TParam",
-            constraints:
+            constraints: 
             [
                 {
                     "kind": "Interface",
@@ -110,7 +114,7 @@
         },
         {
             "name": "TParam2",
-            constraints:
+            constraints: 
             [
                 {
                     "kind": "Interface",
@@ -119,4 +123,5 @@
             ]
         }
     ]
+}
 }
