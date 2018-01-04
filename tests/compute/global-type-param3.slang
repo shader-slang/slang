@@ -21,7 +21,7 @@ struct Impl : IBase
 
 __generic_param TImpl : IBase;
 
-TImpl impl;
+ParameterBlock<TImpl> impl;
 
 float doCompute<T:IBase>(T t)
 {
@@ -32,6 +32,6 @@ float doCompute<T:IBase>(T t)
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
 	uint tid = dispatchThreadID.x;
-	float outVal = doCompute(impl); 
+	float outVal = doCompute<TImpl>(impl); 
 	outputBuffer[tid] = outVal;
 }

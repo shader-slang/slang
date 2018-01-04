@@ -3451,7 +3451,7 @@ namespace Slang
         IRGlobalVar*    originalVar,
         IROriginalValuesForClone const& originalValues)
     {
-        auto clonedVar = context->builder->createGlobalVar(context->maybeCloneType(originalVar->getType()->getValueType()));
+        auto clonedVar = context->builder->createGlobalVar(context->maybeCloneType(originalVar->getType()->getValueType())); 
         registerClonedValue(context, clonedVar, originalValues);
 
         auto mangledName = originalVar->mangledName;
