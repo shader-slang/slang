@@ -437,18 +437,8 @@ SLANG_API SlangReflectionType * spReflection_FindTypeByName(SlangReflection * re
     if (compileRequest->types.TryGetValue(name, result))
         return (SlangReflectionType*)result.Ptr();
 
-    Decl* resultDecl = nullptr;
     auto nameObj = compileRequest->getNamePool()->getName(name);
-    for (auto module : compileRequest->loadedModulesList)
-    {
-        if (module->moduleDecl->memberDictionary.TryGetValue(nameObj, resultDecl))
-            break;
-    }
-    for (auto transUnit : compileRequest->translationUnits)
-    {
-        if (transUnit->SyntaxNode->memberDictionary.TryGetValue(nameObj, resultDecl))
-            break;
-    }
+    Decl* resultDecl = compileRequest->lookupGlobalDecl(nameObj);
     if (resultDecl)
     {
         RefPtr<DeclRefType> declRefType = new DeclRefType();

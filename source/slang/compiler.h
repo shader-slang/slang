@@ -373,6 +373,8 @@ namespace Slang
             Name*               name,
             SourceLoc const&    loc);
 
+        Decl* lookupGlobalDecl(Name* name);
+
         SourceManager* getSourceManager()
         {
             return sourceManager;
