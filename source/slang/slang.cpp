@@ -174,6 +174,8 @@ void CompileRequest::parseTranslationUnit(
     }
 }
 
+void validateEntryPoint(EntryPointRequest*);
+
 void CompileRequest::checkAllTranslationUnits()
 {
     // Iterate over all translation units and
@@ -181,6 +183,24 @@ void CompileRequest::checkAllTranslationUnits()
     for( auto& translationUnit : translationUnits )
     {
         checkTranslationUnit(translationUnit.Ptr());
+    }
+
+    for (auto& translationUnit : translationUnits)
+    {
+        // Next, do follow-up validation on any entry
+        // points that the user declared via API or
+        // command line, to ensure that they meet
+        // requirements.
+        //
+        // Note: We may eventually have syntax to
+        // identify entry points via a modifier on
+        // declarations, and in this case they should
+        // probably get validated as part of orindary
+        // checking above.
+        for (auto entryPoint : translationUnit->entryPoints)
+        {
+            validateEntryPoint(entryPoint);
+        }
     }
 }
 
