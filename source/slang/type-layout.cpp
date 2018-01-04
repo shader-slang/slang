@@ -1348,6 +1348,222 @@ int findGenericParam(List<RefPtr<GenericParamLayout>> & genericParameters, Globa
     return (int)genericParameters.FindFirst([=](RefPtr<GenericParamLayout> & x) {return x->decl.Ptr() == decl; });
 }
 
+// When constructing a new var layout from an existing one,
+// copy fields to the new var from the old.
+void copyVarLayoutFields(
+    VarLayout* dstVarLayout,
+    VarLayout* srcVarLayout)
+{
+    dstVarLayout->varDecl = srcVarLayout->varDecl;
+    dstVarLayout->typeLayout = srcVarLayout->typeLayout;
+    dstVarLayout->flags = srcVarLayout->flags;
+    dstVarLayout->systemValueSemantic = srcVarLayout->systemValueSemantic;
+    dstVarLayout->systemValueSemanticIndex = srcVarLayout->systemValueSemanticIndex;
+    dstVarLayout->semanticName = srcVarLayout->semanticName;
+    dstVarLayout->semanticIndex = srcVarLayout->semanticIndex;
+    dstVarLayout->stage = srcVarLayout->stage;
+    dstVarLayout->resourceInfos = srcVarLayout->resourceInfos;
+}
+
+// When constructing a new type layout from an existing one,
+// copy fields to the new type from the old.
+void copyTypeLayoutFields(
+    TypeLayout* dstTypeLayout,
+    TypeLayout* srcTypeLayout)
+{
+    dstTypeLayout->type = srcTypeLayout->type;
+    dstTypeLayout->rules = srcTypeLayout->rules;
+    dstTypeLayout->uniformAlignment = srcTypeLayout->uniformAlignment;
+    dstTypeLayout->resourceInfos = srcTypeLayout->resourceInfos;
+}
+
+// Does this layout resource kind require adjustment when used in
+// an array-of-structs fashion?
+bool doesResourceRequireAdjustmentForArrayOfStructs(LayoutResourceKind kind)
+{
+    switch( kind )
+    {
+    case LayoutResourceKind::ConstantBuffer:
+    case LayoutResourceKind::ShaderResource:
+    case LayoutResourceKind::UnorderedAccess:
+    case LayoutResourceKind::SamplerState:
+        return true;
+
+    default:
+        return false;
+    }
+}
+
+// Given the type layout for an element of an array, apply any adjustments required
+// based on the element count of the array.
+//
+// The particular case where this matters is when we have an array of an aggregate
+// type that contains resources, since each resource field might need to be at
+// a different offset than we would otherwise expect.
+//
+// For example, given:
+//
+//      struct Foo { Texture2D a; Texture2D b; }
+//
+// if we just write:
+//
+//      Foo foo;
+//
+// it gets split into:
+//
+//      Texture2D foo_a;
+//      Texture2D foo_b;
+//
+// we expect `foo_a` to get `register(t0)` and
+// `foo_b` to get `register(t1)`. However, if we instead have an array:
+//
+//      Foo foo[10];
+//
+// then we expect it to be split into:
+//
+//      Texture2D foo_a[8];
+//      Texture2D foo_b[8];
+//
+// and then we expect `foo_b` to get `register(t8)`, rather
+// than `register(t1)`.
+static RefPtr<TypeLayout>maybeAdjustLayoutForArrayElementType(
+    RefPtr<TypeLayout>  originalTypeLayout,
+    UInt                elementCount)
+{
+    // We will start by looking for cases that we can reject out
+    // of hand.
+
+    // If the original element type layout doesn't use any
+    // resource registers, then we are fine.
+    bool anyResource = false;
+    for( auto resInfo : originalTypeLayout->resourceInfos )
+    {
+        if( doesResourceRequireAdjustmentForArrayOfStructs(resInfo.kind) )
+        {
+            anyResource = true;
+            break;
+        }
+    }
+    if(!anyResource)
+        return originalTypeLayout;
+
+    // Let's look at the type layout we have, and see if there is anything
+    // that we need to do with it.
+    //
+    if( auto originalArrayTypeLayout = originalTypeLayout.As<ArrayTypeLayout>() )
+    {
+        // The element type is itself an array, so we'll need to adjust
+        // *its* element type accordingly.
+        //
+        // We adjust the already-adjusted element type of the inner
+        // array type, so that we pick up adjustments already made:
+        auto originalInnerElementTypeLayout = originalArrayTypeLayout->elementTypeLayout;
+        auto adjustedInnerElementTypeLayout = maybeAdjustLayoutForArrayElementType(
+            originalInnerElementTypeLayout,
+            elementCount);
+
+        // If nothing needed to be changed on the inner element type,
+        // then we are done.
+        if(adjustedInnerElementTypeLayout == originalInnerElementTypeLayout)
+            return originalTypeLayout;
+
+        // Otherwise, we need to construct a new array type layout
+        RefPtr<ArrayTypeLayout> adjustedArrayTypeLayout = new ArrayTypeLayout();
+        adjustedArrayTypeLayout->originalElementTypeLayout = originalInnerElementTypeLayout;
+        adjustedArrayTypeLayout->elementTypeLayout = adjustedInnerElementTypeLayout;
+        adjustedArrayTypeLayout->uniformStride = originalArrayTypeLayout->uniformStride;
+
+        copyTypeLayoutFields(adjustedArrayTypeLayout, originalArrayTypeLayout);
+
+        return adjustedArrayTypeLayout;
+    }
+    else if(auto originalParameterGroupTypeLayout = originalTypeLayout.As<ParameterGroupTypeLayout>() )
+    {
+        auto originalInnerElementTypeLayout = originalParameterGroupTypeLayout->elementVarLayout->typeLayout;
+        auto adjustedInnerElementTypeLayout = maybeAdjustLayoutForArrayElementType(
+            originalInnerElementTypeLayout,
+            elementCount);
+
+        // If nothing needed to be changed on the inner element type,
+        // then we are done.
+        if(adjustedInnerElementTypeLayout == originalInnerElementTypeLayout)
+            return originalTypeLayout;
+
+        // TODO: actually adjust the element type, and create all the required bits and
+        // pieces of layout.
+
+        SLANG_UNIMPLEMENTED_X("array of parameter group");
+        UNREACHABLE_RETURN(originalTypeLayout);
+    }
+    else if(auto originalStructTypeLayout = originalTypeLayout.As<StructTypeLayout>() )
+    {
+        UInt fieldCount = originalStructTypeLayout->fields.Count();
+
+        // Empty struct? Bail out.
+        if(fieldCount == 0)
+            return originalTypeLayout;
+
+        // TODO: we could try to special-case a `struct` type with a single
+        // field that needs no adjustment, just to avoid some extra allocation.
+
+        RefPtr<StructTypeLayout> adjustedStructTypeLayout = new StructTypeLayout();
+        copyTypeLayoutFields(adjustedStructTypeLayout, originalStructTypeLayout);
+
+        Dictionary<RefPtr<VarLayout>, RefPtr<VarLayout>> mapOriginalFieldToAdjusted;
+        for( auto originalField : originalStructTypeLayout->fields )
+        {
+            // Compute the adjusted type for the field
+            auto originalFieldTypeLayout = originalField->typeLayout;
+            auto adjustedFieldTypeLayout = maybeAdjustLayoutForArrayElementType(
+                originalFieldTypeLayout,
+                elementCount);
+
+            // Create an adjusted field variable, that is mostly
+            // a clone of the original field (just with our
+            // adjusted type in place).
+            RefPtr<VarLayout> adjustedField = new VarLayout();
+            copyVarLayoutFields(adjustedField, originalField);
+            adjustedField->typeLayout = adjustedFieldTypeLayout;
+
+            // Finally we get down to the real meat of the change,
+            // which is that the field offsets for any resource-type
+            // fields need to be "adjusted" which amounts to just
+            // multiplying them by the element count of the array.
+
+            for( auto& resInfo : adjustedField->resourceInfos )
+            {
+                if( doesResourceRequireAdjustmentForArrayOfStructs(resInfo.kind) )
+                {
+                    resInfo.index *= elementCount;
+                }
+            }
+
+            adjustedStructTypeLayout->fields.Add(adjustedField);
+
+            mapOriginalFieldToAdjusted.Add(originalField, adjustedField);
+        }
+
+        for( auto p : originalStructTypeLayout->mapVarToLayout )
+        {
+            Decl* key = p.Key;
+            RefPtr<VarLayout> originalVal = p.Value;
+            RefPtr<VarLayout> adjustedVal;
+            if( mapOriginalFieldToAdjusted.TryGetValue(originalVal, adjustedVal) )
+            {
+                adjustedStructTypeLayout->mapVarToLayout.Add(key, adjustedVal);
+            }
+        }
+
+        return adjustedStructTypeLayout;
+    }
+    else
+    {
+        // If the leaf type layout isn't some kind of aggregate,
+        // then we can just bail out here.
+        return originalTypeLayout;
+    }
+}
+
 SimpleLayoutInfo GetLayoutImpl(
     TypeLayoutContext const&    context,
     Type*                       type,
@@ -1585,8 +1801,16 @@ SimpleLayoutInfo GetLayoutImpl(
             RefPtr<ArrayTypeLayout> typeLayout = new ArrayTypeLayout();
             *outTypeLayout = typeLayout;
 
+            // If we construct an array over an aggregate type that contains
+            // resource fields, we may need to adjust the layout we create
+            // for the element type to
+            RefPtr<TypeLayout> adjustedElementTypeLayout = maybeAdjustLayoutForArrayElementType(
+                elementTypeLayout,
+                elementCount);
+
             typeLayout->type = type;
-            typeLayout->elementTypeLayout = elementTypeLayout;
+            typeLayout->originalElementTypeLayout = elementTypeLayout;
+            typeLayout->elementTypeLayout = adjustedElementTypeLayout;
             typeLayout->rules = rules;
 
             typeLayout->uniformAlignment = arrayUniformInfo.alignment;
