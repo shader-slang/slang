@@ -428,6 +428,42 @@ SLANG_API char const* spReflectionType_GetName(SlangReflectionType* inType)
     return nullptr;
 }
 
+SLANG_API SlangReflectionType * spReflection_FindTypeByName(SlangReflection * reflection, char const * name)
+{
+    auto context = convert(reflection);
+    auto compileRequest = context->targetRequest->compileRequest;
+
+    RefPtr<Type> result;
+    if (compileRequest->types.TryGetValue(name, result))
+        return (SlangReflectionType*)result.Ptr();
+
+    auto nameObj = compileRequest->getNamePool()->getName(name);
+    Decl* resultDecl = compileRequest->lookupGlobalDecl(nameObj);
+    if (resultDecl)
+    {
+        RefPtr<DeclRefType> declRefType = new DeclRefType();
+        declRefType->declRef.decl = resultDecl;
+        compileRequest->types[name] = declRefType;
+        return (SlangReflectionType*)declRefType.Ptr();
+    }
+    return nullptr;
+}
+
+SLANG_API SlangReflectionTypeLayout* spReflection_GetTypeLayout(
+    SlangReflection* reflection,
+    SlangReflectionType* inType, 
+    SlangLayoutRules /*rules*/)
+{
+    auto context = convert(reflection);
+    auto type = convert(inType);
+    auto layoutContext = getInitialLayoutContextForTarget(context->targetRequest);
+    RefPtr<TypeLayout> result;
+    if (context->targetRequest->typeLayouts.TryGetValue(type, result))
+        return (SlangReflectionTypeLayout*)result.Ptr();
+    result = CreateTypeLayout(layoutContext, type);
+    context->targetRequest->typeLayouts[type] = result;
+    return (SlangReflectionTypeLayout*)result.Ptr();
+}
 
 SLANG_API SlangReflectionType* spReflectionType_GetResourceResultType(SlangReflectionType* inType)
 {

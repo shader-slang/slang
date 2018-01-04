@@ -1786,6 +1786,8 @@ void generateParameterBindings(
         return;
 
     RefPtr<ProgramLayout> programLayout = new ProgramLayout();
+    programLayout->targetRequest = targetReq;
+
     targetReq->layout = programLayout;
 
     // Create a context to hold shared state during the process
@@ -2061,6 +2063,7 @@ RefPtr<ProgramLayout> specializeProgramLayout(
 {
     RefPtr<ProgramLayout> newProgramLayout;
     newProgramLayout = new ProgramLayout();
+    newProgramLayout->targetRequest = targetReq;
     newProgramLayout->bindingForHackSampler = programLayout->bindingForHackSampler;
     newProgramLayout->hackSamplerVar = programLayout->hackSamplerVar;
     newProgramLayout->globalGenericParams = programLayout->globalGenericParams;

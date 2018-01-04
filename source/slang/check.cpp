@@ -5348,6 +5348,8 @@ namespace Slang
             DeclRef<GenericDecl>			genericDeclRef,
             OverloadResolveContext&	context)
         {
+            EnsureDecl(genericDeclRef.getDecl());
+
             ConstraintSystem constraints;
             constraints.genericDecl = genericDeclRef.getDecl();
 
@@ -6775,7 +6777,8 @@ namespace Slang
         // Lookup generic parameter types in global scope
         for (auto name : entryPoint->genericParameterTypeNames)
         {
-            if (!translationUnitSyntax->memberDictionary.TryGetValue(name, firstDeclWithName))
+            firstDeclWithName = entryPoint->compileRequest->lookupGlobalDecl(name);
+            if (!firstDeclWithName)
             {
                 // If there doesn't appear to be any such declaration, then
                 // we need to diagnose it as an error, and then bail out.

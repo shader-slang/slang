@@ -590,6 +590,22 @@ RefPtr<ModuleDecl> CompileRequest::findOrImportModule(
         loc);
 }
 
+Decl * CompileRequest::lookupGlobalDecl(Name * name)
+{
+    Decl* resultDecl = nullptr;
+    for (auto module : loadedModulesList)
+    {
+        if (module->moduleDecl->memberDictionary.TryGetValue(name, resultDecl))
+            break;
+    }
+    for (auto transUnit : translationUnits)
+    {
+        if (transUnit->SyntaxNode->memberDictionary.TryGetValue(name, resultDecl))
+            break;
+    }
+    return resultDecl;
+}
+
 RefPtr<ModuleDecl> findOrImportModule(
     CompileRequest*     request,
     Name*               name,

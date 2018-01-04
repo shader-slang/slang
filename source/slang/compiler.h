@@ -16,6 +16,7 @@ namespace Slang
     class CompileRequest;
     class ProgramLayout;
     class PtrType;
+    class TypeLayout;
 
     enum class CompilerMode
     {
@@ -197,6 +198,9 @@ namespace Slang
         // in the parent compile request (indexing matches
         // the order they are given in the compile request)
         List<CompileResult> entryPointResults;
+
+        // TypeLayouts created on the fly by reflection API
+        Dictionary<Type*, RefPtr<TypeLayout>> typeLayouts;
     };
 
     // A directory to be searched when looking for files (e.g., `#include`)
@@ -254,6 +258,9 @@ namespace Slang
         // Entry points we've been asked to compile (each
         // assocaited with a translation unit).
         List<RefPtr<EntryPointRequest> > entryPoints;
+
+        // Types constructed by reflection API
+        Dictionary<String, RefPtr<Type>> types;
 
         // The code generation profile we've been asked to use.
         Profile profile;
@@ -365,6 +372,8 @@ namespace Slang
         RefPtr<ModuleDecl> findOrImportModule(
             Name*               name,
             SourceLoc const&    loc);
+
+        Decl* lookupGlobalDecl(Name* name);
 
         SourceManager* getSourceManager()
         {
