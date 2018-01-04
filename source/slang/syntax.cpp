@@ -546,6 +546,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
                 {
                     if (genericSubst->paramDecl == globalGenParam)
                     {
+                        (*ioDiff)++;
                         return genericSubst->actualType;
                     }
                 }
