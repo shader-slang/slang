@@ -310,6 +310,7 @@ RAW(
 protected:
     virtual bool EqualsImpl(Type * type) override;
     virtual Type* CreateCanonicalType() override;
+    virtual RefPtr<Val> SubstituteImpl(Substitutions* subst, int* ioDiff) override;
     virtual int GetHashCode() override;
     )
 END_SYNTAX_CLASS()

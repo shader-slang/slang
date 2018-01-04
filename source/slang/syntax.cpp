@@ -358,6 +358,21 @@ void Type::accept(IValVisitor* visitor, void* extra)
         return (ArrayLength == arrType->ArrayLength && baseType->Equals(arrType->baseType.Ptr()));
     }
 
+    RefPtr<Val> ArrayExpressionType::SubstituteImpl(Substitutions* subst, int* ioDiff)
+    {
+        int diff = 0;
+        auto elementType = baseType->SubstituteImpl(subst, &diff).As<Type>();
+        if (diff)
+        {
+            *ioDiff = 1;
+            auto rsType = getArrayType(
+                elementType,
+                ArrayLength);
+            return rsType;
+        }
+        return this;
+    }
+
     Type* ArrayExpressionType::CreateCanonicalType()
     {
         auto canonicalElementType = baseType->GetCanonicalType();
@@ -531,6 +546,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
                 {
                     if (genericSubst->paramDecl == globalGenParam)
                     {
+                        (*ioDiff)++;
                         return genericSubst->actualType;
                     }
                 }
@@ -1393,7 +1409,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
     {
         int diff = 0;
         RefPtr<Substitutions> substSubst = substituteSubstitutions(substitutions, subst, &diff);
-
+        
         if (!diff)
             return *this;
 

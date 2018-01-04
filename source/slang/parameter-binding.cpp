@@ -1077,7 +1077,7 @@ static void completeBindingsForParameter(
         else if (kind == LayoutResourceKind::GenericResource)
         {
             bindingInfo.space = 0;
-            bindingInfo.count = 0;
+            bindingInfo.count = 1;
             bindingInfo.index = 0;
             continue;
         }
@@ -2118,8 +2118,7 @@ RefPtr<ProgramLayout> specializeProgramLayout(
     for (auto & varLayout : globalStructLayout->fields)
     {
         // To recover layout context, we skip generic resources in the first pass
-        // If the var is a generic resource, its resourceInfos will be empty.
-        if (varLayout->resourceInfos.Count() == 0)
+        if (varLayout->FindResourceInfo(LayoutResourceKind::GenericResource))
             continue;
         SLANG_ASSERT(varLayout->resourceInfos.Count() == varLayout->typeLayout->resourceInfos.Count());
         auto uniformInfo = varLayout->FindResourceInfo(LayoutResourceKind::Uniform);
@@ -2140,7 +2139,7 @@ RefPtr<ProgramLayout> specializeProgramLayout(
             usedRangeSet->usedResourceRanges[(int)resInfo.kind].Add(
                 nullptr, // we don't need to track parameter info here
                 resInfo.index,
-                resInfo.index + varLayout->typeLayout->resourceInfos[0].count);
+                resInfo.index + tresInfo.count);
         }
         structLayout->fields.Add(varLayout);
         varLayoutMapping[varLayout] = varLayout;

@@ -3095,6 +3095,12 @@ namespace Slang
         {
             return declRef;
         }
+
+        // A callback used to clone (or not) a Val
+        virtual RefPtr<Val> maybeCloneVal(Val* val)
+        {
+            return val;
+        }
     };
 
     void registerClonedValue(
@@ -3203,6 +3209,7 @@ namespace Slang
         virtual DeclRef<Decl> maybeCloneDeclRef(DeclRef<Decl> const& declRef) override;
 
         virtual RefPtr<Type> maybeCloneType(Type* originalType) override;
+        virtual RefPtr<Val> maybeCloneVal(Val* val) override;
     };
 
 
@@ -3214,6 +3221,11 @@ namespace Slang
     RefPtr<Type> IRSpecContext::maybeCloneType(Type* originalType)
     {
         return originalType->Substitute(subst).As<Type>();
+    }
+
+    RefPtr<Val> IRSpecContext::maybeCloneVal(Val * val)
+    {
+        return val->Substitute(subst);
     }
 
     IRValue* IRSpecContext::maybeCloneValue(IRValue* originalValue)
@@ -3316,7 +3328,7 @@ namespace Slang
         }
         else
         {
-            return val;
+            return context->maybeCloneVal(val);
         }
     }
 
@@ -3439,7 +3451,7 @@ namespace Slang
         IRGlobalVar*    originalVar,
         IROriginalValuesForClone const& originalValues)
     {
-        auto clonedVar = context->builder->createGlobalVar(context->maybeCloneType(originalVar->getType()->getValueType()));
+        auto clonedVar = context->builder->createGlobalVar(context->maybeCloneType(originalVar->getType()->getValueType())); 
         registerClonedValue(context, clonedVar, originalValues);
 
         auto mangledName = originalVar->mangledName;
@@ -4229,6 +4241,7 @@ namespace Slang
         virtual IRValue* maybeCloneValue(IRValue* originalVal) override;
 
         virtual RefPtr<Type> maybeCloneType(Type* originalType) override;
+        virtual RefPtr<Val> maybeCloneVal(Val* val) override;
     };
 
     // Convert a type-level value into an IR-level equivalent.
@@ -4350,6 +4363,11 @@ namespace Slang
     RefPtr<Type> IRGenericSpecContext::maybeCloneType(Type* originalType)
     {
         return originalType->Substitute(subst).As<Type>();
+    }
+
+    RefPtr<Val> IRGenericSpecContext::maybeCloneVal(Val * val)
+    {
+        return val->Substitute(subst);
     }
 
     // Given a list of substitutions, return the inner-most
