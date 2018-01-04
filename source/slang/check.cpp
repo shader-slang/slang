@@ -6830,7 +6830,7 @@ namespace Slang
                     entryPoint->genericParameterTypes.Count());
                 return;
             }
-            // if number of entry-point type arguments matches parameters, try find
+            // if entry-point type arguments matches parameters, try find
             // SubtypeWitness for each argument
             int index = 0;
             for (auto & gParam : globalGenericParams)
