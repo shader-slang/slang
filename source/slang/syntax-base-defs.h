@@ -180,7 +180,6 @@ END_SYNTAX_CLASS()
 SYNTAX_CLASS(ThisTypeSubstitution, Substitutions)
     // The actual type that provides the lookup scope for an associated type
     SYNTAX_FIELD(RefPtr<Val>, sourceType)
-
     RAW(
     // Apply a set of substitutions to the bindings in this substitution
     virtual RefPtr<Substitutions> SubstituteImpl(Substitutions* subst, int* ioDiff) override;
@@ -193,6 +192,7 @@ SYNTAX_CLASS(ThisTypeSubstitution, Substitutions)
     }
     virtual int GetHashCode() const override
     {
+        SLANG_ASSERT(sourceType);
         return sourceType->GetHashCode();
     }
     )

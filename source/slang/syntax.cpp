@@ -1275,8 +1275,12 @@ void Type::accept(IValVisitor* visitor, void* extra)
     {
         if (!subst)
             return true;
-        if (subst && dynamic_cast<ThisTypeSubstitution*>(subst))
-            return true;
+        if (auto thisTypeSubst = dynamic_cast<ThisTypeSubstitution*>(subst))
+        {
+            if (!sourceType || !thisTypeSubst->sourceType)
+                return true;
+            return sourceType->EqualsVal(thisTypeSubst->sourceType);
+        }
         return false;
     }
 
@@ -1405,19 +1409,48 @@ void Type::accept(IValVisitor* visitor, void* extra)
         *ioDiff += diff;
     }
 
+    void buildMemberDictionary(ContainerDecl* decl);
+
     DeclRefBase DeclRefBase::SubstituteImpl(Substitutions* subst, int* ioDiff)
     {
         int diff = 0;
         RefPtr<Substitutions> substSubst = substituteSubstitutions(substitutions, subst, &diff);
-        
         if (!diff)
-            return *this;
+            return *this; 
 
         *ioDiff += diff;
 
         DeclRefBase substDeclRef;
         substDeclRef.decl = decl;
         substDeclRef.substitutions = substSubst;
+       
+        // if this is a AssocTypeDecl, try lookup the actual associated type
+        if (auto assocTypeDecl = substDeclRef.decl->As<AssocTypeDecl>())
+        {
+            auto thisSubst = getThisTypeSubst(substDeclRef, false);
+            if (thisSubst)
+            {
+                if (auto declRefType = thisSubst->sourceType.As<DeclRefType>())
+                {
+                    if (auto aggDeclRef = declRefType->declRef.As<StructDecl>())
+                    {
+                        Decl* subTypeDecl = nullptr;
+                        buildMemberDictionary(aggDeclRef.getDecl());
+                        SLANG_ASSERT(aggDeclRef.getDecl()->memberDictionaryIsValid);
+                        aggDeclRef.getDecl()->memberDictionary.TryGetValue(assocTypeDecl->getName(), subTypeDecl);
+                        if (auto typeDefDecl = subTypeDecl->As<TypeDefDecl>())
+                        {
+                            auto t = GetType(DeclRef<TypeDefDecl>(typeDefDecl, aggDeclRef.substitutions));
+                            auto canonicalType = t->GetCanonicalType()->AsDeclRefType();
+                            SLANG_ASSERT(canonicalType);
+                            return canonicalType->declRef;
+                        }
+                        SLANG_ASSERT(subTypeDecl);
+                        return DeclRefBase(subTypeDecl, aggDeclRef.substitutions);
+                    }
+                }
+            }
+        }
         return substDeclRef;
     }
 
@@ -1428,7 +1461,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         if (decl != declRef.decl)
             return false;
         if (!substitutions)
-            return !declRef.substitutions || declRef.substitutions.As<ThisTypeSubstitution>();
+            return !hasGenericSubstitutions(declRef.substitutions);
         if (!substitutions->Equals(declRef.substitutions.Ptr()))
             return false;
 
@@ -1903,6 +1936,17 @@ void Type::accept(IValVisitor* visitor, void* extra)
         declRef.substitutions = substToInsert;
     }
 
+    ThisTypeSubstitution* findThisTypeSubst(Substitutions* subst)
+    {
+        while (subst)
+        {
+            if (auto thisSubst = dynamic_cast<ThisTypeSubstitution*>(subst))
+                return thisSubst;
+            subst = subst->outer.Ptr();
+        }
+        return nullptr;
+    }
+
     RefPtr<ThisTypeSubstitution> getThisTypeSubst(DeclRefBase & declRef, bool insertSubstEntry)
     {
         RefPtr<ThisTypeSubstitution> thisSubst;
@@ -1958,6 +2002,18 @@ void Type::accept(IValVisitor* visitor, void* extra)
         }
     }
 
+    bool hasThisTypeSubstitutions(RefPtr<Substitutions> subst)
+    {
+        auto p = subst.Ptr();
+        while (p)
+        {
+            if (dynamic_cast<ThisTypeSubstitution*>(p))
+                return true;
+            p = p->outer.Ptr();
+        }
+        return false;
+    }
+
     bool hasGenericSubstitutions(RefPtr<Substitutions> subst)
     {
         auto p = subst.Ptr();
@@ -1987,8 +2043,22 @@ void Type::accept(IValVisitor* visitor, void* extra)
         if (oldSubst)
             oldSubst = oldSubst->SubstituteImpl(subst, ioDiff);
 
+        // if oldSubst does not have ThisTypeSubst (which means `this_type` is free variable)
+        // and subst has a ThisTypeSubst (which means `this_type` is bound to a type),
+        // then copy that ThisTypeSubst over (to bind the this_type to the specified type)
         RefPtr<Substitutions> newSubst = oldSubst;
         insertGlobalGenericSubstitutions(newSubst, subst, ioDiff);
+        /*if (!hasThisTypeSubstitutions(oldSubst))
+        {
+            auto thisTypeSubst = findThisTypeSubst(subst);
+            if (thisTypeSubst)
+            {
+                auto cpyThisTypeSubst = new ThisTypeSubstitution();
+                cpyThisTypeSubst->sourceType = thisTypeSubst->sourceType;
+                insertSubstAtBottom(newSubst, cpyThisTypeSubst);
+                *ioDiff = 1;
+            }
+        }*/
         return newSubst;
     }
 }

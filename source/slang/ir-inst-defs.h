@@ -98,6 +98,7 @@ INST(decl_ref, decl_ref, 0, 0)
 
 INST(specialize, specialize, 2, 0)
 INST(lookup_interface_method, lookup_interface_method, 2, 0)
+INST(lookup_witness_table, lookup_witness_table, 2, 0)
 
 INST(Construct, construct, 0, 0)
 INST(Call, call, 1, 0)

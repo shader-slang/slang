@@ -678,11 +678,38 @@ namespace Slang
         DeclRef<Decl>   interfaceMethodDeclRef)
     {
         auto witnessTableVal = getDeclRefVal(witnessTableDeclRef);
-        auto interfaceMethodVal = getDeclRefVal(interfaceMethodDeclRef);
+        DeclRef<Decl> removeSubstDeclRef = interfaceMethodDeclRef;
+        removeSubstDeclRef.substitutions = nullptr;
+        auto interfaceMethodVal = getDeclRefVal(removeSubstDeclRef);
         return emitLookupInterfaceMethodInst(type, witnessTableVal, interfaceMethodVal);
     }
 
+    IRValue* IRBuilder::emitLookupInterfaceMethodInst(
+        IRType*         type,
+        IRValue*   witnessTableVal,
+        DeclRef<Decl>   interfaceMethodDeclRef)
+    {
+        DeclRef<Decl> removeSubstDeclRef = interfaceMethodDeclRef;
+        removeSubstDeclRef.substitutions = nullptr;
+        auto interfaceMethodVal = getDeclRefVal(removeSubstDeclRef);
+        return emitLookupInterfaceMethodInst(type, witnessTableVal, interfaceMethodVal);
+    }
 
+    IRValue* IRBuilder::emitFindWitnessTable(
+        DeclRef<Decl> baseTypeDeclRef,
+        IRType* interfaceType)
+    {
+        auto interfaceTypeDeclRef = interfaceType->AsDeclRefType();
+        SLANG_ASSERT(interfaceTypeDeclRef);
+        auto inst = createInst<IRLookupWitnessTable>(
+            this,
+            kIROp_lookup_witness_table,
+            interfaceType,
+            getDeclRefVal(baseTypeDeclRef),
+            getDeclRefVal(interfaceTypeDeclRef->declRef));
+        addInst(inst);
+        return inst;
+    }
 
     IRInst* IRBuilder::emitCallInst(
         IRType*         type,
@@ -3200,7 +3227,6 @@ namespace Slang
         Dictionary<String, VarLayout*> globalVarLayouts;
 
         RefPtr<GlobalGenericParamSubstitution> subst;
-
         // Override the "maybe clone" logic so that we always clone
         virtual IRValue* maybeCloneValue(IRValue* originalVal) override;
 
@@ -3227,6 +3253,7 @@ namespace Slang
     {
         return val->Substitute(subst);
     }
+
 
     IRValue* IRSpecContext::maybeCloneValue(IRValue* originalValue)
     {
@@ -3261,14 +3288,17 @@ namespace Slang
         case kIROp_decl_ref:
             {
                 IRDeclRef* od = (IRDeclRef*)originalValue;
+                auto newDeclRef = od->declRef;
 
                 // if the declRef is one of the __generic_param decl being substituted by subst
                 // return the substituted decl
                 if (subst)
                 {
-                    if (od->declRef.getDecl() == subst->paramDecl)
+                    int diff = 0;
+                    newDeclRef = od->declRef.SubstituteImpl(subst, &diff);
+                    if (newDeclRef.getDecl() == subst->paramDecl)
                         return builder->getTypeVal(subst->actualType.As<Type>());
-                    else if (auto genConstraint = od->declRef.As<GenericTypeConstraintDecl>())
+                    else if (auto genConstraint = newDeclRef.As<GenericTypeConstraintDecl>())
                     {
                         // a decl-ref to GenericTypeConstraintDecl as a result of
                         // referencing a generic parameter type should be replaced with
@@ -3288,7 +3318,7 @@ namespace Slang
                         }
                     }
                 }
-                auto declRef = maybeCloneDeclRef(od->declRef);
+                auto declRef = maybeCloneDeclRef(newDeclRef);
                 return builder->getDeclRefVal(declRef);
             }
             break;
@@ -3640,6 +3670,14 @@ namespace Slang
         // function, including any blocks, their parameters,
         // and their instructions.
         cloneFunctionCommon(context, clonedFunc, originalFunc);
+
+        //// for now, clone all unreferenced witness tables
+        //for (auto gv = context->getOriginalModule()->getFirstGlobalValue();
+        //    gv; gv = gv->getNextValue())
+        //{
+        //    if (gv->op == kIROp_witness_table)
+        //        cloneGlobalValue(context, (IRWitnessTable*)gv);
+        //}
 
         // We need to attach the layout information for
         // the entry point to this declaration, so that
@@ -4048,7 +4086,7 @@ namespace Slang
                             globalVar = globalVar->getNextValue();
                         }
                         SLANG_ASSERT(table);
-                        table = cloneWitnessTableWithoutRegistering(context, (IRWitnessTable*)(table));
+                        table = cloneGlobalValue(context, (IRWitnessTable*)(table));
                         IRProxyVal * tableVal = new IRProxyVal();
                         tableVal->inst.init(nullptr, table);
                         paramSubst->witnessTables.Add(KeyValuePair<RefPtr<Type>, RefPtr<Val>>(subtypeWitness->sup, tableVal));
@@ -4661,6 +4699,16 @@ namespace Slang
             sharedContext->workList.Add(func);
         }
 
+        // Build dictionary for witness tables
+        Dictionary<String, IRWitnessTable*> witnessTables;
+        for (auto gv = module->getFirstGlobalValue();
+            gv;
+            gv = gv->getNextValue())
+        {
+            if (gv->op == kIROp_witness_table)
+                witnessTables.AddIfNotExists(gv->mangledName, (IRWitnessTable*)gv);
+        }
+
         // Now that we have our work list, we are going to
         // process it until it goes empty. Along the way
         // we may specialize a function and thus create
@@ -4738,12 +4786,28 @@ namespace Slang
                                 // specialize a witness table
                                 auto originalTable = (IRWitnessTable*)genericVal;
                                 auto specWitnessTable = specializeWitnessTable(sharedContext, originalTable, specDeclRef); 
+                                witnessTables.AddIfNotExists(specWitnessTable->mangledName, specWitnessTable);
                                 specInst->replaceUsesWith(specWitnessTable);
                                 specInst->removeAndDeallocate();
                             }
                         }
                         break;
-
+                    case kIROp_lookup_witness_table:
+                        {
+                            // try find concrete witness table from global scope
+                            IRLookupWitnessTable* lookupInst = (IRLookupWitnessTable*)ii;
+                            IRWitnessTable* witnessTable = nullptr;
+                            auto srcDeclRef = ((IRDeclRef*)lookupInst->sourceType.usedValue)->declRef;
+                            auto interfaceDeclRef = ((IRDeclRef*)lookupInst->interfaceType.usedValue)->declRef;
+                            auto mangledName = getMangledNameForConformanceWitness(srcDeclRef, interfaceDeclRef);
+                            witnessTables.TryGetValue(mangledName, witnessTable);
+                            if (witnessTable)
+                            {
+                                lookupInst->replaceUsesWith(witnessTable);
+                                lookupInst->removeAndDeallocate();
+                            }
+                        }
+                        break;
                     case kIROp_lookup_interface_method:
                         {
                             // We have a `lookup_interface_method` instruction,

@@ -8,13 +8,13 @@ RWStructuredBuffer<float> outputBuffer;
 interface ISimple
 {
     associatedtype U;
-    U add(U v0, U v1);
+    U addt(U v0, U v1);
 }
 
 struct Simple : ISimple
 {
     typedef float U;
-    U add(U v0, float v1)
+    U addt(U v0, float v1)
     {
         return v0 + v1;
     }
@@ -23,7 +23,7 @@ struct Simple : ISimple
 __generic<T:ISimple>
 T.U test(T simple, T.U v0, T.U v1)
 {
-    return simple.add(v0, v1);
+    return simple.addt(v0, v1);
 }
 
 [numthreads(4, 1, 1)]

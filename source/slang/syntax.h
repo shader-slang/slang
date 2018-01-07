@@ -102,7 +102,8 @@ namespace Slang
         Double,
     };
 
-
+    class Decl;
+    class Val;
 
     // Forward-declare all syntax classes
 #define SYNTAX_CLASS(NAME, BASE, ...) class NAME;
@@ -991,9 +992,9 @@ namespace Slang
         return declRef.Substitute(declRef.getDecl()->sub.Ptr());
     }
 
-    inline RefPtr<Type> GetSup(DeclRef<GenericTypeConstraintDecl> const& declRef)
+    inline RefPtr<Type> GetSup(DeclRef<TypeConstraintDecl> const& declRef)
     {
-        return declRef.Substitute(declRef.getDecl()->sup.Ptr());
+        return declRef.Substitute(declRef.getDecl()->getSup().type);
     }
 
     // Note(tfoley): These logically belong to `Type`,
