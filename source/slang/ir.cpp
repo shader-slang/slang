@@ -2104,10 +2104,10 @@ namespace Slang
         dump(context, "ir_func ");
         dumpID(context, func);
 
-        if (func->genericDecl)
+        if (func->getGenericDecl())
         {
             dump(context, " ");
-            dumpGenericSignature(context, func->genericDecl);
+            dumpGenericSignature(context, func->getGenericDecl());
         }
 
         dumpInstTypeClause(context, func->getType());
@@ -3084,6 +3084,9 @@ namespace Slang
 
         SharedIRBuilder sharedBuilderStorage;
         IRBuilder builderStorage;
+
+        // Non-generic functions to be processed (for generic specialization context)
+        List<IRFunc*> workList;
     };
 
     struct IRSpecContextBase
@@ -3297,23 +3300,28 @@ namespace Slang
                 {
                     int diff = 0;
                     newDeclRef = od->declRef.SubstituteImpl(subst, &diff);
-                    if (newDeclRef.getDecl() == subst.globalGenParamSubstitutions->paramDecl)
-                        return builder->getTypeVal(subst.globalGenParamSubstitutions->actualType.As<Type>());
-                    else if (auto genConstraint = newDeclRef.As<GenericTypeConstraintDecl>())
+                    for (auto globalGenSubst = subst.globalGenParamSubstitutions; globalGenSubst; globalGenSubst = globalGenSubst->outer)
                     {
-                        // a decl-ref to GenericTypeConstraintDecl as a result of
-                        // referencing a generic parameter type should be replaced with
-                        // the actual witness table
-                        if (genConstraint.getDecl()->ParentDecl == subst.globalGenParamSubstitutions->paramDecl)
+                        if (!globalGenSubst)
+                            continue;
+                        if (newDeclRef.getDecl() == globalGenSubst->paramDecl)
+                            return builder->getTypeVal(globalGenSubst->actualType.As<Type>());
+                        else if (auto genConstraint = newDeclRef.As<GenericTypeConstraintDecl>())
                         {
-                            // find the witness table from subst
-                            for (auto witness : subst.globalGenParamSubstitutions->witnessTables)
+                            // a decl-ref to GenericTypeConstraintDecl as a result of
+                            // referencing a generic parameter type should be replaced with
+                            // the actual witness table
+                            if (genConstraint.getDecl()->ParentDecl == globalGenSubst->paramDecl)
                             {
-                                if (witness.Key->EqualsVal(GetSup(genConstraint)))
+                                // find the witness table from subst
+                                for (auto witness : globalGenSubst->witnessTables)
                                 {
-                                    auto proxyVal = witness.Value.As<IRProxyVal>();
-                                    SLANG_ASSERT(proxyVal);
-                                    return proxyVal->inst.usedValue;
+                                    if (witness.Key->EqualsVal(GetSup(genConstraint)))
+                                    {
+                                        auto proxyVal = witness.Value.As<IRProxyVal>();
+                                        SLANG_ASSERT(proxyVal);
+                                        return proxyVal->inst.usedValue;
+                                    }
                                 }
                             }
                         }
@@ -3515,9 +3523,10 @@ namespace Slang
     IRWitnessTable* cloneWitnessTableImpl(
         IRSpecContextBase*  context,
         IRWitnessTable* originalTable,
-        IROriginalValuesForClone const& originalValues)
+        IROriginalValuesForClone const& originalValues,
+        IRWitnessTable* dstTable = nullptr)
     {
-        auto clonedTable = context->builder->createWitnessTable();
+        auto clonedTable = dstTable ? dstTable : context->builder->createWitnessTable();
         registerClonedValue(context, clonedTable, originalValues);
 
         auto mangledName = originalTable->mangledName;
@@ -3543,9 +3552,10 @@ namespace Slang
 
     IRWitnessTable* cloneWitnessTableWithoutRegistering(
         IRSpecContextBase*  context,
-        IRWitnessTable* originalTable)
+        IRWitnessTable* originalTable,
+        IRWitnessTable* dstTable = nullptr)
     {
-        return cloneWitnessTableImpl(context, originalTable, IROriginalValuesForClone());
+        return cloneWitnessTableImpl(context, originalTable, IROriginalValuesForClone(), dstTable);
     }
 
     void cloneGlobalValueWithCodeCommon(
@@ -3614,7 +3624,8 @@ namespace Slang
     {
         // First clone all the simple properties.
         clonedFunc->mangledName = originalFunc->mangledName;
-        clonedFunc->genericDecl = originalFunc->genericDecl;
+        clonedFunc->genericDecls = originalFunc->genericDecls;
+        clonedFunc->specializedGenericLevel = originalFunc->specializedGenericLevel;
         clonedFunc->type = context->maybeCloneType(originalFunc->type);
 
         cloneDecorations(context, clonedFunc, originalFunc);
@@ -3678,13 +3689,13 @@ namespace Slang
         // and their instructions.
         cloneFunctionCommon(context, clonedFunc, originalFunc);
 
-        //// for now, clone all unreferenced witness tables
-        //for (auto gv = context->getOriginalModule()->getFirstGlobalValue();
-        //    gv; gv = gv->getNextValue())
-        //{
-        //    if (gv->op == kIROp_witness_table)
-        //        cloneGlobalValue(context, (IRWitnessTable*)gv);
-        //}
+        // for now, clone all unreferenced witness tables
+        for (auto gv = context->getOriginalModule()->getFirstGlobalValue();
+            gv; gv = gv->getNextValue())
+        {
+            if (gv->op == kIROp_witness_table)
+                cloneGlobalValue(context, (IRWitnessTable*)gv);
+        }
 
         // We need to attach the layout information for
         // the entry point to this declaration, so that
@@ -4055,54 +4066,10 @@ namespace Slang
         SubstitutionSet typeSubst);
 
     RefPtr<GlobalGenericParamSubstitution> createGlobalGenericParamSubstitution(
-        EntryPointRequest * entryPointRequest, 
+        EntryPointRequest * entryPointRequest,
         ProgramLayout * programLayout,
         IRSpecContext*  context,
-        IRModule* originalIRModule)
-    {
-        RefPtr<GlobalGenericParamSubstitution> globalParamSubst;
-        GlobalGenericParamSubstitution * curTailSubst = nullptr;
-        for (auto param : programLayout->globalGenericParams)
-        {
-            auto paramSubst = new GlobalGenericParamSubstitution();
-            if (!globalParamSubst)
-                globalParamSubst = paramSubst;
-            if (curTailSubst)
-                curTailSubst->outer = paramSubst;
-            curTailSubst = paramSubst;
-            paramSubst->paramDecl = param->decl;
-            SLANG_ASSERT((UInt)param->index < entryPointRequest->genericParameterTypes.Count());
-            paramSubst->actualType = entryPointRequest->genericParameterTypes[param->index];
-            // find witness tables
-            for (auto witness : entryPointRequest->genericParameterWitnesses)
-            {
-                if (auto subtypeWitness = witness.As<SubtypeWitness>())
-                {
-                    if (subtypeWitness->sub->EqualsVal(paramSubst->actualType))
-                    {
-                        auto witnessTableName = getMangledNameForConformanceWitness(subtypeWitness->sub, subtypeWitness->sup);
-                        auto globalVar = originalIRModule->getFirstGlobalValue();
-                        IRGlobalValue * table = nullptr;
-                        while (globalVar)
-                        {
-                            if (globalVar->mangledName == witnessTableName)
-                            {
-                                table = globalVar;
-                                break;
-                            }
-                            globalVar = globalVar->getNextValue();
-                        }
-                        SLANG_ASSERT(table);
-                        table = cloneGlobalValue(context, (IRWitnessTable*)(table));
-                        IRProxyVal * tableVal = new IRProxyVal();
-                        tableVal->inst.init(nullptr, table);
-                        paramSubst->witnessTables.Add(KeyValuePair<RefPtr<Type>, RefPtr<Val>>(subtypeWitness->sup, tableVal));
-                    }
-                }
-            }
-        }
-        return globalParamSubst;
-    }
+        IRModule* originalIRModule);
 
     struct IRSpecializationState
     {
@@ -4266,19 +4233,11 @@ namespace Slang
             break;
         }
     }
-
-    //
-
-    struct IRSharedGenericSpecContext : IRSharedSpecContext
-    {
-        // Non-generic functions to be processed
-        List<IRFunc*> workList;
-    };
-
+    
     struct IRGenericSpecContext : IRSpecContextBase
     {
-        IRSharedGenericSpecContext* getShared() { return (IRSharedGenericSpecContext*) shared; }
-        
+        IRSharedSpecContext* getShared() { return shared; }
+
         // Override the "maybe clone" logic so that we always clone
         virtual IRValue* maybeCloneValue(IRValue* originalVal) override;
 
@@ -4298,13 +4257,12 @@ namespace Slang
                 subtypeWitness->sup);
             RefPtr<IRSpecSymbol> symbol;
 
-            if( !context->getSymbols().TryGetValue(mangledName, symbol) )
+            if (context->getSymbols().TryGetValue(mangledName, symbol))
             {
-                SLANG_UNEXPECTED("couldn't find symbol for conformance!");
-                return nullptr;
+                return symbol->irGlobalValue;
             }
-
-            return symbol->irGlobalValue;
+            else
+                return nullptr;
         }
         else if (auto proxyVal = dynamic_cast<IRProxyVal*>(val))
         {
@@ -4385,7 +4343,8 @@ namespace Slang
                 // the `Val` we have been given.
                 if(declRef.getDecl()->ParentDecl == genSubst->genericDecl)
                 {
-                    return getSubstValue(this, declRef);
+                    if (auto substVal = getSubstValue(this, declRef))
+                        return substVal;
                 }
 
                 int diff = 0;
@@ -4442,7 +4401,7 @@ namespace Slang
     // overloads in the mix, and produces a new set of 
     // substitutiosn without this issue.
     RefPtr<GenericSubstitution> cloneSubstitutionsForSpecialization(
-        IRSharedGenericSpecContext* sharedContext,
+        IRSharedSpecContext* sharedContext,
         RefPtr<GenericSubstitution> oldSubst,
         Decl*                       newDecl)
     {
@@ -4452,14 +4411,25 @@ namespace Slang
         if(!oldGenericSubst)
             return nullptr;
 
+        auto innerGenericName = oldGenericSubst->genericDecl->inner->getName();
+
         // We will also peel back layers of declarations until
         // we find our first generic decl.
-        auto newGenericDecl = getInnermostGenericDecl(newDecl);
-        if( !newGenericDecl )
+        GenericDecl* newGenericDecl = nullptr;
+
+        for (Decl* d = newDecl; d; d = d->ParentDecl)
         {
-//            SLANG_UNEXPECTED("generic subst without generic decl");
-            return nullptr;
+            if (auto gd = dynamic_cast<GenericDecl*>(d))
+            {
+                if (gd->inner->getName() == innerGenericName)
+                {
+                    newGenericDecl = gd;
+                    break;
+                }
+            }
         }
+
+        SLANG_ASSERT(newGenericDecl);
 
         RefPtr<GenericSubstitution> newSubst = new GenericSubstitution();
         newSubst->genericDecl = newGenericDecl;
@@ -4474,11 +4444,11 @@ namespace Slang
     }
 
     IRFunc* getSpecializedFunc(
-        IRSharedGenericSpecContext* sharedContext,
+        IRSharedSpecContext* sharedContext,
         IRFunc*                     genericFunc,
         DeclRef<Decl>               specDeclRef);
 
-    IRWitnessTable* specializeWitnessTable(IRSharedGenericSpecContext * sharedContext, IRWitnessTable* originalTable, DeclRef<Decl> specDeclRef)
+    IRWitnessTable* specializeWitnessTable(IRSharedSpecContext * sharedContext, IRWitnessTable* originalTable, DeclRef<Decl> specDeclRef, IRWitnessTable* dstTable)
     {
         // First, we want to see if an existing specialization
         // has already been made. To do that we will need to
@@ -4487,6 +4457,9 @@ namespace Slang
         String specMangledName;
         String specializedMangledName = getMangledNameForConformanceWitness(specDeclRef.Substitute(originalTable->subTypeDeclRef),
             specDeclRef.Substitute(originalTable->supTypeDeclRef));
+
+        if (dstTable && dstTable->mangledName.Length())
+            specializedMangledName = dstTable->mangledName;
 
         // TODO: This is a terrible linear search, and we should
         // avoid it by building a dictionary ahead of time,
@@ -4512,7 +4485,7 @@ namespace Slang
 
         // TODO: other initialization is needed here...
 
-        auto specTable = cloneWitnessTableWithoutRegistering(&context, originalTable);
+        auto specTable = cloneWitnessTableWithoutRegistering(&context, originalTable, dstTable);
 
         // Set up the clone to recognize that it is no longer generic
         specTable->mangledName = specMangledName;
@@ -4525,7 +4498,7 @@ namespace Slang
             if (entry->satisfyingVal.usedValue->op == kIROp_Func)
             {
                 IRFunc* func = (IRFunc*)entry->satisfyingVal.usedValue;
-                if (func->genericDecl)
+                if (func->getGenericDecl())
                     entry->satisfyingVal.set(getSpecializedFunc(sharedContext, func, specDeclRef));
             }
             
@@ -4537,9 +4510,9 @@ namespace Slang
 
         return specTable;
     }
-
+    
     IRFunc* getSpecializedFunc(
-        IRSharedGenericSpecContext* sharedContext,
+        IRSharedSpecContext* sharedContext,
         IRFunc*                     genericFunc,
         DeclRef<Decl>               specDeclRef)
     {
@@ -4548,7 +4521,7 @@ namespace Slang
         // compute the mangled name of the specialized function,
         // so that we can look for existing declarations.
         String specMangledName;
-        if (genericFunc->genericDecl == specDeclRef.decl)
+        if (genericFunc->getGenericDecl() == specDeclRef.decl)
             specMangledName = getMangledName(specDeclRef);
         else
             specMangledName = mangleSpecializedFuncName(genericFunc->mangledName, specDeclRef.substitutions);
@@ -4574,7 +4547,10 @@ namespace Slang
         RefPtr<GenericSubstitution> newSubst = cloneSubstitutionsForSpecialization(
             sharedContext,
             specDeclRef.substitutions.genericSubstitutions,
-            genericFunc->genericDecl);
+            genericFunc->getGenericDecl());
+
+        if (!newSubst)
+            return genericFunc;
 
         IRGenericSpecContext context;
         context.shared = sharedContext;
@@ -4586,9 +4562,11 @@ namespace Slang
 
         auto specFunc = cloneSimpleFuncWithoutRegistering(&context, genericFunc);
 
-        // Set up the clone to recognize that it is no longer generic
         specFunc->mangledName = specMangledName;
-        specFunc->genericDecl = nullptr;
+        
+        // reduce specialized generic level by 1
+        if (specFunc->specializedGenericLevel >= 0)
+            specFunc->specializedGenericLevel--;
 
         // Put the function into the global sequence right after
         // the function it specializes.
@@ -4601,7 +4579,8 @@ namespace Slang
         // At this point we've created a new non-generic function,
         // which means we should add it to our work list for
         // subsequent processing.
-        sharedContext->workList.Add(specFunc);
+        if (specFunc->specializedGenericLevel == -1)
+            sharedContext->workList.Add(specFunc);
 
         // We also need to make sure that we register this specialized
         // function under its mangled name, so that later lookup
@@ -4661,7 +4640,7 @@ namespace Slang
     void specializeGenerics(
         IRModule*   module)
     {
-        IRSharedGenericSpecContext sharedContextStorage;
+        IRSharedSpecContext sharedContextStorage;
         auto sharedContext = &sharedContextStorage;
 
         initializeSharedSpecContext(
@@ -4688,7 +4667,7 @@ namespace Slang
             auto func = (IRFunc*) gv;
 
             // Is it generic? If so, skip.
-            if(func->genericDecl)
+            if(func->getGenericDecl())
                 continue;
 
             sharedContext->workList.Add(func);
@@ -4760,14 +4739,16 @@ namespace Slang
                             if (genericVal->op == kIROp_Func)
                             {
                                 auto genericFunc = (IRFunc*)genericVal;
-                                if (!genericFunc->genericDecl)
+                                if (!genericFunc->getGenericDecl())
                                     continue;
 
                                 // Okay, we have a candidate for specialization here.
                                 //
                                 // We will first find or construct a specialized version
                                 // of the callee funciton/
+                                auto originalFunc = dumpIRFunc(genericFunc);
                                 auto specFunc = getSpecializedFunc(sharedContext, genericFunc, specDeclRef);
+                                auto specFuncStr = dumpIRFunc(specFunc);
                                 //
                                 // Then we will replace the use sites for the `specialize`
                                 // instruction with uses of the specialized function.
@@ -4780,7 +4761,7 @@ namespace Slang
                             {
                                 // specialize a witness table
                                 auto originalTable = (IRWitnessTable*)genericVal;
-                                auto specWitnessTable = specializeWitnessTable(sharedContext, originalTable, specDeclRef); 
+                                auto specWitnessTable = specializeWitnessTable(sharedContext, originalTable, specDeclRef, nullptr); 
                                 witnessTables.AddIfNotExists(specWitnessTable->mangledName, specWitnessTable);
                                 specInst->replaceUsesWith(specWitnessTable);
                                 specInst->removeAndDeallocate();
@@ -4856,6 +4837,90 @@ namespace Slang
         // functions that in turn reference a generic function.
     }
 
-    //
+    RefPtr<GlobalGenericParamSubstitution> createGlobalGenericParamSubstitution(
+        EntryPointRequest * entryPointRequest,
+        ProgramLayout * programLayout,
+        IRSpecContext*  context,
+        IRModule* originalIRModule)
+    {
+        RefPtr<GlobalGenericParamSubstitution> globalParamSubst;
+        GlobalGenericParamSubstitution * curTailSubst = nullptr;
+        struct WitnessTableSpecializationWorkItem
+        {
+            IRWitnessTable* dstTable;
+            IRWitnessTable* srcTable;
+            DeclRef<Decl> specDeclRef;
+        };
+        List<WitnessTableSpecializationWorkItem> witnessTablesToSpecailize;
+        for (auto param : programLayout->globalGenericParams)
+        {
+            auto paramSubst = new GlobalGenericParamSubstitution();
+            if (!globalParamSubst)
+                globalParamSubst = paramSubst;
+            if (curTailSubst)
+                curTailSubst->outer = paramSubst;
+            curTailSubst = paramSubst;
+            paramSubst->paramDecl = param->decl;
+            SLANG_ASSERT((UInt)param->index < entryPointRequest->genericParameterTypes.Count());
+            paramSubst->actualType = entryPointRequest->genericParameterTypes[param->index];
+            // find witness tables
+            for (auto witness : entryPointRequest->genericParameterWitnesses)
+            {
+                if (auto subtypeWitness = witness.As<SubtypeWitness>())
+                {
+                    if (subtypeWitness->sub->EqualsVal(paramSubst->actualType))
+                    {
+                        auto witnessTableName = getMangledNameForConformanceWitness(subtypeWitness->sub, subtypeWitness->sup);
+                        auto findWitnessTableByName = [&](String name)
+                        {
+                            auto globalVar = originalIRModule->getFirstGlobalValue();
+                            IRGlobalValue * rs = nullptr;
+                            while (globalVar)
+                            {
+                                if (globalVar->mangledName == name)
+                                {
+                                    rs = globalVar;
+                                    break;
+                                }
+                                globalVar = globalVar->getNextValue();
+                            }
+                            return rs;
+                        };
+                        auto table = findWitnessTableByName(witnessTableName);
+                        if (!table)
+                        {
+                            if (auto subDeclRefType = subtypeWitness->sub.As<DeclRefType>())
+                            {
+                                auto genericWitnessTableName = getMangledNameForConformanceWitness(DeclRef<Decl>(subDeclRefType->declRef.getDecl(), nullptr), subtypeWitness->sup);
+                                table = findWitnessTableByName(genericWitnessTableName);
+                                WitnessTableSpecializationWorkItem workItem;
+                                workItem.srcTable = (IRWitnessTable*)table;
+                                workItem.dstTable = context->builder->createWitnessTable();
+                                workItem.dstTable->mangledName = getMangledNameForConformanceWitness(subDeclRefType->declRef, subtypeWitness->sup);
+                                workItem.specDeclRef = subDeclRefType->declRef;
+                                registerClonedValue(context, workItem.dstTable, workItem.srcTable);
+                                witnessTablesToSpecailize.Add(workItem);
+                                table = workItem.dstTable;
+                            }
+                        }
+                        else
+                            table = cloneGlobalValue(context, (IRWitnessTable*)(table));
+                        SLANG_ASSERT(table);
+                        IRProxyVal * tableVal = new IRProxyVal();
+                        tableVal->inst.init(nullptr, table);
+                        paramSubst->witnessTables.Add(KeyValuePair<RefPtr<Type>, RefPtr<Val>>(subtypeWitness->sup, tableVal));
+                    }
+                }
+            }
+        }
+        for (auto workItem : witnessTablesToSpecailize)
+        {
+            int diff = 0;
+            specializeWitnessTable(context->shared, workItem.srcTable, 
+                workItem.specDeclRef.SubstituteImpl(SubstitutionSet(nullptr, nullptr, globalParamSubst), &diff), workItem.dstTable);
+        }
+        return globalParamSubst;
+    }
+
 
 }

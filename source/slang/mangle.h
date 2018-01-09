@@ -19,6 +19,9 @@ namespace Slang
     String getMangledNameForConformanceWitness(
         DeclRef<Decl> sub,
         DeclRef<Decl> sup);
+    String getMangledNameForConformanceWitness(
+        DeclRef<Decl> sub,
+        Type* sup);
     String getMangledTypeName(Type* type);
 }
 

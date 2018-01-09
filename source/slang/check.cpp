@@ -120,6 +120,15 @@ namespace Slang
             auto typeRepr = TranslateTypeNodeImpl(node);
             return ExtractTypeFromTypeRepr(typeRepr);
         }
+        TypeExp TranslateTypeNodeForced(TypeExp const& typeExp)
+        {
+            auto typeRepr = TranslateTypeNodeImpl(typeExp.exp);
+
+            TypeExp result;
+            result.exp = typeRepr;
+            result.type = ExtractTypeFromTypeRepr(typeRepr);
+            return result;
+        }
         TypeExp TranslateTypeNode(TypeExp const& typeExp)
         {
             // HACK(tfoley): It seems that in some cases we end up re-checking
@@ -130,14 +139,7 @@ namespace Slang
             {
                 return typeExp;
             }
-
-
-            auto typeRepr = TranslateTypeNodeImpl(typeExp.exp);
-
-            TypeExp result;
-            result.exp = typeRepr;
-            result.type = ExtractTypeFromTypeRepr(typeRepr);
-            return result;
+            return TranslateTypeNodeForced(typeExp);
         }
 
         RefPtr<DeclRefType> getExprDeclRefType(Expr * expr)
@@ -1287,6 +1289,20 @@ namespace Slang
             varDecl->initExpr = initExpr;
         }
 
+        // Fill in default substitutions for the 'subtype' part of a type constraint decl
+        void CheckConstraintSubType(TypeExp & typeExp)
+        {
+            if (auto sharedTypeExpr = typeExp.exp.As<SharedTypeExpr>())
+            {
+                if (auto declRefType = sharedTypeExpr->base->AsDeclRefType())
+                {
+                    declRefType->declRef.substitutions = createDefaultSubstitutions(getSession(), declRefType->declRef.getDecl());
+                    if (auto typetype = typeExp.exp->type.type.As<TypeType>())
+                        typetype->type = declRefType;
+                }
+            }
+        }
+
         void CheckGenericConstraintDecl(GenericTypeConstraintDecl* decl)
         {
             // TODO: are there any other validations we can do at this point?
@@ -1294,9 +1310,13 @@ namespace Slang
             // There probably needs to be a kind of "occurs check" to make
             // sure that the constraint actually applies to at least one
             // of the parameters of the generic.
-
-            decl->sub = TranslateTypeNode(decl->sub);
-            decl->sup = TranslateTypeNode(decl->sup);
+            if (decl->checkState == DeclCheckState::Unchecked)
+            {
+                decl->checkState = DeclCheckState::Checked;
+                CheckConstraintSubType(decl->sub);
+                decl->sub = TranslateTypeNodeForced(decl->sub);
+                decl->sup = TranslateTypeNodeForced(decl->sup);
+            }
         }
 
         void checkDecl(Decl* decl)
@@ -1343,6 +1363,7 @@ namespace Slang
         {
             // check the type being inherited from
             auto base = inheritanceDecl->base;
+            CheckConstraintSubType(base);
             base = TranslateTypeNode(base);
             inheritanceDecl->base = base;
 
@@ -1677,7 +1698,7 @@ namespace Slang
             // An associated type requirement should be allowed
             // to be satisfied by any type declaration:
             // a typedef, a `struct`, etc.
-            auto checkSubTypeMember = [&](DeclRef<AggTypeDecl> subStructTypeDeclRef) -> bool
+            auto checkSubTypeMember = [&](DeclRef<ContainerDecl> subStructTypeDeclRef) -> bool
             {
                 EnsureDecl(subStructTypeDeclRef.getDecl());
                 // this is a sub type (e.g. nested struct declaration) in an aggregate type
@@ -1685,10 +1706,10 @@ namespace Slang
                 if (auto requiredTypeDeclRef = requiredMemberDeclRef.As<AssocTypeDecl>())
                 {
                     bool conformance = true;
-                    auto inheritanceReqDeclRefs = getMembersOfType<InheritanceDecl>(requiredTypeDeclRef);
+                    auto inheritanceReqDeclRefs = getMembersOfType<TypeConstraintDecl>(requiredTypeDeclRef);
                     for (auto inheritanceReqDeclRef : inheritanceReqDeclRefs)
                     {
-                        auto interfaceDeclRefType = inheritanceReqDeclRef.getDecl()->base.type.As<DeclRefType>();
+                        auto interfaceDeclRefType = inheritanceReqDeclRef.getDecl()->getSup().type.As<DeclRefType>();
                         SLANG_ASSERT(interfaceDeclRefType);
                         auto interfaceDeclRef = interfaceDeclRefType->declRef.As<InterfaceDecl>();
                         SLANG_ASSERT(interfaceDeclRef);
@@ -1744,20 +1765,22 @@ namespace Slang
                 // check if the specified type satisfies the constraints defined by the associated type
                 if (auto requiredTypeDeclRef = requiredMemberDeclRef.As<AssocTypeDecl>())
                 {
-                    auto constraintList = getMembersOfType<InheritanceDecl>(requiredTypeDeclRef);
-                    if (constraintList.Count())
+                    auto declRefType = GetType(typedefDeclRef)->GetCanonicalType()->As<DeclRefType>();
+                    if (!declRefType)
+                        return false;
+
+                    if (auto genTypeParamDeclRef = declRefType->declRef.As<GenericTypeParamDecl>())
                     {
-                        auto declRefType = GetType(typedefDeclRef)->GetCanonicalType()->As<DeclRefType>();
-                        if (!declRefType)
-                            return false;
-
-                        auto structTypeDeclRef = declRefType->declRef.As<AggTypeDecl>();
-                        if (!structTypeDeclRef)
-                            return false;
-
-                        return checkSubTypeMember(structTypeDeclRef);
+                        // TODO: check generic type parameter satisfies constraints
+                        return true;
                     }
-                    return true;
+                    
+
+                    auto containerDeclRef = declRefType->declRef.As<ContainerDecl>();
+                    if (!containerDeclRef)
+                        return false;
+
+                    return checkSubTypeMember(containerDeclRef);
                 }
             }
             // Default: just assume that thing aren't being satisfied.
@@ -2496,6 +2519,7 @@ namespace Slang
             // TODO: This needs to bottleneck through the common variable checks
 
             para->type = CheckUsableType(para->type);
+            
             if (para->type.Equals(getSession()->getVoidType()))
             {
                 if (!isRewriteMode())
@@ -6154,7 +6178,6 @@ namespace Slang
                 return expr;
 
             expr->type = QualType(getSession()->getErrorType());
-
             auto lookupResult = lookUp(
                 getSession(),
                 this, expr->name, expr->scope);
@@ -6983,16 +7006,17 @@ namespace Slang
             subst->genericDecl = genericDecl;
             subst->outer = parentSubst.genericSubstitutions;
             resultSubst.genericSubstitutions = subst;
-
+            SubstitutionSet outerSubst = resultSubst;
+            outerSubst.genericSubstitutions = outerSubst.genericSubstitutions?outerSubst.genericSubstitutions->outer:nullptr;
             for( auto mm : genericDecl->Members )
             {
                 if( auto genericTypeParamDecl = mm.As<GenericTypeParamDecl>() )
                 {
-                    subst->args.Add(DeclRefType::Create(session, makeDeclRef(genericTypeParamDecl.Ptr())));
+                    subst->args.Add(DeclRefType::Create(session, DeclRef<Decl>(genericTypeParamDecl.Ptr(), outerSubst)));
                 }
                 else if( auto genericValueParamDecl = mm.As<GenericValueParamDecl>() )
                 {
-                    subst->args.Add(new GenericParamIntVal(makeDeclRef(genericValueParamDecl.Ptr())));
+                    subst->args.Add(new GenericParamIntVal(DeclRef<GenericValueParamDecl>(genericValueParamDecl.Ptr(), outerSubst)));
                 }
             }
 
@@ -7002,7 +7026,7 @@ namespace Slang
                 if (auto genericTypeConstraintDecl = mm.As<GenericTypeConstraintDecl>())
                 {
                     RefPtr<DeclaredSubtypeWitness> witness = new DeclaredSubtypeWitness();
-                    witness->declRef = makeDeclRef(genericTypeConstraintDecl.Ptr());
+                    witness->declRef = DeclRef<Decl>(genericTypeConstraintDecl.Ptr(), outerSubst);
                     witness->sub = genericTypeConstraintDecl->sub.type;
                     witness->sup = genericTypeConstraintDecl->sup.type;
                     subst->args.Add(witness);

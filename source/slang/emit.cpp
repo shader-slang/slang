@@ -4947,7 +4947,7 @@ emitDeclImpl(decl, nullptr);
     {
         auto type = inst->getType();
 
-        if(type->As<UniformParameterGroupType>())
+        if(type->As<UniformParameterGroupType>() && !type->As<ParameterBlockType>())
         {
             // TODO: we need to be careful here, because
             // HLSL shader model 6 allows these as explicit
@@ -6341,7 +6341,7 @@ emitDeclImpl(decl, nullptr);
     {
         // We don't want to declare generic functions,
         // because none of our targets actually support them.
-        if(func->genericDecl)
+        if(func->getGenericDecl())
             return;
 
         // We also don't want to emit declarations for operations
@@ -6453,7 +6453,7 @@ emitDeclImpl(decl, nullptr);
         EmitContext*    ctx,
         IRFunc*         func)
     {
-        if(func->genericDecl)
+        if(func->getGenericDecl())
         {
             Emit("/* ");
             emitIRFuncDecl(ctx, func);
@@ -7110,7 +7110,7 @@ emitDeclImpl(decl, nullptr);
                 // Don't emit anything for a generic function,
                 // since we only care about the types used by
                 // the actual specializations.
-                if (irFunc->genericDecl)
+                if (irFunc->getGenericDecl())
                     return;
 
                 emitIRUsedType(ctx, irFunc->getResultType());

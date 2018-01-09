@@ -438,7 +438,15 @@ struct IRFunc : IRGlobalValueWithCode
     // If this function is generic, then we store a reference
     // to the AST-level generic that defines its parameters
     // and their constraints.
-    RefPtr<GenericDecl> genericDecl;
+    List<RefPtr<GenericDecl>> genericDecls;
+    int specializedGenericLevel = -1;
+
+    GenericDecl* getGenericDecl()
+    {
+        if (specializedGenericLevel != -1)
+            return genericDecls[specializedGenericLevel].Ptr();
+        return nullptr;
+    }
 
     // Convenience accessors for working with the 
     // function's type.

@@ -408,6 +408,22 @@ namespace Slang
     }
 
     String getMangledNameForConformanceWitness(
+        DeclRef<Decl> sub,
+        Type* sup)
+    {
+        // The mangled form for a witness that `sub`
+        // conforms to `sup` will be named:
+        //
+        //     {Conforms(sub,sup)} => _SW{sub}{sup}
+        //
+        ManglingContext context;
+        emitRaw(&context, "_SW");
+        emitQualifiedName(&context, sub);
+        emitType(&context, sup);
+        return context.sb.ProduceString();
+    }
+
+    String getMangledNameForConformanceWitness(
         Type* sub,
         Type* sup)
     {
