@@ -470,6 +470,52 @@ LoweredValInfo emitPostOp(
     return LoweredValInfo::ptr(argPtr);
 }
 
+IRValue* findWitnessTable(
+    IRGenContext*   context,
+    DeclRef<Decl>   declRef);
+
+LoweredValInfo emitWitnessTableRef(
+    IRGenContext* context,
+    Expr* expr)
+{
+    if (auto mbrExpr = dynamic_cast<MemberExpr*>(expr))
+    {
+        if (auto inheritanceDeclRef = mbrExpr->declRef.As<InheritanceDecl>())
+        {
+            if (inheritanceDeclRef.getDecl()->ParentDecl->As<InterfaceDecl>() || inheritanceDeclRef.getDecl()->ParentDecl->As<AssocTypeDecl>())
+            {
+                RefPtr<Type> exprType = nullptr;
+                if (auto tt = mbrExpr->BaseExpression->type->As<TypeType>())
+                    exprType = tt->type;
+                else
+                    exprType = mbrExpr->BaseExpression->type;
+                auto declRefType = exprType->GetCanonicalType()->AsDeclRefType();
+                SLANG_ASSERT(declRefType);
+                IRValue* witnessTableVal = nullptr;
+                DeclRef<Decl> srcDeclRef = declRefType->declRef;
+                if (!declRefType->declRef.As<AssocTypeDecl>())
+                {
+                    // if we are referring to an actual type, don't include substitution
+                    // and generate specialize instruction
+                    srcDeclRef.substitutions = nullptr;
+                }
+                witnessTableVal = context->irBuilder->emitFindWitnessTable(srcDeclRef, inheritanceDeclRef.getDecl()->base.type);
+                return maybeEmitSpecializeInst(context, LoweredValInfo::simple(witnessTableVal), declRefType->declRef);
+            }
+            else if (inheritanceDeclRef.getDecl()->ParentDecl->As<AggTypeDeclBase>())
+            {
+                return LoweredValInfo::simple(findWitnessTable(context, inheritanceDeclRef));
+            }
+
+        }
+        else if (auto genConstraintDeclRef = mbrExpr->declRef.As<GenericTypeConstraintDecl>())
+        {
+            return LoweredValInfo::simple(context->irBuilder->getDeclRefVal(genConstraintDeclRef));
+        }
+    }
+    SLANG_UNEXPECTED("unknown witness table expression");
+}
+
 // Emit a reference to a function, where we have concluded
 // that the original AST referenced `funcDeclRef`. The
 // optional expression `funcExpr` can provide additional
@@ -494,7 +540,7 @@ LoweredValInfo emitFuncRef(
         if(auto baseMemberExpr = baseExpr.As<MemberExpr>())
         {
             auto baseMemberDeclRef = baseMemberExpr->declRef;
-            if(auto baseConstraintDeclRef = baseMemberDeclRef.As<GenericTypeConstraintDecl>())
+            if(auto baseConstraintDeclRef = baseMemberDeclRef.As<TypeConstraintDecl>())
             {
                 // We are calling a method "through" a generic type
                 // parameter that was constrained to some type.
@@ -505,10 +551,10 @@ LoweredValInfo emitFuncRef(
                 // find the corresponding member on our chosen type.
 
                 RefPtr<Type> type = funcExpr->type;
-
+                auto loweredBaseWitnessTable = emitWitnessTableRef(context, baseMemberExpr);
                 auto loweredVal = LoweredValInfo::simple(context->irBuilder->emitLookupInterfaceMethodInst(
                     type,
-                    baseMemberDeclRef,
+                    loweredBaseWitnessTable.val,
                     funcDeclRef));
                 return maybeEmitSpecializeInst(context, loweredVal, funcDeclRef);
             }
@@ -1184,7 +1230,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             boundMemberInfo->declRef = callableDeclRef;
             return LoweredValInfo::boundMember(boundMemberInfo);
         }
-        else if(auto constraintDeclRef = declRef.As<GenericTypeConstraintDecl>())
+        else if(auto constraintDeclRef = declRef.As<TypeConstraintDecl>())
         {
             // The code is making use of a "witness" that a value of
             // some generic type conforms to an interface.
@@ -2770,10 +2816,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         for (auto entry : inheritanceDecl->requirementWitnesses)
         {
             auto requiredMemberDeclRef = entry.Key;
-            auto satisfyingMemberDecl = entry.Value;
-
+            auto satisfyingMemberDeclRef = entry.Value;
+            
             auto irRequirement = context->irBuilder->getDeclRefVal(requiredMemberDeclRef);
-            auto irSatisfyingVal = getSimpleVal(context, ensureDecl(context, satisfyingMemberDecl));
+            IRValue* irSatisfyingVal = nullptr;
+            if (satisfyingMemberDeclRef.As<GenericTypeConstraintDecl>())
+                irSatisfyingVal = context->irBuilder->getDeclRefVal(satisfyingMemberDeclRef);
+            else
+                irSatisfyingVal = getSimpleVal(context, ensureDecl(context, satisfyingMemberDeclRef));
 
             context->irBuilder->createWitnessTableEntry(
                 witnessTable,

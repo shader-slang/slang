@@ -85,6 +85,9 @@ END_SYNTAX_CLASS()
 ABSTRACT_SYNTAX_CLASS(SubtypeWitness, Witness)
     FIELD(RefPtr<Type>, sub)
     FIELD(RefPtr<Type>, sup)
+    RAW(
+    virtual DeclRef<Decl> getLastStepDeclRef() = 0;
+    )
 END_SYNTAX_CLASS()
 
 // A witness that one type is a subtype of another
@@ -96,6 +99,10 @@ RAW(
     virtual String ToString() override;
     virtual int GetHashCode() override;
     virtual RefPtr<Val> SubstituteImpl(Substitutions * subst, int * ioDiff) override;
+    virtual DeclRef<Decl> getLastStepDeclRef() override
+    {
+        return declRef;
+    }
 )
 END_SYNTAX_CLASS()
 
@@ -111,6 +118,10 @@ RAW(
     virtual String ToString() override;
     virtual int GetHashCode() override;
     virtual RefPtr<Val> SubstituteImpl(Substitutions * subst, int * ioDiff) override;
+    virtual DeclRef<Decl> getLastStepDeclRef() override
+    {
+        return midToSup->getLastStepDeclRef();
+    }
 )
 END_SYNTAX_CLASS()
 

@@ -84,6 +84,12 @@ struct IRLookupWitnessMethod : IRInst
     IRUse requirementDeclRef;
 };
 
+struct IRLookupWitnessTable : IRInst
+{
+    IRUse sourceType;
+    IRUse interfaceType;
+};
+
 //
 
 struct IRCall : IRInst
@@ -309,6 +315,14 @@ struct IRWitnessTable : IRGlobalValue
     IRValueList<IRWitnessTableEntry> entries;
 };
 
+// An abstract witness table is a global value that 
+// represents an inheritance relationship that can't
+// be resolved to a witness table at IR-generation time.
+struct IRAbstractWitness : IRGlobalValue
+{
+    RefPtr<SubtypeWitness> witness;
+    DeclRef<Decl> subTypeDeclRef, supTypeDeclRef;
+};
 
 
 // Description of an instruction to be used for global value numbering
@@ -402,6 +416,15 @@ struct IRBuilder
         DeclRef<Decl>   witnessTableDeclRef,
         DeclRef<Decl>   interfaceMethodDeclRef);
 
+    IRValue* emitLookupInterfaceMethodInst(
+        IRType*         type,
+        IRValue*   witnessTableVal,
+        DeclRef<Decl>   interfaceMethodDeclRef);
+
+    IRValue* emitFindWitnessTable(
+        DeclRef<Decl> baseTypeDeclRef,
+        IRType* interfaceType);
+
     IRInst* emitCallInst(
         IRType*         type,
         IRValue*        func,
@@ -424,7 +447,6 @@ struct IRBuilder
     IRFunc* createFunc();
     IRGlobalVar* createGlobalVar(
         IRType* valueType);
-    IRWitnessTable* createWitnessTable(Dictionary<DeclRef<Decl>, Decl*> & witnesses);
     IRWitnessTable* createWitnessTable();
     IRWitnessTableEntry* createWitnessTableEntry(
         IRWitnessTable* witnessTable,

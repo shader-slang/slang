@@ -90,21 +90,30 @@ SIMPLE_SYNTAX_CLASS(ClassDecl, AggTypeDecl)
 // An interface which other types can conform to
 SIMPLE_SYNTAX_CLASS(InterfaceDecl, AggTypeDecl)
 
+ABSTRACT_SYNTAX_CLASS(TypeConstraintDecl, Decl)
+    RAW(
+    virtual TypeExp& getSup() = 0;
+    )
+END_SYNTAX_CLASS()
+
 // A kind of pseudo-member that represents an explicit
 // or implicit inheritance relationship.
 //
-SYNTAX_CLASS(InheritanceDecl, Decl)
-    // The type expression as written
+SYNTAX_CLASS(InheritanceDecl, TypeConstraintDecl)
+// The type expression as written
     SYNTAX_FIELD(TypeExp, base)
 
-RAW(
+    RAW(
     // After checking, this dictionary will map members
     // required by the base type to their concrete
     // implementations in the type that contains
     // this inheritance declaration.
-    Dictionary<DeclRef<Decl>, Decl*> requirementWitnesses;
-)
-
+    Dictionary<DeclRef<Decl>, DeclRef<Decl>> requirementWitnesses;
+    virtual TypeExp& getSup() override
+    {
+        return base;
+    }
+    )
 END_SYNTAX_CLASS()
 
 // TODO: may eventually need sub-classes for explicit/direct vs. implicit/indirect inheritance
@@ -216,13 +225,19 @@ SYNTAX_CLASS(GenericTypeParamDecl, SimpleTypeDecl)
 END_SYNTAX_CLASS()
 
 // A constraint placed as part of a generic declaration
-SYNTAX_CLASS(GenericTypeConstraintDecl, Decl)
+SYNTAX_CLASS(GenericTypeConstraintDecl, TypeConstraintDecl)
     // A type constraint like `T : U` is constraining `T` to be "below" `U`
     // on a lattice of types. This may not be a subtyping relationship
     // per se, but it makes sense to use that terminology here, so we
     // think of these fields as the sub-type and sup-ertype, respectively.
     SYNTAX_FIELD(TypeExp, sub)
     SYNTAX_FIELD(TypeExp, sup)
+    RAW(
+    virtual TypeExp& getSup() override
+    {
+        return sup;
+    }
+    )
 END_SYNTAX_CLASS()
 
 SIMPLE_SYNTAX_CLASS(GenericValueParamDecl, VarDeclBase)

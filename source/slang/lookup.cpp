@@ -412,7 +412,7 @@ void lookUpMemberImpl(
         auto declRef = declRefType->declRef;
         if (declRef.As<AssocTypeDecl>() || declRef.As<GlobalGenericParamDecl>())
         {
-            for (auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(declRef.As<ContainerDecl>()))
+            for (auto constraintDeclRef : getMembersOfType<TypeConstraintDecl>(declRef.As<ContainerDecl>()))
             {
                 // The super-type in the constraint (e.g., `Foo` in `T : Foo`)
                 // will tell us a type we should use for lookup.

@@ -2279,7 +2279,7 @@ namespace Slang
         auto nameToken = parser->ReadToken(TokenType::Identifier);
         assocTypeDecl->nameAndLoc = NameLoc(nameToken);
         assocTypeDecl->loc = nameToken.loc;
-        parseOptionalGenericConstraints(parser, assocTypeDecl);
+        parseOptionalInheritanceClause(parser, assocTypeDecl);
         parser->ReadToken(TokenType::Semicolon);
         return assocTypeDecl;
     }

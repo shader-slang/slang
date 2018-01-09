@@ -153,6 +153,8 @@ namespace Slang
             RefPtr<Expr>    baseExpr,
             SourceLoc       loc)
         {
+            if (declRef.As<AssocTypeDecl>())
+                getNewThisTypeSubst(declRef);
             if (baseExpr)
             {
                 RefPtr<Expr> expr;
@@ -182,26 +184,18 @@ namespace Slang
                 if (auto baseDeclRefExpr = baseExpr->As<DeclRefExpr>())
                 {
                     baseThisTypeSubst = getThisTypeSubst(baseDeclRefExpr->declRef, false);
-                    if (auto baseAssocType = baseDeclRefExpr->declRef.As<AssocTypeDecl>())
-                    {
-                        baseThisTypeSubst = new ThisTypeSubstitution();
-                        baseThisTypeSubst->sourceType = baseDeclRefExpr->type.type;
-                        if (auto typetype = baseThisTypeSubst->sourceType.As<TypeType>())
-                            baseThisTypeSubst->sourceType = typetype->type;
-                    }
                 }
-                if (auto assocTypeDecl = declRef.As<AssocTypeDecl>())
+                if (declRef.As<TypeConstraintDecl>())
                 {
-                    auto newThisTypeSubst = new ThisTypeSubstitution();
-                    if (baseThisTypeSubst)
-                        newThisTypeSubst->sourceType = baseThisTypeSubst->sourceType;
-                    expr->type = GetTypeForDeclRef(DeclRef<AssocTypeDecl>(assocTypeDecl.getDecl(), newThisTypeSubst));
-                    auto declOutThisTypeSubst = getNewThisTypeSubst(*declRefOut);
-                    if (baseThisTypeSubst)
-                        declOutThisTypeSubst->sourceType = baseThisTypeSubst->sourceType;
-                    return expr;
+                    // if this is a reference to type constraint, insert a this-type substitution
+                    RefPtr<Type> expType;
+                    expType = baseExpr->type;
+                    if (auto baseExprTT = baseExpr->type->As<TypeType>())
+                        expType = baseExprTT->type;
+                    auto thisTypeSubst = getNewThisTypeSubst(*declRefOut);
+                    thisTypeSubst->sourceType = expType;
+                    baseThisTypeSubst = nullptr;
                 }
-                
                 // propagate "this-type" substitutions
                 if (baseThisTypeSubst)
                 {
@@ -210,7 +204,7 @@ namespace Slang
                         getNewThisTypeSubst(declRefExpr->declRef)->sourceType = baseThisTypeSubst->sourceType;
                     }
                 }
-                expr->type = GetTypeForDeclRef(declRef);
+                expr->type = GetTypeForDeclRef(*declRefOut);
                 return expr;
             }
             else
@@ -219,21 +213,6 @@ namespace Slang
                 expr->loc = loc;
                 expr->name = declRef.GetName();
                 expr->type = GetTypeForDeclRef(declRef);
-                if (auto exprDeclRefType = getExprDeclRefType(expr))
-                {
-                    if (auto genParmDecl = exprDeclRefType->declRef.As<GenericTypeParamDecl>())
-                    {
-                        // if this is a reference to generic type param, insert a this-type substitution
-                        auto exprType = GetTypeForDeclRef(declRef);
-                        auto thisSubst = new ThisTypeSubstitution();
-                        if (auto typetype = exprType.type.As<TypeType>())
-                            thisSubst->sourceType = typetype->type;
-                        else
-                            thisSubst->sourceType = exprType.type;
-                        thisSubst->outer = declRef.substitutions;
-                        declRef.substitutions = thisSubst;
-                    }
-                }
                 expr->declRef = declRef;
                 return expr;
             }
@@ -1614,27 +1593,27 @@ namespace Slang
         }
 
         bool doesSignatureMatchRequirement(
-            CallableDecl*           /*memberDecl*/,
-            DeclRef<CallableDecl>   requiredMemberDeclRef)
+            DeclRef<CallableDecl>           memberDecl,
+            DeclRef<CallableDecl>   requiredMemberDeclRef,
+            Dictionary<DeclRef<Decl>, DeclRef<Decl>> & requirementDict)
         {
             // TODO: actually implement matching here. For now we'll
-            // just pretend that things are satisfied in order to make progress.
+            // just pretend that things are satisfied in order to make progress..
+            requirementDict.Add(requiredMemberDeclRef, DeclRef<Decl>(memberDecl, nullptr));
             return true;
         }
 
         bool doesGenericSignatureMatchRequirement(
-            GenericDecl * genDecl,
-            DeclRef<GenericDecl> requirementGenDecl)
+            DeclRef<GenericDecl> genDecl,
+            DeclRef<GenericDecl> requirementGenDecl,
+            Dictionary<DeclRef<Decl>, DeclRef<Decl>> & requirementDict)
         {
-            // TODO: genDecl should be a DeclRef to capture the environment generic variables needed to get 
-            // a concrete type for a generic constraint super type (e.g. when this member belongs to a generic type)
-
-            if (genDecl->Members.Count() != requirementGenDecl.getDecl()->Members.Count())
+            if (genDecl.getDecl()->Members.Count() != requirementGenDecl.getDecl()->Members.Count())
                 return false;
-            for (UInt i = 0; i < genDecl->Members.Count(); i++)
+            for (UInt i = 0; i < genDecl.getDecl()->Members.Count(); i++)
             {
-                auto genMbr = genDecl->Members[i];
-                auto requiredGenMbr = genDecl->Members[i];
+                auto genMbr = genDecl.getDecl()->Members[i];
+                auto requiredGenMbr = genDecl.getDecl()->Members[i];
                 if (auto genTypeMbr = genMbr.As<GenericTypeParamDecl>())
                 {
                     if (auto requiredGenTypeMbr = requiredGenMbr.As<GenericTypeParamDecl>())
@@ -1647,7 +1626,8 @@ namespace Slang
                 {
                     if (auto requiredGenValMbr = requiredGenMbr.As<GenericValueParamDecl>())
                     {
-                        return genValMbr->type->Equals(requiredGenValMbr->type);
+                        if (!genValMbr->type->Equals(requiredGenValMbr->type))
+                            return false;
                     }
                     else
                         return false;
@@ -1665,16 +1645,18 @@ namespace Slang
                         return false;
                 }
             }
-            return doesMemberSatisfyRequirement(genDecl->inner.Ptr(),
-                DeclRef<Decl>(requirementGenDecl.getDecl()->inner.Ptr(), requirementGenDecl.substitutions));
+            return doesMemberSatisfyRequirement(DeclRef<Decl>(genDecl.getDecl()->inner.Ptr(), genDecl.substitutions),
+                DeclRef<Decl>(requirementGenDecl.getDecl()->inner.Ptr(), requirementGenDecl.substitutions),
+                requirementDict);
         }
 
         // Does the given `memberDecl` work as an implementation
         // to satisfy the requirement `requiredMemberDeclRef`
         // from an interface?
         bool doesMemberSatisfyRequirement(
-            Decl*           memberDecl,
-            DeclRef<Decl>   requiredMemberDeclRef)
+            DeclRef<Decl>   memberDeclRef,
+            DeclRef<Decl>   requiredMemberDeclRef,
+            Dictionary<DeclRef<Decl>, DeclRef<Decl>> & requirementDictionary)
         {
             // At a high level, we want to chack that the
             // `memberDecl` and the `requiredMemberDeclRef`
@@ -1694,74 +1676,85 @@ namespace Slang
             // An associated type requirement should be allowed
             // to be satisfied by any type declaration:
             // a typedef, a `struct`, etc.
-
-            if (auto memberFuncDecl = dynamic_cast<FuncDecl*>(memberDecl))
+            auto checkSubTypeMember = [&](DeclRef<AggTypeDecl> subStructTypeDeclRef) -> bool
+            {
+                EnsureDecl(subStructTypeDeclRef.getDecl());
+                // this is a sub type (e.g. nested struct declaration) in an aggregate type
+                // check if this sub type declaration satisfies the constraints defined by the associated type
+                if (auto requiredTypeDeclRef = requiredMemberDeclRef.As<AssocTypeDecl>())
+                {
+                    bool conformance = true;
+                    auto inheritanceReqDeclRefs = getMembersOfType<InheritanceDecl>(requiredTypeDeclRef);
+                    for (auto inheritanceReqDeclRef : inheritanceReqDeclRefs)
+                    {
+                        auto interfaceDeclRefType = inheritanceReqDeclRef.getDecl()->base.type.As<DeclRefType>();
+                        SLANG_ASSERT(interfaceDeclRefType);
+                        auto interfaceDeclRef = interfaceDeclRefType->declRef.As<InterfaceDecl>();
+                        SLANG_ASSERT(interfaceDeclRef);
+                        RefPtr<DeclRefType> declRefType = new DeclRefType();
+                        declRefType->declRef = subStructTypeDeclRef;
+                        auto witness = tryGetInterfaceConformanceWitness(declRefType,
+                            interfaceDeclRef).As<SubtypeWitness>();
+                        if (witness)
+                            requirementDictionary.Add(inheritanceReqDeclRef, witness->getLastStepDeclRef());
+                        else
+                            conformance = false;
+                    }
+                    return conformance;
+                }
+                return false;
+            };
+            if (auto memberFuncDecl = memberDeclRef.As<FuncDecl>())
             {
                 if (auto requiredFuncDeclRef = requiredMemberDeclRef.As<FuncDecl>())
                 {
                     // Check signature match.
                     return doesSignatureMatchRequirement(
                         memberFuncDecl,
-                        requiredFuncDeclRef);
+                        requiredFuncDeclRef,
+                        requirementDictionary);
                 }
             }
-            else if (auto memberInitDecl = dynamic_cast<ConstructorDecl*>(memberDecl))
+            else if (auto memberInitDecl = memberDeclRef.As<ConstructorDecl>())
             {
                 if (auto requiredInitDecl = requiredMemberDeclRef.As<ConstructorDecl>())
                 {
                     // Check signature match.
                     return doesSignatureMatchRequirement(
                         memberInitDecl,
-                        requiredInitDecl);
+                        requiredInitDecl,
+                        requirementDictionary);
                 }
             }
-            else if (auto genDecl = dynamic_cast<GenericDecl*>(memberDecl))
+            else if (auto genDecl = memberDeclRef.As<GenericDecl>())
             {
                 if (auto requiredGenDeclRef = requiredMemberDeclRef.As<GenericDecl>())
                 {
-                    return doesGenericSignatureMatchRequirement(genDecl, requiredGenDeclRef);
+                    return doesGenericSignatureMatchRequirement(genDecl, requiredGenDeclRef, requirementDictionary);
                 }
             }
-            else if (auto subStructTypeDecl = dynamic_cast<AggTypeDecl*>(memberDecl))
+            else if (auto subStructTypeDeclRef = memberDeclRef.As<AggTypeDecl>())
             {
-                // this is a sub type (e.g. nested struct declaration) in an aggregate type
-                // check if this sub type declaration satisfies the constraints defined by the associated type
-                if (auto requiredTypeDeclRef = requiredMemberDeclRef.As<AssocTypeDecl>())
-                {
-                    bool conformance = true;
-                    for (auto & inheritanceDecl : requiredTypeDeclRef.getDecl()->getMembersOfType<InheritanceDecl>())
-                    {
-                        conformance = conformance && checkConformance(subStructTypeDecl, inheritanceDecl.Ptr());
-                    }
-                    return conformance;
-                }
+                return checkSubTypeMember(subStructTypeDeclRef);
             }
-            else if (auto typedefDecl = dynamic_cast<TypeDefDecl*>(memberDecl))
+            else if (auto typedefDeclRef = memberDeclRef.As<TypeDefDecl>())
             {
                 // this is a type-def decl in an aggregate type
                 // check if the specified type satisfies the constraints defined by the associated type
-                if (auto requiredTypeDecl = requiredMemberDeclRef.As<AssocTypeDecl>())
+                if (auto requiredTypeDeclRef = requiredMemberDeclRef.As<AssocTypeDecl>())
                 {
-                    auto constraintList = requiredTypeDecl.getDecl()->getMembersOfType<InheritanceDecl>();
+                    auto constraintList = getMembersOfType<InheritanceDecl>(requiredTypeDeclRef);
                     if (constraintList.Count())
                     {
-                        auto declRefType = typedefDecl->type->AsDeclRefType();
+                        auto declRefType = GetType(typedefDeclRef)->GetCanonicalType()->As<DeclRefType>();
                         if (!declRefType)
                             return false;
 
-                        auto structTypeDecl = declRefType->declRef.getDecl()->As<AggTypeDecl>();
-                        if (!structTypeDecl)
+                        auto structTypeDeclRef = declRefType->declRef.As<AggTypeDecl>();
+                        if (!structTypeDeclRef)
                             return false;
-                        //TODO: What do we do if type is a generic specialization?
-                        // i.e. if the struct defines typedef Generic<float> T; 
-                        // how to check if T satisfies the associatedtype constraints?
-                        // the code below will only work when T is defined to be a simple aggregated type (no generics).
-                        bool conformance = true;
-                        for (auto & inheritanceDecl : constraintList)
-                        {
-                            conformance = conformance && checkConformance(structTypeDecl, inheritanceDecl.Ptr());
-                        }
-                        return conformance;
+
+                        return checkSubTypeMember(structTypeDeclRef);
                     }
                     return true;
                 }
@@ -1779,10 +1772,11 @@ namespace Slang
         // `requiredMemberDeclRef` is a required member of
         // the interface.
         RefPtr<Decl> findWitnessForInterfaceRequirement(
-            AggTypeDecl*            typeDecl,
+            DeclRef<AggTypeDecl>    typeDeclRef,
             InheritanceDecl*        inheritanceDecl,
             DeclRef<InterfaceDecl>  interfaceDeclRef,
-            DeclRef<Decl>           requiredMemberDeclRef)
+            DeclRef<Decl>           requiredMemberDeclRef,
+            Dictionary<DeclRef<Decl>, DeclRef<Decl>> & requirementWitness)
         {
             // We will look up members with the same name,
             // since only same-name members will be able to
@@ -1816,14 +1810,14 @@ namespace Slang
             // now, so we won't worry about this.
 
             // Make sure that by-name lookup is possible.
-            buildMemberDictionary(typeDecl);
+            buildMemberDictionary(typeDeclRef.getDecl());
 
             Decl* firstMemberOfName = nullptr;
-            typeDecl->memberDictionary.TryGetValue(name, firstMemberOfName);
+            typeDeclRef.getDecl()->memberDictionary.TryGetValue(name, firstMemberOfName);
 
             if (!firstMemberOfName)
             {
-                getSink()->diagnose(inheritanceDecl, Diagnostics::typeDoesntImplementInterfaceRequirement, typeDecl, requiredMemberDeclRef);
+                getSink()->diagnose(inheritanceDecl, Diagnostics::typeDoesntImplementInterfaceRequirement, typeDeclRef, requiredMemberDeclRef);
                 return nullptr;
             }
 
@@ -1831,7 +1825,7 @@ namespace Slang
             // the expected signature for the requirement.
             for (auto memberDecl = firstMemberOfName; memberDecl; memberDecl = memberDecl->nextInContainerWithSameName)
             {
-                if (doesMemberSatisfyRequirement(memberDecl, requiredMemberDeclRef))
+                if (doesMemberSatisfyRequirement(DeclRef<Decl>(memberDecl, typeDeclRef.substitutions), requiredMemberDeclRef, requirementWitness))
                     return memberDecl;
             }
 
@@ -1842,7 +1836,7 @@ namespace Slang
             // of "candidates" for satisfaction of the requirement,
             // and if nothing is found we print the candidates
 
-            getSink()->diagnose(inheritanceDecl, Diagnostics::typeDoesntImplementInterfaceRequirement, typeDecl, requiredMemberDeclRef);
+            getSink()->diagnose(inheritanceDecl, Diagnostics::typeDoesntImplementInterfaceRequirement, typeDeclRef, requiredMemberDeclRef);
             return nullptr;
         }
 
@@ -1851,7 +1845,7 @@ namespace Slang
         // (via the given `inheritanceDecl`) actually provides
         // members to satisfy all the requirements in the interface.
         bool checkInterfaceConformance(
-            AggTypeDecl*        typeDecl,
+            DeclRef<AggTypeDecl>        typeDeclRef,
             InheritanceDecl*    inheritanceDecl,
             DeclRef<InterfaceDecl>  interfaceDeclRef)
         {
@@ -1884,7 +1878,7 @@ namespace Slang
                     //
                     // TODO: we *really* need a linearization step here!!!!
                     result = result && checkConformanceToType(
-                        typeDecl,
+                        typeDeclRef,
                         inheritanceDecl,
                         getBaseType(requiredInheritanceDeclRef));
                     continue;
@@ -1892,30 +1886,26 @@ namespace Slang
 
                 // Look for a member in the type that can satisfy the
                 // interface requirement.
-                auto conformanceWitness = findWitnessForInterfaceRequirement(
-                    typeDecl,
+                auto isConformanceSatisfied = findWitnessForInterfaceRequirement(
+                    typeDeclRef,
                     inheritanceDecl,
                     interfaceDeclRef,
-                    requiredMemberDeclRef);
+                    requiredMemberDeclRef,
+                    inheritanceDecl->requirementWitnesses);
 
-                if (!conformanceWitness)
+                if (!isConformanceSatisfied)
                 {
                     result = false;
                     continue;
                 }
-
-                // Store that witness into a table stored on the `inheritnaceDecl`
-                // so that it can be used for downstream code generation.
-
-                inheritanceDecl->requirementWitnesses.Add(requiredMemberDeclRef, conformanceWitness);
             }
             return result;
         }
 
         bool checkConformanceToType(
-            AggTypeDecl*        typeDecl,
-            InheritanceDecl*    inheritanceDecl,
-            Type*               baseType)
+            DeclRef<AggTypeDecl> typeDeclRef,
+            InheritanceDecl*     inheritanceDecl,
+            Type*                baseType)
         {
             if (auto baseDeclRefType = baseType->As<DeclRefType>())
             {
@@ -1926,7 +1916,7 @@ namespace Slang
                     // We need to check that it provides all of the members
                     // required by that interface.
                     return checkInterfaceConformance(
-                        typeDecl,
+                        typeDeclRef,
                         inheritanceDecl,
                         baseInterfaceDeclRef);
                 }
@@ -1941,13 +1931,20 @@ namespace Slang
         // `inheritanceDecl` actually does what it needs to
         // for that inheritance to be valid.
         bool checkConformance(
-            AggTypeDecl*        typeDecl,
-            InheritanceDecl*    inheritanceDecl)
+            DeclRef<AggTypeDecl>        typeDecl,
+            InheritanceDecl*            inheritanceDecl)
         {
             // Look at the type being inherited from, and validate
             // appropriately.
             auto baseType = inheritanceDecl->base.type;
-            return checkConformanceToType(typeDecl, inheritanceDecl, baseType);
+            return checkConformanceToType(typeDecl, inheritanceDecl, baseType.As<Type>());
+        }
+
+        bool checkConformance(
+            AggTypeDecl*        typeDecl,
+            InheritanceDecl*    inheritanceDecl)
+        {
+            return checkConformance(DeclRef<AggTypeDecl>(typeDecl, nullptr), inheritanceDecl);
         }
 
         void visitAggTypeDecl(AggTypeDecl* decl)
@@ -5095,7 +5092,7 @@ namespace Slang
             RefPtr<Substitutions>	snd)
         {
             // They must both be NULL or non-NULL
-            if (!fst || !snd)
+            if (!hasGenericSubstitutions(fst) || !hasGenericSubstitutions(snd))
                 return fst == snd;
             auto fstGen = fst.As<GenericSubstitution>();
             auto sndGen = snd.As<GenericSubstitution>();
@@ -6927,7 +6924,7 @@ namespace Slang
             auto type = getFuncType(session, funcDeclRef);
             return QualType(type);
         }
-        else if (auto constraintDeclRef = declRef.As<GenericTypeConstraintDecl>())
+        else if (auto constraintDeclRef = declRef.As<TypeConstraintDecl>())
         {
             // When we access a constraint or an inheritance decl (as a member),
             // we are conceptually performing a "cast" to the given super-type,
