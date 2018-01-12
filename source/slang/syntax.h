@@ -412,7 +412,27 @@ namespace Slang
         return SyntaxClass<T>::getClass();
     }
 
-
+    struct SubstitutionSet
+    {
+        RefPtr<GenericSubstitution> genericSubstitutions;
+        RefPtr<ThisTypeSubstitution> thisTypeSubstitution;
+        RefPtr<GlobalGenericParamSubstitution> globalGenParamSubstitutions;
+        operator bool() const
+        {
+            return genericSubstitutions || thisTypeSubstitution || globalGenParamSubstitutions;
+        }
+        SubstitutionSet() {}
+        SubstitutionSet(RefPtr<GenericSubstitution> genSubst, RefPtr<ThisTypeSubstitution> inThisTypeSubst,
+            RefPtr<GlobalGenericParamSubstitution> globalSubst)
+        {
+            genericSubstitutions = genSubst;
+            thisTypeSubstitution = inThisTypeSubst;
+            globalGenParamSubstitutions = globalSubst;
+        }
+        bool Equals(SubstitutionSet substSet) const;
+        SubstitutionSet substituteImpl(SubstitutionSet subst, int * ioDiff);
+        int GetHashCode() const;
+    };
     // A reference to a declaration, which may include
     // substitutions for generic parameters.
     struct DeclRefBase
@@ -424,14 +444,25 @@ namespace Slang
         Decl* getDecl() const { return decl; }
 
         // Optionally, a chain of substititions to perform
-        RefPtr<Substitutions> substitutions;
+        SubstitutionSet substitutions;
 
         DeclRefBase()
         {}
+        
+        DeclRefBase(Decl* decl)
+            :decl(decl)
+        {}
 
-        DeclRefBase(Decl* decl, RefPtr<Substitutions> substitutions)
-            : decl(decl)
-            , substitutions(substitutions)
+        DeclRefBase(Decl* decl, SubstitutionSet subst)
+            :decl(decl),
+            substitutions(subst)
+        {}
+
+        DeclRefBase(Decl* decl, RefPtr<GenericSubstitution> genSubstitutions,
+            RefPtr<ThisTypeSubstitution> thisTypeSubst = nullptr,
+            RefPtr<GlobalGenericParamSubstitution> globalSubst = nullptr)
+            : decl(decl),
+            substitutions(genSubstitutions, thisTypeSubst, globalSubst)
         {}
 
         // Apply substitutions to a type or ddeclaration
@@ -443,7 +474,7 @@ namespace Slang
         RefPtr<Expr> Substitute(RefPtr<Expr> expr) const;
 
         // Apply substitutions to this declaration reference
-        DeclRefBase SubstituteImpl(Substitutions* subst, int* ioDiff);
+        DeclRefBase SubstituteImpl(SubstitutionSet subst, int* ioDiff);
 
 
         // Check if this is an equivalent declaration reference to another
@@ -470,9 +501,13 @@ namespace Slang
 
         DeclRef()
         {}
+        
+        DeclRef(T* decl, SubstitutionSet subst)
+            : DeclRefBase(decl, subst)
+        {}
 
-        DeclRef(T* decl, RefPtr<Substitutions> substitutions)
-            : DeclRefBase(decl, substitutions)
+        DeclRef(T* decl, RefPtr<GenericSubstitution> genSubst)
+            : DeclRefBase(decl, SubstitutionSet(genSubst, nullptr, nullptr))
         {}
 
         template <typename U>
@@ -525,7 +560,7 @@ namespace Slang
         }
 
         // Apply substitutions to this declaration reference
-        DeclRef<T> SubstituteImpl(Substitutions* subst, int* ioDiff)
+        DeclRef<T> SubstituteImpl(SubstitutionSet subst, int* ioDiff)
         {
             return DeclRef<T>::unsafeInit(DeclRefBase::SubstituteImpl(subst, ioDiff));
         }
@@ -641,11 +676,11 @@ namespace Slang
     struct FilteredMemberRefList
     {
         List<RefPtr<Decl>> const&	decls;
-        RefPtr<Substitutions>		substitutions;
+        SubstitutionSet		substitutions;
 
         FilteredMemberRefList(
             List<RefPtr<Decl>> const&	decls,
-            RefPtr<Substitutions>		substitutions)
+            SubstitutionSet		substitutions)
             : decls(decls)
             , substitutions(substitutions)
         {}
@@ -1153,12 +1188,12 @@ namespace Slang
     }
 
     // TODO: where should this live?
-    RefPtr<Substitutions> createDefaultSubstitutions(
+    SubstitutionSet createDefaultSubstitutions(
         Session*        session,
         Decl*           decl,
-        Substitutions*  parentSubst);
+        SubstitutionSet  parentSubst);
 
-    RefPtr<Substitutions> createDefaultSubstitutions(
+    SubstitutionSet createDefaultSubstitutions(
         Session* session,
         Decl*   decl);
 
@@ -1184,7 +1219,7 @@ namespace Slang
     // substitution lists of `DeclRef` etc. to replace the call of 
     // `declRef.substitutions->SubstituteImpl()`, because the head to the linked list is known as a 
     // member of that class there.
-    RefPtr<Substitutions> substituteSubstitutions(RefPtr<Substitutions> oldSubst, Substitutions * subst, int * ioDiff);
+    SubstitutionSet substituteSubstitutions(SubstitutionSet oldSubst, SubstitutionSet subst, int * ioDiff);
 } // namespace Slang
 
 #endif

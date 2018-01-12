@@ -2629,11 +2629,12 @@ struct LoweringVisitor
         SLANG_UNEXPECTED("unhandled value kind");
     }
 
-    RefPtr<Substitutions> translateSubstitutions(
-        Substitutions*  inSubstitutions)
+    SubstitutionSet translateSubstitutions(
+        SubstitutionSet  inSubstitutions)
     {
-        if (!inSubstitutions) return nullptr;
-        if (auto genSubst = dynamic_cast<GenericSubstitution*>(inSubstitutions))
+        if (!inSubstitutions) return SubstitutionSet();
+        SubstitutionSet rs;
+        if (auto genSubst = inSubstitutions.genericSubstitutions)
         {
             RefPtr<GenericSubstitution> result = new GenericSubstitution();
             result->genericDecl = translateDeclRef(genSubst->genericDecl)->As<GenericDecl>();
@@ -2641,16 +2642,16 @@ struct LoweringVisitor
             {
                 result->args.Add(translateVal(arg));
             }
-            return result;
+            rs.genericSubstitutions = result;
         }
-        else if (auto thisSubst = dynamic_cast<ThisTypeSubstitution*>(inSubstitutions))
+        if (auto thisSubst = inSubstitutions.thisTypeSubstitution)
         {
             RefPtr<ThisTypeSubstitution> result = new ThisTypeSubstitution();
             if (result->sourceType)
                 result->sourceType = translateVal(result->sourceType);
-            return result;
+            rs.thisTypeSubstitution = result;
         }
-        return nullptr;
+        return rs;
     }
 
     static Decl* getModifiedDecl(Decl* decl)
@@ -2673,7 +2674,7 @@ struct LoweringVisitor
     RefPtr<Decl> translateDeclRef(
         Decl*   decl)
     {
-        return translateDeclRefImpl(DeclRef<Decl>(decl, nullptr));
+        return translateDeclRefImpl(DeclRef<Decl>(decl, SubstitutionSet()));
     }
 
     LegalExpr translateSimpleLegalValToLegalExpr(IRValue* irVal)
@@ -4943,11 +4944,16 @@ struct FindIRDeclUsedByASTVisitor
 
         // If this is a specialized declaration reference, then any
         // of the arguments also need to be walked.
-        for(auto subst = declRef.substitutions; subst; subst = subst->outer)
+        for(auto subst = declRef.substitutions.genericSubstitutions; subst; subst = subst->outer)
         {
             walkSubst(subst);
         }
-
+        for (auto subst = declRef.substitutions.globalGenParamSubstitutions; subst; subst = subst->outer)
+        {
+            walkSubst(subst);
+        }
+        if (declRef.substitutions.thisTypeSubstitution)
+            walkSubst(declRef.substitutions.thisTypeSubstitution);
         // If any parent of the declaration was in the stdlib, or
         // is registered as a builtin, then skip it.
         for (auto pp = decl; pp; pp = pp->ParentDecl)

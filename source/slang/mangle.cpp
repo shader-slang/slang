@@ -186,7 +186,7 @@ namespace Slang
 
     // TODO: this needs to be centralized
     RefPtr<GenericSubstitution> getOutermostGenericSubst(
-        RefPtr<Substitutions> inSubst)
+        RefPtr<GenericSubstitution> inSubst)
     {
         for (auto subst = inSubst; subst; subst = subst->outer)
         {
@@ -233,7 +233,7 @@ namespace Slang
             // There are two cases here: either we have specializations
             // in place for the parent generic declaration, or we don't.
 
-            auto subst = getOutermostGenericSubst(declRef.substitutions);
+            auto subst = getOutermostGenericSubst(declRef.substitutions.genericSubstitutions);
             if( subst && subst->genericDecl == parentGenericDeclRef.getDecl() )
             {
                 // This is the case where we *do* have substitutions.
@@ -378,20 +378,15 @@ namespace Slang
             DeclRef<Decl>(declRef.decl, declRef.substitutions));
     }
 
-    String mangleSpecializedFuncName(String baseName, RefPtr<Substitutions> subst)
+    String mangleSpecializedFuncName(String baseName, SubstitutionSet subst)
     {
         ManglingContext context;
         emitRaw(&context, baseName.Buffer());
         emitRaw(&context, "_G");
-        while (subst)
+        if (auto genSubst = subst.genericSubstitutions)
         {
-            if (auto genSubst = subst.As<GenericSubstitution>())
-            {
-                for (auto a : genSubst->args)
-                    emitVal(&context, a);
-                break;
-            }
-            subst = subst->outer;
+            for (auto a : genSubst->args)
+                emitVal(&context, a);
         }
         return context.sb.ProduceString();
     }

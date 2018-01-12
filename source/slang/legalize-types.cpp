@@ -450,8 +450,7 @@ static RefPtr<Type> createBuiltinGenericType(
     // TODO: we should have library code to make
     // manipulations like this way easier.
 
-    RefPtr<GenericSubstitution> oldGenericSubst = getGenericSubstitution(
-        typeDeclRef.substitutions);
+    RefPtr<GenericSubstitution> oldGenericSubst = typeDeclRef.substitutions.genericSubstitutions;
     SLANG_ASSERT(oldGenericSubst);
 
     RefPtr<GenericSubstitution> newGenericSubst = new GenericSubstitution();

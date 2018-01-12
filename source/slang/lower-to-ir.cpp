@@ -497,7 +497,7 @@ LoweredValInfo emitWitnessTableRef(
                 {
                     // if we are referring to an actual type, don't include substitution
                     // and generate specialize instruction
-                    srcDeclRef.substitutions = nullptr;
+                    srcDeclRef.substitutions = SubstitutionSet();
                 }
                 witnessTableVal = context->irBuilder->emitFindWitnessTable(srcDeclRef, inheritanceDeclRef.getDecl()->base.type);
                 return maybeEmitSpecializeInst(context, LoweredValInfo::simple(witnessTableVal), declRefType->declRef);
@@ -1058,15 +1058,12 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     void addGenericArgs(List<IRValue*>* ioArgs, DeclRefBase declRef)
     {
-        auto subs = declRef.substitutions;
+        auto subs = declRef.substitutions.genericSubstitutions;
         while(subs)
         {
-            if (auto genSubst = subs.As<GenericSubstitution>())
+            for (auto aa : subs->args)
             {
-                for (auto aa : genSubst->args)
-                {
-                    (*ioArgs).Add(getSimpleVal(context, lowerVal(context, aa)));
-                }
+                (*ioArgs).Add(getSimpleVal(context, lowerVal(context, aa)));
             }
             subs = subs->outer;
         }
@@ -3837,39 +3834,50 @@ RefPtr<Val> lowerSubstitutionArg(
 // Given a set of substitutions, make sure that we have
 // lowered the arguments being used into a form that
 // is suitable for use in the IR.
-RefPtr<Substitutions> lowerSubstitutions(
+RefPtr<GenericSubstitution> lowerGenericSubstitutions(
     IRGenContext*   context,
-    Substitutions*  subst)
+    GenericSubstitution*  genSubst)
 {
-    if(!subst)
+    if(!genSubst)
         return nullptr;
-    RefPtr<Substitutions> result;
-    if (auto genSubst = dynamic_cast<GenericSubstitution*>(subst))
-    {
-        RefPtr<GenericSubstitution> newSubst = new GenericSubstitution();
-        newSubst->genericDecl = genSubst->genericDecl;
+    RefPtr<GenericSubstitution> result;
+    RefPtr<GenericSubstitution> newSubst = new GenericSubstitution();
+    newSubst->genericDecl = genSubst->genericDecl;
 
-        for (auto arg : genSubst->args)
-        {
-            auto newArg = lowerSubstitutionArg(context, arg);
-            newSubst->args.Add(newArg);
-        }
+    for (auto arg : genSubst->args)
+    {
+        auto newArg = lowerSubstitutionArg(context, arg);
+        newSubst->args.Add(newArg);
+    }
 
-        result = newSubst;
-    }
-    else if (auto thisSubst = dynamic_cast<ThisTypeSubstitution*>(subst))
+    result = newSubst;
+    if (genSubst->outer)
     {
-        RefPtr<ThisTypeSubstitution> newSubst = new ThisTypeSubstitution();
-        newSubst->sourceType = lowerSubstitutionArg(context, thisSubst->sourceType);
-        result = newSubst;
-    }
-    if (subst->outer)
-    {
-        result->outer = lowerSubstitutions(
+        result->outer = lowerGenericSubstitutions(
             context,
-            subst->outer);
+            genSubst->outer);
     }
     return result;
+}
+
+RefPtr<ThisTypeSubstitution> lowerThisTypeSubstitution(
+    IRGenContext*   context,
+    ThisTypeSubstitution*  thisSubst)
+{
+    if (!thisSubst)
+        return nullptr;
+    RefPtr<ThisTypeSubstitution> newSubst = new ThisTypeSubstitution();
+    newSubst->sourceType = lowerSubstitutionArg(context, thisSubst->sourceType);
+    return newSubst;
+}
+
+SubstitutionSet lowerSubstitutions(IRGenContext* context, SubstitutionSet subst)
+{
+    SubstitutionSet rs;
+    rs.genericSubstitutions = lowerGenericSubstitutions(context, subst.genericSubstitutions);
+    rs.thisTypeSubstitution = lowerThisTypeSubstitution(context, subst.thisTypeSubstitution);
+    rs.globalGenParamSubstitutions = subst.globalGenParamSubstitutions;
+    return rs;
 }
 
 LoweredValInfo emitDeclRef(
@@ -3889,7 +3897,7 @@ LoweredValInfo maybeEmitSpecializeInst(IRGenContext*   context,
 {
     // If this declaration reference doesn't involve any specializations,
     // then we are done at this point.
-    if (!hasGenericSubstitutions(declRef.substitutions))
+    if (!declRef.substitutions.genericSubstitutions)
         return loweredDecl;
 
     // There's no reason to specialize something that maps to a NULL pointer.
@@ -3902,7 +3910,7 @@ LoweredValInfo maybeEmitSpecializeInst(IRGenContext*   context,
     // need to walk through those and replace things in
     // cases where the `Val`s used for substitution should
     // lower to something other than their original form.
-    RefPtr<Substitutions> newSubst = lowerSubstitutions(context, declRef.substitutions);
+    auto newSubst = lowerSubstitutions(context, declRef.substitutions);
     declRef.substitutions = newSubst;
 
 

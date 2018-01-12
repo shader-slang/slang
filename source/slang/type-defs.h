@@ -61,7 +61,7 @@ SYNTAX_CLASS(DeclRefType, Type)
 
 RAW(
     virtual String ToString() override;
-    virtual RefPtr<Val> SubstituteImpl(Substitutions* subst, int* ioDiff) override;
+    virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
 
     static DeclRefType* Create(
         Session*        session,
@@ -310,7 +310,7 @@ RAW(
 protected:
     virtual bool EqualsImpl(Type * type) override;
     virtual Type* CreateCanonicalType() override;
-    virtual RefPtr<Val> SubstituteImpl(Substitutions* subst, int* ioDiff) override;
+    virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
     virtual int GetHashCode() override;
     )
 END_SYNTAX_CLASS()
@@ -464,7 +464,7 @@ RAW(
 
     virtual String ToString() override;
 protected:
-    virtual RefPtr<Val> SubstituteImpl(Substitutions* subst, int* ioDiff) override;
+    virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
     virtual bool EqualsImpl(Type * type) override;
     virtual Type* CreateCanonicalType() override;
     virtual int GetHashCode() override;

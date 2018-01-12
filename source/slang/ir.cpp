@@ -679,7 +679,7 @@ namespace Slang
     {
         auto witnessTableVal = getDeclRefVal(witnessTableDeclRef);
         DeclRef<Decl> removeSubstDeclRef = interfaceMethodDeclRef;
-        removeSubstDeclRef.substitutions = nullptr;
+        removeSubstDeclRef.substitutions = SubstitutionSet();
         auto interfaceMethodVal = getDeclRefVal(removeSubstDeclRef);
         return emitLookupInterfaceMethodInst(type, witnessTableVal, interfaceMethodVal);
     }
@@ -690,7 +690,7 @@ namespace Slang
         DeclRef<Decl>   interfaceMethodDeclRef)
     {
         DeclRef<Decl> removeSubstDeclRef = interfaceMethodDeclRef;
-        removeSubstDeclRef.substitutions = nullptr;
+        removeSubstDeclRef.substitutions = SubstitutionSet();
         auto interfaceMethodVal = getDeclRefVal(removeSubstDeclRef);
         return emitLookupInterfaceMethodInst(type, witnessTableVal, interfaceMethodVal);
     }
@@ -1689,7 +1689,7 @@ namespace Slang
 
         if(genericParentDeclRef)
         {
-            auto subst = declRef.substitutions.As<GenericSubstitution>();
+            auto subst = declRef.substitutions.genericSubstitutions;
             if( !subst || subst->genericDecl != genericParentDeclRef.getDecl() )
             {
                 // No actual substitutions in place here
@@ -3103,6 +3103,8 @@ namespace Slang
         // The IR builder to use for creating nodes
         IRBuilder*  builder;
 
+        SubstitutionSet subst;
+
         // A callback to be used when a value that is not registerd in `clonedValues`
         // is needed during cloning. This gives the subtype a chance to intercept
         // the operation and clone (or not) as needed.
@@ -3226,7 +3228,6 @@ namespace Slang
         // to the layout to use for it.
         Dictionary<String, VarLayout*> globalVarLayouts;
 
-        RefPtr<GlobalGenericParamSubstitution> subst;
         // Override the "maybe clone" logic so that we always clone
         virtual IRValue* maybeCloneValue(IRValue* originalVal) override;
 
@@ -3292,21 +3293,21 @@ namespace Slang
 
                 // if the declRef is one of the __generic_param decl being substituted by subst
                 // return the substituted decl
-                if (subst)
+                if (subst.globalGenParamSubstitutions)
                 {
                     int diff = 0;
                     newDeclRef = od->declRef.SubstituteImpl(subst, &diff);
-                    if (newDeclRef.getDecl() == subst->paramDecl)
-                        return builder->getTypeVal(subst->actualType.As<Type>());
+                    if (newDeclRef.getDecl() == subst.globalGenParamSubstitutions->paramDecl)
+                        return builder->getTypeVal(subst.globalGenParamSubstitutions->actualType.As<Type>());
                     else if (auto genConstraint = newDeclRef.As<GenericTypeConstraintDecl>())
                     {
                         // a decl-ref to GenericTypeConstraintDecl as a result of
                         // referencing a generic parameter type should be replaced with
                         // the actual witness table
-                        if (genConstraint.getDecl()->ParentDecl == subst->paramDecl)
+                        if (genConstraint.getDecl()->ParentDecl == subst.globalGenParamSubstitutions->paramDecl)
                         {
                             // find the witness table from subst
-                            for (auto witness : subst->witnessTables)
+                            for (auto witness : subst.globalGenParamSubstitutions->witnessTables)
                             {
                                 if (witness.Key->EqualsVal(GetSup(genConstraint)))
                                 {
@@ -3362,44 +3363,51 @@ namespace Slang
         }
     }
 
-    RefPtr<Substitutions> cloneSubstitutions(
-        IRSpecContext*  context,
-        Substitutions*  subst)
+    RefPtr<GenericSubstitution> cloneGenericSubst(IRSpecContext*  context, GenericSubstitution* genSubst)
+    {
+        if (!genSubst)
+            return nullptr;
+
+        RefPtr<GenericSubstitution> newSubst = new GenericSubstitution();
+        newSubst->outer = cloneGenericSubst(context, genSubst->outer);
+        newSubst->genericDecl = genSubst->genericDecl;
+
+        for (auto arg : genSubst->args)
+        {
+            auto newArg = cloneSubstitutionArg(context, arg);
+            newSubst->args.Add(newArg);
+        }
+        return newSubst;
+    }
+
+    RefPtr<GlobalGenericParamSubstitution> cloneGlobalGenericSubst(IRSpecContext* context, GlobalGenericParamSubstitution* subst)
     {
         if (!subst)
             return nullptr;
-        if (auto genSubst = dynamic_cast<GenericSubstitution*>(subst))
-        {
-            RefPtr<GenericSubstitution> newSubst = new GenericSubstitution();
-            newSubst->outer = cloneSubstitutions(context, subst->outer);
-            newSubst->genericDecl = genSubst->genericDecl;
+        auto newSubst = new GlobalGenericParamSubstitution();
+        newSubst->actualType = subst->actualType;
+        newSubst->paramDecl = subst->paramDecl;
+        newSubst->witnessTables = subst->witnessTables;
+        newSubst->outer = cloneGlobalGenericSubst(context, subst->outer);
+        return newSubst;
+    }
 
-            for (auto arg : genSubst->args)
-            {
-                auto newArg = cloneSubstitutionArg(context, arg);
-                newSubst->args.Add(newArg);
-            }
-            return newSubst;
-        }
-        else if (auto thisSubst = dynamic_cast<ThisTypeSubstitution*>(subst))
+    SubstitutionSet cloneSubstitutions(
+        IRSpecContext*  context,
+        SubstitutionSet  subst)
+    {
+        SubstitutionSet rs;
+        if (!subst)
+            return rs;
+        rs.genericSubstitutions = cloneGenericSubst(context, subst.genericSubstitutions);
+        rs.globalGenParamSubstitutions = cloneGlobalGenericSubst(context, subst.globalGenParamSubstitutions);
+        if (auto thisSubst = subst.thisTypeSubstitution)
         {
             RefPtr<ThisTypeSubstitution> newSubst = new ThisTypeSubstitution();
             newSubst->sourceType = thisSubst->sourceType;
-            newSubst->outer = cloneSubstitutions(context, subst->outer);
-            return newSubst;
+            rs.thisTypeSubstitution = newSubst;
         }
-        else if (auto genTypeSubst = dynamic_cast<GlobalGenericParamSubstitution*>(subst))
-        {
-            RefPtr<GlobalGenericParamSubstitution> newSubst = new GlobalGenericParamSubstitution();
-            newSubst->actualType = genTypeSubst->actualType;
-            newSubst->paramDecl = genTypeSubst->paramDecl;
-            newSubst->witnessTables = genTypeSubst->witnessTables;
-            newSubst->outer = cloneSubstitutions(context, subst->outer);
-            return newSubst;
-        }
-        else
-            SLANG_UNREACHABLE("unimplemented cloneSubstitution");
-        UNREACHABLE_RETURN(nullptr);
+        return rs;
     }
 
     DeclRef<Decl> IRSpecContext::maybeCloneDeclRef(DeclRef<Decl> const& declRef)
@@ -3416,7 +3424,6 @@ namespace Slang
         newDeclRef.substitutions = cloneSubstitutions(this, declRef.substitutions);
 
         return newDeclRef;
-
     }
 
 
@@ -4045,7 +4052,7 @@ namespace Slang
     RefPtr<ProgramLayout> specializeProgramLayout(
         TargetRequest * targetReq,
         ProgramLayout* programLayout,
-        Substitutions * typeSubst);
+        SubstitutionSet typeSubst);
 
     RefPtr<GlobalGenericParamSubstitution> createGlobalGenericParamSubstitution(
         EntryPointRequest * entryPointRequest, 
@@ -4054,7 +4061,7 @@ namespace Slang
         IRModule* originalIRModule)
     {
         RefPtr<GlobalGenericParamSubstitution> globalParamSubst;
-        Substitutions * curTailSubst = nullptr;
+        GlobalGenericParamSubstitution * curTailSubst = nullptr;
         for (auto param : programLayout->globalGenericParams)
         {
             auto paramSubst = new GlobalGenericParamSubstitution();
@@ -4154,10 +4161,10 @@ namespace Slang
         // into user-provided type arguments
         auto globalParamSubst = createGlobalGenericParamSubstitution(entryPointRequest, programLayout, context, originalIRModule);
 
-        context->subst = globalParamSubst;
+        context->subst.globalGenParamSubstitutions = globalParamSubst;
         
         // now specailize the program layout using the substitution
-        RefPtr<ProgramLayout> newProgramLayout = specializeProgramLayout(targetReq, programLayout, globalParamSubst);
+        RefPtr<ProgramLayout> newProgramLayout = specializeProgramLayout(targetReq, programLayout, context->subst);
 
         state->newProgramLayout = newProgramLayout;
 
@@ -4271,10 +4278,7 @@ namespace Slang
     struct IRGenericSpecContext : IRSpecContextBase
     {
         IRSharedGenericSpecContext* getShared() { return (IRSharedGenericSpecContext*) shared; }
-
-        // The substutions to apply
-        RefPtr<Substitutions>   subst;
-
+        
         // Override the "maybe clone" logic so that we always clone
         virtual IRValue* maybeCloneValue(IRValue* originalVal) override;
 
@@ -4322,7 +4326,7 @@ namespace Slang
         IRGenericSpecContext*   context,
         DeclRef<Decl>           declRef)
     {
-        auto subst = context->subst.As<GenericSubstitution>();
+        auto subst = context->subst.genericSubstitutions;
         SLANG_ASSERT(subst);
         auto genericDecl = subst->genericDecl;
 
@@ -4373,7 +4377,7 @@ namespace Slang
             {
                 auto declRefVal = (IRDeclRef*) originalVal;
                 auto declRef = declRefVal->declRef;
-                auto genSubst = subst.As<GenericSubstitution>();
+                auto genSubst = subst.genericSubstitutions;
                 SLANG_ASSERT(genSubst);
                 // We may have a direct reference to one of the parameters
                 // of the generic we are specializing, and in that case
@@ -4412,18 +4416,9 @@ namespace Slang
     // generic substitution in the list, or NULL if there
     // are no generic substitutions.
     RefPtr<GenericSubstitution> getInnermostGenericSubst(
-        Substitutions*  inSubst)
+        SubstitutionSet  inSubst)
     {
-        auto subst = inSubst;
-        while( subst )
-        {
-            GenericSubstitution* genericSubst = dynamic_cast<GenericSubstitution*>(subst);
-            if(genericSubst)
-                return genericSubst;
-
-            subst = subst->outer;
-        }
-        return nullptr;
+        return inSubst.genericSubstitutions;
     }
 
     RefPtr<GenericDecl> getInnermostGenericDecl(
@@ -4442,20 +4437,18 @@ namespace Slang
     }
 
     // This function takes a list of substitutions that we'd
-    // like to apply, but which (1) might apply to a different
+    // like to apply, but which might apply to a different
     // declaration in cases where we have got target-specific
-    // overloads in the mix, and (2) might include some `ThisType`
-    // substitutions, which we don't care about in this context,
-    // and produces a new set of substitutiosn without these
-    // two issues.
-    RefPtr<Substitutions> cloneSubstitutionsForSpecialization(
+    // overloads in the mix, and produces a new set of 
+    // substitutiosn without this issue.
+    RefPtr<GenericSubstitution> cloneSubstitutionsForSpecialization(
         IRSharedGenericSpecContext* sharedContext,
-        Substitutions*              oldSubst,
+        RefPtr<GenericSubstitution> oldSubst,
         Decl*                       newDecl)
     {
         // We will "peel back" layers of substitutions until
         // we find our first generic subsitution.
-        auto oldGenericSubst = getInnermostGenericSubst(oldSubst);
+        auto oldGenericSubst = oldSubst;
         if(!oldGenericSubst)
             return nullptr;
 
@@ -4506,15 +4499,16 @@ namespace Slang
                 return (IRWitnessTable*)gv;
         }
 
-        RefPtr<Substitutions> newSubst = cloneSubstitutionsForSpecialization(
+        RefPtr<GenericSubstitution> newSubst = cloneSubstitutionsForSpecialization(
             sharedContext,
-            specDeclRef.substitutions,
+            specDeclRef.substitutions.genericSubstitutions,
             originalTable->genericDecl);
 
         IRGenericSpecContext context;
         context.shared = sharedContext;
         context.builder = &sharedContext->builderStorage;
-        context.subst = newSubst;
+        context.subst = specDeclRef.substitutions;
+        context.subst.genericSubstitutions = newSubst;
 
         // TODO: other initialization is needed here...
 
@@ -4577,15 +4571,16 @@ namespace Slang
         // using a different overload of a target-specific function,
         // so we need to create a dummy substitution here, to make
         // sure it used the correct generic.
-        RefPtr<Substitutions> newSubst = cloneSubstitutionsForSpecialization(
+        RefPtr<GenericSubstitution> newSubst = cloneSubstitutionsForSpecialization(
             sharedContext,
-            specDeclRef.substitutions,
+            specDeclRef.substitutions.genericSubstitutions,
             genericFunc->genericDecl);
 
         IRGenericSpecContext context;
         context.shared = sharedContext;
         context.builder = &sharedContext->builderStorage;
-        context.subst = newSubst;
+        context.subst = specDeclRef.substitutions;
+        context.subst.genericSubstitutions = newSubst;
 
         // TODO: other initialization is needed here...
 

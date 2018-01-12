@@ -3054,7 +3054,7 @@ struct EmitVisitor
                 return;
             }
 
-            GenericSubstitution* subst = declRef.substitutions.As<GenericSubstitution>().Ptr();
+            GenericSubstitution* subst = declRef.substitutions.genericSubstitutions;
             if (!subst)
                 return;
 
