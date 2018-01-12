@@ -442,7 +442,7 @@ namespace Slang
         {
             RefPtr<GenericSubstitution> subst = new GenericSubstitution();
             subst->genericDecl = genericDeclRef.getDecl();
-            subst->outer = genericDeclRef.substitutions;
+            subst->outer = genericDeclRef.substitutions.genericSubstitutions;
 
             for (auto argExpr : args)
             {
@@ -451,7 +451,8 @@ namespace Slang
 
             DeclRef<Decl> innerDeclRef;
             innerDeclRef.decl = GetInner(genericDeclRef);
-            innerDeclRef.substitutions = subst;
+            innerDeclRef.substitutions = SubstitutionSet(subst, genericDeclRef.substitutions.thisTypeSubstitution,
+                genericDeclRef.substitutions.globalGenParamSubstitutions);
 
             return DeclRefType::Create(
                 getSession(),
@@ -1944,7 +1945,7 @@ namespace Slang
             AggTypeDecl*        typeDecl,
             InheritanceDecl*    inheritanceDecl)
         {
-            return checkConformance(DeclRef<AggTypeDecl>(typeDecl, nullptr), inheritanceDecl);
+            return checkConformance(DeclRef<AggTypeDecl>(typeDecl, SubstitutionSet()), inheritanceDecl);
         }
 
         void visitAggTypeDecl(AggTypeDecl* decl)
@@ -2364,7 +2365,7 @@ namespace Slang
                     // generic.
                     //
                     subst->genericDecl = prevGenericDecl;
-                    prevFuncDeclRef.substitutions = subst;
+                    prevFuncDeclRef.substitutions.genericSubstitutions = subst;
                     //
                     // One way to think about it is that if we have these
                     // declarations (ignore the name differences...):
@@ -4000,7 +4001,7 @@ namespace Slang
         //
         // Returns a new substitution representing the values that
         // we solved for along the way.
-        RefPtr<Substitutions> TrySolveConstraintSystem(
+        SubstitutionSet TrySolveConstraintSystem(
             ConstraintSystem*		system,
             DeclRef<GenericDecl>          genericDeclRef)
         {
@@ -4024,9 +4025,9 @@ namespace Slang
             for( auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(genericDeclRef) )
             {
                 if(!TryUnifyTypes(*system, GetSub(constraintDeclRef), GetSup(constraintDeclRef)))
-                    return nullptr;
+                    return SubstitutionSet();
             }
-
+            SubstitutionSet resultSubst = genericDeclRef.substitutions;
             // We will loop over the generic parameters, and for
             // each we will try to find a way to satisfy all
             // the constraints for that parameter
@@ -4054,7 +4055,7 @@ namespace Slang
                             if (!joinType)
                             {
                                 // failure!
-                                return nullptr;
+                                return SubstitutionSet();
                             }
                             type = joinType;
                         }
@@ -4065,7 +4066,7 @@ namespace Slang
                     if (!type)
                     {
                         // failure!
-                        return nullptr;
+                        return SubstitutionSet();
                     }
                     args.Add(type);
                 }
@@ -4092,7 +4093,7 @@ namespace Slang
                             if(!val->EqualsVal(cVal.Ptr()))
                             {
                                 // failure!
-                                return nullptr;
+                                return SubstitutionSet();
                             }
                         }
 
@@ -4102,7 +4103,7 @@ namespace Slang
                     if (!val)
                     {
                         // failure!
-                        return nullptr;
+                        return SubstitutionSet();
                     }
                     args.Add(val);
                 }
@@ -4130,8 +4131,9 @@ namespace Slang
 
             RefPtr<GenericSubstitution> solvedSubst = new GenericSubstitution();
             solvedSubst->genericDecl = genericDeclRef.getDecl();
-            solvedSubst->outer = genericDeclRef.substitutions;
+            solvedSubst->outer = genericDeclRef.substitutions.genericSubstitutions;
             solvedSubst->args = args;
+            resultSubst.genericSubstitutions = solvedSubst;
 
             for( auto constraintDecl : genericDeclRef.getDecl()->getMembersOfType<GenericTypeConstraintDecl>() )
             {
@@ -4156,7 +4158,7 @@ namespace Slang
                     //
                     // TODO: Ideally we should print an error message in
                     // this case, to let the user know why things failed.
-                    return nullptr;
+                    return SubstitutionSet();
                 }
 
                 // TODO: We may need to mark some constrains in our constraint
@@ -4169,11 +4171,11 @@ namespace Slang
             {
                 if (!c.satisfied)
                 {
-                    return nullptr;
+                    return SubstitutionSet();
                 }
             }
 
-            return solvedSubst;
+            return resultSubst;
         }
 
         //
@@ -4616,13 +4618,14 @@ namespace Slang
             assert(subst);
 
             subst->genericDecl = genericDeclRef.getDecl();
-            subst->outer = genericDeclRef.substitutions;
+            subst->outer = genericDeclRef.substitutions.genericSubstitutions;
 
             for( auto constraintDecl : genericDeclRef.getDecl()->getMembersOfType<GenericTypeConstraintDecl>() )
             {
+                auto subset = genericDeclRef.substitutions;
+                subset.genericSubstitutions = subst;
                 DeclRef<GenericTypeConstraintDecl> constraintDeclRef(
-                    constraintDecl,
-                    subst);
+                    constraintDecl, subset);
 
                 auto sub = GetSub(constraintDeclRef);
                 auto sup = GetSup(constraintDeclRef);
@@ -4695,7 +4698,7 @@ namespace Slang
             }
 
             subst->genericDecl = baseGenericRef.getDecl();
-            subst->outer = baseGenericRef.substitutions;
+            subst->outer = baseGenericRef.substitutions.genericSubstitutions;
 
             DeclRef<Decl> innerDeclRef(GetInner(baseGenericRef), subst);
 
@@ -5085,17 +5088,17 @@ namespace Slang
             // default: fail
             return false;
         }
-
+        
         bool TryUnifySubstitutions(
             ConstraintSystem&		constraints,
-            RefPtr<Substitutions>	fst,
-            RefPtr<Substitutions>	snd)
+            RefPtr<GenericSubstitution>	fst,
+            RefPtr<GenericSubstitution>	snd)
         {
             // They must both be NULL or non-NULL
-            if (!hasGenericSubstitutions(fst) || !hasGenericSubstitutions(snd))
+            if (!fst || !snd)
                 return fst == snd;
-            auto fstGen = fst.As<GenericSubstitution>();
-            auto sndGen = snd.As<GenericSubstitution>();
+            auto fstGen = fst;
+            auto sndGen = snd;
             // They must be specializing the same generic
             if (fstGen->genericDecl != sndGen->genericDecl)
                 return false;
@@ -5162,7 +5165,7 @@ namespace Slang
         {
             if(auto genericValueParamRef = varRef.As<GenericValueParamDecl>())
             {
-                return TryUnifyIntParam(constraints, genericValueParamRef.getDecl(), val);
+                return TryUnifyIntParam(constraints, RefPtr<GenericValueParamDecl>(genericValueParamRef.getDecl()), val);
             }
             else
             {
@@ -5196,8 +5199,8 @@ namespace Slang
                     // to each decalration reference.
                     if (!TryUnifySubstitutions(
                         constraints,
-                        fstDeclRef.substitutions,
-                        sndDeclRef.substitutions))
+                        fstDeclRef.substitutions.genericSubstitutions,
+                        sndDeclRef.substitutions.genericSubstitutions))
                     {
                         return false;
                     }
@@ -5667,7 +5670,7 @@ namespace Slang
             if( parentGenericDeclRef )
             {
                 SLANG_RELEASE_ASSERT(declRef.substitutions);
-                auto genSubst = declRef.substitutions.As<GenericSubstitution>();
+                auto genSubst = declRef.substitutions.genericSubstitutions;
                 SLANG_RELEASE_ASSERT(genSubst->genericDecl == parentGenericDeclRef.getDecl());
 
                 sb << "<";
@@ -6962,10 +6965,10 @@ namespace Slang
     // inside the context where it is declared (e.g., with generic parameters filled in
     // using their archetypes).
     //
-    RefPtr<Substitutions> createDefaultSubstitutions(
+    SubstitutionSet createDefaultSubstitutions(
         Session*        session,
         Decl*           decl,
-        Substitutions*  parentSubst)
+        SubstitutionSet parentSubst)
     {
         auto dd = decl->ParentDecl;
         if( auto genericDecl = dynamic_cast<GenericDecl*>(dd) )
@@ -6975,9 +6978,11 @@ namespace Slang
             if(decl != genericDecl->inner)
                 return parentSubst;
 
+            SubstitutionSet resultSubst = parentSubst;
             RefPtr<GenericSubstitution> subst = new GenericSubstitution();
             subst->genericDecl = genericDecl;
-            subst->outer = parentSubst;
+            subst->outer = parentSubst.genericSubstitutions;
+            resultSubst.genericSubstitutions = subst;
 
             for( auto mm : genericDecl->Members )
             {
@@ -7003,16 +7008,16 @@ namespace Slang
                     subst->args.Add(witness);
                 }
             }
-            return subst;
+            return resultSubst;
         }
         return parentSubst;
     }
 
-    RefPtr<Substitutions> createDefaultSubstitutions(
+    SubstitutionSet createDefaultSubstitutions(
         Session* session,
         Decl*   decl)
     {
-        RefPtr<Substitutions> subst;
+        SubstitutionSet subst;
         if( auto parentDecl = decl->ParentDecl )
         {
             subst = createDefaultSubstitutions(session, parentDecl);

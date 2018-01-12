@@ -40,14 +40,14 @@ ABSTRACT_SYNTAX_CLASS(Val, NodeBase)
     RAW(
     // construct a new value by applying a set of parameter
     // substitutions to this one
-    RefPtr<Val> Substitute(Substitutions* subst);
+    RefPtr<Val> Substitute(SubstitutionSet subst);
 
     // Lower-level interface for substition. Like the basic
     // `Substitute` above, but also takes a by-reference
     // integer parameter that should be incremented when
     // returning a modified value (this can help the caller
     // decide whether they need to do anything).
-    virtual RefPtr<Val> SubstituteImpl(Substitutions* subst, int* ioDiff);
+    virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int* ioDiff);
 
     virtual bool EqualsVal(Val* val) = 0;
     virtual String ToString() = 0;
@@ -113,7 +113,7 @@ public:
     bool IsClass();
     Type* GetCanonicalType();
 
-    virtual RefPtr<Val> SubstituteImpl(Substitutions* subst, int* ioDiff) override;
+    virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
 
     virtual bool EqualsVal(Val* val) override;
 protected:
@@ -132,12 +132,9 @@ END_SYNTAX_CLASS()
 // type-level variables to concrete argument values
 ABSTRACT_SYNTAX_CLASS(Substitutions, RefObject)
 
-    // Any further substitutions, relating to outer generic declarations
-    SYNTAX_FIELD(RefPtr<Substitutions>, outer)
-
     RAW(
     // Apply a set of substitutions to the bindings in this substitution
-    virtual RefPtr<Substitutions> SubstituteImpl(Substitutions* subst, int* ioDiff) = 0;
+    virtual RefPtr<Substitutions> SubstituteImpl(SubstitutionSet subst, int* ioDiff) = 0;
 
     // Check if these are equivalent substitutiosn to another set
     virtual bool Equals(Substitutions* subst) = 0;
@@ -153,10 +150,13 @@ SYNTAX_CLASS(GenericSubstitution, Substitutions)
 
     // The actual values of the arguments
     SYNTAX_FIELD(List<RefPtr<Val>>, args)
-    
+
+    // Any further substitutions, relating to outer generic declarations
+    SYNTAX_FIELD(RefPtr<GenericSubstitution>, outer)
+        
     RAW(
     // Apply a set of substitutions to the bindings in this substitution
-    virtual RefPtr<Substitutions> SubstituteImpl(Substitutions* subst, int* ioDiff) override;
+    virtual RefPtr<Substitutions> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
 
     // Check if these are equivalent substitutiosn to another set
     virtual bool Equals(Substitutions* subst) override;
@@ -182,7 +182,7 @@ SYNTAX_CLASS(ThisTypeSubstitution, Substitutions)
     SYNTAX_FIELD(RefPtr<Val>, sourceType)
     RAW(
     // Apply a set of substitutions to the bindings in this substitution
-    virtual RefPtr<Substitutions> SubstituteImpl(Substitutions* subst, int* ioDiff) override;
+    virtual RefPtr<Substitutions> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
 
     // Check if these are equivalent substitutiosn to another set
     virtual bool Equals(Substitutions* subst) override;
@@ -192,8 +192,9 @@ SYNTAX_CLASS(ThisTypeSubstitution, Substitutions)
     }
     virtual int GetHashCode() const override
     {
-        SLANG_ASSERT(sourceType);
-        return sourceType->GetHashCode();
+        if (sourceType)
+            return sourceType->GetHashCode();
+        return 0;
     }
     )
 END_SYNTAX_CLASS()
@@ -203,10 +204,11 @@ SYNTAX_CLASS(GlobalGenericParamSubstitution, Substitutions)
     DECL_FIELD(GlobalGenericParamDecl*, paramDecl)
     // the actual type to substitute in
     SYNTAX_FIELD(RefPtr<Val>, actualType)
-
+    // Any further global type parameter substitutions
+    SYNTAX_FIELD(RefPtr<GlobalGenericParamSubstitution>, outer)
 RAW(
     // Apply a set of substitutions to the bindings in this substitution
-    virtual RefPtr<Substitutions> SubstituteImpl(Substitutions* subst, int* ioDiff) override;
+    virtual RefPtr<Substitutions> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
 
     // Check if these are equivalent substitutiosn to another set
     virtual bool Equals(Substitutions* subst) override;

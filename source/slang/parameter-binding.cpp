@@ -1529,7 +1529,7 @@ static RefPtr<TypeLayout> processEntryPointParameter(
 static void collectEntryPointParameters(
     ParameterBindingContext*        context,
     EntryPointRequest*              entryPoint,
-    Substitutions*                  typeSubst)
+    SubstitutionSet                 typeSubst)
 {
     FuncDecl* entryPointFuncDecl = entryPoint->decl;
     if (!entryPointFuncDecl)
@@ -1722,7 +1722,7 @@ static void collectParameters(
         for( auto& entryPoint : translationUnit->entryPoints )
         {
             context->stage = entryPoint->profile.GetStage();
-            collectEntryPointParameters(context, entryPoint.Ptr(), nullptr);
+            collectEntryPointParameters(context, entryPoint.Ptr(), SubstitutionSet());
         }
         context->entryPointLayout = nullptr;
     }
@@ -2059,7 +2059,7 @@ StructTypeLayout* getGlobalStructLayout(
 RefPtr<ProgramLayout> specializeProgramLayout(
     TargetRequest * targetReq,
     ProgramLayout* programLayout, 
-    Substitutions * typeSubst)
+    SubstitutionSet typeSubst)
 {
     RefPtr<ProgramLayout> newProgramLayout;
     newProgramLayout = new ProgramLayout();

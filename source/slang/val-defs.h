@@ -37,7 +37,7 @@ SYNTAX_CLASS(GenericParamIntVal, IntVal)
     virtual bool EqualsVal(Val* val) override;
     virtual String ToString() override;
     virtual int GetHashCode() override;
-    virtual RefPtr<Val> SubstituteImpl(Substitutions* subst, int* ioDiff) override;
+    virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
 )
 END_SYNTAX_CLASS()
 
@@ -98,7 +98,7 @@ RAW(
     virtual bool EqualsVal(Val* val) override;
     virtual String ToString() override;
     virtual int GetHashCode() override;
-    virtual RefPtr<Val> SubstituteImpl(Substitutions * subst, int * ioDiff) override;
+    virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int * ioDiff) override;
     virtual DeclRef<Decl> getLastStepDeclRef() override
     {
         return declRef;
@@ -117,7 +117,7 @@ RAW(
     virtual bool EqualsVal(Val* val) override;
     virtual String ToString() override;
     virtual int GetHashCode() override;
-    virtual RefPtr<Val> SubstituteImpl(Substitutions * subst, int * ioDiff) override;
+    virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int * ioDiff) override;
     virtual DeclRef<Decl> getLastStepDeclRef() override
     {
         return midToSup->getLastStepDeclRef();

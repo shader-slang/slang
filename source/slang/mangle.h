@@ -12,7 +12,7 @@ namespace Slang
     String getMangledName(DeclRef<Decl> const & declRef);
     String getMangledName(DeclRefBase const & declRef);
 
-    String mangleSpecializedFuncName(String baseName, RefPtr<Substitutions> subst);
+    String mangleSpecializedFuncName(String baseName, SubstitutionSet subst);
     String getMangledNameForConformanceWitness(
         Type* sub,
         Type* sup);
