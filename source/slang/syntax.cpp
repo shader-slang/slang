@@ -1949,39 +1949,5 @@ void Type::accept(IValVisitor* visitor, void* extra)
             rs = combineHash(rs, globalGenParamSubstitutions->GetHashCode());
         return rs;
     }
-
-    RefPtr<Substitutions> cloneSubstitutionNonRecursive(RefPtr<Substitutions> subst)
-    {
-        if (!subst)
-            return nullptr;
-        if (auto genSubst = dynamic_cast<GenericSubstitution*>(subst.Ptr()))
-        {
-            RefPtr<GenericSubstitution> newSubst = new GenericSubstitution();
-            newSubst->genericDecl = genSubst->genericDecl;
-
-            for (auto arg : genSubst->args)
-            {
-                newSubst->args.Add(arg);
-            }
-            return newSubst;
-        }
-        else if (auto thisSubst = dynamic_cast<ThisTypeSubstitution*>(subst.Ptr()))
-        {
-            RefPtr<ThisTypeSubstitution> newSubst = new ThisTypeSubstitution();
-            newSubst->sourceType = thisSubst->sourceType;
-            return newSubst;
-        }
-        else if (auto genTypeSubst = dynamic_cast<GlobalGenericParamSubstitution*>(subst.Ptr()))
-        {
-            RefPtr<GlobalGenericParamSubstitution> newSubst = new GlobalGenericParamSubstitution();
-            newSubst->actualType = genTypeSubst->actualType;
-            newSubst->paramDecl = genTypeSubst->paramDecl;
-            newSubst->witnessTables = genTypeSubst->witnessTables;
-            return newSubst;
-        }
-        else
-            SLANG_UNREACHABLE("unimplemented cloneSubstitution");
-        UNREACHABLE_RETURN(nullptr);
-    }
 }
 
