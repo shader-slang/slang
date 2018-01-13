@@ -155,8 +155,6 @@ namespace Slang
             RefPtr<Expr>    baseExpr,
             SourceLoc       loc)
         {
-            if (declRef.As<AssocTypeDecl>())
-                getNewThisTypeSubst(declRef);
             if (baseExpr)
             {
                 RefPtr<Expr> expr;
@@ -6993,15 +6991,19 @@ namespace Slang
         Decl*           decl,
         SubstitutionSet parentSubst)
     {
+        SubstitutionSet resultSubst = parentSubst;
+        if (auto interfaceDecl = dynamic_cast<InterfaceDecl*>(decl))
+        {
+            resultSubst.thisTypeSubstitution = new ThisTypeSubstitution();
+        }
         auto dd = decl->ParentDecl;
         if( auto genericDecl = dynamic_cast<GenericDecl*>(dd) )
         {
             // We don't want to specialize references to anything
             // other than the "inner" declaration itself.
             if(decl != genericDecl->inner)
-                return parentSubst;
+                return resultSubst;
 
-            SubstitutionSet resultSubst = parentSubst;
             RefPtr<GenericSubstitution> subst = new GenericSubstitution();
             subst->genericDecl = genericDecl;
             subst->outer = parentSubst.genericSubstitutions;
@@ -7032,9 +7034,8 @@ namespace Slang
                     subst->args.Add(witness);
                 }
             }
-            return resultSubst;
         }
-        return parentSubst;
+        return resultSubst;
     }
 
     SubstitutionSet createDefaultSubstitutions(
