@@ -2216,20 +2216,9 @@ namespace Slang
         return blockVarDecl;
     }
 
-    static RefPtr<RefObject> ParseExtensionDecl(Parser* parser, void* /*userData*/)
+    static void parseOptionalInheritanceClause(Parser* parser, AggTypeDeclBase* decl)
     {
-        RefPtr<ExtensionDecl> decl = new ExtensionDecl();
-        parser->FillPosition(decl.Ptr());
-        decl->targetType = parser->ParseTypeExp();
-
-        parseAggTypeDeclBody(parser, decl.Ptr());
-
-        return decl;
-    }
-
-    static void parseOptionalInheritanceClause(Parser* parser, AggTypeDecl* decl)
-    {
-        if( AdvanceIf(parser, TokenType::Colon) )
+        if (AdvanceIf(parser, TokenType::Colon))
         {
             do
             {
@@ -2242,9 +2231,21 @@ namespace Slang
 
                 AddMember(decl, inheritanceDecl);
 
-            } while( AdvanceIf(parser, TokenType::Comma) );
+            } while (AdvanceIf(parser, TokenType::Comma));
         }
     }
+
+    static RefPtr<RefObject> ParseExtensionDecl(Parser* parser, void* /*userData*/)
+    {
+        RefPtr<ExtensionDecl> decl = new ExtensionDecl();
+        parser->FillPosition(decl.Ptr());
+        decl->targetType = parser->ParseTypeExp();
+        parseOptionalInheritanceClause(parser, decl);
+        parseAggTypeDeclBody(parser, decl.Ptr());
+
+        return decl;
+    }
+
 
     void parseOptionalGenericConstraints(Parser * parser, ContainerDecl* decl)
     {
@@ -2255,6 +2256,7 @@ namespace Slang
                 RefPtr<GenericTypeConstraintDecl> paramConstraint = new GenericTypeConstraintDecl();
                 parser->FillPosition(paramConstraint);
 
+                // substitution needs to be filled during check
                 RefPtr<DeclRefType> paramType = DeclRefType::Create(
                     parser->getSession(),
                     DeclRef<Decl>(decl, nullptr));
@@ -2279,7 +2281,7 @@ namespace Slang
         auto nameToken = parser->ReadToken(TokenType::Identifier);
         assocTypeDecl->nameAndLoc = NameLoc(nameToken);
         assocTypeDecl->loc = nameToken.loc;
-        parseOptionalInheritanceClause(parser, assocTypeDecl);
+        parseOptionalGenericConstraints(parser, assocTypeDecl);
         parser->ReadToken(TokenType::Semicolon);
         return assocTypeDecl;
     }

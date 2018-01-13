@@ -1194,6 +1194,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         auto substSubst = new GenericSubstitution();
         substSubst->genericDecl = genericDecl;
         substSubst->args = substArgs;
+        substSubst->outer = outerSubst.As<GenericSubstitution>();
         return substSubst;
     }
 
@@ -1897,27 +1898,9 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     SubstitutionSet substituteSubstitutions(SubstitutionSet oldSubst, SubstitutionSet subst, int * ioDiff)
     {
-        if (oldSubst)
-            oldSubst = oldSubst.substituteImpl(subst, ioDiff);
-
-        // if oldSubst does not have ThisTypeSubst (which means `this_type` is free variable)
-        // and subst has a ThisTypeSubst (which means `this_type` is bound to a type),
-        // then copy that ThisTypeSubst over (to bind the this_type to the specified type)
-        SubstitutionSet newSubst = oldSubst;
-        insertGlobalGenericSubstitutions(newSubst, subst, ioDiff);
-        /*if (!hasThisTypeSubstitutions(oldSubst))
-        {
-            auto thisTypeSubst = findThisTypeSubst(subst);
-            if (thisTypeSubst)
-            {
-                auto cpyThisTypeSubst = new ThisTypeSubstitution();
-                cpyThisTypeSubst->sourceType = thisTypeSubst->sourceType;
-                insertSubstAtBottom(newSubst, cpyThisTypeSubst);
-                *ioDiff = 1;
-            }
-        }*/
-        return newSubst;
+        return oldSubst.substituteImpl(subst, ioDiff);
     }
+
     bool SubstitutionSet::Equals(SubstitutionSet substSet) const
     {
         if (genericSubstitutions)
@@ -1951,8 +1934,8 @@ void Type::accept(IValVisitor* visitor, void* extra)
             rs.globalGenParamSubstitutions = globalGenParamSubstitutions->SubstituteImpl(subst, ioDiff).As<GlobalGenericParamSubstitution>();
         if (thisTypeSubstitution)
             rs.thisTypeSubstitution = thisTypeSubstitution->SubstituteImpl(subst, ioDiff).As<ThisTypeSubstitution>();
-        else
-            rs.thisTypeSubstitution = subst.thisTypeSubstitution;
+
+        insertGlobalGenericSubstitutions(rs, subst, ioDiff);
         return rs;
     }
     int SubstitutionSet::GetHashCode() const

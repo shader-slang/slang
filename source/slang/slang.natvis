@@ -12,23 +12,59 @@
   <Type Name="Slang::DeclRef&lt;*&gt;">
     <SmartPointer Usage="Minimal">decl ? ($T1*)(decl) : ($T1*)0</SmartPointer>
     <DisplayString Condition="decl == 0">DeclRef nullptr</DisplayString>
-    <DisplayString Condition="decl != 0">DeclRef {(*(*(Slang::DeclRefBase*)this).decl).nameAndLoc}</DisplayString>
+    <DisplayString Condition="decl != 0">{(*(*(Slang::DeclRefBase*)this).decl).nameAndLoc}</DisplayString>
     <Expand>
       <ExpandedItem>decl ? ($T1*)(decl) : ($T1*)0</ExpandedItem>
       <Item Name="[Substitutions]:">"========================="</Item>
       <LinkedListItems>
-        <HeadPointer>substitutions.pointer</HeadPointer>
+        <HeadPointer>substitutions.genericSubstitutions.pointer</HeadPointer>
         <NextPointer>outer.pointer</NextPointer>
         <ValueNode>this</ValueNode>
       </LinkedListItems>
+        <LinkedListItems>
+            <HeadPointer>substitutions.globalGenParamSubstitutions.pointer</HeadPointer>
+            <NextPointer>outer.pointer</NextPointer>
+            <ValueNode>this</ValueNode>
+        </LinkedListItems>
+        <Item Name ="thisSubst">substitutions.thisTypeSubstitution</Item>
     </Expand>
   </Type>
+    <Type Name="Slang::DeclRefBase">
+        <SmartPointer Usage="Minimal">decl</SmartPointer>
+        <DisplayString Condition="decl == 0">DeclRefBase nullptr</DisplayString>
+        <DisplayString Condition="decl != 0">{(*(*(Slang::DeclRefBase*)this).decl).nameAndLoc}</DisplayString>
+        <Expand>
+            <ExpandedItem>decl</ExpandedItem>
+            <Item Name="[Substitutions]:">"========================="</Item>
+            <LinkedListItems>
+                <HeadPointer>substitutions.genericSubstitutions.pointer</HeadPointer>
+                <NextPointer>outer.pointer</NextPointer>
+                <ValueNode>this</ValueNode>
+            </LinkedListItems>
+            <LinkedListItems>
+                <HeadPointer>substitutions.globalGenParamSubstitutions.pointer</HeadPointer>
+                <NextPointer>outer.pointer</NextPointer>
+                <ValueNode>this</ValueNode>
+            </LinkedListItems>
+            <Item Name ="thisSubst">substitutions.thisTypeSubstitution</Item>
+        </Expand>
+    </Type>
+    <Type Name="Slang::GenericSubstitution">
+        <DisplayString>GenSubst {(*genericDecl).nameAndLoc}</DisplayString>
+        <Expand>
+            <Item Name="genericDecl">genericDecl</Item>
+            <ExpandedItem>args</ExpandedItem>
+        </Expand>
+    </Type>
   <Type Name="Slang::DeclRefType">
     <DisplayString>DeclRefType {declRef}</DisplayString>
     <Expand>
       <ExpandedItem>declRef</ExpandedItem>
     </Expand>
   </Type>
+    <Type Name="Slang::FuncDecl">
+        <DisplayString>FuncDecl {nameAndLoc}</DisplayString>
+    </Type>
   <Type Name="Slang::Name">
     <DisplayString>{{name={(char*)(text.buffer.pointer+1), s}}}</DisplayString>
   </Type>
@@ -88,6 +124,8 @@
       <Item Name="[ResultType]">(*(IRFuncType*)(type.pointer)).resultType</Item>
       <Item Name="[ParameterTypes]">(*(IRFuncType*)(type.pointer)).paramTypes</Item>
       <Item Name="[FirstBlock]">firstBlock</Item>
+      <Item Name="[SpecLevel]">specializedGenericLevel</Item>
+      <Item Name="genericDecls">genericDecls</Item>
     </Expand>
   </Type>
   

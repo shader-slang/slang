@@ -315,16 +315,6 @@ struct IRWitnessTable : IRGlobalValue
     IRValueList<IRWitnessTableEntry> entries;
 };
 
-// An abstract witness table is a global value that 
-// represents an inheritance relationship that can't
-// be resolved to a witness table at IR-generation time.
-struct IRAbstractWitness : IRGlobalValue
-{
-    RefPtr<SubtypeWitness> witness;
-    DeclRef<Decl> subTypeDeclRef, supTypeDeclRef;
-};
-
-
 // Description of an instruction to be used for global value numbering
 struct IRInstKey
 {

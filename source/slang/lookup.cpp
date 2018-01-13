@@ -1,5 +1,6 @@
 // lookup.cpp
 #include "lookup.h"
+#include "name.h"
 
 namespace Slang {
 
@@ -320,8 +321,8 @@ void DoLookupImpl(
                 continue;
 
             DeclRef<ContainerDecl> containerDeclRef =
-                DeclRef<Decl>(containerDecl, nullptr).As<ContainerDecl>();
-
+                DeclRef<Decl>(containerDecl, createDefaultSubstitutions(session, containerDecl)).As<ContainerDecl>();
+            
             BreadcrumbInfo breadcrumb;
             BreadcrumbInfo* breadcrumbs = nullptr;
 

@@ -480,9 +480,10 @@ LoweredValInfo emitWitnessTableRef(
 {
     if (auto mbrExpr = dynamic_cast<MemberExpr*>(expr))
     {
-        if (auto inheritanceDeclRef = mbrExpr->declRef.As<InheritanceDecl>())
+        if (auto typeConstraintDeclRef = mbrExpr->declRef.As<TypeConstraintDecl>())
         {
-            if (inheritanceDeclRef.getDecl()->ParentDecl->As<InterfaceDecl>() || inheritanceDeclRef.getDecl()->ParentDecl->As<AssocTypeDecl>())
+            if (mbrExpr->declRef.getDecl()->ParentDecl->As<InterfaceDecl>()
+                || mbrExpr->declRef.getDecl()->ParentDecl->As<AssocTypeDecl>())
             {
                 RefPtr<Type> exprType = nullptr;
                 if (auto tt = mbrExpr->BaseExpression->type->As<TypeType>())
@@ -499,16 +500,19 @@ LoweredValInfo emitWitnessTableRef(
                     // and generate specialize instruction
                     srcDeclRef.substitutions = SubstitutionSet();
                 }
-                witnessTableVal = context->irBuilder->emitFindWitnessTable(srcDeclRef, inheritanceDeclRef.getDecl()->base.type);
+                witnessTableVal = context->irBuilder->emitFindWitnessTable(srcDeclRef, mbrExpr->declRef.As<TypeConstraintDecl>().getDecl()->getSup().type);
                 return maybeEmitSpecializeInst(context, LoweredValInfo::simple(witnessTableVal), declRefType->declRef);
             }
-            else if (inheritanceDeclRef.getDecl()->ParentDecl->As<AggTypeDeclBase>())
-            {
-                return LoweredValInfo::simple(findWitnessTable(context, inheritanceDeclRef));
-            }
-
         }
-        else if (auto genConstraintDeclRef = mbrExpr->declRef.As<GenericTypeConstraintDecl>())
+        if (auto inheritanceDecl = mbrExpr->declRef.As<InheritanceDecl>())
+        {
+            if (mbrExpr->declRef.getDecl()->ParentDecl->As<AggTypeDeclBase>())
+            {
+                return LoweredValInfo::simple(findWitnessTable(context, mbrExpr->declRef));
+            }
+        }
+
+        if (auto genConstraintDeclRef = mbrExpr->declRef.As<GenericTypeConstraintDecl>())
         {
             return LoweredValInfo::simple(context->irBuilder->getDeclRefVal(genConstraintDeclRef));
         }
@@ -549,7 +553,6 @@ LoweredValInfo emitFuncRef(
                 // a body, so we don't want to emit or call it), and
                 // we actually want to perform a lookup step to
                 // find the corresponding member on our chosen type.
-
                 RefPtr<Type> type = funcExpr->type;
                 auto loweredBaseWitnessTable = emitWitnessTableRef(context, baseMemberExpr);
                 auto loweredVal = LoweredValInfo::simple(context->irBuilder->emitLookupInterfaceMethodInst(
@@ -2751,6 +2754,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         SLANG_UNIMPLEMENTED_X("decl catch-all");
     }
 
+    LoweredValInfo visitExtensionDecl(ExtensionDecl* decl)
+    {
+        for (auto & member : decl->Members)
+            ensureDecl(context, member);
+        return LoweredValInfo();
+    }
+
     LoweredValInfo visitImportDecl(ImportDecl* /*decl*/)
     {
         return LoweredValInfo();
@@ -2789,7 +2799,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // Construct the mangled name for the witness table, which depends
         // on the type that is conforming, and the type that it conforms to.
         String mangledName = getMangledNameForConformanceWitness(
-            type,
+            makeDeclRef(parentDecl),
             superType);
 
         // Build an IR level witness table, which will represent the
@@ -3466,11 +3476,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             if(auto genericAncestor = dynamic_cast<GenericDecl*>(pp))
             {
-                irFunc->genericDecl = genericAncestor;
-                break;
+                irFunc->genericDecls.Add(genericAncestor);
             }
         }
-
+        irFunc->specializedGenericLevel = (int)irFunc->genericDecls.Count() - 1;
         for( auto paramInfo : parameterLists.params )
         {
             RefPtr<Type> irParamType = lowerSimpleType(context, paramInfo.type);
@@ -3904,28 +3913,49 @@ LoweredValInfo maybeEmitSpecializeInst(IRGenContext*   context,
     if (loweredDecl.flavor == LoweredValInfo::Flavor::None)
         return loweredDecl;
 
+    if (!declRef.As<FuncDecl>() && !declRef.As<TypeConstraintDecl>())
+        return loweredDecl;
+
     auto val = getSimpleVal(context, loweredDecl);
 
+
+    RefPtr<GenericSubstitution> outterMostSubst, secondOutterMostSubst;
+    for (auto subst = declRef.substitutions.genericSubstitutions; subst; subst = subst->outer)
+    {
+        if (!subst->outer)
+            outterMostSubst = subst;
+        else
+            secondOutterMostSubst = subst;
+    }
+    auto newSubst = outterMostSubst;
     // We have the "raw" substitutions from the AST, but we may
     // need to walk through those and replace things in
     // cases where the `Val`s used for substitution should
     // lower to something other than their original form.
-    auto newSubst = lowerSubstitutions(context, declRef.substitutions);
-    declRef.substitutions = newSubst;
-
+    auto lowedNewSubst = lowerGenericSubstitutions(context, newSubst);
+    DeclRef<Decl> newDeclRef = DeclRef<Decl>(declRef.decl, 
+        SubstitutionSet(lowedNewSubst, declRef.substitutions.thisTypeSubstitution, 
+            declRef.substitutions.globalGenParamSubstitutions));
 
     RefPtr<Type> type;
     if (auto declType = val->getType())
     {
-        type = declType->Substitute(declRef.substitutions).As<Type>();
+        type = declType->Substitute(newDeclRef.substitutions).As<Type>();
     }
 
     // Otherwise, we need to construct a specialization of the
     // given declaration.
-    return LoweredValInfo::simple((IRInst*)context->irBuilder->emitSpecializeInst(
+    auto specializedVal = LoweredValInfo::simple((IRInst*)context->irBuilder->emitSpecializeInst(
         type,
         val,
-        declRef));
+        newDeclRef));
+    if (secondOutterMostSubst)
+    {
+        newDeclRef.substitutions.genericSubstitutions = new GenericSubstitution(*secondOutterMostSubst);
+        newDeclRef.substitutions.genericSubstitutions->outer = nullptr;
+        return maybeEmitSpecializeInst(context, specializedVal, newDeclRef);
+    }
+    return specializedVal;
 }
 
 
