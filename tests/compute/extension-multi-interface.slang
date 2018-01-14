@@ -21,6 +21,7 @@ interface IAddAndSub
 
 struct Simple : IAdd
 {
+    float base;
     float addf(float u, float v)
     {
         return u+v;
@@ -31,7 +32,7 @@ __extension Simple : ISub, IAddAndSub
 {
     float subf(float u, float v)
     {
-        return u-v;
+        return base+u-v;
     }
 };
 
@@ -44,6 +45,7 @@ float testAddSub<T:IAddAndSub>(T t)
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     Simple s;
+    s.base = 0.0;
 	float outVal = testAddSub(s);
 	outputBuffer[dispatchThreadID.x] = outVal;
 }
