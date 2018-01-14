@@ -1076,8 +1076,12 @@ namespace Slang
                 {
                     // The user is asking for us to actually perform the conversion,
                     // so we need to generate an appropriate expression here.
-                    
-                    throw "foo bar baz";
+
+                    // YONGH: I am confused why we are not hitting this case before
+                    //throw "foo bar baz";
+                    // YONGH: temporary work around, may need to create the actual
+                    // invocation expr to the constructor call
+                    *outToExpr = fromExpr;
                 }
 
                 return true;
@@ -1848,7 +1852,7 @@ namespace Slang
                 if (doesMemberSatisfyRequirement(member.declRef, requiredMemberDeclRef, requirementWitness))
                     return member.declRef.getDecl();
             }
-
+            
             // No suitable member found, although there were candidates.
             //
             // TODO: Eventually we might want something akin to the current
