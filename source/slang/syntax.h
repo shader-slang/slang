@@ -978,6 +978,30 @@ namespace Slang
         {
             return items.Count() > 1 ? items[0].declRef.GetName() : item.declRef.GetName();
         }
+        LookupResultItem* begin()
+        {
+            if (isValid())
+            {
+                if (isOverloaded())
+                    return items.begin();
+                else
+                    return &item;
+            }
+            else
+                return nullptr;
+        }
+        LookupResultItem* end()
+        {
+            if (isValid())
+            {
+                if (isOverloaded())
+                    return items.end();
+                else
+                    return &item + 1;
+            }
+            else
+                return nullptr;
+        }
     };
 
     struct SemanticsVisitor;
@@ -1085,6 +1109,27 @@ namespace Slang
         return FilteredMemberRefList<T>(declRef.getDecl()->Members, declRef.substitutions);
     }
 
+    inline ExtensionDecl* GetCandidateExtensions(DeclRef<AggTypeDecl> const& declRef)
+    {
+        return declRef.getDecl()->candidateExtensions;
+    }
+
+    template<typename T>
+    inline FilteredMemberRefList<T> getMembersOfTypeWithExt(DeclRef<ContainerDecl> const& declRef)
+    {
+        auto rs = getMembersOfType<T>(declRef);
+        if (auto aggDeclRef = declRef.As<AggTypeDecl>())
+        {
+            for (auto ext = GetCandidateExtensions(aggDeclRef); ext; ext = ext->nextCandidateExtension)
+            {
+                auto extMembers = getMembersOfType<T>(DeclRef<ContainerDecl>(ext, declRef.substitutions));
+                const_cast<List<RefPtr<Decl>>&>(rs.decls).AddRange(extMembers.decls);
+            }
+        }
+        return rs;
+    }
+
+
     inline RefPtr<Type> GetType(DeclRef<VarDeclBase> const& declRef)
     {
         return declRef.Substitute(declRef.getDecl()->type.Ptr());
@@ -1099,12 +1144,7 @@ namespace Slang
     {
         return declRef.Substitute(declRef.getDecl()->targetType.Ptr());
     }
-
-    inline ExtensionDecl* GetCandidateExtensions(DeclRef<AggTypeDecl> const& declRef)
-    {
-        return declRef.getDecl()->candidateExtensions;
-    }
-
+    
     inline FilteredMemberRefList<StructField> GetFields(DeclRef<StructDecl> const& declRef)
     {
         return getMembersOfType<StructField>(declRef);

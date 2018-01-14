@@ -2788,19 +2788,30 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // TODO: if this inheritance declaration is under an extension,
         // then we should construct the type that is being extended,
         // and not a reference to the extension itself.
-        auto parentDecl = inheritanceDecl->ParentDecl;
-        RefPtr<Type> type = DeclRefType::Create(
-            context->getSession(),
-            makeDeclRef(parentDecl));
 
+        auto parentDecl = inheritanceDecl->ParentDecl;
+        RefPtr<Type> type;
+        if (auto extParentDecl = dynamic_cast<ExtensionDecl*>(parentDecl))
+        {
+            type = extParentDecl->targetType.type;
+            if (auto declRefType = type.As<DeclRefType>())
+            {
+                if (auto aggTypeDecl = declRefType->declRef.As<AggTypeDecl>())
+                    parentDecl = aggTypeDecl.getDecl();
+            }
+        }
+        else
+        {
+            type = DeclRefType::Create(
+                context->getSession(),
+                makeDeclRef(parentDecl));
+        }
         // What is the super-type that we have declared we inherit from?
         RefPtr<Type> superType = inheritanceDecl->base.type;
 
         // Construct the mangled name for the witness table, which depends
         // on the type that is conforming, and the type that it conforms to.
-        String mangledName = getMangledNameForConformanceWitness(
-            makeDeclRef(parentDecl),
-            superType);
+        String mangledName = getMangledNameForConformanceWitness(type, superType);
 
         // Build an IR level witness table, which will represent the
         // conformance of the type to its super-type.
