@@ -4242,10 +4242,12 @@ namespace Slang
         DECL(typedef,         ParseTypeDef);
         DECL(associatedtype,  parseAssocType);
         DECL(__generic_param, parseGlobalGenericParamDecl);
+        DECL(type_param,      parseGlobalGenericParamDecl);
         DECL(cbuffer,         parseHLSLCBufferDecl);
         DECL(tbuffer,         parseHLSLTBufferDecl);
         DECL(__generic,       ParseGenericDecl);
         DECL(__extension,     ParseExtensionDecl);
+        DECL(extension,       ParseExtensionDecl);
         DECL(__init,          parseConstructorDecl);
         DECL(__subscript,     ParseSubscriptDecl);
         DECL(interface,       parseInterfaceDecl);
