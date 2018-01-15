@@ -297,6 +297,23 @@ void DoLocalLookupImpl(
                 session,
                 name, extDeclRef, request, result, inBreadcrumbs);
         }
+
+    }
+    // for interface decls, also lookup in the base interfaces
+    if (request.semantics)
+    {
+        if (auto interfaceDeclRef = containerDeclRef.As<InterfaceDecl>())
+        {
+            auto baseInterfaces = getMembersOfType<InheritanceDecl>(interfaceDeclRef);
+            for (auto inheritanceDeclRef : baseInterfaces)
+            {
+                auto baseType = inheritanceDeclRef.getDecl()->base.type.As<DeclRefType>();
+                SLANG_ASSERT(baseType);
+                int diff = 0;
+                auto baseInterfaceDeclRef = baseType->declRef.SubstituteImpl(interfaceDeclRef.substitutions, &diff);
+                DoLocalLookupImpl(session, name, baseInterfaceDeclRef.As<ContainerDecl>(), request, result, inBreadcrumbs);
+            }
+        }
     }
 }
 

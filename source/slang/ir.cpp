@@ -3690,12 +3690,12 @@ namespace Slang
         cloneFunctionCommon(context, clonedFunc, originalFunc);
 
         // for now, clone all unreferenced witness tables
-        /*for (auto gv = context->getOriginalModule()->getFirstGlobalValue();
+        for (auto gv = context->getOriginalModule()->getFirstGlobalValue();
             gv; gv = gv->getNextValue())
         {
             if (gv->op == kIROp_witness_table)
                 cloneGlobalValue(context, (IRWitnessTable*)gv);
-        }*/
+        }
 
         // We need to attach the layout information for
         // the entry point to this declaration, so that
@@ -4746,7 +4746,9 @@ namespace Slang
                                 //
                                 // We will first find or construct a specialized version
                                 // of the callee funciton/
+                                auto oldFunc = dumpIRFunc(genericFunc);
                                 auto specFunc = getSpecializedFunc(sharedContext, genericFunc, specDeclRef);
+                                auto newFunc = dumpIRFunc(specFunc);
                                 //
                                 // Then we will replace the use sites for the `specialize`
                                 // instruction with uses of the specialized function.

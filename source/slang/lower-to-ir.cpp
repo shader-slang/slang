@@ -2781,6 +2781,30 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return LoweredValInfo();
     }
 
+    void walkInheritanceHierarchyAndCreateWitnessTableCopies(IRWitnessTable* witnessTable, Type* subType, InheritanceDecl* inheritanceDecl)
+    {
+        auto baseDeclRef = inheritanceDecl->base.type.As<DeclRefType>();
+        if (auto baseInterfaceDeclRef = baseDeclRef->declRef.As<InterfaceDecl>())
+        {
+            for (auto subInheritanceDeclRef : getMembersOfType<InheritanceDecl>(baseInterfaceDeclRef))
+            {
+                auto cpyMangledName = getMangledNameForConformanceWitness(subType, subInheritanceDeclRef.getDecl()->getSup().type);
+                if (!witnessTablesDictionary.ContainsKey(cpyMangledName))
+                {
+                    auto cpyTable = context->irBuilder->createWitnessTable();
+                    cpyTable->mangledName = cpyMangledName;
+                    context->irBuilder->createWitnessTableEntry(witnessTable,
+                        context->irBuilder->getDeclRefVal(subInheritanceDeclRef), cpyTable);
+                    cpyTable->entries = witnessTable->entries;
+                    witnessTablesDictionary.Add(cpyMangledName, cpyTable);
+                    walkInheritanceHierarchyAndCreateWitnessTableCopies(witnessTable, subType, subInheritanceDeclRef.getDecl());
+                }
+            }
+        }
+    }
+
+    Dictionary<String, IRWitnessTable*> witnessTablesDictionary;
+
     LoweredValInfo visitInheritanceDecl(InheritanceDecl* inheritanceDecl)
     {
         // Construct a type for the parent declaration.
@@ -2817,6 +2841,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // conformance of the type to its super-type.
         auto witnessTable = context->irBuilder->createWitnessTable();
         witnessTable->mangledName = mangledName;
+        
+        witnessTablesDictionary.Add(mangledName, witnessTable);
 
         if (parentDecl->ParentDecl)
             witnessTable->genericDecl = dynamic_cast<GenericDecl*>(parentDecl->ParentDecl);
@@ -2850,6 +2876,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
 
         witnessTable->moveToEnd();
+        walkInheritanceHierarchyAndCreateWitnessTableCopies(witnessTable, type, inheritanceDecl);
 
         // A direct reference to this inheritance relationship (e.g.,
         // as a subtype witness) will take the form of a reference to
