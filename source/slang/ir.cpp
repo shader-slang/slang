@@ -4746,9 +4746,7 @@ namespace Slang
                                 //
                                 // We will first find or construct a specialized version
                                 // of the callee funciton/
-                                auto oldFunc = dumpIRFunc(genericFunc);
                                 auto specFunc = getSpecializedFunc(sharedContext, genericFunc, specDeclRef);
-                                auto newFunc = dumpIRFunc(specFunc);
                                 //
                                 // Then we will replace the use sites for the `specialize`
                                 // instruction with uses of the specialized function.
