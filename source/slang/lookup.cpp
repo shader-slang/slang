@@ -345,7 +345,19 @@ void DoLookupImpl(
 
             // Now perform "local" lookup in the context of the container,
             // as if we were looking up a member directly.
-            //
+            
+            // if we are currently in an extension decl, perform local lookup
+            // in the target decl we are extending
+            if (auto extDeclRef = containerDeclRef.As<ExtensionDecl>())
+            {
+                if (auto targetDeclRef = extDeclRef.getDecl()->targetType->AsDeclRefType())
+                {
+                    if (auto aggDeclRef = targetDeclRef->declRef.As<AggTypeDecl>())
+                    {
+                        containerDeclRef = extDeclRef.Substitute(aggDeclRef);
+                    }
+                }
+            }
             DoLocalLookupImpl(
                 session,
                 name, containerDeclRef, request, result, breadcrumbs);

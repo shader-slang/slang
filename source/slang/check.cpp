@@ -1076,8 +1076,12 @@ namespace Slang
                 {
                     // The user is asking for us to actually perform the conversion,
                     // so we need to generate an appropriate expression here.
-                    
-                    throw "foo bar baz";
+
+                    // YONGH: I am confused why we are not hitting this case before
+                    //throw "foo bar baz";
+                    // YONGH: temporary work around, may need to create the actual
+                    // invocation expr to the constructor call
+                    *outToExpr = fromExpr;
                 }
 
                 return true;
@@ -1794,7 +1798,7 @@ namespace Slang
         // `requiredMemberDeclRef` is a required member of
         // the interface.
         RefPtr<Decl> findWitnessForInterfaceRequirement(
-            DeclRef<AggTypeDecl>    typeDeclRef,
+            DeclRef<AggTypeDeclBase>    typeDeclRef,
             InheritanceDecl*        inheritanceDecl,
             DeclRef<InterfaceDecl>  interfaceDeclRef,
             DeclRef<Decl>           requiredMemberDeclRef,
@@ -1833,11 +1837,9 @@ namespace Slang
 
             // Make sure that by-name lookup is possible.
             buildMemberDictionary(typeDeclRef.getDecl());
-
-            Decl* firstMemberOfName = nullptr;
-            typeDeclRef.getDecl()->memberDictionary.TryGetValue(name, firstMemberOfName);
-
-            if (!firstMemberOfName)
+            auto lookupResult = lookUpLocal(getSession(), this, name, typeDeclRef);
+            
+            if (!lookupResult.isValid())
             {
                 getSink()->diagnose(inheritanceDecl, Diagnostics::typeDoesntImplementInterfaceRequirement, typeDeclRef, requiredMemberDeclRef);
                 return nullptr;
@@ -1845,12 +1847,12 @@ namespace Slang
 
             // Iterate over the members and look for one that matches
             // the expected signature for the requirement.
-            for (auto memberDecl = firstMemberOfName; memberDecl; memberDecl = memberDecl->nextInContainerWithSameName)
+            for (auto member : lookupResult)
             {
-                if (doesMemberSatisfyRequirement(DeclRef<Decl>(memberDecl, typeDeclRef.substitutions), requiredMemberDeclRef, requirementWitness))
-                    return memberDecl;
+                if (doesMemberSatisfyRequirement(member.declRef, requiredMemberDeclRef, requirementWitness))
+                    return member.declRef.getDecl();
             }
-
+            
             // No suitable member found, although there were candidates.
             //
             // TODO: Eventually we might want something akin to the current
@@ -1867,7 +1869,7 @@ namespace Slang
         // (via the given `inheritanceDecl`) actually provides
         // members to satisfy all the requirements in the interface.
         bool checkInterfaceConformance(
-            DeclRef<AggTypeDecl>        typeDeclRef,
+            DeclRef<AggTypeDeclBase>        typeDeclRef,
             InheritanceDecl*    inheritanceDecl,
             DeclRef<InterfaceDecl>  interfaceDeclRef)
         {
@@ -1925,7 +1927,7 @@ namespace Slang
         }
 
         bool checkConformanceToType(
-            DeclRef<AggTypeDecl> typeDeclRef,
+            DeclRef<AggTypeDeclBase> typeDeclRef,
             InheritanceDecl*     inheritanceDecl,
             Type*                baseType)
         {
@@ -1953,7 +1955,7 @@ namespace Slang
         // `inheritanceDecl` actually does what it needs to
         // for that inheritance to be valid.
         bool checkConformance(
-            DeclRef<AggTypeDecl>        typeDecl,
+            DeclRef<AggTypeDeclBase>        typeDecl,
             InheritanceDecl*            inheritanceDecl)
         {
             // Look at the type being inherited from, and validate
@@ -1963,10 +1965,10 @@ namespace Slang
         }
 
         bool checkConformance(
-            AggTypeDecl*        typeDecl,
+            AggTypeDeclBase*        typeDecl,
             InheritanceDecl*    inheritanceDecl)
         {
-            return checkConformance(DeclRef<AggTypeDecl>(typeDecl, SubstitutionSet()), inheritanceDecl);
+            return checkConformance(DeclRef<AggTypeDeclBase>(typeDecl, SubstitutionSet()), inheritanceDecl);
         }
 
         void visitAggTypeDecl(AggTypeDecl* decl)
@@ -3479,10 +3481,11 @@ namespace Slang
 
             // TODO: need to check that the target type names a declaration...
 
+            DeclRef<AggTypeDecl> aggTypeDeclRef;
             if (auto targetDeclRefType = decl->targetType->As<DeclRefType>())
             {
                 // Attach our extension to that type as a candidate...
-                if (auto aggTypeDeclRef = targetDeclRefType->declRef.As<AggTypeDecl>())
+                if (aggTypeDeclRef = targetDeclRefType->declRef.As<AggTypeDecl>())
                 {
                     auto aggTypeDecl = aggTypeDeclRef.getDecl();
                     decl->nextCandidateExtension = aggTypeDecl->candidateExtensions;
@@ -3516,6 +3519,14 @@ namespace Slang
                 EnsureDecl(m);
             }
 
+            if (aggTypeDeclRef)
+            {
+                for (auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
+                {
+                    checkConformance(aggTypeDeclRef.getDecl(), inheritanceDecl);
+                }
+            }
+            
             decl->SetCheckState(DeclCheckState::Checked);
         }
 
@@ -3802,7 +3813,7 @@ namespace Slang
 
                 if( auto aggTypeDeclRef = declRef.As<AggTypeDecl>() )
                 {
-                    for( auto inheritanceDeclRef : getMembersOfType<InheritanceDecl>(aggTypeDeclRef))
+                    for( auto inheritanceDeclRef : getMembersOfTypeWithExt<InheritanceDecl>(aggTypeDeclRef))
                     {
                         EnsureDecl(inheritanceDeclRef.getDecl());
 
