@@ -62,7 +62,10 @@ void printDiagnosticArg(StringBuilder& sb, TypeExp const& type)
 
 void printDiagnosticArg(StringBuilder& sb, QualType const& type)
 {
-    sb << type.type->ToString();
+    if (type.type)
+        sb << type.type->ToString();
+    else
+        sb << "<null>";
 }
 
 void printDiagnosticArg(StringBuilder& sb, TokenType tokenType)

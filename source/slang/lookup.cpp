@@ -302,15 +302,26 @@ void DoLocalLookupImpl(
     // for interface decls, also lookup in the base interfaces
     if (request.semantics)
     {
-        if (auto interfaceDeclRef = containerDeclRef.As<InterfaceDecl>())
+        bool isInterface = containerDeclRef.As<InterfaceDecl>() ? true : false;
+        // if we are looking at an extension, find the target decl that we are extending
+        if (auto extDeclRef = containerDeclRef.As<ExtensionDecl>())
         {
-            auto baseInterfaces = getMembersOfType<InheritanceDecl>(interfaceDeclRef);
+            auto targetDeclRefType = extDeclRef.getDecl()->targetType->AsDeclRefType();
+            SLANG_ASSERT(targetDeclRefType);
+            int diff = 0;
+            auto targetDeclRef = targetDeclRefType->declRef.As<ContainerDecl>().SubstituteImpl(containerDeclRef.substitutions, &diff);
+            isInterface = targetDeclRef.As<InterfaceDecl>() ? true : false;
+        }
+        // if we are looking inside an interface decl, try find in the interfaces it inherits from
+        if (isInterface)
+        {
+            auto baseInterfaces = getMembersOfType<InheritanceDecl>(containerDeclRef);
             for (auto inheritanceDeclRef : baseInterfaces)
             {
                 auto baseType = inheritanceDeclRef.getDecl()->base.type.As<DeclRefType>();
                 SLANG_ASSERT(baseType);
                 int diff = 0;
-                auto baseInterfaceDeclRef = baseType->declRef.SubstituteImpl(interfaceDeclRef.substitutions, &diff);
+                auto baseInterfaceDeclRef = baseType->declRef.SubstituteImpl(containerDeclRef.substitutions, &diff);
                 DoLocalLookupImpl(session, name, baseInterfaceDeclRef.As<ContainerDecl>(), request, result, inBreadcrumbs);
             }
         }
