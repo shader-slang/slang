@@ -1098,9 +1098,31 @@ namespace Slang
     // Declarations
     //
 
+    inline ExtensionDecl* GetCandidateExtensions(DeclRef<AggTypeDecl> const& declRef)
+    {
+        return declRef.getDecl()->candidateExtensions;
+    }
+
     inline FilteredMemberRefList<Decl> getMembers(DeclRef<ContainerDecl> const& declRef)
     {
         return FilteredMemberRefList<Decl>(declRef.getDecl()->Members, declRef.substitutions);
+    }
+
+    // TODO: change this to return a lazy list instead of constructing actual list
+    inline List<DeclRef<Decl>> getMembersWithExt(DeclRef<ContainerDecl> const& declRef)
+    {
+        List<DeclRef<Decl>> rs;
+        for (auto d : FilteredMemberRefList<Decl>(declRef.getDecl()->Members, declRef.substitutions))
+            rs.Add(d);
+        if (auto aggDeclRef = declRef.As<AggTypeDecl>())
+        {
+            for (auto ext = GetCandidateExtensions(aggDeclRef); ext; ext = ext->nextCandidateExtension)
+            {
+                for (auto mbr : getMembers(DeclRef<ContainerDecl>(ext, declRef.substitutions)))
+                    rs.Add(mbr);
+            }
+        }
+        return rs;
     }
 
     template<typename T>
@@ -1109,21 +1131,19 @@ namespace Slang
         return FilteredMemberRefList<T>(declRef.getDecl()->Members, declRef.substitutions);
     }
 
-    inline ExtensionDecl* GetCandidateExtensions(DeclRef<AggTypeDecl> const& declRef)
-    {
-        return declRef.getDecl()->candidateExtensions;
-    }
-
     template<typename T>
-    inline FilteredMemberRefList<T> getMembersOfTypeWithExt(DeclRef<ContainerDecl> const& declRef)
+    inline List<DeclRef<T>> getMembersOfTypeWithExt(DeclRef<ContainerDecl> const& declRef)
     {
-        auto rs = getMembersOfType<T>(declRef);
+        List<DeclRef<T>> rs;
+        for (auto d : getMembersOfType<T>(declRef))
+            rs.Add(d);
         if (auto aggDeclRef = declRef.As<AggTypeDecl>())
         {
             for (auto ext = GetCandidateExtensions(aggDeclRef); ext; ext = ext->nextCandidateExtension)
             {
                 auto extMembers = getMembersOfType<T>(DeclRef<ContainerDecl>(ext, declRef.substitutions));
-                const_cast<List<RefPtr<Decl>>&>(rs.decls).AddRange(extMembers.decls);
+                for (auto mbr : extMembers)
+                    rs.Add(mbr);
             }
         }
         return rs;
