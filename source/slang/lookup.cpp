@@ -4,6 +4,8 @@
 
 namespace Slang {
 
+void checkDecl(SemanticsVisitor* visitor, Decl* decl);
+
 //
 
 DeclRef<ExtensionDecl> ApplyExtensionToType(
@@ -224,6 +226,10 @@ void DoLocalLookupImpl(
     LookupResult&		    result,
     BreadcrumbInfo*		    inBreadcrumbs)
 {
+    if (result.lookedupDecls.Contains(containerDeclRef))
+        return;
+    result.lookedupDecls.Add(containerDeclRef);
+
     ContainerDecl* containerDecl = containerDeclRef.getDecl();
 
     // Ensure that the lookup dictionary in the container is up to date
@@ -318,6 +324,7 @@ void DoLocalLookupImpl(
             auto baseInterfaces = getMembersOfType<InheritanceDecl>(containerDeclRef);
             for (auto inheritanceDeclRef : baseInterfaces)
             {
+                checkDecl(request.semantics, inheritanceDeclRef.decl);
                 auto baseType = inheritanceDeclRef.getDecl()->base.type.As<DeclRefType>();
                 SLANG_ASSERT(baseType);
                 int diff = 0;

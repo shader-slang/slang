@@ -90,6 +90,18 @@ ABSTRACT_SYNTAX_CLASS(SubtypeWitness, Witness)
     )
 END_SYNTAX_CLASS()
 
+SYNTAX_CLASS(TypeEqualityWitness, SubtypeWitness)
+RAW(
+    virtual bool EqualsVal(Val* val) override;
+    virtual String ToString() override;
+    virtual int GetHashCode() override;
+    virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int * ioDiff) override;
+    virtual DeclRef<Decl> getLastStepDeclRef() override
+    {
+        return DeclRef<Decl>();
+    }
+)
+END_SYNTAX_CLASS()
 // A witness that one type is a subtype of another
 // because some in-scope declaration says so
 SYNTAX_CLASS(DeclaredSubtypeWitness, SubtypeWitness)

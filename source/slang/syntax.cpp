@@ -1673,6 +1673,32 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     // TODO: should really have a `type.cpp` and a `witness.cpp`
 
+    bool TypeEqualityWitness::EqualsVal(Val* val)
+    {
+        auto otherWitness = dynamic_cast<TypeEqualityWitness*>(val);
+        if (!otherWitness)
+            return false;
+        return sub->Equals(otherWitness->sub);
+    }
+
+    RefPtr<Val> TypeEqualityWitness::SubstituteImpl(SubstitutionSet subst, int * ioDiff)
+    {
+        RefPtr<TypeEqualityWitness> rs = new TypeEqualityWitness();
+        rs->sub = sub->SubstituteImpl(subst, ioDiff).As<Type>();
+        rs->sup = sup->SubstituteImpl(subst, ioDiff).As<Type>();
+        return rs;
+    }
+
+    String TypeEqualityWitness::ToString()
+    {
+        return "TypeEqualityWitness(" + sub->ToString() + ")";
+    }
+
+    int TypeEqualityWitness::GetHashCode()
+    {
+        return sub->GetHashCode();
+    }
+
     bool DeclaredSubtypeWitness::EqualsVal(Val* val)
     {
         auto otherWitness = dynamic_cast<DeclaredSubtypeWitness*>(val);
@@ -1760,10 +1786,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     int DeclaredSubtypeWitness::GetHashCode()
     {
-        auto hash = sub->GetHashCode();
-        hash = combineHash(hash, sup->GetHashCode());
-        hash = combineHash(hash, declRef.GetHashCode());
-        return hash;
+        return declRef.GetHashCode();
     }
 
     // TransitiveSubtypeWitness

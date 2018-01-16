@@ -1681,7 +1681,7 @@ namespace Slang
         {
             // TODO: actually implement matching here. For now we'll
             // just pretend that things are satisfied in order to make progress..
-            requirementDict.Add(requiredMemberDeclRef, DeclRef<Decl>(memberDecl, nullptr));
+            requirementDict.AddIfNotExists(requiredMemberDeclRef, DeclRef<Decl>(memberDecl, nullptr));
             return true;
         }
 
@@ -1927,10 +1927,16 @@ namespace Slang
         // (via the given `inheritanceDecl`) actually provides
         // members to satisfy all the requirements in the interface.
         bool checkInterfaceConformance(
+            HashSet<DeclRef<InterfaceDecl>> & checkedInterfaceDeclRef,
             DeclRef<AggTypeDeclBase>        typeDeclRef,
             InheritanceDecl*    inheritanceDecl,
             DeclRef<InterfaceDecl>  interfaceDeclRef)
         {
+            if (!checkedInterfaceDeclRef.Contains(interfaceDeclRef))
+                checkedInterfaceDeclRef.Add(interfaceDeclRef);
+            else
+                return true;
+
             bool result = true;
 
             // We need to check the declaration of the interface
@@ -1960,6 +1966,7 @@ namespace Slang
                     //
                     // TODO: we *really* need a linearization step here!!!!
                     result = result && checkConformanceToType(
+                        checkedInterfaceDeclRef,
                         typeDeclRef,
                         inheritanceDecl,
                         getBaseType(requiredInheritanceDeclRef));
@@ -1985,6 +1992,7 @@ namespace Slang
         }
 
         bool checkConformanceToType(
+            HashSet<DeclRef<InterfaceDecl>>& checkedInterfaceDeclRefs,
             DeclRef<AggTypeDeclBase> typeDeclRef,
             InheritanceDecl*     inheritanceDecl,
             Type*                baseType)
@@ -1998,6 +2006,7 @@ namespace Slang
                     // We need to check that it provides all of the members
                     // required by that interface.
                     return checkInterfaceConformance(
+                        checkedInterfaceDeclRefs,
                         typeDeclRef,
                         inheritanceDecl,
                         baseInterfaceDeclRef);
@@ -2019,7 +2028,8 @@ namespace Slang
             // Look at the type being inherited from, and validate
             // appropriately.
             auto baseType = inheritanceDecl->base.type;
-            return checkConformanceToType(typeDecl, inheritanceDecl, baseType.As<Type>());
+            HashSet<DeclRef<InterfaceDecl>> checkdInterfaceDeclRefs;
+            return checkConformanceToType(checkdInterfaceDeclRefs, typeDecl, inheritanceDecl, baseType.As<Type>());
         }
 
         bool checkConformance(
@@ -2107,7 +2117,6 @@ namespace Slang
             {
                 checkDecl(member);
             }
-
             decl->SetCheckState(getCheckedState());
         }
 
@@ -4672,9 +4681,12 @@ namespace Slang
         // Create a witness that attests to the fact that `type`
         // is equal to itself.
         RefPtr<Val> createTypeEqualityWitness(
-            Type*   /*type*/)
+            Type*  type)
         {
-            SLANG_UNEXPECTED("unimplemented");
+            RefPtr<TypeEqualityWitness> rs = new TypeEqualityWitness();
+            rs->sub = type;
+            rs->sup = type;
+            return rs;
         }
 
         // If `sub` is a subtype of `sup`, then return a value that
@@ -7141,4 +7153,8 @@ namespace Slang
         return subst;
     }
 
+    void checkDecl(SemanticsVisitor* visitor, Decl* decl)
+    {
+        visitor->checkDecl(decl);
+    }
 }
