@@ -4889,8 +4889,10 @@ namespace Slang
                         {
                             if (auto subDeclRefType = subtypeWitness->sub.As<DeclRefType>())
                             {
-                                auto genericWitnessTableName = getMangledNameForConformanceWitness(DeclRef<Decl>(subDeclRefType->declRef.getDecl(), nullptr), subtypeWitness->sup);
+                                auto defaultSubst = createDefaultSubstitutions(entryPointRequest->compileRequest->mSession, subDeclRefType->declRef.getDecl());
+                                auto genericWitnessTableName = getMangledNameForConformanceWitness(DeclRef<Decl>(subDeclRefType->declRef.getDecl(), defaultSubst), subtypeWitness->sup);
                                 table = findWitnessTableByName(genericWitnessTableName);
+                                SLANG_ASSERT(table);
                                 WitnessTableSpecializationWorkItem workItem;
                                 workItem.srcTable = (IRWitnessTable*)table;
                                 workItem.dstTable = context->builder->createWitnessTable();
