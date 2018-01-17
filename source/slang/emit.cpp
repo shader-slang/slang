@@ -2315,7 +2315,7 @@ struct EmitVisitor
                     CASE(kIRPseudoOp_Pos, +);
                     CASE(kIROp_Neg, -);
                     CASE(kIROp_Not, !);
-                    CASE(kIRPseudoOp_BitNot, ~);
+                    CASE(kIROp_BitNot, ~);
 #undef CASE
 
 #define CASE(NAME, OP) case kIRPseudoOp_##NAME: EmitUnaryAssignExpr(outerPrec, kEOp_Prefix, #OP, "", callExpr); return
@@ -2552,6 +2552,11 @@ struct EmitVisitor
     void visitOverloadedExpr(OverloadedExpr* expr, ExprEmitArg const&)
     {
         emitName(expr->lookupResult2.getName());
+    }
+
+    void visitOverloadedExpr2(OverloadedExpr2* expr, ExprEmitArg const& arg)
+    {
+        ExprVisitorWithArg<Slang::EmitVisitor, Slang::ExprEmitArg>::dispatch(expr->candidiateExprs[0].Ptr(), arg);
     }
 
     void setSampleRateFlag()
@@ -4928,6 +4933,10 @@ emitDeclImpl(decl, nullptr);
             // types.
             return true;
         }
+        else if (type->As<HLSLStreamOutputType>())
+        {
+            return true;
+        }
         else if(type->As<TextureTypeBase>())
         {
             // GLSL doesn't allow texture/resource types to
@@ -5512,7 +5521,12 @@ emitDeclImpl(decl, nullptr);
                 emitIROperand(ctx, inst->getArg(0));
             }
             break;
-
+        case kIROp_BitNot:
+            {
+                emit("~");
+                emitIROperand(ctx, inst->getArg(0));
+            }
+            break;
         case kIROp_Sample:
             emitIROperand(ctx, inst->getArg(0));
             emit(".Sample(");
@@ -6266,7 +6280,22 @@ emitDeclImpl(decl, nullptr);
                     emit(")]\n");
                 }
                 break;
-
+            case Stage::Geometry:
+            {
+                if (auto attrib = entryPointLayout->entryPoint->FindModifier<HLSLMaxVertexCountAttribute>())
+                {
+                    emit("[maxvertexcount(");
+                    Emit(attrib->value);
+                    emit(")]\n");
+                }
+                if (auto attrib = entryPointLayout->entryPoint->FindModifier<HLSLInstanceAttribute>())
+                {
+                    emit("[instance(");
+                    Emit(attrib->value);
+                    emit(")]\n");
+                }
+            }
+            break;
             // TODO: There are other stages that will need this kind of handling.
             default:
                 break;
@@ -6279,6 +6308,7 @@ emitDeclImpl(decl, nullptr);
 
         emit("(");
         auto firstParam = func->getFirstParam();
+        int pIdx = 0;
         for( auto pp = firstParam; pp; pp = pp->getNextParam() )
         {
             if(pp != firstParam)
@@ -6286,9 +6316,27 @@ emitDeclImpl(decl, nullptr);
 
             auto paramName = getIRName(pp);
             auto paramType = pp->getType();
+            if (auto decor = pp->findDecoration<IRHighLevelDeclDecoration>())
+            {
+                if (decor->decl)
+                {
+                    auto primType = decor->decl->FindModifier<HLSLGeometryShaderInputPrimitiveTypeModifier>();
+                    if (dynamic_cast<HLSLTriangleModifier*>(primType))
+                        emit("triangle ");
+                    else if (dynamic_cast<HLSLPointModifier*>(primType))
+                        emit("point ");
+                    else if (dynamic_cast<HLSLLineModifier*>(primType))
+                        emit("line ");
+                    else if (dynamic_cast<HLSLLineAdjModifier*>(primType))
+                        emit("lineadj ");
+                    else if (dynamic_cast<HLSLTriangleAdjModifier*>(primType))
+                        emit("triangleadj ");
+                }
+            }
             emitIRParamType(ctx, paramType, paramName);
 
             emitIRSemantics(ctx, pp);
+            pIdx++;
         }
         emit(")");
 

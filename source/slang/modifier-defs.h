@@ -305,6 +305,16 @@ SYNTAX_CLASS(HLSLNumThreadsAttribute, HLSLAttribute)
     FIELD(int32_t, z)
 END_SYNTAX_CLASS()
 
+SYNTAX_CLASS(HLSLMaxVertexCountAttribute, HLSLAttribute)
+    // The number of max vertex count for geometry shader
+    FIELD(int32_t, value)
+END_SYNTAX_CLASS()
+
+SYNTAX_CLASS(HLSLInstanceAttribute, HLSLAttribute)
+    // The number of instances to run for geometry shader
+    FIELD(int32_t, value)
+END_SYNTAX_CLASS()
+
 // HLSL modifiers for geometry shader input topology
 SIMPLE_SYNTAX_CLASS(HLSLGeometryShaderInputPrimitiveTypeModifier, Modifier)
 SIMPLE_SYNTAX_CLASS(HLSLPointModifier        , HLSLGeometryShaderInputPrimitiveTypeModifier)
