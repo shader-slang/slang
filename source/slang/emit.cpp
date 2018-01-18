@@ -6308,7 +6308,6 @@ emitDeclImpl(decl, nullptr);
 
         emit("(");
         auto firstParam = func->getFirstParam();
-        int pIdx = 0;
         for( auto pp = firstParam; pp; pp = pp->getNextParam() )
         {
             if(pp != firstParam)
@@ -6336,7 +6335,6 @@ emitDeclImpl(decl, nullptr);
             emitIRParamType(ctx, paramType, paramName);
 
             emitIRSemantics(ctx, pp);
-            pIdx++;
         }
         emit(")");
 
