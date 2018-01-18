@@ -3591,6 +3591,7 @@ namespace Slang
                 IRParam* clonedParam = builder->emitParam(
                     context->maybeCloneType(
                         originalParam->getType()));
+                cloneDecorations(context, clonedParam, originalParam);
                 registerClonedValue(context, clonedParam, originalParam);
             }
         }

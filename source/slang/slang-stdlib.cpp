@@ -199,7 +199,7 @@ namespace Slang
         { kIRPseudoOp_Pos,     "+",    ARITHMETIC_MASK },
         { kIROp_Neg,     "-",    ARITHMETIC_MASK },
         { kIROp_Not,     "!",    ANY_MASK        },
-        { kIRPseudoOp_BitNot,    "~",    INT_MASK        },
+        { kIROp_BitNot,    "~",    INT_MASK        },
         { kIRPseudoOp_PreInc,  "++",   ARITHMETIC_MASK | ASSIGNMENT },
         { kIRPseudoOp_PreDec,  "--",   ARITHMETIC_MASK | ASSIGNMENT },
         { kIRPseudoOp_PostInc, "++",   ARITHMETIC_MASK | ASSIGNMENT | POSTFIX },

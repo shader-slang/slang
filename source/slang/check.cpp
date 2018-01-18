@@ -1466,7 +1466,9 @@ namespace Slang
                 // For now we will do this in a completely ad hoc fashion,
                 // but it would be nice to have some generic routine to
                 // do the needed type checking/coercion.
-                if(getText(hlslUncheckedAttribute->getName()) == "numthreads")
+                auto attribText = getText(hlslUncheckedAttribute->getName());
+                
+                if(attribText == "numthreads")
                 {
                     if(hlslUncheckedAttribute->args.Count() != 3)
                         return m;
@@ -1490,8 +1492,33 @@ namespace Slang
 
                     return hlslNumThreadsAttribute;
                 }
-            }
+                else if (attribText == "maxvertexcount")
+                {
+                    if (hlslUncheckedAttribute->args.Count() != 1)
+                        return m;
+                    auto val = checkConstantIntVal(hlslUncheckedAttribute->args[0]);
+                    auto hlslMaxVertexCountAttrib = new HLSLMaxVertexCountAttribute();
 
+                    hlslMaxVertexCountAttrib->loc = hlslUncheckedAttribute->loc;
+                    hlslMaxVertexCountAttrib->name = hlslUncheckedAttribute->getName();
+                    hlslMaxVertexCountAttrib->args = hlslUncheckedAttribute->args;
+                    hlslMaxVertexCountAttrib->value = (int32_t)val->value;
+                    return hlslMaxVertexCountAttrib;
+                }
+                else if (attribText == "instance")
+                {
+                    if (hlslUncheckedAttribute->args.Count() != 1)
+                        return m;
+                    auto val = checkConstantIntVal(hlslUncheckedAttribute->args[0]);
+                    auto attrib = new HLSLInstanceAttribute();
+
+                    attrib->loc = hlslUncheckedAttribute->loc;
+                    attrib->name = hlslUncheckedAttribute->getName();
+                    attrib->args = hlslUncheckedAttribute->args;
+                    attrib->value = (int32_t)val->value;
+                    return attrib;
+                }
+            }
             // Default behavior is to leave things as they are,
             // and assume that modifiers are mostly already checked.
             //
@@ -2202,9 +2229,10 @@ namespace Slang
                 // to avoid recursion here.
                 if (functionNode->Body)
                 {
+                    auto oldFunc = function;
                     this->function = functionNode;
                     checkStmt(functionNode->Body);
-                    this->function = nullptr;
+                    this->function = oldFunc;
                 }
             }
         }
@@ -2630,6 +2658,7 @@ namespace Slang
         {
             if (functionNode->IsChecked(DeclCheckState::CheckedHeader)) return;
             functionNode->SetCheckState(DeclCheckState::CheckingHeader);
+            auto oldFunc = this->function;
             this->function = functionNode;
             auto returnType = CheckProperType(functionNode->ReturnType);
             functionNode->ReturnType = returnType;
@@ -2648,7 +2677,7 @@ namespace Slang
                 else
                     paraNames.Add(para->getName());
             }
-            this->function = NULL;
+            this->function = oldFunc;
             functionNode->SetCheckState(DeclCheckState::CheckedHeader);
 
             // One last bit of validation: check if we are redeclaring an existing function
@@ -5745,6 +5774,13 @@ namespace Slang
                     AddDeclRefOverloadCandidates(item, context);
                 }
             }
+            else if (auto overloadedExpr2 = funcExpr.As<OverloadedExpr2>())
+            {
+                for (auto item : overloadedExpr2->candidiateExprs)
+                {
+                    AddOverloadCandidates(item, context);
+                }
+            }
             else if (auto typeType = funcExprType->As<TypeType>())
             {
                 // If none of the above cases matched, but we are
@@ -5943,6 +5979,10 @@ namespace Slang
             else if (auto funcOverloadExpr = funcExpr.As<OverloadedExpr>())
             {
                 context.baseExpr = funcOverloadExpr->base;
+            }
+            else if (auto funcOverloadExpr2 = funcExpr.As<OverloadedExpr2>())
+            {
+                context.baseExpr = funcOverloadExpr2->base;
             }
             AddOverloadCandidates(funcExpr, context);
 
@@ -6172,15 +6212,14 @@ namespace Slang
                     // There were multiple viable candidates, but that isn't an error: we just need
                     // to complete all of them and create an overloaded expression as a result.
 
-                    LookupResult result;
+                    auto overloadedExpr = new OverloadedExpr2();
+                    overloadedExpr->base = context.baseExpr;
                     for (auto candidate : context.bestCandidates)
                     {
                         auto candidateExpr = CompleteOverloadCandidate(context, candidate);
+                        overloadedExpr->candidiateExprs.Add(candidateExpr);
                     }
-
-                    throw "what now?";
-//                        auto overloadedExpr = new OverloadedExpr();
-//                        return overloadedExpr;
+                    return overloadedExpr;
                 }
             }
             else if (context.bestCandidate)
@@ -6399,6 +6438,13 @@ namespace Slang
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), expr, "should not appear in input syntax");
             return expr;
         }
+
+        RefPtr<Expr> visitOverloadedExpr2(OverloadedExpr2* expr)
+        {
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), expr, "should not appear in input syntax");
+            return expr;
+        }
+
 
         RefPtr<Expr> visitAggTypeCtorExpr(AggTypeCtorExpr* expr)
         {

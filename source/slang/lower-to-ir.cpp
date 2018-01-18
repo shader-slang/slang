@@ -705,7 +705,6 @@ LoweredValInfo emitCallToDeclRef(
             CASE(kIRPseudoOp_PostInc, kIROp_Add);
             CASE(kIRPseudoOp_PostDec, kIROp_Sub);
 #undef CASE
-
             default:
                 SLANG_UNIMPLEMENTED_X("IR pseudo-op");
                 break;
@@ -1193,6 +1192,11 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     }
 
     LoweredValInfo visitOverloadedExpr(OverloadedExpr* /*expr*/)
+    {
+        SLANG_UNEXPECTED("overloaded expressions should not occur in checked AST");
+    }
+
+    LoweredValInfo visitOverloadedExpr2(OverloadedExpr2* /*expr*/)
     {
         SLANG_UNEXPECTED("overloaded expressions should not occur in checked AST");
     }
@@ -3521,7 +3525,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         for( auto paramInfo : parameterLists.params )
         {
             RefPtr<Type> irParamType = lowerSimpleType(context, paramInfo.type);
-
             switch( paramInfo.direction )
             {
             case kParameterDirection_In:

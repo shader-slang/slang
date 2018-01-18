@@ -124,6 +124,12 @@ namespace Slang
         {
             emitQualifiedName(context, declRefType->declRef);
         }
+        else if (auto arrType = dynamic_cast<ArrayExpressionType*>(type))
+        {
+            emitRaw(context, "a");
+            emitSimpleIntVal(context, arrType->ArrayLength);
+            emitType(context, arrType->baseType);
+        }
         else
         {
             SLANG_UNEXPECTED("unimplemented case in mangling");

@@ -30,6 +30,18 @@ SYNTAX_CLASS(OverloadedExpr, Expr)
     FIELD(LookupResult, lookupResult2)
 END_SYNTAX_CLASS()
 
+// An expression that references an overloaded set of declarations
+// having the same name.
+SYNTAX_CLASS(OverloadedExpr2, Expr)
+
+    // Optional: the base expression is this overloaded result
+    // arose from a member-reference expression.
+    SYNTAX_FIELD(RefPtr<Expr>, base)
+
+    // The lookup result that was ambiguous
+    FIELD(List<RefPtr<Expr>>, candidiateExprs)
+END_SYNTAX_CLASS()
+
 SYNTAX_CLASS(ConstantExpr, Expr)
     FIELD(Token, token)
 

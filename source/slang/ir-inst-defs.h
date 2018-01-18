@@ -231,6 +231,7 @@ INTRINSIC(Pos)
 
 INST(Neg, neg, 1, 0)
 INST(Not, not, 1, 0)
+INST(BitNot, bitnot, 1, 0)
 
 #if 0
 INTRINSIC(PreInc)
@@ -286,7 +287,6 @@ PSEUDO_INST(XorAssign )
 PSEUDO_INST(LshAssign)
 PSEUDO_INST(RshAssign)
 PSEUDO_INST(Assign)
-PSEUDO_INST(BitNot)
 PSEUDO_INST(And)
 PSEUDO_INST(Or)
 

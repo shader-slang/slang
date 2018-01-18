@@ -5091,6 +5091,14 @@ struct FindIRDeclUsedByASTVisitor
         // TODO: need to walk the lookup result too
     }
 
+    void visitOverloadedExpr2(OverloadedExpr2* expr)
+    {
+        walkExpr(expr->base);
+        for (auto & candidate : expr->candidiateExprs)
+            walkExpr(candidate);
+    }
+
+
     void visitConstantExpr(ConstantExpr*)
     {}
 
