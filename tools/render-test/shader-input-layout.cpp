@@ -20,7 +20,10 @@ namespace renderer_test
                     if (parser.LookAhead("type"))
                     {
                         parser.ReadToken();
-                        globalTypeArguments.Add(parser.ReadWord());
+                        StringBuilder typeExp;
+                        while (!parser.IsEnd())
+                            typeExp << parser.ReadToken().Content;
+                        globalTypeArguments.Add(typeExp);
                     }
                     else
                     {

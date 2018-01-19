@@ -125,6 +125,21 @@ CompileRequest::CompileRequest(Session* session)
 CompileRequest::~CompileRequest()
 {}
 
+
+RefPtr<Expr> CompileRequest::parseTypeString(TranslationUnitRequest * translationUnit, String typeStr, RefPtr<Scope> scope)
+{
+    Slang::SourceFile srcFile;
+    srcFile.content = typeStr;
+    DiagnosticSink sink;
+    auto tokens = preprocessSource(
+        &srcFile,
+        &sink,
+        nullptr,
+        Dictionary<String,String>(),
+        translationUnit);
+    return parseTypeFromSourceFile(translationUnit, tokens, &sink, scope);
+}
+
 void CompileRequest::parseTranslationUnit(
     TranslationUnitRequest* translationUnit)
 {
@@ -429,7 +444,7 @@ int CompileRequest::addEntryPoint(
     entryPoint->profile = entryPointProfile;
     entryPoint->translationUnitIndex = translationUnitIndex;
     for (auto typeName : genericTypeNames)
-        entryPoint->genericParameterTypeNames.Add(getNamePool()->getName(typeName));
+        entryPoint->genericParameterTypeNames.Add(typeName);
     auto translationUnit = translationUnits[translationUnitIndex].Ptr();
     translationUnit->entryPoints.Add(entryPoint);
 

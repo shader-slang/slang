@@ -104,7 +104,7 @@ namespace Slang
         
         // The type names we want to substitute into the 
         // global generic type parameters
-        List<Name*> genericParameterTypeNames;
+        List<String> genericParameterTypeNames;
 
         // The profile that the entry point will be compiled for
         // (this is a combination of the target state, and also
@@ -317,6 +317,8 @@ namespace Slang
         CompileRequest(Session* session);
 
         ~CompileRequest();
+
+        RefPtr<Expr> parseTypeString(TranslationUnitRequest * translationUnit, String typeStr, RefPtr<Scope> scope);
 
         void parseTranslationUnit(
             TranslationUnitRequest* translationUnit);

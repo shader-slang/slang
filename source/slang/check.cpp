@@ -6945,25 +6945,26 @@ namespace Slang
 
         // Lookup generic parameter types in global scope
         for (auto name : entryPoint->genericParameterTypeNames)
-        {
-            firstDeclWithName = entryPoint->compileRequest->lookupGlobalDecl(name);
-            if (!firstDeclWithName)
-            {
-                // If there doesn't appear to be any such declaration, then
-                // we need to diagnose it as an error, and then bail out.
-                sink->diagnose(translationUnitSyntax, Diagnostics::entryPointTypeParameterNotFound, name);
-                return;
-            }
+        {   
+            // parse type name
             RefPtr<Type> type;
-            if (auto aggType = firstDeclWithName->As<AggTypeDecl>())
+            for (auto & module : entryPoint->compileRequest->loadedModulesList)
             {
-                type = DeclRefType::Create(entryPoint->compileRequest->mSession, DeclRef<Decl>(aggType, nullptr));
+                RefPtr<Expr> typeExpr = entryPoint->compileRequest->parseTypeString(entryPoint->getTranslationUnit(),
+                    name, module->moduleDecl->scope);
+                DiagnosticSink nSink;
+                SemanticsVisitor visitor(
+                    &nSink,
+                    translationUnit->compileRequest,
+                    translationUnit);
+                auto typeOut = visitor.CheckProperType(TypeExp(typeExpr));
+                if (!nSink.errorCount)
+                {
+                    type = typeOut.type;
+                    break;
+                }
             }
-            else if (auto typeDefDecl = firstDeclWithName->As<TypeDefDecl>())
-            {
-                type = GetType(DeclRef<TypeDefDecl>(typeDefDecl, nullptr));
-            }
-            else
+            if (!type)
             {
                 sink->diagnose(firstDeclWithName, Diagnostics::entryPointTypeSymbolNotAType, name);
                 return;

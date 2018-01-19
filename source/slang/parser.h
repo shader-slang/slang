@@ -14,6 +14,11 @@ namespace Slang
         DiagnosticSink*                 sink,
         RefPtr<Scope> const&            outerScope);
 
+    RefPtr<Expr> parseTypeFromSourceFile(TranslationUnitRequest*         translationUnit,
+        TokenSpan const&                tokens,
+        DiagnosticSink*                 sink,
+        RefPtr<Scope> const&            outerScope);
+
     RefPtr<ModuleDecl> populateBaseLanguageModule(
         Session*        session,
         RefPtr<Scope>   scope);

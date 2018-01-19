@@ -1,6 +1,6 @@
 //TEST(smoke,compute):COMPARE_COMPUTE:-xslang -use-ir
 //TEST_INPUT:ubuffer(data=[0], stride=4):dxbinding(0),glbinding(0),out
-//TEST_INPUT:type Impl
+//TEST_INPUT:type Wrapper<Impl>
 
 RWStructuredBuffer<float> outputBuffer;
 
@@ -8,6 +8,15 @@ interface IBase
 {
     float compute();
 }
+
+struct Wrapper<T : IBase> : IBase
+{
+    T obj;
+    float compute()
+    {
+        return obj.compute();        
+    }
+};
 
 struct Impl : IBase
 {
