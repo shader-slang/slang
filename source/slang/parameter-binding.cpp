@@ -2109,14 +2109,15 @@ RefPtr<ProgramLayout> specializeProgramLayout(
 
     auto constantBufferRules = context.getRulesFamily()->getConstantBufferRules();
     structLayout->rules = constantBufferRules;
-
+    structLayout->fields.SetSize(globalStructLayout->fields.Count());
     UniformLayoutInfo structLayoutInfo;
     structLayoutInfo.alignment = globalStructLayout->uniformAlignment;
     structLayoutInfo.size = 0;
     bool anyUniforms = false;
     Dictionary<RefPtr<VarLayout>, RefPtr<VarLayout>> varLayoutMapping;
-    for (auto & varLayout : globalStructLayout->fields)
+    for (uint32_t varId = 0; varId < globalStructLayout->fields.Count(); varId++)
     {
+        auto &varLayout = globalStructLayout->fields[varId];
         // To recover layout context, we skip generic resources in the first pass
         if (varLayout->FindResourceInfo(LayoutResourceKind::GenericResource))
             continue;
@@ -2141,7 +2142,7 @@ RefPtr<ProgramLayout> specializeProgramLayout(
                 resInfo.index,
                 resInfo.index + tresInfo.count);
         }
-        structLayout->fields.Add(varLayout);
+        structLayout->fields[varId] = varLayout;
         varLayoutMapping[varLayout] = varLayout;
     }
     auto originalGlobalCBufferInfo = programLayout->globalScopeLayout->FindResourceInfo(LayoutResourceKind::ConstantBuffer);
@@ -2156,8 +2157,9 @@ RefPtr<ProgramLayout> specializeProgramLayout(
         globalCBufferInfo.index = originalGlobalCBufferInfo->index;
     }
     // we have the context restored, can continue to layout the generic variables now
-    for (auto & varLayout : globalStructLayout->fields)
+    for (uint32_t varId = 0; varId < globalStructLayout->fields.Count(); varId++)
     {
+        auto &varLayout = globalStructLayout->fields[varId];
         if (varLayout->typeLayout->FindResourceInfo(LayoutResourceKind::GenericResource))
         {
             RefPtr<Type> newType = varLayout->typeLayout->type->Substitute(typeSubst).As<Type>();
@@ -2202,7 +2204,7 @@ RefPtr<ProgramLayout> specializeProgramLayout(
                 newVarLayout->findOrAddResourceInfo(LayoutResourceKind::Uniform)->index = uniformOffset;
                 anyUniforms = true;
             }
-            structLayout->fields.Add(newVarLayout);
+            structLayout->fields[varId] = newVarLayout;
             varLayoutMapping[varLayout] = newVarLayout;
         }
     }
