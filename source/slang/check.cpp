@@ -6944,14 +6944,18 @@ namespace Slang
         entryPoint->decl = entryPointFuncDecl;
 
         // Lookup generic parameter types in global scope
+        List<RefPtr<Scope>> scopesToTry;
+        scopesToTry.Add(entryPoint->getTranslationUnit()->SyntaxNode->scope);
+        for (auto & module : entryPoint->compileRequest->loadedModulesList)
+            scopesToTry.Add(module->moduleDecl->scope);
         for (auto name : entryPoint->genericParameterTypeNames)
         {   
             // parse type name
             RefPtr<Type> type;
-            for (auto & module : entryPoint->compileRequest->loadedModulesList)
+            for (auto & s : scopesToTry)
             {
                 RefPtr<Expr> typeExpr = entryPoint->compileRequest->parseTypeString(entryPoint->getTranslationUnit(),
-                    name, module->moduleDecl->scope);
+                    name, s);
                 DiagnosticSink nSink;
                 SemanticsVisitor visitor(
                     &nSink,
