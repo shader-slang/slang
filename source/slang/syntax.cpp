@@ -856,7 +856,12 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     Type* ErrorType::CreateCanonicalType()
     {
-        return  this;
+        return this;
+    }
+
+    RefPtr<Val> ErrorType::SubstituteImpl(SubstitutionSet /*subst*/, int* /*ioDiff*/)
+    {
+        return this;
     }
 
     int ErrorType::GetHashCode()

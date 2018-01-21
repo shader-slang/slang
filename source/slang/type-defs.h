@@ -36,6 +36,7 @@ public:
 
 protected:
     virtual bool EqualsImpl(Type * type) override;
+    virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
     virtual Type* CreateCanonicalType() override;
     virtual int GetHashCode() override;
 )
