@@ -433,20 +433,8 @@ SLANG_API SlangReflectionType * spReflection_FindTypeByName(SlangReflection * re
     auto context = convert(reflection);
     auto compileRequest = context->targetRequest->compileRequest;
 
-    RefPtr<Type> result;
-    if (compileRequest->types.TryGetValue(name, result))
-        return (SlangReflectionType*)result.Ptr();
-
-    auto nameObj = compileRequest->getNamePool()->getName(name);
-    Decl* resultDecl = compileRequest->lookupGlobalDecl(nameObj);
-    if (resultDecl)
-    {
-        RefPtr<DeclRefType> declRefType = new DeclRefType();
-        declRefType->declRef.decl = resultDecl;
-        compileRequest->types[name] = declRefType;
-        return (SlangReflectionType*)declRefType.Ptr();
-    }
-    return nullptr;
+    RefPtr<Type> result = compileRequest->getTypeFromString(name);
+    return (SlangReflectionType*)result.Ptr();
 }
 
 SLANG_API SlangReflectionTypeLayout* spReflection_GetTypeLayout(

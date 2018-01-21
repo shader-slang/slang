@@ -2704,6 +2704,7 @@ namespace Slang
 
         PushScope(program);
         program->loc = tokenReader.PeekLoc();
+        program->scope = currentScope;
         ParseDeclBody(this, program, TokenType::EndOfFile);
         PopScope();
 
@@ -3960,6 +3961,17 @@ namespace Slang
         return parsePrefixExpr(this);
     }
 
+    RefPtr<Expr> parseTypeFromSourceFile(TranslationUnitRequest*         translationUnit,
+        TokenSpan const&                tokens,
+        DiagnosticSink*                 sink,
+        RefPtr<Scope> const&            outerScope)
+    {
+        Parser parser(tokens, sink, outerScope);
+        parser.translationUnit = translationUnit;
+        parser.currentScope = outerScope;
+        return parser.ParseType();
+    }
+
     // Parse a source file into an existing translation unit
     void parseSourceFile(
         TranslationUnitRequest*         translationUnit,
@@ -3970,6 +3982,7 @@ namespace Slang
         Parser parser(tokens, sink, outerScope);
 
         parser.translationUnit = translationUnit;
+
 
         return parser.parseSourceFile(translationUnit->SyntaxNode.Ptr());
     }

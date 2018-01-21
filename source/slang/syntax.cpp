@@ -355,19 +355,21 @@ void Type::accept(IValVisitor* visitor, void* extra)
         auto arrType = type->AsArrayType();
         if (!arrType)
             return false;
-        return (ArrayLength == arrType->ArrayLength && baseType->Equals(arrType->baseType.Ptr()));
+        return (ArrayLength->EqualsVal(arrType->ArrayLength) && baseType->Equals(arrType->baseType.Ptr()));
     }
 
     RefPtr<Val> ArrayExpressionType::SubstituteImpl(SubstitutionSet subst, int* ioDiff)
     {
         int diff = 0;
         auto elementType = baseType->SubstituteImpl(subst, &diff).As<Type>();
+        auto arrlen = ArrayLength->SubstituteImpl(subst, &diff).As<IntVal>();
+        SLANG_ASSERT(arrlen);
         if (diff)
         {
             *ioDiff = 1;
             auto rsType = getArrayType(
                 elementType,
-                ArrayLength);
+                arrlen);
             return rsType;
         }
         return this;

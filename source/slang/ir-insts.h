@@ -641,7 +641,8 @@ void specializeIRForEntryPoint(
 // Find suitable uses of the `specialize` instruction that
 // can be replaced with references to specialized functions.
 void specializeGenerics(
-    IRModule*   module);
+    IRModule*   module,
+    CodeGenTarget target);
 
 //
 

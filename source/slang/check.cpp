@@ -6849,6 +6849,23 @@ namespace Slang
         return (!decl->primaryDecl) || (decl == decl->primaryDecl);
     }
 
+    RefPtr<Type> checkProperType(TranslationUnitRequest * tu, TypeExp typeExp)
+    {
+        RefPtr<Type> type;
+        DiagnosticSink nSink;
+        nSink.sourceManager = tu->compileRequest->sourceManager;
+        SemanticsVisitor visitor(
+            &nSink,
+            tu->compileRequest,
+            tu);
+        auto typeOut = visitor.CheckProperType(typeExp);
+        if (!nSink.errorCount)
+        {
+            type = typeOut.type;
+        }
+        return type;
+    }
+
     void validateEntryPoint(
         EntryPointRequest*  entryPoint)
     {
@@ -6944,26 +6961,25 @@ namespace Slang
         entryPoint->decl = entryPointFuncDecl;
 
         // Lookup generic parameter types in global scope
+        List<RefPtr<Scope>> scopesToTry;
+        scopesToTry.Add(entryPoint->getTranslationUnit()->SyntaxNode->scope);
+        for (auto & module : entryPoint->compileRequest->loadedModulesList)
+            scopesToTry.Add(module->moduleDecl->scope);
         for (auto name : entryPoint->genericParameterTypeNames)
-        {
-            firstDeclWithName = entryPoint->compileRequest->lookupGlobalDecl(name);
-            if (!firstDeclWithName)
-            {
-                // If there doesn't appear to be any such declaration, then
-                // we need to diagnose it as an error, and then bail out.
-                sink->diagnose(translationUnitSyntax, Diagnostics::entryPointTypeParameterNotFound, name);
-                return;
-            }
+        {   
+            // parse type name
             RefPtr<Type> type;
-            if (auto aggType = firstDeclWithName->As<AggTypeDecl>())
+            for (auto & s : scopesToTry)
             {
-                type = DeclRefType::Create(entryPoint->compileRequest->mSession, DeclRef<Decl>(aggType, nullptr));
+                RefPtr<Expr> typeExpr = entryPoint->compileRequest->parseTypeString(entryPoint->getTranslationUnit(),
+                    name, s);
+                type = checkProperType(translationUnit, TypeExp(typeExpr));
+                if (type)
+                {
+                    break;
+                }
             }
-            else if (auto typeDefDecl = firstDeclWithName->As<TypeDefDecl>())
-            {
-                type = GetType(DeclRef<TypeDefDecl>(typeDefDecl, nullptr));
-            }
-            else
+            if (!type)
             {
                 sink->diagnose(firstDeclWithName, Diagnostics::entryPointTypeSymbolNotAType, name);
                 return;

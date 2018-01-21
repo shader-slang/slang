@@ -196,7 +196,9 @@ SIMPLE_SYNTAX_CLASS(Variable, VarDeclBase);
 
 // A "module" of code (essentiately, a single translation unit)
 // that provides a scope for some number of declarations.
-SIMPLE_SYNTAX_CLASS(ModuleDecl, ContainerDecl)
+SYNTAX_CLASS(ModuleDecl, ContainerDecl)
+    FIELD(RefPtr<Scope>, scope)
+END_SYNTAX_CLASS()
 
 SYNTAX_CLASS(ImportDecl, Decl)
     // The name of the module we are trying to import

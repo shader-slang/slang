@@ -1021,6 +1021,7 @@ RefPtr<IRFuncType> getFuncType(
     return funcType;
 }
 
+SubstitutionSet lowerSubstitutions(IRGenContext* context, SubstitutionSet subst);
 //
 
 struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, LoweredTypeInfo>
@@ -1080,8 +1081,6 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         // TODO: actually test what module the type is coming from.
 
         lowerDecl(context, type->declRef);
-
-
         return LoweredTypeInfo(type);
     }
 
@@ -3006,6 +3005,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return globalVal;
     }
 
+    LoweredValInfo visitGenericValueParamDecl(GenericValueParamDecl* decl)
+    {
+        return LoweredValInfo::simple(context->irBuilder->getDeclRefVal(DeclRefBase(decl)));
+    }
+
     LoweredValInfo visitVarDeclBase(VarDeclBase* decl)
     {
         // Detect global (or effectively global) variables
@@ -3733,7 +3737,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         if (auto innerFuncDecl = genDecl->inner->As<FuncDecl>())
             return lowerFuncDecl(innerFuncDecl);
         else if (auto innerStructDecl = genDecl->inner->As<StructDecl>())
+        {
+            visitAggTypeDecl(innerStructDecl);
             return LoweredValInfo();
+        }
         SLANG_RELEASE_ASSERT(false);
         UNREACHABLE_RETURN(LoweredValInfo());
     }
@@ -3910,6 +3917,32 @@ RefPtr<GenericSubstitution> lowerGenericSubstitutions(
     return result;
 }
 
+RefPtr<GlobalGenericParamSubstitution> lowerGlobalGenericSubstitutions(
+    IRGenContext*   context,
+    GlobalGenericParamSubstitution*  genSubst)
+{
+    if (!genSubst)
+        return nullptr;
+    RefPtr<GlobalGenericParamSubstitution> result;
+    RefPtr<GlobalGenericParamSubstitution> newSubst = new GlobalGenericParamSubstitution();
+    newSubst->actualType = lowerSubstitutionArg(context, genSubst->actualType);
+    newSubst->paramDecl = genSubst->paramDecl;
+    for (auto & tbl : genSubst->witnessTables)
+    {
+        auto ntbl = tbl;
+        ntbl.Value = lowerSubstitutionArg(context, tbl.Value);
+        newSubst->witnessTables.Add(ntbl);
+    }
+    result = newSubst;
+    if (genSubst->outer)
+    {
+        result->outer = lowerGlobalGenericSubstitutions(
+            context,
+            genSubst->outer);
+    }
+    return result;
+}
+
 RefPtr<ThisTypeSubstitution> lowerThisTypeSubstitution(
     IRGenContext*   context,
     ThisTypeSubstitution*  thisSubst)
@@ -3926,7 +3959,7 @@ SubstitutionSet lowerSubstitutions(IRGenContext* context, SubstitutionSet subst)
     SubstitutionSet rs;
     rs.genericSubstitutions = lowerGenericSubstitutions(context, subst.genericSubstitutions);
     rs.thisTypeSubstitution = lowerThisTypeSubstitution(context, subst.thisTypeSubstitution);
-    rs.globalGenParamSubstitutions = subst.globalGenParamSubstitutions;
+    rs.globalGenParamSubstitutions = lowerGlobalGenericSubstitutions(context, subst.globalGenParamSubstitutions);
     return rs;
 }
 
@@ -3973,10 +4006,10 @@ LoweredValInfo maybeEmitSpecializeInst(IRGenContext*   context,
     // need to walk through those and replace things in
     // cases where the `Val`s used for substitution should
     // lower to something other than their original form.
-    auto lowedNewSubst = lowerGenericSubstitutions(context, newSubst);
-    DeclRef<Decl> newDeclRef = DeclRef<Decl>(declRef.decl, 
-        SubstitutionSet(lowedNewSubst, declRef.substitutions.thisTypeSubstitution, 
-            declRef.substitutions.globalGenParamSubstitutions));
+    SubstitutionSet oldSubst = declRef.substitutions;
+    oldSubst.genericSubstitutions = newSubst;
+    auto lowedNewSubst = lowerSubstitutions(context, oldSubst);
+    DeclRef<Decl> newDeclRef = DeclRef<Decl>(declRef.decl, lowedNewSubst);
 
     RefPtr<Type> type;
     if (auto declType = val->getType())
@@ -4014,9 +4047,9 @@ static void lowerEntryPointToIR(
         return;
     }
     // we need to lower all global type arguments as well
+    auto loweredEntryPointFunc = ensureDecl(context, entryPointFuncDecl);
     for (auto arg : entryPointRequest->genericParameterTypes)
         lowerType(context, arg);
-    auto loweredEntryPointFunc = ensureDecl(context, entryPointFuncDecl);
 }
 
 #if 0

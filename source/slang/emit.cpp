@@ -7500,7 +7500,7 @@ String emitEntryPoint(
         // none of our target supports generics, or interfaces,
         // so we need to specialize those away.
         //
-        specializeGenerics(irModule);
+        specializeGenerics(irModule, sharedContext.target);
 
         // Debugging code for IR transformations...
 #if 0
