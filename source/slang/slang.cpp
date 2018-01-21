@@ -131,6 +131,7 @@ RefPtr<Expr> CompileRequest::parseTypeString(TranslationUnitRequest * translatio
     Slang::SourceFile srcFile;
     srcFile.content = typeStr;
     DiagnosticSink sink;
+    sink.sourceManager = sourceManager;
     auto tokens = preprocessSource(
         &srcFile,
         &sink,
@@ -138,6 +139,34 @@ RefPtr<Expr> CompileRequest::parseTypeString(TranslationUnitRequest * translatio
         Dictionary<String,String>(),
         translationUnit);
     return parseTypeFromSourceFile(translationUnit, tokens, &sink, scope);
+}
+
+RefPtr<Type> checkProperType(TranslationUnitRequest * tu, TypeExp typeExp);
+Type* CompileRequest::getTypeFromString(String typeStr)
+{
+    RefPtr<Type> type;
+    if (types.TryGetValue(typeStr, type))
+        return type;
+    auto translationUnit = translationUnits.First();
+    List<RefPtr<Scope>> scopesToTry;
+    for (auto tu : translationUnits)
+        scopesToTry.Add(tu->SyntaxNode->scope);
+    for (auto & module : loadedModulesList)
+        scopesToTry.Add(module->moduleDecl->scope);
+    // parse type name
+    for (auto & s : scopesToTry)
+    {
+        RefPtr<Expr> typeExpr = parseTypeString(translationUnit,
+            typeStr, s);
+        type = checkProperType(translationUnit, TypeExp(typeExpr));
+        if (type)
+            break;
+    }
+    if (type)
+    {
+        types[typeStr] = type;
+    }
+    return type.Ptr();
 }
 
 void CompileRequest::parseTranslationUnit(

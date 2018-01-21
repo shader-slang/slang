@@ -362,12 +362,14 @@ void Type::accept(IValVisitor* visitor, void* extra)
     {
         int diff = 0;
         auto elementType = baseType->SubstituteImpl(subst, &diff).As<Type>();
+        auto arrlen = ArrayLength->SubstituteImpl(subst, &diff).As<IntVal>();
+        SLANG_ASSERT(arrlen);
         if (diff)
         {
             *ioDiff = 1;
             auto rsType = getArrayType(
                 elementType,
-                ArrayLength);
+                arrlen);
             return rsType;
         }
         return this;

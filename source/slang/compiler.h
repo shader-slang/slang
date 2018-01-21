@@ -319,6 +319,8 @@ namespace Slang
         ~CompileRequest();
 
         RefPtr<Expr> parseTypeString(TranslationUnitRequest * translationUnit, String typeStr, RefPtr<Scope> scope);
+        
+        Type* getTypeFromString(String typeStr);
 
         void parseTranslationUnit(
             TranslationUnitRequest* translationUnit);

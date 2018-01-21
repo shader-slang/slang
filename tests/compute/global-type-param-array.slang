@@ -1,23 +1,10 @@
-//TEST(smoke,compute):COMPARE_COMPUTE:-xslang -use-ir
-//TEST_INPUT: cbuffer(data=[1.0], stride=4):dxbinding(0),glbinding(0)
+//TEST(compute):COMPARE_COMPUTE:-xslang -use-ir
+//TEST_INPUT: cbuffer(data=[1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0], stride=4):dxbinding(0),glbinding(0)
 //TEST_INPUT: ubuffer(data=[0], stride=4):dxbinding(0),glbinding(0),out
-//TEST_INPUT: type Impl
+//TEST_INPUT: type Pair<Arr<Base,1>, Pair<Arr<Base,2> , Base> >
 
 RWStructuredBuffer<float> outputBuffer;
-
-interface IBase
-{
-    float compute();
-}
-
-struct Impl : IBase
-{
-    float base;  // = 1.0
-    float compute()
-    {
-        return 1.0;
-    }
-};
+import globalTypeParamArrayShared;
 
 __generic_param TImpl : IBase;
 
@@ -25,7 +12,7 @@ ParameterBlock<TImpl> impl;
 
 float doCompute<T:IBase>(T t)
 {
-    return t.compute();
+    return t.compute(1.0);
 }
 
 [numthreads(1, 1, 1)]

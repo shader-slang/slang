@@ -100,6 +100,7 @@ struct SlangShaderCompilerWrapper : public ShaderCompiler
                 (int)rawTypeNames.Count(),
                 rawTypeNames.Buffer());
 			int compileErr = spCompile(slangRequest);
+            spSetLineDirectiveMode(slangRequest, SLANG_LINE_DIRECTIVE_MODE_NONE);
 			if (auto diagnostics = spGetDiagnosticOutput(slangRequest))
 			{
 				fprintf(stderr, "%s", diagnostics);

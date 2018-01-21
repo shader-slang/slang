@@ -6849,6 +6849,23 @@ namespace Slang
         return (!decl->primaryDecl) || (decl == decl->primaryDecl);
     }
 
+    RefPtr<Type> checkProperType(TranslationUnitRequest * tu, TypeExp typeExp)
+    {
+        RefPtr<Type> type;
+        DiagnosticSink nSink;
+        nSink.sourceManager = tu->compileRequest->sourceManager;
+        SemanticsVisitor visitor(
+            &nSink,
+            tu->compileRequest,
+            tu);
+        auto typeOut = visitor.CheckProperType(typeExp);
+        if (!nSink.errorCount)
+        {
+            type = typeOut.type;
+        }
+        return type;
+    }
+
     void validateEntryPoint(
         EntryPointRequest*  entryPoint)
     {
@@ -6956,15 +6973,9 @@ namespace Slang
             {
                 RefPtr<Expr> typeExpr = entryPoint->compileRequest->parseTypeString(entryPoint->getTranslationUnit(),
                     name, s);
-                DiagnosticSink nSink;
-                SemanticsVisitor visitor(
-                    &nSink,
-                    translationUnit->compileRequest,
-                    translationUnit);
-                auto typeOut = visitor.CheckProperType(TypeExp(typeExpr));
-                if (!nSink.errorCount)
+                type = checkProperType(translationUnit, TypeExp(typeExpr));
+                if (type)
                 {
-                    type = typeOut.type;
                     break;
                 }
             }

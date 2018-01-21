@@ -916,7 +916,7 @@ LegalType legalizeType(
             }
 
             legalType = builder.getResult();
-            context->mapDeclRefToLegalType.Add(declRef, legalType);
+            context->mapDeclRefToLegalType.AddIfNotExists(declRef, legalType);
             return legalType;
         }
 
