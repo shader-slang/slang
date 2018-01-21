@@ -1,3 +1,4 @@
+//TEST_IGNORE_FILE:
 interface IBase
 {
     float compute<T>(T g);
