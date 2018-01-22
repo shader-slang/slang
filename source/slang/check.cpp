@@ -1708,7 +1708,7 @@ namespace Slang
         {
             // TODO: actually implement matching here. For now we'll
             // just pretend that things are satisfied in order to make progress..
-            requirementDict.AddIfNotExists(requiredMemberDeclRef, DeclRef<Decl>(memberDecl, nullptr));
+            requirementDict.AddIfNotExists(requiredMemberDeclRef, memberDecl);
             return true;
         }
 
