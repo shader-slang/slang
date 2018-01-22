@@ -433,7 +433,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     String DeclRefType::ToString()
     {
-        return getText(declRef.GetName());
+        return declRef.toString();
     }
 
     int DeclRefType::GetHashCode()

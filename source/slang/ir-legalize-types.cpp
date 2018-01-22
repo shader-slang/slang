@@ -470,6 +470,114 @@ static LegalVal legalizeFieldAddress(
         fieldDeclRef);
 }
 
+static LegalVal legalizeGetElementPtr(
+    IRTypeLegalizationContext*  context,
+    LegalType                   type,
+    LegalVal                    legalPtrOperand,
+    IRValue*                    indexOperand)
+{
+    auto builder = context->builder;
+
+    switch (legalPtrOperand.flavor)
+    {
+    case LegalVal::Flavor::simple:
+        return LegalVal::simple(
+            builder->emitElementAddress(
+                type.getSimple(),
+                legalPtrOperand.getSimple(),
+                indexOperand));
+
+    case LegalVal::Flavor::pair:
+        {
+            // There are two sides, the ordinary and the special,
+            // and we basically just dispatch to both of them.
+            auto pairVal = legalPtrOperand.getPair();
+            auto pairInfo = pairVal->pairInfo;
+
+            LegalType ordinaryType = type;
+            LegalType specialType = type;
+            if (type.flavor == LegalType::Flavor::pair)
+            {
+                auto pairType = type.getPair();
+                ordinaryType = pairType->ordinaryType;
+                specialType = pairType->specialType;
+            }
+
+            LegalVal ordinaryVal = legalizeGetElementPtr(
+                context,
+                ordinaryType,
+                pairVal->ordinaryVal,
+                indexOperand);
+
+            LegalVal specialVal = legalizeGetElementPtr(
+                context,
+                specialType,
+                pairVal->specialVal,
+                indexOperand);
+
+            return LegalVal::pair(ordinaryVal, specialVal, pairInfo);
+        }
+        break;
+
+    case LegalVal::Flavor::tuple:
+        {
+            // The operand is a tuple of pointer-like
+            // values, we want to extract the element
+            // corresponding to a field. We will handle
+            // this by simply returning the corresponding
+            // element from the operand.
+            auto ptrTupleInfo = legalPtrOperand.getTuple();
+
+            RefPtr<TuplePseudoVal> resTupleInfo = new TuplePseudoVal();
+
+            auto tupleType = type.getTuple();
+            assert(tupleType);
+
+            auto elemCount = ptrTupleInfo->elements.Count();
+            assert(elemCount == tupleType->elements.Count());
+
+            for(UInt ee = 0; ee < elemCount; ++ee)
+            {
+                auto ptrElem = ptrTupleInfo->elements[ee];
+                auto elemType = tupleType->elements[ee].type;
+
+                TuplePseudoVal::Element resElem;
+                resElem.fieldDeclRef = ptrElem.fieldDeclRef;
+                resElem.val = legalizeGetElementPtr(
+                    context,
+                    elemType,
+                    ptrElem.val,
+                    indexOperand);
+
+                resTupleInfo->elements.Add(resElem);
+            }
+
+            return LegalVal::tuple(resTupleInfo);
+        }
+
+    default:
+        SLANG_UNEXPECTED("unhandled");
+        UNREACHABLE_RETURN(LegalVal());
+    }
+}
+
+static LegalVal legalizeGetElementPtr(
+    IRTypeLegalizationContext*  context,
+    LegalType                   type,
+    LegalVal                    legalPtrOperand,
+    LegalVal                    legalIndexOperand)
+{
+    // We don't expect any legalization to affect
+    // the "index" argument.
+    auto indexOperand = legalIndexOperand.getSimple();
+
+    return legalizeGetElementPtr(
+        context,
+        type,
+        legalPtrOperand,
+        indexOperand);
+}
+
 static LegalVal legalizeInst(
     IRTypeLegalizationContext*    context,
     IRInst*                     inst,
@@ -483,6 +591,9 @@ static LegalVal legalizeInst(
 
     case kIROp_FieldAddress:
         return legalizeFieldAddress(context, type, args[0], args[1]);
+
+    case kIROp_getElementPtr:
+        return legalizeGetElementPtr(context, type, args[0], args[1]);
 
     case kIROp_Store:
         return legalizeStore(context, args[0], args[1]);
