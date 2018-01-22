@@ -4862,6 +4862,20 @@ namespace Slang
                             auto interfaceDeclRef = ((IRDeclRef*)lookupInst->interfaceType.usedValue)->declRef;
                             auto mangledName = getMangledNameForConformanceWitness(srcDeclRef, interfaceDeclRef);
                             witnessTables.TryGetValue(mangledName, witnessTable);
+                            
+                            if (!witnessTable)
+                            {
+                                // try specialize the witness table
+                                auto genDeclRef = srcDeclRef;
+                                genDeclRef.substitutions = createDefaultSubstitutions(module->session, genDeclRef.decl);
+                                auto genName = getMangledNameForConformanceWitness(genDeclRef, interfaceDeclRef);
+                                IRWitnessTable* genTable = nullptr;
+                                if (witnessTables.TryGetValue(genName, genTable))
+                                {
+                                    witnessTable = specializeWitnessTable(sharedContext, genTable, srcDeclRef, nullptr);
+                                    witnessTables.AddIfNotExists(witnessTable->mangledName, witnessTable);
+                                }
+                            }
                             if (witnessTable)
                             {
                                 lookupInst->replaceUsesWith(witnessTable);
