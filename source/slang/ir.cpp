@@ -4510,6 +4510,19 @@ namespace Slang
             }
         }
 
+        if( !newGenericDecl )
+        {
+            if(auto gd = dynamic_cast<GenericDecl*>(newDecl))
+            {
+                if( auto ed = gd->inner.As<ExtensionDecl>() )
+                {
+                    // TODO: we should confirm that it is an extension for the correct type...
+
+                    newGenericDecl = gd;
+                }
+            }
+        }
+
         SLANG_ASSERT(newGenericDecl);
 
         RefPtr<GenericSubstitution> newSubst = new GenericSubstitution();

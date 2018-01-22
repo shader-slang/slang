@@ -3734,12 +3734,18 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitGenericDecl(GenericDecl * genDecl)
     {
+        // TODO: Should this just always visit/lower the inner decl?
+
         if (auto innerFuncDecl = genDecl->inner->As<FuncDecl>())
             return lowerFuncDecl(innerFuncDecl);
         else if (auto innerStructDecl = genDecl->inner->As<StructDecl>())
         {
             visitAggTypeDecl(innerStructDecl);
             return LoweredValInfo();
+        }
+        else if( auto extensionDecl = genDecl->inner->As<ExtensionDecl>() )
+        {
+            return visitExtensionDecl(extensionDecl);
         }
         SLANG_RELEASE_ASSERT(false);
         UNREACHABLE_RETURN(LoweredValInfo());
