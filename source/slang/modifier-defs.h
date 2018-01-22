@@ -343,5 +343,7 @@ END_SYNTAX_CLASS()
 
 // A marker modifier used to indicate that a declaration was created as
 // part of type legalization.
-SIMPLE_SYNTAX_CLASS(LegalizedModifier, Modifier)
+SYNTAX_CLASS(LegalizedModifier, Modifier)
+    FIELD(String, originalMangledName)
+END_SYNTAX_CLASS()
 

@@ -373,6 +373,13 @@ namespace Slang
 
     String getMangledName(DeclRef<Decl> const& declRef)
     {
+        // Special case: if a declaration is the result of a type legalization
+        // transformation, then it should just get the mangled name of the
+        // original declaration, and not the one that would be computed
+        // for it otherwise.
+        if(auto legalizedModifier = declRef.getDecl()->FindModifier<LegalizedModifier>())
+            return legalizedModifier->originalMangledName;
+
         ManglingContext context;
         mangleName(&context, declRef);
         return context.sb.ProduceString();

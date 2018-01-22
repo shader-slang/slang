@@ -1,6 +1,8 @@
 // legalize-types.cpp
 #include "legalize-types.h"
 
+#include "mangle.h"
+
 namespace Slang
 {
 
@@ -335,7 +337,9 @@ struct TupleTypeBuilder
             ordinaryStructDecl->loc = typeDeclRef.getDecl()->loc;
             ordinaryStructDecl->nameAndLoc = typeDeclRef.getDecl()->nameAndLoc;
 
-            addModifier(ordinaryStructDecl, new LegalizedModifier());
+            auto typeLegalizedModifier = new LegalizedModifier();
+            typeLegalizedModifier->originalMangledName = getMangledName(typeDeclRef);
+            addModifier(ordinaryStructDecl, typeLegalizedModifier);
 
             // We will do something a bit unsavory here, by setting the logical
             // parent of the new `struct` type to be the same as the orignal type
@@ -408,7 +412,9 @@ struct TupleTypeBuilder
 
                 pairElements[elementIndex].ordinaryFieldDeclRef = makeDeclRef(fieldDecl.Ptr());
 
-                addModifier(fieldDecl, new LegalizedModifier());
+                auto fieldLegalizedModifier = new LegalizedModifier();
+                fieldLegalizedModifier->originalMangledName = getMangledName(ee.fieldDeclRef);
+                addModifier(fieldDecl, fieldLegalizedModifier);
             }
 
             RefPtr<Type> ordinaryStructType = DeclRefType::Create(
