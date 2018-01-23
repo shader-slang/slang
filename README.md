@@ -85,16 +85,6 @@ We don't currently have a formal set of guidelines for contributors, but here's 
 * Changes should ideally come in as small pull requests on top of `master`, coming from your own personal fork of the project
 * Large features that will involve multiple contributors or a long development time should be discussed in issues, and broken down into smaller pieces that can be implemented and checked in in stages
 
-## Contributors
-
-If you contribute changes to the library, please feel free to add (or remove/update/change) your name here.
-
-* Yong He
-* Haomin Long
-* Teguh Hofstee
-* Tim Foley
-* Kai-Hwa Yao
-
 ## License
 
 The Slang code itself is under the MIT license (see [LICSENSE](LICENSE)).
