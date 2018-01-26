@@ -481,7 +481,33 @@ namespace Slang
             if (decl->checkState == DeclCheckState::CheckingHeader)
             {
                 // We tried to reference the same declaration while checking it!
+                //
+                // TODO: we should ideally be tracking a "chain" of declarations
+                // being checked on the stack, so that we can report the full
+                // chain that leads from this declaration back to itself.
+                //
                 sink->diagnose(decl, Diagnostics::cyclicReference, decl);
+                return;
+            }
+
+            // Hack: if we are somehow referencing a local variable declaration
+            // before the line of code that defines it, then we need to diagnose
+            // an error.
+            //
+            // TODO: The right answer is that lookup should have been performed in
+            // the scope that was in place *before* the variable was declared, but
+            // this is a quick fix that at least alerts the user to how we are
+            // interpreting their code.
+            if (auto varDecl = decl.As<Variable>())
+            {
+                if (auto parenScope = varDecl->ParentDecl->As<ScopeDecl>())
+                {
+                    // TODO: This diagnostic should be emitted on the line that is referencing
+                    // the declaration. That requires `EnsureDecl` to take the requesting
+                    // location as a parameter.
+                    sink->diagnose(decl, Diagnostics::localVariableUsedBeforeDeclared, decl);
+                    return;
+                }
             }
 
             if (DeclCheckState::CheckingHeader > decl->checkState)
@@ -2151,7 +2177,7 @@ namespace Slang
         {
             for (auto decl : declGroup->decls)
             {
-                checkDecl(decl);
+                DeclVisitor::dispatch(decl);
             }
         }
 
@@ -2808,6 +2834,7 @@ namespace Slang
 
             stmt->varDecl->type.type = getSession()->getIntType();
             addModifier(stmt->varDecl, new ConstModifier());
+            stmt->varDecl->SetCheckState(DeclCheckState::Checked);
 
             RefPtr<IntVal> rangeBeginVal;
             RefPtr<IntVal> rangeEndVal;
