@@ -1045,6 +1045,12 @@ SLANG_API int spCompile(
         int anyErrors = req->executeActions();
         return anyErrors;
     }
+    catch (Slang::AbortCompilationException&)
+    {
+        // This should only be thrown if we already emitted a fatal error
+        // message, so there is no reason to print something else.
+        return 1;
+    }
     catch (...)
     {
         req->mSink.diagnose(Slang::SourceLoc(), Slang::Diagnostics::compilationAborted);
