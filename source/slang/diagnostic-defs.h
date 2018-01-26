@@ -257,6 +257,8 @@ DIAGNOSTIC(38102, Error, accessorMustBeInsideSubscriptOrProperty, "an accessor d
 DIAGNOSTIC(38020, Error, mismatchEntryPointTypeArgument, "expecting $0 entry-point type arguments, provided $1.")
 DIAGNOSTIC(38021, Error, typeArgumentDoesNotConformToInterface, "type argument `$1` for generic parameter `$0` does not conform to interface `$1`.")
 
+DIAGNOSTIC(38200, Error, recursiveModuleImport, "module `$0` recursively imports itself")
+
 //
 // 4xxxx - IL code generation.
 //
