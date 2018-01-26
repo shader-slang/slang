@@ -499,16 +499,31 @@ void CompileRequest::loadParsedModule(
     Name*                                   name,
     String const&                           path)
 {
-    checkTranslationUnit(translationUnit.Ptr());
-
-    RefPtr<ModuleDecl> moduleDecl = translationUnit->SyntaxNode;
-
+    // Note: we add the loaded module to our name->module listing
+    // before doing semantic checking, so that if it tries to
+    // recursively `import` itself, we can detect it.
     RefPtr<LoadedModule> loadedModule = new LoadedModule();
-    loadedModule->moduleDecl = moduleDecl;
-    loadedModule->irModule = generateIRForTranslationUnit(translationUnit);
-
     mapPathToLoadedModule.Add(path, loadedModule);
     mapNameToLoadedModules.Add(name, loadedModule);
+
+    int errorCountBefore = mSink.GetErrorCount();
+    checkTranslationUnit(translationUnit.Ptr());
+    int errorCountAfter = mSink.GetErrorCount();
+
+    RefPtr<ModuleDecl> moduleDecl = translationUnit->SyntaxNode;
+    loadedModule->moduleDecl = moduleDecl;
+
+    if (errorCountAfter != errorCountBefore)
+    {
+        // There must have been an error in the loaded module.
+    }
+    else
+    {
+        // If we didn't run into any errors, then try to generate
+        // IR code for the imported module.
+        loadedModule->irModule = generateIRForTranslationUnit(translationUnit);
+    }
+
     loadedModulesList.Add(loadedModule);
 }
 
@@ -591,7 +606,16 @@ RefPtr<ModuleDecl> CompileRequest::findOrImportModule(
     // If so, return it.
     RefPtr<LoadedModule> loadedModule;
     if (mapNameToLoadedModules.TryGetValue(name, loadedModule))
-        return loadedModule->moduleDecl;
+    {
+        if (!loadedModule)
+            return nullptr;
+
+        if (!loadedModule->moduleDecl)
+        {
+            // We seem to be in the middle of loading this module
+            mSink.diagnose(loc, Diagnostics::recursiveModuleImport, name);
+        }
+    }
 
     // Derive a file name for the module, by taking the given
     // identifier, replacing all occurences of `_` with `-`,

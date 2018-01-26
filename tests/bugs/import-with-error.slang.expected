@@ -1,0 +1,6 @@
+result code = -1
+standard error = {
+tests/bugs/import-with-error-extra.slang(10): error 30015: undefined identifier 'b'.
+}
+standard output = {
+}
