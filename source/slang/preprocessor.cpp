@@ -1562,9 +1562,6 @@ static void expectEndOfDirective(PreprocessorDirectiveContext* context)
     AdvanceRawToken(context->preprocessor);
 }
 
-// Handle a `#import` directive
-static void HandleImportDirective(PreprocessorDirectiveContext* context);
-
 // Handle a `#include` directive
 static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
 {
@@ -1928,7 +1925,6 @@ static const PreprocessorDirective kDirectives[] =
     { "elif",       &HandleElifDirective,       ProcessWhenSkipping },
     { "endif",      &HandleEndIfDirective,      ProcessWhenSkipping },
 
-    { "import",     &HandleImportDirective,     0 },
     { "include",    &HandleIncludeDirective,    0 },
     { "define",     &HandleDefineDirective,     0 },
     { "undef",      &HandleUndefDirective,      0 },
@@ -2187,117 +2183,5 @@ TokenList preprocessSource(
 
     return tokens;
 }
-
-//
-
-// Handle a `#import` directive
-static void HandleImportDirective(PreprocessorDirectiveContext* context)
-{
-    Token pathToken;
-    if(!Expect(context, TokenType::StringLiteral, Diagnostics::expectedTokenInPreprocessorDirective, &pathToken))
-        return;
-
-    String path = getFileNameTokenValue(pathToken);
-
-    auto directiveLoc = GetDirectiveLoc(context);
-    auto expandedDirectiveLoc = context->preprocessor->translationUnit->compileRequest->getSourceManager()->expandSourceLoc(directiveLoc);
-    String pathIncludedFrom = expandedDirectiveLoc.getSpellingPath();
-    String foundPath;
-    String foundSource;
-
-    IncludeHandler* includeHandler = context->preprocessor->includeHandler;
-    if (!includeHandler)
-    {
-        GetSink(context)->diagnose(pathToken.loc, Diagnostics::importFailed, path);
-        GetSink(context)->diagnose(pathToken.loc, Diagnostics::noIncludeHandlerSpecified);
-        return;
-    }
-    auto includeResult = includeHandler->TryToFindIncludeFile(path, pathIncludedFrom, &foundPath, &foundSource);
-
-    switch (includeResult)
-    {
-    case IncludeResult::NotFound:
-    case IncludeResult::Error:
-        GetSink(context)->diagnose(pathToken.loc, Diagnostics::importFailed, path);
-        return;
-
-    case IncludeResult::Found:
-        break;
-    }
-
-    // Do all checking related to the end of this directive before we push a new stream,
-    // just to avoid complications where that check would need to deal with
-    // a switch of input stream
-    expectEndOfDirective(context);
-
-    // TODO: may want to have some kind of canonicalization step here
-    String moduleKey = foundPath;
-
-    // Import code from the chosen file, if needed. We only
-    // need to import on the first `#import` directive, and
-    // after that we ignore additional `#import`s for the same file.
-    {
-        auto translationUnit = context->preprocessor->translationUnit;
-        auto request = translationUnit->compileRequest;
-
-
-        // Have we already loaded a module matching this name?
-        if (request->mapPathToLoadedModule.TryGetValue(moduleKey))
-        {
-            // The module has already been loaded, so we don't need to
-            // actually tokenize the code here. But note that we *do*
-            // go on to insert tokens for an `import` operation into
-            // the stream, so it is up to downstream code to avoid
-            // re-importing the same thing twice.
-        }
-        else
-        {
-            // We are going to preprocess the file using the *same* preprocessor
-            // state that is already active. The main alternative would be
-            // to construct a fresh preprocessor and use that. The current
-            // choice is made so that macros defined in the imported file
-            // will be made visible to the importer, rather than disappear
-            // when a sub-preprocessor gets finalized.
-            auto preprocessor = context->preprocessor;
-
-            // We need to save/restore the input stream, so that we can
-            // re-use the preprocessor
-            PreprocessorInputStream* savedStream = preprocessor->inputStream;
-
-            // Create an input stream for reading from the imported file
-            SourceFile* sourceFile = context->preprocessor->getCompileRequest()->getSourceManager()->allocateSourceFile(foundPath, foundSource);
-            PreprocessorInputStream* subInputStream = CreateInputStreamForSource(preprocessor, sourceFile);
-
-            // Now preprocess that stream
-            preprocessor->inputStream = subInputStream;
-            TokenList subTokens = ReadAllTokens(preprocessor);
-
-            // Restore the previous input stream
-            preprocessor->inputStream = savedStream;
-
-            // Now we need to do something with those tokens we read
-            request->handlePoundImport(
-                moduleKey,
-                subTokens);
-        }
-    }
- 
-    // Now create a dummy token stream to represent the import request,
-    // so that it can be manifest in the user's program
-
-    Token token;
-    token.type = TokenType::PoundImport;
-    token.loc = GetDirectiveLoc(context);
-    token.flags = 0;
-    token.Content = foundPath;
-
-    SimpleTokenInputStream* inputStream = createSimpleInputStream(
-        context->preprocessor,
-        token);
-
-    PushInputStream(context->preprocessor, inputStream);
-}
-
-
 
 }

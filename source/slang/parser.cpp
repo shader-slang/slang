@@ -835,24 +835,6 @@ namespace Slang
         return decl;
     }
 
-    static RefPtr<Decl> parsePoundImportDecl(
-        Parser* parser)
-    {
-        parser->haveSeenAnyImportDecls = true;
-
-        Token importToken = parser->ReadToken(TokenType::PoundImport);
-
-        NameLoc nameAndLoc;
-        nameAndLoc.name = getName(parser, importToken.Content);
-        nameAndLoc.loc = importToken.loc;
-
-        auto decl = new ImportDecl();
-        decl->moduleNameAndLoc = nameAndLoc;
-        decl->scope = parser->currentScope;
-
-        return decl;
-    }
-
     static NameLoc ParseDeclName(
         Parser* parser)
     {
@@ -2590,13 +2572,6 @@ namespace Slang
                 decl = new EmptyDecl();
                 decl->loc = loc;
             }
-            break;
-
-        // The preprocessor will generate a custom token to represent
-        // the site of a `#import` directive, so that we can catch
-        // it downstream in the parser, here.
-        case TokenType::PoundImport:
-            decl = parsePoundImportDecl(parser);
             break;
 
         // If nothing else matched, we try to parse an "ordinary" declarator-based declaration

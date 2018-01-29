@@ -364,10 +364,6 @@ namespace Slang
             String const&       source,
             SourceLoc const& loc);
 
-        void handlePoundImport(
-            String const&       path,
-            TokenList const&    tokens);
-
         void loadParsedModule(
             RefPtr<TranslationUnitRequest> const&   translationUnit,
             Name*                                   name,

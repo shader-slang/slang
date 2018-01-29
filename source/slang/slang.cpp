@@ -559,45 +559,6 @@ RefPtr<ModuleDecl> CompileRequest::loadModule(
     return translationUnit->SyntaxNode;
 }
 
-void CompileRequest::handlePoundImport(
-    String const&       path,
-    TokenList const&    tokens)
-{
-    RefPtr<TranslationUnitRequest> translationUnit = new TranslationUnitRequest();
-    translationUnit->compileRequest = this;
-
-    translationUnit->compileFlags = this->compileFlags & (SLANG_COMPILE_FLAG_USE_IR);
-
-    // Imported code is always native Slang code
-    RefPtr<Scope> languageScope = mSession->slangLanguageScope;
-
-    RefPtr<ModuleDecl> translationUnitSyntax = new ModuleDecl();
-    translationUnit->SyntaxNode = translationUnitSyntax;
-
-    parseSourceFile(
-        translationUnit.Ptr(),
-        tokens,
-        &mSink,
-        languageScope);
-
-    // TODO: handle errors
-
-    // TODO: It is a bit broken here that we use the module path,
-    // as the "name" when registering things, but this saves
-    // us the trouble of trying to special-case things when
-    // checking an `import` down the road.
-    //
-    // Ideally we'd construct a suitable name by effectively
-    // running the name->path logic in reverse (e.g., replacing
-    // `-` with `_` and `/` with `.`).
-    Name* name = getNamePool()->getName(path);
-
-    loadParsedModule(
-        translationUnit,
-        name,
-        path);
-}
-
 RefPtr<ModuleDecl> CompileRequest::findOrImportModule(
     Name*               name,
     SourceLoc const&    loc)
@@ -664,7 +625,7 @@ RefPtr<ModuleDecl> CompileRequest::findOrImportModule(
         break;
     }
 
-    // Maybe this was loaded previously via `#import`
+    // Maybe this was loaded previously at a different relative name?
     if (mapPathToLoadedModule.TryGetValue(foundPath, loadedModule))
         return loadedModule->moduleDecl;
 
