@@ -719,7 +719,7 @@ public:
     {
 		if (request.computeShader.name)
 		{
-			auto dxComputeShaderBlob = compileHLSLShader(request.computeShader.source.path, request.computeShader.source.text, request.computeShader.name, request.computeShader.profile);
+			auto dxComputeShaderBlob = compileHLSLShader(request.computeShader.source.path, request.computeShader.source.dataBegin, request.computeShader.name, request.computeShader.profile);
 			if (!dxComputeShaderBlob) 
                 return nullptr;
 
@@ -737,10 +737,10 @@ public:
 		}
 		else
 		{
-			auto dxVertexShaderBlob = compileHLSLShader(request.vertexShader.source.path, request.vertexShader.source.text, request.vertexShader.name, request.vertexShader.profile);
+			auto dxVertexShaderBlob = compileHLSLShader(request.vertexShader.source.path, request.vertexShader.source.dataBegin, request.vertexShader.name, request.vertexShader.profile);
 			if (!dxVertexShaderBlob)     return nullptr;
 
-			auto dxFragmentShaderBlob = compileHLSLShader(request.fragmentShader.source.path, request.fragmentShader.source.text, request.fragmentShader.name, request.fragmentShader.profile);
+			auto dxFragmentShaderBlob = compileHLSLShader(request.fragmentShader.source.path, request.fragmentShader.source.dataBegin, request.fragmentShader.name, request.fragmentShader.profile);
 			if (!dxFragmentShaderBlob)   return nullptr;
 
 			ID3D11VertexShader* dxVertexShader;

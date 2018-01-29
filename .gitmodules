@@ -1,3 +1,7 @@
 [submodule "external/glslang"]
 	path = external/glslang
 	url = https://github.com/KhronosGroup/glslang.git
+[submodule "external/vulkan"]
+	path = external/vulkan
+	url = https://github.com/shader-slang/vulkan.git
+	shallow = true

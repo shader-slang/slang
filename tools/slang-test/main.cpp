@@ -1207,6 +1207,11 @@ TestResult runSlangComputeComparisonTest(TestInput& input)
 	return runComputeComparisonImpl(input, "-slang -compute", input.outputStem + ".expected.txt");
 }
 
+TestResult runSlangComputeComparisonTestEx(TestInput& input)
+{
+	return runComputeComparisonImpl(input, "", input.outputStem + ".expected.txt");
+}
+
 TestResult runHLSLComputeTest(TestInput& input)
 {
     return runComputeComparisonImpl(input, "-hlsl-rewrite -compute", input.outputStem + ".expected.txt");
@@ -1416,6 +1421,7 @@ TestResult runTest(
         { "COMPARE_HLSL_CROSS_COMPILE_RENDER", &runHLSLCrossCompileRenderComparisonTest},
         { "COMPARE_HLSL_GLSL_RENDER", &runHLSLAndGLSLComparisonTest },
         { "COMPARE_COMPUTE", runSlangComputeComparisonTest},
+        { "COMPARE_COMPUTE_EX", runSlangComputeComparisonTestEx},
         { "HLSL_COMPUTE", runHLSLComputeTest},
         { "COMPARE_RENDER_COMPUTE", &runSlangRenderComputeComparisonTest },
 
