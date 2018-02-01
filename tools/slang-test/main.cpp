@@ -30,6 +30,10 @@ enum OutputMode
     // need to output test results in a way that the AppVeyor
     // environment can pick up and display.
     kOutputMode_AppVeyor,
+
+    // We currently don't specialize for Travis, but maybe
+    // we should.
+    kOutputMode_Travis,
 };
 
 struct TestCategory;
@@ -153,6 +157,7 @@ void parseOptions(int* argc, char** argv)
         }
         else if( strcmp(arg, "-travis") == 0 )
         {
+            options.outputMode = kOutputMode_Travis;
             options.dumpOutputOnFailure = true;
         }
         else if( strcmp(arg, "-category") == 0 )
@@ -1493,7 +1498,7 @@ void handleTestResult(
 //    printf("OUTPUT_MODE: %d\n", options.outputMode);
     switch( options.outputMode )
     {
-    case kOutputMode_Default:
+    default :
         {
             char const* resultString = "UNEXPECTED";
             switch( testResult )
@@ -1505,7 +1510,6 @@ void handleTestResult(
                 assert(!"unexpected");
                 break;
             }
-
             printf("%s test: '%S'\n", resultString, testName.ToWString().begin());
         }
         break;
@@ -1550,10 +1554,6 @@ void handleTestResult(
 #endif
             }
         }
-        break;
-
-    default:
-        assert(!"unexpected");
         break;
     }
 }
