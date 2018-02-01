@@ -1,5 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -xslang -use-ir
-//TEST(compute):COMPARE_COMPUTE_EX:-vk -compute -xslang -use-ir
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -xslang -use-ir
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out
 

@@ -1742,6 +1742,9 @@ int main(
 
 	/*auto computeTestCategory = */addTestCategory("compute", fullTestCategory);
 
+    auto vulkanTestCategory = addTestCategory("vulkan", fullTestCategory);
+
+
     // An un-categorized test will always belong to the `full` category
     defaultTestCategory = fullTestCategory;
 
@@ -1761,6 +1764,7 @@ int main(
     if( options.outputMode == kOutputMode_AppVeyor )
     {
         options.excludeCategories.Add(renderTestCategory, renderTestCategory);
+        options.excludeCategories.Add(vulkanTestCategory, vulkanTestCategory);
     }
 
     TestContext context = { 0 };
