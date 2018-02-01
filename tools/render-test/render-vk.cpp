@@ -6,9 +6,9 @@
 
 #ifdef _WIN32
 #define VK_USE_PLATFORM_WIN32_KHR 1
-#pragma comment(lib, "vulkan-1")
 #endif
 
+#define VK_NO_PROTOTYPES
 #include <vulkan/vulkan.h>
 
 #define ENABLE_VALIDATION_LAYER 1
@@ -25,6 +25,53 @@
 #endif
 #endif
 
+#define FOREACH_GLOBAL_PROC(M)          \
+    M(vkCreateInstance)                 \
+    /* */
+
+#define FOREACH_INSTANCE_PROC(M)                \
+    M(vkCreateDevice)                           \
+    M(vkCreateDebugReportCallbackEXT)           \
+    M(vkDestroyDebugReportCallbackEXT)          \
+    M(vkDebugReportMessageEXT)                  \
+    M(vkEnumeratePhysicalDevices)               \
+    M(vkGetPhysicalDeviceProperties)            \
+    M(vkGetPhysicalDeviceFeatures)              \
+    M(vkGetPhysicalDeviceMemoryProperties)      \
+    M(vkGetPhysicalDeviceQueueFamilyProperties) \
+    M(vkGetDeviceProcAddr)                      \
+    /* */
+
+#define FOREACH_DEVICE_PROC(M)          \
+    M(vkCreateDescriptorPool)           \
+    M(vkCreateCommandPool)              \
+    M(vkGetDeviceQueue)                 \
+    M(vkAllocateCommandBuffers)         \
+    M(vkBeginCommandBuffer)             \
+    M(vkEndCommandBuffer)               \
+    M(vkQueueSubmit)                    \
+    M(vkQueueWaitIdle)                  \
+    M(vkFreeCommandBuffers)             \
+    M(vkCreateBuffer)                   \
+    M(vkGetBufferMemoryRequirements)    \
+    M(vkAllocateMemory)                 \
+    M(vkBindBufferMemory)               \
+    M(vkMapMemory)                      \
+    M(vkUnmapMemory)                    \
+    M(vkCmdCopyBuffer)                  \
+    M(vkDestroyBuffer)                  \
+    M(vkFreeMemory)                     \
+    M(vkCreateDescriptorSetLayout)      \
+    M(vkAllocateDescriptorSets)         \
+    M(vkUpdateDescriptorSets)           \
+    M(vkCreatePipelineLayout)           \
+    M(vkCreateComputePipelines)         \
+    M(vkCmdBindPipeline)                \
+    M(vkCmdBindDescriptorSets)          \
+    M(vkCmdDispatch)                    \
+    M(vkDestroyPipeline)                \
+    M(vkCreateShaderModule)             \
+    /* */
 
 namespace renderer_test {
 
@@ -43,6 +90,14 @@ public:
     VkCommandPool                       commandPool;
     VkSubmitInfo                        submitInfo;
     VkDebugReportCallbackEXT            debugReportCallback;
+
+
+#define DECLARE_PROC(NAME) PFN_##NAME NAME;
+    DECLARE_PROC(vkGetInstanceProcAddr);
+    FOREACH_GLOBAL_PROC(DECLARE_PROC)
+    FOREACH_INSTANCE_PROC(DECLARE_PROC)
+    FOREACH_DEVICE_PROC(DECLARE_PROC)
+#undef DECLARE_PROC
 
     // Renderer interface
 
@@ -98,6 +153,22 @@ public:
 
     virtual void initialize(void* inWindowHandle) override
     {
+        char const* dynamicLibraryName = "vulkan-1.dll";
+        HMODULE vulkan = LoadLibraryA(dynamicLibraryName);
+        if(!vulkan)
+        {
+            fprintf(stderr, "error: failed load '%s'\n", dynamicLibraryName);
+            exit(1);
+        }
+
+        vkGetInstanceProcAddr = (PFN_vkGetInstanceProcAddr) GetProcAddress(vulkan, "vkGetInstanceProcAddr");
+        if(!vkGetInstanceProcAddr)
+        {
+            fprintf(stderr,
+                "error: failed load symbol 'vkGetInstanceProcAddr'\n");
+            exit(1);
+        }
+
         VkApplicationInfo applicationInfo = { VK_STRUCTURE_TYPE_APPLICATION_INFO };
         applicationInfo.pApplicationName = "slang-render-test";
         applicationInfo.pEngineName = "slang-render-test";
@@ -132,16 +203,23 @@ public:
         instanceCreateInfo.ppEnabledLayerNames = layerNames;
 #endif
 
+        instance = 0;
+
+#define LOAD_INSTANCE_PROC(NAME) NAME = (PFN_##NAME) vkGetInstanceProcAddr(instance, #NAME);
+
+        FOREACH_GLOBAL_PROC(LOAD_INSTANCE_PROC);
+
         checkResult(vkCreateInstance(
             &instanceCreateInfo,
             nullptr,
             &instance));
 
-#if ENABLE_VALIDATION_LAYER
-        auto createDebugReportCallback   = (PFN_vkCreateDebugReportCallbackEXT)  vkGetInstanceProcAddr(instance, "vkCreateDebugReportCallbackEXT");
-        auto destroyDebugReportCallback  = (PFN_vkDestroyDebugReportCallbackEXT) vkGetInstanceProcAddr(instance, "vkDestroyDebugReportCallbackEXT");
-        auto debugReportMessage          = (PFN_vkDebugReportMessageEXT)         vkGetInstanceProcAddr(instance, "vkDebugReportMessageEXT");
+        FOREACH_INSTANCE_PROC(LOAD_INSTANCE_PROC);
 
+#undef LOAD_INSTANCE_PROC
+
+
+#if ENABLE_VALIDATION_LAYER
         VkDebugReportFlagsEXT debugFlags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
 
         VkDebugReportCallbackCreateInfoEXT debugCreateInfo = { VK_STRUCTURE_TYPE_DEBUG_REPORT_CREATE_INFO_EXT };
@@ -149,7 +227,7 @@ public:
         debugCreateInfo.pUserData = this;
         debugCreateInfo.flags = debugFlags;
 
-        checkResult(createDebugReportCallback(
+        checkResult(vkCreateDebugReportCallbackEXT(
             instance, &debugCreateInfo, nullptr, &debugReportCallback));
 
 #endif
@@ -217,6 +295,10 @@ public:
 
         checkResult(vkCreateDevice(
             physicalDevice, &deviceCreateInfo, nullptr, &device));
+
+#define LOAD_DEVICE_PROC(NAME) NAME = (PFN_##NAME) vkGetDeviceProcAddr(device, #NAME);
+        FOREACH_DEVICE_PROC(LOAD_DEVICE_PROC)
+#undef LOAD_DEVICE_PROC
 
         // Create a command pool
 
