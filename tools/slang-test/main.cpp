@@ -1468,6 +1468,8 @@ void handleTestResult(
     String const&   testName,
     TestResult      testResult)
 {
+    context->totalTestCount++;
+
     switch( testResult )
     {
     case kTestResult_Fail:
@@ -1636,9 +1638,6 @@ void runTestsOnFile(
         {
             continue;
         }
-
-        context->totalTestCount++;
-
 
         String outputStem = filePath;
         if(subTestIndex != 0)
