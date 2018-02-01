@@ -839,13 +839,14 @@ TestResult runCrossCompilerTest(TestInput& input)
 
     actualSpawner.pushArgument(filePath);
     expectedSpawner.pushArgument(filePath + ".glsl");
+    expectedSpawner.pushArgument("-pass-through");
+    expectedSpawner.pushArgument("glslang");
 
     for( auto arg : input.testOptions->args )
     {
         actualSpawner.pushArgument(arg);
         expectedSpawner.pushArgument(arg);
     }
-    expectedSpawner.pushArgument("-no-checking");
 
     if (spawnAndWait(outputStem, expectedSpawner) != kOSError_None)
     {
@@ -1051,8 +1052,6 @@ TestResult doGLSLComparisonTestRun(
         spawner.pushArgument("-pass-through");
         spawner.pushArgument(passThrough);
     }
-
-    spawner.pushArgument("-no-checking");
 
     spawner.pushArgument("-target");
     spawner.pushArgument("spirv-assembly");

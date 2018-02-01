@@ -1,12 +1,15 @@
 //TEST_IGNORE_FILE:
+#version 420
 
 struct VS_OUT
 {
 	float drawID;
 };
 
+layout(location = 0)
 in flat float SLANG_in_vsOut_drawID;
 
+layout(location = 0)
 out vec4 SLANG_out_main_result;
 
 vec4 main_(VS_OUT vsOut)

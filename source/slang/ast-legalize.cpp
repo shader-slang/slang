@@ -1947,29 +1947,6 @@ struct LoweringVisitor
         return LegalExpr(lowerCallExpr(loweredExpr, expr));
     }
 
-    LegalExpr visitHiddenImplicitCastExpr(
-        HiddenImplicitCastExpr* expr)
-    {
-        LegalExpr legalArg = legalizeExpr(expr->Arguments[0]);
-        if(legalArg.getFlavor() == LegalExpr::Flavor::simple)
-        {
-            InvokeExpr* loweredExpr = (InvokeExpr*) expr->getClass().createInstance();
-            lowerExprCommon(loweredExpr, expr);
-            loweredExpr->FunctionExpr = legalizeSimpleExpr(expr->FunctionExpr);
-            addArg(loweredExpr, legalArg.getSimple());
-            return LegalExpr(loweredExpr);
-        }
-        else
-        {
-            // If we hit this case, then there seems to have been a type-checking
-            // error around a type that needed to be desugared. We want to use
-            // the original expression rather than hide it behind a cast, because
-            // it might need to be unpacked into multiple arguments for a call, etc.
-            //
-            return legalArg;
-        }
-    }
-
     LegalExpr visitSelectExpr(
         SelectExpr* expr)
     {

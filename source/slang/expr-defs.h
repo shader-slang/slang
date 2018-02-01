@@ -132,11 +132,6 @@ END_SYNTAX_CLASS()
 SYNTAX_CLASS(ImplicitCastExpr, TypeCastExpr)
 END_SYNTAX_CLASS()
 
-// An implicit type-cast that should also be hidden on output,
-// because we don't want to mess with the user's code
-SYNTAX_CLASS(HiddenImplicitCastExpr, ImplicitCastExpr)
-END_SYNTAX_CLASS()
-
 SIMPLE_SYNTAX_CLASS(SelectExpr, OperatorExpr)
 
 SIMPLE_SYNTAX_CLASS(GenericAppExpr, AppExprBase)

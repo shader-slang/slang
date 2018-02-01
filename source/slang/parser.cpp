@@ -2974,53 +2974,6 @@ namespace Slang
 
     RefPtr<Stmt> Parser::parseBlockStatement()
     {
-        // If we are being asked not to check things *and* we haven't
-        // seen any `import` declarations yet, then we can safely assume
-        // that function bodies should be left as-is.
-        if( (translationUnit->compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING)
-            && !haveSeenAnyImportDecls )
-        {
-            // We have been asked to parse the input, but not attempt to understand it.
-
-            // TODO: record start/end locations...
-
-            List<Token> tokens;
-
-            ReadToken(TokenType::LBrace);
-
-            int depth = 1;
-            for( ;;)
-            {
-                switch( tokenReader.PeekTokenType() )
-                {
-                case TokenType::EndOfFile:
-                    goto done;
-
-                case TokenType::RBrace:
-                    depth--;
-                    if(depth == 0)
-                        goto done;
-                    break;
-
-                case TokenType::LBrace:
-                    depth++;
-                    break;
-
-                default:
-                    break;
-                }
-
-                auto token = tokenReader.AdvanceToken();
-                tokens.Add(token);
-            }
-        done:
-            ReadToken(TokenType::RBrace);
-
-            RefPtr<UnparsedStmt> unparsedStmt = new UnparsedStmt();
-            unparsedStmt->tokens = tokens;
-            return unparsedStmt;
-        }
-
         RefPtr<ScopeDecl> scopeDecl = new ScopeDecl();
         RefPtr<BlockStmt> blockStatement = new BlockStmt();
         blockStatement->scopeDecl = scopeDecl;

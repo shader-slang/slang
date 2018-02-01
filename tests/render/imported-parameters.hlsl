@@ -4,10 +4,10 @@
 // correctly handle cases where top-level shader
 // parameters are declared in an `import`ed file.
 
+#if defined(__HLSL__)
+
 // Pull in Spire code depdendency using extended syntax:
 __import imported_parameters;
-
-#if defined(__HLSL__)
 
 struct AssembledVertex
 {
@@ -80,6 +80,30 @@ FragmentStageOutput fragmentMain(FragmentStageInput input)
 #elif defined(__GLSL__)
 
 #version 420
+
+layout(binding = 0)
+uniform Uniforms
+{
+	mat4x4 modelViewProjection;
+};
+
+float saturate(float x)
+{
+    return clamp(x, float(0), float(1));	
+}
+
+vec3 transformColor(vec3 color)
+{
+	vec3 result;
+
+	result.x = sin(20.0 * (color.x + color.y));
+	result.y = saturate(cos(color.z * 30.0));
+	result.z = sin(color.x * color.y * color.z * 100.0);
+
+	result = 0.5 * (result + 1);
+
+	return result;
+}
 
 #define ASSEMBLED_VERTEX(QUAL)		\
 	/* */

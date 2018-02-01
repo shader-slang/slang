@@ -267,11 +267,6 @@ void CompileRequest::generateIR()
     // in isolation.
     for( auto& translationUnit : translationUnits )
     {
-        // Also skip IR generation if semantic checking is turned off
-        // for a given translation unit.
-        if(translationUnit->compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING)
-            continue;
-
         translationUnit->irModule = generateIRForTranslationUnit(translationUnit);
     }
 }
@@ -309,13 +304,6 @@ int CompileRequest::executeActionsInner()
     for (auto& translationUnit : translationUnits)
     {
         translationUnit->compileFlags |= compileFlags;
-
-        // However, the "no checking" flag shouldn't be applied to
-        // any translation unit that is native Slang code.
-        if (translationUnit->sourceLanguage == SourceLanguage::Slang)
-        {
-            translationUnit->compileFlags &= ~SLANG_COMPILE_FLAG_NO_CHECKING;
-        }
     }
 
     // If no code-generation target was specified, then try to infer one from the source language,
