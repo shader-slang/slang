@@ -815,6 +815,16 @@ public:
             viewDesc.Buffer.Flags = 0;
             viewDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
             viewDesc.Format = DXGI_FORMAT_UNKNOWN;
+
+            if( bufferDesc.stride == 0 )
+            {
+                // TODO: are there UAV cases we need to handle that are neither
+                // raw nor structured? RWBuffer<T> would be one...
+
+                viewDesc.Buffer.Flags |= D3D11_BUFFER_UAV_FLAG_RAW;
+                viewDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+            }
+
             dxDevice->CreateUnorderedAccessView(bufferOut, &viewDesc, &viewOut);
         }
         if (bufferDesc.type != InputBufferType::ConstantBuffer)

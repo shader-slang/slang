@@ -91,6 +91,10 @@ static bool isResourceType(Type* type)
     {
         return true;
     }
+    else if(auto untypedBufferType = type->As<UntypedBufferResourceType>())
+    {
+        return true;
+    }
 
     // TODO: need more comprehensive coverage here
 
