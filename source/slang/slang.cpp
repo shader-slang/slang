@@ -575,7 +575,10 @@ RefPtr<ModuleDecl> CompileRequest::findOrImportModule(
         {
             // We seem to be in the middle of loading this module
             mSink.diagnose(loc, Diagnostics::recursiveModuleImport, name);
+            return nullptr;
         }
+
+        return loadedModule->moduleDecl;
     }
 
     // Derive a file name for the module, by taking the given
