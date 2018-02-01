@@ -752,7 +752,7 @@ public:
         }
 
         VkDescriptorSetLayoutCreateInfo descriptorSetLayoutInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
-        descriptorSetLayoutInfo.bindingCount = bindings.Count();
+        descriptorSetLayoutInfo.bindingCount = uint32_t(bindings.Count());
         descriptorSetLayoutInfo.pBindings = bindings.Buffer();
 
         VkDescriptorSetLayout descriptorSetLayout = 0;
