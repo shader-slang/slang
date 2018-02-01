@@ -1431,6 +1431,7 @@ TestResult runTest(
         { "COMPARE_HLSL_CROSS_COMPILE_RENDER",  &skipTest},
         { "COMPARE_HLSL_GLSL_RENDER",           &skipTest },
         { "COMPARE_COMPUTE",                    &skipTest},
+        { "COMPARE_COMPUTE_EX",                 &skipTest},
         { "HLSL_COMPUTE",                       &skipTest},
         { "COMPARE_RENDER_COMPUTE",             &skipTest },
 #endif
