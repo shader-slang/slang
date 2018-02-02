@@ -1533,6 +1533,7 @@ struct LoweringVisitor
                 auto basePair = baseExpr.getPair();
 
                 RefPtr<PairPseudoExpr> resultPair = new PairPseudoExpr();
+                resultPair->pairInfo = basePair->pairInfo;
                 resultPair->loc = basePair->loc;
 
                 resultPair->ordinary = createSubscriptExpr(basePair->ordinary, indexExpr);
