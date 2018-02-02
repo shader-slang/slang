@@ -16,7 +16,14 @@ struct ShaderCompileRequest
     struct SourceInfo
     {
         char const* path;
-        char const* text;
+
+        // The data may either be source text (in which
+        // case it can be assumed to be nul-terminated with
+        // `dataEnd` pointing at the terminator), or
+        // raw binary data (in which case `dataEnd` points
+        // at the end of the buffer).
+        char const* dataBegin;
+        char const* dataEnd;
     };
 
     struct EntryPoint

@@ -54,27 +54,33 @@ void parseOptions(int* argc, char** argv)
         }
         else if( strcmp(arg, "-hlsl") == 0 )
         {
-            gOptions.mode = Mode::HLSL;
+            gOptions.rendererID = RendererID::D3D11;
+            gOptions.inputLanguageID = InputLanguageID::Native;
         }
         else if( strcmp(arg, "-glsl") == 0 )
         {
-            gOptions.mode = Mode::GLSL;
+            gOptions.rendererID = RendererID::GL;
+            gOptions.inputLanguageID = InputLanguageID::Native;
         }
         else if( strcmp(arg, "-hlsl-rewrite") == 0 )
         {
-            gOptions.mode = Mode::HLSLRewrite;
+            gOptions.rendererID = RendererID::D3D11;
+            gOptions.inputLanguageID = InputLanguageID::NativeRewrite;
         }
         else if( strcmp(arg, "-glsl-rewrite") == 0 )
         {
-            gOptions.mode = Mode::GLSLRewrite;
+            gOptions.rendererID = RendererID::GL;
+            gOptions.inputLanguageID = InputLanguageID::NativeRewrite;
         }
         else if( strcmp(arg, "-slang") == 0 )
         {
-            gOptions.mode = Mode::Slang;
+            gOptions.rendererID = RendererID::D3D11;
+            gOptions.inputLanguageID = InputLanguageID::Slang;
         }
         else if( strcmp(arg, "-glsl-cross") == 0 )
         {
-            gOptions.mode = Mode::GLSLCrossCompile;
+            gOptions.rendererID = RendererID::GL;
+            gOptions.inputLanguageID = InputLanguageID::Slang;
         }
         else if( strcmp(arg, "-xslang") == 0 )
         {
@@ -103,6 +109,16 @@ void parseOptions(int* argc, char** argv)
         else if (strcmp(arg, "-gcompute") == 0)
         {
             gOptions.shaderType = ShaderProgramType::GraphicsCompute;
+        }
+        else if (strcmp(arg, "-vk") == 0
+            || strcmp(arg, "-vulkan") == 0)
+        {
+            gOptions.rendererID = RendererID::VK;
+        }
+        else if (strcmp(arg, "-d3d12") == 0
+            || strcmp(arg, "-dx12") == 0)
+        {
+            gOptions.rendererID = RendererID::D3D12;
         }
         else
         {

@@ -1207,6 +1207,11 @@ TestResult runSlangComputeComparisonTest(TestInput& input)
 	return runComputeComparisonImpl(input, "-slang -compute", input.outputStem + ".expected.txt");
 }
 
+TestResult runSlangComputeComparisonTestEx(TestInput& input)
+{
+	return runComputeComparisonImpl(input, "", input.outputStem + ".expected.txt");
+}
+
 TestResult runHLSLComputeTest(TestInput& input)
 {
     return runComputeComparisonImpl(input, "-hlsl-rewrite -compute", input.outputStem + ".expected.txt");
@@ -1416,6 +1421,7 @@ TestResult runTest(
         { "COMPARE_HLSL_CROSS_COMPILE_RENDER", &runHLSLCrossCompileRenderComparisonTest},
         { "COMPARE_HLSL_GLSL_RENDER", &runHLSLAndGLSLComparisonTest },
         { "COMPARE_COMPUTE", runSlangComputeComparisonTest},
+        { "COMPARE_COMPUTE_EX", runSlangComputeComparisonTestEx},
         { "HLSL_COMPUTE", runHLSLComputeTest},
         { "COMPARE_RENDER_COMPUTE", &runSlangRenderComputeComparisonTest },
 
@@ -1425,6 +1431,7 @@ TestResult runTest(
         { "COMPARE_HLSL_CROSS_COMPILE_RENDER",  &skipTest},
         { "COMPARE_HLSL_GLSL_RENDER",           &skipTest },
         { "COMPARE_COMPUTE",                    &skipTest},
+        { "COMPARE_COMPUTE_EX",                 &skipTest},
         { "HLSL_COMPUTE",                       &skipTest},
         { "COMPARE_RENDER_COMPUTE",             &skipTest },
 #endif
@@ -1735,6 +1742,9 @@ int main(
 
 	/*auto computeTestCategory = */addTestCategory("compute", fullTestCategory);
 
+    auto vulkanTestCategory = addTestCategory("vulkan", fullTestCategory);
+
+
     // An un-categorized test will always belong to the `full` category
     defaultTestCategory = fullTestCategory;
 
@@ -1754,6 +1764,7 @@ int main(
     if( options.outputMode == kOutputMode_AppVeyor )
     {
         options.excludeCategories.Add(renderTestCategory, renderTestCategory);
+        options.excludeCategories.Add(vulkanTestCategory, vulkanTestCategory);
     }
 
     TestContext context = { 0 };

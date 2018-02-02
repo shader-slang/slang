@@ -247,15 +247,17 @@ SIMPLE_SYNTAX_CLASS(PointerLikeType, BuiltinGenericType)
 
 // HLSL buffer-type resources
 
-SIMPLE_SYNTAX_CLASS(HLSLStructuredBufferType, BuiltinGenericType)
-SIMPLE_SYNTAX_CLASS(HLSLRWStructuredBufferType, BuiltinGenericType)
+SIMPLE_SYNTAX_CLASS(HLSLStructuredBufferTypeBase, BuiltinGenericType)
+SIMPLE_SYNTAX_CLASS(HLSLStructuredBufferType, HLSLStructuredBufferTypeBase)
+SIMPLE_SYNTAX_CLASS(HLSLRWStructuredBufferType, HLSLStructuredBufferTypeBase)
+// TODO: need raster-ordered case here
 
 SIMPLE_SYNTAX_CLASS(UntypedBufferResourceType, DeclRefType)
 SIMPLE_SYNTAX_CLASS(HLSLByteAddressBufferType, UntypedBufferResourceType)
 SIMPLE_SYNTAX_CLASS(HLSLRWByteAddressBufferType, UntypedBufferResourceType)
 
-SIMPLE_SYNTAX_CLASS(HLSLAppendStructuredBufferType, BuiltinGenericType)
-SIMPLE_SYNTAX_CLASS(HLSLConsumeStructuredBufferType, BuiltinGenericType)
+SIMPLE_SYNTAX_CLASS(HLSLAppendStructuredBufferType, HLSLStructuredBufferTypeBase)
+SIMPLE_SYNTAX_CLASS(HLSLConsumeStructuredBufferType, HLSLStructuredBufferTypeBase)
 
 SYNTAX_CLASS(HLSLPatchType, DeclRefType)
 RAW(

@@ -63,24 +63,24 @@ struct SlangShaderCompilerWrapper : public ShaderCompiler
 			// active in each case.
 
 			vertexTranslationUnit = spAddTranslationUnit(slangRequest, sourceLanguage, nullptr);
-			spAddTranslationUnitSourceString(slangRequest, vertexTranslationUnit, request.source.path, request.source.text);
+			spAddTranslationUnitSourceString(slangRequest, vertexTranslationUnit, request.source.path, request.source.dataBegin);
 			spTranslationUnit_addPreprocessorDefine(slangRequest, vertexTranslationUnit, "__GLSL_VERTEX__", "1");
 			vertexEntryPointName = "main";
 
 			fragmentTranslationUnit = spAddTranslationUnit(slangRequest, sourceLanguage, nullptr);
-			spAddTranslationUnitSourceString(slangRequest, fragmentTranslationUnit, request.source.path, request.source.text);
+			spAddTranslationUnitSourceString(slangRequest, fragmentTranslationUnit, request.source.path, request.source.dataBegin);
 			spTranslationUnit_addPreprocessorDefine(slangRequest, fragmentTranslationUnit, "__GLSL_FRAGMENT__", "1");
 			fragmentEntryPointName = "main";
 
 			computeTranslationUnit = spAddTranslationUnit(slangRequest, sourceLanguage, nullptr);
-			spAddTranslationUnitSourceString(slangRequest, computeTranslationUnit, request.source.path, request.source.text);
+			spAddTranslationUnitSourceString(slangRequest, computeTranslationUnit, request.source.path, request.source.dataBegin);
 			spTranslationUnit_addPreprocessorDefine(slangRequest, computeTranslationUnit, "__GLSL_COMPUTE__", "1");
 			computeEntryPointName = "main";
 		}
 		else
 		{
 			int translationUnit = spAddTranslationUnit(slangRequest, sourceLanguage, nullptr);
-			spAddTranslationUnitSourceString(slangRequest, translationUnit, request.source.path, request.source.text);
+			spAddTranslationUnitSourceString(slangRequest, translationUnit, request.source.path, request.source.dataBegin);
 
 			vertexTranslationUnit = translationUnit;
 			fragmentTranslationUnit = translationUnit;
@@ -108,8 +108,11 @@ struct SlangShaderCompilerWrapper : public ShaderCompiler
 			if (!compileErr)
 			{
 				ShaderCompileRequest innerRequest = request;
-				char const* computeCode = spGetEntryPointSource(slangRequest, computeEntryPoint);
-				innerRequest.computeShader.source.text = computeCode;
+
+                size_t codeSize = 0;
+                char const* code = (char const*) spGetEntryPointCode(slangRequest, computeEntryPoint, &codeSize);
+                innerRequest.computeShader.source.dataBegin = code;
+                innerRequest.computeShader.source.dataEnd = code + codeSize;
 				result = innerCompiler->compileProgram(innerRequest);
 			}
 		}
@@ -129,11 +132,17 @@ struct SlangShaderCompilerWrapper : public ShaderCompiler
 			{
 				ShaderCompileRequest innerRequest = request;
 
-				char const* vertexCode = spGetEntryPointSource(slangRequest, vertexEntryPoint);
-				char const* fragmentCode = spGetEntryPointSource(slangRequest, fragmentEntryPoint);
+                size_t vertexCodeSize = 0;
+				char const* vertexCode = (char const*) spGetEntryPointCode(slangRequest, vertexEntryPoint, &vertexCodeSize);
 
-				innerRequest.vertexShader.source.text = vertexCode;
-				innerRequest.fragmentShader.source.text = fragmentCode;
+                size_t fragmentCodeSize = 0;
+                char const* fragmentCode = (char const*) spGetEntryPointCode(slangRequest, fragmentEntryPoint, &fragmentCodeSize);
+
+				innerRequest.vertexShader.source.dataBegin = vertexCode;
+                innerRequest.vertexShader.source.dataEnd   = vertexCode + vertexCodeSize;
+
+				innerRequest.fragmentShader.source.dataBegin = fragmentCode;
+                innerRequest.fragmentShader.source.dataEnd   = fragmentCode + fragmentCodeSize;
 
 				result = innerCompiler->compileProgram(innerRequest);
 			}
