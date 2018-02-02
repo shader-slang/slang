@@ -8,50 +8,11 @@ Preliminaries
 -------------
 
 Before using the Slang API, you'll need to link Slang into your application.
-There are multiple ways you can do this:
-
-### Integrating the source into your build
-
-By far the simplest option if you just want to get up and running quickly, without fussing with dynamic libraries, is to integrate the Slang source files into your build.
-The Slang project is packaged in a way that tries to make this easy:
-
-* Either clone the Slang repository, or download a source release
-* Add the root folder of the repository/release to your include path
-* In one `.cpp` file in your path, make sure to define `SLANG_INCLUDE_IMPLEMENTATION` before including `slang.h`:
-
-```c++
-#define SLANG_INCLUDE_IMPLEMENTATION
-#include <slang.h>
-```
-
-This causes the `slang.h` header to `#include` all the source files that make up the Slang compiler implementation.
-
-Note that this option does *not* currently include support for generating SPIR-V output.
-You can of course download or buld `slang-glslang` separately, if you want Slang's SPIR-V output, or you can just have Slang generate GLSL, and hten pass that on to whatever tool(s) you are using for GLSL today.
-
-### Binary releases
-
-Pre-built binary packages for the stand-alone Slang compiler and a DLL of the Slang library are available through GitHub [releases](https://github.com/shader-slang/slang/releases).
+We recommend using a pre-built binary package, available through GitHub [releases](https://github.com/shader-slang/slang/releases).
 
 Just add the downloaded package to your include path, and make sure to add (or copy) the `slang.dll` and `slang-glslang.dll` libraries into the path of your executable.
 
 When using a binary release, you'll need to define the `SLANG_DYNAMIC` macro to indicate that you want to dynamically link against the API functions:
-
-```c++
-#define SLANG_DYNAMIC
-#include <slang.h>
-```
-
-### Building from source
-
-If you would like to build Slang from source, you will currently need Visual Studio 2015.
-Clone [this](https://github.com/shader-slang/slang) repository, and then run:
-
-    git submodule update --init
-
-Next, open `slang.sln` and build your desired platform/configuration.
-
-As with the binary distriution, you'll need to set the `SLANG_DYNAMIC` option when including the Slang header:
 
 ```c++
 #define SLANG_DYNAMIC

@@ -11,19 +11,9 @@ slangc [<options>] <file1> [<file2>...]
 Simple Examples
 ---------------
 
-### GLSL
-
-To compile a GLSL fragment shader and write SPIR-V assembly to the console:
-
-    slangc my-shader.frag
-
-To output binary SPIR-V to disk, use:
-
-    slangc my-shader.frag -o my-shader.spv
-
 ### HLSL
 
-When compiling an HLSL shader, you must also specify the "profile" to use.
+When compiling an HLSL shader, you must specify the path to your shader code file as well as the "profile" to use.
 To see D3D bytecode assembly for a fragment shader entry point:
 
     slangc my-shader.hlsl -profile ps_5_0
@@ -49,18 +39,11 @@ To get SPIR-V assembly:
     slangc my-shader.slang -profile ps_5_0 -entry main -target spriv
 
 The code generation target is implicit when writing to a file with an appropriate extension.
-To write DXBC and SPIR-V to files, use:
+To write DXBC, SPIR-V, or GLSL to files, use:
 
     slangc my-shader.slang -profile ps_5_0 -entry main -o my-shader.dxbc
     slangc my-shader.slang -profile ps_5_0 -entry main -o my-shader.spv
-
-Cross-Compilation
------------------
-
-When the input file is written in Slang (or the subset of HLSL that Slang currently understands) it is possible to cross-compile to GLSL (and on to SPIR-V), e.g.:
-
     slangc my-shader.slang -profile ps_5_0 -entry main -o my-shader.glsl
-    slangc my-shader.slang -profile ps_5_0 -entry main -o my-shader.spv
 
 Multiple Entry Points
 ---------------------
@@ -91,7 +74,7 @@ For completeness, here are the options that `slangc` currently accepts:
   * If no `<value>` is specified, Slang will define the macro with an empty value
 
 * `-entry <name>`: Specify the name of the entry-point function
-  * In single-file compiles for HLSL/GLSL, this defaults to `main`
+  * In single-file compiles for HLSL, this defaults to `main`
   * Multiple `-entry` options may appear on the command line. When they do, the input file path, `-profile` option, and `-o` option that apply for an entry point are each the first one found when scanning to the left from the `-entry` option.
 
 * `-I <path>`: Add a path to be used in resolving `#include` and `__import` operations
@@ -110,8 +93,6 @@ For completeness, here are the options that `slangc` currently accepts:
   * Profiles of the form `glsl_{vertex,tess_control,tess_eval,geometry,fragment,compute}_<version>` are supported for all GLSL language versions where the corresponding stage is supported (e.g., there is a `glsl_fragment_110`, but the earliest compute profile is `glsl_compute_430`)
   * As a convenience profiles of the form `glsl_{vertex,tess_control,tess_eval,geometry,fragment,compute}` are provided that are intended to map to the latest version of GLSL known to the Slang compiler (curently `450`)
 
-* `-no-checking`: Disable semantic checking as much as possible, or all files and entry points specified. Has no effect on Slang files, but will suppress many of Slang's error checks on HLSL/GLSL files. You may still get error messages when the code in those files is passed along to a downstream compiler like `fxc` or `glslang`.
-
 * `-target <target>`: Specifies the desired code-generation target. Values for `<target>` are:
   * `glsl`: GLSL source code
   * `hlsl`: HLSL source code
@@ -119,7 +100,6 @@ For completeness, here are the options that `slangc` currently accepts:
   * `spirv-assembly`: SPIR-V intermediate language assembly
   * `dxbc`: Direct3D shader bytecode binary
   * `dxbc-assembly`: Direct3D shader bytecode assembly
-  * `reflection-json`: A dump of shader parameter information in JSON format. This is only intended for using in debugging/testing at present.
   * `none`: Don't generate output code (but still perform front-end parsing/checking)
 
 * `--`: Stop parsing options, and treat the rest of the command line as input paths
@@ -127,5 +107,5 @@ For completeness, here are the options that `slangc` currently accepts:
 Limitations
 -----------
 
-A major limitation of the `slangc` command today is that there is no provision for getting both compiled code *and* reflection data out in a single invocation.
+A major limitation of the `slangc` command today is that there is no provision for getting reflection data out along with the compiled shade rcode.
 For now, the command-line tool is best seen as a debugging/testing tool, and all serious applications should drive Slang through the API.
