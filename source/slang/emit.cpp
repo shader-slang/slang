@@ -2685,13 +2685,6 @@ struct EmitVisitor
         if(needClose) Emit(")");
     }
 
-    void visitHiddenImplicitCastExpr(HiddenImplicitCastExpr* castExpr, ExprEmitArg const& arg)
-    {
-        // This was an implicit cast inserted in code parsed in "rewriter" mode,
-        // so we don't want to output it and change what the user's code looked like.
-        ExprVisitorWithArg::dispatch(castExpr->Arguments[0], arg);
-    }
-
     void visitTypeCastExpr(TypeCastExpr* castExpr, ExprEmitArg const& arg)
     {
         // We emit a type cast expression as a constructor call
@@ -7669,7 +7662,7 @@ String emitEntryPoint(
     // categories, each of which is reflected as a different code path
     // below:
     //
-    // 1. "Full rewriter" mode, where the user provides HLSL/GLSL, opts
+    // 1. REMOVED: "Full rewriter" mode, where the user provides HLSL/GLSL, opts
     //    out of semantic checking, and doesn't make use of any Slang
     //    code via `import`.
     //
@@ -7684,7 +7677,7 @@ String emitEntryPoint(
     //    via the same AST-to-AST pass that legalized the user's code. This
     //    mode will eventually go away, but it is the main one used right now.
     //
-    //    b) "With IR." If the user opts into using the IR, then we need to
+    //    b) REMOVED: "With IR." If the user opts into using the IR, then we need to
     //    apply the AST-to-AST pass to their HLSL/GLSL code, but *also* use
     //    the IR to compile everything else.
     //
@@ -7694,27 +7687,10 @@ String emitEntryPoint(
     //
     // We'll try to detect the cases here, starting with case (1):
     //
-    if ((translationUnit->compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING)
-        && translationUnit->compileRequest->loadedModulesList.Count() == 0)
-    {
-        // The user has opted out of semantic checking for their own code
-        // (in the "main" module), and also hasn't `import`ed any Slang
-        // modules that would require cross-compilation.
-        //
-        // Our goal in this mode is to print out the AST we parsed and
-        // hopefully reproduce something as close to the original as possible.
-        //
-        // The only deviation we *want* from the original code is that we will
-        // add new parameter binding annotations.
-
-        sharedContext.program = translationUnitSyntax;
-        visitor.EmitDeclsInContainerUsingLayout(
-            translationUnitSyntax,
-            globalStructLayout);
-    }
+    // REMOVED.
     //
     // Next we will check for case (2a):
-    else if (!(translationUnit->compileRequest->compileFlags & SLANG_COMPILE_FLAG_USE_IR))
+    if (!(translationUnit->compileRequest->compileFlags & SLANG_COMPILE_FLAG_USE_IR))
     {
         TypeLegalizationContext typeLegalizationContext;
         typeLegalizationContext.session = entryPoint->compileRequest->mSession;
@@ -7781,37 +7757,16 @@ String emitEntryPoint(
 
         typeLegalizationContext.irModule = irModule;
 
-        List<Decl*> astDecls;
-        if(translationUnit->compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING)
-        {
-            // We are in case (2b), where the main module is in unchecked
-            // HLSL/GLSL that we need to "rewrite," and any library code
-            // is in Slang that will need to be cross-compiled via the IR.
+        // We are in case (3), where all of the code is in Slang, and
+        // has already been lowered to IR as part of the front-end
+        // compilation work. We thus start by cloning any code needed
+        // by the entry point over to our fresh IR module.
 
-            // We first need to walk the AST part of the code to look
-            // for any places where it references declarations that
-            // are implemented in the IR, so that we can be sure to
-            // generate suitable IR code for them.
+        sharedContext.isFullIRMode = true;
 
-            findDeclsUsedByASTEntryPoint(
-                entryPoint,
-                target,
-                irSpecializationState,
-                astDecls);
-        }
-        else
-        {
-            // We are in case (3), where all of the code is in Slang, and
-            // has already been lowered to IR as part of the front-end
-            // compilation work. We thus start by cloning any code needed
-            // by the entry point over to our fresh IR module.
-
-            sharedContext.isFullIRMode = true;
-
-            specializeIRForEntryPoint(
-                irSpecializationState,
-                entryPoint);
-        }
+        specializeIRForEntryPoint(
+            irSpecializationState,
+            entryPoint);
 
         // If the user specified the flag that they want us to dump
         // IR, then do it here, for the target-specific, but
@@ -7853,29 +7808,6 @@ String emitEntryPoint(
 #endif
 
         LoweredEntryPoint lowered;
-        if(translationUnit->compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING)
-        {
-            // In the (2b) case, once we have legalized the IR code,
-            // we now need to go in and legalize the AST code.
-            // This order is important because when referring to a variable
-            // that is defined in the IR, we need to legalize it first (which
-            // might split it into many decls) before we can legalize an AST
-            // expression that references that decl (which will also need
-            // to get split).
-            //
-            // We don't have to worry about references in the other direction;
-            // we don't allow the user to define something in unchecked AST
-            // code and then use it from the IR shader library.
-
-            lowered = lowerEntryPoint(
-                entryPoint,
-                programLayout,
-                target,
-                &sharedContext.extensionUsageTracker,
-                irSpecializationState,
-                &typeLegalizationContext,
-                astDecls);
-        }
 
         // When emitting IR-based declarations, we wnat to
         // track which decls have already been lowered.
@@ -7888,22 +7820,6 @@ String emitEntryPoint(
         // TODO: do we want to emit directly from IR, or translate the
         // IR back into AST for emission?
         visitor.emitIRModule(&context, irModule);
-
-        // If we are in case (2b) and the user *also* has AST-based code
-        // that we need to output, we'll do it now.
-        if (translationUnit->compileFlags & SLANG_COMPILE_FLAG_NO_CHECKING)
-        {
-            // First make sure that we've emitted any types that were declared
-            // in the IR, but then subsequently only used by the AST
-            for( auto decl : lowered.irDecls )
-            {
-                visitor.emitIRUsedDeclRef(&context, makeDeclRef(decl));
-            }
-
-            visitor.EmitDeclsInContainer(lowered.program);
-        }
-
-        // TODO: need to clean up the IR module here
     }
 
     String code = sharedContext.sb.ProduceString();

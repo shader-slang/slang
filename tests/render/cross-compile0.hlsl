@@ -6,11 +6,10 @@
 // but the two will share a dependency on a file of
 // pure Spire code that provides the actual shading logic.
 
+#if defined(__HLSL__)
 
 // Pull in Spire code depdendency using extended syntax:
 __import cross_compile0;
-
-#if defined(__HLSL__)
 
 cbuffer Uniforms
 {
@@ -88,6 +87,24 @@ FragmentStageOutput fragmentMain(FragmentStageInput input)
 #elif defined(__GLSL__)
 
 #version 420
+
+float saturate(float x)
+{
+    return clamp(x, float(0), float(1));	
+}
+
+vec3 transformColor(vec3 color)
+{
+	vec3 result;
+
+	result.x = sin(20.0 * (color.x + color.y));
+	result.y = saturate(cos(color.z * 30.0));
+	result.z = sin(color.x * color.y * color.z * 100.0);
+
+	result = 0.5 * (result + 1);
+
+	return result;
+}
 
 uniform Uniforms
 {

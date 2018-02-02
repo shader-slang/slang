@@ -1,5 +1,5 @@
 #version 450
-//TEST:COMPARE_GLSL:
+//DISABLED_TEST:COMPARE_GLSL:
 
 // Confirm implementation of GitHub issue #84
 

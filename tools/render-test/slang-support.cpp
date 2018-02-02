@@ -34,13 +34,13 @@ struct SlangShaderCompilerWrapper : public ShaderCompiler
 		}
 		spAddPreprocessorDefine(slangRequest, langDefine, "1");
 
-        // If we aren't dealing with true Slang input, then don't enable checking.
-        //
-        // Note: do this before using command-line arguments to set flags, so
-        // that we don't accidentally clobber other flags.
-        if (sourceLanguage != SLANG_SOURCE_LANGUAGE_SLANG)
+        // If we are dealing with GLSL input, then we need to set up
+        // Slang to pass through to glslang instead of actually running
+        // the compiler (this is a workaround to make direct comparisons
+        // possible)
+        if (sourceLanguage == SLANG_SOURCE_LANGUAGE_GLSL)
         {
-            spSetCompileFlags(slangRequest, SLANG_COMPILE_FLAG_NO_CHECKING);
+            spSetPassThrough(slangRequest, SLANG_PASS_THROUGH_GLSLANG);
         }
 
         // Preocess any additional command-line options specified for Slang using

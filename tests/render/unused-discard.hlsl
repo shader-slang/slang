@@ -7,10 +7,10 @@
 // pure Spire code that provides the actual shading logic.
 
 
+#if defined(__HLSL__)
+
 // Pull in Spire code depdendency using extended syntax:
 __import unused_discard;
-
-#if defined(__HLSL__)
 
 cbuffer Uniforms
 {
@@ -91,6 +91,24 @@ FragmentStageOutput fragmentMain(FragmentStageInput input)
 
 #version 420
 
+float saturate(float x)
+{
+    return clamp(x, float(0), float(1));	
+}
+
+vec3 transformColor(vec3 color)
+{
+	vec3 result;
+
+	result.x = sin(20.0 * (color.x + color.y));
+	result.y = saturate(cos(color.z * 30.0));
+	result.z = sin(color.x * color.y * color.z * 100.0);
+
+	result = 0.5 * (result + 1);
+
+	return result;
+}
+
 uniform Uniforms
 {
 	mat4x4 modelViewProjection;
@@ -128,6 +146,12 @@ void main()
 #endif
 
 #ifdef __GLSL_FRAGMENT__
+
+void doConditionalDiscard(vec3 color)
+{
+	if(color.x < 0.5)
+		discard;
+}
 
 V2F(in)
 

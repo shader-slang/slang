@@ -1,4 +1,5 @@
 //TEST_IGNORE_FILE:
+#version 420
 
 layout(binding = 0)
 uniform C

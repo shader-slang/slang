@@ -264,9 +264,7 @@ struct OptionsParser
 //                else if (argStr == "-symbo")
 //                    options.SymbolToCompile = tryReadCommandLineArgument(arg, &argCursor, argEnd);
                 //else
-                if (argStr == "-no-checking")
-                    flags |= SLANG_COMPILE_FLAG_NO_CHECKING;
-                else if(argStr == "-split-mixed-types" )
+                if(argStr == "-split-mixed-types" )
                 {
                     flags |= SLANG_COMPILE_FLAG_SPLIT_MIXED_TYPES;
                 }

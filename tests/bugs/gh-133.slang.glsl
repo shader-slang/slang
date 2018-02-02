@@ -6,6 +6,7 @@ struct Fragment
 	uint foo;
 };
 
+layout(binding = 0)
 uniform U
 {
 	uint bar;

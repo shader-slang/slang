@@ -1,6 +1,4 @@
-//TEST(compute):HLSL_COMPUTE:-xslang -no-checking
 //TEST(compute):COMPARE_COMPUTE:-xslang -use-ir
-//TEST(compute):HLSL_COMPUTE:-xslang -no-checking -xslang -use-ir
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out
 

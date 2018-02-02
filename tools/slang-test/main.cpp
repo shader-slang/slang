@@ -30,6 +30,10 @@ enum OutputMode
     // need to output test results in a way that the AppVeyor
     // environment can pick up and display.
     kOutputMode_AppVeyor,
+
+    // We currently don't specialize for Travis, but maybe
+    // we should.
+    kOutputMode_Travis,
 };
 
 struct TestCategory;
@@ -153,6 +157,7 @@ void parseOptions(int* argc, char** argv)
         }
         else if( strcmp(arg, "-travis") == 0 )
         {
+            options.outputMode = kOutputMode_Travis;
             options.dumpOutputOnFailure = true;
         }
         else if( strcmp(arg, "-category") == 0 )
@@ -839,13 +844,14 @@ TestResult runCrossCompilerTest(TestInput& input)
 
     actualSpawner.pushArgument(filePath);
     expectedSpawner.pushArgument(filePath + ".glsl");
+    expectedSpawner.pushArgument("-pass-through");
+    expectedSpawner.pushArgument("glslang");
 
     for( auto arg : input.testOptions->args )
     {
         actualSpawner.pushArgument(arg);
         expectedSpawner.pushArgument(arg);
     }
-    expectedSpawner.pushArgument("-no-checking");
 
     if (spawnAndWait(outputStem, expectedSpawner) != kOSError_None)
     {
@@ -1051,8 +1057,6 @@ TestResult doGLSLComparisonTestRun(
         spawner.pushArgument("-pass-through");
         spawner.pushArgument(passThrough);
     }
-
-    spawner.pushArgument("-no-checking");
 
     spawner.pushArgument("-target");
     spawner.pushArgument("spirv-assembly");
@@ -1476,6 +1480,8 @@ void handleTestResult(
     String const&   testName,
     TestResult      testResult)
 {
+    context->totalTestCount++;
+
     switch( testResult )
     {
     case kTestResult_Fail:
@@ -1499,7 +1505,7 @@ void handleTestResult(
 //    printf("OUTPUT_MODE: %d\n", options.outputMode);
     switch( options.outputMode )
     {
-    case kOutputMode_Default:
+    default :
         {
             char const* resultString = "UNEXPECTED";
             switch( testResult )
@@ -1511,7 +1517,6 @@ void handleTestResult(
                 assert(!"unexpected");
                 break;
             }
-
             printf("%s test: '%S'\n", resultString, testName.ToWString().begin());
         }
         break;
@@ -1556,10 +1561,6 @@ void handleTestResult(
 #endif
             }
         }
-        break;
-
-    default:
-        assert(!"unexpected");
         break;
     }
 }
@@ -1644,9 +1645,6 @@ void runTestsOnFile(
         {
             continue;
         }
-
-        context->totalTestCount++;
-
 
         String outputStem = filePath;
         if(subTestIndex != 0)

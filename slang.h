@@ -123,7 +123,7 @@ extern "C"
     enum
     {
          /** Disable semantic checking as much as possible. */
-        SLANG_COMPILE_FLAG_NO_CHECKING          = 1 << 0,
+//        SLANG_COMPILE_FLAG_NO_CHECKING          = 1 << 0,
 
         /* Split apart types that contain a mix of resource and non-resource data */
         SLANG_COMPILE_FLAG_SPLIT_MIXED_TYPES    = 1 << 1,
