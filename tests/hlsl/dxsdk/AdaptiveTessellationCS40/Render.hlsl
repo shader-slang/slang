@@ -1,4 +1,4 @@
-//TEST(smoke):COMPARE_HLSL:-no-mangle -use-ir -profile vs_4_0 -entry RenderBaseVS -profile ps_4_0 -entry RenderPS -target dxbc-assembly
+//TEST(smoke):COMPARE_HLSL:-no-mangle -profile vs_4_0 -entry RenderBaseVS -profile ps_4_0 -entry RenderPS -target dxbc-assembly
 //--------------------------------------------------------------------------------------
 // File: Render.hlsl
 //

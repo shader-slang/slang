@@ -1,4 +1,4 @@
-//TEST:SIMPLE:-use-ir -dump-ir -profile cs_5_0 -entry main
+//TEST:SIMPLE:-dump-ir -profile cs_5_0 -entry main
 
 #define GROUP_THREAD_COUNT 64
 

@@ -254,12 +254,6 @@ void CompileRequest::generateIR()
     // for all of the declarations in the translation
     // units that were loaded.
 
-    // At the moment, use of the IR is not enabled by
-    // default, so we will skip this step unless
-    // the flag was set to op in.
-    if (!(compileFlags & SLANG_COMPILE_FLAG_USE_IR))
-        return;
-
     // Each translation unit is its own little world
     // for code generation (we are not trying to
     // replicate the GLSL linkage model), and so
@@ -529,7 +523,7 @@ RefPtr<ModuleDecl> CompileRequest::loadModule(
     // semantic checking to be enabled.
     //
     // TODO: decide which options, if any, should be inherited.
-    translationUnit->compileFlags = this->compileFlags & (SLANG_COMPILE_FLAG_USE_IR);
+    translationUnit->compileFlags = 0;
 
     RefPtr<SourceFile> sourceFile = getSourceManager()->allocateSourceFile(path, source);
 

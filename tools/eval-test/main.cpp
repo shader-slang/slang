@@ -38,10 +38,6 @@ int main(
     SlangSession* session = spCreateSession(nullptr);
     SlangCompileRequest* request = spCreateCompileRequest(session);
 
-    spSetCompileFlags(
-        request,
-        SLANG_COMPILE_FLAG_USE_IR);
-
     spSetOutputContainerFormat(
         request,
         SLANG_CONTAINER_FORMAT_SLANG_MODULE);

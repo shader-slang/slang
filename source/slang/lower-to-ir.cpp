@@ -1327,6 +1327,35 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                 }
             }
         }
+        else if (auto vectorType = type->As<VectorExpressionType>())
+        {
+            auto elementType = lowerType(context, vectorType->elementType);
+
+            UInt elementCount = (UInt) GetIntVal(vectorType->elementCount);
+            UInt argCounter = 0;
+
+            List<IRValue*> elements;
+            for (UInt ee = 0; ee < elementCount; ++ee)
+            {
+                UInt argIndex = argCounter++;
+                if (argIndex < argCount)
+                {
+                    auto argExpr = expr->args[argIndex];
+                    LoweredValInfo argVal = lowerRValueExpr(context, argExpr);
+
+                    elements.Add(getSimpleVal(context, argVal));
+                }
+                else
+                {
+                    SLANG_UNEXPECTED("need to default-initialize vector elements");
+                }
+            }
+
+            assign(context, val, LoweredValInfo::simple(getBuilder()->emitConstructorInst(
+                lowerSimpleType(context, vectorType),
+                elementCount,
+                elements.Buffer())));
+        }
         else if (auto declRefType = type->As<DeclRefType>())
         {
             DeclRef<Decl> declRef = declRefType->declRef;
@@ -2774,6 +2803,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return LoweredValInfo();
     }
 
+    LoweredValInfo visitSyntaxDecl(SyntaxDecl* /*decl*/)
+    {
+        return LoweredValInfo();
+    }
+
     LoweredValInfo visitTypeDefDecl(TypeDefDecl * decl)
     {
         return LoweredValInfo::simple(context->irBuilder->getTypeVal(decl->type.type));
@@ -3736,7 +3770,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     {
         // TODO: Should this just always visit/lower the inner decl?
 
-        if (auto innerFuncDecl = genDecl->inner->As<FuncDecl>())
+        if (auto innerFuncDecl = genDecl->inner->As<FunctionDeclBase>())
             return lowerFuncDecl(innerFuncDecl);
         else if (auto innerStructDecl = genDecl->inner->As<StructDecl>())
         {
@@ -4102,11 +4136,6 @@ IRModule* lowerEntryPointToIR(
 IRModule* generateIRForTranslationUnit(
     TranslationUnitRequest* translationUnit)
 {
-    // If the user did not opt into IR usage, then don't compile IR
-    // for the translation unit.
-    if (!(translationUnit->compileFlags & SLANG_COMPILE_FLAG_USE_IR))
-        return nullptr;
-
     auto compileRequest = translationUnit->compileRequest;
 
     SharedIRGenContext sharedContextStorage;

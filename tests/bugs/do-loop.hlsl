@@ -1,4 +1,4 @@
-//TEST:COMPARE_HLSL: -profile vs_5_0 -target dxbc-assembly
+//TEST_DISABLED:COMPARE_HLSL: -profile vs_5_0 -target dxbc-assembly
 
 // Check output for `do` loops
 

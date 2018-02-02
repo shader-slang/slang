@@ -1,4 +1,4 @@
-//TEST(smoke,compute):COMPARE_COMPUTE:-xslang -use-ir
+//TEST(smoke,compute):COMPARE_COMPUTE:
 //TEST_INPUT: cbuffer(data=[0.5 0 0 0 1.0], stride=4):dxbinding(0),glbinding(0)
 //TEST_INPUT: cbuffer(data=[1.0], stride=4):dxbinding(1),glbinding(1)
 //TEST_INPUT: Texture2D(size=4, content = zero) : dxbinding(0),glbinding(0)

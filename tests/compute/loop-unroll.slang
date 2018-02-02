@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE:-xslang -use-ir
+//TEST(compute):COMPARE_COMPUTE:
 
 //TEST_INPUT:ubuffer(data=[0 1 2 3], stride=4):dxbinding(0),glbinding(0),out
 //TEST_INPUT:ubuffer(data=[1 2 3 0], stride=4):dxbinding(1),glbinding(1)

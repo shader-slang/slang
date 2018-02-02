@@ -43,7 +43,6 @@
     <ClInclude Include="bytecode.h" />
     <ClInclude Include="vm.h" />
     <ClInclude Include="mangle.h" />
-    <ClInclude Include="ast-legalize.h" />
     <ClInclude Include="legalize-types.h" />
   </ItemGroup>
   <ItemGroup>
@@ -73,7 +72,6 @@
     <ClCompile Include="mangle.cpp" />
     <ClCompile Include="dxc-support.cpp" />
     <ClCompile Include="ir-legalize-types.cpp" />
-    <ClCompile Include="ast-legalize.cpp" />
     <ClCompile Include="legalize-types.cpp" />
   </ItemGroup>
   <ItemGroup>

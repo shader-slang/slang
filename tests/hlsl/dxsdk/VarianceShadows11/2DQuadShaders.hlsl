@@ -1,4 +1,4 @@
-//TEST:COMPARE_HLSL: -target dxbc-assembly -profile vs_4_0 -entry VSMain -profile ps_4_0 -entry PSBlurX -entry PSBlurY
+//TEST:COMPARE_HLSL:-no-mangle -target dxbc-assembly -profile vs_4_0 -entry VSMain -profile ps_4_0 -entry PSBlurX -entry PSBlurY
 //--------------------------------------------------------------------------------------
 // File: Skinning10.fx
 //

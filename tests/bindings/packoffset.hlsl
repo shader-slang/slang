@@ -1,4 +1,4 @@
-//TEST:COMPARE_HLSL:-no-mangle -use-ir -target dxbc-assembly -profile ps_4_0 -entry main
+//TEST:COMPARE_HLSL:-no-mangle -target dxbc-assembly -profile ps_4_0 -entry main
 
 // Let's make sure we generate correct output in cases
 // where there are non-trivial `packoffset`s needed

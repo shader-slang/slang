@@ -347,6 +347,67 @@ static const struct {
 };
 static const int kBaseTextureAccessLevelCount = sizeof(kBaseTextureAccessLevels) / sizeof(kBaseTextureAccessLevels[0]);
 
+// Declare the GLSL types here for compatibility...
+//
+// TODO: The stdlib should include a module that declares the GLSL types, to keep
+// them separate...
+for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
+{
+    char const* name = kBaseTextureTypes[tt].name;
+    TextureType::Shape baseShape = kBaseTextureTypes[tt].baseShape;
+
+    for (int isArray = 0; isArray < 2; ++isArray)
+    {
+        // Arrays of 3D textures aren't allowed
+        if (isArray && baseShape == TextureType::Shape3D) continue;
+
+        for (int isMultisample = 0; isMultisample < 2; ++isMultisample)
+        for (int accessLevel = 0; accessLevel < kBaseTextureAccessLevelCount; ++accessLevel)
+        {
+            auto access = kBaseTextureAccessLevels[accessLevel].access;
+
+            // TODO: any constraints to enforce on what gets to be multisampled?
+
+            unsigned flavor = baseShape;
+            if (isArray)		flavor |= TextureType::ArrayFlag;
+            if (isMultisample)	flavor |= TextureType::MultisampleFlag;
+//                        if (isShadow)		flavor |= TextureType::ShadowFlag;
+
+            flavor |= (access << 8);
+
+            // emit a generic signature
+            // TODO: allow for multisample count to come in as well...
+            sb << "__generic<T = float4> ";
+
+            sb << "__magic_type(TextureSampler," << int(flavor) << ")\n";
+            sb << "struct Sampler";
+            sb << kBaseTextureAccessLevels[accessLevel].name;
+            sb << name;
+            if (isMultisample) sb << "MS";
+            if (isArray) sb << "Array";
+//                        if (isShadow) sb << "Shadow";
+            sb << "\n{\n";
+            sb << "__specialized_for_target(glsl)\n";
+			sb << "__init(";
+			sb << kBaseTextureAccessLevels[accessLevel].name;
+            sb << name;
+            if (isMultisample) sb << "MS";
+            if (isArray) sb << "Array";
+			sb << "<T> t, ";
+			sb << "SamplerState s);\n";
+			sb << "};\n";
+
+            sb << "__specialized_for_target(glsl)\n";
+            sb << "T texture<T>(Sampler";
+			sb << kBaseTextureAccessLevels[accessLevel].name;
+            sb << name;
+            if (isMultisample) sb << "MS";
+            if (isArray) sb << "Array";
+			sb << "<T> t, float" << kBaseTextureTypes[tt].coordCount + isArray << " location);\n";
+		}
+	}
+}
+
 for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 {
     char const* name = kBaseTextureTypes[tt].name;
@@ -585,13 +646,25 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
             {
                 // `Sample()`
 
-                sb << "__target_intrinsic(glsl, \"texture($p, $1)\")\n";
+//                sb << "__target_intrinsic(glsl, \"texture($p, $1)\")\n";
 
                 // TODO: only enable if IR is being used?
 //                sb << "__intrinsic_op(sample)\n";
 
                 sb << "T Sample(SamplerState s, ";
                 sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location);\n";
+
+                // Specialized definition for GLSL
+                sb << "__specialized_for_target(glsl)\n";
+                sb << "T Sample(SamplerState s, ";
+                sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location) {\n";
+                sb << "    return texture<T>(Sampler";
+				sb << kBaseTextureAccessLevels[accessLevel].name;
+				sb << name;
+				if (isMultisample) sb << "MS";
+				if (isArray) sb << "Array";
+				sb << "<T>(this, s), location);\n";
+                sb << "}\n";
 
                 if( baseShape != TextureType::ShapeCube )
                 {

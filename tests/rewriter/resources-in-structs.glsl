@@ -1,5 +1,5 @@
 #version 450 core
-//TEST:COMPARE_GLSL:-profile glsl_fragment
+//TEST_DISABLED:COMPARE_GLSL:-profile glsl_fragment
 
 #if defined(__SLANG__)
 

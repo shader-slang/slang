@@ -1,4 +1,4 @@
-//TEST:CROSS_COMPILE: -profile ps_5_0 -entry main -target spirv-assembly
+//TEST_DISABLED:CROSS_COMPILE: -profile ps_5_0 -entry main -target spirv-assembly
 
 // Confirm that order of arguments to matrix-vector
 // multiplication gets reversed when generating GLSL.

@@ -1,4 +1,8 @@
-//TEST:CROSS_COMPILE: -profile vs_5_0 -entry main -target spirv-assembly
+//TEST_DISABLED:CROSS_COMPILE: -profile vs_5_0 -entry main -target spirv-assembly
+
+// Note: disabled until we add a more complete IR solution
+// for translating HLSL semantics into equivalent GLSL
+// builtin variables.
 
 struct VS_OUT
 {

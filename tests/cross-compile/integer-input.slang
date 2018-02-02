@@ -1,4 +1,4 @@
-//TEST:CROSS_COMPILE: -profile ps_5_0 -entry main -target spirv-assembly
+//TEST_DISABLED:CROSS_COMPILE: -profile ps_5_0 -entry main -target spirv-assembly
 
 struct VS_OUT
 {

@@ -1,4 +1,4 @@
-//TEST:COMPARE_HLSL: -target dxbc-assembly -profile ps_4_0 -entry PSMain
+//TEST:COMPARE_HLSL:-no-mangle -target dxbc-assembly -profile ps_4_0 -entry PSMain
 //--------------------------------------------------------------------------------------
 // File: BasicHLSL11_PS.hlsl
 //

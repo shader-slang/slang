@@ -1,4 +1,4 @@
-//TEST(smoke,compute):COMPARE_COMPUTE:-xslang -use-ir
+//TEST(smoke,compute):COMPARE_COMPUTE:
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out
 
 // Use interface constraints on a generic parameter

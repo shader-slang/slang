@@ -1,4 +1,4 @@
-//TEST:COMPARE_HLSL: -target dxbc-assembly -profile cs_5_0 -entry main
+//TEST_DISABLED:COMPARE_HLSL:-no-mangle -target dxbc-assembly -profile cs_5_0 -entry main
 
 // Test various cases of implicit type conversion and preference
 // for overload resolution.
