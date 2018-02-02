@@ -19,19 +19,18 @@ Big-picture stuff that is supported:
 * The built-in templated resource types like `Texture2D<T>` with their object-oriented syntax for sampling operations
 * Attributes like `[unroll]` are parsed, and passed along for HLSL/DXBC output, but dropped for other targets
 * `struct` types that contain textures/samplers as well as ordinary uniform data, both as function parameters and in constant buffers
+* The built-in functions up through Shader Model 6.0 (as documented on MSDN) are supported
 
 New Features
 ------------
 
-Right now the Slang language only has one major feature that is different from existing HLSL (that will change over time).
-
 ### Import Declarations
 
-In order to support better software modularity, and also to deal with the issue of how to integrate shader libraries written in Slang into other langauges, Slang introduces an `__import` declaration construct.
+In order to support better software modularity, and also to deal with the issue of how to integrate shader libraries written in Slang into other langauges, Slang introduces an `import` declaration construct.
 
 The basic idea is that if you write a file `foo.slang` like this:
 
-```
+```hlsl
 // foo.slang
 
 float4 someFunc(float4 x) { return x; }
@@ -39,61 +38,217 @@ float4 someFunc(float4 x) { return x; }
 
 you can then import this code into another file in Slang, HLSL, or GLSL:
 
+```hlsl
+// bar.slang
+
+import foo;
+
+float4 someOtherFunc(float4 y) { return someFunc(y); }
 ```
-// bar.glsl
 
-__import foo;
-
-vec4 someOtherFunc(vec4 y) { return someFunc(y); }
-```
-
-The simplest way to think of it is that the `__import foo` declaration instructs the compiler to look for `foo.slang` (in the same search paths it uses for `#include` files), and give an error if it isn't found.
+The simplest way to think of it is that the `import foo` declaration instructs the compiler to look for `foo.slang` (in the same search paths it uses for `#include` files), and give an error if it isn't found.
 If `foo.slang` is found, then the compiler will go ahead and parse and type-check that file, and make any declarations there visible to the original file (`bar.glsl` in this example).
 
-When it comes time to generate output code, Slang will output any declarations from `__import`ed files that were actually used (it skips those that are never referenced), and it will cross-compile them as needed for the chosen target.
+When it comes time to generate output code, Slang will output any declarations from `import`ed files that were actually used (it skips those that are never referenced), and it will cross-compile them as needed for the chosen target.
 
-A few other details worth knowing about `__import` declarations:
+A few other details worth knowing about `import` declarations:
 
-* The name you use on the `__import` line gets translated into a file name with some very simple rules. An underscore (`_`) in the name turns into a dash (`-`) in the file name, and dot separators (`.`) turn into directory seprators (`/`). After these substitutions, `.slang` is added to the end of the name.
+* The name you use on the `import` line gets translated into a file name with some very simple rules. An underscore (`_`) in the name turns into a dash (`-`) in the file name, and dot separators (`.`) turn into directory seprators (`/`). After these substitutions, `.slang` is added to the end of the name.
 
-* If there are multiple `__import` declarations naming the same file, it will only be imported once. This is also true for nested imports.
+* If there are multiple `import` declarations naming the same file, it will only be imported once. This is also true for nested imports.
 
 * Currently importing does not imply any kind of namespacing; all global declarations still occupy a single namespace, and collisions between different imported files (or between a file and the code it imports) are possible. This is a bug.
 
-* If file `A.slang` imports `B.slang`, and then some other file does `__import A;`, then only the names from `A.slang` are brought into scope, not those from `B.slang`. This behavior can be controlled by having `A.slang` use `__exported __import B;` to also re-export the declarations it imports from `B`.
+* If file `A.slang` imports `B.slang`, and then some other file does `import A;`, then only the names from `A.slang` are brought into scope, not those from `B.slang`. This behavior can be controlled by having `A.slang` use `__exported import B;` to also re-export the declarations it imports from `B`.
 
-* An import is *not* like a `#include`, and so the file that does the `__import` can't see preprocessor macros defined in the imported file (and vice versa). Think inf `__import foo;` as closer to `using namspace foo;` in C++ (perhaps without the same baggage).
+* An import is *not* like a `#include`, and so the file that does the `import` can't see preprocessor macros defined in the imported file (and vice versa). Think of `import foo;` as closer to `using namspace foo;` in C++ (perhaps without the same baggage).
 
-On that last point, if you really do want something that is like `__import` but interacts with the preprocessor more like `#include` then you can try using `#import`:
+### Explicit Parameter Blocks
 
+One of the most important new features of modern APIs like Direct3D 12 and Vulkan is an interface for providing shader parameters using efficient *parameter blocks* that can be stored in GPU memory (these are implemented as descritpor tables/sets in D3D12/Vulkan, and "attribute buffers" in Metal).
+However, HLSL and GLSL don't support explicit syntax for parmaeter blocks, and so shader programmers are left to manually pack parameters into blocks either using `register`/`layout` modifiers, or with API-based remapping (in the D3D12 case).
+
+Slang supports a simple and explicit syntax for exploiting parameter blocks:
+
+```hlsl
+struct ViewParams
+{
+	float3 cameraPos;
+	float4x4 viewProj;
+	TextureCube envMap;
+};
+
+ParameterBlock<ViewParams> gViewParams;
 ```
-#import "foo.slang"
-...
+
+In this example, the fields of `gViewParams` will be assigned to registers/bindings in a way that supports allocating them into a single parameter block.
+For example, when generating GLSL for Vulkan, the Slang compiler will generate a single `uniform` block (for `cameraPos` and `viewProj`) and a global `textureCube` for `envMap`, both decorated with the same `layout(set = ...)`.
+
+
+### Interfaces
+
+Slang supports declaring `interface`s that user-defined `struct` types can implement.
+For example, here is a simple interface for light sources:
+
+```hlsl
+// light.slang
+
+struct LightSample { float3 intensity; float3 direction; };
+
+interface ILight
+{
+	LightSample sample(float3 position);
+}
 ```
 
-The `#import` directive is recognized during preprocessing, so macro definitions from the importing file will affect the imported code, and vice versa.
-The rules about multiple imports still apply, though, so only the first `#import` encountered will determine the text that is parsed (be careful).
-Please think of `#import` as a stopgap for when you want the cross-compilation benefits of `__import`, but need to deal with code that depends on macros in the here and now.
+We can now define a simple user type that "conforms to" (implements) the `ILight` interface:
+
+```hlsl
+// point-light.slang
+
+import light;
+
+struct PointLight : ILight
+{
+	float3 position;
+	float3 intensity;
+
+	LightSample sample(float3 hitPos)
+	{
+		float3 delta = hitPos - position;
+		float distance = length(delta);
+
+		LightSample sample;
+		sample.direction = delta / distance;
+		sample.intensity = intensity * falloff(distance);
+		return sample;
+	}
+}
+```
+
+### Generics
+
+Slang supports *generic* declarations, using the commong angle-brack (`<>`) syntax from languages like C#, Java, etc.
+For example, here is a generic function that works with any type of light:
+
+```hlsl
+// diffuse.slang
+import light;
+
+float4 computeDiffuse<L : ILight>( float4 albedo, float3 P, float3 N, L light )
+{
+	LightSample sample = light.sample(P);
+	float nDotL = max(0, dot(N, sample.direction));
+	return albedo * nDotL;
+}
+```
+
+The `computeDiffuse` function works with any type `L` that implements the `ILight` interface.
+Unlike with C++ templates, the `computeDiffuse` function can be compiled and type-checked once (you won't suddenly get unexpected error messages when plugging in a new type).
+
+#### Global-Scope Generic Parameters
+
+Putting generic parameter directly on functions is helpful, but in many cases existing HLSL shaders declare their parameters at global scope.
+For example, we might have a shader that uses a global declaration of material parameters:
+
+```hlsl
+Material gMaterial;
+```
+
+In order to allow such a shader to be converted to use a generic parameter for the material type (to allow for specialization), Slang supports declaring type parameters at the global scope:
+
+```hlsl
+type_param M : IMaterial;
+M gMaterial;
+```
+
+Conceptually, you can think of this syntax as wrapping your entire shader program in a generic with parameter `<M : IMaterial>`.
+This isn't beautiful syntax, but it may help when incrementally porting an existing HLSL codebase to use Slang's features.
+
+### Associated Types
+
+Sometimes it is difficult to define an interface because each type that implements it might need to make its own choice about some intermediate type.
+As a concrete example, suppose we want to define an interface `IMaterial` for material surface shaders, where each material might use its own BRDF.
+We want to support evaluating the *pattern* of the surface separate from the reflectance function.
+
+```hlsl
+// A reflectance function
+interface IBRDF
+{
+	float3 eval(float3 wi, float3 wo);
+}
+struct DisneyBRDF : IBRDF { ... };
+struct KajiyaKay : IBRDF { ... };
+
+// a surface pattern
+interface IMaterial
+{
+	??? evalPattern(float3 position, float2 uv);
+}
+```
+
+What is the type `???` that `evalPattern` should return? We know that it needs to be a type that supports `IBRDF`, but *which* type?
+One material might want to use `DisneyBRDF` while another wants to use `KajiyaKay`.
+
+The solution in Slang, as in modern languages like Swift and Rust, is to use *associated types* to express the depdence of the BRDF type on the material type:
+
+```hlsl
+interface IMaterial
+{
+	associatedtype B : IBRDF;
+	B evalPattern(float3 position, float2 uv);
+}
+
+struct MyCoolMaterial : IMaterial
+{
+	typedef DisneyBRDF B;
+	DisneyBRDF evalPattern(float3 position, float2 uv)
+	{ ... }
+}
+```
+
+Associated types are an advanced concept, and we only recommend using them when they are needed to define a usable interface.
+
 
 Future Extensions
 -----------------
 
-Longer term we would like to make Slang a much more advanced language, and indeed the implementation already has some of the underpinnings for more powerful things.
+### Implicit Generics Syntax
 
-The most important feature we plan to add is support for "constrained generics" as they appear in C#, Rust, and Swift.
-For those of you with a C++ background you could think of this as "templates + concepts", but without many of the rought edges.
+The syntax for generics and interfaces in Slang is currently explicit, but verbose:
 
-Using constrained generics as an underlying mechanism, we then plan to introduce a feature similar in capability to Cg's "interfaces" feature, to allow shaders to express more flexible patterns of composition and dispatch.
+```hlsl
+float4 computeDiffuse<L : ILight>( L light, ... )
+{ ... }
+```
+
+As a future change, we would like to allow using an interface like `ILight` as an ordinary parameter type:
+
+```hlsl
+float4 computeDiffuse( ILight light, ... )
+{ ... }
+```
+
+This simpler syntax would act like "syntactic sugar" for the existing explicit generics syntax, so it would retain all of the important performance properties.
+
+### Returning a Value of Interface Type
+
+While the above dealt with using an interface as a parameter type, we would eventually like to support using an interface as the *return* type of a function:
+
+```hlsl
+ILight getALightSource(Scene scene) { ... }
+```
+
+Implementing this case efficiently is more challenging. In most cases, an associated type can be used instead when an interface return type would be desired.
 
 
 Not Supported
 -------------
 
-Some things are not supported, but probably will be given enough time/resources:
+Some features of the current HLSL language are not supported, but probably will be given enough time/resources:
 
 * Local variables of texture/sampler type (or that contain these)
 * Matrix swizzles
-* Object-oriented extensions for putting methods inside `struct` types
 * Explicit `packoffset` annotations on members of `cbuffer`s
 
 Some things from HLSL are *not* planned to be supported, unless there is significant outcry from users:

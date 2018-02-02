@@ -2,51 +2,26 @@
 
 [![AppVeyor build status](https://ci.appveyor.com/api/projects/status/3jptgsry13k6wdwp/branch/master?svg=true)](https://ci.appveyor.com/project/shader-slang/slang/branch/master) [![Travis build status](https://travis-ci.org/shader-slang/slang.svg?branch=master)](https://travis-ci.org/shader-slang/slang)
 
-Slang is a library and a stand-alone compiler for working with real-time shader code.
-It can be used with existing HLSL or GLSL code, but also supports a new HLSL-like shading language, also called Slang.
-The library provides a variety of services that support applications in putting together their own shader compilation workflows.
+Slang is a shading language that extends HLSL with new capabilities for building modular, extensible, and high-performance real-time shading systems.
+This repository provides a command-line compiler and a plain C API for loading, compiling, and reflecting shader code in Slang or plain HLSL.
 
 Using Slang you can:
 
-* Take ordinary HLSL or GLSL code that neglects to include all those tedious `register` and `layout` bindings, and transform it into code that includes explicit bindings on every shader parameter. This frees you to write simple and clean code, while still getting completely deterministic binding locations.
+* Compile your HLSL or Slang code to DX bytecode, SPIR-V, or plain source code in HLSL or GLSL (DXIL support is planned).
 
-* Get full reflection information about the parameters of your shader code, with a consistent API interface across GLSL, HLSL, and Slang code. Slang doesn't silently drop unused or "dead" shader parameters from the reflection data, so you can always see the full picture.
+* Get full reflection information about the parameters of your shader code, with a consistent interface no matter the target graphics API. Slang doesn't silently drop unused or "dead" shader parameters from the reflection data, so you can always see the full picture.
 
-* Cross-compile shader code written in the HLSL-like Slang shading language to HLSL, GLSL, DX bytecode, or SPIR-V. You can even write ordinary HLSL or GLSL by hand that makes use of libraries of code written in Slang.
+* Take ordinary HLSL code that neglects to include all those tedious `register` and `layout` bindings, and transform it into code that includes explicit bindings on every shader parameter. This frees you to write simple and clean code, while still getting completely deterministic binding locations.
+
+* Write shading code that uses first-class support for modules, interfaces, and generics to build clean and reusable shader libraries.
 
 ## Getting Started
 
-There are several ways that you can get started using Slang, depending on how complex your application's needs are.
+The fastest way to get started with Slang is to use a pre-built binary package, available through GitHub [releases](https://github.com/shader-slang/slang/releases).
+There are packages built for 32- and 64-bit Windows, as well as 64-bit Ubuntu.
+A binary release includes the command-line `slangc` compiler, a shared library for the compiler, and the `slang.h` header.
 
-Right now Slang only supports Windows builds (32- and 64-bit).
-
-### Binary releases
-
-Pre-built binary packages for the stand-alone Slang compiler and a DLL of the Slang library are available through GitHub [releases](https://github.com/shader-slang/slang/releases).
-
-### Building from source
-
-If you would like to build Slang from source, then clone [this](https://github.com/shader-slang/slang) repository, and then run:
-
-    git submodule update --init
-
-Next, open `slang.sln` and build your desired platform/configuration.
-
-### Integrating the source into your build
-
-If you want to statically link Slang into your application, instead of having to deal with a dynamic library, then the easiset option is to just integrate Slang into your build.
-
-First, clone the Slang repostiory (or download a source [release](https://github.com/shader-slang/slang/releases)) and add the root folder of the slang repository/release to your include path.
-Then in one `.cpp` file in your project, write:
-
-```c++
-#define SLANG_INCLUDE_IMPLEMENTATION
-#include <slang.h>
-```
-
-This causes the `slang.h` header to `#include` all the source files that make up the Slang compiler implementation.
-
-Note that this option does *not* currently include support for generating SPIR-V output, unless you build the `slang-glslang` dynamic library separately.
+If you would like to build Slang from source, please consult the instructions [here](docs/building.md).
 
 ## Documentation
 
@@ -71,7 +46,7 @@ Major limitations to be aware of (beyond everything files in the issue tracker):
 
 * Slang-to-GLSL cross-compilation only supports vertex, fragment, and compute shaders. Geometry and tessellation shader cross-compilation is not yet implemented.
 
-* The Slang front-end does best-effort checking of HLSL input, and only supports very minimal checking of GLSL. When using these languages, the `-no-checking` option can be used to allow Slang to work with these files even when it gets confused by constructs it doesn't support.
+* The Slang front-end does best-effort checking of HLSL input, but it is challenging to achieve 100% compatibility. Bug reports and pull requests related to HLSL feature support are welcome.
 
 * Translations from Slang/HLSL constructs to GLSL equivalents has been done on as as-needed basis, so it is likely that new users will run into unimplemented cases.
 
@@ -92,7 +67,6 @@ The Slang code itself is under the MIT license (see [LICSENSE](LICENSE)).
 The Slang projet can be compiled to use the [`glslang`](https://github.com/KhronosGroup/glslang) project as a submodule (under `external/glslang`), and `glslang` is under a BSD licesnse.
 
 The Slang tests (which are not distributed with source/binary releases) include example shaders extracted from:
-* A [repository](https://github.com/SaschaWillems/Vulkan) of Vulkan GLSL shaders by Sascha Willems, which are under the MIT license
 * Sample HLSL shaders from the Microsoft DirectX SDK, which has its own licesnse
 
-Some of the Slang examples and tests use the `stb_imgae` and `stb_image_write` libraries (under `external/stb`) which have been placed in the public domain by their author(s).
+Some of the Slang examples and tests use the `stb_image` and `stb_image_write` libraries (under `external/stb`) which have been placed in the public domain by their author(s).
