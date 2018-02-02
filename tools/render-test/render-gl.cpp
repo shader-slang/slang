@@ -453,7 +453,7 @@ public:
         auto programID = glCreateProgram();
 		if (request.computeShader.name)
 		{
-			auto computeShaderID = loadShader(GL_COMPUTE_SHADER, request.computeShader.source.text);
+			auto computeShaderID = loadShader(GL_COMPUTE_SHADER, request.computeShader.source.dataBegin);
 
 			glAttachShader(programID, computeShaderID);
 
@@ -464,8 +464,8 @@ public:
 		}
 		else
 		{
-			auto vertexShaderID = loadShader(GL_VERTEX_SHADER, request.vertexShader.source.text);
-			auto fragmentShaderID = loadShader(GL_FRAGMENT_SHADER, request.fragmentShader.source.text);
+			auto vertexShaderID = loadShader(GL_VERTEX_SHADER, request.vertexShader.source.dataBegin);
+			auto fragmentShaderID = loadShader(GL_FRAGMENT_SHADER, request.fragmentShader.source.dataBegin);
 
 			glAttachShader(programID, vertexShaderID);
 			glAttachShader(programID, fragmentShaderID);

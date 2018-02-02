@@ -8,21 +8,24 @@ namespace renderer_test {
 typedef intptr_t Int;
 typedef uintptr_t UInt;
 
-enum class Mode
+enum class RendererID
+{
+    D3D11,
+    D3D12,
+    GL,
+    VK,
+};
+
+enum class InputLanguageID
 {
     // Slang being used as an HLSL-ish compiler
     Slang,
 
     // Raw HLSL or GLSL input, bypassing Slang
-    HLSL,
-    GLSL,
+    Native,
 
     // Raw HLSL or GLSL input, passed through the Slang rewriter
-    HLSLRewrite,
-    GLSLRewrite,
-
-    // Slang/HLSL input -> GLSL output
-    GLSLCrossCompile,
+    NativeRewrite
 };
 
 enum
@@ -44,7 +47,9 @@ struct Options
     char const* sourcePath = nullptr;
     char const* outputPath = nullptr;
 	ShaderProgramType shaderType = ShaderProgramType::Graphics;
-    Mode mode = Mode::Slang;
+
+    RendererID rendererID;
+    InputLanguageID inputLanguageID = InputLanguageID::Slang;
 
     char const* slangArgs[kMaxSlangArgs];
     int slangArgCount = 0;

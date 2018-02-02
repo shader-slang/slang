@@ -4,6 +4,7 @@
 #include "render.h"
 #include "render-d3d11.h"
 #include "render-gl.h"
+#include "render-vk.h"
 #include "slang-support.h"
 #include "shader-input-layout.h"
 #include <stdio.h>
@@ -98,7 +99,8 @@ Error initializeShaders(
 
     ShaderCompileRequest::SourceInfo sourceInfo;
     sourceInfo.path = sourcePath;
-    sourceInfo.text = sourceText;
+    sourceInfo.dataBegin = sourceText;
+    sourceInfo.dataEnd = sourceText + sourceSize;
 
     ShaderCompileRequest compileRequest;
     compileRequest.source                   = sourceInfo;
@@ -322,18 +324,28 @@ int main(
 
 
     Renderer* renderer = nullptr;
-    switch( gOptions.mode )
+    SlangSourceLanguage nativeLanguage = SLANG_SOURCE_LANGUAGE_UNKNOWN;
+    SlangCompileTarget slangTarget = SLANG_TARGET_NONE;
+    switch( gOptions.rendererID )
     {
-    case Mode::Slang:
-    case Mode::HLSL:
-    case Mode::HLSLRewrite:
+    case RendererID::D3D11:
         renderer = createD3D11Renderer();
+        slangTarget = SLANG_HLSL;
+        nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
         break;
 
-    case Mode::GLSL:
-    case Mode::GLSLRewrite:
-    case Mode::GLSLCrossCompile:
+    // TODO: `RendererID::D3D12`
+
+    case RendererID::GL:
         renderer = createGLRenderer();
+        slangTarget = SLANG_GLSL;
+        nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;
+        break;
+
+    case RendererID::VK:
+        renderer = createVKRenderer();
+        slangTarget = SLANG_SPIRV;
+        nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;
         break;
 
     default:
@@ -345,22 +357,14 @@ int main(
     renderer->initialize(windowHandle);
 
     auto shaderCompiler = renderer->getShaderCompiler();
-    switch( gOptions.mode )
+    switch( gOptions.inputLanguageID )
     {
-    case Mode::Slang:
-        shaderCompiler = createSlangShaderCompiler(shaderCompiler, SLANG_SOURCE_LANGUAGE_SLANG, SLANG_HLSL);
+    case InputLanguageID::Slang:
+        shaderCompiler = createSlangShaderCompiler(shaderCompiler, SLANG_SOURCE_LANGUAGE_SLANG, slangTarget);
         break;
 
-    case Mode::HLSLRewrite:
-        shaderCompiler = createSlangShaderCompiler(shaderCompiler, SLANG_SOURCE_LANGUAGE_HLSL, SLANG_HLSL);
-        break;
-
-    case Mode::GLSLRewrite:
-        shaderCompiler = createSlangShaderCompiler(shaderCompiler, SLANG_SOURCE_LANGUAGE_GLSL, SLANG_GLSL);
-        break;
-
-    case Mode::GLSLCrossCompile:
-        shaderCompiler = createSlangShaderCompiler(shaderCompiler, SLANG_SOURCE_LANGUAGE_SLANG, SLANG_GLSL);
+    case InputLanguageID::NativeRewrite:
+        shaderCompiler = createSlangShaderCompiler(shaderCompiler, nativeLanguage, slangTarget);
         break;
 
     default:
@@ -397,9 +401,6 @@ int main(
 		{
 			// Whenver we don't have Windows events to process,
 			// we render a frame.
-			static const float kClearColor[] = { 0.25, 0.25, 0.25, 1.0 };
-			renderer->setClearColor(kClearColor);
-			renderer->clearFrame();
 
 			if (gOptions.shaderType == ShaderProgramType::Compute)
 			{
@@ -407,6 +408,10 @@ int main(
 			}
 			else
 			{
+                static const float kClearColor[] = { 0.25, 0.25, 0.25, 1.0 };
+                renderer->setClearColor(kClearColor);
+                renderer->clearFrame();
+
 				renderFrameInner(renderer);
 			}
 			// If we are in a mode where output is requested, we need to snapshot the back buffer here

@@ -33,6 +33,12 @@
     <ClCompile Include="shader-input-layout.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="render-vk.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="render-d3d12.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="options.h">
@@ -54,6 +60,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="shader-input-layout.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="render-vk.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="render-d3d12.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -4513,22 +4513,178 @@ emitDeclImpl(decl, nullptr);
     }
 
     String getGLSLSystemValueName(
+        IRValue*    varDecl,
         VarLayout*  varLayout)
     {
-        auto semanticName = varLayout->systemValueSemantic;
-        semanticName = semanticName.ToLower();
+        auto semanticNameSpelling = varLayout->systemValueSemantic;
+        auto semanticName = semanticNameSpelling.ToLower();
         
         if(semanticName == "sv_position")
         {
+            // TODO: need to pick between `gl_Position` and
+            // `gl_FragCoord` based on whether this is an input
+            // or an output.
             return "gl_Position";
         }
         else if(semanticName == "sv_target")
         {
+            // Note: we do *not* need to generate some kind of `gl_`
+            // builtin for fragment-shader outputs: they are just
+            // ordinary `out` variables, with ordinary `location`s,
+            // as far as GLSL is concerned.
             return "";
+        }
+        else if(semanticName == "sv_clipdistance")
+        {
+            // TODO: type conversion is required here.
+            return "gl_ClipDistance";
+        }
+        else if(semanticName == "sv_culldistance")
+        {
+            requireGLSLExtension("ARB_cull_distance");
+
+            // TODO: type conversion is required here.
+            return "gl_CullDistance";
+        }
+        else if(semanticName == "sv_coverage")
+        {
+            // TODO: deal with `gl_SampleMaskIn` when used as an input.
+
+            // TODO: type conversion is required here.
+            return "gl_SampleMask";
+        }
+        else if(semanticName == "sv_depth")
+        {
+            return "gl_FragDepth";
+        }
+        else if(semanticName == "sv_depthgreaterequal")
+        {
+            // TODO: layout(depth_greater) out float gl_FragDepth;
+            return "gl_FragDepth";
+        }
+        else if(semanticName == "sv_depthlessequal")
+        {
+            // TODO: layout(depth_greater) out float gl_FragDepth;
+            return "gl_FragDepth";
+        }
+        else if(semanticName == "sv_dispatchthreadid")
+        {
+            return "gl_GlobalInvocationID";
+        }
+        else if(semanticName == "sv_domainlocation")
+        {
+            return "gl_TessCoord";
+        }
+        else if(semanticName == "sv_groupid")
+        {
+            return "gl_WorkGroupID";
+        }
+        else if(semanticName == "sv_groupindex")
+        {
+            return "gl_LocalInvocationIndex";
+        }
+        else if(semanticName == "sv_groupthreadid")
+        {
+            return "gl_LocalInvocationID";
+        }
+        else if(semanticName == "sv_gsinstanceid")
+        {
+            return "gl_InvocationID";
+        }
+        else if(semanticName == "sv_instanceid")
+        {
+            return "gl_InstanceIndex";
+        }
+        else if(semanticName == "sv_isfrontface")
+        {
+            return "gl_FrontFacing";
+        }
+        else if(semanticName == "sv_outputcontrolpointid")
+        {
+            return "gl_InvocationID";
+        }
+        else if(semanticName == "sv_primitiveid")
+        {
+            return "gl_PrimitiveID";
+        }
+        else if (semanticName == "sv_rendertargetarrayindex")
+        {
+            switch (context->shared->entryPoint->profile.GetStage())
+            {
+            case Stage::Geometry:
+                requireGLSLVersion(ProfileVersion::GLSL_150);
+                break;
+
+            case Stage::Fragment:
+                requireGLSLVersion(ProfileVersion::GLSL_430);
+                break;
+
+            default:
+                requireGLSLVersion(ProfileVersion::GLSL_450);
+                requireGLSLExtension("GL_ARB_shader_viewport_layer_array");
+                break;
+            }
+
+            return "gl_Layer";
+        }
+        else if (semanticName == "sv_sampleindex")
+        {
+            return "gl_SampleID";
+        }
+        else if (semanticName == "sv_stencilref")
+        {
+            requireGLSLExtension("ARB_shader_stencil_export");
+            return "gl_FragStencilRef";
+        }
+        else if (semanticName == "sv_tessfactor")
+        {
+            return "gl_TessLevelOuter";
+        }
+        else if (semanticName == "sv_vertexid")
+        {
+            return "gl_VertexIndex";
+        }
+        else if (semanticName == "sv_viewportarrayindex")
+        {
+            return "gl_ViewportIndex";
+        }
+        else if (semanticName == "nv_x_right")
+        {
+            requireGLSLVersion(ProfileVersion::GLSL_450);
+            requireGLSLExtension("GL_NVX_multiview_per_view_attributes");
+
+            // The actual output in GLSL is:
+            //
+            //    vec4 gl_PositionPerViewNV[];
+            //
+            // and is meant to support an arbitrary number of views,
+            // while the HLSL case just defines a second position
+            // output.
+            //
+            // For now we will hack this by:
+            //   1. Mapping an `NV_X_Right` output to `gl_PositionPerViewNV[1]`
+            //      (that is, just one element of the output array)
+            //   2. Adding logic to copy the traditional `gl_Position` output
+            //      over to `gl_PositionPerViewNV[0]`
+            //
+
+            return "gl_PositionPerViewNV[1]";
+
+//            shared->requiresCopyGLPositionToPositionPerView = true;
+        }
+        else if (semanticName == "nv_viewport_mask")
+        {
+            requireGLSLVersion(ProfileVersion::GLSL_450);
+            requireGLSLExtension("GL_NVX_multiview_per_view_attributes");
+
+            return "gl_ViewportMaskPerViewNV";
+//            globalVarExpr = createGLSLBuiltinRef("gl_ViewportMaskPerViewNV",
+//                getUnsizedArrayType(getIntType()));
         }
         else
         {
-            return "gl_Unknown";
+            getSink()->diagnose(varDecl->sourceLoc, Diagnostics::unknownSystemValueSemantic, semanticNameSpelling);
+            return semanticName;
         }
     }
 
@@ -4557,7 +4713,7 @@ emitDeclImpl(decl, nullptr);
                 {
                     if(varLayout->systemValueSemantic.Length() != 0)
                     {
-                        auto translated = getGLSLSystemValueName(varLayout);
+                        auto translated = getGLSLSystemValueName(inst, varLayout);
                         if(translated.Length())
                             return translated;
                     }
@@ -4935,6 +5091,11 @@ emitDeclImpl(decl, nullptr);
             // GLSL doesn't allow texture/resource types to
             // be used as first-class values, so we need
             // to fold them into their use sites in all cases
+            if(getTarget(ctx) == CodeGenTarget::GLSL)
+                return true;
+        }
+        else if(type->As<HLSLStructuredBufferTypeBase>())
+        {
             if(getTarget(ctx) == CodeGenTarget::GLSL)
                 return true;
         }
@@ -6235,6 +6396,133 @@ emitDeclImpl(decl, nullptr);
         }
     }
 
+    void emitIREntryPointAttributes_HLSL(
+        EmitContext*        /*ctx*/,
+        EntryPointLayout*   entryPointLayout)
+    {
+        auto profile = entryPointLayout->profile;
+        auto stage = profile.GetStage();
+
+        switch (stage)
+        {
+        case Stage::Compute:
+            {
+                static const UInt kAxisCount = 3;
+                UInt sizeAlongAxis[kAxisCount];
+
+                // TODO: this is kind of gross because we are using a public
+                // reflection API function, rather than some kind of internal
+                // utility it forwards to...
+                spReflectionEntryPoint_getComputeThreadGroupSize(
+                    (SlangReflectionEntryPoint*)entryPointLayout,
+                    kAxisCount,
+                    &sizeAlongAxis[0]);
+
+                emit("[numthreads(");
+                for (int ii = 0; ii < 3; ++ii)
+                {
+                    if (ii != 0) emit(", ");
+                    Emit(sizeAlongAxis[ii]);
+                }
+                emit(")]\n");
+            }
+            break;
+        case Stage::Geometry:
+        {
+            if (auto attrib = entryPointLayout->entryPoint->FindModifier<HLSLMaxVertexCountAttribute>())
+            {
+                emit("[maxvertexcount(");
+                Emit(attrib->value);
+                emit(")]\n");
+            }
+            if (auto attrib = entryPointLayout->entryPoint->FindModifier<HLSLInstanceAttribute>())
+            {
+                emit("[instance(");
+                Emit(attrib->value);
+                emit(")]\n");
+            }
+        }
+        break;
+        // TODO: There are other stages that will need this kind of handling.
+        default:
+            break;
+        }
+    }
+
+    void emitIREntryPointAttributes_GLSL(
+        EmitContext*        /*ctx*/,
+        EntryPointLayout*   entryPointLayout)
+    {
+        auto profile = entryPointLayout->profile;
+        auto stage = profile.GetStage();
+
+        switch (stage)
+        {
+        case Stage::Compute:
+            {
+                static const UInt kAxisCount = 3;
+                UInt sizeAlongAxis[kAxisCount];
+
+                // TODO: this is kind of gross because we are using a public
+                // reflection API function, rather than some kind of internal
+                // utility it forwards to...
+                spReflectionEntryPoint_getComputeThreadGroupSize(
+                    (SlangReflectionEntryPoint*)entryPointLayout,
+                    kAxisCount,
+                    &sizeAlongAxis[0]);
+
+                emit("layout(");
+                char const* axes[] = { "x", "y", "z" };
+                for (int ii = 0; ii < 3; ++ii)
+                {
+                    if (ii != 0) emit(", ");
+                    emit("local_size_");
+                    emit(axes[ii]);
+                    emit(" = ");
+                    Emit(sizeAlongAxis[ii]);
+                }
+                emit(") in;");
+            }
+            break;
+        case Stage::Geometry:
+        {
+            if (auto attrib = entryPointLayout->entryPoint->FindModifier<HLSLMaxVertexCountAttribute>())
+            {
+                // TODO: need to include primitive type
+                emit("layout(max_vertices = ");
+                Emit(attrib->value);
+                emit(") out;\n");
+            }
+            if (auto attrib = entryPointLayout->entryPoint->FindModifier<HLSLInstanceAttribute>())
+            {
+                emit("layout(invocations = ");
+                Emit(attrib->value);
+                emit(") in;\n");
+            }
+        }
+        break;
+        // TODO: There are other stages that will need this kind of handling.
+        default:
+            break;
+        }
+    }
+
+    void emitIREntryPointAttributes(
+        EmitContext*        ctx,
+        EntryPointLayout*   entryPointLayout)
+    {
+        switch(getTarget(ctx))
+        {
+        case CodeGenTarget::HLSL:
+            emitIREntryPointAttributes_HLSL(ctx, entryPointLayout);
+            break;
+
+        case CodeGenTarget::GLSL:
+            emitIREntryPointAttributes_GLSL(ctx, entryPointLayout);
+            break;
+        }
+    }
+
     void emitIRSimpleFunc(
         EmitContext*    ctx,
         IRFunc*         func)
@@ -6246,53 +6534,7 @@ emitDeclImpl(decl, nullptr);
         auto entryPointLayout = asEntryPoint(func);
         if (entryPointLayout)
         {
-            auto profile = entryPointLayout->profile;
-            auto stage = profile.GetStage();
-
-            switch (stage)
-            {
-            case Stage::Compute:
-                {
-                    static const UInt kAxisCount = 3;
-                    UInt sizeAlongAxis[kAxisCount];
-
-                    // TODO: this is kind of gross because we are using a public
-                    // reflection API function, rather than some kind of internal
-                    // utility it forwards to...
-                    spReflectionEntryPoint_getComputeThreadGroupSize(
-                        (SlangReflectionEntryPoint*)entryPointLayout,
-                        kAxisCount,
-                        &sizeAlongAxis[0]);
-
-                    emit("[numthreads(");
-                    for (int ii = 0; ii < 3; ++ii)
-                    {
-                        if (ii != 0) emit(", ");
-                        Emit(sizeAlongAxis[ii]);
-                    }
-                    emit(")]\n");
-                }
-                break;
-            case Stage::Geometry:
-            {
-                if (auto attrib = entryPointLayout->entryPoint->FindModifier<HLSLMaxVertexCountAttribute>())
-                {
-                    emit("[maxvertexcount(");
-                    Emit(attrib->value);
-                    emit(")]\n");
-                }
-                if (auto attrib = entryPointLayout->entryPoint->FindModifier<HLSLInstanceAttribute>())
-                {
-                    emit("[instance(");
-                    Emit(attrib->value);
-                    emit(")]\n");
-                }
-            }
-            break;
-            // TODO: There are other stages that will need this kind of handling.
-            default:
-                break;
-            }
+            emitIREntryPointAttributes(ctx, entryPointLayout);
         }
 
         auto name = getIRFuncName(func);
@@ -6915,6 +7157,52 @@ emitDeclImpl(decl, nullptr);
         emit(";\n");
     }
 
+    RefPtr<Type> unwrapArray(Type* type)
+    {
+        Type* t = type;
+        while( auto arrayType = t->As<ArrayExpressionType>() )
+        {
+            t = arrayType->baseType;
+        }
+        return t;
+    }
+
+    void emitIRStructuredBuffer_GLSL(
+        EmitContext*                    ctx,
+        IRGlobalVar*                    varDecl,
+        HLSLStructuredBufferTypeBase*   structuredBufferType)
+    {
+        // Shader storage buffer is an OpenGL 430 feature
+        //
+        // TODO: we should require either the extension or the version...
+        requireGLSLVersion(430);
+
+        emit("layout(std430) buffer ");
+
+        // Generate a dummy name for the block
+        emit("_S");
+        Emit(ctx->shared->uniqueIDCounter++);
+
+        emit(" {\n");
+
+
+        auto elementType = structuredBufferType->getElementType();
+        emitIRType(ctx, elementType, getIRName(varDecl) + "[]");
+        emit(";\n");
+
+        emit("}");
+
+        // TODO: we need to consider the case where the type of the variable is
+        // an *array* of structured buffers, in which case we need to declare
+        // the block as an array too.
+        //
+        // The main challenge here is that then the block will have a name,
+        // and also the field inside the block will have a name, so that when
+        // the user had written `a[i][j]` we now need to emit `a[i].someName[j]`.
+
+        emit(";\n");
+    }
+
     void emitIRGlobalVar(
         EmitContext*    ctx,
         IRGlobalVar*    varDecl)
@@ -6946,6 +7234,45 @@ emitDeclImpl(decl, nullptr);
                 varDecl,
                 paramBlockType);
             return;
+        }
+
+        if(getTarget(ctx) == CodeGenTarget::GLSL)
+        {
+            // When outputting GLSL, we need to transform any declaration of
+            // a `*StructuredBuffer<T>` into an ordinary `buffer` declaration.
+            if( auto structuredBufferType = unwrapArray(varType)->As<HLSLStructuredBufferTypeBase>() )
+            {
+                emitIRStructuredBuffer_GLSL(
+                    ctx,
+                    varDecl,
+                    structuredBufferType);
+                return;
+            }
+
+            // We want to skip the declaration of any system-value variables
+            // when outputting GLSL (well, except in the case where they
+            // actually *require* redeclaration...).
+
+            if(auto layoutMod = varDecl->findDecoration<IRLayoutDecoration>())
+            {
+                auto layout = layoutMod->layout;
+                if(auto varLayout = layout.As<VarLayout>())
+                {
+                    if(varLayout->systemValueSemantic.Length() != 0)
+                    {
+                        auto translated = getGLSLSystemValueName(varDecl, varLayout);
+                        if( translated.Length() )
+                        {
+                            // The variable seems to translate to an OpenGL
+                            // system value, so we will assume that it doesn't
+                            // need to be declared.
+                            //
+                            // TODO: handle case where we *should* declare the variable.
+                            return;
+                        }
+                    }
+                }
+            }
         }
 
         // Need to emit appropriate modifiers here.
