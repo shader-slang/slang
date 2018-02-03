@@ -264,15 +264,7 @@ struct OptionsParser
 //                else if (argStr == "-symbo")
 //                    options.SymbolToCompile = tryReadCommandLineArgument(arg, &argCursor, argEnd);
                 //else
-                if(argStr == "-split-mixed-types" )
-                {
-                    flags |= SLANG_COMPILE_FLAG_SPLIT_MIXED_TYPES;
-                }
-                else if(argStr == "-use-ir" )
-                {
-                    flags |= SLANG_COMPILE_FLAG_USE_IR;
-                }
-                else if(argStr == "-no-mangle" )
+                if(argStr == "-no-mangle" )
                 {
                     flags |= SLANG_COMPILE_FLAG_NO_MANGLING;
                 }

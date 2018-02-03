@@ -1,16 +1,13 @@
 #version 450 core
-//TEST:COMPARE_GLSL:
+//TEST_DISABLED:COMPARE_GLSL:-no-mangle
 
 #if defined(__SLANG__)
 
 __import varying_struct;
 
-in VS_IN foo;
-out VS_OUT bar;
-
-void main()
+VS_OUT main(VS_IN foo)
 {
-    bar = doIt(foo);
+    return doIt(foo);
 }
 
 #else

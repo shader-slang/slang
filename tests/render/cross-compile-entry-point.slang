@@ -1,4 +1,4 @@
-//TEST(render):COMPARE_HLSL_CROSS_COMPILE_RENDER:-xslang -use-ir
+//TEST(render):COMPARE_HLSL_CROSS_COMPILE_RENDER:
 
 // This is a test to ensure that we can cross-compile a complete entry point.
 

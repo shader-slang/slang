@@ -1,4 +1,11 @@
-//TEST:SIMPLE:
+//TEST_DISABLED:SIMPLE:
+
+// Note: This test is disabled because we don't currently
+// have support for generating code from files that use
+// interfaces as parameter types.
+//
+// TODO: We need to add a check for this and generate an
+// error!
 
 // Confirm that basic `interface` syntax stuff type-checks.
 

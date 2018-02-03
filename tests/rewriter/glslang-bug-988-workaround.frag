@@ -1,5 +1,5 @@
 #version 450
-//TEST:COMPARE_GLSL:
+//TEST_DISABLED:COMPARE_GLSL:
 
 // Test workaround for glslang issue #988
 // (https://github.com/KhronosGroup/glslang/issues/988)

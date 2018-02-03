@@ -1,4 +1,7 @@
-//TEST:CROSS_COMPILE: -profile ps_5_0 -entry main -target spirv-assembly
+//TEST_DISABLED:CROSS_COMPILE: -profile ps_5_0 -entry main -target spirv-assembly
+
+// Note: disabled pending IR-based translation of the `Sample()`
+// operation for Vulkan.
 
 Texture2D t;
 SamplerState s;

@@ -64,7 +64,7 @@ sb << "};\n";
 sb << "\n";
 sb << "__generic<T, let N : int> __magic_type(HLSLOutputPatchType) struct OutputPatch\n";
 sb << "{\n";
-sb << "    __subscript(uint index) -> T { set; }\n";
+sb << "    __subscript(uint index) -> T;\n";
 sb << "};\n";
 sb << "\n";
 sb << "__magic_type(HLSLRWByteAddressBufferType) struct RWByteAddressBuffer\n";

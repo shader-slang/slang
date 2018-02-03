@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE:-xslang -use-ir
+//TEST(compute):COMPARE_COMPUTE:
 
 //TEST_INPUT:cbuffer(data=[1 2 3 4]):dxbinding(0),glbinding(0)
 //TEST_INPUT:Texture2D(size=4, content = one) : dxbinding(0),glbinding(0)

@@ -1,6 +1,6 @@
 //TEST:COMPARE_HLSL:-no-mangle -target dxbc-assembly -profile ps_5_1 -entry main
 
-// Let's first confirm that Spire can reproduce what the
+// Let's first confirm that Slang can reproduce what the
 // HLSL compiler would already do in the simple case (when
 // all shader parameters are actually used).
 
@@ -27,16 +27,16 @@ float4 main() : SV_Target
 
 #else
 
-Texture2D test_a[2];
-Texture2D test_b[2];
+Texture2D a[2];
+Texture2D b[2];
 SamplerState s;
 
 float4 main() : SV_Target
 {
-	return use(test_a[0],s)
-		 + use(test_b[0],s)
-		 + use(test_a[1],s)
-		 + use(test_b[1],s);
+	return use(a[0],s)
+		 + use(b[0],s)
+		 + use(a[1],s)
+		 + use(b[1],s);
 }
 
 #endif

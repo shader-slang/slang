@@ -1,4 +1,4 @@
-//TEST:COMPARE_HLSL: -profile cs_5_0 -target dxbc-assembly
+//TEST:COMPARE_HLSL:-no-mangle -profile cs_5_0 -target dxbc-assembly
 
 // Check output for `[allow_uav_conditional]`
 
@@ -11,8 +11,10 @@ void main(
 	uint index = tid;
 
 	[allow_uav_condition]
-	while(gBuffer[index] != 0)
+	for(;;)
 	{
+		if(gBuffer[index] == 0)
+			break;
 		index = gBuffer[index];
 		gBuffer[index]--;
 	}

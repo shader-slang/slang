@@ -1,4 +1,4 @@
-//TEST(smoke):COMPARE_HLSL:-no-mangle -use-ir -target dxbc-assembly -profile ps_5_0 -entry main
+//TEST(smoke):COMPARE_HLSL:-no-mangle -target dxbc-assembly -profile ps_5_0 -entry main
 
 // Handle the case where the fragment shader output is
 // defined a structure, and the semantics are on the sub-fields

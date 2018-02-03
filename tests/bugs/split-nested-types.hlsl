@@ -1,5 +1,4 @@
-// array-size-static-const.hlsl
-//TEST:COMPARE_HLSL: -profile ps_5_0 -target dxbc-assembly
+//TEST:COMPARE_HLSL:-no-mangle -profile ps_5_0 -target dxbc-assembly
 
 #ifdef __SLANG__
 import split_nested_types;

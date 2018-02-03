@@ -1,7 +1,6 @@
 // emit.cpp
 #include "emit.h"
 
-#include "ast-legalize.h"
 #include "ir-insts.h"
 #include "legalize-types.h"
 #include "lower-to-ir.h"
@@ -113,13 +112,6 @@ struct SharedEmitContext
     Dictionary<IRBlock*, IRBlock*> irMapContinueTargetToLoopHead;
 
     HashSet<String> irTupleTypes;
-
-    // Map used to tell AST lowering what decls are represented by IR.
-    HashSet<Decl*>* irDeclSetForAST = nullptr;
-
-    // Are we doing IR-only emit, so that everything should get
-    // its mangled name?
-    bool isFullIRMode = false;
 };
 
 struct EmitContext
@@ -3010,29 +3002,12 @@ struct EmitVisitor
 
     void EmitDeclRef(DeclRef<Decl> declRef)
     {
-        // Are we emitting an AST in a context where some declarations
-        // are actually stored as IR code?
-
-        if(auto irDeclSet = context->shared->irDeclSetForAST)
+        // When refering to anything other than a builtin, use its IR-facing name
+        if (!isBuiltinDecl(declRef.getDecl()))
         {
-            Decl* decl = declRef.getDecl();
-            if(irDeclSet->Contains(decl))
-            {
-                emit(getIRName(declRef));
-                return;
-            }
+            emit(getIRName(declRef));
+            return;
         }
-
-        if (context->shared->isFullIRMode)
-        {
-            // Don't apply this to builting declarations
-            if (!isBuiltinDecl(declRef.getDecl()))
-            {
-                emit(getIRName(declRef));
-                return;
-            }
-        }
-
 
 
         // TODO: need to qualify a declaration name based on parent scopes/declarations
@@ -5061,6 +5036,11 @@ emitDeclImpl(decl, nullptr);
         default:
             break;
 
+        case kIROp_Var:
+        case kIROp_global_var:
+        case kIROp_Param:
+            return false;
+
         case kIROp_IntLit:
         case kIROp_FloatLit:
         case kIROp_boolConst:
@@ -5075,6 +5055,12 @@ emitDeclImpl(decl, nullptr);
         // because they aren't allowed as types for temporary
         // variables.
         auto type = inst->getType();
+
+        while (auto ptrType = type->As<PtrTypeBase>())
+        {
+            type = ptrType->getValueType();
+        }
+
         if(type->As<UniformParameterGroupType>())
         {
             // TODO: we need to be careful here, because
@@ -5086,18 +5072,29 @@ emitDeclImpl(decl, nullptr);
         {
             return true;
         }
-        else if(type->As<TextureTypeBase>())
+        else if (type->As<HLSLPatchType>())
         {
-            // GLSL doesn't allow texture/resource types to
-            // be used as first-class values, so we need
-            // to fold them into their use sites in all cases
-            if(getTarget(ctx) == CodeGenTarget::GLSL)
-                return true;
+            return true;
         }
-        else if(type->As<HLSLStructuredBufferTypeBase>())
+
+
+        // GLSL doesn't allow texture/resource types to
+        // be used as first-class values, so we need
+        // to fold them into their use sites in all cases
+        if (getTarget(ctx) == CodeGenTarget::GLSL)
         {
-            if(getTarget(ctx) == CodeGenTarget::GLSL)
+            if(type->As<ResourceTypeBase>())
+            {
                 return true;
+            }
+            else if(type->As<HLSLStructuredBufferTypeBase>())
+            {
+                return true;
+            }
+            else if(type->As<SamplerStateType>())
+            {
+                return true;
+            }
         }
 
         // By default we will *not* fold things into their use sites.
@@ -5576,8 +5573,11 @@ emitDeclImpl(decl, nullptr);
 
                 IRFieldExtract* fieldExtract = (IRFieldExtract*) inst;
 
-                emitIROperand(ctx, fieldExtract->getBase());
-                emit(".");
+                if (!isDerefBaseImplicit(ctx, fieldExtract->getBase()))
+                {
+                    emitIROperand(ctx, fieldExtract->getBase());
+                    emit(".");
+                }
                 emit(getIRName(fieldExtract->getField()));
             }
             break;
@@ -5812,6 +5812,10 @@ emitDeclImpl(decl, nullptr);
                 emit(" : ");
                 emitIROperand(ctx, inst->getArg(2));
             }
+            break;
+
+        case kIROp_Param:
+            emit(getIRName(inst));
             break;
 
         default:
@@ -7003,11 +7007,56 @@ emitDeclImpl(decl, nullptr);
         emit("}\n");
     }
 
+    void emitGLSLParameterBlock(
+        EmitContext*        ctx,
+        IRGlobalVar*        varDecl,
+        ParameterBlockType* type)
+    {
+        auto varLayout = getVarLayout(ctx, varDecl);
+        assert(varLayout);
+
+        EmitVarChain blockChain(varLayout);
+
+        EmitVarChain containerChain = blockChain;
+        EmitVarChain elementChain = blockChain;
+
+        auto typeLayout = varLayout->typeLayout;
+        if( auto parameterGroupTypeLayout = typeLayout.As<ParameterGroupTypeLayout>() )
+        {
+            containerChain = EmitVarChain(parameterGroupTypeLayout->containerVarLayout, &blockChain);
+            elementChain = EmitVarChain(parameterGroupTypeLayout->elementVarLayout, &blockChain);
+
+            typeLayout = parameterGroupTypeLayout->elementVarLayout->getTypeLayout();
+        }
+
+        emitGLSLLayoutQualifier(LayoutResourceKind::DescriptorTableSlot, &containerChain);
+        emit("layout(std140) uniform ");
+
+        // Generate a dummy name for the block
+        emit("_S");
+        Emit(ctx->shared->uniqueIDCounter++);
+
+        emit("\n{\n");
+
+        auto elementType = type->getElementType();
+
+        emitIRType(ctx, elementType, getIRName(varDecl));
+        emit(";\n");
+
+        emit("};\n");
+    }
+
     void emitGLSLParameterGroup(
         EmitContext*                ctx,
         IRGlobalVar*                varDecl,
         UniformParameterGroupType*  type)
     {
+        if(auto parameterBlockType = type->As<ParameterBlockType>())
+        {
+            emitGLSLParameterBlock(ctx, varDecl, parameterBlockType);
+            return;
+        }
+
         auto varLayout = getVarLayout(ctx, varDecl);
         assert(varLayout);
 
@@ -7655,93 +7704,6 @@ String emitEntryPoint(
 
     EmitVisitor visitor(&context);
 
-    // Depending on how the compiler was invoked, we may need to perform
-    // some amount of preocessing on the code before we can emit it.
-    //
-    // We try to partition the cases we need to handle into a few broad
-    // categories, each of which is reflected as a different code path
-    // below:
-    //
-    // 1. REMOVED: "Full rewriter" mode, where the user provides HLSL/GLSL, opts
-    //    out of semantic checking, and doesn't make use of any Slang
-    //    code via `import`.
-    //
-    // 2. "Partial rewriter" modes, where the user starts with HLSL/GLSL
-    //    and opts out of checking for that code, but also imports some
-    //    Slang code which may need cross-compilation. They may also
-    //    need us to rewrite the AST for some of their HLSL/GLSL function
-    //    bodies to make things work. This actually has two main sub-modes:
-    //
-    //    a) "Without IR." If the user doesn't opt into using the IR, then
-    //    the imported Slang code gets translated to the target languge
-    //    via the same AST-to-AST pass that legalized the user's code. This
-    //    mode will eventually go away, but it is the main one used right now.
-    //
-    //    b) REMOVED: "With IR." If the user opts into using the IR, then we need to
-    //    apply the AST-to-AST pass to their HLSL/GLSL code, but *also* use
-    //    the IR to compile everything else.
-    //
-    // 3. "Full IR" mode, where we can assume all the input code is in Slang
-    //    (or the subset of HLSL we understand) that has undergone full
-    //    semantic checking, and the user has opted into using the IR.
-    //
-    // We'll try to detect the cases here, starting with case (1):
-    //
-    // REMOVED.
-    //
-    // Next we will check for case (2a):
-    if (!(translationUnit->compileRequest->compileFlags & SLANG_COMPILE_FLAG_USE_IR))
-    {
-        TypeLegalizationContext typeLegalizationContext;
-        typeLegalizationContext.session = entryPoint->compileRequest->mSession;
-
-        // This case means the user has opted out of using the IR (so we can't use the
-        // cases below), but they either turned on semantic checking *or* imported some
-        // Slang code, so they can't use the case above.
-        //
-        // Note: This case should go away completely once the IR is able to be relied
-        // upon for all cross-compilation scenarios.
-
-        // We will apply our AST-to-AST legalization pass before we emit
-        // any code, and we will emit code for the AST that comes out
-        // of this pass instead of the original.
-
-        // We perform legalization of the program before emitting *anything*,
-        // because the lowering process might change how we emit some
-        // boilerplate at the start of the ouput for GLSL (e.g., what
-        // version we require).
-
-        List<Decl*> astDecls;
-        findDeclsUsedByASTEntryPoint(
-            entryPoint,
-            target,
-            nullptr,
-            astDecls);
-
-        auto lowered = lowerEntryPoint(
-            entryPoint,
-            programLayout,
-            target,
-            &sharedContext.extensionUsageTracker,
-            nullptr,
-            &typeLegalizationContext,
-            astDecls);
-        sharedContext.program = lowered.program;
-
-        // Note that we emit the main body code of the program *before*
-        // we emit any leading preprocessor directives for GLSL.
-        // This is to give the emit logic a change to make last-minute
-        // adjustments like changing the required GLSL version.
-        //
-        // TODO: All such adjustments would be better handled during
-        // lowering, but that requires having a semantic rather than
-        // textual format for the HLSL->GLSL mapping.
-        visitor.EmitDeclsInContainer(lowered.program.Ptr());
-    }
-    //
-    // The remaining cases all require the use of our IR, and so there
-    // are certain steps that need to be shared.
-    else
     {
         TypeLegalizationContext typeLegalizationContext;
         typeLegalizationContext.session = entryPoint->compileRequest->mSession;
@@ -7756,13 +7718,6 @@ String emitEntryPoint(
         IRModule* irModule = getIRModule(irSpecializationState);
 
         typeLegalizationContext.irModule = irModule;
-
-        // We are in case (3), where all of the code is in Slang, and
-        // has already been lowered to IR as part of the front-end
-        // compilation work. We thus start by cloning any code needed
-        // by the entry point over to our fresh IR module.
-
-        sharedContext.isFullIRMode = true;
 
         specializeIRForEntryPoint(
             irSpecializationState,
@@ -7806,12 +7761,6 @@ String emitEntryPoint(
         dumpIR(lowered);
         fprintf(stderr, "###\n");
 #endif
-
-        LoweredEntryPoint lowered;
-
-        // When emitting IR-based declarations, we wnat to
-        // track which decls have already been lowered.
-        sharedContext.irDeclSetForAST = &lowered.irDecls;
 
         // After all of the required optimization and legalization
         // passes have been performed, we can emit target code from

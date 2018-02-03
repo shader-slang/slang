@@ -1,4 +1,4 @@
-//TEST:COMPARE_HLSL: -target dxbc-assembly -profile cs_4_0 -entry CSScatterVertexTriIDIndexID -entry CSScatterIndexTriIDIndexID
+//TEST_DISABLED:COMPARE_HLSL:-no-mangle -target dxbc-assembly -profile cs_4_0 -entry CSScatterVertexTriIDIndexID -entry CSScatterIndexTriIDIndexID
 //--------------------------------------------------------------------------------------
 // File: TessellatorCS40_ScatterIDCS.hlsl
 //
