@@ -5843,6 +5843,14 @@ emitDeclImpl(decl, nullptr);
             emit(";\n");
             break;
 
+        case kIROp_undefined:
+            {
+                auto type = inst->getType();
+                emitIRType(ctx, type, getIRName(inst));
+                emit(";\n");
+            }
+            break;
+
         case kIROp_Var:
             {
                 auto ptrType = inst->getType();
@@ -5971,6 +5979,37 @@ emitDeclImpl(decl, nullptr);
         }
     }
 
+    // When we are about to traverse an edge from one block to another,
+    // we need to emit the assignments that conceptually occur "along"
+    // the edge. In traditional SSA these are the phi nodes in the
+    // target block, while in our representation these use the arguments
+    // to the branch instruction to fill in the parameters of the target.
+    void emitPhiVarAssignments(
+        EmitContext*    ctx,
+        UInt            argCount,
+        IRUse*          args,
+        IRBlock*        targetBlock)
+    {
+        UInt argCounter = 0;
+        for (auto pp = targetBlock->getFirstParam(); pp; pp = pp->getNextParam())
+        {
+            UInt argIndex = argCounter++;
+
+            if (argIndex >= argCount)
+            {
+                assert(!"not enough arguments for branch");
+                break;
+            }
+
+            IRValue* arg = args[argIndex].usedValue;
+
+            emitIROperand(ctx, pp);
+            emit(" = ");
+            emitIROperand(ctx, arg);
+            emit(";\n");
+        }
+    }
+
     // We want to emit a range of code in the IR, represented
     // by the blocks that are logically in the interval [begin, end)
     // which we consider as a single-entry multiple-exit region.
@@ -6074,6 +6113,14 @@ emitDeclImpl(decl, nullptr);
                     auto breakBlock = t->getBreakBlock();
                     auto continueBlock = t->getContinueBlock();
 
+                    UInt argCount = t->getArgCount();
+                    static const UInt kFixedArgCount = 3;
+                    emitPhiVarAssignments(
+                        ctx,
+                        argCount - kFixedArgCount,
+                        t->getArgs() + kFixedArgCount,
+                        targetBlock);
+
                     if (auto loopControlDecoration = t->findDecoration<IRLoopControlDecoration>())
                     {
                         switch (loopControlDecoration->mode)
@@ -6157,7 +6204,20 @@ emitDeclImpl(decl, nullptr);
                 break;
 
             case kIROp_break:
-                emit("break;\n");
+                {
+                    auto t = (IRBreak*)terminator;
+                    auto targetBlock = t->getTargetBlock();
+
+                    UInt argCount = t->getArgCount();
+                    static const UInt kFixedArgCount = 1;
+                    emitPhiVarAssignments(
+                        ctx,
+                        argCount - kFixedArgCount,
+                        t->getArgs() + kFixedArgCount,
+                        targetBlock);
+
+                    emit("break;\n");
+                }
                 return;
 
             case kIROp_continue:
@@ -6174,6 +6234,15 @@ emitDeclImpl(decl, nullptr);
                 {
                     auto continueInst = (IRContinue*) terminator;
                     auto targetBlock = continueInst->getTargetBlock();
+
+                    UInt argCount = continueInst->getArgCount();
+                    static const UInt kFixedArgCount = 1;
+                    emitPhiVarAssignments(
+                        ctx,
+                        argCount - kFixedArgCount,
+                        continueInst->getArgs() + kFixedArgCount,
+                        targetBlock);
+
                     IRBlock* loopHead = nullptr;
                     ctx->shared->irMapContinueTargetToLoopHead.TryGetValue(targetBlock, loopHead);
                     SLANG_ASSERT(loopHead);
@@ -6191,10 +6260,16 @@ emitDeclImpl(decl, nullptr);
                     auto t = (IRLoopTest*)terminator;
 
                     auto afterBlock = t->getTrueBlock();
+                    auto exitBlock = t->getFalseBlock();
 
                     emit("if(");
                     emitIROperand(ctx, t->getCondition());
-                    emit(")\n{} else break;\n");
+                    emit(")\n{} else {\n");
+                    emitIRStmtsForBlocks(
+                        ctx,
+                        exitBlock,
+                        nullptr);
+                    emit("}\n");
 
                     // Continue with the block after the test
                     block = afterBlock;
@@ -6209,6 +6284,16 @@ emitDeclImpl(decl, nullptr);
                     // block, or a backward edge to the top
                     // of a loop.
                     auto t = (IRUnconditionalBranch*)terminator;
+                    auto targetBlock = t->getTargetBlock();
+
+                    UInt argCount = t->getArgCount();
+                    static const UInt kFixedArgCount = 1;
+                    emitPhiVarAssignments(
+                        ctx,
+                        argCount - kFixedArgCount,
+                        t->getArgs() + kFixedArgCount,
+                        targetBlock);
+
                     block = t->getTargetBlock();
                 }
                 break;
@@ -6527,6 +6612,27 @@ emitDeclImpl(decl, nullptr);
         }
     }
 
+    void emitPhiVarDecls(
+        EmitContext*    ctx,
+        IRFunc*         func)
+    {
+        // We will skip the first block, since its parameters are
+        // the parameters of the whole function.
+        auto bb = func->getFirstBlock();
+        if (!bb)
+            return;
+        bb = bb->getNextBlock();
+
+        for (; bb; bb = bb->getNextBlock())
+        {
+            for (auto pp = bb->getFirstParam(); pp; pp = pp->getNextParam())
+            {
+                emitIRType(ctx, pp->getType(), getIRName(pp));
+                emit(";\n");
+            }
+        }
+    }
+
     void emitIRSimpleFunc(
         EmitContext*    ctx,
         IRFunc*         func)
@@ -6584,6 +6690,10 @@ emitDeclImpl(decl, nullptr);
         if(isDefinition(func))
         {
             emit("\n{\n");
+
+            // HACK: forward-declare all the local variables needed for the
+            // prameters of non-entry blocks.
+            emitPhiVarDecls(ctx, func);
 
             // Need to emit the operations in the blocks of the function
 

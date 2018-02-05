@@ -179,6 +179,7 @@
     <ClInclude Include="expr-defs.h" />
     <ClInclude Include="ir-inst-defs.h" />
     <ClInclude Include="ir-insts.h" />
+    <ClInclude Include="ir-ssa.h" />
     <ClInclude Include="ir.h" />
     <ClInclude Include="legalize-types.h" />
     <ClInclude Include="lexer.h" />
@@ -217,6 +218,7 @@
     <ClCompile Include="dxc-support.cpp" />
     <ClCompile Include="emit.cpp" />
     <ClCompile Include="ir-legalize-types.cpp" />
+    <ClCompile Include="ir-ssa.cpp" />
     <ClCompile Include="ir.cpp" />
     <ClCompile Include="legalize-types.cpp" />
     <ClCompile Include="lexer.cpp" />
