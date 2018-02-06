@@ -1559,6 +1559,20 @@ struct EmitVisitor
         emitUnaryExprImpl(outerPrec, prec, preOp, postOp, expr, true);
     }
 
+    bool isTargetIntrinsicModifierApplicable(
+        String const& targetName)
+    {
+        switch(context->shared->target)
+        {
+        default:
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled code generation target");
+            return false;
+
+        case CodeGenTarget::GLSL: return targetName == "glsl";
+        case CodeGenTarget::HLSL: return targetName == "hlsl";
+        }
+    }
+
     // Determine if a target intrinsic modifer is applicable to the target
     // we are currently emitting code for.
     bool isTargetIntrinsicModifierApplicable(
@@ -1575,16 +1589,22 @@ struct EmitVisitor
         // we expect.
         auto const& targetName = targetToken.Content;
 
-        switch(context->shared->target)
-        {
-        default:
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled code generation target");
-            return false;
-
-        case CodeGenTarget::GLSL: return targetName == "glsl";
-        case CodeGenTarget::HLSL: return targetName == "hlsl";
-        }
+        return isTargetIntrinsicModifierApplicable(targetName);
     }
+
+    bool isTargetIntrinsicModifierApplicable(
+        IRTargetIntrinsicDecoration*    decoration)
+    {
+        auto targetName = decoration->targetName;
+
+        // If no target name was specified, then the modifier implicitly
+        // applies to all targets.
+        if(targetName.Length() == 0)
+            return true;
+
+        return isTargetIntrinsicModifierApplicable(targetName);
+    }
+
 
     // Find an intrinsic modifier appropriate to the current compilation target.
     //
@@ -5414,6 +5434,205 @@ emitDeclImpl(decl, nullptr);
         }
     };
 
+    IRTargetIntrinsicDecoration* findTargetIntrinsicDecoration(
+        EmitContext*    /* ctx */,
+        IRFunc*         func)
+    {
+        for (auto dd = func->firstDecoration; dd; dd = dd->next)
+        {
+            if (dd->op != kIRDecorationOp_TargetIntrinsic)
+                continue;
+
+            auto targetIntrinsic = (IRTargetIntrinsicDecoration*)dd;
+            if (isTargetIntrinsicModifierApplicable(targetIntrinsic))
+                return targetIntrinsic;
+        }
+
+        return nullptr;
+    }
+
+    void emitTargetIntrinsicCallExpr(
+        EmitContext*                    ctx,
+        IRCall*                         inst,
+        IRFunc*                         /* func */,
+        IRTargetIntrinsicDecoration*    targetIntrinsic)
+    {
+        IRUse* args = inst->getArgs();
+        UInt argCount = inst->getArgCount();
+
+        // First operand was the function to be called
+        args++;
+        argCount--;
+
+        auto name = targetIntrinsic->definition;
+
+
+        if(name.IndexOf('$') == -1)
+        {
+            // Simple case: it is just an ordinary name, so we call it like a builtin.
+
+            emit(name);
+            Emit("(");
+            for (UInt aa = 0; aa < argCount; ++aa)
+            {
+                if (aa != 0) Emit(", ");
+                emitIROperand(ctx, args[aa].usedValue);
+            }
+            Emit(")");
+            return;
+        }
+        else
+        {
+            // General case: we are going to emit some more complex text.
+
+            Emit("(");
+
+            char const* cursor = name.begin();
+            char const* end = name.end();
+            while(cursor != end)
+            {
+                char c = *cursor++;
+                if( c != '$' )
+                {
+                    // Not an escape sequence
+                    emitRawTextSpan(&c, &c+1);
+                    continue;
+                }
+
+                SLANG_RELEASE_ASSERT(cursor != end);
+
+                char d = *cursor++;
+
+                switch (d)
+                {
+                case '0': case '1': case '2': case '3': case '4':
+                case '5': case '6': case '7': case '8': case '9':
+                    {
+                        // Simple case: emit one of the direct arguments to the call
+                        UInt argIndex = d - '0';
+                        SLANG_RELEASE_ASSERT((0 <= argIndex) && (argIndex < argCount));
+                        Emit("(");
+                        emitIROperand(ctx, args[argIndex].usedValue);
+                        Emit(")");
+                    }
+                    break;
+
+                case 'p':
+                    {
+                        // If we are calling a D3D texturing operation in the form t.Foo(s, ...),
+                        // then this form will pair up the t and s arguments as needed for a GLSL
+                        // texturing operation.
+                        SLANG_RELEASE_ASSERT(argCount >= 2);
+
+                        auto textureArg = args[0].usedValue;
+                        auto samplerArg = args[1].usedValue;
+
+                        if (auto baseTextureType = textureArg->type->As<TextureType>())
+                        {
+                            emitGLSLTextureOrTextureSamplerType(baseTextureType, "sampler");
+
+                            if (auto samplerType = samplerArg->type->As<SamplerStateType>())
+                            {
+                                if (samplerType->flavor == SamplerStateType::Flavor::SamplerComparisonState)
+                                {
+                                    Emit("Shadow");
+                                }
+                            }
+
+                            Emit("(");
+                            emitIROperand(ctx, textureArg);
+                            Emit(",");
+                            emitIROperand(ctx, samplerArg);
+                            Emit(")");
+                        }
+                        else
+                        {
+                            SLANG_UNEXPECTED("bad format in intrinsic definition");
+                        }
+                    }
+                    break;
+
+                case 'P':
+                    {
+                        // Okay, we need a collosal hack to deal with the fact that GLSL `texelFetch()`
+                        // for Vulkan seems to be completely broken by design. It's signature wants
+                        // a `sampler2D` for consistency with its peers, but the actual SPIR-V operation
+                        // ignores the sampler paart of it, and just used the `texture2D` part.
+                        //
+                        // The HLSL equivalent (e.g., `Texture2D.Load()`) doesn't provide a sampler
+                        // argument, so we seemingly need to conjure one out of thin air. :(
+                        //
+                        // We are going to hack this *hard* for now.
+
+                        auto textureArg = args[0].usedValue;
+                        if (auto baseTextureType = textureArg->type->As<TextureType>())
+                        {
+                            emitGLSLTextureOrTextureSamplerType(baseTextureType, "sampler");
+                            Emit("(");
+                            emitIROperand(ctx, textureArg);
+                            Emit(",");
+                            Emit("SLANG_hack_samplerForTexelFetch");
+                            context->shared->needHackSamplerForTexelFetch = true;
+                            Emit(")");
+                        }
+                        else
+                        {
+                            SLANG_UNEXPECTED("bad format in intrinsic definition");
+                        }
+                    }
+                    break;
+
+                case 'z':
+                    {
+                        // If we are calling a D3D texturing operation in the form t.Foo(s, ...),
+                        // where `t` is a `Texture*<T>`, then this is the step where we try to
+                        // properly swizzle the output of the equivalent GLSL call into the right
+                        // shape.
+                        SLANG_RELEASE_ASSERT(argCount >= 1);
+
+                        auto textureArg = args[0].usedValue;
+                        if (auto baseTextureType = textureArg->type->As<TextureType>())
+                        {
+                            auto elementType = baseTextureType->elementType;
+                            if (auto basicType = elementType->As<BasicExpressionType>())
+                            {
+                                // A scalar result is expected
+                                Emit(".x");
+                            }
+                            else if (auto vectorType = elementType->As<VectorExpressionType>())
+                            {
+                                // A vector result is expected
+                                auto elementCount = GetIntVal(vectorType->elementCount);
+
+                                if (elementCount < 4)
+                                {
+                                    char const* swiz[] = { "", ".x", ".xy", ".xyz", "" };
+                                    Emit(swiz[elementCount]);
+                                }
+                            }
+                            else
+                            {
+                                // What other cases are possible?
+                            }
+                        }
+                        else
+                        {
+                            SLANG_UNEXPECTED("bad format in intrinsic definition");
+                        }
+                    }
+                    break;
+
+
+                default:
+                    SLANG_UNEXPECTED("bad format in intrinsic definition");
+                    break;
+                }
+            }
+
+            Emit(")");
+        }
+    }
+
     void emitIntrinsicCallExpr(
         EmitContext*    ctx,
         IRCall*         inst,
@@ -5425,6 +5644,18 @@ emitDeclImpl(decl, nullptr);
         UInt operandCount = inst->getArgCount();
         UInt argCount = operandCount - 1;
         UInt operandIndex = 1;
+
+
+        // 
+        if (auto targetIntrinsicDecoration = findTargetIntrinsicDecoration(ctx, func))
+        {
+            emitTargetIntrinsicCallExpr(
+                ctx,
+                inst,
+                func,
+                targetIntrinsicDecoration);
+            return;
+        }
 
         // Our current strategy for dealing with intrinsic
         // calls is to "un-mangle" the mangled name, in

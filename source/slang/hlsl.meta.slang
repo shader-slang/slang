@@ -1072,12 +1072,12 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
 
     sb << "void GetDimensions(out uint dim);\n";
 
-    sb << "__target_intrinsic(glsl, \"texelFetch($$P, $0)$$z\")\n";
+    sb << "__target_intrinsic(glsl, \"texelFetch($$P, $1)$$z\")\n";
     sb << "T Load(int location);\n";
 
     sb << "T Load(int location, out uint status);\n";
 
-    sb << "__target_intrinsic(glsl, \"texelFetch($$P, int($0))$$z\")\n";
+    sb << "__target_intrinsic(glsl, \"texelFetch($$P, int($1))$$z\")\n";
     sb << "__subscript(uint index) -> T";
 
     if (kBaseBufferAccessLevels[aa].access != SLANG_RESOURCE_ACCESS_READ)
