@@ -1294,6 +1294,15 @@ namespace Slang
             return nullptr;
         }
 
+        // Ugly special case: the result of loading from `groupshared`
+        // memory should not itself be `groupshared`.
+        //
+        // TODO: Should this generalize to any "rate-qualified" type?
+        if(auto rateType = valueType->As<GroupSharedType>())
+        {
+            valueType = rateType->valueType;
+        }
+
         auto inst = createInst<IRLoad>(
             this,
             kIROp_Load,
