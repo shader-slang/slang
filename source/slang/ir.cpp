@@ -3226,6 +3226,15 @@ namespace Slang
                 }
                 break;
 
+            case kIRDecorationOp_TargetIntrinsic:
+                {
+                    auto originalDecoration = (IRTargetIntrinsicDecoration*)dd;
+                    auto newDecoration = context->builder->addDecoration<IRTargetIntrinsicDecoration>(clonedValue);
+                    newDecoration->targetName = originalDecoration->targetName;
+                    newDecoration->definition = originalDecoration->definition;
+                }
+                break;
+
             default:
                 // Don't clone any decorations we don't understand.
                 break;
