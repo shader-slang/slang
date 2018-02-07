@@ -995,8 +995,6 @@ void resumeThread(
 
         case kIROp_loop:
         case kIROp_unconditionalBranch:
-        case kIROp_break:
-        case kIROp_continue:
             {
                 // For now our encoding is very regular, so we can decode without
                 // knowing too much about an instruction...
@@ -1045,8 +1043,6 @@ void resumeThread(
             }
             break;
 
-        case kIROp_loopTest:
-        case kIROp_if:
         case kIROp_ifElse:
         case kIROp_conditionalBranch:
             {
