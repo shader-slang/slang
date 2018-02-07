@@ -19,26 +19,21 @@ layout(binding = 2, set = 1)
 uniform sampler _SV05gTestL2;
 
 layout(location = 0)
-in vec2 _S3;
+out vec4 _S2;
 
 layout(location = 0)
-out vec4 _S2;
+in vec2 _S3;
 
 void main()
 {
 	vec2 _S4 = _S3;
 
-	vec2 _S5 = _S4;
+	vec4 _S5 = _SV05gTestL0.a;
 
-	vec4 _S6 = _SV05gTestL0.a;
+    vec4 _S6 = texture(sampler2D(_SV05gTestL1, _SV05gTestL2), _S4);
 
-	vec2 _S7 = _S5;
-
-
-    vec4 _S8 = texture(sampler2D(_SV05gTestL1, _SV05gTestL2), _S7);
-
-    vec4 _S9 = _S6 + _S8;
-	_S2 = _S9;
+    vec4 _S7 = _S5 + _S6;
+	_S2 = _S7;
 
 	return;
 }
