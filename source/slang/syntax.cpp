@@ -45,6 +45,12 @@ namespace Slang
         case Slang::BaseType::Float:
             res.Append("float");
             break;
+        case Slang::BaseType::Double:
+            res.Append("double");
+            break;
+        case Slang::BaseType::Half:
+            res.Append("half");
+            break;
         case Slang::BaseType::Void:
             res.Append("void");
             break;

@@ -5961,6 +5961,8 @@ namespace Slang
 
 //                        declString = declString + "[" + String(candidate.conversionCostSum) + "]";
 
+#if 0
+                        // Debugging: ensure that we don't consider multiple declarations of the same operation
                         if (auto decl = dynamic_cast<CallableDecl*>(candidate.item.declRef.decl))
                         {
                             char buffer[1024];
@@ -5970,6 +5972,7 @@ namespace Slang
                                 decl->nextDecl);
                             declString.append(buffer);
                         }
+#endif
 
                         getSink()->diagnose(candidate.item.declRef, Diagnostics::overloadCandidate, declString);
 
