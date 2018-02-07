@@ -106,6 +106,7 @@ enum IRDecorationOp : uint16_t
     kIRDecorationOp_Layout,
     kIRDecorationOp_LoopControl,
     kIRDecorationOp_Target,
+    kIRDecorationOp_TargetIntrinsic,
 };
 
 // A "decoration" that gets applied to an instruction.

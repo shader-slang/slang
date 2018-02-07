@@ -3758,6 +3758,24 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             decoration->targetName = targetMod->targetToken.Content;
         }
 
+        // If this declaration was marked as having a target-specific lowering
+        // for a particular target, then handle that here.
+        for (auto targetMod : decl->GetModifiersOfType<TargetIntrinsicModifier>())
+        {
+            auto decoration = getBuilder()->addDecoration<IRTargetIntrinsicDecoration>(irFunc);
+            decoration->targetName = targetMod->targetToken.Content;
+
+            auto definitionToken = targetMod->definitionToken;
+            if (definitionToken.type == TokenType::StringLiteral)
+            {
+                decoration->definition = getStringLiteralTokenValue(definitionToken);
+            }
+            else
+            {
+                decoration->definition = definitionToken.Content;
+            }
+        }
+
         // For convenience, ensure that any additional global
         // values that were emitted while outputting the function
         // body appear before the function itself in the list

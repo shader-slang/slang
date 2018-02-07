@@ -47,12 +47,23 @@ struct IRLoopControlDecoration : IRDecoration
     IRLoopControl mode;
 };
 
-struct IRTargetDecoration : IRDecoration
-{
-    enum { kDecorationOp = kIRDecorationOp_Target };
 
+struct IRTargetSpecificDecoration : IRDecoration
+{
     // TODO: have a more structured representation of target specifiers
     String targetName;
+};
+
+struct IRTargetDecoration : IRTargetSpecificDecoration
+{
+    enum { kDecorationOp = kIRDecorationOp_Target };
+};
+
+struct IRTargetIntrinsicDecoration : IRTargetSpecificDecoration
+{
+    enum { kDecorationOp = kIRDecorationOp_TargetIntrinsic };
+
+    String definition;
 };
 
 //
