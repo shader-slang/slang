@@ -375,6 +375,68 @@ struct IRBlock : IRValue
 
     IRGlobalValueWithCode* getParent() { return parentFunc; }
 
+    void insertAfter(IRBlock* other);
+    void insertAfter(IRBlock* other, IRGlobalValueWithCode* func);
+
+    struct PredecessorList
+    {
+        PredecessorList(IRUse* begin) : b(begin) {}
+        IRUse* b;
+
+        UInt getCount();
+
+        struct Iterator
+        {
+            Iterator(IRUse* use) : use(use) {}
+
+            IRBlock* operator*();
+
+            void operator++();
+
+            bool operator!=(Iterator const& that)
+            {
+                return use != that.use;
+            }
+
+            IRUse* use;
+        };
+
+        Iterator begin() { return Iterator(b); }
+        Iterator end()   { return Iterator(nullptr); }
+    };
+
+    struct SuccessorList
+    {
+        SuccessorList(IRUse* begin, IRUse* end, UInt stride = 1) : begin_(begin), end_(end), stride(stride) {}
+        IRUse* begin_;
+        IRUse* end_;
+        UInt stride;
+
+        UInt getCount();
+
+        struct Iterator
+        {
+            Iterator(IRUse* use, UInt stride) : use(use), stride(stride) {}
+
+            IRBlock* operator*();
+
+            void operator++();
+
+            bool operator!=(Iterator const& that)
+            {
+                return use != that.use;
+            }
+
+            IRUse* use;
+            UInt stride;
+        };
+
+        Iterator begin() { return Iterator(begin_, stride); }
+        Iterator end()   { return Iterator(end_, stride); }
+    };
+
+    PredecessorList getPredecessors();
+    SuccessorList getSuccessors();
 };
 
 // For right now, we will represent the type of

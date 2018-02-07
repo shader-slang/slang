@@ -1232,6 +1232,7 @@ namespace slang
 #include "source/slang/emit.cpp"
 #include "source/slang/ir.cpp"
 #include "source/slang/ir-legalize-types.cpp"
+#include "source/slang/ir-ssa.cpp"
 #include "source/slang/legalize-types.cpp"
 #include "source/slang/lexer.cpp"
 #include "source/slang/mangle.cpp"

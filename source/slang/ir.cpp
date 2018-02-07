@@ -28,15 +28,26 @@ namespace Slang
     {
         // TODO: need to make this faster by using a dictionary...
 
-        if (0) {}
+        static const struct {
+            char const* mnemonic;
+            IROp op;
+        } kOps[] = {
 
 #define INST(ID, MNEMONIC, ARG_COUNT, FLAGS)  \
-    else if(strcmp(name, #MNEMONIC) == 0) return kIROp_##ID;
+        { #MNEMONIC, kIROp_##ID },
 
 #define PSEUDO_INST(ID)  \
-    else if(strcmp(name, #ID) == 0) return kIRPseudoOp_##ID;
+        { #ID, kIRPseudoOp_##ID },
 
 #include "ir-inst-defs.h"
+
+        };
+
+        for (auto ee : kOps)
+        {
+            if (strcmp(name, ee.mnemonic) == 0)
+                return ee.op;
+        }
 
         return IROp(kIROp_Invalid);
     }
@@ -123,6 +134,228 @@ namespace Slang
             firstParam = param;
         }
         lastParam = param;
+    }
+
+    // The predecessors of a block should all show up as users
+    // of its value, so rather than explicitly store the CFG,
+    // we will recover it on demand from the use-def information.
+    //
+    // Note: we are really iterating over incoming/outgoing *edges*
+    // for a block, because there might be multiple uses of a block,
+    // if more than one way of an N-way branch targets the same block.
+
+    // Get the list of successor blocks for an instruction,
+    // which we expect to be the last instruction in a block.
+    static IRBlock::SuccessorList getSuccessors(IRInst* terminator)
+    {
+        // If the block somehow isn't terminated, then
+        // there is no way to read its successors, so
+        // we return an empty list.
+        if (!terminator || !isTerminatorInst(terminator))
+            return IRBlock::SuccessorList(nullptr, nullptr);
+
+        // Otherwise, based on the opcode of the terminator
+        // instruction, we will build up our list of uses.
+        IRUse* begin = nullptr;
+        IRUse* end = nullptr;
+        UInt stride = 1;
+
+        auto args = terminator->getArgs();
+        switch (terminator->op)
+        {
+        case kIROp_ReturnVal:
+        case kIROp_ReturnVoid:
+        case kIROp_unreachable:
+        case kIROp_discard:
+            break;
+
+        case kIROp_unconditionalBranch:
+        case kIROp_break:
+        case kIROp_continue:
+        case kIROp_loop:
+            // unconditonalBranch <block>
+            begin = args + 0;
+            end = begin + 1;
+            break;
+
+        case kIROp_conditionalBranch:
+        case kIROp_if:
+        case kIROp_ifElse:
+        case kIROp_loopTest:
+            // conditionalBranch <condition> <trueBlock> <falseBlock>
+            begin = args + 1;
+            end = begin + 2;
+            break;
+
+        case kIROp_switch:
+            // switch <val> <break> <default> <caseVal1> <caseBlock1> ...
+            begin = args + 4;
+            end = args + terminator->getArgCount() + 1;
+            stride = 2;
+            break;
+
+        default:
+            assert(!"unepxected");
+            return IRBlock::SuccessorList(nullptr, nullptr);
+        }
+
+        return IRBlock::SuccessorList(begin, end, stride);
+    }
+
+    void IRBlock::insertAfter(IRBlock* other)
+    {
+        assert(other);
+        insertAfter(other, other->parentFunc);
+    }
+
+    void IRBlock::insertAfter(IRBlock* other, IRGlobalValueWithCode* func)
+    {
+        assert(other || func);
+
+        if (!other) other = func->lastBlock;
+        if (!func) func = other->parentFunc;
+
+        assert(func);
+
+        auto pp = other;
+        auto nn = other ? other->nextBlock : nullptr;
+
+        if (pp)
+        {
+            pp->nextBlock = this;
+        }
+        else
+        {
+            func->firstBlock = this;
+        }
+
+        if (nn)
+        {
+            nn->prevBlock = this;
+        }
+        else
+        {
+            func->lastBlock = this;
+        }
+
+        this->prevBlock = pp;
+        this->nextBlock = nn;
+        this->parentFunc = func;
+    }
+
+    static IRUse* adjustPredecessorUse(IRUse* use)
+    {
+        // We will search until we either find a
+        // suitable use, or run out of uses.
+        for (;use; use = use->nextUse)
+        {
+            // We only want to deal with uses that represent
+            // a "sucessor" operand to some terminator instruction.
+            // We will re-use the logic for getting the successor
+            // list from such an instruction.
+
+            auto successorList = getSuccessors((IRInst*) use->user);
+
+            if(use >= successorList.begin_
+                && use < successorList.end_)
+            {
+                UInt index = (use - successorList.begin_);
+                if ((index % successorList.stride) == 0)
+                {
+                    // This use is in the range of the sucessor list,
+                    // and so it represents a real edge between
+                    // blocks.
+                    return use;
+                }
+            }
+        }
+
+        // If we ran out of uses, then we are at the end
+        // of the list of incoming edges.
+        return nullptr;
+    }
+
+    IRBlock::PredecessorList IRBlock::getPredecessors()
+    {
+        // We want to iterate over the predecessors of this block.
+        // First, we resign ourselves to iterating over the
+        // incoming edges, rather than the blocks themselves.
+        // This might sound like a trival distinction, but it is
+        // possible for there to be multiple edges between two
+        // blocks (as for a `switch` with multiple cases that
+        // map to the same code). Any client that wants just
+        // the unique predecessor blocks needs to deal with
+        // the deduplication themselves.
+        //
+        // Next, we note that for any predecessor edge, there will
+        // be a use of this block in the terminator instruction of
+        // the predecessor. We basically just want to iterate over
+        // the users of this block, then, but we need to be careful
+        // to rule out anything that doesn't actually represent
+        // an edge. The `adjustPredecessorUse` function will be
+        // used to search for a use that actually represents an edge.
+
+        return PredecessorList(
+            adjustPredecessorUse(firstUse));
+    }
+
+    UInt IRBlock::PredecessorList::getCount()
+    {
+        UInt count = 0;
+        for (auto ii : *this)
+        {
+            (void)ii;
+            count++;
+        }
+        return count;
+    }
+
+    void IRBlock::PredecessorList::Iterator::operator++()
+    {
+        if (!use) return;
+        use = adjustPredecessorUse(use->nextUse);
+    }
+
+    IRBlock* IRBlock::PredecessorList::Iterator::operator*()
+    {
+        if (!use) return nullptr;
+        return (IRBlock*)use->user->parent;
+    }
+
+    IRBlock::SuccessorList IRBlock::getSuccessors()
+    {
+        // The successors of a block will all be listed
+        // as operands of its terminator instruction.
+        // Depending on the terminator, we might have
+        // different numbers of operands to deal with.
+        //
+        // (We might also have to deal with a "stride"
+        // in the case where the basic-block operands
+        // are mixed up with non-block operands)
+
+        auto terminator = getLastInst();
+        return Slang::getSuccessors(terminator);
+    }
+
+    UInt IRBlock::SuccessorList::getCount()
+    {
+        UInt count = 0;
+        for (auto ii : *this)
+        {
+            (void)ii;
+            count++;
+        }
+        return count;
+    }
+
+    void IRBlock::SuccessorList::Iterator::operator++()
+    {
+        use += stride;
+    }
+
+    IRBlock* IRBlock::SuccessorList::Iterator::operator*()
+    {
+        return (IRBlock*)use->usedValue;
     }
 
     // IRFunc
@@ -609,6 +842,18 @@ namespace Slang
             &value);
     }
 
+    IRUndefined* IRBuilder::emitUndefined(IRType* type)
+    {
+        auto inst = createInst<IRUndefined>(
+            this,
+            kIROp_undefined,
+            type);
+
+        addInst(inst);
+    
+        return inst;
+    }
+
     IRValue* IRBuilder::getDeclRefVal(
         DeclRefBase const&  declRef)
     {
@@ -1004,13 +1249,20 @@ namespace Slang
         return bb;
     }
 
-    IRParam* IRBuilder::emitParam(
+    IRParam* IRBuilder::createParam(
         IRType* type)
     {
         auto param = createValue<IRParam>(
             this,
             kIROp_Param,
             type);
+        return param;
+    }
+
+    IRParam* IRBuilder::emitParam(
+        IRType* type)
+    {
+        auto param = createParam(type);
 
         if (auto bb = curBlock)
         {
@@ -3283,6 +3535,7 @@ namespace Slang
         case kIROp_Func:
         case kIROp_witness_table:
             return cloneGlobalValue(this, (IRGlobalValue*) originalValue);
+
         case kIROp_boolConst:
             {
                 IRConstant* c = (IRConstant*)originalValue;

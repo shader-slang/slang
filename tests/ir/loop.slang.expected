@@ -15,68 +15,42 @@ block %1(
 		param %2	: uint,
 		param %3	: uint,
 		param %4	: uint):
-	let  %5	: Ptr<uint>	= var()
-	store(%5, %2)
-	let  %6	: Ptr<uint>	= var()
-	store(%6, %3)
-	let  %7	: Ptr<uint>	= var()
-	store(%7, %4)
-	let  %8	: uint	= load(%6)
-	let  %9	: Ptr<vector<float,4>>	= getElementPtr(@_SV01s, %8)
-	let  %10	: StructuredBuffer<vector<float,4>>	= load(@_SV05input)
-	let  %11	: uint	= load(%5)
-	let  %12	: vector<float,4>	= bufferLoad(%10, %11)
-	store(%9, %12)
-	let  %13	: Ptr<uint>	= var()
-	let  %14	: uint	= construct(1)
-	store(%13, %14)
-	loop(%15, %16, %17)
+	let  %5	: Ptr<vector<float,4>>	= getElementPtr(@_SV01s, %3)
+	let  %6	: StructuredBuffer<vector<float,4>>	= load(@_SV05input)
+	let  %7	: vector<float,4>	= bufferLoad(%6, %2)
+	store(%5, %7)
+	let  %8	: uint	= construct(1)
+	loop(%9, %10, %11, %8)
+
+block %9(
+		param %12	: uint):
+	let  %13	: uint	= construct(64)
+	let  %14	: bool	= cmpLT(%12, %13)
+	loopTest(%14, %15, %10)
 
 block %15:
-	let  %18	: uint	= load(%13)
-	let  %19	: uint	= construct(64)
-	let  %20	: bool	= cmpLT(%18, %19)
-	loopTest(%20, %21, %16)
-
-block %21:
 	call(@_S031GroupMemoryBarrierWithGroupSyncp0pV)
-	let  %22	: uint	= load(%6)
-	let  %23	: Ptr<vector<float,4>>	= getElementPtr(@_SV01s, %22)
-	let  %24	: Ptr<vector<float,4>>	= var()
-	let  %25	: vector<float,4>	= load(%23)
-	store(%24, %25)
-	let  %26	: uint	= load(%6)
-	let  %27	: uint	= load(%13)
-	let  %28	: uint	= sub(%26, %27)
-	let  %29	: Ptr<vector<float,4>>	= getElementPtr(@_SV01s, %28)
-	let  %30	: vector<float,4>	= load(%29)
-	let  %31	: vector<float,4>	= load(%24)
-	let  %32	: vector<float,4>	= add(%31, %30)
-	store(%24, %32)
-	let  %33	: vector<float,4>	= load(%24)
-	store(%23, %33)
-	unconditionalBranch(%17)
+	let  %16	: Ptr<vector<float,4>>	= getElementPtr(@_SV01s, %3)
+	let  %17	: vector<float,4>	= load(%16)
+	let  %18	: uint	= sub(%3, %12)
+	let  %19	: Ptr<vector<float,4>>	= getElementPtr(@_SV01s, %18)
+	let  %20	: vector<float,4>	= load(%19)
+	let  %21	: vector<float,4>	= add(%17, %20)
+	store(%16, %21)
+	unconditionalBranch(%11)
 
-block %17:
-	let  %34	: Ptr<uint>	= var()
-	let  %35	: uint	= load(%13)
-	store(%34, %35)
-	let  %36	: uint	= construct(1)
-	let  %37	: uint	= load(%34)
-	let  %38	: uint	= shl(%37, %36)
-	store(%34, %38)
-	let  %39	: uint	= load(%34)
-	store(%13, %39)
-	unconditionalBranch(%15)
+block %11:
+	let  %22	: uint	= construct(1)
+	let  %23	: uint	= shl(%12, %22)
+	unconditionalBranch(%9, %23)
 
-block %16:
+block %10:
 	call(@_S031GroupMemoryBarrierWithGroupSyncp0pV)
-	let  %40	: RWStructuredBuffer<vector<float,4>>	= load(@_SV06output)
-	let  %41	: uint	= load(%5)
-	let  %42	: Ptr<vector<float,4>>	= bufferElementRef(%40, %41)
-	let  %43	: Ptr<vector<float,4>>	= getElementPtr(@_SV01s, 0)
-	let  %44	: vector<float,4>	= load(%43)
-	store(%42, %44)
+	let  %24	: RWStructuredBuffer<vector<float,4>>	= load(@_SV06output)
+	let  %25	: Ptr<vector<float,4>>	= bufferElementRef(%24, %2)
+	let  %26	: Ptr<vector<float,4>>	= getElementPtr(@_SV01s, 0)
+	let  %27	: vector<float,4>	= load(%26)
+	store(%25, %27)
 	return_void()
 }
 

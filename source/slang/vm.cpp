@@ -1003,17 +1003,45 @@ void resumeThread(
 
                 VMType type = decodeType(frame, &ip);
                 UInt argCount = decodeUInt(&ip);
-                Int destinationBlock = decodeSInt(&ip);
-                for( UInt aa = 2; aa < argCount; ++aa )
+                Int destinationBlockIndex = decodeSInt(&ip);
+
+                auto func = frame->func;
+                auto& destinationBlock = func->bcFunc->blocks[destinationBlockIndex];
+
+                // We may be passing arguments through to the destination
+                // block, so any remaining operands of the branch instruction
+                // need to be used to fill in the parameter registers of
+                // the destination block.
+
+                UInt paramCount = destinationBlock.paramCount;
+
+                // There might be additional operands, because some branches
+                // also include information on merge points and break/continue labels.
+                UInt remainingArgCount = argCount - 1;
+                assert(remainingArgCount >= paramCount);
+
+                UInt extraArgCount = remainingArgCount - paramCount;
+
+                for (UInt ee = 0; ee < extraArgCount; ++ee)
                 {
                     decodeOperandPtr<void>(frame, &ip);
                 }
 
-                // TODO: we need to deal with the case of
-                // passing arguments to the block, which
-                // means copying between the registers...
+                auto baseRegIndex = destinationBlock.params - func->bcFunc->regs;
+                for( UInt pp = 0; pp < paramCount; ++pp )
+                {
+                    auto regIndex = baseRegIndex + pp;
+
+                    void* argPtr = decodeOperandPtr<void>(frame, &ip);
+                    void* regPtr = getRegPtrImpl(frame, regIndex);
+
+                    VMType regType = func->regs[regIndex].type;
+                    memcpy(regPtr, argPtr, regType.getSize());
+                }
+
+                // Now simply jump to the destination block.
                 //
-                ip = frame->func->bcFunc->blocks[destinationBlock].code;
+                ip = destinationBlock.code;
             }
             break;
 

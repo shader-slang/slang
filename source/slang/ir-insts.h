@@ -326,6 +326,15 @@ struct IRWitnessTable : IRGlobalValue
     IRValueList<IRWitnessTableEntry> entries;
 };
 
+// An instruction that yields an undefined value.
+//
+// Note that we make this an instruction rather than a value,
+// so that we will be able to identify a variable that is
+// used when undefined.
+struct IRUndefined : IRInst
+{
+};
+
 // Description of an instruction to be used for global value numbering
 struct IRInstKey
 {
@@ -394,6 +403,7 @@ struct IRBuilder
     IRValue* getBoolValue(bool value);
     IRValue* getIntValue(IRType* type, IRIntegerValue value);
     IRValue* getFloatValue(IRType* type, IRFloatingPointValue value);
+
     IRValue* getDeclRefVal(
         DeclRefBase const&  declRef);
     IRValue* getTypeVal(IRType* type); // create an IR value that represents a type
@@ -443,6 +453,10 @@ struct IRBuilder
         UInt            argCount,
         IRValue* const* args);
 
+    IRUndefined* emitUndefined(IRType* type);
+
+
+
     IRModule* createModule();
     
     IRFunc* createFunc();
@@ -458,6 +472,8 @@ struct IRBuilder
     IRBlock* createBlock();
     IRBlock* emitBlock();
 
+    IRParam* createParam(
+        IRType* type);
     IRParam* emitParam(
         IRType* type);
 

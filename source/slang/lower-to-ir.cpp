@@ -5,6 +5,7 @@
 
 #include "ir.h"
 #include "ir-insts.h"
+#include "ir-ssa.h"
 #include "mangle.h"
 #include "type-layout.h"
 #include "visitor.h"
@@ -4200,6 +4201,42 @@ IRModule* generateIRForTranslationUnit(
     {
         ensureDecl(context, decl);
     }
+
+    // We will perform certain "mandatory" optimization passes now.
+    // These passes serve two purposes:
+    //
+    // 1. To simplify the code that we use in backend compilation,
+    // or when serializing/deserializing modules, so that we can
+    // amortize this effort when we compile multiple entry points
+    // that use the same module(s).
+    //
+    // 2. To ensure certain semantic properties that can't be
+    // validated without dataflow information. For example, we want
+    // to detect when a variable might be used before it is initialized.
+
+    // Note: if you need to debug the IR that is created before
+    // any mandatory optimizations have been applied, then
+    // uncomment this line while debugging.
+
+    //      dumpIR(module);
+
+    // First, attempt to promote local variables to SSA
+    // temporaries whenever possible.
+    constructSSA(module);
+
+    // TODO: Do basic constant folding and DCE
+
+    // TODO: give error messages if any `undefined` or
+    // `unreachable` instructions remain.
+
+    // TODO: consider doing some more aggressive optimizations
+    // (in particular specialization of generics) here, so
+    // that we can avoid doing them downstream.
+    //
+    // Note: doing specialization or inlining involving code
+    // from other modules potentially makes the IR we generate
+    // "fragile" in that we'd now need to recompile when
+    // a module we depend on changes.
 
     // If we are being sked to dump IR during compilation,
     // then we can dump the initial IR for the module here.

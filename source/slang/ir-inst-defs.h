@@ -96,6 +96,8 @@ INST(IntLit, integer_constant, 0, 0)
 INST(FloatLit, float_constant, 0, 0)
 INST(decl_ref, decl_ref, 0, 0)
 
+INST(undefined, undefined, 0, 0)
+
 INST(specialize, specialize, 2, 0)
 INST(lookup_interface_method, lookup_interface_method, 2, 0)
 INST(lookup_witness_table, lookup_witness_table, 2, 0)
