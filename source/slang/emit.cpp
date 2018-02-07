@@ -1093,17 +1093,14 @@ struct EmitVisitor
     UNEXPECTED(PtrType);
 
 #undef UNEXPECTED
+
     void visitNamedExpressionType(NamedExpressionType* type, TypeEmitArg const& arg)
     {
-        // Named types are valid for GLSL
-        if (context->shared->target == CodeGenTarget::GLSL)
-        {
-            emitTypeImpl(GetType(type->declRef), arg.declarator);
-            return;
-        }
+        // We will always emit the actual type referenced by
+        // a named type declaration, rather than try to produce
+        // equivalent `typedef` declarations in the output.
 
-        EmitDeclRef(type->declRef);
-        EmitDeclarator(arg.declarator);
+        emitTypeImpl(GetType(type->declRef), arg.declarator);
     }
 
     void visitBasicExpressionType(BasicExpressionType* basicType, TypeEmitArg const& arg)
