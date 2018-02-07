@@ -4803,7 +4803,7 @@ emitDeclImpl(decl, nullptr);
             break;
 
         case kIROp_FloatLit:
-            emit(((IRConstant*) inst)->u.floatVal);
+            Emit(((IRConstant*) inst)->u.floatVal);
             break;
 
         case kIROp_boolConst:
