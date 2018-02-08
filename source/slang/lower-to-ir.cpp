@@ -2984,15 +2984,18 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         auto builder = getBuilder();
 
         IRGlobalValueWithCode* irGlobal = nullptr;
+        LoweredValInfo globalVal;
 
         // a `static const` global is actually a compile-time constant
         if (decl->HasModifier<HLSLStaticModifier>() && decl->HasModifier<ConstModifier>())
         {
             irGlobal = builder->createGlobalConstant(varType);
+            globalVal = LoweredValInfo::simple(irGlobal);
         }
         else
         {
             irGlobal = builder->createGlobalVar(varType);
+            globalVal = LoweredValInfo::ptr(irGlobal);
         }
         irGlobal->mangledName = getMangledName(decl);
 
@@ -3003,7 +3006,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // A global variable's SSA value is a *pointer* to
         // the underlying storage.
-        auto globalVal = LoweredValInfo::ptr(irGlobal);
         context->shared->declValues[
             DeclRef<VarDeclBase>(decl, nullptr)] = globalVal;
 

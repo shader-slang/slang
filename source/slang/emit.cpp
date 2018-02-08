@@ -5799,14 +5799,6 @@ emitDeclImpl(decl, nullptr);
             }
             break;
 
-        case kIROp_makeStruct:
-            {
-                // TODO: audit that this is correct
-                emitIRType(ctx, inst->getType());
-                emitIRArgs(ctx, inst, mode);
-            }
-            break;
-
         case kIROp_constructVectorFromScalar:
             // Simple constructor call
             if( getTarget(ctx) == CodeGenTarget::HLSL )
@@ -6076,6 +6068,7 @@ emitDeclImpl(decl, nullptr);
             break;
 
         case kIROp_makeArray:
+        case kIROp_makeStruct:
             {
                 // TODO: initializer-list syntax may not always
                 // be appropriate, depending on the context
