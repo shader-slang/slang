@@ -239,9 +239,9 @@ __generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> acos(vector<T
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> acos(matrix<T,N,M> x);
 
 // Test if all components are non-zero (HLSL SM 1.0)
-__generic<T : __BuiltinType> T all(T x);
-__generic<T : __BuiltinType, let N : int> vector<T,N> all(vector<T,N> x);
-__generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> all(matrix<T,N,M> x);
+__generic<T : __BuiltinType> bool all(T x);
+__generic<T : __BuiltinType, let N : int> bool all(vector<T,N> x);
+__generic<T : __BuiltinType, let N : int, let M : int> bool all(matrix<T,N,M> x);
 
 // Barrier for writes to all memory spaces (HLSL SM 5.0)
 void AllMemoryBarrier();
@@ -250,9 +250,9 @@ void AllMemoryBarrier();
 void AllMemoryBarrierWithGroupSync();
 
 // Test if any components is non-zero (HLSL SM 1.0)
-__generic<T : __BuiltinType> T any(T x);
-__generic<T : __BuiltinType, let N : int> vector<T,N> any(vector<T,N> x);
-__generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> any(matrix<T,N,M> x);
+__generic<T : __BuiltinType> bool any(T x);
+__generic<T : __BuiltinType, let N : int> bool any(vector<T,N> x);
+__generic<T : __BuiltinType, let N : int, let M : int> bool any(matrix<T,N,M> x);
 
 
 // Reinterpret bits as a double (HLSL SM 5.0)

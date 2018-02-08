@@ -175,16 +175,19 @@ INST(swizzleSet, swizzleSet, 2, 0)
 INST(ReturnVal, return_val, 1, 0)
 INST(ReturnVoid, return_void, 1, 0)
 
+// unconditionalBranch <target>
 INST(unconditionalBranch, unconditionalBranch, 1, 0)
-INST(break, break, 1, 0)
-INST(continue, continue, 1, 0)
+
+// loop <target> <breakLabel> <continueLabel>
 INST(loop, loop, 3, 0)
 
-INST(conditionalBranch, conditionalBranch, 1, 0)
-INST(if, if, 3, 0)
-INST(ifElse, ifElse, 4, 0)
-INST(loopTest, loopTest, 3, 0)
+// conditionalBranch <condition> <trueBlock> <falseBlock>
+INST(conditionalBranch, conditionalBranch, 3, 0)
 
+// ifElse <condition> <trueBlock> <falseBlock> <mergeBlock>
+INST(ifElse, ifElse, 4, 0)
+
+// switch <val> <break> <default> <caseVal1> <caseBlock1> ...
 INST(switch, switch, 3, 0)
 
 INST(discard, discard, 0, 0)

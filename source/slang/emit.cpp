@@ -109,8 +109,6 @@ struct SharedEmitContext
 
     HashSet<String> irDeclsVisited;
 
-    Dictionary<IRBlock*, IRBlock*> irMapContinueTargetToLoopHead;
-
     HashSet<String> irTupleTypes;
 };
 
@@ -1095,17 +1093,14 @@ struct EmitVisitor
     UNEXPECTED(PtrType);
 
 #undef UNEXPECTED
+
     void visitNamedExpressionType(NamedExpressionType* type, TypeEmitArg const& arg)
     {
-        // Named types are valid for GLSL
-        if (context->shared->target == CodeGenTarget::GLSL)
-        {
-            emitTypeImpl(GetType(type->declRef), arg.declarator);
-            return;
-        }
+        // We will always emit the actual type referenced by
+        // a named type declaration, rather than try to produce
+        // equivalent `typedef` declarations in the output.
 
-        EmitDeclRef(type->declRef);
-        EmitDeclarator(arg.declarator);
+        emitTypeImpl(GetType(type->declRef), arg.declarator);
     }
 
     void visitBasicExpressionType(BasicExpressionType* basicType, TypeEmitArg const& arg)
@@ -4808,7 +4803,7 @@ emitDeclImpl(decl, nullptr);
             break;
 
         case kIROp_FloatLit:
-            emit(((IRConstant*) inst)->u.floatVal);
+            Emit(((IRConstant*) inst)->u.floatVal);
             break;
 
         case kIROp_boolConst:
@@ -6241,6 +6236,21 @@ emitDeclImpl(decl, nullptr);
         }
     }
 
+    enum LabelOp
+    {
+        kLabelOp_break,
+        kLabelOp_continue,
+
+        kLabelOpCount,
+    };
+
+    struct LabelStack
+    {
+        LabelStack* parent;
+        IRBlock*    block;
+        LabelOp     op;
+    };
+
     // We want to emit a range of code in the IR, represented
     // by the blocks that are logically in the interval [begin, end)
     // which we consider as a single-entry multiple-exit region.
@@ -6253,11 +6263,69 @@ emitDeclImpl(decl, nullptr);
     void emitIRStmtsForBlocks(
         EmitContext*    ctx,
         IRBlock*        begin,
-        IRBlock*        end)
+        IRBlock*        end,
+
+        // Labels to use at the start
+        LabelStack*     initialLabels,
+
+        // Labels to switch to after emitting first basic block
+        LabelStack*     labels = nullptr)
     {
+        if(!labels)
+            labels = initialLabels;
+
+        auto useLabels = initialLabels;
+
         IRBlock* block = begin;
         while(block != end)
         {
+            // If the block we are trying to emit has been registered as a
+            // destination label (e.g. for a loop or `switch`) then we
+            // may need to emit a `break` or `continue` as needed.
+            //
+            // TODO: we eventually need to handle the possibility of
+            // multi-level break/continue targets, which could be challenging.
+
+            // First, figure out which block has been registered as
+            // the current `break` and `continue` target.
+            IRBlock* registeredBlock[kLabelOpCount] = {};
+            for( auto ll = labels; ll; ll = ll->parent )
+            {
+                if(!registeredBlock[ll->op])
+                {
+                    registeredBlock[ll->op] = ll->block;
+                }
+            }
+
+            // Next, search in the active labels we are allowed to use,
+            // and see if the block we are trying to branch to is an
+            // available break/continue target.
+            for(auto ll = useLabels; ll; ll = ll->parent)
+            {
+                if(ll->block == block)
+                {
+                    // We are trying to go to a block that has been regsitered as a label.
+
+                    if(block != registeredBlock[ll->op])
+                    {
+                        // ERROR: need support for multi-level break/continue to pull this one off!
+                    }
+
+                    switch(ll->op)
+                    {
+                    case kLabelOp_break:
+                        emit("break;\n");
+                        break;
+
+                    case kLabelOp_continue:
+                        emit("continue;\n");
+                        break;
+                    }
+
+                    return;
+                }
+            }
+
             // Start by emitting the non-terminator instructions in the block.
             auto terminator = block->getLastInst();
             assert(isTerminatorInst(terminator));
@@ -6285,28 +6353,6 @@ emitDeclImpl(decl, nullptr);
                 emitIRInst(ctx, terminator);
                 return;
 
-            case kIROp_if:
-                {
-                    // One-sided `if` statement
-                    auto t = (IRIf*)terminator;
-
-                    auto trueBlock = t->getTrueBlock();
-                    auto afterBlock = t->getAfterBlock();
-
-                    emit("if(");
-                    emitIROperand(ctx, t->getCondition());
-                    emit(")\n{\n");
-                    emitIRStmtsForBlocks(
-                        ctx,
-                        trueBlock,
-                        afterBlock);
-                    emit("}\n");
-
-                    // Continue with the block after the `if`
-                    block = afterBlock;
-                }
-                break;
-
             case kIROp_ifElse:
                 {
                     // Two-sided `if` statement
@@ -6316,19 +6362,31 @@ emitDeclImpl(decl, nullptr);
                     auto falseBlock = t->getFalseBlock();
                     auto afterBlock = t->getAfterBlock();
 
+                    // TODO: consider simplifying the code in
+                    // the case where `trueBlock == afterBlock`
+                    // so that we output `if(!cond) { falseBlock }`
+                    // instead of the current `if(cond) {} else {falseBlock}`
+
                     emit("if(");
                     emitIROperand(ctx, t->getCondition());
                     emit(")\n{\n");
                     emitIRStmtsForBlocks(
                         ctx,
                         trueBlock,
-                        afterBlock);
-                    emit("}\nelse\n{\n");
-                    emitIRStmtsForBlocks(
-                        ctx,
-                        falseBlock,
-                        afterBlock);
+                        afterBlock,
+                        labels);
                     emit("}\n");
+                    // Don't emit the false block if it would be empty
+                    if(falseBlock != afterBlock)
+                    {
+                        emit("else\n{\n");
+                        emitIRStmtsForBlocks(
+                            ctx,
+                            falseBlock,
+                            afterBlock,
+                            labels);
+                        emit("}\n");
+                    }
 
                     // Continue with the block after the `if`
                     block = afterBlock;
@@ -6342,7 +6400,6 @@ emitDeclImpl(decl, nullptr);
 
                     auto targetBlock = t->getTargetBlock();
                     auto breakBlock = t->getBreakBlock();
-                    auto continueBlock = t->getContinueBlock();
 
                     UInt argCount = t->getArgCount();
                     static const UInt kFixedArgCount = 3;
@@ -6351,6 +6408,25 @@ emitDeclImpl(decl, nullptr);
                         argCount - kFixedArgCount,
                         t->getArgs() + kFixedArgCount,
                         targetBlock);
+
+                    // Set up entries on our label stack for break/continue
+
+                    LabelStack subBreakLabel;
+                    subBreakLabel.parent = labels;
+                    subBreakLabel.block = breakBlock;
+                    subBreakLabel.op = kLabelOp_break;
+
+                    // Note: when forming the `continue` label, we don't
+                    // actually point at the "continue block" from the loop
+                    // statement, because we aren't actually going to
+                    // generate an ordinary continue caluse in a `for` loop.
+                    //
+                    // Instead, our `continue` label will always be the
+                    // loop header.
+                    LabelStack subContinueLabel;
+                    subContinueLabel.parent = &subBreakLabel;
+                    subContinueLabel.block = targetBlock;
+                    subContinueLabel.op = kLabelOp_continue;
 
                     if (auto loopControlDecoration = t->findDecoration<IRLoopControlDecoration>())
                     {
@@ -6365,75 +6441,25 @@ emitDeclImpl(decl, nullptr);
                         }
                     }
 
-                    // The challenging case for a loop is when
-                    // there is a `continue` block that we
-                    // need to deal with.
-                    //
-                    if (continueBlock == targetBlock)
-                    {
-                        // There is no continue block, so
-                        // we only need to emit an endless
-                        // loop and then manually `break`
-                        // out of it in the right place(s)
-                        emit("for(;;)\n{\n");
+                    emit("for(;;)\n{\n");
 
-                        emitIRStmtsForBlocks(
-                            ctx,
-                            targetBlock,
-                            nullptr);
+                    emitIRStmtsForBlocks(
+                        ctx,
+                        targetBlock,
+                        nullptr,
+                        // For the first block, we only want the `break` label active
+                        &subBreakLabel,
+                        // After the first block, we can safely use the `continue` label too
+                        &subContinueLabel);
 
-                        emit("}\n");
-                    }
-                    else
-                    {
-                        // Okay, we've got a `continue` block,
-                        // which means we really want to emit
-                        // something akin to:
-                        //
-                        //     for(;; <continueBlock>) { <bodyBlock> }
-                        //
-                        // In principle this isn't so bad, since the
-                        // first case is just interVal [`continueBlock`, `targetBlock`)
-                        // and the latter is the interval [`targetBlock`, `continueBlock`).
-                        //
-                        // The challenge of course is that a `for` statement
-                        // only supports *expressions* in the continue part,
-                        // and we might have expanded things into multiple
-                        // instructions (especially if we inlined or desugared anything).
-                        //
-                        // There are a variety of ways we can support lowering this,
-                        // but for now we are going to do something expedient
-                        // that mimics what `fxc` seems to do:
-                        //
-                        // - Output loop body as `for(;;) { <bodyBlock> <continueBlock> }`
-                        // - At any `continue` site, output `{ <continueBlock>; continue; }`
-                        //
-                        // This isn't ideal because it leads to code duplication, but
-                        // it matches what `fxc` does so hopefully it will be the
-                        // best option for our tests.
-                        //
-
-                        emit("for(;;)\n{\n");
-
-                        // Register information so that `continue` sites
-                        // can do the right thing:
-                        ctx->shared->irMapContinueTargetToLoopHead.Add(continueBlock, targetBlock);
-
-
-                        emitIRStmtsForBlocks(
-                            ctx,
-                            targetBlock,
-                            nullptr);
-
-                        emit("}\n");
-
-                    }
+                    emit("}\n");
 
                     // Continue with the block after the loop
                     block = breakBlock;
                 }
                 break;
 
+#if 0
             case kIROp_break:
                 {
                     auto t = (IRBreak*)terminator;
@@ -6506,6 +6532,7 @@ emitDeclImpl(decl, nullptr);
                     block = afterBlock;
                 }
                 break;
+#endif
 
             case kIROp_unconditionalBranch:
                 {
@@ -6560,6 +6587,12 @@ emitDeclImpl(decl, nullptr);
                     auto conditionVal = t->getCondition();
                     auto breakLabel = t->getBreakLabel();
                     auto defaultLabel = t->getDefaultLabel();
+
+                    // Register the block to be used for our `break` target
+                    LabelStack subLabels;
+                    subLabels.parent = labels;
+                    subLabels.op = kLabelOp_break;
+                    subLabels.block = breakLabel;
 
                     // We need to track whether we've dealt with
                     // the `default` case already.
@@ -6645,7 +6678,7 @@ emitDeclImpl(decl, nullptr);
 
                         // Now emit the statements for this case.
                         emit("{\n");
-                        emitIRStmtsForBlocks(ctx, caseLabel, caseEndLabel);
+                        emitIRStmtsForBlocks(ctx, caseLabel, caseEndLabel, &subLabels);
                         emit("}\n");
                     }
 
@@ -6656,7 +6689,7 @@ emitDeclImpl(decl, nullptr);
                     {
                         emit("default:\n");
                         emit("{\n");
-                        emitIRStmtsForBlocks(ctx, defaultLabel, breakLabel);
+                        emitIRStmtsForBlocks(ctx, defaultLabel, breakLabel, &subLabels);
                         emit("break;\n");
                         emit("}\n");
                     }
@@ -6667,6 +6700,11 @@ emitDeclImpl(decl, nullptr);
                 }
                 break;
             }
+
+            // After we've emitted the first block, we are safe from accidental
+            // cases where we'd emit an entire loop body as a single `continue`,
+            // so we can safely switch in whatever labels are intended to be used.
+            useLabels = labels;
 
             // If we reach this point, then we've emitted
             // one block, and we have a new block where
@@ -6928,7 +6966,7 @@ emitDeclImpl(decl, nullptr);
 
             // Need to emit the operations in the blocks of the function
 
-            emitIRStmtsForBlocks(ctx, func->getFirstBlock(), nullptr);
+            emitIRStmtsForBlocks(ctx, func->getFirstBlock(), nullptr, nullptr);
 
             emit("}\n");
         }
@@ -7612,7 +7650,7 @@ emitDeclImpl(decl, nullptr);
             initFuncName.append("_init");
             emitIRType(ctx, varType, initFuncName);
             Emit("()\n{\n");
-            emitIRStmtsForBlocks(ctx, varDecl->firstBlock, nullptr);
+            emitIRStmtsForBlocks(ctx, varDecl->firstBlock, nullptr, nullptr);
             Emit("}\n");
         }
 

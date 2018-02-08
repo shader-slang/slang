@@ -28,9 +28,9 @@ struct PhiInfo : RefObject
     // order in which the predecessor blocks get enumerated.
     List<IRUse> operands;
 
-    // Did we end up removing this phi because it was determined
-    // to be trivial?
-    bool wasRemoved = false;
+    // If this phi ended up being removed as trivial, then
+    // this will be the value that we replaced it with.
+    IRValue* replacement = nullptr;
 };
 
 // Information about a basic block that we generate/use
@@ -270,12 +270,16 @@ IRValue* tryRemoveTrivialPhi(
     // of itself) with the unique non-phi value.
     phi->replaceUsesWith(same);
 
-    // We will mark the phi as removed in the `PhiInfo` structure,
-    // so that we can avoid adding it to the block later.
-    phiInfo->wasRemoved = true;
+    // Clear out the operands to the phi, since they won't
+    // actually get used in the program any more.
+    for( auto& u : phiInfo->operands )
+    {
+        u.clear();
+    }
 
-    // TODO: we need a way to record that this parameter
-    // is no longer to be used...
+    // We will record the value that was used to replace this
+    // phi, so that we can easily look it up later.
+    phiInfo->replacement = same;
 
     // TODO: need to recursively consider chances to simplify
     // other phi nodes now.
@@ -476,6 +480,29 @@ IRValue* readVar(
     {
         // Hooray, we found a value to use, and we
         // can proceed without too many complications.
+
+        // Well, let's check for one special case here, which
+        // is when the value we intend to use is a `phi`
+        // node that we ultimately decided to remove.
+        while( val->op == kIROp_Param )
+        {
+            // The value is a parameter, but is it a phi?
+            IRParam* maybePhi = (IRParam*) val;
+            RefPtr<PhiInfo> phiInfo = nullptr;
+            if(!context->phiInfos.TryGetValue(maybePhi, phiInfo))
+                break;
+
+            // Okay, this is indeed a phi we are adding, but
+            // is it one that got replaced?
+            if(!phiInfo->replacement)
+                break;
+
+            // The phi we want to use got replaced, so we
+            // had better use the replacement instead.
+            val = phiInfo->replacement;
+        }
+
+
         return val;
     }
 
@@ -724,9 +751,9 @@ void constructSSA(ConstructSSAContext* context)
 
         for (auto phiInfo : blockInfo->phis)
         {
-            // If we eliminated this phi, then we had better not
-            // include it in the result.
-            if (phiInfo->wasRemoved)
+            // If we replaced this phi with another value,
+            // then we had better not include it in the result.
+            if (phiInfo->replacement)
                 continue;
 
             // We should add the phi as an explicit parameter of

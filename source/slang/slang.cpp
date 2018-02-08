@@ -529,9 +529,16 @@ RefPtr<ModuleDecl> CompileRequest::loadModule(
 
     translationUnit->sourceFiles.Add(sourceFile);
 
-    parseTranslationUnit(translationUnit.Ptr());
 
-    // TODO: handle errors
+    int errorCountBefore = mSink.GetErrorCount();
+    parseTranslationUnit(translationUnit.Ptr());
+    int errorCountAfter = mSink.GetErrorCount();
+
+    if( errorCountAfter != errorCountBefore )
+    {
+        // Something went wrong during the parsing, so we should bail out.
+        return nullptr;
+    }
 
     loadParsedModule(
         translationUnit,

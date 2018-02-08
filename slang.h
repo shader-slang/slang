@@ -127,6 +127,12 @@ extern "C"
 
         /* Skip code generation step, just check the code and generate layout */
         SLANG_COMPILE_FLAG_NO_CODEGEN                = 1 << 4,
+
+        /* Deprecated flags: kept around to allow existing applications to
+        compmile. Note that the relevant features will still be left in
+        their default state. */
+        SLANG_COMPILE_FLAG_NO_CHECKING = 0,
+        SLANG_COMPILE_FLAG_SPLIT_MIXED_TYPES = 0,
     };
 
     /*!

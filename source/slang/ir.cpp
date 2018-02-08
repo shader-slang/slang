@@ -170,8 +170,6 @@ namespace Slang
             break;
 
         case kIROp_unconditionalBranch:
-        case kIROp_break:
-        case kIROp_continue:
         case kIROp_loop:
             // unconditonalBranch <block>
             begin = args + 0;
@@ -179,9 +177,7 @@ namespace Slang
             break;
 
         case kIROp_conditionalBranch:
-        case kIROp_if:
         case kIROp_ifElse:
-        case kIROp_loopTest:
             // conditionalBranch <condition> <trueBlock> <falseBlock>
             begin = args + 1;
             end = begin + 2;
@@ -401,12 +397,8 @@ namespace Slang
         case kIROp_ReturnVoid:
         case kIROp_unconditionalBranch:
         case kIROp_conditionalBranch:
-        case kIROp_break:
-        case kIROp_continue:
         case kIROp_loop:
-        case kIROp_if:
         case kIROp_ifElse:
-        case kIROp_loopTest:
         case kIROp_discard:
         case kIROp_switch:
         case kIROp_unreachable:
@@ -1302,6 +1294,15 @@ namespace Slang
             return nullptr;
         }
 
+        // Ugly special case: the result of loading from `groupshared`
+        // memory should not itself be `groupshared`.
+        //
+        // TODO: Should this generalize to any "rate-qualified" type?
+        if(auto rateType = valueType->As<GroupSharedType>())
+        {
+            valueType = rateType->valueType;
+        }
+
         auto inst = createInst<IRLoad>(
             this,
             kIROp_Load,
@@ -1526,25 +1527,13 @@ namespace Slang
     IRInst* IRBuilder::emitBreak(
         IRBlock*    target)
     {
-        auto inst = createInst<IRBreak>(
-            this,
-            kIROp_break,
-            nullptr,
-            target);
-        addInst(inst);
-        return inst;
+        return emitBranch(target);
     }
 
     IRInst* IRBuilder::emitContinue(
         IRBlock*    target)
     {
-        auto inst = createInst<IRContinue>(
-            this,
-            kIROp_continue,
-            nullptr,
-            target);
-        addInst(inst);
-        return inst;
+        return emitBranch(target);
     }
 
     IRInst* IRBuilder::emitLoop(
@@ -1583,24 +1572,6 @@ namespace Slang
         return inst;
     }
 
-    IRInst* IRBuilder::emitIf(
-        IRValue*    val,
-        IRBlock*    trueBlock,
-        IRBlock*    afterBlock)
-    {
-        IRValue* args[] = { val, trueBlock, afterBlock };
-        UInt argCount = sizeof(args) / sizeof(args[0]);
-
-        auto inst = createInst<IRIf>(
-            this,
-            kIROp_if,
-            nullptr,
-            argCount,
-            args);
-        addInst(inst);
-        return inst;
-    }
-
     IRInst* IRBuilder::emitIfElse(
         IRValue*    val,
         IRBlock*    trueBlock,
@@ -1620,22 +1591,20 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitIf(
+        IRValue*    val,
+        IRBlock*    trueBlock,
+        IRBlock*    afterBlock)
+    {
+        return emitIfElse(val, trueBlock, afterBlock, afterBlock);
+    }
+
     IRInst* IRBuilder::emitLoopTest(
         IRValue*    val,
         IRBlock*    bodyBlock,
         IRBlock*    breakBlock)
     {
-        IRValue* args[] = { val, bodyBlock, breakBlock };
-        UInt argCount = sizeof(args) / sizeof(args[0]);
-
-        auto inst = createInst<IRLoopTest>(
-            this,
-            kIROp_loopTest,
-            nullptr,
-            argCount,
-            args);
-        addInst(inst);
-        return inst;
+        return emitIfElse(val, bodyBlock, breakBlock, bodyBlock);
     }
 
     IRInst* IRBuilder::emitSwitch(

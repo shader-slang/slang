@@ -26,7 +26,7 @@ block %9(
 		param %12	: uint):
 	let  %13	: uint	= construct(64)
 	let  %14	: bool	= cmpLT(%12, %13)
-	loopTest(%14, %15, %10)
+	ifElse(%14, %15, %10, %15)
 
 block %15:
 	call(@_S031GroupMemoryBarrierWithGroupSyncp0pV)

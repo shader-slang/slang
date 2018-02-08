@@ -630,16 +630,28 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
             if(baseShape != TextureType::ShapeCube)
             {
-				// TODO: In the case where `access` includes writeability,
-				// this should have both `get` and `set` accessors.
-
                 // subscript operator
                 sb << "__subscript(uint";
 				if(kBaseTextureTypes[tt].coordCount + isArray > 1)
 				{
 					sb << kBaseTextureTypes[tt].coordCount + isArray;
 				}
-				sb << " location) -> T;\n";
+				sb << " location) -> T";
+
+                // Depending on the access level of the texture type,
+                // we either have just a getter (the default), or both
+                // a getter and setter.
+                switch( access )
+                {
+                case SLANG_RESOURCE_ACCESS_NONE:
+                case SLANG_RESOURCE_ACCESS_READ:
+                    sb << ";\n";
+                    break;
+
+                default:
+                    sb << " { get; set; }\n";
+                    break;
+                }
             }
 
             if( !isMultisample )
