@@ -103,6 +103,12 @@ INST(lookup_interface_method, lookup_interface_method, 2, 0)
 INST(lookup_witness_table, lookup_witness_table, 2, 0)
 
 INST(Construct, construct, 0, 0)
+
+INST(makeVector, makeVector, 0, 0)
+INST(makeMatrix, makeMatrix, 0, 0)
+INST(makeArray, makeArray, 0, 0)
+INST(makeStruct, makeStruct, 0, 0)
+
 INST(Call, call, 1, 0)
 
 INST(Module, module, 0, PARENT)
@@ -110,6 +116,8 @@ INST(Func, func, 0, PARENT)
 INST(Block, block, 0, PARENT)
 
 INST(global_var, global_var, 0, 0)
+INST(global_constant, global_constant, 0, 0)
+
 INST(witness_table, witness_table, 0, 0)
 INST(witness_table_entry, witness_table_entry, 2, 0)
 

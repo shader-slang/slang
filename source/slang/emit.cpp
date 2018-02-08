@@ -4728,6 +4728,7 @@ emitDeclImpl(decl, nullptr);
         switch (inst->op)
         {
         case kIROp_global_var:
+        case kIROp_global_constant:
         case kIROp_Func:
             {
                 auto& mangledName = ((IRGlobalValue*)inst)->mangledName;
@@ -4786,7 +4787,7 @@ emitDeclImpl(decl, nullptr);
         case IRDeclaratorInfo::Flavor::Array:
             emitDeclarator(ctx, declarator->next);
             emit("[");
-            emitIROperand(ctx, declarator->elementCount);
+            emitIROperand(ctx, declarator->elementCount, IREmitMode::Default);
             emit("]");
             break;
         }
@@ -5041,9 +5042,17 @@ emitDeclImpl(decl, nullptr);
     }
 #endif
 
+    // Hack to allow IR emit for global constant to override behavior
+    enum class IREmitMode
+    {
+        Default,
+        GlobalConstant,
+    };
+
     bool shouldFoldIRInstIntoUseSites(
         EmitContext*    ctx,
-        IRValue*        inst)
+        IRValue*        inst,
+        IREmitMode      mode)
     {
         // Certain opcodes should always be folded in
         switch( inst->op )
@@ -5053,6 +5062,7 @@ emitDeclImpl(decl, nullptr);
 
         case kIROp_Var:
         case kIROp_global_var:
+        case kIROp_global_constant:
         case kIROp_Param:
             return false;
 
@@ -5065,6 +5075,10 @@ emitDeclImpl(decl, nullptr);
         case kIROp_BufferElementRef:
             return true;
         }
+
+        // Always fold when we are inside a global constant initializer
+        if (mode == IREmitMode::GlobalConstant)
+            return true;
 
         // Certain *types* will usually want to be folded in,
         // because they aren't allowed as types for temporary
@@ -5137,12 +5151,13 @@ emitDeclImpl(decl, nullptr);
 
     void emitIROperand(
         EmitContext*    ctx,
-        IRValue*         inst)
+        IRValue*         inst,
+        IREmitMode      mode)
     {
-        if( shouldFoldIRInstIntoUseSites(ctx, inst) )
+        if( shouldFoldIRInstIntoUseSites(ctx, inst, mode) )
         {
             emit("(");
-            emitIRInstExpr(ctx, inst);
+            emitIRInstExpr(ctx, inst, mode);
             emit(")");
             return;
         }
@@ -5158,7 +5173,8 @@ emitDeclImpl(decl, nullptr);
 
     void emitIRArgs(
         EmitContext*    ctx,
-        IRInst*         inst)
+        IRInst*         inst,
+        IREmitMode      mode)
     {
         UInt argCount = inst->argCount;
         IRUse* args = inst->getArgs();
@@ -5167,7 +5183,7 @@ emitDeclImpl(decl, nullptr);
         for(UInt aa = 0; aa < argCount; ++aa)
         {
             if(aa != 0) emit(", ");
-            emitIROperand(ctx, args[aa].usedValue);
+            emitIROperand(ctx, args[aa].usedValue, mode);
         }
         emit(")");
     }
@@ -5450,7 +5466,8 @@ emitDeclImpl(decl, nullptr);
         EmitContext*                    ctx,
         IRCall*                         inst,
         IRFunc*                         /* func */,
-        IRTargetIntrinsicDecoration*    targetIntrinsic)
+        IRTargetIntrinsicDecoration*    targetIntrinsic,
+        IREmitMode                      mode)
     {
         IRUse* args = inst->getArgs();
         UInt argCount = inst->getArgCount();
@@ -5471,7 +5488,7 @@ emitDeclImpl(decl, nullptr);
             for (UInt aa = 0; aa < argCount; ++aa)
             {
                 if (aa != 0) Emit(", ");
-                emitIROperand(ctx, args[aa].usedValue);
+                emitIROperand(ctx, args[aa].usedValue, mode);
             }
             Emit(")");
             return;
@@ -5507,7 +5524,7 @@ emitDeclImpl(decl, nullptr);
                         UInt argIndex = d - '0';
                         SLANG_RELEASE_ASSERT((0 <= argIndex) && (argIndex < argCount));
                         Emit("(");
-                        emitIROperand(ctx, args[argIndex].usedValue);
+                        emitIROperand(ctx, args[argIndex].usedValue, mode);
                         Emit(")");
                     }
                     break;
@@ -5535,9 +5552,9 @@ emitDeclImpl(decl, nullptr);
                             }
 
                             Emit("(");
-                            emitIROperand(ctx, textureArg);
+                            emitIROperand(ctx, textureArg, mode);
                             Emit(",");
-                            emitIROperand(ctx, samplerArg);
+                            emitIROperand(ctx, samplerArg, mode);
                             Emit(")");
                         }
                         else
@@ -5564,7 +5581,7 @@ emitDeclImpl(decl, nullptr);
                         {
                             emitGLSLTextureOrTextureSamplerType(baseTextureType, "sampler");
                             Emit("(");
-                            emitIROperand(ctx, textureArg);
+                            emitIROperand(ctx, textureArg, mode);
                             Emit(",");
                             Emit("SLANG_hack_samplerForTexelFetch");
                             context->shared->needHackSamplerForTexelFetch = true;
@@ -5631,7 +5648,8 @@ emitDeclImpl(decl, nullptr);
     void emitIntrinsicCallExpr(
         EmitContext*    ctx,
         IRCall*         inst,
-        IRFunc*         func)
+        IRFunc*         func,
+        IREmitMode      mode)
     {
         // For a call with N arguments, the instruction will
         // have N+1 operands. We will start consuming operands
@@ -5648,7 +5666,8 @@ emitDeclImpl(decl, nullptr);
                 ctx,
                 inst,
                 func,
-                targetIntrinsicDecoration);
+                targetIntrinsicDecoration,
+                mode);
             return;
         }
 
@@ -5676,15 +5695,15 @@ emitDeclImpl(decl, nullptr);
         {
             // The user is invoking a built-in subscript operator
             emit("(");
-            emitIROperand(ctx, inst->getArg(operandIndex++));
+            emitIROperand(ctx, inst->getArg(operandIndex++), mode);
             emit(")[");
-            emitIROperand(ctx, inst->getArg(operandIndex++));
+            emitIROperand(ctx, inst->getArg(operandIndex++), mode);
             emit("]");
 
             if(operandIndex < operandCount)
             {
                 emit(" = ");
-                emitIROperand(ctx, inst->getArg(operandIndex++));
+                emitIROperand(ctx, inst->getArg(operandIndex++), mode);
             }
             return;
         }
@@ -5700,7 +5719,7 @@ emitDeclImpl(decl, nullptr);
         {
             // Looks like a member function call
             emit("(");
-            emitIROperand(ctx, inst->getArg(operandIndex));
+            emitIROperand(ctx, inst->getArg(operandIndex), mode);
             emit(").");
 
             operandIndex++;
@@ -5712,7 +5731,7 @@ emitDeclImpl(decl, nullptr);
         for(; operandIndex < operandCount; ++operandIndex )
         {
             if(!first) emit(", ");
-            emitIROperand(ctx, inst->getArg(operandIndex));
+            emitIROperand(ctx, inst->getArg(operandIndex), mode);
             first = false;
         }
         emit(")");
@@ -5720,24 +5739,25 @@ emitDeclImpl(decl, nullptr);
 
     void emitIRCallExpr(
         EmitContext*    ctx,
-        IRCall*         inst)
+        IRCall*         inst,
+        IREmitMode      mode)
     {
         // We want to detect any call to an intrinsic operation,
         // that we can emit it directly without mangling, etc.
         auto funcValue = inst->getArg(0);
         if(auto irFunc = asTargetIntrinsic(ctx, funcValue))
         {
-            emitIntrinsicCallExpr(ctx, inst, irFunc);
+            emitIntrinsicCallExpr(ctx, inst, irFunc, mode);
         }
         else
         {
-            emitIROperand(ctx, funcValue);
+            emitIROperand(ctx, funcValue, mode);
             emit("(");
             UInt argCount = inst->getArgCount();
             for( UInt aa = 1; aa < argCount; ++aa )
             {
                 if(aa != 1) emit(", ");
-                emitIROperand(ctx, inst->getArg(aa));
+                emitIROperand(ctx, inst->getArg(aa), mode);
             }
             emit(")");
         }
@@ -5745,7 +5765,8 @@ emitDeclImpl(decl, nullptr);
 
     void emitIRInstExpr(
         EmitContext*    ctx,
-        IRValue*        value)
+        IRValue*        value,
+        IREmitMode      mode)
     {
         IRInst* inst = (IRInst*) value;
 
@@ -5760,6 +5781,8 @@ emitDeclImpl(decl, nullptr);
             break;
 
         case kIROp_Construct:
+        case kIROp_makeVector:
+        case kIROp_makeMatrix:
             // Simple constructor call
             if( inst->getArgCount() == 1 && getTarget(ctx) == CodeGenTarget::HLSL)
             {
@@ -5767,12 +5790,20 @@ emitDeclImpl(decl, nullptr);
                 emit("(");
                 emitIRType(ctx, inst->getType());
                 emit(") ");
-                emitIROperand(ctx, inst->getArg(0));
+                emitIROperand(ctx, inst->getArg(0), mode);
             }
             else
             {
                 emitIRType(ctx, inst->getType());
-                emitIRArgs(ctx, inst);
+                emitIRArgs(ctx, inst, mode);
+            }
+            break;
+
+        case kIROp_makeStruct:
+            {
+                // TODO: audit that this is correct
+                emitIRType(ctx, inst->getType());
+                emitIRArgs(ctx, inst, mode);
             }
             break;
 
@@ -5789,7 +5820,7 @@ emitDeclImpl(decl, nullptr);
                 emitIRType(ctx, inst->getType());
             }
             emit("(");
-            emitIROperand(ctx, inst->getArg(0));
+            emitIROperand(ctx, inst->getArg(0), mode);
             emit(")");
             break;
 
@@ -5801,7 +5832,7 @@ emitDeclImpl(decl, nullptr);
 
                 if (!isDerefBaseImplicit(ctx, fieldExtract->getBase()))
                 {
-                    emitIROperand(ctx, fieldExtract->getBase());
+                    emitIROperand(ctx, fieldExtract->getBase(), mode);
                     emit(".");
                 }
                 emit(getIRName(fieldExtract->getField()));
@@ -5816,7 +5847,7 @@ emitDeclImpl(decl, nullptr);
 
                 if (!isDerefBaseImplicit(ctx, ii->getBase()))
                 {
-                    emitIROperand(ctx, ii->getBase());
+                    emitIROperand(ctx, ii->getBase(), mode);
                     emit(".");
                 }
 
@@ -5826,9 +5857,9 @@ emitDeclImpl(decl, nullptr);
 
 #define CASE(OPCODE, OP)                                \
         case OPCODE:                                    \
-            emitIROperand(ctx, inst->getArg(0));    \
+            emitIROperand(ctx, inst->getArg(0), mode);  \
             emit(" " #OP " ");                          \
-            emitIROperand(ctx, inst->getArg(1));    \
+            emitIROperand(ctx, inst->getArg(1), mode);  \
             break
 
         CASE(kIROp_Add, +);
@@ -5866,18 +5897,18 @@ emitDeclImpl(decl, nullptr);
                 && inst->type->As<MatrixExpressionType>())
             {
                 emit("matrixCompMult(");
-                emitIROperand(ctx, inst->getArg(0));
+                emitIROperand(ctx, inst->getArg(0), mode);
                 emit(", ");
-                emitIROperand(ctx, inst->getArg(1));
+                emitIROperand(ctx, inst->getArg(1), mode);
                 emit(")");
             }
             else
             {
                 // Default handling is to just rely on infix
                 // `operator*`.
-                emitIROperand(ctx, inst->getArg(0));
+                emitIROperand(ctx, inst->getArg(0), mode);
                 emit(" * ");
-                emitIROperand(ctx, inst->getArg(1));
+                emitIROperand(ctx, inst->getArg(1), mode);
             }
             break;
 
@@ -5891,77 +5922,77 @@ emitDeclImpl(decl, nullptr);
                 {
                     emit("~");
                 }
-                emitIROperand(ctx, inst->getArg(0));
+                emitIROperand(ctx, inst->getArg(0), mode);
             }
             break;
 
         case kIROp_Neg:
             {
                 emit("-");
-                emitIROperand(ctx, inst->getArg(0));
+                emitIROperand(ctx, inst->getArg(0), mode);
             }
             break;
         case kIROp_BitNot:
             {
                 emit("~");
-                emitIROperand(ctx, inst->getArg(0));
+                emitIROperand(ctx, inst->getArg(0), mode);
             }
             break;
         case kIROp_Sample:
-            emitIROperand(ctx, inst->getArg(0));
+            emitIROperand(ctx, inst->getArg(0), mode);
             emit(".Sample(");
-            emitIROperand(ctx, inst->getArg(1));
+            emitIROperand(ctx, inst->getArg(1), mode);
             emit(", ");
-            emitIROperand(ctx, inst->getArg(2));
+            emitIROperand(ctx, inst->getArg(2), mode);
             emit(")");
             break;
 
         case kIROp_SampleGrad:
             // argument 0 is the instruction's type
-            emitIROperand(ctx, inst->getArg(0));
+            emitIROperand(ctx, inst->getArg(0), mode);
             emit(".SampleGrad(");
-            emitIROperand(ctx, inst->getArg(1));
+            emitIROperand(ctx, inst->getArg(1), mode);
             emit(", ");
-            emitIROperand(ctx, inst->getArg(2));
+            emitIROperand(ctx, inst->getArg(2), mode);
             emit(", ");
-            emitIROperand(ctx, inst->getArg(3));
+            emitIROperand(ctx, inst->getArg(3), mode);
             emit(", ");
-            emitIROperand(ctx, inst->getArg(4));
+            emitIROperand(ctx, inst->getArg(4), mode);
             emit(")");
             break;
 
         case kIROp_Load:
             // TODO: this logic will really only work for a simple variable reference...
-            emitIROperand(ctx, inst->getArg(0));
+            emitIROperand(ctx, inst->getArg(0), mode);
             break;
 
         case kIROp_Store:
             // TODO: this logic will really only work for a simple variable reference...
-            emitIROperand(ctx, inst->getArg(0));
+            emitIROperand(ctx, inst->getArg(0), mode);
             emit(" = ");
-            emitIROperand(ctx, inst->getArg(1));
+            emitIROperand(ctx, inst->getArg(1), mode);
             break;
 
         case kIROp_Call:
             {
-                emitIRCallExpr(ctx, (IRCall*)inst);
+                emitIRCallExpr(ctx, (IRCall*)inst, mode);
             }
             break;
 
         case kIROp_BufferLoad:
         case kIROp_BufferElementRef:
-            emitIROperand(ctx, inst->getArg(0));
+            emitIROperand(ctx, inst->getArg(0), mode);
             emit("[");
-            emitIROperand(ctx, inst->getArg(1));
+            emitIROperand(ctx, inst->getArg(1), mode);
             emit("]");
             break;
 
         case kIROp_BufferStore:
-            emitIROperand(ctx, inst->getArg(0));
+            emitIROperand(ctx, inst->getArg(0), mode);
             emit("[");
-            emitIROperand(ctx, inst->getArg(1));
+            emitIROperand(ctx, inst->getArg(1), mode);
             emit("] = ");
-            emitIROperand(ctx, inst->getArg(2));
+            emitIROperand(ctx, inst->getArg(2), mode);
             break;
 
         case kIROp_GroupMemoryBarrierWithGroupSync:
@@ -5970,9 +6001,9 @@ emitDeclImpl(decl, nullptr);
 
         case kIROp_getElement:
         case kIROp_getElementPtr:
-            emitIROperand(ctx, inst->getArg(0));
+            emitIROperand(ctx, inst->getArg(0), mode);
             emit("[");
-            emitIROperand(ctx, inst->getArg(1));
+            emitIROperand(ctx, inst->getArg(1), mode);
             emit("]");
             break;
 
@@ -5989,16 +6020,16 @@ emitDeclImpl(decl, nullptr);
                 // because the notion of what is a "row" vs. a "column"
                 // is reversed between HLSL/Slang and GLSL.
                 //
-                emitIROperand(ctx, inst->getArg(1));
+                emitIROperand(ctx, inst->getArg(1), mode);
                 emit(" * ");
-                emitIROperand(ctx, inst->getArg(0));
+                emitIROperand(ctx, inst->getArg(0), mode);
             }
             else
             {
                 emit("mul(");
-                emitIROperand(ctx, inst->getArg(0));
+                emitIROperand(ctx, inst->getArg(0), mode);
                 emit(", ");
-                emitIROperand(ctx, inst->getArg(1));
+                emitIROperand(ctx, inst->getArg(1), mode);
                 emit(")");
             }
             break;
@@ -6006,7 +6037,7 @@ emitDeclImpl(decl, nullptr);
         case kIROp_swizzle:
             {
                 auto ii = (IRSwizzle*)inst;
-                emitIROperand(ctx, ii->getBase());
+                emitIROperand(ctx, ii->getBase(), mode);
                 emit(".");
                 UInt elementCount = ii->getElementCount();
                 for (UInt ee = 0; ee < elementCount; ++ee)
@@ -6026,22 +6057,39 @@ emitDeclImpl(decl, nullptr);
 
         case kIROp_specialize:
             {
-                emitIROperand(ctx, inst->getArg(0));
+                emitIROperand(ctx, inst->getArg(0), mode);
             }
             break;
 
         case kIROp_Select:
             {
-                emitIROperand(ctx, inst->getArg(0));
+                emitIROperand(ctx, inst->getArg(0), mode);
                 emit(" ? ");
-                emitIROperand(ctx, inst->getArg(1));
+                emitIROperand(ctx, inst->getArg(1), mode);
                 emit(" : ");
-                emitIROperand(ctx, inst->getArg(2));
+                emitIROperand(ctx, inst->getArg(2), mode);
             }
             break;
 
         case kIROp_Param:
             emit(getIRName(inst));
+            break;
+
+        case kIROp_makeArray:
+            {
+                // TODO: initializer-list syntax may not always
+                // be appropriate, depending on the context
+                // of the expression.
+
+                emit("{ ");
+                UInt argCount = inst->getArgCount();
+                for (UInt aa = 0; aa < argCount; ++aa)
+                {
+                    if (aa != 0) emit(", ");
+                    emitIROperand(ctx, inst->getArg(aa), mode);
+                }
+                emit(" }");
+            }
             break;
 
         default:
@@ -6052,9 +6100,10 @@ emitDeclImpl(decl, nullptr);
 
     void emitIRInst(
         EmitContext*    ctx,
-        IRInst*         inst)
+        IRInst*         inst,
+        IREmitMode      mode)
     {
-        if (shouldFoldIRInstIntoUseSites(ctx, inst))
+        if (shouldFoldIRInstIntoUseSites(ctx, inst, mode))
         {
             return;
         }
@@ -6065,7 +6114,7 @@ emitDeclImpl(decl, nullptr);
         {
         default:
             emitIRInstResultDecl(ctx, inst);
-            emitIRInstExpr(ctx, inst);
+            emitIRInstExpr(ctx, inst, mode);
             emit(";\n");
             break;
 
@@ -6103,7 +6152,7 @@ emitDeclImpl(decl, nullptr);
 
         case kIROp_ReturnVal:
             emit("return ");
-            emitIROperand(ctx, ((IRReturnVal*) inst)->getVal());
+            emitIROperand(ctx, ((IRReturnVal*) inst)->getVal(), mode);
             emit(";\n");
             break;
 
@@ -6115,9 +6164,9 @@ emitDeclImpl(decl, nullptr);
             {
                 auto ii = (IRSwizzleSet*)inst;
                 emitIRInstResultDecl(ctx, inst);
-                emitIROperand(ctx, inst->getArg(0));
+                emitIROperand(ctx, inst->getArg(0), mode);
                 emit(";\n");
-                emitIROperand(ctx, inst);
+                emitIROperand(ctx, inst, mode);
                 emit(".");
                 UInt elementCount = ii->getElementCount();
                 for (UInt ee = 0; ee < elementCount; ++ee)
@@ -6133,7 +6182,7 @@ emitDeclImpl(decl, nullptr);
                     emit(kComponents[elementIndex]);
                 }
                 emit(" = ");
-                emitIROperand(ctx, inst->getArg(1));
+                emitIROperand(ctx, inst->getArg(1), mode);
                 emit(";\n");
             }
             break;
@@ -6229,9 +6278,9 @@ emitDeclImpl(decl, nullptr);
 
             IRValue* arg = args[argIndex].usedValue;
 
-            emitIROperand(ctx, pp);
+            emitIROperand(ctx, pp, IREmitMode::Default);
             emit(" = ");
-            emitIROperand(ctx, arg);
+            emitIROperand(ctx, arg, IREmitMode::Default);
             emit(";\n");
         }
     }
@@ -6331,7 +6380,7 @@ emitDeclImpl(decl, nullptr);
             assert(isTerminatorInst(terminator));
             for (auto inst = block->getFirstInst(); inst != terminator; inst = inst->getNextInst())
             {
-                emitIRInst(ctx, inst);
+                emitIRInst(ctx, inst, IREmitMode::Default);
             }
 
             // Now look at the terminator instruction, which will tell us what we need to emit next.
@@ -6350,7 +6399,7 @@ emitDeclImpl(decl, nullptr);
             case kIROp_ReturnVal:
             case kIROp_ReturnVoid:
             case kIROp_discard:
-                emitIRInst(ctx, terminator);
+                emitIRInst(ctx, terminator, IREmitMode::Default);
                 return;
 
             case kIROp_ifElse:
@@ -6368,7 +6417,7 @@ emitDeclImpl(decl, nullptr);
                     // instead of the current `if(cond) {} else {falseBlock}`
 
                     emit("if(");
-                    emitIROperand(ctx, t->getCondition());
+                    emitIROperand(ctx, t->getCondition(), IREmitMode::Default);
                     emit(")\n{\n");
                     emitIRStmtsForBlocks(
                         ctx,
@@ -6606,7 +6655,7 @@ emitDeclImpl(decl, nullptr);
 
                     // Emit the start of our statement.
                     emit("switch(");
-                    emitIROperand(ctx, conditionVal);
+                    emitIROperand(ctx, conditionVal, IREmitMode::Default);
                     emit(")\n{\n");
 
                     // Now iterate over the `case`s of the branch
@@ -6634,7 +6683,7 @@ emitDeclImpl(decl, nullptr);
                         for(;;)
                         {
                             emit("case ");
-                            emitIROperand(ctx, caseVal);
+                            emitIROperand(ctx, caseVal, IREmitMode::Default);
                             emit(":\n");
 
                             if(caseIndex >= caseCount)
@@ -7744,6 +7793,51 @@ emitDeclImpl(decl, nullptr);
         emit(";\n");
     }
 
+    void emitIRGlobalConstantInitializer(
+        EmitContext*        ctx,
+        IRGlobalConstant*   valDecl)
+    {
+        // We expect to see only a single block
+        auto block = valDecl->getFirstBlock();
+        assert(block);
+        assert(!block->getNextBlock());
+
+        // We expect the terminator to be a `return`
+        // instruction with a value.
+        auto returnInst = (IRReturnVal*) block->getLastInst();
+        assert(returnInst->op == kIROp_ReturnVal);
+
+        // Now we want to emit the expression form of
+        // the value being returned, and force any
+        // sub-expressions to be included.
+        emitIRInstExpr(ctx, returnInst->getVal(), IREmitMode::GlobalConstant);
+    }
+
+    void emitIRGlobalConstant(
+        EmitContext*        ctx,
+        IRGlobalConstant*   valDecl)
+    {
+        auto valType = valDecl->getType();
+
+        emit("static const ");
+        emitIRType(ctx, valType, getIRName(valDecl));
+
+        if (valDecl->firstBlock)
+        {
+            // There is an initializer (which we expect for
+            // any global constant...).
+
+            emit(" = ");
+
+            // We need to emit the entire initializer as
+            // a single expression.
+            emitIRGlobalConstantInitializer(ctx, valDecl);
+        }
+
+
+        emit(";\n");
+    }
+
     void emitIRGlobalInst(
         EmitContext*    ctx,
         IRGlobalValue*  inst)
@@ -7758,6 +7852,10 @@ emitDeclImpl(decl, nullptr);
 
         case kIROp_global_var:
             emitIRGlobalVar(ctx, (IRGlobalVar*) inst);
+            break;
+
+        case kIROp_global_constant:
+            emitIRGlobalConstant(ctx, (IRGlobalConstant*) inst);
             break;
 
         case kIROp_Var:
@@ -7916,6 +8014,14 @@ emitDeclImpl(decl, nullptr);
         case kIROp_global_var:
             {
                 auto irGlobal = (IRGlobalVar*) value;
+                emitIRUsedType(ctx, irGlobal->type);
+                emitIRUsedTypesForGlobalValueWithCode(ctx, irGlobal);
+            }
+            break;
+
+        case kIROp_global_constant:
+            {
+                auto irGlobal = (IRGlobalConstant*) value;
                 emitIRUsedType(ctx, irGlobal->type);
                 emitIRUsedTypesForGlobalValueWithCode(ctx, irGlobal);
             }

@@ -104,7 +104,7 @@ static void registerLegalizedValue(
 
 static void maybeRegisterLegalizedGlobal(
     IRTypeLegalizationContext*  context,
-    IRGlobalVar*                irGlobalVar,
+    IRGlobalValue*              irGlobalVar,
     LegalVal const&             legalVal)
 {
     // Check the mangled name of the symbol and don't register
@@ -122,7 +122,7 @@ static void maybeRegisterLegalizedGlobal(
 
 struct IRGlobalNameInfo
 {
-    IRGlobalVar*    globalVar;
+    IRGlobalValue*  globalVar;
     UInt            counter;
 };
 
@@ -1095,6 +1095,48 @@ static void legalizeGlobalVar(
     }
 }
 
+static void legalizeGlobalConstant(
+    IRTypeLegalizationContext*  context,
+    IRGlobalConstant*           irGlobalConstant)
+{
+    // Legalize the type for the variable's value
+    auto legalValueType = legalizeType(
+        context,
+        irGlobalConstant->getType());
+
+    switch (legalValueType.flavor)
+    {
+    case LegalType::Flavor::simple:
+        // Easy case: the type is usable as-is, and we
+        // should just do that.
+        irGlobalConstant->type = legalValueType.getSimple();
+        break;
+
+    default:
+        {
+            context->insertBeforeGlobal = irGlobalConstant->getNextValue();
+
+            IRGlobalNameInfo globalNameInfo;
+            globalNameInfo.globalVar = irGlobalConstant;
+            globalNameInfo.counter = 0;
+
+            // TODO: need to handle initializer here!
+            LegalVal newVal = declareVars(context, kIROp_global_constant, legalValueType, nullptr, nullptr, &globalNameInfo);
+
+            // Register the new value as the replacement for the old
+            registerLegalizedValue(context, irGlobalConstant, newVal);
+
+            // Also register the variable according to its mangled name, if any.
+            maybeRegisterLegalizedGlobal(context, irGlobalConstant, newVal);
+
+            // Remove the old global from the module.
+            irGlobalConstant->removeFromParent();
+            // TODO: actually clean up the global!
+        }
+        break;
+    }
+}
+
 static void legalizeGlobalValue(
     IRTypeLegalizationContext*    context,
     IRGlobalValue*              irValue)
@@ -1111,6 +1153,10 @@ static void legalizeGlobalValue(
 
     case kIROp_global_var:
         legalizeGlobalVar(context, (IRGlobalVar*)irValue);
+        break;
+
+    case kIROp_global_constant:
+        legalizeGlobalConstant(context, (IRGlobalConstant*)irValue);
         break;
 
     default:

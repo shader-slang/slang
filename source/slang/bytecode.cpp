@@ -918,11 +918,14 @@ BytecodeGenerationPtr<BCSymbol> generateBytecodeSymbolForInst(
         break;
 
     case kIROp_global_var:
+    case kIROp_global_constant:
         {
             auto bcVar = allocate<BCSymbol>(context);
 
             bcVar->op = inst->op;
             bcVar->typeID = getTypeID(context, inst->type);
+
+            // TODO: actually need to intialize with body instructions
 
             return bcVar;
         }

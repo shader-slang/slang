@@ -304,6 +304,15 @@ struct IRGlobalVar : IRGlobalValueWithCode
     PtrType* getType() { return type.As<PtrType>(); }
 };
 
+/// @brief A global constant.
+///
+/// Represents a global-scope constant value in the IR.
+/// The initializer for the constant is represented by
+/// the code in the basic block(s) nested in this value.
+struct IRGlobalConstant : IRGlobalValueWithCode
+{
+};
+
 // An entry in a witness table (see below)
 struct IRWitnessTableEntry : IRUser
 {
@@ -453,6 +462,21 @@ struct IRBuilder
         UInt            argCount,
         IRValue* const* args);
 
+    IRInst* emitMakeVector(
+        IRType*         type,
+        UInt            argCount,
+        IRValue* const* args);
+
+    IRInst* emitMakeArray(
+        IRType*         type,
+        UInt            argCount,
+        IRValue* const* args);
+
+    IRInst* emitMakeStruct(
+        IRType*         type,
+        UInt            argCount,
+        IRValue* const* args);
+
     IRUndefined* emitUndefined(IRType* type);
 
 
@@ -461,6 +485,8 @@ struct IRBuilder
     
     IRFunc* createFunc();
     IRGlobalVar* createGlobalVar(
+        IRType* valueType);
+    IRGlobalConstant* createGlobalConstant(
         IRType* valueType);
     IRWitnessTable* createWitnessTable();
     IRWitnessTableEntry* createWitnessTableEntry(
