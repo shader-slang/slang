@@ -1004,6 +1004,30 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitMakeVector(
+        IRType*         type,
+        UInt            argCount,
+        IRValue* const* args)
+    {
+        return emitIntrinsicInst(type, kIROp_makeVector, argCount, args);
+    }
+
+    IRInst* IRBuilder::emitMakeArray(
+        IRType*         type,
+        UInt            argCount,
+        IRValue* const* args)
+    {
+        return emitIntrinsicInst(type, kIROp_makeArray, argCount, args);
+    }
+
+    IRInst* IRBuilder::emitMakeStruct(
+        IRType*         type,
+        UInt            argCount,
+        IRValue* const* args)
+    {
+        return emitIntrinsicInst(type, kIROp_makeStruct, argCount, args);
+    }
+
     IRModule* IRBuilder::createModule()
     {
         auto module = new IRModule();
@@ -1174,6 +1198,18 @@ namespace Slang
         maybeSetSourceLoc(this, globalVar);
         addGlobalValue(getModule(), globalVar);
         return globalVar;
+    }
+
+    IRGlobalConstant* IRBuilder::createGlobalConstant(
+        IRType* valueType)
+    {
+        IRGlobalConstant* globalConstant = createValue<IRGlobalConstant>(
+            this,
+            kIROp_global_constant,
+            valueType);
+        maybeSetSourceLoc(this, globalConstant);
+        addGlobalValue(getModule(), globalConstant);
+        return globalConstant;
     }
 
     IRWitnessTable* IRBuilder::createWitnessTable()
@@ -1747,6 +1783,7 @@ namespace Slang
         {
         case kIROp_Func:
         case kIROp_global_var:
+        case kIROp_global_constant:
         case kIROp_witness_table:
             {
                 auto irFunc = (IRFunc*) inst;
@@ -2391,6 +2428,22 @@ namespace Slang
         dump(context, ";\n");
     }
 
+    void dumpIRGlobalConstant(
+        IRDumpContext*      context,
+        IRGlobalConstant*   val)
+    {
+        dump(context, "\n");
+        dumpIndent(context);
+        dump(context, "ir_global_constant ");
+        dumpID(context, val);
+        dumpInstTypeClause(context, val->getType());
+
+        // TODO: deal with the case where a global
+        // might have embedded initialization logic.
+
+        dump(context, ";\n");
+    }
+
     void dumpIRWitnessTableEntry(
         IRDumpContext*          context,
         IRWitnessTableEntry*    entry)
@@ -2434,6 +2487,10 @@ namespace Slang
 
         case kIROp_global_var:
             dumpIRGlobalVar(context, (IRGlobalVar*)value);
+            break;
+
+        case kIROp_global_constant:
+            dumpIRGlobalConstant(context, (IRGlobalConstant*)value);
             break;
 
         case kIROp_witness_table:
@@ -3501,6 +3558,7 @@ namespace Slang
         switch (originalValue->op)
         {
         case kIROp_global_var:
+        case kIROp_global_constant:
         case kIROp_Func:
         case kIROp_witness_table:
             return cloneGlobalValue(this, (IRGlobalValue*) originalValue);
@@ -3774,6 +3832,29 @@ namespace Slang
             originalVar);
 
         return clonedVar;
+    }
+
+    IRGlobalConstant* cloneGlobalConstantImpl(
+        IRSpecContext*      context,
+        IRGlobalConstant*    originalVal,
+        IROriginalValuesForClone const& originalValues)
+    {
+        auto clonedVal = context->builder->createGlobalConstant(context->maybeCloneType(originalVal->getType()));
+        registerClonedValue(context, clonedVal, originalValues);
+
+        auto mangledName = originalVal->mangledName;
+        clonedVal->mangledName = mangledName;
+
+        cloneDecorations(context, clonedVal, originalVal);
+
+        // Clone any code in the body of the constant, since this
+        // represents the initializer.
+        cloneGlobalValueWithCodeCommon(
+            context,
+            clonedVal,
+            originalVal);
+
+        return clonedVal;
     }
 
     IRWitnessTable* cloneWitnessTableImpl(
@@ -4051,6 +4132,7 @@ namespace Slang
             return ((IRWitnessTable*)val)->entries.first != nullptr;
 
         case kIROp_global_var:
+        case kIROp_global_constant:
         case kIROp_Func:
             return ((IRGlobalValueWithCode*)val)->firstBlock != nullptr;
 
@@ -4148,6 +4230,9 @@ namespace Slang
 
         case kIROp_global_var:
             return cloneGlobalVarImpl(context, (IRGlobalVar*)originalVal, sym);
+
+        case kIROp_global_constant:
+            return cloneGlobalConstantImpl(context, (IRGlobalConstant*)originalVal, sym);
 
         case kIROp_witness_table:
             return cloneWitnessTableImpl(context, (IRWitnessTable*)originalVal, sym);

@@ -650,6 +650,14 @@ void* loadVMSymbol(
         }
         break;
 
+    case kIROp_global_constant:
+        {
+            auto type = getType(vmModule, bcSymbol->typeID);
+            void* valPtr = allocate(vm, type);
+            return valPtr;
+        }
+        break;
+
     case kIROp_Func:
         {
             auto bcFunc = (BCFunc*) bcSymbol;

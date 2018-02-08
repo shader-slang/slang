@@ -1295,7 +1295,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     {
         // Allocate a temporary of the given type
         RefPtr<Type> type = lowerSimpleType(context, expr->type);
-        LoweredValInfo val = createVar(context, type);
+        List<IRValue*> args;
 
         UInt argCount = expr->args.Count();
 
@@ -1305,28 +1305,23 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         {
             UInt elementCount = (UInt) GetIntVal(arrayType->ArrayLength);
             auto elementType = lowerType(context, arrayType->baseType);
+
             for (UInt ee = 0; ee < elementCount; ++ee)
             {
-                IRValue* indexVal = context->irBuilder->getIntValue(
-                        getIntType(context),
-                        ee);
-                LoweredValInfo elemVal = subscriptValue(
-                    elementType,
-                    val,
-                    indexVal);
-
                 if (ee < argCount)
                 {
                     auto argExpr = expr->args[ee];
                     LoweredValInfo argVal = lowerRValueExpr(context, argExpr);
-
-                    assign(context, elemVal, argVal);
+                    args.Add(getSimpleVal(context, argVal));
                 }
                 else
                 {
                     SLANG_UNEXPECTED("need to default-initialize array elements");
                 }
             }
+
+            return LoweredValInfo::simple(
+                getBuilder()->emitMakeArray(type, args.Count(), args.Buffer()));
         }
         else if (auto vectorType = type->As<VectorExpressionType>())
         {
@@ -1335,7 +1330,6 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             UInt elementCount = (UInt) GetIntVal(vectorType->elementCount);
             UInt argCounter = 0;
 
-            List<IRValue*> elements;
             for (UInt ee = 0; ee < elementCount; ++ee)
             {
                 UInt argIndex = argCounter++;
@@ -1343,8 +1337,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                 {
                     auto argExpr = expr->args[argIndex];
                     LoweredValInfo argVal = lowerRValueExpr(context, argExpr);
-
-                    elements.Add(getSimpleVal(context, argVal));
+                    args.Add(getSimpleVal(context, argVal));
                 }
                 else
                 {
@@ -1352,10 +1345,8 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                 }
             }
 
-            assign(context, val, LoweredValInfo::simple(getBuilder()->emitConstructorInst(
-                lowerSimpleType(context, vectorType),
-                elementCount,
-                elements.Buffer())));
+            return LoweredValInfo::simple(
+                getBuilder()->emitMakeVector(type, args.Count(), args.Buffer()));
         }
         else if (auto declRefType = type->As<DeclRefType>())
         {
@@ -1368,26 +1359,21 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                     if (ff.getDecl()->HasModifier<HLSLStaticModifier>())
                         continue;
 
-                    auto loweredFieldType = lowerType(
-                        context,
-                        GetType(ff));
-                    LoweredValInfo fieldVal = extractField(
-                        loweredFieldType,
-                        val,
-                        ff);
-
                     UInt argIndex = argCounter++;
                     if (argIndex < argCount)
                     {
                         auto argExpr = expr->args[argIndex];
                         LoweredValInfo argVal = lowerRValueExpr(context, argExpr);
-                        assign(context, fieldVal, argVal);
+                        args.Add(getSimpleVal(context, argVal));
                     }
                     else
                     {
                         SLANG_UNEXPECTED("need to default-initialize struct fields");
                     }
                 }
+
+                return LoweredValInfo::simple(
+                    getBuilder()->emitMakeStruct(type, args.Count(), args.Buffer()));
             }
             else
             {
@@ -1399,8 +1385,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             SLANG_UNEXPECTED("not sure how to initialize this type");
         }
 
-
-        return val;
+        UNREACHABLE_RETURN(LoweredValInfo());
     }
 
     LoweredValInfo visitConstantExpr(ConstantExpr* expr)
@@ -2997,7 +2982,21 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // to a variable over to its type, when it makes sense.
 
         auto builder = getBuilder();
-        auto irGlobal = builder->createGlobalVar(varType);
+
+        IRGlobalValueWithCode* irGlobal = nullptr;
+        LoweredValInfo globalVal;
+
+        // a `static const` global is actually a compile-time constant
+        if (decl->HasModifier<HLSLStaticModifier>() && decl->HasModifier<ConstModifier>())
+        {
+            irGlobal = builder->createGlobalConstant(varType);
+            globalVal = LoweredValInfo::simple(irGlobal);
+        }
+        else
+        {
+            irGlobal = builder->createGlobalVar(varType);
+            globalVal = LoweredValInfo::ptr(irGlobal);
+        }
         irGlobal->mangledName = getMangledName(decl);
 
         if (decl)
@@ -3007,7 +3006,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // A global variable's SSA value is a *pointer* to
         // the underlying storage.
-        auto globalVal = LoweredValInfo::ptr(irGlobal);
         context->shared->declValues[
             DeclRef<VarDeclBase>(decl, nullptr)] = globalVal;
 
