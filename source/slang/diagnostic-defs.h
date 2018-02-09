@@ -241,6 +241,18 @@ DIAGNOSTIC(39999, Error, invalidFloatingPOintLiteralSuffix, "invalid suffix '$0'
 DIAGNOSTIC(39999, Error, conflictingExplicitBindingsForParameter, "conflicting explicit bindings for parameter '$0'")
 DIAGNOSTIC(39999, Warning, parameterBindingsOverlap, "explicit binding for parameter '$0' overlaps with parameter '$1'")
 
+
+DIAGNOSTIC(39999, Error, shaderParameterDeclarationsDontMatch, "declarations of shader parameter '$0' in different translation units don't match")
+
+DIAGNOSTIC(39999, Note, shaderParameterTypeMismatch, "type is declared as '$0' in one translation unit, and '$0' in another")
+DIAGNOSTIC(39999, Note, fieldTypeMisMatch, "type of field '$0' is declared as '$1' in one translation unit, and '$2' in another")
+DIAGNOSTIC(39999, Note, fieldDeclarationsDontMatch, "type '$0' is declared with different fields in each translation unit")
+DIAGNOSTIC(39999, Note, usedInDeclarationOf, "used in declaration of '$0'")
+
+
+
+
+
 DIAGNOSTIC(38000, Error, entryPointFunctionNotFound, "no function found matching entry point name '$0'")
 DIAGNOSTIC(38001, Error, ambiguousEntryPoint, "more than one function matches entry point name '$0'")
 DIAGNOSTIC(38002, Note, entryPointCandidate, "see candidate declaration for entry point '$0'")
