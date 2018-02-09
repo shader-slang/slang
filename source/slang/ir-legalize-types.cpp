@@ -13,6 +13,7 @@
 #include "ir.h"
 #include "ir-insts.h"
 #include "legalize-types.h"
+#include "mangle.h"
 
 namespace Slang
 {
@@ -277,7 +278,7 @@ static LegalVal legalizeLoad(
             for (auto ee : legalPtrVal.getTuple()->elements)
             {
                 TuplePseudoVal::Element element;
-                element.fieldDeclRef = ee.fieldDeclRef;
+                element.mangledName = ee.mangledName;
                 element.val = legalizeLoad(context, ee.val);
 
                 tupleVal->elements.Add(element);
@@ -366,11 +367,13 @@ static LegalVal legalizeFieldAddress(
 
     case LegalVal::Flavor::pair:
         {
+            String mangledFieldName = getMangledName(fieldDeclRef.getDecl());
+
             // There are two sides, the ordinary and the special,
             // and we basically just dispatch to both of them.
             auto pairVal = legalPtrOperand.getPair();
             auto pairInfo = pairVal->pairInfo;
-            auto pairElement = pairInfo->findElement(fieldDeclRef);
+            auto pairElement = pairInfo->findElement(mangledFieldName);
             if (!pairElement)
             {
                 SLANG_UNEXPECTED("didn't find tuple element");
@@ -424,6 +427,8 @@ static LegalVal legalizeFieldAddress(
 
     case LegalVal::Flavor::tuple:
         {
+            String mangledFieldName = getMangledName(fieldDeclRef.getDecl());
+
             // The operand is a tuple of pointer-like
             // values, we want to extract the element
             // corresponding to a field. We will handle
@@ -432,7 +437,7 @@ static LegalVal legalizeFieldAddress(
             auto ptrTupleInfo = legalPtrOperand.getTuple();
             for (auto ee : ptrTupleInfo->elements)
             {
-                if (ee.fieldDeclRef.Equals(fieldDeclRef))
+                if (ee.mangledName == mangledFieldName)
                 {
                     return ee.val;
                 }
@@ -542,7 +547,7 @@ static LegalVal legalizeGetElementPtr(
                 auto elemType = tupleType->elements[ee].type;
 
                 TuplePseudoVal::Element resElem;
-                resElem.fieldDeclRef = ptrElem.fieldDeclRef;
+                resElem.mangledName = ptrElem.mangledName;
                 resElem.val = legalizeGetElementPtr(
                     context,
                     elemType,
@@ -1001,7 +1006,7 @@ static LegalVal declareVars(
 
             for (auto ee : tupleType->elements)
             {
-                auto fieldLayout = getFieldLayout(typeLayout, ee.fieldDeclRef);
+                auto fieldLayout = getFieldLayout(typeLayout, ee.mangledName);
                 RefPtr<TypeLayout> fieldTypeLayout = fieldLayout ? fieldLayout->typeLayout : nullptr;
 
                 // If we are processing layout information, then
@@ -1026,7 +1031,7 @@ static LegalVal declareVars(
                     globalNameInfo);
 
                 TuplePseudoVal::Element element;
-                element.fieldDeclRef = ee.fieldDeclRef;
+                element.mangledName = ee.mangledName;
                 element.val = fieldVal;
                 tupleVal->elements.Add(element);
             }

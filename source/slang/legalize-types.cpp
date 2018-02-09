@@ -232,10 +232,11 @@ struct TupleTypeBuilder
             break;
         }
 
+        String mangledFieldName = getMangledName(fieldDeclRef.getDecl());
 
         PairInfo::Element pairElement;
         pairElement.flags = 0;
-        pairElement.fieldDeclRef = fieldDeclRef;
+        pairElement.mangledName = mangledFieldName;
         pairElement.fieldPairInfo = elementPairInfo;
 
         // We will always add a field to the "ordinary"
@@ -272,7 +273,7 @@ struct TupleTypeBuilder
             pairElement.flags |= PairInfo::kFlag_hasSpecial;
 
             TuplePseudoType::Element specialElement;
-            specialElement.fieldDeclRef = fieldDeclRef;
+            specialElement.mangledName = mangledFieldName;
             specialElement.type = specialType;
             specialElements.Add(specialElement);
         }
@@ -557,7 +558,7 @@ static LegalType createLegalUniformBufferType(
             {
                 TuplePseudoType::Element newElement;
 
-                newElement.fieldDeclRef = ee.fieldDeclRef;
+                newElement.mangledName = ee.mangledName;
                 newElement.type = LegalType::implicitDeref(ee.type);
 
                 bufferPseudoTupleType->elements.Add(newElement);
@@ -657,7 +658,7 @@ static LegalType createLegalPtrType(
             {
                 TuplePseudoType::Element newElement;
 
-                newElement.fieldDeclRef = ee.fieldDeclRef;
+                newElement.mangledName = ee.mangledName;
                 newElement.type = createLegalPtrType(
                     context,
                     typeDeclRef,
@@ -772,7 +773,7 @@ static LegalType wrapLegalType(
             {
                 TuplePseudoType::Element element;
 
-                element.fieldDeclRef = ee.fieldDeclRef;
+                element.mangledName = ee.mangledName;
                 element.type = wrapLegalType(
                     context,
                     ee.type,
@@ -988,8 +989,8 @@ RefPtr<TypeLayout> getDerefTypeLayout(
 }
 
 RefPtr<VarLayout> getFieldLayout(
-    TypeLayout*             typeLayout,
-    DeclRef<VarDeclBase>    fieldDeclRef)
+    TypeLayout*     typeLayout,
+    String const&   mangledFieldName)
 {
     if (!typeLayout)
         return nullptr;
@@ -1013,9 +1014,13 @@ RefPtr<VarLayout> getFieldLayout(
 
     if (auto structTypeLayout = dynamic_cast<StructTypeLayout*>(typeLayout))
     {
-        RefPtr<VarLayout> fieldLayout;
-        if (structTypeLayout->mapVarToLayout.TryGetValue(fieldDeclRef.getDecl(), fieldLayout))
-            return fieldLayout;
+        for(auto ff : structTypeLayout->fields)
+        {
+            if(mangledFieldName == getMangledName(ff->varDecl) )
+            {
+                return ff;
+            }
+        }
     }
 
     return nullptr;
