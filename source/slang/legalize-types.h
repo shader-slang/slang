@@ -138,7 +138,7 @@ struct TuplePseudoType : LegalTypeImpl
     struct Element
     {
         // The field that this element replaces
-        DeclRef<VarDeclBase>    fieldDeclRef;
+        String mangledName;
 
         // The legalized type of the element
         LegalType               type;
@@ -161,7 +161,7 @@ struct PairInfo : RefObject
     struct Element
     {
         // The original field the element represents
-        DeclRef<Decl> fieldDeclRef;
+        String mangledName;
 
         // The conceptual type of the field.
         // If both the `hasOrdinary` and
@@ -192,11 +192,11 @@ struct PairInfo : RefObject
     // which fields are on which side(s).
     List<Element> elements;
 
-    Element* findElement(DeclRef<Decl> const& fieldDeclRef)
+    Element* findElement(String const& mangledName)
     {
         for (auto& ee : elements)
         {
-            if(ee.fieldDeclRef.Equals(fieldDeclRef))
+            if(ee.mangledName == mangledName)
                 return &ee;
         }
         return nullptr;
@@ -227,8 +227,8 @@ RefPtr<TypeLayout> getDerefTypeLayout(
     TypeLayout* typeLayout);
 
 RefPtr<VarLayout> getFieldLayout(
-    TypeLayout*             typeLayout,
-    DeclRef<VarDeclBase>    fieldDeclRef);
+    TypeLayout*     typeLayout,
+    String const&   mangledFieldName);
 
 // Represents the "chain" of declarations that
 // were followed to get to a variable that we
@@ -321,8 +321,8 @@ struct TuplePseudoVal : LegalValImpl
 {
     struct Element
     {
-        DeclRef<VarDeclBase>            fieldDeclRef;
-        LegalVal                        val;
+        String      mangledName;
+        LegalVal    val;
     };
 
     List<Element>   elements;
