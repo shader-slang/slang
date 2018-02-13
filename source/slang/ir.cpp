@@ -2867,38 +2867,56 @@ namespace Slang
         };
 
         Flavor                      flavor;
-        Val*                        elementCount;
+        IntVal*                     elementCount;
         GlobalVaryingDeclarator*    next;
     };
 
     ScalarizedVal createSimpleGLSLGlobalVarying(
         IRBuilder*                  builder,
-        Type*                       type,
-        VarLayout*                  varLayout,
-        TypeLayout*                 /*typeLayout*/,
-        LayoutResourceKind          /*kind*/,
-        GlobalVaryingDeclarator*    /*declarator*/)
+        Type*                       inType,
+        VarLayout*                  inVarLayout,
+        TypeLayout*                 inTypeLayout,
+        LayoutResourceKind          kind,
+        UInt                        bindingIndex,
+        GlobalVaryingDeclarator*    declarator)
     {
-        // TODO: We might be creating an `in` or `out` variable based on
-        // an `in out` function parameter. In this case we should
-        // rewrite the `typeLayout` to only include the information
-        // for the appropriate `kind`.
-        //
-        // TODO: actually, we should *always* be re-creating the layout,
-        // because we need to apply any offsets from the parent...
-
-        // TODO: If there are any `declarator`s, we need to unwrap
-        // them here, and allow them to modify the type of the
-        // variable that we declare.
-        //
-        // They should probably also affect how we return the
-        // `ScalarizedVal`, since we need to reflect the AOS->SOA conversion.
-
         // TODO: detect when the layout represents a system input/output
-        if( varLayout->systemValueSemantic.Length() != 0 )
+        if( inVarLayout->systemValueSemantic.Length() != 0 )
         {
             // This variable represents a system input/output,
             // and we should probably handle that differently, right?
+        }
+
+        RefPtr<Type> type = inType;
+        RefPtr<TypeLayout> typeLayout = inTypeLayout;
+        for( auto dd = declarator; dd; dd = dd->next )
+        {
+            assert(dd->flavor == GlobalVaryingDeclarator::Flavor::array);
+
+            RefPtr<ArrayExpressionType> arrayType = builder->getSession()->getArrayType(
+                type,
+                dd->elementCount);
+
+            RefPtr<ArrayTypeLayout> arrayTypeLayout = new ArrayTypeLayout();
+            arrayTypeLayout->type = arrayType;
+            arrayTypeLayout->rules = typeLayout->rules;
+            arrayTypeLayout->originalElementTypeLayout =  typeLayout;
+            arrayTypeLayout->elementTypeLayout = typeLayout;
+            arrayTypeLayout->uniformStride = 0;
+
+            if( auto resInfo = inTypeLayout->FindResourceInfo(kind) )
+            {
+                // TODO: it is kind of gross to be re-running some
+                // of the type layout logic here.
+
+                UInt elementCount = (UInt) GetIntVal(dd->elementCount);
+                arrayTypeLayout->addResourceUsage(
+                    kind,
+                    resInfo->count * elementCount);
+            }
+
+            type = arrayType;
+            typeLayout = arrayTypeLayout;
         }
 
         // Simple case: just create a global variable of the matching type,
@@ -2907,7 +2925,24 @@ namespace Slang
         //
         auto globalVariable = addGlobalVariable(builder->getModule(), type);
         moveValueBefore(globalVariable, builder->getFunc());
+
+        // We need to construct a fresh layout for the variable, even
+        // if the original had its own layout, because it might be
+        // an `inout` parameter, and we only want to deal with the case
+        // described by our `kind` parameter.
+        RefPtr<VarLayout> varLayout = new VarLayout();
+        varLayout->varDecl = inVarLayout->varDecl;
+        varLayout->typeLayout = typeLayout;
+        varLayout->flags = inVarLayout->flags;
+        varLayout->systemValueSemantic = inVarLayout->systemValueSemantic;
+        varLayout->systemValueSemanticIndex = inVarLayout->systemValueSemanticIndex;
+        varLayout->semanticName = inVarLayout->semanticName;
+        varLayout->semanticIndex = inVarLayout->semanticIndex;
+        varLayout->stage = inVarLayout->stage;
+        varLayout->AddResourceInfo(kind)->index = bindingIndex;
+
         builder->addLayoutDecoration(globalVariable, varLayout);
+
         return ScalarizedVal::address(globalVariable);
     }
 
@@ -2917,20 +2952,21 @@ namespace Slang
         VarLayout*                  varLayout,
         TypeLayout*                 typeLayout,
         LayoutResourceKind          kind,
+        UInt                        bindingIndex,
         GlobalVaryingDeclarator*    declarator)
     {
         if( type->As<BasicExpressionType>() )
         {
-            return createSimpleGLSLGlobalVarying(builder, type, varLayout, typeLayout, kind, declarator);
+            return createSimpleGLSLGlobalVarying(builder, type, varLayout, typeLayout, kind, bindingIndex, declarator);
         }
         else if( type->As<VectorExpressionType>() )
         {
-            return createSimpleGLSLGlobalVarying(builder, type, varLayout, typeLayout, kind, declarator);
+            return createSimpleGLSLGlobalVarying(builder, type, varLayout, typeLayout, kind, bindingIndex, declarator);
         }
         else if( type->As<MatrixExpressionType>() )
         {
             // TODO: a matrix-type varying should probably be handled like an array of rows
-            return createSimpleGLSLGlobalVarying(builder, type, varLayout, typeLayout, kind, declarator);
+            return createSimpleGLSLGlobalVarying(builder, type, varLayout, typeLayout, kind, bindingIndex, declarator);
         }
         else if( auto arrayType = type->As<ArrayExpressionType>() )
         {
@@ -2953,6 +2989,7 @@ namespace Slang
                 varLayout,
                 elementTypeLayout,
                 kind,
+                bindingIndex,
                 &arrayDeclarator);
         }
         else if( auto declRefType = type->As<DeclRefType>() )
@@ -2978,12 +3015,17 @@ namespace Slang
                     // generate one variable for each.
                     for( auto ff : structTypeLayout->fields )
                     {
+                        UInt fieldBindingIndex = bindingIndex;
+                        if(auto fieldResInfo = ff->FindResourceInfo(kind))
+                            fieldBindingIndex += fieldResInfo->index;
+
                         auto fieldVal = createGLSLGlobalVaryingsImpl(
                             builder,
                             ff->typeLayout->type,
                             ff,
                             ff->typeLayout,
                             kind,
+                            fieldBindingIndex,
                             declarator);
 
                         ScalarizedTupleValImpl::Element element;
@@ -2999,7 +3041,7 @@ namespace Slang
         }
 
         // Default case is to fall back on the simple behavior
-        return createSimpleGLSLGlobalVarying(builder, type, varLayout, typeLayout, kind, declarator);
+        return createSimpleGLSLGlobalVarying(builder, type, varLayout, typeLayout, kind, bindingIndex, declarator);
     }
 
     ScalarizedVal createGLSLGlobalVaryings(
@@ -3008,7 +3050,10 @@ namespace Slang
         VarLayout*          layout,
         LayoutResourceKind  kind)
     {
-        return createGLSLGlobalVaryingsImpl(builder, type, layout, layout->typeLayout, kind, nullptr);
+        UInt bindingIndex = 0;
+        if(auto rr = layout->FindResourceInfo(kind))
+            bindingIndex = rr->index;
+        return createGLSLGlobalVaryingsImpl(builder, type, layout, layout->typeLayout, kind, bindingIndex, nullptr);
     }
 
     ScalarizedVal extractField(
@@ -3059,6 +3104,13 @@ namespace Slang
             case ScalarizedVal::Flavor::value:
                 {
                     builder->emitStore(left.irValue, right.irValue);
+                }
+                break;
+
+            case ScalarizedVal::Flavor::address:
+                {
+                    auto val = builder->emitLoad(right.irValue);
+                    builder->emitStore(left.irValue, val);
                 }
                 break;
 
