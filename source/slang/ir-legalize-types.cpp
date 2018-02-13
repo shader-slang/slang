@@ -232,7 +232,7 @@ static LegalVal legalizeCall(
 
     return LegalVal::simple(context->builder->emitCallInst(
         callInst->type,
-        callInst->func.usedValue,
+        callInst->func.get(),
         instArgs.Count(),
         instArgs.Buffer()));
 }

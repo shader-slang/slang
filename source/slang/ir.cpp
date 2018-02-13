@@ -59,41 +59,81 @@ namespace Slang
 
     //
 
+    void IRUse::debugValidate()
+    {
+#ifdef _DEBUG
+        auto uv = this->usedValue;
+        if(!uv)
+        {
+            assert(!user);
+            assert(!nextUse);
+            assert(!prevLink);
+            return;
+        }
+
+        auto pp = &uv->firstUse;
+        for(auto u = uv->firstUse; u;)
+        {
+            assert(u->prevLink == pp);
+
+            pp = &u->nextUse;
+            u = u->nextUse;
+        }
+#endif
+    }
+
     void IRUse::init(IRUser* u, IRValue* v)
     {
+        clear();
+
         user = u;
         usedValue = v;
-
         if(v)
         {
             nextUse = v->firstUse;
             prevLink = &v->firstUse;
 
+            if(nextUse)
+            {
+                nextUse->prevLink = &this->nextUse;
+            }
+
             v->firstUse = this;
         }
+
+        debugValidate();
     }
 
-    void IRUse::set(IRValue* usedVal)
+    void IRUse::set(IRValue* uv)
     {
-        // clear out the old value
-        if (usedVal)
-        {
-            if (prevLink)
-                *prevLink = nextUse;
-        }
-
-        init(user, usedVal);
+        init(user, uv);
     }
 
     void IRUse::clear()
     {
+        // This `IRUse` is part of the linked list
+        // of uses for  `usedValue`.
+
+        debugValidate();
+
         if (usedValue)
         {
-            *prevLink = nextUse;
-        }
+            auto uv = usedValue;
 
-        user = nullptr;
-        usedValue = nullptr;
+            *prevLink = nextUse;
+            if(nextUse)
+            {
+                nextUse->prevLink = prevLink;
+            }
+
+            user        = nullptr;
+            usedValue   = nullptr;
+            nextUse     = nullptr;
+            prevLink    = nullptr;
+
+            if(uv->firstUse)
+                uv->firstUse->debugValidate();
+        }
     }
 
     //
@@ -250,7 +290,7 @@ namespace Slang
             // We will re-use the logic for getting the successor
             // list from such an instruction.
 
-            auto successorList = getSuccessors((IRInst*) use->user);
+            auto successorList = getSuccessors((IRInst*) use->getUser());
 
             if(use >= successorList.begin_
                 && use < successorList.end_)
@@ -315,7 +355,7 @@ namespace Slang
     IRBlock* IRBlock::PredecessorList::Iterator::operator*()
     {
         if (!use) return nullptr;
-        return (IRBlock*)use->user->parent;
+        return (IRBlock*)use->getUser()->parent;
     }
 
     IRBlock::SuccessorList IRBlock::getSuccessors()
@@ -351,7 +391,7 @@ namespace Slang
 
     IRBlock* IRBlock::SuccessorList::Iterator::operator*()
     {
-        return (IRBlock*)use->usedValue;
+        return (IRBlock*)use->get();
     }
 
     // IRFunc
@@ -714,7 +754,7 @@ namespace Slang
         auto rightArgs = right.inst->getArgs();
         for( UInt aa = 0; aa < argCount; ++aa )
         {
-            if(leftArgs[aa].usedValue != rightArgs[aa].usedValue)
+            if(leftArgs[aa].get() != rightArgs[aa].get())
                 return false;
         }
 
@@ -731,7 +771,7 @@ namespace Slang
         auto args = inst->getArgs();
         for( UInt aa = 0; aa < argCount; ++aa )
         {
-            code = combineHash(code, Slang::GetHashCode(args[aa].usedValue));
+            code = combineHash(code, Slang::GetHashCode(args[aa].get()));
         }
         return code;
     }
@@ -1894,7 +1934,7 @@ namespace Slang
         }
         else if (auto proxyVal = dynamic_cast<IRProxyVal*>(val))
         {
-            dumpOperand(context, proxyVal->inst.usedValue);
+            dumpOperand(context, proxyVal->inst.get());
         }
         else
         {
@@ -2283,7 +2323,7 @@ namespace Slang
             if (ii != 0)
                 dump(context, ", ");
 
-            auto argVal = inst->getArgs()[ii].usedValue;
+            auto argVal = inst->getArgs()[ii].get();
 
             dumpOperand(context, argVal);
         }
@@ -2449,9 +2489,9 @@ namespace Slang
         IRWitnessTableEntry*    entry)
     {
         dump(context, "witness_table_entry(");
-        dumpOperand(context, entry->requirementKey.usedValue);
+        dumpOperand(context, entry->requirementKey.get());
         dump(context, ",");
-        dumpOperand(context, entry->satisfyingVal.usedValue);
+        dumpOperand(context, entry->satisfyingVal.get());
         dump(context, ")\n");
     }
 
@@ -2522,6 +2562,20 @@ namespace Slang
         dumpIRModule(&context, module);
     }
 
+    void dumpIR(IRGlobalValue* globalVal)
+    {
+        StringBuilder sb;
+
+        IRDumpContext context;
+        context.builder = &sb;
+        context.indent = 0;
+
+        dumpIRGlobalValue(&context, globalVal);
+
+        fprintf(stderr, "%s\n", sb.Buffer());
+        fflush(stderr);
+    }
+
     String getSlangIRAssembly(IRModule* module)
     {
         StringBuilder sb;
@@ -2551,12 +2605,14 @@ namespace Slang
         if(!ff)
             return;
 
+        ff->debugValidate();
+
         IRUse* uu = ff;
         for(;;)
         {
             // The uses had better all be uses of this
             // instruction, or invariants are broken.
-            assert(uu->usedValue == this);
+            assert(uu->get() == this);
 
             // Swap this use over to use the other value.
             uu->usedValue = other;
@@ -2597,6 +2653,8 @@ namespace Slang
 
         // And `this` will have no uses any more.
         this->firstUse = nullptr;
+
+        ff->debugValidate();
     }
 
     void IRValue::deallocate()
@@ -2684,15 +2742,7 @@ namespace Slang
         for( UInt aa = 0; aa < argCount; ++aa )
         {
             IRUse& use = getArgs()[aa];
-
-            if(!use.usedValue)
-                continue;
-
-            // Need to unlink this use from the appropriate linked list.
-            use.usedValue = nullptr;
-            *use.prevLink = use.nextUse;
-            use.prevLink = nullptr;
-            use.nextUse = nullptr;
+            use.clear();
         }
     }
 
@@ -3616,7 +3666,7 @@ namespace Slang
                                     {
                                         auto proxyVal = witness.Value.As<IRProxyVal>();
                                         SLANG_ASSERT(proxyVal);
-                                        return proxyVal->inst.usedValue;
+                                        return proxyVal->inst.get();
                                     }
                                 }
                             }
@@ -3651,7 +3701,7 @@ namespace Slang
     {
         if (auto proxyVal = dynamic_cast<IRProxyVal*>(val))
         {
-            auto newIRVal = cloneValue(context, proxyVal->inst.usedValue);
+            auto newIRVal = cloneValue(context, proxyVal->inst.get());
 
             RefPtr<IRProxyVal> newProxyVal = new IRProxyVal();
             newProxyVal->inst.init(nullptr, newIRVal);
@@ -3879,10 +3929,10 @@ namespace Slang
         // Clone the entries in the witness table as well
         for( auto originalEntry : originalTable->entries )
         {
-            auto clonedKey = cloneValue(context, originalEntry->requirementKey.usedValue);
+            auto clonedKey = cloneValue(context, originalEntry->requirementKey.get());
             
             // if a global val with the mangled name already exists, don't clone again
-            auto clonedVal = maybeCloneValueWithMangledName(context, (IRGlobalValue*)(originalEntry->satisfyingVal.usedValue));
+            auto clonedVal = maybeCloneValueWithMangledName(context, (IRGlobalValue*)(originalEntry->satisfyingVal.get()));
 
             /*auto clonedEntry = */context->builder->createWitnessTableEntry(
                 clonedTable,
@@ -4643,7 +4693,7 @@ namespace Slang
             // the pointed-to value and not the proxy type-level `Val`
             // instead.
 
-            return context->maybeCloneValue(proxyVal->inst.usedValue);
+            return context->maybeCloneValue(proxyVal->inst.get());
         }
         else
         {
@@ -4905,9 +4955,9 @@ namespace Slang
         // of involved functions.
         for (auto entry : specTable->entries)
         {
-            if (entry->satisfyingVal.usedValue->op == kIROp_Func)
+            if (entry->satisfyingVal.get()->op == kIROp_Func)
             {
-                IRFunc* func = (IRFunc*)entry->satisfyingVal.usedValue;
+                IRFunc* func = (IRFunc*)entry->satisfyingVal.get();
                 auto specFunc = getSpecializedFunc(sharedContext, func, specDeclRef);
                 entry->satisfyingVal.set(specFunc);
                 insertGlobalValueSymbol(sharedContext, specFunc);
@@ -5016,7 +5066,7 @@ namespace Slang
         {
             // We expect the key on the entry to be a decl-ref,
             // but lets go ahead and check, just to be sure.
-            auto requirementKey = entry->requirementKey.usedValue;
+            auto requirementKey = entry->requirementKey.get();
             if(requirementKey->op != kIROp_decl_ref)
                 continue;
             auto keyDeclRef = ((IRDeclRef*) requirementKey)->declRef;
@@ -5039,7 +5089,7 @@ namespace Slang
 
             // If the keys matched, then we use the value from
             // this entry.
-            auto satisfyingVal = entry->satisfyingVal.usedValue;
+            auto satisfyingVal = entry->satisfyingVal.get();
             return satisfyingVal;
         }
 
@@ -5147,11 +5197,11 @@ namespace Slang
 
                             // Now we extract the specialized decl-ref that will
                             // tell us how to specialize things.
-                            auto specDeclRefVal = (IRDeclRef*)specInst->specDeclRefVal.usedValue;
+                            auto specDeclRefVal = (IRDeclRef*)specInst->specDeclRefVal.get();
                             auto specDeclRef = specDeclRefVal->declRef;
 
                             // We need to specialize functions and witness tables
-                            auto genericVal = specInst->genericVal.usedValue;
+                            auto genericVal = specInst->genericVal.get();
                             if (genericVal->op == kIROp_Func)
                             {
                                 auto genericFunc = (IRFunc*)genericVal;
@@ -5187,8 +5237,8 @@ namespace Slang
                             // try find concrete witness table from global scope
                             IRLookupWitnessTable* lookupInst = (IRLookupWitnessTable*)ii;
                             IRWitnessTable* witnessTable = nullptr;
-                            auto srcDeclRef = ((IRDeclRef*)lookupInst->sourceType.usedValue)->declRef;
-                            auto interfaceDeclRef = ((IRDeclRef*)lookupInst->interfaceType.usedValue)->declRef;
+                            auto srcDeclRef = ((IRDeclRef*)lookupInst->sourceType.get())->declRef;
+                            auto interfaceDeclRef = ((IRDeclRef*)lookupInst->interfaceType.get())->declRef;
                             auto mangledName = getMangledNameForConformanceWitness(srcDeclRef, interfaceDeclRef);
                             witnessTables.TryGetValue(mangledName, witnessTable);
                             
@@ -5221,14 +5271,14 @@ namespace Slang
 
                             // We only want to deal with the case where the witness-table
                             // argument points to a concrete global table.
-                            auto witnessTableArg = lookupInst->witnessTable.usedValue;
+                            auto witnessTableArg = lookupInst->witnessTable.get();
                             if(witnessTableArg->op != kIROp_witness_table)
                                 continue;
                             IRWitnessTable* witnessTable = (IRWitnessTable*)witnessTableArg;
 
                             // We also need to be sure that the requirement we
                             // are trying to look up is identified via a decl-ref:
-                            auto requirementArg = lookupInst->requirementDeclRef.usedValue;
+                            auto requirementArg = lookupInst->requirementDeclRef.get();
                             if(requirementArg->op != kIROp_decl_ref)
                                 continue;
                             auto requirementDeclRef = ((IRDeclRef*) requirementArg)->declRef;
