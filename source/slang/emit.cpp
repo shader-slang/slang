@@ -2,6 +2,7 @@
 #include "emit.h"
 
 #include "ir-insts.h"
+#include "ir-ssa.h"
 #include "legalize-types.h"
 #include "lower-to-ir.h"
 #include "mangle.h"
@@ -8259,6 +8260,14 @@ String emitEntryPoint(
         dumpIR(lowered);
         fprintf(stderr, "###\n");
 #endif
+
+        // Once specialization and type legalization have been performed,
+        // we should perform some of our basic optimization steps again,
+        // to see if we can clean up any temporaries created by legalization.
+        // (e.g., things that used to be aggregated might now be split up,
+        // so that we can work with the individual fields).
+        constructSSA(irModule);
+
 
         // After all of the required optimization and legalization
         // passes have been performed, we can emit target code from
