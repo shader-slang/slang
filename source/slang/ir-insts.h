@@ -124,8 +124,8 @@ struct IRFieldExtract : IRInst
     IRUse   base;
     IRUse   field;
 
-    IRValue* getBase() { return base.usedValue; }
-    IRValue* getField() { return field.usedValue; }
+    IRValue* getBase() { return base.get(); }
+    IRValue* getField() { return field.get(); }
 };
 
 struct IRFieldAddress : IRInst
@@ -133,8 +133,8 @@ struct IRFieldAddress : IRInst
     IRUse   base;
     IRUse   field;
 
-    IRValue* getBase() { return base.usedValue; }
-    IRValue* getField() { return field.usedValue; }
+    IRValue* getBase() { return base.get(); }
+    IRValue* getField() { return field.get(); }
 };
 
 // Terminators
@@ -146,7 +146,7 @@ struct IRReturnVal : IRReturn
 {
     IRUse val;
 
-    IRValue* getVal() { return val.usedValue; }
+    IRValue* getVal() { return val.get(); }
 };
 
 struct IRReturnVoid : IRReturn
@@ -168,7 +168,7 @@ struct IRUnconditionalBranch : IRTerminatorInst
 {
     IRUse block;
 
-    IRBlock* getTargetBlock() { return (IRBlock*)block.usedValue; }
+    IRBlock* getTargetBlock() { return (IRBlock*)block.get(); }
 };
 
 // Special cases of unconditional branch, to handle
@@ -191,8 +191,8 @@ struct IRLoop : IRUnconditionalBranch
     // on a `continue`.
     IRUse continueBlock;
 
-    IRBlock* getBreakBlock() { return (IRBlock*)breakBlock.usedValue; }
-    IRBlock* getContinueBlock() { return (IRBlock*)continueBlock.usedValue; }
+    IRBlock* getBreakBlock() { return (IRBlock*)breakBlock.get(); }
+    IRBlock* getContinueBlock() { return (IRBlock*)continueBlock.get(); }
 };
 
 struct IRConditionalBranch : IRTerminatorInst
@@ -201,9 +201,9 @@ struct IRConditionalBranch : IRTerminatorInst
     IRUse trueBlock;
     IRUse falseBlock;
 
-    IRValue* getCondition() { return condition.usedValue; }
-    IRBlock* getTrueBlock() { return (IRBlock*)trueBlock.usedValue; }
-    IRBlock* getFalseBlock() { return (IRBlock*)falseBlock.usedValue; }
+    IRValue* getCondition() { return condition.get(); }
+    IRBlock* getTrueBlock() { return (IRBlock*)trueBlock.get(); }
+    IRBlock* getFalseBlock() { return (IRBlock*)falseBlock.get(); }
 };
 
 // A conditional branch that represent the test inside a loop
@@ -230,7 +230,7 @@ struct IRIfElse : IRConditionalBranch
 {
     IRUse afterBlock;
 
-    IRBlock* getAfterBlock() { return (IRBlock*)afterBlock.usedValue; }
+    IRBlock* getAfterBlock() { return (IRBlock*)afterBlock.get(); }
 };
 
 // A multi-way branch that represents a source-level `switch`
@@ -240,9 +240,9 @@ struct IRSwitch : IRTerminatorInst
     IRUse breakLabel;
     IRUse defaultLabel;
 
-    IRValue* getCondition() { return condition.usedValue; }
-    IRBlock* getBreakLabel() { return (IRBlock*) breakLabel.usedValue; }
-    IRBlock* getDefaultLabel() { return (IRBlock*) defaultLabel.usedValue; }
+    IRValue* getCondition() { return condition.get(); }
+    IRBlock* getBreakLabel() { return (IRBlock*) breakLabel.get(); }
+    IRBlock* getDefaultLabel() { return (IRBlock*) defaultLabel.get(); }
 
     // remaining args are: caseVal, caseLabel, ...
 
@@ -255,7 +255,7 @@ struct IRSwizzle : IRReturn
 {
     IRUse base;
 
-    IRValue* getBase() { return base.usedValue; }
+    IRValue* getBase() { return base.get(); }
     UInt getElementCount()
     {
         return getArgCount() - 1;
@@ -271,8 +271,8 @@ struct IRSwizzleSet : IRReturn
     IRUse base;
     IRUse source;
 
-    IRValue* getBase() { return base.usedValue; }
-    IRValue* getSource() { return source.usedValue; }
+    IRValue* getBase() { return base.get(); }
+    IRValue* getSource() { return source.get(); }
     UInt getElementCount()
     {
         return getArgCount() - 2;

@@ -82,22 +82,27 @@ IROpInfo getIROpInfo(IROp op);
 // A use of another value/inst within an IR operation
 struct IRUse
 {
-    // The value that is being used
-    IRValue* usedValue;
-
-    // The value that is doing the using.
-    IRUser* user;
-
-    // The next use of the same value
-    IRUse*  nextUse;
-
-    // A "link" back to where this use is referenced,
-    // so that we can simplify updates.
-    IRUse** prevLink;
+    IRValue* get() { return usedValue; }
+    IRUser* getUser() { return user; }
 
     void init(IRUser* user, IRValue* usedValue);
     void set(IRValue* usedValue);
     void clear();
+
+    // The value that is being used
+    IRValue* usedValue = nullptr;
+
+    // The value that is doing the using.
+    IRUser* user = nullptr;
+
+    // The next use of the same value
+    IRUse*  nextUse = nullptr;
+
+    // A "link" back to where this use is referenced,
+    // so that we can simplify updates.
+    IRUse** prevLink = nullptr;
+
+    void debugValidate();
 };
 
 enum IRDecorationOp : uint16_t
@@ -262,7 +267,7 @@ struct IRUser : IRChildValue
 
     IRValue* getArg(UInt index)
     {
-        return getArgs()[index].usedValue;
+        return getArgs()[index].get();
     }
 
     void setArg(UInt index, IRValue* value)
@@ -542,6 +547,8 @@ void printSlangIRAssembly(StringBuilder& builder, IRModule* module);
 String getSlangIRAssembly(IRModule* module);
 
 void dumpIR(IRModule* module);
+void dumpIR(IRGlobalValue* globalVal);
+
 String dumpIRFunc(IRFunc* func);
 
 }

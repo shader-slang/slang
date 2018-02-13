@@ -110,7 +110,7 @@ bool isPromotableVar(
 
     for (auto u = var->firstUse; u; u = u->nextUse)
     {
-        auto user = u->user;
+        auto user = u->getUser();
         switch (user->op)
         {
         default:
@@ -231,7 +231,7 @@ IRValue* tryRemoveTrivialPhi(
     IRValue* same = nullptr;
     for (auto u : phiInfo->operands)
     {
-        auto usedVal = u.usedValue;
+        auto usedVal = u.get();
         assert(usedVal);
 
         if (usedVal == same || usedVal == phi)
@@ -542,8 +542,8 @@ void processBlock(
         case kIROp_Store:
             {
                 auto storeInst = (IRStore*)ii;
-                auto ptrArg = storeInst->ptr.usedValue;
-                auto valArg = storeInst->val.usedValue;
+                auto ptrArg = storeInst->ptr.get();
+                auto valArg = storeInst->val.get();
 
                 if (auto var = asPromotableVar(context, ptrArg))
                 {
@@ -563,7 +563,7 @@ void processBlock(
         case kIROp_Load:
             {
                 IRLoad* loadInst = (IRLoad*)ii;
-                auto ptrArg = loadInst->ptr.usedValue;
+                auto ptrArg = loadInst->ptr.get();
 
                 if (auto var = asPromotableVar(context, ptrArg))
                 {
@@ -669,10 +669,10 @@ static void breakCriticalEdges(
 
     for (auto edgeUse : criticalEdges)
     {
-        auto pred = (IRBlock*) edgeUse->user->parent;
+        auto pred = (IRBlock*) edgeUse->getUser()->parent;
         assert(pred->op == kIROp_Block);
 
-        auto succ = (IRBlock*)edgeUse->usedValue;
+        auto succ = (IRBlock*)edgeUse->get();
         assert(succ->op == kIROp_Block);
 
         IRBuilder builder;
@@ -682,6 +682,8 @@ static void breakCriticalEdges(
 
         // Create a new block that will sit "along" the edge
         IRBlock* edgeBlock = builder.createBlock();
+
+        edgeUse->debugValidate();
 
         // The predecessor block should now branch to
         // the edge block.
@@ -708,7 +710,6 @@ void constructSSA(ConstructSSAContext* context)
     // First, detect and and break any critical edges in the CFG,
     // because our representation of SSA form doesn't allow for them.
     breakCriticalEdges(context);
-
 
     // Figure out what variables we can promote to
     // SSA temporaries.
@@ -766,7 +767,7 @@ void constructSSA(ConstructSSAContext* context)
                 UInt predIndex = predCounter++;
                 auto predInfo = *context->blockInfos.TryGetValue(pp);
 
-                IRValue* operandVal = phiInfo->operands[predIndex].usedValue;
+                IRValue* operandVal = phiInfo->operands[predIndex].get();
 
                 phiInfo->operands[predIndex].clear();
 

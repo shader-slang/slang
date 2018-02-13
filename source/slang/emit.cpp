@@ -5183,7 +5183,7 @@ emitDeclImpl(decl, nullptr);
         for(UInt aa = 0; aa < argCount; ++aa)
         {
             if(aa != 0) emit(", ");
-            emitIROperand(ctx, args[aa].usedValue, mode);
+            emitIROperand(ctx, args[aa].get(), mode);
         }
         emit(")");
     }
@@ -5488,7 +5488,7 @@ emitDeclImpl(decl, nullptr);
             for (UInt aa = 0; aa < argCount; ++aa)
             {
                 if (aa != 0) Emit(", ");
-                emitIROperand(ctx, args[aa].usedValue, mode);
+                emitIROperand(ctx, args[aa].get(), mode);
             }
             Emit(")");
             return;
@@ -5524,7 +5524,7 @@ emitDeclImpl(decl, nullptr);
                         UInt argIndex = d - '0';
                         SLANG_RELEASE_ASSERT((0 <= argIndex) && (argIndex < argCount));
                         Emit("(");
-                        emitIROperand(ctx, args[argIndex].usedValue, mode);
+                        emitIROperand(ctx, args[argIndex].get(), mode);
                         Emit(")");
                     }
                     break;
@@ -5536,8 +5536,8 @@ emitDeclImpl(decl, nullptr);
                         // texturing operation.
                         SLANG_RELEASE_ASSERT(argCount >= 2);
 
-                        auto textureArg = args[0].usedValue;
-                        auto samplerArg = args[1].usedValue;
+                        auto textureArg = args[0].get();
+                        auto samplerArg = args[1].get();
 
                         if (auto baseTextureType = textureArg->type->As<TextureType>())
                         {
@@ -5576,7 +5576,7 @@ emitDeclImpl(decl, nullptr);
                         //
                         // We are going to hack this *hard* for now.
 
-                        auto textureArg = args[0].usedValue;
+                        auto textureArg = args[0].get();
                         if (auto baseTextureType = textureArg->type->As<TextureType>())
                         {
                             emitGLSLTextureOrTextureSamplerType(baseTextureType, "sampler");
@@ -5602,7 +5602,7 @@ emitDeclImpl(decl, nullptr);
                         // shape.
                         SLANG_RELEASE_ASSERT(argCount >= 1);
 
-                        auto textureArg = args[0].usedValue;
+                        auto textureArg = args[0].get();
                         if (auto baseTextureType = textureArg->type->As<TextureType>())
                         {
                             auto elementType = baseTextureType->elementType;
@@ -6269,7 +6269,7 @@ emitDeclImpl(decl, nullptr);
                 break;
             }
 
-            IRValue* arg = args[argIndex].usedValue;
+            IRValue* arg = args[argIndex].get();
 
             emitIROperand(ctx, pp, IREmitMode::Default);
             emit(" = ");
@@ -7142,7 +7142,7 @@ emitDeclImpl(decl, nullptr);
 
         if(value->op == kIROp_specialize)
         {
-            value = ((IRSpecialize*) value)->genericVal.usedValue;
+            value = ((IRSpecialize*) value)->genericVal.get();
         }
 
         if(value->op != kIROp_Func)

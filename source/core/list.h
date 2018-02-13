@@ -420,6 +420,12 @@ namespace Slang
 					{
 						for (UInt i = 0; i < _count; i++)
 							newBuffer[i] = static_cast<T&&>(buffer[i]);
+
+                        // Default-initialize the remaining elements
+                        for(UInt i = _count; i < size; i++)
+                        {
+                            new(newBuffer + i) T();
+                        }
 					}
 					FreeBuffer();
 				}
