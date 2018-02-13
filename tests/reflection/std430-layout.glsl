@@ -1,5 +1,9 @@
 #version 450
-//TEST(smoke):REFLECTION:-profile ps_4_0 -target glsl
+//TEST_DISABLED(smoke):REFLECTION:-profile ps_4_0 -target glsl
+
+// Note: disabled because we don't support GLSL input any more
+// (kept around so we can replace with an equivalent
+// test that uses HLSL input and tests GLSL layout rules)
 
 // Confirm fix for GitHub issue #55
 

@@ -68,6 +68,9 @@ DIAGNOSTIC(    6, Error, cannotDeduceOutputFormatFromPath,
 DIAGNOSTIC(    6, Error, explicitOutputPathsAndMultipleTargets,
     "canot use both explicit output paths ('-o') and multiple targets ('-target')")
 
+DIAGNOSTIC(    7, Error, glslIsNotSupported,
+    "the Slang compiler does not support GLSL as a source language");
+
 //
 // 1xxxx - Lexical anaylsis
 //

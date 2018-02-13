@@ -326,6 +326,23 @@ int CompileRequest::executeActionsInner()
     // Note that we *do* perform output generation as normal in pass-through mode.
     if (passThrough == PassThroughMode::None)
     {
+        // We currently allow GlSL files on the command line so that we can
+        // drive our "pass-through" mode, but we really want to issue an error
+        // message if the user is seriously asking us to compile them.
+        for (auto& translationUnit : translationUnits)
+        {
+            switch(translationUnit->sourceLanguage)
+            {
+            default:
+                break;
+
+            case SourceLanguage::GLSL:
+                mSink.diagnose(SourceLoc(), Diagnostics::glslIsNotSupported);
+                return 1;
+            }
+        }
+
+
         // Parse everything from the input files requested
         for (auto& translationUnit : translationUnits)
         {
