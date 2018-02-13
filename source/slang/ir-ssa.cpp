@@ -89,7 +89,9 @@ struct ConstructSSAContext
 
     PhiInfo* getPhiInfo(IRParam* phi)
     {
-        return *phiInfos.TryGetValue(phi);
+        if(auto found = phiInfos.TryGetValue(phi))
+            return *found;
+        return nullptr;
     }
 };
 
@@ -219,7 +221,7 @@ PhiInfo* addPhi(
 }
 
 IRValue* tryRemoveTrivialPhi(
-    ConstructSSAContext*    /*context*/,
+    ConstructSSAContext*    context,
     PhiInfo*                phiInfo)
 {
     auto phi = phiInfo->phi;
@@ -266,6 +268,26 @@ IRValue* tryRemoveTrivialPhi(
         assert(!"unimplemented");
     }
 
+    // Removing this phi as trivial may make other phi nodes
+    // become trivial. We will recognize such candidates
+    // by looking for phi nodes that use this node.
+    List<PhiInfo*> otherPhis;
+    for( auto u = phi->firstUse; u; u = u->nextUse )
+    {
+        auto user = u->user;
+        if(!user) continue;
+        if(user == phi) continue;
+
+        if( user->op == kIROp_Param )
+        {
+            auto maybeOtherPhi = (IRParam*) user;
+            if( auto otherPhiInfo = context->getPhiInfo(maybeOtherPhi) )
+            {
+                otherPhis.Add(otherPhiInfo);
+            }
+        }
+    }
+
     // replace uses of the phi (including its possible uses
     // of itself) with the unique non-phi value.
     phi->replaceUsesWith(same);
@@ -281,8 +303,12 @@ IRValue* tryRemoveTrivialPhi(
     // phi, so that we can easily look it up later.
     phiInfo->replacement = same;
 
-    // TODO: need to recursively consider chances to simplify
-    // other phi nodes now.
+    // Now that we've cleaned up this phi, we need to consider
+    // other phis that might have become  trivial.
+    for( auto otherPhi : otherPhis )
+    {
+        tryRemoveTrivialPhi(context, otherPhi);
+    }
 
     return same;
 }
@@ -320,7 +346,7 @@ IRValue* addPhiOperands(
     phiInfo->operands.SetSize(operandCount);
     for(UInt ii = 0; ii < operandCount; ++ii)
     {
-        phiInfo->operands[ii].init(nullptr, operandValues[ii]);
+        phiInfo->operands[ii].init(phiInfo->phi, operandValues[ii]);
     }
 
     return tryRemoveTrivialPhi(context, phiInfo);

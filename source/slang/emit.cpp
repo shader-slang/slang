@@ -7212,15 +7212,10 @@ emitDeclImpl(decl, nullptr);
     }
 #endif
 
-    void emitIRVarModifiers(
+    void emitIRMatrixLayoutModifiers(
         EmitContext*    ctx,
         VarLayout*      layout)
     {
-        if (!layout)
-            return;
-
-        auto target = ctx->shared->target;
-
         // We need to handle the case where the variable has
         // a matrix type, and has been given a non-standard
         // layout attribute (for HLSL, `row_major` is the
@@ -7228,6 +7223,8 @@ emitDeclImpl(decl, nullptr);
         //
         if (auto matrixTypeLayout = layout->typeLayout.As<MatrixTypeLayout>())
         {
+            auto target = ctx->shared->target;
+
             switch (target)
             {
             case CodeGenTarget::HLSL:
@@ -7268,6 +7265,17 @@ emitDeclImpl(decl, nullptr);
             }
             
         }
+
+    }
+
+    void emitIRVarModifiers(
+        EmitContext*    ctx,
+        VarLayout*      layout)
+    {
+        if (!layout)
+            return;
+
+        emitIRMatrixLayoutModifiers(ctx, layout);
 
         if (ctx->shared->target == CodeGenTarget::GLSL)
         {
@@ -7539,7 +7547,19 @@ emitDeclImpl(decl, nullptr);
                     if(fieldType->Equals(getSession()->getVoidType()))
                         continue;
 
-                    emitIRVarModifiers(ctx, fieldLayout);
+                    // Note: we will emit matrix-layout modifiers here, but
+                    // we will refrain from emitting other modifiers that
+                    // might not be appropriate to the context (e.g., we
+                    // shouldn't go emitting `uniform` just because these
+                    // things are uniform...).
+                    //
+                    // TODO: we need a more refined set of modifiers that
+                    // we should allow on fields, because we might end
+                    // up supporting layout that isn't the default for
+                    // the given block type (e.g., something other than
+                    // `std140` for a uniform block).
+                    //
+                    emitIRMatrixLayoutModifiers(ctx, fieldLayout);
 
                     emitIRType(ctx, fieldType, getIRName(ff));
 
