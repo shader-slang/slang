@@ -2,6 +2,7 @@
 #include "emit.h"
 
 #include "ir-insts.h"
+#include "ir-ssa.h"
 #include "legalize-types.h"
 #include "lower-to-ir.h"
 #include "mangle.h"
@@ -7212,15 +7213,10 @@ emitDeclImpl(decl, nullptr);
     }
 #endif
 
-    void emitIRVarModifiers(
+    void emitIRMatrixLayoutModifiers(
         EmitContext*    ctx,
         VarLayout*      layout)
     {
-        if (!layout)
-            return;
-
-        auto target = ctx->shared->target;
-
         // We need to handle the case where the variable has
         // a matrix type, and has been given a non-standard
         // layout attribute (for HLSL, `row_major` is the
@@ -7228,6 +7224,8 @@ emitDeclImpl(decl, nullptr);
         //
         if (auto matrixTypeLayout = layout->typeLayout.As<MatrixTypeLayout>())
         {
+            auto target = ctx->shared->target;
+
             switch (target)
             {
             case CodeGenTarget::HLSL:
@@ -7268,6 +7266,17 @@ emitDeclImpl(decl, nullptr);
             }
             
         }
+
+    }
+
+    void emitIRVarModifiers(
+        EmitContext*    ctx,
+        VarLayout*      layout)
+    {
+        if (!layout)
+            return;
+
+        emitIRMatrixLayoutModifiers(ctx, layout);
 
         if (ctx->shared->target == CodeGenTarget::GLSL)
         {
@@ -7539,7 +7548,19 @@ emitDeclImpl(decl, nullptr);
                     if(fieldType->Equals(getSession()->getVoidType()))
                         continue;
 
-                    emitIRVarModifiers(ctx, fieldLayout);
+                    // Note: we will emit matrix-layout modifiers here, but
+                    // we will refrain from emitting other modifiers that
+                    // might not be appropriate to the context (e.g., we
+                    // shouldn't go emitting `uniform` just because these
+                    // things are uniform...).
+                    //
+                    // TODO: we need a more refined set of modifiers that
+                    // we should allow on fields, because we might end
+                    // up supporting layout that isn't the default for
+                    // the given block type (e.g., something other than
+                    // `std140` for a uniform block).
+                    //
+                    emitIRMatrixLayoutModifiers(ctx, fieldLayout);
 
                     emitIRType(ctx, fieldType, getIRName(ff));
 
@@ -8239,6 +8260,14 @@ String emitEntryPoint(
         dumpIR(lowered);
         fprintf(stderr, "###\n");
 #endif
+
+        // Once specialization and type legalization have been performed,
+        // we should perform some of our basic optimization steps again,
+        // to see if we can clean up any temporaries created by legalization.
+        // (e.g., things that used to be aggregated might now be split up,
+        // so that we can work with the individual fields).
+        constructSSA(irModule);
+
 
         // After all of the required optimization and legalization
         // passes have been performed, we can emit target code from

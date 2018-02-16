@@ -256,7 +256,7 @@ struct IRUser : IRChildValue
     // instructions that need "vararg" support to
     // allocate this field ahead of the `this`
     // pointer.
-    uint32_t argCount;
+    uint32_t argCount = 0;
 
     UInt getArgCount()
     {
@@ -333,7 +333,10 @@ bool isTerminatorInst(IRInst* inst);
 //
 // In each case, the basic idea is that a block is a "label with
 // arguments."
-struct IRParam : IRValue
+//
+// Note: an `IRParam` is an `IRUser` *just* so that we can use
+// it as the user of other values during SSA generation.
+struct IRParam : IRUser
 {
     IRParam*    nextParam;
     IRParam*    prevParam;
