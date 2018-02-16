@@ -5481,7 +5481,7 @@ emitDeclImpl(decl, nullptr);
                         // we can use it in the constructed expression.
 
                         SLANG_RELEASE_ASSERT(*cursor >= '0' && *cursor <= '9');
-                        int argIndex = (*cursor++) - '0';
+                        UInt argIndex = (*cursor++) - '0';
                         SLANG_RELEASE_ASSERT(argCount > argIndex);
 
                         auto vectorArg = args[argIndex].get();
