@@ -33,6 +33,8 @@ struct ExtensionUsageTracker
     // Record the GLSL extnsions we have already emitted a `#extension` for
     HashSet<String> glslExtensionsRequired;
     StringBuilder glslExtensionRequireLines;
+
+    ProfileVersion profileVersion = ProfileVersion::GLSL_110;
 };
 
 void requireGLSLExtension(
@@ -51,6 +53,16 @@ void requireGLSLExtension(
     tracker->glslExtensionsRequired.Add(name);
 }
 
+void requireGLSLVersionImpl(
+    ExtensionUsageTracker*  tracker,
+    ProfileVersion          version)
+{
+    // Check if this profile is newer
+    if ((UInt)version > (UInt)tracker->profileVersion)
+    {
+        tracker->profileVersion = version;
+    }
+}
 
 
 // Shared state for an entire emit session
@@ -4503,182 +4515,6 @@ emitDeclImpl(decl, nullptr);
         return name;
     }
 
-    String getGLSLSystemValueName(
-        IRValue*    varDecl,
-        VarLayout*  varLayout)
-    {
-        auto semanticNameSpelling = varLayout->systemValueSemantic;
-        auto semanticName = semanticNameSpelling.ToLower();
-        
-        if(semanticName == "sv_position")
-        {
-            // TODO: need to pick between `gl_Position` and
-            // `gl_FragCoord` based on whether this is an input
-            // or an output.
-            return "gl_Position";
-        }
-        else if(semanticName == "sv_target")
-        {
-            // Note: we do *not* need to generate some kind of `gl_`
-            // builtin for fragment-shader outputs: they are just
-            // ordinary `out` variables, with ordinary `location`s,
-            // as far as GLSL is concerned.
-            return "";
-        }
-        else if(semanticName == "sv_clipdistance")
-        {
-            // TODO: type conversion is required here.
-            return "gl_ClipDistance";
-        }
-        else if(semanticName == "sv_culldistance")
-        {
-            requireGLSLExtension("ARB_cull_distance");
-
-            // TODO: type conversion is required here.
-            return "gl_CullDistance";
-        }
-        else if(semanticName == "sv_coverage")
-        {
-            // TODO: deal with `gl_SampleMaskIn` when used as an input.
-
-            // TODO: type conversion is required here.
-            return "gl_SampleMask";
-        }
-        else if(semanticName == "sv_depth")
-        {
-            return "gl_FragDepth";
-        }
-        else if(semanticName == "sv_depthgreaterequal")
-        {
-            // TODO: layout(depth_greater) out float gl_FragDepth;
-            return "gl_FragDepth";
-        }
-        else if(semanticName == "sv_depthlessequal")
-        {
-            // TODO: layout(depth_greater) out float gl_FragDepth;
-            return "gl_FragDepth";
-        }
-        else if(semanticName == "sv_dispatchthreadid")
-        {
-            return "gl_GlobalInvocationID";
-        }
-        else if(semanticName == "sv_domainlocation")
-        {
-            return "gl_TessCoord";
-        }
-        else if(semanticName == "sv_groupid")
-        {
-            return "gl_WorkGroupID";
-        }
-        else if(semanticName == "sv_groupindex")
-        {
-            return "gl_LocalInvocationIndex";
-        }
-        else if(semanticName == "sv_groupthreadid")
-        {
-            return "gl_LocalInvocationID";
-        }
-        else if(semanticName == "sv_gsinstanceid")
-        {
-            return "gl_InvocationID";
-        }
-        else if(semanticName == "sv_instanceid")
-        {
-            return "gl_InstanceIndex";
-        }
-        else if(semanticName == "sv_isfrontface")
-        {
-            return "gl_FrontFacing";
-        }
-        else if(semanticName == "sv_outputcontrolpointid")
-        {
-            return "gl_InvocationID";
-        }
-        else if(semanticName == "sv_primitiveid")
-        {
-            return "gl_PrimitiveID";
-        }
-        else if (semanticName == "sv_rendertargetarrayindex")
-        {
-            switch (context->shared->entryPoint->profile.GetStage())
-            {
-            case Stage::Geometry:
-                requireGLSLVersion(ProfileVersion::GLSL_150);
-                break;
-
-            case Stage::Fragment:
-                requireGLSLVersion(ProfileVersion::GLSL_430);
-                break;
-
-            default:
-                requireGLSLVersion(ProfileVersion::GLSL_450);
-                requireGLSLExtension("GL_ARB_shader_viewport_layer_array");
-                break;
-            }
-
-            return "gl_Layer";
-        }
-        else if (semanticName == "sv_sampleindex")
-        {
-            return "gl_SampleID";
-        }
-        else if (semanticName == "sv_stencilref")
-        {
-            requireGLSLExtension("ARB_shader_stencil_export");
-            return "gl_FragStencilRef";
-        }
-        else if (semanticName == "sv_tessfactor")
-        {
-            return "gl_TessLevelOuter";
-        }
-        else if (semanticName == "sv_vertexid")
-        {
-            return "gl_VertexIndex";
-        }
-        else if (semanticName == "sv_viewportarrayindex")
-        {
-            return "gl_ViewportIndex";
-        }
-        else if (semanticName == "nv_x_right")
-        {
-            requireGLSLVersion(ProfileVersion::GLSL_450);
-            requireGLSLExtension("GL_NVX_multiview_per_view_attributes");
-
-            // The actual output in GLSL is:
-            //
-            //    vec4 gl_PositionPerViewNV[];
-            //
-            // and is meant to support an arbitrary number of views,
-            // while the HLSL case just defines a second position
-            // output.
-            //
-            // For now we will hack this by:
-            //   1. Mapping an `NV_X_Right` output to `gl_PositionPerViewNV[1]`
-            //      (that is, just one element of the output array)
-            //   2. Adding logic to copy the traditional `gl_Position` output
-            //      over to `gl_PositionPerViewNV[0]`
-            //
-
-            return "gl_PositionPerViewNV[1]";
-
-//            shared->requiresCopyGLPositionToPositionPerView = true;
-        }
-        else if (semanticName == "nv_viewport_mask")
-        {
-            requireGLSLVersion(ProfileVersion::GLSL_450);
-            requireGLSLExtension("GL_NVX_multiview_per_view_attributes");
-
-            return "gl_ViewportMaskPerViewNV";
-//            globalVarExpr = createGLSLBuiltinRef("gl_ViewportMaskPerViewNV",
-//                getUnsizedArrayType(getIntType()));
-        }
-        else
-        {
-            getSink()->diagnose(varDecl->sourceLoc, Diagnostics::unknownSystemValueSemantic, semanticNameSpelling);
-            return semanticName;
-        }
-    }
-
     String getIRName(
         IRValue*        inst)
     {
@@ -4693,23 +4529,6 @@ emitDeclImpl(decl, nullptr);
 
         default:
             break;
-        }
-
-        if(getTarget(context) == CodeGenTarget::GLSL)
-        {
-            if(auto layoutMod = inst->findDecoration<IRLayoutDecoration>())
-            {
-                auto layout = layoutMod->layout;
-                if(auto varLayout = layout.As<VarLayout>())
-                {
-                    if(varLayout->systemValueSemantic.Length() != 0)
-                    {
-                        auto translated = getGLSLSystemValueName(inst, varLayout);
-                        if(translated.Length())
-                            return translated;
-                    }
-                }
-            }
         }
 
         if(auto decoration = inst->findDecoration<IRHighLevelDeclDecoration>())
@@ -7743,26 +7562,15 @@ emitDeclImpl(decl, nullptr);
             // We want to skip the declaration of any system-value variables
             // when outputting GLSL (well, except in the case where they
             // actually *require* redeclaration...).
-
-            if(auto layoutMod = varDecl->findDecoration<IRLayoutDecoration>())
+            //
+            // TODO: can we detect this more robustly?
+            if(varDecl->mangledName.StartsWith("gl_"))
             {
-                auto layout = layoutMod->layout;
-                if(auto varLayout = layout.As<VarLayout>())
-                {
-                    if(varLayout->systemValueSemantic.Length() != 0)
-                    {
-                        auto translated = getGLSLSystemValueName(varDecl, varLayout);
-                        if( translated.Length() )
-                        {
-                            // The variable seems to translate to an OpenGL
-                            // system value, so we will assume that it doesn't
-                            // need to be declared.
-                            //
-                            // TODO: handle case where we *should* declare the variable.
-                            return;
-                        }
-                    }
-                }
+                // The variable represents an OpenGL system value,
+                // so we will assume that it doesn't need to be declared.
+                //
+                // TODO: handle case where we *should* declare the variable.
+                return;
             }
         }
 
@@ -8220,7 +8028,8 @@ String emitEntryPoint(
 
         specializeIRForEntryPoint(
             irSpecializationState,
-            entryPoint);
+            entryPoint,
+            &sharedContext.extensionUsageTracker);
 
         // If the user specified the flag that they want us to dump
         // IR, then do it here, for the target-specific, but
