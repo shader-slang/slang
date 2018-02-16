@@ -747,6 +747,7 @@ Session::~Session()
     initializerListType = nullptr;
     overloadedType = nullptr;
     irBasicBlockType = nullptr;
+    constExprRate = nullptr;
 
     builtinTypes = decltype(builtinTypes)();
     // destroy modules next

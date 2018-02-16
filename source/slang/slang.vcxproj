@@ -177,6 +177,7 @@
     <ClInclude Include="diagnostics.h" />
     <ClInclude Include="emit.h" />
     <ClInclude Include="expr-defs.h" />
+    <ClInclude Include="ir-constexpr.h" />
     <ClInclude Include="ir-inst-defs.h" />
     <ClInclude Include="ir-insts.h" />
     <ClInclude Include="ir-ssa.h" />
@@ -218,6 +219,7 @@
     <ClCompile Include="diagnostics.cpp" />
     <ClCompile Include="dxc-support.cpp" />
     <ClCompile Include="emit.cpp" />
+    <ClCompile Include="ir-constexpr.cpp" />
     <ClCompile Include="ir-legalize-types.cpp" />
     <ClCompile Include="ir-ssa.cpp" />
     <ClCompile Include="ir.cpp" />

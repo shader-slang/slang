@@ -627,7 +627,7 @@ static LegalVal legalizeLocalVar(
     // Legalize the type for the variable's value
     auto legalValueType = legalizeType(
         context,
-        irLocalVar->getType()->getValueType());
+        irLocalVar->getDataType()->getValueType());
 
     RefPtr<VarLayout> varLayout = findVarLayout(irLocalVar);
     RefPtr<TypeLayout> typeLayout = varLayout ? varLayout->typeLayout : nullptr;
@@ -809,7 +809,7 @@ static void legalizeFunc(
         // involve increasing the number of parameters
         for (auto pp = bb->getFirstParam(); pp; pp = pp->nextParam)
         {
-            auto legalParamType = legalizeType(context, pp->getType());
+            auto legalParamType = legalizeType(context, pp->getFullType());
             if (legalParamType.flavor != LegalType::Flavor::simple)
             {
                 context->insertBeforeParam = pp;
@@ -1053,7 +1053,7 @@ static void legalizeGlobalVar(
     // Legalize the type for the variable's value
     auto legalValueType = legalizeType(
         context,
-        irGlobalVar->getType()->getValueType());
+        irGlobalVar->getDataType()->getValueType());
 
     RefPtr<VarLayout> varLayout = findVarLayout(irGlobalVar);
     RefPtr<TypeLayout> typeLayout = varLayout ? varLayout->typeLayout : nullptr;
@@ -1107,7 +1107,7 @@ static void legalizeGlobalConstant(
     // Legalize the type for the variable's value
     auto legalValueType = legalizeType(
         context,
-        irGlobalConstant->getType());
+        irGlobalConstant->getFullType());
 
     switch (legalValueType.flavor)
     {

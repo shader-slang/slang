@@ -318,7 +318,46 @@ protected:
     )
 END_SYNTAX_CLASS()
 
+// A type that has a rate qualifier applied. Conceptually `@R T` where `R`
+// represents a rate, and `T` represents a data type.
+SYNTAX_CLASS(RateQualifiedType, Type)
+
+    // The rate `R` at which the value is computed/stored
+    SYNTAX_FIELD(RefPtr<Type>, rate);
+
+    // The underlying data type `T` of the value
+    SYNTAX_FIELD(RefPtr<Type>, valueType);
+
+RAW(
+    virtual Slang::String ToString() override;
+
+protected:
+    virtual bool EqualsImpl(Type * type) override;
+    virtual RefPtr<Type> CreateCanonicalType() override;
+    virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
+    virtual int GetHashCode() override;
+    )
+END_SYNTAX_CLASS()
+
+// A representation of the `ConstExpr` rate, to be used
+// in defining `@ConstExpr T` for particular data types `T`
+SYNTAX_CLASS(ConstExprRate, Type)
+
+RAW(
+    virtual Slang::String ToString() override;
+
+protected:
+    virtual bool EqualsImpl(Type * type) override;
+    virtual RefPtr<Type> CreateCanonicalType() override;
+    virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
+    virtual int GetHashCode() override;
+    )
+END_SYNTAX_CLASS()
+
 // The effective type of a variable declared with `groupshared` storage qualifier.
+//
+// TODO: this should be converted to a `GroupSharedRate`, which then gets used
+// in conjunction with `RateQualifiedType`.
 SYNTAX_CLASS(GroupSharedType, Type)
     SYNTAX_FIELD(RefPtr<Type>, valueType);
 

@@ -207,7 +207,13 @@ PhiInfo* addPhi(
     IRVar*                  var)
 {
     auto builder = &blockInfo->builder;
-    IRParam* phi = builder->createParam(var->getType()->getValueType());
+
+    auto valueType = var->getDataType()->getValueType();
+    if( auto rate = var->getRate() )
+    {
+        valueType = context->sharedBuilder.getSession()->getRateQualifiedType(rate, valueType);
+    }
+    IRParam* phi = builder->createParam(valueType);
 
     RefPtr<PhiInfo> phiInfo = new PhiInfo();
     context->phiInfos.Add(phi, phiInfo);
@@ -451,7 +457,7 @@ IRValue* readVarRec(
             // a local lookup in the block had already failed, so
             // at this point we are dealing with an undefined value.
 
-            auto type = var->getType()->getValueType();
+            auto type = var->getDataType()->getValueType();
             val = blockInfo->builder.emitUndefined(type);
         }
         else if (!multiplePreds)

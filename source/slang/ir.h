@@ -157,7 +157,10 @@ struct IRValue : public IRObject
     // no value.
     RefPtr<Type>    type;
 
-    Type* getType() { return type; }
+    Type* getFullType() { return type; }
+
+    Type* getRate();
+    Type* getDataType();
 
     // Source location information for this value, if any
     SourceLoc sourceLoc;

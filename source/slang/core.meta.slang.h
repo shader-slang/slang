@@ -1,5 +1,9 @@
 sb << "// Slang `core` library\n";
 sb << "\n";
+sb << "// Modifier for variables that must resolve to compile-time constants\n";
+sb << "// as part of translation.\n";
+sb << "syntax constexpr : ConstExprModifier;\n";
+sb << "\n";
 sb << "// A type that can be used as an operand for builtins\n";
 sb << "interface __BuiltinType {}\n";
 sb << "\n";
@@ -626,7 +630,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 {
                     sb << ", int sampleIndex";
                 }
-                sb << ", int" << loadCoordCount << " offset";
+                sb << ", constexpr int" << loadCoordCount << " offset";
                 sb << ");\n";
 
 
@@ -636,7 +640,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 {
                     sb << ", int sampleIndex";
                 }
-                sb << ", int" << kBaseTextureTypes[tt].coordCount << " offset";
+                sb << ", constexpr int" << kBaseTextureTypes[tt].coordCount << " offset";
                 sb << ", out uint status";
                 sb << ");\n";
             }
@@ -702,14 +706,14 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                     sb << "__target_intrinsic(glsl, \"textureOffset($p, $2, $3)\")\n";
                     sb << "T Sample(SamplerState s, ";
                     sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
-                    sb << "int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
+                    sb << "constexpr int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
                 }
 
                 sb << "T Sample(SamplerState s, ";
                 sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                 if( baseShape != TextureType::ShapeCube )
                 {
-                    sb << "int" << kBaseTextureTypes[tt].coordCount << " offset, ";
+                    sb << "constexpr int" << kBaseTextureTypes[tt].coordCount << " offset, ";
                 }
                 sb << "float clamp);\n";
 
@@ -717,7 +721,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                 if( baseShape != TextureType::ShapeCube )
                 {
-                    sb << "int" << kBaseTextureTypes[tt].coordCount << " offset, ";
+                    sb << "constexpr int" << kBaseTextureTypes[tt].coordCount << " offset, ";
                 }
                 sb << "float clamp, out uint status);\n";
 
@@ -732,7 +736,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                     sb << "__target_intrinsic(glsl, \"textureOffset($p, $2, $3, $4)\")\n";
                     sb << "T SampleBias(SamplerState s, ";
                     sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, float bias, ";
-                    sb << "int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
+                    sb << "constexpr int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
                 }
 
                 // `SampleCmp()` and `SampleCmpLevelZero`
@@ -799,12 +803,12 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                     sb << "T SampleCmp(SamplerState s, ";
                     sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                     sb << "float compareValue, ";
-                    sb << "int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
+                    sb << "constexpr int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
 
                     sb << "T SampleCmpLevelZero(SamplerState s, ";
                     sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                     sb << "float compareValue, ";
-                    sb << "int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
+                    sb << "constexpr int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
                 }
 
 
@@ -824,7 +828,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                     sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                     sb << "float" << kBaseTextureTypes[tt].coordCount << " gradX, ";
                     sb << "float" << kBaseTextureTypes[tt].coordCount << " gradY, ";
-                    sb << "int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
+                    sb << "constexpr int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
                 }
 
                 // `SampleLevel`
@@ -840,7 +844,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                     sb << "T SampleLevel(SamplerState s, ";
                     sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                     sb << "float level, ";
-                    sb << "int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
+                    sb << "constexpr int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
                 }
             }
 
@@ -911,12 +915,12 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                     sb << "__target_intrinsic(glsl, \"textureGatherOffset($p, $2, $3, " << componentIndex << ")\")\n";
                     sb << "vector<T, 4> Gather" << componentName << "(SamplerState s, ";
                     sb << "float" << kBaseTextureTypes[tt].coordCount << " location, ";
-                    sb << "int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
+                    sb << "constexpr int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
 
                     EMIT_LINE_DIRECTIVE();
                     sb << "vector<T, 4> Gather" << componentName << "(SamplerState s, ";
                     sb << "float" << kBaseTextureTypes[tt].coordCount << " location, ";
-                    sb << "int" << kBaseTextureTypes[tt].coordCount << " offset, ";
+                    sb << "constexpr int" << kBaseTextureTypes[tt].coordCount << " offset, ";
                     sb << "out uint status);\n";
 
                     EMIT_LINE_DIRECTIVE();

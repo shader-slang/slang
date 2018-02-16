@@ -231,6 +231,9 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
         irBasicBlockType = new IRBasicBlockType();
         irBasicBlockType->setSession(this);
+
+        constExprRate = new ConstExprRate();
+        constExprRate->setSession(this);
     }
 
     Type* Session::getBoolType()
@@ -286,6 +289,22 @@ void Type::accept(IValVisitor* visitor, void* extra)
     Type* Session::getIRBasicBlockType()
     {
         return irBasicBlockType;
+    }
+
+    Type* Session::getConstExprRate()
+    {
+        return constExprRate;
+    }
+
+    RefPtr<RateQualifiedType> Session::getRateQualifiedType(
+        Type*   rate,
+        Type*   valueType)
+    {
+        RefPtr<RateQualifiedType> rateQualifiedType = new RateQualifiedType();
+        rateQualifiedType->setSession(this);
+        rateQualifiedType->rate = rate;
+        rateQualifiedType->valueType = valueType;
+        return rateQualifiedType;
     }
 
     RefPtr<PtrType> Session::getPtrType(
@@ -405,6 +424,88 @@ void Type::accept(IValVisitor* visitor, void* extra)
             return baseType->ToString() + "[" + ArrayLength->ToString() + "]";
         else
             return baseType->ToString() + "[]";
+    }
+
+    // RateQualifiedType
+
+    Slang::String RateQualifiedType::ToString()
+    {
+        return "@" + rate->ToString() + " " + valueType->ToString();
+    }
+
+    bool RateQualifiedType::EqualsImpl(Type * type)
+    {
+        auto rateQualifiedType = type->As<RateQualifiedType>();
+        if(!rateQualifiedType)
+            return false;
+
+        return rate->Equals(rateQualifiedType->rate)
+            && valueType->Equals(rateQualifiedType->valueType);
+    }
+
+    RefPtr<Val> RateQualifiedType::SubstituteImpl(SubstitutionSet subst, int* ioDiff)
+    {
+        int diff = 0;
+        auto substRate = rate->SubstituteImpl(subst, &diff).As<Type>();
+        auto substValueType = valueType->SubstituteImpl(subst, &diff).As<Type>();
+        if(!diff)
+            return this;
+
+        (*ioDiff)++;
+
+        return getSession()->getRateQualifiedType(substRate, substValueType);
+    }
+
+    RefPtr<Type> RateQualifiedType::CreateCanonicalType()
+    {
+        RefPtr<Type> canRate = rate->GetCanonicalType();
+        RefPtr<Type> canValueType = valueType->GetCanonicalType();
+
+        RefPtr<RateQualifiedType> canRateQualifiedType = new RateQualifiedType();
+        canRateQualifiedType->setSession(session);
+        canRateQualifiedType->rate = canRate;
+        canRateQualifiedType->valueType = valueType;
+        return canRateQualifiedType;
+    }
+
+    int RateQualifiedType::GetHashCode()
+    {
+        auto hash = (int)(typeid(this).hash_code());
+        hash = combineHash(hash, rate->GetHashCode());
+        hash = combineHash(hash, valueType->GetHashCode());
+        return hash;
+    }
+
+    // ConstExprRate
+
+    Slang::String ConstExprRate::ToString()
+    {
+        return "ConstExpr";
+    }
+
+    bool ConstExprRate::EqualsImpl(Type * type)
+    {
+        auto constExprRate = type->As<ConstExprRate>();
+        if(!constExprRate)
+            return false;
+
+        return true;
+    }
+
+    RefPtr<Val> ConstExprRate::SubstituteImpl(SubstitutionSet /*subst*/, int* /*ioDiff*/)
+    {
+        return this;
+    }
+
+    RefPtr<Type> ConstExprRate::CreateCanonicalType()
+    {
+        return this;
+    }
+
+    int ConstExprRate::GetHashCode()
+    {
+        auto hash = (int)(typeid(this).hash_code());
+        return hash;
     }
 
     // GroupSharedType
