@@ -682,6 +682,8 @@ IRGlobalValue* getSpecializedGlobalValueForDeclRef(
     IRSpecializationState*  state,
     DeclRef<Decl> const&    declRef);
 
+struct ExtensionUsageTracker;
+
 // Clone the IR values reachable from the given entry point
 // into the IR module assocaited with the specialization state.
 // When multiple definitions of a symbol are found, the one
@@ -689,7 +691,8 @@ IRGlobalValue* getSpecializedGlobalValueForDeclRef(
 // used.
 void specializeIRForEntryPoint(
     IRSpecializationState*  state,
-    EntryPointRequest*  entryPointRequest);
+    EntryPointRequest*  entryPointRequest,
+    ExtensionUsageTracker*  extensionUsageTracker);
 
 // Find suitable uses of the `specialize` instruction that
 // can be replaced with references to specialized functions.

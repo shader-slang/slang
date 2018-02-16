@@ -2871,7 +2871,242 @@ namespace Slang
         GlobalVaryingDeclarator*    next;
     };
 
+    struct GLSLSystemValueInfo
+    {
+        char const* name;
+    };
+
+    void requireGLSLVersionImpl(
+        ExtensionUsageTracker*  tracker,
+        ProfileVersion          version);
+
+    void requireGLSLExtension(
+        ExtensionUsageTracker*  tracker,
+        String const&           name);
+
+    struct GLSLLegalizationContext
+    {
+        ExtensionUsageTracker*  extensionUsageTracker;
+        DiagnosticSink*         sink;
+        Stage                   stage;
+
+        void requireGLSLExtension(String const& name)
+        {
+            Slang::requireGLSLExtension(extensionUsageTracker, name);
+        }
+
+        void requireGLSLVersion(ProfileVersion version)
+        {
+            Slang::requireGLSLVersionImpl(extensionUsageTracker, version);
+        }
+
+        Stage getStage()
+        {
+            return stage;
+        }
+
+        DiagnosticSink* getSink()
+        {
+            return sink;
+        }
+    };
+
+    GLSLSystemValueInfo* getGLSLSystemValueInfo(
+        GLSLLegalizationContext*    context,
+        VarLayout*                  varLayout,
+        LayoutResourceKind          kind,
+        GLSLSystemValueInfo*        inStorage)
+    {
+        char const* name = nullptr;
+
+        auto semanticNameSpelling = varLayout->systemValueSemantic;
+        if(semanticNameSpelling.Length() == 0)
+            return nullptr;
+
+        auto semanticName = semanticNameSpelling.ToLower();
+
+        if(semanticName == "sv_position")
+        {
+            // TODO: need to pick between `gl_Position` and
+            // `gl_FragCoord` based on whether this is an input
+            // or an output.
+            if( kind == LayoutResourceKind::VaryingOutput )
+            {
+                name = "gl_Position";
+            }
+            else
+            {
+                name = "gl_FragCoord";
+            }
+        }
+        else if(semanticName == "sv_target")
+        {
+            // Note: we do *not* need to generate some kind of `gl_`
+            // builtin for fragment-shader outputs: they are just
+            // ordinary `out` variables, with ordinary `location`s,
+            // as far as GLSL is concerned.
+            return nullptr;
+        }
+        else if(semanticName == "sv_clipdistance")
+        {
+            // TODO: type conversion is required here.
+            name = "gl_ClipDistance";
+        }
+        else if(semanticName == "sv_culldistance")
+        {
+            context->requireGLSLExtension("ARB_cull_distance");
+
+            // TODO: type conversion is required here.
+            name = "gl_CullDistance";
+        }
+        else if(semanticName == "sv_coverage")
+        {
+            // TODO: deal with `gl_SampleMaskIn` when used as an input.
+
+            // TODO: type conversion is required here.
+            name = "gl_SampleMask";
+        }
+        else if(semanticName == "sv_depth")
+        {
+            name = "gl_FragDepth";
+        }
+        else if(semanticName == "sv_depthgreaterequal")
+        {
+            // TODO: layout(depth_greater) out float gl_FragDepth;
+            name = "gl_FragDepth";
+        }
+        else if(semanticName == "sv_depthlessequal")
+        {
+            // TODO: layout(depth_greater) out float gl_FragDepth;
+            name = "gl_FragDepth";
+        }
+        else if(semanticName == "sv_dispatchthreadid")
+        {
+            name = "gl_GlobalInvocationID";
+        }
+        else if(semanticName == "sv_domainlocation")
+        {
+            name = "gl_TessCoord";
+        }
+        else if(semanticName == "sv_groupid")
+        {
+            name = "gl_WorkGroupID";
+        }
+        else if(semanticName == "sv_groupindex")
+        {
+            name = "gl_LocalInvocationIndex";
+        }
+        else if(semanticName == "sv_groupthreadid")
+        {
+            name = "gl_LocalInvocationID";
+        }
+        else if(semanticName == "sv_gsinstanceid")
+        {
+            name = "gl_InvocationID";
+        }
+        else if(semanticName == "sv_instanceid")
+        {
+            name = "gl_InstanceIndex";
+        }
+        else if(semanticName == "sv_isfrontface")
+        {
+            name = "gl_FrontFacing";
+        }
+        else if(semanticName == "sv_outputcontrolpointid")
+        {
+            name = "gl_InvocationID";
+        }
+        else if(semanticName == "sv_primitiveid")
+        {
+            name = "gl_PrimitiveID";
+        }
+        else if (semanticName == "sv_rendertargetarrayindex")
+        {
+            switch (context->getStage())
+            {
+            case Stage::Geometry:
+                context->requireGLSLVersion(ProfileVersion::GLSL_150);
+                break;
+
+            case Stage::Fragment:
+                context->requireGLSLVersion(ProfileVersion::GLSL_430);
+                break;
+
+            default:
+                context->requireGLSLVersion(ProfileVersion::GLSL_450);
+                context->requireGLSLExtension("GL_ARB_shader_viewport_layer_array");
+                break;
+            }
+
+            name = "gl_Layer";
+        }
+        else if (semanticName == "sv_sampleindex")
+        {
+            name = "gl_SampleID";
+        }
+        else if (semanticName == "sv_stencilref")
+        {
+            context->requireGLSLExtension("ARB_shader_stencil_export");
+            name = "gl_FragStencilRef";
+        }
+        else if (semanticName == "sv_tessfactor")
+        {
+            name = "gl_TessLevelOuter";
+        }
+        else if (semanticName == "sv_vertexid")
+        {
+            name = "gl_VertexIndex";
+        }
+        else if (semanticName == "sv_viewportarrayindex")
+        {
+            name = "gl_ViewportIndex";
+        }
+        else if (semanticName == "nv_x_right")
+        {
+            context->requireGLSLVersion(ProfileVersion::GLSL_450);
+            context->requireGLSLExtension("GL_NVX_multiview_per_view_attributes");
+
+            // The actual output in GLSL is:
+            //
+            //    vec4 gl_PositionPerViewNV[];
+            //
+            // and is meant to support an arbitrary number of views,
+            // while the HLSL case just defines a second position
+            // output.
+            //
+            // For now we will hack this by:
+            //   1. Mapping an `NV_X_Right` output to `gl_PositionPerViewNV[1]`
+            //      (that is, just one element of the output array)
+            //   2. Adding logic to copy the traditional `gl_Position` output
+            //      over to `gl_PositionPerViewNV[0]`
+            //
+
+            name = "gl_PositionPerViewNV[1]";
+
+//            shared->requiresCopyGLPositionToPositionPerView = true;
+        }
+        else if (semanticName == "nv_viewport_mask")
+        {
+            context->requireGLSLVersion(ProfileVersion::GLSL_450);
+            context->requireGLSLExtension("GL_NVX_multiview_per_view_attributes");
+
+            name = "gl_ViewportMaskPerViewNV";
+//            globalVarExpr = createGLSLBuiltinRef("gl_ViewportMaskPerViewNV",
+//                getUnsizedArrayType(getIntType()));
+        }
+
+        if( name )
+        {
+            inStorage->name = name;
+            return inStorage;
+        }
+
+        context->getSink()->diagnose(varLayout->varDecl.getDecl()->loc, Diagnostics::unknownSystemValueSemantic, semanticNameSpelling);
+        return nullptr;
+    }
+
     ScalarizedVal createSimpleGLSLGlobalVarying(
+        GLSLLegalizationContext*    context,
         IRBuilder*                  builder,
         Type*                       inType,
         VarLayout*                  inVarLayout,
@@ -2880,13 +3115,18 @@ namespace Slang
         UInt                        bindingIndex,
         GlobalVaryingDeclarator*    declarator)
     {
-        // TODO: detect when the layout represents a system input/output
-        if( inVarLayout->systemValueSemantic.Length() != 0 )
-        {
-            // This variable represents a system input/output,
-            // and we should probably handle that differently, right?
-        }
+        // Check if we have a system value on our hands.
+        GLSLSystemValueInfo systemValueInfoStorage;
+        auto systemValueInfo = getGLSLSystemValueInfo(
+            context,
+            inVarLayout,
+            kind,
+            &systemValueInfoStorage);
 
+        // Construct the actual type and type-layout for the global variable
+        //
+        // TODO: in the case of a system value, we may need to override the type
+        //
         RefPtr<Type> type = inType;
         RefPtr<TypeLayout> typeLayout = inTypeLayout;
         for( auto dd = declarator; dd; dd = dd->next )
@@ -2919,13 +3159,6 @@ namespace Slang
             typeLayout = arrayTypeLayout;
         }
 
-        // Simple case: just create a global variable of the matching type,
-        // and then use the value of the global as a replacement for the
-        // value of the original parameter.
-        //
-        auto globalVariable = addGlobalVariable(builder->getModule(), type);
-        moveValueBefore(globalVariable, builder->getFunc());
-
         // We need to construct a fresh layout for the variable, even
         // if the original had its own layout, because it might be
         // an `inout` parameter, and we only want to deal with the case
@@ -2941,12 +3174,25 @@ namespace Slang
         varLayout->stage = inVarLayout->stage;
         varLayout->AddResourceInfo(kind)->index = bindingIndex;
 
+        // Simple case: just create a global variable of the matching type,
+        // and then use the value of the global as a replacement for the
+        // value of the original parameter.
+        //
+        auto globalVariable = addGlobalVariable(builder->getModule(), type);
+        moveValueBefore(globalVariable, builder->getFunc());
+
+        if( systemValueInfo )
+        {
+            globalVariable->mangledName = systemValueInfo->name;
+        }
+
         builder->addLayoutDecoration(globalVariable, varLayout);
 
         return ScalarizedVal::address(globalVariable);
     }
 
     ScalarizedVal createGLSLGlobalVaryingsImpl(
+        GLSLLegalizationContext*    context,
         IRBuilder*                  builder,
         Type*                       type,
         VarLayout*                  varLayout,
@@ -2957,16 +3203,22 @@ namespace Slang
     {
         if( type->As<BasicExpressionType>() )
         {
-            return createSimpleGLSLGlobalVarying(builder, type, varLayout, typeLayout, kind, bindingIndex, declarator);
+            return createSimpleGLSLGlobalVarying(
+                context,
+                builder, type, varLayout, typeLayout, kind, bindingIndex, declarator);
         }
         else if( type->As<VectorExpressionType>() )
         {
-            return createSimpleGLSLGlobalVarying(builder, type, varLayout, typeLayout, kind, bindingIndex, declarator);
+            return createSimpleGLSLGlobalVarying(
+                context,
+                builder, type, varLayout, typeLayout, kind, bindingIndex, declarator);
         }
         else if( type->As<MatrixExpressionType>() )
         {
             // TODO: a matrix-type varying should probably be handled like an array of rows
-            return createSimpleGLSLGlobalVarying(builder, type, varLayout, typeLayout, kind, bindingIndex, declarator);
+            return createSimpleGLSLGlobalVarying(
+                context,
+                builder, type, varLayout, typeLayout, kind, bindingIndex, declarator);
         }
         else if( auto arrayType = type->As<ArrayExpressionType>() )
         {
@@ -2984,6 +3236,7 @@ namespace Slang
             arrayDeclarator.next = declarator;
 
             return createGLSLGlobalVaryingsImpl(
+                context,
                 builder,
                 elementType,
                 varLayout,
@@ -3020,6 +3273,7 @@ namespace Slang
                             fieldBindingIndex += fieldResInfo->index;
 
                         auto fieldVal = createGLSLGlobalVaryingsImpl(
+                            context,
                             builder,
                             ff->typeLayout->type,
                             ff,
@@ -3041,19 +3295,24 @@ namespace Slang
         }
 
         // Default case is to fall back on the simple behavior
-        return createSimpleGLSLGlobalVarying(builder, type, varLayout, typeLayout, kind, bindingIndex, declarator);
+        return createSimpleGLSLGlobalVarying(
+            context,
+            builder, type, varLayout, typeLayout, kind, bindingIndex, declarator);
     }
 
     ScalarizedVal createGLSLGlobalVaryings(
-        IRBuilder*          builder,
-        Type*               type,
-        VarLayout*          layout,
-        LayoutResourceKind  kind)
+        GLSLLegalizationContext*    context,
+        IRBuilder*                  builder,
+        Type*                       type,
+        VarLayout*                  layout,
+        LayoutResourceKind          kind)
     {
         UInt bindingIndex = 0;
         if(auto rr = layout->FindResourceInfo(kind))
             bindingIndex = rr->index;
-        return createGLSLGlobalVaryingsImpl(builder, type, layout, layout->typeLayout, kind, bindingIndex, nullptr);
+        return createGLSLGlobalVaryingsImpl(
+            context,
+            builder, type, layout, layout->typeLayout, kind, bindingIndex, nullptr);
     }
 
     ScalarizedVal extractField(
@@ -3189,8 +3448,15 @@ namespace Slang
     void legalizeEntryPointForGLSL(
         Session*                session,
         IRFunc*                 func,
-        EntryPointLayout*       entryPointLayout)
+        EntryPointLayout*       entryPointLayout,
+        DiagnosticSink*         sink,
+        ExtensionUsageTracker*  extensionUsageTracker)
     {
+        GLSLLegalizationContext context;
+        context.stage = entryPointLayout->profile.GetStage();
+        context.sink = sink;
+        context.extensionUsageTracker = extensionUsageTracker;
+
         auto module = func->parentModule;
 
         // We require that the entry-point function has no uses,
@@ -3250,6 +3516,7 @@ namespace Slang
             // code to write to that variable.
 
             auto resultGlobal = createGLSLGlobalVaryings(
+                &context,
                 &builder,
                 resultType,
                 entryPointLayout->resultLayout,
@@ -3345,7 +3612,9 @@ namespace Slang
                         // In the `in out` case we need to declare two
                         // sets of global variables: one for the `in`
                         // side and one for the `out` side.
-                        auto globalInputVal = createGLSLGlobalVaryings(&builder, valueType, paramLayout, LayoutResourceKind::VertexInput);
+                        auto globalInputVal = createGLSLGlobalVaryings(
+                            &context,
+                            &builder, valueType, paramLayout, LayoutResourceKind::VertexInput);
 
                         assign(&builder, localVal, globalInputVal);
                     }
@@ -3358,7 +3627,9 @@ namespace Slang
 
                     // We also need one or more global variabels to write the output to
                     // when the function is done. We create them here.
-                    auto globalOutputVal = createGLSLGlobalVaryings(&builder, valueType, paramLayout, LayoutResourceKind::FragmentOutput);
+                    auto globalOutputVal = createGLSLGlobalVaryings(
+                            &context,
+                            &builder, valueType, paramLayout, LayoutResourceKind::FragmentOutput);
 
                     // Now we need to iterate over all the blocks in the function looking
                     // for any `return*` instructions, so that we can write to the output variable
@@ -3392,7 +3663,9 @@ namespace Slang
                     // and attach the required layout information to it along
                     // the way.
 
-                    auto globalValue = createGLSLGlobalVaryings(&builder, paramType, paramLayout, LayoutResourceKind::VertexInput);
+                    auto globalValue = createGLSLGlobalVaryings(
+                        &context,
+                        &builder, paramType, paramLayout, LayoutResourceKind::VertexInput);
 
                     // Next we need to replace uses of the parameter with
                     // references to the variable(s). We are going to do that
@@ -4636,7 +4909,8 @@ namespace Slang
 
     void specializeIRForEntryPoint(
         IRSpecializationState*  state,
-        EntryPointRequest*  entryPointRequest)
+        EntryPointRequest*  entryPointRequest,
+        ExtensionUsageTracker*  extensionUsageTracker)
     {
         auto target = state->target;
 
@@ -4675,7 +4949,12 @@ namespace Slang
         {
         case CodeGenTarget::GLSL:
             {
-                legalizeEntryPointForGLSL(session, irEntryPoint, entryPointLayout);
+                legalizeEntryPointForGLSL(
+                    session,
+                    irEntryPoint,
+                    entryPointLayout,
+                    &compileRequest->mSink,
+                    extensionUsageTracker);
             }
             break;
 
