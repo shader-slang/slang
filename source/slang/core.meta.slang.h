@@ -465,34 +465,47 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                     sb << "__target_intrinsic(glsl, \"(";
 
                     int aa = 1;
-                    String lodStr = "0";
+                    String lodStr = ", 0";
                     if (includeMipInfo)
                     {
                         int mipLevelArg = aa++;
-                        lodStr = "int($";
+                        lodStr = ", int($";
                         lodStr.append(mipLevelArg);
                         lodStr.append(")");
                     }
+
+                    String opStr = " = textureSize($P" + lodStr;
+                    switch( access )
+                    {
+                    case SLANG_RESOURCE_ACCESS_READ_WRITE:
+                    case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
+                        opStr = " = imageSize($0";
+                        break;
+
+                    default:
+                        break;
+                    }
+
 
                     int cc = 0;
                     switch(baseShape)
                     {
                     case TextureType::Shape1D:
-                        sb << "($" << aa++ << " = textureSize($P, " << lodStr << "))";
+                        sb << "($" << aa++ << opStr << "))";
                         cc = 1;
                         break;
 
                     case TextureType::Shape2D:
                     case TextureType::ShapeCube:
-                        sb << "($" << aa++ << " = textureSize($P, " << lodStr << ").x)";
-                        sb << ", ($" << aa++ << " = textureSize($P, " << lodStr << ").y)";
+                        sb << "($" << aa++ << opStr << ").x)";
+                        sb << ", ($" << aa++ << opStr << ").y)";
                         cc = 2;
                         break;
 
                     case TextureType::Shape3D:
-                        sb << "($" << aa++ << " = textureSize($P, " << lodStr << ").x)";
-                        sb << ", ($" << aa++ << " = textureSize($P, " << lodStr << ").y)";
-                        sb << ", ($" << aa++ << " = textureSize($P, " << lodStr << ").z)";
+                        sb << "($" << aa++ << opStr << ").x)";
+                        sb << ", ($" << aa++ << opStr << ").y)";
+                        sb << ", ($" << aa++ << opStr << ").z)";
                         cc = 3;
                         break;
 
@@ -503,7 +516,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
                     if(isArray)
                     {
-                        sb << ", ($" << aa++ << " = textureSize($P, " << lodStr << ")." << kComponentNames[cc] << ")";
+                        sb << ", ($" << aa++ << opStr << ")." << kComponentNames[cc] << ")";
                     }
 
                     if(isMultisample)
@@ -630,13 +643,30 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
             if(baseShape != TextureType::ShapeCube)
             {
+                int N = kBaseTextureTypes[tt].coordCount + isArray;
+
+                char const* uintNs[] = { "", "uint", "uint2", "uint3", "uint4" };
+                char const* ivecNs[] = {  "", "int", "ivec2", "ivec3", "ivec4" };
+
+                auto uintN = uintNs[N];
+                auto ivecN = ivecNs[N];
+
                 // subscript operator
-                sb << "__subscript(uint";
-				if(kBaseTextureTypes[tt].coordCount + isArray > 1)
-				{
-					sb << kBaseTextureTypes[tt].coordCount + isArray;
-				}
-				sb << " location) -> T";
+                sb << "__subscript(" << uintN << " location) -> T {\n";
+
+                sb << "__target_intrinsic(glsl, \"texelFetch($P, " << ivecN << "($1)";
+
+                if( !isMultisample )
+                {
+                    sb << ", 0";
+                }
+                else
+                {
+                    // TODO: how to handle this...
+                    sb << ", 0";
+                }
+
+                sb << ")$z\") get;\n";
 
                 // Depending on the access level of the texture type,
                 // we either have just a getter (the default), or both
@@ -645,13 +675,14 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 {
                 case SLANG_RESOURCE_ACCESS_NONE:
                 case SLANG_RESOURCE_ACCESS_READ:
-                    sb << ";\n";
                     break;
 
                 default:
-                    sb << " { get; set; }\n";
+                    sb << "__target_intrinsic(glsl, \"imageStore($0, " << ivecN << "($1), $2)\") set;\n";
                     break;
                 }
+
+                sb << "}\n";
             }
 
             if( !isMultisample )

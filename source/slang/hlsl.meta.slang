@@ -250,9 +250,18 @@ void AllMemoryBarrier();
 void AllMemoryBarrierWithGroupSync();
 
 // Test if any components is non-zero (HLSL SM 1.0)
-__generic<T : __BuiltinType> bool any(T x);
-__generic<T : __BuiltinType, let N : int> bool any(vector<T,N> x);
-__generic<T : __BuiltinType, let N : int, let M : int> bool any(matrix<T,N,M> x);
+
+__generic<T : __BuiltinType>
+__target_intrinsic(glsl, "bool($0)")
+bool any(T x);
+
+__generic<T : __BuiltinType, let N : int>
+__target_intrinsic(glsl, "any(bvec$$N0($0))")
+bool any(vector<T,N> x);
+
+__generic<T : __BuiltinType, let N : int, let M : int>
+// TODO: need to define GLSL mapping
+bool any(matrix<T,N,M> x);
 
 
 // Reinterpret bits as a double (HLSL SM 5.0)
@@ -555,7 +564,10 @@ uint GetRenderTargetSampleCount();
 float2 GetRenderTargetSamplePosition(int Index);
 
 // Group memory barrier
+__target_intrinsic(glsl, "groupMemoryBarrier")
 void GroupMemoryBarrier();
+
+__target_intrinsic(glsl, "groupMemoryBarrier(); barrier")
 void GroupMemoryBarrierWithGroupSync();
 
 // Atomics
@@ -1077,17 +1089,16 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
 
     sb << "T Load(int location, out uint status);\n";
 
-    sb << "__target_intrinsic(glsl, \"texelFetch($$P, int($1))$$z\")\n";
-    sb << "__subscript(uint index) -> T";
+    sb << "__subscript(uint index) -> T {\n";
+
+    sb << "__target_intrinsic(glsl, \"texelFetch($$P, int($1))$$z\") get;\n";
 
     if (kBaseBufferAccessLevels[aa].access != SLANG_RESOURCE_ACCESS_READ)
     {
-        sb << " { get; set; }\n";
+        sb << "set;\n";
     }
-    else
-    {
-        sb << ";\n";
-    }
+
+    sb << "}\n";
 
     sb << "};\n";
 }
