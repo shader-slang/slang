@@ -1015,7 +1015,17 @@ struct EmitVisitor
     void emitGLSLTextureType(
         RefPtr<TextureType> texType)
     {
-        emitGLSLTextureOrTextureSamplerType(texType, "texture");
+        switch(texType->getAccess())
+        {
+        case SLANG_RESOURCE_ACCESS_READ_WRITE:
+        case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
+            emitGLSLTextureOrTextureSamplerType(texType, "image");
+            break;
+
+        default:
+            emitGLSLTextureOrTextureSamplerType(texType, "texture");
+            break;
+        }
     }
 
     void emitGLSLTextureSamplerType(
@@ -1289,7 +1299,19 @@ struct EmitVisitor
 
     void visitGroupSharedType(GroupSharedType* type, TypeEmitArg const& arg)
     {
-        Emit("groupshared ");
+        switch(getTarget(context))
+        {
+        case CodeGenTarget::HLSL:
+            Emit("groupshared ");
+            break;
+
+        case CodeGenTarget::GLSL:
+            Emit("shared ");
+            break;
+
+        default:
+            break;
+        }
         emitTypeImpl(type->valueType, arg.declarator);
     }
 
@@ -2274,7 +2296,6 @@ struct EmitVisitor
                                     SLANG_UNEXPECTED("bad format in intrinsic definition");
                                 }
                                 break;
-
 
                             default:
                                 SLANG_UNEXPECTED("bad format in intrinsic definition");
@@ -5454,6 +5475,28 @@ emitDeclImpl(decl, nullptr);
                     }
                     break;
 
+                case 'N':
+                    {
+                        // Extract the element count from a vector argument so that
+                        // we can use it in the constructed expression.
+
+                        SLANG_RELEASE_ASSERT(*cursor >= '0' && *cursor <= '9');
+                        UInt argIndex = (*cursor++) - '0';
+                        SLANG_RELEASE_ASSERT(argCount > argIndex);
+
+                        auto vectorArg = args[argIndex].get();
+                        if (auto vectorType = vectorArg->type->As<VectorExpressionType>())
+                        {
+                            auto elementCount = GetIntVal(vectorType->elementCount);
+                            Emit(elementCount);
+                        }
+                        else
+                        {
+                            SLANG_UNEXPECTED("bad format in intrinsic definition");
+                        }
+                    }
+                    break;
+
 
                 default:
                     SLANG_UNEXPECTED("bad format in intrinsic definition");
@@ -7090,12 +7133,42 @@ emitDeclImpl(decl, nullptr);
 
     void emitIRVarModifiers(
         EmitContext*    ctx,
-        VarLayout*      layout)
+        VarLayout*      layout,
+        Type*           valueType)
     {
         if (!layout)
             return;
 
         emitIRMatrixLayoutModifiers(ctx, layout);
+
+        // As a special case, if we are emitting a GLSL declaration
+        // for an HLSL `RWTexture*` then we need to emit a `format` layout qualifier.
+        if(getTarget(context) == CodeGenTarget::GLSL)
+        {
+            if(auto resourceType = unwrapArray(valueType).As<TextureType>())
+            {
+                switch(resourceType->getAccess())
+                {
+                case SLANG_RESOURCE_ACCESS_READ_WRITE:
+                case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
+                    {
+                        // TODO: at this point we need to look at the element
+                        // type and figure out what format we want.
+                        //
+                        // For now just hack it and assume a fixed format.
+                        Emit("layout(rgba32f)");
+
+                        // TODO: we also need a way for users to specify what
+                        // the format should be explicitly, to avoid having
+                        // to have us infer things...
+                    }
+                    break;
+
+                default:
+                    break;
+                }
+            }
+        }
 
         if (ctx->shared->target == CodeGenTarget::GLSL)
         {
@@ -7238,7 +7311,7 @@ emitDeclImpl(decl, nullptr);
                     if(fieldType->Equals(getSession()->getVoidType()))
                         continue;
 
-                    emitIRVarModifiers(ctx, fieldLayout);
+                    emitIRVarModifiers(ctx, fieldLayout, fieldType);
 
                     emitIRType(ctx, fieldType, getIRName(ff));
 
@@ -7444,7 +7517,7 @@ emitDeclImpl(decl, nullptr);
 
         auto layout = getVarLayout(ctx, varDecl);
         
-        emitIRVarModifiers(ctx, layout);
+        emitIRVarModifiers(ctx, layout, varType);
 
 #if 0
         switch (addressSpace)
@@ -7597,7 +7670,7 @@ emitDeclImpl(decl, nullptr);
             }
         }
 
-        emitIRVarModifiers(ctx, layout);
+        emitIRVarModifiers(ctx, layout, varType);
 
         emitIRType(ctx, varType, getIRName(varDecl));
 

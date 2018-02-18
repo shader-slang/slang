@@ -252,9 +252,19 @@ sb << "// Thread-group sync and barrier for writes to all memory spaces (HLSL SM
 sb << "void AllMemoryBarrierWithGroupSync();\n";
 sb << "\n";
 sb << "// Test if any components is non-zero (HLSL SM 1.0)\n";
-sb << "__generic<T : __BuiltinType> bool any(T x);\n";
-sb << "__generic<T : __BuiltinType, let N : int> bool any(vector<T,N> x);\n";
-sb << "__generic<T : __BuiltinType, let N : int, let M : int> bool any(matrix<T,N,M> x);\n";
+sb << "\n";
+sb << "__generic<T : __BuiltinType>\n";
+sb << "__target_intrinsic(glsl, \"bool($0)\")\n";
+sb << "bool any(T x);\n";
+sb << "\n";
+sb << "__generic<T : __BuiltinType, let N : int>\n";
+sb << "__target_intrinsic(glsl, \"any(bvec$";
+sb << "N0($0))\")\n";
+sb << "bool any(vector<T,N> x);\n";
+sb << "\n";
+sb << "__generic<T : __BuiltinType, let N : int, let M : int>\n";
+sb << "// TODO: need to define GLSL mapping\n";
+sb << "bool any(matrix<T,N,M> x);\n";
 sb << "\n";
 sb << "\n";
 sb << "// Reinterpret bits as a double (HLSL SM 5.0)\n";
@@ -557,7 +567,10 @@ sb << "// Get position of given sample\n";
 sb << "float2 GetRenderTargetSamplePosition(int Index);\n";
 sb << "\n";
 sb << "// Group memory barrier\n";
+sb << "__target_intrinsic(glsl, \"groupMemoryBarrier\")\n";
 sb << "void GroupMemoryBarrier();\n";
+sb << "\n";
+sb << "__target_intrinsic(glsl, \"groupMemoryBarrier(); barrier\")\n";
 sb << "void GroupMemoryBarrierWithGroupSync();\n";
 sb << "\n";
 sb << "// Atomics\n";
@@ -1080,17 +1093,16 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
 
     sb << "T Load(int location, out uint status);\n";
 
-    sb << "__target_intrinsic(glsl, \"texelFetch($P, int($1))$z\")\n";
-    sb << "__subscript(uint index) -> T";
+    sb << "__subscript(uint index) -> T {\n";
+
+    sb << "__target_intrinsic(glsl, \"texelFetch($P, int($1))$z\") get;\n";
 
     if (kBaseBufferAccessLevels[aa].access != SLANG_RESOURCE_ACCESS_READ)
     {
-        sb << " { get; set; }\n";
+        sb << "set;\n";
     }
-    else
-    {
-        sb << ";\n";
-    }
+
+    sb << "}\n";
 
     sb << "};\n";
 }
