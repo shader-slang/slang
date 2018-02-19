@@ -179,7 +179,7 @@ namespace Slang
         // This will only be valid/non-null after semantic
         // checking and IR generation are complete, so it
         // is not safe to use this field without testing for NULL.
-        IRModule* irModule;
+        RefPtr<IRModule> irModule;
     };
 
     // A request to generate output in some target format
@@ -225,7 +225,7 @@ namespace Slang
         RefPtr<ModuleDecl>  moduleDecl;
 
         // The IR for the module
-        IRModule* irModule = nullptr;
+        RefPtr<IRModule> irModule = nullptr;
     };
 
     class Session;

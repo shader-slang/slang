@@ -751,6 +751,9 @@ SLANG_API void spDestroySession(
 {
     if(!session) return;
     delete SESSION(session);
+#ifdef _MSC_VER
+    _CrtDumpMemoryLeaks();
+#endif
 }
 
 SLANG_API void spAddBuiltins(

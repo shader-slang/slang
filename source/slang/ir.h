@@ -10,6 +10,7 @@
 #include "../core/basic.h"
 
 #include "source-loc.h"
+#include "memory_pool.h"
 
 namespace Slang {
 
@@ -114,15 +115,26 @@ enum IRDecorationOp : uint16_t
     kIRDecorationOp_TargetIntrinsic,
 };
 
+// represents an object allocated in an IR memory pool 
+struct IRObject
+{
+    bool isDestroyed = false;
+    virtual ~IRObject()
+    {
+        isDestroyed = true;
+    }
+};
+
 // A "decoration" that gets applied to an instruction.
 // These usually don't affect semantics, but are useful
 // for preserving high-level source information.
-struct IRDecoration
+struct IRDecoration : public IRObject
 {
     // Next decoration attached to the same instruction
     IRDecoration* next;
 
     IRDecorationOp op;
+    virtual ~IRDecoration() = default;
 };
 
 // Use AST-level types directly to represent the
@@ -132,7 +144,7 @@ typedef Type IRType;
 struct IRBlock;
 
 // Base class for values in the IR
-struct IRValue
+struct IRValue : public IRObject
 {
     // The operation that this value represents
     IROp op;
@@ -536,6 +548,8 @@ struct IRModule : RefObject
 {
     // The compilation session in use.
     Session*    session;
+    MemoryPool  memoryPool;
+    List<IRObject*> irObjectsToFree; // list of ir objects to run destructor upon destruction
 
     // A list of all the functions and other
     // global values declared in this module.
@@ -544,6 +558,14 @@ struct IRModule : RefObject
 
     IRGlobalValue*  getFirstGlobalValue() { return firstGlobalValue; }
     IRGlobalValue*  getlastGlobalValue() { return lastGlobalValue; }
+
+    ~IRModule()
+    {
+        for (auto val : irObjectsToFree)
+            if (!val->isDestroyed)
+                val->~IRObject();
+        irObjectsToFree = List<IRObject*>();
+    }
 };
 
 void printSlangIRAssembly(StringBuilder& builder, IRModule* module);

@@ -610,22 +610,26 @@ struct IRBuilder
         UInt            caseArgCount,
         IRValue* const* caseArgs);
 
-
-    IRDecoration* addDecorationImpl(
-        IRValue*        value,
-        UInt            decorationSize,
-        IRDecorationOp  op);
-
     template<typename T>
     T* addDecoration(IRValue* value, IRDecorationOp op)
     {
-        return (T*) addDecorationImpl(value, sizeof(T), op);
+        assert(getModule());
+        auto decorationSize = sizeof(T);
+        auto decoration = (T*)getModule()->memoryPool.allocZero(decorationSize);
+        new(decoration)T();
+       
+        decoration->op = op;
+
+        decoration->next = value->firstDecoration;
+        value->firstDecoration = decoration;
+        getModule()->irObjectsToFree.Add(decoration);
+        return decoration;
     }
 
     template<typename T>
     T* addDecoration(IRValue* value)
     {
-        return (T*) addDecorationImpl(value, sizeof(T), IRDecorationOp(T::kDecorationOp));
+        return addDecoration<T>(value, IRDecorationOp(T::kDecorationOp));
     }
 
     IRHighLevelDeclDecoration* addHighLevelDeclDecoration(IRValue* value, Decl* decl);

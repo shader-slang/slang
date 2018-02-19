@@ -1237,6 +1237,7 @@ namespace slang
 #include "source/slang/dxc-support.cpp"
 #include "source/slang/emit.cpp"
 #include "source/slang/ir.cpp"
+#include "source/slang/memory_pool.cpp"
 #include "source/slang/ir-legalize-types.cpp"
 #include "source/slang/ir-ssa.cpp"
 #include "source/slang/legalize-types.cpp"

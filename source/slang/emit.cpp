@@ -8158,6 +8158,7 @@ String emitEntryPoint(
         // TODO: do we want to emit directly from IR, or translate the
         // IR back into AST for emission?
         visitor.emitIRModule(&context, irModule);
+        destroyIRSpecializationState(irSpecializationState);
     }
 
     String code = sharedContext.sb.ProduceString();
@@ -8189,7 +8190,7 @@ String emitEntryPoint(
     finalResultBuilder << code;
 
     String finalResult = finalResultBuilder.ProduceString();
-
+    
     return finalResult;
 }
 

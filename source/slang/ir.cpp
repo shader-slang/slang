@@ -543,26 +543,19 @@ namespace Slang
         value->sourceLoc = sourceLocInfo->sourceLoc;
     }
 
-    static IRValue* createValueImpl(
-        IRBuilder*  /*builder*/,
-        UInt        size,
-        IROp        op,
-        IRType*     type)
-    {
-        IRValue* value = (IRValue*) malloc(size);
-        memset(value, 0, size);
-        value->op = op;
-        value->type = type;
-        return value;
-    }
-
     template<typename T>
     static T* createValue(
         IRBuilder*  builder,
         IROp        op,
         IRType*     type)
     {
-        return (T*) createValueImpl(builder, sizeof(T), op, type);
+        assert(builder->getModule());
+        T* value = (T*)builder->getModule()->memoryPool.allocZero(sizeof(T));
+        new(value)T();
+        value->op = op;
+        value->type = type;
+        builder->getModule()->irObjectsToFree.Add(value);
+        return value;
     }
 
 
@@ -571,7 +564,8 @@ namespace Slang
     // In this case `argCount` and `args` represnt the
     // arguments *after* the type (which is a mandatory
     // argument for all instructions).
-    static IRInst* createInstImpl(
+    template<typename T>
+    static T* createInstImpl(
         IRBuilder*      builder,
         UInt            size,
         IROp            op,
@@ -581,8 +575,9 @@ namespace Slang
         UInt            varArgCount = 0,
         IRValue* const* varArgs = nullptr)
     {
-        IRInst* inst = (IRInst*) malloc(size);
-        memset(inst, 0, size);
+        assert(builder->getModule());
+        T* inst = (T*)builder->getModule()->memoryPool.allocZero(size);
+        new(inst)T();
 
         inst->argCount = (uint32_t)(fixedArgCount + varArgCount);
 
@@ -611,7 +606,7 @@ namespace Slang
             }
             operand++;
         }
-
+        builder->getModule()->irObjectsToFree.Add(inst);
         return inst;
     }
 
@@ -623,7 +618,7 @@ namespace Slang
         UInt            argCount,
         IRValue* const* args)
     {
-        return (T*)createInstImpl(
+        return createInstImpl<T>(
             builder,
             sizeof(T),
             op,
@@ -638,7 +633,7 @@ namespace Slang
         IROp            op,
         IRType*         type)
     {
-        return (T*)createInstImpl(
+        return createInstImpl<T>(
             builder,
             sizeof(T),
             op,
@@ -654,7 +649,7 @@ namespace Slang
         IRType*         type,
         IRValue*        arg)
     {
-        return (T*)createInstImpl(
+        return createInstImpl<T>(
             builder,
             sizeof(T),
             op,
@@ -672,7 +667,7 @@ namespace Slang
         IRValue*        arg2)
     {
         IRValue* args[] = { arg1, arg2 };
-        return (T*)createInstImpl(
+        return createInstImpl<T>(
             builder,
             sizeof(T),
             op,
@@ -689,7 +684,7 @@ namespace Slang
         UInt            argCount,
         IRValue* const* args)
     {
-        return (T*)createInstImpl(
+        return createInstImpl<T>(
             builder,
             sizeof(T) + argCount * sizeof(IRUse),
             op,
@@ -708,7 +703,7 @@ namespace Slang
         UInt            varArgCount,
         IRValue* const* varArgs)
     {
-        return (T*)createInstImpl(
+        return createInstImpl<T>(
             builder,
             sizeof(T) + varArgCount * sizeof(IRUse),
             op,
@@ -731,7 +726,7 @@ namespace Slang
         IRValue* fixedArgs[] = { arg1 };
         UInt fixedArgCount = sizeof(fixedArgs) / sizeof(fixedArgs[0]);
 
-        return (T*)createInstImpl(
+        return createInstImpl<T>(
             builder,
             sizeof(T) + varArgCount * sizeof(IRUse),
             op,
@@ -1705,22 +1700,6 @@ namespace Slang
         return inst;
     }
 
-    IRDecoration* IRBuilder::addDecorationImpl(
-        IRValue*        inst,
-        UInt            decorationSize,
-        IRDecorationOp  op)
-    {
-        auto decoration = (IRDecoration*) malloc(decorationSize);
-        memset(decoration, 0, decorationSize);
-
-        decoration->op = op;
-
-        decoration->next = inst->firstDecoration;
-        inst->firstDecoration = decoration;
-
-        return decoration;
-    }
-
     IRHighLevelDeclDecoration* IRBuilder::addHighLevelDeclDecoration(IRValue* inst, Decl* decl)
     {
         auto decoration = addDecoration<IRHighLevelDeclDecoration>(inst, kIRDecorationOp_HighLevelDecl);
@@ -2666,9 +2645,6 @@ namespace Slang
 #else
         // Run destructor to be sure...
         this->~IRValue();
-
-        // And then free the memory
-        free((void*) this);
 #endif
     }
 
@@ -3729,7 +3705,7 @@ namespace Slang
         CodeGenTarget target;
 
         // The specialized module we are building
-        IRModule*   module;
+        RefPtr<IRModule>   module;
 
         // The original, unspecialized module we are copying
         IRModule*   originalModule;
@@ -5726,11 +5702,9 @@ namespace Slang
         for (auto workItem : witnessTablesToSpecailize)
         {
             int diff = 0;
-            specializeWitnessTable(context->shared, workItem.srcTable, 
+            specializeWitnessTable(context->shared, workItem.srcTable,
                 workItem.specDeclRef.SubstituteImpl(SubstitutionSet(nullptr, nullptr, globalParamSubst), &diff), workItem.dstTable);
         }
         return globalParamSubst;
     }
-
-
 }
