@@ -63,7 +63,7 @@ __generic<T, let N : int> __magic_type(HLSLInputPatchType) struct InputPatch
 
 __generic<T, let N : int> __magic_type(HLSLOutputPatchType) struct OutputPatch
 {
-    __subscript(uint index) -> T { set; }
+    __subscript(uint index) -> T;
 };
 
 __magic_type(HLSLRWByteAddressBufferType) struct RWByteAddressBuffer

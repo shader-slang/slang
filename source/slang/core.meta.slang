@@ -566,16 +566,22 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
             if(baseShape != TextureType::ShapeCube)
             {
-				// TODO: In the case where `access` includes writeability,
-				// this should have both `get` and `set` accessors.
-
                 // subscript operator
                 sb << "__subscript(uint";
 				if(kBaseTextureTypes[tt].coordCount + isArray > 1)
 				{
 					sb << kBaseTextureTypes[tt].coordCount + isArray;
 				}
-				sb << " location) -> T;\n";
+				sb << " location) -> T";
+
+				if (access != SLANG_RESOURCE_ACCESS_READ)
+				{
+					sb << " { get; set; }\n";
+				}
+				else
+				{
+					sb << ";\n";
+				}
             }
 
             if( !isMultisample )
