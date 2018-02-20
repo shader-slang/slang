@@ -35,6 +35,11 @@ namespace Slang
             referenceCount++;
         }
 
+        void decreaseReference()
+        {
+            --referenceCount;
+        }
+
         void releaseReference()
         {
             SLANG_ASSERT(referenceCount != 0);
@@ -190,6 +195,15 @@ namespace Slang
         operator T*() const
         {
             return pointer;
+        }
+
+        T* detach()
+        {
+            if (pointer)
+                dynamic_cast<RefObject*>(pointer)->decreaseReference();
+            auto rs = pointer;
+            pointer = nullptr;
+            return rs;
         }
 
     private:

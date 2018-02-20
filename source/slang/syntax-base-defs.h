@@ -119,7 +119,7 @@ public:
 protected:
     virtual bool EqualsImpl(Type * type) = 0;
 
-    virtual Type* CreateCanonicalType() = 0;
+    virtual RefPtr<Type> CreateCanonicalType() = 0;
     Type* canonicalType = nullptr;
     RefPtr<Type> canonicalTypeRefPtr;
 
@@ -227,7 +227,7 @@ RAW(
         return rs;
     }
     typedef List<KeyValuePair<RefPtr<Type>, RefPtr<Val>>> WitnessTableLookupTable;
-)
+    )
     // The witness tables for each interface this actual type implements
     SYNTAX_FIELD(WitnessTableLookupTable, witnessTables)
 END_SYNTAX_CLASS()

@@ -119,6 +119,10 @@ enum IRDecorationOp : uint16_t
 struct IRObject
 {
     bool isDestroyed = false;
+    virtual void dispose()
+    {
+        isDestroyed = true;
+    }
     virtual ~IRObject()
     {
         isDestroyed = true;
@@ -134,7 +138,6 @@ struct IRDecoration : public IRObject
     IRDecoration* next;
 
     IRDecorationOp op;
-    virtual ~IRDecoration() = default;
 };
 
 // Use AST-level types directly to represent the
@@ -181,6 +184,8 @@ struct IRValue : public IRObject
     // Free a value (which needs to have been removed
     // from its parent, had its uses eliminated, etc.)
     void deallocate();
+
+    virtual void dispose() override;
 };
 
 // Values that are contained in a doubly-linked
@@ -492,6 +497,11 @@ struct IRGlobalValue : IRValue
     void removeFromParent();
 
     void moveToEnd();
+    virtual void dispose() override
+    {
+        IRValue::dispose();
+        mangledName = String();
+    }
 };
 
 /// @brief A global value that potentially holds executable code.
@@ -541,6 +551,12 @@ struct IRFunc : IRGlobalValueWithCode
     // which are actually the parameters of the first
     // block.
     IRParam* getFirstParam();
+
+    virtual void dispose() override
+    {
+        IRGlobalValueWithCode::dispose();
+        genericDecls = decltype(genericDecls)();
+    }
 };
 
 // A module is a parent to functions, global variables, types, etc.
@@ -563,7 +579,7 @@ struct IRModule : RefObject
     {
         for (auto val : irObjectsToFree)
             if (!val->isDestroyed)
-                val->~IRObject();
+                val->dispose();
         irObjectsToFree = List<IRObject*>();
     }
 };

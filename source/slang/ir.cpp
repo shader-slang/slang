@@ -2648,6 +2648,12 @@ namespace Slang
 #endif
     }
 
+    void IRValue::dispose()
+    {
+        IRObject::dispose();
+        type = decltype(type)();
+    }
+
     // Insert this instruction into the same basic block
     // as `other`, right before it.
     void IRInst::insertBefore(IRInst* other)
@@ -4739,9 +4745,9 @@ namespace Slang
         if( !module )
         {
             module = builder->createModule();
-            sharedBuilder->module = module;
         }
 
+        sharedBuilder->module = module;
         sharedContext->module = module;
         sharedContext->originalModule = originalModule;
         sharedContext->target = target;
@@ -4777,6 +4783,12 @@ namespace Slang
 
         IRSharedSpecContext* getSharedContext() { return &sharedContextStorage; }
         IRSpecContext* getContext() { return &contextStorage; }
+        ~IRSpecializationState()
+        {
+            newProgramLayout = nullptr;
+            contextStorage = IRSpecContext();
+            sharedContextStorage = IRSharedSpecContext();
+        }
     };
 
     IRSpecializationState* createIRSpecializationState(
@@ -4816,7 +4828,6 @@ namespace Slang
         auto context = state->getContext();
         context->shared = sharedContext;
         context->builder = &sharedContext->builderStorage;
-
         // Create the GlobalGenericParamSubstitution for substituting global generic types
         // into user-provided type arguments
         auto globalParamSubst = createGlobalGenericParamSubstitution(entryPointRequest, programLayout, context, originalIRModule);

@@ -18,7 +18,7 @@ namespace Slang
         return basicType->baseType == this->baseType;
     }
 
-    Type* BasicExpressionType::CreateCanonicalType()
+    RefPtr<Type> BasicExpressionType::CreateCanonicalType()
     {
         // A basic type is already canonical, in our setup
         return this;
@@ -194,9 +194,12 @@ void Type::accept(IValVisitor* visitor, void* extra)
         if (!et->canonicalType)
         {
             // TODO(tfoley): worry about thread safety here?
-            et->canonicalType = et->CreateCanonicalType();
+            auto canType = et->CreateCanonicalType();
+            et->canonicalType = canType;
             if (dynamic_cast<Type*>(et->canonicalType) != this)
-                et->canonicalTypeRefPtr = et->canonicalType;
+                et->canonicalTypeRefPtr = canType;
+            else
+                canType.detach();
             SLANG_ASSERT(et->canonicalType);
         }
         return et->canonicalType;
@@ -318,10 +321,10 @@ void Type::accept(IValVisitor* visitor, void* extra)
         substitutions->args.Add(valueType);
 
         auto declRef = DeclRef<Decl>(typeDecl.Ptr(), substitutions);
-
-        return DeclRefType::Create(
+        auto rsType = DeclRefType::Create(
             this,
-            declRef)->As<PtrTypeBase>();
+            declRef);
+        return rsType->As<PtrTypeBase>();
     }
 
     RefPtr<ArrayExpressionType> Session::getArrayType(
@@ -381,13 +384,12 @@ void Type::accept(IValVisitor* visitor, void* extra)
         return this;
     }
 
-    Type* ArrayExpressionType::CreateCanonicalType()
+    RefPtr<Type> ArrayExpressionType::CreateCanonicalType()
     {
         auto canonicalElementType = baseType->GetCanonicalType();
         auto canonicalArrayType = getArrayType(
             canonicalElementType,
             ArrayLength);
-        session->canonicalTypes.Add(canonicalArrayType);
         return canonicalArrayType;
     }
     int ArrayExpressionType::GetHashCode()
@@ -420,11 +422,10 @@ void Type::accept(IValVisitor* visitor, void* extra)
         return valueType->Equals(t->valueType);
     }
 
-    Type* GroupSharedType::CreateCanonicalType()
+    RefPtr<Type> GroupSharedType::CreateCanonicalType()
     {
         auto canonicalValueType = valueType->GetCanonicalType();
         auto canonicalGroupSharedType = getSession()->getGroupSharedType(canonicalValueType);
-        session->canonicalTypes.Add(canonicalGroupSharedType);
         return canonicalGroupSharedType;
     }
 
@@ -456,7 +457,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         return false;
     }
 
-    Type* DeclRefType::CreateCanonicalType()
+    RefPtr<Type> DeclRefType::CreateCanonicalType()
     {
         // A declaration reference is already canonical
         return this;
@@ -792,7 +793,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         return false;
     }
 
-    Type* OverloadGroupType::CreateCanonicalType()
+    RefPtr<Type> OverloadGroupType::CreateCanonicalType()
     {
         return this;
     }
@@ -814,7 +815,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         return false;
     }
 
-    Type* IRBasicBlockType::CreateCanonicalType()
+    RefPtr<Type> IRBasicBlockType::CreateCanonicalType()
     {
         return this;
     }
@@ -836,7 +837,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         return false;
     }
 
-    Type* InitializerListType::CreateCanonicalType()
+    RefPtr<Type> InitializerListType::CreateCanonicalType()
     {
         return this;
     }
@@ -860,7 +861,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         return false;
     }
 
-    Type* ErrorType::CreateCanonicalType()
+    RefPtr<Type> ErrorType::CreateCanonicalType()
     {
         return this;
     }
@@ -889,7 +890,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         UNREACHABLE_RETURN(false);
     }
 
-    Type* NamedExpressionType::CreateCanonicalType()
+    RefPtr<Type> NamedExpressionType::CreateCanonicalType()
     {
         if (!innerType)
             innerType = GetType(declRef);
@@ -981,7 +982,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         return substType;
     }
 
-    Type* FuncType::CreateCanonicalType()
+    RefPtr<Type> FuncType::CreateCanonicalType()
     {
         // result type
         RefPtr<Type> canResultType = resultType->GetCanonicalType();
@@ -997,8 +998,6 @@ void Type::accept(IValVisitor* visitor, void* extra)
         canType->session = session;
         canType->resultType = resultType;
         canType->paramTypes = canParamTypes;
-
-        session->canonicalTypes.Add(canType);
 
         return canType;
     }
@@ -1035,10 +1034,9 @@ void Type::accept(IValVisitor* visitor, void* extra)
         return false;
     }
 
-    Type* TypeType::CreateCanonicalType()
+    RefPtr<Type> TypeType::CreateCanonicalType()
     {
         auto canType = getTypeType(type->GetCanonicalType());
-        session->canonicalTypes.Add(canType);
         return canType;
     }
 
@@ -1070,7 +1068,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         return declRef.GetHashCode();
     }
 
-    Type* GenericDeclRefType::CreateCanonicalType()
+    RefPtr<Type> GenericDeclRefType::CreateCanonicalType()
     {
         return this;
     }

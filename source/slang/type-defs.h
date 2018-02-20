@@ -10,7 +10,7 @@ public:
 
 protected:
     virtual bool EqualsImpl(Type * type) override;
-    virtual Type* CreateCanonicalType() override;
+    virtual RefPtr<Type> CreateCanonicalType() override;
     virtual int GetHashCode() override;
 )
 END_SYNTAX_CLASS()
@@ -23,7 +23,7 @@ RAW(
 
 protected:
     virtual bool EqualsImpl(Type * type) override;
-    virtual Type* CreateCanonicalType() override;
+    virtual RefPtr<Type> CreateCanonicalType() override;
     virtual int GetHashCode() override;
 )
 END_SYNTAX_CLASS()
@@ -37,7 +37,7 @@ public:
 protected:
     virtual bool EqualsImpl(Type * type) override;
     virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
-    virtual Type* CreateCanonicalType() override;
+    virtual RefPtr<Type> CreateCanonicalType() override;
     virtual int GetHashCode() override;
 )
 END_SYNTAX_CLASS()
@@ -51,7 +51,7 @@ public:
 
 protected:
     virtual bool EqualsImpl(Type * type) override;
-    virtual Type* CreateCanonicalType() override;
+    virtual RefPtr<Type> CreateCanonicalType() override;
     virtual int GetHashCode() override;
 )
 END_SYNTAX_CLASS()
@@ -77,7 +77,7 @@ RAW(
 protected:
     virtual int GetHashCode() override;
     virtual bool EqualsImpl(Type * type) override;
-    virtual Type* CreateCanonicalType() override;
+    virtual RefPtr<Type> CreateCanonicalType() override;
 )
 END_SYNTAX_CLASS()
 
@@ -103,7 +103,7 @@ RAW(
 protected:
     virtual BasicExpressionType* GetScalarType() override;
     virtual bool EqualsImpl(Type * type) override;
-    virtual Type* CreateCanonicalType() override;
+    virtual RefPtr<Type> CreateCanonicalType() override;
 )
 END_SYNTAX_CLASS()
 
@@ -312,7 +312,7 @@ RAW(
 
 protected:
     virtual bool EqualsImpl(Type * type) override;
-    virtual Type* CreateCanonicalType() override;
+    virtual RefPtr<Type> CreateCanonicalType() override;
     virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
     virtual int GetHashCode() override;
     )
@@ -331,7 +331,7 @@ RAW(
 
 protected:
     virtual bool EqualsImpl(Type * type) override;
-    virtual Type* CreateCanonicalType() override;
+    virtual RefPtr<Type> CreateCanonicalType() override;
     virtual int GetHashCode() override;
     )
 
@@ -356,7 +356,7 @@ public:
 
 protected:
     virtual bool EqualsImpl(Type * type) override;
-    virtual Type* CreateCanonicalType() override;
+    virtual RefPtr<Type> CreateCanonicalType() override;
     virtual int GetHashCode() override;
 )
 END_SYNTAX_CLASS()
@@ -440,7 +440,7 @@ RAW(
 
 protected:
     virtual bool EqualsImpl(Type * type) override;
-    virtual Type* CreateCanonicalType() override;
+    virtual RefPtr<Type> CreateCanonicalType() override;
     virtual int GetHashCode() override;
 )
 END_SYNTAX_CLASS()
@@ -469,7 +469,7 @@ RAW(
 protected:
     virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
     virtual bool EqualsImpl(Type * type) override;
-    virtual Type* CreateCanonicalType() override;
+    virtual RefPtr<Type> CreateCanonicalType() override;
     virtual int GetHashCode() override;
 )
 END_SYNTAX_CLASS()
@@ -495,6 +495,6 @@ SYNTAX_CLASS(GenericDeclRefType, Type)
 protected:
     virtual bool EqualsImpl(Type * type) override;
     virtual int GetHashCode() override;
-    virtual Type* CreateCanonicalType() override;
+    virtual RefPtr<Type> CreateCanonicalType() override;
 )
 END_SYNTAX_CLASS()

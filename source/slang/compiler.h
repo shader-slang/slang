@@ -450,7 +450,6 @@ namespace Slang
 
         Dictionary<int, RefPtr<Type>> builtinTypes;
         Dictionary<String, Decl*> magicDecls;
-        List<RefPtr<Type>> canonicalTypes;
 
         void initializeTypes();
 
@@ -505,6 +504,7 @@ namespace Slang
             RefPtr<Scope> const&    scope,
             String const&           path,
             String const&           source);
+        ~Session();
     };
 
 }

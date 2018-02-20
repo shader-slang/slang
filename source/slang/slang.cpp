@@ -734,6 +734,19 @@ void Session::addBuiltinSource(
     loadedModuleCode.Add(syntax);
 }
 
+Session::~Session()
+{
+    // free all built-in types first
+    errorType = nullptr;
+    initializerListType = nullptr;
+    overloadedType = nullptr;
+    irBasicBlockType = nullptr;
+
+    builtinTypes = decltype(builtinTypes)();
+    // destroy modules next
+    loadedModuleCode = decltype(loadedModuleCode)();
+}
+
 }
 
 // implementation of C interface
