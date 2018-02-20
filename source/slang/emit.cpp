@@ -8158,6 +8158,10 @@ String emitEntryPoint(
         // TODO: do we want to emit directly from IR, or translate the
         // IR back into AST for emission?
         visitor.emitIRModule(&context, irModule);
+        
+        // retain the specialized ir module, because the current
+        // GlobalGenericParamSubstitution implementation may reference ir objects 
+        targetRequest->compileRequest->compiledModules.Add(irModule);
     }
     destroyIRSpecializationState(irSpecializationState);
 
@@ -8166,8 +8170,6 @@ String emitEntryPoint(
 
     // Now that we've emitted the code for all the declaratiosn in the file,
     // it is time to stich together the final output.
-
-
 
     // There may be global-scope modifiers that we should emit now
     visitor.emitGLSLPreprocessorDirectives(translationUnitSyntax);

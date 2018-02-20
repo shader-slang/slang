@@ -313,6 +313,8 @@ namespace Slang
         // Map from the logical name of a module to its definition
         Dictionary<Name*, RefPtr<LoadedModule>> mapNameToLoadedModules;
 
+        // The resulting specialized IR module for each entry point request
+        List<RefPtr<IRModule>> compiledModules;
 
         CompileRequest(Session* session);
 

@@ -123,7 +123,13 @@ CompileRequest::CompileRequest(Session* session)
 }
 
 CompileRequest::~CompileRequest()
-{}
+{
+    // delete things that may reference IR objects first
+    targets = decltype(targets)();
+    translationUnits = decltype(translationUnits)();
+    entryPoints = decltype(entryPoints)();
+    types = decltype(types)();
+}
 
 
 RefPtr<Expr> CompileRequest::parseTypeString(TranslationUnitRequest * translationUnit, String typeStr, RefPtr<Scope> scope)
