@@ -33,6 +33,11 @@ struct IRLayoutDecoration : IRDecoration
     enum { kDecorationOp = kIRDecorationOp_Layout };
 
     RefPtr<Layout>  layout;
+    virtual void dispose() override
+    {
+        IRDecoration::dispose();
+        layout = nullptr;
+    }
 };
 
 enum IRLoopControl
@@ -52,6 +57,11 @@ struct IRTargetSpecificDecoration : IRDecoration
 {
     // TODO: have a more structured representation of target specifiers
     String targetName;
+    virtual void dispose()override
+    {
+        IRDecoration::dispose();
+        targetName = String();
+    }
 };
 
 struct IRTargetDecoration : IRTargetSpecificDecoration
@@ -64,6 +74,11 @@ struct IRTargetIntrinsicDecoration : IRTargetSpecificDecoration
     enum { kDecorationOp = kIRDecorationOp_TargetIntrinsic };
 
     String definition;
+    virtual void dispose()override
+    {
+        IRTargetSpecificDecoration::dispose();
+        definition = String();
+    }
 };
 
 //
@@ -73,6 +88,11 @@ struct IRTargetIntrinsicDecoration : IRTargetSpecificDecoration
 struct IRDeclRef : IRValue
 {
     DeclRef<Decl> declRef;
+    virtual void dispose() override
+    {
+        IRValue::dispose();
+        declRef = decltype(declRef)();
+    }
 };
 
 // An instruction that specializes another IR value
@@ -333,6 +353,13 @@ struct IRWitnessTable : IRGlobalValue
     RefPtr<GenericDecl> genericDecl;
     DeclRef<Decl> subTypeDeclRef, supTypeDeclRef;
     IRValueList<IRWitnessTableEntry> entries;
+    virtual void dispose() override
+    {
+        IRGlobalValue::dispose();
+        genericDecl = decltype(genericDecl)();
+        subTypeDeclRef = decltype(subTypeDeclRef)();
+        supTypeDeclRef = decltype(supTypeDeclRef)();
+    }
 };
 
 // An instruction that yields an undefined value.
@@ -610,22 +637,26 @@ struct IRBuilder
         UInt            caseArgCount,
         IRValue* const* caseArgs);
 
-
-    IRDecoration* addDecorationImpl(
-        IRValue*        value,
-        UInt            decorationSize,
-        IRDecorationOp  op);
-
     template<typename T>
     T* addDecoration(IRValue* value, IRDecorationOp op)
     {
-        return (T*) addDecorationImpl(value, sizeof(T), op);
+        assert(getModule());
+        auto decorationSize = sizeof(T);
+        auto decoration = (T*)getModule()->memoryPool.allocZero(decorationSize);
+        new(decoration)T();
+       
+        decoration->op = op;
+
+        decoration->next = value->firstDecoration;
+        value->firstDecoration = decoration;
+        getModule()->irObjectsToFree.Add(decoration);
+        return decoration;
     }
 
     template<typename T>
     T* addDecoration(IRValue* value)
     {
-        return (T*) addDecorationImpl(value, sizeof(T), IRDecorationOp(T::kDecorationOp));
+        return addDecoration<T>(value, IRDecorationOp(T::kDecorationOp));
     }
 
     IRHighLevelDeclDecoration* addHighLevelDeclDecoration(IRValue* value, Decl* decl);

@@ -8084,17 +8084,17 @@ String emitEntryPoint(
 
     EmitVisitor visitor(&context);
 
+    // We are going to create a fresh IR module that we will use to
+    // clone any code needed by the user's entry point.
+    IRSpecializationState* irSpecializationState = createIRSpecializationState(
+        entryPoint,
+        programLayout,
+        target,
+        targetRequest);
     {
         TypeLegalizationContext typeLegalizationContext;
         typeLegalizationContext.session = entryPoint->compileRequest->mSession;
 
-        // We are going to create a fresh IR module that we will use to
-        // clone any code needed by the user's entry point.
-        IRSpecializationState* irSpecializationState = createIRSpecializationState(
-            entryPoint,
-            programLayout,
-            target,
-            targetRequest);
         IRModule* irModule = getIRModule(irSpecializationState);
 
         typeLegalizationContext.irModule = irModule;
@@ -8158,15 +8158,18 @@ String emitEntryPoint(
         // TODO: do we want to emit directly from IR, or translate the
         // IR back into AST for emission?
         visitor.emitIRModule(&context, irModule);
+        
+        // retain the specialized ir module, because the current
+        // GlobalGenericParamSubstitution implementation may reference ir objects 
+        targetRequest->compileRequest->compiledModules.Add(irModule);
     }
+    destroyIRSpecializationState(irSpecializationState);
 
     String code = sharedContext.sb.ProduceString();
     sharedContext.sb.Clear();
 
     // Now that we've emitted the code for all the declaratiosn in the file,
     // it is time to stich together the final output.
-
-
 
     // There may be global-scope modifiers that we should emit now
     visitor.emitGLSLPreprocessorDirectives(translationUnitSyntax);
@@ -8189,7 +8192,7 @@ String emitEntryPoint(
     finalResultBuilder << code;
 
     String finalResult = finalResultBuilder.ProduceString();
-
+    
     return finalResult;
 }
 

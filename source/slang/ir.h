@@ -10,6 +10,7 @@
 #include "../core/basic.h"
 
 #include "source-loc.h"
+#include "memory_pool.h"
 
 namespace Slang {
 
@@ -114,10 +115,24 @@ enum IRDecorationOp : uint16_t
     kIRDecorationOp_TargetIntrinsic,
 };
 
+// represents an object allocated in an IR memory pool 
+struct IRObject
+{
+    bool isDestroyed = false;
+    virtual void dispose()
+    {
+        isDestroyed = true;
+    }
+    virtual ~IRObject()
+    {
+        isDestroyed = true;
+    }
+};
+
 // A "decoration" that gets applied to an instruction.
 // These usually don't affect semantics, but are useful
 // for preserving high-level source information.
-struct IRDecoration
+struct IRDecoration : public IRObject
 {
     // Next decoration attached to the same instruction
     IRDecoration* next;
@@ -132,7 +147,7 @@ typedef Type IRType;
 struct IRBlock;
 
 // Base class for values in the IR
-struct IRValue
+struct IRValue : public IRObject
 {
     // The operation that this value represents
     IROp op;
@@ -169,6 +184,8 @@ struct IRValue
     // Free a value (which needs to have been removed
     // from its parent, had its uses eliminated, etc.)
     void deallocate();
+
+    virtual void dispose() override;
 };
 
 // Values that are contained in a doubly-linked
@@ -480,6 +497,11 @@ struct IRGlobalValue : IRValue
     void removeFromParent();
 
     void moveToEnd();
+    virtual void dispose() override
+    {
+        IRValue::dispose();
+        mangledName = String();
+    }
 };
 
 /// @brief A global value that potentially holds executable code.
@@ -529,6 +551,12 @@ struct IRFunc : IRGlobalValueWithCode
     // which are actually the parameters of the first
     // block.
     IRParam* getFirstParam();
+
+    virtual void dispose() override
+    {
+        IRGlobalValueWithCode::dispose();
+        genericDecls = decltype(genericDecls)();
+    }
 };
 
 // A module is a parent to functions, global variables, types, etc.
@@ -536,6 +564,8 @@ struct IRModule : RefObject
 {
     // The compilation session in use.
     Session*    session;
+    MemoryPool  memoryPool;
+    List<IRObject*> irObjectsToFree; // list of ir objects to run destructor upon destruction
 
     // A list of all the functions and other
     // global values declared in this module.
@@ -544,6 +574,14 @@ struct IRModule : RefObject
 
     IRGlobalValue*  getFirstGlobalValue() { return firstGlobalValue; }
     IRGlobalValue*  getlastGlobalValue() { return lastGlobalValue; }
+
+    ~IRModule()
+    {
+        for (auto val : irObjectsToFree)
+            if (!val->isDestroyed)
+                val->dispose();
+        irObjectsToFree = List<IRObject*>();
+    }
 };
 
 void printSlangIRAssembly(StringBuilder& builder, IRModule* module);

@@ -2870,6 +2870,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         if (parentDecl->ParentDecl)
             witnessTable->genericDecl = dynamic_cast<GenericDecl*>(parentDecl->ParentDecl);
         witnessTable->subTypeDeclRef = makeDeclRef(parentDecl);
+        witnessTable->subTypeDeclRef.substitutions = createDefaultSubstitutions(context->getSession(), parentDecl);
         witnessTable->supTypeDeclRef = inheritanceDecl->base.type->AsDeclRefType()->declRef;
 
         // Register the value now, rather than later, to avoid

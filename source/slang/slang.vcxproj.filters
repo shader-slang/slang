@@ -45,6 +45,7 @@
     <ClInclude Include="mangle.h" />
     <ClInclude Include="legalize-types.h" />
     <ClInclude Include="ir-ssa.h" />
+    <ClInclude Include="memory_pool.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="check.cpp" />
@@ -75,6 +76,7 @@
     <ClCompile Include="ir-legalize-types.cpp" />
     <ClCompile Include="legalize-types.cpp" />
     <ClCompile Include="ir-ssa.cpp" />
+    <ClCompile Include="memory_pool.cpp" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="core.meta.slang" />

@@ -123,7 +123,13 @@ CompileRequest::CompileRequest(Session* session)
 }
 
 CompileRequest::~CompileRequest()
-{}
+{
+    // delete things that may reference IR objects first
+    targets = decltype(targets)();
+    translationUnits = decltype(translationUnits)();
+    entryPoints = decltype(entryPoints)();
+    types = decltype(types)();
+}
 
 
 RefPtr<Expr> CompileRequest::parseTypeString(TranslationUnitRequest * translationUnit, String typeStr, RefPtr<Scope> scope)
@@ -734,6 +740,19 @@ void Session::addBuiltinSource(
     loadedModuleCode.Add(syntax);
 }
 
+Session::~Session()
+{
+    // free all built-in types first
+    errorType = nullptr;
+    initializerListType = nullptr;
+    overloadedType = nullptr;
+    irBasicBlockType = nullptr;
+
+    builtinTypes = decltype(builtinTypes)();
+    // destroy modules next
+    loadedModuleCode = decltype(loadedModuleCode)();
+}
+
 }
 
 // implementation of C interface
@@ -751,6 +770,9 @@ SLANG_API void spDestroySession(
 {
     if(!session) return;
     delete SESSION(session);
+#ifdef _MSC_VER
+    _CrtDumpMemoryLeaks();
+#endif
 }
 
 SLANG_API void spAddBuiltins(

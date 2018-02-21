@@ -179,7 +179,7 @@ namespace Slang
         // This will only be valid/non-null after semantic
         // checking and IR generation are complete, so it
         // is not safe to use this field without testing for NULL.
-        IRModule* irModule;
+        RefPtr<IRModule> irModule;
     };
 
     // A request to generate output in some target format
@@ -225,7 +225,7 @@ namespace Slang
         RefPtr<ModuleDecl>  moduleDecl;
 
         // The IR for the module
-        IRModule* irModule = nullptr;
+        RefPtr<IRModule> irModule = nullptr;
     };
 
     class Session;
@@ -313,6 +313,8 @@ namespace Slang
         // Map from the logical name of a module to its definition
         Dictionary<Name*, RefPtr<LoadedModule>> mapNameToLoadedModules;
 
+        // The resulting specialized IR module for each entry point request
+        List<RefPtr<IRModule>> compiledModules;
 
         CompileRequest(Session* session);
 
@@ -450,7 +452,6 @@ namespace Slang
 
         Dictionary<int, RefPtr<Type>> builtinTypes;
         Dictionary<String, Decl*> magicDecls;
-        List<RefPtr<Type>> canonicalTypes;
 
         void initializeTypes();
 
@@ -505,6 +506,7 @@ namespace Slang
             RefPtr<Scope> const&    scope,
             String const&           path,
             String const&           source);
+        ~Session();
     };
 
 }
