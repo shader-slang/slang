@@ -115,6 +115,10 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
     {
         return SLANG_TYPE_KIND_CONSTANT_BUFFER;
     }
+    else if( auto streamOutputType = type->As<HLSLStreamOutputType>() )
+    {
+        return SLANG_TYPE_KIND_OUTPUT_STREAM;
+    }
     else if (type->As<TextureBufferType>())
     {
         return SLANG_TYPE_KIND_TEXTURE_BUFFER;

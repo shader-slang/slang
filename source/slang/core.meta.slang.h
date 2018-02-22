@@ -740,7 +740,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 }
 
                 // `SampleCmp()` and `SampleCmpLevelZero`
-                sb << "T SampleCmp(SamplerComparisonState s, ";
+                sb << "float SampleCmp(SamplerComparisonState s, ";
                 sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                 sb << "float compareValue";
                 sb << ");\n";
@@ -786,7 +786,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                     sb << ", vec" << baseCoordCount << "(0.0)";
                     sb << ")\")\n";
                 }
-                sb << "T SampleCmpLevelZero(SamplerComparisonState s, ";
+                sb << "float SampleCmpLevelZero(SamplerComparisonState s, ";
                 sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                 sb << "float compareValue";
                 sb << ");\n";
@@ -800,12 +800,12 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                     // sense). I'm going to assume the documentation for `SampleCmp`
                     // is just wrong.
 
-                    sb << "T SampleCmp(SamplerState s, ";
+                    sb << "float SampleCmp(SamplerComparisonState s, ";
                     sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                     sb << "float compareValue, ";
                     sb << "constexpr int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
 
-                    sb << "T SampleCmpLevelZero(SamplerState s, ";
+                    sb << "float SampleCmpLevelZero(SamplerComparisonState s, ";
                     sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                     sb << "float compareValue, ";
                     sb << "constexpr int" << kBaseTextureTypes[tt].coordCount << " offset);\n";

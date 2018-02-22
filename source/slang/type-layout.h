@@ -353,6 +353,14 @@ public:
     size_t              uniformStride;
 };
 
+// type layout for a variable with stream-output type
+class StreamOutputTypeLayout : public TypeLayout
+{
+public:
+    RefPtr<TypeLayout> elementTypeLayout;
+};
+
+
 // When storing the layout for a matrix-type
 // value, we need to know whether it has been
 // laid ot with row-major or column-major
