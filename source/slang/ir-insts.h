@@ -406,7 +406,7 @@ struct SharedIRBuilder
 
     Dictionary<IRInstKey,       IRInst*>    globalValueNumberingMap;
     Dictionary<IRConstantKey,   IRConstant*>    constantMap;
-    Dictionary<String, IRWitnessTable*> witnessTableMap;
+    Dictionary<Name*, IRWitnessTable*> witnessTableMap;
 };
 
 struct IRBuilderSourceLocRAII;
@@ -523,7 +523,7 @@ struct IRBuilder
         IRWitnessTable* witnessTable,
         IRValue*        requirementKey,
         IRValue*        satisfyingVal);
-    IRWitnessTable* lookupWitnessTable(String mangledName);
+    IRWitnessTable* lookupWitnessTable(Name* mangledName);
     void registerWitnessTable(IRWitnessTable* table);
     IRBlock* createBlock();
     IRBlock* emitBlock();

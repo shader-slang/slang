@@ -11,7 +11,7 @@ namespace Slang
 
     IRGlobalValue* cloneGlobalValueWithMangledName(
         IRSpecContext*  context,
-        String const&   mangledName,
+        Name*   mangledName,
         IRGlobalValue*  originalVal);
 
 
@@ -1277,7 +1277,7 @@ namespace Slang
         return entry;
     }
 
-    IRWitnessTable * IRBuilder::lookupWitnessTable(String mangledName)
+    IRWitnessTable * IRBuilder::lookupWitnessTable(Name* mangledName)
     {
         IRWitnessTable * result;
         if (sharedBuilder->witnessTableMap.TryGetValue(mangledName, result))
@@ -1816,7 +1816,7 @@ namespace Slang
             {
                 auto irFunc = (IRFunc*) inst;
                 dump(context, "@");
-                dump(context, irFunc->mangledName.Buffer());
+                dump(context, getText(irFunc->mangledName).Buffer());
             }
             break;
 
@@ -3202,7 +3202,7 @@ namespace Slang
 
         if( systemValueInfo )
         {
-            globalVariable->mangledName = systemValueInfo->name;
+            globalVariable->mangledName = builder->getSession()->getNameObj(systemValueInfo->name);
         }
 
         builder->addLayoutDecoration(globalVariable, varLayout);
@@ -3756,7 +3756,7 @@ namespace Slang
         // A map from mangled symbol names to zero or
         // more global IR values that have that name,
         // in the *original* module.
-        typedef Dictionary<String, RefPtr<IRSpecSymbol>> SymbolDictionary;
+        typedef Dictionary<Name*, RefPtr<IRSpecSymbol>> SymbolDictionary;
         SymbolDictionary symbols;
 
         // A map from values in the original IR module
@@ -3775,7 +3775,7 @@ namespace Slang
     {
         // A map from the mangled name of a global variable
         // to the layout to use for it.
-        Dictionary<String, VarLayout*> globalVarLayouts;
+        Dictionary<Name*, VarLayout*> globalVarLayouts;
 
         IRSharedSpecContext* shared;
 
@@ -4395,7 +4395,7 @@ namespace Slang
         EntryPointLayout*   entryPointLayout)
     {
         // Look up the IR symbol by name
-        String mangledName = getMangledName(entryPointRequest->decl);
+        auto mangledName = context->getModule()->session->getNameObj(getMangledName(entryPointRequest->decl));
         RefPtr<IRSpecSymbol> sym;
         if (!context->getSymbols().TryGetValue(mangledName, sym))
         {
@@ -4651,7 +4651,7 @@ namespace Slang
     // (It is okay for this parameter to be null).
     IRGlobalValue* cloneGlobalValueWithMangledName(
         IRSpecContext*  context,
-        String const&   mangledName,
+        Name*           mangledName,
         IRGlobalValue*  originalVal)
     {
         // Check if we've already cloned this value, for the case where
@@ -4662,7 +4662,7 @@ namespace Slang
             return (IRGlobalValue*) clonedVal;
         }
 
-        if(mangledName.Length() == 0)
+        if(getText(mangledName).Length() == 0)
         {
             // If there is no mangled name, then we assume this is a local symbol,
             // and it can't possibly have multiple declarations.
@@ -4710,7 +4710,7 @@ namespace Slang
         return cloneGlobalValueImpl(context, bestVal, sym);
     }
 
-    IRGlobalValue* cloneGlobalValueWithMangledName(IRSpecContext* context, String const& mangledName)
+    IRGlobalValue* cloneGlobalValueWithMangledName(IRSpecContext* context, Name* mangledName)
     {
         return cloneGlobalValueWithMangledName(context, mangledName, nullptr);
     }
@@ -4736,12 +4736,12 @@ namespace Slang
         IRSharedSpecContext*    sharedContext,
         IRGlobalValue*          gv)
     {
-        String mangledName = gv->mangledName;
+        auto mangledName = gv->mangledName;
 
         // Don't try to register a symbol for global values
         // with no mangled name, since these represent symbols
         // that shouldn't get "linkage"
-        if (mangledName == "")
+        if (!getText(mangledName).Length())
             return;
 
         RefPtr<IRSpecSymbol> sym = new IRSpecSymbol();
@@ -4890,7 +4890,7 @@ namespace Slang
         auto globalStructLayout = getGlobalStructLayout(newProgramLayout);
         for (auto globalVarLayout : globalStructLayout->fields)
         {
-            String mangledName = getMangledName(globalVarLayout->varDecl);
+            auto mangledName = compileRequest->mSession->getNameObj(getMangledName(globalVarLayout->varDecl));
             context->globalVarLayouts.AddIfNotExists(mangledName, globalVarLayout);
         }
 
@@ -4924,7 +4924,7 @@ namespace Slang
 
         IRGlobalValue* irDeclVal = cloneGlobalValueWithMangledName(
             state->getContext(),
-            mangledDeclName);
+            state->getContext()->getModule()->session->getNameObj(mangledDeclName));
         if(!irDeclVal)
             return nullptr;
 
@@ -5013,9 +5013,9 @@ namespace Slang
     {
         if( auto subtypeWitness = dynamic_cast<SubtypeWitness*>(val) )
         {
-            String mangledName = getMangledNameForConformanceWitness(
+            auto mangledName = context->getModule()->session->getNameObj(getMangledNameForConformanceWitness(
                 subtypeWitness->sub,
-                subtypeWitness->sup);
+                subtypeWitness->sup));
             RefPtr<IRSpecSymbol> symbol;
 
             if (context->getSymbols().TryGetValue(mangledName, symbol))
@@ -5030,9 +5030,9 @@ namespace Slang
                 auto subDeclRefGen = DeclRef<Decl>(subDeclRef->declRef.decl, 
                     createDefaultSubstitutions(context->builder->getSession(), subDeclRef->declRef.decl));
 
-                String genericName = getMangledNameForConformanceWitness(
+                auto genericName = context->getModule()->session->getNameObj(getMangledNameForConformanceWitness(
                     subDeclRefGen,
-                    subtypeWitness->sup);
+                    subtypeWitness->sup));
                 if (context->getSymbols().TryGetValue(genericName, symbol))
                 {
                     auto specInst = context->builder->emitSpecializeInst(subtypeWitness->sup, symbol->irGlobalValue, subDeclRef->declRef);
@@ -5280,8 +5280,8 @@ namespace Slang
         String specializedMangledName = getMangledNameForConformanceWitness(specDeclRef.Substitute(originalTable->subTypeDeclRef),
             specDeclRef.Substitute(originalTable->supTypeDeclRef));
 
-        if (dstTable && dstTable->mangledName.Length())
-            specializedMangledName = dstTable->mangledName;
+        if (dstTable && getText(dstTable->mangledName).Length())
+            specializedMangledName = getText(dstTable->mangledName);
 
         // TODO: This is a terrible linear search, and we should
         // avoid it by building a dictionary ahead of time,
@@ -5292,7 +5292,7 @@ namespace Slang
             auto module = sharedContext->module;
             for (auto gv = module->getFirstGlobalValue(); gv; gv = gv->getNextValue())
             {
-                if (gv->mangledName == specializedMangledName)
+                if (getText(gv->mangledName) == specializedMangledName)
                     return (IRWitnessTable*)gv;
             }
         }
@@ -5311,7 +5311,7 @@ namespace Slang
         auto specTable = cloneWitnessTableWithoutRegistering(&context, originalTable, dstTable);
 
         // Set up the clone to recognize that it is no longer generic
-        specTable->mangledName = specializedMangledName;
+        specTable->mangledName = context.getModule()->session->getNameObj(specializedMangledName);
         specTable->genericDecl = nullptr;
         
         // Specialization of witness tables should trigger cascading specializations 
@@ -5348,9 +5348,10 @@ namespace Slang
         if (genericFunc->getGenericDecl() == specDeclRef.decl)
             specMangledName = getMangledName(specDeclRef);
         else
-            specMangledName = mangleSpecializedFuncName(genericFunc->mangledName, specDeclRef.substitutions);
+            specMangledName = mangleSpecializedFuncName(getText(genericFunc->mangledName), specDeclRef.substitutions);
+        auto specMangledNameObj = sharedContext->module->session->getNameObj(specMangledName);
         RefPtr<IRSpecSymbol> symb;
-        if (sharedContext->symbols.TryGetValue(specMangledName, symb))
+        if (sharedContext->symbols.TryGetValue(specMangledNameObj, symb))
         {
             return (IRFunc*)(symb->irGlobalValue);
         }
@@ -5360,7 +5361,7 @@ namespace Slang
         // We can probalby use the same basic context, actually.
         for (auto gv = sharedContext->module->getFirstGlobalValue(); gv; gv = gv->getNextValue())
         {
-            if (gv->mangledName == specMangledName)
+            if (gv->mangledName == specMangledNameObj)
                 return (IRFunc*) gv;
         }
 
@@ -5389,7 +5390,7 @@ namespace Slang
 
         auto specFunc = cloneSimpleFuncWithoutRegistering(&context, genericFunc);
 
-        specFunc->mangledName = specMangledName;
+        specFunc->mangledName = context.getModule()->session->getNameObj(specMangledName);
         
         // reduce specialized generic level by 1
         if (specFunc->specializedGenericLevel >= 0)
@@ -5503,7 +5504,7 @@ namespace Slang
         }
 
         // Build dictionary for witness tables
-        Dictionary<String, IRWitnessTable*> witnessTables;
+        Dictionary<Name*, IRWitnessTable*> witnessTables;
         for (auto gv = module->getFirstGlobalValue();
             gv;
             gv = gv->getNextValue())
@@ -5602,7 +5603,7 @@ namespace Slang
                             IRWitnessTable* witnessTable = nullptr;
                             auto srcDeclRef = ((IRDeclRef*)lookupInst->sourceType.get())->declRef;
                             auto interfaceDeclRef = ((IRDeclRef*)lookupInst->interfaceType.get())->declRef;
-                            auto mangledName = getMangledNameForConformanceWitness(srcDeclRef, interfaceDeclRef);
+                            auto mangledName = module->session->getNameObj(getMangledNameForConformanceWitness(srcDeclRef, interfaceDeclRef));
                             witnessTables.TryGetValue(mangledName, witnessTable);
                             
                             if (!witnessTable)
@@ -5610,7 +5611,7 @@ namespace Slang
                                 // try specialize the witness table
                                 auto genDeclRef = srcDeclRef;
                                 genDeclRef.substitutions = createDefaultSubstitutions(module->session, genDeclRef.decl);
-                                auto genName = getMangledNameForConformanceWitness(genDeclRef, interfaceDeclRef);
+                                auto genName = module->session->getNameObj(getMangledNameForConformanceWitness(genDeclRef, interfaceDeclRef));
                                 IRWitnessTable* genTable = nullptr;
                                 if (witnessTables.TryGetValue(genName, genTable))
                                 {
@@ -5718,7 +5719,7 @@ namespace Slang
                             IRGlobalValue * rs = nullptr;
                             while (globalVar)
                             {
-                                if (globalVar->mangledName == name)
+                                if (getText(globalVar->mangledName) == name)
                                 {
                                     rs = globalVar;
                                     break;
@@ -5739,7 +5740,7 @@ namespace Slang
                                 WitnessTableSpecializationWorkItem workItem;
                                 workItem.srcTable = (IRWitnessTable*)cloneGlobalValue(context, (IRWitnessTable*)(table));
                                 workItem.dstTable = context->builder->createWitnessTable();
-                                workItem.dstTable->mangledName = getMangledNameForConformanceWitness(subDeclRefType->declRef, subtypeWitness->sup);
+                                workItem.dstTable->mangledName = context->getModule()->session->getNameObj(getMangledNameForConformanceWitness(subDeclRefType->declRef, subtypeWitness->sup));
                                 workItem.specDeclRef = subDeclRefType->declRef;
                                 witnessTablesToSpecailize.Add(workItem);
                                 table = workItem.dstTable;
