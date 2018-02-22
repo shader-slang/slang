@@ -14,6 +14,7 @@
 #include "ir-insts.h"
 #include "legalize-types.h"
 #include "mangle.h"
+#include "name.h"
 
 namespace Slang
 {
@@ -111,14 +112,13 @@ static void maybeRegisterLegalizedGlobal(
     // Check the mangled name of the symbol and don't register
     // symbols that don't have an external name (currently
     // indicated by them having an empty name string).
-    String mangledName = irGlobalVar->mangledName;
-    if (mangledName.Length() == 0)
+    if (getText(irGlobalVar->mangledName).Length() == 0)
         return;
 
     // Otherwise, register the legalized value for this symbol
     // under its mangled name, so that other code can still
     // find the right value(s) to use after legalization.
-    context->typeLegalizationContext->mapMangledNameToLegalIRValue.AddIfNotExists(mangledName, legalVal);
+    context->typeLegalizationContext->mapMangledNameToLegalIRValue.AddIfNotExists(irGlobalVar->mangledName, legalVal);
 }
 
 struct IRGlobalNameInfo
@@ -893,12 +893,12 @@ static LegalVal declareSimpleVar(
             // a counter to each leaf variable generated from the original
             if (globalNameInfo)
             {
-                String mangledName = globalNameInfo->globalVar->mangledName;
-                if (mangledName.Length() != 0)
+                String mangledNameStr = getText(globalNameInfo->globalVar->mangledName);
+                if (mangledNameStr.Length() != 0)
                 {
-                    mangledName.append("L");
-                    mangledName.append(globalNameInfo->counter++);
-                    globalVar->mangledName = mangledName;
+                    mangledNameStr.append("L");
+                    mangledNameStr.append(globalNameInfo->counter++);
+                    globalVar->mangledName = context->session->getNameObj(mangledNameStr);
                 }
             }
             

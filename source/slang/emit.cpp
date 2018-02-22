@@ -4584,8 +4584,8 @@ emitDeclImpl(decl, nullptr);
         case kIROp_Func:
             {
                 auto& mangledName = ((IRGlobalValue*)inst)->mangledName;
-                if(mangledName.Length() != 0)
-                    return mangledName;
+                if(getText(mangledName).Length() != 0)
+                    return getText(mangledName);
             }
             break;
 
@@ -5582,7 +5582,7 @@ emitDeclImpl(decl, nullptr);
         // be better strategies (including just stuffing
         // a pointer to the original decl onto the callee).
 
-        UnmangleContext um(func->mangledName);
+        UnmangleContext um(getText(func->mangledName));
         um.startUnmangling();
 
         // We'll read through the qualified name of the
@@ -7679,7 +7679,7 @@ emitDeclImpl(decl, nullptr);
             // actually *require* redeclaration...).
             //
             // TODO: can we detect this more robustly?
-            if(varDecl->mangledName.StartsWith("gl_"))
+            if(getText(varDecl->mangledName).StartsWith("gl_"))
             {
                 // The variable represents an OpenGL system value,
                 // so we will assume that it doesn't need to be declared.

@@ -2812,7 +2812,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             for (auto subInheritanceDeclRef : getMembersOfType<InheritanceDecl>(baseInterfaceDeclRef))
             {
-                auto cpyMangledName = getMangledNameForConformanceWitness(subType, subInheritanceDeclRef.getDecl()->getSup().type);
+                auto cpyMangledName = context->getSession()->getNameObj(getMangledNameForConformanceWitness(subType, subInheritanceDeclRef.getDecl()->getSup().type));
                 if (!witnessTablesDictionary.ContainsKey(cpyMangledName))
                 {
                     auto cpyTable = context->irBuilder->createWitnessTable();
@@ -2820,14 +2820,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     context->irBuilder->createWitnessTableEntry(witnessTable,
                         context->irBuilder->getDeclRefVal(subInheritanceDeclRef), cpyTable);
                     cpyTable->entries = witnessTable->entries;
-                    witnessTablesDictionary.Add(cpyMangledName, cpyTable);
+                    witnessTablesDictionary.Add(cpyTable->mangledName, cpyTable);
                     walkInheritanceHierarchyAndCreateWitnessTableCopies(witnessTable, subType, subInheritanceDeclRef.getDecl());
                 }
             }
         }
     }
 
-    Dictionary<String, IRWitnessTable*> witnessTablesDictionary;
+    Dictionary<Name*, IRWitnessTable*> witnessTablesDictionary;
 
     LoweredValInfo visitInheritanceDecl(InheritanceDecl* inheritanceDecl)
     {
@@ -2859,7 +2859,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // Construct the mangled name for the witness table, which depends
         // on the type that is conforming, and the type that it conforms to.
-        String mangledName = getMangledNameForConformanceWitness(type, superType);
+        auto mangledName = context->getSession()->getNameObj(getMangledNameForConformanceWitness(type, superType));
 
         // Build an IR level witness table, which will represent the
         // conformance of the type to its super-type.
@@ -2999,7 +2999,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             irGlobal = builder->createGlobalVar(varType);
             globalVal = LoweredValInfo::ptr(irGlobal);
         }
-        irGlobal->mangledName = getMangledName(decl);
+        irGlobal->mangledName = context->getSession()->getNameObj(getMangledName(decl));
 
         if (decl)
         {
@@ -3458,7 +3458,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         String mangledName = getMangledName(decl);
 
-        irFunc->mangledName = mangledName;
+        irFunc->mangledName = context->getSession()->getNameObj(mangledName);
     }
 
     ModuleDecl* findModuleDecl(Decl* decl)

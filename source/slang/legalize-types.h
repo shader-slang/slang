@@ -26,6 +26,7 @@
 #include "../core/basic.h"
 #include "syntax.h"
 #include "type-layout.h"
+#include "name.h"
 
 namespace Slang
 {
@@ -382,7 +383,7 @@ struct TypeLegalizationContext
     Dictionary<DeclRef<Decl>, LegalType> mapDeclRefToLegalType;
 
     //
-    Dictionary<String, LegalVal> mapMangledNameToLegalIRValue;
+    Dictionary<Name*, LegalVal> mapMangledNameToLegalIRValue;
 };
 
 
