@@ -19,12 +19,12 @@ block %1(
 	let  %6	: StructuredBuffer<vector<float,4>>	= load(@_SV05input)
 	let  %7	: vector<float,4>	= bufferLoad(%6, %2)
 	store(%5, %7)
-	let  %8	: uint	= construct(1)
+	let  %8	: @ConstExpr uint	= construct(1)
 	loop(%9, %10, %11, %8)
 
 block %9(
 		param %12	: uint):
-	let  %13	: uint	= construct(64)
+	let  %13	: @ConstExpr uint	= construct(64)
 	let  %14	: bool	= cmpLT(%12, %13)
 	ifElse(%14, %15, %10, %15)
 
@@ -40,7 +40,7 @@ block %15:
 	unconditionalBranch(%11)
 
 block %11:
-	let  %22	: uint	= construct(1)
+	let  %22	: @ConstExpr uint	= construct(1)
 	let  %23	: uint	= shl(%12, %22)
 	unconditionalBranch(%9, %23)
 

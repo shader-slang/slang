@@ -1349,12 +1349,19 @@ namespace Slang
     IRInst* IRBuilder::emitLoad(
         IRValue*    ptr)
     {
+        // Note: a `load` operation does not consider the rate
+        // (if any) attached to its operand (see the use of `getDataType`
+        // below). This means that a load from a rate-qualified
+        // variable will still conceptually execute (and return
+        // results) at the "default" rate of the parent function,
+        // unless a subsequent analysis pass constraints it.
+
         RefPtr<Type> valueType;
-        if(auto ptrType = ptr->getType()->As<PtrTypeBase>())
+        if(auto ptrType = ptr->getDataType()->As<PtrTypeBase>())
         {
             valueType = ptrType->getValueType();
         }
-        else if(auto ptrLikeType = ptr->getType()->As<PointerLikeType>())
+        else if(auto ptrLikeType = ptr->getDataType()->As<PointerLikeType>())
         {
             valueType = ptrLikeType->getElementType();
         }
@@ -1368,7 +1375,9 @@ namespace Slang
         // Ugly special case: the result of loading from `groupshared`
         // memory should not itself be `groupshared`.
         //
-        // TODO: Should this generalize to any "rate-qualified" type?
+        // TODO: This special case will go away once `GroupSharedType`
+        // is replaced by a `GroupSharedRate` that gets used together
+        // with `RateQualifiedType`.
         if(auto rateType = valueType->As<GroupSharedType>())
         {
             valueType = rateType->valueType;
@@ -2036,6 +2045,17 @@ namespace Slang
             dump(context, "@ThreadGroup ");
             dumpType(context, groupSharedType->valueType);
         }
+        else if(auto rateQualifiedType = type->As<RateQualifiedType>())
+        {
+            dump(context, "@");
+            dumpType(context, rateQualifiedType->rate);
+            dump(context, " ");
+            dumpType(context, rateQualifiedType->valueType);
+        }
+        else if(auto constExprRate = type->As<ConstExprRate>())
+        {
+            dump(context, "ConstExpr");
+        }
         else
         {
             // Need a default case here
@@ -2117,7 +2137,7 @@ namespace Slang
                 dumpIndent(context);
                 dump(context, "param ");
                 dumpID(context, pp);
-                dumpInstTypeClause(context, pp->getType());
+                dumpInstTypeClause(context, pp->getFullType());
             }
             context->indent -= 2;
             dump(context, ")");
@@ -2271,15 +2291,16 @@ namespace Slang
         dumpIndent(context);
 
         auto opInfo = &kIROpInfos[op];
-        auto type = inst->getType();
+        auto type = inst->getFullType();
+        auto dataType = inst->getDataType();
 
-        if (!type)
+        if (!dataType)
         {
             // No result, okay...
         }
         else
         {
-            auto basicType = type->As<BasicExpressionType>();
+            auto basicType = dataType->As<BasicExpressionType>();
             if (basicType && basicType->baseType == BaseType::Void)
             {
                 // No result, okay...
@@ -2439,7 +2460,7 @@ namespace Slang
         dumpIndent(context);
         dump(context, "ir_global_var ");
         dumpID(context, var);
-        dumpInstTypeClause(context, var->getType());
+        dumpInstTypeClause(context, var->getFullType());
 
         // TODO: deal with the case where a global
         // might have embedded initialization logic.
@@ -2455,7 +2476,7 @@ namespace Slang
         dumpIndent(context);
         dump(context, "ir_global_constant ");
         dumpID(context, val);
-        dumpInstTypeClause(context, val->getType());
+        dumpInstTypeClause(context, val->getFullType());
 
         // TODO: deal with the case where a global
         // might have embedded initialization logic.
@@ -2573,6 +2594,22 @@ namespace Slang
     //
     //
     //
+
+    Type* IRValue::getRate()
+    {
+        if(auto rateQualifiedType = type->As<RateQualifiedType>())
+            return rateQualifiedType->rate;
+
+        return nullptr;
+    }
+
+    Type* IRValue::getDataType()
+    {
+        if(auto rateQualifiedType = type->As<RateQualifiedType>())
+            return rateQualifiedType->valueType;
+
+        return type;
+    }
 
     void IRValue::replaceUsesWith(IRValue* other)
     {
@@ -3566,7 +3603,7 @@ namespace Slang
                 // uses of the variable, and the exact logic there
                 // will differ a bit between the pointer and non-pointer
                 // cases.
-                auto paramType = pp->getType();
+                auto paramType = pp->getDataType();
 
                 // Any initialization code we insert nees to be at the start
                 // of the block:
@@ -4167,7 +4204,15 @@ namespace Slang
         IRGlobalVar*    originalVar,
         IROriginalValuesForClone const& originalValues)
     {
-        auto clonedVar = context->builder->createGlobalVar(context->maybeCloneType(originalVar->getType()->getValueType())); 
+        auto clonedVar = context->builder->createGlobalVar(
+            context->maybeCloneType(originalVar->getDataType()->getValueType()));
+
+        if(auto rate = originalVar->getRate() )
+        {
+            clonedVar->type = context->builder->getSession()->getRateQualifiedType(
+                rate, clonedVar->type);
+        }
+
         registerClonedValue(context, clonedVar, originalValues);
 
         auto mangledName = originalVar->mangledName;
@@ -4196,7 +4241,7 @@ namespace Slang
         IRGlobalConstant*    originalVal,
         IROriginalValuesForClone const& originalValues)
     {
-        auto clonedVal = context->builder->createGlobalConstant(context->maybeCloneType(originalVal->getType()));
+        auto clonedVal = context->builder->createGlobalConstant(context->maybeCloneType(originalVal->getFullType()));
         registerClonedValue(context, clonedVal, originalValues);
 
         auto mangledName = originalVal->mangledName;
@@ -4290,7 +4335,7 @@ namespace Slang
             {
                 IRParam* clonedParam = builder->emitParam(
                     context->maybeCloneType(
-                        originalParam->getType()));
+                        originalParam->getFullType()));
                 cloneDecorations(context, clonedParam, originalParam);
                 registerClonedValue(context, clonedParam, originalParam);
             }
@@ -5717,5 +5762,19 @@ namespace Slang
                 workItem.specDeclRef.SubstituteImpl(SubstitutionSet(nullptr, nullptr, globalParamSubst), &diff), workItem.dstTable);
         }
         return globalParamSubst;
+    }
+
+    
+    void markConstExpr(
+        Session* session,
+        IRValue* irValue)
+    {
+        // We will take an IR value with type `T`,
+        // and turn it into one with type `@ConstExpr T`.
+
+        // TODO: need to be careful if the value already has a rate
+        // qualifier set.
+
+        irValue->type = session->getConstExprType(irValue->getDataType());
     }
 }

@@ -319,7 +319,7 @@ void encodeOperand(
 
 bool opHasResult(IRValue* inst)
 {
-    auto type = inst->getType();
+    auto type = inst->getDataType();
     if (!type) return false;
 
     // As a bit of a hack right now, we need to check whether
@@ -352,7 +352,7 @@ void generateBytecodeForInst(
 
             auto argCount = inst->getArgCount();
             encodeUInt(context, inst->op);
-            encodeOperand(context, inst->getType());
+            encodeOperand(context, inst->getDataType());
             encodeUInt(context, argCount);
             for( UInt aa = 0; aa < argCount; ++aa )
             {
@@ -381,7 +381,7 @@ void generateBytecodeForInst(
         {
             auto ii = (IRConstant*) inst;
             encodeUInt(context, ii->op);
-            encodeOperand(context, ii->getType());
+            encodeOperand(context, ii->getDataType());
 
             // TODO: probably want distinct encodings
             // for signed vs. unsigned here.
@@ -396,7 +396,7 @@ void generateBytecodeForInst(
         {
             auto cInst = (IRConstant*) inst;
             encodeUInt(context, cInst->op);
-            encodeOperand(context, cInst->getType());
+            encodeOperand(context, cInst->getDataType());
 
             static const UInt size = sizeof(IRFloatingPointValue);
             unsigned char buffer[size];
@@ -446,7 +446,7 @@ void generateBytecodeForInst(
 
             // We need to encode the type being stored, to make
             // our lives easier.
-            encodeOperand(context, inst->getArg(1)->getType());
+            encodeOperand(context, inst->getArg(1)->getDataType());
             encodeOperand(context, inst->getArg(0));
             encodeOperand(context, inst->getArg(1));
         }
@@ -455,7 +455,7 @@ void generateBytecodeForInst(
     case kIROp_Load:
         {
             encodeUInt(context, inst->op);
-            encodeOperand(context, inst->getType());
+            encodeOperand(context, inst->getDataType());
             encodeOperand(context, inst->getArg(0));
             encodeOperand(context, inst);
         }
@@ -611,7 +611,7 @@ uint32_t getTypeIDForGlobalSymbol(
     BytecodeGenerationContext*  context,
     IRValue*                    inst)
 {
-    auto type = inst->getType();
+    auto type = inst->getDataType();
     if(!type)
         return 0;
 
@@ -836,7 +836,7 @@ BytecodeGenerationPtr<BCSymbol> generateBytecodeSymbolForInst(
                             bcRegs[localID+1].op = ii->op;
                             bcRegs[localID+1].previousVarIndexPlusOne = (uint32_t)localID+1;
                             bcRegs[localID+1].typeID = getTypeID(context,
-                                (ii->getType()->As<PtrType>())->getValueType());
+                                (ii->getDataType()->As<PtrType>())->getValueType());
                         }
                         break;
                     }

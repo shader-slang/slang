@@ -4,6 +4,7 @@
 #include "../../slang.h"
 
 #include "ir.h"
+#include "ir-constexpr.h"
 #include "ir-insts.h"
 #include "ir-ssa.h"
 #include "mangle.h"
@@ -1262,7 +1263,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         // need to extract the value type from that pointer here.
         //
         IRValue* loweredBaseVal = getSimpleVal(context, loweredBase);
-        RefPtr<Type> loweredBaseType = loweredBaseVal->getType();
+        RefPtr<Type> loweredBaseType = loweredBaseVal->getDataType();
 
         if (loweredBaseType->As<PointerLikeType>()
             || loweredBaseType->As<PtrTypeBase>())
@@ -2580,7 +2581,7 @@ static LoweredValInfo maybeMoveMutableTemp(
     default:
         {
             IRValue* irVal = getSimpleVal(context, val);
-            auto type = irVal->getType();
+            auto type = irVal->getDataType();
             auto var = createVar(context, type);
 
             assign(context, var, LoweredValInfo::simple(irVal));
@@ -2660,7 +2661,7 @@ top:
 
             // Now apply the swizzle
             IRInst* irSwizzled = builder->emitSwizzleSet(
-                irLeftVal->getType(),
+                irLeftVal->getDataType(),
                 irLeftVal,
                 irRightVal,
                 swizzleInfo->elementCount,
@@ -3503,6 +3504,30 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return false;
     }
 
+    bool isConstExprVar(Decl* decl)
+    {
+        if( decl->HasModifier<ConstExprModifier>() )
+        {
+            return true;
+        }
+        else if(decl->HasModifier<HLSLStaticModifier>() && decl->HasModifier<ConstModifier>())
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    RefPtr<Type> maybeGetConstExprType(Type* type, Decl* decl)
+    {
+        if(isConstExprVar(decl))
+        {
+            return context->getSession()->getConstExprType(type);
+        }
+
+        return type;
+    }
+
     LoweredValInfo lowerFuncDecl(FunctionDeclBase* decl)
     {
         // Collect the parameter lists we will use for our new function.
@@ -3563,11 +3588,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         for( auto paramInfo : parameterLists.params )
         {
             RefPtr<Type> irParamType = lowerSimpleType(context, paramInfo.type);
+
             switch( paramInfo.direction )
             {
             case kParameterDirection_In:
                 // Simple case of a by-value input parameter.
-                paramTypes.Add(irParamType);
                 break;
 
             // If the parameter is declared `out` or `inout`,
@@ -3575,18 +3600,26 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // the IR, but we will use a specialized pointer
             // type that encodes the parameter direction information.
             case kParameterDirection_Out:
-                paramTypes.Add(
-                    context->getSession()->getOutType(irParamType));
+                irParamType = context->getSession()->getOutType(irParamType);
                 break;
             case kParameterDirection_InOut:
-                paramTypes.Add(
-                    context->getSession()->getInOutType(irParamType));
+                irParamType = context->getSession()->getInOutType(irParamType);
                 break;
 
             default:
                 SLANG_UNEXPECTED("unknown parameter direction");
                 break;
             }
+
+            // If the parameter was explicitly marked as being a compile-time
+            // constant (`constexpr`), then attach that information to its
+            // IR-level type explicitly.
+            if( paramInfo.decl )
+            {
+                irParamType = maybeGetConstExprType(irParamType, paramInfo.decl);
+            }
+
+            paramTypes.Add(irParamType);
         }
 
         auto irResultType = lowerSimpleType(context, declForReturnType->ReturnType);
@@ -3600,11 +3633,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             //
             IRType* irParamType = irResultType;
             paramTypes.Add(irParamType);
-            subBuilder->emitParam(irParamType);
-
-            // TODO: we need some way to wire this up to the `newValue`
-            // or whatever name we give for that parameter inside
-            // the setter body.
 
             // Instead, a setter always returns `void`
             //
@@ -3660,11 +3688,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         //
                         // TODO: Is this the best representation we can use?
 
-                        auto irPtrType = irParamType.As<PtrTypeBase>();
-
-                        IRParam* irParamPtr = subBuilder->emitParam(irPtrType);
+                        IRParam* irParamPtr = subBuilder->emitParam(irParamType);
                         if(auto paramDecl = paramInfo.decl)
+                        {
                             subBuilder->addHighLevelDeclDecoration(irParamPtr, paramDecl);
+                        }
 
                         paramVal = LoweredValInfo::ptr(irParamPtr);
 
@@ -3682,27 +3710,51 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 case kParameterDirection_In:
                     {
                         // Simple case of a by-value input parameter.
-                        // But note that HLSL allows an input parameter
-                        // to be used as a local variable inside of a
-                        // function body, so we need to introduce a temporary
-                        // and then copy over to it...
                         //
-                        // TODO: we could skip this step if we knew
-                        // the parameter was marked `const` or similar.
-
-                        paramTypes.Add(irParamType);
-
+                        // We start by declaring an IR parameter of the same type.
+                        //
+                        auto paramDecl = paramInfo.decl;
                         IRParam* irParam = subBuilder->emitParam(irParamType);
-                        if(auto paramDecl = paramInfo.decl)
+                        if( paramDecl )
+                        {
                             subBuilder->addHighLevelDeclDecoration(irParam, paramDecl);
+                        }
                         paramVal = LoweredValInfo::simple(irParam);
-
-                        auto irLocal = subBuilder->emitVar(irParamType);
-                        auto localVal = LoweredValInfo::ptr(irLocal);
-
-                        assign(subContext, localVal, paramVal);
-
-                        paramVal = localVal;
+                        //
+                        // HLSL allows a function parameter to be used as a local
+                        // variable in the function body (just like C/C++), so
+                        // we need to support that case as well.
+                        //
+                        // However, if we notice that the parameter was marked
+                        // `const`, then we can skip this step.
+                        //
+                        // TODO: we should consider having all parameter be implicitly
+                        // immutable except in a specific "compatibility mode."
+                        //
+                        if(paramDecl && paramDecl->FindModifier<ConstModifier>())
+                        {
+                            // This parameter was declared to be immutable,
+                            // so there should be no assignment to it in the
+                            // function body, and we don't need a temporary.
+                        }
+                        else
+                        {
+                            // The parameter migth get used as a temporary in
+                            // the function body. We will allocate a mutable
+                            // local variable for is value, and then assign
+                            // from the parameter to the local at the start
+                            // of the function.
+                            //
+                            auto irLocal = subBuilder->emitVar(irParamType);
+                            auto localVal = LoweredValInfo::ptr(irLocal);
+                            assign(subContext, localVal, paramVal);
+                            //
+                            // When code later in the body of the function refers
+                            // to the parameter declaration, it will actually refer
+                            // to the value stored in the local variable.
+                            //
+                            paramVal = localVal;
+                        }
                     }
                     break;
                 }
@@ -3718,6 +3770,18 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     subContext->thisVal = paramVal;
                 }
             }
+
+            if (auto setterDecl = dynamic_cast<SetterDecl*>(decl))
+            {
+                // Add the IR parameter for the new value
+                IRType* irParamType = irResultType;
+                subBuilder->emitParam(irParamType);
+
+                // TODO: we need some way to wire this up to the `newValue`
+                // or whatever name we give for that parameter inside
+                // the setter body.
+            }
+
 
             lowerStmt(subContext, decl->Body);
 
@@ -4070,7 +4134,7 @@ LoweredValInfo maybeEmitSpecializeInst(IRGenContext*   context,
     DeclRef<Decl> newDeclRef = DeclRef<Decl>(declRef.decl, lowedNewSubst);
 
     RefPtr<Type> type;
-    if (auto declType = val->getType())
+    if (auto declType = val->getDataType())
     {
         type = declType->Substitute(newDeclRef.substitutions).As<Type>();
     }
@@ -4224,6 +4288,10 @@ IRModule* generateIRForTranslationUnit(
     constructSSA(module);
 
     // TODO: Do basic constant folding and DCE
+
+    // Propagate `constexpr`-ness through the dataflow graph (and the
+    // call graph) based on constraints imposed by different instructions.
+    propagateConstExpr(module, &compileRequest->mSink);
 
     // TODO: give error messages if any `undefined` or
     // `unreachable` instructions remain.

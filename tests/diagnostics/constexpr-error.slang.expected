@@ -1,0 +1,8 @@
+result code = -1
+standard error = {
+tests/diagnostics/constexpr-error.slang(27): error 40006: expected a compile-time constant
+tests/diagnostics/constexpr-error.slang(35): error 40006: expected a compile-time constant
+tests/diagnostics/constexpr-error.slang(41): error 40006: expected a compile-time constant
+}
+standard output = {
+}

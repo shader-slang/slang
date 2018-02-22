@@ -1297,6 +1297,17 @@ struct EmitVisitor
         emitTypeImpl(arrayType->baseType, &arrayDeclarator);
     }
 
+    void visitRateQualifiedType(RateQualifiedType* type, TypeEmitArg const& arg)
+    {
+        emitTypeImpl(type->valueType, arg.declarator);
+    }
+
+    void visitConstExprRate(ConstExprRate* /*rate*/, TypeEmitArg const& /*arg*/)
+    {
+        // This should never appear as a data type
+        SLANG_UNEXPECTED("Rates not expected during emit");
+    }
+
     void visitGroupSharedType(GroupSharedType* type, TypeEmitArg const& arg)
     {
         switch(getTarget(context))
@@ -4924,7 +4935,7 @@ emitDeclImpl(decl, nullptr);
         // Certain *types* will usually want to be folded in,
         // because they aren't allowed as types for temporary
         // variables.
-        auto type = inst->getType();
+        auto type = inst->getDataType();
 
         while (auto ptrType = type->As<PtrTypeBase>())
         {
@@ -4975,7 +4986,7 @@ emitDeclImpl(decl, nullptr);
         EmitContext*    /*context*/,
         IRValue*        inst)
     {
-        auto type = inst->getType();
+        auto type = inst->getDataType();
 
         if(type->As<UniformParameterGroupType>() && !type->As<ParameterBlockType>())
         {
@@ -5052,16 +5063,46 @@ emitDeclImpl(decl, nullptr);
         EmitType(type);
     }
 
+    void emitIRRateQualifiers(
+        EmitContext*    ctx,
+        Type*           rate)
+    {
+        if(!rate) return;
+
+        if( auto constExprRate = rate->As<ConstExprRate>() )
+        {
+            switch( getTarget(ctx) )
+            {
+            case CodeGenTarget::GLSL:
+                emit("const ");
+                break;
+
+            default:
+                break;
+            }
+        }
+    }
+
+    void emitIRRateQualifiers(
+        EmitContext*    ctx,
+        IRValue*        value)
+    {
+        emitIRRateQualifiers(ctx, value->getRate());
+    }
+
+
     void emitIRInstResultDecl(
         EmitContext*    ctx,
         IRInst*         inst)
     {
-        auto type = inst->getType();
+        auto type = inst->getDataType();
         if(!type)
             return;
 
         if (type->Equals(getSession()->getVoidType()))
             return;
+
+        emitIRRateQualifiers(ctx, inst);
 
         emitIRType(ctx, type, getIRName(inst));
         emit(" = ");
@@ -5651,13 +5692,13 @@ emitDeclImpl(decl, nullptr);
             {
                 // Need to emit as cast for HLSL
                 emit("(");
-                emitIRType(ctx, inst->getType());
+                emitIRType(ctx, inst->getDataType());
                 emit(") ");
                 emitIROperand(ctx, inst->getArg(0), mode);
             }
             else
             {
-                emitIRType(ctx, inst->getType());
+                emitIRType(ctx, inst->getDataType());
                 emitIRArgs(ctx, inst, mode);
             }
             break;
@@ -5667,12 +5708,12 @@ emitDeclImpl(decl, nullptr);
             if( getTarget(ctx) == CodeGenTarget::HLSL )
             {
                 emit("(");
-                emitIRType(ctx, inst->getType());
+                emitIRType(ctx, inst->getDataType());
                 emit(")");
             }
             else
             {
-                emitIRType(ctx, inst->getType());
+                emitIRType(ctx, inst->getDataType());
             }
             emit("(");
             emitIROperand(ctx, inst->getArg(0), mode);
@@ -5769,7 +5810,7 @@ emitDeclImpl(decl, nullptr);
 
         case kIROp_Not:
             {
-                if (inst->getType()->Equals(getSession()->getBoolType()))
+                if (inst->getDataType()->Equals(getSession()->getBoolType()))
                 {
                     emit("!");
                 }
@@ -5976,7 +6017,7 @@ emitDeclImpl(decl, nullptr);
 
         case kIROp_undefined:
             {
-                auto type = inst->getType();
+                auto type = inst->getDataType();
                 emitIRType(ctx, type, getIRName(inst));
                 emit(";\n");
             }
@@ -5984,7 +6025,7 @@ emitDeclImpl(decl, nullptr);
 
         case kIROp_Var:
             {
-                auto ptrType = inst->getType();
+                auto ptrType = inst->getDataType();
                 auto valType = ((PtrType*)ptrType)->getValueType();
 
                 auto name = getIRName(inst);
@@ -6801,7 +6842,7 @@ emitDeclImpl(decl, nullptr);
         {
             for (auto pp = bb->getFirstParam(); pp; pp = pp->getNextParam())
             {
-                emitIRType(ctx, pp->getType(), getIRName(pp));
+                emitIRType(ctx, pp->getDataType(), getIRName(pp));
                 emit(";\n");
             }
         }
@@ -6833,7 +6874,7 @@ emitDeclImpl(decl, nullptr);
                 emit(", ");
 
             auto paramName = getIRName(pp);
-            auto paramType = pp->getType();
+            auto paramType = pp->getDataType();
             if (auto decor = pp->findDecoration<IRHighLevelDeclDecoration>())
             {
                 if (decor->decl)
@@ -7496,7 +7537,7 @@ emitDeclImpl(decl, nullptr);
         EmitContext*    ctx,
         IRVar*          varDecl)
     {
-        auto allocatedType = varDecl->getType();
+        auto allocatedType = varDecl->getDataType();
         auto varType = allocatedType->getValueType();
 //        auto addressSpace = allocatedType->getAddressSpace();
 
@@ -7530,6 +7571,7 @@ emitDeclImpl(decl, nullptr);
             break;
         }
 #endif
+        emitIRRateQualifiers(ctx, varDecl);
 
         emitIRType(ctx, varType, getIRName(varDecl));
 
@@ -7590,7 +7632,7 @@ emitDeclImpl(decl, nullptr);
         EmitContext*    ctx,
         IRGlobalVar*    varDecl)
     {
-        auto allocatedType = varDecl->getType();
+        auto allocatedType = varDecl->getDataType();
         auto varType = allocatedType->getValueType();
 
         String initFuncName;
@@ -7712,7 +7754,7 @@ emitDeclImpl(decl, nullptr);
         EmitContext*        ctx,
         IRGlobalConstant*   valDecl)
     {
-        auto valType = valDecl->getType();
+        auto valType = valDecl->getDataType();
 
         emit("static const ");
         emitIRType(ctx, valType, getIRName(valDecl));
