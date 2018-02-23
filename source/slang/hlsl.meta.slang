@@ -1086,7 +1086,7 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
 {
 
     sb << "__generic<T> __magic_type(Texture, ";
-    sb << ResourceType::makeFlavor(ResourceType::Shape::ShapeBuffer, kBaseBufferAccessLevels[aa].access);
+    sb << TextureFlavor::create(TextureFlavor::Shape::ShapeBuffer, kBaseBufferAccessLevels[aa].access).flavor;
     sb << ") struct ";
     sb << kBaseBufferAccessLevels[aa].name;
     sb << "Buffer {\n";
