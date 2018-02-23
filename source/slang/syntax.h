@@ -5,7 +5,7 @@
 #include "ir.h"
 #include "lexer.h"
 #include "profile.h"
-
+#include "type-system-shared.h"
 #include "../../slang.h"
 
 #include <assert.h>
@@ -88,19 +88,6 @@ namespace Slang
     // We either need to keep that restriction, or
     // look up promotion rank by some other means.
     //
-    enum class BaseType
-    {
-        // Note(tfoley): These are ordered in terms of promotion rank, so be vareful when messing with this
-
-        Void = 0,
-        Bool,
-        Int,
-        UInt,
-        UInt64,
-        Half,
-        Float,
-        Double,
-    };
 
     class Decl;
     class Val;

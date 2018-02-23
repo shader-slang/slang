@@ -109,56 +109,18 @@ END_SYNTAX_CLASS()
 
 // Base type for things we think of as "resources"
 ABSTRACT_SYNTAX_CLASS(ResourceTypeBase, DeclRefType)
-RAW(
-    enum
-    {
-        // Mask for the overall "shape" of the texture
-        ShapeMask		= SLANG_RESOURCE_BASE_SHAPE_MASK,
+    FIELD(TextureFlavor, flavor)
+    RAW(
+        TextureFlavor::Shape GetBaseShape()
+        {
+            return flavor.GetBaseShape();
+        }
+        bool isMultisample() { return flavor.isMultisample(); }
+        bool isArray() { return flavor.isArray(); }
+        SlangResourceShape getShape() const { return flavor.getShape(); }
+        SlangResourceAccess getAccess() { return flavor.getAccess(); }
 
-        // Flag for whether the shape has "array-ness"
-        ArrayFlag		= SLANG_TEXTURE_ARRAY_FLAG,
-
-        // Whether or not the texture stores multiple samples per pixel
-        MultisampleFlag	= SLANG_TEXTURE_MULTISAMPLE_FLAG,
-
-        // Whether or not this is a shadow texture
-        //
-        // TODO(tfoley): is this even meaningful/used?
-        // ShadowFlag		= 0x80, 
-    };
-
-    enum Shape : uint8_t
-    {
-        Shape1D			= SLANG_TEXTURE_1D,
-        Shape2D			= SLANG_TEXTURE_2D,
-        Shape3D			= SLANG_TEXTURE_3D,
-        ShapeCube		= SLANG_TEXTURE_CUBE,
-        ShapeBuffer     = SLANG_TEXTURE_BUFFER,
-
-        Shape1DArray	= Shape1D | ArrayFlag,
-        Shape2DArray	= Shape2D | ArrayFlag,
-        // No Shape3DArray
-        ShapeCubeArray	= ShapeCube | ArrayFlag,
-    };
-
-    Shape GetBaseShape() const { return Shape(flavor & ShapeMask); }
-    bool isArray() const { return (flavor & ArrayFlag) != 0; }
-    bool isMultisample() const { return (flavor & MultisampleFlag) != 0; }
-//            bool isShadow() const { return (flavor & ShadowFlag) != 0; }
-
-    SlangResourceShape getShape() const { return flavor & 0xFF; }
-    SlangResourceAccess getAccess() const { return (flavor >> 8) & 0xFF; }
-
-    // Bits representing the kind of resource we are looking at
-    // (e.g., `Texture2DMS` vs. `TextureCubeArray`)
-    typedef uint16_t Flavor;
-
-    static Flavor makeFlavor(SlangResourceShape shape, SlangResourceAccess access)
-    {
-        return Flavor(shape | (access << 8));
-    }
-)
-    FIELD(Flavor, flavor)
+    )
 END_SYNTAX_CLASS()
 
 // Resources that contain "elements" that can be fetched
@@ -172,7 +134,7 @@ RAW(
     TextureTypeBase()
     {}
     TextureTypeBase(
-        Flavor flavor,
+        TextureFlavor flavor,
         RefPtr<Type> elementType)
     {
         this->elementType = elementType;
@@ -186,7 +148,7 @@ RAW(
     TextureType()
     {}
     TextureType(
-        Flavor flavor,
+        TextureFlavor flavor,
         RefPtr<Type> elementType)
         : TextureTypeBase(flavor, elementType)
     {}
@@ -200,7 +162,7 @@ RAW(
     TextureSamplerType()
     {}
     TextureSamplerType(
-        Flavor flavor,
+        TextureFlavor flavor,
         RefPtr<Type> elementType)
         : TextureTypeBase(flavor, elementType)
     {}
@@ -213,7 +175,7 @@ RAW(
     GLSLImageType()
     {}
     GLSLImageType(
-        Flavor flavor,
+        TextureFlavor flavor,
         RefPtr<Type> elementType)
         : TextureTypeBase(flavor, elementType)
     {}
@@ -221,16 +183,8 @@ RAW(
 END_SYNTAX_CLASS()
 
 SYNTAX_CLASS(SamplerStateType, DeclRefType)
-
     // What flavor of sampler state is this
-    RAW(enum class Flavor : uint8_t
-    {
-        SamplerState,
-        SamplerComparisonState,
-    };
-
-    )
-    FIELD(Flavor, flavor)
+    FIELD(SamplerStateFlavor, flavor)
 END_SYNTAX_CLASS()
 
 // Other cases of generic types known to the compiler

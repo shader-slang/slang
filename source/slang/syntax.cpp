@@ -735,7 +735,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
                 auto type = new SamplerStateType();
                 type->setSession(session);
                 type->declRef = declRef;
-                type->flavor = SamplerStateType::Flavor(magicMod->tag);
+                type->flavor = SamplerStateFlavor(magicMod->tag);
                 return type;
             }
             else if (magicMod->name == "Vector")
@@ -760,7 +760,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
             {
                 SLANG_ASSERT(subst && subst->args.Count() >= 1);
                 auto textureType = new TextureType(
-                    TextureType::Flavor(magicMod->tag),
+                    TextureFlavor(magicMod->tag),
                     ExtractGenericArgType(subst->args[0]));
                 textureType->setSession(session);
                 textureType->declRef = declRef;
@@ -770,7 +770,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
             {
                 SLANG_ASSERT(subst && subst->args.Count() >= 1);
                 auto textureType = new TextureSamplerType(
-                    TextureType::Flavor(magicMod->tag),
+                    TextureFlavor(magicMod->tag),
                     ExtractGenericArgType(subst->args[0]));
                 textureType->setSession(session);
                 textureType->declRef = declRef;
@@ -780,7 +780,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
             {
                 SLANG_ASSERT(subst && subst->args.Count() >= 1);
                 auto textureType = new GLSLImageType(
-                    TextureType::Flavor(magicMod->tag),
+                    TextureFlavor(magicMod->tag),
                     ExtractGenericArgType(subst->args[0]));
                 textureType->setSession(session);
                 textureType->declRef = declRef;

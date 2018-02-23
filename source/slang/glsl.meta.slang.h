@@ -59,14 +59,14 @@ sb << "__generic<T : __BuiltinArithmeticType, let R : int, let N : int, let C : 
 // TODO(tfoley): Need to handle `RW*` variants of texture types as well...
 static const struct {
     char const*			name;
-    TextureType::Shape	baseShape;
+    TextureFlavor::Shape	baseShape;
     int					coordCount;
 } kBaseTextureTypes[] = {
-    { "1D",		TextureType::Shape1D,	1 },
-    { "2D",		TextureType::Shape2D,	2 },
-    { "3D",		TextureType::Shape3D,	3 },
-    { "Cube",	TextureType::ShapeCube,	3 },
-    { "Buffer", TextureType::ShapeBuffer,   1 },
+    { "1D",		TextureFlavor::Shape::Shape1D,	1 },
+    { "2D",		TextureFlavor::Shape::Shape2D,	2 },
+    { "3D",		TextureFlavor::Shape::Shape3D,	3 },
+    { "Cube",	TextureFlavor::Shape::ShapeCube,	3 },
+    { "Buffer", TextureFlavor::Shape::ShapeBuffer,   1 },
 };
 static const int kBaseTextureTypeCount = sizeof(kBaseTextureTypes) / sizeof(kBaseTextureTypes[0]);
 
@@ -84,12 +84,12 @@ static const int kBaseTextureAccessLevelCount = sizeof(kBaseTextureAccessLevels)
 for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 {
     char const* shapeName = kBaseTextureTypes[tt].name;
-    TextureType::Shape baseShape = kBaseTextureTypes[tt].baseShape;
+    TextureFlavor::Shape baseShape = kBaseTextureTypes[tt].baseShape;
 
     for (int isArray = 0; isArray < 2; ++isArray)
     {
         // Arrays of 3D textures aren't allowed
-        if (isArray && baseShape == TextureType::Shape3D) continue;
+        if (isArray && baseShape == TextureFlavor::Shape::Shape3D) continue;
 
         for (int isMultisample = 0; isMultisample < 2; ++isMultisample)
         {
@@ -100,9 +100,9 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
                         
             unsigned flavor = baseShape;
-            if (isArray)		flavor |= TextureType::ArrayFlag;
-            if (isMultisample)	flavor |= TextureType::MultisampleFlag;
-//                        if (isShadow)		flavor |= TextureType::ShadowFlag;
+            if (isArray)		flavor |= TextureFlavor::ArrayFlag;
+            if (isMultisample)	flavor |= TextureFlavor::MultisampleFlag;
+//                        if (isShadow)		flavor |= TextureFlavor::ShadowFlag;
 
 
 
@@ -155,7 +155,7 @@ sb << "__generic<T> __magic_type(GLSLInputParameterGroupType) struct __GLSLInput
 sb << "__generic<T> __magic_type(GLSLOutputParameterGroupType) struct __GLSLOutputParameterGroup {};\n";
 sb << "__generic<T> __magic_type(GLSLShaderStorageBufferType) struct __GLSLShaderStorageBuffer {};\n";
 
-sb << "__magic_type(SamplerState," << int(SamplerStateType::Flavor::SamplerState) << ") struct sampler {};";
+sb << "__magic_type(SamplerState," << int(SamplerStateFlavor::SamplerState) << ") struct sampler {};";
 
 sb << "__magic_type(GLSLInputAttachmentType) struct subpassInput {};";
 
