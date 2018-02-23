@@ -960,11 +960,11 @@ struct EmitVisitor
 
         switch (texType->GetBaseShape())
         {
-        case TextureType::Shape1D:		Emit("Texture1D");		break;
-        case TextureType::Shape2D:		Emit("Texture2D");		break;
-        case TextureType::Shape3D:		Emit("Texture3D");		break;
-        case TextureType::ShapeCube:	Emit("TextureCube");	break;
-        case TextureType::ShapeBuffer:  Emit("Buffer");         break;
+        case TextureFlavor::Shape::Shape1D:		Emit("Texture1D");		break;
+        case TextureFlavor::Shape::Shape2D:		Emit("Texture2D");		break;
+        case TextureFlavor::Shape::Shape3D:		Emit("Texture3D");		break;
+        case TextureFlavor::Shape::ShapeCube:	Emit("TextureCube");	break;
+        case TextureFlavor::Shape::ShapeBuffer:  Emit("Buffer");         break;
         default:
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource shape");
             break;
@@ -992,11 +992,11 @@ struct EmitVisitor
         Emit(baseName);
         switch (type->GetBaseShape())
         {
-        case TextureType::Shape1D:		Emit("1D");		break;
-        case TextureType::Shape2D:		Emit("2D");		break;
-        case TextureType::Shape3D:		Emit("3D");		break;
-        case TextureType::ShapeCube:	Emit("Cube");	break;
-        case TextureType::ShapeBuffer:	Emit("Buffer");	break;
+        case TextureFlavor::Shape::Shape1D:		Emit("1D");		break;
+        case TextureFlavor::Shape::Shape2D:		Emit("2D");		break;
+        case TextureFlavor::Shape::Shape3D:		Emit("3D");		break;
+        case TextureFlavor::Shape::ShapeCube:	Emit("Cube");	break;
+        case TextureFlavor::Shape::ShapeBuffer:	Emit("Buffer");	break;
         default:
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource shape");
             break;
@@ -1245,8 +1245,8 @@ struct EmitVisitor
         default:
             switch (samplerStateType->flavor)
             {
-            case SamplerStateType::Flavor::SamplerState:			Emit("SamplerState");			break;
-            case SamplerStateType::Flavor::SamplerComparisonState:	Emit("SamplerComparisonState");	break;
+            case SamplerStateFlavor::SamplerState:			Emit("SamplerState");			break;
+            case SamplerStateFlavor::SamplerComparisonState:	Emit("SamplerComparisonState");	break;
             default:
                 SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled sampler state flavor");
                 break;
@@ -1256,8 +1256,8 @@ struct EmitVisitor
         case CodeGenTarget::GLSL:
             switch (samplerStateType->flavor)
             {
-            case SamplerStateType::Flavor::SamplerState:			Emit("sampler");		break;
-            case SamplerStateType::Flavor::SamplerComparisonState:	Emit("samplerShadow");	break;
+            case SamplerStateFlavor::SamplerState:			Emit("sampler");		break;
+            case SamplerStateFlavor::SamplerComparisonState:	Emit("samplerShadow");	break;
             default:
                 SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled sampler state flavor");
                 break;
@@ -2179,7 +2179,7 @@ struct EmitVisitor
 
                                         if (auto samplerType = callExpr->Arguments[0]->type.type->As<SamplerStateType>())
                                         {
-                                            if (samplerType->flavor == SamplerStateType::Flavor::SamplerComparisonState)
+                                            if (samplerType->flavor == SamplerStateFlavor::SamplerComparisonState)
                                             {
                                                 Emit("Shadow");
                                             }
@@ -5447,7 +5447,7 @@ emitDeclImpl(decl, nullptr);
 
                             if (auto samplerType = samplerArg->type->As<SamplerStateType>())
                             {
-                                if (samplerType->flavor == SamplerStateType::Flavor::SamplerComparisonState)
+                                if (samplerType->flavor == SamplerStateFlavor::SamplerComparisonState)
                                 {
                                     Emit("Shadow");
                                 }

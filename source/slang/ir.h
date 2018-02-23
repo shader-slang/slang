@@ -57,6 +57,9 @@ enum IROp : int16_t
 
 #include "ir-inst-defs.h"
 
+#define TYPE(ID) kIRType_##ID,
+#include "ir-type-defs.h"
+
     kIROp_Invalid = -1,
 
 };

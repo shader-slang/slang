@@ -319,24 +319,24 @@ for( int C = 2; C <= 4; ++C )
 
 
 
-sb << "__magic_type(SamplerState," << int(SamplerStateType::Flavor::SamplerState) << ")\n";
-sb << "__intrinsic_type(" << kIROp_SamplerType << ", " << int(SamplerStateType::Flavor::SamplerState) << ")\n";
+sb << "__magic_type(SamplerState," << int(SamplerStateFlavor::SamplerState) << ")\n";
+sb << "__intrinsic_type(" << kIROp_SamplerType << ", " << int(SamplerStateFlavor::SamplerState) << ")\n";
 sb << "struct SamplerState {};";
         
-sb << "__magic_type(SamplerState," << int(SamplerStateType::Flavor::SamplerComparisonState) << ")\n";
-sb << "__intrinsic_type(" << kIROp_SamplerType << ", " << int(SamplerStateType::Flavor::SamplerComparisonState) << ")\n";
+sb << "__magic_type(SamplerState," << int(SamplerStateFlavor::SamplerComparisonState) << ")\n";
+sb << "__intrinsic_type(" << kIROp_SamplerType << ", " << int(SamplerStateFlavor::SamplerComparisonState) << ")\n";
 sb << "struct SamplerComparisonState {};";
 
 // TODO(tfoley): Need to handle `RW*` variants of texture types as well...
 static const struct {
-    char const*			name;
-    TextureType::Shape	baseShape;
-    int					coordCount;
+    char const*			    name;
+    TextureFlavor::Shape	baseShape;
+    int					    coordCount;
 } kBaseTextureTypes[] = {
-    { "Texture1D",		TextureType::Shape1D,	1 },
-    { "Texture2D",		TextureType::Shape2D,	2 },
-    { "Texture3D",		TextureType::Shape3D,	3 },
-    { "TextureCube",	TextureType::ShapeCube,	3 },
+    { "Texture1D",		TextureFlavor::Shape::Shape1D,	1 },
+    { "Texture2D",		TextureFlavor::Shape::Shape2D,	2 },
+    { "Texture3D",		TextureFlavor::Shape::Shape3D,	3 },
+    { "TextureCube",	TextureFlavor::Shape::ShapeCube,	3 },
 };
 static const int kBaseTextureTypeCount = sizeof(kBaseTextureTypes) / sizeof(kBaseTextureTypes[0]);
 
@@ -358,12 +358,12 @@ static const int kBaseTextureAccessLevelCount = sizeof(kBaseTextureAccessLevels)
 for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 {
     char const* name = kBaseTextureTypes[tt].name;
-    TextureType::Shape baseShape = kBaseTextureTypes[tt].baseShape;
+    TextureFlavor::Shape baseShape = kBaseTextureTypes[tt].baseShape;
 
     for (int isArray = 0; isArray < 2; ++isArray)
     {
         // Arrays of 3D textures aren't allowed
-        if (isArray && baseShape == TextureType::Shape3D) continue;
+        if (isArray && baseShape == TextureFlavor::Shape::Shape3D) continue;
 
         for (int isMultisample = 0; isMultisample < 2; ++isMultisample)
         for (int accessLevel = 0; accessLevel < kBaseTextureAccessLevelCount; ++accessLevel)
@@ -373,9 +373,9 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
             // TODO: any constraints to enforce on what gets to be multisampled?
 
             unsigned flavor = baseShape;
-            if (isArray)		flavor |= TextureType::ArrayFlag;
-            if (isMultisample)	flavor |= TextureType::MultisampleFlag;
-//                        if (isShadow)		flavor |= TextureType::ShadowFlag;
+            if (isArray)		flavor |= TextureFlavor::ArrayFlag;
+            if (isMultisample)	flavor |= TextureFlavor::MultisampleFlag;
+//                        if (isShadow)		flavor |= TextureFlavor::ShadowFlag;
 
             flavor |= (access << 8);
 
@@ -415,12 +415,12 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 {
     char const* name = kBaseTextureTypes[tt].name;
-    TextureType::Shape baseShape = kBaseTextureTypes[tt].baseShape;
+    TextureFlavor::Shape baseShape = kBaseTextureTypes[tt].baseShape;
 
     for (int isArray = 0; isArray < 2; ++isArray)
     {
         // Arrays of 3D textures aren't allowed
-        if (isArray && baseShape == TextureType::Shape3D) continue;
+        if (isArray && baseShape == TextureFlavor::Shape::Shape3D) continue;
 
         for (int isMultisample = 0; isMultisample < 2; ++isMultisample)
         for (int accessLevel = 0; accessLevel < kBaseTextureAccessLevelCount; ++accessLevel)
@@ -430,9 +430,9 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
             // TODO: any constraints to enforce on what gets to be multisampled?
 
             unsigned flavor = baseShape;
-            if (isArray)		flavor |= TextureType::ArrayFlag;
-            if (isMultisample)	flavor |= TextureType::MultisampleFlag;
-//                        if (isShadow)		flavor |= TextureType::ShadowFlag;
+            if (isArray)		flavor |= TextureFlavor::ArrayFlag;
+            if (isMultisample)	flavor |= TextureFlavor::MultisampleFlag;
+//                        if (isShadow)		flavor |= TextureFlavor::ShadowFlag;
 
             flavor |= (access << 8);
 
@@ -494,19 +494,19 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                     int cc = 0;
                     switch(baseShape)
                     {
-                    case TextureType::Shape1D:
+                    case TextureFlavor::Shape::Shape1D:
                         sb << "($" << aa++ << opStr << "))";
                         cc = 1;
                         break;
 
-                    case TextureType::Shape2D:
-                    case TextureType::ShapeCube:
+                    case TextureFlavor::Shape::Shape2D:
+                    case TextureFlavor::Shape::ShapeCube:
                         sb << "($" << aa++ << opStr << ").x)";
                         sb << ", ($" << aa++ << opStr << ").y)";
                         cc = 2;
                         break;
 
-                    case TextureType::Shape3D:
+                    case TextureFlavor::Shape::Shape3D:
                         sb << "($" << aa++ << opStr << ").x)";
                         sb << ", ($" << aa++ << opStr << ").y)";
                         sb << ", ($" << aa++ << opStr << ").z)";
@@ -545,17 +545,17 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
                 switch(baseShape)
                 {
-                case TextureType::Shape1D:
+                case TextureFlavor::Shape::Shape1D:
                     sb << t << "width";
                     break;
 
-                case TextureType::Shape2D:
-                case TextureType::ShapeCube:
+                case TextureFlavor::Shape::Shape2D:
+                case TextureFlavor::Shape::ShapeCube:
                     sb << t << "width,";
                     sb << t << "height";
                     break;
 
-                case TextureType::Shape3D:
+                case TextureFlavor::Shape::Shape3D:
                     sb << t << "width,";
                     sb << t << "height,";
                     sb << t << "depth";
@@ -645,7 +645,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 sb << ");\n";
             }
 
-            if(baseShape != TextureType::ShapeCube)
+            if(baseShape != TextureFlavor::Shape::ShapeCube)
             {
                 int N = kBaseTextureTypes[tt].coordCount + isArray;
 
@@ -701,7 +701,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 sb << "T Sample(SamplerState s, ";
                 sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location);\n";
 
-                if( baseShape != TextureType::ShapeCube )
+                if( baseShape != TextureFlavor::Shape::ShapeCube )
                 {
                     sb << "__target_intrinsic(glsl, \"textureOffset($p, $2, $3)\")\n";
                     sb << "T Sample(SamplerState s, ";
@@ -711,7 +711,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
                 sb << "T Sample(SamplerState s, ";
                 sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
-                if( baseShape != TextureType::ShapeCube )
+                if( baseShape != TextureFlavor::Shape::ShapeCube )
                 {
                     sb << "constexpr int" << kBaseTextureTypes[tt].coordCount << " offset, ";
                 }
@@ -719,7 +719,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
                 sb << "T Sample(SamplerState s, ";
                 sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
-                if( baseShape != TextureType::ShapeCube )
+                if( baseShape != TextureFlavor::Shape::ShapeCube )
                 {
                     sb << "constexpr int" << kBaseTextureTypes[tt].coordCount << " offset, ";
                 }
@@ -731,7 +731,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 sb << "T SampleBias(SamplerState s, ";
                 sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, float bias);\n";
 
-                if( baseShape != TextureType::ShapeCube )
+                if( baseShape != TextureFlavor::Shape::ShapeCube )
                 {
                     sb << "__target_intrinsic(glsl, \"textureOffset($p, $2, $3, $4)\")\n";
                     sb << "T SampleBias(SamplerState s, ";
@@ -791,7 +791,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 sb << "float compareValue";
                 sb << ");\n";
 
-                if( baseShape != TextureType::ShapeCube )
+                if( baseShape != TextureFlavor::Shape::ShapeCube )
                 {
                     // Note(tfoley): MSDN seems confused, and claims that the `offset`
                     // parameter for `SampleCmp` is available for everything but 3D
@@ -820,7 +820,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 sb << "float" << kBaseTextureTypes[tt].coordCount << " gradY";
                 sb << ");\n";
 
-                if( baseShape != TextureType::ShapeCube )
+                if( baseShape != TextureFlavor::Shape::ShapeCube )
                 {
                     sb << "__target_intrinsic(glsl, \"textureGradOffset($p, $2, $3, $4, $5)\")\n";
 //                    sb << "__intrinsic_op(sampleGrad)\n";
@@ -838,7 +838,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                 sb << "float level);\n";
 
-                if( baseShape != TextureType::ShapeCube )
+                if( baseShape != TextureFlavor::Shape::ShapeCube )
                 {
                     sb << "__target_intrinsic(glsl, \"textureLodOffset($p, $2, $3, $4)\")\n";
                     sb << "T SampleLevel(SamplerState s, ";

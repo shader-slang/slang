@@ -181,6 +181,8 @@
     <ClInclude Include="ir-inst-defs.h" />
     <ClInclude Include="ir-insts.h" />
     <ClInclude Include="ir-ssa.h" />
+    <ClInclude Include="ir-type-defs.h" />
+    <ClInclude Include="ir-types.h" />
     <ClInclude Include="ir.h" />
     <ClInclude Include="legalize-types.h" />
     <ClInclude Include="lexer.h" />
@@ -208,6 +210,7 @@
     <ClInclude Include="token.h" />
     <ClInclude Include="type-defs.h" />
     <ClInclude Include="type-layout.h" />
+    <ClInclude Include="type-system-shared.h" />
     <ClInclude Include="val-defs.h" />
     <ClInclude Include="visitor.h" />
     <ClInclude Include="vm.h" />
@@ -242,6 +245,7 @@
     <ClCompile Include="syntax.cpp" />
     <ClCompile Include="token.cpp" />
     <ClCompile Include="type-layout.cpp" />
+    <ClCompile Include="type-system-shared.cpp" />
     <ClCompile Include="vm.cpp" />
   </ItemGroup>
   <ItemGroup>

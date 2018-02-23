@@ -1263,7 +1263,7 @@ namespace slang
 #include "source/slang/reflection.cpp"
 #include "source/slang/slang.cpp"
 #include "source/slang/vm.cpp"
-
+#include "source/slang/type-system-shared.cpp"
 #endif
 
 #endif
