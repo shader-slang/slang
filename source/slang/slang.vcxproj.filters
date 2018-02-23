@@ -47,6 +47,9 @@
     <ClInclude Include="ir-ssa.h" />
     <ClInclude Include="memory_pool.h" />
     <ClInclude Include="ir-constexpr.h" />
+    <ClInclude Include="ir-types.h" />
+    <ClInclude Include="ir-type-defs.h" />
+    <ClInclude Include="type-system-shared.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="check.cpp" />
@@ -79,6 +82,7 @@
     <ClCompile Include="ir-ssa.cpp" />
     <ClCompile Include="memory_pool.cpp" />
     <ClCompile Include="ir-constexpr.cpp" />
+    <ClCompile Include="type-system-shared.cpp" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="core.meta.slang" />
