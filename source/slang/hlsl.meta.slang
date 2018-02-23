@@ -207,19 +207,28 @@ struct RWStructuredBuffer
 
 __generic<T> __magic_type(HLSLPointStreamType) struct PointStream
 {
+    __target_intrinsic(glsl, "EmitVertex()")
     void Append(T value);
+
+    __target_intrinsic(glsl, "EndPrimitive()")
     void RestartStrip();
 };
 
 __generic<T> __magic_type(HLSLLineStreamType) struct LineStream
 {
+    __target_intrinsic(glsl, "EmitVertex()")
     void Append(T value);
+
+    __target_intrinsic(glsl, "EndPrimitive()")
     void RestartStrip();
 };
 
 __generic<T> __magic_type(HLSLTriangleStreamType) struct TriangleStream
 {
+    __target_intrinsic(glsl, "EmitVertex()")
     void Append(T value);
+
+    __target_intrinsic(glsl, "EndPrimitive()")
     void RestartStrip();
 };
 
@@ -567,7 +576,7 @@ float2 GetRenderTargetSamplePosition(int Index);
 __target_intrinsic(glsl, "groupMemoryBarrier")
 void GroupMemoryBarrier();
 
-__target_intrinsic(glsl, "groupMemoryBarrier(); barrier")
+__target_intrinsic(glsl, "groupMemoryBarrier(); barrier()")
 void GroupMemoryBarrierWithGroupSync();
 
 // Atomics

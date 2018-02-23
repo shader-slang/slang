@@ -5344,6 +5344,26 @@ emitDeclImpl(decl, nullptr);
         return nullptr;
     }
 
+    // Check if the string being used to define a target intrinsic
+    // is an "ordinary" name, such that we can simply emit a call
+    // to the new name with the arguments of the old operation.
+    bool isOrdinaryName(String const& name)
+    {
+        char const* cursor = name.begin();
+        char const* end = name.end();
+
+        while(cursor != end)
+        {
+            int c = *cursor++;
+            if( (c >= 'a') && (c <= 'z') ) continue;
+            if( (c >= 'A') && (c <= 'Z') ) continue;
+            if( c == '_' ) continue;
+
+            return false;
+        }
+        return true;
+    }
+
     void emitTargetIntrinsicCallExpr(
         EmitContext*                    ctx,
         IRCall*                         inst,
@@ -5361,7 +5381,7 @@ emitDeclImpl(decl, nullptr);
         auto name = targetIntrinsic->definition;
 
 
-        if(name.IndexOf('$') == -1)
+        if(isOrdinaryName(name))
         {
             // Simple case: it is just an ordinary name, so we call it like a builtin.
 
@@ -6379,7 +6399,11 @@ emitDeclImpl(decl, nullptr);
                         switch (loopControlDecoration->mode)
                         {
                         case kIRLoopControl_Unroll:
-                            emit("[unroll]\n");
+                            // Note: loop unrolling control is only available in HLSL, not GLSL
+                            if(getTarget(ctx) == CodeGenTarget::HLSL)
+                            {
+                                emit("[unroll]\n");
+                            }
                             break;
 
                         default:
@@ -6792,7 +6816,6 @@ emitDeclImpl(decl, nullptr);
         {
             if (auto attrib = entryPointLayout->entryPoint->FindModifier<HLSLMaxVertexCountAttribute>())
             {
-                // TODO: need to include primitive type
                 emit("layout(max_vertices = ");
                 Emit(attrib->value);
                 emit(") out;\n");
@@ -6803,6 +6826,51 @@ emitDeclImpl(decl, nullptr);
                 Emit(attrib->value);
                 emit(") in;\n");
             }
+
+            for(auto pp : entryPointLayout->entryPoint->GetParameters())
+            {
+                if(auto inputPrimitiveTypeModifier = pp->FindModifier<HLSLGeometryShaderInputPrimitiveTypeModifier>())
+                {
+                    if(inputPrimitiveTypeModifier->As<HLSLTriangleModifier>())
+                    {
+                        emit("layout(triangles) in;\n");
+                    }
+                    else if(inputPrimitiveTypeModifier->As<HLSLLineModifier>())
+                    {
+                        emit("layout(lines) in;\n");
+                    }
+                    else if(inputPrimitiveTypeModifier->As<HLSLLineAdjModifier>())
+                    {
+                        emit("layout(lines_adjacency) in;\n");
+                    }
+                    else if(inputPrimitiveTypeModifier->As<HLSLPointModifier>())
+                    {
+                        emit("layout(points) in;\n");
+                    }
+                    else if(inputPrimitiveTypeModifier->As<HLSLTriangleAdjModifier>())
+                    {
+                        emit("layout(triangles_adjacency) in;\n");
+                    }
+                }
+
+                if(auto outputStreamType = pp->type->As<HLSLStreamOutputType>())
+                {
+                    if(outputStreamType->As<HLSLTriangleStreamType>())
+                    {
+                        emit("layout(triangle_strip) out;\n");
+                    }
+                    else if(outputStreamType->As<HLSLLineStreamType>())
+                    {
+                        emit("layout(line_strip) out;\n");
+                    }
+                    else if(outputStreamType->As<HLSLPointStreamType>())
+                    {
+                        emit("layout(points) out;\n");
+                    }
+                }
+            }
+
+
         }
         break;
         // TODO: There are other stages that will need this kind of handling.

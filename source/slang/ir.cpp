@@ -2816,6 +2816,7 @@ namespace Slang
     struct ScalarizedValImpl : RefObject
     {};
     struct ScalarizedTupleValImpl;
+    struct ScalarizedTypeAdapterValImpl;
     struct ScalarizedVal
     {
         enum class Flavor
@@ -2831,6 +2832,11 @@ namespace Slang
 
             // A `TupleValImpl` that represents zero or more `ScalarizedVal`s
             tuple,
+
+            // A `TypeAdapterValImpl` that wraps a single `ScalarizedVal` and
+            // represents an implicit type conversion applied to it on read
+            // or write.
+            typeAdapter,
         };
 
         // Create a value representing a simple value
@@ -2860,6 +2866,14 @@ namespace Slang
             return result;
         }
 
+        static ScalarizedVal typeAdapter(ScalarizedTypeAdapterValImpl* impl)
+        {
+            ScalarizedVal result;
+            result.flavor = Flavor::typeAdapter;
+            result.impl = (ScalarizedValImpl*)impl;
+            return result;
+        }
+
         Flavor                      flavor = Flavor::none;
         IRValue*                    irValue = nullptr;
         RefPtr<ScalarizedValImpl>   impl;
@@ -2878,6 +2892,15 @@ namespace Slang
         List<Element>   elements;
     };
 
+    // This is the case for a value that is stored with one type,
+    // but needs to present itself as having a different type
+    struct ScalarizedTypeAdapterValImpl : ScalarizedValImpl
+    {
+        ScalarizedVal   val;
+        RefPtr<Type>    actualType;   // the actual type of `val`
+        RefPtr<Type>    pretendType;     // the type this value pretends to have
+    };
+
     struct GlobalVaryingDeclarator
     {
         enum class Flavor
@@ -2892,7 +2915,11 @@ namespace Slang
 
     struct GLSLSystemValueInfo
     {
-        char const* name;
+        // The name of the built-in GLSL variable
+        char const*     name;
+
+        // The required type of the built-in variable
+        RefPtr<Type>    requiredType;
     };
 
     void requireGLSLVersionImpl(
@@ -2905,6 +2932,7 @@ namespace Slang
 
     struct GLSLLegalizationContext
     {
+        Session*                session;
         ExtensionUsageTracker*  extensionUsageTracker;
         DiagnosticSink*         sink;
         Stage                   stage;
@@ -2943,6 +2971,8 @@ namespace Slang
             return nullptr;
 
         auto semanticName = semanticNameSpelling.ToLower();
+
+        RefPtr<Type> requiredType;
 
         if(semanticName == "sv_position")
         {
@@ -3058,6 +3088,7 @@ namespace Slang
             }
 
             name = "gl_Layer";
+            requiredType = context->session->getBuiltinType(BaseType::Int);
         }
         else if (semanticName == "sv_sampleindex")
         {
@@ -3117,6 +3148,7 @@ namespace Slang
         if( name )
         {
             inStorage->name = name;
+            inStorage->requiredType = requiredType;
             return inStorage;
         }
 
@@ -3142,11 +3174,17 @@ namespace Slang
             kind,
             &systemValueInfoStorage);
 
+        RefPtr<Type> type = inType;
+
+        // A system-value semantic might end up needing to override the type
+        // that the user specified.
+        if( systemValueInfo && systemValueInfo->requiredType )
+        {
+            type = systemValueInfo->requiredType;
+        }
+
         // Construct the actual type and type-layout for the global variable
         //
-        // TODO: in the case of a system value, we may need to override the type
-        //
-        RefPtr<Type> type = inType;
         RefPtr<TypeLayout> typeLayout = inTypeLayout;
         for( auto dd = declarator; dd; dd = dd->next )
         {
@@ -3200,14 +3238,33 @@ namespace Slang
         auto globalVariable = addGlobalVariable(builder->getModule(), type);
         moveValueBefore(globalVariable, builder->getFunc());
 
+        ScalarizedVal val = ScalarizedVal::address(globalVariable);
+
         if( systemValueInfo )
         {
             globalVariable->mangledName = builder->getSession()->getNameObj(systemValueInfo->name);
+
+            if( auto fromType = systemValueInfo->requiredType )
+            {
+                // We may need to adapt from the declared type to/from
+                // the actual type of the GLSL global.
+                auto toType = inType;
+
+                if( !fromType->Equals(toType) )
+                {
+                    RefPtr<ScalarizedTypeAdapterValImpl> typeAdapter = new ScalarizedTypeAdapterValImpl;
+                    typeAdapter->actualType = systemValueInfo->requiredType;
+                    typeAdapter->pretendType = inType;
+                    typeAdapter->val = val;
+
+                    val = ScalarizedVal::typeAdapter(typeAdapter);
+                }
+            }
         }
 
         builder->addLayoutDecoration(globalVariable, varLayout);
 
-        return ScalarizedVal::address(globalVariable);
+        return val;
     }
 
     ScalarizedVal createGLSLGlobalVaryingsImpl(
@@ -3264,6 +3321,23 @@ namespace Slang
                 bindingIndex,
                 &arrayDeclarator);
         }
+        else if( auto streamType = type->As<HLSLStreamOutputType>() )
+        {
+            auto elementType = streamType->getElementType();
+            auto streamLayout = dynamic_cast<StreamOutputTypeLayout*>(typeLayout);
+            SLANG_ASSERT(streamLayout);
+            auto elementTypeLayout = streamLayout->elementTypeLayout;
+
+            return createGLSLGlobalVaryingsImpl(
+                context,
+                builder,
+                elementType,
+                varLayout,
+                elementTypeLayout,
+                kind,
+                bindingIndex,
+                declarator);
+        }
         else if( auto declRefType = type->As<DeclRefType>() )
         {
             auto declRef = declRefType->declRef;
@@ -3281,7 +3355,19 @@ namespace Slang
                 if( structTypeLayout )
                 {
                     RefPtr<ScalarizedTupleValImpl> tupleValImpl = new ScalarizedTupleValImpl();
-                    tupleValImpl->type = type;
+
+
+                    // Construct the actual type for the tuple (including any outer arrays)
+                    RefPtr<Type> fullType = type;
+                    for( auto dd = declarator; dd; dd = dd->next )
+                    {
+                        assert(dd->flavor == GlobalVaryingDeclarator::Flavor::array);
+                        fullType = builder->getSession()->getArrayType(
+                            fullType,
+                            dd->elementCount);
+                    }
+
+                    tupleValImpl->type = fullType;
 
                     // Okay, we want to walk through the fields here, and
                     // generate one variable for each.
@@ -3369,6 +3455,44 @@ namespace Slang
 
     }
 
+    ScalarizedVal adaptType(
+        IRBuilder*              builder,
+        IRValue*                val,
+        Type*                   toType,
+        Type*                   /*fromType*/)
+    {
+        // TODO: actually consider what needs to go on here...
+        return ScalarizedVal::value(builder->emitConstructorInst(
+            toType,
+            1,
+            &val));
+    }
+
+    ScalarizedVal adaptType(
+        IRBuilder*              builder,
+        ScalarizedVal const&    val,
+        Type*                   toType,
+        Type*                   fromType)
+    {
+        switch( val.flavor )
+        {
+        case ScalarizedVal::Flavor::value:
+            return adaptType(builder, val.irValue, toType, fromType);
+            break;
+
+        case ScalarizedVal::Flavor::address:
+            {
+                auto loaded = builder->emitLoad(val.irValue);
+                return adaptType(builder, loaded, toType, fromType);
+            }
+            break;
+
+        default:
+            SLANG_UNEXPECTED("unimplemented");
+            UNREACHABLE_RETURN(ScalarizedVal());
+        }
+    }
+
     void assign(
         IRBuilder*              builder,
         ScalarizedVal const&    left,
@@ -3389,6 +3513,27 @@ namespace Slang
                 {
                     auto val = builder->emitLoad(right.irValue);
                     builder->emitStore(left.irValue, val);
+                }
+                break;
+
+            case ScalarizedVal::Flavor::tuple:
+                {
+                    // We are assigning from a tuple to a destination
+                    // that is not a tuple. We will perform assignment
+                    // element-by-element.
+                    auto rightTupleVal = right.impl.As<ScalarizedTupleValImpl>();
+                    UInt elementCount = rightTupleVal->elements.Count();
+
+                    for( UInt ee = 0; ee < elementCount; ++ee )
+                    {
+                        auto rightElement = rightTupleVal->elements[ee];
+                        auto leftElementVal = extractField(
+                            builder,
+                            left,
+                            ee,
+                            rightElement.declRef);
+                        assign(builder, leftElementVal, rightElement.val);
+                    }
                 }
                 break;
 
@@ -3417,9 +3562,175 @@ namespace Slang
             }
             break;
 
+        case ScalarizedVal::Flavor::typeAdapter:
+            {
+                // We are trying to assign to something that had its type adjusted,
+                // so we will need to adjust the type of the right-hand side first.
+                //
+                // In this case we are converting to the actual type of the GLSL variable,
+                // from the "pretend" type that it had in the IR before.
+                auto typeAdapter = left.impl.As<ScalarizedTypeAdapterValImpl>();
+                auto adaptedRight = adaptType(builder, right, typeAdapter->actualType, typeAdapter->pretendType);
+                assign(builder, typeAdapter->val, adaptedRight);
+            }
+            break;
+
         default:
             SLANG_UNEXPECTED("unimplemented");
             break;
+        }
+    }
+
+    ScalarizedVal getSubscriptVal(
+        IRBuilder*      builder,
+        Type*           elementType,
+        ScalarizedVal   val,
+        IRValue*        indexVal)
+    {
+        switch( val.flavor )
+        {
+        case ScalarizedVal::Flavor::value:
+            return ScalarizedVal::value(
+                builder->emitElementExtract(
+                    elementType,
+                    val.irValue,
+                    indexVal));
+
+        case ScalarizedVal::Flavor::address:
+            return ScalarizedVal::address(
+                builder->emitElementAddress(
+                    builder->getSession()->getPtrType(elementType),
+                    val.irValue,
+                    indexVal));
+
+        case ScalarizedVal::Flavor::tuple:
+            {
+                auto inputTuple = val.impl.As<ScalarizedTupleValImpl>();
+
+                RefPtr<ScalarizedTupleValImpl> resultTuple = new ScalarizedTupleValImpl();
+                resultTuple->type = elementType;
+
+                UInt elementCount = inputTuple->elements.Count();
+                UInt elementCounter = 0;
+
+                auto declRefType = dynamic_cast<DeclRefType*>(elementType);
+                SLANG_RELEASE_ASSERT(declRefType);
+
+                auto aggTypeDeclRef = declRefType->declRef.As<AggTypeDecl>();
+                SLANG_RELEASE_ASSERT(aggTypeDeclRef);
+
+                for(auto fieldDeclRef : getMembersOfType<StructField>(aggTypeDeclRef))
+                {
+                    if(fieldDeclRef.getDecl()->HasModifier<HLSLStaticModifier>())
+                        continue;
+
+                    auto tupleElementType = GetType(fieldDeclRef);
+
+                    UInt elementIndex = elementCounter++;
+
+                    SLANG_RELEASE_ASSERT(elementIndex < elementCount);
+                    auto inputElement = inputTuple->elements[elementIndex];
+
+                    ScalarizedTupleValImpl::Element resultElement;
+                    resultElement.declRef = inputElement.declRef;
+                    resultElement.val = getSubscriptVal(
+                        builder,
+                        tupleElementType,
+                        inputElement.val,
+                        indexVal);
+
+                    resultTuple->elements.Add(resultElement);
+                }
+                SLANG_RELEASE_ASSERT(elementCounter == elementCount);
+
+                return ScalarizedVal::tuple(resultTuple);
+            }
+
+        default:
+            SLANG_UNEXPECTED("unimplemented");
+            UNREACHABLE_RETURN(ScalarizedVal());
+        }
+    }
+
+    ScalarizedVal getSubscriptVal(
+        IRBuilder*      builder,
+        Type*           elementType,
+        ScalarizedVal   val,
+        UInt            index)
+    {
+        return getSubscriptVal(
+            builder,
+            elementType,
+            val,
+            builder->getIntValue(
+                builder->getSession()->getIntType(),
+                index));
+    }
+
+    IRValue* materializeValue(
+        IRBuilder*              builder,
+        ScalarizedVal const&    val);
+
+    IRValue* materializeTupleValue(
+        IRBuilder*      builder,
+        ScalarizedVal   val)
+    {
+        auto tupleVal = val.impl.As<ScalarizedTupleValImpl>();
+        assert(tupleVal);
+
+        UInt elementCount = tupleVal->elements.Count();
+        auto type = tupleVal->type;
+
+        if( auto arrayType = type.As<ArrayExpressionType>() )
+        {
+            // The tuple represent an array, which means that the
+            // individual elements are expected to yield arrays as well.
+            //
+            // We will extract a value for each array element, and
+            // then use these to construct our result.
+
+            List<IRValue*> arrayElementVals;
+            UInt arrayElementCount = (UInt) GetIntVal(arrayType->ArrayLength);
+
+            for( UInt ii = 0; ii < arrayElementCount; ++ii )
+            {
+                auto arrayElementPseudoVal = getSubscriptVal(
+                    builder,
+                    arrayType->baseType,
+                    val,
+                    ii);
+
+                auto arrayElementVal = materializeValue(
+                    builder,
+                    arrayElementPseudoVal);
+
+                arrayElementVals.Add(arrayElementVal);
+            }
+
+            return builder->emitMakeArray(
+                arrayType,
+                arrayElementVals.Count(),
+                arrayElementVals.Buffer());
+        }
+        else
+        {
+            // The tuple represents a value of some aggregate type,
+            // so we can simply materialize the elements and then
+            // construct a value of that type.
+            //
+            // TODO: this should be using a `makeStruct` instruction.
+
+            List<IRValue*> elementVals;
+            for( UInt ee = 0; ee < elementCount; ++ee )
+            {
+                auto elementVal = materializeValue(builder, tupleVal->elements[ee].val);
+                elementVals.Add(elementVal);
+            }
+
+            return builder->emitConstructorInst(
+                tupleVal->type,
+                elementVals.Count(),
+                elementVals.Buffer());
         }
     }
 
@@ -3442,19 +3753,19 @@ namespace Slang
         case ScalarizedVal::Flavor::tuple:
             {
                 auto tupleVal = val.impl.As<ScalarizedTupleValImpl>();
-                UInt elementCount = tupleVal->elements.Count();
+                return materializeTupleValue(builder, val);
+            }
+            break;
 
-                List<IRValue*> elementVals;
-                for( UInt ee = 0; ee < elementCount; ++ee )
-                {
-                    auto elementVal = materializeValue(builder, tupleVal->elements[ee].val);
-                    elementVals.Add(elementVal);
-                }
-
-                return builder->emitConstructorInst(
-                    tupleVal->type,
-                    elementVals.Count(),
-                    elementVals.Buffer());
+        case ScalarizedVal::Flavor::typeAdapter:
+            {
+                // Somebody is trying to use a value where its actual type
+                // doesn't match the type it pretends to have. To make this
+                // work we need to adapt the type from its actual type over
+                // to its pretend type.
+                auto typeAdapter = val.impl.As<ScalarizedTypeAdapterValImpl>();
+                auto adapted = adaptType(builder, typeAdapter->val, typeAdapter->pretendType, typeAdapter->actualType);
+                return materializeValue(builder, adapted);
             }
             break;
 
@@ -3462,6 +3773,23 @@ namespace Slang
             SLANG_UNEXPECTED("unimplemented");
             break;
         }
+    }
+
+    IRTargetIntrinsicDecoration* findTargetIntrinsicDecoration(
+        IRValue*        val,
+        String const&   targetName)
+    {
+        for( auto dd = val->firstDecoration; dd; dd = dd->next )
+        {
+            if(dd->op != kIRDecorationOp_TargetIntrinsic)
+                continue;
+
+            auto decoration = (IRTargetIntrinsicDecoration*) dd;
+            if(decoration->targetName == targetName)
+                return decoration;
+        }
+
+        return nullptr;
     }
 
     void legalizeEntryPointForGLSL(
@@ -3472,6 +3800,7 @@ namespace Slang
         ExtensionUsageTracker*  extensionUsageTracker)
     {
         GLSLLegalizationContext context;
+        context.session = session;
         context.stage = entryPointLayout->profile.GetStage();
         context.sink = sink;
         context.extensionUsageTracker = extensionUsageTracker;
@@ -3610,6 +3939,79 @@ namespace Slang
                 builder.curBlock = firstBlock;
                 builder.insertBeforeInst = firstBlock->getFirstInst();
 
+                // First we will special-case stage input/outputs that
+                // don't fit into the standard varying model.
+                // For right now we are only doing special-case handling
+                // of geometry shader output streams.
+                if( auto paramPtrType = paramType->As<OutTypeBase>() )
+                {
+                    auto valueType = paramPtrType->getValueType();
+                    if( auto gsStreamType = valueType->As<HLSLStreamOutputType>() )
+                    {
+                        // An output stream type like `TriangleStream<Foo>` should
+                        // more or less translate into `out Foo` (plus scalarization).
+
+                        auto globalOutputVal = createGLSLGlobalVaryings(
+                            &context,
+                            &builder,
+                            valueType,
+                            paramLayout,
+                            LayoutResourceKind::VaryingOutput);
+
+                        // TODO: a GS output stream might be passed into other
+                        // functions, so that we should really be modifying
+                        // any function that has one of these in its parameter
+                        // list (and in the limit we should be leagalizing any
+                        // type that nests these...).
+                        //
+                        // For now we will just try to deal with `Append` calls
+                        // directly in this function.
+
+
+
+                        for( auto bb = func->getFirstBlock(); bb; bb = bb->getNextBlock() )
+                        {
+                            for( auto ii = bb->getFirstInst(); ii; ii = ii->getNextInst() )
+                            {
+                                // Is it a call?
+                                if(ii->op != kIROp_Call)
+                                    continue;
+
+                                // Is it calling the append operation?
+                                auto callee = ii->getArg(0);
+                                while( callee->op == kIROp_specialize )
+                                {
+                                    callee = ((IRSpecialize*) callee)->getArg(0);
+                                }
+                                if(callee->op != kIROp_Func)
+                                    continue;
+
+                                // HACK: we will identify the operation based
+                                // on the target-intrinsic definition that was
+                                // given to it.
+                                auto decoration = findTargetIntrinsicDecoration(callee, "glsl");
+                                if(!decoration)
+                                    continue;
+
+                                if(decoration->definition != "EmitVertex()")
+                                {
+                                    continue;
+                                }
+
+                                // Okay, we have a declaration, and we want to modify it!
+
+                                builder.curBlock = bb;
+                                builder.insertBeforeInst = ii;
+
+                                assign(&builder, globalOutputVal, ScalarizedVal::value(ii->getArg(2)));
+                            }
+                        }
+
+                        continue;
+                    }
+                }
+
+
                 // Is the parameter type a special pointer type
                 // that indicates the parameter is used for `out`
                 // or `inout` access?
@@ -3684,7 +4086,7 @@ namespace Slang
 
                     auto globalValue = createGLSLGlobalVaryings(
                         &context,
-                        &builder, paramType, paramLayout, LayoutResourceKind::VertexInput);
+                        &builder, paramType, paramLayout, LayoutResourceKind::VaryingInput);
 
                     // Next we need to replace uses of the parameter with
                     // references to the variable(s). We are going to do that

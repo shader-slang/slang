@@ -1709,10 +1709,46 @@ static RefPtr<TypeLayout> processEntryPointParameterDecl(
 
 static RefPtr<TypeLayout> processEntryPointParameter(
     ParameterBindingContext*        context,
-    RefPtr<Type>          type,
+    RefPtr<Type>                    type,
     EntryPointParameterState const& state,
     RefPtr<VarLayout>               varLayout)
 {
+    if (varLayout)
+    {
+        varLayout->stage = state.stage;
+    }
+
+    // The default handling of varying parameters should not apply
+    // to geometry shader output streams; they have their own special rules.
+    if( auto gsStreamType = type->As<HLSLStreamOutputType>() )
+    {
+        //
+
+        auto elementType = gsStreamType->getElementType();
+
+        int semanticIndex = 0;
+
+        EntryPointParameterState elementState;
+        elementState.directionMask = kEntryPointParameterDirection_Output;
+        elementState.ioSemanticIndex = &semanticIndex;
+        elementState.isSampleRate = false;
+        elementState.optSemanticName = nullptr;
+        elementState.semanticSlotCount = 0;
+        elementState.stage = state.stage;
+
+        auto elementTypeLayout = processEntryPointParameter(context, elementType, elementState, nullptr);
+
+        RefPtr<StreamOutputTypeLayout> typeLayout = new StreamOutputTypeLayout();
+        typeLayout->type = type;
+        typeLayout->rules = elementTypeLayout->rules;
+        typeLayout->elementTypeLayout = elementTypeLayout;
+
+        for(auto resInfo : elementTypeLayout->resourceInfos)
+            typeLayout->addResourceUsage(resInfo);
+
+        return typeLayout;
+    }
+
     // If there is an available semantic name and index,
     // then we should apply it to this parameter unconditionally
     // (that is, not just if it is a leaf parameter).
@@ -1731,11 +1767,6 @@ static RefPtr<TypeLayout> processEntryPointParameter(
         varLayout->semanticName = sn;
         varLayout->semanticIndex = semanticIndex;
         varLayout->flags |= VarLayoutFlag::HasSemantic;
-    }
-
-    if (varLayout)
-    {
-        varLayout->stage = state.stage;
     }
 
     // Scalar and vector types are treated as outputs directly
