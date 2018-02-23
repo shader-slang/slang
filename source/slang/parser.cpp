@@ -1863,11 +1863,17 @@ namespace Slang
             ParseHLSLLayoutSemantic(parser, semantic.Ptr());
             return semantic;
         }
-        else
+        else if (parser->LookAheadToken(TokenType::Identifier))
         {
             RefPtr<HLSLSimpleSemantic> semantic = new HLSLSimpleSemantic();
             semantic->name = parser->ReadToken(TokenType::Identifier);
             return semantic;
+        }
+        else
+        {
+            // expect an identifier, just to produce an error message
+            parser->ReadToken(TokenType::Identifier);
+            return nullptr;
         }
     }
 
@@ -1893,20 +1899,26 @@ namespace Slang
                 link = &semantic->next;
             }
 
-            switch (parser->tokenReader.PeekTokenType())
+            // If we see another `:`, then that means there
+            // is yet another semantic to be processed.
+            // Otherwise we assume we are at the end of the list.
+            //
+            // TODO: This could produce sub-optimal diagnostics
+            // when the user *meant* to apply multiple semantics
+            // to a single declaration:
+            //
+            //     Foo foo : register(t0)   register(s0);
+            //                            ^
+            //         missing ':' here   |
+            //
+            // However, that is an uncommon occurence, and trying
+            // to continue parsing semantics here even if we didn't
+            // see a colon forces us to be careful about 
+            // avoiding an infinite loop here.
+            if (!AdvanceIf(parser, TokenType::Colon))
             {
-            case TokenType::LBrace:
-            case TokenType::Semicolon:
-            case TokenType::Comma:
-            case TokenType::RParent:
-            case TokenType::EndOfFile:
                 return result;
-
-            default:
-                break;
             }
-
-            parser->ReadToken(TokenType::Colon);
         }
 
     }
