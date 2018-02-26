@@ -827,8 +827,8 @@ void Type::accept(IValVisitor* visitor, void* extra)
             CASE(HLSLConsumeStructuredBufferType, HLSLConsumeStructuredBufferType)
 
             CASE(HLSLPointStreamType, HLSLPointStreamType)
-            CASE(HLSLLineStreamType, HLSLPointStreamType)
-            CASE(HLSLTriangleStreamType, HLSLPointStreamType)
+            CASE(HLSLLineStreamType, HLSLLineStreamType)
+            CASE(HLSLTriangleStreamType, HLSLTriangleStreamType)
 
             #undef CASE
 
