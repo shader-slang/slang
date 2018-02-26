@@ -356,6 +356,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> cosh(vector<T
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> cosh(matrix<T,N,M> x);
 
 // Population count
+__target_intrinsic(glsl, "bitCount")
 uint countbits(uint value);
 
 // Cross product
@@ -515,17 +516,29 @@ __generic<let N : int> vector<uint,N> f32tof16(vector<float,N> value);
 __generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> faceforward(vector<T,N> n, vector<T,N> i, vector<T,N> ng);
 
 // Find first set bit starting at high bit and working down
+__target_intrinsic(glsl,"findMSB")
 int firstbithigh(int value);
+
+__target_intrinsic(glsl,"findMSB")
 __generic<let N : int> vector<int,N> firstbithigh(vector<int,N> value);
 
+__target_intrinsic(glsl,"findMSB")
 uint firstbithigh(uint value);
+
+__target_intrinsic(glsl,"findMSB")
 __generic<let N : int> vector<uint,N> firstbithigh(vector<uint,N> value);
 
 // Find first set bit starting at low bit and working up
+__target_intrinsic(glsl,"findLSB")
 int firstbitlow(int value);
+
+__target_intrinsic(glsl,"findLSB")
 __generic<let N : int> vector<int,N> firstbitlow(vector<int,N> value);
 
+__target_intrinsic(glsl,"findLSB")
 uint firstbitlow(uint value);
+
+__target_intrinsic(glsl,"findLSB")
 __generic<let N : int> vector<uint,N> firstbitlow(vector<uint,N> value);
 
 // Floor (HLSL SM 1.0)
@@ -815,7 +828,10 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 vector<T,N> refract(vector<T,N> i, vector<T,N> n, float eta);
 
 // Reverse order of bits
+__target_intrinsic(glsl, "bitfieldReverse")
 uint reversebits(uint value);
+
+__target_intrinsic(glsl, "bitfieldReverse")
 __generic<let N : int> vector<uint,N> reversebits(vector<uint,N> value);
 
 // Round-to-nearest
