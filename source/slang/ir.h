@@ -140,11 +140,9 @@ struct IRDecoration : public IRObject
     IRDecorationOp op;
 };
 
-// Use AST-level types directly to represent the
-// types of IR instructions/values
-typedef Type IRType;
-
 struct IRBlock;
+
+typedef IRInst IRType;
 
 // Base class for values in the IR
 struct IRValue : public IRObject
@@ -155,12 +153,12 @@ struct IRValue : public IRObject
     // The type of the result value of this instruction,
     // or `null` to indicate that the instruction has
     // no value.
-    RefPtr<Type>    type;
+    IRType*    type;
 
-    Type* getFullType() { return type; }
+    IRType* getFullType() { return type; }
 
-    Type* getRate();
-    Type* getDataType();
+    IRType* getRate();
+    IRType* getDataType();
 
     // Source location information for this value, if any
     SourceLoc sourceLoc;
@@ -467,13 +465,6 @@ struct IRBlock : IRValue
     SuccessorList getSuccessors();
 };
 
-// For right now, we will represent the type of
-// an IR function using the type of the AST
-// function from which it was created.
-//
-// TODO: need to do this better.
-typedef FuncType IRFuncType;
-
 struct IRGlobalValue : IRValue
 {
     IRModule*   parentModule;
@@ -541,9 +532,9 @@ struct IRFunc : IRGlobalValueWithCode
 
     // Convenience accessors for working with the 
     // function's type.
-    Type* getResultType();
+    IRType* getResultType();
     UInt getParamCount();
-    Type* getParamType(UInt index);
+    IRType* getParamType(UInt index);
 
     // Convenience accessor for the IR parameters,
     // which are actually the parameters of the first
@@ -572,6 +563,8 @@ struct IRModule : RefObject
 
     IRGlobalValue*  getFirstGlobalValue() { return firstGlobalValue; }
     IRGlobalValue*  getlastGlobalValue() { return lastGlobalValue; }
+
+    IRBlock* globalTypeBlock = nullptr;
 
     ~IRModule()
     {

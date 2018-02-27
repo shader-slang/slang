@@ -438,6 +438,9 @@ struct IRBuilder
 
     void addInst(IRBlock* block, IRInst* inst);
     void addInst(IRInst* inst);
+    IRBasicType* createBasicType(BaseType type);
+    IRFuncType* createFuncType(IRValue* retType, UInt paramCount, IRValue** params);
+    IRPointerType* createPointerType(IRValue* baseType);
 
     IRValue* getBoolValue(bool value);
     IRValue* getIntValue(IRType* type, IRIntegerValue value);
@@ -445,7 +448,6 @@ struct IRBuilder
 
     IRValue* getDeclRefVal(
         DeclRefBase const&  declRef);
-    IRValue* getTypeVal(IRType* type); // create an IR value that represents a type
     IRValue* emitSpecializeInst(
         IRType*     type,
         IRValue*    genericVal,
