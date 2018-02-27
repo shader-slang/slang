@@ -58,6 +58,10 @@ INST(UInt32Type, Int32, 0, 0)
 INST(UIntPtrType, IntPtr, 0, 0)
 INST(UInt64Type, Int64, 0, 0)
 
+INST(HalfType, Half, 0, 0)
+INST(FloatType, Float, 0, 0)
+INST(DoubleType, Double, 0, 0)
+
 // A user-defined structure declaration at the IR level.
 // Unlike in the AST where there is a distinction between
 // a `StructDecl` and a `DeclRefType` that refers to it,

@@ -1,6 +1,7 @@
 // ir.cpp
 #include "ir.h"
 #include "ir-insts.h"
+#include "ir-types.h"
 
 #include "../core/basic.h"
 #include "mangle.h"
@@ -396,7 +397,7 @@ namespace Slang
 
     // IRFunc
 
-    IRType* IRFunc::getResultType() { return getType()->getResultType(); }
+    IRType* IRFunc::getResultType() { return (IRType*)(type->getArg(0)); }
     UInt IRFunc::getParamCount() { return getType()->getParamCount(); }
     IRType* IRFunc::getParamType(UInt index) { return getType()->getParamType(index); }
 
@@ -838,6 +839,57 @@ namespace Slang
 
     //
 
+    IRBasicType* IRBuilder::createBasicType(BaseType type)
+    {
+        IROp op = IROp::kIROp_VoidType;
+        switch (type)
+        {
+        case BaseType::Bool:
+            op = kIROp_BoolType;
+            break;
+        case BaseType::Int:
+            op = kIROp_Int32Type;
+            break;
+        case BaseType::UInt:
+            op = kIROp_UInt32Type;
+            break;
+        case BaseType::UInt64:
+            op = kIROp_UInt64Type;
+            break;
+        case BaseType::Half:
+            op = kIROp_HalfType;
+            break;
+        case BaseType::Float:
+            op = kIROp_FloatType;
+            break;
+        case BaseType::Double:
+            op = kIROp_DoubleType;
+            break;
+        case BaseType::Void:
+            op = kIROp_VoidType;
+            break;
+        default:
+            SLANG_UNIMPLEMENTED_X("base type to ir type");
+        }
+        auto rs = createInst<IRBasicType>(this, op, nullptr);
+        addInst(sharedBuilder->module->globalTypeBlock, rs);
+        return rs;
+    }
+
+    IRPointerType* IRBuilder::createPointerType(IRValue* baseType)
+    {
+        auto rs = createInstWithTrailingArgs<IRPointerType>(this, kIROp_PtrType, nullptr, 1, &baseType);
+        addInst(sharedBuilder->module->globalTypeBlock, rs);
+        return rs;
+    }
+
+    IRFuncType* IRBuilder::createFuncType(IRValue* retType, UInt paramCount, IRValue** params)
+    {
+        auto rs = createInstWithTrailingArgs<IRFuncType>(this, kIROp_FuncType, nullptr, retType, paramCount, params);
+        addInst(sharedBuilder->module->globalTypeBlock, rs);
+        return rs;
+    }
+
     IRValue* IRBuilder::getBoolValue(bool inValue)
     {
         IRIntegerValue value = inValue;
@@ -890,18 +942,6 @@ namespace Slang
             kIROp_decl_ref,
             nullptr);
         irValue->declRef = DeclRef<Decl>(declRef.decl, declRef.substitutions);
-        return irValue;
-    }
-
-    IRValue * IRBuilder::getTypeVal(IRType * type)
-    {
-        auto irValue = createValue<IRValue>(
-            this,
-            kIROp_TypeType,
-            nullptr);
-        irValue->type = type;
-        if (auto typetype = dynamic_cast<TypeType*>(type))
-            irValue->type = typetype->type;
         return irValue;
     }
 
@@ -1067,6 +1107,7 @@ namespace Slang
     {
         auto module = new IRModule();
         module->session = getSession();
+        module->globalTypeBlock = createBlock();
         return module;
     }
 

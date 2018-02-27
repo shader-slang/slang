@@ -72,6 +72,8 @@ Session::Session()
     addBuiltinSource(coreLanguageScope, "core", getCoreLibraryCode());
     addBuiltinSource(hlslLanguageScope, "hlsl", getHLSLLibraryCode());
     addBuiltinSource(glslLanguageScope, "glsl", getGLSLLibraryCode());
+
+    createBuiltinModule(this);
 }
 
 struct IncludeHandlerImpl : IncludeHandler

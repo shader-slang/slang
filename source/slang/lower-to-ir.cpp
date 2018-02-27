@@ -6,6 +6,7 @@
 #include "ir.h"
 #include "ir-constexpr.h"
 #include "ir-insts.h"
+#include "ir-types.h"
 #include "ir-ssa.h"
 #include "mangle.h"
 #include "type-layout.h"
@@ -81,7 +82,7 @@ struct SubscriptInfo : ExtendedValueInfo
 struct BoundSubscriptInfo : ExtendedValueInfo
 {
     DeclRef<SubscriptDecl>  declRef;
-    RefPtr<Type>            type;
+    IRType*                 type;
     List<IRValue*>          args;
 };
 
@@ -211,7 +212,7 @@ struct BoundMemberInfo : ExtendedValueInfo
     DeclRef<Decl> declRef;
 
     // The type of this value
-    RefPtr<Type> type;
+    IRType* type;
 };
 
 // Represents the result of a swizzle operation in
@@ -223,7 +224,7 @@ struct BoundMemberInfo : ExtendedValueInfo
 struct SwizzledLValueInfo : ExtendedValueInfo
 {
     // The type of the expression.
-    RefPtr<Type>    type;
+    IRType*    type;
 
     // The base expression (this should be an l-value)
     LoweredValInfo  base;
@@ -271,13 +272,96 @@ LoweredValInfo LoweredValInfo::swizzledLValue(
     return info;
 }
 
+struct TypeCreateInfo
+{
+    enum class TypeCreateOp
+    {
+        BaseType,
+        Specialize, // a specialization of an existing generic type
+        Array, Pointer, In, InOut, Out,
+        Func
+    };
+    TypeCreateOp op;
+    BaseType baseType = BaseType::Void;
+    List<IRValue*> params;
+    int GetHashCode()
+    {
+        int hash = (int)(op);
+        hash = combineHash(hash, (int)(baseType) << 8);
+        for (auto p : params)
+            hash = combineHash(hash, Slang::GetHashCode(p));
+        return hash;
+    }
+    bool operator == (const TypeCreateInfo& other)
+    {
+        if (op != other.op)
+            return false;
+        if (baseType != other.baseType)
+            return false;
+        if (params.Count() != other.params.Count())
+            return false;
+        for (UInt i = 0; i < params.Count(); i++)
+        {
+            if (params[i] != other.params[i])
+                return false;
+        }
+        return true;
+    }
+
+    template<typename ... TParams>
+    static TypeCreateInfo createImpl(TypeCreateOp op, TParams... params)
+    {
+        TypeCreateInfo info;
+        info.op = op;
+        info.params = List<IRValue*>{ params... };
+        return info;
+    }
+    static TypeCreateInfo createArray(IRValue* baseType, IRValue* size)
+    {
+        return createImpl(TypeCreateOp::Array, baseType, size);
+    }
+    static TypeCreateInfo createPointer(IRValue* baseType)
+    {
+        return createImpl(TypeCreateOp::Pointer, baseType);
+    }
+    static TypeCreateInfo createIn(IRValue* baseType)
+    {
+        return createImpl(TypeCreateOp::In, baseType);
+    }
+    static TypeCreateInfo createOut(IRValue* baseType)
+    {
+        return createImpl(TypeCreateOp::Out, baseType);
+    }
+    static TypeCreateInfo createInOut(IRValue* baseType)
+    {
+        return createImpl(TypeCreateOp::InOut, baseType);
+    }
+    static TypeCreateInfo createBaseType(BaseType t)
+    {
+        TypeCreateInfo info;
+        info.op = TypeCreateOp::BaseType;
+        info.baseType = t;
+        return info;
+    }
+    static TypeCreateInfo createFunc(IRValue* retType, UInt paramCount, IRValue** paramTypes)
+    {
+        TypeCreateInfo info;
+        info.op = TypeCreateOp::Func;
+        for (UInt i = 0; i < paramCount; i++)
+            info.params.Add(paramTypes[i]);
+        return info;
+    }
+};
+
 struct SharedIRGenContext
 {
     CompileRequest* compileRequest;
     ModuleDecl*     mainModuleDecl;
 
     Dictionary<Decl*, LoweredValInfo> declValues;
-
+    
+    // types we have already created
+    Dictionary<TypeCreateInfo, IRType*> typeValues;
     // Arrays we keep around strictly for memory-management purposes:
 
     // Any extended values created during lowering need
@@ -502,7 +586,8 @@ LoweredValInfo emitWitnessTableRef(
                     // and generate specialize instruction
                     srcDeclRef.substitutions = SubstitutionSet();
                 }
-                witnessTableVal = context->irBuilder->emitFindWitnessTable(srcDeclRef, mbrExpr->declRef.As<TypeConstraintDecl>().getDecl()->getSup().type);
+                witnessTableVal = context->irBuilder->emitFindWitnessTable(srcDeclRef, 
+                    lowerType(context, mbrExpr->declRef.As<TypeConstraintDecl>().getDecl()->getSup().type));
                 return maybeEmitSpecializeInst(context, LoweredValInfo::simple(witnessTableVal), declRefType->declRef);
             }
         }
@@ -558,7 +643,7 @@ LoweredValInfo emitFuncRef(
                 RefPtr<Type> type = funcExpr->type;
                 auto loweredBaseWitnessTable = emitWitnessTableRef(context, baseMemberExpr);
                 auto loweredVal = LoweredValInfo::simple(context->irBuilder->emitLookupInterfaceMethodInst(
-                    type,
+                    lowerType(context, type),
                     loweredBaseWitnessTable.val,
                     funcDeclRef));
                 return maybeEmitSpecializeInst(context, loweredVal, funcDeclRef);
@@ -604,7 +689,7 @@ LoweredValInfo emitCallToDeclRef(
             {
                 // The `ref` accessor will return a pointer to the value, so
                 // we need to reflect that in the type of our `call` instruction.
-                RefPtr<Type> ptrType = context->getSession()->getPtrType(type);
+                auto ptrType = getPtrType(context, type);
 
                 // Rather than call `emitCallToVal` here, we make a recursive call
                 // to `emitCallToDeclRef` so that it can handle things like intrinsic-op
@@ -750,7 +835,7 @@ LoweredValInfo emitCallToDeclRef(
 
 LoweredValInfo extractField(
     IRGenContext*           context,
-    Type*                   fieldType,
+    IRType*                 fieldType,
     LoweredValInfo          base,
     DeclRef<StructField>    field)
 {
@@ -793,7 +878,7 @@ LoweredValInfo extractField(
             IRValue* irBasePtr = base.val;
             return LoweredValInfo::ptr(
                 builder->emitFieldAddress(
-                    context->getSession()->getPtrType(fieldType),
+                    getPtrType(context, fieldType),
                     irBasePtr,
                     builder->getDeclRefVal(field)));
         }
@@ -901,38 +986,16 @@ IRValue* getSimpleVal(IRGenContext* context, LoweredValInfo lowered)
     }
 }
 
-struct LoweredTypeInfo
-{
-    enum class Flavor
-    {
-        None,
-        Simple,
-    };
-
-    RefPtr<IRType> type;
-    Flavor flavor;
-
-    LoweredTypeInfo()
-    {
-        flavor = Flavor::None;
-    }
-
-    LoweredTypeInfo(IRType* t)
-    {
-        flavor = Flavor::Simple;
-        type = t;
-    }
-};
-
-RefPtr<Type> getSimpleType(LoweredTypeInfo lowered)
+IRType* getSimpleType(LoweredValInfo lowered)
 {
     switch(lowered.flavor)
     {
-    case LoweredTypeInfo::Flavor::None:
+    case LoweredValInfo::Flavor::None:
         return nullptr;
 
-    case LoweredTypeInfo::Flavor::Simple:
-        return lowered.type;
+    case LoweredValInfo::Flavor::Simple:
+        assert(lowered.val->op > kIROp_TypeType);
+        return (IRType*)lowered.val;
 
     default:
         SLANG_UNEXPECTED("unhandled value flavor");
@@ -952,11 +1015,11 @@ IRValue* lowerSimpleVal(
     return getSimpleVal(context, lowered);
 }
 
-LoweredTypeInfo lowerType(
+IRType* lowerType(
     IRGenContext*   context,
     Type*           type);
 
-static LoweredTypeInfo lowerType(
+static IRType* lowerType(
     IRGenContext*   context,
     QualType const& type)
 {
@@ -964,20 +1027,18 @@ static LoweredTypeInfo lowerType(
 }
 
 // Lower a type and expect the result to be simple
-RefPtr<Type> lowerSimpleType(
+IRType* lowerSimpleType(
     IRGenContext*   context,
     Type*           type)
 {
-    auto lowered = lowerType(context, type);
-    return getSimpleType(lowered);
+    return lowerType(context, type);
 }
 
-RefPtr<Type> lowerSimpleType(
+IRType* lowerSimpleType(
     IRGenContext*   context,
     QualType const& type)
 {
-    auto lowered = lowerType(context, type);
-    return getSimpleType(lowered);
+    return lowerType(context, type);
 }
 
 LoweredValInfo lowerLValueExpr(
@@ -1001,32 +1062,57 @@ LoweredValInfo lowerDecl(
     IRGenContext*   context,
     DeclBase*       decl);
 
+IRType* getBuiltinType(IRGenContext* context, BaseType t)
+{
+    TypeCreateInfo info = TypeCreateInfo::createBaseType(t);
+    IRType* extType = nullptr;
+    if (context->shared->typeValues.TryGetValue(info, extType))
+        return (IRFuncType*)extType;
+    IRBasicType* baseType = context->irBuilder->createBasicType(t);
+    context->shared->typeValues[info] = baseType;
+    return baseType;
+}
+
 IRType* getIntType(
     IRGenContext* context)
 {
-    return context->getSession()->getBuiltinType(BaseType::Int);
+    return getBuiltinType(context, BaseType::Int);
 }
 
-RefPtr<IRFuncType> getFuncType(
+IRPointerType* getPtrType(IRGenContext* context, IRType* baseType)
+{
+    auto info = TypeCreateInfo::createPointer(baseType);
+    IRType* extType = nullptr;
+    if (context->shared->typeValues.TryGetValue(info, extType))
+        return (IRPointerType*)extType;
+    auto ptrType = context->irBuilder->createPointerType(baseType);
+    context->shared->typeValues[info] = ptrType;
+    return ptrType;
+}
+
+IRFuncType* getFuncType(
     IRGenContext*           context,
     UInt                    paramCount,
-    RefPtr<IRType>  const*  paramTypes,
+    IRType**                paramTypes,
     IRType*                 resultType)
 {
-    RefPtr<FuncType> funcType = new FuncType();
-    funcType->setSession(context->getSession());
-    funcType->resultType = resultType;
-    for (UInt pp = 0; pp < paramCount; ++pp)
-    {
-        funcType->paramTypes.Add(paramTypes[pp]);
-    }
+    auto info = TypeCreateInfo::createFunc(resultType, paramCount, (IRValue**)paramTypes);
+    IRType* extType = nullptr;
+    if (context->shared->typeValues.TryGetValue(info, extType))
+        return (IRFuncType*)extType;
+    IRFuncType* funcType = context->irBuilder->createFuncType(resultType, paramCount, (IRValue**)paramTypes);
+    context->shared->typeValues[info] = (IRType*)funcType;
     return funcType;
+}
+
+IRStructType* getTypeForDecl(IRGenContext* context, Decl* decl)
+{
 }
 
 SubstitutionSet lowerSubstitutions(IRGenContext* context, SubstitutionSet subst);
 //
 
-struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, LoweredTypeInfo>
+struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, IRType*>
 {
     IRGenContext* context;
 
@@ -1046,19 +1132,20 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return LoweredValInfo::simple(getBuilder()->getIntValue(type, val->value));
     }
 
-    LoweredTypeInfo visitType(Type* type)
+    IRType* visitType(Type* type)
     {
-        // TODO(tfoley): Now that we use the AST types directly in the IR, there
-        // isn't much to do in the "lowering" step. Still, there might be cases
-        // where certain kinds of legalization need to take place, so this
-        // visitor setup might still be needed in the long run.
-        return LoweredTypeInfo(type);
-//        SLANG_UNIMPLEMENTED_X("type lowering");
+        SLANG_UNIMPLEMENTED_X("type lowering");
     }
 
-    LoweredTypeInfo visitFuncType(FuncType* type)
+    IRType* visitFuncType(FuncType* type)
     {
-        return LoweredTypeInfo(type);
+        auto rsType = this->dispatchType(type->getResultType());
+        List<IRType*> paramTypes;
+        for (UInt i = 0; i < type->getParamCount(); i++)
+        {
+            paramTypes.Add(this->dispatchType(type->getParamType(i)));
+        }
+        return getFuncType(context, paramTypes.Count(), paramTypes.Buffer(), rsType);
     }
 
     void addGenericArgs(List<IRValue*>* ioArgs, DeclRefBase declRef)
@@ -1074,7 +1161,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         }
     }
 
-    LoweredTypeInfo visitDeclRefType(DeclRefType* type)
+    IRType* visitDeclRefType(DeclRefType* type)
     {
         // If the type in question comes from the module we are
         // trying to lower, then we need to make sure to
@@ -1121,18 +1208,18 @@ LoweredValInfo lowerVal(
     return visitor.dispatch(val);
 }
 
-LoweredTypeInfo lowerType(
+IRType* lowerType(
     IRGenContext*   context,
     Type*           type)
 {
     ValLoweringVisitor visitor;
     visitor.context = context;
-    return visitor.dispatchType(type);
+    return (IRType*)(visitor.dispatchType(type).val);
 }
 
 LoweredValInfo createVar(
     IRGenContext*   context,
-    RefPtr<Type>    type,
+    IRType*         type,
     Decl*           decl = nullptr)
 {
     auto builder = context->irBuilder;
@@ -2797,7 +2884,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitTypeDefDecl(TypeDefDecl * decl)
     {
-        return LoweredValInfo::simple(context->irBuilder->getTypeVal(decl->type.type));
+        return lowerType(context, decl->type.type);
     }
 
     LoweredValInfo visitGenericTypeParamDecl(GenericTypeParamDecl* /*decl*/)
@@ -3571,7 +3658,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         trySetMangledName(irFunc, decl);
 
-        List<RefPtr<Type>> paramTypes;
+        List<IRType*> paramTypes;
 
         // We first need to walk the generic parameters (if any)
         // because these will influence the declared type of
@@ -3587,7 +3674,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         irFunc->specializedGenericLevel = (int)irFunc->genericDecls.Count() - 1;
         for( auto paramInfo : parameterLists.params )
         {
-            RefPtr<Type> irParamType = lowerSimpleType(context, paramInfo.type);
+            IRType* irParamType = lowerSimpleType(context, paramInfo.type);
 
             switch( paramInfo.direction )
             {
@@ -3600,10 +3687,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // the IR, but we will use a specialized pointer
             // type that encodes the parameter direction information.
             case kParameterDirection_Out:
-                irParamType = context->getSession()->getOutType(irParamType);
+                irParamType = getOutType(context, irParamType);
                 break;
             case kParameterDirection_InOut:
-                irParamType = context->getSession()->getInOutType(irParamType);
+                irParamType = getInOutType(context, irParamType);
                 break;
 
             default:

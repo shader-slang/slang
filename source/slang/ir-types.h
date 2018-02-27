@@ -6,21 +6,19 @@
 
 namespace Slang
 {
-    struct IRBasicType : public IRType
-    {
-        BaseType type;
-    };
+    struct IRBasicType : public IRType {};
+
     struct IRBuiltinGenericType : public IRType
     {
         IRUse elementType;
     };
     struct IRVectorType : public IRBuiltinGenericType
     {
-        int vectorSize;
+        IRUse vectorSize;
     };
     struct IRMatrixType : public IRBuiltinGenericType
     {
-        int rows, cols;
+        IRUse rows, cols;
     };
     struct IRArrayType : public IRBuiltinGenericType
     {
@@ -32,7 +30,14 @@ namespace Slang
         IRType* getParameterType(uint32_t i);
         int getParameterCount();
     };
-    
+    struct IRStructType : public IRType
+    {
+    };
+    struct IRRateQualifiedType : public IRType
+    {
+        IRUse rate;
+        IRUse valueType;
+    };
     struct IRTextureBaseType : public IRBuiltinGenericType
     {
     public:
