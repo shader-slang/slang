@@ -246,6 +246,9 @@ namespace Slang
 
         String path = getStdlibPath();
 
+#define SLANG_RAW(TEXT) sb << TEXT;
+#define SLANG_SPLICE(EXPR) sb << (EXPR);
+
 #define EMIT_LINE_DIRECTIVE() sb << "#line " << (__LINE__+1) << " \"" << path << "\"\n"
 
         #include "core.meta.slang.h"

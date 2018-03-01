@@ -1,7 +1,5 @@
-sb << "// Slang GLSL compatibility library\n";
-sb << "\n";
-sb << "";
-
+SLANG_RAW("// Slang GLSL compatibility library\n")
+SLANG_RAW("\n")
 
 static const struct {
     char const* name;
@@ -200,7 +198,5 @@ sb << "syntax writeonly : GLSLWriteOnlyModifier;\n";
 
 // We will treat `subroutine` as a qualifier for now
 sb << "syntax subroutine : SimpleModifier;\n";
-
-
-
-sb << "";
+SLANG_RAW("\n")
+SLANG_RAW("\n")

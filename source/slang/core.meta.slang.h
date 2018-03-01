@@ -1,39 +1,38 @@
-sb << "// Slang `core` library\n";
-sb << "\n";
-sb << "// Modifier for variables that must resolve to compile-time constants\n";
-sb << "// as part of translation.\n";
-sb << "syntax constexpr : ConstExprModifier;\n";
-sb << "\n";
-sb << "// A type that can be used as an operand for builtins\n";
-sb << "interface __BuiltinType {}\n";
-sb << "\n";
-sb << "// A type that can be used for arithmetic operations\n";
-sb << "interface __BuiltinArithmeticType : __BuiltinType {}\n";
-sb << "\n";
-sb << "// A type that logically has a sign (positive/negative/zero)\n";
-sb << "interface __BuiltinSignedArithmeticType : __BuiltinArithmeticType {}\n";
-sb << "\n";
-sb << "// A type that can represent integers\n";
-sb << "interface __BuiltinIntegerType : __BuiltinArithmeticType\n";
-sb << "{}\n";
-sb << "\n";
-sb << "// A type that can represent non-integers\n";
-sb << "interface __BuiltinRealType : __BuiltinArithmeticType {}\n";
-sb << "\n";
-sb << "// A type that uses a floating-point representation\n";
-sb << "interface __BuiltinFloatingPointType : __BuiltinRealType, __BuiltinSignedArithmeticType\n";
-sb << "{\n";
-sb << "    // A builtin floating-point type must have an initializer that takes\n";
-sb << "    // a floating-point value...\n";
-sb << "    __init(float value);\n";
-sb << "}\n";
-sb << "\n";
-sb << "__generic<T,U> __intrinsic_op(Sequence) U operator,(T left, U right);\n";
-sb << "\n";
-sb << "__generic<T> __intrinsic_op(select) T operator?:(bool condition, T ifTrue, T ifFalse);\n";
-sb << "__generic<T, let N : int> __intrinsic_op(select) vector<T,N> operator?:(vector<bool,N> condition, vector<T,N> ifTrue, vector<T,N> ifFalse);\n";
-sb << "\n";
-sb << "";
+SLANG_RAW("// Slang `core` library\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Modifier for variables that must resolve to compile-time constants\n")
+SLANG_RAW("// as part of translation.\n")
+SLANG_RAW("syntax constexpr : ConstExprModifier;\n")
+SLANG_RAW("\n")
+SLANG_RAW("// A type that can be used as an operand for builtins\n")
+SLANG_RAW("interface __BuiltinType {}\n")
+SLANG_RAW("\n")
+SLANG_RAW("// A type that can be used for arithmetic operations\n")
+SLANG_RAW("interface __BuiltinArithmeticType : __BuiltinType {}\n")
+SLANG_RAW("\n")
+SLANG_RAW("// A type that logically has a sign (positive/negative/zero)\n")
+SLANG_RAW("interface __BuiltinSignedArithmeticType : __BuiltinArithmeticType {}\n")
+SLANG_RAW("\n")
+SLANG_RAW("// A type that can represent integers\n")
+SLANG_RAW("interface __BuiltinIntegerType : __BuiltinArithmeticType\n")
+SLANG_RAW("{}\n")
+SLANG_RAW("\n")
+SLANG_RAW("// A type that can represent non-integers\n")
+SLANG_RAW("interface __BuiltinRealType : __BuiltinArithmeticType {}\n")
+SLANG_RAW("\n")
+SLANG_RAW("// A type that uses a floating-point representation\n")
+SLANG_RAW("interface __BuiltinFloatingPointType : __BuiltinRealType, __BuiltinSignedArithmeticType\n")
+SLANG_RAW("{\n")
+SLANG_RAW("    // A builtin floating-point type must have an initializer that takes\n")
+SLANG_RAW("    // a floating-point value...\n")
+SLANG_RAW("    __init(float value);\n")
+SLANG_RAW("}\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T,U> __intrinsic_op(Sequence) U operator,(T left, U right);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T> __intrinsic_op(select) T operator?:(bool condition, T ifTrue, T ifFalse);\n")
+SLANG_RAW("__generic<T, let N : int> __intrinsic_op(select) vector<T,N> operator?:(vector<bool,N> condition, vector<T,N> ifTrue, vector<T,N> ifFalse);\n")
+SLANG_RAW("\n")
 
 // We are going to use code generation to produce the
 // declarations for all of our base types.
@@ -98,27 +97,23 @@ for (int tt = 0; tt < kBaseTypeCount; ++tt)
 
 // Declare built-in pointer type
 // (eventually we can have the traditional syntax sugar for this)
-
-sb << "\n";
-sb << "\n";
-sb << "__generic<T>\n";
-sb << "__magic_type(PtrType)\n";
-sb << "struct Ptr\n";
-sb << "{};\n";
-sb << "\n";
-sb << "__generic<T>\n";
-sb << "__magic_type(OutType)\n";
-sb << "struct Out\n";
-sb << "{};\n";
-sb << "\n";
-sb << "__generic<T>\n";
-sb << "__magic_type(InOutType)\n";
-sb << "struct InOut\n";
-sb << "{};\n";
-sb << "\n";
-sb << "";
-
-
+SLANG_RAW("\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T>\n")
+SLANG_RAW("__magic_type(PtrType)\n")
+SLANG_RAW("struct Ptr\n")
+SLANG_RAW("{};\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T>\n")
+SLANG_RAW("__magic_type(OutType)\n")
+SLANG_RAW("struct Out\n")
+SLANG_RAW("{};\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T>\n")
+SLANG_RAW("__magic_type(InOutType)\n")
+SLANG_RAW("struct InOut\n")
+SLANG_RAW("{};\n")
+SLANG_RAW("\n")
 
 // Declare vector and matrix types
 
@@ -134,18 +129,12 @@ sb << "    __init(T value);\n";
 sb << "    __init(vector<T,N> value);\n";
 
 sb << "};\n";
-
-// TODO: Probably need to do similar
-sb << "\n";
-sb << "\n";
-sb << "__generic<T = float, let R : int = 4, let C : int = 4>\n";
-sb << "__magic_type(Matrix)\n";
-sb << "struct matrix {};\n";
-sb << "\n";
-sb << "";
-
-
-
+SLANG_RAW("\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T = float, let R : int = 4, let C : int = 4>\n")
+SLANG_RAW("__magic_type(Matrix)\n")
+SLANG_RAW("struct matrix {};\n")
+SLANG_RAW("\n")
 
 static const struct {
     char const* name;
@@ -693,7 +682,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
             {
                 // `Sample()`
 
-                sb << "__target_intrinsic(glsl, \"texture($p, $2)\")\n";
+                sb << "__target_intrinsic(glsl, \"texture($P, $2)\")\n";
 
                 // TODO: only enable if IR is being used?
 //                sb << "__intrinsic_op(sample)\n";
@@ -703,7 +692,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
                 if( baseShape != TextureFlavor::Shape::ShapeCube )
                 {
-                    sb << "__target_intrinsic(glsl, \"textureOffset($p, $2, $3)\")\n";
+                    sb << "__target_intrinsic(glsl, \"textureOffset($P, $2, $3)\")\n";
                     sb << "T Sample(SamplerState s, ";
                     sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                     sb << "constexpr int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
@@ -727,13 +716,13 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
 
                 // `SampleBias()`
-                sb << "__target_intrinsic(glsl, \"texture($p, $2, $3)\")\n";
+                sb << "__target_intrinsic(glsl, \"texture($P, $2, $3)\")\n";
                 sb << "T SampleBias(SamplerState s, ";
                 sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, float bias);\n";
 
                 if( baseShape != TextureFlavor::Shape::ShapeCube )
                 {
-                    sb << "__target_intrinsic(glsl, \"textureOffset($p, $2, $3, $4)\")\n";
+                    sb << "__target_intrinsic(glsl, \"textureOffset($P, $2, $3, $4)\")\n";
                     sb << "T SampleBias(SamplerState s, ";
                     sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, float bias, ";
                     sb << "constexpr int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
@@ -754,7 +743,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                     if (extCoordCount < 3)
                         extCoordCount = 3;
 
-                    sb << "__target_intrinsic(glsl, \"textureLod($p, ";
+                    sb << "__target_intrinsic(glsl, \"textureLod($P, ";
 
                     sb << "vec" << extCoordCount << "($2,";
                     for (int ii = arrCoordCount; ii < extCoordCount - 1; ++ii)
@@ -772,7 +761,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                     if (extCoordCount < 3)
                         extCoordCount = 3;
 
-                    sb << "__target_intrinsic(glsl, \"textureGrad($p, ";
+                    sb << "__target_intrinsic(glsl, \"textureGrad($P, ";
 
                     sb << "vec" << extCoordCount << "($2,";
                     for (int ii = arrCoordCount; ii < extCoordCount - 1; ++ii)
@@ -812,7 +801,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 }
 
 
-                sb << "__target_intrinsic(glsl, \"textureGrad($p, $2, $3, $4)\")\n";
+                sb << "__target_intrinsic(glsl, \"textureGrad($P, $2, $3, $4)\")\n";
 //                sb << "__intrinsic_op(sampleGrad)\n";
                 sb << "T SampleGrad(SamplerState s, ";
                 sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
@@ -822,7 +811,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
                 if( baseShape != TextureFlavor::Shape::ShapeCube )
                 {
-                    sb << "__target_intrinsic(glsl, \"textureGradOffset($p, $2, $3, $4, $5)\")\n";
+                    sb << "__target_intrinsic(glsl, \"textureGradOffset($P, $2, $3, $4, $5)\")\n";
 //                    sb << "__intrinsic_op(sampleGrad)\n";
                     sb << "T SampleGrad(SamplerState s, ";
                     sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
@@ -833,14 +822,14 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
                 // `SampleLevel`
 
-                sb << "__target_intrinsic(glsl, \"textureLod($p, $2, $3)\")\n";
+                sb << "__target_intrinsic(glsl, \"textureLod($P, $2, $3)\")\n";
                 sb << "T SampleLevel(SamplerState s, ";
                 sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                 sb << "float level);\n";
 
                 if( baseShape != TextureFlavor::Shape::ShapeCube )
                 {
-                    sb << "__target_intrinsic(glsl, \"textureLodOffset($p, $2, $3, $4)\")\n";
+                    sb << "__target_intrinsic(glsl, \"textureLodOffset($P, $2, $3, $4)\")\n";
                     sb << "T SampleLevel(SamplerState s, ";
                     sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                     sb << "float level, ";
@@ -907,12 +896,12 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
                     EMIT_LINE_DIRECTIVE();
                             
-                    sb << "__target_intrinsic(glsl, \"textureGather($p, $2, " << componentIndex << ")\")\n";
+                    sb << "__target_intrinsic(glsl, \"textureGather($P, $2, " << componentIndex << ")\")\n";
                     sb << "vector<T, 4> Gather" << componentName << "(SamplerState s, ";
                     sb << "float" << kBaseTextureTypes[tt].coordCount << " location);\n";
 
                     EMIT_LINE_DIRECTIVE();
-                    sb << "__target_intrinsic(glsl, \"textureGatherOffset($p, $2, $3, " << componentIndex << ")\")\n";
+                    sb << "__target_intrinsic(glsl, \"textureGatherOffset($P, $2, $3, " << componentIndex << ")\")\n";
                     sb << "vector<T, 4> Gather" << componentName << "(SamplerState s, ";
                     sb << "float" << kBaseTextureTypes[tt].coordCount << " location, ";
                     sb << "constexpr int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
@@ -924,7 +913,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                     sb << "out uint status);\n";
 
                     EMIT_LINE_DIRECTIVE();
-                    sb << "__target_intrinsic(glsl, \"textureGatherOffsets($p, $2, int" << kBaseTextureTypes[tt].coordCount << "[]($3, $4, $5, $6), " << componentIndex << ")\")\n";
+                    sb << "__target_intrinsic(glsl, \"textureGatherOffsets($P, $2, int" << kBaseTextureTypes[tt].coordCount << "[]($3, $4, $5, $6), " << componentIndex << ")\")\n";
                     sb << "vector<T, 4> Gather" << componentName << "(SamplerState s, ";
                     sb << "float" << kBaseTextureTypes[tt].coordCount << " location, ";
                     sb << "int" << kBaseTextureTypes[tt].coordCount << " offset1, ";
@@ -1038,6 +1027,4 @@ for (auto op : binaryOps)
         sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << leftQual << "matrix<" << leftType << ",N,M> left, " << rightType << " right);\n";
     }
 }
-
-sb << "\n";
-sb << "";
+SLANG_RAW("\n")

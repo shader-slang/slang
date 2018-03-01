@@ -6,73 +6,62 @@
 #include <string.h>
 #include "../../source/core/secure-crt.h"
 
-struct StringSpan
-{
-    char const* begin;
-    char const* end;
-};
+#include "../../source/core/list.h"
+#include "../../source/core/slang-string.h"
 
-StringSpan makeEmptySpan()
-{
-    StringSpan span = { 0, 0 };
-    return span;
-}
+using namespace Slang;
 
-StringSpan makeSpan(char const* begin, char const* end)
-{
-    StringSpan span;
-    span.begin = begin;
-    span.end = end;
-    return span;
-}
+typedef Slang::UnownedStringSlice StringSpan;
 
 struct Node
 {
-    // The textual range covered by this node
-    // (does not including the opening sigil)
+    enum class Flavor
+    {
+        text,   // Ordinary text to write to output
+        escape, // Meta-level code (statements)
+        splice, // Meta-level expression to splice into output
+    };
+
+    // What sort of node is this?
+    Flavor      flavor;
+
+    // The text of this node for `Flavor::text`
     StringSpan  span;
 
-    // The textual range of the identifier
-    // part of this node (if any)
-    StringSpan  id;
+    // The body of this node for other flavors
+    Node*       body;
 
-    // The textual range of the body part of
-    // this node (if any)
-    StringSpan  body;
-
-    // The parent of this node
-    Node*       parent;
-
-    // The first child node of this node
-    Node*       firstChild;
-
-    // The next node belonging to the same parent
-    Node*       nextSibling;
+    // The next node in the document
+    Node*       next;
 };
 
-struct NodeBuilder
+void addNode(
+    Node**&         ioLink,
+    Node::Flavor    flavor,
+    char const*     spanBegin,
+    char const*     spanEnd)
 {
-    Node*           node;
-    Node**          childLink;
-    unsigned int    curlyCount;
-    unsigned int    nestedCurlyCount;
-};
+    Node* node = new Node();
+    node->flavor = flavor;
+    node->span = StringSpan(spanBegin, spanEnd);
+    node->next = nullptr;
 
-Node* createNode()
-{
-    Node* result = (Node*) malloc(sizeof(Node));
-    memset(result, 0, sizeof(Node));
-    return result;
+    *ioLink = node;
+    ioLink = &node->next;
 }
 
 void addNode(
-    NodeBuilder*    builder,
-    Node*           node)
+    Node**&         ioLink,
+    Node::Flavor    flavor,
+    Node*           body)
 {
-    node->parent = builder->node;
+    Node* node = new Node();
+    node->flavor = flavor;
+    node->body = body;
+    node->next = nullptr;
 
-    *builder->childLink = node;
-    builder->childLink = &node->nextSibling;
+    *ioLink = node;
+    ioLink = &node->next;
 }
 
 bool isAlpha(int c)
@@ -82,194 +71,354 @@ bool isAlpha(int c)
         || (c == '_');
 }
 
-Node* readInput(
-    char const* inputBegin,
-    char const* inputEnd)
+void addTextSpan(
+    Node**&         ioLink,
+    char const*     spanBegin,
+    char const*     spanEnd)
 {
-    static const int kMaxDepth = 16;
-    NodeBuilder nodeStack[kMaxDepth];
-    NodeBuilder* nodeStackEnd = &nodeStack[kMaxDepth];
+    // Don't add an empty text span.
+    if (spanBegin == spanEnd)
+        return;
 
-    Node* root = createNode();
-    root->span.begin = inputBegin;
-    root->span.end = inputEnd;
-    root->body = root->span;
+    addNode(ioLink, Node::Flavor::text, spanBegin, spanEnd);
+}
 
-    NodeBuilder* builder = &nodeStack[0];
+void addSpliceSpan(
+    Node**&         ioLink,
+    Node*           body)
+{
+    addNode(ioLink, Node::Flavor::splice, body);
+}
 
-    builder->node = root;
-    builder->childLink = &root->firstChild;
-    builder->curlyCount = (unsigned int)(-1);
-    builder->nestedCurlyCount = 0;
+void addEscapeSpan(
+    Node**&         ioLink,
+    Node*           body)
+{
+    addNode(ioLink, Node::Flavor::escape, body);
+}
 
-    char const* cursor = inputBegin;
+void addEscapeSpan(
+    Node**&         ioLink,
+    char const*     spanBegin,
+    char const*     spanEnd)
+{
+    Node* body = nullptr;
+    Node** link = &body;
 
-    for(;;)
+    addTextSpan(link, spanBegin, spanEnd);
+
+    return addEscapeSpan(ioLink, body);
+}
+
+bool isIdentifierChar(int c)
+{
+    if (c >= 'a' && c <= 'z')   return true;
+    if (c >= 'A' && c <= 'Z')   return true;
+    if (c == '_')               return true;
+
+    return false;
+
+}
+
+struct Reader
+{
+    char const* cursor;
+    char const* end;
+};
+
+int peek(Reader const& reader)
+{
+    if (reader.cursor == reader.end)
+        return EOF;
+
+    return *reader.cursor;
+}
+
+int get(Reader& reader)
+{
+    if (reader.cursor == reader.end)
+        return -1;
+
+    return *reader.cursor++;
+}
+
+void handleNewline(Reader& reader, int c)
+{
+    int d = peek(reader);
+    if ((c ^ d) == ('\r' ^ '\n'))
     {
-        int c = *cursor;
-        switch(c)
+        get(reader);
+    }
+}
+
+bool isHorizontalSpace(int c)
+{
+    return (c == ' ') || (c == '\t');
+}
+
+void skipHorizontalSpace(Reader& reader)
+{
+    while (isHorizontalSpace(peek(reader)))
+        get(reader);
+}
+
+void skipOptionalNewline(Reader& reader)
+{
+    switch (peek(reader))
+    {
+    default:
+        break;
+
+    case '\r': case '\n':
+        {
+            int c = get(reader);
+            handleNewline(reader, c);
+        }
+        break;
+    }
+}
+
+typedef unsigned int NodeReadFlags;
+enum
+{
+    kNodeReadFlag_AllowEscape = 1 << 0,
+};
+
+Node* readBody(
+    Reader&         reader,
+    NodeReadFlags   flags,
+    char            openChar,
+    int             openCount,
+    char            closeChar)
+{
+    while (peek(reader) == openChar)
+    {
+        get(reader);
+        openCount++;
+    }
+
+    Node* nodes = nullptr;
+    Node** link = &nodes;
+
+    bool atStartOfLine = true;
+    int depth = 0;
+
+    char const* spanBegin = reader.cursor;
+    char const* lineBegin = reader.cursor;
+    for (;;)
+    {
+        int c = get(reader);
+
+        switch (c)
         {
         default:
-            // ordinary text, so we continue the current span
-            cursor++;
-            continue;
+            atStartOfLine = false;
+            break;
 
-        case 0:
-            // possible end of input
-            if(cursor == inputEnd)
+        case EOF:
             {
-                return root;
+                addTextSpan(link, spanBegin, reader.cursor);
+                return nodes;
             }
-            // Otherwise it is just an embedded NULL
-            cursor++;
-            continue;
 
-        case '$':
-            // We've hit our dedicated meta-character, which means
-            // we are being asked to do some kind of splicing.
+        case '{': case '(':
+            if (c == openChar)
             {
-                cursor++;
+                depth++;
+            }
+            atStartOfLine = false;
+            break;
 
-                switch(*cursor)
+        case ')': case '}':
+            if (c == closeChar)
+            {
+                char const* spanEnd = reader.cursor - 1;
+
+                if (openCount == 1)
                 {
-                case '$':
-                    // This is an escaped single `$`.
-                    // We need to create an empty node to
-                    // represent it
+                    if (depth == 0)
                     {
-                        Node* node = createNode();
-                        addNode(builder, node);
-                        node->span.begin = cursor;
-                        cursor++;
-                        node->span.end = cursor;
-                        continue;
+                        // We are at the end of the body.
+                        addTextSpan(link, spanBegin, spanEnd);
+                        return nodes;
                     }
 
-                case '0': case '1': case '2': case '3': case '4':
-                case '5': case '6': case '7': case '8': case '9':
-                case '\'':
-                case '\"':
-                case ')':
-                    // HACK: allow existing usage through
-                    cursor++;
-                    continue;
-
-                default:
-                    break;
-                }
-
-                Node* node = createNode();
-                addNode(builder, node);
-
-                node->span.begin = cursor-1;
-
-                char const* nodeBegin = cursor;
-
-                // Piece one is an optional "identifier" section
-                node->id.begin = cursor;
-                while( isAlpha(*cursor) )
-                {
-                    cursor++;
-                }
-                node->id.end = cursor;
-
-                // Next we have an optional `{}`-delimeted span
-                if( *cursor == '{' )
-                {
-                    unsigned int count = 0;
-                    while( *cursor == '{' )
-                    {
-                        count++;
-                        cursor++;
-                    }
-                    node->body.begin = cursor;
-
-                    assert(builder != nodeStackEnd);
-
-                    builder++;
-                    builder->node = node;
-                    builder->childLink = &node->firstChild;
-                    builder->curlyCount = count;
-                    builder->nestedCurlyCount = 0;
+                    depth--;
                 }
                 else
                 {
-                    node->body.begin = cursor;
-                    node->body.end = cursor;
-                    node->span.end = cursor;
-                }
+                    // Count how many closing chars are stacked up
 
-                continue;
+                    int closeCount = 1;
+                    while (peek(reader) == closeChar)
+                    {
+                        get(reader);
+                        closeCount++;
+                    }
+
+                    if (closeCount == openCount)
+                    {
+                        // We are at the end of the body.
+                        addTextSpan(link, spanBegin, spanEnd);
+                        return nodes;
+                    }
+                }
+            }
+            atStartOfLine = false;
+            break;
+
+
+        case ' ': case '\t':
+            break;
+
+        case '\r': case '\n':
+            {
+                addTextSpan(link, spanBegin, reader.cursor);
+
+                handleNewline(reader, c);
+
+                lineBegin = reader.cursor;
+                spanBegin = reader.cursor;
+                atStartOfLine = true;
             }
             break;
 
-        case '{':
-            builder->nestedCurlyCount++;
-            cursor++;
-            continue;
-
-        case '}':
+        case '$':
             {
-                // Possible end of an open span
+                // If this is the start of a splice, then
+                // the end of the preceding raw-text space
+                // will be the byte before `$`
+                char const* spanEnd = reader.cursor - 1;
 
-                unsigned int count = 0;
-                char const* cc = cursor;
-                while( *cc == '}' )
+                if (peek(reader) == '(')
                 {
-                    count++;
-                    cc++;
+                    // This appears to be an expression splice.
+                    //
+                    // We must end the preceding span.
+                    //
+                    addTextSpan(link, spanBegin, spanEnd);
+
+                    Node* body = readBody(
+                        reader,
+                        0,
+                        '(',
+                        0,
+                        ')');
+
+                    addSpliceSpan(link, body);
+
+                    spanBegin = reader.cursor;
+                    atStartOfLine = false;
                 }
-
-                unsigned int expected = builder->curlyCount;
-
-                if( expected == 1 )
+                else if (peek(reader) == '{')
                 {
-                    unsigned int nested = builder->nestedCurlyCount;
+                    // This is the start of a block-structured escape, which will
+                    // end at a matching `}`.
 
-                    // The user isn't guarding for unmatched braces,
-                    // so some of these braces might go to cancel
-                    // out any open braces inside this scope:
-                    if( count > nested )
-                    {
-                        // There are more available braces than our
-                        // nesting depth, so we need to close them
-                        // out and move on.
-                        cursor += builder->nestedCurlyCount;
-                        count -= builder->nestedCurlyCount;
-                        builder->nestedCurlyCount = 0;
-                    }
-                    else
-                    {
-                        // These braces are only being used to close out
-                        // nested constructs that were already opened.
-                        builder->nestedCurlyCount -= count;
-                        cursor += count;
-                        continue;
-                    }
+                    addTextSpan(link, spanBegin, lineBegin);
+
+                    Node* body = readBody(
+                        reader,
+                        0,
+                        '{',
+                        0,
+                        '}');
+
+                    addEscapeSpan(link, body);
+
+                    spanBegin = reader.cursor;
+                    atStartOfLine = false;
                 }
-
-                if(count >= expected)
+                else if (atStartOfLine && peek(reader) == ':')
                 {
-                    // There are enough braces there to close out this construct
+                    // This is a statement escape, which will
+                    // continue to the end of the line.
+                    //
+                    // The spliced text begins *after* the `:`
+                    get(reader);
+                    char const* spliceBegin = reader.cursor;
 
-                    Node* node = builder->node;
-                    node->body.end = cursor;
+                    // The preceding text span will end at the
+                    // start of this line.
+                    addTextSpan(link, spanBegin, lineBegin);
 
-                    cursor += expected;
-                    node->span.end = cursor;
+                    // Any indentation on this line will be ignored.
 
-                    builder--;
-                    continue;
+                    // Read up to end of line.
+                    for (;;)
+                    {
+                        int c = get(reader);
+                        switch (c)
+                        {
+                        default:
+                            continue;
+
+                        case EOF:
+                            break;
+
+                        case '\r':
+                        case '\n':
+                            handleNewline(reader, c);
+                            break;
+                        }
+
+                        break;
+                    }
+
+                    addEscapeSpan(link, spliceBegin, reader.cursor);
+
+                    spanBegin = reader.cursor;
+                    lineBegin = reader.cursor;
+                }
+                else if (atStartOfLine && isIdentifierChar(peek(reader)))
+                {
+                    // This is a statement splice, which will use a {}-enclosed
+                    // body for the template to generate.
+
+                    // Consume an optional identifier
+                    while (isIdentifierChar(peek(reader)))
+                        get(reader);
+
+                    // Consume optional horizontal space
+                    skipHorizontalSpace(reader);
+
+                    // Consume an optional `()`-enclosed block (strip
+                    // all but the outer-most `()`.
+
+                    // optional space/newline/space before `{`
+                    skipHorizontalSpace(reader);
+                    skipOptionalNewline(reader);
+                    skipHorizontalSpace(reader);
+
+                    throw 99;
                 }
                 else
                 {
-                    cursor += count;
-                    continue;
+                    // Doesn't seem to be a splice at all, just
+                    // a literal `$` in the output.
+                    atStartOfLine = false;
                 }
             }
+            break;
         }
-
     }
+
+}
+
+Node* readInput(
+    char const*     inputBegin,
+    char const*     inputEnd)
+{
+    Reader reader;
+    reader.cursor = inputBegin;
+    reader.end = inputEnd;
+
+    return readBody(
+        reader,
+        kNodeReadFlag_AllowEscape,
+        -2,
+        0,
+        -2);
 }
 
 void emitRaw(
@@ -328,41 +477,147 @@ void emitCode(
     }
 }
 
-void emitNode(
-    FILE*   stream,
-    Node*   node)
+void emit(
+    FILE*       stream,
+    char const* text)
 {
-    // TODO: need to look at the identifier part of the node in case
-    // there are custom instructions there...
-
-    char const* cursor = node->body.begin;
-
-    for( auto nn = node->firstChild; nn; nn = nn->nextSibling )
-    {
-        emitCode(stream, cursor, nn->span.begin);
-
-        cursor = nn->span.end;
-    }
-
-    emitCode(stream, cursor, node->body.end);
+    fprintf(stream, "%s", text);
 }
 
-void emitBody(
+void emit(
+    FILE*       stream,
+    StringSpan const&   span)
+{
+    fprintf(stream, "%.*s", int(span.end() - span.begin()), span.begin());
+}
+
+bool isASCIIPrintable(int c)
+{
+    return (c >= 0x20) && (c <= 0x7E);
+}
+
+void emitStringLiteralText(
+    FILE*               stream,
+    StringSpan const&   span)
+{
+    char const* cursor = span.begin();
+    char const* end = span.end();
+
+    while (cursor != end)
+    {
+        int c = *cursor++;
+        switch (c)
+        {
+        case '\r': case '\n':
+            fprintf(stream, "\\n");
+            break;
+
+        case '\t':
+            fprintf(stream, "\\t");
+            break;
+
+        case ' ':
+            fprintf(stream, " ");
+            break;
+
+        case '"':
+            fprintf(stream, "\\\"");
+            break;
+
+        case '\\':
+            fprintf(stream, "\\\\");
+            break;
+
+        default:
+            if (isASCIIPrintable(c))
+            {
+                fprintf(stream, "%c", c);
+            }
+            else
+            {
+                fprintf(stream, "%03u", c);
+            }
+            break;
+        }
+    }
+}
+
+void emitSimpleText(
+    FILE*               stream,
+    StringSpan const&   span)
+{
+    char const* cursor = span.begin();
+    char const* end = span.end();
+
+    while (cursor != end)
+    {
+        int c = *cursor++;
+        switch (c)
+        {
+        default:
+            fprintf(stream, "%c", c);
+            break;
+
+        case '\r': case '\n':
+            if (cursor != end)
+            {
+                int d = *cursor;
+                if ((c ^ d) == ('\r' ^ '\n'))
+                {
+                    cursor++;
+                }
+                fprintf(stream, "\n");
+            }
+            break;
+        }
+    }
+}
+
+void emitCodeNodes(
     FILE*   stream,
     Node*   node)
 {
-    char const* cursor = node->body.begin;
-
-    for( auto nn = node->firstChild; nn; nn = nn->nextSibling )
+    for (auto nn = node; nn; nn = nn->next)
     {
-        emitRaw(stream, cursor, nn->span.begin);
+        switch (nn->flavor)
+        {
+        case Node::Flavor::text:
+            emitSimpleText(stream, nn->span);
+            emit(stream, "\n");
+            break;
 
-        emitNode(stream, nn);
-
-        cursor = nn->span.end;
+        default:
+            throw "unexpected";
+            break;
+        }
     }
+}
 
-    emitRaw(stream, cursor, node->body.end);
+void emitTemplateNodes(
+    FILE*   stream,
+    Node*   node)
+{
+    for (auto nn = node; nn; nn = nn->next)
+    {
+        switch (nn->flavor)
+        {
+        case Node::Flavor::text:
+            emit(stream, "SLANG_RAW(\"");
+            emitStringLiteralText(stream, nn->span);
+            emit(stream, "\")\n");
+            break;
+
+        case Node::Flavor::splice:
+            emit(stream, "SLANG_SPLICE(");
+            emitCodeNodes(stream, nn->body);
+            emit(stream, ")\n");
+            break;
+
+        case Node::Flavor::escape:
+            emitCodeNodes(stream, nn->body);
+            break;
+        }
+    }
 }
 
 void usage(char const* appName)
@@ -406,10 +661,99 @@ void writeAllText(char const *srcFileName, char const* fileName, char* content)
     }
 }
 
+#define PARSE_HANDLER(NAME) \
+    Node* NAME(StringSpan const& text)
+
+typedef PARSE_HANDLER((*ParseHandler));
+
+PARSE_HANDLER(parseTemplateFile)
+{
+    // Read a template node!
+    return readInput(text.begin(), text.end());
+}
+
+PARSE_HANDLER(parseCxxFile)
+{
+    // TODO: "scrape" the source file for metadata
+    return nullptr;
+}
+
+PARSE_HANDLER(parseUnknownFile)
+{
+    // Don't process files we don't know how to handle.
+    return nullptr;
+}
+
+// Information about a source file
+struct SourceFile
+{
+    char const* inputPath;
+    StringSpan  text;
+    Node*       node;
+};
+
+Node* parseSourceFile(SourceFile* file)
+{
+    auto path = file->inputPath;
+    auto text = file->text;
+
+    static const struct
+    {
+        char const*     extension;
+        ParseHandler    handler;
+    } kHandlers[] =
+    {
+        { ".meta.slang",    &parseTemplateFile },
+        { ".meta.cpp",      &parseTemplateFile },
+        { ".cpp",           &parseCxxFile },
+        { "",               &parseUnknownFile },
+    };
+
+    for (auto hh : kHandlers)
+    {
+        if (UnownedTerminatedStringSlice(path).endsWith(hh.extension))
+        {
+            return hh.handler(text);
+        }
+    }
+
+    return nullptr;
+}
+
+
+
+SourceFile* parseSourceFile(char const* path)
+{
+    FILE* inputStream;
+    fopen_s(&inputStream, path, "rb");
+    fseek(inputStream, 0, SEEK_END);
+    size_t inputSize = ftell(inputStream);
+    fseek(inputStream, 0, SEEK_SET);
+
+    char* input = (char*)malloc(inputSize + 1);
+    fread(input, inputSize, 1, inputStream);
+    input[inputSize] = 0;
+
+    char const* inputEnd = input + inputSize;
+    StringSpan span = StringSpan(input, inputEnd);
+
+    SourceFile* sourceFile = new SourceFile();
+    sourceFile->inputPath = path;
+    sourceFile->text = span;
+
+    Node* node = parseSourceFile(sourceFile);
+
+    sourceFile->node = node;
+    return sourceFile;
+}
+
+List<SourceFile*> gSourceFiles;
+
 int main(
     int     argc,
     char**  argv)
 {
+    // Parse command-line arguments.
     char** argCursor = argv;
     char** argEnd = argv + argc;
 
@@ -419,61 +763,69 @@ int main(
         appName = *argCursor++;
     }
 
-    char const* inputPath = nullptr;
-    if( argCursor != argEnd )
+    char** writeCursor = argv;
+    char const* const* inputPaths = writeCursor;
+
+    while(argCursor != argEnd)
     {
-        inputPath = *argCursor++;
-    }
-    else
-    {
-        usage(appName);
-        exit(1);
+        *writeCursor++ = *argCursor++;
     }
 
-    if( argCursor != argEnd )
+    size_t inputPathCount = writeCursor - inputPaths;
+    if(inputPathCount == 0)
     {
         usage(appName);
         exit(1);
     }
 
-    // Read the contents o the file and translate it into a "template" file
-
-    FILE* inputStream;
-    fopen_s(&inputStream, inputPath, "rb");
-    fseek(inputStream, 0, SEEK_END);
-    size_t inputSize = ftell(inputStream);
-    fseek(inputStream, 0, SEEK_SET);
-
-    char* input = (char*) malloc(inputSize + 1);
-    fread(input, inputSize, 1, inputStream);
-    input[inputSize] = 0;
-
-    char const* inputEnd = input + inputSize;
-
-    Node* node = readInput(input, inputEnd);
-
-    // write output to a temporary file first
-    char outputPath[1024];
-    sprintf_s(outputPath, "%s.temp.h", inputPath);
-
-    FILE* outputStream;
-    fopen_s(&outputStream, outputPath, "w");
-
-    emitBody(outputStream, node);
-
-    fclose(outputStream);
-
-    // update final output only when content has changed
-    char outputPathFinal[1024];
-    sprintf_s(outputPathFinal, "%s.h", inputPath);
-
-    char * allTextOld = readAllText(outputPathFinal);
-    char * allTextNew = readAllText(outputPath);
-    if (strcmp(allTextNew, allTextOld) != 0)
+    if( argCursor != argEnd )
     {
-        writeAllText(inputPath, outputPathFinal, allTextNew);
+        usage(appName);
+        exit(1);
     }
-    remove(outputPath);
+
+    // Read each input file and process it according
+    // to the type of treatment it requires.
+    for (size_t ii = 0; ii < inputPathCount; ++ii)
+    {
+        char const* inputPath = inputPaths[ii];
+        SourceFile* sourceFile = parseSourceFile(inputPath);
+        if (sourceFile)
+        {
+            gSourceFiles.Add(sourceFile);
+        }
+    }
+
+    // Once all inputs have been read, we can start
+    // to produce output files by expanding templates.
+    for (auto sourceFile : gSourceFiles)
+    {
+        auto inputPath = sourceFile->inputPath;
+        auto node = sourceFile->node;
+
+        // write output to a temporary file first
+        char outputPath[1024];
+        sprintf_s(outputPath, "%s.temp.h", inputPath);
+
+        FILE* outputStream;
+        fopen_s(&outputStream, outputPath, "w");
+
+        emitTemplateNodes(outputStream, node);
+
+        fclose(outputStream);
+
+        // update final output only when content has changed
+        char outputPathFinal[1024];
+        sprintf_s(outputPathFinal, "%s.h", inputPath);
+
+        char * allTextOld = readAllText(outputPathFinal);
+        char * allTextNew = readAllText(outputPath);
+        if (strcmp(allTextNew, allTextOld) != 0)
+        {
+            writeAllText(inputPath, outputPathFinal, allTextNew);
+        }
+        remove(outputPath);
+    }
 
     return 0;
 }

@@ -1,1062 +1,1057 @@
-sb << "// Slang HLSL compatibility library\n";
-sb << "\n";
-sb << "typedef uint UINT;\n";
-sb << "\n";
-sb << "__generic<T> __magic_type(HLSLAppendStructuredBufferType) struct AppendStructuredBuffer\n";
-sb << "{\n";
-sb << "    void Append(T value);\n";
-sb << "\n";
-sb << "    void GetDimensions(\n";
-sb << "        out uint numStructs,\n";
-sb << "        out uint stride);\n";
-sb << "};\n";
-sb << "\n";
-sb << "__magic_type(HLSLByteAddressBufferType) struct ByteAddressBuffer\n";
-sb << "{\n";
-sb << "    void GetDimensions(\n";
-sb << "        out uint dim);\n";
-sb << "\n";
-sb << "    uint Load(int location);\n";
-sb << "    uint Load(int location, out uint status);\n";
-sb << "\n";
-sb << "    uint2 Load2(int location);\n";
-sb << "    uint2 Load2(int location, out uint status);\n";
-sb << "\n";
-sb << "    uint3 Load3(int location);\n";
-sb << "    uint3 Load3(int location, out uint status);\n";
-sb << "\n";
-sb << "    uint4 Load4(int location);\n";
-sb << "    uint4 Load4(int location, out uint status);\n";
-sb << "};\n";
-sb << "\n";
-sb << "__generic<T>\n";
-sb << "__magic_type(HLSLStructuredBufferType)\n";
-sb << "__intrinsic_type(";
-
-	// TODO: we really need a simple way to write an "expression splice"
-	sb << kIROp_structuredBufferType;
-sb << ")\n";
-sb << "struct StructuredBuffer\n";
-sb << "{\n";
-sb << "    void GetDimensions(\n";
-sb << "        out uint numStructs,\n";
-sb << "        out uint stride);\n";
-sb << "\n";
-sb << "    T Load(int location);\n";
-sb << "    T Load(int location, out uint status);\n";
-sb << "\n";
-sb << "    __subscript(uint index) -> T { __intrinsic_op(bufferLoad) get; };\n";
-sb << "};\n";
-sb << "\n";
-sb << "__generic<T> __magic_type(HLSLConsumeStructuredBufferType) struct ConsumeStructuredBuffer\n";
-sb << "{\n";
-sb << "    T Consume();\n";
-sb << "\n";
-sb << "    void GetDimensions(\n";
-sb << "        out uint numStructs,\n";
-sb << "        out uint stride);\n";
-sb << "};\n";
-sb << "\n";
-sb << "__generic<T, let N : int> __magic_type(HLSLInputPatchType) struct InputPatch\n";
-sb << "{\n";
-sb << "    __subscript(uint index) -> T;\n";
-sb << "};\n";
-sb << "\n";
-sb << "__generic<T, let N : int> __magic_type(HLSLOutputPatchType) struct OutputPatch\n";
-sb << "{\n";
-sb << "    __subscript(uint index) -> T;\n";
-sb << "};\n";
-sb << "\n";
-sb << "__magic_type(HLSLRWByteAddressBufferType) struct RWByteAddressBuffer\n";
-sb << "{\n";
-sb << "    // Note(tfoley): supports alll operations from `ByteAddressBuffer`\n";
-sb << "    // TODO(tfoley): can this be made a sub-type?\n";
-sb << "\n";
-sb << "    void GetDimensions(\n";
-sb << "        out uint dim);\n";
-sb << "\n";
-sb << "    uint Load(int location);\n";
-sb << "    uint Load(int location, out uint status);\n";
-sb << "\n";
-sb << "    uint2 Load2(int location);\n";
-sb << "    uint2 Load2(int location, out uint status);\n";
-sb << "\n";
-sb << "    uint3 Load3(int location);\n";
-sb << "    uint3 Load3(int location, out uint status);\n";
-sb << "\n";
-sb << "    uint4 Load4(int location);\n";
-sb << "    uint4 Load4(int location, out uint status);\n";
-sb << "\n";
-sb << "    // Added operations:\n";
-sb << "\n";
-sb << "    void InterlockedAdd(\n";
-sb << "        UINT dest,\n";
-sb << "        UINT value,\n";
-sb << "        out UINT original_value);\n";
-sb << "    void InterlockedAdd(\n";
-sb << "        UINT dest,\n";
-sb << "        UINT value);\n";
-sb << "\n";
-sb << "    void InterlockedAnd(\n";
-sb << "        UINT dest,\n";
-sb << "        UINT value,\n";
-sb << "        out UINT original_value);\n";
-sb << "    void InterlockedAnd(\n";
-sb << "        UINT dest,\n";
-sb << "        UINT value);\n";
-sb << "\n";
-sb << "    void InterlockedCompareExchange(\n";
-sb << "        UINT dest,\n";
-sb << "        UINT compare_value,\n";
-sb << "        UINT value,\n";
-sb << "        out UINT original_value);\n";
-sb << "    void InterlockedCompareExchange(\n";
-sb << "        UINT dest,\n";
-sb << "        UINT compare_value,\n";
-sb << "        UINT value);\n";
-sb << "\n";
-sb << "    void InterlockedCompareStore(\n";
-sb << "        UINT dest,\n";
-sb << "        UINT compare_value,\n";
-sb << "        UINT value);\n";
-sb << "    void InterlockedCompareStore(\n";
-sb << "        UINT dest,\n";
-sb << "        UINT compare_value);\n";
-sb << "\n";
-sb << "    void InterlockedExchange(\n";
-sb << "        UINT dest,\n";
-sb << "        UINT value,\n";
-sb << "        out UINT original_value);\n";
-sb << "    void InterlockedExchange(\n";
-sb << "        UINT dest,\n";
-sb << "        UINT value);\n";
-sb << "\n";
-sb << "    void InterlockedMax(\n";
-sb << "        UINT dest,\n";
-sb << "        UINT value,\n";
-sb << "        out UINT original_value);\n";
-sb << "    void InterlockedMax(\n";
-sb << "        UINT dest,\n";
-sb << "        UINT value);\n";
-sb << "\n";
-sb << "    void InterlockedMin(\n";
-sb << "        UINT dest,\n";
-sb << "        UINT value,\n";
-sb << "        out UINT original_value);\n";
-sb << "    void InterlockedMin(\n";
-sb << "        UINT dest,\n";
-sb << "        UINT value);\n";
-sb << "\n";
-sb << "    void InterlockedOr(\n";
-sb << "        UINT dest,\n";
-sb << "        UINT value,\n";
-sb << "        out UINT original_value);\n";
-sb << "    void InterlockedOr(\n";
-sb << "        UINT dest,\n";
-sb << "        UINT value);\n";
-sb << "\n";
-sb << "    void InterlockedXor(\n";
-sb << "        UINT dest,\n";
-sb << "        UINT value,\n";
-sb << "        out UINT original_value);\n";
-sb << "    void InterlockedXor(\n";
-sb << "        UINT dest,\n";
-sb << "        UINT value);\n";
-sb << "\n";
-sb << "    void Store(\n";
-sb << "        uint address,\n";
-sb << "        uint value);\n";
-sb << "\n";
-sb << "    void Store2(\n";
-sb << "        uint address,\n";
-sb << "        uint2 value);\n";
-sb << "\n";
-sb << "    void Store3(\n";
-sb << "        uint address,\n";
-sb << "        uint3 value);\n";
-sb << "\n";
-sb << "    void Store4(\n";
-sb << "        uint address,\n";
-sb << "        uint4 value);\n";
-sb << "};\n";
-sb << "\n";
-sb << "__generic<T>\n";
-sb << "__magic_type(HLSLRWStructuredBufferType)\n";
-sb << "__intrinsic_type(";
-
-	// TODO: we really need a simple way to write an "expression splice"
-	sb << kIROp_readWriteStructuredBufferType;
-sb << ")\n";
-sb << "struct RWStructuredBuffer\n";
-sb << "{\n";
-sb << "    uint DecrementCounter();\n";
-sb << "\n";
-sb << "    void GetDimensions(\n";
-sb << "        out uint numStructs,\n";
-sb << "        out uint stride);\n";
-sb << "\n";
-sb << "    uint IncrementCounter();\n";
-sb << "\n";
-sb << "    T Load(int location);\n";
-sb << "    T Load(int location, out uint status);\n";
-sb << "\n";
-sb << "\t__subscript(uint index) -> T\n";
-sb << "\t{\n";
-sb << "        __intrinsic_op(bufferElementRef)\n";
-sb << "        ref;\n";
-sb << "\t}\n";
-sb << "};\n";
-sb << "\n";
-sb << "__generic<T> __magic_type(HLSLPointStreamType) struct PointStream\n";
-sb << "{\n";
-sb << "    __target_intrinsic(glsl, \"EmitVertex()\")\n";
-sb << "    void Append(T value);\n";
-sb << "\n";
-sb << "    __target_intrinsic(glsl, \"EndPrimitive()\")\n";
-sb << "    void RestartStrip();\n";
-sb << "};\n";
-sb << "\n";
-sb << "__generic<T> __magic_type(HLSLLineStreamType) struct LineStream\n";
-sb << "{\n";
-sb << "    __target_intrinsic(glsl, \"EmitVertex()\")\n";
-sb << "    void Append(T value);\n";
-sb << "\n";
-sb << "    __target_intrinsic(glsl, \"EndPrimitive()\")\n";
-sb << "    void RestartStrip();\n";
-sb << "};\n";
-sb << "\n";
-sb << "__generic<T> __magic_type(HLSLTriangleStreamType) struct TriangleStream\n";
-sb << "{\n";
-sb << "    __target_intrinsic(glsl, \"EmitVertex()\")\n";
-sb << "    void Append(T value);\n";
-sb << "\n";
-sb << "    __target_intrinsic(glsl, \"EndPrimitive()\")\n";
-sb << "    void RestartStrip();\n";
-sb << "};\n";
-sb << "\n";
-sb << "// Note(tfoley): Trying to systematically add all the HLSL builtins\n";
-sb << "\n";
-sb << "// Try to terminate the current draw or dispatch call (HLSL SM 4.0)\n";
-sb << "void abort();\n";
-sb << "\n";
-sb << "// Absolute value (HLSL SM 1.0)\n";
-sb << "__generic<T : __BuiltinSignedArithmeticType> T abs(T x);\n";
-sb << "__generic<T : __BuiltinSignedArithmeticType, let N : int> vector<T,N> abs(vector<T,N> x);\n";
-sb << "__generic<T : __BuiltinSignedArithmeticType, let N : int, let M : int> matrix<T,N,M> abs(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "// Inverse cosine (HLSL SM 1.0)\n";
-sb << "__generic<T : __BuiltinFloatingPointType> T acos(T x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> acos(vector<T,N> x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> acos(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "// Test if all components are non-zero (HLSL SM 1.0)\n";
-sb << "__generic<T : __BuiltinType> bool all(T x);\n";
-sb << "__generic<T : __BuiltinType, let N : int> bool all(vector<T,N> x);\n";
-sb << "__generic<T : __BuiltinType, let N : int, let M : int> bool all(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "// Barrier for writes to all memory spaces (HLSL SM 5.0)\n";
-sb << "void AllMemoryBarrier();\n";
-sb << "\n";
-sb << "// Thread-group sync and barrier for writes to all memory spaces (HLSL SM 5.0)\n";
-sb << "void AllMemoryBarrierWithGroupSync();\n";
-sb << "\n";
-sb << "// Test if any components is non-zero (HLSL SM 1.0)\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinType>\n";
-sb << "__target_intrinsic(glsl, \"bool($0)\")\n";
-sb << "bool any(T x);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinType, let N : int>\n";
-sb << "__target_intrinsic(glsl, \"any(bvec$";
-sb << "N0($0))\")\n";
-sb << "bool any(vector<T,N> x);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinType, let N : int, let M : int>\n";
-sb << "// TODO: need to define GLSL mapping\n";
-sb << "bool any(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "\n";
-sb << "// Reinterpret bits as a double (HLSL SM 5.0)\n";
-sb << "double asdouble(uint lowbits, uint highbits);\n";
-sb << "\n";
-sb << "// Reinterpret bits as a float (HLSL SM 4.0)\n";
-sb << "float asfloat( int x);\n";
-sb << "float asfloat(uint x);\n";
-sb << "__generic<let N : int> vector<float,N> asfloat(vector< int,N> x);\n";
-sb << "__generic<let N : int> vector<float,N> asfloat(vector<uint,N> x);\n";
-sb << "__generic<let N : int, let M : int> matrix<float,N,M> asfloat(matrix< int,N,M> x);\n";
-sb << "__generic<let N : int, let M : int> matrix<float,N,M> asfloat(matrix<uint,N,M> x);\n";
-sb << "\n";
-sb << "\n";
-sb << "// Inverse sine (HLSL SM 1.0)\n";
-sb << "__generic<T : __BuiltinFloatingPointType> T asin(T x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> asin(vector<T,N> x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> asin(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "// Reinterpret bits as an int (HLSL SM 4.0)\n";
-sb << "int asint(float x);\n";
-sb << "int asint(uint x);\n";
-sb << "__generic<let N : int> vector<int,N> asint(vector<float,N> x);\n";
-sb << "__generic<let N : int> vector<int,N> asint(vector<uint,N> x);\n";
-sb << "__generic<let N : int, let M : int> matrix<int,N,M> asint(matrix<float,N,M> x);\n";
-sb << "__generic<let N : int, let M : int> matrix<int,N,M> asint(matrix<uint,N,M> x);\n";
-sb << "\n";
-sb << "// Reinterpret bits of double as a uint (HLSL SM 5.0)\n";
-sb << "void asuint(double value, out uint lowbits, out uint highbits);\n";
-sb << "\n";
-sb << "// Reinterpret bits as a uint (HLSL SM 4.0)\n";
-sb << "uint asuint(float x);\n";
-sb << "uint asuint(int x);\n";
-sb << "__generic<let N : int> vector<uint,N> asuint(vector<float,N> x);\n";
-sb << "__generic<let N : int> vector<uint,N> asuint(vector<int,N> x);\n";
-sb << "__generic<let N : int, let M : int> matrix<uint,N,M> asuint(matrix<float,N,M> x);\n";
-sb << "__generic<let N : int, let M : int> matrix<uint,N,M> asuint(matrix<int,N,M> x);\n";
-sb << "\n";
-sb << "// Inverse tangent (HLSL SM 1.0)\n";
-sb << "__generic<T : __BuiltinFloatingPointType> T atan(T x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> atan(vector<T,N> x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> atan(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinFloatingPointType>\n";
-sb << "__target_intrinsic(glsl,\"atan($0,$1)\")\n";
-sb << "T atan2(T y, T x);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int>\n";
-sb << "__target_intrinsic(glsl,\"atan($0,$1)\")\n";
-sb << "vector<T,N> atan2(vector<T,N> y, vector<T,N> x);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>\n";
-sb << "__target_intrinsic(glsl,\"atan($0,$1)\")\n";
-sb << "matrix<T,N,M> atan2(matrix<T,N,M> y, matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "// Ceiling (HLSL SM 1.0)\n";
-sb << "__generic<T : __BuiltinFloatingPointType> T ceil(T x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> ceil(vector<T,N> x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> ceil(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "\n";
-sb << "// Check access status to tiled resource\n";
-sb << "bool CheckAccessFullyMapped(uint status);\n";
-sb << "\n";
-sb << "// Clamp (HLSL SM 1.0)\n";
-sb << "__generic<T : __BuiltinArithmeticType> T clamp(T x, T min, T max);\n";
-sb << "__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> clamp(vector<T,N> x, vector<T,N> min, vector<T,N> max);\n";
-sb << "__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> clamp(matrix<T,N,M> x, matrix<T,N,M> min, matrix<T,N,M> max);\n";
-sb << "\n";
-sb << "// Clip (discard) fragment conditionally\n";
-sb << "__generic<T : __BuiltinFloatingPointType> void clip(T x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> void clip(vector<T,N> x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> void clip(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "// Cosine\n";
-sb << "__generic<T : __BuiltinFloatingPointType> T cos(T x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> cos(vector<T,N> x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> cos(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "// Hyperbolic cosine\n";
-sb << "__generic<T : __BuiltinFloatingPointType> T cosh(T x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> cosh(vector<T,N> x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> cosh(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "// Population count\n";
-sb << "__target_intrinsic(glsl, \"bitCount\")\n";
-sb << "uint countbits(uint value);\n";
-sb << "\n";
-sb << "// Cross product\n";
-sb << "__generic<T : __BuiltinArithmeticType> vector<T,3> cross(vector<T,3> x, vector<T,3> y);\n";
-sb << "\n";
-sb << "// Convert encoded color\n";
-sb << "int4 D3DCOLORtoUBYTE4(float4 x);\n";
-sb << "\n";
-sb << "// Partial-difference derivatives\n";
-sb << "__generic<T : __BuiltinFloatingPointType>\n";
-sb << "__target_intrinsic(glsl, dFdx)\n";
-sb << "T ddx(T x);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int>\n";
-sb << "__target_intrinsic(glsl, dFdx)\n";
-sb << "vector<T,N> ddx(vector<T,N> x);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>\n";
-sb << "__target_intrinsic(glsl, dFdx)\n";
-sb << "matrix<T,N,M> ddx(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinFloatingPointType>\n";
-sb << "__glsl_extension(GL_ARB_derivative_control)\n";
-sb << "__target_intrinsic(glsl, dFdxCoarse)\n";
-sb << "T ddx_coarse(T x);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int>\n";
-sb << "__glsl_extension(GL_ARB_derivative_control)\n";
-sb << "__target_intrinsic(glsl, dFdxCoarse)\n";
-sb << "vector<T,N> ddx_coarse(vector<T,N> x);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>\n";
-sb << "__glsl_extension(GL_ARB_derivative_control)\n";
-sb << "__target_intrinsic(glsl, dFdxCoarse)\n";
-sb << "matrix<T,N,M> ddx_coarse(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinFloatingPointType>\n";
-sb << "__glsl_extension(GL_ARB_derivative_control)\n";
-sb << "__target_intrinsic(glsl, dFdxFine)\n";
-sb << "T ddx_fine(T x);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int>\n";
-sb << "__glsl_extension(GL_ARB_derivative_control)\n";
-sb << "__target_intrinsic(glsl, dFdxFine)\n";
-sb << "vector<T,N> ddx_fine(vector<T,N> x);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>\n";
-sb << "__glsl_extension(GL_ARB_derivative_control)\n";
-sb << "__target_intrinsic(glsl, dFdxFine)\n";
-sb << "matrix<T,N,M> ddx_fine(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinFloatingPointType>\n";
-sb << "__target_intrinsic(glsl, dFdy)\n";
-sb << "T ddy(T x);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int>\n";
-sb << "__target_intrinsic(glsl, dFdy)\n";
-sb << "vector<T,N> ddy(vector<T,N> x);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>\n";
-sb << "__target_intrinsic(glsl, dFdy)\n";
-sb << " matrix<T,N,M> ddy(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinFloatingPointType>\n";
-sb << "__glsl_extension(GL_ARB_derivative_control)\n";
-sb << "__target_intrinsic(glsl, dFdyCoarse)\n";
-sb << "T ddy_coarse(T x);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int>\n";
-sb << "__glsl_extension(GL_ARB_derivative_control)\n";
-sb << "__target_intrinsic(glsl, dFdyCoarse)\n";
-sb << "vector<T,N> ddy_coarse(vector<T,N> x);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>\n";
-sb << "__glsl_extension(GL_ARB_derivative_control)\n";
-sb << "__target_intrinsic(glsl, dFdyCoarse)\n";
-sb << "matrix<T,N,M> ddy_coarse(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinFloatingPointType>\n";
-sb << "__glsl_extension(GL_ARB_derivative_control)\n";
-sb << "__target_intrinsic(glsl, dFdyFine)\n";
-sb << "T ddy_fine(T x);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int>\n";
-sb << "__glsl_extension(GL_ARB_derivative_control)\n";
-sb << "__target_intrinsic(glsl, dFdyFine)\n";
-sb << "vector<T,N> ddy_fine(vector<T,N> x);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>\n";
-sb << "__glsl_extension(GL_ARB_derivative_control)\n";
-sb << "__target_intrinsic(glsl, dFdyFine)\n";
-sb << "matrix<T,N,M> ddy_fine(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "\n";
-sb << "// Radians to degrees\n";
-sb << "__generic<T : __BuiltinFloatingPointType> T degrees(T x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> degrees(vector<T,N> x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> degrees(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "// Matrix determinant\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> T determinant(matrix<T,N,N> m);\n";
-sb << "\n";
-sb << "// Barrier for device memory\n";
-sb << "void DeviceMemoryBarrier();\n";
-sb << "void DeviceMemoryBarrierWithGroupSync();\n";
-sb << "\n";
-sb << "// Vector distance\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> T distance(vector<T,N> x, vector<T,N> y);\n";
-sb << "\n";
-sb << "// Vector dot product\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinArithmeticType, let N : int> T dot(vector<T,N> x, vector<T,N> y);\n";
-sb << "\n";
-sb << "// Helper for computing distance terms for lighting (obsolete)\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinFloatingPointType> vector<T,4> dst(vector<T,4> x, vector<T,4> y);\n";
-sb << "\n";
-sb << "// Error message\n";
-sb << "\n";
-sb << "// void errorf( string format, ... );\n";
-sb << "\n";
-sb << "// Attribute evaluation\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinArithmeticType> T EvaluateAttributeAtCentroid(T x);\n";
-sb << "__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> EvaluateAttributeAtCentroid(vector<T,N> x);\n";
-sb << "__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> EvaluateAttributeAtCentroid(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinArithmeticType> T EvaluateAttributeAtSample(T x, uint sampleindex);\n";
-sb << "__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> EvaluateAttributeAtSample(vector<T,N> x, uint sampleindex);\n";
-sb << "__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> EvaluateAttributeAtSample(matrix<T,N,M> x, uint sampleindex);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinArithmeticType> T EvaluateAttributeSnapped(T x, int2 offset);\n";
-sb << "__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> EvaluateAttributeSnapped(vector<T,N> x, int2 offset);\n";
-sb << "__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> EvaluateAttributeSnapped(matrix<T,N,M> x, int2 offset);\n";
-sb << "\n";
-sb << "// Base-e exponent\n";
-sb << "__generic<T : __BuiltinFloatingPointType> T exp(T x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> exp(vector<T,N> x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> exp(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "// Base-2 exponent\n";
-sb << "__generic<T : __BuiltinFloatingPointType> T exp2(T x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> exp2(vector<T,N> x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> exp2(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "// Convert 16-bit float stored in low bits of integer\n";
-sb << "float f16tof32(uint value);\n";
-sb << "__generic<let N : int> vector<float,N> f16tof32(vector<uint,N> value);\n";
-sb << "\n";
-sb << "// Convert to 16-bit float stored in low bits of integer\n";
-sb << "uint f32tof16(float value);\n";
-sb << "__generic<let N : int> vector<uint,N> f32tof16(vector<float,N> value);\n";
-sb << "\n";
-sb << "// Flip surface normal to face forward, if needed\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> faceforward(vector<T,N> n, vector<T,N> i, vector<T,N> ng);\n";
-sb << "\n";
-sb << "// Find first set bit starting at high bit and working down\n";
-sb << "__target_intrinsic(glsl,\"findMSB\")\n";
-sb << "int firstbithigh(int value);\n";
-sb << "\n";
-sb << "__target_intrinsic(glsl,\"findMSB\")\n";
-sb << "__generic<let N : int> vector<int,N> firstbithigh(vector<int,N> value);\n";
-sb << "\n";
-sb << "__target_intrinsic(glsl,\"findMSB\")\n";
-sb << "uint firstbithigh(uint value);\n";
-sb << "\n";
-sb << "__target_intrinsic(glsl,\"findMSB\")\n";
-sb << "__generic<let N : int> vector<uint,N> firstbithigh(vector<uint,N> value);\n";
-sb << "\n";
-sb << "// Find first set bit starting at low bit and working up\n";
-sb << "__target_intrinsic(glsl,\"findLSB\")\n";
-sb << "int firstbitlow(int value);\n";
-sb << "\n";
-sb << "__target_intrinsic(glsl,\"findLSB\")\n";
-sb << "__generic<let N : int> vector<int,N> firstbitlow(vector<int,N> value);\n";
-sb << "\n";
-sb << "__target_intrinsic(glsl,\"findLSB\")\n";
-sb << "uint firstbitlow(uint value);\n";
-sb << "\n";
-sb << "__target_intrinsic(glsl,\"findLSB\")\n";
-sb << "__generic<let N : int> vector<uint,N> firstbitlow(vector<uint,N> value);\n";
-sb << "\n";
-sb << "// Floor (HLSL SM 1.0)\n";
-sb << "__generic<T : __BuiltinFloatingPointType> T floor(T x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> floor(vector<T,N> x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> floor(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "// Fused multiply-add for doubles\n";
-sb << "double fma(double a, double b, double c);\n";
-sb << "__generic<let N : int> vector<double, N> fma(vector<double, N> a, vector<double, N> b, vector<double, N> c);\n";
-sb << "__generic<let N : int, let M : int> matrix<double,N,M> fma(matrix<double,N,M> a, matrix<double,N,M> b, matrix<double,N,M> c);\n";
-sb << "\n";
-sb << "// Floating point remainder of x/y\n";
-sb << "__generic<T : __BuiltinFloatingPointType> T fmod(T x, T y);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> fmod(vector<T,N> x, vector<T,N> y);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> fmod(matrix<T,N,M> x, matrix<T,N,M> y);\n";
-sb << "\n";
-sb << "// Fractional part\n";
-sb << "__generic<T : __BuiltinFloatingPointType>\n";
-sb << "__target_intrinsic(glsl, fract)\n";
-sb << "T frac(T x);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int>\n";
-sb << "__target_intrinsic(glsl, fract)\n";
-sb << "vector<T,N> frac(vector<T,N> x);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>\n";
-sb << "__target_intrinsic(glsl, fract)\n";
-sb << "matrix<T,N,M> frac(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "// Split float into mantissa and exponent\n";
-sb << "__generic<T : __BuiltinFloatingPointType> T frexp(T x, out T exp);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> frexp(vector<T,N> x, out vector<T,N> exp);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> frexp(matrix<T,N,M> x, out matrix<T,N,M> exp);\n";
-sb << "\n";
-sb << "// Texture filter width\n";
-sb << "__generic<T : __BuiltinFloatingPointType> T fwidth(T x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> fwidth(vector<T,N> x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> fwidth(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "// Get number of samples in render target\n";
-sb << "uint GetRenderTargetSampleCount();\n";
-sb << "\n";
-sb << "// Get position of given sample\n";
-sb << "float2 GetRenderTargetSamplePosition(int Index);\n";
-sb << "\n";
-sb << "// Group memory barrier\n";
-sb << "__target_intrinsic(glsl, \"groupMemoryBarrier\")\n";
-sb << "void GroupMemoryBarrier();\n";
-sb << "\n";
-sb << "__target_intrinsic(glsl, \"groupMemoryBarrier(); barrier()\")\n";
-sb << "void GroupMemoryBarrierWithGroupSync();\n";
-sb << "\n";
-sb << "// Atomics\n";
-sb << "void InterlockedAdd(in out  int dest,  int value, out  int original_value);\n";
-sb << "void InterlockedAdd(in out uint dest, uint value, out uint original_value);\n";
-sb << "\n";
-sb << "void InterlockedAnd(in out  int dest,  int value, out  int original_value);\n";
-sb << "void InterlockedAnd(in out uint dest, uint value, out uint original_value);\n";
-sb << "\n";
-sb << "void InterlockedCompareExchange(in out  int dest,  int compare_value,  int value, out  int original_value);\n";
-sb << "void InterlockedCompareExchange(in out uint dest, uint compare_value, uint value, out uint original_value);\n";
-sb << "\n";
-sb << "void InterlockedCompareStore(in out  int dest,  int compare_value,  int value);\n";
-sb << "void InterlockedCompareStore(in out uint dest, uint compare_value, uint value);\n";
-sb << "\n";
-sb << "void InterlockedExchange(in out  int dest,  int value, out  int original_value);\n";
-sb << "void InterlockedExchange(in out uint dest, uint value, out uint original_value);\n";
-sb << "\n";
-sb << "void InterlockedMax(in out  int dest,  int value, out  int original_value);\n";
-sb << "void InterlockedMax(in out uint dest, uint value, out uint original_value);\n";
-sb << "\n";
-sb << "void InterlockedMin(in out  int dest,  int value, out  int original_value);\n";
-sb << "void InterlockedMin(in out uint dest, uint value, out uint original_value);\n";
-sb << "\n";
-sb << "void InterlockedOr(in out  int dest,  int value, out  int original_value);\n";
-sb << "void InterlockedOr(in out uint dest, uint value, out uint original_value);\n";
-sb << "\n";
-sb << "void InterlockedXor(in out  int dest,  int value, out  int original_value);\n";
-sb << "void InterlockedXor(in out uint dest, uint value, out uint original_value);\n";
-sb << "\n";
-sb << "// Is floating-point value finite?\n";
-sb << "__generic<T : __BuiltinFloatingPointType> bool isfinite(T x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> vector<bool,N> isfinite(vector<T,N> x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<bool,N,M> isfinite(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "// Is floating-point value infinite?\n";
-sb << "__generic<T : __BuiltinFloatingPointType> bool isinf(T x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> vector<bool,N> isinf(vector<T,N> x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<bool,N,M> isinf(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "// Is floating-point value not-a-number?\n";
-sb << "__generic<T : __BuiltinFloatingPointType> bool isnan(T x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> vector<bool,N> isnan(vector<T,N> x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<bool,N,M> isnan(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "// Construct float from mantissa and exponent\n";
-sb << "__generic<T : __BuiltinFloatingPointType> T ldexp(T x, T exp);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> ldexp(vector<T,N> x, vector<T,N> exp);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> ldexp(matrix<T,N,M> x, matrix<T,N,M> exp);\n";
-sb << "\n";
-sb << "// Vector length\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> T length(vector<T,N> x);\n";
-sb << "\n";
-sb << "// Linear interpolation\n";
-sb << "__generic<T : __BuiltinFloatingPointType>\n";
-sb << "__target_intrinsic(glsl, mix)\n";
-sb << "T lerp(T x, T y, T s);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int>\n";
-sb << "__target_intrinsic(glsl, mix)\n";
-sb << "vector<T,N> lerp(vector<T,N> x, vector<T,N> y, vector<T,N> s);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>\n";
-sb << "__target_intrinsic(glsl, mix)\n";
-sb << "matrix<T,N,M> lerp(matrix<T,N,M> x, matrix<T,N,M> y, matrix<T,N,M> s);\n";
-sb << "\n";
-sb << "// Legacy lighting function (obsolete)\n";
-sb << "float4 lit(float n_dot_l, float n_dot_h, float m);\n";
-sb << "\n";
-sb << "// Base-e logarithm\n";
-sb << "__generic<T : __BuiltinFloatingPointType> T log(T x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> log(vector<T,N> x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> log(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "// Base-10 logarithm\n";
-sb << "__generic<T : __BuiltinFloatingPointType> T log10(T x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> log10(vector<T,N> x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> log10(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "// Base-2 logarithm\n";
-sb << "__generic<T : __BuiltinFloatingPointType> T log2(T x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> log2(vector<T,N> x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> log2(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "// multiply-add\n";
-sb << "__generic<T : __BuiltinArithmeticType> T mad(T mvalue, T avalue, T bvalue);\n";
-sb << "__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> mad(vector<T,N> mvalue, vector<T,N> avalue, vector<T,N> bvalue);\n";
-sb << "__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> mad(matrix<T,N,M> mvalue, matrix<T,N,M> avalue, matrix<T,N,M> bvalue);\n";
-sb << "\n";
-sb << "// maximum\n";
-sb << "__generic<T : __BuiltinArithmeticType> T max(T x, T y);\n";
-sb << "__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> max(vector<T,N> x, vector<T,N> y);\n";
-sb << "__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> max(matrix<T,N,M> x, matrix<T,N,M> y);\n";
-sb << "\n";
-sb << "// minimum\n";
-sb << "__generic<T : __BuiltinArithmeticType> T min(T x, T y);\n";
-sb << "__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> min(vector<T,N> x, vector<T,N> y);\n";
-sb << "__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y);\n";
-sb << "\n";
-sb << "// split into integer and fractional parts (both with same sign)\n";
-sb << "__generic<T : __BuiltinFloatingPointType> T modf(T x, out T ip);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> modf(vector<T,N> x, out vector<T,N> ip);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> modf(matrix<T,N,M> x, out matrix<T,N,M> ip);\n";
-sb << "\n";
-sb << "// msad4 (whatever that is)\n";
-sb << "uint4 msad4(uint reference, uint2 source, uint4 accum);\n";
-sb << "\n";
-sb << "// General inner products\n";
-sb << "\n";
-sb << "// scalar-scalar\n";
-sb << "__generic<T : __BuiltinArithmeticType> T mul(T x, T y);\n";
-sb << "\n";
-sb << "// scalar-vector and vector-scalar\n";
-sb << "__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> mul(vector<T,N> x, T y);\n";
-sb << "__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> mul(T x, vector<T,N> y);\n";
-sb << "\n";
-sb << "// scalar-matrix and matrix-scalar\n";
-sb << "__generic<T : __BuiltinArithmeticType, let N : int, let M :int> matrix<T,N,M> mul(matrix<T,N,M> x, T y);\n";
-sb << "__generic<T : __BuiltinArithmeticType, let N : int, let M :int> matrix<T,N,M> mul(T x, matrix<T,N,M> y);\n";
-sb << "\n";
-sb << "// vector-vector (dot product)\n";
-sb << "__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic_op(dot) T mul(vector<T,N> x, vector<T,N> y);\n";
-sb << "\n";
-sb << "// vector-matrix\n";
-sb << "__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic_op(mulVectorMatrix) vector<T,M> mul(vector<T,N> x, matrix<T,N,M> y);\n";
-sb << "\n";
-sb << "// matrix-vector\n";
-sb << "__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic_op(mulMatrixVector) vector<T,N> mul(matrix<T,N,M> x, vector<T,M> y);\n";
-sb << "\n";
-sb << "// matrix-matrix\n";
-sb << "__generic<T : __BuiltinArithmeticType, let R : int, let N : int, let C : int> __intrinsic_op(mulMatrixMatrix) matrix<T,R,C> mul(matrix<T,R,N> x, matrix<T,N,C> y);\n";
-sb << "\n";
-sb << "// noise (deprecated)\n";
-sb << "float noise(float x);\n";
-sb << "__generic<let N : int> float noise(vector<float, N> x);\n";
-sb << "\n";
-sb << "// Normalize a vector\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> normalize(vector<T,N> x);\n";
-sb << "\n";
-sb << "// Raise to a power\n";
-sb << "__generic<T : __BuiltinFloatingPointType> T pow(T x, T y);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> pow(vector<T,N> x, vector<T,N> y);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> pow(matrix<T,N,M> x, matrix<T,N,M> y);\n";
-sb << "\n";
-sb << "// Output message\n";
-sb << "\n";
-sb << "// void printf( string format, ... );\n";
-sb << "\n";
-sb << "// Tessellation factor fixup routines\n";
-sb << "\n";
-sb << "void Process2DQuadTessFactorsAvg(\n";
-sb << "    in  float4 RawEdgeFactors,\n";
-sb << "    in  float2 InsideScale,\n";
-sb << "    out float4 RoundedEdgeTessFactors,\n";
-sb << "    out float2 RoundedInsideTessFactors,\n";
-sb << "    out float2 UnroundedInsideTessFactors);\n";
-sb << "\n";
-sb << "void Process2DQuadTessFactorsMax(\n";
-sb << "    in  float4 RawEdgeFactors,\n";
-sb << "    in  float2 InsideScale,\n";
-sb << "    out float4 RoundedEdgeTessFactors,\n";
-sb << "    out float2 RoundedInsideTessFactors,\n";
-sb << "    out float2 UnroundedInsideTessFactors);\n";
-sb << "\n";
-sb << "void Process2DQuadTessFactorsMin(\n";
-sb << "    in  float4 RawEdgeFactors,\n";
-sb << "    in  float2 InsideScale,\n";
-sb << "    out float4 RoundedEdgeTessFactors,\n";
-sb << "    out float2 RoundedInsideTessFactors,\n";
-sb << "    out float2 UnroundedInsideTessFactors);\n";
-sb << "\n";
-sb << "void ProcessIsolineTessFactors(\n";
-sb << "    in  float RawDetailFactor,\n";
-sb << "    in  float RawDensityFactor,\n";
-sb << "    out float RoundedDetailFactor,\n";
-sb << "    out float RoundedDensityFactor);\n";
-sb << "\n";
-sb << "void ProcessQuadTessFactorsAvg(\n";
-sb << "    in  float4 RawEdgeFactors,\n";
-sb << "    in  float InsideScale,\n";
-sb << "    out float4 RoundedEdgeTessFactors,\n";
-sb << "    out float2 RoundedInsideTessFactors,\n";
-sb << "    out float2 UnroundedInsideTessFactors);\n";
-sb << "\n";
-sb << "void ProcessQuadTessFactorsMax(\n";
-sb << "    in  float4 RawEdgeFactors,\n";
-sb << "    in  float InsideScale,\n";
-sb << "    out float4 RoundedEdgeTessFactors,\n";
-sb << "    out float2 RoundedInsideTessFactors,\n";
-sb << "    out float2 UnroundedInsideTessFactors);\n";
-sb << "\n";
-sb << "void ProcessQuadTessFactorsMin(\n";
-sb << "    in  float4 RawEdgeFactors,\n";
-sb << "    in  float InsideScale,\n";
-sb << "    out float4 RoundedEdgeTessFactors,\n";
-sb << "    out float2 RoundedInsideTessFactors,\n";
-sb << "    out float2 UnroundedInsideTessFactors);\n";
-sb << "\n";
-sb << "void ProcessTriTessFactorsAvg(\n";
-sb << "    in  float3 RawEdgeFactors,\n";
-sb << "    in  float InsideScale,\n";
-sb << "    out float3 RoundedEdgeTessFactors,\n";
-sb << "    out float RoundedInsideTessFactor,\n";
-sb << "    out float UnroundedInsideTessFactor);\n";
-sb << "\n";
-sb << "void ProcessTriTessFactorsMax(\n";
-sb << "    in  float3 RawEdgeFactors,\n";
-sb << "    in  float InsideScale,\n";
-sb << "    out float3 RoundedEdgeTessFactors,\n";
-sb << "    out float RoundedInsideTessFactor,\n";
-sb << "    out float UnroundedInsideTessFactor);\n";
-sb << "\n";
-sb << "void ProcessTriTessFactorsMin(\n";
-sb << "    in  float3 RawEdgeFactors,\n";
-sb << "    in  float InsideScale,\n";
-sb << "    out float3 RoundedEdgeTessFactors,\n";
-sb << "    out float RoundedInsideTessFactors,\n";
-sb << "    out float UnroundedInsideTessFactors);\n";
-sb << "\n";
-sb << "// Degrees to radians\n";
-sb << "__generic<T : __BuiltinFloatingPointType> T radians(T x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> radians(vector<T,N> x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> radians(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "// Approximate reciprocal\n";
-sb << "__generic<T : __BuiltinFloatingPointType> T rcp(T x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> rcp(vector<T,N> x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> rcp(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "// Reflect incident vector across plane with given normal\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int>\n";
-sb << "vector<T,N> reflect(vector<T,N> i, vector<T,N> n);\n";
-sb << "\n";
-sb << "// Refract incident vector given surface normal and index of refraction\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int>\n";
-sb << "vector<T,N> refract(vector<T,N> i, vector<T,N> n, float eta);\n";
-sb << "\n";
-sb << "// Reverse order of bits\n";
-sb << "__target_intrinsic(glsl, \"bitfieldReverse\")\n";
-sb << "uint reversebits(uint value);\n";
-sb << "\n";
-sb << "__target_intrinsic(glsl, \"bitfieldReverse\")\n";
-sb << "__generic<let N : int> vector<uint,N> reversebits(vector<uint,N> value);\n";
-sb << "\n";
-sb << "// Round-to-nearest\n";
-sb << "__generic<T : __BuiltinFloatingPointType> T round(T x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> round(vector<T,N> x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> round(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "// Reciprocal of square root\n";
-sb << "__generic<T : __BuiltinFloatingPointType> T rsqrt(T x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> rsqrt(vector<T,N> x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> rsqrt(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "// Clamp value to [0,1] range\n";
-sb << "__generic<T : __BuiltinFloatingPointType>\n";
-sb << "__target_intrinsic(glsl, \"clamp($0, 0, 1)\")\n";
-sb << "T saturate(T x);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int>\n";
-sb << "__target_intrinsic(glsl, \"clamp($0, 0, 1)\")\n";
-sb << "vector<T,N> saturate(vector<T,N> x);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>\n";
-sb << "__target_intrinsic(glsl, \"clamp($0, 0, 1)\")\n";
-sb << "matrix<T,N,M> saturate(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinFloatingPointType>\n";
-sb << "__specialized_for_target(glsl)\n";
-sb << "T saturate(T x)\n";
-sb << "{\n";
-sb << "    return clamp<T>(x, T(0), T(1));\n";
-sb << "}\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int>\n";
-sb << "__specialized_for_target(glsl)\n";
-sb << "vector<T,N> saturate(vector<T,N> x)\n";
-sb << "{\n";
-sb << "    return clamp<T,N>(x,\n";
-sb << "        vector<T,N>(T(0)),\n";
-sb << "        vector<T,N>(T(1)));\n";
-sb << "}\n";
-sb << "\n";
-sb << "// HACK: need a helper to turn a scalar into a matrix,\n";
-sb << "// because GLSL and HLSL disagree on the semantics of\n";
-sb << "// constructing a matrix from a single scalar.\n";
-sb << "__generic<T, let N : int, let M : int>\n";
-sb << "matrix<T,N,M> __scalarToMatrix(T value);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>\n";
-sb << "__specialized_for_target(glsl)\n";
-sb << "matrix<T,N,M> saturate(matrix<T,N,M> x)\n";
-sb << "{\n";
-sb << "    return clamp<T,N,M>(x,\n";
-sb << "        __scalarToMatrix<T,N,M>(T(0)),\n";
-sb << "        __scalarToMatrix<T,N,M>(T(1)));\n";
-sb << "}\n";
-sb << "\n";
-sb << "\n";
-sb << "// Extract sign of value\n";
-sb << "__generic<T : __BuiltinSignedArithmeticType> int sign(T x);\n";
-sb << "__generic<T : __BuiltinSignedArithmeticType, let N : int> vector<int,N> sign(vector<T,N> x);\n";
-sb << "__generic<T : __BuiltinSignedArithmeticType, let N : int, let M : int> matrix<int,N,M> sign(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "\n";
-sb << "// Sine\n";
-sb << "__generic<T : __BuiltinFloatingPointType> T sin(T x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> sin(vector<T,N> x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> sin(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "// Sine and cosine\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> void sincos(T x, out T s, out T c);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> void sincos(vector<T,N> x, out vector<T,N> s, out vector<T,N> c);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> void sincos(matrix<T,N,M> x, out matrix<T,N,M> s, out matrix<T,N,M> c);\n";
-sb << "\n";
-sb << "// Hyperbolic Sine\n";
-sb << "__generic<T : __BuiltinFloatingPointType> T sinh(T x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> sinh(vector<T,N> x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> sinh(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "// Smooth step (Hermite interpolation)\n";
-sb << "__generic<T : __BuiltinFloatingPointType> T smoothstep(T min, T max, T x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> smoothstep(vector<T,N> min, vector<T,N> max, vector<T,N> x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> smoothstep(matrix<T,N,M> min, matrix<T,N,M> max, matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "// Square root\n";
-sb << "__generic<T : __BuiltinFloatingPointType> T sqrt(T x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> sqrt(vector<T,N> x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> sqrt(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "// Step function\n";
-sb << "__generic<T : __BuiltinFloatingPointType> T step(T y, T x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> step(vector<T,N> y, vector<T,N> x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> step(matrix<T,N,M> y, matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "// Tangent\n";
-sb << "__generic<T : __BuiltinFloatingPointType> T tan(T x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> tan(vector<T,N> x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> tan(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "// Hyperbolic tangent\n";
-sb << "__generic<T : __BuiltinFloatingPointType> T tanh(T x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> tanh(vector<T,N> x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> tanh(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "// Legacy texture-fetch operations\n";
-sb << "\n";
-sb << "/*\n";
-sb << "float4 tex1D(sampler1D s, float t);\n";
-sb << "float4 tex1D(sampler1D s, float t, float ddx, float ddy);\n";
-sb << "float4 tex1Dbias(sampler1D s, float4 t);\n";
-sb << "float4 tex1Dgrad(sampler1D s, float t, float ddx, float ddy);\n";
-sb << "float4 tex1Dlod(sampler1D s, float4 t);\n";
-sb << "float4 tex1Dproj(sampler1D s, float4 t);\n";
-sb << "\n";
-sb << "float4 tex2D(sampler2D s, float2 t);\n";
-sb << "float4 tex2D(sampler2D s, float2 t, float2 ddx, float2 ddy);\n";
-sb << "float4 tex2Dbias(sampler2D s, float4 t);\n";
-sb << "float4 tex2Dgrad(sampler2D s, float2 t, float2 ddx, float2 ddy);\n";
-sb << "float4 tex2Dlod(sampler2D s, float4 t);\n";
-sb << "float4 tex2Dproj(sampler2D s, float4 t);\n";
-sb << "\n";
-sb << "float4 tex3D(sampler3D s, float3 t);\n";
-sb << "float4 tex3D(sampler3D s, float3 t, float3 ddx, float3 ddy);\n";
-sb << "float4 tex3Dbias(sampler3D s, float4 t);\n";
-sb << "float4 tex3Dgrad(sampler3D s, float3 t, float3 ddx, float3 ddy);\n";
-sb << "float4 tex3Dlod(sampler3D s, float4 t);\n";
-sb << "float4 tex3Dproj(sampler3D s, float4 t);\n";
-sb << "\n";
-sb << "float4 texCUBE(samplerCUBE s, float3 t);\n";
-sb << "float4 texCUBE(samplerCUBE s, float3 t, float3 ddx, float3 ddy);\n";
-sb << "float4 texCUBEbias(samplerCUBE s, float4 t);\n";
-sb << "float4 texCUBEgrad(samplerCUBE s, float3 t, float3 ddx, float3 ddy);\n";
-sb << "float4 texCUBElod(samplerCUBE s, float4 t);\n";
-sb << "float4 texCUBEproj(samplerCUBE s, float4 t);\n";
-sb << "*/\n";
-sb << "\n";
-sb << "// Matrix transpose\n";
-sb << "__generic<T : __BuiltinType, let N : int, let M : int> matrix<T,M,N> transpose(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "// Truncate to integer\n";
-sb << "__generic<T : __BuiltinFloatingPointType> T trunc(T x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> trunc(vector<T,N> x);\n";
-sb << "__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> trunc(matrix<T,N,M> x);\n";
-sb << "\n";
-sb << "// Shader model 6.0 stuff\n";
-sb << "\n";
-sb << "uint GlobalOrderedCountIncrement(uint countToAppendForThisLane);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinType> T QuadReadLaneAt(T sourceValue, int quadLaneID);\n";
-sb << "__generic<T : __BuiltinType, let N : int> vector<T,N> QuadReadLaneAt(vector<T,N> sourceValue, int quadLaneID);\n";
-sb << "__generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadLaneAt(matrix<T,N,M> sourceValue, int quadLaneID);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinType> T QuadSwapX(T localValue);\n";
-sb << "__generic<T : __BuiltinType, let N : int> vector<T,N> QuadSwapX(vector<T,N> localValue);\n";
-sb << "__generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadSwapX(matrix<T,N,M> localValue);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinType> T QuadSwapY(T localValue);\n";
-sb << "__generic<T : __BuiltinType, let N : int> vector<T,N> QuadSwapY(vector<T,N> localValue);\n";
-sb << "__generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadSwapY(matrix<T,N,M> localValue);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinIntegerType> T WaveAllBitAnd(T expr);\n";
-sb << "__generic<T : __BuiltinIntegerType, let N : int> vector<T,N> WaveAllBitAnd(vector<T,N> expr);\n";
-sb << "__generic<T : __BuiltinIntegerType, let N : int, let M : int> matrix<T,N,M> WaveAllBitAnd(matrix<T,N,M> expr);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinIntegerType> T WaveAllBitOr(T expr);\n";
-sb << "__generic<T : __BuiltinIntegerType, let N : int> vector<T,N> WaveAllBitOr(vector<T,N> expr);\n";
-sb << "__generic<T : __BuiltinIntegerType, let N : int, let M : int> matrix<T,N,M> WaveAllBitOr(matrix<T,N,M> expr);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinIntegerType> T WaveAllBitXor(T expr);\n";
-sb << "__generic<T : __BuiltinIntegerType, let N : int> vector<T,N> WaveAllBitXor(vector<T,N> expr);\n";
-sb << "__generic<T : __BuiltinIntegerType, let N : int, let M : int> matrix<T,N,M> WaveAllBitXor(matrix<T,N,M> expr);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinArithmeticType> T WaveAllMax(T expr);\n";
-sb << "__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WaveAllMax(vector<T,N> expr);\n";
-sb << "__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WaveAllMax(matrix<T,N,M> expr);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinArithmeticType> T WaveAllMin(T expr);\n";
-sb << "__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WaveAllMin(vector<T,N> expr);\n";
-sb << "__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WaveAllMin(matrix<T,N,M> expr);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinArithmeticType> T WaveAllProduct(T expr);\n";
-sb << "__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WaveAllProduct(vector<T,N> expr);\n";
-sb << "__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WaveAllProduct(matrix<T,N,M> expr);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinArithmeticType> T WaveAllSum(T expr);\n";
-sb << "__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WaveAllSum(vector<T,N> expr);\n";
-sb << "__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WaveAllSum(matrix<T,N,M> expr);\n";
-sb << "\n";
-sb << "bool WaveAllEqual(bool expr);\n";
-sb << "bool WaveAllTrue(bool expr);\n";
-sb << "bool WaveAnyTrue(bool expr);\n";
-sb << "\n";
-sb << "uint64_t WaveBallot(bool expr);\n";
-sb << "\n";
-sb << "uint WaveGetLaneCount();\n";
-sb << "uint WaveGetLaneIndex();\n";
-sb << "uint WaveGetOrderedIndex();\n";
-sb << "\n";
-sb << "bool WaveIsHelperLane();\n";
-sb << "\n";
-sb << "bool WaveOnce();\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinArithmeticType> T WavePrefixProduct(T expr);\n";
-sb << "__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WavePrefixProduct(vector<T,N> expr);\n";
-sb << "__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WavePrefixProduct(matrix<T,N,M> expr);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinArithmeticType> T WavePrefixSum(T expr);\n";
-sb << "__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WavePrefixSum(vector<T,N> expr);\n";
-sb << "__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WavePrefixSum(matrix<T,N,M> expr);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinType> T WaveReadFirstLane(T expr);\n";
-sb << "__generic<T : __BuiltinType, let N : int> vector<T,N> WaveReadFirstLane(vector<T,N> expr);\n";
-sb << "__generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> WaveReadFirstLane(matrix<T,N,M> expr);\n";
-sb << "\n";
-sb << "__generic<T : __BuiltinType> T WaveReadLaneAt(T expr, int laneIndex);\n";
-sb << "__generic<T : __BuiltinType, let N : int> vector<T,N> WaveReadLaneAt(vector<T,N> expr, int laneIndex);\n";
-sb << "__generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> WaveReadLaneAt(matrix<T,N,M> expr, int laneIndex);\n";
-sb << "\n";
-sb << "// `typedef`s to help with the fact that HLSL has been sorta-kinda case insensitive at various points\n";
-sb << "typedef Texture2D texture2D;\n";
-sb << "\n";
-sb << "";
-
+SLANG_RAW("// Slang HLSL compatibility library\n")
+SLANG_RAW("\n")
+SLANG_RAW("typedef uint UINT;\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T> __magic_type(HLSLAppendStructuredBufferType) struct AppendStructuredBuffer\n")
+SLANG_RAW("{\n")
+SLANG_RAW("    void Append(T value);\n")
+SLANG_RAW("\n")
+SLANG_RAW("    void GetDimensions(\n")
+SLANG_RAW("        out uint numStructs,\n")
+SLANG_RAW("        out uint stride);\n")
+SLANG_RAW("};\n")
+SLANG_RAW("\n")
+SLANG_RAW("__magic_type(HLSLByteAddressBufferType) struct ByteAddressBuffer\n")
+SLANG_RAW("{\n")
+SLANG_RAW("    void GetDimensions(\n")
+SLANG_RAW("        out uint dim);\n")
+SLANG_RAW("\n")
+SLANG_RAW("    uint Load(int location);\n")
+SLANG_RAW("    uint Load(int location, out uint status);\n")
+SLANG_RAW("\n")
+SLANG_RAW("    uint2 Load2(int location);\n")
+SLANG_RAW("    uint2 Load2(int location, out uint status);\n")
+SLANG_RAW("\n")
+SLANG_RAW("    uint3 Load3(int location);\n")
+SLANG_RAW("    uint3 Load3(int location, out uint status);\n")
+SLANG_RAW("\n")
+SLANG_RAW("    uint4 Load4(int location);\n")
+SLANG_RAW("    uint4 Load4(int location, out uint status);\n")
+SLANG_RAW("};\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T>\n")
+SLANG_RAW("__magic_type(HLSLStructuredBufferType)\n")
+SLANG_RAW("__intrinsic_type(")
+SLANG_SPLICE(kIROp_structuredBufferType
+)
+SLANG_RAW(")\n")
+SLANG_RAW("struct StructuredBuffer\n")
+SLANG_RAW("{\n")
+SLANG_RAW("    void GetDimensions(\n")
+SLANG_RAW("        out uint numStructs,\n")
+SLANG_RAW("        out uint stride);\n")
+SLANG_RAW("\n")
+SLANG_RAW("    T Load(int location);\n")
+SLANG_RAW("    T Load(int location, out uint status);\n")
+SLANG_RAW("\n")
+SLANG_RAW("    __subscript(uint index) -> T { __intrinsic_op(bufferLoad) get; };\n")
+SLANG_RAW("};\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T> __magic_type(HLSLConsumeStructuredBufferType) struct ConsumeStructuredBuffer\n")
+SLANG_RAW("{\n")
+SLANG_RAW("    T Consume();\n")
+SLANG_RAW("\n")
+SLANG_RAW("    void GetDimensions(\n")
+SLANG_RAW("        out uint numStructs,\n")
+SLANG_RAW("        out uint stride);\n")
+SLANG_RAW("};\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T, let N : int> __magic_type(HLSLInputPatchType) struct InputPatch\n")
+SLANG_RAW("{\n")
+SLANG_RAW("    __subscript(uint index) -> T;\n")
+SLANG_RAW("};\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T, let N : int> __magic_type(HLSLOutputPatchType) struct OutputPatch\n")
+SLANG_RAW("{\n")
+SLANG_RAW("    __subscript(uint index) -> T;\n")
+SLANG_RAW("};\n")
+SLANG_RAW("\n")
+SLANG_RAW("__magic_type(HLSLRWByteAddressBufferType) struct RWByteAddressBuffer\n")
+SLANG_RAW("{\n")
+SLANG_RAW("    // Note(tfoley): supports alll operations from `ByteAddressBuffer`\n")
+SLANG_RAW("    // TODO(tfoley): can this be made a sub-type?\n")
+SLANG_RAW("\n")
+SLANG_RAW("    void GetDimensions(\n")
+SLANG_RAW("        out uint dim);\n")
+SLANG_RAW("\n")
+SLANG_RAW("    uint Load(int location);\n")
+SLANG_RAW("    uint Load(int location, out uint status);\n")
+SLANG_RAW("\n")
+SLANG_RAW("    uint2 Load2(int location);\n")
+SLANG_RAW("    uint2 Load2(int location, out uint status);\n")
+SLANG_RAW("\n")
+SLANG_RAW("    uint3 Load3(int location);\n")
+SLANG_RAW("    uint3 Load3(int location, out uint status);\n")
+SLANG_RAW("\n")
+SLANG_RAW("    uint4 Load4(int location);\n")
+SLANG_RAW("    uint4 Load4(int location, out uint status);\n")
+SLANG_RAW("\n")
+SLANG_RAW("    // Added operations:\n")
+SLANG_RAW("\n")
+SLANG_RAW("    void InterlockedAdd(\n")
+SLANG_RAW("        UINT dest,\n")
+SLANG_RAW("        UINT value,\n")
+SLANG_RAW("        out UINT original_value);\n")
+SLANG_RAW("    void InterlockedAdd(\n")
+SLANG_RAW("        UINT dest,\n")
+SLANG_RAW("        UINT value);\n")
+SLANG_RAW("\n")
+SLANG_RAW("    void InterlockedAnd(\n")
+SLANG_RAW("        UINT dest,\n")
+SLANG_RAW("        UINT value,\n")
+SLANG_RAW("        out UINT original_value);\n")
+SLANG_RAW("    void InterlockedAnd(\n")
+SLANG_RAW("        UINT dest,\n")
+SLANG_RAW("        UINT value);\n")
+SLANG_RAW("\n")
+SLANG_RAW("    void InterlockedCompareExchange(\n")
+SLANG_RAW("        UINT dest,\n")
+SLANG_RAW("        UINT compare_value,\n")
+SLANG_RAW("        UINT value,\n")
+SLANG_RAW("        out UINT original_value);\n")
+SLANG_RAW("    void InterlockedCompareExchange(\n")
+SLANG_RAW("        UINT dest,\n")
+SLANG_RAW("        UINT compare_value,\n")
+SLANG_RAW("        UINT value);\n")
+SLANG_RAW("\n")
+SLANG_RAW("    void InterlockedCompareStore(\n")
+SLANG_RAW("        UINT dest,\n")
+SLANG_RAW("        UINT compare_value,\n")
+SLANG_RAW("        UINT value);\n")
+SLANG_RAW("    void InterlockedCompareStore(\n")
+SLANG_RAW("        UINT dest,\n")
+SLANG_RAW("        UINT compare_value);\n")
+SLANG_RAW("\n")
+SLANG_RAW("    void InterlockedExchange(\n")
+SLANG_RAW("        UINT dest,\n")
+SLANG_RAW("        UINT value,\n")
+SLANG_RAW("        out UINT original_value);\n")
+SLANG_RAW("    void InterlockedExchange(\n")
+SLANG_RAW("        UINT dest,\n")
+SLANG_RAW("        UINT value);\n")
+SLANG_RAW("\n")
+SLANG_RAW("    void InterlockedMax(\n")
+SLANG_RAW("        UINT dest,\n")
+SLANG_RAW("        UINT value,\n")
+SLANG_RAW("        out UINT original_value);\n")
+SLANG_RAW("    void InterlockedMax(\n")
+SLANG_RAW("        UINT dest,\n")
+SLANG_RAW("        UINT value);\n")
+SLANG_RAW("\n")
+SLANG_RAW("    void InterlockedMin(\n")
+SLANG_RAW("        UINT dest,\n")
+SLANG_RAW("        UINT value,\n")
+SLANG_RAW("        out UINT original_value);\n")
+SLANG_RAW("    void InterlockedMin(\n")
+SLANG_RAW("        UINT dest,\n")
+SLANG_RAW("        UINT value);\n")
+SLANG_RAW("\n")
+SLANG_RAW("    void InterlockedOr(\n")
+SLANG_RAW("        UINT dest,\n")
+SLANG_RAW("        UINT value,\n")
+SLANG_RAW("        out UINT original_value);\n")
+SLANG_RAW("    void InterlockedOr(\n")
+SLANG_RAW("        UINT dest,\n")
+SLANG_RAW("        UINT value);\n")
+SLANG_RAW("\n")
+SLANG_RAW("    void InterlockedXor(\n")
+SLANG_RAW("        UINT dest,\n")
+SLANG_RAW("        UINT value,\n")
+SLANG_RAW("        out UINT original_value);\n")
+SLANG_RAW("    void InterlockedXor(\n")
+SLANG_RAW("        UINT dest,\n")
+SLANG_RAW("        UINT value);\n")
+SLANG_RAW("\n")
+SLANG_RAW("    void Store(\n")
+SLANG_RAW("        uint address,\n")
+SLANG_RAW("        uint value);\n")
+SLANG_RAW("\n")
+SLANG_RAW("    void Store2(\n")
+SLANG_RAW("        uint address,\n")
+SLANG_RAW("        uint2 value);\n")
+SLANG_RAW("\n")
+SLANG_RAW("    void Store3(\n")
+SLANG_RAW("        uint address,\n")
+SLANG_RAW("        uint3 value);\n")
+SLANG_RAW("\n")
+SLANG_RAW("    void Store4(\n")
+SLANG_RAW("        uint address,\n")
+SLANG_RAW("        uint4 value);\n")
+SLANG_RAW("};\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T>\n")
+SLANG_RAW("__magic_type(HLSLRWStructuredBufferType)\n")
+SLANG_RAW("__intrinsic_type(")
+SLANG_SPLICE(kIROp_readWriteStructuredBufferType
+)
+SLANG_RAW(")\n")
+SLANG_RAW("struct RWStructuredBuffer\n")
+SLANG_RAW("{\n")
+SLANG_RAW("    uint DecrementCounter();\n")
+SLANG_RAW("\n")
+SLANG_RAW("    void GetDimensions(\n")
+SLANG_RAW("        out uint numStructs,\n")
+SLANG_RAW("        out uint stride);\n")
+SLANG_RAW("\n")
+SLANG_RAW("    uint IncrementCounter();\n")
+SLANG_RAW("\n")
+SLANG_RAW("    T Load(int location);\n")
+SLANG_RAW("    T Load(int location, out uint status);\n")
+SLANG_RAW("\n")
+SLANG_RAW("\t__subscript(uint index) -> T\n")
+SLANG_RAW("\t{\n")
+SLANG_RAW("        __intrinsic_op(bufferElementRef)\n")
+SLANG_RAW("        ref;\n")
+SLANG_RAW("\t}\n")
+SLANG_RAW("};\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T> __magic_type(HLSLPointStreamType) struct PointStream\n")
+SLANG_RAW("{\n")
+SLANG_RAW("    __target_intrinsic(glsl, \"EmitVertex()\")\n")
+SLANG_RAW("    void Append(T value);\n")
+SLANG_RAW("\n")
+SLANG_RAW("    __target_intrinsic(glsl, \"EndPrimitive()\")\n")
+SLANG_RAW("    void RestartStrip();\n")
+SLANG_RAW("};\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T> __magic_type(HLSLLineStreamType) struct LineStream\n")
+SLANG_RAW("{\n")
+SLANG_RAW("    __target_intrinsic(glsl, \"EmitVertex()\")\n")
+SLANG_RAW("    void Append(T value);\n")
+SLANG_RAW("\n")
+SLANG_RAW("    __target_intrinsic(glsl, \"EndPrimitive()\")\n")
+SLANG_RAW("    void RestartStrip();\n")
+SLANG_RAW("};\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T> __magic_type(HLSLTriangleStreamType) struct TriangleStream\n")
+SLANG_RAW("{\n")
+SLANG_RAW("    __target_intrinsic(glsl, \"EmitVertex()\")\n")
+SLANG_RAW("    void Append(T value);\n")
+SLANG_RAW("\n")
+SLANG_RAW("    __target_intrinsic(glsl, \"EndPrimitive()\")\n")
+SLANG_RAW("    void RestartStrip();\n")
+SLANG_RAW("};\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Note(tfoley): Trying to systematically add all the HLSL builtins\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Try to terminate the current draw or dispatch call (HLSL SM 4.0)\n")
+SLANG_RAW("void abort();\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Absolute value (HLSL SM 1.0)\n")
+SLANG_RAW("__generic<T : __BuiltinSignedArithmeticType> T abs(T x);\n")
+SLANG_RAW("__generic<T : __BuiltinSignedArithmeticType, let N : int> vector<T,N> abs(vector<T,N> x);\n")
+SLANG_RAW("__generic<T : __BuiltinSignedArithmeticType, let N : int, let M : int> matrix<T,N,M> abs(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Inverse cosine (HLSL SM 1.0)\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType> T acos(T x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> acos(vector<T,N> x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> acos(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Test if all components are non-zero (HLSL SM 1.0)\n")
+SLANG_RAW("__generic<T : __BuiltinType> bool all(T x);\n")
+SLANG_RAW("__generic<T : __BuiltinType, let N : int> bool all(vector<T,N> x);\n")
+SLANG_RAW("__generic<T : __BuiltinType, let N : int, let M : int> bool all(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Barrier for writes to all memory spaces (HLSL SM 5.0)\n")
+SLANG_RAW("void AllMemoryBarrier();\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Thread-group sync and barrier for writes to all memory spaces (HLSL SM 5.0)\n")
+SLANG_RAW("void AllMemoryBarrierWithGroupSync();\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Test if any components is non-zero (HLSL SM 1.0)\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinType>\n")
+SLANG_RAW("__target_intrinsic(glsl, \"bool($0)\")\n")
+SLANG_RAW("bool any(T x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinType, let N : int>\n")
+SLANG_RAW("__target_intrinsic(glsl, \"any(bvec$N0($0))\")\n")
+SLANG_RAW("bool any(vector<T,N> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinType, let N : int, let M : int>\n")
+SLANG_RAW("// TODO: need to define GLSL mapping\n")
+SLANG_RAW("bool any(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Reinterpret bits as a double (HLSL SM 5.0)\n")
+SLANG_RAW("double asdouble(uint lowbits, uint highbits);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Reinterpret bits as a float (HLSL SM 4.0)\n")
+SLANG_RAW("float asfloat( int x);\n")
+SLANG_RAW("float asfloat(uint x);\n")
+SLANG_RAW("__generic<let N : int> vector<float,N> asfloat(vector< int,N> x);\n")
+SLANG_RAW("__generic<let N : int> vector<float,N> asfloat(vector<uint,N> x);\n")
+SLANG_RAW("__generic<let N : int, let M : int> matrix<float,N,M> asfloat(matrix< int,N,M> x);\n")
+SLANG_RAW("__generic<let N : int, let M : int> matrix<float,N,M> asfloat(matrix<uint,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Inverse sine (HLSL SM 1.0)\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType> T asin(T x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> asin(vector<T,N> x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> asin(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Reinterpret bits as an int (HLSL SM 4.0)\n")
+SLANG_RAW("int asint(float x);\n")
+SLANG_RAW("int asint(uint x);\n")
+SLANG_RAW("__generic<let N : int> vector<int,N> asint(vector<float,N> x);\n")
+SLANG_RAW("__generic<let N : int> vector<int,N> asint(vector<uint,N> x);\n")
+SLANG_RAW("__generic<let N : int, let M : int> matrix<int,N,M> asint(matrix<float,N,M> x);\n")
+SLANG_RAW("__generic<let N : int, let M : int> matrix<int,N,M> asint(matrix<uint,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Reinterpret bits of double as a uint (HLSL SM 5.0)\n")
+SLANG_RAW("void asuint(double value, out uint lowbits, out uint highbits);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Reinterpret bits as a uint (HLSL SM 4.0)\n")
+SLANG_RAW("uint asuint(float x);\n")
+SLANG_RAW("uint asuint(int x);\n")
+SLANG_RAW("__generic<let N : int> vector<uint,N> asuint(vector<float,N> x);\n")
+SLANG_RAW("__generic<let N : int> vector<uint,N> asuint(vector<int,N> x);\n")
+SLANG_RAW("__generic<let N : int, let M : int> matrix<uint,N,M> asuint(matrix<float,N,M> x);\n")
+SLANG_RAW("__generic<let N : int, let M : int> matrix<uint,N,M> asuint(matrix<int,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Inverse tangent (HLSL SM 1.0)\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType> T atan(T x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> atan(vector<T,N> x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> atan(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType>\n")
+SLANG_RAW("__target_intrinsic(glsl,\"atan($0,$1)\")\n")
+SLANG_RAW("T atan2(T y, T x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int>\n")
+SLANG_RAW("__target_intrinsic(glsl,\"atan($0,$1)\")\n")
+SLANG_RAW("vector<T,N> atan2(vector<T,N> y, vector<T,N> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>\n")
+SLANG_RAW("__target_intrinsic(glsl,\"atan($0,$1)\")\n")
+SLANG_RAW("matrix<T,N,M> atan2(matrix<T,N,M> y, matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Ceiling (HLSL SM 1.0)\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType> T ceil(T x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> ceil(vector<T,N> x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> ceil(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Check access status to tiled resource\n")
+SLANG_RAW("bool CheckAccessFullyMapped(uint status);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Clamp (HLSL SM 1.0)\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType> T clamp(T x, T min, T max);\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> clamp(vector<T,N> x, vector<T,N> min, vector<T,N> max);\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> clamp(matrix<T,N,M> x, matrix<T,N,M> min, matrix<T,N,M> max);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Clip (discard) fragment conditionally\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType> void clip(T x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> void clip(vector<T,N> x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> void clip(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Cosine\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType> T cos(T x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> cos(vector<T,N> x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> cos(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Hyperbolic cosine\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType> T cosh(T x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> cosh(vector<T,N> x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> cosh(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Population count\n")
+SLANG_RAW("__target_intrinsic(glsl, \"bitCount\")\n")
+SLANG_RAW("uint countbits(uint value);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Cross product\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType> vector<T,3> cross(vector<T,3> x, vector<T,3> y);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Convert encoded color\n")
+SLANG_RAW("int4 D3DCOLORtoUBYTE4(float4 x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Partial-difference derivatives\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType>\n")
+SLANG_RAW("__target_intrinsic(glsl, dFdx)\n")
+SLANG_RAW("T ddx(T x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int>\n")
+SLANG_RAW("__target_intrinsic(glsl, dFdx)\n")
+SLANG_RAW("vector<T,N> ddx(vector<T,N> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>\n")
+SLANG_RAW("__target_intrinsic(glsl, dFdx)\n")
+SLANG_RAW("matrix<T,N,M> ddx(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType>\n")
+SLANG_RAW("__glsl_extension(GL_ARB_derivative_control)\n")
+SLANG_RAW("__target_intrinsic(glsl, dFdxCoarse)\n")
+SLANG_RAW("T ddx_coarse(T x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int>\n")
+SLANG_RAW("__glsl_extension(GL_ARB_derivative_control)\n")
+SLANG_RAW("__target_intrinsic(glsl, dFdxCoarse)\n")
+SLANG_RAW("vector<T,N> ddx_coarse(vector<T,N> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>\n")
+SLANG_RAW("__glsl_extension(GL_ARB_derivative_control)\n")
+SLANG_RAW("__target_intrinsic(glsl, dFdxCoarse)\n")
+SLANG_RAW("matrix<T,N,M> ddx_coarse(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType>\n")
+SLANG_RAW("__glsl_extension(GL_ARB_derivative_control)\n")
+SLANG_RAW("__target_intrinsic(glsl, dFdxFine)\n")
+SLANG_RAW("T ddx_fine(T x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int>\n")
+SLANG_RAW("__glsl_extension(GL_ARB_derivative_control)\n")
+SLANG_RAW("__target_intrinsic(glsl, dFdxFine)\n")
+SLANG_RAW("vector<T,N> ddx_fine(vector<T,N> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>\n")
+SLANG_RAW("__glsl_extension(GL_ARB_derivative_control)\n")
+SLANG_RAW("__target_intrinsic(glsl, dFdxFine)\n")
+SLANG_RAW("matrix<T,N,M> ddx_fine(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType>\n")
+SLANG_RAW("__target_intrinsic(glsl, dFdy)\n")
+SLANG_RAW("T ddy(T x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int>\n")
+SLANG_RAW("__target_intrinsic(glsl, dFdy)\n")
+SLANG_RAW("vector<T,N> ddy(vector<T,N> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>\n")
+SLANG_RAW("__target_intrinsic(glsl, dFdy)\n")
+SLANG_RAW(" matrix<T,N,M> ddy(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType>\n")
+SLANG_RAW("__glsl_extension(GL_ARB_derivative_control)\n")
+SLANG_RAW("__target_intrinsic(glsl, dFdyCoarse)\n")
+SLANG_RAW("T ddy_coarse(T x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int>\n")
+SLANG_RAW("__glsl_extension(GL_ARB_derivative_control)\n")
+SLANG_RAW("__target_intrinsic(glsl, dFdyCoarse)\n")
+SLANG_RAW("vector<T,N> ddy_coarse(vector<T,N> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>\n")
+SLANG_RAW("__glsl_extension(GL_ARB_derivative_control)\n")
+SLANG_RAW("__target_intrinsic(glsl, dFdyCoarse)\n")
+SLANG_RAW("matrix<T,N,M> ddy_coarse(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType>\n")
+SLANG_RAW("__glsl_extension(GL_ARB_derivative_control)\n")
+SLANG_RAW("__target_intrinsic(glsl, dFdyFine)\n")
+SLANG_RAW("T ddy_fine(T x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int>\n")
+SLANG_RAW("__glsl_extension(GL_ARB_derivative_control)\n")
+SLANG_RAW("__target_intrinsic(glsl, dFdyFine)\n")
+SLANG_RAW("vector<T,N> ddy_fine(vector<T,N> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>\n")
+SLANG_RAW("__glsl_extension(GL_ARB_derivative_control)\n")
+SLANG_RAW("__target_intrinsic(glsl, dFdyFine)\n")
+SLANG_RAW("matrix<T,N,M> ddy_fine(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Radians to degrees\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType> T degrees(T x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> degrees(vector<T,N> x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> degrees(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Matrix determinant\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> T determinant(matrix<T,N,N> m);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Barrier for device memory\n")
+SLANG_RAW("void DeviceMemoryBarrier();\n")
+SLANG_RAW("void DeviceMemoryBarrierWithGroupSync();\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Vector distance\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> T distance(vector<T,N> x, vector<T,N> y);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Vector dot product\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType, let N : int> T dot(vector<T,N> x, vector<T,N> y);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Helper for computing distance terms for lighting (obsolete)\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType> vector<T,4> dst(vector<T,4> x, vector<T,4> y);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Error message\n")
+SLANG_RAW("\n")
+SLANG_RAW("// void errorf( string format, ... );\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Attribute evaluation\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType> T EvaluateAttributeAtCentroid(T x);\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> EvaluateAttributeAtCentroid(vector<T,N> x);\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> EvaluateAttributeAtCentroid(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType> T EvaluateAttributeAtSample(T x, uint sampleindex);\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> EvaluateAttributeAtSample(vector<T,N> x, uint sampleindex);\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> EvaluateAttributeAtSample(matrix<T,N,M> x, uint sampleindex);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType> T EvaluateAttributeSnapped(T x, int2 offset);\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> EvaluateAttributeSnapped(vector<T,N> x, int2 offset);\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> EvaluateAttributeSnapped(matrix<T,N,M> x, int2 offset);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Base-e exponent\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType> T exp(T x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> exp(vector<T,N> x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> exp(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Base-2 exponent\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType> T exp2(T x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> exp2(vector<T,N> x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> exp2(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Convert 16-bit float stored in low bits of integer\n")
+SLANG_RAW("float f16tof32(uint value);\n")
+SLANG_RAW("__generic<let N : int> vector<float,N> f16tof32(vector<uint,N> value);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Convert to 16-bit float stored in low bits of integer\n")
+SLANG_RAW("uint f32tof16(float value);\n")
+SLANG_RAW("__generic<let N : int> vector<uint,N> f32tof16(vector<float,N> value);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Flip surface normal to face forward, if needed\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> faceforward(vector<T,N> n, vector<T,N> i, vector<T,N> ng);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Find first set bit starting at high bit and working down\n")
+SLANG_RAW("__target_intrinsic(glsl,\"findMSB\")\n")
+SLANG_RAW("int firstbithigh(int value);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__target_intrinsic(glsl,\"findMSB\")\n")
+SLANG_RAW("__generic<let N : int> vector<int,N> firstbithigh(vector<int,N> value);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__target_intrinsic(glsl,\"findMSB\")\n")
+SLANG_RAW("uint firstbithigh(uint value);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__target_intrinsic(glsl,\"findMSB\")\n")
+SLANG_RAW("__generic<let N : int> vector<uint,N> firstbithigh(vector<uint,N> value);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Find first set bit starting at low bit and working up\n")
+SLANG_RAW("__target_intrinsic(glsl,\"findLSB\")\n")
+SLANG_RAW("int firstbitlow(int value);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__target_intrinsic(glsl,\"findLSB\")\n")
+SLANG_RAW("__generic<let N : int> vector<int,N> firstbitlow(vector<int,N> value);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__target_intrinsic(glsl,\"findLSB\")\n")
+SLANG_RAW("uint firstbitlow(uint value);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__target_intrinsic(glsl,\"findLSB\")\n")
+SLANG_RAW("__generic<let N : int> vector<uint,N> firstbitlow(vector<uint,N> value);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Floor (HLSL SM 1.0)\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType> T floor(T x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> floor(vector<T,N> x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> floor(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Fused multiply-add for doubles\n")
+SLANG_RAW("double fma(double a, double b, double c);\n")
+SLANG_RAW("__generic<let N : int> vector<double, N> fma(vector<double, N> a, vector<double, N> b, vector<double, N> c);\n")
+SLANG_RAW("__generic<let N : int, let M : int> matrix<double,N,M> fma(matrix<double,N,M> a, matrix<double,N,M> b, matrix<double,N,M> c);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Floating point remainder of x/y\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType> T fmod(T x, T y);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> fmod(vector<T,N> x, vector<T,N> y);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> fmod(matrix<T,N,M> x, matrix<T,N,M> y);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Fractional part\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType>\n")
+SLANG_RAW("__target_intrinsic(glsl, fract)\n")
+SLANG_RAW("T frac(T x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int>\n")
+SLANG_RAW("__target_intrinsic(glsl, fract)\n")
+SLANG_RAW("vector<T,N> frac(vector<T,N> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>\n")
+SLANG_RAW("__target_intrinsic(glsl, fract)\n")
+SLANG_RAW("matrix<T,N,M> frac(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Split float into mantissa and exponent\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType> T frexp(T x, out T exp);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> frexp(vector<T,N> x, out vector<T,N> exp);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> frexp(matrix<T,N,M> x, out matrix<T,N,M> exp);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Texture filter width\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType> T fwidth(T x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> fwidth(vector<T,N> x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> fwidth(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Get number of samples in render target\n")
+SLANG_RAW("uint GetRenderTargetSampleCount();\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Get position of given sample\n")
+SLANG_RAW("float2 GetRenderTargetSamplePosition(int Index);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Group memory barrier\n")
+SLANG_RAW("__target_intrinsic(glsl, \"groupMemoryBarrier\")\n")
+SLANG_RAW("void GroupMemoryBarrier();\n")
+SLANG_RAW("\n")
+SLANG_RAW("__target_intrinsic(glsl, \"groupMemoryBarrier(); barrier()\")\n")
+SLANG_RAW("void GroupMemoryBarrierWithGroupSync();\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Atomics\n")
+SLANG_RAW("void InterlockedAdd(in out  int dest,  int value, out  int original_value);\n")
+SLANG_RAW("void InterlockedAdd(in out uint dest, uint value, out uint original_value);\n")
+SLANG_RAW("\n")
+SLANG_RAW("void InterlockedAnd(in out  int dest,  int value, out  int original_value);\n")
+SLANG_RAW("void InterlockedAnd(in out uint dest, uint value, out uint original_value);\n")
+SLANG_RAW("\n")
+SLANG_RAW("void InterlockedCompareExchange(in out  int dest,  int compare_value,  int value, out  int original_value);\n")
+SLANG_RAW("void InterlockedCompareExchange(in out uint dest, uint compare_value, uint value, out uint original_value);\n")
+SLANG_RAW("\n")
+SLANG_RAW("void InterlockedCompareStore(in out  int dest,  int compare_value,  int value);\n")
+SLANG_RAW("void InterlockedCompareStore(in out uint dest, uint compare_value, uint value);\n")
+SLANG_RAW("\n")
+SLANG_RAW("void InterlockedExchange(in out  int dest,  int value, out  int original_value);\n")
+SLANG_RAW("void InterlockedExchange(in out uint dest, uint value, out uint original_value);\n")
+SLANG_RAW("\n")
+SLANG_RAW("void InterlockedMax(in out  int dest,  int value, out  int original_value);\n")
+SLANG_RAW("void InterlockedMax(in out uint dest, uint value, out uint original_value);\n")
+SLANG_RAW("\n")
+SLANG_RAW("void InterlockedMin(in out  int dest,  int value, out  int original_value);\n")
+SLANG_RAW("void InterlockedMin(in out uint dest, uint value, out uint original_value);\n")
+SLANG_RAW("\n")
+SLANG_RAW("void InterlockedOr(in out  int dest,  int value, out  int original_value);\n")
+SLANG_RAW("void InterlockedOr(in out uint dest, uint value, out uint original_value);\n")
+SLANG_RAW("\n")
+SLANG_RAW("void InterlockedXor(in out  int dest,  int value, out  int original_value);\n")
+SLANG_RAW("void InterlockedXor(in out uint dest, uint value, out uint original_value);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Is floating-point value finite?\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType> bool isfinite(T x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<bool,N> isfinite(vector<T,N> x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<bool,N,M> isfinite(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Is floating-point value infinite?\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType> bool isinf(T x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<bool,N> isinf(vector<T,N> x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<bool,N,M> isinf(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Is floating-point value not-a-number?\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType> bool isnan(T x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<bool,N> isnan(vector<T,N> x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<bool,N,M> isnan(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Construct float from mantissa and exponent\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType> T ldexp(T x, T exp);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> ldexp(vector<T,N> x, vector<T,N> exp);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> ldexp(matrix<T,N,M> x, matrix<T,N,M> exp);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Vector length\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> T length(vector<T,N> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Linear interpolation\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType>\n")
+SLANG_RAW("__target_intrinsic(glsl, mix)\n")
+SLANG_RAW("T lerp(T x, T y, T s);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int>\n")
+SLANG_RAW("__target_intrinsic(glsl, mix)\n")
+SLANG_RAW("vector<T,N> lerp(vector<T,N> x, vector<T,N> y, vector<T,N> s);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>\n")
+SLANG_RAW("__target_intrinsic(glsl, mix)\n")
+SLANG_RAW("matrix<T,N,M> lerp(matrix<T,N,M> x, matrix<T,N,M> y, matrix<T,N,M> s);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Legacy lighting function (obsolete)\n")
+SLANG_RAW("float4 lit(float n_dot_l, float n_dot_h, float m);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Base-e logarithm\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType> T log(T x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> log(vector<T,N> x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> log(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Base-10 logarithm\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType> T log10(T x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> log10(vector<T,N> x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> log10(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Base-2 logarithm\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType> T log2(T x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> log2(vector<T,N> x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> log2(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// multiply-add\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType> T mad(T mvalue, T avalue, T bvalue);\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> mad(vector<T,N> mvalue, vector<T,N> avalue, vector<T,N> bvalue);\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> mad(matrix<T,N,M> mvalue, matrix<T,N,M> avalue, matrix<T,N,M> bvalue);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// maximum\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType> T max(T x, T y);\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> max(vector<T,N> x, vector<T,N> y);\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> max(matrix<T,N,M> x, matrix<T,N,M> y);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// minimum\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType> T min(T x, T y);\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> min(vector<T,N> x, vector<T,N> y);\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// split into integer and fractional parts (both with same sign)\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType> T modf(T x, out T ip);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> modf(vector<T,N> x, out vector<T,N> ip);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> modf(matrix<T,N,M> x, out matrix<T,N,M> ip);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// msad4 (whatever that is)\n")
+SLANG_RAW("uint4 msad4(uint reference, uint2 source, uint4 accum);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// General inner products\n")
+SLANG_RAW("\n")
+SLANG_RAW("// scalar-scalar\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType> T mul(T x, T y);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// scalar-vector and vector-scalar\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> mul(vector<T,N> x, T y);\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> mul(T x, vector<T,N> y);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// scalar-matrix and matrix-scalar\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType, let N : int, let M :int> matrix<T,N,M> mul(matrix<T,N,M> x, T y);\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType, let N : int, let M :int> matrix<T,N,M> mul(T x, matrix<T,N,M> y);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// vector-vector (dot product)\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic_op(dot) T mul(vector<T,N> x, vector<T,N> y);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// vector-matrix\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic_op(mulVectorMatrix) vector<T,M> mul(vector<T,N> x, matrix<T,N,M> y);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// matrix-vector\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic_op(mulMatrixVector) vector<T,N> mul(matrix<T,N,M> x, vector<T,M> y);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// matrix-matrix\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType, let R : int, let N : int, let C : int> __intrinsic_op(mulMatrixMatrix) matrix<T,R,C> mul(matrix<T,R,N> x, matrix<T,N,C> y);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// noise (deprecated)\n")
+SLANG_RAW("float noise(float x);\n")
+SLANG_RAW("__generic<let N : int> float noise(vector<float, N> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Normalize a vector\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> normalize(vector<T,N> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Raise to a power\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType> T pow(T x, T y);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> pow(vector<T,N> x, vector<T,N> y);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> pow(matrix<T,N,M> x, matrix<T,N,M> y);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Output message\n")
+SLANG_RAW("\n")
+SLANG_RAW("// void printf( string format, ... );\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Tessellation factor fixup routines\n")
+SLANG_RAW("\n")
+SLANG_RAW("void Process2DQuadTessFactorsAvg(\n")
+SLANG_RAW("    in  float4 RawEdgeFactors,\n")
+SLANG_RAW("    in  float2 InsideScale,\n")
+SLANG_RAW("    out float4 RoundedEdgeTessFactors,\n")
+SLANG_RAW("    out float2 RoundedInsideTessFactors,\n")
+SLANG_RAW("    out float2 UnroundedInsideTessFactors);\n")
+SLANG_RAW("\n")
+SLANG_RAW("void Process2DQuadTessFactorsMax(\n")
+SLANG_RAW("    in  float4 RawEdgeFactors,\n")
+SLANG_RAW("    in  float2 InsideScale,\n")
+SLANG_RAW("    out float4 RoundedEdgeTessFactors,\n")
+SLANG_RAW("    out float2 RoundedInsideTessFactors,\n")
+SLANG_RAW("    out float2 UnroundedInsideTessFactors);\n")
+SLANG_RAW("\n")
+SLANG_RAW("void Process2DQuadTessFactorsMin(\n")
+SLANG_RAW("    in  float4 RawEdgeFactors,\n")
+SLANG_RAW("    in  float2 InsideScale,\n")
+SLANG_RAW("    out float4 RoundedEdgeTessFactors,\n")
+SLANG_RAW("    out float2 RoundedInsideTessFactors,\n")
+SLANG_RAW("    out float2 UnroundedInsideTessFactors);\n")
+SLANG_RAW("\n")
+SLANG_RAW("void ProcessIsolineTessFactors(\n")
+SLANG_RAW("    in  float RawDetailFactor,\n")
+SLANG_RAW("    in  float RawDensityFactor,\n")
+SLANG_RAW("    out float RoundedDetailFactor,\n")
+SLANG_RAW("    out float RoundedDensityFactor);\n")
+SLANG_RAW("\n")
+SLANG_RAW("void ProcessQuadTessFactorsAvg(\n")
+SLANG_RAW("    in  float4 RawEdgeFactors,\n")
+SLANG_RAW("    in  float InsideScale,\n")
+SLANG_RAW("    out float4 RoundedEdgeTessFactors,\n")
+SLANG_RAW("    out float2 RoundedInsideTessFactors,\n")
+SLANG_RAW("    out float2 UnroundedInsideTessFactors);\n")
+SLANG_RAW("\n")
+SLANG_RAW("void ProcessQuadTessFactorsMax(\n")
+SLANG_RAW("    in  float4 RawEdgeFactors,\n")
+SLANG_RAW("    in  float InsideScale,\n")
+SLANG_RAW("    out float4 RoundedEdgeTessFactors,\n")
+SLANG_RAW("    out float2 RoundedInsideTessFactors,\n")
+SLANG_RAW("    out float2 UnroundedInsideTessFactors);\n")
+SLANG_RAW("\n")
+SLANG_RAW("void ProcessQuadTessFactorsMin(\n")
+SLANG_RAW("    in  float4 RawEdgeFactors,\n")
+SLANG_RAW("    in  float InsideScale,\n")
+SLANG_RAW("    out float4 RoundedEdgeTessFactors,\n")
+SLANG_RAW("    out float2 RoundedInsideTessFactors,\n")
+SLANG_RAW("    out float2 UnroundedInsideTessFactors);\n")
+SLANG_RAW("\n")
+SLANG_RAW("void ProcessTriTessFactorsAvg(\n")
+SLANG_RAW("    in  float3 RawEdgeFactors,\n")
+SLANG_RAW("    in  float InsideScale,\n")
+SLANG_RAW("    out float3 RoundedEdgeTessFactors,\n")
+SLANG_RAW("    out float RoundedInsideTessFactor,\n")
+SLANG_RAW("    out float UnroundedInsideTessFactor);\n")
+SLANG_RAW("\n")
+SLANG_RAW("void ProcessTriTessFactorsMax(\n")
+SLANG_RAW("    in  float3 RawEdgeFactors,\n")
+SLANG_RAW("    in  float InsideScale,\n")
+SLANG_RAW("    out float3 RoundedEdgeTessFactors,\n")
+SLANG_RAW("    out float RoundedInsideTessFactor,\n")
+SLANG_RAW("    out float UnroundedInsideTessFactor);\n")
+SLANG_RAW("\n")
+SLANG_RAW("void ProcessTriTessFactorsMin(\n")
+SLANG_RAW("    in  float3 RawEdgeFactors,\n")
+SLANG_RAW("    in  float InsideScale,\n")
+SLANG_RAW("    out float3 RoundedEdgeTessFactors,\n")
+SLANG_RAW("    out float RoundedInsideTessFactors,\n")
+SLANG_RAW("    out float UnroundedInsideTessFactors);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Degrees to radians\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType> T radians(T x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> radians(vector<T,N> x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> radians(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Approximate reciprocal\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType> T rcp(T x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> rcp(vector<T,N> x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> rcp(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Reflect incident vector across plane with given normal\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int>\n")
+SLANG_RAW("vector<T,N> reflect(vector<T,N> i, vector<T,N> n);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Refract incident vector given surface normal and index of refraction\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int>\n")
+SLANG_RAW("vector<T,N> refract(vector<T,N> i, vector<T,N> n, float eta);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Reverse order of bits\n")
+SLANG_RAW("__target_intrinsic(glsl, \"bitfieldReverse\")\n")
+SLANG_RAW("uint reversebits(uint value);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__target_intrinsic(glsl, \"bitfieldReverse\")\n")
+SLANG_RAW("__generic<let N : int> vector<uint,N> reversebits(vector<uint,N> value);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Round-to-nearest\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType> T round(T x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> round(vector<T,N> x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> round(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Reciprocal of square root\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType> T rsqrt(T x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> rsqrt(vector<T,N> x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> rsqrt(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Clamp value to [0,1] range\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType>\n")
+SLANG_RAW("__target_intrinsic(glsl, \"clamp($0, 0, 1)\")\n")
+SLANG_RAW("T saturate(T x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int>\n")
+SLANG_RAW("__target_intrinsic(glsl, \"clamp($0, 0, 1)\")\n")
+SLANG_RAW("vector<T,N> saturate(vector<T,N> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>\n")
+SLANG_RAW("__target_intrinsic(glsl, \"clamp($0, 0, 1)\")\n")
+SLANG_RAW("matrix<T,N,M> saturate(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType>\n")
+SLANG_RAW("__specialized_for_target(glsl)\n")
+SLANG_RAW("T saturate(T x)\n")
+SLANG_RAW("{\n")
+SLANG_RAW("    return clamp<T>(x, T(0), T(1));\n")
+SLANG_RAW("}\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int>\n")
+SLANG_RAW("__specialized_for_target(glsl)\n")
+SLANG_RAW("vector<T,N> saturate(vector<T,N> x)\n")
+SLANG_RAW("{\n")
+SLANG_RAW("    return clamp<T,N>(x,\n")
+SLANG_RAW("        vector<T,N>(T(0)),\n")
+SLANG_RAW("        vector<T,N>(T(1)));\n")
+SLANG_RAW("}\n")
+SLANG_RAW("\n")
+SLANG_RAW("// HACK: need a helper to turn a scalar into a matrix,\n")
+SLANG_RAW("// because GLSL and HLSL disagree on the semantics of\n")
+SLANG_RAW("// constructing a matrix from a single scalar.\n")
+SLANG_RAW("__generic<T, let N : int, let M : int>\n")
+SLANG_RAW("matrix<T,N,M> __scalarToMatrix(T value);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>\n")
+SLANG_RAW("__specialized_for_target(glsl)\n")
+SLANG_RAW("matrix<T,N,M> saturate(matrix<T,N,M> x)\n")
+SLANG_RAW("{\n")
+SLANG_RAW("    return clamp<T,N,M>(x,\n")
+SLANG_RAW("        __scalarToMatrix<T,N,M>(T(0)),\n")
+SLANG_RAW("        __scalarToMatrix<T,N,M>(T(1)));\n")
+SLANG_RAW("}\n")
+SLANG_RAW("\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Extract sign of value\n")
+SLANG_RAW("__generic<T : __BuiltinSignedArithmeticType> int sign(T x);\n")
+SLANG_RAW("__generic<T : __BuiltinSignedArithmeticType, let N : int> vector<int,N> sign(vector<T,N> x);\n")
+SLANG_RAW("__generic<T : __BuiltinSignedArithmeticType, let N : int, let M : int> matrix<int,N,M> sign(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Sine\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType> T sin(T x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> sin(vector<T,N> x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> sin(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Sine and cosine\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> void sincos(T x, out T s, out T c);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> void sincos(vector<T,N> x, out vector<T,N> s, out vector<T,N> c);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> void sincos(matrix<T,N,M> x, out matrix<T,N,M> s, out matrix<T,N,M> c);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Hyperbolic Sine\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType> T sinh(T x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> sinh(vector<T,N> x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> sinh(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Smooth step (Hermite interpolation)\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType> T smoothstep(T min, T max, T x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> smoothstep(vector<T,N> min, vector<T,N> max, vector<T,N> x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> smoothstep(matrix<T,N,M> min, matrix<T,N,M> max, matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Square root\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType> T sqrt(T x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> sqrt(vector<T,N> x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> sqrt(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Step function\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType> T step(T y, T x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> step(vector<T,N> y, vector<T,N> x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> step(matrix<T,N,M> y, matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Tangent\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType> T tan(T x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> tan(vector<T,N> x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> tan(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Hyperbolic tangent\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType> T tanh(T x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> tanh(vector<T,N> x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> tanh(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Legacy texture-fetch operations\n")
+SLANG_RAW("\n")
+SLANG_RAW("/*\n")
+SLANG_RAW("float4 tex1D(sampler1D s, float t);\n")
+SLANG_RAW("float4 tex1D(sampler1D s, float t, float ddx, float ddy);\n")
+SLANG_RAW("float4 tex1Dbias(sampler1D s, float4 t);\n")
+SLANG_RAW("float4 tex1Dgrad(sampler1D s, float t, float ddx, float ddy);\n")
+SLANG_RAW("float4 tex1Dlod(sampler1D s, float4 t);\n")
+SLANG_RAW("float4 tex1Dproj(sampler1D s, float4 t);\n")
+SLANG_RAW("\n")
+SLANG_RAW("float4 tex2D(sampler2D s, float2 t);\n")
+SLANG_RAW("float4 tex2D(sampler2D s, float2 t, float2 ddx, float2 ddy);\n")
+SLANG_RAW("float4 tex2Dbias(sampler2D s, float4 t);\n")
+SLANG_RAW("float4 tex2Dgrad(sampler2D s, float2 t, float2 ddx, float2 ddy);\n")
+SLANG_RAW("float4 tex2Dlod(sampler2D s, float4 t);\n")
+SLANG_RAW("float4 tex2Dproj(sampler2D s, float4 t);\n")
+SLANG_RAW("\n")
+SLANG_RAW("float4 tex3D(sampler3D s, float3 t);\n")
+SLANG_RAW("float4 tex3D(sampler3D s, float3 t, float3 ddx, float3 ddy);\n")
+SLANG_RAW("float4 tex3Dbias(sampler3D s, float4 t);\n")
+SLANG_RAW("float4 tex3Dgrad(sampler3D s, float3 t, float3 ddx, float3 ddy);\n")
+SLANG_RAW("float4 tex3Dlod(sampler3D s, float4 t);\n")
+SLANG_RAW("float4 tex3Dproj(sampler3D s, float4 t);\n")
+SLANG_RAW("\n")
+SLANG_RAW("float4 texCUBE(samplerCUBE s, float3 t);\n")
+SLANG_RAW("float4 texCUBE(samplerCUBE s, float3 t, float3 ddx, float3 ddy);\n")
+SLANG_RAW("float4 texCUBEbias(samplerCUBE s, float4 t);\n")
+SLANG_RAW("float4 texCUBEgrad(samplerCUBE s, float3 t, float3 ddx, float3 ddy);\n")
+SLANG_RAW("float4 texCUBElod(samplerCUBE s, float4 t);\n")
+SLANG_RAW("float4 texCUBEproj(samplerCUBE s, float4 t);\n")
+SLANG_RAW("*/\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Matrix transpose\n")
+SLANG_RAW("__generic<T : __BuiltinType, let N : int, let M : int> matrix<T,M,N> transpose(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Truncate to integer\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType> T trunc(T x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> trunc(vector<T,N> x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> trunc(matrix<T,N,M> x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Shader model 6.0 stuff\n")
+SLANG_RAW("\n")
+SLANG_RAW("uint GlobalOrderedCountIncrement(uint countToAppendForThisLane);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinType> T QuadReadLaneAt(T sourceValue, int quadLaneID);\n")
+SLANG_RAW("__generic<T : __BuiltinType, let N : int> vector<T,N> QuadReadLaneAt(vector<T,N> sourceValue, int quadLaneID);\n")
+SLANG_RAW("__generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadLaneAt(matrix<T,N,M> sourceValue, int quadLaneID);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinType> T QuadSwapX(T localValue);\n")
+SLANG_RAW("__generic<T : __BuiltinType, let N : int> vector<T,N> QuadSwapX(vector<T,N> localValue);\n")
+SLANG_RAW("__generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadSwapX(matrix<T,N,M> localValue);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinType> T QuadSwapY(T localValue);\n")
+SLANG_RAW("__generic<T : __BuiltinType, let N : int> vector<T,N> QuadSwapY(vector<T,N> localValue);\n")
+SLANG_RAW("__generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadSwapY(matrix<T,N,M> localValue);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinIntegerType> T WaveAllBitAnd(T expr);\n")
+SLANG_RAW("__generic<T : __BuiltinIntegerType, let N : int> vector<T,N> WaveAllBitAnd(vector<T,N> expr);\n")
+SLANG_RAW("__generic<T : __BuiltinIntegerType, let N : int, let M : int> matrix<T,N,M> WaveAllBitAnd(matrix<T,N,M> expr);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinIntegerType> T WaveAllBitOr(T expr);\n")
+SLANG_RAW("__generic<T : __BuiltinIntegerType, let N : int> vector<T,N> WaveAllBitOr(vector<T,N> expr);\n")
+SLANG_RAW("__generic<T : __BuiltinIntegerType, let N : int, let M : int> matrix<T,N,M> WaveAllBitOr(matrix<T,N,M> expr);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinIntegerType> T WaveAllBitXor(T expr);\n")
+SLANG_RAW("__generic<T : __BuiltinIntegerType, let N : int> vector<T,N> WaveAllBitXor(vector<T,N> expr);\n")
+SLANG_RAW("__generic<T : __BuiltinIntegerType, let N : int, let M : int> matrix<T,N,M> WaveAllBitXor(matrix<T,N,M> expr);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType> T WaveAllMax(T expr);\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WaveAllMax(vector<T,N> expr);\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WaveAllMax(matrix<T,N,M> expr);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType> T WaveAllMin(T expr);\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WaveAllMin(vector<T,N> expr);\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WaveAllMin(matrix<T,N,M> expr);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType> T WaveAllProduct(T expr);\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WaveAllProduct(vector<T,N> expr);\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WaveAllProduct(matrix<T,N,M> expr);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType> T WaveAllSum(T expr);\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WaveAllSum(vector<T,N> expr);\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WaveAllSum(matrix<T,N,M> expr);\n")
+SLANG_RAW("\n")
+SLANG_RAW("bool WaveAllEqual(bool expr);\n")
+SLANG_RAW("bool WaveAllTrue(bool expr);\n")
+SLANG_RAW("bool WaveAnyTrue(bool expr);\n")
+SLANG_RAW("\n")
+SLANG_RAW("uint64_t WaveBallot(bool expr);\n")
+SLANG_RAW("\n")
+SLANG_RAW("uint WaveGetLaneCount();\n")
+SLANG_RAW("uint WaveGetLaneIndex();\n")
+SLANG_RAW("uint WaveGetOrderedIndex();\n")
+SLANG_RAW("\n")
+SLANG_RAW("bool WaveIsHelperLane();\n")
+SLANG_RAW("\n")
+SLANG_RAW("bool WaveOnce();\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType> T WavePrefixProduct(T expr);\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WavePrefixProduct(vector<T,N> expr);\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WavePrefixProduct(matrix<T,N,M> expr);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType> T WavePrefixSum(T expr);\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WavePrefixSum(vector<T,N> expr);\n")
+SLANG_RAW("__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WavePrefixSum(matrix<T,N,M> expr);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinType> T WaveReadFirstLane(T expr);\n")
+SLANG_RAW("__generic<T : __BuiltinType, let N : int> vector<T,N> WaveReadFirstLane(vector<T,N> expr);\n")
+SLANG_RAW("__generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> WaveReadFirstLane(matrix<T,N,M> expr);\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<T : __BuiltinType> T WaveReadLaneAt(T expr, int laneIndex);\n")
+SLANG_RAW("__generic<T : __BuiltinType, let N : int> vector<T,N> WaveReadLaneAt(vector<T,N> expr, int laneIndex);\n")
+SLANG_RAW("__generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> WaveReadLaneAt(matrix<T,N,M> expr, int laneIndex);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// `typedef`s to help with the fact that HLSL has been sorta-kinda case insensitive at various points\n")
+SLANG_RAW("typedef Texture2D texture2D;\n")
+SLANG_RAW("\n")
 
 // Component-wise multiplication ops
 for(auto op : binaryOps)
@@ -1131,5 +1126,4 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
 
     sb << "};\n";
 }
-
-sb << "";
+SLANG_RAW("\n")

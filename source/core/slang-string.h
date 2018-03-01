@@ -170,9 +170,20 @@ namespace Slang
             return (*this) == UnownedStringSlice(str, str + strlen(str));
         }
 
+        bool endsWith(UnownedStringSlice const& other) const;
+        bool endsWith(char const* str) const;
+
     private:
         char const* beginData;
         char const* endData;
+    };
+
+    struct UnownedTerminatedStringSlice : public UnownedStringSlice
+    {
+    public:
+        UnownedTerminatedStringSlice(char const* b)
+            : UnownedStringSlice(b, b + strlen(b))
+        {}
     };
 
     struct StringSlice
