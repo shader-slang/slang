@@ -30,7 +30,7 @@ struct PhiInfo : RefObject
 
     // If this phi ended up being removed as trivial, then
     // this will be the value that we replaced it with.
-    IRValue* replacement = nullptr;
+    IRInst* replacement = nullptr;
 };
 
 // Information about a basic block that we generate/use
@@ -39,7 +39,7 @@ struct SSABlockInfo : RefObject
 {
     // Map a promotable variable to the value to
     // use for that variable
-    Dictionary<IRVar*, IRValue*> valueForVar;
+    Dictionary<IRVar*, IRInst*> valueForVar;
 
     // The underlying basic block.
     IRBlock* block;
@@ -63,7 +63,7 @@ struct SSABlockInfo : RefObject
 
     // Arguments that this block needs to pass along
     // to the phi nodes defined by is sucessor
-    List<IRValue*> successorArgs;
+    List<IRInst*> successorArgs;
 };
 
 // State for constructing SSA form for a global value
@@ -176,7 +176,7 @@ void identifyPromotableVars(
 
 IRVar* asPromotableVar(
     ConstructSSAContext*    context,
-    IRValue*                value)
+    IRInst*                value)
 {
     if (value->op != kIROp_Var)
         return nullptr;
@@ -194,7 +194,7 @@ IRVar* asPromotableVar(
 // that value will be used. If not, this all
 // may recursively work its way up through
 // the predecessors of the block.
-IRValue* readVar(
+IRInst* readVar(
     ConstructSSAContext*    context,
     SSABlockInfo*           blockInfo,
     IRVar*                  var);
@@ -226,7 +226,7 @@ PhiInfo* addPhi(
     return phiInfo;
 }
 
-IRValue* tryRemoveTrivialPhi(
+IRInst* tryRemoveTrivialPhi(
     ConstructSSAContext*    context,
     PhiInfo*                phiInfo)
 {
@@ -236,7 +236,7 @@ IRValue* tryRemoveTrivialPhi(
     // to the phi are either the same, or are equal
     // to the phi itself.
 
-    IRValue* same = nullptr;
+    IRInst* same = nullptr;
     for (auto u : phiInfo->operands)
     {
         auto usedVal = u.get();
@@ -319,7 +319,7 @@ IRValue* tryRemoveTrivialPhi(
     return same;
 }
 
-IRValue* addPhiOperands(
+IRInst* addPhiOperands(
     ConstructSSAContext*    context,
     SSABlockInfo*           blockInfo,
     PhiInfo*                phiInfo)
@@ -328,7 +328,7 @@ IRValue* addPhiOperands(
 
     auto block = blockInfo->block;
 
-    List<IRValue*> operandValues;
+    List<IRInst*> operandValues;
     for (auto predBlock : block->getPredecessors())
     {
         // Precondition: if we have multiple predecessors, then
@@ -362,7 +362,7 @@ void writeVar(
     ConstructSSAContext*    /*context*/,
     SSABlockInfo*           blockInfo,
     IRVar*                  var,
-    IRValue*                val)
+    IRInst*                val)
 {
     blockInfo->valueForVar[var] = val;
 }
@@ -403,12 +403,12 @@ void maybeSealBlock(
     blockInfo->isSealed = true;
 }
 
-IRValue* readVarRec(
+IRInst* readVarRec(
     ConstructSSAContext*    context,
     SSABlockInfo*           blockInfo,
     IRVar*                  var)
 {
-    IRValue* val = nullptr;
+    IRInst* val = nullptr;
     if (!blockInfo->isSealed)
     {
         // If block isn't sealed, we need to
@@ -499,7 +499,7 @@ IRValue* readVarRec(
 }
 
 
-IRValue* readVar(
+IRInst* readVar(
     ConstructSSAContext*    context,
     SSABlockInfo*           blockInfo,
     IRVar*                  var)
@@ -507,7 +507,7 @@ IRValue* readVar(
     // In the easy case, there will be a preceeding
     // store in the same block, so we can use
     // that local value.
-    IRValue* val = nullptr;
+    IRInst* val = nullptr;
     if (blockInfo->valueForVar.TryGetValue(var, val))
     {
         // Hooray, we found a value to use, and we
@@ -617,7 +617,7 @@ void processBlock(
         }
     }
 
-    blockInfo->builder.insertBeforeInst = block->lastInst;
+    blockInfo->builder.insertBeforeInst = block->getLastChild();
 
     // Once we are done with all of the instructions
     // in a block, we can mark it as "filled," which
@@ -757,7 +757,7 @@ void constructSSA(ConstructSSAContext* context)
     // and stores of promotable variables with simple values.
 
     auto globalVal = context->globalVal;
-    for (auto bb = globalVal->firstBlock; bb; bb = bb->nextBlock)
+    for(auto bb : globalVal->getBlocks())
     {
         auto blockInfo = new SSABlockInfo();
         blockInfo->block = bb;
@@ -765,11 +765,11 @@ void constructSSA(ConstructSSAContext* context)
         blockInfo->builder.sharedBuilder = &context->sharedBuilder;
         blockInfo->builder.curBlock = bb;
         blockInfo->builder.curFunc = globalVal;
-        blockInfo->builder.insertBeforeInst = bb->lastInst;
+        blockInfo->builder.insertBeforeInst = bb->getLastInst();
 
         context->blockInfos.Add(bb, blockInfo);
     }
-    for (auto bb = globalVal->firstBlock; bb; bb = bb->nextBlock)
+    for(auto bb : globalVal->getBlocks())
     {
         auto blockInfo = * context->blockInfos.TryGetValue(bb);
         processBlock(context, bb, blockInfo);
@@ -778,7 +778,7 @@ void constructSSA(ConstructSSAContext* context)
     // We need to transfer the logical arguments to our phi nodes
     // from the phi nodes back to the predecessor blocks that will
     // pass them in.
-    for (auto bb = globalVal->firstBlock; bb; bb = bb->nextBlock)
+    for(auto bb : globalVal->getBlocks())
     {
         auto blockInfo = *context->blockInfos.TryGetValue(bb);
 
@@ -799,7 +799,7 @@ void constructSSA(ConstructSSAContext* context)
                 UInt predIndex = predCounter++;
                 auto predInfo = *context->blockInfos.TryGetValue(pp);
 
-                IRValue* operandVal = phiInfo->operands[predIndex].get();
+                IRInst* operandVal = phiInfo->operands[predIndex].get();
 
                 phiInfo->operands[predIndex].clear();
 
@@ -810,7 +810,7 @@ void constructSSA(ConstructSSAContext* context)
 
     // Some blocks may now need to pass along arguments to their sucessor,
     // which have been stored into the `SSABlockInfo::successorArgs` field.
-    for (auto bb = globalVal->firstBlock; bb; bb = bb->nextBlock)
+    for(auto bb : globalVal->getBlocks())
     {
         auto blockInfo = * context->blockInfos.TryGetValue(bb);
 
@@ -827,18 +827,18 @@ void constructSSA(ConstructSSAContext* context)
         // We need to replace the terminator instruction with one that
         // has additional arguments.
 
-        IRTerminatorInst* oldTerminator = (IRTerminatorInst*) bb->getLastInst();
-        assert(isTerminatorInst(oldTerminator));
+        IRTerminatorInst* oldTerminator = bb->getTerminator();
+        assert(oldTerminator);
 
         blockInfo->builder.insertBeforeInst = nullptr;
 
-        auto oldArgCount = oldTerminator->argCount;
+        auto oldArgCount = oldTerminator->getOperandCount();
         auto newArgCount = oldArgCount + addedArgCount;
 
-        List<IRValue*> newArgs;
+        List<IRInst*> newArgs;
         for (UInt aa = 0; aa < oldArgCount; ++aa)
         {
-            newArgs.Add(oldTerminator->getArg(aa));
+            newArgs.Add(oldTerminator->getOperand(aa));
         }
         for (UInt aa = 0; aa < addedArgCount; ++aa)
         {
@@ -884,7 +884,7 @@ void constructSSA(IRModule* module, IRGlobalValueWithCode* globalVal)
     constructSSA(&context);
 }
 
-void constructSSA(IRModule* module, IRGlobalValue* globalVal)
+void constructSSA(IRModule* module, IRInst* globalVal)
 {
     switch (globalVal->op)
     {
@@ -900,9 +900,9 @@ void constructSSA(IRModule* module, IRGlobalValue* globalVal)
 
 void constructSSA(IRModule* module)
 {
-    for (auto gv = module->getFirstGlobalValue(); gv; gv = gv->getNextValue())
+    for(auto ii : module->getGlobalInsts())
     {
-        constructSSA(module, gv);
+        constructSSA(module, ii);
     }
 }
 

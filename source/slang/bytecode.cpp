@@ -103,7 +103,7 @@ struct SharedBytecodeGenerationContext
 
     // Map from an IR value to a global entity
     // that encodes it:
-    Dictionary<IRValue*, BCConst> mapValueToGlobal;
+    Dictionary<IRInst*, BCConst> mapValueToGlobal;
 
     // Types that have been emitted
     List<BytecodeGenerationPtr<BCType>> bcTypes;
@@ -111,7 +111,7 @@ struct SharedBytecodeGenerationContext
 
     // Compile-time constant values that need
     // to be emitted...
-    List<IRValue*>  constants;
+    List<IRInst*>  constants;
 };
 
 struct BytecodeGenerationContext
@@ -131,7 +131,7 @@ struct BytecodeGenerationContext
 
     // Map an instruction to its ID for use local
     // to the current context
-    Dictionary<IRValue*, Int> mapInstToLocalID;
+    Dictionary<IRInst*, Int> mapInstToLocalID;
 };
 
 template<typename T>
@@ -239,7 +239,7 @@ void encodeSInt(
 
 BCConst getGlobalValue(
     BytecodeGenerationContext*  context,
-    IRValue*                    value)
+    IRInst*                     value)
 {
     {
         BCConst bcConst;
@@ -281,7 +281,7 @@ BCConst getGlobalValue(
 
 Int getLocalID(
     BytecodeGenerationContext*  context,
-    IRValue*                    value)
+    IRInst*                     value)
 {
     Int localID = 0;
     if( context->mapInstToLocalID.TryGetValue(value, localID) )
@@ -300,7 +300,7 @@ Int getLocalID(
 
 void encodeOperand(
     BytecodeGenerationContext*  context,
-    IRValue*                    operand)
+    IRInst*                     operand)
 {
     auto id = getLocalID(context, operand);
     encodeSInt(context, id);
@@ -317,7 +317,7 @@ void encodeOperand(
     encodeUInt(context, getTypeID(context, type));
 }
 
-bool opHasResult(IRValue* inst)
+bool opHasResult(IRInst* inst)
 {
     auto type = inst->getDataType();
     if (!type) return false;
@@ -350,13 +350,13 @@ void generateBytecodeForInst(
             // encode the necessary extra info:
             //
 
-            auto argCount = inst->getArgCount();
+            auto operandCount = inst->getOperandCount();
             encodeUInt(context, inst->op);
             encodeOperand(context, inst->getDataType());
-            encodeUInt(context, argCount);
-            for( UInt aa = 0; aa < argCount; ++aa )
+            encodeUInt(context, operandCount);
+            for( UInt aa = 0; aa < operandCount; ++aa )
             {
-                encodeOperand(context, inst->getArg(aa));
+                encodeOperand(context, inst->getOperand(aa));
             }
 
             if (!opHasResult(inst))
@@ -446,9 +446,9 @@ void generateBytecodeForInst(
 
             // We need to encode the type being stored, to make
             // our lives easier.
-            encodeOperand(context, inst->getArg(1)->getDataType());
-            encodeOperand(context, inst->getArg(0));
-            encodeOperand(context, inst->getArg(1));
+            encodeOperand(context, inst->getOperand(1)->getDataType());
+            encodeOperand(context, inst->getOperand(0));
+            encodeOperand(context, inst->getOperand(1));
         }
         break;
 
@@ -456,7 +456,7 @@ void generateBytecodeForInst(
         {
             encodeUInt(context, inst->op);
             encodeOperand(context, inst->getDataType());
-            encodeOperand(context, inst->getArg(0));
+            encodeOperand(context, inst->getOperand(0));
             encodeOperand(context, inst);
         }
         break;
@@ -609,7 +609,7 @@ uint32_t getTypeID(
 
 uint32_t getTypeIDForGlobalSymbol(
     BytecodeGenerationContext*  context,
-    IRValue*                    inst)
+    IRInst*                     inst)
 {
     auto type = inst->getDataType();
     if(!type)
@@ -721,15 +721,6 @@ BytecodeGenerationPtr<BCSymbol> generateBytecodeSymbolForInst(
                 UInt blockID = blockCounter++;
                 UInt paramCount = 0;
 
-                for( auto pp = bb->getFirstParam(); pp; pp = pp->getNextParam() )
-                {
-                    // A parameter always uses a register.
-                    regCounter++;
-                    //
-                    // We also want to keep a count of the parameters themselves.
-                    paramCount++;
-                }
-
                 for( auto ii = bb->getFirstInst(); ii; ii = ii->getNextInst() )
                 {
                     switch( ii->op )
@@ -741,6 +732,14 @@ BytecodeGenerationPtr<BCSymbol> generateBytecodeSymbolForInst(
                         {
                             regCounter++;
                         }
+                        break;
+
+                    case kIROp_Param:
+                        // A parameter always uses a register.
+                        regCounter++;
+                        //
+                        // We also want to keep a count of the parameters themselves.
+                        paramCount++;
                         break;
 
                     case kIROp_Var:
@@ -772,35 +771,21 @@ BytecodeGenerationPtr<BCSymbol> generateBytecodeSymbolForInst(
             {
                 UInt blockID = blockCounter++;
 
-                // Loop over just the parameters first, to ensure they
-                // are always the first N registers of a block.
-                //
-                // This means the parameters of the function itself
-                // are always the first N registers in the overall list.
+                // Loop over the instruction in the block, to allocate registers
+                // for them. The parameters of a block will always be the first
+                // N instructions in the block, so they will always get the
+                // first N registers in that block. Similarly, the entry block
+                // is always the first block, so that the parameters of the function
+                // will always be the first N registers.
                 //
                 bcBlocks[blockID].params = bcRegs + regCounter;
-                for( auto pp = bb->getFirstParam(); pp; pp = pp->getNextParam() )
-                {
-                    Int localID = regCounter++;
-                    subContext->mapInstToLocalID.Add(pp, localID);
-
-                    bcRegs[localID].op = pp->op;
-#if 0
-                    bcRegs[localID].name = tryGenerateNameForSymbol(context, pp);
-#endif
-                    bcRegs[localID].previousVarIndexPlusOne = (uint32_t)localID;
-                    bcRegs[localID].typeID = getTypeIDForGlobalSymbol(context, pp);
-                }
-
-                // Now loop over the non-parameter instructions and
-                // allocate actual register locations to them.
                 for( auto ii = bb->getFirstInst(); ii; ii = ii->getNextInst() )
                 {
                     switch(ii->op)
                     {
                     default:
-                        // For an ordinary instruction with a result,
-                        // allocate it here.
+                        // For a parameter, or an ordinary instruction with
+                        // a result, allocate it here.
                         if( opHasResult(ii) )
                         {
                             Int localID = regCounter++;
@@ -816,12 +801,12 @@ BytecodeGenerationPtr<BCSymbol> generateBytecodeSymbolForInst(
                         break;
 
                     case kIROp_Var:
+                        // As handled in the earlier loop, we are
+                        // allocating *two* locations for each `var`
+                        // instruction. The first of these will be
+                        // the actual pointer value, while the second
+                        // will be the storage for the variable value.
                         {
-                            // As handled in the earlier loop, we are
-                            // allocating *two* locations for each `var`
-                            // instruction. The first of these will be
-                            // the actual pointer value, while the second
-                            // will be the storage for the variable value.
                             Int localID = regCounter;
                             regCounter += 2;
 
@@ -967,8 +952,12 @@ BytecodeGenerationPtr<BCModule> generateBytecodeForModule(
     // for the module, where the registers represent the
     // values being computed at the global scope.
     UInt symbolCount = 0;
-    for( auto gv = irModule->getFirstGlobalValue(); gv; gv = gv->getNextValue() )
+    for(auto ii : irModule->getGlobalInsts())
     {
+        auto gv = as<IRGlobalValue>(ii);
+        if (!gv)
+            continue;
+
         Int globalID = Int(symbolCount++);
 
         // Ensure that local code inside functions can see these symbols
@@ -986,8 +975,12 @@ BytecodeGenerationPtr<BCModule> generateBytecodeForModule(
     bcModule->symbolCount = (uint32_t)symbolCount;
     bcModule->symbols = bcSymbols;
 
-    for( auto gv = irModule->getFirstGlobalValue(); gv; gv = gv->getNextValue() )
+    for(auto ii : irModule->getGlobalInsts())
     {
+        auto gv = as<IRGlobalValue>(ii);
+        if (!gv)
+            continue;
+
         UInt symbolIndex = *context->mapInstToLocalID.TryGetValue(gv);
 
         auto bcSymbol = generateBytecodeSymbolForInst(context, gv);

@@ -8,6 +8,9 @@ namespace Slang {
 
 struct PropagateConstExprContext
 {
+    IRModule* module;
+    IRModule* getModule() { return module; }
+
     DiagnosticSink* sink;
 
     SharedIRBuilder sharedBuilder;
@@ -35,7 +38,7 @@ bool isConstExpr(Type* type)
     return false;
 }
 
-bool isConstExpr(IRValue* value)
+bool isConstExpr(IRInst* value)
 {
     // Certain IR value ops are implicitly `constexpr`
     //
@@ -84,7 +87,7 @@ bool opCanBeConstExpr(IROp op)
     }
 }
 
-bool opCanBeConstExpr(IRValue* value)
+bool opCanBeConstExpr(IRInst* value)
 {
     // TODO: realistically need to special-case `call`
     // operations here, so that we check whether the
@@ -96,7 +99,7 @@ bool opCanBeConstExpr(IRValue* value)
 
 void markConstExpr(
     PropagateConstExprContext*  context,
-    IRValue*                    value)
+    IRInst*                    value)
 {
     Slang::markConstExpr(context->getSession(), value);
 }
@@ -126,10 +129,10 @@ bool propagateConstExprForward(
 
                 // Are all arguments `constexpr`?
                 bool allArgsConstExpr = true;
-                UInt argCount = ii->getArgCount();
+                UInt argCount = ii->getOperandCount();
                 for( UInt aa = 0; aa < argCount; ++aa )
                 {
-                    auto arg = ii->getArg(aa);
+                    auto arg = ii->getOperand(aa);
 
                     if( !isConstExpr(arg) )
                     {
@@ -166,7 +169,7 @@ void maybeAddToWorkList(
 
 bool maybeMarkConstExpr(
     PropagateConstExprContext*  context,
-    IRValue*                    value)
+    IRInst*                    value)
 {
     if(isConstExpr(value))
         return false;
@@ -204,7 +207,7 @@ bool maybeMarkConstExpr(
                 case kIROp_Call:
                     {
                         auto inst = (IRCall*) user;
-                        auto caller = inst->getParentBlock()->getParent();
+                        auto caller = as<IRGlobalValueWithCode>(inst->getParent()->getParent());
                         maybeAddToWorkList(context, caller);
                     }
                     break;
@@ -226,7 +229,7 @@ bool propagateConstExprBackward(
     IRGlobalValueWithCode*      code)
 {
     SharedIRBuilder sharedBuilder;
-    sharedBuilder.module = code->parentModule;
+    sharedBuilder.module = context->getModule();
     sharedBuilder.session = sharedBuilder.module->session;
 
     IRBuilder builder;
@@ -253,10 +256,10 @@ bool propagateConstExprBackward(
                 if( isConstExpr(ii) )
                 {
                     // If this instruction is `constexpr`, then its operands should be too.
-                    UInt argCount = ii->getArgCount();
+                    UInt argCount = ii->getOperandCount();
                     for( UInt aa = 0; aa < argCount; ++aa )
                     {
-                        auto arg = ii->getArg(aa);
+                        auto arg = ii->getOperand(aa);
                         if(isConstExpr(arg))
                             continue;
 
@@ -277,15 +280,15 @@ bool propagateConstExprBackward(
                     // constexpr from the parameters back to the arguments.
                     auto callInst = (IRCall*) ii;
 
-                    UInt operandCount = callInst->getArgCount();
+                    UInt operandCount = callInst->getOperandCount();
 
                     UInt firstCallArg = 1;
                     UInt callArgCount = operandCount - firstCallArg;
 
-                    auto callee = callInst->getArg(0);
+                    auto callee = callInst->getOperand(0);
                     while( callee->op == kIROp_specialize )
                     {
-                        callee = ((IRSpecialize*) callee)->getArg(0);
+                        callee = ((IRSpecialize*) callee)->getOperand(0);
                     }
                     if( callee->op == kIROp_Func )
                     {
@@ -297,7 +300,7 @@ bool propagateConstExprBackward(
 
                         // If the callee has a definition, then we can read `constexpr`
                         // information off of the parameters of its first IR block.
-                        if( auto calleeFirstBlock = calleeFunc->firstBlock )
+                        if( auto calleeFirstBlock = calleeFunc->getFirstBlock() )
                         {
                             UInt paramCounter = 0;
                             for( auto pp = calleeFirstBlock->getFirstParam(); pp; pp = pp->getNextParam() )
@@ -305,7 +308,7 @@ bool propagateConstExprBackward(
                                 UInt paramIndex = paramCounter++;
 
                                 auto param = pp;
-                                auto arg = callInst->getArg(firstCallArg + paramIndex);
+                                auto arg = callInst->getOperand(firstCallArg + paramIndex);
 
                                 if( isConstExpr(param) )
                                 {
@@ -326,7 +329,7 @@ bool propagateConstExprBackward(
                             for( UInt pp = 0; pp < paramCount; ++pp )
                             {
                                 auto paramType = calleeType->getParamType(pp);
-                                auto arg = callInst->getArg(firstCallArg + pp);
+                                auto arg = callInst->getOperand(firstCallArg + pp);
                                 if( isConstExpr(paramType) )
                                 {
                                     if( maybeMarkConstExpr(context, arg) )
@@ -336,14 +339,6 @@ bool propagateConstExprBackward(
                                 }
                             }
                         }
-
-                        // TODO: this currently only works if the callee has a definition,
-                        // because that is the only case where will generate IR values for
-                        // its parameter list. Otherwise we'd need to pull this information
-                        // from the function *type* for builtins.
-                        if(!calleeFunc->firstBlock)
-                            continue;
-
                     }
                 }
             }
@@ -370,9 +365,9 @@ bool propagateConstExprBackward(
                             continue;
 
                         UInt operandIndex = paramIndex + 1;
-                        SLANG_RELEASE_ASSERT(operandIndex < terminator->getArgCount());
+                        SLANG_RELEASE_ASSERT(operandIndex < terminator->getOperandCount());
 
-                        auto operand = terminator->getArg(operandIndex);
+                        auto operand = terminator->getOperand(operandIndex);
                         if( maybeMarkConstExpr(context, operand) )
                         {
                             changedThisIteration = true;
@@ -406,10 +401,10 @@ void validateConstExpr(
                 // For an instruction that must be `constexpr`, we need
                 // to ensure that its argumenst are all `constexpr`
 
-                UInt argCount = ii->getArgCount();
+                UInt argCount = ii->getOperandCount();
                 for( UInt aa = 0; aa < argCount; ++aa )
                 {
-                    auto arg = ii->getArg(aa);
+                    auto arg = ii->getOperand(aa);
 
                     if( !isConstExpr(arg) )
                     {
@@ -432,6 +427,7 @@ void propagateConstExpr(
     auto session = module->session;
 
     PropagateConstExprContext context;
+    context.module = module;
     context.sink = sink;
     context.sharedBuilder.module = module;
     context.sharedBuilder.session = session;
@@ -460,8 +456,11 @@ void propagateConstExpr(
 
     // We will build an initial work list with all of the global values in it.
     
-    for( auto gv = module->getFirstGlobalValue(); gv; gv = gv->getNextValue() )
+    for( auto ii : module->getGlobalInsts() )
     {
+        auto gv = as<IRGlobalValue>(ii);
+        if (!gv)
+            continue;
         maybeAddToWorkList(&context, gv);
     }
 
@@ -508,9 +507,9 @@ void propagateConstExpr(
     // we find that they are *required* to be `constexpr`, but *cannot*
     // be, for some reason.
 
-    for( auto gv = module->getFirstGlobalValue(); gv; gv = gv->getNextValue() )
+    for(auto ii : module->getGlobalInsts())
     {
-        switch( gv->op )
+        switch( ii->op )
         {
         default:
             break;
@@ -519,7 +518,7 @@ void propagateConstExpr(
         case kIROp_global_var:
         case kIROp_global_constant:
             {
-                IRGlobalValueWithCode* code = (IRGlobalValueWithCode*) gv;
+                IRGlobalValueWithCode* code = (IRGlobalValueWithCode*) ii;
                 validateConstExpr(&context, code);
             }
             break;

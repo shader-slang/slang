@@ -83,22 +83,23 @@ struct IRTypeLegalizationContext
     TypeLegalizationContext* typeLegalizationContext;
 
     // When inserting new globals, put them before this one.
-    IRGlobalValue* insertBeforeGlobal = nullptr;
+    IRInst* insertBeforeGlobal = nullptr;
 
     // When inserting new parameters, put them before this one.
     IRParam* insertBeforeParam = nullptr;
 
-    Dictionary<IRValue*, LegalVal> mapValToLegalVal;
+    Dictionary<IRInst*, LegalVal> mapValToLegalVal;
 
     IRVar* insertBeforeLocalVar = nullptr;
-    // store local var instructions that have been replaced here, so we can free them
+
+    // store instructions that have been replaced here, so we can free them
     // when legalization has done
-    List<IRInst*> oldLocalVars;
+    List<IRInst*> replacedInstructions;
 };
 
 static void registerLegalizedValue(
     IRTypeLegalizationContext*    context,
-    IRValue*                    irValue,
+    IRInst*                    irValue,
     LegalVal const&             legalVal)
 {
     context->mapValToLegalVal.Add(irValue, legalVal);
@@ -165,7 +166,7 @@ static RefPtr<Type> legalizeSimpleType(
 // and turn it into the equivalent legalized value.
 static LegalVal legalizeOperand(
     IRTypeLegalizationContext*    context,
-    IRValue*                    irValue)
+    IRInst*                    irValue)
 {
     LegalVal legalVal;
     if (context->mapValToLegalVal.TryGetValue(irValue, legalVal))
@@ -178,7 +179,7 @@ static LegalVal legalizeOperand(
 }
 
 static void getArgumentValues(
-    List<IRValue*> & instArgs, 
+    List<IRInst*> & instArgs, 
     LegalVal val)
 {
     switch (val.flavor)
@@ -226,9 +227,9 @@ static LegalVal legalizeCall(
     auto retType = legalizeType(context, callInst->type);
     SLANG_ASSERT(retType.flavor == LegalType::Flavor::simple);
     
-    List<IRValue*> instArgs;
-    for (auto i = 1u; i < callInst->argCount; i++)
-        getArgumentValues(instArgs, legalizeOperand(context, callInst->getArg(i)));
+    List<IRInst*> instArgs;
+    for (auto i = 1u; i < callInst->getOperandCount(); i++)
+        getArgumentValues(instArgs, legalizeOperand(context, callInst->getOperand(i)));
 
     return LegalVal::simple(context->builder->emitCallInst(
         callInst->type,
@@ -479,7 +480,7 @@ static LegalVal legalizeGetElementPtr(
     IRTypeLegalizationContext*  context,
     LegalType                   type,
     LegalVal                    legalPtrOperand,
-    IRValue*                    indexOperand)
+    IRInst*                    indexOperand)
 {
     auto builder = context->builder;
 
@@ -613,7 +614,7 @@ static LegalVal legalizeInst(
     }
 }
 
-RefPtr<VarLayout> findVarLayout(IRValue* value)
+RefPtr<VarLayout> findVarLayout(IRInst* value)
 {
     if (auto layoutDecoration = value->findDecoration<IRLayoutDecoration>())
         return layoutDecoration->layout.As<VarLayout>();
@@ -667,27 +668,66 @@ static LegalVal legalizeLocalVar(
         // Remove the old local var.
         irLocalVar->removeFromParent();
         // add old local var to list
-        context->oldLocalVars.Add(irLocalVar);
+        context->replacedInstructions.Add(irLocalVar);
         return newVal;
     }
     break;
     }
 }
 
+static LegalVal legalizeParam(
+    IRTypeLegalizationContext*  context,
+    IRParam*                    originalParam)
+{
+    auto legalParamType = legalizeType(context, originalParam->getFullType());
+    if (legalParamType.flavor == LegalType::Flavor::simple)
+    {
+        // Simple case: things were legalized to a simple type,
+        // so we can just use the original parameter as-is.
+        originalParam->type = legalParamType.getSimple();
+        return LegalVal::simple(originalParam);
+    }
+    else
+    {
+        // Complex case: we need to insert zero or more new parameters,
+        // which will replace the old ones.
+
+        context->insertBeforeParam = originalParam;
+
+        auto newVal = declareVars(context, kIROp_Param, legalParamType, nullptr, nullptr, nullptr);
+
+        originalParam->removeFromParent();
+        context->replacedInstructions.Add(originalParam);
+        return newVal;
+    }
+}
+
+
+
 static LegalVal legalizeInst(
-    IRTypeLegalizationContext*    context,
+    IRTypeLegalizationContext*  context,
     IRInst*                     inst)
 {
-    if (inst->op == kIROp_Var)
-        return legalizeLocalVar(context, (IRVar*)inst);
+    // Special-case certain operations
+    switch (inst->op)
+    {
+    case kIROp_Var:
+        return legalizeLocalVar(context, cast<IRVar>(inst));
+
+    case kIROp_Param:
+        return legalizeParam(context, cast<IRParam>(inst));
+
+    default:
+        break;
+    }
 
     // Need to legalize all the operands.
-    auto argCount = inst->getArgCount();
+    auto argCount = inst->getOperandCount();
     List<LegalVal> legalArgs;
     bool anyComplex = false;
     for (UInt aa = 0; aa < argCount; ++aa)
     {
-        auto oldArg = inst->getArg(aa);
+        auto oldArg = inst->getOperand(aa);
         auto legalArg = legalizeOperand(context, oldArg);
         legalArgs.Add(legalArg);
 
@@ -706,7 +746,7 @@ static LegalVal legalizeInst(
         for (UInt aa = 0; aa < argCount; ++aa)
         {
             auto legalArg = legalArgs[aa];
-            inst->setArg(aa, legalArg.getSimple());
+            inst->setOperand(aa, legalArg.getSimple());
         }
 
         inst->type = legalType.getSimple();
@@ -720,9 +760,9 @@ static LegalVal legalizeInst(
 
     // We will set up the IR builder so that any new
     // instructions generated will be placed after
-    // the location of the original instruct.
+    // the location of the original instruction.
     auto builder = context->builder;
-    builder->curBlock = inst->getParentBlock();
+    builder->curBlock = as<IRBlock>(inst->getParent());
     builder->insertBeforeInst = inst->getNextInst();
 
     LegalVal legalVal = legalizeInst(
@@ -795,47 +835,15 @@ static void legalizeFunc(
         addParamType(newFuncType, legalParamType);
     }
     irFunc->type = newFuncType;
-    List<LegalVal> paramVals;
-    List<IRValue*> oldParams;
 
     // we use this list to store replaced local var insts.
     // these old instructions will be freed when we are done.
-    context->oldLocalVars.Clear();
+    context->replacedInstructions.Clear();
     
     // Go through the blocks of the function
     for (auto bb = irFunc->getFirstBlock(); bb; bb = bb->getNextBlock())
     {
-        // Legalize the parameters of the block, which may
-        // involve increasing the number of parameters
-        for (auto pp = bb->getFirstParam(); pp; pp = pp->nextParam)
-        {
-            auto legalParamType = legalizeType(context, pp->getFullType());
-            if (legalParamType.flavor != LegalType::Flavor::simple)
-            {
-                context->insertBeforeParam = pp;
-                context->builder->curBlock = nullptr;
-
-                auto paramVal = declareVars(context, kIROp_Param, legalParamType, nullptr, nullptr, nullptr);
-                paramVals.Add(paramVal);
-                if (pp == bb->getFirstParam())
-                {
-                    bb->firstParam = pp;
-                    while (bb->firstParam->prevParam)
-                        bb->firstParam = bb->firstParam->prevParam;
-                }
-                bb->lastParam = pp->prevParam;
-                if (pp->prevParam)
-                    pp->prevParam->nextParam = pp->nextParam;
-                if (pp->nextParam)
-                    pp->nextParam->prevParam = pp->prevParam;
-                auto oldParam = pp;
-                oldParams.Add(oldParam);
-                registerLegalizedValue(context, oldParam, paramVal);
-            }
-           
-        }
-
-        // Now legalize the instructions inside the block
+        // Legalize the instructions inside the block
         IRInst* nextInst = nullptr;
         for (auto ii = bb->getFirstInst(); ii; ii = nextInst)
         {
@@ -847,13 +855,12 @@ static void legalizeFunc(
         }
 
     }
-    for (auto & op : oldParams)
+
+    // Clean up after any instructions we replaced along the way.
+    for (auto & lv : context->replacedInstructions)
     {
-        SLANG_ASSERT(op->firstUse == nullptr || op->firstUse->nextUse == nullptr);
-        op->deallocate();
-    }
-    for (auto & lv : context->oldLocalVars)
         lv->deallocate();
+    }
 }
 
 static LegalVal declareSimpleVar(
@@ -874,7 +881,7 @@ static LegalVal declareSimpleVar(
 
     IRBuilder* builder = context->builder;
 
-    IRValue*    irVar = nullptr;
+    IRInst*    irVar = nullptr;
     LegalVal    legalVarVal;
 
     switch (op)
@@ -883,7 +890,7 @@ static LegalVal declareSimpleVar(
         {
             auto globalVar = builder->createGlobalVar(type);
             globalVar->removeFromParent();
-            globalVar->insertBefore(context->insertBeforeGlobal, builder->getModule());
+            globalVar->insertBefore(context->insertBeforeGlobal);
 
             // The legalization of a global variable with linkage (one that has
             // a mangled name), must also have an exported name, so that code
@@ -924,11 +931,7 @@ static LegalVal declareSimpleVar(
     case kIROp_Param:
         {
             auto param = builder->emitParam(type);
-            if (context->insertBeforeParam->prevParam)
-                context->insertBeforeParam->prevParam->nextParam = param;
-            param->prevParam = context->insertBeforeParam->prevParam;
-            param->nextParam = context->insertBeforeParam;
-            context->insertBeforeParam->prevParam = param;
+            param->insertBefore(context->insertBeforeParam);
 
             irVar = param;
             legalVarVal = LegalVal::simple(irVar);
@@ -1069,7 +1072,7 @@ static void legalizeGlobalVar(
 
     default:
         {
-            context->insertBeforeGlobal = irGlobalVar->getNextValue();
+            context->insertBeforeGlobal = irGlobalVar->getNextInst();
 
             LegalVarChain* varChain = nullptr;
             LegalVarChain varChainStorage;
@@ -1119,7 +1122,7 @@ static void legalizeGlobalConstant(
 
     default:
         {
-            context->insertBeforeGlobal = irGlobalConstant->getNextValue();
+            context->insertBeforeGlobal = irGlobalConstant->getNextInst();
 
             IRGlobalNameInfo globalNameInfo;
             globalNameInfo.globalVar = irGlobalConstant;
@@ -1174,8 +1177,17 @@ static void legalizeTypes(
     IRTypeLegalizationContext*    context)
 {
     auto module = context->module;
-    for (auto gv = module->getFirstGlobalValue(); gv; gv = gv->getNextValue())
+    IRInst* next = nullptr;
+    for(auto ii = module->getGlobalInsts().getFirst(); ii; ii = next)
     {
+        next = ii->getNextInst();
+
+        // TODO: Once we start having global-scope instructions that
+        // aren't `IRGlobalValue`s, we'll actually want to handle those
+        // here too.
+        auto gv = as<IRGlobalValue>(ii);
+        if (!gv)
+            continue;
         legalizeGlobalValue(context, gv);
     }
 }

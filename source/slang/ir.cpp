@@ -82,7 +82,7 @@ namespace Slang
 #endif
     }
 
-    void IRUse::init(IRUser* u, IRValue* v)
+    void IRUse::init(IRInst* u, IRInst* v)
     {
         clear();
 
@@ -104,7 +104,7 @@ namespace Slang
         debugValidate();
     }
 
-    void IRUse::set(IRValue* uv)
+    void IRUse::set(IRInst* uv)
     {
         init(user, uv);
     }
@@ -138,7 +138,7 @@ namespace Slang
 
     //
 
-    IRUse* IRUser::getArgs()
+    IRUse* IRInst::getOperands()
     {
         // We assume that *all* instructions are laid out
         // in memory such that their arguments come right
@@ -150,7 +150,7 @@ namespace Slang
         return (IRUse*)(this + 1);
     }
 
-    IRDecoration* IRValue::findDecorationImpl(IRDecorationOp decorationOp)
+    IRDecoration* IRInst::findDecorationImpl(IRDecorationOp decorationOp)
     {
         for( auto dd = firstDecoration; dd; dd = dd->next )
         {
@@ -160,20 +160,37 @@ namespace Slang
         return nullptr;
     }
 
+    // IRParam
+
+    IRParam* IRParam::getNextParam()
+    {
+        return as<IRParam>(getNextInst());
+    }
+
     // IRBlock
+
+    IRParam* IRBlock::getLastParam()
+    {
+        IRParam* param = getFirstParam();
+        if (!param) return nullptr;
+
+        while (auto nextParam = param->getNextParam())
+            param = nextParam;
+
+        return param;
+    }
 
     void IRBlock::addParam(IRParam* param)
     {
-        if (auto lp = lastParam)
+        auto lastParam = getLastParam();
+        if (lastParam)
         {
-            lp->nextParam = param;
-            param->prevParam = lp;
+            param->insertAfter(lastParam);
         }
         else
         {
-            firstParam = param;
+            param->insertAtStart(this);
         }
-        lastParam = param;
     }
 
     // The predecessors of a block should all show up as users
@@ -191,7 +208,7 @@ namespace Slang
         // If the block somehow isn't terminated, then
         // there is no way to read its successors, so
         // we return an empty list.
-        if (!terminator || !isTerminatorInst(terminator))
+        if (!terminator || !as<IRTerminatorInst>(terminator))
             return IRBlock::SuccessorList(nullptr, nullptr);
 
         // Otherwise, based on the opcode of the terminator
@@ -200,7 +217,7 @@ namespace Slang
         IRUse* end = nullptr;
         UInt stride = 1;
 
-        auto args = terminator->getArgs();
+        auto operands = terminator->getOperands();
         switch (terminator->op)
         {
         case kIROp_ReturnVal:
@@ -212,21 +229,25 @@ namespace Slang
         case kIROp_unconditionalBranch:
         case kIROp_loop:
             // unconditonalBranch <block>
-            begin = args + 0;
+            begin = operands + 0;
             end = begin + 1;
             break;
 
         case kIROp_conditionalBranch:
         case kIROp_ifElse:
             // conditionalBranch <condition> <trueBlock> <falseBlock>
-            begin = args + 1;
+            begin = operands + 1;
             end = begin + 2;
             break;
 
         case kIROp_switch:
             // switch <val> <break> <default> <caseVal1> <caseBlock1> ...
-            begin = args + 4;
-            end = args + terminator->getArgCount() + 1;
+            begin = operands + 4;
+
+            // TODO: this ends up point one *after* the "one after the end"
+            // location, so we should really change the representation
+            // so that we don't need to form this pointer...
+            end = operands + terminator->getOperandCount() + 1;
             stride = 2;
             break;
 
@@ -236,47 +257,6 @@ namespace Slang
         }
 
         return IRBlock::SuccessorList(begin, end, stride);
-    }
-
-    void IRBlock::insertAfter(IRBlock* other)
-    {
-        assert(other);
-        insertAfter(other, other->parentFunc);
-    }
-
-    void IRBlock::insertAfter(IRBlock* other, IRGlobalValueWithCode* func)
-    {
-        assert(other || func);
-
-        if (!other) other = func->lastBlock;
-        if (!func) func = other->parentFunc;
-
-        assert(func);
-
-        auto pp = other;
-        auto nn = other ? other->nextBlock : nullptr;
-
-        if (pp)
-        {
-            pp->nextBlock = this;
-        }
-        else
-        {
-            func->firstBlock = this;
-        }
-
-        if (nn)
-        {
-            nn->prevBlock = this;
-        }
-        else
-        {
-            func->lastBlock = this;
-        }
-
-        this->prevBlock = pp;
-        this->nextBlock = nn;
-        this->parentFunc = func;
     }
 
     static IRUse* adjustPredecessorUse(IRUse* use)
@@ -410,18 +390,7 @@ namespace Slang
 
     void IRGlobalValueWithCode::addBlock(IRBlock* block)
     {
-        block->parentFunc = this;
-
-        if (auto lb = lastBlock)
-        {
-            lb->nextBlock = block;
-            block->prevBlock = lb;
-        }
-        else
-        {
-            firstBlock = block;
-        }
-        lastBlock = block;
+        block->insertAtEnd(this);
     }
 
     //
@@ -454,52 +423,6 @@ namespace Slang
 
     //
 
-    void IRValueListBase::addImpl(IRValue* parent, IRChildValue* val)
-    {
-        val->parent = parent;
-        val->prev = last;
-        val->next = nullptr;
-
-        if (last)
-        {
-            last->next = val;
-        }
-        else
-        {
-            first = val;
-        }
-
-        last = val;
-    }
-
-
-    //
-
-    // Add an instruction to a specific parent
-    void IRBuilder::addInst(IRBlock* pblock, IRInst* inst)
-    {
-        inst->parent = pblock;
-
-        if (!pblock->firstInst)
-        {
-            inst->prev = nullptr;
-            inst->next = nullptr;
-
-            pblock->firstInst = inst;
-            pblock->lastInst = inst;
-        }
-        else
-        {
-            auto prev = pblock->lastInst;
-
-            inst->prev = prev;
-            inst->next = nullptr;
-
-            prev->next = inst;
-            pblock->lastInst = inst;
-        }
-    }
-
     // Add an instruction into the current scope
     void IRBuilder::addInst(
         IRInst*     inst)
@@ -509,17 +432,19 @@ namespace Slang
             inst->insertBefore(insertBeforeInst);
             return;
         }
-
-        auto parent = curBlock;
-        if (!parent)
-            return;
-
-        addInst(parent, inst);
+        else if (curBlock)
+        {
+            inst->insertAtEnd(curBlock);
+        }
+        else
+        {
+            // Don't append the instruction anywhere
+        }
     }
 
     static void maybeSetSourceLoc(
         IRBuilder*  builder,
-        IRValue*    value)
+        IRInst*     value)
     {
         if(!builder)
             return;
@@ -566,20 +491,21 @@ namespace Slang
     // argument for all instructions).
     template<typename T>
     static T* createInstImpl(
+        IRModule*       module,
         IRBuilder*      builder,
         UInt            size,
         IROp            op,
         IRType*         type,
         UInt            fixedArgCount,
-        IRValue* const* fixedArgs,
+        IRInst* const* fixedArgs,
         UInt            varArgCount = 0,
-        IRValue* const* varArgs = nullptr)
+        IRInst* const* varArgs = nullptr)
     {
-        assert(builder->getModule());
-        T* inst = (T*)builder->getModule()->memoryPool.allocZero(size);
+        assert(module);
+        T* inst = (T*)module->memoryPool.allocZero(size);
         new(inst)T();
 
-        inst->argCount = (uint32_t)(fixedArgCount + varArgCount);
+        inst->operandCount = (uint32_t)(fixedArgCount + varArgCount);
 
         inst->op = op;
 
@@ -587,7 +513,7 @@ namespace Slang
 
         maybeSetSourceLoc(builder, inst);
 
-        auto operand = inst->getArgs();
+        auto operand = inst->getOperands();
 
         for( UInt aa = 0; aa < fixedArgCount; ++aa )
         {
@@ -606,8 +532,31 @@ namespace Slang
             }
             operand++;
         }
-        builder->getModule()->irObjectsToFree.Add(inst);
+        module->irObjectsToFree.Add(inst);
         return inst;
+    }
+
+    template<typename T>
+    static T* createInstImpl(
+        IRBuilder*      builder,
+        UInt            size,
+        IROp            op,
+        IRType*         type,
+        UInt            fixedArgCount,
+        IRInst* const* fixedArgs,
+        UInt            varArgCount = 0,
+        IRInst* const* varArgs = nullptr)
+    {
+        return createInstImpl<T>(
+            builder->getModule(),
+            builder,
+            size,
+            op,
+            type,
+            fixedArgCount,
+            fixedArgs,
+            varArgCount,
+            varArgs);
     }
 
     template<typename T>
@@ -616,7 +565,7 @@ namespace Slang
         IROp            op,
         IRType*         type,
         UInt            argCount,
-        IRValue* const* args)
+        IRInst* const* args)
     {
         return createInstImpl<T>(
             builder,
@@ -647,7 +596,7 @@ namespace Slang
         IRBuilder*      builder,
         IROp            op,
         IRType*         type,
-        IRValue*        arg)
+        IRInst*         arg)
     {
         return createInstImpl<T>(
             builder,
@@ -663,10 +612,10 @@ namespace Slang
         IRBuilder*      builder,
         IROp            op,
         IRType*         type,
-        IRValue*        arg1,
-        IRValue*        arg2)
+        IRInst*         arg1,
+        IRInst*         arg2)
     {
-        IRValue* args[] = { arg1, arg2 };
+        IRInst* args[] = { arg1, arg2 };
         return createInstImpl<T>(
             builder,
             sizeof(T),
@@ -682,7 +631,7 @@ namespace Slang
         IROp            op,
         IRType*         type,
         UInt            argCount,
-        IRValue* const* args)
+        IRInst* const* args)
     {
         return createInstImpl<T>(
             builder,
@@ -699,9 +648,9 @@ namespace Slang
         IROp            op,
         IRType*         type,
         UInt            fixedArgCount,
-        IRValue* const* fixedArgs,
+        IRInst* const*  fixedArgs,
         UInt            varArgCount,
-        IRValue* const* varArgs)
+        IRInst* const*  varArgs)
     {
         return createInstImpl<T>(
             builder,
@@ -719,11 +668,11 @@ namespace Slang
         IRBuilder*      builder,
         IROp            op,
         IRType*         type,
-        IRValue*        arg1,
+        IRInst*         arg1,
         UInt            varArgCount,
-        IRValue* const* varArgs)
+        IRInst* const*  varArgs)
     {
-        IRValue* fixedArgs[] = { arg1 };
+        IRInst* fixedArgs[] = { arg1 };
         UInt fixedArgCount = sizeof(fixedArgs) / sizeof(fixedArgs[0]);
 
         return createInstImpl<T>(
@@ -742,11 +691,11 @@ namespace Slang
     {
         if(left.inst->op != right.inst->op) return false;
         if(left.inst->parent != right.inst->parent) return false;
-        if(left.inst->argCount != right.inst->argCount) return false;
+        if(left.inst->operandCount != right.inst->operandCount) return false;
 
-        auto argCount = left.inst->argCount;
-        auto leftArgs = left.inst->getArgs();
-        auto rightArgs = right.inst->getArgs();
+        auto argCount = left.inst->operandCount;
+        auto leftArgs = left.inst->getOperands();
+        auto rightArgs = right.inst->getOperands();
         for( UInt aa = 0; aa < argCount; ++aa )
         {
             if(leftArgs[aa].get() != rightArgs[aa].get())
@@ -760,10 +709,10 @@ namespace Slang
     {
         auto code = Slang::GetHashCode(inst->op);
         code = combineHash(code, Slang::GetHashCode(inst->parent));
-        code = combineHash(code, Slang::GetHashCode(inst->argCount));
+        code = combineHash(code, Slang::GetHashCode(inst->getOperandCount()));
 
-        auto argCount = inst->argCount;
-        auto args = inst->getArgs();
+        auto argCount = inst->getOperandCount();
+        auto args = inst->getOperands();
         for( UInt aa = 0; aa < argCount; ++aa )
         {
             code = combineHash(code, Slang::GetHashCode(args[aa].get()));
@@ -838,7 +787,7 @@ namespace Slang
 
     //
 
-    IRValue* IRBuilder::getBoolValue(bool inValue)
+    IRInst* IRBuilder::getBoolValue(bool inValue)
     {
         IRIntegerValue value = inValue;
         return findOrEmitConstant(
@@ -849,7 +798,7 @@ namespace Slang
             &value);
     }
 
-    IRValue* IRBuilder::getIntValue(IRType* type, IRIntegerValue value)
+    IRInst* IRBuilder::getIntValue(IRType* type, IRIntegerValue value)
     {
         return findOrEmitConstant(
             this,
@@ -859,7 +808,7 @@ namespace Slang
             &value);
     }
 
-    IRValue* IRBuilder::getFloatValue(IRType* type, IRFloatingPointValue value)
+    IRInst* IRBuilder::getFloatValue(IRType* type, IRFloatingPointValue value)
     {
         return findOrEmitConstant(
             this,
@@ -881,7 +830,7 @@ namespace Slang
         return inst;
     }
 
-    IRValue* IRBuilder::getDeclRefVal(
+    IRInst* IRBuilder::getDeclRefVal(
         DeclRefBase const&  declRef)
     {
         // TODO: we should cache these...
@@ -893,9 +842,9 @@ namespace Slang
         return irValue;
     }
 
-    IRValue * IRBuilder::getTypeVal(IRType * type)
+    IRInst* IRBuilder::getTypeVal(IRType * type)
     {
-        auto irValue = createValue<IRValue>(
+        auto irValue = createValue<IRInst>(
             this,
             kIROp_TypeType,
             nullptr);
@@ -905,10 +854,10 @@ namespace Slang
         return irValue;
     }
 
-    IRValue* IRBuilder::emitSpecializeInst(
+    IRInst* IRBuilder::emitSpecializeInst(
         Type*       type,
-        IRValue*    genericVal,
-        IRValue*    specDeclRef)
+        IRInst*    genericVal,
+        IRInst*    specDeclRef)
     {
         auto inst = createInst<IRSpecialize>(
             this,
@@ -920,9 +869,9 @@ namespace Slang
         return inst;
     }
 
-    IRValue* IRBuilder::emitSpecializeInst(
+    IRInst* IRBuilder::emitSpecializeInst(
         Type*           type,
-        IRValue*        genericVal,
+        IRInst*         genericVal,
         DeclRef<Decl>   specDeclRef)
     {
         auto specDeclRefVal = getDeclRefVal(specDeclRef);
@@ -936,10 +885,10 @@ namespace Slang
         return inst;
     }
 
-    IRValue* IRBuilder::emitLookupInterfaceMethodInst(
-        IRType*     type,
-        IRValue*    witnessTableVal,
-        IRValue*    interfaceMethodVal)
+    IRInst* IRBuilder::emitLookupInterfaceMethodInst(
+        IRType* type,
+        IRInst* witnessTableVal,
+        IRInst* interfaceMethodVal)
     {
         auto inst = createInst<IRLookupWitnessMethod>(
             this,
@@ -951,7 +900,7 @@ namespace Slang
         return inst;
     }
 
-    IRValue* IRBuilder::emitLookupInterfaceMethodInst(
+    IRInst* IRBuilder::emitLookupInterfaceMethodInst(
         IRType*         type,
         DeclRef<Decl>   witnessTableDeclRef,
         DeclRef<Decl>   interfaceMethodDeclRef)
@@ -963,9 +912,9 @@ namespace Slang
         return emitLookupInterfaceMethodInst(type, witnessTableVal, interfaceMethodVal);
     }
 
-    IRValue* IRBuilder::emitLookupInterfaceMethodInst(
+    IRInst* IRBuilder::emitLookupInterfaceMethodInst(
         IRType*         type,
-        IRValue*   witnessTableVal,
+        IRInst*         witnessTableVal,
         DeclRef<Decl>   interfaceMethodDeclRef)
     {
         DeclRef<Decl> removeSubstDeclRef = interfaceMethodDeclRef;
@@ -974,7 +923,7 @@ namespace Slang
         return emitLookupInterfaceMethodInst(type, witnessTableVal, interfaceMethodVal);
     }
 
-    IRValue* IRBuilder::emitFindWitnessTable(
+    IRInst* IRBuilder::emitFindWitnessTable(
         DeclRef<Decl> baseTypeDeclRef,
         IRType* interfaceType)
     {
@@ -992,9 +941,9 @@ namespace Slang
 
     IRInst* IRBuilder::emitCallInst(
         IRType*         type,
-        IRValue*        pFunc,
+        IRInst*        pFunc,
         UInt            argCount,
-        IRValue* const* args)
+        IRInst* const* args)
     {
         auto inst = createInstWithTrailingArgs<IRCall>(
             this,
@@ -1012,7 +961,7 @@ namespace Slang
         IRType*         type,
         IROp            op,
         UInt            argCount,
-        IRValue* const* args)
+        IRInst* const* args)
     {
         auto inst = createInstWithTrailingArgs<IRInst>(
             this,
@@ -1027,7 +976,7 @@ namespace Slang
     IRInst* IRBuilder::emitConstructorInst(
         IRType*         type,
         UInt            argCount,
-        IRValue* const* args)
+        IRInst* const* args)
     {
         auto inst = createInstWithTrailingArgs<IRInst>(
             this,
@@ -1042,7 +991,7 @@ namespace Slang
     IRInst* IRBuilder::emitMakeVector(
         IRType*         type,
         UInt            argCount,
-        IRValue* const* args)
+        IRInst* const* args)
     {
         return emitIntrinsicInst(type, kIROp_makeVector, argCount, args);
     }
@@ -1050,7 +999,7 @@ namespace Slang
     IRInst* IRBuilder::emitMakeArray(
         IRType*         type,
         UInt            argCount,
-        IRValue* const* args)
+        IRInst* const* args)
     {
         return emitIntrinsicInst(type, kIROp_makeArray, argCount, args);
     }
@@ -1058,7 +1007,7 @@ namespace Slang
     IRInst* IRBuilder::emitMakeStruct(
         IRType*         type,
         UInt            argCount,
-        IRValue* const* args)
+        IRInst* const* args)
     {
         return emitIntrinsicInst(type, kIROp_makeStruct, argCount, args);
     }
@@ -1067,148 +1016,28 @@ namespace Slang
     {
         auto module = new IRModule();
         module->session = getSession();
+
+        auto moduleInst = createInstImpl<IRModuleInst>(
+            module,
+            this,
+            sizeof(IRModuleInst),
+            kIROp_Module,
+            nullptr,
+            0,
+            nullptr);
+        module->moduleInst = moduleInst;
+
         return module;
     }
 
-    void IRGlobalValue::insertBefore(IRGlobalValue* other)
-    {
-        assert(other);
-        insertBefore(other, other->parentModule);
-    }
-
-    void IRGlobalValue::insertBefore(IRGlobalValue* other, IRModule* module)
-    {
-        assert(other || module);
-
-        if(!other) other = module->firstGlobalValue;
-        if(!module) module = other->parentModule;
-
-        assert(module);
-
-        auto nn = other;
-        auto pp = other ? other->prevGlobalValue : nullptr;
-
-        if(pp)
-        {
-            pp->nextGlobalValue = this;
-        }
-        else
-        {
-            module->firstGlobalValue = this;
-        }
-
-        if(nn)
-        {
-            nn->prevGlobalValue = this;
-        }
-        else
-        {
-            module->lastGlobalValue = this;
-        }
-
-        this->prevGlobalValue = pp;
-        this->nextGlobalValue = nn;
-        this->parentModule = module;
-    }
-
-    void IRGlobalValue::insertAtStart(IRModule* module)
-    {
-        insertBefore(module->firstGlobalValue, module);
-    }
-
-    void IRGlobalValue::insertAfter(IRGlobalValue* other)
-    {
-        assert(other);
-        insertAfter(other, other->parentModule);
-    }
-
-    void IRGlobalValue::insertAfter(IRGlobalValue* other, IRModule* module)
-    {
-        assert(other || module);
-
-        if(!other) other = module->lastGlobalValue;
-        if(!module) module = other->parentModule;
-
-        assert(module);
-
-        auto pp = other;
-        auto nn = other ? other->nextGlobalValue : nullptr;
-
-        if(pp)
-        {
-            pp->nextGlobalValue = this;
-        }
-        else
-        {
-            module->firstGlobalValue = this;
-        }
-
-        if(nn)
-        {
-            nn->prevGlobalValue = this;
-        }
-        else
-        {
-            module->lastGlobalValue = this;
-        }
-
-        this->prevGlobalValue = pp;
-        this->nextGlobalValue = nn;
-        this->parentModule = module;
-    }
-
-    void IRGlobalValue::insertAtEnd(IRModule* module)
-    {
-        assert(module);
-        insertAfter(module->lastGlobalValue, module);
-    }
-
-    void IRGlobalValue::removeFromParent()
-    {
-        auto module = parentModule;
-        if(!module)
-            return;
-
-        auto pp = this->prevGlobalValue;
-        auto nn = this->nextGlobalValue;
-
-        if(pp)
-        {
-            pp->nextGlobalValue = nn;
-        }
-        else
-        {
-            module->firstGlobalValue = nn;
-        }
-
-        if( nn )
-        {
-            nn->prevGlobalValue = pp;
-        }
-        else
-        {
-            module->lastGlobalValue = pp;
-        }
-    }
-
-    void IRGlobalValue::moveToEnd()
-    {
-        auto module = parentModule;
-        removeFromParent();
-        insertAtEnd(module);
-    }
-
-
-
     void addGlobalValue(
-        IRModule*   module,
+        IRModule*       module,
         IRGlobalValue*  value)
     {
         if(!module)
             return;
 
-        value->parentModule = module;
-        value->insertAfter(module->lastGlobalValue, module);
+        value->insertAtEnd(module->moduleInst);
     }
 
     IRFunc* IRBuilder::createFunc()
@@ -1259,8 +1088,8 @@ namespace Slang
 
     IRWitnessTableEntry* IRBuilder::createWitnessTableEntry(
         IRWitnessTable* witnessTable,
-        IRValue*        requirementKey,
-        IRValue*        satisfyingVal)
+        IRInst*         requirementKey,
+        IRInst*         satisfyingVal)
     {
         IRWitnessTableEntry* entry = createInst<IRWitnessTableEntry>(
             this,
@@ -1271,7 +1100,7 @@ namespace Slang
 
         if (witnessTable)
         {
-            witnessTable->entries.add(witnessTable, entry);
+            entry->insertAtEnd(witnessTable);
         }
 
         return entry;
@@ -1347,7 +1176,7 @@ namespace Slang
     }
 
     IRInst* IRBuilder::emitLoad(
-        IRValue*    ptr)
+        IRInst*    ptr)
     {
         // Note: a `load` operation does not consider the rate
         // (if any) attached to its operand (see the use of `getDataType`
@@ -1394,8 +1223,8 @@ namespace Slang
     }
 
     IRInst* IRBuilder::emitStore(
-        IRValue*    dstPtr,
-        IRValue*    srcVal)
+        IRInst* dstPtr,
+        IRInst* srcVal)
     {
         auto inst = createInst<IRStore>(
             this,
@@ -1409,9 +1238,9 @@ namespace Slang
     }
 
     IRInst* IRBuilder::emitFieldExtract(
-        IRType*         type,
-        IRValue*        base,
-        IRValue*        field)
+        IRType* type,
+        IRInst* base,
+        IRInst* field)
     {
         auto inst = createInst<IRFieldExtract>(
             this,
@@ -1425,9 +1254,9 @@ namespace Slang
     }
 
     IRInst* IRBuilder::emitFieldAddress(
-        IRType*         type,
-        IRValue*        base,
-        IRValue*        field)
+        IRType* type,
+        IRInst* base,
+        IRInst* field)
     {
         auto inst = createInst<IRFieldAddress>(
             this,
@@ -1441,9 +1270,9 @@ namespace Slang
     }
 
     IRInst* IRBuilder::emitElementExtract(
-        IRType*     type,
-        IRValue*    base,
-        IRValue*    index)
+        IRType* type,
+        IRInst* base,
+        IRInst* index)
     {
         auto inst = createInst<IRFieldAddress>(
             this,
@@ -1458,8 +1287,8 @@ namespace Slang
 
     IRInst* IRBuilder::emitElementAddress(
         IRType*     type,
-        IRValue*    basePtr,
-        IRValue*    index)
+        IRInst*    basePtr,
+        IRInst*    index)
     {
         auto inst = createInst<IRFieldAddress>(
             this,
@@ -1474,9 +1303,9 @@ namespace Slang
 
     IRInst* IRBuilder::emitSwizzle(
         IRType*         type,
-        IRValue*        base,
+        IRInst*         base,
         UInt            elementCount,
-        IRValue* const* elementIndices)
+        IRInst* const*  elementIndices)
     {
         auto inst = createInstWithTrailingArgs<IRSwizzle>(
             this,
@@ -1492,13 +1321,13 @@ namespace Slang
 
     IRInst* IRBuilder::emitSwizzle(
         IRType*         type,
-        IRValue*        base,
+        IRInst*         base,
         UInt            elementCount,
         UInt const*     elementIndices)
     {
         auto intType = getSession()->getBuiltinType(BaseType::Int);
 
-        IRValue* irElementIndices[4];
+        IRInst* irElementIndices[4];
         for (UInt ii = 0; ii < elementCount; ++ii)
         {
             irElementIndices[ii] = getIntValue(intType, elementIndices[ii]);
@@ -1510,12 +1339,12 @@ namespace Slang
 
     IRInst* IRBuilder::emitSwizzleSet(
         IRType*         type,
-        IRValue*        base,
-        IRValue*        source,
+        IRInst*         base,
+        IRInst*         source,
         UInt            elementCount,
-        IRValue* const* elementIndices)
+        IRInst* const*  elementIndices)
     {
-        IRValue* fixedArgs[] = { base, source };
+        IRInst* fixedArgs[] = { base, source };
         UInt fixedArgCount = sizeof(fixedArgs) / sizeof(fixedArgs[0]);
 
         auto inst = createInstWithTrailingArgs<IRSwizzleSet>(
@@ -1533,14 +1362,14 @@ namespace Slang
 
     IRInst* IRBuilder::emitSwizzleSet(
         IRType*         type,
-        IRValue*        base,
-        IRValue*        source,
+        IRInst*         base,
+        IRInst*         source,
         UInt            elementCount,
         UInt const*     elementIndices)
     {
         auto intType = getSession()->getBuiltinType(BaseType::Int);
 
-        IRValue* irElementIndices[4];
+        IRInst* irElementIndices[4];
         for (UInt ii = 0; ii < elementCount; ++ii)
         {
             irElementIndices[ii] = getIntValue(intType, elementIndices[ii]);
@@ -1550,7 +1379,7 @@ namespace Slang
     }
 
     IRInst* IRBuilder::emitReturn(
-        IRValue*    val)
+        IRInst*    val)
     {
         auto inst = createInst<IRReturnVal>(
             this,
@@ -1621,7 +1450,7 @@ namespace Slang
         IRBlock*    breakBlock,
         IRBlock*    continueBlock)
     {
-        IRValue* args[] = { target, breakBlock, continueBlock };
+        IRInst* args[] = { target, breakBlock, continueBlock };
         UInt argCount = sizeof(args) / sizeof(args[0]);
 
         auto inst = createInst<IRLoop>(
@@ -1635,11 +1464,11 @@ namespace Slang
     }
 
     IRInst* IRBuilder::emitBranch(
-        IRValue*    val,
+        IRInst*     val,
         IRBlock*    trueBlock,
         IRBlock*    falseBlock)
     {
-        IRValue* args[] = { val, trueBlock, falseBlock };
+        IRInst* args[] = { val, trueBlock, falseBlock };
         UInt argCount = sizeof(args) / sizeof(args[0]);
 
         auto inst = createInst<IRConditionalBranch>(
@@ -1653,12 +1482,12 @@ namespace Slang
     }
 
     IRInst* IRBuilder::emitIfElse(
-        IRValue*    val,
+        IRInst*     val,
         IRBlock*    trueBlock,
         IRBlock*    falseBlock,
         IRBlock*    afterBlock)
     {
-        IRValue* args[] = { val, trueBlock, falseBlock, afterBlock };
+        IRInst* args[] = { val, trueBlock, falseBlock, afterBlock };
         UInt argCount = sizeof(args) / sizeof(args[0]);
 
         auto inst = createInst<IRIfElse>(
@@ -1672,7 +1501,7 @@ namespace Slang
     }
 
     IRInst* IRBuilder::emitIf(
-        IRValue*    val,
+        IRInst*    val,
         IRBlock*    trueBlock,
         IRBlock*    afterBlock)
     {
@@ -1680,7 +1509,7 @@ namespace Slang
     }
 
     IRInst* IRBuilder::emitLoopTest(
-        IRValue*    val,
+        IRInst*     val,
         IRBlock*    bodyBlock,
         IRBlock*    breakBlock)
     {
@@ -1688,13 +1517,13 @@ namespace Slang
     }
 
     IRInst* IRBuilder::emitSwitch(
-        IRValue*        val,
+        IRInst*         val,
         IRBlock*        breakLabel,
         IRBlock*        defaultLabel,
         UInt            caseArgCount,
-        IRValue* const* caseArgs)
+        IRInst* const*  caseArgs)
     {
-        IRValue* fixedArgs[] = { val, breakLabel, defaultLabel };
+        IRInst* fixedArgs[] = { val, breakLabel, defaultLabel };
         UInt fixedArgCount = sizeof(fixedArgs) / sizeof(fixedArgs[0]);
 
         auto inst = createInstWithTrailingArgs<IRSwitch>(
@@ -1709,14 +1538,14 @@ namespace Slang
         return inst;
     }
 
-    IRHighLevelDeclDecoration* IRBuilder::addHighLevelDeclDecoration(IRValue* inst, Decl* decl)
+    IRHighLevelDeclDecoration* IRBuilder::addHighLevelDeclDecoration(IRInst* inst, Decl* decl)
     {
         auto decoration = addDecoration<IRHighLevelDeclDecoration>(inst, kIRDecorationOp_HighLevelDecl);
         decoration->decl = decl;
         return decoration;
     }
 
-    IRLayoutDecoration* IRBuilder::addLayoutDecoration(IRValue* inst, Layout* layout)
+    IRLayoutDecoration* IRBuilder::addLayoutDecoration(IRInst* inst, Layout* layout)
     {
         auto decoration = addDecoration<IRLayoutDecoration>(inst);
         decoration->layout = layout;
@@ -1732,7 +1561,7 @@ namespace Slang
         int     indent = 0;
 
         UInt                        idCounter = 1;
-        Dictionary<IRValue*, UInt>  mapValueToID;
+        Dictionary<IRInst*, UInt>  mapValueToID;
     };
 
     static void dump(
@@ -1778,11 +1607,11 @@ namespace Slang
         }
     }
 
-    bool opHasResult(IRValue* inst);
+    bool opHasResult(IRInst* inst);
 
     static UInt getID(
         IRDumpContext*  context,
-        IRValue*        value)
+        IRInst*         value)
     {
         UInt id = 0;
         if (context->mapValueToID.TryGetValue(value, id))
@@ -1799,7 +1628,7 @@ namespace Slang
 
     static void dumpID(
         IRDumpContext* context,
-        IRValue*        inst)
+        IRInst*        inst)
     {
         if (!inst)
         {
@@ -1847,7 +1676,7 @@ namespace Slang
 
     static void dumpOperand(
         IRDumpContext*  context,
-        IRValue*        inst)
+        IRInst*         inst)
     {
         // TODO: we should have a dedicated value for the `undef` case
         if (!inst)
@@ -2107,16 +1936,6 @@ namespace Slang
         IRDumpContext*  context,
         IRInst*         inst);
 
-    static void dumpChildrenRaw(
-        IRDumpContext*  context,
-        IRBlock*        block)
-    {
-        for (auto ii = block->firstInst; ii; ii = ii->getNextInst())
-        {
-            dumpInst(context, ii);
-        }
-    }
-
     static void dumpBlock(
         IRDumpContext*  context,
         IRBlock*        block)
@@ -2125,19 +1944,30 @@ namespace Slang
         dump(context, "block ");
         dumpID(context, block);
 
-        if( block->getFirstParam() )
+        IRInst* inst = block->getFirstInst();
+
+        // First walk through any `param` instructions,
+        // so that we can format them nicely
+        if (auto firstParam = as<IRParam>(inst))
         {
             dump(context, "(\n");
             context->indent += 2;
-            for (auto pp = block->getFirstParam(); pp; pp = pp->getNextParam())
+
+            for(;;)
             {
-                if (pp != block->getFirstParam())
+                auto param = as<IRParam>(inst);
+                if (!param)
+                    break;
+
+                if (param != firstParam)
                     dump(context, ",\n");
+
+                inst = inst->getNextInst();
 
                 dumpIndent(context);
                 dump(context, "param ");
-                dumpID(context, pp);
-                dumpInstTypeClause(context, pp->getFullType());
+                dumpID(context, param);
+                dumpInstTypeClause(context, param->getFullType());
             }
             context->indent -= 2;
             dump(context, ")");
@@ -2145,191 +1975,10 @@ namespace Slang
         dump(context, ":\n");
         context->indent++;
 
-        dumpChildrenRaw(context, block);
-    }
-#if 0
-    static void dumpChildrenRaw(
-        IRDumpContext*  context,
-        IRFunc*         func)
-    {
-        for (auto bb = func->getFirstBlock(); bb; bb = bb->getNextBlock())
+        for(; inst; inst = inst->getNextInst())
         {
-            dumpBlock(context, bb);
+            dumpInst(context, inst);
         }
-    }
-
-    static void dumpChildren(
-        IRDumpContext*  context,
-        IRFunc*         func)
-    {
-        dumpIndent(context);
-        dump(context, "{\n");
-        context->indent++;
-        dumpChildrenRaw(context, func);
-        context->indent--;
-        dumpIndent(context);
-        dump(context, "}\n");
-    }
-#endif
-    static void dumpInst(
-        IRDumpContext*  context,
-        IRInst*         inst)
-    {
-        if (!inst)
-        {
-            dumpIndent(context);
-            dump(context, "<null>");
-            return;
-        }
-
-        auto op = inst->op;
-
-        // There are several ops we want to special-case here,
-        // so that they will be more pleasant to look at.
-        //
-#if 0
-        switch (op)
-        {
-        case kIROp_Module:
-            dumpIndent(context);
-            dump(context, "module\n");
-            dumpChildren(context, inst);
-            return;
-
-        case kIROp_Func:
-            {
-                IRFunc* func = (IRFunc*)inst;
-                dump(context, "\n");
-                dumpIndent(context);
-                dump(context, "func ");
-                dumpID(context, func);
-                dumpInstTypeClause(context, func->getType());
-                dump(context, "\n");
-
-                dumpIndent(context);
-                dump(context, "{\n");
-                context->indent++;
-
-                for (auto bb = func->getFirstBlock(); bb; bb = bb->getNextBlock())
-                {
-                    if (bb != func->getFirstBlock())
-                        dump(context, "\n");
-                    dumpInst(context, bb);
-                }
-
-                context->indent--;
-                dump(context, "}\n");
-            }
-            return;
-
-        case kIROp_TypeType:
-        case kIROp_Param:
-        case kIROp_IntLit:
-        case kIROp_FloatLit:
-        case kIROp_boolConst:
-            // Don't dump here
-            return;
-
-        case kIROp_Block:
-            {
-                IRBlock* block = (IRBlock*)inst;
-
-                context->indent--;
-                dump(context, "block ");
-                dumpID(context, block);
-
-                if( block->getFirstParam() )
-                {
-                    dump(context, "(");
-                    context->indent++;
-                    for (auto pp = block->getFirstParam(); pp; pp = pp->getNextParam())
-                    {
-                        if (pp != block->getFirstParam())
-                            dump(context, ",\n");
-
-                        dumpIndent(context);
-                        dump(context, "param ");
-                        dumpID(context, pp);
-                        dumpInstTypeClause(context, pp->getType());
-                    }
-                    context->indent--;
-                    dump(context, ")\n");
-                }
-                dump(context, ":\n");
-                context->indent++;
-
-                dumpChildrenRaw(context, block);
-            }
-            return;
-
-        default:
-            break;
-        }
-#endif
-
-#if 0
-        // We also want to special-case based on the *type*
-        // of the instruction
-        auto type = inst->getType();
-        if (type && type->op == kIROp_TypeType)
-        {
-            // We probably don't want to print most types
-            // when producing "friendly" output.
-            switch (type->op)
-            {
-            case kIROp_StructType:
-                break;
-
-            default:
-                return;
-            }
-        }
-#endif
-
-
-        // Okay, we have a seemingly "ordinary" op now
-        dumpIndent(context);
-
-        auto opInfo = &kIROpInfos[op];
-        auto type = inst->getFullType();
-        auto dataType = inst->getDataType();
-
-        if (!dataType)
-        {
-            // No result, okay...
-        }
-        else
-        {
-            auto basicType = dataType->As<BasicExpressionType>();
-            if (basicType && basicType->baseType == BaseType::Void)
-            {
-                // No result, okay...
-            }
-            else
-            {
-                dump(context, "let  ");
-                dumpID(context, inst);
-                dumpInstTypeClause(context, type);
-                dump(context, "\t= ");
-            }
-        }
-
-        dump(context, opInfo->name);
-
-        uint32_t argCount = inst->argCount;
-        dump(context, "(");
-        for (uint32_t ii = 0; ii < argCount; ++ii)
-        {
-            if (ii != 0)
-                dump(context, ", ");
-
-            auto argVal = inst->getArgs()[ii].get();
-
-            dumpOperand(context, argVal);
-        }
-        dump(context, ")");
-
-        dump(context, "\n");
     }
 
     void dumpGenericSignature(
@@ -2506,50 +2155,109 @@ namespace Slang
         dump(context, "\n{\n");
         context->indent++;
 
-        for (auto entry : witnessTable->entries)
+        for (auto ii : witnessTable->getChildren())
         {
-            dumpIRWitnessTableEntry(context, entry);
+            dumpInst(context, ii);
         }
 
         context->indent--;
         dump(context, "}\n");
     }
 
-    void dumpIRGlobalValue(
+    static void dumpInst(
         IRDumpContext*  context,
-        IRGlobalValue*  value)
+        IRInst*         inst)
     {
-        switch (value->op)
+        if (!inst)
+        {
+            dumpIndent(context);
+            dump(context, "<null>");
+            return;
+        }
+
+        auto op = inst->op;
+
+        // There are several ops we want to special-case here,
+        // so that they will be more pleasant to look at.
+        //
+        switch (op)
         {
         case kIROp_Func:
-            dumpIRFunc(context, (IRFunc*)value);
-            break;
+            dumpIRFunc(context, (IRFunc*)inst);
+            return;
 
         case kIROp_global_var:
-            dumpIRGlobalVar(context, (IRGlobalVar*)value);
-            break;
+            dumpIRGlobalVar(context, (IRGlobalVar*)inst);
+            return;
 
         case kIROp_global_constant:
-            dumpIRGlobalConstant(context, (IRGlobalConstant*)value);
-            break;
+            dumpIRGlobalConstant(context, (IRGlobalConstant*)inst);
+            return;
 
         case kIROp_witness_table:
-            dumpIRWitnessTable(context, (IRWitnessTable*)value);
-            break;
+            dumpIRWitnessTable(context, (IRWitnessTable*)inst);
+            return;
+
+        case kIROp_witness_table_entry:
+            dumpIRWitnessTableEntry(context, (IRWitnessTableEntry*)inst);
+            return;
 
         default:
-            dump(context, "???\n");
             break;
         }
+
+        // Okay, we have a seemingly "ordinary" op now
+        dumpIndent(context);
+
+        auto opInfo = &kIROpInfos[op];
+        auto type = inst->getFullType();
+        auto dataType = inst->getDataType();
+
+        if (!dataType)
+        {
+            // No result, okay...
+        }
+        else
+        {
+            auto basicType = dataType->As<BasicExpressionType>();
+            if (basicType && basicType->baseType == BaseType::Void)
+            {
+                // No result, okay...
+            }
+            else
+            {
+                dump(context, "let  ");
+                dumpID(context, inst);
+                dumpInstTypeClause(context, type);
+                dump(context, "\t= ");
+            }
+        }
+
+        dump(context, opInfo->name);
+
+        UInt argCount = inst->getOperandCount();
+        dump(context, "(");
+        for (UInt ii = 0; ii < argCount; ++ii)
+        {
+            if (ii != 0)
+                dump(context, ", ");
+
+            auto argVal = inst->getOperand(ii);
+
+            dumpOperand(context, argVal);
+        }
+        dump(context, ")");
+
+        dump(context, "\n");
     }
 
     void dumpIRModule(
         IRDumpContext*  context,
         IRModule*       module)
     {
-        for( auto gv = module->getFirstGlobalValue(); gv; gv = gv->getNextValue() )
+        for(auto ii : module->getGlobalInsts())
         {
-            dumpIRGlobalValue(context, gv);
+            dumpInst(context, ii);
         }
     }
 
@@ -2570,7 +2278,7 @@ namespace Slang
         context.builder = &sb;
         context.indent = 0;
 
-        dumpIRGlobalValue(&context, globalVal);
+        dumpInst(&context, globalVal);
 
         fprintf(stderr, "%s\n", sb.Buffer());
         fflush(stderr);
@@ -2595,7 +2303,7 @@ namespace Slang
     //
     //
 
-    Type* IRValue::getRate()
+    Type* IRInst::getRate()
     {
         if(auto rateQualifiedType = type->As<RateQualifiedType>())
             return rateQualifiedType->rate;
@@ -2603,7 +2311,7 @@ namespace Slang
         return nullptr;
     }
 
-    Type* IRValue::getDataType()
+    Type* IRInst::getDataType()
     {
         if(auto rateQualifiedType = type->As<RateQualifiedType>())
             return rateQualifiedType->valueType;
@@ -2611,7 +2319,7 @@ namespace Slang
         return type;
     }
 
-    void IRValue::replaceUsesWith(IRValue* other)
+    void IRInst::replaceUsesWith(IRInst* other)
     {
         // We will walk through the list of uses for the current
         // instruction, and make them point to the other inst.
@@ -2635,11 +2343,11 @@ namespace Slang
 
             // Try to move to the next use, but bail
             // out if we are at the last one.
-            IRUse* next = uu->nextUse;
-            if( !next )
+            IRUse* nn = uu->nextUse;
+            if( !nn )
                 break;
 
-            uu = next;
+            uu = nn;
         }
 
         // We are at the last use (and there must
@@ -2673,19 +2381,13 @@ namespace Slang
         ff->debugValidate();
     }
 
-    void IRValue::deallocate()
+    void IRInst::deallocate()
     {
-#if 0
-        // I'm going to intentionally leak here,
-        // just to test that this is the source
-        // of my heap-corruption crashes.
-#else
         // Run destructor to be sure...
-        this->~IRValue();
-#endif
+        this->~IRInst();
     }
 
-    void IRValue::dispose()
+    void IRInst::dispose()
     {
         IRObject::dispose();
         type = decltype(type)();
@@ -2695,60 +2397,146 @@ namespace Slang
     // as `other`, right before it.
     void IRInst::insertBefore(IRInst* other)
     {
+        assert(other);
+        insertBefore(other, other->parent);
+    }
+
+    void IRInst::insertAtStart(IRParentInst* newParent)
+    {
+        assert(newParent);
+        insertBefore(newParent->children.first, newParent);
+    }
+
+    void IRInst::moveToStart()
+    {
+        auto p = parent;
+        removeFromParent();
+        insertAtStart(p);
+    }
+
+    void IRInst::insertBefore(IRInst* other, IRParentInst* newParent)
+    {
         // Make sure this instruction has been removed from any previous parent
         this->removeFromParent();
 
-        auto bb = other->getParentBlock();
-        assert(bb);
+        assert(other || newParent);
+        if (!other) other = newParent->children.first;
+        if (!newParent) newParent = other->parent;
+        assert(newParent);
 
-        auto pp = other->getPrevInst();
+        auto nn = other;
+        auto pp = other ? other->getPrevInst() : nullptr;
+
         if( pp )
         {
             pp->next = this;
         }
         else
         {
-            bb->firstInst = this;
+            newParent->children.first = this;
+        }
+
+        if (nn)
+        {
+            nn->prev = this;
+        }
+        else
+        {
+            newParent->children.last = this;
         }
 
         this->prev = pp;
-        this->next = other;
-        this->parent = bb;
+        this->next = nn;
+        this->parent = newParent;
+    }
 
-        other->prev = this;
+    void IRInst::insertAfter(IRInst* other)
+    {
+        assert(other);
+        insertAfter(other, other->parent);
+    }
+
+    void IRInst::insertAtEnd(IRParentInst* newParent)
+    {
+        assert(newParent);
+        insertAfter(newParent->children.last, newParent);
+    }
+
+    void IRInst::moveToEnd()
+    {
+        auto p = parent;
+        removeFromParent();
+        insertAtEnd(p);
+    }
+
+    void IRInst::insertAfter(IRInst* other, IRParentInst* newParent)
+    {
+        // Make sure this instruction has been removed from any previous parent
+        this->removeFromParent();
+
+        assert(other || newParent);
+        if (!other) other = newParent->children.last;
+        if (!newParent) newParent = other->parent;
+        assert(newParent);
+
+        auto pp = other;
+        auto nn = other ? other->next : nullptr;
+
+        if (pp)
+        {
+            pp->next = this;
+        }
+        else
+        {
+            newParent->children.first = this;
+        }
+
+        if (nn)
+        {
+            nn->prev = this;
+        }
+        else
+        {
+            newParent->children.last = this;
+        }
+
+        this->prev = pp;
+        this->next = nn;
+        this->parent = newParent;
     }
 
     // Remove this instruction from its parent block,
     // and then destroy it (it had better have no uses!)
     void IRInst::removeFromParent()
     {
+        auto oldParent = getParent();
+
         // If we don't currently have a parent, then
         // we are doing fine.
-        if(!getParentBlock())
+        if(!oldParent)
             return;
 
-        auto bb = getParentBlock();
         auto pp = getPrevInst();
         auto nn = getNextInst();
 
         if(pp)
         {
-            SLANG_ASSERT(pp->getParentBlock() == bb);
+            SLANG_ASSERT(pp->getParent() == oldParent);
             pp->next = nn;
         }
         else
         {
-            bb->firstInst = nn;
+            oldParent->children.first = nn;
         }
 
         if(nn)
         {
-            SLANG_ASSERT(nn->getParentBlock() == bb);
+            SLANG_ASSERT(nn->getParent() == oldParent);
             nn->prev = pp;
         }
         else
         {
-            bb->lastInst = pp;
+            oldParent->children.last = pp;
         }
 
         prev = nullptr;
@@ -2758,9 +2546,9 @@ namespace Slang
 
     void IRInst::removeArguments()
     {
-        for( UInt aa = 0; aa < argCount; ++aa )
+        for( UInt aa = 0; aa < operandCount; ++aa )
         {
-            IRUse& use = getArgs()[aa];
+            IRUse& use = getOperands()[aa];
             use.clear();
         }
     }
@@ -2824,10 +2612,10 @@ namespace Slang
             // no value (null pointer)
             none,
 
-            // A simple `IRValue*` that represents the actual value
+            // A simple `IRInst*` that represents the actual value
             value,
 
-            // An `IRValue*` that represents the address of the actual value
+            // An `IRInst*` that represents the address of the actual value
             address,
 
             // A `TupleValImpl` that represents zero or more `ScalarizedVal`s
@@ -2840,7 +2628,7 @@ namespace Slang
         };
 
         // Create a value representing a simple value
-        static ScalarizedVal value(IRValue* irValue)
+        static ScalarizedVal value(IRInst* irValue)
         {
             ScalarizedVal result;
             result.flavor = Flavor::value;
@@ -2850,7 +2638,7 @@ namespace Slang
 
 
         // Create a value representing an address
-        static ScalarizedVal address(IRValue* irValue)
+        static ScalarizedVal address(IRInst* irValue)
         {
             ScalarizedVal result;
             result.flavor = Flavor::address;
@@ -2875,7 +2663,7 @@ namespace Slang
         }
 
         Flavor                      flavor = Flavor::none;
-        IRValue*                    irValue = nullptr;
+        IRInst*                     irValue = nullptr;
         RefPtr<ScalarizedValImpl>   impl;
     };
 
@@ -3457,7 +3245,7 @@ namespace Slang
 
     ScalarizedVal adaptType(
         IRBuilder*              builder,
-        IRValue*                val,
+        IRInst*                 val,
         Type*                   toType,
         Type*                   /*fromType*/)
     {
@@ -3585,7 +3373,7 @@ namespace Slang
         IRBuilder*      builder,
         Type*           elementType,
         ScalarizedVal   val,
-        IRValue*        indexVal)
+        IRInst*         indexVal)
     {
         switch( val.flavor )
         {
@@ -3667,11 +3455,11 @@ namespace Slang
                 index));
     }
 
-    IRValue* materializeValue(
+    IRInst* materializeValue(
         IRBuilder*              builder,
         ScalarizedVal const&    val);
 
-    IRValue* materializeTupleValue(
+    IRInst* materializeTupleValue(
         IRBuilder*      builder,
         ScalarizedVal   val)
     {
@@ -3689,7 +3477,7 @@ namespace Slang
             // We will extract a value for each array element, and
             // then use these to construct our result.
 
-            List<IRValue*> arrayElementVals;
+            List<IRInst*> arrayElementVals;
             UInt arrayElementCount = (UInt) GetIntVal(arrayType->ArrayLength);
 
             for( UInt ii = 0; ii < arrayElementCount; ++ii )
@@ -3720,7 +3508,7 @@ namespace Slang
             //
             // TODO: this should be using a `makeStruct` instruction.
 
-            List<IRValue*> elementVals;
+            List<IRInst*> elementVals;
             for( UInt ee = 0; ee < elementCount; ++ee )
             {
                 auto elementVal = materializeValue(builder, tupleVal->elements[ee].val);
@@ -3734,7 +3522,7 @@ namespace Slang
         }
     }
 
-    IRValue* materializeValue(
+    IRInst* materializeValue(
         IRBuilder*              builder,
         ScalarizedVal const&    val)
     {
@@ -3776,7 +3564,7 @@ namespace Slang
     }
 
     IRTargetIntrinsicDecoration* findTargetIntrinsicDecoration(
-        IRValue*        val,
+        IRInst*        val,
         String const&   targetName)
     {
         for( auto dd = val->firstDecoration; dd; dd = dd->next )
@@ -3794,6 +3582,7 @@ namespace Slang
 
     void legalizeEntryPointForGLSL(
         Session*                session,
+        IRModule*               module,
         IRFunc*                 func,
         EntryPointLayout*       entryPointLayout,
         DiagnosticSink*         sink,
@@ -3804,8 +3593,6 @@ namespace Slang
         context.stage = entryPointLayout->profile.GetStage();
         context.sink = sink;
         context.extensionUsageTracker = extensionUsageTracker;
-
-        auto module = func->parentModule;
 
         // We require that the entry-point function has no uses,
         // because otherwise we'd invalidate the signature
@@ -3881,7 +3668,7 @@ namespace Slang
                         continue;
 
                     IRReturnVal* returnInst = (IRReturnVal*) ii;
-                    IRValue* returnValue = returnInst->getVal();
+                    IRInst* returnValue = returnInst->getVal();
 
                     // Make sure we add these instructions to the right block
                     builder.curBlock = bb;
@@ -3978,10 +3765,10 @@ namespace Slang
                                     continue;
 
                                 // Is it calling the append operation?
-                                auto callee = ii->getArg(0);
+                                auto callee = ii->getOperand(0);
                                 while( callee->op == kIROp_specialize )
                                 {
-                                    callee = ((IRSpecialize*) callee)->getArg(0);
+                                    callee = ((IRSpecialize*) callee)->getOperand(0);
                                 }
                                 if(callee->op != kIROp_Func)
                                     continue;
@@ -4003,7 +3790,7 @@ namespace Slang
                                 builder.curBlock = bb;
                                 builder.insertBeforeInst = ii;
 
-                                assign(&builder, globalOutputVal, ScalarizedVal::value(ii->getArg(2)));
+                                assign(&builder, globalOutputVal, ScalarizedVal::value(ii->getOperand(2)));
                             }
                         }
 
@@ -4092,7 +3879,7 @@ namespace Slang
                     // references to the variable(s). We are going to do that
                     // somewhat naively, by simply materializing the
                     // variables at the start.
-                    IRValue* materialized = materializeValue(&builder, globalValue);
+                    IRInst* materialized = materializeValue(&builder, globalValue);
 
                     pp->replaceUsesWith(materialized);
                 }
@@ -4107,14 +3894,13 @@ namespace Slang
             //
             // We can safely go through and destroy the parameters
             // themselves, and then clear out the parameter list.
+
             for( auto pp = firstBlock->getFirstParam(); pp; )
             {
                 auto next = pp->getNextParam();
                 pp->deallocate();
                 pp = next;
             }
-            firstBlock->firstParam = nullptr;
-            firstBlock->lastParam = nullptr;
         }
 
         // Finally, we need to patch up the type of the entry point,
@@ -4163,7 +3949,7 @@ namespace Slang
 
         // A map from values in the original IR module
         // to their equivalent in the cloned module.
-        typedef Dictionary<IRValue*, IRValue*> ClonedValueDictionary;
+        typedef Dictionary<IRInst*, IRInst*> ClonedValueDictionary;
         ClonedValueDictionary clonedValues;
 
         SharedIRBuilder sharedBuilderStorage;
@@ -4199,7 +3985,7 @@ namespace Slang
         // A callback to be used when a value that is not registerd in `clonedValues`
         // is needed during cloning. This gives the subtype a chance to intercept
         // the operation and clone (or not) as needed.
-        virtual IRValue* maybeCloneValue(IRValue* originalVal)
+        virtual IRInst* maybeCloneValue(IRInst* originalVal)
         {
             return originalVal;
         }
@@ -4225,8 +4011,8 @@ namespace Slang
 
     void registerClonedValue(
         IRSpecContextBase*  context,
-        IRValue*    clonedValue,
-        IRValue*    originalValue)
+        IRInst*    clonedValue,
+        IRInst*    originalValue)
     {
         if(!originalValue)
             return;
@@ -4249,12 +4035,12 @@ namespace Slang
     // Information on values to use when registering a cloned value
     struct IROriginalValuesForClone
     {
-        IRValue*        originalVal = nullptr;
+        IRInst*        originalVal = nullptr;
         IRSpecSymbol*   sym = nullptr;
 
         IROriginalValuesForClone() {}
 
-        IROriginalValuesForClone(IRValue* originalValue)
+        IROriginalValuesForClone(IRInst* originalValue)
             : originalVal(originalValue)
         {}
 
@@ -4265,7 +4051,7 @@ namespace Slang
 
     void registerClonedValue(
         IRSpecContextBase*              context,
-        IRValue*                        clonedValue,
+        IRInst*                        clonedValue,
         IROriginalValuesForClone const& originalValues)
     {
         registerClonedValue(context, clonedValue, originalValues.originalVal);
@@ -4277,8 +4063,8 @@ namespace Slang
 
     void cloneDecorations(
         IRSpecContextBase*  context,
-        IRValue*        clonedValue,
-        IRValue*        originalValue)
+        IRInst*        clonedValue,
+        IRInst*        originalValue)
     {
         for (auto dd = originalValue->firstDecoration; dd; dd = dd->next)
         {
@@ -4322,7 +4108,7 @@ namespace Slang
     struct IRSpecContext : IRSpecContextBase
     {
         // Override the "maybe clone" logic so that we always clone
-        virtual IRValue* maybeCloneValue(IRValue* originalVal) override;
+        virtual IRInst* maybeCloneValue(IRInst* originalVal) override;
 
         // Override teh "maybe clone" logic so that we carefully
         // clone any IR proxy values inside substitutions
@@ -4349,7 +4135,7 @@ namespace Slang
     }
 
 
-    IRValue* IRSpecContext::maybeCloneValue(IRValue* originalValue)
+    IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
     {
         switch (originalValue->op)
         {
@@ -4425,7 +4211,7 @@ namespace Slang
             break;
         case kIROp_TypeType:
             {
-                IRValue* od = (IRValue*)originalValue;
+                IRInst* od = (IRInst*)originalValue;
                 int ioDiff = 0;
                 auto newType = od->type->SubstituteImpl(subst, &ioDiff);
                 return builder->getTypeVal(newType.As<Type>());
@@ -4437,9 +4223,9 @@ namespace Slang
         }
     }
 
-    IRValue* cloneValue(
+    IRInst* cloneValue(
         IRSpecContextBase*  context,
-        IRValue*        originalValue);
+        IRInst*        originalValue);
 
     RefPtr<Val> cloneSubstitutionArg(
         IRSpecContext*  context,
@@ -4526,11 +4312,11 @@ namespace Slang
         return newDeclRef;
     }
 
-    IRValue* cloneValue(
+    IRInst* cloneValue(
         IRSpecContextBase*  context,
-        IRValue*        originalValue)
+        IRInst*        originalValue)
     {
-        IRValue* clonedValue = nullptr;
+        IRInst* clonedValue = nullptr;
         if (context->getClonedValues().TryGetValue(originalValue, clonedValue))
         {
             return clonedValue;
@@ -4539,12 +4325,16 @@ namespace Slang
         return context->maybeCloneValue(originalValue);
     }
 
-    IRValue* maybeCloneValueWithMangledName(
+    IRInst* maybeCloneValueWithMangledName(
         IRSpecContextBase*  context,
         IRGlobalValue*      originalValue)
     {
-        for (auto gv = context->shared->module->firstGlobalValue; gv; gv = gv->nextGlobalValue)
+        for(auto ii : context->shared->module->getGlobalInsts())
         {
+            auto gv = as<IRGlobalValue>(ii);
+            if (!gv)
+                continue;
+
             if (gv->mangledName == originalValue->mangledName)
                 return gv;
         }
@@ -4567,7 +4357,7 @@ namespace Slang
                 // The common case is that we just need to construct a cloned
                 // instruction with the right number of operands, intialize
                 // it, and then add it to the sequence.
-                UInt argCount = originalInst->getArgCount();
+                UInt argCount = originalInst->getOperandCount();
                 IRInst* clonedInst = createInstWithTrailingArgs<IRInst>(
                     builder, originalInst->op,
                     context->maybeCloneType(originalInst->type),
@@ -4578,14 +4368,14 @@ namespace Slang
                 context->builder = builder;
                 for (UInt aa = 0; aa < argCount; ++aa)
                 {
-                    IRValue* originalArg = originalInst->getArg(aa);
-                    IRValue* clonedArg;
+                    IRInst* originalArg = originalInst->getOperand(aa);
+                    IRInst* clonedArg;
                     if (originalArg->op == kIROp_witness_table)
                         clonedArg = cloneGlobalValueWithMangledName((IRSpecContext*)context, 
                         ((IRGlobalValue*)originalArg)->mangledName, (IRGlobalValue*)originalArg);
                     else
                         clonedArg = cloneValue(context, originalArg);
-                    clonedInst->getArgs()[aa].init(clonedInst, clonedArg);
+                    clonedInst->getOperands()[aa].init(clonedInst, clonedArg);
                 }
                 builder->addInst(clonedInst);
                 context->builder = oldBuilder;
@@ -4681,7 +4471,7 @@ namespace Slang
         cloneDecorations(context, clonedTable, originalTable);
 
         // Clone the entries in the witness table as well
-        for( auto originalEntry : originalTable->entries )
+        for(auto originalEntry : originalTable->getEntries() )
         {
             auto clonedKey = cloneValue(context, originalEntry->requirementKey.get());
             
@@ -4729,6 +4519,7 @@ namespace Slang
             clonedValue->addBlock(clonedBlock);
             registerClonedValue(context, clonedBlock, originalBlock);
 
+#if 0
             // We can go ahead and clone parameters here, while we are at it.
             builder->curBlock = clonedBlock;
             for (auto originalParam = originalBlock->getFirstParam();
@@ -4741,6 +4532,7 @@ namespace Slang
                 cloneDecorations(context, clonedParam, originalParam);
                 registerClonedValue(context, clonedParam, originalParam);
             }
+#endif
         }
 
         // Okay, now we are in a good position to start cloning
@@ -4788,7 +4580,7 @@ namespace Slang
         //
         // TODO: This isn't really a good requirement to place on the IR...
         clonedFunc->removeFromParent();
-        clonedFunc->insertAtEnd(context->getModule());
+        clonedFunc->insertAtEnd(context->getModule()->getModuleInst());
     }
 
     IRFunc* specializeIRForEntryPoint(
@@ -4933,12 +4725,10 @@ namespace Slang
         switch (val->op)
         {
         case kIROp_witness_table:
-            return ((IRWitnessTable*)val)->entries.first != nullptr;
-
         case kIROp_global_var:
         case kIROp_global_constant:
         case kIROp_Func:
-            return ((IRGlobalValueWithCode*)val)->firstBlock != nullptr;
+            return ((IRParentInst*)val)->getFirstChild() != nullptr;
 
         default:
             return false;
@@ -5058,7 +4848,7 @@ namespace Slang
     {
         // Check if we've already cloned this value, for the case where
         // an original value has already been established.
-        IRValue* clonedVal = nullptr;
+        IRInst* clonedVal = nullptr;
         if( originalVal && context->getClonedValues().TryGetValue(originalVal, clonedVal) )
         {
             return (IRGlobalValue*) clonedVal;
@@ -5168,8 +4958,11 @@ namespace Slang
         if (!originalModule)
             return;
 
-        for (auto gv = originalModule->firstGlobalValue; gv; gv = gv->nextGlobalValue)
+        for(auto ii : originalModule->getGlobalInsts())
         {
+            auto gv = as<IRGlobalValue>(ii);
+            if (!gv)
+                continue;
             insertGlobalValueSymbol(sharedContext, gv);
         }
     }
@@ -5385,6 +5178,7 @@ namespace Slang
             {
                 legalizeEntryPointForGLSL(
                     session,
+                    context->getModule(),
                     irEntryPoint,
                     entryPointLayout,
                     &compileRequest->mSink,
@@ -5402,14 +5196,14 @@ namespace Slang
         IRSharedSpecContext* getShared() { return shared; }
 
         // Override the "maybe clone" logic so that we always clone
-        virtual IRValue* maybeCloneValue(IRValue* originalVal) override;
+        virtual IRInst* maybeCloneValue(IRInst* originalVal) override;
 
         virtual RefPtr<Type> maybeCloneType(Type* originalType) override;
         virtual RefPtr<Val> maybeCloneVal(Val* val) override;
     };
 
     // Convert a type-level value into an IR-level equivalent.
-    IRValue* getIRValue(
+    IRInst* getIRValue(
         IRGenericSpecContext*   context,
         Val*                    val)
     {
@@ -5467,7 +5261,7 @@ namespace Slang
         }
     }
 
-    IRValue* getSubstValue(
+    IRInst* getSubstValue(
         IRGenericSpecContext*   context,
         DeclRef<Decl>           declRef)
     {
@@ -5538,7 +5332,7 @@ namespace Slang
         }
     }
 
-    IRValue* IRGenericSpecContext::maybeCloneValue(IRValue* originalVal)
+    IRInst* IRGenericSpecContext::maybeCloneValue(IRInst* originalVal)
     {
         switch( originalVal->op )
         {
@@ -5692,8 +5486,12 @@ namespace Slang
         if (!dstTable)
         {
             auto module = sharedContext->module;
-            for (auto gv = module->getFirstGlobalValue(); gv; gv = gv->getNextValue())
+            for(auto ii : module->getGlobalInsts())
             {
+                auto gv = as<IRGlobalValue>(ii);
+                if (!gv)
+                    continue;
+
                 if (getText(gv->mangledName) == specializedMangledName)
                     return (IRWitnessTable*)gv;
             }
@@ -5718,7 +5516,7 @@ namespace Slang
         
         // Specialization of witness tables should trigger cascading specializations 
         // of involved functions.
-        for (auto entry : specTable->entries)
+        for (auto entry : specTable->getEntries())
         {
             if (entry->satisfyingVal.get()->op == kIROp_Func)
             {
@@ -5761,8 +5559,12 @@ namespace Slang
         // avoid it by building a dictionary ahead of time,
         // as is being done for the `IRSpecContext` used above.
         // We can probalby use the same basic context, actually.
-        for (auto gv = sharedContext->module->getFirstGlobalValue(); gv; gv = gv->getNextValue())
+        for(auto ii : sharedContext->module->getGlobalInsts())
         {
+            auto gv = as<IRGlobalValue>(ii);
+            if (!gv)
+                continue;
+
             if (gv->mangledName == specMangledNameObj)
                 return (IRFunc*) gv;
         }
@@ -5823,12 +5625,12 @@ namespace Slang
     // Find the value in the given witness table that
     // satisfies the given requirement (or return
     // null if not found).
-    IRValue* findWitnessVal(
+    IRInst* findWitnessVal(
         IRWitnessTable*         witnessTable,
         DeclRef<Decl> const&    requirementDeclRef)
     {
         // For now we will do a dumb linear search
-        for( auto entry : witnessTable->entries )
+        for( auto entry : witnessTable->getEntries() )
         {
             // We expect the key on the entry to be a decl-ref,
             // but lets go ahead and check, just to be sure.
@@ -5889,10 +5691,12 @@ namespace Slang
         // function.
         //
         // We start by building up a work list of non-generic functions.
-        for( auto gv = module->getFirstGlobalValue();
-            gv;
-            gv = gv->getNextValue() )
+        for(auto ii : module->getGlobalInsts())
         {
+            auto gv = as<IRGlobalValue>(ii);
+            if (!gv)
+                continue;
+
             // Is it a function? If not, skip.
             if(gv->op != kIROp_Func)
                 continue;
@@ -5907,10 +5711,12 @@ namespace Slang
 
         // Build dictionary for witness tables
         Dictionary<Name*, IRWitnessTable*> witnessTables;
-        for (auto gv = module->getFirstGlobalValue();
-            gv;
-            gv = gv->getNextValue())
+        for(auto ii : module->getGlobalInsts())
         {
+            auto gv = as<IRGlobalValue>(ii);
+            if (!gv)
+                continue;
+
             if (gv->op == kIROp_witness_table)
                 witnessTables.AddIfNotExists(gv->mangledName, (IRWitnessTable*)gv);
         }
@@ -6115,20 +5921,18 @@ namespace Slang
                     if (subtypeWitness->sub->EqualsVal(paramSubst->actualType))
                     {
                         auto witnessTableName = getMangledNameForConformanceWitness(subtypeWitness->sub, subtypeWitness->sup);
-                        auto findWitnessTableByName = [&](String name)
+                        auto findWitnessTableByName = [&](String name) -> IRGlobalValue*
                         {
-                            auto globalVar = originalIRModule->getFirstGlobalValue();
-                            IRGlobalValue * rs = nullptr;
-                            while (globalVar)
+                            for (auto ii : originalIRModule->getGlobalInsts())
                             {
-                                if (getText(globalVar->mangledName) == name)
-                                {
-                                    rs = globalVar;
-                                    break;
-                                }
-                                globalVar = globalVar->getNextValue();
+                                auto gv = as<IRGlobalValue>(ii);
+                                if (!gv)
+                                    continue;
+
+                                if (getText(gv->mangledName) == name)
+                                    return gv;
                             }
-                            return rs;
+                            return nullptr;
                         };
                         auto table = findWitnessTableByName(witnessTableName);
                         if (!table)
@@ -6170,7 +5974,7 @@ namespace Slang
     
     void markConstExpr(
         Session* session,
-        IRValue* irValue)
+        IRInst* irValue)
     {
         // We will take an IR value with type `T`,
         // and turn it into one with type `@ConstExpr T`.
