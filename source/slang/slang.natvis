@@ -77,83 +77,95 @@
       <Item Name="[Val]">satisfyingVal</Item>
     </Expand>
   </Type>
-  <Type Name="Slang::IRValue">
+  <Type Name="Slang::IRInst">
     <DisplayString>{{{op}}}</DisplayString>
     <Expand>
-      <Item Name="[OpCode]">op</Item>
-      <Item Name="[Type]">type</Item>
-      <Item Name="[IRInst]">(Slang::IRInst*)this</Item>
-      <ExpandedItem Condition="op==kIROp_decl_ref">(Slang::IRDeclRef*)this</ExpandedItem>
-      <ExpandedItem Condition="op==kIROp_Func">(Slang::IRFunc*)this</ExpandedItem>
-      <ExpandedItem Condition="op==kIROp_Block">(Slang::IRBlock*)this</ExpandedItem>
-      <ExpandedItem Condition="op==kIROp_witness_table">(Slang::IRWitnessTable*)this</ExpandedItem>
-      <ExpandedItem Condition="op==kIROp_witness_table_entry">(Slang::IRWitnessTableEntry*)this</ExpandedItem>
-      <Item Name="====Uses====">"-------"</Item>
-      <LinkedListItems>
-        <HeadPointer>firstUse</HeadPointer>
-        <NextPointer>nextUse</NextPointer>
-        <ValueNode>user</ValueNode>
-      </LinkedListItems> 
-    
+      <Item Name="[op]">op</Item>
+      <Item Name="[type]">type</Item>
+      <Synthetic Name="[operands]">
+        <DisplayString>{{count = {operandCount}}}</DisplayString>
+        <Expand>
+          <Item Name="[count]">operandCount</Item>
+          <ArrayItems>
+            <Size>operandCount</Size>
+            <ValuePointer>(IRUse*)(this + 1)</ValuePointer>
+          </ArrayItems>
+        </Expand>
+      </Synthetic>
+      <Synthetic Name="[uses]">
+        <Expand>
+          <LinkedListItems>
+            <HeadPointer>firstUse</HeadPointer>
+            <NextPointer>nextUse</NextPointer>
+            <ValueNode>user</ValueNode>
+          </LinkedListItems>
+        </Expand>
+      </Synthetic>
   </Expand>
   </Type>
-  <Type Name="Slang::IRUser">
+  <Type Name="Slang::IRParentInst">
     <DisplayString>{{{op}}}</DisplayString>
     <Expand>
-      <Item Name="[OpCode]">op</Item>
-      <Item Name="[ArgCount]">argCount</Item>
-      <ArrayItems>
-        <Size>argCount</Size>
-        <ValuePointer>(IRUse*)(this + 1)</ValuePointer>
-      </ArrayItems>
+      <Item Name="[op]">op</Item>
+      <Item Name="[type]">type</Item>
+      <Synthetic Name="[children]">
+        <Expand>
+          <LinkedListItems>
+            <HeadPointer>children.first</HeadPointer>
+            <NextPointer>next</NextPointer>
+            <ValueNode>this</ValueNode>
+          </LinkedListItems>
+        </Expand>
+      </Synthetic>
+      <Synthetic Name="[uses]">
+        <Expand>
+          <LinkedListItems>
+            <HeadPointer>firstUse</HeadPointer>
+            <NextPointer>nextUse</NextPointer>
+            <ValueNode>user</ValueNode>
+          </LinkedListItems>
+        </Expand>
+      </Synthetic>
     </Expand>
   </Type>
-  <Type Name="Slang::IRBlock">
+  <Type Name="Slang::IRGlobalValue">
+    <DisplayString>{{{op} "{mangledName}"}}</DisplayString>
     <Expand>
-      <LinkedListItems>
-        <HeadPointer>firstInst</HeadPointer>
-        <NextPointer>(Slang::IRInst*)next</NextPointer>
-        <ValueNode>this</ValueNode>
-      </LinkedListItems>
-    </Expand>
-  </Type>
-  <Type Name="Slang::IRFunc">
-    <DisplayString>{{{mangledName}}}</DisplayString>
-    <Expand>
-      <Item Name="[Name]">mangledName</Item>
-      <Item Name="[ResultType]">(*(IRFuncType*)(type.pointer)).resultType</Item>
-      <Item Name="[ParameterTypes]">(*(IRFuncType*)(type.pointer)).paramTypes</Item>
-      <Item Name="[FirstBlock]">firstBlock</Item>
-      <Item Name="[SpecLevel]">specializedGenericLevel</Item>
-      <Item Name="genericDecls">genericDecls</Item>
+      <Item Name="[op]">op</Item>
+      <Item Name="[type]">type</Item>
+      <Synthetic Name="[children]">
+        <Expand>
+          <LinkedListItems>
+            <HeadPointer>children.first</HeadPointer>
+            <NextPointer>next</NextPointer>
+            <ValueNode>this</ValueNode>
+          </LinkedListItems>
+        </Expand>
+      </Synthetic>
+      <Synthetic Name="[uses]">
+        <Expand>
+          <LinkedListItems>
+            <HeadPointer>firstUse</HeadPointer>
+            <NextPointer>nextUse</NextPointer>
+            <ValueNode>user</ValueNode>
+          </LinkedListItems>
+        </Expand>
+      </Synthetic>
     </Expand>
   </Type>
   
   <Type Name="Slang::IRDeclRef">
     <DisplayString>{{IRDeclRef {declRef}}}</DisplayString>
     <Expand>
-      <Item Name="[OpCode]">op</Item>
+      <Item Name="[op]">op</Item>
+      <Item Name="[type]">type</Item>
       <ExpandedItem>declRef</ExpandedItem>
     </Expand>
   </Type>
   <Type Name="Slang::IRUse">
     <DisplayString>{{IRUse {usedValue}}}</DisplayString>
     <Expand>
-      <Item Name="[NextUse]">nextUse</Item>
       <ExpandedItem>usedValue</ExpandedItem>
     </Expand>
-  </Type>
-  <Type Name="Slang::IRModule">
-    <Expand>
-      <Item Name="session">session</Item>
-      <LinkedListItems>
-        <HeadPointer>firstGlobalValue</HeadPointer>
-        <NextPointer>nextGlobalValue</NextPointer>
-        <ValueNode>this</ValueNode>
-      </LinkedListItems>
-    </Expand>
-  </Type>
-  <Type Name="Slang::IRGlobalValue">
-    <DisplayString>{{IRGlobalValue {op} {mangledName}}}</DisplayString>
   </Type>
 </AutoVisualizer>

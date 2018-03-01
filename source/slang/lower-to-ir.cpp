@@ -82,7 +82,7 @@ struct BoundSubscriptInfo : ExtendedValueInfo
 {
     DeclRef<SubscriptDecl>  declRef;
     RefPtr<Type>            type;
-    List<IRValue*>          args;
+    List<IRInst*>          args;
 };
 
 // Some cases of `ExtendedValueInfo` need to
@@ -129,7 +129,7 @@ struct LoweredValInfo
 
     union
     {
-        IRValue*            val;
+        IRInst*            val;
         ExtendedValueInfo*  ext;
     };
     Flavor flavor;
@@ -140,7 +140,7 @@ struct LoweredValInfo
         val = nullptr;
     }
 
-    static LoweredValInfo simple(IRValue* v)
+    static LoweredValInfo simple(IRInst* v)
     {
         LoweredValInfo info;
         info.flavor = Flavor::Simple;
@@ -148,7 +148,7 @@ struct LoweredValInfo
         return info;
     }
 
-    static LoweredValInfo ptr(IRValue* v)
+    static LoweredValInfo ptr(IRInst* v)
     {
         LoweredValInfo info;
         info.flavor = Flavor::Ptr;
@@ -334,7 +334,7 @@ LoweredValInfo maybeEmitSpecializeInst(IRGenContext*   context,
 );
 
 
-IRValue* getSimpleVal(IRGenContext* context, LoweredValInfo lowered);
+IRInst* getSimpleVal(IRGenContext* context, LoweredValInfo lowered);
 
 IROp getIntrinsicOp(
     Decl*                   decl,
@@ -361,7 +361,7 @@ LoweredValInfo emitCallToVal(
     IRType*         type,
     LoweredValInfo  funcVal,
     UInt            argCount,
-    IRValue* const* args)
+    IRInst* const* args)
 {
     auto builder = context->irBuilder;
     switch (funcVal.flavor)
@@ -379,7 +379,7 @@ LoweredValInfo emitCompoundAssignOp(
     IRType*         type,
     IROp            op,
     UInt            argCount,
-    IRValue* const* args)
+    IRInst* const* args)
 {
     auto builder = context->irBuilder;
     SLANG_UNREFERENCED_PARAMETER(argCount);
@@ -389,7 +389,7 @@ LoweredValInfo emitCompoundAssignOp(
 
     auto leftVal = builder->emitLoad(leftPtr);
 
-    IRValue* innerArgs[] = { leftVal, rightVal };
+    IRInst* innerArgs[] = { leftVal, rightVal };
     auto innerOp = builder->emitIntrinsicInst(type, op, 2, innerArgs);
 
     builder->emitStore(leftPtr, innerOp);
@@ -397,7 +397,7 @@ LoweredValInfo emitCompoundAssignOp(
     return LoweredValInfo::ptr(leftPtr);
 }
 
-IRValue* getOneValOfType(
+IRInst* getOneValOfType(
     IRGenContext*   context,
     IRType*         type)
 {
@@ -429,7 +429,7 @@ LoweredValInfo emitPreOp(
     IRType*         type,
     IROp            op,
     UInt            argCount,
-    IRValue* const* args)
+    IRInst* const* args)
 {
     auto builder = context->irBuilder;
     SLANG_UNREFERENCED_PARAMETER(argCount);
@@ -438,9 +438,9 @@ LoweredValInfo emitPreOp(
 
     auto preVal = builder->emitLoad(argPtr);
 
-    IRValue* oneVal = getOneValOfType(context, type);
+    IRInst* oneVal = getOneValOfType(context, type);
 
-    IRValue* innerArgs[] = { preVal, oneVal };
+    IRInst* innerArgs[] = { preVal, oneVal };
     auto innerOp = builder->emitIntrinsicInst(type, op, 2, innerArgs);
 
     builder->emitStore(argPtr, innerOp);
@@ -453,7 +453,7 @@ LoweredValInfo emitPostOp(
     IRType*         type,
     IROp            op,
     UInt            argCount,
-    IRValue* const* args)
+    IRInst* const* args)
 {
     auto builder = context->irBuilder;
     SLANG_UNREFERENCED_PARAMETER(argCount);
@@ -462,9 +462,9 @@ LoweredValInfo emitPostOp(
 
     auto preVal = builder->emitLoad(argPtr);
 
-    IRValue* oneVal = getOneValOfType(context, type);
+    IRInst* oneVal = getOneValOfType(context, type);
 
-    IRValue* innerArgs[] = { preVal, oneVal };
+    IRInst* innerArgs[] = { preVal, oneVal };
     auto innerOp = builder->emitIntrinsicInst(type, op, 2, innerArgs);
 
     builder->emitStore(argPtr, innerOp);
@@ -472,7 +472,7 @@ LoweredValInfo emitPostOp(
     return LoweredValInfo::ptr(argPtr);
 }
 
-IRValue* findWitnessTable(
+IRInst* findWitnessTable(
     IRGenContext*   context,
     DeclRef<Decl>   declRef);
 
@@ -494,7 +494,7 @@ LoweredValInfo emitWitnessTableRef(
                     exprType = mbrExpr->BaseExpression->type;
                 auto declRefType = exprType->GetCanonicalType()->AsDeclRefType();
                 SLANG_ASSERT(declRefType);
-                IRValue* witnessTableVal = nullptr;
+                IRInst* witnessTableVal = nullptr;
                 DeclRef<Decl> srcDeclRef = declRefType->declRef;
                 if (!declRefType->declRef.As<AssocTypeDecl>())
                 {
@@ -579,7 +579,7 @@ LoweredValInfo emitCallToDeclRef(
     DeclRef<Decl>   funcDeclRef,
     Expr*           funcExpr,
     UInt            argCount,
-    IRValue* const* args)
+    IRInst* const* args)
 {
     auto builder = context->irBuilder;
 
@@ -743,7 +743,7 @@ LoweredValInfo emitCallToDeclRef(
     IRType*                 type,
     DeclRef<Decl>           funcDeclRef,
     Expr*                   funcExpr,
-    List<IRValue*> const&   args)
+    List<IRInst*> const&   args)
 {
     return emitCallToDeclRef(context, type, funcDeclRef, funcExpr, args.Count(), args.Buffer());
 }
@@ -760,7 +760,7 @@ LoweredValInfo extractField(
     {
     default:
         {
-            IRValue* irBase = getSimpleVal(context, base);
+            IRInst* irBase = getSimpleVal(context, base);
             return LoweredValInfo::simple(
                 builder->emitFieldExtract(
                     fieldType,
@@ -790,7 +790,7 @@ LoweredValInfo extractField(
             // We are "extracting" a field from an lvalue address,
             // which means we should just compute an lvalue
             // representing the field address.
-            IRValue* irBasePtr = base.val;
+            IRInst* irBasePtr = base.val;
             return LoweredValInfo::ptr(
                 builder->emitFieldAddress(
                     context->getSession()->getPtrType(fieldType),
@@ -876,7 +876,7 @@ top:
 
 }
 
-IRValue* getSimpleVal(IRGenContext* context, LoweredValInfo lowered)
+IRInst* getSimpleVal(IRGenContext* context, LoweredValInfo lowered)
 {
     auto builder = context->irBuilder;
 
@@ -944,7 +944,7 @@ LoweredValInfo lowerVal(
     IRGenContext*   context,
     Val*            val);
 
-IRValue* lowerSimpleVal(
+IRInst* lowerSimpleVal(
     IRGenContext*   context,
     Val*            val)
 {
@@ -1061,7 +1061,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return LoweredTypeInfo(type);
     }
 
-    void addGenericArgs(List<IRValue*>* ioArgs, DeclRefBase declRef)
+    void addGenericArgs(List<IRInst*>* ioArgs, DeclRefBase declRef)
     {
         auto subs = declRef.substitutions.genericSubstitutions;
         while(subs)
@@ -1148,7 +1148,7 @@ LoweredValInfo createVar(
 
 void addArgs(
     IRGenContext*   context,
-    List<IRValue*>* ioArgs,
+    List<IRInst*>* ioArgs,
     LoweredValInfo  argInfo)
 {
     auto& args = *ioArgs;
@@ -1262,7 +1262,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         // in order for a dereference to make senese, so we just
         // need to extract the value type from that pointer here.
         //
-        IRValue* loweredBaseVal = getSimpleVal(context, loweredBase);
+        IRInst* loweredBaseVal = getSimpleVal(context, loweredBase);
         RefPtr<Type> loweredBaseType = loweredBaseVal->getDataType();
 
         if (loweredBaseType->As<PointerLikeType>()
@@ -1296,7 +1296,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     {
         // Allocate a temporary of the given type
         RefPtr<Type> type = lowerSimpleType(context, expr->type);
-        List<IRValue*> args;
+        List<IRInst*> args;
 
         UInt argCount = expr->args.Count();
 
@@ -1417,7 +1417,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     // to the list of argument values for a call.
     void addDirectCallArgs(
         InvokeExpr*     expr,
-        List<IRValue*>* ioArgs)
+        List<IRInst*>* ioArgs)
     {
         for( auto arg : expr->Arguments )
         {
@@ -1444,7 +1444,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     void addDirectCallArgs(
         InvokeExpr*             expr,
         DeclRef<CallableDecl>   funcDeclRef,
-        List<IRValue*>*         ioArgs,
+        List<IRInst*>*         ioArgs,
         List<OutArgumentFixup>* ioFixups)
     {
         UInt argCount = expr->Arguments.Count();
@@ -1530,7 +1530,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     void addDirectCallArgs(
         InvokeExpr*             expr,
         DeclRef<Decl>           funcDeclRef,
-        List<IRValue*>*         ioArgs,
+        List<IRInst*>*         ioArgs,
         List<OutArgumentFixup>* ioFixups)
     {
         if (auto callableDeclRef = funcDeclRef.As<CallableDecl>())
@@ -1546,7 +1546,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
     void addFuncBaseArgs(
         LoweredValInfo funcVal,
-        List<IRValue*>* ioArgs)
+        List<IRInst*>* ioArgs)
     {
         switch (funcVal.flavor)
         {
@@ -1651,7 +1651,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
         // Along the way, we may end up collecting additional
         // arguments that will be part of the call.
-        List<IRValue*> irArgs;
+        List<IRInst*> irArgs;
 
         // We will also collect "fixup" actions that need
         // to be performed after teh call, in order to
@@ -1715,7 +1715,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo subscriptValue(
         LoweredTypeInfo type,
         LoweredValInfo  baseVal,
-        IRValue*        indexVal)
+        IRInst*        indexVal)
     {
         auto builder = getBuilder();
         switch (baseVal.flavor)
@@ -1823,7 +1823,7 @@ struct RValueExprLoweringVisitor : ExprLoweringVisitorBase<RValueExprLoweringVis
         auto irIntType = getIntType(context);
 
         UInt elementCount = (UInt)expr->elementCount;
-        IRValue* irElementIndices[4];
+        IRInst* irElementIndices[4];
         for (UInt ii = 0; ii < elementCount; ++ii)
         {
             irElementIndices[ii] = builder->getIntValue(
@@ -1932,12 +1932,12 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         auto builder = getBuilder();
 
         auto prevBlock = builder->curBlock;
-        auto parentFunc = prevBlock ? prevBlock->parentFunc : builder->curFunc;
+        auto parentFunc = prevBlock ? prevBlock->getParent() : builder->curFunc;
 
         // If the previous block doesn't already have
         // a terminator instruction, then be sure to
         // emit a branch to the new block.
-        if (prevBlock && !isTerminatorInst(prevBlock->lastInst))
+        if (prevBlock && !prevBlock->getTerminator())
         {
             builder->emitBranch(block);
         }
@@ -2326,7 +2326,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // The collected (value, label) pairs for
         // all the `case` statements.
-        List<IRValue*>  cases;
+        List<IRInst*>  cases;
     };
 
     // We need a label to use for a `case` or `default` statement,
@@ -2504,7 +2504,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // that we can find it for nested statements.
         context->shared->breakLabels.Add(stmt, breakLabel);
 
-        builder->curFunc = initialBlock->parentFunc;
+        builder->curFunc = initialBlock->getParent();
         builder->curBlock = nullptr;
 
         // Iterate over the body of the statement, looking
@@ -2528,8 +2528,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         if(builder->curBlock != initialBlock)
         {
             // Is the block already terminated?
-            auto lastInst = builder->curBlock->lastInst;
-            if(!lastInst || !isTerminatorInst(lastInst))
+            if(!builder->curBlock->getTerminator())
             {
                 // Not terminated, so add one.
                 builder->emitBreak(breakLabel);
@@ -2580,7 +2579,7 @@ static LoweredValInfo maybeMoveMutableTemp(
 
     default:
         {
-            IRValue* irVal = getSimpleVal(context, val);
+            IRInst* irVal = getSimpleVal(context, val);
             auto type = irVal->getDataType();
             auto var = createVar(context, type);
 
@@ -2656,8 +2655,8 @@ top:
             auto loweredBase = swizzleInfo->base;
 
             // Load from the base value:
-            IRValue* irLeftVal = getSimpleVal(context, loweredBase);
-            IRValue* irRightVal = getSimpleVal(context, right);
+            IRInst* irLeftVal = getSimpleVal(context, loweredBase);
+            IRInst* irRightVal = getSimpleVal(context, right);
 
             // Now apply the swizzle
             IRInst* irSwizzled = builder->emitSwizzleSet(
@@ -2819,7 +2818,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     cpyTable->mangledName = cpyMangledName;
                     context->irBuilder->createWitnessTableEntry(witnessTable,
                         context->irBuilder->getDeclRefVal(subInheritanceDeclRef), cpyTable);
-                    cpyTable->entries = witnessTable->entries;
+
+                    // HACK: we are re-using the entries in a pre-existing table here,
+                    // which is not how things are supposed to work.
+                    cpyTable->children = witnessTable->children;
+
                     witnessTablesDictionary.Add(cpyTable->mangledName, cpyTable);
                     walkInheritanceHierarchyAndCreateWitnessTableCopies(witnessTable, subType, subInheritanceDeclRef.getDecl());
                 }
@@ -2888,7 +2891,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             auto satisfyingMemberDeclRef = entry.Value;
             
             auto irRequirement = context->irBuilder->getDeclRefVal(requiredMemberDeclRef);
-            IRValue* irSatisfyingVal = nullptr;
+            IRInst* irSatisfyingVal = nullptr;
             if (satisfyingMemberDeclRef.As<GenericTypeConstraintDecl>())
                 irSatisfyingVal = context->irBuilder->getDeclRefVal(satisfyingMemberDeclRef);
             else
@@ -3127,7 +3130,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
 
         // TODO: we currently store a Decl* in the witness table, which causes this function
-        // being invoked to translate the witness table entry into an IRValue.
+        // being invoked to translate the witness table entry into an IRInst.
         // We should really allow a witness table entry to represent a type and not having to
         // construct the type here. The current implementation will not work when the struct type
         // is defined in a generic parent (we lose the environmental substitutions).
@@ -3787,7 +3790,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
             // We need to carefully add a terminator instruction to the end
             // of the body, in case the user didn't do so.
-            if (!isTerminatorInst(subContext->irBuilder->curBlock->lastInst))
+            if (!subContext->irBuilder->curBlock->getTerminator())
             {
                 if (irResultType->Equals(context->getSession()->getVoidType()))
                 {
@@ -3940,11 +3943,11 @@ LoweredValInfo ensureDecl(
     return result;
 }
 
-IRValue* findWitnessTable(
+IRInst* findWitnessTable(
     IRGenContext*   context,
     DeclRef<Decl>   declRef)
 {
-    IRValue* irVal = getSimpleVal(context, emitDeclRef(context, declRef));
+    IRInst* irVal = getSimpleVal(context, emitDeclRef(context, declRef));
     if (!irVal)
     {
         SLANG_UNEXPECTED("expected a witness table");
@@ -3986,7 +3989,7 @@ RefPtr<Val> lowerSubstitutionArg(
         auto irWitnessTable = findWitnessTable(context, declaredSubtypeWitness->declRef);
 
         // We have an IR-level value, but we need to embed it into an AST-level
-        // type, so we will use a proxy `Val` that wraps up an `IRValue` as
+        // type, so we will use a proxy `Val` that wraps up an `IRInst` as
         // an AST-level value.
         //
         // TODO: This proxy value currently doesn't enter into use-def chaining,
@@ -4173,47 +4176,6 @@ static void lowerEntryPointToIR(
     for (auto arg : entryPointRequest->genericParameterTypes)
         lowerType(context, arg);
 }
-
-#if 0
-IRModule* lowerEntryPointToIR(
-    EntryPointRequest*  entryPoint,
-    ProgramLayout*      programLayout,
-    CodeGenTarget       target)
-{
-    SharedIRGenContext sharedContextStorage;
-    SharedIRGenContext* sharedContext = &sharedContextStorage;
-
-    sharedContext->entryPoint       = entryPoint;
-    sharedContext->programLayout    = programLayout;
-    sharedContext->target           = target;
-
-    IRGenContext contextStorage;
-    IRGenContext* context = &contextStorage;
-
-    context->shared = sharedContext;
-
-    SharedIRBuilder sharedBuilderStorage;
-    SharedIRBuilder* sharedBuilder = &sharedBuilderStorage;
-    sharedBuilder->module = nullptr;
-    sharedBuilder->session = entryPoint->compileRequest->mSession;
-
-    IRBuilder builderStorage;
-    IRBuilder* builder = &builderStorage;
-    builder->shared = sharedBuilder;
-
-    IRModule* module = builder->createModule();
-    sharedBuilder->module = module;
-
-    context->irBuilder = builder;
-
-    auto entryPointLayout = findEntryPointLayout(sharedContext, entryPoint);
-
-    lowerEntryPointToIR(context, entryPoint, entryPointLayout);
-
-    return module;
-
-}
-#endif
 
 IRModule* generateIRForTranslationUnit(
     TranslationUnitRequest* translationUnit)

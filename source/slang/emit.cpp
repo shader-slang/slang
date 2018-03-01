@@ -117,7 +117,7 @@ struct SharedEmitContext
     ExtensionUsageTracker extensionUsageTracker;
 
     UInt uniqueIDCounter = 1;
-    Dictionary<IRValue*, UInt> mapIRValueToID;
+    Dictionary<IRInst*, UInt> mapIRValueToID;
     Dictionary<Decl*, UInt> mapDeclToID;
 
     HashSet<String> irDeclsVisited;
@@ -4481,7 +4481,7 @@ emitDeclImpl(decl, nullptr);
 
     // IR-level emit logc
 
-    UInt getID(IRValue* value)
+    UInt getID(IRInst* value)
     {
         auto& mapIRValueToID = context->shared->mapIRValueToID;
 
@@ -4548,7 +4548,7 @@ emitDeclImpl(decl, nullptr);
     }
 
     String getIRName(
-        IRValue*        inst)
+        IRInst*        inst)
     {
         switch(inst->op)
         {
@@ -4903,7 +4903,7 @@ emitDeclImpl(decl, nullptr);
 
     bool shouldFoldIRInstIntoUseSites(
         EmitContext*    ctx,
-        IRValue*        inst,
+        IRInst*        inst,
         IREmitMode      mode)
     {
         // Certain opcodes should always be folded in
@@ -4984,7 +4984,7 @@ emitDeclImpl(decl, nullptr);
 
     bool isDerefBaseImplicit(
         EmitContext*    /*context*/,
-        IRValue*        inst)
+        IRInst*        inst)
     {
         auto type = inst->getDataType();
 
@@ -5003,7 +5003,7 @@ emitDeclImpl(decl, nullptr);
 
     void emitIROperand(
         EmitContext*    ctx,
-        IRValue*         inst,
+        IRInst*         inst,
         IREmitMode      mode)
     {
         if( shouldFoldIRInstIntoUseSites(ctx, inst, mode) )
@@ -5028,8 +5028,8 @@ emitDeclImpl(decl, nullptr);
         IRInst*         inst,
         IREmitMode      mode)
     {
-        UInt argCount = inst->argCount;
-        IRUse* args = inst->getArgs();
+        UInt argCount = inst->getOperandCount();
+        IRUse* args = inst->getOperands();
 
         emit("(");
         for(UInt aa = 0; aa < argCount; ++aa)
@@ -5085,7 +5085,7 @@ emitDeclImpl(decl, nullptr);
 
     void emitIRRateQualifiers(
         EmitContext*    ctx,
-        IRValue*        value)
+        IRInst*         value)
     {
         emitIRRateQualifiers(ctx, value->getRate());
     }
@@ -5371,8 +5371,8 @@ emitDeclImpl(decl, nullptr);
         IRTargetIntrinsicDecoration*    targetIntrinsic,
         IREmitMode                      mode)
     {
-        IRUse* args = inst->getArgs();
-        UInt argCount = inst->getArgCount();
+        IRUse* args = inst->getOperands();
+        UInt argCount = inst->getOperandCount();
 
         // First operand was the function to be called
         args++;
@@ -5578,7 +5578,7 @@ emitDeclImpl(decl, nullptr);
         // For a call with N arguments, the instruction will
         // have N+1 operands. We will start consuming operands
         // starting at the index 1.
-        UInt operandCount = inst->getArgCount();
+        UInt operandCount = inst->getOperandCount();
         UInt argCount = operandCount - 1;
         UInt operandIndex = 1;
 
@@ -5619,15 +5619,15 @@ emitDeclImpl(decl, nullptr);
         {
             // The user is invoking a built-in subscript operator
             emit("(");
-            emitIROperand(ctx, inst->getArg(operandIndex++), mode);
+            emitIROperand(ctx, inst->getOperand(operandIndex++), mode);
             emit(")[");
-            emitIROperand(ctx, inst->getArg(operandIndex++), mode);
+            emitIROperand(ctx, inst->getOperand(operandIndex++), mode);
             emit("]");
 
             if(operandIndex < operandCount)
             {
                 emit(" = ");
-                emitIROperand(ctx, inst->getArg(operandIndex++), mode);
+                emitIROperand(ctx, inst->getOperand(operandIndex++), mode);
             }
             return;
         }
@@ -5643,7 +5643,7 @@ emitDeclImpl(decl, nullptr);
         {
             // Looks like a member function call
             emit("(");
-            emitIROperand(ctx, inst->getArg(operandIndex), mode);
+            emitIROperand(ctx, inst->getOperand(operandIndex), mode);
             emit(").");
 
             operandIndex++;
@@ -5655,7 +5655,7 @@ emitDeclImpl(decl, nullptr);
         for(; operandIndex < operandCount; ++operandIndex )
         {
             if(!first) emit(", ");
-            emitIROperand(ctx, inst->getArg(operandIndex), mode);
+            emitIROperand(ctx, inst->getOperand(operandIndex), mode);
             first = false;
         }
         emit(")");
@@ -5668,7 +5668,7 @@ emitDeclImpl(decl, nullptr);
     {
         // We want to detect any call to an intrinsic operation,
         // that we can emit it directly without mangling, etc.
-        auto funcValue = inst->getArg(0);
+        auto funcValue = inst->getOperand(0);
         if(auto irFunc = asTargetIntrinsic(ctx, funcValue))
         {
             emitIntrinsicCallExpr(ctx, inst, irFunc, mode);
@@ -5677,11 +5677,11 @@ emitDeclImpl(decl, nullptr);
         {
             emitIROperand(ctx, funcValue, mode);
             emit("(");
-            UInt argCount = inst->getArgCount();
+            UInt argCount = inst->getOperandCount();
             for( UInt aa = 1; aa < argCount; ++aa )
             {
                 if(aa != 1) emit(", ");
-                emitIROperand(ctx, inst->getArg(aa), mode);
+                emitIROperand(ctx, inst->getOperand(aa), mode);
             }
             emit(")");
         }
@@ -5689,14 +5689,12 @@ emitDeclImpl(decl, nullptr);
 
     void emitIRInstExpr(
         EmitContext*    ctx,
-        IRValue*        value,
+        IRInst*         inst,
         IREmitMode      mode)
     {
-        IRInst* inst = (IRInst*) value;
-
         advanceToSourceLocation(inst->sourceLoc);
 
-        switch(value->op)
+        switch(inst->op)
         {
         case kIROp_IntLit:
         case kIROp_FloatLit:
@@ -5708,13 +5706,13 @@ emitDeclImpl(decl, nullptr);
         case kIROp_makeVector:
         case kIROp_makeMatrix:
             // Simple constructor call
-            if( inst->getArgCount() == 1 && getTarget(ctx) == CodeGenTarget::HLSL)
+            if( inst->getOperandCount() == 1 && getTarget(ctx) == CodeGenTarget::HLSL)
             {
                 // Need to emit as cast for HLSL
                 emit("(");
                 emitIRType(ctx, inst->getDataType());
                 emit(") ");
-                emitIROperand(ctx, inst->getArg(0), mode);
+                emitIROperand(ctx, inst->getOperand(0), mode);
             }
             else
             {
@@ -5736,7 +5734,7 @@ emitDeclImpl(decl, nullptr);
                 emitIRType(ctx, inst->getDataType());
             }
             emit("(");
-            emitIROperand(ctx, inst->getArg(0), mode);
+            emitIROperand(ctx, inst->getOperand(0), mode);
             emit(")");
             break;
 
@@ -5771,11 +5769,11 @@ emitDeclImpl(decl, nullptr);
             }
             break;
 
-#define CASE(OPCODE, OP)                                \
-        case OPCODE:                                    \
-            emitIROperand(ctx, inst->getArg(0), mode);  \
-            emit(" " #OP " ");                          \
-            emitIROperand(ctx, inst->getArg(1), mode);  \
+#define CASE(OPCODE, OP)                                    \
+        case OPCODE:                                        \
+            emitIROperand(ctx, inst->getOperand(0), mode);  \
+            emit(" " #OP " ");                              \
+            emitIROperand(ctx, inst->getOperand(1), mode);  \
             break
 
         CASE(kIROp_Add, +);
@@ -5813,18 +5811,18 @@ emitDeclImpl(decl, nullptr);
                 && inst->type->As<MatrixExpressionType>())
             {
                 emit("matrixCompMult(");
-                emitIROperand(ctx, inst->getArg(0), mode);
+                emitIROperand(ctx, inst->getOperand(0), mode);
                 emit(", ");
-                emitIROperand(ctx, inst->getArg(1), mode);
+                emitIROperand(ctx, inst->getOperand(1), mode);
                 emit(")");
             }
             else
             {
                 // Default handling is to just rely on infix
                 // `operator*`.
-                emitIROperand(ctx, inst->getArg(0), mode);
+                emitIROperand(ctx, inst->getOperand(0), mode);
                 emit(" * ");
-                emitIROperand(ctx, inst->getArg(1), mode);
+                emitIROperand(ctx, inst->getOperand(1), mode);
             }
             break;
 
@@ -5838,55 +5836,55 @@ emitDeclImpl(decl, nullptr);
                 {
                     emit("~");
                 }
-                emitIROperand(ctx, inst->getArg(0), mode);
+                emitIROperand(ctx, inst->getOperand(0), mode);
             }
             break;
 
         case kIROp_Neg:
             {
                 emit("-");
-                emitIROperand(ctx, inst->getArg(0), mode);
+                emitIROperand(ctx, inst->getOperand(0), mode);
             }
             break;
         case kIROp_BitNot:
             {
                 emit("~");
-                emitIROperand(ctx, inst->getArg(0), mode);
+                emitIROperand(ctx, inst->getOperand(0), mode);
             }
             break;
         case kIROp_Sample:
-            emitIROperand(ctx, inst->getArg(0), mode);
+            emitIROperand(ctx, inst->getOperand(0), mode);
             emit(".Sample(");
-            emitIROperand(ctx, inst->getArg(1), mode);
+            emitIROperand(ctx, inst->getOperand(1), mode);
             emit(", ");
-            emitIROperand(ctx, inst->getArg(2), mode);
+            emitIROperand(ctx, inst->getOperand(2), mode);
             emit(")");
             break;
 
         case kIROp_SampleGrad:
             // argument 0 is the instruction's type
-            emitIROperand(ctx, inst->getArg(0), mode);
+            emitIROperand(ctx, inst->getOperand(0), mode);
             emit(".SampleGrad(");
-            emitIROperand(ctx, inst->getArg(1), mode);
+            emitIROperand(ctx, inst->getOperand(1), mode);
             emit(", ");
-            emitIROperand(ctx, inst->getArg(2), mode);
+            emitIROperand(ctx, inst->getOperand(2), mode);
             emit(", ");
-            emitIROperand(ctx, inst->getArg(3), mode);
+            emitIROperand(ctx, inst->getOperand(3), mode);
             emit(", ");
-            emitIROperand(ctx, inst->getArg(4), mode);
+            emitIROperand(ctx, inst->getOperand(4), mode);
             emit(")");
             break;
 
         case kIROp_Load:
             // TODO: this logic will really only work for a simple variable reference...
-            emitIROperand(ctx, inst->getArg(0), mode);
+            emitIROperand(ctx, inst->getOperand(0), mode);
             break;
 
         case kIROp_Store:
             // TODO: this logic will really only work for a simple variable reference...
-            emitIROperand(ctx, inst->getArg(0), mode);
+            emitIROperand(ctx, inst->getOperand(0), mode);
             emit(" = ");
-            emitIROperand(ctx, inst->getArg(1), mode);
+            emitIROperand(ctx, inst->getOperand(1), mode);
             break;
 
         case kIROp_Call:
@@ -5897,18 +5895,18 @@ emitDeclImpl(decl, nullptr);
 
         case kIROp_BufferLoad:
         case kIROp_BufferElementRef:
-            emitIROperand(ctx, inst->getArg(0), mode);
+            emitIROperand(ctx, inst->getOperand(0), mode);
             emit("[");
-            emitIROperand(ctx, inst->getArg(1), mode);
+            emitIROperand(ctx, inst->getOperand(1), mode);
             emit("]");
             break;
 
         case kIROp_BufferStore:
-            emitIROperand(ctx, inst->getArg(0), mode);
+            emitIROperand(ctx, inst->getOperand(0), mode);
             emit("[");
-            emitIROperand(ctx, inst->getArg(1), mode);
+            emitIROperand(ctx, inst->getOperand(1), mode);
             emit("] = ");
-            emitIROperand(ctx, inst->getArg(2), mode);
+            emitIROperand(ctx, inst->getOperand(2), mode);
             break;
 
         case kIROp_GroupMemoryBarrierWithGroupSync:
@@ -5917,9 +5915,9 @@ emitDeclImpl(decl, nullptr);
 
         case kIROp_getElement:
         case kIROp_getElementPtr:
-            emitIROperand(ctx, inst->getArg(0), mode);
+            emitIROperand(ctx, inst->getOperand(0), mode);
             emit("[");
-            emitIROperand(ctx, inst->getArg(1), mode);
+            emitIROperand(ctx, inst->getOperand(1), mode);
             emit("]");
             break;
 
@@ -5936,16 +5934,16 @@ emitDeclImpl(decl, nullptr);
                 // because the notion of what is a "row" vs. a "column"
                 // is reversed between HLSL/Slang and GLSL.
                 //
-                emitIROperand(ctx, inst->getArg(1), mode);
+                emitIROperand(ctx, inst->getOperand(1), mode);
                 emit(" * ");
-                emitIROperand(ctx, inst->getArg(0), mode);
+                emitIROperand(ctx, inst->getOperand(0), mode);
             }
             else
             {
                 emit("mul(");
-                emitIROperand(ctx, inst->getArg(0), mode);
+                emitIROperand(ctx, inst->getOperand(0), mode);
                 emit(", ");
-                emitIROperand(ctx, inst->getArg(1), mode);
+                emitIROperand(ctx, inst->getOperand(1), mode);
                 emit(")");
             }
             break;
@@ -5958,7 +5956,7 @@ emitDeclImpl(decl, nullptr);
                 UInt elementCount = ii->getElementCount();
                 for (UInt ee = 0; ee < elementCount; ++ee)
                 {
-                    IRValue* irElementIndex = ii->getElementIndex(ee);
+                    IRInst* irElementIndex = ii->getElementIndex(ee);
                     assert(irElementIndex->op == kIROp_IntLit);
                     IRConstant* irConst = (IRConstant*)irElementIndex;
 
@@ -5973,17 +5971,17 @@ emitDeclImpl(decl, nullptr);
 
         case kIROp_specialize:
             {
-                emitIROperand(ctx, inst->getArg(0), mode);
+                emitIROperand(ctx, inst->getOperand(0), mode);
             }
             break;
 
         case kIROp_Select:
             {
-                emitIROperand(ctx, inst->getArg(0), mode);
+                emitIROperand(ctx, inst->getOperand(0), mode);
                 emit(" ? ");
-                emitIROperand(ctx, inst->getArg(1), mode);
+                emitIROperand(ctx, inst->getOperand(1), mode);
                 emit(" : ");
-                emitIROperand(ctx, inst->getArg(2), mode);
+                emitIROperand(ctx, inst->getOperand(2), mode);
             }
             break;
 
@@ -5999,11 +5997,11 @@ emitDeclImpl(decl, nullptr);
                 // of the expression.
 
                 emit("{ ");
-                UInt argCount = inst->getArgCount();
+                UInt argCount = inst->getOperandCount();
                 for (UInt aa = 0; aa < argCount; ++aa)
                 {
                     if (aa != 0) emit(", ");
-                    emitIROperand(ctx, inst->getArg(aa), mode);
+                    emitIROperand(ctx, inst->getOperand(aa), mode);
                 }
                 emit(" }");
             }
@@ -6081,14 +6079,14 @@ emitDeclImpl(decl, nullptr);
             {
                 auto ii = (IRSwizzleSet*)inst;
                 emitIRInstResultDecl(ctx, inst);
-                emitIROperand(ctx, inst->getArg(0), mode);
+                emitIROperand(ctx, inst->getOperand(0), mode);
                 emit(";\n");
                 emitIROperand(ctx, inst, mode);
                 emit(".");
                 UInt elementCount = ii->getElementCount();
                 for (UInt ee = 0; ee < elementCount; ++ee)
                 {
-                    IRValue* irElementIndex = ii->getElementIndex(ee);
+                    IRInst* irElementIndex = ii->getElementIndex(ee);
                     assert(irElementIndex->op == kIROp_IntLit);
                     IRConstant* irConst = (IRConstant*)irElementIndex;
 
@@ -6099,7 +6097,7 @@ emitDeclImpl(decl, nullptr);
                     emit(kComponents[elementIndex]);
                 }
                 emit(" = ");
-                emitIROperand(ctx, inst->getArg(1), mode);
+                emitIROperand(ctx, inst->getOperand(1), mode);
                 emit(";\n");
             }
             break;
@@ -6108,7 +6106,7 @@ emitDeclImpl(decl, nullptr);
 
     void emitIRSemantics(
         EmitContext*    ctx,
-        IRValue*         inst)
+        IRInst*         inst)
     {
         // Don't emit semantics if we aren't translating down to HLSL
         switch (ctx->shared->target)
@@ -6150,7 +6148,7 @@ emitDeclImpl(decl, nullptr);
 
     VarLayout* getVarLayout(
         EmitContext*    /*context*/,
-        IRValue*        var)
+        IRInst*         var)
     {
         auto decoration = var->findDecoration<IRLayoutDecoration>();
         if (!decoration)
@@ -6161,7 +6159,7 @@ emitDeclImpl(decl, nullptr);
 
     void emitIRLayoutSemantics(
         EmitContext*    ctx,
-        IRValue*        inst,
+        IRInst*         inst,
         char const*     uniformSemanticSpelling = "register")
     {
         auto layout = getVarLayout(ctx, inst);
@@ -6193,7 +6191,7 @@ emitDeclImpl(decl, nullptr);
                 break;
             }
 
-            IRValue* arg = args[argIndex].get();
+            IRInst* arg = args[argIndex].get();
 
             emitIROperand(ctx, pp, IREmitMode::Default);
             emit(" = ");
@@ -6294,7 +6292,7 @@ emitDeclImpl(decl, nullptr);
 
             // Start by emitting the non-terminator instructions in the block.
             auto terminator = block->getLastInst();
-            assert(isTerminatorInst(terminator));
+            assert(as<IRTerminatorInst>(terminator));
             for (auto inst = block->getFirstInst(); inst != terminator; inst = inst->getNextInst())
             {
                 emitIRInst(ctx, inst, IREmitMode::Default);
@@ -6367,12 +6365,12 @@ emitDeclImpl(decl, nullptr);
                     auto targetBlock = t->getTargetBlock();
                     auto breakBlock = t->getBreakBlock();
 
-                    UInt argCount = t->getArgCount();
+                    UInt argCount = t->getOperandCount();
                     static const UInt kFixedArgCount = 3;
                     emitPhiVarAssignments(
                         ctx,
                         argCount - kFixedArgCount,
-                        t->getArgs() + kFixedArgCount,
+                        t->getOperands() + kFixedArgCount,
                         targetBlock);
 
                     // Set up entries on our label stack for break/continue
@@ -6514,12 +6512,12 @@ emitDeclImpl(decl, nullptr);
                     auto t = (IRUnconditionalBranch*)terminator;
                     auto targetBlock = t->getTargetBlock();
 
-                    UInt argCount = t->getArgCount();
+                    UInt argCount = t->getOperandCount();
                     static const UInt kFixedArgCount = 1;
                     emitPhiVarAssignments(
                         ctx,
                         argCount - kFixedArgCount,
-                        t->getArgs() + kFixedArgCount,
+                        t->getOperands() + kFixedArgCount,
                         targetBlock);
 
                     block = t->getTargetBlock();
@@ -7107,7 +7105,7 @@ emitDeclImpl(decl, nullptr);
     // if it does.
     IRFunc* asTargetIntrinsic(
         EmitContext*    ctxt,
-        IRValue*        value)
+        IRInst*         value)
     {
         if(!value)
             return nullptr;
@@ -7704,7 +7702,7 @@ emitDeclImpl(decl, nullptr);
         auto varType = allocatedType->getValueType();
 
         String initFuncName;
-        if (varDecl->firstBlock)
+        if (varDecl->getFirstBlock())
         {
             // A global variable with code means it has an initializer
             // associated with it. Eventually we'd like to emit that
@@ -7715,7 +7713,7 @@ emitDeclImpl(decl, nullptr);
             initFuncName.append("_init");
             emitIRType(ctx, varType, initFuncName);
             Emit("()\n{\n");
-            emitIRStmtsForBlocks(ctx, varDecl->firstBlock, nullptr, nullptr);
+            emitIRStmtsForBlocks(ctx, varDecl->getFirstBlock(), nullptr, nullptr);
             Emit("}\n");
         }
 
@@ -7788,7 +7786,7 @@ emitDeclImpl(decl, nullptr);
 
         emitIRLayoutSemantics(ctx, varDecl);
 
-        if (varDecl->firstBlock)
+        if (varDecl->getFirstBlock())
         {
             Emit(" = ");
             emit(initFuncName);
@@ -7827,7 +7825,7 @@ emitDeclImpl(decl, nullptr);
         emit("static const ");
         emitIRType(ctx, valType, getIRName(valDecl));
 
-        if (valDecl->firstBlock)
+        if (valDecl->getFirstBlock())
         {
             // There is an initializer (which we expect for
             // any global constant...).
@@ -7845,10 +7843,8 @@ emitDeclImpl(decl, nullptr);
 
     void emitIRGlobalInst(
         EmitContext*    ctx,
-        IRGlobalValue*  inst)
+        IRInst*         inst)
     {
-        // TODO: need to be able to `switch` on the IR opcode here,
-        // so there is some work to be done.
         switch(inst->op)
         {
         case kIROp_Func:
@@ -7995,7 +7991,7 @@ emitDeclImpl(decl, nullptr);
 
     void emitIRUsedTypesForValue(
         EmitContext*    ctx,
-        IRValue*        value)
+        IRInst*         value)
     {
         if(!value) return;
         switch( value->op )
@@ -8044,9 +8040,9 @@ emitDeclImpl(decl, nullptr);
         EmitContext*    ctx,
         IRModule*       module)
     {
-        for( auto gv = module->getFirstGlobalValue(); gv; gv = gv->getNextValue() )
+        for(auto ii : module->getGlobalInsts())
         {
-            emitIRUsedTypesForValue(ctx, gv);
+            emitIRUsedTypesForValue(ctx, ii);
         }
     }
 
@@ -8059,20 +8055,18 @@ emitDeclImpl(decl, nullptr);
         // Before we emit code, we need to forward-declare
         // all of our functions so that we don't have to
         // sort them by dependencies.
-        for( auto gv = module->getFirstGlobalValue(); gv; gv = gv->getNextValue() )
+        for(auto ii : module->getGlobalInsts())
         {
-            if(gv->op != kIROp_Func)
+            if(ii->op != kIROp_Func)
                 continue;
 
-            auto func = (IRFunc*) gv;
+            auto func = (IRFunc*) ii;
             emitIRFuncDecl(ctx, func);
         }
 
-
-
-        for( auto gv = module->getFirstGlobalValue(); gv; gv = gv->getNextValue() )
+        for(auto ii : module->getGlobalInsts())
         {
-            emitIRGlobalInst(ctx, gv);
+            emitIRGlobalInst(ctx, ii);
         }
     }
 

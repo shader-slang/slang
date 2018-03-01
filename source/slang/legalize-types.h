@@ -278,9 +278,9 @@ struct LegalVal
 
     Flavor              flavor = Flavor::none;
     RefPtr<RefObject>   obj;
-    IRValue*            irValue = nullptr;
+    IRInst*             irValue = nullptr;
 
-    static LegalVal simple(IRValue* irValue)
+    static LegalVal simple(IRInst* irValue)
     {
         LegalVal result;
         result.flavor = Flavor::simple;
@@ -288,7 +288,7 @@ struct LegalVal
         return result;
     }
 
-    IRValue* getSimple()
+    IRInst* getSimple()
     {
         assert(flavor == Flavor::simple);
         return irValue;

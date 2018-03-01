@@ -85,12 +85,12 @@ struct IRTargetIntrinsicDecoration : IRTargetSpecificDecoration
 
 // An IR node to represent a reference to an AST-level
 // declaration.
-struct IRDeclRef : IRValue
+struct IRDeclRef : IRInst
 {
     DeclRef<Decl> declRef;
     virtual void dispose() override
     {
-        IRValue::dispose();
+        IRInst::dispose();
         declRef = decltype(declRef)();
     }
 };
@@ -144,8 +144,8 @@ struct IRFieldExtract : IRInst
     IRUse   base;
     IRUse   field;
 
-    IRValue* getBase() { return base.get(); }
-    IRValue* getField() { return field.get(); }
+    IRInst* getBase() { return base.get(); }
+    IRInst* getField() { return field.get(); }
 };
 
 struct IRFieldAddress : IRInst
@@ -153,8 +153,8 @@ struct IRFieldAddress : IRInst
     IRUse   base;
     IRUse   field;
 
-    IRValue* getBase() { return base.get(); }
-    IRValue* getField() { return field.get(); }
+    IRInst* getBase() { return base.get(); }
+    IRInst* getField() { return field.get(); }
 };
 
 // Terminators
@@ -166,7 +166,7 @@ struct IRReturnVal : IRReturn
 {
     IRUse val;
 
-    IRValue* getVal() { return val.get(); }
+    IRInst* getVal() { return val.get(); }
 };
 
 struct IRReturnVoid : IRReturn
@@ -221,7 +221,7 @@ struct IRConditionalBranch : IRTerminatorInst
     IRUse trueBlock;
     IRUse falseBlock;
 
-    IRValue* getCondition() { return condition.get(); }
+    IRInst* getCondition() { return condition.get(); }
     IRBlock* getTrueBlock() { return (IRBlock*)trueBlock.get(); }
     IRBlock* getFalseBlock() { return (IRBlock*)falseBlock.get(); }
 };
@@ -260,29 +260,29 @@ struct IRSwitch : IRTerminatorInst
     IRUse breakLabel;
     IRUse defaultLabel;
 
-    IRValue* getCondition() { return condition.get(); }
+    IRInst* getCondition() { return condition.get(); }
     IRBlock* getBreakLabel() { return (IRBlock*) breakLabel.get(); }
     IRBlock* getDefaultLabel() { return (IRBlock*) defaultLabel.get(); }
 
     // remaining args are: caseVal, caseLabel, ...
 
-    UInt getCaseCount() { return (getArgCount() - 3) / 2; }
-    IRValue* getCaseValue(UInt index) { return            getArg(3 + index*2 + 0); }
-    IRBlock* getCaseLabel(UInt index) { return (IRBlock*) getArg(3 + index*2 + 1); }
+    UInt getCaseCount() { return (getOperandCount() - 3) / 2; }
+    IRInst* getCaseValue(UInt index) { return            getOperand(3 + index*2 + 0); }
+    IRBlock* getCaseLabel(UInt index) { return (IRBlock*) getOperand(3 + index*2 + 1); }
 };
 
 struct IRSwizzle : IRReturn
 {
     IRUse base;
 
-    IRValue* getBase() { return base.get(); }
+    IRInst* getBase() { return base.get(); }
     UInt getElementCount()
     {
-        return getArgCount() - 1;
+        return getOperandCount() - 1;
     }
-    IRValue* getElementIndex(UInt index)
+    IRInst* getElementIndex(UInt index)
     {
-        return getArg(index + 1);
+        return getOperand(index + 1);
     }
 };
 
@@ -291,15 +291,15 @@ struct IRSwizzleSet : IRReturn
     IRUse base;
     IRUse source;
 
-    IRValue* getBase() { return base.get(); }
-    IRValue* getSource() { return source.get(); }
+    IRInst* getBase() { return base.get(); }
+    IRInst* getSource() { return source.get(); }
     UInt getElementCount()
     {
-        return getArgCount() - 2;
+        return getOperandCount() - 2;
     }
-    IRValue* getElementIndex(UInt index)
+    IRInst* getElementIndex(UInt index)
     {
-        return getArg(index + 2);
+        return getOperand(index + 2);
     }
 };
 
@@ -309,8 +309,10 @@ struct IRVar : IRInst
 {
     PtrType* getDataType()
     {
-        return (PtrType*) ((IRValue*) this)->getDataType();
+        return (PtrType*) IRInst::getDataType();
     }
+
+    static bool isaImpl(IROp op) { return op == kIROp_Var; }
 };
 
 /// @brief A global variable.
@@ -323,7 +325,7 @@ struct IRGlobalVar : IRGlobalValueWithCode
 {
     PtrType* getDataType()
     {
-        return (PtrType*) ((IRValue*) this)->getDataType();
+        return (PtrType*) IRInst::getDataType();
     }
 };
 
@@ -337,7 +339,7 @@ struct IRGlobalConstant : IRGlobalValueWithCode
 };
 
 // An entry in a witness table (see below)
-struct IRWitnessTableEntry : IRUser
+struct IRWitnessTableEntry : IRInst
 {
     // The AST-level requirement
     IRUse requirementKey;
@@ -353,9 +355,14 @@ struct IRWitnessTableEntry : IRUser
 // to the IR values that satisfy those requirements.
 struct IRWitnessTable : IRGlobalValue
 {
+    IRInstList<IRWitnessTableEntry> getEntries()
+    {
+        return IRInstList<IRWitnessTableEntry>(getChildren());
+    }
+
     RefPtr<GenericDecl> genericDecl;
     DeclRef<Decl> subTypeDeclRef, supTypeDeclRef;
-    IRValueList<IRWitnessTableEntry> entries;
+
     virtual void dispose() override
     {
         IRGlobalValue::dispose();
@@ -436,76 +443,75 @@ struct IRBuilder
 
     IRBuilderSourceLocRAII* sourceLocInfo = nullptr;
 
-    void addInst(IRBlock* block, IRInst* inst);
     void addInst(IRInst* inst);
 
-    IRValue* getBoolValue(bool value);
-    IRValue* getIntValue(IRType* type, IRIntegerValue value);
-    IRValue* getFloatValue(IRType* type, IRFloatingPointValue value);
+    IRInst* getBoolValue(bool value);
+    IRInst* getIntValue(IRType* type, IRIntegerValue value);
+    IRInst* getFloatValue(IRType* type, IRFloatingPointValue value);
 
-    IRValue* getDeclRefVal(
+    IRInst* getDeclRefVal(
         DeclRefBase const&  declRef);
-    IRValue* getTypeVal(IRType* type); // create an IR value that represents a type
-    IRValue* emitSpecializeInst(
+    IRInst* getTypeVal(IRType* type); // create an IR value that represents a type
+    IRInst* emitSpecializeInst(
         IRType*     type,
-        IRValue*    genericVal,
-        IRValue*    specDeclRef);
+        IRInst*    genericVal,
+        IRInst*    specDeclRef);
 
-    IRValue* emitSpecializeInst(
+    IRInst* emitSpecializeInst(
         IRType*         type,
-        IRValue*        genericVal,
+        IRInst*        genericVal,
         DeclRef<Decl>   specDeclRef);
 
-    IRValue* emitLookupInterfaceMethodInst(
+    IRInst* emitLookupInterfaceMethodInst(
         IRType*     type,
-        IRValue*    witnessTableVal,
-        IRValue*    interfaceMethodVal);
+        IRInst*    witnessTableVal,
+        IRInst*    interfaceMethodVal);
 
-    IRValue* emitLookupInterfaceMethodInst(
+    IRInst* emitLookupInterfaceMethodInst(
         IRType*         type,
         DeclRef<Decl>   witnessTableDeclRef,
         DeclRef<Decl>   interfaceMethodDeclRef);
 
-    IRValue* emitLookupInterfaceMethodInst(
+    IRInst* emitLookupInterfaceMethodInst(
         IRType*         type,
-        IRValue*   witnessTableVal,
+        IRInst*   witnessTableVal,
         DeclRef<Decl>   interfaceMethodDeclRef);
 
-    IRValue* emitFindWitnessTable(
+    IRInst* emitFindWitnessTable(
         DeclRef<Decl> baseTypeDeclRef,
         IRType* interfaceType);
 
     IRInst* emitCallInst(
         IRType*         type,
-        IRValue*        func,
+        IRInst*        func,
         UInt            argCount,
-        IRValue* const* args);
+        IRInst* const* args);
 
     IRInst* emitIntrinsicInst(
         IRType*         type,
         IROp            op,
         UInt            argCount,
-        IRValue* const* args);
+        IRInst* const* args);
 
     IRInst* emitConstructorInst(
         IRType*         type,
         UInt            argCount,
-        IRValue* const* args);
+        IRInst* const* args);
 
     IRInst* emitMakeVector(
         IRType*         type,
         UInt            argCount,
-        IRValue* const* args);
+        IRInst* const* args);
 
     IRInst* emitMakeArray(
         IRType*         type,
         UInt            argCount,
-        IRValue* const* args);
+        IRInst* const* args);
 
     IRInst* emitMakeStruct(
         IRType*         type,
         UInt            argCount,
-        IRValue* const* args);
+        IRInst* const* args);
 
     IRUndefined* emitUndefined(IRType* type);
 
@@ -521,8 +527,8 @@ struct IRBuilder
     IRWitnessTable* createWitnessTable();
     IRWitnessTableEntry* createWitnessTableEntry(
         IRWitnessTable* witnessTable,
-        IRValue*        requirementKey,
-        IRValue*        satisfyingVal);
+        IRInst*        requirementKey,
+        IRInst*        satisfyingVal);
     IRWitnessTable* lookupWitnessTable(Name* mangledName);
     void registerWitnessTable(IRWitnessTable* table);
     IRBlock* createBlock();
@@ -537,60 +543,60 @@ struct IRBuilder
         IRType* type);
 
     IRInst* emitLoad(
-        IRValue*    ptr);
+        IRInst*    ptr);
 
     IRInst* emitStore(
-        IRValue*    dstPtr,
-        IRValue*    srcVal);
+        IRInst*    dstPtr,
+        IRInst*    srcVal);
 
     IRInst* emitFieldExtract(
         IRType*         type,
-        IRValue*        base,
-        IRValue*        field);
+        IRInst*        base,
+        IRInst*        field);
 
     IRInst* emitFieldAddress(
         IRType*         type,
-        IRValue*        basePtr,
-        IRValue*        field);
+        IRInst*        basePtr,
+        IRInst*        field);
 
     IRInst* emitElementExtract(
         IRType*     type,
-        IRValue*    base,
-        IRValue*    index);
+        IRInst*    base,
+        IRInst*    index);
 
     IRInst* emitElementAddress(
         IRType*     type,
-        IRValue*    basePtr,
-        IRValue*    index);
+        IRInst*    basePtr,
+        IRInst*    index);
 
     IRInst* emitSwizzle(
         IRType*         type,
-        IRValue*        base,
+        IRInst*        base,
         UInt            elementCount,
-        IRValue* const* elementIndices);
+        IRInst* const* elementIndices);
 
     IRInst* emitSwizzle(
         IRType*         type,
-        IRValue*        base,
+        IRInst*        base,
         UInt            elementCount,
         UInt const*     elementIndices);
 
     IRInst* emitSwizzleSet(
         IRType*         type,
-        IRValue*        base,
-        IRValue*        source,
+        IRInst*        base,
+        IRInst*        source,
         UInt            elementCount,
-        IRValue* const* elementIndices);
+        IRInst* const* elementIndices);
 
     IRInst* emitSwizzleSet(
         IRType*         type,
-        IRValue*        base,
-        IRValue*        source,
+        IRInst*        base,
+        IRInst*        source,
         UInt            elementCount,
         UInt const*     elementIndices);
 
     IRInst* emitReturn(
-        IRValue*    val);
+        IRInst*    val);
 
     IRInst* emitReturn();
 
@@ -613,35 +619,35 @@ struct IRBuilder
         IRBlock*    continueBlock);
 
     IRInst* emitBranch(
-        IRValue*    val,
+        IRInst*    val,
         IRBlock*    trueBlock,
         IRBlock*    falseBlock);
 
     IRInst* emitIf(
-        IRValue*    val,
+        IRInst*    val,
         IRBlock*    trueBlock,
         IRBlock*    afterBlock);
 
     IRInst* emitIfElse(
-        IRValue*    val,
+        IRInst*    val,
         IRBlock*    trueBlock,
         IRBlock*    falseBlock,
         IRBlock*    afterBlock);
 
     IRInst* emitLoopTest(
-        IRValue*    val,
+        IRInst*    val,
         IRBlock*    bodyBlock,
         IRBlock*    breakBlock);
 
     IRInst* emitSwitch(
-        IRValue*        val,
+        IRInst*        val,
         IRBlock*        breakLabel,
         IRBlock*        defaultLabel,
         UInt            caseArgCount,
-        IRValue* const* caseArgs);
+        IRInst* const* caseArgs);
 
     template<typename T>
-    T* addDecoration(IRValue* value, IRDecorationOp op)
+    T* addDecoration(IRInst* value, IRDecorationOp op)
     {
         assert(getModule());
         auto decorationSize = sizeof(T);
@@ -657,13 +663,13 @@ struct IRBuilder
     }
 
     template<typename T>
-    T* addDecoration(IRValue* value)
+    T* addDecoration(IRInst* value)
     {
         return addDecoration<T>(value, IRDecorationOp(T::kDecorationOp));
     }
 
-    IRHighLevelDeclDecoration* addHighLevelDeclDecoration(IRValue* value, Decl* decl);
-    IRLayoutDecoration* addLayoutDecoration(IRValue* value, Layout* layout);
+    IRHighLevelDeclDecoration* addHighLevelDeclDecoration(IRInst* value, Decl* decl);
+    IRLayoutDecoration* addLayoutDecoration(IRInst* value, Layout* layout);
 };
 
 // Helper to establish the source location that will be used
@@ -737,8 +743,8 @@ void specializeGenerics(
 //
 
 void markConstExpr(
-    Session* session,
-    IRValue* irValue);
+    Session*    session,
+    IRInst*     irValue);
 
 //
 

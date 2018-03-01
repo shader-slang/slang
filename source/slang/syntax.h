@@ -12,7 +12,6 @@
 
 namespace Slang
 {
-    struct IRValue;
     class Name;
     class Session;
     class Substitutions;

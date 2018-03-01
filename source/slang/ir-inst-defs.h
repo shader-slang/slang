@@ -4,6 +4,10 @@
 #error Must #define `INST` before including `ir-inst-defs.h`
 #endif
 
+#ifndef INST_RANGE
+#define INST_RANGE(BASE, FIRST, LAST) /* empty */
+#endif
+
 #ifndef PSEUDO_INST
 #define PSEUDO_INST(ID) /* empty */
 #endif
@@ -112,13 +116,22 @@ INST(makeStruct, makeStruct, 0, 0)
 INST(Call, call, 1, 0)
 
 INST(Module, module, 0, PARENT)
-INST(Func, func, 0, PARENT)
+
 INST(Block, block, 0, PARENT)
 
-INST(global_var, global_var, 0, 0)
-INST(global_constant, global_constant, 0, 0)
+/*IRGlobalValue*/
 
-INST(witness_table, witness_table, 0, 0)
+    /*IRGlobalValueWithCode*/
+        INST(Func, func, 0, PARENT)
+        INST(global_var, global_var, 0, 0)
+        INST(global_constant, global_constant, 0, 0)
+    INST_RANGE(GlobalValueWithCode, Func, global_constant)
+
+    INST(witness_table, witness_table, 0, 0)
+
+    INST_RANGE(GlobalValue, Func, witness_table)
+
+
 INST(witness_table_entry, witness_table_entry, 2, 0)
 
 INST(Param, param, 0, 0)
@@ -180,26 +193,30 @@ INST(swizzle, swizzle, 1, 0)
 INST(swizzleSet, swizzleSet, 2, 0)
 
 
-INST(ReturnVal, return_val, 1, 0)
-INST(ReturnVoid, return_void, 1, 0)
+/* IRTerminatorInst */
 
-// unconditionalBranch <target>
-INST(unconditionalBranch, unconditionalBranch, 1, 0)
+    INST(ReturnVal, return_val, 1, 0)
+    INST(ReturnVoid, return_void, 1, 0)
 
-// loop <target> <breakLabel> <continueLabel>
-INST(loop, loop, 3, 0)
+    // unconditionalBranch <target>
+    INST(unconditionalBranch, unconditionalBranch, 1, 0)
 
-// conditionalBranch <condition> <trueBlock> <falseBlock>
-INST(conditionalBranch, conditionalBranch, 3, 0)
+    // loop <target> <breakLabel> <continueLabel>
+    INST(loop, loop, 3, 0)
 
-// ifElse <condition> <trueBlock> <falseBlock> <mergeBlock>
-INST(ifElse, ifElse, 4, 0)
+    // conditionalBranch <condition> <trueBlock> <falseBlock>
+    INST(conditionalBranch, conditionalBranch, 3, 0)
 
-// switch <val> <break> <default> <caseVal1> <caseBlock1> ...
-INST(switch, switch, 3, 0)
+    // ifElse <condition> <trueBlock> <falseBlock> <mergeBlock>
+    INST(ifElse, ifElse, 4, 0)
 
-INST(discard, discard, 0, 0)
-INST(unreachable, unreachable, 0, 0)
+    // switch <val> <break> <default> <caseVal1> <caseBlock1> ...
+    INST(switch, switch, 3, 0)
+
+    INST(discard, discard, 0, 0)
+    INST(unreachable, unreachable, 0, 0)
+
+INST_RANGE(TerminatorInst, ReturnVal, unreachable)
 
 INST(Add, add, 2, 0)
 INST(Sub, sub, 2, 0)
@@ -306,5 +323,6 @@ PSEUDO_INST(Or)
 
 #undef PSEUDO_INST
 #undef PARENT
+#undef INST_RANGE
 #undef INST
 
