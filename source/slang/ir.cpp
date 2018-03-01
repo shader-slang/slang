@@ -2235,9 +2235,9 @@ namespace Slang
 
         dump(context, opInfo->name);
 
-        uint32_t argCount = inst->getOperandCount();
+        UInt argCount = inst->getOperandCount();
         dump(context, "(");
-        for (uint32_t ii = 0; ii < argCount; ++ii)
+        for (UInt ii = 0; ii < argCount; ++ii)
         {
             if (ii != 0)
                 dump(context, ", ");
