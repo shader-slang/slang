@@ -193,6 +193,48 @@ namespace Slang
         }
     }
 
+    IRInst* IRBlock::getFirstOrdinaryInst()
+    {
+        // Find the last parameter (if any) of the block
+        auto lastParam = getLastParam();
+        if (lastParam)
+        {
+            // If there is a last parameter, then the
+            // instructions after it are the ordinary
+            // instructions.
+            return lastParam->getNextInst();
+        }
+        else
+        {
+            // If there isn't a last parameter, then
+            // there must not have been *any* parameters,
+            // and so the first instruction in the block
+            // is also the first ordinary one.
+            return getFirstInst();
+        }
+    }
+
+    IRInst* IRBlock::getLastOrdinaryInst()
+    {
+        // Under normal circumstances, the last instruction
+        // in the block is also the last ordinary instruction.
+        // However, there is the special case of a block with
+        // only parameters (which might happen as a temporary
+        // state while we are building IR).
+        auto inst = getLastInst();
+
+        // If the last instruction is a parameter, then
+        // there are no ordinary instructions, so the last
+        // one is a null pointer.
+        if (as<IRParam>(inst))
+            return nullptr;
+
+        // Otherwise the last instruction is the last "ordinary"
+        // instruction as well.
+        return inst;
+    }
+
+
     // The predecessors of a block should all show up as users
     // of its value, so rather than explicitly store the CFG,
     // we will recover it on demand from the use-def information.
@@ -423,6 +465,38 @@ namespace Slang
 
     //
 
+    IRBlock* IRBuilder::getBlock()
+    {
+        return as<IRBlock>(insertIntoParent);
+    }
+
+    // Get the current function (or other value with code)
+    // that we are inserting into (if any).
+    IRGlobalValueWithCode* IRBuilder::getFunc()
+    {
+        auto pp = insertIntoParent;
+        if (auto block = as<IRBlock>(pp))
+        {
+            pp = pp->getParent();
+        }
+        return as<IRGlobalValueWithCode>(pp);
+    }
+
+
+    void IRBuilder::setInsertInto(IRParentInst* insertInto)
+    {
+        insertIntoParent = insertInto;
+        insertBeforeInst = nullptr;
+    }
+
+    void IRBuilder::setInsertBefore(IRInst* insertBefore)
+    {
+        SLANG_ASSERT(insertBefore);
+        insertIntoParent = insertBefore->parent;
+        insertBeforeInst = insertBefore;
+    }
+
+
     // Add an instruction into the current scope
     void IRBuilder::addInst(
         IRInst*     inst)
@@ -430,16 +504,201 @@ namespace Slang
         if(insertBeforeInst)
         {
             inst->insertBefore(insertBeforeInst);
-            return;
         }
-        else if (curBlock)
+        else if (insertIntoParent)
         {
-            inst->insertAtEnd(curBlock);
+            inst->insertAtEnd(insertIntoParent);
         }
         else
         {
             // Don't append the instruction anywhere
         }
+    }
+
+    // Given two parent instructions, pick the better one to use as as
+    // insertion location for a "hoistable" instruction.
+    //
+    IRParentInst* mergeCandidateParentsForHoistableInst(IRParentInst* left, IRParentInst* right)
+    {
+        // If either `left` or `right` is a block, then we need to be
+        // a bit careful, because blocks can see other values just using
+        // the dominance relationship, without a direct parent-child relationship.
+        //
+        // First, check if each of `left` and `right` is a block.
+        //
+        auto leftBlock = as<IRBlock>(left);
+        auto rightBlock = as<IRBlock>(right);
+        //
+        // As a special case, if both of these are blocks in the same parent,
+        // then we need to pick between them based on dominance.
+        //
+        if (leftBlock && rightBlock && (leftBlock->getParent() == rightBlock->getParent()))
+        {
+            // We assume that the order of basic blocks in a function is compatible
+            // with the dominance relationship (that is, if A dominates B, then
+            // A comes before B in the list of blocks), so it suffices to pick
+            // the *later* of the two blocks.
+            //
+            // There are ways we could try to speed up this search, but no matter
+            // what it will be O(n) in the number of blocks, unless we build
+            // an explicit dominator tree, which is infeasible during IR building.
+            // Thus we just do a simple linear walk here.
+            //
+            // We will start at `leftBlock` and walk forward, until either...
+            //
+            for (auto ll = leftBlock; ll; ll = ll->getNextBlock())
+            {
+                // ... we see `rightBlock` (in which case `rightBlock` came later), or ...
+                //
+                if (ll == rightBlock) return rightBlock;
+            }
+            //
+            // ... we run out of blocks (in which case `leftBlock` came later).
+            //
+            return leftBlock;
+        }
+
+        //
+        // If the special case above doesn't apply, then `left` or `right` might
+        // still be a block, but they aren't blocks nested in the same function.
+        // We will find the first non-block ancestor of `left` and/or `right`.
+        // This will either be the inst itself (it is isn't a block), or
+        // its immediate parent (if it *is* a block).
+        //
+        auto leftNonBlock = leftBlock ? leftBlock->getParent() : left;
+        auto rightNonBlock = rightBlock ? rightBlock->getParent() : right;
+
+        // If either side is null, then take the non-null one.
+        //
+        if (!leftNonBlock) return right;
+        if (!rightNonBlock) return left;
+
+        // If the non-block on the left or right is a descendent of
+        // the other, then that is what we should use.
+        //
+        IRParentInst* parentNonBlock = nullptr;
+        for (auto ll = leftNonBlock; ll; ll = ll->getParent())
+        {
+            if (ll == rightNonBlock)
+            {
+                parentNonBlock = leftNonBlock;
+                break;
+            }
+        }
+        for (auto rr = rightNonBlock; rr; rr = rr->getParent())
+        {
+            if (rr == leftNonBlock)
+            {
+                SLANG_ASSERT(!parentNonBlock);
+                parentNonBlock = rightNonBlock;
+                break;
+            }
+        }
+
+        // As a matter of validity in the IR, we expect one
+        // of the two to be an ancestor (in the non-block case),
+        // because otherwise we'd be violating the basic dominance
+        // assumptions.
+        //
+        SLANG_ASSERT(parentNonBlock);
+
+        // As a fallback, try to use the left parent as a default
+        // in case things go badly.
+        //
+        if (!parentNonBlock)
+        {
+            parentNonBlock = leftNonBlock;
+        }
+
+        IRParentInst* parent = parentNonBlock;
+
+        // At this point we've found a non-block parent where we
+        // could stick things, but we have to fix things up in
+        // case we should be inserting into a block beneath
+        // that non-block parent.
+        if (leftBlock && (parentNonBlock == leftNonBlock))
+        {
+            // We have a left block, and have picked its parent.
+
+            // It cannot be the case that there is a right block
+            // with the same parent, or else our special case
+            // would have triggered at the start.
+            SLANG_ASSERT(!rightBlock || (parentNonBlock != rightNonBlock));
+
+            parent = leftBlock;
+        }
+        else if (rightBlock && (parentNonBlock == rightNonBlock))
+        {
+            // We have a right block, and have picked its parent.
+
+            // We already tested above, so we know there isn't a
+            // matching situation on the left side.
+
+            parent = rightBlock;
+        }
+
+        // Okay, we've picked the parent we want to insert into,
+        // *but* one last special case arises, because an `IRGlobalValueWithCode`
+        // is not actually a suitable place to insert instructions.
+        // Furthermore, there is no actual need to insert instructions at
+        // that scope, because any parameters, etc. are actually attached
+        // to the block(s) within the function.
+        if (auto parentFunc = as<IRGlobalValueWithCode>(parent))
+        {
+            // Insert in the parent of the function (or other value with code).
+            // We know that the parent must be able to hold ordinary instructions,
+            // because it was able to hold this `IRGlobalValueWithCode`
+            parent = parentFunc->getParent();
+        }
+
+        return parent;
+    }
+
+    // Given an instruction that represents a constant, a type, etc.
+    // Try to "hoist" it as far toward the global scope as possible
+    // to insert it at a location where it will be maximally visible.
+    //
+    void addHoistableInst(
+        IRBuilder*  builder,
+        IRInst*     inst)
+    {
+        // Start with the assumption that we would insert this instruction
+        // into the global scope (the instruction that represents the module)
+        IRParentInst* parent = builder->getModule()->getModuleInst();
+
+        // The above decision might be invalid, because there might be
+        // one or more operands of the instruction that are defined in
+        // more deeply nested parents than the global scope.
+        //
+        // Therefore, we will scan the operands of the instruction, and
+        // look at the parents that define them.
+        //
+        UInt operandCount = inst->getOperandCount();
+        for (UInt ii = 0; ii < operandCount; ++ii)
+        {
+            auto operand = inst->getOperand(ii);
+            auto operandParent = operand->getParent();
+
+            parent = mergeCandidateParentsForHoistableInst(parent, operandParent);
+        }
+
+        // We better have ended up with a place to insert.
+        SLANG_ASSERT(parent);
+
+        // If we have chosen to insert into the same parent that the
+        // IRBuilder is configured to use, then respect its `insertBeforeInst`
+        // setting.
+        if (parent == builder->insertIntoParent)
+        {
+            builder->addInst(inst);
+            return;
+        }
+
+        // Otherwise, we just want to insert at the end of the chosen parent.
+        //
+        // TODO: be careful about inserting after the terminator of a block...
+
+        inst->insertAtEnd(parent);
     }
 
     static void maybeSetSourceLoc(
@@ -747,11 +1006,6 @@ namespace Slang
         UInt            valueSize,
         void const*     value)
     {
-        // First, we need to pick a good insertion point
-        // for the instruction, which we do by looking
-        // at its operands.
-        //
-
         IRConstant keyInst;
         memset(&keyInst, 0, sizeof(keyInst));
         keyInst.op = op;
@@ -780,6 +1034,8 @@ namespace Slang
 
         key.inst = irValue;
         builder->sharedBuilder->constantMap.Add(key, irValue);
+
+        addHoistableInst(builder, irValue);
 
         return irValue;
     }
@@ -839,6 +1095,9 @@ namespace Slang
             kIROp_decl_ref,
             nullptr);
         irValue->declRef = DeclRef<Decl>(declRef.decl, declRef.substitutions);
+
+        addHoistableInst(this, irValue);
+
         return irValue;
     }
 
@@ -1130,13 +1389,19 @@ namespace Slang
 
     IRBlock* IRBuilder::emitBlock()
     {
+        // Create a block
         auto bb = createBlock();
 
-        auto f = this->curFunc;
+        // If we are emitting into a function
+        // (or another value with code), then
+        // append the block to the function and
+        // set this block as the new parent for
+        // subsequent instructions we insert.
+        auto f = getFunc();
         if (f)
         {
             f->addBlock(bb);
-            this->curBlock = bb;
+            setInsertInto(bb);
         }
         return bb;
     }
@@ -1155,8 +1420,7 @@ namespace Slang
         IRType* type)
     {
         auto param = createParam(type);
-
-        if (auto bb = curBlock)
+        if (auto bb = getBlock())
         {
             bb->addParam(param);
         }
@@ -2236,16 +2500,45 @@ namespace Slang
         dump(context, opInfo->name);
 
         UInt argCount = inst->getOperandCount();
-        dump(context, "(");
-        for (UInt ii = 0; ii < argCount; ++ii)
+        UInt ii = 0;
+
+        // Special case: make printing of `call` a bit
+        // nicer to look at
+        if (inst->op == kIROp_Call && argCount > 0)
         {
-            if (ii != 0)
+            dump(context, " ");
+            auto argVal = inst->getOperand(ii++);
+            dumpOperand(context, argVal);
+        }
+
+        bool first = true;
+        dump(context, "(");
+        for (; ii < argCount; ++ii)
+        {
+            if (!first)
                 dump(context, ", ");
 
             auto argVal = inst->getOperand(ii);
 
             dumpOperand(context, argVal);
+
+            first = false;
         }
+
+        // Special cases: literals and other instructions with no real operands
+        switch (inst->op)
+        {
+        case kIROp_IntLit:
+        case kIROp_FloatLit:
+        case kIROp_boolConst:
+        case kIROp_decl_ref:
+            dumpOperand(context, inst);
+            break;
+
+        default:
+            break;
+        }
+
         dump(context, ")");
 
         dump(context, "\n");
@@ -3613,7 +3906,7 @@ namespace Slang
         shared.session = session;
         IRBuilder builder;
         builder.sharedBuilder = &shared;
-        builder.curFunc = func;
+        builder.setInsertInto(func);
 
         // We will start by looking at the return type of the
         // function, because that will enable us to do an
@@ -3671,7 +3964,7 @@ namespace Slang
                     IRInst* returnValue = returnInst->getVal();
 
                     // Make sure we add these instructions to the right block
-                    builder.curBlock = bb;
+                    builder.setInsertInto(bb);
 
                     // Write to our global variable(s) from the value being returned.
                     assign(&builder, resultGlobal, ScalarizedVal::value(returnValue));
@@ -3694,6 +3987,10 @@ namespace Slang
         // and turn them into global variables.
         if( auto firstBlock = func->getFirstBlock() )
         {
+            // Any initialization code we insert for parameters needs
+            // to be at the start of the "ordinary" instructions in the block:
+            builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
+
             UInt paramCounter = 0;
             for( auto pp = firstBlock->getFirstParam(); pp; pp = pp->getNextParam() )
             {
@@ -3720,11 +4017,6 @@ namespace Slang
                 // will differ a bit between the pointer and non-pointer
                 // cases.
                 auto paramType = pp->getDataType();
-
-                // Any initialization code we insert nees to be at the start
-                // of the block:
-                builder.curBlock = firstBlock;
-                builder.insertBeforeInst = firstBlock->getFirstInst();
 
                 // First we will special-case stage input/outputs that
                 // don't fit into the standard varying model.
@@ -3787,8 +4079,7 @@ namespace Slang
 
                                 // Okay, we have a declaration, and we want to modify it!
 
-                                builder.curBlock = bb;
-                                builder.insertBeforeInst = ii;
+                                builder.setInsertBefore(ii);
 
                                 assign(&builder, globalOutputVal, ScalarizedVal::value(ii->getOperand(2)));
                             }
@@ -3857,8 +4148,7 @@ namespace Slang
                             break;
                         }
 
-                        builder.curBlock = bb;
-                        builder.insertBeforeInst = terminatorInst;
+                        builder.setInsertBefore(terminatorInst);
 
                         assign(&builder, globalOutputVal, localVal);
                     }
@@ -3898,6 +4188,7 @@ namespace Slang
             for( auto pp = firstBlock->getFirstParam(); pp; )
             {
                 auto next = pp->getNextParam();
+                pp->removeFromParent();
                 pp->deallocate();
                 pp = next;
             }
@@ -4503,7 +4794,7 @@ namespace Slang
         // Next we are going to clone the actual code.
         IRBuilder builderStorage = *context->builder;
         IRBuilder* builder = &builderStorage;
-        builder->curFunc = clonedValue;
+        builder->setInsertInto(clonedValue);
 
 
         // We will walk through the blocks of the function, and clone each of them.
@@ -4544,7 +4835,7 @@ namespace Slang
             {
                 assert(cb);
 
-                builder->curBlock = cb;
+                builder->setInsertInto(cb);
                 for (auto oi = ob->getFirstInst(); oi; oi = oi->getNextInst())
                 {
                     cloneInst(context, builder, oi);
@@ -5006,8 +5297,7 @@ namespace Slang
     RefPtr<GlobalGenericParamSubstitution> createGlobalGenericParamSubstitution(
         EntryPointRequest * entryPointRequest,
         ProgramLayout * programLayout,
-        IRSpecContext*  context,
-        IRModule* originalIRModule);
+        IRSpecContext*  context);
 
     struct IRSpecializationState
     {
@@ -5070,7 +5360,7 @@ namespace Slang
         context->builder = &sharedContext->builderStorage;
         // Create the GlobalGenericParamSubstitution for substituting global generic types
         // into user-provided type arguments
-        auto globalParamSubst = createGlobalGenericParamSubstitution(entryPointRequest, programLayout, context, originalIRModule);
+        auto globalParamSubst = createGlobalGenericParamSubstitution(entryPointRequest, programLayout, context);
 
         context->subst.globalGenParamSubstitutions = globalParamSubst;
         
@@ -5193,6 +5483,8 @@ namespace Slang
     
     struct IRGenericSpecContext : IRSpecContextBase
     {
+        IRSpecContextBase* parent = nullptr;
+
         IRSharedSpecContext* getShared() { return shared; }
 
         // Override the "maybe clone" logic so that we always clone
@@ -5216,7 +5508,10 @@ namespace Slang
 
             if (context->getSymbols().TryGetValue(mangledName, symbol))
             {
-                return symbol->irGlobalValue;
+                // Note: the symbols always come from the source module,
+                // not the destination module, so we may need to clone
+                // them if we are doing an initialize specialization pass.
+                return cloneValue(context, symbol->irGlobalValue);
             }
             else
             {
@@ -5231,7 +5526,8 @@ namespace Slang
                     subtypeWitness->sup));
                 if (context->getSymbols().TryGetValue(genericName, symbol))
                 {
-                    auto specInst = context->builder->emitSpecializeInst(subtypeWitness->sup, symbol->irGlobalValue, subDeclRef->declRef);
+                    auto clonedSymbol = cloneValue(context, symbol->irGlobalValue);
+                    auto specInst = context->builder->emitSpecializeInst(subtypeWitness->sup, clonedSymbol, subDeclRef->declRef);
                     return specInst;
                 }
                 else
@@ -5363,7 +5659,14 @@ namespace Slang
             break;
 
         default:
-            return originalVal;
+            if (parent)
+            {
+                return parent->maybeCloneValue(originalVal);
+            }
+            else
+            {
+                return originalVal;
+            }
         }
     }
 
@@ -5463,11 +5766,17 @@ namespace Slang
     }
 
     IRFunc* getSpecializedFunc(
-        IRSharedSpecContext* sharedContext,
-        IRFunc*                     genericFunc,
-        DeclRef<Decl>               specDeclRef);
+        IRSharedSpecContext*    sharedContext,
+        IRSpecContextBase*      parentContext,
+        IRFunc*                 genericFunc,
+        DeclRef<Decl>           specDeclRef);
 
-    IRWitnessTable* specializeWitnessTable(IRSharedSpecContext * sharedContext, IRWitnessTable* originalTable, DeclRef<Decl> specDeclRef, IRWitnessTable* dstTable)
+    IRWitnessTable* specializeWitnessTable(
+        IRSharedSpecContext*    sharedContext,
+        IRSpecContextBase*      parentContext,
+        IRWitnessTable*         originalTable,
+        DeclRef<Decl>           specDeclRef,
+        IRWitnessTable*         dstTable)
     {
         // First, we want to see if an existing specialization
         // has already been made. To do that we will need to
@@ -5503,6 +5812,7 @@ namespace Slang
 
         IRGenericSpecContext context;
         context.shared = sharedContext;
+        context.parent = parentContext;
         context.builder = &sharedContext->builderStorage;
         context.subst = specDeclRef.substitutions;
         context.subst.genericSubstitutions = newSubst;
@@ -5521,7 +5831,7 @@ namespace Slang
             if (entry->satisfyingVal.get()->op == kIROp_Func)
             {
                 IRFunc* func = (IRFunc*)entry->satisfyingVal.get();
-                auto specFunc = getSpecializedFunc(sharedContext, func, specDeclRef);
+                auto specFunc = getSpecializedFunc(sharedContext, parentContext, func, specDeclRef);
                 entry->satisfyingVal.set(specFunc);
                 insertGlobalValueSymbol(sharedContext, specFunc);
             }
@@ -5536,9 +5846,10 @@ namespace Slang
     }
     
     IRFunc* getSpecializedFunc(
-        IRSharedSpecContext* sharedContext,
-        IRFunc*                     genericFunc,
-        DeclRef<Decl>               specDeclRef)
+        IRSharedSpecContext*    sharedContext,
+        IRSpecContextBase*      parentContext,
+        IRFunc*                 genericFunc,
+        DeclRef<Decl>           specDeclRef)
     {
         // First, we want to see if an existing specialization
         // has already been made. To do that we will need to
@@ -5586,6 +5897,7 @@ namespace Slang
 
         IRGenericSpecContext context;
         context.shared = sharedContext;
+        context.parent = parentContext;
         context.builder = &sharedContext->builderStorage;
         context.subst = specDeclRef.substitutions;
         context.subst.genericSubstitutions = newSubst;
@@ -5784,7 +6096,7 @@ namespace Slang
                                 //
                                 // We will first find or construct a specialized version
                                 // of the callee funciton/
-                                auto specFunc = getSpecializedFunc(sharedContext, genericFunc, specDeclRef);
+                                auto specFunc = getSpecializedFunc(sharedContext, nullptr, genericFunc, specDeclRef);
                                 //
                                 // Then we will replace the use sites for the `specialize`
                                 // instruction with uses of the specialized function.
@@ -5797,7 +6109,7 @@ namespace Slang
                             {
                                 // specialize a witness table
                                 auto originalTable = (IRWitnessTable*)genericVal;
-                                auto specWitnessTable = specializeWitnessTable(sharedContext, originalTable, specDeclRef, nullptr); 
+                                auto specWitnessTable = specializeWitnessTable(sharedContext, nullptr, originalTable, specDeclRef, nullptr); 
                                 witnessTables.AddIfNotExists(specWitnessTable->mangledName, specWitnessTable);
                                 specInst->replaceUsesWith(specWitnessTable);
                                 specInst->removeAndDeallocate();
@@ -5823,7 +6135,7 @@ namespace Slang
                                 IRWitnessTable* genTable = nullptr;
                                 if (witnessTables.TryGetValue(genName, genTable))
                                 {
-                                    witnessTable = specializeWitnessTable(sharedContext, genTable, srcDeclRef, nullptr);
+                                    witnessTable = specializeWitnessTable(sharedContext, nullptr, genTable, srcDeclRef, nullptr);
                                     witnessTables.AddIfNotExists(witnessTable->mangledName, witnessTable);
                                 }
                             }
@@ -5890,11 +6202,23 @@ namespace Slang
     RefPtr<GlobalGenericParamSubstitution> createGlobalGenericParamSubstitution(
         EntryPointRequest * entryPointRequest,
         ProgramLayout * programLayout,
-        IRSpecContext*  context,
-        IRModule* originalIRModule)
+        IRSpecContext*  context)
     {
         RefPtr<GlobalGenericParamSubstitution> globalParamSubst;
         GlobalGenericParamSubstitution * curTailSubst = nullptr;
+
+        // Because we can't currently put `specialize` instructions inside
+        // witness tables, or at the global scope, we will track a set of
+        // witness tables that we need to clone, and then specialize
+        // from the original module(s) to get what we need.
+
+        struct WitnessTableCloneWorkItem
+        {
+            IRWitnessTable* dstTable;
+            IRWitnessTable* originalTable;
+        };
+        List<WitnessTableCloneWorkItem> witnessTablesToClone;
+
         struct WitnessTableSpecializationWorkItem
         {
             IRWitnessTable* dstTable;
@@ -5902,6 +6226,10 @@ namespace Slang
             DeclRef<Decl> specDeclRef;
         };
         List<WitnessTableSpecializationWorkItem> witnessTablesToSpecailize;
+
+        Dictionary<Name*, IRWitnessTable*> witnessTablesByName;
+        auto namePool = entryPointRequest->compileRequest->getNamePool();
+
         for (auto param : programLayout->globalGenericParams)
         {
             auto paramSubst = new GlobalGenericParamSubstitution();
@@ -5920,41 +6248,64 @@ namespace Slang
                 {
                     if (subtypeWitness->sub->EqualsVal(paramSubst->actualType))
                     {
-                        auto witnessTableName = getMangledNameForConformanceWitness(subtypeWitness->sub, subtypeWitness->sup);
-                        auto findWitnessTableByName = [&](String name) -> IRGlobalValue*
+                        auto witnessTableName = namePool->getName(getMangledNameForConformanceWitness(subtypeWitness->sub, subtypeWitness->sup));
+                        auto findWitnessTableByName = [&](Name* name) -> IRWitnessTable*
                         {
-                            for (auto ii : originalIRModule->getGlobalInsts())
-                            {
-                                auto gv = as<IRGlobalValue>(ii);
-                                if (!gv)
-                                    continue;
+                            RefPtr<IRSpecSymbol> symbol;
+                            if (!context->getSymbols().TryGetValue(name, symbol))
+                                return nullptr;
 
-                                if (getText(gv->mangledName) == name)
-                                    return gv;
-                            }
-                            return nullptr;
+                            return (IRWitnessTable*) symbol->irGlobalValue;
                         };
-                        auto table = findWitnessTableByName(witnessTableName);
+
+                        auto findCloneOfWitnessTableByName = [&](Name* name) -> IRWitnessTable*
+                        {
+                            IRWitnessTable* clonedTable = nullptr;
+                            if (witnessTablesByName.TryGetValue(name, clonedTable))
+                                return clonedTable;
+
+                            IRWitnessTable* originalTable = findWitnessTableByName(name);
+                            if (!originalTable)
+                                return nullptr;
+
+                            clonedTable = context->builder->createWitnessTable();
+
+                            WitnessTableCloneWorkItem cloneWorkItem;
+                            cloneWorkItem.originalTable = originalTable;
+                            cloneWorkItem.dstTable = clonedTable;
+                            witnessTablesToClone.Add(cloneWorkItem);
+
+                            return clonedTable;
+                        };
+
+                        // First look for a non-generic witness table that matches
+                        auto table = findCloneOfWitnessTableByName(witnessTableName);
                         if (!table)
                         {
+                            // If we didn't find a non-generic table, then maybe we are looking at
+                            // a specialization of a generic witness table.
                             if (auto subDeclRefType = subtypeWitness->sub.As<DeclRefType>())
                             {
                                 auto defaultSubst = createDefaultSubstitutions(entryPointRequest->compileRequest->mSession, subDeclRefType->declRef.getDecl());
-                                auto genericWitnessTableName = getMangledNameForConformanceWitness(DeclRef<Decl>(subDeclRefType->declRef.getDecl(), defaultSubst), subtypeWitness->sup);
-                                table = findWitnessTableByName(genericWitnessTableName);
-                                SLANG_ASSERT(table);
-                                WitnessTableSpecializationWorkItem workItem;
-                                workItem.srcTable = (IRWitnessTable*)cloneGlobalValue(context, (IRWitnessTable*)(table));
-                                workItem.dstTable = context->builder->createWitnessTable();
-                                workItem.dstTable->mangledName = context->getModule()->session->getNameObj(getMangledNameForConformanceWitness(subDeclRefType->declRef, subtypeWitness->sup));
-                                workItem.specDeclRef = subDeclRefType->declRef;
-                                witnessTablesToSpecailize.Add(workItem);
-                                table = workItem.dstTable;
+                                auto genericWitnessTableName = namePool->getName(
+                                    getMangledNameForConformanceWitness(DeclRef<Decl>(subDeclRefType->declRef.getDecl(), defaultSubst), subtypeWitness->sup));
+
+                                IRWitnessTable* genericTable = findCloneOfWitnessTableByName(genericWitnessTableName);
+                                SLANG_ASSERT(genericTable);
+
+                                WitnessTableSpecializationWorkItem specializeWorkItem;
+                                specializeWorkItem.srcTable = genericTable;
+                                specializeWorkItem.dstTable = context->builder->createWitnessTable();
+                                specializeWorkItem.dstTable->mangledName = context->getModule()->session->getNameObj(getMangledNameForConformanceWitness(subDeclRefType->declRef, subtypeWitness->sup));
+                                specializeWorkItem.specDeclRef = subDeclRefType->declRef;
+
+                                witnessTablesToSpecailize.Add(specializeWorkItem);
+                                table = specializeWorkItem.dstTable;
                             }
                         }
-                        else
-                            table = cloneGlobalValue(context, (IRWitnessTable*)(table));
+                        // We expect to find the table no matter what.
                         SLANG_ASSERT(table);
+
                         IRProxyVal * tableVal = new IRProxyVal();
                         tableVal->inst.init(nullptr, table);
                         paramSubst->witnessTables.Add(KeyValuePair<RefPtr<Type>, RefPtr<Val>>(subtypeWitness->sup, tableVal));
@@ -5962,12 +6313,26 @@ namespace Slang
                 }
             }
         }
+
+        for (auto workItem : witnessTablesToClone)
+        {
+            cloneWitnessTableWithoutRegistering(
+                context,
+                workItem.originalTable,
+                workItem.dstTable);
+        }
+
         for (auto workItem : witnessTablesToSpecailize)
         {
             int diff = 0;
-            specializeWitnessTable(context->shared, workItem.srcTable,
-                workItem.specDeclRef.SubstituteImpl(SubstitutionSet(nullptr, nullptr, globalParamSubst), &diff), workItem.dstTable);
+            specializeWitnessTable(
+                context->shared,
+                context,
+                workItem.srcTable,
+                workItem.specDeclRef.SubstituteImpl(SubstitutionSet(nullptr, nullptr, globalParamSubst), &diff),
+                workItem.dstTable);
         }
+
         return globalParamSubst;
     }
 

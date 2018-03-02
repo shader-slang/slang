@@ -762,8 +762,7 @@ static LegalVal legalizeInst(
     // instructions generated will be placed after
     // the location of the original instruction.
     auto builder = context->builder;
-    builder->curBlock = as<IRBlock>(inst->getParent());
-    builder->insertBeforeInst = inst->getNextInst();
+    builder->setInsertBefore(inst->getNextInst());
 
     LegalVal legalVal = legalizeInst(
         context,

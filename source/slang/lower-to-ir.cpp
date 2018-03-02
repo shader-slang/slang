@@ -7,6 +7,7 @@
 #include "ir-constexpr.h"
 #include "ir-insts.h"
 #include "ir-ssa.h"
+#include "ir-validate.h"
 #include "mangle.h"
 #include "type-layout.h"
 #include "visitor.h"
@@ -1931,8 +1932,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     {
         auto builder = getBuilder();
 
-        auto prevBlock = builder->curBlock;
-        auto parentFunc = prevBlock ? prevBlock->getParent() : builder->curFunc;
+        auto prevBlock = builder->getBlock();
+        auto parentFunc = prevBlock ? prevBlock->getParent() : builder->getFunc();
 
         // If the previous block doesn't already have
         // a terminator instruction, then be sure to
@@ -1944,8 +1945,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         parentFunc->addBlock(block);
 
-        builder->curFunc = parentFunc;
-        builder->curBlock = block;
+        builder->setInsertInto(block);
     }
 
     // Start a new block at the current location.
@@ -2495,7 +2495,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Remember the initial block so that we can add to it
         // after we've collected all the `case`s
-        auto initialBlock = builder->curBlock;
+        auto initialBlock = builder->getBlock();
 
         // Next, create a block to use as the target for any `break` statements
         auto breakLabel = createBlock();
@@ -2504,8 +2504,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // that we can find it for nested statements.
         context->shared->breakLabels.Add(stmt, breakLabel);
 
-        builder->curFunc = initialBlock->getParent();
-        builder->curBlock = nullptr;
+        builder->setInsertInto(initialBlock->getParent());
 
         // Iterate over the body of the statement, looking
         // for `case` or `default` statements:
@@ -2525,10 +2524,11 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // Double check that we aren't in the initial
         // block, so we don't get tripped up on an
         // empty `switch`.
-        if(builder->curBlock != initialBlock)
+        auto curBlock = builder->getBlock();
+        if(curBlock != initialBlock)
         {
             // Is the block already terminated?
-            if(!builder->curBlock->getTerminator())
+            if(!curBlock->getTerminator())
             {
                 // Not terminated, so add one.
                 builder->emitBreak(breakLabel);
@@ -2542,7 +2542,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // Now that we've collected the cases, we are
         // prepared to emit the `switch` instruction
         // itself.
-        builder->curBlock = initialBlock;
+        builder->setInsertInto(initialBlock);
         builder->emitSwitch(
             conditionVal,
             breakLabel,
@@ -2819,9 +2819,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     context->irBuilder->createWitnessTableEntry(witnessTable,
                         context->irBuilder->getDeclRefVal(subInheritanceDeclRef), cpyTable);
 
-                    // HACK: we are re-using the entries in a pre-existing table here,
-                    // which is not how things are supposed to work.
-                    cpyTable->children = witnessTable->children;
+                    // We need to copy all the entries from the original table to this new table.
+                    for (auto entry : witnessTable->getEntries())
+                    {
+                        context->irBuilder->createWitnessTableEntry(cpyTable,
+                            entry->requirementKey.get(),
+                            entry->satisfyingVal.get());
+                    }
 
                     witnessTablesDictionary.Add(cpyTable->mangledName, cpyTable);
                     walkInheritanceHierarchyAndCreateWitnessTableCopies(witnessTable, subType, subInheritanceDeclRef.getDecl());
@@ -3024,7 +3028,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             IRBuilder subBuilderStorage = *getBuilder();
             IRBuilder* subBuilder = &subBuilderStorage;
 
-            subBuilder->curFunc = irGlobal;
+            subBuilder->setInsertInto(irGlobal);
 
             IRGenContext subContextStorage = *context;
             IRGenContext* subContext = &subContextStorage;
@@ -3034,7 +3038,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // TODO: set up a parent IR decl to put the instructions into
 
             IRBlock* entryBlock = subBuilder->emitBlock();
-            subBuilder->curBlock = entryBlock;
+            subBuilder->setInsertInto(entryBlock);
 
             LoweredValInfo initVal = lowerLValueExpr(subContext, initExpr);
             subContext->irBuilder->emitReturn(getSimpleVal(subContext, initVal));
@@ -3570,7 +3574,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // need to create an IR function here
 
         IRFunc* irFunc = subBuilder->createFunc();
-        subBuilder->curFunc = irFunc;
+        subBuilder->setInsertInto(irFunc);
 
         trySetMangledName(irFunc, decl);
 
@@ -3673,7 +3677,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // This is a function definition, so we need to actually
             // construct IR for the body...
             IRBlock* entryBlock = subBuilder->emitBlock();
-            subBuilder->curBlock = entryBlock;
+            subBuilder->setInsertInto(entryBlock);
 
             UInt paramTypeIndex = 0;
             for( auto paramInfo : parameterLists.params )
@@ -3790,7 +3794,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
             // We need to carefully add a terminator instruction to the end
             // of the body, in case the user didn't do so.
-            if (!subContext->irBuilder->curBlock->getTerminator())
+            if (!subContext->irBuilder->getBlock()->getTerminator())
             {
                 if (irResultType->Equals(context->getSession()->getVoidType()))
                 {
@@ -4227,6 +4231,8 @@ IRModule* generateIRForTranslationUnit(
         ensureDecl(context, decl);
     }
 
+    validateIRModuleIfEnabled(compileRequest, module);
+
     // We will perform certain "mandatory" optimization passes now.
     // These passes serve two purposes:
     //
@@ -4266,6 +4272,8 @@ IRModule* generateIRForTranslationUnit(
     // from other modules potentially makes the IR we generate
     // "fragile" in that we'd now need to recompile when
     // a module we depend on changes.
+
+    validateIRModuleIfEnabled(compileRequest, module);
 
     // If we are being sked to dump IR during compilation,
     // then we can dump the initial IR for the module here.

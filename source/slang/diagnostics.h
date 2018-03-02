@@ -94,10 +94,12 @@ namespace Slang
     inline SourceLoc const& getDiagnosticPos(SourceLoc const& pos) { return pos;  }
 
     class SyntaxNode;
-    class ShaderClosure;
     SourceLoc const& getDiagnosticPos(SyntaxNode const* syntax);
     SourceLoc const& getDiagnosticPos(Token const& token);
     SourceLoc const& getDiagnosticPos(TypeExp const& typeExp);
+
+    struct IRInst;
+    SourceLoc const& getDiagnosticPos(IRInst* inst);
 
     template<typename T>
     SourceLoc getDiagnosticPos(RefPtr<T> const& ptr)

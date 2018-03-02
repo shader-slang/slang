@@ -234,8 +234,7 @@ bool propagateConstExprBackward(
 
     IRBuilder builder;
     builder.sharedBuilder = &sharedBuilder;
-    builder.curFunc = code;
-    builder.curBlock = nullptr;
+    builder.setInsertInto(code);
 
     bool anyChanges = false;
     for(;;)
@@ -432,9 +431,6 @@ void propagateConstExpr(
     context.sharedBuilder.module = module;
     context.sharedBuilder.session = session;
     context.builder.sharedBuilder = &context.sharedBuilder;
-    context.builder.curFunc = nullptr;
-    context.builder.curBlock = nullptr;
-
 
 
     // We need to propagate information both forward and backward.

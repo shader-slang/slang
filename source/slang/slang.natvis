@@ -92,6 +92,7 @@
           </ArrayItems>
         </Expand>
       </Synthetic>
+      <Item Name="[parent]">parent</Item>
       <Synthetic Name="[uses]">
         <Expand>
           <LinkedListItems>
@@ -117,6 +118,7 @@
           </LinkedListItems>
         </Expand>
       </Synthetic>
+      <Item Name="[parent]">parent</Item>
       <Synthetic Name="[uses]">
         <Expand>
           <LinkedListItems>
@@ -142,6 +144,7 @@
           </LinkedListItems>
         </Expand>
       </Synthetic>
+      <Item Name="[parent]">parent</Item>
       <Synthetic Name="[uses]">
         <Expand>
           <LinkedListItems>
@@ -159,7 +162,8 @@
     <Expand>
       <Item Name="[op]">op</Item>
       <Item Name="[type]">type</Item>
-      <ExpandedItem>declRef</ExpandedItem>
+      <Item Name="[declRef]">declRef</Item>
+      <Item Name="[parent]">parent</Item>
     </Expand>
   </Type>
   <Type Name="Slang::IRUse">

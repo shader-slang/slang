@@ -115,22 +115,25 @@ INST(makeStruct, makeStruct, 0, 0)
 
 INST(Call, call, 1, 0)
 
-INST(Module, module, 0, PARENT)
+/*IRParentInst*/
 
-INST(Block, block, 0, PARENT)
+    INST(Module, module, 0, PARENT)
 
-/*IRGlobalValue*/
+    INST(Block, block, 0, PARENT)
 
-    /*IRGlobalValueWithCode*/
-        INST(Func, func, 0, PARENT)
-        INST(global_var, global_var, 0, 0)
-        INST(global_constant, global_constant, 0, 0)
-    INST_RANGE(GlobalValueWithCode, Func, global_constant)
+    /*IRGlobalValue*/
 
-    INST(witness_table, witness_table, 0, 0)
+        /*IRGlobalValueWithCode*/
+            INST(Func, func, 0, PARENT)
+            INST(global_var, global_var, 0, 0)
+            INST(global_constant, global_constant, 0, 0)
+        INST_RANGE(GlobalValueWithCode, Func, global_constant)
+
+        INST(witness_table, witness_table, 0, 0)
 
     INST_RANGE(GlobalValue, Func, witness_table)
 
+INST_RANGE(ParentInst, Module, witness_table)
 
 INST(witness_table_entry, witness_table_entry, 2, 0)
 
@@ -241,36 +244,9 @@ INST(BitOr, or , 2, 0)
 INST(And, logicalAnd, 2, 0)
 INST(Or, logicalOr, 2, 0)
 
-#if 0
-INST(Assign, assign, 2, 0)
-INST(AddAssign, addAssign, 2, 0)
-INST(SubAssign, subAssign, 2, 0)
-INST(SubAssign, subAssign, 2, 0)
-
-INTRINSIC(SubAssign)
-INTRINSIC(MulAssign)
-INTRINSIC(DivAssign)
-INTRINSIC(ModAssign)
-INTRINSIC(LshAssign)
-INTRINSIC(RshAssign)
-INTRINSIC(OrAssign)
-INTRINSIC(AndAssign)
-INTRINSIC(XorAssign)
-INTRINSIC(Pos)
-#endif
-
 INST(Neg, neg, 1, 0)
 INST(Not, not, 1, 0)
 INST(BitNot, bitnot, 1, 0)
-
-#if 0
-INTRINSIC(PreInc)
-INTRINSIC(PreDec)
-INTRINSIC(PostInc)
-INTRINSIC(PostDec)
-
-INTRINSIC(Sequence)
-#endif
 
 INST(Select, select, 3, 0)
 
@@ -279,18 +255,6 @@ INST(Dot, dot, 2, 0)
 INST(Mul_Vector_Matrix, mulVectorMatrix, 2, 0)
 INST(Mul_Matrix_Vector, mulMatrixVector, 2, 0)
 INST(Mul_Matrix_Matrix, mulMatrixMatrix, 2, 0)
-
-#if 0
-INTRINSIC(Mul_Scalar_Scalar)
-INTRINSIC(Mul_Vector_Scalar)
-INTRINSIC(Mul_Scalar_Vector)
-INTRINSIC(Mul_Matrix_Scalar)
-INTRINSIC(Mul_Scalar_Matrix)
-INTRINSIC(InnerProduct_Vector_Vector)
-INTRINSIC(InnerProduct_Vector_Matrix)
-INTRINSIC(InnerProduct_Matrix_Vector)
-INTRINSIC(InnerProduct_Matrix_Matrix)
-#endif
 
 // Texture sampling operation of the form `t.Sample(s,u)`
 INST(Sample, sample, 3, 0)

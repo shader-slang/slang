@@ -275,6 +275,7 @@ namespace Slang
         bool shouldDumpIntermediates = false;
 
         bool shouldDumpIR = false;
+        bool shouldValidateIR = false;
         bool shouldSkipCodegen = false;
 
         // How should `#line` directives be emitted (if at all)?

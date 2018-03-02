@@ -431,6 +431,11 @@ struct IRParentInst : IRInst
     IRInst* getFirstChild() { return children.first; }
     IRInst* getLastChild()  { return children.last;  }
     IRInstListBase getChildren() { return children; }
+
+    static bool isaImpl(IROp op)
+    {
+        return (op >= kIROp_FirstParentInst) && (op <= kIROp_LastParentInst);
+    }
 };
 
 // A basic block is a parent instruction that adds the constraint
@@ -474,6 +479,16 @@ struct IRBlock : IRParentInst
     }
 
     void addParam(IRParam* param);
+
+    // The "ordinary" instructions come after the parameters
+    IRInst* getFirstOrdinaryInst();
+    IRInst* getLastOrdinaryInst();
+    IRInstList<IRInst> getOrdinaryInsts()
+    {
+        return IRInstList<IRInst>(
+            getFirstOrdinaryInst(),
+            getLastOrdinaryInst());
+    }
 
     // The parent of a basic block is assumed to be a
     // value with code (e.g., a function, global variable

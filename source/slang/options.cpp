@@ -276,6 +276,10 @@ struct OptionsParser
                 {
                     requestImpl->shouldDumpIR = true;
                 }
+                else if(argStr == "-validate-ir" )
+                {
+                    requestImpl->shouldValidateIR = true;
+                }
                 else if(argStr == "-skip-codegen" )
                 {
                     requestImpl->shouldSkipCodegen = true;

@@ -4,53 +4,56 @@ standard error = {
 ir_global_var @_SV01s	: Ptr<@ThreadGroup vector<float,4>[64]>;
 
 ir_global_var @_SV05input	: Ptr<StructuredBuffer<vector<float,4>>>;
+let  %1	: int	= integer_constant(1)
+let  %2	: int	= integer_constant(64)
 
 ir_func @_S031GroupMemoryBarrierWithGroupSyncp0pV	: () -> void;
 
 ir_global_var @_SV06output	: Ptr<RWStructuredBuffer<vector<float,4>>>;
+let  %3	: int	= integer_constant(0)
 
 ir_func @_S04mainp3puuuV	: (uint, uint, uint) -> void
 {
-block %1(
-		param %2	: uint,
-		param %3	: uint,
-		param %4	: uint):
-	let  %5	: Ptr<vector<float,4>>	= getElementPtr(@_SV01s, %3)
-	let  %6	: StructuredBuffer<vector<float,4>>	= load(@_SV05input)
-	let  %7	: vector<float,4>	= bufferLoad(%6, %2)
-	store(%5, %7)
-	let  %8	: @ConstExpr uint	= construct(1)
-	loop(%9, %10, %11, %8)
+block %4(
+		param %5	: uint,
+		param %6	: uint,
+		param %7	: uint):
+	let  %8	: Ptr<vector<float,4>>	= getElementPtr(@_SV01s, %6)
+	let  %9	: StructuredBuffer<vector<float,4>>	= load(@_SV05input)
+	let  %10	: vector<float,4>	= bufferLoad(%9, %5)
+	store(%8, %10)
+	let  %11	: @ConstExpr uint	= construct(1)
+	loop(%12, %13, %14, %11)
 
-block %9(
-		param %12	: uint):
-	let  %13	: @ConstExpr uint	= construct(64)
-	let  %14	: bool	= cmpLT(%12, %13)
-	ifElse(%14, %15, %10, %15)
+block %12(
+		param %15	: uint):
+	let  %16	: @ConstExpr uint	= construct(64)
+	let  %17	: bool	= cmpLT(%15, %16)
+	ifElse(%17, %18, %13, %18)
 
-block %15:
-	call(@_S031GroupMemoryBarrierWithGroupSyncp0pV)
-	let  %16	: Ptr<vector<float,4>>	= getElementPtr(@_SV01s, %3)
-	let  %17	: vector<float,4>	= load(%16)
-	let  %18	: uint	= sub(%3, %12)
-	let  %19	: Ptr<vector<float,4>>	= getElementPtr(@_SV01s, %18)
+block %18:
+	call @_S031GroupMemoryBarrierWithGroupSyncp0pV()
+	let  %19	: Ptr<vector<float,4>>	= getElementPtr(@_SV01s, %6)
 	let  %20	: vector<float,4>	= load(%19)
-	let  %21	: vector<float,4>	= add(%17, %20)
-	store(%16, %21)
-	unconditionalBranch(%11)
+	let  %21	: uint	= sub(%6, %15)
+	let  %22	: Ptr<vector<float,4>>	= getElementPtr(@_SV01s, %21)
+	let  %23	: vector<float,4>	= load(%22)
+	let  %24	: vector<float,4>	= add(%20, %23)
+	store(%19, %24)
+	unconditionalBranch(%14)
 
-block %11:
-	let  %22	: @ConstExpr uint	= construct(1)
-	let  %23	: uint	= shl(%12, %22)
-	unconditionalBranch(%9, %23)
+block %14:
+	let  %25	: @ConstExpr uint	= construct(1)
+	let  %26	: uint	= shl(%15, %25)
+	unconditionalBranch(%12, %26)
 
-block %10:
-	call(@_S031GroupMemoryBarrierWithGroupSyncp0pV)
-	let  %24	: RWStructuredBuffer<vector<float,4>>	= load(@_SV06output)
-	let  %25	: Ptr<vector<float,4>>	= bufferElementRef(%24, %2)
-	let  %26	: Ptr<vector<float,4>>	= getElementPtr(@_SV01s, 0)
-	let  %27	: vector<float,4>	= load(%26)
-	store(%25, %27)
+block %13:
+	call @_S031GroupMemoryBarrierWithGroupSyncp0pV()
+	let  %27	: RWStructuredBuffer<vector<float,4>>	= load(@_SV06output)
+	let  %28	: Ptr<vector<float,4>>	= bufferElementRef(%27, %5)
+	let  %29	: Ptr<vector<float,4>>	= getElementPtr(@_SV01s, 0)
+	let  %30	: vector<float,4>	= load(%29)
+	store(%28, %30)
 	return_void()
 }
 

@@ -93,6 +93,12 @@ SourceLoc const& getDiagnosticPos(TypeExp const& typeExp)
     return typeExp.exp->loc;
 }
 
+SourceLoc const& getDiagnosticPos(IRInst* inst)
+{
+    return inst->sourceLoc;
+}
+
+
 // Take the format string for a diagnostic message, along with its arguments, and turn it into a
 static void formatDiagnosticMessage(StringBuilder& sb, char const* format, int argCount, DiagnosticArg const* const* args)
 {
