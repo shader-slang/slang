@@ -563,7 +563,7 @@ void processBlock(
         // Any new instructions we create to represent
         // the new value will get inserted before whatever
         // instruction we are working with.
-        blockInfo->builder.insertBeforeInst = ii;
+        blockInfo->builder.setInsertBefore(ii);
 
         switch (ii->op)
         {
@@ -617,7 +617,7 @@ void processBlock(
         }
     }
 
-    blockInfo->builder.insertBeforeInst = block->getLastChild();
+    blockInfo->builder.setInsertBefore(block->getLastChild());
 
     // Once we are done with all of the instructions
     // in a block, we can mark it as "filled," which
@@ -709,8 +709,7 @@ static void breakCriticalEdges(
 
         IRBuilder builder;
         builder.sharedBuilder = &context->sharedBuilder;
-        builder.curFunc = globalVal;
-        builder.curBlock = pred;
+        builder.setInsertInto(pred);
 
         // Create a new block that will sit "along" the edge
         IRBlock* edgeBlock = builder.createBlock();
@@ -723,7 +722,7 @@ static void breakCriticalEdges(
 
         // The edge block should branch (unconditionally)
         // to the successor block.
-        builder.curBlock = edgeBlock;
+        builder.setInsertInto(edgeBlock);
         builder.emitBranch(succ);
 
         // Insert the new block into the block list
@@ -763,9 +762,7 @@ void constructSSA(ConstructSSAContext* context)
         blockInfo->block = bb;
 
         blockInfo->builder.sharedBuilder = &context->sharedBuilder;
-        blockInfo->builder.curBlock = bb;
-        blockInfo->builder.curFunc = globalVal;
-        blockInfo->builder.insertBeforeInst = bb->getLastInst();
+        blockInfo->builder.setInsertBefore(bb->getLastInst());
 
         context->blockInfos.Add(bb, blockInfo);
     }
@@ -830,7 +827,7 @@ void constructSSA(ConstructSSAContext* context)
         IRTerminatorInst* oldTerminator = bb->getTerminator();
         assert(oldTerminator);
 
-        blockInfo->builder.insertBeforeInst = nullptr;
+        blockInfo->builder.setInsertInto(bb);
 
         auto oldArgCount = oldTerminator->getOperandCount();
         auto newArgCount = oldArgCount + addedArgCount;

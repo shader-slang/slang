@@ -286,7 +286,9 @@ DIAGNOSTIC(40005, Error, topLevelModuleUsedWithoutSpecifyingBinding, "top level 
 
 DIAGNOSTIC(49999, Error, unknownSystemValueSemantic, "unknown system-value semantic '$0'")
 
-DIAGNOSTIC(40006, Error, needCompileTimeConstant, "expected a compile-time constant");
+DIAGNOSTIC(40006, Error, needCompileTimeConstant, "expected a compile-time constant")
+
+DIAGNOSTIC(40007, Internal, irValidationFailed, "IR validation failed: $0")
 
 //
 // 5xxxx - Target code generation.

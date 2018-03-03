@@ -3,6 +3,7 @@
 
 #include "ir-insts.h"
 #include "ir-ssa.h"
+#include "ir-validate.h"
 #include "legalize-types.h"
 #include "lower-to-ir.h"
 #include "mangle.h"
@@ -8200,6 +8201,7 @@ String emitEntryPoint(
         typeLegalizationContext.session = entryPoint->compileRequest->mSession;
 
         IRModule* irModule = getIRModule(irSpecializationState);
+        auto compileRequest = translationUnit->compileRequest;
 
         typeLegalizationContext.irModule = irModule;
 
@@ -8207,6 +8209,8 @@ String emitEntryPoint(
             irSpecializationState,
             entryPoint,
             &sharedContext.extensionUsageTracker);
+
+        validateIRModuleIfEnabled(compileRequest, irModule);
 
         // If the user specified the flag that they want us to dump
         // IR, then do it here, for the target-specific, but
@@ -8254,6 +8258,7 @@ String emitEntryPoint(
         // so that we can work with the individual fields).
         constructSSA(irModule);
 
+        validateIRModuleIfEnabled(compileRequest, irModule);
 
         // After all of the required optimization and legalization
         // passes have been performed, we can emit target code from

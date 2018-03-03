@@ -430,16 +430,23 @@ struct IRBuilder
 
     IRModule* getModule() { return sharedBuilder->module; }
 
-    // The current function and block being inserted into
-    // (or `null` if we aren't inserting).
-    IRGlobalValueWithCode*  curFunc = nullptr;
-    IRBlock*                curBlock = nullptr;
+    // The current parent being inserted into (this might
+    // be the global scope, a function, a block inside
+    // a function, etc.)
+    IRParentInst*   insertIntoParent = nullptr;
     //
-    // An instruction in the current block that we should insert before
-    IRInst*     insertBeforeInst = nullptr;
+    // An instruction in the current parent that we should insert before
+    IRInst*         insertBeforeInst = nullptr;
 
-    IRGlobalValueWithCode*  getFunc() { return curFunc; }
-    IRBlock*                getBlock() { return curBlock; }
+    // Get the current basic block we are inserting into (if any)
+    IRBlock*                getBlock();
+
+    // Get the current function (or other value with code)
+    // that we are inserting into (if any).
+    IRGlobalValueWithCode*  getFunc();
+
+    void setInsertInto(IRParentInst* insertInto);
+    void setInsertBefore(IRInst* insertBefore);
 
     IRBuilderSourceLocRAII* sourceLocInfo = nullptr;
 

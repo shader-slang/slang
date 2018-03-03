@@ -1241,6 +1241,7 @@ namespace slang
 #include "source/slang/ir-constexpr.cpp"
 #include "source/slang/ir-legalize-types.cpp"
 #include "source/slang/ir-ssa.cpp"
+#include "source/slang/ir-validate.cpp"
 #include "source/slang/legalize-types.cpp"
 #include "source/slang/lexer.cpp"
 #include "source/slang/mangle.cpp"
