@@ -5149,6 +5149,20 @@ namespace Slang
                 }
             }
 
+            if (auto fstWit = fst.As<DeclaredSubtypeWitness>())
+            {
+                if (auto sndWit = snd.As<DeclaredSubtypeWitness>())
+                {
+                    auto constraintDecl1 = fstWit->declRef.As<TypeConstraintDecl>();
+                    auto constraintDecl2 = sndWit->declRef.As<TypeConstraintDecl>();
+                    assert(constraintDecl1);
+                    assert(constraintDecl2);
+                    return TryUnifyTypes(constraints, 
+                        constraintDecl1.getDecl()->getSup().type,
+                        constraintDecl2.getDecl()->getSup().type);
+                }
+            }
+
             throw "unimplemented";
 
             // default: fail
