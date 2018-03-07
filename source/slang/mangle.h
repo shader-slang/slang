@@ -8,11 +8,14 @@
 
 namespace Slang
 {
+    struct IRSpecialize;
+
     String getMangledName(Decl* decl);
     String getMangledName(DeclRef<Decl> const & declRef);
     String getMangledName(DeclRefBase const & declRef);
 
-    String mangleSpecializedFuncName(String baseName, SubstitutionSet subst);
+    String mangleSpecializedFuncName(String baseName, IRSpecialize* specializeInst);
+
     String getMangledNameForConformanceWitness(
         Type* sub,
         Type* sup);

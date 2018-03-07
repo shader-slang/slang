@@ -8,6 +8,36 @@
 #define R(X) /**/
 #else
 #define R(X) X
+
+#define CA _SV023SLANG_parameterGroup_CAL0
+#define caa _SV023SLANG_ParameterGroup_CA3caa
+#define cab _SV023SLANG_ParameterGroup_CA3cab
+#define cac _SV023SLANG_ParameterGroup_CA3cac
+#define cad _SV023SLANG_ParameterGroup_CA3cad
+#define cae _SV023SLANG_ParameterGroup_CA3cae
+#define ta 	_SV023SLANG_parameterGroup_CAL1
+#define sa 	_SV023SLANG_parameterGroup_CAL2
+
+#define CB _SV023SLANG_parameterGroup_CBL0
+#define cba _SV023SLANG_ParameterGroup_CB3cba
+#define cbb _SV023SLANG_ParameterGroup_CB3cbb
+#define cbc _SV023SLANG_ParameterGroup_CB3cbc
+#define cbd _SV023SLANG_ParameterGroup_CB3cbd
+#define cbe _SV023SLANG_ParameterGroup_CB3cbe
+#define tbx	_SV023SLANG_parameterGroup_CBL1
+#define tby	_SV023SLANG_parameterGroup_CBL2
+#define sb 	_SV023SLANG_parameterGroup_CBL3
+
+#define CC _SV023SLANG_parameterGroup_CCL0
+#define cca _SV023SLANG_ParameterGroup_CC3cca
+#define ccb _SV023SLANG_ParameterGroup_CC3ccb
+#define ccc _SV023SLANG_ParameterGroup_CC3ccc
+#define ccd _SV023SLANG_ParameterGroup_CC3ccd
+#define cce _SV023SLANG_ParameterGroup_CC3cce
+#define tc 	_SV023SLANG_parameterGroup_CCL1
+#define scx	_SV023SLANG_parameterGroup_CCL2
+#define scy	_SV023SLANG_parameterGroup_CCL3
+
 #endif
 
 float4 use(float  val) { return val; };
@@ -54,7 +84,7 @@ cbuffer CC R(: register(b2))
 	SamplerState scy R(: register(s3));
 }
 
-float4 main() : SV_Target
+float4 main() : SV_TARGET
 {
 	// Go ahead and use everything in this case:
 	return use(ta,  sa)

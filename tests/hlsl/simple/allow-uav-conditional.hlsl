@@ -2,6 +2,10 @@
 
 // Check output for `[allow_uav_conditional]`
 
+#ifndef __SLANG__
+#define gBuffer _SV07gBuffer
+#endif
+
 RWStructuredBuffer<uint> gBuffer : register(u0);
 
 [numthreads(16,1,1)]

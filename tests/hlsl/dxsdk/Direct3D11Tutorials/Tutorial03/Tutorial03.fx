@@ -1,4 +1,9 @@
 //TEST:COMPARE_HLSL: -target dxbc-assembly -profile vs_4_0 -entry VS -profile ps_4_0 -entry PS
+
+#ifndef __SLANG__
+#define SV_Target SV_TARGET
+#endif
+
 //--------------------------------------------------------------------------------------
 // File: Tutorial02.fx
 //

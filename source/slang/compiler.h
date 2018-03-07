@@ -152,10 +152,7 @@ namespace Slang
         // where any errors were diagnosed.
         RefPtr<FuncDecl> decl;
 
-        // The declaration of the global generic parameter types
-        // This will be filled in as part of semantic analysis.
-        List<RefPtr<Type>> genericParameterTypes;
-        List<RefPtr<Val>> genericParameterWitnesses;
+        RefPtr<Substitutions> globalGenericSubst;
     };
 
     enum class PassThroughMode : SlangPassThrough
@@ -453,7 +450,6 @@ namespace Slang
         RefPtr<Scope>   coreLanguageScope;
         RefPtr<Scope>   hlslLanguageScope;
         RefPtr<Scope>   slangLanguageScope;
-        RefPtr<Scope>   glslLanguageScope;
 
         List<RefPtr<ModuleDecl>> loadedModuleCode;
 
@@ -481,7 +477,6 @@ namespace Slang
         String getStdlibPath();
         String getCoreLibraryCode();
         String getHLSLLibraryCode();
-        String getGLSLLibraryCode();
 
         // Basic types that we don't want to re-create all the time
         RefPtr<Type> errorType;
@@ -508,20 +503,6 @@ namespace Slang
         Type* getErrorType();
         Type* getStringType();
 
-        Type* getConstExprRate();
-        RefPtr<RateQualifiedType> getRateQualifiedType(
-            Type* rate,
-            Type* valueType);
-
-        RefPtr<RateQualifiedType> getConstExprType(
-            Type* valueType)
-        {
-            return getRateQualifiedType(getConstExprRate(), valueType);
-        }
-
-        // Should not be used in front-end code
-        Type* getIRBasicBlockType();
-
         // Construct the type `Ptr<valueType>`, where `Ptr`
         // is looked up as a builtin type.
         RefPtr<PtrType> getPtrType(RefPtr<Type> valueType);
@@ -543,8 +524,6 @@ namespace Slang
         RefPtr<ArrayExpressionType> getArrayType(
             Type*   elementType,
             IntVal* elementCount);
-
-        RefPtr<GroupSharedType> getGroupSharedType(RefPtr<Type> valueType);
 
         SyntaxClass<RefObject> findSyntaxClass(Name* name);
 

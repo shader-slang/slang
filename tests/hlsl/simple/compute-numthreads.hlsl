@@ -2,6 +2,10 @@
 
 // Confirm that we properly pass along the `numthreads` attribute on an entry point.
 
+#ifndef __SLANG__
+#define b _SV01b
+#endif
+
 RWStructuredBuffer<float> b;
 
 [numthreads(32,1,1)]

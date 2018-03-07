@@ -26,12 +26,12 @@ struct PropagateConstExprContext
     DiagnosticSink* getSink() { return sink; }
 };
 
-bool isConstExpr(Type* type)
+bool isConstExpr(IRType* fullType)
 {
-    if( auto rateQualifiedType = type->As<RateQualifiedType>() )
+    if( auto rateQualifiedType = as<IRRateQualifiedType>(fullType))
     {
-        auto rate = rateQualifiedType->rate;
-        if(auto constExprRate = rate->As<ConstExprRate>())
+        auto rate = rateQualifiedType->getRate();
+        if(auto constExprRate = as<IRConstExprRate>(rate))
             return true;
     }
 
@@ -101,7 +101,7 @@ void markConstExpr(
     PropagateConstExprContext*  context,
     IRInst*                    value)
 {
-    Slang::markConstExpr(context->getSession(), value);
+    Slang::markConstExpr(context->getBuilder(), value);
 }
 
 
@@ -285,49 +285,79 @@ bool propagateConstExprBackward(
                     UInt callArgCount = operandCount - firstCallArg;
 
                     auto callee = callInst->getOperand(0);
-                    while( callee->op == kIROp_specialize )
+
+                    // If we are calling a generic operation, then
+                    // try to follow through the `specialize` chain
+                    // and find the callee.
+                    //
+                    // TODO: This probably shouldn't be required,
+                    // since we can hopefully use the type of the
+                    // callee in all cases.
+                    //
+                    while(auto specInst = as<IRSpecialize>(callee))
                     {
-                        callee = ((IRSpecialize*) callee)->getOperand(0);
+                        auto genericInst = as<IRGeneric>(specInst->getBase());
+                        if(!genericInst)
+                            break;
+
+                        auto returnVal = findGenericReturnVal(genericInst);
+                        if(!returnVal)
+                            break;
+
+                        callee = returnVal;
                     }
-                    if( callee->op == kIROp_Func )
+
+                    auto calleeFunc = as<IRFunc>(callee);
+                    if(calleeFunc && isDefinition(calleeFunc))
                     {
-                        auto calleeFunc = (IRFunc*) callee;
-                        auto calleeFuncType = calleeFunc->getType();
+                        // We have an IR-level function definition we are calling,
+                        // and thus we can propagate `constexpr` information
+                        // through its `IRParam`s.
+
+                        auto calleeFuncType = calleeFunc->getDataType();
 
                         UInt callParamCount = calleeFuncType->getParamCount();
                         SLANG_RELEASE_ASSERT(callParamCount == callArgCount);
 
                         // If the callee has a definition, then we can read `constexpr`
                         // information off of the parameters of its first IR block.
-                        if( auto calleeFirstBlock = calleeFunc->getFirstBlock() )
+                        if(auto calleeFirstBlock = calleeFunc->getFirstBlock())
                         {
                             UInt paramCounter = 0;
-                            for( auto pp = calleeFirstBlock->getFirstParam(); pp; pp = pp->getNextParam() )
+                            for(auto pp = calleeFirstBlock->getFirstParam(); pp; pp = pp->getNextParam())
                             {
                                 UInt paramIndex = paramCounter++;
 
                                 auto param = pp;
                                 auto arg = callInst->getOperand(firstCallArg + paramIndex);
 
-                                if( isConstExpr(param) )
+                                if(isConstExpr(param))
                                 {
-                                    if( maybeMarkConstExpr(context, arg) )
+                                    if(maybeMarkConstExpr(context, arg))
                                     {
                                         changedThisIteration = true;
                                     }
                                 }
                             }
                         }
-                        else
+                    }
+                    else
+                    {
+                        // If we don't have a concrete callee function
+                        // definition, then we need to extract the
+                        // type of the callee instruction, and try to work
+                        // with that.
+                        //
+                        // Note that this does not allow us to propagate
+                        // `constexpr` information from the body of a callee
+                        // back to call sites.
+                        auto calleeType = callee->getDataType();
+                        if(auto caleeFuncType = as<IRFuncType>(calleeType))
                         {
-                            // If we don't have the definition/body for the callee,
-                            // then we have to glean `constexpr` information from its
-                            // type instead.
-                            auto calleeType = calleeFunc->getType();
-                            auto paramCount = calleeType->getParamCount();
+                            auto paramCount = caleeFuncType->getParamCount();
                             for( UInt pp = 0; pp < paramCount; ++pp )
                             {
-                                auto paramType = calleeType->getParamType(pp);
+                                auto paramType = caleeFuncType->getParamType(pp);
                                 auto arg = callInst->getOperand(firstCallArg + pp);
                                 if( isConstExpr(paramType) )
                                 {
@@ -474,8 +504,8 @@ void propagateConstExpr(
             break;
 
         case kIROp_Func:
-        case kIROp_global_var:
-        case kIROp_global_constant:
+        case kIROp_GlobalVar:
+        case kIROp_GlobalConstant:
             {
                 IRGlobalValueWithCode* code = (IRGlobalValueWithCode*) gv;
 
@@ -511,8 +541,8 @@ void propagateConstExpr(
             break;
 
         case kIROp_Func:
-        case kIROp_global_var:
-        case kIROp_global_constant:
+        case kIROp_GlobalVar:
+        case kIROp_GlobalConstant:
             {
                 IRGlobalValueWithCode* code = (IRGlobalValueWithCode*) ii;
                 validateConstExpr(&context, code);

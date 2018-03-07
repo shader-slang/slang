@@ -81,14 +81,14 @@
     <DisplayString>{{{op}}}</DisplayString>
     <Expand>
       <Item Name="[op]">op</Item>
-      <Item Name="[type]">type</Item>
+      <Item Name="[type]">typeUse.usedValue</Item>
       <Synthetic Name="[operands]">
         <DisplayString>{{count = {operandCount}}}</DisplayString>
         <Expand>
           <Item Name="[count]">operandCount</Item>
           <ArrayItems>
             <Size>operandCount</Size>
-            <ValuePointer>(IRUse*)(this + 1)</ValuePointer>
+            <ValuePointer>(IRUse*)(&amp;(typeUse) + 1)</ValuePointer>
           </ArrayItems>
         </Expand>
       </Synthetic>
@@ -108,7 +108,7 @@
     <DisplayString>{{{op}}}</DisplayString>
     <Expand>
       <Item Name="[op]">op</Item>
-      <Item Name="[type]">type</Item>
+      <Item Name="[type]">typeUse.usedValue</Item>
       <Synthetic Name="[children]">
         <Expand>
           <LinkedListItems>

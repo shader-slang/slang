@@ -5,16 +5,22 @@
 
 namespace Slang
 {
+#define FOREACH_BASE_TYPE(X)    \
+    X(Void)                     \
+    X(Bool)                     \
+    X(Int)                      \
+    X(UInt)                     \
+    X(UInt64)                   \
+    X(Half)                     \
+    X(Float)                    \
+    X(Double)                   \
+/* end */
+
     enum class BaseType
     {
-        Void = 0,
-        Bool,
-        Int,
-        UInt,
-        UInt64,
-        Half,
-        Float,
-        Double,
+#define DEFINE_BASE_TYPE(NAME) NAME,
+FOREACH_BASE_TYPE(DEFINE_BASE_TYPE)
+#undef DEFINE_BASE_TYPE
     };
 
     struct TextureFlavor
@@ -22,7 +28,7 @@ namespace Slang
         enum
         {
             // Mask for the overall "shape" of the texture
-            ShapeMask = SLANG_RESOURCE_BASE_SHAPE_MASK,
+            BaseShapeMask = SLANG_RESOURCE_BASE_SHAPE_MASK,
 
             // Flag for whether the shape has "array-ness"
             ArrayFlag = SLANG_TEXTURE_ARRAY_FLAG,
@@ -50,9 +56,17 @@ namespace Slang
             ShapeCubeArray = ShapeCube | ArrayFlag,
         };
 
+        enum
+        {
+            // This the total number of expressible flavors,
+            // which is *not* to say that every expressible
+            // flavor is actual valid.
+            Count = 0x10000,
+        };
+
         uint16_t flavor;
 
-        Shape GetBaseShape() const { return Shape(flavor & ShapeMask); }
+        Shape GetBaseShape() const { return Shape(flavor & BaseShapeMask); }
         bool isArray() const { return (flavor & ArrayFlag) != 0; }
         bool isMultisample() const { return (flavor & MultisampleFlag) != 0; }
         //            bool isShadow() const { return (flavor & ShadowFlag) != 0; }

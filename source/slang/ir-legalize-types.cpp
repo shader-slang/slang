@@ -98,28 +98,11 @@ struct IRTypeLegalizationContext
 };
 
 static void registerLegalizedValue(
-    IRTypeLegalizationContext*    context,
-    IRInst*                    irValue,
-    LegalVal const&             legalVal)
-{
-    context->mapValToLegalVal.Add(irValue, legalVal);
-}
-
-static void maybeRegisterLegalizedGlobal(
     IRTypeLegalizationContext*  context,
-    IRGlobalValue*              irGlobalVar,
+    IRInst*                     irValue,
     LegalVal const&             legalVal)
 {
-    // Check the mangled name of the symbol and don't register
-    // symbols that don't have an external name (currently
-    // indicated by them having an empty name string).
-    if (getText(irGlobalVar->mangledName).Length() == 0)
-        return;
-
-    // Otherwise, register the legalized value for this symbol
-    // under its mangled name, so that other code can still
-    // find the right value(s) to use after legalization.
-    context->typeLegalizationContext->mapMangledNameToLegalIRValue.AddIfNotExists(irGlobalVar->mangledName, legalVal);
+    context->mapValToLegalVal[irValue] = legalVal;
 }
 
 struct IRGlobalNameInfo
@@ -138,16 +121,16 @@ static LegalVal declareVars(
 
 static LegalType legalizeType(
     IRTypeLegalizationContext*  context,
-    Type*                       type)
+    IRType*                     type)
 {
     return legalizeType(context->typeLegalizationContext, type);
 }
 
 // Legalize a type, and then expect it to
 // result in a simple type.
-static RefPtr<Type> legalizeSimpleType(
+static IRType* legalizeSimpleType(
     IRTypeLegalizationContext*    context,
-    Type*                       type)
+    IRType*                       type)
 {
     auto legalType = legalizeType(context, type);
     switch (legalType.flavor)
@@ -179,7 +162,7 @@ static LegalVal legalizeOperand(
 }
 
 static void getArgumentValues(
-    List<IRInst*> & instArgs, 
+    List<IRInst*> & instArgs,
     LegalVal val)
 {
     switch (val.flavor)
@@ -224,15 +207,15 @@ static LegalVal legalizeCall(
     IRCall* callInst)
 {
     // TODO: implement legalization of non-simple return types
-    auto retType = legalizeType(context, callInst->type);
+    auto retType = legalizeType(context, callInst->getFullType());
     SLANG_ASSERT(retType.flavor == LegalType::Flavor::simple);
-    
+
     List<IRInst*> instArgs;
     for (auto i = 1u; i < callInst->getOperandCount(); i++)
         getArgumentValues(instArgs, legalizeOperand(context, callInst->getOperand(i)));
 
     return LegalVal::simple(context->builder->emitCallInst(
-        callInst->type,
+        callInst->getFullType(),
         callInst->func.get(),
         instArgs.Count(),
         instArgs.Buffer()));
@@ -279,7 +262,7 @@ static LegalVal legalizeLoad(
             for (auto ee : legalPtrVal.getTuple()->elements)
             {
                 TuplePseudoVal::Element element;
-                element.mangledName = ee.mangledName;
+                element.key = ee.key;
                 element.val = legalizeLoad(context, ee.val);
 
                 tupleVal->elements.Add(element);
@@ -353,7 +336,7 @@ static LegalVal legalizeFieldAddress(
     IRTypeLegalizationContext*    context,
     LegalType                   type,
     LegalVal                    legalPtrOperand,
-    DeclRef<Decl>               fieldDeclRef)
+    IRStructKey*                fieldKey)
 {
     auto builder = context->builder;
 
@@ -364,17 +347,15 @@ static LegalVal legalizeFieldAddress(
             builder->emitFieldAddress(
                 type.getSimple(),
                 legalPtrOperand.getSimple(),
-                builder->getDeclRefVal(fieldDeclRef)));
+                fieldKey));
 
     case LegalVal::Flavor::pair:
         {
-            String mangledFieldName = getMangledName(fieldDeclRef.getDecl());
-
             // There are two sides, the ordinary and the special,
             // and we basically just dispatch to both of them.
             auto pairVal = legalPtrOperand.getPair();
             auto pairInfo = pairVal->pairInfo;
-            auto pairElement = pairInfo->findElement(mangledFieldName);
+            auto pairElement = pairInfo->findElement(fieldKey);
             if (!pairElement)
             {
                 SLANG_UNEXPECTED("didn't find tuple element");
@@ -400,18 +381,11 @@ static LegalVal legalizeFieldAddress(
 
             if (pairElement->flags & PairInfo::kFlag_hasOrdinary)
             {
-                // Note: the ordinary side of the pair is expected
-                // to be a filtered `struct` type, and so it will
-                // have different field declarations than the
-                // oridinal type. The element of the `PairInfo`
-                // structure stores the correct field decl-ref to use
-                // as `ordinaryFieldDeclRef`.
-
                 ordinaryVal = legalizeFieldAddress(
                     context,
                     ordinaryType,
                     pairVal->ordinaryVal,
-                    pairElement->ordinaryFieldDeclRef);
+                    fieldKey);
             }
 
             if (pairElement->flags & PairInfo::kFlag_hasSpecial)
@@ -420,7 +394,7 @@ static LegalVal legalizeFieldAddress(
                     context,
                     specialType,
                     pairVal->specialVal,
-                    fieldDeclRef);
+                    fieldKey);
             }
             return LegalVal::pair(ordinaryVal, specialVal, fieldPairInfo);
         }
@@ -428,8 +402,6 @@ static LegalVal legalizeFieldAddress(
 
     case LegalVal::Flavor::tuple:
         {
-            String mangledFieldName = getMangledName(fieldDeclRef.getDecl());
-
             // The operand is a tuple of pointer-like
             // values, we want to extract the element
             // corresponding to a field. We will handle
@@ -438,7 +410,7 @@ static LegalVal legalizeFieldAddress(
             auto ptrTupleInfo = legalPtrOperand.getTuple();
             for (auto ee : ptrTupleInfo->elements)
             {
-                if (ee.mangledName == mangledFieldName)
+                if (ee.key == fieldKey)
                 {
                     return ee.val;
                 }
@@ -465,15 +437,13 @@ static LegalVal legalizeFieldAddress(
 {
     // We don't expect any legalization to affect
     // the "field" argument.
-    auto fieldOperand = legalFieldOperand.getSimple();
-    assert(fieldOperand->op == kIROp_decl_ref);
-    auto fieldDeclRef = ((IRDeclRef*)fieldOperand)->declRef;
+    auto fieldKey = legalFieldOperand.getSimple();
 
     return legalizeFieldAddress(
         context,
         type,
         legalPtrOperand,
-        fieldDeclRef);
+        (IRStructKey*) fieldKey);
 }
 
 static LegalVal legalizeGetElementPtr(
@@ -548,7 +518,7 @@ static LegalVal legalizeGetElementPtr(
                 auto elemType = tupleType->elements[ee].type;
 
                 TuplePseudoVal::Element resElem;
-                resElem.mangledName = ptrElem.mangledName;
+                resElem.key = ptrElem.key;
                 resElem.val = legalizeGetElementPtr(
                     context,
                     elemType,
@@ -646,8 +616,8 @@ static LegalVal legalizeLocalVar(
     case LegalType::Flavor::simple:
         // Easy case: the type is usable as-is, and we
         // should just do that.
-        irLocalVar->type = context->session->getPtrType(
-            maybeSimpleType.getSimple());
+        irLocalVar->setFullType(context->builder->getPtrType(
+            maybeSimpleType.getSimple()));
         return LegalVal::simple(irLocalVar);
 
     default:
@@ -684,7 +654,7 @@ static LegalVal legalizeParam(
     {
         // Simple case: things were legalized to a simple type,
         // so we can just use the original parameter as-is.
-        originalParam->type = legalParamType.getSimple();
+        originalParam->setFullType(legalParamType.getSimple());
         return LegalVal::simple(originalParam);
     }
     else
@@ -702,6 +672,17 @@ static LegalVal legalizeParam(
     }
 }
 
+static LegalVal legalizeFunc(
+    IRTypeLegalizationContext*  context,
+    IRFunc*                     irFunc);
+
+static LegalVal legalizeGlobalVar(
+    IRTypeLegalizationContext*    context,
+    IRGlobalVar*                irGlobalVar);
+
+static LegalVal legalizeGlobalConstant(
+    IRTypeLegalizationContext*  context,
+    IRGlobalConstant*           irGlobalConstant);
 
 
 static LegalVal legalizeInst(
@@ -716,6 +697,19 @@ static LegalVal legalizeInst(
 
     case kIROp_Param:
         return legalizeParam(context, cast<IRParam>(inst));
+
+    case kIROp_WitnessTable:
+        // Just skip these.
+        break;
+
+    case kIROp_Func:
+        return legalizeFunc(context, cast<IRFunc>(inst));
+
+    case kIROp_GlobalVar:
+        return legalizeGlobalVar(context, cast<IRGlobalVar>(inst));
+
+    case kIROp_GlobalConstant:
+        return legalizeGlobalConstant(context, cast<IRGlobalConstant>(inst));
 
     default:
         break;
@@ -736,7 +730,7 @@ static LegalVal legalizeInst(
     }
 
     // Also legalize the type of the instruction
-    LegalType legalType = legalizeType(context, inst->type);
+    LegalType legalType = legalizeType(context, inst->getFullType());
 
     if (!anyComplex && legalType.flavor == LegalType::Flavor::simple)
     {
@@ -749,7 +743,7 @@ static LegalVal legalizeInst(
             inst->setOperand(aa, legalArg.getSimple());
         }
 
-        inst->type = legalType.getSimple();
+        inst->setFullType(legalType.getSimple());
 
         return LegalVal::simple(inst);
     }
@@ -774,9 +768,8 @@ static LegalVal legalizeInst(
     // original instruction by removing it from
     // the IR.
     //
-    // TODO: we need to add it to a list of
-    // instructions to be cleaned up...
     inst->removeFromParent();
+    context->replacedInstructions.Add(inst);
 
     // The value to be used when referencing
     // the original instruction will now be
@@ -784,33 +777,35 @@ static LegalVal legalizeInst(
     return legalVal;
 }
 
-static void addParamType(IRFuncType * ftype, LegalType t)
+static void addParamType(List<IRType*>& ioParamTypes, LegalType t)
 {
     switch (t.flavor)
     {
     case LegalType::Flavor::none:
         break;
+
     case LegalType::Flavor::simple:
-        ftype->paramTypes.Add(t.obj.As<Type>());
+        ioParamTypes.Add(t.getSimple());
         break;
+
     case LegalType::Flavor::implicitDeref:
     {
-        auto imp = t.obj.As<ImplicitDerefType>();
-        addParamType(ftype, imp->valueType);
+        auto imp = t.getImplicitDeref();
+        addParamType(ioParamTypes, imp->valueType);
         break;
     }
     case LegalType::Flavor::pair:
         {
             auto pairInfo = t.getPair();
-            addParamType(ftype, pairInfo->ordinaryType);
-            addParamType(ftype, pairInfo->specialType);
+            addParamType(ioParamTypes, pairInfo->ordinaryType);
+            addParamType(ioParamTypes, pairInfo->specialType);
         }
         break;
     case LegalType::Flavor::tuple:
     {
-        auto tup = t.obj.As<TuplePseudoType>();
+        auto tup = t.getTuple();
         for (auto & elem : tup->elements)
-            addParamType(ftype, elem.type);
+            addParamType(ioParamTypes, elem.type);
     }
     break;
     default:
@@ -818,54 +813,63 @@ static void addParamType(IRFuncType * ftype, LegalType t)
     }
 }
 
-static void legalizeFunc(
-    IRTypeLegalizationContext*    context,
-    IRFunc*                     irFunc)
+static void legalizeInstsInParent(
+    IRTypeLegalizationContext*  context,
+    IRParentInst*               parent)
 {
-    // Overwrite the function's type with
-    // the result of legalization.
-    auto newFuncType = new IRFuncType();
-    newFuncType->setSession(context->session);
-    auto oldFuncType = irFunc->type.As<IRFuncType>();
-    newFuncType->resultType = legalizeSimpleType(context, oldFuncType->resultType);
-    for (auto & paramType : oldFuncType->paramTypes)
+    IRInst* nextChild = nullptr;
+    for(auto child = parent->getFirstChild(); child; child = nextChild)
     {
-        auto legalParamType = legalizeType(context, paramType);
-        addParamType(newFuncType, legalParamType);
-    }
-    irFunc->type = newFuncType;
+        nextChild = child->getNextInst();
 
-    // we use this list to store replaced local var insts.
-    // these old instructions will be freed when we are done.
-    context->replacedInstructions.Clear();
-    
-    // Go through the blocks of the function
-    for (auto bb = irFunc->getFirstBlock(); bb; bb = bb->getNextBlock())
-    {
-        // Legalize the instructions inside the block
-        IRInst* nextInst = nullptr;
-        for (auto ii = bb->getFirstInst(); ii; ii = nextInst)
+        if (auto block = as<IRBlock>(child))
         {
-            nextInst = ii->getNextInst();
-
-            LegalVal legalVal = legalizeInst(context, ii);
-
-            registerLegalizedValue(context, ii, legalVal);
+            legalizeInstsInParent(context, block);
         }
-
-    }
-
-    // Clean up after any instructions we replaced along the way.
-    for (auto & lv : context->replacedInstructions)
-    {
-        lv->deallocate();
+        else
+        {
+            LegalVal legalVal = legalizeInst(context, child);
+            registerLegalizedValue(context, child, legalVal);
+        }
     }
 }
 
+static LegalVal legalizeFunc(
+    IRTypeLegalizationContext*  context,
+    IRFunc*                     irFunc)
+{
+    // Overwrite the function's type with the result of legalization.
+
+    IRFuncType* oldFuncType = irFunc->getDataType();
+    UInt oldParamCount = oldFuncType->getParamCount();
+
+    // TODO: we should give an error message when the result type of a function
+    // can't be legalized (e.g., trying to return a texture, or a structue that
+    // contains one).
+    IRType* newResultType = legalizeSimpleType(context, oldFuncType->getResultType());
+    List<IRType*> newParamTypes;
+    for (UInt pp = 0; pp < oldParamCount; ++pp)
+    {
+        auto legalParamType = legalizeType(context, oldFuncType->getParamType(pp));
+        addParamType(newParamTypes, legalParamType);
+    }
+
+    auto newFuncType = context->builder->getFuncType(
+        newParamTypes.Count(),
+        newParamTypes.Buffer(),
+        newResultType);
+
+    context->builder->setDataType(irFunc, newFuncType);
+
+    legalizeInstsInParent(context, irFunc);
+
+    return LegalVal::simple(irFunc);
+}
+
 static LegalVal declareSimpleVar(
-    IRTypeLegalizationContext*    context,
+    IRTypeLegalizationContext*  context,
     IROp                        op,
-    Type*                       type,
+    IRType*                     type,
     TypeLayout*                 typeLayout,
     LegalVarChain*              varChain,
     IRGlobalNameInfo*           globalNameInfo)
@@ -885,7 +889,7 @@ static LegalVal declareSimpleVar(
 
     switch (op)
     {
-    case kIROp_global_var:
+    case kIROp_GlobalVar:
         {
             auto globalVar = builder->createGlobalVar(type);
             globalVar->removeFromParent();
@@ -907,7 +911,7 @@ static LegalVal declareSimpleVar(
                     globalVar->mangledName = context->session->getNameObj(mangledNameStr);
                 }
             }
-            
+
 
 
             irVar = globalVar;
@@ -1008,7 +1012,7 @@ static LegalVal declareVars(
 
             for (auto ee : tupleType->elements)
             {
-                auto fieldLayout = getFieldLayout(typeLayout, ee.mangledName);
+                auto fieldLayout = getFieldLayout(typeLayout, getText(ee.key->mangledName));
                 RefPtr<TypeLayout> fieldTypeLayout = fieldLayout ? fieldLayout->typeLayout : nullptr;
 
                 // If we are processing layout information, then
@@ -1033,7 +1037,7 @@ static LegalVal declareVars(
                     globalNameInfo);
 
                 TuplePseudoVal::Element element;
-                element.mangledName = ee.mangledName;
+                element.key = ee.key;
                 element.val = fieldVal;
                 tupleVal->elements.Add(element);
             }
@@ -1048,7 +1052,7 @@ static LegalVal declareVars(
     }
 }
 
-static void legalizeGlobalVar(
+static LegalVal legalizeGlobalVar(
     IRTypeLegalizationContext*    context,
     IRGlobalVar*                irGlobalVar)
 {
@@ -1065,9 +1069,11 @@ static void legalizeGlobalVar(
     case LegalType::Flavor::simple:
         // Easy case: the type is usable as-is, and we
         // should just do that.
-        irGlobalVar->type = context->session->getPtrType(
-            legalValueType.getSimple());
-        break;
+        context->builder->setDataType(
+            irGlobalVar,
+            context->builder->getPtrType(
+                legalValueType.getSimple()));
+        return LegalVal::simple(irGlobalVar);
 
     default:
         {
@@ -1086,23 +1092,22 @@ static void legalizeGlobalVar(
             globalNameInfo.globalVar = irGlobalVar;
             globalNameInfo.counter = 0;
 
-            LegalVal newVal = declareVars(context, kIROp_global_var, legalValueType, typeLayout, varChain, &globalNameInfo);
+            LegalVal newVal = declareVars(context, kIROp_GlobalVar, legalValueType, typeLayout, varChain, &globalNameInfo);
 
             // Register the new value as the replacement for the old
             registerLegalizedValue(context, irGlobalVar, newVal);
 
-            // Also register the variable according to its mangled name, if any.
-            maybeRegisterLegalizedGlobal(context, irGlobalVar, newVal);
-
             // Remove the old global from the module.
             irGlobalVar->removeFromParent();
-            // TODO: actually clean up the global!
+            context->replacedInstructions.Add(irGlobalVar);
+
+            return newVal;
         }
         break;
     }
 }
 
-static void legalizeGlobalConstant(
+static LegalVal legalizeGlobalConstant(
     IRTypeLegalizationContext*  context,
     IRGlobalConstant*           irGlobalConstant)
 {
@@ -1116,8 +1121,8 @@ static void legalizeGlobalConstant(
     case LegalType::Flavor::simple:
         // Easy case: the type is usable as-is, and we
         // should just do that.
-        irGlobalConstant->type = legalValueType.getSimple();
-        break;
+        irGlobalConstant->setFullType(legalValueType.getSimple());
+        return LegalVal::simple(irGlobalConstant);
 
     default:
         {
@@ -1128,46 +1133,17 @@ static void legalizeGlobalConstant(
             globalNameInfo.counter = 0;
 
             // TODO: need to handle initializer here!
-            LegalVal newVal = declareVars(context, kIROp_global_constant, legalValueType, nullptr, nullptr, &globalNameInfo);
+            LegalVal newVal = declareVars(context, kIROp_GlobalConstant, legalValueType, nullptr, nullptr, &globalNameInfo);
 
             // Register the new value as the replacement for the old
             registerLegalizedValue(context, irGlobalConstant, newVal);
 
-            // Also register the variable according to its mangled name, if any.
-            maybeRegisterLegalizedGlobal(context, irGlobalConstant, newVal);
-
             // Remove the old global from the module.
             irGlobalConstant->removeFromParent();
-            // TODO: actually clean up the global!
+            context->replacedInstructions.Add(irGlobalConstant);
+
+            return newVal;
         }
-        break;
-    }
-}
-
-static void legalizeGlobalValue(
-    IRTypeLegalizationContext*    context,
-    IRGlobalValue*              irValue)
-{
-    switch (irValue->op)
-    {
-    case kIROp_witness_table:
-        // Just skip these.
-        break;
-
-    case kIROp_Func:
-        legalizeFunc(context, (IRFunc*)irValue);
-        break;
-
-    case kIROp_global_var:
-        legalizeGlobalVar(context, (IRGlobalVar*)irValue);
-        break;
-
-    case kIROp_global_constant:
-        legalizeGlobalConstant(context, (IRGlobalConstant*)irValue);
-        break;
-
-    default:
-        SLANG_UNEXPECTED("unknown global value type");
         break;
     }
 }
@@ -1175,19 +1151,14 @@ static void legalizeGlobalValue(
 static void legalizeTypes(
     IRTypeLegalizationContext*    context)
 {
+    // Legalize all the top-level instructions in the module
     auto module = context->module;
-    IRInst* next = nullptr;
-    for(auto ii = module->getGlobalInsts().getFirst(); ii; ii = next)
-    {
-        next = ii->getNextInst();
+    legalizeInstsInParent(context, module->moduleInst);
 
-        // TODO: Once we start having global-scope instructions that
-        // aren't `IRGlobalValue`s, we'll actually want to handle those
-        // here too.
-        auto gv = as<IRGlobalValue>(ii);
-        if (!gv)
-            continue;
-        legalizeGlobalValue(context, gv);
+    // Clean up after any instructions we replaced along the way.
+    for (auto& lv : context->replacedInstructions)
+    {
+        lv->deallocate();
     }
 }
 
@@ -1221,6 +1192,17 @@ void legalizeTypes(
 
     legalizeTypes(context);
 
+    // Clean up after any type instructions we removed (e.g.,
+    // global `struct` types).
+    //
+    // TODO: this logic should probably get paired up with
+    // the case for `IRTypeLegalizationContext::replacedInstructions`,
+    // but we haven't yet folded all the legalization logic into
+    // the IR legalization pass (since it used to apply to the AST too).
+    for (auto& oldInst : typeLegalizationContext->instsToRemove)
+    {
+        oldInst->removeAndDeallocate();
+    }
 }
 
 }

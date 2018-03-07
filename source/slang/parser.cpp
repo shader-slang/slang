@@ -992,7 +992,7 @@ namespace Slang
         else
         {
             // default case is a type parameter
-            auto paramDecl = new GenericTypeParamDecl();
+            RefPtr<GenericTypeParamDecl> paramDecl = new GenericTypeParamDecl();
             parser->FillPosition(paramDecl);
             paramDecl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
             if (AdvanceIf(parser, TokenType::Colon))

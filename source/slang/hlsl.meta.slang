@@ -2,7 +2,10 @@
 
 typedef uint UINT;
 
-__generic<T> __magic_type(HLSLAppendStructuredBufferType) struct AppendStructuredBuffer
+__generic<T>
+__magic_type(HLSLAppendStructuredBufferType)
+__intrinsic_type($(kIROp_HLSLAppendStructuredBufferType))
+struct AppendStructuredBuffer
 {
     void Append(T value);
 
@@ -11,7 +14,9 @@ __generic<T> __magic_type(HLSLAppendStructuredBufferType) struct AppendStructure
         out uint stride);
 };
 
-__magic_type(HLSLByteAddressBufferType) struct ByteAddressBuffer
+__magic_type(HLSLByteAddressBufferType)
+__intrinsic_type($(kIROp_HLSLByteAddressBufferType))
+struct ByteAddressBuffer
 {
     void GetDimensions(
         out uint dim);
@@ -31,7 +36,7 @@ __magic_type(HLSLByteAddressBufferType) struct ByteAddressBuffer
 
 __generic<T>
 __magic_type(HLSLStructuredBufferType)
-__intrinsic_type($(kIROp_structuredBufferType))
+__intrinsic_type($(kIROp_HLSLStructuredBufferType))
 struct StructuredBuffer
 {
     void GetDimensions(
@@ -44,7 +49,10 @@ struct StructuredBuffer
     __subscript(uint index) -> T { __intrinsic_op(bufferLoad) get; };
 };
 
-__generic<T> __magic_type(HLSLConsumeStructuredBufferType) struct ConsumeStructuredBuffer
+__generic<T>
+__magic_type(HLSLConsumeStructuredBufferType)
+__intrinsic_type($(kIROp_HLSLConsumeStructuredBufferType))
+struct ConsumeStructuredBuffer
 {
     T Consume();
 
@@ -53,17 +61,25 @@ __generic<T> __magic_type(HLSLConsumeStructuredBufferType) struct ConsumeStructu
         out uint stride);
 };
 
-__generic<T, let N : int> __magic_type(HLSLInputPatchType) struct InputPatch
+__generic<T, let N : int>
+__magic_type(HLSLInputPatchType)
+__intrinsic_type($(kIROp_HLSLInputPatchType))
+struct InputPatch
 {
     __subscript(uint index) -> T;
 };
 
-__generic<T, let N : int> __magic_type(HLSLOutputPatchType) struct OutputPatch
+__generic<T, let N : int>
+__magic_type(HLSLOutputPatchType)
+__intrinsic_type($(kIROp_HLSLOutputPatchType))
+struct OutputPatch
 {
     __subscript(uint index) -> T;
 };
 
-__magic_type(HLSLRWByteAddressBufferType) struct RWByteAddressBuffer
+__magic_type(HLSLRWByteAddressBufferType)
+__intrinsic_type($(kIROp_HLSLRWByteAddressBufferType))
+struct RWByteAddressBuffer
 {
     // Note(tfoley): supports alll operations from `ByteAddressBuffer`
     // TODO(tfoley): can this be made a sub-type?
@@ -178,7 +194,7 @@ __magic_type(HLSLRWByteAddressBufferType) struct RWByteAddressBuffer
 
 __generic<T>
 __magic_type(HLSLRWStructuredBufferType)
-__intrinsic_type($(kIROp_readWriteStructuredBufferType))
+__intrinsic_type($(kIROp_HLSLRWStructuredBufferType))
 struct RWStructuredBuffer
 {
     uint DecrementCounter();
@@ -199,7 +215,10 @@ struct RWStructuredBuffer
 	}
 };
 
-__generic<T> __magic_type(HLSLPointStreamType) struct PointStream
+__generic<T>
+__magic_type(HLSLPointStreamType)
+__intrinsic_type($(kIROp_HLSLPointStreamType))
+struct PointStream
 {
     __target_intrinsic(glsl, "EmitVertex()")
     void Append(T value);
@@ -208,7 +227,10 @@ __generic<T> __magic_type(HLSLPointStreamType) struct PointStream
     void RestartStrip();
 };
 
-__generic<T> __magic_type(HLSLLineStreamType) struct LineStream
+__generic<T>
+__magic_type(HLSLLineStreamType)
+__intrinsic_type($(kIROp_HLSLLineStreamType))
+struct LineStream
 {
     __target_intrinsic(glsl, "EmitVertex()")
     void Append(T value);
@@ -217,7 +239,10 @@ __generic<T> __magic_type(HLSLLineStreamType) struct LineStream
     void RestartStrip();
 };
 
-__generic<T> __magic_type(HLSLTriangleStreamType) struct TriangleStream
+__generic<T>
+__magic_type(HLSLTriangleStreamType)
+__intrinsic_type($(kIROp_HLSLTriangleStreamType))
+struct TriangleStream
 {
     __target_intrinsic(glsl, "EmitVertex()")
     void Append(T value);
@@ -1098,10 +1123,11 @@ static const int kBaseBufferAccessLevelCount = sizeof(kBaseBufferAccessLevels) /
 
 for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
 {
-
-    sb << "__generic<T> __magic_type(Texture, ";
-    sb << TextureFlavor::create(TextureFlavor::Shape::ShapeBuffer, kBaseBufferAccessLevels[aa].access).flavor;
-    sb << ") struct ";
+    auto flavor = TextureFlavor::create(TextureFlavor::Shape::ShapeBuffer, kBaseBufferAccessLevels[aa].access).flavor;
+    sb << "__generic<T>\n";
+    sb << "__magic_type(Texture," << int(flavor) << ")\n";
+    sb << "__intrinsic_type(" << (kIROp_FirstTextureType + flavor) << ")\n";
+    sb << "struct ";
     sb << kBaseBufferAccessLevels[aa].name;
     sb << "Buffer {\n";
 
@@ -1151,7 +1177,10 @@ static const RAY_FLAG RAY_FLAG_CULL_NON_OPAQUE                  = 0x80;
 
 // 10.1.2 - Ray Description Structure
 
-__builtin struct RayDesc
+__builtin
+__magic_type(RayDescType)
+__intrinsic_type($(kIROp_RayDescType))
+struct RayDesc
 {
     float3 Origin;
     float  TMin;
@@ -1161,7 +1190,9 @@ __builtin struct RayDesc
 
 // 10.1.3 - Ray Acceleration Structure
 
-__builtin __magic_type(UntypedBufferResourceType)
+__builtin
+__magic_type(RaytracingAccelerationStructureType)
+__intrinsic_type($(kIROp_RaytracingAccelerationStructureType))
 struct RaytracingAccelerationStructure {};
 
 // 10.1.4 - Subobject Definitions
@@ -1173,7 +1204,10 @@ struct RaytracingAccelerationStructure {};
 
 // 10.1.5 - Intersection Attributes Structure
 
-__builtin struct BuiltInTriangleIntersectionAttributes
+__builtin
+__magic_type(BuiltInTriangleIntersectionAttributesType)
+__intrinsic_type($(kIROp_BuiltInTriangleIntersectionAttributesType))
+struct BuiltInTriangleIntersectionAttributes
 {
     float2 barycentrics;
 };

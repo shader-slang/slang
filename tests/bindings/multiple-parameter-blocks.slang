@@ -37,7 +37,7 @@ Texture2D _SV02p1L0 : register(t0, space1);
 Texture2D _SV02p1L1[4] : register(t1, space1);
 SamplerState _SV02p1L2 : register(s0, space1);
 
-float4 main(float v : V) : SV_Target
+float4 main(float v : V) : SV_TARGET
 {
 	return use(_SV01pL0,          _SV01pL2)
 		 + use(_SV01pL1[int(v)],  _SV01pL2)

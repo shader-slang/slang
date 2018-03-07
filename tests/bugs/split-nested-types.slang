@@ -4,11 +4,11 @@ struct A { int x; };
 
 struct B { float y; };
 
-struct C { Texture2D t; SamplerState s; };
+struct CC { Texture2D t; SamplerState s; };
 
 struct M
 {
 	A a;
 	B b;
-	C c;
+	CC c;
 };

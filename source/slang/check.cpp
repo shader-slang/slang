@@ -168,64 +168,54 @@ namespace Slang
             RefPtr<Expr>    baseExpr,
             SourceLoc       loc)
         {
+            // Compute the type that this declaration reference will have in context.
+            //
+            auto type = GetTypeForDeclRef(declRef);
+
+            // Construct an appropriate expression based on teh structured of
+            // the declaration reference.
+            //
             if (baseExpr)
             {
-                RefPtr<Expr> expr;
-                DeclRef<Decl> *declRefOut;
+                // If there was a base expression, we will have some kind of
+                // member expression.
+                //
                 if (baseExpr->type->As<TypeType>())
                 {
-                    auto sexpr = new StaticMemberExpr();
-                    sexpr->loc = loc;
-                    sexpr->BaseExpression = baseExpr;
-                    sexpr->name = declRef.GetName();
-                    sexpr->declRef = declRef;
-                    declRefOut = &sexpr->declRef;
-                    expr = sexpr;
+                    // If the base expression was a type, then that means we
+                    // are constructing a static member reference.
+                    //
+                    auto expr = new StaticMemberExpr();
+                    expr->loc = loc;
+                    expr->type = type;
+                    expr->BaseExpression = baseExpr;
+                    expr->name = declRef.GetName();
+                    expr->declRef = declRef;
+                    return expr;
                 }
                 else
                 {
-                    auto sexpr = new MemberExpr();
-                    sexpr->loc = loc;
-                    sexpr->BaseExpression = baseExpr;
-                    sexpr->name = declRef.GetName();
-                    sexpr->declRef = declRef;
-                    declRefOut = &sexpr->declRef;
-                    expr = sexpr;
+                    // If the base expression wasn't a type, then this
+                    // is a normal member expression.
+                    //
+                    auto expr = new MemberExpr();
+                    expr->loc = loc;
+                    expr->type = type;
+                    expr->BaseExpression = baseExpr;
+                    expr->name = declRef.GetName();
+                    expr->declRef = declRef;
+                    return expr;
                 }
-
-                RefPtr<ThisTypeSubstitution> baseThisTypeSubst;
-                if (auto baseDeclRefExpr = baseExpr->As<DeclRefExpr>())
-                {
-                    baseThisTypeSubst = getThisTypeSubst(baseDeclRefExpr->declRef, false);
-                }
-                if (declRef.As<TypeConstraintDecl>())
-                {
-                    // if this is a reference to type constraint, insert a this-type substitution
-                    RefPtr<Type> expType;
-                    expType = baseExpr->type;
-                    if (auto baseExprTT = baseExpr->type->As<TypeType>())
-                        expType = baseExprTT->type;
-                    auto thisTypeSubst = getNewThisTypeSubst(*declRefOut);
-                    thisTypeSubst->sourceType = expType;
-                    baseThisTypeSubst = nullptr;
-                }
-                // propagate "this-type" substitutions
-                if (baseThisTypeSubst)
-                {
-                    if (auto declRefExpr = expr.As<DeclRefExpr>())
-                    {
-                        getNewThisTypeSubst(declRefExpr->declRef)->sourceType = baseThisTypeSubst->sourceType;
-                    }
-                }
-                expr->type = GetTypeForDeclRef(*declRefOut);
-                return expr;
             }
             else
             {
+                // If there is no base expression, then the result must
+                // be an ordinary variable expression.
+                //
                 auto expr = new VarExpr();
                 expr->loc = loc;
                 expr->name = declRef.GetName();
-                expr->type = GetTypeForDeclRef(declRef);
+                expr->type = type;
                 expr->declRef = declRef;
                 return expr;
             }
@@ -444,12 +434,12 @@ namespace Slang
         // The arguments should already be checked against
         // the declaration.
         RefPtr<Type> InstantiateGenericType(
-            DeclRef<GenericDecl>						genericDeclRef,
-            List<RefPtr<Expr>> const&	args)
+            DeclRef<GenericDecl>        genericDeclRef,
+            List<RefPtr<Expr>> const&   args)
         {
             RefPtr<GenericSubstitution> subst = new GenericSubstitution();
             subst->genericDecl = genericDeclRef.getDecl();
-            subst->outer = genericDeclRef.substitutions.genericSubstitutions;
+            subst->outer = genericDeclRef.substitutions.substitutions;
 
             for (auto argExpr : args)
             {
@@ -458,8 +448,7 @@ namespace Slang
 
             DeclRef<Decl> innerDeclRef;
             innerDeclRef.decl = GetInner(genericDeclRef);
-            innerDeclRef.substitutions = SubstitutionSet(subst, genericDeclRef.substitutions.thisTypeSubstitution,
-                genericDeclRef.substitutions.globalGenParamSubstitutions);
+            innerDeclRef.substitutions = SubstitutionSet(subst);
 
             return DeclRefType::Create(
                 getSession(),
@@ -874,7 +863,7 @@ namespace Slang
 
                             auto arg = fromInitializerListExpr->args[argIndex++];
 
-                            // 
+                            //
                             RefPtr<Expr> coercedArg;
                             ConversionCost argCost;
 
@@ -1066,7 +1055,7 @@ namespace Slang
 
             overloadContext.baseExpr = nullptr;
             overloadContext.mode = OverloadResolveContext::Mode::JustTrying;
-            
+
             AddTypeOverloadCandidates(toType, overloadContext, toType);
 
             if(overloadContext.bestCandidates.Count() != 0)
@@ -1821,7 +1810,7 @@ namespace Slang
             for (int pass = 0; pass < 2; pass++)
             {
                 checkingPhase = pass == 0 ? CheckingPhase::Header : CheckingPhase::Body;
-                
+
                 for (auto & s : programNode->getMembersOfType<AggTypeDecl>())
                 {
                     checkDecl(s.Ptr());
@@ -1866,7 +1855,7 @@ namespace Slang
                 {
                     checkModifiers(d.Ptr());
                 }
-                
+
                 if (pass == 0)
                 {
                     // now we can check all interface conformances
@@ -1896,20 +1885,22 @@ namespace Slang
         }
 
         bool doesSignatureMatchRequirement(
-            DeclRef<CallableDecl>           memberDecl,
+            DeclRef<CallableDecl>   satisfyingMemberDeclRef,
             DeclRef<CallableDecl>   requiredMemberDeclRef,
-            Dictionary<DeclRef<Decl>, DeclRef<Decl>> & requirementDict)
+            RefPtr<WitnessTable>    witnessTable)
         {
             // TODO: actually implement matching here. For now we'll
             // just pretend that things are satisfied in order to make progress..
-            requirementDict.AddIfNotExists(requiredMemberDeclRef, memberDecl);
+            witnessTable->requirementDictionary.Add(
+                requiredMemberDeclRef.getDecl(),
+                RequirementWitness(satisfyingMemberDeclRef));
             return true;
         }
 
         bool doesGenericSignatureMatchRequirement(
-            DeclRef<GenericDecl> genDecl,
-            DeclRef<GenericDecl> requirementGenDecl,
-            Dictionary<DeclRef<Decl>, DeclRef<Decl>> & requirementDict)
+            DeclRef<GenericDecl>        genDecl,
+            DeclRef<GenericDecl>        requirementGenDecl,
+            RefPtr<WitnessTable>        witnessTable)
         {
             if (genDecl.getDecl()->Members.Count() != requirementGenDecl.getDecl()->Members.Count())
                 return false;
@@ -1948,20 +1939,81 @@ namespace Slang
                         return false;
                 }
             }
-            return doesMemberSatisfyRequirement(DeclRef<Decl>(genDecl.getDecl()->inner.Ptr(), genDecl.substitutions),
+
+            // TODO: this isn't right, because we need to specialize the
+            // declarations of the generics to a common set of substitutions,
+            // so that their types are comparable (e.g., foo<T> and foo<U>
+            // need to have substutition applies so that they are both foo<X>,
+            // after which uses of the type X in their parameter lists can
+            // be compared).
+
+            return doesMemberSatisfyRequirement(
+                DeclRef<Decl>(genDecl.getDecl()->inner.Ptr(), genDecl.substitutions),
                 DeclRef<Decl>(requirementGenDecl.getDecl()->inner.Ptr(), requirementGenDecl.substitutions),
-                requirementDict);
+                witnessTable);
+        }
+
+        bool doesTypeSatisfyAssociatedTypeRequirement(
+            RefPtr<Type>            satisfyingType,
+            DeclRef<AssocTypeDecl>  requiredAssociatedTypeDeclRef,
+            RefPtr<WitnessTable>    witnessTable)
+        {
+            // We need to confirm that the chosen type `satisfyingType`,
+            // meets all the constraints placed on the associated type
+            // requirement `requiredAssociatedTypeDeclRef`.
+            //
+            // We will enumerate the type constraints placed on the
+            // associated type and see if they can be satisfied.
+            //
+            bool conformance = true;
+            for (auto requiredConstraintDeclRef : getMembersOfType<TypeConstraintDecl>(requiredAssociatedTypeDeclRef))
+            {
+                // Grab the type we expect to conform to from the constraint.
+                auto requiredSuperType = GetSup(requiredConstraintDeclRef);
+
+                // Perform a search for a witness to the subtype relationship.
+                auto witness = tryGetSubtypeWitness(satisfyingType, requiredSuperType);
+                if(witness)
+                {
+                    // If a subtype witness was found, then the conformance
+                    // appears to hold, and we can satisfy that requirement.
+                    witnessTable->requirementDictionary.Add(requiredConstraintDeclRef, RequirementWitness(witness));
+                }
+                else
+                {
+                    // If a witness couldn't be found, then the conformance
+                    // seems like it will fail.
+                    conformance = false;
+                }
+            }
+
+            // TODO: if any conformance check failed, we should probably include
+            // that in an error message produced about not satisfying the requirement.
+
+            if(conformance)
+            {
+                // If all the constraints were satsified, then the chosen
+                // type can indeed satisfy the interface requirement.
+                witnessTable->requirementDictionary.Add(
+                    requiredAssociatedTypeDeclRef.getDecl(),
+                    RequirementWitness(satisfyingType));
+            }
+
+            return conformance;
         }
 
         // Does the given `memberDecl` work as an implementation
         // to satisfy the requirement `requiredMemberDeclRef`
         // from an interface?
+        //
+        // If it does, then inserts a witness into `witnessTable`
+        // and returns `true`, otherwise returns `false`
         bool doesMemberSatisfyRequirement(
-            DeclRef<Decl>   memberDeclRef,
-            DeclRef<Decl>   requiredMemberDeclRef,
-            Dictionary<DeclRef<Decl>, DeclRef<Decl>> & requirementDictionary)
+            DeclRef<Decl>               memberDeclRef,
+            DeclRef<Decl>               requiredMemberDeclRef,
+            RefPtr<WitnessTable>        witnessTable)
         {
-            // At a high level, we want to chack that the
+            // At a high level, we want to check that the
             // `memberDecl` and the `requiredMemberDeclRef`
             // have the same AST node class, and then also
             // check that their signatures match.
@@ -1979,34 +2031,7 @@ namespace Slang
             // An associated type requirement should be allowed
             // to be satisfied by any type declaration:
             // a typedef, a `struct`, etc.
-            auto checkSubTypeMember = [&](DeclRef<ContainerDecl> subStructTypeDeclRef) -> bool
-            {
-                checkDecl(subStructTypeDeclRef.getDecl());
-                // this is a sub type (e.g. nested struct declaration) in an aggregate type
-                // check if this sub type declaration satisfies the constraints defined by the associated type
-                if (auto requiredTypeDeclRef = requiredMemberDeclRef.As<AssocTypeDecl>())
-                {
-                    bool conformance = true;
-                    auto inheritanceReqDeclRefs = getMembersOfType<TypeConstraintDecl>(requiredTypeDeclRef);
-                    for (auto inheritanceReqDeclRef : inheritanceReqDeclRefs)
-                    {
-                        auto interfaceDeclRefType = inheritanceReqDeclRef.getDecl()->getSup().type.As<DeclRefType>();
-                        SLANG_ASSERT(interfaceDeclRefType);
-                        auto interfaceDeclRef = interfaceDeclRefType->declRef.As<InterfaceDecl>();
-                        SLANG_ASSERT(interfaceDeclRef);
-                        RefPtr<DeclRefType> declRefType = new DeclRefType();
-                        declRefType->declRef = subStructTypeDeclRef;
-                        auto witness = tryGetInterfaceConformanceWitness(declRefType,
-                            interfaceDeclRef).As<SubtypeWitness>();
-                        if (witness)
-                            requirementDictionary.Add(inheritanceReqDeclRef, witness->getLastStepDeclRef());
-                        else
-                            conformance = false;
-                    }
-                    return conformance;
-                }
-                return false;
-            };
+            //
             if (auto memberFuncDecl = memberDeclRef.As<FuncDecl>())
             {
                 if (auto requiredFuncDeclRef = requiredMemberDeclRef.As<FuncDecl>())
@@ -2015,7 +2040,7 @@ namespace Slang
                     return doesSignatureMatchRequirement(
                         memberFuncDecl,
                         requiredFuncDeclRef,
-                        requirementDictionary);
+                        witnessTable);
                 }
             }
             else if (auto memberInitDecl = memberDeclRef.As<ConstructorDecl>())
@@ -2026,19 +2051,35 @@ namespace Slang
                     return doesSignatureMatchRequirement(
                         memberInitDecl,
                         requiredInitDecl,
-                        requirementDictionary);
+                        witnessTable);
                 }
             }
             else if (auto genDecl = memberDeclRef.As<GenericDecl>())
             {
+                // For a generic member, we will check if it can satisfy
+                // a generic requirement in the interface.
+                //
+                // TODO: we could also conceivably check that the generic
+                // could be *specialized* to satisfy the requirement,
+                // and then install a specialization of the generic into
+                // the witness table. Actually doing this would seem
+                // to require performing something akin to overload
+                // resolution as part of requirement satisfaction.
+                //
                 if (auto requiredGenDeclRef = requiredMemberDeclRef.As<GenericDecl>())
                 {
-                    return doesGenericSignatureMatchRequirement(genDecl, requiredGenDeclRef, requirementDictionary);
+                    return doesGenericSignatureMatchRequirement(genDecl, requiredGenDeclRef, witnessTable);
                 }
             }
-            else if (auto subStructTypeDeclRef = memberDeclRef.As<AggTypeDecl>())
+            else if (auto subAggTypeDeclRef = memberDeclRef.As<AggTypeDecl>())
             {
-                return checkSubTypeMember(subStructTypeDeclRef);
+                if(auto requiredTypeDeclRef = requiredMemberDeclRef.As<AssocTypeDecl>())
+                {
+                    checkDecl(subAggTypeDeclRef.getDecl());
+
+                    auto satisfyingType = DeclRefType::Create(getSession(), subAggTypeDeclRef);
+                    return doesTypeSatisfyAssociatedTypeRequirement(satisfyingType, requiredTypeDeclRef, witnessTable);
+                }
             }
             else if (auto typedefDeclRef = memberDeclRef.As<TypeDefDecl>())
             {
@@ -2046,27 +2087,24 @@ namespace Slang
                 // check if the specified type satisfies the constraints defined by the associated type
                 if (auto requiredTypeDeclRef = requiredMemberDeclRef.As<AssocTypeDecl>())
                 {
-                    auto declRefType = GetType(typedefDeclRef)->GetCanonicalType()->As<DeclRefType>();
-                    if (!declRefType)
-                        return false;
+                    checkDecl(typedefDeclRef.getDecl());
 
-                    if (auto genTypeParamDeclRef = declRefType->declRef.As<GenericTypeParamDecl>())
-                    {
-                        // TODO: check generic type parameter satisfies constraints
-                        return true;
-                    }
-                    
-
-                    auto containerDeclRef = declRefType->declRef.As<ContainerDecl>();
-                    if (!containerDeclRef)
-                        return false;
-
-                    return checkSubTypeMember(containerDeclRef);
+                    auto satisfyingType = getNamedType(getSession(), typedefDeclRef);
+                    return doesTypeSatisfyAssociatedTypeRequirement(satisfyingType, requiredTypeDeclRef, witnessTable);
                 }
             }
             // Default: just assume that thing aren't being satisfied.
             return false;
         }
+
+        // State used while checking if a declaration (either a type declaration
+        // or an extension of that type) conforms to the interfaces it claims
+        // via its inheritance clauses.
+        //
+        struct ConformanceCheckingContext
+        {
+            Dictionary<DeclRef<InterfaceDecl>, RefPtr<WitnessTable>>    mapInterfaceToWitnessTable;
+        };
 
         // Find the appropriate member of a declared type to
         // satisfy a requirement of an interface the type
@@ -2076,13 +2114,56 @@ namespace Slang
         // conforms to the interface `interfaceDeclRef`, and
         // `requiredMemberDeclRef` is a required member of
         // the interface.
-        RefPtr<Decl> findWitnessForInterfaceRequirement(
+        //
+        // If a satisfying value is found, registers it in
+        // `witnessTable` and returns `true`, otherwise
+        // returns `false`.
+        //
+        bool findWitnessForInterfaceRequirement(
+            ConformanceCheckingContext* context,
             DeclRef<AggTypeDeclBase>    typeDeclRef,
-            InheritanceDecl*        inheritanceDecl,
-            DeclRef<InterfaceDecl>  interfaceDeclRef,
-            DeclRef<Decl>           requiredMemberDeclRef,
-            Dictionary<DeclRef<Decl>, DeclRef<Decl>> & requirementWitness)
+            InheritanceDecl*            inheritanceDecl,
+            DeclRef<InterfaceDecl>      interfaceDeclRef,
+            DeclRef<Decl>               requiredMemberDeclRef,
+            RefPtr<WitnessTable>        witnessTable)
         {
+            // The goal of this function is to find a suitable
+            // value to satisfy the requirement.
+            //
+            // The 99% case is that the requirement is a named member
+            // of the interface, and we need to search for a member
+            // with the same name in the type declaration and
+            // its (known) extensions.
+
+            // An important exception to the above is that an
+            // inheritance declaration in the interface is not going
+            // to be satisfied by an inheritance declaration in the
+            // conforming type, but rather by a full "witness table"
+            // full of the satisfying values for each requirement
+            // in the inherited-from interface.
+            //
+            if( auto requiredInheritanceDeclRef = requiredMemberDeclRef.As<InheritanceDecl>() )
+            {
+                // Recursively check that the type conforms
+                // to the inherited interface.
+                //
+                // TODO: we *really* need a linearization step here!!!!
+
+                RefPtr<WitnessTable> satisfyingWitnessTable = checkConformanceToType(
+                    context,
+                    typeDeclRef,
+                    requiredInheritanceDeclRef.getDecl(),
+                    getBaseType(requiredInheritanceDeclRef));
+
+                if(!satisfyingWitnessTable)
+                    return false;
+
+                witnessTable->requirementDictionary.Add(
+                    requiredInheritanceDeclRef.getDecl(),
+                    RequirementWitness(satisfyingWitnessTable));
+                return true;
+            }
+
             // We will look up members with the same name,
             // since only same-name members will be able to
             // satisfy the requirement.
@@ -2117,7 +2198,7 @@ namespace Slang
             // Make sure that by-name lookup is possible.
             buildMemberDictionary(typeDeclRef.getDecl());
             auto lookupResult = lookUpLocal(getSession(), this, name, typeDeclRef);
-            
+
             if (!lookupResult.isValid())
             {
                 getSink()->diagnose(inheritanceDecl, Diagnostics::typeDoesntImplementInterfaceRequirement, typeDeclRef, requiredMemberDeclRef);
@@ -2128,10 +2209,10 @@ namespace Slang
             // the expected signature for the requirement.
             for (auto member : lookupResult)
             {
-                if (doesMemberSatisfyRequirement(member.declRef, requiredMemberDeclRef, requirementWitness))
-                    return member.declRef.getDecl();
+                if (doesMemberSatisfyRequirement(member.declRef, requiredMemberDeclRef, witnessTable))
+                    return true;
             }
-            
+
             // No suitable member found, although there were candidates.
             //
             // TODO: Eventually we might want something akin to the current
@@ -2147,22 +2228,30 @@ namespace Slang
         // declares conformance to the interface `interfaceDeclRef`,
         // (via the given `inheritanceDecl`) actually provides
         // members to satisfy all the requirements in the interface.
-        bool checkInterfaceConformance(
-            HashSet<DeclRef<InterfaceDecl>> & checkedInterfaceDeclRef,
-            DeclRef<AggTypeDeclBase>        typeDeclRef,
-            InheritanceDecl*    inheritanceDecl,
-            DeclRef<InterfaceDecl>  interfaceDeclRef)
+        RefPtr<WitnessTable> checkInterfaceConformance(
+            ConformanceCheckingContext* context,
+            DeclRef<AggTypeDeclBase>    typeDeclRef,
+            InheritanceDecl*            inheritanceDecl,
+            DeclRef<InterfaceDecl>      interfaceDeclRef)
         {
-            if (!checkedInterfaceDeclRef.Contains(interfaceDeclRef))
-                checkedInterfaceDeclRef.Add(interfaceDeclRef);
-            else
-                return true;
-
-            bool result = true;
+            // Has somebody already checked this conformance,
+            // and/or is in the middle of checking it?
+            RefPtr<WitnessTable> witnessTable;
+            if(context->mapInterfaceToWitnessTable.TryGetValue(interfaceDeclRef, witnessTable))
+                return witnessTable;
 
             // We need to check the declaration of the interface
             // before we can check that we conform to it.
             checkDecl(interfaceDeclRef.getDecl());
+
+            // We will construct the witness table, and register it
+            // *before* we go about checking fine-grained requirements,
+            // in order to short-circuit any potential for infinite recursion.
+
+            witnessTable = new WitnessTable();
+            context->mapInterfaceToWitnessTable.Add(interfaceDeclRef, witnessTable);
+
+            bool result = true;
 
             // TODO: If we ever allow for implementation inheritance,
             // then we will need to consider the case where a type
@@ -2170,53 +2259,87 @@ namespace Slang
             // its (non-interface) base types already conforms to
             // that interface, so that all of the requirements are
             // already satisfied with inherited implementations...
-            auto allMembers = getMembersWithExt(interfaceDeclRef);
-            for (auto requiredMemberDeclRef : allMembers)
+            for(auto requiredMemberDeclRef : getMembers(interfaceDeclRef))
             {
-                // Some members of the interface don't actually represent
-                // things that we required of the implementing type.
-                // For example, when the interface declares that
-                // it inherits from another interface, we don't look for
-                // a matching inheritance clause on the type, but
-                // instead require that it also conforms to that
-                // interface.
-                if (auto requiredInheritanceDeclRef = requiredMemberDeclRef.As<InheritanceDecl>())
-                {
-                    // Recursively check that the type conforms
-                    // to the inherited interface.
-                    //
-                    // TODO: we *really* need a linearization step here!!!!
-                    result = result && checkConformanceToType(
-                        checkedInterfaceDeclRef,
-                        typeDeclRef,
-                        inheritanceDecl,
-                        getBaseType(requiredInheritanceDeclRef));
-                    continue;
-                }
-
-                // Look for a member in the type that can satisfy the
-                // interface requirement.
-                auto isConformanceSatisfied = findWitnessForInterfaceRequirement(
+                auto requirementSatisfied = findWitnessForInterfaceRequirement(
+                    context,
                     typeDeclRef,
                     inheritanceDecl,
                     interfaceDeclRef,
                     requiredMemberDeclRef,
-                    inheritanceDecl->requirementWitnesses);
+                    witnessTable);
 
-                if (!isConformanceSatisfied)
-                {
-                    result = false;
+                result = result && requirementSatisfied;
+            }
+
+            // Extensions that apply to the interface type can create new conformances
+            // for the concrete types that inherit from the interface.
+            //
+            // These new conformances should not be able to introduce new *requirements*
+            // for an implementing interface (although they currently can), but we
+            // still need to go through this logic to find the appropriate value
+            // that will satisfy the requirement in these cases, and also to put
+            // the required entry into the witness table for the interface itself.
+            //
+            // TODO: This logic is a bit slippery, and we need to figure out what
+            // it means in the context of separate compilation. If module A defines
+            // an interface IA, module B defines a type C that conforms to IA, and then
+            // module C defines an extension that makes IA conform to IC, then it is
+            // unreasonable to expect the {B:IA} witness table to contain an entry
+            // corresponding to {IA:IC}.
+            //
+            // The simple answer then would be that the {IA:IC} conformance should be
+            // fixed, with a single witness table for {IA:IC}, but then what should
+            // happen in B explicitly conformed to IC already?
+            //
+            // For now we will just walk through the extensions that are known at
+            // the time we are compiling and handle those, and punt on the larger issue
+            // for abit longer.
+            for(auto candidateExt = interfaceDeclRef.getDecl()->candidateExtensions; candidateExt; candidateExt = candidateExt->nextCandidateExtension)
+            {
+                // We need to apply the extension to the interface type that our
+                // concrete type is inheriting from.
+                //
+                // TODO: need to decide if a this-type substitution is needed here.
+                // It probably it.
+                RefPtr<Type> targetType = DeclRefType::Create(
+                    getSession(),
+                    interfaceDeclRef);
+                auto extDeclRef = ApplyExtensionToType(candidateExt, targetType);
+                if(!extDeclRef)
                     continue;
+
+                // Only inheritance clauses from the extension matter right now.
+                for(auto requiredInheritanceDeclRef : getMembersOfType<InheritanceDecl>(extDeclRef))
+                {
+                    auto requirementSatisfied = findWitnessForInterfaceRequirement(
+                        context,
+                        typeDeclRef,
+                        inheritanceDecl,
+                        interfaceDeclRef,
+                        requiredInheritanceDeclRef,
+                        witnessTable);
+
+                    result = result && requirementSatisfied;
                 }
             }
-            return result;
+
+            // If we failed to satisfy any requirements along the way,
+            // then we don't actually want to keep the witness table
+            // we've been constructing, because the whole thing was a failure.
+            if(!result)
+            {
+                return nullptr;
+            }
+
+            return witnessTable;
         }
 
-        bool checkConformanceToType(
-            HashSet<DeclRef<InterfaceDecl>>& checkedInterfaceDeclRefs,
-            DeclRef<AggTypeDeclBase> typeDeclRef,
-            InheritanceDecl*     inheritanceDecl,
-            Type*                baseType)
+        RefPtr<WitnessTable> checkConformanceToType(
+            ConformanceCheckingContext* context,
+            DeclRef<AggTypeDeclBase>    typeDeclRef,
+            InheritanceDecl*            inheritanceDecl,
+            Type*                       baseType)
         {
             if (auto baseDeclRefType = baseType->As<DeclRefType>())
             {
@@ -2227,7 +2350,7 @@ namespace Slang
                     // We need to check that it provides all of the members
                     // required by that interface.
                     return checkInterfaceConformance(
-                        checkedInterfaceDeclRefs,
+                        context,
                         typeDeclRef,
                         inheritanceDecl,
                         baseInterfaceDeclRef);
@@ -2238,26 +2361,51 @@ namespace Slang
             return false;
         }
 
-        // Check that the type declaration `typeDecl`, which
-        // declares that it inherits from another type via
+        // Check that the type (or extension) declaration `declRef`,
+        // which declares that it inherits from another type via
         // `inheritanceDecl` actually does what it needs to
         // for that inheritance to be valid.
         bool checkConformance(
-            DeclRef<AggTypeDeclBase>        typeDecl,
+            DeclRef<AggTypeDeclBase>    declRef,
             InheritanceDecl*            inheritanceDecl)
         {
+            declRef = createDefaultSubstitutionsIfNeeded(getSession(), declRef).As<AggTypeDeclBase>();
+
+            // Don't check conformances for abstract types that
+            // are being used to express *required* conformances.
+            if (auto assocTypeDeclRef = declRef.As<AssocTypeDecl>())
+            {
+                // An associated type declaration represents a requirement
+                // in an outer interface declaration, and its members
+                // (type constraints) represent additional requirements.
+                return true;
+            }
+            else if (auto interfaceDeclRef = declRef.As<InterfaceDecl>())
+            {
+                // HACK: Our semantics as they stand today are that an
+                // `extension` of an interface that adds a new inheritance
+                // clause acts *as if* that inheritnace clause had been
+                // attached to the original `interface` decl: that is,
+                // it adds additional requirements.
+                //
+                // This is *not* a reasonable semantic to keep long-term,
+                // but it is required for some of our current example
+                // code to work.
+                return true;
+            }
+
+
             // Look at the type being inherited from, and validate
             // appropriately.
             auto baseType = inheritanceDecl->base.type;
-            HashSet<DeclRef<InterfaceDecl>> checkdInterfaceDeclRefs;
-            return checkConformanceToType(checkdInterfaceDeclRefs, typeDecl, inheritanceDecl, baseType.As<Type>());
-        }
 
-        bool checkConformance(
-            AggTypeDeclBase*        typeDecl,
-            InheritanceDecl*    inheritanceDecl)
-        {
-            return checkConformance(DeclRef<AggTypeDeclBase>(typeDecl, SubstitutionSet()), inheritanceDecl);
+            ConformanceCheckingContext context;
+            RefPtr<WitnessTable> witnessTable = checkConformanceToType(&context, declRef, inheritanceDecl, baseType);
+            if(!witnessTable)
+                return false;
+
+            inheritanceDecl->witnessTable = witnessTable;
+            return true;
         }
 
         void checkExtensionConformance(ExtensionDecl* decl)
@@ -2269,7 +2417,7 @@ namespace Slang
                 {
                     for (auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
                     {
-                        checkConformance(aggTypeDeclRef.getDecl(), inheritanceDecl);
+                        checkConformance(aggTypeDeclRef, inheritanceDecl);
                     }
                 }
             }
@@ -2303,7 +2451,7 @@ namespace Slang
                 // (That's what C# does).
                 for (auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
                 {
-                    checkConformance(decl, inheritanceDecl);
+                    checkConformance(makeDeclRef(decl), inheritanceDecl);
                 }
             }
         }
@@ -2708,7 +2856,7 @@ namespace Slang
                     // generic.
                     //
                     subst->genericDecl = prevGenericDecl;
-                    prevFuncDeclRef.substitutions.genericSubstitutions = subst;
+                    prevFuncDeclRef.substitutions.substitutions = subst;
                     //
                     // One way to think about it is that if we have these
                     // declarations (ignore the name differences...):
@@ -3626,7 +3774,7 @@ namespace Slang
             auto vectorGenericDecl = findMagicDecl(
                 session, "Vector").As<GenericDecl>();
             auto vectorTypeDecl = vectorGenericDecl->inner;
-               
+
             auto substitutions = new GenericSubstitution();
             substitutions->genericDecl = vectorGenericDecl.Ptr();
             substitutions->args.Add(elementType);
@@ -4034,7 +4182,7 @@ namespace Slang
 
         // Crete a subtype witness based on the declared relationship
         // found in a single breadcrumb
-        RefPtr<SubtypeWitness> createSimplSubtypeWitness(
+        RefPtr<DeclaredSubtypeWitness> createSimpleSubtypeWitness(
             TypeWitnessBreadcrumb*  breadcrumb)
         {
             RefPtr<DeclaredSubtypeWitness> witness = new DeclaredSubtypeWitness();
@@ -4052,7 +4200,7 @@ namespace Slang
             if(!inBreadcrumbs)
             {
                 // We need to construct a witness to the fact
-                // that `type` has been proven to be equal
+                // that `type` has been proven to be *equal*
                 // to `interfaceDeclRef`.
                 //
                 SLANG_UNEXPECTED("reflexive type witness");
@@ -4061,44 +4209,74 @@ namespace Slang
 
             // We might have one or more steps in the breadcrumb trail, e.g.:
             //
-            //      (A : B) (B : C) (C : D)
+            //      {A : B} {B : C} {C : D}
             //
             // The chain is stored as a reversed linked list, so that
             // the first entry would be the `(C : D)` relationship
             // above.
             //
-            // We are going to walk the list and build up a suitable
-            // subtype witness.
+            // We need to walk the list and build up a suitable witness,
+            // which in the above case would look like:
+            //
+            //      Transitive(
+            //          Transitive(
+            //              Declared({A : B}),
+            //              {B : C}),
+            //          {C : D})
+            //
+            // Because of the ordering of the breadcrumb trail, along
+            // with the way the `Transitive` case nests, we will be
+            // building these objects outside-in, and keeping
+            // track of the "hole" where the next step goes.
+            //
             auto bb = inBreadcrumbs;
 
-            // Create a witness for the last step in the chain
-            RefPtr<SubtypeWitness> witness = createSimplSubtypeWitness(bb);
-            bb = bb->prev;
+            // `witness` here will hold the first (outer-most) object
+            // we create, which is the overall result.
+            RefPtr<SubtypeWitness> witness;
 
-            // Now, as long as we have more entries to deal with,
-            // we'll be in a situation like:
-            //
-            //      ... (B : C) <witness>
-            //
-            // and we want to wrap up one more link in our chain.
+            // `link` will point at the remaining "hole" in the
+            // data structure, to be filled in.
+            RefPtr<SubtypeWitness>* link = &witness;
 
-            while (bb)
+            // As long as there is more than one breadcrumb, we
+            // need to be creating transitie witnesses.
+            while(bb->prev)
             {
-                // Create simple witness for the step in the chain
-                RefPtr<SubtypeWitness> link = createSimplSubtypeWitness(bb);
-
-                // Now join the link onto the existing chain represented
-                // by `witness`.
+                // On the first iteration when processing the list
+                // above, the breadcrumb would be for `{ C : D }`,
+                // and so we'd create:
+                //
+                //      Transitive(
+                //          [...],
+                //          { C : D})
+                //
+                // where `[...]` represents the "hole" we leave
+                // open to fill in next.
+                //
                 RefPtr<TransitiveSubtypeWitness> transitiveWitness = new TransitiveSubtypeWitness();
-                transitiveWitness->sub = link->sub;
-                transitiveWitness->sup = witness->sup;
-                transitiveWitness->subToMid = link;
-                transitiveWitness->midToSup = witness;
+                transitiveWitness->sub = bb->sub;
+                transitiveWitness->sup = bb->sup;
+                transitiveWitness->midToSup = bb->declRef;
 
-                witness = transitiveWitness;
+                // Fill in the current hole, and then set the
+                // hole to point into the node we just created.
+                *link = transitiveWitness;
+                link = &transitiveWitness->subToMid;
+
+                // Move on with the list.
                 bb = bb->prev;
             }
 
+            // If we exit the loop, then there is only one breadcrumb left.
+            // In our running example this would be `{ A : B }`. We create
+            // a simple (declared) subtype witness for it, and plug the
+            // final hole, after which there shouldn't be a hole to deal with.
+            RefPtr<DeclaredSubtypeWitness> declaredWitness = createSimpleSubtypeWitness(bb);
+            *link = declaredWitness;
+
+            // We now know that our original `witness` variable has been
+            // filled in, and there are no other holes.
             return witness;
         }
 
@@ -4325,7 +4503,7 @@ namespace Slang
             {
                 if( auto leftInterfaceRef = leftDeclRefType->declRef.As<InterfaceDecl>() )
                 {
-                    // 
+                    //
                     return TryJoinTypeWithInterface(right, leftInterfaceRef);
                 }
             }
@@ -4333,7 +4511,7 @@ namespace Slang
             {
                 if( auto rightInterfaceRef = rightDeclRefType->declRef.As<InterfaceDecl>() )
                 {
-                    // 
+                    //
                     return TryJoinTypeWithInterface(left, rightInterfaceRef);
                 }
             }
@@ -4481,9 +4659,9 @@ namespace Slang
 
             RefPtr<GenericSubstitution> solvedSubst = new GenericSubstitution();
             solvedSubst->genericDecl = genericDeclRef.getDecl();
-            solvedSubst->outer = genericDeclRef.substitutions.genericSubstitutions;
+            solvedSubst->outer = genericDeclRef.substitutions.substitutions;
             solvedSubst->args = args;
-            resultSubst.genericSubstitutions = solvedSubst;
+            resultSubst.substitutions = solvedSubst;
 
             for( auto constraintDecl : genericDeclRef.getDecl()->getMembersOfType<GenericTypeConstraintDecl>() )
             {
@@ -4959,12 +5137,12 @@ namespace Slang
             assert(subst);
 
             subst->genericDecl = genericDeclRef.getDecl();
-            subst->outer = genericDeclRef.substitutions.genericSubstitutions;
+            subst->outer = genericDeclRef.substitutions.substitutions;
 
             for( auto constraintDecl : genericDeclRef.getDecl()->getMembersOfType<GenericTypeConstraintDecl>() )
             {
                 auto subset = genericDeclRef.substitutions;
-                subset.genericSubstitutions = subst;
+                subset.substitutions = subst;
                 DeclRef<GenericTypeConstraintDecl> constraintDeclRef(
                     constraintDecl, subset);
 
@@ -5039,7 +5217,7 @@ namespace Slang
             }
 
             subst->genericDecl = baseGenericRef.getDecl();
-            subst->outer = baseGenericRef.substitutions.genericSubstitutions;
+            subst->outer = baseGenericRef.substitutions.substitutions;
 
             DeclRef<Decl> innerDeclRef(GetInner(baseGenericRef), subst);
 
@@ -5305,7 +5483,6 @@ namespace Slang
                 }
             }
 
-
             OverloadCandidate candidate;
             candidate.flavor = OverloadCandidate::Flavor::Func;
             candidate.item = item;
@@ -5429,7 +5606,7 @@ namespace Slang
                     auto constraintDecl2 = sndWit->declRef.As<TypeConstraintDecl>();
                     assert(constraintDecl1);
                     assert(constraintDecl2);
-                    return TryUnifyTypes(constraints, 
+                    return TryUnifyTypes(constraints,
                         constraintDecl1.getDecl()->getSup().type,
                         constraintDecl2.getDecl()->getSup().type);
                 }
@@ -5440,15 +5617,40 @@ namespace Slang
             // default: fail
             return false;
         }
-        
-        bool TryUnifySubstitutions(
-            ConstraintSystem&		constraints,
-            RefPtr<GenericSubstitution>	fst,
-            RefPtr<GenericSubstitution>	snd)
+
+        bool tryUnifySubstitutions(
+            ConstraintSystem&       constraints,
+            RefPtr<Substitutions>   fst,
+            RefPtr<Substitutions>   snd)
         {
             // They must both be NULL or non-NULL
             if (!fst || !snd)
-                return fst == snd;
+                return !fst && !snd;
+
+            if(auto fstGeneric = fst.As<GenericSubstitution>())
+            {
+                if(auto sndGeneric = snd.As<GenericSubstitution>())
+                {
+                    return tryUnifyGenericSubstitutions(
+                        constraints,
+                        fstGeneric,
+                        sndGeneric);
+                }
+            }
+
+            // TODO: need to handle other cases here
+
+            return false;
+        }
+
+        bool tryUnifyGenericSubstitutions(
+            ConstraintSystem&           constraints,
+            RefPtr<GenericSubstitution> fst,
+            RefPtr<GenericSubstitution> snd)
+        {
+            SLANG_ASSERT(fst);
+            SLANG_ASSERT(snd);
+
             auto fstGen = fst;
             auto sndGen = snd;
             // They must be specializing the same generic
@@ -5468,7 +5670,7 @@ namespace Slang
             }
 
             // Their "base" specializations must unify
-            if (!TryUnifySubstitutions(constraints, fstGen->outer, sndGen->outer))
+            if (!tryUnifySubstitutions(constraints, fstGen->outer, sndGen->outer))
             {
                 okay = false;
             }
@@ -5554,10 +5756,10 @@ namespace Slang
 
                     // next we need to unify the substitutions applied
                     // to each decalration reference.
-                    if (!TryUnifySubstitutions(
+                    if (!tryUnifySubstitutions(
                         constraints,
-                        fstDeclRef.substitutions.genericSubstitutions,
-                        sndDeclRef.substitutions.genericSubstitutions))
+                        fstDeclRef.substitutions.substitutions,
+                        sndDeclRef.substitutions.substitutions))
                     {
                         return false;
                     }
@@ -5648,41 +5850,117 @@ namespace Slang
 
         // Is the candidate extension declaration actually applicable to the given type
         DeclRef<ExtensionDecl> ApplyExtensionToType(
-            ExtensionDecl*			extDecl,
-            RefPtr<Type>	type)
+            ExtensionDecl*  extDecl,
+            RefPtr<Type>    type)
         {
+            DeclRef<ExtensionDecl> extDeclRef = makeDeclRef(extDecl);
+
+            // If the extension is a generic extension, then we
+            // need to infer type argumenst that will give
+            // us a target type that matches `type`.
+            //
             if (auto extGenericDecl = GetOuterGeneric(extDecl))
             {
                 ConstraintSystem constraints;
                 constraints.genericDecl = extGenericDecl;
 
                 if (!TryUnifyTypes(constraints, extDecl->targetType.Ptr(), type))
-                    return DeclRef<Decl>().As<ExtensionDecl>();
+                    return DeclRef<ExtensionDecl>();
 
                 auto constraintSubst = TrySolveConstraintSystem(&constraints, DeclRef<Decl>(extGenericDecl, nullptr).As<GenericDecl>());
                 if (!constraintSubst)
                 {
-                    return DeclRef<Decl>().As<ExtensionDecl>();
+                    return DeclRef<ExtensionDecl>();
                 }
 
                 // Consruct a reference to the extension with our constraint variables
                 // set as they were found by solving the constraint system.
-                DeclRef<ExtensionDecl> extDeclRef = DeclRef<Decl>(extDecl, constraintSubst).As<ExtensionDecl>();
-
-                // We expect/require that the result of unification is such that
-                // the target types are now equal
-                SLANG_ASSERT(GetTargetType(extDeclRef)->Equals(type));
-
-                return extDeclRef;
+                extDeclRef = DeclRef<Decl>(extDecl, constraintSubst).As<ExtensionDecl>();
             }
-            else
+
+            // Now extract the target type from our (possibly specialized) extension decl-ref.
+            RefPtr<Type> targetType = GetTargetType(extDeclRef);
+
+            // As a bit of a kludge here, if the target type of the extension is
+            // an interface, and the `type` we are trying to match up has a this-type
+            // substitution for that interface, then we want to attach a matching
+            // substitution to the extension decl-ref.
+            if(auto targetDeclRefType = targetType->As<DeclRefType>())
             {
-                // The easy case is when the extension isn't generic:
-                // either it applies to the type or not.
-                if (!type->Equals(extDecl->targetType))
-                    return DeclRef<Decl>().As<ExtensionDecl>();
-                return DeclRef<Decl>(extDecl, nullptr).As<ExtensionDecl>();
+                if(auto targetInterfaceDeclRef = targetDeclRefType->declRef.As<InterfaceDecl>())
+                {
+                    // Okay, the target type is an interface.
+                    //
+                    // Is the type we want to apply to also an interface?
+                    if(auto appDeclRefType = type->As<DeclRefType>())
+                    {
+                        if(auto appInterfaceDeclRef = appDeclRefType->declRef.As<InterfaceDecl>())
+                        {
+                            if(appInterfaceDeclRef.getDecl() == targetInterfaceDeclRef.getDecl())
+                            {
+                                // Looks like we have a match in the types,
+                                // now let's see if we have a this-type substitution.
+                                if(auto appThisTypeSubst = appInterfaceDeclRef.substitutions.substitutions.As<ThisTypeSubstitution>())
+                                {
+                                    if(appThisTypeSubst->interfaceDecl == appInterfaceDeclRef.getDecl())
+                                    {
+                                        // The type we want to apply to has a this-type substitution,
+                                        // and (by construction) the target type currently does not.
+                                        //
+                                        SLANG_ASSERT(!targetInterfaceDeclRef.substitutions.substitutions.As<ThisTypeSubstitution>());
+
+                                        // We will create a new substitution to apply to the target type.
+                                        RefPtr<ThisTypeSubstitution> newTargetSubst = new ThisTypeSubstitution();
+                                        newTargetSubst->interfaceDecl = appThisTypeSubst->interfaceDecl;
+                                        newTargetSubst->witness = appThisTypeSubst->witness;
+                                        newTargetSubst->outer = targetInterfaceDeclRef.substitutions.substitutions;
+
+                                        targetType = DeclRefType::Create(getSession(),
+                                            DeclRef<InterfaceDecl>(targetInterfaceDeclRef.getDecl(), newTargetSubst));
+
+                                        // Note: we are constructing a this-type substitution that
+                                        // we will apply to the extension declaration as well.
+                                        // This is not strictly allowed by our current representation
+                                        // choices, but we need it in order to make sure that
+                                        // references to the target type of the extension
+                                        // declaration have a chance to resolve the way we want them to.
+
+                                        RefPtr<ThisTypeSubstitution> newExtSubst = new ThisTypeSubstitution();
+                                        newExtSubst->interfaceDecl = appThisTypeSubst->interfaceDecl;
+                                        newExtSubst->witness = appThisTypeSubst->witness;
+                                        newExtSubst->outer = extDeclRef.substitutions.substitutions;
+
+                                        extDeclRef = DeclRef<ExtensionDecl>(
+                                            extDeclRef.getDecl(),
+                                            newExtSubst);
+
+                                        // TODO: Ideally we should also apply the chosen specialization to
+                                        // the decl-ref for the extension, so that subsequent lookup through
+                                        // the members of this extension will retain that substitution and
+                                        // be able to apply it.
+                                        //
+                                        // E.g., if an extension method returns a value of an associated
+                                        // type, then we'd want that to become specialized to a concrete
+                                        // type when using the extension method on a value of concrete type.
+                                        //
+                                        // The challenge here that makes me reluctant to just staple on
+                                        // such a substitution is that it wouldn't follow our implicit
+                                        // rules about where `ThisTypeSubstitution`s can appear.
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
+
+            // In order for this extension to apply to the given type, we
+            // need to have a match on the target types.
+            if (!type->Equals(targetType))
+                return DeclRef<ExtensionDecl>();
+
+
+            return extDeclRef;
         }
 
 #if 0
@@ -6033,8 +6311,8 @@ namespace Slang
             // signature
             if( parentGenericDeclRef )
             {
-                SLANG_RELEASE_ASSERT(declRef.substitutions);
-                auto genSubst = declRef.substitutions.genericSubstitutions;
+                auto genSubst = declRef.substitutions.substitutions.As<GenericSubstitution>();
+                SLANG_RELEASE_ASSERT(genSubst);
                 SLANG_RELEASE_ASSERT(genSubst->genericDecl == parentGenericDeclRef.getDecl());
 
                 sb << "<";
@@ -7166,8 +7444,10 @@ namespace Slang
         scopesToTry.Add(entryPoint->getTranslationUnit()->SyntaxNode->scope);
         for (auto & module : entryPoint->compileRequest->loadedModulesList)
             scopesToTry.Add(module->moduleDecl->scope);
+
+        List<RefPtr<Type>> globalGenericArgs;
         for (auto name : entryPoint->genericParameterTypeNames)
-        {   
+        {
             // parse type name
             RefPtr<Type> type;
             for (auto & s : scopesToTry)
@@ -7185,9 +7465,10 @@ namespace Slang
                 sink->diagnose(firstDeclWithName, Diagnostics::entryPointTypeSymbolNotAType, name);
                 return;
             }
-            entryPoint->genericParameterTypes.Add(type);
+
+            globalGenericArgs.Add(type);
         }
-        
+
         // validate global type arguments only when we are generating code
         if ((entryPoint->compileRequest->compileFlags & SLANG_COMPILE_FLAG_NO_CODEGEN) == 0)
         {
@@ -7210,38 +7491,102 @@ namespace Slang
                 for (auto p : globalGenParams)
                     globalGenericParams.Add(p);
             }
-            if (globalGenericParams.Count() != entryPoint->genericParameterTypes.Count())
+
+            if (globalGenericParams.Count() != globalGenericArgs.Count())
             {
-                sink->diagnose(entryPoint->decl, Diagnostics::mismatchEntryPointTypeArgument, globalGenericParams.Count(),
-                    entryPoint->genericParameterTypes.Count());
+                sink->diagnose(entryPoint->decl, Diagnostics::mismatchEntryPointTypeArgument,
+                    globalGenericParams.Count(),
+                    globalGenericArgs.Count());
                 return;
             }
-            // if entry-point type arguments matches parameters, try find
-            // SubtypeWitness for each argument
-            int index = 0;
-            for (auto & gParam : globalGenericParams)
+
+            // We have an appropriate number of arguments for the global generic parameters,
+            // and now we need to check that the arguments conform to the declared constraints.
+            //
+            // Along the way, we will build up an appropriate set of substitutions to represent
+            // the generic arguments and their conformances.
+            //
+            RefPtr<Substitutions> globalGenericSubsts;
+            auto globalGenericSubstLink = &globalGenericSubsts;
+            //
+            // TODO: There is a serious flaw to this checking logic if we ever have cases where
+            // the constraints on one `type_param` can depend on another `type_param`, e.g.:
+            //
+            //      type_param A;
+            //      type_param B : ISidekick<A>;
+            //
+            // In that case, if a user tries to set `B` to `Robin` and `Robin` conforms to
+            // `ISidekick<Batman>`, then the compiler needs to know whether `A` is being
+            // set to `Batman` to know whether the setting for `B` is valid. In this limit
+            // the constraints can be mutually recursive (so `A : IMentor<B>`).
+            //
+            // The only way to check things corectly is to validate each conformance under
+            // a set of assumptions (substitutions) that includes all the type substitutions,
+            // and possibly also all the other constraints *except* the one to be validated.
+            //
+            // We will punt on this for now, and just check each constraint in isolation.
+            //
+            UInt argCounter = 0;
+            for(auto& globalGenericParam : globalGenericParams)
             {
-                for (auto constraint : gParam->getMembersOfType<GenericTypeConstraintDecl>())
+                // Get the argument that matches this parameter.
+                UInt argIndex = argCounter++;
+                SLANG_ASSERT(argIndex < globalGenericArgs.Count());
+                auto globalGenericArg = globalGenericArgs[argIndex];
+
+                // Create a substitution for this parameter/argument.
+                RefPtr<GlobalGenericParamSubstitution> subst = new GlobalGenericParamSubstitution();
+                subst->paramDecl = globalGenericParam;
+                subst->actualType = globalGenericArg;
+
+                // Walk through the declared constraints for the parameter,
+                // and check that the argument actually satisfies them.
+                for(auto constraint : globalGenericParam->getMembersOfType<GenericTypeConstraintDecl>())
                 {
+                    // Get the type that the constraint is enforcing conformance to
                     auto interfaceType = GetSup(DeclRef<GenericTypeConstraintDecl>(constraint, nullptr));
+
+                    // Use our semantic-checking logic to search for a witness to the required conformance
                     SemanticsVisitor visitor(sink, entryPoint->compileRequest, translationUnit);
-                    auto witness = visitor.tryGetSubtypeWitness(entryPoint->genericParameterTypes[index], interfaceType);
+                    auto witness = visitor.tryGetSubtypeWitness(globalGenericArg, interfaceType);
                     if (!witness)
                     {
-                        sink->diagnose(gParam,
-                            Diagnostics::typeArgumentDoesNotConformToInterface, gParam->nameAndLoc.name, entryPoint->genericParameterTypes[index],
+                        // If no witness was found, then we will be unable to satisfy
+                        // the conformances required.
+                        sink->diagnose(globalGenericParam,
+                            Diagnostics::typeArgumentDoesNotConformToInterface,
+                            globalGenericParam->nameAndLoc.name,
+                            globalGenericArg,
                             interfaceType);
                     }
-                    entryPoint->genericParameterWitnesses.Add(witness);
+
+                    // Attach the concrete witness for this conformance to the
+                    // substutiton
+                    GlobalGenericParamSubstitution::ConstraintArg constraintArg;
+                    constraintArg.decl = constraint;
+                    constraintArg.val = witness;
+                    subst->constraintArgs.Add(constraintArg);
                 }
-                index++;
+
+                // Add the substitution for this parameter to the global substitution
+                // set that we are building.
+
+                *globalGenericSubstLink = subst;
+                globalGenericSubstLink = &subst->outer;
             }
+
+            entryPoint->globalGenericSubst = globalGenericSubsts;
         }
         if (sink->errorCount != 0)
             return;
 
         // Now that we've *found* the entry point, it is time to validate
         // that it actually meets the constraints for the chosen stage/profile.
+        //
+        // TODO: This validation should be performed "under" any global generic
+        // parameter substitution we might have created, so that we can validate
+        // based on knowledge of actual types.
+        //
         validateEntryPoint(entryPoint);
     }
 
@@ -7453,6 +7798,43 @@ namespace Slang
         return semantics->ApplyExtensionToType(extDecl, type);
     }
 
+    RefPtr<GenericSubstitution> createDefaultSubsitutionsForGeneric(
+        Session*                session,
+        GenericDecl*            genericDecl,
+        RefPtr<Substitutions>   outerSubst)
+    {
+        RefPtr<GenericSubstitution> genericSubst = new GenericSubstitution();
+        genericSubst->genericDecl = genericDecl;
+        genericSubst->outer = outerSubst;
+
+        for( auto mm : genericDecl->Members )
+        {
+            if( auto genericTypeParamDecl = mm.As<GenericTypeParamDecl>() )
+            {
+                genericSubst->args.Add(DeclRefType::Create(session, DeclRef<Decl>(genericTypeParamDecl.Ptr(), outerSubst)));
+            }
+            else if( auto genericValueParamDecl = mm.As<GenericValueParamDecl>() )
+            {
+                genericSubst->args.Add(new GenericParamIntVal(DeclRef<GenericValueParamDecl>(genericValueParamDecl.Ptr(), outerSubst)));
+            }
+        }
+
+        // create default substitution arguments for constraints
+        for (auto mm : genericDecl->Members)
+        {
+            if (auto genericTypeConstraintDecl = mm.As<GenericTypeConstraintDecl>())
+            {
+                RefPtr<DeclaredSubtypeWitness> witness = new DeclaredSubtypeWitness();
+                witness->declRef = DeclRef<Decl>(genericTypeConstraintDecl.Ptr(), outerSubst);
+                witness->sub = genericTypeConstraintDecl->sub.type;
+                witness->sup = genericTypeConstraintDecl->sup.type;
+                genericSubst->args.Add(witness);
+            }
+        }
+
+        return genericSubst;
+    }
+
     // Sometimes we need to refer to a declaration the way that it would be specialized
     // inside the context where it is declared (e.g., with generic parameters filled in
     // using their archetypes).
@@ -7460,53 +7842,25 @@ namespace Slang
     SubstitutionSet createDefaultSubstitutions(
         Session*        session,
         Decl*           decl,
-        SubstitutionSet parentSubst)
+        SubstitutionSet outerSubstSet)
     {
-        SubstitutionSet resultSubst = parentSubst;
-        if (auto interfaceDecl = dynamic_cast<InterfaceDecl*>(decl))
-        {
-            resultSubst.thisTypeSubstitution = new ThisTypeSubstitution();
-        }
         auto dd = decl->ParentDecl;
         if( auto genericDecl = dynamic_cast<GenericDecl*>(dd) )
         {
             // We don't want to specialize references to anything
             // other than the "inner" declaration itself.
             if(decl != genericDecl->inner)
-                return resultSubst;
+                return outerSubstSet;
 
-            RefPtr<GenericSubstitution> subst = new GenericSubstitution();
-            subst->genericDecl = genericDecl;
-            subst->outer = parentSubst.genericSubstitutions;
-            resultSubst.genericSubstitutions = subst;
-            SubstitutionSet outerSubst = resultSubst;
-            outerSubst.genericSubstitutions = outerSubst.genericSubstitutions?outerSubst.genericSubstitutions->outer:nullptr;
-            for( auto mm : genericDecl->Members )
-            {
-                if( auto genericTypeParamDecl = mm.As<GenericTypeParamDecl>() )
-                {
-                    subst->args.Add(DeclRefType::Create(session, DeclRef<Decl>(genericTypeParamDecl.Ptr(), outerSubst)));
-                }
-                else if( auto genericValueParamDecl = mm.As<GenericValueParamDecl>() )
-                {
-                    subst->args.Add(new GenericParamIntVal(DeclRef<GenericValueParamDecl>(genericValueParamDecl.Ptr(), outerSubst)));
-                }
-            }
+            RefPtr<GenericSubstitution> genericSubst = createDefaultSubsitutionsForGeneric(
+                session,
+                genericDecl,
+                outerSubstSet.substitutions);
 
-            // create default substitution arguments for constraints
-            for (auto mm : genericDecl->Members)
-            {
-                if (auto genericTypeConstraintDecl = mm.As<GenericTypeConstraintDecl>())
-                {
-                    RefPtr<DeclaredSubtypeWitness> witness = new DeclaredSubtypeWitness();
-                    witness->declRef = DeclRef<Decl>(genericTypeConstraintDecl.Ptr(), outerSubst);
-                    witness->sub = genericTypeConstraintDecl->sub.type;
-                    witness->sup = genericTypeConstraintDecl->sup.type;
-                    subst->args.Add(witness);
-                }
-            }
+            return SubstitutionSet(genericSubst);
         }
-        return resultSubst;
+
+        return outerSubstSet;
     }
 
     SubstitutionSet createDefaultSubstitutions(

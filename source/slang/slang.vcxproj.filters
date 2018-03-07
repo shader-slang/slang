@@ -88,7 +88,6 @@
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="core.meta.slang" />
-    <CustomBuild Include="glsl.meta.slang" />
     <CustomBuild Include="hlsl.meta.slang" />
   </ItemGroup>
 </Project>

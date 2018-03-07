@@ -15,15 +15,22 @@
 #define R(X) /**/
 #else
 #define R(X) X
+
+#define tB _SV02tB
+#define sB _SV02sB
+
+#define C1 _SV023SLANG_parameterGroup_C1
+#define c1 _SV023SLANG_ParameterGroup_C12c1
+
 #endif
 
 float4 use(float4 val) { return val; };
 float4 use(Texture2D t, SamplerState s) { return t.Sample(s, 0.0); }
 
-Texture2D 		t0 R(: register(t0));
-Texture2D 		t1 R(: register(t1));
-SamplerState 	s0 R(: register(s0));
-SamplerState 	s1 R(: register(s1));
+Texture2D 		tA R(: register(t0));
+Texture2D 		tB R(: register(t1));
+SamplerState 	sA R(: register(s0));
+SamplerState 	sB R(: register(s1));
 
 cbuffer C0 R(: register(b0))
 {
@@ -35,7 +42,7 @@ cbuffer C1 R(: register(b1))
 	float c1;
 }
 
-float4 main() : SV_Target
+float4 main() : SV_TARGET
 {
-	return use(t1,s1) + use(c1);
+	return use(tB,sB) + use(c1);
 }

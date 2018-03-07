@@ -131,10 +131,12 @@ END_SYNTAX_CLASS()
 // A substitution represents a binding of certain
 // type-level variables to concrete argument values
 ABSTRACT_SYNTAX_CLASS(Substitutions, RefObject)
+    // The next outer that this one refines.
+    FIELD(RefPtr<Substitutions>, outer)
 
     RAW(
     // Apply a set of substitutions to the bindings in this substitution
-    virtual RefPtr<Substitutions> SubstituteImpl(SubstitutionSet subst, int* ioDiff) = 0;
+    virtual RefPtr<Substitutions> applySubstitutionsShallow(SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff) = 0;
 
     // Check if these are equivalent substitutiosn to another set
     virtual bool Equals(Substitutions* subst) = 0;
@@ -151,12 +153,9 @@ SYNTAX_CLASS(GenericSubstitution, Substitutions)
     // The actual values of the arguments
     SYNTAX_FIELD(List<RefPtr<Val>>, args)
 
-    // Any further substitutions, relating to outer generic declarations
-    SYNTAX_FIELD(RefPtr<GenericSubstitution>, outer)
-        
     RAW(
     // Apply a set of substitutions to the bindings in this substitution
-    virtual RefPtr<Substitutions> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
+    virtual RefPtr<Substitutions> applySubstitutionsShallow(SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff)  override;
 
     // Check if these are equivalent substitutiosn to another set
     virtual bool Equals(Substitutions* subst) override;
@@ -178,11 +177,17 @@ SYNTAX_CLASS(GenericSubstitution, Substitutions)
 END_SYNTAX_CLASS()
 
 SYNTAX_CLASS(ThisTypeSubstitution, Substitutions)
+    // The declaration of the interface that we are specializing
+    FIELD_INIT(InterfaceDecl*, interfaceDecl, nullptr)
+
+    // A witness that shows that the concrete type used to
+    // specialize the interface conforms to the interface.
+    FIELD(RefPtr<SubtypeWitness>, witness)
+
     // The actual type that provides the lookup scope for an associated type
-    SYNTAX_FIELD(RefPtr<Val>, sourceType)
     RAW(
     // Apply a set of substitutions to the bindings in this substitution
-    virtual RefPtr<Substitutions> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
+    virtual RefPtr<Substitutions> applySubstitutionsShallow(SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff)  override;
 
     // Check if these are equivalent substitutiosn to another set
     virtual bool Equals(Substitutions* subst) override;
@@ -190,25 +195,31 @@ SYNTAX_CLASS(ThisTypeSubstitution, Substitutions)
     {
         return Equals(const_cast<Substitutions*>(&subst));
     }
-    virtual int GetHashCode() const override
-    {
-        if (sourceType)
-            return sourceType->GetHashCode();
-        return 0;
-    }
+    virtual int GetHashCode() const override;
     )
 END_SYNTAX_CLASS()
 
 SYNTAX_CLASS(GlobalGenericParamSubstitution, Substitutions)
     // the __generic_param decl to be substituted
     DECL_FIELD(GlobalGenericParamDecl*, paramDecl)
+
     // the actual type to substitute in
-    SYNTAX_FIELD(RefPtr<Val>, actualType)
-    // Any further global type parameter substitutions
-    SYNTAX_FIELD(RefPtr<GlobalGenericParamSubstitution>, outer)
+    SYNTAX_FIELD(RefPtr<Type>, actualType)
+
+    RAW(
+    struct ConstraintArg
+    {
+        RefPtr<Decl>    decl;
+        RefPtr<Val>     val;
+    };
+    )
+
+    // the values that satisfy any constraints on the type parameter
+    SYNTAX_FIELD(List<ConstraintArg>, constraintArgs)
+
 RAW(
     // Apply a set of substitutions to the bindings in this substitution
-    virtual RefPtr<Substitutions> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
+    virtual RefPtr<Substitutions> applySubstitutionsShallow(SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff)  override;
 
     // Check if these are equivalent substitutiosn to another set
     virtual bool Equals(Substitutions* subst) override;
@@ -219,17 +230,13 @@ RAW(
     virtual int GetHashCode() const override
     {
         int rs = actualType->GetHashCode();
-        for (auto && v : witnessTables)
+        for (auto && a : constraintArgs)
         {
-            rs = combineHash(rs, v.Key->GetHashCode());
-            rs = combineHash(rs, v.Value->GetHashCode());
+            rs = combineHash(rs, a.val->GetHashCode());
         }
         return rs;
     }
-    typedef List<KeyValuePair<RefPtr<Type>, RefPtr<Val>>> WitnessTableLookupTable;
     )
-    // The witness tables for each interface this actual type implements
-    SYNTAX_FIELD(WitnessTableLookupTable, witnessTables)
 END_SYNTAX_CLASS()
 
 ABSTRACT_SYNTAX_CLASS(SyntaxNode, SyntaxNodeBase)

@@ -1,6 +1,7 @@
 // legalize-types.cpp
 #include "legalize-types.h"
 
+#include "ir-insts.h"
 #include "mangle.h"
 
 namespace Slang
@@ -68,30 +69,30 @@ LegalType LegalType::pair(
 
 //
 
-static bool isResourceType(Type* type)
+static bool isResourceType(IRType* type)
 {
-    while (auto arrayType = type->As<ArrayExpressionType>())
+    while (auto arrayType = as<IRArrayTypeBase>(type))
     {
-        type = arrayType->baseType;
+        type = arrayType->getElementType();
     }
 
-    if (auto resourceTypeBase = type->As<ResourceTypeBase>())
+    if (auto resourceTypeBase = as<IRResourceTypeBase>(type))
     {
         return true;
     }
-    else if (auto builtinGenericType = type->As<BuiltinGenericType>())
+    else if (auto builtinGenericType = as<IRBuiltinGenericType>(type))
     {
         return true;
     }
-    else if (auto pointerLikeType = type->As<PointerLikeType>())
+    else if (auto pointerLikeType = as<IRPointerLikeType>(type))
     {
         return true;
     }
-    else if (auto samplerType = type->As<SamplerStateType>())
+    else if (auto samplerType = as<IRSamplerStateType>(type))
     {
         return true;
     }
-    else if(auto untypedBufferType = type->As<UntypedBufferResourceType>())
+    else if(auto untypedBufferType = as<IRUntypedBufferResourceType>(type))
     {
         return true;
     }
@@ -118,13 +119,13 @@ ModuleDecl* findModuleForDecl(
 struct TupleTypeBuilder
 {
     TypeLegalizationContext*    context;
-    RefPtr<Type>                type;
-    DeclRef<AggTypeDecl>        typeDeclRef;
+    IRType*                     type;
+    IRStructType*               originalStructType;
 
     struct OrdinaryElement
     {
-        DeclRef<VarDeclBase>    fieldDeclRef;
-        RefPtr<Type>            type;
+        IRStructKey*            fieldKey = nullptr;
+        IRType*                 type = nullptr;
     };
 
 
@@ -146,10 +147,10 @@ struct TupleTypeBuilder
 
     // Add a field to the (pseudo-)type we are building
     void addField(
-        DeclRef<VarDeclBase>    fieldDeclRef,
-        LegalType               legalFieldType,
-        LegalType               legalLeafType,
-        bool                    isResource)
+        IRStructKey*    fieldKey,
+        LegalType       legalFieldType,
+        LegalType       legalLeafType,
+        bool            isResource)
     {
         LegalType ordinaryType;
         LegalType specialType;
@@ -188,7 +189,7 @@ struct TupleTypeBuilder
                 // or a pair "under" an `implicitDeref`, so
                 // we'll need to ensure that elsewhere.
                 addField(
-                    fieldDeclRef,
+                    fieldKey,
                     legalFieldType,
                     legalLeafType.getImplicitDeref()->valueType,
                     isResource);
@@ -232,11 +233,11 @@ struct TupleTypeBuilder
             break;
         }
 
-        String mangledFieldName = getMangledName(fieldDeclRef.getDecl());
+//        String mangledFieldName = getMangledName(fieldDeclRef.getDecl());
 
         PairInfo::Element pairElement;
         pairElement.flags = 0;
-        pairElement.mangledName = mangledFieldName;
+        pairElement.key = fieldKey;
         pairElement.fieldPairInfo = elementPairInfo;
 
         // We will always add a field to the "ordinary"
@@ -244,7 +245,7 @@ struct TupleTypeBuilder
         // data, just to keep the list of fields aligned
         // with the original type.
         OrdinaryElement ordinaryElement;
-        ordinaryElement.fieldDeclRef = fieldDeclRef;
+        ordinaryElement.fieldKey = fieldKey;
         if (ordinaryType.flavor != LegalType::Flavor::none)
         {
             anyOrdinary = true;
@@ -273,7 +274,7 @@ struct TupleTypeBuilder
             pairElement.flags |= PairInfo::kFlag_hasSpecial;
 
             TuplePseudoType::Element specialElement;
-            specialElement.mangledName = mangledFieldName;
+            specialElement.key = fieldKey;
             specialElement.type = specialType;
             specialElements.Add(specialElement);
         }
@@ -284,19 +285,15 @@ struct TupleTypeBuilder
 
     // Add a field to the (pseudo-)type we are building
     void addField(
-        DeclRef<VarDeclBase>    fieldDeclRef)
+        IRStructField*  field)
     {
-        // Skip `static` fields.
-        if (fieldDeclRef.getDecl()->HasModifier<HLSLStaticModifier>())
-            return;
-
-        auto fieldType = GetType(fieldDeclRef);
+        auto fieldType = field->getFieldType();
 
         bool isResourceField = isResourceType(fieldType);
-
         auto legalFieldType = legalizeType(context, fieldType);
+
         addField(
-            fieldDeclRef,
+            field->getKey(),
             legalFieldType,
             legalFieldType,
             isResourceField);
@@ -328,69 +325,37 @@ struct TupleTypeBuilder
         LegalType ordinaryType;
         if (anyOrdinary)
         {
-            // We are going to create a new `struct` type declaration that clones
-            // the fields we care about from the original `struct` type. Note that
-            // these fields may have different types from what they did before,
+            // We are going to create an new IR `struct` type that contains
+            // the "ordinary" fields from the original type. Note that these
+            // fields may have different types from what they did before,
             // because the fields themselves might have been legalized.
             //
-            // Our new declaration will have the same name as the old one, so
+            // The new type will have the same mangled name as the old one, so
             // downstream code is going to need to be careful not to emit declarations
             // for both of them. This should be okay, though, because the original
             // type was illegal (that was the whole point) and so it shouldn't be
-            // allowed in the output anyway.
-            RefPtr<StructDecl> ordinaryStructDecl = new StructDecl();
-            ordinaryStructDecl->loc = typeDeclRef.getDecl()->loc;
-            ordinaryStructDecl->nameAndLoc = typeDeclRef.getDecl()->nameAndLoc;
-
-            auto typeLegalizedModifier = new LegalizedModifier();
-            typeLegalizedModifier->originalMangledName = getMangledName(typeDeclRef);
-            addModifier(ordinaryStructDecl, typeLegalizedModifier);
-
-            // We will do something a bit unsavory here, by setting the logical
-            // parent of the new `struct` type to be the same as the orignal type
-            // (All of this helps ensure it gets the same mangled name).
+            // referenced in the output anyway.
             //
-            ordinaryStructDecl->ParentDecl = typeDeclRef.getDecl()->ParentDecl;
+            IRBuilder* builder = context->getBuilder();
+            IRStructType* ordinaryStructType = builder->createStructType();
+            ordinaryStructType->sourceLoc = originalStructType->sourceLoc;
+            ordinaryStructType->mangledName = originalStructType->mangledName;
 
-            if (context->mainModuleDecl)
-            {
-                // If the declaration we are lowering belongs to the AST-based
-                // module being lowered (rather than translated to IR), then we
-                // need to add any new declaration we create to that output.
+            // The new struct type will appear right after the original in the IR,
+            // so that we can be sure any instruction that could reference the
+            // original can also reference the new one.
+            ordinaryStructType->insertAfter(originalStructType);
 
-                // If we are *not* outputting an IR module as well, then
-                // everything needs to wind up in a single AST module.
-                if (!context->irModule)
-                {
-                    context->outputModuleDecl->Members.Add(ordinaryStructDecl);
-                }
-                else
-                {
-                    // Otherwise, check if this declaration belongs to the main
-                    // module (which is being lowered via the AST-to-AST pass),
-                    // and add it to the output if needed.
-                    //
-                    // TODO: This won't work correctly if a type from the AST
-                    // module is used to specialize a generic in the IR module,
-                    // since the declaration would need to precede the specialized
-                    // func...
-                    auto parentModule = findModuleForDecl(typeDeclRef.getDecl());
-                    if (parentModule && (parentModule == context->mainModuleDecl))
-                    {
-                        context->outputModuleDecl->Members.Add(ordinaryStructDecl);
-                    }
-                }
-            }
+            // Mark the original type for removal once all the other legalization
+            // activity is completed. This is necessary because both the original
+            // and replacement type have the same mangled name, so they would
+            // collide.
+            //
+            // (Also, the original type wasn't legal - that was the whole point...)
+            context->instsToRemove.Add(originalStructType);
 
-            // For memory management reasons, we need to keep a reference to
-            // the declaration live, no matter what.
-            context->createdDecls.Add(ordinaryStructDecl);
-
-            UInt elementCounter = 0;
             for(auto ee : ordinaryElements)
             {
-                UInt elementIndex = elementCounter++;
-
                 // We will ensure that all the original fields are represented,
                 // although they may have different types (due to legalization).
                 // For fields that have *no* ordinary data, we will give them
@@ -401,32 +366,23 @@ struct TupleTypeBuilder
                 // and modified type will have the same number of fields, so
                 // we can continue to look up field layouts by index in the
                 // emit logic)
-                RefPtr<Type> fieldType = ee.type;
+                //
+                // TODO: we should scrap that, and layout lookup should just
+                // be based on mangled field names in all cases.
+                //
+                IRType* fieldType = ee.type;
                 if(!fieldType)
-                    fieldType = context->session->getVoidType();
+                    fieldType = context->getBuilder()->getVoidType();
 
                 // TODO: shallow clone of modifiers, etc.
 
-                RefPtr<StructField> fieldDecl = new StructField();
-                fieldDecl->loc = ee.fieldDeclRef.getDecl()->loc;
-                fieldDecl->nameAndLoc = ee.fieldDeclRef.getDecl()->nameAndLoc;
-                fieldDecl->type.type = fieldType;
-
-                fieldDecl->ParentDecl = ordinaryStructDecl;
-                ordinaryStructDecl->Members.Add(fieldDecl);
-
-                pairElements[elementIndex].ordinaryFieldDeclRef = makeDeclRef(fieldDecl.Ptr());
-
-                auto fieldLegalizedModifier = new LegalizedModifier();
-                fieldLegalizedModifier->originalMangledName = getMangledName(ee.fieldDeclRef);
-                addModifier(fieldDecl, fieldLegalizedModifier);
+                builder->createStructField(
+                    ordinaryStructType,
+                    ee.fieldKey,
+                    fieldType);
             }
 
-            RefPtr<Type> ordinaryStructType = DeclRefType::Create(
-                context->session,
-                makeDeclRef(ordinaryStructDecl.Ptr()));
-
-            ordinaryType = LegalType::simple(ordinaryStructType);
+            ordinaryType = LegalType::simple((IRType*) ordinaryStructType);
         }
 
         LegalType specialType;
@@ -449,44 +405,23 @@ struct TupleTypeBuilder
 
 };
 
-static RefPtr<Type> createBuiltinGenericType(
+static IRType* createBuiltinGenericType(
     TypeLegalizationContext*    context,
-    DeclRef<Decl> const&        typeDeclRef,
-    RefPtr<Type>                elementType)
+    IROp                        op,
+    IRType*                     elementType)
 {
-    // We are going to take the type for the original
-    // decl-ref and construct a new one that uses
-    // our new element type as its parameter.
-    //
-    // TODO: we should have library code to make
-    // manipulations like this way easier.
-
-    RefPtr<GenericSubstitution> oldGenericSubst = typeDeclRef.substitutions.genericSubstitutions;
-    SLANG_ASSERT(oldGenericSubst);
-
-    RefPtr<GenericSubstitution> newGenericSubst = new GenericSubstitution();
-
-    newGenericSubst->outer = oldGenericSubst->outer;
-    newGenericSubst->genericDecl = oldGenericSubst->genericDecl;
-    newGenericSubst->args = oldGenericSubst->args;
-    newGenericSubst->args[0] = elementType;
-
-    auto newDeclRef = DeclRef<Decl>(
-        typeDeclRef.getDecl(),
-        newGenericSubst);
-
-    auto newType = DeclRefType::Create(
-        context->session,
-        newDeclRef);
-
-    return newType;
+    IRInst* operands[] = { elementType };
+    return context->getBuilder()->getType(
+        op,
+        1,
+        operands);
 }
 
 // Create a uniform buffer type with a given legalized
 // element type.
 static LegalType createLegalUniformBufferType(
     TypeLegalizationContext*    context,
-    DeclRef<Decl> const&        typeDeclRef,
+    IROp                        op,
     LegalType                   legalElementType)
 {
     switch (legalElementType.flavor)
@@ -497,7 +432,7 @@ static LegalType createLegalUniformBufferType(
             // so we want to create a uniform buffer that wraps it.
             return LegalType::simple(createBuiltinGenericType(
                 context,
-                typeDeclRef,
+                op,
                 legalElementType.getSimple()));
         }
         break;
@@ -520,7 +455,7 @@ static LegalType createLegalUniformBufferType(
             // I'm going to attempt to hack this for now.
             return LegalType::implicitDeref(createLegalUniformBufferType(
                 context,
-                typeDeclRef,
+                op,
                 legalElementType.getImplicitDeref()->valueType));
         }
         break;
@@ -535,7 +470,7 @@ static LegalType createLegalUniformBufferType(
 
             auto ordinaryType = createLegalUniformBufferType(
                 context,
-                typeDeclRef,
+                op,
                 pairType->ordinaryType);
             auto specialType = LegalType::implicitDeref(pairType->specialType);
 
@@ -558,7 +493,7 @@ static LegalType createLegalUniformBufferType(
             {
                 TuplePseudoType::Element newElement;
 
-                newElement.mangledName = ee.mangledName;
+                newElement.key = ee.key;
                 newElement.type = LegalType::implicitDeref(ee.type);
 
                 bufferPseudoTupleType->elements.Add(newElement);
@@ -576,20 +511,20 @@ static LegalType createLegalUniformBufferType(
 }
 
 static LegalType createLegalUniformBufferType(
-    TypeLegalizationContext*    context,
-    UniformParameterGroupType*  uniformBufferType,
-    LegalType                   legalElementType)
+    TypeLegalizationContext*        context,
+    IRUniformParameterGroupType*    uniformBufferType,
+    LegalType                       legalElementType)
 {
     return createLegalUniformBufferType(
         context,
-        uniformBufferType->declRef,
+        uniformBufferType->op,
         legalElementType);
 }
 
 // Create a pointer type with a given legalized value type.
 static LegalType createLegalPtrType(
     TypeLegalizationContext*    context,
-    DeclRef<Decl> const&        typeDeclRef,
+    IROp                        op,
     LegalType                   legalValueType)
 {
     switch (legalValueType.flavor)
@@ -600,7 +535,7 @@ static LegalType createLegalPtrType(
             // so we want to create a uniform buffer that wraps it.
             return LegalType::simple(createBuiltinGenericType(
                 context,
-                typeDeclRef,
+                op,
                 legalValueType.getSimple()));
         }
         break;
@@ -610,7 +545,7 @@ static LegalType createLegalPtrType(
             // We are being asked to create a pointer type to something
             // that is implicitly dereferenced, meaning we had:
             //
-            //      Ptr(PtrLink(T))
+            //      Ptr(PtrLike(T))
             //
             // and now are being asked to make:
             //
@@ -621,9 +556,12 @@ static LegalType createLegalPtrType(
             //      implicitDeref(Ptr(LegalT))
             //
             // and nobody should really be able to tell the difference, right?
+            //
+            // TODO: invetigate whether there are situations where this
+            // will matter.
             return LegalType::implicitDeref(createLegalPtrType(
                 context,
-                typeDeclRef,
+                op,
                 legalValueType.getImplicitDeref()->valueType));
         }
         break;
@@ -635,11 +573,11 @@ static LegalType createLegalPtrType(
 
             auto ordinaryType = createLegalPtrType(
                 context,
-                typeDeclRef,
+                op,
                 pairType->ordinaryType);
             auto specialType = createLegalPtrType(
                 context,
-                typeDeclRef,
+                op,
                 pairType->specialType);
 
             return LegalType::pair(ordinaryType, specialType, pairType->pairInfo);
@@ -658,10 +596,10 @@ static LegalType createLegalPtrType(
             {
                 TuplePseudoType::Element newElement;
 
-                newElement.mangledName = ee.mangledName;
+                newElement.key = ee.key;
                 newElement.type = createLegalPtrType(
                     context,
-                    typeDeclRef,
+                    op,
                     ee.type);
 
                 ptrPseudoTupleType->elements.Add(newElement);
@@ -680,30 +618,31 @@ static LegalType createLegalPtrType(
 
 struct LegalTypeWrapper
 {
-    virtual LegalType wrap(TypeLegalizationContext* context, Type* type) = 0;
+    virtual LegalType wrap(TypeLegalizationContext* context, IRType* type) = 0;
 };
 
 struct ArrayLegalTypeWrapper : LegalTypeWrapper
 {
-    ArrayExpressionType*    arrayType;
+    IRArrayTypeBase*    arrayType;
 
-    LegalType wrap(TypeLegalizationContext* context, Type* type)
+    LegalType wrap(TypeLegalizationContext* context, IRType* type)
     {
-        return LegalType::simple(context->session->getArrayType(
+        return LegalType::simple(context->getBuilder()->getArrayTypeBase(
+            arrayType->op,
             type,
-            arrayType->ArrayLength));
+            arrayType->getElementCount()));
     }
 };
 
 struct BuiltinGenericLegalTypeWrapper : LegalTypeWrapper
 {
-    DeclRef<Decl>   declRef;
+    IROp op;
 
-    LegalType wrap(TypeLegalizationContext* context, Type* type)
+    LegalType wrap(TypeLegalizationContext* context, IRType* type)
     {
         return LegalType::simple(createBuiltinGenericType(
             context,
-            declRef,
+            op,
             type));
     }
 };
@@ -711,7 +650,7 @@ struct BuiltinGenericLegalTypeWrapper : LegalTypeWrapper
 
 struct ImplicitDerefLegalTypeWrapper : LegalTypeWrapper
 {
-    LegalType wrap(TypeLegalizationContext*, Type* type)
+    LegalType wrap(TypeLegalizationContext*, IRType* type)
     {
         return LegalType::implicitDeref(LegalType::simple(type));
     }
@@ -773,7 +712,7 @@ static LegalType wrapLegalType(
             {
                 TuplePseudoType::Element element;
 
-                element.mangledName = ee.mangledName;
+                element.key = ee.key;
                 element.type = wrapLegalType(
                     context,
                     ee.type,
@@ -794,14 +733,14 @@ static LegalType wrapLegalType(
     }
 }
 
-
 // Legalize a type, including any nested types
 // that it transitively contains.
-LegalType legalizeType(
+LegalType legalizeTypeImpl(
     TypeLegalizationContext*    context,
-    Type*                       type)
+    IRType*                     type)
 {
-    if (auto uniformBufferType = type->As<UniformParameterGroupType>())
+
+    if (auto uniformBufferType = as<IRUniformParameterGroupType>(type))
     {
         // We have one of:
         //
@@ -840,111 +779,99 @@ LegalType legalizeType(
         // are legal as-is.
         return LegalType::simple(type);
     }
-    else if (type->As<BasicExpressionType>())
+    else if (as<IRBasicType>(type))
     {
         return LegalType::simple(type);
     }
-    else if (type->As<VectorExpressionType>())
+    else if (as<IRVectorType>(type))
     {
         return LegalType::simple(type);
     }
-    else if (type->As<MatrixExpressionType>())
+    else if (as<IRMatrixType>(type))
     {
         return LegalType::simple(type);
     }
-    else if (auto ptrType = type->As<PtrTypeBase>())
+    else if (auto ptrType = as<IRPtrTypeBase>(type))
     {
         auto legalValueType = legalizeType(context, ptrType->getValueType());
-        return createLegalPtrType(context, ptrType->declRef, legalValueType);
+        return createLegalPtrType(context, ptrType->op, legalValueType);
     }
-    else if (auto declRefType = type->As<DeclRefType>())
+    else if(auto structType = as<IRStructType>(type))
     {
-        auto declRef = declRefType->declRef;
+        // Look at the (non-static) fields, and
+        // see if anything needs to be cleaned up.
+        // The things that need to be "cleaned up" for
+        // our purposes are:
+        //
+        // - Fields of resource type, or any other future
+        //   type we run into that isn't allowed in
+        //   aggregates for at least some targets
+        //
+        // - Fields with types that themselves had to
+        //   get legalized.
+        //
+        // If we don't run into any of these, we
+        // can just use the type as-is. Hooray!
+        //
+        // Otherwise, we are effectively going to split
+        // the type apart and create a `TuplePseudoType`.
+        // Every field of the original type will be
+        // represented as an element of this pseudo-type.
+        // Each element will record its `LegalType`,
+        // and the original field that it was created from.
+        // An element will also track whether it contains
+        // any "ordinary" data, and if so, it will remember
+        // an element index in a real (AST-level, non-pseudo)
+        // `TupleType` that is used to bundle together
+        // such fields.
+        //
+        // Storing all the simple fields together like this
+        // obviously adds complexity to the legalization
+        // pass, but it has important benefits:
+        //
+        // - It avoids creating functions with a very large
+        //   number of parameters (when passing a structure
+        //   with many fields), which might confuse downstream
+        //   compilers.
+        //
+        // - It avoids applying AOS->SOA conversion to fields
+        //   that don't actually need it, which is basically
+        //   required if we want type layout to work.
+        //
+        // - It ensures that we can actually construct a
+        //   constant-buffer type that wraps a legalized
+        //   aggregate type; the ordinary fields will get
+        //   placed inside a new constant-buffer type,
+        //   while the special ones will get left outside.
+        // 
 
-        LegalType legalType;
-        if(context->mapDeclRefToLegalType.TryGetValue(declRef, legalType))
-            return legalType;
+        // TODO: there is a risk here that we might recursively
+        // invole `legalizeType` on the type that we are
+        // currently trying to legalize. We need to detect that
+        // situation somehow, by inserting a sentinel value
+        // into `mapTypeToLegalType` during the per-field
+        // legalization process, and then if we ever see that
+        // sentinel in a call to `legalizeType`, we need
+        // to construct some kind of proxy type to help resolve
+        // the problem.
 
+        TupleTypeBuilder builder;
+        builder.context = context;
+        builder.type = type;
+        builder.originalStructType = structType;
 
-        if (auto aggTypeDeclRef = declRef.As<AggTypeDecl>())
+        for (auto ff : structType->getFields())
         {
-            // Look at the (non-static) fields, and
-            // see if anything needs to be cleaned up.
-            // The things that need to be "cleaned up" for
-            // our purposes are:
-            //
-            // - Fields of resource type, or any other future
-            //   type we run into that isn't allowed in
-            //   aggregates for at least some targets
-            //
-            // - Fields with types that themselves had to
-            //   get legalized.
-            //
-            // If we don't run into any of these, we
-            // can just use the type as-is. Hooray!
-            //
-            // Otherwise, we are effectively going to split
-            // the type apart and create a `TuplePseudoType`.
-            // Every field of the original type will be
-            // represented as an element of this pseudo-type.
-            // Each element will record its `LegalType`,
-            // and the original field that it was created from.
-            // An element will also track whether it contains
-            // any "ordinary" data, and if so, it will remember
-            // an element index in a real (AST-level, non-pseudo)
-            // `TupleType` that is used to bundle together
-            // such fields.
-            //
-            // Storing all the simple fields together like this
-            // obviously adds complexity to the legalization
-            // pass, but it has important benefits:
-            //
-            // - It avoids creating functions with a very large
-            //   number of parameters (when passing a structure
-            //   with many fields), which might confuse downstream
-            //   compilers.
-            //
-            // - It avoids applying AOS->SOA conversion to fields
-            //   that don't actually need it, which is basically
-            //   required if we want type layout to work.
-            //
-            // - It ensures that we can actually construct a
-            //   constant-buffer type that wraps a legalized
-            //   aggregate type; the ordinary fields will get
-            //   placed inside a new constant-buffer type,
-            //   while the special ones will get left outside.
-            // 
-
-            TupleTypeBuilder builder;
-            builder.context = context;
-            builder.type = type;
-            builder.typeDeclRef = aggTypeDeclRef;
-
-
-            for (auto ff : getMembersOfType<StructField>(aggTypeDeclRef))
-            {
-                builder.addField(ff);
-            }
-
-            legalType = builder.getResult();
-            context->mapDeclRefToLegalType.AddIfNotExists(declRef, legalType);
-            return legalType;
+            builder.addField(ff);
         }
 
-        // TODO: for other declaration-reference types, we really
-        // need to legalize the types used in substitutions, and
-        // signal an error if any of them turn out to be non-simple.
-        //
-        // The limited cases of types that can handle having non-simple
-        // types as generic arguments all need to be special-cased here.
-        // (For example, we can't handle `Texture2D<SomeStructWithTexturesInIt>`.
-        // 
+        return builder.getResult();
     }
-    else if(auto arrayType = type->As<ArrayExpressionType>())
+    else if(auto arrayType = as<IRArrayTypeBase>(type))
     {
         auto legalElementType = legalizeType(
             context,
-            arrayType->baseType);
+            arrayType->getElementType());
 
         switch (legalElementType.flavor)
         {
@@ -970,6 +897,34 @@ LegalType legalizeType(
     }
 
     return LegalType::simple(type);
+}
+
+void initialize(
+    TypeLegalizationContext*    context,
+    Session*                    session,
+    IRModule*                   module)
+{
+    context->session = session;
+    context->irModule = module;
+
+    context->sharedBuilder.session = session;
+    context->sharedBuilder.module = module;
+
+    context->builder.sharedBuilder = &context->sharedBuilder;
+    context->builder.setInsertInto(module->moduleInst);
+}
+
+LegalType legalizeType(
+    TypeLegalizationContext*    context,
+    IRType*                     type)
+{
+    LegalType legalType;
+    if(context->mapTypeToLegalType.TryGetValue(type, legalType))
+        return legalType;
+
+    legalType = legalizeTypeImpl(context, type);
+    context->mapTypeToLegalType[type] = legalType;
+    return legalType;
 }
 
 //

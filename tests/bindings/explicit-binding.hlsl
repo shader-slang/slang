@@ -7,6 +7,24 @@
 #define R(X) /**/
 #else
 #define R(X) X
+
+#define CA _SV023SLANG_parameterGroup_CA
+#define ca _SV023SLANG_ParameterGroup_CA2ca
+
+#define CB _SV023SLANG_parameterGroup_CB
+#define cb _SV023SLANG_ParameterGroup_CB2cb
+
+#define CC _SV023SLANG_parameterGroup_CC
+#define cc _SV023SLANG_ParameterGroup_CC2cc
+
+#define sa _SV02sa
+#define sb _SV02sb
+#define sc _SV02sc
+
+#define ta _SV02ta
+#define tb _SV02tb
+#define tc _SV02tc
+
 #endif
 
 float4 use(float4 val) { return val; };
@@ -46,7 +64,7 @@ cbuffer CC : register(b9)
 	float cc;
 }
 
-float4 main() : SV_Target
+float4 main() : SV_TARGET
 {
 	// Go ahead and use everything in this case:
 	return use(ta, sa) + use(ca)
