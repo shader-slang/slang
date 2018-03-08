@@ -43,6 +43,26 @@ namespace Slang
         return endData ? endData : kEmptyOSString;
     }
 
+    // UnownedStringSlice
+
+    bool UnownedStringSlice::endsWith(UnownedStringSlice const& other) const
+    {
+        UInt thisSize = size();
+        UInt otherSize = other.size();
+
+        if (otherSize > thisSize)
+            return false;
+
+        return UnownedStringSlice(
+            end() - otherSize, end()) == other;
+    }
+
+    bool UnownedStringSlice::endsWith(char const* str) const
+    {
+        return endsWith(UnownedTerminatedStringSlice(str));
+    }
+
+
     // StringSlice
 
     StringSlice::StringSlice()

@@ -31,10 +31,7 @@ __magic_type(HLSLByteAddressBufferType) struct ByteAddressBuffer
 
 __generic<T>
 __magic_type(HLSLStructuredBufferType)
-__intrinsic_type(${{
-	// TODO: we really need a simple way to write an "expression splice"
-	sb << kIROp_structuredBufferType;
-}})
+__intrinsic_type($(kIROp_structuredBufferType))
 struct StructuredBuffer
 {
     void GetDimensions(
@@ -181,10 +178,7 @@ __magic_type(HLSLRWByteAddressBufferType) struct RWByteAddressBuffer
 
 __generic<T>
 __magic_type(HLSLRWStructuredBufferType)
-__intrinsic_type(${{
-	// TODO: we really need a simple way to write an "expression splice"
-	sb << kIROp_readWriteStructuredBufferType;
-}})
+__intrinsic_type($(kIROp_readWriteStructuredBufferType))
 struct RWStructuredBuffer
 {
     uint DecrementCounter();
@@ -265,7 +259,7 @@ __target_intrinsic(glsl, "bool($0)")
 bool any(T x);
 
 __generic<T : __BuiltinType, let N : int>
-__target_intrinsic(glsl, "any(bvec$$N0($0))")
+__target_intrinsic(glsl, "any(bvec$N0($0))")
 bool any(vector<T,N> x);
 
 __generic<T : __BuiltinType, let N : int, let M : int>
@@ -1053,7 +1047,6 @@ __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> WaveReadLan
 typedef Texture2D texture2D;
 
 ${{{{
-
 // Component-wise multiplication ops
 for(auto op : binaryOps)
 {
@@ -1109,14 +1102,14 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
 
     sb << "void GetDimensions(out uint dim);\n";
 
-    sb << "__target_intrinsic(glsl, \"texelFetch($$P, $1)$$z\")\n";
+    sb << "__target_intrinsic(glsl, \"texelFetch($P, $1)$z\")\n";
     sb << "T Load(int location);\n";
 
     sb << "T Load(int location, out uint status);\n";
 
     sb << "__subscript(uint index) -> T {\n";
 
-    sb << "__target_intrinsic(glsl, \"texelFetch($$P, int($1))$$z\") get;\n";
+    sb << "__target_intrinsic(glsl, \"texelFetch($P, int($1))$z\") get;\n";
 
     if (kBaseBufferAccessLevels[aa].access != SLANG_RESOURCE_ACCESS_READ)
     {
@@ -1127,5 +1120,4 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
 
     sb << "};\n";
 }
-
 }}}}

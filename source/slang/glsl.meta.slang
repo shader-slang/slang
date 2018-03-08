@@ -1,7 +1,6 @@
 // Slang GLSL compatibility library
 
 ${{{{
-
 static const struct {
     char const* name;
     char const* glslPrefix;
@@ -199,7 +198,5 @@ sb << "syntax writeonly : GLSLWriteOnlyModifier;\n";
 
 // We will treat `subroutine` as a qualifier for now
 sb << "syntax subroutine : SimpleModifier;\n";
-
-
-
 }}}}
+
