@@ -526,9 +526,9 @@ void CompileRequest::loadParsedModule(
     {
         // If we didn't run into any errors, then try to generate
         // IR code for the imported module.
+        SLANG_ASSERT(errorCountAfter == 0);
         loadedModule->irModule = generateIRForTranslationUnit(translationUnit);
     }
-
     loadedModulesList.Add(loadedModule);
 }
 
@@ -536,7 +536,7 @@ RefPtr<ModuleDecl> CompileRequest::loadModule(
     Name*               name,
     String const&       path,
     String const&       source,
-    SourceLoc const&)
+    SourceLoc const&    srcLoc)
 {
     RefPtr<TranslationUnitRequest> translationUnit = new TranslationUnitRequest();
     translationUnit->compileRequest = this;
@@ -559,6 +559,7 @@ RefPtr<ModuleDecl> CompileRequest::loadModule(
 
     if( errorCountAfter != errorCountBefore )
     {
+        mSink.diagnose(srcLoc, Diagnostics::errorInImportedModule);
         // Something went wrong during the parsing, so we should bail out.
         return nullptr;
     }
@@ -567,6 +568,15 @@ RefPtr<ModuleDecl> CompileRequest::loadModule(
         translationUnit,
         name,
         path);
+
+    errorCountAfter = mSink.GetErrorCount();
+
+    if (errorCountAfter != errorCountBefore)
+    {
+        mSink.diagnose(srcLoc, Diagnostics::errorInImportedModule);
+        // Something went wrong during the parsing, so we should bail out.
+        return nullptr;
+    }
 
     return translationUnit->SyntaxNode;
 }
