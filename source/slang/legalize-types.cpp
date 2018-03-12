@@ -1016,7 +1016,7 @@ RefPtr<VarLayout> getFieldLayout(
     {
         for(auto ff : structTypeLayout->fields)
         {
-            if(mangledFieldName == getMangledName(ff->varDecl) )
+            if(mangledFieldName == getMangledName(ff->varDecl.getDecl()) )
             {
                 return ff;
             }
