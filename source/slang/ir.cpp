@@ -4848,10 +4848,31 @@ namespace Slang
 
     }
 
+    void checkIRDuplicate(IRParentInst* moduleInst, Name* mangledName)
+    {
+#ifdef _DEBUG
+        for (auto child : moduleInst->getChildren())
+        {
+            if (child->op == kIROp_Func)
+            {
+                auto extName = ((IRGlobalValue*)child)->mangledName;
+                if (extName == mangledName ||
+                    (extName && mangledName &&
+                        extName->text == mangledName->text))
+                    SLANG_UNEXPECTED("duplicate global var");
+            }
+        }
+#else
+        SLANG_UNREFERENCED_PARAMETER(moduleInst);
+        SLANG_UNREFERENCED_PARAMETER(mangledName);
+#endif
+    }
+
     void cloneFunctionCommon(
         IRSpecContextBase*  context,
         IRFunc*         clonedFunc,
-        IRFunc*         originalFunc)
+        IRFunc*         originalFunc,
+        bool checkDuplicate = true)
     {
         // First clone all the simple properties.
         clonedFunc->mangledName = originalFunc->mangledName;
@@ -4871,6 +4892,8 @@ namespace Slang
         //
         // TODO: This isn't really a good requirement to place on the IR...
         clonedFunc->removeFromParent();
+        if (checkDuplicate)
+            checkIRDuplicate(context->getModule()->getModuleInst(), clonedFunc->mangledName);
         clonedFunc->insertAtEnd(context->getModule()->getModuleInst());
     }
 
@@ -4958,7 +4981,7 @@ namespace Slang
     IRFunc* cloneSimpleFuncWithoutRegistering(IRSpecContextBase* context, IRFunc* originalFunc)
     {
         auto clonedFunc = context->builder->createFunc();
-        cloneFunctionCommon(context, clonedFunc, originalFunc);
+        cloneFunctionCommon(context, clonedFunc, originalFunc, false);
         return clonedFunc;
     }
 
@@ -5137,6 +5160,15 @@ namespace Slang
         Name*           mangledName,
         IRGlobalValue*  originalVal)
     {
+        // If the global value being cloned is already in target module, don't clone
+        // Why checking this?
+        //   When specializing a generic function G (which is already in target module),
+        //   where G calls a normal function F (which is already in target module), 
+        //   then when we are making a copy of G via cloneFuncCommom(), it will recursively clone F,
+        //   however we don't want to make a duplicate of F in the target module.
+        if (originalVal->getParent() == context->getModule()->getModuleInst())
+            return originalVal;
+
         // Check if we've already cloned this value, for the case where
         // an original value has already been established.
         IRInst* clonedVal = nullptr;
