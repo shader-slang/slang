@@ -4853,11 +4853,14 @@ namespace Slang
 #ifdef _DEBUG
         for (auto child : moduleInst->getChildren())
         {
-            auto extName = ((IRGlobalValue*)child)->mangledName;
-            if (extName == mangledName || 
-                (extName && mangledName &&
-                extName->text == mangledName->text))
-                SLANG_UNEXPECTED("duplicate global var");
+            if (child->op == kIROp_Func)
+            {
+                auto extName = ((IRGlobalValue*)child)->mangledName;
+                if (extName == mangledName ||
+                    (extName && mangledName &&
+                        extName->text == mangledName->text))
+                    SLANG_UNEXPECTED("duplicate global var");
+            }
         }
 #else
         SLANG_UNREFERENCED_PARAMETER(moduleInst);
