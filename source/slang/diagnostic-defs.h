@@ -273,6 +273,7 @@ DIAGNOSTIC(38020, Error, mismatchEntryPointTypeArgument, "expecting $0 entry-poi
 DIAGNOSTIC(38021, Error, typeArgumentDoesNotConformToInterface, "type argument `$1` for generic parameter `$0` does not conform to interface `$1`.")
 
 DIAGNOSTIC(38200, Error, recursiveModuleImport, "module `$0` recursively imports itself")
+DIAGNOSTIC(39999, Fatal, errorInImportedModule, "error in imported module, compilation ceased.")
 
 //
 // 4xxxx - IL code generation.
