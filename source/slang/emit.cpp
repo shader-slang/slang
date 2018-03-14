@@ -7889,6 +7889,15 @@ emitDeclImpl(decl, nullptr);
             emitIRUsedType(ctx, fieldType);
         }
 
+        // Don't emit declarations for types that should be built-in on the target.
+        //
+        // TODO: This should really be checking if the type is a target intrinsic
+        // for the chosen target, and not just whether it is globally declared
+        // as a builtin (so that we can have types that are builtin in some cases,
+        // but not others).
+        if(declRef.getDecl()->HasModifier<BuiltinModifier>())
+            return;
+
         Emit("struct ");
         EmitDeclRef(declRef);
         Emit("\n{\n");
