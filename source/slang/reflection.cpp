@@ -961,7 +961,7 @@ SLANG_API void spReflectionEntryPoint_getComputeThreadGroupSize(
     SlangUInt sizeAlongAxis[3] = { 1, 1, 1 };
 
     // First look for the HLSL case, where we have an attribute attached to the entry point function
-    auto numThreadsAttribute = entryPointFunc->FindModifier<HLSLNumThreadsAttribute>();
+    auto numThreadsAttribute = entryPointFunc->FindModifier<NumThreadsAttribute>();
     if (numThreadsAttribute)
     {
         sizeAlongAxis[0] = numThreadsAttribute->x;

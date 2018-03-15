@@ -266,3 +266,10 @@ SYNTAX_CLASS(SyntaxDecl, Decl)
     FIELD(SyntaxParseCallback,  parseCallback)
     FIELD(void*,                parseUserData)
 END_SYNTAX_CLASS()
+
+// A declaration of an attribute to be used with `[name(...)]` syntax.
+//
+SYNTAX_CLASS(AttributeDecl, ContainerDecl)
+    // What type of syntax node will be produced to represent this attribute.
+    FIELD(SyntaxClass<RefObject>, syntaxClass)
+END_SYNTAX_CLASS()

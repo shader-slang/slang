@@ -1412,6 +1412,11 @@ namespace Slang
             // These are only used in the stdlib, so no checking is needed
         }
 
+        void visitAttributeDecl(AttributeDecl*)
+        {
+            // These are only used in the stdlib, so no checking is needed
+        }
+
         void visitGenericTypeParamDecl(GenericTypeParamDecl*)
         {
             // These are only used in the stdlib, so no checking is needed for now
@@ -1427,70 +1432,208 @@ namespace Slang
             // Do nothing with modifiers for now
         }
 
-        RefPtr<Modifier> checkModifier(
-            RefPtr<Modifier>    m,
-            Decl*               /*decl*/)
+        AttributeDecl* lookUpAttributeDecl(Name* attributeName, Scope* scope)
         {
-            if(auto hlslUncheckedAttribute = m.As<HLSLUncheckedAttribute>())
+            // Look up the name and see what we find.
+            //
+            // TODO: This needs to have some special filtering or naming
+            // rules to keep us from seeing shadowing variable declarations.
+            auto lookupResult = lookUp(getSession(), this, attributeName, scope, LookupMask::Attribute);
+
+            // If we didn't find anything, or the result was overloaded,
+            // then we aren't going to be able to extract a single decl.
+            if(!lookupResult.isValid() || lookupResult.isOverloaded())
+                return nullptr;
+
+            auto decl = lookupResult.item.declRef.getDecl();
+            if( auto attributeDecl = dynamic_cast<AttributeDecl*>(decl) )
+            {
+                return attributeDecl;
+            }
+            else
+            {
+                return nullptr;
+            }
+        }
+
+        bool validateAttribute(RefPtr<Attribute> attr)
+        {
+                if(auto numThreadsAttr = attr.As<NumThreadsAttribute>())
+                {
+                    SLANG_ASSERT(attr->args.Count() == 3);
+                    auto xVal = checkConstantIntVal(attr->args[0]);
+                    auto yVal = checkConstantIntVal(attr->args[1]);
+                    auto zVal = checkConstantIntVal(attr->args[2]);
+
+                    if(!xVal) return false;
+                    if(!yVal) return false;
+                    if(!zVal) return false;
+
+                    numThreadsAttr->x          = (int32_t) xVal->value;
+                    numThreadsAttr->y          = (int32_t) yVal->value;
+                    numThreadsAttr->z          = (int32_t) zVal->value;
+                }
+                else if (auto maxVertexCountAttr = attr.As<MaxVertexCountAttribute>())
+                {
+                    SLANG_ASSERT(attr->args.Count() == 1);
+                    auto val = checkConstantIntVal(attr->args[0]);
+
+                    maxVertexCountAttr->value = (int32_t)val->value;
+                }
+                else if(auto instanceAttr = attr.As<InstanceAttribute>())
+                {
+                    SLANG_ASSERT(attr->args.Count() == 1);
+                    auto val = checkConstantIntVal(attr->args[0]);
+
+                    instanceAttr->value = (int32_t)val->value;
+                }
+                else
+                {
+                    if(attr->args.Count() == 0)
+                    {
+                        // If the attribute took no arguments, then we will
+                        // assume it is valid as written.
+                    }
+                    else
+                    {
+                        // We should be special-casing the checking of any attribute
+                        // with a non-zero number of arguments.
+                        SLANG_DIAGNOSE_UNEXPECTED(getSink(), attr, "unhandled attribute");
+                        return false;
+                    }
+                }
+
+                return true;
+        }
+
+        RefPtr<AttributeBase> checkAttribute(
+            UncheckedAttribute*     uncheckedAttr,
+            ModifiableSyntaxNode*   attrTarget)
+        {
+            auto attrName = uncheckedAttr->getName();
+            auto attrDecl = lookUpAttributeDecl(
+                attrName,
+                uncheckedAttr->scope);
+
+            if(!attrDecl)
+            {
+                getSink()->diagnose(uncheckedAttr, Diagnostics::unknownAttributeName, attrName);
+                return uncheckedAttr;
+            }
+
+            if(!attrDecl->syntaxClass.isSubClassOf<Attribute>())
+            {
+                SLANG_DIAGNOSE_UNEXPECTED(getSink(), attrDecl, "attribute declaration does not reference an attribute class");
+                return uncheckedAttr;
+            }
+
+            RefPtr<RefObject> attrObj = attrDecl->syntaxClass.createInstance();
+            auto attr = attrObj.As<Attribute>();
+            if(!attr)
+            {
+                SLANG_DIAGNOSE_UNEXPECTED(getSink(), attrDecl, "attribute class did not yield an attribute object");
+                return uncheckedAttr;
+            }
+
+            // We are going to replace the unchecked attribute with the checked one.
+
+            // First copy all of the state over from the original attribute.
+            attr->name  = uncheckedAttr->name;
+            attr->args  = uncheckedAttr->args;
+            attr->loc   = uncheckedAttr->loc;
+
+            // We will start with checking steps that can be applied independent
+            // of the concrete attribute type that was selected. These only need
+            // us to look at the attribute declaration itself.
+            //
+            // Start by doing argument/parameter matching
+            UInt argCount = attr->args.Count();
+            UInt paramCounter = 0;
+            bool mismatch = false;
+            for(auto paramDecl : attrDecl->getMembersOfType<ParamDecl>())
+            {
+                UInt paramIndex = paramCounter++;
+                if( paramIndex < argCount )
+                {
+                    auto arg = attr->args[paramIndex];
+
+                    // TODO: support checking the argument against the declared
+                    // type for the parameter.
+
+                }
+                else
+                {
+                    // We didn't have enough arguments for the
+                    // number of parameters declared.
+                    if(auto defaultArg = paramDecl->initExpr)
+                    {
+                        // The attribute declaration provided a default,
+                        // so we should use that.
+                        //
+                        // TODO: we need to figure out how to hook up
+                        // default arguments as needed.
+                    }
+                    else
+                    {
+                        mismatch = true;
+                    }
+                }
+            }
+            UInt paramCount = paramCounter;
+
+            if(mismatch)
+            {
+                getSink()->diagnose(attr, Diagnostics::attributeArgumentCountMismatch, attrName, paramCount, argCount);
+                return uncheckedAttr;
+            }
+
+            // The next bit of validation that we can apply semi-generically
+            // is to validate that the target for this attribute is a valid
+            // one for the chosen attribute.
+            //
+            // The attribute declaration will have one or more `AttributeTargetModifier`s
+            // that each specify a syntax class that the attribute can be applied to.
+            // If any of these match `attrTarget`, then we are good.
+            //
+            bool validTarget = false;
+            for(auto attrTargetMod : attrDecl->GetModifiersOfType<AttributeTargetModifier>())
+            {
+                if(attrTarget->getClass().isSubClassOf(attrTargetMod->syntaxClass))
+                {
+                    validTarget = true;
+                    break;
+                }
+            }
+            if(!validTarget)
+            {
+                getSink()->diagnose(attr, Diagnostics::attributeNotApplicable, attrName);
+                return uncheckedAttr;
+            }
+
+            // Now apply type-specific validation to the attribute.
+            if(!validateAttribute(attr))
+            {
+                return uncheckedAttr;
+            }
+
+
+            return attr;
+        }
+
+        RefPtr<Modifier> checkModifier(
+            RefPtr<Modifier>        m,
+            ModifiableSyntaxNode*   syntaxNode)
+        {
+            if(auto hlslUncheckedAttribute = m.As<UncheckedAttribute>())
             {
                 // We have an HLSL `[name(arg,...)]` attribute, and we'd like
                 // to check that it is provides all the expected arguments
                 //
-                // For now we will do this in a completely ad hoc fashion,
-                // but it would be nice to have some generic routine to
-                // do the needed type checking/coercion.
-                auto attribText = getText(hlslUncheckedAttribute->getName());
-                
-                if(attribText == "numthreads")
-                {
-                    if(hlslUncheckedAttribute->args.Count() != 3)
-                        return m;
+                // First, look up the attribute name in the current scope to find
+                // the right syntax class to instantiate.
+                //
 
-                    auto xVal = checkConstantIntVal(hlslUncheckedAttribute->args[0]);
-                    auto yVal = checkConstantIntVal(hlslUncheckedAttribute->args[1]);
-                    auto zVal = checkConstantIntVal(hlslUncheckedAttribute->args[2]);
-
-                    if(!xVal) return m;
-                    if(!yVal) return m;
-                    if(!zVal) return m;
-
-                    auto hlslNumThreadsAttribute = new HLSLNumThreadsAttribute();
-
-                    hlslNumThreadsAttribute->loc   = hlslUncheckedAttribute->loc;
-                    hlslNumThreadsAttribute->name       = hlslUncheckedAttribute->getName();
-                    hlslNumThreadsAttribute->args       = hlslUncheckedAttribute->args;
-                    hlslNumThreadsAttribute->x          = (int32_t) xVal->value;
-                    hlslNumThreadsAttribute->y          = (int32_t) yVal->value;
-                    hlslNumThreadsAttribute->z          = (int32_t) zVal->value;
-
-                    return hlslNumThreadsAttribute;
-                }
-                else if (attribText == "maxvertexcount")
-                {
-                    if (hlslUncheckedAttribute->args.Count() != 1)
-                        return m;
-                    auto val = checkConstantIntVal(hlslUncheckedAttribute->args[0]);
-                    auto hlslMaxVertexCountAttrib = new HLSLMaxVertexCountAttribute();
-
-                    hlslMaxVertexCountAttrib->loc = hlslUncheckedAttribute->loc;
-                    hlslMaxVertexCountAttrib->name = hlslUncheckedAttribute->getName();
-                    hlslMaxVertexCountAttrib->args = hlslUncheckedAttribute->args;
-                    hlslMaxVertexCountAttrib->value = (int32_t)val->value;
-                    return hlslMaxVertexCountAttrib;
-                }
-                else if (attribText == "instance")
-                {
-                    if (hlslUncheckedAttribute->args.Count() != 1)
-                        return m;
-                    auto val = checkConstantIntVal(hlslUncheckedAttribute->args[0]);
-                    auto attrib = new HLSLInstanceAttribute();
-
-                    attrib->loc = hlslUncheckedAttribute->loc;
-                    attrib->name = hlslUncheckedAttribute->getName();
-                    attrib->args = hlslUncheckedAttribute->args;
-                    attrib->value = (int32_t)val->value;
-                    return attrib;
-                }
+                return checkAttribute(hlslUncheckedAttribute, syntaxNode);
             }
             // Default behavior is to leave things as they are,
             // and assume that modifiers are mostly already checked.
@@ -1505,7 +1648,7 @@ namespace Slang
         }
 
 
-        void checkModifiers(Decl* decl)
+        void checkModifiers(ModifiableSyntaxNode* syntaxNode)
         {
             // TODO(tfoley): need to make sure this only
             // performs semantic checks on a `SharedModifier` once...
@@ -1516,7 +1659,7 @@ namespace Slang
             RefPtr<Modifier> resultModifiers;
             RefPtr<Modifier>* resultModifierLink = &resultModifiers;
 
-            RefPtr<Modifier> modifier = decl->modifiers.first;
+            RefPtr<Modifier> modifier = syntaxNode->modifiers.first;
             while(modifier)
             {
                 // Because we are rewriting the list in place, we need to extract
@@ -1528,7 +1671,7 @@ namespace Slang
                 // be to return a single unlinked modifier.
                 modifier->next = nullptr;
 
-                auto checkedModifier = checkModifier(modifier, decl);
+                auto checkedModifier = checkModifier(modifier, syntaxNode);
                 if(checkedModifier)
                 {
                     // If checking gave us a modifier to add, then we
@@ -1552,7 +1695,7 @@ namespace Slang
 
             // Whether we actually re-wrote anything or note, lets
             // install the new list of modifiers on the declaration
-            decl->modifiers.first = resultModifiers;
+            syntaxNode->modifiers.first = resultModifiers;
         }
 
         void visitModuleDecl(ModuleDecl* programNode)
@@ -2182,6 +2325,7 @@ namespace Slang
         {
             if (!stmt) return;
             StmtVisitor::dispatch(stmt);
+            checkModifiers(stmt);
         }
 
         void visitFuncDecl(FuncDecl *functionNode)
@@ -2610,11 +2754,14 @@ namespace Slang
         {
             // TODO: This needs to bottleneck through the common variable checks
 
-            para->type = CheckUsableType(para->type);
-            
-            if (para->type.Equals(getSession()->getVoidType()))
+            if(para->type.exp)
             {
-                getSink()->diagnose(para, Diagnostics::parameterCannotBeVoid);
+                para->type = CheckUsableType(para->type);
+            
+                if (para->type.Equals(getSession()->getVoidType()))
+                {
+                    getSink()->diagnose(para, Diagnostics::parameterCannotBeVoid);
+                }
             }
         }
 

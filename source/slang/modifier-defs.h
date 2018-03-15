@@ -288,32 +288,86 @@ SIMPLE_SYNTAX_CLASS(HLSLUniformModifier, Modifier)
 // HLSL `volatile` modifier (ignored)
 SIMPLE_SYNTAX_CLASS(HLSLVolatileModifier, Modifier)
 
-// An HLSL `[name(arg0, ...)]` style attribute.
-SYNTAX_CLASS(HLSLAttribute, Modifier)
+SYNTAX_CLASS(AttributeTargetModifier, Modifier)
+    // A class to which the declared attribute type is applicable
+    FIELD(SyntaxClass<RefObject>, syntaxClass)
+END_SYNTAX_CLASS()
+
+// Base class for checked and unchecked `[name(arg0, ...)]` style attribute.
+SYNTAX_CLASS(AttributeBase, Modifier)
     SYNTAX_FIELD(List<RefPtr<Expr>>, args)
 END_SYNTAX_CLASS()
 
-// An HLSL `[name(...)]` attribute that hasn't undergone
-// any semantic analysis.
-// After analysis, this might be transformed into a more specific case.
-SIMPLE_SYNTAX_CLASS(HLSLUncheckedAttribute, HLSLAttribute)
+// A `[name(...)]` attribute that hasn't undergone any semantic analysis.
+// After analysis, this will be transformed into a more specific case.
+SYNTAX_CLASS(UncheckedAttribute, AttributeBase)
+    FIELD(RefPtr<Scope>, scope)
+END_SYNTAX_CLASS()
+
+// A `[name(arg0, ...)]` style attribute that has been validated.
+SYNTAX_CLASS(Attribute, AttributeBase)
+END_SYNTAX_CLASS()
+
+// An `[unroll]` or `[unroll(count)]` attribute
+SYNTAX_CLASS(UnrollAttribute, Attribute)
+    RAW(IntegerLiteralValue getCount();)
+END_SYNTAX_CLASS()
+
+SIMPLE_SYNTAX_CLASS(LoopAttribute, Attribute)               // `[loop]`
+SIMPLE_SYNTAX_CLASS(FastOptAttribute, Attribute)            // `[fastopt]`
+SIMPLE_SYNTAX_CLASS(AllowUAVConditionAttribute, Attribute)  // `[allow_uav_condition]`
+SIMPLE_SYNTAX_CLASS(BranchAttribute, Attribute)             // `[branch]`
+SIMPLE_SYNTAX_CLASS(FlattenAttribute, Attribute)            // `[flatten]`
+SIMPLE_SYNTAX_CLASS(ForceCaseAttribute, Attribute)          // `[forcecase]`
+SIMPLE_SYNTAX_CLASS(CallAttribute, Attribute)               // `[call]`
+
+// TODO: for attributes that take arguments, the syntax node
+// classes should provide accessors for the values of those arguments.
+
+SIMPLE_SYNTAX_CLASS(MaxTessFactorAttribute, Attribute)
+SIMPLE_SYNTAX_CLASS(OutputControlPointsAttribute, Attribute)
+SIMPLE_SYNTAX_CLASS(OuptutTopologyAttribute, Attribute)
+SIMPLE_SYNTAX_CLASS(PartitioningAttribute, Attribute)
+SIMPLE_SYNTAX_CLASS(PatchConstantFuncAttribute, Attribute)
+SIMPLE_SYNTAX_CLASS(DomainAttribute, Attribute)
+
+SIMPLE_SYNTAX_CLASS(EarlyDepthStencilAttribute, Attribute)
 
 // An HLSL `[numthreads(x,y,z)]` attribute
-SYNTAX_CLASS(HLSLNumThreadsAttribute, HLSLAttribute)
+SYNTAX_CLASS(NumThreadsAttribute, Attribute)
     // The number of threads to use along each axis
+    //
+    // TODO: These should be accessors that use the
+    // ordinary `args` list, rather than side data.
     FIELD(int32_t, x)
     FIELD(int32_t, y)
     FIELD(int32_t, z)
 END_SYNTAX_CLASS()
 
-SYNTAX_CLASS(HLSLMaxVertexCountAttribute, HLSLAttribute)
+SYNTAX_CLASS(MaxVertexCountAttribute, Attribute)
     // The number of max vertex count for geometry shader
+    //
+    // TODO: This should be an accessor that uses the
+    // ordinary `args` list, rather than side data.
     FIELD(int32_t, value)
 END_SYNTAX_CLASS()
 
-SYNTAX_CLASS(HLSLInstanceAttribute, HLSLAttribute)
+SYNTAX_CLASS(InstanceAttribute, Attribute)
     // The number of instances to run for geometry shader
+    //
+    // TODO: This should be an accessor that uses the
+    // ordinary `args` list, rather than side data.
     FIELD(int32_t, value)
+END_SYNTAX_CLASS()
+
+// A `[shader("stageName")]` attribute, which marks an entry point
+// to be compiled, and specifies the stage for that entry point
+SYNTAX_CLASS(EntryPointAttribute, Attribute)
+    // The resolved stage that the entry point is targetting.
+    //
+    // TODO: This should be an accessor that uses the
+    // ordinary `args` list, rather than side data.
+    FIELD(Stage, stage);
 END_SYNTAX_CLASS()
 
 // HLSL modifiers for geometry shader input topology

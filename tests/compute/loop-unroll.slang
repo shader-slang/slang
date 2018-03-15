@@ -17,13 +17,16 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
 	uint tid = dispatchThreadID.x;
 
-	int val = buffers[1][tid];
+	// Note: using `unroll` as a variable name to validate that
+	// the lookup process for attribute names doesn't run into
+	// problems because of local declarations with the same name.
+	int unroll = buffers[1][tid];
 
 	[unroll]
 	for(int ii = 0; ii < 2; ii++)
 	{
-		val = buffers[ii][val];
+		unroll = buffers[ii][unroll];
 	}
 
-	buffers[0][tid] = val;
+	buffers[0][tid] = unroll;
 }

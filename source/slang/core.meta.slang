@@ -1028,3 +1028,71 @@ for (auto op : binaryOps)
     }
 }
 }}}}
+
+// Statement Attributes
+
+__attributeTarget(LoopStmt)
+attribute_syntax [unroll(count: int = 0)]   : UnrollAttribute;
+
+__attributeTarget(LoopStmt)
+attribute_syntax [loop]                 : LoopAttribute;
+
+__attributeTarget(LoopStmt)
+attribute_syntax [fastopt]              : FastOptAttribute;
+
+__attributeTarget(LoopStmt)
+attribute_syntax [allow_uav_condition]  : AllowUAVConditionAttribute;
+
+__attributeTarget(IfStmt)
+attribute_syntax [flatten]              : FlattenAttribute;
+
+__attributeTarget(IfStmt)
+__attributeTarget(SwitchStmt)
+attribute_syntax [branch]               : BranchAttribute;
+
+__attributeTarget(SwitchStmt)
+attribute_syntax [forcecase]            : ForceCaseAttribute;
+
+__attributeTarget(SwitchStmt)
+attribute_syntax [call]                 : CallAttribute;
+
+// Entry-point Attributes
+
+// All Stages
+__attributeTarget(FuncDecl)
+attribute_syntax [shader(stage)]    : EntryPointAttribute;
+
+// Hull Shader
+__attributeTarget(FuncDecl)
+attribute_syntax [maxtessfactor(factor: float)]     : MaxTessFactorAttribute;
+
+__attributeTarget(FuncDecl)
+attribute_syntax [outputcontrolpoints(count: int)]  : OutputControlPointsAttribute;
+
+__attributeTarget(FuncDecl)
+attribute_syntax [outputtopology(topology)]         : OuptutTopologyAttribute;
+
+__attributeTarget(FuncDecl)
+attribute_syntax [partitioning(mode)]               : PartitioningAttribute;
+
+__attributeTarget(FuncDecl)
+attribute_syntax [patchconstantfunc(name)]          : PatchConstantFuncAttribute;
+
+// Hull/Domain Shader
+__attributeTarget(FuncDecl)
+attribute_syntax [domain(domain)]   : DomainAttribute;
+
+// Geometry Shader
+__attributeTarget(FuncDecl)
+attribute_syntax [maxvertexcount(count: int)]   : MaxVertexCountAttribute;
+
+__attributeTarget(FuncDecl)
+attribute_syntax [instance(count: int)]         : InstanceAttribute;
+
+// Fragment ("Pixel") Shader
+__attributeTarget(FuncDecl)
+attribute_syntax [earlydepthstencil]    : EarlyDepthStencilAttribute;
+
+// Compute Shader
+__attributeTarget(FuncDecl)
+attribute_syntax [numthreads(x: int, y: int = 1, z: int = 1)]   : NumThreadsAttribute;
