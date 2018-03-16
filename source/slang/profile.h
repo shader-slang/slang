@@ -67,13 +67,18 @@ namespace Slang
         bool operator!=(Profile const& other) const { return raw != other.raw; }
 
         Stage GetStage() const { return Stage((uint32_t(raw) >> 16) & 0xFFFF); }
-        ProfileVersion GetVersion() const { return ProfileVersion(uint32_t(raw) & 0xFFFF); }
-        ProfileFamily getFamily() const { return getProfileFamily(GetVersion()); }
+        void setStage(Stage stage)
+        {
+            raw = (raw & 0x0000FFFF) | (uint32_t(stage) << 16);
+        }
 
+        ProfileVersion GetVersion() const { return ProfileVersion(uint32_t(raw) & 0xFFFF); }
         void setVersion(ProfileVersion version)
         {
             raw = (raw & ~0xFFFF) | uint32_t(version);
         }
+
+        ProfileFamily getFamily() const { return getProfileFamily(GetVersion()); }
 
         static Profile LookUp(char const* name);
 

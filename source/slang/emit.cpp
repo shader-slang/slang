@@ -124,6 +124,10 @@ struct SharedEmitContext
     HashSet<String> irDeclsVisited;
 
     HashSet<String> irTupleTypes;
+
+    // The "effective" profile that is being used to emit code,
+    // combining information from the target and entry point.
+    Profile effctiveProfile;
 };
 
 struct EmitContext
@@ -134,6 +138,7 @@ struct EmitContext
 
 //
 
+#ifdef DEADCODE
 void requireGLSLVersion(
     EntryPointRequest*  entryPoint,
     ProfileVersion      version)
@@ -155,6 +160,7 @@ void requireGLSLVersion(
         entryPoint->profile = profile;
     }
 }
+#endif
 
 //
 
@@ -2011,8 +2017,7 @@ struct EmitVisitor
         if (context->shared->target != CodeGenTarget::GLSL)
             return;
 
-        auto entryPoint = context->shared->entryPoint;
-        Slang::requireGLSLVersion(entryPoint, version);
+        Slang::requireGLSLVersionImpl(&context->shared->extensionUsageTracker, version);
     }
 
     void requireGLSLVersion(int version)
@@ -2083,12 +2088,14 @@ struct EmitVisitor
                         requireGLSLExtension(requiredGLSLExtensionModifier->extensionNameToken.Content);
                     }
 
+#ifdef DEADCODE
                     // Does this intrinsic requie a particular GLSL extension that wouldn't be available by default?
                     if (auto requiredGLSLVersionModifier = funcDecl->FindModifier<RequiredGLSLVersionModifier>())
                     {
                         // If so, we had better request the extension.
                         requireGLSLVersion((int) getIntegerLiteralValue(requiredGLSLVersionModifier->versionNumberToken));
                     }
+#endif
                 }
 
 
@@ -4309,8 +4316,9 @@ struct EmitVisitor
     }
 
     void emitGLSLVersionDirective(
-        ModuleDecl*  program)
+        ModuleDecl*  /*program*/)
     {
+#ifdef DEADCODE
         // Did the user provide an explicit `#version` directive in their code?
         if( auto versionDirective = program->FindModifier<GLSLVersionDirective>() )
         {
@@ -4357,6 +4365,48 @@ struct EmitVisitor
             default:
                 break;
             }
+        }
+#endif
+
+        auto effctiveProfile = context->shared->effctiveProfile;
+        if(effctiveProfile.getFamily() == ProfileFamily::GLSL)
+        {
+            requireGLSLVersion(effctiveProfile.GetVersion());
+        }
+
+        // HACK: We aren't picking GLSL versions carefully right now,
+        // and so we might end up only requiring the initial 1.10 version,
+        // even though even basic functionality needs a higher version.
+        //
+        // For now, we'll work around this by just setting the minimum required
+        // version to a high one:
+        //
+        // TODO: Either correctly compute a minimum required version, or require
+        // the user to specify a version as part of the target.
+        requireGLSLVersionImpl(&context->shared->extensionUsageTracker, ProfileVersion::GLSL_450);
+
+        auto requiredProfileVersion = context->shared->extensionUsageTracker.profileVersion;
+        switch (requiredProfileVersion)
+        {
+#define CASE(TAG, VALUE)    \
+        case ProfileVersion::TAG: Emit("#version " #VALUE "\n"); return
+
+        CASE(GLSL_110, 110);
+        CASE(GLSL_120, 120);
+        CASE(GLSL_130, 130);
+        CASE(GLSL_140, 140);
+        CASE(GLSL_150, 150);
+        CASE(GLSL_330, 330);
+        CASE(GLSL_400, 400);
+        CASE(GLSL_410, 410);
+        CASE(GLSL_420, 420);
+        CASE(GLSL_430, 430);
+        CASE(GLSL_440, 440);
+        CASE(GLSL_450, 450);
+#undef CASE
+
+        default:
+            break;
         }
 
         // No information is available for us to guess a profile,
@@ -8069,6 +8119,13 @@ EntryPointLayout* findEntryPointLayout(
         if(entryPointLayout->entryPoint->getName() != entryPointRequest->name)
             continue;
 
+        // TODO: We need to be careful about this check, since it relies on
+        // the profile information in the layout matching that in the request.
+        //
+        // What we really seem to want here is some dictionary mapping the
+        // `EntryPointRequest` directly to the `EntryPointLayout`, and maybe
+        // that is precisely what we should build...
+        //
         if(entryPointLayout->profile != entryPointRequest->profile)
             continue;
 
@@ -8147,6 +8204,7 @@ String emitEntryPoint(
     sharedContext.target = target;
     sharedContext.finalTarget = targetRequest->target;
     sharedContext.entryPoint = entryPoint;
+    sharedContext.effctiveProfile = getEffectiveProfile(entryPoint, targetRequest);
 
     if (entryPoint)
     {
