@@ -337,7 +337,7 @@ DIAGNOSTIC(51092, Error, stageDoesntHaveInputWorld, "'$0' doesn't appear to have
 // 99999 - Internal compiler errors, and not-yet-classified diagnostics.
 
 DIAGNOSTIC(99999, Internal, unimplemented, "unimplemented: $0")
-DIAGNOSTIC(99999, Internal, unexpected, "uuexpected: $0")
+DIAGNOSTIC(99999, Internal, unexpected, "unexpected: $0")
 DIAGNOSTIC(99999, Internal, internalCompilerError, "internal compiler error")
 DIAGNOSTIC(99999, Error, compilationAborted, "compilation aborted due to internal error");
 
