@@ -62,11 +62,11 @@ We don't currently have a formal set of guidelines for contributors, but here's 
 
 ## License
 
-The Slang code itself is under the MIT license (see [LICSENSE](LICENSE)).
+The Slang code itself is under the MIT license (see [LICENSE](LICENSE)).
 
-The Slang projet can be compiled to use the [`glslang`](https://github.com/KhronosGroup/glslang) project as a submodule (under `external/glslang`), and `glslang` is under a BSD licesnse.
+The Slang projet can be compiled to use the [`glslang`](https://github.com/KhronosGroup/glslang) project as a submodule (under `external/glslang`), and `glslang` is under a BSD license.
 
 The Slang tests (which are not distributed with source/binary releases) include example shaders extracted from:
-* Sample HLSL shaders from the Microsoft DirectX SDK, which has its own licesnse
+* Sample HLSL shaders from the Microsoft DirectX SDK, which has its own license
 
 Some of the Slang examples and tests use the `stb_image` and `stb_image_write` libraries (under `external/stb`) which have been placed in the public domain by their author(s).
