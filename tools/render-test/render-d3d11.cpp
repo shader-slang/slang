@@ -193,7 +193,7 @@ static HRESULT captureTextureToFile(
     D3D11_TEXTURE2D_DESC dxTextureDesc;
     dxTexture->GetDesc(&dxTextureDesc);
 
-    // Don't bother supporing MSAA for right now
+    // Don't bother supporting MSAA for right now
     if( dxTextureDesc.SampleDesc.Count > 1 )
     {
         fprintf(stderr, "ERROR: cannot capture multisample texture\n");
@@ -535,7 +535,7 @@ public:
                 hlslCursor+= sprintf(hlslCursor, ",\n");
             }
 
-            char const* typeName = "Uknown";
+            char const* typeName = "Unknown";
             switch(inputElements[ii].format)
             {
             case Format::RGB_Float32:

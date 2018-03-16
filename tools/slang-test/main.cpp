@@ -976,7 +976,7 @@ TestResult runHLSLComparisonTest(TestInput& input)
 
     OSProcessSpawner::ResultCode resultCode = spawner.getResultCode();
 
-    String standardOuptut = spawner.getStandardOutput();
+    String standardOuput = spawner.getStandardOutput();
     String standardError = spawner.getStandardError();
 
     // We construct a single output string that captures the results
@@ -986,7 +986,7 @@ TestResult runHLSLComparisonTest(TestInput& input)
     actualOutputBuilder.Append("\nstandard error = {\n");
     actualOutputBuilder.Append(standardError);
     actualOutputBuilder.Append("}\nstandard output = {\n");
-    actualOutputBuilder.Append(standardOuptut);
+    actualOutputBuilder.Append(standardOuput);
     actualOutputBuilder.Append("}\n");
 
     String actualOutput = actualOutputBuilder.ProduceString();
@@ -1008,7 +1008,7 @@ TestResult runHLSLComparisonTest(TestInput& input)
     {
         if (resultCode != 0)				result = kTestResult_Fail;
         if (standardError.Length() != 0)	result = kTestResult_Fail;
-        if (standardOuptut.Length() != 0)	result = kTestResult_Fail;
+        if (standardOuput.Length() != 0)	result = kTestResult_Fail;
     }
     // Otherwise we compare to the expected output
     else if (actualOutput != expectedOutput)
