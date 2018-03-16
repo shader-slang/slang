@@ -2492,14 +2492,14 @@ RefPtr<ProgramLayout> specializeProgramLayout(
         for (UInt i = 0; i < varLayout->resourceInfos.Count(); i++)
         {
             auto resInfo = varLayout->resourceInfos[i];
-            auto tresInfo = varLayout->typeLayout->resourceInfos[i];
-            SLANG_ASSERT(resInfo.kind == tresInfo.kind);
+            auto tresInfo = varLayout->typeLayout->FindResourceInfo(resInfo.kind);
+            SLANG_ASSERT(tresInfo);
             auto usedRangeSet = findUsedRangeSetForSpace(&context, resInfo.space);
             markSpaceUsed(&context, resInfo.space);
             usedRangeSet->usedResourceRanges[(int)resInfo.kind].Add(
                 nullptr, // we don't need to track parameter info here
                 resInfo.index,
-                resInfo.index + tresInfo.count);
+                resInfo.index + tresInfo->count);
         }
         structLayout->fields[varId] = varLayout;
         varLayoutMapping[varLayout] = varLayout;
