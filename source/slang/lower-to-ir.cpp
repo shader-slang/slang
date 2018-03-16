@@ -2549,6 +2549,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // (and that control flow will fall through to otherwise).
         // This is the block that subsequent code will go into.
         insertBlock(breakLabel);
+        context->shared->breakLabels.Remove(stmt);
     }
 };
 
