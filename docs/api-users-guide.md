@@ -89,7 +89,7 @@ If you will be passing files with `#include` directives to Slang, you'll need to
 spAddSearchPath(request, "some/path/");
 ```
 
-Note that for now Slang does not support any kind of "virtual filesystem," although that is obviously a desirable feature to add.
+Note that for now Slang does not support any kind of "virtual file-system," although that is obviously a desirable feature to add.
 
 #### Preprocessor Definitions
 
@@ -127,7 +127,7 @@ The last argument is an optional name for the translation unit; Slang currently 
 
 The `spAddTranslationUnit` function returns the zero-based index of the translation unit you added.
 You don't need to use this return value, because it will be deterministic (the first translation unit gets `0`, the next gets `1`, etc.), but the API returns it in case it saves you from having to track it with your own counter.
-The translation unit index is used in subsequent API calls taht modify or query the translation unit.
+The translation unit index is used in subsequent API calls that modify or query the translation unit.
 
 #### Source Files/Strings
 
@@ -194,7 +194,7 @@ The diagnostic output will also contain any warnings produced, even if the compi
 Note that the returned pointer is guaranteed to live at least as long as the compile request, but no longer.
 If you need to retain the data for later use, then you must make your own copy.
 
-If any errors occured, you shouldn't expect to read any useful output (other than the diagnostics) from the request; you should destroy it and move on.
+If any errors occurred, you shouldn't expect to read any useful output (other than the diagnostics) from the request; you should destroy it and move on.
 
 ### Reading Output Code
 
@@ -308,12 +308,12 @@ for(unsigned cc = 0; cc < categoryCount; cc++)
 }
 ```
 
-A loop like this lets you enumerate all of the reosurce types consumed by a parameter, and get a starting offset (and space) for each category.
+A loop like this lets you enumerate all of the resource types consumed by a parameter, and get a starting offset (and space) for each category.
 
 #### Type Layouts
 
 Just knowing where a shader parameter *starts* is only part of the story, of course.
-We also need to know how many resources (e.g., registers, bytes of uniform data, ...) it consumes, how many elemnets it occupies (if it is an array), and what "sub-parameters" it might include.
+We also need to know how many resources (e.g., registers, bytes of uniform data, ...) it consumes, how many elements it occupies (if it is an array), and what "sub-parameters" it might include.
 
 For these kinds of queries, we need to look at the *type layout* of a parameter:
 
@@ -322,7 +322,7 @@ slang::TypeLayoutReflection* typeLayout = parameter->getTypeLayout();
 ```
 
 Just as with the distinction between a variable and a variable layout, a type layout represents a particular type in the source code that has been laid out according to API-specific rules.
-A single type like `float[10]` might be laid out differently in different contets (e.g., using GLSL `std140` vs. `std430` rules).
+A single type like `float[10]` might be laid out differently in different contexts (e.g., using GLSL `std140` vs. `std430` rules).
 
 The first thing we want to know about a type is its *kind*:
 
@@ -352,13 +352,13 @@ slang::TypeLayoutReflection* elementTypeLayout = typeLayout->getElementTypeLayou
 sie_t arrayElementStride = typeLayout->getElementStride(category);
 ```
 
-An array of unknoqn size will currently report zero elements.
+An array of unknown size will currently report zero elements.
 The "stride" of an array is the amount of resources (e.g., the number of bytes of uniform data) that need to be skipped between consecutive array elements.
 This need *not* be the same as `elementTypeLayout->getSize(category)`, and there are two notable cases to be aware of:
 
 - An array in a constant buffer may have a stride larger than the element size. E.g., a `float a[10]` in a D3D or `std140` constant buffer will have 4-byte elements, but a stride of 16.
 
-- An arrray of resources in Vulkan will have a stride of *zero* descriptor-table slots, because the entire array is allocated a single `binding`.
+- An array of resources in Vulkan will have a stride of *zero* descriptor-table slots, because the entire array is allocated a single `binding`.
 
 ##### Structures
 
@@ -378,7 +378,7 @@ Each field is represented as a full variable layout, so application code can rec
 An important caveat to be aware of when recursing into structure types like this, is that the layout information on a field is relative to the start of the parent type layout, and not absolute.
 This is perhaps not surprising in the case of `slang::ParameterCategory::Uniform`: if you ask a field in a `struct` type for its byte offset, it will return the offset from the start of the `struct`.
 
-Where this can trip up users is when a `struct` type containss fields of other categories (e.g., a structure with a `Texture2D` in it).
+Where this can trip up users is when a `struct` type contains fields of other categories (e.g., a structure with a `Texture2D` in it).
 In these cases, the "binding index" of a structure field in a relative offset from whatever binding index is given to the parent structure.
 
 The basic rule is that no matter what category of binding resource (bytes, registers, etc.) you are talking about, the index/offset of `a.b.c` must be computed by adding together the offsets of `a`, `b` and `c`.
@@ -417,7 +417,7 @@ If you are implementing some kind of "hot reload" system for shaders, then you p
 Slang provides a simple API for enumerating these, on a successful compile:
 
 ```c++
-int depCount = spGetDepenencyFileCount(request);
+int depCount = spGetDependencyFileCount(request);
 for(int dep = 0; dep < depCount; dep++)
 {
 	char const* depPath = spGetDependencyFilePath(request, dep);
