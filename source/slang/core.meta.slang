@@ -114,6 +114,10 @@ __magic_type(InOutType)
 struct InOut
 {};
 
+__magic_type(StringType)
+struct String
+{};
+
 ${{{{
 // Declare vector and matrix types
 

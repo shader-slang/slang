@@ -2673,8 +2673,15 @@ struct EmitVisitor
         ExprVisitorWithArg::dispatch(derefExpr->base, arg);
     }
 
-    void visitConstantExpr(ConstantExpr* litExpr, ExprEmitArg const& arg)
+    void visitLiteralExpr(LiteralExpr*, ExprEmitArg const&)
     {
+        // Disabling because we no longer use the AST-based emit path.
+        //
+        // Note: I'm keeping this code around for a while just in case
+        // we want to borrow any of the logic here for how to apply
+        // suffixes to numeric literals we emit.
+        //
+#if 0
         auto outerPrec = arg.outerPrec;
         bool needClose = MaybeEmitParens(outerPrec, kEOp_Atomic);
 
@@ -2736,6 +2743,7 @@ struct EmitVisitor
             break;
         }
         if(needClose) Emit(")");
+#endif
     }
 
     void visitTypeCastExpr(TypeCastExpr* castExpr, ExprEmitArg const& arg)

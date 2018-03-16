@@ -42,25 +42,32 @@ SYNTAX_CLASS(OverloadedExpr2, Expr)
     FIELD(List<RefPtr<Expr>>, candidiateExprs)
 END_SYNTAX_CLASS()
 
-SYNTAX_CLASS(ConstantExpr, Expr)
+ABSTRACT_SYNTAX_CLASS(LiteralExpr, Expr)
+    // The token that was used to express the literal. This can be
+    // used to get the raw text of the literal, including any suffix.
     FIELD(Token, token)
+END_SYNTAX_CLASS()
 
-    RAW(
-    enum class ConstantType
-    {
-        Int,
-        Bool,
-        Float,
-        String,
-    };
-    ConstantType ConstType;
-    union
-    {
-        IntegerLiteralValue         integerValue;
-        FloatingPointLiteralValue   floatingPointValue;
-    };
-    String stringValue;
-    )
+SYNTAX_CLASS(IntegerLiteralExpr, LiteralExpr)
+    FIELD(IntegerLiteralValue, value)
+END_SYNTAX_CLASS()
+
+SYNTAX_CLASS(FloatingPointLiteralExpr, LiteralExpr)
+    FIELD(FloatingPointLiteralValue, value)
+END_SYNTAX_CLASS()
+
+SYNTAX_CLASS(BoolLiteralExpr, LiteralExpr)
+    FIELD(bool, value)
+END_SYNTAX_CLASS()
+
+SYNTAX_CLASS(StringLiteralExpr, LiteralExpr)
+    // TODO: consider storing the "segments" of the string
+    // literal, in the case where multiple literals were
+    //lined up at the lexer level, e.g.:
+    //
+    //      "first" "second" "third"
+    //
+    FIELD(String, value)
 END_SYNTAX_CLASS()
 
 // An initializer list, e.g. `{ 1, 2, 3 }`

@@ -468,6 +468,7 @@ namespace Slang
         Type* getInitializerListType();
         Type* getOverloadedType();
         Type* getErrorType();
+        Type* getStringType();
 
         Type* getConstExprRate();
         RefPtr<RateQualifiedType> getRateQualifiedType(

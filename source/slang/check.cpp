@@ -1407,6 +1407,30 @@ namespace Slang
             return constIntVal;
         }
 
+        // Check an expression, coerce it to the `String` type, and then
+        // ensure that it has a literal (not just compile-time constant) value.
+        bool checkLiteralStringVal(
+            RefPtr<Expr>    expr,
+            String*         outVal)
+        {
+            // TODO: This should actually perform semantic checking, etc.,
+            // but for now we are just going to look for a direct string
+            // literal AST node.
+
+            if(auto stringLitExpr = expr.As<StringLiteralExpr>())
+            {
+                if(outVal)
+                {
+                    *outVal = stringLitExpr->value;
+                }
+                return true;
+            }
+
+            getSink()->diagnose(expr, Diagnostics::expectedAStringLiteral);
+
+            return false;
+        }
+
         void visitSyntaxDecl(SyntaxDecl*)
         {
             // These are only used in the stdlib, so no checking is needed
@@ -1456,6 +1480,36 @@ namespace Slang
             }
         }
 
+        Stage findStageByName(String const& name)
+        {
+            static const struct
+            {
+                char const* name;
+                Stage       stage;
+            } kStages[] =
+            {
+                { "vertex",     Stage::Vertex },
+                { "hull",       Stage::Hull },
+                { "domain",     Stage::Domain },
+                { "geometry",   Stage::Geometry },
+                { "fragment",   Stage::Fragment },
+                { "compute",    Stage::Compute },
+
+                // Allow `pixel` as an alias of `fragment`
+                { "pixel",      Stage::Fragment },
+            };
+
+            for(auto entry : kStages)
+            {
+                if(name == entry.name)
+                {
+                    return entry.stage;
+                }
+            }
+
+            return Stage::Unknown;
+        }
+
         bool validateAttribute(RefPtr<Attribute> attr)
         {
                 if(auto numThreadsAttr = attr.As<NumThreadsAttribute>())
@@ -1486,6 +1540,24 @@ namespace Slang
                     auto val = checkConstantIntVal(attr->args[0]);
 
                     instanceAttr->value = (int32_t)val->value;
+                }
+                else if(auto entryPointAttr = attr.As<EntryPointAttribute>())
+                {
+                    SLANG_ASSERT(attr->args.Count() == 1);
+
+                    String stageName;
+                    if(!checkLiteralStringVal(attr->args[0], &stageName))
+                    {
+                        return false;
+                    }
+
+                    auto stage = findStageByName(stageName);
+                    if(stage == Stage::Unknown)
+                    {
+                        getSink()->diagnose(attr->args[0], Diagnostics::unknownStageName, stageName);
+                    }
+
+                    entryPointAttr->stage = stage;
                 }
                 else
                 {
@@ -3172,35 +3244,51 @@ namespace Slang
             stmt->Expression = CheckExpr(stmt->Expression);
         }
 
-        RefPtr<Expr> visitConstantExpr(ConstantExpr *expr)
+        RefPtr<Expr> visitBoolLiteralExpr(BoolLiteralExpr* expr)
         {
-            // The expression might already have a type, determined by its suffix
-            if(expr->type.type)
-                return expr;
+            expr->type = getSession()->getBoolType();
+            return expr;
+        }
 
-            switch (expr->ConstType)
+        RefPtr<Expr> visitIntegerLiteralExpr(IntegerLiteralExpr* expr)
+        {
+            // The expression might already have a type, determined by its suffix.
+            // It it doesn't, we will give it a default type.
+            //
+            // TODO: We should be careful to pick a "big enough" type
+            // based on the size of the value (e.g., don't try to stuff
+            // a constant in an `int` if it requires 64 or more bits).
+            //
+            // The long-term solution here is to give a type to a literal
+            // based on the context where it is used, but that requires
+            // a more sophisticated type system than we have today.
+            //
+            if(!expr->type.type)
             {
-            case ConstantExpr::ConstantType::Int:
                 expr->type = getSession()->getIntType();
-                break;
-            case ConstantExpr::ConstantType::Bool:
-                expr->type = getSession()->getBoolType();
-                break;
-            case ConstantExpr::ConstantType::Float:
-                expr->type = getSession()->getFloatType();
-                break;
-            default:
-                expr->type = QualType(getSession()->getErrorType());
-                throw "Invalid constant type.";
-                break;
             }
             return expr;
         }
 
-        IntVal* GetIntVal(ConstantExpr* expr)
+        RefPtr<Expr> visitFloatingPointLiteralExpr(FloatingPointLiteralExpr* expr)
+        {
+            if(!expr->type.type)
+            {
+                expr->type = getSession()->getFloatType();
+            }
+            return expr;
+        }
+
+        RefPtr<Expr> visitStringLiteralExpr(StringLiteralExpr* expr)
+        {
+            expr->type = getSession()->getStringType();
+            return expr;
+        }
+
+        IntVal* GetIntVal(IntegerLiteralExpr* expr)
         {
             // TODO(tfoley): don't keep allocating here!
-            return new ConstantIntVal(expr->integerValue);
+            return new ConstantIntVal(expr->value);
         }
 
         Name* getName(String const& text)
@@ -3339,9 +3427,9 @@ namespace Slang
             }
 
             // TODO(tfoley): more serious constant folding here
-            if (auto constExp = dynamic_cast<ConstantExpr*>(expr))
+            if (auto intLitExpr = dynamic_cast<IntegerLiteralExpr*>(expr))
             {
-                return GetIntVal(constExp);
+                return GetIntVal(intLitExpr);
             }
 
             // it is possible that we are referring to a generic value param
