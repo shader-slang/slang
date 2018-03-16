@@ -805,8 +805,9 @@ namespace Slang
         type = 0x1,
         Function = 0x2,
         Value = 0x4,
+        Attribute = 0x8,
 
-        All = type | Function | Value,
+        Default = type | Function | Value,
     };
 
     // Represents one item found during lookup
@@ -1000,7 +1001,7 @@ namespace Slang
         RefPtr<Scope>       scope       = nullptr;
         RefPtr<Scope>       endScope    = nullptr;
 
-        LookupMask          mask        = LookupMask::All;
+        LookupMask          mask        = LookupMask::Default;
     };
 
     // Generate class definition for all syntax classes

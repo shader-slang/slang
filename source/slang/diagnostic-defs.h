@@ -197,6 +197,11 @@ DIAGNOSTIC(30051, Error, invalidValueForArgument, "invalid value for argument '$
 DIAGNOSTIC(30052, Error, invalidSwizzleExpr, "invalid swizzle pattern '$0' on type '$1'")
 DIAGNOSTIC(33070, Error, expectedFunction, "expression preceding parenthesis of apparent call must have function type.")
 
+// Attributes
+DIAGNOSTIC(31000, Error, unknownAttributeName, "unknown attribute '$0'")
+DIAGNOSTIC(31001, Error, attributeArgumentCountMismatch, "attribute '$0' expects $1 arguments ($2 provided)")
+DIAGNOSTIC(31001, Error, attributeNotApplicable, "attribute '$0' is not valid here")
+
 // 303xx: interfaces and associated types
 DIAGNOSTIC(30300, Error, assocTypeInInterfaceOnly, "'associatedtype' can only be defined in an 'interface'.")
 DIAGNOSTIC(30301, Error, globalGenParamInGlobalScopeOnly, "'__generic_param' can only be defined global scope.")

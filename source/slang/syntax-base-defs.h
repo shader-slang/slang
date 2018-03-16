@@ -240,7 +240,7 @@ END_SYNTAX_CLASS()
 // (that is, we don't use a bitfield, even for simple/common flags).
 // This ensures that we can track source locations for all modifiers.
 //
-ABSTRACT_SYNTAX_CLASS(Modifier, SyntaxNodeBase)
+ABSTRACT_SYNTAX_CLASS(Modifier, SyntaxNode)
     RAW(typedef IModifierVisitor Visitor;)
 
     RAW(virtual void accept(IModifierVisitor* visitor, void* extra) = 0;)

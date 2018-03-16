@@ -96,6 +96,11 @@ bool DeclPassesLookupMask(Decl* decl, LookupMask mask)
     {
         return (int(mask) & int(LookupMask::Function)) != 0;
     }
+    // attribute declaration
+    else if( auto attrDecl = dynamic_cast<AttributeDecl*>(decl) )
+    {
+        return (int(mask) & int(LookupMask::Attribute)) != 0;
+    }
 
     // default behavior is to assume a value declaration
     // (no overloading allowed)
@@ -423,11 +428,13 @@ LookupResult lookUp(
     Session*            session,
     SemanticsVisitor*   semantics,
     Name*               name,
-    RefPtr<Scope>       scope)
+    RefPtr<Scope>       scope,
+    LookupMask          mask)
 {
     LookupRequest request;
     request.semantics = semantics;
     request.scope = scope;
+    request.mask = mask;
     return DoLookup(session, name, request);
 }
 
@@ -437,10 +444,12 @@ LookupResult lookUpLocal(
     Session*                session,
     SemanticsVisitor*       semantics,
     Name*                   name,
-    DeclRef<ContainerDecl>  containerDeclRef)
+    DeclRef<ContainerDecl>  containerDeclRef,
+    LookupMask              mask)
 {
     LookupRequest request;
     request.semantics = semantics;
+    request.mask = mask;
 
     LookupResult result;
     DoLocalLookupImpl(session, name, containerDeclRef, request, result, nullptr);
@@ -448,12 +457,13 @@ LookupResult lookUpLocal(
 }
 
 void lookUpMemberImpl(
-    Session* session,
+    Session*            session,
     SemanticsVisitor*   semantics,
     Name*               name,
     Type*               type,
     LookupResult&       ioResult,
-    BreadcrumbInfo*     inBreadcrumbs)
+    BreadcrumbInfo*     inBreadcrumbs,
+    LookupMask          mask)
 {
     if (auto declRefType = type->As<DeclRefType>())
     {
@@ -475,7 +485,7 @@ void lookUpMemberImpl(
                 breadcrumb.declRef = constraintDeclRef;
 
                 // TODO: Need to consider case where this might recurse infinitely.
-                lookUpMemberImpl(session, semantics, name, bound, ioResult, &breadcrumb);
+                lookUpMemberImpl(session, semantics, name, bound, ioResult, &breadcrumb, mask);
             }
         }
         else if (auto aggTypeDeclRef = declRef.As<AggTypeDecl>())
@@ -517,7 +527,7 @@ void lookUpMemberImpl(
                 breadcrumb.declRef = constraintDeclRef;
 
                 // TODO: Need to consider case where this might recurse infinitely.
-                lookUpMemberImpl(session, semantics, name, bound, ioResult, &breadcrumb);
+                lookUpMemberImpl(session, semantics, name, bound, ioResult, &breadcrumb, mask);
             }
         }
         
@@ -529,10 +539,11 @@ LookupResult lookUpMember(
     Session*            session,
     SemanticsVisitor*   semantics,
     Name*               name,
-    Type*               type)
+    Type*               type,
+    LookupMask          mask)
 {
     LookupResult result;
-    lookUpMemberImpl(session, semantics, name, type, result, nullptr);
+    lookUpMemberImpl(session, semantics, name, type, result, nullptr, mask);
     return result;
 }
 

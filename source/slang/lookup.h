@@ -21,7 +21,8 @@ LookupResult lookUp(
     Session*            session,
     SemanticsVisitor*   semantics,
     Name*               name,
-    RefPtr<Scope>       scope);
+    RefPtr<Scope>       scope,
+    LookupMask          mask = LookupMask::Default);
 
 // perform lookup within the context of a particular container declaration,
 // and do *not* look further up the chain
@@ -29,14 +30,16 @@ LookupResult lookUpLocal(
     Session*                session,
     SemanticsVisitor*       semantics,
     Name*                   name,
-    DeclRef<ContainerDecl>  containerDeclRef);
+    DeclRef<ContainerDecl>  containerDeclRef,
+    LookupMask          mask = LookupMask::Default);
 
 // Perform member lookup in the context of a type
 LookupResult lookUpMember(
     Session*            session,
     SemanticsVisitor*   semantics,
     Name*               name,
-    Type*               type);
+    Type*               type,
+    LookupMask          mask = LookupMask::Default);
 
 // TODO: this belongs somewhere else
 

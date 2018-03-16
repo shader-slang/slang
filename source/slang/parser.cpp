@@ -602,10 +602,20 @@ namespace Slang
         parser->ReadToken(TokenType::LBracket);
         for(;;)
         {
+            // Note: When parsing we just construct an AST node for an
+            // "unchecked" attribute, and defer all detailed semantic
+            // checking until later.
+            //
+            // An alternative would be to perform lookup of an `AttributeDecl`
+            // at this point, similar to what we do for `SyntaxDecl`, but it
+            // seems better to not complicate the parsing process any more.
+            //
+
             auto nameToken = parser->ReadToken(TokenType::Identifier);
-            RefPtr<HLSLUncheckedAttribute> modifier = new HLSLUncheckedAttribute();
+            RefPtr<UncheckedAttribute> modifier = new UncheckedAttribute();
             modifier->name = nameToken.getName();
             modifier->loc = nameToken.getLoc();
+            modifier->scope = parser->currentScope;
 
             if (AdvanceIf(parser, TokenType::LParent))
             {
@@ -2500,6 +2510,107 @@ namespace Slang
         return syntaxDecl;
     }
 
+    // A parameter declaration in an attribute declaration.
+    //
+    // We are going to use `name: type` syntax just for simplicty, and let the type
+    // be optional, because we don't actually need it in all cases.
+    //
+    static RefPtr<ParamDecl> parseAttributeParamDecl(Parser* parser)
+    {
+        auto nameAndLoc = expectIdentifier(parser);
+
+        RefPtr<ParamDecl> paramDecl = new ParamDecl();
+        paramDecl->nameAndLoc = nameAndLoc;
+
+        if(AdvanceIf(parser, TokenType::Colon))
+        {
+            paramDecl->type = parser->ParseTypeExp();
+        }
+
+        if(AdvanceIf(parser, TokenType::OpAssign))
+        {
+            paramDecl->initExpr = parser->ParseInitExpr();
+        }
+
+        return paramDecl;
+    }
+
+    // Parse declaration of a name to be used for resolving `[attribute(...)]` style modifiers.
+    //
+    // These are distinct from `syntax` declarations, because their names don't get added
+    // to the current scope using their default name.
+    //
+    // Also, attribute-specific code doesn't get invokved during parsing. We always parse
+    // using the default attribute-parsing logic and then all specialized behavior takes
+    // place during semantic checking.
+    //
+    static RefPtr<RefObject> parseAttributeSyntaxDecl(Parser* parser, void* /*userData*/)
+    {
+        // Right now the basic form is:
+        //
+        // attribute_syntax <name:id> : <syntaxClass:id>;
+        //
+        // - `name` gives the name of the attribute to define.
+        // - `syntaxClass` is the name of an AST node class that we expect
+        //   this attribute to create when checked.
+        // - `existingKeyword` is the name of an existing keyword that
+        //   the new syntax should be an alias for.
+
+        expect(parser, TokenType::LBracket);
+
+        // First we parse the attribute name.
+        auto nameAndLoc = expectIdentifier(parser);
+
+        RefPtr<AttributeDecl> attrDecl = new AttributeDecl();
+        if(AdvanceIf(parser, TokenType::LParent))
+        {
+            while(!AdvanceIfMatch(parser, TokenType::RParent))
+            {
+                auto param = parseAttributeParamDecl(parser);
+
+                AddMember(attrDecl, param);
+
+                if(AdvanceIfMatch(parser, TokenType::RParent))
+                    break;
+
+                expect(parser, TokenType::Comma);
+            }
+        }
+
+        expect(parser, TokenType::RBracket);
+
+        // TODO: we should allow parameters to be specified here, to cut down
+        // on the amount of per-attribute-type logic that has to occur later.
+
+        // Next we look for a clause that specified the AST node class.
+        SyntaxClass<RefObject> syntaxClass;
+        if (AdvanceIf(parser, TokenType::Colon))
+        {
+            // User is specifying the class that should be construted
+            auto classNameAndLoc = expectIdentifier(parser);
+
+            syntaxClass = parser->getSession()->findSyntaxClass(classNameAndLoc.name);
+        }
+        else
+        {
+            // For now we don't support the alternative approach where
+            // an existing piece of syntax is named to provide the parsing
+            // support.
+
+            // TODO: diagnose: a syntax class must be specified.
+        }
+
+        expect(parser, TokenType::Semicolon);
+
+        // TODO: skip creating the declaration if anything failed, just to not screw things
+        // up for downstream code?
+
+        attrDecl->nameAndLoc = nameAndLoc;
+        attrDecl->loc = nameAndLoc.loc;
+        attrDecl->syntaxClass = syntaxClass;
+        return attrDecl;
+    }
+
     // Finish up work on a declaration that was parsed
     static void CompleteDecl(
         Parser*				/*parser*/,
@@ -4182,6 +4293,20 @@ namespace Slang
         return modifier;
     }
 
+    static RefPtr<RefObject> parseAttributeTargetModifier(Parser* parser, void* /*userData*/)
+    {
+        expect(parser, TokenType::LParent);
+        auto syntaxClassNameAndLoc = expectIdentifier(parser);
+        expect(parser, TokenType::RParent);
+
+        auto syntaxClass = parser->getSession()->findSyntaxClass(syntaxClassNameAndLoc.name);
+
+        RefPtr<AttributeTargetModifier> modifier = new AttributeTargetModifier();
+        modifier->syntaxClass = syntaxClass;
+
+        return modifier;
+    }
+
     RefPtr<ModuleDecl> populateBaseLanguageModule(
         Session*        session,
         RefPtr<Scope>   scope)
@@ -4205,6 +4330,7 @@ namespace Slang
         DECL(__subscript,     ParseSubscriptDecl);
         DECL(interface,       parseInterfaceDecl);
         DECL(syntax,          parseSyntaxDecl);
+        DECL(attribute_syntax,parseAttributeSyntaxDecl);
         DECL(__import,        parseImportDecl);
         DECL(import,          parseImportDecl);
 
@@ -4279,6 +4405,9 @@ namespace Slang
         MODIFIER(__magic_type,      parseMagicTypeModifier);
         MODIFIER(__intrinsic_type,    parseIntrinsicTypeModifier);
         MODIFIER(__implicit_conversion,     parseImplicitConversionModifier);
+
+        MODIFIER(__attributeTarget, parseAttributeTargetModifier);
+
 
 #undef MODIFIER
 

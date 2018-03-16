@@ -2004,17 +2004,12 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         IRInst* inst,
         Stmt*   stmt)
     {
-        for(auto attr : stmt->GetModifiersOfType<HLSLUncheckedAttribute>())
+        if( stmt->FindModifier<UnrollAttribute>() )
         {
-            // TODO: We should actually catch these attributes during
-            // semantic checking, so that they have a strongly-typed
-            // representation in the AST.
-            if(getText(attr->getName()) == "unroll")
-            {
-                auto decoration = getBuilder()->addDecoration<IRLoopControlDecoration>(inst);
-                decoration->mode = kIRLoopControl_Unroll;
-            }
+            auto decoration = getBuilder()->addDecoration<IRLoopControlDecoration>(inst);
+            decoration->mode = kIRLoopControl_Unroll;
         }
+        // TODO: handle other cases here
     }
 
     void visitForStmt(ForStmt* stmt)
@@ -2790,6 +2785,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     }
 
     LoweredValInfo visitSyntaxDecl(SyntaxDecl* /*decl*/)
+    {
+        return LoweredValInfo();
+    }
+
+    LoweredValInfo visitAttributeDecl(AttributeDecl* /*decl*/)
     {
         return LoweredValInfo();
     }

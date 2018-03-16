@@ -2809,23 +2809,7 @@ struct EmitVisitor
 
     void EmitLoopAttributes(RefPtr<Stmt> decl)
     {
-        // Don't emit these attributes for GLSL, because it doesn't understand them
-        if (context->shared->target == CodeGenTarget::GLSL)
-            return;
-
-        // TODO(tfoley): There really ought to be a semantic checking step for attributes,
-        // that turns abstract syntax into a concrete hierarchy of attribute types (e.g.,
-        // a specific `LoopModifier` or `UnrollModifier`).
-
-        for(auto attr : decl->GetModifiersOfType<HLSLUncheckedAttribute>())
-        {
-            // Emit whatever attributes the user might have attached,
-            // whether or not we think they make semantic sense.
-            //
-            Emit("[");
-            emit(attr->getName());
-            Emit("]");
-        }
+        // NOTE: Emit-from-AST is gone, so this code is doing nothing.
     }
 
     void EmitUnparsedStmt(RefPtr<UnparsedStmt> stmt)
@@ -3134,6 +3118,7 @@ struct EmitVisitor
 
     // Only used by stdlib
     IGNORED(SyntaxDecl)
+    IGNORED(AttributeDecl)
 
     // Don't emit generic decls directly; we will only
     // ever emit particular instantiations of them.
@@ -3344,27 +3329,6 @@ struct EmitVisitor
                 case CodeGenTarget::GLSL:
                     break;
                 }
-            }
-
-            // TODO: eventually we should be checked these modifiers, but for
-            // now we can emit them unchecked, I guess
-            else if (auto uncheckedAttr = mod.As<HLSLAttribute>())
-            {
-                Emit("[");
-                emit(uncheckedAttr->getNameAndLoc());
-                auto& args = uncheckedAttr->args;
-                auto argCount = args.Count();
-                if (argCount != 0)
-                {
-                    Emit("(");
-                    for (UInt aa = 0; aa < argCount; ++aa)
-                    {
-                        if (aa != 0) Emit(", ");
-                        EmitExpr(args[aa]);
-                    }
-                    Emit(")");
-                }
-                Emit("]");
             }
 
             else if(auto simpleModifier = mod.As<SimpleModifier>())
@@ -6756,13 +6720,13 @@ emitDeclImpl(decl, nullptr);
             break;
         case Stage::Geometry:
         {
-            if (auto attrib = entryPointLayout->entryPoint->FindModifier<HLSLMaxVertexCountAttribute>())
+            if (auto attrib = entryPointLayout->entryPoint->FindModifier<MaxVertexCountAttribute>())
             {
                 emit("[maxvertexcount(");
                 Emit(attrib->value);
                 emit(")]\n");
             }
-            if (auto attrib = entryPointLayout->entryPoint->FindModifier<HLSLInstanceAttribute>())
+            if (auto attrib = entryPointLayout->entryPoint->FindModifier<InstanceAttribute>())
             {
                 emit("[instance(");
                 Emit(attrib->value);
@@ -6813,13 +6777,13 @@ emitDeclImpl(decl, nullptr);
             break;
         case Stage::Geometry:
         {
-            if (auto attrib = entryPointLayout->entryPoint->FindModifier<HLSLMaxVertexCountAttribute>())
+            if (auto attrib = entryPointLayout->entryPoint->FindModifier<MaxVertexCountAttribute>())
             {
                 emit("layout(max_vertices = ");
                 Emit(attrib->value);
                 emit(") out;\n");
             }
-            if (auto attrib = entryPointLayout->entryPoint->FindModifier<HLSLInstanceAttribute>())
+            if (auto attrib = entryPointLayout->entryPoint->FindModifier<InstanceAttribute>())
             {
                 emit("layout(invocations = ");
                 Emit(attrib->value);
