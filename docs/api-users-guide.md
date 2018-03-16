@@ -86,7 +86,7 @@ spSetCodeGenTarget(request, SLANG_SPIRV);
 If you will be passing files with `#include` directives to Slang, you'll need to specify where it should look for those files:
 
 ```c++
-spAddSearchpath(request, "some/path/");
+spAddSearchPath(request, "some/path/");
 ```
 
 Note that for now Slang does not support any kind of "virtual filesystem," although that is obviously a desirable feature to add.
