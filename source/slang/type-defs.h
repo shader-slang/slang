@@ -388,6 +388,9 @@ protected:
 )
 END_SYNTAX_CLASS()
 
+// The built-in `String` type
+SIMPLE_SYNTAX_CLASS(StringType, DeclRefType)
+
 // Base class for types that map down to
 // simple pointers as part of code generation.
 SYNTAX_CLASS(PtrTypeBase, DeclRefType)

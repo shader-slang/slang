@@ -1922,7 +1922,7 @@ static void collectEntryPointParameters(
     state.ioSemanticIndex = &defaultSemanticIndex;
     state.optSemanticName = nullptr;
     state.semanticSlotCount = 0;
-    state.stage = entryPoint->profile.GetStage();
+    state.stage = entryPoint->getStage();
 
     for( auto m : entryPointFuncDecl->Members )
     {
@@ -2020,12 +2020,14 @@ inferStageForTranslationUnit(
     // and have only a single entry point, use the stage
     // of the entry point.
     //
-    // TODO: can we generalize this at all?
+    // TODO: now that we've dropped official GLSL support,
+    // we probably should drop this as well.
+    //
     if( translationUnit->sourceLanguage == SourceLanguage::GLSL )
     {
         if( translationUnit->entryPoints.Count() == 1 )
         {
-            return translationUnit->entryPoints[0]->profile.GetStage();
+            return translationUnit->entryPoints[0]->getStage();
         }
     }
 
@@ -2080,7 +2082,7 @@ static void collectParameters(
         // Next consider parameters for entry points
         for( auto& entryPoint : translationUnit->entryPoints )
         {
-            context->stage = entryPoint->profile.GetStage();
+            context->stage = entryPoint->getStage();
             collectEntryPointParameters(context, entryPoint.Ptr(), SubstitutionSet());
         }
         context->entryPointLayout = nullptr;
