@@ -350,12 +350,17 @@ public:
                 &dxFeatureLevel,
                 &dxImmediateContext);
 
-            // Failures with `E_INVALIDARG` might be due to feature level 11_1
-            // not being supported. Other failures are real, though.
-            if( hr != E_INVALIDARG )
+			// Failures with `E_INVALIDARG` might be due to feature level 11_1
+			// not being supported. 
+			if (hr == E_INVALIDARG)
 			{
-				SLANG_RETURN_ON_FAIL(hr);
+				continue;
 			}
+
+			// Other failures are real, though.
+			SLANG_RETURN_ON_FAIL(hr);
+			// We must have a swap chain
+			break;
         }
  
         // After we've created the swap chain, we can request a pointer to the
