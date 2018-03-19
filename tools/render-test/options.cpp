@@ -10,7 +10,7 @@ namespace renderer_test {
 
 Options gOptions;
 
-void parseOptions(int* argc, char** argv)
+SlangResult parseOptions(int* argc, char** argv)
 {
     int argCount = *argc;
     char const* const* argCursor = argv;
@@ -48,7 +48,7 @@ void parseOptions(int* argc, char** argv)
             if( argCursor == argEnd )
             {
                 fprintf(stderr, "expected argument for '%s' option\n", arg);
-                exit(1);
+                return SLANG_FAIL;
             }
             gOptions.outputPath = *argCursor++;
         }
@@ -89,12 +89,12 @@ void parseOptions(int* argc, char** argv)
             if( argCursor == argEnd )
             {
                 fprintf(stderr, "expected argument for '%s' option\n", arg);
-                exit(1);
+                return SLANG_FAIL;
             }
             if( gOptions.slangArgCount == kMaxSlangArgs )
             {
                 fprintf(stderr, "maximum number of '%s' options exceeded (%d)\n", arg, kMaxSlangArgs);
-                exit(1);
+                return SLANG_FAIL;
             }
             gOptions.slangArgs[gOptions.slangArgCount++] = *argCursor++;
         }
@@ -123,7 +123,7 @@ void parseOptions(int* argc, char** argv)
         else
         {
             fprintf(stderr, "unknown option '%s'\n", arg);
-            exit(1);
+            return SLANG_FAIL;
         }
     }
     
@@ -142,10 +142,11 @@ void parseOptions(int* argc, char** argv)
     if(argCursor != argEnd)
     {
         fprintf(stderr, "unexpected arguments\n");
-        exit(1);
+        return SLANG_FAIL;
     }
 
     *argc = 0;
+	return SLANG_OK;
 }
 
 } // renderer_test

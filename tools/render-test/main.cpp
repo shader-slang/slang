@@ -5,7 +5,9 @@
 #include "render-d3d11.h"
 #include "render-gl.h"
 #include "render-vk.h"
+
 #include "slang-support.h"
+
 #include "shader-input-layout.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,9 +23,6 @@
 #endif
 
 namespace renderer_test {
-
-//
-
 
 int gWindowWidth = 1024;
 int gWindowHeight = 768;
@@ -71,7 +70,7 @@ static char const* vertexProfileName   = "vs_5_0";
 static char const* fragmentProfileName = "ps_5_0";
 static char const* computeProfileName = "cs_5_0";
 
-Error initializeShaders(
+SlangResult initializeShaders(
     ShaderCompiler* shaderCompiler)
 {
     // Read in the source code
@@ -80,7 +79,7 @@ Error initializeShaders(
     if( !sourceFile )
     {
         fprintf(stderr, "error: failed to open '%s' for reading\n", sourcePath);
-        exit(1);
+        return SLANG_FAIL;
     }
     fseek(sourceFile, 0, SEEK_END);
     size_t sourceSize = ftell(sourceFile);
@@ -89,7 +88,7 @@ Error initializeShaders(
     if( !sourceText )
     {
         fprintf(stderr, "error: out of memory");
-        exit(1);
+		return SLANG_FAIL;
     }
     fread(sourceText, sourceSize, 1, sourceFile);
     fclose(sourceFile);
@@ -123,23 +122,20 @@ Error initializeShaders(
     gShaderProgram = shaderCompiler->compileProgram(compileRequest);
     if( !gShaderProgram )
     {
-        return Error::Unexpected;
+        return SLANG_FAIL;
     }
 
-    return Error::None;
+    return SLANG_OK;
 }
 //
 // At initialization time, we are going to load and compile our Slang shader
 // code, and then create the D3D11 API objects we need for rendering.
 //
-Error initializeInner(
+SlangResult initializeInner(
     Renderer*       renderer,
     ShaderCompiler* shaderCompiler)
 {
-    Error err = Error::None;
-
-    err = initializeShaders(shaderCompiler);
-    if(err != Error::None) return err;
+    SLANG_RETURN_ON_FAIL(initializeShaders(shaderCompiler));
 
     gBindingState = renderer->createBindingState(gShaderInputLayout);
 
@@ -154,8 +150,8 @@ Error initializeInner(
 
     gConstantBuffer = renderer->createBuffer(constantBufferDesc);
     if(!gConstantBuffer)
-        return Error::Unexpected;
-    
+        return SLANG_FAIL;
+		
     // Input Assembler (IA)
 
     InputElementDesc inputElements[] = {
@@ -166,7 +162,7 @@ Error initializeInner(
 
     gInputLayout = renderer->createInputLayout(&inputElements[0], sizeof(inputElements)/sizeof(inputElements[0]));
     if(!gInputLayout)
-        return Error::Unexpected;
+        return SLANG_FAIL;
 
     BufferDesc vertexBufferDesc;
     vertexBufferDesc.size = kVertexCount * sizeof(Vertex);
@@ -175,9 +171,9 @@ Error initializeInner(
 
     gVertexBuffer = renderer->createBuffer(vertexBufferDesc);
     if(!gVertexBuffer)
-        return Error::Unexpected;
+        return SLANG_FAIL;
 
-    return Error::None;
+    return SLANG_OK;
 }
 
 void renderFrameInner(
@@ -248,139 +244,123 @@ static LRESULT CALLBACK windowProc(
 }
 
 
-} // renderer_test
-
-
-//
-
-int main(
-    int argc,
-    char**  argv)
+SlangResult innerMain(int argc, char** argv)
 {
-    using namespace renderer_test;
+	// Parse command-line options
+	SLANG_RETURN_ON_FAIL(parseOptions(&argc, argv));
 
-    // Parse command-line options
-    parseOptions(&argc, argv);
+	// Do initial window-creation stuff here, rather than in the renderer-specific files
 
+	HINSTANCE instance = GetModuleHandleA(0);
+	int showCommand = SW_SHOW;
 
-    // Do initial window-creation stuff here, rather than in the renderer-specific files
+	// First we register a window class.
 
-    HINSTANCE instance = GetModuleHandleA(0);
-    int showCommand = SW_SHOW;
+	WNDCLASSEXW windowClassDesc;
+	windowClassDesc.cbSize = sizeof(windowClassDesc);
+	windowClassDesc.style = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
+	windowClassDesc.lpfnWndProc = &windowProc;
+	windowClassDesc.cbClsExtra = 0;
+	windowClassDesc.cbWndExtra = 0;
+	windowClassDesc.hInstance = instance;
+	windowClassDesc.hIcon = 0;
+	windowClassDesc.hCursor = 0;
+	windowClassDesc.hbrBackground = 0;
+	windowClassDesc.lpszMenuName = 0;
+	windowClassDesc.lpszClassName = L"HelloWorld";
+	windowClassDesc.hIconSm = 0;
+	ATOM windowClassAtom = RegisterClassExW(&windowClassDesc);
+	if (!windowClassAtom)
+	{
+		fprintf(stderr, "error: failed to register window class\n");
+		return SLANG_FAIL;
+	}
 
-    // First we register a window class.
+	// Next, we create a window using that window class.
 
-    WNDCLASSEXW windowClassDesc;
-    windowClassDesc.cbSize = sizeof(windowClassDesc);
-    windowClassDesc.style = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
-    windowClassDesc.lpfnWndProc = &windowProc;
-    windowClassDesc.cbClsExtra = 0;
-    windowClassDesc.cbWndExtra = 0;
-    windowClassDesc.hInstance = instance;
-    windowClassDesc.hIcon = 0;
-    windowClassDesc.hCursor = 0;
-    windowClassDesc.hbrBackground = 0;
-    windowClassDesc.lpszMenuName = 0;
-    windowClassDesc.lpszClassName = L"HelloWorld";
-    windowClassDesc.hIconSm = 0;
-    ATOM windowClassAtom = RegisterClassExW(&windowClassDesc);
-    if(!windowClassAtom)
-    {
-        fprintf(stderr, "error: failed to register window class\n");
-        return 1;
-    }
-
-    // Next, we create a window using that window class.
-
-    // We will create a borderless window since our screen-capture logic in GL
-    // seems to get thrown off by having to deal with a window frame.
-    DWORD windowStyle = WS_POPUP;
-    DWORD windowExtendedStyle = 0;
+	// We will create a borderless window since our screen-capture logic in GL
+	// seems to get thrown off by having to deal with a window frame.
+	DWORD windowStyle = WS_POPUP;
+	DWORD windowExtendedStyle = 0;
 
 
-    RECT windowRect = { 0, 0, gWindowWidth, gWindowHeight };
-    AdjustWindowRectEx(&windowRect, windowStyle, /*hasMenu=*/false, windowExtendedStyle);
+	RECT windowRect = { 0, 0, gWindowWidth, gWindowHeight };
+	AdjustWindowRectEx(&windowRect, windowStyle, /*hasMenu=*/false, windowExtendedStyle);
 
-    auto width = windowRect.right - windowRect.left;
-    auto height = windowRect.bottom - windowRect.top;
+	auto width = windowRect.right - windowRect.left;
+	auto height = windowRect.bottom - windowRect.top;
 
-    LPWSTR windowName = L"Slang Render Test";
-    HWND windowHandle = CreateWindowExW(
-        windowExtendedStyle,
-        (LPWSTR)windowClassAtom,
-        windowName,
-        windowStyle,
-        0, 0, // x, y
-        width, height,
-        NULL, // parent
-        NULL, // menu
-        instance,
-        NULL);
-    if(!windowHandle)
-    {
-        fprintf(stderr, "error: failed to create window\n");
-        return 1;
-    }
-
-
-    Renderer* renderer = nullptr;
-    SlangSourceLanguage nativeLanguage = SLANG_SOURCE_LANGUAGE_UNKNOWN;
-    SlangCompileTarget slangTarget = SLANG_TARGET_NONE;
-    switch( gOptions.rendererID )
-    {
-    case RendererID::D3D11:
-        renderer = createD3D11Renderer();
-        slangTarget = SLANG_HLSL;
-        nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
-        break;
-
-    // TODO: `RendererID::D3D12`
-
-    case RendererID::GL:
-        renderer = createGLRenderer();
-        slangTarget = SLANG_GLSL;
-        nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;
-        break;
-
-    case RendererID::VK:
-        renderer = createVKRenderer();
-        slangTarget = SLANG_SPIRV;
-        nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;
-        break;
-
-    default:
-        fprintf(stderr, "error: unexpected\n");
-        exit(1);
-        break;
-    }
-
-    renderer->initialize(windowHandle);
-
-    auto shaderCompiler = renderer->getShaderCompiler();
-    switch( gOptions.inputLanguageID )
-    {
-    case InputLanguageID::Slang:
-        shaderCompiler = createSlangShaderCompiler(shaderCompiler, SLANG_SOURCE_LANGUAGE_SLANG, slangTarget);
-        break;
-
-    case InputLanguageID::NativeRewrite:
-        shaderCompiler = createSlangShaderCompiler(shaderCompiler, nativeLanguage, slangTarget);
-        break;
-
-    default:
-        break;
-    }
-
-    Error err = initializeInner(renderer, shaderCompiler);
-    if( err != Error::None )
-    {
-        exit(1);
-    }
+	LPWSTR windowName = L"Slang Render Test";
+	HWND windowHandle = CreateWindowExW(
+		windowExtendedStyle,
+		(LPWSTR)windowClassAtom,
+		windowName,
+		windowStyle,
+		0, 0, // x, y
+		width, height,
+		NULL, // parent
+		NULL, // menu
+		instance,
+		NULL);
+	if (!windowHandle)
+	{
+		fprintf(stderr, "error: failed to create window\n");
+		return SLANG_FAIL;
+	}
 
 
-    // Once initialization is all complete, we show the window...
-    ShowWindow(windowHandle, showCommand);
-	
+	Renderer* renderer = nullptr;
+	SlangSourceLanguage nativeLanguage = SLANG_SOURCE_LANGUAGE_UNKNOWN;
+	SlangCompileTarget slangTarget = SLANG_TARGET_NONE;
+	switch (gOptions.rendererID)
+	{
+		case RendererID::D3D11:
+			renderer = createD3D11Renderer();
+			slangTarget = SLANG_HLSL;
+			nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
+			break;
+
+			// TODO: `RendererID::D3D12`
+
+		case RendererID::GL:
+			renderer = createGLRenderer();
+			slangTarget = SLANG_GLSL;
+			nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;
+			break;
+
+		case RendererID::VK:
+			renderer = createVKRenderer();
+			slangTarget = SLANG_SPIRV;
+			nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;
+			break;
+
+		default:
+			fprintf(stderr, "error: unexpected\n");
+			return SLANG_FAIL;
+	}
+
+	SLANG_RETURN_ON_FAIL(renderer->initialize(windowHandle));
+
+	auto shaderCompiler = renderer->getShaderCompiler();
+	switch (gOptions.inputLanguageID)
+	{
+		case InputLanguageID::Slang:
+			shaderCompiler = createSlangShaderCompiler(shaderCompiler, SLANG_SOURCE_LANGUAGE_SLANG, slangTarget);
+			break;
+
+		case InputLanguageID::NativeRewrite:
+			shaderCompiler = createSlangShaderCompiler(shaderCompiler, nativeLanguage, slangTarget);
+			break;
+
+		default:
+			break;
+	}
+
+	SLANG_RETURN_ON_FAIL(initializeInner(renderer, shaderCompiler));
+
+	// Once initialization is all complete, we show the window...
+	ShowWindow(windowHandle, showCommand);
+
 	// ... and enter the event loop:
 	for (;;)
 	{
@@ -391,7 +371,7 @@ int main(
 		{
 			if (message.message == WM_QUIT)
 			{
-                return (int)message.wParam;
+				return (int)message.wParam;
 			}
 
 			TranslateMessage(&message);
@@ -399,35 +379,42 @@ int main(
 		}
 		else
 		{
-			// Whenver we don't have Windows events to process,
-			// we render a frame.
-
+			// Whenever we don't have Windows events to process, we render a frame.
 			if (gOptions.shaderType == ShaderProgramType::Compute)
 			{
 				runCompute(renderer);
 			}
 			else
 			{
-                static const float kClearColor[] = { 0.25, 0.25, 0.25, 1.0 };
-                renderer->setClearColor(kClearColor);
-                renderer->clearFrame();
+				static const float kClearColor[] = { 0.25, 0.25, 0.25, 1.0 };
+				renderer->setClearColor(kClearColor);
+				renderer->clearFrame();
 
 				renderFrameInner(renderer);
 			}
 			// If we are in a mode where output is requested, we need to snapshot the back buffer here
 			if (gOptions.outputPath)
 			{
-                if (gOptions.shaderType == ShaderProgramType::Compute || gOptions.shaderType == ShaderProgramType::GraphicsCompute)
-                    renderer->serializeOutput(gBindingState, gOptions.outputPath);
-                else
-				    renderer->captureScreenShot(gOptions.outputPath);
-				return 0;
+				if (gOptions.shaderType == ShaderProgramType::Compute || gOptions.shaderType == ShaderProgramType::GraphicsCompute)
+					renderer->serializeOutput(gBindingState, gOptions.outputPath);
+				else
+					SLANG_RETURN_ON_FAIL(renderer->captureScreenShot(gOptions.outputPath));
+				return SLANG_OK;
 			}
 
 			renderer->presentFrame();
 		}
 	}
 
-    return 0;
+	return SLANG_OK;
+}
+
+} // renderer_test
+
+int main(int argc, char**  argv)
+{
+	SlangResult res = renderer_test::innerMain(argc, argv);
+
+	return SLANG_FAILED(res) ? 1 : 0;
 }
 

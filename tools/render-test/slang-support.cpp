@@ -170,7 +170,6 @@ ShaderCompiler* createSlangShaderCompiler(
     result->target = target;
 
     return result;
-
 }
 
 

@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#include "../../source/core/slang-result.h"
+
 namespace renderer_test {
 
 typedef intptr_t Int;
@@ -61,13 +63,6 @@ extern int gWindowWidth;
 extern int gWindowHeight;
 
 
-void parseOptions(int* argc, char** argv);
-
-enum class Error
-{
-    None = 0,
-    InvalidParam,
-    Unexpected,
-};
+SlangResult parseOptions(int* argc, char** argv);
 
 } // renderer_test

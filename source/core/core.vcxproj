@@ -32,6 +32,7 @@
     <ClInclude Include="secure-crt.h" />
     <ClInclude Include="slang-io.h" />
     <ClInclude Include="slang-math.h" />
+    <ClInclude Include="slang-result.h" />
     <ClInclude Include="slang-string.h" />
     <ClInclude Include="smart-pointer.h" />
     <ClInclude Include="stream.h" />
