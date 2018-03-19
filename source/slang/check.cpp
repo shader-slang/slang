@@ -7292,7 +7292,7 @@ namespace Slang
                     // We manually fill in the entry point request object.
                     RefPtr<EntryPointRequest> entryPointReq = new EntryPointRequest();
                     entryPointReq->compileRequest = compileRequest;
-                    entryPointReq->translationUnitIndex = tt;
+                    entryPointReq->translationUnitIndex = int(tt);
                     entryPointReq->decl = funcDecl;
                     entryPointReq->name = funcDecl->getName();
                     entryPointReq->profile = profile;
