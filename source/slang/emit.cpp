@@ -6752,6 +6752,32 @@ emitDeclImpl(decl, nullptr);
         auto profile = entryPointLayout->profile;
         auto stage = profile.GetStage();
 
+        if(profile.getFamily() == ProfileFamily::DX)
+        {
+            if(profile.GetVersion() >= ProfileVersion::DX_6_1 )
+            {
+                char const* stageName = nullptr;
+                switch(stage)
+                {
+                case Stage::Compute:    stageName = "compute";
+                case Stage::Vertex:     stageName = "vertex";
+                case Stage::Hull:       stageName = "hull";
+                case Stage::Domain:     stageName = "domain";
+                case Stage::Geometry:   stageName = "geometry";
+                case Stage::Fragment:   stageName = "pixel";
+                default:
+                    break;
+                }
+
+                if(stageName)
+                {
+                    emit("[shader(\"");
+                    emit(stageName);
+                    emit("\")]");
+                }
+            }
+        }
+
         switch (stage)
         {
         case Stage::Compute:
