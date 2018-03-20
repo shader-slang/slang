@@ -197,10 +197,15 @@ DIAGNOSTIC(30051, Error, invalidValueForArgument, "invalid value for argument '$
 DIAGNOSTIC(30052, Error, invalidSwizzleExpr, "invalid swizzle pattern '$0' on type '$1'")
 DIAGNOSTIC(33070, Error, expectedFunction, "expression preceding parenthesis of apparent call must have function type.")
 
+DIAGNOSTIC(33071, Error, expectedAStringLiteral, "expected a string literal")
+
 // Attributes
 DIAGNOSTIC(31000, Error, unknownAttributeName, "unknown attribute '$0'")
 DIAGNOSTIC(31001, Error, attributeArgumentCountMismatch, "attribute '$0' expects $1 arguments ($2 provided)")
 DIAGNOSTIC(31001, Error, attributeNotApplicable, "attribute '$0' is not valid here")
+
+DIAGNOSTIC(31100, Error, unknownStageName,  "unknown stage name '$0'")
+
 
 // 303xx: interfaces and associated types
 DIAGNOSTIC(30300, Error, assocTypeInInterfaceOnly, "'associatedtype' can only be defined in an 'interface'.")
@@ -299,7 +304,6 @@ DIAGNOSTIC(40007, Internal, irValidationFailed, "IR validation failed: $0")
 //
 // 5xxxx - Target code generation.
 //
-DIAGNOSTIC(50020, Error, unknownStageType,              "Unknown stage type '$0'.")
 DIAGNOSTIC(50020, Error, invalidTessCoordType,          "TessCoord must have vec2 or vec3 type.")
 DIAGNOSTIC(50020, Error, invalidFragCoordType,          "FragCoord must be a vec4.")
 DIAGNOSTIC(50020, Error, invalidInvocationIdType,       "InvocationId must have int type.")
@@ -337,7 +341,7 @@ DIAGNOSTIC(51092, Error, stageDoesntHaveInputWorld, "'$0' doesn't appear to have
 // 99999 - Internal compiler errors, and not-yet-classified diagnostics.
 
 DIAGNOSTIC(99999, Internal, unimplemented, "unimplemented: $0")
-DIAGNOSTIC(99999, Internal, unexpected, "uuexpected: $0")
+DIAGNOSTIC(99999, Internal, unexpected, "unexpected: $0")
 DIAGNOSTIC(99999, Internal, internalCompilerError, "internal compiler error")
 DIAGNOSTIC(99999, Error, compilationAborted, "compilation aborted due to internal error");
 

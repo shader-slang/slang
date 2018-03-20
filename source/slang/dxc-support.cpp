@@ -125,7 +125,8 @@ namespace Slang
         String entryPointName = getText(entryPoint->name);
         OSString wideEntryPointName = entryPointName.ToWString();
 
-        String profileName = GetHLSLProfileName(entryPoint->profile);
+        auto profile = getEffectiveProfile(entryPoint, targetReq);
+        String profileName = GetHLSLProfileName(profile);
         OSString wideProfileName = profileName.ToWString();
 
 

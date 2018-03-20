@@ -1390,23 +1390,26 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
-    LoweredValInfo visitConstantExpr(ConstantExpr* expr)
+    LoweredValInfo visitBoolLiteralExpr(BoolLiteralExpr* expr)
+    {
+        return LoweredValInfo::simple(context->irBuilder->getBoolValue(expr->value));
+    }
+
+    LoweredValInfo visitIntegerLiteralExpr(IntegerLiteralExpr* expr)
     {
         auto type = lowerSimpleType(context, expr->type);
+        return LoweredValInfo::simple(context->irBuilder->getIntValue(type, expr->value));
+    }
 
-        switch( expr->ConstType )
-        {
-        case ConstantExpr::ConstantType::Bool:
-            return LoweredValInfo::simple(context->irBuilder->getBoolValue(expr->integerValue != 0));
-        case ConstantExpr::ConstantType::Int:
-            return LoweredValInfo::simple(context->irBuilder->getIntValue(type, expr->integerValue));
-        case ConstantExpr::ConstantType::Float:
-            return LoweredValInfo::simple(context->irBuilder->getFloatValue(type, expr->floatingPointValue));
-        case ConstantExpr::ConstantType::String:
-            break;
-        }
+    LoweredValInfo visitFloatingPointLiteralExpr(FloatingPointLiteralExpr* expr)
+    {
+        auto type = lowerSimpleType(context, expr->type);
+        return LoweredValInfo::simple(context->irBuilder->getFloatValue(type, expr->value));
+    }
 
-        SLANG_UNEXPECTED("unexpected constant type");
+    LoweredValInfo visitStringLiteralExpr(StringLiteralExpr*)
+    {
+        SLANG_UNEXPECTED("string literal encountered during code emit");
     }
 
     LoweredValInfo visitAggTypeCtorExpr(AggTypeCtorExpr* /*expr*/)

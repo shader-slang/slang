@@ -3603,10 +3603,9 @@ namespace Slang
 
     static RefPtr<Expr> parseBoolLitExpr(Parser* /*parser*/, bool value)
     {
-        RefPtr<ConstantExpr> constExpr = new ConstantExpr();
-        constExpr->ConstType = ConstantExpr::ConstantType::Bool;
-        constExpr->integerValue = value ? 1 : 0;
-        return constExpr;
+        RefPtr<BoolLiteralExpr> expr = new BoolLiteralExpr();
+        expr->value = value;
+        return expr;
     }
 
     static RefPtr<RefObject> parseTrueExpr(Parser* parser, void* /*userData*/)
@@ -3696,7 +3695,7 @@ namespace Slang
 
         case TokenType::IntegerLiteral:
             {
-                RefPtr<ConstantExpr> constExpr = new ConstantExpr();
+                RefPtr<IntegerLiteralExpr> constExpr = new IntegerLiteralExpr();
                 parser->FillPosition(constExpr.Ptr());
 
                 auto token = parser->tokenReader.AdvanceToken();
@@ -3756,8 +3755,7 @@ namespace Slang
                     }
                 }
 
-                constExpr->ConstType = ConstantExpr::ConstantType::Int;
-                constExpr->integerValue = value;
+                constExpr->value = value;
                 constExpr->type = QualType(suffixType);
 
                 return constExpr;
@@ -3766,7 +3764,7 @@ namespace Slang
 
         case TokenType::FloatingPointLiteral:
             {
-                RefPtr<ConstantExpr> constExpr = new ConstantExpr();
+                RefPtr<FloatingPointLiteralExpr> constExpr = new FloatingPointLiteralExpr();
                 parser->FillPosition(constExpr.Ptr());
 
                 auto token = parser->tokenReader.AdvanceToken();
@@ -3825,8 +3823,7 @@ namespace Slang
                     }
                 }
 
-                constExpr->ConstType = ConstantExpr::ConstantType::Float;
-                constExpr->floatingPointValue = value;
+                constExpr->value = value;
                 constExpr->type = QualType(suffixType);
 
                 return constExpr;
@@ -3834,16 +3831,15 @@ namespace Slang
 
         case TokenType::StringLiteral:
             {
-                RefPtr<ConstantExpr> constExpr = new ConstantExpr();
+                RefPtr<StringLiteralExpr> constExpr = new StringLiteralExpr();
                 auto token = parser->tokenReader.AdvanceToken();
                 constExpr->token = token;
                 parser->FillPosition(constExpr.Ptr());
-                constExpr->ConstType = ConstantExpr::ConstantType::String;
 
                 if (!parser->LookAheadToken(TokenType::StringLiteral))
                 {
                     // Easy/common case: a single string
-                    constExpr->stringValue = getStringLiteralTokenValue(token);
+                    constExpr->value = getStringLiteralTokenValue(token);
                 }
                 else
                 {
@@ -3854,7 +3850,7 @@ namespace Slang
                         token = parser->tokenReader.AdvanceToken();
                         sb << getStringLiteralTokenValue(token);
                     }
-                    constExpr->stringValue = sb.ProduceString();
+                    constExpr->value = sb.ProduceString();
                 }
 
                 return constExpr;
