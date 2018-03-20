@@ -1488,15 +1488,13 @@ namespace Slang
                 Stage       stage;
             } kStages[] =
             {
-                { "vertex",     Stage::Vertex },
-                { "hull",       Stage::Hull },
-                { "domain",     Stage::Domain },
-                { "geometry",   Stage::Geometry },
-                { "fragment",   Stage::Fragment },
-                { "compute",    Stage::Compute },
+            #define PROFILE_STAGE(ID, NAME, ENUM) \
+                { #NAME,    Stage::ID },
 
-                // Allow `pixel` as an alias of `fragment`
-                { "pixel",      Stage::Fragment },
+            #define PROFILE_STAGE_ALIAS(ID, NAME) \
+                { #NAME,    Stage::ID },
+
+            #include "profile-defs.h"
             };
 
             for(auto entry : kStages)

@@ -6746,10 +6746,10 @@ emitDeclImpl(decl, nullptr);
     }
 
     void emitIREntryPointAttributes_HLSL(
-        EmitContext*        /*ctx*/,
+        EmitContext*        ctx,
         EntryPointLayout*   entryPointLayout)
     {
-        auto profile = entryPointLayout->profile;
+        auto profile = ctx->shared->effctiveProfile;
         auto stage = profile.GetStage();
 
         if(profile.getFamily() == ProfileFamily::DX)
@@ -6759,12 +6759,11 @@ emitDeclImpl(decl, nullptr);
                 char const* stageName = nullptr;
                 switch(stage)
                 {
-                case Stage::Compute:    stageName = "compute";
-                case Stage::Vertex:     stageName = "vertex";
-                case Stage::Hull:       stageName = "hull";
-                case Stage::Domain:     stageName = "domain";
-                case Stage::Geometry:   stageName = "geometry";
-                case Stage::Fragment:   stageName = "pixel";
+            #define PROFILE_STAGE(ID, NAME, ENUM) \
+                case Stage::ID: stageName = #NAME; break;
+
+            #include "profile-defs.h"
+
                 default:
                     break;
                 }

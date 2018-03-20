@@ -60,6 +60,14 @@ PROFILE_STAGE(Geometry, geometry,   SLANG_STAGE_GEOMETRY)
 PROFILE_STAGE(Fragment, fragment,   SLANG_STAGE_FRAGMENT)
 PROFILE_STAGE(Compute,	compute,    SLANG_STAGE_COMPUTE)
 
+PROFILE_STAGE(RayGeneration,    raygeneration,  SLANG_STAGE_RAY_GENERATION)
+PROFILE_STAGE(Intersection,     intersection,   SLANG_STAGE_INTERSECTION)
+PROFILE_STAGE(AnyHit,           anyhit,         SLANG_STAGE_ANY_HIT)
+PROFILE_STAGE(ClosestHit,       closesthit,     SLANG_STAGE_CLOSEST_HIT)
+PROFILE_STAGE(Miss,             miss,           SLANG_STAGE_MISS)
+PROFILE_STAGE(Callable,         callable,       SLANG_STAGE_CALLABLE)
+
+
 PROFILE_STAGE_ALIAS(Fragment, pixel)
 
 // Profile families
@@ -150,6 +158,18 @@ PROFILE(DX_Vertex_5_1,				vs_5_1,				Vertex,		DX_5_1)
 PROFILE(DX_Vertex_6_0,			    vs_6_0,				Vertex,	DX_6_0)
 PROFILE(DX_Vertex_6_1,			    vs_6_1,				Vertex,	DX_6_1)
 PROFILE(DX_Vertex_6_2,			    vs_6_2,				Vertex,	DX_6_2)
+
+// TODO: consider making `lib_*_*` alias these...
+PROFILE(DX_None_4_0,              sm_4_0,             Unknown, DX_4_0)
+PROFILE(DX_None_4_0_Level_9_0,    sm_4_0_level_9_0,   Unknown, DX_4_0_Level_9_0)
+PROFILE(DX_None_4_0_Level_9_1,    sm_4_0_level_9_1,   Unknown, DX_4_0_Level_9_1)
+PROFILE(DX_None_4_0_Level_9_3,    sm_4_0_level_9_3,   Unknown, DX_4_0_Level_9_3)
+PROFILE(DX_None_4_1,              sm_4_1,             Unknown, DX_4_1)
+PROFILE(DX_None_5_0,              sm_5_0,             Unknown, DX_5_0)
+PROFILE(DX_None_5_1,              sm_5_1,             Unknown, DX_5_1)
+PROFILE(DX_None_6_0,              sm_6_0,             Unknown, DX_6_0)
+PROFILE(DX_None_6_1,              sm_6_1,             Unknown, DX_6_1)
+PROFILE(DX_None_6_2,              sm_6_2,             Unknown, DX_6_2)
 
 // Define all the GLSL profiles
 
