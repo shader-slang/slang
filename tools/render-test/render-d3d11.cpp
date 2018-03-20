@@ -294,19 +294,7 @@ public:
         UINT deviceFlags = 0;
         deviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
 
-        // We will ask for the highest feature level that can be supported.
-
-        D3D_FEATURE_LEVEL featureLevels[] = {
-            D3D_FEATURE_LEVEL_11_1,
-            D3D_FEATURE_LEVEL_11_0,
-            D3D_FEATURE_LEVEL_10_1,
-            D3D_FEATURE_LEVEL_10_0,
-            D3D_FEATURE_LEVEL_9_3,
-            D3D_FEATURE_LEVEL_9_2,
-            D3D_FEATURE_LEVEL_9_1,
-        };
-        D3D_FEATURE_LEVEL dxFeatureLevel = D3D_FEATURE_LEVEL_9_1;
-
+        
         // Our swap chain uses RGBA8 with sRGB, with double buffering.
 
         DXGI_SWAP_CHAIN_DESC dxSwapChainDesc = { 0 };
@@ -326,6 +314,19 @@ public:
         dxSwapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
         dxSwapChainDesc.Flags = 0;
 
+		// We will ask for the highest feature level that can be supported.
+		D3D_FEATURE_LEVEL featureLevels[] = {
+			D3D_FEATURE_LEVEL_11_1,
+			D3D_FEATURE_LEVEL_11_0,
+			D3D_FEATURE_LEVEL_10_1,
+			D3D_FEATURE_LEVEL_10_0,
+			D3D_FEATURE_LEVEL_9_3,
+			D3D_FEATURE_LEVEL_9_2,
+			D3D_FEATURE_LEVEL_9_1,
+		};
+		D3D_FEATURE_LEVEL dxFeatureLevel = D3D_FEATURE_LEVEL_9_1;
+		const int totalNumFeatureLevels = sizeof(featureLevels) / sizeof(featureLevels[0]);
+
         // On a machine that does not have an up-to-date version of D3D installed,
         // the `D3D11CreateDeviceAndSwapChain` call will fail with `E_INVALIDARG`
         // if you ask for featuer level 11_1. The workaround is to call
@@ -342,7 +343,7 @@ public:
                 NULL,                    // software
                 deviceFlags,
                 &featureLevels[ii],
-                (sizeof(featureLevels) / sizeof(featureLevels[0])) - 1,
+				totalNumFeatureLevels - ii,
                 D3D11_SDK_VERSION,
                 &dxSwapChainDesc,
                 &dxSwapChain,
