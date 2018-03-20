@@ -5,6 +5,8 @@
 #include "window.h"
 #include "shader-input-layout.h"
 
+#include "../../source/core/slang-result.h"
+
 namespace renderer_test {
 
 typedef struct Buffer           Buffer;
@@ -90,14 +92,14 @@ enum class PrimitiveTopology
 class Renderer
 {
 public:
-    virtual void initialize(void* inWindowHandle) = 0;
+    virtual SlangResult initialize(void* inWindowHandle) = 0;
 
     virtual void setClearColor(float const* color) = 0;
     virtual void clearFrame() = 0;
 
     virtual void presentFrame() = 0;
 
-    virtual void captureScreenShot(char const* outputPath) = 0;
+    virtual SlangResult captureScreenShot(char const* outputPath) = 0;
     virtual void serializeOutput(BindingState * state, char const* outputPath) = 0;
     virtual Buffer* createBuffer(BufferDesc const& desc) = 0;
 

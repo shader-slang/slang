@@ -3,6 +3,8 @@
 #include "../../source/core/slang-io.h"
 #include "../../source/core/token-reader.h"
 
+#include "../../source/core/slang-result.h"
+
 using namespace Slang;
 
 #include "os.h"
@@ -26,7 +28,7 @@ enum OutputMode
     // Default mode is to write test results to the console
     kOutputMode_Default = 0,
 
-    // When running under AppVeyor contiuous integration, we
+    // When running under AppVeyor continuous integration, we
     // need to output test results in a way that the AppVeyor
     // environment can pick up and display.
     kOutputMode_AppVeyor,
@@ -66,12 +68,12 @@ struct Options
     // Only run tests that match one of the given categories
     Dictionary<TestCategory*, TestCategory*> includeCategories;
 
-    // Exclude test taht match one these categories
+    // Exclude test that match one these categories
     Dictionary<TestCategory*, TestCategory*> excludeCategories;
 };
 Options options;
 
-void parseOptions(int* argc, char** argv)
+Result parseOptions(int* argc, char** argv)
 {
     int argCount = *argc;
     char const* const* argCursor = argv;
@@ -110,7 +112,7 @@ void parseOptions(int* argc, char** argv)
             if( argCursor == argEnd )
             {
                 fprintf(stderr, "error: expected operand for '%s'\n", arg);
-                exit(1);
+                return SLANG_FAIL;
             }
             options.binDir = *argCursor++;
         }
@@ -135,7 +137,7 @@ void parseOptions(int* argc, char** argv)
             if( argCursor == argEnd )
             {
                 fprintf(stderr, "error: expected operand for '%s'\n", arg);
-                exit(1);
+				return SLANG_FAIL;
             }
             argCursor++;
             // Assumed to be handle by .bat file that called us
@@ -145,7 +147,7 @@ void parseOptions(int* argc, char** argv)
             if( argCursor == argEnd )
             {
                 fprintf(stderr, "error: expected operand for '%s'\n", arg);
-                exit(1);
+				return SLANG_FAIL;
             }
             argCursor++;
             // Assumed to be handle by .bat file that called us
@@ -165,7 +167,7 @@ void parseOptions(int* argc, char** argv)
             if( argCursor == argEnd )
             {
                 fprintf(stderr, "error: expected operand for '%s'\n", arg);
-                exit(1);
+                return SLANG_FAIL;
             }
             auto category = findTestCategory(*argCursor++);
             if(category)
@@ -178,7 +180,7 @@ void parseOptions(int* argc, char** argv)
             if( argCursor == argEnd )
             {
                 fprintf(stderr, "error: expected operand for '%s'\n", arg);
-                exit(1);
+                return SLANG_FAIL;
             }
             auto category = findTestCategory(*argCursor++);
             if(category)
@@ -189,7 +191,7 @@ void parseOptions(int* argc, char** argv)
         else
         {
             fprintf(stderr, "unknown option '%s'\n", arg);
-            exit(1);
+            return SLANG_FAIL;
         }
     }
     
@@ -208,10 +210,11 @@ void parseOptions(int* argc, char** argv)
     if(argCursor != argEnd)
     {
         fprintf(stderr, "unexpected arguments\n");
-        exit(1);
+        return SLANG_FAIL;
     }
 
     *argc = 0;
+	return SLANG_OK;
 }
 
 // Called for an error in the test-runner (not for an error involving
@@ -357,7 +360,7 @@ TestCategory* findTestCategory(String const& name)
     return category;
 }
 
-// Optiosn for a particular test
+// Options for a particular test
 struct TestOptions
 {
     String command;
@@ -976,7 +979,7 @@ TestResult runHLSLComparisonTest(TestInput& input)
 
     OSProcessSpawner::ResultCode resultCode = spawner.getResultCode();
 
-    String standardOuptut = spawner.getStandardOutput();
+    String standardOutput = spawner.getStandardOutput();
     String standardError = spawner.getStandardError();
 
     // We construct a single output string that captures the results
@@ -986,7 +989,7 @@ TestResult runHLSLComparisonTest(TestInput& input)
     actualOutputBuilder.Append("\nstandard error = {\n");
     actualOutputBuilder.Append(standardError);
     actualOutputBuilder.Append("}\nstandard output = {\n");
-    actualOutputBuilder.Append(standardOuptut);
+    actualOutputBuilder.Append(standardOutput);
     actualOutputBuilder.Append("}\n");
 
     String actualOutput = actualOutputBuilder.ProduceString();
@@ -1008,7 +1011,7 @@ TestResult runHLSLComparisonTest(TestInput& input)
     {
         if (resultCode != 0)				result = kTestResult_Fail;
         if (standardError.Length() != 0)	result = kTestResult_Fail;
-        if (standardOuptut.Length() != 0)	result = kTestResult_Fail;
+        if (standardOutput.Length() != 0)	result = kTestResult_Fail;
     }
     // Otherwise we compare to the expected output
     else if (actualOutput != expectedOutput)
@@ -1230,13 +1233,13 @@ TestResult doRenderComparisonTestRun(TestInput& input, char const* langOption, c
 {
     // TODO: delete any existing files at the output path(s) to avoid stale outputs leading to a false pass
 
-    auto filePath999 = input.filePath;
+    auto filePath = input.filePath;
     auto outputStem = input.outputStem;
 
     OSProcessSpawner spawner;
 
     spawner.pushExecutablePath(String(options.binDir) + "render-test" + osGetExecutableSuffix());
-    spawner.pushArgument(filePath999);
+    spawner.pushArgument(filePath);
 
     for( auto arg : input.testOptions->args )
     {
@@ -1280,7 +1283,7 @@ TestResult doImageComparison(String const& filePath)
     // Allow a difference in the low bits of the 8-bit result, just to play it safe
     static const int kAbsoluteDiffCutoff = 2;
 
-    // Allow a relatie 1% difference
+    // Allow a relative 1% difference
     static const float kRelativeDiffCutoff = 0.01f;
 
     String expectedPath = filePath + ".expected.png";
@@ -1288,7 +1291,6 @@ TestResult doImageComparison(String const& filePath)
 
     int expectedX,  expectedY,  expectedN;
     int actualX,    actualY,    actualN;
-
 
     unsigned char* expectedData = stbi_load(expectedPath.begin(), &expectedX, &expectedY, &expectedN, 0);
     unsigned char* actualData = stbi_load(actualPath.begin(), &actualX, &actualY, &actualN, 0);
@@ -1304,47 +1306,51 @@ TestResult doImageComparison(String const& filePath)
     unsigned char* actualCursor = actualData;
 
     for( int y = 0; y < actualY; ++y )
-    for( int x = 0; x < actualX; ++x )
-    for( int n = 0; n < actualN; ++n )
-    {
-        int expectedVal = *expectedCursor++;
-        int actualVal = *actualCursor++;
+	{
+		for( int x = 0; x < actualX; ++x )
+		{
+			for( int n = 0; n < actualN; ++n )
+			{
+				int expectedVal = *expectedCursor++;
+				int actualVal = *actualCursor++;
 
-        int absoluteDiff = actualVal - expectedVal;
-        if(absoluteDiff < 0) absoluteDiff = -absoluteDiff;
+				int absoluteDiff = actualVal - expectedVal;
+				if(absoluteDiff < 0) absoluteDiff = -absoluteDiff;
 
-        if( absoluteDiff < kAbsoluteDiffCutoff )
-        {
-            // There might be a difference, but we'll consider it to be inside tolerance
-            continue;
-        }
+				if( absoluteDiff < kAbsoluteDiffCutoff )
+				{
+					// There might be a difference, but we'll consider it to be inside tolerance
+					continue;
+				}
 
-        float relativeDiff = 0.0f;
-        if( expectedVal != 0 )
-        {
-            relativeDiff = fabsf(float(actualVal) - float(expectedVal)) / float(expectedVal);
+				float relativeDiff = 0.0f;
+				if( expectedVal != 0 )
+				{
+					relativeDiff = fabsf(float(actualVal) - float(expectedVal)) / float(expectedVal);
 
-            if( relativeDiff < kRelativeDiffCutoff )
-            {
-                // relative difference was small enough
-                continue;
-            }
-        }
+					if( relativeDiff < kRelativeDiffCutoff )
+					{
+						// relative difference was small enough
+						continue;
+					}
+				}
 
-        // TODO: may need to do some local search sorts of things, to deal with
-        // cases where vertex shader results lead to rendering that is off
-        // by one pixel...
+				// TODO: may need to do some local search sorts of things, to deal with
+				// cases where vertex shader results lead to rendering that is off
+				// by one pixel...
 
-        fprintf(stderr, "image compare failure at (%d,%d) channel %d. expected %d got %d (absolute error: %d, relative error: %f)\n",
-            x, y, n,
-            expectedVal,
-            actualVal,
-            absoluteDiff,
-            relativeDiff);
-
-        // There was a difference we couldn't excuse!
-        return kTestResult_Fail;
-    }
+			    fprintf(stderr, "image compare failure at (%d,%d) channel %d. expected %d got %d (absolute error: %d, relative error: %f)\n",
+			    	x, y, n,
+			    	expectedVal,
+			    	actualVal,
+			    	absoluteDiff,
+			    	relativeDiff);
+                
+			    // There was a difference we couldn't excuse!
+			    return kTestResult_Fail;
+		    }
+		}
+	}
 
     return kTestResult_Pass;
 }
@@ -1354,7 +1360,7 @@ TestResult runHLSLRenderComparisonTestImpl(
     char const* expectedArg,
     char const* actualArg)
 {
-    auto filePath999 = input.filePath;
+    auto filePath = input.filePath;
     auto outputStem = input.outputStem;
 
     String expectedOutput;
@@ -1395,7 +1401,7 @@ TestResult runHLSLCrossCompileRenderComparisonTest(TestInput& input)
     return runHLSLRenderComparisonTestImpl(input, "-slang", "-glsl-cross");
 }
 
-TestResult runHLSLAndGLSLComparisonTest(TestInput& input)
+TestResult runHLSLAndGLSLRenderComparisonTest(TestInput& input)
 {
     return runHLSLRenderComparisonTestImpl(input, "-hlsl-rewrite", "-glsl-rewrite");
 }
@@ -1412,18 +1418,21 @@ TestResult runTest(
     FileTestList const& testList)
 {
     // based on command name, dispatch to an appropriate callback
-    static const struct TestCommands
+    struct TestCommands
     {
         char const*     name;
         TestCallback    callback;
-    } kTestCommands[] = {
+    };
+	
+	static const TestCommands kTestCommands[] = 
+	{
         { "SIMPLE", &runSimpleTest },
         { "REFLECTION", &runReflectionTest },
 #if SLANG_TEST_SUPPORT_HLSL
         { "COMPARE_HLSL", &runHLSLComparisonTest },
         { "COMPARE_HLSL_RENDER", &runHLSLRenderComparisonTest },
         { "COMPARE_HLSL_CROSS_COMPILE_RENDER", &runHLSLCrossCompileRenderComparisonTest},
-        { "COMPARE_HLSL_GLSL_RENDER", &runHLSLAndGLSLComparisonTest },
+        { "COMPARE_HLSL_GLSL_RENDER", &runHLSLAndGLSLRenderComparisonTest },
         { "COMPARE_COMPUTE", runSlangComputeComparisonTest},
         { "COMPARE_COMPUTE_EX", runSlangComputeComparisonTestEx},
         { "HLSL_COMPUTE", runHLSLComputeTest},
@@ -1748,8 +1757,11 @@ int main(
 
     //
 
-
-    parseOptions(&argc, argv);
+    if (SLANG_FAILED(parseOptions(&argc, argv)))
+    {
+    	// Return exit code with error
+    	return 1;
+    }
 
     if( options.includeCategories.Count() == 0 )
     {
@@ -1778,7 +1790,6 @@ int main(
         return 0;
     }
 
-
     auto passCount = context.passedTestCount;
     auto rawTotal = context.totalTestCount;
     auto ignoredCount = context.ignoredTestCount;
@@ -1788,7 +1799,7 @@ int main(
     printf("\n===\n%d%% of tests passed (%d/%d)", (passCount*100) / runTotal, passCount, runTotal);
     if(ignoredCount)
     {
-        printf(", %d tests ingored", ignoredCount);
+        printf(", %d tests ignored", ignoredCount);
     }
     printf("\n===\n\n");
 

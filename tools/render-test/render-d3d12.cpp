@@ -39,6 +39,7 @@ namespace renderer_test {
 
 // The Slang compiler currently generates HLSL source, so we'll need a utility
 // routine (defined later) to translate that into D3D11 shader bytecode.
+// Returns nullptr if compilation fails.
 ID3DBlob* compileHLSLShader(
     char const* sourcePath,
     char const* source,
@@ -53,9 +54,9 @@ static char const* fragmentProfileName = "ps_4_0";
 class D3D12Renderer : public Renderer, public ShaderCompiler
 {
 public:
-    IDXGISwapChain* dxSwapChain = NULL;
+    IDXGISwapChain* dxSwapChain = nullptr;
 
-    ID3D12Device* dxDevice = NULL;
+    ID3D12Device* dxDevice = nullptr;
 
     virtual PROC loadProc(
         HMODULE module,
@@ -66,17 +67,12 @@ public:
         {
             fprintf(stderr,
                 "error: failed load symbol '%s'\n", name);
-            exit(1);
+            return nullptr;
         }
         return proc;
     }
 
-    void checkResult(HRESULT result)
-    {
-        assert(SUCCEEDED(result));
-    }
-
-    virtual void initialize(void* inWindowHandle) override
+    virtual SlangResult initialize(void* inWindowHandle) override
     {
         auto windowHandle = (HWND) inWindowHandle;
         // Rather than statically link against D3D, we load it dynamically.
@@ -85,12 +81,12 @@ public:
         if(!d3d12)
         {
             fprintf(stderr, "error: failed load 'd3d12.dll'\n");
-            exit(1);
+            return SLANG_FAIL;
         }
 
 #define LOAD_PROC(TYPE, NAME) \
-        TYPE NAME##_ = (TYPE) loadProc(d3d12, #NAME)
-
+        TYPE NAME##_ = (TYPE) loadProc(d3d12, #NAME); \
+		if (NAME##_ == nullptr) return SLANG_FAIL;
 
         UINT dxgiFactoryFlags = 0;
 
@@ -107,11 +103,10 @@ public:
         
         typedef HRESULT (WINAPI *PFN_DXGI_CREATE_FACTORY_2)(UINT Flags, REFIID riid, _COM_Outptr_ void **ppFactory);
 
-
         LOAD_PROC(PFN_DXGI_CREATE_FACTORY_2, CreateDXGIFactory2);
 
         IDXGIFactory4* dxgiFactory;
-        checkResult(CreateDXGIFactory2_(dxgiFactoryFlags, IID_PPV_ARGS(&dxgiFactory)));
+        SLANG_RETURN_ON_FAIL(CreateDXGIFactory2_(dxgiFactoryFlags, IID_PPV_ARGS(&dxgiFactory)));
 
         D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_11_0;
 
@@ -135,8 +130,7 @@ public:
             {
                 // TODO: may want to allow software driver as fallback
             }
-            else if( SUCCEEDED(D3D12CreateDevice_(
-                candidateAdapter, featureLevel, IID_PPV_ARGS(&dxDevice))) )
+            else if( SUCCEEDED(D3D12CreateDevice_(candidateAdapter, featureLevel, IID_PPV_ARGS(&dxDevice))) )
             {
                 // We found one!
                 adapter = candidateAdapter;
@@ -148,20 +142,18 @@ public:
 
         if(!adapter)
         {
-            return;
+			// Couldn't find an adapter
+            return SLANG_FAIL;
         }
 
         // Command Queue
-
         D3D12_COMMAND_QUEUE_DESC queueDesc = {};
         queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 
         ID3D12CommandQueue* commandQueue;
-        checkResult(dxDevice->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&commandQueue)));
+		SLANG_RETURN_ON_FAIL(dxDevice->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&commandQueue)));
 
         // Swap Chain
-
-
         UINT frameCount = 2; // TODO: configure
 
         DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
@@ -174,7 +166,7 @@ public:
         swapChainDesc.SampleDesc.Count = 1;
 
         IDXGISwapChain1* swapChain;
-        checkResult(dxgiFactory->CreateSwapChainForHwnd(
+        SLANG_RETURN_ON_FAIL(dxgiFactory->CreateSwapChainForHwnd(
             commandQueue,
             windowHandle,
             &swapChainDesc,
@@ -183,11 +175,10 @@ public:
             &swapChain));
 
         // Is this needed?
-        dxgiFactory->MakeWindowAssociation(
-            windowHandle, DXGI_MWA_NO_ALT_ENTER);
+        dxgiFactory->MakeWindowAssociation(windowHandle, DXGI_MWA_NO_ALT_ENTER);
 
         IDXGISwapChain3* swapChainEx;
-        swapChain->QueryInterface(IID_PPV_ARGS(&swapChainEx));
+        SLANG_RETURN_ON_FAIL(swapChain->QueryInterface(IID_PPV_ARGS(&swapChainEx)));
 
         UINT frameIndex = swapChainEx->GetCurrentBackBufferIndex();
 
@@ -198,10 +189,9 @@ public:
         rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 
         ID3D12DescriptorHeap* rtvHeap;
-        checkResult(dxDevice->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&rtvHeap)));
+        SLANG_RETURN_ON_FAIL(dxDevice->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&rtvHeap)));
 
-        UINT rtvDescriptorSize = dxDevice->GetDescriptorHandleIncrementSize(
-            D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+        UINT rtvDescriptorSize = dxDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
         D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = rtvHeap->GetCPUDescriptorHandleForHeapStart();
 
@@ -209,18 +199,14 @@ public:
         ID3D12Resource* backBufferResources[2];
         for( UINT ff = 0; ff < frameCount; ++ff )
         {
-            checkResult(swapChainEx->GetBuffer(ff, IID_PPV_ARGS(&backBufferResources[ff])));
-            dxDevice->CreateRenderTargetView(
-                backBufferResources[ff],
-                nullptr,
-                rtvHandle);
+            SLANG_RETURN_ON_FAIL(swapChainEx->GetBuffer(ff, IID_PPV_ARGS(&backBufferResources[ff])));
+            dxDevice->CreateRenderTargetView(backBufferResources[ff], nullptr, rtvHandle);
             rtvHandle.ptr += rtvDescriptorSize;
         }
 
         ID3D12CommandAllocator* commandAllocator;
-        checkResult(dxDevice->CreateCommandAllocator(
-            D3D12_COMMAND_LIST_TYPE_DIRECT,
-            IID_PPV_ARGS(&commandAllocator)));
+        SLANG_RETURN_ON_FAIL(dxDevice->CreateCommandAllocator( D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&commandAllocator)));
+		return SLANG_OK;
     }
 
     float clearColor[4] = { 0, 0, 0, 0 };
@@ -237,8 +223,9 @@ public:
     {
     }
 
-    virtual void captureScreenShot(char const* outputPath) override
+    virtual SlangResult captureScreenShot(char const* outputPath) override
     {
+		return SLANG_FAIL;
     }
 
     virtual ShaderCompiler* getShaderCompiler() override

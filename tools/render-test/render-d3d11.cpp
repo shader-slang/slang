@@ -111,14 +111,14 @@ ID3DBlob* compileHLSLShader(
         if(!d3dcompiler)
         {
             fprintf(stderr, "error: failed load 'd3dcompiler_47.dll'\n");
-            exit(1);
+            return nullptr;
         }
 
         D3DCompile_ = (pD3DCompile)GetProcAddress(d3dcompiler, "D3DCompile");
         if( !D3DCompile_ )
         {
             fprintf(stderr, "error: failed load symbol 'D3DCompile'\n");
-            exit(1);
+			return nullptr;
         }
     }
 
@@ -193,7 +193,7 @@ static HRESULT captureTextureToFile(
     D3D11_TEXTURE2D_DESC dxTextureDesc;
     dxTexture->GetDesc(&dxTextureDesc);
 
-    // Don't bother supporing MSAA for right now
+    // Don't bother supporting MSAA for right now
     if( dxTextureDesc.SampleDesc.Count > 1 )
     {
         fprintf(stderr, "ERROR: cannot capture multisample texture\n");
@@ -261,14 +261,14 @@ static HRESULT captureTextureToFile(
 class D3D11Renderer : public Renderer, public ShaderCompiler
 {
 public:
-    IDXGISwapChain* dxSwapChain = NULL;
-    ID3D11Device* dxDevice = NULL;
-    ID3D11DeviceContext* dxImmediateContext = NULL;
-    ID3D11Texture2D* dxBackBufferTexture = NULL;
+    IDXGISwapChain* dxSwapChain = nullptr;
+    ID3D11Device* dxDevice = nullptr;
+    ID3D11DeviceContext* dxImmediateContext = nullptr;
+    ID3D11Texture2D* dxBackBufferTexture = nullptr;
     List<ID3D11RenderTargetView*> dxRenderTargetViews;
     List<ID3D11Texture2D *> dxRenderTargetTextures;
     D3DBindingState * currentBindings = nullptr;
-    virtual void initialize(void* inWindowHandle) override
+    virtual SlangResult initialize(void* inWindowHandle) override
     {
         auto windowHandle = (HWND) inWindowHandle;
         // Rather than statically link against D3D, we load it dynamically.
@@ -277,18 +277,16 @@ public:
         if(!d3d11)
         {
             fprintf(stderr, "error: failed load 'd3d11.dll'\n");
-            exit(1);
+            return SLANG_FAIL;
         }
 
         PFN_D3D11_CREATE_DEVICE_AND_SWAP_CHAIN D3D11CreateDeviceAndSwapChain_ =
-            (PFN_D3D11_CREATE_DEVICE_AND_SWAP_CHAIN)GetProcAddress(
-                d3d11,
-                "D3D11CreateDeviceAndSwapChain");
+            (PFN_D3D11_CREATE_DEVICE_AND_SWAP_CHAIN)GetProcAddress(d3d11, "D3D11CreateDeviceAndSwapChain");
         if(!D3D11CreateDeviceAndSwapChain_)
         {
             fprintf(stderr,
                 "error: failed load symbol 'D3D11CreateDeviceAndSwapChain'\n");
-            exit(1);
+			return SLANG_FAIL;
         }
 
         // We create our device in debug mode, just so that we can check that the
@@ -296,19 +294,7 @@ public:
         UINT deviceFlags = 0;
         deviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
 
-        // We will ask for the highest feature level that can be supported.
-
-        D3D_FEATURE_LEVEL featureLevels[] = {
-            D3D_FEATURE_LEVEL_11_1,
-            D3D_FEATURE_LEVEL_11_0,
-            D3D_FEATURE_LEVEL_10_1,
-            D3D_FEATURE_LEVEL_10_0,
-            D3D_FEATURE_LEVEL_9_3,
-            D3D_FEATURE_LEVEL_9_2,
-            D3D_FEATURE_LEVEL_9_1,
-        };
-        D3D_FEATURE_LEVEL dxFeatureLevel = D3D_FEATURE_LEVEL_9_1;
-
+        
         // Our swap chain uses RGBA8 with sRGB, with double buffering.
 
         DXGI_SWAP_CHAIN_DESC dxSwapChainDesc = { 0 };
@@ -328,6 +314,19 @@ public:
         dxSwapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
         dxSwapChainDesc.Flags = 0;
 
+		// We will ask for the highest feature level that can be supported.
+		D3D_FEATURE_LEVEL featureLevels[] = {
+			D3D_FEATURE_LEVEL_11_1,
+			D3D_FEATURE_LEVEL_11_0,
+			D3D_FEATURE_LEVEL_10_1,
+			D3D_FEATURE_LEVEL_10_0,
+			D3D_FEATURE_LEVEL_9_3,
+			D3D_FEATURE_LEVEL_9_2,
+			D3D_FEATURE_LEVEL_9_1,
+		};
+		D3D_FEATURE_LEVEL dxFeatureLevel = D3D_FEATURE_LEVEL_9_1;
+		const int totalNumFeatureLevels = sizeof(featureLevels) / sizeof(featureLevels[0]);
+
         // On a machine that does not have an up-to-date version of D3D installed,
         // the `D3D11CreateDeviceAndSwapChain` call will fail with `E_INVALIDARG`
         // if you ask for featuer level 11_1. The workaround is to call
@@ -335,17 +334,16 @@ public:
         // at the start of the list of requested feature levels, and the second
         // time without it.
 
-        HRESULT hr = S_OK;
         for( int ii = 0; ii < 2; ++ii )
         {
-            hr = D3D11CreateDeviceAndSwapChain_(
+            const HRESULT hr = D3D11CreateDeviceAndSwapChain_(
                 NULL,                    // adapter (use default)
                 D3D_DRIVER_TYPE_REFERENCE,
               //D3D_DRIVER_TYPE_HARDWARE,
                 NULL,                    // software
                 deviceFlags,
                 &featureLevels[ii],
-                (sizeof(featureLevels) / sizeof(featureLevels[0])) - 1,
+				totalNumFeatureLevels - ii,
                 D3D11_SDK_VERSION,
                 &dxSwapChainDesc,
                 &dxSwapChain,
@@ -353,16 +351,19 @@ public:
                 &dxFeatureLevel,
                 &dxImmediateContext);
 
-            // Failures with `E_INVALIDARG` might be due to feature level 11_1
-            // not being supported. Other failures are real, though.
-            if( hr != E_INVALIDARG )
-                break;
-        }
-        if( FAILED(hr) )
-        {
-            exit(1);
-        }
+			// Failures with `E_INVALIDARG` might be due to feature level 11_1
+			// not being supported. 
+			if (hr == E_INVALIDARG)
+			{
+				continue;
+			}
 
+			// Other failures are real, though.
+			SLANG_RETURN_ON_FAIL(hr);
+			// We must have a swap chain
+			break;
+        }
+ 
         // After we've created the swap chain, we can request a pointer to the
         // back buffer as a D3D11 texture, and create a render-target view from it.
 
@@ -370,35 +371,28 @@ public:
             0x6f15aaf2, 0xd208, 0x4e89, 0x9a, 0xb4, 0x48,
             0x95, 0x35, 0xd3, 0x4f, 0x9c };
 
-        dxSwapChain->GetBuffer(
-            0,
-            kIID_ID3D11Texture2D,
-            (void**)&dxBackBufferTexture);
+        SLANG_RETURN_ON_FAIL(dxSwapChain->GetBuffer(0, kIID_ID3D11Texture2D, (void**)&dxBackBufferTexture));
 
         for (int i = 0; i < 8; i++)
         {
             ID3D11Texture2D* texture;
             D3D11_TEXTURE2D_DESC textureDesc;
             dxBackBufferTexture->GetDesc(&textureDesc);
-            dxDevice->CreateTexture2D(&textureDesc, nullptr, &texture);
+            SLANG_RETURN_ON_FAIL(dxDevice->CreateTexture2D(&textureDesc, nullptr, &texture));
+
             ID3D11RenderTargetView * rtv;
             D3D11_RENDER_TARGET_VIEW_DESC rtvDesc;
             rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
             rtvDesc.Texture2D.MipSlice = 0;
             rtvDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
-            dxDevice->CreateRenderTargetView(
-                texture,
-                &rtvDesc,
-                &rtv);
+            SLANG_RETURN_ON_FAIL(dxDevice->CreateRenderTargetView(texture, &rtvDesc, &rtv));
+
             dxRenderTargetViews.Add(rtv);
             dxRenderTargetTextures.Add(texture);
         }
 
-        dxImmediateContext->OMSetRenderTargets(
-            (UINT)dxRenderTargetViews.Count(),
-            dxRenderTargetViews.Buffer(),
-            NULL);
-
+        dxImmediateContext->OMSetRenderTargets((UINT)dxRenderTargetViews.Count(), dxRenderTargetViews.Buffer(), nullptr);
+		
         // Similarly, we are going to set up a viewport once, and then never
         // switch, since this is a simple test app.
         D3D11_VIEWPORT dxViewport;
@@ -409,6 +403,8 @@ public:
         dxViewport.MaxDepth = 1; // TODO(tfoley): use reversed depth
         dxViewport.MinDepth = 0;
         dxImmediateContext->RSSetViewports(1, &dxViewport);
+
+		return SLANG_OK;
     }
 
     float clearColor[4] = { 0, 0, 0, 0 };
@@ -431,7 +427,7 @@ public:
         dxSwapChain->Present(0, 0);
     }
 
-    virtual void captureScreenShot(char const* outputPath) override
+    virtual SlangResult captureScreenShot(char const* outputPath) override
     {
         HRESULT hr = captureTextureToFile(
             dxDevice,
@@ -441,8 +437,9 @@ public:
         if( FAILED(hr) )
         {
             fprintf(stderr, "error: could not capture screenshot to '%s'\n", outputPath);
-            exit(1);
-        }
+			SLANG_RETURN_ON_FAIL(hr);
+		}
+		return SLANG_OK;
     }
 
     virtual ShaderCompiler* getShaderCompiler() override
@@ -535,7 +532,7 @@ public:
                 hlslCursor+= sprintf(hlslCursor, ",\n");
             }
 
-            char const* typeName = "Uknown";
+            char const* typeName = "Unknown";
             switch(inputElements[ii].format)
             {
             case Format::RGB_Float32:

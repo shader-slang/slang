@@ -86,7 +86,7 @@ public:
 
     // Renderer interface
 
-    virtual void initialize(void* inWindowHandle) override
+    virtual SlangResult initialize(void* inWindowHandle) override
     {
         auto windowHandle = (HWND) inWindowHandle;
 
@@ -127,6 +127,8 @@ public:
             glEnable(GL_DEBUG_OUTPUT);
             glDebugMessageCallback(staticDebugCallback, this);
         }
+
+		return SLANG_OK;
     }
 
     void debugCallback(
@@ -181,7 +183,7 @@ public:
         SwapBuffers(deviceContext);
     }
 
-    virtual void captureScreenShot(char const* outputPath) override
+    virtual SlangResult captureScreenShot(char const* outputPath) override
     {
         int width = gWindowWidth;
         int height = gWindowHeight;
@@ -189,7 +191,7 @@ public:
         int components = 4;
         int rowStride = width*components;
 
-        GLubyte* buffer = (GLubyte*)malloc(components * width * height);
+        GLubyte* buffer = (GLubyte*)::malloc(components * width * height);
 
         glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
 
@@ -222,12 +224,16 @@ public:
             components,
             buffer,
             rowStride);
-        if( !stbResult )
+        
+		::free(buffer);
+
+		if( !stbResult )
         {
             assert(!"unexpected");
+			return SLANG_FAIL;
         }
 
-        delete(buffer);
+		return SLANG_OK;
     }
 
     virtual ShaderCompiler* getShaderCompiler() override
@@ -483,7 +489,7 @@ public:
             int maxSize = 0;
             glGetProgramiv(programID, GL_INFO_LOG_LENGTH, &maxSize);
 
-            auto infoBuffer = (char*) malloc(maxSize);
+            auto infoBuffer = (char*)::malloc(maxSize);
 
             int infoSize = 0;
             glGetProgramInfoLog(programID, maxSize, &infoSize, infoBuffer);
@@ -493,8 +499,10 @@ public:
                 OutputDebugStringA(infoBuffer);
             }
 
+			::free(infoBuffer);
+
             glDeleteProgram(programID);
-            return 0;
+            return nullptr;
         }
 
         return (ShaderProgram*) (uintptr_t) programID;

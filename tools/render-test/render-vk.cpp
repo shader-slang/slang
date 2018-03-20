@@ -73,7 +73,10 @@
     M(vkCreateShaderModule)             \
     /* */
 
+
 namespace renderer_test {
+
+#define RETURN_ON_VK_FAIL(x) { VkResult _vkRes = x; if (_vkRes != VK_SUCCESS) { SLANG_RETURN_ON_FAIL(toSlangResult(_vkRes)); }}
 
 class VKRenderer : public Renderer, public ShaderCompiler
 {
@@ -101,10 +104,14 @@ public:
 
     // Renderer interface
 
-    void checkResult(VkResult result)
-    {
-        assert(result == VK_SUCCESS);
-    }
+	static SlangResult toSlangResult(VkResult res)
+	{
+		return (res == VK_SUCCESS) ? SLANG_OK : SLANG_FAIL;
+	}
+	void checkResult(VkResult result)
+	{
+		assert(result == VK_SUCCESS);
+	}
 
     VkBool32 handleDebugMessage(
         VkDebugReportFlagsEXT flags,
@@ -151,22 +158,21 @@ public:
             flags, objType, srcObject, location, msgCode, pLayerPrefix, pMsg);
     }
 
-    virtual void initialize(void* inWindowHandle) override
+    virtual SlangResult initialize(void* inWindowHandle) override
     {
         char const* dynamicLibraryName = "vulkan-1.dll";
         HMODULE vulkan = LoadLibraryA(dynamicLibraryName);
         if(!vulkan)
         {
             fprintf(stderr, "error: failed load '%s'\n", dynamicLibraryName);
-            exit(1);
+            return SLANG_FAIL;
         }
 
         vkGetInstanceProcAddr = (PFN_vkGetInstanceProcAddr) GetProcAddress(vulkan, "vkGetInstanceProcAddr");
         if(!vkGetInstanceProcAddr)
         {
-            fprintf(stderr,
-                "error: failed load symbol 'vkGetInstanceProcAddr'\n");
-            exit(1);
+            fprintf(stderr, "error: failed load symbol 'vkGetInstanceProcAddr'\n");
+			return SLANG_FAIL;
         }
 
         VkApplicationInfo applicationInfo = { VK_STRUCTURE_TYPE_APPLICATION_INFO };
@@ -209,10 +215,7 @@ public:
 
         FOREACH_GLOBAL_PROC(LOAD_INSTANCE_PROC);
 
-        checkResult(vkCreateInstance(
-            &instanceCreateInfo,
-            nullptr,
-            &instance));
+		RETURN_ON_VK_FAIL(vkCreateInstance(&instanceCreateInfo, nullptr, &instance));
 
         FOREACH_INSTANCE_PROC(LOAD_INSTANCE_PROC);
 
@@ -227,18 +230,16 @@ public:
         debugCreateInfo.pUserData = this;
         debugCreateInfo.flags = debugFlags;
 
-        checkResult(vkCreateDebugReportCallbackEXT(
-            instance, &debugCreateInfo, nullptr, &debugReportCallback));
+		RETURN_ON_VK_FAIL(vkCreateDebugReportCallbackEXT(instance, &debugCreateInfo, nullptr, &debugReportCallback));
 
 #endif
 
         uint32_t physicalDeviceCount = 0;
-        checkResult(vkEnumeratePhysicalDevices(
-            instance, &physicalDeviceCount, nullptr));
+		RETURN_ON_VK_FAIL(vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, nullptr));
 
         VkPhysicalDevice* physicalDevices = (VkPhysicalDevice*)alloca(
             physicalDeviceCount * sizeof(VkPhysicalDevice));
-        checkResult(vkEnumeratePhysicalDevices(
+		RETURN_ON_VK_FAIL(vkEnumeratePhysicalDevices(
             instance, &physicalDeviceCount, physicalDevices));
 
         uint32_t selectedDeviceIndex = 0;
@@ -293,7 +294,7 @@ public:
         deviceCreateInfo.enabledExtensionCount = sizeof(deviceExtensions) / sizeof(deviceExtensions[0]);
         deviceCreateInfo.ppEnabledExtensionNames = &deviceExtensions[0];
 
-        checkResult(vkCreateDevice(
+		RETURN_ON_VK_FAIL(vkCreateDevice(
             physicalDevice, &deviceCreateInfo, nullptr, &device));
 
 #define LOAD_DEVICE_PROC(NAME) NAME = (PFN_##NAME) vkGetDeviceProcAddr(device, #NAME);
@@ -306,7 +307,7 @@ public:
         commandPoolCreateInfo.queueFamilyIndex = queueFamilyIndex;
         commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
-        checkResult(vkCreateCommandPool(
+		RETURN_ON_VK_FAIL(vkCreateCommandPool(
             device, &commandPoolCreateInfo, nullptr, &commandPool));
 
         vkGetDeviceQueue(
@@ -316,6 +317,8 @@ public:
             &queue);
 
         // set up swap chain
+
+
 
         // create command buffers
 
@@ -329,9 +332,9 @@ public:
 
 
 
-// create semaphores for sync
+		// create semaphores for sync
 
-
+		return SLANG_OK;
     }
 
     float clearColor[4];
@@ -349,8 +352,9 @@ public:
     {
     }
 
-    virtual void captureScreenShot(char const* outputPath) override
+    virtual SlangResult captureScreenShot(char const* outputPath) override
     {
+		return SLANG_FAIL;
     }
 
     virtual ShaderCompiler* getShaderCompiler() override
