@@ -28,7 +28,7 @@ enum OutputMode
     // Default mode is to write test results to the console
     kOutputMode_Default = 0,
 
-    // When running under AppVeyor contiuous integration, we
+    // When running under AppVeyor continuous integration, we
     // need to output test results in a way that the AppVeyor
     // environment can pick up and display.
     kOutputMode_AppVeyor,
@@ -68,7 +68,7 @@ struct Options
     // Only run tests that match one of the given categories
     Dictionary<TestCategory*, TestCategory*> includeCategories;
 
-    // Exclude test taht match one these categories
+    // Exclude test that match one these categories
     Dictionary<TestCategory*, TestCategory*> excludeCategories;
 };
 Options options;
