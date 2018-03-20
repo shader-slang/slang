@@ -979,7 +979,7 @@ TestResult runHLSLComparisonTest(TestInput& input)
 
     OSProcessSpawner::ResultCode resultCode = spawner.getResultCode();
 
-    String standardOuput = spawner.getStandardOutput();
+    String standardOutput = spawner.getStandardOutput();
     String standardError = spawner.getStandardError();
 
     // We construct a single output string that captures the results
@@ -989,7 +989,7 @@ TestResult runHLSLComparisonTest(TestInput& input)
     actualOutputBuilder.Append("\nstandard error = {\n");
     actualOutputBuilder.Append(standardError);
     actualOutputBuilder.Append("}\nstandard output = {\n");
-    actualOutputBuilder.Append(standardOuput);
+    actualOutputBuilder.Append(standardOutput);
     actualOutputBuilder.Append("}\n");
 
     String actualOutput = actualOutputBuilder.ProduceString();
@@ -1011,7 +1011,7 @@ TestResult runHLSLComparisonTest(TestInput& input)
     {
         if (resultCode != 0)				result = kTestResult_Fail;
         if (standardError.Length() != 0)	result = kTestResult_Fail;
-        if (standardOuput.Length() != 0)	result = kTestResult_Fail;
+        if (standardOutput.Length() != 0)	result = kTestResult_Fail;
     }
     // Otherwise we compare to the expected output
     else if (actualOutput != expectedOutput)
@@ -1339,16 +1339,16 @@ TestResult doImageComparison(String const& filePath)
 				// cases where vertex shader results lead to rendering that is off
 				// by one pixel...
 
-				fprintf(stderr, "image compare failure at (%d,%d) channel %d. expected %d got %d (absolute error: %d, relative error: %f)\n",
-					x, y, n,
-					expectedVal,
-					actualVal,
-					absoluteDiff,
-					relativeDiff);
-
-				// There was a difference we couldn't excuse!
-				return kTestResult_Fail;
-			}
+			    fprintf(stderr, "image compare failure at (%d,%d) channel %d. expected %d got %d (absolute error: %d, relative error: %f)\n",
+			    	x, y, n,
+			    	expectedVal,
+			    	actualVal,
+			    	absoluteDiff,
+			    	relativeDiff);
+                
+			    // There was a difference we couldn't excuse!
+			    return kTestResult_Fail;
+		    }
 		}
 	}
 
@@ -1758,10 +1758,10 @@ int main(
     //
 
     if (SLANG_FAILED(parseOptions(&argc, argv)))
-	{
-		// Return exit code with error
-		return 1;
-	}
+    {
+    	// Return exit code with error
+    	return 1;
+    }
 
     if( options.includeCategories.Count() == 0 )
     {
@@ -1799,7 +1799,7 @@ int main(
     printf("\n===\n%d%% of tests passed (%d/%d)", (passCount*100) / runTotal, passCount, runTotal);
     if(ignoredCount)
     {
-        printf(", %d tests ingored", ignoredCount);
+        printf(", %d tests ignored", ignoredCount);
     }
     printf("\n===\n\n");
 
