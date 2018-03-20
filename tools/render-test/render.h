@@ -9,10 +9,12 @@
 
 namespace renderer_test {
 
-typedef struct Buffer           Buffer;
-typedef struct InputLayout      InputLayout;
-typedef struct ShaderProgram    ShaderProgram;
-typedef struct BindingState     BindingState;
+// Declare opaque type
+struct Buffer;
+struct InputLayout;
+struct ShaderProgram;
+struct BindingState;
+
 struct ShaderCompileRequest
 {
     struct SourceInfo
@@ -39,7 +41,7 @@ struct ShaderCompileRequest
     SourceInfo source;
     EntryPoint vertexShader;
     EntryPoint fragmentShader;
-	EntryPoint computeShader;
+    EntryPoint computeShader;
     Slang::List<Slang::String> entryPointTypeArguments;
 };
 
@@ -79,8 +81,8 @@ struct InputElementDesc
 
 enum class MapFlavor
 {
-	HostRead,
-	HostWrite,
+    HostRead,
+    HostWrite,
     WriteDiscard,
 };
 
@@ -115,20 +117,28 @@ public:
     virtual void setBindingState(BindingState * state) = 0;
     virtual void setVertexBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* strides, UInt const* offsets) = 0;
 
-    inline void setVertexBuffer(UInt slot, Buffer* buffer, UInt stride, UInt offset = 0)
-    {
-        setVertexBuffers(slot, 1, &buffer, &stride, &offset);
-    }
+    inline void setVertexBuffer(UInt slot, Buffer* buffer, UInt stride, UInt offset = 0);
 
     virtual void setShaderProgram(ShaderProgram* program) = 0;
 
     virtual void setConstantBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* offsets) = 0;
-    inline void setConstantBuffer(UInt slot, Buffer* buffer, UInt offset = 0)
-    {
-        setConstantBuffers(slot, 1, &buffer, &offset);
-    }
+    inline void setConstantBuffer(UInt slot, Buffer* buffer, UInt offset = 0);
+
     virtual void draw(UInt vertexCount, UInt startVertex = 0) = 0;
-	virtual void dispatchCompute(int x, int y, int z) = 0;
+    virtual void dispatchCompute(int x, int y, int z) = 0;
 };
+
+
+// ----------------------------------------------------------------------------------------
+inline void Renderer::setVertexBuffer(UInt slot, Buffer* buffer, UInt stride, UInt offset)
+{
+    setVertexBuffers(slot, 1, &buffer, &stride, &offset);
+}
+// ----------------------------------------------------------------------------------------
+inline void Renderer::setConstantBuffer(UInt slot, Buffer* buffer, UInt offset)
+{
+    setConstantBuffers(slot, 1, &buffer, &offset);
+}
+
 
 } // renderer_test
