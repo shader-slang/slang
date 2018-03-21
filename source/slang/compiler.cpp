@@ -213,6 +213,21 @@ namespace Slang
 
     char const* GetHLSLProfileName(Profile profile)
     {
+        switch( profile.getFamily() )
+        {
+        case ProfileFamily::DX:
+            // Profile version is a DX one, so stick with it.
+            break;
+
+        default:
+            // Profile is a non-DX profile family, so we need to try
+            // to clobber it with something to get a default.
+            //
+            // TODO: This is a huge hack...
+            profile.setVersion(ProfileVersion::DX_5_0);
+            break;
+        }
+
         switch(profile.raw)
         {
         #define PROFILE(TAG, NAME, STAGE, VERSION) case Profile::TAG: return #NAME;
@@ -262,6 +277,8 @@ namespace Slang
         auto hlslCode = emitHLSLForEntryPoint(entryPoint, targetReq);
         maybeDumpIntermediate(entryPoint->compileRequest, hlslCode.Buffer(), CodeGenTarget::HLSL);
 
+        auto profile = getEffectiveProfile(entryPoint, targetReq);
+
         ID3DBlob* codeBlob;
         ID3DBlob* diagnosticsBlob;
         HRESULT hr = D3DCompile_(
@@ -271,7 +288,7 @@ namespace Slang
             nullptr,
             nullptr,
             getText(entryPoint->name).begin(),
-            GetHLSLProfileName(entryPoint->profile),
+            GetHLSLProfileName(profile),
             0,
             0,
             &codeBlob,
@@ -485,7 +502,7 @@ String dissassembleDXILUsingDXC(
         glslang_CompileRequest request;
         request.action = GLSLANG_ACTION_COMPILE_GLSL_TO_SPIRV;
         request.sourcePath = "slang";
-        request.slangStage = (SlangStage)entryPoint->profile.GetStage();
+        request.slangStage = (SlangStage)entryPoint->getStage();
 
         request.inputBegin  = rawGLSL.begin();
         request.inputEnd    = rawGLSL.end();

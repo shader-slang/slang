@@ -114,6 +114,10 @@ SLANG_RAW("__magic_type(InOutType)\n")
 SLANG_RAW("struct InOut\n")
 SLANG_RAW("{};\n")
 SLANG_RAW("\n")
+SLANG_RAW("__magic_type(StringType)\n")
+SLANG_RAW("struct String\n")
+SLANG_RAW("{};\n")
+SLANG_RAW("\n")
 
 // Declare vector and matrix types
 

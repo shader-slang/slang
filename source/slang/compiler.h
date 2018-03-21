@@ -107,9 +107,19 @@ namespace Slang
         List<String> genericParameterTypeNames;
 
         // The profile that the entry point will be compiled for
-        // (this is a combination of the target state, and also
+        // (this is a combination of the target stage, and also
         // a feature level that sets capabilities)
+        //
+        // Note: the profile-version part of this should probably
+        // be moving towards deprecation, in favor of the version
+        // information (e.g., "Shader Model 5.1") always coming
+        // from the target, while the stage part is all that is
+        // intrinsic to the entry point.
+        //
         Profile profile;
+
+        // Get the stage that the entry point is being compiled for.
+        Stage getStage() { return profile.GetStage(); }
 
         // The index of the translation unit (within the parent
         // compile request) that the entry point function is
@@ -118,6 +128,19 @@ namespace Slang
 
         // The output path requested for this entry point.
         // (only used when compiling from the command line)
+        //
+        // TODO: This should get dropped. When compiling from the
+        // command line, the user should be either:
+        //
+        // * Compiling a single entry point for a single target, so
+        //   that only a single output path is needed for the whole request.
+        //
+        // * Compiling for a target that supports multiple entry points directly
+        //   (e.g., a recent DXIL version), so that only one output file is needed.
+        //
+        // * Compiling to a slang module container, so that as many entry
+        //   points and targets as needed can be specified.
+        //
         String outputPath;
 
         // The translation unit that this entry point came from
@@ -202,6 +225,21 @@ namespace Slang
         // TypeLayouts created on the fly by reflection API
         Dictionary<Type*, RefPtr<TypeLayout>> typeLayouts;
     };
+
+    // Compute the "effective" profile to use when outputting the given entry point
+    // for the chosen code-generation target.
+    //
+    // The stage of the effective profile will always come from the entry point, while
+    // the profile version (aka "shader model") will be computed as follows:
+    //
+    // - If the entry point and target belong to the same profile family, then take
+    //   the latest version between the two (e.g., if the entry point specified `ps_5_1`
+    //   and the target specifies `sm_5_0` then use `sm_5_1` as the version).
+    //
+    // - If the entry point and target disagree on the profile family, always use the
+    //   profile family and version from the target.
+    //
+    Profile getEffectiveProfile(EntryPointRequest* entryPoint, TargetRequest* target);
 
     // A directory to be searched when looking for files (e.g., `#include`)
     struct SearchDirectory
@@ -468,6 +506,7 @@ namespace Slang
         Type* getInitializerListType();
         Type* getOverloadedType();
         Type* getErrorType();
+        Type* getStringType();
 
         Type* getConstExprRate();
         RefPtr<RateQualifiedType> getRateQualifiedType(

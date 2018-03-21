@@ -112,6 +112,38 @@ struct IncludeHandlerImpl : IncludeHandler
     }
 };
 
+//
+
+
+Profile getEffectiveProfile(EntryPointRequest* entryPoint, TargetRequest* target)
+{
+    auto entryPointProfile = entryPoint->profile;
+    auto targetProfile = target->targetProfile;
+
+    auto entryPointProfileVersion = entryPointProfile.GetVersion();
+    auto targetProfileVersion = targetProfile.GetVersion();
+
+    // Default to the entry point profile, since we know that has the right stage.
+    Profile effectiveProfile = entryPointProfile;
+
+    // Ignore the input from the target profile if it is missing.
+    if( targetProfile.getFamily() != ProfileFamily::Unknown )
+    {
+        // If the target comes from a different profile family, *or* it is from
+        // the same family but has a greater version number, then use the target's version.
+        if( targetProfile.getFamily() != entryPointProfile.getFamily()
+            || (targetProfileVersion > entryPointProfileVersion) )
+        {
+            effectiveProfile.setVersion(targetProfileVersion);
+        }
+    }
+
+    return effectiveProfile;
+}
+
+
+//
+
 CompileRequest::CompileRequest(Session* session)
     : mSession(session)
 {
@@ -224,7 +256,7 @@ void CompileRequest::parseTranslationUnit(
     }
 }
 
-void validateEntryPoint(EntryPointRequest*);
+void validateEntryPoints(CompileRequest*);
 
 void CompileRequest::checkAllTranslationUnits()
 {
@@ -235,23 +267,8 @@ void CompileRequest::checkAllTranslationUnits()
         checkTranslationUnit(translationUnit.Ptr());
     }
 
-    for (auto& translationUnit : translationUnits)
-    {
-        // Next, do follow-up validation on any entry
-        // points that the user declared via API or
-        // command line, to ensure that they meet
-        // requirements.
-        //
-        // Note: We may eventually have syntax to
-        // identify entry points via a modifier on
-        // declarations, and in this case they should
-        // probably get validated as part of orindary
-        // checking above.
-        for (auto entryPoint : translationUnit->entryPoints)
-        {
-            validateEntryPoint(entryPoint);
-        }
-    }
+    // Next, do follow-up validation on any entry points.
+    validateEntryPoints(this);
 }
 
 void CompileRequest::generateIR()

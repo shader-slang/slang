@@ -296,6 +296,12 @@ void Type::accept(IValVisitor* visitor, void* extra)
         return constExprRate;
     }
 
+    Type* Session::getStringType()
+    {
+        auto stringTypeDecl = findMagicDecl(this, "StringType");
+        return DeclRefType::Create(this, makeDeclRef<Decl>(stringTypeDecl));
+    }
+
     RefPtr<RateQualifiedType> Session::getRateQualifiedType(
         Type*   rate,
         Type*   valueType)
