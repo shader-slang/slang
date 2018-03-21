@@ -59,8 +59,8 @@
     F(glEnableVertexAttribArray,    PFNGLENABLEVERTEXATTRIBARRAYPROC)   \
     F(glDisableVertexAttribArray,   PFNGLDISABLEVERTEXATTRIBARRAYPROC)  \
     F(glDebugMessageCallback,       PFNGLDEBUGMESSAGECALLBACKPROC)      \
-	F(glDispatchCompute,            PFNGLDISPATCHCOMPUTEPROC) \
-	F(glActiveTexture,              PFNGLACTIVETEXTUREPROC) \
+    F(glDispatchCompute,            PFNGLDISPATCHCOMPUTEPROC) \
+    F(glActiveTexture,              PFNGLACTIVETEXTUREPROC) \
     F(glCreateSamplers,             PFNGLCREATESAMPLERSPROC) \
     F(glBindSampler,                PFNGLBINDSAMPLERPROC) \
     F(glTexImage3D,                 PFNGLTEXIMAGE3DPROC) \
@@ -74,189 +74,37 @@ namespace renderer_test {
 class GLRenderer : public Renderer, public ShaderCompiler
 {
 public:
-    HDC     deviceContext;
-    HGLRC   glContext;
+    
+    // Renderer    implementation
+    virtual SlangResult initialize(void* inWindowHandle) override;
+    virtual void setClearColor(float const* color) override;
+    virtual void clearFrame() override;
+    virtual void presentFrame() override;
+    virtual SlangResult captureScreenShot(char const* outputPath) override;
+    virtual void serializeOutput(BindingState* state, const char * fileName) override;
+    virtual Buffer* createBuffer(BufferDesc const& desc) override;
+    virtual InputLayout* createInputLayout(InputElementDesc const* inputElements, UInt inputElementCount) override;
+    virtual BindingState * createBindingState(const ShaderInputLayout & layout) override;
+    virtual ShaderCompiler* getShaderCompiler() override;
+    virtual void* map(Buffer* buffer, MapFlavor flavor) override;
+    virtual void unmap(Buffer* buffer) override;
+    virtual void setInputLayout(InputLayout* inputLayout) override;
+    virtual void setPrimitiveTopology(PrimitiveTopology topology) override;
+    virtual void setBindingState(BindingState * state);
+    virtual void setVertexBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* strides, UInt const* offsets) override;
+    virtual void setShaderProgram(ShaderProgram* inProgram) override;
+    virtual void setConstantBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* offsets) override;
+    virtual void draw(UInt vertexCount, UInt startVertex) override;
+    virtual void dispatchCompute(int x, int y, int z) override;
 
-    // Declre a function pointer for each OpenGL
-    // extension function we need to load
+    // ShaderCompiler implementation
+    virtual ShaderProgram* compileProgram(ShaderCompileRequest const& request) override;
 
-#define DECLARE_GL_EXTENSION_FUNC(NAME, TYPE) TYPE NAME;
-    MAP_GL_EXTENSION_FUNCS(DECLARE_GL_EXTENSION_FUNC)
-#undef DECLARE_GL_EXTENSION_FUNC
-
-    // Renderer interface
-
-    virtual SlangResult initialize(void* inWindowHandle) override
+    protected:
+    enum
     {
-        auto windowHandle = (HWND) inWindowHandle;
-
-        deviceContext = GetDC(windowHandle);
-
-        PIXELFORMATDESCRIPTOR pixelFormatDesc = { sizeof(PIXELFORMATDESCRIPTOR) };
-        pixelFormatDesc.nVersion = 1;
-        pixelFormatDesc.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
-        pixelFormatDesc.iPixelType = PFD_TYPE_RGBA;
-        pixelFormatDesc.cColorBits = 32;
-        pixelFormatDesc.cDepthBits = 24;
-        pixelFormatDesc.cStencilBits = 8;
-        pixelFormatDesc.iLayerType = PFD_MAIN_PLANE;
-
-        int pixelFormatIndex = ChoosePixelFormat(deviceContext, &pixelFormatDesc);
-        SetPixelFormat(deviceContext, pixelFormatIndex, &pixelFormatDesc);
-
-        glContext = wglCreateContext(deviceContext);
-        wglMakeCurrent(deviceContext, glContext);
-
-        auto renderer = glGetString(GL_RENDERER);
-        auto extensions = glGetString(GL_EXTENSIONS);
-
-        // Load ech of our etension functions by name
-
-    #define LOAD_GL_EXTENSION_FUNC(NAME, TYPE) NAME = (TYPE) wglGetProcAddress(#NAME);
-        MAP_GL_EXTENSION_FUNCS(LOAD_GL_EXTENSION_FUNC)
-    #undef LOAD_GL_EXTENSION_FUNC
-
-
-        glDisable(GL_DEPTH_TEST);
-        glDisable(GL_CULL_FACE);
-
-        glViewport(0, 0, gWindowWidth, gWindowHeight);
-
-        if (glDebugMessageCallback)
-        {
-            glEnable(GL_DEBUG_OUTPUT);
-            glDebugMessageCallback(staticDebugCallback, this);
-        }
-
-		return SLANG_OK;
-    }
-
-    void debugCallback(
-        GLenum          source,
-        GLenum          type,
-        GLuint          id,
-        GLenum          severity,
-        GLsizei         length,
-        GLchar const*   message)
-    {
-        OutputDebugStringA("GL: ");
-        OutputDebugStringA(message);
-        OutputDebugStringA("\n");
-
-        switch (type)
-        {
-        case GL_DEBUG_TYPE_ERROR:
-            break;
-
-        default:
-            break;
-        }
-    }
-
-    static void APIENTRY staticDebugCallback(
-        GLenum          source,
-        GLenum          type,
-        GLuint          id,
-        GLenum          severity,
-        GLsizei         length,
-        GLchar const*   message,
-        void const*     userParam)
-    {
-        ((GLRenderer*) userParam)->debugCallback(
-            source, type, id, severity, length, message);
-    }
-
-    float clearColor[4] = { 0, 0, 0, 0 };
-    virtual void setClearColor(float const* color) override
-    {
-        glClearColor(color[0], color[1], color[2], color[3]);
-    }
-
-    virtual void clearFrame() override
-    {
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-    }
-
-    virtual void presentFrame() override
-    {
-        glFlush();
-        SwapBuffers(deviceContext);
-    }
-
-    virtual SlangResult captureScreenShot(char const* outputPath) override
-    {
-        int width = gWindowWidth;
-        int height = gWindowHeight;
-
-        int components = 4;
-        int rowStride = width*components;
-
-        GLubyte* buffer = (GLubyte*)::malloc(components * width * height);
-
-        glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
-
-        // OpenGL's "upside down" convention bites us here, so we need
-        // to flip the data in the buffer by swapping rows
-        int halfHeight = height / 2;
-        for (int hh = 0; hh < halfHeight; ++hh)
-        {
-            // Get a pointer to the row data, and a pointer
-            // to the row on the "other end" of the image
-            GLubyte* rowA = buffer + rowStride*hh;
-            GLubyte* rowB = buffer + rowStride*(height - (hh + 1));
-
-            for (int ii = 0; ii < rowStride; ++ii)
-            {
-                auto a = rowA[ii];
-                auto b = rowB[ii];
-
-                rowA[ii] = b;
-                rowB[ii] = a;
-            }
-        }
-
-        //
-
-        int stbResult = stbi_write_png(
-            outputPath,
-            width,
-            height,
-            components,
-            buffer,
-            rowStride);
-        
-		::free(buffer);
-
-		if( !stbResult )
-        {
-            assert(!"unexpected");
-			return SLANG_FAIL;
-        }
-
-		return SLANG_OK;
-    }
-
-    virtual ShaderCompiler* getShaderCompiler() override
-    {
-        return this;
-    }
-
-    virtual Buffer* createBuffer(BufferDesc const& desc) override
-    {
-        // TODO: should derive target from desc...
-        GLenum target = GL_UNIFORM_BUFFER;
-
-        // TODO: should derive from desc...
-        GLenum usage = GL_DYNAMIC_DRAW;
-
-        GLuint bufferID = 0;
-        glGenBuffers(1, &bufferID);
-        glBindBuffer(target, bufferID);
-
-        glBufferData(target, desc.size, desc.initData, usage);
-
-        return (Buffer*)(uintptr_t)bufferID;
-    }
+        kMaxVertexStreams = 16,
+    };
 
     struct VertexAttributeFormat
     {
@@ -272,290 +120,185 @@ public:
         GLsizei                 offset;
     };
 
-    enum
-    {
-        kMaxVertexStreams = 16,
-    };
-
     struct InputLayoutImpl
     {
         VertexAttributeDesc attributes[kMaxVertexStreams];
         UInt attributeCount = 0;
     };
 
-    static VertexAttributeFormat getVertexAttributeFormat(
-        Format format)
+    struct BindingEntryImpl
     {
-        switch (format)
-        {
-        default: assert(!"unexpected"); return VertexAttributeFormat();
-
-    #define CASE(NAME, COUNT, TYPE, NORMALIZED) \
-        case Format::NAME: do { VertexAttributeFormat result = {COUNT, TYPE, NORMALIZED}; return result; } while (0)
-
-        CASE(RGB_Float32, 3, GL_FLOAT, GL_FALSE);
-        CASE(RG_Float32, 2, GL_FLOAT, GL_FALSE);
-
-    #undef CASE
-
-        }
-    }
-
-    virtual InputLayout* createInputLayout(InputElementDesc const* inputElements, UInt inputElementCount) override
+        ShaderInputType type;
+        GLuint handle;
+        List<int> binding;
+        int bindTarget;
+        int bufferSize;
+        bool isOutput = false;
+    };
+    struct BindingStateImpl
     {
-        InputLayoutImpl* inputLayout = new InputLayoutImpl();
+        List<BindingEntryImpl> entries;
+    };
 
-        inputLayout->attributeCount = inputElementCount;
-        for (UInt ii = 0; ii < inputElementCount; ++ii)
-        {
-            auto& inputAttr = inputElements[ii];
-            auto& glAttr = inputLayout->attributes[ii];
+    void bindBufferImpl(int target, UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* offsets);
+    void flushStateForDraw();
+    GLuint loadShader(GLenum stage, char const* source);
+    void createInputBuffer(BindingEntryImpl& rs, InputBufferDesc bufDesc, List<unsigned int>& bufferData);
+    void debugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, GLchar const* message);
+    void createInputTexture(BindingEntryImpl& rs, InputTextureDesc texDesc, InputSamplerDesc samplerDesc);
+    void createInputSampler(BindingEntryImpl& rs, InputSamplerDesc samplerDesc);
 
-            glAttr.streamIndex = 0;
-            glAttr.format = getVertexAttributeFormat(inputAttr.format);
-            glAttr.offset = (GLsizei) inputAttr.offset;
-        }
-
-        return (InputLayout*)inputLayout;
-    }
-
-    virtual void* map(Buffer* buffer, MapFlavor flavor) override
-    {
-        GLenum target = GL_UNIFORM_BUFFER;
-
-        GLuint access = 0;
-        switch (flavor)
-        {
-        case MapFlavor::WriteDiscard:
-		case MapFlavor::HostWrite:
-            access = GL_WRITE_ONLY;
-            break;
-		case MapFlavor::HostRead:
-			access = GL_READ_ONLY;
-			break;
-        }
-
-        auto bufferID = (GLuint)(uintptr_t)buffer;
-        glBindBuffer(target, bufferID);
-
-        return glMapBuffer(target, access);
-    }
-
-    virtual void unmap(Buffer* buffer) override
-    {
-        GLenum target = GL_UNIFORM_BUFFER;
-
-        auto bufferID = (GLuint)(uintptr_t)buffer;
-        glUnmapBuffer(target);
-    }
+    static void APIENTRY staticDebugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, GLchar const* message, void const* userParam);
+    static VertexAttributeFormat getVertexAttributeFormat(Format format);
 
     InputLayoutImpl* boundInputLayout = nullptr;
 
-    virtual void setInputLayout(InputLayout* inputLayout) override
-    {
-        boundInputLayout = (InputLayoutImpl*) inputLayout;
-    }
-
     GLenum boundPrimitiveTopology = GL_TRIANGLES;
 
-    virtual void setPrimitiveTopology(PrimitiveTopology topology) override
-    {
-        GLenum glTopology = 0;
-        switch (topology)
-        {
-    #define CASE(NAME, VALUE) case PrimitiveTopology::NAME: glTopology = VALUE; break
-
-        CASE(TriangleList, GL_TRIANGLES);
-
-    #undef CASE
-        }
-        boundPrimitiveTopology = glTopology;
-    }
-
+    HDC     deviceContext;
+    HGLRC   glContext;
+    float clearColor[4] = { 0, 0, 0, 0 };
     GLuint  boundVertexStreamBuffers[kMaxVertexStreams];
     UInt    boundVertexStreamStrides[kMaxVertexStreams];
     UInt    boundVertexStreamOffsets[kMaxVertexStreams];
 
-    virtual void setVertexBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* strides, UInt const* offsets) override
+    // Declare a function pointer for each OpenGL
+    // extension function we need to load
+#define DECLARE_GL_EXTENSION_FUNC(NAME, TYPE) TYPE NAME;
+    MAP_GL_EXTENSION_FUNCS(DECLARE_GL_EXTENSION_FUNC)
+#undef DECLARE_GL_EXTENSION_FUNC
+};
+
+Renderer* createGLRenderer()
+{
+    return new GLRenderer();
+}
+
+void GLRenderer::debugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, GLchar const* message)
+{
+    ::OutputDebugStringA("GL: ");
+    ::OutputDebugStringA(message);
+    ::OutputDebugStringA("\n");
+
+    switch (type)
     {
-        for (UInt ii = 0; ii < slotCount; ++ii)
+        case GL_DEBUG_TYPE_ERROR:
+            break;
+        default:
+            break;
+    }
+}
+
+/* static */void APIENTRY GLRenderer::staticDebugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, GLchar const* message, void const* userParam)
+{
+    ((GLRenderer*)userParam)->debugCallback(source, type, id, severity, length, message);
+}
+
+/* static */GLRenderer::VertexAttributeFormat GLRenderer::getVertexAttributeFormat(Format format)
+{
+    switch (format)
+    {
+        default: assert(!"unexpected"); return VertexAttributeFormat();
+
+#define CASE(NAME, COUNT, TYPE, NORMALIZED) \
+        case Format::NAME: do { VertexAttributeFormat result = {COUNT, TYPE, NORMALIZED}; return result; } while (0)
+
+        CASE(RGB_Float32, 3, GL_FLOAT, GL_FALSE);
+        CASE(RG_Float32, 2, GL_FLOAT, GL_FALSE);
+#undef CASE
+    }
+}
+
+void GLRenderer::bindBufferImpl(int target, UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* offsets)
+{
+    for (UInt ii = 0; ii < slotCount; ++ii)
+    {
+        UInt slot = startSlot + ii;
+
+        Buffer* buffer = buffers[ii];
+        GLuint bufferID = (GLuint)(uintptr_t)buffer;
+
+        assert(!offsets || !offsets[ii]);
+
+        glBindBufferBase(target, (GLuint)slot, bufferID);
+    }
+}
+
+void GLRenderer::flushStateForDraw()
+{
+    auto layout = this->boundInputLayout;
+    auto attrCount = layout->attributeCount;
+    for (UInt ii = 0; ii < attrCount; ++ii)
+    {
+        auto& attr = layout->attributes[ii];
+
+        auto streamIndex = attr.streamIndex;
+
+        glBindBuffer(GL_ARRAY_BUFFER, boundVertexStreamBuffers[streamIndex]);
+
+        glVertexAttribPointer(
+            (GLuint)ii,
+            attr.format.componentCount,
+            attr.format.componentType,
+            attr.format.normalized,
+            (GLsizei)boundVertexStreamStrides[streamIndex],
+            (GLvoid*)(attr.offset + boundVertexStreamOffsets[streamIndex]));
+
+        glEnableVertexAttribArray((GLuint)ii);
+    }
+    for (UInt ii = attrCount; ii < kMaxVertexStreams; ++ii)
+    {
+        glDisableVertexAttribArray((GLuint)ii);
+    }
+}
+
+GLuint GLRenderer::loadShader(GLenum stage, char const* source)
+{
+    // GLSL is monumentally stupid. It officially requires the `#version` directive
+    // to be the first thing in the file, which wouldn't be so bad but the API
+    // doesn't provide a way to pass a `#define` into your shader other than by
+    // prepending it to the whole thing.
+    //
+    // We are going to solve this problem by doing some surgery on the source
+    // that was passed in.
+
+    char const* sourceBegin = source;
+    char const* sourceEnd = source + strlen(source);
+
+    // Look for a version directive in the user-provided source.
+    char const* versionBegin = strstr(source, "#version");
+    char const* versionEnd = nullptr;
+    if (versionBegin)
+    {
+        // If we found a directive, then scan for the end-of-line
+        // after it, and use that to specify the slice.
+        versionEnd = strchr(versionBegin, '\n');
+        if (!versionEnd)
         {
-            UInt slot = startSlot + ii;
-
-            Buffer* buffer = buffers[ii];
-            GLuint bufferID = (GLuint)(uintptr_t)buffer;
-
-            boundVertexStreamBuffers[slot] = bufferID;
-            boundVertexStreamStrides[slot] = strides[ii];
-            boundVertexStreamOffsets[slot] = offsets[ii];
-        }
-    }
-
-    virtual void setShaderProgram(ShaderProgram* program) override
-    {
-        GLuint programID = (GLuint)(uintptr_t)program;
-        glUseProgram(programID);
-    }
-
-	void bindBufferImpl(int target, UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* offsets)
-	{
-		for (UInt ii = 0; ii < slotCount; ++ii)
-		{
-			UInt slot = startSlot + ii;
-
-			Buffer* buffer = buffers[ii];
-			GLuint bufferID = (GLuint)(uintptr_t)buffer;
-
-			assert(!offsets || !offsets[ii]);
-
-			glBindBufferBase(target, (GLuint)slot, bufferID);
-		}
-	}
-
-    virtual void setConstantBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* offsets) override
-    {
-		bindBufferImpl(GL_UNIFORM_BUFFER, startSlot, slotCount, buffers, offsets);
-    }
-
-    void flushStateForDraw()
-    {
-        auto layout = this->boundInputLayout;
-        auto attrCount = layout->attributeCount;
-        for (UInt ii = 0; ii < attrCount; ++ii)
-        {
-            auto& attr = layout->attributes[ii];
-
-            auto streamIndex = attr.streamIndex;
-
-            glBindBuffer(GL_ARRAY_BUFFER, boundVertexStreamBuffers[streamIndex]);
-
-            glVertexAttribPointer(
-                (GLuint) ii,
-                 attr.format.componentCount,
-                attr.format.componentType,
-                attr.format.normalized,
-                (GLsizei) boundVertexStreamStrides[streamIndex],
-                (GLvoid*)(attr.offset + boundVertexStreamOffsets[streamIndex]));
-
-            glEnableVertexAttribArray((GLuint)ii);
-        }
-        for (UInt ii = attrCount; ii < kMaxVertexStreams; ++ii)
-        {
-            glDisableVertexAttribArray((GLuint)ii);
-        }
-    }
-
-    virtual void draw(UInt vertexCount, UInt startVertex = 0) override
-    {
-        flushStateForDraw();
-
-        glDrawArrays(boundPrimitiveTopology, (GLint) startVertex, (GLsizei) vertexCount);
-    }
-
-    // ShaderCompiler interface
-
-    virtual ShaderProgram* compileProgram(ShaderCompileRequest const& request) override
-    {
-        auto programID = glCreateProgram();
-		if (request.computeShader.name)
-		{
-			auto computeShaderID = loadShader(GL_COMPUTE_SHADER, request.computeShader.source.dataBegin);
-
-			glAttachShader(programID, computeShaderID);
-
-
-			glLinkProgram(programID);
-
-			glDeleteShader(computeShaderID);
-		}
-		else
-		{
-			auto vertexShaderID = loadShader(GL_VERTEX_SHADER, request.vertexShader.source.dataBegin);
-			auto fragmentShaderID = loadShader(GL_FRAGMENT_SHADER, request.fragmentShader.source.dataBegin);
-
-			glAttachShader(programID, vertexShaderID);
-			glAttachShader(programID, fragmentShaderID);
-
-
-			glLinkProgram(programID);
-
-			glDeleteShader(vertexShaderID);
-			glDeleteShader(fragmentShaderID);
-		}
-        GLint success = GL_FALSE;
-        glGetProgramiv(programID, GL_LINK_STATUS, &success);
-        if( !success )
-        {
-            int maxSize = 0;
-            glGetProgramiv(programID, GL_INFO_LOG_LENGTH, &maxSize);
-
-            auto infoBuffer = (char*)::malloc(maxSize);
-
-            int infoSize = 0;
-            glGetProgramInfoLog(programID, maxSize, &infoSize, infoBuffer);
-            if( infoSize > 0 )
-            {
-                fprintf(stderr, "%s", infoBuffer);
-                OutputDebugStringA(infoBuffer);
-            }
-
-			::free(infoBuffer);
-
-            glDeleteProgram(programID);
-            return nullptr;
-        }
-
-        return (ShaderProgram*) (uintptr_t) programID;
-    }
-
-    GLuint loadShader(GLenum stage, char const* source)
-    {
-
-        // GLSL in monumentally stupid. It officially requires the `#version` directive
-        // to be the first thing in the file, which wouldn't be so bad but the API
-        // doesn't provide a way to pass a `#define` into your shader other than by
-        // prepending it to the whole thing.
-        //
-        // We are going to solve this problem by doing some surgery on the source
-        // that was passed in.
-
-        char const* sourceBegin = source;
-        char const* sourceEnd = source + strlen(source);
-
-        // Look for a version directive in the user-provided source.
-        char const* versionBegin = strstr(source, "#version");
-        char const* versionEnd = nullptr;
-        if( versionBegin )
-        {
-            // If we found a directive, then scan for the end-of-line
-            // after it, and use that to specify the slice.
-            versionEnd = strchr(versionBegin, '\n');
-            if( !versionEnd )
-            {
-                versionEnd = sourceEnd;
-            }
-            else
-            {
-                versionEnd = versionEnd + 1;
-            }
+            versionEnd = sourceEnd;
         }
         else
         {
-            // If we didn't find a directive, then treat it as being
-            // a zero-byte slice at the start of the string
-            versionBegin = sourceBegin;
-            versionEnd = sourceBegin;
+            versionEnd = versionEnd + 1;
         }
+    }
+    else
+    {
+        // If we didn't find a directive, then treat it as being
+        // a zero-byte slice at the start of the string
+        versionBegin = sourceBegin;
+        versionEnd = sourceBegin;
+    }
 
-        enum { kMaxSourceStringCount = 16 };
-        GLchar const* sourceStrings[kMaxSourceStringCount];
-        GLint sourceStringLengths[kMaxSourceStringCount];
+    enum { kMaxSourceStringCount = 16 };
+    GLchar const* sourceStrings[kMaxSourceStringCount];
+    GLint sourceStringLengths[kMaxSourceStringCount];
 
-        int sourceStringCount = 0;
+    int sourceStringCount = 0;
 
-        char const* stagePrelude = "\n";
-        switch (stage)
-        {
+    char const* stagePrelude = "\n";
+    switch (stage)
+    {
 #define CASE(NAME) case GL_##NAME##_SHADER: stagePrelude = "#define __GLSL_" #NAME "__ 1\n"; break
 
         CASE(VERTEX);
@@ -566,11 +309,11 @@ public:
         CASE(COMPUTE);
 
 #undef CASE
-        }
+    }
 
-        char const* prelude =
-            "#define __GLSL__ 1\n"
-            ;
+    char const* prelude =
+        "#define __GLSL__ 1\n"
+        ;
 
 #define ADD_SOURCE_STRING_SPAN(BEGIN, END)                              \
         sourceStrings[sourceStringCount] = BEGIN;                       \
@@ -582,79 +325,61 @@ public:
         sourceStringLengths[sourceStringCount++] = GLint(strlen(BEGIN)) \
         /* end */
 
-        ADD_SOURCE_STRING_SPAN(versionBegin, versionEnd);
-        ADD_SOURCE_STRING(stagePrelude);
-        ADD_SOURCE_STRING(prelude);
-        ADD_SOURCE_STRING_SPAN(sourceBegin, versionBegin);
-        ADD_SOURCE_STRING_SPAN(versionEnd, sourceEnd);
+    ADD_SOURCE_STRING_SPAN(versionBegin, versionEnd);
+    ADD_SOURCE_STRING(stagePrelude);
+    ADD_SOURCE_STRING(prelude);
+    ADD_SOURCE_STRING_SPAN(sourceBegin, versionBegin);
+    ADD_SOURCE_STRING_SPAN(versionEnd, sourceEnd);
 
-        auto shaderID = glCreateShader(stage);
-        glShaderSource(
-            shaderID,
-            sourceStringCount,
-            &sourceStrings[0],
-            &sourceStringLengths[0]);
-        glCompileShader(shaderID);
+    auto shaderID = glCreateShader(stage);
+    glShaderSource(
+        shaderID,
+        sourceStringCount,
+        &sourceStrings[0],
+        &sourceStringLengths[0]);
+    glCompileShader(shaderID);
 
-        GLint success = GL_FALSE;
-        glGetShaderiv(shaderID, GL_COMPILE_STATUS, &success);
-        if( !success )
+    GLint success = GL_FALSE;
+    glGetShaderiv(shaderID, GL_COMPILE_STATUS, &success);
+    if (!success)
+    {
+        int maxSize = 0;
+        glGetShaderiv(shaderID, GL_INFO_LOG_LENGTH, &maxSize);
+
+        auto infoBuffer = (char*)malloc(maxSize);
+
+        int infoSize = 0;
+        glGetShaderInfoLog(shaderID, maxSize, &infoSize, infoBuffer);
+        if (infoSize > 0)
         {
-            int maxSize = 0;
-            glGetShaderiv(shaderID, GL_INFO_LOG_LENGTH, &maxSize);
-
-            auto infoBuffer = (char*) malloc(maxSize);
-
-            int infoSize = 0;
-            glGetShaderInfoLog(shaderID, maxSize, &infoSize, infoBuffer);
-            if( infoSize > 0 )
-            {
-                fprintf(stderr, "%s", infoBuffer);
-                OutputDebugStringA(infoBuffer);
-            }
-
-            glDeleteShader(shaderID);
-            return 0;
+            fprintf(stderr, "%s", infoBuffer);
+            OutputDebugStringA(infoBuffer);
         }
 
-        return shaderID;
-    } 
-
-	virtual void dispatchCompute(int x, int y, int z) override
-	{
-		glDispatchCompute(x, y, z);
-	}
-
-    struct GLBindingEntry
-    {
-        ShaderInputType type;
-        GLuint handle;
-        List<int> binding;
-        int bindTarget;
-        int bufferSize;
-        bool isOutput = false;
-    };
-    struct GLBindingState
-    {
-        List<GLBindingEntry> entries;
-    };
-
-    void createInputBuffer(GLBindingEntry & rs, InputBufferDesc bufDesc, List<unsigned int> & bufferData)
-    {
-        rs.bindTarget = (bufDesc.type == InputBufferType::StorageBuffer ? GL_SHADER_STORAGE_BUFFER : GL_UNIFORM_BUFFER);
-        glGenBuffers(1, &rs.handle);
-        glBindBuffer(rs.bindTarget, rs.handle);
-        glBufferData(rs.bindTarget, bufferData.Count() * sizeof(unsigned int), bufferData.Buffer(), GL_STATIC_READ);
-        glBindBuffer(rs.bindTarget, 0);
+        glDeleteShader(shaderID);
+        return 0;
     }
 
-    void createInputTexture(GLBindingEntry & rs, InputTextureDesc texDesc, InputSamplerDesc samplerDesc)
+    return shaderID;
+}
+
+void GLRenderer::createInputBuffer(BindingEntryImpl& rs, InputBufferDesc bufDesc, List<unsigned int>& bufferData)
+{
+    rs.bindTarget = (bufDesc.type == InputBufferType::StorageBuffer ? GL_SHADER_STORAGE_BUFFER : GL_UNIFORM_BUFFER);
+    glGenBuffers(1, &rs.handle);
+    glBindBuffer(rs.bindTarget, rs.handle);
+    glBufferData(rs.bindTarget, bufferData.Count() * sizeof(unsigned int), bufferData.Buffer(), GL_STATIC_READ);
+    glBindBuffer(rs.bindTarget, 0);
+}
+
+
+void GLRenderer::createInputTexture(BindingEntryImpl& rs, InputTextureDesc texDesc, InputSamplerDesc samplerDesc)
+{
+    TextureData texData;
+    generateTextureData(texData, texDesc);
+    glGenTextures(1, &rs.handle);
+    switch (texDesc.dimension)
     {
-        TextureData texData;
-        generateTextureData(texData, texDesc);
-        glGenTextures(1, &rs.handle);
-        switch (texDesc.dimension)
-        {
         case 1:
             if (texDesc.arrayLength > 0)
             {
@@ -714,59 +439,295 @@ public:
             for (int i = 0; i < texData.mipLevels; i++)
                 glTexImage3D(rs.bindTarget, i, GL_RGBA8, texData.textureSize, texData.textureSize, texData.textureSize, 0, GL_RGBA, GL_UNSIGNED_BYTE, texData.dataBuffer[i].Buffer());
             break;
-        }
-        glTexParameteri(rs.bindTarget, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(rs.bindTarget, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexParameteri(rs.bindTarget, GL_TEXTURE_WRAP_R, GL_REPEAT);
+    }
+    glTexParameteri(rs.bindTarget, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(rs.bindTarget, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(rs.bindTarget, GL_TEXTURE_WRAP_R, GL_REPEAT);
 
-        if (samplerDesc.isCompareSampler)
+    if (samplerDesc.isCompareSampler)
+    {
+        glTexParameteri(rs.bindTarget, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(rs.bindTarget, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameterf(rs.bindTarget, GL_TEXTURE_MAX_ANISOTROPY_EXT, 8.0f);
+    }
+    else
+    {
+        glTexParameteri(rs.bindTarget, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(rs.bindTarget, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(rs.bindTarget, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+        glTexParameteri(rs.bindTarget, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+    }
+}
+
+void GLRenderer::createInputSampler(BindingEntryImpl& rs, InputSamplerDesc samplerDesc)
+{
+    glCreateSamplers(1, &rs.handle);
+    glSamplerParameteri(rs.handle, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glSamplerParameteri(rs.handle, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glSamplerParameteri(rs.handle, GL_TEXTURE_WRAP_R, GL_REPEAT);
+
+    if (samplerDesc.isCompareSampler)
+    {
+        glSamplerParameteri(rs.handle, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glSamplerParameteri(rs.handle, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glSamplerParameteri(rs.handle, GL_TEXTURE_MAX_ANISOTROPY_EXT, 8);
+    }
+    else
+    {
+        glSamplerParameteri(rs.handle, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glSamplerParameteri(rs.handle, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glSamplerParameteri(rs.handle, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+        glSamplerParameteri(rs.handle, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+    }
+}
+
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!! Renderer interface !!!!!!!!!!!!!!!!!!!!!!!!!!
+
+SlangResult GLRenderer::initialize(void* inWindowHandle)
+{
+    auto windowHandle = (HWND)inWindowHandle;
+
+    deviceContext = ::GetDC(windowHandle);
+
+    PIXELFORMATDESCRIPTOR pixelFormatDesc = { sizeof(PIXELFORMATDESCRIPTOR) };
+    pixelFormatDesc.nVersion = 1;
+    pixelFormatDesc.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
+    pixelFormatDesc.iPixelType = PFD_TYPE_RGBA;
+    pixelFormatDesc.cColorBits = 32;
+    pixelFormatDesc.cDepthBits = 24;
+    pixelFormatDesc.cStencilBits = 8;
+    pixelFormatDesc.iLayerType = PFD_MAIN_PLANE;
+
+    int pixelFormatIndex = ChoosePixelFormat(deviceContext, &pixelFormatDesc);
+    SetPixelFormat(deviceContext, pixelFormatIndex, &pixelFormatDesc);
+
+    glContext = wglCreateContext(deviceContext);
+    wglMakeCurrent(deviceContext, glContext);
+
+    auto renderer = glGetString(GL_RENDERER);
+    auto extensions = glGetString(GL_EXTENSIONS);
+
+    // Load each of our extension functions by name
+
+#define LOAD_GL_EXTENSION_FUNC(NAME, TYPE) NAME = (TYPE) wglGetProcAddress(#NAME);
+    MAP_GL_EXTENSION_FUNCS(LOAD_GL_EXTENSION_FUNC)
+#undef LOAD_GL_EXTENSION_FUNC
+
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
+
+    glViewport(0, 0, gWindowWidth, gWindowHeight);
+
+    if (glDebugMessageCallback)
+    {
+        glEnable(GL_DEBUG_OUTPUT);
+        glDebugMessageCallback(staticDebugCallback, this);
+    }
+
+    return SLANG_OK;
+}
+
+void GLRenderer::setClearColor(float const* color)
+{
+    glClearColor(color[0], color[1], color[2], color[3]);
+}
+
+void GLRenderer::clearFrame()
+{
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+}
+
+void GLRenderer::presentFrame()
+{
+    glFlush();
+    ::SwapBuffers(deviceContext);
+}
+
+SlangResult GLRenderer::captureScreenShot(char const* outputPath)
+{
+    int width = gWindowWidth;
+    int height = gWindowHeight;
+
+    int components = 4;
+    int rowStride = width*components;
+
+    GLubyte* buffer = (GLubyte*)::malloc(components * width * height);
+
+    glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
+
+    // OpenGL's "upside down" convention bites us here, so we need
+    // to flip the data in the buffer by swapping rows
+    int halfHeight = height / 2;
+    for (int hh = 0; hh < halfHeight; ++hh)
+    {
+        // Get a pointer to the row data, and a pointer
+        // to the row on the "other end" of the image
+        GLubyte* rowA = buffer + rowStride*hh;
+        GLubyte* rowB = buffer + rowStride*(height - (hh + 1));
+
+        for (int ii = 0; ii < rowStride; ++ii)
         {
-            glTexParameteri(rs.bindTarget, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-            glTexParameteri(rs.bindTarget, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-            glTexParameterf(rs.bindTarget, GL_TEXTURE_MAX_ANISOTROPY_EXT, 8.0f);
-        }
-        else
-        {
-            glTexParameteri(rs.bindTarget, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(rs.bindTarget, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-            glTexParameteri(rs.bindTarget, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
-            glTexParameteri(rs.bindTarget, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+            auto a = rowA[ii];
+            auto b = rowB[ii];
+
+            rowA[ii] = b;
+            rowB[ii] = a;
         }
     }
 
-    void createInputSampler(GLBindingEntry & rs, InputSamplerDesc samplerDesc)
-    {
-        glCreateSamplers(1, &rs.handle);
-        glSamplerParameteri(rs.handle, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glSamplerParameteri(rs.handle, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glSamplerParameteri(rs.handle, GL_TEXTURE_WRAP_R, GL_REPEAT);
+    //
+    int stbResult = stbi_write_png(outputPath, width, height, components, buffer, rowStride);
 
-        if (samplerDesc.isCompareSampler)
-        {
-            glSamplerParameteri(rs.handle, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-            glSamplerParameteri(rs.handle, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-            glSamplerParameteri(rs.handle, GL_TEXTURE_MAX_ANISOTROPY_EXT, 8);
-        }
-        else
-        {
-            glSamplerParameteri(rs.handle, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glSamplerParameteri(rs.handle, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-            glSamplerParameteri(rs.handle, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
-            glSamplerParameteri(rs.handle, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
-        }
+    ::free(buffer);
+
+    if (!stbResult)
+    {
+        assert(!"unexpected");
+        return SLANG_FAIL;
     }
 
-    virtual BindingState * createBindingState(const ShaderInputLayout & layout)
+    return SLANG_OK;
+}
+
+ShaderCompiler* GLRenderer::getShaderCompiler()
+{
+    return this;
+}
+
+Buffer* GLRenderer::createBuffer(BufferDesc const& desc)
+{
+    // TODO: should derive target from desc...
+    GLenum target = GL_UNIFORM_BUFFER;
+
+    // TODO: should derive from desc...
+    GLenum usage = GL_DYNAMIC_DRAW;
+
+    GLuint bufferID = 0;
+    glGenBuffers(1, &bufferID);
+    glBindBuffer(target, bufferID);
+
+    glBufferData(target, desc.size, desc.initData, usage);
+
+    return (Buffer*)(uintptr_t)bufferID;
+}
+
+InputLayout* GLRenderer::createInputLayout(InputElementDesc const* inputElements, UInt inputElementCount)
+{
+    InputLayoutImpl* inputLayout = new InputLayoutImpl();
+
+    inputLayout->attributeCount = inputElementCount;
+    for (UInt ii = 0; ii < inputElementCount; ++ii)
     {
-        GLBindingState * rs = new GLBindingState();
-        for (auto & entry : layout.entries)
+        auto& inputAttr = inputElements[ii];
+        auto& glAttr = inputLayout->attributes[ii];
+
+        glAttr.streamIndex = 0;
+        glAttr.format = getVertexAttributeFormat(inputAttr.format);
+        glAttr.offset = (GLsizei)inputAttr.offset;
+    }
+
+    return (InputLayout*)inputLayout;
+}
+
+void* GLRenderer::map(Buffer* buffer, MapFlavor flavor)
+{
+    GLenum target = GL_UNIFORM_BUFFER;
+
+    GLuint access = 0;
+    switch (flavor)
+    {
+        case MapFlavor::WriteDiscard:
+        case MapFlavor::HostWrite:
+            access = GL_WRITE_ONLY;
+            break;
+        case MapFlavor::HostRead:
+            access = GL_READ_ONLY;
+            break;
+    }
+
+    auto bufferID = (GLuint)(uintptr_t)buffer;
+    glBindBuffer(target, bufferID);
+
+    return glMapBuffer(target, access);
+}
+
+void GLRenderer::unmap(Buffer* buffer)
+{
+    GLenum target = GL_UNIFORM_BUFFER;
+
+    auto bufferID = (GLuint)(uintptr_t)buffer;
+    glUnmapBuffer(target);
+}
+
+void GLRenderer::setInputLayout(InputLayout* inputLayout)
+{
+    boundInputLayout = (InputLayoutImpl*)inputLayout;
+}
+
+void GLRenderer::setPrimitiveTopology(PrimitiveTopology topology)
+{
+    GLenum glTopology = 0;
+    switch (topology)
+    {
+#define CASE(NAME, VALUE) case PrimitiveTopology::NAME: glTopology = VALUE; break
+
+        CASE(TriangleList, GL_TRIANGLES);
+
+#undef CASE
+    }
+    boundPrimitiveTopology = glTopology;
+}
+
+void GLRenderer::setVertexBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* strides, UInt const* offsets)
+{
+    for (UInt ii = 0; ii < slotCount; ++ii)
+    {
+        UInt slot = startSlot + ii;
+
+        Buffer* buffer = buffers[ii];
+        GLuint bufferID = (GLuint)(uintptr_t)buffer;
+
+        boundVertexStreamBuffers[slot] = bufferID;
+        boundVertexStreamStrides[slot] = strides[ii];
+        boundVertexStreamOffsets[slot] = offsets[ii];
+    }
+}
+
+void GLRenderer::setShaderProgram(ShaderProgram* program)
+{
+    GLuint programID = (GLuint)(uintptr_t)program;
+    glUseProgram(programID);
+}
+
+void GLRenderer::setConstantBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* offsets) 
+{
+    bindBufferImpl(GL_UNIFORM_BUFFER, startSlot, slotCount, buffers, offsets);
+}
+
+void GLRenderer::draw(UInt vertexCount, UInt startVertex = 0) 
+{
+    flushStateForDraw();
+
+    glDrawArrays(boundPrimitiveTopology, (GLint)startVertex, (GLsizei)vertexCount);
+}
+
+void GLRenderer::dispatchCompute(int x, int y, int z)
+{
+    glDispatchCompute(x, y, z);
+}
+
+BindingState* GLRenderer::createBindingState(const ShaderInputLayout & layout)
+{
+    BindingStateImpl * rs = new BindingStateImpl();
+    for (auto & entry : layout.entries)
+    {
+        BindingEntryImpl rsEntry;
+        rsEntry.isOutput = entry.isOutput;
+        rsEntry.binding = entry.glslBinding;
+        rsEntry.type = entry.type;
+        switch (entry.type)
         {
-            GLBindingEntry rsEntry;
-            rsEntry.isOutput = entry.isOutput;
-            rsEntry.binding = entry.glslBinding;
-            rsEntry.type = entry.type;
-            switch (entry.type)
-            {
             case ShaderInputType::Buffer:
                 createInputBuffer(rsEntry, entry.bufferDesc, entry.bufferData);
                 break;
@@ -779,19 +740,19 @@ public:
             case ShaderInputType::Sampler:
                 createInputSampler(rsEntry, entry.samplerDesc);
                 break;
-            }
-            rs->entries.Add(rsEntry);
         }
-        return (BindingState*)rs;
+        rs->entries.Add(rsEntry);
     }
+    return (BindingState*)rs;
+}
 
-    virtual void setBindingState(BindingState * state)
+void GLRenderer::setBindingState(BindingState * state)
+{
+    BindingStateImpl * glState = (BindingStateImpl*)state;
+    for (auto & entry : glState->entries)
     {
-        GLBindingState * glState = (GLBindingState*)state;
-        for (auto & entry : glState->entries)
+        switch (entry.type)
         {
-            switch (entry.type)
-            {
             case ShaderInputType::Buffer:
                 glBindBufferBase(entry.bindTarget, entry.binding[0], entry.handle);
                 break;
@@ -804,35 +765,81 @@ public:
                 glActiveTexture(GL_TEXTURE0 + entry.binding[0]);
                 glBindTexture(entry.bindTarget, entry.handle);
                 break;
-            }
         }
     }
-
-    virtual void serializeOutput(BindingState* state, const char * fileName)
-    {
-        GLBindingState * glState = (GLBindingState*)state;
-        FILE * f;
-        fopen_s(&f, fileName, "wt");
-        for (auto & entry : glState->entries)
-        {
-            if (entry.isOutput)
-            {
-                glBindBuffer(entry.bindTarget, entry.handle);
-                auto ptr = (unsigned int *)glMapBuffer(entry.bindTarget, GL_READ_ONLY);
-                for (auto i = 0u; i < entry.bufferSize / sizeof(unsigned int); i++)
-                    fprintf(f, "%X\n", ptr[i]);
-                glUnmapBuffer(entry.bindTarget);
-            }
-        }
-        fclose(f);
-    }
-};
-
-
-
-Renderer* createGLRenderer()
-{
-    return new GLRenderer();
 }
+
+void GLRenderer::serializeOutput(BindingState* state, const char * fileName)
+{
+    BindingStateImpl * glState = (BindingStateImpl*)state;
+    FILE * f;
+    fopen_s(&f, fileName, "wt");
+    for (auto & entry : glState->entries)
+    {
+        if (entry.isOutput)
+        {
+            glBindBuffer(entry.bindTarget, entry.handle);
+            auto ptr = (unsigned int *)glMapBuffer(entry.bindTarget, GL_READ_ONLY);
+            for (auto i = 0u; i < entry.bufferSize / sizeof(unsigned int); i++)
+                fprintf(f, "%X\n", ptr[i]);
+            glUnmapBuffer(entry.bindTarget);
+        }
+    }
+    fclose(f);
+}
+
+
+// ShaderCompiler interface
+
+ShaderProgram* GLRenderer::compileProgram(ShaderCompileRequest const& request) 
+{
+    auto programID = glCreateProgram();
+    if (request.computeShader.name)
+    {
+        auto computeShaderID = loadShader(GL_COMPUTE_SHADER, request.computeShader.source.dataBegin);
+        glAttachShader(programID, computeShaderID);
+        glLinkProgram(programID);
+        glDeleteShader(computeShaderID);
+    }
+    else
+    {
+        auto vertexShaderID = loadShader(GL_VERTEX_SHADER, request.vertexShader.source.dataBegin);
+        auto fragmentShaderID = loadShader(GL_FRAGMENT_SHADER, request.fragmentShader.source.dataBegin);
+
+        glAttachShader(programID, vertexShaderID);
+        glAttachShader(programID, fragmentShaderID);
+
+
+        glLinkProgram(programID);
+
+        glDeleteShader(vertexShaderID);
+        glDeleteShader(fragmentShaderID);
+    }
+    GLint success = GL_FALSE;
+    glGetProgramiv(programID, GL_LINK_STATUS, &success);
+    if (!success)
+    {
+        int maxSize = 0;
+        glGetProgramiv(programID, GL_INFO_LOG_LENGTH, &maxSize);
+
+        auto infoBuffer = (char*)::malloc(maxSize);
+
+        int infoSize = 0;
+        glGetProgramInfoLog(programID, maxSize, &infoSize, infoBuffer);
+        if (infoSize > 0)
+        {
+            fprintf(stderr, "%s", infoBuffer);
+            OutputDebugStringA(infoBuffer);
+        }
+
+        ::free(infoBuffer);
+
+        glDeleteProgram(programID);
+        return nullptr;
+    }
+
+    return (ShaderProgram*)(uintptr_t)programID;
+}
+
 
 } // renderer_test
