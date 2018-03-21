@@ -30,6 +30,8 @@
     <ClInclude Include="int-set.h" />
     <ClInclude Include="list.h" />
     <ClInclude Include="secure-crt.h" />
+    <ClInclude Include="slang-com-ptr.h" />
+    <ClInclude Include="slang-defines.h" />
     <ClInclude Include="slang-io.h" />
     <ClInclude Include="slang-math.h" />
     <ClInclude Include="slang-result.h" />
