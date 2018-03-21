@@ -1,4 +1,4 @@
-﻿// render-d3d11.cpp
+// render-d3d11.cpp
 #include "render-d3d11.h"
 
 #include "options.h"

@@ -1,4 +1,4 @@
-﻿// render-d3d12.cpp
+// render-d3d12.cpp
 #include "render-d3d12.h"
 
 #include "options.h"
@@ -342,3 +342,4 @@ ShaderProgram* D3D12Renderer::compileProgram(ShaderCompileRequest const& request
 }
 
 } // renderer_test
+
