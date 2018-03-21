@@ -77,28 +77,28 @@ public:
     
     // Renderer    implementation
     virtual SlangResult initialize(void* inWindowHandle) override;
-    virtual void setClearColor(float const* color) override;
+    virtual void setClearColor(const float color[4]) override;
     virtual void clearFrame() override;
     virtual void presentFrame() override;
     virtual SlangResult captureScreenShot(char const* outputPath) override;
-    virtual void serializeOutput(BindingState* state, const char * fileName) override;
-    virtual Buffer* createBuffer(BufferDesc const& desc) override;
-    virtual InputLayout* createInputLayout(InputElementDesc const* inputElements, UInt inputElementCount) override;
-    virtual BindingState * createBindingState(const ShaderInputLayout & layout) override;
+    virtual void serializeOutput(BindingState* state, const char* fileName) override;
+    virtual Buffer* createBuffer(const BufferDesc& desc) override;
+    virtual InputLayout* createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) override;
+    virtual BindingState * createBindingState(const ShaderInputLayout& layout) override;
     virtual ShaderCompiler* getShaderCompiler() override;
     virtual void* map(Buffer* buffer, MapFlavor flavor) override;
     virtual void unmap(Buffer* buffer) override;
     virtual void setInputLayout(InputLayout* inputLayout) override;
     virtual void setPrimitiveTopology(PrimitiveTopology topology) override;
-    virtual void setBindingState(BindingState * state);
-    virtual void setVertexBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* strides, UInt const* offsets) override;
+    virtual void setBindingState(BindingState* state);
+    virtual void setVertexBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* strides, const UInt* offsets) override;
     virtual void setShaderProgram(ShaderProgram* inProgram) override;
-    virtual void setConstantBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* offsets) override;
+    virtual void setConstantBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* offsets) override;
     virtual void draw(UInt vertexCount, UInt startVertex) override;
     virtual void dispatchCompute(int x, int y, int z) override;
 
     // ShaderCompiler implementation
-    virtual ShaderProgram* compileProgram(ShaderCompileRequest const& request) override;
+    virtual ShaderProgram* compileProgram(const ShaderCompileRequest& request) override;
 
     protected:
     enum
@@ -140,15 +140,15 @@ public:
         List<BindingEntryImpl> entries;
     };
 
-    void bindBufferImpl(int target, UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* offsets);
+    void bindBufferImpl(int target, UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* offsets);
     void flushStateForDraw();
     GLuint loadShader(GLenum stage, char const* source);
     void createInputBuffer(BindingEntryImpl& rs, InputBufferDesc bufDesc, List<unsigned int>& bufferData);
-    void debugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, GLchar const* message);
+    void debugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message);
     void createInputTexture(BindingEntryImpl& rs, InputTextureDesc texDesc, InputSamplerDesc samplerDesc);
     void createInputSampler(BindingEntryImpl& rs, InputSamplerDesc samplerDesc);
 
-    static void APIENTRY staticDebugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, GLchar const* message, void const* userParam);
+    static void APIENTRY staticDebugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam);
     static VertexAttributeFormat getVertexAttributeFormat(Format format);
 
     HDC     m_hdc;
@@ -173,7 +173,7 @@ Renderer* createGLRenderer()
     return new GLRenderer();
 }
 
-void GLRenderer::debugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, GLchar const* message)
+void GLRenderer::debugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message)
 {
     ::OutputDebugStringA("GL: ");
     ::OutputDebugStringA(message);
@@ -188,7 +188,7 @@ void GLRenderer::debugCallback(GLenum source, GLenum type, GLuint id, GLenum sev
     }
 }
 
-/* static */void APIENTRY GLRenderer::staticDebugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, GLchar const* message, void const* userParam)
+/* static */void APIENTRY GLRenderer::staticDebugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam)
 {
     ((GLRenderer*)userParam)->debugCallback(source, type, id, severity, length, message);
 }
@@ -208,7 +208,7 @@ void GLRenderer::debugCallback(GLenum source, GLenum type, GLuint id, GLenum sev
     }
 }
 
-void GLRenderer::bindBufferImpl(int target, UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* offsets)
+void GLRenderer::bindBufferImpl(int target, UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* offsets)
 {
     for (UInt ii = 0; ii < slotCount; ++ii)
     {
@@ -225,7 +225,7 @@ void GLRenderer::bindBufferImpl(int target, UInt startSlot, UInt slotCount, Buff
 
 void GLRenderer::flushStateForDraw()
 {
-    auto layout = this->m_boundInputLayout;
+    auto layout = m_boundInputLayout;
     auto attrCount = layout->attributeCount;
     for (UInt ii = 0; ii < attrCount; ++ii)
     {
@@ -251,7 +251,7 @@ void GLRenderer::flushStateForDraw()
     }
 }
 
-GLuint GLRenderer::loadShader(GLenum stage, char const* source)
+GLuint GLRenderer::loadShader(GLenum stage, const char* source)
 {
     // GLSL is monumentally stupid. It officially requires the `#version` directive
     // to be the first thing in the file, which wouldn't be so bad but the API
@@ -261,12 +261,12 @@ GLuint GLRenderer::loadShader(GLenum stage, char const* source)
     // We are going to solve this problem by doing some surgery on the source
     // that was passed in.
 
-    char const* sourceBegin = source;
-    char const* sourceEnd = source + strlen(source);
+    const char* sourceBegin = source;
+    const char* sourceEnd = source + strlen(source);
 
     // Look for a version directive in the user-provided source.
-    char const* versionBegin = strstr(source, "#version");
-    char const* versionEnd = nullptr;
+    const char* versionBegin = strstr(source, "#version");
+    const char* versionEnd = nullptr;
     if (versionBegin)
     {
         // If we found a directive, then scan for the end-of-line
@@ -290,12 +290,12 @@ GLuint GLRenderer::loadShader(GLenum stage, char const* source)
     }
 
     enum { kMaxSourceStringCount = 16 };
-    GLchar const* sourceStrings[kMaxSourceStringCount];
+    const GLchar* sourceStrings[kMaxSourceStringCount];
     GLint sourceStringLengths[kMaxSourceStringCount];
 
     int sourceStringCount = 0;
 
-    char const* stagePrelude = "\n";
+    const char* stagePrelude = "\n";
     switch (stage)
     {
 #define CASE(NAME) case GL_##NAME##_SHADER: stagePrelude = "#define __GLSL_" #NAME "__ 1\n"; break
@@ -310,7 +310,7 @@ GLuint GLRenderer::loadShader(GLenum stage, char const* source)
 #undef CASE
     }
 
-    char const* prelude =
+    const char* prelude =
         "#define __GLSL__ 1\n"
         ;
 
@@ -352,7 +352,7 @@ GLuint GLRenderer::loadShader(GLenum stage, char const* source)
         if (infoSize > 0)
         {
             fprintf(stderr, "%s", infoBuffer);
-            OutputDebugStringA(infoBuffer);
+            ::OutputDebugStringA(infoBuffer);
         }
 
         glDeleteShader(shaderID);
@@ -527,7 +527,7 @@ SlangResult GLRenderer::initialize(void* inWindowHandle)
     return SLANG_OK;
 }
 
-void GLRenderer::setClearColor(float const* color)
+void GLRenderer::setClearColor(const float color[4])
 {
     glClearColor(color[0], color[1], color[2], color[3]);
 }
@@ -543,7 +543,7 @@ void GLRenderer::presentFrame()
     ::SwapBuffers(m_hdc);
 }
 
-SlangResult GLRenderer::captureScreenShot(char const* outputPath)
+SlangResult GLRenderer::captureScreenShot(const char* outputPath)
 {
     int width = gWindowWidth;
     int height = gWindowHeight;
@@ -594,7 +594,7 @@ ShaderCompiler* GLRenderer::getShaderCompiler()
     return this;
 }
 
-Buffer* GLRenderer::createBuffer(BufferDesc const& desc)
+Buffer* GLRenderer::createBuffer(const BufferDesc& desc)
 {
     // TODO: should derive target from desc...
     GLenum target = GL_UNIFORM_BUFFER;
@@ -611,9 +611,9 @@ Buffer* GLRenderer::createBuffer(BufferDesc const& desc)
     return (Buffer*)(uintptr_t)bufferID;
 }
 
-InputLayout* GLRenderer::createInputLayout(InputElementDesc const* inputElements, UInt inputElementCount)
+InputLayout* GLRenderer::createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount)
 {
-    InputLayoutImpl* inputLayout = new InputLayoutImpl();
+    InputLayoutImpl* inputLayout = new InputLayoutImpl;
 
     inputLayout->attributeCount = inputElementCount;
     for (UInt ii = 0; ii < inputElementCount; ++ii)
@@ -678,7 +678,7 @@ void GLRenderer::setPrimitiveTopology(PrimitiveTopology topology)
     m_boundPrimitiveTopology = glTopology;
 }
 
-void GLRenderer::setVertexBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* strides, UInt const* offsets)
+void GLRenderer::setVertexBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* strides, const UInt* offsets)
 {
     for (UInt ii = 0; ii < slotCount; ++ii)
     {
@@ -699,7 +699,7 @@ void GLRenderer::setShaderProgram(ShaderProgram* program)
     glUseProgram(programID);
 }
 
-void GLRenderer::setConstantBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* offsets) 
+void GLRenderer::setConstantBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* offsets) 
 {
     bindBufferImpl(GL_UNIFORM_BUFFER, startSlot, slotCount, buffers, offsets);
 }
@@ -716,9 +716,9 @@ void GLRenderer::dispatchCompute(int x, int y, int z)
     glDispatchCompute(x, y, z);
 }
 
-BindingState* GLRenderer::createBindingState(const ShaderInputLayout & layout)
+BindingState* GLRenderer::createBindingState(const ShaderInputLayout& layout)
 {
-    BindingStateImpl * rs = new BindingStateImpl();
+    BindingStateImpl* rs = new BindingStateImpl;
     for (auto & entry : layout.entries)
     {
         BindingEntryImpl rsEntry;
@@ -745,10 +745,10 @@ BindingState* GLRenderer::createBindingState(const ShaderInputLayout & layout)
     return (BindingState*)rs;
 }
 
-void GLRenderer::setBindingState(BindingState * state)
+void GLRenderer::setBindingState(BindingState* stateIn)
 {
-    BindingStateImpl * glState = (BindingStateImpl*)state;
-    for (auto & entry : glState->entries)
+    BindingStateImpl* state = (BindingStateImpl*)stateIn;
+    for (auto & entry : state->entries)
     {
         switch (entry.type)
         {
@@ -768,12 +768,12 @@ void GLRenderer::setBindingState(BindingState * state)
     }
 }
 
-void GLRenderer::serializeOutput(BindingState* state, const char * fileName)
+void GLRenderer::serializeOutput(BindingState* stateIn, const char* fileName)
 {
-    BindingStateImpl * glState = (BindingStateImpl*)state;
+    BindingStateImpl * state = (BindingStateImpl*)stateIn;
     FILE * f;
     fopen_s(&f, fileName, "wt");
-    for (auto & entry : glState->entries)
+    for (auto & entry : state->entries)
     {
         if (entry.isOutput)
         {
@@ -790,7 +790,7 @@ void GLRenderer::serializeOutput(BindingState* state, const char * fileName)
 
 // ShaderCompiler interface
 
-ShaderProgram* GLRenderer::compileProgram(ShaderCompileRequest const& request) 
+ShaderProgram* GLRenderer::compileProgram(const ShaderCompileRequest& request) 
 {
     auto programID = glCreateProgram();
     if (request.computeShader.name)

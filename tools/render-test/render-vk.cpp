@@ -83,28 +83,28 @@ class VKRenderer : public Renderer, public ShaderCompiler
 public:
     // Renderer    implementation
     virtual SlangResult initialize(void* inWindowHandle) override;
-    virtual void setClearColor(float const* color) override;
+    virtual void setClearColor(const float color[4]) override;
     virtual void clearFrame() override;
     virtual void presentFrame() override;
-    virtual SlangResult captureScreenShot(char const* outputPath) override;
+    virtual SlangResult captureScreenShot(const char* outputPath) override;
     virtual void serializeOutput(BindingState* state, const char * fileName) override;
-    virtual Buffer* createBuffer(BufferDesc const& desc) override;
-    virtual InputLayout* createInputLayout(InputElementDesc const* inputElements, UInt inputElementCount) override;
-    virtual BindingState * createBindingState(const ShaderInputLayout & layout) override;
+    virtual Buffer* createBuffer(const BufferDesc& desc) override;
+    virtual InputLayout* createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) override;
+    virtual BindingState * createBindingState(const ShaderInputLayout& layout) override;
     virtual ShaderCompiler* getShaderCompiler() override;
     virtual void* map(Buffer* buffer, MapFlavor flavor) override;
     virtual void unmap(Buffer* buffer) override;
     virtual void setInputLayout(InputLayout* inputLayout) override;
     virtual void setPrimitiveTopology(PrimitiveTopology topology) override;
-    virtual void setBindingState(BindingState * state);
-    virtual void setVertexBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* strides, UInt const* offsets) override;
+    virtual void setBindingState(BindingState* state);
+    virtual void setVertexBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* strides, const UInt* offsets) override;
     virtual void setShaderProgram(ShaderProgram* inProgram) override;
-    virtual void setConstantBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* offsets) override;
+    virtual void setConstantBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers,  const UInt* offsets) override;
     virtual void draw(UInt vertexCount, UInt startVertex) override;
     virtual void dispatchCompute(int x, int y, int z) override;
 
     // ShaderCompiler implementation
-    virtual ShaderProgram* compileProgram(ShaderCompileRequest const& request) override;
+    virtual ShaderProgram* compileProgram(const ShaderCompileRequest& request) override;
 
     protected:
 
@@ -148,7 +148,7 @@ public:
 
     VkBool32 handleDebugMessage(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t srcObject,
         size_t location, int32_t msgCode, const char* pLayerPrefix, const char* pMsg);
-    BufferImpl createBufferImpl(size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties, void const* initData = nullptr);
+    BufferImpl createBufferImpl(size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties, const void* initData = nullptr);
 
     VkCommandBuffer getCommandBuffer();
     VkCommandBuffer beginCommandBuffer();
@@ -247,8 +247,7 @@ VkCommandBuffer VKRenderer::getCommandBuffer()
     info.commandBufferCount = 1;
 
     VkCommandBuffer commandBuffer;
-    checkResult(vkAllocateCommandBuffers(
-        m_device, &info, &commandBuffer));
+    checkResult(vkAllocateCommandBuffers(m_device, &info, &commandBuffer));
 
     return commandBuffer;
 }
@@ -277,7 +276,7 @@ void VKRenderer::flushCommandBuffer(VkCommandBuffer commandBuffer)
     vkFreeCommandBuffers(m_device, m_commandPool, 1, &commandBuffer);
 }
 
-VKRenderer::BufferImpl VKRenderer::createBufferImpl(size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties, void const* initData)
+VKRenderer::BufferImpl VKRenderer::createBufferImpl(size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties, const void* initData)
 {
     if (initData)
     {
@@ -290,14 +289,12 @@ VKRenderer::BufferImpl VKRenderer::createBufferImpl(size_t bufferSize, VkBufferU
     bufferCreateInfo.usage = usage;
 
     VkBuffer buffer;
-    checkResult(vkCreateBuffer(
-        m_device, &bufferCreateInfo, nullptr, &buffer));
+    checkResult(vkCreateBuffer(m_device, &bufferCreateInfo, nullptr, &buffer));
 
     VkMemoryRequirements memoryReqs = {};
     vkGetBufferMemoryRequirements(m_device, buffer, &memoryReqs);
 
-    uint32_t memoryTypeIndex = getMemoryTypeIndex(
-        memoryReqs.memoryTypeBits, reqMemoryProperties);
+    uint32_t memoryTypeIndex = getMemoryTypeIndex(memoryReqs.memoryTypeBits, reqMemoryProperties);
 
     VkMemoryPropertyFlags actualMemoryProperites = m_deviceMemoryProperties.memoryTypes[memoryTypeIndex].propertyFlags;
 
@@ -306,11 +303,9 @@ VKRenderer::BufferImpl VKRenderer::createBufferImpl(size_t bufferSize, VkBufferU
     allocateInfo.memoryTypeIndex = memoryTypeIndex;
 
     VkDeviceMemory memory;
-    checkResult(vkAllocateMemory(
-        m_device, &allocateInfo, nullptr, &memory));
+    checkResult(vkAllocateMemory(m_device, &allocateInfo, nullptr, &memory));
 
-    checkResult(vkBindBufferMemory(
-        m_device, buffer, memory, 0));
+    checkResult(vkBindBufferMemory(m_device, buffer, memory, 0));
 
     if (initData)
     {
@@ -377,7 +372,7 @@ void VKRenderer::createInputSampler(const InputSamplerDesc& inputDesc, VkSampler
     assert(!"unimplemented");
 }
 
-void VKRenderer::createInputBuffer(const ShaderInputLayoutEntry& entry,    const InputBufferDesc& bufferDesc, const Slang::List<unsigned int>& bufferData, 
+void VKRenderer::createInputBuffer(const ShaderInputLayoutEntry& entry, const InputBufferDesc& bufferDesc, const Slang::List<unsigned int>& bufferData, 
     VkBuffer& bufferOut, VkBufferView& uavOut, VkImageView& srvOut)
 {
     size_t bufferSize = bufferData.Count() * sizeof(unsigned int);
@@ -622,7 +617,7 @@ SlangResult VKRenderer::initialize(void* inWindowHandle)
     return SLANG_OK;
 }
 
-void VKRenderer::setClearColor(float const* color)
+void VKRenderer::setClearColor(const float color[4])
 {
     for (int ii = 0; ii < 4; ++ii)
         m_clearColor[ii] = color[ii];
@@ -646,7 +641,7 @@ ShaderCompiler* VKRenderer::getShaderCompiler()
     return this;
 }
 
-Buffer* VKRenderer::createBuffer(BufferDesc const& desc)
+Buffer* VKRenderer::createBuffer(const BufferDesc& desc)
 {
     size_t bufferSize = desc.size;
 
@@ -677,7 +672,7 @@ Buffer* VKRenderer::createBuffer(BufferDesc const& desc)
     return (Buffer*)bufferPtr;
 }
 
-InputLayout* VKRenderer::createInputLayout(InputElementDesc const* inputElements, UInt inputElementCount) 
+InputLayout* VKRenderer::createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) 
 {
     InputLayoutImpl* impl = new InputLayoutImpl;
 
@@ -703,7 +698,7 @@ void VKRenderer::setPrimitiveTopology(PrimitiveTopology topology)
 {
 }
 
-void VKRenderer::setVertexBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* strides, UInt const* offsets)
+void VKRenderer::setVertexBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* strides, const UInt* offsets)
 {
 }
 
@@ -712,7 +707,7 @@ void VKRenderer::setShaderProgram(ShaderProgram* program)
     m_currentProgram = (ShaderProgramImpl*)program;
 }
 
-void VKRenderer::setConstantBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* offsets) 
+void VKRenderer::setConstantBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* offsets) 
 {
 }
 
@@ -761,12 +756,12 @@ BindingState* VKRenderer::createBindingState(const ShaderInputLayout& layout)
     return (BindingState*)bindingState;
 }
 
-void VKRenderer::setBindingState(BindingState * state)
+void VKRenderer::setBindingState(BindingState* state)
 {
     m_currentBindingState = (BindingStateImpl*)state;
 }
 
-void VKRenderer::serializeOutput(BindingState* s, const char * fileName)
+void VKRenderer::serializeOutput(BindingState* s, const char* fileName)
 {
     auto state = (BindingStateImpl*)s;
 
@@ -780,9 +775,7 @@ void VKRenderer::serializeOutput(BindingState* s, const char * fileName)
             {
                 // create staging buffer
                 size_t bufferSize = bb.bufferLength;
-                BufferImpl staging = createBufferImpl(
-                    bufferSize,
-                    VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                BufferImpl staging = createBufferImpl(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
                 // Copy from real buffer to staging buffer
@@ -790,12 +783,7 @@ void VKRenderer::serializeOutput(BindingState* s, const char * fileName)
 
                 VkBufferCopy copyInfo = {};
                 copyInfo.size = bufferSize;
-                vkCmdCopyBuffer(
-                    commandBuffer,
-                    bb.buffer,
-                    staging.buffer,
-                    1,
-                    &copyInfo);
+                vkCmdCopyBuffer(commandBuffer, bb.buffer, staging.buffer, 1, &copyInfo);
 
                 flushCommandBuffer(commandBuffer);
 
@@ -869,8 +857,7 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
     descriptorSetLayoutInfo.pBindings = bindings.Buffer();
 
     VkDescriptorSetLayout descriptorSetLayout = 0;
-    checkResult(vkCreateDescriptorSetLayout(
-        m_device, &descriptorSetLayoutInfo, nullptr, &descriptorSetLayout));
+    checkResult(vkCreateDescriptorSetLayout(m_device, &descriptorSetLayoutInfo, nullptr, &descriptorSetLayout));
 
     // Create a descriptor pool for allocating sets
 
@@ -887,8 +874,7 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
     descriptorPoolInfo.pPoolSizes = poolSizes;
 
     VkDescriptorPool descriptorPool;
-    checkResult(vkCreateDescriptorPool(
-        m_device, &descriptorPoolInfo, nullptr, &descriptorPool));
+    checkResult(vkCreateDescriptorPool(m_device, &descriptorPoolInfo, nullptr, &descriptorPool));
 
     // Create a descriptor set based on our layout
 
@@ -898,8 +884,7 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
     descriptorSetAllocInfo.pSetLayouts = &descriptorSetLayout;
 
     VkDescriptorSet descriptorSet;
-    checkResult(vkAllocateDescriptorSets(
-        m_device, &descriptorSetAllocInfo, &descriptorSet));
+    checkResult(vkAllocateDescriptorSets(m_device, &descriptorSetAllocInfo, &descriptorSet));
 
     // Fill in the descritpor set, using our binding information
     for (auto bb : m_currentBindingState->bindings)
@@ -925,12 +910,7 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
                         writeInfo.dstArrayElement = 0;
                         writeInfo.pBufferInfo = &bufferInfo;
 
-                        vkUpdateDescriptorSets(
-                            m_device,
-                            1,
-                            &writeInfo,
-                            0,
-                            nullptr);
+                        vkUpdateDescriptorSets(m_device, 1, &writeInfo, 0, nullptr);
                     }
                     break;
 
@@ -947,7 +927,6 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
         }
     }
 
-
     // Create a pipeline layout based on our descriptor set layout(s)
 
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
@@ -955,8 +934,7 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
     pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
 
     VkPipelineLayout pipelineLayout = 0;
-    checkResult(vkCreatePipelineLayout(
-        m_device, &pipelineLayoutInfo, nullptr, &pipelineLayout));
+    checkResult(vkCreatePipelineLayout(m_device, &pipelineLayoutInfo, nullptr, &pipelineLayout));
 
     // Then create a pipeline to use that layout
 
@@ -967,15 +945,13 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
     VkPipelineCache pipelineCache = 0;
 
     VkPipeline pipeline;
-    checkResult(vkCreateComputePipelines(
-        m_device, pipelineCache, 1, &computePipelineInfo, nullptr, &pipeline));
+    checkResult(vkCreateComputePipelines(m_device, pipelineCache, 1, &computePipelineInfo, nullptr, &pipeline));
 
     // Also create descriptor sets based on the given pipeline layout
 
     VkCommandBuffer commandBuffer = beginCommandBuffer();
 
-    vkCmdBindPipeline(
-        commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
 
     vkCmdBindDescriptorSets(
         commandBuffer,
@@ -995,8 +971,6 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
     // TODO: need to free up the other resources too...
 }
 
-
-
 // ShaderCompiler interface
 ShaderProgram* VKRenderer::compileProgram(const ShaderCompileRequest & request) 
 {
@@ -1012,6 +986,5 @@ ShaderProgram* VKRenderer::compileProgram(const ShaderCompileRequest & request)
     }
     return (ShaderProgram*)impl;
 }
-
 
 } // renderer_test

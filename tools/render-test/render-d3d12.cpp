@@ -55,28 +55,28 @@ class D3D12Renderer : public Renderer, public ShaderCompiler
 public:
     // Renderer    implementation
     virtual SlangResult initialize(void* inWindowHandle) override;
-    virtual void setClearColor(float const* color) override;
+    virtual void setClearColor(const float color[4]) override;
     virtual void clearFrame() override;
     virtual void presentFrame() override;
-    virtual SlangResult captureScreenShot(char const* outputPath) override;
-    virtual void serializeOutput(BindingState* state, const char * fileName) override;
-    virtual Buffer* createBuffer(BufferDesc const& desc) override;
-    virtual InputLayout* createInputLayout(InputElementDesc const* inputElements, UInt inputElementCount) override;
-    virtual BindingState * createBindingState(const ShaderInputLayout & layout) override;
+    virtual SlangResult captureScreenShot(const char* outputPath) override;
+    virtual void serializeOutput(BindingState* state, const char* fileName) override;
+    virtual Buffer* createBuffer(const BufferDesc& desc) override;
+    virtual InputLayout* createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) override;
+    virtual BindingState * createBindingState(const ShaderInputLayout& layout) override;
     virtual ShaderCompiler* getShaderCompiler() override;
     virtual void* map(Buffer* buffer, MapFlavor flavor) override;
     virtual void unmap(Buffer* buffer) override;
     virtual void setInputLayout(InputLayout* inputLayout) override;
     virtual void setPrimitiveTopology(PrimitiveTopology topology) override;
-    virtual void setBindingState(BindingState * state);
-    virtual void setVertexBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* strides, UInt const* offsets) override;
+    virtual void setBindingState(BindingState* state);
+    virtual void setVertexBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* strides, const UInt* offsets) override;
     virtual void setShaderProgram(ShaderProgram* inProgram) override;
-    virtual void setConstantBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* offsets) override;
+    virtual void setConstantBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* offsets) override;
     virtual void draw(UInt vertexCount, UInt startVertex) override;
     virtual void dispatchCompute(int x, int y, int z) override;
 
     // ShaderCompiler implementation
-    virtual ShaderProgram* compileProgram(ShaderCompileRequest const& request) override;
+    virtual ShaderProgram* compileProgram(const ShaderCompileRequest& request) override;
     
     protected:
     PROC loadProc(HMODULE module, char const* name);
@@ -249,7 +249,7 @@ SlangResult D3D12Renderer::initialize(void* inWindowHandle)
     return SLANG_OK;
 }
 
-void D3D12Renderer::setClearColor(float const* color)
+void D3D12Renderer::setClearColor(const float color[4])
 {
     memcpy(m_clearColor, color, sizeof(m_clearColor));
 }
@@ -262,7 +262,7 @@ void D3D12Renderer::presentFrame()
 {
 }
 
-SlangResult D3D12Renderer::captureScreenShot(char const* outputPath)
+SlangResult D3D12Renderer::captureScreenShot(const char* outputPath)
 {
     return SLANG_FAIL;
 }
@@ -272,13 +272,13 @@ ShaderCompiler* D3D12Renderer::getShaderCompiler()
     return this;
 }
 
-Buffer* D3D12Renderer::createBuffer(BufferDesc const& desc)
+Buffer* D3D12Renderer::createBuffer(const BufferDesc& desc)
 {
     return nullptr;
 }
 
 
-InputLayout* D3D12Renderer::createInputLayout(InputElementDesc const* inputElements, UInt inputElementCount) 
+InputLayout* D3D12Renderer::createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) 
 {
     return nullptr;
 }
@@ -300,7 +300,7 @@ void D3D12Renderer::setPrimitiveTopology(PrimitiveTopology topology)
 {
 }
 
-void D3D12Renderer::setVertexBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* strides, UInt const* offsets)
+void D3D12Renderer::setVertexBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt * strides, const UInt* offsets)
 {
 }
 
@@ -308,7 +308,7 @@ void D3D12Renderer::setShaderProgram(ShaderProgram* inProgram)
 {
 }
 
-void D3D12Renderer::setConstantBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* offsets)
+void D3D12Renderer::setConstantBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* offsets)
 {
 }
 
@@ -321,22 +321,22 @@ void D3D12Renderer::dispatchCompute(int x, int y, int z)
 {
 }
 
-BindingState* D3D12Renderer::createBindingState(const ShaderInputLayout & layout)
+BindingState* D3D12Renderer::createBindingState(const ShaderInputLayout& layout)
 {
     return nullptr;
 }
 
-void D3D12Renderer::setBindingState(BindingState * state)
+void D3D12Renderer::setBindingState(BindingState* state)
 {
 }
 
-void D3D12Renderer::serializeOutput(BindingState* state, const char * fileName)
+void D3D12Renderer::serializeOutput(BindingState* state, const char* fileName)
 {
 }
 
 // ShaderCompiler interface
 
-ShaderProgram* D3D12Renderer::compileProgram(ShaderCompileRequest const& request)
+ShaderProgram* D3D12Renderer::compileProgram(const ShaderCompileRequest& request)
 {
     return nullptr;
 }

@@ -96,17 +96,17 @@ class Renderer
 public:
     virtual SlangResult initialize(void* inWindowHandle) = 0;
 
-    virtual void setClearColor(float const* color) = 0;
+    virtual void setClearColor(const float color[4]) = 0;
     virtual void clearFrame() = 0;
 
     virtual void presentFrame() = 0;
 
-    virtual SlangResult captureScreenShot(char const* outputPath) = 0;
-    virtual void serializeOutput(BindingState * state, char const* outputPath) = 0;
-    virtual Buffer* createBuffer(BufferDesc const& desc) = 0;
+    virtual SlangResult captureScreenShot(const char* outputPath) = 0;
+    virtual void serializeOutput(BindingState* state, const char* outputPath) = 0;
+    virtual Buffer* createBuffer(const BufferDesc& desc) = 0;
 
-    virtual InputLayout* createInputLayout(InputElementDesc const* inputElements, UInt inputElementCount) = 0;
-    virtual BindingState* createBindingState(const ShaderInputLayout & shaderInput) = 0;
+    virtual InputLayout* createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) = 0;
+    virtual BindingState* createBindingState(const ShaderInputLayout& shaderInput) = 0;
     virtual ShaderCompiler* getShaderCompiler() = 0;
 
     virtual void* map(Buffer* buffer, MapFlavor flavor) = 0;
@@ -114,14 +114,14 @@ public:
 
     virtual void setInputLayout(InputLayout* inputLayout) = 0;
     virtual void setPrimitiveTopology(PrimitiveTopology topology) = 0;
-    virtual void setBindingState(BindingState * state) = 0;
-    virtual void setVertexBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* strides, UInt const* offsets) = 0;
+    virtual void setBindingState(BindingState* state) = 0;
+    virtual void setVertexBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* strides, const UInt* offsets) = 0;
 
     inline void setVertexBuffer(UInt slot, Buffer* buffer, UInt stride, UInt offset = 0);
 
     virtual void setShaderProgram(ShaderProgram* program) = 0;
 
-    virtual void setConstantBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* offsets) = 0;
+    virtual void setConstantBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* offsets) = 0;
     inline void setConstantBuffer(UInt slot, Buffer* buffer, UInt offset = 0);
 
     virtual void draw(UInt vertexCount, UInt startVertex = 0) = 0;

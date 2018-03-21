@@ -45,13 +45,13 @@ class D3D11Renderer : public Renderer, public ShaderCompiler
 public:
     // Renderer    implementation
     virtual SlangResult initialize(void* inWindowHandle) override;
-    virtual void setClearColor(float const* color) override;
+    virtual void setClearColor(const float color[4]) override;
     virtual void clearFrame() override;
     virtual void presentFrame() override;
     virtual SlangResult captureScreenShot(char const* outputPath) override;
-    virtual void serializeOutput(BindingState* state, const char * fileName) override;
-    virtual Buffer* createBuffer(BufferDesc const& desc) override;
-    virtual InputLayout* createInputLayout(InputElementDesc const* inputElements, UInt inputElementCount) override;
+    virtual void serializeOutput(BindingState* state, const char* fileName) override;
+    virtual Buffer* createBuffer(const BufferDesc& desc) override;
+    virtual InputLayout* createInputLayout( const InputElementDesc* inputElements, UInt inputElementCount) override;
     virtual BindingState * createBindingState(const ShaderInputLayout& layout) override;
     virtual ShaderCompiler* getShaderCompiler() override;
     virtual void* map(Buffer* buffer, MapFlavor flavor) override;
@@ -59,9 +59,9 @@ public:
     virtual void setInputLayout(InputLayout* inputLayout) override;
     virtual void setPrimitiveTopology(PrimitiveTopology topology) override;
     virtual void setBindingState(BindingState * state);
-    virtual void setVertexBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* strides, UInt const* offsets) override;    
+    virtual void setVertexBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* strides,  const UInt* offsets) override;    
     virtual void setShaderProgram(ShaderProgram* inProgram) override;
-    virtual void setConstantBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* offsets) override;
+    virtual void setConstantBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers,  const UInt* offsets) override;
     virtual void draw(UInt vertexCount, UInt startVertex) override;
     virtual void dispatchCompute(int x, int y, int z) override;
     
@@ -114,12 +114,12 @@ public:
     void* map(ID3D11Buffer* buffer, MapFlavor flavor);
     void unmap(ID3D11Buffer* buffer);
 
-    void createInputBuffer(InputBufferDesc& bufferDesc, List<unsigned int>& bufferData, ID3D11Buffer*&bufferOut,
+    void createInputBuffer(InputBufferDesc& bufferDesc, List<unsigned int>& bufferData, ID3D11Buffer*& bufferOut,
         ID3D11UnorderedAccessView*& viewOut, ID3D11ShaderResourceView*& srvOut);
 
-    void createInputTexture(const InputTextureDesc & inputDesc, ID3D11ShaderResourceView*& viewOut);
+    void createInputTexture(const InputTextureDesc& inputDesc, ID3D11ShaderResourceView*& viewOut);
 
-    void createInputSampler(const InputSamplerDesc & inputDesc, ID3D11SamplerState*& stateOut);
+    void createInputSampler(const InputSamplerDesc& inputDesc, ID3D11SamplerState*& stateOut);
 
     void applyBindingState(bool isCompute);
 
@@ -197,30 +197,16 @@ Renderer* createD3D11Renderer()
     // don't really need most of them for Slang-generated code.
     ID3DBlob* shaderBlob = nullptr;
     ID3DBlob* errorBlob = nullptr;
-    HRESULT hr = compileFunc(
-        source,
-        strlen(source),
-        sourcePath,
-        &defines[0],
-        nullptr,
-        entryPointName,
-        dxProfileName,
-        flags,
-        0,
-        &shaderBlob,
-        &errorBlob);
+    HRESULT hr = compileFunc(source, strlen(source), sourcePath, &defines[0], nullptr, entryPointName, dxProfileName, flags, 0,
+        &shaderBlob, &errorBlob);
 
     // If the HLSL-to-bytecode compilation produced any diagnostic messages
     // then we will print them out (whether or not the compilation failed).
     if (errorBlob)
     {
-        fputs(
-            (char const*)errorBlob->GetBufferPointer(),
-            stderr);
-        fflush(stderr);
-
-        OutputDebugStringA(
-            (char const*)errorBlob->GetBufferPointer());
+        ::fputs((const char*)errorBlob->GetBufferPointer(), stderr);
+        ::fflush(stderr);
+        ::OutputDebugStringA((const char*)errorBlob->GetBufferPointer());
 
         errorBlob->Release();
     }
@@ -306,8 +292,8 @@ Renderer* createD3D11Renderer()
 SlangResult D3D11Renderer::initialize(void* inWindowHandle)
 {
     auto windowHandle = (HWND)inWindowHandle;
-    // Rather than statically link against D3D, we load it dynamically.
 
+    // Rather than statically link against D3D, we load it dynamically.
     HMODULE d3dModule = LoadLibraryA("d3d11.dll");
     if (!d3dModule)
     {
@@ -330,7 +316,6 @@ SlangResult D3D11Renderer::initialize(void* inWindowHandle)
     deviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
 
     // Our swap chain uses RGBA8 with sRGB, with double buffering.
-
     DXGI_SWAP_CHAIN_DESC swapChainDesc = { 0 };
     swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 
@@ -441,7 +426,7 @@ SlangResult D3D11Renderer::initialize(void* inWindowHandle)
     return SLANG_OK;
 }
 
-void D3D11Renderer::setClearColor(float const* color)
+void D3D11Renderer::setClearColor(const float color[4])
 {
     memcpy(m_clearColor, color, sizeof(m_clearColor));
 }
@@ -460,13 +445,9 @@ void D3D11Renderer::presentFrame()
     m_swapChain->Present(0, 0);
 }
 
-SlangResult D3D11Renderer::captureScreenShot(char const* outputPath)
+SlangResult D3D11Renderer::captureScreenShot(const char* outputPath)
 {
-    HRESULT hr = captureTextureToFile(
-        m_device,
-        m_immediateContext,
-        m_renderTargetTextures[0],
-        outputPath);
+    HRESULT hr = captureTextureToFile(m_device, m_immediateContext, m_renderTargetTextures[0], outputPath);
     if (FAILED(hr))
     {
         fprintf(stderr, "error: could not capture screen-shot to '%s'\n", outputPath);
@@ -514,7 +495,7 @@ Buffer* D3D11Renderer::createBuffer(const BufferDesc& desc)
     return (Buffer*)rs;
 }
 
-InputLayout* D3D11Renderer::createInputLayout(InputElementDesc const* inputElementsIn, UInt inputElementCount)
+InputLayout* D3D11Renderer::createInputLayout(const InputElementDesc* inputElementsIn, UInt inputElementCount)
 {
     D3D11_INPUT_ELEMENT_DESC inputElements[16] = {};
 
@@ -565,11 +546,7 @@ InputLayout* D3D11Renderer::createInputLayout(InputElementDesc const* inputEleme
         return nullptr;
 
     ID3D11InputLayout* inputLayout = nullptr;
-    HRESULT hr = m_device->CreateInputLayout(
-        &inputElements[0],
-        (UINT)inputElementCount,
-        vertexShaderBlob->GetBufferPointer(),
-        vertexShaderBlob->GetBufferSize(),
+    HRESULT hr = m_device->CreateInputLayout(&inputElements[0], (UINT)inputElementCount, vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize(),
         &inputLayout);
 
     vertexShaderBlob->Release();
@@ -614,7 +591,7 @@ void* D3D11Renderer::map(Buffer* buffer, MapFlavor flavor)
     return map(((BufferImpl*)buffer)->buffer, flavor);
 }
 
-void D3D11Renderer::unmap(ID3D11Buffer * buffer)
+void D3D11Renderer::unmap(ID3D11Buffer* buffer)
 {
     m_immediateContext->Unmap(buffer, 0);
 }
@@ -647,7 +624,7 @@ void D3D11Renderer::setPrimitiveTopology(PrimitiveTopology topology)
     m_immediateContext->IASetPrimitiveTopology(primTopology);
 }
 
-void D3D11Renderer::setVertexBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffersIn, UInt const* stridesIn, UInt const* offsetsIn)
+void D3D11Renderer::setVertexBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffersIn, const UInt* stridesIn, const UInt* offsetsIn)
 {
     static const int kMaxVertexBuffers = 16;
 
@@ -673,11 +650,11 @@ void D3D11Renderer::setShaderProgram(ShaderProgram* programIn)
     m_immediateContext->PSSetShader(program->pixelShader, nullptr, 0);
 }
 
-void D3D11Renderer::setConstantBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffersIn, UInt const* offsetsIn)
+void D3D11Renderer::setConstantBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffersIn, const UInt* offsetsIn)
 {
     // TODO: actually use those offsets
 
-    auto buffers = (BufferImpl* const*)buffersIn;
+    auto buffers = (BufferImpl*const*)buffersIn;
     m_immediateContext->VSSetConstantBuffers((UINT)startSlot, (UINT)slotCount, &buffers[0]->buffer);
     m_immediateContext->VSSetConstantBuffers((UINT)startSlot, (UINT)slotCount, &buffers[0]->buffer);
 }
@@ -688,7 +665,7 @@ void D3D11Renderer::draw(UInt vertexCount, UInt startVertex)
     m_immediateContext->Draw((UINT)vertexCount, (UINT)startVertex);
 }
 
-ShaderProgram* D3D11Renderer::compileProgram(ShaderCompileRequest const& request)
+ShaderProgram* D3D11Renderer::compileProgram(const ShaderCompileRequest& request)
 {
     if (request.computeShader.name)
     {
@@ -741,7 +718,7 @@ void D3D11Renderer::dispatchCompute(int x, int y, int z)
     m_immediateContext->Dispatch(x, y, z);
 }
 
-void D3D11Renderer::createInputBuffer(InputBufferDesc& bufferDesc, List<unsigned int>& bufferData, ID3D11Buffer* &bufferOut,
+void D3D11Renderer::createInputBuffer(InputBufferDesc& bufferDesc, List<unsigned int>& bufferData, ID3D11Buffer*& bufferOut,
     ID3D11UnorderedAccessView*& viewOut, ID3D11ShaderResourceView*& srvOut)
 {
     D3D11_BUFFER_DESC desc = { 0 };
@@ -808,7 +785,7 @@ void D3D11Renderer::createInputBuffer(InputBufferDesc& bufferDesc, List<unsigned
     }
 }
 
-void D3D11Renderer::createInputTexture(const InputTextureDesc & inputDesc, ID3D11ShaderResourceView * &viewOut)
+void D3D11Renderer::createInputTexture(const InputTextureDesc& inputDesc, ID3D11ShaderResourceView*& viewOut)
 {
     TextureData texData;
     generateTextureData(texData, inputDesc);
@@ -921,7 +898,7 @@ void D3D11Renderer::createInputTexture(const InputTextureDesc & inputDesc, ID3D1
     }
 }
 
-void D3D11Renderer::createInputSampler(const InputSamplerDesc & inputDesc, ID3D11SamplerState * & stateOut)
+void D3D11Renderer::createInputSampler(const InputSamplerDesc& inputDesc, ID3D11SamplerState*& stateOut)
 {
     D3D11_SAMPLER_DESC desc;
     memset(&desc, 0, sizeof(desc));
