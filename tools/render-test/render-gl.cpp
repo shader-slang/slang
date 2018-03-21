@@ -151,16 +151,15 @@ public:
     static void APIENTRY staticDebugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, GLchar const* message, void const* userParam);
     static VertexAttributeFormat getVertexAttributeFormat(Format format);
 
-    InputLayoutImpl* boundInputLayout = nullptr;
-
-    GLenum boundPrimitiveTopology = GL_TRIANGLES;
-
-    HDC     deviceContext;
-    HGLRC   glContext;
-    float clearColor[4] = { 0, 0, 0, 0 };
-    GLuint  boundVertexStreamBuffers[kMaxVertexStreams];
-    UInt    boundVertexStreamStrides[kMaxVertexStreams];
-    UInt    boundVertexStreamOffsets[kMaxVertexStreams];
+    HDC     m_hdc;
+    HGLRC   m_glContext;
+    float   m_clearColor[4] = { 0, 0, 0, 0 };
+    
+    InputLayoutImpl* m_boundInputLayout = nullptr;
+    GLenum m_boundPrimitiveTopology = GL_TRIANGLES;
+    GLuint  m_boundVertexStreamBuffers[kMaxVertexStreams];
+    UInt    m_boundVertexStreamStrides[kMaxVertexStreams];
+    UInt    m_boundVertexStreamOffsets[kMaxVertexStreams];
 
     // Declare a function pointer for each OpenGL
     // extension function we need to load
@@ -226,7 +225,7 @@ void GLRenderer::bindBufferImpl(int target, UInt startSlot, UInt slotCount, Buff
 
 void GLRenderer::flushStateForDraw()
 {
-    auto layout = this->boundInputLayout;
+    auto layout = this->m_boundInputLayout;
     auto attrCount = layout->attributeCount;
     for (UInt ii = 0; ii < attrCount; ++ii)
     {
@@ -234,15 +233,15 @@ void GLRenderer::flushStateForDraw()
 
         auto streamIndex = attr.streamIndex;
 
-        glBindBuffer(GL_ARRAY_BUFFER, boundVertexStreamBuffers[streamIndex]);
+        glBindBuffer(GL_ARRAY_BUFFER, m_boundVertexStreamBuffers[streamIndex]);
 
         glVertexAttribPointer(
             (GLuint)ii,
             attr.format.componentCount,
             attr.format.componentType,
             attr.format.normalized,
-            (GLsizei)boundVertexStreamStrides[streamIndex],
-            (GLvoid*)(attr.offset + boundVertexStreamOffsets[streamIndex]));
+            (GLsizei)m_boundVertexStreamStrides[streamIndex],
+            (GLvoid*)(attr.offset + m_boundVertexStreamOffsets[streamIndex]));
 
         glEnableVertexAttribArray((GLuint)ii);
     }
@@ -488,7 +487,7 @@ SlangResult GLRenderer::initialize(void* inWindowHandle)
 {
     auto windowHandle = (HWND)inWindowHandle;
 
-    deviceContext = ::GetDC(windowHandle);
+    m_hdc = ::GetDC(windowHandle);
 
     PIXELFORMATDESCRIPTOR pixelFormatDesc = { sizeof(PIXELFORMATDESCRIPTOR) };
     pixelFormatDesc.nVersion = 1;
@@ -499,11 +498,11 @@ SlangResult GLRenderer::initialize(void* inWindowHandle)
     pixelFormatDesc.cStencilBits = 8;
     pixelFormatDesc.iLayerType = PFD_MAIN_PLANE;
 
-    int pixelFormatIndex = ChoosePixelFormat(deviceContext, &pixelFormatDesc);
-    SetPixelFormat(deviceContext, pixelFormatIndex, &pixelFormatDesc);
+    int pixelFormatIndex = ChoosePixelFormat(m_hdc, &pixelFormatDesc);
+    SetPixelFormat(m_hdc, pixelFormatIndex, &pixelFormatDesc);
 
-    glContext = wglCreateContext(deviceContext);
-    wglMakeCurrent(deviceContext, glContext);
+    m_glContext = wglCreateContext(m_hdc);
+    wglMakeCurrent(m_hdc, m_glContext);
 
     auto renderer = glGetString(GL_RENDERER);
     auto extensions = glGetString(GL_EXTENSIONS);
@@ -541,7 +540,7 @@ void GLRenderer::clearFrame()
 void GLRenderer::presentFrame()
 {
     glFlush();
-    ::SwapBuffers(deviceContext);
+    ::SwapBuffers(m_hdc);
 }
 
 SlangResult GLRenderer::captureScreenShot(char const* outputPath)
@@ -662,7 +661,7 @@ void GLRenderer::unmap(Buffer* buffer)
 
 void GLRenderer::setInputLayout(InputLayout* inputLayout)
 {
-    boundInputLayout = (InputLayoutImpl*)inputLayout;
+    m_boundInputLayout = (InputLayoutImpl*)inputLayout;
 }
 
 void GLRenderer::setPrimitiveTopology(PrimitiveTopology topology)
@@ -676,7 +675,7 @@ void GLRenderer::setPrimitiveTopology(PrimitiveTopology topology)
 
 #undef CASE
     }
-    boundPrimitiveTopology = glTopology;
+    m_boundPrimitiveTopology = glTopology;
 }
 
 void GLRenderer::setVertexBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* strides, UInt const* offsets)
@@ -688,9 +687,9 @@ void GLRenderer::setVertexBuffers(UInt startSlot, UInt slotCount, Buffer* const*
         Buffer* buffer = buffers[ii];
         GLuint bufferID = (GLuint)(uintptr_t)buffer;
 
-        boundVertexStreamBuffers[slot] = bufferID;
-        boundVertexStreamStrides[slot] = strides[ii];
-        boundVertexStreamOffsets[slot] = offsets[ii];
+        m_boundVertexStreamBuffers[slot] = bufferID;
+        m_boundVertexStreamStrides[slot] = strides[ii];
+        m_boundVertexStreamOffsets[slot] = offsets[ii];
     }
 }
 
@@ -709,7 +708,7 @@ void GLRenderer::draw(UInt vertexCount, UInt startVertex = 0)
 {
     flushStateForDraw();
 
-    glDrawArrays(boundPrimitiveTopology, (GLint)startVertex, (GLsizei)vertexCount);
+    glDrawArrays(m_boundPrimitiveTopology, (GLint)startVertex, (GLsizei)vertexCount);
 }
 
 void GLRenderer::dispatchCompute(int x, int y, int z)

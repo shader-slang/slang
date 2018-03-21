@@ -1,4 +1,4 @@
-// render-d3d12.cpp
+﻿// render-d3d12.cpp
 #include "render-d3d12.h"
 
 #include "options.h"
@@ -40,11 +40,11 @@ namespace renderer_test {
 // The Slang compiler currently generates HLSL source, so we'll need a utility
 // routine (defined later) to translate that into D3D11 shader bytecode.
 // Returns nullptr if compilation fails.
-ID3DBlob* compileHLSLShader(
+/* ID3DBlob* compileHLSLShader(
     char const* sourcePath,
     char const* source,
     char const* entryPointName,
-    char const* dxProfileName);
+    char const* dxProfileName); */
 
 //static char const* vertexProfileName   = "vs_4_0";
 //static char const* fragmentProfileName = "ps_4_0";
@@ -82,9 +82,9 @@ public:
     PROC loadProc(HMODULE module, char const* name);
     static DXGI_FORMAT mapFormat(Format format);
 
-    float clearColor[4] = { 0, 0, 0, 0 };
-    IDXGISwapChain* dxSwapChain = nullptr;
-    ID3D12Device* dxDevice = nullptr;
+    float m_clearColor[4] = { 0, 0, 0, 0 };
+    IDXGISwapChain* m_swapChain = nullptr;
+    ID3D12Device* m_device = nullptr;
 };
 
 Renderer* createD3D12Renderer()
@@ -123,15 +123,15 @@ SlangResult D3D12Renderer::initialize(void* inWindowHandle)
     auto windowHandle = (HWND)inWindowHandle;
     // Rather than statically link against D3D, we load it dynamically.
 
-    HMODULE d3d12 = LoadLibraryA("d3d12.dll");
-    if (!d3d12)
+    HMODULE d3dModule = LoadLibraryA("d3d12.dll");
+    if (!d3dModule)
     {
         fprintf(stderr, "error: failed load 'd3d12.dll'\n");
         return SLANG_FAIL;
     }
 
 #define LOAD_PROC(TYPE, NAME) \
-        TYPE NAME##_ = (TYPE) loadProc(d3d12, #NAME); \
+        TYPE NAME##_ = (TYPE) loadProc(d3dModule, #NAME); \
         if (NAME##_ == nullptr) return SLANG_FAIL;
 
     UINT dxgiFactoryFlags = 0;
@@ -176,7 +176,7 @@ SlangResult D3D12Renderer::initialize(void* inWindowHandle)
         {
             // TODO: may want to allow software driver as fallback
         }
-        else if (SUCCEEDED(D3D12CreateDevice_(candidateAdapter, featureLevel, IID_PPV_ARGS(&dxDevice))))
+        else if (SUCCEEDED(D3D12CreateDevice_(candidateAdapter, featureLevel, IID_PPV_ARGS(&m_device))))
         {
             // We found one!
             adapter = candidateAdapter;
@@ -197,7 +197,7 @@ SlangResult D3D12Renderer::initialize(void* inWindowHandle)
     queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 
     ID3D12CommandQueue* commandQueue;
-    SLANG_RETURN_ON_FAIL(dxDevice->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&commandQueue)));
+    SLANG_RETURN_ON_FAIL(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&commandQueue)));
 
     // Swap Chain
     UINT frameCount = 2; // TODO: configure
@@ -229,9 +229,9 @@ SlangResult D3D12Renderer::initialize(void* inWindowHandle)
     rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 
     ID3D12DescriptorHeap* rtvHeap;
-    SLANG_RETURN_ON_FAIL(dxDevice->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&rtvHeap)));
+    SLANG_RETURN_ON_FAIL(m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&rtvHeap)));
 
-    UINT rtvDescriptorSize = dxDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+    UINT rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
     D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = rtvHeap->GetCPUDescriptorHandleForHeapStart();
 
@@ -240,18 +240,18 @@ SlangResult D3D12Renderer::initialize(void* inWindowHandle)
     for (UINT ff = 0; ff < frameCount; ++ff)
     {
         SLANG_RETURN_ON_FAIL(swapChainEx->GetBuffer(ff, IID_PPV_ARGS(&backBufferResources[ff])));
-        dxDevice->CreateRenderTargetView(backBufferResources[ff], nullptr, rtvHandle);
+        m_device->CreateRenderTargetView(backBufferResources[ff], nullptr, rtvHandle);
         rtvHandle.ptr += rtvDescriptorSize;
     }
 
     ID3D12CommandAllocator* commandAllocator;
-    SLANG_RETURN_ON_FAIL(dxDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&commandAllocator)));
+    SLANG_RETURN_ON_FAIL(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&commandAllocator)));
     return SLANG_OK;
 }
 
 void D3D12Renderer::setClearColor(float const* color)
 {
-    memcpy(clearColor, color, sizeof(clearColor));
+    memcpy(m_clearColor, color, sizeof(m_clearColor));
 }
 
 void D3D12Renderer::clearFrame()
@@ -342,4 +342,3 @@ ShaderProgram* D3D12Renderer::compileProgram(ShaderCompileRequest const& request
 }
 
 } // renderer_test
-
