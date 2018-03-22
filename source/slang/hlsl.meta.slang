@@ -1121,3 +1121,112 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
     sb << "};\n";
 }
 }}}}
+
+
+// DirectX Raytracing (DXR) Support
+//
+// The following is based on the experimental DXR SDK v0.09.01.
+//
+// Numbering follows the sections in the "D3D12 Raytracing Functional Spec" v0.09 (2018-03-12)
+//
+
+// 10.1.1 - Ray Flags
+
+typedef uint RAY_FLAG;
+
+static const RAY_FLAG RAY_FLAG_NONE                             = 0x00;
+static const RAY_FLAG RAY_FLAG_FORCE_OPAQUE                     = 0x01;
+static const RAY_FLAG RAY_FLAG_FORCE_NON_OPAQUE                 = 0x02;
+static const RAY_FLAG RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH  = 0x04;
+static const RAY_FLAG RAY_FLAG_SKIP_CLOSEST_HIT_SHADER          = 0x08;
+static const RAY_FLAG RAY_FLAG_CULL_BACK_FACING_TRIANGLES       = 0x10;
+static const RAY_FLAG RAY_FLAG_CULL_FRONT_FACING_TRIANGLES      = 0x20;
+static const RAY_FLAG RAY_FLAG_CULL_OPAQUE                      = 0x40;
+static const RAY_FLAG RAY_FLAG_CULL_NON_OPAQUE                  = 0x80;
+
+// 10.1.2 - Ray Description Structure
+
+__builtin struct RayDesc
+{
+    float3 Origin;
+    float  TMin;
+    float3 Direction;
+    float  TMax;
+};
+
+// 10.1.3 - Ray Acceleration Structure
+
+__builtin __magic_type(UntypedBufferResourceType)
+struct RaytracingAccelerationStructure {};
+
+// 10.1.4 - Subobject Definitions
+
+// TODO: We may decide to support these, but their reliance on C++ implicit
+// constructor call syntax (`SomeType someVar(arg0, arg1);`) makes them
+// annoying for the current Slang parsing strategy, and using global variables
+// for this stuff comes across as a kludge rather than the best possible design.
+
+// 10.1.5 - Intersection Attributes Structure
+
+__builtin struct BuiltInTriangleIntersectionAttributes
+{
+    float2 barycentrics;
+};
+
+// 10.2 Shaders
+
+// Right now new shader stages need to be added directly to the compiler
+// implementation, rather than being something that can be declared in the stdlib.
+
+// 10.3 - Intrinsics
+
+// 10.3.1
+void CallShader<param_t>(uint ShaderIndex, inout param_t Parameter);
+
+// 10.3.2
+void TraceRay<payload_t>(
+    RaytracingAccelerationStructure AccelerationStructure,
+    uint                            RayFlags,
+    uint                            InstanceInclusionMask,
+    uint                            RayContributionToHitGroupIndex,
+    uint                            MultiplierForGeometryContributionToHitGroupIndex,
+    uint                            MissShaderIndex,
+    RayDesc                         Ray,
+    inout payload_t                 Payload);
+
+// 10.3.3
+bool ReportHit<attr_t>(float THit, uint HitKind, attr_t Attributes);
+
+// 10.3.4
+void IgnoreHit();
+
+// 10.3.5
+void AcceptHitAndEndSearch();
+
+// 10.4 - System Values and Special Semantics
+
+// TODO: Many of these functions need to be restricted so that
+// they can only be accessed from specific stages.
+
+// 10.4.1 - Ray Dispatch System Values
+uint2 DispatchRaysIndex();
+uint2 DispatchRaysDimensions();
+
+// 10.4.2 - Ray System Values
+float3 WorldRayOrigin();
+float3 WorldRayDirection();
+float RayTMin();
+float RayTCurrent();
+uint RayFlags();
+
+// 10.4.3 - Primitive/Object Space System Values
+uint InstanceIndex();
+uint InstanceID();
+uint PrimitiveIndex();
+float3 ObjectRayOrigin();
+float3 ObjectRayDirection();
+float3x4 ObjectToWorld();
+float3x4 WorldToObject();
+
+// 10.4.4 - Hit Specific System values
+uint HitKind();

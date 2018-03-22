@@ -138,6 +138,41 @@ Profile getEffectiveProfile(EntryPointRequest* entryPoint, TargetRequest* target
         }
     }
 
+    // Now consider the possibility that the chosen stage might force an "upgrade"
+    // to the profile level.
+    ProfileVersion stageMinVersion = ProfileVersion::Unknown;
+    switch( effectiveProfile.getFamily() )
+    {
+    case ProfileFamily::DX:
+        switch(effectiveProfile.GetStage())
+        {
+        default:
+            break;
+
+        case Stage::RayGeneration:
+        case Stage::Intersection:
+        case Stage::ClosestHit:
+        case Stage::AnyHit:
+        case Stage::Miss:
+        case Stage::Callable:
+            stageMinVersion = ProfileVersion::DX_6_1;
+            break;
+
+        //  TODO: Add equivalent logic for geometry, tessellation, and compute stages.
+        }
+        break;
+
+    // TODO: Add equivalent logic for the GL/VK case.
+
+    default:
+        break;
+    }
+
+    if( stageMinVersion > effectiveProfile.GetVersion() )
+    {
+        effectiveProfile.setVersion(stageMinVersion);
+    }
+
     return effectiveProfile;
 }
 
