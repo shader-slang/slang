@@ -1,4 +1,4 @@
-// render-d3d11.cpp
+﻿// render-d3d11.cpp
 #include "render-d3d11.h"
 
 #include "options.h"
@@ -40,24 +40,18 @@ using namespace Slang;
 
 namespace renderer_test {
 
-//static char const* vertexEntryPointName    = "vertexMain";
-//static char const* fragmentEntryPointName  = "fragmentMain";
-
-//static char const* vertexProfileName   = "vs_4_0";
-//static char const* fragmentProfileName = "ps_4_0";
-
 class D3D11Renderer : public Renderer, public ShaderCompiler
 {
 public:
     // Renderer    implementation
     virtual SlangResult initialize(void* inWindowHandle) override;
-    virtual void setClearColor(float const* color) override;
+    virtual void setClearColor(const float color[4]) override;
     virtual void clearFrame() override;
     virtual void presentFrame() override;
     virtual SlangResult captureScreenShot(char const* outputPath) override;
-    virtual void serializeOutput(BindingState* state, const char * fileName) override;
-    virtual Buffer* createBuffer(BufferDesc const& desc) override;
-    virtual InputLayout* createInputLayout(InputElementDesc const* inputElements, UInt inputElementCount) override;
+    virtual void serializeOutput(BindingState* state, const char* fileName) override;
+    virtual Buffer* createBuffer(const BufferDesc& desc) override;
+    virtual InputLayout* createInputLayout( const InputElementDesc* inputElements, UInt inputElementCount) override;
     virtual BindingState * createBindingState(const ShaderInputLayout& layout) override;
     virtual ShaderCompiler* getShaderCompiler() override;
     virtual void* map(Buffer* buffer, MapFlavor flavor) override;
@@ -65,9 +59,9 @@ public:
     virtual void setInputLayout(InputLayout* inputLayout) override;
     virtual void setPrimitiveTopology(PrimitiveTopology topology) override;
     virtual void setBindingState(BindingState * state);
-    virtual void setVertexBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* strides, UInt const* offsets) override;    
+    virtual void setVertexBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* strides,  const UInt* offsets) override;    
     virtual void setShaderProgram(ShaderProgram* inProgram) override;
-    virtual void setConstantBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* offsets) override;
+    virtual void setConstantBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers,  const UInt* offsets) override;
     virtual void draw(UInt vertexCount, UInt startVertex) override;
     virtual void dispatchCompute(int x, int y, int z) override;
     
@@ -80,10 +74,10 @@ public:
     {
         ShaderInputType type;
         InputBufferType bufferType;                        // Only valid if `type` is `Buffer`
-        ID3D11ShaderResourceView * srv = nullptr;
-        ID3D11UnorderedAccessView * uav = nullptr;
-        ID3D11Buffer * buffer = nullptr;
-        ID3D11SamplerState * samplerState = nullptr;
+        ID3D11ShaderResourceView* srv = nullptr;
+        ID3D11UnorderedAccessView* uav = nullptr;
+        ID3D11Buffer* buffer = nullptr;
+        ID3D11SamplerState* samplerState = nullptr;
         int binding = 0;
         bool isOutput = false;
         int bufferLength = 0;
@@ -95,9 +89,9 @@ public:
     };
     struct ShaderProgramImpl
     {
-        ID3D11VertexShader* dxVertexShader = nullptr;
-        ID3D11PixelShader*  dxPixelShader = nullptr;
-        ID3D11ComputeShader* dxComputeShader = nullptr;
+        ID3D11VertexShader* vertexShader = nullptr;
+        ID3D11PixelShader*  pixelShader = nullptr;
+        ID3D11ComputeShader* computeShader = nullptr;
     };
 
     struct BufferImpl
@@ -115,28 +109,28 @@ public:
         /// Definition of the HLSL-to-bytecode compilation logic.
     static ID3DBlob* compileHLSLShader(char const* sourcePath, char const* source, char const* entryPointName, char const* dxProfileName);
         /// Capture a texture to a file
-    static HRESULT captureTextureToFile(ID3D11Device* dxDevice, ID3D11DeviceContext* dxContext, ID3D11Texture2D* dxTexture, char const* outputPath);
+    static HRESULT captureTextureToFile(ID3D11Device* device, ID3D11DeviceContext* context, ID3D11Texture2D* texture, char const* outputPath);
 
-    void* map(ID3D11Buffer * buffer, MapFlavor flavor);
-    void unmap(ID3D11Buffer * buffer);
+    void* map(ID3D11Buffer* buffer, MapFlavor flavor);
+    void unmap(ID3D11Buffer* buffer);
 
-    void createInputBuffer(InputBufferDesc & bufferDesc, List<unsigned int> & bufferData, ID3D11Buffer * &bufferOut,
-        ID3D11UnorderedAccessView * &viewOut, ID3D11ShaderResourceView * &srvOut);
+    void createInputBuffer(InputBufferDesc& bufferDesc, List<unsigned int>& bufferData, ID3D11Buffer*& bufferOut,
+        ID3D11UnorderedAccessView*& viewOut, ID3D11ShaderResourceView*& srvOut);
 
-    void createInputTexture(const InputTextureDesc & inputDesc, ID3D11ShaderResourceView * &viewOut);
+    void createInputTexture(const InputTextureDesc& inputDesc, ID3D11ShaderResourceView*& viewOut);
 
-    void createInputSampler(const InputSamplerDesc & inputDesc, ID3D11SamplerState * & stateOut);
+    void createInputSampler(const InputSamplerDesc& inputDesc, ID3D11SamplerState*& stateOut);
 
     void applyBindingState(bool isCompute);
 
-    IDXGISwapChain* dxSwapChain = nullptr;
-    ID3D11Device* dxDevice = nullptr;
-    ID3D11DeviceContext* dxImmediateContext = nullptr;
-    ID3D11Texture2D* dxBackBufferTexture = nullptr;
-    List<ID3D11RenderTargetView*> dxRenderTargetViews;
-    List<ID3D11Texture2D*> dxRenderTargetTextures;
-    BindingStateImpl* currentBindings = nullptr;
-    float clearColor[4] = { 0, 0, 0, 0 };
+    IDXGISwapChain* m_swapChain = nullptr;
+    ID3D11Device* m_device = nullptr;
+    ID3D11DeviceContext* m_immediateContext = nullptr;
+    ID3D11Texture2D* m_backBufferTexture = nullptr;
+    List<ID3D11RenderTargetView*> m_renderTargetViews;
+    List<ID3D11Texture2D*> m_renderTargetTextures;
+    BindingStateImpl* m_currentBindings = nullptr;
+    float m_clearColor[4] = { 0, 0, 0, 0 };
 };
 
 Renderer* createD3D11Renderer()
@@ -166,19 +160,19 @@ Renderer* createD3D11Renderer()
     // shader bytecode as part of an offline process, rather than doing it
     // on-the-fly like this
     //
-    static pD3DCompile D3DCompile_ = nullptr;
-    if (!D3DCompile_)
+    static pD3DCompile compileFunc = nullptr;
+    if (!compileFunc)
     {
         // TODO(tfoley): maybe want to search for one of a few versions of the DLL
-        HMODULE d3dcompiler = LoadLibraryA("d3dcompiler_47.dll");
-        if (!d3dcompiler)
+        HMODULE compilerModule = LoadLibraryA("d3dcompiler_47.dll");
+        if (!compilerModule)
         {
             fprintf(stderr, "error: failed load 'd3dcompiler_47.dll'\n");
             return nullptr;
         }
 
-        D3DCompile_ = (pD3DCompile)GetProcAddress(d3dcompiler, "D3DCompile");
-        if (!D3DCompile_)
+        compileFunc = (pD3DCompile)GetProcAddress(compilerModule, "D3DCompile");
+        if (!compileFunc)
         {
             fprintf(stderr, "error: failed load symbol 'D3DCompile'\n");
             return nullptr;
@@ -201,34 +195,20 @@ Renderer* createD3D11Renderer()
 
     // The `D3DCompile` entry point takes a bunch of parameters, but we
     // don't really need most of them for Slang-generated code.
-    ID3DBlob* dxShaderBlob = nullptr;
-    ID3DBlob* dxErrorBlob = nullptr;
-    HRESULT hr = D3DCompile_(
-        source,
-        strlen(source),
-        sourcePath,
-        &defines[0],
-        nullptr,
-        entryPointName,
-        dxProfileName,
-        flags,
-        0,
-        &dxShaderBlob,
-        &dxErrorBlob);
+    ID3DBlob* shaderBlob = nullptr;
+    ID3DBlob* errorBlob = nullptr;
+    HRESULT hr = compileFunc(source, strlen(source), sourcePath, &defines[0], nullptr, entryPointName, dxProfileName, flags, 0,
+        &shaderBlob, &errorBlob);
 
     // If the HLSL-to-bytecode compilation produced any diagnostic messages
     // then we will print them out (whether or not the compilation failed).
-    if (dxErrorBlob)
+    if (errorBlob)
     {
-        fputs(
-            (char const*)dxErrorBlob->GetBufferPointer(),
-            stderr);
-        fflush(stderr);
+        ::fputs((const char*)errorBlob->GetBufferPointer(), stderr);
+        ::fflush(stderr);
+        ::OutputDebugStringA((const char*)errorBlob->GetBufferPointer());
 
-        OutputDebugStringA(
-            (char const*)dxErrorBlob->GetBufferPointer());
-
-        dxErrorBlob->Release();
+        errorBlob->Release();
     }
 
     if (FAILED(hr))
@@ -236,67 +216,67 @@ Renderer* createD3D11Renderer()
         return nullptr;
     }
 
-    return dxShaderBlob;
+    return shaderBlob;
 }
 
-/* static */HRESULT D3D11Renderer::captureTextureToFile(ID3D11Device* dxDevice, ID3D11DeviceContext* dxContext,
-    ID3D11Texture2D* dxTexture, char const* outputPath)
+/* static */HRESULT D3D11Renderer::captureTextureToFile(ID3D11Device* device, ID3D11DeviceContext* context,
+    ID3D11Texture2D* texture, char const* outputPath)
 {
-    if (!dxContext) return E_INVALIDARG;
-    if (!dxTexture) return E_INVALIDARG;
+    if (!context) return E_INVALIDARG;
+    if (!texture) return E_INVALIDARG;
 
-    D3D11_TEXTURE2D_DESC dxTextureDesc;
-    dxTexture->GetDesc(&dxTextureDesc);
+    D3D11_TEXTURE2D_DESC textureDesc;
+    texture->GetDesc(&textureDesc);
 
     // Don't bother supporting MSAA for right now
-    if (dxTextureDesc.SampleDesc.Count > 1)
+    if (textureDesc.SampleDesc.Count > 1)
     {
         fprintf(stderr, "ERROR: cannot capture multi-sample texture\n");
         return E_INVALIDARG;
     }
 
     HRESULT hr = S_OK;
-    ID3D11Texture2D* dxStagingTexture = nullptr;
+    ID3D11Texture2D* stagingTexture = nullptr;
 
-    if (dxTextureDesc.Usage == D3D11_USAGE_STAGING && (dxTextureDesc.CPUAccessFlags & D3D11_CPU_ACCESS_READ))
+    if (textureDesc.Usage == D3D11_USAGE_STAGING && (textureDesc.CPUAccessFlags & D3D11_CPU_ACCESS_READ))
     {
-        dxStagingTexture = dxTexture;
-        dxStagingTexture->AddRef();
+        stagingTexture = texture;
+        stagingTexture->AddRef();
     }
     else
     {
         // Modify the descriptor to give us a staging texture
-        dxTextureDesc.BindFlags = 0;
-        dxTextureDesc.MiscFlags &= ~D3D11_RESOURCE_MISC_TEXTURECUBE;
-        dxTextureDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
-        dxTextureDesc.Usage = D3D11_USAGE_STAGING;
+        textureDesc.BindFlags = 0;
+        textureDesc.MiscFlags &= ~D3D11_RESOURCE_MISC_TEXTURECUBE;
+        textureDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+        textureDesc.Usage = D3D11_USAGE_STAGING;
 
-        hr = dxDevice->CreateTexture2D(&dxTextureDesc, 0, &dxStagingTexture);
+        hr = device->CreateTexture2D(&textureDesc, 0, &stagingTexture);
         if (FAILED(hr))
         {
             fprintf(stderr, "ERROR: failed to create staging texture\n");
             return hr;
         }
 
-        dxContext->CopyResource(dxStagingTexture, dxTexture);
+        context->CopyResource(stagingTexture, texture);
     }
 
     // Now just read back texels from the staging textures
 
-    D3D11_MAPPED_SUBRESOURCE dxMappedResource;
-    hr = dxContext->Map(dxStagingTexture, 0, D3D11_MAP_READ, 0, &dxMappedResource);
+    D3D11_MAPPED_SUBRESOURCE mappedResource;
+    hr = context->Map(stagingTexture, 0, D3D11_MAP_READ, 0, &mappedResource);
     if (FAILED(hr))
     {
         fprintf(stderr, "ERROR: failed to map texture for read\n");
         return hr;
     }
 
-    int stbResult = stbi_write_png(outputPath, dxTextureDesc.Width, dxTextureDesc.Height, 4,
-        dxMappedResource.pData, dxMappedResource.RowPitch);
+    int stbResult = stbi_write_png(outputPath, textureDesc.Width, textureDesc.Height, 4,
+        mappedResource.pData, mappedResource.RowPitch);
 
     // Make sure to unmap
-    dxContext->Unmap(dxStagingTexture, 0);
-    dxStagingTexture->Release();
+    context->Unmap(stagingTexture, 0);
+    stagingTexture->Release();
 
     if (!stbResult)
     {
@@ -312,17 +292,17 @@ Renderer* createD3D11Renderer()
 SlangResult D3D11Renderer::initialize(void* inWindowHandle)
 {
     auto windowHandle = (HWND)inWindowHandle;
-    // Rather than statically link against D3D, we load it dynamically.
 
-    HMODULE d3d11 = LoadLibraryA("d3d11.dll");
-    if (!d3d11)
+    // Rather than statically link against D3D, we load it dynamically.
+    HMODULE d3dModule = LoadLibraryA("d3d11.dll");
+    if (!d3dModule)
     {
         fprintf(stderr, "error: failed load 'd3d11.dll'\n");
         return SLANG_FAIL;
     }
 
     PFN_D3D11_CREATE_DEVICE_AND_SWAP_CHAIN D3D11CreateDeviceAndSwapChain_ =
-        (PFN_D3D11_CREATE_DEVICE_AND_SWAP_CHAIN)GetProcAddress(d3d11, "D3D11CreateDeviceAndSwapChain");
+        (PFN_D3D11_CREATE_DEVICE_AND_SWAP_CHAIN)GetProcAddress(d3dModule, "D3D11CreateDeviceAndSwapChain");
     if (!D3D11CreateDeviceAndSwapChain_)
     {
         fprintf(stderr,
@@ -335,28 +315,26 @@ SlangResult D3D11Renderer::initialize(void* inWindowHandle)
     UINT deviceFlags = 0;
     deviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
 
-
     // Our swap chain uses RGBA8 with sRGB, with double buffering.
-
-    DXGI_SWAP_CHAIN_DESC dxSwapChainDesc = { 0 };
-    dxSwapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+    DXGI_SWAP_CHAIN_DESC swapChainDesc = { 0 };
+    swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 
     // Note(tfoley): Disabling sRGB for DX back buffer for now, so that we
     // can get consistent output with OpenGL, where setting up sRGB will
     // probably be more involved.
-    //        dxSwapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-    dxSwapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    // swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+    swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 
-    dxSwapChainDesc.SampleDesc.Count = 1;
-    dxSwapChainDesc.SampleDesc.Quality = 0;
-    dxSwapChainDesc.BufferCount = 2;
-    dxSwapChainDesc.OutputWindow = windowHandle;
-    dxSwapChainDesc.Windowed = TRUE;
-    dxSwapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
-    dxSwapChainDesc.Flags = 0;
+    swapChainDesc.SampleDesc.Count = 1;
+    swapChainDesc.SampleDesc.Quality = 0;
+    swapChainDesc.BufferCount = 2;
+    swapChainDesc.OutputWindow = windowHandle;
+    swapChainDesc.Windowed = TRUE;
+    swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
+    swapChainDesc.Flags = 0;
 
     // We will ask for the highest feature level that can be supported.
-    D3D_FEATURE_LEVEL featureLevels[] = {
+    const D3D_FEATURE_LEVEL featureLevels[] = {
         D3D_FEATURE_LEVEL_11_1,
         D3D_FEATURE_LEVEL_11_0,
         D3D_FEATURE_LEVEL_10_1,
@@ -365,7 +343,7 @@ SlangResult D3D11Renderer::initialize(void* inWindowHandle)
         D3D_FEATURE_LEVEL_9_2,
         D3D_FEATURE_LEVEL_9_1,
     };
-    D3D_FEATURE_LEVEL dxFeatureLevel = D3D_FEATURE_LEVEL_9_1;
+    D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_9_1;
     const int totalNumFeatureLevels = sizeof(featureLevels) / sizeof(featureLevels[0]);
 
     // On a machine that does not have an up-to-date version of D3D installed,
@@ -386,11 +364,11 @@ SlangResult D3D11Renderer::initialize(void* inWindowHandle)
             &featureLevels[ii],
             totalNumFeatureLevels - ii,
             D3D11_SDK_VERSION,
-            &dxSwapChainDesc,
-            &dxSwapChain,
-            &dxDevice,
-            &dxFeatureLevel,
-            &dxImmediateContext);
+            &swapChainDesc,
+            &m_swapChain,
+            &m_device,
+            &featureLevel,
+            &m_immediateContext);
 
         // Failures with `E_INVALIDARG` might be due to feature level 11_1
         // not being supported. 
@@ -412,68 +390,64 @@ SlangResult D3D11Renderer::initialize(void* inWindowHandle)
         0x6f15aaf2, 0xd208, 0x4e89, 0x9a, 0xb4, 0x48,
         0x95, 0x35, 0xd3, 0x4f, 0x9c };
 
-    SLANG_RETURN_ON_FAIL(dxSwapChain->GetBuffer(0, kIID_ID3D11Texture2D, (void**)&dxBackBufferTexture));
+    SLANG_RETURN_ON_FAIL(m_swapChain->GetBuffer(0, kIID_ID3D11Texture2D, (void**)&m_backBufferTexture));
 
     for (int i = 0; i < 8; i++)
     {
         ID3D11Texture2D* texture;
         D3D11_TEXTURE2D_DESC textureDesc;
-        dxBackBufferTexture->GetDesc(&textureDesc);
-        SLANG_RETURN_ON_FAIL(dxDevice->CreateTexture2D(&textureDesc, nullptr, &texture));
+        m_backBufferTexture->GetDesc(&textureDesc);
+        SLANG_RETURN_ON_FAIL(m_device->CreateTexture2D(&textureDesc, nullptr, &texture));
 
         ID3D11RenderTargetView * rtv;
         D3D11_RENDER_TARGET_VIEW_DESC rtvDesc;
         rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
         rtvDesc.Texture2D.MipSlice = 0;
         rtvDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
-        SLANG_RETURN_ON_FAIL(dxDevice->CreateRenderTargetView(texture, &rtvDesc, &rtv));
+        SLANG_RETURN_ON_FAIL(m_device->CreateRenderTargetView(texture, &rtvDesc, &rtv));
 
-        dxRenderTargetViews.Add(rtv);
-        dxRenderTargetTextures.Add(texture);
+        m_renderTargetViews.Add(rtv);
+        m_renderTargetTextures.Add(texture);
     }
 
-    dxImmediateContext->OMSetRenderTargets((UINT)dxRenderTargetViews.Count(), dxRenderTargetViews.Buffer(), nullptr);
+    m_immediateContext->OMSetRenderTargets((UINT)m_renderTargetViews.Count(), m_renderTargetViews.Buffer(), nullptr);
 
     // Similarly, we are going to set up a viewport once, and then never
     // switch, since this is a simple test app.
-    D3D11_VIEWPORT dxViewport;
-    dxViewport.TopLeftX = 0;
-    dxViewport.TopLeftY = 0;
-    dxViewport.Width = (float)gWindowWidth;
-    dxViewport.Height = (float)gWindowHeight;
-    dxViewport.MaxDepth = 1; // TODO(tfoley): use reversed depth
-    dxViewport.MinDepth = 0;
-    dxImmediateContext->RSSetViewports(1, &dxViewport);
+    D3D11_VIEWPORT viewport;
+    viewport.TopLeftX = 0;
+    viewport.TopLeftY = 0;
+    viewport.Width = (float)gWindowWidth;
+    viewport.Height = (float)gWindowHeight;
+    viewport.MaxDepth = 1; // TODO(tfoley): use reversed depth
+    viewport.MinDepth = 0;
+    m_immediateContext->RSSetViewports(1, &viewport);
 
     return SLANG_OK;
 }
 
-void D3D11Renderer::setClearColor(float const* color)
+void D3D11Renderer::setClearColor(const float color[4])
 {
-    memcpy(clearColor, color, sizeof(clearColor));
+    memcpy(m_clearColor, color, sizeof(m_clearColor));
 }
 
 void D3D11Renderer::clearFrame()
 {
-    for (auto i = 0u; i < dxRenderTargetViews.Count(); i++)
-        dxImmediateContext->ClearRenderTargetView(
-            dxRenderTargetViews[i],
-            clearColor);
+    for (auto i = 0u; i < m_renderTargetViews.Count(); i++)
+        m_immediateContext->ClearRenderTargetView(
+            m_renderTargetViews[i],
+            m_clearColor);
 }
 
 void D3D11Renderer::presentFrame()
 {
-    dxImmediateContext->CopyResource(dxBackBufferTexture, dxRenderTargetTextures[0]);
-    dxSwapChain->Present(0, 0);
+    m_immediateContext->CopyResource(m_backBufferTexture, m_renderTargetTextures[0]);
+    m_swapChain->Present(0, 0);
 }
 
-SlangResult D3D11Renderer::captureScreenShot(char const* outputPath)
+SlangResult D3D11Renderer::captureScreenShot(const char* outputPath)
 {
-    HRESULT hr = captureTextureToFile(
-        dxDevice,
-        dxImmediateContext,
-        dxRenderTargetTextures[0],
-        outputPath);
+    HRESULT hr = captureTextureToFile(m_device, m_immediateContext, m_renderTargetTextures[0], outputPath);
     if (FAILED(hr))
     {
         fprintf(stderr, "error: could not capture screen-shot to '%s'\n", outputPath);
@@ -487,43 +461,43 @@ ShaderCompiler* D3D11Renderer::getShaderCompiler()
     return this;
 }
 
-Buffer* D3D11Renderer::createBuffer(BufferDesc const& desc)
+Buffer* D3D11Renderer::createBuffer(const BufferDesc& desc)
 {
-    D3D11_BUFFER_DESC dxBufferDesc = { 0 };
-    dxBufferDesc.ByteWidth = (UINT)calcAligned(desc.size, 256);
+    D3D11_BUFFER_DESC bufferDesc = { 0 };
+    bufferDesc.ByteWidth = (UINT)calcAligned(desc.size, 256);
 
     switch (desc.flavor)
     {
         case BufferFlavor::Constant:
-            dxBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-            dxBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-            dxBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+            bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+            bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+            bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
             break;
 
         case BufferFlavor::Vertex:
-            dxBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-            dxBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-            dxBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+            bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+            bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+            bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
             break;
         default:
             return nullptr;
     }
 
-    D3D11_SUBRESOURCE_DATA dxInitData = { 0 };
-    dxInitData.pSysMem = desc.initData;
+    D3D11_SUBRESOURCE_DATA subResourceData = { 0 };
+    subResourceData.pSysMem = desc.initData;
 
-    ID3D11Buffer* dxBuffer = nullptr;
-    HRESULT hr = dxDevice->CreateBuffer(&dxBufferDesc, desc.initData ? &dxInitData : nullptr, &dxBuffer);
+    ID3D11Buffer* buffer = nullptr;
+    HRESULT hr = m_device->CreateBuffer(&bufferDesc, desc.initData ? &subResourceData : nullptr, &buffer);
     if (FAILED(hr)) return nullptr;
 
     BufferImpl* rs = new BufferImpl;
-    rs->buffer = dxBuffer;
+    rs->buffer = buffer;
     return (Buffer*)rs;
 }
 
-InputLayout* D3D11Renderer::createInputLayout(InputElementDesc const* inputElements, UInt inputElementCount)
+InputLayout* D3D11Renderer::createInputLayout(const InputElementDesc* inputElementsIn, UInt inputElementCount)
 {
-    D3D11_INPUT_ELEMENT_DESC dxInputElements[16] = {};
+    D3D11_INPUT_ELEMENT_DESC inputElements[16] = {};
 
     char hlslBuffer[1024];
     char* hlslCursor = &hlslBuffer[0];
@@ -532,13 +506,13 @@ InputLayout* D3D11Renderer::createInputLayout(InputElementDesc const* inputEleme
 
     for (UInt ii = 0; ii < inputElementCount; ++ii)
     {
-        dxInputElements[ii].SemanticName = inputElements[ii].semanticName;
-        dxInputElements[ii].SemanticIndex = (UINT)inputElements[ii].semanticIndex;
-        dxInputElements[ii].Format = getMapFormat(inputElements[ii].format);
-        dxInputElements[ii].InputSlot = 0;
-        dxInputElements[ii].AlignedByteOffset = (UINT)inputElements[ii].offset;
-        dxInputElements[ii].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
-        dxInputElements[ii].InstanceDataStepRate = 0;
+        inputElements[ii].SemanticName = inputElementsIn[ii].semanticName;
+        inputElements[ii].SemanticIndex = (UINT)inputElementsIn[ii].semanticIndex;
+        inputElements[ii].Format = getMapFormat(inputElementsIn[ii].format);
+        inputElements[ii].InputSlot = 0;
+        inputElements[ii].AlignedByteOffset = (UINT)inputElementsIn[ii].offset;
+        inputElements[ii].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
+        inputElements[ii].InstanceDataStepRate = 0;
 
         if (ii != 0)
         {
@@ -546,7 +520,7 @@ InputLayout* D3D11Renderer::createInputLayout(InputElementDesc const* inputEleme
         }
 
         char const* typeName = "Unknown";
-        switch (inputElements[ii].format)
+        switch (inputElementsIn[ii].format)
         {
             case Format::RGB_Float32:
                 typeName = "float3";
@@ -561,49 +535,41 @@ InputLayout* D3D11Renderer::createInputLayout(InputElementDesc const* inputEleme
         hlslCursor += sprintf(hlslCursor, "%s a%d : %s%d",
             typeName,
             (int)ii,
-            inputElements[ii].semanticName,
-            (int)inputElements[ii].semanticIndex);
+            inputElementsIn[ii].semanticName,
+            (int)inputElementsIn[ii].semanticIndex);
     }
 
     hlslCursor += sprintf(hlslCursor, "\n) : SV_Position { return 0; }");
 
-    auto dxVertexShaderBlob = compileHLSLShader("inputLayout", hlslBuffer, "main", "vs_5_0");
-    if (!dxVertexShaderBlob)
+    auto vertexShaderBlob = compileHLSLShader("inputLayout", hlslBuffer, "main", "vs_5_0");
+    if (!vertexShaderBlob)
         return nullptr;
 
-    ID3D11InputLayout* dxInputLayout = nullptr;
-    HRESULT hr = dxDevice->CreateInputLayout(
-        &dxInputElements[0],
-        (UINT)inputElementCount,
-        dxVertexShaderBlob->GetBufferPointer(),
-        dxVertexShaderBlob->GetBufferSize(),
-        &dxInputLayout);
+    ID3D11InputLayout* inputLayout = nullptr;
+    HRESULT hr = m_device->CreateInputLayout(&inputElements[0], (UINT)inputElementCount, vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize(),
+        &inputLayout);
 
-    dxVertexShaderBlob->Release();
+    vertexShaderBlob->Release();
 
     if (FAILED(hr))
         return nullptr;
 
-    return (InputLayout*)dxInputLayout;
+    return (InputLayout*)inputLayout;
 }
 
-void* D3D11Renderer::map(ID3D11Buffer * buffer, MapFlavor flavor)
+void* D3D11Renderer::map(ID3D11Buffer* buffer, MapFlavor flavorIn)
 {
-    auto dxContext = dxImmediateContext;
-
-    auto dxBuffer = buffer;
-
-    D3D11_MAP dxMapFlavor;
-    switch (flavor)
+    D3D11_MAP mapType;
+    switch (flavorIn)
     {
         case MapFlavor::WriteDiscard:
-            dxMapFlavor = D3D11_MAP_WRITE_DISCARD;
+            mapType = D3D11_MAP_WRITE_DISCARD;
             break;
         case MapFlavor::HostWrite:
-            dxMapFlavor = D3D11_MAP_WRITE;
+            mapType = D3D11_MAP_WRITE;
             break;
         case MapFlavor::HostRead:
-            dxMapFlavor = D3D11_MAP_READ;
+            mapType = D3D11_MAP_READ;
             break;
         default:
             return nullptr;
@@ -612,12 +578,12 @@ void* D3D11Renderer::map(ID3D11Buffer * buffer, MapFlavor flavor)
     // We update our constant buffer per-frame, just for the purposes
     // of the example, but we don't actually load different data
     // per-frame (we always use an identity projection).
-    D3D11_MAPPED_SUBRESOURCE dxMapped;
-    HRESULT hr = dxContext->Map(dxBuffer, 0, dxMapFlavor, 0, &dxMapped);
+    D3D11_MAPPED_SUBRESOURCE mappedSub;
+    HRESULT hr = m_immediateContext->Map(buffer, 0, mapType, 0, &mappedSub);
     if (FAILED(hr))
         return nullptr;
 
-    return dxMapped.pData;
+    return mappedSub.pData;
 }
 
 void* D3D11Renderer::map(Buffer* buffer, MapFlavor flavor)
@@ -625,152 +591,136 @@ void* D3D11Renderer::map(Buffer* buffer, MapFlavor flavor)
     return map(((BufferImpl*)buffer)->buffer, flavor);
 }
 
-void D3D11Renderer::unmap(ID3D11Buffer * buffer)
+void D3D11Renderer::unmap(ID3D11Buffer* buffer)
 {
-    auto dxContext = dxImmediateContext;
-    dxContext->Unmap(buffer, 0);
+    m_immediateContext->Unmap(buffer, 0);
 }
 
-void D3D11Renderer::unmap(Buffer* buffer)
+void D3D11Renderer::unmap(Buffer* bufferIn)
 {
-    auto dxBuffer = ((BufferImpl*)buffer)->buffer;
-    unmap(dxBuffer);
+    unmap(((BufferImpl*)bufferIn)->buffer);
 }
 
-void D3D11Renderer::setInputLayout(InputLayout* inputLayout)
+void D3D11Renderer::setInputLayout(InputLayout* inputLayoutIn)
 {
-    auto dxContext = dxImmediateContext;
-    auto dxInputLayout = (ID3D11InputLayout*)inputLayout;
+    auto inputLayout = (ID3D11InputLayout*)inputLayoutIn;
 
-    dxContext->IASetInputLayout(dxInputLayout);
+    m_immediateContext->IASetInputLayout(inputLayout);
 }
 
 void D3D11Renderer::setPrimitiveTopology(PrimitiveTopology topology)
 {
-    auto dxContext = dxImmediateContext;
-
-    D3D11_PRIMITIVE_TOPOLOGY dxTopology;
+    D3D11_PRIMITIVE_TOPOLOGY primTopology;
     switch (topology)
     {
         case PrimitiveTopology::TriangleList:
-            dxTopology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+            primTopology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
             break;
 
         default:
             return;
     }
 
-    dxContext->IASetPrimitiveTopology(dxTopology);
+    m_immediateContext->IASetPrimitiveTopology(primTopology);
 }
 
-void D3D11Renderer::setVertexBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* strides, UInt const* offsets)
+void D3D11Renderer::setVertexBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffersIn, const UInt* stridesIn, const UInt* offsetsIn)
 {
-    auto dxContext = dxImmediateContext;
-
     static const int kMaxVertexBuffers = 16;
 
-    UINT dxVertexStrides[kMaxVertexBuffers];
-    UINT dxVertexOffsets[kMaxVertexBuffers];
+    UINT vertexStrides[kMaxVertexBuffers];
+    UINT vertexOffsets[kMaxVertexBuffers];
 
     for (UInt ii = 0; ii < slotCount; ++ii)
     {
-        dxVertexStrides[ii] = (UINT)strides[ii];
-        dxVertexOffsets[ii] = (UINT)offsets[ii];
+        vertexStrides[ii] = (UINT)stridesIn[ii];
+        vertexOffsets[ii] = (UINT)offsetsIn[ii];
     }
 
-    auto dxVertexBuffers = (BufferImpl* const*)buffers;
+    auto buffers = (BufferImpl* const*)buffersIn;
 
-    dxContext->IASetVertexBuffers(
-        (UINT)startSlot,
-        (UINT)slotCount, &(dxVertexBuffers[0])->buffer, &dxVertexStrides[0], &dxVertexOffsets[0]);
+    m_immediateContext->IASetVertexBuffers((UINT)startSlot, (UINT)slotCount, &(buffers[0])->buffer, &vertexStrides[0], &vertexOffsets[0]);
 }
 
-void D3D11Renderer::setShaderProgram(ShaderProgram* inProgram)
+void D3D11Renderer::setShaderProgram(ShaderProgram* programIn)
 {
-    auto dxContext = dxImmediateContext;
-
-    auto program = (ShaderProgramImpl*)inProgram;
-    dxContext->CSSetShader(program->dxComputeShader, nullptr, 0);
-    dxContext->VSSetShader(program->dxVertexShader, nullptr, 0);
-    dxContext->PSSetShader(program->dxPixelShader, nullptr, 0);
+    auto program = (ShaderProgramImpl*)programIn;
+    m_immediateContext->CSSetShader(program->computeShader, nullptr, 0);
+    m_immediateContext->VSSetShader(program->vertexShader, nullptr, 0);
+    m_immediateContext->PSSetShader(program->pixelShader, nullptr, 0);
 }
 
-void D3D11Renderer::setConstantBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* offsets)
+void D3D11Renderer::setConstantBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffersIn, const UInt* offsetsIn)
 {
-    auto dxContext = dxImmediateContext;
-
     // TODO: actually use those offsets
 
-    auto dxConstantBuffers = (BufferImpl* const*)buffers;
-    dxContext->VSSetConstantBuffers((UINT)startSlot, (UINT)slotCount, &dxConstantBuffers[0]->buffer);
-    dxContext->VSSetConstantBuffers((UINT)startSlot, (UINT)slotCount, &dxConstantBuffers[0]->buffer);
+    auto buffers = (BufferImpl*const*)buffersIn;
+    m_immediateContext->VSSetConstantBuffers((UINT)startSlot, (UINT)slotCount, &buffers[0]->buffer);
+    m_immediateContext->VSSetConstantBuffers((UINT)startSlot, (UINT)slotCount, &buffers[0]->buffer);
 }
 
 void D3D11Renderer::draw(UInt vertexCount, UInt startVertex)
 {
-    auto dxContext = dxImmediateContext;
     applyBindingState(false);
-    dxContext->Draw((UINT)vertexCount, (UINT)startVertex);
+    m_immediateContext->Draw((UINT)vertexCount, (UINT)startVertex);
 }
 
-ShaderProgram* D3D11Renderer::compileProgram(ShaderCompileRequest const& request)
+ShaderProgram* D3D11Renderer::compileProgram(const ShaderCompileRequest& request)
 {
     if (request.computeShader.name)
     {
-        auto dxComputeShaderBlob = compileHLSLShader(request.computeShader.source.path, request.computeShader.source.dataBegin, request.computeShader.name, request.computeShader.profile);
-        if (!dxComputeShaderBlob)
+        auto computeShaderBlob = compileHLSLShader(request.computeShader.source.path, request.computeShader.source.dataBegin, request.computeShader.name, request.computeShader.profile);
+        if (!computeShaderBlob)
             return nullptr;
 
-        ID3D11ComputeShader* dxComputeShader;
+        ID3D11ComputeShader* computeShader;
 
-        HRESULT csResult = dxDevice->CreateComputeShader(dxComputeShaderBlob->GetBufferPointer(), dxComputeShaderBlob->GetBufferSize(), nullptr, &dxComputeShader);
+        HRESULT hr = m_device->CreateComputeShader(computeShaderBlob->GetBufferPointer(), computeShaderBlob->GetBufferSize(), nullptr, &computeShader);
 
-        dxComputeShaderBlob->Release();
+        computeShaderBlob->Release();
 
-        if (FAILED(csResult)) return nullptr;
+        if (FAILED(hr)) return nullptr;
 
         ShaderProgramImpl* shaderProgram = new ShaderProgramImpl();
-        shaderProgram->dxComputeShader = dxComputeShader;
+        shaderProgram->computeShader = computeShader;
         return (ShaderProgram*)shaderProgram;
     }
     else
     {
-        auto dxVertexShaderBlob = compileHLSLShader(request.vertexShader.source.path, request.vertexShader.source.dataBegin, request.vertexShader.name, request.vertexShader.profile);
-        if (!dxVertexShaderBlob)     return nullptr;
+        auto vertexShaderBlob = compileHLSLShader(request.vertexShader.source.path, request.vertexShader.source.dataBegin, request.vertexShader.name, request.vertexShader.profile);
+        if (!vertexShaderBlob)     return nullptr;
 
-        auto dxFragmentShaderBlob = compileHLSLShader(request.fragmentShader.source.path, request.fragmentShader.source.dataBegin, request.fragmentShader.name, request.fragmentShader.profile);
-        if (!dxFragmentShaderBlob)   return nullptr;
+        auto fragmentShaderBlob = compileHLSLShader(request.fragmentShader.source.path, request.fragmentShader.source.dataBegin, request.fragmentShader.name, request.fragmentShader.profile);
+        if (!fragmentShaderBlob)   return nullptr;
 
-        ID3D11VertexShader* dxVertexShader;
-        ID3D11PixelShader*  dxPixelShader;
+        ID3D11VertexShader* vertexShader;
+        ID3D11PixelShader*  pixelShader;
 
-        HRESULT vsResult = dxDevice->CreateVertexShader(dxVertexShaderBlob->GetBufferPointer(), dxVertexShaderBlob->GetBufferSize(), nullptr, &dxVertexShader);
-        HRESULT psResult = dxDevice->CreatePixelShader(dxFragmentShaderBlob->GetBufferPointer(), dxFragmentShaderBlob->GetBufferSize(), nullptr, &dxPixelShader);
+        HRESULT vsResult = m_device->CreateVertexShader(vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize(), nullptr, &vertexShader);
+        HRESULT psResult = m_device->CreatePixelShader(fragmentShaderBlob->GetBufferPointer(), fragmentShaderBlob->GetBufferSize(), nullptr, &pixelShader);
 
-        dxVertexShaderBlob->Release();
-        dxFragmentShaderBlob->Release();
+        vertexShaderBlob->Release();
+        fragmentShaderBlob->Release();
 
         if (FAILED(vsResult)) return nullptr;
         if (FAILED(psResult)) return nullptr;
 
         ShaderProgramImpl* shaderProgram = new ShaderProgramImpl();
-        shaderProgram->dxVertexShader = dxVertexShader;
-        shaderProgram->dxPixelShader = dxPixelShader;
+        shaderProgram->vertexShader = vertexShader;
+        shaderProgram->pixelShader = pixelShader;
         return (ShaderProgram*)shaderProgram;
     }
 }
 
 void D3D11Renderer::dispatchCompute(int x, int y, int z)
 {
-    auto dxContext = dxImmediateContext;
     applyBindingState(true);
-    dxContext->Dispatch(x, y, z);
+    m_immediateContext->Dispatch(x, y, z);
 }
 
-void D3D11Renderer::createInputBuffer(InputBufferDesc & bufferDesc,    List<unsigned int> & bufferData, ID3D11Buffer * &bufferOut,
-    ID3D11UnorderedAccessView * &viewOut, ID3D11ShaderResourceView * &srvOut)
+void D3D11Renderer::createInputBuffer(InputBufferDesc& bufferDesc, List<unsigned int>& bufferData, ID3D11Buffer*& bufferOut,
+    ID3D11UnorderedAccessView*& viewOut, ID3D11ShaderResourceView*& srvOut)
 {
-    auto dxContext = dxImmediateContext;
     D3D11_BUFFER_DESC desc = { 0 };
     List<unsigned int> newBuffer;
     desc.ByteWidth = (UINT)calcAligned((bufferData.Count() * sizeof(unsigned int)), 256);
@@ -798,7 +748,7 @@ void D3D11Renderer::createInputBuffer(InputBufferDesc & bufferDesc,    List<unsi
     }
     D3D11_SUBRESOURCE_DATA data = { 0 };
     data.pSysMem = newBuffer.Buffer();
-    dxDevice->CreateBuffer(&desc, &data, &bufferOut);
+    m_device->CreateBuffer(&desc, &data, &bufferOut);
     int elemSize = bufferDesc.stride <= 0 ? 1 : bufferDesc.stride;
     if (bufferDesc.type == InputBufferType::StorageBuffer)
     {
@@ -819,7 +769,7 @@ void D3D11Renderer::createInputBuffer(InputBufferDesc & bufferDesc,    List<unsi
             viewDesc.Format = DXGI_FORMAT_R32_TYPELESS;
         }
 
-        dxDevice->CreateUnorderedAccessView(bufferOut, &viewDesc, &viewOut);
+        m_device->CreateUnorderedAccessView(bufferOut, &viewDesc, &viewOut);
     }
     if (bufferDesc.type != InputBufferType::ConstantBuffer)
     {
@@ -831,11 +781,11 @@ void D3D11Renderer::createInputBuffer(InputBufferDesc & bufferDesc,    List<unsi
         srvDesc.Buffer.ElementOffset = 0;
         srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
         srvDesc.Format = DXGI_FORMAT_UNKNOWN;
-        dxDevice->CreateShaderResourceView(bufferOut, &srvDesc, &srvOut);
+        m_device->CreateShaderResourceView(bufferOut, &srvDesc, &srvOut);
     }
 }
 
-void D3D11Renderer::createInputTexture(const InputTextureDesc & inputDesc, ID3D11ShaderResourceView * &viewOut)
+void D3D11Renderer::createInputTexture(const InputTextureDesc& inputDesc, ID3D11ShaderResourceView*& viewOut)
 {
     TextureData texData;
     generateTextureData(texData, inputDesc);
@@ -867,7 +817,7 @@ void D3D11Renderer::createInputTexture(const InputTextureDesc & inputDesc, ID3D1
         desc.Usage = D3D11_USAGE_DEFAULT;
 
         ID3D11Texture1D * texture;
-        dxDevice->CreateTexture1D(&desc, subRes.Buffer(), &texture);
+        m_device->CreateTexture1D(&desc, subRes.Buffer(), &texture);
         D3D11_SHADER_RESOURCE_VIEW_DESC viewDesc;
 
         viewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE1D;
@@ -880,7 +830,7 @@ void D3D11Renderer::createInputTexture(const InputTextureDesc & inputDesc, ID3D1
         viewDesc.Texture1DArray.MipLevels = texData.mipLevels;
         viewDesc.Texture1DArray.MostDetailedMip = 0;
         viewDesc.Format = desc.Format;
-        dxDevice->CreateShaderResourceView(texture, &viewDesc, &viewOut);
+        m_device->CreateShaderResourceView(texture, &viewDesc, &viewOut);
     }
     else if (inputDesc.dimension == 2)
     {
@@ -922,8 +872,8 @@ void D3D11Renderer::createInputTexture(const InputTextureDesc & inputDesc, ID3D1
         desc.SampleDesc.Quality = 0;
         viewDesc.Format = desc.Format;
         ID3D11Texture2D * texture;
-        dxDevice->CreateTexture2D(&desc, subRes.Buffer(), &texture);
-        dxDevice->CreateShaderResourceView(texture, &viewDesc, &viewOut);
+        m_device->CreateTexture2D(&desc, subRes.Buffer(), &texture);
+        m_device->CreateShaderResourceView(texture, &viewDesc, &viewOut);
     }
     else if (inputDesc.dimension == 3)
     {
@@ -940,15 +890,15 @@ void D3D11Renderer::createInputTexture(const InputTextureDesc & inputDesc, ID3D1
         desc.Depth = texData.textureSize;
         desc.Usage = D3D11_USAGE_DEFAULT;
         ID3D11Texture3D * texture;
-        dxDevice->CreateTexture3D(&desc, subRes.Buffer(), &texture);
+        m_device->CreateTexture3D(&desc, subRes.Buffer(), &texture);
         viewDesc.Texture3D.MipLevels = 1;
         viewDesc.Texture3D.MostDetailedMip = 0;
         viewDesc.Format = desc.Format;
-        dxDevice->CreateShaderResourceView(texture, &viewDesc, &viewOut);
+        m_device->CreateShaderResourceView(texture, &viewDesc, &viewOut);
     }
 }
 
-void D3D11Renderer::createInputSampler(const InputSamplerDesc & inputDesc, ID3D11SamplerState * & stateOut)
+void D3D11Renderer::createInputSampler(const InputSamplerDesc& inputDesc, ID3D11SamplerState*& stateOut)
 {
     D3D11_SAMPLER_DESC desc;
     memset(&desc, 0, sizeof(desc));
@@ -966,12 +916,12 @@ void D3D11Renderer::createInputSampler(const InputSamplerDesc & inputDesc, ID3D1
         desc.MinLOD = 0.0f;
         desc.MaxLOD = 100.0f;
     }
-    dxDevice->CreateSamplerState(&desc, &stateOut);
+    m_device->CreateSamplerState(&desc, &stateOut);
 }
 
 BindingState * D3D11Renderer::createBindingState(const ShaderInputLayout& layout)
 {
-    BindingStateImpl * rs = new BindingStateImpl();
+    BindingStateImpl * rs = new BindingStateImpl;
     rs->numRenderTargets = layout.numRenderTargets;
     for (auto & entry : layout.entries)
     {
@@ -1012,37 +962,37 @@ BindingState * D3D11Renderer::createBindingState(const ShaderInputLayout& layout
 
 void D3D11Renderer::applyBindingState(bool isCompute)
 {
-    auto dxContext = dxImmediateContext;
-    for (auto & binding : currentBindings->bindings)
+    auto context = m_immediateContext;
+    for (auto & binding : m_currentBindings->bindings)
     {
         if (binding.type == ShaderInputType::Buffer)
         {
             if (binding.bufferType == InputBufferType::ConstantBuffer)
             {
                 if (isCompute)
-                    dxContext->CSSetConstantBuffers(binding.binding, 1, &binding.buffer);
+                    context->CSSetConstantBuffers(binding.binding, 1, &binding.buffer);
                 else
                 {
-                    dxContext->VSSetConstantBuffers(binding.binding, 1, &binding.buffer);
-                    dxContext->PSSetConstantBuffers(binding.binding, 1, &binding.buffer);
+                    context->VSSetConstantBuffers(binding.binding, 1, &binding.buffer);
+                    context->PSSetConstantBuffers(binding.binding, 1, &binding.buffer);
                 }
             }
             else if (binding.uav)
             {
                 if (isCompute)
-                    dxContext->CSSetUnorderedAccessViews(binding.binding, 1, &binding.uav, nullptr);
+                    context->CSSetUnorderedAccessViews(binding.binding, 1, &binding.uav, nullptr);
                 else
-                    dxContext->OMSetRenderTargetsAndUnorderedAccessViews(currentBindings->numRenderTargets,
-                        dxRenderTargetViews.Buffer(), nullptr, binding.binding, 1, &binding.uav, nullptr);
+                    context->OMSetRenderTargetsAndUnorderedAccessViews(m_currentBindings->numRenderTargets,
+                        m_renderTargetViews.Buffer(), nullptr, binding.binding, 1, &binding.uav, nullptr);
             }
             else
             {
                 if (isCompute)
-                    dxContext->CSSetShaderResources(binding.binding, 1, &binding.srv);
+                    context->CSSetShaderResources(binding.binding, 1, &binding.srv);
                 else
                 {
-                    dxContext->PSSetShaderResources(binding.binding, 1, &binding.srv);
-                    dxContext->VSSetShaderResources(binding.binding, 1, &binding.srv);
+                    context->PSSetShaderResources(binding.binding, 1, &binding.srv);
+                    context->VSSetShaderResources(binding.binding, 1, &binding.srv);
                 }
             }
         }
@@ -1051,30 +1001,30 @@ void D3D11Renderer::applyBindingState(bool isCompute)
             if (binding.uav)
             {
                 if (isCompute)
-                    dxContext->CSSetUnorderedAccessViews(binding.binding, 1, &binding.uav, nullptr);
+                    context->CSSetUnorderedAccessViews(binding.binding, 1, &binding.uav, nullptr);
                 else
-                    dxContext->OMSetRenderTargetsAndUnorderedAccessViews(D3D11_KEEP_RENDER_TARGETS_AND_DEPTH_STENCIL,
+                    context->OMSetRenderTargetsAndUnorderedAccessViews(D3D11_KEEP_RENDER_TARGETS_AND_DEPTH_STENCIL,
                         nullptr, nullptr, binding.binding, 1, &binding.uav, nullptr);
             }
             else
             {
                 if (isCompute)
-                    dxContext->CSSetShaderResources(binding.binding, 1, &binding.srv);
+                    context->CSSetShaderResources(binding.binding, 1, &binding.srv);
                 else
                 {
-                    dxContext->PSSetShaderResources(binding.binding, 1, &binding.srv);
-                    dxContext->VSSetShaderResources(binding.binding, 1, &binding.srv);
+                    context->PSSetShaderResources(binding.binding, 1, &binding.srv);
+                    context->VSSetShaderResources(binding.binding, 1, &binding.srv);
                 }
             }
         }
         else if (binding.type == ShaderInputType::Sampler)
         {
             if (isCompute)
-                dxContext->CSSetSamplers(binding.binding, 1, &binding.samplerState);
+                context->CSSetSamplers(binding.binding, 1, &binding.samplerState);
             else
             {
-                dxContext->PSSetSamplers(binding.binding, 1, &binding.samplerState);
-                dxContext->VSSetSamplers(binding.binding, 1, &binding.samplerState);
+                context->PSSetSamplers(binding.binding, 1, &binding.samplerState);
+                context->VSSetSamplers(binding.binding, 1, &binding.samplerState);
             }
         }
         else
@@ -1084,17 +1034,15 @@ void D3D11Renderer::applyBindingState(bool isCompute)
 
 void D3D11Renderer::setBindingState(BindingState* state)
 {
-    auto dxBindingState = (BindingStateImpl*)state;
-    currentBindings = dxBindingState;
+    m_currentBindings = (BindingStateImpl*)state;
 }
 
 void D3D11Renderer::serializeOutput(BindingState* state, const char* fileName)
 {
-    auto dxContext = dxImmediateContext;
-    auto dxBindingState = (BindingStateImpl*)state;
+    auto bindingState = (BindingStateImpl*)state;
     FILE * f = fopen(fileName, "wb");
     int id = 0;
-    for (auto & binding : dxBindingState->bindings)
+    for (auto & binding : bindingState->bindings)
     {
         if (binding.isOutput)
         {
@@ -1108,8 +1056,10 @@ void D3D11Renderer::serializeOutput(BindingState* state, const char* fileName)
                 bufDesc.ByteWidth = (UINT)calcAligned(binding.bufferLength, 256);
                 bufDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
                 bufDesc.Usage = D3D11_USAGE_STAGING;
-                dxDevice->CreateBuffer(&bufDesc, nullptr, &stageBuf);
-                dxContext->CopyResource(stageBuf, binding.buffer);
+                
+                m_device->CreateBuffer(&bufDesc, nullptr, &stageBuf);
+                m_immediateContext->CopyResource(stageBuf, binding.buffer);
+
                 auto ptr = (unsigned int *)map(stageBuf, MapFlavor::HostRead);
                 for (auto i = 0u; i < binding.bufferLength / sizeof(unsigned int); i++)
                     fprintf(f, "%X\n", ptr[i]);

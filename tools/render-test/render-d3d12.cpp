@@ -1,4 +1,4 @@
-// render-d3d12.cpp
+﻿// render-d3d12.cpp
 #include "render-d3d12.h"
 
 #include "options.h"
@@ -40,11 +40,11 @@ namespace renderer_test {
 // The Slang compiler currently generates HLSL source, so we'll need a utility
 // routine (defined later) to translate that into D3D11 shader bytecode.
 // Returns nullptr if compilation fails.
-ID3DBlob* compileHLSLShader(
+/* ID3DBlob* compileHLSLShader(
     char const* sourcePath,
     char const* source,
     char const* entryPointName,
-    char const* dxProfileName);
+    char const* dxProfileName); */
 
 //static char const* vertexProfileName   = "vs_4_0";
 //static char const* fragmentProfileName = "ps_4_0";
@@ -55,36 +55,36 @@ class D3D12Renderer : public Renderer, public ShaderCompiler
 public:
     // Renderer    implementation
     virtual SlangResult initialize(void* inWindowHandle) override;
-    virtual void setClearColor(float const* color) override;
+    virtual void setClearColor(const float color[4]) override;
     virtual void clearFrame() override;
     virtual void presentFrame() override;
-    virtual SlangResult captureScreenShot(char const* outputPath) override;
-    virtual void serializeOutput(BindingState* state, const char * fileName) override;
-    virtual Buffer* createBuffer(BufferDesc const& desc) override;
-    virtual InputLayout* createInputLayout(InputElementDesc const* inputElements, UInt inputElementCount) override;
-    virtual BindingState * createBindingState(const ShaderInputLayout & layout) override;
+    virtual SlangResult captureScreenShot(const char* outputPath) override;
+    virtual void serializeOutput(BindingState* state, const char* fileName) override;
+    virtual Buffer* createBuffer(const BufferDesc& desc) override;
+    virtual InputLayout* createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) override;
+    virtual BindingState * createBindingState(const ShaderInputLayout& layout) override;
     virtual ShaderCompiler* getShaderCompiler() override;
     virtual void* map(Buffer* buffer, MapFlavor flavor) override;
     virtual void unmap(Buffer* buffer) override;
     virtual void setInputLayout(InputLayout* inputLayout) override;
     virtual void setPrimitiveTopology(PrimitiveTopology topology) override;
-    virtual void setBindingState(BindingState * state);
-    virtual void setVertexBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* strides, UInt const* offsets) override;
+    virtual void setBindingState(BindingState* state);
+    virtual void setVertexBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* strides, const UInt* offsets) override;
     virtual void setShaderProgram(ShaderProgram* inProgram) override;
-    virtual void setConstantBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* offsets) override;
+    virtual void setConstantBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* offsets) override;
     virtual void draw(UInt vertexCount, UInt startVertex) override;
     virtual void dispatchCompute(int x, int y, int z) override;
 
     // ShaderCompiler implementation
-    virtual ShaderProgram* compileProgram(ShaderCompileRequest const& request) override;
+    virtual ShaderProgram* compileProgram(const ShaderCompileRequest& request) override;
     
     protected:
     PROC loadProc(HMODULE module, char const* name);
     static DXGI_FORMAT mapFormat(Format format);
 
-    float clearColor[4] = { 0, 0, 0, 0 };
-    IDXGISwapChain* dxSwapChain = nullptr;
-    ID3D12Device* dxDevice = nullptr;
+    float m_clearColor[4] = { 0, 0, 0, 0 };
+    IDXGISwapChain* m_swapChain = nullptr;
+    ID3D12Device* m_device = nullptr;
 };
 
 Renderer* createD3D12Renderer()
@@ -123,15 +123,15 @@ SlangResult D3D12Renderer::initialize(void* inWindowHandle)
     auto windowHandle = (HWND)inWindowHandle;
     // Rather than statically link against D3D, we load it dynamically.
 
-    HMODULE d3d12 = LoadLibraryA("d3d12.dll");
-    if (!d3d12)
+    HMODULE d3dModule = LoadLibraryA("d3d12.dll");
+    if (!d3dModule)
     {
         fprintf(stderr, "error: failed load 'd3d12.dll'\n");
         return SLANG_FAIL;
     }
 
 #define LOAD_PROC(TYPE, NAME) \
-        TYPE NAME##_ = (TYPE) loadProc(d3d12, #NAME); \
+        TYPE NAME##_ = (TYPE) loadProc(d3dModule, #NAME); \
         if (NAME##_ == nullptr) return SLANG_FAIL;
 
     UINT dxgiFactoryFlags = 0;
@@ -176,7 +176,7 @@ SlangResult D3D12Renderer::initialize(void* inWindowHandle)
         {
             // TODO: may want to allow software driver as fallback
         }
-        else if (SUCCEEDED(D3D12CreateDevice_(candidateAdapter, featureLevel, IID_PPV_ARGS(&dxDevice))))
+        else if (SUCCEEDED(D3D12CreateDevice_(candidateAdapter, featureLevel, IID_PPV_ARGS(&m_device))))
         {
             // We found one!
             adapter = candidateAdapter;
@@ -197,7 +197,7 @@ SlangResult D3D12Renderer::initialize(void* inWindowHandle)
     queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 
     ID3D12CommandQueue* commandQueue;
-    SLANG_RETURN_ON_FAIL(dxDevice->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&commandQueue)));
+    SLANG_RETURN_ON_FAIL(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&commandQueue)));
 
     // Swap Chain
     UINT frameCount = 2; // TODO: configure
@@ -229,9 +229,9 @@ SlangResult D3D12Renderer::initialize(void* inWindowHandle)
     rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 
     ID3D12DescriptorHeap* rtvHeap;
-    SLANG_RETURN_ON_FAIL(dxDevice->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&rtvHeap)));
+    SLANG_RETURN_ON_FAIL(m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&rtvHeap)));
 
-    UINT rtvDescriptorSize = dxDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+    UINT rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
     D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = rtvHeap->GetCPUDescriptorHandleForHeapStart();
 
@@ -240,18 +240,18 @@ SlangResult D3D12Renderer::initialize(void* inWindowHandle)
     for (UINT ff = 0; ff < frameCount; ++ff)
     {
         SLANG_RETURN_ON_FAIL(swapChainEx->GetBuffer(ff, IID_PPV_ARGS(&backBufferResources[ff])));
-        dxDevice->CreateRenderTargetView(backBufferResources[ff], nullptr, rtvHandle);
+        m_device->CreateRenderTargetView(backBufferResources[ff], nullptr, rtvHandle);
         rtvHandle.ptr += rtvDescriptorSize;
     }
 
     ID3D12CommandAllocator* commandAllocator;
-    SLANG_RETURN_ON_FAIL(dxDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&commandAllocator)));
+    SLANG_RETURN_ON_FAIL(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&commandAllocator)));
     return SLANG_OK;
 }
 
-void D3D12Renderer::setClearColor(float const* color)
+void D3D12Renderer::setClearColor(const float color[4])
 {
-    memcpy(clearColor, color, sizeof(clearColor));
+    memcpy(m_clearColor, color, sizeof(m_clearColor));
 }
 
 void D3D12Renderer::clearFrame()
@@ -262,7 +262,7 @@ void D3D12Renderer::presentFrame()
 {
 }
 
-SlangResult D3D12Renderer::captureScreenShot(char const* outputPath)
+SlangResult D3D12Renderer::captureScreenShot(const char* outputPath)
 {
     return SLANG_FAIL;
 }
@@ -272,13 +272,13 @@ ShaderCompiler* D3D12Renderer::getShaderCompiler()
     return this;
 }
 
-Buffer* D3D12Renderer::createBuffer(BufferDesc const& desc)
+Buffer* D3D12Renderer::createBuffer(const BufferDesc& desc)
 {
     return nullptr;
 }
 
 
-InputLayout* D3D12Renderer::createInputLayout(InputElementDesc const* inputElements, UInt inputElementCount) 
+InputLayout* D3D12Renderer::createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) 
 {
     return nullptr;
 }
@@ -300,7 +300,7 @@ void D3D12Renderer::setPrimitiveTopology(PrimitiveTopology topology)
 {
 }
 
-void D3D12Renderer::setVertexBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* strides, UInt const* offsets)
+void D3D12Renderer::setVertexBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt * strides, const UInt* offsets)
 {
 }
 
@@ -308,7 +308,7 @@ void D3D12Renderer::setShaderProgram(ShaderProgram* inProgram)
 {
 }
 
-void D3D12Renderer::setConstantBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* offsets)
+void D3D12Renderer::setConstantBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* offsets)
 {
 }
 
@@ -321,25 +321,24 @@ void D3D12Renderer::dispatchCompute(int x, int y, int z)
 {
 }
 
-BindingState* D3D12Renderer::createBindingState(const ShaderInputLayout & layout)
+BindingState* D3D12Renderer::createBindingState(const ShaderInputLayout& layout)
 {
     return nullptr;
 }
 
-void D3D12Renderer::setBindingState(BindingState * state)
+void D3D12Renderer::setBindingState(BindingState* state)
 {
 }
 
-void D3D12Renderer::serializeOutput(BindingState* state, const char * fileName)
+void D3D12Renderer::serializeOutput(BindingState* state, const char* fileName)
 {
 }
 
 // ShaderCompiler interface
 
-ShaderProgram* D3D12Renderer::compileProgram(ShaderCompileRequest const& request)
+ShaderProgram* D3D12Renderer::compileProgram(const ShaderCompileRequest& request)
 {
     return nullptr;
 }
 
 } // renderer_test
-

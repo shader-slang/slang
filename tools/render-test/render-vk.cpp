@@ -83,28 +83,28 @@ class VKRenderer : public Renderer, public ShaderCompiler
 public:
     // Renderer    implementation
     virtual SlangResult initialize(void* inWindowHandle) override;
-    virtual void setClearColor(float const* color) override;
+    virtual void setClearColor(const float color[4]) override;
     virtual void clearFrame() override;
     virtual void presentFrame() override;
-    virtual SlangResult captureScreenShot(char const* outputPath) override;
+    virtual SlangResult captureScreenShot(const char* outputPath) override;
     virtual void serializeOutput(BindingState* state, const char * fileName) override;
-    virtual Buffer* createBuffer(BufferDesc const& desc) override;
-    virtual InputLayout* createInputLayout(InputElementDesc const* inputElements, UInt inputElementCount) override;
-    virtual BindingState * createBindingState(const ShaderInputLayout & layout) override;
+    virtual Buffer* createBuffer(const BufferDesc& desc) override;
+    virtual InputLayout* createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) override;
+    virtual BindingState * createBindingState(const ShaderInputLayout& layout) override;
     virtual ShaderCompiler* getShaderCompiler() override;
     virtual void* map(Buffer* buffer, MapFlavor flavor) override;
     virtual void unmap(Buffer* buffer) override;
     virtual void setInputLayout(InputLayout* inputLayout) override;
     virtual void setPrimitiveTopology(PrimitiveTopology topology) override;
-    virtual void setBindingState(BindingState * state);
-    virtual void setVertexBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* strides, UInt const* offsets) override;
+    virtual void setBindingState(BindingState* state);
+    virtual void setVertexBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* strides, const UInt* offsets) override;
     virtual void setShaderProgram(ShaderProgram* inProgram) override;
-    virtual void setConstantBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* offsets) override;
+    virtual void setConstantBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers,  const UInt* offsets) override;
     virtual void draw(UInt vertexCount, UInt startVertex) override;
     virtual void dispatchCompute(int x, int y, int z) override;
 
     // ShaderCompiler implementation
-    virtual ShaderProgram* compileProgram(ShaderCompileRequest const& request) override;
+    virtual ShaderProgram* compileProgram(const ShaderCompileRequest& request) override;
 
     protected:
 
@@ -148,7 +148,7 @@ public:
 
     VkBool32 handleDebugMessage(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t srcObject,
         size_t location, int32_t msgCode, const char* pLayerPrefix, const char* pMsg);
-    BufferImpl createBufferImpl(size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties, void const* initData = nullptr);
+    BufferImpl createBufferImpl(size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties, const void* initData = nullptr);
 
     VkCommandBuffer getCommandBuffer();
     VkCommandBuffer beginCommandBuffer();
@@ -168,22 +168,21 @@ public:
     static VKAPI_ATTR VkBool32 VKAPI_CALL debugMessageCallback(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t srcObject,
         size_t location, int32_t msgCode, const char* pLayerPrefix, const char* pMsg, void* pUserData);
 
-    VkInstance                          instance;
-    VkPhysicalDevice                    physicalDevice;
-    VkPhysicalDeviceProperties          deviceProperties;
-    VkPhysicalDeviceFeatures            deviceFeatures;
-    VkPhysicalDeviceMemoryProperties    deviceMemoryProperties;
-    VkPhysicalDeviceFeatures            enabledFeatures;
-    VkDevice                            device;
-    VkQueue                             queue;
-    VkCommandPool                       commandPool;
-    VkSubmitInfo                        submitInfo;
-    VkDebugReportCallbackEXT            debugReportCallback;
+    VkInstance                          m_instance;
+    VkPhysicalDevice                    m_physicalDevice;
+    VkPhysicalDeviceProperties          m_deviceProperties;
+    VkPhysicalDeviceFeatures            m_deviceFeatures;
+    VkPhysicalDeviceMemoryProperties    m_deviceMemoryProperties;
+    VkDevice                            m_device;
+    VkQueue                             m_queue;
+    VkCommandPool                       m_commandPool;
+    VkSubmitInfo                        m_submitInfo;
+    VkDebugReportCallbackEXT            m_debugReportCallback;
 
-    BindingStateImpl* currentBindingState = nullptr;
-    ShaderProgramImpl* currentProgram = nullptr;
+    BindingStateImpl* m_currentBindingState = nullptr;
+    ShaderProgramImpl* m_currentProgram = nullptr;
 
-    float clearColor[4];
+    float m_clearColor[4] = { 0, 0, 0, 0 };;
 
 #define DECLARE_PROC(NAME) PFN_##NAME NAME;
     DECLARE_PROC(vkGetInstanceProcAddr);
@@ -196,7 +195,7 @@ public:
 
 Renderer* createVKRenderer()
 {
-    return new VKRenderer();
+    return new VKRenderer;
 }
 
 /* static */SlangResult VKRenderer::toSlangResult(VkResult res)
@@ -243,13 +242,12 @@ VkBool32 VKRenderer::handleDebugMessage(VkDebugReportFlagsEXT flags, VkDebugRepo
 VkCommandBuffer VKRenderer::getCommandBuffer()
 {
     VkCommandBufferAllocateInfo info = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
-    info.commandPool = commandPool;
+    info.commandPool = m_commandPool;
     info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     info.commandBufferCount = 1;
 
     VkCommandBuffer commandBuffer;
-    checkResult(vkAllocateCommandBuffers(
-        device, &info, &commandBuffer));
+    checkResult(vkAllocateCommandBuffers(m_device, &info, &commandBuffer));
 
     return commandBuffer;
 }
@@ -272,13 +270,13 @@ void VKRenderer::flushCommandBuffer(VkCommandBuffer commandBuffer)
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &commandBuffer;
 
-    checkResult(vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE));
-    checkResult(vkQueueWaitIdle(queue));
+    checkResult(vkQueueSubmit(m_queue, 1, &submitInfo, VK_NULL_HANDLE));
+    checkResult(vkQueueWaitIdle(m_queue));
 
-    vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
+    vkFreeCommandBuffers(m_device, m_commandPool, 1, &commandBuffer);
 }
 
-VKRenderer::BufferImpl VKRenderer::createBufferImpl(size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties, void const* initData)
+VKRenderer::BufferImpl VKRenderer::createBufferImpl(size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties, const void* initData)
 {
     if (initData)
     {
@@ -291,27 +289,23 @@ VKRenderer::BufferImpl VKRenderer::createBufferImpl(size_t bufferSize, VkBufferU
     bufferCreateInfo.usage = usage;
 
     VkBuffer buffer;
-    checkResult(vkCreateBuffer(
-        device, &bufferCreateInfo, nullptr, &buffer));
+    checkResult(vkCreateBuffer(m_device, &bufferCreateInfo, nullptr, &buffer));
 
     VkMemoryRequirements memoryReqs = {};
-    vkGetBufferMemoryRequirements(device, buffer, &memoryReqs);
+    vkGetBufferMemoryRequirements(m_device, buffer, &memoryReqs);
 
-    uint32_t memoryTypeIndex = getMemoryTypeIndex(
-        memoryReqs.memoryTypeBits, reqMemoryProperties);
+    uint32_t memoryTypeIndex = getMemoryTypeIndex(memoryReqs.memoryTypeBits, reqMemoryProperties);
 
-    VkMemoryPropertyFlags actualMemoryProperites = deviceMemoryProperties.memoryTypes[memoryTypeIndex].propertyFlags;
+    VkMemoryPropertyFlags actualMemoryProperites = m_deviceMemoryProperties.memoryTypes[memoryTypeIndex].propertyFlags;
 
     VkMemoryAllocateInfo allocateInfo = { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
     allocateInfo.allocationSize = memoryReqs.size;
     allocateInfo.memoryTypeIndex = memoryTypeIndex;
 
     VkDeviceMemory memory;
-    checkResult(vkAllocateMemory(
-        device, &allocateInfo, nullptr, &memory));
+    checkResult(vkAllocateMemory(m_device, &allocateInfo, nullptr, &memory));
 
-    checkResult(vkBindBufferMemory(
-        device, buffer, memory, 0));
+    checkResult(vkBindBufferMemory(m_device, buffer, memory, 0));
 
     if (initData)
     {
@@ -324,9 +318,9 @@ VKRenderer::BufferImpl VKRenderer::createBufferImpl(size_t bufferSize, VkBufferU
 
         // Copy into staging buffer
         void* mappedData = nullptr;
-        checkResult(vkMapMemory(device, staging.memory, 0, bufferSize, 0, &mappedData));
+        checkResult(vkMapMemory(m_device, staging.memory, 0, bufferSize, 0, &mappedData));
         memcpy(mappedData, initData, bufferSize);
-        vkUnmapMemory(device, staging.memory);
+        vkUnmapMemory(m_device, staging.memory);
 
         // Copy from staging buffer to real buffer
         VkCommandBuffer commandBuffer = beginCommandBuffer();
@@ -338,8 +332,8 @@ VKRenderer::BufferImpl VKRenderer::createBufferImpl(size_t bufferSize, VkBufferU
         flushCommandBuffer(commandBuffer);
 
         // Now destroy the staging buffer
-        vkDestroyBuffer(device, staging.buffer, nullptr);
-        vkFreeMemory(device, staging.memory, nullptr);
+        vkDestroyBuffer(m_device, staging.buffer, nullptr);
+        vkFreeMemory(m_device, staging.memory, nullptr);
     }
 
     BufferImpl impl;
@@ -354,7 +348,7 @@ uint32_t VKRenderer::getMemoryTypeIndex(uint32_t inTypeBits, VkMemoryPropertyFla
     uint32_t typeIndex = 0;
     while (typeBits)
     {
-        if ((deviceMemoryProperties.memoryTypes[typeIndex].propertyFlags & properties) == properties)
+        if ((m_deviceMemoryProperties.memoryTypes[typeIndex].propertyFlags & properties) == properties)
         {
             return typeIndex;
         }
@@ -378,7 +372,7 @@ void VKRenderer::createInputSampler(const InputSamplerDesc& inputDesc, VkSampler
     assert(!"unimplemented");
 }
 
-void VKRenderer::createInputBuffer(const ShaderInputLayoutEntry& entry,    const InputBufferDesc& bufferDesc, const Slang::List<unsigned int>& bufferData, 
+void VKRenderer::createInputBuffer(const ShaderInputLayoutEntry& entry, const InputBufferDesc& bufferDesc, const Slang::List<unsigned int>& bufferData, 
     VkBuffer& bufferOut, VkBufferView& uavOut, VkImageView& srvOut)
 {
     size_t bufferSize = bufferData.Count() * sizeof(unsigned int);
@@ -443,7 +437,7 @@ VkPipelineShaderStageCreateInfo VKRenderer::compileEntryPoint(const ShaderCompil
     moduleCreateInfo.codeSize = codeSize;
 
     VkShaderModule module;
-    checkResult(vkCreateShaderModule(device, &moduleCreateInfo, nullptr, &module));
+    checkResult(vkCreateShaderModule(m_device, &moduleCreateInfo, nullptr, &module));
 
     //::free(codeBegin);
 
@@ -508,13 +502,13 @@ SlangResult VKRenderer::initialize(void* inWindowHandle)
     instanceCreateInfo.ppEnabledLayerNames = layerNames;
 #endif
 
-    instance = 0;
+    m_instance = 0;
 
-#define LOAD_INSTANCE_PROC(NAME) NAME = (PFN_##NAME) vkGetInstanceProcAddr(instance, #NAME);
+#define LOAD_INSTANCE_PROC(NAME) NAME = (PFN_##NAME) vkGetInstanceProcAddr(m_instance, #NAME);
 
     FOREACH_GLOBAL_PROC(LOAD_INSTANCE_PROC);
 
-    RETURN_ON_VK_FAIL(vkCreateInstance(&instanceCreateInfo, nullptr, &instance));
+    RETURN_ON_VK_FAIL(vkCreateInstance(&instanceCreateInfo, nullptr, &m_instance));
 
     FOREACH_INSTANCE_PROC(LOAD_INSTANCE_PROC);
 
@@ -529,34 +523,29 @@ SlangResult VKRenderer::initialize(void* inWindowHandle)
     debugCreateInfo.pUserData = this;
     debugCreateInfo.flags = debugFlags;
 
-    RETURN_ON_VK_FAIL(vkCreateDebugReportCallbackEXT(instance, &debugCreateInfo, nullptr, &debugReportCallback));
+    RETURN_ON_VK_FAIL(vkCreateDebugReportCallbackEXT(m_instance, &debugCreateInfo, nullptr, &m_debugReportCallback));
 
 #endif
 
     uint32_t physicalDeviceCount = 0;
-    RETURN_ON_VK_FAIL(vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, nullptr));
+    RETURN_ON_VK_FAIL(vkEnumeratePhysicalDevices(m_instance, &physicalDeviceCount, nullptr));
 
-    VkPhysicalDevice* physicalDevices = (VkPhysicalDevice*)alloca(
-        physicalDeviceCount * sizeof(VkPhysicalDevice));
-    RETURN_ON_VK_FAIL(vkEnumeratePhysicalDevices(
-        instance, &physicalDeviceCount, physicalDevices));
+    VkPhysicalDevice* physicalDevices = (VkPhysicalDevice*)alloca(physicalDeviceCount * sizeof(VkPhysicalDevice));
+    RETURN_ON_VK_FAIL(vkEnumeratePhysicalDevices(m_instance, &physicalDeviceCount, physicalDevices));
 
     uint32_t selectedDeviceIndex = 0;
     // TODO: allow override of selected device
-    physicalDevice = physicalDevices[selectedDeviceIndex];
+    m_physicalDevice = physicalDevices[selectedDeviceIndex];
 
-    vkGetPhysicalDeviceProperties(physicalDevice, &deviceProperties);
-    vkGetPhysicalDeviceFeatures(physicalDevice, &deviceFeatures);
-    vkGetPhysicalDeviceMemoryProperties(physicalDevice, &deviceMemoryProperties);
+    vkGetPhysicalDeviceProperties(m_physicalDevice, &m_deviceProperties);
+    vkGetPhysicalDeviceFeatures(m_physicalDevice, &m_deviceFeatures);
+    vkGetPhysicalDeviceMemoryProperties(m_physicalDevice, &m_deviceMemoryProperties);
 
     uint32_t queueFamilyCount = 0;
-    vkGetPhysicalDeviceQueueFamilyProperties(
-        physicalDevice, &queueFamilyCount, nullptr);
+    vkGetPhysicalDeviceQueueFamilyProperties(m_physicalDevice, &queueFamilyCount, nullptr);
 
-    VkQueueFamilyProperties* queueFamilies = (VkQueueFamilyProperties*)alloca(
-        queueFamilyCount * sizeof(VkQueueFamilyProperties));
-    vkGetPhysicalDeviceQueueFamilyProperties(
-        physicalDevice, &queueFamilyCount, queueFamilies);
+    VkQueueFamilyProperties* queueFamilies = (VkQueueFamilyProperties*)alloca(queueFamilyCount * sizeof(VkQueueFamilyProperties));
+    vkGetPhysicalDeviceQueueFamilyProperties(m_physicalDevice, &queueFamilyCount, queueFamilies);
 
     // Find a queue that can service our needs
     VkQueueFlags reqQueueFlags = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT;
@@ -586,28 +575,26 @@ SlangResult VKRenderer::initialize(void* inWindowHandle)
     VkDeviceCreateInfo deviceCreateInfo = { VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
     deviceCreateInfo.queueCreateInfoCount = 1;
     deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
-    deviceCreateInfo.pEnabledFeatures = &enabledFeatures;
+    deviceCreateInfo.pEnabledFeatures = &m_deviceFeatures;
 
     deviceCreateInfo.enabledExtensionCount = sizeof(deviceExtensions) / sizeof(deviceExtensions[0]);
     deviceCreateInfo.ppEnabledExtensionNames = &deviceExtensions[0];
 
-    RETURN_ON_VK_FAIL(vkCreateDevice(
-        physicalDevice, &deviceCreateInfo, nullptr, &device));
+    RETURN_ON_VK_FAIL(vkCreateDevice(m_physicalDevice, &deviceCreateInfo, nullptr, &m_device));
 
-#define LOAD_DEVICE_PROC(NAME) NAME = (PFN_##NAME) vkGetDeviceProcAddr(device, #NAME);
+#define LOAD_DEVICE_PROC(NAME) NAME = (PFN_##NAME) vkGetDeviceProcAddr(m_device, #NAME);
     FOREACH_DEVICE_PROC(LOAD_DEVICE_PROC)
 #undef LOAD_DEVICE_PROC
 
         // Create a command pool
 
-        VkCommandPoolCreateInfo commandPoolCreateInfo = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
+    VkCommandPoolCreateInfo commandPoolCreateInfo = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
     commandPoolCreateInfo.queueFamilyIndex = queueFamilyIndex;
     commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
-    RETURN_ON_VK_FAIL(vkCreateCommandPool(
-        device, &commandPoolCreateInfo, nullptr, &commandPool));
+    RETURN_ON_VK_FAIL(vkCreateCommandPool(m_device, &commandPoolCreateInfo, nullptr, &m_commandPool));
 
-    vkGetDeviceQueue(device, queueFamilyIndex, 0, &queue);
+    vkGetDeviceQueue(m_device, queueFamilyIndex, 0, &m_queue);
 
     // set up swap chain
 
@@ -630,10 +617,10 @@ SlangResult VKRenderer::initialize(void* inWindowHandle)
     return SLANG_OK;
 }
 
-void VKRenderer::setClearColor(float const* color)
+void VKRenderer::setClearColor(const float color[4])
 {
     for (int ii = 0; ii < 4; ++ii)
-        clearColor[ii] = color[ii];
+        m_clearColor[ii] = color[ii];
 }
 
 void VKRenderer::clearFrame()
@@ -654,7 +641,7 @@ ShaderCompiler* VKRenderer::getShaderCompiler()
     return this;
 }
 
-Buffer* VKRenderer::createBuffer(BufferDesc const& desc)
+Buffer* VKRenderer::createBuffer(const BufferDesc& desc)
 {
     size_t bufferSize = desc.size;
 
@@ -685,7 +672,7 @@ Buffer* VKRenderer::createBuffer(BufferDesc const& desc)
     return (Buffer*)bufferPtr;
 }
 
-InputLayout* VKRenderer::createInputLayout(InputElementDesc const* inputElements, UInt inputElementCount) 
+InputLayout* VKRenderer::createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) 
 {
     InputLayoutImpl* impl = new InputLayoutImpl;
 
@@ -711,16 +698,16 @@ void VKRenderer::setPrimitiveTopology(PrimitiveTopology topology)
 {
 }
 
-void VKRenderer::setVertexBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* strides, UInt const* offsets)
+void VKRenderer::setVertexBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* strides, const UInt* offsets)
 {
 }
 
 void VKRenderer::setShaderProgram(ShaderProgram* program)
 {
-    currentProgram = (ShaderProgramImpl*)program;
+    m_currentProgram = (ShaderProgramImpl*)program;
 }
 
-void VKRenderer::setConstantBuffers(UInt startSlot, UInt slotCount, Buffer* const* buffers, UInt const* offsets) 
+void VKRenderer::setConstantBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* offsets) 
 {
 }
 
@@ -769,12 +756,12 @@ BindingState* VKRenderer::createBindingState(const ShaderInputLayout& layout)
     return (BindingState*)bindingState;
 }
 
-void VKRenderer::setBindingState(BindingState * state)
+void VKRenderer::setBindingState(BindingState* state)
 {
-    currentBindingState = (BindingStateImpl*)state;
+    m_currentBindingState = (BindingStateImpl*)state;
 }
 
-void VKRenderer::serializeOutput(BindingState* s, const char * fileName)
+void VKRenderer::serializeOutput(BindingState* s, const char* fileName)
 {
     auto state = (BindingStateImpl*)s;
 
@@ -788,9 +775,7 @@ void VKRenderer::serializeOutput(BindingState* s, const char * fileName)
             {
                 // create staging buffer
                 size_t bufferSize = bb.bufferLength;
-                BufferImpl staging = createBufferImpl(
-                    bufferSize,
-                    VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                BufferImpl staging = createBufferImpl(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
                 // Copy from real buffer to staging buffer
@@ -798,28 +783,23 @@ void VKRenderer::serializeOutput(BindingState* s, const char * fileName)
 
                 VkBufferCopy copyInfo = {};
                 copyInfo.size = bufferSize;
-                vkCmdCopyBuffer(
-                    commandBuffer,
-                    bb.buffer,
-                    staging.buffer,
-                    1,
-                    &copyInfo);
+                vkCmdCopyBuffer(commandBuffer, bb.buffer, staging.buffer, 1, &copyInfo);
 
                 flushCommandBuffer(commandBuffer);
 
                 // Write out the data from the buffer
                 void* mappedData = nullptr;
-                checkResult(vkMapMemory(device, staging.memory, 0, bufferSize, 0, &mappedData));
+                checkResult(vkMapMemory(m_device, staging.memory, 0, bufferSize, 0, &mappedData));
 
                 auto ptr = (unsigned int *)mappedData;
                 for (auto i = 0u; i < bufferSize / sizeof(unsigned int); i++)
                     fprintf(f, "%X\n", ptr[i]);
 
-                vkUnmapMemory(device, staging.memory);
+                vkUnmapMemory(m_device, staging.memory);
 
                 // Now destroy the staging buffer
-                vkDestroyBuffer(device, staging.buffer, nullptr);
-                vkFreeMemory(device, staging.memory, nullptr);
+                vkDestroyBuffer(m_device, staging.buffer, nullptr);
+                vkFreeMemory(m_device, staging.memory, nullptr);
             }
             else
             {
@@ -839,7 +819,7 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
 
     Slang::List<VkDescriptorSetLayoutBinding> bindings;
 
-    for (auto bb : currentBindingState->bindings)
+    for (auto bb : m_currentBindingState->bindings)
     {
         switch (bb.type)
         {
@@ -877,8 +857,7 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
     descriptorSetLayoutInfo.pBindings = bindings.Buffer();
 
     VkDescriptorSetLayout descriptorSetLayout = 0;
-    checkResult(vkCreateDescriptorSetLayout(
-        device, &descriptorSetLayoutInfo, nullptr, &descriptorSetLayout));
+    checkResult(vkCreateDescriptorSetLayout(m_device, &descriptorSetLayoutInfo, nullptr, &descriptorSetLayout));
 
     // Create a descriptor pool for allocating sets
 
@@ -895,8 +874,7 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
     descriptorPoolInfo.pPoolSizes = poolSizes;
 
     VkDescriptorPool descriptorPool;
-    checkResult(vkCreateDescriptorPool(
-        device, &descriptorPoolInfo, nullptr, &descriptorPool));
+    checkResult(vkCreateDescriptorPool(m_device, &descriptorPoolInfo, nullptr, &descriptorPool));
 
     // Create a descriptor set based on our layout
 
@@ -906,11 +884,10 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
     descriptorSetAllocInfo.pSetLayouts = &descriptorSetLayout;
 
     VkDescriptorSet descriptorSet;
-    checkResult(vkAllocateDescriptorSets(
-        device, &descriptorSetAllocInfo, &descriptorSet));
+    checkResult(vkAllocateDescriptorSets(m_device, &descriptorSetAllocInfo, &descriptorSet));
 
     // Fill in the descritpor set, using our binding information
-    for (auto bb : currentBindingState->bindings)
+    for (auto bb : m_currentBindingState->bindings)
     {
         switch (bb.type)
         {
@@ -933,12 +910,7 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
                         writeInfo.dstArrayElement = 0;
                         writeInfo.pBufferInfo = &bufferInfo;
 
-                        vkUpdateDescriptorSets(
-                            device,
-                            1,
-                            &writeInfo,
-                            0,
-                            nullptr);
+                        vkUpdateDescriptorSets(m_device, 1, &writeInfo, 0, nullptr);
                     }
                     break;
 
@@ -955,7 +927,6 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
         }
     }
 
-
     // Create a pipeline layout based on our descriptor set layout(s)
 
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
@@ -963,27 +934,24 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
     pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
 
     VkPipelineLayout pipelineLayout = 0;
-    checkResult(vkCreatePipelineLayout(
-        device, &pipelineLayoutInfo, nullptr, &pipelineLayout));
+    checkResult(vkCreatePipelineLayout(m_device, &pipelineLayoutInfo, nullptr, &pipelineLayout));
 
     // Then create a pipeline to use that layout
 
     VkComputePipelineCreateInfo computePipelineInfo = { VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
-    computePipelineInfo.stage = currentProgram->compute;
+    computePipelineInfo.stage = m_currentProgram->compute;
     computePipelineInfo.layout = pipelineLayout;
 
     VkPipelineCache pipelineCache = 0;
 
     VkPipeline pipeline;
-    checkResult(vkCreateComputePipelines(
-        device, pipelineCache, 1, &computePipelineInfo, nullptr, &pipeline));
+    checkResult(vkCreateComputePipelines(m_device, pipelineCache, 1, &computePipelineInfo, nullptr, &pipeline));
 
     // Also create descriptor sets based on the given pipeline layout
 
     VkCommandBuffer commandBuffer = beginCommandBuffer();
 
-    vkCmdBindPipeline(
-        commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
 
     vkCmdBindDescriptorSets(
         commandBuffer,
@@ -998,12 +966,10 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
 
     flushCommandBuffer(commandBuffer);
 
-    vkDestroyPipeline(device, pipeline, nullptr);
+    vkDestroyPipeline(m_device, pipeline, nullptr);
 
     // TODO: need to free up the other resources too...
 }
-
-
 
 // ShaderCompiler interface
 ShaderProgram* VKRenderer::compileProgram(const ShaderCompileRequest & request) 
@@ -1020,6 +986,5 @@ ShaderProgram* VKRenderer::compileProgram(const ShaderCompileRequest & request)
     }
     return (ShaderProgram*)impl;
 }
-
 
 } // renderer_test

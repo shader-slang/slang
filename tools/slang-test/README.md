@@ -4,6 +4,18 @@ Slang Test is a command line tool that is used to coordinate tests via other com
 
 Slang Test can be thought of as the 'hub' running multiple tests and accumulating the results. In the distribution tests are held in the 'tests' directory. Inside this directory there are tests grouped together via other directories. Inside those directories are the actual tests themselves. The tests exist as .hlsl, .slang and .glsl and other file extensions. The top line of each of these files describe what kind of test will be performed with a specialized comment '//TEST'. 
 
+Most command line options are prefixed by - for both switches and parameter options. On the command line you can specify a 'free parameter', and this value specifies the prefix of the name of the test to run. Note that such a prefix includes the path, with each directory separated via '/'.
+
+An example command line:
+
+```
+slang-test -bindir "E:\slang\bin\windows-x64\Debug\\" -category full tests/compute/array-param
+```
+
+* The -bindir value means that the tools slang-test will use the binaries found in this directory. 
+* The -category full means that all tests can be run.
+* The final 'free parameter' is 'tests/compute/array-param' and means only tests starting with this string will run.
+
 ## Test Categories
 
 There are the following test categories

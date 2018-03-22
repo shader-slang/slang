@@ -4,6 +4,7 @@
 #include "allocator.h"
 #include "slang-math.h"
 #include "array-view.h"
+#include "slang-defines.h"
 
 #include <algorithm>
 #include <new>
@@ -29,6 +30,17 @@ namespace Slang
 				new (buffer + i) T();
 		}
 	};
+    template<typename T>
+    class Initializer<T, 1>
+    {
+    public:
+        static void Initialize(T * buffer, int size)
+        {
+            // It's pod so no initialization required
+            //for (int i = 0; i < size; i++)
+            //    new (buffer + i) T;
+        }
+    };
 
 	template<typename T, typename TAllocator>
 	class AllocateMethod
@@ -67,16 +79,6 @@ namespace Slang
 		}
 	};
 
-	template<typename T>
-	class Initializer<T, 1>
-	{
-	public:
-		static void Initialize(T * buffer, int size)
-		{
-			for (int i = 0; i<size; i++)
-				new (buffer + i) T;
-		}
-	};
 
 	template<typename T, typename TAllocator = StandardAllocator>
 	class List
@@ -201,10 +203,10 @@ namespace Slang
 			T* tmpBuffer = this->buffer;
 			this->buffer = other.buffer;
 			other.buffer = tmpBuffer;
-			int tmpBufferSize = this->bufferSize;
+			auto tmpBufferSize = this->bufferSize;
 			this->bufferSize = other.bufferSize;
 			other.bufferSize = tmpBufferSize;
-			int tmpCount = this->_count;
+			auto tmpCount = this->_count;
 			this->_count = other._count;
 			other._count = tmpCount;
 			TAllocator tmpAlloc = _Move(this->allocator);
@@ -468,15 +470,7 @@ namespace Slang
 			}
 		}
 
-#ifndef FORCE_INLINE
-#ifdef _MSC_VER
-#define FORCE_INLINE __forceinline
-#else
-#define FORCE_INLINE inline
-#endif
-#endif
-
-		FORCE_INLINE T & operator [](UInt id) const
+		SLANG_FORCE_INLINE T & operator [](UInt id) const
 		{
 #if _DEBUG
 			if(id >= _count)
