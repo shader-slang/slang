@@ -127,7 +127,7 @@ struct SharedEmitContext
 
     // The "effective" profile that is being used to emit code,
     // combining information from the target and entry point.
-    Profile effctiveProfile;
+    Profile effectiveProfile;
 };
 
 struct EmitContext
@@ -4368,10 +4368,10 @@ struct EmitVisitor
         }
 #endif
 
-        auto effctiveProfile = context->shared->effctiveProfile;
-        if(effctiveProfile.getFamily() == ProfileFamily::GLSL)
+        auto effectiveProfile = context->shared->effectiveProfile;
+        if(effectiveProfile.getFamily() == ProfileFamily::GLSL)
         {
-            requireGLSLVersion(effctiveProfile.GetVersion());
+            requireGLSLVersion(effectiveProfile.GetVersion());
         }
 
         // HACK: We aren't picking GLSL versions carefully right now,
@@ -6749,7 +6749,7 @@ emitDeclImpl(decl, nullptr);
         EmitContext*        ctx,
         EntryPointLayout*   entryPointLayout)
     {
-        auto profile = ctx->shared->effctiveProfile;
+        auto profile = ctx->shared->effectiveProfile;
         auto stage = profile.GetStage();
 
         if(profile.getFamily() == ProfileFamily::DX)
@@ -8229,7 +8229,7 @@ String emitEntryPoint(
     sharedContext.target = target;
     sharedContext.finalTarget = targetRequest->target;
     sharedContext.entryPoint = entryPoint;
-    sharedContext.effctiveProfile = getEffectiveProfile(entryPoint, targetRequest);
+    sharedContext.effectiveProfile = getEffectiveProfile(entryPoint, targetRequest);
 
     if (entryPoint)
     {

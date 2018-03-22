@@ -1161,7 +1161,7 @@ struct RaytracingAccelerationStructure {};
 
 // 10.1.4 - Subobject Definitions
 
-// TODO: We may decide to suppor these, but their reliance on C++ implicit
+// TODO: We may decide to support these, but their reliance on C++ implicit
 // constructor call syntax (`SomeType someVar(arg0, arg1);`) makes them
 // annoying for the current Slang parsing strategy, and using global variables
 // for this stuff comes across as a kludge rather than the best possible design.
