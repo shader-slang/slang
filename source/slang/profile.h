@@ -41,6 +41,7 @@ namespace Slang
     {
         Unknown = SLANG_STAGE_NONE,
 #define PROFILE_STAGE(TAG, NAME, VAL) TAG = VAL,
+#define PROFILE_STAGE_ALIAS(TAG, NAME, VAL) TAG = VAL,
 #include "profile-defs.h"
     };
 

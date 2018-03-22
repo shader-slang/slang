@@ -23,7 +23,7 @@
 #endif
 
 #ifndef PROFILE_STAGE_ALIAS
-#define PROFILE_STAGE_ALIAS(TAG, NAME) /* empty */
+#define PROFILE_STAGE_ALIAS(TAG, NAME, VAL) /* empty */
 #endif
 
 
@@ -57,7 +57,7 @@ PROFILE_STAGE(Vertex,	vertex,     SLANG_STAGE_VERTEX)
 PROFILE_STAGE(Hull,		hull,       SLANG_STAGE_HULL)
 PROFILE_STAGE(Domain,	domain,     SLANG_STAGE_DOMAIN)
 PROFILE_STAGE(Geometry, geometry,   SLANG_STAGE_GEOMETRY)
-PROFILE_STAGE(Fragment, fragment,   SLANG_STAGE_FRAGMENT)
+PROFILE_STAGE(Pixel,    pixel,      SLANG_STAGE_FRAGMENT)
 PROFILE_STAGE(Compute,	compute,    SLANG_STAGE_COMPUTE)
 
 PROFILE_STAGE(RayGeneration,    raygeneration,  SLANG_STAGE_RAY_GENERATION)
@@ -68,7 +68,14 @@ PROFILE_STAGE(Miss,             miss,           SLANG_STAGE_MISS)
 PROFILE_STAGE(Callable,         callable,       SLANG_STAGE_CALLABLE)
 
 
-PROFILE_STAGE_ALIAS(Fragment, pixel)
+// Note: HLSL and Direct3D convention erroneously uses the term "Pixel Shader"
+// for the thing that shades *fragments*. Slang strives to treat the more correct
+// term "Fragment Shader" as the primary one, but in order to be compatible with
+// existing HLSL conventions, we need to treat `pixel` as the official stage
+// name and `fragment` as an alias for it here, because the lower-case stage
+// names are used to drive output HLSL generation.
+//
+PROFILE_STAGE_ALIAS(Fragment, fragment, Pixel)
 
 // Profile families
 

@@ -1491,7 +1491,7 @@ namespace Slang
             #define PROFILE_STAGE(ID, NAME, ENUM) \
                 { #NAME,    Stage::ID },
 
-            #define PROFILE_STAGE_ALIAS(ID, NAME) \
+            #define PROFILE_STAGE_ALIAS(ID, NAME, VAL) \
                 { #NAME,    Stage::ID },
 
             #include "profile-defs.h"
