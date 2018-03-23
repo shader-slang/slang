@@ -47,62 +47,128 @@ static const Vertex kVertexData[kVertexCount] = {
     { { 1,  0, 0.5 }, {0, 1, 0} , {1, 1} },
 };
 
+using namespace Slang;
 
-// Global variables for state to be used for rendering...
+class RenderTestApp
+{
+	public:
 
-uintptr_t gConstantBufferSize, gComputeResultBufferSize;
+		// At initialization time, we are going to load and compile our Slang shader
+		// code, and then create the API objects we need for rendering.
+	Result initialize(Renderer* renderer, ShaderCompiler* shaderCompiler);	
+	void runCompute();
+	void renderFrame();
+	void finalize();
 
-Buffer*         gConstantBuffer;
-InputLayout*    gInputLayout;
-Buffer*         gVertexBuffer;
-ShaderProgram*      gShaderProgram;
-BindingState*       gBindingState;
-ShaderInputLayout   gShaderInputLayout;
+	BindingState* getBindingState() const { return m_bindingState; }
+
+	protected:
+		/// Called in initialize
+	Result initializeShaders(ShaderCompiler* shaderCompiler);
+
+	// variables for state to be used for rendering...
+	uintptr_t m_constantBufferSize, m_computeResultBufferSize;
+
+	RefPtr<Renderer> m_renderer;
+
+	RefPtr<Buffer>	m_constantBuffer;
+	RefPtr<InputLayout> m_inputLayout;
+	RefPtr<Buffer>      m_vertexBuffer;
+	RefPtr<ShaderProgram> m_shaderProgram;
+	RefPtr<BindingState> m_bindingState;
+
+	ShaderInputLayout m_shaderInputLayout;
+
+};
 
 // Entry point name to use for vertex/fragment shader
-static char const* vertexEntryPointName    = "vertexMain";
-static char const* fragmentEntryPointName  = "fragmentMain";
-static char const* computeEntryPointName = "computeMain";
+static const char vertexEntryPointName[]    = "vertexMain";
+static const char fragmentEntryPointName[]  = "fragmentMain";
+static const char computeEntryPointName[]	= "computeMain";
 
 // "Profile" to use when compiling for HLSL targets
 // TODO: does this belong here?
-static char const* vertexProfileName   = "vs_5_0";
-static char const* fragmentProfileName = "ps_5_0";
-static char const* computeProfileName = "cs_5_0";
+static const char vertexProfileName[]   = "vs_5_0";
+static const char fragmentProfileName[] = "ps_5_0";
+static const char computeProfileName[]	= "cs_5_0";
 
-SlangResult initializeShaders(
-    ShaderCompiler* shaderCompiler)
+SlangResult RenderTestApp::initialize(Renderer* renderer, ShaderCompiler* shaderCompiler)
 {
-    // Read in the source code
-    char const* sourcePath = gOptions.sourcePath;
-    FILE* sourceFile = fopen(sourcePath, "rb");
-    if( !sourceFile )
-    {
-        fprintf(stderr, "error: failed to open '%s' for reading\n", sourcePath);
+    SLANG_RETURN_ON_FAIL(initializeShaders(shaderCompiler));
+
+	m_renderer = renderer;
+
+    m_bindingState = renderer->createBindingState(m_shaderInputLayout);
+
+    // Do other initialization that doesn't depend on the source language.
+
+    // TODO(tfoley): use each API's reflection interface to query the constant-buffer size needed
+    m_constantBufferSize = 16 * sizeof(float);
+
+    BufferDesc constantBufferDesc;
+    constantBufferDesc.size = m_constantBufferSize;
+    constantBufferDesc.flavor = BufferFlavor::Constant;
+
+    m_constantBuffer = renderer->createBuffer(constantBufferDesc);
+    if(!m_constantBuffer)
         return SLANG_FAIL;
-    }
-    fseek(sourceFile, 0, SEEK_END);
-    size_t sourceSize = ftell(sourceFile);
-    fseek(sourceFile, 0, SEEK_SET);
-    char* sourceText = (char*) malloc(sourceSize + 1);
-    if( !sourceText )
-    {
-        fprintf(stderr, "error: out of memory");
+		
+    // Input Assembler (IA)
+
+    InputElementDesc inputElements[] = {
+        { "A", 0, Format::RGB_Float32, offsetof(Vertex, position) },
+        { "A", 1, Format::RGB_Float32, offsetof(Vertex, color) },
+        { "A", 2, Format::RG_Float32, offsetof(Vertex, uv) },
+    };
+
+    m_inputLayout = renderer->createInputLayout(&inputElements[0], sizeof(inputElements)/sizeof(inputElements[0]));
+    if(!m_inputLayout)
+        return SLANG_FAIL;
+
+    BufferDesc vertexBufferDesc;
+    vertexBufferDesc.size = kVertexCount * sizeof(Vertex);
+    vertexBufferDesc.flavor = BufferFlavor::Vertex;
+    vertexBufferDesc.initData = &kVertexData[0];
+
+    m_vertexBuffer = renderer->createBuffer(vertexBufferDesc);
+    if(!m_vertexBuffer)
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
+Result RenderTestApp::initializeShaders(ShaderCompiler* shaderCompiler)
+{
+	// Read in the source code
+	char const* sourcePath = gOptions.sourcePath;
+	FILE* sourceFile = fopen(sourcePath, "rb");
+	if (!sourceFile)
+	{
+		fprintf(stderr, "error: failed to open '%s' for reading\n", sourcePath);
 		return SLANG_FAIL;
-    }
-    fread(sourceText, sourceSize, 1, sourceFile);
-    fclose(sourceFile);
-    sourceText[sourceSize] = 0;
+	}
+	fseek(sourceFile, 0, SEEK_END);
+	size_t sourceSize = ftell(sourceFile);
+	fseek(sourceFile, 0, SEEK_SET);
+	char* sourceText = (char*)malloc(sourceSize + 1);
+	if (!sourceText)
+	{
+		fprintf(stderr, "error: out of memory");
+		return SLANG_FAIL;
+	}
+	fread(sourceText, sourceSize, 1, sourceFile);
+	fclose(sourceFile);
+	sourceText[sourceSize] = 0;
 
-    gShaderInputLayout.Parse(sourceText);
+	m_shaderInputLayout.Parse(sourceText);
 
-    ShaderCompileRequest::SourceInfo sourceInfo;
-    sourceInfo.path = sourcePath;
-    sourceInfo.dataBegin = sourceText;
-    sourceInfo.dataEnd = sourceText + sourceSize;
+	ShaderCompileRequest::SourceInfo sourceInfo;
+	sourceInfo.path = sourcePath;
+	sourceInfo.dataBegin = sourceText;
+	sourceInfo.dataEnd = sourceText + sourceSize;
 
-    ShaderCompileRequest compileRequest;
-    compileRequest.source                   = sourceInfo;
+	ShaderCompileRequest compileRequest;
+	compileRequest.source = sourceInfo;
 	if (gOptions.shaderType == ShaderProgramType::Graphics || gOptions.shaderType == ShaderProgramType::GraphicsCompute)
 	{
 		compileRequest.vertexShader.source = sourceInfo;
@@ -118,68 +184,19 @@ SlangResult initializeShaders(
 		compileRequest.computeShader.name = computeEntryPointName;
 		compileRequest.computeShader.profile = computeProfileName;
 	}
-    compileRequest.entryPointTypeArguments = gShaderInputLayout.globalTypeArguments;
-    gShaderProgram = shaderCompiler->compileProgram(compileRequest);
-    if( !gShaderProgram )
-    {
-        return SLANG_FAIL;
-    }
+	compileRequest.entryPointTypeArguments = m_shaderInputLayout.globalTypeArguments;
+	m_shaderProgram = shaderCompiler->compileProgram(compileRequest);
+	if (!m_shaderProgram)
+	{
+		return SLANG_FAIL;
+	}
 
-    return SLANG_OK;
-}
-//
-// At initialization time, we are going to load and compile our Slang shader
-// code, and then create the D3D11 API objects we need for rendering.
-//
-SlangResult initializeInner(
-    Renderer*       renderer,
-    ShaderCompiler* shaderCompiler)
-{
-    SLANG_RETURN_ON_FAIL(initializeShaders(shaderCompiler));
-
-    gBindingState = renderer->createBindingState(gShaderInputLayout);
-
-    // Do other initialization that doesn't depend on the source language.
-
-    // TODO(tfoley): use each API's reflection interface to query the constant-buffer size needed
-    gConstantBufferSize = 16 * sizeof(float);
-
-    BufferDesc constantBufferDesc;
-    constantBufferDesc.size = gConstantBufferSize;
-    constantBufferDesc.flavor = BufferFlavor::Constant;
-
-    gConstantBuffer = renderer->createBuffer(constantBufferDesc);
-    if(!gConstantBuffer)
-        return SLANG_FAIL;
-		
-    // Input Assembler (IA)
-
-    InputElementDesc inputElements[] = {
-        { "A", 0, Format::RGB_Float32, offsetof(Vertex, position) },
-        { "A", 1, Format::RGB_Float32, offsetof(Vertex, color) },
-        { "A", 2, Format::RG_Float32, offsetof(Vertex, uv) },
-    };
-
-    gInputLayout = renderer->createInputLayout(&inputElements[0], sizeof(inputElements)/sizeof(inputElements[0]));
-    if(!gInputLayout)
-        return SLANG_FAIL;
-
-    BufferDesc vertexBufferDesc;
-    vertexBufferDesc.size = kVertexCount * sizeof(Vertex);
-    vertexBufferDesc.flavor = BufferFlavor::Vertex;
-    vertexBufferDesc.initData = &kVertexData[0];
-
-    gVertexBuffer = renderer->createBuffer(vertexBufferDesc);
-    if(!gVertexBuffer)
-        return SLANG_FAIL;
-
-    return SLANG_OK;
+	return SLANG_OK;
 }
 
-void renderFrameInner(
-    Renderer* renderer)
+void RenderTestApp::renderFrame()
 {
-    auto mappedData = renderer->map(gConstantBuffer, MapFlavor::WriteDiscard);
+    auto mappedData = m_renderer->map(m_constantBuffer, MapFlavor::WriteDiscard);
     if(mappedData)
     {
         static const float kIdentity[] =
@@ -189,38 +206,37 @@ void renderFrameInner(
           0, 0, 0, 1 };
         memcpy(mappedData, kIdentity, sizeof(kIdentity));
 
-        renderer->unmap(gConstantBuffer);
+		m_renderer->unmap(m_constantBuffer);
     }
 
     // Input Assembler (IA)
 
-    renderer->setInputLayout(gInputLayout);
-    renderer->setPrimitiveTopology(PrimitiveTopology::TriangleList);
+	m_renderer->setInputLayout(m_inputLayout);
+	m_renderer->setPrimitiveTopology(PrimitiveTopology::TriangleList);
 
-    renderer->setVertexBuffer(0, gVertexBuffer, sizeof(Vertex));
+	m_renderer->setVertexBuffer(0, m_vertexBuffer, sizeof(Vertex));
 
     // Vertex Shader (VS)
     // Pixel Shader (PS)
 
-    renderer->setShaderProgram(gShaderProgram);
-    renderer->setConstantBuffer(0, gConstantBuffer);
-    renderer->setBindingState(gBindingState);
+	m_renderer->setShaderProgram(m_shaderProgram);
+	m_renderer->setConstantBuffer(0, m_constantBuffer);
+	m_renderer->setBindingState(m_bindingState);
     //
 
-    renderer->draw(3);
+	m_renderer->draw(3);
 }
 
-void runCompute(Renderer * renderer)
+void RenderTestApp::runCompute()
 {
-	renderer->setShaderProgram(gShaderProgram);
-    renderer->setBindingState(gBindingState);
-	renderer->dispatchCompute(1, 1, 1);
+	m_renderer->setShaderProgram(m_shaderProgram);
+	m_renderer->setBindingState(m_bindingState);
+	m_renderer->dispatchCompute(1, 1, 1);
 }
 
-void finalize()
+void RenderTestApp::finalize()
 {
 }
-
 
 
 //
@@ -242,7 +258,6 @@ static LRESULT CALLBACK windowProc(
 
     return DefWindowProcW(windowHandle, message, wParam, lParam);
 }
-
 
 SlangResult innerMain(int argc, char** argv)
 {
@@ -283,7 +298,6 @@ SlangResult innerMain(int argc, char** argv)
 	DWORD windowStyle = WS_POPUP;
 	DWORD windowExtendedStyle = 0;
 
-
 	RECT windowRect = { 0, 0, gWindowWidth, gWindowHeight };
 	AdjustWindowRectEx(&windowRect, windowStyle, /*hasMenu=*/false, windowExtendedStyle);
 
@@ -308,8 +322,8 @@ SlangResult innerMain(int argc, char** argv)
 		return SLANG_FAIL;
 	}
 
+	Slang::RefPtr<Renderer> renderer;
 
-	Renderer* renderer = nullptr;
 	SlangSourceLanguage nativeLanguage = SLANG_SOURCE_LANGUAGE_UNKNOWN;
 	SlangCompileTarget slangTarget = SLANG_TARGET_NONE;
 	switch (gOptions.rendererID)
@@ -356,53 +370,57 @@ SlangResult innerMain(int argc, char** argv)
 			break;
 	}
 
-	SLANG_RETURN_ON_FAIL(initializeInner(renderer, shaderCompiler));
-
-	// Once initialization is all complete, we show the window...
-	ShowWindow(windowHandle, showCommand);
-
-	// ... and enter the event loop:
-	for (;;)
 	{
-		MSG message;
+		RenderTestApp app;
 
-		int result = PeekMessageW(&message, NULL, 0, 0, PM_REMOVE);
-		if (result != 0)
-		{
-			if (message.message == WM_QUIT)
-			{
-				return (int)message.wParam;
-			}
+		SLANG_RETURN_ON_FAIL(app.initialize(renderer, shaderCompiler));
 
-			TranslateMessage(&message);
-			DispatchMessageW(&message);
-		}
-		else
+		// Once initialization is all complete, we show the window...
+		ShowWindow(windowHandle, showCommand);
+
+		// ... and enter the event loop:
+		for (;;)
 		{
-			// Whenever we don't have Windows events to process, we render a frame.
-			if (gOptions.shaderType == ShaderProgramType::Compute)
+			MSG message;
+
+			int result = PeekMessageW(&message, NULL, 0, 0, PM_REMOVE);
+			if (result != 0)
 			{
-				runCompute(renderer);
+				if (message.message == WM_QUIT)
+				{
+					return (int)message.wParam;
+				}
+
+				TranslateMessage(&message);
+				DispatchMessageW(&message);
 			}
 			else
 			{
-				static const float kClearColor[] = { 0.25, 0.25, 0.25, 1.0 };
-				renderer->setClearColor(kClearColor);
-				renderer->clearFrame();
-
-				renderFrameInner(renderer);
-			}
-			// If we are in a mode where output is requested, we need to snapshot the back buffer here
-			if (gOptions.outputPath)
-			{
-				if (gOptions.shaderType == ShaderProgramType::Compute || gOptions.shaderType == ShaderProgramType::GraphicsCompute)
-					renderer->serializeOutput(gBindingState, gOptions.outputPath);
+				// Whenever we don't have Windows events to process, we render a frame.
+				if (gOptions.shaderType == ShaderProgramType::Compute)
+				{
+					app.runCompute();
+				}
 				else
-					SLANG_RETURN_ON_FAIL(renderer->captureScreenShot(gOptions.outputPath));
-				return SLANG_OK;
-			}
+				{
+					static const float kClearColor[] = { 0.25, 0.25, 0.25, 1.0 };
+					renderer->setClearColor(kClearColor);
+					renderer->clearFrame();
 
-			renderer->presentFrame();
+					app.renderFrame();
+				}
+				// If we are in a mode where output is requested, we need to snapshot the back buffer here
+				if (gOptions.outputPath)
+				{
+					if (gOptions.shaderType == ShaderProgramType::Compute || gOptions.shaderType == ShaderProgramType::GraphicsCompute)
+						renderer->serializeOutput(app.getBindingState(), gOptions.outputPath);
+					else
+						SLANG_RETURN_ON_FAIL(renderer->captureScreenShot(gOptions.outputPath));
+					return SLANG_OK;
+				}
+
+				renderer->presentFrame();
+			}
 		}
 	}
 
