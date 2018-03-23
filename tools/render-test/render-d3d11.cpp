@@ -632,19 +632,22 @@ void D3D11Renderer::setPrimitiveTopology(PrimitiveTopology topology)
 void D3D11Renderer::setVertexBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffersIn, const UInt* stridesIn, const UInt* offsetsIn)
 {
     static const int kMaxVertexBuffers = 16;
+	assert(slotCount <= kMaxVertexBuffers);
 
     UINT vertexStrides[kMaxVertexBuffers];
     UINT vertexOffsets[kMaxVertexBuffers];
+	ID3D11Buffer* dxBuffers[kMaxVertexBuffers];
+
+	auto buffers = (BufferImpl*const*)buffersIn;
 
     for (UInt ii = 0; ii < slotCount; ++ii)
     {
         vertexStrides[ii] = (UINT)stridesIn[ii];
         vertexOffsets[ii] = (UINT)offsetsIn[ii];
-    }
+		dxBuffers[ii] = buffers[ii]->m_buffer;
+	}
 
-    auto buffers = (BufferImpl* const*)buffersIn;
-
-    m_immediateContext->IASetVertexBuffers((UINT)startSlot, (UINT)slotCount, (buffers[0])->m_buffer.readRef(), &vertexStrides[0], &vertexOffsets[0]);
+    m_immediateContext->IASetVertexBuffers((UINT)startSlot, (UINT)slotCount, dxBuffers, &vertexStrides[0], &vertexOffsets[0]);
 }
 
 void D3D11Renderer::setShaderProgram(ShaderProgram* programIn)
@@ -657,11 +660,22 @@ void D3D11Renderer::setShaderProgram(ShaderProgram* programIn)
 
 void D3D11Renderer::setConstantBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffersIn, const UInt* offsetsIn)
 {
+	static const int kMaxConstantBuffers = 16;
+	assert(slotCount <= kMaxConstantBuffers);
+
     // TODO: actually use those offsets
 
     auto buffers = (BufferImpl*const*)buffersIn;
-    m_immediateContext->VSSetConstantBuffers((UINT)startSlot, (UINT)slotCount, buffers[0]->m_buffer.readRef());
-    m_immediateContext->VSSetConstantBuffers((UINT)startSlot, (UINT)slotCount, buffers[0]->m_buffer.readRef());
+
+	// Copy out the actual dx buffers
+	ID3D11Buffer* dxBuffers[kMaxConstantBuffers];
+	for (int i = 0; i < slotCount; i++)
+	{
+		dxBuffers[i] = buffers[i]->m_buffer;
+	}
+
+    m_immediateContext->VSSetConstantBuffers((UINT)startSlot, (UINT)slotCount, dxBuffers);
+    m_immediateContext->VSSetConstantBuffers((UINT)startSlot, (UINT)slotCount, dxBuffers);
 }
 
 void D3D11Renderer::draw(UInt vertexCount, UInt startVertex)
