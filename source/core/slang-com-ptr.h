@@ -49,13 +49,57 @@ struct Guid
     uint8_t  data4[8];  ///< 0, 1 = clock_seq_hi_and_reserved, clock_seq_low, followed by 'spatially unique node' (48 bits) 
 };
 
+SLANG_FORCE_INLINE bool operator==(const Guid& aIn, const Guid& bIn)
+{
+    struct GuidCompare
+    {
+        enum { kNum = sizeof(Guid) / sizeof(size_t) };
+        Guid guid;
+        size_t data[kNum];
+    };
+    const GuidCompare& a = reinterpret_cast<const GuidCompare&>(aIn);
+    const GuidCompare& b = reinterpret_cast<const GuidCompare&>(bIn);
+    
+    switch (GuidCompare::kNum)
+    {
+        case 2:     return ((a.data[0] ^ b.data[0]) | (a.data[1] ^ b.data[1])) == 0;   
+        case 4:     return ((a.data[0] ^ b.data[0]) | (a.data[1] ^ b.data[1]) | (a.data[2] ^ b.data[2]) | (a.data[3] ^ b.data[3]) ) == 0;   
+        default:    return false;
+    }
+} 
+
+SLANG_FORCE_INLINE bool operator!=(const Guid& a, const Guid& b)
+{
+    return !(a == b);
+} 
+
+// Allows for defining of a GUID that works in C++ and C which defines in a format similar to microsofts INTERFACE style
+// MIDL_INTERFACE("00000000-0000-0000-C000-00 00 00 00 00 46")
+
+#define SLANG_GUID_BYTE(x, index) ((uint8_t)(SLANG_UINT64(0x##x) >> (8 * index)))
+
+#define SLANG_MAKE_GUID(data0, data1, data2, shortTail, tail) \
+	{ (uint32_t)(0x##data0), (uint16_t)(0x##data1), (uint16_t)(0x##data2), \
+		{ (uint8_t)(0x##shortTail >> 8), (uint8_t)(0x##shortTail & 0xff), \
+		SLANG_GUID_BYTE(tail,5), SLANG_GUID_BYTE(tail,4), SLANG_GUID_BYTE(tail,3), SLANG_GUID_BYTE(tail,2), SLANG_GUID_BYTE(tail,1), SLANG_GUID_BYTE(tail,0) \
+	}}
+
+// Compatible with Microsoft IUnknown
+static const Guid IID_IComUnknown = SLANG_MAKE_GUID(00000000, 0000, 0000, C000, 000000000046);
+
 /// ! Must be kept in sync with IUnknown
-class IForwardUnknown
+class IComUnknown
 {
 public:
-    virtual SLANG_NO_THROW Result SLANG_MCALL QueryInterface(const Guid& iid, void* objOut) = 0;
-    virtual SLANG_NO_THROW uint32_t SLANG_MCALL AddRef() = 0;
-    virtual SLANG_NO_THROW uint32_t SLANG_MCALL Release() = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL queryInterface(const Guid& iid, void* objOut) = 0;
+    virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() = 0;
+    virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() = 0;
+};
+
+// Enum to force initializing as an attach (without adding a reference) 
+enum InitAttach
+{
+    INIT_ATTACH
 };
 
 template <class T>
@@ -64,15 +108,20 @@ class ComPtr
 public:
 	typedef T Type;
 	typedef ComPtr ThisType;
-	typedef IForwardUnknown* Ptr;
+	typedef IComUnknown* Ptr;
 
 		/// Constructors
 		/// Default Ctor. Sets to nullptr
 	SLANG_FORCE_INLINE ComPtr() :m_ptr(nullptr) {}
 		/// Sets, and ref counts.
-	SLANG_FORCE_INLINE explicit ComPtr(T* ptr) :m_ptr(ptr) { if (ptr) ((Ptr)ptr)->AddRef(); }
+	SLANG_FORCE_INLINE explicit ComPtr(T* ptr) :m_ptr(ptr) { if (ptr) ((Ptr)ptr)->addRef(); }
 		/// The copy ctor
-	SLANG_FORCE_INLINE ComPtr(const ThisType& rhs) : m_ptr(rhs.m_ptr) { if (m_ptr) ((Ptr)m_ptr)->AddRef(); }
+	SLANG_FORCE_INLINE ComPtr(const ThisType& rhs) : m_ptr(rhs.m_ptr) { if (m_ptr) ((Ptr)m_ptr)->addRef(); }
+
+        /// Ctor without adding to ref count.
+    SLANG_FORCE_INLINE explicit ComPtr(InitAttach, T* ptr) :m_ptr(ptr) { }
+        /// Ctor without adding to ref count
+    SLANG_FORCE_INLINE ComPtr(InitAttach, const ThisType& rhs) : m_ptr(rhs.m_ptr) { }
 
 #ifdef SLANG_HAS_MOVE_SEMANTICS
 		/// Move Ctor
@@ -82,7 +131,7 @@ public:
 #endif
 
 	/// Destructor releases the pointer, assuming it is set
-	SLANG_FORCE_INLINE ~ComPtr() { if (m_ptr) ((Ptr)m_ptr)->Release(); }
+	SLANG_FORCE_INLINE ~ComPtr() { if (m_ptr) ((Ptr)m_ptr)->release(); }
 
 	// !!! Operators !!!
 
@@ -118,6 +167,7 @@ public:
 
 protected:
 	/// Gets the address of the dumb pointer.
+    // Disabled: use writeRef and readRef to get a reference based on usage.
 	SLANG_FORCE_INLINE T** operator&();
 
 	T* m_ptr;
@@ -129,23 +179,23 @@ void ComPtr<T>::setNull()
 {
 	if (m_ptr)
 	{
-		((Ptr)m_ptr)->Release();
+		((Ptr)m_ptr)->release();
 		m_ptr = nullptr;
 	}
 }
 //----------------------------------------------------------------------------
-template <typename T>
+/* template <typename T>
 T** ComPtr<T>::operator&()
 {
 	assert(m_ptr == nullptr);
 	return &m_ptr;
-}
+} */
 //----------------------------------------------------------------------------
 template <typename T>
 const ComPtr<T>& ComPtr<T>::operator=(const ThisType& rhs)
 {
-	if (rhs.m_ptr) ((Ptr)rhs.m_ptr)->AddRef();
-	if (m_ptr) ((Ptr)m_ptr)->Release();
+	if (rhs.m_ptr) ((Ptr)rhs.m_ptr)->addRef();
+	if (m_ptr) ((Ptr)m_ptr)->release();
 	m_ptr = rhs.m_ptr;
 	return *this;
 }
@@ -153,8 +203,8 @@ const ComPtr<T>& ComPtr<T>::operator=(const ThisType& rhs)
 template <typename T>
 T* ComPtr<T>::operator=(T* ptr)
 {
-	if (ptr) ((Ptr)ptr)->AddRef();
-	if (m_ptr) ((Ptr)m_ptr)->Release();
+	if (ptr) ((Ptr)ptr)->addRef();
+	if (m_ptr) ((Ptr)m_ptr)->release();
 	m_ptr = ptr;           
 	return m_ptr;
 }
