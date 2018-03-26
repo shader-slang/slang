@@ -166,6 +166,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="d3d-util.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="options.cpp" />
     <ClCompile Include="render-d3d11.cpp" />
@@ -176,6 +177,7 @@
     <ClCompile Include="slang-support.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="d3d-util.h" />
     <ClInclude Include="options.h" />
     <ClInclude Include="render-d3d11.h" />
     <ClInclude Include="render-d3d12.h" />

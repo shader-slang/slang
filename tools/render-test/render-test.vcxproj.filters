@@ -39,6 +39,9 @@
     <ClCompile Include="render-d3d12.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="d3d-util.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="options.h">
@@ -66,6 +69,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="render-d3d12.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d-util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

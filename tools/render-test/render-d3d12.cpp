@@ -21,6 +21,8 @@
 #include <d3d12.h>
 #include <d3dcompiler.h>
 
+#include "../../source/core/slang-com-ptr.h"
+
 // We will use the C standard library just for printing error messages.
 #include <stdio.h>
 
@@ -31,11 +33,11 @@
 #endif
 #endif
 //
-using namespace Slang;
 
 #define ENABLE_DEBUG_LAYER 1
 
 namespace renderer_test {
+using namespace Slang;
 
 // The Slang compiler currently generates HLSL source, so we'll need a utility
 // routine (defined later) to translate that into D3D11 shader bytecode.
@@ -83,8 +85,14 @@ public:
     static DXGI_FORMAT mapFormat(Format format);
 
     float m_clearColor[4] = { 0, 0, 0, 0 };
-    IDXGISwapChain* m_swapChain = nullptr;
-    ID3D12Device* m_device = nullptr;
+
+    ComPtr<IDXGISwapChain1> m_swapChain;
+    ComPtr<ID3D12CommandQueue> m_commandQueue;
+    ComPtr<ID3D12Device> m_device;
+    ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
+
+    ComPtr<ID3D12Resource> m_backBufferResources[2];
+    ComPtr<ID3D12CommandAllocator> m_commandAllocator;
 };
 
 Renderer* createD3D12Renderer()
@@ -157,16 +165,17 @@ SlangResult D3D12Renderer::initialize(void* inWindowHandle)
     D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_11_0;
 
     // Search for an adapter that meets our requirements
-    IDXGIAdapter* adapter = nullptr;
-
+    ComPtr<IDXGIAdapter> adapter;
+    
     LOAD_PROC(PFN_D3D12_CREATE_DEVICE, D3D12CreateDevice);
 
     UINT adapterCounter = 0;
     for (;;)
     {
         UINT adapterIndex = adapterCounter++;
-        IDXGIAdapter1* candidateAdapter = nullptr;
-        if (dxgiFactory->EnumAdapters1(adapterIndex, &candidateAdapter) == DXGI_ERROR_NOT_FOUND)
+
+        ComPtr<IDXGIAdapter1> candidateAdapter;
+        if (dxgiFactory->EnumAdapters1(adapterIndex, candidateAdapter.writeRef()) == DXGI_ERROR_NOT_FOUND)
             break;
 
         DXGI_ADAPTER_DESC1 desc;
@@ -176,14 +185,12 @@ SlangResult D3D12Renderer::initialize(void* inWindowHandle)
         {
             // TODO: may want to allow software driver as fallback
         }
-        else if (SUCCEEDED(D3D12CreateDevice_(candidateAdapter, featureLevel, IID_PPV_ARGS(&m_device))))
+        else if (SUCCEEDED(D3D12CreateDevice_(candidateAdapter, featureLevel, IID_PPV_ARGS(m_device.writeRef()))))
         {
             // We found one!
             adapter = candidateAdapter;
             break;
         }
-
-        candidateAdapter->Release();
     }
 
     if (!adapter)
@@ -196,8 +203,7 @@ SlangResult D3D12Renderer::initialize(void* inWindowHandle)
     D3D12_COMMAND_QUEUE_DESC queueDesc = {};
     queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 
-    ID3D12CommandQueue* commandQueue;
-    SLANG_RETURN_ON_FAIL(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&commandQueue)));
+    SLANG_RETURN_ON_FAIL(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(m_commandQueue.writeRef())));
 
     // Swap Chain
     UINT frameCount = 2; // TODO: configure
@@ -211,14 +217,13 @@ SlangResult D3D12Renderer::initialize(void* inWindowHandle)
     swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
     swapChainDesc.SampleDesc.Count = 1;
 
-    IDXGISwapChain1* swapChain;
-    SLANG_RETURN_ON_FAIL(dxgiFactory->CreateSwapChainForHwnd(commandQueue, windowHandle, &swapChainDesc, nullptr, nullptr, &swapChain));
+    SLANG_RETURN_ON_FAIL(dxgiFactory->CreateSwapChainForHwnd(m_commandQueue, windowHandle, &swapChainDesc, nullptr, nullptr, m_swapChain.writeRef()));
 
     // Is this needed?
     dxgiFactory->MakeWindowAssociation(windowHandle, DXGI_MWA_NO_ALT_ENTER);
 
-    IDXGISwapChain3* swapChainEx;
-    SLANG_RETURN_ON_FAIL(swapChain->QueryInterface(IID_PPV_ARGS(&swapChainEx)));
+    ComPtr<IDXGISwapChain3> swapChainEx;
+    SLANG_RETURN_ON_FAIL(m_swapChain->QueryInterface(IID_PPV_ARGS(swapChainEx.writeRef())));
 
     UINT frameIndex = swapChainEx->GetCurrentBackBufferIndex();
 
@@ -228,24 +233,22 @@ SlangResult D3D12Renderer::initialize(void* inWindowHandle)
     rtvHeapDesc.NumDescriptors = frameCount;
     rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 
-    ID3D12DescriptorHeap* rtvHeap;
-    SLANG_RETURN_ON_FAIL(m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&rtvHeap)));
+    SLANG_RETURN_ON_FAIL(m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(m_rtvHeap.writeRef())));
 
     UINT rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
-    D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = rtvHeap->GetCPUDescriptorHandleForHeapStart();
+    D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
 
     // Create per-frame RTVs
-    ID3D12Resource* backBufferResources[2];
+    ComPtr<ID3D12Resource> backBufferResources[2];
     for (UINT ff = 0; ff < frameCount; ++ff)
     {
-        SLANG_RETURN_ON_FAIL(swapChainEx->GetBuffer(ff, IID_PPV_ARGS(&backBufferResources[ff])));
+        SLANG_RETURN_ON_FAIL(swapChainEx->GetBuffer(ff, IID_PPV_ARGS(m_backBufferResources[ff].writeRef())));
         m_device->CreateRenderTargetView(backBufferResources[ff], nullptr, rtvHandle);
         rtvHandle.ptr += rtvDescriptorSize;
     }
 
-    ID3D12CommandAllocator* commandAllocator;
-    SLANG_RETURN_ON_FAIL(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&commandAllocator)));
+    SLANG_RETURN_ON_FAIL(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(m_commandAllocator.writeRef())));
     return SLANG_OK;
 }
 
