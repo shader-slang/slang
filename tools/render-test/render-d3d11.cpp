@@ -585,10 +585,8 @@ void* D3D11Renderer::map(ID3D11Buffer* buffer, MapFlavor flavorIn)
     // of the example, but we don't actually load different data
     // per-frame (we always use an identity projection).
     D3D11_MAPPED_SUBRESOURCE mappedSub;
-    HRESULT hr = m_immediateContext->Map(buffer, 0, mapType, 0, &mappedSub);
-    if (FAILED(hr))
-        return nullptr;
-
+    SLANG_RETURN_NULL_ON_FAIL(m_immediateContext->Map(buffer, 0, mapType, 0, &mappedSub));
+    
     return mappedSub.pData;
 }
 
@@ -889,7 +887,7 @@ Result D3D11Renderer::createInputTexture(const InputTextureDesc& inputDesc, ComP
         
 		ComPtr<ID3D11Texture2D> texture;
         SLANG_RETURN_ON_FAIL(m_device->CreateTexture2D(&desc, subRes.Buffer(), texture.writeRef()));
-        SLANG_RETURN_ON_FAIL(m_device->CreateShaderResourceView(texture, &viewDesc, viewOut.writeRef()));
+        SLANG_RETURN_ON_FAIL(m_device->CreateShaderResourceView(texture, &viewDesc, view.writeRef()));
     }
     else if (inputDesc.dimension == 3)
     {
@@ -911,7 +909,7 @@ Result D3D11Renderer::createInputTexture(const InputTextureDesc& inputDesc, ComP
         viewDesc.Texture3D.MipLevels = 1;
         viewDesc.Texture3D.MostDetailedMip = 0;
         viewDesc.Format = desc.Format;
-        m_device->CreateShaderResourceView(texture, &viewDesc, viewOut.writeRef());
+        m_device->CreateShaderResourceView(texture, &viewDesc, view.writeRef());
     }
 
 	viewOut.swap(view);
@@ -1064,9 +1062,9 @@ void D3D11Renderer::setBindingState(BindingState* state)
     m_currentBindings = static_cast<BindingStateImpl*>(state);
 }
 
-void D3D11Renderer::serializeOutput(BindingState* state, const char* fileName)
+void D3D11Renderer::serializeOutput(BindingState* stateIn, const char* fileName)
 {
-    auto bindingState = (BindingStateImpl*)state;
+    auto bindingState = static_cast<BindingStateImpl*>(stateIn);
     FILE * f = fopen(fileName, "wb");
     int id = 0;
     for (auto & binding : bindingState->m_bindings)
