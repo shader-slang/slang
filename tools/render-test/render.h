@@ -6,14 +6,29 @@
 #include "shader-input-layout.h"
 
 #include "../../source/core/slang-result.h"
+#include "../../source/core/smart-pointer.h"
 
 namespace renderer_test {
 
 // Declare opaque type
-struct Buffer;
-struct InputLayout;
-struct ShaderProgram;
-struct BindingState;
+class Buffer: public Slang::RefObject
+{
+	public:
+};
+class InputLayout: public Slang::RefObject
+{
+	public:
+};
+
+class ShaderProgram: public Slang::RefObject
+{
+	public:
+};
+
+class BindingState: public Slang::RefObject
+{
+	public:
+};
 
 struct ShaderCompileRequest
 {
@@ -91,7 +106,7 @@ enum class PrimitiveTopology
     TriangleList,
 };
 
-class Renderer
+class Renderer: public Slang::RefObject
 {
 public:
     virtual SlangResult initialize(void* inWindowHandle) = 0;

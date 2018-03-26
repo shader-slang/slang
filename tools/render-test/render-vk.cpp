@@ -4,6 +4,8 @@
 #include "options.h"
 #include "render.h"
 
+#include "../../source/core/smart-pointer.h"
+
 #ifdef _WIN32
 #define VK_USE_PLATFORM_WIN32_KHR 1
 #endif
@@ -75,6 +77,7 @@
 
 
 namespace renderer_test {
+using namespace Slang;
 
 #define RETURN_ON_VK_FAIL(x) { VkResult _vkRes = x; if (_vkRes != VK_SUCCESS) { SLANG_RETURN_ON_FAIL(toSlangResult(_vkRes)); }}
 
@@ -108,20 +111,45 @@ public:
 
     protected:
 
-    struct BufferImpl
+    class BufferImpl: public Buffer
     {
-        VkBuffer        buffer;
-        VkDeviceMemory  memory;
+		public:
+
+		BufferImpl(VKRenderer* renderer, VkBuffer buffer, VkDeviceMemory memory):
+			m_renderer(renderer),
+			m_buffer(buffer),
+			m_memory(memory)
+		{
+			assert(renderer);
+		}
+
+		~BufferImpl()
+		{
+			// Now destroy the staging buffer
+			if (m_renderer)
+			{
+				m_renderer->vkDestroyBuffer(m_renderer->m_device, m_buffer, nullptr);
+				m_renderer->vkFreeMemory(m_renderer->m_device, m_memory, nullptr);
+			}
+		}
+
+		VKRenderer*		m_renderer;
+        VkBuffer        m_buffer;
+        VkDeviceMemory  m_memory;
     };
 
-    struct ShaderProgramImpl
+	class ShaderProgramImpl: public ShaderProgram
     {
-        VkPipelineShaderStageCreateInfo compute;
-        VkPipelineShaderStageCreateInfo vertex;
-        VkPipelineShaderStageCreateInfo fragment;
+		public:
+
+        VkPipelineShaderStageCreateInfo m_compute;
+        VkPipelineShaderStageCreateInfo m_vertex;
+        VkPipelineShaderStageCreateInfo m_fragment;
+		
+		List<char> m_buffers[2];								//< To keep storage of code in scope	
     };
 
-    struct BindingImpl
+    struct Binding
     {
         ShaderInputType type;
         InputBufferType bufferType; // Only valid if `type` is `Buffer`
@@ -136,19 +164,28 @@ public:
         int bufferLength = 0;
     };
 
-    struct BindingStateImpl
+    class BindingStateImpl: public BindingState
     {
-        Slang::List<BindingImpl> bindings;
-        int numRenderTargets;
+		public:
+		BindingStateImpl(VKRenderer* renderer):
+			m_renderer(renderer),
+			m_numRenderTargets(0)
+		{
+		}
+
+		VKRenderer* m_renderer;
+        List<Binding> m_bindings;
+        int m_numRenderTargets;
     };
     
-    struct InputLayoutImpl 
+	class InputLayoutImpl: public InputLayout
     {
+		public:
     };
 
     VkBool32 handleDebugMessage(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t srcObject,
         size_t location, int32_t msgCode, const char* pLayerPrefix, const char* pMsg);
-    BufferImpl createBufferImpl(size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties, const void* initData = nullptr);
+    BufferImpl* createBufferImpl(size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties, const void* initData = nullptr);
 
     VkCommandBuffer getCommandBuffer();
     VkCommandBuffer beginCommandBuffer();
@@ -156,7 +193,7 @@ public:
     
     uint32_t getMemoryTypeIndex(uint32_t inTypeBits, VkMemoryPropertyFlags properties);
 
-    VkPipelineShaderStageCreateInfo compileEntryPoint(const ShaderCompileRequest::EntryPoint& entryPointRequest, VkShaderStageFlagBits stage);
+    VkPipelineShaderStageCreateInfo compileEntryPoint(const ShaderCompileRequest::EntryPoint& entryPointRequest, VkShaderStageFlagBits stage, List<char>& bufferOut);
 
     void createInputTexture(const InputTextureDesc& inputDesc, VkImageView& viewOut);
     void createInputSampler(const InputSamplerDesc& inputDesc, VkSampler& stateOut);
@@ -179,8 +216,8 @@ public:
     VkSubmitInfo                        m_submitInfo;
     VkDebugReportCallbackEXT            m_debugReportCallback;
 
-    BindingStateImpl* m_currentBindingState = nullptr;
-    ShaderProgramImpl* m_currentProgram = nullptr;
+    RefPtr<BindingStateImpl> m_currentBindingState;
+    RefPtr<ShaderProgramImpl> m_currentProgram;
 
     float m_clearColor[4] = { 0, 0, 0, 0 };;
 
@@ -276,7 +313,7 @@ void VKRenderer::flushCommandBuffer(VkCommandBuffer commandBuffer)
     vkFreeCommandBuffers(m_device, m_commandPool, 1, &commandBuffer);
 }
 
-VKRenderer::BufferImpl VKRenderer::createBufferImpl(size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties, const void* initData)
+VKRenderer::BufferImpl* VKRenderer::createBufferImpl(size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties, const void* initData)
 {
     if (initData)
     {
@@ -313,33 +350,26 @@ VKRenderer::BufferImpl VKRenderer::createBufferImpl(size_t bufferSize, VkBufferU
         // used for the buffer doesn't let us fill things in
         // directly.
 
-        BufferImpl staging = createBufferImpl(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        RefPtr<BufferImpl> staging = createBufferImpl(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
         // Copy into staging buffer
         void* mappedData = nullptr;
-        checkResult(vkMapMemory(m_device, staging.memory, 0, bufferSize, 0, &mappedData));
+        checkResult(vkMapMemory(m_device, staging->m_memory, 0, bufferSize, 0, &mappedData));
         memcpy(mappedData, initData, bufferSize);
-        vkUnmapMemory(m_device, staging.memory);
+        vkUnmapMemory(m_device, staging->m_memory);
 
         // Copy from staging buffer to real buffer
         VkCommandBuffer commandBuffer = beginCommandBuffer();
 
         VkBufferCopy copyInfo = {};
         copyInfo.size = bufferSize;
-        vkCmdCopyBuffer(commandBuffer, staging.buffer, buffer, 1, &copyInfo);
+        vkCmdCopyBuffer(commandBuffer, staging->m_buffer, buffer, 1, &copyInfo);
 
         flushCommandBuffer(commandBuffer);
-
-        // Now destroy the staging buffer
-        vkDestroyBuffer(m_device, staging.buffer, nullptr);
-        vkFreeMemory(m_device, staging.memory, nullptr);
     }
 
-    BufferImpl impl;
-    impl.buffer = buffer;
-    impl.memory = memory;
-    return impl;
+    return new BufferImpl(this, buffer, memory);
 }
 
 uint32_t VKRenderer::getMemoryTypeIndex(uint32_t inTypeBits, VkMemoryPropertyFlags properties)
@@ -401,12 +431,13 @@ void VKRenderer::createInputBuffer(const ShaderInputLayoutEntry& entry, const In
         usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
     }
 
-    BufferImpl bufferImpl = createBufferImpl(bufferSize, usage, reqMemoryProperties, initData);
+    RefPtr<BufferImpl> bufferImpl(createBufferImpl(bufferSize, usage, reqMemoryProperties, initData));
 
     // TODO: need to hang onto the `memory` field so
     // that we can release it when we are done.
-
-    bufferOut = bufferImpl.buffer;
+	// Set the m_renderer to null to stop any destruction as bufferImpl leaves scope
+	bufferImpl->m_renderer = nullptr;
+    bufferOut = bufferImpl->m_buffer;
 
     // Fill in any views needed
     switch (bufferDesc.type)
@@ -421,7 +452,7 @@ void VKRenderer::createInputBuffer(const ShaderInputLayoutEntry& entry, const In
     }
 }
 
-VkPipelineShaderStageCreateInfo VKRenderer::compileEntryPoint(const ShaderCompileRequest::EntryPoint& entryPointRequest, VkShaderStageFlagBits stage)
+VkPipelineShaderStageCreateInfo VKRenderer::compileEntryPoint(const ShaderCompileRequest::EntryPoint& entryPointRequest, VkShaderStageFlagBits stage, List<char>& bufferOut)
 {
     char const* dataBegin = entryPointRequest.source.dataBegin;
     char const* dataEnd = entryPointRequest.source.dataEnd;
@@ -429,9 +460,11 @@ VkPipelineShaderStageCreateInfo VKRenderer::compileEntryPoint(const ShaderCompil
     // We need to make a copy of the code, since the Slang compiler
     // will free the memory after a compile request is closed.
     size_t codeSize = dataEnd - dataBegin;
-    char* codeBegin = (char*)malloc(codeSize);
-    memcpy(codeBegin, dataBegin, codeSize);
 
+	bufferOut.InsertRange(0, dataBegin, codeSize);
+
+    char* codeBegin = bufferOut.Buffer();
+	
     VkShaderModuleCreateInfo moduleCreateInfo = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
     moduleCreateInfo.pCode = (uint32_t*)codeBegin;
     moduleCreateInfo.codeSize = codeSize;
@@ -661,15 +694,7 @@ Buffer* VKRenderer::createBuffer(const BufferDesc& desc)
             break;
     }
 
-    BufferImpl bufferImpl = createBufferImpl(
-        bufferSize,
-        usage,
-        reqMemoryProperties,
-        desc.initData);
-
-    BufferImpl* bufferPtr = new BufferImpl();
-    *bufferPtr = bufferImpl;
-    return (Buffer*)bufferPtr;
+    return createBufferImpl(bufferSize, usage, reqMemoryProperties, desc.initData);
 }
 
 InputLayout* VKRenderer::createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) 
@@ -717,11 +742,11 @@ void VKRenderer::draw(UInt vertexCount, UInt startVertex = 0)
 
 BindingState* VKRenderer::createBindingState(const ShaderInputLayout& layout)
 {
-    BindingStateImpl* bindingState = new BindingStateImpl;
-    bindingState->numRenderTargets = layout.numRenderTargets;
+    BindingStateImpl* bindingState = new BindingStateImpl(this);
+    bindingState->m_numRenderTargets = layout.numRenderTargets;
     for (auto & entry : layout.entries)
     {
-        BindingImpl binding;
+        Binding binding;
         binding.type = entry.type;
         binding.binding = entry.hlslBinding;
         binding.isOutput = entry.isOutput;
@@ -750,24 +775,24 @@ BindingState* VKRenderer::createBindingState(const ShaderInputLayout& layout)
                 break;
             }
         }
-        bindingState->bindings.Add(binding);
+        bindingState->m_bindings.Add(binding);
     }
 
-    return (BindingState*)bindingState;
+    return bindingState;
 }
 
 void VKRenderer::setBindingState(BindingState* state)
 {
-    m_currentBindingState = (BindingStateImpl*)state;
+    m_currentBindingState = static_cast<BindingStateImpl*>(state);
 }
 
 void VKRenderer::serializeOutput(BindingState* s, const char* fileName)
 {
-    auto state = (BindingStateImpl*)s;
+    auto state = static_cast<BindingStateImpl*>(s);
 
     FILE * f = fopen(fileName, "wb");
     int id = 0;
-    for (auto& bb : state->bindings)
+    for (auto& bb : state->m_bindings)
     {
         if (bb.isOutput)
         {
@@ -775,31 +800,27 @@ void VKRenderer::serializeOutput(BindingState* s, const char* fileName)
             {
                 // create staging buffer
                 size_t bufferSize = bb.bufferLength;
-                BufferImpl staging = createBufferImpl(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+                RefPtr<BufferImpl> staging(createBufferImpl(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
 
                 // Copy from real buffer to staging buffer
                 VkCommandBuffer commandBuffer = beginCommandBuffer();
 
                 VkBufferCopy copyInfo = {};
                 copyInfo.size = bufferSize;
-                vkCmdCopyBuffer(commandBuffer, bb.buffer, staging.buffer, 1, &copyInfo);
+                vkCmdCopyBuffer(commandBuffer, bb.buffer, staging->m_buffer, 1, &copyInfo);
 
                 flushCommandBuffer(commandBuffer);
 
                 // Write out the data from the buffer
                 void* mappedData = nullptr;
-                checkResult(vkMapMemory(m_device, staging.memory, 0, bufferSize, 0, &mappedData));
+                checkResult(vkMapMemory(m_device, staging->m_memory, 0, bufferSize, 0, &mappedData));
 
                 auto ptr = (unsigned int *)mappedData;
                 for (auto i = 0u; i < bufferSize / sizeof(unsigned int); i++)
                     fprintf(f, "%X\n", ptr[i]);
 
-                vkUnmapMemory(m_device, staging.memory);
-
-                // Now destroy the staging buffer
-                vkDestroyBuffer(m_device, staging.buffer, nullptr);
-                vkFreeMemory(m_device, staging.memory, nullptr);
+                vkUnmapMemory(m_device, staging->m_memory);
             }
             else
             {
@@ -819,7 +840,7 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
 
     Slang::List<VkDescriptorSetLayoutBinding> bindings;
 
-    for (auto bb : m_currentBindingState->bindings)
+    for (auto bb : m_currentBindingState->m_bindings)
     {
         switch (bb.type)
         {
@@ -887,7 +908,7 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
     checkResult(vkAllocateDescriptorSets(m_device, &descriptorSetAllocInfo, &descriptorSet));
 
     // Fill in the descritpor set, using our binding information
-    for (auto bb : m_currentBindingState->bindings)
+    for (auto bb : m_currentBindingState->m_bindings)
     {
         switch (bb.type)
         {
@@ -939,7 +960,7 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
     // Then create a pipeline to use that layout
 
     VkComputePipelineCreateInfo computePipelineInfo = { VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
-    computePipelineInfo.stage = m_currentProgram->compute;
+    computePipelineInfo.stage = m_currentProgram->m_compute;
     computePipelineInfo.layout = pipelineLayout;
 
     VkPipelineCache pipelineCache = 0;
@@ -977,14 +998,14 @@ ShaderProgram* VKRenderer::compileProgram(const ShaderCompileRequest & request)
     ShaderProgramImpl* impl = new ShaderProgramImpl;
     if (request.computeShader.name)
     {
-        impl->compute = compileEntryPoint(request.computeShader, VK_SHADER_STAGE_COMPUTE_BIT);
+        impl->m_compute = compileEntryPoint(request.computeShader, VK_SHADER_STAGE_COMPUTE_BIT, impl->m_buffers[0]);
     }
     else
     {
-        impl->vertex = compileEntryPoint(request.vertexShader, VK_SHADER_STAGE_VERTEX_BIT);
-        impl->fragment = compileEntryPoint(request.fragmentShader, VK_SHADER_STAGE_FRAGMENT_BIT);
+        impl->m_vertex = compileEntryPoint(request.vertexShader, VK_SHADER_STAGE_VERTEX_BIT, impl->m_buffers[0]);
+        impl->m_fragment = compileEntryPoint(request.fragmentShader, VK_SHADER_STAGE_FRAGMENT_BIT, impl->m_buffers[1]);
     }
-    return (ShaderProgram*)impl;
+    return impl;
 }
 
 } // renderer_test
