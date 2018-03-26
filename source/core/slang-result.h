@@ -38,7 +38,7 @@ f is the short version of the facility name
 For the common used SLANG_OK and SLANG_FAIL, the name prefix is dropped.
 It is acceptable to expand 'f' to a longer name to differentiate a name
 ie for a facility 'DRIVER' it might make sense to have an error of the form SLANG_E_DRIVER_OUT_OF_MEMORY 
-*/
+*/ 
 
 typedef int32_t SlangResult;
 
@@ -55,8 +55,8 @@ typedef int32_t SlangResult;
 //! Get the result code for the facility 
 #define SLANG_GET_RESULT_CODE(r)		((int32_t)((r) & 0xffff))
 
-#define SLANG_MAKE_ERROR(fac, code)		(SLANG_MAKE_RESULT_ID(SLANG_FACILITY_##fac, code) | 0x80000000)
-#define SLANG_MAKE_SUCCESS(fac, code)	SLANG_MAKE_RESULT_ID(SLANG_FACILITY_##fac, code)
+#define SLANG_MAKE_ERROR(fac, code)		(SLANG_MAKE_RESULT_ID(fac, code) | 0x80000000)
+#define SLANG_MAKE_SUCCESS(fac, code)	SLANG_MAKE_RESULT_ID(fac, code)
 
 /*************************** Facilities ************************************/
 
@@ -81,21 +81,24 @@ It can be useful to have a consistent short name for a facility, as used in the 
 /* *************************** Codes **************************************/
 
 // Memory
-#define SLANG_E_MEM_OUT_OF_MEMORY            SLANG_MAKE_ERROR(MEMORY, 1)
-#define SLANG_E_MEM_BUFFER_TOO_SMALL         SLANG_MAKE_ERROR(MEMORY, 2)
+#define SLANG_E_MEM_OUT_OF_MEMORY            SLANG_MAKE_ERROR(SLANG_FACILITY_MEMORY, 1)
+#define SLANG_E_MEM_BUFFER_TOO_SMALL         SLANG_MAKE_ERROR(SLANG_FACILITY_MEMORY, 2)
 
 //! SLANG_OK indicates success, and is equivalent to SLANG_MAKE_RESULT(0, GENERAL, 0)
 #define SLANG_OK                          0
 //! SLANG_FAIL is the generic failure code - meaning a serious error occurred and the call couldn't complete
-#define SLANG_FAIL                        SLANG_MAKE_ERROR(GENERAL, 1)
+#define SLANG_FAIL                        SLANG_MAKE_ERROR(SLANG_FACILITY_GENERAL, 1)
 
 //! Used to identify a Result that has yet to be initialized.  
 //! It defaults to failure such that if used incorrectly will fail, as similar in concept to using an uninitialized variable. 
-#define SLANG_E_MISC_UNINITIALIZED			SLANG_MAKE_ERROR(MISC, 2)
+#define SLANG_E_MISC_UNINITIALIZED			SLANG_MAKE_ERROR(SLANG_FACILITY_MISC, 2)
 //! Returned from an async method meaning the output is invalid (thus an error), but a result for the request is pending, and will be returned on a subsequent call with the async handle. 			
-#define SLANG_E_MISC_PENDING				SLANG_MAKE_ERROR(MISC, 3)
+#define SLANG_E_MISC_PENDING				SLANG_MAKE_ERROR(SLANG_FACILITY_MISC, 3)
 //! Indicates that a handle passed in as parameter to a method is invalid. 
-#define SLANG_E_MISC_INVALID_HANDLE			SLANG_MAKE_ERROR(MISC, 4)
+#define SLANG_E_MISC_INVALID_HANDLE			SLANG_MAKE_ERROR(SLANG_FACILITY_MISC, 4)
+
+//! Indicates that tn interface could not be found 
+#define SLANG_E_INTF_NO_INTERFACE           SLANG_MAKE_ERROR(SLANG_FACILITY_INTERFACE, 2)
 
 /*! Set SLANG_HANDLE_RESULT_FAIL(x) to code to be executed whenever an error occurs, and is detected by one of the macros */
 #ifndef SLANG_HANDLE_RESULT_FAIL

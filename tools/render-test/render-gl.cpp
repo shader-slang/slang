@@ -51,7 +51,8 @@
     F(glGenBuffers,         PFNGLGENBUFFERSPROC)        \
     F(glBindBuffer,         PFNGLBINDBUFFERPROC)        \
     F(glBufferData,         PFNGLBUFFERDATAPROC)        \
-    F(glMapBuffer,          PFNGLMAPBUFFERPROC)         \
+	F(glDeleteBuffers,		PFNGLDELETEBUFFERSPROC)		\
+	F(glMapBuffer,          PFNGLMAPBUFFERPROC)         \
     F(glUnmapBuffer,        PFNGLUNMAPBUFFERPROC)       \
     F(glUseProgram,         PFNGLUSEPROGRAMPROC)        \
     F(glBindBufferBase,     PFNGLBINDBUFFERBASEPROC)    \
@@ -62,6 +63,7 @@
     F(glDispatchCompute,            PFNGLDISPATCHCOMPUTEPROC) \
     F(glActiveTexture,              PFNGLACTIVETEXTUREPROC) \
     F(glCreateSamplers,             PFNGLCREATESAMPLERSPROC) \
+	F(glDeleteSamplers,				PFNGLDELETESAMPLERSPROC) \
     F(glBindSampler,                PFNGLBINDSAMPLERPROC) \
     F(glTexImage3D,                 PFNGLTEXIMAGE3DPROC) \
     F(glSamplerParameteri,          PFNGLSAMPLERPARAMETERIPROC) \
@@ -120,13 +122,33 @@ public:
         GLsizei                 offset;
     };
 
-    struct InputLayoutImpl
+    class InputLayoutImpl: public InputLayout
     {
-        VertexAttributeDesc attributes[kMaxVertexStreams];
-        UInt attributeCount = 0;
+		public:
+        VertexAttributeDesc m_attributes[kMaxVertexStreams];
+        UInt m_attributeCount = 0;
     };
 
-    struct BindingEntryImpl
+	class BufferImpl: public Buffer
+	{
+		public:
+		BufferImpl(GLRenderer* renderer, GLuint id):
+			m_renderer(renderer),
+			m_id(id)
+		{}
+		~BufferImpl()
+		{
+			if (m_renderer)
+			{
+				m_renderer->glDeleteBuffers(1, &m_id);
+			}
+		}
+
+		GLRenderer* m_renderer;
+		GLuint m_id;
+	};
+
+    struct BindingEntry
     {
         ShaderInputType type;
         GLuint handle;
@@ -135,18 +157,56 @@ public:
         int bufferSize;
         bool isOutput = false;
     };
-    struct BindingStateImpl
+    class BindingStateImpl: public BindingState
     {
-        List<BindingEntryImpl> entries;
+		public:
+		BindingStateImpl(GLRenderer* renderer):
+			m_renderer(renderer)
+		{
+		}
+
+		~BindingStateImpl()
+		{
+			if (m_renderer)
+			{
+				m_renderer->destroyBindingEntries(m_entries.Buffer(), int(m_entries.Count()));
+			}
+		}
+
+		GLRenderer* m_renderer;
+        List<BindingEntry> m_entries;
     };
+
+	class ShaderProgramImpl : public ShaderProgram
+	{
+	public:
+		ShaderProgramImpl(GLRenderer* renderer, GLuint id):
+			m_renderer(renderer),
+			m_id(id)
+		{
+		}
+		~ShaderProgramImpl()
+		{
+			if (m_renderer)
+			{
+				m_renderer->glDeleteProgram(m_id);
+			}
+		}
+	
+		GLuint m_id;
+		GLRenderer* m_renderer;
+	};
+
+	void destroyBindingEntry(const BindingEntry& entry);
+	void destroyBindingEntries(const BindingEntry* entries, int numEntries);
 
     void bindBufferImpl(int target, UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* offsets);
     void flushStateForDraw();
     GLuint loadShader(GLenum stage, char const* source);
-    void createInputBuffer(BindingEntryImpl& rs, InputBufferDesc bufDesc, List<unsigned int>& bufferData);
+    void createInputBuffer(BindingEntry& rs, InputBufferDesc bufDesc, List<unsigned int>& bufferData);
     void debugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message);
-    void createInputTexture(BindingEntryImpl& rs, InputTextureDesc texDesc, InputSamplerDesc samplerDesc);
-    void createInputSampler(BindingEntryImpl& rs, InputSamplerDesc samplerDesc);
+    void createInputTexture(BindingEntry& rs, InputTextureDesc texDesc, InputSamplerDesc samplerDesc);
+    void createInputSampler(BindingEntry& rs, InputSamplerDesc samplerDesc);
 
     static void APIENTRY staticDebugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam);
     static VertexAttributeFormat getVertexAttributeFormat(Format format);
@@ -155,7 +215,9 @@ public:
     HGLRC   m_glContext;
     float   m_clearColor[4] = { 0, 0, 0, 0 };
     
-    InputLayoutImpl* m_boundInputLayout = nullptr;
+	RefPtr<ShaderProgramImpl> m_boundShaderProgram;
+    RefPtr<InputLayoutImpl> m_boundInputLayout;
+
     GLenum m_boundPrimitiveTopology = GL_TRIANGLES;
     GLuint  m_boundVertexStreamBuffers[kMaxVertexStreams];
     UInt    m_boundVertexStreamStrides[kMaxVertexStreams];
@@ -214,9 +276,9 @@ void GLRenderer::bindBufferImpl(int target, UInt startSlot, UInt slotCount, Buff
     {
         UInt slot = startSlot + ii;
 
-        Buffer* buffer = buffers[ii];
-        GLuint bufferID = (GLuint)(uintptr_t)buffer;
-
+        BufferImpl* buffer = static_cast<BufferImpl*>(buffers[ii]);
+        GLuint bufferID = buffer ? buffer->m_id : 0;
+		
         assert(!offsets || !offsets[ii]);
 
         glBindBufferBase(target, (GLuint)slot, bufferID);
@@ -225,11 +287,11 @@ void GLRenderer::bindBufferImpl(int target, UInt startSlot, UInt slotCount, Buff
 
 void GLRenderer::flushStateForDraw()
 {
-    auto layout = m_boundInputLayout;
-    auto attrCount = layout->attributeCount;
+    auto layout = m_boundInputLayout.Ptr();
+    auto attrCount = layout->m_attributeCount;
     for (UInt ii = 0; ii < attrCount; ++ii)
     {
-        auto& attr = layout->attributes[ii];
+        auto& attr = layout->m_attributes[ii];
 
         auto streamIndex = attr.streamIndex;
 
@@ -362,7 +424,39 @@ GLuint GLRenderer::loadShader(GLenum stage, const char* source)
     return shaderID;
 }
 
-void GLRenderer::createInputBuffer(BindingEntryImpl& rs, InputBufferDesc bufDesc, List<unsigned int>& bufferData)
+void GLRenderer::destroyBindingEntry(const BindingEntry& entry)
+{
+	switch (entry.type)
+	{
+		case ShaderInputType::Buffer:
+		{
+			glDeleteBuffers(1, &entry.handle);
+			break;
+		}
+		case ShaderInputType::Texture:
+		case ShaderInputType::CombinedTextureSampler:
+		{
+			glDeleteTextures(1, &entry.handle);
+			break;
+		}
+		case ShaderInputType::Sampler:
+		{
+			glDeleteSamplers(1, &entry.handle);
+			break;
+		}
+		default: break;
+	}
+}
+
+void GLRenderer::destroyBindingEntries(const BindingEntry* entries, int numEntries)
+{
+	for (int i = 0; i < numEntries; ++i)
+	{
+		destroyBindingEntry(entries[i]);
+	}
+}
+
+void GLRenderer::createInputBuffer(BindingEntry& rs, InputBufferDesc bufDesc, List<unsigned int>& bufferData)
 {
     rs.bindTarget = (bufDesc.type == InputBufferType::StorageBuffer ? GL_SHADER_STORAGE_BUFFER : GL_UNIFORM_BUFFER);
     glGenBuffers(1, &rs.handle);
@@ -371,8 +465,7 @@ void GLRenderer::createInputBuffer(BindingEntryImpl& rs, InputBufferDesc bufDesc
     glBindBuffer(rs.bindTarget, 0);
 }
 
-
-void GLRenderer::createInputTexture(BindingEntryImpl& rs, InputTextureDesc texDesc, InputSamplerDesc samplerDesc)
+void GLRenderer::createInputTexture(BindingEntry& rs, InputTextureDesc texDesc, InputSamplerDesc samplerDesc)
 {
     TextureData texData;
     generateTextureData(texData, texDesc);
@@ -386,11 +479,13 @@ void GLRenderer::createInputTexture(BindingEntryImpl& rs, InputTextureDesc texDe
                 glBindTexture(rs.bindTarget, rs.handle);
                 int slice = 0;
                 for (int i = 0; i < texData.arraySize; i++)
+				{
                     for (int j = 0; j < texData.mipLevels; j++)
                     {
                         glTexImage2D(rs.bindTarget, j, GL_RGBA8, texData.textureSize, i, 0, GL_RGBA, GL_UNSIGNED_BYTE, texData.dataBuffer[slice].Buffer());
                         slice++;
                     }
+				}
             }
             else
             {
@@ -458,7 +553,7 @@ void GLRenderer::createInputTexture(BindingEntryImpl& rs, InputTextureDesc texDe
     }
 }
 
-void GLRenderer::createInputSampler(BindingEntryImpl& rs, InputSamplerDesc samplerDesc)
+void GLRenderer::createInputSampler(BindingEntry& rs, InputSamplerDesc samplerDesc)
 {
     glCreateSamplers(1, &rs.handle);
     glSamplerParameteri(rs.handle, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -608,18 +703,18 @@ Buffer* GLRenderer::createBuffer(const BufferDesc& desc)
 
     glBufferData(target, desc.size, desc.initData, usage);
 
-    return (Buffer*)(uintptr_t)bufferID;
+	return new BufferImpl(this, bufferID);
 }
 
 InputLayout* GLRenderer::createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount)
 {
     InputLayoutImpl* inputLayout = new InputLayoutImpl;
 
-    inputLayout->attributeCount = inputElementCount;
+    inputLayout->m_attributeCount = inputElementCount;
     for (UInt ii = 0; ii < inputElementCount; ++ii)
     {
         auto& inputAttr = inputElements[ii];
-        auto& glAttr = inputLayout->attributes[ii];
+        auto& glAttr = inputLayout->m_attributes[ii];
 
         glAttr.streamIndex = 0;
         glAttr.format = getVertexAttributeFormat(inputAttr.format);
@@ -629,8 +724,10 @@ InputLayout* GLRenderer::createInputLayout(const InputElementDesc* inputElements
     return (InputLayout*)inputLayout;
 }
 
-void* GLRenderer::map(Buffer* buffer, MapFlavor flavor)
+void* GLRenderer::map(Buffer* bufferIn, MapFlavor flavor)
 {
+	BufferImpl* buffer = static_cast<BufferImpl*>(bufferIn);
+
     GLenum target = GL_UNIFORM_BUFFER;
 
     GLuint access = 0;
@@ -645,23 +742,23 @@ void* GLRenderer::map(Buffer* buffer, MapFlavor flavor)
             break;
     }
 
-    auto bufferID = (GLuint)(uintptr_t)buffer;
+    auto bufferID = buffer ? buffer->m_id : 0;
     glBindBuffer(target, bufferID);
 
     return glMapBuffer(target, access);
 }
 
-void GLRenderer::unmap(Buffer* buffer)
+void GLRenderer::unmap(Buffer* bufferIn)
 {
+	BufferImpl* buffer = static_cast<BufferImpl*>(bufferIn);
     GLenum target = GL_UNIFORM_BUFFER;
-
-    auto bufferID = (GLuint)(uintptr_t)buffer;
+    auto bufferID = buffer ? buffer->m_id : 0;
     glUnmapBuffer(target);
 }
 
 void GLRenderer::setInputLayout(InputLayout* inputLayout)
 {
-    m_boundInputLayout = (InputLayoutImpl*)inputLayout;
+    m_boundInputLayout = static_cast<InputLayoutImpl*>(inputLayout);
 }
 
 void GLRenderer::setPrimitiveTopology(PrimitiveTopology topology)
@@ -684,19 +781,21 @@ void GLRenderer::setVertexBuffers(UInt startSlot, UInt slotCount, Buffer*const* 
     {
         UInt slot = startSlot + ii;
 
-        Buffer* buffer = buffers[ii];
-        GLuint bufferID = (GLuint)(uintptr_t)buffer;
-
+        BufferImpl* buffer = static_cast<BufferImpl*>(buffers[ii]);
+        GLuint bufferID = buffer ? buffer->m_id : 0;
+		
         m_boundVertexStreamBuffers[slot] = bufferID;
         m_boundVertexStreamStrides[slot] = strides[ii];
         m_boundVertexStreamOffsets[slot] = offsets[ii];
     }
 }
 
-void GLRenderer::setShaderProgram(ShaderProgram* program)
+void GLRenderer::setShaderProgram(ShaderProgram* programIn)
 {
-    GLuint programID = (GLuint)(uintptr_t)program;
-    glUseProgram(programID);
+	ShaderProgramImpl* program = static_cast<ShaderProgramImpl*>(programIn);
+	m_boundShaderProgram = program;
+    GLuint programID = program ? program->m_id : 0;
+	glUseProgram(programID);
 }
 
 void GLRenderer::setConstantBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* offsets) 
@@ -718,10 +817,10 @@ void GLRenderer::dispatchCompute(int x, int y, int z)
 
 BindingState* GLRenderer::createBindingState(const ShaderInputLayout& layout)
 {
-    BindingStateImpl* rs = new BindingStateImpl;
+    BindingStateImpl* state = new BindingStateImpl(this);
     for (auto & entry : layout.entries)
     {
-        BindingEntryImpl rsEntry;
+        BindingEntry rsEntry;
         rsEntry.isOutput = entry.isOutput;
         rsEntry.binding = entry.glslBinding;
         rsEntry.type = entry.type;
@@ -740,15 +839,15 @@ BindingState* GLRenderer::createBindingState(const ShaderInputLayout& layout)
                 createInputSampler(rsEntry, entry.samplerDesc);
                 break;
         }
-        rs->entries.Add(rsEntry);
+        state->m_entries.Add(rsEntry);
     }
-    return (BindingState*)rs;
+    return state;
 }
 
 void GLRenderer::setBindingState(BindingState* stateIn)
 {
-    BindingStateImpl* state = (BindingStateImpl*)stateIn;
-    for (auto & entry : state->entries)
+    BindingStateImpl* state = static_cast<BindingStateImpl*>(stateIn);
+    for (auto & entry : state->m_entries)
     {
         switch (entry.type)
         {
@@ -773,7 +872,7 @@ void GLRenderer::serializeOutput(BindingState* stateIn, const char* fileName)
     BindingStateImpl * state = (BindingStateImpl*)stateIn;
     FILE * f;
     fopen_s(&f, fileName, "wt");
-    for (auto & entry : state->entries)
+    for (auto & entry : state->m_entries)
     {
         if (entry.isOutput)
         {
@@ -837,7 +936,7 @@ ShaderProgram* GLRenderer::compileProgram(const ShaderCompileRequest& request)
         return nullptr;
     }
 
-    return (ShaderProgram*)(uintptr_t)programID;
+    return new ShaderProgramImpl(this, programID);
 }
 
 
