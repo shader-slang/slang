@@ -667,7 +667,7 @@ void D3D11Renderer::setConstantBuffers(UInt startSlot, UInt slotCount, Buffer*co
 
 	// Copy out the actual dx buffers
 	ID3D11Buffer* dxBuffers[kMaxConstantBuffers];
-	for (int i = 0; i < slotCount; i++)
+	for (UInt i = 0; i < slotCount; i++)
 	{
 		dxBuffers[i] = buffers[i]->m_buffer;
 	}
