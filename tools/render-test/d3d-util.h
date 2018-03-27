@@ -30,6 +30,9 @@ class D3DUtil
 		USAGE_FLAG_SRV = 0x2,
 	};
 
+		/// Get primitive topoloyg as D3D primitive topology
+	static D3D_PRIMITIVE_TOPOLOGY getPrimitiveTopology(PrimitiveTopology prim);
+
         /// Calculate size taking into account alignment. Alignment must be a power of 2
     static UInt calcAligned(UInt size, UInt alignment) { return (size + alignment - 1) & ~(alignment - 1); }
 

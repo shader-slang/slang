@@ -88,6 +88,25 @@ protected:
 		UINT64 m_fenceValue;										///< The fence value when rendering this Frame is complete
 	};
 
+	class ShaderProgramImpl: public ShaderProgram
+	{
+		public:
+		List<uint8_t> m_vertexShader;
+		List<uint8_t> m_pixelShader;
+		List<uint8_t> m_computeShader;
+	};
+	class BufferImpl: public Buffer
+	{
+		public:
+		BufferImpl(const BufferDesc& desc):
+			m_desc(desc)
+		{
+		}
+		D3D12Resource m_resource;
+		D3D12Resource m_uploadResource;
+		BufferDesc m_desc;
+	};
+
 	static PROC loadProc(HMODULE module, char const* name);
 	Result createFrameResources();
 		/// Blocks until gpu has completed all work
@@ -608,9 +627,85 @@ ShaderCompiler* D3D12Renderer::getShaderCompiler()
 
 Buffer* D3D12Renderer::createBuffer(const BufferDesc& desc)
 {
-    return nullptr;
-}
+	RefPtr<BufferImpl> buffer(new BufferImpl(desc));
+	const size_t bufferSize = desc.size;
 
+	switch (desc.flavor)
+	{
+		case BufferFlavor::Constant:
+		{
+/* 			bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+			bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+			bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE; */
+		
+			break;	 
+		}
+		case BufferFlavor::Vertex:
+		{
+			D3D12_RESOURCE_DESC resourceDesc{};
+			resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+			resourceDesc.Alignment = 0;
+			resourceDesc.Width = bufferSize;
+			resourceDesc.Height = 1;
+			resourceDesc.DepthOrArraySize = 1;
+			resourceDesc.MipLevels = 1;
+			resourceDesc.Format = DXGI_FORMAT_UNKNOWN;
+			resourceDesc.SampleDesc.Count = 1;
+			resourceDesc.SampleDesc.Quality = 0;
+			resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+			resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+			{
+				D3D12_HEAP_PROPERTIES heapProps;
+				heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
+				heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+				heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+				heapProps.CreationNodeMask = 1;
+				heapProps.VisibleNodeMask = 1;
+				
+				SLANG_RETURN_NULL_ON_FAIL(buffer->m_resource.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, resourceDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr));
+			}
+
+			{
+				D3D12_HEAP_PROPERTIES heapProps;
+				heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
+				heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+				heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+				heapProps.CreationNodeMask = 1;
+				heapProps.VisibleNodeMask = 1;
+
+				SLANG_RETURN_NULL_ON_FAIL(buffer->m_uploadResource.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, resourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr));
+			}
+
+			if (desc.initData)
+			{
+				// Copy data to the intermediate upload heap and then schedule a copy 
+				// from the upload heap to the vertex buffer.
+				UINT8* vertexData;
+				D3D12_RANGE readRange = {}; 		// We do not intend to read from this resource on the CPU.
+				
+				ID3D12Resource* uploadResource = buffer->m_uploadResource; 
+				ID3D12Resource* resource = buffer->m_resource;  
+				
+				SLANG_RETURN_NULL_ON_FAIL(uploadResource->Map(0, &readRange, reinterpret_cast<void**>(&vertexData)));
+				::memcpy(vertexData, desc.initData, bufferSize);
+				uploadResource->Unmap(0, nullptr);
+
+				m_commandList->CopyBufferRegion(resource, 0, uploadResource, 0, bufferSize);
+			}
+			// Make sure it's in the right state
+			{
+				D3D12BarrierSubmitter submitter(m_commandList);
+				buffer->m_resource.transition(D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, submitter);
+			}
+			break;
+		}
+		default:
+			return nullptr;
+	}
+	
+	return buffer.detach();
+}
 
 InputLayout* D3D12Renderer::createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) 
 {
@@ -657,6 +752,8 @@ void D3D12Renderer::dispatchCompute(int x, int y, int z)
 
 BindingState* D3D12Renderer::createBindingState(const ShaderInputLayout& layout)
 {
+	
+
     return nullptr;
 }
 
@@ -672,7 +769,27 @@ void D3D12Renderer::serializeOutput(BindingState* state, const char* fileName)
 
 ShaderProgram* D3D12Renderer::compileProgram(const ShaderCompileRequest& request)
 {
-    return nullptr;
+	RefPtr<ShaderProgramImpl> program(new ShaderProgramImpl);
+
+	if (request.computeShader.name)
+	{
+		ComPtr<ID3DBlob> computeShaderBlob;
+		SLANG_RETURN_NULL_ON_FAIL(D3DUtil::compileHLSLShader(request.computeShader.source.path, request.computeShader.source.dataBegin, request.computeShader.name, request.computeShader.profile, computeShaderBlob));
+
+		program->m_computeShader.InsertRange(0, (const uint8_t*)computeShaderBlob->GetBufferPointer(), UInt(computeShaderBlob->GetBufferSize()));
+	}
+	else
+	{
+		ComPtr<ID3DBlob> vertexShaderBlob, fragmentShaderBlob;
+		SLANG_RETURN_NULL_ON_FAIL(D3DUtil::compileHLSLShader(request.vertexShader.source.path, request.vertexShader.source.dataBegin, request.vertexShader.name, request.vertexShader.profile, vertexShaderBlob));
+		SLANG_RETURN_NULL_ON_FAIL(D3DUtil::compileHLSLShader(request.fragmentShader.source.path, request.fragmentShader.source.dataBegin, request.fragmentShader.name, request.fragmentShader.profile, fragmentShaderBlob));
+
+		program->m_vertexShader.InsertRange(0, (const uint8_t*)vertexShaderBlob->GetBufferPointer(), UInt(vertexShaderBlob->GetBufferSize()));
+		program->m_pixelShader.InsertRange(0, (const uint8_t*)fragmentShaderBlob->GetBufferPointer(), UInt(fragmentShaderBlob->GetBufferSize()));
+	}
+
+	return program.detach();
 }
+
 
 } // renderer_test

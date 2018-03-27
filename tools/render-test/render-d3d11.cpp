@@ -527,18 +527,7 @@ void D3D11Renderer::setInputLayout(InputLayout* inputLayoutIn)
 
 void D3D11Renderer::setPrimitiveTopology(PrimitiveTopology topology)
 {
-    D3D11_PRIMITIVE_TOPOLOGY primTopology;
-    switch (topology)
-    {
-        case PrimitiveTopology::TriangleList:
-            primTopology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-            break;
-
-        default:
-            return;
-    }
-
-    m_immediateContext->IASetPrimitiveTopology(primTopology);
+    m_immediateContext->IASetPrimitiveTopology(D3DUtil::getPrimitiveTopology(topology)); 
 }
 
 void D3D11Renderer::setVertexBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffersIn, const UInt* stridesIn, const UInt* offsetsIn)

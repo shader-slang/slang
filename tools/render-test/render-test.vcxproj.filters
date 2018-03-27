@@ -45,6 +45,9 @@
     <ClCompile Include="resource-d3d12.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="circular-resource-heap-d3d12.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="options.h">
@@ -78,6 +81,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="resource-d3d12.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="circular-resource-heap-d3d12.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

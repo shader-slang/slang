@@ -9,6 +9,19 @@
 namespace renderer_test {
 using namespace Slang;
 
+/* static */D3D_PRIMITIVE_TOPOLOGY D3DUtil::getPrimitiveTopology(PrimitiveTopology topology)
+{
+	switch (topology)
+	{
+		case PrimitiveTopology::TriangleList:		
+		{
+			return D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+		}
+		default: break;
+	}
+	return D3D11_PRIMITIVE_TOPOLOGY_UNDEFINED;
+}
+
 /* static */DXGI_FORMAT D3DUtil::getMapFormat(Format format)
 {
     switch (format)

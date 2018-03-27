@@ -166,6 +166,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="circular-resource-heap-d3d12.cpp" />
     <ClCompile Include="d3d-util.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="options.cpp" />
@@ -178,6 +179,7 @@
     <ClCompile Include="slang-support.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="circular-resource-heap-d3d12.h" />
     <ClInclude Include="d3d-util.h" />
     <ClInclude Include="options.h" />
     <ClInclude Include="render-d3d11.h" />
