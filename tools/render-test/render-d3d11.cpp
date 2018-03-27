@@ -468,7 +468,7 @@ InputLayout* D3D11Renderer::createInputLayout(const InputElementDesc* inputEleme
 	SLANG_RETURN_NULL_ON_FAIL(D3DUtil::compileHLSLShader("inputLayout", hlslBuffer, "main", "vs_5_0", vertexShaderBlob));
 
     ComPtr<ID3D11InputLayout> inputLayout;
-   SLANG_RETURN_NULL_ON_FAIL(m_device->CreateInputLayout(&inputElements[0], (UINT)inputElementCount, vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize(),
+	SLANG_RETURN_NULL_ON_FAIL(m_device->CreateInputLayout(&inputElements[0], (UINT)inputElementCount, vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize(),
         inputLayout.writeRef()));
 
 	InputLayoutImpl* impl = new InputLayoutImpl;

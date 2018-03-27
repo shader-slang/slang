@@ -109,12 +109,23 @@ protected:
 		List<uint8_t> m_memory;
 		MapFlavor m_mapFlavor;
 	};
+	class InputLayoutImpl: public InputLayout
+	{
+		public:
+		List<D3D12_INPUT_ELEMENT_DESC> m_elements;
+	};
 
 	static PROC loadProc(HMODULE module, char const* name);
 	Result createFrameResources();
 		/// Blocks until gpu has completed all work
 	void waitForGpu();
 	void releaseFrameResources();
+
+	List<RefPtr<BufferImpl> > m_boundVertexBuffers;
+	List<RefPtr<BufferImpl> > m_boundConstantBuffers;
+
+	RefPtr<ShaderProgramImpl> m_boundShaderProgram;
+	RefPtr<InputLayoutImpl> m_boundInputLayout;
 
 	DXGI_FORMAT m_targetFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
 	DXGI_FORMAT m_depthStencilFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
@@ -129,6 +140,8 @@ protected:
 	int m_windowHeight = 0;
 
 	bool m_isInitialized = false;
+
+	D3D_PRIMITIVE_TOPOLOGY m_primitiveTopology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 
     float m_clearColor[4] = { 0, 0, 0, 0 };
 
@@ -711,7 +724,27 @@ Buffer* D3D12Renderer::createBuffer(const BufferDesc& desc)
 
 InputLayout* D3D12Renderer::createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) 
 {
-    return nullptr;
+	RefPtr<InputLayoutImpl> layout(new InputLayoutImpl);
+
+	List<D3D12_INPUT_ELEMENT_DESC>& elements = layout->m_elements;
+	elements.SetSize(inputElementCount);
+
+	for (UInt i = 0; i < inputElementCount; ++i)
+	{
+		const InputElementDesc& srcEle = inputElements[i];
+		D3D12_INPUT_ELEMENT_DESC& dstEle = elements[i];
+
+		// JS: TODO - we need to store the semantic names somewhere... As they will be lost outside
+		dstEle.SemanticName = srcEle.semanticName;
+		dstEle.SemanticIndex = (UINT)srcEle.semanticIndex;
+		dstEle.Format = D3DUtil::getMapFormat(srcEle.format);
+		dstEle.InputSlot = 0;
+		dstEle.AlignedByteOffset = (UINT)srcEle.offset;
+		dstEle.InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
+		dstEle.InstanceDataStepRate = 0;
+	}
+
+    return layout.detach();
 }
 
 void* D3D12Renderer::map(Buffer* buffer, MapFlavor flavor) 
@@ -806,36 +839,94 @@ void D3D12Renderer::unmap(Buffer* buffer)
 
 void D3D12Renderer::setInputLayout(InputLayout* inputLayout) 
 {
+	m_boundInputLayout = static_cast<InputLayoutImpl*>(inputLayout);
 }
 
 void D3D12Renderer::setPrimitiveTopology(PrimitiveTopology topology) 
 {
+	m_primitiveTopology = D3DUtil::getPrimitiveTopology(topology);
+	assert(m_primitiveTopology != D3D11_PRIMITIVE_TOPOLOGY_UNDEFINED);
 }
 
 void D3D12Renderer::setVertexBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt * strides, const UInt* offsets)
 {
+	{
+		const UInt num = startSlot + slotCount;
+		if (num > m_boundVertexBuffers.Count())
+		{
+			m_boundVertexBuffers.SetSize(num);
+		}
+	}
+
+	for (UInt i = 0; i < slotCount; i++)
+	{
+		BufferImpl* buffer = static_cast<BufferImpl*>(buffers[i]);
+		if (buffer)
+		{
+			assert(buffer->m_desc.flavor == BufferFlavor::Vertex);
+		}
+		m_boundVertexBuffers[startSlot + i] = buffer;
+	}
 }
 
 void D3D12Renderer::setShaderProgram(ShaderProgram* inProgram)
 {
+	m_boundShaderProgram = static_cast<ShaderProgramImpl*>(inProgram);
 }
 
 void D3D12Renderer::setConstantBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* offsets)
 {
+	{
+		const UInt num = startSlot + slotCount;
+		if (num > m_boundConstantBuffers.Count())
+		{
+			m_boundConstantBuffers.SetSize(num);
+		}
+	}
+
+	for (UInt i = 0; i < slotCount; i++)
+	{
+		BufferImpl* buffer = static_cast<BufferImpl*>(buffers[i]);
+		if (buffer)
+		{
+			assert(buffer->m_desc.flavor == BufferFlavor::Constant);
+		}
+		m_boundConstantBuffers[startSlot + i] = buffer;
+	}
 }
 
 void D3D12Renderer::draw(UInt vertexCount, UInt startVertex)
 {
+	ID3D12GraphicsCommandList* commandList = m_commandList;
+	
+	//commandList->SetGraphicsRootSignature(m_rootSignature);
+	///commandList->SetPipelineState(m_pipelineState);
+
+	commandList->IASetPrimitiveTopology(m_primitiveTopology);
+	//commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
+	commandList->DrawInstanced(UINT(vertexCount), 1, UINT(startVertex), 0);
 }
 
 void D3D12Renderer::dispatchCompute(int x, int y, int z)
 {
+	ID3D12GraphicsCommandList* commandList = m_commandList;
+
+	//commandList->SetComputeRootSignature(m_rootSignature);
+	//commandList->SetDescriptorHeaps(SLANG_COUNT_OF(heaps), heaps);
+
+	//commandList->SetPipelineState(m_pipelineState);
+
+	//commandList->SetComputeRootConstantBufferView(0, cbCursor.getGpuHandle());
+
+	//commandList->SetComputeRootDescriptorTable(1, viewHandles[0]);
+	//commandList->SetComputeRootDescriptorTable(2, viewHandles[1]);
+	//commandList->SetComputeRootDescriptorTable(3, glob->m_samplerHeap.getGpuStart());
+
+	commandList->Dispatch(x, y, z);
 }
 
 BindingState* D3D12Renderer::createBindingState(const ShaderInputLayout& layout)
 {
-	
-
     return nullptr;
 }
 
