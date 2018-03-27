@@ -99,12 +99,15 @@ protected:
 	{
 		public:
 		BufferImpl(const BufferDesc& desc):
-			m_desc(desc)
+			m_desc(desc),
+			m_mapFlavor(MapFlavor::HostRead)
 		{
 		}
 		D3D12Resource m_resource;
 		D3D12Resource m_uploadResource;
 		BufferDesc m_desc;
+		List<uint8_t> m_memory;
+		MapFlavor m_mapFlavor;
 	};
 
 	static PROC loadProc(HMODULE module, char const* name);
@@ -634,10 +637,9 @@ Buffer* D3D12Renderer::createBuffer(const BufferDesc& desc)
 	{
 		case BufferFlavor::Constant:
 		{
-/* 			bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-			bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-			bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE; */
-		
+			// Assume the constant buffer will change every frame. We'll just keep a copy of the contents 
+			// in regular memory until it needed 
+			buffer->m_memory.SetSize(UInt(bufferSize));
 			break;	 
 		}
 		case BufferFlavor::Vertex:
@@ -714,11 +716,92 @@ InputLayout* D3D12Renderer::createInputLayout(const InputElementDesc* inputEleme
 
 void* D3D12Renderer::map(Buffer* buffer, MapFlavor flavor) 
 {
+	BufferImpl* impl = static_cast<BufferImpl*>(buffer);
+	impl->m_mapFlavor = flavor;
+
+	switch (impl->m_desc.flavor)
+	{
+		case BufferFlavor::Vertex:
+		{
+			D3D12_RANGE readRange = {}; 		// We do not intend to read from this resource on the CPU.
+
+			// We need this in a state so we can upload
+			switch (flavor)
+			{
+				case MapFlavor::HostWrite:
+				case MapFlavor::WriteDiscard:
+				{
+					D3D12BarrierSubmitter submitter(m_commandList);
+					impl->m_uploadResource.transition(D3D12_RESOURCE_STATE_GENERIC_READ, submitter);
+					impl->m_resource.transition(D3D12_RESOURCE_STATE_COPY_DEST, submitter);
+					break;
+				}
+				case MapFlavor::HostRead: 
+				{
+					// Lock whole of the buffer
+					readRange.End = impl->m_desc.size;
+					break;
+				}
+			}
+			
+			// Lock it
+			void* uploadData;
+			SLANG_RETURN_NULL_ON_FAIL(impl->m_uploadResource.getResource()->Map(0, &readRange, reinterpret_cast<void**>(&uploadData)));
+			return uploadData;
+		}
+		case BufferFlavor::Constant:
+		{
+			return impl->m_memory.Buffer();
+		}
+	}
+
     return nullptr;
 }
 
 void D3D12Renderer::unmap(Buffer* buffer)
 {
+	BufferImpl* impl = static_cast<BufferImpl*>(buffer);
+
+	switch (impl->m_desc.flavor)
+	{
+		case BufferFlavor::Vertex:
+		{
+			// Unmap
+			ID3D12Resource* uploadResource = impl->m_uploadResource;
+			ID3D12Resource* resource = impl->m_resource;
+
+			uploadResource->Unmap(0, nullptr);
+
+			// We need this in a state so we can upload
+			switch (impl->m_mapFlavor)
+			{
+				case MapFlavor::HostWrite:
+				case MapFlavor::WriteDiscard:
+				{
+					{
+						D3D12BarrierSubmitter submitter(m_commandList);
+						impl->m_uploadResource.transition(D3D12_RESOURCE_STATE_GENERIC_READ, submitter);
+						impl->m_resource.transition(D3D12_RESOURCE_STATE_COPY_DEST, submitter);
+					}
+
+					m_commandList->CopyBufferRegion(resource, 0, uploadResource, 0, impl->m_desc.size);
+
+					{
+						D3D12BarrierSubmitter submitter(m_commandList);
+						impl->m_resource.transition(D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, submitter);
+					}
+					
+					break;
+				}
+				case MapFlavor::HostRead: break;
+			}
+			break;
+		}
+		case BufferFlavor::Constant: 
+		{
+			break;
+		}
+	}
 }
 
 void D3D12Renderer::setInputLayout(InputLayout* inputLayout) 
@@ -744,7 +827,6 @@ void D3D12Renderer::setConstantBuffers(UInt startSlot, UInt slotCount, Buffer*co
 void D3D12Renderer::draw(UInt vertexCount, UInt startVertex)
 {
 }
-
 
 void D3D12Renderer::dispatchCompute(int x, int y, int z)
 {

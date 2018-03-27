@@ -63,7 +63,7 @@ void D3D12CircularResourceHeap::updateCompleted()
 {
 	const uint64_t completedValue = m_fence->getCompletedValue();
 	
-/* 
+#if 0 
 	while (m_pendingQueue.Count() != 0)
 	{
 		const PendingEntry& entry = m_pendingQueue[0];
@@ -77,7 +77,8 @@ void D3D12CircularResourceHeap::updateCompleted()
 			break;
 		}
 	}
-*/
+#else
+	// A more efficient implementation is m_pendingQueue is implemented as a vector like type
 	const int size = int(m_pendingQueue.Count());
 	int end = 0;
 	while (end < size && m_pendingQueue[end].m_completedValue <= completedValue)
@@ -98,6 +99,7 @@ void D3D12CircularResourceHeap::updateCompleted()
 			m_pendingQueue.RemoveRange(0, size);
 		}
 	}
+#endif
 }
 
 D3D12CircularResourceHeap::Block* D3D12CircularResourceHeap::_newBlock()
