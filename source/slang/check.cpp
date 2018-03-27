@@ -5419,17 +5419,22 @@ namespace Slang
             // Their arguments must unify
             SLANG_RELEASE_ASSERT(fstGen->args.Count() == sndGen->args.Count());
             UInt argCount = fstGen->args.Count();
+            bool okay = true;
             for (UInt aa = 0; aa < argCount; ++aa)
             {
                 if (!TryUnifyVals(constraints, fstGen->args[aa], sndGen->args[aa]))
-                    return false;
+                {
+                    okay = false;
+                }
             }
 
             // Their "base" specializations must unify
             if (!TryUnifySubstitutions(constraints, fstGen->outer, sndGen->outer))
-                return false;
+            {
+                okay = false;
+            }
 
-            return true;
+            return okay;
         }
 
         bool TryUnifyTypeParam(
