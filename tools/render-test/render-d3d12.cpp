@@ -23,6 +23,10 @@
 
 #include "../../source/core/slang-com-ptr.h"
 
+#include "resource-d3d12.h"
+
+#include "d3d-util.h"
+
 // We will use the C standard library just for printing error messages.
 #include <stdio.h>
 
@@ -39,19 +43,6 @@
 namespace renderer_test {
 using namespace Slang;
 
-// The Slang compiler currently generates HLSL source, so we'll need a utility
-// routine (defined later) to translate that into D3D11 shader bytecode.
-// Returns nullptr if compilation fails.
-/* ID3DBlob* compileHLSLShader(
-    char const* sourcePath,
-    char const* source,
-    char const* entryPointName,
-    char const* dxProfileName); */
-
-//static char const* vertexProfileName   = "vs_4_0";
-//static char const* fragmentProfileName = "ps_4_0";
-
-//
 class D3D12Renderer : public Renderer, public ShaderCompiler
 {
 public:
@@ -80,27 +71,96 @@ public:
     // ShaderCompiler implementation
     virtual ShaderProgram* compileProgram(const ShaderCompileRequest& request) override;
     
-    protected:
-    PROC loadProc(HMODULE module, char const* name);
-    static DXGI_FORMAT mapFormat(Format format);
+	~D3D12Renderer();
+
+protected:
+	static const Int kMaxNumRenderFrames = 4;
+	static const Int kMaxNumRenderTargets = 3;
+	
+	struct FrameInfo
+	{
+		FrameInfo() :m_fenceValue(0) {}
+		void reset()
+		{
+			m_commandAllocator.setNull();
+		}
+		ComPtr<ID3D12CommandAllocator> m_commandAllocator;			///< The command allocator for this frame
+		UINT64 m_fenceValue;										///< The fence value when rendering this Frame is complete
+	};
+
+	static PROC loadProc(HMODULE module, char const* name);
+	Result createFrameResources();
+		/// Blocks until gpu has completed all work
+	void waitForGpu();
+	void releaseFrameResources();
+
+	DXGI_FORMAT m_targetFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+	DXGI_FORMAT m_depthStencilFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+	bool m_hasVsync = true;
+	bool m_isFullSpeed = false;
+	bool m_allowFullScreen = false;
+	bool m_isMultiSampled = false;
+	int m_numTargetSamples = 1;								///< The number of multi sample samples
+	int m_targetSampleQuality = 0;							///< The multi sample quality
+
+	int m_windowWidth = 0;
+	int m_windowHeight = 0;
+
+	bool m_isInitialized = false;
 
     float m_clearColor[4] = { 0, 0, 0, 0 };
 
-    ComPtr<IDXGISwapChain1> m_swapChain;
-    ComPtr<ID3D12CommandQueue> m_commandQueue;
-    ComPtr<ID3D12Device> m_device;
-    ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
+	D3D12_VIEWPORT m_viewport = {};
 
-    ComPtr<ID3D12Resource> m_backBufferResources[2];
-    ComPtr<ID3D12CommandAllocator> m_commandAllocator;
+	ComPtr<ID3D12Debug> m_dxDebug;
+
+	ComPtr<ID3D12Device> m_device;
+	ComPtr<IDXGISwapChain3> m_swapChain;
+    ComPtr<ID3D12CommandQueue> m_commandQueue;
+    ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
+	ComPtr<ID3D12GraphicsCommandList> m_commandList;
+
+	D3D12_RECT m_scissorRect = {};
+
+	UINT m_rtvDescriptorSize = 0;
+
+	ComPtr<ID3D12DescriptorHeap> m_dsvHeap;
+	UINT m_dsvDescriptorSize = 0;
+
+	// Synchronization objects.
+	D3D12CounterFence m_fence;
+
+	HANDLE m_swapChainWaitableObject;
+
+	// Frame specific data
+	int m_numRenderFrames = 0;
+	UINT m_frameIndex = 0;
+	FrameInfo m_frameInfos[kMaxNumRenderFrames];
+
+	int m_numRenderTargets = 2;
+	int m_renderTargetIndex = 0;
+
+	D3D12Resource* m_backBuffers[kMaxNumRenderTargets];
+	D3D12Resource* m_renderTargets[kMaxNumRenderTargets];
+
+	D3D12Resource m_backBufferResources[kMaxNumRenderTargets];
+	D3D12Resource m_renderTargetResources[kMaxNumRenderTargets];
+
+	D3D12Resource m_depthStencil;
+	D3D12_CPU_DESCRIPTOR_HANDLE m_depthStencilView;
+
+	int32_t m_depthStencilUsageFlags = 0;	///< D3DUtil::UsageFlag combination for depth stencil
+	int32_t m_targetUsageFlags = 0;			///< D3DUtil::UsageFlag combination for target
+
+	HWND m_hwnd = nullptr;
 };
 
 Renderer* createD3D12Renderer()
 {
-    return new D3D12Renderer;
+	return new D3D12Renderer;
 }
 
-PROC D3D12Renderer::loadProc(HMODULE module, char const* name)
+/* static */PROC D3D12Renderer::loadProc(HMODULE module, char const* name)
 {
     PROC proc = ::GetProcAddress(module, name);
     if (!proc)
@@ -111,24 +171,46 @@ PROC D3D12Renderer::loadProc(HMODULE module, char const* name)
     return proc;
 }
 
-/* static */DXGI_FORMAT D3D12Renderer::mapFormat(Format format)
+void D3D12Renderer::releaseFrameResources()
 {
-    switch (format)
-    {
-        case Format::RGB_Float32:
-            return DXGI_FORMAT_R32G32B32_FLOAT;
-        case Format::RG_Float32:
-            return DXGI_FORMAT_R32G32_FLOAT;
-        default:
-            return DXGI_FORMAT_UNKNOWN;
-    }
+	// https://msdn.microsoft.com/en-us/library/windows/desktop/bb174577%28v=vs.85%29.aspx
+
+	// Release the resources holding references to the swap chain (requirement of
+	// IDXGISwapChain::ResizeBuffers) and reset the frame fence values to the
+	// current fence value.
+	for (int i = 0; i < m_numRenderFrames; i++)
+	{
+		FrameInfo& info = m_frameInfos[i];
+		info.reset();
+		info.m_fenceValue = m_fence.getCurrentValue();
+	}
+	for (int i = 0; i < m_numRenderTargets; i++)
+	{
+		m_backBuffers[i]->setResourceNull();
+		m_renderTargets[i]->setResourceNull();
+	}
+}
+
+void D3D12Renderer::waitForGpu()
+{
+	m_fence.nextSignalAndWait(m_commandQueue);
+}
+
+D3D12Renderer::~D3D12Renderer()
+{
+	if (m_isInitialized)
+	{
+		// Ensure that the GPU is no longer referencing resources that are about to be
+		// cleaned up by the destructor.
+		waitForGpu();
+	}
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! Renderer interface !!!!!!!!!!!!!!!!!!!!!!!!!!
 
 SlangResult D3D12Renderer::initialize(void* inWindowHandle)
 {
-    auto windowHandle = (HWND)inWindowHandle;
+	m_hwnd = (HWND)inWindowHandle;
     // Rather than statically link against D3D, we load it dynamically.
 
     HMODULE d3dModule = LoadLibraryA("d3d12.dll");
@@ -138,36 +220,57 @@ SlangResult D3D12Renderer::initialize(void* inWindowHandle)
         return SLANG_FAIL;
     }
 
-#define LOAD_PROC(TYPE, NAME) \
-        TYPE NAME##_ = (TYPE) loadProc(d3dModule, #NAME); \
-        if (NAME##_ == nullptr) return SLANG_FAIL;
+	HMODULE dxgiModule = LoadLibraryA("Dxgi.dll");
+	if (!dxgiModule)
+	{
+		fprintf(stderr, "error: failed load 'dxgi.dll'\n");
+		return SLANG_FAIL;
+	}
+
+
+#define LOAD_D3D_PROC(TYPE, NAME) \
+        TYPE NAME##_ = (TYPE) loadProc(d3dModule, #NAME); 
+#define LOAD_DXGI_PROC(TYPE, NAME) \
+        TYPE NAME##_ = (TYPE) loadProc(dxgiModule, #NAME); 
 
     UINT dxgiFactoryFlags = 0;
 
 #if ENABLE_DEBUG_LAYER
-    LOAD_PROC(PFN_D3D12_GET_DEBUG_INTERFACE, D3D12GetDebugInterface);
-
-    ID3D12Debug* debugController;
-    if (SUCCEEDED(D3D12GetDebugInterface_(IID_PPV_ARGS(&debugController))))
-    {
-        debugController->EnableDebugLayer();
-        dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
-    }
+	{
+		LOAD_D3D_PROC(PFN_D3D12_GET_DEBUG_INTERFACE, D3D12GetDebugInterface);
+		if (D3D12GetDebugInterface_)
+		{
+			if (SUCCEEDED(D3D12GetDebugInterface_(IID_PPV_ARGS(m_dxDebug.writeRef()))))
+			{
+				m_dxDebug->EnableDebugLayer();
+				dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
+			}
+		}
+	}
 #endif
 
-    typedef HRESULT(WINAPI *PFN_DXGI_CREATE_FACTORY_2)(UINT Flags, REFIID riid, _COM_Outptr_ void **ppFactory);
-
-    LOAD_PROC(PFN_DXGI_CREATE_FACTORY_2, CreateDXGIFactory2);
-
-    IDXGIFactory4* dxgiFactory;
-    SLANG_RETURN_ON_FAIL(CreateDXGIFactory2_(dxgiFactoryFlags, IID_PPV_ARGS(&dxgiFactory)));
-
+	// Try and create DXGIFactory
+	ComPtr<IDXGIFactory4> dxgiFactory;
+	{
+		typedef HRESULT(WINAPI *PFN_DXGI_CREATE_FACTORY_2)(UINT Flags, REFIID riid, _COM_Outptr_ void **ppFactory);
+		LOAD_DXGI_PROC(PFN_DXGI_CREATE_FACTORY_2, CreateDXGIFactory2);
+		if (!CreateDXGIFactory2_)
+		{
+			return SLANG_FAIL;
+		}
+		SLANG_RETURN_ON_FAIL(CreateDXGIFactory2_(dxgiFactoryFlags, IID_PPV_ARGS(dxgiFactory.writeRef())));
+	}
+    
     D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_11_0;
 
     // Search for an adapter that meets our requirements
     ComPtr<IDXGIAdapter> adapter;
     
-    LOAD_PROC(PFN_D3D12_CREATE_DEVICE, D3D12CreateDevice);
+    LOAD_D3D_PROC(PFN_D3D12_CREATE_DEVICE, D3D12CreateDevice);
+	if (!D3D12CreateDevice_)
+	{
+		return SLANG_FAIL;
+	}
 
     UINT adapterCounter = 0;
     for (;;)
@@ -198,58 +301,249 @@ SlangResult D3D12Renderer::initialize(void* inWindowHandle)
         // Couldn't find an adapter
         return SLANG_FAIL;
     }
+	
+	m_numRenderFrames = 3;
+	m_numRenderTargets = 2;
+	
+	m_windowWidth = gWindowWidth;
+	m_windowHeight = gWindowHeight;
 
-    // Command Queue
-    D3D12_COMMAND_QUEUE_DESC queueDesc = {};
-    queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+	// set viewport
+	{
+		m_viewport.Width = float(m_windowWidth);
+		m_viewport.Height = float(m_windowHeight);
+		m_viewport.MinDepth = 0;
+		m_viewport.MaxDepth = 1;
+		m_viewport.TopLeftX = 0;
+		m_viewport.TopLeftY = 0;
+	}
 
-    SLANG_RETURN_ON_FAIL(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(m_commandQueue.writeRef())));
+	{
+		m_scissorRect.left = 0;
+		m_scissorRect.top = 0;
+		m_scissorRect.right = m_windowWidth;
+		m_scissorRect.bottom = m_windowHeight;
+	}
 
-    // Swap Chain
-    UINT frameCount = 2; // TODO: configure
+	// Describe and create the command queue.
+	D3D12_COMMAND_QUEUE_DESC queueDesc = {};
+	queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+	queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 
-    DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
-    swapChainDesc.BufferCount = frameCount;
-    swapChainDesc.Width = gWindowWidth;
-    swapChainDesc.Height = gWindowHeight;
-    swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
-    swapChainDesc.SampleDesc.Count = 1;
+	SLANG_RETURN_ON_FAIL(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(m_commandQueue.writeRef())));
 
-    SLANG_RETURN_ON_FAIL(dxgiFactory->CreateSwapChainForHwnd(m_commandQueue, windowHandle, &swapChainDesc, nullptr, nullptr, m_swapChain.writeRef()));
+	// Describe the swap chain.
+	DXGI_SWAP_CHAIN_DESC swapChainDesc = {};
+	swapChainDesc.BufferCount = m_numRenderTargets;
+	swapChainDesc.BufferDesc.Width = m_windowWidth;
+	swapChainDesc.BufferDesc.Height = m_windowHeight;
+	swapChainDesc.BufferDesc.Format = m_targetFormat;
+	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+	swapChainDesc.OutputWindow = m_hwnd;
+	swapChainDesc.SampleDesc.Count = 1;
+	swapChainDesc.Windowed = TRUE;
 
-    // Is this needed?
-    dxgiFactory->MakeWindowAssociation(windowHandle, DXGI_MWA_NO_ALT_ENTER);
+	if (m_isFullSpeed)
+	{
+		m_hasVsync = false;
+		m_allowFullScreen = false;
+	}
 
-    ComPtr<IDXGISwapChain3> swapChainEx;
-    SLANG_RETURN_ON_FAIL(m_swapChain->QueryInterface(IID_PPV_ARGS(swapChainEx.writeRef())));
+	if (!m_hasVsync)
+	{
+		swapChainDesc.Flags |= DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
+	}
 
-    UINT frameIndex = swapChainEx->GetCurrentBackBufferIndex();
+	// Swap chain needs the queue so that it can force a flush on it.
+	ComPtr<IDXGISwapChain> swapChain;
+	SLANG_RETURN_ON_FAIL(dxgiFactory->CreateSwapChain(m_commandQueue, &swapChainDesc, swapChain.writeRef()));
+	SLANG_RETURN_ON_FAIL(swapChain->QueryInterface(m_swapChain.writeRef()));
 
-    // Descriptor heaps
+	if (!m_hasVsync)
+	{
+		m_swapChainWaitableObject = m_swapChain->GetFrameLatencyWaitableObject();
 
-    D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
-    rtvHeapDesc.NumDescriptors = frameCount;
-    rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+		int maxLatency = m_numRenderTargets - 2;
 
-    SLANG_RETURN_ON_FAIL(m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(m_rtvHeap.writeRef())));
+		// Make sure the maximum latency is in the range required by dx12 runtime
+		maxLatency = (maxLatency < 1) ? 1 : maxLatency;
+		maxLatency = (maxLatency > DXGI_MAX_SWAP_CHAIN_BUFFERS) ? DXGI_MAX_SWAP_CHAIN_BUFFERS : maxLatency;
 
-    UINT rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+		m_swapChain->SetMaximumFrameLatency(maxLatency);
+	}
 
-    D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
+	// This sample does not support fullscreen transitions.
+	SLANG_RETURN_ON_FAIL(dxgiFactory->MakeWindowAssociation(m_hwnd, DXGI_MWA_NO_ALT_ENTER));
 
-    // Create per-frame RTVs
-    ComPtr<ID3D12Resource> backBufferResources[2];
-    for (UINT ff = 0; ff < frameCount; ++ff)
-    {
-        SLANG_RETURN_ON_FAIL(swapChainEx->GetBuffer(ff, IID_PPV_ARGS(m_backBufferResources[ff].writeRef())));
-        m_device->CreateRenderTargetView(backBufferResources[ff], nullptr, rtvHandle);
-        rtvHandle.ptr += rtvDescriptorSize;
-    }
+	m_renderTargetIndex = m_swapChain->GetCurrentBackBufferIndex();
 
-    SLANG_RETURN_ON_FAIL(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(m_commandAllocator.writeRef())));
+	// Create descriptor heaps.
+	{
+		// Describe and create a render target view (RTV) descriptor heap.
+		D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
+
+		rtvHeapDesc.NumDescriptors = m_numRenderTargets;
+		rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+		rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+		SLANG_RETURN_ON_FAIL(m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(m_rtvHeap.writeRef())));
+		m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	}
+
+	{
+		// Describe and create a depth stencil view (DSV) descriptor heap.
+		D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
+		dsvHeapDesc.NumDescriptors = 1;
+		dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+		dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+		SLANG_RETURN_ON_FAIL(m_device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(m_dsvHeap.writeRef())));
+
+		m_dsvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+	}
+
+	// Setup frame resources
+	{
+		SLANG_RETURN_ON_FAIL(createFrameResources());
+	}
+
+	// Setup fence, and close the command list (as default state without begin/endRender is closed)
+	{
+		SLANG_RETURN_ON_FAIL(m_fence.init(m_device));
+		// Create the command list. When command lists are created they are open, so close it.
+		FrameInfo& frame = m_frameInfos[m_frameIndex];
+		SLANG_RETURN_ON_FAIL(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, frame.m_commandAllocator, nullptr, IID_PPV_ARGS(m_commandList.writeRef())));
+		m_commandList->Close();
+	}
+
+	m_isInitialized = true;
     return SLANG_OK;
+}
+
+Result D3D12Renderer::createFrameResources()
+{
+	// Create back buffers
+	{
+		D3D12_CPU_DESCRIPTOR_HANDLE rtvStart(m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
+
+		// Create a RTV, and a command allocator for each frame.
+		for (int i = 0; i < m_numRenderTargets; i++)
+		{
+			// Get the back buffer
+			ComPtr<ID3D12Resource> backBuffer;
+			SLANG_RETURN_ON_FAIL(m_swapChain->GetBuffer(UINT(i), IID_PPV_ARGS(backBuffer.writeRef())));
+
+			// Set up resource for back buffer
+			m_backBufferResources[i].setResource(backBuffer, D3D12_RESOURCE_STATE_COMMON);
+			m_backBuffers[i] = &m_backBufferResources[i];
+			// Assume they are the same thing for now...
+			m_renderTargets[i] = &m_backBufferResources[i];
+
+			// If we are multi-sampling - create a render target separate from the back buffer
+			if (m_isMultiSampled)
+			{
+				D3D12_HEAP_PROPERTIES heapProps;
+				heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
+				heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+				heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+				heapProps.CreationNodeMask = 1;
+				heapProps.VisibleNodeMask = 1;
+
+				D3D12_RESOURCE_DESC desc = backBuffer->GetDesc();
+
+				DXGI_FORMAT resourceFormat = D3DUtil::calcResourceFormat(D3DUtil::USAGE_TARGET, m_targetUsageFlags, desc.Format);
+				DXGI_FORMAT targetFormat = D3DUtil::calcFormat(D3DUtil::USAGE_TARGET, resourceFormat);
+
+				// Set the target format
+				m_targetFormat = targetFormat;
+
+				D3D12_CLEAR_VALUE clearValue = {};
+				clearValue.Format = targetFormat;
+
+				// Don't know targets alignment, so just memory copy
+				::memcpy(clearValue.Color, m_clearColor, sizeof(m_clearColor));
+
+				desc.Format = resourceFormat;
+				desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+				desc.SampleDesc.Count = m_numTargetSamples;
+				desc.SampleDesc.Quality = m_targetSampleQuality; 
+				desc.Alignment = 0;
+
+				SLANG_RETURN_ON_FAIL(m_renderTargetResources[i].initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, desc, D3D12_RESOURCE_STATE_RENDER_TARGET, &clearValue));
+				m_renderTargets[i] = &m_renderTargetResources[i];
+			}
+
+			D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = { rtvStart.ptr + i * m_rtvDescriptorSize };
+			m_device->CreateRenderTargetView(*m_renderTargets[i], nullptr, rtvHandle);
+		}
+	}
+
+	// Set up frames
+	for (int i = 0; i < m_numRenderFrames; i++)
+	{
+		FrameInfo& frame = m_frameInfos[i];
+		SLANG_RETURN_ON_FAIL(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(frame.m_commandAllocator.writeRef())));
+	}
+
+	{
+		D3D12_RESOURCE_DESC desc = m_backBuffers[0]->getResource()->GetDesc();
+		assert(desc.Width == UINT64(m_windowWidth) && desc.Height == UINT64(m_windowHeight));
+	}
+
+	// Create the depth stencil view.
+	{
+		D3D12_HEAP_PROPERTIES heapProps;
+		heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
+		heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+		heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+		heapProps.CreationNodeMask = 1;
+		heapProps.VisibleNodeMask = 1;
+
+		DXGI_FORMAT resourceFormat = D3DUtil::calcResourceFormat(D3DUtil::USAGE_DEPTH_STENCIL, m_depthStencilUsageFlags, m_depthStencilFormat);
+		DXGI_FORMAT depthStencilFormat = D3DUtil::calcFormat(D3DUtil::USAGE_DEPTH_STENCIL, resourceFormat);
+
+		// Set the depth stencil format
+		m_depthStencilFormat = depthStencilFormat;
+
+		// Setup default clear
+		D3D12_CLEAR_VALUE clearValue = {};
+		clearValue.Format = depthStencilFormat;
+		clearValue.DepthStencil.Depth = 1.0f;
+		clearValue.DepthStencil.Stencil = 0;
+
+		D3D12_RESOURCE_DESC resourceDesc = {};
+		resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+		resourceDesc.Format = resourceFormat;
+		resourceDesc.Width = m_windowWidth;
+		resourceDesc.Height = m_windowHeight;
+		resourceDesc.DepthOrArraySize = 1;
+		resourceDesc.MipLevels = 1;
+		resourceDesc.SampleDesc.Count = m_numTargetSamples;
+		resourceDesc.SampleDesc.Quality = m_targetSampleQuality;
+		resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+		resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+		resourceDesc.Alignment = 0;
+
+		SLANG_RETURN_ON_FAIL(m_depthStencil.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, resourceDesc, D3D12_RESOURCE_STATE_DEPTH_WRITE, &clearValue));
+
+		// Set the depth stencil
+		D3D12_DEPTH_STENCIL_VIEW_DESC depthStencilDesc = {};
+		depthStencilDesc.Format = depthStencilFormat;
+		depthStencilDesc.ViewDimension = m_isMultiSampled ? D3D12_DSV_DIMENSION_TEXTURE2DMS : D3D12_DSV_DIMENSION_TEXTURE2D;
+		depthStencilDesc.Flags = D3D12_DSV_FLAG_NONE;
+
+		// Set up as the depth stencil view
+		m_device->CreateDepthStencilView(m_depthStencil, &depthStencilDesc, m_dsvHeap->GetCPUDescriptorHandleForHeapStart());
+		m_depthStencilView = m_dsvHeap->GetCPUDescriptorHandleForHeapStart();
+	}
+
+	m_viewport.Width = static_cast<float>(m_windowWidth);
+	m_viewport.Height = static_cast<float>(m_windowHeight);
+	m_viewport.MaxDepth = 1.0f;
+
+	m_scissorRect.right = static_cast<LONG>(m_windowWidth);
+	m_scissorRect.bottom = static_cast<LONG>(m_windowHeight);
+
+	return SLANG_OK;
 }
 
 void D3D12Renderer::setClearColor(const float color[4])
@@ -259,10 +553,47 @@ void D3D12Renderer::setClearColor(const float color[4])
 
 void D3D12Renderer::clearFrame()
 {
+	// Record commands
+	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = { m_rtvHeap->GetCPUDescriptorHandleForHeapStart().ptr + m_renderTargetIndex * m_rtvDescriptorSize };
+	m_commandList->ClearRenderTargetView(rtvHandle, m_clearColor, 0, nullptr);
+	if (m_depthStencil)
+	{
+		m_commandList->ClearDepthStencilView(m_depthStencilView, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+	}
 }
 
 void D3D12Renderer::presentFrame()
 {
+	if (m_swapChainWaitableObject)
+	{
+		// check if now is good time to present
+		// This doesn't wait - because the wait time is 0. If it returns WAIT_TIMEOUT it means that no frame is waiting to be be displayed
+		// so there is no point doing a present.
+		const bool shouldPresent = (WaitForSingleObjectEx(m_swapChainWaitableObject, 0, TRUE) != WAIT_TIMEOUT);
+		if (shouldPresent)
+		{
+			m_swapChain->Present(0, 0);
+		}
+	}
+	else
+	{
+		SLANG_ASSERT_VOID_ON_FAIL(m_swapChain->Present(1, 0));
+	}
+
+	// Increment the fence value. Save on the frame - we'll know that frame is done when the fence value >= 
+	m_frameInfos[m_frameIndex].m_fenceValue = m_fence.nextSignal(m_commandQueue);
+
+	// increment frame index after signal
+	m_frameIndex = (m_frameIndex + 1) % m_numRenderFrames;
+	// Update the render target index.
+	m_renderTargetIndex = m_swapChain->GetCurrentBackBufferIndex();
+
+	// On the current frame wait until it is completed 
+	{
+		FrameInfo& frame = m_frameInfos[m_frameIndex];
+		// If the next frame is not ready to be rendered yet, wait until it is ready.
+		m_fence.waitUntilCompleted(frame.m_fenceValue);
+	}
 }
 
 SlangResult D3D12Renderer::captureScreenShot(const char* outputPath)

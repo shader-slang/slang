@@ -3,6 +3,7 @@
 #include "options.h"
 #include "render.h"
 #include "render-d3d11.h"
+#include "render-d3d12.h"
 #include "render-gl.h"
 #include "render-vk.h"
 
@@ -334,7 +335,11 @@ SlangResult innerMain(int argc, char** argv)
 			nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
 			break;
 
-			// TODO: `RendererID::D3D12`
+		case RendererID::D3D12:
+			renderer = createD3D12Renderer();
+			slangTarget = SLANG_HLSL;
+			nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
+			break;
 
 		case RendererID::GL:
 			renderer = createGLRenderer();

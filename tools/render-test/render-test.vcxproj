@@ -173,6 +173,7 @@
     <ClCompile Include="render-d3d12.cpp" />
     <ClCompile Include="render-gl.cpp" />
     <ClCompile Include="render-vk.cpp" />
+    <ClCompile Include="resource-d3d12.cpp" />
     <ClCompile Include="shader-input-layout.cpp" />
     <ClCompile Include="slang-support.cpp" />
   </ItemGroup>
@@ -184,6 +185,7 @@
     <ClInclude Include="render-gl.h" />
     <ClInclude Include="render-vk.h" />
     <ClInclude Include="render.h" />
+    <ClInclude Include="resource-d3d12.h" />
     <ClInclude Include="shader-input-layout.h" />
     <ClInclude Include="slang-support.h" />
     <ClInclude Include="window.h" />
