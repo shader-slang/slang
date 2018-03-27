@@ -2820,18 +2820,38 @@ namespace Slang
             // Nothing to do
         }
 
-        void visitParamDecl(ParamDecl* para)
+        void visitParamDecl(ParamDecl* paramDecl)
         {
-            // TODO: This needs to bottleneck through the common variable checks
+            // TODO: This logic should be shared with the other cases of
+            // variable declarations. The main reason I am not doing it
+            // yet is that we use a `ParamDecl` with a null type as a
+            // special case in attribute declarations, and that could
+            // trip up the ordinary variable checks.
 
-            if(para->type.exp)
+            auto typeExpr = paramDecl->type;
+            if(typeExpr.exp)
             {
-                para->type = CheckUsableType(para->type);
-            
-                if (para->type.Equals(getSession()->getVoidType()))
-                {
-                    getSink()->diagnose(para, Diagnostics::parameterCannotBeVoid);
-                }
+                typeExpr = CheckUsableType(typeExpr);
+                paramDecl->type = typeExpr;
+            }
+
+            // The "initializer" expression for a parameter represents
+            // a default argument value to use if an explicit one is
+            // not supplied.
+            if(auto initExpr = paramDecl->initExpr)
+            {
+                // We must check the expression and coerce it to the
+                // actual type of the parameter.
+                //
+                initExpr = CheckExpr(initExpr);
+                initExpr = Coerce(typeExpr.type, initExpr);
+                paramDecl->initExpr = initExpr;
+
+                // TODO: a default argument expression needs to
+                // conform to other constraints to be valid.
+                // For example, it should not be allowed to refer
+                // to other parameters of the same function (or maybe
+                // only the parameters to its left...).
             }
         }
 
