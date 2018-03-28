@@ -497,6 +497,7 @@ extern "C"
 
     typedef struct SlangReflection                  SlangReflection;
     typedef struct SlangReflectionEntryPoint        SlangReflectionEntryPoint;
+    typedef struct SlangReflectionModifier          SlangReflectionModifier;
     typedef struct SlangReflectionType              SlangReflectionType;
     typedef struct SlangReflectionTypeLayout        SlangReflectionTypeLayout;
     typedef struct SlangReflectionVariable          SlangReflectionVariable;
@@ -643,6 +644,12 @@ extern "C"
         SLANG_LAYOUT_RULES_DEFAULT,
     };
 
+    typedef SlangUInt32 SlangModifierID;
+    enum
+    {
+        SLANG_MODIFIER_SHARED,
+    };
+
     // Type Reflection
 
     SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* type);
@@ -682,6 +689,8 @@ extern "C"
 
     SLANG_API char const* spReflectionVariable_GetName(SlangReflectionVariable* var);
     SLANG_API SlangReflectionType* spReflectionVariable_GetType(SlangReflectionVariable* var);
+
+    SLANG_API SlangReflectionModifier* spReflectionVariable_FindModifier(SlangReflectionVariable* var, SlangModifierID modifierID);
 
     // Variable Layout Reflection
 
@@ -1034,6 +1043,14 @@ namespace slang
         }
     };
 
+    struct Modifier
+    {
+        enum ID : SlangModifierID
+        {
+            Shared = SLANG_MODIFIER_SHARED,
+        };
+    };
+
     struct VariableReflection
     {
         char const* getName()
@@ -1044,6 +1061,11 @@ namespace slang
         TypeReflection* getType()
         {
             return (TypeReflection*) spReflectionVariable_GetType((SlangReflectionVariable*) this);
+        }
+
+        Modifier* findModifier(Modifier::ID id)
+        {
+            return (Modifier*) spReflectionVariable_FindModifier((SlangReflectionVariable*) this, (SlangModifierID) id);
         }
     };
 
@@ -1057,6 +1079,11 @@ namespace slang
         char const* getName()
         {
             return getVariable()->getName();
+        }
+
+        Modifier* findModifier(Modifier::ID id)
+        {
+            return getVariable()->findModifier(id);
         }
 
         TypeLayoutReflection* getTypeLayout()
