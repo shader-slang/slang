@@ -29,6 +29,9 @@ struct D3D12BarrierSubmitter
 	/// Flush barriers to command list 
 	SLANG_FORCE_INLINE void flush() { if (m_numBarriers > 0) _flush(); }
 
+        /// Transition resource from prevState to nextState
+    void transition(ID3D12Resource* resource, D3D12_RESOURCE_STATES prevState, D3D12_RESOURCE_STATES nextState);
+
 	/// Ctor
 	SLANG_FORCE_INLINE D3D12BarrierSubmitter(ID3D12GraphicsCommandList* commandList) : m_numBarriers(0), m_commandList(commandList) { }
 	/// Dtor

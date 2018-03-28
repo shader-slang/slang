@@ -23,6 +23,36 @@ D3D12_RESOURCE_BARRIER& D3D12BarrierSubmitter::_expandOne()
 	return m_barriers[m_numBarriers++];
 }
 
+D3D12BarrierSubmitter::transition(ID3D12Resource* resource, D3D12_RESOURCE_STATES prevState, D3D12_RESOURCE_STATES nextState)
+{
+    if (nextState != prevState)
+    {
+        D3D12_RESOURCE_BARRIER& barrier = expandOne();
+
+        const UINT subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        const D3D12_RESOURCE_BARRIER_FLAGS flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+
+        ::memset(&barrier, 0, sizeof(barrier));
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Flags = flags;
+        barrier.Transition.pResource = m_resource;
+        barrier.Transition.StateBefore = m_state;
+        barrier.Transition.StateAfter = nextState;
+        barrier.Transition.Subresource = subresource;
+    }
+    else
+    {
+        if (nextState == D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+        {
+            D3D12_RESOURCE_BARRIER& barrier = expandOne();
+
+            ::memset(&barrier, 0, sizeof(barrier));
+            barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+            barrier.UAV.pResource = m_resource;
+        }
+    }
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! D3D12ResourceBase !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 /* static */DXGI_FORMAT D3D12ResourceBase::calcFormat(D3DUtil::UsageType usage, ID3D12Resource* resource)
@@ -32,43 +62,12 @@ D3D12_RESOURCE_BARRIER& D3D12BarrierSubmitter::_expandOne()
 
 void D3D12ResourceBase::transition(D3D12_RESOURCE_STATES nextState, D3D12BarrierSubmitter& submitter)
 {
-	// If there is no resource, then there is nothing to transition
-	if (!m_resource)
+	// Transition only if there is a resource
+	if (m_resource)
 	{
-		return;
-	}
-
-	if (nextState != m_state)
-	{
-		D3D12_RESOURCE_BARRIER& barrier = submitter.expandOne();
-
-		const UINT subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-		const D3D12_RESOURCE_BARRIER_FLAGS flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-
-		::memset(&barrier, 0, sizeof(barrier));
-		barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-		barrier.Flags = flags;
-		barrier.Transition.pResource = m_resource;
-		barrier.Transition.StateBefore = m_state;
-		barrier.Transition.StateAfter = nextState;
-		barrier.Transition.Subresource = subresource;
-
-		m_prevState = m_state;
-		m_state = nextState;
-	}
-	else
-	{
-		if (nextState == D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
-		{
-			D3D12_RESOURCE_BARRIER& barrier = submitter.expandOne();
-
-			::memset(&barrier, 0, sizeof(barrier));
-			barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-			barrier.UAV.pResource = m_resource;
-
-			m_state = nextState;
-		}
-	}
+        submitter.transition(m_resource, m_state, nextState);
+        m_state = nextState;
+    }
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! D3D12CounterFence !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
