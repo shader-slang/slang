@@ -5,7 +5,7 @@
 // make sure that any `u` registers we allocate don't
 // interfere with render targets.
 
-#ifdef __SPIRE__
+#ifdef __SLANG__
 #define R(X) /**/
 #else
 #define R(X) X

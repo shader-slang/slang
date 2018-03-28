@@ -1,6 +1,6 @@
 //TEST:COMPARE_HLSL:-no-mangle -target dxbc-assembly -profile ps_4_0 -entry main
 
-// We want to make sure that the registers that Spire generates
+// We want to make sure that the registers Slang generates
 // are used, even if there are "dead" parameter earlier in the program.
 //
 // In this case, we declare two each of textures, samplers, and constant
@@ -8,10 +8,10 @@
 // Left to its own devices, the HLSL compiler would usually shift the
 // object that was used up to binding slot zero, and eliminate the one
 // that wasn't used.
-// We expect Spire to generate explicit annotations that stop this from
+// We expect Slang to generate explicit annotations that stop this from
 // happening.
 
-#ifdef __SPIRE__
+#ifdef __SLANG__
 #define R(X) /**/
 #else
 #define R(X) X

@@ -21,7 +21,7 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{DB00DA62-0533-4AFD-B59F-A67D5B3A0808}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>SpireCore</RootNamespace>
+    <RootNamespace>slang</RootNamespace>
     <ProjectName>slang</ProjectName>
     <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
   </PropertyGroup>

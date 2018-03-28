@@ -6,7 +6,7 @@
 // This file provides the vertex shader, while the fragment shader resides in
 // the file `multi-file-extra.hlsl`
 
-#ifdef __SPIRE__
+#ifdef __SLANG__
 #define R(X) /**/
 #else
 #define R(X) X

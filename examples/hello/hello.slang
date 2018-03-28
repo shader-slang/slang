@@ -1,4 +1,4 @@
-// shaders.spire
+// hello.slang
 
 cbuffer Uniforms
 {

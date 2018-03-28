@@ -157,7 +157,7 @@
     <ClCompile Include="hello.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="hello.spire" />
+    <None Include="hello.slang" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

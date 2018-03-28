@@ -4,6 +4,6 @@
     <ClCompile Include="hello.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="hello.spire" />
+    <None Include="hello.slang" />
   </ItemGroup>
 </Project>

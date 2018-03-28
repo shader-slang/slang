@@ -3,7 +3,7 @@
 // Let's make sure we generate correct output in cases
 // where there are non-trivial `packoffset`s needed
 
-#ifdef __SPIRE__
+#ifdef __SLANG__
 #define R(X) /**/
 #else
 #define R(X) X
