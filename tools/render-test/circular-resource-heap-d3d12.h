@@ -6,8 +6,6 @@
 
 #include "resource-d3d12.h"
 
-//#include <Nv/Common/Container/NvCoQueue.h>
-
 namespace renderer_test {
 
 /*! \brief The D3D12CircularResourceHeap is a heap that is suited for size constrained real-time resources allocation that 
@@ -24,15 +22,15 @@ sure the invariant holds, but in most normal usage it does so simply.
 
 Another feature of the heap is that it does not require upfront knowledge of how big a heap is needed. The backing resources will be expanded 
 dynamically with requests as needed. The only requirement is that know single request can be larger than m_blockSize specified in the Desc 
-used to initialize the heap. This is because all the backing resources are allocated to a single size. This limitation means the Dx12CircularResourceHeap
+used to initialize the heap. This is because all the backing resources are allocated to a single size. This limitation means the D3D12CircularResourceHeap
 may not be the best use for example for uploading a texture - because it's design is really around transitory uploads or write backs, and so more suited 
 to constant buffers, vertex buffer, index buffers and the like. 
 
-To upload a texture at program startup it is most likely better to use a Dx12ResourceScopeManager.
+To upload a texture at program startup it is most likely better to use a D3D12ResourceScopeManager.
 
 \code{.cpp}
 
-typedef Dx12CircularResourceHeap Heap;
+typedef D3D12CircularResourceHeap Heap;
 
 Heap::Cursor cursor = heap.allocateVertexBuffer(sizeof(Vertex) * numVerts);
 Memory:copy(cursor.m_position, verts, sizeof(Vertex) * numVerts);
@@ -46,11 +44,11 @@ m_commandList->...
 // Execute the command list on the command queue
 {
 	ID3D12CommandList* lists[] = { m_commandList };
-	m_commandQueue->ExecuteCommandLists(NV_COUNT_OF(lists), lists);
+	m_commandQueue->ExecuteCommandLists(SLANG_COUNT_OF(lists), lists);
 }
 
 // Add a sync point
-const UInt64 signalValue = m_fence.nextSignal(m_commandQueue);
+const uint64_t signalValue = m_fence.nextSignal(m_commandQueue);
 heap.addSync(signalValue)
 
 // The cursors cannot be used anymore
@@ -190,7 +188,7 @@ class D3D12CircularResourceHeap
 		/// Create a new block (with associated resource), do not add the block list
 	Block* _newBlock();
 
-	Block* m_blocks;					///< Circular singly linked list of block. NV_NULL initially
+	Block* m_blocks;					///< Circular singly linked list of block. nullptr initially
 	Slang::FreeList m_blockFreeList;			///< Free list of actual allocations of blocks
 	Slang::List<PendingEntry> m_pendingQueue;	///< Holds the list of pending positions. When the fence value is greater than the value on the queue entry, the entry is done.
 

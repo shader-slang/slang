@@ -844,30 +844,30 @@ BindingState* D3D11Renderer::createBindingState(const ShaderInputLayout& layout)
 {
 	List<Binding> bindings;
 
-    for (auto & entry : layout.entries)
+    for (auto & srcEntry : layout.entries)
     {
-        Binding rsEntry;
-        rsEntry.type = entry.type;
-        rsEntry.binding = entry.hlslBinding;
-        rsEntry.isOutput = entry.isOutput;
-        switch (entry.type)
+        Binding dstEntry;
+        dstEntry.type = srcEntry.type;
+        dstEntry.binding = srcEntry.hlslBinding;
+        dstEntry.isOutput = srcEntry.isOutput;
+        switch (srcEntry.type)
         {
             case ShaderInputType::Buffer:
             {
-                SLANG_RETURN_NULL_ON_FAIL(createInputBuffer(entry.bufferDesc, entry.bufferData, rsEntry.buffer, rsEntry.uav, rsEntry.srv));
+                SLANG_RETURN_NULL_ON_FAIL(createInputBuffer(srcEntry.bufferDesc, srcEntry.bufferData, dstEntry.buffer, dstEntry.uav, dstEntry.srv));
 
-                rsEntry.bufferLength = (int)(entry.bufferData.Count() * sizeof(unsigned int));
-                rsEntry.bufferType = entry.bufferDesc.type;
+                dstEntry.bufferLength = (int)(srcEntry.bufferData.Count() * sizeof(unsigned int));
+                dstEntry.bufferType = srcEntry.bufferDesc.type;
 				break;
 			}
             case ShaderInputType::Texture:
             {
-                SLANG_RETURN_NULL_ON_FAIL(createInputTexture(entry.textureDesc, rsEntry.srv));
+                SLANG_RETURN_NULL_ON_FAIL(createInputTexture(srcEntry.textureDesc, dstEntry.srv));
 				break;
 			}
             case ShaderInputType::Sampler:
             {
-                SLANG_RETURN_NULL_ON_FAIL(createInputSampler(entry.samplerDesc, rsEntry.samplerState));
+                SLANG_RETURN_NULL_ON_FAIL(createInputSampler(srcEntry.samplerDesc, dstEntry.samplerState));
 				break;
 			}
             case ShaderInputType::CombinedTextureSampler:
@@ -878,7 +878,7 @@ BindingState* D3D11Renderer::createBindingState(const ShaderInputLayout& layout)
 				break;
 			}
         }
-        bindings.Add(rsEntry);
+        bindings.Add(dstEntry);
     }
 
 	BindingStateImpl* rs = new BindingStateImpl;
