@@ -4,7 +4,7 @@
 // including the case where there are *multiple* constant buffers
 // with reosurces.
 
-#ifdef __SPIRE__
+#ifdef __SLANG__
 #define R(X) /**/
 #else
 #define R(X) X

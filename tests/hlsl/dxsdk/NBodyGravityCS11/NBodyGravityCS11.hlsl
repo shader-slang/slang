@@ -1,4 +1,4 @@
-//TEST_IGNORE_FILE: Currently failing due to Spire compiler issues.
+//TEST_IGNORE_FILE: Currently failing due to Slang compiler issues.
 //TEST:COMPARE_HLSL: -target dxbc-assembly -profile cs_4_0 -entry CSMain
 //--------------------------------------------------------------------------------------
 // File: NBodyGravityCS11.hlsl

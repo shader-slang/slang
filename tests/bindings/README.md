@@ -21,9 +21,9 @@ The resulting code guarantees that `tb` will always be assigned to the same loca
 Methodology
 -----------
 
-These tests currently rely on the ability to run the same HLSL code through the Spire compiler driver and execute either Spire, or HLSL. We write an example like the above by wrapping explicit `register` semantics in a macro:
+These tests currently rely on the ability to run the same HLSL code through the Slang compiler driver and execute either Slang, or HLSL. We write an example like the above by wrapping explicit `register` semantics in a macro:
 
     Texture2D ta R(: register(t0));
     Texture2D tb R(: register(t1));
 
-In the HLSL case, these annotations will manually place things where we want them, while in the Spire case, we define the macro to have an empty expansion, so that the annotations express our expectation for what the compiler will auto-generate.
+In the HLSL case, these annotations will manually place things where we want them, while in the Slang case, we define the macro to have an empty expansion, so that the annotations express our expectation for what the compiler will auto-generate.

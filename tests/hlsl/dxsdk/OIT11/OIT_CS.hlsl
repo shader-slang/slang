@@ -1,4 +1,4 @@
-//TEST_IGNORE_FILE: Currently failing due to Spire compiler issues.
+//TEST_IGNORE_FILE: Currently failing due to Slang compiler issues.
 //TEST:COMPARE_HLSL: -target dxbc-assembly -profile cs_4_0 -entry VSParticleDraw -profile gs_4_0 -entry GSParticleDraw -profile ps_4_0 -entry PSParticleDraw
 //-----------------------------------------------------------------------------
 // File: OIT_CS.hlsl
