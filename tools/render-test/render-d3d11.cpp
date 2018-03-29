@@ -118,7 +118,7 @@ public:
     void* map(ID3D11Buffer* buffer, MapFlavor flavor);
     void unmap(ID3D11Buffer* buffer);
 
-    Result createInputBuffer(InputBufferDesc& bufferDesc, const List<unsigned int>& bufferData, 
+    Result createInputBuffer(const InputBufferDesc& bufferDesc, const List<unsigned int>& bufferData, 
 		ComPtr<ID3D11Buffer>& bufferOut, ComPtr<ID3D11UnorderedAccessView>& viewOut, ComPtr<ID3D11ShaderResourceView>& srvOut);
 
     Result createInputTexture(const InputTextureDesc& inputDesc, ComPtr<ID3D11ShaderResourceView>& viewOut);
@@ -624,7 +624,7 @@ void D3D11Renderer::dispatchCompute(int x, int y, int z)
     m_immediateContext->Dispatch(x, y, z);
 }
 
-Result D3D11Renderer::createInputBuffer(InputBufferDesc& bufferDesc, const List<unsigned int>& bufferData, 
+Result D3D11Renderer::createInputBuffer(const InputBufferDesc& bufferDesc, const List<unsigned int>& bufferData, 
 	ComPtr<ID3D11Buffer>& bufferOut, ComPtr<ID3D11UnorderedAccessView>& viewOut, ComPtr<ID3D11ShaderResourceView>& srvOut)
 {
     D3D11_BUFFER_DESC desc = { 0 };
@@ -842,32 +842,42 @@ Result D3D11Renderer::createInputSampler(const InputSamplerDesc& inputDesc, ComP
 
 BindingState* D3D11Renderer::createBindingState(const ShaderInputLayout& layout)
 {
-	List<Binding> bindings;
+    RefPtr<BindingStateImpl> bindingState(new BindingStateImpl);
 
-    for (auto & srcEntry : layout.entries)
+    const List<ShaderInputLayoutEntry>& srcBindings = layout.entries;
+    const int numBindings = int(srcBindings.Count());
+
+    List<Binding>& dstBindings = bindingState->m_bindings;
+    dstBindings.SetSize(numBindings);
+
+    bindingState->m_numRenderTargets = layout.numRenderTargets;
+	
+    for (int i = 0; i < numBindings; ++i)
     {
-        Binding dstEntry;
-        dstEntry.type = srcEntry.type;
-        dstEntry.binding = srcEntry.hlslBinding;
-        dstEntry.isOutput = srcEntry.isOutput;
-        switch (srcEntry.type)
+        Binding& dstBinding = dstBindings[i];
+        const ShaderInputLayoutEntry& srcBinding = srcBindings[i];
+
+        dstBinding.type = srcBinding.type;
+        dstBinding.binding = srcBinding.hlslBinding;
+        dstBinding.isOutput = srcBinding.isOutput;
+        switch (srcBinding.type)
         {
             case ShaderInputType::Buffer:
             {
-                SLANG_RETURN_NULL_ON_FAIL(createInputBuffer(srcEntry.bufferDesc, srcEntry.bufferData, dstEntry.buffer, dstEntry.uav, dstEntry.srv));
+                SLANG_RETURN_NULL_ON_FAIL(createInputBuffer(srcBinding.bufferDesc, srcBinding.bufferData, dstBinding.buffer, dstBinding.uav, dstBinding.srv));
 
-                dstEntry.bufferLength = (int)(srcEntry.bufferData.Count() * sizeof(unsigned int));
-                dstEntry.bufferType = srcEntry.bufferDesc.type;
+                dstBinding.bufferLength = (int)(srcBinding.bufferData.Count() * sizeof(unsigned int));
+                dstBinding.bufferType = srcBinding.bufferDesc.type;
 				break;
 			}
             case ShaderInputType::Texture:
             {
-                SLANG_RETURN_NULL_ON_FAIL(createInputTexture(srcEntry.textureDesc, dstEntry.srv));
+                SLANG_RETURN_NULL_ON_FAIL(createInputTexture(srcBinding.textureDesc, dstBinding.srv));
 				break;
 			}
             case ShaderInputType::Sampler:
             {
-                SLANG_RETURN_NULL_ON_FAIL(createInputSampler(srcEntry.samplerDesc, dstEntry.samplerState));
+                SLANG_RETURN_NULL_ON_FAIL(createInputSampler(srcBinding.samplerDesc, dstBinding.samplerState));
 				break;
 			}
             case ShaderInputType::CombinedTextureSampler:
@@ -878,14 +888,9 @@ BindingState* D3D11Renderer::createBindingState(const ShaderInputLayout& layout)
 				break;
 			}
         }
-        bindings.Add(dstEntry);
     }
 
-	BindingStateImpl* rs = new BindingStateImpl;
-	rs->m_numRenderTargets = layout.numRenderTargets;
-	rs->m_bindings.SwapWith(bindings);
-
-    return rs;
+    return bindingState.detach();
 }
 
 void D3D11Renderer::applyBindingState(bool isCompute)
