@@ -1,10 +1,10 @@
 //TEST:COMPARE_HLSL:-no-mangle -target dxbc-assembly -profile ps_4_0 -entry main
 
-// Let's first confirm that Spire can reproduce what the
+// Let's first confirm that Slang can reproduce what the
 // HLSL compiler would already do in the simple case (when
 // all shader parameters are actually used).
 
-#ifdef __SPIRE__
+#ifdef __SLANG__
 #define R(X) /**/
 #else
 #define R(X) X

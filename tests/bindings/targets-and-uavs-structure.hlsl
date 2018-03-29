@@ -3,7 +3,7 @@
 // Handle the case where the fragment shader output is
 // defined a structure, and the semantics are on the sub-fields
 
-#ifdef __SPIRE__
+#ifdef __SLANG__
 #define R(X) /**/
 #else
 #define R(X) X

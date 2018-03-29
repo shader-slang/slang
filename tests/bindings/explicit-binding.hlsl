@@ -3,7 +3,7 @@
 // We need to allow the user to add explicit bindings to their parameters,
 // and we can't go and auto-assign anything to use the same locations.
 
-#ifdef __SPIRE__
+#ifdef __SLANG__
 #define R(X) /**/
 #else
 #define R(X) X

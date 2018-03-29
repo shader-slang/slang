@@ -21,7 +21,7 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{0C768A18-1D25-4000-9F37-DA5FE99E3B64}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>SpireTestTool</RootNamespace>
+    <RootNamespace>slang_test</RootNamespace>
     <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />

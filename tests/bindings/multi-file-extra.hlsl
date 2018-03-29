@@ -5,7 +5,7 @@
 
 // This file provides the fragment shader, and is only meant to be tested in combination with `multi-file.hlsl`
 
-#ifdef __SPIRE__
+#ifdef __SLANG__
 #define R(X) /**/
 #else
 #define R(X) X

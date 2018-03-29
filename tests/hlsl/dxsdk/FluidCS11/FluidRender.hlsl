@@ -1,4 +1,4 @@
-//TEST_IGNORE_FILE: Currently failing due to Spire compiler issues.
+//TEST_IGNORE_FILE: Currently failing due to Slang compiler issues.
 //TEST:COMPARE_HLSL: -target dxbc-assembly -profile vs_4_0 -entry ParticleVS -profile gs_4_0 -entry ParticleGS -profile ps_4_0 -entry ParticlePS
 //--------------------------------------------------------------------------------------
 // File: FluidRender.hlsl
