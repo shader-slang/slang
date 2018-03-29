@@ -681,6 +681,26 @@ SLANG_API SlangReflectionType* spReflectionVariable_GetType(SlangReflectionVaria
     return  convert(var->getType());
 }
 
+SLANG_API SlangReflectionModifier* spReflectionVariable_FindModifier(SlangReflectionVariable* inVar, SlangModifierID modifierID)
+{
+    auto var = convert(inVar);
+    if(!var) return nullptr;
+
+    Modifier* modifier = nullptr;
+    switch( modifierID )
+    {
+    case SLANG_MODIFIER_SHARED:
+        modifier = var->FindModifier<HLSLEffectSharedModifier>();
+        break;
+
+    default:
+        return nullptr;
+    }
+
+    return (SlangReflectionModifier*) modifier;
+}
+
+
 // Variable Layout Reflection
 
 SLANG_API SlangReflectionVariable* spReflectionVariableLayout_GetVariable(SlangReflectionVariableLayout* inVarLayout)
