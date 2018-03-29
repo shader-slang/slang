@@ -1530,12 +1530,16 @@ namespace Slang
                     SLANG_ASSERT(attr->args.Count() == 1);
                     auto val = checkConstantIntVal(attr->args[0]);
 
+                    if(!val) return false;
+
                     maxVertexCountAttr->value = (int32_t)val->value;
                 }
                 else if(auto instanceAttr = attr.As<InstanceAttribute>())
                 {
                     SLANG_ASSERT(attr->args.Count() == 1);
                     auto val = checkConstantIntVal(attr->args[0]);
+
+                    if(!val) return false;
 
                     instanceAttr->value = (int32_t)val->value;
                 }
@@ -3535,8 +3539,15 @@ namespace Slang
         // Enforce that an expression resolves to an integer constant, and get its value
         RefPtr<IntVal> CheckIntegerConstantExpression(Expr* inExpr)
         {
+            // No need to issue further errors if the expression didn't even type-check.
+            if(IsErrorExpr(inExpr)) return nullptr;
+
             // First coerce the expression to the expected type
             auto expr = Coerce(getSession()->getIntType(),inExpr);
+
+            // No need to issue further errors if the type coercion failed.
+            if(IsErrorExpr(expr)) return nullptr;
+
             auto result = TryCheckIntegerConstantExpression(expr.Ptr());
             if (!result)
             {
