@@ -67,7 +67,9 @@ public:
     virtual void setConstantBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers,  const UInt* offsets) override;
     virtual void draw(UInt vertexCount, UInt startVertex) override;
     virtual void dispatchCompute(int x, int y, int z) override;
-    
+    virtual void submitGpuWork() override {}
+    virtual void waitForGpu() override {}
+
     // ShaderCompiler implementation
     virtual ShaderProgram* compileProgram(ShaderCompileRequest const& request) override;
 

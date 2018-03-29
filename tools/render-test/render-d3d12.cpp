@@ -68,6 +68,8 @@ public:
     virtual void setConstantBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* offsets) override;
     virtual void draw(UInt vertexCount, UInt startVertex) override;
     virtual void dispatchCompute(int x, int y, int z) override;
+    virtual void submitGpuWork() override;
+    virtual void waitForGpu() override;
 
     // ShaderCompiler implementation
     virtual ShaderProgram* compileProgram(const ShaderCompileRequest& request) override;
@@ -156,7 +158,6 @@ protected:
 	static PROC loadProc(HMODULE module, char const* name);
 	Result createFrameResources();
 		/// Blocks until gpu has completed all work
-	void waitForGpu();
 	void releaseFrameResources();
 
     Result createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const void* srcData, D3D12Resource& uploadResource, D3D12_RESOURCE_STATES finalState, D3D12Resource& resourceOut);
@@ -166,6 +167,21 @@ protected:
     Result createInputTexture(const InputTextureDesc& inputDesc,  D3D12DescriptorHeap& viewHeap, int srvIndex, D3D12Resource& resourceOut);
     Result createInputBuffer(InputBufferDesc& bufferDesc, const List<unsigned int>& bufferData, D3D12DescriptorHeap& viewHeap, int uavIndex, int srvIndex,
         D3D12Resource& resourceOut);
+
+    void beginGpuWork();
+    
+    void beginRender();
+
+    void endRender();
+
+    void submitGpuWorkAndWait();
+
+    FrameInfo& getFrame() { return m_frameInfos[m_frameIndex]; }
+    const FrameInfo& getFrame() const { return m_frameInfos[m_frameIndex]; }
+
+    ID3D12GraphicsCommandList* getCommandList() const { return m_commandList; }
+
+    int m_commandListOpenCount = 0;			///< If >0 the command list should be open
 
 	List<RefPtr<BufferImpl> > m_boundVertexBuffers;
 	List<RefPtr<BufferImpl> > m_boundConstantBuffers;
@@ -287,7 +303,6 @@ D3D12Renderer::~D3D12Renderer()
 		waitForGpu();
 	}
 }
-
 
 Result D3D12Renderer::createInputSampler(const InputSamplerDesc& inputDesc, D3D12DescriptorHeap& samplerHeap, int samplerIndex)
 {
@@ -421,7 +436,7 @@ Result D3D12Renderer::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, cons
             resourceOut.transition(finalState, submitter);
         }
 
-        waitForGpu();
+        submitGpuWorkAndWait();
     }
 
     return SLANG_OK;
@@ -571,7 +586,7 @@ Result D3D12Renderer::createTexture(const InputTextureDesc& inputDesc, const Tex
     }
 
     // Block - waiting for copy to complete (so can drop upload texture)
-    waitForGpu();
+    submitGpuWorkAndWait();
 
     return SLANG_OK;
 }
@@ -679,9 +694,109 @@ Result D3D12Renderer::createInputBuffer(InputBufferDesc& bufferDesc, const List<
     return SLANG_OK;
 }
 
+void D3D12Renderer::beginGpuWork()
+{
+    if (m_commandListOpenCount == 0)
+    {
+        // It's not open so open it
+        const FrameInfo& frame = getFrame();
+        ID3D12GraphicsCommandList* commandList = getCommandList();
+        commandList->Reset(frame.m_commandAllocator, nullptr);
+    }
+    m_commandListOpenCount++;
+}
+
+void D3D12Renderer::beginRender()
+{
+    // Should currently not be open!
+    assert(m_commandListOpenCount == 0);
+
+    getFrame().m_commandAllocator->Reset();
+    beginGpuWork();
+
+    // Indicate that the render target needs to be writable
+    {
+        D3D12BarrierSubmitter submitter(m_commandList);
+        m_renderTargets[m_renderTargetIndex]->transition(D3D12_RESOURCE_STATE_RENDER_TARGET, submitter);
+    }
+}
+
+void D3D12Renderer::endRender()
+{
+    assert(m_commandListOpenCount == 1);
+
+    D3D12Resource& backBuffer = *m_backBuffers[m_renderTargetIndex];
+    if (m_isMultiSampled)
+    {
+        // MSAA resolve	
+        D3D12Resource& renderTarget = *m_renderTargets[m_renderTargetIndex];
+        assert(&renderTarget != &backBuffer);
+        // Barriers to wait for the render target, and the backbuffer to be in correct state
+        {
+            D3D12BarrierSubmitter submitter(m_commandList);
+            renderTarget.transition(D3D12_RESOURCE_STATE_RESOLVE_SOURCE, submitter);
+            backBuffer.transition(D3D12_RESOURCE_STATE_RESOLVE_DEST, submitter);
+        }
+        
+        // Do the resolve...
+        m_commandList->ResolveSubresource(backBuffer, 0, renderTarget, 0, m_targetFormat);
+    }
+
+    // Make the back buffer presentable
+    {
+        D3D12BarrierSubmitter submitter(m_commandList);
+        backBuffer.transition(D3D12_RESOURCE_STATE_PRESENT, submitter);
+    }
+
+    SLANG_ASSERT_VOID_ON_FAIL(m_commandList->Close());
+
+    {
+        // Execute the command list.
+        ID3D12CommandList* commandLists[] = { m_commandList };
+        m_commandQueue->ExecuteCommandLists(SLANG_COUNT_OF(commandLists), commandLists);
+    }
+
+    /* 
+    if (m_listener)
+    {
+        m_listener->onGpuWorkSubmitted(Dx12Type::wrap(m_commandQueue));
+    } */
+
+    assert(m_commandListOpenCount == 1);
+    // Must be 0
+    m_commandListOpenCount = 0;
+}
+
+void D3D12Renderer::submitGpuWork()
+{
+    assert(m_commandListOpenCount);
+    ID3D12GraphicsCommandList* commandList = getCommandList();
+
+    SLANG_ASSERT_VOID_ON_FAIL(commandList->Close());
+    {
+        // Execute the command list.
+        ID3D12CommandList* commandLists[] = { commandList };
+        m_commandQueue->ExecuteCommandLists(SLANG_COUNT_OF(commandLists), commandLists);
+    }
+/* 
+    if (m_listener)
+    {
+        m_listener->onGpuWorkSubmitted(Dx12Type::wrap(m_commandQueue));
+    }
+    */
+    // Reopen
+    commandList->Reset(getFrame().m_commandAllocator, nullptr);
+}
+
+void D3D12Renderer::submitGpuWorkAndWait()
+{
+    submitGpuWork();
+    waitForGpu();
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! Renderer interface !!!!!!!!!!!!!!!!!!!!!!!!!!
 
-SlangResult D3D12Renderer::initialize(void* inWindowHandle)
+Result D3D12Renderer::initialize(void* inWindowHandle)
 {
 	m_hwnd = (HWND)inWindowHandle;
     // Rather than statically link against D3D, we load it dynamically.
@@ -888,6 +1003,9 @@ SlangResult D3D12Renderer::initialize(void* inWindowHandle)
 		m_commandList->Close();
 	}
 
+    // Setup for rendering
+    beginRender();
+
 	m_isInitialized = true;
     return SLANG_OK;
 }
@@ -897,6 +1015,19 @@ Result D3D12Renderer::createFrameResources()
 	// Create back buffers
 	{
 		D3D12_CPU_DESCRIPTOR_HANDLE rtvStart(m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
+
+        // Work out target format 
+        D3D12_RESOURCE_DESC resourceDesc;
+        {
+            ComPtr<ID3D12Resource> backBuffer;
+            SLANG_RETURN_ON_FAIL(m_swapChain->GetBuffer(0, IID_PPV_ARGS(backBuffer.writeRef())));
+            resourceDesc = backBuffer->GetDesc();
+        }
+        const DXGI_FORMAT resourceFormat = D3DUtil::calcResourceFormat(D3DUtil::USAGE_TARGET, m_targetUsageFlags, resourceDesc.Format);
+        const DXGI_FORMAT targetFormat = D3DUtil::calcFormat(D3DUtil::USAGE_TARGET, resourceFormat);
+
+        // Set the target format
+        m_targetFormat = targetFormat;
 
 		// Create a RTV, and a command allocator for each frame.
 		for (int i = 0; i < m_numRenderTargets; i++)
@@ -919,21 +1050,14 @@ Result D3D12Renderer::createFrameResources()
 				heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
 				heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
 				heapProps.CreationNodeMask = 1;
-				heapProps.VisibleNodeMask = 1;
-
-				D3D12_RESOURCE_DESC desc = backBuffer->GetDesc();
-
-				DXGI_FORMAT resourceFormat = D3DUtil::calcResourceFormat(D3DUtil::USAGE_TARGET, m_targetUsageFlags, desc.Format);
-				DXGI_FORMAT targetFormat = D3DUtil::calcFormat(D3DUtil::USAGE_TARGET, resourceFormat);
-
-				// Set the target format
-				m_targetFormat = targetFormat;
-
+				heapProps.VisibleNodeMask = 1;		
 				D3D12_CLEAR_VALUE clearValue = {};
-				clearValue.Format = targetFormat;
+				clearValue.Format = m_targetFormat;
 
 				// Don't know targets alignment, so just memory copy
 				::memcpy(clearValue.Color, m_clearColor, sizeof(m_clearColor));
+
+                D3D12_RESOURCE_DESC desc(resourceDesc);
 
 				desc.Format = resourceFormat;
 				desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
@@ -1037,6 +1161,8 @@ void D3D12Renderer::clearFrame()
 
 void D3D12Renderer::presentFrame()
 {
+    endRender();
+
 	if (m_swapChainWaitableObject)
 	{
 		// check if now is good time to present
@@ -1050,7 +1176,12 @@ void D3D12Renderer::presentFrame()
 	}
 	else
 	{
-		SLANG_ASSERT_VOID_ON_FAIL(m_swapChain->Present(1, 0));
+		if (SLANG_FAILED(m_swapChain->Present(1, 0)))
+        {
+            assert(!"Problem presenting");
+            beginRender();
+            return;
+        }
 	}
 
 	// Increment the fence value. Save on the frame - we'll know that frame is done when the fence value >= 
@@ -1067,6 +1198,9 @@ void D3D12Renderer::presentFrame()
 		// If the next frame is not ready to be rendered yet, wait until it is ready.
 		m_fence.waitUntilCompleted(frame.m_fenceValue);
 	}
+
+    // Setup such that rendering can restart
+    beginRender();
 }
 
 SlangResult D3D12Renderer::captureScreenShot(const char* outputPath)

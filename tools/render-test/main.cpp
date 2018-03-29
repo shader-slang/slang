@@ -417,6 +417,11 @@ SlangResult innerMain(int argc, char** argv)
 				// If we are in a mode where output is requested, we need to snapshot the back buffer here
 				if (gOptions.outputPath)
 				{
+                    // Submit the work
+                    renderer->submitGpuWork();
+                    // Wait until everything is complete
+                    renderer->waitForGpu();
+
 					if (gOptions.shaderType == ShaderProgramType::Compute || gOptions.shaderType == ShaderProgramType::GraphicsCompute)
 						renderer->serializeOutput(app.getBindingState(), gOptions.outputPath);
 					else
