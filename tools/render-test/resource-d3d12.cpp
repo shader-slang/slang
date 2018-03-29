@@ -23,7 +23,7 @@ D3D12_RESOURCE_BARRIER& D3D12BarrierSubmitter::_expandOne()
 	return m_barriers[m_numBarriers++];
 }
 
-D3D12BarrierSubmitter::transition(ID3D12Resource* resource, D3D12_RESOURCE_STATES prevState, D3D12_RESOURCE_STATES nextState)
+void D3D12BarrierSubmitter::transition(ID3D12Resource* resource, D3D12_RESOURCE_STATES prevState, D3D12_RESOURCE_STATES nextState)
 {
     if (nextState != prevState)
     {
@@ -35,8 +35,8 @@ D3D12BarrierSubmitter::transition(ID3D12Resource* resource, D3D12_RESOURCE_STATE
         ::memset(&barrier, 0, sizeof(barrier));
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
         barrier.Flags = flags;
-        barrier.Transition.pResource = m_resource;
-        barrier.Transition.StateBefore = m_state;
+        barrier.Transition.pResource = resource;
+        barrier.Transition.StateBefore = prevState;
         barrier.Transition.StateAfter = nextState;
         barrier.Transition.Subresource = subresource;
     }
@@ -48,7 +48,7 @@ D3D12BarrierSubmitter::transition(ID3D12Resource* resource, D3D12_RESOURCE_STATE
 
             ::memset(&barrier, 0, sizeof(barrier));
             barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-            barrier.UAV.pResource = m_resource;
+            barrier.UAV.pResource = resource;
         }
     }
 }
