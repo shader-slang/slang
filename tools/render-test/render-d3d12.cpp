@@ -28,6 +28,13 @@
 
 #include "d3d-util.h"
 
+#ifdef _MSC_VER
+#pragma warning(disable: 4996)
+#endif
+
+//#define STB_IMAGE_WRITE_IMPLEMENTATION
+//#include "external/stb/stb_image_write.h"
+
 // We will use the C standard library just for printing error messages.
 #include <stdio.h>
 
@@ -175,6 +182,8 @@ protected:
     void endRender();
 
     void submitGpuWorkAndWait();
+
+    Result captureTextureToFile(D3D12Resource& resource, const char* outputPath);
 
     FrameInfo& getFrame() { return m_frameInfos[m_frameIndex]; }
     const FrameInfo& getFrame() const { return m_frameInfos[m_frameIndex]; }
@@ -794,6 +803,95 @@ void D3D12Renderer::submitGpuWorkAndWait()
     waitForGpu();
 }
 
+Result D3D12Renderer::captureTextureToFile(D3D12Resource& resource, const char* outputPath)
+{
+    const D3D12_RESOURCE_STATES initialState = resource.getState();
+
+    const D3D12_RESOURCE_DESC desc = resource.getResource()->GetDesc();
+
+    // Don't bother supporting MSAA for right now
+    if (desc.SampleDesc.Count > 1)
+    {
+        fprintf(stderr, "ERROR: cannot capture multi-sample texture\n");
+        return SLANG_FAIL;
+    }
+
+    size_t bytesPerPixel = sizeof(uint32_t);
+    size_t rowPitch = int(desc.Width) * bytesPerPixel;
+    size_t bufferSize = rowPitch * int(desc.Height);
+
+    D3D12Resource stagingResource;
+    {
+        D3D12_RESOURCE_DESC stagingDesc;
+        _initBufferResourceDesc(bufferSize, stagingDesc);
+
+        D3D12_HEAP_PROPERTIES heapProps;
+        heapProps.Type = D3D12_HEAP_TYPE_READBACK;
+        heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+        heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+        heapProps.CreationNodeMask = 1;
+        heapProps.VisibleNodeMask = 1;
+
+        SLANG_RETURN_ON_FAIL(stagingResource.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, stagingDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr));
+    }
+
+    {
+        D3D12BarrierSubmitter submitter(m_commandList);
+        resource.transition(D3D12_RESOURCE_STATE_COPY_SOURCE, submitter);
+    }
+
+    // Do the copy
+    {
+        D3D12_TEXTURE_COPY_LOCATION srcLoc;
+        srcLoc.pResource = resource; 
+        srcLoc.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+        srcLoc.SubresourceIndex = 0;
+
+        D3D12_TEXTURE_COPY_LOCATION dstLoc;
+        dstLoc.pResource = stagingResource; 
+        dstLoc.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+        dstLoc.PlacedFootprint.Offset = 0;
+        dstLoc.PlacedFootprint.Footprint.Format = desc.Format;
+        dstLoc.PlacedFootprint.Footprint.Width = UINT(desc.Width); 
+        dstLoc.PlacedFootprint.Footprint.Height = UINT(desc.Height);
+        dstLoc.PlacedFootprint.Footprint.Depth = 1;
+        dstLoc.PlacedFootprint.Footprint.RowPitch = UINT(rowPitch);
+
+        m_commandList->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
+    }
+
+    {
+        D3D12BarrierSubmitter submitter(m_commandList);
+        resource.transition(initialState, submitter);
+    }
+
+    // Submit the copy, and wait for copy to complete
+    submitGpuWorkAndWait();
+
+    int stbResult = 0;
+    {
+        ID3D12Resource* dxResource = stagingResource;
+
+        UINT8* data;
+        D3D12_RANGE readRange = {0, bufferSize}; 		
+        
+        SLANG_RETURN_ON_FAIL(dxResource->Map(0, &readRange, reinterpret_cast<void**>(&data)));
+        
+        //stbResult = stbi_write_png(outputPath, int(desc.Width), int(desc.Height), 4, data, int(rowPitch));
+        
+        dxResource->Unmap(0, nullptr);
+    }
+
+
+    if (!stbResult)
+    {
+        fprintf(stderr, "ERROR: failed to write texture to file\n");
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
+}
+
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! Renderer interface !!!!!!!!!!!!!!!!!!!!!!!!!!
 
 Result D3D12Renderer::initialize(void* inWindowHandle)
@@ -1205,7 +1303,7 @@ void D3D12Renderer::presentFrame()
 
 SlangResult D3D12Renderer::captureScreenShot(const char* outputPath)
 {
-    return SLANG_FAIL;
+    return captureTextureToFile(*m_renderTargets[m_renderTargetIndex], outputPath);
 }
 
 ShaderCompiler* D3D12Renderer::getShaderCompiler() 
@@ -1550,6 +1648,7 @@ void D3D12Renderer::setBindingState(BindingState* state)
 
 void D3D12Renderer::serializeOutput(BindingState* state, const char* fileName)
 {
+    
 }
 
 // ShaderCompiler interface
