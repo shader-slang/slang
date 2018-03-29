@@ -116,10 +116,25 @@ protected:
 	{
 		public:
 		List<D3D12_INPUT_ELEMENT_DESC> m_elements;
-        List<char> m_text;
+        List<char> m_text;                              ///< Holds all strings to keep in scope
 	};
 
-    class BindStateImpl: public BindingState
+    struct Binding
+    {
+        ShaderInputType m_type;
+        InputBufferType m_bufferType;                         // Only valid if `type` is `Buffer`
+        int m_srvIndex = -1;
+        int m_uavIndex = -1;
+        int m_samplerIndex = -1;      
+        
+        D3D12Resource m_resource;
+        
+        int m_binding = 0;
+        bool m_isOutput = false;
+        int m_bufferLength = 0;
+    };
+
+    class BindingStateImpl: public BindingState
     {
         public:
 
@@ -130,6 +145,9 @@ protected:
             SLANG_RETURN_ON_FAIL(m_samplerHeap.init(device, 16, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE));
             return SLANG_OK;
         }
+
+        List<Binding> m_bindings;
+        int m_numRenderTargets = 0;
 
         D3D12DescriptorHeap m_viewHeap;		    ///< Cbv, Srv, Uav 
         D3D12DescriptorHeap m_samplerHeap;		///< Heap for samplers
@@ -142,10 +160,10 @@ protected:
 	void releaseFrameResources();
 
     Result createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const void* srcData, D3D12Resource& uploadResource, D3D12_RESOURCE_STATES finalState, D3D12Resource& resourceOut);
-    Result createTexture(const InputTextureDesc& inputDesc, const TextureData& texData, ComPtr<ID3D12Resource>& resourceOut);
+    Result createTexture(const InputTextureDesc& inputDesc, const TextureData& texData, D3D12Resource& resourceOut);
 
     Result createInputSampler(const InputSamplerDesc& inputDesc, D3D12DescriptorHeap& samplerHeap, int samplerIndex);
-    Result createInputTexture(const InputTextureDesc& inputDesc,  D3D12DescriptorHeap& viewHeap, int srvIndex, ComPtr<ID3D12Resource>& resourceOut);
+    Result createInputTexture(const InputTextureDesc& inputDesc,  D3D12DescriptorHeap& viewHeap, int srvIndex, D3D12Resource& resourceOut);
     Result createInputBuffer(InputBufferDesc& bufferDesc, const List<unsigned int>& bufferData, D3D12DescriptorHeap& viewHeap, int uavIndex, int srvIndex,
         D3D12Resource& resourceOut);
 
@@ -154,6 +172,7 @@ protected:
 
 	RefPtr<ShaderProgramImpl> m_boundShaderProgram;
 	RefPtr<InputLayoutImpl> m_boundInputLayout;
+    RefPtr<BindingStateImpl> m_boundBindingState;
 
 	DXGI_FORMAT m_targetFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
 	DXGI_FORMAT m_depthStencilFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
@@ -408,7 +427,7 @@ Result D3D12Renderer::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, cons
     return SLANG_OK;
 }
 
-Result D3D12Renderer::createTexture(const InputTextureDesc& inputDesc, const TextureData& texData, ComPtr<ID3D12Resource>& resourceOut)
+Result D3D12Renderer::createTexture(const InputTextureDesc& inputDesc, const TextureData& texData, D3D12Resource& resourceOut)
 {
     // generateTextureData(texData, inputDesc);
 
@@ -458,7 +477,7 @@ Result D3D12Renderer::createTexture(const InputTextureDesc& inputDesc, const Tex
     ::memset(subData.Buffer(), 0, numMipMaps * sizeof(D3D12_SUBRESOURCE_DATA));
     
     // Create the upload texture
-    ComPtr<ID3D12Resource> uploadTexture;
+    D3D12Resource uploadTexture;
     {
         D3D12_HEAP_PROPERTIES heapProps;
 
@@ -482,16 +501,17 @@ Result D3D12Renderer::createTexture(const InputTextureDesc& inputDesc, const Tex
         uploadResourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
         uploadResourceDesc.Alignment = 0;
 
-        SLANG_RETURN_ON_FAIL(m_device->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &uploadResourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, 
-            IID_PPV_ARGS(uploadTexture.writeRef())));
-
-        uploadTexture->SetName(L"TextureUpload");
+        SLANG_RETURN_ON_FAIL(uploadTexture.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, uploadResourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr));
+        
+        uploadTexture.setDebugName(L"TextureUpload");
     }
 
     // Map it all 
     {
+        ID3D12Resource* uploadResource = uploadTexture;
+
         uint8_t* p;
-        uploadTexture->Map(0, nullptr, reinterpret_cast<void**>(&p));
+        uploadResource->Map(0, nullptr, reinterpret_cast<void**>(&p));
 
         // Strictly speaking it should be bigger
         assert(texData.dataBuffer.Count() == numMipMaps);
@@ -512,10 +532,9 @@ Result D3D12Renderer::createTexture(const InputTextureDesc& inputDesc, const Tex
                 ::memcpy(p + layouts[j].Offset, srcPixels, mipSizeInBytes);
             }
         }
-        uploadTexture->Unmap(0, nullptr);
+        uploadResource->Unmap(0, nullptr);
     }
 
-    ComPtr<ID3D12Resource> texture;
     {
         D3D12_HEAP_PROPERTIES heapProps;
 
@@ -525,9 +544,9 @@ Result D3D12Renderer::createTexture(const InputTextureDesc& inputDesc, const Tex
         heapProps.CreationNodeMask = 1;
         heapProps.VisibleNodeMask = 1;
 
-        SLANG_RETURN_ON_FAIL(m_device->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &resourceDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
-            IID_PPV_ARGS(texture.writeRef())));
-        texture->SetName(L"Texture");
+        SLANG_RETURN_ON_FAIL(resourceOut.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, resourceDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr));
+        
+        resourceOut.setDebugName(L"Texture");
     }
 
     {
@@ -539,7 +558,7 @@ Result D3D12Renderer::createTexture(const InputTextureDesc& inputDesc, const Tex
             src.PlacedFootprint = layouts[i];
 
             D3D12_TEXTURE_COPY_LOCATION dst;
-            dst.pResource = texture;
+            dst.pResource = resourceOut;
             dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
             dst.SubresourceIndex = UINT(i);
             m_commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
@@ -548,7 +567,7 @@ Result D3D12Renderer::createTexture(const InputTextureDesc& inputDesc, const Tex
 
     {
         D3D12BarrierSubmitter submitter(m_commandList);
-        submitter.transition(texture, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+        resourceOut.transition(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, submitter);
     }
 
     // Block - waiting for copy to complete (so can drop upload texture)
@@ -557,27 +576,26 @@ Result D3D12Renderer::createTexture(const InputTextureDesc& inputDesc, const Tex
     return SLANG_OK;
 }
 
-Result D3D12Renderer::createInputTexture(const InputTextureDesc& inputDesc, D3D12DescriptorHeap& viewHeap, int srvIndex, ComPtr<ID3D12Resource>& resourceOut)
+Result D3D12Renderer::createInputTexture(const InputTextureDesc& inputDesc, D3D12DescriptorHeap& viewHeap, int srvIndex, D3D12Resource& resourceOut)
 {
-    // 
     TextureData texData;
     generateTextureData(texData, inputDesc);
     
-    ComPtr<ID3D12Resource> texture;
-    SLANG_RETURN_ON_FAIL(createTexture(inputDesc, texData, texture));
+    SLANG_RETURN_ON_FAIL(createTexture(inputDesc, texData, resourceOut));
 
     if (srvIndex >= 0)
     {
-        DXGI_FORMAT pixelFormat = texture->GetDesc().Format;
+        const D3D12_RESOURCE_DESC resourceDesc = resourceOut.getResource()->GetDesc();
+
+        DXGI_FORMAT pixelFormat = resourceDesc.Format;
 
         D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc;
-        _initSrvDesc(texture->GetDesc(), pixelFormat, srvDesc);
+        _initSrvDesc(resourceDesc, pixelFormat, srvDesc);
 
         // Copy to the descriptor
-        m_device->CreateShaderResourceView(texture, &srvDesc, viewHeap.getCpuHandle(srvIndex));
+        m_device->CreateShaderResourceView(resourceOut, &srvDesc, viewHeap.getCpuHandle(srvIndex));
     }
 
-    resourceOut.swap(texture);
     return SLANG_OK;
 }
 
@@ -1094,17 +1112,38 @@ InputLayout* D3D12Renderer::createInputLayout(const InputElementDesc* inputEleme
 {
 	RefPtr<InputLayoutImpl> layout(new InputLayoutImpl);
 
+    // Work out a buffer size to hold all text
+    size_t textSize = 0;
+    for (int i = 0; i < Int(inputElementCount); ++i)
+    {
+        const char* text = inputElements[i].semanticName;
+        textSize += text ? (::strlen(text) + 1) : 0;
+    }
+    layout->m_text.SetSize(textSize);
+    char* textPos = layout->m_text.Buffer();
+
+    // 
 	List<D3D12_INPUT_ELEMENT_DESC>& elements = layout->m_elements;
 	elements.SetSize(inputElementCount);
+
 
 	for (UInt i = 0; i < inputElementCount; ++i)
 	{
 		const InputElementDesc& srcEle = inputElements[i];
 		D3D12_INPUT_ELEMENT_DESC& dstEle = elements[i];
 
-		// JS: TODO - we need to store the semantic names somewhere... As they will be lost outside
-		dstEle.SemanticName = srcEle.semanticName;
-		dstEle.SemanticIndex = (UINT)srcEle.semanticIndex;
+        // Add text to the buffer
+        const char* semanticName = srcEle.semanticName;
+        if (semanticName)
+        {
+            const int len = int(::strlen(semanticName));
+            ::memcpy(textPos, semanticName, len + 1);
+            semanticName = textPos;
+            textPos += len + 1;
+        }
+
+		dstEle.SemanticName = semanticName;
+     	dstEle.SemanticIndex = (UINT)srcEle.semanticIndex;
 		dstEle.Format = D3DUtil::getMapFormat(srcEle.format);
 		dstEle.InputSlot = 0;
 		dstEle.AlignedByteOffset = (UINT)srcEle.offset;
@@ -1295,11 +1334,84 @@ void D3D12Renderer::dispatchCompute(int x, int y, int z)
 
 BindingState* D3D12Renderer::createBindingState(const ShaderInputLayout& layout)
 {
-    return nullptr;
+    RefPtr<BindingStateImpl> bindingState(new BindingStateImpl);
+
+    SLANG_RETURN_NULL_ON_FAIL(bindingState->init(m_device));
+    bindingState->m_numRenderTargets = layout.numRenderTargets;
+
+    const List<ShaderInputLayoutEntry>& srcBindings = layout.entries;
+    const int numBindings = int(srcBindings.Count());
+
+    List<Binding>& dstBindings = bindingState->m_bindings;
+    dstBindings.SetSize(numBindings);
+
+    for (int i = 0; i < numBindings; ++i)
+    {
+        ShaderInputLayoutEntry& srcEntry = srcBindings[i];
+        Binding& dstEntry = dstBindings[i];
+
+        dstEntry.m_type = srcEntry.type;
+        dstEntry.m_binding = srcEntry.hlslBinding;
+        dstEntry.m_isOutput = srcEntry.isOutput;
+
+        switch (srcEntry.type)
+        {
+            case ShaderInputType::Buffer:
+            {
+                dstEntry.m_uavIndex = bindingState->m_viewHeap.allocate();
+                dstEntry.m_srvIndex = bindingState->m_viewHeap.allocate();
+
+                if (dstEntry.m_uavIndex < 0 || dstEntry.m_srvIndex < 0)
+                {
+                    return nullptr;
+                }
+
+                SLANG_RETURN_NULL_ON_FAIL(createInputBuffer(srcEntry.bufferDesc, srcEntry.bufferData, bindingState->m_viewHeap, dstEntry.m_uavIndex, dstEntry.m_srvIndex, dstEntry.m_resource));
+                
+                dstEntry.m_bufferLength = (int)(srcEntry.bufferData.Count() * sizeof(unsigned int));
+                dstEntry.m_bufferType = srcEntry.bufferDesc.type;
+                break;
+            }
+            case ShaderInputType::Texture:
+            {
+                dstEntry.m_srvIndex = bindingState->m_viewHeap.allocate();
+
+                if (dstEntry.m_srvIndex < 0)
+                {
+                    return nullptr;
+                }
+
+                SLANG_RETURN_NULL_ON_FAIL(createInputTexture(srcEntry.textureDesc, bindingState->m_viewHeap, dstEntry.m_srvIndex, dstEntry.m_resource));
+                break;
+            }
+            case ShaderInputType::Sampler:
+            {
+                dstEntry.m_samplerIndex = bindingState->m_samplerHeap.allocate();
+
+                if (dstEntry.m_samplerIndex < 0)
+                {
+                    return nullptr;
+                }
+
+                SLANG_RETURN_NULL_ON_FAIL(createInputSampler(srcEntry.samplerDesc, bindingState->m_samplerHeap, dstEntry.m_samplerIndex));
+                break;
+            }
+            case ShaderInputType::CombinedTextureSampler:
+            {
+                assert(!"Not implemented");
+                //throw "not implemented";
+                return nullptr;
+                break;
+            }
+        }
+    }
+
+    return bindingState.detach();
 }
 
 void D3D12Renderer::setBindingState(BindingState* state)
 {
+    m_boundBindingState = static_cast<BindingStateImpl*>(state);
 }
 
 void D3D12Renderer::serializeOutput(BindingState* state, const char* fileName)
