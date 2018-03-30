@@ -20,12 +20,18 @@ class D3D12DescriptorHeap
 		/// Initialize with an array of handles copying over the representation
     Slang::Result init(ID3D12Device* device, const D3D12_CPU_DESCRIPTOR_HANDLE* handles, int numHandles, D3D12_DESCRIPTOR_HEAP_TYPE type, D3D12_DESCRIPTOR_HEAP_FLAGS flags);
 
+		/// Returns the number of slots that have been used
+	SLANG_FORCE_INLINE int getUsedSize() const { return m_currentIndex; }
+
 		/// Get the total amount of descriptors possible on the heap
-	SLANG_FORCE_INLINE int getSize() const { return m_size; }
+	SLANG_FORCE_INLINE int getTotalSize() const { return m_totalSize; }
 		/// Allocate a descriptor. Returns the index, or -1 if none left.
 	SLANG_FORCE_INLINE int allocate();
 		/// Allocate a number of descriptors. Returns the start index (or -1 if not possible)
 	SLANG_FORCE_INLINE int allocate(int numDescriptors);
+
+		/// 
+	SLANG_FORCE_INLINE int placeAt(int index);
 
 		/// Deallocates all allocations, and starts allocation from the start of the underlying heap again
 	SLANG_FORCE_INLINE void deallocateAll() { m_currentIndex = 0; }
@@ -51,7 +57,7 @@ class D3D12DescriptorHeap
 
 protected:
     Slang::ComPtr<ID3D12DescriptorHeap> m_heap;	///< The underlying heap being allocated from
-	int m_size;								///< Total amount of allocations available on the heap
+	int m_totalSize;								///< Total amount of allocations available on the heap
     int m_currentIndex;						///< The current descriptor
     int m_descriptorSize;					///< The size of each descriptor
 };
@@ -59,8 +65,8 @@ protected:
 // ---------------------------------------------------------------------------
 int D3D12DescriptorHeap::allocate()
 {
-	assert(m_currentIndex < m_size);
-	if (m_currentIndex < m_size)
+	assert(m_currentIndex < m_totalSize);
+	if (m_currentIndex < m_totalSize)
 	{
 		return m_currentIndex++;	
 	}
@@ -69,8 +75,8 @@ int D3D12DescriptorHeap::allocate()
 // ---------------------------------------------------------------------------
 int D3D12DescriptorHeap::allocate(int numDescriptors)
 {
-    assert(m_currentIndex + numDescriptors <= m_size);
-	if (m_currentIndex + numDescriptors <= m_size)
+    assert(m_currentIndex + numDescriptors <= m_totalSize);
+	if (m_currentIndex + numDescriptors <= m_totalSize)
 	{
 		const int index = m_currentIndex;
 		m_currentIndex += numDescriptors;
@@ -79,9 +85,17 @@ int D3D12DescriptorHeap::allocate(int numDescriptors)
 	return -1;
 }
 // ---------------------------------------------------------------------------
+SLANG_FORCE_INLINE int D3D12DescriptorHeap::placeAt(int index)
+{
+	assert(index >= 0 && index < m_totalSize);
+	m_currentIndex = index + 1;
+	return index;
+}
+
+// ---------------------------------------------------------------------------
 SLANG_FORCE_INLINE D3D12_CPU_DESCRIPTOR_HANDLE D3D12DescriptorHeap::getCpuHandle(int index) const
 { 
-    assert(index >= 0 && index < m_size);  
+    assert(index >= 0 && index < m_totalSize);  
 	D3D12_CPU_DESCRIPTOR_HANDLE start = m_heap->GetCPUDescriptorHandleForHeapStart();
 	D3D12_CPU_DESCRIPTOR_HANDLE dst;
 	dst.ptr = start.ptr + m_descriptorSize * index;
@@ -90,7 +104,7 @@ SLANG_FORCE_INLINE D3D12_CPU_DESCRIPTOR_HANDLE D3D12DescriptorHeap::getCpuHandle
 // ---------------------------------------------------------------------------
 SLANG_FORCE_INLINE D3D12_GPU_DESCRIPTOR_HANDLE D3D12DescriptorHeap::getGpuHandle(int index) const
 { 
-	assert(index >= 0 && index < m_size);  
+	assert(index >= 0 && index < m_totalSize);  
 	D3D12_GPU_DESCRIPTOR_HANDLE start = m_heap->GetGPUDescriptorHandleForHeapStart();
 	D3D12_GPU_DESCRIPTOR_HANDLE dst;
 	dst.ptr = start.ptr + m_descriptorSize * index;

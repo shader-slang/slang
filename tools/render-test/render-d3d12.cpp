@@ -25,6 +25,7 @@
 
 #include "resource-d3d12.h"
 #include "descriptor-heap-d3d12.h"
+#include "circular-resource-heap-d3d12.h"
 
 #include "d3d-util.h"
 
@@ -33,7 +34,7 @@
 #endif
 
 //#define STB_IMAGE_WRITE_IMPLEMENTATION
-//#include "external/stb/stb_image_write.h"
+#include "external/stb/stb_image_write.h"
 
 // We will use the C standard library just for printing error messages.
 #include <stdio.h>
@@ -63,7 +64,7 @@ public:
     virtual void serializeOutput(BindingState* state, const char* fileName) override;
     virtual Buffer* createBuffer(const BufferDesc& desc) override;
     virtual InputLayout* createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) override;
-    virtual BindingState * createBindingState(const ShaderInputLayout& layout) override;
+    virtual BindingState* createBindingState(const ShaderInputLayout& layout) override;
     virtual ShaderCompiler* getShaderCompiler() override;
     virtual void* map(Buffer* buffer, MapFlavor flavor) override;
     virtual void unmap(Buffer* buffer) override;
@@ -150,7 +151,7 @@ protected:
         Result init(ID3D12Device* device)
         {
             // Set up descriptor heaps
-            SLANG_RETURN_ON_FAIL(m_viewHeap.init(device, 256, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE));
+            SLANG_RETURN_ON_FAIL(m_viewHeap.init(device, 256, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE));
             SLANG_RETURN_ON_FAIL(m_samplerHeap.init(device, 16, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE));
             return SLANG_OK;
         }
@@ -161,6 +162,25 @@ protected:
         D3D12DescriptorHeap m_viewHeap;		    ///< Cbv, Srv, Uav 
         D3D12DescriptorHeap m_samplerHeap;		///< Heap for samplers
     };
+
+	class RenderState: public RefObject
+	{
+		public:
+		D3D12_PRIMITIVE_TOPOLOGY_TYPE m_primitiveTopologyType;
+		RefPtr<BindingStateImpl> m_bindingState;
+		RefPtr<InputLayoutImpl> m_inputLayout;
+		RefPtr<ShaderProgramImpl> m_shaderProgram;
+
+		ComPtr<ID3D12RootSignature> m_rootSignature;
+		ComPtr<ID3D12PipelineState> m_pipelineState;
+	};
+
+	struct BoundVertexBuffer
+	{
+		RefPtr<BufferImpl> m_buffer;
+		int m_stride;
+		int m_offset;
+	};
 
 	static PROC loadProc(HMODULE module, char const* name);
 	Result createFrameResources();
@@ -190,9 +210,15 @@ protected:
 
     ID3D12GraphicsCommandList* getCommandList() const { return m_commandList; }
 
+	RenderState* calcRenderState();
+
+	PFN_D3D12_SERIALIZE_ROOT_SIGNATURE m_D3D12SerializeRootSignature = nullptr;
+
+	D3D12CircularResourceHeap m_circularResourceHeap;
+
     int m_commandListOpenCount = 0;			///< If >0 the command list should be open
 
-	List<RefPtr<BufferImpl> > m_boundVertexBuffers;
+	List<BoundVertexBuffer> m_boundVertexBuffers;
 	List<RefPtr<BufferImpl> > m_boundConstantBuffers;
 
 	RefPtr<ShaderProgramImpl> m_boundShaderProgram;
@@ -213,7 +239,8 @@ protected:
 
 	bool m_isInitialized = false;
 
-	D3D_PRIMITIVE_TOPOLOGY m_primitiveTopology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	D3D12_PRIMITIVE_TOPOLOGY_TYPE m_primitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	D3D12_PRIMITIVE_TOPOLOGY m_primitiveTopology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 
     float m_clearColor[4] = { 0, 0, 0, 0 };
 
@@ -228,6 +255,9 @@ protected:
 	ComPtr<ID3D12GraphicsCommandList> m_commandList;
 
 	D3D12_RECT m_scissorRect = {};
+
+	List<RefPtr<RenderState> > m_renderStates;				///< Holds list of all render state combinations
+	RenderState* m_currentRenderState = nullptr;			///< The current combination
 
 	UINT m_rtvDescriptorSize = 0;
 
@@ -877,11 +907,10 @@ Result D3D12Renderer::captureTextureToFile(D3D12Resource& resource, const char* 
         
         SLANG_RETURN_ON_FAIL(dxResource->Map(0, &readRange, reinterpret_cast<void**>(&data)));
         
-        //stbResult = stbi_write_png(outputPath, int(desc.Width), int(desc.Height), 4, data, int(rowPitch));
+        stbResult = stbi_write_png(outputPath, int(desc.Width), int(desc.Height), 4, data, int(rowPitch));
         
         dxResource->Unmap(0, nullptr);
     }
-
 
     if (!stbResult)
     {
@@ -891,6 +920,264 @@ Result D3D12Renderer::captureTextureToFile(D3D12Resource& resource, const char* 
     return SLANG_OK;
 }
 
+D3D12Renderer::RenderState* D3D12Renderer::calcRenderState()
+{
+	if (m_currentRenderState)
+	{
+		if (m_currentRenderState->m_bindingState == m_boundBindingState &&
+			m_currentRenderState->m_inputLayout == m_boundInputLayout &&
+			m_currentRenderState->m_shaderProgram == m_boundShaderProgram &&
+			m_currentRenderState->m_primitiveTopologyType == m_primitiveTopologyType)
+		{
+			return m_currentRenderState;
+		}
+		// Doesn't match
+		m_currentRenderState = nullptr;
+	}
+	// See if matches one in the list
+	{
+		const int num = int(m_renderStates.Count());
+		for (int i = 0; i < num; i++)
+		{
+			RenderState* renderState = m_renderStates[i];
+			if (renderState->m_bindingState == m_boundBindingState &&
+				renderState->m_inputLayout == m_boundInputLayout &&
+				renderState->m_shaderProgram == m_boundShaderProgram && 
+				renderState->m_primitiveTopologyType == m_primitiveTopologyType)
+			{
+				// Okay we have a match
+				m_currentRenderState = renderState;
+				return renderState;
+			}
+		}
+	}
+
+	D3D12_DESCRIPTOR_RANGE ranges[8];
+	int curRangeIndex = 0;
+	D3D12_ROOT_PARAMETER rootParameters[32];
+	int curParamIndex = 0;
+
+	int numConstantBuffers = 0;
+	{
+		// Okay we need to try and create a render state
+		for (int i = 0; i < int(m_boundConstantBuffers.Count()); i++)
+		{
+			const BufferImpl* buffer = m_boundConstantBuffers[i];
+			if (buffer)
+			{
+				D3D12_ROOT_PARAMETER& param = rootParameters[curParamIndex++];
+				param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+				param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+				
+				D3D12_ROOT_DESCRIPTOR& descriptor = param.Descriptor;
+				descriptor.ShaderRegister = numConstantBuffers;
+				descriptor.RegisterSpace = 0;
+
+				numConstantBuffers++;
+			}
+		}
+
+		const int numBoundConstantBuffers = numConstantBuffers;
+		for (int i = 0; i < int(m_boundBindingState->m_bindings.Count()); i++)
+		{
+			const Binding& binding = m_boundBindingState->m_bindings[i];
+			if (binding.m_type == ShaderInputType::Buffer)
+			{ 
+				if (binding.m_bufferType == InputBufferType::ConstantBuffer)
+				{
+					// Make sure it's not overlapping the ones we just statically defined
+					assert(binding.m_binding < numBoundConstantBuffers);
+
+					D3D12_ROOT_PARAMETER& param = rootParameters[curParamIndex++];
+					param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+					param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+					D3D12_ROOT_DESCRIPTOR& descriptor = param.Descriptor;
+					descriptor.ShaderRegister = binding.m_binding;
+					descriptor.RegisterSpace = 0;
+
+					numConstantBuffers++;
+				}
+			
+				if (binding.m_bufferType == InputBufferType::StorageBuffer)
+				{
+					D3D12_DESCRIPTOR_RANGE& range = ranges[curRangeIndex++];
+
+					range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+					range.NumDescriptors = 1;
+					range.BaseShaderRegister = binding.m_binding;
+					range.RegisterSpace = 0;
+					range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+					D3D12_ROOT_PARAMETER& param = rootParameters[curParamIndex++];
+
+					param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+					param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+					D3D12_ROOT_DESCRIPTOR_TABLE& table = param.DescriptorTable;
+					table.NumDescriptorRanges = 1;
+					table.pDescriptorRanges = &range;
+				}
+				
+				if (binding.m_uavIndex >= 0)
+				{
+					D3D12_DESCRIPTOR_RANGE& range = ranges[curRangeIndex++];
+
+					range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+					range.NumDescriptors = 1;
+					range.BaseShaderRegister = binding.m_binding;
+					range.RegisterSpace = 0;
+					range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+					D3D12_ROOT_PARAMETER& param = rootParameters[curParamIndex++];
+
+					param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+					param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+					D3D12_ROOT_DESCRIPTOR_TABLE& table = param.DescriptorTable;
+					table.NumDescriptorRanges = 1;
+					table.pDescriptorRanges = &range;
+				}
+			}
+		}
+	}
+	
+	if (m_boundBindingState->m_samplerHeap.getUsedSize() > 0)
+	{
+		D3D12_DESCRIPTOR_RANGE& range = ranges[curRangeIndex++];
+
+		range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
+		range.NumDescriptors = m_boundBindingState->m_samplerHeap.getUsedSize();
+		range.BaseShaderRegister = 0;
+		range.RegisterSpace = 0;
+		range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+		
+		D3D12_ROOT_PARAMETER& param = rootParameters[curParamIndex++];
+	
+		param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		
+		D3D12_ROOT_DESCRIPTOR_TABLE& table = param.DescriptorTable;
+		table.NumDescriptorRanges = 1;
+		table.pDescriptorRanges = &range;
+	}
+
+	ComPtr<ID3D12RootSignature> rootSignature;
+	ComPtr<ID3D12PipelineState> pipelineState;
+
+	{
+		// Deny unnecessary access to certain pipeline stages
+		D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc;
+		rootSignatureDesc.NumParameters = curParamIndex;
+		rootSignatureDesc.pParameters = rootParameters;
+		rootSignatureDesc.NumStaticSamplers = 0;
+		rootSignatureDesc.pStaticSamplers = nullptr;
+		rootSignatureDesc.Flags = m_boundInputLayout ? D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT : D3D12_ROOT_SIGNATURE_FLAG_NONE;
+
+		ComPtr<ID3DBlob> signature;
+		ComPtr<ID3DBlob> error;
+		SLANG_RETURN_NULL_ON_FAIL(m_D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, signature.writeRef(), error.writeRef()));
+		SLANG_RETURN_NULL_ON_FAIL(m_device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(rootSignature.writeRef())));
+	}
+
+	{
+		// Describe and create the graphics pipeline state object (PSO)
+		D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+
+		psoDesc.pRootSignature = rootSignature;
+
+		psoDesc.VS = { m_boundShaderProgram->m_vertexShader.Buffer(), m_boundShaderProgram->m_vertexShader.Count() };
+		psoDesc.PS = { m_boundShaderProgram->m_pixelShader.Buffer(), m_boundShaderProgram->m_pixelShader.Count() };
+
+		{
+			psoDesc.InputLayout = { m_boundInputLayout->m_elements.Buffer(), UINT(m_boundInputLayout->m_elements.Count()) };			
+			psoDesc.PrimitiveTopologyType = m_primitiveTopologyType;
+			
+			{
+				psoDesc.DSVFormat = m_depthStencilFormat;
+				psoDesc.NumRenderTargets = m_boundBindingState->m_numRenderTargets;
+				for (Int i = 0; i < m_boundBindingState->m_numRenderTargets; i++)
+				{
+					psoDesc.RTVFormats[i] = m_targetFormat;
+				}
+
+				psoDesc.SampleDesc.Count = 1; 
+				psoDesc.SampleDesc.Quality = 0;
+				
+				psoDesc.SampleMask = UINT(0) - 1;
+			}
+
+			{
+				auto& rs = psoDesc.RasterizerState;
+				rs.FillMode = D3D12_FILL_MODE_SOLID;
+				rs.CullMode = D3D12_CULL_MODE_NONE;
+				rs.FrontCounterClockwise = FALSE;
+				rs.DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
+				rs.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
+				rs.SlopeScaledDepthBias = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
+				rs.DepthClipEnable = TRUE;
+				rs.MultisampleEnable = FALSE;
+				rs.AntialiasedLineEnable = FALSE;
+				rs.ForcedSampleCount = 0;
+				rs.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
+			}
+
+			{
+				D3D12_BLEND_DESC& blend = psoDesc.BlendState;
+
+				blend.AlphaToCoverageEnable = FALSE;
+				blend.IndependentBlendEnable = FALSE;
+				const D3D12_RENDER_TARGET_BLEND_DESC defaultRenderTargetBlendDesc =
+				{
+					FALSE,FALSE,
+					D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
+					D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
+					D3D12_LOGIC_OP_NOOP,
+					D3D12_COLOR_WRITE_ENABLE_ALL,
+				};
+				for (UINT i = 0; i < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT; ++i)
+				{
+					blend.RenderTarget[i] = defaultRenderTargetBlendDesc;
+				}
+			}
+	
+			{
+				auto& ds = psoDesc.DepthStencilState;
+
+				ds.DepthEnable = FALSE;
+				ds.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+				ds.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+				ds.StencilEnable = FALSE;
+				ds.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
+				ds.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
+				const D3D12_DEPTH_STENCILOP_DESC defaultStencilOp =
+				{ D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS };
+				ds.FrontFace = defaultStencilOp;
+				ds.BackFace = defaultStencilOp;
+			}
+		}
+
+		psoDesc.PrimitiveTopologyType = m_primitiveTopologyType;
+		
+		SLANG_RETURN_NULL_ON_FAIL(m_device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(pipelineState.writeRef())));
+	}
+
+	RenderState* renderState = new RenderState;
+
+	renderState->m_primitiveTopologyType = m_primitiveTopologyType;
+	renderState->m_bindingState = m_boundBindingState;
+	renderState->m_inputLayout = m_boundInputLayout;
+	renderState->m_shaderProgram = m_boundShaderProgram;
+	
+	renderState->m_rootSignature.swap(rootSignature);
+	renderState->m_pipelineState.swap(pipelineState);
+
+	m_renderStates.Add(renderState);
+
+	m_currentRenderState = renderState;
+
+	return renderState;
+}
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! Renderer interface !!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -934,6 +1221,12 @@ Result D3D12Renderer::initialize(void* inWindowHandle)
 		}
 	}
 #endif
+
+	m_D3D12SerializeRootSignature = (PFN_D3D12_SERIALIZE_ROOT_SIGNATURE)loadProc(d3dModule, "D3D12SerializeRootSignature");
+	if (!m_D3D12SerializeRootSignature)
+	{
+		return SLANG_FAIL;
+	}
 
 	// Try and create DXGIFactory
 	ComPtr<IDXGIFactory4> dxgiFactory;
@@ -1099,6 +1392,15 @@ Result D3D12Renderer::initialize(void* inWindowHandle)
 		FrameInfo& frame = m_frameInfos[m_frameIndex];
 		SLANG_RETURN_ON_FAIL(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, frame.m_commandAllocator, nullptr, IID_PPV_ARGS(m_commandList.writeRef())));
 		m_commandList->Close();
+	}
+
+	{
+		D3D12CircularResourceHeap::Desc desc;
+		desc.init();
+		// Define size
+		desc.m_blockSize = 65536;
+		// Set up the heap
+		m_circularResourceHeap.init(m_device, desc, &m_fence);
 	}
 
     // Setup for rendering
@@ -1483,11 +1785,22 @@ void D3D12Renderer::setInputLayout(InputLayout* inputLayout)
 
 void D3D12Renderer::setPrimitiveTopology(PrimitiveTopology topology) 
 {
-	m_primitiveTopology = D3DUtil::getPrimitiveTopology(topology);
-	assert(m_primitiveTopology != D3D11_PRIMITIVE_TOPOLOGY_UNDEFINED);
+	switch (topology)
+	{
+		case PrimitiveTopology::TriangleList:
+		{
+			m_primitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+			m_primitiveTopology = D3DUtil::getPrimitiveTopology(topology);
+			break;
+		}
+		default:
+		{
+			assert(!"Unhandled type");
+		}
+	}
 }
 
-void D3D12Renderer::setVertexBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt * strides, const UInt* offsets)
+void D3D12Renderer::setVertexBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* strides, const UInt* offsets)
 {
 	{
 		const UInt num = startSlot + slotCount;
@@ -1504,7 +1817,11 @@ void D3D12Renderer::setVertexBuffers(UInt startSlot, UInt slotCount, Buffer*cons
 		{
 			assert(buffer->m_desc.flavor == BufferFlavor::Vertex);
 		}
-		m_boundVertexBuffers[startSlot + i] = buffer;
+
+		BoundVertexBuffer& boundBuffer = m_boundVertexBuffers[startSlot + i];
+		boundBuffer.m_buffer = buffer;
+		boundBuffer.m_stride = int(strides[i]);
+		boundBuffer.m_offset = int(offsets[i]);
 	}
 }
 
@@ -1538,17 +1855,103 @@ void D3D12Renderer::draw(UInt vertexCount, UInt startVertex)
 {
 	ID3D12GraphicsCommandList* commandList = m_commandList;
 	
-	//commandList->SetGraphicsRootSignature(m_rootSignature);
-	///commandList->SetPipelineState(m_pipelineState);
+	RenderState* renderState = calcRenderState();
 
+	m_commandList->SetGraphicsRootSignature(renderState->m_rootSignature);
+	m_commandList->SetPipelineState(renderState->m_pipelineState);
+	
 	commandList->IASetPrimitiveTopology(m_primitiveTopology);
-	//commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
+
+	BindingStateImpl* bindingState = renderState->m_bindingState;
+	{
+		int index = 0;
+
+		int numConstantBuffers = 0;
+		{
+			// Okay we need to try and create a render state
+			for (int i = 0; i < int(m_boundConstantBuffers.Count()); i++)
+			{
+				const BufferImpl* buffer = m_boundConstantBuffers[i];
+				if (buffer)
+				{
+					size_t bufferSize = buffer->m_memory.Count();
+
+					D3D12CircularResourceHeap::Cursor cursor = m_circularResourceHeap.allocateConstantBuffer(bufferSize);
+					::memcpy(cursor.m_position, buffer->m_memory.Buffer(), bufferSize);
+					// Set the constant buffer
+					commandList->SetGraphicsRootConstantBufferView(index++, m_circularResourceHeap.getGpuHandle(cursor));
+			
+					numConstantBuffers++;
+				}
+			}
+
+			D3D12DescriptorHeap& heap = bindingState->m_viewHeap;
+
+			for (int i = 0; i < int(bindingState->m_bindings.Count()); i++)
+			{
+				const Binding& binding = bindingState->m_bindings[i];
+				if (binding.m_type == ShaderInputType::Buffer)
+				{
+					if (binding.m_bufferType == InputBufferType::ConstantBuffer)
+					{
+						commandList->SetGraphicsRootConstantBufferView(index++, binding.m_resource.getResource()->GetGPUVirtualAddress());
+						numConstantBuffers++;
+					}
+
+					if (binding.m_bufferType == InputBufferType::StorageBuffer)
+					{
+						commandList->SetGraphicsRootDescriptorTable(index++, heap.getGpuHandle(binding.m_srvIndex));
+					}
+
+					if (binding.m_uavIndex >= 0)
+					{
+						commandList->SetGraphicsRootDescriptorTable(index++, heap.getGpuHandle(binding.m_uavIndex));
+					}
+				}
+			}
+		}
+
+		if (m_boundBindingState->m_samplerHeap.getUsedSize() > 0)
+		{
+			commandList->SetComputeRootDescriptorTable(index, bindingState->m_samplerHeap.getGpuStart());
+		}
+	}
+
+	{
+		ID3D12DescriptorHeap* heaps[] = 
+		{
+			bindingState->m_viewHeap.getHeap(),
+			bindingState->m_samplerHeap.getHeap(),
+		};
+
+		m_commandList->SetDescriptorHeaps(SLANG_COUNT_OF(heaps), heaps);
+	}
+
+	int numVertexViews = 0;
+	D3D12_VERTEX_BUFFER_VIEW vertexViews[16];
+	for (int i = 0; i < int(m_boundVertexBuffers.Count()); i++)
+	{
+		const BoundVertexBuffer& boundVertexBuffer = m_boundVertexBuffers[i];
+		BufferImpl* buffer = boundVertexBuffer.m_buffer;
+		if (buffer)
+		{
+			D3D12_VERTEX_BUFFER_VIEW& vertexView = vertexViews[numVertexViews++];
+			vertexView.BufferLocation = buffer->m_resource.getResource()->GetGPUVirtualAddress();
+			vertexView.SizeInBytes = int(buffer->m_desc.size);
+			vertexView.StrideInBytes = boundVertexBuffer.m_stride;
+		}
+	}
+
+	commandList->IASetVertexBuffers(0, numVertexViews, vertexViews);
+
 	commandList->DrawInstanced(UINT(vertexCount), 1, UINT(startVertex), 0);
 }
 
 void D3D12Renderer::dispatchCompute(int x, int y, int z)
 {
 	ID3D12GraphicsCommandList* commandList = m_commandList;
+
+	RenderState* renderState = calcRenderState();
 
 	//commandList->SetComputeRootSignature(m_rootSignature);
 	//commandList->SetDescriptorHeaps(SLANG_COUNT_OF(heaps), heaps);
@@ -1618,12 +2021,8 @@ BindingState* D3D12Renderer::createBindingState(const ShaderInputLayout& layout)
             }
             case ShaderInputType::Sampler:
             {
-                dstEntry.m_samplerIndex = bindingState->m_samplerHeap.allocate();
-
-                if (dstEntry.m_samplerIndex < 0)
-                {
-                    return nullptr;
-                }
+				dstEntry.m_samplerIndex = srcEntry.hlslBinding;
+				bindingState->m_samplerHeap.placeAt(srcEntry.hlslBinding);
 
                 SLANG_RETURN_NULL_ON_FAIL(createInputSampler(srcEntry.samplerDesc, bindingState->m_samplerHeap, dstEntry.m_samplerIndex));
                 break;
@@ -1646,9 +2045,72 @@ void D3D12Renderer::setBindingState(BindingState* state)
     m_boundBindingState = static_cast<BindingStateImpl*>(state);
 }
 
-void D3D12Renderer::serializeOutput(BindingState* state, const char* fileName)
+void D3D12Renderer::serializeOutput(BindingState* stateIn, const char* fileName)
 {
-    
+	auto bindingState = static_cast<BindingStateImpl*>(stateIn);
+	FILE * f = fopen(fileName, "wb");
+
+	D3D12_HEAP_PROPERTIES heapProps;
+	heapProps.Type = D3D12_HEAP_TYPE_READBACK;
+	heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+	heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+	heapProps.CreationNodeMask = 1;
+	heapProps.VisibleNodeMask = 1;
+
+	int id = 0;
+	for (auto & binding : bindingState->m_bindings)
+	{
+		if (binding.m_isOutput)
+		{
+			if (binding.m_resource.getResource())
+			{
+				// create staging buffer
+
+				size_t bufferSize = D3DUtil::calcAligned(binding.m_bufferLength, 256);
+
+				D3D12_RESOURCE_DESC stagingDesc;
+				_initBufferResourceDesc(bufferSize, stagingDesc);
+				
+				D3D12Resource stageBuf;
+				SLANG_RETURN_VOID_ON_FAIL(stageBuf.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, stagingDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr));
+				
+				const D3D12_RESOURCE_STATES initialState = binding.m_resource.getState();
+
+				// Make it a source
+				{
+					D3D12BarrierSubmitter submitter(m_commandList);
+					binding.m_resource.transition(D3D12_RESOURCE_STATE_COPY_SOURCE, submitter);
+				}
+				// Do the copy
+				m_commandList->CopyBufferRegion(stageBuf, 0, binding.m_resource, 0, bufferSize);
+				// Switch it back
+				{
+					D3D12BarrierSubmitter submitter(m_commandList);
+					binding.m_resource.transition(initialState, submitter);
+				}
+
+				// Wait until complete
+				submitGpuWorkAndWait();
+
+				UINT8* data;
+				D3D12_RANGE readRange = {0, bufferSize};
+				
+				SLANG_RETURN_VOID_ON_FAIL(stageBuf.getResource()->Map(0, &readRange, reinterpret_cast<void**>(&data)));
+				{
+					auto ptr = (unsigned int *)data;
+					for (auto i = 0u; i < binding.m_bufferLength / sizeof(unsigned int); i++)
+						fprintf(f, "%X\n", ptr[i]);
+				}
+				stageBuf.getResource()->Unmap(0, nullptr);
+			}
+			else
+			{
+				printf("invalid output type at %d.\n", id);
+			}
+		}
+		id++;
+	}
+	fclose(f);
 }
 
 // ShaderCompiler interface

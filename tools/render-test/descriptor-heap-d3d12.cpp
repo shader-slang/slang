@@ -5,7 +5,7 @@ namespace renderer_test {
 using namespace Slang;
 
 D3D12DescriptorHeap::D3D12DescriptorHeap():
-	m_size(0),
+	m_totalSize(0),
 	m_currentIndex(0),
 	m_descriptorSize(0)
 {
@@ -20,7 +20,7 @@ Result D3D12DescriptorHeap::init(ID3D12Device* device, int size, D3D12_DESCRIPTO
 	SLANG_RETURN_ON_FAIL(device->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(m_heap.writeRef())));
 
 	m_descriptorSize = device->GetDescriptorHandleIncrementSize(type);
-	m_size = size;
+	m_totalSize = size;
 
 	return SLANG_OK;
 }
