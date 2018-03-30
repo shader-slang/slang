@@ -4545,6 +4545,35 @@ struct EmitVisitor
 
     }
 
+    // Emit the `flat` qualifier if the underlying type
+    // of the variable is an integer type.
+    void maybeEmitGLSLFlatModifier(
+        EmitContext*,
+        Type*           valueType)
+    {
+        auto tt = valueType;
+        if(auto vecType = tt->As<VectorExpressionType>())
+            tt = vecType->elementType;
+        if(auto vecType = tt->As<MatrixExpressionType>())
+            tt = vecType->getElementType();
+
+        auto baseType = tt->As<BasicExpressionType>();
+        if(!baseType)
+            return;
+
+        switch(baseType->baseType)
+        {
+        default:
+            break;
+
+        case BaseType::Int:
+        case BaseType::UInt:
+        case BaseType::UInt64:
+            Emit("flat ");
+            break;
+        }
+    }
+
     void emitIRVarModifiers(
         EmitContext*    ctx,
         VarLayout*      layout,
@@ -4601,12 +4630,24 @@ struct EmitVisitor
                     emit("uniform ");
                     break;
 
-                case LayoutResourceKind::VertexInput:
-                    emit("in ");
+                case LayoutResourceKind::VaryingInput:
+                    {
+                        emit("in ");
+                        if(layout->stage == Stage::Fragment)
+                        {
+                            maybeEmitGLSLFlatModifier(ctx, valueType);
+                        }
+                    }
                     break;
 
                 case LayoutResourceKind::FragmentOutput:
-                    emit("out ");
+                    {
+                        emit("out ");
+                        if(layout->stage != Stage::Fragment)
+                        {
+                            maybeEmitGLSLFlatModifier(ctx, valueType);
+                        }
+                    }
                     break;
 
                 default:
@@ -5145,7 +5186,11 @@ struct EmitVisitor
     {
         auto valType = valDecl->getDataType();
 
-        emit("static const ");
+        if( ctx->shared->target != CodeGenTarget::GLSL )
+        {
+            emit("static ");
+        }
+        emit("const ");
         emitIRType(ctx, valType, getIRName(valDecl));
 
         if (valDecl->getFirstBlock())
