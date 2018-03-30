@@ -511,7 +511,11 @@ namespace Slang
 
             // Use visitor pattern to dispatch to correct case
             DeclVisitor::dispatch(decl);
-            decl->SetCheckState(state);
+
+            if(state > decl->checkState)
+            {
+                decl->SetCheckState(state);
+            }
         }
 
         void EnusreAllDeclsRec(RefPtr<Decl> decl)
@@ -2839,6 +2843,8 @@ namespace Slang
                 paramDecl->type = typeExpr;
             }
 
+            paramDecl->SetCheckState(DeclCheckState::CheckedHeader);
+
             // The "initializer" expression for a parameter represents
             // a default argument value to use if an explicit one is
             // not supplied.
@@ -2857,6 +2863,8 @@ namespace Slang
                 // to other parameters of the same function (or maybe
                 // only the parameters to its left...).
             }
+
+            paramDecl->SetCheckState(DeclCheckState::Checked);
         }
 
         void VisitFunctionDeclaration(FuncDecl *functionNode)
@@ -2870,7 +2878,7 @@ namespace Slang
             HashSet<Name*> paraNames;
             for (auto & para : functionNode->GetParameters())
             {
-                checkDecl(para);
+                EnsureDecl(para, DeclCheckState::CheckedHeader);
 
                 if (paraNames.Contains(para->getName()))
                 {
