@@ -128,6 +128,14 @@ struct SharedEmitContext
     // The "effective" profile that is being used to emit code,
     // combining information from the target and entry point.
     Profile effectiveProfile;
+
+
+    // Are we at the start of a line, so that we should indent
+    // before writing any other text?
+    bool isAtStartOfLine = true;
+
+    // How far are we indented?
+    Int indentLevel = 0;
 };
 
 struct EmitContext
@@ -137,51 +145,6 @@ struct EmitContext
 };
 
 //
-
-#ifdef DEADCODE
-void requireGLSLVersion(
-    EntryPointRequest*  entryPoint,
-    ProfileVersion      version)
-{
-    auto profile = entryPoint->profile;
-    if (profile.getFamily() == ProfileFamily::GLSL)
-    {
-        // Check if this profile is newer
-        if ((UInt)version > (UInt)profile.GetVersion())
-        {
-            profile.setVersion(version);
-            entryPoint->profile = profile;
-        }
-    }
-    else
-    {
-        // Non-GLSL target? Set it to a GLSL one.
-        profile.setVersion(version);
-        entryPoint->profile = profile;
-    }
-}
-#endif
-
-//
-
-static String getStringOrIdentifierTokenValue(
-    Token const& token)
-{
-    switch(token.type)
-    {
-    default:
-        SLANG_UNEXPECTED("needed an identifier or string literal");
-        break;
-
-    case TokenType::Identifier:
-        return token.Content;
-
-    case TokenType::StringLiteral:
-        return getStringLiteralTokenValue(token);
-        break;
-    }
-}
-
 
 enum EPrecedence
 {
@@ -220,57 +183,6 @@ enum EPrecedence
     RIGHT(Prefix),
     LEFT(Postfix),
     NONASSOC(Atomic),
-
-#if 0
-
-    kEPrecedence_None,
-    kEPrecedence_Comma,
-
-    kEPrecedence_Assign,
-    kEPrecedence_AddAssign = kEPrecedence_Assign,
-    kEPrecedence_SubAssign = kEPrecedence_Assign,
-    kEPrecedence_MulAssign = kEPrecedence_Assign,
-    kEPrecedence_DivAssign = kEPrecedence_Assign,
-    kEPrecedence_ModAssign = kEPrecedence_Assign,
-    kEPrecedence_LshAssign = kEPrecedence_Assign,
-    kEPrecedence_RshAssign = kEPrecedence_Assign,
-    kEPrecedence_OrAssign = kEPrecedence_Assign,
-    kEPrecedence_AndAssign = kEPrecedence_Assign,
-    kEPrecedence_XorAssign = kEPrecedence_Assign,
-
-    kEPrecedence_General = kEPrecedence_Assign,
-
-    kEPrecedence_Conditional, // "ternary"
-    kEPrecedence_Or,
-    kEPrecedence_And,
-    kEPrecedence_BitOr,
-    kEPrecedence_BitXor,
-    kEPrecedence_BitAnd,
-
-    kEPrecedence_Eql,
-    kEPrecedence_Neq = kEPrecedence_Eql,
-
-    kEPrecedence_Less,
-    kEPrecedence_Greater = kEPrecedence_Less,
-    kEPrecedence_Leq = kEPrecedence_Less,
-    kEPrecedence_Geq = kEPrecedence_Less,
-
-    kEPrecedence_Lsh,
-    kEPrecedence_Rsh = kEPrecedence_Lsh,
-
-    kEPrecedence_Add,
-    kEPrecedence_Sub = kEPrecedence_Add,
-
-    kEPrecedence_Mul,
-    kEPrecedence_Div = kEPrecedence_Mul,
-    kEPrecedence_Mod = kEPrecedence_Mul,
-
-    kEPrecedence_Prefix,
-    kEPrecedence_Postfix,
-    kEPrecedence_Atomic = kEPrecedence_Postfix
-
-#endif
-
 };
 
 // Info on an op for emit purposes
@@ -398,20 +310,8 @@ struct TypeEmitArg
     EDeclarator* declarator;
 };
 
-struct ExprEmitArg
-{
-    EOpInfo outerPrec;
-};
-
-struct DeclEmitArg
-{
-    VarLayout*      layout;
-};
-
 struct EmitVisitor
     : TypeVisitorWithArg<EmitVisitor, TypeEmitArg>
-    , ExprVisitorWithArg<EmitVisitor, ExprEmitArg>
-    , DeclVisitorWithArg<EmitVisitor, DeclEmitArg>
 {
     EmitContext* context;
     EmitVisitor(EmitContext* context)
@@ -439,23 +339,61 @@ struct EmitVisitor
 
     void emitTextSpan(char const* textBegin, char const* textEnd)
     {
+        // Don't change anything given an empty string
+        if(textBegin == textEnd)
+            return;
+
         // If the source location has changed in a way that required update,
         // do it now!
         flushSourceLocationChange();
+
+        // Note: we don't want to emit indentation on a line that is empty.
+        // The logic in `Emit(textBegin, textEnd)` below will have broken
+        // the text into lines, so we can simply check if a line consists
+        // of just a newline.
+        if(context->shared->isAtStartOfLine && *textBegin != '\n')
+        {
+            // We are about to emit text (other than a newline)
+            // at the start of a line, so we will emit the proper
+            // amount of indentation to keep things looking nice.
+            context->shared->isAtStartOfLine = false;
+            for(Int ii = 0; ii < context->shared->indentLevel; ++ii)
+            {
+                char const* indentString = "    ";
+                size_t indentStringSize = strlen(indentString);
+                emitRawTextSpan(indentString, indentString + indentStringSize);
+
+                // We will also update our tracking location, just in
+                // case other logic needs it.
+                //
+                // TODO: We may need to have a switch that controls whether
+                // we are in "pretty-printing" mode or "follow the locations
+                // in the original code" mode.
+                context->shared->loc.column += indentStringSize;
+            }
+        }
 
         // Emit the raw text
         emitRawTextSpan(textBegin, textEnd);
 
         // Update our logical position
-        // TODO(tfoley): Need to make "corelib" not use `int` for pointer-sized things...
         auto len = int(textEnd - textBegin);
         context->shared->loc.column += len;
+    }
+
+    void indent()
+    {
+        context->shared->indentLevel++;
+    }
+
+    void dedent()
+    {
+        context->shared->indentLevel--;
     }
 
     void Emit(char const* textBegin, char const* textEnd)
     {
         char const* spanBegin = textBegin;
-
         char const* spanEnd = spanBegin;
         for(;;)
         {
@@ -475,6 +413,7 @@ struct EmitVisitor
                 emitTextSpan(spanBegin, spanEnd);
                 context->shared->loc.line++;
                 context->shared->loc.column = 1;
+                context->shared->isAtStartOfLine = true;
 
                 // Start a new span for emit purposes
                 spanBegin = spanEnd;
@@ -619,10 +558,10 @@ struct EmitVisitor
         switch (mode)
         {
         case LineDirectiveMode::None:
-            SLANG_UNEXPECTED("should not trying to emit '#line' directive");
+        case LineDirectiveMode::Default:
+            SLANG_UNEXPECTED("should not be trying to emit '#line' directive");
             return;
 
-        case LineDirectiveMode::Default:
         default:
             // To try to make the default behavior reasonable, we will
             // always use C-style line directives (to give the user
@@ -722,8 +661,17 @@ struct EmitVisitor
         // Don't do any of this work if the user has requested that we
         // not emit line directives.
         auto mode = context->shared->entryPoint->compileRequest->lineDirectiveMode;
-        if (mode == LineDirectiveMode::None)
+        switch(mode)
+        {
+        case LineDirectiveMode::None:
+        case LineDirectiveMode::Default:
+            // Default behavior is to not emit line directives, since they
+            // don't help readability much for IR-based output.
             return;
+
+        default:
+            break;
+        }
 
         // Ignore invalid source locations
         if(sourceLocation.line <= 0)
@@ -757,23 +705,6 @@ struct EmitVisitor
                 // Go ahead and output a `#line` directive to get us caught up
                 emitLineDirectiveAndUpdateSourceLocation(sourceLocation);
             }
-        }
-
-        // Now indent up to the appropriate column, so that error messages
-        // that reference columns will be correct.
-        //
-        // TODO: This logic does not take into account whether indentation
-        // came in as spaces or tabs, so there is necessarily going to be
-        // coupling between how the downstream compiler counts columns,
-        // and how we do.
-        if(sourceLocation.column > context->shared->loc.column)
-        {
-            Slang::Int delta = sourceLocation.column - context->shared->loc.column;
-            for( int ii = 0; ii < delta; ++ii )
-            {
-                emitRawText(" ");
-            }
-            context->shared->loc.column = sourceLocation.column;
         }
     }
 
@@ -810,38 +741,6 @@ struct EmitVisitor
         // triggers this flush operation.
         context->shared->needToUpdateSourceLocation = false;
         emitLineDirectiveIfNeeded(context->shared->nextSourceLocation);
-    }
-
-    void emitTokenWithLocation(Token const& token)
-    {
-        auto mode = context->shared->entryPoint->compileRequest->lineDirectiveMode;
-        if (mode == LineDirectiveMode::None)
-            return;
-
-        if ((mode == LineDirectiveMode::None)
-            || !token.loc.isValid())
-        {
-            // If we don't have the original position info, or we are in the
-            // mode where the user didn't want line directives, we need to play
-            // it safe and emit whitespace to line things up nicely
-
-            if(token.flags & TokenFlag::AtStartOfLine)
-                Emit("\n");
-            // TODO(tfoley): macro expansion can currently lead to whitespace getting dropped,
-            // so we will just insert it aggressively, to play it safe.
-            else //  if(token.flags & TokenFlag::AfterWhitespace)
-                Emit(" ");
-        }
-        else
-        {
-            // If location information is available, and we are emitting
-            // such information, then just advance our tracking location
-            // to the right place.
-            advanceToSourceLocation(token.loc);
-        }
-
-        // Emit the raw textual content of the token
-        emit(token.Content);
     }
 
     DiagnosticSink* getSink()
@@ -1369,117 +1268,9 @@ struct EmitVisitor
         emitTypeImpl(type, nullptr);
     }
 
-    void emitTypeBasedOnExpr(Expr* expr, EDeclarator* declarator)
-    {
-        if (auto subscriptExpr = dynamic_cast<IndexExpr*>(expr))
-        {
-            // Looks like an array
-            emitTypeBasedOnExpr(subscriptExpr->BaseExpression, declarator);
-            Emit("[");
-            if (auto indexExpr = subscriptExpr->IndexExpression)
-            {
-                EmitExpr(indexExpr);
-            }
-            Emit("]");
-        }
-        else
-        {
-            // Default case
-            EmitExpr(expr);
-            EmitDeclarator(declarator);
-        }
-    }
-
-    void EmitType(TypeExp const& typeExp, Name* name, SourceLoc const& nameLoc)
-    {
-        if (!typeExp.type || typeExp.type->As<ErrorType>())
-        {
-            if (!typeExp.exp)
-            {
-                SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unresolved type expression should have expression part");
-            }
-
-            EDeclarator nameDeclarator;
-            nameDeclarator.flavor = EDeclarator::Flavor::name;
-            nameDeclarator.name = name;
-            nameDeclarator.loc = nameLoc;
-
-            emitTypeBasedOnExpr(typeExp.exp, &nameDeclarator);
-        }
-        else
-        {
-            EmitType(typeExp.type,
-                typeExp.exp ? typeExp.exp->loc : SourceLoc(),
-                name, nameLoc);
-        }
-    }
-
-    void EmitType(TypeExp const& typeExp, NameLoc const& nameAndLoc)
-    {
-        EmitType(typeExp, nameAndLoc.name, nameAndLoc.loc);
-    }
-
-    void EmitType(TypeExp const& typeExp, Name* name)
-    {
-        EmitType(typeExp, name, SourceLoc());
-    }
-
-    void emitTypeExp(TypeExp const& typeExp)
-    {
-        // TODO: we need to handle cases where the type part of things is bad...
-        emitTypeImpl(typeExp.type, nullptr);
-    }
-
     //
     // Expressions
     //
-
-    // Determine if an expression should not be emitted when it is the base of
-    // a member reference expression.
-    bool IsBaseExpressionImplicit(RefPtr<Expr> expr)
-    {
-        // HACK(tfoley): For now, anything with a constant-buffer type should be
-        // left implicit.
-
-        // Look through any dereferencing that took place
-        RefPtr<Expr> e = expr;
-        while (auto derefExpr = e.As<DerefExpr>())
-        {
-            e = derefExpr->base;
-        }
-
-        if (auto declRefExpr = e.As<DeclRefExpr>())
-        {
-            auto decl = declRefExpr->declRef.getDecl();
-            if (decl && decl->HasModifier<TransparentModifier>())
-                return true;
-        }
-
-        // Is the expression referencing a uniform parameter group,
-        // but *not* a `ParameterBlock<T>`?
-        if (auto parameterBlockType = e->type->As<ParameterBlockType>())
-        {
-            return false;
-        }
-        if (auto uniformParameterGroupType = e->type->As<UniformParameterGroupType>())
-        {
-            return true;
-        }
-
-        return false;
-    }
-
-#if 0
-    void EmitPostfixExpr(RefPtr<Expr> expr)
-    {
-        EmitExprWithPrecedence(expr, kEOp_Postfix);
-    }
-#endif
-
-    void EmitExpr(RefPtr<Expr> expr)
-    {
-        EmitExprWithPrecedence(expr, kEOp_General);
-    }
 
     bool MaybeEmitParens(EOpInfo& outerPrec, EOpInfo prec)
     {
@@ -1493,118 +1284,6 @@ struct EmitVisitor
             outerPrec = kEOp_None;
         }
         return needParens;
-    }
-
-    // When we are going to emit an expression in an l-value context,
-    // we may need to ignore certain constructs that the type-checker
-    // might have introduced, but which interfere with our ability
-    // to use it effectively in the target language
-    RefPtr<Expr> prepareLValueExpr(
-        RefPtr<Expr>    expr)
-    {
-        for(;;)
-        {
-            if(auto typeCastExpr = expr.As<TypeCastExpr>())
-            {
-                expr = typeCastExpr->Arguments[0];
-            }
-            // TODO: any other cases?
-            else
-            {
-                return expr;
-            }
-        }
-
-    }
-
-    void emitInfixExprImpl(
-        EOpInfo outerPrec,
-        EOpInfo prec,
-        char const* op,
-        RefPtr<InvokeExpr> binExpr,
-        bool isAssign)
-    {
-        bool needsClose = MaybeEmitParens(outerPrec, prec);
-
-        auto left = binExpr->Arguments[0];
-        if(isAssign)
-        {
-            left = prepareLValueExpr(left);
-        }
-
-        EmitExprWithPrecedence(left, leftSide(outerPrec, prec));
-        Emit(" ");
-        Emit(op);
-        Emit(" ");
-        EmitExprWithPrecedence(binExpr->Arguments[1], rightSide(prec, outerPrec));
-        if (needsClose)
-        {
-            Emit(")");
-        }
-    }
-
-    void EmitBinExpr(EOpInfo outerPrec, EOpInfo prec, char const* op, RefPtr<InvokeExpr> binExpr)
-    {
-        emitInfixExprImpl(outerPrec, prec, op, binExpr, false);
-    }
-
-    void EmitBinAssignExpr(EOpInfo outerPrec, EOpInfo prec, char const* op, RefPtr<InvokeExpr> binExpr)
-    {
-        emitInfixExprImpl(outerPrec, prec, op, binExpr, true);
-    }
-
-    void emitUnaryExprImpl(
-        EOpInfo outerPrec,
-        EOpInfo prec,
-        char const* preOp,
-        char const* postOp,
-        RefPtr<InvokeExpr> expr,
-        bool isAssign)
-    {
-        bool needsClose = MaybeEmitParens(outerPrec, prec);
-        Emit(preOp);
-
-        auto arg = expr->Arguments[0];
-        if(isAssign)
-        {
-            arg = prepareLValueExpr(arg);
-        }
-
-        if (preOp)
-        {
-            EmitExprWithPrecedence(arg, rightSide(prec, outerPrec));
-        }
-        else
-        {
-            SLANG_ASSERT(postOp);
-            EmitExprWithPrecedence(arg, leftSide(outerPrec, prec));
-        }
-
-        Emit(postOp);
-        if (needsClose)
-        {
-            Emit(")");
-        }
-    }
-
-    void EmitUnaryExpr(
-        EOpInfo outerPrec,
-        EOpInfo prec,
-        char const* preOp,
-        char const* postOp,
-        RefPtr<InvokeExpr> expr)
-    {
-        emitUnaryExprImpl(outerPrec, prec, preOp, postOp, expr, false);
-    }
-
-    void EmitUnaryAssignExpr(
-        EOpInfo outerPrec,
-        EOpInfo prec,
-        char const* preOp,
-        char const* postOp,
-        RefPtr<InvokeExpr> expr)
-    {
-        emitUnaryExprImpl(outerPrec, prec, preOp, postOp, expr, true);
     }
 
     bool isTargetIntrinsicModifierApplicable(
@@ -1621,25 +1300,6 @@ struct EmitVisitor
         }
     }
 
-    // Determine if a target intrinsic modifer is applicable to the target
-    // we are currently emitting code for.
-    bool isTargetIntrinsicModifierApplicable(
-        RefPtr<TargetIntrinsicModifier> modifier)
-    {
-        auto const& targetToken = modifier->targetToken;
-
-        // If no target name was specified, then the modifier implicitly
-        // applies to all targets.
-        if(targetToken.type == TokenType::Unknown)
-            return true;
-
-        // Otherwise, we need to check if the target name matches what
-        // we expect.
-        auto const& targetName = targetToken.Content;
-
-        return isTargetIntrinsicModifierApplicable(targetName);
-    }
-
     bool isTargetIntrinsicModifierApplicable(
         IRTargetIntrinsicDecoration*    decoration)
     {
@@ -1651,171 +1311,6 @@ struct EmitVisitor
             return true;
 
         return isTargetIntrinsicModifierApplicable(targetName);
-    }
-
-
-    // Find an intrinsic modifier appropriate to the current compilation target.
-    //
-    // If there are multiple such modifiers, this should return the best one.
-    RefPtr<TargetIntrinsicModifier> findTargetIntrinsicModifier(
-        RefPtr<ModifiableSyntaxNode>    syntax)
-    {
-        RefPtr<TargetIntrinsicModifier> bestModifier;
-        for(auto m : syntax->GetModifiersOfType<TargetIntrinsicModifier>())
-        {
-            if(!isTargetIntrinsicModifierApplicable(m))
-                continue;
-
-            // For now "better"-ness is defined as: a modifier
-            // with a specified target is better than one without
-            // (it is more specific)
-            if(!bestModifier || bestModifier->targetToken.type == TokenType::Unknown)
-            {
-                bestModifier = m;
-            }
-        }
-
-        return bestModifier;
-    }
-
-    void emitSimpleCallArgs(
-        RefPtr<InvokeExpr>  callExpr)
-    {
-        Emit("(");
-        UInt argCount = callExpr->Arguments.Count();
-        for (UInt aa = 0; aa < argCount; ++aa)
-        {
-            if (aa != 0) Emit(", ");
-            EmitExpr(callExpr->Arguments[aa]);
-        }
-        Emit(")");
-    }
-
-    void emitTypeOrExpr(
-        Type*   type,
-        Expr*   expr)
-    {
-        if (type && !type->As<ErrorType>())
-        {
-            EmitType(type);
-        }
-        else
-        {
-            emitTypeBasedOnExpr(expr, nullptr);
-        }
-    }
-
-    void emitSimpleConstructorCallExpr(
-        RefPtr<InvokeExpr>  callExpr,
-        EOpInfo             outerPrec)
-    {
-        if(context->shared->target == CodeGenTarget::HLSL)
-        {
-            // HLSL needs to special-case a constructor call with a single argument.
-            if(callExpr->Arguments.Count() == 1)
-            {
-                auto prec = kEOp_Prefix;
-                bool needClose = MaybeEmitParens(outerPrec, prec);
-
-                Emit("(");
-                emitTypeOrExpr(callExpr->type.type, callExpr->FunctionExpr);
-                Emit(") ");
-
-                EmitExprWithPrecedence(callExpr->Arguments[0], rightSide(outerPrec, prec));
-
-                if(needClose) Emit(")");
-                return;
-            }
-        }
-
-
-        // Default handling is to emit what amounts to an ordinary call,
-        // but using the type of the expression directly as the "function" to call.
-        auto prec = kEOp_Postfix;
-        bool needClose = MaybeEmitParens(outerPrec, prec);
-
-        emitTypeOrExpr(callExpr->type.type, callExpr->FunctionExpr);
-
-        emitSimpleCallArgs(callExpr);
-
-        if (needClose)
-        {
-            Emit(")");
-        }
-    }
-
-    void emitSimpleSubscriptCallExpr(
-        RefPtr<InvokeExpr>  callExpr,
-        EOpInfo             /*outerPrec*/)
-    {
-        auto funcExpr = callExpr->FunctionExpr;
-
-        // We expect any subscript operation to be invoked as a member,
-        // so the function expression had better be in the correct form.
-        auto memberExpr = funcExpr.As<MemberExpr>();
-        if(!memberExpr)
-        {
-            SLANG_UNEXPECTED("subscript needs base expression");
-        }
-
-        Emit("(");
-        EmitExpr(memberExpr->BaseExpression);
-        Emit(")[");
-        UInt argCount = callExpr->Arguments.Count();
-        for (UInt aa = 0; aa < argCount; ++aa)
-        {
-            if (aa != 0) Emit(", ");
-            EmitExpr(callExpr->Arguments[aa]);
-        }
-        Emit("]");
-    }
-
-    // Emit a call expression that doesn't involve any special cases,
-    // just an expression of the form `f(a0, a1, ...)`
-    void emitSimpleCallExpr(
-        RefPtr<InvokeExpr>  callExpr,
-        EOpInfo                             outerPrec)
-    {
-        // We will first check if this represents a constructor call,
-        // since those may need to be handled differently.
-
-        auto funcExpr = callExpr->FunctionExpr;
-        if (auto funcDeclRefExpr = funcExpr.As<DeclRefExpr>())
-        {
-            auto declRef = funcDeclRefExpr->declRef;
-            if (auto ctorDeclRef = declRef.As<ConstructorDecl>())
-            {
-                emitSimpleConstructorCallExpr(callExpr, outerPrec);
-                return;
-            }
-
-            if(auto acessorDeclRef = declRef.As<AccessorDecl>())
-            {
-                declRef = acessorDeclRef.GetParent();
-            }
-
-            if(auto subscriptDeclRef = declRef.As<SubscriptDecl>())
-            {
-                emitSimpleSubscriptCallExpr(callExpr, outerPrec);
-                return;
-            }
-
-        }
-
-        // Once we've ruled out constructor calls, we can move on
-        // to just emitting an ordinary calll expression.
-
-        auto prec = kEOp_Postfix;
-        bool needClose = MaybeEmitParens(outerPrec, prec);
-
-        EmitExprWithPrecedence(funcExpr, leftSide(outerPrec, prec));
-
-        emitSimpleCallArgs(callExpr);
-
-        if (needClose)
-        {
-            Emit(")");
-        }
     }
 
     void emitStringLiteral(
@@ -1861,152 +1356,6 @@ struct EmitVisitor
         return result;
     }
 
-    void EmitExprWithPrecedence(RefPtr<Expr> expr, EOpInfo outerPrec)
-    {
-        ExprEmitArg arg;
-        arg.outerPrec = outerPrec;
-
-        ExprVisitorWithArg::dispatch(expr, arg);
-    }
-
-    void EmitExprWithPrecedence(RefPtr<Expr> expr, EPrecedence leftPrec, EPrecedence rightPrec)
-    {
-        EOpInfo outerPrec;
-        outerPrec.leftPrecedence = leftPrec;
-        outerPrec.rightPrecedence = rightPrec;
-    }
-
-    void visitGenericAppExpr(GenericAppExpr* expr, ExprEmitArg const& arg)
-    {
-        auto prec = kEOp_Postfix;
-        auto outerPrec = arg.outerPrec;
-        bool needClose = MaybeEmitParens(outerPrec, prec);
-
-        EmitExprWithPrecedence(expr->FunctionExpr, leftSide(outerPrec, prec));
-        Emit("<");
-        bool first = true;
-        for(auto aa : expr->Arguments)
-        {
-            if(!first) Emit(", ");
-            EmitExpr(aa);
-            first = false;
-        }
-        Emit(" >");
-
-        if(needClose)
-        {
-            Emit(")");
-        }
-    }
-
-    void visitSharedTypeExpr(SharedTypeExpr* expr, ExprEmitArg const&)
-    {
-        emitTypeExp(expr->base);
-    }
-
-    void visitSelectExpr(SelectExpr* selectExpr, ExprEmitArg const& arg)
-    {
-        auto prec = kEOp_Conditional;
-        auto outerPrec = arg.outerPrec;
-        bool needClose = MaybeEmitParens(outerPrec, kEOp_Conditional);
-
-        // TODO(tfoley): Need to ver the precedence here...
-
-        EmitExprWithPrecedence(selectExpr->Arguments[0], leftSide(outerPrec, prec));
-        Emit(" ? ");
-        EmitExprWithPrecedence(selectExpr->Arguments[1], prec);
-        Emit(" : ");
-        EmitExprWithPrecedence(selectExpr->Arguments[2], rightSide(prec, outerPrec));
-
-        if(needClose) Emit(")");
-    }
-
-    void visitParenExpr(ParenExpr* expr, ExprEmitArg const&)
-    {
-        Emit("(");
-        EmitExprWithPrecedence(expr->base, kEOp_None);
-        Emit(")");
-    }
-
-    void visitAssignExpr(AssignExpr* assignExpr, ExprEmitArg const& arg)
-    {
-        auto prec = kEOp_Assign;
-        auto outerPrec = arg.outerPrec;
-        bool needClose = MaybeEmitParens(outerPrec, prec);
-        EmitExprWithPrecedence(assignExpr->left, leftSide(outerPrec, prec));
-        Emit(" = ");
-        EmitExprWithPrecedence(assignExpr->right, rightSide(prec, outerPrec));
-        if(needClose) Emit(")");
-    }
-
-    void emitUncheckedCallExpr(
-        RefPtr<InvokeExpr>  callExpr,
-        Name*               funcName,
-        ExprEmitArg const&  arg)
-    {
-        auto outerPrec = arg.outerPrec;
-        auto funcExpr = callExpr->FunctionExpr;
-
-        auto funcNameText = getText(funcName);
-
-        // This can occur when we are dealing with unchecked input syntax,
-        // because we are in "rewriter" mode. In this case we should go
-        // ahead and emit things in the form that they were written.
-        if( auto infixExpr = callExpr.As<InfixExpr>() )
-        {
-            auto prec = kEOp_Comma;
-            for (auto opInfo : kInfixOpInfos)
-            {
-                if (funcNameText == opInfo->op)
-                {
-                    prec = *opInfo;
-                    break;
-                }
-            }
-
-            EmitBinExpr(
-                outerPrec,
-                prec,
-                funcNameText.Buffer(),
-                callExpr);
-        }
-        else if( auto prefixExpr = callExpr.As<PrefixExpr>() )
-        {
-            EmitUnaryExpr(
-                outerPrec,
-                kEOp_Prefix,
-                funcNameText.Buffer(),
-                "",
-                callExpr);
-        }
-        else if(auto postfixExpr = callExpr.As<PostfixExpr>())
-        {
-            EmitUnaryExpr(
-                outerPrec,
-                kEOp_Postfix,
-                "",
-                funcNameText.Buffer(),
-                callExpr);
-        }
-        else
-        {
-            bool needClose = MaybeEmitParens(outerPrec, kEOp_Postfix);
-
-            EmitExpr(funcExpr);
-
-            Emit("(");
-            UInt argCount = callExpr->Arguments.Count();
-            for (UInt aa = 0; aa < argCount; ++aa)
-            {
-                if (aa != 0) Emit(", ");
-                EmitExpr(callExpr->Arguments[aa]);
-            }
-            Emit(")");
-
-            if (needClose) Emit(")");
-        }
-    }
-
     void requireGLSLExtension(String const& name)
     {
         Slang::requireGLSLExtension(&context->shared->extensionUsageTracker, name);
@@ -2044,592 +1393,9 @@ struct EmitVisitor
         }
     }
 
-    void visitInvokeExpr(
-        RefPtr<InvokeExpr>  callExpr,
-        ExprEmitArg const& arg)
-    {
-        auto outerPrec = arg.outerPrec;
-
-        auto funcExpr = callExpr->FunctionExpr;
-        if (auto funcDeclRefExpr = funcExpr.As<DeclRefExpr>())
-        {
-            auto funcDeclRef = funcDeclRefExpr->declRef;
-            auto funcDecl = funcDeclRef.getDecl();
-            if (!funcDecl)
-            {
-                emitUncheckedCallExpr(callExpr, funcDeclRefExpr->name, arg);
-                return;
-            }
-            // Note: We check for a "target intrinsic" modifier that flags the
-            // operation as having a custom elaboration for a specific target
-            // *before* we check for an "intrinsic op." The basic problem is
-            // that a single operation could have both finds of modifiers on it.
-            // The "target" intrinsic modifier tags something expansion during
-            // our current source-to-source translation approach, while an
-            // intrinsic op is needed for helping things lower to our IR.
-            //
-            // We need to check for this case first to make sure that when a
-            // function gets an intrinsic op added it doesn't break existing
-            // cross-compilation logic.
-            //
-            // The long term fix will be to not use the AST-based cross-compilation
-            // logic (which has all kinds of problems) and instead use the IR
-            // exclusively, at which point the notion of a "target intrinsic" modifier
-            // goes away (although we may have something similar to express how
-            // a particular op should lower/expand for a given target).
-            else if(auto targetIntrinsicModifier = findTargetIntrinsicModifier(funcDecl))
-            {
-                if (context->shared->target == CodeGenTarget::GLSL)
-                {
-                    // Does this intrinsic requie a particular GLSL extension that wouldn't be available by default?
-                    if (auto requiredGLSLExtensionModifier = funcDecl->FindModifier<RequiredGLSLExtensionModifier>())
-                    {
-                        // If so, we had better request the extension.
-                        requireGLSLExtension(requiredGLSLExtensionModifier->extensionNameToken.Content);
-                    }
-
-#ifdef DEADCODE
-                    // Does this intrinsic requie a particular GLSL extension that wouldn't be available by default?
-                    if (auto requiredGLSLVersionModifier = funcDecl->FindModifier<RequiredGLSLVersionModifier>())
-                    {
-                        // If so, we had better request the extension.
-                        requireGLSLVersion((int) getIntegerLiteralValue(requiredGLSLVersionModifier->versionNumberToken));
-                    }
-#endif
-                }
-
-
-                if(targetIntrinsicModifier->definitionToken.type != TokenType::Unknown)
-                {
-                    auto name = getStringOrIdentifierTokenValue(targetIntrinsicModifier->definitionToken);
-
-                    if(name.IndexOf('$') == -1)
-                    {
-                        // Simple case: it is just an ordinary name, so we call it like a builtin.
-                        //
-                        // TODO: this case could probably handle things like operators, for generality?
-
-                        emit(name);
-                        Emit("(");
-                        UInt argCount = callExpr->Arguments.Count();
-                        for (UInt aa = 0; aa < argCount; ++aa)
-                        {
-                            if (aa != 0) Emit(", ");
-                            EmitExpr(callExpr->Arguments[aa]);
-                        }
-                        Emit(")");
-                        return;
-                    }
-                    else
-                    {
-                        // General case: we are going to emit some more complex text.
-
-                        UInt argCount = callExpr->Arguments.Count();
-
-                        Emit("(");
-
-                        char const* cursor = name.begin();
-                        char const* end = name.end();
-                        while(cursor != end)
-                        {
-                            char c = *cursor++;
-                            if( c != '$' )
-                            {
-                                // Not an escape sequence
-                                emitRawTextSpan(&c, &c+1);
-                                continue;
-                            }
-
-                            SLANG_RELEASE_ASSERT(cursor != end);
-
-                            char d = *cursor++;
-
-                            switch (d)
-                            {
-                            case '0': case '1': case '2': case '3': case '4':
-                            case '5': case '6': case '7': case '8': case '9':
-                                {
-                                    // Simple case: emit one of the direct arguments to the call
-                                    UInt argIndex = d - '0';
-                                    SLANG_RELEASE_ASSERT((0 <= argIndex) && (argIndex < argCount));
-                                    Emit("(");
-                                    EmitExpr(callExpr->Arguments[argIndex]);
-                                    Emit(")");
-                                }
-                                break;
-
-                            case 'o':
-                                // For a call using object-oriented syntax, this
-                                // expands to the "base" object used for the call
-                                if (auto memberExpr = callExpr->FunctionExpr.As<MemberExpr>())
-                                {
-                                    Emit("(");
-                                    EmitExpr(memberExpr->BaseExpression);
-                                    Emit(")");
-                                }
-                                else
-                                {
-                                    SLANG_UNEXPECTED("bad format in intrinsic definition");
-                                }
-                                break;
-
-                            case 'p':
-                                // If we are calling a D3D texturing operation in the form t.Foo(s, ...),
-                                // then this form will pair up the t and s arguments as needed for a GLSL
-                                // texturing operation.
-                                SLANG_RELEASE_ASSERT(argCount > 0);
-                                if (auto memberExpr = callExpr->FunctionExpr.As<MemberExpr>())
-                                {
-                                    auto base = memberExpr->BaseExpression;
-                                    if (auto baseTextureType = base->type->As<TextureType>())
-                                    {
-                                        emitGLSLTextureOrTextureSamplerType(baseTextureType, "sampler");
-
-                                        if (auto samplerType = callExpr->Arguments[0]->type.type->As<SamplerStateType>())
-                                        {
-                                            if (samplerType->flavor == SamplerStateFlavor::SamplerComparisonState)
-                                            {
-                                                Emit("Shadow");
-                                            }
-                                        }
-
-                                        Emit("(");
-                                        EmitExpr(memberExpr->BaseExpression);
-                                        Emit(",");
-                                        EmitExpr(callExpr->Arguments[0]);
-                                        Emit(")");
-                                    }
-                                    else
-                                    {
-                                        SLANG_UNEXPECTED("bad format in intrinsic definition");
-                                    }
-
-                                }
-                                else
-                                {
-                                    SLANG_UNEXPECTED("bad format in intrinsic definition");
-                                }
-                                break;
-
-                            case 'P':
-                                {
-                                    // Okay, we need a collosal hack to deal with the fact that GLSL `texelFetch()`
-                                    // for Vulkan seems to be completely broken by design. It's signature wants
-                                    // a `sampler2D` for consistency with its peers, but the actual SPIR-V operation
-                                    // ignores the sampler paart of it, and just used the `texture2D` part.
-                                    //
-                                    // The HLSL equivalent (e.g., `Texture2D.Load()`) doesn't provide a sampler
-                                    // argument, so we seemingly need to conjure one out of thin air. :(
-                                    //
-                                    // We are going to hack this *hard* for now.
-
-                                    // Try to find a suitable sampler-type shader parameter in the global scope
-                                    // (fingers crossed)
-                                    RefPtr<VarDeclBase> samplerVar;
-                                    for (auto dd : context->shared->program->Members)
-                                    {
-                                        if (auto varDecl = dd.As<VarDeclBase>())
-                                        {
-                                            if (auto samplerType = varDecl->type.type->As<SamplerStateType>())
-                                            {
-                                                samplerVar = varDecl;
-                                                break;
-                                            }
-                                        }
-                                    }
-
-                                    if (auto memberExpr = callExpr->FunctionExpr.As<MemberExpr>())
-                                    {
-                                        auto base = memberExpr->BaseExpression;
-                                        if (auto baseTextureType = base->type->As<TextureType>())
-                                        {
-                                            emitGLSLTextureOrTextureSamplerType(baseTextureType, "sampler");
-                                            Emit("(");
-                                            EmitExpr(memberExpr->BaseExpression);
-                                            Emit(",");
-                                            if (samplerVar)
-                                            {
-                                                EmitDeclRef(makeDeclRef(samplerVar.Ptr()));
-                                            }
-                                            else
-                                            {
-                                                Emit("SLANG_hack_samplerForTexelFetch");
-                                                context->shared->needHackSamplerForTexelFetch = true;
-                                            }
-                                            Emit(")");
-                                        }
-                                        else
-                                        {
-                                            SLANG_UNEXPECTED("bad format in intrinsic definition");
-                                        }
-
-                                    }
-                                    else
-                                    {
-                                        SLANG_UNEXPECTED("bad format in intrinsic definition");
-                                    }
-                                }
-                                break;
-
-                            case 'z':
-                                // If we are calling a D3D texturing operation in the form t.Foo(s, ...),
-                                // where `t` is a `Texture*<T>`, then this is the step where we try to
-                                // properly swizzle the output of the equivalent GLSL call into the right
-                                // shape.
-                                SLANG_RELEASE_ASSERT(argCount > 0);
-                                if (auto memberExpr = callExpr->FunctionExpr.As<MemberExpr>())
-                                {
-                                    auto base = memberExpr->BaseExpression;
-                                    if (auto baseTextureType = base->type->As<TextureType>())
-                                    {
-                                        auto elementType = baseTextureType->elementType;
-                                        if (auto basicType = elementType->As<BasicExpressionType>())
-                                        {
-                                            // A scalar result is expected
-                                            Emit(".x");
-                                        }
-                                        else if (auto vectorType = elementType->As<VectorExpressionType>())
-                                        {
-                                            // A vector result is expected
-                                            auto elementCount = GetIntVal(vectorType->elementCount);
-
-                                            if (elementCount < 4)
-                                            {
-                                                char const* swiz[] = { "", ".x", ".xy", ".xyz", "" };
-                                                Emit(swiz[elementCount]);
-                                            }
-                                        }
-                                        else
-                                        {
-                                            // What other cases are possible?
-                                        }
-                                    }
-                                    else
-                                    {
-                                        SLANG_UNEXPECTED("bad format in intrinsic definition");
-                                    }
-
-                                }
-                                else
-                                {
-                                    SLANG_UNEXPECTED("bad format in intrinsic definition");
-                                }
-                                break;
-
-                            default:
-                                SLANG_UNEXPECTED("bad format in intrinsic definition");
-                                break;
-                            }
-                        }
-
-                        Emit(")");
-                    }
-
-                    return;
-                }
-
-                // If we fall through here, we will treat the call like any other.
-            }
-            else if (auto intrinsicOpModifier = funcDecl->FindModifier<IntrinsicOpModifier>())
-            {
-                switch (intrinsicOpModifier->op)
-                {
-#define CASE(NAME, OP) case kIROp_##NAME: EmitBinExpr(outerPrec, kEOp_##NAME, #OP, callExpr); return
-                    CASE(Mul, *);
-                    CASE(Div, / );
-                    CASE(Mod, %);
-                    CASE(Add, +);
-                    CASE(Sub, -);
-                    CASE(Lsh, << );
-                    CASE(Rsh, >> );
-                    CASE(Eql, == );
-                    CASE(Neq, != );
-                    CASE(Greater, > );
-                    CASE(Less, < );
-                    CASE(Geq, >= );
-                    CASE(Leq, <= );
-                    CASE(BitAnd, &);
-                    CASE(BitXor, ^);
-                    CASE(BitOr, | );
-                    CASE(And, &&);
-                    CASE(Or, || );
-#undef CASE
-
-#define CASE(NAME, OP) case kIRPseudoOp_##NAME: EmitBinAssignExpr(outerPrec, kEOp_##NAME, #OP, callExpr); return
-                    CASE(Assign, =);
-                    CASE(AddAssign, +=);
-                    CASE(SubAssign, -=);
-                    CASE(MulAssign, *=);
-                    CASE(DivAssign, /=);
-                    CASE(ModAssign, %=);
-                    CASE(LshAssign, <<=);
-                    CASE(RshAssign, >>=);
-                    CASE(OrAssign, |=);
-                    CASE(AndAssign, &=);
-                    CASE(XorAssign, ^=);
-#undef CASE
-
-                case kIRPseudoOp_Sequence: EmitBinExpr(outerPrec, kEOp_Comma, ",", callExpr); return;
-
-#define CASE(NAME, OP) case NAME: EmitUnaryExpr(outerPrec, kEOp_Prefix, #OP, "", callExpr); return
-                    CASE(kIRPseudoOp_Pos, +);
-                    CASE(kIROp_Neg, -);
-                    CASE(kIROp_Not, !);
-                    CASE(kIROp_BitNot, ~);
-#undef CASE
-
-#define CASE(NAME, OP) case kIRPseudoOp_##NAME: EmitUnaryAssignExpr(outerPrec, kEOp_Prefix, #OP, "", callExpr); return
-                    CASE(PreInc, ++);
-                    CASE(PreDec, --);
-#undef CASE
-
-#define CASE(NAME, OP) case kIRPseudoOp_##NAME: EmitUnaryAssignExpr(outerPrec, kEOp_Postfix, "", #OP, callExpr); return
-                    CASE(PostInc, ++);
-                    CASE(PostDec, --);
-#undef CASE
-
-                case kIROp_Dot:
-                    // HLSL allows `mul()` to be used as a synonym for `dot()`,
-                    // so we need to translate to `dot` for GLSL
-                    if (context->shared->target == CodeGenTarget::GLSL)
-                    {
-                        Emit("dot(");
-                        EmitExpr(callExpr->Arguments[0]);
-                        Emit(", ");
-                        EmitExpr(callExpr->Arguments[1]);
-                        Emit(")");
-                        return;
-                    }
-                    break;
-
-                case kIROp_Mul_Matrix_Matrix:
-                case kIROp_Mul_Vector_Matrix:
-                case kIROp_Mul_Matrix_Vector:
-                    // HLSL exposes these with the `mul()` function, while GLSL uses ordinary
-                    // `operator*`.
-                    //
-                    // The other critical detail here is that the way we handle matrix
-                    // conventions requires that the operands to the product be swapped.
-                    if (context->shared->target == CodeGenTarget::GLSL)
-                    {
-                        Emit("((");
-                        EmitExpr(callExpr->Arguments[1]);
-                        Emit(") * (");
-                        EmitExpr(callExpr->Arguments[0]);
-                        Emit("))");
-                        return;
-                    }
-                    break;
-
-                default:
-                    break;
-                }
-
-                // If none of the above matched, then we don't have a specific
-                // case implemented to handle the opcode on the callee.
-                //
-                // We do one more special-case check here, in case the operation
-                // is a "subscript" (array indexing) operation, because we'd
-                // generally like to reproduce those as array indexing operations
-                // in the output if that is how they were written in the input.
-                if(auto subscriptDeclRef = funcDeclRef.As<SubscriptDecl>())
-                {
-                    // We expect any subscript operation to be invoked as a member,
-                    // so the function expression had better be in the correct form.
-                    if(auto memberExpr = funcExpr.As<MemberExpr>())
-                    {
-
-                        Emit("(");
-                        EmitExpr(memberExpr->BaseExpression);
-                        Emit(")[");
-                        UInt argCount = callExpr->Arguments.Count();
-                        for (UInt aa = 0; aa < argCount; ++aa)
-                        {
-                            if (aa != 0) Emit(", ");
-                            EmitExpr(callExpr->Arguments[aa]);
-                        }
-                        Emit("]");
-                        return;
-                    }
-                }
-
-            }
-        }
-        else if (auto overloadedExpr = funcExpr.As<OverloadedExpr>())
-        {
-            emitUncheckedCallExpr(callExpr, overloadedExpr->lookupResult2.getName(), arg);
-            return;
-        }
-
-        // Fall through to default handling...
-        emitSimpleCallExpr(callExpr, outerPrec);
-    }
-
-    void visitAggTypeCtorExpr(AggTypeCtorExpr* expr, ExprEmitArg const& arg)
-    {
-        auto prec = kEOp_Postfix;
-        auto outerPrec = arg.outerPrec;
-        bool needClose = MaybeEmitParens(outerPrec, prec);
-
-        emitTypeExp(expr->base);
-        Emit("(");
-        bool first = true;
-        for (auto aa : expr->Arguments)
-        {
-            if (!first) Emit(", ");
-            EmitExpr(aa);
-            first = false;
-        }
-        Emit(")");
-
-        if(needClose) Emit(")");
-    }
-
-    void visitStaticMemberExpr(StaticMemberExpr* memberExpr, ExprEmitArg const& arg)
-    {
-        auto prec = kEOp_Postfix;
-        auto outerPrec = arg.outerPrec;
-        bool needClose = MaybeEmitParens(outerPrec, prec);
-
-        // TODO(tfoley): figure out a good way to reference
-        // declarations that might be generic and/or might
-        // not be generated as lexically nested declarations...
-
-        // TODO(tfoley): also, probably need to special case
-        // this for places where we are using a built-in...
-
-        auto base = memberExpr->BaseExpression;
-        if (IsBaseExpressionImplicit(base))
-        {
-            // don't emit the base expression
-        }
-        else
-        {
-            EmitExprWithPrecedence(memberExpr->BaseExpression, leftSide(outerPrec, prec));
-            Emit(".");
-        }
-
-        if (!memberExpr->declRef)
-        {
-            // This case arises when checking didn't find anything, but we were
-            // in "rewrite" mode so we blazed ahead anyway.
-            emitName(memberExpr->name);
-        }
-        else
-        {
-            EmitDeclRef(memberExpr->declRef);
-//            emit(memberExpr->declRef.GetName());
-        }
-
-        if(needClose) Emit(")");
-    }
-
-    void visitMemberExpr(MemberExpr* memberExpr, ExprEmitArg const& arg)
-    {
-        auto prec = kEOp_Postfix;
-        auto outerPrec = arg.outerPrec;
-        bool needClose = MaybeEmitParens(outerPrec, prec);
-
-        // TODO(tfoley): figure out a good way to reference
-        // declarations that might be generic and/or might
-        // not be generated as lexically nested declarations...
-
-        // TODO(tfoley): also, probably need to special case
-        // this for places where we are using a built-in...
-
-        auto base = memberExpr->BaseExpression;
-        if (IsBaseExpressionImplicit(base))
-        {
-            // don't emit the base expression
-        }
-        else
-        {
-            EmitExprWithPrecedence(memberExpr->BaseExpression, leftSide(outerPrec, prec));
-            Emit(".");
-        }
-
-        if (!memberExpr->declRef)
-        {
-            // This case arises when checking didn't find anything, but we were
-            // in "rewrite" mode so we blazed ahead anyway.
-            emitName(memberExpr->name);
-        }
-        else
-        {
-            EmitDeclRef(memberExpr->declRef);
-//            emit(memberExpr->declRef.GetName());
-        }
-
-        if(needClose) Emit(")");
-    }
-
-    void visitThisExpr(ThisExpr* /*expr*/, ExprEmitArg const& arg)
-    {
-        auto prec = kEOp_Atomic;
-        auto outerPrec = arg.outerPrec;
-        bool needClose = MaybeEmitParens(outerPrec, prec);
-
-        Emit("this");
-
-        if(needClose) Emit(")");
-    }
-
-    void visitSwizzleExpr(SwizzleExpr* swizExpr, ExprEmitArg const& arg)
-    {
-        auto prec = kEOp_Postfix;
-        auto outerPrec = arg.outerPrec;
-        bool needClose = MaybeEmitParens(outerPrec, prec);
-
-        EmitExprWithPrecedence(swizExpr->base, leftSide(outerPrec, prec));
-        Emit(".");
-        static const char* kComponentNames[] = { "x", "y", "z", "w" };
-        int elementCount = swizExpr->elementCount;
-        for (int ee = 0; ee < elementCount; ++ee)
-        {
-            Emit(kComponentNames[swizExpr->elementIndices[ee]]);
-        }
-
-        if(needClose) Emit(")");
-    }
-
-    void visitIndexExpr(IndexExpr* subscriptExpr, ExprEmitArg const& arg)
-    {
-        auto prec = kEOp_Postfix;
-        auto outerPrec = arg.outerPrec;
-        bool needClose = MaybeEmitParens(outerPrec, prec);
-
-        EmitExprWithPrecedence(subscriptExpr->BaseExpression, leftSide(outerPrec, prec));
-        Emit("[");
-        if (auto indexExpr = subscriptExpr->IndexExpression)
-        {
-            EmitExpr(indexExpr);
-        }
-        Emit("]");
-
-        if(needClose) Emit(")");
-    }
-
-    void visitOverloadedExpr(OverloadedExpr* expr, ExprEmitArg const&)
-    {
-        emitName(expr->lookupResult2.getName());
-    }
-
-    void visitOverloadedExpr2(OverloadedExpr2* expr, ExprEmitArg const& arg)
-    {
-        ExprVisitorWithArg<Slang::EmitVisitor, Slang::ExprEmitArg>::dispatch(expr->candidiateExprs[0].Ptr(), arg);
-    }
-
     void setSampleRateFlag()
     {
         context->shared->entryPointLayout->flags |= EntryPointLayout::Flag::usesAnySampleRateInput;
-    }
-
-    void doSampleRateInputCheck(VarDeclBase* decl)
-    {
-        if (decl->HasModifier<HLSLSampleModifier>())
-        {
-            setSampleRateFlag();
-        }
     }
 
     void doSampleRateInputCheck(Name* name)
@@ -2641,397 +1407,9 @@ struct EmitVisitor
         }
     }
 
-    void visitVarExpr(VarExpr* varExpr, ExprEmitArg const& arg)
-    {
-        doSampleRateInputCheck(varExpr->name);
-
-        auto prec = kEOp_Atomic;
-        auto outerPrec = arg.outerPrec;
-        bool needClose = MaybeEmitParens(outerPrec, kEOp_Atomic);
-
-        // TODO: This won't be valid if we had to generate a qualified
-        // reference for some reason.
-        advanceToSourceLocation(varExpr->loc);
-
-        // Because of the "rewriter" use case, it is possible that we will
-        // be trying to emit an expression that hasn't been wired up to
-        // any associated declaration. In that case, we will just emit
-        // the variable name.
-        //
-        // TODO: A better long-term solution here is to have a distinct
-        // case for an "unchecked" `NameExpr` that doesn't include
-        // a declaration reference.
-
-        if(varExpr->declRef)
-        {
-            EmitDeclRef(varExpr->declRef);
-        }
-        else
-        {
-            emit(varExpr->name);
-        }
-
-        if(needClose) Emit(")");
-    }
-
-    void visitDerefExpr(DerefExpr* derefExpr, ExprEmitArg const& arg)
-    {
-        // TODO(tfoley): dereference shouldn't always be implicit
-        ExprVisitorWithArg::dispatch(derefExpr->base, arg);
-    }
-
-    void visitLiteralExpr(LiteralExpr*, ExprEmitArg const&)
-    {
-        // Disabling because we no longer use the AST-based emit path.
-        //
-        // Note: I'm keeping this code around for a while just in case
-        // we want to borrow any of the logic here for how to apply
-        // suffixes to numeric literals we emit.
-        //
-#if 0
-        auto outerPrec = arg.outerPrec;
-        bool needClose = MaybeEmitParens(outerPrec, kEOp_Atomic);
-
-        char const* suffix = "";
-        auto type = litExpr->type.type;
-        switch (litExpr->ConstType)
-        {
-        case ConstantExpr::ConstantType::Int:
-            if(!type)
-            {
-                // Special case for "rewrite" mode
-                emitTokenWithLocation(litExpr->token);
-                break;
-            }
-            if(type->Equals(getSession()->getIntType()))
-            {}
-            else if(type->Equals(getSession()->getUIntType()))
-            {
-                suffix = "u";
-            }
-            else
-            {
-                SLANG_DIAGNOSE_UNEXPECTED(getSink(), litExpr, "unhandled type for integer literal");
-            }
-            Emit(litExpr->integerValue);
-            Emit(suffix);
-            break;
-
-
-        case ConstantExpr::ConstantType::Float:
-            if(!type)
-            {
-                // Special case for "rewrite" mode
-                emitTokenWithLocation(litExpr->token);
-                break;
-            }
-            if(type->Equals(getSession()->getFloatType()))
-            {}
-            else if(type->Equals(getSession()->getDoubleType()))
-            {
-                suffix = "l";
-            }
-            else
-            {
-                SLANG_DIAGNOSE_UNEXPECTED(getSink(), litExpr, "unhandled type for floating-point literal");
-            }
-            Emit(litExpr->floatingPointValue);
-            Emit(suffix);
-            break;
-
-        case ConstantExpr::ConstantType::Bool:
-            Emit(litExpr->integerValue ? "true" : "false");
-            break;
-        case ConstantExpr::ConstantType::String:
-            emitStringLiteral(litExpr->stringValue);
-            break;
-        default:
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), litExpr, "unhandled kind of literal expression");
-            break;
-        }
-        if(needClose) Emit(")");
-#endif
-    }
-
-    void visitTypeCastExpr(TypeCastExpr* castExpr, ExprEmitArg const& arg)
-    {
-        // We emit a type cast expression as a constructor call
-        emitSimpleConstructorCallExpr(castExpr, arg.outerPrec);
-
-#if 0
-        bool needClose = false;
-        switch(context->shared->target)
-        {
-        case CodeGenTarget::GLSL:
-            // GLSL requires constructor syntax for all conversions
-            EmitType(castExpr->type);
-            Emit("(");
-            EmitExpr(castExpr->Expression);
-            Emit(")");
-            break;
-
-        default:
-            // HLSL (and C/C++) prefer cast syntax
-            // (In fact, HLSL doesn't allow constructor syntax for some conversions it allows as a cast)
-            {
-                auto prec = kEOp_Prefix;
-                auto outerPrec = arg.outerPrec;
-                needClose = MaybeEmitParens(outerPrec, prec);
-
-                Emit("(");
-                EmitType(castExpr->type);
-                Emit(")(");
-                EmitExpr(castExpr->Expression);
-                Emit(")");
-            }
-            break;
-        }
-        if(needClose) Emit(")");
-#endif
-    }
-
-    void visitInitializerListExpr(InitializerListExpr* expr, ExprEmitArg const&)
-    {
-        Emit("{ ");
-        for(auto& arg : expr->args)
-        {
-            EmitExpr(arg);
-            Emit(", ");
-        }
-        Emit("}");
-    }
-
-    //
-    // Statements
-    //
-
-    // Emit a statement as a `{}`-enclosed block statement, but avoid adding redundant
-    // curly braces if the statement is itself a block statement.
-    void EmitBlockStmt(RefPtr<Stmt> stmt)
-    {
-        // TODO(tfoley): support indenting
-        Emit("{\n");
-        if( auto blockStmt = stmt.As<BlockStmt>() )
-        {
-            EmitStmt(blockStmt->body);
-        }
-        else
-        {
-            EmitStmt(stmt);
-        }
-        Emit("}\n");
-    }
-
-    void EmitLoopAttributes(RefPtr<Stmt> decl)
-    {
-        // NOTE: Emit-from-AST is gone, so this code is doing nothing.
-    }
-
-    void EmitUnparsedStmt(RefPtr<UnparsedStmt> stmt)
-    {
-        // TODO: actually emit the tokens that made up the statement...
-        Emit("{\n");
-        for( auto& token : stmt->tokens )
-        {
-            if (token.type == TokenType::Identifier)
-            {
-                doSampleRateInputCheck(token.getName());
-            }
-
-            emitTokenWithLocation(token);
-        }
-        Emit("}\n");
-    }
-
-    void EmitStmt(RefPtr<Stmt> stmt)
-    {
-        // TODO(tfoley): this shouldn't occur, but sometimes
-        // lowering will get confused by an empty function body...
-        if (!stmt)
-            return;
-
-        // Try to ensure that debugging can find the right location
-        advanceToSourceLocation(stmt->loc);
-
-        if (auto blockStmt = stmt.As<BlockStmt>())
-        {
-            EmitBlockStmt(blockStmt);
-            return;
-        }
-        else if (auto seqStmt = stmt.As<SeqStmt>())
-        {
-            for (auto ss : seqStmt->stmts)
-            {
-                EmitStmt(ss);
-            }
-            return;
-        }
-        else if( auto unparsedStmt = stmt.As<UnparsedStmt>() )
-        {
-            EmitUnparsedStmt(unparsedStmt);
-            return;
-        }
-        else if (auto exprStmt = stmt.As<ExpressionStmt>())
-        {
-            EmitExpr(exprStmt->Expression);
-            Emit(";\n");
-            return;
-        }
-        else if (auto returnStmt = stmt.As<ReturnStmt>())
-        {
-            Emit("return");
-            if (auto expr = returnStmt->Expression)
-            {
-                Emit(" ");
-                EmitExpr(expr);
-            }
-            Emit(";\n");
-            return;
-        }
-        else if (auto declStmt = stmt.As<DeclStmt>())
-        {
-            EmitDecl(declStmt->decl);
-            return;
-        }
-        else if (auto ifStmt = stmt.As<IfStmt>())
-        {
-            Emit("if(");
-            EmitExpr(ifStmt->Predicate);
-            Emit(")\n");
-            EmitBlockStmt(ifStmt->PositiveStatement);
-            if(auto elseStmt = ifStmt->NegativeStatement)
-            {
-                Emit("\nelse\n");
-                EmitBlockStmt(elseStmt);
-            }
-            return;
-        }
-        else if (auto forStmt = stmt.As<ForStmt>())
-        {
-            // We are going to always take a `for` loop like:
-            //
-            //    for(A; B; C) { D }
-            //
-            // and emit it as:
-            //
-            //    { A; for(; B; C) { D } }
-            //
-            // This ensures that we are robust against any kind
-            // of statement appearing in `A`, including things
-            // that might occur due to lowering steps.
-            //
-
-            // The one wrinkle is that HLSL implements the
-            // bad approach to scoping a `for` loop variable,
-            // so we need to avoid those outer `{...}` when
-            // we are emitting code that was written in HLSL.
-            //
-            bool brokenScoping = false;
-            if (forStmt.As<UnscopedForStmt>())
-            {
-                brokenScoping = true;
-            }
-
-            auto initStmt = forStmt->InitialStatement;
-            if(initStmt)
-            {
-                if(!brokenScoping)
-                    Emit("{\n");
-                EmitStmt(initStmt);
-            }
-
-            EmitLoopAttributes(forStmt);
-
-            Emit("for(;");
-            if (auto testExp = forStmt->PredicateExpression)
-            {
-                EmitExpr(testExp);
-            }
-            Emit(";");
-            if (auto incrExpr = forStmt->SideEffectExpression)
-            {
-                EmitExpr(incrExpr);
-            }
-            Emit(")\n");
-            EmitBlockStmt(forStmt->Statement);
-
-            if (initStmt)
-            {
-                if(!brokenScoping)
-                    Emit("}\n");
-            }
-
-            return;
-        }
-        else if (auto whileStmt = stmt.As<WhileStmt>())
-        {
-            EmitLoopAttributes(whileStmt);
-
-            Emit("while(");
-            EmitExpr(whileStmt->Predicate);
-            Emit(")\n");
-            EmitBlockStmt(whileStmt->Statement);
-            return;
-        }
-        else if (auto doWhileStmt = stmt.As<DoWhileStmt>())
-        {
-            EmitLoopAttributes(doWhileStmt);
-
-            Emit("do\n");
-            EmitBlockStmt(doWhileStmt->Statement);
-            Emit(" while(");
-            EmitExpr(doWhileStmt->Predicate);
-            Emit(");\n");
-            return;
-        }
-        else if (auto discardStmt = stmt.As<DiscardStmt>())
-        {
-            Emit("discard;\n");
-            return;
-        }
-        else if (auto emptyStmt = stmt.As<EmptyStmt>())
-        {
-            return;
-        }
-        else if (auto switchStmt = stmt.As<SwitchStmt>())
-        {
-            Emit("switch(");
-            EmitExpr(switchStmt->condition);
-            Emit(")\n");
-            EmitBlockStmt(switchStmt->body);
-            return;
-        }
-        else if (auto caseStmt = stmt.As<CaseStmt>())
-        {
-            Emit("case ");
-            EmitExpr(caseStmt->expr);
-            Emit(":\n");
-            return;
-        }
-        else if (auto defaultStmt = stmt.As<DefaultStmt>())
-        {
-            Emit("default:\n");
-            return;
-        }
-        else if (auto breakStmt = stmt.As<BreakStmt>())
-        {
-            Emit("break;\n");
-            return;
-        }
-        else if (auto continueStmt = stmt.As<ContinueStmt>())
-        {
-            Emit("continue;\n");
-            return;
-        }
-
-        SLANG_UNEXPECTED("unhandled statement kind");
-    }
-
     //
     // Declaration References
     //
-
-    // Declaration References
 
     void EmitVal(RefPtr<Val> val)
     {
@@ -3103,263 +1481,6 @@ struct EmitVisitor
 
     }
 
-
-    //
-    // Declarations
-    //
-
-    void emitDeclImpl(
-        Decl*           decl,
-        VarLayout*      layout)
-    {
-        // Don't emit code for declarations that came from the stdlib.
-        //
-        // TODO(tfoley): We probably need to relax this eventually,
-        // since different targets might have different sets of builtins.
-        if (decl->HasModifier<FromStdLibModifier>())
-            return;
-
-        // Try to ensure that debugging can find the right location
-        advanceToSourceLocation(decl->loc);
-
-        DeclEmitArg arg;
-        arg.layout = layout;
-
-        DeclVisitorWithArg::dispatch(decl, arg);
-    }
-
-#define IGNORED(NAME) \
-    void visit##NAME(NAME*, DeclEmitArg const&) {}
-
-    // Only used by stdlib
-    IGNORED(SyntaxDecl)
-    IGNORED(AttributeDecl)
-
-    // Don't emit generic decls directly; we will only
-    // ever emit particular instantiations of them.
-    IGNORED(GenericDecl)
-    IGNORED(GenericTypeConstraintDecl)
-    IGNORED(GenericValueParamDecl)
-    IGNORED(GenericTypeParamDecl)
-
-    // Not epected to appear (probably dead code)
-    IGNORED(ClassDecl)
-
-    // Not semantically meaningful for emit, or expected
-    // to be lowered out of existence before we get here
-    IGNORED(InheritanceDecl)
-    IGNORED(ExtensionDecl)
-    IGNORED(ScopeDecl)
-
-    // Catch-all cases where we handle the types that matter,
-    // while others will be lowered out of exitence
-    IGNORED(CallableDecl)
-    IGNORED(AggTypeDeclBase)
-
-    // Should not appear nested inside other decls
-    IGNORED(ModuleDecl)
-
-#undef IGNORED
-
-    void visitDeclGroup(DeclGroup* declGroup, DeclEmitArg const&)
-    {
-        for (auto decl : declGroup->decls)
-        {
-            EmitDecl(decl);
-        }
-    }
-
-    void visitTypeDefDecl(TypeDefDecl* decl, DeclEmitArg const&)
-    {
-        // Note(tfoley): any `typedef`s should already have been filtered
-        // out if we are generating GLSL.
-        SLANG_RELEASE_ASSERT(context->shared->target != CodeGenTarget::GLSL);
-
-        Emit("typedef ");
-        EmitType(decl->type, decl->getNameAndLoc());
-        Emit(";\n");
-    }
-
-    void visitAssocTypeDecl(AssocTypeDecl * /*assocType*/, DeclEmitArg const&)
-    {
-        SLANG_UNREACHABLE("visitAssocTypeDecl in EmitVisitor");
-    }
-
-
-    void visitImportDecl(ImportDecl* decl, DeclEmitArg const&)
-    {
-        // When in "rewriter" mode, we need to emit the code of the imported
-        // module in-place at the `import` site.
-
-        auto moduleDecl = decl->importedModuleDecl.Ptr();
-
-        // We might import the same module along two different paths,
-        // so we need to be careful to only emit each module once
-        // per output.
-        if(!context->shared->modulesAlreadyEmitted.Contains(moduleDecl))
-        {
-            // Add the module to our set before emitting it, just
-            // in case a circular reference would lead us to
-            // infinite recursion (but that shouldn't be allowed
-            // in the first place).
-            context->shared->modulesAlreadyEmitted.Add(moduleDecl);
-
-            // TODO: do we need to modify the code generation environment at
-            // all when doing this recursive emit?
-
-            EmitDeclsInContainerUsingLayout(moduleDecl, context->shared->globalStructLayout);
-        }
-    }
-
-    void visitEmptyDecl(EmptyDecl* decl, DeclEmitArg const&)
-    {
-        // GLSL uses empty declarations to carry semantically relevant modifiers,
-        // so we can't just skip empty declarations in general
-
-        EmitModifiers(decl);
-        Emit(";\n");
-    }
-
-    bool shouldSkipModifierForDecl(
-        Modifier*   modifier,
-        Decl*       decl)
-    {
-        switch(context->shared->target)
-        {
-        default:
-            break;
-
-        case CodeGenTarget::GLSL:
-            {
-                // Don't emit interpolation mode modifiers on `struct` fields
-                // (only allowed on global or block `in`/`out`)
-                if (auto interpolationMod = dynamic_cast<InterpolationModeModifier*>(modifier))
-                {
-                    if (auto fieldDecl = dynamic_cast<StructField*>(decl))
-                    {
-                        return true;
-                    }
-                }
-
-            }
-            break;
-        }
-
-
-        return false;
-    }
-
-    // Emit any modifiers that should go in front of a declaration
-    void EmitModifiers(RefPtr<Decl> decl)
-    {
-        // Emit any GLSL `layout` modifiers first
-        bool anyLayout = false;
-        for( auto mod : decl->GetModifiersOfType<GLSLUnparsedLayoutModifier>())
-        {
-            if(!anyLayout)
-            {
-                Emit("layout(");
-                anyLayout = true;
-            }
-            else
-            {
-                Emit(", ");
-            }
-
-            emit(mod->getNameAndLoc());
-            if(mod->valToken.type != TokenType::Unknown)
-            {
-                Emit(" = ");
-                emit(mod->valToken.Content);
-            }
-        }
-        if(anyLayout)
-        {
-            Emit(")\n");
-        }
-
-        for (auto mod = decl->modifiers.first; mod; mod = mod->next)
-        {
-            if (shouldSkipModifierForDecl(mod, decl))
-                continue;
-
-            advanceToSourceLocation(mod->loc);
-
-            if (0) {}
-
-            #define CASE(TYPE, KEYWORD) \
-                else if(auto mod_##TYPE = mod.As<TYPE>()) Emit(#KEYWORD " ")
-
-            #define CASE2(TYPE, HLSL_NAME, GLSL_NAME) \
-                else if(auto mod_##TYPE = mod.As<TYPE>()) Emit((context->shared->target == CodeGenTarget::GLSL) ? (#GLSL_NAME " ") : (#HLSL_NAME " "))
-
-            #define CASE2_RAW(TYPE, HLSL_NAME, GLSL_NAME) \
-                else if(auto mod_##TYPE = mod.As<TYPE>()) Emit((context->shared->target == CodeGenTarget::GLSL) ? (GLSL_NAME) : (HLSL_NAME))
-
-            CASE(RowMajorLayoutModifier, row_major);
-            CASE(ColumnMajorLayoutModifier, column_major);
-
-            CASE2(HLSLNoInterpolationModifier, nointerpolation, flat);
-            CASE(HLSLPreciseModifier, precise);
-            CASE(HLSLEffectSharedModifier, shared);
-            CASE(HLSLGroupSharedModifier, groupshared);
-            CASE(HLSLUniformModifier, uniform);
-            CASE(HLSLVolatileModifier, volatile);
-
-            CASE(InOutModifier, inout);
-            CASE(InModifier, in);
-            CASE(OutModifier, out);
-
-            CASE(HLSLPointModifier, point);
-            CASE(HLSLLineModifier, line);
-            CASE(HLSLTriangleModifier, triangle);
-            CASE(HLSLLineAdjModifier, lineadj);
-            CASE(HLSLTriangleAdjModifier, triangleadj);
-
-            CASE2_RAW(HLSLLinearModifier, "linear ", "");
-            CASE(HLSLSampleModifier, sample);
-            CASE(HLSLCentroidModifier, centroid);
-
-            CASE(ConstModifier, const);
-
-            #undef CASE
-            #undef CASE2
-
-            else if (auto staticModifier = mod.As<HLSLStaticModifier>())
-            {
-                // GLSL does not support the `static` keyword.
-                // HLSL uses it both to mark global variables as being "thread-local"
-                // (rather than shader inputs), and also seems to support function-`static`
-                // variables.
-                // The latter case needs to be dealt with in lowering anyway, so that
-                // we only need to deal with globals here, and GLSL variables
-                // don't need a `static` modifier anyway.
-
-                switch(context->shared->target)
-                {
-                default:
-                    Emit("static ");
-                    break;
-
-                case CodeGenTarget::GLSL:
-                    break;
-                }
-            }
-
-            else if(auto simpleModifier = mod.As<SimpleModifier>())
-            {
-                emit(simpleModifier->getNameAndLoc());
-                Emit(" ");
-            }
-
-            else
-            {
-                // skip any extra modifiers
-            }
-        }
-    }
-
-
     typedef unsigned int ESemanticMask;
     enum
     {
@@ -3374,39 +1495,16 @@ struct EmitVisitor
     {
         if (auto simple = semantic.As<HLSLSimpleSemantic>())
         {
-            Emit(": ");
+            Emit(" : ");
             emit(simple->name.Content);
         }
         else if(auto registerSemantic = semantic.As<HLSLRegisterSemantic>())
         {
             // Don't print out semantic from the user, since we are going to print the same thing our own way...
-    #if 0
-            Emit(": register(");
-            Emit(registerSemantic->registerName.Content);
-            if(registerSemantic->componentMask.type != TokenType::Unknown)
-            {
-                Emit(".");
-                Emit(registerSemantic->componentMask.Content);
-            }
-            Emit(")");
-    #endif
         }
         else if(auto packOffsetSemantic = semantic.As<HLSLPackOffsetSemantic>())
         {
             // Don't print out semantic from the user, since we are going to print the same thing our own way...
-    #if 0
-            if(mask & kESemanticMask_NoPackOffset)
-                return;
-
-            Emit(": packoffset(");
-            Emit(packOffsetSemantic->registerName.Content);
-            if(packOffsetSemantic->componentMask.type != TokenType::Unknown)
-            {
-                Emit(".");
-                Emit(packOffsetSemantic->componentMask.Content);
-            }
-            Emit(")");
-    #endif
         }
         else
         {
@@ -3435,99 +1533,6 @@ struct EmitVisitor
 
             EmitSemantic(semantic, mask);
         }
-    }
-
-    void EmitDeclsInContainer(RefPtr<ContainerDecl> container)
-    {
-        for (auto member : container->Members)
-        {
-            EmitDecl(member);
-        }
-    }
-
-    void EmitDeclsInContainerUsingLayout(
-        RefPtr<ContainerDecl>       container,
-        RefPtr<StructTypeLayout>    containerLayout)
-    {
-        for (auto member : container->Members)
-        {
-            RefPtr<VarLayout> memberLayout;
-            if( containerLayout->mapVarToLayout.TryGetValue(member.Ptr(), memberLayout) )
-            {
-                EmitDeclUsingLayout(member, memberLayout);
-            }
-            else
-            {
-                // No layout for this decl
-                EmitDecl(member);
-            }
-        }
-    }
-
-    void visitStructDecl(RefPtr<StructDecl> decl, DeclEmitArg const&)
-    {
-        // Don't emit a declaration that was only generated implicitly, for
-        // the purposes of semantic checking.
-        if(decl->HasModifier<ImplicitParameterGroupElementTypeModifier>())
-            return;
-
-        Emit("struct ");
-        emitName(decl->getNameAndLoc());
-        Emit("\n{\n");
-
-        // TODO(tfoley): Need to hoist members functions, etc. out to global scope
-        EmitDeclsInContainer(decl);
-
-        Emit("};\n");
-    }
-
-    // Shared emit logic for variable declarations (used for parameters, locals, globals, fields)
-
-    void emitVarDeclHead(DeclRef<VarDeclBase> declRef)
-    {
-        EmitModifiers(declRef.getDecl());
-
-        auto type = GetType(declRef);
-        if (!type || type->As<ErrorType>())
-        {
-            EmitType(declRef.getDecl()->type, declRef.getDecl()->getName());
-        }
-        else
-        {
-            EmitType(GetType(declRef), declRef.getDecl()->getName());
-        }
-
-        EmitSemantics(declRef.getDecl());
-    }
-
-    void emitVarDeclInit(DeclRef<VarDeclBase> declRef)
-    {
-        // TODO(tfoley): technically have to apply substitution here too...
-        if (auto initExpr = declRef.getDecl()->initExpr)
-        {
-            if (declRef.As<ParamDecl>()
-                && context->shared->target == CodeGenTarget::GLSL)
-            {
-                // Don't emit default parameter values when lowering to GLSL
-            }
-            else
-            {
-                Emit(" = ");
-                EmitExpr(initExpr);
-            }
-        }
-    }
-
-    void EmitVarDeclCommon(DeclRef<VarDeclBase> declRef)
-    {
-        emitVarDeclHead(declRef);
-        emitVarDeclInit(declRef);
-    }
-
-    // Shared emit logic for variable declarations (used for parameters, locals, globals, fields)
-    void EmitVarDeclCommon(RefPtr<VarDeclBase> decl)
-    {
-        EmitVarDeclCommon(DeclRef<Decl>(decl.Ptr(), nullptr).As<VarDeclBase>());
     }
 
     // A chain of variables to use for emitting semantic/layout info
@@ -3610,7 +1615,7 @@ struct EmitVisitor
                 // units, and then a "component" within that register, based on 4-byte
                 // offsets from there. We cannot support more fine-grained offsets than that.
 
-                Emit(": ");
+                Emit(" : ");
                 Emit(uniformSemanticSpelling);
                 Emit("(c");
 
@@ -3649,7 +1654,7 @@ struct EmitVisitor
             break;
         default:
             {
-                Emit(": register(");
+                Emit(" : register(");
                 switch( kind )
                 {
                 case LayoutResourceKind::ConstantBuffer:
@@ -3714,25 +1719,6 @@ struct EmitVisitor
         emitHLSLRegisterSemantics(&chain, uniformSemanticSpelling);
     }
 
-    static RefPtr<VarLayout> maybeFetchLayout(
-        RefPtr<Decl>        decl,
-        RefPtr<VarLayout>   layout)
-    {
-        // If we have already found layout info, don't go searching
-        if (layout) return layout;
-
-        // Otherwise, we need to look and see if computed layout
-        // information has been attached to the declaration.
-        auto modifier = decl->FindModifier<ComputedLayoutModifier>();
-        if (!modifier) return nullptr;
-
-        auto computedLayout = modifier->layout;
-        SLANG_RELEASE_ASSERT(computedLayout);
-
-        auto varLayout = computedLayout.As<VarLayout>();
-        return varLayout;
-    }
-
     void emitHLSLParameterGroupFieldLayoutSemantics(
         EmitVarChain*       chain)
     {
@@ -3753,160 +1739,6 @@ struct EmitVisitor
     {
         EmitVarChain chain(fieldLayout, inChain);
         emitHLSLParameterGroupFieldLayoutSemantics(&chain);
-    }
-
-    void emitHLSLParameterBlockDecl(
-        RefPtr<VarDeclBase>             varDecl,
-        RefPtr<ParameterBlockType>      parameterBlockType,
-        RefPtr<VarLayout>               varLayout)
-    {
-        EmitVarChain blockChain(varLayout);
-
-        Emit("cbuffer ");
-
-        emitName(varDecl);
-
-        // We expect to always have layout information
-        varLayout = maybeFetchLayout(varDecl, varLayout);
-        SLANG_RELEASE_ASSERT(varLayout);
-
-        // We expect the layout to be for a parameter group type...
-        RefPtr<ParameterGroupTypeLayout> bufferLayout = varLayout->typeLayout.As<ParameterGroupTypeLayout>();
-        SLANG_RELEASE_ASSERT(bufferLayout);
-
-        RefPtr<VarLayout> containerVarLayout = bufferLayout->containerVarLayout;
-        EmitVarChain containerChain(containerVarLayout, &blockChain);
-
-        RefPtr<VarLayout> elementVarLayout = bufferLayout->elementVarLayout;
-        EmitVarChain elementChain(elementVarLayout, &blockChain);
-
-        EmitSemantics(varDecl, kESemanticMask_None);
-
-        emitHLSLRegisterSemantic(LayoutResourceKind::ConstantBuffer, &containerChain);
-
-        Emit("\n{\n");
-
-        // The user wrote this declaration as, e.g.:
-        //
-        //      ParameterBlock<Foo> gFoo;
-        //
-        // and we are desugaring it into something like:
-        //
-        //      cbuffer anon0 { Foo gFoo; }
-        //
-
-        RefPtr<Type> elementType = parameterBlockType->elementType;
-
-        EmitType(elementType, varDecl->getName());
-
-        // The layout for the field ends up coming from the layout
-        // for the parameter block as a whole.
-        emitHLSLParameterGroupFieldLayoutSemantics(&elementChain);
-
-        Emit(";\n");
-        Emit("}\n");
-    }
-
-    void emitHLSLParameterGroupDecl(
-        RefPtr<VarDeclBase>             varDecl,
-        RefPtr<ParameterGroupType>      parameterGroupType,
-        RefPtr<VarLayout>               varLayout)
-    {
-        if( auto parameterBlockType = parameterGroupType->As<ParameterBlockType>())
-        {
-            emitHLSLParameterBlockDecl(varDecl, parameterBlockType, varLayout);
-            return;
-        }
-        if( auto textureBufferType = parameterGroupType->As<TextureBufferType>() )
-        {
-            Emit("tbuffer ");
-        }
-        else
-        {
-            Emit("cbuffer ");
-        }
-
-        EmitVarChain blockChain(varLayout);
-
-        // The data type that describes where stuff in the constant buffer should go
-        RefPtr<Type> dataType = parameterGroupType->elementType;
-
-        // We expect to always have layout information
-        varLayout = maybeFetchLayout(varDecl, varLayout);
-        SLANG_RELEASE_ASSERT(varLayout);
-
-        // We expect the layout to be for a structured type...
-        RefPtr<ParameterGroupTypeLayout> bufferLayout = varLayout->typeLayout.As<ParameterGroupTypeLayout>();
-        SLANG_RELEASE_ASSERT(bufferLayout);
-
-        auto containerVarLayout = bufferLayout->containerVarLayout;
-        EmitVarChain containerChain(containerVarLayout, &blockChain);
-
-        auto elementVarLayout = bufferLayout->elementVarLayout;
-        EmitVarChain elementChain(elementVarLayout, &blockChain);
-
-        RefPtr<StructTypeLayout> structTypeLayout = bufferLayout->elementVarLayout->typeLayout.As<StructTypeLayout>();
-        SLANG_RELEASE_ASSERT(structTypeLayout);
-
-
-        Emit(" ");
-        if( auto reflectionNameModifier = varDecl->FindModifier<ParameterGroupReflectionName>() )
-        {
-            emitName(reflectionNameModifier->nameAndLoc);
-        }
-        else
-        {
-            emitName(varDecl->nameAndLoc);
-        }
-
-        EmitSemantics(varDecl, kESemanticMask_None);
-
-        emitHLSLRegisterSemantic(LayoutResourceKind::ConstantBuffer, &containerChain);
-
-        Emit("\n{\n");
-
-        // We expect the data type to be a user-defined `struct` type,
-        // but it might also be a "filtered" type that represents the
-        // case where only some fields of the original type are valid
-        // to appear inside of a `struct`.
-        if (auto declRefType = dataType->As<DeclRefType>())
-        {
-            if (auto structRef = declRefType->declRef.As<StructDecl>())
-            {
-                int fieldCounter = 0;
-
-                for (auto field : getMembersOfType<StructField>(structRef))
-                {
-                    int fieldIndex = fieldCounter++;
-
-                    // Skip fields that have `void` type, since these represent
-                    // declarations that got legalized out of existence.
-                    if(GetType(field)->Equals(getSession()->getVoidType()))
-                        continue;
-
-                    emitVarDeclHead(field);
-
-                    RefPtr<VarLayout> fieldLayout = structTypeLayout->fields[fieldIndex];
-                    SLANG_RELEASE_ASSERT(fieldLayout->varDecl.GetName() == field.GetName());
-
-                    // Emit explicit layout annotations for every field
-                    emitHLSLParameterGroupFieldLayoutSemantics(fieldLayout, &elementChain);
-
-                    emitVarDeclInit(field);
-
-                    Emit(";\n");
-                }
-            }
-            else
-            {
-                SLANG_UNEXPECTED("unexpected element type for parameter group");
-            }
-        }
-        else
-        {
-            SLANG_UNEXPECTED("unexpected element type for parameter group");
-        }
-        Emit("}\n");
     }
 
     void emitGLSLLayoutQualifier(
@@ -4019,355 +1851,10 @@ struct EmitVisitor
         }
     }
 
-    void emitGLSLParameterBlockDecl(
-        RefPtr<VarDeclBase>             varDecl,
-        RefPtr<ParameterBlockType>      parameterBlockType,
-        RefPtr<VarLayout>               varLayout)
-    {
-        EmitVarChain blockChain(varLayout);
-
-        RefPtr<ParameterGroupTypeLayout> bufferLayout = varLayout->typeLayout.As<ParameterGroupTypeLayout>();
-        SLANG_RELEASE_ASSERT(bufferLayout);
-
-        auto containerVarLayout = bufferLayout->containerVarLayout;
-        EmitVarChain containerChain(containerVarLayout, &blockChain);
-
-        auto elementVarLayout = bufferLayout->elementVarLayout;
-        EmitVarChain elementChain(elementVarLayout, &blockChain);
-
-        EmitModifiers(varDecl);
-        emitGLSLLayoutQualifiers(containerVarLayout, &blockChain);
-        Emit("uniform ");
-
-        emitName(varDecl);
-
-        Emit("\n{\n");
-
-
-        RefPtr<Type> elementType = parameterBlockType->elementType;
-
-        EmitType(elementType, varDecl->getName());
-        Emit(";\n");
-
-        Emit("};\n");
-    }
-
-    void emitGLSLParameterGroupDecl(
-        RefPtr<VarDeclBase>             varDecl,
-        RefPtr<ParameterGroupType>      parameterGroupType,
-        RefPtr<VarLayout>               varLayout)
-    {
-        if( auto parameterBlockType = parameterGroupType->As<ParameterBlockType>())
-        {
-            emitGLSLParameterBlockDecl(varDecl, parameterBlockType, varLayout);
-            return;
-        }
-
-        // The data type that describes where stuff in the constant buffer should go
-        RefPtr<Type> dataType = parameterGroupType->elementType;
-
-        // We expect the layout, if present, to be for a structured type...
-        RefPtr<StructTypeLayout> structTypeLayout;
-
-        EmitVarChain blockChain;
-        if (varLayout)
-        {
-            blockChain = EmitVarChain(varLayout);
-
-            auto typeLayout = varLayout->typeLayout;
-            if (auto bufferLayout = typeLayout.As<ParameterGroupTypeLayout>())
-            {
-                typeLayout = bufferLayout->elementVarLayout->getTypeLayout();
-
-                emitGLSLLayoutQualifiers(bufferLayout->containerVarLayout, &blockChain);
-            }
-            else
-            {
-                // Fallback: we somehow have a messed up layout
-                emitGLSLLayoutQualifiers(varLayout, nullptr);
-            }
-
-            // We expect the element type to be structured.
-            structTypeLayout = typeLayout.As<StructTypeLayout>();
-            SLANG_RELEASE_ASSERT(structTypeLayout);
-        }
-
-
-        EmitModifiers(varDecl);
-
-        // Emit an apprpriate declaration keyword based on the kind of block
-        if (parameterGroupType->As<GLSLShaderStorageBufferType>())
-        {
-            Emit("buffer");
-        }
-        // Note: tested `buffer` case before `uniform`, since `GLSLShaderStorageBufferType`
-        // is also a subclass of `UniformParameterGroupType`.
-        else if (parameterGroupType->As<UniformParameterGroupType>())
-        {
-            Emit("uniform");
-        }
-        else if (parameterGroupType->As<GLSLInputParameterGroupType>())
-        {
-            Emit("in");
-        }
-        else if (parameterGroupType->As<GLSLOutputParameterGroupType>())
-        {
-            Emit("out");
-        }
-        else
-        {
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), varDecl, "unhandled GLSL shader parameter kind");
-            Emit("uniform");
-        }
-
-        if( auto reflectionNameModifier = varDecl->FindModifier<ParameterGroupReflectionName>() )
-        {
-            Emit(" ");
-            emitName(reflectionNameModifier->nameAndLoc);
-        }
-
-        Emit("\n{\n");
-
-        // We expect the data type to be a user-defined `struct` type,
-        // but it might also be a "filtered" type that represents the
-        // case where only some fields of the original type are valid
-        // to appear inside of a `struct`.
-        if (auto declRefType = dataType->As<DeclRefType>())
-        {
-
-            if (auto structRef = declRefType->declRef.As<StructDecl>())
-            {
-                int fieldCounter = 0;
-                for (auto field : getMembersOfType<StructField>(structRef))
-                {
-                    int fieldIndex = fieldCounter++;
-
-                    // Skip fields that have `void` type, since these represent
-                    // declarations that got legalized out of existence.
-                    if(GetType(field)->Equals(getSession()->getVoidType()))
-                        continue;
-
-                    if (structTypeLayout)
-                    {
-                        RefPtr<VarLayout> fieldLayout = structTypeLayout->fields[fieldIndex];
-                        //            assert(fieldLayout);
-
-                        // TODO(tfoley): We may want to emit *some* of these,
-                        // some of the time...
-            //            emitGLSLLayoutQualifiers(fieldLayout);
-                    }
-
-
-                    EmitVarDeclCommon(field);
-
-                    Emit(";\n");
-                }
-            }
-            else
-            {
-                SLANG_UNEXPECTED("unexpected element type for parameter group");
-            }
-        }
-        else
-        {
-            SLANG_UNEXPECTED("unexpected element type for parameter group");
-        }
-
-
-
-        Emit("}");
-
-        if( varDecl->getNameLoc().isValid() )
-        {
-            Emit(" ");
-            emitName(varDecl->getName());
-        }
-
-        Emit(";\n");
-    }
-
-    void emitParameterGroupDecl(
-        RefPtr<VarDeclBase>			varDecl,
-        RefPtr<ParameterGroupType>  parameterGroupType,
-        RefPtr<VarLayout>           layout)
-    {
-        switch(context->shared->target)
-        {
-        case CodeGenTarget::HLSL:
-            emitHLSLParameterGroupDecl(varDecl, parameterGroupType, layout);
-            break;
-
-        case CodeGenTarget::GLSL:
-            emitGLSLParameterGroupDecl(varDecl, parameterGroupType, layout);
-            break;
-
-        default:
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), varDecl, "unhandled code generation target");
-            break;
-        }
-    }
-
-    void visitVarDeclBase(RefPtr<VarDeclBase> decl, DeclEmitArg const& arg)
-    {
-        // Global variable? Check if it is a sample-rate input.
-        if (dynamic_cast<ModuleDecl*>(decl->ParentDecl))
-        {
-            if (decl->HasModifier<InModifier>())
-            {
-                doSampleRateInputCheck(decl);
-            }
-        }
-
-        // Skip fields that have `void` type, since these may be introduced
-        // as part of type leglaization.
-        if(decl->getType()->Equals(getSession()->getVoidType()))
-            return;
-
-        RefPtr<VarLayout> layout = arg.layout;
-        layout = maybeFetchLayout(decl, layout);
-
-        // As a special case, a variable using a parameter block type
-        // will be translated into a declaration using the more primitive
-        // language syntax.
-        //
-        // TODO(tfoley): Be sure to unwrap arrays here, in the GLSL case.
-        //
-        // TODO(tfoley): Detect cases where we need to fall back to
-        // ordinary variable declaration syntax in HLSL.
-        //
-        // TODO(tfoley): there might be a better way to detect this, e.g.,
-        // with an attribute that gets attached to the variable declaration.
-        if (auto parameterGroupType = decl->type->As<ParameterGroupType>())
-        {
-            emitParameterGroupDecl(decl, parameterGroupType, layout);
-            return;
-        }
-
-
-        if (context->shared->target == CodeGenTarget::GLSL)
-        {
-            if (decl->HasModifier<InModifier>())
-            {
-                emitGLSLLayoutQualifiers(layout, nullptr, LayoutResourceKind::VertexInput);
-            }
-            else if (decl->HasModifier<OutModifier>())
-            {
-                emitGLSLLayoutQualifiers(layout, nullptr, LayoutResourceKind::FragmentOutput);
-            }
-            else
-            {
-                emitGLSLLayoutQualifiers(layout, nullptr);
-            }
-
-            // If we have a uniform that wasn't tagged `uniform` in GLSL, then fix that here
-            if (layout
-                && !decl->HasModifier<HLSLUniformModifier>())
-            {
-                if (layout->FindResourceInfo(LayoutResourceKind::Uniform)
-                    || layout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot))
-                {
-                    Emit("uniform ");
-                }
-            }
-        }
-
-        emitVarDeclHead(makeDeclRef(decl.Ptr()));
-        emitHLSLRegisterSemantics(layout);
-        emitVarDeclInit(makeDeclRef(decl.Ptr()));
-
-        Emit(";\n");
-    }
-
-    void EmitParamDecl(RefPtr<ParamDecl> decl)
-    {
-        EmitVarDeclCommon(decl);
-    }
-
-    void visitFuncDecl(RefPtr<FuncDecl> decl, DeclEmitArg const&)
-    {
-        EmitModifiers(decl);
-
-        // TODO: if a function returns an array type, or something similar that
-        // isn't allowed by declarator syntax and/or language rules, we could
-        // hypothetically wrap things in a `typedef` and work around it.
-
-        EmitType(decl->ReturnType, decl->getNameAndLoc());
-
-        Emit("(");
-        bool first = true;
-        for (auto paramDecl : decl->getMembersOfType<ParamDecl>())
-        {
-            if (!first) Emit(", ");
-            EmitParamDecl(paramDecl);
-            first = false;
-        }
-        Emit(")");
-
-        EmitSemantics(decl);
-
-        if (auto bodyStmt = decl->Body)
-        {
-            EmitBlockStmt(bodyStmt);
-        }
-        else
-        {
-            Emit(";\n");
-        }
-    }
 
     void emitGLSLVersionDirective(
         ModuleDecl*  /*program*/)
     {
-#ifdef DEADCODE
-        // Did the user provide an explicit `#version` directive in their code?
-        if( auto versionDirective = program->FindModifier<GLSLVersionDirective>() )
-        {
-            // TODO(tfoley): Emit an appropriate `#line` directive...
-
-            Emit("#version ");
-            emit(versionDirective->versionNumberToken.Content);
-            if(versionDirective->glslProfileToken.type != TokenType::Unknown)
-            {
-                Emit(" ");
-                emit(versionDirective->glslProfileToken.Content);
-            }
-            Emit("\n");
-            return;
-        }
-
-        // No explicit version was given. This could be because we are cross-compiling,
-        // but it also might just be that they user wrote GLSL without thinking about
-        // versions.
-
-        // First, look and see if the target profile gives us a version to use:
-        auto profile = context->shared->entryPoint->profile;
-        if (profile.getFamily() == ProfileFamily::GLSL)
-        {
-            switch (profile.GetVersion())
-            {
-#define CASE(TAG, VALUE)    \
-            case ProfileVersion::TAG: Emit("#version " #VALUE "\n"); return
-
-            CASE(GLSL_110, 110);
-            CASE(GLSL_120, 120);
-            CASE(GLSL_130, 130);
-            CASE(GLSL_140, 140);
-            CASE(GLSL_150, 150);
-            CASE(GLSL_330, 330);
-            CASE(GLSL_400, 400);
-            CASE(GLSL_410, 410);
-            CASE(GLSL_420, 420);
-            CASE(GLSL_430, 430);
-            CASE(GLSL_440, 440);
-            CASE(GLSL_450, 450);
-#undef CASE
-
-            default:
-                break;
-            }
-        }
-#endif
-
         auto effectiveProfile = context->shared->effectiveProfile;
         if(effectiveProfile.getFamily() == ProfileFamily::GLSL)
         {
@@ -4451,33 +1938,6 @@ struct EmitVisitor
         }
 
         // TODO: handle other cases...
-    }
-
-    void EmitDecl(RefPtr<Decl> decl)
-    {
-emitDeclImpl(decl, nullptr);
-    }
-
-    void EmitDeclUsingLayout(RefPtr<Decl> decl, RefPtr<VarLayout> layout)
-    {
-        emitDeclImpl(decl, layout);
-    }
-
-    void EmitDecl(RefPtr<DeclBase> declBase)
-    {
-        if( auto decl = declBase.As<Decl>() )
-        {
-            EmitDecl(decl);
-        }
-        else if( auto declGroup = declBase.As<DeclGroup>() )
-        {
-            for( auto d : declGroup->decls )
-                EmitDecl(d);
-        }
-        else
-        {
-            SLANG_UNEXPECTED("unhandled declaration kind");
-        }
     }
 
     // Utility code for generating unique IDs as needed
@@ -4696,226 +2156,10 @@ emitDeclImpl(decl, nullptr);
 
     }
 
-#if 0
-    void emitIRSimpleType(
-        EmitContext*    context,
-        IRType*         type)
-    {
-        switch(type->op)
-        {
-    #define CASE(ID, NAME) \
-        case kIROp_##ID: emit(#NAME); break
-
-        CASE(Float32Type,   float);
-        CASE(Int32Type,     int);
-        CASE(UInt32Type,    uint);
-        CASE(VoidType,      void);
-        CASE(BoolType,      bool);
-
-    #undef CASE
-
-
-        case kIROp_VectorType:
-            emitIRVectorType(context, (IRVectorType*) type);
-            break;
-
-        case kIROp_MatrixType:
-            emitIRMatrixType(context, (IRMatrixType*) type);
-            break;
-
-        case kIROp_StructType:
-            emit(getName(type));
-            break;
-
-        case kIROp_TextureType:
-            {
-                auto textureType = (IRTextureType*) type;
-
-                switch (context->shared->target)
-                {
-                case CodeGenTarget::HLSL:
-                    // TODO: actually look at the flavor and emit the right name
-                    emit("Texture2D");
-                    emit("<");
-                    emitIRType(context, textureType->getElementType(), nullptr);
-                    emit(">");
-                    break;
-
-                case CodeGenTarget::GLSL:
-                    // TODO: actually look at the flavor and emit the right name
-                    // TODO: look at element type to emit the right prefix
-                    emit("texture2D");
-                    break;
-
-                default:
-                    SLANG_UNEXPECTED("codegen target");
-                    break;
-                }
-            }
-            break;
-
-        case kIROp_ConstantBufferType:
-            {
-                auto tt = (IRConstantBufferType*) type;
-                emit("ConstantBuffer<");
-                emitIRType(context, tt->getElementType(), nullptr);
-                emit(">");
-            }
-            break;
-
-        case kIROp_TextureBufferType:
-            {
-                auto tt = (IRTextureBufferType*) type;
-                emit("ConstantBuffer<");
-                emitIRType(context, tt->getElementType(), nullptr);
-                emit(">");
-            }
-            break;
-
-        case kIROp_readWriteStructuredBufferType:
-            {
-                auto tt = (IRBufferType*) type;
-                emit("RWStructuredBuffer<");
-                emitIRType(context, tt->getElementType(), nullptr);
-                emit(">");
-            }
-            break;
-
-        case kIROp_structuredBufferType:
-            {
-                auto tt = (IRBufferType*) type;
-                emit("StructuredBuffer<");
-                emitIRType(context, tt->getElementType(), nullptr);
-                emit(">");
-            }
-            break;
-
-        case kIROp_SamplerType:
-            {
-                // TODO: actually look at the flavor and emit the right name
-                emit("SamplerState");
-            }
-            break;
-
-        case kIROp_TypeType:
-            {
-                // Note: this should actually be an error case, since
-                // type-level operands shouldn't be exposed in generated
-                // code, but I'm allowing this now to make the output
-                // a bit more clear.
-                emit("Type");
-            }
-            break;
-
-
-        default:
-            SLANG_UNIMPLEMENTED_X("type case for emit");
-            break;
-        }
-
-    }
-#endif
-
     CodeGenTarget getTarget(EmitContext* ctx)
     {
         return ctx->shared->target;
     }
-
-#if 0
-    void emitGLSLTypePrefix(
-        EmitContext*    context,
-        IRType*   type)
-    {
-        switch(type->op)
-        {
-        case kIROp_UInt32Type:
-            emit("u");
-            break;
-
-        case kIROp_Int32Type:
-            emit("i");
-            break;
-
-        case kIROp_BoolType:
-            emit("b");
-            break;
-
-        case kIROp_Float32Type:
-            // no prefix
-            break;
-
-        case kIROp_Float64Type:
-            emit("d");
-            break;
-
-        // TODO: we should handle vector and matrix types here
-        // and recurse into them to find the elemnt type,
-        // just as a convenience.
-
-        default:
-            SLANG_UNEXPECTED("case for GLSL type prefix");
-            break;
-        }
-    }
-#endif
-
-#if 0
-    void emitIRType(
-        EmitContext*        context,
-        IRType*             type,
-        IRDeclaratorInfo*   declarator)
-    {
-        switch (type->op)
-        {
-        case kIROp_PtrType:
-            {
-                auto ptrType = (IRPtrType*)type;
-
-                IRDeclaratorInfo ptrDeclarator;
-                ptrDeclarator.flavor = IRDeclaratorInfo::Flavor::Ptr;
-                ptrDeclarator.next = declarator;
-                emitIRType(context, ptrType->getValueType(), &ptrDeclarator);
-            }
-            break;
-
-        case kIROp_arrayType:
-            {
-                auto arrayType = (IRArrayType*)type;
-
-                IRDeclaratorInfo arrayDeclarator;
-                arrayDeclarator.flavor = IRDeclaratorInfo::Flavor::Array;
-                arrayDeclarator.elementCount = arrayType->getElementCount();
-                arrayDeclarator.next = declarator;
-                emitIRType(context, arrayType->getElementType(), &arrayDeclarator);
-            }
-            break;
-
-        default:
-            emitIRSimpleType(context, type);
-            emitDeclarator(context, declarator);
-            break;
-        }
-    }
-
-    void emitIRType(
-        EmitContext*    context,
-        IRType*         type,
-        String const&   name)
-    {
-        IRDeclaratorInfo declarator;
-        declarator.flavor = IRDeclaratorInfo::Flavor::Simple;
-        declarator.name = &name;
-
-        emitIRType(context, type, &declarator);
-    }
-
-    void emitIRType(
-        EmitContext*    context,
-        IRType*         type)
-    {
-        emitIRType(context, type, (IRDeclaratorInfo*) nullptr);
-    }
-#endif
 
     // Hack to allow IR emit for global constant to override behavior
     enum class IREmitMode
@@ -6357,21 +3601,25 @@ emitDeclImpl(decl, nullptr);
                     emit("if(");
                     emitIROperand(ctx, t->getCondition(), IREmitMode::Default);
                     emit(")\n{\n");
+                    indent();
                     emitIRStmtsForBlocks(
                         ctx,
                         trueBlock,
                         afterBlock,
                         labels);
+                    dedent();
                     emit("}\n");
                     // Don't emit the false block if it would be empty
                     if(falseBlock != afterBlock)
                     {
                         emit("else\n{\n");
+                        indent();
                         emitIRStmtsForBlocks(
                             ctx,
                             falseBlock,
                             afterBlock,
                             labels);
+                        dedent();
                         emit("}\n");
                     }
 
@@ -6433,7 +3681,7 @@ emitDeclImpl(decl, nullptr);
                     }
 
                     emit("for(;;)\n{\n");
-
+                    indent();
                     emitIRStmtsForBlocks(
                         ctx,
                         targetBlock,
@@ -6442,7 +3690,7 @@ emitDeclImpl(decl, nullptr);
                         &subBreakLabel,
                         // After the first block, we can safely use the `continue` label too
                         &subContinueLabel);
-
+                    dedent();
                     emit("}\n");
 
                     // Continue with the block after the loop
@@ -6668,9 +3916,13 @@ emitDeclImpl(decl, nullptr);
                         }
 
                         // Now emit the statements for this case.
+                        indent();
                         emit("{\n");
+                        indent();
                         emitIRStmtsForBlocks(ctx, caseLabel, caseEndLabel, &subLabels);
+                        dedent();
                         emit("}\n");
+                        dedent();
                     }
 
                     // If we've gone through all the cases and haven't
@@ -6679,10 +3931,14 @@ emitDeclImpl(decl, nullptr);
                     if(!defaultLabelHandled)
                     {
                         emit("default:\n");
+                        indent();
                         emit("{\n");
+                        indent();
                         emitIRStmtsForBlocks(ctx, defaultLabel, breakLabel, &subLabels);
                         emit("break;\n");
+                        dedent();
                         emit("}\n");
+                        dedent();
                     }
 
                     emit("}\n");
@@ -6968,6 +4224,10 @@ emitDeclImpl(decl, nullptr);
     {
         auto resultType = func->getResultType();
 
+        // Put a newline before the function so that
+        // the output will be more readable.
+        emit("\n");
+
         // Deal with decorations that need
         // to be emitted as attributes
         auto entryPointLayout = asEntryPoint(func);
@@ -7019,6 +4279,7 @@ emitDeclImpl(decl, nullptr);
         if(isDefinition(func))
         {
             emit("\n{\n");
+            indent();
 
             // HACK: forward-declare all the local variables needed for the
             // prameters of non-entry blocks.
@@ -7028,6 +4289,7 @@ emitDeclImpl(decl, nullptr);
 
             emitIRStmtsForBlocks(ctx, func->getFirstBlock(), nullptr, nullptr);
 
+            dedent();
             emit("}\n");
         }
         else
@@ -7179,9 +4441,6 @@ emitDeclImpl(decl, nullptr);
     {
         if(func->getGenericDecl())
         {
-            Emit("/* ");
-            emitIRFuncDecl(ctx, func);
-            Emit(" */\n");
             return;
         }
 
@@ -7286,6 +4545,35 @@ emitDeclImpl(decl, nullptr);
 
     }
 
+    // Emit the `flat` qualifier if the underlying type
+    // of the variable is an integer type.
+    void maybeEmitGLSLFlatModifier(
+        EmitContext*,
+        Type*           valueType)
+    {
+        auto tt = valueType;
+        if(auto vecType = tt->As<VectorExpressionType>())
+            tt = vecType->elementType;
+        if(auto vecType = tt->As<MatrixExpressionType>())
+            tt = vecType->getElementType();
+
+        auto baseType = tt->As<BasicExpressionType>();
+        if(!baseType)
+            return;
+
+        switch(baseType->baseType)
+        {
+        default:
+            break;
+
+        case BaseType::Int:
+        case BaseType::UInt:
+        case BaseType::UInt64:
+            Emit("flat ");
+            break;
+        }
+    }
+
     void emitIRVarModifiers(
         EmitContext*    ctx,
         VarLayout*      layout,
@@ -7342,12 +4630,24 @@ emitDeclImpl(decl, nullptr);
                     emit("uniform ");
                     break;
 
-                case LayoutResourceKind::VertexInput:
-                    emit("in ");
+                case LayoutResourceKind::VaryingInput:
+                    {
+                        emit("in ");
+                        if(layout->stage == Stage::Fragment)
+                        {
+                            maybeEmitGLSLFlatModifier(ctx, valueType);
+                        }
+                    }
                     break;
 
                 case LayoutResourceKind::FragmentOutput:
-                    emit("out ");
+                    {
+                        emit("out ");
+                        if(layout->stage != Stage::Fragment)
+                        {
+                            maybeEmitGLSLFlatModifier(ctx, valueType);
+                        }
+                    }
                     break;
 
                 default:
@@ -7390,6 +4690,7 @@ emitDeclImpl(decl, nullptr);
         emitHLSLRegisterSemantic(LayoutResourceKind::ConstantBuffer, &containerChain);
 
         emit("\n{\n");
+        indent();
 
         auto elementType = type->getElementType();
 
@@ -7399,6 +4700,7 @@ emitDeclImpl(decl, nullptr);
         emitHLSLParameterGroupFieldLayoutSemantics(&elementChain);
         emit(";\n");
 
+        dedent();
         emit("}\n");
     }
 
@@ -7436,6 +4738,7 @@ emitDeclImpl(decl, nullptr);
         emitHLSLRegisterSemantic(LayoutResourceKind::ConstantBuffer, &containerChain);
 
         emit("\n{\n");
+        indent();
 
         auto elementType = type->getElementType();
 
@@ -7481,6 +4784,7 @@ emitDeclImpl(decl, nullptr);
             emit("/* unexpected */");
         }
 
+        dedent();
         emit("}\n");
     }
 
@@ -7514,12 +4818,14 @@ emitDeclImpl(decl, nullptr);
         Emit(ctx->shared->uniqueIDCounter++);
 
         emit("\n{\n");
+        indent();
 
         auto elementType = type->getElementType();
 
         emitIRType(ctx, elementType, getIRName(varDecl));
         emit(";\n");
 
+        dedent();
         emit("};\n");
     }
 
@@ -7566,6 +4872,7 @@ emitDeclImpl(decl, nullptr);
         emit(getIRName(varDecl));
 
         emit("\n{\n");
+        indent();
 
         auto elementType = type->getElementType();
 
@@ -7627,6 +4934,7 @@ emitDeclImpl(decl, nullptr);
         // the semantics of things, and will reduce the risk of
         // collisions in the global namespace...
 
+        dedent();
         emit("};\n");
     }
 
@@ -7723,12 +5031,14 @@ emitDeclImpl(decl, nullptr);
         Emit(ctx->shared->uniqueIDCounter++);
 
         emit(" {\n");
+        indent();
 
 
         auto elementType = structuredBufferType->getElementType();
         emitIRType(ctx, elementType, getIRName(varDecl) + "[]");
         emit(";\n");
 
+        dedent();
         emit("}");
 
         // TODO: we need to consider the case where the type of the variable is
@@ -7759,12 +5069,18 @@ emitDeclImpl(decl, nullptr);
 
             initFuncName = getIRName(varDecl);
             initFuncName.append("_init");
+
+            emit("\n");
             emitIRType(ctx, varType, initFuncName);
             Emit("()\n{\n");
+            indent();
             emitIRStmtsForBlocks(ctx, varDecl->getFirstBlock(), nullptr, nullptr);
+            dedent();
             Emit("}\n");
         }
 
+        // Emit a blank line so that the formatting is nicer.
+        emit("\n");
 
         if (auto paramBlockType = varType->As<UniformParameterGroupType>())
         {
@@ -7870,7 +5186,11 @@ emitDeclImpl(decl, nullptr);
     {
         auto valType = valDecl->getDataType();
 
-        emit("static const ");
+        if( ctx->shared->target != CodeGenTarget::GLSL )
+        {
+            emit("static ");
+        }
+        emit("const ");
         emitIRType(ctx, valType, getIRName(valDecl));
 
         if (valDecl->getFirstBlock())
@@ -7945,9 +5265,10 @@ emitDeclImpl(decl, nullptr);
         if(declRef.getDecl()->HasModifier<BuiltinModifier>())
             return;
 
-        Emit("struct ");
+        Emit("\nstruct ");
         EmitDeclRef(declRef);
         Emit("\n{\n");
+        indent();
         for( auto ff : GetFields(declRef) )
         {
             if(ff.getDecl()->HasModifier<HLSLStaticModifier>())
@@ -7965,6 +5286,7 @@ emitDeclImpl(decl, nullptr);
 
             emit(";\n");
         }
+        dedent();
         Emit("};\n");
     }
 

@@ -583,7 +583,12 @@ float2 GetRenderTargetSamplePosition(int Index);
 __target_intrinsic(glsl, "groupMemoryBarrier")
 void GroupMemoryBarrier();
 
-__target_intrinsic(glsl, "groupMemoryBarrier(); barrier()")
+// Note: the unmatched parentheses in the GLSL lowering are
+// to cancel out the parens that the emit logic uses, so that
+// we can emit this as if it were an expression.
+//
+// TODO: investigate whether we can just use "operator comma" here.
+__target_intrinsic(glsl, "groupMemoryBarrier()); (barrier()")
 void GroupMemoryBarrierWithGroupSync();
 
 // Atomics

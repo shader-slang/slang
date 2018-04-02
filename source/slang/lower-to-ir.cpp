@@ -1417,21 +1417,6 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         SLANG_UNIMPLEMENTED_X("codegen for aggregate type constructor expression");
     }
 
-    // Add arguments that appeared directly in an argument list
-    // to the list of argument values for a call.
-    void addDirectCallArgs(
-        InvokeExpr*     expr,
-        List<IRInst*>* ioArgs)
-    {
-        for( auto arg : expr->Arguments )
-        {
-            // TODO: Need to handle case of l-value arguments,
-            // when they are matched to `out` or `in out` parameters.
-            auto loweredArg = lowerRValueExpr(context, arg);
-            addArgs(context, ioArgs, loweredArg);
-        }
-    }
-
     // After a call to a function with `out` or `in out`
     // parameters, we may need to copy data back into
     // the l-value locations used for output arguments.
@@ -1452,18 +1437,44 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         List<OutArgumentFixup>* ioFixups)
     {
         UInt argCount = expr->Arguments.Count();
-        UInt argIndex = 0;
+        UInt argCounter = 0;
         for (auto paramDeclRef : getMembersOfType<ParamDecl>(funcDeclRef))
         {
-            if (argIndex >= argCount)
-            {
-                // The remaining parameters must be defaulted...
-                break;
-            }
-
             auto paramDecl = paramDeclRef.getDecl();
             RefPtr<Type> paramType = lowerSimpleType(context, GetType(paramDeclRef));
-            auto argExpr = expr->Arguments[argIndex++];
+
+            UInt argIndex = argCounter++;
+            RefPtr<Expr> argExpr;
+            if(argIndex < argCount)
+            {
+                argExpr = expr->Arguments[argIndex];
+            }
+            else
+            {
+                // We have run out of arguments supplied at the call site,
+                // but there are still parameters remaining. This must mean
+                // that these parameters have default argument expressions
+                // associated with them.
+                argExpr = getInitExpr(paramDeclRef);
+
+                // Assert that such an expression must have been present.
+                SLANG_ASSERT(argExpr);
+
+                // TODO: The approach we are taking here to default arguments
+                // is simplistic, and has consequences for the front-end as
+                // well as binary serializatiojn of modules.
+                //
+                // We could consider some more refined approaches where, e.g.,
+                // functions with default arguments generate multiple IR-level
+                // functions, that compute and provide the default values.
+                //
+                // Alternatively, each parameter with defaults could be generated
+                // into its own callable function that provides the default value,
+                // so that calling modules can call into a pre-generated function.
+                //
+                // Each of these options involves trade-offs, and we need to
+                // make a conscious decision at some point.
+            }
 
             if (paramDecl->HasModifier<OutModifier>()
                 || paramDecl->HasModifier<InOutModifier>())
@@ -1543,8 +1554,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         }
         else
         {
-            SLANG_UNEXPECTED("shouldn't relaly happen");
-            UNREACHABLE(addDirectCallArgs(expr, ioArgs));
+            SLANG_UNEXPECTED("callee was not a callable decl");
         }
     }
 
@@ -1696,24 +1706,21 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             return result;
         }
 
-        // The default case is to assume that we just have
-        // an ordinary expression, and can lower it as such.
-        LoweredValInfo funcVal = lowerRValueExpr(context, expr->FunctionExpr);
-
-        // Now we add any direct arguments from the call expression itself.
-        addDirectCallArgs(expr, &irArgs);
-
-        // Delegate to the logic for invoking a value.
-        auto result = emitCallToVal(context, type, funcVal, irArgs.Count(), irArgs.Buffer());
-
-        // TODO: because of the nature of how the `emitCallToVal` case works
-        // right now, we don't have information on in/out parameters, and
-        // so we can't collect info to apply fixups.
+        // TODO: In this case we should be emitting code for the callee as
+        // an ordinary expression, then emitting the arguments according
+        // to the type information on the callee (e.g., which paameters
+        // are `out` or `inout`, and then finally emitting the `call`
+        // instruciton.
         //
-        // Once we have a better representation for function types, though,
-        // this should be fixable.
-
-        return result;
+        // We don't currently have the case of emitting arguments according
+        // to function type info (instead of declaration info), and really
+        // this case can't occur unless we start adding first-class functions
+        // to the source language.
+        //
+        // For now we just bail out with an error.
+        //
+        SLANG_UNEXPECTED("could not resolve target declaration for call");
+        UNREACHABLE_RETURN(LoweredValInfo());
     }
 
     LoweredValInfo subscriptValue(

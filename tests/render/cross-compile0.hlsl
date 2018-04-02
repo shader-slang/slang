@@ -4,11 +4,11 @@
 //
 // We will define distinct HLSL and GLSL entry points,
 // but the two will share a dependency on a file of
-// pure Spire code that provides the actual shading logic.
+// pure Slang code that provides the actual shading logic.
 
 #if defined(__HLSL__)
 
-// Pull in Spire code depdendency using extended syntax:
+// Pull in Slang code depdendency using extended syntax:
 __import cross_compile0;
 
 cbuffer Uniforms

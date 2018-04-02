@@ -96,7 +96,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>NV_EXTENSIONS;AMD_EXTENSIONS;WIN32;_DEBUG;_WINDOWS;_USRDLL;GLSLANG_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NV_EXTENSIONS;AMD_EXTENSIONS;ENABLE_OPT=0;WIN32;_DEBUG;_WINDOWS;_USRDLL;GLSLANG_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DisableSpecificWarnings>4819;4267</DisableSpecificWarnings>
     </ClCompile>
     <Link>
@@ -110,7 +110,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>NV_EXTENSIONS;AMD_EXTENSIONS;_DEBUG;_WINDOWS;_USRDLL;GLSLANG_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NV_EXTENSIONS;AMD_EXTENSIONS;ENABLE_OPT=0;_DEBUG;_WINDOWS;_USRDLL;GLSLANG_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DisableSpecificWarnings>4819;4267</DisableSpecificWarnings>
     </ClCompile>
     <Link>
@@ -126,7 +126,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>NV_EXTENSIONS;AMD_EXTENSIONS;WIN32;NDEBUG;_WINDOWS;_USRDLL;GLSLANG_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NV_EXTENSIONS;AMD_EXTENSIONS;ENABLE_OPT=0;WIN32;NDEBUG;_WINDOWS;_USRDLL;GLSLANG_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DisableSpecificWarnings>4819;4267</DisableSpecificWarnings>
     </ClCompile>
     <Link>
@@ -144,7 +144,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>NV_EXTENSIONS;AMD_EXTENSIONS;NDEBUG;_WINDOWS;_USRDLL;GLSLANG_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NV_EXTENSIONS;AMD_EXTENSIONS;ENABLE_OPT=0;NDEBUG;_WINDOWS;_USRDLL;GLSLANG_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DisableSpecificWarnings>4819;4267</DisableSpecificWarnings>
     </ClCompile>
     <Link>
@@ -157,6 +157,7 @@
   <ItemGroup>
     <ClCompile Include="..\..\external\glslang\glslang\GenericCodeGen\CodeGen.cpp" />
     <ClCompile Include="..\..\external\glslang\glslang\GenericCodeGen\Link.cpp" />
+    <ClCompile Include="..\..\external\glslang\glslang\MachineIndependent\attribute.cpp" />
     <ClCompile Include="..\..\external\glslang\glslang\MachineIndependent\Constant.cpp" />
     <ClCompile Include="..\..\external\glslang\glslang\MachineIndependent\glslang_tab.cpp" />
     <ClCompile Include="..\..\external\glslang\glslang\MachineIndependent\InfoSink.cpp" />
@@ -197,6 +198,7 @@
     <ClCompile Include="slang-glslang.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\external\glslang\glslang\MachineIndependent\attribute.h" />
     <ClInclude Include="..\..\external\glslang\glslang\MachineIndependent\glslang_tab.cpp.h" />
     <ClInclude Include="..\..\external\glslang\glslang\MachineIndependent\gl_types.h" />
     <ClInclude Include="..\..\external\glslang\glslang\MachineIndependent\Initialize.h" />

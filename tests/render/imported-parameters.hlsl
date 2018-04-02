@@ -6,7 +6,7 @@
 
 #if defined(__HLSL__)
 
-// Pull in Spire code depdendency using extended syntax:
+// Pull in Slang code depdendency using extended syntax:
 __import imported_parameters;
 
 struct AssembledVertex

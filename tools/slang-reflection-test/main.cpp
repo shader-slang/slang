@@ -239,6 +239,16 @@ static void emitReflectionNameInfoJSON(
     write(writer, "\"");
 }
 
+static void emitReflectionModifierInfoJSON(
+    PrettyWriter&               writer,
+    slang::VariableReflection*  var)
+{
+    if( var->findModifier(slang::Modifier::Shared) )
+    {
+        write(writer, ",\n\"shared\": true");
+    }
+}
+
 static void emitReflectionVarLayoutJSON(
     PrettyWriter&                       writer,
     slang::VariableLayoutReflection*    var)
@@ -251,6 +261,8 @@ static void emitReflectionVarLayoutJSON(
 
     write(writer, "\"type\": ");
     emitReflectionTypeLayoutJSON(writer, var->getTypeLayout());
+
+    emitReflectionModifierInfoJSON(writer, var->getVariable());
 
     emitReflectionVarBindingInfoJSON(writer, var);
 
@@ -607,8 +619,10 @@ static void emitReflectionVarInfoJSON(
     slang::VariableReflection*  var)
 {
     emitReflectionNameInfoJSON(writer, var->getName());
-    write(writer, ",\n");
 
+    emitReflectionModifierInfoJSON(writer, var);
+
+    write(writer, ",\n");
     write(writer, "\"type\": ");
     emitReflectionTypeJSON(writer, var->getType());
 }
@@ -621,6 +635,8 @@ static void emitReflectionParamJSON(
     indent(writer);
 
     emitReflectionNameInfoJSON(writer, param->getName());
+
+    emitReflectionModifierInfoJSON(writer, param->getVariable());
 
     emitReflectionVarBindingInfoJSON(writer, param);
     write(writer, ",\n");

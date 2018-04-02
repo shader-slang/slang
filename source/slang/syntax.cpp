@@ -2011,10 +2011,13 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     String DeclRefBase::toString() const
     {
-        StringBuilder sb;
-        sb << this->getDecl()->getName()->text;
+        if (!decl) return "";
+
+        auto name = decl->getName();
+        if (!name) return "";
+
         // TODO: need to print out substitutions too!
-        return sb.ProduceString();
+        return name->text;
     }
     
     RefPtr<ThisTypeSubstitution> getThisTypeSubst(DeclRefBase & declRef, bool insertSubstEntry)
