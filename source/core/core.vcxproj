@@ -32,6 +32,7 @@
     <ClInclude Include="secure-crt.h" />
     <ClInclude Include="slang-com-ptr.h" />
     <ClInclude Include="slang-defines.h" />
+    <ClInclude Include="slang-free-list.h" />
     <ClInclude Include="slang-io.h" />
     <ClInclude Include="slang-math.h" />
     <ClInclude Include="slang-result.h" />
@@ -44,6 +45,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="platform.cpp" />
+    <ClCompile Include="slang-free-list.cpp" />
     <ClCompile Include="slang-io.cpp" />
     <ClCompile Include="slang-string.cpp" />
     <ClCompile Include="stream.cpp" />

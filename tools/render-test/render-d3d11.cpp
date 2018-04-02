@@ -3,6 +3,7 @@
 
 #include "options.h"
 #include "render.h"
+#include "d3d-util.h"
 
 // In order to use the Slang API, we need to include its header
 
@@ -66,7 +67,9 @@ public:
     virtual void setConstantBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers,  const UInt* offsets) override;
     virtual void draw(UInt vertexCount, UInt startVertex) override;
     virtual void dispatchCompute(int x, int y, int z) override;
-    
+    virtual void submitGpuWork() override {}
+    virtual void waitForGpu() override {}
+
     // ShaderCompiler implementation
     virtual ShaderProgram* compileProgram(ShaderCompileRequest const& request) override;
 
@@ -111,22 +114,13 @@ public:
 		ComPtr<ID3D11InputLayout> m_layout;
 	};
 
-        /// Calculate size taking into account alignment. Alignment must be a power of 2
-    static UInt calcAligned(UInt size, UInt alignment) { return (size + alignment - 1) & ~(alignment - 1); } 
-    
-    static DXGI_FORMAT getMapFormat(Format format);
-
-        /// The Slang compiler currently generates HLSL source, so we'll need a utility
-        /// routine (defined later) to translate that into D3D11 shader bytecode.
-        /// Definition of the HLSL-to-bytecode compilation logic.
-    static Result compileHLSLShader(char const* sourcePath, char const* source, char const* entryPointName, char const* dxProfileName, ComPtr<ID3DBlob>& shaderBlobOut);
         /// Capture a texture to a file
     static HRESULT captureTextureToFile(ID3D11Device* device, ID3D11DeviceContext* context, ID3D11Texture2D* texture, char const* outputPath);
 
     void* map(ID3D11Buffer* buffer, MapFlavor flavor);
     void unmap(ID3D11Buffer* buffer);
 
-    Result createInputBuffer(InputBufferDesc& bufferDesc, const List<unsigned int>& bufferData, 
+    Result createInputBuffer(const InputBufferDesc& bufferDesc, const List<unsigned int>& bufferData, 
 		ComPtr<ID3D11Buffer>& bufferOut, ComPtr<ID3D11UnorderedAccessView>& viewOut, ComPtr<ID3D11ShaderResourceView>& srvOut);
 
     Result createInputTexture(const InputTextureDesc& inputDesc, ComPtr<ID3D11ShaderResourceView>& viewOut);
@@ -151,84 +145,6 @@ public:
 Renderer* createD3D11Renderer()
 {
     return new D3D11Renderer();
-}
-
-/* static */DXGI_FORMAT D3D11Renderer::getMapFormat(Format format)
-{
-    switch (format)
-    {
-        case Format::RGB_Float32:
-            return DXGI_FORMAT_R32G32B32_FLOAT;
-        case Format::RG_Float32:
-            return DXGI_FORMAT_R32G32_FLOAT;
-        default:
-            return DXGI_FORMAT_UNKNOWN;
-    }
-}
-
-/* static */Result D3D11Renderer::compileHLSLShader(char const* sourcePath, char const* source, char const* entryPointName, char const* dxProfileName, ComPtr<ID3DBlob>& shaderBlobOut)
-{
-    // Rather than statically link against the `d3dcompile` library, we
-    // dynamically load it.
-    //
-    // Note: A more realistic application would compile from HLSL text to D3D
-    // shader bytecode as part of an offline process, rather than doing it
-    // on-the-fly like this
-    //
-    static pD3DCompile compileFunc = nullptr;
-    if (!compileFunc)
-    {
-        // TODO(tfoley): maybe want to search for one of a few versions of the DLL
-        HMODULE compilerModule = LoadLibraryA("d3dcompiler_47.dll");
-        if (!compilerModule)
-        {
-            fprintf(stderr, "error: failed load 'd3dcompiler_47.dll'\n");
-            return SLANG_FAIL;
-	    }
-
-        compileFunc = (pD3DCompile)GetProcAddress(compilerModule, "D3DCompile");
-        if (!compileFunc)
-        {
-            fprintf(stderr, "error: failed load symbol 'D3DCompile'\n");
-            return SLANG_FAIL;
-        }
-    }
-
-    // For this example, we turn on debug output, and turn off all
-    // optimization. A real application would only use these flags
-    // when shader debugging is needed.
-    UINT flags = 0;
-    flags |= D3DCOMPILE_DEBUG;
-    flags |= D3DCOMPILE_OPTIMIZATION_LEVEL0 | D3DCOMPILE_SKIP_OPTIMIZATION;
-
-    // We will always define `__HLSL__` when compiling here, so that
-    // input code can react differently to being compiled as pure HLSL.
-    D3D_SHADER_MACRO defines[] = {
-        { "__HLSL__", "1" },
-        { nullptr, nullptr },
-    };
-
-    // The `D3DCompile` entry point takes a bunch of parameters, but we
-    // don't really need most of them for Slang-generated code.
-    ComPtr<ID3DBlob> shaderBlob;
-    ComPtr<ID3DBlob> errorBlob;
-
-    HRESULT hr = compileFunc(source, strlen(source), sourcePath, &defines[0], nullptr, entryPointName, dxProfileName, flags, 0,
-        shaderBlob.writeRef(), errorBlob.writeRef());
-
-    // If the HLSL-to-bytecode compilation produced any diagnostic messages
-    // then we will print them out (whether or not the compilation failed).
-    if (errorBlob)
-    {
-        ::fputs((const char*)errorBlob->GetBufferPointer(), stderr);
-        ::fflush(stderr);
-        ::OutputDebugStringA((const char*)errorBlob->GetBufferPointer());
-		return SLANG_FAIL;
-    }
-
-	SLANG_RETURN_ON_FAIL(hr);
-	shaderBlobOut.swap(shaderBlob);
-	return SLANG_OK;
 }
 
 /* static */HRESULT D3D11Renderer::captureTextureToFile(ID3D11Device* device, ID3D11DeviceContext* context,
@@ -474,7 +390,7 @@ ShaderCompiler* D3D11Renderer::getShaderCompiler()
 Buffer* D3D11Renderer::createBuffer(const BufferDesc& desc)
 {
     D3D11_BUFFER_DESC bufferDesc = { 0 };
-    bufferDesc.ByteWidth = (UINT)calcAligned(desc.size, 256);
+    bufferDesc.ByteWidth = (UINT)D3DUtil::calcAligned(desc.size, 256);
 
     switch (desc.flavor)
     {
@@ -517,7 +433,7 @@ InputLayout* D3D11Renderer::createInputLayout(const InputElementDesc* inputEleme
     {
         inputElements[ii].SemanticName = inputElementsIn[ii].semanticName;
         inputElements[ii].SemanticIndex = (UINT)inputElementsIn[ii].semanticIndex;
-        inputElements[ii].Format = getMapFormat(inputElementsIn[ii].format);
+        inputElements[ii].Format = D3DUtil::getMapFormat(inputElementsIn[ii].format);
         inputElements[ii].InputSlot = 0;
         inputElements[ii].AlignedByteOffset = (UINT)inputElementsIn[ii].offset;
         inputElements[ii].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
@@ -551,10 +467,10 @@ InputLayout* D3D11Renderer::createInputLayout(const InputElementDesc* inputEleme
     hlslCursor += sprintf(hlslCursor, "\n) : SV_Position { return 0; }");
 
 	ComPtr<ID3DBlob> vertexShaderBlob;
-	SLANG_RETURN_NULL_ON_FAIL(compileHLSLShader("inputLayout", hlslBuffer, "main", "vs_5_0", vertexShaderBlob));
+	SLANG_RETURN_NULL_ON_FAIL(D3DUtil::compileHLSLShader("inputLayout", hlslBuffer, "main", "vs_5_0", vertexShaderBlob));
 
     ComPtr<ID3D11InputLayout> inputLayout;
-   SLANG_RETURN_NULL_ON_FAIL(m_device->CreateInputLayout(&inputElements[0], (UINT)inputElementCount, vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize(),
+	SLANG_RETURN_NULL_ON_FAIL(m_device->CreateInputLayout(&inputElements[0], (UINT)inputElementCount, vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize(),
         inputLayout.writeRef()));
 
 	InputLayoutImpl* impl = new InputLayoutImpl;
@@ -613,18 +529,7 @@ void D3D11Renderer::setInputLayout(InputLayout* inputLayoutIn)
 
 void D3D11Renderer::setPrimitiveTopology(PrimitiveTopology topology)
 {
-    D3D11_PRIMITIVE_TOPOLOGY primTopology;
-    switch (topology)
-    {
-        case PrimitiveTopology::TriangleList:
-            primTopology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-            break;
-
-        default:
-            return;
-    }
-
-    m_immediateContext->IASetPrimitiveTopology(primTopology);
+    m_immediateContext->IASetPrimitiveTopology(D3DUtil::getPrimitiveTopology(topology)); 
 }
 
 void D3D11Renderer::setVertexBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffersIn, const UInt* stridesIn, const UInt* offsetsIn)
@@ -687,7 +592,7 @@ ShaderProgram* D3D11Renderer::compileProgram(const ShaderCompileRequest& request
     if (request.computeShader.name)
     {
 		ComPtr<ID3DBlob> computeShaderBlob;
-		SLANG_RETURN_NULL_ON_FAIL(compileHLSLShader(request.computeShader.source.path, request.computeShader.source.dataBegin, request.computeShader.name, request.computeShader.profile, computeShaderBlob));
+		SLANG_RETURN_NULL_ON_FAIL(D3DUtil::compileHLSLShader(request.computeShader.source.path, request.computeShader.source.dataBegin, request.computeShader.name, request.computeShader.profile, computeShaderBlob));
 
         ComPtr<ID3D11ComputeShader> computeShader;
         SLANG_RETURN_NULL_ON_FAIL(m_device->CreateComputeShader(computeShaderBlob->GetBufferPointer(), computeShaderBlob->GetBufferSize(), nullptr, computeShader.writeRef()));
@@ -699,8 +604,8 @@ ShaderProgram* D3D11Renderer::compileProgram(const ShaderCompileRequest& request
     else
     {
 		ComPtr<ID3DBlob> vertexShaderBlob, fragmentShaderBlob;
-        SLANG_RETURN_NULL_ON_FAIL(compileHLSLShader(request.vertexShader.source.path, request.vertexShader.source.dataBegin, request.vertexShader.name, request.vertexShader.profile, vertexShaderBlob));
-        SLANG_RETURN_NULL_ON_FAIL(compileHLSLShader(request.fragmentShader.source.path, request.fragmentShader.source.dataBegin, request.fragmentShader.name, request.fragmentShader.profile, fragmentShaderBlob));
+        SLANG_RETURN_NULL_ON_FAIL(D3DUtil::compileHLSLShader(request.vertexShader.source.path, request.vertexShader.source.dataBegin, request.vertexShader.name, request.vertexShader.profile, vertexShaderBlob));
+        SLANG_RETURN_NULL_ON_FAIL(D3DUtil::compileHLSLShader(request.fragmentShader.source.path, request.fragmentShader.source.dataBegin, request.fragmentShader.name, request.fragmentShader.profile, fragmentShaderBlob));
         
         ComPtr<ID3D11VertexShader> vertexShader;
         ComPtr<ID3D11PixelShader> pixelShader;
@@ -721,12 +626,12 @@ void D3D11Renderer::dispatchCompute(int x, int y, int z)
     m_immediateContext->Dispatch(x, y, z);
 }
 
-Result D3D11Renderer::createInputBuffer(InputBufferDesc& bufferDesc, const List<unsigned int>& bufferData, 
+Result D3D11Renderer::createInputBuffer(const InputBufferDesc& bufferDesc, const List<unsigned int>& bufferData, 
 	ComPtr<ID3D11Buffer>& bufferOut, ComPtr<ID3D11UnorderedAccessView>& viewOut, ComPtr<ID3D11ShaderResourceView>& srvOut)
 {
     D3D11_BUFFER_DESC desc = { 0 };
     List<unsigned int> newBuffer;
-    desc.ByteWidth = (UINT)calcAligned((bufferData.Count() * sizeof(unsigned int)), 256);
+    desc.ByteWidth = (UINT)D3DUtil::calcAligned((bufferData.Count() * sizeof(unsigned int)), 256);
     newBuffer.SetSize(desc.ByteWidth / sizeof(unsigned int));
     for (UInt i = 0; i < bufferData.Count(); i++)
         newBuffer[i] = bufferData[i];
@@ -939,32 +844,42 @@ Result D3D11Renderer::createInputSampler(const InputSamplerDesc& inputDesc, ComP
 
 BindingState* D3D11Renderer::createBindingState(const ShaderInputLayout& layout)
 {
-	List<Binding> bindings;
+    RefPtr<BindingStateImpl> bindingState(new BindingStateImpl);
 
-    for (auto & entry : layout.entries)
+    const List<ShaderInputLayoutEntry>& srcBindings = layout.entries;
+    const int numBindings = int(srcBindings.Count());
+
+    List<Binding>& dstBindings = bindingState->m_bindings;
+    dstBindings.SetSize(numBindings);
+
+    bindingState->m_numRenderTargets = layout.numRenderTargets;
+	
+    for (int i = 0; i < numBindings; ++i)
     {
-        Binding rsEntry;
-        rsEntry.type = entry.type;
-        rsEntry.binding = entry.hlslBinding;
-        rsEntry.isOutput = entry.isOutput;
-        switch (entry.type)
+        Binding& dstBinding = dstBindings[i];
+        const ShaderInputLayoutEntry& srcBinding = srcBindings[i];
+
+        dstBinding.type = srcBinding.type;
+        dstBinding.binding = srcBinding.hlslBinding;
+        dstBinding.isOutput = srcBinding.isOutput;
+        switch (srcBinding.type)
         {
             case ShaderInputType::Buffer:
             {
-                SLANG_RETURN_NULL_ON_FAIL(createInputBuffer(entry.bufferDesc, entry.bufferData, rsEntry.buffer, rsEntry.uav, rsEntry.srv));
+                SLANG_RETURN_NULL_ON_FAIL(createInputBuffer(srcBinding.bufferDesc, srcBinding.bufferData, dstBinding.buffer, dstBinding.uav, dstBinding.srv));
 
-                rsEntry.bufferLength = (int)(entry.bufferData.Count() * sizeof(unsigned int));
-                rsEntry.bufferType = entry.bufferDesc.type;
+                dstBinding.bufferLength = (int)(srcBinding.bufferData.Count() * sizeof(unsigned int));
+                dstBinding.bufferType = srcBinding.bufferDesc.type;
 				break;
 			}
             case ShaderInputType::Texture:
             {
-                SLANG_RETURN_NULL_ON_FAIL(createInputTexture(entry.textureDesc, rsEntry.srv));
+                SLANG_RETURN_NULL_ON_FAIL(createInputTexture(srcBinding.textureDesc, dstBinding.srv));
 				break;
 			}
             case ShaderInputType::Sampler:
             {
-                SLANG_RETURN_NULL_ON_FAIL(createInputSampler(entry.samplerDesc, rsEntry.samplerState));
+                SLANG_RETURN_NULL_ON_FAIL(createInputSampler(srcBinding.samplerDesc, dstBinding.samplerState));
 				break;
 			}
             case ShaderInputType::CombinedTextureSampler:
@@ -975,14 +890,9 @@ BindingState* D3D11Renderer::createBindingState(const ShaderInputLayout& layout)
 				break;
 			}
         }
-        bindings.Add(rsEntry);
     }
 
-	BindingStateImpl* rs = new BindingStateImpl;
-	rs->m_numRenderTargets = layout.numRenderTargets;
-	rs->m_bindings.SwapWith(bindings);
-
-    return rs;
+    return bindingState.detach();
 }
 
 void D3D11Renderer::applyBindingState(bool isCompute)
@@ -1079,7 +989,7 @@ void D3D11Renderer::serializeOutput(BindingState* stateIn, const char* fileName)
                 D3D11_BUFFER_DESC bufDesc;
                 memset(&bufDesc, 0, sizeof(bufDesc));
                 bufDesc.BindFlags = 0;
-                bufDesc.ByteWidth = (UINT)calcAligned(binding.bufferLength, 256);
+                bufDesc.ByteWidth = (UINT)D3DUtil::calcAligned(binding.bufferLength, 256);
                 bufDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
                 bufDesc.Usage = D3D11_USAGE_STAGING;
                 

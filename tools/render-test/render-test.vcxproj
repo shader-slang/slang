@@ -166,22 +166,30 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="circular-resource-heap-d3d12.cpp" />
+    <ClCompile Include="d3d-util.cpp" />
+    <ClCompile Include="descriptor-heap-d3d12.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="options.cpp" />
     <ClCompile Include="render-d3d11.cpp" />
     <ClCompile Include="render-d3d12.cpp" />
     <ClCompile Include="render-gl.cpp" />
     <ClCompile Include="render-vk.cpp" />
+    <ClCompile Include="resource-d3d12.cpp" />
     <ClCompile Include="shader-input-layout.cpp" />
     <ClCompile Include="slang-support.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="circular-resource-heap-d3d12.h" />
+    <ClInclude Include="d3d-util.h" />
+    <ClInclude Include="descriptor-heap-d3d12.h" />
     <ClInclude Include="options.h" />
     <ClInclude Include="render-d3d11.h" />
     <ClInclude Include="render-d3d12.h" />
     <ClInclude Include="render-gl.h" />
     <ClInclude Include="render-vk.h" />
     <ClInclude Include="render.h" />
+    <ClInclude Include="resource-d3d12.h" />
     <ClInclude Include="shader-input-layout.h" />
     <ClInclude Include="slang-support.h" />
     <ClInclude Include="window.h" />
