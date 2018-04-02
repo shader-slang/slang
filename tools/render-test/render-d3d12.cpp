@@ -88,6 +88,12 @@ protected:
 	static const Int kMaxNumRenderFrames = 4;
 	static const Int kMaxNumRenderTargets = 3;
 	
+	enum class ProgramType
+	{
+		kCompute,
+		kGraphics,
+	};
+
 	struct FrameInfo
 	{
 		FrameInfo() :m_fenceValue(0) {}
@@ -102,6 +108,7 @@ protected:
 	class ShaderProgramImpl: public ShaderProgram
 	{
 		public:
+		ProgramType m_programType;
 		List<uint8_t> m_vertexShader;
 		List<uint8_t> m_pixelShader;
 		List<uint8_t> m_computeShader;
@@ -182,6 +189,81 @@ protected:
 		int m_offset;
 	};
 
+	struct Submitter
+	{
+		virtual void setRootConstantBufferView(int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation) = 0;
+		virtual void setRootDescriptorTable(int index, D3D12_GPU_DESCRIPTOR_HANDLE BaseDescriptor) = 0;
+		virtual void setRootSigniture(ID3D12RootSignature* rootSignature) = 0;		
+	};
+
+	struct BindParameters
+	{
+		enum 
+		{ 
+			kMaxRanges = 16, 
+			kMaxParameters = 32 
+		};
+
+		D3D12_DESCRIPTOR_RANGE& nextRange() { return m_ranges[m_rangeIndex++]; }
+		D3D12_ROOT_PARAMETER& nextParameter() { return m_parameters[m_paramIndex++]; }
+
+		BindParameters():
+			m_rangeIndex(0),
+			m_paramIndex(0)
+		{}
+
+		D3D12_DESCRIPTOR_RANGE m_ranges[kMaxRanges];
+		int m_rangeIndex;
+		D3D12_ROOT_PARAMETER m_parameters[kMaxParameters];
+		int m_paramIndex;
+	};
+
+	struct GraphicsSubmitter : public Submitter
+	{
+		virtual void setRootConstantBufferView(int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation) override
+		{
+			m_commandList->SetGraphicsRootConstantBufferView(index, gpuBufferLocation);
+		}
+		virtual void setRootDescriptorTable(int index, D3D12_GPU_DESCRIPTOR_HANDLE baseDescriptor) override
+		{
+			m_commandList->SetGraphicsRootDescriptorTable(index, baseDescriptor); 
+		}
+		void setRootSigniture(ID3D12RootSignature* rootSignature)
+		{
+			m_commandList->SetGraphicsRootSignature(rootSignature);
+		}
+
+		GraphicsSubmitter(ID3D12GraphicsCommandList* commandList):
+			m_commandList(commandList)
+		{
+		}
+
+		ID3D12GraphicsCommandList* m_commandList;
+	};
+
+	struct ComputeSubmitter : public Submitter
+	{
+		virtual void setRootConstantBufferView(int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation) override
+		{
+			m_commandList->SetComputeRootConstantBufferView(index, gpuBufferLocation);
+		}
+		virtual void setRootDescriptorTable(int index, D3D12_GPU_DESCRIPTOR_HANDLE baseDescriptor) override
+		{
+			m_commandList->SetComputeRootDescriptorTable(index, baseDescriptor);
+		}
+		void setRootSigniture(ID3D12RootSignature* rootSignature)
+		{
+			m_commandList->SetComputeRootSignature(rootSignature);
+		}
+
+		ComputeSubmitter(ID3D12GraphicsCommandList* commandList) :
+			m_commandList(commandList)
+		{
+		}
+
+		ID3D12GraphicsCommandList* m_commandList;
+	};
+
 	static PROC loadProc(HMODULE module, char const* name);
 	Result createFrameResources();
 		/// Blocks until gpu has completed all work
@@ -212,7 +294,13 @@ protected:
 
 	RenderState* calcRenderState();
 		/// From current bindings calculate the root signature and pipeline state
-	Result calcPipelineState(ComPtr<ID3D12RootSignature>& sigOut, ComPtr<ID3D12PipelineState>& pipelineStateOut);
+	Result calcGraphicsPipelineState(ComPtr<ID3D12RootSignature>& sigOut, ComPtr<ID3D12PipelineState>& pipelineStateOut);
+	Result calcComputePipelineState(ComPtr<ID3D12RootSignature>& signatureOut, ComPtr<ID3D12PipelineState>& pipelineStateOut);
+
+	Result _bindRenderState(RenderState* renderState, ID3D12GraphicsCommandList* commandList, Submitter* submitter);
+	
+	Result _calcBindParameters(BindParameters& params);
+	RenderState* findRenderState(ProgramType programType);
 
 	PFN_D3D12_SERIALIZE_ROOT_SIGNATURE m_D3D12SerializeRootSignature = nullptr;
 
@@ -945,117 +1033,46 @@ Result D3D12Renderer::captureTextureToFile(D3D12Resource& resource, const char* 
     return SLANG_OK;
 }
 
-Result D3D12Renderer::calcPipelineState(ComPtr<ID3D12RootSignature>& signatureOut, ComPtr<ID3D12PipelineState>& pipelineStateOut)
+Result D3D12Renderer::calcComputePipelineState(ComPtr<ID3D12RootSignature>& signatureOut, ComPtr<ID3D12PipelineState>& pipelineStateOut)
 {
-	D3D12_DESCRIPTOR_RANGE ranges[8];
-	int curRangeIndex = 0;
-	D3D12_ROOT_PARAMETER rootParameters[32];
-	int curParamIndex = 0;
+	BindParameters bindParameters;
+	_calcBindParameters(bindParameters);
 
-	int numConstantBuffers = 0;
+	ComPtr<ID3D12RootSignature> rootSignature;
+	ComPtr<ID3D12PipelineState> pipelineState;
+
 	{
-		// Okay we need to try and create a render state
-		for (int i = 0; i < int(m_boundConstantBuffers.Count()); i++)
-		{
-			const BufferImpl* buffer = m_boundConstantBuffers[i];
-			if (buffer)
-			{
-				D3D12_ROOT_PARAMETER& param = rootParameters[curParamIndex++];
-				param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-				param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc;
+		rootSignatureDesc.NumParameters = bindParameters.m_paramIndex;
+		rootSignatureDesc.pParameters = bindParameters.m_parameters;
+		rootSignatureDesc.NumStaticSamplers = 0;
+		rootSignatureDesc.pStaticSamplers = nullptr;
+		rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
 
-				D3D12_ROOT_DESCRIPTOR& descriptor = param.Descriptor;
-				descriptor.ShaderRegister = numConstantBuffers;
-				descriptor.RegisterSpace = 0;
-
-				numConstantBuffers++;
-			}
-		}
-
-		const int numBoundConstantBuffers = numConstantBuffers;
-		for (int i = 0; i < int(m_boundBindingState->m_bindings.Count()); i++)
-		{
-			const Binding& binding = m_boundBindingState->m_bindings[i];
-			if (binding.m_type == ShaderInputType::Buffer)
-			{
-				if (binding.m_bufferType == InputBufferType::ConstantBuffer)
-				{
-					// Make sure it's not overlapping the ones we just statically defined
-					assert(binding.m_binding < numBoundConstantBuffers);
-
-					D3D12_ROOT_PARAMETER& param = rootParameters[curParamIndex++];
-					param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-					param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-
-					D3D12_ROOT_DESCRIPTOR& descriptor = param.Descriptor;
-					descriptor.ShaderRegister = binding.m_binding;
-					descriptor.RegisterSpace = 0;
-
-					numConstantBuffers++;
-				}
-
-				if (binding.m_bufferType == InputBufferType::StorageBuffer)
-				{
-					D3D12_DESCRIPTOR_RANGE& range = ranges[curRangeIndex++];
-
-					range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-					range.NumDescriptors = 1;
-					range.BaseShaderRegister = binding.m_binding;
-					range.RegisterSpace = 0;
-					range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-
-					D3D12_ROOT_PARAMETER& param = rootParameters[curParamIndex++];
-
-					param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-					param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-
-					D3D12_ROOT_DESCRIPTOR_TABLE& table = param.DescriptorTable;
-					table.NumDescriptorRanges = 1;
-					table.pDescriptorRanges = &range;
-				}
-
-				if (binding.m_uavIndex >= 0)
-				{
-					D3D12_DESCRIPTOR_RANGE& range = ranges[curRangeIndex++];
-
-					range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-					range.NumDescriptors = 1;
-					range.BaseShaderRegister = binding.m_binding;
-					range.RegisterSpace = 0;
-					range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-
-					D3D12_ROOT_PARAMETER& param = rootParameters[curParamIndex++];
-
-					param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-					param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-
-					D3D12_ROOT_DESCRIPTOR_TABLE& table = param.DescriptorTable;
-					table.NumDescriptorRanges = 1;
-					table.pDescriptorRanges = &range;
-				}
-			}
-		}
+		ComPtr<ID3DBlob> signature;
+		ComPtr<ID3DBlob> error;
+		SLANG_RETURN_ON_FAIL(m_D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, signature.writeRef(), error.writeRef()));
+		SLANG_RETURN_ON_FAIL(m_device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(rootSignature.writeRef())));
 	}
 
-	if (m_boundBindingState->m_samplerHeap.getUsedSize() > 0)
 	{
-		D3D12_DESCRIPTOR_RANGE& range = ranges[curRangeIndex++];
-
-		range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
-		range.NumDescriptors = m_boundBindingState->m_samplerHeap.getUsedSize();
-		range.BaseShaderRegister = 0;
-		range.RegisterSpace = 0;
-		range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-
-		D3D12_ROOT_PARAMETER& param = rootParameters[curParamIndex++];
-
-		param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-		param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-
-		D3D12_ROOT_DESCRIPTOR_TABLE& table = param.DescriptorTable;
-		table.NumDescriptorRanges = 1;
-		table.pDescriptorRanges = &range;
+		// Describe and create the compute pipeline state object 
+		D3D12_COMPUTE_PIPELINE_STATE_DESC computeDesc = {};
+		computeDesc.pRootSignature = rootSignature;
+		computeDesc.CS = { m_boundShaderProgram->m_computeShader.Buffer(), m_boundShaderProgram->m_computeShader.Count() };
+		SLANG_RETURN_ON_FAIL(m_device->CreateComputePipelineState(&computeDesc, IID_PPV_ARGS(pipelineState.writeRef())));
 	}
+
+	signatureOut.swap(rootSignature);
+	pipelineStateOut.swap(pipelineState);
+
+	return SLANG_OK;
+}
+
+Result D3D12Renderer::calcGraphicsPipelineState(ComPtr<ID3D12RootSignature>& signatureOut, ComPtr<ID3D12PipelineState>& pipelineStateOut)
+{
+	BindParameters bindParameters;
+	_calcBindParameters(bindParameters);
 
 	ComPtr<ID3D12RootSignature> rootSignature;
 	ComPtr<ID3D12PipelineState> pipelineState;
@@ -1063,8 +1080,8 @@ Result D3D12Renderer::calcPipelineState(ComPtr<ID3D12RootSignature>& signatureOu
 	{
 		// Deny unnecessary access to certain pipeline stages
 		D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc;
-		rootSignatureDesc.NumParameters = curParamIndex;
-		rootSignatureDesc.pParameters = rootParameters;
+		rootSignatureDesc.NumParameters = bindParameters.m_paramIndex;
+		rootSignatureDesc.pParameters = bindParameters.m_parameters;
 		rootSignatureDesc.NumStaticSamplers = 0;
 		rootSignatureDesc.pStaticSamplers = nullptr;
 		rootSignatureDesc.Flags = m_boundInputLayout ? D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT : D3D12_ROOT_SIGNATURE_FLAG_NONE;
@@ -1166,44 +1183,103 @@ Result D3D12Renderer::calcPipelineState(ComPtr<ID3D12RootSignature>& signatureOu
 	return SLANG_OK;
 }
 
+D3D12Renderer::RenderState* D3D12Renderer::findRenderState(ProgramType programType)
+{
+	switch (programType)
+	{
+		case ProgramType::kCompute:
+		{
+			// Check if current state is a match
+			if (m_currentRenderState)
+			{
+				if (m_currentRenderState->m_bindingState == m_boundBindingState &&
+					m_currentRenderState->m_shaderProgram == m_boundShaderProgram)
+				{
+					return m_currentRenderState;
+				}
+			}
+
+			const int num = int(m_renderStates.Count());
+			for (int i = 0; i < num; i++)
+			{
+				RenderState* renderState = m_renderStates[i];
+				if (renderState->m_bindingState == m_boundBindingState &&
+					renderState->m_shaderProgram == m_boundShaderProgram)
+				{
+					return renderState;
+				}
+			}
+			break;
+		}
+		case ProgramType::kGraphics:
+		{
+			if (m_currentRenderState)
+			{
+				if (m_currentRenderState->m_bindingState == m_boundBindingState &&
+					m_currentRenderState->m_inputLayout == m_boundInputLayout &&
+					m_currentRenderState->m_shaderProgram == m_boundShaderProgram &&
+					m_currentRenderState->m_primitiveTopologyType == m_primitiveTopologyType)
+				{
+					return m_currentRenderState;
+				}
+			}
+			// See if matches one in the list
+			{
+				const int num = int(m_renderStates.Count());
+				for (int i = 0; i < num; i++)
+				{
+					RenderState* renderState = m_renderStates[i];
+					if (renderState->m_bindingState == m_boundBindingState &&
+						renderState->m_inputLayout == m_boundInputLayout &&
+						renderState->m_shaderProgram == m_boundShaderProgram &&
+						renderState->m_primitiveTopologyType == m_primitiveTopologyType)
+					{
+						// Okay we have a match
+						return renderState;
+					}
+				}
+			}
+			break;
+		}
+		default: break;
+	}
+	return nullptr;
+}
+
 D3D12Renderer::RenderState* D3D12Renderer::calcRenderState()
 {
+	if (!m_boundShaderProgram)
+	{
+		return nullptr;
+	}
+	m_currentRenderState = findRenderState(m_boundShaderProgram->m_programType);
 	if (m_currentRenderState)
 	{
-		if (m_currentRenderState->m_bindingState == m_boundBindingState &&
-			m_currentRenderState->m_inputLayout == m_boundInputLayout &&
-			m_currentRenderState->m_shaderProgram == m_boundShaderProgram &&
-			m_currentRenderState->m_primitiveTopologyType == m_primitiveTopologyType)
-		{
-			return m_currentRenderState;
-		}
-		// Doesn't match
-		m_currentRenderState = nullptr;
-	}
-	// See if matches one in the list
-	{
-		const int num = int(m_renderStates.Count());
-		for (int i = 0; i < num; i++)
-		{
-			RenderState* renderState = m_renderStates[i];
-			if (renderState->m_bindingState == m_boundBindingState &&
-				renderState->m_inputLayout == m_boundInputLayout &&
-				renderState->m_shaderProgram == m_boundShaderProgram && 
-				renderState->m_primitiveTopologyType == m_primitiveTopologyType)
-			{
-				// Okay we have a match
-				m_currentRenderState = renderState;
-				return renderState;
-			}
-		}
+		return m_currentRenderState;
 	}
 
 	ComPtr<ID3D12RootSignature> rootSignature;
 	ComPtr<ID3D12PipelineState> pipelineState;
 
-	if (SLANG_FAILED(calcPipelineState(rootSignature, pipelineState)))
+	switch (m_boundShaderProgram->m_programType)
 	{
-		return nullptr;
+		case ProgramType::kCompute:
+		{
+			if (SLANG_FAILED(calcComputePipelineState(rootSignature, pipelineState)))
+			{
+				return nullptr;
+			}
+			break;
+		}
+		case ProgramType::kGraphics:
+		{
+			if (SLANG_FAILED(calcGraphicsPipelineState(rootSignature, pipelineState)))
+			{
+				return nullptr;
+			}
+			break;
+		}
+		default: return nullptr;
 	}
 
 	RenderState* renderState = new RenderState;
@@ -1221,6 +1297,200 @@ D3D12Renderer::RenderState* D3D12Renderer::calcRenderState()
 	m_currentRenderState = renderState;
 
 	return renderState;
+}
+
+Result D3D12Renderer::_calcBindParameters(BindParameters& params)
+{
+	int numConstantBuffers = 0;
+	{
+		// Okay we need to try and create a render state
+		for (int i = 0; i < int(m_boundConstantBuffers.Count()); i++)
+		{
+			const BufferImpl* buffer = m_boundConstantBuffers[i];
+			if (buffer)
+			{
+				D3D12_ROOT_PARAMETER& param = params.nextParameter();
+				param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+				param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+				D3D12_ROOT_DESCRIPTOR& descriptor = param.Descriptor;
+				descriptor.ShaderRegister = numConstantBuffers;
+				descriptor.RegisterSpace = 0;
+
+				numConstantBuffers++;
+			}
+		}
+
+		if (m_boundBindingState)
+		{
+			const int numBoundConstantBuffers = numConstantBuffers;
+			for (int i = 0; i < int(m_boundBindingState->m_bindings.Count()); i++)
+			{
+				const Binding& binding = m_boundBindingState->m_bindings[i];
+				if (binding.m_type == ShaderInputType::Buffer)
+				{
+					if (binding.m_bufferType == InputBufferType::ConstantBuffer)
+					{
+						// Make sure it's not overlapping the ones we just statically defined
+						assert(binding.m_binding < numBoundConstantBuffers);
+
+						D3D12_ROOT_PARAMETER& param = params.nextParameter();
+						param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+						param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+						D3D12_ROOT_DESCRIPTOR& descriptor = param.Descriptor;
+						descriptor.ShaderRegister = binding.m_binding;
+						descriptor.RegisterSpace = 0;
+
+						numConstantBuffers++;
+					}
+
+					if (binding.m_bufferType == InputBufferType::StorageBuffer)
+					{
+						D3D12_DESCRIPTOR_RANGE& range = params.nextRange();
+						
+						range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+						range.NumDescriptors = 1;
+						range.BaseShaderRegister = binding.m_binding;
+						range.RegisterSpace = 0;
+						range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+						D3D12_ROOT_PARAMETER& param = params.nextParameter();
+						
+						param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+						param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+						D3D12_ROOT_DESCRIPTOR_TABLE& table = param.DescriptorTable;
+						table.NumDescriptorRanges = 1;
+						table.pDescriptorRanges = &range;
+					}
+
+					if (binding.m_uavIndex >= 0)
+					{
+						D3D12_DESCRIPTOR_RANGE& range = params.nextRange();
+						
+						range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+						range.NumDescriptors = 1;
+						range.BaseShaderRegister = binding.m_binding;
+						range.RegisterSpace = 0;
+						range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+						D3D12_ROOT_PARAMETER& param = params.nextParameter();
+						
+						param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+						param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+						D3D12_ROOT_DESCRIPTOR_TABLE& table = param.DescriptorTable;
+						table.NumDescriptorRanges = 1;
+						table.pDescriptorRanges = &range;
+					}
+				}
+			}
+		}
+	}
+
+	if (m_boundBindingState && m_boundBindingState->m_samplerHeap.getUsedSize() > 0)
+	{
+		D3D12_DESCRIPTOR_RANGE& range = params.nextRange();
+		
+		range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
+		range.NumDescriptors = m_boundBindingState->m_samplerHeap.getUsedSize();
+		range.BaseShaderRegister = 0;
+		range.RegisterSpace = 0;
+		range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+		D3D12_ROOT_PARAMETER& param = params.nextParameter();
+		
+		param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+		D3D12_ROOT_DESCRIPTOR_TABLE& table = param.DescriptorTable;
+		table.NumDescriptorRanges = 1;
+		table.pDescriptorRanges = &range;
+	}
+	return SLANG_OK;
+}
+
+Result D3D12Renderer::_bindRenderState(RenderState* renderState, ID3D12GraphicsCommandList* commandList, Submitter* submitter)
+{
+	BindingStateImpl* bindingState = m_boundBindingState;
+
+	submitter->setRootSigniture(renderState->m_rootSignature);
+	commandList->SetPipelineState(renderState->m_pipelineState);
+
+	{
+		int index = 0;
+
+		int numConstantBuffers = 0;
+		{
+			// Okay we need to try and create a render state
+			for (int i = 0; i < int(m_boundConstantBuffers.Count()); i++)
+			{
+				const BufferImpl* buffer = m_boundConstantBuffers[i];
+				if (buffer)
+				{
+					size_t bufferSize = buffer->m_memory.Count();
+
+					D3D12CircularResourceHeap::Cursor cursor = m_circularResourceHeap.allocateConstantBuffer(bufferSize);
+					::memcpy(cursor.m_position, buffer->m_memory.Buffer(), bufferSize);
+					// Set the constant buffer
+					submitter->setRootConstantBufferView(index++, m_circularResourceHeap.getGpuHandle(cursor));
+					
+					numConstantBuffers++;
+				}
+			}
+
+			
+			if (bindingState)
+			{
+				D3D12DescriptorHeap& heap = bindingState->m_viewHeap;
+
+				for (int i = 0; i < int(bindingState->m_bindings.Count()); i++)
+				{
+					const Binding& binding = bindingState->m_bindings[i];
+					if (binding.m_type == ShaderInputType::Buffer)
+					{
+						if (binding.m_bufferType == InputBufferType::ConstantBuffer)
+						{
+							submitter->setRootConstantBufferView(index++, binding.m_resource.getResource()->GetGPUVirtualAddress());
+							numConstantBuffers++;
+						}
+
+						if (binding.m_bufferType == InputBufferType::StorageBuffer)
+						{
+							submitter->setRootDescriptorTable(index++, heap.getGpuHandle(binding.m_srvIndex));
+						}
+
+						if (binding.m_uavIndex >= 0)
+						{
+							submitter->setRootDescriptorTable(index++, heap.getGpuHandle(binding.m_uavIndex));
+						}
+					}
+				}
+			}
+		}
+
+		if (bindingState && bindingState->m_samplerHeap.getUsedSize() > 0)
+		{
+			submitter->setRootDescriptorTable(index, bindingState->m_samplerHeap.getGpuStart());
+		}
+	}
+
+	if (bindingState)
+	{
+		ID3D12DescriptorHeap* heaps[] =
+		{
+			bindingState->m_viewHeap.getHeap(),
+			bindingState->m_samplerHeap.getHeap(),
+		};
+		commandList->SetDescriptorHeaps(SLANG_COUNT_OF(heaps), heaps);
+	}
+	else
+	{
+		commandList->SetDescriptorHeaps(0, nullptr);
+	}
+
+	return SLANG_OK;
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! Renderer interface !!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1900,93 +2170,34 @@ void D3D12Renderer::draw(UInt vertexCount, UInt startVertex)
 	ID3D12GraphicsCommandList* commandList = m_commandList;
 	
 	RenderState* renderState = calcRenderState();
+	BindingStateImpl* bindingState = m_boundBindingState;
+		
+	// Submit - setting for graphics
+	{
+		GraphicsSubmitter submitter(commandList);
+		_bindRenderState(renderState, commandList, &submitter);
+	}
 
-	m_commandList->SetGraphicsRootSignature(renderState->m_rootSignature);
-	m_commandList->SetPipelineState(renderState->m_pipelineState);
-	
 	commandList->IASetPrimitiveTopology(m_primitiveTopology);
 
-	BindingStateImpl* bindingState = renderState->m_bindingState;
+	// Set up vertex buffer views
 	{
-		int index = 0;
-
-		int numConstantBuffers = 0;
+		int numVertexViews = 0;
+		D3D12_VERTEX_BUFFER_VIEW vertexViews[16];
+		for (int i = 0; i < int(m_boundVertexBuffers.Count()); i++)
 		{
-			// Okay we need to try and create a render state
-			for (int i = 0; i < int(m_boundConstantBuffers.Count()); i++)
+			const BoundVertexBuffer& boundVertexBuffer = m_boundVertexBuffers[i];
+			BufferImpl* buffer = boundVertexBuffer.m_buffer;
+			if (buffer)
 			{
-				const BufferImpl* buffer = m_boundConstantBuffers[i];
-				if (buffer)
-				{
-					size_t bufferSize = buffer->m_memory.Count();
-
-					D3D12CircularResourceHeap::Cursor cursor = m_circularResourceHeap.allocateConstantBuffer(bufferSize);
-					::memcpy(cursor.m_position, buffer->m_memory.Buffer(), bufferSize);
-					// Set the constant buffer
-					commandList->SetGraphicsRootConstantBufferView(index++, m_circularResourceHeap.getGpuHandle(cursor));
-			
-					numConstantBuffers++;
-				}
-			}
-
-			D3D12DescriptorHeap& heap = bindingState->m_viewHeap;
-
-			for (int i = 0; i < int(bindingState->m_bindings.Count()); i++)
-			{
-				const Binding& binding = bindingState->m_bindings[i];
-				if (binding.m_type == ShaderInputType::Buffer)
-				{
-					if (binding.m_bufferType == InputBufferType::ConstantBuffer)
-					{
-						commandList->SetGraphicsRootConstantBufferView(index++, binding.m_resource.getResource()->GetGPUVirtualAddress());
-						numConstantBuffers++;
-					}
-
-					if (binding.m_bufferType == InputBufferType::StorageBuffer)
-					{
-						commandList->SetGraphicsRootDescriptorTable(index++, heap.getGpuHandle(binding.m_srvIndex));
-					}
-
-					if (binding.m_uavIndex >= 0)
-					{
-						commandList->SetGraphicsRootDescriptorTable(index++, heap.getGpuHandle(binding.m_uavIndex));
-					}
-				}
+				D3D12_VERTEX_BUFFER_VIEW& vertexView = vertexViews[numVertexViews++];
+				vertexView.BufferLocation = buffer->m_resource.getResource()->GetGPUVirtualAddress();
+				vertexView.SizeInBytes = int(buffer->m_desc.size);
+				vertexView.StrideInBytes = boundVertexBuffer.m_stride;
 			}
 		}
-
-		if (m_boundBindingState->m_samplerHeap.getUsedSize() > 0)
-		{
-			commandList->SetGraphicsRootDescriptorTable(index, bindingState->m_samplerHeap.getGpuStart());
-		}
+		commandList->IASetVertexBuffers(0, numVertexViews, vertexViews);
 	}
-
-	{
-		ID3D12DescriptorHeap* heaps[] = 
-		{
-			bindingState->m_viewHeap.getHeap(),
-			bindingState->m_samplerHeap.getHeap(),
-		};
-
-		m_commandList->SetDescriptorHeaps(SLANG_COUNT_OF(heaps), heaps);
-	}
-
-	int numVertexViews = 0;
-	D3D12_VERTEX_BUFFER_VIEW vertexViews[16];
-	for (int i = 0; i < int(m_boundVertexBuffers.Count()); i++)
-	{
-		const BoundVertexBuffer& boundVertexBuffer = m_boundVertexBuffers[i];
-		BufferImpl* buffer = boundVertexBuffer.m_buffer;
-		if (buffer)
-		{
-			D3D12_VERTEX_BUFFER_VIEW& vertexView = vertexViews[numVertexViews++];
-			vertexView.BufferLocation = buffer->m_resource.getResource()->GetGPUVirtualAddress();
-			vertexView.SizeInBytes = int(buffer->m_desc.size);
-			vertexView.StrideInBytes = boundVertexBuffer.m_stride;
-		}
-	}
-
-	commandList->IASetVertexBuffers(0, numVertexViews, vertexViews);
 
 	commandList->DrawInstanced(UINT(vertexCount), 1, UINT(startVertex), 0);
 }
@@ -1994,19 +2205,13 @@ void D3D12Renderer::draw(UInt vertexCount, UInt startVertex)
 void D3D12Renderer::dispatchCompute(int x, int y, int z)
 {
 	ID3D12GraphicsCommandList* commandList = m_commandList;
-
 	RenderState* renderState = calcRenderState();
 
-	//commandList->SetComputeRootSignature(m_rootSignature);
-	//commandList->SetDescriptorHeaps(SLANG_COUNT_OF(heaps), heaps);
-
-	//commandList->SetPipelineState(m_pipelineState);
-
-	//commandList->SetComputeRootConstantBufferView(0, cbCursor.getGpuHandle());
-
-	//commandList->SetComputeRootDescriptorTable(1, viewHandles[0]);
-	//commandList->SetComputeRootDescriptorTable(2, viewHandles[1]);
-	//commandList->SetComputeRootDescriptorTable(3, glob->m_samplerHeap.getGpuStart());
+	// Submit binding for compute
+	{
+		ComputeSubmitter submitter(commandList);
+		_bindRenderState(renderState, commandList, &submitter);
+	}
 
 	commandList->Dispatch(x, y, z);
 }
@@ -2165,6 +2370,7 @@ ShaderProgram* D3D12Renderer::compileProgram(const ShaderCompileRequest& request
 
 	if (request.computeShader.name)
 	{
+		program->m_programType = ProgramType::kCompute;
 		ComPtr<ID3DBlob> computeShaderBlob;
 		SLANG_RETURN_NULL_ON_FAIL(D3DUtil::compileHLSLShader(request.computeShader.source.path, request.computeShader.source.dataBegin, request.computeShader.name, request.computeShader.profile, computeShaderBlob));
 
@@ -2172,6 +2378,7 @@ ShaderProgram* D3D12Renderer::compileProgram(const ShaderCompileRequest& request
 	}
 	else
 	{
+		program->m_programType = ProgramType::kGraphics;
 		ComPtr<ID3DBlob> vertexShaderBlob, fragmentShaderBlob;
 		SLANG_RETURN_NULL_ON_FAIL(D3DUtil::compileHLSLShader(request.vertexShader.source.path, request.vertexShader.source.dataBegin, request.vertexShader.name, request.vertexShader.profile, vertexShaderBlob));
 		SLANG_RETURN_NULL_ON_FAIL(D3DUtil::compileHLSLShader(request.fragmentShader.source.path, request.fragmentShader.source.dataBegin, request.fragmentShader.name, request.fragmentShader.profile, fragmentShaderBlob));
