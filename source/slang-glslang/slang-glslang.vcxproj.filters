@@ -133,6 +133,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-glslang.cpp" />
+    <ClCompile Include="..\..\external\glslang\glslang\MachineIndependent\attribute.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\external\glslang\glslang\MachineIndependent\gl_types.h">
@@ -241,6 +244,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-glslang.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\external\glslang\glslang\MachineIndependent\attribute.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
