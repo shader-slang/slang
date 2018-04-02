@@ -51,21 +51,18 @@ struct Guid
 
 SLANG_FORCE_INLINE bool operator==(const Guid& aIn, const Guid& bIn)
 {
+	// Use the largest type the honors the alignment of Guid
+	typedef uint32_t CmpType;
     struct GuidCompare
     {
-        enum { kNum = sizeof(Guid) / sizeof(size_t) };
         Guid guid;
-        size_t data[kNum];
+		CmpType data[sizeof(Guid) / sizeof(CmpType)];
     };
-    const GuidCompare& a = reinterpret_cast<const GuidCompare&>(aIn);
-    const GuidCompare& b = reinterpret_cast<const GuidCompare&>(bIn);
-    
-    switch (GuidCompare::kNum)
-    {
-        case 2:     return ((a.data[0] ^ b.data[0]) | (a.data[1] ^ b.data[1])) == 0;   
-        case 4:     return ((a.data[0] ^ b.data[0]) | (a.data[1] ^ b.data[1]) | (a.data[2] ^ b.data[2]) | (a.data[3] ^ b.data[3]) ) == 0;   
-        default:    return false;
-    }
+	// Type pun - so compiler can 'see' the pun and not break aliasing rules 
+    const CmpType* a = reinterpret_cast<const GuidCompare&>(aIn).data;
+    const CmpType* b = reinterpret_cast<const GuidCompare&>(bIn).data;
+	// Make the guid comparison a single branch, by not using short circuit
+	return ((a[0] ^ b[0]) | (a[1] ^ b[1]) | (a[2] ^ b[2]) | (a[3] ^ b[3])) == 0;
 } 
 
 SLANG_FORCE_INLINE bool operator!=(const Guid& a, const Guid& b)

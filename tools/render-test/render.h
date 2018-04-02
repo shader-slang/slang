@@ -141,6 +141,12 @@ public:
 
     virtual void draw(UInt vertexCount, UInt startVertex = 0) = 0;
     virtual void dispatchCompute(int x, int y, int z) = 0;
+
+        /// Commit any buffered state changes or draw calls. 
+        /// presentFrame will commitAll implicitly before doing a present
+    virtual void submitGpuWork() = 0;
+        /// Blocks until Gpu work is complete
+    virtual void waitForGpu() = 0;
 };
 
 

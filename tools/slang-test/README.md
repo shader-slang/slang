@@ -9,12 +9,14 @@ Most command line options are prefixed by - for both switches and parameter opti
 An example command line:
 
 ```
-slang-test -bindir "E:\slang\bin\windows-x64\Debug\\" -category full tests/compute/array-param
+slang-test -bindir E:\slang\bin\windows-x64\Debug\\ -category full tests/compute/array-param
 ```
 
 * The -bindir value means that the tools slang-test will use the binaries found in this directory. 
 * The -category full means that all tests can be run.
 * The final 'free parameter' is 'tests/compute/array-param' and means only tests starting with this string will run.
+
+It may also be necessary to have the working directory the root directory of the slang distribution - in the example about this would be "E:\slang\". 
 
 ## Test Categories
 
