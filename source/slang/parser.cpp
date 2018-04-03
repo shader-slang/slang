@@ -4358,6 +4358,7 @@ namespace Slang
         MODIFIER(column_major,  HLSLColumnMajorLayoutModifier);
 
         MODIFIER(nointerpolation,   HLSLNoInterpolationModifier);
+        MODIFIER(noperspective,     HLSLNoPerspectiveModifier);
         MODIFIER(linear,            HLSLLinearModifier);
         MODIFIER(sample,            HLSLSampleModifier);
         MODIFIER(centroid,          HLSLCentroidModifier);

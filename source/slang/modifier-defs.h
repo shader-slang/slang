@@ -258,6 +258,9 @@ END_SYNTAX_CLASS()
 // HLSL `nointerpolation` modifier
 SIMPLE_SYNTAX_CLASS(HLSLNoInterpolationModifier, InterpolationModeModifier)
 
+// HLSL `noperspective` modifier
+SIMPLE_SYNTAX_CLASS(HLSLNoPerspectiveModifier, InterpolationModeModifier)
+
 // HLSL `linear` modifier
 SIMPLE_SYNTAX_CLASS(HLSLLinearModifier, InterpolationModeModifier)
 
