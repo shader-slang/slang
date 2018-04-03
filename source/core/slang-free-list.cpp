@@ -33,7 +33,7 @@ void FreeList::_init(size_t elementSize, size_t alignment, size_t elemsPerBlock)
 	// Alignment must be a power of 2
 	assert(((alignment - 1) & alignment) == 0);
 
-	// The elementSize must at least be 
+	// The elementSize must at least be at least the same size as the alignment 
 	elementSize = (elementSize >= alignment) ? elementSize : alignment;
 	m_blockSize = elementSize * elemsPerBlock;
 	m_elementSize = elementSize;
