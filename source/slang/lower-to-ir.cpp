@@ -681,6 +681,15 @@ LoweredValInfo emitCallToDeclRef(
             case kIRPseudoOp_Pos:
                 return LoweredValInfo::simple(args[0]);
 
+            case kIRPseudoOp_Sequence:
+                // The main effect of "operator comma" is to enforce
+                // sequencing of its operands, but Slang already
+                // implements a strictly left-to-right evaluation
+                // order for function arguments, so in practice we
+                // just need to compile `a, b` to the value of `b`
+                // (because argument evaluation already happened).
+                return LoweredValInfo::simple(args[1]);
+
 #define CASE(COMPOUND, OP)  \
             case COMPOUND: return emitCompoundAssignOp(context, type, OP, argCount, args)
 
