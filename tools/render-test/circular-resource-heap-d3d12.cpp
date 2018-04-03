@@ -24,17 +24,18 @@ void D3D12CircularResourceHeap::_freeBlockListResources(const Block* start)
 {
 	if (start)
 	{
-		{
-			ID3D12Resource* resource = start->m_resource;
-			resource->Unmap(0, nullptr);
-			resource->Release();
-		}
-		for (Block* block = start->m_next; block != start; block = block->m_next)
-		{
-			ID3D12Resource* resource = block->m_resource;
-			resource->Unmap(0, nullptr);
-			resource->Release();
-		}
+        const Block* block = start; 
+        do 
+        {
+            ID3D12Resource* resource = block->m_resource;
+
+            resource->Unmap(0, nullptr);
+            resource->Release();
+
+            // Next in list
+            block = block->m_next;
+
+        } while (block != start);
 	} 
 }
 
