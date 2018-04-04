@@ -1,4 +1,5 @@
 //TEST(smoke):COMPARE_HLSL_RENDER:
+//TEST(smoke):COMPARE_HLSL_RENDER:-dx12
 // Starting with a basic test for the ability to render stuff...
 
 cbuffer Uniforms
