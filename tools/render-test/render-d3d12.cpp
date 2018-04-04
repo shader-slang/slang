@@ -277,13 +277,12 @@ protected:
     Result createInputBuffer(InputBufferDesc& bufferDesc, const List<unsigned int>& bufferData, D3D12DescriptorHeap& viewHeap, int uavIndex, int srvIndex,
         D3D12Resource& resourceOut);
 
-    void beginGpuWork();
-    
     void beginRender();
 
     void endRender();
 
     void submitGpuWorkAndWait();
+    void _resetCommandList();
 
     Result captureTextureToFile(D3D12Resource& resource, const char* outputPath);
 
@@ -823,16 +822,26 @@ Result D3D12Renderer::createInputBuffer(InputBufferDesc& bufferDesc, const List<
     return SLANG_OK;
 }
 
-void D3D12Renderer::beginGpuWork()
+void D3D12Renderer::_resetCommandList()
 {
-    if (m_commandListOpenCount == 0)
+    const FrameInfo& frame = getFrame();
+
+    ID3D12GraphicsCommandList* commandList = getCommandList();
+    commandList->Reset(frame.m_commandAllocator, nullptr);
+
+    D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = { m_rtvHeap->GetCPUDescriptorHandleForHeapStart().ptr + m_renderTargetIndex * m_rtvDescriptorSize };
+    if (m_depthStencil)
     {
-        // It's not open so open it
-        const FrameInfo& frame = getFrame();
-        ID3D12GraphicsCommandList* commandList = getCommandList();
-        commandList->Reset(frame.m_commandAllocator, nullptr);
+        commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &m_depthStencilView);
     }
-    m_commandListOpenCount++;
+    else
+    {
+        commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+    }
+
+    // Set necessary state.
+    commandList->RSSetViewports(1, &m_viewport);
+    commandList->RSSetScissorRects(1, &m_scissorRect);
 }
 
 void D3D12Renderer::beginRender()
@@ -843,7 +852,8 @@ void D3D12Renderer::beginRender()
     m_circularResourceHeap.updateCompleted();
 
     getFrame().m_commandAllocator->Reset();
-    beginGpuWork();
+    
+    _resetCommandList();
 
     // Indicate that the render target needs to be writable
     {
@@ -851,21 +861,7 @@ void D3D12Renderer::beginRender()
         m_renderTargets[m_renderTargetIndex]->transition(D3D12_RESOURCE_STATE_RENDER_TARGET, submitter);
     }
 
-    {
-        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = {m_rtvHeap->GetCPUDescriptorHandleForHeapStart().ptr + m_renderTargetIndex * m_rtvDescriptorSize };
-        if (m_depthStencil)
-        {
-            m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &m_depthStencilView);
-        }
-        else
-        {
-            m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
-        }
-
-        // Set necessary state.
-        m_commandList->RSSetViewports(1, &m_viewport);
-        m_commandList->RSSetScissorRects(1, &m_scissorRect);
-    }
+    m_commandListOpenCount = 1;
 }
 
 void D3D12Renderer::endRender()
@@ -908,12 +904,6 @@ void D3D12Renderer::endRender()
         m_commandQueue->ExecuteCommandLists(SLANG_COUNT_OF(commandLists), commandLists);
     }
 
-    /* 
-    if (m_listener)
-    {
-        m_listener->onGpuWorkSubmitted(Dx12Type::wrap(m_commandQueue));
-    } */
-
     assert(m_commandListOpenCount == 1);
     // Must be 0
     m_commandListOpenCount = 0;
@@ -930,14 +920,9 @@ void D3D12Renderer::submitGpuWork()
         ID3D12CommandList* commandLists[] = { commandList };
         m_commandQueue->ExecuteCommandLists(SLANG_COUNT_OF(commandLists), commandLists);
     }
-/* 
-    if (m_listener)
-    {
-        m_listener->onGpuWorkSubmitted(Dx12Type::wrap(m_commandQueue));
-    }
-    */
-    // Reopen
-    commandList->Reset(getFrame().m_commandAllocator, nullptr);
+
+    // Reset the render target
+    _resetCommandList();
 }
 
 void D3D12Renderer::submitGpuWorkAndWait()
