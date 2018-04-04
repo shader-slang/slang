@@ -540,7 +540,10 @@ Result D3D12Renderer::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, cons
         heapProps.CreationNodeMask = 1;
         heapProps.VisibleNodeMask = 1;
 
-        SLANG_RETURN_ON_FAIL(uploadResource.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, resourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr));
+        D3D12_RESOURCE_DESC uploadResourceDesc(resourceDesc);
+        uploadResourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+        
+        SLANG_RETURN_ON_FAIL(uploadResource.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, uploadResourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr));
     }
 
     if (srcData)
@@ -746,6 +749,7 @@ Result D3D12Renderer::createInputBuffer(InputBufferDesc& bufferDesc, const List<
      D3D12Resource& bufferOut)
 {
     const size_t bufferSize = bufferData.Count() * sizeof(unsigned int);
+    //bufferSize = D3DUtil::calcAligned(bufferSize, 256);
 
     D3D12_RESOURCE_DESC resourceDesc;
     _initBufferResourceDesc(bufferSize, resourceDesc);
@@ -779,24 +783,27 @@ Result D3D12Renderer::createInputBuffer(InputBufferDesc& bufferDesc, const List<
 
     if (bufferDesc.type == InputBufferType::StorageBuffer)
     {
-        D3D12_UNORDERED_ACCESS_VIEW_DESC viewDesc = {};
+        D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
 
-        viewDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-        viewDesc.Format = DXGI_FORMAT_UNKNOWN;
+        uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+        uavDesc.Format = DXGI_FORMAT_UNKNOWN;
+        //uavDesc.Format = DXGI_FORMAT_R32_UINT;
 
-        viewDesc.Buffer.FirstElement = 0;
-        viewDesc.Buffer.NumElements = (UINT)(bufferData.Count() * sizeof(unsigned int) / elemSize);
-        viewDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
+        uavDesc.Buffer.StructureByteStride = elemSize;
+
+        uavDesc.Buffer.FirstElement = 0;
+        uavDesc.Buffer.NumElements = (UINT)(bufferData.Count() * sizeof(unsigned int) / elemSize);
+        uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
         
         if (bufferDesc.stride == 0)
         {
             // TODO: are there UAV cases we need to handle that are neither
             // raw nor structured? RWBuffer<T> would be one...
-            viewDesc.Buffer.Flags |= D3D12_BUFFER_UAV_FLAG_RAW;
-            viewDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+            uavDesc.Buffer.Flags |= D3D12_BUFFER_UAV_FLAG_RAW;
+            uavDesc.Format = DXGI_FORMAT_R32_TYPELESS;
         }
 
-        m_device->CreateUnorderedAccessView(bufferOut.getResource(), nullptr, &viewDesc, viewHeap.getCpuHandle(uavIndex));
+        m_device->CreateUnorderedAccessView(bufferOut.getResource(), nullptr, &uavDesc, viewHeap.getCpuHandle(uavIndex));
     }
 
     if (bufferDesc.type != InputBufferType::ConstantBuffer)
@@ -805,6 +812,8 @@ Result D3D12Renderer::createInputBuffer(InputBufferDesc& bufferDesc, const List<
 
         srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
         srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+        //srvDesc.Format = DXGI_FORMAT_R32_UINT;
+        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 
         srvDesc.Buffer.FirstElement = 0;
         srvDesc.Buffer.NumElements = (UINT)(bufferData.Count() * sizeof(unsigned int) / elemSize);
@@ -1403,6 +1412,20 @@ Result D3D12Renderer::_bindRenderState(RenderState* renderState, ID3D12GraphicsC
     submitter->setRootSignature(renderState->m_rootSignature);
     commandList->SetPipelineState(renderState->m_pipelineState);
 
+    if (bindingState)
+    {
+        ID3D12DescriptorHeap* heaps[] =
+        {
+            bindingState->m_viewHeap.getHeap(),
+            bindingState->m_samplerHeap.getHeap(),
+        };
+        commandList->SetDescriptorHeaps(SLANG_COUNT_OF(heaps), heaps);
+    }
+    else
+    {
+        commandList->SetDescriptorHeaps(0, nullptr);
+    }
+
     {
         int index = 0;
 
@@ -1461,19 +1484,7 @@ Result D3D12Renderer::_bindRenderState(RenderState* renderState, ID3D12GraphicsC
         }
     }
 
-    if (bindingState)
-    {
-        ID3D12DescriptorHeap* heaps[] =
-        {
-            bindingState->m_viewHeap.getHeap(),
-            bindingState->m_samplerHeap.getHeap(),
-        };
-        commandList->SetDescriptorHeaps(SLANG_COUNT_OF(heaps), heaps);
-    }
-    else
-    {
-        commandList->SetDescriptorHeaps(0, nullptr);
-    }
+   
 
     return SLANG_OK;
 }
@@ -2299,8 +2310,8 @@ void D3D12Renderer::serializeOutput(BindingState* stateIn, const char* fileName)
             if (binding.m_resource.getResource())
             {
                 // create staging buffer
-
-                size_t bufferSize = D3DUtil::calcAligned(binding.m_bufferLength, 256);
+                //size_t bufferSize = D3DUtil::calcAligned(binding.m_bufferLength, 256);
+                const size_t bufferSize = binding.m_bufferLength;
 
                 D3D12_RESOURCE_DESC stagingDesc;
                 _initBufferResourceDesc(bufferSize, stagingDesc);
