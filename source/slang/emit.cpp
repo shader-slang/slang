@@ -4574,6 +4574,57 @@ struct EmitVisitor
         }
     }
 
+    void emitInterpolationModifiers(
+        EmitContext*    ctx,
+        VarDeclBase*    decl,
+        Type*           valueType)
+    {
+        bool isGLSL = (ctx->shared->target == CodeGenTarget::GLSL);
+        bool anyModifiers = false;
+
+        if(decl->FindModifier<HLSLNoInterpolationModifier>())
+        {
+            anyModifiers = true;
+            Emit(isGLSL ? "flat " : "nointerpolation ");
+        }
+        else if(decl->FindModifier<HLSLNoPerspectiveModifier>())
+        {
+            anyModifiers = true;
+            Emit("noperspective ");
+        }
+        else if(decl->FindModifier<HLSLLinearModifier>())
+        {
+            anyModifiers = true;
+            Emit(isGLSL ? "smooth " : "linear ");
+        }
+        else if(decl->FindModifier<HLSLSampleModifier>())
+        {
+            anyModifiers = true;
+            Emit("sample ");
+        }
+        else if(decl->FindModifier<HLSLCentroidModifier>())
+        {
+            anyModifiers = true;
+            Emit("centroid ");
+        }
+
+        // If the user didn't explicitly qualify a varying
+        // with integer type, then we need to explicitly
+        // add the `flat` modifier for GLSL.
+        if(!anyModifiers && isGLSL)
+        {
+            maybeEmitGLSLFlatModifier(ctx, valueType);
+        }
+    }
+
+    void emitInterpolationModifiers(
+        EmitContext*    ctx,
+        VarLayout*      layout,
+        Type*           valueType)
+    {
+        emitInterpolationModifiers(ctx, layout->varDecl, valueType);
+    }
+
     void emitIRVarModifiers(
         EmitContext*    ctx,
         VarLayout*      layout,
@@ -5280,6 +5331,7 @@ struct EmitVisitor
             if(fieldType->Equals(getSession()->getVoidType()))
                 continue;
 
+            emitInterpolationModifiers(ctx, ff.getDecl(), fieldType);
             emitIRType(ctx, fieldType, getIRName(ff));
 
             EmitSemantics(ff.getDecl());
