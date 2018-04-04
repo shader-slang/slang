@@ -193,7 +193,7 @@ protected:
     {
         virtual void setRootConstantBufferView(int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation) = 0;
         virtual void setRootDescriptorTable(int index, D3D12_GPU_DESCRIPTOR_HANDLE BaseDescriptor) = 0;
-        virtual void setRootSigniture(ID3D12RootSignature* rootSignature) = 0;        
+        virtual void setRootSignature(ID3D12RootSignature* rootSignature) = 0;        
     };
 
     struct BindParameters
@@ -228,7 +228,7 @@ protected:
         {
             m_commandList->SetGraphicsRootDescriptorTable(index, baseDescriptor); 
         }
-        void setRootSigniture(ID3D12RootSignature* rootSignature)
+        void setRootSignature(ID3D12RootSignature* rootSignature)
         {
             m_commandList->SetGraphicsRootSignature(rootSignature);
         }
@@ -251,7 +251,7 @@ protected:
         {
             m_commandList->SetComputeRootDescriptorTable(index, baseDescriptor);
         }
-        void setRootSigniture(ID3D12RootSignature* rootSignature)
+        void setRootSignature(ID3D12RootSignature* rootSignature)
         {
             m_commandList->SetComputeRootSignature(rootSignature);
         }
@@ -1415,7 +1415,7 @@ Result D3D12Renderer::_bindRenderState(RenderState* renderState, ID3D12GraphicsC
 {
     BindingStateImpl* bindingState = m_boundBindingState;
 
-    submitter->setRootSigniture(renderState->m_rootSignature);
+    submitter->setRootSignature(renderState->m_rootSignature);
     commandList->SetPipelineState(renderState->m_pipelineState);
 
     {

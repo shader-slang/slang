@@ -42,8 +42,11 @@ using namespace Slang;
     {
         switch (format)
         {
-            case DXGI_FORMAT_R32_FLOAT:
-            case DXGI_FORMAT_D32_FLOAT:            return DXGI_FORMAT_R32_TYPELESS;
+            case DXGI_FORMAT_R32_FLOAT:     /* fallthru */
+            case DXGI_FORMAT_D32_FLOAT:            
+            {
+                return DXGI_FORMAT_R32_TYPELESS;
+            }
             case DXGI_FORMAT_D24_UNORM_S8_UINT:    return DXGI_FORMAT_R24G8_TYPELESS;
             default: break;
         }
@@ -65,8 +68,11 @@ using namespace Slang;
         {
             switch (format)
             {
-                case DXGI_FORMAT_D32_FLOAT:
-                case DXGI_FORMAT_R32_TYPELESS:            return DXGI_FORMAT_D32_FLOAT;
+                case DXGI_FORMAT_D32_FLOAT:     /* fallthru */
+                case DXGI_FORMAT_R32_TYPELESS:            
+                {
+                    return DXGI_FORMAT_D32_FLOAT;
+                }
                 case DXGI_FORMAT_R24_UNORM_X8_TYPELESS:    return DXGI_FORMAT_D24_UNORM_S8_UINT;
                 case DXGI_FORMAT_R24G8_TYPELESS:        return DXGI_FORMAT_D24_UNORM_S8_UINT;
                 default: break;
@@ -77,8 +83,11 @@ using namespace Slang;
         {
             switch (format)
             {
-                case DXGI_FORMAT_D32_FLOAT:
-                case DXGI_FORMAT_D24_UNORM_S8_UINT: return DXGI_FORMAT_UNKNOWN;
+                case DXGI_FORMAT_D32_FLOAT:     /* fallthru */
+                case DXGI_FORMAT_D24_UNORM_S8_UINT: 
+                {
+                    return DXGI_FORMAT_UNKNOWN;
+                }
                 case DXGI_FORMAT_R32_TYPELESS:        return DXGI_FORMAT_R32_FLOAT;
                 default: break;
             }
@@ -88,8 +97,11 @@ using namespace Slang;
         {
             switch (format)
             {
-                case DXGI_FORMAT_D32_FLOAT:
-                case DXGI_FORMAT_R32_TYPELESS:            return DXGI_FORMAT_R32_FLOAT;
+                case DXGI_FORMAT_D32_FLOAT:     /* fallthru */
+                case DXGI_FORMAT_R32_TYPELESS:            
+                {
+                    return DXGI_FORMAT_R32_FLOAT;
+                }
                 case DXGI_FORMAT_R24_UNORM_X8_TYPELESS:    return DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
                 default: break;
             }
@@ -149,22 +161,25 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
         case DXGI_FORMAT_R32G32B32_FLOAT:
         case DXGI_FORMAT_R32G32B32_UINT:
         case DXGI_FORMAT_R32G32B32_SINT:
+        {
             return 32;
-
+        }
         case DXGI_FORMAT_R16G16B16A16_TYPELESS:
         case DXGI_FORMAT_R16G16B16A16_FLOAT:
         case DXGI_FORMAT_R16G16B16A16_UNORM:
         case DXGI_FORMAT_R16G16B16A16_UINT:
         case DXGI_FORMAT_R16G16B16A16_SNORM:
         case DXGI_FORMAT_R16G16B16A16_SINT:
+        {
             return 16;
-
+        }
         case DXGI_FORMAT_R10G10B10A2_TYPELESS:
         case DXGI_FORMAT_R10G10B10A2_UNORM:
         case DXGI_FORMAT_R10G10B10A2_UINT:
         case DXGI_FORMAT_R10G10B10_XR_BIAS_A2_UNORM:
+        {
             return 10;
-
+        }
         case DXGI_FORMAT_R8G8B8A8_TYPELESS:
         case DXGI_FORMAT_R8G8B8A8_UNORM:
         case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
@@ -177,12 +192,14 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
         case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB:
         case DXGI_FORMAT_B8G8R8X8_TYPELESS:
         case DXGI_FORMAT_B8G8R8X8_UNORM_SRGB:
+        {
             return 8;
-
+        }
         case DXGI_FORMAT_B5G6R5_UNORM:
         case DXGI_FORMAT_B5G5R5A1_UNORM:
+        {
             return 5;
-
+        }
         case DXGI_FORMAT_B4G4R4A4_UNORM:
             return 4;
 

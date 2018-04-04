@@ -16,7 +16,7 @@ slang-test -bindir E:\slang\bin\windows-x64\Debug\\ -category full tests/compute
 * The -category full means that all tests can be run.
 * The final 'free parameter' is 'tests/compute/array-param' and means only tests starting with this string will run.
 
-It may also be necessary to have the working directory the root directory of the slang distribution - in the example about this would be "E:\slang\". 
+It may also be necessary to have the working directory the root directory of the slang distribution - in the example above this would be "E:\slang\". 
 
 ## Test Categories
 
