@@ -636,6 +636,44 @@ void maybeDumpOutput(
     fflush(stderr);
 }
 
+// Finds the specialized or default path for expected data for a test. 
+// If neither are found, will return an empty string
+String findExpectedPath(const TestInput& input, const char* postFix)
+{
+    StringBuilder specializedBuf;
+
+    // Try the specialized name first
+    specializedBuf << input.outputStem;
+    if (postFix)
+    {
+        specializedBuf << postFix;
+    }
+    if (File::Exists(specializedBuf))
+    {
+        return specializedBuf;
+    }
+
+
+    // Try the default name
+    StringBuilder defaultBuf;
+    defaultBuf.Clear();
+    defaultBuf << input.filePath;
+    if (postFix)
+    {
+        defaultBuf << postFix;
+    }
+
+    if (File::Exists(defaultBuf))
+    {
+        return defaultBuf;
+    }
+
+    // Couldn't find either 
+    printf("referenceOutput '%s' or '%s' not found.\n", defaultBuf.Buffer(), specializedBuf.Buffer());
+
+    return "";
+}
+
 TestResult runSimpleTest(TestInput& input)
 {
     // need to execute the stand-alone Slang compiler on the file, and compare its output to what we expect
@@ -1124,11 +1162,18 @@ TestResult runGLSLComparisonTest(TestInput& input)
     return kTestResult_Pass;
 }
 
-TestResult runComputeComparisonImpl(TestInput& input, const char * langOption, String referenceOutput)
+
+TestResult runComputeComparisonImpl(TestInput& input, const char * langOption)
 {
 	// TODO: delete any existing files at the output path(s) to avoid stale outputs leading to a false pass
 	auto filePath999 = input.filePath;
 	auto outputStem = input.outputStem;
+
+    const String referenceOutput = findExpectedPath(input, ".expected.txt");
+    if (referenceOutput.Length() <= 0)
+    {
+        return kTestResult_Fail;
+    }
 
 	OSProcessSpawner spawner;
 
@@ -1211,22 +1256,22 @@ TestResult runComputeComparisonImpl(TestInput& input, const char * langOption, S
 
 TestResult runSlangComputeComparisonTest(TestInput& input)
 {
-	return runComputeComparisonImpl(input, "-slang -compute", input.outputStem + ".expected.txt");
+	return runComputeComparisonImpl(input, "-slang -compute"); 
 }
 
 TestResult runSlangComputeComparisonTestEx(TestInput& input)
 {
-	return runComputeComparisonImpl(input, "", input.outputStem + ".expected.txt");
+	return runComputeComparisonImpl(input, "");
 }
 
 TestResult runHLSLComputeTest(TestInput& input)
 {
-    return runComputeComparisonImpl(input, "-hlsl-rewrite -compute", input.outputStem + ".expected.txt");
+    return runComputeComparisonImpl(input, "-hlsl-rewrite -compute");
 }
 
 TestResult runSlangRenderComputeComparisonTest(TestInput& input)
 {
-    return runComputeComparisonImpl(input, "-slang -gcompute", input.outputStem + ".expected.txt");
+    return runComputeComparisonImpl(input, "-slang -gcompute");
 }
 
 TestResult doRenderComparisonTestRun(TestInput& input, char const* langOption, char const* outputKind, String* outOutput)
