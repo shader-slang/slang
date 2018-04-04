@@ -1,4 +1,5 @@
 //TEST(smoke,render):COMPARE_HLSL_GLSL_RENDER:
+//TEST(smoke,render):COMPARE_HLSL_GLSL_RENDER: -dx12
 
 // This test is trying to ensure that we can
 // correctly handle cases where top-level shader
