@@ -4,6 +4,7 @@
 #include "../../source/core/token-reader.h"
 
 #include "../../source/core/slang-result.h"
+#include "../../source/core/slang-string-util.h"
 
 using namespace Slang;
 
@@ -38,8 +39,47 @@ enum OutputMode
     kOutputMode_Travis,
 };
 
+enum class ApiType
+{
+    kUnknown = -1,
+    kOpenGl = 0,
+    kVulkan,
+    kD3D12,
+    kD3D11,
+    kCountOf,
+};
+
+// Use a struct wrapped Enum instead of enum class, cos we want to be able to manipulate as integrals
+struct ApiTypeBit
+{
+    enum Enum
+    {
+        kOpenGl = 1 << int(ApiType::kOpenGl),
+        kVulkan = 1 << int(ApiType::kVulkan),
+        kD3D12 = 1 << int(ApiType::kD3D12),
+        kD3D11 = 1 << int(ApiType::kD3D11),                 
+        kAllOf = (1 << int(ApiType::kCountOf)) - 1                   ///< All bits set
+    };
+};
+
+struct ApiInfo
+{
+    ApiType type;               ///< The type
+    const char* names;          ///< Comma separated list of names associated with the type
+};
+
+static const ApiInfo s_apiInfos[] = 
+{
+    { ApiType::kOpenGl, "gl,ogl,opengl"},
+    { ApiType::kVulkan, "vk,vulkan"},
+    { ApiType::kD3D12,  "dx12,d3d12"},
+    { ApiType::kD3D11,  "dx11,d3d11"},
+};
+
 struct TestCategory;
 TestCategory* findTestCategory(String const& name);
+
+SlangResult findApis(const char* text, int* apiBitsOut);
 
 struct Options
 {
@@ -70,6 +110,9 @@ struct Options
 
     // Exclude test that match one these categories
     Dictionary<TestCategory*, TestCategory*> excludeCategories;
+
+    // By default we can test against all apis
+    int enabledApis = int(ApiTypeBit::kAllOf);           
 };
 Options options;
 
@@ -188,6 +231,22 @@ Result parseOptions(int* argc, char** argv)
                 options.excludeCategories.Add(category, category);
             }
         }
+        else if (strcmp(arg, "-api") == 0)
+        {
+            if (argCursor == argEnd)
+            {
+                fprintf(stderr, "error: expected comma separated list of apis '%s'\n", arg);
+                return SLANG_FAIL;
+            }
+            const char* apiList = *argCursor++;
+
+            SlangResult res = findApis(apiList, &options.enabledApis);
+            if (SLANG_FAILED(res))
+            {
+                fprintf(stderr, "error: unable to parse api list '%s'\n", apiList);
+                return res;
+            }
+        }
         else
         {
             fprintf(stderr, "unknown option '%s'\n", arg);
@@ -237,6 +296,88 @@ enum TestResult
     kTestResult_Pass,
     kTestResult_Ignored,
 };
+
+/* Returns 0 if none found */
+static int findApiBitsByName(const UnownedStringSlice& name)
+{   
+    // Special case 'all'
+    if (name == "all")
+    {
+        return int(ApiTypeBit::kAllOf);
+    }
+
+    List<UnownedStringSlice> namesList;
+    for (int j = 0; j < SLANG_COUNT_OF(s_apiInfos); j++)
+    {
+        const auto& apiInfo = s_apiInfos[j];
+        const UnownedStringSlice names(apiInfo.names);
+
+        if (names.indexOf(',') >= 0)
+        {
+            StringUtil::split(names, ',', namesList);
+            if (namesList.IndexOf(name) != UInt(-1))
+            {
+                return 1 << int(apiInfo.type);
+            }
+        }
+        else if (names == name)
+        {
+            return 1 << int(apiInfo.type);
+        }
+    }
+    return 0;
+}
+
+SlangResult findApis(const char* textIn, int* apiBitsOut)
+{
+    UnownedStringSlice text(textIn);
+
+    int apiBits = 0;
+
+    List<UnownedStringSlice> slices;
+    StringUtil::split(text, ',', slices);
+
+    for (int i = 0; i < int(slices.Count()); ++i)
+    {
+        UnownedStringSlice slice = slices[i];
+        bool add = true;
+        if (slice.size() <= 0)
+        {
+            return SLANG_FAIL;
+        }
+        if (slice[0] == '+')
+        {
+            // Drop the +
+            slice = UnownedStringSlice(slice.begin() + 1, slice.end());
+        }
+        else if (slice[0] == '-')
+        {
+            add = false;
+            // Drop the +
+            slice = UnownedStringSlice(slice.begin() + 1, slice.end());
+        }
+
+        // We need to find the bits... 
+        int bits = findApiBitsByName(slice);
+        // 0 means an error
+        if (bits == 0)
+        {
+            return SLANG_FAIL;
+        }
+       
+        if (add)
+        {
+            apiBits |= bits;
+        }    
+        else
+        {
+            apiBits &= ~bits;
+        }
+    }
+
+    *apiBitsOut = apiBits;
+    return SLANG_OK;
+}
 
 bool match(char const** ioCursor, char const* expected)
 {
@@ -1456,12 +1597,48 @@ TestResult skipTest(TestInput& /*input*/)
     return kTestResult_Ignored;
 }
 
+static bool hasD3D12Option(const TestOptions& testOptions)
+{
+    return (testOptions.args.IndexOf("-dx12") != UInt(-1) ||
+        testOptions.args.IndexOf("-d3d12") != UInt(-1));
+}
+
+bool hasD3D12Option(const FileTestList& testList)
+{
+    const int numTests = int(testList.tests.Count());
+    for (int i = 0; i < numTests; i++)
+    {
+        if (hasD3D12Option(testList.tests[i]))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool isRenderTest(const String& command)
+{
+    return command == "COMPARE_COMPUTE" ||
+        command == "COMPARE_COMPUTE_EX" ||
+        command == "HLSL_COMPUTE" ||
+        command == "COMPARE_RENDER_COMPUTE" ||
+        command == "COMPARE_HLSL_RENDER" ||
+        command == "COMPARE_HLSL_CROSS_COMPILE_RENDER" ||
+        command == "COMPARE_HLSL_GLSL_RENDER";
+}
+
 TestResult runTest(
     String const&       filePath,
     String const&       outputStem,
     TestOptions const&  testOptions,
     FileTestList const& testList)
 {
+    // If this is d3d12 test
+    if (hasD3D12Option(testOptions) && (options.enabledApis & ApiTypeBit::kD3D12) == 0)
+    {
+        return kTestResult_Ignored;
+    }
+    
     // based on command name, dispatch to an appropriate callback
     struct TestCommands
     {
@@ -1471,11 +1648,11 @@ TestResult runTest(
 	
 	static const TestCommands kTestCommands[] = 
 	{
-        { "SIMPLE", &runSimpleTest },
-        { "REFLECTION", &runReflectionTest },
+        { "SIMPLE", &runSimpleTest},
+        { "REFLECTION", &runReflectionTest},
 #if SLANG_TEST_SUPPORT_HLSL
-        { "COMPARE_HLSL", &runHLSLComparisonTest },
-        { "COMPARE_HLSL_RENDER", &runHLSLRenderComparisonTest },
+        { "COMPARE_HLSL", &runHLSLComparisonTest},
+        { "COMPARE_HLSL_RENDER", &runHLSLRenderComparisonTest},
         { "COMPARE_HLSL_CROSS_COMPILE_RENDER", &runHLSLCrossCompileRenderComparisonTest},
         { "COMPARE_HLSL_GLSL_RENDER", &runHLSLAndGLSLRenderComparisonTest },
         { "COMPARE_COMPUTE", runSlangComputeComparisonTest},
@@ -1668,6 +1845,9 @@ bool testPassesCategoryMask(
     return false;
 }
 
+
+
+
 void runTestsOnFile(
     TestContext*    context,
     String          filePath)
@@ -1686,6 +1866,29 @@ void runTestsOnFile(
     {
         handleTestResult(context, filePath, kTestResult_Ignored);
         return;
+    }
+
+    // If dx12 is available synthesize Dx12 test
+    if ((options.enabledApis & ApiTypeBit::kD3D12) != 0)
+    {
+        // If doesn't have option generate dx12 options from dx11
+        if (!hasD3D12Option(testList))
+        {
+            const int numTests = int(testList.tests.Count());
+            for (int i = 0; i < numTests; i++)
+            {
+                const TestOptions& testOptions = testList.tests[i];
+                // If it's a render test, and there is on d3d option, add one
+                if (isRenderTest(testOptions.command) && !hasD3D12Option(testOptions))
+                {
+                    // Add with -dx12 option
+                    TestOptions testOptionsCopy(testOptions);
+                    testOptionsCopy.args.Add("-dx12");
+
+                    testList.tests.Add(testOptionsCopy);
+                }
+            }
+        }
     }
 
     // We have found a test to run!
