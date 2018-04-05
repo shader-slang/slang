@@ -2999,6 +2999,10 @@ namespace Slang
         // The name of the built-in GLSL variable
         char const*     name;
 
+        // The name of an outer array that wraps
+        // the variable, in the case of a GS input
+        char const*     outerArrayName;
+
         // The required type of the built-in variable
         RefPtr<Type>    requiredType;
     };
@@ -3043,9 +3047,11 @@ namespace Slang
         GLSLLegalizationContext*    context,
         VarLayout*                  varLayout,
         LayoutResourceKind          kind,
+        Stage                       stage,
         GLSLSystemValueInfo*        inStorage)
     {
         char const* name = nullptr;
+        char const* outerArrayName = nullptr;
 
         auto semanticNameSpelling = varLayout->systemValueSemantic;
         if(semanticNameSpelling.Length() == 0)
@@ -3057,16 +3063,31 @@ namespace Slang
 
         if(semanticName == "sv_position")
         {
-            // TODO: need to pick between `gl_Position` and
-            // `gl_FragCoord` based on whether this is an input
-            // or an output.
-            if( kind == LayoutResourceKind::VaryingOutput )
+            // This semantic can either work like `gl_FragCoord`
+            // when it is used as a fragment shader input, or
+            // like `gl_Position` when used in other stages.
+            //
+            // Note: This isn't as simple as testing input-vs-output,
+            // because a user might have a VS output `SV_Position`,
+            // and then pass it along to a GS that reads it as input.
+            //
+            if( stage == Stage::Fragment
+                && kind == LayoutResourceKind::VaryingInput )
             {
+                name = "gl_FragCoord";
+            }
+            else if( stage == Stage::Geometry
+                && kind == LayoutResourceKind::VaryingInput )
+            {
+                // As a GS input, the correct syntax is `gl_in[...].gl_Position`,
+                // but that is not compatible with picking the array dimension later,
+                // of course.
+                outerArrayName = "gl_in";
                 name = "gl_Position";
             }
             else
             {
-                name = "gl_FragCoord";
+                name = "gl_Position";
             }
         }
         else if(semanticName == "sv_target")
@@ -3229,6 +3250,7 @@ namespace Slang
         if( name )
         {
             inStorage->name = name;
+            inStorage->outerArrayName = outerArrayName;
             inStorage->requiredType = requiredType;
             return inStorage;
         }
@@ -3244,6 +3266,7 @@ namespace Slang
         VarLayout*                  inVarLayout,
         TypeLayout*                 inTypeLayout,
         LayoutResourceKind          kind,
+        Stage                       stage,
         UInt                        bindingIndex,
         GlobalVaryingDeclarator*    declarator)
     {
@@ -3253,6 +3276,7 @@ namespace Slang
             context,
             inVarLayout,
             kind,
+            stage,
             &systemValueInfoStorage);
 
         RefPtr<Type> type = inType;
@@ -3341,6 +3365,12 @@ namespace Slang
                     val = ScalarizedVal::typeAdapter(typeAdapter);
                 }
             }
+
+            if(auto outerArrayName = systemValueInfo->outerArrayName)
+            {
+                auto decoration = builder->addDecoration<IRGLSLOuterArrayDecoration>(globalVariable);
+                decoration->outerArrayName = outerArrayName;
+            }
         }
 
         builder->addLayoutDecoration(globalVariable, varLayout);
@@ -3355,6 +3385,7 @@ namespace Slang
         VarLayout*                  varLayout,
         TypeLayout*                 typeLayout,
         LayoutResourceKind          kind,
+        Stage                       stage,
         UInt                        bindingIndex,
         GlobalVaryingDeclarator*    declarator)
     {
@@ -3362,20 +3393,20 @@ namespace Slang
         {
             return createSimpleGLSLGlobalVarying(
                 context,
-                builder, type, varLayout, typeLayout, kind, bindingIndex, declarator);
+                builder, type, varLayout, typeLayout, kind, stage, bindingIndex, declarator);
         }
         else if( type->As<VectorExpressionType>() )
         {
             return createSimpleGLSLGlobalVarying(
                 context,
-                builder, type, varLayout, typeLayout, kind, bindingIndex, declarator);
+                builder, type, varLayout, typeLayout, kind, stage, bindingIndex, declarator);
         }
         else if( type->As<MatrixExpressionType>() )
         {
             // TODO: a matrix-type varying should probably be handled like an array of rows
             return createSimpleGLSLGlobalVarying(
                 context,
-                builder, type, varLayout, typeLayout, kind, bindingIndex, declarator);
+                builder, type, varLayout, typeLayout, kind, stage, bindingIndex, declarator);
         }
         else if( auto arrayType = type->As<ArrayExpressionType>() )
         {
@@ -3399,6 +3430,7 @@ namespace Slang
                 varLayout,
                 elementTypeLayout,
                 kind,
+                stage,
                 bindingIndex,
                 &arrayDeclarator);
         }
@@ -3416,6 +3448,7 @@ namespace Slang
                 varLayout,
                 elementTypeLayout,
                 kind,
+                stage,
                 bindingIndex,
                 declarator);
         }
@@ -3465,6 +3498,7 @@ namespace Slang
                             ff,
                             ff->typeLayout,
                             kind,
+                            stage,
                             fieldBindingIndex,
                             declarator);
 
@@ -3483,7 +3517,7 @@ namespace Slang
         // Default case is to fall back on the simple behavior
         return createSimpleGLSLGlobalVarying(
             context,
-            builder, type, varLayout, typeLayout, kind, bindingIndex, declarator);
+            builder, type, varLayout, typeLayout, kind, stage, bindingIndex, declarator);
     }
 
     ScalarizedVal createGLSLGlobalVaryings(
@@ -3491,14 +3525,15 @@ namespace Slang
         IRBuilder*                  builder,
         Type*                       type,
         VarLayout*                  layout,
-        LayoutResourceKind          kind)
+        LayoutResourceKind          kind,
+        Stage                       stage)
     {
         UInt bindingIndex = 0;
         if(auto rr = layout->FindResourceInfo(kind))
             bindingIndex = rr->index;
         return createGLSLGlobalVaryingsImpl(
             context,
-            builder, type, layout, layout->typeLayout, kind, bindingIndex, nullptr);
+            builder, type, layout, layout->typeLayout, kind, stage, bindingIndex, nullptr);
     }
 
     ScalarizedVal extractField(
@@ -3887,6 +3922,8 @@ namespace Slang
         context.sink = sink;
         context.extensionUsageTracker = extensionUsageTracker;
 
+        Stage stage = entryPointLayout->profile.GetStage();
+
         // We require that the entry-point function has no uses,
         // because otherwise we'd invalidate the signature
         // at all existing call sites.
@@ -3948,7 +3985,8 @@ namespace Slang
                 &builder,
                 resultType,
                 entryPointLayout->resultLayout,
-                LayoutResourceKind::FragmentOutput);
+                LayoutResourceKind::VaryingOutput,
+                stage);
 
             for( auto bb = func->getFirstBlock(); bb; bb = bb->getNextBlock() )
             {
@@ -4035,7 +4073,8 @@ namespace Slang
                             &builder,
                             valueType,
                             paramLayout,
-                            LayoutResourceKind::VaryingOutput);
+                            LayoutResourceKind::VaryingOutput,
+                            stage);
 
                         // TODO: a GS output stream might be passed into other
                         // functions, so that we should really be modifying
@@ -4113,7 +4152,7 @@ namespace Slang
                         // side and one for the `out` side.
                         auto globalInputVal = createGLSLGlobalVaryings(
                             &context,
-                            &builder, valueType, paramLayout, LayoutResourceKind::VertexInput);
+                            &builder, valueType, paramLayout, LayoutResourceKind::VaryingInput, stage);
 
                         assign(&builder, localVal, globalInputVal);
                     }
@@ -4128,7 +4167,7 @@ namespace Slang
                     // when the function is done. We create them here.
                     auto globalOutputVal = createGLSLGlobalVaryings(
                             &context,
-                            &builder, valueType, paramLayout, LayoutResourceKind::FragmentOutput);
+                            &builder, valueType, paramLayout, LayoutResourceKind::VaryingOutput, stage);
 
                     // Now we need to iterate over all the blocks in the function looking
                     // for any `return*` instructions, so that we can write to the output variable
@@ -4163,7 +4202,7 @@ namespace Slang
 
                     auto globalValue = createGLSLGlobalVaryings(
                         &context,
-                        &builder, paramType, paramLayout, LayoutResourceKind::VaryingInput);
+                        &builder, paramType, paramLayout, LayoutResourceKind::VaryingInput, stage);
 
                     // Next we need to replace uses of the parameter with
                     // references to the variable(s). We are going to do that

@@ -118,6 +118,7 @@ enum IRDecorationOp : uint16_t
     kIRDecorationOp_LoopControl,
     kIRDecorationOp_Target,
     kIRDecorationOp_TargetIntrinsic,
+    kIRDecorationOp_GLSLOuterArray,
 };
 
 // represents an object allocated in an IR memory pool 
