@@ -498,7 +498,7 @@ static void _initSrvDesc(const D3D12_RESOURCE_DESC& desc, DXGI_FORMAT pixelForma
     }
 }
 
-void _initBufferResourceDesc(size_t bufferSize, D3D12_RESOURCE_DESC& out)
+static void _initBufferResourceDesc(size_t bufferSize, D3D12_RESOURCE_DESC& out)
 {
     out = {};
 
@@ -666,16 +666,31 @@ Result D3D12Renderer::createTexture(const InputTextureDesc& inputDesc, const Tex
         {     
             for (int j = 0; j < numMipMaps; ++j)
             {
-                int size = texData.textureSize >> j;
+                const int mipWidth = width >> j;
+                const int mipHeight = height >> j;
 
-                const size_t mipSizeInBytes = layouts[j].Footprint.RowPitch * mipNumRows[j];
+                // NOTE! Like the D3D11 implementation -> this repeats the same mip pixels to every target (!)
+                const List<uint32_t>& srcMip = texData.dataBuffer[j];
 
-                // NOTE! Like the D3D11 implementation -> this repeats the same mip pixels to every target
+                // Check the input data is the same size as expected
+                assert(mipWidth * mipHeight == srcMip.Count());
 
-                const uint8_t* srcPixels = (const uint8_t*)texData.dataBuffer[j].Buffer();
-                assert(mipSizeInBytes == texData.dataBuffer[j].Count() * sizeof(uint32_t));
+                const ptrdiff_t dstMipRowPitch = ptrdiff_t(layouts[j].Footprint.RowPitch);
+                const ptrdiff_t srcMipRowPitch = ptrdiff_t(sizeof(uint32_t) * mipWidth);
 
-                ::memcpy(p + layouts[j].Offset, srcPixels, mipSizeInBytes);
+                assert(dstMipRowPitch >= srcMipRowPitch); 
+                
+                const uint8_t* srcRow = (const uint8_t*)srcMip.Buffer();
+                uint8_t* dstRow = p + layouts[j].Offset;
+
+                // Copy rows
+                for (int k = 0; k < mipHeight; ++k)
+                {
+                    ::memcpy(dstRow, srcRow, srcMipRowPitch);
+
+                    srcRow += srcMipRowPitch;
+                    dstRow += dstMipRowPitch;
+                }
             }
         }
         uploadResource->Unmap(0, nullptr);
@@ -787,7 +802,6 @@ Result D3D12Renderer::createInputBuffer(InputBufferDesc& bufferDesc, const List<
 
         uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
         uavDesc.Format = DXGI_FORMAT_UNKNOWN;
-        //uavDesc.Format = DXGI_FORMAT_R32_UINT;
 
         uavDesc.Buffer.StructureByteStride = elemSize;
 
@@ -812,7 +826,6 @@ Result D3D12Renderer::createInputBuffer(InputBufferDesc& bufferDesc, const List<
 
         srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
         srvDesc.Format = DXGI_FORMAT_UNKNOWN;
-        //srvDesc.Format = DXGI_FORMAT_R32_UINT;
         srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 
         srvDesc.Buffer.FirstElement = 0;
@@ -1321,68 +1334,66 @@ Result D3D12Renderer::_calcBindParameters(BindParameters& params)
             for (int i = 0; i < int(m_boundBindingState->m_bindings.Count()); i++)
             {
                 const Binding& binding = m_boundBindingState->m_bindings[i];
-                if (binding.m_type == ShaderInputType::Buffer)
+                if (binding.m_type == ShaderInputType::Buffer && binding.m_bufferType == InputBufferType::ConstantBuffer)
                 {
-                    if (binding.m_bufferType == InputBufferType::ConstantBuffer)
-                    {
-                        // Make sure it's not overlapping the ones we just statically defined
-                        assert(binding.m_binding < numBoundConstantBuffers);
+                    // Make sure it's not overlapping the ones we just statically defined
+                    assert(binding.m_binding < numBoundConstantBuffers);
 
-                        D3D12_ROOT_PARAMETER& param = params.nextParameter();
-                        param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-                        param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+                    D3D12_ROOT_PARAMETER& param = params.nextParameter();
+                    param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+                    param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-                        D3D12_ROOT_DESCRIPTOR& descriptor = param.Descriptor;
-                        descriptor.ShaderRegister = binding.m_binding;
-                        descriptor.RegisterSpace = 0;
+                    D3D12_ROOT_DESCRIPTOR& descriptor = param.Descriptor;
+                    descriptor.ShaderRegister = binding.m_binding;
+                    descriptor.RegisterSpace = 0;
 
-                        numConstantBuffers++;
-                    }
+                    numConstantBuffers++;
+                }
 
-                    if (binding.m_bufferType == InputBufferType::StorageBuffer)
-                    {
-                        D3D12_DESCRIPTOR_RANGE& range = params.nextRange();
+                if (binding.m_srvIndex >= 0)
+                {
+                    D3D12_DESCRIPTOR_RANGE& range = params.nextRange();
                         
-                        range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-                        range.NumDescriptors = 1;
-                        range.BaseShaderRegister = binding.m_binding;
-                        range.RegisterSpace = 0;
-                        range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+                    range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+                    range.NumDescriptors = 1;
+                    range.BaseShaderRegister = binding.m_binding;
+                    range.RegisterSpace = 0;
+                    range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-                        D3D12_ROOT_PARAMETER& param = params.nextParameter();
+                    D3D12_ROOT_PARAMETER& param = params.nextParameter();
                         
-                        param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-                        param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+                    param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+                    param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-                        D3D12_ROOT_DESCRIPTOR_TABLE& table = param.DescriptorTable;
-                        table.NumDescriptorRanges = 1;
-                        table.pDescriptorRanges = &range;
-                    }
+                    D3D12_ROOT_DESCRIPTOR_TABLE& table = param.DescriptorTable;
+                    table.NumDescriptorRanges = 1;
+                    table.pDescriptorRanges = &range;
+                }
 
-                    if (binding.m_uavIndex >= 0)
-                    {
-                        D3D12_DESCRIPTOR_RANGE& range = params.nextRange();
+                if (binding.m_uavIndex >= 0)
+                {
+                    D3D12_DESCRIPTOR_RANGE& range = params.nextRange();
                         
-                        range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-                        range.NumDescriptors = 1;
-                        range.BaseShaderRegister = binding.m_binding;
-                        range.RegisterSpace = 0;
-                        range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+                    range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+                    range.NumDescriptors = 1;
+                    range.BaseShaderRegister = binding.m_binding;
+                    range.RegisterSpace = 0;
+                    range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-                        D3D12_ROOT_PARAMETER& param = params.nextParameter();
+                    D3D12_ROOT_PARAMETER& param = params.nextParameter();
                         
-                        param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-                        param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+                    param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+                    param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-                        D3D12_ROOT_DESCRIPTOR_TABLE& table = param.DescriptorTable;
-                        table.NumDescriptorRanges = 1;
-                        table.pDescriptorRanges = &range;
-                    }
+                    D3D12_ROOT_DESCRIPTOR_TABLE& table = param.DescriptorTable;
+                    table.NumDescriptorRanges = 1;
+                    table.pDescriptorRanges = &range;
                 }
             }
         }
     }
 
+    // All the samplers are in one continuous section of the sampler heap
     if (m_boundBindingState && m_boundBindingState->m_samplerHeap.getUsedSize() > 0)
     {
         D3D12_DESCRIPTOR_RANGE& range = params.nextRange();
@@ -1456,23 +1467,20 @@ Result D3D12Renderer::_bindRenderState(RenderState* renderState, ID3D12GraphicsC
                 for (int i = 0; i < int(bindingState->m_bindings.Count()); i++)
                 {
                     const Binding& binding = bindingState->m_bindings[i];
-                    if (binding.m_type == ShaderInputType::Buffer)
+                    if (binding.m_type == ShaderInputType::Buffer && binding.m_bufferType == InputBufferType::ConstantBuffer)
                     {
-                        if (binding.m_bufferType == InputBufferType::ConstantBuffer)
-                        {
-                            submitter->setRootConstantBufferView(index++, binding.m_resource.getResource()->GetGPUVirtualAddress());
-                            numConstantBuffers++;
-                        }
+                        submitter->setRootConstantBufferView(index++, binding.m_resource.getResource()->GetGPUVirtualAddress());
+                        numConstantBuffers++;
+                    }
 
-                        if (binding.m_bufferType == InputBufferType::StorageBuffer)
-                        {
-                            submitter->setRootDescriptorTable(index++, heap.getGpuHandle(binding.m_srvIndex));
-                        }
+                    if (binding.m_srvIndex >= 0)
+                    {
+                        submitter->setRootDescriptorTable(index++, heap.getGpuHandle(binding.m_srvIndex));
+                    }
 
-                        if (binding.m_uavIndex >= 0)
-                        {
-                            submitter->setRootDescriptorTable(index++, heap.getGpuHandle(binding.m_uavIndex));
-                        }
+                    if (binding.m_uavIndex >= 0)
+                    {
+                        submitter->setRootDescriptorTable(index++, heap.getGpuHandle(binding.m_uavIndex));
                     }
                 }
             }
@@ -2166,6 +2174,12 @@ void D3D12Renderer::draw(UInt vertexCount, UInt startVertex)
     ID3D12GraphicsCommandList* commandList = m_commandList;
     
     RenderState* renderState = calcRenderState();
+    if (!renderState)
+    {
+        assert(!"Couldn't create render state");
+        return;    
+    }
+
     BindingStateImpl* bindingState = m_boundBindingState;
         
     // Submit - setting for graphics
