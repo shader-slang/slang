@@ -3073,9 +3073,10 @@ struct EmitVisitor
         // because GLSL uses infix `*` to express inner product
         // when working with matrices.
         case kIROp_Mul:
-            // Are we targetting GLSL, and is this a matrix product?
+            // Are we targetting GLSL, and are both operands matrices?
             if(getTarget(ctx) == CodeGenTarget::GLSL
-                && inst->type->As<MatrixExpressionType>())
+                && inst->getOperand(0)->type->As<MatrixExpressionType>()
+                && inst->getOperand(1)->type->As<MatrixExpressionType>())
             {
                 emit("matrixCompMult(");
                 emitIROperand(ctx, inst->getOperand(0), mode);
