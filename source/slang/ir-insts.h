@@ -81,6 +81,13 @@ struct IRTargetIntrinsicDecoration : IRTargetSpecificDecoration
     }
 };
 
+struct IRGLSLOuterArrayDecoration : IRDecoration
+{
+    enum { kDecorationOp = kIRDecorationOp_GLSLOuterArray };
+
+    char const* outerArrayName;
+};
+
 //
 
 // An IR node to represent a reference to an AST-level

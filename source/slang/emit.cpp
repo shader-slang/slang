@@ -3182,6 +3182,17 @@ struct EmitVisitor
 
         case kIROp_getElement:
         case kIROp_getElementPtr:
+            // HACK: deal with translation of GLSL geometry shader input arrays.
+            if(auto decoration = inst->getOperand(0)->findDecoration<IRGLSLOuterArrayDecoration>())
+            {
+                emit(decoration->outerArrayName);
+                emit("[");
+                emitIROperand(ctx, inst->getOperand(1), mode);
+                emit("].");
+                emitIROperand(ctx, inst->getOperand(0), mode);
+                break;
+            }
+
             emitIROperand(ctx, inst->getOperand(0), mode);
             emit("[");
             emitIROperand(ctx, inst->getOperand(1), mode);
