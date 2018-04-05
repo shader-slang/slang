@@ -5331,7 +5331,11 @@ struct EmitVisitor
             if(fieldType->Equals(getSession()->getVoidType()))
                 continue;
 
-            emitInterpolationModifiers(ctx, ff.getDecl(), fieldType);
+            // Note: GLSL doesn't support interpolation modifiers on `struct` fields
+            if( ctx->shared->target != CodeGenTarget::GLSL )
+            {
+                emitInterpolationModifiers(ctx, ff.getDecl(), fieldType);
+            }
             emitIRType(ctx, fieldType, getIRName(ff));
 
             EmitSemantics(ff.getDecl());
