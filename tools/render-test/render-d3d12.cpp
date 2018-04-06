@@ -455,7 +455,7 @@ Result D3D12Renderer::createInputSampler(const InputSamplerDesc& inputDesc, D3D1
     return SLANG_OK;
 }
 
-static void _initSrvDesc(const D3D12_RESOURCE_DESC& desc, DXGI_FORMAT pixelFormat, D3D12_SHADER_RESOURCE_VIEW_DESC& descOut)
+static void _initSrvDesc(const InputTextureDesc& inputDesc, const D3D12_RESOURCE_DESC& desc, DXGI_FORMAT pixelFormat, D3D12_SHADER_RESOURCE_VIEW_DESC& descOut)
 {
     // create SRV
     descOut = D3D12_SHADER_RESOURCE_VIEW_DESC();
@@ -477,17 +477,37 @@ static void _initSrvDesc(const D3D12_RESOURCE_DESC& desc, DXGI_FORMAT pixelForma
         descOut.Texture2D.PlaneSlice = 0;
         descOut.Texture2D.ResourceMinLODClamp = 0.0f;
     }
-    else if (desc.DepthOrArraySize == 6)
+    else if (inputDesc.isCube)
     {
-        descOut.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+        if (inputDesc.arrayLength > 1)
+        {
+            descOut.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBEARRAY;
 
-        descOut.TextureCube.MipLevels = desc.MipLevels;
-        descOut.TextureCube.MostDetailedMip = 0;
-        descOut.TextureCube.ResourceMinLODClamp = 0;
+            descOut.TextureCubeArray.NumCubes = inputDesc.arrayLength;
+            descOut.TextureCubeArray.First2DArrayFace = 0;
+            descOut.TextureCubeArray.MipLevels = desc.MipLevels;
+            descOut.TextureCubeArray.MostDetailedMip = 0;
+            descOut.TextureCubeArray.ResourceMinLODClamp = 0;
+        }
+        else
+        {
+            descOut.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+
+            descOut.TextureCube.MipLevels = desc.MipLevels;
+            descOut.TextureCube.MostDetailedMip = 0;
+            descOut.TextureCube.ResourceMinLODClamp = 0;
+        }
     }
     else
     {
-        descOut.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+        assert(desc.DepthOrArraySize > 1);
+
+        switch (desc.Dimension)
+        {
+            case D3D12_RESOURCE_DIMENSION_TEXTURE1D:  descOut.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE1DARRAY; break;
+            case D3D12_RESOURCE_DIMENSION_TEXTURE2D:  descOut.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY; break;
+            default: assert(!"Unknown dimension");
+        }
 
         descOut.Texture2DArray.ArraySize = desc.DepthOrArraySize;
         descOut.Texture2DArray.MostDetailedMip = 0;
@@ -697,13 +717,17 @@ Result D3D12Renderer::createTexture(const InputTextureDesc& inputDesc, const Tex
                 const uint8_t* srcRow = (const uint8_t*)srcMip.Buffer();
                 uint8_t* dstRow = p + layouts[j].Offset;
 
-                // Copy rows
-                for (int k = 0; k < mipHeight; ++k)
+                // Copy the depth each mip
+                for (int l = 0; l < mipDepth; ++l)
                 {
-                    ::memcpy(dstRow, srcRow, srcMipRowPitch);
+                    // Copy rows
+                    for (int k = 0; k < mipHeight; ++k)
+                    {
+                        ::memcpy(dstRow, srcRow, srcMipRowPitch);
 
-                    srcRow += srcMipRowPitch;
-                    dstRow += dstMipRowPitch;
+                        srcRow += srcMipRowPitch;
+                        dstRow += dstMipRowPitch;
+                    }
                 }
             }
         }
@@ -765,7 +789,7 @@ Result D3D12Renderer::createInputTexture(const InputTextureDesc& inputDesc, D3D1
         DXGI_FORMAT pixelFormat = resourceDesc.Format;
 
         D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc;
-        _initSrvDesc(resourceDesc, pixelFormat, srvDesc);
+        _initSrvDesc(inputDesc, resourceDesc, pixelFormat, srvDesc);
 
         // Copy to the descriptor
         m_device->CreateShaderResourceView(resourceOut, &srvDesc, viewHeap.getCpuHandle(srvIndex));
