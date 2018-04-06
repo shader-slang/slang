@@ -581,7 +581,9 @@ Result D3D12Renderer::createTexture(const InputTextureDesc& inputDesc, const Tex
     const int numMipMaps = texData.mipLevels;
 
     const int width = inputDesc.size;
-    const int height = width;
+    // If the dimension is 1, then we have no height
+    const int height = (inputDesc.dimension <= 1) ? 1 : width;
+    const int depth = (inputDesc.dimension <= 2) ? 1 : width;
 
     // Setup desc
     D3D12_RESOURCE_DESC resourceDesc;
@@ -597,6 +599,9 @@ Result D3D12Renderer::createTexture(const InputTextureDesc& inputDesc, const Tex
     resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
     resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
     resourceDesc.Alignment = 0;
+
+    // How to do cubemap here?
+    // inputDesc.isCube 
 
     switch (inputDesc.dimension)
     {
@@ -652,6 +657,9 @@ Result D3D12Renderer::createTexture(const InputTextureDesc& inputDesc, const Tex
         uploadTexture.setDebugName(L"TextureUpload");
     }
 
+    // TODO! js: this doesn't handle cubemaps, or 3d textures correctly
+    // It basically ignores the data for either.
+
     // Map it all 
     {
         ID3D12Resource* uploadResource = uploadTexture;
@@ -659,21 +667,27 @@ Result D3D12Renderer::createTexture(const InputTextureDesc& inputDesc, const Tex
         uint8_t* p;
         uploadResource->Map(0, nullptr, reinterpret_cast<void**>(&p));
 
-        // Strictly speaking it should be bigger
-        assert(texData.dataBuffer.Count() == numMipMaps);
+        // 
+        assert(texData.dataBuffer.Count() == numMipMaps * texData.arraySize);
 
         for (int i = 0; i < texData.arraySize; i++)
         {     
             for (int j = 0; j < numMipMaps; ++j)
             {
-                const int mipWidth = width >> j;
-                const int mipHeight = height >> j;
+                int mipWidth = width >> j;
+                mipWidth = (mipWidth <= 0) ? 1 : mipWidth;
+                
+                int mipHeight = height >> j;
+                mipHeight = (mipHeight <= 0) ? 1 : mipHeight;
+
+                int mipDepth = depth >> j;
+                mipDepth = (mipDepth <= 0) ? 1 : mipDepth;
 
                 // NOTE! Like the D3D11 implementation -> this repeats the same mip pixels to every target (!)
                 const List<uint32_t>& srcMip = texData.dataBuffer[j];
 
                 // Check the input data is the same size as expected
-                assert(mipWidth * mipHeight == srcMip.Count());
+                assert(mipWidth * mipHeight * mipDepth == srcMip.Count());
 
                 const ptrdiff_t dstMipRowPitch = ptrdiff_t(layouts[j].Footprint.RowPitch);
                 const ptrdiff_t srcMipRowPitch = ptrdiff_t(sizeof(uint32_t) * mipWidth);
@@ -796,8 +810,10 @@ Result D3D12Renderer::createInputBuffer(InputBufferDesc& bufferDesc, const List<
 
     const int elemSize = bufferDesc.stride <= 0 ? 1 : bufferDesc.stride;
 
-    if (bufferDesc.type == InputBufferType::StorageBuffer)
+    if (uavIndex >= 0)
     {
+        assert(bufferDesc.type == InputBufferType::StorageBuffer);
+
         D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
 
         uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
@@ -820,8 +836,10 @@ Result D3D12Renderer::createInputBuffer(InputBufferDesc& bufferDesc, const List<
         m_device->CreateUnorderedAccessView(bufferOut.getResource(), nullptr, &uavDesc, viewHeap.getCpuHandle(uavIndex));
     }
 
-    if (bufferDesc.type != InputBufferType::ConstantBuffer)
+    if (srvIndex >= 0)
     {
+        //bufferDesc.type != InputBufferType::ConstantBuffer
+
         D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc;
 
         srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
@@ -1113,9 +1131,11 @@ Result D3D12Renderer::calcGraphicsPipelineState(ComPtr<ID3D12RootSignature>& sig
             psoDesc.PrimitiveTopologyType = m_primitiveTopologyType;
 
             {
+                const int numRenderTargets = m_boundBindingState ? m_boundBindingState->m_numRenderTargets : 1;
+
                 psoDesc.DSVFormat = m_depthStencilFormat;
-                psoDesc.NumRenderTargets = m_boundBindingState->m_numRenderTargets;
-                for (Int i = 0; i < m_boundBindingState->m_numRenderTargets; i++)
+                psoDesc.NumRenderTargets = numRenderTargets;
+                for (Int i = 0; i < numRenderTargets; i++)
                 {
                     psoDesc.RTVFormats[i] = m_targetFormat;
                 }
@@ -2252,12 +2272,17 @@ BindingState* D3D12Renderer::createBindingState(const ShaderInputLayout& layout)
         {
             case ShaderInputType::Buffer:
             {
-                dstEntry.m_uavIndex = bindingState->m_viewHeap.allocate();
-                dstEntry.m_srvIndex = bindingState->m_viewHeap.allocate();
-
-                if (dstEntry.m_uavIndex < 0 || dstEntry.m_srvIndex < 0)
+                // NOTE! In this arrangement the buffer can either be a ConstantBuffer or a 'StorageBuffer'.
+                // If it's a storage buffer then it has a 'uav'.
+                // In neither circumstance is there an associated srv 
+                // This departs a little from dx11 code - in that it will create srv and uav for a storage buffer.
+                if (srcEntry.bufferDesc.type == InputBufferType::StorageBuffer)
                 {
-                    return nullptr;
+                    dstEntry.m_uavIndex = bindingState->m_viewHeap.allocate();
+                    if (dstEntry.m_uavIndex < 0)
+                    {
+                        return nullptr;
+                    }
                 }
 
                 SLANG_RETURN_NULL_ON_FAIL(createInputBuffer(srcEntry.bufferDesc, srcEntry.bufferData, bindingState->m_viewHeap, dstEntry.m_uavIndex, dstEntry.m_srvIndex, dstEntry.m_resource));
