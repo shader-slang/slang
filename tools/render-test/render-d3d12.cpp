@@ -843,7 +843,7 @@ Result D3D12Renderer::createInputBuffer(InputBufferDesc& bufferDesc, const List<
     D3D12Resource uploadBuffer;
     SLANG_RETURN_ON_FAIL(createBuffer(resourceDesc, bufferData.Buffer(), uploadBuffer, finalState, bufferOut));
 
-    const int elemSize = bufferDesc.stride <= 0 ? 1 : bufferDesc.stride;
+    const int elemSize = bufferDesc.stride <= 0 ? sizeof(uint32_t) : bufferDesc.stride;
 
     if (uavIndex >= 0)
     {
@@ -866,6 +866,8 @@ Result D3D12Renderer::createInputBuffer(InputBufferDesc& bufferDesc, const List<
             // raw nor structured? RWBuffer<T> would be one...
             uavDesc.Buffer.Flags |= D3D12_BUFFER_UAV_FLAG_RAW;
             uavDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+
+            uavDesc.Buffer.StructureByteStride = 0;
         }
 
         m_device->CreateUnorderedAccessView(bufferOut.getResource(), nullptr, &uavDesc, viewHeap.getCpuHandle(uavIndex));
@@ -1627,27 +1629,37 @@ Result D3D12Renderer::initialize(void* inWindowHandle)
         return SLANG_FAIL;
     }
 
-    UINT adapterCounter = 0;
-    for (;;)
+    const bool useWarp = false;
+
+    if (useWarp)
     {
-        UINT adapterIndex = adapterCounter++;
-
-        ComPtr<IDXGIAdapter1> candidateAdapter;
-        if (dxgiFactory->EnumAdapters1(adapterIndex, candidateAdapter.writeRef()) == DXGI_ERROR_NOT_FOUND)
-            break;
-
-        DXGI_ADAPTER_DESC1 desc;
-        candidateAdapter->GetDesc1(&desc);
-
-        if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
+        SLANG_RETURN_ON_FAIL(dxgiFactory->EnumWarpAdapter(IID_PPV_ARGS(adapter.writeRef())));
+        SLANG_RETURN_ON_FAIL(D3D12CreateDevice_(adapter, featureLevel, IID_PPV_ARGS(m_device.writeRef())));
+    }
+    else
+    {
+        UINT adapterCounter = 0;
+        for (;;)
         {
-            // TODO: may want to allow software driver as fallback
-        }
-        else if (SUCCEEDED(D3D12CreateDevice_(candidateAdapter, featureLevel, IID_PPV_ARGS(m_device.writeRef()))))
-        {
-            // We found one!
-            adapter = candidateAdapter;
-            break;
+            UINT adapterIndex = adapterCounter++;
+
+            ComPtr<IDXGIAdapter1> candidateAdapter;
+            if (dxgiFactory->EnumAdapters1(adapterIndex, candidateAdapter.writeRef()) == DXGI_ERROR_NOT_FOUND)
+                break;
+
+            DXGI_ADAPTER_DESC1 desc;
+            candidateAdapter->GetDesc1(&desc);
+
+            if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
+            {
+                // TODO: may want to allow software driver as fallback
+            }
+            else if (SUCCEEDED(D3D12CreateDevice_(candidateAdapter, featureLevel, IID_PPV_ARGS(m_device.writeRef()))))
+            {
+                // We found one!
+                adapter = candidateAdapter;
+                break;
+            }
         }
     }
 
