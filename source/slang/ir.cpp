@@ -1153,7 +1153,7 @@ namespace Slang
         new(keyInst) IRInst();
         keyInst->op = op;
         keyInst->typeUse.usedValue = type;
-        keyInst->operandCount = operandCount;
+        keyInst->operandCount = (uint32_t) operandCount;
 
         IRUse* operand = keyInst->getOperands();
         for (UInt ii = 0; ii < operandListCount; ++ii)
