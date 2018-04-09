@@ -2202,7 +2202,7 @@ namespace Slang
             if (!lookupResult.isValid())
             {
                 getSink()->diagnose(inheritanceDecl, Diagnostics::typeDoesntImplementInterfaceRequirement, typeDeclRef, requiredMemberDeclRef);
-                return nullptr;
+                return false;
             }
 
             // Iterate over the members and look for one that matches
@@ -2221,7 +2221,7 @@ namespace Slang
             // and if nothing is found we print the candidates
 
             getSink()->diagnose(inheritanceDecl, Diagnostics::typeDoesntImplementInterfaceRequirement, typeDeclRef, requiredMemberDeclRef);
-            return nullptr;
+            return false;
         }
 
         // Check that the type declaration `typeDecl`, which
@@ -2358,7 +2358,7 @@ namespace Slang
             }
 
             getSink()->diagnose(inheritanceDecl, Diagnostics::unimplemented, "type not supported for inheritance");
-            return false;
+            return nullptr;
         }
 
         // Check that the type (or extension) declaration `declRef`,
@@ -2410,10 +2410,9 @@ namespace Slang
 
         void checkExtensionConformance(ExtensionDecl* decl)
         {
-            DeclRef<AggTypeDecl> aggTypeDeclRef;
             if (auto targetDeclRefType = decl->targetType->As<DeclRefType>())
             {
-                if (aggTypeDeclRef = targetDeclRefType->declRef.As<AggTypeDecl>())
+                if (auto aggTypeDeclRef = targetDeclRefType->declRef.As<AggTypeDecl>())
                 {
                     for (auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
                     {
@@ -3629,6 +3628,7 @@ namespace Slang
 
                     switch(getSourceLanguage())
                     {
+                    default:
                     case SourceLanguage::Slang:
                     case SourceLanguage::HLSL:
                         // HLSL: `static const` is used to mark compile-time constant expressions
@@ -3963,11 +3963,10 @@ namespace Slang
 
             // TODO: need to check that the target type names a declaration...
 
-            DeclRef<AggTypeDecl> aggTypeDeclRef;
             if (auto targetDeclRefType = decl->targetType->As<DeclRefType>())
             {
                 // Attach our extension to that type as a candidate...
-                if (aggTypeDeclRef = targetDeclRefType->declRef.As<AggTypeDecl>())
+                if (auto aggTypeDeclRef = targetDeclRefType->declRef.As<AggTypeDecl>())
                 {
                     auto aggTypeDecl = aggTypeDeclRef.getDecl();
                     decl->nextCandidateExtension = aggTypeDecl->candidateExtensions;

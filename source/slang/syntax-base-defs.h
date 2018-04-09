@@ -81,8 +81,6 @@ public:
     Session* getSession() { return this->session; }
     void setSession(Session* s) { this->session = s; }
 
-    virtual String ToString() = 0;
-
     bool Equals(Type * type);
     bool Equals(RefPtr<Type> type);
 
