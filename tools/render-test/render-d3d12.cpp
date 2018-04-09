@@ -1365,23 +1365,7 @@ Result D3D12Renderer::_calcBindParameters(BindParameters& params)
 {
     int numConstantBuffers = 0;
     {
-        // Okay we need to try and create a render state
-        for (int i = 0; i < int(m_boundConstantBuffers.Count()); i++)
-        {
-            const BufferImpl* buffer = m_boundConstantBuffers[i];
-            if (buffer)
-            {
-                D3D12_ROOT_PARAMETER& param = params.nextParameter();
-                param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-                param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-                D3D12_ROOT_DESCRIPTOR& descriptor = param.Descriptor;
-                descriptor.ShaderRegister = numConstantBuffers;
-                descriptor.RegisterSpace = 0;
-
-                numConstantBuffers++;
-            }
-        }
 
         if (m_boundBindingState)
         {
@@ -1392,7 +1376,7 @@ Result D3D12Renderer::_calcBindParameters(BindParameters& params)
                 if (binding.m_type == ShaderInputType::Buffer && binding.m_bufferType == InputBufferType::ConstantBuffer)
                 {
                     // Make sure it's not overlapping the ones we just statically defined
-                    assert(binding.m_binding < numBoundConstantBuffers);
+                    //assert(binding.m_binding < numBoundConstantBuffers);
 
                     D3D12_ROOT_PARAMETER& param = params.nextParameter();
                     param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
@@ -1448,6 +1432,26 @@ Result D3D12Renderer::_calcBindParameters(BindParameters& params)
         }
     }
 
+#if 1
+    // Okay we need to try and create a render state
+    for (int i = 0; i < int(m_boundConstantBuffers.Count()); i++)
+    {
+        const BufferImpl* buffer = m_boundConstantBuffers[i];
+        if (buffer)
+        {
+            D3D12_ROOT_PARAMETER& param = params.nextParameter();
+            param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+            param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+            D3D12_ROOT_DESCRIPTOR& descriptor = param.Descriptor;
+            descriptor.ShaderRegister = numConstantBuffers;
+            descriptor.RegisterSpace = 0;
+
+            numConstantBuffers++;
+        }
+    }
+#endif
+
     // All the samplers are in one continuous section of the sampler heap
     if (m_boundBindingState && m_boundBindingState->m_samplerHeap.getUsedSize() > 0)
     {
@@ -1497,24 +1501,6 @@ Result D3D12Renderer::_bindRenderState(RenderState* renderState, ID3D12GraphicsC
 
         int numConstantBuffers = 0;
         {
-            // Okay we need to try and create a render state
-            for (int i = 0; i < int(m_boundConstantBuffers.Count()); i++)
-            {
-                const BufferImpl* buffer = m_boundConstantBuffers[i];
-                if (buffer)
-                {
-                    size_t bufferSize = buffer->m_memory.Count();
-
-                    D3D12CircularResourceHeap::Cursor cursor = m_circularResourceHeap.allocateConstantBuffer(bufferSize);
-                    ::memcpy(cursor.m_position, buffer->m_memory.Buffer(), bufferSize);
-                    // Set the constant buffer
-                    submitter->setRootConstantBufferView(index++, m_circularResourceHeap.getGpuHandle(cursor));
-                    
-                    numConstantBuffers++;
-                }
-            }
-
-            
             if (bindingState)
             {
                 D3D12DescriptorHeap& heap = bindingState->m_viewHeap;
@@ -1537,6 +1523,23 @@ Result D3D12Renderer::_bindRenderState(RenderState* renderState, ID3D12GraphicsC
                     {
                         submitter->setRootDescriptorTable(index++, heap.getGpuHandle(binding.m_uavIndex));
                     }
+                }
+            }
+
+            // Okay we need to try and create a render state
+            for (int i = 0; i < int(m_boundConstantBuffers.Count()); i++)
+            {
+                const BufferImpl* buffer = m_boundConstantBuffers[i];
+                if (buffer)
+                {
+                    size_t bufferSize = buffer->m_memory.Count();
+
+                    D3D12CircularResourceHeap::Cursor cursor = m_circularResourceHeap.allocateConstantBuffer(bufferSize);
+                    ::memcpy(cursor.m_position, buffer->m_memory.Buffer(), bufferSize);
+                    // Set the constant buffer
+                    submitter->setRootConstantBufferView(index++, m_circularResourceHeap.getGpuHandle(cursor));
+
+                    numConstantBuffers++;
                 }
             }
         }
