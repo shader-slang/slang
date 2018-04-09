@@ -506,6 +506,8 @@ static void _initSrvDesc(const InputTextureDesc& inputDesc, const D3D12_RESOURCE
         {
             case D3D12_RESOURCE_DIMENSION_TEXTURE1D:  descOut.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE1DARRAY; break;
             case D3D12_RESOURCE_DIMENSION_TEXTURE2D:  descOut.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY; break;
+            case D3D12_RESOURCE_DIMENSION_TEXTURE3D:  descOut.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D; break;
+
             default: assert(!"Unknown dimension");
         }
 
@@ -595,7 +597,8 @@ Result D3D12Renderer::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, cons
 
 Result D3D12Renderer::createTexture(const InputTextureDesc& inputDesc, const TextureData& texData, D3D12Resource& resourceOut)
 {
-    // generateTextureData(texData, inputDesc);
+    // Description of uploading on Dx12
+    // https://msdn.microsoft.com/en-us/library/windows/desktop/dn899215%28v=vs.85%29.aspx
 
     const DXGI_FORMAT pixelFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
     const int numMipMaps = texData.mipLevels;
@@ -612,16 +615,14 @@ Result D3D12Renderer::createTexture(const InputTextureDesc& inputDesc, const Tex
     resourceDesc.Format = pixelFormat;
     resourceDesc.Width = width;
     resourceDesc.Height = height;
-    resourceDesc.DepthOrArraySize = texData.arraySize;
+    resourceDesc.DepthOrArraySize = (depth > 1) ? depth : texData.arraySize;
+ 
     resourceDesc.MipLevels = numMipMaps;
     resourceDesc.SampleDesc.Count = 1;
     resourceDesc.SampleDesc.Quality = 0;
     resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
     resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
     resourceDesc.Alignment = 0;
-
-    // How to do cubemap here?
-    // inputDesc.isCube 
 
     switch (inputDesc.dimension)
     {
@@ -630,7 +631,22 @@ Result D3D12Renderer::createTexture(const InputTextureDesc& inputDesc, const Tex
         case 3: resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE3D; break;
         default: return SLANG_FAIL;
     }
-    
+
+    // Create the target resource
+    {
+        D3D12_HEAP_PROPERTIES heapProps;
+
+        heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
+        heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+        heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+        heapProps.CreationNodeMask = 1;
+        heapProps.VisibleNodeMask = 1;
+
+        SLANG_RETURN_ON_FAIL(resourceOut.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, resourceDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr));
+
+        resourceOut.setDebugName(L"Texture");
+    }
+
     // Calculate the layout 
     List<D3D12_PLACED_SUBRESOURCE_FOOTPRINT> layouts;
     layouts.SetSize(numMipMaps);
@@ -642,135 +658,130 @@ Result D3D12Renderer::createTexture(const InputTextureDesc& inputDesc, const Tex
     UInt64 requiredSize = 0;
     m_device->GetCopyableFootprints(&resourceDesc, 0, texData.mipLevels, 0, layouts.begin(), mipNumRows.begin(), mipRowSizeInBytes.begin(), &requiredSize);
 
+#if 0
     List<D3D12_SUBRESOURCE_DATA> subData;
     subData.SetSize(numMipMaps);
     // Zero it all initially
     ::memset(subData.Buffer(), 0, numMipMaps * sizeof(D3D12_SUBRESOURCE_DATA));
-    
-    // Create the upload texture
-    D3D12Resource uploadTexture;
+#endif 
+
+    // 
+    assert(texData.dataBuffer.Count() == numMipMaps * texData.arraySize);
+
+    // Sub resource indexing
+    // https://msdn.microsoft.com/en-us/library/windows/desktop/dn705766(v=vs.85).aspx#subresource_indexing
+
+    int subResourceIndex = 0;
+    for (int i = 0; i < texData.arraySize; i++)
     {
-        D3D12_HEAP_PROPERTIES heapProps;
+        // Create the upload texture
+        D3D12Resource uploadTexture;
+        {
+            D3D12_HEAP_PROPERTIES heapProps;
 
-        heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
-        heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-        heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-        heapProps.CreationNodeMask = 1;
-        heapProps.VisibleNodeMask = 1;
+            heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
+            heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+            heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+            heapProps.CreationNodeMask = 1;
+            heapProps.VisibleNodeMask = 1;
 
-        D3D12_RESOURCE_DESC uploadResourceDesc;
-        
-        uploadResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        uploadResourceDesc.Format = DXGI_FORMAT_UNKNOWN;
-        uploadResourceDesc.Width = requiredSize;
-        uploadResourceDesc.Height = 1;
-        uploadResourceDesc.DepthOrArraySize = 1; 
-        uploadResourceDesc.MipLevels = 1; 
-        uploadResourceDesc.SampleDesc.Count = 1;
-        uploadResourceDesc.SampleDesc.Quality = 0;
-        uploadResourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-        uploadResourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-        uploadResourceDesc.Alignment = 0;
+            D3D12_RESOURCE_DESC uploadResourceDesc;
 
-        SLANG_RETURN_ON_FAIL(uploadTexture.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, uploadResourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr));
-        
-        uploadTexture.setDebugName(L"TextureUpload");
-    }
+            uploadResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+            uploadResourceDesc.Format = DXGI_FORMAT_UNKNOWN;
+            uploadResourceDesc.Width = requiredSize;
+            uploadResourceDesc.Height = 1;
+            uploadResourceDesc.DepthOrArraySize = 1;
+            uploadResourceDesc.MipLevels = 1;
+            uploadResourceDesc.SampleDesc.Count = 1;
+            uploadResourceDesc.SampleDesc.Quality = 0;
+            uploadResourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+            uploadResourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+            uploadResourceDesc.Alignment = 0;
 
-    // TODO! js: this doesn't handle cubemaps, or 3d textures correctly
-    // It basically ignores the data for either.
+            SLANG_RETURN_ON_FAIL(uploadTexture.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, uploadResourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr));
 
-    // Map it all 
-    {
+            uploadTexture.setDebugName(L"TextureUpload");
+        }
+
         ID3D12Resource* uploadResource = uploadTexture;
 
         uint8_t* p;
         uploadResource->Map(0, nullptr, reinterpret_cast<void**>(&p));
+        
+        for (int j = 0; j < numMipMaps; ++j)
+        {
+            const D3D12_PLACED_SUBRESOURCE_FOOTPRINT& layout = layouts[j];
+            const D3D12_SUBRESOURCE_FOOTPRINT& footprint = layout.Footprint;
 
-        // 
-        assert(texData.dataBuffer.Count() == numMipMaps * texData.arraySize);
+            int mipWidth = width >> j;
+            mipWidth = (mipWidth <= 0) ? 1 : mipWidth;
+                
+            int mipHeight = height >> j;
+            mipHeight = (mipHeight <= 0) ? 1 : mipHeight;
 
-        for (int i = 0; i < texData.arraySize; i++)
-        {     
-            for (int j = 0; j < numMipMaps; ++j)
+            int mipDepth = depth >> j;
+            mipDepth = (mipDepth <= 0) ? 1 : mipDepth;
+
+            assert(footprint.Width == mipWidth && footprint.Height == mipHeight && footprint.Depth == mipDepth);
+
+            // NOTE! Like the D3D11 implementation -> this repeats the same mip pixels to every target (!)
+            const List<uint32_t>& srcMip = texData.dataBuffer[j];
+
+            // Check the input data is the same size as expected
+            assert(mipWidth * mipHeight * mipDepth == srcMip.Count());
+
+            const ptrdiff_t dstMipRowPitch = ptrdiff_t(layouts[j].Footprint.RowPitch);
+            const ptrdiff_t srcMipRowPitch = ptrdiff_t(sizeof(uint32_t) * mipWidth);
+
+            assert(dstMipRowPitch >= srcMipRowPitch); 
+                
+            const uint8_t* srcRow = (const uint8_t*)srcMip.Buffer();
+            uint8_t* dstRow = p + layouts[j].Offset;
+
+            // Copy the depth each mip
+            for (int l = 0; l < mipDepth; l++)
             {
-                int mipWidth = width >> j;
-                mipWidth = (mipWidth <= 0) ? 1 : mipWidth;
-                
-                int mipHeight = height >> j;
-                mipHeight = (mipHeight <= 0) ? 1 : mipHeight;
-
-                int mipDepth = depth >> j;
-                mipDepth = (mipDepth <= 0) ? 1 : mipDepth;
-
-                // NOTE! Like the D3D11 implementation -> this repeats the same mip pixels to every target (!)
-                const List<uint32_t>& srcMip = texData.dataBuffer[j];
-
-                // Check the input data is the same size as expected
-                assert(mipWidth * mipHeight * mipDepth == srcMip.Count());
-
-                const ptrdiff_t dstMipRowPitch = ptrdiff_t(layouts[j].Footprint.RowPitch);
-                const ptrdiff_t srcMipRowPitch = ptrdiff_t(sizeof(uint32_t) * mipWidth);
-
-                assert(dstMipRowPitch >= srcMipRowPitch); 
-                
-                const uint8_t* srcRow = (const uint8_t*)srcMip.Buffer();
-                uint8_t* dstRow = p + layouts[j].Offset;
-
-                // Copy the depth each mip
-                for (int l = 0; l < mipDepth; ++l)
+                // Copy rows
+                for (int k = 0; k < mipHeight; ++k)
                 {
-                    // Copy rows
-                    for (int k = 0; k < mipHeight; ++k)
-                    {
-                        ::memcpy(dstRow, srcRow, srcMipRowPitch);
+                    ::memcpy(dstRow, srcRow, srcMipRowPitch);
 
-                        srcRow += srcMipRowPitch;
-                        dstRow += dstMipRowPitch;
-                    }
+                    srcRow += srcMipRowPitch;
+                    dstRow += dstMipRowPitch;
                 }
             }
+
+            assert(srcRow == (const uint8_t*)(srcMip.Buffer() + srcMip.Count()));
         }
         uploadResource->Unmap(0, nullptr);
-    }
 
-    {
-        D3D12_HEAP_PROPERTIES heapProps;
-
-        heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
-        heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-        heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-        heapProps.CreationNodeMask = 1;
-        heapProps.VisibleNodeMask = 1;
-
-        SLANG_RETURN_ON_FAIL(resourceOut.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, resourceDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr));
-        
-        resourceOut.setDebugName(L"Texture");
-    }
-
-    {
-        for (int i = 0; i < numMipMaps; ++i)
+        for (int mipIndex = 0; mipIndex < numMipMaps; ++mipIndex)
         {
+            // https://msdn.microsoft.com/en-us/library/windows/desktop/dn903862(v=vs.85).aspx
+
             D3D12_TEXTURE_COPY_LOCATION src;
             src.pResource = uploadTexture;
             src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-            src.PlacedFootprint = layouts[i];
+            src.PlacedFootprint = layouts[mipIndex];
 
             D3D12_TEXTURE_COPY_LOCATION dst;
             dst.pResource = resourceOut;
             dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-            dst.SubresourceIndex = UINT(i);
+            dst.SubresourceIndex = subResourceIndex;
             m_commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+
+            subResourceIndex++;
         }
-    }
+        
+        {
+            D3D12BarrierSubmitter submitter(m_commandList);
+            resourceOut.transition(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, submitter);
+        }
 
-    {
-        D3D12BarrierSubmitter submitter(m_commandList);
-        resourceOut.transition(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, submitter);
+        // Block - waiting for copy to complete (so can drop upload texture)
+        submitGpuWorkAndWait();
     }
-
-    // Block - waiting for copy to complete (so can drop upload texture)
-    submitGpuWorkAndWait();
 
     return SLANG_OK;
 }
