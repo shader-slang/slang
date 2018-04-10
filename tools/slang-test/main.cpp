@@ -9,6 +9,7 @@
 using namespace Slang;
 
 #include "os.h"
+#include "render-api-util.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "external/stb/stb_image.h"
@@ -37,43 +38,6 @@ enum OutputMode
     // We currently don't specialize for Travis, but maybe
     // we should.
     kOutputMode_Travis,
-};
-
-enum class ApiType
-{
-    kUnknown = -1,
-    kOpenGl = 0,
-    kVulkan,
-    kD3D12,
-    kD3D11,
-    kCountOf,
-};
-
-// Use a struct wrapped Enum instead of enum class, cos we want to be able to manipulate as integrals
-struct ApiTypeBit
-{
-    enum Enum
-    {
-        kOpenGl = 1 << int(ApiType::kOpenGl),
-        kVulkan = 1 << int(ApiType::kVulkan),
-        kD3D12 = 1 << int(ApiType::kD3D12),
-        kD3D11 = 1 << int(ApiType::kD3D11),                 
-        kAllOf = (1 << int(ApiType::kCountOf)) - 1                   ///< All bits set
-    };
-};
-
-struct ApiInfo
-{
-    ApiType type;               ///< The type
-    const char* names;          ///< Comma separated list of names associated with the type
-};
-
-static const ApiInfo s_apiInfos[] = 
-{
-    { ApiType::kOpenGl, "gl,ogl,opengl"},
-    { ApiType::kVulkan, "vk,vulkan"},
-    { ApiType::kD3D12,  "dx12,d3d12"},
-    { ApiType::kD3D11,  "dx11,d3d11"},
 };
 
 struct TestCategory;
@@ -112,7 +76,7 @@ struct Options
     Dictionary<TestCategory*, TestCategory*> excludeCategories;
 
     // By default we can test against all apis
-    int enabledApis = int(ApiTypeBit::kAllOf);           
+    int enabledApis = int(RenderApiFlag::kAllOf);           
 };
 Options options;
 
@@ -254,6 +218,13 @@ Result parseOptions(int* argc, char** argv)
         }
     }
     
+    {
+        // Find out what apis are available
+        const int availableApis = RenderApiUtil::getAvailableApis();
+        // Only allow apis we know are available
+        options.enabledApis &= availableApis;
+    }
+
     // any arguments left over were positional arguments
     argCount = (int)((char**)writeCursor - argv);
     argCursor = argv;
@@ -303,13 +274,13 @@ static int findApiBitsByName(const UnownedStringSlice& name)
     // Special case 'all'
     if (name == "all")
     {
-        return int(ApiTypeBit::kAllOf);
+        return int(RenderApiFlag::kAllOf);
     }
 
     List<UnownedStringSlice> namesList;
-    for (int j = 0; j < SLANG_COUNT_OF(s_apiInfos); j++)
+    for (int j = 0; j < SLANG_COUNT_OF(RenderApiUtil::s_infos); j++)
     {
-        const auto& apiInfo = s_apiInfos[j];
+        const auto& apiInfo = RenderApiUtil::s_infos[j];
         const UnownedStringSlice names(apiInfo.names);
 
         if (names.indexOf(',') >= 0)
@@ -1634,7 +1605,7 @@ TestResult runTest(
     FileTestList const& testList)
 {
     // If this is d3d12 test
-    if (hasD3D12Option(testOptions) && (options.enabledApis & ApiTypeBit::kD3D12) == 0)
+    if (hasD3D12Option(testOptions) && (options.enabledApis & RenderApiFlag::kD3D12) == 0)
     {
         return kTestResult_Ignored;
     }
@@ -1869,7 +1840,7 @@ void runTestsOnFile(
     }
 
     // If dx12 is available synthesize Dx12 test
-    if ((options.enabledApis & ApiTypeBit::kD3D12) != 0)
+    if ((options.enabledApis & RenderApiFlag::kD3D12) != 0)
     {
         // If doesn't have option generate dx12 options from dx11
         if (!hasD3D12Option(testList))
