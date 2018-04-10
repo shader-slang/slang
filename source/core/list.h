@@ -504,7 +504,7 @@ namespace Slang
 		template<typename T2>
 		UInt IndexOf(const T2 & val) const
 		{
-			for (int i = 0; i < _count; i++)
+			for (UInt i = 0; i < _count; i++)
 			{
 				if (buffer[i] == val)
 					return i;

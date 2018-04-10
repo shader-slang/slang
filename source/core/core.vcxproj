@@ -36,6 +36,7 @@
     <ClInclude Include="slang-io.h" />
     <ClInclude Include="slang-math.h" />
     <ClInclude Include="slang-result.h" />
+    <ClInclude Include="slang-string-util.h" />
     <ClInclude Include="slang-string.h" />
     <ClInclude Include="smart-pointer.h" />
     <ClInclude Include="stream.h" />
@@ -47,6 +48,7 @@
     <ClCompile Include="platform.cpp" />
     <ClCompile Include="slang-free-list.cpp" />
     <ClCompile Include="slang-io.cpp" />
+    <ClCompile Include="slang-string-util.cpp" />
     <ClCompile Include="slang-string.cpp" />
     <ClCompile Include="stream.cpp" />
     <ClCompile Include="text-io.cpp" />
