@@ -74,7 +74,7 @@ struct Options
     Dictionary<TestCategory*, TestCategory*> excludeCategories;
 
     // By default we can test against all apis
-    int enabledApis = int(RenderApiFlag::kAllOf);           
+    int enabledApis = int(RenderApiFlag::AllOf);           
 };
 Options options;
 
@@ -1521,7 +1521,7 @@ TestResult runTest(
     FileTestList const& testList)
 {
     // If this is d3d12 test
-    if (hasD3D12Option(testOptions) && (options.enabledApis & RenderApiFlag::kD3D12) == 0)
+    if (hasD3D12Option(testOptions) && (options.enabledApis & RenderApiFlag::D3D12) == 0)
     {
         return kTestResult_Ignored;
     }
@@ -1756,7 +1756,7 @@ void runTestsOnFile(
     }
 
     // If dx12 is available synthesize Dx12 test
-    if ((options.enabledApis & RenderApiFlag::kD3D12) != 0)
+    if ((options.enabledApis & RenderApiFlag::D3D12) != 0)
     {
         // If doesn't have option generate dx12 options from dx11
         if (!hasD3D12Option(testList))

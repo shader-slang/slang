@@ -8,16 +8,16 @@
 
 /* static */const RenderApiUtil::Info RenderApiUtil::s_infos[] =
 {
-    { RenderApiType::kOpenGl, "gl,ogl,opengl"},
-    { RenderApiType::kVulkan, "vk,vulkan"},
-    { RenderApiType::kD3D12,  "dx12,d3d12"},
-    { RenderApiType::kD3D11,  "dx11,d3d11"},
+    { RenderApiType::OpenGl, "gl,ogl,opengl"},
+    { RenderApiType::Vulkan, "vk,vulkan"},
+    { RenderApiType::D3D12,  "dx12,d3d12"},
+    { RenderApiType::D3D11,  "dx11,d3d11"},
 };
 
 static int _calcAvailableApis()
 {
     int flags = 0;
-    for (int i = 0; i < int(RenderApiType::kCountOf); i++)
+    for (int i = 0; i < int(RenderApiType::CountOf); i++)
     {
         if (RenderApiUtil::calcHasApi(RenderApiType(i)))
         {
@@ -56,7 +56,7 @@ static int _calcAvailableApis()
             return apiInfo.type;
         }
     }
-    return RenderApiType::kUnknown;
+    return RenderApiType::Unknown;
 }
 
 /* static */int RenderApiUtil::findApiFlagsByName(const Slang::UnownedStringSlice& name)
@@ -64,10 +64,10 @@ static int _calcAvailableApis()
     // Special case 'all'
     if (name == "all")
     {
-        return int(RenderApiFlag::kAllOf);
+        return int(RenderApiFlag::AllOf);
     }
     RenderApiType type = findApiTypeByName(name);
-    return (type == RenderApiType::kUnknown) ? 0 : (1 << int(type));
+    return (type == RenderApiType::Unknown) ? 0 : (1 << int(type));
 }
 
 /* static */Slang::Result RenderApiUtil::parseApiFlags(const Slang::UnownedStringSlice& text, int* apiBitsOut)
@@ -186,10 +186,10 @@ protected:
 #if SLANG_WINDOWS_FAMILY
     switch (type)
     {
-        case RenderApiType::kOpenGl:    return WinModule("opengl32.dll").isLoaded();
-        case RenderApiType::kVulkan:    return WinModule("vulkan-1.dll").isLoaded();
-        case RenderApiType::kD3D11:     return WinModule("d3d11.dll").isLoaded();
-        case RenderApiType::kD3D12:     return WinModule("d3d12.dll").isLoaded();
+        case RenderApiType::OpenGl:    return WinModule("opengl32.dll").isLoaded();
+        case RenderApiType::Vulkan:    return WinModule("vulkan-1.dll").isLoaded();
+        case RenderApiType::D3D11:     return WinModule("d3d11.dll").isLoaded();
+        case RenderApiType::D3D12:     return WinModule("d3d12.dll").isLoaded();
 
         default: return false;
     }
@@ -198,8 +198,8 @@ protected:
 
     switch (type)
     {
-        case RenderApiType::kOpenGl:
-        case RenderApiType::kVulkan:
+        case RenderApiType::OpenGl:
+        case RenderApiType::Vulkan:
         {
             return true;
         }
