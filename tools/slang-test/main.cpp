@@ -43,8 +43,6 @@ enum OutputMode
 struct TestCategory;
 TestCategory* findTestCategory(String const& name);
 
-SlangResult findApis(const char* text, int* apiBitsOut);
-
 struct Options
 {
     char const* appName = "slang-test";
@@ -204,7 +202,7 @@ Result parseOptions(int* argc, char** argv)
             }
             const char* apiList = *argCursor++;
 
-            SlangResult res = findApis(apiList, &options.enabledApis);
+            SlangResult res = RenderApiUtil::parseApiFlags(UnownedStringSlice(apiList), &options.enabledApis);
             if (SLANG_FAILED(res))
             {
                 fprintf(stderr, "error: unable to parse api list '%s'\n", apiList);
@@ -267,88 +265,6 @@ enum TestResult
     kTestResult_Pass,
     kTestResult_Ignored,
 };
-
-/* Returns 0 if none found */
-static int findApiBitsByName(const UnownedStringSlice& name)
-{   
-    // Special case 'all'
-    if (name == "all")
-    {
-        return int(RenderApiFlag::kAllOf);
-    }
-
-    List<UnownedStringSlice> namesList;
-    for (int j = 0; j < SLANG_COUNT_OF(RenderApiUtil::s_infos); j++)
-    {
-        const auto& apiInfo = RenderApiUtil::s_infos[j];
-        const UnownedStringSlice names(apiInfo.names);
-
-        if (names.indexOf(',') >= 0)
-        {
-            StringUtil::split(names, ',', namesList);
-            if (namesList.IndexOf(name) != UInt(-1))
-            {
-                return 1 << int(apiInfo.type);
-            }
-        }
-        else if (names == name)
-        {
-            return 1 << int(apiInfo.type);
-        }
-    }
-    return 0;
-}
-
-SlangResult findApis(const char* textIn, int* apiBitsOut)
-{
-    UnownedStringSlice text(textIn);
-
-    int apiBits = 0;
-
-    List<UnownedStringSlice> slices;
-    StringUtil::split(text, ',', slices);
-
-    for (int i = 0; i < int(slices.Count()); ++i)
-    {
-        UnownedStringSlice slice = slices[i];
-        bool add = true;
-        if (slice.size() <= 0)
-        {
-            return SLANG_FAIL;
-        }
-        if (slice[0] == '+')
-        {
-            // Drop the +
-            slice = UnownedStringSlice(slice.begin() + 1, slice.end());
-        }
-        else if (slice[0] == '-')
-        {
-            add = false;
-            // Drop the +
-            slice = UnownedStringSlice(slice.begin() + 1, slice.end());
-        }
-
-        // We need to find the bits... 
-        int bits = findApiBitsByName(slice);
-        // 0 means an error
-        if (bits == 0)
-        {
-            return SLANG_FAIL;
-        }
-       
-        if (add)
-        {
-            apiBits |= bits;
-        }    
-        else
-        {
-            apiBits &= ~bits;
-        }
-    }
-
-    *apiBitsOut = apiBits;
-    return SLANG_OK;
-}
 
 bool match(char const** ioCursor, char const* expected)
 {
