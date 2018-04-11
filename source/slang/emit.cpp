@@ -282,7 +282,6 @@ static EOpInfo const* const kInfixOpInfos[] =
     &kEOp_Mod,
 };
 
-
 //
 
 // represents a declarator for use in emitting types
@@ -302,16 +301,10 @@ struct EDeclarator
     SourceLoc   loc;
 
     // Used for `Flavor::Array`
-    IntVal* elementCount;
-};
-
-struct TypeEmitArg
-{
-    EDeclarator* declarator;
+    IRInst* elementCount;
 };
 
 struct EmitVisitor
-    : TypeVisitorWithArg<EmitVisitor, TypeEmitArg>
 {
     EmitContext* context;
     EmitVisitor(EmitContext* context)
@@ -464,23 +457,6 @@ struct EmitVisitor
     void emitName(Name* name)
     {
         emitName(name, SourceLoc());
-    }
-
-    void emitName(
-        Decl*               decl,
-        SourceLoc const&    loc)
-    {
-        if(auto name = decl->getName())
-            emitName(name, loc);
-
-        Emit("_S");
-        Emit(getID(decl));
-    }
-
-    void emitName(
-        Decl*               decl)
-    {
-        emitName(decl, SourceLoc());
     }
 
     void Emit(IntegerLiteralValue value)
@@ -752,22 +728,6 @@ struct EmitVisitor
     // Types
     //
 
-    void Emit(RefPtr<IntVal> val)
-    {
-        if(auto constantIntVal = val.As<ConstantIntVal>())
-        {
-            Emit(constantIntVal->value);
-        }
-        else if(auto varRefVal = val.As<GenericParamIntVal>())
-        {
-            EmitDeclRef(varRefVal->declRef);
-        }
-        else
-        {
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unknown type of integer constant value");
-        }
-    }
-
     void EmitDeclarator(EDeclarator* declarator)
     {
         if (!declarator) return;
@@ -785,7 +745,7 @@ struct EmitVisitor
             Emit("[");
             if(auto elementCount = declarator->elementCount)
             {
-                Emit(elementCount);
+                EmitVal(elementCount);
             }
             Emit("]");
             break;
@@ -802,41 +762,35 @@ struct EmitVisitor
     }
 
     void emitGLSLTypePrefix(
-        RefPtr<Type>  type)
+        IRType* type)
     {
-        if(auto basicElementType = type->As<BasicExpressionType>())
+        switch (type->op)
         {
-            switch (basicElementType->baseType)
-            {
-            case BaseType::Float:
-                // no prefix
-                break;
+        case kIROp_FloatType:
+            // no prefix
+            break;
 
-            case BaseType::Int:		Emit("i");		break;
-            case BaseType::UInt:	Emit("u");		break;
-            case BaseType::Bool:	Emit("b");		break;
-            case BaseType::Double:	Emit("d");		break;
-            default:
-                SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled GLSL type prefix");
-                break;
-            }
-        }
-        else if(auto vectorType = type->As<VectorExpressionType>())
-        {
-            emitGLSLTypePrefix(vectorType->elementType);
-        }
-        else if(auto matrixType = type->As<MatrixExpressionType>())
-        {
-            emitGLSLTypePrefix(matrixType->getElementType());
-        }
-        else
-        {
+        case kIROp_IntType:		Emit("i");		break;
+        case kIROp_UIntType:	Emit("u");		break;
+        case kIROp_BoolType:	Emit("b");		break;
+        case kIROp_DoubleType:	Emit("d");		break;
+
+        case kIROp_VectorType:
+            emitGLSLTypePrefix(cast<IRVectorType>(type)->getElementType());
+            break;
+
+        case kIROp_MatrixType:
+            emitGLSLTypePrefix(cast<IRMatrixType>(type)->getElementType());
+            break;
+
+        default:
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled GLSL type prefix");
+            break;
         }
     }
 
     void emitHLSLTextureType(
-        RefPtr<TextureTypeBase> texType)
+        IRTextureTypeBase* texType)
     {
         switch(texType->getAccess())
         {
@@ -885,15 +839,15 @@ struct EmitVisitor
             Emit("Array");
         }
         Emit("<");
-        EmitType(texType->elementType);
+        EmitType(texType->getElementType());
         Emit(" >");
     }
 
     void emitGLSLTextureOrTextureSamplerType(
-        RefPtr<TextureTypeBase> type,
-        char const*             baseName)
+        IRTextureTypeBase*  type,
+        char const*         baseName)
     {
-        emitGLSLTypePrefix(type->elementType);
+        emitGLSLTypePrefix(type->getElementType());
 
         Emit(baseName);
         switch (type->GetBaseShape())
@@ -919,7 +873,7 @@ struct EmitVisitor
     }
 
     void emitGLSLTextureType(
-        RefPtr<TextureType> texType)
+        IRTextureType* texType)
     {
         switch(texType->getAccess())
         {
@@ -935,19 +889,19 @@ struct EmitVisitor
     }
 
     void emitGLSLTextureSamplerType(
-        RefPtr<TextureSamplerType>  type)
+        IRTextureSamplerType* type)
     {
         emitGLSLTextureOrTextureSamplerType(type, "sampler");
     }
 
     void emitGLSLImageType(
-        RefPtr<GLSLImageType>   type)
+        IRGLSLImageType* type)
     {
         emitGLSLTextureOrTextureSamplerType(type, "image");
     }
 
     void emitTextureType(
-        RefPtr<TextureType> texType)
+        IRTextureType*  texType)
     {
         switch(context->shared->target)
         {
@@ -966,7 +920,7 @@ struct EmitVisitor
     }
 
     void emitTextureSamplerType(
-        RefPtr<TextureSamplerType>  type)
+        IRTextureSamplerType*   type)
     {
         switch(context->shared->target)
         {
@@ -981,7 +935,7 @@ struct EmitVisitor
     }
 
     void emitImageType(
-        RefPtr<GLSLImageType>   type)
+        IRGLSLImageType*    type)
     {
         switch(context->shared->target)
         {
@@ -999,79 +953,27 @@ struct EmitVisitor
         }
     }
 
-    void emitTypeImpl(RefPtr<Type> type, EDeclarator* declarator)
+
+    void emitVectorTypeImpl(IRVectorType* vecType)
     {
-        TypeEmitArg arg;
-        arg.declarator = declarator;
-
-        TypeVisitorWithArg::dispatch(type, arg);
-    }
-
-#define UNEXPECTED(NAME) \
-    void visit##NAME(NAME*, TypeEmitArg const& arg) \
-    { Emit(#NAME); EmitDeclarator(arg.declarator); }
-
-    UNEXPECTED(ErrorType);
-    UNEXPECTED(OverloadGroupType);
-    UNEXPECTED(FuncType);
-    UNEXPECTED(TypeType);
-    UNEXPECTED(GenericDeclRefType);
-    UNEXPECTED(InitializerListType);
-
-    UNEXPECTED(IRBasicBlockType);
-    UNEXPECTED(PtrType);
-
-#undef UNEXPECTED
-
-    void visitNamedExpressionType(NamedExpressionType* type, TypeEmitArg const& arg)
-    {
-        // We will always emit the actual type referenced by
-        // a named type declaration, rather than try to produce
-        // equivalent `typedef` declarations in the output.
-
-        emitTypeImpl(GetType(type->declRef), arg.declarator);
-    }
-
-    void visitBasicExpressionType(BasicExpressionType* basicType, TypeEmitArg const& arg)
-    {
-        auto declarator = arg.declarator;
-        switch (basicType->baseType)
-        {
-        case BaseType::Void:	Emit("void");		break;
-        case BaseType::Int:		Emit("int");		break;
-        case BaseType::Float:	Emit("float");		break;
-        case BaseType::UInt:	Emit("uint");		break;
-        case BaseType::Bool:	Emit("bool");		break;
-        case BaseType::Double:	Emit("double");		break;
-        default:
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled scalar type");
-            break;
-        }
-
-        EmitDeclarator(declarator);
-    }
-
-    void visitVectorExpressionType(VectorExpressionType* vecType, TypeEmitArg const& arg)
-    {
-        auto declarator = arg.declarator;
         switch(context->shared->target)
         {
         case CodeGenTarget::GLSL:
         case CodeGenTarget::GLSL_Vulkan:
         case CodeGenTarget::GLSL_Vulkan_OneDesc:
             {
-                emitGLSLTypePrefix(vecType->elementType);
+                emitGLSLTypePrefix(vecType->getElementType());
                 Emit("vec");
-                Emit(vecType->elementCount);
+                EmitVal(vecType->getElementCount());
             }
             break;
 
         case CodeGenTarget::HLSL:
             // TODO(tfoley): should really emit these with sugar
             Emit("vector<");
-            EmitType(vecType->elementType);
+            EmitType(vecType->getElementType());
             Emit(",");
-            Emit(vecType->elementCount);
+            EmitVal(vecType->getElementCount());
             Emit(">");
             break;
 
@@ -1079,13 +981,10 @@ struct EmitVisitor
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled code generation target");
             break;
         }
-
-        EmitDeclarator(declarator);
     }
 
-    void visitMatrixExpressionType(MatrixExpressionType* matType, TypeEmitArg const& arg)
+    void emitMatrixTypeImpl(IRMatrixType* matType)
     {
-        auto declarator = arg.declarator;
         switch(context->shared->target)
         {
         case CodeGenTarget::GLSL:
@@ -1094,11 +993,11 @@ struct EmitVisitor
             {
                 emitGLSLTypePrefix(matType->getElementType());
                 Emit("mat");
-                Emit(matType->getRowCount());
+                EmitVal(matType->getRowCount());
                 // TODO(tfoley): only emit the next bit
                 // for non-square matrix
                 Emit("x");
-                Emit(matType->getColumnCount());
+                EmitVal(matType->getColumnCount());
             }
             break;
 
@@ -1107,9 +1006,9 @@ struct EmitVisitor
             Emit("matrix<");
             EmitType(matType->getElementType());
             Emit(",");
-            Emit(matType->getRowCount());
+            EmitVal(matType->getRowCount());
             Emit(",");
-            Emit(matType->getColumnCount());
+            EmitVal(matType->getColumnCount());
             Emit("> ");
             break;
 
@@ -1117,42 +1016,18 @@ struct EmitVisitor
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled code generation target");
             break;
         }
-
-        EmitDeclarator(declarator);
     }
 
-    void visitTextureType(TextureType* texType, TypeEmitArg const& arg)
+    void emitSamplerStateType(IRSamplerStateTypeBase* samplerStateType)
     {
-        auto declarator = arg.declarator;
-        emitTextureType(texType);
-        EmitDeclarator(declarator);
-    }
-
-    void visitTextureSamplerType(TextureSamplerType* textureSamplerType, TypeEmitArg const& arg)
-    {
-        auto declarator = arg.declarator;
-        emitTextureSamplerType(textureSamplerType);
-        EmitDeclarator(declarator);
-    }
-
-    void visitGLSLImageType(GLSLImageType* imageType, TypeEmitArg const& arg)
-    {
-        auto declarator = arg.declarator;
-        emitImageType(imageType);
-        EmitDeclarator(declarator);
-    }
-
-    void visitSamplerStateType(SamplerStateType* samplerStateType, TypeEmitArg const& arg)
-    {
-        auto declarator = arg.declarator;
         switch(context->shared->target)
         {
         case CodeGenTarget::HLSL:
         default:
-            switch (samplerStateType->flavor)
+            switch (samplerStateType->op)
             {
-            case SamplerStateFlavor::SamplerState:			Emit("SamplerState");			break;
-            case SamplerStateFlavor::SamplerComparisonState:	Emit("SamplerComparisonState");	break;
+            case kIROp_SamplerStateType:			Emit("SamplerState");			break;
+            case kIROp_SamplerComparisonStateType:	Emit("SamplerComparisonState");	break;
             default:
                 SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled sampler state flavor");
                 break;
@@ -1160,10 +1035,10 @@ struct EmitVisitor
             break;
 
         case CodeGenTarget::GLSL:
-            switch (samplerStateType->flavor)
+            switch (samplerStateType->op)
             {
-            case SamplerStateFlavor::SamplerState:			Emit("sampler");		break;
-            case SamplerStateFlavor::SamplerComparisonState:	Emit("samplerShadow");	break;
+            case kIROp_SamplerStateType:			Emit("sampler");		break;
+            case kIROp_SamplerComparisonStateType:	Emit("samplerShadow");	break;
             default:
                 SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled sampler state flavor");
                 break;
@@ -1171,69 +1046,217 @@ struct EmitVisitor
             break;
             break;
         }
-
-        EmitDeclarator(declarator);
     }
 
-    void visitDeclRefType(DeclRefType* declRefType, TypeEmitArg const& arg)
+    void emitStructuredBufferType(IRHLSLStructuredBufferTypeBase* type)
     {
-        auto declarator = arg.declarator;
-        EmitDeclRef(declRefType->declRef);
-        EmitDeclarator(declarator);
-    }
-
-    void visitArrayExpressionType(ArrayExpressionType* arrayType, TypeEmitArg const& arg)
-    {
-        auto declarator = arg.declarator;
-
-        EDeclarator arrayDeclarator;
-        arrayDeclarator.next = declarator;
-
-        if(arrayType->ArrayLength)
-        {
-            arrayDeclarator.flavor = EDeclarator::Flavor::Array;
-            arrayDeclarator.elementCount = arrayType->ArrayLength.Ptr();
-        }
-        else
-        {
-            arrayDeclarator.flavor = EDeclarator::Flavor::UnsizedArray;
-        }
-
-
-        emitTypeImpl(arrayType->baseType, &arrayDeclarator);
-    }
-
-    void visitRateQualifiedType(RateQualifiedType* type, TypeEmitArg const& arg)
-    {
-        emitTypeImpl(type->valueType, arg.declarator);
-    }
-
-    void visitConstExprRate(ConstExprRate* /*rate*/, TypeEmitArg const& /*arg*/)
-    {
-        // This should never appear as a data type
-        SLANG_UNEXPECTED("Rates not expected during emit");
-    }
-
-    void visitGroupSharedType(GroupSharedType* type, TypeEmitArg const& arg)
-    {
-        switch(getTarget(context))
+        switch(context->shared->target)
         {
         case CodeGenTarget::HLSL:
-            Emit("groupshared ");
+        default:
+            {
+                switch (type->op)
+                {
+                case kIROp_HLSLStructuredBufferType:        Emit("StructuredBuffer");           break;
+                case kIROp_HLSLRWStructuredBufferType:      Emit("RWStructuredBuffer");         break;
+                case kIROp_HLSLAppendStructuredBufferType:  Emit("AppendStructuredBuffer");     break;
+                case kIROp_HLSLConsumeStructuredBufferType: Emit("ConsumeStructuredBuffer");    break;
+
+                default:
+                    SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled structured buffer type");
+                    break;
+                }
+
+                Emit("<");
+                EmitType(type->getElementType());
+                Emit(" >");
+            }
             break;
 
         case CodeGenTarget::GLSL:
-            Emit("shared ");
-            break;
-
-        default:
+            // TODO: We desugar global variables with structured-buffer type into GLSL
+            // `buffer` declarations, but we don't currently handle structured-buffer types
+            // in other contexts (e.g., as function parameters). The simplest thing to do
+            // would be to emit a `StructuredBuffer<Foo>` as `Foo[]` and `RWStructuredBuffer<Foo>`
+            // as `in out Foo[]`, but that is starting to get into the realm of transformations
+            // that should really be handled during legalization, rather than during emission.
+            //
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "structured buffer type used unexpectedly");
             break;
         }
-        emitTypeImpl(type->valueType, arg.declarator);
+    }
+
+    void emitUntypedBufferType(IRUntypedBufferResourceType* type)
+    {
+        switch(context->shared->target)
+        {
+        case CodeGenTarget::HLSL:
+        default:
+            {
+                switch (type->op)
+                {
+                case kIROp_HLSLByteAddressBufferType:           Emit("ByteAddressBuffer");           break;
+                case kIROp_HLSLRWByteAddressBufferType:         Emit("RWByteAddressBuffer");         break;
+                case kIROp_RaytracingAccelerationStructureType: Emit("RaytracingAccelerationStructureType");     break;
+
+                default:
+                    SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled buffer type");
+                    break;
+                }
+            }
+            break;
+
+        case CodeGenTarget::GLSL:
+            {
+                switch (type->op)
+                {
+                case kIROp_HLSLByteAddressBufferType:           Emit("ByteAddressBuffer");           break;
+                case kIROp_HLSLRWByteAddressBufferType:         Emit("RWByteAddressBuffer");         break;
+                case kIROp_RaytracingAccelerationStructureType: Emit("RaytracingAccelerationStructureType");     break;
+
+                default:
+                    SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled buffer type");
+                    break;
+                }
+            }
+            break;
+        }
+    }
+
+    void emitSimpleTypeImpl(IRType* type)
+    {
+        switch (type->op)
+        {
+        default:
+            break;
+
+        case kIROp_VoidType:    Emit("void");       return;
+        case kIROp_IntType:     Emit("int");        return;
+        case kIROp_UIntType:    Emit("uint");       return;
+        case kIROp_BoolType:    Emit("bool");       return;
+        case kIROp_HalfType:    Emit("half");       return;
+        case kIROp_FloatType:   Emit("float");      return;
+        case kIROp_DoubleType:  Emit("double");     return;
+
+        case kIROp_VectorType:
+            emitVectorTypeImpl((IRVectorType*)type);
+            return;
+
+        case kIROp_MatrixType:
+            emitMatrixTypeImpl((IRMatrixType*)type);
+            return;
+
+        case kIROp_SamplerStateType:
+        case kIROp_SamplerComparisonStateType:
+            emitSamplerStateType(cast<IRSamplerStateTypeBase>(type));
+            return;
+
+        case kIROp_StructType:
+            emit(getIRName(type));
+            return;
+        }
+
+        // TODO: Ideally the following should be data-driven,
+        // based on meta-data attached to the definitions of
+        // each of these IR opcodes.
+
+        if (auto texType = as<IRTextureType>(type))
+        {
+            emitTextureType(texType);
+            return;
+        }
+        else if (auto textureSamplerType = as<IRTextureSamplerType>(type))
+        {
+            emitTextureSamplerType(textureSamplerType);
+            return;
+        }
+        else if (auto imageType = as<IRGLSLImageType>(type))
+        {
+            emitImageType(imageType);
+            return;
+        }
+        else if (auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type))
+        {
+            emitStructuredBufferType(structuredBufferType);
+            return;
+        }
+        else if(auto untypedBufferType = as<IRUntypedBufferResourceType>(type))
+        {
+            emitUntypedBufferType(untypedBufferType);
+            return;
+        }
+
+        // HACK: As a fallback for HLSL targets, assume that the name of the
+        // instruction being used is the same as the name of the HLSL type.
+        if(context->shared->target == CodeGenTarget::HLSL)
+        {
+            auto opInfo = getIROpInfo(type->op);
+            emit(opInfo.name);
+            UInt operandCount = type->getOperandCount();
+            if(operandCount)
+            {
+                emit("<");
+                for(UInt ii = 0; ii < operandCount; ++ii)
+                {
+                    if(ii != 0) emit(", ");
+                    EmitVal(type->getOperand(ii));
+                }
+                emit(" >");
+            }
+
+            return;
+        }
+
+        SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled type");
+    }
+
+    void emitArrayTypeImpl(IRArrayType* arrayType, EDeclarator* declarator)
+    {
+        EDeclarator arrayDeclarator;
+        arrayDeclarator.flavor = EDeclarator::Flavor::Array;
+        arrayDeclarator.next = declarator;
+        arrayDeclarator.elementCount = arrayType->getElementCount();
+
+        emitTypeImpl(arrayType->getElementType(), &arrayDeclarator);
+    }
+
+    void emitUnsizedArrayTypeImpl(IRUnsizedArrayType* arrayType, EDeclarator* declarator)
+    {
+        EDeclarator arrayDeclarator;
+        arrayDeclarator.flavor = EDeclarator::Flavor::UnsizedArray;
+        arrayDeclarator.next = declarator;
+
+        emitTypeImpl(arrayType->getElementType(), &arrayDeclarator);
+    }
+
+    void emitTypeImpl(IRType* type, EDeclarator* declarator)
+    {
+        switch (type->op)
+        {
+        default:
+            emitSimpleTypeImpl(type);
+            EmitDeclarator(declarator);
+            break;
+
+        case kIROp_RateQualifiedType:
+            {
+                auto rateQualifiedType = cast<IRRateQualifiedType>(type);
+                emitTypeImpl(rateQualifiedType->getValueType(), declarator);
+            }
+
+        case kIROp_ArrayType:
+            emitArrayTypeImpl(cast<IRArrayType>(type), declarator);
+            break;
+
+        case kIROp_UnsizedArrayType:
+            emitUnsizedArrayTypeImpl(cast<IRUnsizedArrayType>(type), declarator);
+            break;
+        }
+
     }
 
     void EmitType(
-        RefPtr<Type>        type,
+        IRType*             type,
         SourceLoc const&    typeLoc,
         Name*               name,
         SourceLoc const&    nameLoc)
@@ -1247,12 +1270,12 @@ struct EmitVisitor
         emitTypeImpl(type, &nameDeclarator);
     }
 
-    void EmitType(RefPtr<Type> type, Name* name)
+    void EmitType(IRType* type, Name* name)
     {
         EmitType(type, SourceLoc(), name, SourceLoc());
     }
 
-    void EmitType(RefPtr<Type> type, String const& name)
+    void EmitType(IRType* type, String const& name)
     {
         // HACK: the rest of the code wants a `Name`,
         // so we'll create one for a bit...
@@ -1263,7 +1286,7 @@ struct EmitVisitor
     }
 
 
-    void EmitType(RefPtr<Type> type)
+    void EmitType(IRType* type)
     {
         emitTypeImpl(type, nullptr);
     }
@@ -1298,6 +1321,20 @@ struct EmitVisitor
         case CodeGenTarget::GLSL: return targetName == "glsl";
         case CodeGenTarget::HLSL: return targetName == "hlsl";
         }
+    }
+
+    void EmitType(IRType* type, Name* name, SourceLoc const& nameLoc)
+    {
+        EmitType(
+            type,
+            SourceLoc(),
+            name,
+            nameLoc);
+    }
+
+    void EmitType(IRType* type, NameLoc const& nameAndLoc)
+    {
+        EmitType(type, nameAndLoc.name, nameAndLoc.loc);
     }
 
     bool isTargetIntrinsicModifierApplicable(
@@ -1407,78 +1444,16 @@ struct EmitVisitor
         }
     }
 
-    //
-    // Declaration References
-    //
-
-    void EmitVal(RefPtr<Val> val)
+    void EmitVal(IRInst* val)
     {
-        if (auto type = val.As<Type>())
+        if(auto type = as<IRType>(val))
         {
             EmitType(type);
         }
-        else if (auto intVal = val.As<IntVal>())
-        {
-            Emit(intVal);
-        }
         else
         {
-            // Note(tfoley): ignore unhandled cases for semantics for now...
-    //		assert(!"unimplemented");
+            emitIRInstExpr(context, val, IREmitMode::Default);
         }
-    }
-
-    bool isBuiltinDecl(Decl* decl)
-    {
-        for (auto dd = decl; dd; dd = dd->ParentDecl)
-        {
-            if (dd->FindModifier<FromStdLibModifier>())
-                return true;
-        }
-        return false;
-    }
-
-    void EmitDeclRef(DeclRef<Decl> declRef)
-    {
-        // When refering to anything other than a builtin, use its IR-facing name
-        if (!isBuiltinDecl(declRef.getDecl()))
-        {
-            emit(getIRName(declRef));
-            return;
-        }
-
-
-        // TODO: need to qualify a declaration name based on parent scopes/declarations
-
-        // Emit the name for the declaration itself
-        emitName(declRef.GetName());
-
-        // If the declaration is nested directly in a generic, then
-        // we need to output the generic arguments here
-        auto parentDeclRef = declRef.GetParent();
-        if (auto genericDeclRef = parentDeclRef.As<GenericDecl>())
-        {
-            // Only do this for declarations of appropriate flavors
-            if(auto funcDeclRef = declRef.As<FunctionDeclBase>())
-            {
-                // Don't emit generic arguments for functions, because HLSL doesn't allow them
-                return;
-            }
-
-            GenericSubstitution* subst = declRef.substitutions.genericSubstitutions;
-            if (!subst)
-                return;
-
-            Emit("<");
-            UInt argCount = subst->args.Count();
-            for (UInt aa = 0; aa < argCount; ++aa)
-            {
-                if (aa != 0) Emit(",");
-                EmitVal(subst->args[aa]);
-            }
-            Emit(" >");
-        }
-
     }
 
     typedef unsigned int ESemanticMask;
@@ -1490,50 +1465,6 @@ struct EmitVisitor
 
         kESemanticMask_Default = kESemanticMask_NoPackOffset,
     };
-
-    void EmitSemantic(RefPtr<HLSLSemantic> semantic, ESemanticMask /*mask*/)
-    {
-        if (auto simple = semantic.As<HLSLSimpleSemantic>())
-        {
-            Emit(" : ");
-            emit(simple->name.Content);
-        }
-        else if(auto registerSemantic = semantic.As<HLSLRegisterSemantic>())
-        {
-            // Don't print out semantic from the user, since we are going to print the same thing our own way...
-        }
-        else if(auto packOffsetSemantic = semantic.As<HLSLPackOffsetSemantic>())
-        {
-            // Don't print out semantic from the user, since we are going to print the same thing our own way...
-        }
-        else
-        {
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), semantic->loc, "unhandled kind of semantic");
-        }
-    }
-
-
-    void EmitSemantics(RefPtr<Decl> decl, ESemanticMask mask = kESemanticMask_Default )
-    {
-        // Don't emit semantics if we aren't translating down to HLSL
-        switch (context->shared->target)
-        {
-        case CodeGenTarget::HLSL:
-            break;
-
-        default:
-            return;
-        }
-
-        for (auto mod = decl->modifiers.first; mod; mod = mod->next)
-        {
-            auto semantic = mod.As<HLSLSemantic>();
-            if (!semantic)
-                continue;
-
-            EmitSemantic(semantic, mask);
-        }
-    }
 
     // A chain of variables to use for emitting semantic/layout info
     struct EmitVarChain
@@ -1851,7 +1782,6 @@ struct EmitVisitor
         }
     }
 
-
     void emitGLSLVersionDirective(
         ModuleDecl*  /*program*/)
     {
@@ -1949,19 +1879,6 @@ struct EmitVisitor
         return context->shared->uniqueIDCounter++;
     }
 
-    UInt getID(Decl* decl)
-    {
-        auto& mapDeclToID = context->shared->mapDeclToID;
-
-        UInt id = 0;
-        if(mapDeclToID.TryGetValue(decl, id))
-            return id;
-
-        id = allocateUniqueID();
-        mapDeclToID.Add(decl, id);
-        return id;
-    }
-
     // IR-level emit logc
 
     UInt getID(IRInst* value)
@@ -1977,105 +1894,25 @@ struct EmitVisitor
         return id;
     }
 
-    String getIRName(Decl* decl)
-    {
-        // TODO: need a flag to get rid of the step that adds
-        // a prefix here, so that we can get "clean" output
-        // when needed.
-        //
-
-        String name;
-        if (!(context->shared->entryPoint->compileRequest->compileFlags & SLANG_COMPILE_FLAG_NO_MANGLING))
-        {
-            name.append("_s");
-        }
-        name.append(getText(decl->getName()));
-        return name;
-    }
-
-    String getIRName(DeclRefBase const& declRef)
-    {
-        // In general, when referring to a declaration that has been lowered
-        // via the IR, we want to use its mangled name.
-        //
-        // There are two main exceptions to this:
-        //
-        // 1. For debugging, we accept the `-no-mangle` flag which basically
-        //    instructs us to try to use the original name of all declarations,
-        //    to make the output more like what is expected to come out of
-        //    fxc pass-through. This case should get deprecated some day.
-        //
-        // 2. It is really annoying to have the fields of a `struct` type
-        //    get ridiculously lengthy mangled names, and this also messes
-        //    up stuff like specialization (since the mangled name of a field
-        //    would then include the mangled name of the outer type).
-        //
-
-        String name;
-        if (context->shared->entryPoint->compileRequest->compileFlags & SLANG_COMPILE_FLAG_NO_MANGLING)
-        {
-            // Special case (1):
-            name.append(getText(declRef.GetName()));
-            return name;
-        }
-
-        // Special case (2)
-        if (declRef.GetParent().decl->As<AggTypeDecl>())
-        {
-            name.append(declRef.decl->nameAndLoc.name->text);
-            return name;
-        }
-        // General case:
-        name.append(getMangledName(declRef));
-        return name;
-    }
-
     String getIRName(
         IRInst*        inst)
     {
-        switch(inst->op)
+        // If the instruction has a mangled name, then emit using that.
+        if (auto globalValue = as<IRGlobalValue>(inst))
         {
-        case kIROp_decl_ref:
+            auto mangledName = globalValue->mangledName;
+            if (mangledName)
             {
-                auto irDeclRef = (IRDeclRef*) inst;
-                return getIRName(irDeclRef->declRef);
-            }
-            break;
-
-        default:
-            break;
-        }
-
-        if(auto decoration = inst->findDecoration<IRHighLevelDeclDecoration>())
-        {
-            auto decl = decoration->decl;
-            if (auto reflectionNameMod = decl->FindModifier<ParameterGroupReflectionName>())
-            {
-                return getText(reflectionNameMod->nameAndLoc.name);
-            }
-
-            if ((context->shared->entryPoint->compileRequest->compileFlags & SLANG_COMPILE_FLAG_NO_MANGLING))
-            {
-                return getIRName(decl);
-            }
-        }
-
-        switch (inst->op)
-        {
-        case kIROp_global_var:
-        case kIROp_global_constant:
-        case kIROp_Func:
-            {
-                auto& mangledName = ((IRGlobalValue*)inst)->mangledName;
-                if(getText(mangledName).Length() != 0)
+                auto mangledNameText = getText(mangledName);
+                if (mangledNameText.Length() != 0)
+                {
                     return getText(mangledName);
+                }
             }
-            break;
-
-        default:
-            break;
         }
 
+        // Otherwise fall back to a construct temporary name
+        // for the instruction.
         StringBuilder sb;
         sb << "_S";
         sb << getID(inst);
@@ -2180,8 +2017,8 @@ struct EmitVisitor
             break;
 
         case kIROp_Var:
-        case kIROp_global_var:
-        case kIROp_global_constant:
+        case kIROp_GlobalVar:
+        case kIROp_GlobalConstant:
         case kIROp_Param:
             return false;
 
@@ -2190,7 +2027,7 @@ struct EmitVisitor
         case kIROp_boolConst:
         case kIROp_FieldAddress:
         case kIROp_getElementPtr:
-        case kIROp_specialize:
+        case kIROp_Specialize:
         case kIROp_BufferElementRef:
             return true;
         }
@@ -2204,23 +2041,23 @@ struct EmitVisitor
         // variables.
         auto type = inst->getDataType();
 
-        while (auto ptrType = type->As<PtrTypeBase>())
+        while (auto ptrType = as<IRPtrTypeBase>(type))
         {
             type = ptrType->getValueType();
         }
 
-        if(type->As<UniformParameterGroupType>())
+        if(as<IRUniformParameterGroupType>(type))
         {
             // TODO: we need to be careful here, because
             // HLSL shader model 6 allows these as explicit
             // types.
             return true;
         }
-        else if (type->As<HLSLStreamOutputType>())
+        else if (as<IRHLSLStreamOutputType>(type))
         {
             return true;
         }
-        else if (type->As<HLSLPatchType>())
+        else if (as<IRHLSLPatchType>(type))
         {
             return true;
         }
@@ -2231,15 +2068,15 @@ struct EmitVisitor
         // to fold them into their use sites in all cases
         if (getTarget(ctx) == CodeGenTarget::GLSL)
         {
-            if(type->As<ResourceTypeBase>())
+            if(as<IRResourceTypeBase>(type))
             {
                 return true;
             }
-            else if(type->As<HLSLStructuredBufferTypeBase>())
+            else if(as<IRHLSLStructuredBufferTypeBase>(type))
             {
                 return true;
             }
-            else if(type->As<SamplerStateType>())
+            else if(as<IRSamplerStateType>(type))
             {
                 return true;
             }
@@ -2255,7 +2092,7 @@ struct EmitVisitor
     {
         auto type = inst->getDataType();
 
-        if(type->As<UniformParameterGroupType>() && !type->As<ParameterBlockType>())
+        if(as<IRUniformParameterGroupType>(type) && !as<IRParameterBlockType>(type))
         {
             // TODO: we need to be careful here, because
             // HLSL shader model 6 allows these as explicit
@@ -2332,16 +2169,33 @@ struct EmitVisitor
 
     void emitIRRateQualifiers(
         EmitContext*    ctx,
-        Type*           rate)
+        IRRate*         rate)
     {
         if(!rate) return;
 
-        if( auto constExprRate = rate->As<ConstExprRate>() )
+        if(as<IRConstExprRate>(rate))
         {
             switch( getTarget(ctx) )
             {
             case CodeGenTarget::GLSL:
                 emit("const ");
+                break;
+
+            default:
+                break;
+            }
+        }
+
+        if (as<IRGroupSharedRate>(rate))
+        {
+            switch( getTarget(ctx) )
+            {
+            case CodeGenTarget::HLSL:
+                Emit("groupshared ");
+                break;
+
+            case CodeGenTarget::GLSL:
+                Emit("shared ");
                 break;
 
             default:
@@ -2366,7 +2220,7 @@ struct EmitVisitor
         if(!type)
             return;
 
-        if (type->Equals(getSession()->getVoidType()))
+        if (as<IRVoidType>(type))
             return;
 
         emitIRRateQualifiers(ctx, inst);
@@ -2708,13 +2562,13 @@ struct EmitVisitor
                         auto textureArg = args[0].get();
                         auto samplerArg = args[1].get();
 
-                        if (auto baseTextureType = textureArg->type->As<TextureType>())
+                        if (auto baseTextureType = as<IRTextureType>(textureArg->getDataType()))
                         {
                             emitGLSLTextureOrTextureSamplerType(baseTextureType, "sampler");
 
-                            if (auto samplerType = samplerArg->type->As<SamplerStateType>())
+                            if (auto samplerType = as<IRSamplerStateTypeBase>(samplerArg->getDataType()))
                             {
-                                if (samplerType->flavor == SamplerStateFlavor::SamplerComparisonState)
+                                if (as<IRSamplerComparisonStateType>(samplerType))
                                 {
                                     Emit("Shadow");
                                 }
@@ -2746,7 +2600,7 @@ struct EmitVisitor
                         // We are going to hack this *hard* for now.
 
                         auto textureArg = args[0].get();
-                        if (auto baseTextureType = textureArg->type->As<TextureType>())
+                        if (auto baseTextureType = as<IRTextureType>(textureArg->getDataType()))
                         {
                             emitGLSLTextureOrTextureSamplerType(baseTextureType, "sampler");
                             Emit("(");
@@ -2772,18 +2626,18 @@ struct EmitVisitor
                         SLANG_RELEASE_ASSERT(argCount >= 1);
 
                         auto textureArg = args[0].get();
-                        if (auto baseTextureType = textureArg->type->As<TextureType>())
+                        if (auto baseTextureType = as<IRTextureType>(textureArg->getDataType()))
                         {
-                            auto elementType = baseTextureType->elementType;
-                            if (auto basicType = elementType->As<BasicExpressionType>())
+                            auto elementType = baseTextureType->getElementType();
+                            if (auto basicType = as<IRBasicType>(elementType))
                             {
                                 // A scalar result is expected
                                 Emit(".x");
                             }
-                            else if (auto vectorType = elementType->As<VectorExpressionType>())
+                            else if (auto vectorType = as<IRVectorType>(elementType))
                             {
                                 // A vector result is expected
-                                auto elementCount = GetIntVal(vectorType->elementCount);
+                                auto elementCount = GetIntVal(vectorType->getElementCount());
 
                                 if (elementCount < 4)
                                 {
@@ -2813,9 +2667,9 @@ struct EmitVisitor
                         SLANG_RELEASE_ASSERT(argCount > argIndex);
 
                         auto vectorArg = args[argIndex].get();
-                        if (auto vectorType = vectorArg->type->As<VectorExpressionType>())
+                        if (auto vectorType = as<IRVectorType>(vectorArg->getDataType()))
                         {
-                            auto elementCount = GetIntVal(vectorType->elementCount);
+                            auto elementCount = GetIntVal(vectorType->getElementCount());
                             Emit(elementCount);
                         }
                         else
@@ -2850,7 +2704,7 @@ struct EmitVisitor
         UInt operandIndex = 1;
 
 
-        // 
+        //
         if (auto targetIntrinsicDecoration = findTargetIntrinsicDecoration(ctx, func))
         {
             emitTargetIntrinsicCallExpr(
@@ -2869,7 +2723,29 @@ struct EmitVisitor
         // be better strategies (including just stuffing
         // a pointer to the original decl onto the callee).
 
-        UnmangleContext um(getText(func->mangledName));
+        // If the intrinsic the user is calling is a generic,
+        // then the mangled name will have been set on the
+        // outer-most generic, and not on the leaf value
+        // (which is `func` above), so we need to walk
+        // upwards to find it.
+        //
+        IRGlobalValue* valueForName = func;
+        for(;;)
+        {
+            auto parentBlock = as<IRBlock>(valueForName->parent);
+            if(!parentBlock)
+                break;
+
+            auto parentGeneric = as<IRGeneric>(parentBlock->parent);
+            if(!parentGeneric)
+                break;
+
+            valueForName = parentGeneric;
+        }
+
+        // We will use the `UnmangleContext` utility to
+        // help us split the original name into its pieces.
+        UnmangleContext um(getText(valueForName->mangledName));
         um.startUnmangling();
 
         // We'll read through the qualified name of the
@@ -3075,8 +2951,8 @@ struct EmitVisitor
         case kIROp_Mul:
             // Are we targetting GLSL, and are both operands matrices?
             if(getTarget(ctx) == CodeGenTarget::GLSL
-                && inst->getOperand(0)->type->As<MatrixExpressionType>()
-                && inst->getOperand(1)->type->As<MatrixExpressionType>())
+                && as<IRMatrixType>(inst->getOperand(0)->getDataType())
+                && as<IRMatrixType>(inst->getOperand(1)->getDataType()))
             {
                 emit("matrixCompMult(");
                 emitIROperand(ctx, inst->getOperand(0), mode);
@@ -3096,7 +2972,7 @@ struct EmitVisitor
 
         case kIROp_Not:
             {
-                if (inst->getDataType()->Equals(getSession()->getBoolType()))
+                if (as<IRBoolType>(inst->getDataType()))
                 {
                     emit("!");
                 }
@@ -3248,7 +3124,7 @@ struct EmitVisitor
             }
             break;
 
-        case kIROp_specialize:
+        case kIROp_Specialize:
             {
                 emitIROperand(ctx, inst->getOperand(0), mode);
             }
@@ -3322,8 +3198,8 @@ struct EmitVisitor
 
         case kIROp_Var:
             {
-                auto ptrType = inst->getDataType();
-                auto valType = ((PtrType*)ptrType)->getValueType();
+                auto ptrType = cast<IRPtrType>(inst->getDataType());
+                auto valType = ptrType->getValueType();
 
                 auto name = getIRName(inst);
                 emitIRType(ctx, valType, name);
@@ -3384,6 +3260,21 @@ struct EmitVisitor
     }
 
     void emitIRSemantics(
+        EmitContext*,
+        VarLayout*      varLayout)
+    {
+        if(varLayout->flags & VarLayoutFlag::HasSemantic)
+        {
+            Emit(" : ");
+            emit(varLayout->semanticName);
+            if(varLayout->semanticIndex)
+            {
+                Emit(varLayout->semanticIndex);
+            }
+        }
+    }
+
+    void emitIRSemantics(
         EmitContext*    ctx,
         IRInst*         inst)
     {
@@ -3397,31 +3288,24 @@ struct EmitVisitor
             return;
         }
 
-        if(auto layoutDecoration = inst->findDecoration<IRLayoutDecoration>())
+        if (auto semanticDecoration = inst->findDecoration<IRSemanticDecoration>())
         {
-            if(auto varLayout = layoutDecoration->layout.As<VarLayout>())
-            {
-                if(varLayout->flags & VarLayoutFlag::HasSemantic)
-                {
-                    Emit(" : ");
-                    emit(varLayout->semanticName);
-                    if(varLayout->semanticIndex)
-                    {
-                        Emit(varLayout->semanticIndex);
-                    }
-
-                    return;
-                }
-            }
+            Emit(" : ");
+            emit(semanticDecoration->semanticName);
+            return;
         }
 
-        // TODO(tfoley): should we ever need to use the high-level declaration
-        // for this? It seems like the wrong approach...
-
-        auto decoration = inst->findDecoration<IRHighLevelDeclDecoration>();
-        if( decoration )
+        if(auto layoutDecoration = inst->findDecoration<IRLayoutDecoration>())
         {
-            EmitSemantics(decoration->decl);
+            auto layout = layoutDecoration->layout;
+            if(auto varLayout = layout.As<VarLayout>())
+            {
+                emitIRSemantics(ctx, varLayout);
+            }
+            else if (auto entryPointLayout = layout.As<EntryPointLayout>())
+            {
+                emitIRSemantics(ctx, entryPointLayout->resultLayout);
+            }
         }
     }
 
@@ -3502,7 +3386,7 @@ struct EmitVisitor
     // may exit this region with operations that do *not* branch
     // to `end`, but such non-local control flow will hopefully
     // be captured.
-    // 
+    //
     void emitIRStmtsForBlocks(
         EmitContext*    ctx,
         IRBlock*        begin,
@@ -4003,7 +3887,7 @@ struct EmitVisitor
                 return getText(entryPointLayout->entryPoint->getName());
             }
 
-            // 
+            //
 
             return "main";
         }
@@ -4250,7 +4134,7 @@ struct EmitVisitor
 
         auto name = getIRFuncName(func);
 
-        emitIRType(ctx, resultType, name);
+        EmitType(resultType, name);
 
         emit("(");
         auto firstParam = func->getFirstParam();
@@ -4312,19 +4196,19 @@ struct EmitVisitor
 
     void emitIRParamType(
         EmitContext*    ctx,
-        Type*           type,
+        IRType*         type,
         String const&   name)
     {
         // An `out` or `inout` parameter will have been
         // encoded as a parameter of pointer type, so
         // we need to decode that here.
         //
-        if( auto outType = type->As<OutType>() )
+        if( auto outType = as<IROutType>(type))
         {
             emit("out ");
             type = outType->getValueType();
         }
-        else if( auto inOutType = type->As<InOutType>() )
+        else if( auto inOutType = as<IRInOutType>(type))
         {
             emit("inout ");
             type = inOutType->getValueType();
@@ -4333,16 +4217,29 @@ struct EmitVisitor
         emitIRType(ctx, type, name);
     }
 
+    IRInst* getSpecializedValue(IRSpecialize* specInst)
+    {
+        auto base = specInst->getBase();
+        auto baseGeneric = as<IRGeneric>(base);
+        if (!baseGeneric)
+            return base;
+
+        auto lastBlock = baseGeneric->getLastBlock();
+        if (!lastBlock)
+            return base;
+
+        auto returnInst = as<IRReturnVal>(lastBlock->getTerminator());
+        if (!returnInst)
+            return base;
+
+        return returnInst->getVal();
+    }
+
     void emitIRFuncDecl(
         EmitContext*    ctx,
         IRFunc*         func)
     {
-        // We don't want to declare generic functions,
-        // because none of our targets actually support them.
-        if(func->getGenericDecl())
-            return;
-
-        // We also don't want to emit declarations for operations
+        // We don't want to emit declarations for operations
         // that only appear in the IR as stand-ins for built-in
         // operations on that target.
         if (isTargetIntrinsic(ctx, func))
@@ -4361,7 +4258,7 @@ struct EmitVisitor
         // and as a result it *also* doesn't have the IR `param` instructions,
         // so we need to emit a declaration entirely from the type.
 
-        auto funcType = func->getType();
+        auto funcType = func->getDataType();
         auto resultType = func->getResultType();
 
         auto name = getIRFuncName(func);
@@ -4432,9 +4329,9 @@ struct EmitVisitor
         if(!value)
             return nullptr;
 
-        if(value->op == kIROp_specialize)
+        while (auto specInst = as<IRSpecialize>(value))
         {
-            value = ((IRSpecialize*) value)->genericVal.get();
+            value = getSpecializedValue(specInst);
         }
 
         if(value->op != kIROp_Func)
@@ -4451,11 +4348,6 @@ struct EmitVisitor
         EmitContext*    ctx,
         IRFunc*         func)
     {
-        if(func->getGenericDecl())
-        {
-            return;
-        }
-
         if(!isDefinition(func))
         {
             // This is just a function declaration,
@@ -4479,27 +4371,39 @@ struct EmitVisitor
         }
     }
 
-#if 0
     void emitIRStruct(
-        EmitContext*    context,
-        IRStructDecl*   structType)
+        EmitContext*    ctx,
+        IRStructType*   structType)
     {
         emit("struct ");
-        emit(getName(structType));
+        emit(getIRName(structType));
         emit("\n{\n");
+        indent();
 
-        for(auto ff = structType->getFirstField(); ff; ff = ff->getNextField())
+        for(auto ff : structType->getFields())
         {
+            auto fieldKey = ff->getKey();
             auto fieldType = ff->getFieldType();
-            emitIRType(context, fieldType, getName(ff));
 
-            emitIRSemantics(context, ff);
+            // Filter out fields with `void` type that might
+            // have been introduced by legalization.
+            if(as<IRVoidType>(fieldType))
+                continue;
 
+            // Note: GLSL doesn't support interpolation modifiers on `struct` fields
+            if( ctx->shared->target != CodeGenTarget::GLSL )
+            {
+                emitInterpolationModifiers(ctx, fieldKey, fieldType);
+            }
+
+            emitIRType(ctx, fieldType, getIRName(fieldKey));
+            emitIRSemantics(ctx, fieldKey);
             emit(";\n");
         }
+
+        dedent();
         emit("};\n");
     }
-#endif
 
     void emitIRMatrixLayoutModifiers(
         EmitContext*    ctx,
@@ -4552,7 +4456,7 @@ struct EmitVisitor
             default:
                 break;
             }
-            
+
         }
 
     }
@@ -4561,26 +4465,22 @@ struct EmitVisitor
     // of the variable is an integer type.
     void maybeEmitGLSLFlatModifier(
         EmitContext*,
-        Type*           valueType)
+        IRType*           valueType)
     {
         auto tt = valueType;
-        if(auto vecType = tt->As<VectorExpressionType>())
-            tt = vecType->elementType;
-        if(auto vecType = tt->As<MatrixExpressionType>())
+        if(auto vecType = as<IRVectorType>(tt))
+            tt = vecType->getElementType();
+        if(auto vecType = as<IRMatrixType>(tt))
             tt = vecType->getElementType();
 
-        auto baseType = tt->As<BasicExpressionType>();
-        if(!baseType)
-            return;
-
-        switch(baseType->baseType)
+        switch(tt->op)
         {
         default:
             break;
 
-        case BaseType::Int:
-        case BaseType::UInt:
-        case BaseType::UInt64:
+        case kIROp_IntType:
+        case kIROp_UIntType:
+        case kIROp_UInt64Type:
             Emit("flat ");
             break;
         }
@@ -4588,36 +4488,51 @@ struct EmitVisitor
 
     void emitInterpolationModifiers(
         EmitContext*    ctx,
-        VarDeclBase*    decl,
-        Type*           valueType)
+        IRInst*         varInst,
+        IRType*         valueType)
     {
         bool isGLSL = (ctx->shared->target == CodeGenTarget::GLSL);
         bool anyModifiers = false;
 
-        if(decl->FindModifier<HLSLNoInterpolationModifier>())
+        anyModifiers = true;
+        for(auto dd = varInst->firstDecoration; dd; dd = dd->next)
         {
-            anyModifiers = true;
-            Emit(isGLSL ? "flat " : "nointerpolation ");
-        }
-        else if(decl->FindModifier<HLSLNoPerspectiveModifier>())
-        {
-            anyModifiers = true;
-            Emit("noperspective ");
-        }
-        else if(decl->FindModifier<HLSLLinearModifier>())
-        {
-            anyModifiers = true;
-            Emit(isGLSL ? "smooth " : "linear ");
-        }
-        else if(decl->FindModifier<HLSLSampleModifier>())
-        {
-            anyModifiers = true;
-            Emit("sample ");
-        }
-        else if(decl->FindModifier<HLSLCentroidModifier>())
-        {
-            anyModifiers = true;
-            Emit("centroid ");
+            if(dd->op != kIRDecorationOp_InterpolationMode)
+                continue;
+
+            auto decoration = (IRInterpolationModeDecoration*)dd;
+            auto mode = decoration->mode;
+
+            switch(mode)
+            {
+            case IRInterpolationMode::NoInterpolation:
+                anyModifiers = true;
+                Emit(isGLSL ? "flat " : "nointerpolation ");
+                break;
+
+            case IRInterpolationMode::NoPerspective:
+                anyModifiers = true;
+                Emit("noperspective ");
+                break;
+
+            case IRInterpolationMode::Linear:
+                anyModifiers = true;
+                Emit(isGLSL ? "smooth " : "linear ");
+                break;
+
+            case IRInterpolationMode::Sample:
+                anyModifiers = true;
+                Emit("sample ");
+                break;
+
+            case IRInterpolationMode::Centroid:
+                anyModifiers = true;
+                Emit("centroid ");
+                break;
+
+            default:
+                break;
+            }
         }
 
         // If the user didn't explicitly qualify a varying
@@ -4629,18 +4544,11 @@ struct EmitVisitor
         }
     }
 
-    void emitInterpolationModifiers(
-        EmitContext*    ctx,
-        VarLayout*      layout,
-        Type*           valueType)
-    {
-        emitInterpolationModifiers(ctx, layout->varDecl, valueType);
-    }
-
     void emitIRVarModifiers(
         EmitContext*    ctx,
         VarLayout*      layout,
-        Type*           valueType)
+        IRInst*         varDecl,
+        IRType*         varType)
     {
         if (!layout)
             return;
@@ -4651,7 +4559,7 @@ struct EmitVisitor
         // for an HLSL `RWTexture*` then we need to emit a `format` layout qualifier.
         if(getTarget(context) == CodeGenTarget::GLSL)
         {
-            if(auto resourceType = unwrapArray(valueType).As<TextureType>())
+            if(auto resourceType = as<IRTextureType>(unwrapArray(varType)))
             {
                 switch(resourceType->getAccess())
                 {
@@ -4676,6 +4584,12 @@ struct EmitVisitor
             }
         }
 
+        if(layout->FindResourceInfo(LayoutResourceKind::VaryingInput)
+            || layout->FindResourceInfo(LayoutResourceKind::VaryingOutput))
+        {
+            emitInterpolationModifiers(ctx, varDecl, varType);
+        }
+
         if (ctx->shared->target == CodeGenTarget::GLSL)
         {
             // Layout-related modifiers need to come before the declaration,
@@ -4696,20 +4610,12 @@ struct EmitVisitor
                 case LayoutResourceKind::VaryingInput:
                     {
                         emit("in ");
-                        if(layout->stage == Stage::Fragment)
-                        {
-                            maybeEmitGLSLFlatModifier(ctx, valueType);
-                        }
                     }
                     break;
 
-                case LayoutResourceKind::FragmentOutput:
+                case LayoutResourceKind::VaryingOutput:
                     {
                         emit("out ");
-                        if(layout->stage != Stage::Fragment)
-                        {
-                            maybeEmitGLSLFlatModifier(ctx, valueType);
-                        }
                     }
                     break;
 
@@ -4723,9 +4629,9 @@ struct EmitVisitor
     }
 
     void emitHLSLParameterBlock(
-        EmitContext*        ctx,
-        IRGlobalVar*        varDecl,
-        ParameterBlockType* type)
+        EmitContext*            ctx,
+        IRGlobalVar*            varDecl,
+        IRParameterBlockType*   type)
     {
         emit("cbuffer ");
 
@@ -4768,11 +4674,11 @@ struct EmitVisitor
     }
 
     void emitHLSLParameterGroup(
-        EmitContext*                ctx,
-        IRGlobalVar*                varDecl,
-        UniformParameterGroupType*  type)
+        EmitContext*                    ctx,
+        IRGlobalVar*                    varDecl,
+        IRUniformParameterGroupType*    type)
     {
-        if(auto parameterBlockType = type->As<ParameterBlockType>())
+        if(auto parameterBlockType = as<IRParameterBlockType>(type))
         {
             emitHLSLParameterBlock(ctx, varDecl, parameterBlockType);
             return;
@@ -4805,45 +4711,52 @@ struct EmitVisitor
 
         auto elementType = type->getElementType();
 
-
-        if(auto declRefType = elementType->As<DeclRefType>())
+        if(auto structType = as<IRStructType>(elementType))
         {
-            if(auto structDeclRef = declRefType->declRef.As<StructDecl>())
+            auto structTypeLayout = typeLayout.As<StructTypeLayout>();
+            assert(structTypeLayout);
+
+            UInt fieldIndex = 0;
+            for(auto ff : structType->getFields())
             {
-                auto structTypeLayout = typeLayout.As<StructTypeLayout>();
-                assert(structTypeLayout);
+                // TODO: need a plan to deal with the case where the IR-level
+                // `struct` type might not match the high-level type, so that
+                // the numbering of fields is different.
+                //
+                // The right plan is probably to require that the lowering pass
+                // create a fresh layout for any type/variable that it splits
+                // in this fashion, so that the layout information it attaches
+                // can always be assumed to apply to the actual instruciton.
+                //
 
-                UInt fieldIndex = 0;
-                for(auto ff : GetFields(structDeclRef))
-                {
-                    // TODO: need a plan to deal with the case where the IR-level
-                    // `struct` type might not match the high-level type, so that
-                    // the numbering of fields is different.
-                    //
-                    // The right plan is probably to require that the lowering pass
-                    // create a fresh layout for any type/variable that it splits
-                    // in this fashion, so that the layout information it attaches
-                    // can always be assumed to apply to the actual instruciton.
-                    //
+                auto fieldLayout = structTypeLayout->fields[fieldIndex++];
 
-                    auto fieldLayout = structTypeLayout->fields[fieldIndex++];
+                auto fieldKey = ff->getKey();
+                auto fieldType = ff->getFieldType();
 
-                    auto fieldType = GetType(ff);
-                    if(fieldType->Equals(getSession()->getVoidType()))
-                        continue;
+                // Fields of `void` type aren't valid in HLSL/GLSL.
+                //
+                // TODO: legalization should get rid of any fields that have
+                // empty, or effectively empty types (e.g., emptry structs
+                // should be translated over to `void`).
+                if(as<IRVoidType>(fieldType))
+                    continue;
 
-                    emitIRVarModifiers(ctx, fieldLayout, fieldType);
+                emitIRVarModifiers(ctx, fieldLayout, fieldKey, fieldType);
 
-                    emitIRType(ctx, fieldType, getIRName(ff));
+                emitIRType(ctx, fieldType, getIRName(fieldKey));
 
-                    emitHLSLParameterGroupFieldLayoutSemantics(fieldLayout, &elementChain);
+                emitHLSLParameterGroupFieldLayoutSemantics(fieldLayout, &elementChain);
 
-                    emit(";\n");
-                }
+                emit(";\n");
             }
         }
         else
         {
+            // TODO: during legalization we should turn `ParameterGroup<X>` where `X`
+            // is not a `struct` type into `ParameterGroup<S>` where `S` is defined
+            // as something like `struct S { X _; };`
+            //
             emit("/* unexpected */");
         }
 
@@ -4852,9 +4765,9 @@ struct EmitVisitor
     }
 
     void emitGLSLParameterBlock(
-        EmitContext*        ctx,
-        IRGlobalVar*        varDecl,
-        ParameterBlockType* type)
+        EmitContext*            ctx,
+        IRGlobalVar*            varDecl,
+        IRParameterBlockType*   type)
     {
         auto varLayout = getVarLayout(ctx, varDecl);
         assert(varLayout);
@@ -4893,11 +4806,11 @@ struct EmitVisitor
     }
 
     void emitGLSLParameterGroup(
-        EmitContext*                ctx,
-        IRGlobalVar*                varDecl,
-        UniformParameterGroupType*  type)
+        EmitContext*                    ctx,
+        IRGlobalVar*                    varDecl,
+        IRUniformParameterGroupType*    type)
     {
-        if(auto parameterBlockType = type->As<ParameterBlockType>())
+        if(auto parameterBlockType = as<IRParameterBlockType>(type))
         {
             emitGLSLParameterBlock(ctx, varDecl, parameterBlockType);
             return;
@@ -4922,7 +4835,7 @@ struct EmitVisitor
 
         emitGLSLLayoutQualifier(LayoutResourceKind::DescriptorTableSlot, &containerChain);
 
-        if(type->As<GLSLShaderStorageBufferType>())
+        if(as<IRGLSLShaderStorageBufferType>(type))
         {
             emit("layout(std430) buffer ");
         }
@@ -4939,52 +4852,50 @@ struct EmitVisitor
 
         auto elementType = type->getElementType();
 
-        if(auto declRefType = elementType->As<DeclRefType>())
+        if(auto structType = as<IRStructType>(elementType))
         {
-            if(auto structDeclRef = declRefType->declRef.As<StructDecl>())
+            auto structTypeLayout = typeLayout.As<StructTypeLayout>();
+            assert(structTypeLayout);
+
+            UInt fieldIndex = 0;
+            for(auto ff : structType->getFields())
             {
-                auto structTypeLayout = typeLayout.As<StructTypeLayout>();
-                assert(structTypeLayout);
+                // TODO: need a plan to deal with the case where the IR-level
+                // `struct` type might not match the high-level type, so that
+                // the numbering of fields is different.
+                //
+                // The right plan is probably to require that the lowering pass
+                // create a fresh layout for any type/variable that it splits
+                // in this fashion, so that the layout information it attaches
+                // can always be assumed to apply to the actual instruciton.
+                //
 
-                UInt fieldIndex = 0;
-                for(auto ff : GetFields(structDeclRef))
-                {
-                    // TODO: need a plan to deal with the case where the IR-level
-                    // `struct` type might not match the high-level type, so that
-                    // the numbering of fields is different.
-                    //
-                    // The right plan is probably to require that the lowering pass
-                    // create a fresh layout for any type/variable that it splits
-                    // in this fashion, so that the layout information it attaches
-                    // can always be assumed to apply to the actual instruciton.
-                    //
+                auto fieldLayout = structTypeLayout->fields[fieldIndex++];
 
-                    auto fieldLayout = structTypeLayout->fields[fieldIndex++];
+                auto fieldKey = ff->getKey();
+                auto fieldType = ff->getFieldType();
+                if(as<IRVoidType>(fieldType))
+                    continue;
 
-                    auto fieldType = GetType(ff);
-                    if(fieldType->Equals(getSession()->getVoidType()))
-                        continue;
+                // Note: we will emit matrix-layout modifiers here, but
+                // we will refrain from emitting other modifiers that
+                // might not be appropriate to the context (e.g., we
+                // shouldn't go emitting `uniform` just because these
+                // things are uniform...).
+                //
+                // TODO: we need a more refined set of modifiers that
+                // we should allow on fields, because we might end
+                // up supporting layout that isn't the default for
+                // the given block type (e.g., something other than
+                // `std140` for a uniform block).
+                //
+                emitIRMatrixLayoutModifiers(ctx, fieldLayout);
 
-                    // Note: we will emit matrix-layout modifiers here, but
-                    // we will refrain from emitting other modifiers that
-                    // might not be appropriate to the context (e.g., we
-                    // shouldn't go emitting `uniform` just because these
-                    // things are uniform...).
-                    //
-                    // TODO: we need a more refined set of modifiers that
-                    // we should allow on fields, because we might end
-                    // up supporting layout that isn't the default for
-                    // the given block type (e.g., something other than
-                    // `std140` for a uniform block).
-                    //
-                    emitIRMatrixLayoutModifiers(ctx, fieldLayout);
-
-                    emitIRType(ctx, fieldType, getIRName(ff));
+                emitIRType(ctx, fieldType, getIRName(fieldKey));
 
 //                    emitHLSLParameterGroupFieldLayoutSemantics(layout, fieldLayout);
 
-                    emit(";\n");
-                }
+                emit(";\n");
             }
         }
         else
@@ -5002,9 +4913,9 @@ struct EmitVisitor
     }
 
     void emitIRParameterGroup(
-        EmitContext*                ctx,
-        IRGlobalVar*                varDecl,
-        UniformParameterGroupType*  type)
+        EmitContext*                    ctx,
+        IRGlobalVar*                    varDecl,
+        IRUniformParameterGroupType*    type)
     {
         switch (ctx->shared->target)
         {
@@ -5042,8 +4953,8 @@ struct EmitVisitor
         // Need to emit appropriate modifiers here.
 
         auto layout = getVarLayout(ctx, varDecl);
-        
-        emitIRVarModifiers(ctx, layout, varType);
+
+        emitIRVarModifiers(ctx, layout, varDecl, varType);
 
 #if 0
         switch (addressSpace)
@@ -5067,12 +4978,12 @@ struct EmitVisitor
         emit(";\n");
     }
 
-    RefPtr<Type> unwrapArray(Type* type)
+    IRType* unwrapArray(IRType* type)
     {
-        Type* t = type;
-        while( auto arrayType = t->As<ArrayExpressionType>() )
+        IRType* t = type;
+        while( auto arrayType = as<IRArrayTypeBase>(t) )
         {
-            t = arrayType->baseType;
+            t = arrayType->getElementType();
         }
         return t;
     }
@@ -5080,7 +4991,7 @@ struct EmitVisitor
     void emitIRStructuredBuffer_GLSL(
         EmitContext*                    ctx,
         IRGlobalVar*                    varDecl,
-        HLSLStructuredBufferTypeBase*   structuredBufferType)
+        IRHLSLStructuredBufferTypeBase* structuredBufferType)
     {
         // Shader storage buffer is an OpenGL 430 feature
         //
@@ -5145,7 +5056,7 @@ struct EmitVisitor
         // Emit a blank line so that the formatting is nicer.
         emit("\n");
 
-        if (auto paramBlockType = varType->As<UniformParameterGroupType>())
+        if (auto paramBlockType = as<IRUniformParameterGroupType>(varType))
         {
             emitIRParameterGroup(
                 ctx,
@@ -5158,7 +5069,7 @@ struct EmitVisitor
         {
             // When outputting GLSL, we need to transform any declaration of
             // a `*StructuredBuffer<T>` into an ordinary `buffer` declaration.
-            if( auto structuredBufferType = unwrapArray(varType)->As<HLSLStructuredBufferTypeBase>() )
+            if( auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(unwrapArray(varType)) )
             {
                 emitIRStructuredBuffer_GLSL(
                     ctx,
@@ -5205,7 +5116,7 @@ struct EmitVisitor
             }
         }
 
-        emitIRVarModifiers(ctx, layout, varType);
+        emitIRVarModifiers(ctx, layout, varDecl, varType);
 
         emitIRType(ctx, varType, getIRName(varDecl));
 
@@ -5282,11 +5193,11 @@ struct EmitVisitor
             emitIRFunc(ctx, (IRFunc*) inst);
             break;
 
-        case kIROp_global_var:
+        case kIROp_GlobalVar:
             emitIRGlobalVar(ctx, (IRGlobalVar*) inst);
             break;
 
-        case kIROp_global_constant:
+        case kIROp_GlobalConstant:
             emitIRGlobalConstant(ctx, (IRGlobalConstant*) inst);
             break;
 
@@ -5294,202 +5205,158 @@ struct EmitVisitor
             emitIRVar(ctx, (IRVar*) inst);
             break;
 
+        case kIROp_StructType:
+            emitIRStruct(ctx, cast<IRStructType>(inst));
+            break;
+
         default:
             break;
         }
     }
 
-    void ensureStructDecl(
-        EmitContext*        ctx,
-        DeclRef<StructDecl> declRef)
+    // An action to be performed during code emit.
+    struct EmitAction
     {
-        auto mangledName = getMangledName(declRef);
-        if(ctx->shared->irDeclsVisited.Contains(mangledName))
-            return;
-
-        ctx->shared->irDeclsVisited.Add(mangledName);
-
-        // First emit any types used by fields of this type
-        for( auto ff : GetFields(declRef) )
+        enum Level
         {
-            if(ff.getDecl()->HasModifier<HLSLStaticModifier>())
-                continue;
+            ForwardDeclaration,
+            Definition,
+        };
+        Level   level;
+        IRInst* inst;
+    };
 
-            auto fieldType = GetType(ff);
-            emitIRUsedType(ctx, fieldType);
-        }
+    struct ComputeEmitActionsContext
+    {
+        IRInst*             moduleInst;
+        HashSet<IRInst*>    openInsts;
+        Dictionary<IRInst*, EmitAction::Level> mapInstToLevel;
+        List<EmitAction>*   actions;
+    };
 
-        // Don't emit declarations for types that should be built-in on the target.
-        //
-        // TODO: This should really be checking if the type is a target intrinsic
-        // for the chosen target, and not just whether it is globally declared
-        // as a builtin (so that we can have types that are builtin in some cases,
-        // but not others).
-        if(declRef.getDecl()->HasModifier<BuiltinModifier>())
-            return;
+    void ensureInstOperand(
+        ComputeEmitActionsContext*  ctx,
+        IRInst*                     inst,
+        EmitAction::Level           requiredLevel = EmitAction::Level::Definition)
+    {
+        if(!inst) return;
 
-        Emit("\nstruct ");
-        EmitDeclRef(declRef);
-        Emit("\n{\n");
-        indent();
-        for( auto ff : GetFields(declRef) )
+        if(inst->getParent() == ctx->moduleInst)
         {
-            if(ff.getDecl()->HasModifier<HLSLStaticModifier>())
-                continue;
-
-            auto fieldType = GetType(ff);
-
-            // Skip `void` fields that might have been created by legalization.
-            if(fieldType->Equals(getSession()->getVoidType()))
-                continue;
-
-            // Note: GLSL doesn't support interpolation modifiers on `struct` fields
-            if( ctx->shared->target != CodeGenTarget::GLSL )
-            {
-                emitInterpolationModifiers(ctx, ff.getDecl(), fieldType);
-            }
-            emitIRType(ctx, fieldType, getIRName(ff));
-
-            EmitSemantics(ff.getDecl());
-
-            emit(";\n");
+            ensureGlobalInst(ctx, inst, requiredLevel);
         }
-        dedent();
-        Emit("};\n");
     }
 
-    void emitIRUsedDeclRef(
-        EmitContext*    ctx,
-        DeclRef<Decl>   declRef)
+    void ensureInstOperandsRec(
+        ComputeEmitActionsContext*  ctx,
+        IRInst*                     inst)
     {
-        auto decl = declRef.getDecl();
+        ensureInstOperand(ctx, inst->getFullType());
 
-        if(decl->HasModifier<BuiltinTypeModifier>()
-            || decl->HasModifier<MagicTypeModifier>())
+        UInt operandCount = inst->operandCount;
+        for(UInt ii = 0; ii < operandCount; ++ii)
         {
-            return;
-        }
-
-        if( auto structDeclRef = declRef.As<StructDecl>() )
-        {
+            // TODO: there are some special cases we can add here,
+            // to avoid outputting full definitions in cases that
+            // can get by with forward declarations.
             //
-            ensureStructDecl(ctx, structDeclRef);
-        }
-    }
+            // For example, true pointer types should (in principle)
+            // only need the type they point to to be forward-declared.
+            // Similarly, a `call` instruction only needs the callee
+            // to be forward-declared, etc.
 
-    // A type is going to be used by the IR, so
-    // make sure that we have emitted whatever
-    // it needs.
-    void emitIRUsedType(
-        EmitContext*    ctx,
-        Type*           type)
-    {
-        if(type->As<BasicExpressionType>())
-        {}
-        else if(type->As<VectorExpressionType>())
-        {}
-        else if(type->As<MatrixExpressionType>())
-        {}
-        else if(auto arrayType = type->As<ArrayExpressionType>())
-        {
-            emitIRUsedType(ctx, arrayType->baseType);
+            ensureInstOperand(ctx, inst->getOperand(ii));
         }
-        else if( auto textureType = type->As<TextureTypeBase>() )
-        {
-            emitIRUsedType(ctx, textureType->elementType);
-        }
-        else if( auto genericType = type->As<BuiltinGenericType>() )
-        {
-            emitIRUsedType(ctx, genericType->elementType);
-        }
-        else if( auto ptrType = type->As<PtrTypeBase>() )
-        {
-            emitIRUsedType(ctx, ptrType->getValueType());
-        }
-        else if(type->As<SamplerStateType>() )
-        {
-        }
-        else if( auto declRefType = type->As<DeclRefType>() )
-        {
-            auto declRef = declRefType->declRef;
-            emitIRUsedDeclRef(ctx, declRef);
-        }
-        else
-        {}
-    }
 
-    void emitIRUsedTypesForGlobalValueWithCode(
-        EmitContext*            ctx,
-        IRGlobalValueWithCode*  value)
-    {
-        for( auto bb = value->getFirstBlock(); bb; bb = bb->getNextBlock() )
+        if(auto parentInst = as<IRParentInst>(inst))
         {
-            for( auto pp = bb->getFirstParam(); pp; pp = pp->getNextParam() )
+            for(auto child : parentInst->getChildren())
             {
-                emitIRUsedTypesForValue(ctx, pp);
-            }
-
-            for( auto ii = bb->getFirstInst(); ii; ii = ii->getNextInst() )
-            {
-                emitIRUsedTypesForValue(ctx, ii);
+                ensureInstOperandsRec(ctx, child);
             }
         }
     }
 
-    void emitIRUsedTypesForValue(
-        EmitContext*    ctx,
-        IRInst*         value)
+    void ensureGlobalInst(
+        ComputeEmitActionsContext*  ctx,
+        IRInst*                     inst,
+        EmitAction::Level           requiredLevel)
     {
-        if(!value) return;
-        switch( value->op )
+        // Skip certain instrutions, since they
+        // don't affect output.
+        switch(inst->op)
         {
-        case kIROp_Func:
-            {
-                auto irFunc = (IRFunc*) value;
-
-                // Don't emit anything for a generic function,
-                // since we only care about the types used by
-                // the actual specializations.
-                if (irFunc->getGenericDecl())
-                    return;
-
-                emitIRUsedType(ctx, irFunc->getResultType());
-
-                emitIRUsedTypesForGlobalValueWithCode(ctx, irFunc);
-            }
-            break;
-
-        case kIROp_global_var:
-            {
-                auto irGlobal = (IRGlobalVar*) value;
-                emitIRUsedType(ctx, irGlobal->type);
-                emitIRUsedTypesForGlobalValueWithCode(ctx, irGlobal);
-            }
-            break;
-
-        case kIROp_global_constant:
-            {
-                auto irGlobal = (IRGlobalConstant*) value;
-                emitIRUsedType(ctx, irGlobal->type);
-                emitIRUsedTypesForGlobalValueWithCode(ctx, irGlobal);
-            }
-            break;
+        case kIROp_WitnessTable:
+        case kIROp_Generic:
+            return;
 
         default:
-            {
-                emitIRUsedType(ctx, value->type);
-            }
             break;
+        }
+
+        // Have we already processed this instruction?
+        EmitAction::Level existingLevel;
+        if(ctx->mapInstToLevel.TryGetValue(inst, existingLevel))
+        {
+            // If we've already emitted it suitably,
+            // then don't worry about it.
+            if(existingLevel >= requiredLevel)
+                return;
+        }
+
+        EmitAction action;
+        action.level = requiredLevel;
+        action.inst = inst;
+
+        if(requiredLevel == EmitAction::Level::Definition)
+        {
+            if(ctx->openInsts.Contains(inst))
+            {
+                SLANG_UNEXPECTED("circularity during codegen");
+                return;
+            }
+
+            ctx->openInsts.Add(inst);
+
+            ensureInstOperandsRec(ctx, inst);
+
+            ctx->openInsts.Remove(inst);
+        }
+
+        ctx->mapInstToLevel[inst] = requiredLevel;
+        ctx->actions->Add(action);
+    }
+
+    void computeIREmitActions(
+        IRModule*           module,
+        List<EmitAction>&   ioActions)
+    {
+        ComputeEmitActionsContext ctx;
+        ctx.moduleInst = module->getModuleInst();
+        ctx.actions = &ioActions;
+
+        for(auto inst : module->getGlobalInsts())
+        {
+            ensureGlobalInst(&ctx, inst, EmitAction::Level::Definition);
         }
     }
 
-    void emitIRUsedTypesForModule(
-        EmitContext*    ctx,
-        IRModule*       module)
+    void executeIREmitActions(
+        EmitContext*                ctx,
+        List<EmitAction> const&     actions)
     {
-        for(auto ii : module->getGlobalInsts())
+        for(auto action : actions)
         {
-            emitIRUsedTypesForValue(ctx, ii);
+            switch(action.level)
+            {
+            case EmitAction::Level::ForwardDeclaration:
+                emitIRFuncDecl(ctx, cast<IRFunc>(action.inst));
+                break;
+
+            case EmitAction::Level::Definition:
+                emitIRGlobalInst(ctx, action.inst);
+                break;
+            }
         }
     }
 
@@ -5497,27 +5364,16 @@ struct EmitVisitor
         EmitContext*    ctx,
         IRModule*       module)
     {
-        emitIRUsedTypesForModule(ctx, module);
+        // The IR will usually come in an order that respects
+        // dependencies between global declarations, but this
+        // isn't guaranteed, so we need to be careful about
+        // the order in which we emit things.
 
-        // Before we emit code, we need to forward-declare
-        // all of our functions so that we don't have to
-        // sort them by dependencies.
-        for(auto ii : module->getGlobalInsts())
-        {
-            if(ii->op != kIROp_Func)
-                continue;
+        List<EmitAction> actions;
 
-            auto func = (IRFunc*) ii;
-            emitIRFuncDecl(ctx, func);
-        }
-
-        for(auto ii : module->getGlobalInsts())
-        {
-            emitIRGlobalInst(ctx, ii);
-        }
+        computeIREmitActions(module, actions);
+        executeIREmitActions(ctx, actions);
     }
-
-
 };
 
 //
@@ -5614,7 +5470,7 @@ String emitEntryPoint(
     TargetRequest*      targetRequest)
 {
     auto translationUnit = entryPoint->getTranslationUnit();
-   
+
     SharedEmitContext sharedContext;
     sharedContext.target = target;
     sharedContext.finalTarget = targetRequest->target;
@@ -5651,18 +5507,25 @@ String emitEntryPoint(
         target,
         targetRequest);
     {
-        TypeLegalizationContext typeLegalizationContext;
-        typeLegalizationContext.session = entryPoint->compileRequest->mSession;
-
         IRModule* irModule = getIRModule(irSpecializationState);
         auto compileRequest = translationUnit->compileRequest;
+        auto session = compileRequest->mSession;
 
-        typeLegalizationContext.irModule = irModule;
+        TypeLegalizationContext typeLegalizationContext;
+        initialize(&typeLegalizationContext,
+            session,
+            irModule);
 
         specializeIRForEntryPoint(
             irSpecializationState,
             entryPoint,
             &sharedContext.extensionUsageTracker);
+
+#if 0
+        fprintf(stderr, "### CLONED:\n");
+        dumpIR(irModule);
+        fprintf(stderr, "###\n");
+#endif
 
         validateIRModuleIfEnabled(compileRequest, irModule);
 
@@ -5685,15 +5548,16 @@ String emitEntryPoint(
         // Debugging code for IR transformations...
 #if 0
         fprintf(stderr, "### SPECIALIZED:\n");
-        dumpIR(lowered);
+        dumpIR(irModule);
         fprintf(stderr, "###\n");
 #endif
+        validateIRModuleIfEnabled(compileRequest, irModule);
 
         // After we've fully specialized all generics, and
         // "devirtualized" all the calls through interfaces,
         // we need to ensure that the code only uses types
         // that are legal on the chosen target.
-        // 
+        //
         legalizeTypes(
             &typeLegalizationContext,
             irModule);
@@ -5701,9 +5565,10 @@ String emitEntryPoint(
         //  Debugging output of legalization
 #if 0
         fprintf(stderr, "### LEGALIZED:\n");
-        dumpIR(lowered);
+        dumpIR(irModule);
         fprintf(stderr, "###\n");
 #endif
+        validateIRModuleIfEnabled(compileRequest, irModule);
 
         // Once specialization and type legalization have been performed,
         // we should perform some of our basic optimization steps again,
@@ -5712,6 +5577,11 @@ String emitEntryPoint(
         // so that we can work with the individual fields).
         constructSSA(irModule);
 
+#if 0
+        fprintf(stderr, "### AFTER SSA:\n");
+        dumpIR(irModule);
+        fprintf(stderr, "###\n");
+#endif
         validateIRModuleIfEnabled(compileRequest, irModule);
 
         // After all of the required optimization and legalization
@@ -5721,9 +5591,9 @@ String emitEntryPoint(
         // TODO: do we want to emit directly from IR, or translate the
         // IR back into AST for emission?
         visitor.emitIRModule(&context, irModule);
-        
+
         // retain the specialized ir module, because the current
-        // GlobalGenericParamSubstitution implementation may reference ir objects 
+        // GlobalGenericParamSubstitution implementation may reference ir objects
         targetRequest->compileRequest->compiledModules.Add(irModule);
     }
     destroyIRSpecializationState(irSpecializationState);
@@ -5755,7 +5625,7 @@ String emitEntryPoint(
     finalResultBuilder << code;
 
     String finalResult = finalResultBuilder.ProduceString();
-    
+
     return finalResult;
 }
 

@@ -400,23 +400,18 @@ namespace Slang
 
     struct SubstitutionSet
     {
-        RefPtr<GenericSubstitution> genericSubstitutions;
-        RefPtr<ThisTypeSubstitution> thisTypeSubstitution;
-        RefPtr<GlobalGenericParamSubstitution> globalGenParamSubstitutions;
-        operator bool() const
+        RefPtr<Substitutions> substitutions;
+        operator Substitutions*() const
         {
-            return genericSubstitutions || thisTypeSubstitution || globalGenParamSubstitutions;
+            return substitutions;
         }
+
         SubstitutionSet() {}
-        SubstitutionSet(RefPtr<GenericSubstitution> genSubst, RefPtr<ThisTypeSubstitution> inThisTypeSubst,
-            RefPtr<GlobalGenericParamSubstitution> globalSubst)
+        SubstitutionSet(RefPtr<Substitutions> subst)
+            : substitutions(subst)
         {
-            genericSubstitutions = genSubst;
-            thisTypeSubstitution = inThisTypeSubst;
-            globalGenParamSubstitutions = globalSubst;
         }
         bool Equals(SubstitutionSet substSet) const;
-        SubstitutionSet substituteImpl(SubstitutionSet subst, int * ioDiff);
         int GetHashCode() const;
     };
     // A reference to a declaration, which may include
@@ -444,11 +439,9 @@ namespace Slang
             substitutions(subst)
         {}
 
-        DeclRefBase(Decl* decl, RefPtr<GenericSubstitution> genSubstitutions,
-            RefPtr<ThisTypeSubstitution> thisTypeSubst = nullptr,
-            RefPtr<GlobalGenericParamSubstitution> globalSubst = nullptr)
-            : decl(decl),
-            substitutions(genSubstitutions, thisTypeSubst, globalSubst)
+        DeclRefBase(Decl* decl, RefPtr<Substitutions> subst)
+            : decl(decl)
+            , substitutions(subst)
         {}
 
         // Apply substitutions to a type or ddeclaration
@@ -492,8 +485,8 @@ namespace Slang
             : DeclRefBase(decl, subst)
         {}
 
-        DeclRef(T* decl, RefPtr<GenericSubstitution> genSubst)
-            : DeclRefBase(decl, SubstitutionSet(genSubst, nullptr, nullptr))
+        DeclRef(T* decl, RefPtr<Substitutions> subst)
+            : DeclRefBase(decl, SubstitutionSet(subst))
         {}
 
         template <typename U>
@@ -1004,6 +997,67 @@ namespace Slang
         LookupMask          mask        = LookupMask::Default;
     };
 
+    struct WitnessTable;
+
+    // A value that witnesses the satisfaction of an interface
+    // requirement by a particular declaration or value.
+    struct RequirementWitness
+    {
+        RequirementWitness()
+            : m_flavor(Flavor::none)
+        {}
+
+        RequirementWitness(DeclRef<Decl> declRef)
+            : m_flavor(Flavor::declRef)
+            , m_declRef(declRef)
+        {}
+
+        RequirementWitness(RefPtr<Val> val);
+
+        RequirementWitness(RefPtr<WitnessTable> witnessTable);
+
+        enum class Flavor
+        {
+            none,
+            declRef,
+            val,
+            witnessTable,
+        };
+
+        Flavor getFlavor()
+        {
+            return m_flavor;
+        }
+
+        DeclRef<Decl> getDeclRef()
+        {
+            SLANG_ASSERT(getFlavor() == Flavor::declRef);
+            return m_declRef;
+        }
+
+        RefPtr<Val> getVal()
+        {
+            SLANG_ASSERT(getFlavor() == Flavor::val);
+            return m_obj.As<Val>();
+        }
+
+        RefPtr<WitnessTable> getWitnessTable();
+
+        RequirementWitness specialize(SubstitutionSet const& subst);
+
+        Flavor              m_flavor;
+        DeclRef<Decl>       m_declRef;
+        RefPtr<RefObject>   m_obj;
+
+    };
+
+    typedef Dictionary<Decl*, RequirementWitness> RequirementDictionary;
+
+    struct WitnessTable : RefObject
+    {
+        RequirementDictionary requirementDictionary;
+    };
+
     // Generate class definition for all syntax classes
 #define SYNTAX_FIELD(TYPE, NAME) TYPE NAME;
 #define FIELD(TYPE, NAME) TYPE NAME;
@@ -1094,23 +1148,6 @@ namespace Slang
     inline FilteredMemberRefList<Decl> getMembers(DeclRef<ContainerDecl> const& declRef)
     {
         return FilteredMemberRefList<Decl>(declRef.getDecl()->Members, declRef.substitutions);
-    }
-
-    // TODO: change this to return a lazy list instead of constructing actual list
-    inline List<DeclRef<Decl>> getMembersWithExt(DeclRef<ContainerDecl> const& declRef)
-    {
-        List<DeclRef<Decl>> rs;
-        for (auto d : FilteredMemberRefList<Decl>(declRef.getDecl()->Members, declRef.substitutions))
-            rs.Add(d);
-        if (auto aggDeclRef = declRef.As<AggTypeDecl>())
-        {
-            for (auto ext = GetCandidateExtensions(aggDeclRef); ext; ext = ext->nextCandidateExtension)
-            {
-                for (auto mbr : getMembers(DeclRef<ContainerDecl>(ext, declRef.substitutions)))
-                    rs.Add(mbr);
-            }
-        }
-        return rs;
     }
 
     template<typename T>
@@ -1245,29 +1282,16 @@ namespace Slang
         Session* session,
         Decl*   decl);
 
-    void insertSubstAtBottom(RefPtr<Substitutions> & substHead, RefPtr<Substitutions> substToInsert);
-    RefPtr<ThisTypeSubstitution> getNewThisTypeSubst(DeclRefBase & declRef);
-    RefPtr<ThisTypeSubstitution> getThisTypeSubst(DeclRefBase & declRef, bool insertSubstEntry);
-    void removeSubstitution(DeclRefBase & declRef, RefPtr<Substitutions> subst);
-    bool hasGenericSubstitutions(RefPtr<Substitutions> subst);
-    RefPtr<GenericSubstitution> getGenericSubstitution(RefPtr<Substitutions> subst);
-    
-    // This function substitutes the type arguments referenced in a linked list of substitutions 
-    // which head is at `substHead` using the substitutions specified by `subst`. If the linked
-    // list `substHead` does not contain `GlobalGenericParamSubstitution` entries, they will be 
-    // added to the bottom(outter most) of the linked list.
-    // Note that this function should be called when `substHead` is known to be the head of 
-    // substitution linked list because the existance of `GlobalGenericPaaramSubstitution` is 
-    // detected assuming the linked lists starts at `substHead`. If a substitution that is not 
-    // the head of a substitution linked list is passed in, duplicate 
-    // `GlobalGenericParamSubstitution`s could be appended to the linked list.
-    // This means that this function should * not* be called in places like 
-    // `GenericSubstitution::SubstitutionImpl()` for its outer substitutions, because `outer` is 
-    // obviously not the head of the linked list. Instead, use this function to substitution the 
-    // substitution lists of `DeclRef` etc. to replace the call of 
-    // `declRef.substitutions->SubstituteImpl()`, because the head to the linked list is known as a 
-    // member of that class there.
-    SubstitutionSet substituteSubstitutions(SubstitutionSet oldSubst, SubstitutionSet subst, int * ioDiff);
+    DeclRef<Decl> createDefaultSubstitutionsIfNeeded(
+        Session*        session,
+        DeclRef<Decl>   declRef);
+
+    RefPtr<GenericSubstitution> createDefaultSubsitutionsForGeneric(
+        Session*                session,
+        GenericDecl*            genericDecl,
+        RefPtr<Substitutions>   outerSubst);
+
+    RefPtr<GenericSubstitution> findInnerMostGenericSubstitution(Substitutions* subst);
 } // namespace Slang
 
 #endif

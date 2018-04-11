@@ -10,6 +10,36 @@
 #define R(X) /**/
 #else
 #define R(X) X
+
+#define sharedC     _SV028SLANG_parameterGroup_sharedC
+#define sharedCA    _SV028SLANG_ParameterGroup_sharedC8sharedCA
+#define sharedCB    _SV028SLANG_ParameterGroup_sharedC8sharedCB
+#define sharedCC    _SV028SLANG_ParameterGroup_sharedC8sharedCC
+#define sharedCD    _SV028SLANG_ParameterGroup_sharedC8sharedCD
+
+#define vertexC     _SV028SLANG_parameterGroup_vertexC
+#define vertexCA    _SV028SLANG_ParameterGroup_vertexC8vertexCA
+#define vertexCB    _SV028SLANG_ParameterGroup_vertexC8vertexCB
+#define vertexCC    _SV028SLANG_ParameterGroup_vertexC8vertexCC
+#define vertexCD    _SV028SLANG_ParameterGroup_vertexC8vertexCD
+
+#define fragmentC   _SV030SLANG_parameterGroup_fragmentC
+#define fragmentCA  _SV030SLANG_ParameterGroup_fragmentC10fragmentCA
+#define fragmentCB  _SV030SLANG_ParameterGroup_fragmentC10fragmentCB
+#define fragmentCC  _SV030SLANG_ParameterGroup_fragmentC10fragmentCC
+#define fragmentCD  _SV030SLANG_ParameterGroup_fragmentC10fragmentCD
+
+#define sharedS     _SV07sharedS
+#define sharedT     _SV07sharedT
+#define sharedTV    _SV08sharedTV
+#define sharedTF    _SV08sharedTF
+
+#define vertexS     _SV07vertexS
+#define vertexT     _SV07vertexT
+
+#define fragmentS     _SV09fragmentS
+#define fragmentT     _SV09fragmentT
+
 #endif
 
 float4 use(float  val) { return val; };
@@ -18,8 +48,8 @@ float4 use(float3 val) { return float4(val,0.0); };
 float4 use(float4 val) { return val; };
 float4 use(Texture2D t, SamplerState s)
 {
-	// This is the vertex shader, so we can't do implicit-gradient sampling
-	return t.SampleGrad(s, 0.0, 0.0, 0.0);
+    // This is the vertex shader, so we can't do implicit-gradient sampling
+    return t.SampleGrad(s, 0.0, 0.0, 0.0);
 }
 
 // Start with some parameters that will appear in both shaders
@@ -27,10 +57,10 @@ Texture2D sharedT R(: register(t0));
 SamplerState sharedS R(: register(s0));
 cbuffer sharedC R(: register(b0))
 {
-	float3 sharedCA R(: packoffset(c0));
-	float  sharedCB R(: packoffset(c0.w));
-	float3 sharedCC R(: packoffset(c1));
-	float2 sharedCD R(: packoffset(c2));
+    float3 sharedCA R(: packoffset(c0));
+    float  sharedCB R(: packoffset(c0.w));
+    float3 sharedCC R(: packoffset(c1));
+    float2 sharedCD R(: packoffset(c2));
 }
 
 // Then some parameters specific to this shader
@@ -41,10 +71,10 @@ Texture2D vertexT R(: register(t1));
 SamplerState vertexS R(: register(s1));
 cbuffer vertexC R(: register(b1))
 {
-	float3 vertexCA R(: packoffset(c0));
-	float  vertexCB R(: packoffset(c0.w));
-	float3 vertexCC R(: packoffset(c1));
-	float2 vertexCD R(: packoffset(c2));
+    float3 vertexCA R(: packoffset(c0));
+    float  vertexCB R(: packoffset(c0.w));
+    float3 vertexCC R(: packoffset(c1));
+    float2 vertexCD R(: packoffset(c2));
 }
 
 // And end with some shared parameters again
@@ -52,13 +82,13 @@ Texture2D sharedTV R(: register(t2));
 Texture2D sharedTF R(: register(t3));
 
 
-float4 main() : SV_Position
+float4 main() : SV_POSITION
 {
-	// Go ahead and use everything here, just to make sure things got placed correctly
-	return use(sharedT, sharedS)
-		+  use(sharedCD)
-		+  use(vertexT, vertexS)
-		+  use(vertexCD)
-		+  use(sharedTV, vertexS)
-		;
+    // Go ahead and use everything here, just to make sure things got placed correctly
+    return use(sharedT, sharedS)
+        +  use(sharedCD)
+        +  use(vertexT, vertexS)
+        +  use(vertexCD)
+        +  use(sharedTV, vertexS)
+        ;
 }

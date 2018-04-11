@@ -101,20 +101,24 @@ for (int tt = 0; tt < kBaseTypeCount; ++tt)
 
 __generic<T>
 __magic_type(PtrType)
+__intrinsic_type($(kIROp_PtrType))
 struct Ptr
 {};
 
 __generic<T>
 __magic_type(OutType)
+__intrinsic_type($(kIROp_OutType))
 struct Out
 {};
 
 __generic<T>
 __magic_type(InOutType)
+__intrinsic_type($(kIROp_InOutType))
 struct InOut
 {};
 
 __magic_type(StringType)
+__intrinsic_type($(kIROp_StringType))
 struct String
 {};
 
@@ -181,6 +185,7 @@ sb << "__intrinsic_type(" << kIROp_TextureBufferType << ")\n";
 sb << "__magic_type(TextureBuffer) struct TextureBuffer {};\n";
 
 sb << "__generic<T>\n";
+sb << "__intrinsic_type(" << kIROp_ParameterBlockType << ")\n";
 sb << "__magic_type(ParameterBlockType) struct ParameterBlock {};\n";
 
 static const char* kComponentNames[]{ "x", "y", "z", "w" };
@@ -313,11 +318,11 @@ for( int C = 2; C <= 4; ++C )
 
 
 sb << "__magic_type(SamplerState," << int(SamplerStateFlavor::SamplerState) << ")\n";
-sb << "__intrinsic_type(" << kIROp_SamplerType << ", " << int(SamplerStateFlavor::SamplerState) << ")\n";
+sb << "__intrinsic_type(" << kIROp_SamplerStateType << ")\n";
 sb << "struct SamplerState {};";
         
 sb << "__magic_type(SamplerState," << int(SamplerStateFlavor::SamplerComparisonState) << ")\n";
-sb << "__intrinsic_type(" << kIROp_SamplerType << ", " << int(SamplerStateFlavor::SamplerComparisonState) << ")\n";
+sb << "__intrinsic_type(" << kIROp_SamplerComparisonStateType << ")\n";
 sb << "struct SamplerComparisonState {};";
 
 // TODO(tfoley): Need to handle `RW*` variants of texture types as well...
@@ -377,6 +382,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
             sb << "__generic<T = float4> ";
 
             sb << "__magic_type(TextureSampler," << int(flavor) << ")\n";
+            sb << "__intrinsic_type(" << (kIROp_FirstTextureSamplerType + flavor) << ")\n";
             sb << "struct Sampler";
             sb << kBaseTextureAccessLevels[accessLevel].name;
             sb << name;
@@ -434,7 +440,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
             sb << "__generic<T = float4> ";
 
             sb << "__magic_type(Texture," << int(flavor) << ")\n";
-            sb << "__intrinsic_type(" << kIROp_TextureType << ", " << flavor << ")\n";
+            sb << "__intrinsic_type(" << (kIROp_FirstTextureType + flavor) << ")\n";
             sb << "struct ";
             sb << kBaseTextureAccessLevels[accessLevel].name;
             sb << name;

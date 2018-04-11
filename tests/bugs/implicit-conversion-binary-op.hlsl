@@ -10,7 +10,7 @@
 float4 main(
 	float4 	a : A,
 	uint4	b : B
-	) : SV_Target
+	) : SV_TARGET
 {
 	return a * b;
 }

@@ -27,11 +27,15 @@ float4 main() : SV_Target
 
 #else
 
+#define a _SV04testL0
+#define b _SV04testL1
+#define s _SV01s
+
 Texture2D a[2];
 Texture2D b[2];
 SamplerState s;
 
-float4 main() : SV_Target
+float4 main() : SV_TARGET
 {
 	return use(a[0],s)
 		 + use(b[0],s)

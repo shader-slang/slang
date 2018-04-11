@@ -548,22 +548,71 @@ static bool validateGenericSubstitutionsMatch(
     return true;
 }
 
+static bool validateThisTypeSubstitutionsMatch(
+    ParameterBindingContext*    /*context*/,
+    ThisTypeSubstitution*       /*left*/,
+    ThisTypeSubstitution*       /*right*/,
+    StructuralTypeMatchStack*   /*stack*/)
+{
+    // TODO: actual checking.
+    return true;
+}
+
 static bool validateSpecializationsMatch(
     ParameterBindingContext*    context,
     SubstitutionSet             left,
     SubstitutionSet             right,
     StructuralTypeMatchStack*   stack)
 {
-    if(!validateGenericSubstitutionsMatch(
-        context,
-        left.genericSubstitutions,
-        right.genericSubstitutions,
-        stack))
+    auto ll = left.substitutions;
+    auto rr = right.substitutions;
+    for(;;)
     {
+        // Skip any global generic substitutions.
+        if(auto leftGlobalGeneric = ll.As<GlobalGenericParamSubstitution>())
+        {
+            ll = leftGlobalGeneric->outer;
+            continue;
+        }
+        if(auto rightGlobalGeneric = rr.As<GlobalGenericParamSubstitution>())
+        {
+            rr = rightGlobalGeneric->outer;
+            continue;
+        }
+
+        // If either ran out, then we expect both to have run out.
+        if(!ll || !rr)
+            return !ll && !rr;
+
+        auto leftSubst = ll;
+        auto rightSubst = rr;
+
+        ll = ll->outer;
+        rr = rr->outer;
+
+        if(auto leftGeneric = leftSubst.As<GenericSubstitution>())
+        {
+            if(auto rightGeneric = rightSubst.As<GenericSubstitution>())
+            {
+                if(validateGenericSubstitutionsMatch(context, leftGeneric, rightGeneric, stack))
+                {
+                    continue;
+                }
+            }
+        }
+        else if(auto leftThisType = leftSubst.As<ThisTypeSubstitution>())
+        {
+            if(auto rightThisType = rightSubst.As<ThisTypeSubstitution>())
+            {
+                if(validateThisTypeSubstitutionsMatch(context, leftThisType, rightThisType, stack))
+                {
+                    continue;
+                }
+            }
+        }
+
         return false;
     }
-
-    // TODO: anything else to match?
 
     return true;
 }

@@ -7,6 +7,17 @@
 #define R(X) /**/
 #else
 #define R(X) X
+
+#define CA _SV023SLANG_parameterGroup_CAL0
+#define ca _SV023SLANG_ParameterGroup_CA2ca
+#define cb _SV023SLANG_ParameterGroup_CA2cb
+#define cc _SV023SLANG_ParameterGroup_CA2cc
+#define cd _SV023SLANG_ParameterGroup_CA2cd
+#define ce _SV023SLANG_ParameterGroup_CA2ce
+
+#define ta _SV023SLANG_parameterGroup_CAL1
+#define sa _SV023SLANG_parameterGroup_CAL2
+
 #endif
 
 float4 use(float  val) { return val; };
@@ -27,7 +38,7 @@ cbuffer CA R(: register(b0))
 	SamplerState sa R(: register(s0));
 }
 
-float4 main() : SV_Target
+float4 main() : SV_TARGET
 {
 	// Go ahead and use everything in this case:
 	return use(ta, sa)

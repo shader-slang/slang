@@ -1,4 +1,12 @@
 //TEST:COMPARE_HLSL: -target dxbc-assembly -profile vs_4_0 -entry VSMain
+
+#ifndef __SLANG__
+#define cbPerObject _SV032SLANG_parameterGroup_cbPerObject
+#define g_mWorld _SV032SLANG_ParameterGroup_cbPerObject8g_mWorld
+#define cbPerScene _SV031SLANG_parameterGroup_cbPerScene
+#define g_mViewProj _SV031SLANG_ParameterGroup_cbPerScene11g_mViewProj
+#endif
+
 //--------------------------------------------------------------------------------------
 // File: MultithreadedRendering11_VS.hlsl
 //

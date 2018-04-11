@@ -17,6 +17,10 @@ Bad foo(int x) { Bad b; b.bad = x; return b; }
 // we either respect the suffix and call the right overload,
 // or ignore it and call the wrong one.
 
+#ifndef __SLANG__
+#define b _SV01b
+#endif
+
 RWStructuredBuffer<uint> b;
 [numthreads(32,1,1)]
 void main(uint3 tid : SV_DispatchThreadID)

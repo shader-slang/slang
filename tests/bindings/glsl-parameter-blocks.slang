@@ -1,9 +1,6 @@
 #version 450 core
 //TEST:CROSS_COMPILE: -profile ps_5_0 -entry main -target spirv-assembly
 
-// Note: disabled because the translation of `Texture2D.Sample()`
-// requires handling of local variables with resource types in the IR.
-
 struct Test
 {
     float4 a;

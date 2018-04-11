@@ -1,6 +1,7 @@
 #include "mangle.h"
 
 #include "name.h"
+#include "ir-insts.h"
 #include "syntax.h"
 
 namespace Slang
@@ -159,12 +160,6 @@ namespace Slang
             // to mangle in the constraints even when
             // the whole thing is specialized...
         }
-        else if (auto proxyVal = dynamic_cast<IRProxyVal*>(val))
-        {
-            // This is a proxy standing in for some IR-level
-            // value, so we certainly don't want to include
-            // it in the mangling.
-        }
         else if( auto genericParamIntVal = dynamic_cast<GenericParamIntVal*>(val) )
         {
             // TODO: we shouldn't be including the names of generic parameters
@@ -190,16 +185,89 @@ namespace Slang
         }
     }
 
-    // TODO: this needs to be centralized
-    RefPtr<GenericSubstitution> getOutermostGenericSubst(
-        RefPtr<GenericSubstitution> inSubst)
+    void emitIRVal(
+        ManglingContext*    context,
+        IRInst*             inst);
+
+    void emitIRSimpleIntVal(
+        ManglingContext*    context,
+        IRInst*             inst)
     {
-        for (auto subst = inSubst; subst; subst = subst->outer)
+        if (auto intLit = as<IRIntLit>(inst))
         {
-            if (auto genericSubst = subst.As<GenericSubstitution>())
-                return genericSubst;
+            auto cVal = intLit->getValue();
+            if(cVal >= 0 && cVal <= 9 )
+            {
+                emit(context, (UInt)cVal);
+                return;
+            }
         }
-        return nullptr;
+
+        // Fallback:
+        emitIRVal(context, inst);
+    }
+
+    void emitIRVal(
+        ManglingContext*    context,
+        IRInst*             inst)
+    {
+        switch (inst->op)
+        {
+        case kIROp_VoidType:    emitRaw(context, "V");  return;
+        case kIROp_BoolType:    emitRaw(context, "b");  return;
+        case kIROp_IntType:     emitRaw(context, "i");  return;
+        case kIROp_UIntType:    emitRaw(context, "u");  return;
+        case kIROp_UInt64Type:  emitRaw(context, "U");  return;
+        case kIROp_HalfType:    emitRaw(context, "h");  return;
+        case kIROp_FloatType:   emitRaw(context, "f");  return;
+        case kIROp_DoubleType:  emitRaw(context, "d");  return;
+
+        default:
+            break;
+        }
+
+        if (auto globalVal = as<IRGlobalValue>(inst))
+        {
+            // If it is a global value, it has its own mangled name.
+            emit(context, getText(globalVal->mangledName));
+        }
+        // TODO: need to handle various type cases here
+        else if (auto intLit = as<IRIntLit>(inst))
+        {
+            // TODO: need to figure out what prefix/suffix is needed
+            // to allow demangling later.
+            emitRaw(context, "k");
+            emit(context, (UInt) intLit->getValue());
+        }
+        // Note: the cases here handling types really should match
+        // the cases above that handle AST-level `Type`s. This
+        // seems to be a weakness in the way we mangle names, because
+        // we may mangle in both IR-level and AST-level types.
+        else if (auto vecType = as<IRVectorType>(inst))
+        {
+            emitRaw(context, "v");
+            emitIRSimpleIntVal(context, vecType->getElementCount());
+            emitIRVal(context, vecType->getElementType());
+
+        }
+        else if( auto matType = as<IRMatrixType>(inst) )
+        {
+            emitRaw(context, "m");
+            emitIRSimpleIntVal(context, matType->getRowCount());
+            emitRaw(context, "x");
+            emitIRSimpleIntVal(context, matType->getColumnCount());
+            emitIRVal(context, matType->getElementType());
+        }
+        else if (auto arrType = as<IRArrayType>(inst))
+        {
+            emitRaw(context, "a");
+            emitIRSimpleIntVal(context, arrType->getElementCount());
+            emitIRVal(context, arrType->getElementCount());
+        }
+        else
+        {
+            SLANG_UNEXPECTED("unimplemented case in mangling");
+        }
     }
 
     void emitQualifiedName(
@@ -231,6 +299,29 @@ namespace Slang
             return;
         }
 
+        // Inheritance declarations don't have meaningful names,
+        // and so we should emit them based on the type
+        // that is doing the inheriting.
+        if(auto inheritanceDeclRef = declRef.As<InheritanceDecl>())
+        {
+            emit(context, "I");
+            emitType(context, GetSup(inheritanceDeclRef));
+            return;
+        }
+
+        // Similarly, an extension doesn't have a name worth
+        // emitting, and we should base things on its target
+        // type instead.
+        if(auto extensionDeclRef = declRef.As<ExtensionDecl>())
+        {
+            // TODO: as a special case, an "unconditional" extension
+            // that is in the same module as the type it extends should
+            // be treated as equivalent to the type itself.
+            emit(context, "X");
+            emitType(context, GetTargetType(extensionDeclRef));
+            return;
+        }
+
         emitName(context, declRef.GetName());
 
         // Are we the "inner" declaration beneath a generic decl?
@@ -239,7 +330,7 @@ namespace Slang
             // There are two cases here: either we have specializations
             // in place for the parent generic declaration, or we don't.
 
-            auto subst = getOutermostGenericSubst(declRef.substitutions.genericSubstitutions);
+            auto subst = findInnerMostGenericSubstitution(declRef.substitutions);
             if( subst && subst->genericDecl == parentGenericDeclRef.getDecl() )
             {
                 // This is the case where we *do* have substitutions.
@@ -373,13 +464,6 @@ namespace Slang
 
     String getMangledName(DeclRef<Decl> const& declRef)
     {
-        // Special case: if a declaration is the result of a type legalization
-        // transformation, then it should just get the mangled name of the
-        // original declaration, and not the one that would be computed
-        // for it otherwise.
-        if(auto legalizedModifier = declRef.getDecl()->FindModifier<LegalizedModifier>())
-            return legalizedModifier->originalMangledName;
-
         ManglingContext context;
         mangleName(&context, declRef);
         return context.sb.ProduceString();
@@ -391,16 +475,18 @@ namespace Slang
             DeclRef<Decl>(declRef.decl, declRef.substitutions));
     }
 
-    String mangleSpecializedFuncName(String baseName, SubstitutionSet subst)
+    String mangleSpecializedFuncName(String baseName, IRSpecialize* specializeInst)
     {
         ManglingContext context;
         emitRaw(&context, baseName.Buffer());
         emitRaw(&context, "_G");
-        if (auto genSubst = subst.genericSubstitutions)
+
+        UInt argCount = specializeInst->getArgCount();
+        for (UInt aa = 0; aa < argCount; ++aa)
         {
-            for (auto a : genSubst->args)
-                emitVal(&context, a);
+            emitIRVal(&context, specializeInst->getArg(aa));
         }
+
         return context.sb.ProduceString();
     }
 

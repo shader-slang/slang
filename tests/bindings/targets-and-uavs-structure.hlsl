@@ -7,6 +7,11 @@
 #define R(X) /**/
 #else
 #define R(X) X
+
+#define Foo _ST03Foo
+#define v _SV03Foo1v
+#define fooBuffer _SV09fooBuffer
+
 #endif
 
 float4 use(float  val) { return val; };

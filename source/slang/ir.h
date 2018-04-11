@@ -11,6 +11,7 @@
 
 #include "source-loc.h"
 #include "memory_pool.h"
+#include "type-system-shared.h"
 
 namespace Slang {
 
@@ -35,10 +36,13 @@ enum : IROpFlags
     kIROpFlag_Parent = 1 << 0,
 };
 
-enum IROp : int16_t
+enum IROp : int32_t
 {
 #define INST(ID, MNEMONIC, ARG_COUNT, FLAGS)  \
     kIROp_##ID,
+
+#define MANUAL_INST_RANGE(ID, START, COUNT) \
+    kIROp_First##ID = START, kIROp_Last##ID = kIROp_First##ID + ((COUNT) - 1),
 
 #include "ir-inst-defs.h"
 
@@ -119,9 +123,11 @@ enum IRDecorationOp : uint16_t
     kIRDecorationOp_Target,
     kIRDecorationOp_TargetIntrinsic,
     kIRDecorationOp_GLSLOuterArray,
+    kIRDecorationOp_Semantic,
+    kIRDecorationOp_InterpolationMode,
 };
 
-// represents an object allocated in an IR memory pool 
+// represents an object allocated in an IR memory pool
 struct IRObject
 {
     bool isDestroyed = false;
@@ -146,12 +152,10 @@ struct IRDecoration : public IRObject
     IRDecorationOp op;
 };
 
-// Use AST-level types directly to represent the
-// types of IR instructions/values
-typedef Type IRType;
-
 struct IRBlock;
 struct IRParentInst;
+struct IRRate;
+struct IRType;
 
 // Every value in the IR is an instruction (even things
 // like literal values).
@@ -209,12 +213,14 @@ struct IRInst : public IRObject
     // The type of the result value of this instruction,
     // or `null` to indicate that the instruction has
     // no value.
-    RefPtr<Type>    type;
+    IRUse typeUse;
 
-    Type* getFullType() { return type; }
+    IRType* getFullType() { return (IRType*) typeUse.get(); }
+    void setFullType(IRType* type) { typeUse.init(this, (IRInst*) type); }
 
-    Type* getRate();
-    Type* getDataType();
+    IRRate* getRate();
+
+    IRType* getDataType();
 
     // After the type, we have data that is specific to
     // the subtype of `IRInst`. In most cases, this is
@@ -277,6 +283,8 @@ struct IRInst : public IRObject
     // for those values.
     void removeArguments();
 
+    // RTTI support
+    static bool isaImpl(IROp) { return true; }
 };
 
 // `dynamic_cast` equivalent
@@ -380,6 +388,43 @@ struct IRInstList : IRInstListBase
     Iterator end() { return Iterator(last ? last->next : nullptr); }
 };
 
+// Types
+
+#define IR_LEAF_ISA(NAME) static bool isaImpl(IROp op) { return op == kIROp_##NAME; }
+#define IR_PARENT_ISA(NAME) static bool isaImpl(IROp op) { return op >= kIROp_First##NAME && op <= kIROp_Last##NAME; }
+
+#define SIMPLE_IR_TYPE(NAME, BASE) struct IR##NAME : IR##BASE { IR_LEAF_ISA(NAME) };
+#define SIMPLE_IR_PARENT_TYPE(NAME, BASE) struct IR##NAME : IR##BASE { IR_PARENT_ISA(NAME) };
+
+
+// All types in the IR are represented as instructions which conceptually
+// execute before run time.
+struct IRType : IRInst
+{
+    IRType* getCanonicalType() { return this; }
+
+    IR_PARENT_ISA(Type)
+};
+
+struct IRBasicType : IRType
+{
+    BaseType getBaseType() { return BaseType(op - kIROp_FirstBasicType); }
+
+    IR_PARENT_ISA(BasicType)
+};
+
+struct IRVoidType : IRBasicType
+{
+    IR_LEAF_ISA(VoidType)
+};
+
+struct IRBoolType : IRBasicType
+{
+    IR_LEAF_ISA(BoolType)
+};
+
+// Constant Instructions
+
 typedef int64_t IRIntegerValue;
 typedef double IRFloatingPointValue;
 
@@ -393,15 +438,25 @@ struct IRConstant : IRInst
         // HACK: allows us to hash the value easily
         void*                   ptrData[2];
     } u;
+
+    IR_PARENT_ISA(Constant)
 };
+
+struct IRIntLit : IRConstant
+{
+    IRIntegerValue getValue() { return u.intVal; }
+
+    IR_LEAF_ISA(IntLit);
+};
+
+// Get the compile-time constant integer value of an instruction,
+// if it has one, and assert-fail otherwise.
+IRIntegerValue GetIntVal(IRInst* inst);
 
 // A instruction that ends a basic block (usually because of control flow)
 struct IRTerminatorInst : IRInst
 {
-    static bool isaImpl(IROp op)
-    {
-        return (op >= kIROp_FirstTerminatorInst) && (op <= kIROp_LastTerminatorInst);
-    }
+    IR_PARENT_ISA(TerminatorInst)
 };
 
 // A function parameter is owned by a basic block, and represents
@@ -417,7 +472,7 @@ struct IRParam : IRInst
     IRParam* getNextParam();
     IRParam* getPrevParam();
 
-    static bool isaImpl(IROp op) { return op == kIROp_Param; }
+    IR_LEAF_ISA(Param)
 };
 
 // A "parent" instruction is one that contains other instructions
@@ -433,10 +488,7 @@ struct IRParentInst : IRInst
     IRInst* getLastChild()  { return children.last;  }
     IRInstListBase getChildren() { return children; }
 
-    static bool isaImpl(IROp op)
-    {
-        return (op >= kIROp_FirstParentInst) && (op <= kIROp_LastParentInst);
-    }
+    IR_PARENT_ISA(ParentInst)
 };
 
 // A basic block is a parent instruction that adds the constraint
@@ -510,7 +562,7 @@ struct IRBlock : IRParentInst
     // by the terminator instruction of the block.
     // The `getPredecessors()` and `getSuccessors()` functions
     // make this more precise.
-    // 
+    //
     struct PredecessorList
     {
         PredecessorList(IRUse* begin) : b(begin) {}
@@ -573,15 +625,204 @@ struct IRBlock : IRParentInst
 
     //
 
-    static bool isaImpl(IROp op) { return op == kIROp_Block; }
+    IR_LEAF_ISA(Block)
 };
 
-// For right now, we will represent the type of
-// an IR function using the type of the AST
-// function from which it was created.
+SIMPLE_IR_TYPE(BasicBlockType, Type)
+
+struct IRResourceTypeBase : IRType
+{
+    TextureFlavor getFlavor() const
+    {
+        return TextureFlavor(op & 0xFFFF);
+    }
+
+    TextureFlavor::Shape GetBaseShape() const
+    {
+        return getFlavor().GetBaseShape();
+    }
+    bool isMultisample() const { return getFlavor().isMultisample(); }
+    bool isArray() const { return getFlavor().isArray(); }
+    SlangResourceShape getShape() const { return getFlavor().getShape(); }
+    SlangResourceAccess getAccess() const { return getFlavor().getAccess(); }
+
+    IR_PARENT_ISA(ResourceTypeBase);
+};
+
+struct IRResourceType : IRResourceTypeBase
+{
+    IRType* getElementType() { return (IRType*)getOperand(0); }
+
+    IR_PARENT_ISA(ResourceType)
+};
+
+struct IRTextureTypeBase : IRResourceType
+{
+    IR_PARENT_ISA(TextureTypeBase)
+};
+
+struct IRTextureType : IRTextureTypeBase
+{
+    IR_PARENT_ISA(TextureType)
+};
+
+struct IRTextureSamplerType : IRTextureTypeBase
+{
+    IR_PARENT_ISA(TextureSamplerType)
+};
+
+struct IRGLSLImageType : IRTextureTypeBase
+{
+    IR_PARENT_ISA(GLSLImageType)
+};
+
+struct IRSamplerStateTypeBase : IRType
+{
+    IR_PARENT_ISA(SamplerStateTypeBase)
+};
+
+SIMPLE_IR_TYPE(SamplerStateType, SamplerStateTypeBase)
+SIMPLE_IR_TYPE(SamplerComparisonStateType, SamplerStateTypeBase)
+
+struct IRBuiltinGenericType : IRType
+{
+    IRType* getElementType() { return (IRType*)getOperand(0); }
+
+    IR_PARENT_ISA(BuiltinGenericType)
+};
+
+SIMPLE_IR_PARENT_TYPE(PointerLikeType, BuiltinGenericType);
+SIMPLE_IR_PARENT_TYPE(HLSLStructuredBufferTypeBase, BuiltinGenericType)
+SIMPLE_IR_TYPE(HLSLStructuredBufferType, HLSLStructuredBufferTypeBase)
+SIMPLE_IR_TYPE(HLSLRWStructuredBufferType, HLSLStructuredBufferTypeBase)
+// TODO: need raster-ordered case here
+
+SIMPLE_IR_PARENT_TYPE(UntypedBufferResourceType, Type)
+SIMPLE_IR_TYPE(HLSLByteAddressBufferType, UntypedBufferResourceType)
+SIMPLE_IR_TYPE(HLSLRWByteAddressBufferType, UntypedBufferResourceType)
+
+SIMPLE_IR_TYPE(HLSLAppendStructuredBufferType, HLSLStructuredBufferTypeBase)
+SIMPLE_IR_TYPE(HLSLConsumeStructuredBufferType, HLSLStructuredBufferTypeBase)
+
+struct IRHLSLPatchType : IRType
+{
+    IRType* getElementType() { return (IRType*)getOperand(0); }
+    IRInst* getElementCount() { return getOperand(1); }
+
+    IR_PARENT_ISA(HLSLPatchType)
+};
+
+SIMPLE_IR_TYPE(HLSLInputPatchType, HLSLPatchType)
+SIMPLE_IR_TYPE(HLSLOutputPatchType, HLSLPatchType)
+
+SIMPLE_IR_PARENT_TYPE(HLSLStreamOutputType, BuiltinGenericType)
+SIMPLE_IR_TYPE(HLSLPointStreamType, HLSLStreamOutputType)
+SIMPLE_IR_TYPE(HLSLLineStreamType, HLSLStreamOutputType)
+SIMPLE_IR_TYPE(HLSLTriangleStreamType, HLSLStreamOutputType)
+
+SIMPLE_IR_TYPE(GLSLInputAttachmentType, Type)
+SIMPLE_IR_PARENT_TYPE(ParameterGroupType, PointerLikeType)
+SIMPLE_IR_PARENT_TYPE(UniformParameterGroupType, ParameterGroupType)
+SIMPLE_IR_PARENT_TYPE(VaryingParameterGroupType, ParameterGroupType)
+SIMPLE_IR_TYPE(ConstantBufferType, UniformParameterGroupType)
+SIMPLE_IR_TYPE(TextureBufferType, UniformParameterGroupType)
+SIMPLE_IR_TYPE(GLSLInputParameterGroupType, VaryingParameterGroupType)
+SIMPLE_IR_TYPE(GLSLOutputParameterGroupType, VaryingParameterGroupType)
+SIMPLE_IR_TYPE(GLSLShaderStorageBufferType, UniformParameterGroupType)
+SIMPLE_IR_TYPE(ParameterBlockType, UniformParameterGroupType)
+
+struct IRArrayTypeBase : IRType
+{
+    IRType* getElementType() { return (IRType*)getOperand(0); }
+
+    // Returns the element count for an `IRArrayType`, and null
+    // for an `IRUnsizedArrayType`.
+    IRInst* getElementCount();
+
+    IR_PARENT_ISA(ArrayTypeBase)
+};
+
+struct IRArrayType: IRArrayTypeBase
+{
+    IRInst* getElementCount() { return getOperand(1); }
+
+    IR_LEAF_ISA(ArrayType)
+};
+
+SIMPLE_IR_TYPE(UnsizedArrayType, ArrayTypeBase)
+
+SIMPLE_IR_PARENT_TYPE(Rate, Type)
+SIMPLE_IR_TYPE(ConstExprRate, Rate)
+SIMPLE_IR_TYPE(GroupSharedRate, Rate)
+
+struct IRRateQualifiedType : IRType
+{
+    IRRate* getRate() { return (IRRate*) getOperand(0); }
+    IRType* getValueType() { return (IRType*) getOperand(1); }
+
+    IR_LEAF_ISA(RateQualifiedType)
+};
+
+
+// Unlike the AST-level type system where `TypeType` tracks the
+// underlying type, the "type of types" in the IR is a simple
+// value with no operands, so that all type nodes have the
+// same type.
+SIMPLE_IR_PARENT_TYPE(Kind, Type);
+SIMPLE_IR_TYPE(TypeKind, Kind);
+
+// The kind of any and all generics.
 //
-// TODO: need to do this better.
-typedef FuncType IRFuncType;
+// A more complete type system would include "arrow kinds" to
+// be able to track the domain and range of generics (e.g.,
+// the `vector` generic maps a type and an integer to a type).
+// This is only really needed if we ever wanted to support
+// "higher-kinded" generics (e.g., a generic that takes another
+// generic as a parameter).
+//
+SIMPLE_IR_TYPE(GenericKind, Kind)
+
+struct IRVectorType : IRType
+{
+    IRType* getElementType() { return (IRType*)getOperand(0); }
+    IRInst* getElementCount() { return getOperand(1); }
+
+    IR_LEAF_ISA(VectorType)
+};
+
+struct IRMatrixType : IRType
+{
+    IRType* getElementType() { return (IRType*)getOperand(0); }
+    IRInst* getRowCount() { return getOperand(1); }
+    IRInst* getColumnCount() { return getOperand(2); }
+
+    IR_LEAF_ISA(MatrixType)
+};
+
+struct IRPtrTypeBase : IRType
+{
+    IRType* getValueType() { return (IRType*)getOperand(0); }
+
+    IR_PARENT_ISA(PtrTypeBase)
+};
+
+struct IRPtrType : IRPtrTypeBase
+{
+    IR_LEAF_ISA(PtrType)
+};
+
+SIMPLE_IR_PARENT_TYPE(OutTypeBase, PtrTypeBase)
+SIMPLE_IR_TYPE(OutType, OutTypeBase)
+SIMPLE_IR_TYPE(InOutType, OutTypeBase)
+
+struct IRFuncType : IRType
+{
+    IRType* getResultType() { return (IRType*) getOperand(0); }
+    UInt getParamCount() { return getOperandCount() - 1; }
+    IRType* getParamType(UInt index) { return (IRType*)getOperand(1 + index); }
+
+    IR_LEAF_ISA(FuncType)
+};
 
 // A "global value" is an instruction that might have
 // linkage, so that it can be declared in one module
@@ -607,11 +848,54 @@ struct IRGlobalValue : IRParentInst
     void moveToEnd();
 #endif
 
-    static bool isaImpl(IROp op)
-    {
-        return (op >= kIROp_FirstGlobalValue) && (op <= kIROp_LastGlobalValue);
-    }
+    IR_PARENT_ISA(GlobalValue)
 };
+
+bool isDefinition(
+    IRGlobalValue* inVal);
+
+
+// A structure type is represented as a parent instruction,
+// where the child instructions represent the fields of the
+// struct.
+//
+// The space of fields that a given struct type supports
+// are defined as its "keys", which are global values
+// (that is, they have mangled names that can be used
+// for linkage).
+//
+struct IRStructKey : IRGlobalValue
+{
+    IR_LEAF_ISA(StructKey)
+};
+//
+// The fields of the struct are then defined as mappings
+// from those keys to the associated type (in the case of
+// the struct type) or to values (when lookup up a field).
+//
+// A struct field thus has two operands: the key, and the
+// type of the field.
+//
+struct IRStructField : IRInst
+{
+    IRStructKey* getKey() { return cast<IRStructKey>(getOperand(0)); }
+    IRType* getFieldType() { return cast<IRType>(getOperand(1)); }
+
+    IR_LEAF_ISA(StructField)
+};
+//
+// The struct type is then represented as a parent instruction
+// that contains the various fields. Note that a struct does
+// *not* contain the keys, because code needs to be able to
+// reference the keys from scopes outside of the struct.
+//
+struct IRStructType : IRGlobalValue
+{
+    IRInstList<IRStructField> getFields() { return IRInstList<IRStructField>(getChildren()); }
+
+    IR_LEAF_ISA(StructType)
+};
+
 
 /// @brief A global value that potentially holds executable code.
 ///
@@ -628,47 +912,52 @@ struct IRGlobalValueWithCode : IRGlobalValue
 
     // Add a block to the end of this function.
     void addBlock(IRBlock* block);
+
+    IR_PARENT_ISA(GlobalValueWithCode)
+};
+
+// A value that has parameters so that it can conceptually be called.
+struct IRGlobalValueWithParams : IRGlobalValueWithCode
+{
+    // Convenience accessor for the IR parameters,
+    // which are actually the parameters of the first
+    // block.
+    IRParam* getFirstParam();
+
+    IR_PARENT_ISA(GlobalValueWithParams)
 };
 
 // A function is a parent to zero or more blocks of instructions.
 //
 // A function is itself a value, so that it can be a direct operand of
 // an instruction (e.g., a call).
-struct IRFunc : IRGlobalValueWithCode
+struct IRFunc : IRGlobalValueWithParams
 {
     // The type of the IR-level function
-    IRFuncType* getType() { return (IRFuncType*) type.Ptr(); }
+    IRFuncType* getDataType() { return (IRFuncType*) IRInst::getDataType(); }
 
-    // If this function is generic, then we store a reference
-    // to the AST-level generic that defines its parameters
-    // and their constraints.
-    List<RefPtr<GenericDecl>> genericDecls;
-    int specializedGenericLevel = -1;
-
-    GenericDecl* getGenericDecl()
-    {
-        if (specializedGenericLevel != -1)
-            return genericDecls[specializedGenericLevel].Ptr();
-        return nullptr;
-    }
-
-    // Convenience accessors for working with the 
+    // Convenience accessors for working with the
     // function's type.
-    Type* getResultType();
+    IRType* getResultType();
     UInt getParamCount();
-    Type* getParamType(UInt index);
+    IRType* getParamType(UInt index);
 
-    // Convenience accessor for the IR parameters,
-    // which are actually the parameters of the first
-    // block.
-    IRParam* getFirstParam();
-
-    virtual void dispose() override
-    {
-        IRGlobalValueWithCode::dispose();
-        genericDecls = decltype(genericDecls)();
-    }
+    IR_LEAF_ISA(Func)
 };
+
+// A generic is akin to a function, but is conceptually executed
+// before runtime, to specialize the code nested within.
+//
+// In practice, a generic always holds only a single block, and ends
+// with a `return` instruction for the value that the generic yields.
+struct IRGeneric : IRGlobalValueWithParams
+{
+    IR_LEAF_ISA(Generic)
+};
+
+// Find the value that is returned from a generic, so that
+// a pass can glean information from it.
+IRInst* findGenericReturnVal(IRGeneric* generic);
 
 // The IR module itself is represented as an instruction, which
 // serves at the root of the tree of all instructions in the module.
@@ -680,6 +969,8 @@ struct IRModuleInst : IRParentInst
     IRModule* module;
 
     IRInstListBase getGlobalInsts() { return getChildren(); }
+
+    IR_LEAF_ISA(Module)
 };
 
 struct IRModule : RefObject

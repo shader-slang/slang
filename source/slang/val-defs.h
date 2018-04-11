@@ -85,9 +85,6 @@ END_SYNTAX_CLASS()
 ABSTRACT_SYNTAX_CLASS(SubtypeWitness, Witness)
     FIELD(RefPtr<Type>, sub)
     FIELD(RefPtr<Type>, sup)
-    RAW(
-    virtual DeclRef<Decl> getLastStepDeclRef() = 0;
-    )
 END_SYNTAX_CLASS()
 
 SYNTAX_CLASS(TypeEqualityWitness, SubtypeWitness)
@@ -96,10 +93,6 @@ RAW(
     virtual String ToString() override;
     virtual int GetHashCode() override;
     virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int * ioDiff) override;
-    virtual DeclRef<Decl> getLastStepDeclRef() override
-    {
-        return DeclRef<Decl>();
-    }
 )
 END_SYNTAX_CLASS()
 // A witness that one type is a subtype of another
@@ -111,10 +104,6 @@ RAW(
     virtual String ToString() override;
     virtual int GetHashCode() override;
     virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int * ioDiff) override;
-    virtual DeclRef<Decl> getLastStepDeclRef() override
-    {
-        return declRef;
-    }
 )
 END_SYNTAX_CLASS()
 
@@ -124,31 +113,11 @@ SYNTAX_CLASS(TransitiveSubtypeWitness, SubtypeWitness)
     FIELD(RefPtr<SubtypeWitness>, subToMid);
 
     // Witness that `mid : sup`
-    FIELD(RefPtr<SubtypeWitness>, midToSup);
+    FIELD(DeclRef<Decl>, midToSup);
 RAW(
     virtual bool EqualsVal(Val* val) override;
     virtual String ToString() override;
     virtual int GetHashCode() override;
     virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int * ioDiff) override;
-    virtual DeclRef<Decl> getLastStepDeclRef() override
-    {
-        return midToSup->getLastStepDeclRef();
-    }
 )
 END_SYNTAX_CLASS()
-
-// A value that is used as a proxy when we need to
-// put an IR-level value into AST types
-SYNTAX_CLASS(IRProxyVal, Val)
-    FIELD(IRUse, inst)
-RAW(
-    virtual bool EqualsVal(Val* val) override;
-    virtual String ToString() override;
-    virtual int GetHashCode() override;
-    ~IRProxyVal() override
-    {
-        inst.clear();
-    }
-)
-END_SYNTAX_CLASS()
-

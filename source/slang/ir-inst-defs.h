@@ -8,59 +8,135 @@
 #define INST_RANGE(BASE, FIRST, LAST) /* empty */
 #endif
 
+#ifndef MANUAL_INST_RANGE
+#define MANUAL_INST_RANGE(NAME, START, COUNT) /* empty */
+#endif
+
 #ifndef PSEUDO_INST
 #define PSEUDO_INST(ID) /* empty */
 #endif
 
 #define PARENT kIROpFlag_Parent
 
-// Invalid operation: should not appear in valid code
 INST(Nop, nop, 0, 0)
 
-INST(TypeType, Type, 0, 0)
-INST(VoidType, Void, 0, 0)
-INST(BlockType, Block, 0, 0)
-INST(VectorType, Vec, 2, 0)
-INST(MatrixType, Mat, 3, 0)
-INST(arrayType, Array, 2, 0)
+/* Types */
 
-INST(BoolType, Bool, 0, 0)
+    /* Basic Types */
 
-INST(Float16Type, Float16, 0, 0)
-INST(Float32Type, Float32, 0, 0)
-INST(Float64Type, Float64, 0, 0)
+    #define DEFINE_BASE_TYPE_INST(NAME) INST(NAME ## Type, NAME, 0, 0)
+    FOREACH_BASE_TYPE(DEFINE_BASE_TYPE_INST)
+    #undef DEFINE_BASE_TYPE_INST
+    INST(AfterBaseType, afterBaseType, 0, 0)
 
-// Signed integer types.
-// Note that `IntPtr` represents a pointer-sized integer type,
-// and will end up being equivalent to either `Int32` or `Int64`
-// when it comes time to actually generate code.
-//
-INST(Int8Type, Int8, 0, 0)
-INST(Int16Type, Int16, 0, 0)
-INST(Int32Type, Int32, 0, 0)
-INST(IntPtrType, IntPtr, 0, 0)
-INST(Int64Type, Int64, 0, 0)
+    INST_RANGE(BasicType, VoidType, AfterBaseType)
 
-// Unlike a lot of other IRs, we retain a distinction between
-// signed and unsigned integer types, simply because many of
-// the target languages we need to generate code for also
-// keep this distinction, and it will help us generate variable
-// declarations that will be friendly to debuggers.
-//
-// TODO: We may want to reconsider this choice simply because
-// some targets (e.g., those based on C++) may have undefined
-// behavior around operations on signed integers that are
-// well-defined (two's complement) on unsigned integers. In
-// those cases we either want to default to unsigned integers,
-// and then cast around the few ops that care about the difference,
-// or else we want to keep using the orignal types, but need
-// to cast around any ordinary math operations on signed types.
-//
-INST(UInt8Type, Int8, 0, 0)
-INST(UInt16Type, Int16, 0, 0)
-INST(UInt32Type, Int32, 0, 0)
-INST(UIntPtrType, IntPtr, 0, 0)
-INST(UInt64Type, Int64, 0, 0)
+    INST(StringType, String, 0, 0)
+    INST(RayDescType, RayDesc, 0, 0)
+    INST(BuiltInTriangleIntersectionAttributesType, BuiltInTriangleIntersectionAttributes, 0, 0)
+
+    /* ArrayTypeBase */
+        INST(ArrayType, Array, 2, 0)
+        INST(UnsizedArrayType, UnsizedArray, 1, 0)
+    INST_RANGE(ArrayTypeBase, ArrayType, UnsizedArrayType)
+
+    INST(FuncType, Func, 0, 0)
+    INST(BasicBlockType, BasicBlock, 0, 0)
+
+    INST(VectorType, Vec, 2, 0)
+    INST(MatrixType, Mat, 3, 0)
+
+    /* Rate */
+        INST(ConstExprRate, ConstExpr, 0, 0)
+        INST(GroupSharedRate, GroupShared, 0, 0)
+    INST_RANGE(Rate, ConstExprRate, GroupSharedRate)
+
+    INST(RateQualifiedType, RateQualified, 2, 0)
+
+    // Kinds represent the "types of types."
+    // They should not really be nested under `IRType`
+    // in the overall hierarchy, but we can fix that later.
+    //
+    /* Kind */
+        INST(TypeKind, Type, 0, 0)
+        INST(RateKind, Rate, 0, 0)
+        INST(GenericKind, Generic, 0, 0)
+    INST_RANGE(Kind, TypeKind, GenericKind)
+
+    /* PtrTypeBase */
+        INST(PtrType, Ptr, 1, 0)
+        /* OutTypeBase */
+            INST(OutType, Out, 1, 0)
+            INST(InOutType, InOut, 1, 0)
+        INST_RANGE(OutTypeBase, OutType, InOutType)
+    INST_RANGE(PtrTypeBase, PtrType, InOutType)
+
+    /* SamplerStateTypeBase */
+        INST(SamplerStateType, SamplerState, 0, 0)
+        INST(SamplerComparisonStateType, SamplerComparisonState, 0, 0)
+    INST_RANGE(SamplerStateTypeBase, SamplerStateType, SamplerComparisonStateType)
+
+    // TODO: Why do we have all this hierarchy here, when everything
+    // that actually matters is currently nested under `TextureTypeBase`?
+    /* ResourceTypeBase */
+        /* ResourceType */
+            /* TextureTypeBase */
+                /* TextureType */
+                MANUAL_INST_RANGE(TextureType, 0x10000, TextureFlavor::Count)
+                /* TextureSamplerType */
+                MANUAL_INST_RANGE(TextureSamplerType, 0x20000, TextureFlavor::Count)
+                /* GLSLImageType */
+                MANUAL_INST_RANGE(GLSLImageType, 0x30000, TextureFlavor::Count)
+            INST_RANGE(TextureTypeBase, FirstTextureType, LastGLSLImageType)
+        INST_RANGE(ResourceType, FirstTextureType, LastGLSLImageType)
+    INST_RANGE(ResourceTypeBase, FirstTextureType, LastGLSLImageType)
+
+    /* UntypedBufferResourceType */
+        INST(HLSLByteAddressBufferType,      ByteAddressBuffer,   0, 0)
+        INST(HLSLRWByteAddressBufferType,    RWByteAddressBuffer, 0, 0)
+        INST(RaytracingAccelerationStructureType, RaytracingAccelerationStructure, 0, 0)
+    INST_RANGE(UntypedBufferResourceType, HLSLByteAddressBufferType, RaytracingAccelerationStructureType)
+
+    /* HLSLPatchType */
+        INST(HLSLInputPatchType,    InputPatch,     2, 0)
+        INST(HLSLOutputPatchType,   OutputPatch,    2, 0)
+    INST_RANGE(HLSLPatchType, HLSLInputPatchType, HLSLOutputPatchType)
+
+    INST(GLSLInputAttachmentType, GLSLInputAttachment, 0, 0)
+
+    /* BuiltinGenericType */
+        /* HLSLStreamOutputType */
+            INST(HLSLPointStreamType,       PointStream,    1, 0)
+            INST(HLSLLineStreamType,        LineStream,     1, 0)
+            INST(HLSLTriangleStreamType,    TriangleStream, 1, 0)
+        INST_RANGE(HLSLStreamOutputType, HLSLPointStreamType, HLSLTriangleStreamType)
+
+        /* HLSLStructuredBufferTypeBase */
+            INST(HLSLStructuredBufferType,          StructuredBuffer,           0, 0)
+            INST(HLSLRWStructuredBufferType,        RWStructuredBuffer,         0, 0)
+            INST(HLSLAppendStructuredBufferType,    AppendStructuredBuffer,     0, 0)
+            INST(HLSLConsumeStructuredBufferType,   ConsumeStructuredBuffer,    0, 0)
+        INST_RANGE(HLSLStructuredBufferTypeBase, HLSLStructuredBufferType, HLSLConsumeStructuredBufferType)
+
+        /* PointerLikeType */
+            /* ParameterGroupType */
+                /* UniformParameterGroupType */
+                    INST(ConstantBufferType, ConstantBuffer, 1, 0)
+                    INST(TextureBufferType, TextureBuffer, 1, 0)
+                    INST(ParameterBlockType, ParameterBlock, 1, 0)
+                    INST(GLSLShaderStorageBufferType, GLSLShaderStorageBuffer, 0, 0)
+                INST_RANGE(UniformParameterGroupType, ConstantBufferType, GLSLShaderStorageBufferType)
+            
+                /* VaryingParameterGroupType */
+                    INST(GLSLInputParameterGroupType, GLSLInputParameterGroup, 0, 0)
+                    INST(GLSLOutputParameterGroupType, GLSLOutputParameterGroup, 0, 0)
+                INST_RANGE(VaryingParameterGroupType, GLSLInputParameterGroupType, GLSLOutputParameterGroupType)
+            INST_RANGE(ParameterGroupType, ConstantBufferType, GLSLOutputParameterGroupType)
+        INST_RANGE(PointerLikeType, ConstantBufferType, GLSLOutputParameterGroupType)
+    INST_RANGE(BuiltinGenericType, HLSLPointStreamType, GLSLOutputParameterGroupType)
+
+
+
 
 // A user-defined structure declaration at the IR level.
 // Unlike in the AST where there is a distinction between
@@ -71,40 +147,53 @@ INST(UInt64Type, Int64, 0, 0)
 // This is a parent instruction that holds zero or more
 // `field` instructions.
 //
-INST(StructType, Struct, 0, PARENT)
+// Note: we are being a bit slippery here, because a `struct`
+// instruction is really an `IRParentInst`, but we want it
+// to also be caught in any dynamic cast to `IRType`, so we
+// ensure that it comes at the *end* of the range for `IRType`,
+// and the start of the range for `IRParentInst` (and `IRGlobalValue`)
+INST(StructType, struct, 0, PARENT)
 
-INST(FuncType, Func, 0, 0)
-INST(PtrType, Ptr, 1, 0)
-INST(TextureType, Texture, 2, 0)
-INST(SamplerType, SamplerState, 1, 0)
-INST(ConstantBufferType, ConstantBuffer, 1, 0)
-INST(TextureBufferType, TextureBuffer, 1, 0)
+INST_RANGE(Type, VoidType, StructType)
 
-INST(structuredBufferType, StructuredBuffer, 1, 0)
-INST(readWriteStructuredBufferType, RWStructuredBuffer, 1, 0)
+/*IRParentInst*/
 
-// A type use to represent an earlier generic parameter in
-// a signature. For example, given an AST declaration like:
-//
-//     func Foo<T, U>(int a, T b) -> U;
-//
-// The lowered function type would be something like:
-//
-//      T     U     a      b
-//     (Type, Type, Int32, GenericParameterType<0>) -> GenericParameterType<1>
-//
-INST(GenericParameterType, GenericParameterType, 1, 0)
+    /*IRGlobalValue*/
 
-INST(boolConst, boolConst, 0, 0)
-INST(IntLit, integer_constant, 0, 0)
-INST(FloatLit, float_constant, 0, 0)
-INST(decl_ref, decl_ref, 0, 0)
+        /*IRGlobalValueWithCode*/
+            /* IRGlobalValueWIthParams*/
+                INST(Func, func, 0, PARENT)
+                INST(Generic, generic, 0, PARENT)
+            INST_RANGE(GlobalValueWithParams, Func, Generic)
+
+            INST(GlobalVar, global_var, 0, 0)
+            INST(GlobalConstant, global_constant, 0, 0)
+        INST_RANGE(GlobalValueWithCode, Func, GlobalConstant)
+
+        INST(StructKey, key, 0, 0)
+        INST(GlobalGenericParam, global_generic_param, 0, 0)
+        INST(WitnessTable, witness_table, 0, 0)
+
+    INST_RANGE(GlobalValue, StructType, WitnessTable)
+
+    INST(Module, module, 0, PARENT)
+
+    INST(Block, block, 0, PARENT)
+
+INST_RANGE(ParentInst, StructType, Block)
+
+/* IRConstant */
+    INST(boolConst, boolConst, 0, 0)
+    INST(IntLit, integer_constant, 0, 0)
+    INST(FloatLit, float_constant, 0, 0)
+INST_RANGE(Constant, boolConst, FloatLit)
 
 INST(undefined, undefined, 0, 0)
 
-INST(specialize, specialize, 2, 0)
+INST(Specialize, specialize, 2, 0)
 INST(lookup_interface_method, lookup_interface_method, 2, 0)
 INST(lookup_witness_table, lookup_witness_table, 2, 0)
+INST(BindGlobalGenericParam, bind_global_generic_param, 2, 0)
 
 INST(Construct, construct, 0, 0)
 
@@ -115,30 +204,11 @@ INST(makeStruct, makeStruct, 0, 0)
 
 INST(Call, call, 1, 0)
 
-/*IRParentInst*/
 
-    INST(Module, module, 0, PARENT)
-
-    INST(Block, block, 0, PARENT)
-
-    /*IRGlobalValue*/
-
-        /*IRGlobalValueWithCode*/
-            INST(Func, func, 0, PARENT)
-            INST(global_var, global_var, 0, 0)
-            INST(global_constant, global_constant, 0, 0)
-        INST_RANGE(GlobalValueWithCode, Func, global_constant)
-
-        INST(witness_table, witness_table, 0, 0)
-
-    INST_RANGE(GlobalValue, Func, witness_table)
-
-INST_RANGE(ParentInst, Module, witness_table)
-
-INST(witness_table_entry, witness_table_entry, 2, 0)
+INST(WitnessTableEntry, witness_table_entry, 2, 0)
 
 INST(Param, param, 0, 0)
-INST(StructField, field, 0, 0)
+INST(StructField, field, 2, 0)
 INST(Var, var, 0, 0)
 
 INST(Load, load, 1, 0)
@@ -287,6 +357,7 @@ PSEUDO_INST(Or)
 
 #undef PSEUDO_INST
 #undef PARENT
+#undef MANUAL_INST_RANGE
 #undef INST_RANGE
 #undef INST
 
