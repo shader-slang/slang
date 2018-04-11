@@ -21,9 +21,15 @@
     <ClCompile Include="os.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="render-api-util.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="os.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="render-api-util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

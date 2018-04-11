@@ -41,12 +41,13 @@ struct Vertex
     float uv[2];
 };
 
-static const int kVertexCount = 3;
-static const Vertex kVertexData[kVertexCount] = {
+static const Vertex kVertexData[] = 
+{
     { { 0,  0, 0.5 }, {1, 0, 0} , {0, 0} },
     { { 0,  1, 0.5 }, {0, 0, 1} , {1, 0} },
     { { 1,  0, 0.5 }, {0, 1, 0} , {1, 1} },
 };
+static const int kVertexCount = SLANG_COUNT_OF(kVertexData);
 
 using namespace Slang;
 
@@ -79,7 +80,6 @@ class RenderTestApp
 	RefPtr<BindingState> m_bindingState;
 
 	ShaderInputLayout m_shaderInputLayout;
-
 };
 
 // Entry point name to use for vertex/fragment shader
@@ -116,13 +116,13 @@ SlangResult RenderTestApp::initialize(Renderer* renderer, ShaderCompiler* shader
 		
     // Input Assembler (IA)
 
-    InputElementDesc inputElements[] = {
+    const InputElementDesc inputElements[] = {
         { "A", 0, Format::RGB_Float32, offsetof(Vertex, position) },
         { "A", 1, Format::RGB_Float32, offsetof(Vertex, color) },
         { "A", 2, Format::RG_Float32, offsetof(Vertex, uv) },
     };
 
-    m_inputLayout = renderer->createInputLayout(&inputElements[0], sizeof(inputElements)/sizeof(inputElements[0]));
+    m_inputLayout = renderer->createInputLayout(inputElements, SLANG_COUNT_OF(inputElements));
     if(!m_inputLayout)
         return SLANG_FAIL;
 
@@ -437,7 +437,7 @@ SlangResult innerMain(int argc, char** argv)
 	return SLANG_OK;
 }
 
-} // renderer_test
+} //  namespace renderer_test
 
 int main(int argc, char**  argv)
 {

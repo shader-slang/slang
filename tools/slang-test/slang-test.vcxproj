@@ -160,9 +160,11 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="os.cpp" />
+    <ClCompile Include="render-api-util.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="os.h" />
+    <ClInclude Include="render-api-util.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\source\core\core.vcxproj">

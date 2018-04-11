@@ -26,8 +26,8 @@ class D3DUtil
     };
     enum UsageFlag
     {
-        USAGE_FLAG_MULTI_SAMPLE = 0x1,
-        USAGE_FLAG_SRV = 0x2,
+        USAGE_FLAG_MULTI_SAMPLE = 0x1,      ///< If set will be used form multi sampling (such as MSAA)
+        USAGE_FLAG_SRV = 0x2,               ///< If set means will be used as a shader resource view (SRV)
     };
 
         /// Get primitive topology as D3D primitive topology
@@ -41,8 +41,8 @@ class D3DUtil
         /// Definition of the HLSL-to-bytecode compilation logic.
     static Slang::Result compileHLSLShader(char const* sourcePath, char const* source, char const* entryPointName, char const* dxProfileName, Slang::ComPtr<ID3DBlob>& shaderBlobOut);
 
+        /// Given a slang pixel format returns the equivalent DXGI_ pixel format. If the format is not known, will return DXGI_FORMAT_UNKNOWN
     static DXGI_FORMAT getMapFormat(Format format);
-
 
         /// Given the usage, flags, and format will return the most suitable format. Will return DXGI_UNKNOWN if combination is not possible
     static DXGI_FORMAT calcFormat(UsageType usage, DXGI_FORMAT format);

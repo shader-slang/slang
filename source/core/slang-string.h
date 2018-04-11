@@ -135,10 +135,14 @@ namespace Slang
     {
     public:
         UnownedStringSlice()
-            : beginData(0)
+            : beginData(nullptr)
             , endData(0)
         {}
 
+        explicit UnownedStringSlice(char const* a):
+            beginData(a),
+            endData(a + strlen(a))
+        {}
         UnownedStringSlice(char const* b, char const* e)
             : beginData(b)
             , endData(e)
@@ -159,13 +163,32 @@ namespace Slang
             return endData - beginData;
         }
 
-        bool operator==(UnownedStringSlice const& other)
+        int indexOf(char c) const
+        {
+            const int size = int(endData - beginData);
+            for (int i = 0; i < size; ++i)
+            {
+                if (beginData[i] == c)
+                {
+                    return i;
+                }
+            } 
+            return -1;
+        }
+
+        const char& operator[](int i) const
+        {
+            assert(i >= 0 && i < int(endData - beginData));
+            return beginData[i];
+        }
+
+        bool operator==(UnownedStringSlice const& other) const
         {
             return size() == other.size()
                 && memcmp(begin(), other.begin(), size()) == 0;
         }
 
-        bool operator==(char const* str)
+        bool operator==(char const* str) const
         {
             return (*this) == UnownedStringSlice(str, str + strlen(str));
         }

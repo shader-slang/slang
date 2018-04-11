@@ -12,6 +12,7 @@ typedef uintptr_t UInt;
 
 enum class RendererID
 {
+    NONE,          
     D3D11,
     D3D12,
     GL,
@@ -50,7 +51,7 @@ struct Options
     char const* outputPath = nullptr;
 	ShaderProgramType shaderType = ShaderProgramType::Graphics;
 
-    RendererID rendererID;
+    RendererID rendererID = RendererID::NONE;
     InputLanguageID inputLanguageID = InputLanguageID::Slang;
 
     char const* slangArgs[kMaxSlangArgs];

@@ -10,6 +10,12 @@ namespace renderer_test {
 
 Options gOptions;
 
+// Only set it, if the 
+void setDefaultRendererID(RendererID id)
+{
+    gOptions.rendererID = (gOptions.rendererID == RendererID::NONE) ? id : gOptions.rendererID;
+}
+
 SlangResult parseOptions(int* argc, char** argv)
 {
     int argCount = *argc;
@@ -54,32 +60,32 @@ SlangResult parseOptions(int* argc, char** argv)
         }
         else if( strcmp(arg, "-hlsl") == 0 )
         {
-            gOptions.rendererID = RendererID::D3D11;
+            setDefaultRendererID( RendererID::D3D11);
             gOptions.inputLanguageID = InputLanguageID::Native;
         }
         else if( strcmp(arg, "-glsl") == 0 )
         {
-            gOptions.rendererID = RendererID::GL;
+            setDefaultRendererID(RendererID::GL);
             gOptions.inputLanguageID = InputLanguageID::Native;
         }
         else if( strcmp(arg, "-hlsl-rewrite") == 0 )
         {
-            gOptions.rendererID = RendererID::D3D11;
+            setDefaultRendererID(RendererID::D3D11);
             gOptions.inputLanguageID = InputLanguageID::NativeRewrite;
         }
         else if( strcmp(arg, "-glsl-rewrite") == 0 )
         {
-            gOptions.rendererID = RendererID::GL;
+            setDefaultRendererID(RendererID::GL);
             gOptions.inputLanguageID = InputLanguageID::NativeRewrite;
         }
         else if( strcmp(arg, "-slang") == 0 )
         {
-            gOptions.rendererID = RendererID::D3D11;
+            setDefaultRendererID(RendererID::D3D11);
             gOptions.inputLanguageID = InputLanguageID::Slang;
         }
         else if( strcmp(arg, "-glsl-cross") == 0 )
         {
-            gOptions.rendererID = RendererID::GL;
+            setDefaultRendererID(RendererID::GL);
             gOptions.inputLanguageID = InputLanguageID::Slang;
         }
         else if( strcmp(arg, "-xslang") == 0 )
@@ -119,6 +125,15 @@ SlangResult parseOptions(int* argc, char** argv)
             || strcmp(arg, "-dx12") == 0)
         {
             gOptions.rendererID = RendererID::D3D12;
+        }
+        else if(strcmp(arg, "-gl") == 0)
+        {
+            gOptions.rendererID = RendererID::GL;
+        }
+        else if (strcmp(arg, "-d3d11") == 0 
+            || strcmp(arg, "-dx11") == 0)
+        {
+            gOptions.rendererID = RendererID::D3D11;
         }
         else
         {
