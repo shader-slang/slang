@@ -1,4 +1,11 @@
 //TEST:COMPARE_HLSL: -target dxbc-assembly -profile vs_4_0 -entry VSMain
+
+#ifndef __SLANG__
+#define cbPerObject _SV032SLANG_parameterGroup_cbPerObject
+#define g_mWorldViewProjection _SV032SLANG_ParameterGroup_cbPerObject22g_mWorldViewProjection
+#define g_mWorld _SV032SLANG_ParameterGroup_cbPerObject8g_mWorld
+#endif
+
 //--------------------------------------------------------------------------------------
 // File: BasicHLSL11_VS.hlsl
 //

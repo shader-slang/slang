@@ -398,10 +398,3 @@ SYNTAX_CLASS(ImplicitConversionModifier, Modifier)
     // The conversion cost, used to rank conversions
     FIELD(ConversionCost, cost)
 END_SYNTAX_CLASS()
-
-// A marker modifier used to indicate that a declaration was created as
-// part of type legalization.
-SYNTAX_CLASS(LegalizedModifier, Modifier)
-    FIELD(String, originalMangledName)
-END_SYNTAX_CLASS()
-

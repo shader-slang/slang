@@ -9,6 +9,11 @@
 #define R(X) /**/
 #else
 #define R(X) X
+
+#define Foo _ST03Foo
+#define v _SV03Foo1v
+#define fooBuffer _SV09fooBuffer
+
 #endif
 
 float4 use(float  val) { return val; };
@@ -22,7 +27,7 @@ struct Foo { float2 v; };
 // This should be allocated a register *after* the render target
 RWStructuredBuffer<Foo> fooBuffer R(: register(u1));
 
-float4 main() : SV_Target
+float4 main() : SV_TARGET
 {
 	return use(fooBuffer[12].v);
 }

@@ -8,6 +8,12 @@
 #define R(X) /**/
 #else
 #define R(X) X
+
+#define C _SV022SLANG_parameterGroup_C
+#define t _SV01t
+#define s _SV01s
+#define c _SV022SLANG_ParameterGroup_C1c
+
 #endif
 
 float4 use(float4 val) { return val; };
@@ -21,7 +27,7 @@ cbuffer C R(: register(b0))
 	float c;
 }
 
-float4 main() : SV_Target
+float4 main() : SV_TARGET
 {
 	return use(t,s) + use(c);
 }

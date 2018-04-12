@@ -66,12 +66,8 @@ Session::Session()
     slangLanguageScope = new Scope();
     slangLanguageScope->nextSibling = hlslLanguageScope;
 
-    glslLanguageScope = new Scope();
-    glslLanguageScope->nextSibling = coreLanguageScope;
-
     addBuiltinSource(coreLanguageScope, "core", getCoreLibraryCode());
     addBuiltinSource(hlslLanguageScope, "hlsl", getHLSLLibraryCode());
-    addBuiltinSource(glslLanguageScope, "glsl", getGLSLLibraryCode());
 }
 
 struct IncludeHandlerImpl : IncludeHandler
@@ -253,10 +249,6 @@ void CompileRequest::parseTranslationUnit(
     {
     case SourceLanguage::HLSL:
         languageScope = mSession->hlslLanguageScope;
-        break;
-
-    case SourceLanguage::GLSL:
-        languageScope = mSession->glslLanguageScope;
         break;
 
     case SourceLanguage::Slang:

@@ -129,6 +129,9 @@ namespace Slang
         IRValidateContext*  context,
         IRInst*             inst)
     {
+        if(inst->getFullType())
+            validateIRInstOperand(context, inst, &inst->typeUse);
+
         UInt operandCount = inst->getOperandCount();
         for (UInt ii = 0; ii < operandCount; ++ii)
         {

@@ -24,12 +24,15 @@
 // and some extra tuple-ified fields.
 
 #include "../core/basic.h"
+#include "ir-insts.h"
 #include "syntax.h"
 #include "type-layout.h"
 #include "name.h"
 
 namespace Slang
 {
+
+struct IRBuilder;
 
 struct LegalTypeImpl : RefObject
 {
@@ -65,19 +68,20 @@ struct LegalType
 
     Flavor              flavor = Flavor::none;
     RefPtr<RefObject>   obj;
+    IRType*             irType;
 
-    static LegalType simple(Type* type)
+    static LegalType simple(IRType* type)
     {
         LegalType result;
         result.flavor = Flavor::simple;
-        result.obj = type;
+        result.irType = type;
         return result;
     }
 
-    RefPtr<Type> getSimple() const
+    IRType* getSimple() const
     {
         assert(flavor == Flavor::simple);
-        return obj.As<Type>();
+        return irType;
     }
 
     static LegalType implicitDeref(
@@ -139,15 +143,17 @@ struct TuplePseudoType : LegalTypeImpl
     struct Element
     {
         // The field that this element replaces
-        String mangledName;
+        IRStructKey*    key;
 
         // The legalized type of the element
-        LegalType               type;
+        LegalType       type;
     };
 
     // All of the elements of the tuple pseduo-type.
     List<Element>   elements;
 };
+
+struct IRStructKey;
 
 struct PairInfo : RefObject
 {
@@ -159,10 +165,11 @@ struct PairInfo : RefObject
         kFlag_hasOrdinaryAndSpecial = kFlag_hasOrdinary | kFlag_hasSpecial,
     };
 
+
     struct Element
     {
         // The original field the element represents
-        String mangledName;
+        IRStructKey* key;
 
         // The conceptual type of the field.
         // If both the `hasOrdinary` and
@@ -182,22 +189,17 @@ struct PairInfo : RefObject
         // then this is the `PairInfo` for that
         // pair type:
         RefPtr<PairInfo> fieldPairInfo;
-
-        // The actual field decl-ref that needs
-        // to be used for looking up this element
-        // in the ordinary type.
-        DeclRef<Decl> ordinaryFieldDeclRef;
     };
 
     // For a pair type or value, we need to track
     // which fields are on which side(s).
     List<Element> elements;
 
-    Element* findElement(String const& mangledName)
+    Element* findElement(IRStructKey* key)
     {
         for (auto& ee : elements)
         {
-            if(ee.mangledName == mangledName)
+            if(ee.key == key)
                 return &ee;
         }
         return nullptr;
@@ -322,8 +324,8 @@ struct TuplePseudoVal : LegalValImpl
 {
     struct Element
     {
-        String      mangledName;
-        LegalVal    val;
+        IRStructKey*    key;
+        LegalVal        val;
     };
 
     List<Element>   elements;
@@ -348,48 +350,31 @@ struct ImplicitDerefVal : LegalValImpl
 
 struct TypeLegalizationContext
 {
-    /// The overall compilation session (used when
-    /// constructing types).
+    /// The overall compilation session..
     Session*            session;
 
-    // If the type we are legalizing comes from an
-    // AST module being lowered via AST-to-AST translation,
-    // then we want to add any new declaration we create
-    // to represent it to the appropriate output module.
-    // We store some fields here to enable that:
-    RefPtr<ModuleDecl> mainModuleDecl;
-    RefPtr<ModuleDecl> outputModuleDecl;
-
-    // We also need to know whether the IR is involved
-    // at all, because if it is, then it will own certain
-    // declarations instead.
-    //
-    // We do this in a slightly silly way by storing a pointer
-    // to the IR module (if any), and assume that its presence
-    // or absence is the indicator we need.
     IRModule* irModule = nullptr;
 
-    /// A list to retain any AST objects created during type legalization.
-    List<RefPtr<Decl>> createdDecls;
+    SharedIRBuilder sharedBuilder;
+    IRBuilder builder;
 
-    /// A mapping from declaration references to the resulting
-    /// legalized type.
-    ///
-    /// For declaration-reference types, this map can be used
-    /// to cache a legalization so that it will be re-used
-    /// for equivalent declaration references (and so avoid
-    /// emitting declarations of legalized `struct` types
-    /// multiple times).
-    Dictionary<DeclRef<Decl>, LegalType> mapDeclRefToLegalType;
+    IRBuilder* getBuilder() { return &builder; }
 
-    //
-    Dictionary<Name*, LegalVal> mapMangledNameToLegalIRValue;
+    Dictionary<IRType*, LegalType> mapTypeToLegalType;
+
+    // Intstructions to be removed when legalization is done
+    HashSet<IRInst*> instsToRemove;
 };
+
+void initialize(
+    TypeLegalizationContext*    context,
+    Session*                    session,
+    IRModule*                   module);
 
 
 LegalType legalizeType(
     TypeLegalizationContext*    context,
-    Type*                       type);
+    IRType*                     type);
 
 /// Try to find the module that (recursively) contains a given declaration.
 ModuleDecl* findModuleForDecl(

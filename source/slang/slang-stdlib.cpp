@@ -269,22 +269,4 @@ namespace Slang
         hlslLibraryCode = sb.ProduceString();
         return hlslLibraryCode;
     }
-
-
-    // GLSL-specific library code
-
-    String Session::getGLSLLibraryCode()
-    {
-        if(glslLibraryCode.Length() != 0)
-            return glslLibraryCode;
-
-        String path = getStdlibPath();
-
-        StringBuilder sb;
-
-        #include "glsl.meta.slang.h"
-
-        glslLibraryCode = sb.ProduceString();
-        return glslLibraryCode;
-    }
 }

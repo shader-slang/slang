@@ -2,6 +2,14 @@
 
 // Check handling of initializer list for vector
 
+#ifndef __SLANG__
+
+#define C _SV022SLANG_parameterGroup_C
+#define a _SV022SLANG_ParameterGroup_C1a
+#define SV_Position SV_POSITION
+
+#endif
+
 cbuffer C : register(b0)
 {
 	float4 a;	

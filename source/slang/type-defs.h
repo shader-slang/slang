@@ -42,20 +42,6 @@ protected:
 )
 END_SYNTAX_CLASS()
 
-// The type of a reference to a basic block
-// in our IR
-SYNTAX_CLASS(IRBasicBlockType, Type)
-RAW(
-public:
-    virtual String ToString() override;
-
-protected:
-    virtual bool EqualsImpl(Type * type) override;
-    virtual RefPtr<Type> CreateCanonicalType() override;
-    virtual int GetHashCode() override;
-)
-END_SYNTAX_CLASS()
-
 // A type that takes the form of a reference to some declaration
 SYNTAX_CLASS(DeclRefType, Type)
     DECL_FIELD(DeclRef<Decl>, declRef)
@@ -107,9 +93,20 @@ protected:
 )
 END_SYNTAX_CLASS()
 
-// Base type for things we think of as "resources"
-ABSTRACT_SYNTAX_CLASS(ResourceTypeBase, DeclRefType)
+// Base type for things that are built in to the compiler,
+// and will usually have special behavior or a custom
+// mapping to the IR level.
+ABSTRACT_SYNTAX_CLASS(BuiltinType, DeclRefType)
+END_SYNTAX_CLASS()
+
+// Resources that contain "elements" that can be fetched
+ABSTRACT_SYNTAX_CLASS(ResourceType, BuiltinType)
+    // The type that results from fetching an element from this resource
+    SYNTAX_FIELD(RefPtr<Type>, elementType)
+
+    // Shape and access level information for this resource type
     FIELD(TextureFlavor, flavor)
+
     RAW(
         TextureFlavor::Shape GetBaseShape()
         {
@@ -121,12 +118,6 @@ ABSTRACT_SYNTAX_CLASS(ResourceTypeBase, DeclRefType)
         SlangResourceAccess getAccess() { return flavor.getAccess(); }
 
     )
-END_SYNTAX_CLASS()
-
-// Resources that contain "elements" that can be fetched
-ABSTRACT_SYNTAX_CLASS(ResourceType, ResourceTypeBase)
-    // The type that results from fetching an element from this resource
-    SYNTAX_FIELD(RefPtr<Type>, elementType)
 END_SYNTAX_CLASS()
 
 ABSTRACT_SYNTAX_CLASS(TextureTypeBase, ResourceType)
@@ -182,13 +173,13 @@ RAW(
 )
 END_SYNTAX_CLASS()
 
-SYNTAX_CLASS(SamplerStateType, DeclRefType)
+SYNTAX_CLASS(SamplerStateType, BuiltinType)
     // What flavor of sampler state is this
     FIELD(SamplerStateFlavor, flavor)
 END_SYNTAX_CLASS()
 
 // Other cases of generic types known to the compiler
-SYNTAX_CLASS(BuiltinGenericType, DeclRefType)
+SYNTAX_CLASS(BuiltinGenericType, BuiltinType)
     SYNTAX_FIELD(RefPtr<Type>, elementType)
 
     RAW(Type* getElementType() { return elementType; })
@@ -206,14 +197,18 @@ SIMPLE_SYNTAX_CLASS(HLSLStructuredBufferType, HLSLStructuredBufferTypeBase)
 SIMPLE_SYNTAX_CLASS(HLSLRWStructuredBufferType, HLSLStructuredBufferTypeBase)
 // TODO: need raster-ordered case here
 
-SIMPLE_SYNTAX_CLASS(UntypedBufferResourceType, DeclRefType)
+SIMPLE_SYNTAX_CLASS(UntypedBufferResourceType, BuiltinType)
 SIMPLE_SYNTAX_CLASS(HLSLByteAddressBufferType, UntypedBufferResourceType)
 SIMPLE_SYNTAX_CLASS(HLSLRWByteAddressBufferType, UntypedBufferResourceType)
+SIMPLE_SYNTAX_CLASS(RaytracingAccelerationStructureType, UntypedBufferResourceType)
 
 SIMPLE_SYNTAX_CLASS(HLSLAppendStructuredBufferType, HLSLStructuredBufferTypeBase)
 SIMPLE_SYNTAX_CLASS(HLSLConsumeStructuredBufferType, HLSLStructuredBufferTypeBase)
 
-SYNTAX_CLASS(HLSLPatchType, DeclRefType)
+SIMPLE_SYNTAX_CLASS(RayDescType, BuiltinType)
+SIMPLE_SYNTAX_CLASS(BuiltInTriangleIntersectionAttributesType, BuiltinType)
+
+SYNTAX_CLASS(HLSLPatchType, BuiltinType)
 RAW(
     Type* getElementType();
     IntVal*         getElementCount();
@@ -231,7 +226,7 @@ SIMPLE_SYNTAX_CLASS(HLSLLineStreamType, HLSLStreamOutputType)
 SIMPLE_SYNTAX_CLASS(HLSLTriangleStreamType, HLSLStreamOutputType)
 
 //
-SIMPLE_SYNTAX_CLASS(GLSLInputAttachmentType, DeclRefType)
+SIMPLE_SYNTAX_CLASS(GLSLInputAttachmentType, BuiltinType)
 
 // Base class for types used when desugaring parameter block
 // declarations, includeing HLSL `cbuffer` or GLSL `uniform` blocks.
@@ -270,64 +265,6 @@ protected:
     virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
     virtual int GetHashCode() override;
     )
-END_SYNTAX_CLASS()
-
-// A type that has a rate qualifier applied. Conceptually `@R T` where `R`
-// represents a rate, and `T` represents a data type.
-SYNTAX_CLASS(RateQualifiedType, Type)
-
-    // The rate `R` at which the value is computed/stored
-    SYNTAX_FIELD(RefPtr<Type>, rate);
-
-    // The underlying data type `T` of the value
-    SYNTAX_FIELD(RefPtr<Type>, valueType);
-
-RAW(
-    virtual Slang::String ToString() override;
-
-protected:
-    virtual bool EqualsImpl(Type * type) override;
-    virtual RefPtr<Type> CreateCanonicalType() override;
-    virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
-    virtual int GetHashCode() override;
-    )
-END_SYNTAX_CLASS()
-
-// A representation of the `ConstExpr` rate, to be used
-// in defining `@ConstExpr T` for particular data types `T`
-SYNTAX_CLASS(ConstExprRate, Type)
-
-RAW(
-    virtual Slang::String ToString() override;
-
-protected:
-    virtual bool EqualsImpl(Type * type) override;
-    virtual RefPtr<Type> CreateCanonicalType() override;
-    virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
-    virtual int GetHashCode() override;
-    )
-END_SYNTAX_CLASS()
-
-// The effective type of a variable declared with `groupshared` storage qualifier.
-//
-// TODO: this should be converted to a `GroupSharedRate`, which then gets used
-// in conjunction with `RateQualifiedType`.
-SYNTAX_CLASS(GroupSharedType, Type)
-    SYNTAX_FIELD(RefPtr<Type>, valueType);
-
-RAW(
-    virtual ~GroupSharedType()
-    {
-    }
-
-    virtual Slang::String ToString() override;
-
-protected:
-    virtual bool EqualsImpl(Type * type) override;
-    virtual RefPtr<Type> CreateCanonicalType() override;
-    virtual int GetHashCode() override;
-    )
-
 END_SYNTAX_CLASS()
 
 // The "type" of an expression that resolves to a type.
@@ -389,11 +326,11 @@ protected:
 END_SYNTAX_CLASS()
 
 // The built-in `String` type
-SIMPLE_SYNTAX_CLASS(StringType, DeclRefType)
+SIMPLE_SYNTAX_CLASS(StringType, BuiltinType)
 
 // Base class for types that map down to
 // simple pointers as part of code generation.
-SYNTAX_CLASS(PtrTypeBase, DeclRefType)
+SYNTAX_CLASS(PtrTypeBase, BuiltinType)
 RAW(
     // Get the type of the pointed-to value.
     Type*   getValueType();

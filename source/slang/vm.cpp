@@ -257,7 +257,7 @@ VMSizeAlign getVMSymbolSize(BCSymbol* symbol)
         SLANG_UNEXPECTED("op");
         break;
 
-    case kIROp_TypeType:
+    case kIROp_TypeKind:
         break;
 
     case kIROp_Func:
@@ -409,16 +409,16 @@ void dumpVMFrame(VMFrame* vmFrame)
         {
             switch (regType.impl->op)
             {
-            case kIROp_TypeType:
+            case kIROp_TypeKind:
                 // TODO: we could recursively go and print types...
                 fprintf(stderr, ": Type = ???");
                 break;
 
-            case kIROp_readWriteStructuredBufferType:
+            case kIROp_HLSLRWStructuredBufferType:
                 fprintf(stderr, ": RWStructuredBuffer<???> = ???");
                 break;
 
-            case kIROp_structuredBufferType:
+            case kIROp_HLSLStructuredBufferType:
                 fprintf(stderr, ": StructuredBuffer<???> = ???");
                 break;
 
@@ -426,11 +426,11 @@ void dumpVMFrame(VMFrame* vmFrame)
                 fprintf(stderr, ": Bool = %s", *(bool*)regData ? "true" : "false");
                 break;
 
-            case kIROp_Int32Type:
+            case kIROp_IntType:
                 fprintf(stderr, ": Int32 = %d", *(int32_t*)regData);
                 break;
 
-            case kIROp_UInt32Type:
+            case kIROp_UIntType:
                 fprintf(stderr, ": UInt32 = %u", *(uint32_t*)regData);
                 break;
 
@@ -499,16 +499,16 @@ void computeTypeSizeAlign(
         size = 1;
         break;
 
-    case kIROp_Int32Type:
-    case kIROp_UInt32Type:
-    case kIROp_Float32Type:
+    case kIROp_IntType:
+    case kIROp_UIntType:
+    case kIROp_FloatType:
         size = 4;
         break;
 
     case kIROp_FuncType:
     case kIROp_PtrType:
-    case kIROp_readWriteStructuredBufferType:
-    case kIROp_structuredBufferType:
+    case kIROp_HLSLRWStructuredBufferType:
+    case kIROp_HLSLStructuredBufferType:
         size = sizeof(void*);
         break;
 
@@ -632,7 +632,7 @@ void* loadVMSymbol(
 
     switch(bcSymbol->op)
     {
-    case kIROp_global_var:
+    case kIROp_GlobalVar:
         {
             auto type = getType(vmModule, bcSymbol->typeID);
             assert(type.impl->op == kIROp_PtrType);
@@ -650,7 +650,7 @@ void* loadVMSymbol(
         }
         break;
 
-    case kIROp_global_constant:
+    case kIROp_GlobalConstant:
         {
             auto type = getType(vmModule, bcSymbol->typeID);
             void* valPtr = allocate(vm, type);
@@ -1094,7 +1094,7 @@ void resumeThread(
 
                 switch (type.impl->op)
                 {
-                case kIROp_Int32Type:
+                case kIROp_IntType:
                     *destPtr = *(int32_t*)leftPtr > *(int32_t*)rightPtr;
                     break;
 
@@ -1116,7 +1116,7 @@ void resumeThread(
 
                 switch (type.impl->op)
                 {
-                case kIROp_Int32Type:
+                case kIROp_IntType:
                     *(int32_t*)destPtr = *(int32_t*)leftPtr * *(int32_t*)rightPtr;
                     break;
 
@@ -1138,7 +1138,7 @@ void resumeThread(
 
                 switch (type.impl->op)
                 {
-                case kIROp_Int32Type:
+                case kIROp_IntType:
                     *(int32_t*)destPtr = *(int32_t*)leftPtr - *(int32_t*)rightPtr;
                     break;
 

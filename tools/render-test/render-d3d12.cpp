@@ -455,7 +455,7 @@ Result D3D12Renderer::createInputSampler(const InputSamplerDesc& inputDesc, D3D1
     return SLANG_OK;
 }
 
-static void _initSrvDesc(const D3D12_RESOURCE_DESC& desc, DXGI_FORMAT pixelFormat, D3D12_SHADER_RESOURCE_VIEW_DESC& descOut)
+static void _initSrvDesc(const InputTextureDesc& inputDesc, const D3D12_RESOURCE_DESC& desc, DXGI_FORMAT pixelFormat, D3D12_SHADER_RESOURCE_VIEW_DESC& descOut)
 {
     // create SRV
     descOut = D3D12_SHADER_RESOURCE_VIEW_DESC();
@@ -477,17 +477,39 @@ static void _initSrvDesc(const D3D12_RESOURCE_DESC& desc, DXGI_FORMAT pixelForma
         descOut.Texture2D.PlaneSlice = 0;
         descOut.Texture2D.ResourceMinLODClamp = 0.0f;
     }
-    else if (desc.DepthOrArraySize == 6)
+    else if (inputDesc.isCube)
     {
-        descOut.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+        if (inputDesc.arrayLength > 1)
+        {
+            descOut.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBEARRAY;
 
-        descOut.TextureCube.MipLevels = desc.MipLevels;
-        descOut.TextureCube.MostDetailedMip = 0;
-        descOut.TextureCube.ResourceMinLODClamp = 0;
+            descOut.TextureCubeArray.NumCubes = inputDesc.arrayLength;
+            descOut.TextureCubeArray.First2DArrayFace = 0;
+            descOut.TextureCubeArray.MipLevels = desc.MipLevels;
+            descOut.TextureCubeArray.MostDetailedMip = 0;
+            descOut.TextureCubeArray.ResourceMinLODClamp = 0;
+        }
+        else
+        {
+            descOut.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+
+            descOut.TextureCube.MipLevels = desc.MipLevels;
+            descOut.TextureCube.MostDetailedMip = 0;
+            descOut.TextureCube.ResourceMinLODClamp = 0;
+        }
     }
     else
     {
-        descOut.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+        assert(desc.DepthOrArraySize > 1);
+
+        switch (desc.Dimension)
+        {
+            case D3D12_RESOURCE_DIMENSION_TEXTURE1D:  descOut.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE1DARRAY; break;
+            case D3D12_RESOURCE_DIMENSION_TEXTURE2D:  descOut.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY; break;
+            case D3D12_RESOURCE_DIMENSION_TEXTURE3D:  descOut.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D; break;
+
+            default: assert(!"Unknown dimension");
+        }
 
         descOut.Texture2DArray.ArraySize = desc.DepthOrArraySize;
         descOut.Texture2DArray.MostDetailedMip = 0;
@@ -498,7 +520,7 @@ static void _initSrvDesc(const D3D12_RESOURCE_DESC& desc, DXGI_FORMAT pixelForma
     }
 }
 
-void _initBufferResourceDesc(size_t bufferSize, D3D12_RESOURCE_DESC& out)
+static void _initBufferResourceDesc(size_t bufferSize, D3D12_RESOURCE_DESC& out)
 {
     out = {};
 
@@ -540,7 +562,10 @@ Result D3D12Renderer::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, cons
         heapProps.CreationNodeMask = 1;
         heapProps.VisibleNodeMask = 1;
 
-        SLANG_RETURN_ON_FAIL(uploadResource.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, resourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr));
+        D3D12_RESOURCE_DESC uploadResourceDesc(resourceDesc);
+        uploadResourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+        
+        SLANG_RETURN_ON_FAIL(uploadResource.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, uploadResourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr));
     }
 
     if (srcData)
@@ -572,13 +597,16 @@ Result D3D12Renderer::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, cons
 
 Result D3D12Renderer::createTexture(const InputTextureDesc& inputDesc, const TextureData& texData, D3D12Resource& resourceOut)
 {
-    // generateTextureData(texData, inputDesc);
+    // Description of uploading on Dx12
+    // https://msdn.microsoft.com/en-us/library/windows/desktop/dn899215%28v=vs.85%29.aspx
 
     const DXGI_FORMAT pixelFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
     const int numMipMaps = texData.mipLevels;
 
     const int width = inputDesc.size;
-    const int height = width;
+    // If the dimension is 1, then we have no height
+    const int height = (inputDesc.dimension <= 1) ? 1 : width;
+    const int depth = (inputDesc.dimension <= 2) ? 1 : width;
 
     // Setup desc
     D3D12_RESOURCE_DESC resourceDesc;
@@ -587,7 +615,8 @@ Result D3D12Renderer::createTexture(const InputTextureDesc& inputDesc, const Tex
     resourceDesc.Format = pixelFormat;
     resourceDesc.Width = width;
     resourceDesc.Height = height;
-    resourceDesc.DepthOrArraySize = texData.arraySize;
+    resourceDesc.DepthOrArraySize = (depth > 1) ? depth : texData.arraySize;
+ 
     resourceDesc.MipLevels = numMipMaps;
     resourceDesc.SampleDesc.Count = 1;
     resourceDesc.SampleDesc.Quality = 0;
@@ -602,7 +631,22 @@ Result D3D12Renderer::createTexture(const InputTextureDesc& inputDesc, const Tex
         case 3: resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE3D; break;
         default: return SLANG_FAIL;
     }
-    
+
+    // Create the target resource
+    {
+        D3D12_HEAP_PROPERTIES heapProps;
+
+        heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
+        heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+        heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+        heapProps.CreationNodeMask = 1;
+        heapProps.VisibleNodeMask = 1;
+
+        SLANG_RETURN_ON_FAIL(resourceOut.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, resourceDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr));
+
+        resourceOut.setDebugName(L"Texture");
+    }
+
     // Calculate the layout 
     List<D3D12_PLACED_SUBRESOURCE_FOOTPRINT> layouts;
     layouts.SetSize(numMipMaps);
@@ -614,107 +658,130 @@ Result D3D12Renderer::createTexture(const InputTextureDesc& inputDesc, const Tex
     UInt64 requiredSize = 0;
     m_device->GetCopyableFootprints(&resourceDesc, 0, texData.mipLevels, 0, layouts.begin(), mipNumRows.begin(), mipRowSizeInBytes.begin(), &requiredSize);
 
+#if 0
     List<D3D12_SUBRESOURCE_DATA> subData;
     subData.SetSize(numMipMaps);
     // Zero it all initially
     ::memset(subData.Buffer(), 0, numMipMaps * sizeof(D3D12_SUBRESOURCE_DATA));
-    
-    // Create the upload texture
-    D3D12Resource uploadTexture;
+#endif 
+
+    // 
+    assert(texData.dataBuffer.Count() == numMipMaps * texData.arraySize);
+
+    // Sub resource indexing
+    // https://msdn.microsoft.com/en-us/library/windows/desktop/dn705766(v=vs.85).aspx#subresource_indexing
+
+    int subResourceIndex = 0;
+    for (int i = 0; i < texData.arraySize; i++)
     {
-        D3D12_HEAP_PROPERTIES heapProps;
+        // Create the upload texture
+        D3D12Resource uploadTexture;
+        {
+            D3D12_HEAP_PROPERTIES heapProps;
 
-        heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
-        heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-        heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-        heapProps.CreationNodeMask = 1;
-        heapProps.VisibleNodeMask = 1;
+            heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
+            heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+            heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+            heapProps.CreationNodeMask = 1;
+            heapProps.VisibleNodeMask = 1;
 
-        D3D12_RESOURCE_DESC uploadResourceDesc;
-        
-        uploadResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        uploadResourceDesc.Format = DXGI_FORMAT_UNKNOWN;
-        uploadResourceDesc.Width = requiredSize;
-        uploadResourceDesc.Height = 1;
-        uploadResourceDesc.DepthOrArraySize = 1; 
-        uploadResourceDesc.MipLevels = 1; 
-        uploadResourceDesc.SampleDesc.Count = 1;
-        uploadResourceDesc.SampleDesc.Quality = 0;
-        uploadResourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-        uploadResourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-        uploadResourceDesc.Alignment = 0;
+            D3D12_RESOURCE_DESC uploadResourceDesc;
 
-        SLANG_RETURN_ON_FAIL(uploadTexture.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, uploadResourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr));
-        
-        uploadTexture.setDebugName(L"TextureUpload");
-    }
+            uploadResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+            uploadResourceDesc.Format = DXGI_FORMAT_UNKNOWN;
+            uploadResourceDesc.Width = requiredSize;
+            uploadResourceDesc.Height = 1;
+            uploadResourceDesc.DepthOrArraySize = 1;
+            uploadResourceDesc.MipLevels = 1;
+            uploadResourceDesc.SampleDesc.Count = 1;
+            uploadResourceDesc.SampleDesc.Quality = 0;
+            uploadResourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+            uploadResourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+            uploadResourceDesc.Alignment = 0;
 
-    // Map it all 
-    {
+            SLANG_RETURN_ON_FAIL(uploadTexture.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, uploadResourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr));
+
+            uploadTexture.setDebugName(L"TextureUpload");
+        }
+
         ID3D12Resource* uploadResource = uploadTexture;
 
         uint8_t* p;
         uploadResource->Map(0, nullptr, reinterpret_cast<void**>(&p));
+        
+        for (int j = 0; j < numMipMaps; ++j)
+        {
+            const D3D12_PLACED_SUBRESOURCE_FOOTPRINT& layout = layouts[j];
+            const D3D12_SUBRESOURCE_FOOTPRINT& footprint = layout.Footprint;
 
-        // Strictly speaking it should be bigger
-        assert(texData.dataBuffer.Count() == numMipMaps);
+            int mipWidth = width >> j;
+            mipWidth = (mipWidth <= 0) ? 1 : mipWidth;
+                
+            int mipHeight = height >> j;
+            mipHeight = (mipHeight <= 0) ? 1 : mipHeight;
 
-        for (int i = 0; i < texData.arraySize; i++)
-        {     
-            for (int j = 0; j < numMipMaps; ++j)
+            int mipDepth = depth >> j;
+            mipDepth = (mipDepth <= 0) ? 1 : mipDepth;
+
+            assert(footprint.Width == mipWidth && footprint.Height == mipHeight && footprint.Depth == mipDepth);
+
+            // NOTE! Like the D3D11 implementation -> this repeats the same mip pixels to every target (!)
+            const List<uint32_t>& srcMip = texData.dataBuffer[j];
+
+            // Check the input data is the same size as expected
+            assert(mipWidth * mipHeight * mipDepth == srcMip.Count());
+
+            const ptrdiff_t dstMipRowPitch = ptrdiff_t(layouts[j].Footprint.RowPitch);
+            const ptrdiff_t srcMipRowPitch = ptrdiff_t(sizeof(uint32_t) * mipWidth);
+
+            assert(dstMipRowPitch >= srcMipRowPitch); 
+                
+            const uint8_t* srcRow = (const uint8_t*)srcMip.Buffer();
+            uint8_t* dstRow = p + layouts[j].Offset;
+
+            // Copy the depth each mip
+            for (int l = 0; l < mipDepth; l++)
             {
-                int size = texData.textureSize >> j;
+                // Copy rows
+                for (int k = 0; k < mipHeight; ++k)
+                {
+                    ::memcpy(dstRow, srcRow, srcMipRowPitch);
 
-                const size_t mipSizeInBytes = layouts[j].Footprint.RowPitch * mipNumRows[j];
-
-                // NOTE! Like the D3D11 implementation -> this repeats the same mip pixels to every target
-
-                const uint8_t* srcPixels = (const uint8_t*)texData.dataBuffer[j].Buffer();
-                assert(mipSizeInBytes == texData.dataBuffer[j].Count() * sizeof(uint32_t));
-
-                ::memcpy(p + layouts[j].Offset, srcPixels, mipSizeInBytes);
+                    srcRow += srcMipRowPitch;
+                    dstRow += dstMipRowPitch;
+                }
             }
+
+            assert(srcRow == (const uint8_t*)(srcMip.Buffer() + srcMip.Count()));
         }
         uploadResource->Unmap(0, nullptr);
-    }
 
-    {
-        D3D12_HEAP_PROPERTIES heapProps;
-
-        heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
-        heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-        heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-        heapProps.CreationNodeMask = 1;
-        heapProps.VisibleNodeMask = 1;
-
-        SLANG_RETURN_ON_FAIL(resourceOut.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, resourceDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr));
-        
-        resourceOut.setDebugName(L"Texture");
-    }
-
-    {
-        for (int i = 0; i < numMipMaps; ++i)
+        for (int mipIndex = 0; mipIndex < numMipMaps; ++mipIndex)
         {
+            // https://msdn.microsoft.com/en-us/library/windows/desktop/dn903862(v=vs.85).aspx
+
             D3D12_TEXTURE_COPY_LOCATION src;
             src.pResource = uploadTexture;
             src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-            src.PlacedFootprint = layouts[i];
+            src.PlacedFootprint = layouts[mipIndex];
 
             D3D12_TEXTURE_COPY_LOCATION dst;
             dst.pResource = resourceOut;
             dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-            dst.SubresourceIndex = UINT(i);
+            dst.SubresourceIndex = subResourceIndex;
             m_commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+
+            subResourceIndex++;
         }
-    }
+        
+        {
+            D3D12BarrierSubmitter submitter(m_commandList);
+            resourceOut.transition(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, submitter);
+        }
 
-    {
-        D3D12BarrierSubmitter submitter(m_commandList);
-        resourceOut.transition(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, submitter);
+        // Block - waiting for copy to complete (so can drop upload texture)
+        submitGpuWorkAndWait();
     }
-
-    // Block - waiting for copy to complete (so can drop upload texture)
-    submitGpuWorkAndWait();
 
     return SLANG_OK;
 }
@@ -733,7 +800,7 @@ Result D3D12Renderer::createInputTexture(const InputTextureDesc& inputDesc, D3D1
         DXGI_FORMAT pixelFormat = resourceDesc.Format;
 
         D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc;
-        _initSrvDesc(resourceDesc, pixelFormat, srvDesc);
+        _initSrvDesc(inputDesc, resourceDesc, pixelFormat, srvDesc);
 
         // Copy to the descriptor
         m_device->CreateShaderResourceView(resourceOut, &srvDesc, viewHeap.getCpuHandle(srvIndex));
@@ -746,6 +813,7 @@ Result D3D12Renderer::createInputBuffer(InputBufferDesc& bufferDesc, const List<
      D3D12Resource& bufferOut)
 {
     const size_t bufferSize = bufferData.Count() * sizeof(unsigned int);
+    //bufferSize = D3DUtil::calcAligned(bufferSize, 256);
 
     D3D12_RESOURCE_DESC resourceDesc;
     _initBufferResourceDesc(bufferSize, resourceDesc);
@@ -775,36 +843,45 @@ Result D3D12Renderer::createInputBuffer(InputBufferDesc& bufferDesc, const List<
     D3D12Resource uploadBuffer;
     SLANG_RETURN_ON_FAIL(createBuffer(resourceDesc, bufferData.Buffer(), uploadBuffer, finalState, bufferOut));
 
-    const int elemSize = bufferDesc.stride <= 0 ? 1 : bufferDesc.stride;
+    const int elemSize = bufferDesc.stride <= 0 ? sizeof(uint32_t) : bufferDesc.stride;
 
-    if (bufferDesc.type == InputBufferType::StorageBuffer)
+    if (uavIndex >= 0)
     {
-        D3D12_UNORDERED_ACCESS_VIEW_DESC viewDesc = {};
+        assert(bufferDesc.type == InputBufferType::StorageBuffer);
 
-        viewDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-        viewDesc.Format = DXGI_FORMAT_UNKNOWN;
+        D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
 
-        viewDesc.Buffer.FirstElement = 0;
-        viewDesc.Buffer.NumElements = (UINT)(bufferData.Count() * sizeof(unsigned int) / elemSize);
-        viewDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
+        uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+        uavDesc.Format = DXGI_FORMAT_UNKNOWN;
+
+        uavDesc.Buffer.StructureByteStride = elemSize;
+
+        uavDesc.Buffer.FirstElement = 0;
+        uavDesc.Buffer.NumElements = (UINT)(bufferData.Count() * sizeof(unsigned int) / elemSize);
+        uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
         
         if (bufferDesc.stride == 0)
         {
             // TODO: are there UAV cases we need to handle that are neither
             // raw nor structured? RWBuffer<T> would be one...
-            viewDesc.Buffer.Flags |= D3D12_BUFFER_UAV_FLAG_RAW;
-            viewDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+            uavDesc.Buffer.Flags |= D3D12_BUFFER_UAV_FLAG_RAW;
+            uavDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+
+            uavDesc.Buffer.StructureByteStride = 0;
         }
 
-        m_device->CreateUnorderedAccessView(bufferOut.getResource(), nullptr, &viewDesc, viewHeap.getCpuHandle(uavIndex));
+        m_device->CreateUnorderedAccessView(bufferOut.getResource(), nullptr, &uavDesc, viewHeap.getCpuHandle(uavIndex));
     }
 
-    if (bufferDesc.type != InputBufferType::ConstantBuffer)
+    if (srvIndex >= 0)
     {
+        //bufferDesc.type != InputBufferType::ConstantBuffer
+
         D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc;
 
         srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
         srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 
         srvDesc.Buffer.FirstElement = 0;
         srvDesc.Buffer.NumElements = (UINT)(bufferData.Count() * sizeof(unsigned int) / elemSize);
@@ -1091,9 +1168,11 @@ Result D3D12Renderer::calcGraphicsPipelineState(ComPtr<ID3D12RootSignature>& sig
             psoDesc.PrimitiveTopologyType = m_primitiveTopologyType;
 
             {
+                const int numRenderTargets = m_boundBindingState ? m_boundBindingState->m_numRenderTargets : 1;
+
                 psoDesc.DSVFormat = m_depthStencilFormat;
-                psoDesc.NumRenderTargets = m_boundBindingState->m_numRenderTargets;
-                for (Int i = 0; i < m_boundBindingState->m_numRenderTargets; i++)
+                psoDesc.NumRenderTargets = numRenderTargets;
+                for (Int i = 0; i < numRenderTargets; i++)
                 {
                     psoDesc.RTVFormats[i] = m_targetFormat;
                 }
@@ -1288,23 +1367,7 @@ Result D3D12Renderer::_calcBindParameters(BindParameters& params)
 {
     int numConstantBuffers = 0;
     {
-        // Okay we need to try and create a render state
-        for (int i = 0; i < int(m_boundConstantBuffers.Count()); i++)
-        {
-            const BufferImpl* buffer = m_boundConstantBuffers[i];
-            if (buffer)
-            {
-                D3D12_ROOT_PARAMETER& param = params.nextParameter();
-                param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-                param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-                D3D12_ROOT_DESCRIPTOR& descriptor = param.Descriptor;
-                descriptor.ShaderRegister = numConstantBuffers;
-                descriptor.RegisterSpace = 0;
-
-                numConstantBuffers++;
-            }
-        }
 
         if (m_boundBindingState)
         {
@@ -1312,68 +1375,86 @@ Result D3D12Renderer::_calcBindParameters(BindParameters& params)
             for (int i = 0; i < int(m_boundBindingState->m_bindings.Count()); i++)
             {
                 const Binding& binding = m_boundBindingState->m_bindings[i];
-                if (binding.m_type == ShaderInputType::Buffer)
+                if (binding.m_type == ShaderInputType::Buffer && binding.m_bufferType == InputBufferType::ConstantBuffer)
                 {
-                    if (binding.m_bufferType == InputBufferType::ConstantBuffer)
-                    {
-                        // Make sure it's not overlapping the ones we just statically defined
-                        assert(binding.m_binding < numBoundConstantBuffers);
+                    // Make sure it's not overlapping the ones we just statically defined
+                    //assert(binding.m_binding < numBoundConstantBuffers);
 
-                        D3D12_ROOT_PARAMETER& param = params.nextParameter();
-                        param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-                        param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+                    D3D12_ROOT_PARAMETER& param = params.nextParameter();
+                    param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+                    param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-                        D3D12_ROOT_DESCRIPTOR& descriptor = param.Descriptor;
-                        descriptor.ShaderRegister = binding.m_binding;
-                        descriptor.RegisterSpace = 0;
+                    D3D12_ROOT_DESCRIPTOR& descriptor = param.Descriptor;
+                    descriptor.ShaderRegister = binding.m_binding;
+                    descriptor.RegisterSpace = 0;
 
-                        numConstantBuffers++;
-                    }
+                    numConstantBuffers++;
+                }
 
-                    if (binding.m_bufferType == InputBufferType::StorageBuffer)
-                    {
-                        D3D12_DESCRIPTOR_RANGE& range = params.nextRange();
+                if (binding.m_srvIndex >= 0)
+                {
+                    D3D12_DESCRIPTOR_RANGE& range = params.nextRange();
                         
-                        range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-                        range.NumDescriptors = 1;
-                        range.BaseShaderRegister = binding.m_binding;
-                        range.RegisterSpace = 0;
-                        range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+                    range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+                    range.NumDescriptors = 1;
+                    range.BaseShaderRegister = binding.m_binding;
+                    range.RegisterSpace = 0;
+                    range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-                        D3D12_ROOT_PARAMETER& param = params.nextParameter();
+                    D3D12_ROOT_PARAMETER& param = params.nextParameter();
                         
-                        param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-                        param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+                    param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+                    param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-                        D3D12_ROOT_DESCRIPTOR_TABLE& table = param.DescriptorTable;
-                        table.NumDescriptorRanges = 1;
-                        table.pDescriptorRanges = &range;
-                    }
+                    D3D12_ROOT_DESCRIPTOR_TABLE& table = param.DescriptorTable;
+                    table.NumDescriptorRanges = 1;
+                    table.pDescriptorRanges = &range;
+                }
 
-                    if (binding.m_uavIndex >= 0)
-                    {
-                        D3D12_DESCRIPTOR_RANGE& range = params.nextRange();
+                if (binding.m_uavIndex >= 0)
+                {
+                    D3D12_DESCRIPTOR_RANGE& range = params.nextRange();
                         
-                        range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-                        range.NumDescriptors = 1;
-                        range.BaseShaderRegister = binding.m_binding;
-                        range.RegisterSpace = 0;
-                        range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+                    range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+                    range.NumDescriptors = 1;
+                    range.BaseShaderRegister = binding.m_binding;
+                    range.RegisterSpace = 0;
+                    range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-                        D3D12_ROOT_PARAMETER& param = params.nextParameter();
+                    D3D12_ROOT_PARAMETER& param = params.nextParameter();
                         
-                        param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-                        param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+                    param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+                    param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-                        D3D12_ROOT_DESCRIPTOR_TABLE& table = param.DescriptorTable;
-                        table.NumDescriptorRanges = 1;
-                        table.pDescriptorRanges = &range;
-                    }
+                    D3D12_ROOT_DESCRIPTOR_TABLE& table = param.DescriptorTable;
+                    table.NumDescriptorRanges = 1;
+                    table.pDescriptorRanges = &range;
                 }
             }
         }
     }
 
+#if 1
+    // Okay we need to try and create a render state
+    for (int i = 0; i < int(m_boundConstantBuffers.Count()); i++)
+    {
+        const BufferImpl* buffer = m_boundConstantBuffers[i];
+        if (buffer)
+        {
+            D3D12_ROOT_PARAMETER& param = params.nextParameter();
+            param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+            param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+            D3D12_ROOT_DESCRIPTOR& descriptor = param.Descriptor;
+            descriptor.ShaderRegister = numConstantBuffers;
+            descriptor.RegisterSpace = 0;
+
+            numConstantBuffers++;
+        }
+    }
+#endif
+
+    // All the samplers are in one continuous section of the sampler heap
     if (m_boundBindingState && m_boundBindingState->m_samplerHeap.getUsedSize() > 0)
     {
         D3D12_DESCRIPTOR_RANGE& range = params.nextRange();
@@ -1403,64 +1484,6 @@ Result D3D12Renderer::_bindRenderState(RenderState* renderState, ID3D12GraphicsC
     submitter->setRootSignature(renderState->m_rootSignature);
     commandList->SetPipelineState(renderState->m_pipelineState);
 
-    {
-        int index = 0;
-
-        int numConstantBuffers = 0;
-        {
-            // Okay we need to try and create a render state
-            for (int i = 0; i < int(m_boundConstantBuffers.Count()); i++)
-            {
-                const BufferImpl* buffer = m_boundConstantBuffers[i];
-                if (buffer)
-                {
-                    size_t bufferSize = buffer->m_memory.Count();
-
-                    D3D12CircularResourceHeap::Cursor cursor = m_circularResourceHeap.allocateConstantBuffer(bufferSize);
-                    ::memcpy(cursor.m_position, buffer->m_memory.Buffer(), bufferSize);
-                    // Set the constant buffer
-                    submitter->setRootConstantBufferView(index++, m_circularResourceHeap.getGpuHandle(cursor));
-                    
-                    numConstantBuffers++;
-                }
-            }
-
-            
-            if (bindingState)
-            {
-                D3D12DescriptorHeap& heap = bindingState->m_viewHeap;
-
-                for (int i = 0; i < int(bindingState->m_bindings.Count()); i++)
-                {
-                    const Binding& binding = bindingState->m_bindings[i];
-                    if (binding.m_type == ShaderInputType::Buffer)
-                    {
-                        if (binding.m_bufferType == InputBufferType::ConstantBuffer)
-                        {
-                            submitter->setRootConstantBufferView(index++, binding.m_resource.getResource()->GetGPUVirtualAddress());
-                            numConstantBuffers++;
-                        }
-
-                        if (binding.m_bufferType == InputBufferType::StorageBuffer)
-                        {
-                            submitter->setRootDescriptorTable(index++, heap.getGpuHandle(binding.m_srvIndex));
-                        }
-
-                        if (binding.m_uavIndex >= 0)
-                        {
-                            submitter->setRootDescriptorTable(index++, heap.getGpuHandle(binding.m_uavIndex));
-                        }
-                    }
-                }
-            }
-        }
-
-        if (bindingState && bindingState->m_samplerHeap.getUsedSize() > 0)
-        {
-            submitter->setRootDescriptorTable(index, bindingState->m_samplerHeap.getGpuStart());
-        }
-    }
-
     if (bindingState)
     {
         ID3D12DescriptorHeap* heaps[] =
@@ -1474,6 +1497,62 @@ Result D3D12Renderer::_bindRenderState(RenderState* renderState, ID3D12GraphicsC
     {
         commandList->SetDescriptorHeaps(0, nullptr);
     }
+
+    {
+        int index = 0;
+
+        int numConstantBuffers = 0;
+        {
+            if (bindingState)
+            {
+                D3D12DescriptorHeap& heap = bindingState->m_viewHeap;
+
+                for (int i = 0; i < int(bindingState->m_bindings.Count()); i++)
+                {
+                    const Binding& binding = bindingState->m_bindings[i];
+                    if (binding.m_type == ShaderInputType::Buffer && binding.m_bufferType == InputBufferType::ConstantBuffer)
+                    {
+                        submitter->setRootConstantBufferView(index++, binding.m_resource.getResource()->GetGPUVirtualAddress());
+                        numConstantBuffers++;
+                    }
+
+                    if (binding.m_srvIndex >= 0)
+                    {
+                        submitter->setRootDescriptorTable(index++, heap.getGpuHandle(binding.m_srvIndex));
+                    }
+
+                    if (binding.m_uavIndex >= 0)
+                    {
+                        submitter->setRootDescriptorTable(index++, heap.getGpuHandle(binding.m_uavIndex));
+                    }
+                }
+            }
+
+            // Okay we need to try and create a render state
+            for (int i = 0; i < int(m_boundConstantBuffers.Count()); i++)
+            {
+                const BufferImpl* buffer = m_boundConstantBuffers[i];
+                if (buffer)
+                {
+                    size_t bufferSize = buffer->m_memory.Count();
+
+                    D3D12CircularResourceHeap::Cursor cursor = m_circularResourceHeap.allocateConstantBuffer(bufferSize);
+                    ::memcpy(cursor.m_position, buffer->m_memory.Buffer(), bufferSize);
+                    // Set the constant buffer
+                    submitter->setRootConstantBufferView(index++, m_circularResourceHeap.getGpuHandle(cursor));
+
+                    numConstantBuffers++;
+                }
+            }
+        }
+
+        if (bindingState && bindingState->m_samplerHeap.getUsedSize() > 0)
+        {
+            submitter->setRootDescriptorTable(index, bindingState->m_samplerHeap.getGpuStart());
+        }
+    }
+
+   
 
     return SLANG_OK;
 }
@@ -1550,27 +1629,37 @@ Result D3D12Renderer::initialize(void* inWindowHandle)
         return SLANG_FAIL;
     }
 
-    UINT adapterCounter = 0;
-    for (;;)
+    const bool useWarp = false;
+
+    if (useWarp)
     {
-        UINT adapterIndex = adapterCounter++;
-
-        ComPtr<IDXGIAdapter1> candidateAdapter;
-        if (dxgiFactory->EnumAdapters1(adapterIndex, candidateAdapter.writeRef()) == DXGI_ERROR_NOT_FOUND)
-            break;
-
-        DXGI_ADAPTER_DESC1 desc;
-        candidateAdapter->GetDesc1(&desc);
-
-        if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
+        SLANG_RETURN_ON_FAIL(dxgiFactory->EnumWarpAdapter(IID_PPV_ARGS(adapter.writeRef())));
+        SLANG_RETURN_ON_FAIL(D3D12CreateDevice_(adapter, featureLevel, IID_PPV_ARGS(m_device.writeRef())));
+    }
+    else
+    {
+        UINT adapterCounter = 0;
+        for (;;)
         {
-            // TODO: may want to allow software driver as fallback
-        }
-        else if (SUCCEEDED(D3D12CreateDevice_(candidateAdapter, featureLevel, IID_PPV_ARGS(m_device.writeRef()))))
-        {
-            // We found one!
-            adapter = candidateAdapter;
-            break;
+            UINT adapterIndex = adapterCounter++;
+
+            ComPtr<IDXGIAdapter1> candidateAdapter;
+            if (dxgiFactory->EnumAdapters1(adapterIndex, candidateAdapter.writeRef()) == DXGI_ERROR_NOT_FOUND)
+                break;
+
+            DXGI_ADAPTER_DESC1 desc;
+            candidateAdapter->GetDesc1(&desc);
+
+            if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
+            {
+                // TODO: may want to allow software driver as fallback
+            }
+            else if (SUCCEEDED(D3D12CreateDevice_(candidateAdapter, featureLevel, IID_PPV_ARGS(m_device.writeRef()))))
+            {
+                // We found one!
+                adapter = candidateAdapter;
+                break;
+            }
         }
     }
 
@@ -2155,6 +2244,12 @@ void D3D12Renderer::draw(UInt vertexCount, UInt startVertex)
     ID3D12GraphicsCommandList* commandList = m_commandList;
     
     RenderState* renderState = calcRenderState();
+    if (!renderState)
+    {
+        assert(!"Couldn't create render state");
+        return;    
+    }
+
     BindingStateImpl* bindingState = m_boundBindingState;
         
     // Submit - setting for graphics
@@ -2227,12 +2322,17 @@ BindingState* D3D12Renderer::createBindingState(const ShaderInputLayout& layout)
         {
             case ShaderInputType::Buffer:
             {
-                dstEntry.m_uavIndex = bindingState->m_viewHeap.allocate();
-                dstEntry.m_srvIndex = bindingState->m_viewHeap.allocate();
-
-                if (dstEntry.m_uavIndex < 0 || dstEntry.m_srvIndex < 0)
+                // NOTE! In this arrangement the buffer can either be a ConstantBuffer or a 'StorageBuffer'.
+                // If it's a storage buffer then it has a 'uav'.
+                // In neither circumstance is there an associated srv 
+                // This departs a little from dx11 code - in that it will create srv and uav for a storage buffer.
+                if (srcEntry.bufferDesc.type == InputBufferType::StorageBuffer)
                 {
-                    return nullptr;
+                    dstEntry.m_uavIndex = bindingState->m_viewHeap.allocate();
+                    if (dstEntry.m_uavIndex < 0)
+                    {
+                        return nullptr;
+                    }
                 }
 
                 SLANG_RETURN_NULL_ON_FAIL(createInputBuffer(srcEntry.bufferDesc, srcEntry.bufferData, bindingState->m_viewHeap, dstEntry.m_uavIndex, dstEntry.m_srvIndex, dstEntry.m_resource));
@@ -2299,8 +2399,8 @@ void D3D12Renderer::serializeOutput(BindingState* stateIn, const char* fileName)
             if (binding.m_resource.getResource())
             {
                 // create staging buffer
-
-                size_t bufferSize = D3DUtil::calcAligned(binding.m_bufferLength, 256);
+                //size_t bufferSize = D3DUtil::calcAligned(binding.m_bufferLength, 256);
+                const size_t bufferSize = binding.m_bufferLength;
 
                 D3D12_RESOURCE_DESC stagingDesc;
                 _initBufferResourceDesc(bufferSize, stagingDesc);

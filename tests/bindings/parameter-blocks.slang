@@ -26,11 +26,15 @@ float4 main(float v : V) : SV_Target
 
 #else
 
+#define t _SV01pL0
+#define ta _SV01pL1
+#define s _SV01pL2
+
 Texture2D t : register(t0, space0);
 Texture2D ta[4] : register(t1, space0);
 SamplerState s : register(s0, space0);
 
-float4 main(float v : V) : SV_Target
+float4 main(float v : V) : SV_TARGET
 {
 	return use(ta[int(v)], s)
 		+ use(t, s);

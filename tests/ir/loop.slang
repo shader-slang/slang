@@ -1,4 +1,14 @@
-//TEST:SIMPLE:-dump-ir -profile cs_5_0 -entry main
+//TEST_DISABLED:SIMPLE:-dump-ir -profile cs_5_0 -entry main
+
+// Note: disabling this test for now because
+// the actual IR that gets dumped is not very
+// stable with code generation changes going on,
+// and we already have more significant tests
+// that stress the IR functionality.
+//
+// We should consider removing this test, or
+// else work to ensure that "canonical" IR
+// output is more consistent.
 
 #define GROUP_THREAD_COUNT 64
 

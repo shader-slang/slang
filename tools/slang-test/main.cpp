@@ -4,10 +4,12 @@
 #include "../../source/core/token-reader.h"
 
 #include "../../source/core/slang-result.h"
+#include "../../source/core/slang-string-util.h"
 
 using namespace Slang;
 
 #include "os.h"
+#include "render-api-util.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "external/stb/stb_image.h"
@@ -70,6 +72,9 @@ struct Options
 
     // Exclude test that match one these categories
     Dictionary<TestCategory*, TestCategory*> excludeCategories;
+
+    // By default we can test against all apis
+    int enabledApis = int(RenderApiFlag::AllOf);           
 };
 Options options;
 
@@ -188,6 +193,22 @@ Result parseOptions(int* argc, char** argv)
                 options.excludeCategories.Add(category, category);
             }
         }
+        else if (strcmp(arg, "-api") == 0)
+        {
+            if (argCursor == argEnd)
+            {
+                fprintf(stderr, "error: expected comma separated list of apis '%s'\n", arg);
+                return SLANG_FAIL;
+            }
+            const char* apiList = *argCursor++;
+
+            SlangResult res = RenderApiUtil::parseApiFlags(UnownedStringSlice(apiList), &options.enabledApis);
+            if (SLANG_FAILED(res))
+            {
+                fprintf(stderr, "error: unable to parse api list '%s'\n", apiList);
+                return res;
+            }
+        }
         else
         {
             fprintf(stderr, "unknown option '%s'\n", arg);
@@ -195,6 +216,13 @@ Result parseOptions(int* argc, char** argv)
         }
     }
     
+    {
+        // Find out what apis are available
+        const int availableApis = RenderApiUtil::getAvailableApis();
+        // Only allow apis we know are available
+        options.enabledApis &= availableApis;
+    }
+
     // any arguments left over were positional arguments
     argCount = (int)((char**)writeCursor - argv);
     argCursor = argv;
@@ -634,6 +662,44 @@ void maybeDumpOutput(
         expectedOutput.Buffer(),
         actualOutput.Buffer());
     fflush(stderr);
+}
+
+// Finds the specialized or default path for expected data for a test. 
+// If neither are found, will return an empty string
+String findExpectedPath(const TestInput& input, const char* postFix)
+{
+    StringBuilder specializedBuf;
+
+    // Try the specialized name first
+    specializedBuf << input.outputStem;
+    if (postFix)
+    {
+        specializedBuf << postFix;
+    }
+    if (File::Exists(specializedBuf))
+    {
+        return specializedBuf;
+    }
+
+
+    // Try the default name
+    StringBuilder defaultBuf;
+    defaultBuf.Clear();
+    defaultBuf << input.filePath;
+    if (postFix)
+    {
+        defaultBuf << postFix;
+    }
+
+    if (File::Exists(defaultBuf))
+    {
+        return defaultBuf;
+    }
+
+    // Couldn't find either 
+    printf("referenceOutput '%s' or '%s' not found.\n", defaultBuf.Buffer(), specializedBuf.Buffer());
+
+    return "";
 }
 
 TestResult runSimpleTest(TestInput& input)
@@ -1124,11 +1190,18 @@ TestResult runGLSLComparisonTest(TestInput& input)
     return kTestResult_Pass;
 }
 
-TestResult runComputeComparisonImpl(TestInput& input, const char * langOption, String referenceOutput)
+
+TestResult runComputeComparisonImpl(TestInput& input, const char * langOption)
 {
 	// TODO: delete any existing files at the output path(s) to avoid stale outputs leading to a false pass
 	auto filePath999 = input.filePath;
 	auto outputStem = input.outputStem;
+
+    const String referenceOutput = findExpectedPath(input, ".expected.txt");
+    if (referenceOutput.Length() <= 0)
+    {
+        return kTestResult_Fail;
+    }
 
 	OSProcessSpawner spawner;
 
@@ -1211,22 +1284,22 @@ TestResult runComputeComparisonImpl(TestInput& input, const char * langOption, S
 
 TestResult runSlangComputeComparisonTest(TestInput& input)
 {
-	return runComputeComparisonImpl(input, "-slang -compute", input.outputStem + ".expected.txt");
+	return runComputeComparisonImpl(input, "-slang -compute"); 
 }
 
 TestResult runSlangComputeComparisonTestEx(TestInput& input)
 {
-	return runComputeComparisonImpl(input, "", input.outputStem + ".expected.txt");
+	return runComputeComparisonImpl(input, "");
 }
 
 TestResult runHLSLComputeTest(TestInput& input)
 {
-    return runComputeComparisonImpl(input, "-hlsl-rewrite -compute", input.outputStem + ".expected.txt");
+    return runComputeComparisonImpl(input, "-hlsl-rewrite -compute");
 }
 
 TestResult runSlangRenderComputeComparisonTest(TestInput& input)
 {
-    return runComputeComparisonImpl(input, "-slang -gcompute", input.outputStem + ".expected.txt");
+    return runComputeComparisonImpl(input, "-slang -gcompute");
 }
 
 TestResult doRenderComparisonTestRun(TestInput& input, char const* langOption, char const* outputKind, String* outOutput)
@@ -1411,12 +1484,48 @@ TestResult skipTest(TestInput& /*input*/)
     return kTestResult_Ignored;
 }
 
+static bool hasD3D12Option(const TestOptions& testOptions)
+{
+    return (testOptions.args.IndexOf("-dx12") != UInt(-1) ||
+        testOptions.args.IndexOf("-d3d12") != UInt(-1));
+}
+
+bool hasD3D12Option(const FileTestList& testList)
+{
+    const int numTests = int(testList.tests.Count());
+    for (int i = 0; i < numTests; i++)
+    {
+        if (hasD3D12Option(testList.tests[i]))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool isRenderTest(const String& command)
+{
+    return command == "COMPARE_COMPUTE" ||
+        command == "COMPARE_COMPUTE_EX" ||
+        command == "HLSL_COMPUTE" ||
+        command == "COMPARE_RENDER_COMPUTE" ||
+        command == "COMPARE_HLSL_RENDER" ||
+        command == "COMPARE_HLSL_CROSS_COMPILE_RENDER" ||
+        command == "COMPARE_HLSL_GLSL_RENDER";
+}
+
 TestResult runTest(
     String const&       filePath,
     String const&       outputStem,
     TestOptions const&  testOptions,
     FileTestList const& testList)
 {
+    // If this is d3d12 test
+    if (hasD3D12Option(testOptions) && (options.enabledApis & RenderApiFlag::D3D12) == 0)
+    {
+        return kTestResult_Ignored;
+    }
+    
     // based on command name, dispatch to an appropriate callback
     struct TestCommands
     {
@@ -1426,11 +1535,11 @@ TestResult runTest(
 	
 	static const TestCommands kTestCommands[] = 
 	{
-        { "SIMPLE", &runSimpleTest },
-        { "REFLECTION", &runReflectionTest },
+        { "SIMPLE", &runSimpleTest},
+        { "REFLECTION", &runReflectionTest},
 #if SLANG_TEST_SUPPORT_HLSL
-        { "COMPARE_HLSL", &runHLSLComparisonTest },
-        { "COMPARE_HLSL_RENDER", &runHLSLRenderComparisonTest },
+        { "COMPARE_HLSL", &runHLSLComparisonTest},
+        { "COMPARE_HLSL_RENDER", &runHLSLRenderComparisonTest},
         { "COMPARE_HLSL_CROSS_COMPILE_RENDER", &runHLSLCrossCompileRenderComparisonTest},
         { "COMPARE_HLSL_GLSL_RENDER", &runHLSLAndGLSLRenderComparisonTest },
         { "COMPARE_COMPUTE", runSlangComputeComparisonTest},
@@ -1623,6 +1732,9 @@ bool testPassesCategoryMask(
     return false;
 }
 
+
+
+
 void runTestsOnFile(
     TestContext*    context,
     String          filePath)
@@ -1641,6 +1753,29 @@ void runTestsOnFile(
     {
         handleTestResult(context, filePath, kTestResult_Ignored);
         return;
+    }
+
+    // If dx12 is available synthesize Dx12 test
+    if ((options.enabledApis & RenderApiFlag::D3D12) != 0)
+    {
+        // If doesn't have option generate dx12 options from dx11
+        if (!hasD3D12Option(testList))
+        {
+            const int numTests = int(testList.tests.Count());
+            for (int i = 0; i < numTests; i++)
+            {
+                const TestOptions& testOptions = testList.tests[i];
+                // If it's a render test, and there is on d3d option, add one
+                if (isRenderTest(testOptions.command) && !hasD3D12Option(testOptions))
+                {
+                    // Add with -dx12 option
+                    TestOptions testOptionsCopy(testOptions);
+                    testOptionsCopy.args.Add("-dx12");
+
+                    testList.tests.Add(testOptionsCopy);
+                }
+            }
+        }
     }
 
     // We have found a test to run!

@@ -84,6 +84,9 @@ struct ConstructSSAContext
     // IR building state to use during the operation
     SharedIRBuilder sharedBuilder;
 
+    IRBuilder builder;
+    IRBuilder* getBuilder() { return &builder; }
+
 
     Dictionary<IRParam*, RefPtr<PhiInfo>> phiInfos;
 
@@ -211,7 +214,7 @@ PhiInfo* addPhi(
     auto valueType = var->getDataType()->getValueType();
     if( auto rate = var->getRate() )
     {
-        valueType = context->sharedBuilder.getSession()->getRateQualifiedType(rate, valueType);
+        valueType = context->getBuilder()->getRateQualifiedType(rate, valueType);
     }
     IRParam* phi = builder->createParam(valueType);
 
@@ -843,7 +846,7 @@ void constructSSA(ConstructSSAContext* context)
         }
 
         IRTerminatorInst* newTerminator = (IRTerminatorInst*)blockInfo->builder.emitIntrinsicInst(
-            oldTerminator->type,
+            oldTerminator->getFullType(),
             oldTerminator->op,
             newArgCount,
             newArgs.Buffer());
@@ -878,6 +881,9 @@ void constructSSA(IRModule* module, IRGlobalValueWithCode* globalVal)
     context.sharedBuilder.module = module;
     context.sharedBuilder.session = module->session;
 
+    context.builder.sharedBuilder = &context.sharedBuilder;
+    context.builder.setInsertInto(module->moduleInst);
+
     constructSSA(&context);
 }
 
@@ -886,8 +892,8 @@ void constructSSA(IRModule* module, IRInst* globalVal)
     switch (globalVal->op)
     {
     case kIROp_Func:
-    case kIROp_global_var:
-    case kIROp_global_constant:
+    case kIROp_GlobalVar:
+    case kIROp_GlobalConstant:
         constructSSA(module, (IRGlobalValueWithCode*)globalVal);
 
     default:

@@ -107,7 +107,7 @@ struct SharedBytecodeGenerationContext
 
     // Types that have been emitted
     List<BytecodeGenerationPtr<BCType>> bcTypes;
-    Dictionary<Type*, UInt> mapTypeToID;
+    Dictionary<IRType*, UInt> mapTypeToID;
 
     // Compile-time constant values that need
     // to be emitted...
@@ -308,7 +308,7 @@ void encodeOperand(
 
 uint32_t getTypeID(
     BytecodeGenerationContext*  context,
-    Type*                       type);
+    IRType*                     type);
 
 void encodeOperand(
     BytecodeGenerationContext*  context,
@@ -326,11 +326,8 @@ bool opHasResult(IRInst* inst)
     // the function returns the distinguished `Void` type,
     // since that is conceptually the same as "not returning
     // a value."
-    if (auto basicType = dynamic_cast<BasicExpressionType*>(type))
-    {
-        if (basicType->baseType == BaseType::Void)
-            return false;
-    }
+    if(type->op == kIROp_VoidType)
+        return false;
 
     return true;
 }
@@ -465,7 +462,7 @@ void generateBytecodeForInst(
 
 BytecodeGenerationPtr<BCType> emitBCType(
     BytecodeGenerationContext*              context,
-    Type*                                   type,
+    IRType*                                 type,
     IROp                                    op,
     BytecodeGenerationPtr<uint8_t> const*   args,
     UInt                                    argCount)
@@ -498,7 +495,7 @@ BytecodeGenerationPtr<BCType> emitBCType(
 
 BytecodeGenerationPtr<BCType> emitBCVarArgType(
     BytecodeGenerationContext*              context,
-    Type*                                   type,
+    IRType*                                 type,
     IROp                                    op,
     List<BytecodeGenerationPtr<uint8_t>>    args)
 {
@@ -507,7 +504,7 @@ BytecodeGenerationPtr<BCType> emitBCVarArgType(
 
 BytecodeGenerationPtr<BCType> emitBCType(
     BytecodeGenerationContext*  context,
-    Type*                       type,
+    IRType*                     type,
     IROp                        op)
 {
     return emitBCType(context, type, op, nullptr, 0);
@@ -515,12 +512,12 @@ BytecodeGenerationPtr<BCType> emitBCType(
 
 BytecodeGenerationPtr<BCType> emitBCType(
     BytecodeGenerationContext*  context,
-    Type*                       type);
+    IRType*                     type);
 
 // Emit a `BCType` representation for the given `Type`
 BytecodeGenerationPtr<BCType> emitBCTypeImpl(
     BytecodeGenerationContext*  context,
-    Type*                       type)
+    IRType*                     type)
 {
     // A NULL type is interpreted as equivalent to `Void` for now.
     if( !type )
@@ -528,65 +525,20 @@ BytecodeGenerationPtr<BCType> emitBCTypeImpl(
         return emitBCType(context, type, kIROp_VoidType);
     }
 
-    if( auto basicType = type->As<BasicExpressionType>() )
+    List<BytecodeGenerationPtr<uint8_t>> operands;
+    UInt operandCount = type->getOperandCount();
+    for (UInt ii = 0; ii < operandCount; ++ii)
     {
-        switch(basicType->baseType)
-        {
-        case BaseType::Void:    return emitBCType(context, type, kIROp_VoidType);
-        case BaseType::Bool:    return emitBCType(context, type, kIROp_BoolType);
-        case BaseType::Int:     return emitBCType(context, type, kIROp_Int32Type);
-        case BaseType::UInt:    return emitBCType(context, type, kIROp_UInt32Type);
-        case BaseType::UInt64:  return emitBCType(context, type, kIROp_UInt64Type);
-        case BaseType::Half:    return emitBCType(context, type, kIROp_Float16Type);
-        case BaseType::Float:   return emitBCType(context, type, kIROp_Float32Type);
-        case BaseType::Double:  return emitBCType(context, type, kIROp_Float64Type);
-
-        default:
-            break;
-        }
+        operands.Add(emitBCType(context, (IRType*) type->getOperand(ii)).bitCast<uint8_t>());
     }
-    else if( auto funcType = type->As<FuncType>() )
-    {
-        List<BytecodeGenerationPtr<uint8_t>> operands;
-        
-        operands.Add(emitBCType(context, funcType->resultType).bitCast<uint8_t>());
-        UInt paramCount = funcType->getParamCount();
-        for(UInt pp = 0; pp < paramCount; ++pp)
-        {
-            operands.Add(emitBCType(context, funcType->getParamType(pp)).bitCast<uint8_t>());
-        }
-
-        return emitBCVarArgType(context, type, kIROp_FuncType, operands);
-    }
-    else if( auto ptrType = type->As<PtrType>() )
-    {
-        List<BytecodeGenerationPtr<uint8_t>> operands;
-        operands.Add(emitBCType(context, ptrType->getValueType()).bitCast<uint8_t>());
-        return emitBCVarArgType(context, type, kIROp_PtrType, operands);
-    }
-    else if( auto rwStructuredBufferType = type->As<HLSLRWStructuredBufferType>() )
-    {
-        List<BytecodeGenerationPtr<uint8_t>> operands;
-        operands.Add(emitBCType(context, rwStructuredBufferType->elementType).bitCast<uint8_t>());
-        return emitBCVarArgType(context, type, kIROp_readWriteStructuredBufferType, operands);
-    }
-    else if( auto structuredBufferType = type->As<HLSLStructuredBufferType>() )
-    {
-        List<BytecodeGenerationPtr<uint8_t>> operands;
-        operands.Add(emitBCType(context, structuredBufferType->elementType).bitCast<uint8_t>());
-        return emitBCVarArgType(context, type, kIROp_structuredBufferType, operands);
-    }
-
-
-    SLANG_UNEXPECTED("unimplemented");
-    UNREACHABLE_RETURN(BytecodeGenerationPtr<BCType>());
+    return emitBCVarArgType(context, type, type->op, operands);
 }
 
 BytecodeGenerationPtr<BCType> emitBCType(
     BytecodeGenerationContext*  context,
-    Type*                       type)
+    IRType*                     type)
 {
-    auto canonical = type->GetCanonicalType();
+    auto canonical = type->getCanonicalType();
     UInt id = 0;
     if(context->shared->mapTypeToID.TryGetValue(canonical, id))
     {
@@ -599,7 +551,7 @@ BytecodeGenerationPtr<BCType> emitBCType(
 
 uint32_t getTypeID(
     BytecodeGenerationContext*  context,
-    Type*                       type)
+    IRType*                     type)
 {
     // We have a type, and we need to emit it (if we haven't
     // already) and return its index in the global type table.
@@ -821,7 +773,7 @@ BytecodeGenerationPtr<BCSymbol> generateBytecodeSymbolForInst(
                             bcRegs[localID+1].op = ii->op;
                             bcRegs[localID+1].previousVarIndexPlusOne = (uint32_t)localID+1;
                             bcRegs[localID+1].typeID = getTypeID(context,
-                                (ii->getDataType()->As<PtrType>())->getValueType());
+                                (as<IRPtrType>(ii->getDataType()))->getValueType());
                         }
                         break;
                     }
@@ -902,13 +854,13 @@ BytecodeGenerationPtr<BCSymbol> generateBytecodeSymbolForInst(
         }
         break;
 
-    case kIROp_global_var:
-    case kIROp_global_constant:
+    case kIROp_GlobalVar:
+    case kIROp_GlobalConstant:
         {
             auto bcVar = allocate<BCSymbol>(context);
 
             bcVar->op = inst->op;
-            bcVar->typeID = getTypeID(context, inst->type);
+            bcVar->typeID = getTypeID(context, inst->getFullType());
 
             // TODO: actually need to intialize with body instructions
 
@@ -1003,7 +955,7 @@ BytecodeGenerationPtr<BCModule> generateBytecodeForModule(
     {
         auto irConstant = (IRConstant*) context->shared->constants[cc];
         bcConstants[cc].op = irConstant->op;
-        bcConstants[cc].typeID = getTypeID(context, irConstant->type);
+        bcConstants[cc].typeID = getTypeID(context, irConstant->getFullType());
 
         switch(irConstant->op)
         {

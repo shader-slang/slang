@@ -108,12 +108,12 @@ struct D3D12ResourceBase
 		/// True if a resource is set
 	SLANG_FORCE_INLINE bool isSet() const { return m_resource != nullptr; }
 
-		/// Coercable into ID3D12Resource
+		/// Coercible into ID3D12Resource
 	SLANG_FORCE_INLINE operator ID3D12Resource*() const { return m_resource; }
 
 		/// restore previous state
 #if SLANG_ENABLE_CONSERVATIVE_RESOURCE_BARRIERS
-	NV_FORCE_INLINE Void restore(Dx12BarrierSubmitter& submitter) { transition(m_prevState, submitter); }
+	SLANG_FORCE_INLINE Void restore(D3D12BarrierSubmitter& submitter) { transition(m_prevState, submitter); }
 #else
 	SLANG_FORCE_INLINE void restore(D3D12BarrierSubmitter& submitter) { SLANG_UNUSED(submitter) }
 #endif
@@ -132,9 +132,9 @@ protected:
 	/// This is protected so as clients cannot slice the class, and so state tracking is lost
 	~D3D12ResourceBase() {}
 
-	ID3D12Resource* m_resource;
-	D3D12_RESOURCE_STATES m_state;
-	D3D12_RESOURCE_STATES m_prevState;
+	ID3D12Resource* m_resource;                 ///< The resource (ref counted)
+	D3D12_RESOURCE_STATES m_state;              ///< The current tracked expected state, if all associated transitions have completed on ID3D12CommandList
+	D3D12_RESOURCE_STATES m_prevState;          ///< The previous state
 };
 
 struct D3D12Resource : public D3D12ResourceBase
