@@ -273,7 +273,7 @@ namespace Slang
             case kEOF:
                 // TODO(tfoley) diagnostic!
                 return;
-                    
+
             case '\n': case '\r':
                 handleNewLine(lexer);
                 continue;
@@ -490,7 +490,7 @@ namespace Slang
     {
         lexDigits(lexer, base);
         maybeLexNumberExponent(lexer, base);
-            
+
         return maybeLexNumberSuffix(lexer, TokenType::FloatingPointLiteral);
     }
 
@@ -940,20 +940,38 @@ namespace Slang
 
 
 
-    static TokenType lexTokenImpl(Lexer* lexer)
+    static TokenType lexTokenImpl(Lexer* lexer, LexerFlags effectiveFlags)
     {
+        if(effectiveFlags & kLexerFlag_ExpectDirectiveMessage)
+        {
+            for(;;)
+            {
+                switch(peek(lexer))
+                {
+                default:
+                    advance(lexer);
+                    continue;
+
+                case kEOF: case '\r': case '\n':
+                    break;
+                }
+                break;
+            }
+            return TokenType::DirectiveMessage;
+        }
+
         switch(peek(lexer))
         {
         default:
             break;
 
         case kEOF:
-            if((lexer->lexerFlags & kLexerFlag_InDirective) != 0)
+            if((effectiveFlags & kLexerFlag_InDirective) != 0)
                 return TokenType::EndOfDirective;
             return TokenType::EndOfFile;
 
         case '\r': case '\n':
-            if((lexer->lexerFlags & kLexerFlag_InDirective) != 0)
+            if((effectiveFlags & kLexerFlag_InDirective) != 0)
                 return TokenType::EndOfDirective;
             handleNewLine(lexer);
             return TokenType::NewLine;
@@ -1201,24 +1219,27 @@ namespace Slang
             // unexpected/invalid character.
 
             auto loc = getSourceLoc(lexer);
-            auto sink = lexer->sink;
             int c = advance(lexer);
-            if(c >= 0x20 && c <=  0x7E)
+            if(!(effectiveFlags & kLexerFlag_IgnoreInvalid))
             {
-                char buffer[] = { (char) c, 0 };
-                sink->diagnose(loc, Diagnostics::illegalCharacterPrint, buffer);
-            }
-            else
-            {
-                // Fallback: print as hexadecimal
-                sink->diagnose(loc, Diagnostics::illegalCharacterHex, String((unsigned char)c, 16));
+                auto sink = lexer->sink;
+                if(c >= 0x20 && c <=  0x7E)
+                {
+                    char buffer[] = { (char) c, 0 };
+                    sink->diagnose(loc, Diagnostics::illegalCharacterPrint, buffer);
+                }
+                else
+                {
+                    // Fallback: print as hexadecimal
+                    sink->diagnose(loc, Diagnostics::illegalCharacterHex, String((unsigned char)c, 16));
+                }
             }
 
             return TokenType::Invalid;
         }
     }
 
-    Token Lexer::lexToken()
+    Token Lexer::lexToken(LexerFlags extraFlags)
     {
         auto& flags = this->tokenFlags;
         for(;;)
@@ -1228,7 +1249,7 @@ namespace Slang
 
             char const* textBegin = cursor;
 
-            auto tokenType = lexTokenImpl(this);
+            auto tokenType = lexTokenImpl(this, this->lexerFlags | extraFlags);
 
             // The low-level lexer produces tokens for things we want
             // to ignore, such as white space, so we skip them here.
