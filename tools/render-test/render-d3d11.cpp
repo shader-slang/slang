@@ -51,20 +51,21 @@ public:
     virtual void setClearColor(const float color[4]) override;
     virtual void clearFrame() override;
     virtual void presentFrame() override;
+    virtual TextureResource* createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData) override;
+    virtual BufferResource* createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& bufferDesc, const void* initData) override;
     virtual SlangResult captureScreenShot(char const* outputPath) override;
     virtual void serializeOutput(BindingState* state, const char* fileName) override;
-    virtual Buffer* createBuffer(const BufferDesc& desc) override;
     virtual InputLayout* createInputLayout( const InputElementDesc* inputElements, UInt inputElementCount) override;
     virtual BindingState * createBindingState(const ShaderInputLayout& layout) override;
     virtual ShaderCompiler* getShaderCompiler() override;
-    virtual void* map(Buffer* buffer, MapFlavor flavor) override;
-    virtual void unmap(Buffer* buffer) override;
+    virtual void* map(BufferResource* buffer, MapFlavor flavor) override;
+    virtual void unmap(BufferResource* buffer) override;
     virtual void setInputLayout(InputLayout* inputLayout) override;
     virtual void setPrimitiveTopology(PrimitiveTopology topology) override;
     virtual void setBindingState(BindingState * state);
-    virtual void setVertexBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* strides,  const UInt* offsets) override;    
+    virtual void setVertexBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* strides,  const UInt* offsets) override;    
     virtual void setShaderProgram(ShaderProgram* inProgram) override;
-    virtual void setConstantBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers,  const UInt* offsets) override;
+    virtual void setConstantBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers,  const UInt* offsets) override;
     virtual void draw(UInt vertexCount, UInt startVertex) override;
     virtual void dispatchCompute(int x, int y, int z) override;
     virtual void submitGpuWork() override {}
@@ -102,9 +103,18 @@ public:
         ComPtr<ID3D11ComputeShader> m_computeShader;
     };
 
-    class BufferImpl: public Buffer
+    class BufferResourceImpl: public BufferResource
     {
 		public:
+        typedef BufferResource Parent;
+
+        BufferResourceImpl(Resource::Usage initialUsage, const Desc& desc):
+            Parent(desc),
+            m_initialUsage(initialUsage)
+        {
+        }
+
+        Usage m_initialUsage;
         ComPtr<ID3D11Buffer> m_buffer;
     };
 
@@ -387,35 +397,104 @@ ShaderCompiler* D3D11Renderer::getShaderCompiler()
     return this;
 }
 
-Buffer* D3D11Renderer::createBuffer(const BufferDesc& desc)
+static D3D11_BIND_FLAG _calcResourceFlag(Resource::BindFlag::Enum bindFlag)
 {
-    D3D11_BUFFER_DESC bufferDesc = { 0 };
-    bufferDesc.ByteWidth = (UINT)D3DUtil::calcAligned(desc.size, 256);
-
-    switch (desc.flavor)
+    typedef Resource::BindFlag BindFlag;
+    switch (bindFlag)
     {
-        case BufferFlavor::Constant:
-            bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-            bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-            bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-            break;
+        case BindFlag::VertexBuffer:            return D3D11_BIND_VERTEX_BUFFER;
+        case BindFlag::IndexBuffer:             return D3D11_BIND_INDEX_BUFFER;
+        case BindFlag::ConstantBuffer:          return D3D11_BIND_CONSTANT_BUFFER;
+        case BindFlag::StreamOutput:            return D3D11_BIND_STREAM_OUTPUT;
+        case BindFlag::RenderTarget:            return D3D11_BIND_RENDER_TARGET;
+        case BindFlag::DepthStencil:            return D3D11_BIND_DEPTH_STENCIL;
+        case BindFlag::UnorderedAccess:         return D3D11_BIND_UNORDERED_ACCESS;
+        case BindFlag::PixelShaderResource:     return D3D11_BIND_SHADER_RESOURCE;
+        case BindFlag::NonPixelShaderResource:  return D3D11_BIND_SHADER_RESOURCE;
+        default:                                return D3D11_BIND_FLAG(0);
+    }
+}
 
-        case BufferFlavor::Vertex:
+static int _calcResourceBindFlags(int bindFlags)
+{
+    int dstFlags = 0;
+    while (bindFlags)
+    {
+        int lsb = bindFlags & -bindFlags;
+
+        dstFlags |= _calcResourceFlag(Resource::BindFlag::Enum(lsb));
+        bindFlags &= ~lsb;
+    }
+    return dstFlags;
+}
+
+static int _calcResourceAccessFlags(int accessFlags)
+{
+    switch (accessFlags)
+    {
+        case 0:         return 0;
+        case Resource::AccessFlag::Read:            return D3D11_CPU_ACCESS_READ;
+        case Resource::AccessFlag::Write:           return D3D11_CPU_ACCESS_WRITE;
+        case Resource::AccessFlag::Read |
+             Resource::AccessFlag::Write:           return D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
+        default: assert(!"Invalid flags"); return 0;
+    }
+}
+
+TextureResource* D3D11Renderer::createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData)
+{
+    return nullptr;
+}
+
+BufferResource* D3D11Renderer::createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& descIn, const void* initData)
+{    
+    BufferResource::Desc desc(descIn);
+
+    // Make aligned to 256 bytes... not sure why
+    desc.sizeInBytes = D3DUtil::calcAligned(desc.sizeInBytes, 256);
+    if (desc.bindFlags)
+    {
+        desc.bindFlags = Resource::s_requiredBinding[int(initialUsage)];
+    }
+ 
+    D3D11_BUFFER_DESC bufferDesc = { 0 };
+    bufferDesc.ByteWidth = UINT(desc.sizeInBytes);
+    bufferDesc.BindFlags = _calcResourceBindFlags(desc.bindFlags);
+    bufferDesc.CPUAccessFlags = _calcResourceAccessFlags(descIn.accessFlags);
+    bufferDesc.Usage = D3D11_USAGE_DEFAULT;
+
+    switch (initialUsage)
+    {
+        case Resource::Usage::ConstantBuffer:
+        {
+            // We'll just assume ConstantBuffers are dynamic for now
             bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-            bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-            bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
             break;
-        default:
-            return nullptr;
+        }
+        default: break;
+    }
+
+    if (bufferDesc.BindFlags & (D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE))
+    {
+        //desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+        if (desc.elementSize != 0)
+        {
+            bufferDesc.StructureByteStride = desc.elementSize;
+            bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+        }
+        else
+        {
+            bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS;
+        }
     }
 
     D3D11_SUBRESOURCE_DATA subResourceData = { 0 };
-    subResourceData.pSysMem = desc.initData;
+    subResourceData.pSysMem = initData;
 
     ComPtr<ID3D11Buffer> buffer;
-	SLANG_RETURN_NULL_ON_FAIL(m_device->CreateBuffer(&bufferDesc, desc.initData ? &subResourceData : nullptr, buffer.writeRef()));
+	SLANG_RETURN_NULL_ON_FAIL(m_device->CreateBuffer(&bufferDesc, initData ? &subResourceData : nullptr, buffer.writeRef()));
     
-    BufferImpl* rs = new BufferImpl;
+    BufferResourceImpl* rs = new BufferResourceImpl(initialUsage, desc);
     rs->m_buffer = buffer;
     return rs;
 }
@@ -452,6 +531,9 @@ InputLayout* D3D11Renderer::createInputLayout(const InputElementDesc* inputEleme
                 break;
             case Format::RG_Float32:
                 typeName = "float2";
+                break;
+            case Format::R_Float32:
+                typeName = "float";
                 break;
             default:
                 return nullptr;
@@ -506,9 +588,9 @@ void* D3D11Renderer::map(ID3D11Buffer* buffer, MapFlavor flavorIn)
     return mappedSub.pData;
 }
 
-void* D3D11Renderer::map(Buffer* buffer, MapFlavor flavor)
+void* D3D11Renderer::map(BufferResource* buffer, MapFlavor flavor)
 {
-    return map(((BufferImpl*)buffer)->m_buffer, flavor);
+    return map(((BufferResourceImpl*)buffer)->m_buffer, flavor);
 }
 
 void D3D11Renderer::unmap(ID3D11Buffer* buffer)
@@ -516,9 +598,9 @@ void D3D11Renderer::unmap(ID3D11Buffer* buffer)
     m_immediateContext->Unmap(buffer, 0);
 }
 
-void D3D11Renderer::unmap(Buffer* bufferIn)
+void D3D11Renderer::unmap(BufferResource* bufferIn)
 {
-    unmap(((BufferImpl*)bufferIn)->m_buffer);
+    unmap(((BufferResourceImpl*)bufferIn)->m_buffer);
 }
 
 void D3D11Renderer::setInputLayout(InputLayout* inputLayoutIn)
@@ -532,7 +614,7 @@ void D3D11Renderer::setPrimitiveTopology(PrimitiveTopology topology)
     m_immediateContext->IASetPrimitiveTopology(D3DUtil::getPrimitiveTopology(topology)); 
 }
 
-void D3D11Renderer::setVertexBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffersIn, const UInt* stridesIn, const UInt* offsetsIn)
+void D3D11Renderer::setVertexBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffersIn, const UInt* stridesIn, const UInt* offsetsIn)
 {
     static const int kMaxVertexBuffers = 16;
 	assert(slotCount <= kMaxVertexBuffers);
@@ -541,7 +623,7 @@ void D3D11Renderer::setVertexBuffers(UInt startSlot, UInt slotCount, Buffer*cons
     UINT vertexOffsets[kMaxVertexBuffers];
 	ID3D11Buffer* dxBuffers[kMaxVertexBuffers];
 
-	auto buffers = (BufferImpl*const*)buffersIn;
+	auto buffers = (BufferResourceImpl*const*)buffersIn;
 
     for (UInt ii = 0; ii < slotCount; ++ii)
     {
@@ -561,14 +643,14 @@ void D3D11Renderer::setShaderProgram(ShaderProgram* programIn)
     m_immediateContext->PSSetShader(program->m_pixelShader, nullptr, 0);
 }
 
-void D3D11Renderer::setConstantBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffersIn, const UInt* offsetsIn)
+void D3D11Renderer::setConstantBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffersIn, const UInt* offsetsIn)
 {
 	static const int kMaxConstantBuffers = 16;
 	assert(slotCount <= kMaxConstantBuffers);
 
     // TODO: actually use those offsets
 
-    auto buffers = (BufferImpl*const*)buffersIn;
+    auto buffers = (BufferResourceImpl*const*)buffersIn;
 
 	// Copy out the actual dx buffers
 	ID3D11Buffer* dxBuffers[kMaxConstantBuffers];

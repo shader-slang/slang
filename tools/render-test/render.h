@@ -71,19 +71,7 @@ enum class Format
     Unknown,
     RGB_Float32,
     RG_Float32,
-};
-
-enum class BufferFlavor
-{
-    Constant,
-    Vertex
-};
-
-struct BufferDesc
-{
-    UInt            size        = 0;
-    BufferFlavor    flavor      = BufferFlavor::Constant;
-    void const*     initData    = nullptr;
+    R_Float32,
 };
 
 struct InputElementDesc
@@ -106,6 +94,176 @@ enum class PrimitiveTopology
     TriangleList,
 };
 
+class Resource: public Slang::RefObject
+{
+    public:
+
+    enum class Type
+    {
+        Unknown,            ///< Unknown
+        Buffer,
+        Texture1D,
+        Texture2D,
+        Texture3D,
+        TextureCube,
+    };
+
+        /// Describes how a resource is to be used
+    enum class Usage
+    {
+        Unknown = -1,
+        VertexBuffer = 0,
+        IndexBuffer,
+        ConstantBuffer,
+        StreamOutput,
+        RenderTarget,
+        DepthRead,
+        DepthWrite,
+        UnorderedAccess,
+        PixelShaderResource,
+        NonPixelShaderResource,
+        CountOf,
+    };
+
+        /// Binding flags describe all of the ways a resource can be bound - and therefore used
+    struct BindFlag
+    {
+        enum Enum
+        {
+            VertexBuffer            = 0x001,
+            IndexBuffer             = 0x002, 
+            ConstantBuffer          = 0x004, 
+            StreamOutput            = 0x008, 
+            RenderTarget            = 0x010, 
+            DepthStencil            = 0x020, 
+            UnorderedAccess         = 0x040, 
+            PixelShaderResource     = 0x080, 
+            NonPixelShaderResource  = 0x100, 
+        };
+    };
+
+    struct AccessFlag
+    {
+        enum Enum
+        {
+            Read = 0x1,
+            Write = 0x2
+        };
+    };
+
+        /// Get the type
+    SLANG_FORCE_INLINE Type getType() const { return m_type; }
+        /// True if it's a texture derived type
+    SLANG_FORCE_INLINE bool isTexture() const { return int(m_type) >= int(Type::Texture1D); }
+        /// True if it's a buffer derived type
+    SLANG_FORCE_INLINE bool isBuffer() const { return m_type == Type::Buffer; }
+
+        /// For a usage gives the required binding flags
+    static const BindFlag::Enum s_requiredBinding[int(Usage::CountOf)]; 
+
+    protected:
+    Resource(Type type):
+        m_type(type)
+    {}
+
+    Type m_type;
+};
+
+class BufferResource: public Resource
+{
+    public:
+    typedef Resource Parent;
+
+    struct Desc
+    {
+        void init(size_t sizeInBytesIn)
+        {
+            bindFlags = 0;
+            accessFlags = 0;
+            sizeInBytes = sizeInBytesIn;
+            elementSize = 0;
+        }
+
+        int bindFlags;          ///< Combination of Resource::BindFlag or 0 (and will use initialUsage to set)
+        int accessFlags;        ///< Combination of Resource::AccessFlag 
+
+        size_t sizeInBytes;     ///< Total size in bytes 
+        int elementSize;        ///< Get the element stride. If > 0, this is a structured buffer
+    };
+
+        /// Get the buffer description
+    SLANG_FORCE_INLINE const Desc& getDesc() const { return m_desc; }
+
+        /// Ctor
+    BufferResource(const Desc& desc):
+        Parent(Type::Buffer),
+        m_desc(desc)
+    {
+    }
+
+    protected:
+    Desc m_desc;
+};
+
+class TextureResource: public Resource
+{
+    public:
+    typedef Resource Parent;
+
+    struct SampleDesc
+    {
+        void init()
+        {
+            numSamples = 1;
+            quality = 0;
+        }
+        int numSamples;
+        int quality;
+    };
+
+    struct Desc
+    {
+        int bindFlags;          ///< Combination of Resource::BindFlag or 0 (and will use initialUsage to set)
+        int accessFlags;        ///< Combination of Resource::AccessFlag 
+
+        int width;              ///< Width in pixels
+        int height;             ///< Height in pixels (if 2d or 3d)
+        int depth;              ///< Depth (if 3d) 
+        int arraySize;          ///< Array size 
+
+        int usageFlags;         ///< Combination of usage flags
+
+        int numMipLevels;       ///< Number of mip levels - if 0 will generate all mip levels
+        Format format;          ///< The resources format
+        SampleDesc sampleDesc;  ///< How the resource is sampled
+    };
+
+        /// The ordering of the subResources is 
+        /// forall (array/cube faces)
+        ///     forall (mip levels)
+        ///         forall (depth levels)
+    struct Data
+    {
+        ptrdiff_t* mipRowStride;        /// The row stride for a mip map
+        int numMips;                    ///< The number of mip maps 
+        const void*const* subResource;  ///< Pointers to each full mip subResource 
+        int numSubResources;            /// The total amount of subResources. Typically = numMips * depth * arraySize 
+    };
+
+        /// Get the description of the texture
+    SLANG_FORCE_INLINE const Desc& getDesc() const { return m_desc; }
+
+        /// Ctor
+    TextureResource(Type type, const Desc& desc):
+        Parent(type),
+        m_desc(desc)
+    {
+    }
+
+    protected:
+    Desc m_desc;
+};
+
 class Renderer: public Slang::RefObject
 {
 public:
@@ -116,28 +274,32 @@ public:
 
     virtual void presentFrame() = 0;
 
+        /// Create a texture resource. If initData is set it holds 
+    virtual TextureResource* createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData = nullptr) { return nullptr; }
+        /// Create a buffer resource
+    virtual BufferResource* createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& desc, const void* initData = nullptr) { return nullptr; } 
+
     virtual SlangResult captureScreenShot(const char* outputPath) = 0;
     virtual void serializeOutput(BindingState* state, const char* outputPath) = 0;
-    virtual Buffer* createBuffer(const BufferDesc& desc) = 0;
 
     virtual InputLayout* createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) = 0;
     virtual BindingState* createBindingState(const ShaderInputLayout& shaderInput) = 0;
     virtual ShaderCompiler* getShaderCompiler() = 0;
 
-    virtual void* map(Buffer* buffer, MapFlavor flavor) = 0;
-    virtual void unmap(Buffer* buffer) = 0;
+    virtual void* map(BufferResource* buffer, MapFlavor flavor) = 0;
+    virtual void unmap(BufferResource* buffer) = 0;
 
     virtual void setInputLayout(InputLayout* inputLayout) = 0;
     virtual void setPrimitiveTopology(PrimitiveTopology topology) = 0;
     virtual void setBindingState(BindingState* state) = 0;
-    virtual void setVertexBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* strides, const UInt* offsets) = 0;
+    virtual void setVertexBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* strides, const UInt* offsets) = 0;
 
-    inline void setVertexBuffer(UInt slot, Buffer* buffer, UInt stride, UInt offset = 0);
+    inline void setVertexBuffer(UInt slot, BufferResource* buffer, UInt stride, UInt offset = 0);
 
     virtual void setShaderProgram(ShaderProgram* program) = 0;
 
-    virtual void setConstantBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* offsets) = 0;
-    inline void setConstantBuffer(UInt slot, Buffer* buffer, UInt offset = 0);
+    virtual void setConstantBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* offsets) = 0;
+    inline void setConstantBuffer(UInt slot, BufferResource* buffer, UInt offset = 0);
 
     virtual void draw(UInt vertexCount, UInt startVertex = 0) = 0;
     virtual void dispatchCompute(int x, int y, int z) = 0;
@@ -149,14 +311,13 @@ public:
     virtual void waitForGpu() = 0;
 };
 
-
 // ----------------------------------------------------------------------------------------
-inline void Renderer::setVertexBuffer(UInt slot, Buffer* buffer, UInt stride, UInt offset)
+inline void Renderer::setVertexBuffer(UInt slot, BufferResource* buffer, UInt stride, UInt offset)
 {
     setVertexBuffers(slot, 1, &buffer, &stride, &offset);
 }
 // ----------------------------------------------------------------------------------------
-inline void Renderer::setConstantBuffer(UInt slot, Buffer* buffer, UInt offset)
+inline void Renderer::setConstantBuffer(UInt slot, BufferResource* buffer, UInt offset)
 {
     setConstantBuffers(slot, 1, &buffer, &offset);
 }

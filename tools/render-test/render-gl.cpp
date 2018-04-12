@@ -82,20 +82,21 @@ public:
     virtual void setClearColor(const float color[4]) override;
     virtual void clearFrame() override;
     virtual void presentFrame() override;
+    virtual TextureResource* createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData) override;
+    virtual BufferResource* createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& descIn, const void* initData) override;
     virtual SlangResult captureScreenShot(char const* outputPath) override;
     virtual void serializeOutput(BindingState* state, const char* fileName) override;
-    virtual Buffer* createBuffer(const BufferDesc& desc) override;
     virtual InputLayout* createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) override;
     virtual BindingState * createBindingState(const ShaderInputLayout& layout) override;
     virtual ShaderCompiler* getShaderCompiler() override;
-    virtual void* map(Buffer* buffer, MapFlavor flavor) override;
-    virtual void unmap(Buffer* buffer) override;
+    virtual void* map(BufferResource* buffer, MapFlavor flavor) override;
+    virtual void unmap(BufferResource* buffer) override;
     virtual void setInputLayout(InputLayout* inputLayout) override;
     virtual void setPrimitiveTopology(PrimitiveTopology topology) override;
     virtual void setBindingState(BindingState* state);
-    virtual void setVertexBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* strides, const UInt* offsets) override;
+    virtual void setVertexBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* strides, const UInt* offsets) override;
     virtual void setShaderProgram(ShaderProgram* inProgram) override;
-    virtual void setConstantBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* offsets) override;
+    virtual void setConstantBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* offsets) override;
     virtual void draw(UInt vertexCount, UInt startVertex) override;
     virtual void dispatchCompute(int x, int y, int z) override;
     virtual void submitGpuWork() override {}
@@ -131,14 +132,19 @@ public:
         UInt m_attributeCount = 0;
     };
 
-	class BufferImpl: public Buffer
+	class BufferResourceImpl: public BufferResource
 	{
 		public:
-		BufferImpl(GLRenderer* renderer, GLuint id):
+        typedef BufferResource Parent;
+
+        BufferResourceImpl(Usage initialUsage, const Desc& desc, GLRenderer* renderer, GLuint id, GLenum target):
+            Parent(desc),
 			m_renderer(renderer),
-			m_id(id)
+			m_id(id),
+            m_initialUsage(initialUsage),
+            m_target(target)
 		{}
-		~BufferImpl()
+		~BufferResourceImpl()
 		{
 			if (m_renderer)
 			{
@@ -146,8 +152,10 @@ public:
 			}
 		}
 
+        Usage m_initialUsage;
 		GLRenderer* m_renderer;
 		GLuint m_id;
+        GLenum m_target;
 	};
 
     struct BindingEntry
@@ -202,7 +210,7 @@ public:
 	void destroyBindingEntry(const BindingEntry& entry);
 	void destroyBindingEntries(const BindingEntry* entries, int numEntries);
 
-    void bindBufferImpl(int target, UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* offsets);
+    void bindBufferImpl(int target, UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* offsets);
     void flushStateForDraw();
     GLuint loadShader(GLenum stage, char const* source);
     void createInputBuffer(BindingEntry& rs, InputBufferDesc bufDesc, List<unsigned int>& bufferData);
@@ -268,17 +276,18 @@ void GLRenderer::debugCallback(GLenum source, GLenum type, GLuint id, GLenum sev
 
         CASE(RGB_Float32, 3, GL_FLOAT, GL_FALSE);
         CASE(RG_Float32, 2, GL_FLOAT, GL_FALSE);
+        CASE(R_Float32, 1, GL_FLOAT, GL_FALSE);
 #undef CASE
     }
 }
 
-void GLRenderer::bindBufferImpl(int target, UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* offsets)
+void GLRenderer::bindBufferImpl(int target, UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* offsets)
 {
     for (UInt ii = 0; ii < slotCount; ++ii)
     {
         UInt slot = startSlot + ii;
 
-        BufferImpl* buffer = static_cast<BufferImpl*>(buffers[ii]);
+        BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(buffers[ii]);
         GLuint bufferID = buffer ? buffer->m_id : 0;
 		
         assert(!offsets || !offsets[ii]);
@@ -691,21 +700,51 @@ ShaderCompiler* GLRenderer::getShaderCompiler()
     return this;
 }
 
-Buffer* GLRenderer::createBuffer(const BufferDesc& desc)
+TextureResource* GLRenderer::createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData)
 {
-    // TODO: should derive target from desc...
-    GLenum target = GL_UNIFORM_BUFFER;
+    return nullptr;
+}
 
+static GLenum _calcUsage(Resource::Usage usage)
+{
+    typedef Resource::Usage Usage;
+    switch (usage)
+    {
+        case Usage::ConstantBuffer:     return GL_DYNAMIC_DRAW;
+        default:                        return GL_STATIC_READ;
+    }
+}
+
+static GLenum _calcTarget(Resource::Usage usage)
+{
+    typedef Resource::Usage Usage;
+    switch (usage)
+    {
+        case Usage::ConstantBuffer:     return GL_UNIFORM_BUFFER;
+        default:                        return GL_SHADER_STORAGE_BUFFER;
+    }
+}
+
+BufferResource* GLRenderer::createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& descIn, const void* initData) 
+{
+    BufferResource::Desc desc(descIn);
+
+    if (desc.bindFlags == 0)
+    {
+        desc.bindFlags = Resource::s_requiredBinding[int(initialUsage)];
+    }
+
+    const GLenum target = _calcTarget(initialUsage);
     // TODO: should derive from desc...
-    GLenum usage = GL_DYNAMIC_DRAW;
-
+    const GLenum usage = _calcUsage(initialUsage);
+    
     GLuint bufferID = 0;
     glGenBuffers(1, &bufferID);
     glBindBuffer(target, bufferID);
 
-    glBufferData(target, desc.size, desc.initData, usage);
+    glBufferData(target, descIn.sizeInBytes, initData, usage);
 
-	return new BufferImpl(this, bufferID);
+	return new BufferResourceImpl(initialUsage, desc, this, bufferID, target);
 }
 
 InputLayout* GLRenderer::createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount)
@@ -726,11 +765,11 @@ InputLayout* GLRenderer::createInputLayout(const InputElementDesc* inputElements
     return (InputLayout*)inputLayout;
 }
 
-void* GLRenderer::map(Buffer* bufferIn, MapFlavor flavor)
+void* GLRenderer::map(BufferResource* bufferIn, MapFlavor flavor)
 {
-	BufferImpl* buffer = static_cast<BufferImpl*>(bufferIn);
+    BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(bufferIn);
 
-    GLenum target = GL_UNIFORM_BUFFER;
+    //GLenum target = GL_UNIFORM_BUFFER;
 
     GLuint access = 0;
     switch (flavor)
@@ -744,18 +783,15 @@ void* GLRenderer::map(Buffer* bufferIn, MapFlavor flavor)
             break;
     }
 
-    auto bufferID = buffer ? buffer->m_id : 0;
-    glBindBuffer(target, bufferID);
+    glBindBuffer(buffer->m_target, buffer->m_id);
 
-    return glMapBuffer(target, access);
+    return glMapBuffer(buffer->m_target, access);
 }
 
-void GLRenderer::unmap(Buffer* bufferIn)
+void GLRenderer::unmap(BufferResource* bufferIn)
 {
-	BufferImpl* buffer = static_cast<BufferImpl*>(bufferIn);
-    GLenum target = GL_UNIFORM_BUFFER;
-    auto bufferID = buffer ? buffer->m_id : 0;
-    glUnmapBuffer(target);
+    BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(bufferIn);
+    glUnmapBuffer(buffer->m_target);
 }
 
 void GLRenderer::setInputLayout(InputLayout* inputLayout)
@@ -777,13 +813,13 @@ void GLRenderer::setPrimitiveTopology(PrimitiveTopology topology)
     m_boundPrimitiveTopology = glTopology;
 }
 
-void GLRenderer::setVertexBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* strides, const UInt* offsets)
+void GLRenderer::setVertexBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* strides, const UInt* offsets)
 {
     for (UInt ii = 0; ii < slotCount; ++ii)
     {
         UInt slot = startSlot + ii;
 
-        BufferImpl* buffer = static_cast<BufferImpl*>(buffers[ii]);
+        BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(buffers[ii]);
         GLuint bufferID = buffer ? buffer->m_id : 0;
 		
         m_boundVertexStreamBuffers[slot] = bufferID;
@@ -800,7 +836,7 @@ void GLRenderer::setShaderProgram(ShaderProgram* programIn)
 	glUseProgram(programID);
 }
 
-void GLRenderer::setConstantBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* offsets) 
+void GLRenderer::setConstantBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* offsets) 
 {
     bindBufferImpl(GL_UNIFORM_BUFFER, startSlot, slotCount, buffers, offsets);
 }

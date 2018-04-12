@@ -60,20 +60,21 @@ public:
     virtual void setClearColor(const float color[4]) override;
     virtual void clearFrame() override;
     virtual void presentFrame() override;
+    virtual TextureResource* createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData) override;
+    virtual BufferResource* createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& bufferDesc, const void* initData) override;
     virtual SlangResult captureScreenShot(const char* outputPath) override;
     virtual void serializeOutput(BindingState* state, const char* fileName) override;
-    virtual Buffer* createBuffer(const BufferDesc& desc) override;
     virtual InputLayout* createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) override;
     virtual BindingState* createBindingState(const ShaderInputLayout& layout) override;
     virtual ShaderCompiler* getShaderCompiler() override;
-    virtual void* map(Buffer* buffer, MapFlavor flavor) override;
-    virtual void unmap(Buffer* buffer) override;
+    virtual void* map(BufferResource* buffer, MapFlavor flavor) override;
+    virtual void unmap(BufferResource* buffer) override;
     virtual void setInputLayout(InputLayout* inputLayout) override;
     virtual void setPrimitiveTopology(PrimitiveTopology topology) override;
     virtual void setBindingState(BindingState* state);
-    virtual void setVertexBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* strides, const UInt* offsets) override;
+    virtual void setVertexBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* strides, const UInt* offsets) override;
     virtual void setShaderProgram(ShaderProgram* inProgram) override;
-    virtual void setConstantBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* offsets) override;
+    virtual void setConstantBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* offsets) override;
     virtual void draw(UInt vertexCount, UInt startVertex) override;
     virtual void dispatchCompute(int x, int y, int z) override;
     virtual void submitGpuWork() override;
@@ -113,22 +114,45 @@ protected:
         List<uint8_t> m_pixelShader;
         List<uint8_t> m_computeShader;
     };
-    class BufferImpl: public Buffer
+
+    class BufferResourceImpl: public BufferResource
     {
         public:
-        BufferImpl(const BufferDesc& desc):
-            m_desc(desc),
-            m_mapFlavor(MapFlavor::HostRead)
+        typedef BufferResource Parent;
+        
+        enum class Style
+        {
+            Unknown,
+            ResourceBacked,             ///< The contents is only held within the resource
+            MemoryBacked,               ///< The current contents is held in m_memory and copied to GPU every time it's used (typically used for constant buffers)
+        };
+
+        BufferResourceImpl(Resource::Usage initialUsage, const Desc& desc):
+            Parent(desc),
+            m_mapFlavor(MapFlavor::HostRead),
+            m_initialUsage(initialUsage)
         {
         }
 
+        static Style _calcResourceStyle(Usage usage)
+        {
+            switch (usage)
+            {
+                case Usage::ConstantBuffer:     return Style::MemoryBacked;
+                default:                        return Style::ResourceBacked;
+            }
+        }
+
+        Style m_style;                      ///< How memory is handled.
         D3D12Resource m_resource;
         D3D12Resource m_uploadResource;
 
-        BufferDesc m_desc;
+        Usage m_initialUsage;
+
         List<uint8_t> m_memory;
         MapFlavor m_mapFlavor;
     };
+
     class InputLayoutImpl: public InputLayout
     {
         public:
@@ -184,7 +208,7 @@ protected:
 
     struct BoundVertexBuffer
     {
-        RefPtr<BufferImpl> m_buffer;
+        RefPtr<BufferResourceImpl> m_buffer;
         int m_stride;
         int m_offset;
     };
@@ -308,7 +332,7 @@ protected:
     int m_commandListOpenCount = 0;            ///< If >0 the command list should be open
 
     List<BoundVertexBuffer> m_boundVertexBuffers;
-    List<RefPtr<BufferImpl> > m_boundConstantBuffers;
+    List<RefPtr<BufferResourceImpl> > m_boundConstantBuffers;
 
     RefPtr<ShaderProgramImpl> m_boundShaderProgram;
     RefPtr<InputLayoutImpl> m_boundInputLayout;
@@ -1438,7 +1462,7 @@ Result D3D12Renderer::_calcBindParameters(BindParameters& params)
     // Okay we need to try and create a render state
     for (int i = 0; i < int(m_boundConstantBuffers.Count()); i++)
     {
-        const BufferImpl* buffer = m_boundConstantBuffers[i];
+        const BufferResourceImpl* buffer = m_boundConstantBuffers[i];
         if (buffer)
         {
             D3D12_ROOT_PARAMETER& param = params.nextParameter();
@@ -1531,7 +1555,7 @@ Result D3D12Renderer::_bindRenderState(RenderState* renderState, ID3D12GraphicsC
             // Okay we need to try and create a render state
             for (int i = 0; i < int(m_boundConstantBuffers.Count()); i++)
             {
-                const BufferImpl* buffer = m_boundConstantBuffers[i];
+                const BufferResourceImpl* buffer = m_boundConstantBuffers[i];
                 if (buffer)
                 {
                     size_t bufferSize = buffer->m_memory.Count();
@@ -2001,32 +2025,98 @@ ShaderCompiler* D3D12Renderer::getShaderCompiler()
     return this;
 }
 
-Buffer* D3D12Renderer::createBuffer(const BufferDesc& desc)
+static D3D12_RESOURCE_STATES _calcResourceState(Resource::Usage usage)
 {
-    RefPtr<BufferImpl> buffer(new BufferImpl(desc));
-    const size_t bufferSize = desc.size;
-
-    switch (desc.flavor)
+    typedef Resource::Usage Usage;
+    switch (usage)
     {
-        case BufferFlavor::Constant:
+        case Usage::VertexBuffer:           return D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+        case Usage::IndexBuffer:            return D3D12_RESOURCE_STATE_INDEX_BUFFER;
+        case Usage::ConstantBuffer:         return D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+        case Usage::StreamOutput:           return D3D12_RESOURCE_STATE_STREAM_OUT;
+        case Usage::RenderTarget:           return D3D12_RESOURCE_STATE_RENDER_TARGET;
+        case Usage::DepthWrite:             return D3D12_RESOURCE_STATE_DEPTH_WRITE;
+        case Usage::DepthRead:              return D3D12_RESOURCE_STATE_DEPTH_READ;
+        case Usage::UnorderedAccess:        return D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+        case Usage::PixelShaderResource:    return D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        case Usage::NonPixelShaderResource: return D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        default: return D3D12_RESOURCE_STATES(0);
+    }
+}
+
+static D3D12_RESOURCE_FLAGS _calcResourceFlag(Resource::BindFlag::Enum bindFlag)
+{
+    typedef Resource::BindFlag BindFlag;
+    switch (bindFlag)
+    {
+        case BindFlag::RenderTarget:        return D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+        case BindFlag::DepthStencil:        return D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+        case BindFlag::UnorderedAccess:     return D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+        default:                            return D3D12_RESOURCE_FLAG_NONE;
+    }
+}
+
+static D3D12_RESOURCE_FLAGS _calcResourceBindFlags(Resource::Usage initialUsage, int bindFlags)
+{
+    int dstFlags = 0;
+    while (bindFlags)
+    {
+        int lsb = bindFlags & -bindFlags;
+
+        dstFlags |= _calcResourceFlag(Resource::BindFlag::Enum(lsb));
+        bindFlags &= ~lsb;
+    }
+    return D3D12_RESOURCE_FLAGS(dstFlags);
+}
+
+TextureResource* D3D12Renderer::createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData)
+{
+    return nullptr;
+}
+
+BufferResource* D3D12Renderer::createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& descIn, const void* initData)
+{
+    typedef BufferResourceImpl::Style Style;
+    
+    BufferResource::Desc desc(descIn);
+    if (desc.bindFlags == 0)
+    {
+        desc.bindFlags = Resource::s_requiredBinding[int(initialUsage)];
+    }
+
+    RefPtr<BufferResourceImpl> buffer(new BufferResourceImpl(initialUsage, desc));
+
+    // Save the style
+    buffer->m_style = BufferResourceImpl::_calcResourceStyle(initialUsage);
+
+    D3D12_RESOURCE_DESC bufferDesc;
+    _initBufferResourceDesc(desc.sizeInBytes, bufferDesc);
+
+    bufferDesc.Flags = _calcResourceBindFlags(initialUsage, desc.bindFlags);
+
+    switch (buffer->m_style)
+    {
+        case Style::MemoryBacked:
         {
             // Assume the constant buffer will change every frame. We'll just keep a copy of the contents 
             // in regular memory until it needed 
-            buffer->m_memory.SetSize(UInt(bufferSize));
-            break;     
-        }
-        case BufferFlavor::Vertex:
-        {
-            D3D12_RESOURCE_DESC bufferDesc;
-            _initBufferResourceDesc(bufferSize, bufferDesc);
-
-            SLANG_RETURN_NULL_ON_FAIL(createBuffer(bufferDesc, desc.initData, buffer->m_uploadResource, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, buffer->m_resource));
+            buffer->m_memory.SetSize(UInt(desc.sizeInBytes));
+            // Initialize
+            if (initData)
+            {
+                ::memcpy(buffer->m_memory.Buffer(), initData, desc.sizeInBytes);
+            }
             break;
         }
-        default:
-            return nullptr;
+        case Style::ResourceBacked:
+        {
+            const D3D12_RESOURCE_STATES initialState = _calcResourceState(initialUsage);
+            SLANG_RETURN_NULL_ON_FAIL(createBuffer(bufferDesc, initData, buffer->m_uploadResource, initialState, buffer->m_resource));
+            break;
+        }
+        default: return nullptr;
     }
-    
+
     return buffer.detach();
 }
 
@@ -2076,17 +2166,19 @@ InputLayout* D3D12Renderer::createInputLayout(const InputElementDesc* inputEleme
     return layout.detach();
 }
 
-void* D3D12Renderer::map(Buffer* bufferIn, MapFlavor flavor) 
+void* D3D12Renderer::map(BufferResource* bufferIn, MapFlavor flavor) 
 {
-    BufferImpl* buffer = static_cast<BufferImpl*>(bufferIn);
+    typedef BufferResourceImpl::Style Style;
+
+    BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(bufferIn);
     buffer->m_mapFlavor = flavor;
 
-    switch (buffer->m_desc.flavor)
+    const size_t bufferSize = buffer->getDesc().sizeInBytes;
+    
+    switch (buffer->m_style)
     {
-        case BufferFlavor::Vertex:
+        case Style::ResourceBacked:
         {
-            D3D12_RANGE readRange = {};         // We do not intend to read from this resource on the CPU.
-
             // We need this in a state so we can upload
             switch (flavor)
             {
@@ -2096,72 +2188,129 @@ void* D3D12Renderer::map(Buffer* bufferIn, MapFlavor flavor)
                     D3D12BarrierSubmitter submitter(m_commandList);
                     buffer->m_uploadResource.transition(D3D12_RESOURCE_STATE_GENERIC_READ, submitter);
                     buffer->m_resource.transition(D3D12_RESOURCE_STATE_COPY_DEST, submitter);
+
+                    const D3D12_RANGE readRange = {};
+
+                    void* uploadData;
+                    SLANG_RETURN_NULL_ON_FAIL(buffer->m_uploadResource.getResource()->Map(0, &readRange, reinterpret_cast<void**>(&uploadData)));
+                    return uploadData;
+
                     break;
                 }
-                case MapFlavor::HostRead: 
+                case MapFlavor::HostRead:
                 {
-                    // Lock whole of the buffer
-                    readRange.End = buffer->m_desc.size;
-                    break;
+                    // This will be slow!!! - it blocks CPU on GPU completion
+                    D3D12Resource& resource = buffer->m_resource;
+
+                    // Readback heap
+                    D3D12_HEAP_PROPERTIES heapProps;
+                    heapProps.Type = D3D12_HEAP_TYPE_READBACK;
+                    heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+                    heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+                    heapProps.CreationNodeMask = 1;
+                    heapProps.VisibleNodeMask = 1;
+
+                    // Resource to readback to
+                    D3D12_RESOURCE_DESC stagingDesc;
+                    _initBufferResourceDesc(bufferSize, stagingDesc);
+
+                    D3D12Resource stageBuf;
+                    SLANG_RETURN_NULL_ON_FAIL(stageBuf.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, stagingDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr));
+
+                    const D3D12_RESOURCE_STATES initialState = resource.getState();
+
+                    // Make it a source
+                    {
+                        D3D12BarrierSubmitter submitter(m_commandList);
+                        resource.transition(D3D12_RESOURCE_STATE_COPY_SOURCE, submitter);
+                    }
+                    // Do the copy
+                    m_commandList->CopyBufferRegion(stageBuf, 0, resource, 0, bufferSize);
+                    // Switch it back
+                    {
+                        D3D12BarrierSubmitter submitter(m_commandList);
+                        resource.transition(initialState, submitter);
+                    }
+
+                    // Wait until complete
+                    submitGpuWorkAndWait();
+
+                    // Map and copy
+                    {
+                        UINT8* data;
+                        D3D12_RANGE readRange = { 0, bufferSize };
+
+                        SLANG_RETURN_NULL_ON_FAIL(stageBuf.getResource()->Map(0, &readRange, reinterpret_cast<void**>(&data)));
+                        
+                        // Copy to memory buffer
+                        buffer->m_memory.SetSize(bufferSize);
+                        ::memcpy(buffer->m_memory.Buffer(), data, bufferSize);
+                        
+                        stageBuf.getResource()->Unmap(0, nullptr);
+                    }
+
+                    return buffer->m_memory.Buffer();
                 }
             }
-            
-            // Lock it
-            void* uploadData;
-            SLANG_RETURN_NULL_ON_FAIL(buffer->m_uploadResource.getResource()->Map(0, &readRange, reinterpret_cast<void**>(&uploadData)));
-            return uploadData;
+            break;
         }
-        case BufferFlavor::Constant:
+        case Style::MemoryBacked:
         {
             return buffer->m_memory.Buffer();
         }
+        default: return nullptr;
     }
 
     return nullptr;
 }
 
-void D3D12Renderer::unmap(Buffer* buffer)
+void D3D12Renderer::unmap(BufferResource* bufferIn)
 {
-    BufferImpl* impl = static_cast<BufferImpl*>(buffer);
+    typedef BufferResourceImpl::Style Style;
+    BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(bufferIn);
 
-    switch (impl->m_desc.flavor)
+    switch (buffer->m_style)
     {
-        case BufferFlavor::Vertex:
+        case Style::MemoryBacked:
         {
-            // Unmap
-            ID3D12Resource* uploadResource = impl->m_uploadResource;
-            ID3D12Resource* resource = impl->m_resource;
-
-            uploadResource->Unmap(0, nullptr);
-
+            // Don't need to do anything, as will be uploaded automatically when used
+            break;
+        }
+        case Style::ResourceBacked:
+        {
             // We need this in a state so we can upload
-            switch (impl->m_mapFlavor)
+            switch (buffer->m_mapFlavor)
             {
                 case MapFlavor::HostWrite:
                 case MapFlavor::WriteDiscard:
                 {
+                    // Unmap
+                    ID3D12Resource* uploadResource = buffer->m_uploadResource;
+                    ID3D12Resource* resource = buffer->m_resource;
+
+                    uploadResource->Unmap(0, nullptr);
+
+                    const D3D12_RESOURCE_STATES initialState = buffer->m_resource.getState();
+
                     {
                         D3D12BarrierSubmitter submitter(m_commandList);
-                        impl->m_uploadResource.transition(D3D12_RESOURCE_STATE_GENERIC_READ, submitter);
-                        impl->m_resource.transition(D3D12_RESOURCE_STATE_COPY_DEST, submitter);
+                        buffer->m_uploadResource.transition(D3D12_RESOURCE_STATE_GENERIC_READ, submitter);
+                        buffer->m_resource.transition(D3D12_RESOURCE_STATE_COPY_DEST, submitter);
                     }
 
-                    m_commandList->CopyBufferRegion(resource, 0, uploadResource, 0, impl->m_desc.size);
+                    m_commandList->CopyBufferRegion(resource, 0, uploadResource, 0, buffer->getDesc().sizeInBytes);
 
                     {
                         D3D12BarrierSubmitter submitter(m_commandList);
-                        impl->m_resource.transition(D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, submitter);
+                        buffer->m_resource.transition(initialState, submitter);
                     }
-                    
                     break;
                 }
-                case MapFlavor::HostRead: break;
+                case MapFlavor::HostRead:
+                {
+                    break;
+                }
             }
-            break;
-        }
-        case BufferFlavor::Constant: 
-        {
-            break;
         }
     }
 }
@@ -2188,7 +2337,7 @@ void D3D12Renderer::setPrimitiveTopology(PrimitiveTopology topology)
     }
 }
 
-void D3D12Renderer::setVertexBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* strides, const UInt* offsets)
+void D3D12Renderer::setVertexBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* strides, const UInt* offsets)
 {
     {
         const UInt num = startSlot + slotCount;
@@ -2200,10 +2349,10 @@ void D3D12Renderer::setVertexBuffers(UInt startSlot, UInt slotCount, Buffer*cons
 
     for (UInt i = 0; i < slotCount; i++)
     {
-        BufferImpl* buffer = static_cast<BufferImpl*>(buffers[i]);
+        BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(buffers[i]);
         if (buffer)
         {
-            assert(buffer->m_desc.flavor == BufferFlavor::Vertex);
+            assert(buffer->m_initialUsage == Resource::Usage::VertexBuffer); 
         }
 
         BoundVertexBuffer& boundBuffer = m_boundVertexBuffers[startSlot + i];
@@ -2218,7 +2367,7 @@ void D3D12Renderer::setShaderProgram(ShaderProgram* inProgram)
     m_boundShaderProgram = static_cast<ShaderProgramImpl*>(inProgram);
 }
 
-void D3D12Renderer::setConstantBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* offsets)
+void D3D12Renderer::setConstantBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* offsets)
 {
     {
         const UInt num = startSlot + slotCount;
@@ -2230,10 +2379,10 @@ void D3D12Renderer::setConstantBuffers(UInt startSlot, UInt slotCount, Buffer*co
 
     for (UInt i = 0; i < slotCount; i++)
     {
-        BufferImpl* buffer = static_cast<BufferImpl*>(buffers[i]);
+        BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(buffers[i]);
         if (buffer)
         {
-            assert(buffer->m_desc.flavor == BufferFlavor::Constant);
+            assert(buffer->m_initialUsage == Resource::Usage::ConstantBuffer); 
         }
         m_boundConstantBuffers[startSlot + i] = buffer;
     }
@@ -2267,12 +2416,12 @@ void D3D12Renderer::draw(UInt vertexCount, UInt startVertex)
         for (int i = 0; i < int(m_boundVertexBuffers.Count()); i++)
         {
             const BoundVertexBuffer& boundVertexBuffer = m_boundVertexBuffers[i];
-            BufferImpl* buffer = boundVertexBuffer.m_buffer;
+            BufferResourceImpl* buffer = boundVertexBuffer.m_buffer;
             if (buffer)
             {
                 D3D12_VERTEX_BUFFER_VIEW& vertexView = vertexViews[numVertexViews++];
                 vertexView.BufferLocation = buffer->m_resource.getResource()->GetGPUVirtualAddress();
-                vertexView.SizeInBytes = int(buffer->m_desc.size);
+                vertexView.SizeInBytes = int(buffer->getDesc().sizeInBytes);
                 vertexView.StrideInBytes = boundVertexBuffer.m_stride;
             }
         }
