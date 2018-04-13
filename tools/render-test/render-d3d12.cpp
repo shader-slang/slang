@@ -91,8 +91,15 @@ protected:
     
     enum class ProgramType
     {
-        kCompute,
-        kGraphics,
+        Compute,
+        Graphics,
+    };
+
+    struct Submitter
+    {
+        virtual void setRootConstantBufferView(int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation) = 0;
+        virtual void setRootDescriptorTable(int index, D3D12_GPU_DESCRIPTOR_HANDLE BaseDescriptor) = 0;
+        virtual void setRootSignature(ID3D12RootSignature* rootSignature) = 0;
     };
 
     struct FrameInfo
@@ -126,6 +133,29 @@ protected:
             ResourceBacked,             ///< The contents is only held within the resource
             MemoryBacked,               ///< The current contents is held in m_memory and copied to GPU every time it's used (typically used for constant buffers)
         };
+
+        void bindConstantBufferView(D3D12CircularResourceHeap& circularHeap, int index, Submitter* submitter) const
+        {
+            switch (m_style)
+            {
+                case Style::MemoryBacked:
+                {
+                    const size_t bufferSize = m_memory.Count();
+                    D3D12CircularResourceHeap::Cursor cursor = circularHeap.allocateConstantBuffer(bufferSize);
+                    ::memcpy(cursor.m_position, m_memory.Buffer(), bufferSize);
+                    // Set the constant buffer
+                    submitter->setRootConstantBufferView(index, circularHeap.getGpuHandle(cursor));
+                    break;
+                }
+                case Style::ResourceBacked:
+                {
+                    // Set the constant buffer
+                    submitter->setRootConstantBufferView(index, m_resource.getResource()->GetGPUVirtualAddress());
+                    break;
+                }
+                default: break;
+            }
+        }
 
         BufferResourceImpl(Resource::Usage initialUsage, const Desc& desc):
             Parent(desc),
@@ -224,13 +254,6 @@ protected:
         RefPtr<BufferResourceImpl> m_buffer;
         int m_stride;
         int m_offset;
-    };
-
-    struct Submitter
-    {
-        virtual void setRootConstantBufferView(int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation) = 0;
-        virtual void setRootDescriptorTable(int index, D3D12_GPU_DESCRIPTOR_HANDLE BaseDescriptor) = 0;
-        virtual void setRootSignature(ID3D12RootSignature* rootSignature) = 0;        
     };
 
     struct BindParameters
@@ -1175,7 +1198,7 @@ D3D12Renderer::RenderState* D3D12Renderer::findRenderState(ProgramType programTy
 {
     switch (programType)
     {
-        case ProgramType::kCompute:
+        case ProgramType::Compute:
         {
             // Check if current state is a match
             if (m_currentRenderState)
@@ -1199,7 +1222,7 @@ D3D12Renderer::RenderState* D3D12Renderer::findRenderState(ProgramType programTy
             }
             break;
         }
-        case ProgramType::kGraphics:
+        case ProgramType::Graphics:
         {
             if (m_currentRenderState)
             {
@@ -1251,7 +1274,7 @@ D3D12Renderer::RenderState* D3D12Renderer::calcRenderState()
 
     switch (m_boundShaderProgram->m_programType)
     {
-        case ProgramType::kCompute:
+        case ProgramType::Compute:
         {
             if (SLANG_FAILED(calcComputePipelineState(rootSignature, pipelineState)))
             {
@@ -1259,7 +1282,7 @@ D3D12Renderer::RenderState* D3D12Renderer::calcRenderState()
             }
             break;
         }
-        case ProgramType::kGraphics:
+        case ProgramType::Graphics:
         {
             if (SLANG_FAILED(calcGraphicsPipelineState(rootSignature, pipelineState)))
             {
@@ -1439,13 +1462,7 @@ Result D3D12Renderer::_bindRenderState(RenderState* renderState, ID3D12GraphicsC
                     if (binding.m_type == ShaderInputType::Buffer && binding.m_bufferType == InputBufferType::ConstantBuffer)
                     {
                         BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(binding.m_resource.Ptr());
-                        size_t bufferSize = buffer->m_memory.Count();
-
-                        D3D12CircularResourceHeap::Cursor cursor = m_circularResourceHeap.allocateConstantBuffer(bufferSize);
-                        ::memcpy(cursor.m_position, buffer->m_memory.Buffer(), bufferSize);
-                        // Set the constant buffer
-                        submitter->setRootConstantBufferView(index++, m_circularResourceHeap.getGpuHandle(cursor));
-
+                        buffer->bindConstantBufferView(m_circularResourceHeap, index++, submitter);
                         numConstantBuffers++;
                     }
 
@@ -1467,13 +1484,7 @@ Result D3D12Renderer::_bindRenderState(RenderState* renderState, ID3D12GraphicsC
                 const BufferResourceImpl* buffer = m_boundConstantBuffers[i];
                 if (buffer)
                 {
-                    size_t bufferSize = buffer->m_memory.Count();
-
-                    D3D12CircularResourceHeap::Cursor cursor = m_circularResourceHeap.allocateConstantBuffer(bufferSize);
-                    ::memcpy(cursor.m_position, buffer->m_memory.Buffer(), bufferSize);
-                    // Set the constant buffer
-                    submitter->setRootConstantBufferView(index++, m_circularResourceHeap.getGpuHandle(cursor));
-
+                    buffer->bindConstantBufferView(m_circularResourceHeap, index++, submitter);
                     numConstantBuffers++;
                 }
             }
@@ -2674,7 +2685,7 @@ ShaderProgram* D3D12Renderer::compileProgram(const ShaderCompileRequest& request
 
     if (request.computeShader.name)
     {
-        program->m_programType = ProgramType::kCompute;
+        program->m_programType = ProgramType::Compute;
         ComPtr<ID3DBlob> computeShaderBlob;
         SLANG_RETURN_NULL_ON_FAIL(D3DUtil::compileHLSLShader(request.computeShader.source.path, request.computeShader.source.dataBegin, request.computeShader.name, request.computeShader.profile, computeShaderBlob));
 
@@ -2682,7 +2693,7 @@ ShaderProgram* D3D12Renderer::compileProgram(const ShaderCompileRequest& request
     }
     else
     {
-        program->m_programType = ProgramType::kGraphics;
+        program->m_programType = ProgramType::Graphics;
         ComPtr<ID3DBlob> vertexShaderBlob, fragmentShaderBlob;
         SLANG_RETURN_NULL_ON_FAIL(D3DUtil::compileHLSLShader(request.vertexShader.source.path, request.vertexShader.source.dataBegin, request.vertexShader.name, request.vertexShader.profile, vertexShaderBlob));
         SLANG_RETURN_NULL_ON_FAIL(D3DUtil::compileHLSLShader(request.fragmentShader.source.path, request.fragmentShader.source.dataBegin, request.fragmentShader.name, request.fragmentShader.profile, fragmentShaderBlob));
