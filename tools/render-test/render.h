@@ -179,7 +179,7 @@ class BufferResource: public Resource
         void init(size_t sizeInBytesIn)
         {
             bindFlags = 0;
-            accessFlags = 0;
+            cpuAccessFlags = 0;
             sizeInBytes = sizeInBytesIn;
             elementSize = 0;
         }
@@ -187,7 +187,7 @@ class BufferResource: public Resource
         void setDefaults(Usage initialUsage);
 
         int bindFlags;          ///< Combination of Resource::BindFlag or 0 (and will use initialUsage to set)
-        int accessFlags;        ///< Combination of Resource::AccessFlag 
+        int cpuAccessFlags;        ///< Combination of Resource::AccessFlag 
 
         size_t sizeInBytes;     ///< Total size in bytes 
         int elementSize;        ///< Get the element stride. If > 0, this is a structured buffer

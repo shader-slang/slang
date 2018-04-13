@@ -701,7 +701,7 @@ Result D3D12Renderer::createInputBuffer(InputBufferDesc& bufferDesc, const List<
     Resource::Usage initialUsage = Resource::Usage::GenericRead;
     if (bufferDesc.type == InputBufferType::ConstantBuffer)
     {
-        bufferResourceDesc.accessFlags |= Resource::AccessFlag::Write;
+        bufferResourceDesc.cpuAccessFlags |= Resource::AccessFlag::Write;
         bufferResourceDesc.bindFlags |= Resource::BindFlag::ConstantBuffer;
         initialUsage = Resource::Usage::ConstantBuffer;
     } 
@@ -2004,7 +2004,7 @@ TextureResource* D3D12Renderer::createTextureResource(Resource::Type type, Resou
     // Since textures are effectively immutable currently initData must be set
     assert(initData);
     // We should have this many sub resources
-    assert(initData->numSubResources == numMipMaps * srcDesc.depth * arraySize);
+    assert(initData->numSubResources == numMipMaps * srcDesc.size.depth * arraySize);
 
     // This is just the size for one array upload -> not for the whole texure
     UInt64 requiredSize = 0;

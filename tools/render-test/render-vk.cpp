@@ -436,7 +436,7 @@ void VKRenderer::createInputBuffer(const ShaderInputLayoutEntry& entry, const In
 
     BufferResource::Desc bufferResourceDesc;
 
-    bufferResourceDesc.accessFlags = (entry.isOutput) ? Resource::AccessFlag::Read : 0;
+    bufferResourceDesc.cpuAccessFlags = (entry.isOutput) ? Resource::AccessFlag::Read : 0;
     bufferResourceDesc.bindFlags = Resource::s_requiredBinding[int(initialUsage)];
     bufferResourceDesc.elementSize = 0;
     bufferResourceDesc.sizeInBytes = bufferSize;
@@ -744,12 +744,12 @@ BufferResource* VKRenderer::createBufferResource(Resource::Usage initialUsage, c
     VkBufferUsageFlags usage = _calcUsageFlagBit(desc.bindFlags);
     VkMemoryPropertyFlags reqMemoryProperties = 0;
 
-    if (desc.accessFlags & Resource::AccessFlag::Read)
+    if (desc.cpuAccessFlags & Resource::AccessFlag::Read)
     {
         // If it can be read from, set this
         usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
     }
-    if (desc.accessFlags & Resource::AccessFlag::Write)
+    if (desc.cpuAccessFlags & Resource::AccessFlag::Write)
     {
         usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     }
@@ -873,7 +873,7 @@ void VKRenderer::serializeOutput(BindingState* s, const char* fileName)
 
                 size_t bufferSize = bb.bufferLength;
 
-                bufferResourceDesc.accessFlags = Resource::AccessFlag::Read;
+                bufferResourceDesc.cpuAccessFlags = Resource::AccessFlag::Read;
                 bufferResourceDesc.bindFlags = 0;
                 bufferResourceDesc.elementSize = 0;
                 bufferResourceDesc.sizeInBytes = bufferSize;

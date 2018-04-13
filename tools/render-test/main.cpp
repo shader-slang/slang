@@ -108,7 +108,7 @@ SlangResult RenderTestApp::initialize(Renderer* renderer, ShaderCompiler* shader
 
     BufferResource::Desc constantBufferDesc;
     constantBufferDesc.init(m_constantBufferSize);
-    constantBufferDesc.accessFlags = Resource::AccessFlag::Write;
+    constantBufferDesc.cpuAccessFlags = Resource::AccessFlag::Write;
 
     m_constantBuffer = renderer->createBufferResource(Resource::Usage::ConstantBuffer, constantBufferDesc);
     if(!m_constantBuffer)
