@@ -68,6 +68,9 @@ enum class Format
     RGB_Float32,
     RG_Float32,
     R_Float32,
+
+    RGBA_Unorm_UInt8,
+    CountOf, 
 };
 
 struct InputElementDesc
@@ -118,6 +121,7 @@ class Resource: public Slang::RefObject
         UnorderedAccess,
         PixelShaderResource,
         NonPixelShaderResource,
+        GenericRead,
         CountOf,
     };
 
@@ -219,6 +223,25 @@ class TextureResource: public Resource
 
     struct Desc
     {
+            /// Initialize with default values
+        void init();
+            /// Initialize different dimensions. For cubemap, use init2D
+        void init1D(Format format, int width, int numMipMaps = 0);
+        void init2D(Format format, int width, int height, int numMipMaps = 0);
+        void init3D(Format format, int width, int height, int depth, int numMipMaps = 0);
+
+            /// Given the type works out the maximum dimension size
+        int calcMaxDimensionSize(Type type) const;
+            /// Given the type, calculates the number of mip maps. 0 on error
+        int calcNumMipMaps(Type type) const;
+            /// Calculate the total number of sub resources. 0 on error.
+        int calcNumSubResources(Type type) const;
+            /// Calculate the array size
+        int calcEffectiveArraySize(Type type) const;
+
+            /// 
+        void fixSize(Type type);
+
         int bindFlags;          ///< Combination of Resource::BindFlag or 0 (and will use initialUsage to set)
         int accessFlags;        ///< Combination of Resource::AccessFlag 
 
@@ -226,8 +249,6 @@ class TextureResource: public Resource
         int height;             ///< Height in pixels (if 2d or 3d)
         int depth;              ///< Depth (if 3d) 
         int arraySize;          ///< Array size 
-
-        int usageFlags;         ///< Combination of usage flags
 
         int numMipLevels;       ///< Number of mip levels - if 0 will generate all mip levels
         Format format;          ///< The resources format
@@ -240,9 +261,9 @@ class TextureResource: public Resource
         ///         forall (depth levels)
     struct Data
     {
-        ptrdiff_t* mipRowStride;        /// The row stride for a mip map
+        ptrdiff_t* mipRowStrides;        /// The row stride for a mip map
         int numMips;                    ///< The number of mip maps 
-        const void*const* subResource;  ///< Pointers to each full mip subResource 
+        const void*const* subResources;  ///< Pointers to each full mip subResource 
         int numSubResources;            /// The total amount of subResources. Typically = numMips * depth * arraySize 
     };
 
@@ -255,6 +276,9 @@ class TextureResource: public Resource
         m_desc(desc)
     {
     }
+
+        /// Calculate the total number of subresources
+    static int calcNumSubResources(Type type, int numMipMaps, int arraySize);
 
     protected:
     Desc m_desc;
