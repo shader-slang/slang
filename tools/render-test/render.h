@@ -11,10 +11,6 @@
 namespace renderer_test {
 
 // Declare opaque type
-class Buffer: public Slang::RefObject
-{
-	public:
-};
 class InputLayout: public Slang::RefObject
 {
 	public:

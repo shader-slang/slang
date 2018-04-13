@@ -452,7 +452,7 @@ BufferResource* D3D11Renderer::createBufferResource(Resource::Usage initialUsage
 
     // Make aligned to 256 bytes... not sure why
     desc.sizeInBytes = D3DUtil::calcAligned(desc.sizeInBytes, 256);
-    if (desc.bindFlags)
+    if (desc.bindFlags == 0)
     {
         desc.bindFlags = Resource::s_requiredBinding[int(initialUsage)];
     }
