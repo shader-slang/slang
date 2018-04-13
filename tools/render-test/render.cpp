@@ -44,6 +44,16 @@ TextureResource::Size TextureResource::Size::calcMipSize(int mipLevel) const
     return size;
 }
 
+/* !!!!!!!!!!!!!!!!!!!!!!!!! BufferResource::Desc !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+void BufferResource::Desc::setDefaults(Usage initialUsage)
+{
+    if (this->bindFlags == 0)
+    {
+        this->bindFlags = Resource::s_requiredBinding[int(initialUsage)];
+    }
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!! TextureResource::Desc !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 int TextureResource::Desc::calcNumMipLevels(Type type) const
@@ -104,6 +114,19 @@ void TextureResource::Desc::fixSize(Type type)
     }
 }
 
+void TextureResource::Desc::setDefaults(Type type, Usage initialUsage)
+{
+    fixSize(type);
+    if (this->bindFlags == 0)
+    {
+        this->bindFlags = Resource::s_requiredBinding[int(initialUsage)];
+    }
+    if (this->numMipLevels <= 0)
+    {
+        this->numMipLevels = calcNumMipLevels(type);
+    }
+}
+
 int TextureResource::Desc::calcEffectiveArraySize(Type type) const
 {
     const int arrSize = (this->arraySize > 0) ? this->arraySize : 1;
@@ -131,7 +154,7 @@ void TextureResource::Desc::init()
     this->sampleDesc.init();
 
     this->bindFlags = 0;
-    this->accessFlags = 0;
+    this->cpuAccessFlags = 0;
 }
 
 void TextureResource::Desc::init1D(Format formatIn, int widthIn, int numMipMapsIn)
@@ -144,7 +167,7 @@ void TextureResource::Desc::init1D(Format formatIn, int widthIn, int numMipMapsI
     this->sampleDesc.init();
 
     this->bindFlags = 0;
-    this->accessFlags = 0; 
+    this->cpuAccessFlags = 0; 
 }
 
 void TextureResource::Desc::init2D(Format formatIn, int widthIn, int heightIn, int numMipMapsIn)
@@ -157,7 +180,7 @@ void TextureResource::Desc::init2D(Format formatIn, int widthIn, int heightIn, i
     this->sampleDesc.init();
 
     this->bindFlags = 0;
-    this->accessFlags = 0;
+    this->cpuAccessFlags = 0;
 }
 
 void TextureResource::Desc::init3D(Format formatIn, int widthIn, int heightIn, int depthIn, int numMipMapsIn)
@@ -170,7 +193,7 @@ void TextureResource::Desc::init3D(Format formatIn, int widthIn, int heightIn, i
     this->sampleDesc.init();
 
     this->bindFlags = 0;
-    this->accessFlags = 0;
+    this->cpuAccessFlags = 0;
 }
 
 } // renderer_test

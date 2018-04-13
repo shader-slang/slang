@@ -183,6 +183,8 @@ class BufferResource: public Resource
             sizeInBytes = sizeInBytesIn;
             elementSize = 0;
         }
+            /// Set up default parameters based on usage
+        void setDefaults(Usage initialUsage);
 
         int bindFlags;          ///< Combination of Resource::BindFlag or 0 (and will use initialUsage to set)
         int accessFlags;        ///< Combination of Resource::AccessFlag 
@@ -263,8 +265,11 @@ class TextureResource: public Resource
             /// 
         void fixSize(Type type);
 
+            /// Set up default parameters based on type and usage
+        void setDefaults(Type type, Usage initialUsage);
+
         int bindFlags;          ///< Combination of Resource::BindFlag or 0 (and will use initialUsage to set)
-        int accessFlags;        ///< Combination of Resource::AccessFlag 
+        int cpuAccessFlags;        ///< Combination of Resource::AccessFlag 
 
         Size size; 
 

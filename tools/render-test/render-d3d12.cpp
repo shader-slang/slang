@@ -2010,7 +2010,7 @@ TextureResource* D3D12Renderer::createTextureResource(Resource::Type type, Resou
     // https://msdn.microsoft.com/en-us/library/windows/desktop/dn899215%28v=vs.85%29.aspx
 
     TextureResource::Desc srcDesc(descIn);
-    srcDesc.fixSize(type);
+    srcDesc.setDefaults(type, initialUsage);
 
     const DXGI_FORMAT pixelFormat = D3DUtil::getMapFormat(srcDesc.format);
     if (pixelFormat == DXGI_FORMAT_UNKNOWN)
@@ -2019,11 +2019,7 @@ TextureResource* D3D12Renderer::createTextureResource(Resource::Type type, Resou
     }
         
     const int arraySize = srcDesc.calcEffectiveArraySize(type);
-    if (srcDesc.numMipLevels <= 0)
-    {
-        srcDesc.numMipLevels = srcDesc.calcNumMipLevels(type);
-    }
-
+    
     const D3D12_RESOURCE_DIMENSION dimension = _calcResourceDimension(type);
     if (dimension == D3D12_RESOURCE_DIMENSION_UNKNOWN)
     {   
@@ -2195,21 +2191,18 @@ BufferResource* D3D12Renderer::createBufferResource(Resource::Usage initialUsage
 {
     typedef BufferResourceImpl::Style Style;
     
-    BufferResource::Desc desc(descIn);
-    if (desc.bindFlags == 0)
-    {
-        desc.bindFlags = Resource::s_requiredBinding[int(initialUsage)];
-    }
+    BufferResource::Desc srcDesc(descIn);
+    srcDesc.setDefaults(initialUsage);
 
-    RefPtr<BufferResourceImpl> buffer(new BufferResourceImpl(initialUsage, desc));
+    RefPtr<BufferResourceImpl> buffer(new BufferResourceImpl(initialUsage, srcDesc));
 
     // Save the style
     buffer->m_style = BufferResourceImpl::_calcResourceStyle(initialUsage);
 
     D3D12_RESOURCE_DESC bufferDesc;
-    _initBufferResourceDesc(desc.sizeInBytes, bufferDesc);
+    _initBufferResourceDesc(srcDesc.sizeInBytes, bufferDesc);
 
-    bufferDesc.Flags = _calcResourceBindFlags(initialUsage, desc.bindFlags);
+    bufferDesc.Flags = _calcResourceBindFlags(initialUsage, srcDesc.bindFlags);
 
     switch (buffer->m_style)
     {
@@ -2217,11 +2210,11 @@ BufferResource* D3D12Renderer::createBufferResource(Resource::Usage initialUsage
         {
             // Assume the constant buffer will change every frame. We'll just keep a copy of the contents 
             // in regular memory until it needed 
-            buffer->m_memory.SetSize(UInt(desc.sizeInBytes));
+            buffer->m_memory.SetSize(UInt(srcDesc.sizeInBytes));
             // Initialize
             if (initData)
             {
-                ::memcpy(buffer->m_memory.Buffer(), initData, desc.sizeInBytes);
+                ::memcpy(buffer->m_memory.Buffer(), initData, srcDesc.sizeInBytes);
             }
             break;
         }

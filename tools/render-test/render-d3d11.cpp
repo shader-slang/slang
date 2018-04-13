@@ -108,7 +108,7 @@ public:
 		public:
         typedef BufferResource Parent;
 
-        BufferResourceImpl(Resource::Usage initialUsage, const Desc& desc):
+        BufferResourceImpl(const Desc& desc, Usage initialUsage):
             Parent(desc),
             m_initialUsage(initialUsage)
         {
@@ -116,6 +116,18 @@ public:
 
         Usage m_initialUsage;
         ComPtr<ID3D11Buffer> m_buffer;
+    };
+    class TextureResourceImpl : public TextureResource
+    {
+    public:
+        typedef TextureResource Parent;
+        TextureResourceImpl(Type type, const Desc& desc, Usage initialUsage) :
+            Parent(type, desc),
+            m_initialUsage(initialUsage)
+        {
+        }
+        Usage m_initialUsage;
+        ComPtr<ID3D11Resource> m_resource;
     };
 
 	class InputLayoutImpl: public InputLayout
@@ -441,25 +453,124 @@ static int _calcResourceAccessFlags(int accessFlags)
     }
 }
 
-TextureResource* D3D11Renderer::createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData)
+TextureResource* D3D11Renderer::createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& descIn, const TextureResource::Data* initData)
 {
+    TextureResource::Desc srcDesc(descIn);
+    srcDesc.setDefaults(type, initialUsage);
+ 
+    const int effectiveArraySize = srcDesc.calcEffectiveArraySize(type);
+    
+    assert(initData);
+    assert(initData->numSubResources == srcDesc.numMipLevels * effectiveArraySize);
+
+    const DXGI_FORMAT format = D3DUtil::getMapFormat(srcDesc.format);
+    if (format == DXGI_FORMAT_UNKNOWN)
+    {
+        return nullptr;
+    }
+
+    const int bindFlags = _calcResourceBindFlags(srcDesc.bindFlags);
+
+    // Set up the initialize data
+    List<D3D11_SUBRESOURCE_DATA> subRes;
+    subRes.SetSize(srcDesc.numMipLevels * effectiveArraySize);
+    {
+        int subResourceIndex = 0;
+        for (int i = 0; i < effectiveArraySize; i++)
+        {
+            for (int j = 0; j < srcDesc.numMipLevels; j++)
+            {
+                const int mipHeight = TextureResource::calcMipSize(srcDesc.size.height, j);
+
+                D3D11_SUBRESOURCE_DATA& data = subRes[subResourceIndex];
+
+                data.pSysMem = initData->subResources[subResourceIndex];
+
+                data.SysMemPitch = UINT(initData->mipRowStrides[j]);
+                data.SysMemSlicePitch = UINT(initData->mipRowStrides[j] * mipHeight);
+
+                subResourceIndex++;
+            }
+        }
+    }
+
+    const int accessFlags = _calcResourceAccessFlags(srcDesc.cpuAccessFlags);
+
+    RefPtr<TextureResourceImpl> texture(new TextureResourceImpl(type, srcDesc, initialUsage));
+
+    switch (type)
+    {
+        case Resource::Type::Texture1D:
+        {
+            D3D11_TEXTURE1D_DESC desc = { 0 };
+            desc.BindFlags = bindFlags;
+            desc.CPUAccessFlags = accessFlags;
+            desc.Format = format;
+            desc.MiscFlags = 0;
+            desc.MipLevels = srcDesc.numMipLevels;
+            desc.ArraySize = srcDesc.arraySize; 
+            desc.Width = srcDesc.size.width; 
+            desc.Usage = D3D11_USAGE_DEFAULT;
+            
+            ComPtr<ID3D11Texture1D> texture;
+            SLANG_RETURN_NULL_ON_FAIL(m_device->CreateTexture1D(&desc, subRes.Buffer(), texture.writeRef()));
+            break;
+        }
+        case Resource::Type::TextureCube:
+        case Resource::Type::Texture2D:
+        {
+            D3D11_TEXTURE2D_DESC desc = { 0 };
+            desc.BindFlags = bindFlags;
+            desc.CPUAccessFlags = accessFlags;
+            desc.Format = format;
+            desc.MiscFlags = 0;
+            desc.MipLevels = srcDesc.numMipLevels;
+            desc.ArraySize = (type == Resource::Type::TextureCube) ? effectiveArraySize : srcDesc.arraySize;
+       
+            desc.Width = srcDesc.size.width;
+            desc.Height = srcDesc.size.height;
+            desc.Usage = D3D11_USAGE_DEFAULT;
+            desc.SampleDesc.Count = srcDesc.sampleDesc.numSamples;
+            desc.SampleDesc.Quality = srcDesc.sampleDesc.quality;
+
+            ComPtr<ID3D11Texture2D> texture;
+            SLANG_RETURN_NULL_ON_FAIL(m_device->CreateTexture2D(&desc, subRes.Buffer(), texture.writeRef()));
+            break;
+        }
+        case Resource::Type::Texture3D:
+        {
+            D3D11_TEXTURE3D_DESC desc = { 0 };
+            desc.BindFlags = bindFlags;
+            desc.CPUAccessFlags = accessFlags;
+            desc.Format = format;
+            desc.MiscFlags = 0;
+            desc.MipLevels = srcDesc.numMipLevels;
+            desc.Width = srcDesc.size.width; 
+            desc.Height = srcDesc.size.height;
+            desc.Depth = srcDesc.size.depth;
+            desc.Usage = D3D11_USAGE_DEFAULT;
+            
+            ComPtr<ID3D11Texture3D> texture;
+            SLANG_RETURN_NULL_ON_FAIL(m_device->CreateTexture3D(&desc, subRes.Buffer(), texture.writeRef()));
+            break;
+        }
+        default: return nullptr;
+    }
+
     return nullptr;
 }
 
 BufferResource* D3D11Renderer::createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& descIn, const void* initData)
 {    
-    BufferResource::Desc desc(descIn);
+    BufferResource::Desc srcDesc(descIn);
+    srcDesc.setDefaults(initialUsage);
 
     // Make aligned to 256 bytes... not sure why
-    desc.sizeInBytes = D3DUtil::calcAligned(desc.sizeInBytes, 256);
-    if (desc.bindFlags == 0)
-    {
-        desc.bindFlags = Resource::s_requiredBinding[int(initialUsage)];
-    }
- 
+    srcDesc.sizeInBytes = D3DUtil::calcAligned(srcDesc.sizeInBytes, 256);
+        
     D3D11_BUFFER_DESC bufferDesc = { 0 };
-    bufferDesc.ByteWidth = UINT(desc.sizeInBytes);
-    bufferDesc.BindFlags = _calcResourceBindFlags(desc.bindFlags);
+    bufferDesc.ByteWidth = UINT(srcDesc.sizeInBytes);
+    bufferDesc.BindFlags = _calcResourceBindFlags(srcDesc.bindFlags);
     bufferDesc.CPUAccessFlags = _calcResourceAccessFlags(descIn.accessFlags);
     bufferDesc.Usage = D3D11_USAGE_DEFAULT;
 
@@ -477,9 +588,9 @@ BufferResource* D3D11Renderer::createBufferResource(Resource::Usage initialUsage
     if (bufferDesc.BindFlags & (D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE))
     {
         //desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
-        if (desc.elementSize != 0)
+        if (srcDesc.elementSize != 0)
         {
-            bufferDesc.StructureByteStride = desc.elementSize;
+            bufferDesc.StructureByteStride = srcDesc.elementSize;
             bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
         }
         else
@@ -494,7 +605,7 @@ BufferResource* D3D11Renderer::createBufferResource(Resource::Usage initialUsage
     ComPtr<ID3D11Buffer> buffer;
 	SLANG_RETURN_NULL_ON_FAIL(m_device->CreateBuffer(&bufferDesc, initData ? &subResourceData : nullptr, buffer.writeRef()));
     
-    BufferResourceImpl* rs = new BufferResourceImpl(initialUsage, desc);
+    BufferResourceImpl* rs = new BufferResourceImpl(srcDesc, initialUsage);
     rs->m_buffer = buffer;
     return rs;
 }
