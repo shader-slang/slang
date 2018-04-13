@@ -221,6 +221,29 @@ class TextureResource: public Resource
         int quality;
     };
 
+    
+    struct Size
+    {
+        void init()
+        {
+            width = height = depth = 1;
+        }
+        void init(int widthIn, int heightIn = 1, int depthIn = 1)
+        {
+            width = widthIn;
+            height = heightIn; 
+            depth = depthIn; 
+        }
+            /// Given the type works out the maximum dimension size
+        int calcMaxDimension(Type type) const;
+            /// Given a size, calculates the size at a mip level
+        Size calcMipSize(int mipLevel) const;
+
+        int width;              ///< Width in pixels
+        int height;             ///< Height in pixels (if 2d or 3d)
+        int depth;              ///< Depth (if 3d) 
+    };
+
     struct Desc
     {
             /// Initialize with default values
@@ -230,10 +253,8 @@ class TextureResource: public Resource
         void init2D(Format format, int width, int height, int numMipMaps = 0);
         void init3D(Format format, int width, int height, int depth, int numMipMaps = 0);
 
-            /// Given the type works out the maximum dimension size
-        int calcMaxDimensionSize(Type type) const;
             /// Given the type, calculates the number of mip maps. 0 on error
-        int calcNumMipMaps(Type type) const;
+        int calcNumMipLevels(Type type) const;
             /// Calculate the total number of sub resources. 0 on error.
         int calcNumSubResources(Type type) const;
             /// Calculate the array size
@@ -245,9 +266,8 @@ class TextureResource: public Resource
         int bindFlags;          ///< Combination of Resource::BindFlag or 0 (and will use initialUsage to set)
         int accessFlags;        ///< Combination of Resource::AccessFlag 
 
-        int width;              ///< Width in pixels
-        int height;             ///< Height in pixels (if 2d or 3d)
-        int depth;              ///< Depth (if 3d) 
+        Size size; 
+
         int arraySize;          ///< Array size 
 
         int numMipLevels;       ///< Number of mip levels - if 0 will generate all mip levels
@@ -277,9 +297,12 @@ class TextureResource: public Resource
     {
     }
 
-        /// Calculate the total number of subresources
-    static int calcNumSubResources(Type type, int numMipMaps, int arraySize);
-
+    SLANG_FORCE_INLINE static int calcMipSize(int width, int mipLevel)
+    {
+        width = width >> mipLevel;
+        return width > 0 ? width : 1;
+    }
+    
     protected:
     Desc m_desc;
 };

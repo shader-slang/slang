@@ -21,7 +21,9 @@ using namespace Slang;
     BindFlag::Enum(BindFlag::PixelShaderResource | BindFlag::NonPixelShaderResource), // GenericRead
 }; 
 
-int TextureResource::Desc::calcMaxDimensionSize(Type type) const
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!! TextureResource::Size !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+int TextureResource::Size::calcMaxDimension(Type type) const
 {
     switch (type)
     {
@@ -33,15 +35,26 @@ int TextureResource::Desc::calcMaxDimensionSize(Type type) const
     }
 }
 
-int TextureResource::Desc::calcNumMipMaps(Type type) const
+TextureResource::Size TextureResource::Size::calcMipSize(int mipLevel) const
 {
-    const int maxDimensionSize = calcMaxDimensionSize(type);
+    Size size;
+    size.width = TextureResource::calcMipSize(this->width, mipLevel);
+    size.height = TextureResource::calcMipSize(this->height, mipLevel);
+    size.depth = TextureResource::calcMipSize(this->depth, mipLevel);
+    return size;
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!! TextureResource::Desc !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+int TextureResource::Desc::calcNumMipLevels(Type type) const
+{
+    const int maxDimensionSize = this->size.calcMaxDimension(type);
     return (maxDimensionSize > 0) ? (Math::Log2Floor(maxDimensionSize) + 1) : 0;
 }
 
 int TextureResource::Desc::calcNumSubResources(Type type) const
 {
-    const int numMipMaps = (this->numMipLevels > 0) ? this->numMipLevels : calcNumMipMaps(type);
+    const int numMipMaps = (this->numMipLevels > 0) ? this->numMipLevels : calcNumMipLevels(type);
     const int arrSize = (this->arraySize > 0) ? this->arraySize : 1;
 
     switch (type)
@@ -55,7 +68,7 @@ int TextureResource::Desc::calcNumSubResources(Type type) const
         {
             // can't have arrays of 3d textures
             assert(this->arraySize <= 1);
-            return numMipMaps * this->depth;  
+            return numMipMaps * this->size.depth;  
         }
         case Resource::Type::TextureCube:   
         {
@@ -72,14 +85,14 @@ void TextureResource::Desc::fixSize(Type type)
     {
         case Resource::Type::Texture1D:
         {
-            this->height = 1;
-            this->depth = 1;
+            this->size.height = 1;
+            this->size.depth = 1;
             break;
         }
         case Resource::Type::TextureCube:
         case Resource::Type::Texture2D:
         {
-            this->depth = 1;
+            this->size.depth = 1;
             break;
         }
         case Resource::Type::Texture3D:
@@ -110,10 +123,8 @@ int TextureResource::Desc::calcEffectiveArraySize(Type type) const
 
 void TextureResource::Desc::init()
 {
-    this->width = 1;
-    this->height = 1;
-    this->depth = 1;
-
+    this->size.init();
+    
     this->format = Format::Unknown;
     this->arraySize = 0;
     this->numMipLevels = 0;
@@ -125,9 +136,7 @@ void TextureResource::Desc::init()
 
 void TextureResource::Desc::init1D(Format formatIn, int widthIn, int numMipMapsIn)
 {
-    this->width = widthIn;
-    this->height = 1;
-    this->depth = 1;
+    this->size.init(widthIn);
     
     this->format = format;
     this->arraySize = 0;
@@ -140,9 +149,7 @@ void TextureResource::Desc::init1D(Format formatIn, int widthIn, int numMipMapsI
 
 void TextureResource::Desc::init2D(Format formatIn, int widthIn, int heightIn, int numMipMapsIn)
 {
-    this->width = widthIn;
-    this->height = heightIn;
-    this->depth = 1;
+    this->size.init(widthIn, heightIn);
     
     this->format = format;
     this->arraySize = 0;
@@ -155,10 +162,7 @@ void TextureResource::Desc::init2D(Format formatIn, int widthIn, int heightIn, i
 
 void TextureResource::Desc::init3D(Format formatIn, int widthIn, int heightIn, int depthIn, int numMipMapsIn)
 {
-    
-    this->width = widthIn;
-    this->height = heightIn;
-    this->depth = depthIn;
+    this->size.init(widthIn, heightIn, depthIn);
 
     this->format = format;
     this->arraySize = 0;

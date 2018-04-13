@@ -650,24 +650,19 @@ Result D3D12Renderer::createInputTexture(const InputTextureDesc& inputDesc, D3D1
         case 1:
         {
             type = Resource::Type::Texture1D;
-            textureResourceDesc.width = inputDesc.size;
+            textureResourceDesc.size.init(inputDesc.size);
             break;
         }
         case 2:
         {
             type = inputDesc.isCube ? Resource::Type::TextureCube : Resource::Type::Texture2D;
-
-            textureResourceDesc.width = inputDesc.size;
-            textureResourceDesc.height = inputDesc.size;
+            textureResourceDesc.size.init(inputDesc.size, inputDesc.size);
             break;
         } 
         case 3:
         {
             type = Resource::Type::Texture3D;
-
-            textureResourceDesc.width = inputDesc.size;
-            textureResourceDesc.height = inputDesc.size;
-            textureResourceDesc.depth = inputDesc.size;
+            textureResourceDesc.size.init(inputDesc.size, inputDesc.size, inputDesc.size);
             break;
         }
     }
@@ -691,8 +686,7 @@ Result D3D12Renderer::createInputTexture(const InputTextureDesc& inputDesc, D3D1
     // Set up the src row strides
     for (int i = 0; i < textureResourceDesc.numMipLevels; i++)
     {
-        int mipWidth = textureResourceDesc.width >> i;
-        mipWidth = (mipWidth <= 0) ? 1 : mipWidth;
+        const int mipWidth = TextureResource::calcMipSize(textureResourceDesc.size.width, i);
         mipRowStrides[i] = mipWidth * sizeof(uint32_t);
     }
 
@@ -2016,7 +2010,7 @@ TextureResource* D3D12Renderer::createTextureResource(Resource::Type type, Resou
     const int arraySize = srcDesc.calcEffectiveArraySize(type);
     if (srcDesc.numMipLevels <= 0)
     {
-        srcDesc.numMipLevels = srcDesc.calcNumMipMaps(type);
+        srcDesc.numMipLevels = srcDesc.calcNumMipLevels(type);
     }
 
     const D3D12_RESOURCE_DIMENSION dimension = _calcResourceDimension(type);
@@ -2032,9 +2026,9 @@ TextureResource* D3D12Renderer::createTextureResource(Resource::Type type, Resou
 
     resourceDesc.Dimension = dimension; 
     resourceDesc.Format = pixelFormat;
-    resourceDesc.Width = srcDesc.width;
-    resourceDesc.Height = srcDesc.height;
-    resourceDesc.DepthOrArraySize = (srcDesc.depth > 1) ? srcDesc.depth : arraySize; 
+    resourceDesc.Width = srcDesc.size.width;
+    resourceDesc.Height = srcDesc.size.height;
+    resourceDesc.DepthOrArraySize = (srcDesc.size.depth > 1) ? srcDesc.size.depth : arraySize; 
     
     resourceDesc.MipLevels = numMipMaps;
     resourceDesc.SampleDesc.Count = srcDesc.sampleDesc.numSamples;
@@ -2124,16 +2118,9 @@ TextureResource* D3D12Renderer::createTextureResource(Resource::Type type, Resou
             const D3D12_PLACED_SUBRESOURCE_FOOTPRINT& layout = layouts[j];
             const D3D12_SUBRESOURCE_FOOTPRINT& footprint = layout.Footprint;
 
-            int mipWidth = srcDesc.width >> j;
-            mipWidth = (mipWidth <= 0) ? 1 : mipWidth;
+            const TextureResource::Size mipSize = srcDesc.size.calcMipSize(j);
 
-            int mipHeight = srcDesc.height >> j;
-            mipHeight = (mipHeight <= 0) ? 1 : mipHeight;
-
-            int mipDepth = srcDesc.depth >> j;
-            mipDepth = (mipDepth <= 0) ? 1 : mipDepth;
-
-            assert(footprint.Width == mipWidth && footprint.Height == mipHeight && footprint.Depth == mipDepth);
+            assert(footprint.Width == mipSize.width && footprint.Height == mipSize.height && footprint.Depth == mipSize.depth);
 
             const ptrdiff_t dstMipRowPitch = ptrdiff_t(layouts[j].Footprint.RowPitch);
             const ptrdiff_t srcMipRowPitch = ptrdiff_t(initData->mipRowStrides[j]); 
@@ -2144,10 +2131,10 @@ TextureResource* D3D12Renderer::createTextureResource(Resource::Type type, Resou
             uint8_t* dstRow = p + layouts[j].Offset;
 
             // Copy the depth each mip
-            for (int l = 0; l < mipDepth; l++)
+            for (int l = 0; l < mipSize.depth; l++)
             {
                 // Copy rows
-                for (int k = 0; k < mipHeight; ++k)
+                for (int k = 0; k < mipSize.height; ++k)
                 {
                     ::memcpy(dstRow, srcRow, srcMipRowPitch);
 
