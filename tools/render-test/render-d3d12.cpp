@@ -3,6 +3,7 @@
 
 #include "options.h"
 #include "render.h"
+#include "slang-support.h"
 
 // In order to use the Slang API, we need to include its header
 
@@ -656,85 +657,15 @@ Result D3D12Renderer::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, cons
 
 Result D3D12Renderer::createInputTexture(const InputTextureDesc& inputDesc, D3D12DescriptorHeap& viewHeap, int srvIndex, RefPtr<Resource>& resourceOut)
 {
-    TextureData texData;
-    generateTextureData(texData, inputDesc);
-    
-    TextureResource::Desc textureResourceDesc;
-    textureResourceDesc.init();
-    
-    textureResourceDesc.format = Format::RGBA_Unorm_UInt8;
-    textureResourceDesc.numMipLevels = texData.mipLevels;
-    textureResourceDesc.arraySize = inputDesc.arrayLength;
-
-    // It's the same size in all dimensions 
-    Resource::Type type = Resource::Type::Unknown;
-    switch (inputDesc.dimension)
-    {
-        case 1:
-        {
-            type = Resource::Type::Texture1D;
-            textureResourceDesc.size.init(inputDesc.size);
-            break;
-        }
-        case 2:
-        {
-            type = inputDesc.isCube ? Resource::Type::TextureCube : Resource::Type::Texture2D;
-            textureResourceDesc.size.init(inputDesc.size, inputDesc.size);
-            break;
-        } 
-        case 3:
-        {
-            type = Resource::Type::Texture3D;
-            textureResourceDesc.size.init(inputDesc.size, inputDesc.size, inputDesc.size);
-            break;
-        }
-    }
-
+    int bindFlags = 0;
     if (srvIndex >= 0)
     {
-        textureResourceDesc.bindFlags |= Resource::BindFlag::NonPixelShaderResource | Resource::BindFlag::PixelShaderResource;
+        bindFlags |= Resource::BindFlag::NonPixelShaderResource | Resource::BindFlag::PixelShaderResource;
     }
 
-    const int effectiveArraySize = textureResourceDesc.calcEffectiveArraySize(type);
-    const int numSubResources = textureResourceDesc.calcNumSubResources(type);
-
-    Resource::Usage initialUsage = Resource::Usage::GenericRead;
-    TextureResource::Data initData;
-
-    List<ptrdiff_t> mipRowStrides;
-    mipRowStrides.SetSize(textureResourceDesc.numMipLevels);
-    List<const void*> subResources;
-    subResources.SetSize(numSubResources);
-
-    // Set up the src row strides
-    for (int i = 0; i < textureResourceDesc.numMipLevels; i++)
-    {
-        const int mipWidth = TextureResource::calcMipSize(textureResourceDesc.size.width, i);
-        mipRowStrides[i] = mipWidth * sizeof(uint32_t);
-    }
-
-    // Set up pointers the the data
-    {
-        int subResourceIndex = 0;
-        const int numGen = int(texData.dataBuffer.Count());
-        for (int i = 0; i < numSubResources; i++)
-        {
-            subResources[i] = texData.dataBuffer[subResourceIndex].Buffer();
-            // Wrap around
-            subResourceIndex = (subResourceIndex + 1 >= numGen) ? 0 : (subResourceIndex + 1);
-        }
-    }
-
-    initData.mipRowStrides = mipRowStrides.Buffer();
-    initData.numMips = textureResourceDesc.numMipLevels;
-    initData.numSubResources = numSubResources;
-    initData.subResources = subResources.Buffer();
-
-    RefPtr<TextureResource> texture = createTextureResource(type, Resource::Usage::GenericRead, textureResourceDesc, &initData);
-    if (!texture)
-    {
-        return SLANG_FAIL;
-    }
+    RefPtr<TextureResource> texture;
+    SLANG_RETURN_ON_FAIL(generateTextureResource(inputDesc, bindFlags, this, texture));
+    
     TextureResourceImpl* textureImpl = static_cast<TextureResourceImpl*>(texture.Ptr());
 
     if (srvIndex >= 0)
