@@ -225,6 +225,7 @@ static DiagnosticSink* GetSink(Preprocessor* preprocessor)
 
 static void DestroyConditional(PreprocessorConditional* conditional);
 static void DestroyMacro(Preprocessor* preprocessor, PreprocessorMacro* macro);
+static bool IsSkipping(Preprocessor* preprocessor);
 
 //
 // Basic Input Handling
@@ -314,12 +315,12 @@ static void EndInputStream(Preprocessor* preprocessor, PreprocessorInputStream* 
 }
 
 // Consume one token from an input stream
-static Token AdvanceRawToken(PreprocessorInputStream* inputStream)
+static Token AdvanceRawToken(PreprocessorInputStream* inputStream, LexerFlags lexerFlags = 0)
 {
     if( auto primaryStream = asPrimaryInputStream(inputStream) )
     {
         auto result = primaryStream->token;
-        primaryStream->token = primaryStream->lexer.lexToken();
+        primaryStream->token = primaryStream->lexer.lexToken(lexerFlags);
         return result;
     }
     else
@@ -359,24 +360,24 @@ static TokenType PeekRawTokenType(PreprocessorInputStream* inputStream)
 
 
 // Read one token in "raw" mode (meaning don't expand macros)
-static Token AdvanceRawToken(Preprocessor* preprocessor)
+static Token AdvanceRawToken(Preprocessor* preprocessor, LexerFlags lexerFlags = 0)
 {
-    for (;;)
+    for(;;)
     {
         // Look at the input stream on top of the stack
         PreprocessorInputStream* inputStream = preprocessor->inputStream;
 
         // If there isn't one, then there is no more input left to read.
-        if (!inputStream)
+        if(!inputStream)
         {
             return preprocessor->endOfFileToken;
         }
 
         // The top-most input stream may be at its end
-        if (PeekRawTokenType(inputStream) == TokenType::EndOfFile)
+        if(PeekRawTokenType(inputStream) == TokenType::EndOfFile)
         {
             // If there is another stream remaining, switch to it
-            if (inputStream->parent)
+            if(inputStream->parent)
             {
                 preprocessor->inputStream = inputStream->parent;
                 EndInputStream(preprocessor, inputStream);
@@ -385,7 +386,9 @@ static Token AdvanceRawToken(Preprocessor* preprocessor)
         }
 
         // Everything worked, so read a token from the top-most stream
-        return AdvanceRawToken(inputStream);
+        return AdvanceRawToken(
+            inputStream,
+            lexerFlags | (IsSkipping(preprocessor) ? kLexerFlag_IgnoreInvalid : 0));
     }
 }
 
@@ -586,7 +589,7 @@ static SimpleTokenInputStream* createSimpleInputStream(
     eofToken.loc = token.loc;
     eofToken.flags = TokenFlag::AfterWhitespace | TokenFlag::AtStartOfLine;
     inputStream->lexedTokens.mTokens.Add(eofToken);
- 
+
     inputStream->tokenReader = TokenReader(inputStream->lexedTokens);
 
     return inputStream;
@@ -953,11 +956,11 @@ static Token PeekRawToken(PreprocessorDirectiveContext* context)
 }
 
 // Read one raw token in a directive, without going past the end of the line.
-static Token AdvanceRawToken(PreprocessorDirectiveContext* context)
+static Token AdvanceRawToken(PreprocessorDirectiveContext* context, LexerFlags lexerFlags = 0)
 {
     if (IsEndOfLine(context))
         return PeekRawToken(context);
-    return AdvanceRawToken(context->preprocessor);
+    return AdvanceRawToken(context->preprocessor, lexerFlags);
 }
 
 // Peek next raw token type, without going past the end of the line.
@@ -1565,6 +1568,9 @@ static void expectEndOfDirective(PreprocessorDirectiveContext* context)
 // Handle a `#include` directive
 static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
 {
+    // Consume the directive, and inform the lexer to process the remainder of the line as a file path.
+    AdvanceRawToken(context, kLexerFlag_ExpectFileName);
+
     Token pathToken;
     if(!Expect(context, TokenType::StringLiteral, Diagnostics::expectedTokenInPreprocessorDirective, &pathToken))
         return;
@@ -1721,17 +1727,29 @@ static void HandleUndefDirective(PreprocessorDirectiveContext* context)
 // Handle a `#warning` directive
 static void HandleWarningDirective(PreprocessorDirectiveContext* context)
 {
-    // TODO: read rest of line without actual tokenization
-    GetSink(context)->diagnose(GetDirectiveLoc(context), Diagnostics::userDefinedWarning, "user-defined warning");
-    SkipToEndOfLine(context);
+    // Consume the directive, and inform the lexer to process the remainder of the line as a custom message.
+    AdvanceRawToken(context, kLexerFlag_ExpectDirectiveMessage);
+
+    // Read the message token.
+    Token messageToken;
+    Expect(context, TokenType::DirectiveMessage, Diagnostics::expectedTokenInPreprocessorDirective, &messageToken);
+
+    // Report the custom error.
+    GetSink(context)->diagnose(GetDirectiveLoc(context), Diagnostics::userDefinedWarning, messageToken.Content);
 }
 
 // Handle a `#error` directive
 static void HandleErrorDirective(PreprocessorDirectiveContext* context)
 {
-    // TODO: read rest of line without actual tokenization
-    GetSink(context)->diagnose(GetDirectiveLoc(context), Diagnostics::userDefinedError, "user-defined warning");
-    SkipToEndOfLine(context);
+    // Consume the directive, and inform the lexer to process the remainder of the line as a custom message.
+    AdvanceRawToken(context, kLexerFlag_ExpectDirectiveMessage);
+
+    // Read the message token.
+    Token messageToken;
+    Expect(context, TokenType::DirectiveMessage, Diagnostics::expectedTokenInPreprocessorDirective, &messageToken);
+
+    // Report the custom error.
+    GetSink(context)->diagnose(GetDirectiveLoc(context), Diagnostics::userDefinedError, messageToken.Content);
 }
 
 // Handle a `#line` directive
@@ -1898,6 +1916,11 @@ enum PreprocessorDirectiveFlag : unsigned int
 {
     // Should this directive be handled even when skipping disbaled code?
     ProcessWhenSkipping = 1 << 0,
+
+    /// Allow the handler for this directive to advance past the
+    /// directive token itself, so that it can control lexer behavior
+    /// more closely.
+    DontConsumeDirectiveAutomatically = 1 << 1,
 };
 
 // Information about a specific directive
@@ -1925,11 +1948,11 @@ static const PreprocessorDirective kDirectives[] =
     { "elif",       &HandleElifDirective,       ProcessWhenSkipping },
     { "endif",      &HandleEndIfDirective,      ProcessWhenSkipping },
 
-    { "include",    &HandleIncludeDirective,    0 },
+    { "include",    &HandleIncludeDirective,    DontConsumeDirectiveAutomatically },
     { "define",     &HandleDefineDirective,     0 },
     { "undef",      &HandleUndefDirective,      0 },
-    { "warning",    &HandleWarningDirective,    0 },
-    { "error",      &HandleErrorDirective,      0 },
+    { "warning",    &HandleWarningDirective,    DontConsumeDirectiveAutomatically },
+    { "error",      &HandleErrorDirective,      DontConsumeDirectiveAutomatically },
     { "line",       &HandleLineDirective,       0 },
     { "pragma",     &HandlePragmaDirective,     0 },
 
@@ -1982,9 +2005,6 @@ static void HandleDirective(PreprocessorDirectiveContext* context)
         return;
     }
 
-    // Consume the directive name token.
-    AdvanceRawToken(context);
-
     // Look up the handler for the directive.
     PreprocessorDirective const* directive = FindDirective(GetDirectiveName(context));
 
@@ -1994,6 +2014,12 @@ static void HandleDirective(PreprocessorDirectiveContext* context)
     {
         SkipToEndOfLine(context);
         return;
+    }
+
+    if(!(directive->flags & PreprocessorDirectiveFlag::DontConsumeDirectiveAutomatically))
+    {
+        // Consume the directive name token.
+        AdvanceRawToken(context);
     }
 
     // Apply the directive-specific callback
@@ -2009,11 +2035,22 @@ static Token ReadToken(Preprocessor* preprocessor)
 {
     for (;;)
     {
+        // Depending on what the lookahead token is, we
+        // might need to start expanding it.
+        //
+        // Note: doing this at the start of this loop
+        // is important, in case a macro has an empty
+        // expansion, and we end up looking at a different
+        // token after applying the expansion.
+        if(!IsSkipping(preprocessor))
+        {
+            MaybeBeginMacroExpansion(preprocessor);
+        }
+
         // Look at the next raw token in the input.
         Token const& token = PeekRawToken(preprocessor);
         if (token.type == TokenType::EndOfFile)
             return token;
-
 
         // If we have a directive (`#` at start of line) then handle it
         if ((token.type == TokenType::Pound) && (token.flags & TokenFlag::AtStartOfLine))
@@ -2174,7 +2211,7 @@ TokenList preprocessSource(
         {
             sb << " ";
         }
-        
+
         sb << t.Content;
     }
 

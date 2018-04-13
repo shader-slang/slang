@@ -29,6 +29,7 @@ TOKEN(WhiteSpace,       "whitespace")
 TOKEN(NewLine,          "newline")
 TOKEN(LineComment,      "line comment")
 TOKEN(BlockComment,     "block comment")
+TOKEN(DirectiveMessage, "user-defined message")
 
 #define PUNCTUATION(id, text) \
     TOKEN(id, "'" text "'")
