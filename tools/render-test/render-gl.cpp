@@ -520,16 +520,16 @@ void GLRenderer::createInputSampler(BindingEntry& entry, InputSamplerDesc sample
 
     if (samplerDesc.isCompareSampler)
     {
-        glSamplerParameteri(handle, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-        glSamplerParameteri(handle, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glSamplerParameteri(handle, GL_TEXTURE_MAX_ANISOTROPY_EXT, 8);
-    }
-    else
-    {
         glSamplerParameteri(handle, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glSamplerParameteri(handle, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glSamplerParameteri(handle, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
         glSamplerParameteri(handle, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+    }
+    else
+    {
+        glSamplerParameteri(handle, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glSamplerParameteri(handle, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glSamplerParameteri(handle, GL_TEXTURE_MAX_ANISOTROPY_EXT, 8);
     }
 
     entry.samplerHandle = handle;
@@ -778,21 +778,11 @@ TextureResource* GLRenderer::createTextureResource(Resource::Type type, Resource
     glTexParameteri(target, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(target, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(target, GL_TEXTURE_WRAP_R, GL_REPEAT);
-
-    //if (samplerDesc.isCompareSampler)
-    {
-        glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-        glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameterf(target, GL_TEXTURE_MAX_ANISOTROPY_EXT, 8.0f);
-    }
-    /* 
-    else
-    {
-        glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(target, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
-        glTexParameteri(target, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
-    } */
+    
+    // Assume regular sampling (might be superseded - if a combined sampler wanted)
+    glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameterf(target, GL_TEXTURE_MAX_ANISOTROPY_EXT, 8.0f);
 
     texture->m_target = target;
 
