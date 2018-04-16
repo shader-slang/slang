@@ -468,7 +468,7 @@ TextureResource* D3D11Renderer::createTextureResource(Resource::Type type, Resou
     const int effectiveArraySize = srcDesc.calcEffectiveArraySize(type);
     
     assert(initData);
-    assert(initData->numSubResources == srcDesc.numMipLevels * effectiveArraySize);
+    assert(initData->numSubResources == srcDesc.numMipLevels * effectiveArraySize * srcDesc.size.depth);
 
     const DXGI_FORMAT format = D3DUtil::getMapFormat(srcDesc.format);
     if (format == DXGI_FORMAT_UNKNOWN)
@@ -515,12 +515,14 @@ TextureResource* D3D11Renderer::createTextureResource(Resource::Type type, Resou
             desc.Format = format;
             desc.MiscFlags = 0;
             desc.MipLevels = srcDesc.numMipLevels;
-            desc.ArraySize = srcDesc.arraySize; 
+            desc.ArraySize = effectiveArraySize; 
             desc.Width = srcDesc.size.width; 
             desc.Usage = D3D11_USAGE_DEFAULT;
             
-            ComPtr<ID3D11Texture1D> texture;
-            SLANG_RETURN_NULL_ON_FAIL(m_device->CreateTexture1D(&desc, subRes.Buffer(), texture.writeRef()));
+            ComPtr<ID3D11Texture1D> texture1D;
+            SLANG_RETURN_NULL_ON_FAIL(m_device->CreateTexture1D(&desc, subRes.Buffer(), texture1D.writeRef()));
+
+            texture->m_resource = texture1D;
             break;
         }
         case Resource::Type::TextureCube:
@@ -532,7 +534,7 @@ TextureResource* D3D11Renderer::createTextureResource(Resource::Type type, Resou
             desc.Format = format;
             desc.MiscFlags = 0;
             desc.MipLevels = srcDesc.numMipLevels;
-            desc.ArraySize = (type == Resource::Type::TextureCube) ? effectiveArraySize : srcDesc.arraySize;
+            desc.ArraySize = effectiveArraySize; 
        
             desc.Width = srcDesc.size.width;
             desc.Height = srcDesc.size.height;
@@ -540,8 +542,15 @@ TextureResource* D3D11Renderer::createTextureResource(Resource::Type type, Resou
             desc.SampleDesc.Count = srcDesc.sampleDesc.numSamples;
             desc.SampleDesc.Quality = srcDesc.sampleDesc.quality;
 
-            ComPtr<ID3D11Texture2D> texture;
-            SLANG_RETURN_NULL_ON_FAIL(m_device->CreateTexture2D(&desc, subRes.Buffer(), texture.writeRef()));
+            if (type == Resource::Type::TextureCube)
+            {
+                desc.MiscFlags |= D3D11_RESOURCE_MISC_TEXTURECUBE;
+            }
+
+            ComPtr<ID3D11Texture2D> texture2D;
+            SLANG_RETURN_NULL_ON_FAIL(m_device->CreateTexture2D(&desc, subRes.Buffer(), texture2D.writeRef()));
+
+            texture->m_resource = texture2D;
             break;
         }
         case Resource::Type::Texture3D:
@@ -557,14 +566,16 @@ TextureResource* D3D11Renderer::createTextureResource(Resource::Type type, Resou
             desc.Depth = srcDesc.size.depth;
             desc.Usage = D3D11_USAGE_DEFAULT;
             
-            ComPtr<ID3D11Texture3D> texture;
-            SLANG_RETURN_NULL_ON_FAIL(m_device->CreateTexture3D(&desc, subRes.Buffer(), texture.writeRef()));
+            ComPtr<ID3D11Texture3D> texture3D;
+            SLANG_RETURN_NULL_ON_FAIL(m_device->CreateTexture3D(&desc, subRes.Buffer(), texture3D.writeRef()));
+
+            texture->m_resource = texture3D;
             break;
         }
         default: return nullptr;
     }
 
-    return nullptr;
+    return texture.detach();
 }
 
 BufferResource* D3D11Renderer::createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& descIn, const void* initData)
@@ -970,16 +981,9 @@ Result D3D11Renderer::createInputTexture(const InputTextureDesc& inputDesc, RefP
     else if (inputDesc.dimension == 2)
     {
         D3D11_SHADER_RESOURCE_VIEW_DESC viewDesc;
-        D3D11_TEXTURE2D_DESC desc = { 0 };
-        desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-        desc.CPUAccessFlags = 0;
-        desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-        desc.MiscFlags = 0;
-        desc.MipLevels = textureDesc.numMipLevels;
-        desc.ArraySize = textureDesc.arraySize;
+
         if (inputDesc.isCube)
         {
-            desc.MiscFlags |= D3D11_RESOURCE_MISC_TEXTURECUBE;
             viewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURECUBE;
             viewDesc.TextureCube.MipLevels = textureDesc.numMipLevels;
             viewDesc.TextureCube.MostDetailedMip = 0;
