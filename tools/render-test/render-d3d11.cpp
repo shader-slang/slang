@@ -128,6 +128,7 @@ public:
     {
     public:
         typedef TextureResource Parent;
+
         TextureResourceImpl(Type type, const Desc& desc, Usage initialUsage) :
             Parent(type, desc),
             m_initialUsage(initialUsage)
@@ -865,40 +866,15 @@ void D3D11Renderer::dispatchCompute(int x, int y, int z)
 Result D3D11Renderer::createInputBuffer(const InputBufferDesc& bufferDesc, bool isOutput, const List<unsigned int>& bufferData, 
     RefPtr<Resource>& resourceOut, ComPtr<ID3D11UnorderedAccessView>& viewOut, ComPtr<ID3D11ShaderResourceView>& srvOut)
 {
+    // For some reason we want/need to make the buffer 256 byte sized
     List<uint8_t> newBuffer;
     const size_t bufferSize = D3DUtil::calcAligned((bufferData.Count() * sizeof(unsigned int)), 256);
     newBuffer.SetSize(UInt(bufferSize));
     ::memcpy(newBuffer.Buffer(), bufferData.Buffer(), bufferSize);
 
-    Resource::Usage initialUsage = Resource::Usage::GenericRead;
+    RefPtr<BufferResource> bufferResource;
+    SLANG_RETURN_ON_FAIL(createInputBufferResource(bufferDesc, isOutput, bufferSize, newBuffer.Buffer(), this, bufferResource));
 
-    BufferResource::Desc srcDesc;
-    srcDesc.init(bufferSize);
-
-    int bindFlags = 0;
-    if (bufferDesc.type == InputBufferType::ConstantBuffer)
-    {
-        bindFlags |= Resource::BindFlag::ConstantBuffer;
-        srcDesc.cpuAccessFlags |= Resource::AccessFlag::Write;
-    }
-    else
-    {
-        bindFlags |= Resource::BindFlag::UnorderedAccess | Resource::BindFlag::PixelShaderResource | Resource::BindFlag::NonPixelShaderResource; 
-        srcDesc.elementSize = bufferDesc.stride;
-    }
-
-    if (isOutput)
-    {
-        srcDesc.cpuAccessFlags |= Resource::AccessFlag::Read;
-    }
-
-    srcDesc.bindFlags = bindFlags;
-
-    RefPtr<BufferResource> bufferResource = createBufferResource(initialUsage, srcDesc, bufferData.Buffer());
-    if (!bufferResource)
-    {
-        return SLANG_FAIL;
-    }
     BufferResourceImpl* bufferImpl = static_cast<BufferResourceImpl*>(bufferResource.Ptr());
 
     const int elemSize = bufferDesc.stride <= 0 ? 1 : bufferDesc.stride;

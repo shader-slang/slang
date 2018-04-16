@@ -334,7 +334,7 @@ protected:
     
     Result createInputSampler(const InputSamplerDesc& inputDesc, D3D12DescriptorHeap& samplerHeap, int samplerIndex);
     Result createInputTexture(const InputTextureDesc& inputDesc,  D3D12DescriptorHeap& viewHeap, int srvIndex, RefPtr<Resource>& resourceOut);
-    Result createInputBuffer(InputBufferDesc& bufferDesc, const List<unsigned int>& bufferData, D3D12DescriptorHeap& viewHeap, int uavIndex, int srvIndex,
+    Result createInputBuffer(InputBufferDesc& bufferDesc, bool isOutput, const List<unsigned int>& bufferData, D3D12DescriptorHeap& viewHeap, int uavIndex, int srvIndex,
         RefPtr<Resource>& resourceOut);
 
     void beginRender();
@@ -684,38 +684,13 @@ Result D3D12Renderer::createInputTexture(const InputTextureDesc& inputDesc, D3D1
     return SLANG_OK;
 }
 
-Result D3D12Renderer::createInputBuffer(InputBufferDesc& bufferDesc, const List<unsigned int>& bufferData, D3D12DescriptorHeap& viewHeap, int uavIndex, int srvIndex,
+Result D3D12Renderer::createInputBuffer(InputBufferDesc& bufferDesc, bool isOutput, const List<unsigned int>& bufferData, D3D12DescriptorHeap& viewHeap, int uavIndex, int srvIndex,
      RefPtr<Resource>& bufferOut)
 {
     const size_t bufferSize = bufferData.Count() * sizeof(unsigned int);
-    //bufferSize = D3DUtil::calcAligned(bufferSize, 256);
-
-    D3D12_RESOURCE_DESC resourceDesc;
-    _initBufferResourceDesc(bufferSize, resourceDesc);
-
-    BufferResource::Desc bufferResourceDesc;
-    bufferResourceDesc.init(bufferSize);
-
-    bufferResourceDesc.elementSize = bufferDesc.stride;
     
-    Resource::Usage initialUsage = Resource::Usage::GenericRead;
-    if (bufferDesc.type == InputBufferType::ConstantBuffer)
-    {
-        bufferResourceDesc.cpuAccessFlags |= Resource::AccessFlag::Write;
-        bufferResourceDesc.bindFlags |= Resource::BindFlag::ConstantBuffer;
-        initialUsage = Resource::Usage::ConstantBuffer;
-    } 
-    else
-    {
-        initialUsage = Resource::Usage::UnorderedAccess;
-        bufferResourceDesc.bindFlags |= Resource::BindFlag::UnorderedAccess;
-    }
-
-    RefPtr<BufferResource> resource = createBufferResource(initialUsage, bufferResourceDesc, bufferData.Buffer());
-    if (!resource)
-    {
-        return SLANG_FAIL;
-    }
+    RefPtr<BufferResource> resource;
+    SLANG_RETURN_ON_FAIL(createInputBufferResource(bufferDesc, isOutput, bufferSize, bufferData.Buffer(), this, resource));
 
     BufferResourceImpl* resourceImpl = static_cast<BufferResourceImpl*>(resource.Ptr());
 
@@ -2525,7 +2500,7 @@ BindingState* D3D12Renderer::createBindingState(const ShaderInputLayout& layout)
                     }
                 }
 
-                SLANG_RETURN_NULL_ON_FAIL(createInputBuffer(srcEntry.bufferDesc, srcEntry.bufferData, bindingState->m_viewHeap, dstEntry.m_uavIndex, dstEntry.m_srvIndex, dstEntry.m_resource));
+                SLANG_RETURN_NULL_ON_FAIL(createInputBuffer(srcEntry.bufferDesc, srcEntry.isOutput, srcEntry.bufferData, bindingState->m_viewHeap, dstEntry.m_uavIndex, dstEntry.m_srvIndex, dstEntry.m_resource));
                 
                 dstEntry.m_bufferLength = (int)(srcEntry.bufferData.Count() * sizeof(unsigned int));
                 dstEntry.m_bufferType = srcEntry.bufferDesc.type;

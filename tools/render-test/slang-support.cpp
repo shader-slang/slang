@@ -251,4 +251,46 @@ SlangResult generateTextureResource(const InputTextureDesc& inputDesc, int bindF
     return textureOut ? SLANG_OK : SLANG_FAIL;
 }
 
+SlangResult createInputBufferResource(const InputBufferDesc& inputDesc, bool isOutput, size_t bufferSize, const void* initData, Renderer* renderer, Slang::RefPtr<BufferResource>& bufferOut)
+{
+    using namespace Slang;
+
+    Resource::Usage initialUsage = Resource::Usage::GenericRead;
+
+    BufferResource::Desc srcDesc;
+    srcDesc.init(bufferSize);
+
+    int bindFlags = 0;
+    if (inputDesc.type == InputBufferType::ConstantBuffer)
+    {
+        bindFlags |= Resource::BindFlag::ConstantBuffer;
+        srcDesc.cpuAccessFlags |= Resource::AccessFlag::Write;
+        initialUsage = Resource::Usage::ConstantBuffer;
+    }
+    else
+    {
+        bindFlags |= Resource::BindFlag::UnorderedAccess | Resource::BindFlag::PixelShaderResource | Resource::BindFlag::NonPixelShaderResource;
+        srcDesc.elementSize = inputDesc.stride;
+        initialUsage = Resource::Usage::UnorderedAccess;
+    }
+
+    if (isOutput)
+    {
+        srcDesc.cpuAccessFlags |= Resource::AccessFlag::Read;
+    }
+
+    srcDesc.bindFlags = bindFlags;
+
+    RefPtr<BufferResource> bufferResource = renderer->createBufferResource(initialUsage, srcDesc, initData);
+    if (!bufferResource)
+    {
+        return SLANG_FAIL;
+    }
+
+    bufferOut = bufferResource;
+    return SLANG_OK;
+}
+    
+
+
 } // renderer_test
