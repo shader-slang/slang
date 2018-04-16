@@ -97,14 +97,17 @@ class Resource: public Slang::RefObject
 {
     public:
 
+        /// The type of resource.
+        /// NOTE! The order needs to be such that all texture types are at or after Texture1D (otherwise isTexture won't work correctly)
     enum class Type
     {
         Unknown,            ///< Unknown
-        Buffer,
-        Texture1D,
-        Texture2D,
-        Texture3D,
-        TextureCube,
+        Buffer,             ///< A buffer (like a constant/index/vertex buffer)
+        Texture1D,          ///< A 1d texture
+        Texture2D,          ///< A 2d texture
+        Texture3D,          ///< A 3d texture
+        TextureCube,        ///< A cubemap consists of 6 Texture2D like faces
+        CountOf,
     };
 
         /// Describes how a resource is to be used
@@ -142,6 +145,7 @@ class Resource: public Slang::RefObject
         };
     };
 
+        /// Combinations describe how a resource can be accessed (typically by the host/cpu)
     struct AccessFlag
     {
         enum Enum
@@ -283,7 +287,7 @@ class TextureResource: public Resource
     };
 
         /// The ordering of the subResources is 
-        /// forall (array/cube faces)
+        /// forall (cube faces (6) * arraySize / arraySize)
         ///     forall (mip levels)
         ///         forall (depth levels)
     struct Data
@@ -324,7 +328,7 @@ public:
 
     virtual void presentFrame() = 0;
 
-        /// Create a texture resource. If initData is set it holds 
+        /// Create a texture resource. initData holds the initialize data to set the contents of the texture when constructed. 
     virtual TextureResource* createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData = nullptr) { return nullptr; }
         /// Create a buffer resource
     virtual BufferResource* createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& desc, const void* initData = nullptr) { return nullptr; } 
