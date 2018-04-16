@@ -216,7 +216,6 @@ protected:
 
         int m_binding = 0;
         bool m_isOutput = false;
-        int m_bufferLength = 0;
     };
 
     class BindingStateImpl: public BindingState
@@ -2502,7 +2501,6 @@ BindingState* D3D12Renderer::createBindingState(const ShaderInputLayout& layout)
 
                 SLANG_RETURN_NULL_ON_FAIL(createInputBuffer(srcEntry.bufferDesc, srcEntry.isOutput, srcEntry.bufferData, bindingState->m_viewHeap, dstEntry.m_uavIndex, dstEntry.m_srvIndex, dstEntry.m_resource));
                 
-                dstEntry.m_bufferLength = (int)(srcEntry.bufferData.Count() * sizeof(unsigned int));
                 dstEntry.m_bufferType = srcEntry.bufferDesc.type;
                 break;
             }
@@ -2557,10 +2555,11 @@ void D3D12Renderer::serializeOutput(BindingState* stateIn, const char* fileName)
             if (binding.m_resource && binding.m_resource->isBuffer())
             {
                 BufferResource* bufferResource = static_cast<BufferResource*>(binding.m_resource.Ptr());
-                
+                const size_t bufferSize = bufferResource->getDesc().sizeInBytes;
+
                 unsigned int* ptr = (unsigned int*)map(bufferResource, MapFlavor::HostRead);
 
-                for (auto i = 0u; i < binding.m_bufferLength / sizeof(unsigned int); i++)
+                for (auto i = 0u; i < bufferSize / sizeof(unsigned int); i++)
                 {
                     fprintf(f, "%X\n", ptr[i]);
                 }

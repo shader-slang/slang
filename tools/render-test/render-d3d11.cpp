@@ -91,7 +91,6 @@ public:
 
         int binding = 0;
         bool isOutput = false;
-        int bufferLength = 0;
     };
 
     class BindingStateImpl: public BindingState
@@ -584,11 +583,20 @@ BufferResource* D3D11Renderer::createBufferResource(Resource::Usage initialUsage
     BufferResource::Desc srcDesc(descIn);
     srcDesc.setDefaults(initialUsage);
 
-    // Make aligned to 256 bytes... not sure why
-    srcDesc.sizeInBytes = D3DUtil::calcAligned(srcDesc.sizeInBytes, 256);
+    // Make aligned to 256 bytes... not sure why, but if you remove this the tests do fail.
+    const size_t alignedSizeInBytes = D3DUtil::calcAligned(srcDesc.sizeInBytes, 256);
         
+    // Hack to make the initialization never read from out of bounds memory, by copying into a buffer
+    List<uint8_t> initDataBuffer;
+    if (initData && alignedSizeInBytes > srcDesc.sizeInBytes)
+    {
+        initDataBuffer.SetSize(alignedSizeInBytes);
+        ::memcpy(initDataBuffer.Buffer(), initData, srcDesc.sizeInBytes);
+        initData = initDataBuffer.Buffer();
+    }
+
     D3D11_BUFFER_DESC bufferDesc = { 0 };
-    bufferDesc.ByteWidth = UINT(srcDesc.sizeInBytes);
+    bufferDesc.ByteWidth = UINT(alignedSizeInBytes);
     bufferDesc.BindFlags = _calcResourceBindFlags(srcDesc.bindFlags);
     // For read we'll need to do some staging
     bufferDesc.CPUAccessFlags = _calcResourceAccessFlags(descIn.cpuAccessFlags & Resource::AccessFlag::Write);
@@ -636,7 +644,7 @@ BufferResource* D3D11Renderer::createBufferResource(Resource::Usage initialUsage
     {
         D3D11_BUFFER_DESC bufDesc = {};
         bufDesc.BindFlags = 0;
-        bufDesc.ByteWidth = (UINT)srcDesc.sizeInBytes;
+        bufDesc.ByteWidth = (UINT)alignedSizeInBytes;
         bufDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
         bufDesc.Usage = D3D11_USAGE_STAGING;
 
@@ -866,14 +874,9 @@ void D3D11Renderer::dispatchCompute(int x, int y, int z)
 Result D3D11Renderer::createInputBuffer(const InputBufferDesc& bufferDesc, bool isOutput, const List<unsigned int>& bufferData, 
     RefPtr<Resource>& resourceOut, ComPtr<ID3D11UnorderedAccessView>& viewOut, ComPtr<ID3D11ShaderResourceView>& srvOut)
 {
-    // For some reason we want/need to make the buffer 256 byte sized
-    List<uint8_t> newBuffer;
-    const size_t bufferSize = D3DUtil::calcAligned((bufferData.Count() * sizeof(unsigned int)), 256);
-    newBuffer.SetSize(UInt(bufferSize));
-    ::memcpy(newBuffer.Buffer(), bufferData.Buffer(), bufferSize);
-
+    const size_t bufferSize = bufferData.Count() * sizeof(unsigned int);
     RefPtr<BufferResource> bufferResource;
-    SLANG_RETURN_ON_FAIL(createInputBufferResource(bufferDesc, isOutput, bufferSize, newBuffer.Buffer(), this, bufferResource));
+    SLANG_RETURN_ON_FAIL(createInputBufferResource(bufferDesc, isOutput, bufferSize, bufferData.Buffer(), this, bufferResource));
 
     BufferResourceImpl* bufferImpl = static_cast<BufferResourceImpl*>(bufferResource.Ptr());
 
@@ -1046,8 +1049,6 @@ BindingState* D3D11Renderer::createBindingState(const ShaderInputLayout& layout)
             case ShaderInputType::Buffer:
             {
                 SLANG_RETURN_NULL_ON_FAIL(createInputBuffer(srcBinding.bufferDesc, srcBinding.isOutput, srcBinding.bufferData, dstBinding.resource, dstBinding.uav, dstBinding.srv));
-
-                dstBinding.bufferLength = (int)(srcBinding.bufferData.Count() * sizeof(unsigned int));
                 dstBinding.bufferType = srcBinding.bufferDesc.type;
 				break;
 			}
@@ -1167,9 +1168,10 @@ void D3D11Renderer::serializeOutput(BindingState* stateIn, const char* fileName)
             if (binding.resource && binding.resource->isBuffer())
             {
                 BufferResource* bufferResource = static_cast<BufferResource*>(binding.resource.Ptr());
+                const size_t bufferSize = bufferResource->getDesc().sizeInBytes;
+                
                 unsigned int* ptr = (unsigned int*)map(bufferResource, MapFlavor::HostRead);
-
-                for (auto i = 0u; i < binding.bufferLength / sizeof(unsigned int); i++)
+                for (auto i = 0u; i < bufferSize / sizeof(unsigned int); i++)
                 {
                     fprintf(f, "%X\n", ptr[i]);
                 }
