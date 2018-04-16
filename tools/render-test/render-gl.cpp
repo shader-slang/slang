@@ -158,6 +158,34 @@ public:
         GLenum m_target;
 	};
 
+    class TextureResourceImpl: public TextureResource
+    {
+        public:
+        typedef TextureResource Parent;
+
+        TextureResourceImpl(Type type, Usage initialUsage, const Desc& desc, GLRenderer* renderer):
+            Parent(type, desc),
+            m_initialUsage(initialUsage),
+            m_renderer(renderer)
+        {
+            m_target = 0;
+            m_handle = 0;
+        }
+
+        ~TextureResourceImpl()
+        {
+            if (m_handle)
+            {
+                glDeleteTextures(1, &m_handle);
+            }
+         }   
+
+        Usage m_initialUsage;
+        GLRenderer* m_renderer;
+        GLenum m_target;
+        GLuint m_handle;
+    };
+
     struct BindingEntry
     {
         ShaderInputType type;
@@ -167,6 +195,7 @@ public:
         int bufferSize;
         bool isOutput = false;
     };
+
     class BindingStateImpl: public BindingState
     {
 		public:
@@ -207,6 +236,20 @@ public:
 		GLRenderer* m_renderer;
 	};
 
+    enum class GlPixelFormat
+    {
+        Unknown,
+        RGBA_Unorm_UInt8,
+        CountOf,
+    };
+
+    struct GlPixelFormatInfo
+    {
+        GLint internalFormat;           // such as GL_RGBA8
+        GLenum format;                  // such as GL_RGBA
+        GLenum formatType;              // such as GL_UNSIGNED_BYTE
+    };
+
 	void destroyBindingEntry(const BindingEntry& entry);
 	void destroyBindingEntries(const BindingEntry* entries, int numEntries);
 
@@ -217,6 +260,9 @@ public:
     void debugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message);
     void createInputTexture(BindingEntry& rs, InputTextureDesc texDesc, InputSamplerDesc samplerDesc);
     void createInputSampler(BindingEntry& rs, InputSamplerDesc samplerDesc);
+
+        /// Returns GlPixelFormat::Unknown if not an equivalent
+    static GlPixelFormat _getGlPixelFormat(Format format);
 
     static void APIENTRY staticDebugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam);
     static VertexAttributeFormat getVertexAttributeFormat(Format format);
@@ -238,6 +284,24 @@ public:
 #define DECLARE_GL_EXTENSION_FUNC(NAME, TYPE) TYPE NAME;
     MAP_GL_EXTENSION_FUNCS(DECLARE_GL_EXTENSION_FUNC)
 #undef DECLARE_GL_EXTENSION_FUNC
+
+        static const GlPixelFormatInfo s_pixelFormatInfos[int(GlPixelFormat::CountOf)];
+};
+
+/* static */GLRenderer::GlPixelFormat GLRenderer::_getGlPixelFormat(Format format)
+{
+    switch (format)
+    {
+        case Format::RGBA_Unorm_UInt8:      return GlPixelFormat::RGBA_Unorm_UInt8;
+        default:                            return GlPixelFormat::Unknown;
+    }
+}
+
+/* static */ const GLRenderer::GlPixelFormatInfo GLRenderer::s_pixelFormatInfos[int(GlPixelFormat::CountOf)] = 
+{
+    // internalType, format, formatType
+    { 0,                0,          0},                         // GlPixelFormat::Unknown
+    { GL_RGBA8,         GL_RGBA,    GL_UNSIGNED_BYTE },         // GlPixelFormat::RGBA_Unorm_UInt8
 };
 
 Renderer* createGLRenderer()
@@ -700,9 +764,155 @@ ShaderCompiler* GLRenderer::getShaderCompiler()
     return this;
 }
 
-TextureResource* GLRenderer::createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData)
+TextureResource* GLRenderer::createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& descIn, const TextureResource::Data* initData)
 {
-    return nullptr;
+    TextureResource::Desc srcDesc(descIn);
+    srcDesc.setDefaults(type, initialUsage);
+
+    GlPixelFormat pixelFormat = _getGlPixelFormat(srcDesc.format);
+    if (pixelFormat == GlPixelFormat::Unknown)
+    {
+        return nullptr;
+    }
+
+    const GlPixelFormatInfo& info = s_pixelFormatInfos[int(pixelFormat)];
+
+    const GLint internalFormat = info.internalFormat;
+    const GLenum format = info.format;
+    const GLenum formatType = info.formatType;
+    
+    RefPtr<TextureResourceImpl> texture(new TextureResourceImpl(type, initialUsage, srcDesc, this));
+
+    GLenum target = 0;
+    GLuint handle = 0;
+    glGenTextures(1, &handle);
+
+    const int effectiveArraySize = srcDesc.calcEffectiveArraySize(type);
+
+    assert(initData);
+    assert(initData->numSubResources == srcDesc.numMipLevels * srcDesc.size.depth * effectiveArraySize);
+
+    // Set on texture so will be freed if failure
+    texture->m_handle = handle;
+    const void*const*const data = initData->subResources;
+
+    switch (type)
+    {
+        case Resource::Type::Texture1D:
+        {
+            if (srcDesc.arraySize > 0)
+            {
+                target = GL_TEXTURE_1D_ARRAY;
+                glBindTexture(target, handle);
+
+                int slice = 0;
+                for (int i = 0; i < effectiveArraySize; i++)
+                {
+                    for (int j = 0; j < srcDesc.numMipLevels; j++)
+                    {
+                        glTexImage2D(target, j, internalFormat, srcDesc.size.width, i, 0, format, formatType, data[slice++]);
+                    }
+                }
+            }
+            else
+            {
+                target = GL_TEXTURE_1D;
+                glBindTexture(target, handle);
+                for (int i = 0; i < srcDesc.numMipLevels; i++)
+                {
+                    glTexImage1D(target, i, internalFormat, srcDesc.size.width, 0, format, formatType, data[i]);
+                }
+            }
+            break;
+        }
+        case Resource::Type::TextureCube:
+        case Resource::Type::Texture2D:
+        {
+            if (srcDesc.arraySize > 0)
+            {
+                if (type == Resource::Type::TextureCube)
+                {
+                    target = GL_TEXTURE_CUBE_MAP_ARRAY;
+                }
+                else
+                {
+                    target = GL_TEXTURE_2D_ARRAY;
+                }
+
+                glBindTexture(target, handle);
+                
+                int slice = 0;
+                for (int i = 0; i < effectiveArraySize; i++)
+                {
+                    for (int j = 0; j < srcDesc.numMipLevels; j++)
+                    {
+                        glTexImage3D(target, j, internalFormat, srcDesc.size.width, srcDesc.size.height, slice, 0, format, formatType, data[slice++]);
+                    }
+                }
+            }
+            else
+            {
+                if (type == Resource::Type::TextureCube)
+                {
+                    target = GL_TEXTURE_CUBE_MAP;
+                    glBindTexture(target, handle);
+                    
+                    int slice = 0;
+                    for (int j = 0; j < 6; j++)
+                    {
+                        for (int i = 0; i < srcDesc.numMipLevels; i++)
+                        {
+                            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + j, i, internalFormat, srcDesc.size.width, srcDesc.size.height, 0, format, formatType, data[slice++]);
+                        }
+                    }
+                }
+                else
+                {
+                    target = GL_TEXTURE_2D;
+                    glBindTexture(target, handle);
+                    for (int i = 0; i < srcDesc.numMipLevels; i++)
+                    {
+                        glTexImage2D(target, i, internalFormat, srcDesc.size.width, srcDesc.size.height, 0, format, formatType, data[i]);
+                    }
+                }
+            }
+            break;
+        }
+        case Resource::Type::Texture3D:
+        {
+            target = GL_TEXTURE_3D;
+            glBindTexture(target, handle);
+            for (int i = 0; i < srcDesc.numMipLevels; i++)
+            {
+                glTexImage3D(target, i, internalFormat, srcDesc.size.width, srcDesc.size.height, srcDesc.size.depth, 0, format, formatType, data[i]);
+            }
+            break;
+        }
+        default: return nullptr;
+    }
+
+    glTexParameteri(target, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(target, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(target, GL_TEXTURE_WRAP_R, GL_REPEAT);
+
+    //if (samplerDesc.isCompareSampler)
+    {
+        glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameterf(target, GL_TEXTURE_MAX_ANISOTROPY_EXT, 8.0f);
+    }
+    /* 
+    else
+    {
+        glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(target, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+        glTexParameteri(target, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+    } */
+
+    texture->m_target = target;
+
+    return texture.detach();
 }
 
 static GLenum _calcUsage(Resource::Usage usage)
@@ -856,28 +1066,29 @@ void GLRenderer::dispatchCompute(int x, int y, int z)
 BindingState* GLRenderer::createBindingState(const ShaderInputLayout& layout)
 {
     BindingStateImpl* state = new BindingStateImpl(this);
-    for (auto & entry : layout.entries)
+    for (auto & srcEntry : layout.entries)
     {
-        BindingEntry rsEntry;
-        rsEntry.isOutput = entry.isOutput;
-        rsEntry.binding = entry.glslBinding;
-        rsEntry.type = entry.type;
-        switch (entry.type)
+        BindingEntry dstEntry;
+        dstEntry.isOutput = srcEntry.isOutput;
+        dstEntry.binding = srcEntry.glslBinding;
+        dstEntry.type = srcEntry.type;
+
+        switch (srcEntry.type)
         {
             case ShaderInputType::Buffer:
-                createInputBuffer(rsEntry, entry.bufferDesc, entry.bufferData);
+                createInputBuffer(dstEntry, srcEntry.bufferDesc, srcEntry.bufferData);
                 break;
             case ShaderInputType::Texture:
-                createInputTexture(rsEntry, entry.textureDesc, InputSamplerDesc());
+                createInputTexture(dstEntry, srcEntry.textureDesc, InputSamplerDesc());
                 break;
             case ShaderInputType::CombinedTextureSampler:
-                createInputTexture(rsEntry, entry.textureDesc, entry.samplerDesc);
+                createInputTexture(dstEntry, srcEntry.textureDesc, srcEntry.samplerDesc);
                 break;
             case ShaderInputType::Sampler:
-                createInputSampler(rsEntry, entry.samplerDesc);
+                createInputSampler(dstEntry, srcEntry.samplerDesc);
                 break;
         }
-        state->m_entries.Add(rsEntry);
+        state->m_entries.Add(dstEntry);
     }
     return state;
 }
