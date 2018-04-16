@@ -128,7 +128,7 @@ protected:
         public:
         typedef BufferResource Parent;
         
-        enum class Style
+        enum class BackingStyle
         {
             Unknown,
             ResourceBacked,             ///< The contents is only held within the resource
@@ -137,9 +137,9 @@ protected:
 
         void bindConstantBufferView(D3D12CircularResourceHeap& circularHeap, int index, Submitter* submitter) const
         {
-            switch (m_style)
+            switch (m_backingStyle)
             {
-                case Style::MemoryBacked:
+                case BackingStyle::MemoryBacked:
                 {
                     const size_t bufferSize = m_memory.Count();
                     D3D12CircularResourceHeap::Cursor cursor = circularHeap.allocateConstantBuffer(bufferSize);
@@ -148,7 +148,7 @@ protected:
                     submitter->setRootConstantBufferView(index, circularHeap.getGpuHandle(cursor));
                     break;
                 }
-                case Style::ResourceBacked:
+                case BackingStyle::ResourceBacked:
                 {
                     // Set the constant buffer
                     submitter->setRootConstantBufferView(index, m_resource.getResource()->GetGPUVirtualAddress());
@@ -165,23 +165,23 @@ protected:
         {
         }
 
-        static Style _calcResourceStyle(Usage usage)
+        static BackingStyle _calcResourceBackingStyle(Usage usage)
         {
             switch (usage)
             {
-                case Usage::ConstantBuffer:     return Style::MemoryBacked;
-                default:                        return Style::ResourceBacked;
+                case Usage::ConstantBuffer:     return BackingStyle::MemoryBacked;
+                default:                        return BackingStyle::ResourceBacked;
             }
         }
 
-        Style m_style;                      ///< How memory is handled.
-        D3D12Resource m_resource;
-        D3D12Resource m_uploadResource;
+        BackingStyle m_backingStyle;        ///< How the resource is 'backed' - either as a resource or cpu memory. Cpu memory is typically used for constant buffers.
+        D3D12Resource m_resource;           ///< The resource typically in gpu memory             
+        D3D12Resource m_uploadResource;     ///< If the resource can be written to, and is in gpu memory (ie not Memory backed), will have upload resource 
 
         Usage m_initialUsage;
 
-        List<uint8_t> m_memory;
-        MapFlavor m_mapFlavor;
+        List<uint8_t> m_memory;             ///< Cpu memory buffer, used if the m_backingStyle is MemoryBacked
+        MapFlavor m_mapFlavor;              ///< If the resource is mapped holds the current mapping flavor
     };
 
     class TextureResourceImpl: public TextureResource
@@ -1292,7 +1292,7 @@ Result D3D12Renderer::_calcBindParameters(BindParameters& params)
         const BufferResourceImpl* buffer = m_boundConstantBuffers[i];
         if (buffer)
         {
-            assert(buffer->m_style == BufferResourceImpl::Style::MemoryBacked);
+            assert(buffer->m_backingStyle == BufferResourceImpl::BackingStyle::MemoryBacked);
 
             D3D12_ROOT_PARAMETER& param = params.nextParameter();
             param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
@@ -2094,7 +2094,7 @@ TextureResource* D3D12Renderer::createTextureResource(Resource::Type type, Resou
 
 BufferResource* D3D12Renderer::createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& descIn, const void* initData)
 {
-    typedef BufferResourceImpl::Style Style;
+    typedef BufferResourceImpl::BackingStyle Style;
     
     BufferResource::Desc srcDesc(descIn);
     srcDesc.setDefaults(initialUsage);
@@ -2102,14 +2102,14 @@ BufferResource* D3D12Renderer::createBufferResource(Resource::Usage initialUsage
     RefPtr<BufferResourceImpl> buffer(new BufferResourceImpl(initialUsage, srcDesc));
 
     // Save the style
-    buffer->m_style = BufferResourceImpl::_calcResourceStyle(initialUsage);
+    buffer->m_backingStyle = BufferResourceImpl::_calcResourceBackingStyle(initialUsage);
 
     D3D12_RESOURCE_DESC bufferDesc;
     _initBufferResourceDesc(srcDesc.sizeInBytes, bufferDesc);
 
     bufferDesc.Flags = _calcResourceBindFlags(initialUsage, srcDesc.bindFlags);
 
-    switch (buffer->m_style)
+    switch (buffer->m_backingStyle)
     {
         case Style::MemoryBacked:
         {
@@ -2183,14 +2183,14 @@ InputLayout* D3D12Renderer::createInputLayout(const InputElementDesc* inputEleme
 
 void* D3D12Renderer::map(BufferResource* bufferIn, MapFlavor flavor) 
 {
-    typedef BufferResourceImpl::Style Style;
+    typedef BufferResourceImpl::BackingStyle Style;
 
     BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(bufferIn);
     buffer->m_mapFlavor = flavor;
 
     const size_t bufferSize = buffer->getDesc().sizeInBytes;
     
-    switch (buffer->m_style)
+    switch (buffer->m_backingStyle)
     {
         case Style::ResourceBacked:
         {
@@ -2281,10 +2281,10 @@ void* D3D12Renderer::map(BufferResource* bufferIn, MapFlavor flavor)
 
 void D3D12Renderer::unmap(BufferResource* bufferIn)
 {
-    typedef BufferResourceImpl::Style Style;
+    typedef BufferResourceImpl::BackingStyle Style;
     BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(bufferIn);
 
-    switch (buffer->m_style)
+    switch (buffer->m_backingStyle)
     {
         case Style::MemoryBacked:
         {

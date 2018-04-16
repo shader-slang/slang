@@ -28,9 +28,12 @@ int TextureResource::Size::calcMaxDimension(Type type) const
     switch (type)
     {
         case Resource::Type::Texture1D:     return this->width;
-        case Resource::Type::TextureCube:
-        case Resource::Type::Texture2D:     return std::max(this->width, this->height);
         case Resource::Type::Texture3D:     return std::max(std::max(this->width, this->height), this->depth);
+        case Resource::Type::TextureCube:   // fallthru
+        case Resource::Type::Texture2D:     
+        {
+            return std::max(this->width, this->height);
+        }
         default: return 0;
     }
 }
@@ -107,7 +110,8 @@ void TextureResource::Desc::fixSize(Type type)
         }
         case Resource::Type::Texture3D:
         {
-            this->arraySize = 1;
+            // Can't have an array
+            this->arraySize = 0;
             break;
         }
         default: break;
@@ -133,7 +137,7 @@ int TextureResource::Desc::calcEffectiveArraySize(Type type) const
 
     switch (type)
     {
-        case Resource::Type::Texture1D:
+        case Resource::Type::Texture1D:         // fallthru
         case Resource::Type::Texture2D:         
         {
             return arrSize;

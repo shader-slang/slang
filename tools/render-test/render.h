@@ -219,10 +219,9 @@ class TextureResource: public Resource
             numSamples = 1;
             quality = 0;
         }
-        int numSamples;
-        int quality;
+        int numSamples;                     ///< Number of samples per pixel
+        int quality;                        ///< The quality measure for the samples
     };
-
     
     struct Size
     {
@@ -259,7 +258,10 @@ class TextureResource: public Resource
         int calcNumMipLevels(Type type) const;
             /// Calculate the total number of sub resources. 0 on error.
         int calcNumSubResources(Type type) const;
-            /// Calculate the array size
+
+            /// Calculate the effective array size - in essence the amount if mip map sets needed. 
+            /// In practice takes into account if the arraySize is 0 (it's not an array, but it will still have at least one mip set) 
+            /// and if the type is a cubemap (multiplies the amount of mip sets by 6) 
         int calcEffectiveArraySize(Type type) const;
 
             /// 
