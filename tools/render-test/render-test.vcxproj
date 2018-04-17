@@ -175,6 +175,7 @@
     <ClCompile Include="render-d3d12.cpp" />
     <ClCompile Include="render-gl.cpp" />
     <ClCompile Include="render-vk.cpp" />
+    <ClCompile Include="render.cpp" />
     <ClCompile Include="resource-d3d12.cpp" />
     <ClCompile Include="shader-input-layout.cpp" />
     <ClCompile Include="slang-support.cpp" />

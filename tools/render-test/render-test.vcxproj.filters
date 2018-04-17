@@ -51,6 +51,9 @@
     <ClCompile Include="descriptor-heap-d3d12.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="render.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="options.h">
