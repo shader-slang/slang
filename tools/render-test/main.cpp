@@ -73,11 +73,11 @@ class RenderTestApp
 
 	RefPtr<Renderer> m_renderer;
 
-	RefPtr<Buffer>	m_constantBuffer;
-	RefPtr<InputLayout> m_inputLayout;
-	RefPtr<Buffer>      m_vertexBuffer;
-	RefPtr<ShaderProgram> m_shaderProgram;
-	RefPtr<BindingState> m_bindingState;
+	RefPtr<BufferResource>	m_constantBuffer;
+	RefPtr<InputLayout>     m_inputLayout;
+	RefPtr<BufferResource>  m_vertexBuffer;
+	RefPtr<ShaderProgram>   m_shaderProgram;
+	RefPtr<BindingState>    m_bindingState;
 
 	ShaderInputLayout m_shaderInputLayout;
 };
@@ -106,11 +106,11 @@ SlangResult RenderTestApp::initialize(Renderer* renderer, ShaderCompiler* shader
     // TODO(tfoley): use each API's reflection interface to query the constant-buffer size needed
     m_constantBufferSize = 16 * sizeof(float);
 
-    BufferDesc constantBufferDesc;
-    constantBufferDesc.size = m_constantBufferSize;
-    constantBufferDesc.flavor = BufferFlavor::Constant;
+    BufferResource::Desc constantBufferDesc;
+    constantBufferDesc.init(m_constantBufferSize);
+    constantBufferDesc.cpuAccessFlags = Resource::AccessFlag::Write;
 
-    m_constantBuffer = renderer->createBuffer(constantBufferDesc);
+    m_constantBuffer = renderer->createBufferResource(Resource::Usage::ConstantBuffer, constantBufferDesc);
     if(!m_constantBuffer)
         return SLANG_FAIL;
 		
@@ -126,12 +126,10 @@ SlangResult RenderTestApp::initialize(Renderer* renderer, ShaderCompiler* shader
     if(!m_inputLayout)
         return SLANG_FAIL;
 
-    BufferDesc vertexBufferDesc;
-    vertexBufferDesc.size = kVertexCount * sizeof(Vertex);
-    vertexBufferDesc.flavor = BufferFlavor::Vertex;
-    vertexBufferDesc.initData = &kVertexData[0];
+    BufferResource::Desc vertexBufferDesc;
+    vertexBufferDesc.init(kVertexCount * sizeof(Vertex));
 
-    m_vertexBuffer = renderer->createBuffer(vertexBufferDesc);
+    m_vertexBuffer = renderer->createBufferResource(Resource::Usage::VertexBuffer, vertexBufferDesc, kVertexData);
     if(!m_vertexBuffer)
         return SLANG_FAIL;
 

@@ -1,4 +1,5 @@
 //TEST(smoke):COMPARE_HLSL_RENDER:
+//TEST(smoke):COMPARE_HLSL_RENDER: -dx12
 
 // Confirm that the `nointerpolation` modifier
 // makes it through Slang codegen with the
