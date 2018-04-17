@@ -600,6 +600,8 @@ static LegalVal legalizeLocalVar(
         context,
         irLocalVar->getDataType()->getValueType());
 
+    auto originalRate = irLocalVar->getRate();
+
     RefPtr<VarLayout> varLayout = findVarLayout(irLocalVar);
     RefPtr<TypeLayout> typeLayout = varLayout ? varLayout->typeLayout : nullptr;
 
@@ -614,14 +616,25 @@ static LegalVal legalizeLocalVar(
     switch (maybeSimpleType.flavor)
     {
     case LegalType::Flavor::simple:
-        // Easy case: the type is usable as-is, and we
-        // should just do that.
-        irLocalVar->setFullType(context->builder->getPtrType(
-            maybeSimpleType.getSimple()));
-        return LegalVal::simple(irLocalVar);
+        {
+            // Easy case: the type is usable as-is, and we
+            // should just do that.
+            auto type = maybeSimpleType.getSimple();
+            type = context->builder->getPtrType(type);
+            if( originalRate )
+            {
+                type = context->builder->getRateQualifiedType(
+                    originalRate,
+                    type);
+            }
+            irLocalVar->setFullType(type);
+            return LegalVal::simple(irLocalVar);
+        }
 
     default:
     {
+        // TODO: We don't handle rates in this path.
+
         context->insertBeforeLocalVar = irLocalVar;
 
         LegalVarChain* varChain = nullptr;

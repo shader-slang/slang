@@ -548,6 +548,9 @@ namespace Slang
     //
     IRParentInst* mergeCandidateParentsForHoistableInst(IRParentInst* left, IRParentInst* right)
     {
+        // If the candidates are both the same, then who cares?
+        if(left == right) return left;
+
         // If either `left` or `right` is a block, then we need to be
         // a bit careful, because blocks can see other values just using
         // the dominance relationship, without a direct parent-child relationship.
@@ -4805,6 +4808,27 @@ namespace Slang
         IRGlobalValueWithCode*  clonedValue,
         IRGlobalValueWithCode*  originalValue);
 
+    IRRate* cloneRate(
+        IRSpecContextBase*  context,
+        IRRate*             rate)
+    {
+        return (IRRate*) cloneType(context, rate);
+    }
+
+    void maybeSetClonedRate(
+        IRSpecContextBase*  context,
+        IRBuilder*          builder,
+        IRInst*             clonedValue,
+        IRInst*             originalValue)
+    {
+        if(auto rate = originalValue->getRate() )
+        {
+            clonedValue->setFullType(builder->getRateQualifiedType(
+                cloneRate(context, rate),
+                clonedValue->getFullType()));
+        }
+    }
+
     IRGlobalVar* cloneGlobalVarImpl(
         IRSpecContextBase*              context,
         IRBuilder*                      builder,
@@ -4814,11 +4838,7 @@ namespace Slang
         auto clonedVar = builder->createGlobalVar(
             cloneType(context, originalVar->getDataType()->getValueType()));
 
-        if(auto rate = originalVar->getRate() )
-        {
-            clonedVar->setFullType(builder->getRateQualifiedType(
-                rate, clonedVar->getFullType()));
-        }
+        maybeSetClonedRate(context, builder, clonedVar, originalVar);
 
         registerClonedValue(context, clonedVar, originalValues);
 
