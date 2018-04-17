@@ -37,12 +37,12 @@ void BindingState::Desc::addSampler(const SamplerDesc& desc, const RegisterDesc&
     m_bindings.Add(binding);
 }
 
-void BindingState::Desc::addResource(Resource* resource, const RegisterDesc& registerDesc)
+void BindingState::Desc::addResource(Binding::Type type, Resource* resource, const RegisterDesc& registerDesc)
 {
     assert(resource);
 
     Binding binding;
-    binding.type = Binding::Type::Resource;
+    binding.type = type;
     binding.resource = resource;
     binding.descIndex = -1;
     binding.registerDesc = registerDesc;
@@ -110,6 +110,7 @@ void BindingState::Desc::clear()
     m_bindings.Clear();
     m_samplers.Clear();
     m_indices.Clear();
+    m_numRenderTargets = 1;
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!! TextureResource::Size !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */

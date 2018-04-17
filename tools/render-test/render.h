@@ -11,9 +11,6 @@
 
 namespace renderer_test {
 
-// Pre declare
-class Resource;
-class TextureResource;
 
 // Declare opaque type
 class InputLayout: public Slang::RefObject
@@ -27,100 +24,6 @@ class ShaderProgram: public Slang::RefObject
 };
 
 
-class BindingState: public Slang::RefObject
-{
-	public:
-
-    enum class ShaderStyle
-    {
-        Hlsl,
-        Glsl,
-        CountOf,
-    };
-
-    struct RegisterSet
-    {
-        /// Default Ctor makes an empty set
-        SLANG_FORCE_INLINE RegisterSet() :
-            m_numIndices(0),
-            m_indexOrBase(0)
-        {}
-        /// Ctor for one or more. NOTE! Meaning if indexIn changes depending if numIndices > 1.
-        SLANG_FORCE_INLINE RegisterSet(int indexIn, int numIndicesIn) :
-            m_numIndices(uint8_t(numIndicesIn)),
-            m_indexOrBase(uint16_t(indexIn))
-        {
-        }
-        uint8_t m_numIndices;
-        uint16_t m_indexOrBase;                 ///< Meaning changes depending on numIndices. If 1, it is the index if larger than 1, then is an index into 'indices'  
-    };
-
-    struct RegisterDesc
-    {
-        RegisterSet registerSets[int(ShaderStyle::CountOf)];
-    };
-
-    struct RegisterList
-    {
-        const uint16_t* begin() const { return indices; }
-        const uint16_t* end() const { return indices + numIndices; }
-
-        const uint16_t* indices;
-        size_t numIndices;
-    };
-
-    struct SamplerDesc
-    {
-        bool isCompareSampler;
-    };
-
-    struct Desc
-    {
-        RegisterList asRegisterList(const RegisterSet& set) const
-        {
-            switch (set.m_numIndices)
-            {
-                case 0:     return RegisterList { nullptr, 0 };
-                case 1:     return RegisterList { &set.m_indexOrBase, 1 };
-                default:    return RegisterList { m_indices.Buffer() + set.m_indexOrBase, set.m_numIndices};
-            }
-        }
-
-        struct Binding
-        {
-            enum class Type
-            {
-                Sampler,
-                Resource,
-                CombinedTextureSampler,     
-            };
-
-            Type type;                      ///< Type of binding
-            int descIndex;                  ///< Index associated with type. -1 if not used
-            Slang::RefPtr<Resource> resource;             ///< Associated resource. nullptr if not used
-            RegisterDesc registerDesc;      ///< Registers associated with binding
-        };
-
-            /// Add a sampler        
-        void addSampler(const SamplerDesc& desc, const RegisterDesc& registerDesc);
-            /// Add a resource - assumed that the binding will match the Desc of the resource
-        void addResource(Resource* resource, const RegisterDesc& registerDesc);
-            /// Add combined texture a
-        void addCombinedTextureSampler(TextureResource* resource, const SamplerDesc& samplerDesc, const RegisterDesc& registerDesc);
-
-            /// Returns the first member of the set, or returns -1 if is empty
-        int getFirst(const RegisterSet& set) const;
-            /// Clear the contents 
-        void clear();
-
-        RegisterSet addRegisterSet(int index);
-        RegisterSet addRegisterSet(const int* indices, int numIndices);
-
-        Slang::List<Binding> m_bindings;
-        Slang::List<SamplerDesc> m_samplers;    
-        Slang::List<uint16_t> m_indices;                  ///< Used to store lists of registers
-    };
-};
 
 struct ShaderCompileRequest
 {
@@ -414,6 +317,107 @@ class TextureResource: public Resource
     Desc m_desc;
 };
 
+class BindingState : public Slang::RefObject
+{
+public:
+
+    enum class ShaderStyle
+    {
+        Hlsl,
+        Glsl,
+        CountOf,
+    };
+
+    struct RegisterSet
+    {
+        /// Default Ctor makes an empty set
+        SLANG_FORCE_INLINE RegisterSet() :
+            m_numIndices(0),
+            m_indexOrBase(0)
+        {}
+        /// Ctor for one or more. NOTE! Meaning if indexIn changes depending if numIndices > 1.
+        SLANG_FORCE_INLINE RegisterSet(int indexIn, int numIndicesIn) :
+            m_numIndices(uint8_t(numIndicesIn)),
+            m_indexOrBase(uint16_t(indexIn))
+        {
+        }
+        uint8_t m_numIndices;
+        uint16_t m_indexOrBase;                 ///< Meaning changes depending on numIndices. If 1, it is the index if larger than 1, then is an index into 'indices'  
+    };
+
+    struct RegisterDesc
+    {
+        RegisterSet registerSets[int(ShaderStyle::CountOf)];
+    };
+
+    struct RegisterList
+    {
+        const uint16_t* begin() const { return indices; }
+        const uint16_t* end() const { return indices + numIndices; }
+
+        const uint16_t* indices;
+        size_t numIndices;
+    };
+
+    struct SamplerDesc
+    {
+        bool isCompareSampler;
+    };
+
+    struct Desc
+    {
+        RegisterList asRegisterList(const RegisterSet& set) const
+        {
+            switch (set.m_numIndices)
+            {
+                case 0:     return RegisterList{ nullptr, 0 };
+                case 1:     return RegisterList{ &set.m_indexOrBase, 1 };
+                default:    return RegisterList{ m_indices.Buffer() + set.m_indexOrBase, set.m_numIndices };
+            }
+        }
+
+        struct Binding
+        {
+            enum class Type
+            {
+                Sampler,
+                Buffer,
+                Texture,
+                CombinedTextureSampler,
+            };
+
+            Type type;                      ///< Type of binding
+            int descIndex;                  ///< Index associated with type. -1 if not used
+            Slang::RefPtr<Resource> resource;             ///< Associated resource. nullptr if not used
+            RegisterDesc registerDesc;      ///< Registers associated with binding
+        };
+
+        /// Add a resource - assumed that the binding will match the Desc of the resource
+        void addResource(Binding::Type type, Resource* resource, const RegisterDesc& registerDesc);
+        /// Add a sampler        
+        void addSampler(const SamplerDesc& desc, const RegisterDesc& registerDesc);
+        /// Add a BufferResource 
+        void addBufferResource(BufferResource* resource, const RegisterDesc& registerDesc) { addResource(Binding::Type::Buffer, resource, registerDesc); }
+        /// Add a texture 
+        void addTextureResource(TextureResource* resource, const RegisterDesc& registerDesc) { addResource(Binding::Type::Texture, resource, registerDesc); }
+        /// Add combined texture a
+        void addCombinedTextureSampler(TextureResource* resource, const SamplerDesc& samplerDesc, const RegisterDesc& registerDesc);
+
+        /// Returns the first member of the set, or returns -1 if is empty
+        int getFirst(const RegisterSet& set) const;
+        /// Clear the contents 
+        void clear();
+
+        RegisterSet addRegisterSet(int index);
+        RegisterSet addRegisterSet(const int* indices, int numIndices);
+
+        Slang::List<Binding> m_bindings;
+        Slang::List<SamplerDesc> m_samplers;
+        Slang::List<uint16_t> m_indices;                  ///< Used to store lists of registers
+        int m_numRenderTargets = 1;
+    };
+};
+
 class Renderer: public Slang::RefObject
 {
 public:
@@ -434,6 +438,7 @@ public:
 
     virtual InputLayout* createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) = 0;
     virtual BindingState* createBindingState(const ShaderInputLayout& shaderInput) = 0;
+    virtual BindingState* createBindingState(const BindingState::Desc& desc) { return nullptr; }
     virtual ShaderCompiler* getShaderCompiler() = 0;
 
     virtual void* map(BufferResource* buffer, MapFlavor flavor) = 0;

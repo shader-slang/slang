@@ -324,7 +324,7 @@ SlangResult createBindingSetDesc(ShaderInputLayoutEntry* srcEntries, int numEntr
                 RefPtr<BufferResource> bufferResource;
                 SLANG_RETURN_ON_FAIL(createInputBufferResource(srcEntry.bufferDesc, srcEntry.isOutput, bufferSize, srcEntry.bufferData.Buffer(), renderer, bufferResource));
                 
-                descOut.addResource(bufferResource, registerDesc);
+                descOut.addBufferResource(bufferResource, registerDesc);
                 break;
             }
             case ShaderInputType::CombinedTextureSampler:
@@ -339,7 +339,7 @@ SlangResult createBindingSetDesc(ShaderInputLayoutEntry* srcEntries, int numEntr
                 RefPtr<TextureResource> texture;
                 SLANG_RETURN_ON_FAIL(generateTextureResource(srcEntry.textureDesc, textureBindFlags, renderer, texture));
 
-                descOut.addResource(texture, registerDesc);
+                descOut.addTextureResource(texture, registerDesc);
                 break;
             }
             case ShaderInputType::Sampler:
