@@ -291,9 +291,9 @@ SlangResult createInputBufferResource(const InputBufferDesc& inputDesc, bool isO
     return SLANG_OK;
 }
     
-static BindingState::Desc::SamplerDesc _calcSamplerDesc(const InputSamplerDesc& srcDesc)
+static BindingState::SamplerDesc _calcSamplerDesc(const InputSamplerDesc& srcDesc)
 {
-    BindingState::Desc::SamplerDesc dstDesc;
+    BindingState::SamplerDesc dstDesc;
     dstDesc.isCompareSampler = srcDesc.isCompareSampler;
     return dstDesc;
 }
@@ -309,9 +309,9 @@ SlangResult createBindingSetDesc(ShaderInputLayoutEntry* srcEntries, int numEntr
     {
         const ShaderInputLayoutEntry& srcEntry = srcEntries[i];
 
-        BindingState::Desc::RegisterDesc registerDesc;
-        registerDesc.registerSets[int(BindingState::Desc::ShaderStyle::Hlsl)] = descOut.addRegisterSet(srcEntry.hlslBinding);
-        registerDesc.registerSets[int(BindingState::Desc::ShaderStyle::Glsl)] = descOut.addRegisterSet(srcEntry.glslBinding.Buffer(), int(srcEntry.glslBinding.Count()));
+        BindingState::RegisterDesc registerDesc;
+        registerDesc.registerSets[int(BindingState::ShaderStyle::Hlsl)] = descOut.addRegisterSet(srcEntry.hlslBinding);
+        registerDesc.registerSets[int(BindingState::ShaderStyle::Glsl)] = descOut.addRegisterSet(srcEntry.glslBinding.Buffer(), int(srcEntry.glslBinding.Count()));
 
         switch (srcEntry.type)
         {

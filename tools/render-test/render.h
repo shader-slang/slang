@@ -31,41 +31,51 @@ class BindingState: public Slang::RefObject
 {
 	public:
 
+    enum class ShaderStyle
+    {
+        Hlsl,
+        Glsl,
+        CountOf,
+    };
+
+    struct RegisterSet
+    {
+        /// Default Ctor makes an empty set
+        SLANG_FORCE_INLINE RegisterSet() :
+            m_numIndices(0),
+            m_indexOrBase(0)
+        {}
+        /// Ctor for one or more. NOTE! Meaning if indexIn changes depending if numIndices > 1.
+        SLANG_FORCE_INLINE RegisterSet(int indexIn, int numIndicesIn) :
+            m_numIndices(uint8_t(numIndicesIn)),
+            m_indexOrBase(uint16_t(indexIn))
+        {
+        }
+        uint8_t m_numIndices;
+        uint16_t m_indexOrBase;                 ///< Meaning changes depending on numIndices. If 1, it is the index if larger than 1, then is an index into 'indices'  
+    };
+
+    struct RegisterDesc
+    {
+        RegisterSet registerSets[int(ShaderStyle::CountOf)];
+    };
+
+    struct RegisterList
+    {
+        const uint16_t* begin() const { return indices; }
+        const uint16_t* end() const { return indices + numIndices; }
+
+        const uint16_t* indices;
+        size_t numIndices;
+    };
+
+    struct SamplerDesc
+    {
+        bool isCompareSampler;
+    };
+
     struct Desc
     {
-        enum class ShaderStyle
-        {
-            Hlsl,
-            Glsl,
-            CountOf,
-        };
-
-        struct RegisterSet
-        {
-                /// Default Ctor makes an empty set
-            SLANG_FORCE_INLINE RegisterSet():
-                m_numIndices(0),
-                m_indexOrBase(0)
-            {}
-                /// Ctor for one or more. NOTE! Meaning if indexIn changes depending if numIndices > 1.
-            SLANG_FORCE_INLINE RegisterSet(int indexIn, int numIndicesIn):
-                m_numIndices(uint8_t(numIndicesIn)),
-                m_indexOrBase(uint16_t(indexIn))
-            {
-            }
-            uint8_t m_numIndices;             
-            uint16_t m_indexOrBase;                 ///< Meaning changes depending on numIndices. If 1, it is the index if larger than 1, then is an index into 'indices'  
-        };
-
-        struct RegisterList
-        {
-            const uint16_t* begin() const { return indices; }
-            const uint16_t* end() const { return indices + numIndices; }
-
-            const uint16_t* indices;
-            size_t numIndices;    
-        };
-
         RegisterList asRegisterList(const RegisterSet& set) const
         {
             switch (set.m_numIndices)
@@ -75,11 +85,6 @@ class BindingState: public Slang::RefObject
                 default:    return RegisterList { m_indices.Buffer() + set.m_indexOrBase, set.m_numIndices};
             }
         }
-
-        struct RegisterDesc
-        {
-            RegisterSet registerSets[int(ShaderStyle::CountOf)];
-        };
 
         struct Binding
         {
@@ -94,11 +99,6 @@ class BindingState: public Slang::RefObject
             int descIndex;                  ///< Index associated with type. -1 if not used
             Slang::RefPtr<Resource> resource;             ///< Associated resource. nullptr if not used
             RegisterDesc registerDesc;      ///< Registers associated with binding
-        };
-
-        struct SamplerDesc
-        {
-            bool isCompareSampler;
         };
 
             /// Add a sampler        

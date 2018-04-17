@@ -64,7 +64,7 @@ void BindingState::Desc::addCombinedTextureSampler(TextureResource* resource, co
     m_bindings.Add(binding);
 }
 
-BindingState::Desc::RegisterSet BindingState::Desc::addRegisterSet(int index)
+BindingState::RegisterSet BindingState::Desc::addRegisterSet(int index)
 {
     if (index < 0)
     {
@@ -73,7 +73,7 @@ BindingState::Desc::RegisterSet BindingState::Desc::addRegisterSet(int index)
     return RegisterSet(index, 1);
 }
 
-BindingState::Desc::RegisterSet BindingState::Desc::addRegisterSet(const int* srcIndices, int numIndices)
+BindingState::RegisterSet BindingState::Desc::addRegisterSet(const int* srcIndices, int numIndices)
 {
     assert(numIndices >= 0);
     switch (numIndices)
