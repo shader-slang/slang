@@ -67,6 +67,7 @@ public:
     virtual void serializeOutput(BindingState* state, const char* fileName) override;
     virtual InputLayout* createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) override;
     virtual BindingState* createBindingState(const ShaderInputLayout& layout) override;
+    virtual BindingState* createBindingState(const BindingState::Desc& bindingStateDesc) override;
     virtual ShaderCompiler* getShaderCompiler() override;
     virtual void* map(BufferResource* buffer, MapFlavor flavor) override;
     virtual void unmap(BufferResource* buffer) override;
@@ -543,6 +544,71 @@ static void _initSrvDesc(const InputTextureDesc& inputDesc, const D3D12_RESOURCE
             descOut.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBEARRAY;
 
             descOut.TextureCubeArray.NumCubes = inputDesc.arrayLength;
+            descOut.TextureCubeArray.First2DArrayFace = 0;
+            descOut.TextureCubeArray.MipLevels = desc.MipLevels;
+            descOut.TextureCubeArray.MostDetailedMip = 0;
+            descOut.TextureCubeArray.ResourceMinLODClamp = 0;
+        }
+        else
+        {
+            descOut.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+
+            descOut.TextureCube.MipLevels = desc.MipLevels;
+            descOut.TextureCube.MostDetailedMip = 0;
+            descOut.TextureCube.ResourceMinLODClamp = 0;
+        }
+    }
+    else
+    {
+        assert(desc.DepthOrArraySize > 1);
+
+        switch (desc.Dimension)
+        {
+            case D3D12_RESOURCE_DIMENSION_TEXTURE1D:  descOut.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE1DARRAY; break;
+            case D3D12_RESOURCE_DIMENSION_TEXTURE2D:  descOut.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY; break;
+            case D3D12_RESOURCE_DIMENSION_TEXTURE3D:  descOut.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D; break;
+
+            default: assert(!"Unknown dimension");
+        }
+
+        descOut.Texture2DArray.ArraySize = desc.DepthOrArraySize;
+        descOut.Texture2DArray.MostDetailedMip = 0;
+        descOut.Texture2DArray.MipLevels = desc.MipLevels;
+        descOut.Texture2DArray.FirstArraySlice = 0;
+        descOut.Texture2DArray.PlaneSlice = 0;
+        descOut.Texture2DArray.ResourceMinLODClamp = 0;
+    }
+}
+
+static void _initSrvDesc(Resource::Type resourceType, const TextureResource::Desc& textureDesc, const D3D12_RESOURCE_DESC& desc, DXGI_FORMAT pixelFormat, D3D12_SHADER_RESOURCE_VIEW_DESC& descOut)
+{
+    // create SRV
+    descOut = D3D12_SHADER_RESOURCE_VIEW_DESC();
+
+    descOut.Format = (pixelFormat == DXGI_FORMAT_UNKNOWN) ? D3DUtil::calcFormat(D3DUtil::USAGE_SRV, desc.Format) : pixelFormat;
+    descOut.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    if (desc.DepthOrArraySize == 1)
+    {
+        switch (desc.Dimension)
+        {
+            case D3D12_RESOURCE_DIMENSION_TEXTURE1D:  descOut.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE1D; break;
+            case D3D12_RESOURCE_DIMENSION_TEXTURE2D:  descOut.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D; break;
+            case D3D12_RESOURCE_DIMENSION_TEXTURE3D:  descOut.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D; break;
+            default: assert(!"Unknown dimension");
+        }
+
+        descOut.Texture2D.MipLevels = desc.MipLevels;
+        descOut.Texture2D.MostDetailedMip = 0;
+        descOut.Texture2D.PlaneSlice = 0;
+        descOut.Texture2D.ResourceMinLODClamp = 0.0f;
+    }
+    else if (resourceType == Resource::Type::TextureCube)
+    {
+        if (textureDesc.arraySize > 1)
+        {
+            descOut.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBEARRAY;
+
+            descOut.TextureCubeArray.NumCubes = textureDesc.arraySize;
             descOut.TextureCubeArray.First2DArrayFace = 0;
             descOut.TextureCubeArray.MipLevels = desc.MipLevels;
             descOut.TextureCubeArray.MostDetailedMip = 0;
@@ -2530,6 +2596,173 @@ BindingState* D3D12Renderer::createBindingState(const ShaderInputLayout& layout)
                 //throw "not implemented";
                 return nullptr;
                 break;
+            }
+        }
+    }
+
+    return bindingState.detach();
+}
+
+BindingState* D3D12Renderer::createBindingState(const BindingState::Desc& bindingStateDesc)
+{
+    RefPtr<BindingStateImpl> bindingState(new BindingStateImpl);
+
+    SLANG_RETURN_NULL_ON_FAIL(bindingState->init(m_device));
+    bindingState->m_numRenderTargets = bindingStateDesc.m_numRenderTargets;
+
+    const List<BindingState::Desc::Binding>& srcBindings = bindingStateDesc.m_bindings;
+    const int numBindings = int(srcBindings.Count());
+
+    List<Binding>& dstBindings = bindingState->m_bindings;
+    dstBindings.SetSize(numBindings);
+
+    for (int i = 0; i < numBindings; ++i)
+    {
+        const BindingState::Desc::Binding& srcEntry = srcBindings[i];
+        Binding& dstEntry = dstBindings[i];
+
+        //dstEntry.m_type = srcEntry.type;
+
+        dstEntry.m_binding = bindingStateDesc.getFirst(srcEntry.registerDesc.registerSets[int(BindingState::ShaderStyle::Hlsl)]);
+        dstEntry.m_isOutput = false;
+        dstEntry.m_resource = srcEntry.resource;
+
+        switch (srcEntry.type)
+        {
+            case BindingState::Desc::Binding::Type::Buffer:
+            {
+                assert(srcEntry.resource && srcEntry.resource->isBuffer());
+                BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(srcEntry.resource.Ptr());
+                const BufferResource::Desc& bufferDesc = bufferResource->getDesc();
+
+                dstEntry.m_isOutput = (bufferDesc.cpuAccessFlags & Resource::AccessFlag::Read) != 0;
+                
+                const size_t bufferSize = bufferDesc.sizeInBytes;
+                const int elemSize = bufferDesc.elementSize <= 0 ? sizeof(uint32_t) : bufferDesc.elementSize;
+
+                const  bool createSrv = false;
+                // NOTE! In this arrangement the buffer can either be a ConstantBuffer or a 'StorageBuffer'.
+                // If it's a storage buffer then it has a 'uav'.
+                // In neither circumstance is there an associated srv 
+                // This departs a little from dx11 code - in that it will create srv and uav for a storage buffer.
+                if (bufferDesc.bindFlags & Resource::BindFlag::UnorderedAccess)
+                {
+                    dstEntry.m_uavIndex = bindingState->m_viewHeap.allocate();
+                    if (dstEntry.m_uavIndex < 0)
+                    {
+                        return nullptr;
+                    }
+
+                    D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+
+                    uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+                    uavDesc.Format = DXGI_FORMAT_UNKNOWN;
+
+                    uavDesc.Buffer.StructureByteStride = elemSize;
+
+                    uavDesc.Buffer.FirstElement = 0;
+                    uavDesc.Buffer.NumElements = (UINT)(bufferSize / elemSize);
+                    uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
+
+                    if (bufferDesc.elementSize == 0)
+                    {
+                        // TODO: are there UAV cases we need to handle that are neither
+                        // raw nor structured? RWBuffer<T> would be one...
+                        uavDesc.Buffer.Flags |= D3D12_BUFFER_UAV_FLAG_RAW;
+                        uavDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+
+                        uavDesc.Buffer.StructureByteStride = 0;
+                    }
+
+                    m_device->CreateUnorderedAccessView(bufferResource->m_resource, nullptr, &uavDesc, bindingState->m_viewHeap.getCpuHandle(dstEntry.m_uavIndex));
+                }
+                if (createSrv && (bufferDesc.bindFlags & (Resource::BindFlag::NonPixelShaderResource | Resource::BindFlag::PixelShaderResource)))
+                {
+                    dstEntry.m_srvIndex = bindingState->m_viewHeap.allocate();
+                    if (dstEntry.m_srvIndex < 0)
+                    {
+                        return nullptr;
+                    }
+
+                    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc;
+
+                    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+                    srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+                    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+
+                    srvDesc.Buffer.FirstElement = 0;
+                    srvDesc.Buffer.NumElements = (UINT)(bufferSize / elemSize);
+                    srvDesc.Buffer.StructureByteStride = elemSize;
+                    srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+
+                    if (bufferDesc.elementSize == 0)
+                    {
+                        srvDesc.Format = DXGI_FORMAT_R32_FLOAT;
+                    }
+
+                    m_device->CreateShaderResourceView(bufferResource->m_resource, &srvDesc, bindingState->m_viewHeap.getCpuHandle(dstEntry.m_srvIndex));
+                }
+
+                break;
+            }
+            case BindingState::Desc::Binding::Type::Texture:
+            {
+                assert(srcEntry.resource && srcEntry.resource->isTexture());
+
+                TextureResourceImpl* textureResource = static_cast<TextureResourceImpl*>(srcEntry.resource.Ptr());
+
+                dstEntry.m_srvIndex = bindingState->m_viewHeap.allocate();
+                if (dstEntry.m_srvIndex < 0)
+                {
+                    return nullptr;
+                }
+                
+                {
+                    const D3D12_RESOURCE_DESC resourceDesc = textureResource->m_resource.getResource()->GetDesc();
+                    const DXGI_FORMAT pixelFormat = resourceDesc.Format;
+
+                    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc;
+                    _initSrvDesc(textureResource->getType(), textureResource->getDesc(), resourceDesc, pixelFormat, srvDesc);
+
+                    // Create descriptor
+                    m_device->CreateShaderResourceView(textureResource->m_resource, &srvDesc, bindingState->m_viewHeap.getCpuHandle(dstEntry.m_srvIndex));
+                }
+
+                break;
+            }
+            case BindingState::Desc::Binding::Type::Sampler:
+            {
+                const BindingState::SamplerDesc& samplerDesc = bindingStateDesc.m_samplers[srcEntry.descIndex];
+
+                const int samplerIndex = bindingStateDesc.getFirst(srcEntry.registerDesc.registerSets[int(BindingState::ShaderStyle::Hlsl)]);
+                dstEntry.m_samplerIndex = samplerIndex;
+                bindingState->m_samplerHeap.placeAt(samplerIndex);
+
+                D3D12_SAMPLER_DESC desc = {};
+                desc.AddressU = desc.AddressV = desc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+                desc.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+
+                if (samplerDesc.isCompareSampler)
+                {
+                    desc.ComparisonFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+                    desc.Filter = D3D12_FILTER_MIN_LINEAR_MAG_MIP_POINT;
+                }
+                else
+                {
+                    desc.Filter = D3D12_FILTER_ANISOTROPIC;
+                    desc.MaxAnisotropy = 8;
+                    desc.MinLOD = 0.0f;
+                    desc.MaxLOD = 100.0f;
+                }
+
+                m_device->CreateSampler(&desc, bindingState->m_samplerHeap.getCpuHandle(samplerIndex));
+
+                break;
+            }
+            case ShaderInputType::CombinedTextureSampler:
+            {
+                assert(!"Not implemented");
+                return nullptr;
             }
         }
     }
