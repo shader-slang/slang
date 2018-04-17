@@ -21,6 +21,97 @@ using namespace Slang;
     BindFlag::Enum(BindFlag::PixelShaderResource | BindFlag::NonPixelShaderResource), // GenericRead
 }; 
 
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!! BindingState::Desc !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+void BindingState::Desc::addSampler(const SamplerDesc& desc, const RegisterDesc& registerDesc)
+{
+    int descIndex = int(m_samplers.Count());
+    m_samplers.Add(desc);
+
+    Binding binding;
+    binding.type = Binding::Type::Sampler;
+    binding.resource = nullptr;
+    binding.registerDesc = registerDesc;
+    binding.descIndex = descIndex;
+
+    m_bindings.Add(binding);
+}
+
+void BindingState::Desc::addResource(Resource* resource, const RegisterDesc& registerDesc)
+{
+    assert(resource);
+
+    Binding binding;
+    binding.type = Binding::Type::Resource;
+    binding.resource = resource;
+    binding.descIndex = -1;
+    binding.registerDesc = registerDesc;
+    m_bindings.Add(binding);
+}
+
+void BindingState::Desc::addCombinedTextureSampler(TextureResource* resource, const SamplerDesc& samplerDesc, const RegisterDesc& registerDesc)
+{
+    assert(resource);
+
+    int samplerDescIndex = int(m_samplers.Count());
+    m_samplers.Add(samplerDesc);
+
+    Binding binding;
+    binding.type = Binding::Type::CombinedTextureSampler;
+    binding.resource = resource;
+    binding.descIndex = samplerDescIndex;
+    binding.registerDesc = registerDesc;
+    m_bindings.Add(binding);
+}
+
+BindingState::Desc::RegisterSet BindingState::Desc::addRegisterSet(int index)
+{
+    if (index < 0)
+    {
+        return RegisterSet();
+    }
+    return RegisterSet(index, 1);
+}
+
+BindingState::Desc::RegisterSet BindingState::Desc::addRegisterSet(const int* srcIndices, int numIndices)
+{
+    assert(numIndices >= 0);
+    switch (numIndices)
+    {
+        case 0:     return RegisterSet(); 
+        case 1:     return RegisterSet(srcIndices[0], 1);
+        default:
+        {
+            int startIndex = int(m_indices.Count());
+            m_indices.SetSize(startIndex + numIndices);
+            uint16_t* dstIndices = m_indices.Buffer() + startIndex;
+            for (int i = 0; i < numIndices; i++)
+            {
+                dstIndices[i] = uint16_t(srcIndices[i]);
+            }
+            return RegisterSet(startIndex, numIndices);
+        }
+    }
+}
+
+
+int BindingState::Desc::getFirst(const RegisterSet& set) const
+{
+    switch (set.m_numIndices)
+    {
+        case 0:             return -1;
+        case 1:             return set.m_indexOrBase;
+        default:            return m_indices[set.m_indexOrBase];
+    }
+}
+
+void BindingState::Desc::clear()
+{
+    m_bindings.Clear();
+    m_samplers.Clear();
+    m_indices.Clear();
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!! TextureResource::Size !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 int TextureResource::Size::calcMaxDimension(Type type) const

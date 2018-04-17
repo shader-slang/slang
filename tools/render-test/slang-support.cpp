@@ -291,6 +291,71 @@ SlangResult createInputBufferResource(const InputBufferDesc& inputDesc, bool isO
     return SLANG_OK;
 }
     
+static BindingState::Desc::SamplerDesc _calcSamplerDesc(const InputSamplerDesc& srcDesc)
+{
+    BindingState::Desc::SamplerDesc dstDesc;
+    dstDesc.isCompareSampler = srcDesc.isCompareSampler;
+    return dstDesc;
+}
 
+SlangResult createBindingSetDesc(ShaderInputLayoutEntry* srcEntries, int numEntries, Renderer* renderer, BindingState::Desc& descOut)
+{
+    using namespace Slang;
+
+    const int textureBindFlags = Resource::BindFlag::NonPixelShaderResource | Resource::BindFlag::PixelShaderResource;
+
+    descOut.clear();
+    for (int i = 0; i < numEntries; i++)
+    {
+        const ShaderInputLayoutEntry& srcEntry = srcEntries[i];
+
+        BindingState::Desc::RegisterDesc registerDesc;
+        registerDesc.registerSets[int(BindingState::Desc::ShaderStyle::Hlsl)] = descOut.addRegisterSet(srcEntry.hlslBinding);
+        registerDesc.registerSets[int(BindingState::Desc::ShaderStyle::Glsl)] = descOut.addRegisterSet(srcEntry.glslBinding.Buffer(), int(srcEntry.glslBinding.Count()));
+
+        switch (srcEntry.type)
+        {
+            case ShaderInputType::Buffer:
+            {
+                const InputBufferDesc& srcBuffer = srcEntry.bufferDesc;
+
+                const size_t bufferSize = srcEntry.bufferData.Count() * sizeof(uint32_t);
+
+                RefPtr<BufferResource> bufferResource;
+                SLANG_RETURN_ON_FAIL(createInputBufferResource(srcEntry.bufferDesc, srcEntry.isOutput, bufferSize, srcEntry.bufferData.Buffer(), renderer, bufferResource));
+                
+                descOut.addResource(bufferResource, registerDesc);
+                break;
+            }
+            case ShaderInputType::CombinedTextureSampler:
+            {
+                RefPtr<TextureResource> texture;
+                SLANG_RETURN_ON_FAIL(generateTextureResource(srcEntry.textureDesc, textureBindFlags, renderer, texture));
+                descOut.addCombinedTextureSampler(texture, _calcSamplerDesc(srcEntry.samplerDesc), registerDesc);
+                break;
+            }
+            case ShaderInputType::Texture:
+            {
+                RefPtr<TextureResource> texture;
+                SLANG_RETURN_ON_FAIL(generateTextureResource(srcEntry.textureDesc, textureBindFlags, renderer, texture));
+
+                descOut.addResource(texture, registerDesc);
+                break;
+            }
+            case ShaderInputType::Sampler:
+            {
+                descOut.addSampler(_calcSamplerDesc(srcEntry.samplerDesc), registerDesc);
+                break;
+            }
+            default: 
+            {
+                assert(!"Unhandled type");
+                return SLANG_FAIL;
+            }
+        }
+    }    
+
+    return SLANG_OK;
+}
 
 } // renderer_test

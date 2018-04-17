@@ -20,4 +20,8 @@ SlangResult generateTextureResource(const InputTextureDesc& inputDesc, int bindF
     /// Create the buffer resource using the renderer
 SlangResult createInputBufferResource(const InputBufferDesc& inputDesc, bool isOutput, size_t bufferSize, const void* initData, Renderer* renderer, Slang::RefPtr<BufferResource>& bufferOut);
 
+SlangResult createBindingSetDesc(ShaderInputLayoutEntry* srcEntries, int numEntries, Renderer* renderer, BindingState::Desc& descOut);
+
+
+
 } // renderer_test
