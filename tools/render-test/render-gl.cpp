@@ -11,6 +11,8 @@
 #include "core/secure-crt.h"
 #include "external/stb/stb_image_write.h"
 
+#include "slang-support.h"
+
 // TODO(tfoley): eventually we should be able to run these
 // tests on non-Windows targets to confirm that cross-compilation
 // at least *works* on those platforms...
@@ -82,20 +84,21 @@ public:
     virtual void setClearColor(const float color[4]) override;
     virtual void clearFrame() override;
     virtual void presentFrame() override;
+    virtual TextureResource* createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData) override;
+    virtual BufferResource* createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& descIn, const void* initData) override;
     virtual SlangResult captureScreenShot(char const* outputPath) override;
     virtual void serializeOutput(BindingState* state, const char* fileName) override;
-    virtual Buffer* createBuffer(const BufferDesc& desc) override;
     virtual InputLayout* createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) override;
     virtual BindingState * createBindingState(const ShaderInputLayout& layout) override;
     virtual ShaderCompiler* getShaderCompiler() override;
-    virtual void* map(Buffer* buffer, MapFlavor flavor) override;
-    virtual void unmap(Buffer* buffer) override;
+    virtual void* map(BufferResource* buffer, MapFlavor flavor) override;
+    virtual void unmap(BufferResource* buffer) override;
     virtual void setInputLayout(InputLayout* inputLayout) override;
     virtual void setPrimitiveTopology(PrimitiveTopology topology) override;
     virtual void setBindingState(BindingState* state);
-    virtual void setVertexBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* strides, const UInt* offsets) override;
+    virtual void setVertexBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* strides, const UInt* offsets) override;
     virtual void setShaderProgram(ShaderProgram* inProgram) override;
-    virtual void setConstantBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* offsets) override;
+    virtual void setConstantBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* offsets) override;
     virtual void draw(UInt vertexCount, UInt startVertex) override;
     virtual void dispatchCompute(int x, int y, int z) override;
     virtual void submitGpuWork() override {}
@@ -131,34 +134,69 @@ public:
         UInt m_attributeCount = 0;
     };
 
-	class BufferImpl: public Buffer
+	class BufferResourceImpl: public BufferResource
 	{
 		public:
-		BufferImpl(GLRenderer* renderer, GLuint id):
+        typedef BufferResource Parent;
+
+        BufferResourceImpl(Usage initialUsage, const Desc& desc, GLRenderer* renderer, GLuint id, GLenum target):
+            Parent(desc),
 			m_renderer(renderer),
-			m_id(id)
+			m_handle(id),
+            m_initialUsage(initialUsage),
+            m_target(target)
 		{}
-		~BufferImpl()
+		~BufferResourceImpl()
 		{
 			if (m_renderer)
 			{
-				m_renderer->glDeleteBuffers(1, &m_id);
+				m_renderer->glDeleteBuffers(1, &m_handle);
 			}
 		}
 
+        Usage m_initialUsage;
 		GLRenderer* m_renderer;
-		GLuint m_id;
+		GLuint m_handle;
+        GLenum m_target;
 	};
+
+    class TextureResourceImpl: public TextureResource
+    {
+        public:
+        typedef TextureResource Parent;
+
+        TextureResourceImpl(Type type, Usage initialUsage, const Desc& desc, GLRenderer* renderer):
+            Parent(type, desc),
+            m_initialUsage(initialUsage),
+            m_renderer(renderer)
+        {
+            m_target = 0;
+            m_handle = 0;
+        }
+
+        ~TextureResourceImpl()
+        {
+            if (m_handle)
+            {
+                glDeleteTextures(1, &m_handle);
+            }
+         }   
+
+        Usage m_initialUsage;
+        GLRenderer* m_renderer;
+        GLenum m_target;
+        GLuint m_handle;
+    };
 
     struct BindingEntry
     {
         ShaderInputType type;
-        GLuint handle;
+        RefPtr<Resource> resource;
+        GLuint samplerHandle = 0;
         List<int> binding;
-        int bindTarget;
-        int bufferSize;
         bool isOutput = false;
     };
+
     class BindingStateImpl: public BindingState
     {
 		public:
@@ -199,16 +237,30 @@ public:
 		GLRenderer* m_renderer;
 	};
 
-	void destroyBindingEntry(const BindingEntry& entry);
+    enum class GlPixelFormat
+    {
+        Unknown,
+        RGBA_Unorm_UInt8,
+        CountOf,
+    };
+
+    struct GlPixelFormatInfo
+    {
+        GLint internalFormat;           // such as GL_RGBA8
+        GLenum format;                  // such as GL_RGBA
+        GLenum formatType;              // such as GL_UNSIGNED_BYTE
+    };
+
 	void destroyBindingEntries(const BindingEntry* entries, int numEntries);
 
-    void bindBufferImpl(int target, UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* offsets);
+    void bindBufferImpl(int target, UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* offsets);
     void flushStateForDraw();
     GLuint loadShader(GLenum stage, char const* source);
-    void createInputBuffer(BindingEntry& rs, InputBufferDesc bufDesc, List<unsigned int>& bufferData);
     void debugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message);
-    void createInputTexture(BindingEntry& rs, InputTextureDesc texDesc, InputSamplerDesc samplerDesc);
     void createInputSampler(BindingEntry& rs, InputSamplerDesc samplerDesc);
+
+        /// Returns GlPixelFormat::Unknown if not an equivalent
+    static GlPixelFormat _getGlPixelFormat(Format format);
 
     static void APIENTRY staticDebugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam);
     static VertexAttributeFormat getVertexAttributeFormat(Format format);
@@ -230,6 +282,24 @@ public:
 #define DECLARE_GL_EXTENSION_FUNC(NAME, TYPE) TYPE NAME;
     MAP_GL_EXTENSION_FUNCS(DECLARE_GL_EXTENSION_FUNC)
 #undef DECLARE_GL_EXTENSION_FUNC
+
+        static const GlPixelFormatInfo s_pixelFormatInfos[int(GlPixelFormat::CountOf)];
+};
+
+/* static */GLRenderer::GlPixelFormat GLRenderer::_getGlPixelFormat(Format format)
+{
+    switch (format)
+    {
+        case Format::RGBA_Unorm_UInt8:      return GlPixelFormat::RGBA_Unorm_UInt8;
+        default:                            return GlPixelFormat::Unknown;
+    }
+}
+
+/* static */ const GLRenderer::GlPixelFormatInfo GLRenderer::s_pixelFormatInfos[int(GlPixelFormat::CountOf)] = 
+{
+    // internalType, format, formatType
+    { 0,                0,          0},                         // GlPixelFormat::Unknown
+    { GL_RGBA8,         GL_RGBA,    GL_UNSIGNED_BYTE },         // GlPixelFormat::RGBA_Unorm_UInt8
 };
 
 Renderer* createGLRenderer()
@@ -268,18 +338,19 @@ void GLRenderer::debugCallback(GLenum source, GLenum type, GLuint id, GLenum sev
 
         CASE(RGB_Float32, 3, GL_FLOAT, GL_FALSE);
         CASE(RG_Float32, 2, GL_FLOAT, GL_FALSE);
+        CASE(R_Float32, 1, GL_FLOAT, GL_FALSE);
 #undef CASE
     }
 }
 
-void GLRenderer::bindBufferImpl(int target, UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* offsets)
+void GLRenderer::bindBufferImpl(int target, UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* offsets)
 {
     for (UInt ii = 0; ii < slotCount; ++ii)
     {
         UInt slot = startSlot + ii;
 
-        BufferImpl* buffer = static_cast<BufferImpl*>(buffers[ii]);
-        GLuint bufferID = buffer ? buffer->m_id : 0;
+        BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(buffers[ii]);
+        GLuint bufferID = buffer ? buffer->m_handle : 0;
 		
         assert(!offsets || !offsets[ii]);
 
@@ -426,157 +497,43 @@ GLuint GLRenderer::loadShader(GLenum stage, const char* source)
     return shaderID;
 }
 
-void GLRenderer::destroyBindingEntry(const BindingEntry& entry)
-{
-	switch (entry.type)
-	{
-		case ShaderInputType::Buffer:
-		{
-			glDeleteBuffers(1, &entry.handle);
-			break;
-		}
-		case ShaderInputType::Texture:
-		case ShaderInputType::CombinedTextureSampler:
-		{
-			glDeleteTextures(1, &entry.handle);
-			break;
-		}
-		case ShaderInputType::Sampler:
-		{
-			glDeleteSamplers(1, &entry.handle);
-			break;
-		}
-		default: break;
-	}
-}
-
 void GLRenderer::destroyBindingEntries(const BindingEntry* entries, int numEntries)
 {
 	for (int i = 0; i < numEntries; ++i)
 	{
-		destroyBindingEntry(entries[i]);
+        const BindingEntry& entry = entries[i];
+        if (entry.type == ShaderInputType::Sampler && entry.samplerHandle != 0)
+        {
+            glDeleteSamplers(1, &entry.samplerHandle);
+        }
 	}
 }
 
-void GLRenderer::createInputBuffer(BindingEntry& rs, InputBufferDesc bufDesc, List<unsigned int>& bufferData)
+void GLRenderer::createInputSampler(BindingEntry& entry, InputSamplerDesc samplerDesc)
 {
-    rs.bindTarget = (bufDesc.type == InputBufferType::StorageBuffer ? GL_SHADER_STORAGE_BUFFER : GL_UNIFORM_BUFFER);
-    glGenBuffers(1, &rs.handle);
-    glBindBuffer(rs.bindTarget, rs.handle);
-    glBufferData(rs.bindTarget, bufferData.Count() * sizeof(unsigned int), bufferData.Buffer(), GL_STATIC_READ);
-    glBindBuffer(rs.bindTarget, 0);
-}
+    GLuint handle;
 
-void GLRenderer::createInputTexture(BindingEntry& rs, InputTextureDesc texDesc, InputSamplerDesc samplerDesc)
-{
-    TextureData texData;
-    generateTextureData(texData, texDesc);
-    glGenTextures(1, &rs.handle);
-    switch (texDesc.dimension)
-    {
-        case 1:
-            if (texDesc.arrayLength > 0)
-            {
-                rs.bindTarget = GL_TEXTURE_1D_ARRAY;
-                glBindTexture(rs.bindTarget, rs.handle);
-                int slice = 0;
-                for (int i = 0; i < texData.arraySize; i++)
-				{
-                    for (int j = 0; j < texData.mipLevels; j++)
-                    {
-                        glTexImage2D(rs.bindTarget, j, GL_RGBA8, texData.textureSize, i, 0, GL_RGBA, GL_UNSIGNED_BYTE, texData.dataBuffer[slice].Buffer());
-                        slice++;
-                    }
-				}
-            }
-            else
-            {
-                rs.bindTarget = GL_TEXTURE_1D;
-                glBindTexture(rs.bindTarget, rs.handle);
-                for (int i = 0; i < texData.mipLevels; i++)
-                    glTexImage1D(rs.bindTarget, i, GL_RGBA8, texData.textureSize, 0, GL_RGBA, GL_UNSIGNED_BYTE, texData.dataBuffer[i].Buffer());
-            }
-            break;
-        case 2:
-            if (texDesc.arrayLength > 0)
-            {
-                if (texDesc.isCube)
-                    rs.bindTarget = GL_TEXTURE_CUBE_MAP_ARRAY;
-                else
-                    rs.bindTarget = GL_TEXTURE_2D_ARRAY;
-                glBindTexture(rs.bindTarget, rs.handle);
-                for (auto i = 0u; i < texData.dataBuffer.Count(); i++)
-                    glTexImage3D(rs.bindTarget, i % texData.mipLevels, GL_RGBA8, texData.textureSize, texData.textureSize, i, 0, GL_RGBA, GL_UNSIGNED_BYTE, texData.dataBuffer[i].Buffer());
-            }
-            else
-            {
-                if (texDesc.isCube)
-                {
-                    rs.bindTarget = GL_TEXTURE_CUBE_MAP;
-                    glBindTexture(rs.bindTarget, rs.handle);
-                    for (int j = 0; j < 6; j++)
-                    {
-                        for (int i = 0; i < texData.mipLevels; i++)
-                            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + j, i, GL_RGBA8, texData.textureSize, texData.textureSize, 0, GL_RGBA, GL_UNSIGNED_BYTE, texData.dataBuffer[i + j*texData.mipLevels].Buffer());
-                    }
-                }
-                else
-                {
-                    rs.bindTarget = GL_TEXTURE_2D;
-                    glBindTexture(rs.bindTarget, rs.handle);
-                    for (int i = 0; i < texData.mipLevels; i++)
-                        glTexImage2D(rs.bindTarget, i, GL_RGBA8, texData.textureSize, texData.textureSize, 0, GL_RGBA, GL_UNSIGNED_BYTE, texData.dataBuffer[i].Buffer());
-                }
-            }
-            break;
-        case 3:
-            rs.bindTarget = GL_TEXTURE_3D;
-            glBindTexture(rs.bindTarget, rs.handle);
-            for (int i = 0; i < texData.mipLevels; i++)
-                glTexImage3D(rs.bindTarget, i, GL_RGBA8, texData.textureSize, texData.textureSize, texData.textureSize, 0, GL_RGBA, GL_UNSIGNED_BYTE, texData.dataBuffer[i].Buffer());
-            break;
-    }
-    glTexParameteri(rs.bindTarget, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(rs.bindTarget, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(rs.bindTarget, GL_TEXTURE_WRAP_R, GL_REPEAT);
+    glCreateSamplers(1, &handle);
+    glSamplerParameteri(handle, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glSamplerParameteri(handle, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glSamplerParameteri(handle, GL_TEXTURE_WRAP_R, GL_REPEAT);
 
     if (samplerDesc.isCompareSampler)
     {
-        glTexParameteri(rs.bindTarget, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-        glTexParameteri(rs.bindTarget, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameterf(rs.bindTarget, GL_TEXTURE_MAX_ANISOTROPY_EXT, 8.0f);
+        glSamplerParameteri(handle, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glSamplerParameteri(handle, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glSamplerParameteri(handle, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+        glSamplerParameteri(handle, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
     }
     else
     {
-        glTexParameteri(rs.bindTarget, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(rs.bindTarget, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(rs.bindTarget, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
-        glTexParameteri(rs.bindTarget, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+        glSamplerParameteri(handle, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glSamplerParameteri(handle, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glSamplerParameteri(handle, GL_TEXTURE_MAX_ANISOTROPY_EXT, 8);
     }
+
+    entry.samplerHandle = handle;
 }
-
-void GLRenderer::createInputSampler(BindingEntry& rs, InputSamplerDesc samplerDesc)
-{
-    glCreateSamplers(1, &rs.handle);
-    glSamplerParameteri(rs.handle, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glSamplerParameteri(rs.handle, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glSamplerParameteri(rs.handle, GL_TEXTURE_WRAP_R, GL_REPEAT);
-
-    if (samplerDesc.isCompareSampler)
-    {
-        glSamplerParameteri(rs.handle, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-        glSamplerParameteri(rs.handle, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glSamplerParameteri(rs.handle, GL_TEXTURE_MAX_ANISOTROPY_EXT, 8);
-    }
-    else
-    {
-        glSamplerParameteri(rs.handle, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glSamplerParameteri(rs.handle, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glSamplerParameteri(rs.handle, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
-        glSamplerParameteri(rs.handle, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
-    }
-}
-
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! Renderer interface !!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -691,21 +648,187 @@ ShaderCompiler* GLRenderer::getShaderCompiler()
     return this;
 }
 
-Buffer* GLRenderer::createBuffer(const BufferDesc& desc)
+TextureResource* GLRenderer::createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& descIn, const TextureResource::Data* initData)
 {
-    // TODO: should derive target from desc...
-    GLenum target = GL_UNIFORM_BUFFER;
+    TextureResource::Desc srcDesc(descIn);
+    srcDesc.setDefaults(type, initialUsage);
 
+    GlPixelFormat pixelFormat = _getGlPixelFormat(srcDesc.format);
+    if (pixelFormat == GlPixelFormat::Unknown)
+    {
+        return nullptr;
+    }
+
+    const GlPixelFormatInfo& info = s_pixelFormatInfos[int(pixelFormat)];
+
+    const GLint internalFormat = info.internalFormat;
+    const GLenum format = info.format;
+    const GLenum formatType = info.formatType;
+    
+    RefPtr<TextureResourceImpl> texture(new TextureResourceImpl(type, initialUsage, srcDesc, this));
+
+    GLenum target = 0;
+    GLuint handle = 0;
+    glGenTextures(1, &handle);
+
+    const int effectiveArraySize = srcDesc.calcEffectiveArraySize(type);
+
+    assert(initData);
+    assert(initData->numSubResources == srcDesc.numMipLevels * srcDesc.size.depth * effectiveArraySize);
+
+    // Set on texture so will be freed if failure
+    texture->m_handle = handle;
+    const void*const*const data = initData->subResources;
+
+    switch (type)
+    {
+        case Resource::Type::Texture1D:
+        {
+            if (srcDesc.arraySize > 0)
+            {
+                target = GL_TEXTURE_1D_ARRAY;
+                glBindTexture(target, handle);
+
+                int slice = 0;
+                for (int i = 0; i < effectiveArraySize; i++)
+                {
+                    for (int j = 0; j < srcDesc.numMipLevels; j++)
+                    {
+                        glTexImage2D(target, j, internalFormat, srcDesc.size.width, i, 0, format, formatType, data[slice++]);
+                    }
+                }
+            }
+            else
+            {
+                target = GL_TEXTURE_1D;
+                glBindTexture(target, handle);
+                for (int i = 0; i < srcDesc.numMipLevels; i++)
+                {
+                    glTexImage1D(target, i, internalFormat, srcDesc.size.width, 0, format, formatType, data[i]);
+                }
+            }
+            break;
+        }
+        case Resource::Type::TextureCube:
+        case Resource::Type::Texture2D:
+        {
+            if (srcDesc.arraySize > 0)
+            {
+                if (type == Resource::Type::TextureCube)
+                {
+                    target = GL_TEXTURE_CUBE_MAP_ARRAY;
+                }
+                else
+                {
+                    target = GL_TEXTURE_2D_ARRAY;
+                }
+
+                glBindTexture(target, handle);
+                
+                int slice = 0;
+                for (int i = 0; i < effectiveArraySize; i++)
+                {
+                    for (int j = 0; j < srcDesc.numMipLevels; j++)
+                    {
+                        glTexImage3D(target, j, internalFormat, srcDesc.size.width, srcDesc.size.height, slice, 0, format, formatType, data[slice++]);
+                    }
+                }
+            }
+            else
+            {
+                if (type == Resource::Type::TextureCube)
+                {
+                    target = GL_TEXTURE_CUBE_MAP;
+                    glBindTexture(target, handle);
+                    
+                    int slice = 0;
+                    for (int j = 0; j < 6; j++)
+                    {
+                        for (int i = 0; i < srcDesc.numMipLevels; i++)
+                        {
+                            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + j, i, internalFormat, srcDesc.size.width, srcDesc.size.height, 0, format, formatType, data[slice++]);
+                        }
+                    }
+                }
+                else
+                {
+                    target = GL_TEXTURE_2D;
+                    glBindTexture(target, handle);
+                    for (int i = 0; i < srcDesc.numMipLevels; i++)
+                    {
+                        glTexImage2D(target, i, internalFormat, srcDesc.size.width, srcDesc.size.height, 0, format, formatType, data[i]);
+                    }
+                }
+            }
+            break;
+        }
+        case Resource::Type::Texture3D:
+        {
+            target = GL_TEXTURE_3D;
+            glBindTexture(target, handle);
+            for (int i = 0; i < srcDesc.numMipLevels; i++)
+            {
+                glTexImage3D(target, i, internalFormat, srcDesc.size.width, srcDesc.size.height, srcDesc.size.depth, 0, format, formatType, data[i]);
+            }
+            break;
+        }
+        default: return nullptr;
+    }
+
+    glTexParameteri(target, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(target, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(target, GL_TEXTURE_WRAP_R, GL_REPEAT);
+    
+    // Assume regular sampling (might be superseded - if a combined sampler wanted)
+    glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameterf(target, GL_TEXTURE_MAX_ANISOTROPY_EXT, 8.0f);
+
+    texture->m_target = target;
+
+    return texture.detach();
+}
+
+static GLenum _calcUsage(Resource::Usage usage)
+{
+    typedef Resource::Usage Usage;
+    switch (usage)
+    {
+        case Usage::ConstantBuffer:     return GL_DYNAMIC_DRAW;
+        default:                        return GL_STATIC_READ;
+    }
+}
+
+static GLenum _calcTarget(Resource::Usage usage)
+{
+    typedef Resource::Usage Usage;
+    switch (usage)
+    {
+        case Usage::ConstantBuffer:     return GL_UNIFORM_BUFFER;
+        default:                        return GL_SHADER_STORAGE_BUFFER;
+    }
+}
+
+BufferResource* GLRenderer::createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& descIn, const void* initData) 
+{
+    BufferResource::Desc desc(descIn);
+
+    if (desc.bindFlags == 0)
+    {
+        desc.bindFlags = Resource::s_requiredBinding[int(initialUsage)];
+    }
+
+    const GLenum target = _calcTarget(initialUsage);
     // TODO: should derive from desc...
-    GLenum usage = GL_DYNAMIC_DRAW;
-
+    const GLenum usage = _calcUsage(initialUsage);
+    
     GLuint bufferID = 0;
     glGenBuffers(1, &bufferID);
     glBindBuffer(target, bufferID);
 
-    glBufferData(target, desc.size, desc.initData, usage);
+    glBufferData(target, descIn.sizeInBytes, initData, usage);
 
-	return new BufferImpl(this, bufferID);
+	return new BufferResourceImpl(initialUsage, desc, this, bufferID, target);
 }
 
 InputLayout* GLRenderer::createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount)
@@ -726,11 +849,11 @@ InputLayout* GLRenderer::createInputLayout(const InputElementDesc* inputElements
     return (InputLayout*)inputLayout;
 }
 
-void* GLRenderer::map(Buffer* bufferIn, MapFlavor flavor)
+void* GLRenderer::map(BufferResource* bufferIn, MapFlavor flavor)
 {
-	BufferImpl* buffer = static_cast<BufferImpl*>(bufferIn);
+    BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(bufferIn);
 
-    GLenum target = GL_UNIFORM_BUFFER;
+    //GLenum target = GL_UNIFORM_BUFFER;
 
     GLuint access = 0;
     switch (flavor)
@@ -744,18 +867,15 @@ void* GLRenderer::map(Buffer* bufferIn, MapFlavor flavor)
             break;
     }
 
-    auto bufferID = buffer ? buffer->m_id : 0;
-    glBindBuffer(target, bufferID);
+    glBindBuffer(buffer->m_target, buffer->m_handle);
 
-    return glMapBuffer(target, access);
+    return glMapBuffer(buffer->m_target, access);
 }
 
-void GLRenderer::unmap(Buffer* bufferIn)
+void GLRenderer::unmap(BufferResource* bufferIn)
 {
-	BufferImpl* buffer = static_cast<BufferImpl*>(bufferIn);
-    GLenum target = GL_UNIFORM_BUFFER;
-    auto bufferID = buffer ? buffer->m_id : 0;
-    glUnmapBuffer(target);
+    BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(bufferIn);
+    glUnmapBuffer(buffer->m_target);
 }
 
 void GLRenderer::setInputLayout(InputLayout* inputLayout)
@@ -777,14 +897,14 @@ void GLRenderer::setPrimitiveTopology(PrimitiveTopology topology)
     m_boundPrimitiveTopology = glTopology;
 }
 
-void GLRenderer::setVertexBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* strides, const UInt* offsets)
+void GLRenderer::setVertexBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* strides, const UInt* offsets)
 {
     for (UInt ii = 0; ii < slotCount; ++ii)
     {
         UInt slot = startSlot + ii;
 
-        BufferImpl* buffer = static_cast<BufferImpl*>(buffers[ii]);
-        GLuint bufferID = buffer ? buffer->m_id : 0;
+        BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(buffers[ii]);
+        GLuint bufferID = buffer ? buffer->m_handle : 0;
 		
         m_boundVertexStreamBuffers[slot] = bufferID;
         m_boundVertexStreamStrides[slot] = strides[ii];
@@ -800,7 +920,7 @@ void GLRenderer::setShaderProgram(ShaderProgram* programIn)
 	glUseProgram(programID);
 }
 
-void GLRenderer::setConstantBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* offsets) 
+void GLRenderer::setConstantBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* offsets) 
 {
     bindBufferImpl(GL_UNIFORM_BUFFER, startSlot, slotCount, buffers, offsets);
 }
@@ -820,28 +940,51 @@ void GLRenderer::dispatchCompute(int x, int y, int z)
 BindingState* GLRenderer::createBindingState(const ShaderInputLayout& layout)
 {
     BindingStateImpl* state = new BindingStateImpl(this);
-    for (auto & entry : layout.entries)
+    for (auto & srcEntry : layout.entries)
     {
-        BindingEntry rsEntry;
-        rsEntry.isOutput = entry.isOutput;
-        rsEntry.binding = entry.glslBinding;
-        rsEntry.type = entry.type;
-        switch (entry.type)
+        BindingEntry dstEntry;
+        dstEntry.isOutput = srcEntry.isOutput;
+        dstEntry.binding = srcEntry.glslBinding;
+        dstEntry.type = srcEntry.type;
+
+        switch (srcEntry.type)
         {
             case ShaderInputType::Buffer:
-                createInputBuffer(rsEntry, entry.bufferDesc, entry.bufferData);
+            {
+                RefPtr<BufferResource> bufferResource;
+                SLANG_RETURN_NULL_ON_FAIL(createInputBufferResource(srcEntry.bufferDesc, srcEntry.isOutput, srcEntry.bufferData.Count() * sizeof(uint32_t), srcEntry.bufferData.Buffer(), this, bufferResource));
+                dstEntry.resource = bufferResource;
                 break;
+            }
             case ShaderInputType::Texture:
-                createInputTexture(rsEntry, entry.textureDesc, InputSamplerDesc());
-                break;
             case ShaderInputType::CombinedTextureSampler:
-                createInputTexture(rsEntry, entry.textureDesc, entry.samplerDesc);
+            {
+                RefPtr<TextureResource> textureResource;
+
+                int bindFlags = 0;
+                SLANG_RETURN_NULL_ON_FAIL(generateTextureResource(srcEntry.textureDesc, bindFlags, this, textureResource));
+                
+                // Handle if combined 
+                if (srcEntry.type == ShaderInputType::CombinedTextureSampler && srcEntry.samplerDesc.isCompareSampler)
+                {
+                    TextureResourceImpl* texture = static_cast<TextureResourceImpl*>(textureResource.Ptr());
+                    auto target = texture->m_target;
+
+                    glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+                    glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                    glTexParameteri(target, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+                    glTexParameteri(target, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+                }
+                
                 break;
+            }
             case ShaderInputType::Sampler:
-                createInputSampler(rsEntry, entry.samplerDesc);
+            {
+                createInputSampler(dstEntry, srcEntry.samplerDesc);
                 break;
+            }
         }
-        state->m_entries.Add(rsEntry);
+        state->m_entries.Add(dstEntry);
     }
     return state;
 }
@@ -854,17 +997,28 @@ void GLRenderer::setBindingState(BindingState* stateIn)
         switch (entry.type)
         {
             case ShaderInputType::Buffer:
-                glBindBufferBase(entry.bindTarget, entry.binding[0], entry.handle);
+            {
+                BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(entry.resource.Ptr());
+                glBindBufferBase(buffer->m_target, entry.binding[0], buffer->m_handle);
                 break;
+            }
             case ShaderInputType::Sampler:
+            {
                 for (auto b : entry.binding)
-                    glBindSampler(b, entry.handle);
+                {
+                    glBindSampler(b, entry.samplerHandle);
+                }
                 break;
+            }
             case ShaderInputType::Texture:
             case ShaderInputType::CombinedTextureSampler:
+            {
+                BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(entry.resource.Ptr());
+
                 glActiveTexture(GL_TEXTURE0 + entry.binding[0]);
-                glBindTexture(entry.bindTarget, entry.handle);
+                glBindTexture(buffer->m_target, buffer->m_handle);
                 break;
+            }
         }
     }
 }
@@ -878,11 +1032,19 @@ void GLRenderer::serializeOutput(BindingState* stateIn, const char* fileName)
     {
         if (entry.isOutput)
         {
-            glBindBuffer(entry.bindTarget, entry.handle);
-            auto ptr = (unsigned int *)glMapBuffer(entry.bindTarget, GL_READ_ONLY);
-            for (auto i = 0u; i < entry.bufferSize / sizeof(unsigned int); i++)
-                fprintf(f, "%X\n", ptr[i]);
-            glUnmapBuffer(entry.bindTarget);
+            if (entry.resource && entry.resource->isBuffer())
+            {
+                BufferResource* bufferResource = static_cast<BufferResource*>(entry.resource.Ptr());
+                size_t bufferSize = bufferResource->getDesc().sizeInBytes;
+
+                unsigned int* ptr = (unsigned int*)map(bufferResource, MapFlavor::HostRead);
+
+                for (auto i = 0u; i < bufferSize / sizeof(unsigned int); i++)
+                {
+                    fprintf(f, "%X\n", ptr[i]);
+                }
+                unmap(bufferResource);
+            }
         }
     }
     fclose(f);

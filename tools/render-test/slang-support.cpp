@@ -172,5 +172,125 @@ ShaderCompiler* createSlangShaderCompiler(
     return result;
 }
 
+SlangResult generateTextureResource(const InputTextureDesc& inputDesc, int bindFlags, Renderer* renderer, Slang::RefPtr<TextureResource>& textureOut)
+{
+    using namespace Slang;
+
+    TextureData texData;
+    generateTextureData(texData, inputDesc);
+
+    TextureResource::Desc textureResourceDesc;
+    textureResourceDesc.init();
+
+    textureResourceDesc.format = Format::RGBA_Unorm_UInt8;
+    textureResourceDesc.numMipLevels = texData.mipLevels;
+    textureResourceDesc.arraySize = inputDesc.arrayLength;
+    textureResourceDesc.bindFlags = bindFlags;
+
+    // It's the same size in all dimensions 
+    Resource::Type type = Resource::Type::Unknown;
+    switch (inputDesc.dimension)
+    {
+        case 1:
+        {
+            type = Resource::Type::Texture1D;
+            textureResourceDesc.size.init(inputDesc.size);
+            break;
+        }
+        case 2:
+        {
+            type = inputDesc.isCube ? Resource::Type::TextureCube : Resource::Type::Texture2D;
+            textureResourceDesc.size.init(inputDesc.size, inputDesc.size);
+            break;
+        }
+        case 3:
+        {
+            type = Resource::Type::Texture3D;
+            textureResourceDesc.size.init(inputDesc.size, inputDesc.size, inputDesc.size);
+            break;
+        }
+    }
+
+    const int effectiveArraySize = textureResourceDesc.calcEffectiveArraySize(type);
+    const int numSubResources = textureResourceDesc.calcNumSubResources(type);
+
+    Resource::Usage initialUsage = Resource::Usage::GenericRead;
+    TextureResource::Data initData;
+
+    List<ptrdiff_t> mipRowStrides;
+    mipRowStrides.SetSize(textureResourceDesc.numMipLevels);
+    List<const void*> subResources;
+    subResources.SetSize(numSubResources);
+
+    // Set up the src row strides
+    for (int i = 0; i < textureResourceDesc.numMipLevels; i++)
+    {
+        const int mipWidth = TextureResource::calcMipSize(textureResourceDesc.size.width, i);
+        mipRowStrides[i] = mipWidth * sizeof(uint32_t);
+    }
+
+    // Set up pointers the the data
+    {
+        int subResourceIndex = 0;
+        const int numGen = int(texData.dataBuffer.Count());
+        for (int i = 0; i < numSubResources; i++)
+        {
+            subResources[i] = texData.dataBuffer[subResourceIndex].Buffer();
+            // Wrap around
+            subResourceIndex = (subResourceIndex + 1 >= numGen) ? 0 : (subResourceIndex + 1);
+        }
+    }
+
+    initData.mipRowStrides = mipRowStrides.Buffer();
+    initData.numMips = textureResourceDesc.numMipLevels;
+    initData.numSubResources = numSubResources;
+    initData.subResources = subResources.Buffer();
+
+    textureOut = renderer->createTextureResource(type, Resource::Usage::GenericRead, textureResourceDesc, &initData);
+
+    return textureOut ? SLANG_OK : SLANG_FAIL;
+}
+
+SlangResult createInputBufferResource(const InputBufferDesc& inputDesc, bool isOutput, size_t bufferSize, const void* initData, Renderer* renderer, Slang::RefPtr<BufferResource>& bufferOut)
+{
+    using namespace Slang;
+
+    Resource::Usage initialUsage = Resource::Usage::GenericRead;
+
+    BufferResource::Desc srcDesc;
+    srcDesc.init(bufferSize);
+
+    int bindFlags = 0;
+    if (inputDesc.type == InputBufferType::ConstantBuffer)
+    {
+        bindFlags |= Resource::BindFlag::ConstantBuffer;
+        srcDesc.cpuAccessFlags |= Resource::AccessFlag::Write;
+        initialUsage = Resource::Usage::ConstantBuffer;
+    }
+    else
+    {
+        bindFlags |= Resource::BindFlag::UnorderedAccess | Resource::BindFlag::PixelShaderResource | Resource::BindFlag::NonPixelShaderResource;
+        srcDesc.elementSize = inputDesc.stride;
+        initialUsage = Resource::Usage::UnorderedAccess;
+    }
+
+    if (isOutput)
+    {
+        srcDesc.cpuAccessFlags |= Resource::AccessFlag::Read;
+    }
+
+    srcDesc.bindFlags = bindFlags;
+
+    RefPtr<BufferResource> bufferResource = renderer->createBufferResource(initialUsage, srcDesc, initData);
+    if (!bufferResource)
+    {
+        return SLANG_FAIL;
+    }
+
+    bufferOut = bufferResource;
+    return SLANG_OK;
+}
+    
+
 
 } // renderer_test

@@ -1120,6 +1120,10 @@ SLANG_API int spCompile(
     {
         // This should only be thrown if we already emitted a fatal error
         // message, so there is no reason to print something else.
+        //
+        // We still need to copy the diagnostic output into the variable
+        // that the user will query via the API.
+        req->mDiagnosticOutput = req->mSink.outputBuffer.ProduceString();
         return 1;
     }
     catch (...)

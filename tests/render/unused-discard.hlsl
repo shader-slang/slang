@@ -1,4 +1,5 @@
 //TEST(smoke,render):COMPARE_HLSL_GLSL_RENDER:
+//TEST(smoke,render):COMPARE_HLSL_GLSL_RENDER: -dx12
 
 // This is a basic test case for cross-compilation behavior.
 //
