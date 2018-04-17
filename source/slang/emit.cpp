@@ -2363,7 +2363,7 @@ struct EmitVisitor
             if(count > UInt(end_ - cursor_))
             {
                 SLANG_UNEXPECTED("bad name mangling");
-                UNREACHABLE_RETURN(result);
+                UNREACHABLE_RETURN(UnownedStringSlice());
             }
 
             auto result = UnownedStringSlice(cursor_, cursor_ + count);
