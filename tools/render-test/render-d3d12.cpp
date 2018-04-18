@@ -207,8 +207,14 @@ protected:
 
     struct Binding
     {
-        ShaderInputType m_type;
-        InputBufferType m_bufferType;                         // Only valid if `type` is `Buffer`
+        enum Type
+        {
+            ConstantBuffer,                 ///< If set bound as constant buffer
+            Other,
+        };
+
+        Type m_type = Type::Other;
+
         int m_srvIndex = -1;
         int m_uavIndex = -1;
         int m_samplerIndex = -1;      
@@ -1292,7 +1298,7 @@ Result D3D12Renderer::_calcBindParameters(BindParameters& params)
             {
                 const Binding& binding = m_boundBindingState->m_bindings[i];
 
-                if (binding.m_type == ShaderInputType::Buffer && binding.m_bufferType == InputBufferType::ConstantBuffer)
+                if (binding.m_type == Binding::Type::ConstantBuffer)
                 {
                     // Make sure it's not overlapping the ones we just statically defined
                     //assert(binding.m_binding < numBoundConstantBuffers);
@@ -1430,7 +1436,7 @@ Result D3D12Renderer::_bindRenderState(RenderState* renderState, ID3D12GraphicsC
                 {
                     const Binding& binding = bindingState->m_bindings[i];
 
-                    if (binding.m_type == ShaderInputType::Buffer && binding.m_bufferType == InputBufferType::ConstantBuffer)
+                    if (binding.m_type == Binding::ConstantBuffer)
                     {
                         BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(binding.m_resource.Ptr());
                         buffer->bindConstantBufferView(m_circularResourceHeap, index++, submitter);
@@ -2544,7 +2550,6 @@ BindingState* D3D12Renderer::createBindingState(const ShaderInputLayout& layout)
         ShaderInputLayoutEntry& srcEntry = srcBindings[i];
         Binding& dstEntry = dstBindings[i];
 
-        dstEntry.m_type = srcEntry.type;
         dstEntry.m_binding = srcEntry.hlslBinding;
         dstEntry.m_isOutput = srcEntry.isOutput;
 
@@ -2564,10 +2569,12 @@ BindingState* D3D12Renderer::createBindingState(const ShaderInputLayout& layout)
                         return nullptr;
                     }
                 }
+                else
+                {
+                    dstEntry.m_type = Binding::Type::ConstantBuffer;
+                }
 
-                SLANG_RETURN_NULL_ON_FAIL(createInputBuffer(srcEntry.bufferDesc, srcEntry.isOutput, srcEntry.bufferData, bindingState->m_viewHeap, dstEntry.m_uavIndex, dstEntry.m_srvIndex, dstEntry.m_resource));
-                
-                dstEntry.m_bufferType = srcEntry.bufferDesc.type;
+                SLANG_RETURN_NULL_ON_FAIL(createInputBuffer(srcEntry.bufferDesc, srcEntry.isOutput, srcEntry.bufferData, bindingState->m_viewHeap, dstEntry.m_uavIndex, dstEntry.m_srvIndex, dstEntry.m_resource));                
                 break;
             }
             case ShaderInputType::Texture:
@@ -2641,6 +2648,12 @@ BindingState* D3D12Renderer::createBindingState(const BindingState::Desc& bindin
                 const int elemSize = bufferDesc.elementSize <= 0 ? sizeof(uint32_t) : bufferDesc.elementSize;
 
                 const  bool createSrv = false;
+
+                if (bufferDesc.bindFlags & Resource::BindFlag::ConstantBuffer)
+                {
+                    dstEntry.m_type = Binding::Type::ConstantBuffer;
+                }
+
                 // NOTE! In this arrangement the buffer can either be a ConstantBuffer or a 'StorageBuffer'.
                 // If it's a storage buffer then it has a 'uav'.
                 // In neither circumstance is there an associated srv 
@@ -2759,7 +2772,7 @@ BindingState* D3D12Renderer::createBindingState(const BindingState::Desc& bindin
 
                 break;
             }
-            case ShaderInputType::CombinedTextureSampler:
+            case BindingState::Desc::Binding::Type::CombinedTextureSampler:
             {
                 assert(!"Not implemented");
                 return nullptr;
