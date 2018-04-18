@@ -2076,7 +2076,7 @@ struct EmitVisitor
             {
                 return true;
             }
-            else if(as<IRSamplerStateType>(type))
+            else if(as<IRSamplerStateTypeBase>(type))
             {
                 return true;
             }
