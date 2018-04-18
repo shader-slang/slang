@@ -317,6 +317,16 @@ class TextureResource: public Resource
     Desc m_desc;
 };
 
+enum class BindingType
+{
+    Unknown,
+    Sampler,
+    Buffer,
+    Texture,
+    CombinedTextureSampler,
+    CountOf,
+};
+
 class BindingState : public Slang::RefObject
 {
 public:
@@ -385,30 +395,20 @@ public:
 
         struct Binding
         {
-            enum class Type
-            {
-                Unknown,
-                Sampler,
-                Buffer,
-                Texture,
-                CombinedTextureSampler,
-                CountOf,
-            };
-
-            Type type;                      ///< Type of binding
+            BindingType bindingType;                      ///< Type of binding
             int descIndex;                  ///< Index associated with type. -1 if not used
             Slang::RefPtr<Resource> resource;             ///< Associated resource. nullptr if not used
             RegisterDesc registerDesc;      ///< Registers associated with binding
         };
 
         /// Add a resource - assumed that the binding will match the Desc of the resource
-        void addResource(Binding::Type type, Resource* resource, const RegisterDesc& registerDesc);
+        void addResource(BindingType bindingType, Resource* resource, const RegisterDesc& registerDesc);
         /// Add a sampler        
         void addSampler(const SamplerDesc& desc, const RegisterDesc& registerDesc);
         /// Add a BufferResource 
-        void addBufferResource(BufferResource* resource, const RegisterDesc& registerDesc) { addResource(Binding::Type::Buffer, resource, registerDesc); }
+        void addBufferResource(BufferResource* resource, const RegisterDesc& registerDesc) { addResource(BindingType::Buffer, resource, registerDesc); }
         /// Add a texture 
-        void addTextureResource(TextureResource* resource, const RegisterDesc& registerDesc) { addResource(Binding::Type::Texture, resource, registerDesc); }
+        void addTextureResource(TextureResource* resource, const RegisterDesc& registerDesc) { addResource(BindingType::Texture, resource, registerDesc); }
         /// Add combined texture a
         void addCombinedTextureSampler(TextureResource* resource, const SamplerDesc& samplerDesc, const RegisterDesc& registerDesc);
 

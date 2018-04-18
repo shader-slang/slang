@@ -2634,9 +2634,9 @@ BindingState* D3D12Renderer::createBindingState(const BindingState::Desc& bindin
         dstEntry.m_isOutput = false;
         dstEntry.m_resource = srcEntry.resource;
 
-        switch (srcEntry.type)
+        switch (srcEntry.bindingType)
         {
-            case BindingState::Desc::Binding::Type::Buffer:
+            case BindingType::Buffer:
             {
                 assert(srcEntry.resource && srcEntry.resource->isBuffer());
                 BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(srcEntry.resource.Ptr());
@@ -2718,7 +2718,7 @@ BindingState* D3D12Renderer::createBindingState(const BindingState::Desc& bindin
 
                 break;
             }
-            case BindingState::Desc::Binding::Type::Texture:
+            case BindingType::Texture:
             {
                 assert(srcEntry.resource && srcEntry.resource->isTexture());
 
@@ -2743,7 +2743,7 @@ BindingState* D3D12Renderer::createBindingState(const BindingState::Desc& bindin
 
                 break;
             }
-            case BindingState::Desc::Binding::Type::Sampler:
+            case BindingType::Sampler:
             {
                 const BindingState::SamplerDesc& samplerDesc = bindingStateDesc.m_samplers[srcEntry.descIndex];
 
@@ -2772,7 +2772,7 @@ BindingState* D3D12Renderer::createBindingState(const BindingState::Desc& bindin
 
                 break;
             }
-            case BindingState::Desc::Binding::Type::CombinedTextureSampler:
+            case BindingType::CombinedTextureSampler:
             {
                 assert(!"Not implemented");
                 return nullptr;

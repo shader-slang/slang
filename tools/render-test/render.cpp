@@ -29,7 +29,7 @@ void BindingState::Desc::addSampler(const SamplerDesc& desc, const RegisterDesc&
     m_samplers.Add(desc);
 
     Binding binding;
-    binding.type = Binding::Type::Sampler;
+    binding.bindingType = BindingType::Sampler;
     binding.resource = nullptr;
     binding.registerDesc = registerDesc;
     binding.descIndex = descIndex;
@@ -37,12 +37,12 @@ void BindingState::Desc::addSampler(const SamplerDesc& desc, const RegisterDesc&
     m_bindings.Add(binding);
 }
 
-void BindingState::Desc::addResource(Binding::Type type, Resource* resource, const RegisterDesc& registerDesc)
+void BindingState::Desc::addResource(BindingType bindingType, Resource* resource, const RegisterDesc& registerDesc)
 {
     assert(resource);
 
     Binding binding;
-    binding.type = type;
+    binding.bindingType = bindingType;
     binding.resource = resource;
     binding.descIndex = -1;
     binding.registerDesc = registerDesc;
@@ -57,7 +57,7 @@ void BindingState::Desc::addCombinedTextureSampler(TextureResource* resource, co
     m_samplers.Add(samplerDesc);
 
     Binding binding;
-    binding.type = Binding::Type::CombinedTextureSampler;
+    binding.bindingType = BindingType::CombinedTextureSampler;
     binding.resource = resource;
     binding.descIndex = samplerDescIndex;
     binding.registerDesc = registerDesc;
@@ -93,7 +93,6 @@ BindingState::RegisterSet BindingState::Desc::addRegisterSet(const int* srcIndic
         }
     }
 }
-
 
 int BindingState::Desc::getFirst(const RegisterSet& set) const
 {

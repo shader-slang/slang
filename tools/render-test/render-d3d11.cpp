@@ -1041,9 +1041,9 @@ BindingState* D3D11Renderer::createBindingState(const BindingState::Desc& bindin
         Binding& dstBinding = dstBindings[i];
         const BindingState::Desc::Binding& srcBinding = bindingStateDesc.m_bindings[i];
 
-        switch (srcBinding.type)
+        switch (srcBinding.bindingType)
         {
-            case BindingState::Desc::Binding::Type::Buffer:
+            case BindingType::Buffer:
             {
                 assert(srcBinding.resource && srcBinding.resource->isBuffer());
 
@@ -1093,8 +1093,8 @@ BindingState* D3D11Renderer::createBindingState(const BindingState::Desc& bindin
                 }
                 break;
             }
-            case BindingState::Desc::Binding::Type::Texture:
-            case BindingState::Desc::Binding::Type::CombinedTextureSampler:
+            case BindingType::Texture:
+            case BindingType::CombinedTextureSampler:
             {
                 assert(srcBinding.resource && srcBinding.resource->isTexture());
             
@@ -1178,7 +1178,7 @@ BindingState* D3D11Renderer::createBindingState(const BindingState::Desc& bindin
                 SLANG_RETURN_NULL_ON_FAIL(m_device->CreateShaderResourceView(texture->m_resource, &viewDesc, dstBinding.srv.writeRef()));
                 break;
             }
-            case BindingState::Desc::Binding::Type::Sampler:
+            case BindingType::Sampler:
             {
                 const BindingState::SamplerDesc& samplerDesc = bindingStateDesc.m_samplers[srcBinding.descIndex];
 
