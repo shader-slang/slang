@@ -355,6 +355,9 @@ public:
         const uint16_t* begin() const { return indices; }
         const uint16_t* end() const { return indices + numIndices; }
 
+        int getSize() const { return int(numIndices); }
+        uint16_t operator[](int i) const { assert(i >= 0 && i < numIndices); return indices[i]; }
+
         const uint16_t* indices;
         size_t numIndices;
     };
@@ -375,15 +378,21 @@ public:
                 default:    return RegisterList{ m_indices.Buffer() + set.m_indexOrBase, set.m_numIndices };
             }
         }
+        RegisterList asRegisterList(ShaderStyle style, const RegisterDesc& registerDesc) const
+        {
+            return asRegisterList(registerDesc.registerSets[int(style)]);
+        }
 
         struct Binding
         {
             enum class Type
             {
+                Unknown,
                 Sampler,
                 Buffer,
                 Texture,
                 CombinedTextureSampler,
+                CountOf,
             };
 
             Type type;                      ///< Type of binding
