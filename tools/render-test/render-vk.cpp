@@ -5,6 +5,7 @@
 #include "render.h"
 
 #include "../../source/core/smart-pointer.h"
+#include "slang-support.h"
 
 #ifdef _WIN32
 #define VK_USE_PLATFORM_WIN32_KHR 1
@@ -114,35 +115,49 @@ public:
 
     protected:
 
+    class Buffer
+    {
+        public:
+        
+            /// Returns true if has been initialized
+        bool isInitialized() const { return m_renderer != nullptr; }
+        
+            // Default Ctor
+        Buffer():
+            m_renderer(nullptr)
+        {}
+
+            /// Dtor
+        ~Buffer()
+        {
+            if (m_renderer)
+            {
+                m_renderer->vkDestroyBuffer(m_renderer->m_device, m_buffer, nullptr);
+                m_renderer->vkFreeMemory(m_renderer->m_device, m_memory, nullptr);
+            }
+        }
+
+        VkBuffer m_buffer;
+        VkDeviceMemory m_memory;
+        VKRenderer* m_renderer;
+    };
+    
     class BufferResourceImpl: public BufferResource
     {
 		public:
         typedef BufferResource Parent;
 
-        BufferResourceImpl(Resource::Usage initialUsage, const BufferResource::Desc& desc, VKRenderer* renderer, VkBuffer buffer, VkDeviceMemory memory):
+        BufferResourceImpl(Resource::Usage initialUsage, const BufferResource::Desc& desc, VKRenderer* renderer):
             Parent(desc),
 			m_renderer(renderer),
-			m_buffer(buffer),
-			m_memory(memory),
             m_initialUsage(initialUsage)
 		{
 			assert(renderer);
 		}
 
-		~BufferResourceImpl()
-		{
-			// Now destroy the staging buffer
-			if (m_renderer)
-			{
-				m_renderer->vkDestroyBuffer(m_renderer->m_device, m_buffer, nullptr);
-				m_renderer->vkFreeMemory(m_renderer->m_device, m_memory, nullptr);
-			}
-		}
-
         Resource::Usage m_initialUsage;
-		VKRenderer*		m_renderer;
-        VkBuffer        m_buffer;
-        VkDeviceMemory  m_memory;
+		VKRenderer* m_renderer;
+        Buffer m_buffer;
     };
 
 	class ShaderProgramImpl: public ShaderProgram
@@ -163,8 +178,9 @@ public:
 
         VkImageView     srv;
         VkBufferView    uav;
-        VkBuffer        buffer;
         VkSampler       samplerState;
+
+        RefPtr<Resource> resource;                  ///< Holds either the BufferResource, or TextureResource
 
         int binding = 0;
         bool isOutput = false;
@@ -192,8 +208,7 @@ public:
 
     VkBool32 handleDebugMessage(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t srcObject,
         size_t location, int32_t msgCode, const char* pLayerPrefix, const char* pMsg);
-    BufferResourceImpl* createBufferResourceImpl(Resource::Usage initialUsage, const BufferResource::Desc& desc, size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties, const void* initData = nullptr);
-
+    
     VkCommandBuffer getCommandBuffer();
     VkCommandBuffer beginCommandBuffer();
     void flushCommandBuffer(VkCommandBuffer commandBuffer);
@@ -204,8 +219,10 @@ public:
 
     void createInputTexture(const InputTextureDesc& inputDesc, VkImageView& viewOut);
     void createInputSampler(const InputSamplerDesc& inputDesc, VkSampler& stateOut);
-    void createInputBuffer(const ShaderInputLayoutEntry& entry, const InputBufferDesc& bufferDesc, const Slang::List<unsigned int>& bufferData,
-        VkBuffer& bufferOut, VkBufferView& uavOut, VkImageView& srvOut);
+    SlangResult createInputBuffer(const ShaderInputLayoutEntry& entry, const InputBufferDesc& bufferDesc, const Slang::List<unsigned int>& bufferData,
+        RefPtr<BufferResource>& bufferOut, VkBufferView& uavOut, VkImageView& srvOut);
+
+    SlangResult _initBuffer(size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties, Buffer& bufferOut);
 
     static SlangResult toSlangResult(VkResult res);
     static void checkResult(VkResult result);
@@ -320,23 +337,22 @@ void VKRenderer::flushCommandBuffer(VkCommandBuffer commandBuffer)
     vkFreeCommandBuffers(m_device, m_commandPool, 1, &commandBuffer);
 }
 
-VKRenderer::BufferResourceImpl* VKRenderer::createBufferResourceImpl(Resource::Usage initialUsage, const BufferResource::Desc& desc, size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties, const void* initData)
+SlangResult VKRenderer::_initBuffer(size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties, Buffer& bufferOut)
 {
-    if (initData)
-    {
-        // TODO: what if we are allocating it as CPU-writable anyway?
-        usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-    }
+    assert(bufferOut.isInitialized());
+
+    bufferOut.m_renderer = this;
+    bufferOut.m_memory = nullptr;
+    bufferOut.m_buffer = nullptr;
 
     VkBufferCreateInfo bufferCreateInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
     bufferCreateInfo.size = bufferSize;
     bufferCreateInfo.usage = usage;
 
-    VkBuffer buffer;
-    checkResult(vkCreateBuffer(m_device, &bufferCreateInfo, nullptr, &buffer));
+    checkResult(vkCreateBuffer(m_device, &bufferCreateInfo, nullptr, &bufferOut.m_buffer));
 
     VkMemoryRequirements memoryReqs = {};
-    vkGetBufferMemoryRequirements(m_device, buffer, &memoryReqs);
+    vkGetBufferMemoryRequirements(m_device, bufferOut.m_buffer, &memoryReqs);
 
     uint32_t memoryTypeIndex = getMemoryTypeIndex(memoryReqs.memoryTypeBits, reqMemoryProperties);
 
@@ -346,37 +362,10 @@ VKRenderer::BufferResourceImpl* VKRenderer::createBufferResourceImpl(Resource::U
     allocateInfo.allocationSize = memoryReqs.size;
     allocateInfo.memoryTypeIndex = memoryTypeIndex;
 
-    VkDeviceMemory memory;
-    checkResult(vkAllocateMemory(m_device, &allocateInfo, nullptr, &memory));
+    checkResult(vkAllocateMemory(m_device, &allocateInfo, nullptr, &bufferOut.m_memory));
+    checkResult(vkBindBufferMemory(m_device, bufferOut.m_buffer, bufferOut.m_memory, 0));
 
-    checkResult(vkBindBufferMemory(m_device, buffer, memory, 0));
-
-    if (initData)
-    {
-        // TODO: only create staging buffer if the memory type
-        // used for the buffer doesn't let us fill things in
-        // directly.
-
-        RefPtr<BufferResourceImpl> staging = createBufferResourceImpl(initialUsage, desc, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-        // Copy into staging buffer
-        void* mappedData = nullptr;
-        checkResult(vkMapMemory(m_device, staging->m_memory, 0, bufferSize, 0, &mappedData));
-        memcpy(mappedData, initData, bufferSize);
-        vkUnmapMemory(m_device, staging->m_memory);
-
-        // Copy from staging buffer to real buffer
-        VkCommandBuffer commandBuffer = beginCommandBuffer();
-
-        VkBufferCopy copyInfo = {};
-        copyInfo.size = bufferSize;
-        vkCmdCopyBuffer(commandBuffer, staging->m_buffer, buffer, 1, &copyInfo);
-
-        flushCommandBuffer(commandBuffer);
-    }
-
-    return new BufferResourceImpl(initialUsage, desc, this, buffer, memory);
+    return SLANG_OK;
 }
 
 uint32_t VKRenderer::getMemoryTypeIndex(uint32_t inTypeBits, VkMemoryPropertyFlags properties)
@@ -409,53 +398,20 @@ void VKRenderer::createInputSampler(const InputSamplerDesc& inputDesc, VkSampler
     assert(!"unimplemented");
 }
 
-void VKRenderer::createInputBuffer(const ShaderInputLayoutEntry& entry, const InputBufferDesc& bufferDesc, const Slang::List<unsigned int>& bufferData, 
-    VkBuffer& bufferOut, VkBufferView& uavOut, VkImageView& srvOut)
+SlangResult VKRenderer::createInputBuffer(const ShaderInputLayoutEntry& entry, const InputBufferDesc& bufferDesc, const Slang::List<unsigned int>& bufferData, 
+    RefPtr<BufferResource>& bufferOut, VkBufferView& uavOut, VkImageView& srvOut)
 {
     size_t bufferSize = bufferData.Count() * sizeof(unsigned int);
-    void const* initData = bufferData.Buffer();
 
-    VkBufferUsageFlags usage = 0;
-    VkMemoryPropertyFlags reqMemoryProperties = 0;
+    RefPtr<BufferResource> bufferResource;
+    SLANG_RETURN_ON_FAIL(createInputBufferResource(bufferDesc, entry.isOutput, bufferSize, bufferData.Buffer(), this, bufferResource));
 
-    Resource::Usage initialUsage = Resource::Usage::Unknown;
-    switch (bufferDesc.type)
-    {
-        case InputBufferType::ConstantBuffer:
-            usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-            reqMemoryProperties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-            initialUsage = Resource::Usage::ConstantBuffer;
-            break;
-
-        case InputBufferType::StorageBuffer:
-            usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-            reqMemoryProperties = 0;
-            initialUsage = Resource::Usage::PixelShaderResource;
-            break;
-    }
-
-    BufferResource::Desc bufferResourceDesc;
-
-    bufferResourceDesc.cpuAccessFlags = (entry.isOutput) ? Resource::AccessFlag::Read : 0;
-    bufferResourceDesc.bindFlags = Resource::s_requiredBinding[int(initialUsage)];
-    bufferResourceDesc.elementSize = 0;
-    bufferResourceDesc.sizeInBytes = bufferSize;
-
-    // If we are going to read back from the buffer, be sure to request
-    // the required access.
-    if (entry.isOutput)
-    {
-        usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-    }
-
-    RefPtr<BufferResourceImpl> bufferImpl(createBufferResourceImpl(initialUsage, bufferResourceDesc, bufferSize, usage, reqMemoryProperties, initData));
+    BufferResourceImpl* resourceImpl = static_cast<BufferResourceImpl*>(bufferResource.Ptr());
 
     // TODO: need to hang onto the `memory` field so
     // that we can release it when we are done.
-	// Set the m_renderer to null to stop any destruction as bufferImpl leaves scope
-	bufferImpl->m_renderer = nullptr;
-    bufferOut = bufferImpl->m_buffer;
-
+	
+    
     // Fill in any views needed
     switch (bufferDesc.type)
     {
@@ -467,6 +423,9 @@ void VKRenderer::createInputBuffer(const ShaderInputLayoutEntry& entry, const In
         }
         break;
     }
+
+    bufferOut = bufferResource;
+    return SLANG_OK;
 }
 
 VkPipelineShaderStageCreateInfo VKRenderer::compileEntryPoint(const ShaderCompileRequest::EntryPoint& entryPointRequest, VkShaderStageFlagBits stage, List<char>& bufferOut)
@@ -764,7 +723,41 @@ BufferResource* VKRenderer::createBufferResource(Resource::Usage initialUsage, c
         default: break;
     }
 
-    return createBufferResourceImpl(initialUsage, desc, bufferSize, usage, reqMemoryProperties, initData);
+    if (initData)
+    {
+        // TODO: what if we are allocating it as CPU-writable anyway?
+        usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    }
+
+    RefPtr<BufferResourceImpl> buffer(new BufferResourceImpl(initialUsage, desc, this));
+    SLANG_RETURN_NULL_ON_FAIL(_initBuffer(desc.sizeInBytes, usage, reqMemoryProperties, buffer->m_buffer));
+
+    if (initData)
+    {
+        // TODO: only create staging buffer if the memory type
+        // used for the buffer doesn't let us fill things in
+        // directly.
+
+        Buffer staging;
+        SLANG_RETURN_NULL_ON_FAIL(_initBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, staging));
+
+        // Copy into staging buffer
+        void* mappedData = nullptr;
+        checkResult(vkMapMemory(m_device, staging.m_memory, 0, bufferSize, 0, &mappedData));
+        memcpy(mappedData, initData, bufferSize);
+        vkUnmapMemory(m_device, staging.m_memory);
+
+        // Copy from staging buffer to real buffer
+        VkCommandBuffer commandBuffer = beginCommandBuffer();
+
+        VkBufferCopy copyInfo = {};
+        copyInfo.size = bufferSize;
+        vkCmdCopyBuffer(commandBuffer, staging.m_buffer, buffer->m_buffer.m_buffer, 1, &copyInfo);
+
+        flushCommandBuffer(commandBuffer);
+    }
+
+    return buffer.detach();
 }
 
 InputLayout* VKRenderer::createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) 
@@ -824,7 +817,11 @@ BindingState* VKRenderer::createBindingState(const ShaderInputLayout& layout)
         {
             case ShaderInputType::Buffer:
             {
-                createInputBuffer(entry, entry.bufferDesc, entry.bufferData, binding.buffer, binding.uav, binding.srv);
+                RefPtr<BufferResource> bufferResource;
+                SLANG_RETURN_NULL_ON_FAIL(createInputBuffer(entry, entry.bufferDesc, entry.bufferData, bufferResource, binding.uav, binding.srv));
+
+                binding.resource = bufferResource;
+
                 binding.bufferLength = (int)(entry.bufferData.Count() * sizeof(unsigned int));
                 binding.bufferType = entry.bufferDesc.type;
             }
@@ -866,40 +863,35 @@ void VKRenderer::serializeOutput(BindingState* s, const char* fileName)
     {
         if (bb.isOutput)
         {
-            if (bb.buffer)
+            if (bb.resource && bb.resource->isBuffer())
             {
-                Resource::Usage initialUsage = Resource::Usage::NonPixelShaderResource;
-                BufferResource::Desc bufferResourceDesc;
+                BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(bb.resource.Ptr());
 
                 size_t bufferSize = bb.bufferLength;
-
-                bufferResourceDesc.cpuAccessFlags = Resource::AccessFlag::Read;
-                bufferResourceDesc.bindFlags = 0;
-                bufferResourceDesc.elementSize = 0;
-                bufferResourceDesc.sizeInBytes = bufferSize;
-
+                                
                 // create staging buffer
-                RefPtr<BufferResourceImpl> staging(createBufferResourceImpl(initialUsage, bufferResourceDesc, bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
+                Buffer staging;
+                
+                SLANG_RETURN_VOID_ON_FAIL(_initBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, staging));
 
                 // Copy from real buffer to staging buffer
                 VkCommandBuffer commandBuffer = beginCommandBuffer();
 
                 VkBufferCopy copyInfo = {};
                 copyInfo.size = bufferSize;
-                vkCmdCopyBuffer(commandBuffer, bb.buffer, staging->m_buffer, 1, &copyInfo);
+                vkCmdCopyBuffer(commandBuffer, bufferResource->m_buffer.m_buffer, staging.m_buffer, 1, &copyInfo);
 
                 flushCommandBuffer(commandBuffer);
 
                 // Write out the data from the buffer
                 void* mappedData = nullptr;
-                checkResult(vkMapMemory(m_device, staging->m_memory, 0, bufferSize, 0, &mappedData));
+                checkResult(vkMapMemory(m_device, staging.m_memory, 0, bufferSize, 0, &mappedData));
 
                 auto ptr = (unsigned int *)mappedData;
                 for (auto i = 0u; i < bufferSize / sizeof(unsigned int); i++)
                     fprintf(f, "%X\n", ptr[i]);
 
-                vkUnmapMemory(m_device, staging->m_memory);
+                vkUnmapMemory(m_device, staging.m_memory);
             }
             else
             {
@@ -997,8 +989,12 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
                 {
                     case InputBufferType::StorageBuffer:
                     {
+                        assert(bb.resource && bb.resource->isBuffer());
+
+                        BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(bb.resource.Ptr());
+
                         VkDescriptorBufferInfo bufferInfo;
-                        bufferInfo.buffer = bb.buffer;
+                        bufferInfo.buffer = bufferResource->m_buffer.m_buffer;
                         bufferInfo.offset = 0;
                         bufferInfo.range = bb.bufferLength;
 

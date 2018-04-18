@@ -2628,8 +2628,6 @@ BindingState* D3D12Renderer::createBindingState(const BindingState::Desc& bindin
         const BindingState::Desc::Binding& srcEntry = srcBindings[i];
         Binding& dstEntry = dstBindings[i];
 
-        //dstEntry.m_type = srcEntry.type;
-
         dstEntry.m_binding = bindingStateDesc.getFirst(srcEntry.registerDesc.registerSets[int(BindingState::ShaderStyle::Hlsl)]);
         dstEntry.m_isOutput = false;
         dstEntry.m_resource = srcEntry.resource;
