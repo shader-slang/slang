@@ -173,8 +173,9 @@ public:
 
     struct Binding
     {
-        ShaderInputType type;
-        InputBufferType bufferType; // Only valid if `type` is `Buffer`
+        BindingType    bindingType;
+        //ShaderInputType type;
+        //InputBufferType bufferType; // Only valid if `type` is `Buffer`
 
         VkImageView     srv;
         VkBufferView    uav;
@@ -184,7 +185,6 @@ public:
 
         int binding = 0;
         bool isOutput = false;
-        int bufferLength = 0;
     };
 
     class BindingStateImpl: public BindingState
@@ -803,6 +803,18 @@ void VKRenderer::draw(UInt vertexCount, UInt startVertex = 0)
 {
 }
 
+static BindingType _getBindingType(ShaderInputType type)
+{
+    switch (type)
+    {
+        case ShaderInputType::Buffer:                   return BindingType::Buffer;
+        case ShaderInputType::Texture:                  return BindingType::Texture;
+        case ShaderInputType::CombinedTextureSampler:   return BindingType::CombinedTextureSampler;
+        case ShaderInputType::Sampler:                  return BindingType::Sampler;
+        default:                                        return BindingType::Unknown;
+    }
+}
+
 BindingState* VKRenderer::createBindingState(const ShaderInputLayout& layout)
 {
     BindingStateImpl* bindingState = new BindingStateImpl(this);
@@ -810,7 +822,9 @@ BindingState* VKRenderer::createBindingState(const ShaderInputLayout& layout)
     for (auto & entry : layout.entries)
     {
         Binding binding;
-        binding.type = entry.type;
+        
+        binding.bindingType = _getBindingType(entry.type);
+
         binding.binding = entry.hlslBinding;
         binding.isOutput = entry.isOutput;
         switch (entry.type)
@@ -822,10 +836,10 @@ BindingState* VKRenderer::createBindingState(const ShaderInputLayout& layout)
 
                 binding.resource = bufferResource;
 
-                binding.bufferLength = (int)(entry.bufferData.Count() * sizeof(unsigned int));
-                binding.bufferType = entry.bufferDesc.type;
+                //binding.bufferType = entry.bufferDesc.type;
+            
+                break;
             }
-            break;
             case ShaderInputType::Texture:
             {
                 createInputTexture(entry.textureDesc, binding.srv);
@@ -866,8 +880,9 @@ void VKRenderer::serializeOutput(BindingState* s, const char* fileName)
             if (bb.resource && bb.resource->isBuffer())
             {
                 BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(bb.resource.Ptr());
+                const BufferResource::Desc& bufferResourceDesc = bufferResource->getDesc();
 
-                size_t bufferSize = bb.bufferLength;
+                size_t bufferSize = bufferResourceDesc.sizeInBytes;
                                 
                 // create staging buffer
                 Buffer staging;
@@ -913,31 +928,26 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
 
     for (auto bb : m_currentBindingState->m_bindings)
     {
-        switch (bb.type)
+        switch (bb.bindingType)
         {
-            case ShaderInputType::Buffer:
+            case BindingType::Buffer:
             {
-                switch (bb.bufferType)
+                BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(bb.resource.Ptr());
+                const BufferResource::Desc& bufferResourceDesc = bufferResource->getDesc();
+
+                if (bufferResourceDesc.bindFlags & Resource::BindFlag::UnorderedAccess)
                 {
-                    case InputBufferType::StorageBuffer:
-                    {
-                        VkDescriptorSetLayoutBinding binding = {};
-                        binding.binding = bb.binding;
-                        binding.descriptorCount = 1;
-                        binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-                        binding.stageFlags = VK_SHADER_STAGE_ALL;
+                    VkDescriptorSetLayoutBinding binding = {};
+                    binding.binding = bb.binding;
+                    binding.descriptorCount = 1;
+                    binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                    binding.stageFlags = VK_SHADER_STAGE_ALL;
 
-                        bindings.Add(binding);
-                    }
-                    break;
-
-                    default:
-                        // handle other cases
-                        break;
-                }
+                    bindings.Add(binding);
+                }    
+            
+                break;
             }
-            break;
-
             default:
                 // TODO: handle the other cases
                 break;
@@ -978,48 +988,40 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
     VkDescriptorSet descriptorSet;
     checkResult(vkAllocateDescriptorSets(m_device, &descriptorSetAllocInfo, &descriptorSet));
 
-    // Fill in the descritpor set, using our binding information
+    // Fill in the descriptor set, using our binding information
     for (auto bb : m_currentBindingState->m_bindings)
     {
-        switch (bb.type)
+        switch (bb.bindingType)
         {
-            case ShaderInputType::Buffer:
+            case BindingType::Buffer:
             {
-                switch (bb.bufferType)
+                BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(bb.resource.Ptr());
+                const BufferResource::Desc& bufferResourceDesc = bufferResource->getDesc();
+
+                if (bufferResourceDesc.bindFlags & Resource::BindFlag::UnorderedAccess)
                 {
-                    case InputBufferType::StorageBuffer:
-                    {
-                        assert(bb.resource && bb.resource->isBuffer());
+                    VkDescriptorBufferInfo bufferInfo;
+                    bufferInfo.buffer = bufferResource->m_buffer.m_buffer;
+                    bufferInfo.offset = 0;
+                    bufferInfo.range = bufferResourceDesc.sizeInBytes;
+                        
+                    VkWriteDescriptorSet writeInfo = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+                    writeInfo.descriptorCount = 1;
+                    writeInfo.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                    writeInfo.dstSet = descriptorSet;
+                    writeInfo.dstBinding = bb.binding;
+                    writeInfo.dstArrayElement = 0;
+                    writeInfo.pBufferInfo = &bufferInfo;
 
-                        BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(bb.resource.Ptr());
-
-                        VkDescriptorBufferInfo bufferInfo;
-                        bufferInfo.buffer = bufferResource->m_buffer.m_buffer;
-                        bufferInfo.offset = 0;
-                        bufferInfo.range = bb.bufferLength;
-
-                        VkWriteDescriptorSet writeInfo = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-                        writeInfo.descriptorCount = 1;
-                        writeInfo.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-                        writeInfo.dstSet = descriptorSet;
-                        writeInfo.dstBinding = bb.binding;
-                        writeInfo.dstArrayElement = 0;
-                        writeInfo.pBufferInfo = &bufferInfo;
-
-                        vkUpdateDescriptorSets(m_device, 1, &writeInfo, 0, nullptr);
-                    }
-                    break;
-
-                    default:
-                        // handle other cases
-                        break;
+                    vkUpdateDescriptorSets(m_device, 1, &writeInfo, 0, nullptr);
                 }
-            }
-            break;
-
-            default:
-                // TODO: handle the other cases
                 break;
+            }
+            default:
+            {
+                // handle other cases
+                break;
+            }
         }
     }
 
