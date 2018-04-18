@@ -170,6 +170,7 @@ namespace Slang
             // (both types and values) to be mangled in terms of their
             // "depth" (how many outer generics) and "index" (which
             // parameter are they at the specified depth).
+            emitRaw(context, "K");
             emitName(context, genericParamIntVal->declRef.GetName());
         }
         else if( auto constantIntVal = dynamic_cast<ConstantIntVal*>(val) )

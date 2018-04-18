@@ -2355,6 +2355,28 @@ struct EmitVisitor
             }
         }
 
+
+        UnownedStringSlice readRawStringSegment()
+        {
+            // Read the length part
+            UInt count = readCount();
+            if(count > UInt(end_ - cursor_))
+            {
+                SLANG_UNEXPECTED("bad name mangling");
+                UNREACHABLE_RETURN(UnownedStringSlice());
+            }
+
+            auto result = UnownedStringSlice(cursor_, cursor_ + count);
+            cursor_ += count;
+            return result;
+        }
+
+        void readNamedType()
+        {
+            // TODO: handle types with more complicated names
+            readRawStringSegment();
+        }
+
         void readType()
         {
             int c = peek();
@@ -2378,16 +2400,30 @@ struct EmitVisitor
                 break;
 
             default:
-                // TODO: need to read a named type
-                // here...
+                readNamedType();
                 break;
             }
         }
 
         void readVal()
         {
-            // TODO: handle other cases here
-            readType();
+            switch(peek())
+            {
+            case 'k':
+                get();
+                readCount();
+                break;
+
+            case 'K':
+                get();
+                readRawStringSegment();
+                break;
+
+            default:
+                readType();
+                break;
+            }
+
         }
 
         void readGenericArg()
@@ -2405,6 +2441,12 @@ struct EmitVisitor
             }
         }
 
+        void readExtensionSpec()
+        {
+            expect("X");
+            readType();
+        }
+
         UnownedStringSlice readSimpleName()
         {
             UnownedStringSlice result;
@@ -2420,6 +2462,11 @@ struct EmitVisitor
                 else if(c == 'G')
                 {
                     readGenericArgs();
+                    continue;
+                }
+                else if(c == 'X')
+                {
+                    readExtensionSpec();
                     continue;
                 }
 
