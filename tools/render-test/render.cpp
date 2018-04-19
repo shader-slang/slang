@@ -21,6 +21,134 @@ using namespace Slang;
     BindFlag::Enum(BindFlag::PixelShaderResource | BindFlag::NonPixelShaderResource), // GenericRead
 }; 
 
+static const Resource::DescBase s_emptyDescBase = {};
+
+const Resource::DescBase& Resource::getDescBase() const
+{
+    if (isBuffer())
+    {
+        return static_cast<const BufferResource *>(this)->getDesc();
+    }
+    else if (isTexture())
+    {
+        return static_cast<const TextureResource *>(this)->getDesc();
+    }
+    return s_emptyDescBase;
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!! BindingState::Desc !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+void BindingState::Desc::addSampler(const SamplerDesc& desc, const RegisterDesc& registerDesc)
+{
+    int descIndex = int(m_samplerDescs.Count());
+    m_samplerDescs.Add(desc);
+
+    Binding binding;
+    binding.bindingType = BindingType::Sampler;
+    binding.resource = nullptr;
+    binding.registerDesc = registerDesc;
+    binding.descIndex = descIndex;
+
+    m_bindings.Add(binding);
+}
+
+void BindingState::Desc::addResource(BindingType bindingType, Resource* resource, const RegisterDesc& registerDesc)
+{
+    assert(resource);
+
+    Binding binding;
+    binding.bindingType = bindingType;
+    binding.resource = resource;
+    binding.descIndex = -1;
+    binding.registerDesc = registerDesc;
+    m_bindings.Add(binding);
+}
+
+void BindingState::Desc::addCombinedTextureSampler(TextureResource* resource, const SamplerDesc& samplerDesc, const RegisterDesc& registerDesc)
+{
+    assert(resource);
+
+    int samplerDescIndex = int(m_samplerDescs.Count());
+    m_samplerDescs.Add(samplerDesc);
+
+    Binding binding;
+    binding.bindingType = BindingType::CombinedTextureSampler;
+    binding.resource = resource;
+    binding.descIndex = samplerDescIndex;
+    binding.registerDesc = registerDesc;
+    m_bindings.Add(binding);
+}
+
+BindingState::RegisterSet BindingState::Desc::addRegisterSet(int index)
+{
+    if (index < 0)
+    {
+        return RegisterSet();
+    }
+    return RegisterSet(index, 1);
+}
+
+BindingState::RegisterSet BindingState::Desc::addRegisterSet(const int* srcIndices, int numIndices)
+{
+    assert(numIndices >= 0);
+    switch (numIndices)
+    {
+        case 0:     return RegisterSet(); 
+        case 1:     return RegisterSet(srcIndices[0], 1);
+        default:
+        {
+            int startIndex = int(m_indices.Count());
+            m_indices.SetSize(startIndex + numIndices);
+            uint16_t* dstIndices = m_indices.Buffer() + startIndex;
+            for (int i = 0; i < numIndices; i++)
+            {
+                assert(srcIndices[i] >= 0);
+                dstIndices[i] = uint16_t(srcIndices[i]);
+            }
+            return RegisterSet(startIndex, numIndices);
+        }
+    }
+}
+
+int BindingState::Desc::getFirst(const RegisterSet& set) const
+{
+    switch (set.m_numIndices)
+    {
+        case 0:             return -1;
+        case 1:             return set.m_indexOrBase;
+        default:            return m_indices[set.m_indexOrBase];
+    }
+}
+
+int BindingState::Desc::getFirst(ShaderStyle style, const RegisterDesc& registerDesc) const
+{
+    return getFirst(registerDesc.registerSets[int(style)]); 
+}
+
+void BindingState::Desc::clear()
+{
+    m_bindings.Clear();
+    m_samplerDescs.Clear();
+    m_indices.Clear();
+    m_numRenderTargets = 1;
+}
+
+BindingState::RegisterList BindingState::Desc::asRegisterList(const RegisterSet& set) const
+{
+    switch (set.m_numIndices)
+    {
+        case 0:     return RegisterList{ nullptr, 0 };
+        case 1:     return RegisterList{ &set.m_indexOrBase, 1 };
+        default:    return RegisterList{ m_indices.Buffer() + set.m_indexOrBase, set.m_numIndices };
+    }
+}
+
+BindingState::RegisterList BindingState::Desc::asRegisterList(ShaderStyle style, const RegisterDesc& registerDesc) const
+{
+    return asRegisterList(registerDesc.registerSets[int(style)]);
+}
+
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!! TextureResource::Size !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 int TextureResource::Size::calcMaxDimension(Type type) const

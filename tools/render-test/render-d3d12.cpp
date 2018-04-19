@@ -3,7 +3,6 @@
 
 #include "options.h"
 #include "render.h"
-#include "slang-support.h"
 
 // In order to use the Slang API, we need to include its header
 
@@ -64,9 +63,8 @@ public:
     virtual TextureResource* createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData) override;
     virtual BufferResource* createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& bufferDesc, const void* initData) override;
     virtual SlangResult captureScreenShot(const char* outputPath) override;
-    virtual void serializeOutput(BindingState* state, const char* fileName) override;
     virtual InputLayout* createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) override;
-    virtual BindingState* createBindingState(const ShaderInputLayout& layout) override;
+    virtual BindingState* createBindingState(const BindingState::Desc& bindingStateDesc) override;
     virtual ShaderCompiler* getShaderCompiler() override;
     virtual void* map(BufferResource* buffer, MapFlavor flavor) override;
     virtual void unmap(BufferResource* buffer) override;
@@ -204,23 +202,18 @@ protected:
         List<char> m_text;                              ///< Holds all strings to keep in scope
     };
 
-    struct Binding
+    struct BindingDetail
     {
-        ShaderInputType m_type;
-        InputBufferType m_bufferType;                         // Only valid if `type` is `Buffer`
         int m_srvIndex = -1;
         int m_uavIndex = -1;
-        int m_samplerIndex = -1;      
-        
-        RefPtr<Resource> m_resource;
-
+        int m_samplerIndex = -1;
         int m_binding = 0;
-        bool m_isOutput = false;
     };
 
     class BindingStateImpl: public BindingState
     {
         public:
+        typedef BindingState Parent;
 
         Result init(ID3D12Device* device)
         {
@@ -230,9 +223,13 @@ protected:
             return SLANG_OK;
         }
 
-        List<Binding> m_bindings;
-        int m_numRenderTargets = 0;
+            /// Ctor
+        BindingStateImpl(const Desc& desc) :
+            Parent(desc)
+        {}
 
+        List<BindingDetail> m_bindingDetails;       ///< These match 1-1 to the bindings in the m_desc
+        
         D3D12DescriptorHeap m_viewHeap;            ///< Cbv, Srv, Uav 
         D3D12DescriptorHeap m_samplerHeap;        ///< Heap for samplers
     };
@@ -331,11 +328,6 @@ protected:
 
     Result createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const void* srcData, D3D12Resource& uploadResource, D3D12_RESOURCE_STATES finalState, D3D12Resource& resourceOut);
     
-    Result createInputSampler(const InputSamplerDesc& inputDesc, D3D12DescriptorHeap& samplerHeap, int samplerIndex);
-    Result createInputTexture(const InputTextureDesc& inputDesc,  D3D12DescriptorHeap& viewHeap, int srvIndex, RefPtr<Resource>& resourceOut);
-    Result createInputBuffer(InputBufferDesc& bufferDesc, bool isOutput, const List<unsigned int>& bufferData, D3D12DescriptorHeap& viewHeap, int uavIndex, int srvIndex,
-        RefPtr<Resource>& resourceOut);
-
     void beginRender();
 
     void endRender();
@@ -491,30 +483,7 @@ D3D12Renderer::~D3D12Renderer()
     }
 }
 
-Result D3D12Renderer::createInputSampler(const InputSamplerDesc& inputDesc, D3D12DescriptorHeap& samplerHeap, int samplerIndex)
-{
-    D3D12_SAMPLER_DESC desc = {};
-    desc.AddressU = desc.AddressV = desc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    desc.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
-
-    if (inputDesc.isCompareSampler)
-    {
-        desc.ComparisonFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
-        desc.Filter = D3D12_FILTER_MIN_LINEAR_MAG_MIP_POINT;
-    }
-    else
-    {
-        desc.Filter = D3D12_FILTER_ANISOTROPIC;
-        desc.MaxAnisotropy = 8;
-        desc.MinLOD = 0.0f;
-        desc.MaxLOD = 100.0f;
-    }
-
-    m_device->CreateSampler(&desc, samplerHeap.getCpuHandle(samplerIndex));
-    return SLANG_OK;
-}
-
-static void _initSrvDesc(const InputTextureDesc& inputDesc, const D3D12_RESOURCE_DESC& desc, DXGI_FORMAT pixelFormat, D3D12_SHADER_RESOURCE_VIEW_DESC& descOut)
+static void _initSrvDesc(Resource::Type resourceType, const TextureResource::Desc& textureDesc, const D3D12_RESOURCE_DESC& desc, DXGI_FORMAT pixelFormat, D3D12_SHADER_RESOURCE_VIEW_DESC& descOut)
 {
     // create SRV
     descOut = D3D12_SHADER_RESOURCE_VIEW_DESC();
@@ -536,13 +505,13 @@ static void _initSrvDesc(const InputTextureDesc& inputDesc, const D3D12_RESOURCE
         descOut.Texture2D.PlaneSlice = 0;
         descOut.Texture2D.ResourceMinLODClamp = 0.0f;
     }
-    else if (inputDesc.isCube)
+    else if (resourceType == Resource::Type::TextureCube)
     {
-        if (inputDesc.arrayLength > 1)
+        if (textureDesc.arraySize > 1)
         {
             descOut.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBEARRAY;
 
-            descOut.TextureCubeArray.NumCubes = inputDesc.arrayLength;
+            descOut.TextureCubeArray.NumCubes = textureDesc.arraySize;
             descOut.TextureCubeArray.First2DArrayFace = 0;
             descOut.TextureCubeArray.MipLevels = desc.MipLevels;
             descOut.TextureCubeArray.MostDetailedMip = 0;
@@ -650,103 +619,6 @@ Result D3D12Renderer::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, cons
 
         submitGpuWorkAndWait();
     }
-
-    return SLANG_OK;
-}
-
-Result D3D12Renderer::createInputTexture(const InputTextureDesc& inputDesc, D3D12DescriptorHeap& viewHeap, int srvIndex, RefPtr<Resource>& resourceOut)
-{
-    int bindFlags = 0;
-    if (srvIndex >= 0)
-    {
-        bindFlags |= Resource::BindFlag::NonPixelShaderResource | Resource::BindFlag::PixelShaderResource;
-    }
-
-    RefPtr<TextureResource> texture;
-    SLANG_RETURN_ON_FAIL(generateTextureResource(inputDesc, bindFlags, this, texture));
-    
-    TextureResourceImpl* textureImpl = static_cast<TextureResourceImpl*>(texture.Ptr());
-
-    if (srvIndex >= 0)
-    {
-        const D3D12_RESOURCE_DESC resourceDesc = textureImpl->m_resource.getResource()->GetDesc();
-        const DXGI_FORMAT pixelFormat = resourceDesc.Format;
-
-        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc;
-        _initSrvDesc(inputDesc, resourceDesc, pixelFormat, srvDesc);
-
-        // Copy to the descriptor
-        m_device->CreateShaderResourceView(textureImpl->m_resource, &srvDesc, viewHeap.getCpuHandle(srvIndex));
-    }
-
-    resourceOut = texture.Ptr();
-    return SLANG_OK;
-}
-
-Result D3D12Renderer::createInputBuffer(InputBufferDesc& bufferDesc, bool isOutput, const List<unsigned int>& bufferData, D3D12DescriptorHeap& viewHeap, int uavIndex, int srvIndex,
-     RefPtr<Resource>& bufferOut)
-{
-    const size_t bufferSize = bufferData.Count() * sizeof(unsigned int);
-    
-    RefPtr<BufferResource> resource;
-    SLANG_RETURN_ON_FAIL(createInputBufferResource(bufferDesc, isOutput, bufferSize, bufferData.Buffer(), this, resource));
-
-    BufferResourceImpl* resourceImpl = static_cast<BufferResourceImpl*>(resource.Ptr());
-
-    const int elemSize = bufferDesc.stride <= 0 ? sizeof(uint32_t) : bufferDesc.stride;
-
-    if (uavIndex >= 0)
-    {
-        assert(bufferDesc.type == InputBufferType::StorageBuffer);
-
-        D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
-
-        uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-        uavDesc.Format = DXGI_FORMAT_UNKNOWN;
-
-        uavDesc.Buffer.StructureByteStride = elemSize;
-
-        uavDesc.Buffer.FirstElement = 0;
-        uavDesc.Buffer.NumElements = (UINT)(bufferData.Count() * sizeof(unsigned int) / elemSize);
-        uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
-        
-        if (bufferDesc.stride == 0)
-        {
-            // TODO: are there UAV cases we need to handle that are neither
-            // raw nor structured? RWBuffer<T> would be one...
-            uavDesc.Buffer.Flags |= D3D12_BUFFER_UAV_FLAG_RAW;
-            uavDesc.Format = DXGI_FORMAT_R32_TYPELESS;
-
-            uavDesc.Buffer.StructureByteStride = 0;
-        }
-
-        m_device->CreateUnorderedAccessView(resourceImpl->m_resource, nullptr, &uavDesc, viewHeap.getCpuHandle(uavIndex));
-    }
-
-    if (srvIndex >= 0)
-    {
-        //bufferDesc.type != InputBufferType::ConstantBuffer
-
-        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc;
-
-        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-        srvDesc.Format = DXGI_FORMAT_UNKNOWN;
-        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-
-        srvDesc.Buffer.FirstElement = 0;
-        srvDesc.Buffer.NumElements = (UINT)(bufferData.Count() * sizeof(unsigned int) / elemSize);
-        srvDesc.Buffer.StructureByteStride = elemSize;
-        srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
-                
-        if (bufferDesc.stride == 0)
-        {
-            srvDesc.Format = DXGI_FORMAT_R32_FLOAT;
-        }
-
-        m_device->CreateShaderResourceView(resourceImpl->m_resource, &srvDesc, viewHeap.getCpuHandle(srvIndex));
-    }
-
-    bufferOut = resource.detach();
 
     return SLANG_OK;
 }
@@ -1020,7 +892,7 @@ Result D3D12Renderer::calcGraphicsPipelineState(ComPtr<ID3D12RootSignature>& sig
             psoDesc.PrimitiveTopologyType = m_primitiveTopologyType;
 
             {
-                const int numRenderTargets = m_boundBindingState ? m_boundBindingState->m_numRenderTargets : 1;
+                const int numRenderTargets = m_boundBindingState ? m_boundBindingState->getDesc().m_numRenderTargets : 1;
 
                 psoDesc.DSVFormat = m_depthStencilFormat;
                 psoDesc.NumRenderTargets = numRenderTargets;
@@ -1222,33 +1094,46 @@ Result D3D12Renderer::_calcBindParameters(BindParameters& params)
         if (m_boundBindingState)
         {
             const int numBoundConstantBuffers = numConstantBuffers;
-            for (int i = 0; i < int(m_boundBindingState->m_bindings.Count()); i++)
+
+            const BindingState::Desc& bindingStateDesc = m_boundBindingState->getDesc();
+            
+            const auto& bindings = bindingStateDesc.m_bindings;
+            const auto& details = m_boundBindingState->m_bindingDetails;
+
+            const int numBindings = int(bindings.Count());
+
+            for (int i = 0; i < numBindings; i++)
             {
-                const Binding& binding = m_boundBindingState->m_bindings[i];
+                const auto& binding = bindings[i];
+                const auto& detail = details[i];
 
-                if (binding.m_type == ShaderInputType::Buffer && binding.m_bufferType == InputBufferType::ConstantBuffer)
+                if (binding.bindingType == BindingType::Buffer)
                 {
-                    // Make sure it's not overlapping the ones we just statically defined
-                    //assert(binding.m_binding < numBoundConstantBuffers);
+                    assert(binding.resource && binding.resource->isBuffer());
+                    if (binding.resource->canBind(Resource::BindFlag::ConstantBuffer))
+                    {
+                        // Make sure it's not overlapping the ones we just statically defined
+                        //assert(binding.m_binding < numBoundConstantBuffers);
 
-                    D3D12_ROOT_PARAMETER& param = params.nextParameter();
-                    param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-                    param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+                        D3D12_ROOT_PARAMETER& param = params.nextParameter();
+                        param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+                        param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-                    D3D12_ROOT_DESCRIPTOR& descriptor = param.Descriptor;
-                    descriptor.ShaderRegister = binding.m_binding;
-                    descriptor.RegisterSpace = 0;
+                        D3D12_ROOT_DESCRIPTOR& descriptor = param.Descriptor;
+                        descriptor.ShaderRegister = detail.m_binding;
+                        descriptor.RegisterSpace = 0;
 
-                    numConstantBuffers++;
+                        numConstantBuffers++;
+                    }
                 }
                 
-                if (binding.m_srvIndex >= 0)
+                if (detail.m_srvIndex >= 0)
                 {
                     D3D12_DESCRIPTOR_RANGE& range = params.nextRange();
                         
                     range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
                     range.NumDescriptors = 1;
-                    range.BaseShaderRegister = binding.m_binding;
+                    range.BaseShaderRegister = detail.m_binding;
                     range.RegisterSpace = 0;
                     range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
@@ -1262,13 +1147,13 @@ Result D3D12Renderer::_calcBindParameters(BindParameters& params)
                     table.pDescriptorRanges = &range;
                 }
 
-                if (binding.m_uavIndex >= 0)
+                if (detail.m_uavIndex >= 0)
                 {
                     D3D12_DESCRIPTOR_RANGE& range = params.nextRange();
                         
                     range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
                     range.NumDescriptors = 1;
-                    range.BaseShaderRegister = binding.m_binding;
+                    range.BaseShaderRegister = detail.m_binding;
                     range.RegisterSpace = 0;
                     range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
@@ -1359,26 +1244,34 @@ Result D3D12Renderer::_bindRenderState(RenderState* renderState, ID3D12GraphicsC
             if (bindingState)
             {
                 D3D12DescriptorHeap& heap = bindingState->m_viewHeap;
+                const auto& details = bindingState->m_bindingDetails;
+                const auto& bindings = bindingState->getDesc().m_bindings;
+                const int numBindings = int(details.Count());
 
-                for (int i = 0; i < int(bindingState->m_bindings.Count()); i++)
+                for (int i = 0; i < numBindings; i++)
                 {
-                    const Binding& binding = bindingState->m_bindings[i];
-
-                    if (binding.m_type == ShaderInputType::Buffer && binding.m_bufferType == InputBufferType::ConstantBuffer)
+                    const auto& detail = details[i];
+                    const auto& binding = bindings[i];
+                    
+                    if (binding.bindingType == BindingType::Buffer)
                     {
-                        BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(binding.m_resource.Ptr());
-                        buffer->bindConstantBufferView(m_circularResourceHeap, index++, submitter);
-                        numConstantBuffers++;
+                        assert(binding.resource && binding.resource->isBuffer());
+                        if (binding.resource->canBind(Resource::BindFlag::ConstantBuffer))
+                        {
+                            BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(binding.resource.Ptr());
+                            buffer->bindConstantBufferView(m_circularResourceHeap, index++, submitter);
+                            numConstantBuffers++;
+                        }
                     }
 
-                    if (binding.m_srvIndex >= 0)
+                    if (detail.m_srvIndex >= 0)
                     {
-                        submitter->setRootDescriptorTable(index++, heap.getGpuHandle(binding.m_srvIndex));
+                        submitter->setRootDescriptorTable(index++, heap.getGpuHandle(detail.m_srvIndex));
                     }
 
-                    if (binding.m_uavIndex >= 0)
+                    if (detail.m_uavIndex >= 0)
                     {
-                        submitter->setRootDescriptorTable(index++, heap.getGpuHandle(binding.m_uavIndex));
+                        submitter->setRootDescriptorTable(index++, heap.getGpuHandle(detail.m_uavIndex));
                     }
                 }
             }
@@ -2460,76 +2353,160 @@ void D3D12Renderer::dispatchCompute(int x, int y, int z)
     commandList->Dispatch(x, y, z);
 }
 
-BindingState* D3D12Renderer::createBindingState(const ShaderInputLayout& layout)
+BindingState* D3D12Renderer::createBindingState(const BindingState::Desc& bindingStateDesc)
 {
-    RefPtr<BindingStateImpl> bindingState(new BindingStateImpl);
+    RefPtr<BindingStateImpl> bindingState(new BindingStateImpl(bindingStateDesc));
 
     SLANG_RETURN_NULL_ON_FAIL(bindingState->init(m_device));
-    bindingState->m_numRenderTargets = layout.numRenderTargets;
-
-    const List<ShaderInputLayoutEntry>& srcBindings = layout.entries;
+    
+    const auto& srcBindings = bindingStateDesc.m_bindings;
     const int numBindings = int(srcBindings.Count());
 
-    List<Binding>& dstBindings = bindingState->m_bindings;
-    dstBindings.SetSize(numBindings);
+    auto& dstDetails = bindingState->m_bindingDetails;
+    dstDetails.SetSize(numBindings);
 
     for (int i = 0; i < numBindings; ++i)
     {
-        ShaderInputLayoutEntry& srcEntry = srcBindings[i];
-        Binding& dstEntry = dstBindings[i];
+        const auto& srcEntry = srcBindings[i];
+        auto& dstDetail = dstDetails[i];
 
-        dstEntry.m_type = srcEntry.type;
-        dstEntry.m_binding = srcEntry.hlslBinding;
-        dstEntry.m_isOutput = srcEntry.isOutput;
-
-        switch (srcEntry.type)
+        dstDetail.m_binding = bindingStateDesc.getFirst(srcEntry.registerDesc.registerSets[int(BindingState::ShaderStyle::Hlsl)]);
+        
+        switch (srcEntry.bindingType)
         {
-            case ShaderInputType::Buffer:
+            case BindingType::Buffer:
             {
+                assert(srcEntry.resource && srcEntry.resource->isBuffer());
+                BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(srcEntry.resource.Ptr());
+                const BufferResource::Desc& bufferDesc = bufferResource->getDesc();
+ 
+                const size_t bufferSize = bufferDesc.sizeInBytes;
+                const int elemSize = bufferDesc.elementSize <= 0 ? sizeof(uint32_t) : bufferDesc.elementSize;
+
+                const  bool createSrv = false;
+
                 // NOTE! In this arrangement the buffer can either be a ConstantBuffer or a 'StorageBuffer'.
                 // If it's a storage buffer then it has a 'uav'.
                 // In neither circumstance is there an associated srv 
                 // This departs a little from dx11 code - in that it will create srv and uav for a storage buffer.
-                if (srcEntry.bufferDesc.type == InputBufferType::StorageBuffer)
+                if (bufferDesc.bindFlags & Resource::BindFlag::UnorderedAccess)
                 {
-                    dstEntry.m_uavIndex = bindingState->m_viewHeap.allocate();
-                    if (dstEntry.m_uavIndex < 0)
+                    dstDetail.m_uavIndex = bindingState->m_viewHeap.allocate();
+                    if (dstDetail.m_uavIndex < 0)
                     {
                         return nullptr;
                     }
+
+                    D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+
+                    uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+                    uavDesc.Format = DXGI_FORMAT_UNKNOWN;
+
+                    uavDesc.Buffer.StructureByteStride = elemSize;
+
+                    uavDesc.Buffer.FirstElement = 0;
+                    uavDesc.Buffer.NumElements = (UINT)(bufferSize / elemSize);
+                    uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
+
+                    if (bufferDesc.elementSize == 0)
+                    {
+                        // TODO: are there UAV cases we need to handle that are neither
+                        // raw nor structured? RWBuffer<T> would be one...
+                        uavDesc.Buffer.Flags |= D3D12_BUFFER_UAV_FLAG_RAW;
+                        uavDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+
+                        uavDesc.Buffer.StructureByteStride = 0;
+                    }
+
+                    m_device->CreateUnorderedAccessView(bufferResource->m_resource, nullptr, &uavDesc, bindingState->m_viewHeap.getCpuHandle(dstDetail.m_uavIndex));
+                }
+                if (createSrv && (bufferDesc.bindFlags & (Resource::BindFlag::NonPixelShaderResource | Resource::BindFlag::PixelShaderResource)))
+                {
+                    dstDetail.m_srvIndex = bindingState->m_viewHeap.allocate();
+                    if (dstDetail.m_srvIndex < 0)
+                    {
+                        return nullptr;
+                    }
+
+                    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc;
+
+                    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+                    srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+                    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+
+                    srvDesc.Buffer.FirstElement = 0;
+                    srvDesc.Buffer.NumElements = (UINT)(bufferSize / elemSize);
+                    srvDesc.Buffer.StructureByteStride = elemSize;
+                    srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+
+                    if (bufferDesc.elementSize == 0)
+                    {
+                        srvDesc.Format = DXGI_FORMAT_R32_FLOAT;
+                    }
+
+                    m_device->CreateShaderResourceView(bufferResource->m_resource, &srvDesc, bindingState->m_viewHeap.getCpuHandle(dstDetail.m_srvIndex));
                 }
 
-                SLANG_RETURN_NULL_ON_FAIL(createInputBuffer(srcEntry.bufferDesc, srcEntry.isOutput, srcEntry.bufferData, bindingState->m_viewHeap, dstEntry.m_uavIndex, dstEntry.m_srvIndex, dstEntry.m_resource));
-                
-                dstEntry.m_bufferType = srcEntry.bufferDesc.type;
                 break;
             }
-            case ShaderInputType::Texture:
+            case BindingType::Texture:
             {
-                dstEntry.m_srvIndex = bindingState->m_viewHeap.allocate();
+                assert(srcEntry.resource && srcEntry.resource->isTexture());
 
-                if (dstEntry.m_srvIndex < 0)
+                TextureResourceImpl* textureResource = static_cast<TextureResourceImpl*>(srcEntry.resource.Ptr());
+
+                dstDetail.m_srvIndex = bindingState->m_viewHeap.allocate();
+                if (dstDetail.m_srvIndex < 0)
                 {
                     return nullptr;
                 }
+                
+                {
+                    const D3D12_RESOURCE_DESC resourceDesc = textureResource->m_resource.getResource()->GetDesc();
+                    const DXGI_FORMAT pixelFormat = resourceDesc.Format;
 
-                SLANG_RETURN_NULL_ON_FAIL(createInputTexture(srcEntry.textureDesc, bindingState->m_viewHeap, dstEntry.m_srvIndex, dstEntry.m_resource));
+                    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc;
+                    _initSrvDesc(textureResource->getType(), textureResource->getDesc(), resourceDesc, pixelFormat, srvDesc);
+
+                    // Create descriptor
+                    m_device->CreateShaderResourceView(textureResource->m_resource, &srvDesc, bindingState->m_viewHeap.getCpuHandle(dstDetail.m_srvIndex));
+                }
+
                 break;
             }
-            case ShaderInputType::Sampler:
+            case BindingType::Sampler:
             {
-                dstEntry.m_samplerIndex = srcEntry.hlslBinding;
-                bindingState->m_samplerHeap.placeAt(srcEntry.hlslBinding);
+                const BindingState::SamplerDesc& samplerDesc = bindingStateDesc.m_samplerDescs[srcEntry.descIndex];
 
-                SLANG_RETURN_NULL_ON_FAIL(createInputSampler(srcEntry.samplerDesc, bindingState->m_samplerHeap, dstEntry.m_samplerIndex));
+                const int samplerIndex = bindingStateDesc.getFirst(srcEntry.registerDesc.registerSets[int(BindingState::ShaderStyle::Hlsl)]);
+                dstDetail.m_samplerIndex = samplerIndex;
+                bindingState->m_samplerHeap.placeAt(samplerIndex);
+
+                D3D12_SAMPLER_DESC desc = {};
+                desc.AddressU = desc.AddressV = desc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+                desc.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+
+                if (samplerDesc.isCompareSampler)
+                {
+                    desc.ComparisonFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+                    desc.Filter = D3D12_FILTER_MIN_LINEAR_MAG_MIP_POINT;
+                }
+                else
+                {
+                    desc.Filter = D3D12_FILTER_ANISOTROPIC;
+                    desc.MaxAnisotropy = 8;
+                    desc.MinLOD = 0.0f;
+                    desc.MaxLOD = 100.0f;
+                }
+
+                m_device->CreateSampler(&desc, bindingState->m_samplerHeap.getCpuHandle(samplerIndex));
+
                 break;
             }
-            case ShaderInputType::CombinedTextureSampler:
+            case BindingType::CombinedTextureSampler:
             {
                 assert(!"Not implemented");
-                //throw "not implemented";
                 return nullptr;
-                break;
             }
         }
     }
@@ -2540,39 +2517,6 @@ BindingState* D3D12Renderer::createBindingState(const ShaderInputLayout& layout)
 void D3D12Renderer::setBindingState(BindingState* state)
 {
     m_boundBindingState = static_cast<BindingStateImpl*>(state);
-}
-
-void D3D12Renderer::serializeOutput(BindingState* stateIn, const char* fileName)
-{
-    auto bindingState = static_cast<BindingStateImpl*>(stateIn);
-    FILE * f = fopen(fileName, "wb");
-
-    int id = 0;
-    for (auto & binding : bindingState->m_bindings)
-    {
-        if (binding.m_isOutput)
-        {
-            if (binding.m_resource && binding.m_resource->isBuffer())
-            {
-                BufferResource* bufferResource = static_cast<BufferResource*>(binding.m_resource.Ptr());
-                const size_t bufferSize = bufferResource->getDesc().sizeInBytes;
-
-                unsigned int* ptr = (unsigned int*)map(bufferResource, MapFlavor::HostRead);
-
-                for (auto i = 0u; i < bufferSize / sizeof(unsigned int); i++)
-                {
-                    fprintf(f, "%X\n", ptr[i]);
-                }
-                unmap(bufferResource);
-            }
-            else
-            {
-                printf("invalid output type at %d.\n", id);
-            }
-        }
-        id++;
-    }
-    fclose(f);
 }
 
 // ShaderCompiler interface

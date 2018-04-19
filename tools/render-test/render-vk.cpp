@@ -92,9 +92,8 @@ public:
     virtual TextureResource* createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData) override;
     virtual BufferResource* createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& bufferDesc, const void* initData) override;
     virtual SlangResult captureScreenShot(const char* outputPath) override;
-    virtual void serializeOutput(BindingState* state, const char * fileName) override;
     virtual InputLayout* createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) override;
-    virtual BindingState * createBindingState(const ShaderInputLayout& layout) override;
+    virtual BindingState* createBindingState(const BindingState::Desc& bindingStateDesc) override;
     virtual ShaderCompiler* getShaderCompiler() override;
     virtual void* map(BufferResource* buffer, MapFlavor flavor) override;
     virtual void unmap(BufferResource* buffer) override;
@@ -114,35 +113,53 @@ public:
 
     protected:
 
+    class Buffer
+    {
+        public:
+        
+            /// Returns true if has been initialized
+        bool isInitialized() const { return m_renderer != nullptr; }
+        
+            // Default Ctor
+        Buffer():
+            m_renderer(nullptr)
+        {}
+
+            /// Dtor
+        ~Buffer()
+        {
+            if (m_renderer)
+            {
+                m_renderer->vkDestroyBuffer(m_renderer->m_device, m_buffer, nullptr);
+                m_renderer->vkFreeMemory(m_renderer->m_device, m_memory, nullptr);
+            }
+        }
+
+        VkBuffer m_buffer;
+        VkDeviceMemory m_memory;
+        VKRenderer* m_renderer;
+    };
+    
     class BufferResourceImpl: public BufferResource
     {
 		public:
         typedef BufferResource Parent;
 
-        BufferResourceImpl(Resource::Usage initialUsage, const BufferResource::Desc& desc, VKRenderer* renderer, VkBuffer buffer, VkDeviceMemory memory):
+        BufferResourceImpl(Resource::Usage initialUsage, const BufferResource::Desc& desc, VKRenderer* renderer):
             Parent(desc),
 			m_renderer(renderer),
-			m_buffer(buffer),
-			m_memory(memory),
             m_initialUsage(initialUsage)
 		{
 			assert(renderer);
 		}
 
-		~BufferResourceImpl()
-		{
-			// Now destroy the staging buffer
-			if (m_renderer)
-			{
-				m_renderer->vkDestroyBuffer(m_renderer->m_device, m_buffer, nullptr);
-				m_renderer->vkFreeMemory(m_renderer->m_device, m_memory, nullptr);
-			}
-		}
-
         Resource::Usage m_initialUsage;
-		VKRenderer*		m_renderer;
-        VkBuffer        m_buffer;
-        VkDeviceMemory  m_memory;
+		VKRenderer* m_renderer;
+        Buffer m_buffer;
+        Buffer m_uploadBuffer;
+        List<uint8_t> m_readBuffer;                         ///< Stores the contents when a map read is performed
+
+        MapFlavor m_mapFlavor = MapFlavor::Unknown;         ///< If resource is mapped, records what kind of mapping else Unknown (if not mapped)
     };
 
 	class ShaderProgramImpl: public ShaderProgram
@@ -156,33 +173,27 @@ public:
 		List<char> m_buffers[2];								//< To keep storage of code in scope	
     };
 
-    struct Binding
+    struct BindingDetail
     {
-        ShaderInputType type;
-        InputBufferType bufferType; // Only valid if `type` is `Buffer`
-
-        VkImageView     srv;
-        VkBufferView    uav;
-        VkBuffer        buffer;
-        VkSampler       samplerState;
-
-        int binding = 0;
-        bool isOutput = false;
-        int bufferLength = 0;
+        VkImageView     m_srv;
+        VkBufferView    m_uav;
+        VkSampler       m_samplerState;
+        int             m_binding = 0;
     };
 
     class BindingStateImpl: public BindingState
     {
 		public:
-		BindingStateImpl(VKRenderer* renderer):
-			m_renderer(renderer),
-			m_numRenderTargets(0)
+        typedef BindingState Parent;
+
+		BindingStateImpl(const Desc& desc, VKRenderer* renderer):
+            Parent(desc), 
+			m_renderer(renderer)
 		{
 		}
 
 		VKRenderer* m_renderer;
-        List<Binding> m_bindings;
-        int m_numRenderTargets;
+        List<BindingDetail> m_bindingDetails;
     };
     
 	class InputLayoutImpl: public InputLayout
@@ -192,8 +203,7 @@ public:
 
     VkBool32 handleDebugMessage(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t srcObject,
         size_t location, int32_t msgCode, const char* pLayerPrefix, const char* pMsg);
-    BufferResourceImpl* createBufferResourceImpl(Resource::Usage initialUsage, const BufferResource::Desc& desc, size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties, const void* initData = nullptr);
-
+    
     VkCommandBuffer getCommandBuffer();
     VkCommandBuffer beginCommandBuffer();
     void flushCommandBuffer(VkCommandBuffer commandBuffer);
@@ -202,10 +212,7 @@ public:
 
     VkPipelineShaderStageCreateInfo compileEntryPoint(const ShaderCompileRequest::EntryPoint& entryPointRequest, VkShaderStageFlagBits stage, List<char>& bufferOut);
 
-    void createInputTexture(const InputTextureDesc& inputDesc, VkImageView& viewOut);
-    void createInputSampler(const InputSamplerDesc& inputDesc, VkSampler& stateOut);
-    void createInputBuffer(const ShaderInputLayoutEntry& entry, const InputBufferDesc& bufferDesc, const Slang::List<unsigned int>& bufferData,
-        VkBuffer& bufferOut, VkBufferView& uavOut, VkImageView& srvOut);
+    SlangResult _initBuffer(size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties, Buffer& bufferOut);
 
     static SlangResult toSlangResult(VkResult res);
     static void checkResult(VkResult result);
@@ -320,23 +327,22 @@ void VKRenderer::flushCommandBuffer(VkCommandBuffer commandBuffer)
     vkFreeCommandBuffers(m_device, m_commandPool, 1, &commandBuffer);
 }
 
-VKRenderer::BufferResourceImpl* VKRenderer::createBufferResourceImpl(Resource::Usage initialUsage, const BufferResource::Desc& desc, size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties, const void* initData)
+SlangResult VKRenderer::_initBuffer(size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties, Buffer& bufferOut)
 {
-    if (initData)
-    {
-        // TODO: what if we are allocating it as CPU-writable anyway?
-        usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-    }
+    assert(!bufferOut.isInitialized());
 
+    bufferOut.m_renderer = this;
+    bufferOut.m_memory = 0;
+    bufferOut.m_buffer = 0;
+    
     VkBufferCreateInfo bufferCreateInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
     bufferCreateInfo.size = bufferSize;
     bufferCreateInfo.usage = usage;
 
-    VkBuffer buffer;
-    checkResult(vkCreateBuffer(m_device, &bufferCreateInfo, nullptr, &buffer));
+    checkResult(vkCreateBuffer(m_device, &bufferCreateInfo, nullptr, &bufferOut.m_buffer));
 
     VkMemoryRequirements memoryReqs = {};
-    vkGetBufferMemoryRequirements(m_device, buffer, &memoryReqs);
+    vkGetBufferMemoryRequirements(m_device, bufferOut.m_buffer, &memoryReqs);
 
     uint32_t memoryTypeIndex = getMemoryTypeIndex(memoryReqs.memoryTypeBits, reqMemoryProperties);
 
@@ -346,37 +352,10 @@ VKRenderer::BufferResourceImpl* VKRenderer::createBufferResourceImpl(Resource::U
     allocateInfo.allocationSize = memoryReqs.size;
     allocateInfo.memoryTypeIndex = memoryTypeIndex;
 
-    VkDeviceMemory memory;
-    checkResult(vkAllocateMemory(m_device, &allocateInfo, nullptr, &memory));
+    checkResult(vkAllocateMemory(m_device, &allocateInfo, nullptr, &bufferOut.m_memory));
+    checkResult(vkBindBufferMemory(m_device, bufferOut.m_buffer, bufferOut.m_memory, 0));
 
-    checkResult(vkBindBufferMemory(m_device, buffer, memory, 0));
-
-    if (initData)
-    {
-        // TODO: only create staging buffer if the memory type
-        // used for the buffer doesn't let us fill things in
-        // directly.
-
-        RefPtr<BufferResourceImpl> staging = createBufferResourceImpl(initialUsage, desc, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-        // Copy into staging buffer
-        void* mappedData = nullptr;
-        checkResult(vkMapMemory(m_device, staging->m_memory, 0, bufferSize, 0, &mappedData));
-        memcpy(mappedData, initData, bufferSize);
-        vkUnmapMemory(m_device, staging->m_memory);
-
-        // Copy from staging buffer to real buffer
-        VkCommandBuffer commandBuffer = beginCommandBuffer();
-
-        VkBufferCopy copyInfo = {};
-        copyInfo.size = bufferSize;
-        vkCmdCopyBuffer(commandBuffer, staging->m_buffer, buffer, 1, &copyInfo);
-
-        flushCommandBuffer(commandBuffer);
-    }
-
-    return new BufferResourceImpl(initialUsage, desc, this, buffer, memory);
+    return SLANG_OK;
 }
 
 uint32_t VKRenderer::getMemoryTypeIndex(uint32_t inTypeBits, VkMemoryPropertyFlags properties)
@@ -395,78 +374,6 @@ uint32_t VKRenderer::getMemoryTypeIndex(uint32_t inTypeBits, VkMemoryPropertyFla
 
     assert(!"failed to find a usable memory type");
     return uint32_t(-1);
-}
-
-void VKRenderer::createInputTexture(const InputTextureDesc& inputDesc, VkImageView& viewOut)
-{
-    TextureData texData;
-    generateTextureData(texData, inputDesc);
-    assert(!"unimplemented");
-}
-
-void VKRenderer::createInputSampler(const InputSamplerDesc& inputDesc, VkSampler& stateOut)
-{
-    assert(!"unimplemented");
-}
-
-void VKRenderer::createInputBuffer(const ShaderInputLayoutEntry& entry, const InputBufferDesc& bufferDesc, const Slang::List<unsigned int>& bufferData, 
-    VkBuffer& bufferOut, VkBufferView& uavOut, VkImageView& srvOut)
-{
-    size_t bufferSize = bufferData.Count() * sizeof(unsigned int);
-    void const* initData = bufferData.Buffer();
-
-    VkBufferUsageFlags usage = 0;
-    VkMemoryPropertyFlags reqMemoryProperties = 0;
-
-    Resource::Usage initialUsage = Resource::Usage::Unknown;
-    switch (bufferDesc.type)
-    {
-        case InputBufferType::ConstantBuffer:
-            usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-            reqMemoryProperties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-            initialUsage = Resource::Usage::ConstantBuffer;
-            break;
-
-        case InputBufferType::StorageBuffer:
-            usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-            reqMemoryProperties = 0;
-            initialUsage = Resource::Usage::PixelShaderResource;
-            break;
-    }
-
-    BufferResource::Desc bufferResourceDesc;
-
-    bufferResourceDesc.cpuAccessFlags = (entry.isOutput) ? Resource::AccessFlag::Read : 0;
-    bufferResourceDesc.bindFlags = Resource::s_requiredBinding[int(initialUsage)];
-    bufferResourceDesc.elementSize = 0;
-    bufferResourceDesc.sizeInBytes = bufferSize;
-
-    // If we are going to read back from the buffer, be sure to request
-    // the required access.
-    if (entry.isOutput)
-    {
-        usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-    }
-
-    RefPtr<BufferResourceImpl> bufferImpl(createBufferResourceImpl(initialUsage, bufferResourceDesc, bufferSize, usage, reqMemoryProperties, initData));
-
-    // TODO: need to hang onto the `memory` field so
-    // that we can release it when we are done.
-	// Set the m_renderer to null to stop any destruction as bufferImpl leaves scope
-	bufferImpl->m_renderer = nullptr;
-    bufferOut = bufferImpl->m_buffer;
-
-    // Fill in any views needed
-    switch (bufferDesc.type)
-    {
-        case InputBufferType::ConstantBuffer:
-            break;
-
-        case InputBufferType::StorageBuffer:
-        {
-        }
-        break;
-    }
 }
 
 VkPipelineShaderStageCreateInfo VKRenderer::compileEntryPoint(const ShaderCompileRequest::EntryPoint& entryPointRequest, VkShaderStageFlagBits stage, List<char>& bufferOut)
@@ -749,7 +656,7 @@ BufferResource* VKRenderer::createBufferResource(Resource::Usage initialUsage, c
         // If it can be read from, set this
         usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
     }
-    if (desc.cpuAccessFlags & Resource::AccessFlag::Write)
+    if ((desc.cpuAccessFlags & Resource::AccessFlag::Write) || initData)
     {
         usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     }
@@ -764,7 +671,36 @@ BufferResource* VKRenderer::createBufferResource(Resource::Usage initialUsage, c
         default: break;
     }
 
-    return createBufferResourceImpl(initialUsage, desc, bufferSize, usage, reqMemoryProperties, initData);
+    RefPtr<BufferResourceImpl> buffer(new BufferResourceImpl(initialUsage, desc, this));
+    SLANG_RETURN_NULL_ON_FAIL(_initBuffer(desc.sizeInBytes, usage, reqMemoryProperties, buffer->m_buffer));
+
+    if ((desc.cpuAccessFlags & Resource::AccessFlag::Write) || initData)
+    {
+        SLANG_RETURN_NULL_ON_FAIL(_initBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, buffer->m_uploadBuffer));
+    }
+
+    if (initData)
+    {
+        // TODO: only create staging buffer if the memory type
+        // used for the buffer doesn't let us fill things in
+        // directly.
+        // Copy into staging buffer
+        void* mappedData = nullptr;
+        checkResult(vkMapMemory(m_device, buffer->m_uploadBuffer.m_memory, 0, bufferSize, 0, &mappedData));
+        memcpy(mappedData, initData, bufferSize);
+        vkUnmapMemory(m_device, buffer->m_uploadBuffer.m_memory);
+
+        // Copy from staging buffer to real buffer
+        VkCommandBuffer commandBuffer = beginCommandBuffer();
+
+        VkBufferCopy copyInfo = {};
+        copyInfo.size = bufferSize;
+        vkCmdCopyBuffer(commandBuffer, buffer->m_uploadBuffer.m_buffer, buffer->m_buffer.m_buffer, 1, &copyInfo);
+
+        flushCommandBuffer(commandBuffer);
+    }
+
+    return buffer.detach();
 }
 
 InputLayout* VKRenderer::createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) 
@@ -776,13 +712,90 @@ InputLayout* VKRenderer::createInputLayout(const InputElementDesc* inputElements
     return (InputLayout*)impl;
 }
 
-void* VKRenderer::map(BufferResource* buffer, MapFlavor flavor)
+void* VKRenderer::map(BufferResource* bufferIn, MapFlavor flavor)
 {
-    return nullptr;
+    BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(bufferIn);
+    assert(buffer->m_mapFlavor == MapFlavor::Unknown);
+
+    const size_t bufferSize = buffer->getDesc().sizeInBytes;
+
+    switch (flavor)
+    {
+        case MapFlavor::WriteDiscard:
+        case MapFlavor::HostWrite:
+        {
+            if (!buffer->m_uploadBuffer.isInitialized())
+            {
+                return nullptr;
+            }
+
+            void* mappedData = nullptr;
+            checkResult(vkMapMemory(m_device, buffer->m_uploadBuffer.m_memory, 0, bufferSize, 0, &mappedData));
+            buffer->m_mapFlavor = flavor;
+            return mappedData;
+        }
+        case MapFlavor::HostRead:
+        {
+            // Make sure there is space in the read buffer
+            buffer->m_readBuffer.SetSize(bufferSize);
+
+            // create staging buffer
+            Buffer staging;
+
+            SLANG_RETURN_NULL_ON_FAIL(_initBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, staging));
+
+            // Copy from real buffer to staging buffer
+            VkCommandBuffer commandBuffer = beginCommandBuffer();
+
+            VkBufferCopy copyInfo = {};
+            copyInfo.size = bufferSize;
+            vkCmdCopyBuffer(commandBuffer, buffer->m_buffer.m_buffer, staging.m_buffer, 1, &copyInfo);
+
+            flushCommandBuffer(commandBuffer);
+
+            // Write out the data from the buffer
+            void* mappedData = nullptr;
+            checkResult(vkMapMemory(m_device, staging.m_memory, 0, bufferSize, 0, &mappedData));
+
+            ::memcpy(buffer->m_readBuffer.Buffer(), mappedData, bufferSize);
+            vkUnmapMemory(m_device, staging.m_memory);
+
+            return buffer->m_readBuffer.Buffer();
+        }
+        default:
+            return nullptr;
+    }
 }
 
-void VKRenderer::unmap(BufferResource* buffer)
+void VKRenderer::unmap(BufferResource* bufferIn)
 {
+    BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(bufferIn);
+    assert(buffer->m_mapFlavor != MapFlavor::Unknown);
+
+    const size_t bufferSize = buffer->getDesc().sizeInBytes;
+
+    switch (buffer->m_mapFlavor)
+    {
+        case MapFlavor::WriteDiscard:
+        case MapFlavor::HostWrite:
+        {
+            vkUnmapMemory(m_device, buffer->m_uploadBuffer.m_memory);
+
+            // Copy from staging buffer to real buffer
+            VkCommandBuffer commandBuffer = beginCommandBuffer();
+
+            VkBufferCopy copyInfo = {};
+            copyInfo.size = bufferSize;
+            vkCmdCopyBuffer(commandBuffer, buffer->m_uploadBuffer.m_buffer, buffer->m_buffer.m_buffer, 1, &copyInfo);
+
+            flushCommandBuffer(commandBuffer);
+            break;
+        }
+        default: break;
+    }
+
+    // Mark as no longer mapped
+    buffer->m_mapFlavor = MapFlavor::Unknown;
 }
 
 void VKRenderer::setInputLayout(InputLayout* inputLayout)
@@ -810,105 +823,52 @@ void VKRenderer::draw(UInt vertexCount, UInt startVertex = 0)
 {
 }
 
-BindingState* VKRenderer::createBindingState(const ShaderInputLayout& layout)
-{
-    BindingStateImpl* bindingState = new BindingStateImpl(this);
-    bindingState->m_numRenderTargets = layout.numRenderTargets;
-    for (auto & entry : layout.entries)
+BindingState* VKRenderer::createBindingState(const BindingState::Desc& bindingStateDesc)
+{   
+    RefPtr<BindingStateImpl> bindingState(new BindingStateImpl(bindingStateDesc, this));
+
+    const auto& srcBindings = bindingStateDesc.m_bindings;
+    const int numBindings = int(srcBindings.Count());
+
+    auto& dstDetails = bindingState->m_bindingDetails;
+    dstDetails.SetSize(numBindings);
+
+    for (int i = 0; i < numBindings; ++i)
     {
-        Binding binding;
-        binding.type = entry.type;
-        binding.binding = entry.hlslBinding;
-        binding.isOutput = entry.isOutput;
-        switch (entry.type)
+        auto& dstDetail = dstDetails[i];
+        const auto& srcBinding = srcBindings[i];
+
+        // For now use Glsl binding
+        dstDetail.m_binding = bindingStateDesc.getFirst(BindingState::ShaderStyle::Glsl, srcBinding.registerDesc);
+        
+        switch (srcBinding.bindingType)
         {
-            case ShaderInputType::Buffer:
+            case BindingType::Buffer:
             {
-                createInputBuffer(entry, entry.bufferDesc, entry.bufferData, binding.buffer, binding.uav, binding.srv);
-                binding.bufferLength = (int)(entry.bufferData.Count() * sizeof(unsigned int));
-                binding.bufferType = entry.bufferDesc.type;
-            }
-            break;
-            case ShaderInputType::Texture:
-            {
-                createInputTexture(entry.textureDesc, binding.srv);
+                assert(srcBinding.resource && srcBinding.resource->isBuffer());
+                //BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(srcBinding.resource.Ptr());
+                //const BufferResource::Desc& bufferResourceDesc = bufferResource->getDesc();
+
+                // TODO: Setup views. 
+                // VkBufferView uav
+                // VkImageView srv
                 break;
             }
-            case ShaderInputType::Sampler:
+            case BindingType::Texture:
+            case BindingType::Sampler:
+            case BindingType::CombinedTextureSampler:
             {
-                createInputSampler(entry.samplerDesc, binding.samplerState);
-                break;
-            }
-            case ShaderInputType::CombinedTextureSampler:
-            {
-                throw "not implemented";
-                break;
+                assert(!"not implemented");
             }
         }
-        bindingState->m_bindings.Add(binding);
     }
 
-    return bindingState;
+    return bindingState.detach();;
 }
 
 void VKRenderer::setBindingState(BindingState* state)
 {
     m_currentBindingState = static_cast<BindingStateImpl*>(state);
-}
-
-void VKRenderer::serializeOutput(BindingState* s, const char* fileName)
-{
-    auto state = static_cast<BindingStateImpl*>(s);
-
-    FILE * f = fopen(fileName, "wb");
-    int id = 0;
-    for (auto& bb : state->m_bindings)
-    {
-        if (bb.isOutput)
-        {
-            if (bb.buffer)
-            {
-                Resource::Usage initialUsage = Resource::Usage::NonPixelShaderResource;
-                BufferResource::Desc bufferResourceDesc;
-
-                size_t bufferSize = bb.bufferLength;
-
-                bufferResourceDesc.cpuAccessFlags = Resource::AccessFlag::Read;
-                bufferResourceDesc.bindFlags = 0;
-                bufferResourceDesc.elementSize = 0;
-                bufferResourceDesc.sizeInBytes = bufferSize;
-
-                // create staging buffer
-                RefPtr<BufferResourceImpl> staging(createBufferResourceImpl(initialUsage, bufferResourceDesc, bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
-
-                // Copy from real buffer to staging buffer
-                VkCommandBuffer commandBuffer = beginCommandBuffer();
-
-                VkBufferCopy copyInfo = {};
-                copyInfo.size = bufferSize;
-                vkCmdCopyBuffer(commandBuffer, bb.buffer, staging->m_buffer, 1, &copyInfo);
-
-                flushCommandBuffer(commandBuffer);
-
-                // Write out the data from the buffer
-                void* mappedData = nullptr;
-                checkResult(vkMapMemory(m_device, staging->m_memory, 0, bufferSize, 0, &mappedData));
-
-                auto ptr = (unsigned int *)mappedData;
-                for (auto i = 0u; i < bufferSize / sizeof(unsigned int); i++)
-                    fprintf(f, "%X\n", ptr[i]);
-
-                vkUnmapMemory(m_device, staging->m_memory);
-            }
-            else
-            {
-                printf("invalid output type at %d.\n", id);
-            }
-        }
-        id++;
-    }
-    fclose(f);
 }
 
 void VKRenderer::dispatchCompute(int x, int y, int z)
@@ -917,35 +877,37 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
 
     // First create a pipeline layout based on what is bound
 
-    Slang::List<VkDescriptorSetLayoutBinding> bindings;
+    const auto& srcDetails = m_currentBindingState->m_bindingDetails;
+    const auto& srcBindings = m_currentBindingState->getDesc().m_bindings;
 
-    for (auto bb : m_currentBindingState->m_bindings)
+    const int numBindings = int(srcBindings.Count());
+
+    Slang::List<VkDescriptorSetLayoutBinding> dstBindings;
+    for (int i = 0; i < numBindings; ++i)
     {
-        switch (bb.type)
+        const auto& srcDetail = srcDetails[i];
+        const auto& srcBinding = srcBindings[i];
+
+        switch (srcBinding.bindingType)
         {
-            case ShaderInputType::Buffer:
+            case BindingType::Buffer:
             {
-                switch (bb.bufferType)
+                BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(srcBinding.resource.Ptr());
+                const BufferResource::Desc& bufferResourceDesc = bufferResource->getDesc();
+
+                if (bufferResourceDesc.bindFlags & Resource::BindFlag::UnorderedAccess)
                 {
-                    case InputBufferType::StorageBuffer:
-                    {
-                        VkDescriptorSetLayoutBinding binding = {};
-                        binding.binding = bb.binding;
-                        binding.descriptorCount = 1;
-                        binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-                        binding.stageFlags = VK_SHADER_STAGE_ALL;
+                    VkDescriptorSetLayoutBinding dstBinding = {};
+                    dstBinding.binding = srcDetail.m_binding;
+                    dstBinding.descriptorCount = 1;
+                    dstBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                    dstBinding.stageFlags = VK_SHADER_STAGE_ALL;
 
-                        bindings.Add(binding);
-                    }
-                    break;
-
-                    default:
-                        // handle other cases
-                        break;
-                }
+                    dstBindings.Add(dstBinding);
+                }    
+            
+                break;
             }
-            break;
-
             default:
                 // TODO: handle the other cases
                 break;
@@ -953,8 +915,8 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
     }
 
     VkDescriptorSetLayoutCreateInfo descriptorSetLayoutInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
-    descriptorSetLayoutInfo.bindingCount = uint32_t(bindings.Count());
-    descriptorSetLayoutInfo.pBindings = bindings.Buffer();
+    descriptorSetLayoutInfo.bindingCount = uint32_t(dstBindings.Count());
+    descriptorSetLayoutInfo.pBindings = dstBindings.Buffer();
 
     VkDescriptorSetLayout descriptorSetLayout = 0;
     checkResult(vkCreateDescriptorSetLayout(m_device, &descriptorSetLayoutInfo, nullptr, &descriptorSetLayout));
@@ -986,44 +948,44 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
     VkDescriptorSet descriptorSet;
     checkResult(vkAllocateDescriptorSets(m_device, &descriptorSetAllocInfo, &descriptorSet));
 
-    // Fill in the descritpor set, using our binding information
-    for (auto bb : m_currentBindingState->m_bindings)
+    // Fill in the descriptor set, using our binding information
+
+    for (int i = 0; i < numBindings; ++i)
     {
-        switch (bb.type)
+        const auto& srcDetail = srcDetails[i];
+        const auto& srcBinding = srcBindings[i];
+    
+        switch (srcBinding.bindingType)
         {
-            case ShaderInputType::Buffer:
+            case BindingType::Buffer:
             {
-                switch (bb.bufferType)
+                BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(srcBinding.resource.Ptr());
+                const BufferResource::Desc& bufferResourceDesc = bufferResource->getDesc();
+
+                if (bufferResourceDesc.bindFlags & Resource::BindFlag::UnorderedAccess)
                 {
-                    case InputBufferType::StorageBuffer:
-                    {
-                        VkDescriptorBufferInfo bufferInfo;
-                        bufferInfo.buffer = bb.buffer;
-                        bufferInfo.offset = 0;
-                        bufferInfo.range = bb.bufferLength;
+                    VkDescriptorBufferInfo bufferInfo;
+                    bufferInfo.buffer = bufferResource->m_buffer.m_buffer;
+                    bufferInfo.offset = 0;
+                    bufferInfo.range = bufferResourceDesc.sizeInBytes;
+                        
+                    VkWriteDescriptorSet writeInfo = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+                    writeInfo.descriptorCount = 1;
+                    writeInfo.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                    writeInfo.dstSet = descriptorSet;
+                    writeInfo.dstBinding = srcDetail.m_binding;
+                    writeInfo.dstArrayElement = 0;
+                    writeInfo.pBufferInfo = &bufferInfo;
 
-                        VkWriteDescriptorSet writeInfo = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-                        writeInfo.descriptorCount = 1;
-                        writeInfo.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-                        writeInfo.dstSet = descriptorSet;
-                        writeInfo.dstBinding = bb.binding;
-                        writeInfo.dstArrayElement = 0;
-                        writeInfo.pBufferInfo = &bufferInfo;
-
-                        vkUpdateDescriptorSets(m_device, 1, &writeInfo, 0, nullptr);
-                    }
-                    break;
-
-                    default:
-                        // handle other cases
-                        break;
+                    vkUpdateDescriptorSets(m_device, 1, &writeInfo, 0, nullptr);
                 }
-            }
-            break;
-
-            default:
-                // TODO: handle the other cases
                 break;
+            }
+            default:
+            {
+                // handle other cases
+                break;
+            }
         }
     }
 

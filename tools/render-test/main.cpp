@@ -64,6 +64,8 @@ class RenderTestApp
 
 	BindingState* getBindingState() const { return m_bindingState; }
 
+    Result writeBindingOutput(const char* fileName);
+    
 	protected:
 		/// Called in initialize
 	Result initializeShaders(ShaderCompiler* shaderCompiler);
@@ -99,7 +101,12 @@ SlangResult RenderTestApp::initialize(Renderer* renderer, ShaderCompiler* shader
 
 	m_renderer = renderer;
 
-    m_bindingState = renderer->createBindingState(m_shaderInputLayout);
+    {
+        BindingState::Desc bindingStateDesc;
+        SLANG_RETURN_ON_FAIL(createBindingStateDesc(m_shaderInputLayout, m_renderer, bindingStateDesc));
+
+        m_bindingState = m_renderer->createBindingState(bindingStateDesc);
+    }
 
     // Do other initialization that doesn't depend on the source language.
 
@@ -235,6 +242,11 @@ void RenderTestApp::runCompute()
 
 void RenderTestApp::finalize()
 {
+}
+
+Result RenderTestApp::writeBindingOutput(const char* fileName)
+{
+    return serializeBindingOutput(m_shaderInputLayout, m_bindingState, m_renderer, fileName);
 }
 
 
@@ -421,9 +433,13 @@ SlangResult innerMain(int argc, char** argv)
                     renderer->waitForGpu();
 
 					if (gOptions.shaderType == ShaderProgramType::Compute || gOptions.shaderType == ShaderProgramType::GraphicsCompute)
-						renderer->serializeOutput(app.getBindingState(), gOptions.outputPath);
+                    {
+                        SLANG_RETURN_ON_FAIL(app.writeBindingOutput(gOptions.outputPath));
+                    }
 					else
+                    {
 						SLANG_RETURN_ON_FAIL(renderer->captureScreenShot(gOptions.outputPath));
+                    }
 					return SLANG_OK;
 				}
 

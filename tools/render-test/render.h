@@ -3,12 +3,15 @@
 
 #include "options.h"
 #include "window.h"
-#include "shader-input-layout.h"
+
+//#include "shader-input-layout.h"
 
 #include "../../source/core/slang-result.h"
 #include "../../source/core/smart-pointer.h"
+#include "../../source/core/list.h"
 
 namespace renderer_test {
+
 
 // Declare opaque type
 class InputLayout: public Slang::RefObject
@@ -21,10 +24,7 @@ class ShaderProgram: public Slang::RefObject
 	public:
 };
 
-class BindingState: public Slang::RefObject
-{
-	public:
-};
+
 
 struct ShaderCompileRequest
 {
@@ -83,6 +83,7 @@ struct InputElementDesc
 
 enum class MapFlavor
 {
+    Unknown,                    ///< Unknown mapping type
     HostRead,
     HostWrite,
     WriteDiscard,
@@ -155,12 +156,24 @@ class Resource: public Slang::RefObject
         };
     };
 
+        /// Base class for Descs
+    struct DescBase
+    {
+        int bindFlags = 0;          ///< Combination of Resource::BindFlag or 0 (and will use initialUsage to set)
+        int cpuAccessFlags = 0;     ///< Combination of Resource::AccessFlag 
+    };
+
         /// Get the type
     SLANG_FORCE_INLINE Type getType() const { return m_type; }
         /// True if it's a texture derived type
     SLANG_FORCE_INLINE bool isTexture() const { return int(m_type) >= int(Type::Texture1D); }
         /// True if it's a buffer derived type
     SLANG_FORCE_INLINE bool isBuffer() const { return m_type == Type::Buffer; }
+
+        /// Get the descBase
+    const DescBase& getDescBase() const;
+        /// Returns true if can bind with flag
+    bool canBind(BindFlag::Enum bindFlag) const { return (getDescBase().bindFlags & bindFlag) != 0; }
 
         /// For a usage gives the required binding flags
     static const BindFlag::Enum s_requiredBinding[int(Usage::CountOf)]; 
@@ -178,20 +191,15 @@ class BufferResource: public Resource
     public:
     typedef Resource Parent;
 
-    struct Desc
+    struct Desc: public DescBase
     {
         void init(size_t sizeInBytesIn)
         {
-            bindFlags = 0;
-            cpuAccessFlags = 0;
             sizeInBytes = sizeInBytesIn;
             elementSize = 0;
         }
             /// Set up default parameters based on usage
         void setDefaults(Usage initialUsage);
-
-        int bindFlags;          ///< Combination of Resource::BindFlag or 0 (and will use initialUsage to set)
-        int cpuAccessFlags;        ///< Combination of Resource::AccessFlag 
 
         size_t sizeInBytes;     ///< Total size in bytes 
         int elementSize;        ///< Get the element stride. If > 0, this is a structured buffer
@@ -249,7 +257,7 @@ class TextureResource: public Resource
         int depth;              ///< Depth (if 3d) 
     };
 
-    struct Desc
+    struct Desc: public DescBase
     {
             /// Initialize with default values
         void init();
@@ -273,9 +281,6 @@ class TextureResource: public Resource
 
             /// Set up default parameters based on type and usage
         void setDefaults(Type type, Usage initialUsage);
-
-        int bindFlags;          ///< Combination of Resource::BindFlag or 0 (and will use initialUsage to set)
-        int cpuAccessFlags;        ///< Combination of Resource::AccessFlag 
 
         Size size; 
 
@@ -318,6 +323,124 @@ class TextureResource: public Resource
     Desc m_desc;
 };
 
+enum class BindingType
+{
+    Unknown,
+    Sampler,
+    Buffer,
+    Texture,
+    CombinedTextureSampler,
+    CountOf,
+};
+
+class BindingState : public Slang::RefObject
+{
+public:
+
+    enum class ShaderStyle
+    {
+        Hlsl,
+        Glsl,
+        CountOf,
+    };
+
+    struct RegisterSet
+    {
+        /// Default Ctor makes an empty set
+        SLANG_FORCE_INLINE RegisterSet() :
+            m_numIndices(0),
+            m_indexOrBase(0)
+        {}
+        /// Ctor for one or more. NOTE! Meaning if indexIn changes depending if numIndices > 1.
+        SLANG_FORCE_INLINE RegisterSet(int indexIn, int numIndicesIn) :
+            m_numIndices(uint8_t(numIndicesIn)),
+            m_indexOrBase(uint16_t(indexIn))
+        {
+        }
+        uint8_t m_numIndices;
+        uint16_t m_indexOrBase;                 ///< Meaning changes depending on numIndices. If 1, it is the index if larger than 1, then is an index into 'indices'  
+    };
+
+    struct RegisterDesc
+    {
+        RegisterSet registerSets[int(ShaderStyle::CountOf)];
+    };
+
+    struct RegisterList
+    {
+        const uint16_t* begin() const { return indices; }
+        const uint16_t* end() const { return indices + numIndices; }
+
+        int getSize() const { return int(numIndices); }
+        uint16_t operator[](int i) const { assert(i >= 0 && i < numIndices); return indices[i]; }
+
+        const uint16_t* indices;
+        int numIndices;
+    };
+
+    struct SamplerDesc
+    {
+        bool isCompareSampler;
+    };
+
+    struct Binding
+    {
+        BindingType bindingType;                ///< Type of binding
+        int descIndex;                          ///< The description index associated with type. -1 if not used. For example if bindingType is Sampler, the descIndex is into m_samplerDescs.
+        Slang::RefPtr<Resource> resource;       ///< Associated resource. nullptr if not used
+        RegisterDesc registerDesc;              ///< Registers associated with binding
+    };
+
+    struct Desc
+    {        
+            /// Given a RegisterSet, return as a RegisterList, that can be easily iterated over
+        RegisterList asRegisterList(const RegisterSet& set) const;
+            /// Given a RegisterDesc and a style returns a RegisterList, that can be easily iterated over
+        RegisterList asRegisterList(ShaderStyle style, const RegisterDesc& registerDesc) const;
+
+            /// Returns the first member of the set, or returns -1 if is empty
+        int getFirst(const RegisterSet& set) const;
+            /// Returns the first member of the set, or returns -1 if is empty
+        int getFirst(ShaderStyle style, const RegisterDesc& registerDesc) const;
+
+            /// Add a resource - assumed that the binding will match the Desc of the resource
+        void addResource(BindingType bindingType, Resource* resource, const RegisterDesc& registerDesc);
+            /// Add a sampler        
+        void addSampler(const SamplerDesc& desc, const RegisterDesc& registerDesc);
+            /// Add a BufferResource 
+        void addBufferResource(BufferResource* resource, const RegisterDesc& registerDesc) { addResource(BindingType::Buffer, resource, registerDesc); }
+            /// Add a texture 
+        void addTextureResource(TextureResource* resource, const RegisterDesc& registerDesc) { addResource(BindingType::Texture, resource, registerDesc); }
+            /// Add combined texture a
+        void addCombinedTextureSampler(TextureResource* resource, const SamplerDesc& samplerDesc, const RegisterDesc& registerDesc);
+
+            /// Clear the contents 
+        void clear();
+
+            /// Given an index, returns as a register set. If index is < 0, assumes means no indices, and just returns the empty set
+        RegisterSet addRegisterSet(int index);
+            /// Given a list of indices, returns the associated register set. Note does check for indices being unique. The order is maintained. 
+            /// Only >= 0 indices are valid
+        RegisterSet addRegisterSet(const int* indices, int numIndices);
+
+        Slang::List<Binding> m_bindings;
+        Slang::List<SamplerDesc> m_samplerDescs;
+        Slang::List<uint16_t> m_indices;                  ///< Used to store lists of registers
+        int m_numRenderTargets = 1;
+    };
+
+        /// Get the Desc used to create this binding
+    SLANG_FORCE_INLINE const Desc& getDesc() const { return m_desc; }
+
+    protected:
+    BindingState(const Desc& desc):
+        m_desc(desc)
+    {
+    }
+
+    Desc m_desc;
+};
+
 class Renderer: public Slang::RefObject
 {
 public:
@@ -334,10 +457,9 @@ public:
     virtual BufferResource* createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& desc, const void* initData = nullptr) { return nullptr; } 
 
     virtual SlangResult captureScreenShot(const char* outputPath) = 0;
-    virtual void serializeOutput(BindingState* state, const char* outputPath) = 0;
 
     virtual InputLayout* createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) = 0;
-    virtual BindingState* createBindingState(const ShaderInputLayout& shaderInput) = 0;
+    virtual BindingState* createBindingState(const BindingState::Desc& desc) { return nullptr; }
     virtual ShaderCompiler* getShaderCompiler() = 0;
 
     virtual void* map(BufferResource* buffer, MapFlavor flavor) = 0;

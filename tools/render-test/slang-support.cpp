@@ -1,5 +1,7 @@
 // slang-support.cpp
 
+#define _CRT_SECURE_NO_WARNINGS 1
+
 #include "slang-support.h"
 
 #include <assert.h>
@@ -291,6 +293,136 @@ SlangResult createInputBufferResource(const InputBufferDesc& inputDesc, bool isO
     return SLANG_OK;
 }
     
+static BindingState::SamplerDesc _calcSamplerDesc(const InputSamplerDesc& srcDesc)
+{
+    BindingState::SamplerDesc dstDesc;
+    dstDesc.isCompareSampler = srcDesc.isCompareSampler;
+    return dstDesc;
+}
+
+SlangResult createBindingStateDesc(ShaderInputLayoutEntry* srcEntries, int numEntries, Renderer* renderer, BindingState::Desc& descOut)
+{
+    using namespace Slang;
+
+    const int textureBindFlags = Resource::BindFlag::NonPixelShaderResource | Resource::BindFlag::PixelShaderResource;
+
+    descOut.clear();
+    for (int i = 0; i < numEntries; i++)
+    {
+        const ShaderInputLayoutEntry& srcEntry = srcEntries[i];
+
+        BindingState::RegisterDesc registerDesc;
+        registerDesc.registerSets[int(BindingState::ShaderStyle::Hlsl)] = descOut.addRegisterSet(srcEntry.hlslBinding);
+        registerDesc.registerSets[int(BindingState::ShaderStyle::Glsl)] = descOut.addRegisterSet(srcEntry.glslBinding.Buffer(), int(srcEntry.glslBinding.Count()));
+
+        switch (srcEntry.type)
+        {
+            case ShaderInputType::Buffer:
+            {
+                const InputBufferDesc& srcBuffer = srcEntry.bufferDesc;
+
+                const size_t bufferSize = srcEntry.bufferData.Count() * sizeof(uint32_t);
+
+                RefPtr<BufferResource> bufferResource;
+                SLANG_RETURN_ON_FAIL(createInputBufferResource(srcEntry.bufferDesc, srcEntry.isOutput, bufferSize, srcEntry.bufferData.Buffer(), renderer, bufferResource));
+                
+                descOut.addBufferResource(bufferResource, registerDesc);
+                break;
+            }
+            case ShaderInputType::CombinedTextureSampler:
+            {
+                RefPtr<TextureResource> texture;
+                SLANG_RETURN_ON_FAIL(generateTextureResource(srcEntry.textureDesc, textureBindFlags, renderer, texture));
+                descOut.addCombinedTextureSampler(texture, _calcSamplerDesc(srcEntry.samplerDesc), registerDesc);
+                break;
+            }
+            case ShaderInputType::Texture:
+            {
+                RefPtr<TextureResource> texture;
+                SLANG_RETURN_ON_FAIL(generateTextureResource(srcEntry.textureDesc, textureBindFlags, renderer, texture));
+
+                descOut.addTextureResource(texture, registerDesc);
+                break;
+            }
+            case ShaderInputType::Sampler:
+            {
+                descOut.addSampler(_calcSamplerDesc(srcEntry.samplerDesc), registerDesc);
+                break;
+            }
+            default: 
+            {
+                assert(!"Unhandled type");
+                return SLANG_FAIL;
+            }
+        }
+    }    
+
+    return SLANG_OK;
+}
+
+SlangResult createBindingStateDesc(const ShaderInputLayout& layout, Renderer* renderer, BindingState::Desc& descOut)
+{
+    SLANG_RETURN_ON_FAIL(createBindingStateDesc(layout.entries.Buffer(), int(layout.entries.Count()), renderer, descOut));
+    descOut.m_numRenderTargets = layout.numRenderTargets;
+
+    return SLANG_OK;
+}
+
+SlangResult serializeBindingOutput(const ShaderInputLayout& layout, BindingState* bindingState, Renderer* renderer, const char* fileName)
+{
+    // Submit the work
+    renderer->submitGpuWork();
+    // Wait until everything is complete
+    renderer->waitForGpu();
+
+    FILE * f = fopen(fileName, "wb");
+    if (!f)
+    {
+        return SLANG_FAIL;
+    }
+
+    const BindingState::Desc& bindingStateDesc = bindingState->getDesc();
+    // Must be the same amount of entries
+    assert(bindingStateDesc.m_bindings.Count() == layout.entries.Count());
+
+    const int numBindings = int(bindingStateDesc.m_bindings.Count());
+
+    for (int i = 0; i < numBindings; ++i)
+    {
+        const auto& layoutBinding = layout.entries[i];
+        const auto& binding = bindingStateDesc.m_bindings[i];
+
+        if (layoutBinding.isOutput)
+        {
+            if (binding.resource && binding.resource->isBuffer())
+            {
+                BufferResource* bufferResource = static_cast<BufferResource*>(binding.resource.Ptr());
+                const size_t bufferSize = bufferResource->getDesc().sizeInBytes;
+
+                unsigned int* ptr = (unsigned int*)renderer->map(bufferResource, MapFlavor::HostRead);
+                if (!ptr)
+                {
+                    fclose(f);
+                    return SLANG_FAIL;
+                }
+
+                const int size = int(bufferSize / sizeof(unsigned int));
+                for (int i = 0; i < size; ++i)
+                {
+                    fprintf(f, "%X\n", ptr[i]);
+                }
+                renderer->unmap(bufferResource);
+            }
+            else
+            {
+                printf("invalid output type at %d.\n", i);
+            }
+        }
+    }
+    fclose(f);
+
+    return SLANG_OK;
+}
 
 
 } // renderer_test
