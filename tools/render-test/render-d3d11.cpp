@@ -75,18 +75,13 @@ public:
 
     protected:
 
-    struct Binding
+    struct BindingDetail
     {
-        BindingType bindingType;
-     
-        ComPtr<ID3D11ShaderResourceView> srv;
-        ComPtr<ID3D11UnorderedAccessView> uav;
-        ComPtr<ID3D11SamplerState> samplerState;
+        ComPtr<ID3D11ShaderResourceView> m_srv;
+        ComPtr<ID3D11UnorderedAccessView> m_uav;
+        ComPtr<ID3D11SamplerState> m_samplerState;
 
-        RefPtr<Resource> resource;                        /// Can hold texture of buffer
-
-        int binding = 0;
-        bool isOutput = false;
+        int m_binding = 0;
     };
 
     class BindingStateImpl: public BindingState
@@ -99,9 +94,9 @@ public:
             Parent(desc)
         {}
 
-        List<Binding> m_bindings;
-        int m_numRenderTargets = 0;
+        List<BindingDetail> m_bindingDetails;
     };
+
     class ShaderProgramImpl: public ShaderProgram
     {
 		public:
@@ -868,24 +863,18 @@ BindingState* D3D11Renderer::createBindingState(const BindingState::Desc& bindin
 {
     RefPtr<BindingStateImpl> bindingState(new BindingStateImpl(bindingStateDesc));
 
-    const int numBindings = int(bindingStateDesc.m_bindings.Count());
-
-    List<Binding>& dstBindings = bindingState->m_bindings;
-    dstBindings.SetSize(numBindings);
-
-    bindingState->m_numRenderTargets = bindingStateDesc.m_numRenderTargets;
+    const auto& srcBindings = bindingStateDesc.m_bindings;
+    const int numBindings = int(srcBindings.Count());
+    
+    auto& dstDetails = bindingState->m_bindingDetails;
+    dstDetails.SetSize(numBindings);
 
     for (int i = 0; i < numBindings; ++i)
     {
-        Binding& dstBinding = dstBindings[i];
-        const BindingState::Desc::Binding& srcBinding = bindingStateDesc.m_bindings[i];
-
-        dstBinding.bindingType = srcBinding.bindingType;
-        dstBinding.resource = srcBinding.resource;
-        dstBinding.binding = bindingStateDesc.getFirst(BindingState::ShaderStyle::Hlsl, srcBinding.registerDesc);
-
-        // It's output if it can be read from
-        dstBinding.isOutput = srcBinding.resource && (srcBinding.resource->getDescBase().cpuAccessFlags & Resource::AccessFlag::Read);
+        auto& dstDetail = dstDetails[i];
+        const auto& srcBinding = srcBindings[i];
+        
+        dstDetail.m_binding = bindingStateDesc.getFirst(BindingState::ShaderStyle::Hlsl, srcBinding.registerDesc);
 
         switch (srcBinding.bindingType)
         {
@@ -917,7 +906,7 @@ BindingState* D3D11Renderer::createBindingState(const BindingState::Desc& bindin
                         viewDesc.Format = DXGI_FORMAT_R32_TYPELESS;
                     }
 
-                    SLANG_RETURN_NULL_ON_FAIL(m_device->CreateUnorderedAccessView(buffer->m_buffer, &viewDesc, dstBinding.uav.writeRef()));
+                    SLANG_RETURN_NULL_ON_FAIL(m_device->CreateUnorderedAccessView(buffer->m_buffer, &viewDesc, dstDetail.m_uav.writeRef()));
                 }
                 if (bufferDesc.bindFlags & (Resource::BindFlag::NonPixelShaderResource | Resource::BindFlag::PixelShaderResource)) 
                 {
@@ -935,7 +924,7 @@ BindingState* D3D11Renderer::createBindingState(const BindingState::Desc& bindin
                         viewDesc.Format = DXGI_FORMAT_R32_FLOAT;
                     }
 
-                    SLANG_RETURN_NULL_ON_FAIL(m_device->CreateShaderResourceView(buffer->m_buffer, &viewDesc, dstBinding.srv.writeRef()));
+                    SLANG_RETURN_NULL_ON_FAIL(m_device->CreateShaderResourceView(buffer->m_buffer, &viewDesc, dstDetail.m_srv.writeRef()));
                 }
                 break;
             }
@@ -1021,7 +1010,7 @@ BindingState* D3D11Renderer::createBindingState(const BindingState::Desc& bindin
                     }
                 }
 
-                SLANG_RETURN_NULL_ON_FAIL(m_device->CreateShaderResourceView(texture->m_resource, &viewDesc, dstBinding.srv.writeRef()));
+                SLANG_RETURN_NULL_ON_FAIL(m_device->CreateShaderResourceView(texture->m_resource, &viewDesc, dstDetail.m_srv.writeRef()));
                 break;
             }
             case BindingType::Sampler:
@@ -1044,7 +1033,7 @@ BindingState* D3D11Renderer::createBindingState(const BindingState::Desc& bindin
                     desc.MinLOD = 0.0f;
                     desc.MaxLOD = 100.0f;
                 }
-                SLANG_RETURN_NULL_ON_FAIL(m_device->CreateSamplerState(&desc, dstBinding.samplerState.writeRef()));
+                SLANG_RETURN_NULL_ON_FAIL(m_device->CreateSamplerState(&desc, dstDetail.m_samplerState.writeRef()));
                 break;
             }
             default:
@@ -1062,8 +1051,17 @@ BindingState* D3D11Renderer::createBindingState(const BindingState::Desc& bindin
 void D3D11Renderer::applyBindingState(bool isCompute)
 {
     auto context = m_immediateContext.get();
-    for (auto & binding : m_currentBindings->m_bindings)
+
+    const auto& details = m_currentBindings->m_bindingDetails;
+    const auto& bindings = m_currentBindings->getDesc().m_bindings;
+
+    const int numBindings = int(bindings.Count());
+
+    for (int i = 0; i < numBindings; ++i)
     {
+        const auto& binding = bindings[i];
+        const auto& detail = details[i];
+
         switch (binding.bindingType)
         {
             case BindingType::Buffer:
@@ -1073,51 +1071,51 @@ void D3D11Renderer::applyBindingState(bool isCompute)
                 {
                     ID3D11Buffer* buffer = static_cast<BufferResourceImpl*>(binding.resource.Ptr())->m_buffer;
                     if (isCompute)
-                        context->CSSetConstantBuffers(binding.binding, 1, &buffer); 
+                        context->CSSetConstantBuffers(detail.m_binding, 1, &buffer); 
                     else
                     {
-                        context->VSSetConstantBuffers(binding.binding, 1, &buffer);
-                        context->PSSetConstantBuffers(binding.binding, 1, &buffer);
+                        context->VSSetConstantBuffers(detail.m_binding, 1, &buffer);
+                        context->PSSetConstantBuffers(detail.m_binding, 1, &buffer);
                     }
                 }
-                else if (binding.uav)
+                else if (detail.m_uav)
                 {
                     if (isCompute)
-                        context->CSSetUnorderedAccessViews(binding.binding, 1, binding.uav.readRef(), nullptr);
+                        context->CSSetUnorderedAccessViews(detail.m_binding, 1, detail.m_uav.readRef(), nullptr);
                     else
-                        context->OMSetRenderTargetsAndUnorderedAccessViews(m_currentBindings->m_numRenderTargets,
-                            m_renderTargetViews.Buffer()->readRef(), nullptr, binding.binding, 1, binding.uav.readRef(), nullptr);
+                        context->OMSetRenderTargetsAndUnorderedAccessViews(m_currentBindings->getDesc().m_numRenderTargets,
+                            m_renderTargetViews.Buffer()->readRef(), nullptr, detail.m_binding, 1, detail.m_uav.readRef(), nullptr);
                 }
                 else
                 {
                     if (isCompute)
-                        context->CSSetShaderResources(binding.binding, 1, binding.srv.readRef());
+                        context->CSSetShaderResources(detail.m_binding, 1, detail.m_srv.readRef());
                     else
                     {
-                        context->PSSetShaderResources(binding.binding, 1, binding.srv.readRef());
-                        context->VSSetShaderResources(binding.binding, 1, binding.srv.readRef());
+                        context->PSSetShaderResources(detail.m_binding, 1, detail.m_srv.readRef());
+                        context->VSSetShaderResources(detail.m_binding, 1, detail.m_srv.readRef());
                     }
                 }
                 break;
             }
             case BindingType::Texture: 
             {
-                if (binding.uav)
+                if (detail.m_uav)
                 {
                     if (isCompute)
-                        context->CSSetUnorderedAccessViews(binding.binding, 1, binding.uav.readRef(), nullptr);
+                        context->CSSetUnorderedAccessViews(detail.m_binding, 1, detail.m_uav.readRef(), nullptr);
                     else
                         context->OMSetRenderTargetsAndUnorderedAccessViews(D3D11_KEEP_RENDER_TARGETS_AND_DEPTH_STENCIL,
-                            nullptr, nullptr, binding.binding, 1, binding.uav.readRef(), nullptr);
+                            nullptr, nullptr, detail.m_binding, 1, detail.m_uav.readRef(), nullptr);
                 }
                 else
                 {
                     if (isCompute)
-                        context->CSSetShaderResources(binding.binding, 1, binding.srv.readRef());
+                        context->CSSetShaderResources(detail.m_binding, 1, detail.m_srv.readRef());
                     else
                     {
-                        context->PSSetShaderResources(binding.binding, 1, binding.srv.readRef());
-                        context->VSSetShaderResources(binding.binding, 1, binding.srv.readRef());
+                        context->PSSetShaderResources(detail.m_binding, 1, detail.m_srv.readRef());
+                        context->VSSetShaderResources(detail.m_binding, 1, detail.m_srv.readRef());
                     }
                 }
                 break;
@@ -1125,11 +1123,11 @@ void D3D11Renderer::applyBindingState(bool isCompute)
             case BindingType::Sampler: 
             {
                 if (isCompute)
-                    context->CSSetSamplers(binding.binding, 1, binding.samplerState.readRef());
+                    context->CSSetSamplers(detail.m_binding, 1, detail.m_samplerState.readRef());
                 else
                 {
-                    context->PSSetSamplers(binding.binding, 1, binding.samplerState.readRef());
-                    context->VSSetSamplers(binding.binding, 1, binding.samplerState.readRef());
+                    context->PSSetSamplers(detail.m_binding, 1, detail.m_samplerState.readRef());
+                    context->VSSetSamplers(detail.m_binding, 1, detail.m_samplerState.readRef());
                 }
                 break;
             }

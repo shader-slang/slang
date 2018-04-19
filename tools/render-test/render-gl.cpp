@@ -185,13 +185,10 @@ public:
         GLuint m_handle;
     };
 
-    struct BindingEntry
+    struct BindingDetail
     {
-        BindingType bindingType = BindingType::Unknown;
-        RefPtr<Resource> resource;
-        GLuint samplerHandle = 0;
-        List<int> binding;
-        bool isOutput = false;
+        GLuint m_samplerHandle = 0;
+        int m_firstBinding;                      //< Holds binding index if not sampler (which has multiple, and can be read from the BindingState::Desc)
     };
 
     class BindingStateImpl: public BindingState
@@ -210,12 +207,12 @@ public:
 		{
 			if (m_renderer)
 			{
-				m_renderer->destroyBindingEntries(m_entries.Buffer(), int(m_entries.Count()));
+				m_renderer->destroyBindingEntries(getDesc(), m_bindingDetails.Buffer());
 			}
 		}
 
 		GLRenderer* m_renderer;
-        List<BindingEntry> m_entries;
+        List<BindingDetail> m_bindingDetails;
     };
 
 	class ShaderProgramImpl : public ShaderProgram
@@ -252,7 +249,7 @@ public:
         GLenum formatType;              // such as GL_UNSIGNED_BYTE
     };
 
-	void destroyBindingEntries(const BindingEntry* entries, int numEntries);
+	void destroyBindingEntries(const BindingState::Desc& desc, const BindingDetail* details);
 
     void bindBufferImpl(int target, UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* offsets);
     void flushStateForDraw();
@@ -497,14 +494,18 @@ GLuint GLRenderer::loadShader(GLenum stage, const char* source)
     return shaderID;
 }
 
-void GLRenderer::destroyBindingEntries(const BindingEntry* entries, int numEntries)
+void GLRenderer::destroyBindingEntries(const BindingState::Desc& desc, const BindingDetail* details)
 {
-	for (int i = 0; i < numEntries; ++i)
+    const auto& bindings = desc.m_bindings;
+    const int numBindings = int(bindings.Count());
+	for (int i = 0; i < numBindings; ++i)
 	{
-        const BindingEntry& entry = entries[i];
-        if (entry.bindingType == BindingType::Sampler && entry.samplerHandle != 0)
+        const auto& binding = bindings[i];
+        const auto& detail = details[i];
+
+        if (binding.bindingType == BindingType::Sampler && detail.m_samplerHandle != 0)
         {
-            glDeleteSamplers(1, &entry.samplerHandle);
+            glDeleteSamplers(1, &detail.m_samplerHandle);
         }
 	}
 }
@@ -915,63 +916,42 @@ BindingState* GLRenderer::createBindingState(const BindingState::Desc& bindingSt
 {
     RefPtr<BindingStateImpl> bindingState(new BindingStateImpl(bindingStateDesc, this));
 
-    const List<BindingState::Desc::Binding>& srcBindings = bindingStateDesc.m_bindings;
+    const auto& srcBindings = bindingStateDesc.m_bindings;
     const int numBindings = int(srcBindings.Count());
 
-    List<BindingEntry>& dstBindings = bindingState->m_entries;
-    dstBindings.SetSize(numBindings);
+    auto& dstDetails = bindingState->m_bindingDetails;
+    dstDetails.SetSize(numBindings);
 
     for (int i = 0; i < numBindings; ++i)
     {
-        BindingEntry& dstEntry = dstBindings[i];
+        BindingDetail& dstDetail = dstDetails[i];
         const BindingState::Desc::Binding& srcBinding = srcBindings[i];
 
-        // Copy over the bindings
-        BindingState::RegisterList registerList = bindingStateDesc.asRegisterList(BindingState::ShaderStyle::Glsl, srcBinding.registerDesc);
-        dstEntry.binding.SetSize(registerList.getSize());
-        for (int i = 0; i < registerList.getSize(); ++i)
-        {
-            dstEntry.binding[i] = registerList[i];
-        }
+        // Copy over the bindings 
+        dstDetail.m_firstBinding = bindingStateDesc.getFirst(BindingState::ShaderStyle::Glsl, srcBinding.registerDesc);
         
-        dstEntry.bindingType = srcBinding.bindingType;
-
         switch (srcBinding.bindingType)
         {
+            case BindingType::Texture:
             case BindingType::Buffer:
             {
-                assert(srcBinding.resource && srcBinding.resource->isBuffer());
-                BufferResource* bufferResource = static_cast<BufferResource*>(srcBinding.resource.Ptr());
-               
-                const BufferResource::Desc& bufferResourceDesc = bufferResource->getDesc();
-
-                dstEntry.isOutput = (bufferResourceDesc.cpuAccessFlags & Resource::AccessFlag::Read) != 0;
-
-                dstEntry.resource = srcBinding.resource;
                 break;
             }
-            case BindingType::Texture:
             case BindingType::CombinedTextureSampler:
             {
                 assert(srcBinding.resource && srcBinding.resource->isTexture());
                 TextureResourceImpl* texture = static_cast<TextureResourceImpl*>(srcBinding.resource.Ptr());
-                
-                // Handle if combined 
-                if (srcBinding.bindingType == BindingType::CombinedTextureSampler)
+                const BindingState::SamplerDesc& samplerDesc = bindingStateDesc.m_samplerDescs[srcBinding.descIndex];
+
+                if (samplerDesc.isCompareSampler)
                 {
-                    const BindingState::SamplerDesc& samplerDesc = bindingStateDesc.m_samplerDescs[srcBinding.descIndex];
+                    auto target = texture->m_target;
 
-                    if (samplerDesc.isCompareSampler)
-                    {
-                        auto target = texture->m_target;
-
-                        glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-                        glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-                        glTexParameteri(target, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
-                        glTexParameteri(target, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
-                    }
+                    glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+                    glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                    glTexParameteri(target, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+                    glTexParameteri(target, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
                 }
-
                 break;
             }
             case BindingType::Sampler:
@@ -999,7 +979,7 @@ BindingState* GLRenderer::createBindingState(const BindingState::Desc& bindingSt
                     glSamplerParameteri(handle, GL_TEXTURE_MAX_ANISOTROPY_EXT, 8);
                 }
 
-                dstEntry.samplerHandle = handle;
+                dstDetail.m_samplerHandle = handle;
                 break;
             }
         }
@@ -1011,30 +991,41 @@ BindingState* GLRenderer::createBindingState(const BindingState::Desc& bindingSt
 void GLRenderer::setBindingState(BindingState* stateIn)
 {
     BindingStateImpl* state = static_cast<BindingStateImpl*>(stateIn);
-    for (auto& entry : state->m_entries)
+
+    const auto& bindingDesc = state->getDesc();
+
+    const auto& details = state->m_bindingDetails;
+    const auto& bindings = bindingDesc.m_bindings;
+    const int numBindings = int(bindings.Count());
+
+    for (int i = 0; i < numBindings; ++i)
     {
-        switch (entry.bindingType)
+        const auto& binding = bindings[i];
+        const auto& detail = details[i];
+
+        switch (binding.bindingType)
         {
             case BindingType::Buffer:
             {
-                BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(entry.resource.Ptr());
-                glBindBufferBase(buffer->m_target, entry.binding[0], buffer->m_handle);
+                BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(binding.resource.Ptr());
+                glBindBufferBase(buffer->m_target, detail.m_firstBinding, buffer->m_handle);
                 break;
             }
             case BindingType::Sampler:
             {
-                for (auto b : entry.binding)
+                auto bindings = bindingDesc.asRegisterList(BindingState::ShaderStyle::Glsl, binding.registerDesc);
+                for (auto b : bindings)
                 {
-                    glBindSampler(b, entry.samplerHandle);
+                    glBindSampler(b, detail.m_samplerHandle);
                 }
                 break;
             }
             case BindingType::Texture:
             case BindingType::CombinedTextureSampler:
             {
-                BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(entry.resource.Ptr());
+                BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(binding.resource.Ptr());
 
-                glActiveTexture(GL_TEXTURE0 + entry.binding[0]);
+                glActiveTexture(GL_TEXTURE0 + detail.m_firstBinding);
                 glBindTexture(buffer->m_target, buffer->m_handle);
                 break;
             }

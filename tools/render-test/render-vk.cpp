@@ -173,18 +173,12 @@ public:
 		List<char> m_buffers[2];								//< To keep storage of code in scope	
     };
 
-    struct Binding
+    struct BindingDetail
     {
-        BindingType    bindingType;
-        
-        VkImageView     srv;
-        VkBufferView    uav;
-        VkSampler       samplerState;
-
-        RefPtr<Resource> resource;                              ///< Holds either the BufferResource, or TextureResource
-
-        int binding = 0;
-        bool isOutput = false;
+        VkImageView     m_srv;
+        VkBufferView    m_uav;
+        VkSampler       m_samplerState;
+        int             m_binding = 0;
     };
 
     class BindingStateImpl: public BindingState
@@ -194,14 +188,12 @@ public:
 
 		BindingStateImpl(const Desc& desc, VKRenderer* renderer):
             Parent(desc), 
-			m_renderer(renderer),
-			m_numRenderTargets(0)
+			m_renderer(renderer)
 		{
 		}
 
 		VKRenderer* m_renderer;
-        List<Binding> m_bindings;
-        int m_numRenderTargets;
+        List<BindingDetail> m_bindingDetails;
     };
     
 	class InputLayoutImpl: public InputLayout
@@ -835,40 +827,32 @@ BindingState* VKRenderer::createBindingState(const BindingState::Desc& bindingSt
 {   
     RefPtr<BindingStateImpl> bindingState(new BindingStateImpl(bindingStateDesc, this));
 
-    bindingState->m_numRenderTargets = bindingStateDesc.m_numRenderTargets;
-
     const List<BindingState::Desc::Binding>& srcBindings = bindingStateDesc.m_bindings;
     const int numBindings = int(srcBindings.Count());
 
-    List<Binding>& dstBindings = bindingState->m_bindings;
-    dstBindings.SetSize(numBindings);
+    List<BindingDetail>& dstDetails = bindingState->m_bindingDetails;
+    dstDetails.SetSize(numBindings);
 
     for (int i = 0; i < numBindings; ++i)
     {
-        Binding& dstBinding = dstBindings[i];
+        BindingDetail& dstDetail = dstDetails[i];
         const BindingState::Desc::Binding& srcBinding = srcBindings[i];
 
-        dstBinding.bindingType = srcBinding.bindingType;
-        
         //! TODO: Is this correct?! It's using the hlsl binding
-        dstBinding.binding = bindingStateDesc.getFirst(BindingState::ShaderStyle::Hlsl, srcBinding.registerDesc);
+        dstDetail.m_binding = bindingStateDesc.getFirst(BindingState::ShaderStyle::Hlsl, srcBinding.registerDesc);
         
         switch (srcBinding.bindingType)
         {
             case BindingType::Buffer:
             {
                 assert(srcBinding.resource && srcBinding.resource->isBuffer());
-                BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(srcBinding.resource.Ptr());
+                //BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(srcBinding.resource.Ptr());
 
-                const BufferResource::Desc& bufferResourceDesc = bufferResource->getDesc();
-
-                dstBinding.isOutput = (bufferResourceDesc.cpuAccessFlags & Resource::AccessFlag::Read) != 0;
+                //const BufferResource::Desc& bufferResourceDesc = bufferResource->getDesc();
 
                 // TODO: Setup views. 
                 // VkBufferView uav
                 // VkImageView srv
-
-                dstBinding.resource = bufferResource;
                 break;
             }
             case BindingType::Texture:
@@ -894,26 +878,33 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
 
     // First create a pipeline layout based on what is bound
 
-    Slang::List<VkDescriptorSetLayoutBinding> bindings;
+    const auto& srcDetails = m_currentBindingState->m_bindingDetails;
+    const auto& srcBindings = m_currentBindingState->getDesc().m_bindings;
 
-    for (auto bb : m_currentBindingState->m_bindings)
+    const int numBindings = int(srcBindings.Count());
+
+    Slang::List<VkDescriptorSetLayoutBinding> dstBindings;
+    for (int i = 0; i < numBindings; ++i)
     {
-        switch (bb.bindingType)
+        const auto& srcDetail = srcDetails[i];
+        const auto& srcBinding = srcBindings[i];
+
+        switch (srcBinding.bindingType)
         {
             case BindingType::Buffer:
             {
-                BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(bb.resource.Ptr());
+                BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(srcBinding.resource.Ptr());
                 const BufferResource::Desc& bufferResourceDesc = bufferResource->getDesc();
 
                 if (bufferResourceDesc.bindFlags & Resource::BindFlag::UnorderedAccess)
                 {
-                    VkDescriptorSetLayoutBinding binding = {};
-                    binding.binding = bb.binding;
-                    binding.descriptorCount = 1;
-                    binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-                    binding.stageFlags = VK_SHADER_STAGE_ALL;
+                    VkDescriptorSetLayoutBinding dstBinding = {};
+                    dstBinding.binding = srcDetail.m_binding;
+                    dstBinding.descriptorCount = 1;
+                    dstBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                    dstBinding.stageFlags = VK_SHADER_STAGE_ALL;
 
-                    bindings.Add(binding);
+                    dstBindings.Add(dstBinding);
                 }    
             
                 break;
@@ -925,8 +916,8 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
     }
 
     VkDescriptorSetLayoutCreateInfo descriptorSetLayoutInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
-    descriptorSetLayoutInfo.bindingCount = uint32_t(bindings.Count());
-    descriptorSetLayoutInfo.pBindings = bindings.Buffer();
+    descriptorSetLayoutInfo.bindingCount = uint32_t(dstBindings.Count());
+    descriptorSetLayoutInfo.pBindings = dstBindings.Buffer();
 
     VkDescriptorSetLayout descriptorSetLayout = 0;
     checkResult(vkCreateDescriptorSetLayout(m_device, &descriptorSetLayoutInfo, nullptr, &descriptorSetLayout));
@@ -959,13 +950,17 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
     checkResult(vkAllocateDescriptorSets(m_device, &descriptorSetAllocInfo, &descriptorSet));
 
     // Fill in the descriptor set, using our binding information
-    for (auto bb : m_currentBindingState->m_bindings)
+
+    for (int i = 0; i < numBindings; ++i)
     {
-        switch (bb.bindingType)
+        const auto& srcDetail = srcDetails[i];
+        const auto& srcBinding = srcBindings[i];
+    
+        switch (srcBinding.bindingType)
         {
             case BindingType::Buffer:
             {
-                BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(bb.resource.Ptr());
+                BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(srcBinding.resource.Ptr());
                 const BufferResource::Desc& bufferResourceDesc = bufferResource->getDesc();
 
                 if (bufferResourceDesc.bindFlags & Resource::BindFlag::UnorderedAccess)
@@ -979,7 +974,7 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
                     writeInfo.descriptorCount = 1;
                     writeInfo.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
                     writeInfo.dstSet = descriptorSet;
-                    writeInfo.dstBinding = bb.binding;
+                    writeInfo.dstBinding = srcDetail.m_binding;
                     writeInfo.dstArrayElement = 0;
                     writeInfo.pBufferInfo = &bufferInfo;
 
