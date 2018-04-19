@@ -383,16 +383,16 @@ public:
         bool isCompareSampler;
     };
 
-    struct Desc
+    struct Binding
     {
-        struct Binding
-        {
-            BindingType bindingType;                ///< Type of binding
-            int descIndex;                          ///< The description index associated with type. -1 if not used. For example if bindingType is Sampler, the descIndex is into m_samplerDescs.
-            Slang::RefPtr<Resource> resource;       ///< Associated resource. nullptr if not used
-            RegisterDesc registerDesc;              ///< Registers associated with binding
-        };
+        BindingType bindingType;                ///< Type of binding
+        int descIndex;                          ///< The description index associated with type. -1 if not used. For example if bindingType is Sampler, the descIndex is into m_samplerDescs.
+        Slang::RefPtr<Resource> resource;       ///< Associated resource. nullptr if not used
+        RegisterDesc registerDesc;              ///< Registers associated with binding
+    };
 
+    struct Desc
+    {        
             /// Given a RegisterSet, return as a RegisterList, that can be easily iterated over
         RegisterList asRegisterList(const RegisterSet& set) const;
             /// Given a RegisterDesc and a style returns a RegisterList, that can be easily iterated over

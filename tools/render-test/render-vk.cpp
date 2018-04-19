@@ -827,16 +827,16 @@ BindingState* VKRenderer::createBindingState(const BindingState::Desc& bindingSt
 {   
     RefPtr<BindingStateImpl> bindingState(new BindingStateImpl(bindingStateDesc, this));
 
-    const List<BindingState::Desc::Binding>& srcBindings = bindingStateDesc.m_bindings;
+    const auto& srcBindings = bindingStateDesc.m_bindings;
     const int numBindings = int(srcBindings.Count());
 
-    List<BindingDetail>& dstDetails = bindingState->m_bindingDetails;
+    auto& dstDetails = bindingState->m_bindingDetails;
     dstDetails.SetSize(numBindings);
 
     for (int i = 0; i < numBindings; ++i)
     {
-        BindingDetail& dstDetail = dstDetails[i];
-        const BindingState::Desc::Binding& srcBinding = srcBindings[i];
+        auto& dstDetail = dstDetails[i];
+        const auto& srcBinding = srcBindings[i];
 
         // For now use Glsl binding
         dstDetail.m_binding = bindingStateDesc.getFirst(BindingState::ShaderStyle::Glsl, srcBinding.registerDesc);
@@ -847,7 +847,6 @@ BindingState* VKRenderer::createBindingState(const BindingState::Desc& bindingSt
             {
                 assert(srcBinding.resource && srcBinding.resource->isBuffer());
                 //BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(srcBinding.resource.Ptr());
-
                 //const BufferResource::Desc& bufferResourceDesc = bufferResource->getDesc();
 
                 // TODO: Setup views. 

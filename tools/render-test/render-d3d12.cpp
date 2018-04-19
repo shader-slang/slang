@@ -2359,7 +2359,7 @@ BindingState* D3D12Renderer::createBindingState(const BindingState::Desc& bindin
 
     SLANG_RETURN_NULL_ON_FAIL(bindingState->init(m_device));
     
-    const List<BindingState::Desc::Binding>& srcBindings = bindingStateDesc.m_bindings;
+    const auto& srcBindings = bindingStateDesc.m_bindings;
     const int numBindings = int(srcBindings.Count());
 
     auto& dstDetails = bindingState->m_bindingDetails;

@@ -924,8 +924,8 @@ BindingState* GLRenderer::createBindingState(const BindingState::Desc& bindingSt
 
     for (int i = 0; i < numBindings; ++i)
     {
-        BindingDetail& dstDetail = dstDetails[i];
-        const BindingState::Desc::Binding& srcBinding = srcBindings[i];
+        auto& dstDetail = dstDetails[i];
+        const auto& srcBinding = srcBindings[i];
 
         // Copy over the bindings 
         dstDetail.m_firstBinding = bindingStateDesc.getFirst(BindingState::ShaderStyle::Glsl, srcBinding.registerDesc);
