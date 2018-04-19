@@ -64,8 +64,10 @@ namespace Slang
     typedef unsigned int LexerFlags;
     enum
     {
-        kLexerFlag_InDirective      = 1 << 0,
-        kLexerFlag_ExpectFileName   = 1 << 1,
+        kLexerFlag_InDirective      = 1 << 0, ///< Turn end-of-line and end-of-file into end-of-directive
+        kLexerFlag_ExpectFileName   = 1 << 1, ///< Support `<>` style strings for file paths
+        kLexerFlag_IgnoreInvalid    = 1 << 2, ///< Suppress errors about invalid/unsupported characters
+        kLexerFlag_ExpectDirectiveMessage = 1 << 3, ///< Don't lexer ordinary tokens, and instead consume rest of line as a string
     };
 
     struct Lexer
@@ -77,7 +79,7 @@ namespace Slang
 
         ~Lexer();
 
-        Token lexToken();
+        Token lexToken(LexerFlags extraFlags = 0);
 
         TokenList lexAllTokens();
 

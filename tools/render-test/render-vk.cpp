@@ -89,20 +89,21 @@ public:
     virtual void setClearColor(const float color[4]) override;
     virtual void clearFrame() override;
     virtual void presentFrame() override;
+    virtual TextureResource* createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData) override;
+    virtual BufferResource* createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& bufferDesc, const void* initData) override;
     virtual SlangResult captureScreenShot(const char* outputPath) override;
     virtual void serializeOutput(BindingState* state, const char * fileName) override;
-    virtual Buffer* createBuffer(const BufferDesc& desc) override;
     virtual InputLayout* createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) override;
     virtual BindingState * createBindingState(const ShaderInputLayout& layout) override;
     virtual ShaderCompiler* getShaderCompiler() override;
-    virtual void* map(Buffer* buffer, MapFlavor flavor) override;
-    virtual void unmap(Buffer* buffer) override;
+    virtual void* map(BufferResource* buffer, MapFlavor flavor) override;
+    virtual void unmap(BufferResource* buffer) override;
     virtual void setInputLayout(InputLayout* inputLayout) override;
     virtual void setPrimitiveTopology(PrimitiveTopology topology) override;
     virtual void setBindingState(BindingState* state);
-    virtual void setVertexBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* strides, const UInt* offsets) override;
+    virtual void setVertexBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* strides, const UInt* offsets) override;
     virtual void setShaderProgram(ShaderProgram* inProgram) override;
-    virtual void setConstantBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers,  const UInt* offsets) override;
+    virtual void setConstantBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers,  const UInt* offsets) override;
     virtual void draw(UInt vertexCount, UInt startVertex) override;
     virtual void dispatchCompute(int x, int y, int z) override;
     virtual void submitGpuWork() override {}
@@ -113,19 +114,22 @@ public:
 
     protected:
 
-    class BufferImpl: public Buffer
+    class BufferResourceImpl: public BufferResource
     {
 		public:
+        typedef BufferResource Parent;
 
-		BufferImpl(VKRenderer* renderer, VkBuffer buffer, VkDeviceMemory memory):
+        BufferResourceImpl(Resource::Usage initialUsage, const BufferResource::Desc& desc, VKRenderer* renderer, VkBuffer buffer, VkDeviceMemory memory):
+            Parent(desc),
 			m_renderer(renderer),
 			m_buffer(buffer),
-			m_memory(memory)
+			m_memory(memory),
+            m_initialUsage(initialUsage)
 		{
 			assert(renderer);
 		}
 
-		~BufferImpl()
+		~BufferResourceImpl()
 		{
 			// Now destroy the staging buffer
 			if (m_renderer)
@@ -135,6 +139,7 @@ public:
 			}
 		}
 
+        Resource::Usage m_initialUsage;
 		VKRenderer*		m_renderer;
         VkBuffer        m_buffer;
         VkDeviceMemory  m_memory;
@@ -187,7 +192,7 @@ public:
 
     VkBool32 handleDebugMessage(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t srcObject,
         size_t location, int32_t msgCode, const char* pLayerPrefix, const char* pMsg);
-    BufferImpl* createBufferImpl(size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties, const void* initData = nullptr);
+    BufferResourceImpl* createBufferResourceImpl(Resource::Usage initialUsage, const BufferResource::Desc& desc, size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties, const void* initData = nullptr);
 
     VkCommandBuffer getCommandBuffer();
     VkCommandBuffer beginCommandBuffer();
@@ -315,7 +320,7 @@ void VKRenderer::flushCommandBuffer(VkCommandBuffer commandBuffer)
     vkFreeCommandBuffers(m_device, m_commandPool, 1, &commandBuffer);
 }
 
-VKRenderer::BufferImpl* VKRenderer::createBufferImpl(size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties, const void* initData)
+VKRenderer::BufferResourceImpl* VKRenderer::createBufferResourceImpl(Resource::Usage initialUsage, const BufferResource::Desc& desc, size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties, const void* initData)
 {
     if (initData)
     {
@@ -352,7 +357,7 @@ VKRenderer::BufferImpl* VKRenderer::createBufferImpl(size_t bufferSize, VkBuffer
         // used for the buffer doesn't let us fill things in
         // directly.
 
-        RefPtr<BufferImpl> staging = createBufferImpl(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        RefPtr<BufferResourceImpl> staging = createBufferResourceImpl(initialUsage, desc, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
         // Copy into staging buffer
@@ -371,7 +376,7 @@ VKRenderer::BufferImpl* VKRenderer::createBufferImpl(size_t bufferSize, VkBuffer
         flushCommandBuffer(commandBuffer);
     }
 
-    return new BufferImpl(this, buffer, memory);
+    return new BufferResourceImpl(initialUsage, desc, this, buffer, memory);
 }
 
 uint32_t VKRenderer::getMemoryTypeIndex(uint32_t inTypeBits, VkMemoryPropertyFlags properties)
@@ -413,18 +418,28 @@ void VKRenderer::createInputBuffer(const ShaderInputLayoutEntry& entry, const In
     VkBufferUsageFlags usage = 0;
     VkMemoryPropertyFlags reqMemoryProperties = 0;
 
+    Resource::Usage initialUsage = Resource::Usage::Unknown;
     switch (bufferDesc.type)
     {
         case InputBufferType::ConstantBuffer:
             usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
             reqMemoryProperties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+            initialUsage = Resource::Usage::ConstantBuffer;
             break;
 
         case InputBufferType::StorageBuffer:
             usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
             reqMemoryProperties = 0;
+            initialUsage = Resource::Usage::PixelShaderResource;
             break;
     }
+
+    BufferResource::Desc bufferResourceDesc;
+
+    bufferResourceDesc.cpuAccessFlags = (entry.isOutput) ? Resource::AccessFlag::Read : 0;
+    bufferResourceDesc.bindFlags = Resource::s_requiredBinding[int(initialUsage)];
+    bufferResourceDesc.elementSize = 0;
+    bufferResourceDesc.sizeInBytes = bufferSize;
 
     // If we are going to read back from the buffer, be sure to request
     // the required access.
@@ -433,7 +448,7 @@ void VKRenderer::createInputBuffer(const ShaderInputLayoutEntry& entry, const In
         usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
     }
 
-    RefPtr<BufferImpl> bufferImpl(createBufferImpl(bufferSize, usage, reqMemoryProperties, initData));
+    RefPtr<BufferResourceImpl> bufferImpl(createBufferResourceImpl(initialUsage, bufferResourceDesc, bufferSize, usage, reqMemoryProperties, initData));
 
     // TODO: need to hang onto the `memory` field so
     // that we can release it when we are done.
@@ -676,27 +691,80 @@ ShaderCompiler* VKRenderer::getShaderCompiler()
     return this;
 }
 
-Buffer* VKRenderer::createBuffer(const BufferDesc& desc)
+TextureResource* VKRenderer::createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData)
 {
-    size_t bufferSize = desc.size;
+    return nullptr;
+}
 
-    VkBufferUsageFlags usage = 0;
-    VkMemoryPropertyFlags reqMemoryProperties = 0;
+static VkBufferUsageFlagBits _calcUsageFlagBit(Resource::BindFlag::Enum bind)
+{
+    typedef Resource::BindFlag BindFlag;
 
-    switch (desc.flavor)
+    switch (bind)
     {
-        case BufferFlavor::Constant:
-            usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-            reqMemoryProperties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-            break;
+        case BindFlag::VertexBuffer:            return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+        case BindFlag::IndexBuffer:             return VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+        case BindFlag::ConstantBuffer:          return VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+        case BindFlag::StreamOutput:
+        case BindFlag::RenderTarget:
+        case BindFlag::DepthStencil:
+        {
+            assert(!"Not supported yet");
+            return VkBufferUsageFlagBits(0);
+        }
+        case BindFlag::UnorderedAccess:         return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+        case BindFlag::PixelShaderResource:     return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+        case BindFlag::NonPixelShaderResource:  return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+        default:                                return VkBufferUsageFlagBits(0);
+    }
+}
 
-        case BufferFlavor::Vertex:
-            usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-            reqMemoryProperties = 0;
-            break;
+static VkBufferUsageFlagBits _calcUsageFlagBit(int bindFlags)
+{
+    int dstFlags = 0;
+    while (bindFlags)
+    {
+        int lsb = bindFlags & -bindFlags;
+        dstFlags |= _calcUsageFlagBit(Resource::BindFlag::Enum(lsb));
+        bindFlags &= ~lsb;
+    }
+    return VkBufferUsageFlagBits(dstFlags);
+}
+
+BufferResource* VKRenderer::createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& descIn, const void* initData)
+{
+    BufferResource::Desc desc(descIn);
+    if (desc.bindFlags == 0)
+    {
+        desc.bindFlags = Resource::s_requiredBinding[int(initialUsage)];
     }
 
-    return createBufferImpl(bufferSize, usage, reqMemoryProperties, desc.initData);
+    const size_t bufferSize = desc.sizeInBytes;
+
+    VkBufferUsageFlags usage = _calcUsageFlagBit(desc.bindFlags);
+    VkMemoryPropertyFlags reqMemoryProperties = 0;
+
+    if (desc.cpuAccessFlags & Resource::AccessFlag::Read)
+    {
+        // If it can be read from, set this
+        usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    }
+    if (desc.cpuAccessFlags & Resource::AccessFlag::Write)
+    {
+        usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    }
+
+    switch (initialUsage)
+    {
+        case Resource::Usage::ConstantBuffer:
+        {
+            reqMemoryProperties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+            break;
+        }
+        default: break;
+    }
+
+    return createBufferResourceImpl(initialUsage, desc, bufferSize, usage, reqMemoryProperties, initData);
 }
 
 InputLayout* VKRenderer::createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) 
@@ -708,12 +776,12 @@ InputLayout* VKRenderer::createInputLayout(const InputElementDesc* inputElements
     return (InputLayout*)impl;
 }
 
-void* VKRenderer::map(Buffer* buffer, MapFlavor flavor)
+void* VKRenderer::map(BufferResource* buffer, MapFlavor flavor)
 {
     return nullptr;
 }
 
-void VKRenderer::unmap(Buffer* buffer)
+void VKRenderer::unmap(BufferResource* buffer)
 {
 }
 
@@ -725,7 +793,7 @@ void VKRenderer::setPrimitiveTopology(PrimitiveTopology topology)
 {
 }
 
-void VKRenderer::setVertexBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* strides, const UInt* offsets)
+void VKRenderer::setVertexBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* strides, const UInt* offsets)
 {
 }
 
@@ -734,7 +802,7 @@ void VKRenderer::setShaderProgram(ShaderProgram* program)
     m_currentProgram = (ShaderProgramImpl*)program;
 }
 
-void VKRenderer::setConstantBuffers(UInt startSlot, UInt slotCount, Buffer*const* buffers, const UInt* offsets) 
+void VKRenderer::setConstantBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* offsets) 
 {
 }
 
@@ -800,9 +868,18 @@ void VKRenderer::serializeOutput(BindingState* s, const char* fileName)
         {
             if (bb.buffer)
             {
-                // create staging buffer
+                Resource::Usage initialUsage = Resource::Usage::NonPixelShaderResource;
+                BufferResource::Desc bufferResourceDesc;
+
                 size_t bufferSize = bb.bufferLength;
-                RefPtr<BufferImpl> staging(createBufferImpl(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+
+                bufferResourceDesc.cpuAccessFlags = Resource::AccessFlag::Read;
+                bufferResourceDesc.bindFlags = 0;
+                bufferResourceDesc.elementSize = 0;
+                bufferResourceDesc.sizeInBytes = bufferSize;
+
+                // create staging buffer
+                RefPtr<BufferResourceImpl> staging(createBufferResourceImpl(initialUsage, bufferResourceDesc, bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
 
                 // Copy from real buffer to staging buffer

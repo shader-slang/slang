@@ -548,6 +548,9 @@ namespace Slang
     //
     IRParentInst* mergeCandidateParentsForHoistableInst(IRParentInst* left, IRParentInst* right)
     {
+        // If the candidates are both the same, then who cares?
+        if(left == right) return left;
+
         // If either `left` or `right` is a block, then we need to be
         // a bit careful, because blocks can see other values just using
         // the dominance relationship, without a direct parent-child relationship.
@@ -4276,9 +4279,43 @@ namespace Slang
 
                                 // Is it calling the append operation?
                                 auto callee = ii->getOperand(0);
-                                while( callee->op == kIROp_Specialize )
+                                for(;;)
                                 {
-                                    callee = ((IRSpecialize*) callee)->getOperand(0);
+                                    // If the instruction is `specialize(X,...)` then
+                                    // we want to look at `X`, and if it is `generic { ... return R; }`
+                                    // then we want to look at `R`. We handle this
+                                    // iteratively here.
+                                    //
+                                    // TODO: This idiom seems to come up enough that we
+                                    // should probably have a dedicated convenience routine
+                                    // for this.
+                                    //
+                                    // Alternatively, we could switch the IR encoding so
+                                    // that decorations are added to the generic instead of the
+                                    // value it returns.
+                                    //
+                                    switch(callee->op)
+                                    {
+                                    case kIROp_Specialize:
+                                        {
+                                            callee = cast<IRSpecialize>(callee)->getOperand(0);
+                                            continue;
+                                        }
+
+                                    case kIROp_Generic:
+                                        {
+                                            auto genericResult = findGenericReturnVal(cast<IRGeneric>(callee));
+                                            if(genericResult)
+                                            {
+                                                callee = genericResult;
+                                                continue;
+                                            }
+                                        }
+
+                                    default:
+                                        break;
+                                    }
+                                    break;
                                 }
                                 if(callee->op != kIROp_Func)
                                     continue;
@@ -4805,6 +4842,27 @@ namespace Slang
         IRGlobalValueWithCode*  clonedValue,
         IRGlobalValueWithCode*  originalValue);
 
+    IRRate* cloneRate(
+        IRSpecContextBase*  context,
+        IRRate*             rate)
+    {
+        return (IRRate*) cloneType(context, rate);
+    }
+
+    void maybeSetClonedRate(
+        IRSpecContextBase*  context,
+        IRBuilder*          builder,
+        IRInst*             clonedValue,
+        IRInst*             originalValue)
+    {
+        if(auto rate = originalValue->getRate() )
+        {
+            clonedValue->setFullType(builder->getRateQualifiedType(
+                cloneRate(context, rate),
+                clonedValue->getFullType()));
+        }
+    }
+
     IRGlobalVar* cloneGlobalVarImpl(
         IRSpecContextBase*              context,
         IRBuilder*                      builder,
@@ -4814,11 +4872,7 @@ namespace Slang
         auto clonedVar = builder->createGlobalVar(
             cloneType(context, originalVar->getDataType()->getValueType()));
 
-        if(auto rate = originalVar->getRate() )
-        {
-            clonedVar->setFullType(builder->getRateQualifiedType(
-                rate, clonedVar->getFullType()));
-        }
+        maybeSetClonedRate(context, builder, clonedVar, originalVar);
 
         registerClonedValue(context, clonedVar, originalValues);
 

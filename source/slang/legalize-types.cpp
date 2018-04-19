@@ -88,7 +88,7 @@ static bool isResourceType(IRType* type)
     {
         return true;
     }
-    else if (auto samplerType = as<IRSamplerStateType>(type))
+    else if (auto samplerType = as<IRSamplerStateTypeBase>(type))
     {
         return true;
     }

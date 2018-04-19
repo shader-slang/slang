@@ -1095,9 +1095,9 @@ struct EmitVisitor
             {
                 switch (type->op)
                 {
-                case kIROp_HLSLByteAddressBufferType:           Emit("ByteAddressBuffer");           break;
-                case kIROp_HLSLRWByteAddressBufferType:         Emit("RWByteAddressBuffer");         break;
-                case kIROp_RaytracingAccelerationStructureType: Emit("RaytracingAccelerationStructureType");     break;
+                case kIROp_HLSLByteAddressBufferType:           Emit("ByteAddressBuffer");                  break;
+                case kIROp_HLSLRWByteAddressBufferType:         Emit("RWByteAddressBuffer");                break;
+                case kIROp_RaytracingAccelerationStructureType: Emit("RaytracingAccelerationStructure");    break;
 
                 default:
                     SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled buffer type");
@@ -1110,9 +1110,9 @@ struct EmitVisitor
             {
                 switch (type->op)
                 {
-                case kIROp_HLSLByteAddressBufferType:           Emit("ByteAddressBuffer");           break;
-                case kIROp_HLSLRWByteAddressBufferType:         Emit("RWByteAddressBuffer");         break;
-                case kIROp_RaytracingAccelerationStructureType: Emit("RaytracingAccelerationStructureType");     break;
+                case kIROp_HLSLByteAddressBufferType:           Emit("ByteAddressBuffer");                  break;
+                case kIROp_HLSLRWByteAddressBufferType:         Emit("RWByteAddressBuffer");                break;
+                case kIROp_RaytracingAccelerationStructureType: Emit("RaytracingAccelerationStructure");    break;
 
                 default:
                     SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled buffer type");
@@ -1243,6 +1243,7 @@ struct EmitVisitor
                 auto rateQualifiedType = cast<IRRateQualifiedType>(type);
                 emitTypeImpl(rateQualifiedType->getValueType(), declarator);
             }
+            break;
 
         case kIROp_ArrayType:
             emitArrayTypeImpl(cast<IRArrayType>(type), declarator);
@@ -1897,6 +1898,14 @@ struct EmitVisitor
     String getIRName(
         IRInst*        inst)
     {
+        // If the instruction names something
+        // that should be emitted as a target intrinsic,
+        // then use that name instead.
+        if(auto intrinsicDecoration = findTargetIntrinsicDecoration(context, inst))
+        {
+            return intrinsicDecoration->definition;
+        }
+
         // If the instruction has a mangled name, then emit using that.
         if (auto globalValue = as<IRGlobalValue>(inst))
         {
@@ -2076,7 +2085,7 @@ struct EmitVisitor
             {
                 return true;
             }
-            else if(as<IRSamplerStateType>(type))
+            else if(as<IRSamplerStateTypeBase>(type))
             {
                 return true;
             }
@@ -2355,6 +2364,28 @@ struct EmitVisitor
             }
         }
 
+
+        UnownedStringSlice readRawStringSegment()
+        {
+            // Read the length part
+            UInt count = readCount();
+            if(count > UInt(end_ - cursor_))
+            {
+                SLANG_UNEXPECTED("bad name mangling");
+                UNREACHABLE_RETURN(UnownedStringSlice());
+            }
+
+            auto result = UnownedStringSlice(cursor_, cursor_ + count);
+            cursor_ += count;
+            return result;
+        }
+
+        void readNamedType()
+        {
+            // TODO: handle types with more complicated names
+            readRawStringSegment();
+        }
+
         void readType()
         {
             int c = peek();
@@ -2378,16 +2409,30 @@ struct EmitVisitor
                 break;
 
             default:
-                // TODO: need to read a named type
-                // here...
+                readNamedType();
                 break;
             }
         }
 
         void readVal()
         {
-            // TODO: handle other cases here
-            readType();
+            switch(peek())
+            {
+            case 'k':
+                get();
+                readCount();
+                break;
+
+            case 'K':
+                get();
+                readRawStringSegment();
+                break;
+
+            default:
+                readType();
+                break;
+            }
+
         }
 
         void readGenericArg()
@@ -2405,6 +2450,12 @@ struct EmitVisitor
             }
         }
 
+        void readExtensionSpec()
+        {
+            expect("X");
+            readType();
+        }
+
         UnownedStringSlice readSimpleName()
         {
             UnownedStringSlice result;
@@ -2420,6 +2471,11 @@ struct EmitVisitor
                 else if(c == 'G')
                 {
                     readGenericArgs();
+                    continue;
+                }
+                else if(c == 'X')
+                {
+                    readExtensionSpec();
                     continue;
                 }
 
@@ -2450,9 +2506,9 @@ struct EmitVisitor
 
     IRTargetIntrinsicDecoration* findTargetIntrinsicDecoration(
         EmitContext*    /* ctx */,
-        IRFunc*         func)
+        IRInst*         inst)
     {
-        for (auto dd = func->firstDecoration; dd; dd = dd->next)
+        for (auto dd = inst->firstDecoration; dd; dd = dd->next)
         {
             if (dd->op != kIRDecorationOp_TargetIntrinsic)
                 continue;
@@ -3202,6 +3258,7 @@ struct EmitVisitor
                 auto valType = ptrType->getValueType();
 
                 auto name = getIRName(inst);
+                emitIRRateQualifiers(ctx, inst);
                 emitIRType(ctx, valType, name);
                 emit(";\n");
             }
@@ -4108,7 +4165,7 @@ struct EmitVisitor
         {
             for (auto pp = bb->getFirstParam(); pp; pp = pp->getNextParam())
             {
-                emitIRType(ctx, pp->getDataType(), getIRName(pp));
+                emitIRType(ctx, pp->getFullType(), getIRName(pp));
                 emit(";\n");
             }
         }
@@ -5118,6 +5175,7 @@ struct EmitVisitor
 
         emitIRVarModifiers(ctx, layout, varDecl, varType);
 
+        emitIRRateQualifiers(ctx, varDecl);
         emitIRType(ctx, varType, getIRName(varDecl));
 
         emitIRSemantics(ctx, varDecl);
@@ -5165,6 +5223,7 @@ struct EmitVisitor
             emit("static ");
         }
         emit("const ");
+        emitIRRateQualifiers(ctx, valDecl);
         emitIRType(ctx, valType, getIRName(valDecl));
 
         if (valDecl->getFirstBlock())
