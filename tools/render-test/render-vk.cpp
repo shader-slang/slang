@@ -838,8 +838,8 @@ BindingState* VKRenderer::createBindingState(const BindingState::Desc& bindingSt
         BindingDetail& dstDetail = dstDetails[i];
         const BindingState::Desc::Binding& srcBinding = srcBindings[i];
 
-        //! TODO: Is this correct?! It's using the hlsl binding
-        dstDetail.m_binding = bindingStateDesc.getFirst(BindingState::ShaderStyle::Hlsl, srcBinding.registerDesc);
+        // For now use Glsl binding
+        dstDetail.m_binding = bindingStateDesc.getFirst(BindingState::ShaderStyle::Glsl, srcBinding.registerDesc);
         
         switch (srcBinding.bindingType)
         {
