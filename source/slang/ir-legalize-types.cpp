@@ -446,6 +446,120 @@ static LegalVal legalizeFieldAddress(
         (IRStructKey*) fieldKey);
 }
 
+static LegalVal legalizeFieldExtract(
+    IRTypeLegalizationContext*  context,
+    LegalType                   type,
+    LegalVal                    legalStructOperand,
+    IRStructKey*                fieldKey)
+{
+    auto builder = context->builder;
+
+    switch (legalStructOperand.flavor)
+    {
+    case LegalVal::Flavor::simple:
+        return LegalVal::simple(
+            builder->emitFieldExtract(
+                type.getSimple(),
+                legalStructOperand.getSimple(),
+                fieldKey));
+
+    case LegalVal::Flavor::pair:
+        {
+            // There are two sides, the ordinary and the special,
+            // and we basically just dispatch to both of them.
+            auto pairVal = legalStructOperand.getPair();
+            auto pairInfo = pairVal->pairInfo;
+            auto pairElement = pairInfo->findElement(fieldKey);
+            if (!pairElement)
+            {
+                SLANG_UNEXPECTED("didn't find tuple element");
+                UNREACHABLE_RETURN(LegalVal());
+            }
+
+            // If the field we are extracting has a pair type,
+            // that means it exists on both the ordinary and
+            // special sides.
+            RefPtr<PairInfo> fieldPairInfo;
+            LegalType ordinaryType = type;
+            LegalType specialType = type;
+            if (type.flavor == LegalType::Flavor::pair)
+            {
+                auto fieldPairType = type.getPair();
+                fieldPairInfo = fieldPairType->pairInfo;
+                ordinaryType = fieldPairType->ordinaryType;
+                specialType = fieldPairType->specialType;
+            }
+
+            LegalVal ordinaryVal;
+            LegalVal specialVal;
+
+            if (pairElement->flags & PairInfo::kFlag_hasOrdinary)
+            {
+                ordinaryVal = legalizeFieldExtract(
+                    context,
+                    ordinaryType,
+                    pairVal->ordinaryVal,
+                    fieldKey);
+            }
+
+            if (pairElement->flags & PairInfo::kFlag_hasSpecial)
+            {
+                specialVal = legalizeFieldExtract(
+                    context,
+                    specialType,
+                    pairVal->specialVal,
+                    fieldKey);
+            }
+            return LegalVal::pair(ordinaryVal, specialVal, fieldPairInfo);
+        }
+        break;
+
+    case LegalVal::Flavor::tuple:
+        {
+            // The operand is a tuple of pointer-like
+            // values, we want to extract the element
+            // corresponding to a field. We will handle
+            // this by simply returning the corresponding
+            // element from the operand.
+            auto ptrTupleInfo = legalStructOperand.getTuple();
+            for (auto ee : ptrTupleInfo->elements)
+            {
+                if (ee.key == fieldKey)
+                {
+                    return ee.val;
+                }
+            }
+
+            // TODO: we can legally reach this case now
+            // when the field is "ordinary".
+
+            SLANG_UNEXPECTED("didn't find tuple element");
+            UNREACHABLE_RETURN(LegalVal());
+        }
+
+    default:
+        SLANG_UNEXPECTED("unhandled");
+        UNREACHABLE_RETURN(LegalVal());
+    }
+}
+
+static LegalVal legalizeFieldExtract(
+    IRTypeLegalizationContext*    context,
+    LegalType                   type,
+    LegalVal                    legalPtrOperand,
+    LegalVal                    legalFieldOperand)
+{
+    // We don't expect any legalization to affect
+    // the "field" argument.
+    auto fieldKey = legalFieldOperand.getSimple();
+
+    return legalizeFieldExtract(
+        context,
+        type,
+        legalPtrOperand,
+        (IRStructKey*) fieldKey);
+}
+
 static LegalVal legalizeGetElementPtr(
     IRTypeLegalizationContext*  context,
     LegalType                   type,
@@ -567,6 +681,9 @@ static LegalVal legalizeInst(
 
     case kIROp_FieldAddress:
         return legalizeFieldAddress(context, type, args[0], args[1]);
+
+    case kIROp_FieldExtract:
+        return legalizeFieldExtract(context, type, args[0], args[1]);
 
     case kIROp_getElementPtr:
         return legalizeGetElementPtr(context, type, args[0], args[1]);
