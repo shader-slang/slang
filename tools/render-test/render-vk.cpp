@@ -332,9 +332,9 @@ SlangResult VKRenderer::_initBuffer(size_t bufferSize, VkBufferUsageFlags usage,
     assert(!bufferOut.isInitialized());
 
     bufferOut.m_renderer = this;
-    bufferOut.m_memory = nullptr;
-    bufferOut.m_buffer = nullptr;
-
+    bufferOut.m_memory = 0;
+    bufferOut.m_buffer = 0;
+    
     VkBufferCreateInfo bufferCreateInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
     bufferCreateInfo.size = bufferSize;
     bufferCreateInfo.usage = usage;

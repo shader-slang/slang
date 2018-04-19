@@ -375,7 +375,7 @@ public:
         uint16_t operator[](int i) const { assert(i >= 0 && i < numIndices); return indices[i]; }
 
         const uint16_t* indices;
-        size_t numIndices;
+        int numIndices;
     };
 
     struct SamplerDesc
