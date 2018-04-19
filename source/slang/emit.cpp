@@ -1243,6 +1243,7 @@ struct EmitVisitor
                 auto rateQualifiedType = cast<IRRateQualifiedType>(type);
                 emitTypeImpl(rateQualifiedType->getValueType(), declarator);
             }
+            break;
 
         case kIROp_ArrayType:
             emitArrayTypeImpl(cast<IRArrayType>(type), declarator);
@@ -3249,6 +3250,7 @@ struct EmitVisitor
                 auto valType = ptrType->getValueType();
 
                 auto name = getIRName(inst);
+                emitIRRateQualifiers(ctx, inst);
                 emitIRType(ctx, valType, name);
                 emit(";\n");
             }
@@ -4155,7 +4157,7 @@ struct EmitVisitor
         {
             for (auto pp = bb->getFirstParam(); pp; pp = pp->getNextParam())
             {
-                emitIRType(ctx, pp->getDataType(), getIRName(pp));
+                emitIRType(ctx, pp->getFullType(), getIRName(pp));
                 emit(";\n");
             }
         }
@@ -5165,6 +5167,7 @@ struct EmitVisitor
 
         emitIRVarModifiers(ctx, layout, varDecl, varType);
 
+        emitIRRateQualifiers(ctx, varDecl);
         emitIRType(ctx, varType, getIRName(varDecl));
 
         emitIRSemantics(ctx, varDecl);
@@ -5212,6 +5215,7 @@ struct EmitVisitor
             emit("static ");
         }
         emit("const ");
+        emitIRRateQualifiers(ctx, valDecl);
         emitIRType(ctx, valType, getIRName(valDecl));
 
         if (valDecl->getFirstBlock())

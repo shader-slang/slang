@@ -1195,6 +1195,25 @@ void addVarDecorations(
     }
 }
 
+/// If `decl` has a modifier that should turn into a
+/// rate qualifier, then apply it to `inst`.
+void maybeSetRate(
+    IRGenContext*   context,
+    IRInst*         inst,
+    Decl*           decl)
+{
+    auto builder = context->irBuilder;
+
+    if (decl->HasModifier<HLSLGroupSharedModifier>())
+    {
+        inst->setFullType(builder->getRateQualifiedType(
+            builder->getGroupSharedRate(),
+            inst->getFullType()));
+    }
+}
+
+
+
 LoweredValInfo createVar(
     IRGenContext*   context,
     IRType*         type,
@@ -1205,6 +1224,8 @@ LoweredValInfo createVar(
 
     if (decl)
     {
+        maybeSetRate(context, irAlloc, decl);
+
         addVarDecorations(context, irAlloc, decl);
 
         builder->addHighLevelDeclDecoration(irAlloc, decl);
@@ -3192,22 +3213,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     {
         IRType* varType = lowerType(context, decl->getType());
 
-        if (decl->HasModifier<HLSLGroupSharedModifier>())
-        {
-            // TODO: here we are applying the rate qualifier to
-            // the *data type* of the variable, when we really
-            // should be applying the rate to the variable itself.
-            //
-            // This ends up making a distinction between
-            // `Ptr<@GroupShared X>` and `@GroupShared Ptr<X>`.
-            // The latter is more technically correct, but the
-            // code generation logic currently looks for the former.
-
-            varType = getBuilder()->getRateQualifiedType(
-                getBuilder()->getGroupSharedRate(),
-                varType);
-        }
-
         auto builder = getBuilder();
 
         IRGlobalValueWithCode* irGlobal = nullptr;
@@ -3225,6 +3230,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             globalVal = LoweredValInfo::ptr(irGlobal);
         }
         irGlobal->mangledName = context->getSession()->getNameObj(getMangledName(decl));
+
+        maybeSetRate(context, irGlobal, decl);
 
         if (decl)
         {
@@ -3299,36 +3306,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // to the global scope, and then we have to deal with its
         // initializer expression a bit carefully (it should only
         // be initialized on-demand at its first use).
-
-        // Some qualifiers on a variable will change how we allocate it,
-        // so we need to reflect that somehow. The first example
-        // we run into is the `groupshared` qualifier, which marks
-        // a variable in a compute shader as having per-group allocation
-        // rather than the traditional per-thread (or rather per-thread
-        // per-activation-record) allocation.
-        //
-        // Options include:
-        //
-        //  - Use a distinct allocation opration, so that the type
-        //    of the variable address/value is unchanged.
-        //
-        //  - Add a notion of an "address space" to pointer types,
-        //    so that we can allocate things in distinct spaces.
-        //
-        //  - Add a notion of a "rate" so that we can declare a
-        //    variable with a distinct rate.
-        //
-        // For now we might do the expedient thing and handle this
-        // via a notion of an "address space."
-
-        if (decl->HasModifier<HLSLGroupSharedModifier>())
-        {
-            // TODO: This logic is duplicated with the global-variable
-            // case. We should seek to share it.
-            varType = getBuilder()->getRateQualifiedType(
-                getBuilder()->getGroupSharedRate(),
-                varType);
-        }
 
         LoweredValInfo varVal = createVar(context, varType, decl);
 
