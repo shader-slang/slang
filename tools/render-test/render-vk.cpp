@@ -95,7 +95,8 @@ public:
     virtual SlangResult captureScreenShot(const char* outputPath) override;
     virtual void serializeOutput(BindingState* state, const char * fileName) override;
     virtual InputLayout* createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) override;
-    virtual BindingState * createBindingState(const ShaderInputLayout& layout) override;
+    virtual BindingState* createBindingState(const ShaderInputLayout& layout) override;
+    virtual BindingState* createBindingState(const BindingState::Desc& bindingStateDesc) override;
     virtual ShaderCompiler* getShaderCompiler() override;
     virtual void* map(BufferResource* buffer, MapFlavor flavor) override;
     virtual void unmap(BufferResource* buffer) override;
@@ -826,6 +827,7 @@ BindingState* VKRenderer::createBindingState(const ShaderInputLayout& layout)
             case ShaderInputType::Buffer:
             {
                 RefPtr<BufferResource> bufferResource;
+
                 SLANG_RETURN_NULL_ON_FAIL(createInputBuffer(entry, entry.bufferDesc, entry.bufferData, bufferResource, binding.uav, binding.srv));
 
                 binding.resource = bufferResource;
@@ -835,18 +837,10 @@ BindingState* VKRenderer::createBindingState(const ShaderInputLayout& layout)
                 break;
             }
             case ShaderInputType::Texture:
-            {
-                createInputTexture(entry.textureDesc, binding.srv);
-                break;
-            }
             case ShaderInputType::Sampler:
-            {
-                createInputSampler(entry.samplerDesc, binding.samplerState);
-                break;
-            }
             case ShaderInputType::CombinedTextureSampler:
             {
-                throw "not implemented";
+                assert(!"not implemented");
                 break;
             }
         }
@@ -854,6 +848,58 @@ BindingState* VKRenderer::createBindingState(const ShaderInputLayout& layout)
     }
 
     return bindingState;
+}
+
+BindingState* VKRenderer::createBindingState(const BindingState::Desc& bindingStateDesc)
+{   
+    RefPtr<BindingStateImpl> bindingState(new BindingStateImpl(this));
+
+    bindingState->m_numRenderTargets = bindingStateDesc.m_numRenderTargets;
+
+    const List<BindingState::Desc::Binding>& srcBindings = bindingStateDesc.m_bindings;
+    const int numBindings = int(srcBindings.Count());
+
+    List<Binding>& dstBindings = bindingState->m_bindings;
+    dstBindings.SetSize(numBindings);
+
+    for (int i = 0; i < numBindings; ++i)
+    {
+        Binding& dstBinding = dstBindings[i];
+        const BindingState::Desc::Binding& srcBinding = srcBindings[i];
+
+        dstBinding.bindingType = srcBinding.bindingType;
+        
+        //! TODO: Is this correct?! It's using the hlsl binding
+        dstBinding.binding = bindingStateDesc.getFirst(BindingState::ShaderStyle::Hlsl, srcBinding.registerDesc);
+        
+        switch (srcBinding.bindingType)
+        {
+            case BindingType::Buffer:
+            {
+                assert(srcBinding.resource && srcBinding.resource->isBuffer());
+                BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(srcBinding.resource.Ptr());
+
+                const BufferResource::Desc& bufferResourceDesc = bufferResource->getDesc();
+
+                dstBinding.isOutput = (bufferResourceDesc.cpuAccessFlags & Resource::AccessFlag::Read) != 0;
+
+                // TODO: Setup views. 
+                // VkBufferView uav
+                // VkImageView srv
+
+                dstBinding.resource = bufferResource;
+                break;
+            }
+            case BindingType::Texture:
+            case BindingType::Sampler:
+            case BindingType::CombinedTextureSampler:
+            {
+                assert(!"not implemented");
+            }
+        }
+    }
+
+    return bindingState.detach();;
 }
 
 void VKRenderer::setBindingState(BindingState* state)

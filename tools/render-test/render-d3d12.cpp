@@ -2743,7 +2743,7 @@ BindingState* D3D12Renderer::createBindingState(const BindingState::Desc& bindin
             }
             case BindingType::Sampler:
             {
-                const BindingState::SamplerDesc& samplerDesc = bindingStateDesc.m_samplers[srcEntry.descIndex];
+                const BindingState::SamplerDesc& samplerDesc = bindingStateDesc.m_samplerDescs[srcEntry.descIndex];
 
                 const int samplerIndex = bindingStateDesc.getFirst(srcEntry.registerDesc.registerSets[int(BindingState::ShaderStyle::Hlsl)]);
                 dstEntry.m_samplerIndex = samplerIndex;

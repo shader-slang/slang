@@ -1180,7 +1180,7 @@ BindingState* D3D11Renderer::createBindingState(const BindingState::Desc& bindin
             }
             case BindingType::Sampler:
             {
-                const BindingState::SamplerDesc& samplerDesc = bindingStateDesc.m_samplers[srcBinding.descIndex];
+                const BindingState::SamplerDesc& samplerDesc = bindingStateDesc.m_samplerDescs[srcBinding.descIndex];
 
                 D3D11_SAMPLER_DESC desc = {};
                 desc.AddressU = desc.AddressV = desc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;

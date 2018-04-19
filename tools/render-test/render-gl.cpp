@@ -1050,7 +1050,7 @@ BindingState* GLRenderer::createBindingState(const BindingState::Desc& bindingSt
                 // Handle if combined 
                 if (srcBinding.bindingType == BindingType::CombinedTextureSampler)
                 {
-                    const BindingState::SamplerDesc& samplerDesc = bindingStateDesc.m_samplers[srcBinding.descIndex];
+                    const BindingState::SamplerDesc& samplerDesc = bindingStateDesc.m_samplerDescs[srcBinding.descIndex];
 
                     if (samplerDesc.isCompareSampler)
                     {
@@ -1067,7 +1067,7 @@ BindingState* GLRenderer::createBindingState(const BindingState::Desc& bindingSt
             }
             case BindingType::Sampler:
             {
-                const BindingState::SamplerDesc& samplerDesc = bindingStateDesc.m_samplers[srcBinding.descIndex];
+                const BindingState::SamplerDesc& samplerDesc = bindingStateDesc.m_samplerDescs[srcBinding.descIndex];
 
                 GLuint handle;
 

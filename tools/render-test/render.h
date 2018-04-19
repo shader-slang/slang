@@ -379,49 +379,46 @@ public:
 
     struct Desc
     {
-        RegisterList asRegisterList(const RegisterSet& set) const
-        {
-            switch (set.m_numIndices)
-            {
-                case 0:     return RegisterList{ nullptr, 0 };
-                case 1:     return RegisterList{ &set.m_indexOrBase, 1 };
-                default:    return RegisterList{ m_indices.Buffer() + set.m_indexOrBase, set.m_numIndices };
-            }
-        }
-        RegisterList asRegisterList(ShaderStyle style, const RegisterDesc& registerDesc) const
-        {
-            return asRegisterList(registerDesc.registerSets[int(style)]);
-        }
-
         struct Binding
         {
-            BindingType bindingType;                      ///< Type of binding
-            int descIndex;                  ///< Index associated with type. -1 if not used
-            Slang::RefPtr<Resource> resource;             ///< Associated resource. nullptr if not used
-            RegisterDesc registerDesc;      ///< Registers associated with binding
+            BindingType bindingType;                ///< Type of binding
+            int descIndex;                          ///< The description index associated with type. -1 if not used. For example if bindingType is Sampler, the descIndex is into m_samplerDescs.
+            Slang::RefPtr<Resource> resource;       ///< Associated resource. nullptr if not used
+            RegisterDesc registerDesc;              ///< Registers associated with binding
         };
 
-        /// Add a resource - assumed that the binding will match the Desc of the resource
+            /// Given a RegisterSet, return as a RegisterList, that can be easily iterated over
+        RegisterList asRegisterList(const RegisterSet& set) const;
+            /// Given a RegisterDesc and a style returns a RegisterList, that can be easily iterated over
+        RegisterList asRegisterList(ShaderStyle style, const RegisterDesc& registerDesc) const;
+
+            /// Returns the first member of the set, or returns -1 if is empty
+        int getFirst(const RegisterSet& set) const;
+            /// Returns the first member of the set, or returns -1 if is empty
+        int getFirst(ShaderStyle style, const RegisterDesc& registerDesc) const;
+
+            /// Add a resource - assumed that the binding will match the Desc of the resource
         void addResource(BindingType bindingType, Resource* resource, const RegisterDesc& registerDesc);
-        /// Add a sampler        
+            /// Add a sampler        
         void addSampler(const SamplerDesc& desc, const RegisterDesc& registerDesc);
-        /// Add a BufferResource 
+            /// Add a BufferResource 
         void addBufferResource(BufferResource* resource, const RegisterDesc& registerDesc) { addResource(BindingType::Buffer, resource, registerDesc); }
-        /// Add a texture 
+            /// Add a texture 
         void addTextureResource(TextureResource* resource, const RegisterDesc& registerDesc) { addResource(BindingType::Texture, resource, registerDesc); }
-        /// Add combined texture a
+            /// Add combined texture a
         void addCombinedTextureSampler(TextureResource* resource, const SamplerDesc& samplerDesc, const RegisterDesc& registerDesc);
 
-        /// Returns the first member of the set, or returns -1 if is empty
-        int getFirst(const RegisterSet& set) const;
-        /// Clear the contents 
+            /// Clear the contents 
         void clear();
 
+            /// Given an index, returns as a register set. If index is < 0, assumes means no indices, and just returns the empty set
         RegisterSet addRegisterSet(int index);
+            /// Given a list of indices, returns the associated register set. Note does check for indices being unique. The order is maintained. 
+            /// Only >= 0 indices are valid
         RegisterSet addRegisterSet(const int* indices, int numIndices);
 
         Slang::List<Binding> m_bindings;
-        Slang::List<SamplerDesc> m_samplers;
+        Slang::List<SamplerDesc> m_samplerDescs;
         Slang::List<uint16_t> m_indices;                  ///< Used to store lists of registers
         int m_numRenderTargets = 1;
     };
