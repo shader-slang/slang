@@ -1030,9 +1030,19 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     IRType* visitDeclRefType(DeclRefType* type)
     {
+        auto declRef = type->declRef;
+        auto decl = declRef.getDecl();
+
+        // Check for types with teh `__intrinsic_type` modifier.
+        if(decl->FindModifier<IntrinsicTypeModifier>())
+        {
+            return lowerSimpleIntrinsicType(type);
+        }
+
+
         return (IRType*) getSimpleVal(
             context,
-            emitDeclRef(context, type->declRef,
+            emitDeclRef(context, declRef,
                 context->irBuilder->getTypeKind()));
     }
 
@@ -3500,6 +3510,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             semanticDecoration->semanticName = semanticModifier->name.getName();
         }
 
+        // We allow a field to be marked as a target intrinsic,
+        // so that we can override its mangled name in the
+        // output for the chosen target.
+        addTargetIntrinsicDecorations(irFieldKey, fieldDecl);
+
+
         return LoweredValInfo::simple(irFieldKey);
     }
 
@@ -3967,6 +3983,29 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return v;
     }
 
+    // Attach target-intrinsic decorations to an instruction,
+    // based on modifiers on an AST declaration.
+    void addTargetIntrinsicDecorations(
+        IRInst* irInst,
+        Decl*   decl)
+    {
+        for (auto targetMod : decl->GetModifiersOfType<TargetIntrinsicModifier>())
+        {
+            auto decoration = getBuilder()->addDecoration<IRTargetIntrinsicDecoration>(irInst);
+            decoration->targetName = targetMod->targetToken.Content;
+
+            auto definitionToken = targetMod->definitionToken;
+            if (definitionToken.type == TokenType::StringLiteral)
+            {
+                decoration->definition = getStringLiteralTokenValue(definitionToken);
+            }
+            else
+            {
+                decoration->definition = definitionToken.Content;
+            }
+        }
+    }
+
     LoweredValInfo lowerFuncDecl(FunctionDeclBase* decl)
     {
         // We are going to use a nested builder, because we will
@@ -4259,21 +4298,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // If this declaration was marked as having a target-specific lowering
         // for a particular target, then handle that here.
-        for (auto targetMod : decl->GetModifiersOfType<TargetIntrinsicModifier>())
-        {
-            auto decoration = getBuilder()->addDecoration<IRTargetIntrinsicDecoration>(irFunc);
-            decoration->targetName = targetMod->targetToken.Content;
-
-            auto definitionToken = targetMod->definitionToken;
-            if (definitionToken.type == TokenType::StringLiteral)
-            {
-                decoration->definition = getStringLiteralTokenValue(definitionToken);
-            }
-            else
-            {
-                decoration->definition = definitionToken.Content;
-            }
-        }
+        addTargetIntrinsicDecorations(irFunc, decl);
 
         // For convenience, ensure that any additional global
         // values that were emitted while outputting the function

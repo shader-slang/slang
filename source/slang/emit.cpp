@@ -1095,9 +1095,9 @@ struct EmitVisitor
             {
                 switch (type->op)
                 {
-                case kIROp_HLSLByteAddressBufferType:           Emit("ByteAddressBuffer");           break;
-                case kIROp_HLSLRWByteAddressBufferType:         Emit("RWByteAddressBuffer");         break;
-                case kIROp_RaytracingAccelerationStructureType: Emit("RaytracingAccelerationStructureType");     break;
+                case kIROp_HLSLByteAddressBufferType:           Emit("ByteAddressBuffer");                  break;
+                case kIROp_HLSLRWByteAddressBufferType:         Emit("RWByteAddressBuffer");                break;
+                case kIROp_RaytracingAccelerationStructureType: Emit("RaytracingAccelerationStructure");    break;
 
                 default:
                     SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled buffer type");
@@ -1110,9 +1110,9 @@ struct EmitVisitor
             {
                 switch (type->op)
                 {
-                case kIROp_HLSLByteAddressBufferType:           Emit("ByteAddressBuffer");           break;
-                case kIROp_HLSLRWByteAddressBufferType:         Emit("RWByteAddressBuffer");         break;
-                case kIROp_RaytracingAccelerationStructureType: Emit("RaytracingAccelerationStructureType");     break;
+                case kIROp_HLSLByteAddressBufferType:           Emit("ByteAddressBuffer");                  break;
+                case kIROp_HLSLRWByteAddressBufferType:         Emit("RWByteAddressBuffer");                break;
+                case kIROp_RaytracingAccelerationStructureType: Emit("RaytracingAccelerationStructure");    break;
 
                 default:
                     SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled buffer type");
@@ -1898,6 +1898,14 @@ struct EmitVisitor
     String getIRName(
         IRInst*        inst)
     {
+        // If the instruction names something
+        // that should be emitted as a target intrinsic,
+        // then use that name instead.
+        if(auto intrinsicDecoration = findTargetIntrinsicDecoration(context, inst))
+        {
+            return intrinsicDecoration->definition;
+        }
+
         // If the instruction has a mangled name, then emit using that.
         if (auto globalValue = as<IRGlobalValue>(inst))
         {
@@ -2498,9 +2506,9 @@ struct EmitVisitor
 
     IRTargetIntrinsicDecoration* findTargetIntrinsicDecoration(
         EmitContext*    /* ctx */,
-        IRFunc*         func)
+        IRInst*         inst)
     {
-        for (auto dd = func->firstDecoration; dd; dd = dd->next)
+        for (auto dd = inst->firstDecoration; dd; dd = dd->next)
         {
             if (dd->op != kIRDecorationOp_TargetIntrinsic)
                 continue;
