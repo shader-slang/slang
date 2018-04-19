@@ -5,7 +5,6 @@
 #include "render.h"
 
 #include "../../source/core/smart-pointer.h"
-#include "slang-support.h"
 
 #ifdef _WIN32
 #define VK_USE_PLATFORM_WIN32_KHR 1
@@ -95,7 +94,6 @@ public:
     virtual SlangResult captureScreenShot(const char* outputPath) override;
     virtual void serializeOutput(BindingState* state, const char * fileName) override;
     virtual InputLayout* createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) override;
-    virtual BindingState* createBindingState(const ShaderInputLayout& layout) override;
     virtual BindingState* createBindingState(const BindingState::Desc& bindingStateDesc) override;
     virtual ShaderCompiler* getShaderCompiler() override;
     virtual void* map(BufferResource* buffer, MapFlavor flavor) override;
@@ -216,11 +214,6 @@ public:
     uint32_t getMemoryTypeIndex(uint32_t inTypeBits, VkMemoryPropertyFlags properties);
 
     VkPipelineShaderStageCreateInfo compileEntryPoint(const ShaderCompileRequest::EntryPoint& entryPointRequest, VkShaderStageFlagBits stage, List<char>& bufferOut);
-
-    void createInputTexture(const InputTextureDesc& inputDesc, VkImageView& viewOut);
-    void createInputSampler(const InputSamplerDesc& inputDesc, VkSampler& stateOut);
-    SlangResult createInputBuffer(const ShaderInputLayoutEntry& entry, const InputBufferDesc& bufferDesc, const Slang::List<unsigned int>& bufferData,
-        RefPtr<BufferResource>& bufferOut, VkBufferView& uavOut, VkImageView& srvOut);
 
     SlangResult _initBuffer(size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties, Buffer& bufferOut);
 
@@ -384,48 +377,6 @@ uint32_t VKRenderer::getMemoryTypeIndex(uint32_t inTypeBits, VkMemoryPropertyFla
 
     assert(!"failed to find a usable memory type");
     return uint32_t(-1);
-}
-
-void VKRenderer::createInputTexture(const InputTextureDesc& inputDesc, VkImageView& viewOut)
-{
-    TextureData texData;
-    generateTextureData(texData, inputDesc);
-    assert(!"unimplemented");
-}
-
-void VKRenderer::createInputSampler(const InputSamplerDesc& inputDesc, VkSampler& stateOut)
-{
-    assert(!"unimplemented");
-}
-
-SlangResult VKRenderer::createInputBuffer(const ShaderInputLayoutEntry& entry, const InputBufferDesc& bufferDesc, const Slang::List<unsigned int>& bufferData, 
-    RefPtr<BufferResource>& bufferOut, VkBufferView& uavOut, VkImageView& srvOut)
-{
-    size_t bufferSize = bufferData.Count() * sizeof(unsigned int);
-
-    RefPtr<BufferResource> bufferResource;
-    SLANG_RETURN_ON_FAIL(createInputBufferResource(bufferDesc, entry.isOutput, bufferSize, bufferData.Buffer(), this, bufferResource));
-
-    BufferResourceImpl* resourceImpl = static_cast<BufferResourceImpl*>(bufferResource.Ptr());
-
-    // TODO: need to hang onto the `memory` field so
-    // that we can release it when we are done.
-	
-    
-    // Fill in any views needed
-    switch (bufferDesc.type)
-    {
-        case InputBufferType::ConstantBuffer:
-            break;
-
-        case InputBufferType::StorageBuffer:
-        {
-        }
-        break;
-    }
-
-    bufferOut = bufferResource;
-    return SLANG_OK;
 }
 
 VkPipelineShaderStageCreateInfo VKRenderer::compileEntryPoint(const ShaderCompileRequest::EntryPoint& entryPointRequest, VkShaderStageFlagBits stage, List<char>& bufferOut)
@@ -796,46 +747,6 @@ void VKRenderer::setConstantBuffers(UInt startSlot, UInt slotCount, BufferResour
 
 void VKRenderer::draw(UInt vertexCount, UInt startVertex = 0)
 {
-}
-
-BindingState* VKRenderer::createBindingState(const ShaderInputLayout& layout)
-{
-    BindingStateImpl* bindingState = new BindingStateImpl(this);
-    bindingState->m_numRenderTargets = layout.numRenderTargets;
-    for (auto & entry : layout.entries)
-    {
-        Binding binding;
-        
-        binding.bindingType = calcBindingType(entry.type);
-
-        binding.binding = entry.hlslBinding;
-        binding.isOutput = entry.isOutput;
-        switch (entry.type)
-        {
-            case ShaderInputType::Buffer:
-            {
-                RefPtr<BufferResource> bufferResource;
-
-                SLANG_RETURN_NULL_ON_FAIL(createInputBuffer(entry, entry.bufferDesc, entry.bufferData, bufferResource, binding.uav, binding.srv));
-
-                binding.resource = bufferResource;
-
-                //binding.bufferType = entry.bufferDesc.type;
-            
-                break;
-            }
-            case ShaderInputType::Texture:
-            case ShaderInputType::Sampler:
-            case ShaderInputType::CombinedTextureSampler:
-            {
-                assert(!"not implemented");
-                break;
-            }
-        }
-        bindingState->m_bindings.Add(binding);
-    }
-
-    return bindingState;
 }
 
 BindingState* VKRenderer::createBindingState(const BindingState::Desc& bindingStateDesc)

@@ -3,7 +3,8 @@
 
 #include "options.h"
 #include "window.h"
-#include "shader-input-layout.h"
+
+//#include "shader-input-layout.h"
 
 #include "../../source/core/slang-result.h"
 #include "../../source/core/smart-pointer.h"
@@ -447,7 +448,6 @@ public:
     virtual void serializeOutput(BindingState* state, const char* outputPath) = 0;
 
     virtual InputLayout* createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) = 0;
-    virtual BindingState* createBindingState(const ShaderInputLayout& shaderInput) = 0;
     virtual BindingState* createBindingState(const BindingState::Desc& desc) { return nullptr; }
     virtual ShaderCompiler* getShaderCompiler() = 0;
 

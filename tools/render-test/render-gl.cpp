@@ -11,8 +11,6 @@
 #include "core/secure-crt.h"
 #include "external/stb/stb_image_write.h"
 
-#include "slang-support.h"
-
 // TODO(tfoley): eventually we should be able to run these
 // tests on non-Windows targets to confirm that cross-compilation
 // at least *works* on those platforms...
@@ -89,7 +87,6 @@ public:
     virtual SlangResult captureScreenShot(char const* outputPath) override;
     virtual void serializeOutput(BindingState* state, const char* fileName) override;
     virtual InputLayout* createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) override;
-    virtual BindingState* createBindingState(const ShaderInputLayout& layout) override;
     virtual BindingState* createBindingState(const BindingState::Desc& bindingStateDesc) override;
     virtual ShaderCompiler* getShaderCompiler() override;
     virtual void* map(BufferResource* buffer, MapFlavor flavor) override;
@@ -258,8 +255,7 @@ public:
     void flushStateForDraw();
     GLuint loadShader(GLenum stage, char const* source);
     void debugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message);
-    void createInputSampler(BindingEntry& rs, InputSamplerDesc samplerDesc);
-
+    
         /// Returns GlPixelFormat::Unknown if not an equivalent
     static GlPixelFormat _getGlPixelFormat(Format format);
 
@@ -508,32 +504,6 @@ void GLRenderer::destroyBindingEntries(const BindingEntry* entries, int numEntri
             glDeleteSamplers(1, &entry.samplerHandle);
         }
 	}
-}
-
-void GLRenderer::createInputSampler(BindingEntry& entry, InputSamplerDesc samplerDesc)
-{
-    GLuint handle;
-
-    glCreateSamplers(1, &handle);
-    glSamplerParameteri(handle, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glSamplerParameteri(handle, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glSamplerParameteri(handle, GL_TEXTURE_WRAP_R, GL_REPEAT);
-
-    if (samplerDesc.isCompareSampler)
-    {
-        glSamplerParameteri(handle, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glSamplerParameteri(handle, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glSamplerParameteri(handle, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
-        glSamplerParameteri(handle, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
-    }
-    else
-    {
-        glSamplerParameteri(handle, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-        glSamplerParameteri(handle, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glSamplerParameteri(handle, GL_TEXTURE_MAX_ANISOTROPY_EXT, 8);
-    }
-
-    entry.samplerHandle = handle;
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! Renderer interface !!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -936,58 +906,6 @@ void GLRenderer::draw(UInt vertexCount, UInt startVertex = 0)
 void GLRenderer::dispatchCompute(int x, int y, int z)
 {
     glDispatchCompute(x, y, z);
-}
-
-BindingState* GLRenderer::createBindingState(const ShaderInputLayout& layout)
-{
-    BindingStateImpl* state = new BindingStateImpl(this);
-    for (auto & srcEntry : layout.entries)
-    {
-        BindingEntry dstEntry;
-        dstEntry.isOutput = srcEntry.isOutput;
-        dstEntry.binding = srcEntry.glslBinding;
-        dstEntry.bindingType = calcBindingType(srcEntry.type);
-
-        switch (srcEntry.type)
-        {
-            case ShaderInputType::Buffer:
-            {
-                RefPtr<BufferResource> bufferResource;
-                SLANG_RETURN_NULL_ON_FAIL(createInputBufferResource(srcEntry.bufferDesc, srcEntry.isOutput, srcEntry.bufferData.Count() * sizeof(uint32_t), srcEntry.bufferData.Buffer(), this, bufferResource));
-                dstEntry.resource = bufferResource;
-                break;
-            }
-            case ShaderInputType::Texture:
-            case ShaderInputType::CombinedTextureSampler:
-            {
-                RefPtr<TextureResource> textureResource;
-
-                int bindFlags = 0;
-                SLANG_RETURN_NULL_ON_FAIL(generateTextureResource(srcEntry.textureDesc, bindFlags, this, textureResource));
-                
-                // Handle if combined 
-                if (srcEntry.type == ShaderInputType::CombinedTextureSampler && srcEntry.samplerDesc.isCompareSampler)
-                {
-                    TextureResourceImpl* texture = static_cast<TextureResourceImpl*>(textureResource.Ptr());
-                    auto target = texture->m_target;
-
-                    glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-                    glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-                    glTexParameteri(target, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
-                    glTexParameteri(target, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
-                }
-                
-                break;
-            }
-            case ShaderInputType::Sampler:
-            {
-                createInputSampler(dstEntry, srcEntry.samplerDesc);
-                break;
-            }
-        }
-        state->m_entries.Add(dstEntry);
-    }
-    return state;
 }
 
 BindingState* GLRenderer::createBindingState(const BindingState::Desc& bindingStateDesc)

@@ -22,7 +22,5 @@ SlangResult createInputBufferResource(const InputBufferDesc& inputDesc, bool isO
 
 SlangResult createBindingSetDesc(ShaderInputLayoutEntry* srcEntries, int numEntries, Renderer* renderer, BindingState::Desc& descOut);
 
-BindingType calcBindingType(ShaderInputType type);
-
 
 } // renderer_test
