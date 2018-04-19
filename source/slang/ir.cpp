@@ -4279,9 +4279,43 @@ namespace Slang
 
                                 // Is it calling the append operation?
                                 auto callee = ii->getOperand(0);
-                                while( callee->op == kIROp_Specialize )
+                                for(;;)
                                 {
-                                    callee = ((IRSpecialize*) callee)->getOperand(0);
+                                    // If the instruction is `specialize(X,...)` then
+                                    // we want to look at `X`, and if it is `generic { ... return R; }`
+                                    // then we want to look at `R`. We handle this
+                                    // iteratively here.
+                                    //
+                                    // TODO: This idiom seems to come up enough that we
+                                    // should probably have a dedicated convenience routine
+                                    // for this.
+                                    //
+                                    // Alternatively, we could switch the IR encoding so
+                                    // that decorations are added to the generic instead of the
+                                    // value it returns.
+                                    //
+                                    switch(callee->op)
+                                    {
+                                    case kIROp_Specialize:
+                                        {
+                                            callee = cast<IRSpecialize>(callee)->getOperand(0);
+                                            continue;
+                                        }
+
+                                    case kIROp_Generic:
+                                        {
+                                            auto genericResult = findGenericReturnVal(cast<IRGeneric>(callee));
+                                            if(genericResult)
+                                            {
+                                                callee = genericResult;
+                                                continue;
+                                            }
+                                        }
+
+                                    default:
+                                        break;
+                                    }
+                                    break;
                                 }
                                 if(callee->op != kIROp_Func)
                                     continue;
