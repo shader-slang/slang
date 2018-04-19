@@ -1182,9 +1182,16 @@ __magic_type(RayDescType)
 __intrinsic_type($(kIROp_RayDescType))
 struct RayDesc
 {
+    __target_intrinsic(hlsl, Origin)
     float3 Origin;
+
+    __target_intrinsic(hlsl, TMin)
     float  TMin;
+
+    __target_intrinsic(hlsl, Direction)
     float3 Direction;
+
+    __target_intrinsic(hlsl, TMax)
     float  TMax;
 };
 
@@ -1209,6 +1216,7 @@ __magic_type(BuiltInTriangleIntersectionAttributesType)
 __intrinsic_type($(kIROp_BuiltInTriangleIntersectionAttributesType))
 struct BuiltInTriangleIntersectionAttributes
 {
+    __target_intrinsic(hlsl, barycentrics)
     float2 barycentrics;
 };
 
