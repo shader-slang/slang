@@ -57,6 +57,9 @@ namespace Slang
         // Conversion from signed->unsigned integer of same or greater size
         kConversionCost_SignedToUnsignedConversion = 300,
 
+        // Conversion from unsigned->signed integer of same size
+        kConversionCost_UnsignedToSignedConversion = 350,
+
         // Cost of converting an integer to a floating-point type
         kConversionCost_IntegerToFloatConversion = 400,
 
@@ -66,8 +69,14 @@ namespace Slang
         // Catch-all for conversions that should be discouraged
         // (i.e., that really shouldn't be made implicitly)
         //
-        // TODO: make these conversions not be allowed implicitly in "Slang mode"
+        // We will warn when performing one of these conversions,
+        // and in the future we might support a "strict mode" where
+        // these conversions are treated as errors.
+        //
         kConversionCost_GeneralConversion = 900,
+
+        // Implicit truncation of a vector is known to be dangerous.
+        kConversionCost_VectorTruncation = kConversionCost_GeneralConversion,
 
         // This is the cost of an explicit conversion, which should
         // not actually be performed.

@@ -205,6 +205,9 @@ DIAGNOSTIC(31001, Error, attributeNotApplicable, "attribute '$0' is not valid he
 
 DIAGNOSTIC(31100, Error, unknownStageName,  "unknown stage name '$0'")
 
+// Conversion
+DIAGNOSTIC(32000, Error, ambiguousImplicitConversion, "conversion from type '$0' to '$1' is ambiguous");
+DIAGNOSTIC(32001, Warning, implicitConversion, "implicit conversion from '$0' to '$1'");
 
 // 303xx: interfaces and associated types
 DIAGNOSTIC(30300, Error, assocTypeInInterfaceOnly, "'associatedtype' can only be defined in an 'interface'.")

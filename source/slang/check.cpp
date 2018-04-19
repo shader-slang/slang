@@ -1091,13 +1091,15 @@ namespace Slang
                 if(outToExpr)
                 {
                     // The user is asking for us to actually perform the conversion,
-                    // so we need to generate an appropriate expression here.
+                    // so we need to generate an appropriate expression here, but
+                    // also diagnose the ambiguity.
+                    //
 
-                    // YONGH: I am confused why we are not hitting this case before
-                    //throw "foo bar baz";
-                    // YONGH: temporary work around, may need to create the actual
-                    // invocation expr to the constructor call
-                    *outToExpr = fromExpr;
+                    getSink()->diagnose(fromExpr, Diagnostics::ambiguousImplicitConversion,
+                        fromType,
+                        toType);
+
+                    *outToExpr = CreateImplicitCastExpr(toType, fromExpr);
                 }
 
                 return true;
@@ -1122,6 +1124,15 @@ namespace Slang
 
                 if(outToExpr)
                 {
+                    // If the conversion is a "bad" one, we should let the user
+                    // know about it, and encourage them to be more explicit.
+                    if(cost >= kConversionCost_GeneralConversion)
+                    {
+                        getSink()->diagnose(fromExpr, Diagnostics::implicitConversion,
+                            fromType,
+                            toType);
+                    }
+
                     // The logic here is a bit ugly, to deal with the fact that
                     // `CompleteOverloadCandidate` will, left to its own devices,
                     // construct a vanilla `InvokeExpr` to represent the call

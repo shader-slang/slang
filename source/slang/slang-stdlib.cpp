@@ -163,9 +163,20 @@ namespace Slang
         // to signed, for same-size types.
         else if(toInfo.conversionKind == kBaseTypeConversionKind_Unsigned
             && fromInfo.conversionKind == kBaseTypeConversionKind_Signed
-            && toInfo.conversionRank >= fromInfo.conversionRank)
+            && toInfo.conversionRank == fromInfo.conversionRank)
         {
             return kConversionCost_SignedToUnsignedConversion;
+        }
+
+        // Conversion from an unsigned type to a signed type
+        // that is the same size are always lossy, but we
+        // conceptually think of them as "better" than conversions
+        // to smaller-size types.
+        else if(toInfo.conversionKind == kBaseTypeConversionKind_Signed
+            && fromInfo.conversionKind == kBaseTypeConversionKind_Unsigned
+            && toInfo.conversionRank == fromInfo.conversionRank)
+        {
+            return kConversionCost_UnsignedToSignedConversion;
         }
 
         // Conversion from an integer to a floating-point type

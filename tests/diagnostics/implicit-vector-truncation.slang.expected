@@ -1,0 +1,6 @@
+result code = 0
+standard error = {
+tests/diagnostics/implicit-vector-truncation.slang(10): warning 32001: implicit conversion from 'vector<float,4>' to 'vector<float,3>'
+}
+standard output = {
+}

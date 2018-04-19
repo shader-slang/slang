@@ -18,5 +18,5 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     float3 b[4];
     writeArray(b);
-	outputBuffer[dispatchThreadID.x] = b[0].x;
+	outputBuffer[dispatchThreadID.x] = int(b[0].x);
 }
