@@ -21,6 +21,21 @@ using namespace Slang;
     BindFlag::Enum(BindFlag::PixelShaderResource | BindFlag::NonPixelShaderResource), // GenericRead
 }; 
 
+static const Resource::DescBase s_emptyDescBase = {};
+
+const Resource::DescBase& Resource::getDescBase() const
+{
+    if (isBuffer())
+    {
+        return static_cast<const BufferResource *>(this)->getDesc();
+    }
+    else if (isTexture())
+    {
+        return static_cast<const TextureResource *>(this)->getDesc();
+    }
+    return s_emptyDescBase;
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!! BindingState::Desc !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 void BindingState::Desc::addSampler(const SamplerDesc& desc, const RegisterDesc& registerDesc)

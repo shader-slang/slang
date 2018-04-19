@@ -358,4 +358,16 @@ SlangResult createBindingSetDesc(ShaderInputLayoutEntry* srcEntries, int numEntr
     return SLANG_OK;
 }
 
+BindingType calcBindingType(ShaderInputType type)
+{
+    switch (type)
+    {
+        case ShaderInputType::Sampler:                  return BindingType::Sampler;
+        case ShaderInputType::Texture:                  return BindingType::Texture;
+        case ShaderInputType::CombinedTextureSampler:   return BindingType::CombinedTextureSampler;
+        case ShaderInputType::Buffer:                   return BindingType::Buffer;
+        default:                                        return BindingType::Unknown;
+    }
+}
+
 } // renderer_test

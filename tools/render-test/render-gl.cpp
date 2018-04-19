@@ -191,7 +191,7 @@ public:
 
     struct BindingEntry
     {
-        BindingType bindingType;
+        BindingType bindingType = BindingType::Unknown;
         RefPtr<Resource> resource;
         GLuint samplerHandle = 0;
         List<int> binding;
@@ -938,18 +938,6 @@ void GLRenderer::dispatchCompute(int x, int y, int z)
     glDispatchCompute(x, y, z);
 }
 
-BindingType _calcBindingType(ShaderInputType type)
-{
-    switch (type)
-    {
-        case ShaderInputType::Sampler:                  return BindingType::Sampler;
-        case ShaderInputType::Texture:                  return BindingType::Texture;
-        case ShaderInputType::CombinedTextureSampler:   return BindingType::CombinedTextureSampler;
-        case ShaderInputType::Buffer:                   return BindingType::Buffer;
-        default:                                        return BindingType::Unknown;
-    }
-}
-
 BindingState* GLRenderer::createBindingState(const ShaderInputLayout& layout)
 {
     BindingStateImpl* state = new BindingStateImpl(this);
@@ -958,7 +946,7 @@ BindingState* GLRenderer::createBindingState(const ShaderInputLayout& layout)
         BindingEntry dstEntry;
         dstEntry.isOutput = srcEntry.isOutput;
         dstEntry.binding = srcEntry.glslBinding;
-        dstEntry.bindingType = _calcBindingType(srcEntry.type);
+        dstEntry.bindingType = calcBindingType(srcEntry.type);
 
         switch (srcEntry.type)
         {

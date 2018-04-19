@@ -798,18 +798,6 @@ void VKRenderer::draw(UInt vertexCount, UInt startVertex = 0)
 {
 }
 
-static BindingType _getBindingType(ShaderInputType type)
-{
-    switch (type)
-    {
-        case ShaderInputType::Buffer:                   return BindingType::Buffer;
-        case ShaderInputType::Texture:                  return BindingType::Texture;
-        case ShaderInputType::CombinedTextureSampler:   return BindingType::CombinedTextureSampler;
-        case ShaderInputType::Sampler:                  return BindingType::Sampler;
-        default:                                        return BindingType::Unknown;
-    }
-}
-
 BindingState* VKRenderer::createBindingState(const ShaderInputLayout& layout)
 {
     BindingStateImpl* bindingState = new BindingStateImpl(this);
@@ -818,7 +806,7 @@ BindingState* VKRenderer::createBindingState(const ShaderInputLayout& layout)
     {
         Binding binding;
         
-        binding.bindingType = _getBindingType(entry.type);
+        binding.bindingType = calcBindingType(entry.type);
 
         binding.binding = entry.hlslBinding;
         binding.isOutput = entry.isOutput;

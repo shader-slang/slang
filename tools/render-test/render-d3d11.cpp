@@ -81,9 +81,8 @@ public:
 
     struct Binding
     {
-        ShaderInputType type;
-        InputBufferType bufferType;                        // Only valid if `type` is `Buffer`
-        
+        BindingType bindingType;
+     
         ComPtr<ID3D11ShaderResourceView> srv;
         ComPtr<ID3D11UnorderedAccessView> uav;
         ComPtr<ID3D11SamplerState> samplerState;
@@ -1041,6 +1040,13 @@ BindingState* D3D11Renderer::createBindingState(const BindingState::Desc& bindin
         Binding& dstBinding = dstBindings[i];
         const BindingState::Desc::Binding& srcBinding = bindingStateDesc.m_bindings[i];
 
+        dstBinding.bindingType = srcBinding.bindingType;
+        dstBinding.resource = srcBinding.resource;
+        dstBinding.binding = bindingStateDesc.getFirst(BindingState::ShaderStyle::Hlsl, srcBinding.registerDesc);
+
+        // It's output if it can be read from
+        dstBinding.isOutput = srcBinding.resource && (srcBinding.resource->getDescBase().cpuAccessFlags & Resource::AccessFlag::Read);
+
         switch (srcBinding.bindingType)
         {
             case BindingType::Buffer:
@@ -1073,7 +1079,7 @@ BindingState* D3D11Renderer::createBindingState(const BindingState::Desc& bindin
 
                     SLANG_RETURN_NULL_ON_FAIL(m_device->CreateUnorderedAccessView(buffer->m_buffer, &viewDesc, dstBinding.uav.writeRef()));
                 }
-                if (bufferDesc.bindFlags & (Resource::BindFlag::NonPixelShaderResource | Resource::BindFlag::PixelShaderResource | Resource::BindFlag::ConstantBuffer))
+                if (bufferDesc.bindFlags & (Resource::BindFlag::NonPixelShaderResource | Resource::BindFlag::PixelShaderResource)) 
                 {
                     D3D11_SHADER_RESOURCE_VIEW_DESC viewDesc;
                     memset(&viewDesc, 0, sizeof(viewDesc));
@@ -1230,7 +1236,7 @@ BindingState* D3D11Renderer::createBindingState(const ShaderInputLayout& layout)
         Binding& dstBinding = dstBindings[i];
         const ShaderInputLayoutEntry& srcBinding = srcBindings[i];
 
-        dstBinding.type = srcBinding.type;
+        dstBinding.bindingType = calcBindingType(srcBinding.type);
         dstBinding.binding = srcBinding.hlslBinding;
         dstBinding.isOutput = srcBinding.isOutput;
         switch (srcBinding.type)
@@ -1238,7 +1244,6 @@ BindingState* D3D11Renderer::createBindingState(const ShaderInputLayout& layout)
             case ShaderInputType::Buffer:
             {
                 SLANG_RETURN_NULL_ON_FAIL(createInputBuffer(srcBinding.bufferDesc, srcBinding.isOutput, srcBinding.bufferData, dstBinding.resource, dstBinding.uav, dstBinding.srv));
-                dstBinding.bufferType = srcBinding.bufferDesc.type;
 				break;
 			}
             case ShaderInputType::Texture:
@@ -1269,74 +1274,81 @@ void D3D11Renderer::applyBindingState(bool isCompute)
     auto context = m_immediateContext.get();
     for (auto & binding : m_currentBindings->m_bindings)
     {
-        if (binding.type == ShaderInputType::Buffer)
+        switch (binding.bindingType)
         {
-            
-            if (binding.bufferType == InputBufferType::ConstantBuffer)
+            case BindingType::Buffer:
             {
-                BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(binding.resource.Ptr());
-                ID3D11Buffer* buffer = bufferResource->m_buffer;
-
-                if (isCompute)
-                    context->CSSetConstantBuffers(binding.binding, 1, &buffer); 
+                assert(binding.resource && binding.resource->isBuffer());
+                if (binding.resource->canBind(Resource::BindFlag::ConstantBuffer))
+                {
+                    ID3D11Buffer* buffer = static_cast<BufferResourceImpl*>(binding.resource.Ptr())->m_buffer;
+                    if (isCompute)
+                        context->CSSetConstantBuffers(binding.binding, 1, &buffer); 
+                    else
+                    {
+                        context->VSSetConstantBuffers(binding.binding, 1, &buffer);
+                        context->PSSetConstantBuffers(binding.binding, 1, &buffer);
+                    }
+                }
+                else if (binding.uav)
+                {
+                    if (isCompute)
+                        context->CSSetUnorderedAccessViews(binding.binding, 1, binding.uav.readRef(), nullptr);
+                    else
+                        context->OMSetRenderTargetsAndUnorderedAccessViews(m_currentBindings->m_numRenderTargets,
+                            m_renderTargetViews.Buffer()->readRef(), nullptr, binding.binding, 1, binding.uav.readRef(), nullptr);
+                }
                 else
                 {
-                    context->VSSetConstantBuffers(binding.binding, 1, &buffer);
-                    context->PSSetConstantBuffers(binding.binding, 1, &buffer);
+                    if (isCompute)
+                        context->CSSetShaderResources(binding.binding, 1, binding.srv.readRef());
+                    else
+                    {
+                        context->PSSetShaderResources(binding.binding, 1, binding.srv.readRef());
+                        context->VSSetShaderResources(binding.binding, 1, binding.srv.readRef());
+                    }
                 }
+                break;
             }
-            else if (binding.uav)
+            case BindingType::Texture: 
             {
-                if (isCompute)
-                    context->CSSetUnorderedAccessViews(binding.binding, 1, binding.uav.readRef(), nullptr);
-                else
-                    context->OMSetRenderTargetsAndUnorderedAccessViews(m_currentBindings->m_numRenderTargets,
-                        m_renderTargetViews.Buffer()->readRef(), nullptr, binding.binding, 1, binding.uav.readRef(), nullptr);
-            }
-            else
-            {
-                if (isCompute)
-                    context->CSSetShaderResources(binding.binding, 1, binding.srv.readRef());
+                if (binding.uav)
+                {
+                    if (isCompute)
+                        context->CSSetUnorderedAccessViews(binding.binding, 1, binding.uav.readRef(), nullptr);
+                    else
+                        context->OMSetRenderTargetsAndUnorderedAccessViews(D3D11_KEEP_RENDER_TARGETS_AND_DEPTH_STENCIL,
+                            nullptr, nullptr, binding.binding, 1, binding.uav.readRef(), nullptr);
+                }
                 else
                 {
-                    context->PSSetShaderResources(binding.binding, 1, binding.srv.readRef());
-                    context->VSSetShaderResources(binding.binding, 1, binding.srv.readRef());
+                    if (isCompute)
+                        context->CSSetShaderResources(binding.binding, 1, binding.srv.readRef());
+                    else
+                    {
+                        context->PSSetShaderResources(binding.binding, 1, binding.srv.readRef());
+                        context->VSSetShaderResources(binding.binding, 1, binding.srv.readRef());
+                    }
                 }
+                break;
             }
-        }
-        else if (binding.type == ShaderInputType::Texture)
-        {
-            if (binding.uav)
+            case BindingType::Sampler: 
             {
                 if (isCompute)
-                    context->CSSetUnorderedAccessViews(binding.binding, 1, binding.uav.readRef(), nullptr);
-                else
-                    context->OMSetRenderTargetsAndUnorderedAccessViews(D3D11_KEEP_RENDER_TARGETS_AND_DEPTH_STENCIL,
-                        nullptr, nullptr, binding.binding, 1, binding.uav.readRef(), nullptr);
-            }
-            else
-            {
-                if (isCompute)
-                    context->CSSetShaderResources(binding.binding, 1, binding.srv.readRef());
+                    context->CSSetSamplers(binding.binding, 1, binding.samplerState.readRef());
                 else
                 {
-                    context->PSSetShaderResources(binding.binding, 1, binding.srv.readRef());
-                    context->VSSetShaderResources(binding.binding, 1, binding.srv.readRef());
+                    context->PSSetSamplers(binding.binding, 1, binding.samplerState.readRef());
+                    context->VSSetSamplers(binding.binding, 1, binding.samplerState.readRef());
                 }
+                break;
             }
-        }
-        else if (binding.type == ShaderInputType::Sampler)
-        {
-            if (isCompute)
-                context->CSSetSamplers(binding.binding, 1, binding.samplerState.readRef());
-            else
+            default:
             {
-                context->PSSetSamplers(binding.binding, 1, binding.samplerState.readRef());
-                context->VSSetSamplers(binding.binding, 1, binding.samplerState.readRef());
+                assert(!"Not implemented");
+                return;
             }
         }
-        else
-            throw "not implemented";
     }
 }
 

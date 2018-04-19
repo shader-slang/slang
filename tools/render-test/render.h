@@ -154,12 +154,24 @@ class Resource: public Slang::RefObject
         };
     };
 
+        /// Base class for Descs
+    struct DescBase
+    {
+        int bindFlags = 0;          ///< Combination of Resource::BindFlag or 0 (and will use initialUsage to set)
+        int cpuAccessFlags = 0;     ///< Combination of Resource::AccessFlag 
+    };
+
         /// Get the type
     SLANG_FORCE_INLINE Type getType() const { return m_type; }
         /// True if it's a texture derived type
     SLANG_FORCE_INLINE bool isTexture() const { return int(m_type) >= int(Type::Texture1D); }
         /// True if it's a buffer derived type
     SLANG_FORCE_INLINE bool isBuffer() const { return m_type == Type::Buffer; }
+
+        /// Get the descBase
+    const DescBase& getDescBase() const;
+        /// Returns true if can bind with flag
+    bool canBind(BindFlag::Enum bindFlag) const { return (getDescBase().bindFlags & bindFlag) != 0; }
 
         /// For a usage gives the required binding flags
     static const BindFlag::Enum s_requiredBinding[int(Usage::CountOf)]; 
@@ -177,20 +189,15 @@ class BufferResource: public Resource
     public:
     typedef Resource Parent;
 
-    struct Desc
+    struct Desc: public DescBase
     {
         void init(size_t sizeInBytesIn)
         {
-            bindFlags = 0;
-            cpuAccessFlags = 0;
             sizeInBytes = sizeInBytesIn;
             elementSize = 0;
         }
             /// Set up default parameters based on usage
         void setDefaults(Usage initialUsage);
-
-        int bindFlags;          ///< Combination of Resource::BindFlag or 0 (and will use initialUsage to set)
-        int cpuAccessFlags;        ///< Combination of Resource::AccessFlag 
 
         size_t sizeInBytes;     ///< Total size in bytes 
         int elementSize;        ///< Get the element stride. If > 0, this is a structured buffer
@@ -248,7 +255,7 @@ class TextureResource: public Resource
         int depth;              ///< Depth (if 3d) 
     };
 
-    struct Desc
+    struct Desc: public DescBase
     {
             /// Initialize with default values
         void init();
@@ -272,9 +279,6 @@ class TextureResource: public Resource
 
             /// Set up default parameters based on type and usage
         void setDefaults(Type type, Usage initialUsage);
-
-        int bindFlags;          ///< Combination of Resource::BindFlag or 0 (and will use initialUsage to set)
-        int cpuAccessFlags;        ///< Combination of Resource::AccessFlag 
 
         Size size; 
 
