@@ -300,7 +300,7 @@ static BindingState::SamplerDesc _calcSamplerDesc(const InputSamplerDesc& srcDes
     return dstDesc;
 }
 
-SlangResult createBindingSetDesc(ShaderInputLayoutEntry* srcEntries, int numEntries, Renderer* renderer, BindingState::Desc& descOut)
+SlangResult createBindingStateDesc(ShaderInputLayoutEntry* srcEntries, int numEntries, Renderer* renderer, BindingState::Desc& descOut)
 {
     using namespace Slang;
 
@@ -360,9 +360,9 @@ SlangResult createBindingSetDesc(ShaderInputLayoutEntry* srcEntries, int numEntr
     return SLANG_OK;
 }
 
-SlangResult createBindingSetDesc(const ShaderInputLayout& layout, Renderer* renderer, BindingState::Desc& descOut)
+SlangResult createBindingStateDesc(const ShaderInputLayout& layout, Renderer* renderer, BindingState::Desc& descOut)
 {
-    SLANG_RETURN_ON_FAIL(createBindingSetDesc(layout.entries.Buffer(), int(layout.entries.Count()), renderer, descOut));
+    SLANG_RETURN_ON_FAIL(createBindingStateDesc(layout.entries.Buffer(), int(layout.entries.Count()), renderer, descOut));
     descOut.m_numRenderTargets = layout.numRenderTargets;
 
     return SLANG_OK;
@@ -385,7 +385,6 @@ SlangResult serializeBindingOutput(const ShaderInputLayout& layout, BindingState
     // Must be the same amount of entries
     assert(bindingStateDesc.m_bindings.Count() == layout.entries.Count());
 
-    int id = 0;
     const int numBindings = int(bindingStateDesc.m_bindings.Count());
 
     for (int i = 0; i < numBindings; ++i)
@@ -416,10 +415,9 @@ SlangResult serializeBindingOutput(const ShaderInputLayout& layout, BindingState
             }
             else
             {
-                printf("invalid output type at %d.\n", id);
+                printf("invalid output type at %d.\n", i);
             }
         }
-        id++;
     }
     fclose(f);
 

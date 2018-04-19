@@ -103,7 +103,7 @@ SlangResult RenderTestApp::initialize(Renderer* renderer, ShaderCompiler* shader
 
     {
         BindingState::Desc bindingStateDesc;
-        SLANG_RETURN_ON_FAIL(createBindingSetDesc(m_shaderInputLayout, m_renderer, bindingStateDesc));
+        SLANG_RETURN_ON_FAIL(createBindingStateDesc(m_shaderInputLayout, m_renderer, bindingStateDesc));
 
         m_bindingState = m_renderer->createBindingState(bindingStateDesc);
     }
