@@ -54,7 +54,6 @@ public:
     virtual TextureResource* createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData) override;
     virtual BufferResource* createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& bufferDesc, const void* initData) override;
     virtual SlangResult captureScreenShot(char const* outputPath) override;
-    virtual void serializeOutput(BindingState* state, const char* fileName) override;
     virtual InputLayout* createInputLayout( const InputElementDesc* inputElements, UInt inputElementCount) override;
     virtual BindingState* createBindingState(const BindingState::Desc& desc) override;
     virtual ShaderCompiler* getShaderCompiler() override;
@@ -93,6 +92,13 @@ public:
     class BindingStateImpl: public BindingState
     {
 		public:
+        typedef BindingState Parent;
+
+            /// Ctor
+        BindingStateImpl(const Desc& desc):
+            Parent(desc)
+        {}
+
         List<Binding> m_bindings;
         int m_numRenderTargets = 0;
     };
@@ -860,7 +866,7 @@ void D3D11Renderer::dispatchCompute(int x, int y, int z)
 
 BindingState* D3D11Renderer::createBindingState(const BindingState::Desc& bindingStateDesc)
 {
-    RefPtr<BindingStateImpl> bindingState(new BindingStateImpl);
+    RefPtr<BindingStateImpl> bindingState(new BindingStateImpl(bindingStateDesc));
 
     const int numBindings = int(bindingStateDesc.m_bindings.Count());
 
@@ -1139,37 +1145,6 @@ void D3D11Renderer::applyBindingState(bool isCompute)
 void D3D11Renderer::setBindingState(BindingState* state)
 {
     m_currentBindings = static_cast<BindingStateImpl*>(state);
-}
-
-void D3D11Renderer::serializeOutput(BindingState* stateIn, const char* fileName)
-{
-    auto bindingState = static_cast<BindingStateImpl*>(stateIn);
-    FILE * f = fopen(fileName, "wb");
-    int id = 0;
-    for (auto & binding : bindingState->m_bindings)
-    {
-        if (binding.isOutput)
-        {
-            if (binding.resource && binding.resource->isBuffer())
-            {
-                BufferResource* bufferResource = static_cast<BufferResource*>(binding.resource.Ptr());
-                const size_t bufferSize = bufferResource->getDesc().sizeInBytes;
-                
-                unsigned int* ptr = (unsigned int*)map(bufferResource, MapFlavor::HostRead);
-                for (auto i = 0u; i < bufferSize / sizeof(unsigned int); i++)
-                {
-                    fprintf(f, "%X\n", ptr[i]);
-                }
-                unmap(bufferResource);
-            }
-            else
-            {
-                printf("invalid output type at %d.\n", id);
-            }
-        }
-        id++;
-    }
-    fclose(f);
 }
 
 } // renderer_test

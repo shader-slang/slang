@@ -83,6 +83,7 @@ struct InputElementDesc
 
 enum class MapFlavor
 {
+    Unknown,                    ///< Unknown mapping type
     HostRead,
     HostWrite,
     WriteDiscard,
@@ -427,6 +428,17 @@ public:
         Slang::List<uint16_t> m_indices;                  ///< Used to store lists of registers
         int m_numRenderTargets = 1;
     };
+
+        /// Get the Desc used to create this binding
+    SLANG_FORCE_INLINE const Desc& getDesc() const { return m_desc; }
+
+    protected:
+    BindingState(const Desc& desc):
+        m_desc(desc)
+    {
+    }
+
+    Desc m_desc;
 };
 
 class Renderer: public Slang::RefObject
@@ -445,7 +457,6 @@ public:
     virtual BufferResource* createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& desc, const void* initData = nullptr) { return nullptr; } 
 
     virtual SlangResult captureScreenShot(const char* outputPath) = 0;
-    virtual void serializeOutput(BindingState* state, const char* outputPath) = 0;
 
     virtual InputLayout* createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) = 0;
     virtual BindingState* createBindingState(const BindingState::Desc& desc) { return nullptr; }

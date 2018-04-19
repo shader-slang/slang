@@ -22,5 +22,10 @@ SlangResult createInputBufferResource(const InputBufferDesc& inputDesc, bool isO
 
 SlangResult createBindingSetDesc(ShaderInputLayoutEntry* srcEntries, int numEntries, Renderer* renderer, BindingState::Desc& descOut);
 
+    /// Create binding set from the layout
+SlangResult createBindingSetDesc(const ShaderInputLayout& layout, Renderer* renderer, BindingState::Desc& descOut);
+
+    /// Write out the contents of buffers marked as output in layout to file with 'filename'
+SlangResult serializeBindingOutput(const ShaderInputLayout& layout, BindingState* bindingState, Renderer* renderer, const char* fileName);
 
 } // renderer_test

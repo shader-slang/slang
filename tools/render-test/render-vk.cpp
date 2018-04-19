@@ -92,7 +92,6 @@ public:
     virtual TextureResource* createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData) override;
     virtual BufferResource* createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& bufferDesc, const void* initData) override;
     virtual SlangResult captureScreenShot(const char* outputPath) override;
-    virtual void serializeOutput(BindingState* state, const char * fileName) override;
     virtual InputLayout* createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) override;
     virtual BindingState* createBindingState(const BindingState::Desc& bindingStateDesc) override;
     virtual ShaderCompiler* getShaderCompiler() override;
@@ -158,6 +157,9 @@ public:
 		VKRenderer* m_renderer;
         Buffer m_buffer;
         Buffer m_uploadBuffer;
+        List<uint8_t> m_readBuffer;                         ///< Stores the contents when a map read is performed
+
+        MapFlavor m_mapFlavor = MapFlavor::Unknown;         ///< If resource is mapped, records what kind of mapping else Unknown (if not mapped)
     };
 
 	class ShaderProgramImpl: public ShaderProgram
@@ -188,7 +190,10 @@ public:
     class BindingStateImpl: public BindingState
     {
 		public:
-		BindingStateImpl(VKRenderer* renderer):
+        typedef BindingState Parent;
+
+		BindingStateImpl(const Desc& desc, VKRenderer* renderer):
+            Parent(desc), 
 			m_renderer(renderer),
 			m_numRenderTargets(0)
 		{
@@ -715,13 +720,90 @@ InputLayout* VKRenderer::createInputLayout(const InputElementDesc* inputElements
     return (InputLayout*)impl;
 }
 
-void* VKRenderer::map(BufferResource* buffer, MapFlavor flavor)
+void* VKRenderer::map(BufferResource* bufferIn, MapFlavor flavor)
 {
-    return nullptr;
+    BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(bufferIn);
+    assert(buffer->m_mapFlavor == MapFlavor::Unknown);
+
+    const size_t bufferSize = buffer->getDesc().sizeInBytes;
+
+    switch (flavor)
+    {
+        case MapFlavor::WriteDiscard:
+        case MapFlavor::HostWrite:
+        {
+            if (!buffer->m_uploadBuffer.isInitialized())
+            {
+                return nullptr;
+            }
+
+            void* mappedData = nullptr;
+            checkResult(vkMapMemory(m_device, buffer->m_uploadBuffer.m_memory, 0, bufferSize, 0, &mappedData));
+            buffer->m_mapFlavor = flavor;
+            return mappedData;
+        }
+        case MapFlavor::HostRead:
+        {
+            // Make sure there is space in the read buffer
+            buffer->m_readBuffer.SetSize(bufferSize);
+
+            // create staging buffer
+            Buffer staging;
+
+            SLANG_RETURN_NULL_ON_FAIL(_initBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, staging));
+
+            // Copy from real buffer to staging buffer
+            VkCommandBuffer commandBuffer = beginCommandBuffer();
+
+            VkBufferCopy copyInfo = {};
+            copyInfo.size = bufferSize;
+            vkCmdCopyBuffer(commandBuffer, buffer->m_buffer.m_buffer, staging.m_buffer, 1, &copyInfo);
+
+            flushCommandBuffer(commandBuffer);
+
+            // Write out the data from the buffer
+            void* mappedData = nullptr;
+            checkResult(vkMapMemory(m_device, staging.m_memory, 0, bufferSize, 0, &mappedData));
+
+            ::memcpy(buffer->m_readBuffer.Buffer(), mappedData, bufferSize);
+            vkUnmapMemory(m_device, staging.m_memory);
+
+            return buffer->m_readBuffer.Buffer();
+        }
+        default:
+            return nullptr;
+    }
 }
 
-void VKRenderer::unmap(BufferResource* buffer)
+void VKRenderer::unmap(BufferResource* bufferIn)
 {
+    BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(bufferIn);
+    assert(buffer->m_mapFlavor != MapFlavor::Unknown);
+
+    const size_t bufferSize = buffer->getDesc().sizeInBytes;
+
+    switch (buffer->m_mapFlavor)
+    {
+        case MapFlavor::WriteDiscard:
+        case MapFlavor::HostWrite:
+        {
+            vkUnmapMemory(m_device, buffer->m_uploadBuffer.m_memory);
+
+            // Copy from staging buffer to real buffer
+            VkCommandBuffer commandBuffer = beginCommandBuffer();
+
+            VkBufferCopy copyInfo = {};
+            copyInfo.size = bufferSize;
+            vkCmdCopyBuffer(commandBuffer, buffer->m_uploadBuffer.m_buffer, buffer->m_buffer.m_buffer, 1, &copyInfo);
+
+            flushCommandBuffer(commandBuffer);
+            break;
+        }
+        default: break;
+    }
+
+    // Mark as no longer mapped
+    buffer->m_mapFlavor = MapFlavor::Unknown;
 }
 
 void VKRenderer::setInputLayout(InputLayout* inputLayout)
@@ -751,7 +833,7 @@ void VKRenderer::draw(UInt vertexCount, UInt startVertex = 0)
 
 BindingState* VKRenderer::createBindingState(const BindingState::Desc& bindingStateDesc)
 {   
-    RefPtr<BindingStateImpl> bindingState(new BindingStateImpl(this));
+    RefPtr<BindingStateImpl> bindingState(new BindingStateImpl(bindingStateDesc, this));
 
     bindingState->m_numRenderTargets = bindingStateDesc.m_numRenderTargets;
 
@@ -804,57 +886,6 @@ BindingState* VKRenderer::createBindingState(const BindingState::Desc& bindingSt
 void VKRenderer::setBindingState(BindingState* state)
 {
     m_currentBindingState = static_cast<BindingStateImpl*>(state);
-}
-
-void VKRenderer::serializeOutput(BindingState* s, const char* fileName)
-{
-    auto state = static_cast<BindingStateImpl*>(s);
-
-    FILE * f = fopen(fileName, "wb");
-    int id = 0;
-    for (auto& bb : state->m_bindings)
-    {
-        if (bb.isOutput)
-        {
-            if (bb.resource && bb.resource->isBuffer())
-            {
-                BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(bb.resource.Ptr());
-                const BufferResource::Desc& bufferResourceDesc = bufferResource->getDesc();
-
-                size_t bufferSize = bufferResourceDesc.sizeInBytes;
-                                
-                // create staging buffer
-                Buffer staging;
-                
-                SLANG_RETURN_VOID_ON_FAIL(_initBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, staging));
-
-                // Copy from real buffer to staging buffer
-                VkCommandBuffer commandBuffer = beginCommandBuffer();
-
-                VkBufferCopy copyInfo = {};
-                copyInfo.size = bufferSize;
-                vkCmdCopyBuffer(commandBuffer, bufferResource->m_buffer.m_buffer, staging.m_buffer, 1, &copyInfo);
-
-                flushCommandBuffer(commandBuffer);
-
-                // Write out the data from the buffer
-                void* mappedData = nullptr;
-                checkResult(vkMapMemory(m_device, staging.m_memory, 0, bufferSize, 0, &mappedData));
-
-                auto ptr = (unsigned int *)mappedData;
-                for (auto i = 0u; i < bufferSize / sizeof(unsigned int); i++)
-                    fprintf(f, "%X\n", ptr[i]);
-
-                vkUnmapMemory(m_device, staging.m_memory);
-            }
-            else
-            {
-                printf("invalid output type at %d.\n", id);
-            }
-        }
-        id++;
-    }
-    fclose(f);
 }
 
 void VKRenderer::dispatchCompute(int x, int y, int z)

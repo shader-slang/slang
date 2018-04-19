@@ -85,7 +85,6 @@ public:
     virtual TextureResource* createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData) override;
     virtual BufferResource* createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& descIn, const void* initData) override;
     virtual SlangResult captureScreenShot(char const* outputPath) override;
-    virtual void serializeOutput(BindingState* state, const char* fileName) override;
     virtual InputLayout* createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) override;
     virtual BindingState* createBindingState(const BindingState::Desc& bindingStateDesc) override;
     virtual ShaderCompiler* getShaderCompiler() override;
@@ -198,7 +197,11 @@ public:
     class BindingStateImpl: public BindingState
     {
 		public:
-		BindingStateImpl(GLRenderer* renderer):
+        typedef BindingState Parent;
+
+            /// Ctor
+		BindingStateImpl(const Desc& desc, GLRenderer* renderer):
+            Parent(desc),
 			m_renderer(renderer)
 		{
 		}
@@ -910,7 +913,7 @@ void GLRenderer::dispatchCompute(int x, int y, int z)
 
 BindingState* GLRenderer::createBindingState(const BindingState::Desc& bindingStateDesc)
 {
-    RefPtr<BindingStateImpl> bindingState(new BindingStateImpl(this));
+    RefPtr<BindingStateImpl> bindingState(new BindingStateImpl(bindingStateDesc, this));
 
     const List<BindingState::Desc::Binding>& srcBindings = bindingStateDesc.m_bindings;
     const int numBindings = int(srcBindings.Count());
@@ -1038,34 +1041,6 @@ void GLRenderer::setBindingState(BindingState* stateIn)
         }
     }
 }
-
-void GLRenderer::serializeOutput(BindingState* stateIn, const char* fileName)
-{
-    BindingStateImpl * state = (BindingStateImpl*)stateIn;
-    FILE * f;
-    fopen_s(&f, fileName, "wt");
-    for (auto & entry : state->m_entries)
-    {
-        if (entry.isOutput)
-        {
-            if (entry.resource && entry.resource->isBuffer())
-            {
-                BufferResource* bufferResource = static_cast<BufferResource*>(entry.resource.Ptr());
-                size_t bufferSize = bufferResource->getDesc().sizeInBytes;
-
-                unsigned int* ptr = (unsigned int*)map(bufferResource, MapFlavor::HostRead);
-
-                for (auto i = 0u; i < bufferSize / sizeof(unsigned int); i++)
-                {
-                    fprintf(f, "%X\n", ptr[i]);
-                }
-                unmap(bufferResource);
-            }
-        }
-    }
-    fclose(f);
-}
-
 
 // ShaderCompiler interface
 

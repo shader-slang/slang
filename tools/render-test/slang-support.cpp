@@ -1,5 +1,7 @@
 // slang-support.cpp
 
+#define _CRT_SECURE_NO_WARNINGS 1
+
 #include "slang-support.h"
 
 #include <assert.h>
@@ -357,5 +359,72 @@ SlangResult createBindingSetDesc(ShaderInputLayoutEntry* srcEntries, int numEntr
 
     return SLANG_OK;
 }
+
+SlangResult createBindingSetDesc(const ShaderInputLayout& layout, Renderer* renderer, BindingState::Desc& descOut)
+{
+    SLANG_RETURN_ON_FAIL(createBindingSetDesc(layout.entries.Buffer(), int(layout.entries.Count()), renderer, descOut));
+    descOut.m_numRenderTargets = layout.numRenderTargets;
+
+    return SLANG_OK;
+}
+
+SlangResult serializeBindingOutput(const ShaderInputLayout& layout, BindingState* bindingState, Renderer* renderer, const char* fileName)
+{
+    // Submit the work
+    renderer->submitGpuWork();
+    // Wait until everything is complete
+    renderer->waitForGpu();
+
+    FILE * f = fopen(fileName, "wb");
+    if (!f)
+    {
+        return SLANG_FAIL;
+    }
+
+    const BindingState::Desc& bindingStateDesc = bindingState->getDesc();
+    // Must be the same amount of entries
+    assert(bindingStateDesc.m_bindings.Count() == layout.entries.Count());
+
+    int id = 0;
+    const int numBindings = int(bindingStateDesc.m_bindings.Count());
+
+    for (int i = 0; i < numBindings; ++i)
+    {
+        const auto& layoutBinding = layout.entries[i];
+        const auto& binding = bindingStateDesc.m_bindings[i];
+
+        if (layoutBinding.isOutput)
+        {
+            if (binding.resource && binding.resource->isBuffer())
+            {
+                BufferResource* bufferResource = static_cast<BufferResource*>(binding.resource.Ptr());
+                const size_t bufferSize = bufferResource->getDesc().sizeInBytes;
+
+                unsigned int* ptr = (unsigned int*)renderer->map(bufferResource, MapFlavor::HostRead);
+                if (!ptr)
+                {
+                    fclose(f);
+                    return SLANG_FAIL;
+                }
+
+                const int size = int(bufferSize / sizeof(unsigned int));
+                for (int i = 0; i < size; ++i)
+                {
+                    fprintf(f, "%X\n", ptr[i]);
+                }
+                renderer->unmap(bufferResource);
+            }
+            else
+            {
+                printf("invalid output type at %d.\n", id);
+            }
+        }
+        id++;
+    }
+    fclose(f);
+
+    return SLANG_OK;
+}
+
 
 } // renderer_test

@@ -63,7 +63,6 @@ public:
     virtual TextureResource* createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData) override;
     virtual BufferResource* createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& bufferDesc, const void* initData) override;
     virtual SlangResult captureScreenShot(const char* outputPath) override;
-    virtual void serializeOutput(BindingState* state, const char* fileName) override;
     virtual InputLayout* createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) override;
     virtual BindingState* createBindingState(const BindingState::Desc& bindingStateDesc) override;
     virtual ShaderCompiler* getShaderCompiler() override;
@@ -220,6 +219,7 @@ protected:
     class BindingStateImpl: public BindingState
     {
         public:
+        typedef BindingState Parent;
 
         Result init(ID3D12Device* device)
         {
@@ -228,6 +228,12 @@ protected:
             SLANG_RETURN_ON_FAIL(m_samplerHeap.init(device, 16, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE));
             return SLANG_OK;
         }
+
+        /// Ctor
+        BindingStateImpl(const Desc& desc) :
+            Parent(desc)
+        {}
+
 
         List<Binding> m_bindings;
         int m_numRenderTargets = 0;
@@ -2344,7 +2350,7 @@ void D3D12Renderer::dispatchCompute(int x, int y, int z)
 
 BindingState* D3D12Renderer::createBindingState(const BindingState::Desc& bindingStateDesc)
 {
-    RefPtr<BindingStateImpl> bindingState(new BindingStateImpl);
+    RefPtr<BindingStateImpl> bindingState(new BindingStateImpl(bindingStateDesc));
 
     SLANG_RETURN_NULL_ON_FAIL(bindingState->init(m_device));
     bindingState->m_numRenderTargets = bindingStateDesc.m_numRenderTargets;
@@ -2512,39 +2518,6 @@ BindingState* D3D12Renderer::createBindingState(const BindingState::Desc& bindin
 void D3D12Renderer::setBindingState(BindingState* state)
 {
     m_boundBindingState = static_cast<BindingStateImpl*>(state);
-}
-
-void D3D12Renderer::serializeOutput(BindingState* stateIn, const char* fileName)
-{
-    auto bindingState = static_cast<BindingStateImpl*>(stateIn);
-    FILE * f = fopen(fileName, "wb");
-
-    int id = 0;
-    for (auto & binding : bindingState->m_bindings)
-    {
-        if (binding.m_isOutput)
-        {
-            if (binding.m_resource && binding.m_resource->isBuffer())
-            {
-                BufferResource* bufferResource = static_cast<BufferResource*>(binding.m_resource.Ptr());
-                const size_t bufferSize = bufferResource->getDesc().sizeInBytes;
-
-                unsigned int* ptr = (unsigned int*)map(bufferResource, MapFlavor::HostRead);
-
-                for (auto i = 0u; i < bufferSize / sizeof(unsigned int); i++)
-                {
-                    fprintf(f, "%X\n", ptr[i]);
-                }
-                unmap(bufferResource);
-            }
-            else
-            {
-                printf("invalid output type at %d.\n", id);
-            }
-        }
-        id++;
-    }
-    fclose(f);
 }
 
 // ShaderCompiler interface
