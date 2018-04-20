@@ -6783,13 +6783,37 @@ namespace Slang
                         auto paramType = funcType->getParamType(pp);
                         if (auto outParamType = paramType->As<OutTypeBase>())
                         {
-                            if (pp < expr->Arguments.Count()
-                                && !expr->Arguments[pp]->type.IsLeftValue)
+                            if( pp < expr->Arguments.Count() )
                             {
-                                getSink()->diagnose(
-                                    expr->Arguments[pp],
-                                    Diagnostics::argumentExpectedLValue,
-                                    pp);
+                                auto argExpr = expr->Arguments[pp];
+                                if( !argExpr->type.IsLeftValue )
+                                {
+                                    getSink()->diagnose(
+                                        argExpr,
+                                        Diagnostics::argumentExpectedLValue,
+                                        pp);
+
+                                    if( auto implicitCastExpr = argExpr.As<ImplicitCastExpr>() )
+                                    {
+                                        getSink()->diagnose(
+                                            argExpr,
+                                            Diagnostics::implicitCastUsedAsLValue,
+                                            implicitCastExpr->Arguments[0]->type,
+                                            implicitCastExpr->type);
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                // This implies that the function had an `out`
+                                // or `inout` parameter and they gave it a default
+                                // argument expression. I'm not even sure what
+                                // that would mean.
+                                //
+                                // TODO: make sure this gets validated on the
+                                // declaring side.
+                                //
+                                SLANG_DIAGNOSE_UNEXPECTED(getSink(), invoke, "default argument expression for out/inout paameter");
                             }
                         }
                     }
