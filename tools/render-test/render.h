@@ -276,7 +276,8 @@ class TextureResource: public Resource
             /// and if the type is a cubemap (multiplies the amount of mip sets by 6) 
         int calcEffectiveArraySize(Type type) const;
 
-            /// 
+            /// Use type to fix the size values (and array size). 
+            /// For example a 1d texture, should have height and depth set to 1.
         void fixSize(Type type);
 
             /// Set up default parameters based on type and usage
@@ -286,13 +287,13 @@ class TextureResource: public Resource
 
         int arraySize;          ///< Array size 
 
-        int numMipLevels;       ///< Number of mip levels - if 0 will generate all mip levels
+        int numMipLevels;       ///< Number of mip levels - if 0 will create all mip levels
         Format format;          ///< The resources format
         SampleDesc sampleDesc;  ///< How the resource is sampled
     };
 
-        /// The ordering of the subResources is 
-        /// forall (cube faces (6) * arraySize / arraySize)
+        /// The ordering of the subResources is
+        /// forall (effectiveArraySize)
         ///     forall (mip levels)
         ///         forall (depth levels)
     struct Data
@@ -337,6 +338,9 @@ class BindingState : public Slang::RefObject
 {
 public:
 
+    typedef uint16_t BindIndex;
+
+        /// Shader binding style
     enum class ShaderStyle
     {
         Hlsl,
@@ -344,38 +348,48 @@ public:
         CountOf,
     };
 
-    struct RegisterSet
+        /// A 'compact' representation of a 0 or more BindIndices.  
+        /// A Slice in this context is effectively an unowned array. 
+        /// If only a single index is he held (which is common) it's held directly in the m_indexOrBase member, otherwise m_indexOrBase is an index into the 
+        /// m_indices list of the Desc. Can be turned into a BindIndexSlice (which is easier to use, and iterable) using asBindIndexSlice method on Desc 
+    struct CompactBindIndexSlice
     {
+        typedef uint16_t SizeType;
         /// Default Ctor makes an empty set
-        SLANG_FORCE_INLINE RegisterSet() :
-            m_numIndices(0),
+        SLANG_FORCE_INLINE CompactBindIndexSlice() :
+            m_size(0),
             m_indexOrBase(0)
         {}
-        /// Ctor for one or more. NOTE! Meaning if indexIn changes depending if numIndices > 1.
-        SLANG_FORCE_INLINE RegisterSet(int indexIn, int numIndicesIn) :
-            m_numIndices(uint8_t(numIndicesIn)),
-            m_indexOrBase(uint16_t(indexIn))
+            /// Ctor for one or more. NOTE! Meaning if indexIn changes depending if numIndices > 1.
+        SLANG_FORCE_INLINE CompactBindIndexSlice(int indexIn, int sizeIn) :
+            m_size(SizeType(sizeIn)),
+            m_indexOrBase(BindIndex(indexIn))
         {
         }
-        uint8_t m_numIndices;
-        uint16_t m_indexOrBase;                 ///< Meaning changes depending on numIndices. If 1, it is the index if larger than 1, then is an index into 'indices'  
+        SizeType m_size;
+        BindIndex m_indexOrBase;                 ///< Meaning changes depending on numIndices. If 1, it is the index if larger than 1, then is an index into 'indices'  
     };
 
-    struct RegisterDesc
+        /// Holds the BindIndex slice associated with each ShaderStyle
+    struct ShaderBindSet
     {
-        RegisterSet registerSets[int(ShaderStyle::CountOf)];
+        void set(ShaderStyle style, const CompactBindIndexSlice& slice) { shaderSlices[int(style)] = slice; }
+
+        CompactBindIndexSlice shaderSlices[int(ShaderStyle::CountOf)];
     };
 
-    struct RegisterList
+        /// A slice (non owned array) of BindIndices
+        /// TODO: have a generic Slice<T> type instead of this specific type
+    struct BindIndexSlice
     {
-        const uint16_t* begin() const { return indices; }
-        const uint16_t* end() const { return indices + numIndices; }
+        const BindIndex* begin() const { return data; }
+        const BindIndex* end() const { return data + size; }
 
-        int getSize() const { return int(numIndices); }
-        uint16_t operator[](int i) const { assert(i >= 0 && i < numIndices); return indices[i]; }
+        int getSize() const { return int(size); }
+        BindIndex operator[](int i) const { assert(i >= 0 && i < size); return data[i]; }
 
-        const uint16_t* indices;
-        int numIndices;
+        const BindIndex* data;
+        int size;
     };
 
     struct SamplerDesc
@@ -388,44 +402,44 @@ public:
         BindingType bindingType;                ///< Type of binding
         int descIndex;                          ///< The description index associated with type. -1 if not used. For example if bindingType is Sampler, the descIndex is into m_samplerDescs.
         Slang::RefPtr<Resource> resource;       ///< Associated resource. nullptr if not used
-        RegisterDesc registerDesc;              ///< Registers associated with binding
+        ShaderBindSet shaderBindSet;            ///< Holds BindIndices associated with each ShaderStyle 
     };
 
     struct Desc
     {        
             /// Given a RegisterSet, return as a RegisterList, that can be easily iterated over
-        RegisterList asRegisterList(const RegisterSet& set) const;
+        BindIndexSlice asSlice(const CompactBindIndexSlice& set) const;
             /// Given a RegisterDesc and a style returns a RegisterList, that can be easily iterated over
-        RegisterList asRegisterList(ShaderStyle style, const RegisterDesc& registerDesc) const;
+        BindIndexSlice asSlice(ShaderStyle style, const ShaderBindSet& shaderBindSet) const;
 
             /// Returns the first member of the set, or returns -1 if is empty
-        int getFirst(const RegisterSet& set) const;
+        int getFirst(const CompactBindIndexSlice& set) const;
             /// Returns the first member of the set, or returns -1 if is empty
-        int getFirst(ShaderStyle style, const RegisterDesc& registerDesc) const;
+        int getFirst(ShaderStyle style, const ShaderBindSet& shaderBindSet) const;
 
             /// Add a resource - assumed that the binding will match the Desc of the resource
-        void addResource(BindingType bindingType, Resource* resource, const RegisterDesc& registerDesc);
+        void addResource(BindingType bindingType, Resource* resource, const ShaderBindSet& shaderBindSet);
             /// Add a sampler        
-        void addSampler(const SamplerDesc& desc, const RegisterDesc& registerDesc);
+        void addSampler(const SamplerDesc& desc, const ShaderBindSet& shaderBindSet);
             /// Add a BufferResource 
-        void addBufferResource(BufferResource* resource, const RegisterDesc& registerDesc) { addResource(BindingType::Buffer, resource, registerDesc); }
+        void addBufferResource(BufferResource* resource, const ShaderBindSet& shaderBindSet) { addResource(BindingType::Buffer, resource, shaderBindSet); }
             /// Add a texture 
-        void addTextureResource(TextureResource* resource, const RegisterDesc& registerDesc) { addResource(BindingType::Texture, resource, registerDesc); }
+        void addTextureResource(TextureResource* resource, const ShaderBindSet& shaderBindSet) { addResource(BindingType::Texture, resource, shaderBindSet); }
             /// Add combined texture a
-        void addCombinedTextureSampler(TextureResource* resource, const SamplerDesc& samplerDesc, const RegisterDesc& registerDesc);
+        void addCombinedTextureSampler(TextureResource* resource, const SamplerDesc& samplerDesc, const ShaderBindSet& shaderBindSet);
 
             /// Clear the contents 
         void clear();
 
-            /// Given an index, returns as a register set. If index is < 0, assumes means no indices, and just returns the empty set
-        RegisterSet addRegisterSet(int index);
-            /// Given a list of indices, returns the associated register set. Note does check for indices being unique. The order is maintained. 
+            /// Given an index, makes a CompactBindIndexSlice. If index is < 0, assumes means no indices, and just returns the empty slice
+        CompactBindIndexSlice makeCompactSlice(int index);
+            /// Given a list of indices, makes a CompactBindIndexSlice. Note does check for indices being unique and the order is maintained. 
             /// Only >= 0 indices are valid
-        RegisterSet addRegisterSet(const int* indices, int numIndices);
+        CompactBindIndexSlice makeCompactSlice(const int* indices, int numIndices);
 
-        Slang::List<Binding> m_bindings;
-        Slang::List<SamplerDesc> m_samplerDescs;
-        Slang::List<uint16_t> m_indices;                  ///< Used to store lists of registers
+        Slang::List<Binding> m_bindings;                            ///< All of the bindings in order
+        Slang::List<SamplerDesc> m_samplerDescs;                    ///< Holds the SamplerDesc for the binding - indexed by the descIndex member of Binding 
+        Slang::List<BindIndex> m_sharedBindIndices;                 ///< Used to store BindIndex slices that don't fit into CompactBindIndexSlice
         int m_numRenderTargets = 1;
     };
 

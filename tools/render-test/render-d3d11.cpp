@@ -874,7 +874,7 @@ BindingState* D3D11Renderer::createBindingState(const BindingState::Desc& bindin
         auto& dstDetail = dstDetails[i];
         const auto& srcBinding = srcBindings[i];
         
-        dstDetail.m_binding = bindingStateDesc.getFirst(BindingState::ShaderStyle::Hlsl, srcBinding.registerDesc);
+        dstDetail.m_binding = bindingStateDesc.getFirst(BindingState::ShaderStyle::Hlsl, srcBinding.shaderBindSet);
 
         switch (srcBinding.bindingType)
         {
