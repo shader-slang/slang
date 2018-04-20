@@ -54,6 +54,9 @@
     <ClCompile Include="render.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="shader-renderer-util.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="options.h">
@@ -94,6 +97,9 @@
     </ClInclude>
     <ClInclude Include="descriptor-heap-d3d12.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="shader-renderer-util.h">
+      <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
