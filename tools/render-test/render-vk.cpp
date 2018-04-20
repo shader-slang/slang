@@ -839,7 +839,7 @@ BindingState* VKRenderer::createBindingState(const BindingState::Desc& bindingSt
         const auto& srcBinding = srcBindings[i];
 
         // For now use Glsl binding
-        dstDetail.m_binding = bindingStateDesc.getFirst(BindingState::ShaderStyle::Glsl, srcBinding.registerDesc);
+        dstDetail.m_binding = bindingStateDesc.getFirst(BindingState::ShaderStyle::Glsl, srcBinding.shaderBindSet);
         
         switch (srcBinding.bindingType)
         {

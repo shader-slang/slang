@@ -38,7 +38,7 @@ const Resource::DescBase& Resource::getDescBase() const
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!! BindingState::Desc !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-void BindingState::Desc::addSampler(const SamplerDesc& desc, const RegisterDesc& registerDesc)
+void BindingState::Desc::addSampler(const SamplerDesc& desc, const ShaderBindSet& shaderBindSet)
 {
     int descIndex = int(m_samplerDescs.Count());
     m_samplerDescs.Add(desc);
@@ -46,13 +46,13 @@ void BindingState::Desc::addSampler(const SamplerDesc& desc, const RegisterDesc&
     Binding binding;
     binding.bindingType = BindingType::Sampler;
     binding.resource = nullptr;
-    binding.registerDesc = registerDesc;
+    binding.shaderBindSet = shaderBindSet;
     binding.descIndex = descIndex;
 
     m_bindings.Add(binding);
 }
 
-void BindingState::Desc::addResource(BindingType bindingType, Resource* resource, const RegisterDesc& registerDesc)
+void BindingState::Desc::addResource(BindingType bindingType, Resource* resource, const ShaderBindSet& shaderBindSet)
 {
     assert(resource);
 
@@ -60,11 +60,11 @@ void BindingState::Desc::addResource(BindingType bindingType, Resource* resource
     binding.bindingType = bindingType;
     binding.resource = resource;
     binding.descIndex = -1;
-    binding.registerDesc = registerDesc;
+    binding.shaderBindSet = shaderBindSet;
     m_bindings.Add(binding);
 }
 
-void BindingState::Desc::addCombinedTextureSampler(TextureResource* resource, const SamplerDesc& samplerDesc, const RegisterDesc& registerDesc)
+void BindingState::Desc::addCombinedTextureSampler(TextureResource* resource, const SamplerDesc& samplerDesc, const ShaderBindSet& shaderBindSet)
 {
     assert(resource);
 
@@ -75,77 +75,77 @@ void BindingState::Desc::addCombinedTextureSampler(TextureResource* resource, co
     binding.bindingType = BindingType::CombinedTextureSampler;
     binding.resource = resource;
     binding.descIndex = samplerDescIndex;
-    binding.registerDesc = registerDesc;
+    binding.shaderBindSet = shaderBindSet;
     m_bindings.Add(binding);
 }
 
-BindingState::RegisterSet BindingState::Desc::addRegisterSet(int index)
+BindingState::CompactBindIndexSlice BindingState::Desc::makeCompactSlice(int index)
 {
     if (index < 0)
     {
-        return RegisterSet();
+        return CompactBindIndexSlice();
     }
-    return RegisterSet(index, 1);
+    return CompactBindIndexSlice(index, 1);
 }
 
-BindingState::RegisterSet BindingState::Desc::addRegisterSet(const int* srcIndices, int numIndices)
+BindingState::CompactBindIndexSlice BindingState::Desc::makeCompactSlice(const int* srcIndices, int numIndices)
 {
     assert(numIndices >= 0);
     switch (numIndices)
     {
-        case 0:     return RegisterSet(); 
-        case 1:     return RegisterSet(srcIndices[0], 1);
+        case 0:     return CompactBindIndexSlice(); 
+        case 1:     return CompactBindIndexSlice(srcIndices[0], 1);
         default:
         {
-            int startIndex = int(m_indices.Count());
-            m_indices.SetSize(startIndex + numIndices);
-            uint16_t* dstIndices = m_indices.Buffer() + startIndex;
+            int startIndex = int(m_sharedBindIndices.Count());
+            m_sharedBindIndices.SetSize(startIndex + numIndices);
+            uint16_t* dstIndices = m_sharedBindIndices.Buffer() + startIndex;
             for (int i = 0; i < numIndices; i++)
             {
                 assert(srcIndices[i] >= 0);
                 dstIndices[i] = uint16_t(srcIndices[i]);
             }
-            return RegisterSet(startIndex, numIndices);
+            return CompactBindIndexSlice(startIndex, numIndices);
         }
     }
 }
 
-int BindingState::Desc::getFirst(const RegisterSet& set) const
+int BindingState::Desc::getFirst(const CompactBindIndexSlice& set) const
 {
-    switch (set.m_numIndices)
+    switch (set.m_size)
     {
         case 0:             return -1;
         case 1:             return set.m_indexOrBase;
-        default:            return m_indices[set.m_indexOrBase];
+        default:            return m_sharedBindIndices[set.m_indexOrBase];
     }
 }
 
-int BindingState::Desc::getFirst(ShaderStyle style, const RegisterDesc& registerDesc) const
+int BindingState::Desc::getFirst(ShaderStyle style, const ShaderBindSet& shaderBindSet) const
 {
-    return getFirst(registerDesc.registerSets[int(style)]); 
+    return getFirst(shaderBindSet.shaderSlices[int(style)]); 
 }
 
 void BindingState::Desc::clear()
 {
     m_bindings.Clear();
     m_samplerDescs.Clear();
-    m_indices.Clear();
+    m_sharedBindIndices.Clear();
     m_numRenderTargets = 1;
 }
 
-BindingState::RegisterList BindingState::Desc::asRegisterList(const RegisterSet& set) const
+BindingState::BindIndexSlice BindingState::Desc::asSlice(const CompactBindIndexSlice& compactSlice) const
 {
-    switch (set.m_numIndices)
+    switch (compactSlice.m_size)
     {
-        case 0:     return RegisterList{ nullptr, 0 };
-        case 1:     return RegisterList{ &set.m_indexOrBase, 1 };
-        default:    return RegisterList{ m_indices.Buffer() + set.m_indexOrBase, set.m_numIndices };
+        case 0:     return BindIndexSlice{ nullptr, 0 };
+        case 1:     return BindIndexSlice{ &compactSlice.m_indexOrBase, 1 };
+        default:    return BindIndexSlice{ m_sharedBindIndices.Buffer() + compactSlice.m_indexOrBase, compactSlice.m_size };
     }
 }
 
-BindingState::RegisterList BindingState::Desc::asRegisterList(ShaderStyle style, const RegisterDesc& registerDesc) const
+BindingState::BindIndexSlice BindingState::Desc::asSlice(ShaderStyle style, const ShaderBindSet& shaderBindSet) const
 {
-    return asRegisterList(registerDesc.registerSets[int(style)]);
+    return asSlice(shaderBindSet.shaderSlices[int(style)]);
 }
 
 
