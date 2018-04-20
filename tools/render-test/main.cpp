@@ -261,7 +261,7 @@ Result RenderTestApp::writeBindingOutput(const char* fileName)
 
     const BindingState::Desc& bindingStateDesc = m_bindingState->getDesc();
     // Must be the same amount of entries
-    assert(bindingStateDesc.m_bindings.Count() == layout.entries.Count());
+    assert(bindingStateDesc.m_bindings.Count() == m_shaderInputLayout.entries.Count());
 
     const int numBindings = int(bindingStateDesc.m_bindings.Count());
 
