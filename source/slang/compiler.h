@@ -423,6 +423,12 @@ namespace Slang
             sourceManager = sm;
             mSink.sourceManager = sm;
         }
+
+            /// During propagation of an exception for an internal
+            /// error, note that this source location was involved
+        void noteInternalErrorLoc(SourceLoc const& loc);
+
+        int internalErrorLocsNoted = 0;
     };
 
     void generateOutput(

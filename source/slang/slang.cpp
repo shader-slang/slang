@@ -727,6 +727,23 @@ Decl * CompileRequest::lookupGlobalDecl(Name * name)
     return resultDecl;
 }
 
+void CompileRequest::noteInternalErrorLoc(SourceLoc const& loc)
+{
+    // Don't consider invalid source locations.
+    if(!loc.isValid())
+        return;
+
+    // If this is the first source location being noted,
+    // then emit a message to help the user isolate what
+    // code might have confused the compiler.
+    if(internalErrorLocsNoted == 0)
+    {
+        mSink.diagnose(loc, Diagnostics::noteLocationOfInternalError);
+    }
+    internalErrorLocsNoted++;
+}
+
+
 RefPtr<ModuleDecl> findOrImportModule(
     CompileRequest*     request,
     Name*               name,
