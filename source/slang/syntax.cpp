@@ -2081,9 +2081,22 @@ void Type::accept(IValVisitor* visitor, void* extra)
         funcType->setSession(session);
 
         funcType->resultType = GetResultType(declRef);
-        for (auto pp : GetParameters(declRef))
+        for (auto paramDeclRef : GetParameters(declRef))
         {
-            funcType->paramTypes.Add(GetType(pp));
+            auto paramDecl = paramDeclRef.getDecl();
+            auto paramType = GetType(paramDeclRef);
+            if( paramDecl->FindModifier<OutModifier>() )
+            {
+                if(paramDecl->FindModifier<InOutModifier>() || paramDecl->FindModifier<InModifier>())
+                {
+                    paramType = session->getInOutType(paramType);
+                }
+                else
+                {
+                    paramType = session->getOutType(paramType);
+                }
+            }
+            funcType->paramTypes.Add(paramType);
         }
 
         return funcType;
