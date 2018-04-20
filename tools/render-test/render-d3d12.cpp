@@ -2370,7 +2370,7 @@ BindingState* D3D12Renderer::createBindingState(const BindingState::Desc& bindin
         const auto& srcEntry = srcBindings[i];
         auto& dstDetail = dstDetails[i];
 
-        dstDetail.m_binding = bindingStateDesc.getFirst(srcEntry.registerDesc.registerSets[int(BindingState::ShaderStyle::Hlsl)]);
+        dstDetail.m_binding = bindingStateDesc.getFirst(BindingState::ShaderStyle::Hlsl, srcEntry.shaderBindSet);
         
         switch (srcEntry.bindingType)
         {
@@ -2478,7 +2478,7 @@ BindingState* D3D12Renderer::createBindingState(const BindingState::Desc& bindin
             {
                 const BindingState::SamplerDesc& samplerDesc = bindingStateDesc.m_samplerDescs[srcEntry.descIndex];
 
-                const int samplerIndex = bindingStateDesc.getFirst(srcEntry.registerDesc.registerSets[int(BindingState::ShaderStyle::Hlsl)]);
+                const int samplerIndex = bindingStateDesc.getFirst(BindingState::ShaderStyle::Hlsl, srcEntry.shaderBindSet);
                 dstDetail.m_samplerIndex = samplerIndex;
                 bindingState->m_samplerHeap.placeAt(samplerIndex);
 

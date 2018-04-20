@@ -10,7 +10,11 @@ using namespace Slang;
 {
     TextureData texData;
     generateTextureData(texData, inputDesc);
+    return createTextureResource(inputDesc, texData, bindFlags, renderer, textureOut);
+}
 
+/* static */Result ShaderRendererUtil::createTextureResource(const InputTextureDesc& inputDesc, const TextureData& texData, int bindFlags, Renderer* renderer, RefPtr<TextureResource>& textureOut)
+{
     TextureResource::Desc textureResourceDesc;
     textureResourceDesc.init();
 
@@ -83,7 +87,7 @@ using namespace Slang;
     return textureOut ? SLANG_OK : SLANG_FAIL;
 }
 
-/* static */Result ShaderRendererUtil::createInputBufferResource(const InputBufferDesc& inputDesc, bool isOutput, size_t bufferSize, const void* initData, Renderer* renderer, Slang::RefPtr<BufferResource>& bufferOut)
+/* static */Result ShaderRendererUtil::createBufferResource(const InputBufferDesc& inputDesc, bool isOutput, size_t bufferSize, const void* initData, Renderer* renderer, Slang::RefPtr<BufferResource>& bufferOut)
 {
     Resource::Usage initialUsage = Resource::Usage::GenericRead;
 
@@ -137,9 +141,9 @@ static BindingState::SamplerDesc _calcSamplerDesc(const InputSamplerDesc& srcDes
     {
         const ShaderInputLayoutEntry& srcEntry = srcEntries[i];
 
-        BindingState::RegisterDesc registerDesc;
-        registerDesc.registerSets[int(BindingState::ShaderStyle::Hlsl)] = descOut.addRegisterSet(srcEntry.hlslBinding);
-        registerDesc.registerSets[int(BindingState::ShaderStyle::Glsl)] = descOut.addRegisterSet(srcEntry.glslBinding.Buffer(), int(srcEntry.glslBinding.Count()));
+        BindingState::ShaderBindSet shaderBindSet;
+        shaderBindSet.set(BindingState::ShaderStyle::Hlsl, descOut.makeCompactSlice(srcEntry.hlslBinding));
+        shaderBindSet.set(BindingState::ShaderStyle::Glsl, descOut.makeCompactSlice(srcEntry.glslBinding.Buffer(), int(srcEntry.glslBinding.Count())));
 
         switch (srcEntry.type)
         {
@@ -150,16 +154,16 @@ static BindingState::SamplerDesc _calcSamplerDesc(const InputSamplerDesc& srcDes
                 const size_t bufferSize = srcEntry.bufferData.Count() * sizeof(uint32_t);
 
                 RefPtr<BufferResource> bufferResource;
-                SLANG_RETURN_ON_FAIL(createInputBufferResource(srcEntry.bufferDesc, srcEntry.isOutput, bufferSize, srcEntry.bufferData.Buffer(), renderer, bufferResource));
+                SLANG_RETURN_ON_FAIL(createBufferResource(srcEntry.bufferDesc, srcEntry.isOutput, bufferSize, srcEntry.bufferData.Buffer(), renderer, bufferResource));
                 
-                descOut.addBufferResource(bufferResource, registerDesc);
+                descOut.addBufferResource(bufferResource, shaderBindSet);
                 break;
             }
             case ShaderInputType::CombinedTextureSampler:
             {
                 RefPtr<TextureResource> texture;
                 SLANG_RETURN_ON_FAIL(generateTextureResource(srcEntry.textureDesc, textureBindFlags, renderer, texture));
-                descOut.addCombinedTextureSampler(texture, _calcSamplerDesc(srcEntry.samplerDesc), registerDesc);
+                descOut.addCombinedTextureSampler(texture, _calcSamplerDesc(srcEntry.samplerDesc), shaderBindSet);
                 break;
             }
             case ShaderInputType::Texture:
@@ -167,12 +171,12 @@ static BindingState::SamplerDesc _calcSamplerDesc(const InputSamplerDesc& srcDes
                 RefPtr<TextureResource> texture;
                 SLANG_RETURN_ON_FAIL(generateTextureResource(srcEntry.textureDesc, textureBindFlags, renderer, texture));
 
-                descOut.addTextureResource(texture, registerDesc);
+                descOut.addTextureResource(texture, shaderBindSet);
                 break;
             }
             case ShaderInputType::Sampler:
             {
-                descOut.addSampler(_calcSamplerDesc(srcEntry.samplerDesc), registerDesc);
+                descOut.addSampler(_calcSamplerDesc(srcEntry.samplerDesc), shaderBindSet);
                 break;
             }
             default: 
