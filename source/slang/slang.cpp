@@ -9,6 +9,9 @@
 #include "syntax-visitors.h"
 #include "../slang/type-layout.h"
 
+// Used to print exception type names in internal-compiler-error messages
+#include <typeinfo>
+
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -1111,27 +1114,35 @@ SLANG_API int spCompile(
     //
     // TODO: Consider supporting Windows "Structured Exception Handling"
     // so that we can also recover from a wider class of crashes.
+    int anyErrors = 1;
     try
     {
-        int anyErrors = req->executeActions();
-        return anyErrors;
+        anyErrors = req->executeActions();
     }
     catch (Slang::AbortCompilationException&)
     {
-        // This should only be thrown if we already emitted a fatal error
-        // message, so there is no reason to print something else.
-        //
-        // We still need to copy the diagnostic output into the variable
-        // that the user will query via the API.
-        req->mDiagnosticOutput = req->mSink.outputBuffer.ProduceString();
-        return 1;
+        // This situation indicates a fatal (but not necesarily internal) error
+        // that forced compilation to terminate. There should already have been
+        // a diagnositc produced, so we don't need to add one here.
+    }
+    catch (Slang::Exception& e)
+    {
+        // The compiler failed due to an internal error that was detected.
+        // We will print out information on the exception to help out the user
+        // in either filing a bug, or locating what in their code created
+        // a problem.
+        req->mSink.diagnose(Slang::SourceLoc(), Slang::Diagnostics::compilationAbortedDueToException, typeid(e).name(), e.Message);
     }
     catch (...)
     {
+        // The compiler failed due to some exception that wasn't a sublass of
+        // `Exception`, so something really fishy is going on. We want to
+        // let the user know that we messed up, so they know to blame Slang
+        // and not some other component in their system.
         req->mSink.diagnose(Slang::SourceLoc(), Slang::Diagnostics::compilationAborted);
-        req->mDiagnosticOutput = req->mSink.outputBuffer.ProduceString();
-        return 1;
     }
+    req->mDiagnosticOutput = req->mSink.outputBuffer.ProduceString();
+    return anyErrors;
 #else
     // When debugging, we probably don't want to filter out any errors, since
     // we are probably trying to root-cause and *fix* those errors.
