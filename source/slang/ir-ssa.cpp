@@ -280,7 +280,7 @@ IRVar* asPromotableVarAccessChain(
 
     case kIROp_FieldAddress:
     case kIROp_getElementPtr:
-        return asPromotableVar(context, value->getOperand(0));
+        return asPromotableVarAccessChain(context, value->getOperand(0));
 
     default:
         return nullptr;
@@ -311,6 +311,8 @@ IRInst* applyAccessChain(
 
     case kIROp_FieldAddress:
         {
+            SLANG_ASSERT(context->instsToRemove.Contains(accessChain));
+
             auto baseChain = accessChain->getOperand(0);
             auto fieldKey = accessChain->getOperand(1);
             auto type = cast<IRPtrTypeBase>(accessChain->getDataType())->getValueType();
@@ -323,29 +325,18 @@ IRInst* applyAccessChain(
 
     case kIROp_getElementPtr:
         {
+            SLANG_ASSERT(context->instsToRemove.Contains(accessChain));
+
             auto baseChain = accessChain->getOperand(0);
             auto index = accessChain->getOperand(1);
             auto type = cast<IRPtrTypeBase>(accessChain->getDataType())->getValueType();
             auto baseValue = applyAccessChain(context, builder, baseChain, leafVarValue);
-            return builder->emitElementAddress(
+            return builder->emitElementExtract(
                 type,
                 baseValue,
                 index);
         }
     }
-}
-
-IRInst* applyAccessChain(
-    ConstructSSAContext*    context,
-    IRInst*                 accessChain,
-    IRInst*                 leafVarValue,
-    IRInst*                 insertBeforeInst)
-{
-    IRBuilder builder;
-    builder.sharedBuilder = &context->sharedBuilder;
-    builder.setInsertBefore(insertBeforeInst);
-
-    return applyAccessChain(context, &builder, accessChain, leafVarValue);
 }
 
 // Try to read the value of an SSA variable
@@ -764,7 +755,7 @@ void processBlock(
                     // block.
                     auto val = readVar(context, blockInfo, var);
 
-                    val = applyAccessChain(context, ptrArg, val, ii);
+                    val = applyAccessChain(context, &blockInfo->builder, ptrArg, val);
 
                     // We can just replace all uses of this
                     // load instruction with the given value.
