@@ -355,6 +355,11 @@ struct IRGenContext
     {
         return shared->compileRequest->mSession;
     }
+
+    CompileRequest* getCompileRequest()
+    {
+        return shared->compileRequest;
+    }
 };
 
 void setGlobalValue(SharedIRGenContext* sharedContext, Decl* decl, LoweredValInfo value)
@@ -2680,7 +2685,19 @@ void lowerStmt(
 
     StmtLoweringVisitor visitor;
     visitor.context = context;
-    return visitor.dispatch(stmt);
+
+    try
+    {
+        visitor.dispatch(stmt);
+    }
+    // Don't emit any context message for an explicit `AbortCompilationException`
+    // because it should only happen when an error is already emitted.
+    catch(AbortCompilationException&) { throw; }
+    catch(...)
+    {
+        context->getCompileRequest()->noteInternalErrorLoc(stmt->loc);
+        throw;
+    }
 }
 
 static LoweredValInfo maybeMoveMutableTemp(
@@ -4380,7 +4397,21 @@ LoweredValInfo lowerDecl(
 
     DeclLoweringVisitor visitor;
     visitor.context = &subContext;
-    return visitor.dispatch(decl);
+
+
+
+    try
+    {
+        return visitor.dispatch(decl);
+    }
+    // Don't emit any context message for an explicit `AbortCompilationException`
+    // because it should only happen when an error is already emitted.
+    catch(AbortCompilationException&) { throw; }
+    catch(...)
+    {
+        context->getCompileRequest()->noteInternalErrorLoc(decl->loc);
+        throw;
+    }
 }
 
 // Ensure that a version of the given declaration has been emitted to the IR
