@@ -1,6 +1,9 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
+//TEST_DISABLED(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
+
+// Note: can't actually test this on Vulkan right now because
+// the support in render-test isn't good enough.
 
 // Confirm that we can handle arrays of resources
 // being passed to a function.
