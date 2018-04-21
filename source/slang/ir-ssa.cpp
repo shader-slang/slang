@@ -304,7 +304,7 @@ IRInst* applyAccessChain(
     {
     default:
         SLANG_UNEXPECTED("unexpected op along access chain");
-        UNREACHABLE_RETURN(v);
+        UNREACHABLE_RETURN(leafVarValue);
 
     case kIROp_Var:
         return leafVarValue;
