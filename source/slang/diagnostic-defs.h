@@ -197,8 +197,10 @@ DIAGNOSTIC(30049, Note,  thisIsImmutableByDefault, "a 'this' parameter is curren
 
 DIAGNOSTIC(30051, Error, invalidValueForArgument, "invalid value for argument '$0'")
 DIAGNOSTIC(30052, Error, invalidSwizzleExpr, "invalid swizzle pattern '$0' on type '$1'")
-DIAGNOSTIC(33070, Error, expectedFunction, "expression preceding parenthesis of apparent call must have function type.")
 
+DIAGNOSTIC(30100, Error, staticRefToNonStaticMember, "type '$0' cannot be used to refer to non-static member '$1'")
+
+DIAGNOSTIC(33070, Error, expectedFunction, "expression preceding parenthesis of apparent call must have function type.")
 DIAGNOSTIC(33071, Error, expectedAStringLiteral, "expected a string literal")
 
 // Attributes
@@ -207,6 +209,14 @@ DIAGNOSTIC(31001, Error, attributeArgumentCountMismatch, "attribute '$0' expects
 DIAGNOSTIC(31001, Error, attributeNotApplicable, "attribute '$0' is not valid here")
 
 DIAGNOSTIC(31100, Error, unknownStageName,  "unknown stage name '$0'")
+
+// Enums
+
+DIAGNOSTIC(32000, Error, invalidEnumTagType,        "invalid tag type for 'enum': '$0'")
+DIAGNOSTIC(32001, Error, enumTypeAlreadyHasTagType, "'enum' type has already declared a tag type")
+DIAGNOSTIC(32002, Note,  seePreviousTagType,        "see previous tag type declaration")
+DIAGNOSTIC(32003, Error, unexpectedEnumTagExpr,     "unexpected form for 'enum' tag value expression")
+
 
 
 // 303xx: interfaces and associated types

@@ -28,6 +28,23 @@ interface __BuiltinFloatingPointType : __BuiltinRealType, __BuiltinSignedArithme
     __init(float value);
 }
 
+// A type resulting from an `enum` declaration.
+__magic_type(EnumTypeType)
+interface __EnumType
+{
+    // The type of tags for this `enum`
+    //
+    // Note: using `__Tag` instead of `Tag` to avoid any
+    // conflict if a user had an `enum` case called `Tag`
+    associatedtype __Tag : __BuiltinIntegerType;
+};
+
+// A type resulting from an `enum` declaration
+// with the `[flags]` attribute.
+interface __FlagsEnumType : __EnumType
+{
+};
+
 __generic<T,U> __intrinsic_op(Sequence) U operator,(T left, U right);
 
 __generic<T> __intrinsic_op(select) T operator?:(bool condition, T ifTrue, T ifFalse);
@@ -90,6 +107,28 @@ for (int tt = 0; tt < kBaseTypeCount; ++tt)
 
         EMIT_LINE_DIRECTIVE();
         sb << "__init(" << kBaseTypes[ss].name << " value);\n";
+    }
+
+    // If this is a basic integer type, then define explicit
+    // initializers that take a value of an `enum` type.
+    //
+    // TODO: This should actually be restricted, so that this
+    // only applies `where T.__Tag == Self`, but we don't have
+    // the needed features in our type system to implement
+    // that constraint right now.
+    //
+    switch (kBaseTypes[tt].tag)
+    {
+    case BaseType::Int:
+    case BaseType::UInt:
+}}}}
+        __generic<T:__EnumType>
+        __init(T value);
+${{{{
+        break;
+
+    default:
+        break;
     }
 
     sb << "};\n";
@@ -1049,6 +1088,12 @@ for (auto op : binaryOps)
     }
 }
 }}}}
+
+// Operators to apply to `enum` types
+
+__generic<E : __EnumType>
+__intrinsic_op($(kIROp_Eql))
+bool operator==(E left, E right);
 
 // Statement Attributes
 
