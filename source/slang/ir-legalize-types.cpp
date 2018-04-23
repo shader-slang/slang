@@ -1329,6 +1329,11 @@ void legalizeTypes(
     // the case for `IRTypeLegalizationContext::replacedInstructions`,
     // but we haven't yet folded all the legalization logic into
     // the IR legalization pass (since it used to apply to the AST too).
+    //
+    // TODO: This code has issues that can lead to IR validation
+    // failure, because we might remove a `struct X` that has been
+    // legalized away, but leave around a `ParameterBlock<X>` instruction
+    // that is no longer valid.
     for (auto& oldInst : typeLegalizationContext->instsToRemove)
     {
         oldInst->removeAndDeallocate();

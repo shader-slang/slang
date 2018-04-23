@@ -2054,6 +2054,10 @@ struct EmitVisitor
         {
             type = ptrType->getValueType();
         }
+        while (auto ptrType = as<IRArrayTypeBase>(type))
+        {
+            type = ptrType->getElementType();
+        }
 
         if(as<IRUniformParameterGroupType>(type))
         {

@@ -75,6 +75,16 @@ namespace Slang
         auto instParent = inst->getParent();
 
         auto operandValue = operandUse->get();
+
+        if( !operandValue )
+        {
+            // A null operand should almost always be an error, but
+            // we currently have a few cases where this arises.
+            //
+            // TODO: plug the leaks.
+            return;
+        }
+
         auto operandParent = operandValue->getParent();
 
         if (auto instParentBlock = as<IRBlock>(instParent))
