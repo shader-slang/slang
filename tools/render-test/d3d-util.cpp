@@ -26,6 +26,7 @@ using namespace Slang;
 {
     switch (format)
     {
+        case Format::RGBA_Float32:          return DXGI_FORMAT_R32G32B32A32_FLOAT;
         case Format::RGB_Float32:           return DXGI_FORMAT_R32G32B32_FLOAT;
         case Format::RG_Float32:            return DXGI_FORMAT_R32G32_FLOAT;
         case Format::R_Float32:             return DXGI_FORMAT_R32_FLOAT;

@@ -62,9 +62,13 @@ public:
     virtual ShaderProgram* compileProgram(ShaderCompileRequest const& request) = 0;
 };
 
+/// Different formats of things like pixels or elements of vertices
+/// NOTE! Any change to this type (adding, removing, changing order) - must also be reflected in changes to RendererUtil 
 enum class Format
 {
     Unknown,
+
+    RGBA_Float32,
     RGB_Float32,
     RG_Float32,
     R_Float32,
@@ -512,5 +516,14 @@ inline void Renderer::setConstantBuffer(UInt slot, BufferResource* buffer, UInt 
     setConstantBuffers(slot, 1, &buffer, &offset);
 }
 
+/// Functions that are around Renderer and it's types
+struct RendererUtil
+{
+        /// Gets the size in bytes of a Format type. Returns 0 if a size is not defined/invalid
+    SLANG_FORCE_INLINE static size_t getFormatSize(Format format) { return s_formatSize[int(format)]; }
+
+    private:
+    static const uint8_t s_formatSize[int(Format::CountOf)];
+};
 
 } // renderer_test

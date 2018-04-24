@@ -669,6 +669,9 @@ InputLayout* D3D11Renderer::createInputLayout(const InputElementDesc* inputEleme
         char const* typeName = "Unknown";
         switch (inputElementsIn[ii].format)
         {
+            case Format::RGBA_Float32:  
+                typeName = "float4";
+                break;
             case Format::RGB_Float32:
                 typeName = "float3";
                 break;

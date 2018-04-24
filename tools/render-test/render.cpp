@@ -36,6 +36,20 @@ const Resource::DescBase& Resource::getDescBase() const
     return s_emptyDescBase;
 }
 
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! RendererUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+/* static */const uint8_t RendererUtil::s_formatSize[int(Format::CountOf)] = 
+{
+    0,                               // Unknown,
+
+    uint8_t(sizeof(float) * 4),      // RGBA_Float32,
+    uint8_t(sizeof(float) * 3),      // RGB_Float32,
+    uint8_t(sizeof(float) * 2),      // RG_Float32,
+    uint8_t(sizeof(float) * 1),      // R_Float32,
+
+    uint8_t(sizeof(uint32_t)),       // RGBA_Unorm_UInt8,
+};
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!! BindingState::Desc !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 void BindingState::Desc::addSampler(const SamplerDesc& desc, const ShaderBindSet& shaderBindSet)

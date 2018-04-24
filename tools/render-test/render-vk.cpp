@@ -140,6 +140,12 @@ public:
         VKRenderer* m_renderer;
     };
     
+    class InputLayoutImpl : public InputLayout
+    {
+    public:
+        List<VkVertexInputAttributeDescription> m_vertexDescs;
+    };
+
     class BufferResourceImpl: public BufferResource
     {
 		public:
@@ -196,10 +202,6 @@ public:
         List<BindingDetail> m_bindingDetails;
     };
     
-	class InputLayoutImpl: public InputLayout
-    {
-		public:
-    };
 
     VkBool32 handleDebugMessage(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t srcObject,
         size_t location, int32_t msgCode, const char* pLayerPrefix, const char* pMsg);
@@ -230,6 +232,7 @@ public:
     VkSubmitInfo                        m_submitInfo;
     VkDebugReportCallbackEXT            m_debugReportCallback;
 
+    RefPtr<InputLayoutImpl> m_currentInputLayout;
     RefPtr<BindingStateImpl> m_currentBindingState;
     RefPtr<ShaderProgramImpl> m_currentProgram;
 
@@ -703,13 +706,44 @@ BufferResource* VKRenderer::createBufferResource(Resource::Usage initialUsage, c
     return buffer.detach();
 }
 
-InputLayout* VKRenderer::createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) 
+static VkFormat _getVkFormat(Format format)
 {
-    InputLayoutImpl* impl = new InputLayoutImpl;
+    switch (format)
+    {
+        case Format::RGBA_Float32:      return VK_FORMAT_R32G32B32A32_SFLOAT;
+        case Format::RGB_Float32:       return VK_FORMAT_R32G32B32_SFLOAT;
+        case Format::RG_Float32:        return VK_FORMAT_R32G32_SFLOAT;
+        case Format::R_Float32:         return VK_FORMAT_R32_SFLOAT;
+        case Format::RGBA_Unorm_UInt8:  return VK_FORMAT_R8G8B8A8_UNORM;
+        default:                        return VK_FORMAT_UNDEFINED;
+    }
+}
 
-    // TODO: actually initialize things
+InputLayout* VKRenderer::createInputLayout(const InputElementDesc* elements, UInt numElements) 
+{
+    RefPtr<InputLayoutImpl> layout(new InputLayoutImpl);
 
-    return (InputLayout*)impl;
+    List<VkVertexInputAttributeDescription>& dstVertexDescs = layout->m_vertexDescs;
+
+    dstVertexDescs.SetSize(numElements);
+
+    for (UInt i = 0; i <  numElements; ++i)
+    {
+        const InputElementDesc& srcDesc = elements[i];
+        VkVertexInputAttributeDescription& dstDesc = dstVertexDescs[i];
+
+        dstDesc.location = uint32_t(i);
+        dstDesc.binding = 0;
+        dstDesc.format = _getVkFormat(srcDesc.format);
+        if (dstDesc.format == VK_FORMAT_UNDEFINED)
+        {
+            return nullptr;
+        }
+
+        dstDesc.offset = uint32_t(srcDesc.offset); 
+    }
+
+    return layout.detach();
 }
 
 void* VKRenderer::map(BufferResource* bufferIn, MapFlavor flavor)
@@ -800,6 +834,7 @@ void VKRenderer::unmap(BufferResource* bufferIn)
 
 void VKRenderer::setInputLayout(InputLayout* inputLayout)
 {
+    m_currentInputLayout = static_cast<InputLayoutImpl*>(inputLayout);
 }
 
 void VKRenderer::setPrimitiveTopology(PrimitiveTopology topology)

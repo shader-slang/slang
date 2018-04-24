@@ -333,6 +333,7 @@ void GLRenderer::debugCallback(GLenum source, GLenum type, GLuint id, GLenum sev
 #define CASE(NAME, COUNT, TYPE, NORMALIZED) \
         case Format::NAME: do { VertexAttributeFormat result = {COUNT, TYPE, NORMALIZED}; return result; } while (0)
 
+        CASE(RGBA_Float32, 4, GL_FLOAT, GL_FALSE);
         CASE(RGB_Float32, 3, GL_FLOAT, GL_FALSE);
         CASE(RG_Float32, 2, GL_FLOAT, GL_FALSE);
         CASE(R_Float32, 1, GL_FLOAT, GL_FALSE);
