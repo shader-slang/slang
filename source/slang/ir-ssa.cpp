@@ -84,6 +84,9 @@ struct ConstructSSAContext
     // IR building state to use during the operation
     SharedIRBuilder sharedBuilder;
 
+    // Instructions to remove during cleanup
+    List<IRInst*> instsToRemove;
+
     IRBuilder builder;
     IRBuilder* getBuilder() { return &builder; }
 
@@ -98,20 +101,78 @@ struct ConstructSSAContext
     }
 };
 
+/// Do all uses of this instruction lead to a `load`?
+///
+/// Checks if all uses of `inst` are either loads,
+/// or get-element-address/get-field-address operations
+/// that also lead to loads.
+bool allUsesLeadToLoads(IRInst* inst)
+{
+    for (auto u = inst->firstUse; u; u = u->nextUse)
+    {
+        auto user = u->getUser();
+        switch (user->op)
+        {
+        default:
+            return false;
+
+        case kIROp_Load:
+            break;
+
+        case kIROp_getElementPtr:
+        case kIROp_FieldAddress:
+            {
+                // Sanity check: the address being used should
+                // be the base-address operand, and not the field
+                // key or index (this should never be a problem).
+                if (u != &user->getOperands()[0])
+                    return false;
+
+                if (!allUsesLeadToLoads(user))
+                    return false;
+            }
+            break;
+        }
+    }
+
+    // If all of the uses passed our checking, then
+    // we are good to go.
+    return true;
+
+}
+
 // Is the given variable one that we can promote to SSA form?
 bool isPromotableVar(
     ConstructSSAContext*    /*context*/,
     IRVar*                  var)
 {
-    // If the variable is only used directly as the pointer
-    // operand of load and store instructions, then it should
-    // be promote-able.
+    // We want to identify variables such that we can always
+    // determine what they will contain at a point in the
+    // program by directly inspecting their uses.
     //
-    // For now, we won't deal with cases where the variable
-    // is an aggregate an we sometimes pull out individual
-    // fields or elements. This is an important extension,
-    // but we probably also need to think about scalarizing
-    // any aggregates when we promote them to registers.
+    // The simplest possible answer would be instructions
+    // that are only ever used as the operand of "full"
+    // load and store instructions (loads and stores that
+    // write the entire variable). This is enough to
+    // promote simple scalar variables to SSA temporaries,
+    // but falls apart for aggregates and arrays.
+    //
+    // A slightly more powerful option (which is what we
+    // implement for now) is to promote variables when
+    // all of the stores are "full," and all other uses
+    // are in the form of a "chain" of `getElmeentAddress`
+    // or `getFieldAddress` operations that terminates
+    // with a load.
+    //
+    // An even more powerful option (which we do not yet
+    // implement) would be to handle cases where there are
+    // "chains" that end with stores, and to treat these
+    // as partial assignments (where we can still form
+    // an SSA value by creating a new temporary with just
+    // one element/field different). This kind of approach
+    // would be best if it is combined with scalarization,
+    // so that we don't need to construct aggregate temps.
+    //
 
     for (auto u = var->firstUse; u; u = u->nextUse)
     {
@@ -148,6 +209,20 @@ bool isPromotableVar(
                 assert(u == &storeInst->ptr);
             }
             break;
+
+        case kIROp_getElementPtr:
+        case kIROp_FieldAddress:
+            {
+                // Sanity check: the address being used should
+                // be the base-address operand, and not the field
+                // key or index (this should never be a problem).
+                if (u != &user->getOperands()[0])
+                    return false;
+
+                if (!allUsesLeadToLoads(user))
+                    return false;
+            }
+            break;
         }
     }
 
@@ -177,6 +252,7 @@ void identifyPromotableVars(
     }
 }
 
+/// If `value` is a promotable variable, then cast and return it.
 IRVar* asPromotableVar(
     ConstructSSAContext*    context,
     IRInst*                value)
@@ -189,6 +265,78 @@ IRVar* asPromotableVar(
         return nullptr;
 
     return var;
+}
+
+/// If `value` is a promotable variable or an access chain
+/// based on one, then cast and return the variable.
+IRVar* asPromotableVarAccessChain(
+    ConstructSSAContext*    context,
+    IRInst*                 value)
+{
+    switch (value->op)
+    {
+    case kIROp_Var:
+        return asPromotableVar(context, value);
+
+    case kIROp_FieldAddress:
+    case kIROp_getElementPtr:
+        return asPromotableVarAccessChain(context, value->getOperand(0));
+
+    default:
+        return nullptr;
+    }
+}
+
+/// After looking up the SSA value of avariable in some context,
+/// apply whatever "access chain" was applied at the original use site.
+///
+/// E.g., if the original operation was *((&a)->b) or *((&a) + i) and we've
+/// resolved that the value of the variable `a` should be `v`, then
+/// construct v.b or v[i].
+///
+IRInst* applyAccessChain(
+    ConstructSSAContext*    context,
+    IRBuilder*              builder,
+    IRInst*                 accessChain,
+    IRInst*                 leafVarValue)
+{
+    switch (accessChain->op)
+    {
+    default:
+        SLANG_UNEXPECTED("unexpected op along access chain");
+        UNREACHABLE_RETURN(leafVarValue);
+
+    case kIROp_Var:
+        return leafVarValue;
+
+    case kIROp_FieldAddress:
+        {
+            SLANG_ASSERT(context->instsToRemove.Contains(accessChain));
+
+            auto baseChain = accessChain->getOperand(0);
+            auto fieldKey = accessChain->getOperand(1);
+            auto type = cast<IRPtrTypeBase>(accessChain->getDataType())->getValueType();
+            auto baseValue = applyAccessChain(context, builder, baseChain, leafVarValue);
+            return builder->emitFieldExtract(
+                type,
+                baseValue,
+                fieldKey);
+        }
+
+    case kIROp_getElementPtr:
+        {
+            SLANG_ASSERT(context->instsToRemove.Contains(accessChain));
+
+            auto baseChain = accessChain->getOperand(0);
+            auto index = accessChain->getOperand(1);
+            auto type = cast<IRPtrTypeBase>(accessChain->getDataType())->getValueType();
+            auto baseValue = applyAccessChain(context, builder, baseChain, leafVarValue);
+            return builder->emitElementExtract(
+                type,
+                baseValue,
+                index);
+        }
+    }
 }
 
 // Try to read the value of an SSA variable
@@ -600,12 +748,14 @@ void processBlock(
                 IRLoad* loadInst = (IRLoad*)ii;
                 auto ptrArg = loadInst->ptr.get();
 
-                if (auto var = asPromotableVar(context, ptrArg))
+                if (auto var = asPromotableVarAccessChain(context, ptrArg))
                 {
                     // We are loading from a promotable variable.
                     // Look up the value in the context of this
                     // block.
                     auto val = readVar(context, blockInfo, var);
+
+                    val = applyAccessChain(context, &blockInfo->builder, ptrArg, val);
 
                     // We can just replace all uses of this
                     // load instruction with the given value.
@@ -615,8 +765,21 @@ void processBlock(
                     // since it is no longer needed.
                     loadInst->removeAndDeallocate();
                 }
-        }
+            }
             break;
+
+        case kIROp_getElementPtr:
+        case kIROp_FieldAddress:
+            {
+                auto  ptrArg = ii->getOperand(0);
+                if (auto var = asPromotableVarAccessChain(context, ptrArg))
+                {
+                    context->instsToRemove.Add(ii);
+                }
+            }
+            break;
+
+
         }
     }
 
@@ -862,6 +1025,20 @@ void constructSSA(ConstructSSAContext* context)
 
         // Okay, we should be clear to remove the old terminator
         oldTerminator->removeAndDeallocate();
+    }
+
+    // Remove all the instructions we marked for deletion along
+    // the way.
+    //
+    // Currently these are "access chain" instructions for
+    // loads from (parts of) variables that got promoted.
+    for (auto inst : context->instsToRemove)
+    {
+        // TODO: do we need to be careful here in case one
+        // of thes operations still has uses, as part of
+        // another to-be-remvoed instruction?
+
+        inst->removeAndDeallocate();
     }
 
     // Now we should be able to go through and remove

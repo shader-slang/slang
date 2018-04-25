@@ -312,7 +312,7 @@ namespace Slang
 
         case kIROp_switch:
             // switch <val> <break> <default> <caseVal1> <caseBlock1> ...
-            begin = operands + 4;
+            begin = operands + 2;
 
             // TODO: this ends up point one *after* the "one after the end"
             // location, so we should really change the representation

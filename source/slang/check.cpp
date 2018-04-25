@@ -455,6 +455,51 @@ namespace Slang
                 innerDeclRef);
         }
 
+        // This routine is a bottleneck for all declaration checking,
+        // so that we can add some quality-of-life features for users
+        // in cases where the compiler crashes
+        void dispatchDecl(DeclBase* decl)
+        {
+            try
+            {
+                DeclVisitor::dispatch(decl);
+            }
+            // Don't emit any context message for an explicit `AbortCompilationException`
+            // because it should only happen when an error is already emitted.
+            catch(AbortCompilationException&) { throw; }
+            catch(...)
+            {
+                getCompileRequest()->noteInternalErrorLoc(decl->loc);
+                throw;
+            }
+        }
+        void dispatchStmt(Stmt* stmt)
+        {
+            try
+            {
+                StmtVisitor::dispatch(stmt);
+            }
+            catch(AbortCompilationException&) { throw; }
+            catch(...)
+            {
+                getCompileRequest()->noteInternalErrorLoc(stmt->loc);
+                throw;
+            }
+        }
+        void dispatchExpr(Expr* expr)
+        {
+            try
+            {
+                ExprVisitor::dispatch(expr);
+            }
+            catch(AbortCompilationException&) { throw; }
+            catch(...)
+            {
+                getCompileRequest()->noteInternalErrorLoc(expr->loc);
+                throw;
+            }
+        }
+
         // Make sure a declaration has been checked, so we can refer to it.
         // Note that this may lead to us recursively invoking checking,
         // so this may not be the best way to handle things.
@@ -499,7 +544,7 @@ namespace Slang
             }
 
             // Use visitor pattern to dispatch to correct case
-            DeclVisitor::dispatch(decl);
+            dispatchDecl(decl);
 
             if(state > decl->checkState)
             {
@@ -2492,7 +2537,7 @@ namespace Slang
         {
             for (auto decl : declGroup->decls)
             {
-                DeclVisitor::dispatch(decl);
+                dispatchDecl(decl);
             }
         }
 
@@ -2549,7 +2594,7 @@ namespace Slang
         void checkStmt(Stmt* stmt)
         {
             if (!stmt) return;
-            StmtVisitor::dispatch(stmt);
+            dispatchStmt(stmt);
             checkModifiers(stmt);
         }
 
@@ -3052,7 +3097,7 @@ namespace Slang
             // 2. `EnsureDecl()` is specialized for `Decl*` instead of `DeclBase*`
             // and trying to special case `DeclGroup*` here feels silly.
             //
-            DeclVisitor::dispatch(stmt->decl);
+            dispatchDecl(stmt->decl);
         }
 
         void visitBlockStmt(BlockStmt* stmt)
@@ -6738,13 +6783,37 @@ namespace Slang
                         auto paramType = funcType->getParamType(pp);
                         if (auto outParamType = paramType->As<OutTypeBase>())
                         {
-                            if (pp < expr->Arguments.Count()
-                                && !expr->Arguments[pp]->type.IsLeftValue)
+                            if( pp < expr->Arguments.Count() )
                             {
-                                getSink()->diagnose(
-                                    expr->Arguments[pp],
-                                    Diagnostics::argumentExpectedLValue,
-                                    pp);
+                                auto argExpr = expr->Arguments[pp];
+                                if( !argExpr->type.IsLeftValue )
+                                {
+                                    getSink()->diagnose(
+                                        argExpr,
+                                        Diagnostics::argumentExpectedLValue,
+                                        pp);
+
+                                    if( auto implicitCastExpr = argExpr.As<ImplicitCastExpr>() )
+                                    {
+                                        getSink()->diagnose(
+                                            argExpr,
+                                            Diagnostics::implicitCastUsedAsLValue,
+                                            implicitCastExpr->Arguments[0]->type,
+                                            implicitCastExpr->type);
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                // This implies that the function had an `out`
+                                // or `inout` parameter and they gave it a default
+                                // argument expression. I'm not even sure what
+                                // that would mean.
+                                //
+                                // TODO: make sure this gets validated on the
+                                // declaring side.
+                                //
+                                SLANG_DIAGNOSE_UNEXPECTED(getSink(), invoke, "default argument expression for out/inout paameter");
                             }
                         }
                     }

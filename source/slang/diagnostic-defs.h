@@ -192,6 +192,8 @@ DIAGNOSTIC(30033, Error, invalidTypeForLocalVariable, "cannot declare a local va
 DIAGNOSTIC(30035, Error, componentOverloadTypeMismatch, "'$0': type of overloaded component mismatches previous definition.")
 DIAGNOSTIC(30041, Error, bitOperationNonIntegral, "bit operation: operand must be integral type.")
 DIAGNOSTIC(30047, Error, argumentExpectedLValue, "argument passed to parameter '$0' must be l-value.")
+DIAGNOSTIC(30048, Note,  implicitCastUsedAsLValue, "argument was implicitly cast from '$0' to '$1', and Slang does not support using an implicit cast as an l-value")
+
 DIAGNOSTIC(30051, Error, invalidValueForArgument, "invalid value for argument '$0'")
 DIAGNOSTIC(30052, Error, invalidSwizzleExpr, "invalid swizzle pattern '$0' on type '$1'")
 DIAGNOSTIC(33070, Error, expectedFunction, "expression preceding parenthesis of apparent call must have function type.")
@@ -339,9 +341,11 @@ DIAGNOSTIC(51092, Error, stageDoesntHaveInputWorld, "'$0' doesn't appear to have
 
 // 99999 - Internal compiler errors, and not-yet-classified diagnostics.
 
-DIAGNOSTIC(99999, Internal, unimplemented, "unimplemented: $0")
-DIAGNOSTIC(99999, Internal, unexpected, "unexpected: $0")
-DIAGNOSTIC(99999, Internal, internalCompilerError, "internal compiler error")
-DIAGNOSTIC(99999, Error, compilationAborted, "compilation aborted due to internal error");
+DIAGNOSTIC(99999, Internal, unimplemented, "unimplemented feature in Slang compiler: $0")
+DIAGNOSTIC(99999, Internal, unexpected, "unexpected condition encountered in Slang compiler: $0")
+DIAGNOSTIC(99999, Internal, internalCompilerError, "Slang internal compiler error")
+DIAGNOSTIC(99999, Error, compilationAborted, "Slang compilation aborted due to internal error");
+DIAGNOSTIC(99999, Error, compilationAbortedDueToException, "Slang compilation aborted due to an exception of $0: $1");
+DIAGNOSTIC(99999, Note, noteLocationOfInternalError, "the Slang compiler threw an exception while working on code near this location");
 
 #undef DIAGNOSTIC

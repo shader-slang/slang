@@ -928,7 +928,7 @@ BindingState* GLRenderer::createBindingState(const BindingState::Desc& bindingSt
         const auto& srcBinding = srcBindings[i];
 
         // Copy over the bindings 
-        dstDetail.m_firstBinding = bindingStateDesc.getFirst(BindingState::ShaderStyle::Glsl, srcBinding.registerDesc);
+        dstDetail.m_firstBinding = bindingStateDesc.getFirst(BindingState::ShaderStyle::Glsl, srcBinding.shaderBindSet);
         
         switch (srcBinding.bindingType)
         {
@@ -1013,7 +1013,7 @@ void GLRenderer::setBindingState(BindingState* stateIn)
             }
             case BindingType::Sampler:
             {
-                auto bindings = bindingDesc.asRegisterList(BindingState::ShaderStyle::Glsl, binding.registerDesc);
+                auto bindings = bindingDesc.asSlice(BindingState::ShaderStyle::Glsl, binding.shaderBindSet);
                 for (auto b : bindings)
                 {
                     glBindSampler(b, detail.m_samplerHandle);
