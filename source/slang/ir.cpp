@@ -6252,6 +6252,20 @@ namespace Slang
             if(!bindInst)
                 continue;
 
+            // HACK: Our current front-end emit logic can end up emitting multiple
+            // `bindGlobalGeneric` instructions for the same parameter. This is
+            // a buggy behavior, but a real fix would require refactoring the way
+            // global generic arguments are specified today.
+            //
+            // For now we will do a sanity check to detect parameters that
+            // have already been specialized.
+            if( !as<IRGlobalGenericParam>(bindInst->getOperand(0)) )
+            {
+                // parameter operand is no longer a parameter, so it
+                // seems things must have been specialized already.
+                continue;
+            }
+
             auto param = bindInst->getParam();
             auto val = bindInst->getVal();
 
