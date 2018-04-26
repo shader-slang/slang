@@ -1,0 +1,96 @@
+// vk-swap-chain.h
+#pragma once
+
+#include "vk-api.h"
+#include "vk-device-queue.h"
+
+#include "render.h"
+
+#include "../../source/core/list.h"
+
+namespace renderer_test {
+
+struct VulkanSwapChain
+{
+    enum 
+    {
+        kMaxImages = 8,
+    };
+
+    struct PlatformDesc
+    {
+    };
+
+#if SLANG_WINDOWS_FAMILY
+    struct WinPlatformDesc: public PlatformDesc
+    {
+        HINSTANCE m_hinstance;
+        HWND m_hwnd;
+    };
+#else
+    struct XPlatformDesc : public PlatformDesc
+    {
+        Display* m_display; 
+        Window m_window;
+    };
+#endif
+
+    struct Desc
+    {
+        Format m_format;
+        bool m_enableFormat;
+        Format m_depthFormatTypeless;
+        Format m_depthFormat;
+        Format m_textureDepthFormat;
+    };
+
+    SlangResult init(VulkanDeviceQueue* deviceQueue, const Desc& desc, const PlatformDesc* platformDesc);
+
+    SlangResult initSwapchain();
+
+    void present(bool vsync);
+
+    void destroySwapchain();
+
+    void getWindowSize(int* widthOut, int* heightOut) const;
+
+    TextureResource* getFrontRenderTargetVulkan();
+
+    ~VulkanSwapChain();
+
+    protected:
+    template <typename T>
+    void _setPlatformDesc(const T& desc)
+    {
+        const PlatformDesc* check = &desc;
+        int size = (sizeof(T) + sizeof(void*) - 1) / sizeof(void*);
+        m_platformDescBuffer.SetSize(size);
+        *(T*)m_platformDescBuffer.Buffer() = desc;
+    }
+    template <typename T>
+    const T* _getPlatformDesc() const { return static_cast<const T*>((const PlatformDesc*)m_platformDescBuffer.Buffer()); }
+
+    bool m_vsync = true;
+    int m_width = 0;
+    int m_height = 0;
+
+    VkPresentModeKHR m_presentMode = VK_PRESENT_MODE_IMMEDIATE_KHR;
+    VkFormat m_swapchainFormat = VK_FORMAT_B8G8R8A8_UNORM;
+
+    VkSurfaceKHR m_surface = VK_NULL_HANDLE;
+    VkSwapchainKHR m_swapChain = VK_NULL_HANDLE;
+
+    int m_numImages = 0;
+    VkImage m_images[kMaxImages] = { VK_NULL_HANDLE };
+    int m_currentSwapChainIndex = 0;
+
+    //NvFlowRenderTarget*	m_renderTargets[kMaxImages] = {};
+    //NvFlowDepthBuffer* m_depthBuffer = nullptr;
+
+    VulkanDeviceQueue* m_deviceQueue = nullptr;
+    const VulkanApi* m_api = nullptr;
+
+    Slang::List<void*> m_platformDescBuffer;
+};
+
+} // renderer_test

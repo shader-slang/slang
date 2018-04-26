@@ -63,6 +63,12 @@
     <ClCompile Include="vk-module.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="vk-swap-chain.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="vk-device-queue.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="options.h">
@@ -111,6 +117,12 @@
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="vk-module.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vk-swap-chain.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vk-device-queue.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>

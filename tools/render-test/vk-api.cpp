@@ -56,7 +56,7 @@ Slang::Result VulkanApi::initInstanceProcs(VkInstance instance)
     return SLANG_OK;
 }
 
-Slang::Result VulkanApi::initDeviceProcs(VkDevice device)
+Slang::Result VulkanApi::initDeviceProcs(VkPhysicalDevice physicalDevice, VkDevice device)
 {
     assert(m_instance && device && vkGetDeviceProcAddr != nullptr);
 
@@ -70,6 +70,7 @@ Slang::Result VulkanApi::initDeviceProcs(VkDevice device)
     }
 
     m_device = device;
+    m_physicalDevice = physicalDevice;
     return SLANG_OK;
 }
 

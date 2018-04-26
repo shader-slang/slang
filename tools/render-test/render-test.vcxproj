@@ -181,7 +181,9 @@
     <ClCompile Include="shader-renderer-util.cpp" />
     <ClCompile Include="slang-support.cpp" />
     <ClCompile Include="vk-api.cpp" />
+    <ClCompile Include="vk-device-queue.cpp" />
     <ClCompile Include="vk-module.cpp" />
+    <ClCompile Include="vk-swap-chain.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="circular-resource-heap-d3d12.h" />
@@ -198,7 +200,9 @@
     <ClInclude Include="shader-renderer-util.h" />
     <ClInclude Include="slang-support.h" />
     <ClInclude Include="vk-api.h" />
+    <ClInclude Include="vk-device-queue.h" />
     <ClInclude Include="vk-module.h" />
+    <ClInclude Include="vk-swap-chain.h" />
     <ClInclude Include="window.h" />
   </ItemGroup>
   <ItemGroup>

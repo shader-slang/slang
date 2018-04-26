@@ -52,8 +52,22 @@ namespace renderer_test {
     x(vkCmdDispatch)                    \
     x(vkDestroyPipeline)                \
     x(vkCreateShaderModule)             \
+    \
+    x(vkCreateFence) \
+    x(vkDestroyFence) \
+    x(vkResetFences) \
+    x(vkGetFenceStatus) \
+    x(vkWaitForFences) \
+    x(vkCreateSemaphore) \
+    x(vkDestroySemaphore) \
+    x(vkCreateEvent) \
+    x(vkDestroyEvent) \
+    x(vkGetEventStatus) \
+    x(vkSetEvent) \
+    x(vkResetEvent) \
+    \
+    x(vkResetCommandBuffer) \
     /* */
-
 
 #if SLANG_WINDOWS_FAMILY
 #   define VK_API_INSTANCE_PLATFORM_KHR_PROCS(x)          \
@@ -119,11 +133,12 @@ struct VulkanApi
         /// Initialize the instance functions
     Slang::Result initInstanceProcs(VkInstance instance);
         /// Initialize the device functions
-    Slang::Result initDeviceProcs(VkDevice device);
+    Slang::Result initDeviceProcs(VkPhysicalDevice physicalDevice, VkDevice device);
 
     const VulkanModule* m_module = nullptr;               ///< Module this was all loaded from
     VkInstance m_instance = VK_NULL_HANDLE;
     VkDevice m_device = VK_NULL_HANDLE;
+    VkPhysicalDevice m_physicalDevice = VK_NULL_HANDLE;
 };
 
 } // renderer_test

@@ -460,7 +460,7 @@ SlangResult VKRenderer::initialize(void* inWindowHandle)
 
     RETURN_ON_VK_FAIL(m_api.vkCreateDevice(m_physicalDevice, &deviceCreateInfo, nullptr, &m_device));
 
-    SLANG_RETURN_ON_FAIL(m_api.initDeviceProcs(m_device));
+    SLANG_RETURN_ON_FAIL(m_api.initDeviceProcs(m_physicalDevice, m_device));
 
     // Create a command pool
 
