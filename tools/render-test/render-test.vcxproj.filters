@@ -57,6 +57,12 @@
     <ClCompile Include="shader-renderer-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="vk-api.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="vk-module.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="options.h">
@@ -99,6 +105,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="shader-renderer-util.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vk-api.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vk-module.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>

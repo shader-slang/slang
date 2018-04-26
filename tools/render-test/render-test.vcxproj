@@ -180,6 +180,8 @@
     <ClCompile Include="shader-input-layout.cpp" />
     <ClCompile Include="shader-renderer-util.cpp" />
     <ClCompile Include="slang-support.cpp" />
+    <ClCompile Include="vk-api.cpp" />
+    <ClCompile Include="vk-module.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="circular-resource-heap-d3d12.h" />
@@ -195,6 +197,8 @@
     <ClInclude Include="shader-input-layout.h" />
     <ClInclude Include="shader-renderer-util.h" />
     <ClInclude Include="slang-support.h" />
+    <ClInclude Include="vk-api.h" />
+    <ClInclude Include="vk-module.h" />
     <ClInclude Include="window.h" />
   </ItemGroup>
   <ItemGroup>

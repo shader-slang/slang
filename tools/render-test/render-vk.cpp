@@ -6,75 +6,17 @@
 
 #include "../../source/core/smart-pointer.h"
 
-#ifdef _WIN32
-#define VK_USE_PLATFORM_WIN32_KHR 1
-#endif
-
-#define VK_NO_PROTOTYPES
-#include <vulkan/vulkan.h>
+#include "vk-api.h"
 
 #define ENABLE_VALIDATION_LAYER 1
 
-
 #ifdef _MSC_VER
-
-#include <stddef.h>
-
-#pragma warning(disable: 4996)
-
-#if (_MSC_VER < 1900)
-#define snprintf sprintf_s
+#   include <stddef.h>
+#   pragma warning(disable: 4996)
+#   if (_MSC_VER < 1900)
+#       define snprintf sprintf_s
+#   endif
 #endif
-#endif
-
-#define FOREACH_GLOBAL_PROC(M)          \
-    M(vkCreateInstance)                 \
-    /* */
-
-#define FOREACH_INSTANCE_PROC(M)                \
-    M(vkCreateDevice)                           \
-    M(vkCreateDebugReportCallbackEXT)           \
-    M(vkDestroyDebugReportCallbackEXT)          \
-    M(vkDebugReportMessageEXT)                  \
-    M(vkEnumeratePhysicalDevices)               \
-    M(vkGetPhysicalDeviceProperties)            \
-    M(vkGetPhysicalDeviceFeatures)              \
-    M(vkGetPhysicalDeviceMemoryProperties)      \
-    M(vkGetPhysicalDeviceQueueFamilyProperties) \
-    M(vkGetDeviceProcAddr)                      \
-    /* */
-
-#define FOREACH_DEVICE_PROC(M)          \
-    M(vkCreateDescriptorPool)           \
-    M(vkCreateCommandPool)              \
-    M(vkGetDeviceQueue)                 \
-    M(vkAllocateCommandBuffers)         \
-    M(vkBeginCommandBuffer)             \
-    M(vkEndCommandBuffer)               \
-    M(vkQueueSubmit)                    \
-    M(vkQueueWaitIdle)                  \
-    M(vkFreeCommandBuffers)             \
-    M(vkCreateBuffer)                   \
-    M(vkGetBufferMemoryRequirements)    \
-    M(vkAllocateMemory)                 \
-    M(vkBindBufferMemory)               \
-    M(vkMapMemory)                      \
-    M(vkUnmapMemory)                    \
-    M(vkCmdCopyBuffer)                  \
-    M(vkDestroyBuffer)                  \
-    M(vkFreeMemory)                     \
-    M(vkCreateDescriptorSetLayout)      \
-    M(vkAllocateDescriptorSets)         \
-    M(vkUpdateDescriptorSets)           \
-    M(vkCreatePipelineLayout)           \
-    M(vkCreateComputePipelines)         \
-    M(vkCmdBindPipeline)                \
-    M(vkCmdBindDescriptorSets)          \
-    M(vkCmdDispatch)                    \
-    M(vkDestroyPipeline)                \
-    M(vkCreateShaderModule)             \
-    /* */
-
 
 namespace renderer_test {
 using namespace Slang;
@@ -118,26 +60,26 @@ public:
         public:
         
             /// Returns true if has been initialized
-        bool isInitialized() const { return m_renderer != nullptr; }
+        bool isInitialized() const { return m_api != nullptr; }
         
             // Default Ctor
         Buffer():
-            m_renderer(nullptr)
+            m_api(nullptr)
         {}
 
             /// Dtor
         ~Buffer()
         {
-            if (m_renderer)
+            if (m_api)
             {
-                m_renderer->vkDestroyBuffer(m_renderer->m_device, m_buffer, nullptr);
-                m_renderer->vkFreeMemory(m_renderer->m_device, m_memory, nullptr);
+                m_api->vkDestroyBuffer(m_api->m_device, m_buffer, nullptr);
+                m_api->vkFreeMemory(m_api->m_device, m_memory, nullptr);
             }
         }
 
         VkBuffer m_buffer;
         VkDeviceMemory m_memory;
-        VKRenderer* m_renderer;
+        VulkanApi* m_api;
     };
     
     class InputLayoutImpl : public InputLayout
@@ -221,30 +163,26 @@ public:
     static VKAPI_ATTR VkBool32 VKAPI_CALL debugMessageCallback(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t srcObject,
         size_t location, int32_t msgCode, const char* pLayerPrefix, const char* pMsg, void* pUserData);
 
-    VkInstance                          m_instance;
-    VkPhysicalDevice                    m_physicalDevice;
+    VkInstance                          m_instance = VK_NULL_HANDLE;
+    VkPhysicalDevice                    m_physicalDevice = VK_NULL_HANDLE;
     VkPhysicalDeviceProperties          m_deviceProperties;
     VkPhysicalDeviceFeatures            m_deviceFeatures;
     VkPhysicalDeviceMemoryProperties    m_deviceMemoryProperties;
-    VkDevice                            m_device;
-    VkQueue                             m_queue;
-    VkCommandPool                       m_commandPool;
+    VkDevice                            m_device  = VK_NULL_HANDLE;
+    VkQueue                             m_queue  = VK_NULL_HANDLE;
+    VkCommandPool                       m_commandPool = VK_NULL_HANDLE;
     VkSubmitInfo                        m_submitInfo;
+
     VkDebugReportCallbackEXT            m_debugReportCallback;
 
     RefPtr<InputLayoutImpl> m_currentInputLayout;
     RefPtr<BindingStateImpl> m_currentBindingState;
     RefPtr<ShaderProgramImpl> m_currentProgram;
 
-    float m_clearColor[4] = { 0, 0, 0, 0 };;
+    VulkanModule m_module;
+    VulkanApi m_api;
 
-#define DECLARE_PROC(NAME) PFN_##NAME NAME;
-    DECLARE_PROC(vkGetInstanceProcAddr);
-    FOREACH_GLOBAL_PROC(DECLARE_PROC)
-    FOREACH_INSTANCE_PROC(DECLARE_PROC)
-    FOREACH_DEVICE_PROC(DECLARE_PROC)
-#undef DECLARE_PROC
-    
+    float m_clearColor[4] = { 0, 0, 0, 0 };;
 };
 
 Renderer* createVKRenderer()
@@ -301,7 +239,7 @@ VkCommandBuffer VKRenderer::getCommandBuffer()
     info.commandBufferCount = 1;
 
     VkCommandBuffer commandBuffer;
-    checkResult(vkAllocateCommandBuffers(m_device, &info, &commandBuffer));
+    checkResult(m_api.vkAllocateCommandBuffers(m_device, &info, &commandBuffer));
 
     return commandBuffer;
 }
@@ -311,41 +249,41 @@ VkCommandBuffer VKRenderer::beginCommandBuffer()
     VkCommandBuffer commandBuffer = getCommandBuffer();
 
     VkCommandBufferBeginInfo beginInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
-    checkResult(vkBeginCommandBuffer(commandBuffer, &beginInfo));
+    checkResult(m_api.vkBeginCommandBuffer(commandBuffer, &beginInfo));
 
     return commandBuffer;
 }
 
 void VKRenderer::flushCommandBuffer(VkCommandBuffer commandBuffer)
 {
-    checkResult(vkEndCommandBuffer(commandBuffer));
+    checkResult(m_api.vkEndCommandBuffer(commandBuffer));
 
     VkSubmitInfo submitInfo = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &commandBuffer;
 
-    checkResult(vkQueueSubmit(m_queue, 1, &submitInfo, VK_NULL_HANDLE));
-    checkResult(vkQueueWaitIdle(m_queue));
+    checkResult(m_api.vkQueueSubmit(m_queue, 1, &submitInfo, VK_NULL_HANDLE));
+    checkResult(m_api.vkQueueWaitIdle(m_queue));
 
-    vkFreeCommandBuffers(m_device, m_commandPool, 1, &commandBuffer);
+    m_api.vkFreeCommandBuffers(m_device, m_commandPool, 1, &commandBuffer);
 }
 
 SlangResult VKRenderer::_initBuffer(size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties, Buffer& bufferOut)
 {
     assert(!bufferOut.isInitialized());
 
-    bufferOut.m_renderer = this;
-    bufferOut.m_memory = 0;
-    bufferOut.m_buffer = 0;
+    bufferOut.m_api = &m_api;
+    bufferOut.m_memory = VK_NULL_HANDLE;
+    bufferOut.m_buffer = VK_NULL_HANDLE;
     
     VkBufferCreateInfo bufferCreateInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
     bufferCreateInfo.size = bufferSize;
     bufferCreateInfo.usage = usage;
 
-    checkResult(vkCreateBuffer(m_device, &bufferCreateInfo, nullptr, &bufferOut.m_buffer));
+    checkResult(m_api.vkCreateBuffer(m_device, &bufferCreateInfo, nullptr, &bufferOut.m_buffer));
 
     VkMemoryRequirements memoryReqs = {};
-    vkGetBufferMemoryRequirements(m_device, bufferOut.m_buffer, &memoryReqs);
+    m_api.vkGetBufferMemoryRequirements(m_device, bufferOut.m_buffer, &memoryReqs);
 
     uint32_t memoryTypeIndex = getMemoryTypeIndex(memoryReqs.memoryTypeBits, reqMemoryProperties);
 
@@ -355,8 +293,8 @@ SlangResult VKRenderer::_initBuffer(size_t bufferSize, VkBufferUsageFlags usage,
     allocateInfo.allocationSize = memoryReqs.size;
     allocateInfo.memoryTypeIndex = memoryTypeIndex;
 
-    checkResult(vkAllocateMemory(m_device, &allocateInfo, nullptr, &bufferOut.m_memory));
-    checkResult(vkBindBufferMemory(m_device, bufferOut.m_buffer, bufferOut.m_memory, 0));
+    checkResult(m_api.vkAllocateMemory(m_device, &allocateInfo, nullptr, &bufferOut.m_memory));
+    checkResult(m_api.vkBindBufferMemory(m_device, bufferOut.m_buffer, bufferOut.m_memory, 0));
 
     return SLANG_OK;
 }
@@ -397,7 +335,7 @@ VkPipelineShaderStageCreateInfo VKRenderer::compileEntryPoint(const ShaderCompil
     moduleCreateInfo.codeSize = codeSize;
 
     VkShaderModule module;
-    checkResult(vkCreateShaderModule(m_device, &moduleCreateInfo, nullptr, &module));
+    checkResult(m_api.vkCreateShaderModule(m_device, &moduleCreateInfo, nullptr, &module));
 
     //::free(codeBegin);
 
@@ -413,37 +351,30 @@ VkPipelineShaderStageCreateInfo VKRenderer::compileEntryPoint(const ShaderCompil
 
 SlangResult VKRenderer::initialize(void* inWindowHandle)
 {
-    char const* dynamicLibraryName = "vulkan-1.dll";
-    HMODULE vulkan = LoadLibraryA(dynamicLibraryName);
-    if (!vulkan)
-    {
-        fprintf(stderr, "error: failed load '%s'\n", dynamicLibraryName);
-        return SLANG_FAIL;
-    }
-
-    vkGetInstanceProcAddr = (PFN_vkGetInstanceProcAddr)GetProcAddress(vulkan, "vkGetInstanceProcAddr");
-    if (!vkGetInstanceProcAddr)
-    {
-        fprintf(stderr, "error: failed load symbol 'vkGetInstanceProcAddr'\n");
-        return SLANG_FAIL;
-    }
+    SLANG_RETURN_ON_FAIL(m_module.init());
+    SLANG_RETURN_ON_FAIL(m_api.initGlobalProcs(m_module));
 
     VkApplicationInfo applicationInfo = { VK_STRUCTURE_TYPE_APPLICATION_INFO };
     applicationInfo.pApplicationName = "slang-render-test";
     applicationInfo.pEngineName = "slang-render-test";
     applicationInfo.apiVersion = VK_API_VERSION_1_0;
 
-    char const* instanceExtensions[] = {
+    char const* instanceExtensions[] = 
+    {
         VK_KHR_SURFACE_EXTENSION_NAME,
-#ifdef _WIN32
+
+#if SLANG_WINDOWS_FAMILY
         VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
 #else
+        VK_KHR_XLIB_SURFACE_EXTENSION_NAME
 #endif
 
 #if ENABLE_VALIDATION_LAYER
         VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
 #endif
     };
+
+    m_instance = VK_NULL_HANDLE;
 
     VkInstanceCreateInfo instanceCreateInfo = { VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
     instanceCreateInfo.pApplicationInfo = &applicationInfo;
@@ -452,27 +383,13 @@ SlangResult VKRenderer::initialize(void* inWindowHandle)
     instanceCreateInfo.ppEnabledExtensionNames = &instanceExtensions[0];
 
 #if ENABLE_VALIDATION_LAYER
-
-    uint32_t layerCount = 1;
-    const char *layerNames[] = {
-        "VK_LAYER_LUNARG_standard_validation"
-    };
-
-    instanceCreateInfo.enabledLayerCount = layerCount;
+    const char* layerNames[] = { "VK_LAYER_LUNARG_standard_validation" };
+    instanceCreateInfo.enabledLayerCount = SLANG_COUNT_OF(layerNames); 
     instanceCreateInfo.ppEnabledLayerNames = layerNames;
 #endif
 
-    m_instance = 0;
-
-#define LOAD_INSTANCE_PROC(NAME) NAME = (PFN_##NAME) vkGetInstanceProcAddr(m_instance, #NAME);
-
-    FOREACH_GLOBAL_PROC(LOAD_INSTANCE_PROC);
-
-    RETURN_ON_VK_FAIL(vkCreateInstance(&instanceCreateInfo, nullptr, &m_instance));
-
-    FOREACH_INSTANCE_PROC(LOAD_INSTANCE_PROC);
-
-#undef LOAD_INSTANCE_PROC
+    RETURN_ON_VK_FAIL(m_api.vkCreateInstance(&instanceCreateInfo, nullptr, &m_instance));
+    SLANG_RETURN_ON_FAIL(m_api.initInstanceProcs(m_instance));
 
 
 #if ENABLE_VALIDATION_LAYER
@@ -483,44 +400,45 @@ SlangResult VKRenderer::initialize(void* inWindowHandle)
     debugCreateInfo.pUserData = this;
     debugCreateInfo.flags = debugFlags;
 
-    RETURN_ON_VK_FAIL(vkCreateDebugReportCallbackEXT(m_instance, &debugCreateInfo, nullptr, &m_debugReportCallback));
-
+    RETURN_ON_VK_FAIL(m_api.vkCreateDebugReportCallbackEXT(m_instance, &debugCreateInfo, nullptr, &m_debugReportCallback));
 #endif
 
-    uint32_t physicalDeviceCount = 0;
-    RETURN_ON_VK_FAIL(vkEnumeratePhysicalDevices(m_instance, &physicalDeviceCount, nullptr));
+    uint32_t numPhysicalDevices = 0;
+    RETURN_ON_VK_FAIL(m_api.vkEnumeratePhysicalDevices(m_instance, &numPhysicalDevices, nullptr));
 
-    VkPhysicalDevice* physicalDevices = (VkPhysicalDevice*)alloca(physicalDeviceCount * sizeof(VkPhysicalDevice));
-    RETURN_ON_VK_FAIL(vkEnumeratePhysicalDevices(m_instance, &physicalDeviceCount, physicalDevices));
+    List<VkPhysicalDevice> physicalDevices;
+    physicalDevices.SetSize(numPhysicalDevices);
+    RETURN_ON_VK_FAIL(m_api.vkEnumeratePhysicalDevices(m_instance, &numPhysicalDevices, physicalDevices.Buffer()));
 
     uint32_t selectedDeviceIndex = 0;
     // TODO: allow override of selected device
     m_physicalDevice = physicalDevices[selectedDeviceIndex];
 
-    vkGetPhysicalDeviceProperties(m_physicalDevice, &m_deviceProperties);
-    vkGetPhysicalDeviceFeatures(m_physicalDevice, &m_deviceFeatures);
-    vkGetPhysicalDeviceMemoryProperties(m_physicalDevice, &m_deviceMemoryProperties);
+    m_api.vkGetPhysicalDeviceProperties(m_physicalDevice, &m_deviceProperties);
+    m_api.vkGetPhysicalDeviceFeatures(m_physicalDevice, &m_deviceFeatures);
+    m_api.vkGetPhysicalDeviceMemoryProperties(m_physicalDevice, &m_deviceMemoryProperties);
 
-    uint32_t queueFamilyCount = 0;
-    vkGetPhysicalDeviceQueueFamilyProperties(m_physicalDevice, &queueFamilyCount, nullptr);
+    uint32_t numQueueFamilies = 0;
+    m_api.vkGetPhysicalDeviceQueueFamilyProperties(m_physicalDevice, &numQueueFamilies, nullptr);
 
-    VkQueueFamilyProperties* queueFamilies = (VkQueueFamilyProperties*)alloca(queueFamilyCount * sizeof(VkQueueFamilyProperties));
-    vkGetPhysicalDeviceQueueFamilyProperties(m_physicalDevice, &queueFamilyCount, queueFamilies);
+    List<VkQueueFamilyProperties> queueFamilies;
+    queueFamilies.SetSize(numQueueFamilies);
+    m_api.vkGetPhysicalDeviceQueueFamilyProperties(m_physicalDevice, &numQueueFamilies, queueFamilies.Buffer());
 
     // Find a queue that can service our needs
     VkQueueFlags reqQueueFlags = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT;
 
-    uint32_t queueFamilyIndex = uint32_t(-1);
-    for (uint32_t qq = 0; qq < queueFamilyCount; ++qq)
+    int queueFamilyIndex = -1;
+    for (int i = 0; i < int(numQueueFamilies); ++i)
     {
-        if ((queueFamilies[qq].queueFlags & reqQueueFlags) == reqQueueFlags)
+        if ((queueFamilies[i].queueFlags & reqQueueFlags) == reqQueueFlags)
         {
-            queueFamilyIndex = qq;
+            queueFamilyIndex = i;
             break;
         }
     }
-    assert(queueFamilyIndex < queueFamilyCount);
-
+    assert(queueFamilyIndex >= 0 && queueFamilyIndex < int(numQueueFamilies));
+    
     float queuePriority = 0.0f;
     VkDeviceQueueCreateInfo queueCreateInfo = { VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO };
     queueCreateInfo.queueFamilyIndex = queueFamilyIndex;
@@ -540,21 +458,19 @@ SlangResult VKRenderer::initialize(void* inWindowHandle)
     deviceCreateInfo.enabledExtensionCount = sizeof(deviceExtensions) / sizeof(deviceExtensions[0]);
     deviceCreateInfo.ppEnabledExtensionNames = &deviceExtensions[0];
 
-    RETURN_ON_VK_FAIL(vkCreateDevice(m_physicalDevice, &deviceCreateInfo, nullptr, &m_device));
+    RETURN_ON_VK_FAIL(m_api.vkCreateDevice(m_physicalDevice, &deviceCreateInfo, nullptr, &m_device));
 
-#define LOAD_DEVICE_PROC(NAME) NAME = (PFN_##NAME) vkGetDeviceProcAddr(m_device, #NAME);
-    FOREACH_DEVICE_PROC(LOAD_DEVICE_PROC)
-#undef LOAD_DEVICE_PROC
+    SLANG_RETURN_ON_FAIL(m_api.initDeviceProcs(m_device));
 
-        // Create a command pool
+    // Create a command pool
 
     VkCommandPoolCreateInfo commandPoolCreateInfo = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
     commandPoolCreateInfo.queueFamilyIndex = queueFamilyIndex;
     commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
-    RETURN_ON_VK_FAIL(vkCreateCommandPool(m_device, &commandPoolCreateInfo, nullptr, &m_commandPool));
+    RETURN_ON_VK_FAIL(m_api.vkCreateCommandPool(m_device, &commandPoolCreateInfo, nullptr, &m_commandPool));
 
-    vkGetDeviceQueue(m_device, queueFamilyIndex, 0, &m_queue);
+    m_api.vkGetDeviceQueue(m_device, queueFamilyIndex, 0, &m_queue);
 
     // set up swap chain
 
@@ -689,16 +605,16 @@ BufferResource* VKRenderer::createBufferResource(Resource::Usage initialUsage, c
         // directly.
         // Copy into staging buffer
         void* mappedData = nullptr;
-        checkResult(vkMapMemory(m_device, buffer->m_uploadBuffer.m_memory, 0, bufferSize, 0, &mappedData));
-        memcpy(mappedData, initData, bufferSize);
-        vkUnmapMemory(m_device, buffer->m_uploadBuffer.m_memory);
+        checkResult(m_api.vkMapMemory(m_device, buffer->m_uploadBuffer.m_memory, 0, bufferSize, 0, &mappedData));
+        ::memcpy(mappedData, initData, bufferSize);
+        m_api.vkUnmapMemory(m_device, buffer->m_uploadBuffer.m_memory);
 
         // Copy from staging buffer to real buffer
         VkCommandBuffer commandBuffer = beginCommandBuffer();
 
         VkBufferCopy copyInfo = {};
         copyInfo.size = bufferSize;
-        vkCmdCopyBuffer(commandBuffer, buffer->m_uploadBuffer.m_buffer, buffer->m_buffer.m_buffer, 1, &copyInfo);
+        m_api.vkCmdCopyBuffer(commandBuffer, buffer->m_uploadBuffer.m_buffer, buffer->m_buffer.m_buffer, 1, &copyInfo);
 
         flushCommandBuffer(commandBuffer);
     }
@@ -764,7 +680,7 @@ void* VKRenderer::map(BufferResource* bufferIn, MapFlavor flavor)
             }
 
             void* mappedData = nullptr;
-            checkResult(vkMapMemory(m_device, buffer->m_uploadBuffer.m_memory, 0, bufferSize, 0, &mappedData));
+            checkResult(m_api.vkMapMemory(m_device, buffer->m_uploadBuffer.m_memory, 0, bufferSize, 0, &mappedData));
             buffer->m_mapFlavor = flavor;
             return mappedData;
         }
@@ -783,16 +699,18 @@ void* VKRenderer::map(BufferResource* bufferIn, MapFlavor flavor)
 
             VkBufferCopy copyInfo = {};
             copyInfo.size = bufferSize;
-            vkCmdCopyBuffer(commandBuffer, buffer->m_buffer.m_buffer, staging.m_buffer, 1, &copyInfo);
+            m_api.vkCmdCopyBuffer(commandBuffer, buffer->m_buffer.m_buffer, staging.m_buffer, 1, &copyInfo);
 
             flushCommandBuffer(commandBuffer);
 
             // Write out the data from the buffer
             void* mappedData = nullptr;
-            checkResult(vkMapMemory(m_device, staging.m_memory, 0, bufferSize, 0, &mappedData));
+            checkResult(m_api.vkMapMemory(m_device, staging.m_memory, 0, bufferSize, 0, &mappedData));
 
             ::memcpy(buffer->m_readBuffer.Buffer(), mappedData, bufferSize);
-            vkUnmapMemory(m_device, staging.m_memory);
+            m_api.vkUnmapMemory(m_device, staging.m_memory);
+
+            buffer->m_mapFlavor = flavor;
 
             return buffer->m_readBuffer.Buffer();
         }
@@ -813,14 +731,14 @@ void VKRenderer::unmap(BufferResource* bufferIn)
         case MapFlavor::WriteDiscard:
         case MapFlavor::HostWrite:
         {
-            vkUnmapMemory(m_device, buffer->m_uploadBuffer.m_memory);
+            m_api.vkUnmapMemory(m_device, buffer->m_uploadBuffer.m_memory);
 
             // Copy from staging buffer to real buffer
             VkCommandBuffer commandBuffer = beginCommandBuffer();
 
             VkBufferCopy copyInfo = {};
             copyInfo.size = bufferSize;
-            vkCmdCopyBuffer(commandBuffer, buffer->m_uploadBuffer.m_buffer, buffer->m_buffer.m_buffer, 1, &copyInfo);
+            m_api.vkCmdCopyBuffer(commandBuffer, buffer->m_uploadBuffer.m_buffer, buffer->m_buffer.m_buffer, 1, &copyInfo);
 
             flushCommandBuffer(commandBuffer);
             break;
@@ -954,7 +872,7 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
     descriptorSetLayoutInfo.pBindings = dstBindings.Buffer();
 
     VkDescriptorSetLayout descriptorSetLayout = 0;
-    checkResult(vkCreateDescriptorSetLayout(m_device, &descriptorSetLayoutInfo, nullptr, &descriptorSetLayout));
+    checkResult(m_api.vkCreateDescriptorSetLayout(m_device, &descriptorSetLayoutInfo, nullptr, &descriptorSetLayout));
 
     // Create a descriptor pool for allocating sets
 
@@ -971,7 +889,7 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
     descriptorPoolInfo.pPoolSizes = poolSizes;
 
     VkDescriptorPool descriptorPool;
-    checkResult(vkCreateDescriptorPool(m_device, &descriptorPoolInfo, nullptr, &descriptorPool));
+    checkResult(m_api.vkCreateDescriptorPool(m_device, &descriptorPoolInfo, nullptr, &descriptorPool));
 
     // Create a descriptor set based on our layout
 
@@ -981,7 +899,7 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
     descriptorSetAllocInfo.pSetLayouts = &descriptorSetLayout;
 
     VkDescriptorSet descriptorSet;
-    checkResult(vkAllocateDescriptorSets(m_device, &descriptorSetAllocInfo, &descriptorSet));
+    checkResult(m_api.vkAllocateDescriptorSets(m_device, &descriptorSetAllocInfo, &descriptorSet));
 
     // Fill in the descriptor set, using our binding information
 
@@ -1012,7 +930,7 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
                     writeInfo.dstArrayElement = 0;
                     writeInfo.pBufferInfo = &bufferInfo;
 
-                    vkUpdateDescriptorSets(m_device, 1, &writeInfo, 0, nullptr);
+                    m_api.vkUpdateDescriptorSets(m_device, 1, &writeInfo, 0, nullptr);
                 }
                 break;
             }
@@ -1031,7 +949,7 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
     pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
 
     VkPipelineLayout pipelineLayout = 0;
-    checkResult(vkCreatePipelineLayout(m_device, &pipelineLayoutInfo, nullptr, &pipelineLayout));
+    checkResult(m_api.vkCreatePipelineLayout(m_device, &pipelineLayoutInfo, nullptr, &pipelineLayout));
 
     // Then create a pipeline to use that layout
 
@@ -1042,15 +960,15 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
     VkPipelineCache pipelineCache = 0;
 
     VkPipeline pipeline;
-    checkResult(vkCreateComputePipelines(m_device, pipelineCache, 1, &computePipelineInfo, nullptr, &pipeline));
+    checkResult(m_api.vkCreateComputePipelines(m_device, pipelineCache, 1, &computePipelineInfo, nullptr, &pipeline));
 
     // Also create descriptor sets based on the given pipeline layout
 
     VkCommandBuffer commandBuffer = beginCommandBuffer();
 
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
+    m_api.vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
 
-    vkCmdBindDescriptorSets(
+    m_api.vkCmdBindDescriptorSets(
         commandBuffer,
         VK_PIPELINE_BIND_POINT_COMPUTE,
         pipelineLayout,
@@ -1059,11 +977,11 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
         0,
         nullptr);
 
-    vkCmdDispatch(commandBuffer, x, y, z);
+    m_api.vkCmdDispatch(commandBuffer, x, y, z);
 
     flushCommandBuffer(commandBuffer);
 
-    vkDestroyPipeline(m_device, pipeline, nullptr);
+    m_api.vkDestroyPipeline(m_device, pipeline, nullptr);
 
     // TODO: need to free up the other resources too...
 }

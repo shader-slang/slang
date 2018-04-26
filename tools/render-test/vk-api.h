@@ -1,0 +1,129 @@
+// vk-api.h
+#pragma once
+
+#include "vk-module.h"
+
+namespace renderer_test {
+
+#define VK_API_GLOBAL_PROCS(x)          \
+    x(vkGetInstanceProcAddr)            \
+    x(vkCreateInstance)                 \
+    /* */
+
+#define VK_API_INSTANCE_PROCS(x)                \
+    x(vkCreateDevice)                           \
+    x(vkCreateDebugReportCallbackEXT)           \
+    x(vkDestroyDebugReportCallbackEXT)          \
+    x(vkDebugReportMessageEXT)                  \
+    x(vkEnumeratePhysicalDevices)               \
+    x(vkGetPhysicalDeviceProperties)            \
+    x(vkGetPhysicalDeviceFeatures)              \
+    x(vkGetPhysicalDeviceMemoryProperties)      \
+    x(vkGetPhysicalDeviceQueueFamilyProperties) \
+    x(vkGetDeviceProcAddr)                      \
+    /* */
+
+#define VK_API_DEVICE_PROCS(x)          \
+    x(vkCreateDescriptorPool)           \
+    x(vkCreateCommandPool)              \
+    x(vkGetDeviceQueue)                 \
+    x(vkAllocateCommandBuffers)         \
+    x(vkBeginCommandBuffer)             \
+    x(vkEndCommandBuffer)               \
+    x(vkQueueSubmit)                    \
+    x(vkQueueWaitIdle)                  \
+    x(vkFreeCommandBuffers)             \
+    x(vkCreateBuffer)                   \
+    x(vkGetBufferMemoryRequirements)    \
+    x(vkAllocateMemory)                 \
+    x(vkBindBufferMemory)               \
+    x(vkMapMemory)                      \
+    x(vkUnmapMemory)                    \
+    x(vkCmdCopyBuffer)                  \
+    x(vkDestroyBuffer)                  \
+    x(vkFreeMemory)                     \
+    x(vkCreateDescriptorSetLayout)      \
+    x(vkAllocateDescriptorSets)         \
+    x(vkUpdateDescriptorSets)           \
+    x(vkCreatePipelineLayout)           \
+    x(vkCreateComputePipelines)         \
+    x(vkCmdBindPipeline)                \
+    x(vkCmdBindDescriptorSets)          \
+    x(vkCmdDispatch)                    \
+    x(vkDestroyPipeline)                \
+    x(vkCreateShaderModule)             \
+    /* */
+
+
+#if SLANG_WINDOWS_FAMILY
+#   define VK_API_INSTANCE_PLATFORM_KHR_PROCS(x)          \
+    x(vkCreateWin32SurfaceKHR) \
+    /* */
+#else
+#   define VK_API_INSTANCE_PLATFORM_KHR_PROCS(x)          \
+    x(vkCreateXlibSurfaceKHR) \
+    /* */
+#endif
+
+#define VK_API_INSTANCE_KHR_PROCS(x)          \
+    VK_API_INSTANCE_PLATFORM_KHR_PROCS(x) \
+    x(vkGetPhysicalDeviceSurfaceSupportKHR) \
+    x(vkGetPhysicalDeviceSurfaceFormatsKHR) \
+    x(vkGetPhysicalDeviceSurfacePresentModesKHR) \
+    x(vkDestroySurfaceKHR) \
+    /* */
+
+#define VK_API_DEVICE_KHR_PROCS(x) \
+    x(vkQueuePresentKHR) \
+    x(vkCreateSwapchainKHR) \
+    x(vkGetSwapchainImagesKHR) \
+    x(vkDestroySwapchainKHR) \
+    x(vkAcquireNextImageKHR) \
+    /* */
+
+#define VK_API_ALL_GLOBAL_PROCS(x) \
+    VK_API_GLOBAL_PROCS(x)
+
+#define VK_API_ALL_INSTANCE_PROCS(x) \
+    VK_API_INSTANCE_PROCS(x) \
+    VK_API_INSTANCE_KHR_PROCS(x)
+
+#define VK_API_ALL_DEVICE_PROCS(x) \
+    VK_API_DEVICE_PROCS(x) \
+    VK_API_DEVICE_KHR_PROCS(x)
+
+#define VK_API_ALL_PROCS(x) \
+    VK_API_ALL_GLOBAL_PROCS(x) \
+    VK_API_ALL_INSTANCE_PROCS(x) \
+    VK_API_ALL_DEVICE_PROCS(x) \
+    /* */
+
+#define VK_API_DECLARE_PROC(NAME) PFN_##NAME NAME = nullptr;
+
+struct VulkanApi
+{
+    VK_API_ALL_PROCS(VK_API_DECLARE_PROC)
+
+    enum class ProcType 
+    {
+        Global,
+        Instance, 
+        Device,
+    };
+
+        /// Returns true if all the functions in the class are defined 
+    bool areDefined(ProcType type) const;
+
+        /// Sets up global parameters 
+    Slang::Result initGlobalProcs(const VulkanModule& module);
+        /// Initialize the instance functions
+    Slang::Result initInstanceProcs(VkInstance instance);
+        /// Initialize the device functions
+    Slang::Result initDeviceProcs(VkDevice device);
+
+    const VulkanModule* m_module = nullptr;               ///< Module this was all loaded from
+    VkInstance m_instance = VK_NULL_HANDLE;
+    VkDevice m_device = VK_NULL_HANDLE;
+};
+
+} // renderer_test
