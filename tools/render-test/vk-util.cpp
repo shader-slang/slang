@@ -41,6 +41,18 @@ namespace renderer_test {
 {
     assert(res != VK_SUCCESS);
     assert(!"Vulkan check failed");
+
+}
+
+/* static */VkPrimitiveTopology VulkanUtil::calcVkPrimitiveTopology(PrimitiveTopology topology)
+{
+    switch (topology)
+    {
+        case PrimitiveTopology::TriangleList:       return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+        default: break;
+    }
+    assert(!"Unknown topology");
+    return VK_PRIMITIVE_TOPOLOGY_MAX_ENUM;
 }
 
 } // renderer_test

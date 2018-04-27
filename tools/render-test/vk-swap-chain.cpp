@@ -49,11 +49,14 @@ SlangResult VulkanSwapChain::init(VulkanDeviceQueue* deviceQueue, const Desc& de
     surfaceFormats.SetSize(int(numSurfaceFormats));
     m_api->vkGetPhysicalDeviceSurfaceFormatsKHR(m_api->m_physicalDevice, m_surface, &numSurfaceFormats, surfaceFormats.Buffer());
 
-    m_swapchainFormat = VulkanUtil::calcVkFormat(desc.m_format);
-    if (m_swapchainFormat == VK_FORMAT_UNDEFINED)
+    m_format = VulkanUtil::calcVkFormat(desc.m_format);
+    if (m_format == VK_FORMAT_UNDEFINED)
     {
         return SLANG_FAIL;
     }
+
+    // Save the desc
+    m_desc = desc;
 
     /*
     // try to find BGR, fall back to RGB
@@ -81,7 +84,8 @@ SlangResult VulkanSwapChain::init(VulkanDeviceQueue* deviceQueue, const Desc& de
     }
     */
 
-    return initSwapchain();
+
+    return _createSwapChain();
 }
 
 void VulkanSwapChain::getWindowSize(int* widthOut, int* heightOut) const
@@ -104,8 +108,13 @@ void VulkanSwapChain::getWindowSize(int* widthOut, int* heightOut) const
 #endif
 }
 
-SlangResult VulkanSwapChain::initSwapchain()
+SlangResult VulkanSwapChain::_createSwapChain()
 {
+    if (hasValidSwapChain())
+    {
+        return SLANG_OK;
+    }
+
     int width, height; 
     getWindowSize(&width, &height);
 
@@ -128,24 +137,31 @@ SlangResult VulkanSwapChain::initSwapchain()
     presentModes.SetSize(numPresentModes);
     m_api->vkGetPhysicalDeviceSurfacePresentModesKHR(m_api->m_physicalDevice, m_surface, &numPresentModes, presentModes.Buffer());
 
-    VkPresentModeKHR presentOptions[] = { VK_PRESENT_MODE_IMMEDIATE_KHR, VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_FIFO_KHR };
-    if (m_vsync)
     {
-        presentOptions[0] = VK_PRESENT_MODE_FIFO_KHR;
-        presentOptions[1] = VK_PRESENT_MODE_IMMEDIATE_KHR;
-        presentOptions[2] = VK_PRESENT_MODE_MAILBOX_KHR;
-    }
-
-    for (int j = 0; j < 3; j++)
-    {
-        for (uint32_t i = 0; i < numPresentModes; i++)
+        int numCheckPresentOptions = 3;
+        VkPresentModeKHR presentOptions[] = { VK_PRESENT_MODE_IMMEDIATE_KHR, VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_FIFO_KHR };
+        if (m_vsync)
         {
-            if (presentModes[i] == presentOptions[j])
+            presentOptions[0] = VK_PRESENT_MODE_FIFO_KHR;
+            presentOptions[1] = VK_PRESENT_MODE_IMMEDIATE_KHR;
+            presentOptions[2] = VK_PRESENT_MODE_MAILBOX_KHR;
+        }
+
+        m_presentMode = VK_PRESENT_MODE_MAX_ENUM_KHR;       // Invalid
+
+        // Find the first option that's available on the device
+        for (int j = 0; j < numCheckPresentOptions; j++)
+        {
+            if (presentModes.IndexOf(presentOptions[j]) != UInt(-1))
             {
                 m_presentMode = presentOptions[j];
-                j = 3;
                 break;
-            }
+            } 
+        } 
+
+        if (m_presentMode == VK_PRESENT_MODE_MAX_ENUM_KHR)
+        {
+            return SLANG_FAIL;
         }
     }
 
@@ -155,7 +171,7 @@ SlangResult VulkanSwapChain::initSwapchain()
     swapchainDesc.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
     swapchainDesc.surface = m_surface;
     swapchainDesc.minImageCount = 3;
-    swapchainDesc.imageFormat = m_swapchainFormat;
+    swapchainDesc.imageFormat = m_format;
     swapchainDesc.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
     swapchainDesc.imageExtent = imageExtent;
     swapchainDesc.imageArrayLayers = 1;
@@ -171,14 +187,48 @@ SlangResult VulkanSwapChain::initSwapchain()
 
     uint32_t numSwapChainImages = 0;
     m_api->vkGetSwapchainImagesKHR(m_api->m_device, m_swapChain, &numSwapChainImages, nullptr);
-    if (numSwapChainImages > kMaxImages)
+    
     {
-        numSwapChainImages = kMaxImages;
+        List<VkImage> images;
+        images.SetSize(numSwapChainImages);
+
+        m_api->vkGetSwapchainImagesKHR(m_api->m_device, m_swapChain, &numSwapChainImages, images.Buffer());
+    
+        m_images.SetSize(numSwapChainImages);
+        for (int i = 0; i < int(numSwapChainImages); ++i)
+        {
+            Image& dstImage = m_images[i];
+            dstImage.m_image = images[i];
+         
+        }
     }
 
-    m_api->vkGetSwapchainImagesKHR(m_api->m_device, m_swapChain, &numSwapChainImages, m_images);
-    m_numImages = int(numSwapChainImages);
+    {
+        VkImageViewCreateInfo createInfo = {};
+        createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        
+        createInfo.format = m_format;
+        
+        createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+        createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+        createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+        createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
 
+        createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        createInfo.subresourceRange.baseMipLevel = 0;
+        createInfo.subresourceRange.levelCount = 1;
+        createInfo.subresourceRange.baseArrayLayer = 0;
+        createInfo.subresourceRange.layerCount = 1;
+
+        for (int i = 0; i < int(numSwapChainImages); ++i)
+        {
+            Image& image = m_images[i];
+
+            createInfo.image = image.m_image;
+      
+            SLANG_VK_RETURN_ON_FAIL(m_api->vkCreateImageView(m_api->m_device, &createInfo, nullptr, &image.m_imageView));
+        }
+    }
 #if 0
     for (NvFlowUint idx = 0; idx < ptr->numSwapchainImages; idx++)
     {
@@ -207,9 +257,23 @@ SlangResult VulkanSwapChain::initSwapchain()
     return SLANG_OK;
 }
 
-void VulkanSwapChain::destroySwapchain()
+void VulkanSwapChain::_destroySwapChain()
 {
+    if (!hasValidSwapChain())
+    {
+        return;   
+    }
+
     m_deviceQueue->waitForIdle();
+
+    for (int i = 0; i < int(m_images.Count()); ++i)
+    {
+        Image& image = m_images[i];
+        if (image.m_imageView != VK_NULL_HANDLE)
+        {
+            m_api->vkDestroyImageView(m_api->m_device, image.m_imageView, nullptr);
+        }
+    }
 
 #if 0
     if (m_depthBuffer)
@@ -230,11 +294,14 @@ void VulkanSwapChain::destroySwapchain()
         m_api->vkDestroySwapchainKHR(m_api->m_device, m_swapChain, nullptr);
         m_swapChain = VK_NULL_HANDLE;
     }
+
+    // Mark that it is no longer used
+    m_images.Clear();
 }
 
 VulkanSwapChain::~VulkanSwapChain()
 {
-    destroySwapchain();
+    _destroySwapChain();
    
     if (m_surface)
     {
@@ -243,8 +310,13 @@ VulkanSwapChain::~VulkanSwapChain()
     }
 }
 
-TextureResource* VulkanSwapChain::getFrontRenderTargetVulkan()
+TextureResource* VulkanSwapChain::getFrontRenderTarget()
 {
+    if (!hasValidSwapChain())
+    {
+        SLANG_RETURN_NULL_ON_FAIL(_createSwapChain());
+    }
+
     VkSemaphore beginFrameSemaphore = m_deviceQueue->makeCurrent(VulkanDeviceQueue::EventType::BeginFrame);
     
     uint32_t swapChainIndex = 0;
@@ -252,26 +324,22 @@ TextureResource* VulkanSwapChain::getFrontRenderTargetVulkan()
 
     if (result != VK_SUCCESS)
     {
-        destroySwapchain();
-
-        //ptr->valid = NV_FLOW_FALSE;
+        _destroySwapChain();
         return nullptr;
     }
     m_currentSwapChainIndex = int(swapChainIndex);
 
-    //return ptr->renderTargets[ptr->currentSwapchainIdx];
+    //return m_renderTargets[m_currentSwapChainIndex];
     return nullptr;
 }
 
 void VulkanSwapChain::present(bool vsync)
 {
-#if 0
-    if (ptr->valid == NV_FLOW_FALSE)
+    if (!hasValidSwapChain())
     {
-        NvFlowDeviceQueueFlush(&ptr->deviceQueue->deviceQueue);
+        m_deviceQueue->flushStep();
         return;
     }
-#endif
 
     VkSemaphore endFrameSemaphore = m_deviceQueue->makeCurrent(VulkanDeviceQueue::EventType::EndFrame);
     
@@ -293,16 +361,11 @@ void VulkanSwapChain::present(bool vsync)
     
     m_deviceQueue->flushStepB();
     
-#if 0
     if (result != VK_SUCCESS || m_vsync != vsync)
     {
         m_vsync = vsync;
-        destroySwapchain();
-        ptr->valid = NV_FLOW_FALSE;
+        _destroySwapChain();
     }
-#endif
 }
-
-
 
 } // renderer_test

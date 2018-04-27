@@ -71,6 +71,9 @@ namespace renderer_test {
     x(vkBeginCommandBuffer)             \
     x(vkEndCommandBuffer)               \
     x(vkResetCommandBuffer) \
+    \
+    x(vkCreateImageView) \
+    x(vkDestroyImageView) \
     /* */
 
 #if SLANG_WINDOWS_FAMILY

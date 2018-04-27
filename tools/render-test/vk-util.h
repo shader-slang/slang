@@ -18,6 +18,8 @@ struct VulkanUtil
         /// Handles a failure
     static Slang::Result handleFail(VkResult res);
 
+    static VkPrimitiveTopology calcVkPrimitiveTopology(PrimitiveTopology topology);
+
         /// Called when a failure has occured with SLANG_VK_CHECK - will typically assert.
     static void checkFail(VkResult res);
 

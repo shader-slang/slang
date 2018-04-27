@@ -172,6 +172,8 @@ public:
     List<BoundVertexBuffer> m_boundVertexBuffers;
     List<RefPtr<BufferResourceImpl> > m_boundConstantBuffers;
 
+    VkPrimitiveTopology m_primitiveTopology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+
     VkDevice m_device = VK_NULL_HANDLE;
 
     VulkanModule m_module;
@@ -328,7 +330,6 @@ SlangResult VKRenderer::initialize(void* inWindowHandle)
 
     SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateInstance(&instanceCreateInfo, nullptr, &instance));
     SLANG_RETURN_ON_FAIL(m_api.initInstanceProcs(instance));
-
 
 #if ENABLE_VALIDATION_LAYER
     VkDebugReportFlagsEXT debugFlags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
@@ -577,6 +578,9 @@ void* VKRenderer::map(BufferResource* bufferIn, MapFlavor flavor)
     BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(bufferIn);
     assert(buffer->m_mapFlavor == MapFlavor::Unknown);
 
+    // Make sure everything has completed before reading...
+    m_deviceQueue.flushAndWait();
+
     const size_t bufferSize = buffer->getDesc().sizeInBytes;
 
     switch (flavor)
@@ -668,6 +672,7 @@ void VKRenderer::setInputLayout(InputLayout* inputLayout)
 
 void VKRenderer::setPrimitiveTopology(PrimitiveTopology topology)
 {
+    m_primitiveTopology = VulkanUtil::calcVkPrimitiveTopology(topology);
 }
 
 void VKRenderer::setVertexBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* strides, const UInt* offsets)
