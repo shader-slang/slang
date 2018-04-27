@@ -22,8 +22,6 @@
 namespace renderer_test {
 using namespace Slang;
 
-#define RETURN_ON_VK_FAIL(x) { VkResult _vkRes = x; if (_vkRes != VK_SUCCESS) { SLANG_RETURN_ON_FAIL(toSlangResult(_vkRes)); }}
-
 class VKRenderer : public Renderer, public ShaderCompiler
 {
 public:
@@ -60,6 +58,10 @@ public:
     {
         public:
         
+            
+            /// Initialize a buffer with specified size, and memory props 
+        Result init(const VulkanApi& api, size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties);
+
             /// Returns true if has been initialized
         bool isInitialized() const { return m_api != nullptr; }
         
@@ -80,7 +82,7 @@ public:
 
         VkBuffer m_buffer;
         VkDeviceMemory m_memory;
-        VulkanApi* m_api;
+        const VulkanApi* m_api;
     };
     
     class InputLayoutImpl : public InputLayout
@@ -153,22 +155,13 @@ public:
     VkCommandBuffer beginCommandBuffer();
     void flushCommandBuffer(VkCommandBuffer commandBuffer);
     
-    uint32_t getMemoryTypeIndex(uint32_t inTypeBits, VkMemoryPropertyFlags properties);
-
     VkPipelineShaderStageCreateInfo compileEntryPoint(const ShaderCompileRequest::EntryPoint& entryPointRequest, VkShaderStageFlagBits stage, List<char>& bufferOut);
 
-    SlangResult _initBuffer(size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties, Buffer& bufferOut);
-
-    static SlangResult toSlangResult(VkResult res);
-    static void checkResult(VkResult result);
     static VKAPI_ATTR VkBool32 VKAPI_CALL debugMessageCallback(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t srcObject,
         size_t location, int32_t msgCode, const char* pLayerPrefix, const char* pMsg, void* pUserData);
 
     VkInstance                          m_instance = VK_NULL_HANDLE;
-    VkPhysicalDevice                    m_physicalDevice = VK_NULL_HANDLE;
-    VkPhysicalDeviceProperties          m_deviceProperties;
-    VkPhysicalDeviceFeatures            m_deviceFeatures;
-    VkPhysicalDeviceMemoryProperties    m_deviceMemoryProperties;
+    
     VkDevice                            m_device  = VK_NULL_HANDLE;
     VkQueue                             m_queue  = VK_NULL_HANDLE;
     VkCommandPool                       m_commandPool = VK_NULL_HANDLE;
@@ -186,19 +179,47 @@ public:
     float m_clearColor[4] = { 0, 0, 0, 0 };;
 };
 
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! VkRenderer::Buffer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+
+Result VKRenderer::Buffer::init(const VulkanApi& api, size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties)
+{
+    assert(!isInitialized());
+
+    m_api = &api;
+    m_memory = VK_NULL_HANDLE;
+    m_buffer = VK_NULL_HANDLE;
+
+    VkBufferCreateInfo bufferCreateInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+    bufferCreateInfo.size = bufferSize;
+    bufferCreateInfo.usage = usage;
+
+    SLANG_VK_CHECK(api.vkCreateBuffer(api.m_device, &bufferCreateInfo, nullptr, &m_buffer));
+
+    VkMemoryRequirements memoryReqs = {};
+    api.vkGetBufferMemoryRequirements(api.m_device, m_buffer, &memoryReqs);
+
+    int memoryTypeIndex = api.findMemoryTypeIndex(memoryReqs.memoryTypeBits, reqMemoryProperties);
+    assert(memoryTypeIndex >= 0);
+
+    VkMemoryPropertyFlags actualMemoryProperites = api.m_deviceMemoryProperties.memoryTypes[memoryTypeIndex].propertyFlags;
+
+    VkMemoryAllocateInfo allocateInfo = { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
+    allocateInfo.allocationSize = memoryReqs.size;
+    allocateInfo.memoryTypeIndex = memoryTypeIndex;
+
+    SLANG_VK_CHECK(api.vkAllocateMemory(api.m_device, &allocateInfo, nullptr, &m_memory));
+    SLANG_VK_CHECK(api.vkBindBufferMemory(api.m_device, m_buffer, m_memory, 0));
+
+    return SLANG_OK;
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! VkRenderer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+
 Renderer* createVKRenderer()
 {
     return new VKRenderer;
-}
-
-/* static */SlangResult VKRenderer::toSlangResult(VkResult res)
-{
-    return (res == VK_SUCCESS) ? SLANG_OK : SLANG_FAIL;
-}
-
-void VKRenderer::checkResult(VkResult result)
-{
-    assert(result == VK_SUCCESS);
 }
 
 VkBool32 VKRenderer::handleDebugMessage(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t srcObject,
@@ -240,7 +261,7 @@ VkCommandBuffer VKRenderer::getCommandBuffer()
     info.commandBufferCount = 1;
 
     VkCommandBuffer commandBuffer;
-    checkResult(m_api.vkAllocateCommandBuffers(m_device, &info, &commandBuffer));
+    SLANG_VK_CHECK(m_api.vkAllocateCommandBuffers(m_device, &info, &commandBuffer));
 
     return commandBuffer;
 }
@@ -250,73 +271,26 @@ VkCommandBuffer VKRenderer::beginCommandBuffer()
     VkCommandBuffer commandBuffer = getCommandBuffer();
 
     VkCommandBufferBeginInfo beginInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
-    checkResult(m_api.vkBeginCommandBuffer(commandBuffer, &beginInfo));
+    SLANG_VK_CHECK(m_api.vkBeginCommandBuffer(commandBuffer, &beginInfo));
 
     return commandBuffer;
 }
 
 void VKRenderer::flushCommandBuffer(VkCommandBuffer commandBuffer)
 {
-    checkResult(m_api.vkEndCommandBuffer(commandBuffer));
+    SLANG_VK_CHECK(m_api.vkEndCommandBuffer(commandBuffer));
 
     VkSubmitInfo submitInfo = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &commandBuffer;
 
-    checkResult(m_api.vkQueueSubmit(m_queue, 1, &submitInfo, VK_NULL_HANDLE));
-    checkResult(m_api.vkQueueWaitIdle(m_queue));
+    SLANG_VK_CHECK(m_api.vkQueueSubmit(m_queue, 1, &submitInfo, VK_NULL_HANDLE));
+    SLANG_VK_CHECK(m_api.vkQueueWaitIdle(m_queue));
 
     m_api.vkFreeCommandBuffers(m_device, m_commandPool, 1, &commandBuffer);
 }
 
-SlangResult VKRenderer::_initBuffer(size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties, Buffer& bufferOut)
-{
-    assert(!bufferOut.isInitialized());
 
-    bufferOut.m_api = &m_api;
-    bufferOut.m_memory = VK_NULL_HANDLE;
-    bufferOut.m_buffer = VK_NULL_HANDLE;
-    
-    VkBufferCreateInfo bufferCreateInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
-    bufferCreateInfo.size = bufferSize;
-    bufferCreateInfo.usage = usage;
-
-    checkResult(m_api.vkCreateBuffer(m_device, &bufferCreateInfo, nullptr, &bufferOut.m_buffer));
-
-    VkMemoryRequirements memoryReqs = {};
-    m_api.vkGetBufferMemoryRequirements(m_device, bufferOut.m_buffer, &memoryReqs);
-
-    uint32_t memoryTypeIndex = getMemoryTypeIndex(memoryReqs.memoryTypeBits, reqMemoryProperties);
-
-    VkMemoryPropertyFlags actualMemoryProperites = m_deviceMemoryProperties.memoryTypes[memoryTypeIndex].propertyFlags;
-
-    VkMemoryAllocateInfo allocateInfo = { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
-    allocateInfo.allocationSize = memoryReqs.size;
-    allocateInfo.memoryTypeIndex = memoryTypeIndex;
-
-    checkResult(m_api.vkAllocateMemory(m_device, &allocateInfo, nullptr, &bufferOut.m_memory));
-    checkResult(m_api.vkBindBufferMemory(m_device, bufferOut.m_buffer, bufferOut.m_memory, 0));
-
-    return SLANG_OK;
-}
-
-uint32_t VKRenderer::getMemoryTypeIndex(uint32_t inTypeBits, VkMemoryPropertyFlags properties)
-{
-    uint32_t typeBits = inTypeBits;
-    uint32_t typeIndex = 0;
-    while (typeBits)
-    {
-        if ((m_deviceMemoryProperties.memoryTypes[typeIndex].propertyFlags & properties) == properties)
-        {
-            return typeIndex;
-        }
-        typeIndex++;
-        typeBits >>= 1;
-    }
-
-    assert(!"failed to find a usable memory type");
-    return uint32_t(-1);
-}
 
 VkPipelineShaderStageCreateInfo VKRenderer::compileEntryPoint(const ShaderCompileRequest::EntryPoint& entryPointRequest, VkShaderStageFlagBits stage, List<char>& bufferOut)
 {
@@ -336,7 +310,7 @@ VkPipelineShaderStageCreateInfo VKRenderer::compileEntryPoint(const ShaderCompil
     moduleCreateInfo.codeSize = codeSize;
 
     VkShaderModule module;
-    checkResult(m_api.vkCreateShaderModule(m_device, &moduleCreateInfo, nullptr, &module));
+    SLANG_VK_CHECK(m_api.vkCreateShaderModule(m_device, &moduleCreateInfo, nullptr, &module));
 
     //::free(codeBegin);
 
@@ -389,7 +363,7 @@ SlangResult VKRenderer::initialize(void* inWindowHandle)
     instanceCreateInfo.ppEnabledLayerNames = layerNames;
 #endif
 
-    RETURN_ON_VK_FAIL(m_api.vkCreateInstance(&instanceCreateInfo, nullptr, &m_instance));
+    SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateInstance(&instanceCreateInfo, nullptr, &m_instance));
     SLANG_RETURN_ON_FAIL(m_api.initInstanceProcs(m_instance));
 
 
@@ -401,45 +375,24 @@ SlangResult VKRenderer::initialize(void* inWindowHandle)
     debugCreateInfo.pUserData = this;
     debugCreateInfo.flags = debugFlags;
 
-    RETURN_ON_VK_FAIL(m_api.vkCreateDebugReportCallbackEXT(m_instance, &debugCreateInfo, nullptr, &m_debugReportCallback));
+    SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateDebugReportCallbackEXT(m_instance, &debugCreateInfo, nullptr, &m_debugReportCallback));
 #endif
 
     uint32_t numPhysicalDevices = 0;
-    RETURN_ON_VK_FAIL(m_api.vkEnumeratePhysicalDevices(m_instance, &numPhysicalDevices, nullptr));
+    SLANG_VK_RETURN_ON_FAIL(m_api.vkEnumeratePhysicalDevices(m_instance, &numPhysicalDevices, nullptr));
 
     List<VkPhysicalDevice> physicalDevices;
     physicalDevices.SetSize(numPhysicalDevices);
-    RETURN_ON_VK_FAIL(m_api.vkEnumeratePhysicalDevices(m_instance, &numPhysicalDevices, physicalDevices.Buffer()));
+    SLANG_VK_RETURN_ON_FAIL(m_api.vkEnumeratePhysicalDevices(m_instance, &numPhysicalDevices, physicalDevices.Buffer()));
 
-    uint32_t selectedDeviceIndex = 0;
     // TODO: allow override of selected device
-    m_physicalDevice = physicalDevices[selectedDeviceIndex];
-
-    m_api.vkGetPhysicalDeviceProperties(m_physicalDevice, &m_deviceProperties);
-    m_api.vkGetPhysicalDeviceFeatures(m_physicalDevice, &m_deviceFeatures);
-    m_api.vkGetPhysicalDeviceMemoryProperties(m_physicalDevice, &m_deviceMemoryProperties);
-
-    uint32_t numQueueFamilies = 0;
-    m_api.vkGetPhysicalDeviceQueueFamilyProperties(m_physicalDevice, &numQueueFamilies, nullptr);
-
-    List<VkQueueFamilyProperties> queueFamilies;
-    queueFamilies.SetSize(numQueueFamilies);
-    m_api.vkGetPhysicalDeviceQueueFamilyProperties(m_physicalDevice, &numQueueFamilies, queueFamilies.Buffer());
-
-    // Find a queue that can service our needs
-    VkQueueFlags reqQueueFlags = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT;
-
-    int queueFamilyIndex = -1;
-    for (int i = 0; i < int(numQueueFamilies); ++i)
-    {
-        if ((queueFamilies[i].queueFlags & reqQueueFlags) == reqQueueFlags)
-        {
-            queueFamilyIndex = i;
-            break;
-        }
-    }
-    assert(queueFamilyIndex >= 0 && queueFamilyIndex < int(numQueueFamilies));
+    uint32_t selectedDeviceIndex = 0;
     
+    SLANG_RETURN_ON_FAIL(m_api.initPhysicalDevice(physicalDevices[selectedDeviceIndex]));
+    
+    int queueFamilyIndex = m_api.findQueue(VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT);
+    assert(queueFamilyIndex >= 0);
+
     float queuePriority = 0.0f;
     VkDeviceQueueCreateInfo queueCreateInfo = { VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO };
     queueCreateInfo.queueFamilyIndex = queueFamilyIndex;
@@ -454,14 +407,13 @@ SlangResult VKRenderer::initialize(void* inWindowHandle)
     VkDeviceCreateInfo deviceCreateInfo = { VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
     deviceCreateInfo.queueCreateInfoCount = 1;
     deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
-    deviceCreateInfo.pEnabledFeatures = &m_deviceFeatures;
+    deviceCreateInfo.pEnabledFeatures = &m_api.m_deviceFeatures;
 
-    deviceCreateInfo.enabledExtensionCount = sizeof(deviceExtensions) / sizeof(deviceExtensions[0]);
-    deviceCreateInfo.ppEnabledExtensionNames = &deviceExtensions[0];
+    deviceCreateInfo.enabledExtensionCount = SLANG_COUNT_OF(deviceExtensions);
+    deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions;
 
-    RETURN_ON_VK_FAIL(m_api.vkCreateDevice(m_physicalDevice, &deviceCreateInfo, nullptr, &m_device));
-
-    SLANG_RETURN_ON_FAIL(m_api.initDeviceProcs(m_physicalDevice, m_device));
+    SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateDevice(m_api.m_physicalDevice, &deviceCreateInfo, nullptr, &m_device));
+    SLANG_RETURN_ON_FAIL(m_api.initDeviceProcs(m_device));
 
     // Create a command pool
 
@@ -469,7 +421,7 @@ SlangResult VKRenderer::initialize(void* inWindowHandle)
     commandPoolCreateInfo.queueFamilyIndex = queueFamilyIndex;
     commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
-    RETURN_ON_VK_FAIL(m_api.vkCreateCommandPool(m_device, &commandPoolCreateInfo, nullptr, &m_commandPool));
+    SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateCommandPool(m_device, &commandPoolCreateInfo, nullptr, &m_commandPool));
 
     m_api.vkGetDeviceQueue(m_device, queueFamilyIndex, 0, &m_queue);
 
@@ -592,11 +544,11 @@ BufferResource* VKRenderer::createBufferResource(Resource::Usage initialUsage, c
     }
 
     RefPtr<BufferResourceImpl> buffer(new BufferResourceImpl(initialUsage, desc, this));
-    SLANG_RETURN_NULL_ON_FAIL(_initBuffer(desc.sizeInBytes, usage, reqMemoryProperties, buffer->m_buffer));
+    SLANG_RETURN_NULL_ON_FAIL(buffer->m_buffer.init(m_api, desc.sizeInBytes, usage, reqMemoryProperties));
 
     if ((desc.cpuAccessFlags & Resource::AccessFlag::Write) || initData)
     {
-        SLANG_RETURN_NULL_ON_FAIL(_initBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, buffer->m_uploadBuffer));
+        SLANG_RETURN_NULL_ON_FAIL(buffer->m_uploadBuffer.init(m_api, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
     }
 
     if (initData)
@@ -606,7 +558,7 @@ BufferResource* VKRenderer::createBufferResource(Resource::Usage initialUsage, c
         // directly.
         // Copy into staging buffer
         void* mappedData = nullptr;
-        checkResult(m_api.vkMapMemory(m_device, buffer->m_uploadBuffer.m_memory, 0, bufferSize, 0, &mappedData));
+        SLANG_VK_CHECK(m_api.vkMapMemory(m_device, buffer->m_uploadBuffer.m_memory, 0, bufferSize, 0, &mappedData));
         ::memcpy(mappedData, initData, bufferSize);
         m_api.vkUnmapMemory(m_device, buffer->m_uploadBuffer.m_memory);
 
@@ -668,7 +620,7 @@ void* VKRenderer::map(BufferResource* bufferIn, MapFlavor flavor)
             }
 
             void* mappedData = nullptr;
-            checkResult(m_api.vkMapMemory(m_device, buffer->m_uploadBuffer.m_memory, 0, bufferSize, 0, &mappedData));
+            SLANG_VK_CHECK(m_api.vkMapMemory(m_device, buffer->m_uploadBuffer.m_memory, 0, bufferSize, 0, &mappedData));
             buffer->m_mapFlavor = flavor;
             return mappedData;
         }
@@ -680,7 +632,7 @@ void* VKRenderer::map(BufferResource* bufferIn, MapFlavor flavor)
             // create staging buffer
             Buffer staging;
 
-            SLANG_RETURN_NULL_ON_FAIL(_initBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, staging));
+            SLANG_RETURN_NULL_ON_FAIL(staging.init(m_api, bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
 
             // Copy from real buffer to staging buffer
             VkCommandBuffer commandBuffer = beginCommandBuffer();
@@ -693,7 +645,7 @@ void* VKRenderer::map(BufferResource* bufferIn, MapFlavor flavor)
 
             // Write out the data from the buffer
             void* mappedData = nullptr;
-            checkResult(m_api.vkMapMemory(m_device, staging.m_memory, 0, bufferSize, 0, &mappedData));
+            SLANG_VK_CHECK(m_api.vkMapMemory(m_device, staging.m_memory, 0, bufferSize, 0, &mappedData));
 
             ::memcpy(buffer->m_readBuffer.Buffer(), mappedData, bufferSize);
             m_api.vkUnmapMemory(m_device, staging.m_memory);
@@ -860,7 +812,7 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
     descriptorSetLayoutInfo.pBindings = dstBindings.Buffer();
 
     VkDescriptorSetLayout descriptorSetLayout = 0;
-    checkResult(m_api.vkCreateDescriptorSetLayout(m_device, &descriptorSetLayoutInfo, nullptr, &descriptorSetLayout));
+    SLANG_VK_CHECK(m_api.vkCreateDescriptorSetLayout(m_device, &descriptorSetLayoutInfo, nullptr, &descriptorSetLayout));
 
     // Create a descriptor pool for allocating sets
 
@@ -877,7 +829,7 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
     descriptorPoolInfo.pPoolSizes = poolSizes;
 
     VkDescriptorPool descriptorPool;
-    checkResult(m_api.vkCreateDescriptorPool(m_device, &descriptorPoolInfo, nullptr, &descriptorPool));
+    SLANG_VK_CHECK(m_api.vkCreateDescriptorPool(m_device, &descriptorPoolInfo, nullptr, &descriptorPool));
 
     // Create a descriptor set based on our layout
 
@@ -887,7 +839,7 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
     descriptorSetAllocInfo.pSetLayouts = &descriptorSetLayout;
 
     VkDescriptorSet descriptorSet;
-    checkResult(m_api.vkAllocateDescriptorSets(m_device, &descriptorSetAllocInfo, &descriptorSet));
+    SLANG_VK_CHECK(m_api.vkAllocateDescriptorSets(m_device, &descriptorSetAllocInfo, &descriptorSet));
 
     // Fill in the descriptor set, using our binding information
 
@@ -937,7 +889,7 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
     pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
 
     VkPipelineLayout pipelineLayout = 0;
-    checkResult(m_api.vkCreatePipelineLayout(m_device, &pipelineLayoutInfo, nullptr, &pipelineLayout));
+    SLANG_VK_CHECK(m_api.vkCreatePipelineLayout(m_device, &pipelineLayoutInfo, nullptr, &pipelineLayout));
 
     // Then create a pipeline to use that layout
 
@@ -948,7 +900,7 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
     VkPipelineCache pipelineCache = 0;
 
     VkPipeline pipeline;
-    checkResult(m_api.vkCreateComputePipelines(m_device, pipelineCache, 1, &computePipelineInfo, nullptr, &pipeline));
+    SLANG_VK_CHECK(m_api.vkCreateComputePipelines(m_device, pipelineCache, 1, &computePipelineInfo, nullptr, &pipeline));
 
     // Also create descriptor sets based on the given pipeline layout
 

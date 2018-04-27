@@ -1,6 +1,8 @@
 // vk-api.cpp
 #include "vk-api.h"
 
+#include "../../source/core/list.h"
+
 namespace renderer_test {
 using namespace Slang;
 
@@ -56,7 +58,19 @@ Slang::Result VulkanApi::initInstanceProcs(VkInstance instance)
     return SLANG_OK;
 }
 
-Slang::Result VulkanApi::initDeviceProcs(VkPhysicalDevice physicalDevice, VkDevice device)
+Slang::Result VulkanApi::initPhysicalDevice(VkPhysicalDevice physicalDevice)
+{
+    assert(m_physicalDevice == VK_NULL_HANDLE);
+    m_physicalDevice = physicalDevice;
+
+    vkGetPhysicalDeviceProperties(m_physicalDevice, &m_deviceProperties);
+    vkGetPhysicalDeviceFeatures(m_physicalDevice, &m_deviceFeatures);
+    vkGetPhysicalDeviceMemoryProperties(m_physicalDevice, &m_deviceMemoryProperties);
+
+    return SLANG_OK;
+}
+
+Slang::Result VulkanApi::initDeviceProcs(VkDevice device)
 {
     assert(m_instance && device && vkGetDeviceProcAddr != nullptr);
 
@@ -70,11 +84,53 @@ Slang::Result VulkanApi::initDeviceProcs(VkPhysicalDevice physicalDevice, VkDevi
     }
 
     m_device = device;
-    m_physicalDevice = physicalDevice;
     return SLANG_OK;
 }
 
+int VulkanApi::findMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties) const
+{
+    const int numMemoryTypes = int(m_deviceMemoryProperties.memoryTypeCount);
+    
+    // bit holds current test bit against typeBits. Ie bit == 1 << typeBits 
+    
+    uint32_t bit = 1;       
+    for (int i = 0;  (typeBits != 0) && i < numMemoryTypes; ++i, bit += bit)
+    {
+        auto const& memoryType = m_deviceMemoryProperties.memoryTypes[i];
+        if ((typeBits & bit) && (memoryType.propertyFlags & properties) == properties)
+        {
+            return i;
+        }
+    }
 
+    //assert(!"failed to find a usable memory type");
+    return -1;
+}
 
+int VulkanApi::findQueue(VkQueueFlags reqFlags) const
+{
+    assert(m_physicalDevice != VK_NULL_HANDLE);
+
+    uint32_t numQueueFamilies = 0;
+    vkGetPhysicalDeviceQueueFamilyProperties(m_physicalDevice, &numQueueFamilies, nullptr);
+
+    Slang::List<VkQueueFamilyProperties> queueFamilies;
+    queueFamilies.SetSize(numQueueFamilies);
+    vkGetPhysicalDeviceQueueFamilyProperties(m_physicalDevice, &numQueueFamilies, queueFamilies.Buffer());
+
+    // Find a queue that can service our needs
+    //VkQueueFlags reqQueueFlags = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT;
+
+    int queueFamilyIndex = -1;
+    for (int i = 0; i < int(numQueueFamilies); ++i)
+    {
+        if ((queueFamilies[i].queueFlags & reqFlags) == reqFlags)
+        {
+            return i;
+        }
+    }
+
+    return -1;
+}
 
 } // renderer_test

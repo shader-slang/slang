@@ -132,13 +132,29 @@ struct VulkanApi
     Slang::Result initGlobalProcs(const VulkanModule& module);
         /// Initialize the instance functions
     Slang::Result initInstanceProcs(VkInstance instance);
+
+        /// Called before initDevice
+    Slang::Result initPhysicalDevice(VkPhysicalDevice physicalDevice);
+
         /// Initialize the device functions
-    Slang::Result initDeviceProcs(VkPhysicalDevice physicalDevice, VkDevice device);
+    Slang::Result initDeviceProcs(VkDevice device);
+
+        /// Type bits control which indices are tested against bit 0 for testing at index 0
+        /// properties - a memory type must have all the bits set as passed in
+        /// Returns -1 if couldn't find an appropriate memory type index
+    int findMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties) const;
+
+        /// Given queue required flags, finds a queue
+    int findQueue(VkQueueFlags reqFlags) const;
 
     const VulkanModule* m_module = nullptr;               ///< Module this was all loaded from
     VkInstance m_instance = VK_NULL_HANDLE;
     VkDevice m_device = VK_NULL_HANDLE;
     VkPhysicalDevice m_physicalDevice = VK_NULL_HANDLE;
+
+    VkPhysicalDeviceProperties          m_deviceProperties;
+    VkPhysicalDeviceFeatures            m_deviceFeatures;
+    VkPhysicalDeviceMemoryProperties    m_deviceMemoryProperties;
 };
 
 } // renderer_test

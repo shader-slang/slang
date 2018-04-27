@@ -19,4 +19,24 @@ namespace renderer_test {
     }
 }
 
+/* static */SlangResult VulkanUtil::toSlangResult(VkResult res)
+{
+    return (res == VK_SUCCESS) ? SLANG_OK : SLANG_FAIL;
+}
+
+/* static */Slang::Result VulkanUtil::handleFail(VkResult res)
+{
+    if (res != VK_SUCCESS)
+    {
+        assert(!"Vulkan returned a failure");
+    }
+    return toSlangResult(res);
+}
+
+/* static */void VulkanUtil::checkFail(VkResult res)
+{
+    assert(res != VK_SUCCESS);
+    assert(!"Vulkan check failed");
+}
+
 } // renderer_test
