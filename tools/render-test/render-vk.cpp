@@ -290,8 +290,6 @@ void VKRenderer::flushCommandBuffer(VkCommandBuffer commandBuffer)
     m_api.vkFreeCommandBuffers(m_device, m_commandPool, 1, &commandBuffer);
 }
 
-
-
 VkPipelineShaderStageCreateInfo VKRenderer::compileEntryPoint(const ShaderCompileRequest::EntryPoint& entryPointRequest, VkShaderStageFlagBits stage, List<char>& bufferOut)
 {
     char const* dataBegin = entryPointRequest.source.dataBegin;

@@ -25,14 +25,9 @@ namespace renderer_test {
 
 #define VK_API_DEVICE_PROCS(x)          \
     x(vkCreateDescriptorPool)           \
-    x(vkCreateCommandPool)              \
     x(vkGetDeviceQueue)                 \
-    x(vkAllocateCommandBuffers)         \
-    x(vkBeginCommandBuffer)             \
-    x(vkEndCommandBuffer)               \
     x(vkQueueSubmit)                    \
     x(vkQueueWaitIdle)                  \
-    x(vkFreeCommandBuffers)             \
     x(vkCreateBuffer)                   \
     x(vkGetBufferMemoryRequirements)    \
     x(vkAllocateMemory)                 \
@@ -58,14 +53,23 @@ namespace renderer_test {
     x(vkResetFences) \
     x(vkGetFenceStatus) \
     x(vkWaitForFences) \
+    \
     x(vkCreateSemaphore) \
     x(vkDestroySemaphore) \
+    \
     x(vkCreateEvent) \
     x(vkDestroyEvent) \
     x(vkGetEventStatus) \
     x(vkSetEvent) \
     x(vkResetEvent) \
     \
+    x(vkCreateCommandPool)              \
+    x(vkDestroyCommandPool) \
+    \
+    x(vkFreeCommandBuffers)             \
+    x(vkAllocateCommandBuffers)         \
+    x(vkBeginCommandBuffer)             \
+    x(vkEndCommandBuffer)               \
     x(vkResetCommandBuffer) \
     /* */
 

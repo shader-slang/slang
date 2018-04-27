@@ -12,19 +12,41 @@ struct VulkanDeviceQueue
         kMaxCommandBuffers = 8,
     };
 
+    enum class EventType
+    {
+        BeginFrame,
+        EndFrame,
+        CountOf,
+    };
+
     SlangResult init(const VulkanApi& api, VkQueue graphicsQueue, int graphicsQueueIndex);
 
     void flushStep();
-
-    void flushStepA();
-    void flushStepB();
 
     void fenceUpdate(int fenceIndex, bool blocking);
 
     void waitForIdle() { m_api->vkQueueWaitIdle(m_graphicsQueue); }
 
-    //NvFlowDeviceQueue deviceQueue;
-    //NvFlowDeviceVulkan* device;
+        /// Set the graphics queue index (as set on init)
+    int getGraphicsQueueIndex() const { return m_graphicsQueueIndex; }
+
+    VkSemaphore makeCurrent(EventType eventType);
+
+    void makeCompleted(EventType eventType);
+
+        /// Get the graphics queu
+    VkQueue getGraphicsQueue() const { return m_graphicsQueue; }
+
+        /// Get the API
+    const VulkanApi* getApi() const { return m_api; }
+
+    void flushStepA();
+    void flushStepB();
+
+        /// Dtor
+    ~VulkanDeviceQueue();
+
+    protected:
 
     VkQueue m_graphicsQueue = nullptr;
 
@@ -38,22 +60,20 @@ struct VulkanDeviceQueue
     VkCommandPool m_commandPool = VK_NULL_HANDLE;
     int m_numCommandBuffers = 0;
     int m_commandBufferIndex = 0;
+    // There are the same amount of command buffers as fences
     VkCommandBuffer m_commandBuffers[kMaxCommandBuffers] = { nullptr };
+
     Fence m_fences[kMaxCommandBuffers] = { {VK_NULL_HANDLE, 0, 0u} };
+    
     VkCommandBuffer m_commandBuffer = nullptr;
 
-    VkSemaphore m_beginFrameSemaphore = VK_NULL_HANDLE;
-    VkSemaphore m_endFrameSemaphore = VK_NULL_HANDLE;
-
-    VkSemaphore m_currentBeginFrameSemaphore = VK_NULL_HANDLE;
-    VkSemaphore m_currentEndFrameSemaphore = VK_NULL_HANDLE;
+    VkSemaphore m_semaphores[int(EventType::CountOf)];
+    VkSemaphore m_currentSemaphores[int(EventType::CountOf)];
 
     uint64_t m_lastFenceCompleted = 1;
     uint64_t m_nextFenceValue = 2;
 
     int m_graphicsQueueIndex = 0;
-
-    //NvFlowContext* internalContext = nullptr;
 
     const VulkanApi* m_api = nullptr;
 };

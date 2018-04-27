@@ -16,7 +16,7 @@ SlangResult VulkanSwapChain::init(VulkanDeviceQueue* deviceQueue, const Desc& de
     assert(platformDescIn);
 
     m_deviceQueue = deviceQueue;
-    m_api = deviceQueue->m_api;
+    m_api = deviceQueue->getApi();
     
 #if SLANG_WINDOWS_FAMILY
     const WinPlatformDesc* platformDesc = static_cast<const WinPlatformDesc*>(platformDescIn);
@@ -41,7 +41,7 @@ SlangResult VulkanSwapChain::init(VulkanDeviceQueue* deviceQueue, const Desc& de
 #endif
 
     VkBool32 supported = false;
-    m_api->vkGetPhysicalDeviceSurfaceSupportKHR(m_api->m_physicalDevice, deviceQueue->m_graphicsQueueIndex, m_surface, &supported);
+    m_api->vkGetPhysicalDeviceSurfaceSupportKHR(m_api->m_physicalDevice, deviceQueue->getGraphicsQueueIndex(), m_surface, &supported);
 
     uint32_t numSurfaceFormats = 0;
     List<VkSurfaceFormatKHR> surfaceFormats;
@@ -250,10 +250,10 @@ VulkanSwapChain::~VulkanSwapChain()
 
 TextureResource* VulkanSwapChain::getFrontRenderTargetVulkan()
 {
-    m_deviceQueue->m_currentBeginFrameSemaphore = m_deviceQueue->m_beginFrameSemaphore;
-
+    VkSemaphore beginFrameSemaphore = m_deviceQueue->makeCurrent(VulkanDeviceQueue::EventType::BeginFrame);
+    
     uint32_t swapChainIndex = 0;
-    VkResult result = m_api->vkAcquireNextImageKHR(m_api->m_device, m_swapChain, UINT64_MAX, m_deviceQueue->m_currentBeginFrameSemaphore, VK_NULL_HANDLE, &swapChainIndex);
+    VkResult result = m_api->vkAcquireNextImageKHR(m_api->m_device, m_swapChain, UINT64_MAX, beginFrameSemaphore, VK_NULL_HANDLE, &swapChainIndex);
 
     if (result != VK_SUCCESS)
     {
@@ -278,8 +278,8 @@ void VulkanSwapChain::present(bool vsync)
     }
 #endif
 
-    m_deviceQueue->m_currentEndFrameSemaphore = m_deviceQueue->m_endFrameSemaphore;
-
+    VkSemaphore endFrameSemaphore = m_deviceQueue->makeCurrent(VulkanDeviceQueue::EventType::EndFrame);
+    
     m_deviceQueue->flushStepA();
     
     uint32_t swapChainIndices[] = { uint32_t(m_currentSwapChainIndex) };
@@ -290,12 +290,12 @@ void VulkanSwapChain::present(bool vsync)
     presentInfo.pSwapchains = &m_swapChain; 
     presentInfo.pImageIndices = swapChainIndices;
     presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = &m_deviceQueue->m_currentEndFrameSemaphore;
+    presentInfo.pWaitSemaphores = &endFrameSemaphore;
 
-    VkResult result = m_api->vkQueuePresentKHR(m_deviceQueue->m_graphicsQueue, &presentInfo);
+    VkResult result = m_api->vkQueuePresentKHR(m_deviceQueue->getGraphicsQueue(), &presentInfo);
 
-    m_deviceQueue->m_currentEndFrameSemaphore = VK_NULL_HANDLE;
-
+    m_deviceQueue->makeCompleted(VulkanDeviceQueue::EventType::EndFrame);
+    
     m_deviceQueue->flushStepB();
     
 #if 0
