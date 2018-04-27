@@ -7,6 +7,7 @@
 #include "../../source/core/smart-pointer.h"
 
 #include "vk-api.h"
+#include "vk-util.h"
 
 #define ENABLE_VALIDATION_LAYER 1
 
@@ -622,19 +623,6 @@ BufferResource* VKRenderer::createBufferResource(Resource::Usage initialUsage, c
     return buffer.detach();
 }
 
-static VkFormat _getVkFormat(Format format)
-{
-    switch (format)
-    {
-        case Format::RGBA_Float32:      return VK_FORMAT_R32G32B32A32_SFLOAT;
-        case Format::RGB_Float32:       return VK_FORMAT_R32G32B32_SFLOAT;
-        case Format::RG_Float32:        return VK_FORMAT_R32G32_SFLOAT;
-        case Format::R_Float32:         return VK_FORMAT_R32_SFLOAT;
-        case Format::RGBA_Unorm_UInt8:  return VK_FORMAT_R8G8B8A8_UNORM;
-        default:                        return VK_FORMAT_UNDEFINED;
-    }
-}
-
 InputLayout* VKRenderer::createInputLayout(const InputElementDesc* elements, UInt numElements) 
 {
     RefPtr<InputLayoutImpl> layout(new InputLayoutImpl);
@@ -650,7 +638,7 @@ InputLayout* VKRenderer::createInputLayout(const InputElementDesc* elements, UIn
 
         dstDesc.location = uint32_t(i);
         dstDesc.binding = 0;
-        dstDesc.format = _getVkFormat(srcDesc.format);
+        dstDesc.format = VulkanUtil::calcVkFormat(srcDesc.format);
         if (dstDesc.format == VK_FORMAT_UNDEFINED)
         {
             return nullptr;

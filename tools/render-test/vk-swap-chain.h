@@ -17,6 +17,7 @@ struct VulkanSwapChain
         kMaxImages = 8,
     };
 
+        /// Base class for platform specific information
     struct PlatformDesc
     {
     };

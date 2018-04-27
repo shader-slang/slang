@@ -184,6 +184,7 @@
     <ClCompile Include="vk-device-queue.cpp" />
     <ClCompile Include="vk-module.cpp" />
     <ClCompile Include="vk-swap-chain.cpp" />
+    <ClCompile Include="vk-util.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="circular-resource-heap-d3d12.h" />
@@ -203,6 +204,7 @@
     <ClInclude Include="vk-device-queue.h" />
     <ClInclude Include="vk-module.h" />
     <ClInclude Include="vk-swap-chain.h" />
+    <ClInclude Include="vk-util.h" />
     <ClInclude Include="window.h" />
   </ItemGroup>
   <ItemGroup>

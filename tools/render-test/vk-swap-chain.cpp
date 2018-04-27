@@ -1,6 +1,8 @@
 // vk-swap-chain.cpp
 #include "vk-swap-chain.h"
 
+#include "vk-util.h"
+
 #include "../../source/core/list.h"
 
 #include <stdlib.h>
@@ -47,7 +49,11 @@ SlangResult VulkanSwapChain::init(VulkanDeviceQueue* deviceQueue, const Desc& de
     surfaceFormats.SetSize(int(numSurfaceFormats));
     m_api->vkGetPhysicalDeviceSurfaceFormatsKHR(m_api->m_physicalDevice, m_surface, &numSurfaceFormats, surfaceFormats.Buffer());
 
-    //m_swapchainFormat = NvFlowVulkan_convertToVulkan(ptr->swapchain.desc.format);
+    m_swapchainFormat = VulkanUtil::calcVkFormat(desc.m_format);
+    if (m_swapchainFormat == VK_FORMAT_UNDEFINED)
+    {
+        return SLANG_FAIL;
+    }
 
     /*
     // try to find BGR, fall back to RGB

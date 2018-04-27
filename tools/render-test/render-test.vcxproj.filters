@@ -69,6 +69,9 @@
     <ClCompile Include="vk-device-queue.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="vk-util.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="options.h">
@@ -123,6 +126,9 @@
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="vk-device-queue.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vk-util.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>

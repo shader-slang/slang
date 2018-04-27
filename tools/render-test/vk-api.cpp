@@ -74,4 +74,7 @@ Slang::Result VulkanApi::initDeviceProcs(VkPhysicalDevice physicalDevice, VkDevi
     return SLANG_OK;
 }
 
+
+
+
 } // renderer_test
