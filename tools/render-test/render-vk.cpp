@@ -8,6 +8,7 @@
 
 #include "vk-api.h"
 #include "vk-util.h"
+#include "vk-device-queue.h"
 
 #define ENABLE_VALIDATION_LAYER 1
 
@@ -151,21 +152,14 @@ public:
     VkBool32 handleDebugMessage(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t srcObject,
         size_t location, int32_t msgCode, const char* pLayerPrefix, const char* pMsg);
     
-    VkCommandBuffer getCommandBuffer();
-    VkCommandBuffer beginCommandBuffer();
-    void flushCommandBuffer(VkCommandBuffer commandBuffer);
-    
     VkPipelineShaderStageCreateInfo compileEntryPoint(const ShaderCompileRequest::EntryPoint& entryPointRequest, VkShaderStageFlagBits stage, List<char>& bufferOut);
 
     static VKAPI_ATTR VkBool32 VKAPI_CALL debugMessageCallback(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t srcObject,
         size_t location, int32_t msgCode, const char* pLayerPrefix, const char* pMsg, void* pUserData);
 
-    VkInstance                          m_instance = VK_NULL_HANDLE;
-    
     VkDevice                            m_device  = VK_NULL_HANDLE;
-    VkQueue                             m_queue  = VK_NULL_HANDLE;
-    VkCommandPool                       m_commandPool = VK_NULL_HANDLE;
-    VkSubmitInfo                        m_submitInfo;
+
+    VulkanDeviceQueue                   m_deviceQueue;
 
     VkDebugReportCallbackEXT            m_debugReportCallback;
 
@@ -253,43 +247,6 @@ VkBool32 VKRenderer::handleDebugMessage(VkDebugReportFlagsEXT flags, VkDebugRepo
     return ((VKRenderer*)pUserData)->handleDebugMessage(flags, objType, srcObject, location, msgCode, pLayerPrefix, pMsg);
 }
 
-VkCommandBuffer VKRenderer::getCommandBuffer()
-{
-    VkCommandBufferAllocateInfo info = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
-    info.commandPool = m_commandPool;
-    info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    info.commandBufferCount = 1;
-
-    VkCommandBuffer commandBuffer;
-    SLANG_VK_CHECK(m_api.vkAllocateCommandBuffers(m_device, &info, &commandBuffer));
-
-    return commandBuffer;
-}
-
-VkCommandBuffer VKRenderer::beginCommandBuffer()
-{
-    VkCommandBuffer commandBuffer = getCommandBuffer();
-
-    VkCommandBufferBeginInfo beginInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
-    SLANG_VK_CHECK(m_api.vkBeginCommandBuffer(commandBuffer, &beginInfo));
-
-    return commandBuffer;
-}
-
-void VKRenderer::flushCommandBuffer(VkCommandBuffer commandBuffer)
-{
-    SLANG_VK_CHECK(m_api.vkEndCommandBuffer(commandBuffer));
-
-    VkSubmitInfo submitInfo = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffer;
-
-    SLANG_VK_CHECK(m_api.vkQueueSubmit(m_queue, 1, &submitInfo, VK_NULL_HANDLE));
-    SLANG_VK_CHECK(m_api.vkQueueWaitIdle(m_queue));
-
-    m_api.vkFreeCommandBuffers(m_device, m_commandPool, 1, &commandBuffer);
-}
-
 VkPipelineShaderStageCreateInfo VKRenderer::compileEntryPoint(const ShaderCompileRequest::EntryPoint& entryPointRequest, VkShaderStageFlagBits stage, List<char>& bufferOut)
 {
     char const* dataBegin = entryPointRequest.source.dataBegin;
@@ -309,8 +266,6 @@ VkPipelineShaderStageCreateInfo VKRenderer::compileEntryPoint(const ShaderCompil
 
     VkShaderModule module;
     SLANG_VK_CHECK(m_api.vkCreateShaderModule(m_device, &moduleCreateInfo, nullptr, &module));
-
-    //::free(codeBegin);
 
     VkPipelineShaderStageCreateInfo shaderStageCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
     shaderStageCreateInfo.stage = stage;
@@ -347,12 +302,12 @@ SlangResult VKRenderer::initialize(void* inWindowHandle)
 #endif
     };
 
-    m_instance = VK_NULL_HANDLE;
+    VkInstance instance = VK_NULL_HANDLE;
 
     VkInstanceCreateInfo instanceCreateInfo = { VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
     instanceCreateInfo.pApplicationInfo = &applicationInfo;
 
-    instanceCreateInfo.enabledExtensionCount = sizeof(instanceExtensions) / sizeof(instanceExtensions[0]);
+    instanceCreateInfo.enabledExtensionCount = SLANG_COUNT_OF(instanceExtensions);
     instanceCreateInfo.ppEnabledExtensionNames = &instanceExtensions[0];
 
 #if ENABLE_VALIDATION_LAYER
@@ -361,8 +316,8 @@ SlangResult VKRenderer::initialize(void* inWindowHandle)
     instanceCreateInfo.ppEnabledLayerNames = layerNames;
 #endif
 
-    SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateInstance(&instanceCreateInfo, nullptr, &m_instance));
-    SLANG_RETURN_ON_FAIL(m_api.initInstanceProcs(m_instance));
+    SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateInstance(&instanceCreateInfo, nullptr, &instance));
+    SLANG_RETURN_ON_FAIL(m_api.initInstanceProcs(instance));
 
 
 #if ENABLE_VALIDATION_LAYER
@@ -373,15 +328,15 @@ SlangResult VKRenderer::initialize(void* inWindowHandle)
     debugCreateInfo.pUserData = this;
     debugCreateInfo.flags = debugFlags;
 
-    SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateDebugReportCallbackEXT(m_instance, &debugCreateInfo, nullptr, &m_debugReportCallback));
+    SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateDebugReportCallbackEXT(instance, &debugCreateInfo, nullptr, &m_debugReportCallback));
 #endif
 
     uint32_t numPhysicalDevices = 0;
-    SLANG_VK_RETURN_ON_FAIL(m_api.vkEnumeratePhysicalDevices(m_instance, &numPhysicalDevices, nullptr));
+    SLANG_VK_RETURN_ON_FAIL(m_api.vkEnumeratePhysicalDevices(instance, &numPhysicalDevices, nullptr));
 
     List<VkPhysicalDevice> physicalDevices;
     physicalDevices.SetSize(numPhysicalDevices);
-    SLANG_VK_RETURN_ON_FAIL(m_api.vkEnumeratePhysicalDevices(m_instance, &numPhysicalDevices, physicalDevices.Buffer()));
+    SLANG_VK_RETURN_ON_FAIL(m_api.vkEnumeratePhysicalDevices(instance, &numPhysicalDevices, physicalDevices.Buffer()));
 
     // TODO: allow override of selected device
     uint32_t selectedDeviceIndex = 0;
@@ -413,15 +368,11 @@ SlangResult VKRenderer::initialize(void* inWindowHandle)
     SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateDevice(m_api.m_physicalDevice, &deviceCreateInfo, nullptr, &m_device));
     SLANG_RETURN_ON_FAIL(m_api.initDeviceProcs(m_device));
 
-    // Create a command pool
-
-    VkCommandPoolCreateInfo commandPoolCreateInfo = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
-    commandPoolCreateInfo.queueFamilyIndex = queueFamilyIndex;
-    commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-
-    SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateCommandPool(m_device, &commandPoolCreateInfo, nullptr, &m_commandPool));
-
-    m_api.vkGetDeviceQueue(m_device, queueFamilyIndex, 0, &m_queue);
+    {
+        VkQueue queue;
+        m_api.vkGetDeviceQueue(m_device, queueFamilyIndex, 0, &queue);
+        SLANG_RETURN_ON_FAIL(m_deviceQueue.init(m_api, queue, queueFamilyIndex));
+    }
 
     // set up swap chain
 
@@ -561,13 +512,13 @@ BufferResource* VKRenderer::createBufferResource(Resource::Usage initialUsage, c
         m_api.vkUnmapMemory(m_device, buffer->m_uploadBuffer.m_memory);
 
         // Copy from staging buffer to real buffer
-        VkCommandBuffer commandBuffer = beginCommandBuffer();
-
+        VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
+        
         VkBufferCopy copyInfo = {};
         copyInfo.size = bufferSize;
         m_api.vkCmdCopyBuffer(commandBuffer, buffer->m_uploadBuffer.m_buffer, buffer->m_buffer.m_buffer, 1, &copyInfo);
 
-        flushCommandBuffer(commandBuffer);
+        //flushCommandBuffer(commandBuffer);
     }
 
     return buffer.detach();
@@ -633,13 +584,13 @@ void* VKRenderer::map(BufferResource* bufferIn, MapFlavor flavor)
             SLANG_RETURN_NULL_ON_FAIL(staging.init(m_api, bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
 
             // Copy from real buffer to staging buffer
-            VkCommandBuffer commandBuffer = beginCommandBuffer();
+            VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
 
             VkBufferCopy copyInfo = {};
             copyInfo.size = bufferSize;
             m_api.vkCmdCopyBuffer(commandBuffer, buffer->m_buffer.m_buffer, staging.m_buffer, 1, &copyInfo);
 
-            flushCommandBuffer(commandBuffer);
+            m_deviceQueue.flushAndWait();
 
             // Write out the data from the buffer
             void* mappedData = nullptr;
@@ -672,13 +623,14 @@ void VKRenderer::unmap(BufferResource* bufferIn)
             m_api.vkUnmapMemory(m_device, buffer->m_uploadBuffer.m_memory);
 
             // Copy from staging buffer to real buffer
-            VkCommandBuffer commandBuffer = beginCommandBuffer();
+            VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
 
             VkBufferCopy copyInfo = {};
             copyInfo.size = bufferSize;
             m_api.vkCmdCopyBuffer(commandBuffer, buffer->m_uploadBuffer.m_buffer, buffer->m_buffer.m_buffer, 1, &copyInfo);
 
-            flushCommandBuffer(commandBuffer);
+            // TODO: is this necessary?
+            m_deviceQueue.flushAndWait();
             break;
         }
         default: break;
@@ -902,7 +854,7 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
 
     // Also create descriptor sets based on the given pipeline layout
 
-    VkCommandBuffer commandBuffer = beginCommandBuffer();
+    VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
 
     m_api.vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
 
@@ -917,8 +869,8 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
 
     m_api.vkCmdDispatch(commandBuffer, x, y, z);
 
-    flushCommandBuffer(commandBuffer);
-
+    m_deviceQueue.flushAndWait();
+    
     m_api.vkDestroyPipeline(m_device, pipeline, nullptr);
 
     // TODO: need to free up the other resources too...

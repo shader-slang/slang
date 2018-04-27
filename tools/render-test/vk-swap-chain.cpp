@@ -41,7 +41,7 @@ SlangResult VulkanSwapChain::init(VulkanDeviceQueue* deviceQueue, const Desc& de
 #endif
 
     VkBool32 supported = false;
-    m_api->vkGetPhysicalDeviceSurfaceSupportKHR(m_api->m_physicalDevice, deviceQueue->getGraphicsQueueIndex(), m_surface, &supported);
+    m_api->vkGetPhysicalDeviceSurfaceSupportKHR(m_api->m_physicalDevice, deviceQueue->getQueueIndex(), m_surface, &supported);
 
     uint32_t numSurfaceFormats = 0;
     List<VkSurfaceFormatKHR> surfaceFormats;
@@ -292,7 +292,7 @@ void VulkanSwapChain::present(bool vsync)
     presentInfo.waitSemaphoreCount = 1;
     presentInfo.pWaitSemaphores = &endFrameSemaphore;
 
-    VkResult result = m_api->vkQueuePresentKHR(m_deviceQueue->getGraphicsQueue(), &presentInfo);
+    VkResult result = m_api->vkQueuePresentKHR(m_deviceQueue->getQueue(), &presentInfo);
 
     m_deviceQueue->makeCompleted(VulkanDeviceQueue::EventType::EndFrame);
     

@@ -22,9 +22,10 @@ VulkanDeviceQueue::~VulkanDeviceQueue()
     m_api->vkDestroyCommandPool(m_api->m_device, m_commandPool, nullptr);
 }
 
-SlangResult VulkanDeviceQueue::init(const VulkanApi& api, VkQueue graphicsQueue, int graphicsQueueIndex)
+SlangResult VulkanDeviceQueue::init(const VulkanApi& api, VkQueue queue, int queueIndex)
 {
     assert(m_api == nullptr);
+    m_api = &api;
 
     for (int i = 0; i < int(EventType::CountOf); ++i)
     {
@@ -33,15 +34,15 @@ SlangResult VulkanDeviceQueue::init(const VulkanApi& api, VkQueue graphicsQueue,
     }
     
     m_numCommandBuffers = kMaxCommandBuffers;
-    m_graphicsQueueIndex = graphicsQueueIndex;
+    m_queueIndex = queueIndex;
 
-    m_graphicsQueue = graphicsQueue;
+    m_queue = queue;
     
     VkCommandPoolCreateInfo poolCreateInfo = {};
     poolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     poolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
-    poolCreateInfo.queueFamilyIndex = graphicsQueueIndex;
+    poolCreateInfo.queueFamilyIndex = queueIndex;
 
     api.vkCreateCommandPool(api.m_device, &poolCreateInfo, nullptr, &m_commandPool);
 
@@ -92,11 +93,8 @@ SlangResult VulkanDeviceQueue::init(const VulkanApi& api, VkQueue graphicsQueue,
     ptr->internalContext = NvFlowCreateContextVulkan(NV_FLOW_VERSION, &contextDesc);
 #endif
 
-    m_api = &api;
     return SLANG_OK;
 }
-
-
 
 void VulkanDeviceQueue::flushStepA()
 {
@@ -129,7 +127,7 @@ void VulkanDeviceQueue::flushStepA()
 
     Fence& fence = m_fences[m_commandBufferIndex];
 
-    m_api->vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, fence.fence);
+    m_api->vkQueueSubmit(m_queue, 1, &submitInfo, fence.fence);
 
     // mark signaled fence value
     fence.value = m_nextFenceValue;
@@ -165,11 +163,7 @@ void VulkanDeviceQueue::fenceUpdate( int fenceIndex, bool blocking)
 }
 
 void VulkanDeviceQueue::flushStepB()
-{
-    VkCommandBufferBeginInfo beginInfo = {};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
+{    
     m_commandBufferIndex = (m_commandBufferIndex + 1) % m_numCommandBuffers;
     m_commandBuffer = m_commandBuffers[m_commandBufferIndex];
     
@@ -186,6 +180,10 @@ void VulkanDeviceQueue::flushStepB()
 
     //m_api.vkResetCommandPool(m_api->m_device, m_commandPool, 0);
 
+    VkCommandBufferBeginInfo beginInfo = {};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
     m_api->vkBeginCommandBuffer(m_commandBuffer, &beginInfo);
 }
 
@@ -193,6 +191,13 @@ void VulkanDeviceQueue::flushStep()
 {
     flushStepA();
     flushStepB();
+}
+
+
+void VulkanDeviceQueue::flushAndWait()
+{
+    flushStep();
+    waitForIdle();
 }
 
 VkSemaphore VulkanDeviceQueue::makeCurrent(EventType eventType)
@@ -205,7 +210,7 @@ VkSemaphore VulkanDeviceQueue::makeCurrent(EventType eventType)
 
 void VulkanDeviceQueue::makeCompleted(EventType eventType)
 {
-    assert(m_currentSemaphores[int(eventType)] != VK_NULL_HANDLE);
+    //assert(m_currentSemaphores[int(eventType)] != VK_NULL_HANDLE);
     m_currentSemaphores[int(eventType)] = VK_NULL_HANDLE;
 }
 
