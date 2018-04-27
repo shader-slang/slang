@@ -27,6 +27,8 @@ using namespace Slang;
 class VKRenderer : public Renderer, public ShaderCompiler
 {
 public:
+    enum { kMaxRenderTargets = 8 };
+    
     // Renderer    implementation
     virtual SlangResult initialize(void* inWindowHandle) override;
     virtual void setClearColor(const float color[4]) override;
@@ -53,6 +55,9 @@ public:
 
     // ShaderCompiler implementation
     virtual ShaderProgram* compileProgram(const ShaderCompileRequest& request) override;
+
+        /// Dtor
+    ~VKRenderer();
 
     protected:
 
@@ -182,6 +187,8 @@ public:
     VulkanDeviceQueue m_deviceQueue;
     VulkanSwapChain m_swapChain;
 
+    VkRenderPass m_renderPass = VK_NULL_HANDLE;
+
     float m_clearColor[4] = { 0, 0, 0, 0 };
 };
 
@@ -227,6 +234,16 @@ Renderer* createVKRenderer()
 {
     return new VKRenderer;
 }
+
+VKRenderer::~VKRenderer()
+{
+    if (m_renderPass != VK_NULL_HANDLE)
+    {
+        m_api.vkDestroyRenderPass(m_device, m_renderPass, nullptr);
+        m_renderPass = VK_NULL_HANDLE;
+    }
+}
+
 
 VkBool32 VKRenderer::handleDebugMessage(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t srcObject,
     size_t location, int32_t msgCode, const char* pLayerPrefix, const char* pMsg)
@@ -407,6 +424,83 @@ SlangResult VKRenderer::initialize(void* inWindowHandle)
     // depth/stencil?
 
     // render pass?
+
+    {
+        const int numRenderTargets = 1;
+        bool shouldClear = true;
+        bool shouldClearDepth = false;
+        bool shouldClearStencil = false;
+        bool hasDepthBuffer = false;
+
+        Format depthFormat = Format::Unknown;
+
+        int numAttachments = 0;
+        // We need extra space if we have depth buffer
+        VkAttachmentDescription attachmentDesc[kMaxRenderTargets + 1] = {};
+        for (int i = 0; i < numRenderTargets; ++i)
+        {
+            VkAttachmentDescription& dst = attachmentDesc[numAttachments ++];
+
+            VkFormat format = VulkanUtil::calcVkFormat(m_swapChain.getDesc().m_format);
+
+            dst.flags = 0;
+            dst.format = format;
+            dst.samples = VK_SAMPLE_COUNT_1_BIT;
+            dst.loadOp = shouldClear ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
+            dst.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            dst.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            dst.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            dst.initialLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+            dst.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        }
+        if (hasDepthBuffer)
+        {
+            VkAttachmentDescription& dst = attachmentDesc[numAttachments++];
+
+            dst.flags = 0;
+            dst.format = VulkanUtil::calcVkFormat(depthFormat);
+            dst.samples = VK_SAMPLE_COUNT_1_BIT;
+            dst.loadOp = shouldClearDepth ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
+            dst.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            dst.stencilLoadOp = shouldClearStencil ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
+            dst.stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+            dst.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+            dst.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        }
+
+        VkAttachmentReference colorAttachments[kMaxRenderTargets] = {};
+        for (int i = 0; i < numRenderTargets; ++i)
+        {
+            VkAttachmentReference& dst = colorAttachments[i];
+            dst.attachment = i;
+            dst.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        }
+
+        VkAttachmentReference depthAttachment = {};
+        depthAttachment.attachment = numRenderTargets;
+        depthAttachment.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+        VkSubpassDescription subpassDesc = {};
+        subpassDesc.flags = 0;
+        subpassDesc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        subpassDesc.inputAttachmentCount = 0u;
+        subpassDesc.pInputAttachments = nullptr;
+        subpassDesc.colorAttachmentCount = numRenderTargets;
+        subpassDesc.pColorAttachments = colorAttachments;
+        subpassDesc.pResolveAttachments = nullptr;
+        subpassDesc.pDepthStencilAttachment = hasDepthBuffer ? &depthAttachment : nullptr;
+        subpassDesc.preserveAttachmentCount = 0u;
+        subpassDesc.pPreserveAttachments = nullptr;
+
+        VkRenderPassCreateInfo renderPassCreateInfo = {};
+        renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+        renderPassCreateInfo.attachmentCount = numAttachments;
+        renderPassCreateInfo.pAttachments = attachmentDesc;
+        renderPassCreateInfo.subpassCount = 1;
+        renderPassCreateInfo.pSubpasses = &subpassDesc;
+        SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateRenderPass(m_device, &renderPassCreateInfo, nullptr, &m_renderPass));
+    }
+
 
     // pipeline cache
 

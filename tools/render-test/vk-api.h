@@ -74,6 +74,9 @@ namespace renderer_test {
     \
     x(vkCreateImageView) \
     x(vkDestroyImageView) \
+    \
+    x(vkCreateRenderPass) \
+    x(vkDestroyRenderPass) \
     /* */
 
 #if SLANG_WINDOWS_FAMILY
