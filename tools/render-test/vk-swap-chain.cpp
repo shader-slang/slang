@@ -27,7 +27,7 @@ SlangResult VulkanSwapChain::init(VulkanDeviceQueue* deviceQueue, const Desc& de
     surfaceCreateInfo.hinstance = platformDesc->m_hinstance;
     surfaceCreateInfo.hwnd = platformDesc->m_hwnd;
 
-    m_api->vkCreateWin32SurfaceKHR(m_api->m_instance, &surfaceCreateInfo, nullptr, &m_surface);
+    SLANG_VK_RETURN_ON_FAIL(m_api->vkCreateWin32SurfaceKHR(m_api->m_instance, &surfaceCreateInfo, nullptr, &m_surface));
 #else
     const XPlatformDesc* platformDesc = static_cast<const XPlatformDesc*>(platformDescIn);
     _setPlatformDesc(*platformDesc);
@@ -37,7 +37,7 @@ SlangResult VulkanSwapChain::init(VulkanDeviceQueue* deviceQueue, const Desc& de
     surfaceCreateInfo.dpy = platformDesc->m_display; 
     surfaceCreateInfo.window = platformDesc->m_window;
     
-    m_api->vkCreateXlibSurfaceKHR(m_api->m_instance, &surfaceCreateInfo, nullptr, &m_surface);
+    SLANG_VK_RETURN_ON_FAIL(m_api->vkCreateXlibSurfaceKHR(m_api->m_instance, &surfaceCreateInfo, nullptr, &m_surface));
 #endif
 
     VkBool32 supported = false;
@@ -167,12 +167,7 @@ SlangResult VulkanSwapChain::initSwapchain()
     swapchainDesc.clipped = VK_TRUE;
     swapchainDesc.oldSwapchain = oldSwapchain;
 
-    VkResult result = m_api->vkCreateSwapchainKHR(m_api->m_device, &swapchainDesc, nullptr, &m_swapChain);
-
-    if (result != VK_SUCCESS)
-    {
-        return SLANG_FAIL;
-    }
+    SLANG_VK_RETURN_ON_FAIL(m_api->vkCreateSwapchainKHR(m_api->m_device, &swapchainDesc, nullptr, &m_swapChain));
 
     uint32_t numSwapChainImages = 0;
     m_api->vkGetSwapchainImagesKHR(m_api->m_device, m_swapChain, &numSwapChainImages, nullptr);

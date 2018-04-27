@@ -38,8 +38,16 @@ struct VulkanSwapChain
 
     struct Desc
     {
+        void init()
+        {
+            m_format = Format::Unknown;
+            m_depthFormatTypeless = Format::Unknown;
+            m_depthFormat = Format::Unknown;
+            m_textureDepthFormat = Format::Unknown;
+        }
+
         Format m_format;
-        bool m_enableFormat;
+        //bool m_enableFormat;
         Format m_depthFormatTypeless;
         Format m_depthFormat;
         Format m_textureDepthFormat;

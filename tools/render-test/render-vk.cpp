@@ -9,6 +9,7 @@
 #include "vk-api.h"
 #include "vk-util.h"
 #include "vk-device-queue.h"
+#include "vk-swap-chain.h"
 
 #define ENABLE_VALIDATION_LAYER 1
 
@@ -157,18 +158,20 @@ public:
     static VKAPI_ATTR VkBool32 VKAPI_CALL debugMessageCallback(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t srcObject,
         size_t location, int32_t msgCode, const char* pLayerPrefix, const char* pMsg, void* pUserData);
 
-    VkDevice                            m_device  = VK_NULL_HANDLE;
-
-    VulkanDeviceQueue                   m_deviceQueue;
-
-    VkDebugReportCallbackEXT            m_debugReportCallback;
+    
+    VkDebugReportCallbackEXT m_debugReportCallback;
 
     RefPtr<InputLayoutImpl> m_currentInputLayout;
     RefPtr<BindingStateImpl> m_currentBindingState;
     RefPtr<ShaderProgramImpl> m_currentProgram;
 
+    VkDevice m_device = VK_NULL_HANDLE;
+
     VulkanModule m_module;
     VulkanApi m_api;
+
+    VulkanDeviceQueue m_deviceQueue;
+    VulkanSwapChain m_swapChain;
 
     float m_clearColor[4] = { 0, 0, 0, 0 };;
 };
@@ -376,6 +379,22 @@ SlangResult VKRenderer::initialize(void* inWindowHandle)
 
     // set up swap chain
 
+    {
+        VulkanSwapChain::Desc desc;
+        VulkanSwapChain::PlatformDesc* platformDesc = nullptr;
+
+        desc.init();
+        desc.m_format = Format::RGBA_Unorm_UInt8;
+
+#if SLANG_WINDOWS_FAMILY
+        VulkanSwapChain::WinPlatformDesc winPlatformDesc;
+        winPlatformDesc.m_hinstance = ::GetModuleHandle(nullptr);
+        winPlatformDesc.m_hwnd = (HWND)inWindowHandle;
+        platformDesc = &winPlatformDesc;
+#endif
+
+        SLANG_RETURN_ON_FAIL(m_swapChain.init(&m_deviceQueue, desc, platformDesc)); 
+    }
 
 
     // create command buffers
