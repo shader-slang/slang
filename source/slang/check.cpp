@@ -204,6 +204,19 @@ namespace Slang
                     expr->BaseExpression = baseExpr;
                     expr->name = declRef.GetName();
                     expr->declRef = declRef;
+
+                    // When referring to a member through an expression,
+                    // the result is only an l-value if both the base
+                    // expression and the member agree that it should be.
+                    //
+                    // We have already used the `QualType` from the member
+                    // above (that is `type`), so we need to take the
+                    // l-value status of the base expression into account now.
+                    if(!baseExpr->type.IsLeftValue)
+                    {
+                        expr->type.IsLeftValue = false;
+                    }
+
                     return expr;
                 }
             }
@@ -3991,6 +4004,46 @@ namespace Slang
                 else
                 {
                     getSink()->diagnose(expr, Diagnostics::assignNonLValue);
+
+                    // As a special case, check if the LHS expression is derived
+                    // from a `this` parameter (implicitly or explicitly), which
+                    // is immutable. We can give the user a bit more context into
+                    // what is going on.
+                    //
+                    // We will try to handle expressions of the form:
+                    //
+                    //      e ::= "this"
+                    //          | e . name
+                    //          | e [ expr ]
+                    //
+                    // We will unwrap the `e.name` and `e[expr]` cases in a loop.
+                    RefPtr<Expr> e = expr->left;
+                    for(;;)
+                    {
+                        if(auto memberExpr = e.As<MemberExpr>())
+                        {
+                            e = memberExpr->BaseExpression;
+                        }
+                        else if(auto subscriptExpr = e.As<IndexExpr>())
+                        {
+                            e = subscriptExpr->BaseExpression;
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                    //
+                    // Now we check to see if we have a `this` expression,
+                    // and if it is immutable.
+                    if(auto thisExpr = e.As<ThisExpr>())
+                    {
+                        if(!thisExpr->type.IsLeftValue)
+                        {
+                            getSink()->diagnose(thisExpr, Diagnostics::thisIsImmutableByDefault);
+                        }
+                    }
+
                 }
             }
             expr->type = type;
@@ -7800,7 +7853,12 @@ namespace Slang
         {
             QualType qualType;
             qualType.type = GetType(varDeclRef);
-            qualType.IsLeftValue = true; // TODO(tfoley): allow explicit `const` or `let` variables
+
+            bool isLValue = true;
+            if(varDeclRef.getDecl()->FindModifier<ConstModifier>())
+                isLValue = false;
+
+            qualType.IsLeftValue = isLValue;
             return qualType;
         }
         else if (auto typeAliasDeclRef = declRef.As<TypeDefDecl>())
