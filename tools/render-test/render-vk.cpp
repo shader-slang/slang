@@ -59,8 +59,6 @@ public:
     class Buffer
     {
         public:
-        
-            
             /// Initialize a buffer with specified size, and memory props 
         Result init(const VulkanApi& api, size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties);
 
@@ -148,7 +146,13 @@ public:
 		VKRenderer* m_renderer;
         List<BindingDetail> m_bindingDetails;
     };
-    
+
+    struct BoundVertexBuffer
+    {
+        RefPtr<BufferResourceImpl> m_buffer;
+        int m_stride;
+        int m_offset;
+    };
 
     VkBool32 handleDebugMessage(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t srcObject,
         size_t location, int32_t msgCode, const char* pLayerPrefix, const char* pMsg);
@@ -165,6 +169,9 @@ public:
     RefPtr<BindingStateImpl> m_currentBindingState;
     RefPtr<ShaderProgramImpl> m_currentProgram;
 
+    List<BoundVertexBuffer> m_boundVertexBuffers;
+    List<RefPtr<BufferResourceImpl> > m_boundConstantBuffers;
+
     VkDevice m_device = VK_NULL_HANDLE;
 
     VulkanModule m_module;
@@ -173,7 +180,7 @@ public:
     VulkanDeviceQueue m_deviceQueue;
     VulkanSwapChain m_swapChain;
 
-    float m_clearColor[4] = { 0, 0, 0, 0 };;
+    float m_clearColor[4] = { 0, 0, 0, 0 };
 };
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! VkRenderer::Buffer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -396,9 +403,6 @@ SlangResult VKRenderer::initialize(void* inWindowHandle)
         SLANG_RETURN_ON_FAIL(m_swapChain.init(&m_deviceQueue, desc, platformDesc)); 
     }
 
-
-    // create command buffers
-
     // depth/stencil?
 
     // render pass?
@@ -406,10 +410,6 @@ SlangResult VKRenderer::initialize(void* inWindowHandle)
     // pipeline cache
 
     // frame buffer
-
-
-
-    // create semaphores for sync
 
     return SLANG_OK;
 }
@@ -425,7 +425,9 @@ void VKRenderer::clearFrame()
 }
 
 void VKRenderer::presentFrame()
-{
+{   
+    const bool vsync = true;
+    m_swapChain.present(vsync);
 }
 
 SlangResult VKRenderer::captureScreenShot(char const* outputPath)
@@ -670,6 +672,27 @@ void VKRenderer::setPrimitiveTopology(PrimitiveTopology topology)
 
 void VKRenderer::setVertexBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* strides, const UInt* offsets)
 {
+    {
+        const UInt num = startSlot + slotCount;
+        if (num > m_boundVertexBuffers.Count())
+        {
+            m_boundVertexBuffers.SetSize(num);
+        }
+    }
+
+    for (UInt i = 0; i < slotCount; i++)
+    {
+        BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(buffers[i]);
+        if (buffer)
+        {
+            assert(buffer->m_initialUsage == Resource::Usage::VertexBuffer);
+        }
+
+        BoundVertexBuffer& boundBuffer = m_boundVertexBuffers[startSlot + i];
+        boundBuffer.m_buffer = buffer;
+        boundBuffer.m_stride = int(strides[i]);
+        boundBuffer.m_offset = int(offsets[i]);
+    }
 }
 
 void VKRenderer::setShaderProgram(ShaderProgram* program)
@@ -679,6 +702,23 @@ void VKRenderer::setShaderProgram(ShaderProgram* program)
 
 void VKRenderer::setConstantBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* offsets) 
 {
+    {
+        const UInt num = startSlot + slotCount;
+        if (num > m_boundConstantBuffers.Count())
+        {
+            m_boundConstantBuffers.SetSize(num);
+        }
+    }
+
+    for (UInt i = 0; i < slotCount; i++)
+    {
+        BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(buffers[i]);
+        if (buffer)
+        {
+            assert(buffer->m_initialUsage == Resource::Usage::ConstantBuffer);
+        }
+        m_boundConstantBuffers[startSlot + i] = buffer;
+    }
 }
 
 void VKRenderer::draw(UInt vertexCount, UInt startVertex = 0)

@@ -74,6 +74,10 @@ enum class Format
     R_Float32,
 
     RGBA_Unorm_UInt8,
+
+    D_Float32, 
+    D_Unorm24_S8,
+
     CountOf, 
 };
 

@@ -48,6 +48,9 @@ const Resource::DescBase& Resource::getDescBase() const
     uint8_t(sizeof(float) * 1),      // R_Float32,
 
     uint8_t(sizeof(uint32_t)),       // RGBA_Unorm_UInt8,
+
+    uint8_t(sizeof(float)),          // D_Float32,
+    uint8_t(sizeof(uint32_t)),       // D_Unorm24_S8,
 };
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!! BindingState::Desc !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
