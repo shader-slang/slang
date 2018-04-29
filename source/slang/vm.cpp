@@ -1084,7 +1084,7 @@ void resumeThread(
 
                 VMType resultType = decodeType(frame, &ip);
                 /*UInt argCount = */decodeUInt(&ip);
-                void* argPtrs[16] = { 0 };
+                //void* argPtrs[16] = { 0 };
                 auto leftOpnd = decodeOperandPtrAndType(frame, &ip);
                 auto type = leftOpnd.type;
                 auto leftPtr = leftOpnd.ptr;
