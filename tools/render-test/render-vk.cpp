@@ -1122,11 +1122,6 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
         0, 1, &pipeline->m_descriptorSet, 0, nullptr);
 
     m_api.vkCmdDispatch(commandBuffer, x, y, z);
-
-    m_deviceQueue.flushAndWait();
-    
-
-    // TODO: need to free up the other resources too...
 }
 
 // ShaderCompiler interface
