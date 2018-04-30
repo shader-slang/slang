@@ -20,6 +20,7 @@ namespace renderer_test {
     x(vkGetPhysicalDeviceFeatures)              \
     x(vkGetPhysicalDeviceMemoryProperties)      \
     x(vkGetPhysicalDeviceQueueFamilyProperties) \
+    x(vkGetPhysicalDeviceFormatProperties) \
     x(vkGetDeviceProcAddr)                      \
     /* */
 
@@ -94,6 +95,7 @@ namespace renderer_test {
     x(vkGetPhysicalDeviceSurfaceSupportKHR) \
     x(vkGetPhysicalDeviceSurfaceFormatsKHR) \
     x(vkGetPhysicalDeviceSurfacePresentModesKHR) \
+    x(vkGetPhysicalDeviceSurfaceCapabilitiesKHR) \
     x(vkDestroySurfaceKHR) \
     /* */
 

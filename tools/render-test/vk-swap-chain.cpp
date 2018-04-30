@@ -11,13 +11,33 @@
 namespace renderer_test {
 using namespace Slang;
 
-SlangResult VulkanSwapChain::init(VulkanDeviceQueue* deviceQueue, const Desc& desc, const PlatformDesc* platformDescIn)
+static int _indexOfFormat(List<VkSurfaceFormatKHR>& formatsIn, VkFormat format)
+{
+    const int numFormats = int(formatsIn.Count());
+    const VkSurfaceFormatKHR* formats = formatsIn.Buffer();
+
+    for (int i = 0; i < numFormats; ++i)
+    {
+        if (formats[i].format == format)
+        {
+            return i;
+        }
+    }
+    return -1;
+}
+
+SlangResult VulkanSwapChain::init(VulkanDeviceQueue* deviceQueue, const Desc& descIn, const PlatformDesc* platformDescIn)
 {
     assert(platformDescIn);
 
     m_deviceQueue = deviceQueue;
     m_api = deviceQueue->getApi();
     
+    // Make sure it's not set initially
+    m_format = VK_FORMAT_UNDEFINED;
+
+    Desc desc(descIn);
+
 #if SLANG_WINDOWS_FAMILY
     const WinPlatformDesc* platformDesc = static_cast<const WinPlatformDesc*>(platformDescIn);
     _setPlatformDesc(*platformDesc);
@@ -49,7 +69,25 @@ SlangResult VulkanSwapChain::init(VulkanDeviceQueue* deviceQueue, const Desc& de
     surfaceFormats.SetSize(int(numSurfaceFormats));
     m_api->vkGetPhysicalDeviceSurfaceFormatsKHR(m_api->m_physicalDevice, m_surface, &numSurfaceFormats, surfaceFormats.Buffer());
 
-    m_format = VulkanUtil::calcVkFormat(desc.m_format);
+    VkFormat format = VulkanUtil::calcVkFormat(desc.m_format);
+    if (format == VK_FORMAT_UNDEFINED)
+    {
+        return SLANG_FAIL;
+    }
+
+    // Look it up
+    if (_indexOfFormat(surfaceFormats, format) >= 0)
+    {
+        m_format = format;
+    }
+    else if (descIn.m_format == Format::RGBA_Unorm_UInt8)
+    {
+        if (_indexOfFormat(surfaceFormats, VK_FORMAT_B8G8R8A8_UNORM) >= 0)
+        {
+            m_format = VK_FORMAT_B8G8R8A8_UNORM;
+        }
+    }
+    
     if (m_format == VK_FORMAT_UNDEFINED)
     {
         return SLANG_FAIL;
@@ -84,8 +122,10 @@ SlangResult VulkanSwapChain::init(VulkanDeviceQueue* deviceQueue, const Desc& de
     }
     */
 
+    SLANG_RETURN_ON_FAIL(_createSwapChain());
 
-    return _createSwapChain();
+    m_desc = desc;
+    return SLANG_OK;
 }
 
 void VulkanSwapChain::getWindowSize(int* widthOut, int* heightOut) const
@@ -129,6 +169,13 @@ SlangResult VulkanSwapChain::_createSwapChain()
     if (m_width == 0 || m_height == 0)
     {
         return SLANG_FAIL;
+    }
+
+    // It is necessary to query the caps -> otherwise the LunarG verification layer will issue an error
+    {
+        VkSurfaceCapabilitiesKHR surfaceCaps;
+
+        SLANG_VK_RETURN_ON_FAIL(m_api->vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_api->m_physicalDevice, m_surface, &surfaceCaps));
     }
 
     List<VkPresentModeKHR> presentModes;
@@ -207,6 +254,7 @@ SlangResult VulkanSwapChain::_createSwapChain()
         VkImageViewCreateInfo createInfo = {};
         createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         
+        createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
         createInfo.format = m_format;
         
         createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -230,27 +278,27 @@ SlangResult VulkanSwapChain::_createSwapChain()
         }
     }
 #if 0
-    for (NvFlowUint idx = 0; idx < ptr->numSwapchainImages; idx++)
+    for (int i = 0; i < int(m_images.Count()); ++i)
     {
-        NvFlowRenderTargetDescVulkan renderTargetDesc = {};
+        RenderTargetDescVulkan renderTargetDesc = {};
         renderTargetDesc.texture = ptr->swapchainImages[idx];
         renderTargetDesc.format = ptr->swapchainFormat;
         renderTargetDesc.width = imageExtent.width;
         renderTargetDesc.height = imageExtent.height;
 
-        ptr->renderTargets[idx] = NvFlowCreateRenderTargetExternalVulkan(ptr->deviceQueue->internalContext, &renderTargetDesc);
+        ptr->renderTargets[idx] = CreateRenderTargetExternalVulkan(ptr->deviceQueue->internalContext, &renderTargetDesc);
     }
 
     if (ptr->swapchain.desc.enableDepth)
     {
-        NvFlowDepthBufferDesc depthBufferDesc = {};
+        DepthBufferDesc depthBufferDesc = {};
         depthBufferDesc.format_typeless = ptr->swapchain.desc.depthFormat_typeless;
         depthBufferDesc.format_depth = ptr->swapchain.desc.depthFormat_depth;
         depthBufferDesc.format_texture = ptr->swapchain.desc.depthFormat_texture;
         depthBufferDesc.width = ptr->width;
         depthBufferDesc.height = ptr->height;
 
-        ptr->depthBuffer = NvFlowCreateDepthBuffer(ptr->deviceQueue->internalContext, &depthBufferDesc);
+        ptr->depthBuffer = CreateDepthBuffer(ptr->deviceQueue->internalContext, &depthBufferDesc);
     }
 #endif
 
