@@ -50,8 +50,8 @@ public:
     virtual void setConstantBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers,  const UInt* offsets) override;
     virtual void draw(UInt vertexCount, UInt startVertex) override;
     virtual void dispatchCompute(int x, int y, int z) override;
-    virtual void submitGpuWork() override {}
-    virtual void waitForGpu() override {}
+    virtual void submitGpuWork() override;
+    virtual void waitForGpu() override;
 
     // ShaderCompiler implementation
     virtual ShaderProgram* compileProgram(const ShaderCompileRequest& request) override;
@@ -121,6 +121,12 @@ public:
 	class ShaderProgramImpl: public ShaderProgram
     {
 		public:
+
+        ShaderProgramImpl(PipelineType pipelineType):
+            m_pipelineType(pipelineType)
+        {}
+
+        PipelineType m_pipelineType;
 
         VkPipelineShaderStageCreateInfo m_compute;
         VkPipelineShaderStageCreateInfo m_vertex;
@@ -212,6 +218,8 @@ public:
     Pipeline* _getPipeline();
     bool _isEqual(const Pipeline& pipeline) const;
     Slang::Result _createPipeline(RefPtr<Pipeline>& pipelineOut);
+    void _beginRender();
+    void _endRender();
 
     VkDebugReportCallbackEXT m_debugReportCallback;
 
@@ -241,7 +249,6 @@ public:
 };
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! VkRenderer::Buffer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
 
 Result VKRenderer::Buffer::init(const VulkanApi& api, size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties)
 {
@@ -462,22 +469,123 @@ Slang::Result VKRenderer::_createPipeline(RefPtr<Pipeline>& pipelineOut)
 
     SLANG_VK_CHECK(m_api.vkCreatePipelineLayout(m_device, &pipelineLayoutInfo, nullptr, &pipeline->m_pipelineLayout));
 
-    // Then create a pipeline to use that layout
-
-    VkComputePipelineCreateInfo computePipelineInfo = { VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
-    computePipelineInfo.stage = m_currentProgram->m_compute;
-    computePipelineInfo.layout = pipeline->m_pipelineLayout;
-
     VkPipelineCache pipelineCache = VK_NULL_HANDLE;
 
-    SLANG_VK_CHECK(m_api.vkCreateComputePipelines(m_device, pipelineCache, 1, &computePipelineInfo, nullptr, &pipeline->m_pipeline));
+    if (m_currentProgram->m_pipelineType == PipelineType::Compute)
+    {
+        // Then create a pipeline to use that layout
+
+        VkComputePipelineCreateInfo computePipelineInfo = { VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
+        computePipelineInfo.stage = m_currentProgram->m_compute;
+        computePipelineInfo.layout = pipeline->m_pipelineLayout;
+
+        SLANG_VK_CHECK(m_api.vkCreateComputePipelines(m_device, pipelineCache, 1, &computePipelineInfo, nullptr, &pipeline->m_pipeline));
+    }
+    else if (m_currentProgram->m_pipelineType == PipelineType::Graphics)
+    {
+        // Create the graphics pipeline
+
+        const int width = m_swapChain.getWidth();
+        const int height = m_swapChain.getHeight();
+
+        VkPipelineShaderStageCreateInfo shaderStages[] = {  m_currentProgram->m_vertex, m_currentProgram->m_fragment };
+
+        VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
+        vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+        vertexInputInfo.vertexBindingDescriptionCount = 0;
+        vertexInputInfo.vertexAttributeDescriptionCount = 0;
+
+        VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
+        inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+        inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+        inputAssembly.primitiveRestartEnable = VK_FALSE;
+
+        VkViewport viewport = {};
+        viewport.x = 0.0f;
+        viewport.y = 0.0f;
+        viewport.width = (float)width;
+        viewport.height = (float)height;
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+
+        VkRect2D scissor = {};
+        scissor.offset = { 0, 0 };
+        scissor.extent = { uint32_t(width), uint32_t(height) };
+        
+        VkPipelineViewportStateCreateInfo viewportState = {};
+        viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+        viewportState.viewportCount = 1;
+        viewportState.pViewports = &viewport;
+        viewportState.scissorCount = 1;
+        viewportState.pScissors = &scissor;
+
+        VkPipelineRasterizationStateCreateInfo rasterizer = {};
+        rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+        rasterizer.depthClampEnable = VK_FALSE;
+        rasterizer.rasterizerDiscardEnable = VK_FALSE;
+        rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+        rasterizer.lineWidth = 1.0f;
+        rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+        rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+        rasterizer.depthBiasEnable = VK_FALSE;
+
+        VkPipelineMultisampleStateCreateInfo multisampling = {};
+        multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+        multisampling.sampleShadingEnable = VK_FALSE;
+        multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+        VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
+        colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+        colorBlendAttachment.blendEnable = VK_FALSE;
+
+        VkPipelineColorBlendStateCreateInfo colorBlending = {};
+        colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+        colorBlending.logicOpEnable = VK_FALSE;
+        colorBlending.logicOp = VK_LOGIC_OP_COPY;
+        colorBlending.attachmentCount = 1;
+        colorBlending.pAttachments = &colorBlendAttachment;
+        colorBlending.blendConstants[0] = 0.0f;
+        colorBlending.blendConstants[1] = 0.0f;
+        colorBlending.blendConstants[2] = 0.0f;
+        colorBlending.blendConstants[3] = 0.0f;
+
+        VkGraphicsPipelineCreateInfo pipelineInfo = { VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
+        
+        pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+        pipelineInfo.stageCount = 2;
+        pipelineInfo.pStages = shaderStages;
+        pipelineInfo.pVertexInputState = &vertexInputInfo;
+        pipelineInfo.pInputAssemblyState = &inputAssembly;
+        pipelineInfo.pViewportState = &viewportState;
+        pipelineInfo.pRasterizationState = &rasterizer;
+        pipelineInfo.pMultisampleState = &multisampling;
+        pipelineInfo.pColorBlendState = &colorBlending;
+        pipelineInfo.layout = pipeline->m_pipelineLayout;
+        pipelineInfo.renderPass = m_renderPass;
+        pipelineInfo.subpass = 0;
+        pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+
+        SLANG_VK_CHECK(m_api.vkCreateGraphicsPipelines(m_device, pipelineCache, 1, &pipelineInfo, nullptr, &pipeline->m_pipeline));
+    }
+    else
+    {
+        assert(!"Unhandled program type");
+        return SLANG_FAIL;
+    }
 
     pipelineOut = pipeline;
     return SLANG_OK;
 }
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! VkRenderer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+void VKRenderer::_beginRender()
+{
+    
+}
 
+void VKRenderer::_endRender()
+{
+    m_deviceQueue.flushStep();
+}
 
 Renderer* createVKRenderer()
 {
@@ -750,13 +858,22 @@ SlangResult VKRenderer::initialize(void* inWindowHandle)
         SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateRenderPass(m_device, &renderPassCreateInfo, nullptr, &m_renderPass));
     }
 
-
-    // pipeline cache
-
     // frame buffer
     SLANG_RETURN_ON_FAIL(m_swapChain.createFrameBuffers(m_renderPass));
 
+    _beginRender();
+
     return SLANG_OK;
+}
+
+void VKRenderer::submitGpuWork()
+{
+    m_deviceQueue.flushStep();
+}
+
+void VKRenderer::waitForGpu()
+{
+    m_deviceQueue.flushAndWait();
 }
 
 void VKRenderer::setClearColor(const float color[4])
@@ -771,8 +888,17 @@ void VKRenderer::clearFrame()
 
 void VKRenderer::presentFrame()
 {   
+    _endRender();
+
+    // Work out where to render to 
+    m_swapChain.getFrontRenderTarget();
+
     const bool vsync = true;
     m_swapChain.present(vsync);
+
+    
+
+    _beginRender();
 }
 
 SlangResult VKRenderer::captureScreenShot(char const* outputPath)
@@ -1072,6 +1198,30 @@ void VKRenderer::setConstantBuffers(UInt startSlot, UInt slotCount, BufferResour
 
 void VKRenderer::draw(UInt vertexCount, UInt startVertex = 0)
 {
+    Pipeline* pipeline = _getPipeline();
+    if (!pipeline || pipeline->m_shaderProgram->m_pipelineType != PipelineType::Graphics)
+    {
+        assert(!"Invalid render pipeline");
+        return;
+    }
+
+    // Also create descriptor sets based on the given pipeline layout
+    VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
+
+    m_api.vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->m_pipeline);
+
+    // Bind the vertex buffer
+    if (m_boundVertexBuffers.Count() > 0 && m_boundVertexBuffers[0].m_buffer)
+    {
+        const BoundVertexBuffer& boundVertexBuffer = m_boundVertexBuffers[0];
+
+        VkBuffer vertexBuffers[] = { boundVertexBuffer.m_buffer->m_buffer.m_buffer };
+        VkDeviceSize offsets[] = { VkDeviceSize(boundVertexBuffer.m_offset) };
+
+        m_api.vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+    }
+
+    m_api.vkCmdDraw(commandBuffer, static_cast<uint32_t>(vertexCount), 1, 0, 0);
 }
 
 BindingState* VKRenderer::createBindingState(const BindingState::Desc& bindingStateDesc)
@@ -1125,14 +1275,13 @@ void VKRenderer::setBindingState(BindingState* state)
 void VKRenderer::dispatchCompute(int x, int y, int z)
 {
     Pipeline* pipeline = _getPipeline();
-    assert(pipeline);
-    if (!pipeline)
+    if (!pipeline || pipeline->m_shaderProgram->m_pipelineType != PipelineType::Compute)
     {
+        assert(!"Invalid render pipeline");
         return;
     }
 
     // Also create descriptor sets based on the given pipeline layout
-
     VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
 
     m_api.vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->m_pipeline);
@@ -1144,9 +1293,11 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
 }
 
 // ShaderCompiler interface
-ShaderProgram* VKRenderer::compileProgram(const ShaderCompileRequest & request) 
+ShaderProgram* VKRenderer::compileProgram(const ShaderCompileRequest& request) 
 {
-    ShaderProgramImpl* impl = new ShaderProgramImpl;
+    const PipelineType pipelineType = request.computeShader.name ? PipelineType::Compute : PipelineType::Graphics;
+
+    ShaderProgramImpl* impl = new ShaderProgramImpl(pipelineType);
     if (request.computeShader.name)
     {
         impl->m_compute = compileEntryPoint(request.computeShader, VK_SHADER_STAGE_COMPUTE_BIT, impl->m_buffers[0]);

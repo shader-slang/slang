@@ -11,13 +11,18 @@ namespace renderer_test {
 Options gOptions;
 
 // Only set it, if the 
-void setDefaultRendererID(RendererID id)
+void setDefaultRendererID(Options::RendererID id)
 {
-    gOptions.rendererID = (gOptions.rendererID == RendererID::NONE) ? id : gOptions.rendererID;
+    gOptions.rendererID = (gOptions.rendererID == Options::RendererID::NONE) ? id : gOptions.rendererID;
 }
 
 SlangResult parseOptions(int* argc, char** argv)
 {
+    typedef Options::RendererID RendererID;
+    typedef Options::ShaderProgramType ShaderProgramType;
+    typedef Options::InputLanguageID InputLanguageID;
+
+
     int argCount = *argc;
     char const* const* argCursor = argv;
     char const* const* argEnd = argCursor + argCount;
@@ -97,9 +102,9 @@ SlangResult parseOptions(int* argc, char** argv)
                 fprintf(stderr, "expected argument for '%s' option\n", arg);
                 return SLANG_FAIL;
             }
-            if( gOptions.slangArgCount == kMaxSlangArgs )
+            if( gOptions.slangArgCount == Options::kMaxSlangArgs )
             {
-                fprintf(stderr, "maximum number of '%s' options exceeded (%d)\n", arg, kMaxSlangArgs);
+                fprintf(stderr, "maximum number of '%s' options exceeded (%d)\n", arg, Options::kMaxSlangArgs);
                 return SLANG_FAIL;
             }
             gOptions.slangArgs[gOptions.slangArgCount++] = *argCursor++;

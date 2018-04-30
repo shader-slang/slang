@@ -19,12 +19,18 @@ class InputLayout: public Slang::RefObject
 	public:
 };
 
+enum class PipelineType
+{
+    Unknown,
+    Graphics,
+    Compute,
+    CountOf,
+};
+
 class ShaderProgram: public Slang::RefObject
 {
 	public:
 };
-
-
 
 struct ShaderCompileRequest
 {

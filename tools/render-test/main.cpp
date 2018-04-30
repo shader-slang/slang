@@ -177,7 +177,7 @@ Result RenderTestApp::initializeShaders(ShaderCompiler* shaderCompiler)
 
 	ShaderCompileRequest compileRequest;
 	compileRequest.source = sourceInfo;
-	if (gOptions.shaderType == ShaderProgramType::Graphics || gOptions.shaderType == ShaderProgramType::GraphicsCompute)
+	if (gOptions.shaderType == Options::ShaderProgramType::Graphics || gOptions.shaderType == Options::ShaderProgramType::GraphicsCompute)
 	{
 		compileRequest.vertexShader.source = sourceInfo;
 		compileRequest.vertexShader.name = vertexEntryPointName;
@@ -391,25 +391,25 @@ SlangResult innerMain(int argc, char** argv)
 	SlangCompileTarget slangTarget = SLANG_TARGET_NONE;
 	switch (gOptions.rendererID)
 	{
-		case RendererID::D3D11:
+		case Options::RendererID::D3D11:
 			renderer = createD3D11Renderer();
 			slangTarget = SLANG_HLSL;
 			nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
 			break;
 
-		case RendererID::D3D12:
+		case Options::RendererID::D3D12:
 			renderer = createD3D12Renderer();
 			slangTarget = SLANG_HLSL;
 			nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
 			break;
 
-		case RendererID::GL:
+		case Options::RendererID::GL:
 			renderer = createGLRenderer();
 			slangTarget = SLANG_GLSL;
 			nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;
 			break;
 
-		case RendererID::VK:
+		case Options::RendererID::VK:
 			renderer = createVKRenderer();
 			slangTarget = SLANG_SPIRV;
 			nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;
@@ -425,11 +425,11 @@ SlangResult innerMain(int argc, char** argv)
 	auto shaderCompiler = renderer->getShaderCompiler();
 	switch (gOptions.inputLanguageID)
 	{
-		case InputLanguageID::Slang:
+		case Options::InputLanguageID::Slang:
 			shaderCompiler = createSlangShaderCompiler(shaderCompiler, SLANG_SOURCE_LANGUAGE_SLANG, slangTarget);
 			break;
 
-		case InputLanguageID::NativeRewrite:
+		case Options::InputLanguageID::NativeRewrite:
 			shaderCompiler = createSlangShaderCompiler(shaderCompiler, nativeLanguage, slangTarget);
 			break;
 
@@ -464,7 +464,7 @@ SlangResult innerMain(int argc, char** argv)
 			else
 			{
 				// Whenever we don't have Windows events to process, we render a frame.
-				if (gOptions.shaderType == ShaderProgramType::Compute)
+				if (gOptions.shaderType == Options::ShaderProgramType::Compute)
 				{
 					app.runCompute();
 				}
@@ -484,7 +484,7 @@ SlangResult innerMain(int argc, char** argv)
                     // Wait until everything is complete
                     renderer->waitForGpu();
 
-					if (gOptions.shaderType == ShaderProgramType::Compute || gOptions.shaderType == ShaderProgramType::GraphicsCompute)
+					if (gOptions.shaderType == Options::ShaderProgramType::Compute || gOptions.shaderType == Options::ShaderProgramType::GraphicsCompute)
                     {
                         SLANG_RETURN_ON_FAIL(app.writeBindingOutput(gOptions.outputPath));
                     }

@@ -46,6 +46,7 @@ namespace renderer_test {
     x(vkCreatePipelineLayout)           \
     x(vkDestroyPipelineLayout)          \
     x(vkCreateComputePipelines)         \
+    x(vkCreateGraphicsPipelines)        \
     x(vkDestroyPipeline)                \
     x(vkCreateShaderModule)             \
     x(vkDestroyShaderModule)            \
@@ -55,6 +56,7 @@ namespace renderer_test {
     x(vkCmdBindPipeline)                \
     x(vkCmdBindDescriptorSets)          \
     x(vkCmdDispatch)                    \
+    x(vkCmdDraw) \
     \
     x(vkCreateFence) \
     x(vkDestroyFence) \
@@ -85,6 +87,9 @@ namespace renderer_test {
     \
     x(vkCreateRenderPass) \
     x(vkDestroyRenderPass) \
+    \
+    x(vkCmdBindVertexBuffers) \
+    x(vkCmdBindIndexBuffer) \
     /* */
 
 #if SLANG_WINDOWS_FAMILY

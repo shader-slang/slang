@@ -56,7 +56,7 @@ struct VulkanSwapChain
         /// Must be called before the swap chain can be used
     SlangResult init(VulkanDeviceQueue* deviceQueue, const Desc& desc, const PlatformDesc* platformDesc);
 
-        /// 
+        /// Create the frame buffers (they must be compatible with the supplied renderPass)
     SlangResult createFrameBuffers(VkRenderPass renderPass);
 
         /// Returned the desc used to construct the swap chain. 
@@ -74,6 +74,11 @@ struct VulkanSwapChain
 
         /// Get the VkFormat for the back buffer
     VkFormat getVkFormat() const { return m_format; }
+
+        /// Get width of the back buffers
+    int getWidth() const { return m_width; }
+        /// Get the height of the back buffer
+    int getHeight() const { return m_height; }
 
     TextureResource* getFrontRenderTarget();
 
@@ -109,7 +114,7 @@ struct VulkanSwapChain
     int m_height = 0;
 
     VkPresentModeKHR m_presentMode = VK_PRESENT_MODE_IMMEDIATE_KHR;
-    VkFormat m_format = VK_FORMAT_B8G8R8A8_UNORM;
+    VkFormat m_format = VK_FORMAT_UNDEFINED;                ///< The format used for backbuffer. Valid after successful init.
 
     VkSurfaceKHR m_surface = VK_NULL_HANDLE;
     VkSwapchainKHR m_swapChain = VK_NULL_HANDLE;
@@ -119,9 +124,6 @@ struct VulkanSwapChain
     int m_currentSwapChainIndex = 0;
 
     Slang::List<Image> m_images;              
-
-    //RenderTarget*	m_renderTargets[kMaxImages] = {};
-    //DepthBuffer* m_depthBuffer = nullptr;
 
     VulkanDeviceQueue* m_deviceQueue = nullptr;
     const VulkanApi* m_api = nullptr;

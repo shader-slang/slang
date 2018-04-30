@@ -88,12 +88,6 @@ protected:
     static const Int kMaxNumRenderFrames = 4;
     static const Int kMaxNumRenderTargets = 3;
     
-    enum class ProgramType
-    {
-        Compute,
-        Graphics,
-    };
-
     struct Submitter
     {
         virtual void setRootConstantBufferView(int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation) = 0;
@@ -115,7 +109,7 @@ protected:
     class ShaderProgramImpl: public ShaderProgram
     {
         public:
-        ProgramType m_programType;
+        PipelineType m_pipelineType; 
         List<uint8_t> m_vertexShader;
         List<uint8_t> m_pixelShader;
         List<uint8_t> m_computeShader;
@@ -350,7 +344,7 @@ protected:
     Result _bindRenderState(RenderState* renderState, ID3D12GraphicsCommandList* commandList, Submitter* submitter);
     
     Result _calcBindParameters(BindParameters& params);
-    RenderState* findRenderState(ProgramType programType);
+    RenderState* findRenderState(PipelineType pipelineType);
 
     PFN_D3D12_SERIALIZE_ROOT_SIGNATURE m_D3D12SerializeRootSignature = nullptr;
 
@@ -971,11 +965,11 @@ Result D3D12Renderer::calcGraphicsPipelineState(ComPtr<ID3D12RootSignature>& sig
     return SLANG_OK;
 }
 
-D3D12Renderer::RenderState* D3D12Renderer::findRenderState(ProgramType programType)
+D3D12Renderer::RenderState* D3D12Renderer::findRenderState(PipelineType pipelineType)
 {
-    switch (programType)
+    switch (pipelineType)
     {
-        case ProgramType::Compute:
+        case PipelineType::Compute:
         {
             // Check if current state is a match
             if (m_currentRenderState)
@@ -999,7 +993,7 @@ D3D12Renderer::RenderState* D3D12Renderer::findRenderState(ProgramType programTy
             }
             break;
         }
-        case ProgramType::Graphics:
+        case PipelineType::Graphics:
         {
             if (m_currentRenderState)
             {
@@ -1040,7 +1034,7 @@ D3D12Renderer::RenderState* D3D12Renderer::calcRenderState()
     {
         return nullptr;
     }
-    m_currentRenderState = findRenderState(m_boundShaderProgram->m_programType);
+    m_currentRenderState = findRenderState(m_boundShaderProgram->m_pipelineType);
     if (m_currentRenderState)
     {
         return m_currentRenderState;
@@ -1049,9 +1043,9 @@ D3D12Renderer::RenderState* D3D12Renderer::calcRenderState()
     ComPtr<ID3D12RootSignature> rootSignature;
     ComPtr<ID3D12PipelineState> pipelineState;
 
-    switch (m_boundShaderProgram->m_programType)
+    switch (m_boundShaderProgram->m_pipelineType)
     {
-        case ProgramType::Compute:
+        case PipelineType::Compute:
         {
             if (SLANG_FAILED(calcComputePipelineState(rootSignature, pipelineState)))
             {
@@ -1059,7 +1053,7 @@ D3D12Renderer::RenderState* D3D12Renderer::calcRenderState()
             }
             break;
         }
-        case ProgramType::Graphics:
+        case PipelineType::Graphics:
         {
             if (SLANG_FAILED(calcGraphicsPipelineState(rootSignature, pipelineState)))
             {
@@ -2527,7 +2521,7 @@ ShaderProgram* D3D12Renderer::compileProgram(const ShaderCompileRequest& request
 
     if (request.computeShader.name)
     {
-        program->m_programType = ProgramType::Compute;
+        program->m_pipelineType = PipelineType::Compute;
         ComPtr<ID3DBlob> computeShaderBlob;
         SLANG_RETURN_NULL_ON_FAIL(D3DUtil::compileHLSLShader(request.computeShader.source.path, request.computeShader.source.dataBegin, request.computeShader.name, request.computeShader.profile, computeShaderBlob));
 
@@ -2535,7 +2529,7 @@ ShaderProgram* D3D12Renderer::compileProgram(const ShaderCompileRequest& request
     }
     else
     {
-        program->m_programType = ProgramType::Graphics;
+        program->m_pipelineType = PipelineType::Graphics;
         ComPtr<ID3DBlob> vertexShaderBlob, fragmentShaderBlob;
         SLANG_RETURN_NULL_ON_FAIL(D3DUtil::compileHLSLShader(request.vertexShader.source.path, request.vertexShader.source.dataBegin, request.vertexShader.name, request.vertexShader.profile, vertexShaderBlob));
         SLANG_RETURN_NULL_ON_FAIL(D3DUtil::compileHLSLShader(request.fragmentShader.source.path, request.fragmentShader.source.dataBegin, request.fragmentShader.name, request.fragmentShader.profile, fragmentShaderBlob));

@@ -69,6 +69,7 @@ SlangResult VulkanSwapChain::init(VulkanDeviceQueue* deviceQueue, const Desc& de
     surfaceFormats.SetSize(int(numSurfaceFormats));
     m_api->vkGetPhysicalDeviceSurfaceFormatsKHR(m_api->m_physicalDevice, m_surface, &numSurfaceFormats, surfaceFormats.Buffer());
 
+    // Look for a suitable format
     List<VkFormat> formats;
     formats.Add(VulkanUtil::calcVkFormat(desc.m_format));
     // HACK! To check for a different format if couldn't be found
@@ -93,32 +94,6 @@ SlangResult VulkanSwapChain::init(VulkanDeviceQueue* deviceQueue, const Desc& de
 
     // Save the desc
     m_desc = desc;
-
-    /*
-    // try to find BGR, fall back to RGB
-    bool formatFound = false;
-    for (uint32_t i = 0; i < surfaceCount; i++)
-    {
-    if (surfaceFormats[i].format == VK_FORMAT_B8G8R8A8_UNORM)
-    {
-    ptr->swapchainFormat = surfaceFormats[i].format;
-    formatFound = true;
-    break;
-    }
-    }
-    if (!formatFound)
-    {
-    for (uint32_t i = 0; i < surfaceCount; i++)
-    {
-    if (surfaceFormats[i].format == VK_FORMAT_R8G8B8A8_UNORM)
-    {
-    ptr->swapchainFormat = surfaceFormats[i].format;
-    formatFound = true;
-    break;
-    }
-    }
-    }
-    */
 
     SLANG_RETURN_ON_FAIL(_createSwapChain());
 
@@ -441,8 +416,6 @@ TextureResource* VulkanSwapChain::getFrontRenderTarget()
         return nullptr;
     }
     m_currentSwapChainIndex = int(swapChainIndex);
-
-    //return m_renderTargets[m_currentSwapChainIndex];
     return nullptr;
 }
 
