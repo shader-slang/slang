@@ -146,6 +146,61 @@ void VulkanSwapChain::getWindowSize(int* widthOut, int* heightOut) const
 #endif
 }
 
+SlangResult VulkanSwapChain::_createFrameBuffers(VkRenderPass renderPass)
+{
+    assert(renderPass != VK_NULL_HANDLE);
+
+    for (int i = 0; i < int(m_images.Count()); ++i)
+    {
+        Image& image = m_images[i];
+        VkImageView attachments[] = 
+        {
+            image.m_imageView
+        };
+
+        VkFramebufferCreateInfo framebufferInfo = {};
+        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        framebufferInfo.renderPass = renderPass;
+        framebufferInfo.attachmentCount = 1;
+        framebufferInfo.pAttachments = attachments;
+        framebufferInfo.width = m_width;
+        framebufferInfo.height = m_height;
+        framebufferInfo.layers = 1;
+
+        SLANG_VK_RETURN_ON_FAIL(m_api->vkCreateFramebuffer(m_api->m_device, &framebufferInfo, nullptr, &image.m_frameBuffer));
+    }
+
+    return SLANG_OK;
+}
+
+void VulkanSwapChain::_destroyFrameBuffers()
+{
+    for (int i = 0; i < int(m_images.Count()); ++i)
+    {
+        Image& image = m_images[i];
+        if (image.m_frameBuffer != VK_NULL_HANDLE)
+        {
+            m_api->vkDestroyFramebuffer(m_api->m_device, image.m_frameBuffer, nullptr);
+            image.m_frameBuffer = VK_NULL_HANDLE;
+        }
+    }
+}
+
+SlangResult VulkanSwapChain::createFrameBuffers(VkRenderPass renderPass)
+{
+    if (m_renderPass != VK_NULL_HANDLE)
+    {
+        _destroyFrameBuffers();
+        m_renderPass = VK_NULL_HANDLE;
+    }
+    if (renderPass != VK_NULL_HANDLE)
+    {
+        SLANG_RETURN_ON_FAIL(_createFrameBuffers(renderPass));
+    }
+    m_renderPass = renderPass;
+    return SLANG_OK;
+}
+
 SlangResult VulkanSwapChain::_createSwapChain()
 {
     if (hasValidSwapChain())
@@ -300,6 +355,11 @@ SlangResult VulkanSwapChain::_createSwapChain()
     }
 #endif
 
+    if (m_renderPass != VK_NULL_HANDLE)
+    {
+        _createFrameBuffers(m_renderPass);
+    }
+
     return SLANG_OK;
 }
 
@@ -312,9 +372,15 @@ void VulkanSwapChain::_destroySwapChain()
 
     m_deviceQueue->waitForIdle();
 
+    if (m_renderPass != VK_NULL_HANDLE)
+    {
+        _destroyFrameBuffers();
+    }
+
     for (int i = 0; i < int(m_images.Count()); ++i)
     {
         Image& image = m_images[i];
+
         if (image.m_imageView != VK_NULL_HANDLE)
         {
             m_api->vkDestroyImageView(m_api->m_device, image.m_imageView, nullptr);
@@ -341,6 +407,7 @@ void VulkanSwapChain::_destroySwapChain()
         m_swapChain = VK_NULL_HANDLE;
     }
 
+    
     // Mark that it is no longer used
     m_images.Clear();
 }

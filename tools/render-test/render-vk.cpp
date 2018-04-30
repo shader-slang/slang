@@ -321,7 +321,7 @@ Slang::Result VKRenderer::_createPipeline(RefPtr<Pipeline>& pipelineOut)
     pipeline->m_shaderProgram = m_currentProgram;
     pipeline->m_inputLayout = m_currentInputLayout;
 
-    // Must be equal at this point if all the items are correctly set in pipleine
+    // Must be equal at this point if all the items are correctly set in pipeline
     assert(_isEqual(*pipeline));
 
     // First create a pipeline layout based on what is bound
@@ -354,6 +354,16 @@ Slang::Result VKRenderer::_createPipeline(RefPtr<Pipeline>& pipelineOut)
 
                     dstBindings.Add(dstBinding);
                 }
+                else if (bufferResourceDesc.bindFlags & Resource::BindFlag::ConstantBuffer)
+                {
+                    VkDescriptorSetLayoutBinding dstBinding = {};
+                    dstBinding.binding = srcDetail.m_binding;
+                    dstBinding.descriptorCount = 1;
+                    dstBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+                    dstBinding.stageFlags = VK_SHADER_STAGE_ALL;
+
+                    dstBindings.Add(dstBinding);
+                }
 
                 break;
             }
@@ -382,7 +392,6 @@ Slang::Result VKRenderer::_createPipeline(RefPtr<Pipeline>& pipelineOut)
     descriptorPoolInfo.poolSizeCount = SLANG_COUNT_OF(poolSizes);
     descriptorPoolInfo.pPoolSizes = poolSizes;
 
-    
     SLANG_VK_CHECK(m_api.vkCreateDescriptorPool(m_device, &descriptorPoolInfo, nullptr, &pipeline->m_descriptorPool));
 
     // Create a descriptor set based on our layout
@@ -396,6 +405,8 @@ Slang::Result VKRenderer::_createPipeline(RefPtr<Pipeline>& pipelineOut)
 
     // Fill in the descriptor set, using our binding information
 
+    int elementIndex = 0;
+
     for (int i = 0; i < numBindings; ++i)
     {
         const auto& srcDetail = srcDetails[i];
@@ -408,23 +419,31 @@ Slang::Result VKRenderer::_createPipeline(RefPtr<Pipeline>& pipelineOut)
                 BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(srcBinding.resource.Ptr());
                 const BufferResource::Desc& bufferResourceDesc = bufferResource->getDesc();
 
-                if (bufferResourceDesc.bindFlags & Resource::BindFlag::UnorderedAccess)
+                VkDescriptorBufferInfo bufferInfo;
+                bufferInfo.buffer = bufferResource->m_buffer.m_buffer;
+                bufferInfo.offset = 0;
+                bufferInfo.range = bufferResourceDesc.sizeInBytes;
+
+                VkWriteDescriptorSet writeInfo = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+                writeInfo.descriptorCount = 1;
+                
+                writeInfo.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                if (bufferResource->m_initialUsage == Resource::Usage::UnorderedAccess)
                 {
-                    VkDescriptorBufferInfo bufferInfo;
-                    bufferInfo.buffer = bufferResource->m_buffer.m_buffer;
-                    bufferInfo.offset = 0;
-                    bufferInfo.range = bufferResourceDesc.sizeInBytes;
-
-                    VkWriteDescriptorSet writeInfo = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-                    writeInfo.descriptorCount = 1;
                     writeInfo.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-                    writeInfo.dstSet = pipeline->m_descriptorSet;
-                    writeInfo.dstBinding = srcDetail.m_binding;
-                    writeInfo.dstArrayElement = 0;
-                    writeInfo.pBufferInfo = &bufferInfo;
-
-                    m_api.vkUpdateDescriptorSets(m_device, 1, &writeInfo, 0, nullptr);
                 }
+                else if (bufferResource->m_initialUsage == Resource::Usage::ConstantBuffer)
+                {
+                    writeInfo.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+                }
+
+                writeInfo.dstSet = pipeline->m_descriptorSet;
+                writeInfo.dstBinding = srcDetail.m_binding;
+                writeInfo.dstArrayElement = elementIndex++;
+                writeInfo.pBufferInfo = &bufferInfo;
+
+                m_api.vkUpdateDescriptorSets(m_device, 1, &writeInfo, 0, nullptr);
+           
                 break;
             }
             default:
@@ -664,6 +683,7 @@ SlangResult VKRenderer::initialize(void* inWindowHandle)
         bool hasDepthBuffer = false;
 
         Format depthFormat = Format::Unknown;
+        VkFormat colorFormat = m_swapChain.getVkFormat();
 
         int numAttachments = 0;
         // We need extra space if we have depth buffer
@@ -672,10 +692,8 @@ SlangResult VKRenderer::initialize(void* inWindowHandle)
         {
             VkAttachmentDescription& dst = attachmentDesc[numAttachments ++];
 
-            VkFormat format = VulkanUtil::calcVkFormat(m_swapChain.getDesc().m_format);
-
             dst.flags = 0;
-            dst.format = format;
+            dst.format = colorFormat;
             dst.samples = VK_SAMPLE_COUNT_1_BIT;
             dst.loadOp = shouldClear ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
             dst.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -736,6 +754,7 @@ SlangResult VKRenderer::initialize(void* inWindowHandle)
     // pipeline cache
 
     // frame buffer
+    SLANG_RETURN_ON_FAIL(m_swapChain.createFrameBuffers(m_renderPass));
 
     return SLANG_OK;
 }

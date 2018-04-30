@@ -49,6 +49,8 @@ namespace renderer_test {
     x(vkDestroyPipeline)                \
     x(vkCreateShaderModule)             \
     x(vkDestroyShaderModule)            \
+    x(vkCreateFramebuffer) \
+    x(vkDestroyFramebuffer) \
     \
     x(vkCmdBindPipeline)                \
     x(vkCmdBindDescriptorSets)          \

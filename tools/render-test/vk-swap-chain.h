@@ -56,6 +56,9 @@ struct VulkanSwapChain
         /// Must be called before the swap chain can be used
     SlangResult init(VulkanDeviceQueue* deviceQueue, const Desc& desc, const PlatformDesc* platformDesc);
 
+        /// 
+    SlangResult createFrameBuffers(VkRenderPass renderPass);
+
         /// Returned the desc used to construct the swap chain. 
         /// Is invalid if init hasn't returned with successful result.
     const Desc& getDesc() const { return m_desc; }
@@ -69,6 +72,9 @@ struct VulkanSwapChain
         /// Get the current size of the window (in pixels written to widthOut, heightOut)
     void getWindowSize(int* widthOut, int* heightOut) const;
 
+        /// Get the VkFormat for the back buffer
+    VkFormat getVkFormat() const { return m_format; }
+
     TextureResource* getFrontRenderTarget();
 
         /// Dtor
@@ -80,6 +86,7 @@ struct VulkanSwapChain
     {
         VkImage m_image = VK_NULL_HANDLE;
         VkImageView m_imageView = VK_NULL_HANDLE;
+        VkFramebuffer m_frameBuffer = VK_NULL_HANDLE;
     };
 
     template <typename T>
@@ -94,6 +101,8 @@ struct VulkanSwapChain
     const T* _getPlatformDesc() const { return static_cast<const T*>((const PlatformDesc*)m_platformDescBuffer.Buffer()); }
     SlangResult _createSwapChain();
     void _destroySwapChain();
+    SlangResult _createFrameBuffers(VkRenderPass renderPass);
+    void _destroyFrameBuffers();
 
     bool m_vsync = true;
     int m_width = 0;
@@ -104,6 +113,8 @@ struct VulkanSwapChain
 
     VkSurfaceKHR m_surface = VK_NULL_HANDLE;
     VkSwapchainKHR m_swapChain = VK_NULL_HANDLE;
+
+    VkRenderPass m_renderPass = VK_NULL_HANDLE;             //< Not owned
 
     int m_currentSwapChainIndex = 0;
 
