@@ -11,7 +11,7 @@
 namespace renderer_test {
 using namespace Slang;
 
-static int _indexOfFormat(List<VkSurfaceFormatKHR>& formatsIn, VkFormat format)
+static int _indexOf(List<VkSurfaceFormatKHR>& formatsIn, VkFormat format)
 {
     const int numFormats = int(formatsIn.Count());
     const VkSurfaceFormatKHR* formats = formatsIn.Buffer();
@@ -69,25 +69,23 @@ SlangResult VulkanSwapChain::init(VulkanDeviceQueue* deviceQueue, const Desc& de
     surfaceFormats.SetSize(int(numSurfaceFormats));
     m_api->vkGetPhysicalDeviceSurfaceFormatsKHR(m_api->m_physicalDevice, m_surface, &numSurfaceFormats, surfaceFormats.Buffer());
 
-    VkFormat format = VulkanUtil::calcVkFormat(desc.m_format);
-    if (format == VK_FORMAT_UNDEFINED)
+    List<VkFormat> formats;
+    formats.Add(VulkanUtil::calcVkFormat(desc.m_format));
+    // HACK! To check for a different format if couldn't be found
+    if (descIn.m_format == Format::RGBA_Unorm_UInt8)
     {
-        return SLANG_FAIL;
+        formats.Add(VK_FORMAT_B8G8R8A8_UNORM);
     }
 
-    // Look it up
-    if (_indexOfFormat(surfaceFormats, format) >= 0)
+    for(int i = 0; i < int(formats.Count()); ++i)
     {
-        m_format = format;
-    }
-    else if (descIn.m_format == Format::RGBA_Unorm_UInt8)
-    {
-        if (_indexOfFormat(surfaceFormats, VK_FORMAT_B8G8R8A8_UNORM) >= 0)
+        VkFormat format = formats[i];
+        if (_indexOf(surfaceFormats, format) >= 0)
         {
-            m_format = VK_FORMAT_B8G8R8A8_UNORM;
+            m_format =  format;
         }
     }
-    
+
     if (m_format == VK_FORMAT_UNDEFINED)
     {
         return SLANG_FAIL;

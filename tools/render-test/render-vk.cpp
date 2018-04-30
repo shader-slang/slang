@@ -159,6 +159,47 @@ public:
         int m_offset;
     };
 
+    class Pipeline : public RefObject
+    {
+    public:
+        Pipeline(const VulkanApi& api):
+            m_api(&api)
+        {
+        }
+        ~Pipeline()
+        {
+            if (m_pipeline != VK_NULL_HANDLE)
+            {
+                m_api->vkDestroyPipeline(m_api->m_device, m_pipeline, nullptr);
+            }
+            if (m_descriptorPool != VK_NULL_HANDLE)
+            {
+                m_api->vkDestroyDescriptorPool(m_api->m_device, m_descriptorPool, nullptr);
+            }
+            if (m_pipelineLayout != VK_NULL_HANDLE)
+            {
+                m_api->vkDestroyPipelineLayout(m_api->m_device, m_pipelineLayout, nullptr);
+            }
+            if(m_descriptorSetLayout != VK_NULL_HANDLE)
+            {
+                m_api->vkDestroyDescriptorSetLayout(m_api->m_device, m_descriptorSetLayout, nullptr);
+            }
+        }
+
+        const VulkanApi* m_api;
+
+        VkPrimitiveTopology m_primitiveTopology;
+        RefPtr<BindingStateImpl> m_bindingState;
+        RefPtr<InputLayoutImpl> m_inputLayout;
+        RefPtr<ShaderProgramImpl> m_shaderProgram;
+
+        VkDescriptorSetLayout m_descriptorSetLayout = VK_NULL_HANDLE;
+        VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;
+        VkDescriptorPool m_descriptorPool = VK_NULL_HANDLE;
+        VkDescriptorSet m_descriptorSet = VK_NULL_HANDLE;
+        VkPipeline m_pipeline = VK_NULL_HANDLE;
+    };
+
     VkBool32 handleDebugMessage(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t srcObject,
         size_t location, int32_t msgCode, const char* pLayerPrefix, const char* pMsg);
     
@@ -167,12 +208,19 @@ public:
     static VKAPI_ATTR VkBool32 VKAPI_CALL debugMessageCallback(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t srcObject,
         size_t location, int32_t msgCode, const char* pLayerPrefix, const char* pMsg, void* pUserData);
 
-    
+        /// Returns true if m_currentPipeline matches the current configuration 
+    Pipeline* _getPipeline();
+    bool _isEqual(const Pipeline& pipeline) const;
+    Slang::Result _createPipeline(RefPtr<Pipeline>& pipelineOut);
+
     VkDebugReportCallbackEXT m_debugReportCallback;
 
     RefPtr<InputLayoutImpl> m_currentInputLayout;
     RefPtr<BindingStateImpl> m_currentBindingState;
     RefPtr<ShaderProgramImpl> m_currentProgram;
+
+    List<RefPtr<Pipeline> > m_pipelineCache;
+    Pipeline* m_currentPipeline = nullptr;
 
     List<BoundVertexBuffer> m_boundVertexBuffers;
     List<RefPtr<BufferResourceImpl> > m_boundConstantBuffers;
@@ -224,6 +272,188 @@ Result VKRenderer::Buffer::init(const VulkanApi& api, size_t bufferSize, VkBuffe
     SLANG_VK_CHECK(api.vkAllocateMemory(api.m_device, &allocateInfo, nullptr, &m_memory));
     SLANG_VK_CHECK(api.vkBindBufferMemory(api.m_device, m_buffer, m_memory, 0));
 
+    return SLANG_OK;
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! VkRenderer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+bool VKRenderer::_isEqual(const Pipeline& pipeline) const
+{
+    return 
+        pipeline.m_bindingState == m_currentBindingState &&
+        pipeline.m_primitiveTopology == m_primitiveTopology &&
+        pipeline.m_inputLayout == m_currentInputLayout &&
+        pipeline.m_shaderProgram == m_currentProgram;
+}
+
+VKRenderer::Pipeline* VKRenderer::_getPipeline()
+{
+    if (m_currentPipeline && _isEqual(*m_currentPipeline))
+    {
+        return m_currentPipeline;
+    }
+    
+    // Look for a match in the cache
+    for (int i = 0; i < int(m_pipelineCache.Count()); ++i)
+    {
+        Pipeline* pipeline = m_pipelineCache[i];
+        if (_isEqual(*pipeline))
+        {
+            m_currentPipeline = pipeline;
+            return pipeline;
+        }
+    }
+
+    RefPtr<Pipeline> pipeline;
+    SLANG_RETURN_NULL_ON_FAIL(_createPipeline(pipeline));
+    m_pipelineCache.Add(pipeline);
+    m_currentPipeline = pipeline;
+    return pipeline;
+}
+
+Slang::Result VKRenderer::_createPipeline(RefPtr<Pipeline>& pipelineOut)
+{
+    RefPtr<Pipeline> pipeline(new Pipeline(m_api));
+
+    // Initialize the state
+    pipeline->m_primitiveTopology = m_primitiveTopology;
+    pipeline->m_bindingState = m_currentBindingState;
+    pipeline->m_shaderProgram = m_currentProgram;
+    pipeline->m_inputLayout = m_currentInputLayout;
+
+    // Must be equal at this point if all the items are correctly set in pipleine
+    assert(_isEqual(*pipeline));
+
+    // First create a pipeline layout based on what is bound
+
+    const auto& srcDetails = m_currentBindingState->m_bindingDetails;
+    const auto& srcBindings = m_currentBindingState->getDesc().m_bindings;
+
+    const int numBindings = int(srcBindings.Count());
+
+    Slang::List<VkDescriptorSetLayoutBinding> dstBindings;
+    for (int i = 0; i < numBindings; ++i)
+    {
+        const auto& srcDetail = srcDetails[i];
+        const auto& srcBinding = srcBindings[i];
+
+        switch (srcBinding.bindingType)
+        {
+            case BindingType::Buffer:
+            {
+                BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(srcBinding.resource.Ptr());
+                const BufferResource::Desc& bufferResourceDesc = bufferResource->getDesc();
+
+                if (bufferResourceDesc.bindFlags & Resource::BindFlag::UnorderedAccess)
+                {
+                    VkDescriptorSetLayoutBinding dstBinding = {};
+                    dstBinding.binding = srcDetail.m_binding;
+                    dstBinding.descriptorCount = 1;
+                    dstBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                    dstBinding.stageFlags = VK_SHADER_STAGE_ALL;
+
+                    dstBindings.Add(dstBinding);
+                }
+
+                break;
+            }
+            default:
+                // TODO: handle the other cases
+                break;
+        }
+    }
+
+    VkDescriptorSetLayoutCreateInfo descriptorSetLayoutInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
+    descriptorSetLayoutInfo.bindingCount = uint32_t(dstBindings.Count());
+    descriptorSetLayoutInfo.pBindings = dstBindings.Buffer();
+
+    SLANG_VK_CHECK(m_api.vkCreateDescriptorSetLayout(m_device, &descriptorSetLayoutInfo, nullptr, &pipeline->m_descriptorSetLayout));
+
+    // Create a descriptor pool for allocating sets
+    VkDescriptorPoolSize poolSizes[] =
+    {
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 128 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 128 },
+        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 128 },
+    };
+
+    VkDescriptorPoolCreateInfo descriptorPoolInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
+    descriptorPoolInfo.maxSets = 128; // TODO: actually pick a size
+    descriptorPoolInfo.poolSizeCount = SLANG_COUNT_OF(poolSizes);
+    descriptorPoolInfo.pPoolSizes = poolSizes;
+
+    
+    SLANG_VK_CHECK(m_api.vkCreateDescriptorPool(m_device, &descriptorPoolInfo, nullptr, &pipeline->m_descriptorPool));
+
+    // Create a descriptor set based on our layout
+
+    VkDescriptorSetAllocateInfo descriptorSetAllocInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+    descriptorSetAllocInfo.descriptorPool = pipeline->m_descriptorPool;
+    descriptorSetAllocInfo.descriptorSetCount = 1;
+    descriptorSetAllocInfo.pSetLayouts = &pipeline->m_descriptorSetLayout;
+
+    SLANG_VK_CHECK(m_api.vkAllocateDescriptorSets(m_device, &descriptorSetAllocInfo, &pipeline->m_descriptorSet));
+
+    // Fill in the descriptor set, using our binding information
+
+    for (int i = 0; i < numBindings; ++i)
+    {
+        const auto& srcDetail = srcDetails[i];
+        const auto& srcBinding = srcBindings[i];
+
+        switch (srcBinding.bindingType)
+        {
+            case BindingType::Buffer:
+            {
+                BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(srcBinding.resource.Ptr());
+                const BufferResource::Desc& bufferResourceDesc = bufferResource->getDesc();
+
+                if (bufferResourceDesc.bindFlags & Resource::BindFlag::UnorderedAccess)
+                {
+                    VkDescriptorBufferInfo bufferInfo;
+                    bufferInfo.buffer = bufferResource->m_buffer.m_buffer;
+                    bufferInfo.offset = 0;
+                    bufferInfo.range = bufferResourceDesc.sizeInBytes;
+
+                    VkWriteDescriptorSet writeInfo = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+                    writeInfo.descriptorCount = 1;
+                    writeInfo.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                    writeInfo.dstSet = pipeline->m_descriptorSet;
+                    writeInfo.dstBinding = srcDetail.m_binding;
+                    writeInfo.dstArrayElement = 0;
+                    writeInfo.pBufferInfo = &bufferInfo;
+
+                    m_api.vkUpdateDescriptorSets(m_device, 1, &writeInfo, 0, nullptr);
+                }
+                break;
+            }
+            default:
+            {
+                // handle other cases
+                break;
+            }
+        }
+    }
+
+    // Create a pipeline layout based on our descriptor set layout(s)
+
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
+    pipelineLayoutInfo.setLayoutCount = 1;
+    pipelineLayoutInfo.pSetLayouts = &pipeline->m_descriptorSetLayout;
+
+    SLANG_VK_CHECK(m_api.vkCreatePipelineLayout(m_device, &pipelineLayoutInfo, nullptr, &pipeline->m_pipelineLayout));
+
+    // Then create a pipeline to use that layout
+
+    VkComputePipelineCreateInfo computePipelineInfo = { VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
+    computePipelineInfo.stage = m_currentProgram->m_compute;
+    computePipelineInfo.layout = pipeline->m_pipelineLayout;
+
+    VkPipelineCache pipelineCache = VK_NULL_HANDLE;
+
+    SLANG_VK_CHECK(m_api.vkCreateComputePipelines(m_device, pipelineCache, 1, &computePipelineInfo, nullptr, &pipeline->m_pipeline));
+
+    pipelineOut = pipeline;
     return SLANG_OK;
 }
 
@@ -301,6 +531,7 @@ VkPipelineShaderStageCreateInfo VKRenderer::compileEntryPoint(const ShaderCompil
 
     shaderStageCreateInfo.module = module;
     shaderStageCreateInfo.pName = "main";
+    
     return shaderStageCreateInfo;
 }
 
@@ -874,162 +1105,26 @@ void VKRenderer::setBindingState(BindingState* state)
 
 void VKRenderer::dispatchCompute(int x, int y, int z)
 {
-    // HACK: create a new pipeline for every call
-
-    // First create a pipeline layout based on what is bound
-
-    const auto& srcDetails = m_currentBindingState->m_bindingDetails;
-    const auto& srcBindings = m_currentBindingState->getDesc().m_bindings;
-
-    const int numBindings = int(srcBindings.Count());
-
-    Slang::List<VkDescriptorSetLayoutBinding> dstBindings;
-    for (int i = 0; i < numBindings; ++i)
+    Pipeline* pipeline = _getPipeline();
+    assert(pipeline);
+    if (!pipeline)
     {
-        const auto& srcDetail = srcDetails[i];
-        const auto& srcBinding = srcBindings[i];
-
-        switch (srcBinding.bindingType)
-        {
-            case BindingType::Buffer:
-            {
-                BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(srcBinding.resource.Ptr());
-                const BufferResource::Desc& bufferResourceDesc = bufferResource->getDesc();
-
-                if (bufferResourceDesc.bindFlags & Resource::BindFlag::UnorderedAccess)
-                {
-                    VkDescriptorSetLayoutBinding dstBinding = {};
-                    dstBinding.binding = srcDetail.m_binding;
-                    dstBinding.descriptorCount = 1;
-                    dstBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-                    dstBinding.stageFlags = VK_SHADER_STAGE_ALL;
-
-                    dstBindings.Add(dstBinding);
-                }    
-            
-                break;
-            }
-            default:
-                // TODO: handle the other cases
-                break;
-        }
+        return;
     }
-
-    VkDescriptorSetLayoutCreateInfo descriptorSetLayoutInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
-    descriptorSetLayoutInfo.bindingCount = uint32_t(dstBindings.Count());
-    descriptorSetLayoutInfo.pBindings = dstBindings.Buffer();
-
-    VkDescriptorSetLayout descriptorSetLayout = 0;
-    SLANG_VK_CHECK(m_api.vkCreateDescriptorSetLayout(m_device, &descriptorSetLayoutInfo, nullptr, &descriptorSetLayout));
-
-    // Create a descriptor pool for allocating sets
-
-    VkDescriptorPoolSize poolSizes[] =
-    {
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 128 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 128 },
-        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 128 },
-    };
-
-    VkDescriptorPoolCreateInfo descriptorPoolInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
-    descriptorPoolInfo.maxSets = 128; // TODO: actually pick a size
-    descriptorPoolInfo.poolSizeCount = sizeof(poolSizes) / sizeof(poolSizes[0]);
-    descriptorPoolInfo.pPoolSizes = poolSizes;
-
-    VkDescriptorPool descriptorPool;
-    SLANG_VK_CHECK(m_api.vkCreateDescriptorPool(m_device, &descriptorPoolInfo, nullptr, &descriptorPool));
-
-    // Create a descriptor set based on our layout
-
-    VkDescriptorSetAllocateInfo descriptorSetAllocInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
-    descriptorSetAllocInfo.descriptorPool = descriptorPool;
-    descriptorSetAllocInfo.descriptorSetCount = 1;
-    descriptorSetAllocInfo.pSetLayouts = &descriptorSetLayout;
-
-    VkDescriptorSet descriptorSet;
-    SLANG_VK_CHECK(m_api.vkAllocateDescriptorSets(m_device, &descriptorSetAllocInfo, &descriptorSet));
-
-    // Fill in the descriptor set, using our binding information
-
-    for (int i = 0; i < numBindings; ++i)
-    {
-        const auto& srcDetail = srcDetails[i];
-        const auto& srcBinding = srcBindings[i];
-    
-        switch (srcBinding.bindingType)
-        {
-            case BindingType::Buffer:
-            {
-                BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(srcBinding.resource.Ptr());
-                const BufferResource::Desc& bufferResourceDesc = bufferResource->getDesc();
-
-                if (bufferResourceDesc.bindFlags & Resource::BindFlag::UnorderedAccess)
-                {
-                    VkDescriptorBufferInfo bufferInfo;
-                    bufferInfo.buffer = bufferResource->m_buffer.m_buffer;
-                    bufferInfo.offset = 0;
-                    bufferInfo.range = bufferResourceDesc.sizeInBytes;
-                        
-                    VkWriteDescriptorSet writeInfo = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-                    writeInfo.descriptorCount = 1;
-                    writeInfo.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-                    writeInfo.dstSet = descriptorSet;
-                    writeInfo.dstBinding = srcDetail.m_binding;
-                    writeInfo.dstArrayElement = 0;
-                    writeInfo.pBufferInfo = &bufferInfo;
-
-                    m_api.vkUpdateDescriptorSets(m_device, 1, &writeInfo, 0, nullptr);
-                }
-                break;
-            }
-            default:
-            {
-                // handle other cases
-                break;
-            }
-        }
-    }
-
-    // Create a pipeline layout based on our descriptor set layout(s)
-
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
-    pipelineLayoutInfo.setLayoutCount = 1;
-    pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
-
-    VkPipelineLayout pipelineLayout = 0;
-    SLANG_VK_CHECK(m_api.vkCreatePipelineLayout(m_device, &pipelineLayoutInfo, nullptr, &pipelineLayout));
-
-    // Then create a pipeline to use that layout
-
-    VkComputePipelineCreateInfo computePipelineInfo = { VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
-    computePipelineInfo.stage = m_currentProgram->m_compute;
-    computePipelineInfo.layout = pipelineLayout;
-
-    VkPipelineCache pipelineCache = 0;
-
-    VkPipeline pipeline;
-    SLANG_VK_CHECK(m_api.vkCreateComputePipelines(m_device, pipelineCache, 1, &computePipelineInfo, nullptr, &pipeline));
 
     // Also create descriptor sets based on the given pipeline layout
 
     VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
 
-    m_api.vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
+    m_api.vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->m_pipeline);
 
-    m_api.vkCmdBindDescriptorSets(
-        commandBuffer,
-        VK_PIPELINE_BIND_POINT_COMPUTE,
-        pipelineLayout,
-        0, 1,
-        &descriptorSet,
-        0,
-        nullptr);
+    m_api.vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->m_pipelineLayout,
+        0, 1, &pipeline->m_descriptorSet, 0, nullptr);
 
     m_api.vkCmdDispatch(commandBuffer, x, y, z);
 
     m_deviceQueue.flushAndWait();
     
-    m_api.vkDestroyPipeline(m_device, pipeline, nullptr);
 
     // TODO: need to free up the other resources too...
 }

@@ -26,6 +26,7 @@ namespace renderer_test {
 
 #define VK_API_DEVICE_PROCS(x)          \
     x(vkCreateDescriptorPool)           \
+    x(vkDestroyDescriptorPool)          \
     x(vkGetDeviceQueue)                 \
     x(vkQueueSubmit)                    \
     x(vkQueueWaitIdle)                  \
@@ -39,15 +40,19 @@ namespace renderer_test {
     x(vkDestroyBuffer)                  \
     x(vkFreeMemory)                     \
     x(vkCreateDescriptorSetLayout)      \
+    x(vkDestroyDescriptorSetLayout)     \
     x(vkAllocateDescriptorSets)         \
     x(vkUpdateDescriptorSets)           \
     x(vkCreatePipelineLayout)           \
+    x(vkDestroyPipelineLayout)          \
     x(vkCreateComputePipelines)         \
+    x(vkDestroyPipeline)                \
+    x(vkCreateShaderModule)             \
+    x(vkDestroyShaderModule)            \
+    \
     x(vkCmdBindPipeline)                \
     x(vkCmdBindDescriptorSets)          \
     x(vkCmdDispatch)                    \
-    x(vkDestroyPipeline)                \
-    x(vkCreateShaderModule)             \
     \
     x(vkCreateFence) \
     x(vkDestroyFence) \
