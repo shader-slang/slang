@@ -576,7 +576,7 @@ IRInst* readVarRec(
         // it predecessor list, and use that to decide what to do.
         auto predecessors = blockInfo->block->getPredecessors();
 
-        // 
+        //
         IRBlock* firstPred = nullptr;
         bool multiplePreds = false;
         for (auto pp : predecessors)

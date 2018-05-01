@@ -34,7 +34,7 @@
 #include <stddef.h>
 #endif // ! SLANG_NO_STDDEF
 
-#ifdef __cplusplus  
+#ifdef __cplusplus
 extern "C"
 {
 #endif
@@ -403,7 +403,7 @@ extern "C"
         SlangCompileRequest*    request);
 
     /** Get the number of files that this compilation depended on.
-    
+
     This includes both the explicit source files, as well as any
     additional files that were transitively referenced (e.g., via
     a `#include` directive).
@@ -767,7 +767,7 @@ extern "C"
     SLANG_API SlangUInt spReflection_getGlobalConstantBufferBinding(SlangReflection* reflection);
     SLANG_API size_t spReflection_getGlobalConstantBufferSize(SlangReflection* reflection);
 
-#ifdef __cplusplus  
+#ifdef __cplusplus
 }
 
 /* Helper interfaces for C++ users */
@@ -1159,7 +1159,7 @@ namespace slang
         {
             return spReflectionEntryPoint_getParameterCount((SlangReflectionEntryPoint*) this);
         }
-        
+
         VariableLayoutReflection* getParameterByIndex(unsigned index)
         {
             return (VariableLayoutReflection*) spReflectionEntryPoint_getParameterByIndex((SlangReflectionEntryPoint*) this, index);
@@ -1209,7 +1209,7 @@ namespace slang
         {
             return spReflection_GetParameterCount((SlangReflection*) this);
         }
-        
+
         unsigned getTypeParameterCount()
         {
             return spReflection_GetTypeParameterCount((SlangReflection*) this);
@@ -1272,6 +1272,7 @@ namespace slang
 #include "source/slang/emit.cpp"
 #include "source/slang/ir.cpp"
 #include "source/slang/ir-constexpr.cpp"
+#include "source/slang/ir-dominators.cpp"
 #include "source/slang/ir-legalize-types.cpp"
 #include "source/slang/ir-ssa.cpp"
 #include "source/slang/ir-validate.cpp"

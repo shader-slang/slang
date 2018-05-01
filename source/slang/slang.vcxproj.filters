@@ -51,6 +51,7 @@
     <ClInclude Include="ir-type-defs.h" />
     <ClInclude Include="type-system-shared.h" />
     <ClInclude Include="ir-validate.h" />
+    <ClInclude Include="ir-dominators.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="check.cpp" />
@@ -85,6 +86,7 @@
     <ClCompile Include="ir-constexpr.cpp" />
     <ClCompile Include="type-system-shared.cpp" />
     <ClCompile Include="ir-validate.cpp" />
+    <ClCompile Include="ir-dominators.cpp" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="core.meta.slang" />
