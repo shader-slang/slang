@@ -27,7 +27,7 @@ using namespace Slang;
 class VKRenderer : public Renderer, public ShaderCompiler
 {
 public:
-    enum { kMaxRenderTargets = 8 };
+    enum { kMaxRenderTargets = 8, kMaxAttachments = kMaxRenderTargets + 1 };
     
     // Renderer    implementation
     virtual SlangResult initialize(void* inWindowHandle) override;
@@ -221,6 +221,9 @@ public:
     void _beginRender();
     void _endRender();
 
+    Slang::Result _beginPass();
+    void _endPass();
+
     VkDebugReportCallbackEXT m_debugReportCallback;
 
     RefPtr<InputLayoutImpl> m_currentInputLayout;
@@ -244,6 +247,8 @@ public:
     VulkanSwapChain m_swapChain;
 
     VkRenderPass m_renderPass = VK_NULL_HANDLE;
+
+    int m_swapChainImageIndex = -1;
 
     float m_clearColor[4] = { 0, 0, 0, 0 };
 };
@@ -525,7 +530,7 @@ Slang::Result VKRenderer::_createPipeline(RefPtr<Pipeline>& pipelineOut)
         rasterizer.rasterizerDiscardEnable = VK_FALSE;
         rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
         rasterizer.lineWidth = 1.0f;
-        rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+        rasterizer.cullMode = VK_CULL_MODE_NONE;
         rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
         rasterizer.depthBiasEnable = VK_FALSE;
 
@@ -577,9 +582,123 @@ Slang::Result VKRenderer::_createPipeline(RefPtr<Pipeline>& pipelineOut)
     return SLANG_OK;
 }
 
+Result VKRenderer::_beginPass()
+{
+    if (m_swapChainImageIndex < 0)
+    {
+        return SLANG_FAIL;
+    }
+
+    const int numRenderTargets = 1;
+
+    const VulkanSwapChain::Image& image = m_swapChain.getImages()[m_swapChainImageIndex];
+
+    int numAttachments = 0;
+
+    // Start render pass
+    VkClearValue clearValues[kMaxAttachments];
+    clearValues[numAttachments++] = VkClearValue{ m_clearColor[0], m_clearColor[1], m_clearColor[2], m_clearColor[3] };
+
+    bool hasDepthBuffer = false;
+    if (hasDepthBuffer)
+    {
+        VkClearValue& clearValue = clearValues[numAttachments++];
+
+        clearValue.depthStencil.depth = 1.0f;
+        clearValue.depthStencil.stencil = 0;
+    }
+
+    const int width = m_swapChain.getWidth();
+    const int height = m_swapChain.getHeight();
+
+    VkCommandBuffer cmdBuffer = m_deviceQueue.getCommandBuffer();
+
+    VkRenderPassBeginInfo renderPassBegin = {};
+    renderPassBegin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    renderPassBegin.renderPass = m_renderPass;
+    renderPassBegin.framebuffer = image.m_frameBuffer;
+    renderPassBegin.renderArea.offset.x = 0;
+    renderPassBegin.renderArea.offset.y = 0;
+    renderPassBegin.renderArea.extent.width = width;
+    renderPassBegin.renderArea.extent.height = height;
+    renderPassBegin.clearValueCount = numAttachments;
+    renderPassBegin.pClearValues = clearValues;
+
+    m_api.vkCmdBeginRenderPass(cmdBuffer, &renderPassBegin, VK_SUBPASS_CONTENTS_INLINE);
+
+    // Set up scissor and viewport
+    {
+        VkRect2D rects[kMaxRenderTargets] = {};
+        VkViewport viewports[kMaxRenderTargets] = {};
+        for (int i = 0; i < numRenderTargets; ++i)
+        {
+            rects[i] = VkRect2D{ 0, 0, uint32_t(width), uint32_t(height) };
+
+            VkViewport& dstViewport = viewports[i];
+
+            dstViewport.x = 0.0f;
+            dstViewport.y = 0.0f; 
+            dstViewport.width = float(width); 
+            dstViewport.height = float(height); 
+            dstViewport.minDepth = 0.0f; 
+            dstViewport.maxDepth = 1.0f; 
+        }
+
+        m_api.vkCmdSetScissor(cmdBuffer, 0, numRenderTargets, rects);
+        m_api.vkCmdSetViewport(cmdBuffer, 0, numRenderTargets, viewports);
+    }
+
+    return SLANG_OK;
+}
+
+void VKRenderer::_endPass()
+{
+    VkCommandBuffer cmdBuffer = m_deviceQueue.getCommandBuffer();
+    m_api.vkCmdEndRenderPass(cmdBuffer);
+}
+
 void VKRenderer::_beginRender()
 {
-    
+    m_swapChainImageIndex = m_swapChain.nextFrontImageIndex();
+
+    if (m_swapChainImageIndex < 0)
+    {
+        return;
+    }
+
+#if 0
+    const VulkanSwapChain::Image& image = m_swapChain.getImages[m_swapChainImageIndex];
+
+    // Transition render targets to VK_IMAGE_LAYOUT_PRESENT_SRC_KHR as needed
+    // Transition depth buffer to VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+    {
+        const NvFlowUint maxSlots = NV_FLOW_MAX_RENDER_TARGETS + 1u;
+
+        NvFlowBarrierParamsVulkan barriers[maxSlots];
+        NvFlowUint barrierIdx = 0u;
+
+        VkPipelineStageFlags srcStageMask = 0u;
+        VkPipelineStageFlags dstStageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+
+        for (NvFlowUint idx = 0u; idx < numRenderTargets; idx++)
+        {
+            if (params->renderTargets[idx].renderTarget)
+            {
+                auto resource = NvFlowRenderTargetGetResource(params->renderTargets[idx].renderTarget);
+                auto state = NvFlowCastResourceVulkan(resource)->resourceState;
+                barriers[barrierIdx++] = NvFlowBarrierParamsVulkan{ state, 0, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR };
+            }
+        }
+        if (params->depthBuffer.depthBuffer)
+        {
+            auto resource = NvFlowDepthBufferGetResource(params->depthBuffer.depthBuffer);
+            auto state = NvFlowCastResourceVulkan(resource)->resourceState;
+            barriers[barrierIdx++] = NvFlowBarrierParamsVulkan{ state, 0, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
+        }
+
+        NvFlowContextVulkan_barrier(context, barriers, barrierIdx, dstStageMask);
+    }
+#endif
 }
 
 void VKRenderer::_endRender()
@@ -807,7 +926,7 @@ SlangResult VKRenderer::initialize(void* inWindowHandle)
             dst.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
             dst.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
             dst.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-            dst.initialLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+            dst.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
             dst.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
         }
         if (hasDepthBuffer)
@@ -890,13 +1009,8 @@ void VKRenderer::presentFrame()
 {   
     _endRender();
 
-    // Work out where to render to 
-    m_swapChain.getFrontRenderTarget();
-
     const bool vsync = true;
     m_swapChain.present(vsync);
-
-    
 
     _beginRender();
 }
@@ -1125,7 +1239,7 @@ void VKRenderer::unmap(BufferResource* bufferIn)
             m_api.vkCmdCopyBuffer(commandBuffer, buffer->m_uploadBuffer.m_buffer, buffer->m_buffer.m_buffer, 1, &copyInfo);
 
             // TODO: is this necessary?
-            m_deviceQueue.flushAndWait();
+            //m_deviceQueue.flushAndWait();
             break;
         }
         default: break;
@@ -1205,10 +1319,14 @@ void VKRenderer::draw(UInt vertexCount, UInt startVertex = 0)
         return;
     }
 
+    SLANG_RETURN_VOID_ON_FAIL(_beginPass());
+
     // Also create descriptor sets based on the given pipeline layout
     VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
 
     m_api.vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->m_pipeline);
+    m_api.vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->m_pipelineLayout,
+        0, 1, &pipeline->m_descriptorSet, 0, nullptr);
 
     // Bind the vertex buffer
     if (m_boundVertexBuffers.Count() > 0 && m_boundVertexBuffers[0].m_buffer)
@@ -1222,6 +1340,28 @@ void VKRenderer::draw(UInt vertexCount, UInt startVertex = 0)
     }
 
     m_api.vkCmdDraw(commandBuffer, static_cast<uint32_t>(vertexCount), 1, 0, 0);
+
+    _endPass();
+}
+
+void VKRenderer::dispatchCompute(int x, int y, int z)
+{
+    Pipeline* pipeline = _getPipeline();
+    if (!pipeline || pipeline->m_shaderProgram->m_pipelineType != PipelineType::Compute)
+    {
+        assert(!"Invalid render pipeline");
+        return;
+    }
+
+    // Also create descriptor sets based on the given pipeline layout
+    VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
+
+    m_api.vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->m_pipeline);
+
+    m_api.vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->m_pipelineLayout,
+        0, 1, &pipeline->m_descriptorSet, 0, nullptr);
+
+    m_api.vkCmdDispatch(commandBuffer, x, y, z);
 }
 
 BindingState* VKRenderer::createBindingState(const BindingState::Desc& bindingStateDesc)
@@ -1270,26 +1410,6 @@ BindingState* VKRenderer::createBindingState(const BindingState::Desc& bindingSt
 void VKRenderer::setBindingState(BindingState* state)
 {
     m_currentBindingState = static_cast<BindingStateImpl*>(state);
-}
-
-void VKRenderer::dispatchCompute(int x, int y, int z)
-{
-    Pipeline* pipeline = _getPipeline();
-    if (!pipeline || pipeline->m_shaderProgram->m_pipelineType != PipelineType::Compute)
-    {
-        assert(!"Invalid render pipeline");
-        return;
-    }
-
-    // Also create descriptor sets based on the given pipeline layout
-    VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
-
-    m_api.vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->m_pipeline);
-
-    m_api.vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->m_pipelineLayout,
-        0, 1, &pipeline->m_descriptorSet, 0, nullptr);
-
-    m_api.vkCmdDispatch(commandBuffer, x, y, z);
 }
 
 // ShaderCompiler interface

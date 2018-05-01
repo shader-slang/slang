@@ -398,11 +398,14 @@ VulkanSwapChain::~VulkanSwapChain()
     }
 }
 
-TextureResource* VulkanSwapChain::getFrontRenderTarget()
+int VulkanSwapChain::nextFrontImageIndex()
 {
     if (!hasValidSwapChain())
     {
-        SLANG_RETURN_NULL_ON_FAIL(_createSwapChain());
+        if (SLANG_FAILED(_createSwapChain()))
+        {
+            return -1;
+        }
     }
 
     VkSemaphore beginFrameSemaphore = m_deviceQueue->makeCurrent(VulkanDeviceQueue::EventType::BeginFrame);
@@ -413,10 +416,10 @@ TextureResource* VulkanSwapChain::getFrontRenderTarget()
     if (result != VK_SUCCESS)
     {
         _destroySwapChain();
-        return nullptr;
+        return -1;
     }
     m_currentSwapChainIndex = int(swapChainIndex);
-    return nullptr;
+    return swapChainIndex;
 }
 
 void VulkanSwapChain::present(bool vsync)

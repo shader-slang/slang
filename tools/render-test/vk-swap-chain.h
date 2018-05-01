@@ -53,6 +53,14 @@ struct VulkanSwapChain
         Format m_textureDepthFormat;
     };
 
+    struct Image
+    {
+        VkImage m_image = VK_NULL_HANDLE;
+        VkImageView m_imageView = VK_NULL_HANDLE;
+        VkFramebuffer m_frameBuffer = VK_NULL_HANDLE;
+    };
+
+
         /// Must be called before the swap chain can be used
     SlangResult init(VulkanDeviceQueue* deviceQueue, const Desc& desc, const PlatformDesc* platformDesc);
 
@@ -80,20 +88,18 @@ struct VulkanSwapChain
         /// Get the height of the back buffer
     int getHeight() const { return m_height; }
 
-    TextureResource* getFrontRenderTarget();
+        /// Get the detail about the images
+    const Slang::List<Image>& getImages() const { return m_images; }
+
+        /// Get the next front render image index. Returns -1, if image couldn't be found
+    int nextFrontImageIndex();
 
         /// Dtor
     ~VulkanSwapChain();
 
     protected:
 
-    struct Image
-    {
-        VkImage m_image = VK_NULL_HANDLE;
-        VkImageView m_imageView = VK_NULL_HANDLE;
-        VkFramebuffer m_frameBuffer = VK_NULL_HANDLE;
-    };
-
+    
     template <typename T>
     void _setPlatformDesc(const T& desc)
     {

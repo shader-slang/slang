@@ -57,6 +57,12 @@ namespace renderer_test {
     x(vkCmdBindDescriptorSets)          \
     x(vkCmdDispatch)                    \
     x(vkCmdDraw) \
+    x(vkCmdSetScissor) \
+    x(vkCmdSetViewport) \
+    x(vkCmdBindVertexBuffers) \
+    x(vkCmdBindIndexBuffer) \
+    x(vkCmdBeginRenderPass) \
+    x(vkCmdEndRenderPass) \
     \
     x(vkCreateFence) \
     x(vkDestroyFence) \
@@ -87,9 +93,6 @@ namespace renderer_test {
     \
     x(vkCreateRenderPass) \
     x(vkDestroyRenderPass) \
-    \
-    x(vkCmdBindVertexBuffers) \
-    x(vkCmdBindIndexBuffer) \
     /* */
 
 #if SLANG_WINDOWS_FAMILY
