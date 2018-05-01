@@ -16,7 +16,7 @@ struct Sphere
         center = value;
     }
 
-    void setRadisu(float value)
+    void setRadius(float value)
     {
         this.radius = value;
     }
