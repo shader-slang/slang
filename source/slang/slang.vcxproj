@@ -181,8 +181,6 @@
     <ClInclude Include="ir-inst-defs.h" />
     <ClInclude Include="ir-insts.h" />
     <ClInclude Include="ir-ssa.h" />
-    <ClInclude Include="ir-type-defs.h" />
-    <ClInclude Include="ir-types.h" />
     <ClInclude Include="ir-validate.h" />
     <ClInclude Include="ir.h" />
     <ClInclude Include="legalize-types.h" />
