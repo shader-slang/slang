@@ -173,6 +173,9 @@ class Resource: public Slang::RefObject
         /// Base class for Descs
     struct DescBase
     {
+        bool canBind(BindFlag::Enum bindFlag) const { return (bindFlags & bindFlag) != 0; }
+        bool hasCpuAccessFlag(AccessFlag::Enum accessFlag) { return (cpuAccessFlags & accessFlag) != 0; }
+
         int bindFlags = 0;          ///< Combination of Resource::BindFlag or 0 (and will use initialUsage to set)
         int cpuAccessFlags = 0;     ///< Combination of Resource::AccessFlag 
     };
@@ -187,7 +190,7 @@ class Resource: public Slang::RefObject
         /// Get the descBase
     const DescBase& getDescBase() const;
         /// Returns true if can bind with flag
-    bool canBind(BindFlag::Enum bindFlag) const { return (getDescBase().bindFlags & bindFlag) != 0; }
+    bool canBind(BindFlag::Enum bindFlag) const { return getDescBase().canBind(bindFlag); }
 
         /// For a usage gives the required binding flags
     static const BindFlag::Enum s_requiredBinding[int(Usage::CountOf)]; 
