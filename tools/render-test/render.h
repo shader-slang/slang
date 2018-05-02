@@ -1,7 +1,6 @@
 // render.h
 #pragma once
 
-#include "options.h"
 #include "window.h"
 
 //#include "shader-input-layout.h"
@@ -12,6 +11,9 @@
 
 namespace renderer_test {
 
+// Had to move here, because Options needs types defined here
+typedef intptr_t Int;
+typedef uintptr_t UInt;
 
 // Declare opaque type
 class InputLayout: public Slang::RefObject
@@ -24,6 +26,25 @@ enum class PipelineType
     Unknown,
     Graphics,
     Compute,
+    CountOf,
+};
+
+enum class RendererType
+{
+    Unknown,
+    DirectX11,
+    DirectX12,
+    OpenGl,
+    Vulkan,
+    CountOf,
+};
+
+enum class ProjectionStyle
+{
+    Unknown,
+    OpenGl,
+    DirectX,
+    Vulkan, 
     CountOf,
 };
 
@@ -510,6 +531,12 @@ public:
 class Renderer: public Slang::RefObject
 {
 public:
+    
+    struct Info
+    {
+        ProjectionStyle m_projectionStyle;
+    };
+
     virtual SlangResult initialize(void* inWindowHandle) = 0;
 
     virtual void setClearColor(const float color[4]) = 0;
@@ -548,6 +575,9 @@ public:
     virtual void submitGpuWork() = 0;
         /// Blocks until Gpu work is complete
     virtual void waitForGpu() = 0;
+
+        /// Get the type of this renderer
+    virtual RendererType getRendererType() const = 0;
 };
 
 // ----------------------------------------------------------------------------------------
@@ -561,6 +591,11 @@ struct RendererUtil
 {
         /// Gets the size in bytes of a Format type. Returns 0 if a size is not defined/invalid
     SLANG_FORCE_INLINE static size_t getFormatSize(Format format) { return s_formatSize[int(format)]; }
+        /// Given a renderer type, gets a projection style
+    static ProjectionStyle getProjectionStyle(RendererType type);
+
+        /// Given the projection style returns an 'identity' matrix, which ensures x,y mapping to pixels is the same on all targets
+    static void getIdentityProjection(ProjectionStyle style, float projMatrix[16]);
 
     private:
     static const uint8_t s_formatSize[int(Format::CountOf)];

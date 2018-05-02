@@ -222,13 +222,9 @@ void RenderTestApp::renderFrame()
     auto mappedData = m_renderer->map(m_constantBuffer, MapFlavor::WriteDiscard);
     if(mappedData)
     {
-        static const float kIdentity[] =
-        { 1, 0, 0, 0,
-          0, 1, 0, 0,
-          0, 0, 1, 0,
-          0, 0, 0, 1 };
-        memcpy(mappedData, kIdentity, sizeof(kIdentity));
-
+        const ProjectionStyle projectionStyle = RendererUtil::getProjectionStyle(m_renderer->getRendererType());
+        RendererUtil::getIdentityProjection(projectionStyle, (float*)mappedData);
+        
 		m_renderer->unmap(m_constantBuffer);
     }
 
@@ -403,27 +399,27 @@ SlangResult innerMain(int argc, char** argv)
 
 	SlangSourceLanguage nativeLanguage = SLANG_SOURCE_LANGUAGE_UNKNOWN;
 	SlangCompileTarget slangTarget = SLANG_TARGET_NONE;
-	switch (gOptions.rendererID)
+	switch (gOptions.rendererType)
 	{
-		case Options::RendererID::D3D11:
+		case RendererType::DirectX11:
 			renderer = createD3D11Renderer();
 			slangTarget = SLANG_HLSL;
 			nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
 			break;
 
-		case Options::RendererID::D3D12:
+		case RendererType::DirectX12:
 			renderer = createD3D12Renderer();
 			slangTarget = SLANG_HLSL;
 			nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
 			break;
 
-		case Options::RendererID::GL:
+		case RendererType::OpenGl:
 			renderer = createGLRenderer();
 			slangTarget = SLANG_GLSL;
 			nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;
 			break;
 
-		case Options::RendererID::VK:
+		case RendererType::Vulkan:
 			renderer = createVKRenderer();
 			slangTarget = SLANG_SPIRV;
 			nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;

@@ -11,6 +11,9 @@
 #include "vk-device-queue.h"
 #include "vk-swap-chain.h"
 
+// Vulkan has a different coordinate system to ogl
+// http://anki3d.org/vulkan-coordinate-system/
+
 #define ENABLE_VALIDATION_LAYER 1
 
 #ifdef _MSC_VER
@@ -51,6 +54,7 @@ public:
     virtual void dispatchCompute(int x, int y, int z) override;
     virtual void submitGpuWork() override;
     virtual void waitForGpu() override;
+    virtual RendererType getRendererType() const override { return RendererType::Vulkan; }
 
     // ShaderCompiler implementation
     virtual ShaderProgram* compileProgram(const ShaderCompileRequest& request) override;
@@ -93,6 +97,7 @@ public:
     {
     public:
         List<VkVertexInputAttributeDescription> m_vertexDescs;
+        int m_vertexSize;
     };
 
     class BufferResourceImpl: public BufferResource
@@ -493,10 +498,32 @@ Slang::Result VKRenderer::_createPipeline(RefPtr<Pipeline>& pipelineOut)
 
         VkPipelineShaderStageCreateInfo shaderStages[] = {  m_currentProgram->m_vertex, m_currentProgram->m_fragment };
 
-        VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
+        // VertexBuffer/s
+        // Currently only handles one
+
+        VkPipelineVertexInputStateCreateInfo vertexInputInfo = { VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
         vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
         vertexInputInfo.vertexBindingDescriptionCount = 0;
         vertexInputInfo.vertexAttributeDescriptionCount = 0;
+
+        VkVertexInputBindingDescription vertexInputBindingDescription;
+
+        if (m_currentInputLayout)
+        {
+            vertexInputBindingDescription.binding = 0;
+            vertexInputBindingDescription.stride = m_currentInputLayout->m_vertexSize; 
+            vertexInputBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+            const auto& srcAttributeDescs = m_currentInputLayout->m_vertexDescs;
+
+            vertexInputInfo.vertexBindingDescriptionCount = 1;
+            vertexInputInfo.pVertexBindingDescriptions = &vertexInputBindingDescription;
+
+            vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(srcAttributeDescs.Count());
+            vertexInputInfo.pVertexAttributeDescriptions = srcAttributeDescs.Buffer();
+        }
+
+        //
 
         VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
         inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -663,40 +690,6 @@ void VKRenderer::_beginRender()
     {
         return;
     }
-
-#if 0
-    const VulkanSwapChain::Image& image = m_swapChain.getImages[m_swapChainImageIndex];
-
-    // Transition render targets to VK_IMAGE_LAYOUT_PRESENT_SRC_KHR as needed
-    // Transition depth buffer to VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
-    {
-        const NvFlowUint maxSlots = NV_FLOW_MAX_RENDER_TARGETS + 1u;
-
-        NvFlowBarrierParamsVulkan barriers[maxSlots];
-        NvFlowUint barrierIdx = 0u;
-
-        VkPipelineStageFlags srcStageMask = 0u;
-        VkPipelineStageFlags dstStageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-
-        for (NvFlowUint idx = 0u; idx < numRenderTargets; idx++)
-        {
-            if (params->renderTargets[idx].renderTarget)
-            {
-                auto resource = NvFlowRenderTargetGetResource(params->renderTargets[idx].renderTarget);
-                auto state = NvFlowCastResourceVulkan(resource)->resourceState;
-                barriers[barrierIdx++] = NvFlowBarrierParamsVulkan{ state, 0, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR };
-            }
-        }
-        if (params->depthBuffer.depthBuffer)
-        {
-            auto resource = NvFlowDepthBufferGetResource(params->depthBuffer.depthBuffer);
-            auto state = NvFlowCastResourceVulkan(resource)->resourceState;
-            barriers[barrierIdx++] = NvFlowBarrierParamsVulkan{ state, 0, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
-        }
-
-        NvFlowContextVulkan_barrier(context, barriers, barrierIdx, dstStageMask);
-    }
-#endif
 }
 
 void VKRenderer::_endRender()
@@ -1134,6 +1127,7 @@ InputLayout* VKRenderer::createInputLayout(const InputElementDesc* elements, UIn
 
     List<VkVertexInputAttributeDescription>& dstVertexDescs = layout->m_vertexDescs;
 
+    size_t vertexSize = 0;
     dstVertexDescs.SetSize(numElements);
 
     for (UInt i = 0; i <  numElements; ++i)
@@ -1150,8 +1144,16 @@ InputLayout* VKRenderer::createInputLayout(const InputElementDesc* elements, UIn
         }
 
         dstDesc.offset = uint32_t(srcDesc.offset); 
+    
+        const size_t elementSize = RendererUtil::getFormatSize(srcDesc.format);
+        assert(elementSize > 0);
+        const size_t endElement = srcDesc.offset + elementSize;
+
+        vertexSize = (vertexSize < endElement) ? endElement : vertexSize;
     }
 
+    // Work out the overall size
+    layout->m_vertexSize = int(vertexSize);
     return layout.detach();
 }
 

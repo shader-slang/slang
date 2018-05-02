@@ -365,4 +365,62 @@ void TextureResource::Desc::init3D(Format formatIn, int widthIn, int heightIn, i
     this->cpuAccessFlags = 0;
 }
 
+/* !!!!!!!!!!!!!!!!!!!!!!!!! RennderUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+ProjectionStyle RendererUtil::getProjectionStyle(RendererType type)
+{
+    switch (type)
+    {
+        case RendererType::DirectX11:
+        case RendererType::DirectX12:
+        {
+            return ProjectionStyle::DirectX;
+        }
+        case RendererType::OpenGl:              return ProjectionStyle::OpenGl;
+        case RendererType::Vulkan:              return ProjectionStyle::Vulkan;
+        case RendererType::Unknown:             return ProjectionStyle::Unknown;
+        default:
+        {
+            assert(!"Unhandled type");
+            return ProjectionStyle::Unknown;
+        }
+    }
+}
+
+/* static */void RendererUtil::getIdentityProjection(ProjectionStyle style, float projMatrix[16])
+{
+    switch (style)
+    {
+        case ProjectionStyle::DirectX:
+        case ProjectionStyle::OpenGl:
+        {
+            static const float kIdentity[] =
+            { 
+                1, 0, 0, 0,
+                0, 1, 0, 0,
+                0, 0, 1, 0,
+                0, 0, 0, 1
+            };
+            ::memcpy(projMatrix, kIdentity, sizeof(kIdentity));
+            break;
+        }
+        case ProjectionStyle::Vulkan:
+        {
+            static const float kIdentity[] =
+            {
+                1, 0, 0, 0,
+                0, -1, 0, 0,
+                0, 0, 1, 0,
+                0, 0, 0, 1
+            };
+            ::memcpy(projMatrix, kIdentity, sizeof(kIdentity));
+            break;
+        }
+        default: 
+        {
+            assert(!"Not handled");
+        }
+    }
+}
+
 } // renderer_test

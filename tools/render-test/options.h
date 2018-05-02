@@ -5,10 +5,9 @@
 
 #include "../../source/core/slang-result.h"
 
-namespace renderer_test {
+#include "render.h"
 
-typedef intptr_t Int;
-typedef uintptr_t UInt;
+namespace renderer_test {
 
 struct Options
 {
@@ -29,14 +28,7 @@ struct Options
         // Raw HLSL or GLSL input, passed through the Slang rewriter
         NativeRewrite
     };
-    enum class RendererID
-    {
-        NONE,
-        D3D11,
-        D3D12,
-        GL,
-        VK,
-    };
+   
 
     enum class ShaderProgramType
     {
@@ -50,7 +42,7 @@ struct Options
     char const* outputPath = nullptr;
 	ShaderProgramType shaderType = ShaderProgramType::Graphics;
 
-    RendererID rendererID = RendererID::NONE;
+    RendererType rendererType = RendererType::Unknown;
     InputLanguageID inputLanguageID = InputLanguageID::Slang;
 
     char const* slangArgs[kMaxSlangArgs];
