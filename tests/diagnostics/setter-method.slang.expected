@@ -1,0 +1,9 @@
+result code = -1
+standard error = {
+tests/diagnostics/setter-method.slang(16): error 30011: left of '=' is not an l-value.
+tests/diagnostics/setter-method.slang(16): note 30049: a 'this' parameter is currently immutable in Slang
+tests/diagnostics/setter-method.slang(21): error 30011: left of '=' is not an l-value.
+tests/diagnostics/setter-method.slang(21): note 30049: a 'this' parameter is currently immutable in Slang
+}
+standard output = {
+}
