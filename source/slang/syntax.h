@@ -77,6 +77,9 @@ namespace Slang
         // a vector (this will be added to the cost, if any, of converting
         // the element type of the vector)
         kConversionCost_ScalarToVector = 1,
+
+        // Conversion is impossible
+        kConversionCost_Impossible = 0xFFFFFFFF,
     };
 
     // TODO(tfoley): We should ditch this enumeration
