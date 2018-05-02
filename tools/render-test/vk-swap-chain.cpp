@@ -240,7 +240,7 @@ SlangResult VulkanSwapChain::_createSwapChain()
         }
     }
 
-    VkSwapchainKHR oldSwapchain = nullptr;
+    VkSwapchainKHR oldSwapchain = VK_NULL_HANDLE;
 
     VkSwapchainCreateInfoKHR swapchainDesc = {};
     swapchainDesc.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
