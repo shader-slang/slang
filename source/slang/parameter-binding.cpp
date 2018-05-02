@@ -288,8 +288,34 @@ struct LayoutSemanticInfo
     // TODO: need to deal with component-granularity binding...
 };
 
+static bool isDigit(char c)
+{
+    return (c >= '0') && (c <= '9');
+}
+
+/// Given a string that specifies a name and index (e.g., `COLOR0`),
+/// split it into slices for the name part and the index part.
+static void splitNameAndIndex(
+    String const&       text,
+    UnownedStringSlice& outName,
+    UnownedStringSlice& outDigits)
+{
+    char const* nameBegin = text.begin();
+    char const* digitsEnd = text.end();
+
+    char const* nameEnd = digitsEnd;
+    while( nameEnd != nameBegin && isDigit(*(nameEnd - 1)) )
+    {
+        nameEnd--;
+    }
+    char const* digitsBegin = nameEnd;
+
+    outName = UnownedStringSlice(nameBegin, nameEnd);
+    outDigits = UnownedStringSlice(digitsBegin, digitsEnd);
+}
+
 LayoutSemanticInfo ExtractLayoutSemanticInfo(
-    ParameterBindingContext*    /*context*/,
+    ParameterBindingContext*    context,
     HLSLLayoutSemantic*         semantic)
 {
     LayoutSemanticInfo info;
@@ -297,12 +323,31 @@ LayoutSemanticInfo ExtractLayoutSemanticInfo(
     info.index = 0;
     info.kind = LayoutResourceKind::None;
 
-    auto registerName = semantic->registerName.Content;
+    String registerName = semantic->registerName.Content;
     if (registerName.Length() == 0)
         return info;
 
+    // The register name is expected to be in the form:
+    //
+    //      identifier-char+ digit+
+    //
+    // where the identifier characters name a "register class"
+    // and the digits identify a register index within that class.
+    //
+    // We are going to split the string the user gave us
+    // into these constituent parts:
+    //
+    UnownedStringSlice registerClassName;
+    UnownedStringSlice registerIndexDigits;
+    splitNameAndIndex(registerName, registerClassName, registerIndexDigits);
+
+    // All of the register classes we support are single ASCII characters,
+    // so we really just care about the first byte, but we want to be
+    // careful and only look at it if the register class name is one
+    // byte long.
+    char registerClassChar = registerClassName.size() == 1 ? *registerClassName.begin() : 0;
     LayoutResourceKind kind = LayoutResourceKind::None;
-    switch (registerName[0])
+    switch (registerClassChar)
     {
     case 'b':
         kind = LayoutResourceKind::ConstantBuffer;
@@ -321,29 +366,59 @@ LayoutSemanticInfo ExtractLayoutSemanticInfo(
         break;
 
     default:
-        // TODO: issue an error here!
+        getSink(context)->diagnose(semantic->registerName, Diagnostics::unknownRegisterClass, registerClassName);
         return info;
     }
 
-    // TODO: need to parse and handle `space` binding
-    int space = 0;
+    // For a `register` semantic, the register index is not optional (unlike
+    // how it works for varying input/output semantics).
+    if( registerIndexDigits.size() == 0 )
+    {
+        getSink(context)->diagnose(semantic->registerName, Diagnostics::expectedARegisterIndex, registerClassName);
+    }
 
     UInt index = 0;
-    for (UInt ii = 1; ii < registerName.Length(); ++ii)
+    for(auto c : registerIndexDigits)
     {
-        int c = registerName[ii];
-        if (c >= '0' && c <= '9')
+        SLANG_ASSERT(isDigit(c));
+        index = index * 10 + (c - '0');
+    }
+
+
+    UInt space = 0;
+    if( auto registerSemantic = dynamic_cast<HLSLRegisterSemantic*>(semantic) )
+    {
+        auto const& spaceName = registerSemantic->spaceName.Content;
+        if(spaceName.Length() != 0)
         {
-            index = index * 10 + (c - '0');
-        }
-        else
-        {
-            // TODO: issue an error here!
-            return info;
+            UnownedStringSlice spaceSpelling;
+            UnownedStringSlice spaceDigits;
+            splitNameAndIndex(spaceName, spaceSpelling, spaceDigits);
+
+            if( spaceSpelling != UnownedTerminatedStringSlice("space") )
+            {
+                getSink(context)->diagnose(semantic->registerName, Diagnostics::expectedSpace, spaceSpelling);
+            }
+            else if( spaceDigits.size() == 0 )
+            {
+                getSink(context)->diagnose(semantic->registerName, Diagnostics::expectedSpaceIndex);
+            }
+            else
+            {
+                for(auto c : spaceDigits)
+                {
+                    SLANG_ASSERT(isDigit(c));
+                    space = space * 10 + (c - '0');
+                }
+            }
         }
     }
 
     // TODO: handle component mask part of things...
+    if( semantic->componentMask.Content.Length() != 0 )
+    {
+        getSink(context)->diagnose(semantic->componentMask, Diagnostics::componentMaskNotSupported);
+    }
 
     info.kind = kind;
     info.index = (int) index;

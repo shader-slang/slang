@@ -77,6 +77,7 @@ namespace Slang
     void printDiagnosticArg(StringBuilder& sb, int val);
     void printDiagnosticArg(StringBuilder& sb, UInt val);
     void printDiagnosticArg(StringBuilder& sb, Slang::String const& str);
+    void printDiagnosticArg(StringBuilder& sb, Slang::UnownedStringSlice const& str);
     void printDiagnosticArg(StringBuilder& sb, Name* name);
     void printDiagnosticArg(StringBuilder& sb, Decl* decl);
     void printDiagnosticArg(StringBuilder& sb, Type* type);

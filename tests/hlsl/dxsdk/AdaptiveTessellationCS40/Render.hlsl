@@ -15,7 +15,7 @@
 //--------------------------------------------------------------------------------------
 cbuffer cbPerObject : register( b0 )
 {
-    row_major matrix    g_mWorldViewProjection    : packoffset( c0 );
+    row_major matrix    g_mWorldViewProjection    ;//SLANG: : packoffset( c0 );
 }
 
 // The tessellated vertex structure

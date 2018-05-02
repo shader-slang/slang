@@ -1,0 +1,6 @@
+result code = -1
+standard error = {
+tests/diagnostics/packoffset.slang(7): error 39012: explicit 'packoffset' bindings are not yet supported in Slang
+}
+standard output = {
+}

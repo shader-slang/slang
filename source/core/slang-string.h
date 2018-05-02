@@ -193,6 +193,12 @@ namespace Slang
             return (*this) == UnownedStringSlice(str, str + strlen(str));
         }
 
+        bool operator!=(UnownedStringSlice const& other) const
+        {
+            return !(*this == other);
+        }
+
+
         bool endsWith(UnownedStringSlice const& other) const;
         bool endsWith(char const* str) const;
 
@@ -328,6 +334,7 @@ namespace Slang
         void append(char chr);
         void append(String const& str);
         void append(StringSlice const& slice);
+        void append(UnownedStringSlice const& slice);
 
 		String(int32_t val, int radix = 10)
 		{
