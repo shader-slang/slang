@@ -360,6 +360,11 @@ struct IRGenContext
     {
         return shared->compileRequest;
     }
+
+    DiagnosticSink* getSink()
+    {
+        return &getCompileRequest()->mSink;
+    }
 };
 
 void setGlobalValue(SharedIRGenContext* sharedContext, Decl* decl, LoweredValInfo value)
@@ -2049,9 +2054,35 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         return getBuilder()->createBlock();
     }
 
-    // Insert a block at the current location (ending
-    // the previous block with an unconditional jump
-    // if needed).
+    /// Does the given block have a terminator?
+    bool isBlockTerminated(IRBlock* block)
+    {
+        return block->getTerminator() != nullptr;
+    }
+
+    /// Emit a branch to the target block if the current
+    /// block being inserted into is not already terminated.
+    void emitBranchIfNeeded(IRBlock* targetBlock)
+    {
+        auto builder = getBuilder();
+        auto currentBlock = builder->getBlock();
+
+        // Don't emit if there is no current block.
+        if(!currentBlock)
+            return;
+
+        // Don't emit if the block already has a terminator.
+        if(isBlockTerminated(currentBlock))
+            return;
+
+        // The block is unterminated, so cap it off with
+        // a terminator that branches to the target.
+        builder->emitBranch(targetBlock);
+    }
+
+    /// Insert a block at the current location (ending
+    /// the previous block with an unconditional jump
+    /// if needed).
     void insertBlock(IRBlock* block)
     {
         auto builder = getBuilder();
@@ -2062,13 +2093,11 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // If the previous block doesn't already have
         // a terminator instruction, then be sure to
         // emit a branch to the new block.
-        if (prevBlock && !prevBlock->getTerminator())
-        {
-            builder->emitBranch(block);
-        }
+        emitBranchIfNeeded(block);
 
+        // Add the new block to the function we are building,
+        // and setit as the block we will be inserting into.
         parentFunc->addBlock(block);
-
         builder->setInsertInto(block);
     }
 
@@ -2082,9 +2111,43 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         return block;
     }
 
+    /// Start a new block if there isn't a current
+    /// block that we can append to.
+    ///
+    /// The `stmt` parameter is the statement we
+    /// are about to emit.
+    void startBlockIfNeeded(Stmt* stmt)
+    {
+        auto builder = getBuilder();
+        auto currentBlock = builder->getBlock();
+
+        // If there is a current block and it hasn't
+        // been terminated, then we can just use that.
+        if(currentBlock && !isBlockTerminated(currentBlock))
+        {
+            return;
+        }
+
+        // We are about to emit code *after* a terminator
+        // instruction, and there is no label to allow
+        // branching into this code, so whatever we are
+        // about to emit is going to be unreachable.
+        //
+        // Let's diagnose that here just to help the user.
+        //
+        // TODO: We might want to have a more robust check
+        // for unreachable code based on IR analysis instead,
+        // at which point we'd probably disable this check.
+        //
+        context->getSink()->diagnose(stmt, Diagnostics::unreachableCode);
+
+        startBlock();
+    }
+
     void visitIfStmt(IfStmt* stmt)
     {
         auto builder = getBuilder();
+        startBlockIfNeeded(stmt);
 
         auto condExpr = stmt->Predicate;
         auto thenStmt = stmt->PositiveStatement;
@@ -2103,7 +2166,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
             insertBlock(thenBlock);
             lowerStmt(context, thenStmt);
-            builder->emitBranch(afterBlock);
+            emitBranchIfNeeded(afterBlock);
 
             insertBlock(elseBlock);
             lowerStmt(context, elseStmt);
@@ -2139,6 +2202,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     void visitForStmt(ForStmt* stmt)
     {
         auto builder = getBuilder();
+        startBlockIfNeeded(stmt);
 
         // The initializer clause for the statement
         // can always safetly be emitted to the current block.
@@ -2199,7 +2263,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         }
 
         // At the end of the body we need to jump back to the top.
-        builder->emitBranch(loopHead);
+        emitBranchIfNeeded(loopHead);
 
         // Finally we insert the label that a `break` will jump to
         insertBlock(breakLabel);
@@ -2211,6 +2275,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // `for` statement, but without a lot of the complications.
 
         auto builder = getBuilder();
+        startBlockIfNeeded(stmt);
 
         // We will create blocks for the various places
         // we need to jump to inside the control flow,
@@ -2260,7 +2325,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         lowerStmt(context, stmt->Statement);
 
         // At the end of the body we need to jump back to the top.
-        builder->emitBranch(loopHead);
+        emitBranchIfNeeded(loopHead);
 
         // Finally we insert the label that a `break` will jump to
         insertBlock(breakLabel);
@@ -2272,6 +2337,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // `while` statement, just with the test in a different place
 
         auto builder = getBuilder();
+        startBlockIfNeeded(stmt);
 
         // We will create blocks for the various places
         // we need to jump to inside the control flow,
@@ -2328,6 +2394,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
     void visitExpressionStmt(ExpressionStmt* stmt)
     {
+        startBlockIfNeeded(stmt);
+
         // The statement evaluates an expression
         // (for side effects, one assumes) and then
         // discards the result. As such, we simply
@@ -2343,6 +2411,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
     void visitDeclStmt(DeclStmt* stmt)
     {
+        startBlockIfNeeded(stmt);
+
         // For now, we lower a declaration directly
         // into the current context.
         //
@@ -2376,6 +2446,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
     void visitReturnStmt(ReturnStmt* stmt)
     {
+        startBlockIfNeeded(stmt);
+
         // A `return` statement turns into a return
         // instruction. If the statement had an argument
         // expression, then we need to lower that to
@@ -2392,13 +2464,16 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         }
     }
 
-    void visitDiscardStmt(DiscardStmt* /*stmt*/)
+    void visitDiscardStmt(DiscardStmt* stmt)
     {
+        startBlockIfNeeded(stmt);
         getBuilder()->emitDiscard();
     }
 
     void visitBreakStmt(BreakStmt* stmt)
     {
+        startBlockIfNeeded(stmt);
+
         // Semantic checking is responsible for finding
         // the statement taht this `break` breaks out of
         auto parentStmt = stmt->parentStmt;
@@ -2415,6 +2490,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
     void visitContinueStmt(ContinueStmt* stmt)
     {
+        startBlockIfNeeded(stmt);
+
         // Semantic checking is responsible for finding
         // the loop that this `continue` statement continues
         auto parentStmt = stmt->parentStmt;
@@ -2575,6 +2652,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     void visitSwitchStmt(SwitchStmt* stmt)
     {
         auto builder = getBuilder();
+        startBlockIfNeeded(stmt);
 
         // Given a statement:
         //

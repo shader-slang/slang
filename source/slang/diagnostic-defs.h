@@ -303,6 +303,11 @@ DIAGNOSTIC(40006, Error, needCompileTimeConstant, "expected a compile-time const
 
 DIAGNOSTIC(40007, Internal, irValidationFailed, "IR validation failed: $0")
 
+// 41000 - IR-level validation issues
+
+DIAGNOSTIC(41000, Warning, unreachableCode, "unreachable code detected")
+
+
 //
 // 5xxxx - Target code generation.
 //

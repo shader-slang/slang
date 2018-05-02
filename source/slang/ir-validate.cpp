@@ -48,6 +48,21 @@ namespace Slang
             // Recursively validate the instruction itself.
             validateIRInst(context, child);
 
+            // Do some extra validation around terminator instructions:
+            //
+            // * The last instruction of a block should always be a terminator
+            // * No other instruction should be a terminator
+            //
+            if(as<IRBlock>(parent) && (child == parent->getLastChild()))
+            {
+                validate(context, as<IRTerminatorInst>(child) != nullptr, child, "last instruction in block must be terminator");
+            }
+            else
+            {
+                validate(context, !as<IRTerminatorInst>(child), child, "terminator must be last instruction in a block");
+            }
+
+
             prevChild = child;
         }
     }
