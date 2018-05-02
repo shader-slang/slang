@@ -47,8 +47,6 @@
     <ClInclude Include="ir-ssa.h" />
     <ClInclude Include="memory_pool.h" />
     <ClInclude Include="ir-constexpr.h" />
-    <ClInclude Include="ir-types.h" />
-    <ClInclude Include="ir-type-defs.h" />
     <ClInclude Include="type-system-shared.h" />
     <ClInclude Include="ir-validate.h" />
     <ClInclude Include="ir-dominators.h" />

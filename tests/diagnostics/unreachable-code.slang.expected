@@ -1,0 +1,6 @@
+result code = 0
+standard error = {
+tests/diagnostics/unreachable-code.slang(10): warning 41000: unreachable code detected
+}
+standard output = {
+}
