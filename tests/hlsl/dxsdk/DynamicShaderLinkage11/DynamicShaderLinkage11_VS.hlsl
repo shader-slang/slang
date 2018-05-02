@@ -19,8 +19,8 @@
 //--------------------------------------------------------------------------------------
 cbuffer cbPerObject : register( b0 )
 {
-	float4x4		g_mWorldViewProjection	: packoffset( c0 );
-	float4x4		g_mWorld				: packoffset( c4 );
+	float4x4		g_mWorldViewProjection	;//SLANG: : packoffset( c0 );
+	float4x4		g_mWorld				;//SLANG: : packoffset( c4 );
 };
 
 //--------------------------------------------------------------------------------------

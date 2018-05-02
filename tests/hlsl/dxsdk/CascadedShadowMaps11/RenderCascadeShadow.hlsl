@@ -19,7 +19,7 @@
 //--------------------------------------------------------------------------------------
 cbuffer cbPerObject : register( b0 )
 {
-    matrix        g_mWorldViewProjection    : packoffset( c0 );
+    matrix        g_mWorldViewProjection    ;//SLANG: : packoffset( c0 );
 };
 
 //--------------------------------------------------------------------------------------

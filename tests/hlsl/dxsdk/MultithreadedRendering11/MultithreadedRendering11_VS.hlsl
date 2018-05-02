@@ -23,11 +23,11 @@
 //--------------------------------------------------------------------------------------
 cbuffer cbPerObject : register( b0 )
 {
-	matrix		g_mWorld	: packoffset( c0 );
+	matrix		g_mWorld	;//SLANG: : packoffset( c0 );
 };
 cbuffer cbPerScene : register( b1 )
 {
-	matrix		g_mViewProj	: packoffset( c0 );
+	matrix		g_mViewProj	;//SLANG: : packoffset( c0 );
 };
 
 //--------------------------------------------------------------------------------------

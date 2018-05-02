@@ -21,13 +21,13 @@
 //--------------------------------------------------------------------------------------
 cbuffer cbPerObject : register( b0 )
 {
-	float4		g_vObjectColor			: packoffset( c0 );
+	float4		g_vObjectColor			;//SLANG: : packoffset( c0 );
 };
 
 cbuffer cbPerFrame : register( b1 )
 {
-	float3		g_vLightDir				: packoffset( c0 );
-	float		g_fAmbient				: packoffset( c0.w );
+	float3		g_vLightDir				;//SLANG: : packoffset( c0 );
+	float		g_fAmbient				;//SLANG: : packoffset( c0.w );
 };
 
 //--------------------------------------------------------------------------------------

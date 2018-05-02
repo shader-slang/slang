@@ -39,6 +39,12 @@ void printDiagnosticArg(StringBuilder& sb, Slang::String const& str)
     sb << str;
 }
 
+void printDiagnosticArg(StringBuilder& sb, Slang::UnownedStringSlice const& str)
+{
+    sb.append(str);
+}
+
+
 void printDiagnosticArg(StringBuilder& sb, Name* name)
 {
     sb << getText(name);
