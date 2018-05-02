@@ -73,7 +73,6 @@ public:
     virtual void setBindingState(BindingState* state);
     virtual void setVertexBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* strides, const UInt* offsets) override;
     virtual void setShaderProgram(ShaderProgram* inProgram) override;
-    virtual void setConstantBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* offsets) override;
     virtual void draw(UInt vertexCount, UInt startVertex) override;
     virtual void dispatchCompute(int x, int y, int z) override;
     virtual void submitGpuWork() override;
@@ -353,7 +352,6 @@ protected:
     int m_commandListOpenCount = 0;            ///< If >0 the command list should be open
 
     List<BoundVertexBuffer> m_boundVertexBuffers;
-    List<RefPtr<BufferResourceImpl> > m_boundConstantBuffers;
 
     RefPtr<ShaderProgramImpl> m_boundShaderProgram;
     RefPtr<InputLayoutImpl> m_boundInputLayout;
@@ -1164,28 +1162,6 @@ Result D3D12Renderer::_calcBindParameters(BindParameters& params)
         }
     }
 
-#if 1
-    // Okay we need to try and create a render state
-    for (int i = 0; i < int(m_boundConstantBuffers.Count()); i++)
-    {
-        const BufferResourceImpl* buffer = m_boundConstantBuffers[i];
-        if (buffer)
-        {
-            assert(buffer->m_backingStyle == BufferResourceImpl::BackingStyle::MemoryBacked);
-
-            D3D12_ROOT_PARAMETER& param = params.nextParameter();
-            param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-            param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-
-            D3D12_ROOT_DESCRIPTOR& descriptor = param.Descriptor;
-            descriptor.ShaderRegister = numConstantBuffers;
-            descriptor.RegisterSpace = 0;
-
-            numConstantBuffers++;
-        }
-    }
-#endif
-
     // All the samplers are in one continuous section of the sampler heap
     if (m_boundBindingState && m_boundBindingState->m_samplerHeap.getUsedSize() > 0)
     {
@@ -1267,17 +1243,6 @@ Result D3D12Renderer::_bindRenderState(RenderState* renderState, ID3D12GraphicsC
                     {
                         submitter->setRootDescriptorTable(index++, heap.getGpuHandle(detail.m_uavIndex));
                     }
-                }
-            }
-
-            // Okay we need to try and create a render state
-            for (int i = 0; i < int(m_boundConstantBuffers.Count()); i++)
-            {
-                const BufferResourceImpl* buffer = m_boundConstantBuffers[i];
-                if (buffer)
-                {
-                    buffer->bindConstantBufferView(m_circularResourceHeap, index++, submitter);
-                    numConstantBuffers++;
                 }
             }
         }
@@ -2267,27 +2232,6 @@ void D3D12Renderer::setVertexBuffers(UInt startSlot, UInt slotCount, BufferResou
 void D3D12Renderer::setShaderProgram(ShaderProgram* inProgram)
 {
     m_boundShaderProgram = static_cast<ShaderProgramImpl*>(inProgram);
-}
-
-void D3D12Renderer::setConstantBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* offsets)
-{
-    {
-        const UInt num = startSlot + slotCount;
-        if (num > m_boundConstantBuffers.Count())
-        {
-            m_boundConstantBuffers.SetSize(num);
-        }
-    }
-
-    for (UInt i = 0; i < slotCount; i++)
-    {
-        BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(buffers[i]);
-        if (buffer)
-        {
-            assert(buffer->m_initialUsage == Resource::Usage::ConstantBuffer); 
-        }
-        m_boundConstantBuffers[startSlot + i] = buffer;
-    }
 }
 
 void D3D12Renderer::draw(UInt vertexCount, UInt startVertex)

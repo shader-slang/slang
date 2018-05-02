@@ -64,7 +64,6 @@ public:
     virtual void setBindingState(BindingState * state);
     virtual void setVertexBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* strides,  const UInt* offsets) override;    
     virtual void setShaderProgram(ShaderProgram* inProgram) override;
-    virtual void setConstantBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers,  const UInt* offsets) override;
     virtual void draw(UInt vertexCount, UInt startVertex) override;
     virtual void dispatchCompute(int x, int y, int z) override;
     virtual void submitGpuWork() override {}
@@ -144,7 +143,7 @@ public:
         /// Capture a texture to a file
     static HRESULT captureTextureToFile(ID3D11Device* device, ID3D11DeviceContext* context, ID3D11Texture2D* texture, char const* outputPath);
 
-    void applyBindingState(bool isCompute);
+    void _applyBindingState(bool isCompute);
 
     ComPtr<IDXGISwapChain> m_swapChain;
     ComPtr<ID3D11Device> m_device;
@@ -797,29 +796,9 @@ void D3D11Renderer::setShaderProgram(ShaderProgram* programIn)
     m_immediateContext->PSSetShader(program->m_pixelShader, nullptr, 0);
 }
 
-void D3D11Renderer::setConstantBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffersIn, const UInt* offsetsIn)
-{
-	static const int kMaxConstantBuffers = 16;
-	assert(slotCount <= kMaxConstantBuffers);
-
-    // TODO: actually use those offsets
-
-    auto buffers = (BufferResourceImpl*const*)buffersIn;
-
-	// Copy out the actual dx buffers
-	ID3D11Buffer* dxBuffers[kMaxConstantBuffers];
-	for (UInt i = 0; i < slotCount; i++)
-	{
-		dxBuffers[i] = buffers[i]->m_buffer;
-	}
-
-    m_immediateContext->VSSetConstantBuffers((UINT)startSlot, (UINT)slotCount, dxBuffers);
-    m_immediateContext->VSSetConstantBuffers((UINT)startSlot, (UINT)slotCount, dxBuffers);
-}
-
 void D3D11Renderer::draw(UInt vertexCount, UInt startVertex)
 {
-    applyBindingState(false);
+    _applyBindingState(false);
     m_immediateContext->Draw((UINT)vertexCount, (UINT)startVertex);
 }
 
@@ -858,7 +837,7 @@ ShaderProgram* D3D11Renderer::compileProgram(const ShaderCompileRequest& request
 
 void D3D11Renderer::dispatchCompute(int x, int y, int z)
 {
-    applyBindingState(true);
+    _applyBindingState(true);
     m_immediateContext->Dispatch(x, y, z);
 }
 
@@ -1051,7 +1030,7 @@ BindingState* D3D11Renderer::createBindingState(const BindingState::Desc& bindin
     return bindingState.detach();
 }
 
-void D3D11Renderer::applyBindingState(bool isCompute)
+void D3D11Renderer::_applyBindingState(bool isCompute)
 {
     auto context = m_immediateContext.get();
 

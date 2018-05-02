@@ -166,6 +166,26 @@ BindingState::BindIndexSlice BindingState::Desc::asSlice(ShaderStyle style, cons
 }
 
 
+int BindingState::Desc::findBindingIndex(Resource::BindFlag::Enum bindFlag, ShaderStyleFlags shaderStyleFlags, BindIndex index) const
+{
+    const int numBindings = int(m_bindings.Count());
+    for (int i = 0; i < numBindings; ++i)
+    {
+        const Binding& binding = m_bindings[i];
+        if (binding.resource && (binding.resource->getDescBase().bindFlags & bindFlag) != 0)
+        {
+            for (int j = 0; j < int(ShaderStyle::CountOf); ++j)
+            {
+                if (indexOf(binding.shaderBindSet.shaderSlices[j], index) >= 0)
+                {
+                    return i;
+                }
+            }
+        }
+    }
+
+    return -1;
+}
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!! TextureResource::Size !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 int TextureResource::Size::calcMaxDimension(Type type) const

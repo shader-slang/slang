@@ -365,6 +365,16 @@ public:
         CountOf,
     };
 
+    struct ShaderStyleFlag
+    {
+        enum Enum 
+        {
+            Hlsl = 1 << int(ShaderStyle::Hlsl),
+            Glsl = 1 << int(ShaderStyle::Glsl),
+        };
+    };
+    typedef int ShaderStyleFlags;           ///< Combination of ShaderStyleFlag 
+
         /// A 'compact' representation of a 0 or more BindIndices.  
         /// A Slice in this context is effectively an unowned array. 
         /// If only a single index is he held (which is common) it's held directly in the m_indexOrBase member, otherwise m_indexOrBase is an index into the 
@@ -391,6 +401,13 @@ public:
     struct ShaderBindSet
     {
         void set(ShaderStyle style, const CompactBindIndexSlice& slice) { shaderSlices[int(style)] = slice; }
+        void setAll(const CompactBindIndexSlice& slice) 
+        {
+            for (int i = 0; i < int(ShaderStyle::CountOf); ++i)
+            {
+                shaderSlices[i] = slice;
+            }
+        }
 
         CompactBindIndexSlice shaderSlices[int(ShaderStyle::CountOf)];
     };
@@ -401,6 +418,18 @@ public:
     {
         const BindIndex* begin() const { return data; }
         const BindIndex* end() const { return data + size; }
+
+        int indexOf(BindIndex index) const 
+        {
+            for (int i = 0; i < size; ++i)
+            {
+                if (data[i] == index) 
+                {
+                    return i;
+                }   
+            }
+            return -1;
+        }
 
         int getSize() const { return int(size); }
         BindIndex operator[](int i) const { assert(i >= 0 && i < size); return data[i]; }
@@ -454,6 +483,12 @@ public:
             /// Only >= 0 indices are valid
         CompactBindIndexSlice makeCompactSlice(const int* indices, int numIndices);
 
+            /// Returns the index of the element in the slice
+        int indexOf(const CompactBindIndexSlice& slice, BindIndex index) const { return asSlice(slice).indexOf(index); }
+
+            /// Find the 
+        int findBindingIndex(Resource::BindFlag::Enum bindFlag, ShaderStyleFlags shaderStyleFlags, BindIndex index) const;
+
         Slang::List<Binding> m_bindings;                            ///< All of the bindings in order
         Slang::List<SamplerDesc> m_samplerDescs;                    ///< Holds the SamplerDesc for the binding - indexed by the descIndex member of Binding 
         Slang::List<BindIndex> m_sharedBindIndices;                 ///< Used to store BindIndex slices that don't fit into CompactBindIndexSlice
@@ -505,9 +540,6 @@ public:
 
     virtual void setShaderProgram(ShaderProgram* program) = 0;
 
-    virtual void setConstantBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* offsets) = 0;
-    inline void setConstantBuffer(UInt slot, BufferResource* buffer, UInt offset = 0);
-
     virtual void draw(UInt vertexCount, UInt startVertex = 0) = 0;
     virtual void dispatchCompute(int x, int y, int z) = 0;
 
@@ -522,11 +554,6 @@ public:
 inline void Renderer::setVertexBuffer(UInt slot, BufferResource* buffer, UInt stride, UInt offset)
 {
     setVertexBuffers(slot, 1, &buffer, &stride, &offset);
-}
-// ----------------------------------------------------------------------------------------
-inline void Renderer::setConstantBuffer(UInt slot, BufferResource* buffer, UInt offset)
-{
-    setConstantBuffers(slot, 1, &buffer, &offset);
 }
 
 /// Functions that are around Renderer and it's types

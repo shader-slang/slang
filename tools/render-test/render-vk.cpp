@@ -47,7 +47,6 @@ public:
     virtual void setBindingState(BindingState* state);
     virtual void setVertexBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* strides, const UInt* offsets) override;
     virtual void setShaderProgram(ShaderProgram* inProgram) override;
-    virtual void setConstantBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers,  const UInt* offsets) override;
     virtual void draw(UInt vertexCount, UInt startVertex) override;
     virtual void dispatchCompute(int x, int y, int z) override;
     virtual void submitGpuWork() override;
@@ -234,8 +233,7 @@ public:
     Pipeline* m_currentPipeline = nullptr;
 
     List<BoundVertexBuffer> m_boundVertexBuffers;
-    List<RefPtr<BufferResourceImpl> > m_boundConstantBuffers;
-
+    
     VkPrimitiveTopology m_primitiveTopology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 
     VkDevice m_device = VK_NULL_HANDLE;
@@ -451,7 +449,7 @@ Slang::Result VKRenderer::_createPipeline(RefPtr<Pipeline>& pipelineOut)
 
                 writeInfo.dstSet = pipeline->m_descriptorSet;
                 writeInfo.dstBinding = srcDetail.m_binding;
-                writeInfo.dstArrayElement = elementIndex++;
+                writeInfo.dstArrayElement = 0; 
                 writeInfo.pBufferInfo = &bufferInfo;
 
                 m_api.vkUpdateDescriptorSets(m_device, 1, &writeInfo, 0, nullptr);
@@ -1287,27 +1285,6 @@ void VKRenderer::setVertexBuffers(UInt startSlot, UInt slotCount, BufferResource
 void VKRenderer::setShaderProgram(ShaderProgram* program)
 {
     m_currentProgram = (ShaderProgramImpl*)program;
-}
-
-void VKRenderer::setConstantBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* offsets) 
-{
-    {
-        const UInt num = startSlot + slotCount;
-        if (num > m_boundConstantBuffers.Count())
-        {
-            m_boundConstantBuffers.SetSize(num);
-        }
-    }
-
-    for (UInt i = 0; i < slotCount; i++)
-    {
-        BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(buffers[i]);
-        if (buffer)
-        {
-            assert(buffer->m_initialUsage == Resource::Usage::ConstantBuffer);
-        }
-        m_boundConstantBuffers[startSlot + i] = buffer;
-    }
 }
 
 void VKRenderer::draw(UInt vertexCount, UInt startVertex = 0)

@@ -103,26 +103,41 @@ SlangResult RenderTestApp::initialize(Renderer* renderer, ShaderCompiler* shader
 
 	m_renderer = renderer;
 
+    // TODO(tfoley): use each API's reflection interface to query the constant-buffer size needed
+    {
+        m_constantBufferSize = 16 * sizeof(float);
+
+        BufferResource::Desc constantBufferDesc;
+        constantBufferDesc.init(m_constantBufferSize);
+        constantBufferDesc.cpuAccessFlags = Resource::AccessFlag::Write;
+
+        m_constantBuffer = renderer->createBufferResource(Resource::Usage::ConstantBuffer, constantBufferDesc);
+        if (!m_constantBuffer)
+            return SLANG_FAIL;
+    }
+
     {
         BindingState::Desc bindingStateDesc;
         SLANG_RETURN_ON_FAIL(ShaderRendererUtil::createBindingStateDesc(m_shaderInputLayout, m_renderer, bindingStateDesc));
+
+        //! Hack -> if bindings are specified, just set up the constant buffer binding
+        // Should probably be more sophisticated than this - with 'dynamic' constant buffer/s binding always being specified
+        // in the test file 
+
+        if ((gOptions.shaderType == Options::ShaderProgramType::Graphics || gOptions.shaderType == Options::ShaderProgramType::GraphicsCompute)
+            && bindingStateDesc.findBindingIndex(Resource::BindFlag::ConstantBuffer, -1, 0) < 0)
+        {
+            BindingState::ShaderBindSet shaderBindSet;
+            shaderBindSet.setAll(bindingStateDesc.makeCompactSlice(0));
+
+            bindingStateDesc.addResource(BindingType::Buffer, m_constantBuffer, shaderBindSet);
+        }
 
         m_bindingState = m_renderer->createBindingState(bindingStateDesc);
     }
 
     // Do other initialization that doesn't depend on the source language.
 
-    // TODO(tfoley): use each API's reflection interface to query the constant-buffer size needed
-    m_constantBufferSize = 16 * sizeof(float);
-
-    BufferResource::Desc constantBufferDesc;
-    constantBufferDesc.init(m_constantBufferSize);
-    constantBufferDesc.cpuAccessFlags = Resource::AccessFlag::Write;
-
-    m_constantBuffer = renderer->createBufferResource(Resource::Usage::ConstantBuffer, constantBufferDesc);
-    if(!m_constantBuffer)
-        return SLANG_FAIL;
-		
     // Input Assembler (IA)
 
     const InputElementDesc inputElements[] = {
@@ -228,7 +243,6 @@ void RenderTestApp::renderFrame()
     // Pixel Shader (PS)
 
 	m_renderer->setShaderProgram(m_shaderProgram);
-	m_renderer->setConstantBuffer(0, m_constantBuffer);
 	m_renderer->setBindingState(m_bindingState);
     //
 
