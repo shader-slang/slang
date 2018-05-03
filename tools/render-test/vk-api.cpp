@@ -89,12 +89,14 @@ Slang::Result VulkanApi::initDeviceProcs(VkDevice device)
 
 int VulkanApi::findMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties) const
 {
+    assert(typeBits);
+
     const int numMemoryTypes = int(m_deviceMemoryProperties.memoryTypeCount);
     
     // bit holds current test bit against typeBits. Ie bit == 1 << typeBits 
     
     uint32_t bit = 1;       
-    for (int i = 0;  (typeBits != 0) && i < numMemoryTypes; ++i, bit += bit)
+    for (int i = 0;  i < numMemoryTypes; ++i, bit += bit)
     {
         auto const& memoryType = m_deviceMemoryProperties.memoryTypes[i];
         if ((typeBits & bit) && (memoryType.propertyFlags & properties) == properties)
@@ -102,7 +104,7 @@ int VulkanApi::findMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags prop
             return i;
         }
     }
-
+    
     //assert(!"failed to find a usable memory type");
     return -1;
 }

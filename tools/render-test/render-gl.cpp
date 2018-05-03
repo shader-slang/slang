@@ -265,6 +265,8 @@ public:
     static void APIENTRY staticDebugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam);
     static VertexAttributeFormat getVertexAttributeFormat(Format format);
 
+    static void compileTimeAsserts();
+
     HDC     m_hdc;
     HGLRC   m_glContext;
     float   m_clearColor[4] = { 0, 0, 0, 0 };
@@ -285,7 +287,7 @@ public:
     MAP_GL_EXTENSION_FUNCS(DECLARE_GL_EXTENSION_FUNC)
 #undef DECLARE_GL_EXTENSION_FUNC
 
-    static const GlPixelFormatInfo s_pixelFormatInfos[int(GlPixelFormat::CountOf)];
+    static const GlPixelFormatInfo s_pixelFormatInfos[];            /// Maps GlPixelFormat to a format info 
 };
 
 /* static */GLRenderer::GlPixelFormat GLRenderer::_getGlPixelFormat(Format format)
@@ -297,12 +299,17 @@ public:
     }
 }
 
-/* static */ const GLRenderer::GlPixelFormatInfo GLRenderer::s_pixelFormatInfos[int(GlPixelFormat::CountOf)] = 
+/* static */ const GLRenderer::GlPixelFormatInfo GLRenderer::s_pixelFormatInfos[] = 
 {
     // internalType, format, formatType
     { 0,                0,          0},                         // GlPixelFormat::Unknown
     { GL_RGBA8,         GL_RGBA,    GL_UNSIGNED_BYTE },         // GlPixelFormat::RGBA_Unorm_UInt8
 };
+
+/* static */void GLRenderer::compileTimeAsserts()
+{
+    SLANG_COMPILE_TIME_ASSERT(SLANG_COUNT_OF(s_pixelFormatInfos) == int(GlPixelFormat::CountOf));
+}
 
 Renderer* createGLRenderer()
 {
