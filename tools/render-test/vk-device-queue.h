@@ -22,8 +22,10 @@ struct VulkanDeviceQueue
         /// Initialize - must be called before anything else can be done
     SlangResult init(const VulkanApi& api, VkQueue queue, int queueIndex);
 
-        /// Flushes the current command list, and steps to next (ie combination of step A then B)
-    void flushStep();
+        /// Flushes the current command list, and steps to next (internally this is equivalent to a stepA followed by stepB)
+    void flush();
+        /// Performs a full flush, and then waits for idle. 
+    void flushAndWait();
 
         /// Blocks until all work submitted to GPU has completed
     void waitForIdle() { m_api->vkQueueWaitIdle(m_queue); }
@@ -31,9 +33,13 @@ struct VulkanDeviceQueue
         /// Set the graphics queue index (as set on init)
     int getQueueIndex() const { return m_queueIndex; }
 
-    VkSemaphore makeCurrent(EventType eventType);
 
+        /// Make the specified event 'current' - meaning it's semaphone must be waited on
+    VkSemaphore makeCurrent(EventType eventType);
+        /// Makes the event no longer required to be waited on
     void makeCompleted(EventType eventType);
+        /// Returns true if the event is already current
+    SLANG_FORCE_INLINE bool isCurrent(EventType eventType) const { return m_currentSemaphores[int(eventType)] != VK_NULL_HANDLE; }
 
         /// Get the command buffer
     VkCommandBuffer getCommandBuffer() const { return m_commandBuffer; }
@@ -49,8 +55,6 @@ struct VulkanDeviceQueue
         /// Steps to next command buffer and opens. May block if command buffer is still in use
     void flushStepB();
 
-    void flushAndWait();
-
         /// Dtor
     ~VulkanDeviceQueue();
 
@@ -59,11 +63,11 @@ struct VulkanDeviceQueue
     struct Fence
     {
         VkFence fence;
-        bool  active;
+        bool active;
         uint64_t value;
     };
 
-    void fenceUpdate(int fenceIndex, bool blocking);
+    void _updateFenceAtIndex(int fenceIndex, bool blocking);
 
     VkQueue m_queue = VK_NULL_HANDLE;
 

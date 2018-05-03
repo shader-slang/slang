@@ -6,7 +6,7 @@
 
 namespace renderer_test {
 
-/* static */VkFormat VulkanUtil::calcVkFormat(Format format)
+/* static */VkFormat VulkanUtil::getVkFormat(Format format)
 {
     switch (format)
     {
@@ -44,7 +44,7 @@ namespace renderer_test {
 
 }
 
-/* static */VkPrimitiveTopology VulkanUtil::calcVkPrimitiveTopology(PrimitiveTopology topology)
+/* static */VkPrimitiveTopology VulkanUtil::getVkPrimitiveTopology(PrimitiveTopology topology)
 {
     switch (topology)
     {

@@ -71,7 +71,7 @@ SlangResult VulkanSwapChain::init(VulkanDeviceQueue* deviceQueue, const Desc& de
 
     // Look for a suitable format
     List<VkFormat> formats;
-    formats.Add(VulkanUtil::calcVkFormat(desc.m_format));
+    formats.Add(VulkanUtil::getVkFormat(desc.m_format));
     // HACK! To check for a different format if couldn't be found
     if (descIn.m_format == Format::RGBA_Unorm_UInt8)
     {
@@ -305,30 +305,6 @@ SlangResult VulkanSwapChain::_createSwapChain()
             SLANG_VK_RETURN_ON_FAIL(m_api->vkCreateImageView(m_api->m_device, &createInfo, nullptr, &image.m_imageView));
         }
     }
-#if 0
-    for (int i = 0; i < int(m_images.Count()); ++i)
-    {
-        RenderTargetDescVulkan renderTargetDesc = {};
-        renderTargetDesc.texture = ptr->swapchainImages[idx];
-        renderTargetDesc.format = ptr->swapchainFormat;
-        renderTargetDesc.width = imageExtent.width;
-        renderTargetDesc.height = imageExtent.height;
-
-        ptr->renderTargets[idx] = CreateRenderTargetExternalVulkan(ptr->deviceQueue->internalContext, &renderTargetDesc);
-    }
-
-    if (ptr->swapchain.desc.enableDepth)
-    {
-        DepthBufferDesc depthBufferDesc = {};
-        depthBufferDesc.format_typeless = ptr->swapchain.desc.depthFormat_typeless;
-        depthBufferDesc.format_depth = ptr->swapchain.desc.depthFormat_depth;
-        depthBufferDesc.format_texture = ptr->swapchain.desc.depthFormat_texture;
-        depthBufferDesc.width = ptr->width;
-        depthBufferDesc.height = ptr->height;
-
-        ptr->depthBuffer = CreateDepthBuffer(ptr->deviceQueue->internalContext, &depthBufferDesc);
-    }
-#endif
 
     if (m_renderPass != VK_NULL_HANDLE)
     {
@@ -362,27 +338,12 @@ void VulkanSwapChain::_destroySwapChain()
         }
     }
 
-#if 0
-    if (m_depthBuffer)
-    {
-        NvFlowDestroyDepthBuffer(ptr->deviceQueue->internalContext, ptr->depthBuffer);
-        ptr->depthBuffer = nullptr;
-    }
-
-    for (NvFlowUint idx = 0; idx < ptr->numSwapchainImages; idx++)
-    {
-        NvFlowDestroyRenderTarget(ptr->deviceQueue->internalContext, ptr->renderTargets[idx]);
-        ptr->renderTargets[idx] = VK_NULL_HANDLE;
-    }
-#endif
-
     if (m_swapChain != VK_NULL_HANDLE)
     {
         m_api->vkDestroySwapchainKHR(m_api->m_device, m_swapChain, nullptr);
         m_swapChain = VK_NULL_HANDLE;
     }
 
-    
     // Mark that it is no longer used
     m_images.Clear();
 }
@@ -426,7 +387,7 @@ void VulkanSwapChain::present(bool vsync)
 {
     if (!hasValidSwapChain())
     {
-        m_deviceQueue->flushStep();
+        m_deviceQueue->flush();
         return;
     }
 

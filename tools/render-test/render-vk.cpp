@@ -694,7 +694,7 @@ void VKRenderer::_beginRender()
 
 void VKRenderer::_endRender()
 {
-    m_deviceQueue.flushStep();
+    m_deviceQueue.flush();
 }
 
 Renderer* createVKRenderer()
@@ -925,7 +925,7 @@ SlangResult VKRenderer::initialize(void* inWindowHandle)
             VkAttachmentDescription& dst = attachmentDesc[numAttachments++];
 
             dst.flags = 0;
-            dst.format = VulkanUtil::calcVkFormat(depthFormat);
+            dst.format = VulkanUtil::getVkFormat(depthFormat);
             dst.samples = VK_SAMPLE_COUNT_1_BIT;
             dst.loadOp = shouldClearDepth ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
             dst.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -978,7 +978,7 @@ SlangResult VKRenderer::initialize(void* inWindowHandle)
 
 void VKRenderer::submitGpuWork()
 {
-    m_deviceQueue.flushStep();
+    m_deviceQueue.flush();
 }
 
 void VKRenderer::waitForGpu()
@@ -1137,7 +1137,7 @@ InputLayout* VKRenderer::createInputLayout(const InputElementDesc* elements, UIn
 
         dstDesc.location = uint32_t(i);
         dstDesc.binding = 0;
-        dstDesc.format = VulkanUtil::calcVkFormat(srcDesc.format);
+        dstDesc.format = VulkanUtil::getVkFormat(srcDesc.format);
         if (dstDesc.format == VK_FORMAT_UNDEFINED)
         {
             return nullptr;
@@ -1256,7 +1256,7 @@ void VKRenderer::setInputLayout(InputLayout* inputLayout)
 
 void VKRenderer::setPrimitiveTopology(PrimitiveTopology topology)
 {
-    m_primitiveTopology = VulkanUtil::calcVkPrimitiveTopology(topology);
+    m_primitiveTopology = VulkanUtil::getVkPrimitiveTopology(topology);
 }
 
 void VKRenderer::setVertexBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* strides, const UInt* offsets)

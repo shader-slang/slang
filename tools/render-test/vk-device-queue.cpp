@@ -78,21 +78,6 @@ SlangResult VulkanDeviceQueue::init(const VulkanApi& api, VkQueue queue, int que
     // Second step of flush to prime command buffer
     flushStepB();
 
-#if 0
-    NvFlowContextDescVulkan contextDesc = {};
-    contextDesc.vkGetInstanceProcAddr = ptr->device->loader.vkGetInstanceProcAddr;
-    contextDesc.vkGetDeviceProcAddr = ptr->device->loader.vkGetDeviceProcAddr;
-    contextDesc.instance = ptr->device->vulkanInstance;
-    contextDesc.physicalDevice = ptr->device->physicalDevice;
-    contextDesc.device = ptr->vulkanDevice;
-    contextDesc.queue = ptr->graphicsQueue;
-    contextDesc.commandBuffer = ptr->commandBuffer;
-    contextDesc.lastFenceCompleted = ptr->lastFenceCompleted;
-    contextDesc.nextFenceValue = ptr->nextFenceValue;
-
-    ptr->internalContext = NvFlowCreateContextVulkan(NV_FLOW_VERSION, &contextDesc);
-#endif
-
     return SLANG_OK;
 }
 
@@ -108,7 +93,7 @@ void VulkanDeviceQueue::flushStepA()
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
     // Wait semaphores
-    if (m_currentSemaphores[int(EventType::BeginFrame)] != VK_NULL_HANDLE)
+    if (isCurrent(EventType::BeginFrame))
     {
         submitInfo.waitSemaphoreCount = 1;
         submitInfo.pWaitSemaphores = &m_currentSemaphores[int(EventType::BeginFrame)];
@@ -119,7 +104,7 @@ void VulkanDeviceQueue::flushStepA()
     submitInfo.pCommandBuffers = &m_commandBuffer;
     
     // Signal semaphores
-    if (m_currentSemaphores[int(EventType::EndFrame)] != VK_NULL_HANDLE)
+    if (isCurrent(EventType::EndFrame))
     {
         submitInfo.signalSemaphoreCount = 1;
         submitInfo.pSignalSemaphores = &m_currentSemaphores[int(EventType::EndFrame)];
@@ -140,7 +125,7 @@ void VulkanDeviceQueue::flushStepA()
     makeCompleted(EventType::BeginFrame);
 }
 
-void VulkanDeviceQueue::fenceUpdate( int fenceIndex, bool blocking)
+void VulkanDeviceQueue::_updateFenceAtIndex( int fenceIndex, bool blocking)
 {
     Fence& fence = m_fences[fenceIndex];
 
@@ -170,11 +155,11 @@ void VulkanDeviceQueue::flushStepB()
     // non-blocking update of fence values
     for (int i = 0; i < m_numCommandBuffers; ++i)
     {
-        fenceUpdate(i, false);
+        _updateFenceAtIndex(i, false);
     }
 
     // blocking update of fence values
-    fenceUpdate(m_commandBufferIndex, true);
+    _updateFenceAtIndex(m_commandBufferIndex, true);
     
     m_api->vkResetCommandBuffer(m_commandBuffer, 0);
 
@@ -187,22 +172,21 @@ void VulkanDeviceQueue::flushStepB()
     m_api->vkBeginCommandBuffer(m_commandBuffer, &beginInfo);
 }
 
-void VulkanDeviceQueue::flushStep()
+void VulkanDeviceQueue::flush()
 {
     flushStepA();
     flushStepB();
 }
 
-
 void VulkanDeviceQueue::flushAndWait()
 {
-    flushStep();
+    flush();
     waitForIdle();
 }
 
 VkSemaphore VulkanDeviceQueue::makeCurrent(EventType eventType)
 {
-    assert(m_currentSemaphores[int(eventType)] == VK_NULL_HANDLE);
+    assert(!isCurrent(eventType)); 
     VkSemaphore semaphore = m_semaphores[int(eventType)];
     m_currentSemaphores[int(eventType)] = semaphore;
     return semaphore;
@@ -210,7 +194,6 @@ VkSemaphore VulkanDeviceQueue::makeCurrent(EventType eventType)
 
 void VulkanDeviceQueue::makeCompleted(EventType eventType)
 {
-    //assert(m_currentSemaphores[int(eventType)] != VK_NULL_HANDLE);
     m_currentSemaphores[int(eventType)] = VK_NULL_HANDLE;
 }
 
