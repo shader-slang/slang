@@ -2033,6 +2033,45 @@ namespace Slang
         return emitSwizzleSet(type, base, source, elementCount, irElementIndices);
     }
 
+    IRInst* IRBuilder::emitSwizzledStore(
+        IRInst*         dest,
+        IRInst*         source,
+        UInt            elementCount,
+        IRInst* const*  elementIndices)
+    {
+        IRInst* fixedArgs[] = { dest, source };
+        UInt fixedArgCount = sizeof(fixedArgs) / sizeof(fixedArgs[0]);
+
+        auto inst = createInstImpl<IRSwizzledStore>(
+            this,
+            kIROp_SwizzledStore,
+            nullptr,
+            fixedArgCount,
+            fixedArgs,
+            elementCount,
+            elementIndices);
+
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitSwizzledStore(
+        IRInst*         dest,
+        IRInst*         source,
+        UInt            elementCount,
+        UInt const*     elementIndices)
+    {
+        auto intType = getBasicType(BaseType::Int);
+
+        IRInst* irElementIndices[4];
+        for (UInt ii = 0; ii < elementCount; ++ii)
+        {
+            irElementIndices[ii] = getIntValue(intType, elementIndices[ii]);
+        }
+
+        return emitSwizzledStore(dest, source, elementCount, irElementIndices);
+    }
+
     IRInst* IRBuilder::emitReturn(
         IRInst*    val)
     {

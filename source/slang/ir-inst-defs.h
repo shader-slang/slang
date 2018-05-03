@@ -265,6 +265,25 @@ INST(swizzle, swizzle, 1, 0)
 //
 INST(swizzleSet, swizzleSet, 2, 0)
 
+// Store to memory with a swizzle
+//
+// TODO: eventually this should be reduced to just
+// a write mask by moving the actual swizzle to the RHS.
+//
+// swizzleStore %dst %src %idx0 %idx1 ...
+//
+// where:
+// - `dst` is a vector<T,N>
+// - `src` is a vector<T,M>
+// - `idx0` through `idx[M-1]` are literal integers
+//
+// The semantics of the op is:
+//
+//     for(ii : 0 ... M-1 )
+//         dst[ii] = src[idx[ii]];
+//
+INST(SwizzledStore, swizzledStore, 2, 0)
+
 
 /* IRTerminatorInst */
 

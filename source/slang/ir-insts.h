@@ -322,7 +322,7 @@ struct IRSwitch : IRTerminatorInst
     IRBlock* getCaseLabel(UInt index) { return (IRBlock*) getOperand(3 + index*2 + 1); }
 };
 
-struct IRSwizzle : IRReturn
+struct IRSwizzle : IRInst
 {
     IRUse base;
 
@@ -337,7 +337,7 @@ struct IRSwizzle : IRReturn
     }
 };
 
-struct IRSwizzleSet : IRReturn
+struct IRSwizzleSet : IRInst
 {
     IRUse base;
     IRUse source;
@@ -352,6 +352,22 @@ struct IRSwizzleSet : IRReturn
     {
         return getOperand(index + 2);
     }
+};
+
+struct IRSwizzledStore : IRInst
+{
+    IRInst* getDest() { return getOperand(0); }
+    IRInst* getSource() { return getOperand(1); }
+    UInt getElementCount()
+    {
+        return getOperandCount() - 2;
+    }
+    IRInst* getElementIndex(UInt index)
+    {
+        return getOperand(index + 2);
+    }
+
+    IR_LEAF_ISA(SwizzledStore)
 };
 
 // An IR `var` instruction conceptually represents
@@ -721,6 +737,20 @@ struct IRBuilder
         IRInst*        source,
         UInt            elementCount,
         UInt const*     elementIndices);
+
+    IRInst* emitSwizzledStore(
+        IRInst*         dest,
+        IRInst*         source,
+        UInt            elementCount,
+        IRInst* const*  elementIndices);
+
+    IRInst* emitSwizzledStore(
+        IRInst*         dest,
+        IRInst*         source,
+        UInt            elementCount,
+        UInt const*     elementIndices);
+
+
 
     IRInst* emitReturn(
         IRInst*    val);
