@@ -1232,7 +1232,92 @@ void maybeSetRate(
     }
 }
 
+static Name* getNameForNameHint(
+    IRGenContext*   context,
+    Decl*           decl)
+{
+    // We will use a bit of an ad hoc convention here for now.
 
+    Name* leafName = decl->getName();
+
+    // Handle custom name for a global parameter group (e.g., a `cbuffer`)
+    if(auto reflectionNameModifier = decl->FindModifier<ParameterGroupReflectionName>())
+    {
+        leafName = reflectionNameModifier->nameAndLoc.name;
+    }
+
+    // There is no point in trying to provide a name hint for something with no name,
+    // or with an empty name
+    if(!leafName)
+        return nullptr;
+    if(leafName->text.Length() == 0)
+        return nullptr;
+
+
+    if(auto varDecl = dynamic_cast<VarDeclBase*>(decl))
+    {
+        // For an ordinary local variable, global variable,
+        // parameter, or field, we will just use the name
+        // as declared, and now work in anything from
+        // its parent declaration(s).
+        //
+        // TODO: consider whether global/static variables should
+        // follow different rules.
+        //
+        return leafName;
+    }
+
+    // For other cases of declaration, we want to consider
+    // merging its name with the name of its parent declaration.
+    auto parentDecl = decl->ParentDecl;
+
+    // Skip past a generic parent, if we are a declaration nested in a generic.
+    if(auto genericParentDecl = dynamic_cast<GenericDecl*>(parentDecl))
+        parentDecl = genericParentDecl->ParentDecl;
+
+    auto parentName = getNameForNameHint(context, parentDecl);
+    if(!parentName)
+    {
+        return leafName;
+    }
+
+    // TODO: at some point we will start giving `ModuleDecl`s names,
+    // and in that case we need to think carefully about whether to
+    // include their names here or not.
+
+    // We will now construct a new `Name` to use as the hint,
+    // combining the name of the parent and the leaf declaration.
+
+    StringBuilder sb;
+    sb.append(parentName->text);
+    sb.append(".");
+    sb.append(leafName->text);
+
+    return context->getSession()->getNameObj(sb.ProduceString());
+}
+
+/// Try to add an appropriate name hint to the instruction,
+/// that can be used for back-end code emission or debug info.
+static void addNameHint(
+    IRGenContext*   context,
+    IRInst*         inst,
+    Decl*           decl)
+{
+    Name* name = getNameForNameHint(context, decl);
+    if(!name)
+        return;    
+    context->irBuilder->addDecoration<IRNameHintDecoration>(inst)->name = name;
+}
+
+/// Add a name hint based on a fixed string.
+static void addNameHint(
+    IRGenContext*   context,
+    IRInst*         inst,
+    char const*     text)
+{
+    Name* name = context->getSession()->getNameObj(text);
+    context->irBuilder->addDecoration<IRNameHintDecoration>(inst)->name = name;
+}
 
 LoweredValInfo createVar(
     IRGenContext*   context,
@@ -1249,6 +1334,8 @@ LoweredValInfo createVar(
         addVarDecorations(context, irAlloc, decl);
 
         builder->addHighLevelDeclDecoration(irAlloc, decl);
+
+        addNameHint(context, irAlloc, decl);
     }
 
     return LoweredValInfo::ptr(irAlloc);
@@ -3406,6 +3493,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             globalVal = LoweredValInfo::ptr(irGlobal);
         }
         irGlobal->mangledName = context->getSession()->getNameObj(getMangledName(decl));
+        addNameHint(context, irGlobal, decl);
 
         maybeSetRate(context, irGlobal, decl);
 
@@ -3605,6 +3693,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         subContext->irBuilder = subBuilder;
 
         IRStructType* irStruct = subBuilder->createStructType();
+        addNameHint(context, irStruct, decl);
 
         setMangledName(irStruct, getMangledName(decl));
 
@@ -3664,6 +3753,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         auto builder = getBuilder();
         auto irFieldKey = builder->createStructKey();
+        addNameHint(context, irFieldKey, fieldDecl);
 
         addVarDecorations(context, irFieldKey, fieldDecl);
 
@@ -4074,12 +4164,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 // TODO: use a `TypeKind` to represent the
                 // classifier of the parameter.
                 auto param = subBuilder->emitParam(nullptr);
+                addNameHint(context, param, typeParamDecl);
                 setValue(subContext, typeParamDecl, LoweredValInfo::simple(param));
             }
             else if (auto valDecl = member.As<GenericValueParamDecl>())
             {
                 auto paramType = lowerType(subContext, valDecl->getType());
                 auto param = subBuilder->emitParam(paramType);
+                addNameHint(context, param, valDecl);
                 setValue(subContext, valDecl, LoweredValInfo::simple(param));
             }
         }
@@ -4092,6 +4184,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 // TODO: use a `WitnessTableKind` to represent the
                 // classifier of the parameter.
                 auto param = subBuilder->emitParam(nullptr);
+                addNameHint(context, param, constraintDecl);
                 setValue(subContext, constraintDecl, LoweredValInfo::simple(param));
             }
         }
@@ -4172,6 +4265,18 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
     }
 
+    void addParamNameHint(IRInst* inst, ParameterInfo info)
+    {
+        if(auto decl = info.decl)
+        {
+            addNameHint(context, inst, decl);
+        }
+        else if( info.isThisParam )
+        {
+            addNameHint(context, inst, "this");
+        }
+    }
+
     LoweredValInfo lowerFuncDecl(FunctionDeclBase* decl)
     {
         // We are going to use a nested builder, because we will
@@ -4221,6 +4326,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // need to create an IR function here
 
         IRFunc* irFunc = subBuilder->createFunc();
+        addNameHint(context, irFunc, decl);
 
         setMangledName(irFunc, getMangledName(decl));
 
@@ -4335,6 +4441,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         {
                             subBuilder->addHighLevelDeclDecoration(irParamPtr, paramDecl);
                         }
+                        addParamNameHint(irParamPtr, paramInfo);
 
                         paramVal = LoweredValInfo::ptr(irParamPtr);
 
@@ -4361,6 +4468,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         {
                             subBuilder->addHighLevelDeclDecoration(irParam, paramDecl);
                         }
+                        addParamNameHint(irParam, paramInfo);
                         paramVal = LoweredValInfo::simple(irParam);
                         //
                         // HLSL allows a function parameter to be used as a local
@@ -4416,7 +4524,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 // Add the IR parameter for the new value
                 IRType* irParamType = irResultType;
-                subBuilder->emitParam(irParamType);
+                auto irParam = subBuilder->emitParam(irParamType);
+                addNameHint(context, irParam, "newValue");
 
                 // TODO: we need some way to wire this up to the `newValue`
                 // or whatever name we give for that parameter inside

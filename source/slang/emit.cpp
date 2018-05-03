@@ -136,6 +136,14 @@ struct SharedEmitContext
 
     // How far are we indented?
     Int indentLevel = 0;
+
+    // Map a string name to the number of times we have seen this
+    // name used so far during code emission.
+    Dictionary<String, UInt> uniqueNameCounters;
+
+    // Map an IR instruction to the name that we've decided
+    // to use for it when emitting code.
+    Dictionary<IRInst*, String> mapInstToName;
 };
 
 struct EmitContext
@@ -1895,8 +1903,128 @@ struct EmitVisitor
         return id;
     }
 
-    String getIRName(
-        IRInst*        inst)
+    /// "Scrub" a name so that it complies with restrictions of the target language.
+    String scrubName(
+        String const& name)
+    {
+        // We will use a plain `U` as a dummy character to insert
+        // whenever we need to insert things to make a string into
+        // valid name.
+        //
+        char const* dummyChar = "U";
+
+        // Special case a name that is the empty string, just in case.
+        if(name.Length() == 0)
+            return dummyChar;
+
+        // Otherwise, we are going to walk over the name byte by byte
+        // and write some legal characters to the output as we go.
+        StringBuilder sb;
+
+        if(getTarget(context) == CodeGenTarget::GLSL)
+        {
+            // GLSL reserverse all names that start with `gl_`,
+            // so if we are in danger of collision, then make
+            // our name start with a dummy character instead.
+            if(name.StartsWith("gl_"))
+            {
+                sb.append(dummyChar);
+            }
+        }
+
+        // We will also detect user-defined names that
+        // might overlap with our convention for mangled names,
+        // to avoid an possible collision.
+        if(name.StartsWith("_S"))
+        {
+            sb.Append(dummyChar);
+        }
+
+        // TODO: This is where we might want to consult
+        // a dictionary of reserved words for the chosen target
+        //
+        //  if(isReservedWord(name)) { sb.Append(dummyChar); }
+        //
+
+        // We need to track the previous byte in
+        // order to detect consecutive underscores for GLSL.
+        int prevChar = -1;
+
+        for(auto c : name)
+        {
+            // We will treat a dot character just like an underscore
+            // for the purposes of producing a scrubbed name, so
+            // that we translate `SomeType.someMethod` into
+            // `SomeType_someMethod`.
+            //
+            // By handling this case at the top of this loop, we
+            // ensure that a `.`-turned-`_` is handled just like
+            // a `_` in the original name, and will be properly
+            // scrubbed for GLSL output.
+            //
+            if(c == '.')
+            {
+                c = '_';
+            }
+
+            if(((c >= 'a') && (c <= 'z'))
+                || ((c >= 'A') && (c <= 'Z')))
+            {
+                // Ordinary ASCII alphabetic characters are assumed
+                // to always be okay.
+            }
+            else if((c >= '0') && (c <= '9'))
+            {
+                // We don't want to allow a digit as the first
+                // byte in a name, since the result wouldn't
+                // be a valid identifier in many target languages.
+                if(prevChar == -1)
+                {
+                    sb.append(dummyChar);
+                }
+            }
+            else if(c == '_')
+            {
+                // We will collapse any consecutive sequence of `_`
+                // characters into a single one (this means that
+                // some names that were unique in the original
+                // code might not resolve to unique names after
+                // scrubbing, but that was true in general).
+
+                if(prevChar == '_')
+                {
+                    // Skip this underscore, so we don't output
+                    // more than one in a row.
+                    continue;
+                }
+            }
+            else
+            {
+                // If we run into a character that wouldn't normally
+                // be allowed in an identifier, we need to translate
+                // it into something that *is* valid.
+                //
+                // Our solution for now will be very clumsy: we will
+                // emit `x` and then the hexadecimal version of
+                // the byte we were given.
+                sb.append("x");
+                sb.append(uint32_t((unsigned char) c), 16);
+
+                // We don't want to apply the default handling below,
+                // so skip to the top of the loop now.
+                prevChar = c;
+                continue;
+            }
+
+            sb.append(c);
+            prevChar = c;
+        }
+
+        return sb.ProduceString();
+    }
+
+    String generateIRName(
+        IRInst* inst)
     {
         // If the instruction names something
         // that should be emitted as a target intrinsic,
@@ -1905,6 +2033,58 @@ struct EmitVisitor
         {
             return intrinsicDecoration->definition;
         }
+
+        // If we have a name hint on the instruction, then we will try to use that
+        // to provide the actual name in the output code.
+        //
+        // We need to be careful that the name follows the rules of the target language,
+        // so there is a "scrubbing" step that needs to be applied here.
+        //
+        // We also need to make sure that the name won't collide with other declarations
+        // that might have the same name hint applied, so we will still unique
+        // them by appending the numeric ID of the instruction.
+        //
+        // TODO: Find cases where we can drop the suffix safely.
+        //
+        // TODO: When we start having to handle symbols with external linkage for
+        // things like DXIL libraries, we will need to *not* use the friendly
+        // names for stuff that should be link-able.
+        //
+        if(auto nameHintDecoration = inst->findDecoration<IRNameHintDecoration>())
+        {
+            // The name we output will basically be:
+            //
+            //      <nameHint>_<uniqueID>
+            //
+            // Except that we will "scrub" the name hint first,
+            // and we will omit the underscore if the (scrubbed)
+            // name hint already ends with one.
+            //
+
+            String nameHint = nameHintDecoration->name->text;
+            nameHint = scrubName(nameHint);
+
+            StringBuilder sb;
+            sb.append(nameHint);
+
+            // Avoid introducing a double underscore
+            if(!nameHint.EndsWith("_"))
+            {
+                sb.append("_");
+            }
+
+            String key = sb.ProduceString();
+            UInt count = 0;
+            context->shared->uniqueNameCounters.TryGetValue(key, count);
+
+            context->shared->uniqueNameCounters[key] = count+1;
+
+            sb.append(count);
+            return sb.ProduceString();
+        }
+
+
+
 
         // If the instruction has a mangled name, then emit using that.
         if (auto globalValue = as<IRGlobalValue>(inst))
@@ -1925,7 +2105,21 @@ struct EmitVisitor
         StringBuilder sb;
         sb << "_S";
         sb << getID(inst);
+
+
         return sb.ProduceString();
+    }
+
+    String getIRName(
+        IRInst*        inst)
+    {
+        String name;
+        if(!context->shared->mapInstToName.TryGetValue(inst, name))
+        {
+            name = generateIRName(inst);
+            context->shared->mapInstToName.Add(inst, name);
+        }
+        return name;
     }
 
     struct IRDeclaratorInfo

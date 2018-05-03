@@ -9,10 +9,10 @@
 #else
 #define R(X) X
 
-#define C _SV022SLANG_parameterGroup_C
-#define t _SV01t
-#define s _SV01s
-#define c _SV022SLANG_ParameterGroup_C1c
+#define C C_0
+#define t t_0
+#define s s_0
+#define c c_0
 
 #endif
 

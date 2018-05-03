@@ -18,7 +18,7 @@ Bad foo(int x) { Bad b; b.bad = x; return b; }
 // or ignore it and call the wrong one.
 
 #ifndef __SLANG__
-#define b _SV01b
+#define b b_0
 #endif
 
 RWStructuredBuffer<uint> b;

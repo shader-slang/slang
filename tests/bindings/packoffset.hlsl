@@ -8,15 +8,15 @@
 #else
 #define R(X) X
 
-#define CA _SV023SLANG_parameterGroup_CAL0
-#define ca _SV023SLANG_ParameterGroup_CA2ca
-#define cb _SV023SLANG_ParameterGroup_CA2cb
-#define cc _SV023SLANG_ParameterGroup_CA2cc
-#define cd _SV023SLANG_ParameterGroup_CA2cd
-#define ce _SV023SLANG_ParameterGroup_CA2ce
+#define CA CA_0
+#define ca ca_0
+#define cb cb_0
+#define cc cc_0
+#define cd cd_0
+#define ce ce_0
 
-#define ta _SV023SLANG_parameterGroup_CAL1
-#define sa _SV023SLANG_parameterGroup_CAL2
+#define ta CA_ta_0
+#define sa CA_sa_0
 
 #endif
 

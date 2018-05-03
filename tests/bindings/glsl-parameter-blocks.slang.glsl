@@ -1,12 +1,12 @@
 //TEST_IGNORE_FILE:
 #version 450 core
 
-#define Test _ST04Test
-#define a _SV04Test1a
+#define Test Test_0
+#define a a_0
 
-#define gTest _SV05gTestL0
-#define gTest_t _SV05gTestL1
-#define gTest_s _SV05gTestL2
+#define gTest gTest_0
+#define gTest_t gTest_t_0
+#define gTest_s gTest_s_0
 
 #define ParameterBlock_gTest _S1
 
