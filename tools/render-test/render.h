@@ -1,7 +1,6 @@
 // render.h
 #pragma once
 
-#include "options.h"
 #include "window.h"
 
 //#include "shader-input-layout.h"
@@ -12,6 +11,9 @@
 
 namespace renderer_test {
 
+// Had to move here, because Options needs types defined here
+typedef intptr_t Int;
+typedef uintptr_t UInt;
 
 // Declare opaque type
 class InputLayout: public Slang::RefObject
@@ -19,12 +21,37 @@ class InputLayout: public Slang::RefObject
 	public:
 };
 
+enum class PipelineType
+{
+    Unknown,
+    Graphics,
+    Compute,
+    CountOf,
+};
+
+enum class RendererType
+{
+    Unknown,
+    DirectX11,
+    DirectX12,
+    OpenGl,
+    Vulkan,
+    CountOf,
+};
+
+enum class ProjectionStyle
+{
+    Unknown,
+    OpenGl,
+    DirectX,
+    Vulkan, 
+    CountOf,
+};
+
 class ShaderProgram: public Slang::RefObject
 {
 	public:
 };
-
-
 
 struct ShaderCompileRequest
 {
@@ -62,14 +89,22 @@ public:
     virtual ShaderProgram* compileProgram(ShaderCompileRequest const& request) = 0;
 };
 
+/// Different formats of things like pixels or elements of vertices
+/// NOTE! Any change to this type (adding, removing, changing order) - must also be reflected in changes to RendererUtil 
 enum class Format
 {
     Unknown,
+
+    RGBA_Float32,
     RGB_Float32,
     RG_Float32,
     R_Float32,
 
     RGBA_Unorm_UInt8,
+
+    D_Float32, 
+    D_Unorm24_S8,
+
     CountOf, 
 };
 
@@ -159,6 +194,9 @@ class Resource: public Slang::RefObject
         /// Base class for Descs
     struct DescBase
     {
+        bool canBind(BindFlag::Enum bindFlag) const { return (bindFlags & bindFlag) != 0; }
+        bool hasCpuAccessFlag(AccessFlag::Enum accessFlag) { return (cpuAccessFlags & accessFlag) != 0; }
+
         int bindFlags = 0;          ///< Combination of Resource::BindFlag or 0 (and will use initialUsage to set)
         int cpuAccessFlags = 0;     ///< Combination of Resource::AccessFlag 
     };
@@ -173,15 +211,17 @@ class Resource: public Slang::RefObject
         /// Get the descBase
     const DescBase& getDescBase() const;
         /// Returns true if can bind with flag
-    bool canBind(BindFlag::Enum bindFlag) const { return (getDescBase().bindFlags & bindFlag) != 0; }
+    bool canBind(BindFlag::Enum bindFlag) const { return getDescBase().canBind(bindFlag); }
 
         /// For a usage gives the required binding flags
-    static const BindFlag::Enum s_requiredBinding[int(Usage::CountOf)]; 
+    static const BindFlag::Enum s_requiredBinding[];    /// Maps Usage to bind flags required  
 
     protected:
     Resource(Type type):
         m_type(type)
     {}
+
+    static void compileTimeAsserts();
 
     Type m_type;
 };
@@ -298,10 +338,10 @@ class TextureResource: public Resource
         ///         forall (depth levels)
     struct Data
     {
-        ptrdiff_t* mipRowStrides;        /// The row stride for a mip map
-        int numMips;                    ///< The number of mip maps 
-        const void*const* subResources;  ///< Pointers to each full mip subResource 
-        int numSubResources;            /// The total amount of subResources. Typically = numMips * depth * arraySize 
+        ptrdiff_t* mipRowStrides;           ///< The row stride for a mip map
+        int numMips;                        ///< The number of mip maps 
+        const void*const* subResources;     ///< Pointers to each full mip subResource 
+        int numSubResources;                ///< The total amount of subResources. Typically = numMips * depth * arraySize 
     };
 
         /// Get the description of the texture
@@ -348,6 +388,16 @@ public:
         CountOf,
     };
 
+    struct ShaderStyleFlag
+    {
+        enum Enum 
+        {
+            Hlsl = 1 << int(ShaderStyle::Hlsl),
+            Glsl = 1 << int(ShaderStyle::Glsl),
+        };
+    };
+    typedef int ShaderStyleFlags;           ///< Combination of ShaderStyleFlag 
+
         /// A 'compact' representation of a 0 or more BindIndices.  
         /// A Slice in this context is effectively an unowned array. 
         /// If only a single index is he held (which is common) it's held directly in the m_indexOrBase member, otherwise m_indexOrBase is an index into the 
@@ -374,6 +424,13 @@ public:
     struct ShaderBindSet
     {
         void set(ShaderStyle style, const CompactBindIndexSlice& slice) { shaderSlices[int(style)] = slice; }
+        void setAll(const CompactBindIndexSlice& slice) 
+        {
+            for (int i = 0; i < int(ShaderStyle::CountOf); ++i)
+            {
+                shaderSlices[i] = slice;
+            }
+        }
 
         CompactBindIndexSlice shaderSlices[int(ShaderStyle::CountOf)];
     };
@@ -384,6 +441,18 @@ public:
     {
         const BindIndex* begin() const { return data; }
         const BindIndex* end() const { return data + size; }
+
+        int indexOf(BindIndex index) const 
+        {
+            for (int i = 0; i < size; ++i)
+            {
+                if (data[i] == index) 
+                {
+                    return i;
+                }   
+            }
+            return -1;
+        }
 
         int getSize() const { return int(size); }
         BindIndex operator[](int i) const { assert(i >= 0 && i < size); return data[i]; }
@@ -437,6 +506,12 @@ public:
             /// Only >= 0 indices are valid
         CompactBindIndexSlice makeCompactSlice(const int* indices, int numIndices);
 
+            /// Returns the index of the element in the slice
+        int indexOf(const CompactBindIndexSlice& slice, BindIndex index) const { return asSlice(slice).indexOf(index); }
+
+            /// Find the 
+        int findBindingIndex(Resource::BindFlag::Enum bindFlag, ShaderStyleFlags shaderStyleFlags, BindIndex index) const;
+
         Slang::List<Binding> m_bindings;                            ///< All of the bindings in order
         Slang::List<SamplerDesc> m_samplerDescs;                    ///< Holds the SamplerDesc for the binding - indexed by the descIndex member of Binding 
         Slang::List<BindIndex> m_sharedBindIndices;                 ///< Used to store BindIndex slices that don't fit into CompactBindIndexSlice
@@ -458,7 +533,14 @@ public:
 class Renderer: public Slang::RefObject
 {
 public:
-    virtual SlangResult initialize(void* inWindowHandle) = 0;
+    
+    struct Desc
+    {
+        int width;          ///< Width in pixels
+        int height;         ///< height in pixels
+    };
+
+    virtual SlangResult initialize(const Desc& desc, void* inWindowHandle) = 0;
 
     virtual void setClearColor(const float color[4]) = 0;
     virtual void clearFrame() = 0;
@@ -488,9 +570,6 @@ public:
 
     virtual void setShaderProgram(ShaderProgram* program) = 0;
 
-    virtual void setConstantBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* offsets) = 0;
-    inline void setConstantBuffer(UInt slot, BufferResource* buffer, UInt offset = 0);
-
     virtual void draw(UInt vertexCount, UInt startVertex = 0) = 0;
     virtual void dispatchCompute(int x, int y, int z) = 0;
 
@@ -499,6 +578,9 @@ public:
     virtual void submitGpuWork() = 0;
         /// Blocks until Gpu work is complete
     virtual void waitForGpu() = 0;
+
+        /// Get the type of this renderer
+    virtual RendererType getRendererType() const = 0;
 };
 
 // ----------------------------------------------------------------------------------------
@@ -506,11 +588,21 @@ inline void Renderer::setVertexBuffer(UInt slot, BufferResource* buffer, UInt st
 {
     setVertexBuffers(slot, 1, &buffer, &stride, &offset);
 }
-// ----------------------------------------------------------------------------------------
-inline void Renderer::setConstantBuffer(UInt slot, BufferResource* buffer, UInt offset)
-{
-    setConstantBuffers(slot, 1, &buffer, &offset);
-}
 
+/// Functions that are around Renderer and it's types
+struct RendererUtil
+{
+        /// Gets the size in bytes of a Format type. Returns 0 if a size is not defined/invalid
+    SLANG_FORCE_INLINE static size_t getFormatSize(Format format) { return s_formatSize[int(format)]; }
+        /// Given a renderer type, gets a projection style
+    static ProjectionStyle getProjectionStyle(RendererType type);
+
+        /// Given the projection style returns an 'identity' matrix, which ensures x,y mapping to pixels is the same on all targets
+    static void getIdentityProjection(ProjectionStyle style, float projMatrix[16]);
+
+    private:
+    static void compileTimeAsserts();
+    static const uint8_t s_formatSize[]; // Maps Format::XXX to a size in bytes;
+};
 
 } // renderer_test

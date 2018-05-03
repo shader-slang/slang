@@ -4,6 +4,8 @@
 
 #include "slang-support.h"
 
+#include "options.h"
+
 #include <assert.h>
 #include <stdio.h>
 
