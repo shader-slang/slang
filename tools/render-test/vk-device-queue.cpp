@@ -83,8 +83,6 @@ SlangResult VulkanDeviceQueue::init(const VulkanApi& api, VkQueue queue, int que
 
 void VulkanDeviceQueue::flushStepA()
 {
-    //NvFlowContextEndRenderPass(ptr->internalContext);
-
     m_api->vkEndCommandBuffer(m_commandBuffer);
 
     VkPipelineStageFlags stageFlags = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
