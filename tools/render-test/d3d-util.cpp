@@ -26,10 +26,15 @@ using namespace Slang;
 {
     switch (format)
     {
+        case Format::RGBA_Float32:          return DXGI_FORMAT_R32G32B32A32_FLOAT;
         case Format::RGB_Float32:           return DXGI_FORMAT_R32G32B32_FLOAT;
         case Format::RG_Float32:            return DXGI_FORMAT_R32G32_FLOAT;
         case Format::R_Float32:             return DXGI_FORMAT_R32_FLOAT;
         case Format::RGBA_Unorm_UInt8:      return DXGI_FORMAT_R8G8B8A8_UNORM;
+
+        case Format::D_Float32:             return DXGI_FORMAT_D32_FLOAT;
+        case Format::D_Unorm24_S8:          return DXGI_FORMAT_D24_UNORM_S8_UINT;
+
         default:                            return DXGI_FORMAT_UNKNOWN;
     }
 }

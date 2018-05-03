@@ -36,6 +36,23 @@ const Resource::DescBase& Resource::getDescBase() const
     return s_emptyDescBase;
 }
 
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! RendererUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+/* static */const uint8_t RendererUtil::s_formatSize[int(Format::CountOf)] = 
+{
+    0,                               // Unknown,
+
+    uint8_t(sizeof(float) * 4),      // RGBA_Float32,
+    uint8_t(sizeof(float) * 3),      // RGB_Float32,
+    uint8_t(sizeof(float) * 2),      // RG_Float32,
+    uint8_t(sizeof(float) * 1),      // R_Float32,
+
+    uint8_t(sizeof(uint32_t)),       // RGBA_Unorm_UInt8,
+
+    uint8_t(sizeof(float)),          // D_Float32,
+    uint8_t(sizeof(uint32_t)),       // D_Unorm24_S8,
+};
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!! BindingState::Desc !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 void BindingState::Desc::addSampler(const SamplerDesc& desc, const ShaderBindSet& shaderBindSet)
@@ -149,6 +166,26 @@ BindingState::BindIndexSlice BindingState::Desc::asSlice(ShaderStyle style, cons
 }
 
 
+int BindingState::Desc::findBindingIndex(Resource::BindFlag::Enum bindFlag, ShaderStyleFlags shaderStyleFlags, BindIndex index) const
+{
+    const int numBindings = int(m_bindings.Count());
+    for (int i = 0; i < numBindings; ++i)
+    {
+        const Binding& binding = m_bindings[i];
+        if (binding.resource && (binding.resource->getDescBase().bindFlags & bindFlag) != 0)
+        {
+            for (int j = 0; j < int(ShaderStyle::CountOf); ++j)
+            {
+                if (indexOf(binding.shaderBindSet.shaderSlices[j], index) >= 0)
+                {
+                    return i;
+                }
+            }
+        }
+    }
+
+    return -1;
+}
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!! TextureResource::Size !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 int TextureResource::Size::calcMaxDimension(Type type) const
@@ -326,6 +363,64 @@ void TextureResource::Desc::init3D(Format formatIn, int widthIn, int heightIn, i
 
     this->bindFlags = 0;
     this->cpuAccessFlags = 0;
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!! RennderUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+ProjectionStyle RendererUtil::getProjectionStyle(RendererType type)
+{
+    switch (type)
+    {
+        case RendererType::DirectX11:
+        case RendererType::DirectX12:
+        {
+            return ProjectionStyle::DirectX;
+        }
+        case RendererType::OpenGl:              return ProjectionStyle::OpenGl;
+        case RendererType::Vulkan:              return ProjectionStyle::Vulkan;
+        case RendererType::Unknown:             return ProjectionStyle::Unknown;
+        default:
+        {
+            assert(!"Unhandled type");
+            return ProjectionStyle::Unknown;
+        }
+    }
+}
+
+/* static */void RendererUtil::getIdentityProjection(ProjectionStyle style, float projMatrix[16])
+{
+    switch (style)
+    {
+        case ProjectionStyle::DirectX:
+        case ProjectionStyle::OpenGl:
+        {
+            static const float kIdentity[] =
+            { 
+                1, 0, 0, 0,
+                0, 1, 0, 0,
+                0, 0, 1, 0,
+                0, 0, 0, 1
+            };
+            ::memcpy(projMatrix, kIdentity, sizeof(kIdentity));
+            break;
+        }
+        case ProjectionStyle::Vulkan:
+        {
+            static const float kIdentity[] =
+            {
+                1, 0, 0, 0,
+                0, -1, 0, 0,
+                0, 0, 1, 0,
+                0, 0, 0, 1
+            };
+            ::memcpy(projMatrix, kIdentity, sizeof(kIdentity));
+            break;
+        }
+        default: 
+        {
+            assert(!"Not handled");
+        }
+    }
 }
 
 } // renderer_test

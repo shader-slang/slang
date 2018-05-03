@@ -95,11 +95,11 @@ public:
     virtual void setBindingState(BindingState* state);
     virtual void setVertexBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* strides, const UInt* offsets) override;
     virtual void setShaderProgram(ShaderProgram* inProgram) override;
-    virtual void setConstantBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* offsets) override;
     virtual void draw(UInt vertexCount, UInt startVertex) override;
     virtual void dispatchCompute(int x, int y, int z) override;
     virtual void submitGpuWork() override {}
     virtual void waitForGpu() override {}
+    virtual RendererType getRendererType() const override { return RendererType::OpenGl; }
 
     // ShaderCompiler implementation
     virtual ShaderProgram* compileProgram(const ShaderCompileRequest& request) override;
@@ -280,7 +280,7 @@ public:
     MAP_GL_EXTENSION_FUNCS(DECLARE_GL_EXTENSION_FUNC)
 #undef DECLARE_GL_EXTENSION_FUNC
 
-        static const GlPixelFormatInfo s_pixelFormatInfos[int(GlPixelFormat::CountOf)];
+    static const GlPixelFormatInfo s_pixelFormatInfos[int(GlPixelFormat::CountOf)];
 };
 
 /* static */GLRenderer::GlPixelFormat GLRenderer::_getGlPixelFormat(Format format)
@@ -333,6 +333,7 @@ void GLRenderer::debugCallback(GLenum source, GLenum type, GLuint id, GLenum sev
 #define CASE(NAME, COUNT, TYPE, NORMALIZED) \
         case Format::NAME: do { VertexAttributeFormat result = {COUNT, TYPE, NORMALIZED}; return result; } while (0)
 
+        CASE(RGBA_Float32, 4, GL_FLOAT, GL_FALSE);
         CASE(RGB_Float32, 3, GL_FLOAT, GL_FALSE);
         CASE(RG_Float32, 2, GL_FLOAT, GL_FALSE);
         CASE(R_Float32, 1, GL_FLOAT, GL_FALSE);
@@ -893,11 +894,6 @@ void GLRenderer::setShaderProgram(ShaderProgram* programIn)
 	m_boundShaderProgram = program;
     GLuint programID = program ? program->m_id : 0;
 	glUseProgram(programID);
-}
-
-void GLRenderer::setConstantBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* offsets) 
-{
-    bindBufferImpl(GL_UNIFORM_BUFFER, startSlot, slotCount, buffers, offsets);
 }
 
 void GLRenderer::draw(UInt vertexCount, UInt startVertex = 0) 

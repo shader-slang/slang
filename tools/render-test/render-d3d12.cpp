@@ -73,11 +73,11 @@ public:
     virtual void setBindingState(BindingState* state);
     virtual void setVertexBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* strides, const UInt* offsets) override;
     virtual void setShaderProgram(ShaderProgram* inProgram) override;
-    virtual void setConstantBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* offsets) override;
     virtual void draw(UInt vertexCount, UInt startVertex) override;
     virtual void dispatchCompute(int x, int y, int z) override;
     virtual void submitGpuWork() override;
     virtual void waitForGpu() override;
+    virtual RendererType getRendererType() const override { return RendererType::DirectX12; }
 
     // ShaderCompiler implementation
     virtual ShaderProgram* compileProgram(const ShaderCompileRequest& request) override;
@@ -88,12 +88,6 @@ protected:
     static const Int kMaxNumRenderFrames = 4;
     static const Int kMaxNumRenderTargets = 3;
     
-    enum class ProgramType
-    {
-        Compute,
-        Graphics,
-    };
-
     struct Submitter
     {
         virtual void setRootConstantBufferView(int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation) = 0;
@@ -115,7 +109,7 @@ protected:
     class ShaderProgramImpl: public ShaderProgram
     {
         public:
-        ProgramType m_programType;
+        PipelineType m_pipelineType; 
         List<uint8_t> m_vertexShader;
         List<uint8_t> m_pixelShader;
         List<uint8_t> m_computeShader;
@@ -350,7 +344,7 @@ protected:
     Result _bindRenderState(RenderState* renderState, ID3D12GraphicsCommandList* commandList, Submitter* submitter);
     
     Result _calcBindParameters(BindParameters& params);
-    RenderState* findRenderState(ProgramType programType);
+    RenderState* findRenderState(PipelineType pipelineType);
 
     PFN_D3D12_SERIALIZE_ROOT_SIGNATURE m_D3D12SerializeRootSignature = nullptr;
 
@@ -359,7 +353,6 @@ protected:
     int m_commandListOpenCount = 0;            ///< If >0 the command list should be open
 
     List<BoundVertexBuffer> m_boundVertexBuffers;
-    List<RefPtr<BufferResourceImpl> > m_boundConstantBuffers;
 
     RefPtr<ShaderProgramImpl> m_boundShaderProgram;
     RefPtr<InputLayoutImpl> m_boundInputLayout;
@@ -971,11 +964,11 @@ Result D3D12Renderer::calcGraphicsPipelineState(ComPtr<ID3D12RootSignature>& sig
     return SLANG_OK;
 }
 
-D3D12Renderer::RenderState* D3D12Renderer::findRenderState(ProgramType programType)
+D3D12Renderer::RenderState* D3D12Renderer::findRenderState(PipelineType pipelineType)
 {
-    switch (programType)
+    switch (pipelineType)
     {
-        case ProgramType::Compute:
+        case PipelineType::Compute:
         {
             // Check if current state is a match
             if (m_currentRenderState)
@@ -999,7 +992,7 @@ D3D12Renderer::RenderState* D3D12Renderer::findRenderState(ProgramType programTy
             }
             break;
         }
-        case ProgramType::Graphics:
+        case PipelineType::Graphics:
         {
             if (m_currentRenderState)
             {
@@ -1040,7 +1033,7 @@ D3D12Renderer::RenderState* D3D12Renderer::calcRenderState()
     {
         return nullptr;
     }
-    m_currentRenderState = findRenderState(m_boundShaderProgram->m_programType);
+    m_currentRenderState = findRenderState(m_boundShaderProgram->m_pipelineType);
     if (m_currentRenderState)
     {
         return m_currentRenderState;
@@ -1049,9 +1042,9 @@ D3D12Renderer::RenderState* D3D12Renderer::calcRenderState()
     ComPtr<ID3D12RootSignature> rootSignature;
     ComPtr<ID3D12PipelineState> pipelineState;
 
-    switch (m_boundShaderProgram->m_programType)
+    switch (m_boundShaderProgram->m_pipelineType)
     {
-        case ProgramType::Compute:
+        case PipelineType::Compute:
         {
             if (SLANG_FAILED(calcComputePipelineState(rootSignature, pipelineState)))
             {
@@ -1059,7 +1052,7 @@ D3D12Renderer::RenderState* D3D12Renderer::calcRenderState()
             }
             break;
         }
-        case ProgramType::Graphics:
+        case PipelineType::Graphics:
         {
             if (SLANG_FAILED(calcGraphicsPipelineState(rootSignature, pipelineState)))
             {
@@ -1170,28 +1163,6 @@ Result D3D12Renderer::_calcBindParameters(BindParameters& params)
         }
     }
 
-#if 1
-    // Okay we need to try and create a render state
-    for (int i = 0; i < int(m_boundConstantBuffers.Count()); i++)
-    {
-        const BufferResourceImpl* buffer = m_boundConstantBuffers[i];
-        if (buffer)
-        {
-            assert(buffer->m_backingStyle == BufferResourceImpl::BackingStyle::MemoryBacked);
-
-            D3D12_ROOT_PARAMETER& param = params.nextParameter();
-            param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-            param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-
-            D3D12_ROOT_DESCRIPTOR& descriptor = param.Descriptor;
-            descriptor.ShaderRegister = numConstantBuffers;
-            descriptor.RegisterSpace = 0;
-
-            numConstantBuffers++;
-        }
-    }
-#endif
-
     // All the samplers are in one continuous section of the sampler heap
     if (m_boundBindingState && m_boundBindingState->m_samplerHeap.getUsedSize() > 0)
     {
@@ -1273,17 +1244,6 @@ Result D3D12Renderer::_bindRenderState(RenderState* renderState, ID3D12GraphicsC
                     {
                         submitter->setRootDescriptorTable(index++, heap.getGpuHandle(detail.m_uavIndex));
                     }
-                }
-            }
-
-            // Okay we need to try and create a render state
-            for (int i = 0; i < int(m_boundConstantBuffers.Count()); i++)
-            {
-                const BufferResourceImpl* buffer = m_boundConstantBuffers[i];
-                if (buffer)
-                {
-                    buffer->bindConstantBufferView(m_circularResourceHeap, index++, submitter);
-                    numConstantBuffers++;
                 }
             }
         }
@@ -2275,27 +2235,6 @@ void D3D12Renderer::setShaderProgram(ShaderProgram* inProgram)
     m_boundShaderProgram = static_cast<ShaderProgramImpl*>(inProgram);
 }
 
-void D3D12Renderer::setConstantBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* offsets)
-{
-    {
-        const UInt num = startSlot + slotCount;
-        if (num > m_boundConstantBuffers.Count())
-        {
-            m_boundConstantBuffers.SetSize(num);
-        }
-    }
-
-    for (UInt i = 0; i < slotCount; i++)
-    {
-        BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(buffers[i]);
-        if (buffer)
-        {
-            assert(buffer->m_initialUsage == Resource::Usage::ConstantBuffer); 
-        }
-        m_boundConstantBuffers[startSlot + i] = buffer;
-    }
-}
-
 void D3D12Renderer::draw(UInt vertexCount, UInt startVertex)
 {
     ID3D12GraphicsCommandList* commandList = m_commandList;
@@ -2527,7 +2466,7 @@ ShaderProgram* D3D12Renderer::compileProgram(const ShaderCompileRequest& request
 
     if (request.computeShader.name)
     {
-        program->m_programType = ProgramType::Compute;
+        program->m_pipelineType = PipelineType::Compute;
         ComPtr<ID3DBlob> computeShaderBlob;
         SLANG_RETURN_NULL_ON_FAIL(D3DUtil::compileHLSLShader(request.computeShader.source.path, request.computeShader.source.dataBegin, request.computeShader.name, request.computeShader.profile, computeShaderBlob));
 
@@ -2535,7 +2474,7 @@ ShaderProgram* D3D12Renderer::compileProgram(const ShaderCompileRequest& request
     }
     else
     {
-        program->m_programType = ProgramType::Graphics;
+        program->m_pipelineType = PipelineType::Graphics;
         ComPtr<ID3DBlob> vertexShaderBlob, fragmentShaderBlob;
         SLANG_RETURN_NULL_ON_FAIL(D3DUtil::compileHLSLShader(request.vertexShader.source.path, request.vertexShader.source.dataBegin, request.vertexShader.name, request.vertexShader.profile, vertexShaderBlob));
         SLANG_RETURN_NULL_ON_FAIL(D3DUtil::compileHLSLShader(request.fragmentShader.source.path, request.fragmentShader.source.dataBegin, request.fragmentShader.name, request.fragmentShader.profile, fragmentShaderBlob));

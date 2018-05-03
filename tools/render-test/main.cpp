@@ -103,26 +103,41 @@ SlangResult RenderTestApp::initialize(Renderer* renderer, ShaderCompiler* shader
 
 	m_renderer = renderer;
 
+    // TODO(tfoley): use each API's reflection interface to query the constant-buffer size needed
+    {
+        m_constantBufferSize = 16 * sizeof(float);
+
+        BufferResource::Desc constantBufferDesc;
+        constantBufferDesc.init(m_constantBufferSize);
+        constantBufferDesc.cpuAccessFlags = Resource::AccessFlag::Write;
+
+        m_constantBuffer = renderer->createBufferResource(Resource::Usage::ConstantBuffer, constantBufferDesc);
+        if (!m_constantBuffer)
+            return SLANG_FAIL;
+    }
+
     {
         BindingState::Desc bindingStateDesc;
         SLANG_RETURN_ON_FAIL(ShaderRendererUtil::createBindingStateDesc(m_shaderInputLayout, m_renderer, bindingStateDesc));
+
+        //! Hack -> if bindings are specified, just set up the constant buffer binding
+        // Should probably be more sophisticated than this - with 'dynamic' constant buffer/s binding always being specified
+        // in the test file 
+
+        if ((gOptions.shaderType == Options::ShaderProgramType::Graphics || gOptions.shaderType == Options::ShaderProgramType::GraphicsCompute)
+            && bindingStateDesc.findBindingIndex(Resource::BindFlag::ConstantBuffer, -1, 0) < 0)
+        {
+            BindingState::ShaderBindSet shaderBindSet;
+            shaderBindSet.setAll(bindingStateDesc.makeCompactSlice(0));
+
+            bindingStateDesc.addResource(BindingType::Buffer, m_constantBuffer, shaderBindSet);
+        }
 
         m_bindingState = m_renderer->createBindingState(bindingStateDesc);
     }
 
     // Do other initialization that doesn't depend on the source language.
 
-    // TODO(tfoley): use each API's reflection interface to query the constant-buffer size needed
-    m_constantBufferSize = 16 * sizeof(float);
-
-    BufferResource::Desc constantBufferDesc;
-    constantBufferDesc.init(m_constantBufferSize);
-    constantBufferDesc.cpuAccessFlags = Resource::AccessFlag::Write;
-
-    m_constantBuffer = renderer->createBufferResource(Resource::Usage::ConstantBuffer, constantBufferDesc);
-    if(!m_constantBuffer)
-        return SLANG_FAIL;
-		
     // Input Assembler (IA)
 
     const InputElementDesc inputElements[] = {
@@ -177,7 +192,7 @@ Result RenderTestApp::initializeShaders(ShaderCompiler* shaderCompiler)
 
 	ShaderCompileRequest compileRequest;
 	compileRequest.source = sourceInfo;
-	if (gOptions.shaderType == ShaderProgramType::Graphics || gOptions.shaderType == ShaderProgramType::GraphicsCompute)
+	if (gOptions.shaderType == Options::ShaderProgramType::Graphics || gOptions.shaderType == Options::ShaderProgramType::GraphicsCompute)
 	{
 		compileRequest.vertexShader.source = sourceInfo;
 		compileRequest.vertexShader.name = vertexEntryPointName;
@@ -207,13 +222,9 @@ void RenderTestApp::renderFrame()
     auto mappedData = m_renderer->map(m_constantBuffer, MapFlavor::WriteDiscard);
     if(mappedData)
     {
-        static const float kIdentity[] =
-        { 1, 0, 0, 0,
-          0, 1, 0, 0,
-          0, 0, 1, 0,
-          0, 0, 0, 1 };
-        memcpy(mappedData, kIdentity, sizeof(kIdentity));
-
+        const ProjectionStyle projectionStyle = RendererUtil::getProjectionStyle(m_renderer->getRendererType());
+        RendererUtil::getIdentityProjection(projectionStyle, (float*)mappedData);
+        
 		m_renderer->unmap(m_constantBuffer);
     }
 
@@ -228,7 +239,6 @@ void RenderTestApp::renderFrame()
     // Pixel Shader (PS)
 
 	m_renderer->setShaderProgram(m_shaderProgram);
-	m_renderer->setConstantBuffer(0, m_constantBuffer);
 	m_renderer->setBindingState(m_bindingState);
     //
 
@@ -389,27 +399,27 @@ SlangResult innerMain(int argc, char** argv)
 
 	SlangSourceLanguage nativeLanguage = SLANG_SOURCE_LANGUAGE_UNKNOWN;
 	SlangCompileTarget slangTarget = SLANG_TARGET_NONE;
-	switch (gOptions.rendererID)
+	switch (gOptions.rendererType)
 	{
-		case RendererID::D3D11:
+		case RendererType::DirectX11:
 			renderer = createD3D11Renderer();
 			slangTarget = SLANG_HLSL;
 			nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
 			break;
 
-		case RendererID::D3D12:
+		case RendererType::DirectX12:
 			renderer = createD3D12Renderer();
 			slangTarget = SLANG_HLSL;
 			nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
 			break;
 
-		case RendererID::GL:
+		case RendererType::OpenGl:
 			renderer = createGLRenderer();
 			slangTarget = SLANG_GLSL;
 			nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;
 			break;
 
-		case RendererID::VK:
+		case RendererType::Vulkan:
 			renderer = createVKRenderer();
 			slangTarget = SLANG_SPIRV;
 			nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;
@@ -425,11 +435,11 @@ SlangResult innerMain(int argc, char** argv)
 	auto shaderCompiler = renderer->getShaderCompiler();
 	switch (gOptions.inputLanguageID)
 	{
-		case InputLanguageID::Slang:
+		case Options::InputLanguageID::Slang:
 			shaderCompiler = createSlangShaderCompiler(shaderCompiler, SLANG_SOURCE_LANGUAGE_SLANG, slangTarget);
 			break;
 
-		case InputLanguageID::NativeRewrite:
+		case Options::InputLanguageID::NativeRewrite:
 			shaderCompiler = createSlangShaderCompiler(shaderCompiler, nativeLanguage, slangTarget);
 			break;
 
@@ -464,7 +474,7 @@ SlangResult innerMain(int argc, char** argv)
 			else
 			{
 				// Whenever we don't have Windows events to process, we render a frame.
-				if (gOptions.shaderType == ShaderProgramType::Compute)
+				if (gOptions.shaderType == Options::ShaderProgramType::Compute)
 				{
 					app.runCompute();
 				}
@@ -484,7 +494,7 @@ SlangResult innerMain(int argc, char** argv)
                     // Wait until everything is complete
                     renderer->waitForGpu();
 
-					if (gOptions.shaderType == ShaderProgramType::Compute || gOptions.shaderType == ShaderProgramType::GraphicsCompute)
+					if (gOptions.shaderType == Options::ShaderProgramType::Compute || gOptions.shaderType == Options::ShaderProgramType::GraphicsCompute)
                     {
                         SLANG_RETURN_ON_FAIL(app.writeBindingOutput(gOptions.outputPath));
                     }
