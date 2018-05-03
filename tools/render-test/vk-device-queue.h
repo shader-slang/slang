@@ -30,11 +30,10 @@ struct VulkanDeviceQueue
         /// Blocks until all work submitted to GPU has completed
     void waitForIdle() { m_api->vkQueueWaitIdle(m_queue); }
 
-        /// Set the graphics queue index (as set on init)
+        /// Get the graphics queue index (as set on init)
     int getQueueIndex() const { return m_queueIndex; }
 
-
-        /// Make the specified event 'current' - meaning it's semaphone must be waited on
+        /// Make the specified event 'current' - meaning it's semaphore must be waited on
     VkSemaphore makeCurrent(EventType eventType);
         /// Makes the event no longer required to be waited on
     void makeCompleted(EventType eventType);
