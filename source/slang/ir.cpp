@@ -4713,6 +4713,14 @@ namespace Slang
                 }
                 break;
 
+            case kIRDecorationOp_NameHint:
+                {
+                    auto originalDecoration = (IRNameHintDecoration*)dd;
+                    auto newDecoration = context->builder->addDecoration<IRNameHintDecoration>(clonedValue);
+                    newDecoration->name = originalDecoration->name;
+                }
+                break;
+
             default:
                 // Don't clone any decorations we don't understand.
                 break;

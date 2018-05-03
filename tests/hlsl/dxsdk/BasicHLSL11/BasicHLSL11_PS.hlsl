@@ -1,11 +1,11 @@
 //TEST:COMPARE_HLSL:-no-mangle -target dxbc-assembly -profile ps_4_0 -entry PSMain
 
 #ifndef __SLANG__
-#define cbPerFrame _SV031SLANG_parameterGroup_cbPerFrame
-#define g_vLightDir _SV031SLANG_ParameterGroup_cbPerFrame11g_vLightDir
-#define g_fAmbient _SV031SLANG_ParameterGroup_cbPerFrame10g_fAmbient
-#define g_samLinear _SV011g_samLinear
-#define g_txDiffuse _SV011g_txDiffuse
+#define cbPerFrame cbPerFrame_0
+#define g_vLightDir g_vLightDir_0
+#define g_fAmbient g_fAmbient_0
+#define g_samLinear g_samLinear_0
+#define g_txDiffuse g_txDiffuse_0
 #endif
 
 //--------------------------------------------------------------------------------------

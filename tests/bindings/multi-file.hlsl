@@ -11,34 +11,34 @@
 #else
 #define R(X) X
 
-#define sharedC     _SV028SLANG_parameterGroup_sharedC
-#define sharedCA    _SV028SLANG_ParameterGroup_sharedC8sharedCA
-#define sharedCB    _SV028SLANG_ParameterGroup_sharedC8sharedCB
-#define sharedCC    _SV028SLANG_ParameterGroup_sharedC8sharedCC
-#define sharedCD    _SV028SLANG_ParameterGroup_sharedC8sharedCD
+#define sharedC     sharedC_0
+#define sharedCA    sharedCA_0
+#define sharedCB    sharedCB_0
+#define sharedCC    sharedCC_0
+#define sharedCD    sharedCD_0
 
-#define vertexC     _SV028SLANG_parameterGroup_vertexC
-#define vertexCA    _SV028SLANG_ParameterGroup_vertexC8vertexCA
-#define vertexCB    _SV028SLANG_ParameterGroup_vertexC8vertexCB
-#define vertexCC    _SV028SLANG_ParameterGroup_vertexC8vertexCC
-#define vertexCD    _SV028SLANG_ParameterGroup_vertexC8vertexCD
+#define vertexC     vertexC_0
+#define vertexCA    vertexCA_0
+#define vertexCB    vertexCB_0
+#define vertexCC    vertexCC_0
+#define vertexCD    vertexCD_0
 
-#define fragmentC   _SV030SLANG_parameterGroup_fragmentC
-#define fragmentCA  _SV030SLANG_ParameterGroup_fragmentC10fragmentCA
-#define fragmentCB  _SV030SLANG_ParameterGroup_fragmentC10fragmentCB
-#define fragmentCC  _SV030SLANG_ParameterGroup_fragmentC10fragmentCC
-#define fragmentCD  _SV030SLANG_ParameterGroup_fragmentC10fragmentCD
+#define fragmentC   fragmentC_0
+#define fragmentCA  fragmentCA_0
+#define fragmentCB  fragmentCB_0
+#define fragmentCC  fragmentCC_0
+#define fragmentCD  fragmentCD_0
 
-#define sharedS     _SV07sharedS
-#define sharedT     _SV07sharedT
-#define sharedTV    _SV08sharedTV
-#define sharedTF    _SV08sharedTF
+#define sharedS     sharedS_0
+#define sharedT     sharedT_0
+#define sharedTV    sharedTV_0
+#define sharedTF    sharedTF_0
 
-#define vertexS     _SV07vertexS
-#define vertexT     _SV07vertexT
+#define vertexS     vertexS_0
+#define vertexT     vertexT_0
 
-#define fragmentS     _SV09fragmentS
-#define fragmentT     _SV09fragmentT
+#define fragmentS     fragmentS_0
+#define fragmentT     fragmentT_0
 
 #endif
 

@@ -3,7 +3,7 @@
 // Check output for `[allow_uav_conditional]`
 
 #ifndef __SLANG__
-#define gBuffer _SV07gBuffer
+#define gBuffer gBuffer_0
 #endif
 
 RWStructuredBuffer<uint> gBuffer : register(u0);

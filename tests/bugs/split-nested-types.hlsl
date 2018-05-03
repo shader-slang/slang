@@ -4,18 +4,18 @@
 import split_nested_types;
 #else
 
-#define A _ST01A
-#define x _SV01A1x
+#define A A_0
+#define x x_0
 
-#define B _ST01B
-#define y _SV01B1y
+#define B B_0
+#define y y_0
 
-#define M _ST01M
-#define a _SV01M1a
-#define b _SV01M1b
+#define M M_0
+#define a a_0
+#define b b_0
 
-#define C _SV022SLANG_parameterGroup_CL0
-#define m _SV022SLANG_ParameterGroup_C1m
+#define C C_0
+#define m m_0
 
 struct A { int x; };
 

@@ -341,6 +341,11 @@ struct TupleTypeBuilder
             ordinaryStructType->sourceLoc = originalStructType->sourceLoc;
             ordinaryStructType->mangledName = originalStructType->mangledName;
 
+            if(auto nameHintDecoration = originalStructType->findDecoration<IRNameHintDecoration>())
+            {
+                builder->addDecoration<IRNameHintDecoration>(ordinaryStructType)->name = nameHintDecoration->name;
+            }
+
             // The new struct type will appear right after the original in the IR,
             // so that we can be sure any instruction that could reference the
             // original can also reference the new one.

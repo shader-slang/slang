@@ -16,11 +16,11 @@
 #else
 #define R(X) X
 
-#define tB _SV02tB
-#define sB _SV02sB
+#define tB tB_0
+#define sB sB_0
 
-#define C1 _SV023SLANG_parameterGroup_C1
-#define c1 _SV023SLANG_ParameterGroup_C12c1
+#define C1 C1_0
+#define c1 c1_0
 
 #endif
 

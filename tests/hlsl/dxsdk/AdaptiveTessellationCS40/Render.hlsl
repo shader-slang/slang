@@ -1,8 +1,8 @@
 //TEST(smoke):COMPARE_HLSL:-no-mangle -profile vs_4_0 -entry RenderBaseVS -profile ps_4_0 -entry RenderPS -target dxbc-assembly
 
 #ifndef __SLANG__
-#define cbPerObject _SV032SLANG_parameterGroup_cbPerObject
-#define g_mWorldViewProjection _SV032SLANG_ParameterGroup_cbPerObject22g_mWorldViewProjection
+#define cbPerObject cbPerObject_0
+#define g_mWorldViewProjection g_mWorldViewProjection_0
 #endif
 
 

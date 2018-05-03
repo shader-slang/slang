@@ -121,6 +121,17 @@ struct IRInterpolationModeDecoration : IRDecoration
     IRInterpolationMode mode;
 };
 
+/// A decoration that provides a desired name to be used
+/// in conjunction with the given instruction. Back-end
+/// code generation may use this to help derive symbol
+/// names, emit debug information, etc.
+struct IRNameHintDecoration : IRDecoration
+{
+    enum { kDecorationOp = kIRDecorationOp_NameHint };
+
+    Name* name;
+};
+
 //
 
 // An IR node to represent a reference to an AST-level

@@ -125,6 +125,7 @@ enum IRDecorationOp : uint16_t
     kIRDecorationOp_GLSLOuterArray,
     kIRDecorationOp_Semantic,
     kIRDecorationOp_InterpolationMode,
+    kIRDecorationOp_NameHint,
 };
 
 // represents an object allocated in an IR memory pool

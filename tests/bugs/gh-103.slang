@@ -3,9 +3,9 @@
 // Ensure that matrix-times-scalar works
 
 #ifndef __SLANG__
-#define C _SV022SLANG_parameterGroup_C
-#define a _SV022SLANG_ParameterGroup_C1a
-#define b _SV022SLANG_ParameterGroup_C1b
+#define C C_0
+#define a a_0
+#define b b_0
 #endif
 
 float4x4 doIt(float4x4 a, float b)

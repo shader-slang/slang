@@ -1,8 +1,8 @@
 //TEST:COMPARE_HLSL: -target dxbc-assembly -profile vs_4_0 -entry VSMain -profile ps_4_0 -entry PSMain
 
 #ifndef __SLANG__
-#define cbPerObject _SV032SLANG_parameterGroup_cbPerObject
-#define g_mWorldViewProjection _SV032SLANG_ParameterGroup_cbPerObject22g_mWorldViewProjection
+#define cbPerObject cbPerObject_0
+#define g_mWorldViewProjection g_mWorldViewProjection_0
 #endif
 
 //--------------------------------------------------------------------------------------
