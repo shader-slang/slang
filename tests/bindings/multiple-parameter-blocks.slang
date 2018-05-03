@@ -29,20 +29,20 @@ float4 main(float v : V) : SV_Target
 
 #else
 
-Texture2D _SV01pL0 : register(t0, space0);
-Texture2D _SV01pL1[4] : register(t1, space0);
-SamplerState _SV01pL2 : register(s0, space0);
+Texture2D p_t_0 : register(t0, space0);
+Texture2D p_ta_0[4] : register(t1, space0);
+SamplerState p_s_0 : register(s0, space0);
 
-Texture2D _SV02p1L0 : register(t0, space1);
-Texture2D _SV02p1L1[4] : register(t1, space1);
-SamplerState _SV02p1L2 : register(s0, space1);
+Texture2D p1_t_0 : register(t0, space1);
+Texture2D p1_ta_0[4] : register(t1, space1);
+SamplerState p1_s_0 : register(s0, space1);
 
 float4 main(float v : V) : SV_TARGET
 {
-	return use(_SV01pL0,          _SV01pL2)
-		 + use(_SV01pL1[int(v)],  _SV01pL2)
-		 + use(_SV02p1L0,         _SV02p1L2)
-		 + use(_SV02p1L1[int(v)], _SV02p1L2);
+	return use(p_t_0,         	p_s_0)
+		 + use(p_ta_0[int(v)],  p_s_0)
+		 + use(p1_t_0,         	p1_s_0)
+		 + use(p1_ta_0[int(v)], p1_s_0);
 }
 
 #endif

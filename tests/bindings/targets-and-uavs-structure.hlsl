@@ -8,9 +8,9 @@
 #else
 #define R(X) X
 
-#define Foo _ST03Foo
-#define v _SV03Foo1v
-#define fooBuffer _SV09fooBuffer
+#define Foo Foo_0
+#define v v_0
+#define fooBuffer fooBuffer_0
 
 #endif
 

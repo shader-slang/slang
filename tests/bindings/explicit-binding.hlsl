@@ -8,22 +8,22 @@
 #else
 #define R(X) X
 
-#define CA _SV023SLANG_parameterGroup_CA
-#define ca _SV023SLANG_ParameterGroup_CA2ca
+#define CA CA_0
+#define ca ca_0
 
-#define CB _SV023SLANG_parameterGroup_CB
-#define cb _SV023SLANG_ParameterGroup_CB2cb
+#define CB CB_0
+#define cb cb_0
 
-#define CC _SV023SLANG_parameterGroup_CC
-#define cc _SV023SLANG_ParameterGroup_CC2cc
+#define CC CC_0
+#define cc cc_0
 
-#define sa _SV02sa
-#define sb _SV02sb
-#define sc _SV02sc
+#define sa sa_0
+#define sb sb_0
+#define sc sc_0
 
-#define ta _SV02ta
-#define tb _SV02tb
-#define tc _SV02tc
+#define ta ta_0
+#define tb tb_0
+#define tc tc_0
 
 #endif
 

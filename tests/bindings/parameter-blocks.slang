@@ -26,9 +26,9 @@ float4 main(float v : V) : SV_Target
 
 #else
 
-#define t _SV01pL0
-#define ta _SV01pL1
-#define s _SV01pL2
+#define t p_t_0
+#define ta p_ta_0
+#define s p_s_0
 
 Texture2D t : register(t0, space0);
 Texture2D ta[4] : register(t1, space0);

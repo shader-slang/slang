@@ -445,6 +445,7 @@ namespace Slang
         char const*     text,
         CodeGenTarget   target);
 
+    struct TypeCheckingCache;
     //
 
     class Session
@@ -535,6 +536,10 @@ namespace Slang
 
         Dictionary<Name*, SyntaxClass<RefObject> > mapNameToSyntaxClass;
 
+        // cache used by type checking, implemented in check.cpp
+        TypeCheckingCache* typeCheckingCache = nullptr;
+        TypeCheckingCache* getTypeCheckingCache();
+        void destroyTypeCheckingCache();
         //
 
         Session();

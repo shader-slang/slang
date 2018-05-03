@@ -3,13 +3,13 @@
 // Ensure declaration order in output is correct
 
 #ifndef __SLANG__
-#define A _ST01A
-#define x _SV01A1x
-#define B _ST01B
-#define y _SV01B1y
-#define C _SV022SLANG_parameterGroup_CL0
-#define a _SV022SLANG_ParameterGroup_C1a
-#define b _SV022SLANG_ParameterGroup_C1b
+#define A A_0
+#define x x_0
+#define B B_0
+#define y y_0
+#define C C_0
+#define a a_0
+#define b b_0
 #endif
 
 struct A

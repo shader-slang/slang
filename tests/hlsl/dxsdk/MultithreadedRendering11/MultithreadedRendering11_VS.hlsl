@@ -1,10 +1,10 @@
 //TEST:COMPARE_HLSL: -target dxbc-assembly -profile vs_4_0 -entry VSMain
 
 #ifndef __SLANG__
-#define cbPerObject _SV032SLANG_parameterGroup_cbPerObject
-#define g_mWorld _SV032SLANG_ParameterGroup_cbPerObject8g_mWorld
-#define cbPerScene _SV031SLANG_parameterGroup_cbPerScene
-#define g_mViewProj _SV031SLANG_ParameterGroup_cbPerScene11g_mViewProj
+#define cbPerObject cbPerObject_0
+#define g_mWorld g_mWorld_0
+#define cbPerScene cbPerScene_0
+#define g_mViewProj g_mViewProj_0
 #endif
 
 //--------------------------------------------------------------------------------------
@@ -23,11 +23,11 @@
 //--------------------------------------------------------------------------------------
 cbuffer cbPerObject : register( b0 )
 {
-	matrix		g_mWorld	: packoffset( c0 );
+	matrix		g_mWorld	;//SLANG: : packoffset( c0 );
 };
 cbuffer cbPerScene : register( b1 )
 {
-	matrix		g_mViewProj	: packoffset( c0 );
+	matrix		g_mViewProj	;//SLANG: : packoffset( c0 );
 };
 
 //--------------------------------------------------------------------------------------

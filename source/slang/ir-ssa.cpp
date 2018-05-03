@@ -350,6 +350,24 @@ IRInst* readVar(
     SSABlockInfo*           blockInfo,
     IRVar*                  var);
 
+/// Try to take any name hint on `var` and apply it to `val`.
+///
+/// Doesn't do anything if `val` already has a name hint,
+/// or if `var` doesn't have one to transfer over.
+///
+void maybeApplyNameHint(
+    ConstructSSAContext*    context,
+    IRVar*                  var,
+    IRInst*                 val)
+{
+    if( auto nameHint = var->findDecoration<IRNameHintDecoration>() )
+    {
+        if( !val->findDecoration<IRNameHintDecoration>() )
+        {
+            context->getBuilder()->addDecoration<IRNameHintDecoration>(val)->name = nameHint->name;
+        }
+    }
+}
 
 // Add a phi node to represent the given variable
 PhiInfo* addPhi(
@@ -365,6 +383,7 @@ PhiInfo* addPhi(
         valueType = context->getBuilder()->getRateQualifiedType(rate, valueType);
     }
     IRParam* phi = builder->createParam(valueType);
+    maybeApplyNameHint(context, var, phi);
 
     RefPtr<PhiInfo> phiInfo = new PhiInfo();
     context->phiInfos.Add(phi, phiInfo);
@@ -754,6 +773,8 @@ void processBlock(
                     // Look up the value in the context of this
                     // block.
                     auto val = readVar(context, blockInfo, var);
+
+                    maybeApplyNameHint(context, var, val);
 
                     val = applyAccessChain(context, &blockInfo->builder, ptrArg, val);
 

@@ -1,8 +1,8 @@
 //TEST(smoke):COMPARE_HLSL:-no-mangle -profile vs_4_0 -entry RenderBaseVS -profile ps_4_0 -entry RenderPS -target dxbc-assembly
 
 #ifndef __SLANG__
-#define cbPerObject _SV032SLANG_parameterGroup_cbPerObject
-#define g_mWorldViewProjection _SV032SLANG_ParameterGroup_cbPerObject22g_mWorldViewProjection
+#define cbPerObject cbPerObject_0
+#define g_mWorldViewProjection g_mWorldViewProjection_0
 #endif
 
 
@@ -15,7 +15,7 @@
 //--------------------------------------------------------------------------------------
 cbuffer cbPerObject : register( b0 )
 {
-    row_major matrix    g_mWorldViewProjection    : packoffset( c0 );
+    row_major matrix    g_mWorldViewProjection    ;//SLANG: : packoffset( c0 );
 }
 
 // The tessellated vertex structure

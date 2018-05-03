@@ -1,8 +1,8 @@
 //TEST:COMPARE_HLSL: -target dxbc-assembly -profile vs_4_0 -entry SceneVS
 
 #ifndef __SLANG__
-#define cbPerObject _SV032SLANG_parameterGroup_cbPerObject
-#define g_mWorldViewProjection _SV032SLANG_ParameterGroup_cbPerObject22g_mWorldViewProjection
+#define cbPerObject cbPerObject_0
+#define g_mWorldViewProjection g_mWorldViewProjection_0
 #endif
 
 //-----------------------------------------------------------------------------
@@ -16,7 +16,7 @@
 
 cbuffer cbPerObject : register( b0 )
 {
-    row_major matrix    g_mWorldViewProjection	: packoffset( c0 );
+    row_major matrix    g_mWorldViewProjection	;//SLANG: : packoffset( c0 );
 }
 
 struct SceneVS_Input

@@ -27,9 +27,9 @@ float4 main() : SV_Target
 
 #else
 
-#define a _SV04testL0
-#define b _SV04testL1
-#define s _SV01s
+#define a test_a_0
+#define b test_b_0
+#define s s_0
 
 Texture2D a[2];
 Texture2D b[2];

@@ -6,86 +6,34 @@
 
 #include "../../source/core/smart-pointer.h"
 
-#ifdef _WIN32
-#define VK_USE_PLATFORM_WIN32_KHR 1
-#endif
+#include "vk-api.h"
+#include "vk-util.h"
+#include "vk-device-queue.h"
+#include "vk-swap-chain.h"
 
-#define VK_NO_PROTOTYPES
-#include <vulkan/vulkan.h>
+// Vulkan has a different coordinate system to ogl
+// http://anki3d.org/vulkan-coordinate-system/
 
 #define ENABLE_VALIDATION_LAYER 1
 
-
 #ifdef _MSC_VER
-
-#include <stddef.h>
-
-#pragma warning(disable: 4996)
-
-#if (_MSC_VER < 1900)
-#define snprintf sprintf_s
+#   include <stddef.h>
+#   pragma warning(disable: 4996)
+#   if (_MSC_VER < 1900)
+#       define snprintf sprintf_s
+#   endif
 #endif
-#endif
-
-#define FOREACH_GLOBAL_PROC(M)          \
-    M(vkCreateInstance)                 \
-    /* */
-
-#define FOREACH_INSTANCE_PROC(M)                \
-    M(vkCreateDevice)                           \
-    M(vkCreateDebugReportCallbackEXT)           \
-    M(vkDestroyDebugReportCallbackEXT)          \
-    M(vkDebugReportMessageEXT)                  \
-    M(vkEnumeratePhysicalDevices)               \
-    M(vkGetPhysicalDeviceProperties)            \
-    M(vkGetPhysicalDeviceFeatures)              \
-    M(vkGetPhysicalDeviceMemoryProperties)      \
-    M(vkGetPhysicalDeviceQueueFamilyProperties) \
-    M(vkGetDeviceProcAddr)                      \
-    /* */
-
-#define FOREACH_DEVICE_PROC(M)          \
-    M(vkCreateDescriptorPool)           \
-    M(vkCreateCommandPool)              \
-    M(vkGetDeviceQueue)                 \
-    M(vkAllocateCommandBuffers)         \
-    M(vkBeginCommandBuffer)             \
-    M(vkEndCommandBuffer)               \
-    M(vkQueueSubmit)                    \
-    M(vkQueueWaitIdle)                  \
-    M(vkFreeCommandBuffers)             \
-    M(vkCreateBuffer)                   \
-    M(vkGetBufferMemoryRequirements)    \
-    M(vkAllocateMemory)                 \
-    M(vkBindBufferMemory)               \
-    M(vkMapMemory)                      \
-    M(vkUnmapMemory)                    \
-    M(vkCmdCopyBuffer)                  \
-    M(vkDestroyBuffer)                  \
-    M(vkFreeMemory)                     \
-    M(vkCreateDescriptorSetLayout)      \
-    M(vkAllocateDescriptorSets)         \
-    M(vkUpdateDescriptorSets)           \
-    M(vkCreatePipelineLayout)           \
-    M(vkCreateComputePipelines)         \
-    M(vkCmdBindPipeline)                \
-    M(vkCmdBindDescriptorSets)          \
-    M(vkCmdDispatch)                    \
-    M(vkDestroyPipeline)                \
-    M(vkCreateShaderModule)             \
-    /* */
-
 
 namespace renderer_test {
 using namespace Slang;
 
-#define RETURN_ON_VK_FAIL(x) { VkResult _vkRes = x; if (_vkRes != VK_SUCCESS) { SLANG_RETURN_ON_FAIL(toSlangResult(_vkRes)); }}
-
 class VKRenderer : public Renderer, public ShaderCompiler
 {
 public:
+    enum { kMaxRenderTargets = 8, kMaxAttachments = kMaxRenderTargets + 1 };
+    
     // Renderer    implementation
-    virtual SlangResult initialize(void* inWindowHandle) override;
+    virtual SlangResult initialize(const Desc& desc, void* inWindowHandle) override;
     virtual void setClearColor(const float color[4]) override;
     virtual void clearFrame() override;
     virtual void presentFrame() override;
@@ -102,44 +50,56 @@ public:
     virtual void setBindingState(BindingState* state);
     virtual void setVertexBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* strides, const UInt* offsets) override;
     virtual void setShaderProgram(ShaderProgram* inProgram) override;
-    virtual void setConstantBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers,  const UInt* offsets) override;
     virtual void draw(UInt vertexCount, UInt startVertex) override;
     virtual void dispatchCompute(int x, int y, int z) override;
-    virtual void submitGpuWork() override {}
-    virtual void waitForGpu() override {}
+    virtual void submitGpuWork() override;
+    virtual void waitForGpu() override;
+    virtual RendererType getRendererType() const override { return RendererType::Vulkan; }
 
     // ShaderCompiler implementation
     virtual ShaderProgram* compileProgram(const ShaderCompileRequest& request) override;
+
+        /// Dtor
+    ~VKRenderer();
 
     protected:
 
     class Buffer
     {
         public:
-        
+            /// Initialize a buffer with specified size, and memory props 
+        Result init(const VulkanApi& api, size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties);
+
             /// Returns true if has been initialized
-        bool isInitialized() const { return m_renderer != nullptr; }
+        bool isInitialized() const { return m_api != nullptr; }
         
             // Default Ctor
         Buffer():
-            m_renderer(nullptr)
+            m_api(nullptr)
         {}
 
             /// Dtor
         ~Buffer()
         {
-            if (m_renderer)
+            if (m_api)
             {
-                m_renderer->vkDestroyBuffer(m_renderer->m_device, m_buffer, nullptr);
-                m_renderer->vkFreeMemory(m_renderer->m_device, m_memory, nullptr);
+                m_api->vkDestroyBuffer(m_api->m_device, m_buffer, nullptr);
+                m_api->vkFreeMemory(m_api->m_device, m_memory, nullptr);
             }
         }
 
         VkBuffer m_buffer;
         VkDeviceMemory m_memory;
-        VKRenderer* m_renderer;
+        const VulkanApi* m_api;
     };
     
+    class InputLayoutImpl : public InputLayout
+    {
+    public:
+        List<VkVertexInputAttributeDescription> m_vertexDescs;
+        int m_vertexSize;
+    };
+
     class BufferResourceImpl: public BufferResource
     {
 		public:
@@ -165,6 +125,12 @@ public:
 	class ShaderProgramImpl: public ShaderProgram
     {
 		public:
+
+        ShaderProgramImpl(PipelineType pipelineType):
+            m_pipelineType(pipelineType)
+        {}
+
+        PipelineType m_pipelineType;
 
         VkPipelineShaderStageCreateInfo m_compute;
         VkPipelineShaderStageCreateInfo m_vertex;
@@ -195,69 +161,558 @@ public:
 		VKRenderer* m_renderer;
         List<BindingDetail> m_bindingDetails;
     };
-    
-	class InputLayoutImpl: public InputLayout
+
+    struct BoundVertexBuffer
     {
-		public:
+        RefPtr<BufferResourceImpl> m_buffer;
+        int m_stride;
+        int m_offset;
+    };
+
+    class Pipeline : public RefObject
+    {
+    public:
+        Pipeline(const VulkanApi& api):
+            m_api(&api)
+        {
+        }
+        ~Pipeline()
+        {
+            if (m_pipeline != VK_NULL_HANDLE)
+            {
+                m_api->vkDestroyPipeline(m_api->m_device, m_pipeline, nullptr);
+            }
+            if (m_descriptorPool != VK_NULL_HANDLE)
+            {
+                m_api->vkDestroyDescriptorPool(m_api->m_device, m_descriptorPool, nullptr);
+            }
+            if (m_pipelineLayout != VK_NULL_HANDLE)
+            {
+                m_api->vkDestroyPipelineLayout(m_api->m_device, m_pipelineLayout, nullptr);
+            }
+            if(m_descriptorSetLayout != VK_NULL_HANDLE)
+            {
+                m_api->vkDestroyDescriptorSetLayout(m_api->m_device, m_descriptorSetLayout, nullptr);
+            }
+        }
+
+        const VulkanApi* m_api;
+
+        VkPrimitiveTopology m_primitiveTopology;
+        RefPtr<BindingStateImpl> m_bindingState;
+        RefPtr<InputLayoutImpl> m_inputLayout;
+        RefPtr<ShaderProgramImpl> m_shaderProgram;
+
+        VkDescriptorSetLayout m_descriptorSetLayout = VK_NULL_HANDLE;
+        VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;
+        VkDescriptorPool m_descriptorPool = VK_NULL_HANDLE;
+        VkDescriptorSet m_descriptorSet = VK_NULL_HANDLE;
+        VkPipeline m_pipeline = VK_NULL_HANDLE;
     };
 
     VkBool32 handleDebugMessage(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t srcObject,
         size_t location, int32_t msgCode, const char* pLayerPrefix, const char* pMsg);
     
-    VkCommandBuffer getCommandBuffer();
-    VkCommandBuffer beginCommandBuffer();
-    void flushCommandBuffer(VkCommandBuffer commandBuffer);
-    
-    uint32_t getMemoryTypeIndex(uint32_t inTypeBits, VkMemoryPropertyFlags properties);
-
     VkPipelineShaderStageCreateInfo compileEntryPoint(const ShaderCompileRequest::EntryPoint& entryPointRequest, VkShaderStageFlagBits stage, List<char>& bufferOut);
 
-    SlangResult _initBuffer(size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties, Buffer& bufferOut);
-
-    static SlangResult toSlangResult(VkResult res);
-    static void checkResult(VkResult result);
     static VKAPI_ATTR VkBool32 VKAPI_CALL debugMessageCallback(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t srcObject,
         size_t location, int32_t msgCode, const char* pLayerPrefix, const char* pMsg, void* pUserData);
 
-    VkInstance                          m_instance;
-    VkPhysicalDevice                    m_physicalDevice;
-    VkPhysicalDeviceProperties          m_deviceProperties;
-    VkPhysicalDeviceFeatures            m_deviceFeatures;
-    VkPhysicalDeviceMemoryProperties    m_deviceMemoryProperties;
-    VkDevice                            m_device;
-    VkQueue                             m_queue;
-    VkCommandPool                       m_commandPool;
-    VkSubmitInfo                        m_submitInfo;
-    VkDebugReportCallbackEXT            m_debugReportCallback;
+        /// Returns true if m_currentPipeline matches the current configuration 
+    Pipeline* _getPipeline();
+    bool _isEqual(const Pipeline& pipeline) const;
+    Slang::Result _createPipeline(RefPtr<Pipeline>& pipelineOut);
+    void _beginRender();
+    void _endRender();
 
+    Slang::Result _beginPass();
+    void _endPass();
+
+    VkDebugReportCallbackEXT m_debugReportCallback;
+
+    RefPtr<InputLayoutImpl> m_currentInputLayout;
     RefPtr<BindingStateImpl> m_currentBindingState;
     RefPtr<ShaderProgramImpl> m_currentProgram;
 
-    float m_clearColor[4] = { 0, 0, 0, 0 };;
+    List<RefPtr<Pipeline> > m_pipelineCache;
+    Pipeline* m_currentPipeline = nullptr;
 
-#define DECLARE_PROC(NAME) PFN_##NAME NAME;
-    DECLARE_PROC(vkGetInstanceProcAddr);
-    FOREACH_GLOBAL_PROC(DECLARE_PROC)
-    FOREACH_INSTANCE_PROC(DECLARE_PROC)
-    FOREACH_DEVICE_PROC(DECLARE_PROC)
-#undef DECLARE_PROC
+    List<BoundVertexBuffer> m_boundVertexBuffers;
     
+    VkPrimitiveTopology m_primitiveTopology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+
+    VkDevice m_device = VK_NULL_HANDLE;
+
+    VulkanModule m_module;
+    VulkanApi m_api;
+
+    VulkanDeviceQueue m_deviceQueue;
+    VulkanSwapChain m_swapChain;
+
+    VkRenderPass m_renderPass = VK_NULL_HANDLE;
+
+    int m_swapChainImageIndex = -1;
+
+    float m_clearColor[4] = { 0, 0, 0, 0 };
+
+    Desc m_desc;
 };
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! VkRenderer::Buffer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+Result VKRenderer::Buffer::init(const VulkanApi& api, size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties)
+{
+    assert(!isInitialized());
+
+    m_api = &api;
+    m_memory = VK_NULL_HANDLE;
+    m_buffer = VK_NULL_HANDLE;
+
+    VkBufferCreateInfo bufferCreateInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+    bufferCreateInfo.size = bufferSize;
+    bufferCreateInfo.usage = usage;
+
+    SLANG_VK_CHECK(api.vkCreateBuffer(api.m_device, &bufferCreateInfo, nullptr, &m_buffer));
+
+    VkMemoryRequirements memoryReqs = {};
+    api.vkGetBufferMemoryRequirements(api.m_device, m_buffer, &memoryReqs);
+
+    int memoryTypeIndex = api.findMemoryTypeIndex(memoryReqs.memoryTypeBits, reqMemoryProperties);
+    assert(memoryTypeIndex >= 0);
+
+    VkMemoryPropertyFlags actualMemoryProperites = api.m_deviceMemoryProperties.memoryTypes[memoryTypeIndex].propertyFlags;
+
+    VkMemoryAllocateInfo allocateInfo = { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
+    allocateInfo.allocationSize = memoryReqs.size;
+    allocateInfo.memoryTypeIndex = memoryTypeIndex;
+
+    SLANG_VK_CHECK(api.vkAllocateMemory(api.m_device, &allocateInfo, nullptr, &m_memory));
+    SLANG_VK_CHECK(api.vkBindBufferMemory(api.m_device, m_buffer, m_memory, 0));
+
+    return SLANG_OK;
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! VkRenderer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+bool VKRenderer::_isEqual(const Pipeline& pipeline) const
+{
+    return 
+        pipeline.m_bindingState == m_currentBindingState &&
+        pipeline.m_primitiveTopology == m_primitiveTopology &&
+        pipeline.m_inputLayout == m_currentInputLayout &&
+        pipeline.m_shaderProgram == m_currentProgram;
+}
+
+VKRenderer::Pipeline* VKRenderer::_getPipeline()
+{
+    if (m_currentPipeline && _isEqual(*m_currentPipeline))
+    {
+        return m_currentPipeline;
+    }
+    
+    // Look for a match in the cache
+    for (int i = 0; i < int(m_pipelineCache.Count()); ++i)
+    {
+        Pipeline* pipeline = m_pipelineCache[i];
+        if (_isEqual(*pipeline))
+        {
+            m_currentPipeline = pipeline;
+            return pipeline;
+        }
+    }
+
+    RefPtr<Pipeline> pipeline;
+    SLANG_RETURN_NULL_ON_FAIL(_createPipeline(pipeline));
+    m_pipelineCache.Add(pipeline);
+    m_currentPipeline = pipeline;
+    return pipeline;
+}
+
+Slang::Result VKRenderer::_createPipeline(RefPtr<Pipeline>& pipelineOut)
+{
+    RefPtr<Pipeline> pipeline(new Pipeline(m_api));
+
+    // Initialize the state
+    pipeline->m_primitiveTopology = m_primitiveTopology;
+    pipeline->m_bindingState = m_currentBindingState;
+    pipeline->m_shaderProgram = m_currentProgram;
+    pipeline->m_inputLayout = m_currentInputLayout;
+
+    // Must be equal at this point if all the items are correctly set in pipeline
+    assert(_isEqual(*pipeline));
+
+    // First create a pipeline layout based on what is bound
+
+    const auto& srcDetails = m_currentBindingState->m_bindingDetails;
+    const auto& srcBindings = m_currentBindingState->getDesc().m_bindings;
+
+    const int numBindings = int(srcBindings.Count());
+
+    Slang::List<VkDescriptorSetLayoutBinding> dstBindings;
+    for (int i = 0; i < numBindings; ++i)
+    {
+        const auto& srcDetail = srcDetails[i];
+        const auto& srcBinding = srcBindings[i];
+
+        switch (srcBinding.bindingType)
+        {
+            case BindingType::Buffer:
+            {
+                BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(srcBinding.resource.Ptr());
+                const BufferResource::Desc& bufferResourceDesc = bufferResource->getDesc();
+
+                if (bufferResourceDesc.bindFlags & Resource::BindFlag::UnorderedAccess)
+                {
+                    VkDescriptorSetLayoutBinding dstBinding = {};
+                    dstBinding.binding = srcDetail.m_binding;
+                    dstBinding.descriptorCount = 1;
+                    dstBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                    dstBinding.stageFlags = VK_SHADER_STAGE_ALL;
+
+                    dstBindings.Add(dstBinding);
+                }
+                else if (bufferResourceDesc.bindFlags & Resource::BindFlag::ConstantBuffer)
+                {
+                    VkDescriptorSetLayoutBinding dstBinding = {};
+                    dstBinding.binding = srcDetail.m_binding;
+                    dstBinding.descriptorCount = 1;
+                    dstBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+                    dstBinding.stageFlags = VK_SHADER_STAGE_ALL;
+
+                    dstBindings.Add(dstBinding);
+                }
+
+                break;
+            }
+            default:
+                // TODO: handle the other cases
+                break;
+        }
+    }
+
+    VkDescriptorSetLayoutCreateInfo descriptorSetLayoutInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
+    descriptorSetLayoutInfo.bindingCount = uint32_t(dstBindings.Count());
+    descriptorSetLayoutInfo.pBindings = dstBindings.Buffer();
+
+    SLANG_VK_CHECK(m_api.vkCreateDescriptorSetLayout(m_device, &descriptorSetLayoutInfo, nullptr, &pipeline->m_descriptorSetLayout));
+
+    // Create a descriptor pool for allocating sets
+    VkDescriptorPoolSize poolSizes[] =
+    {
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 128 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 128 },
+        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 128 },
+    };
+
+    VkDescriptorPoolCreateInfo descriptorPoolInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
+    descriptorPoolInfo.maxSets = 128; // TODO: actually pick a size
+    descriptorPoolInfo.poolSizeCount = SLANG_COUNT_OF(poolSizes);
+    descriptorPoolInfo.pPoolSizes = poolSizes;
+
+    SLANG_VK_CHECK(m_api.vkCreateDescriptorPool(m_device, &descriptorPoolInfo, nullptr, &pipeline->m_descriptorPool));
+
+    // Create a descriptor set based on our layout
+
+    VkDescriptorSetAllocateInfo descriptorSetAllocInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+    descriptorSetAllocInfo.descriptorPool = pipeline->m_descriptorPool;
+    descriptorSetAllocInfo.descriptorSetCount = 1;
+    descriptorSetAllocInfo.pSetLayouts = &pipeline->m_descriptorSetLayout;
+
+    SLANG_VK_CHECK(m_api.vkAllocateDescriptorSets(m_device, &descriptorSetAllocInfo, &pipeline->m_descriptorSet));
+
+    // Fill in the descriptor set, using our binding information
+
+    int elementIndex = 0;
+
+    for (int i = 0; i < numBindings; ++i)
+    {
+        const auto& srcDetail = srcDetails[i];
+        const auto& srcBinding = srcBindings[i];
+
+        switch (srcBinding.bindingType)
+        {
+            case BindingType::Buffer:
+            {
+                BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(srcBinding.resource.Ptr());
+                const BufferResource::Desc& bufferResourceDesc = bufferResource->getDesc();
+
+                VkDescriptorBufferInfo bufferInfo;
+                bufferInfo.buffer = bufferResource->m_buffer.m_buffer;
+                bufferInfo.offset = 0;
+                bufferInfo.range = bufferResourceDesc.sizeInBytes;
+
+                VkWriteDescriptorSet writeInfo = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+                writeInfo.descriptorCount = 1;
+                
+                writeInfo.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                if (bufferResource->m_initialUsage == Resource::Usage::UnorderedAccess)
+                {
+                    writeInfo.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                }
+                else if (bufferResource->m_initialUsage == Resource::Usage::ConstantBuffer)
+                {
+                    writeInfo.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+                }
+
+                writeInfo.dstSet = pipeline->m_descriptorSet;
+                writeInfo.dstBinding = srcDetail.m_binding;
+                writeInfo.dstArrayElement = 0; 
+                writeInfo.pBufferInfo = &bufferInfo;
+
+                m_api.vkUpdateDescriptorSets(m_device, 1, &writeInfo, 0, nullptr);
+           
+                break;
+            }
+            default:
+            {
+                // handle other cases
+                break;
+            }
+        }
+    }
+
+    // Create a pipeline layout based on our descriptor set layout(s)
+
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
+    pipelineLayoutInfo.setLayoutCount = 1;
+    pipelineLayoutInfo.pSetLayouts = &pipeline->m_descriptorSetLayout;
+
+    SLANG_VK_CHECK(m_api.vkCreatePipelineLayout(m_device, &pipelineLayoutInfo, nullptr, &pipeline->m_pipelineLayout));
+
+    VkPipelineCache pipelineCache = VK_NULL_HANDLE;
+
+    if (m_currentProgram->m_pipelineType == PipelineType::Compute)
+    {
+        // Then create a pipeline to use that layout
+
+        VkComputePipelineCreateInfo computePipelineInfo = { VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
+        computePipelineInfo.stage = m_currentProgram->m_compute;
+        computePipelineInfo.layout = pipeline->m_pipelineLayout;
+
+        SLANG_VK_CHECK(m_api.vkCreateComputePipelines(m_device, pipelineCache, 1, &computePipelineInfo, nullptr, &pipeline->m_pipeline));
+    }
+    else if (m_currentProgram->m_pipelineType == PipelineType::Graphics)
+    {
+        // Create the graphics pipeline
+
+        const int width = m_swapChain.getWidth();
+        const int height = m_swapChain.getHeight();
+
+        VkPipelineShaderStageCreateInfo shaderStages[] = {  m_currentProgram->m_vertex, m_currentProgram->m_fragment };
+
+        // VertexBuffer/s
+        // Currently only handles one
+
+        VkPipelineVertexInputStateCreateInfo vertexInputInfo = { VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
+        vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+        vertexInputInfo.vertexBindingDescriptionCount = 0;
+        vertexInputInfo.vertexAttributeDescriptionCount = 0;
+
+        VkVertexInputBindingDescription vertexInputBindingDescription;
+
+        if (m_currentInputLayout)
+        {
+            vertexInputBindingDescription.binding = 0;
+            vertexInputBindingDescription.stride = m_currentInputLayout->m_vertexSize; 
+            vertexInputBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+            const auto& srcAttributeDescs = m_currentInputLayout->m_vertexDescs;
+
+            vertexInputInfo.vertexBindingDescriptionCount = 1;
+            vertexInputInfo.pVertexBindingDescriptions = &vertexInputBindingDescription;
+
+            vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(srcAttributeDescs.Count());
+            vertexInputInfo.pVertexAttributeDescriptions = srcAttributeDescs.Buffer();
+        }
+
+        //
+
+        VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
+        inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+        inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+        inputAssembly.primitiveRestartEnable = VK_FALSE;
+
+        VkViewport viewport = {};
+        viewport.x = 0.0f;
+        viewport.y = 0.0f;
+        viewport.width = (float)width;
+        viewport.height = (float)height;
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+
+        VkRect2D scissor = {};
+        scissor.offset = { 0, 0 };
+        scissor.extent = { uint32_t(width), uint32_t(height) };
+        
+        VkPipelineViewportStateCreateInfo viewportState = {};
+        viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+        viewportState.viewportCount = 1;
+        viewportState.pViewports = &viewport;
+        viewportState.scissorCount = 1;
+        viewportState.pScissors = &scissor;
+
+        VkPipelineRasterizationStateCreateInfo rasterizer = {};
+        rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+        rasterizer.depthClampEnable = VK_FALSE;
+        rasterizer.rasterizerDiscardEnable = VK_FALSE;
+        rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+        rasterizer.lineWidth = 1.0f;
+        rasterizer.cullMode = VK_CULL_MODE_NONE;
+        rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+        rasterizer.depthBiasEnable = VK_FALSE;
+
+        VkPipelineMultisampleStateCreateInfo multisampling = {};
+        multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+        multisampling.sampleShadingEnable = VK_FALSE;
+        multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+        VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
+        colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+        colorBlendAttachment.blendEnable = VK_FALSE;
+
+        VkPipelineColorBlendStateCreateInfo colorBlending = {};
+        colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+        colorBlending.logicOpEnable = VK_FALSE;
+        colorBlending.logicOp = VK_LOGIC_OP_COPY;
+        colorBlending.attachmentCount = 1;
+        colorBlending.pAttachments = &colorBlendAttachment;
+        colorBlending.blendConstants[0] = 0.0f;
+        colorBlending.blendConstants[1] = 0.0f;
+        colorBlending.blendConstants[2] = 0.0f;
+        colorBlending.blendConstants[3] = 0.0f;
+
+        VkGraphicsPipelineCreateInfo pipelineInfo = { VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
+        
+        pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+        pipelineInfo.stageCount = 2;
+        pipelineInfo.pStages = shaderStages;
+        pipelineInfo.pVertexInputState = &vertexInputInfo;
+        pipelineInfo.pInputAssemblyState = &inputAssembly;
+        pipelineInfo.pViewportState = &viewportState;
+        pipelineInfo.pRasterizationState = &rasterizer;
+        pipelineInfo.pMultisampleState = &multisampling;
+        pipelineInfo.pColorBlendState = &colorBlending;
+        pipelineInfo.layout = pipeline->m_pipelineLayout;
+        pipelineInfo.renderPass = m_renderPass;
+        pipelineInfo.subpass = 0;
+        pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+
+        SLANG_VK_CHECK(m_api.vkCreateGraphicsPipelines(m_device, pipelineCache, 1, &pipelineInfo, nullptr, &pipeline->m_pipeline));
+    }
+    else
+    {
+        assert(!"Unhandled program type");
+        return SLANG_FAIL;
+    }
+
+    pipelineOut = pipeline;
+    return SLANG_OK;
+}
+
+Result VKRenderer::_beginPass()
+{
+    if (m_swapChainImageIndex < 0)
+    {
+        return SLANG_FAIL;
+    }
+
+    const int numRenderTargets = 1;
+
+    const VulkanSwapChain::Image& image = m_swapChain.getImages()[m_swapChainImageIndex];
+
+    int numAttachments = 0;
+
+    // Start render pass
+    VkClearValue clearValues[kMaxAttachments];
+    clearValues[numAttachments++] = VkClearValue{ m_clearColor[0], m_clearColor[1], m_clearColor[2], m_clearColor[3] };
+
+    bool hasDepthBuffer = false;
+    if (hasDepthBuffer)
+    {
+        VkClearValue& clearValue = clearValues[numAttachments++];
+
+        clearValue.depthStencil.depth = 1.0f;
+        clearValue.depthStencil.stencil = 0;
+    }
+
+    const int width = m_swapChain.getWidth();
+    const int height = m_swapChain.getHeight();
+
+    VkCommandBuffer cmdBuffer = m_deviceQueue.getCommandBuffer();
+
+    VkRenderPassBeginInfo renderPassBegin = {};
+    renderPassBegin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    renderPassBegin.renderPass = m_renderPass;
+    renderPassBegin.framebuffer = image.m_frameBuffer;
+    renderPassBegin.renderArea.offset.x = 0;
+    renderPassBegin.renderArea.offset.y = 0;
+    renderPassBegin.renderArea.extent.width = width;
+    renderPassBegin.renderArea.extent.height = height;
+    renderPassBegin.clearValueCount = numAttachments;
+    renderPassBegin.pClearValues = clearValues;
+
+    m_api.vkCmdBeginRenderPass(cmdBuffer, &renderPassBegin, VK_SUBPASS_CONTENTS_INLINE);
+
+    // Set up scissor and viewport
+    {
+        VkRect2D rects[kMaxRenderTargets] = {};
+        VkViewport viewports[kMaxRenderTargets] = {};
+        for (int i = 0; i < numRenderTargets; ++i)
+        {
+            rects[i] = VkRect2D{ 0, 0, uint32_t(width), uint32_t(height) };
+
+            VkViewport& dstViewport = viewports[i];
+
+            dstViewport.x = 0.0f;
+            dstViewport.y = 0.0f; 
+            dstViewport.width = float(width); 
+            dstViewport.height = float(height); 
+            dstViewport.minDepth = 0.0f; 
+            dstViewport.maxDepth = 1.0f; 
+        }
+
+        m_api.vkCmdSetScissor(cmdBuffer, 0, numRenderTargets, rects);
+        m_api.vkCmdSetViewport(cmdBuffer, 0, numRenderTargets, viewports);
+    }
+
+    return SLANG_OK;
+}
+
+void VKRenderer::_endPass()
+{
+    VkCommandBuffer cmdBuffer = m_deviceQueue.getCommandBuffer();
+    m_api.vkCmdEndRenderPass(cmdBuffer);
+}
+
+void VKRenderer::_beginRender()
+{
+    m_swapChainImageIndex = m_swapChain.nextFrontImageIndex();
+
+    if (m_swapChainImageIndex < 0)
+    {
+        return;
+    }
+}
+
+void VKRenderer::_endRender()
+{
+    m_deviceQueue.flush();
+}
 
 Renderer* createVKRenderer()
 {
     return new VKRenderer;
 }
 
-/* static */SlangResult VKRenderer::toSlangResult(VkResult res)
+VKRenderer::~VKRenderer()
 {
-    return (res == VK_SUCCESS) ? SLANG_OK : SLANG_FAIL;
+    if (m_renderPass != VK_NULL_HANDLE)
+    {
+        m_api.vkDestroyRenderPass(m_device, m_renderPass, nullptr);
+        m_renderPass = VK_NULL_HANDLE;
+    }
 }
 
-void VKRenderer::checkResult(VkResult result)
-{
-    assert(result == VK_SUCCESS);
-}
 
 VkBool32 VKRenderer::handleDebugMessage(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t srcObject,
     size_t location, int32_t msgCode, const char* pLayerPrefix, const char* pMsg)
@@ -290,92 +745,6 @@ VkBool32 VKRenderer::handleDebugMessage(VkDebugReportFlagsEXT flags, VkDebugRepo
     return ((VKRenderer*)pUserData)->handleDebugMessage(flags, objType, srcObject, location, msgCode, pLayerPrefix, pMsg);
 }
 
-VkCommandBuffer VKRenderer::getCommandBuffer()
-{
-    VkCommandBufferAllocateInfo info = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
-    info.commandPool = m_commandPool;
-    info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    info.commandBufferCount = 1;
-
-    VkCommandBuffer commandBuffer;
-    checkResult(vkAllocateCommandBuffers(m_device, &info, &commandBuffer));
-
-    return commandBuffer;
-}
-
-VkCommandBuffer VKRenderer::beginCommandBuffer()
-{
-    VkCommandBuffer commandBuffer = getCommandBuffer();
-
-    VkCommandBufferBeginInfo beginInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
-    checkResult(vkBeginCommandBuffer(commandBuffer, &beginInfo));
-
-    return commandBuffer;
-}
-
-void VKRenderer::flushCommandBuffer(VkCommandBuffer commandBuffer)
-{
-    checkResult(vkEndCommandBuffer(commandBuffer));
-
-    VkSubmitInfo submitInfo = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffer;
-
-    checkResult(vkQueueSubmit(m_queue, 1, &submitInfo, VK_NULL_HANDLE));
-    checkResult(vkQueueWaitIdle(m_queue));
-
-    vkFreeCommandBuffers(m_device, m_commandPool, 1, &commandBuffer);
-}
-
-SlangResult VKRenderer::_initBuffer(size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties, Buffer& bufferOut)
-{
-    assert(!bufferOut.isInitialized());
-
-    bufferOut.m_renderer = this;
-    bufferOut.m_memory = 0;
-    bufferOut.m_buffer = 0;
-    
-    VkBufferCreateInfo bufferCreateInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
-    bufferCreateInfo.size = bufferSize;
-    bufferCreateInfo.usage = usage;
-
-    checkResult(vkCreateBuffer(m_device, &bufferCreateInfo, nullptr, &bufferOut.m_buffer));
-
-    VkMemoryRequirements memoryReqs = {};
-    vkGetBufferMemoryRequirements(m_device, bufferOut.m_buffer, &memoryReqs);
-
-    uint32_t memoryTypeIndex = getMemoryTypeIndex(memoryReqs.memoryTypeBits, reqMemoryProperties);
-
-    VkMemoryPropertyFlags actualMemoryProperites = m_deviceMemoryProperties.memoryTypes[memoryTypeIndex].propertyFlags;
-
-    VkMemoryAllocateInfo allocateInfo = { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
-    allocateInfo.allocationSize = memoryReqs.size;
-    allocateInfo.memoryTypeIndex = memoryTypeIndex;
-
-    checkResult(vkAllocateMemory(m_device, &allocateInfo, nullptr, &bufferOut.m_memory));
-    checkResult(vkBindBufferMemory(m_device, bufferOut.m_buffer, bufferOut.m_memory, 0));
-
-    return SLANG_OK;
-}
-
-uint32_t VKRenderer::getMemoryTypeIndex(uint32_t inTypeBits, VkMemoryPropertyFlags properties)
-{
-    uint32_t typeBits = inTypeBits;
-    uint32_t typeIndex = 0;
-    while (typeBits)
-    {
-        if ((m_deviceMemoryProperties.memoryTypes[typeIndex].propertyFlags & properties) == properties)
-        {
-            return typeIndex;
-        }
-        typeIndex++;
-        typeBits >>= 1;
-    }
-
-    assert(!"failed to find a usable memory type");
-    return uint32_t(-1);
-}
-
 VkPipelineShaderStageCreateInfo VKRenderer::compileEntryPoint(const ShaderCompileRequest::EntryPoint& entryPointRequest, VkShaderStageFlagBits stage, List<char>& bufferOut)
 {
     char const* dataBegin = entryPointRequest.source.dataBegin;
@@ -394,47 +763,39 @@ VkPipelineShaderStageCreateInfo VKRenderer::compileEntryPoint(const ShaderCompil
     moduleCreateInfo.codeSize = codeSize;
 
     VkShaderModule module;
-    checkResult(vkCreateShaderModule(m_device, &moduleCreateInfo, nullptr, &module));
-
-    //::free(codeBegin);
+    SLANG_VK_CHECK(m_api.vkCreateShaderModule(m_device, &moduleCreateInfo, nullptr, &module));
 
     VkPipelineShaderStageCreateInfo shaderStageCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
     shaderStageCreateInfo.stage = stage;
 
     shaderStageCreateInfo.module = module;
     shaderStageCreateInfo.pName = "main";
+    
     return shaderStageCreateInfo;
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! Renderer interface !!!!!!!!!!!!!!!!!!!!!!!!!!
 
-SlangResult VKRenderer::initialize(void* inWindowHandle)
+SlangResult VKRenderer::initialize(const Desc& desc, void* inWindowHandle)
 {
-    char const* dynamicLibraryName = "vulkan-1.dll";
-    HMODULE vulkan = LoadLibraryA(dynamicLibraryName);
-    if (!vulkan)
-    {
-        fprintf(stderr, "error: failed load '%s'\n", dynamicLibraryName);
-        return SLANG_FAIL;
-    }
+    SLANG_RETURN_ON_FAIL(m_module.init());
+    SLANG_RETURN_ON_FAIL(m_api.initGlobalProcs(m_module));
 
-    vkGetInstanceProcAddr = (PFN_vkGetInstanceProcAddr)GetProcAddress(vulkan, "vkGetInstanceProcAddr");
-    if (!vkGetInstanceProcAddr)
-    {
-        fprintf(stderr, "error: failed load symbol 'vkGetInstanceProcAddr'\n");
-        return SLANG_FAIL;
-    }
+    m_desc = desc;
 
     VkApplicationInfo applicationInfo = { VK_STRUCTURE_TYPE_APPLICATION_INFO };
     applicationInfo.pApplicationName = "slang-render-test";
     applicationInfo.pEngineName = "slang-render-test";
     applicationInfo.apiVersion = VK_API_VERSION_1_0;
 
-    char const* instanceExtensions[] = {
+    char const* instanceExtensions[] = 
+    {
         VK_KHR_SURFACE_EXTENSION_NAME,
-#ifdef _WIN32
+
+#if SLANG_WINDOWS_FAMILY
         VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
 #else
+        VK_KHR_XLIB_SURFACE_EXTENSION_NAME
 #endif
 
 #if ENABLE_VALIDATION_LAYER
@@ -442,35 +803,22 @@ SlangResult VKRenderer::initialize(void* inWindowHandle)
 #endif
     };
 
+    VkInstance instance = VK_NULL_HANDLE;
+
     VkInstanceCreateInfo instanceCreateInfo = { VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
     instanceCreateInfo.pApplicationInfo = &applicationInfo;
 
-    instanceCreateInfo.enabledExtensionCount = sizeof(instanceExtensions) / sizeof(instanceExtensions[0]);
+    instanceCreateInfo.enabledExtensionCount = SLANG_COUNT_OF(instanceExtensions);
     instanceCreateInfo.ppEnabledExtensionNames = &instanceExtensions[0];
 
 #if ENABLE_VALIDATION_LAYER
-
-    uint32_t layerCount = 1;
-    const char *layerNames[] = {
-        "VK_LAYER_LUNARG_standard_validation"
-    };
-
-    instanceCreateInfo.enabledLayerCount = layerCount;
+    const char* layerNames[] = { "VK_LAYER_LUNARG_standard_validation" };
+    instanceCreateInfo.enabledLayerCount = SLANG_COUNT_OF(layerNames); 
     instanceCreateInfo.ppEnabledLayerNames = layerNames;
 #endif
 
-    m_instance = 0;
-
-#define LOAD_INSTANCE_PROC(NAME) NAME = (PFN_##NAME) vkGetInstanceProcAddr(m_instance, #NAME);
-
-    FOREACH_GLOBAL_PROC(LOAD_INSTANCE_PROC);
-
-    RETURN_ON_VK_FAIL(vkCreateInstance(&instanceCreateInfo, nullptr, &m_instance));
-
-    FOREACH_INSTANCE_PROC(LOAD_INSTANCE_PROC);
-
-#undef LOAD_INSTANCE_PROC
-
+    SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateInstance(&instanceCreateInfo, nullptr, &instance));
+    SLANG_RETURN_ON_FAIL(m_api.initInstanceProcs(instance));
 
 #if ENABLE_VALIDATION_LAYER
     VkDebugReportFlagsEXT debugFlags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
@@ -480,43 +828,23 @@ SlangResult VKRenderer::initialize(void* inWindowHandle)
     debugCreateInfo.pUserData = this;
     debugCreateInfo.flags = debugFlags;
 
-    RETURN_ON_VK_FAIL(vkCreateDebugReportCallbackEXT(m_instance, &debugCreateInfo, nullptr, &m_debugReportCallback));
-
+    SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateDebugReportCallbackEXT(instance, &debugCreateInfo, nullptr, &m_debugReportCallback));
 #endif
 
-    uint32_t physicalDeviceCount = 0;
-    RETURN_ON_VK_FAIL(vkEnumeratePhysicalDevices(m_instance, &physicalDeviceCount, nullptr));
+    uint32_t numPhysicalDevices = 0;
+    SLANG_VK_RETURN_ON_FAIL(m_api.vkEnumeratePhysicalDevices(instance, &numPhysicalDevices, nullptr));
 
-    VkPhysicalDevice* physicalDevices = (VkPhysicalDevice*)alloca(physicalDeviceCount * sizeof(VkPhysicalDevice));
-    RETURN_ON_VK_FAIL(vkEnumeratePhysicalDevices(m_instance, &physicalDeviceCount, physicalDevices));
+    List<VkPhysicalDevice> physicalDevices;
+    physicalDevices.SetSize(numPhysicalDevices);
+    SLANG_VK_RETURN_ON_FAIL(m_api.vkEnumeratePhysicalDevices(instance, &numPhysicalDevices, physicalDevices.Buffer()));
 
-    uint32_t selectedDeviceIndex = 0;
     // TODO: allow override of selected device
-    m_physicalDevice = physicalDevices[selectedDeviceIndex];
-
-    vkGetPhysicalDeviceProperties(m_physicalDevice, &m_deviceProperties);
-    vkGetPhysicalDeviceFeatures(m_physicalDevice, &m_deviceFeatures);
-    vkGetPhysicalDeviceMemoryProperties(m_physicalDevice, &m_deviceMemoryProperties);
-
-    uint32_t queueFamilyCount = 0;
-    vkGetPhysicalDeviceQueueFamilyProperties(m_physicalDevice, &queueFamilyCount, nullptr);
-
-    VkQueueFamilyProperties* queueFamilies = (VkQueueFamilyProperties*)alloca(queueFamilyCount * sizeof(VkQueueFamilyProperties));
-    vkGetPhysicalDeviceQueueFamilyProperties(m_physicalDevice, &queueFamilyCount, queueFamilies);
-
-    // Find a queue that can service our needs
-    VkQueueFlags reqQueueFlags = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT;
-
-    uint32_t queueFamilyIndex = uint32_t(-1);
-    for (uint32_t qq = 0; qq < queueFamilyCount; ++qq)
-    {
-        if ((queueFamilies[qq].queueFlags & reqQueueFlags) == reqQueueFlags)
-        {
-            queueFamilyIndex = qq;
-            break;
-        }
-    }
-    assert(queueFamilyIndex < queueFamilyCount);
+    uint32_t selectedDeviceIndex = 0;
+    
+    SLANG_RETURN_ON_FAIL(m_api.initPhysicalDevice(physicalDevices[selectedDeviceIndex]));
+    
+    int queueFamilyIndex = m_api.findQueue(VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT);
+    assert(queueFamilyIndex >= 0);
 
     float queuePriority = 0.0f;
     VkDeviceQueueCreateInfo queueCreateInfo = { VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO };
@@ -532,46 +860,134 @@ SlangResult VKRenderer::initialize(void* inWindowHandle)
     VkDeviceCreateInfo deviceCreateInfo = { VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
     deviceCreateInfo.queueCreateInfoCount = 1;
     deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
-    deviceCreateInfo.pEnabledFeatures = &m_deviceFeatures;
+    deviceCreateInfo.pEnabledFeatures = &m_api.m_deviceFeatures;
 
-    deviceCreateInfo.enabledExtensionCount = sizeof(deviceExtensions) / sizeof(deviceExtensions[0]);
-    deviceCreateInfo.ppEnabledExtensionNames = &deviceExtensions[0];
+    deviceCreateInfo.enabledExtensionCount = SLANG_COUNT_OF(deviceExtensions);
+    deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions;
 
-    RETURN_ON_VK_FAIL(vkCreateDevice(m_physicalDevice, &deviceCreateInfo, nullptr, &m_device));
+    SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateDevice(m_api.m_physicalDevice, &deviceCreateInfo, nullptr, &m_device));
+    SLANG_RETURN_ON_FAIL(m_api.initDeviceProcs(m_device));
 
-#define LOAD_DEVICE_PROC(NAME) NAME = (PFN_##NAME) vkGetDeviceProcAddr(m_device, #NAME);
-    FOREACH_DEVICE_PROC(LOAD_DEVICE_PROC)
-#undef LOAD_DEVICE_PROC
-
-        // Create a command pool
-
-    VkCommandPoolCreateInfo commandPoolCreateInfo = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
-    commandPoolCreateInfo.queueFamilyIndex = queueFamilyIndex;
-    commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-
-    RETURN_ON_VK_FAIL(vkCreateCommandPool(m_device, &commandPoolCreateInfo, nullptr, &m_commandPool));
-
-    vkGetDeviceQueue(m_device, queueFamilyIndex, 0, &m_queue);
+    {
+        VkQueue queue;
+        m_api.vkGetDeviceQueue(m_device, queueFamilyIndex, 0, &queue);
+        SLANG_RETURN_ON_FAIL(m_deviceQueue.init(m_api, queue, queueFamilyIndex));
+    }
 
     // set up swap chain
 
+    {
+        VulkanSwapChain::Desc desc;
+        VulkanSwapChain::PlatformDesc* platformDesc = nullptr;
 
+        desc.init();
+        desc.m_format = Format::RGBA_Unorm_UInt8;
 
-    // create command buffers
+#if SLANG_WINDOWS_FAMILY
+        VulkanSwapChain::WinPlatformDesc winPlatformDesc;
+        winPlatformDesc.m_hinstance = ::GetModuleHandle(nullptr);
+        winPlatformDesc.m_hwnd = (HWND)inWindowHandle;
+        platformDesc = &winPlatformDesc;
+#endif
+
+        SLANG_RETURN_ON_FAIL(m_swapChain.init(&m_deviceQueue, desc, platformDesc)); 
+    }
 
     // depth/stencil?
 
     // render pass?
 
-    // pipeline cache
+    {
+        const int numRenderTargets = 1;
+        bool shouldClear = true;
+        bool shouldClearDepth = false;
+        bool shouldClearStencil = false;
+        bool hasDepthBuffer = false;
+
+        Format depthFormat = Format::Unknown;
+        VkFormat colorFormat = m_swapChain.getVkFormat();
+
+        int numAttachments = 0;
+        // We need extra space if we have depth buffer
+        VkAttachmentDescription attachmentDesc[kMaxRenderTargets + 1] = {};
+        for (int i = 0; i < numRenderTargets; ++i)
+        {
+            VkAttachmentDescription& dst = attachmentDesc[numAttachments ++];
+
+            dst.flags = 0;
+            dst.format = colorFormat;
+            dst.samples = VK_SAMPLE_COUNT_1_BIT;
+            dst.loadOp = shouldClear ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
+            dst.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            dst.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            dst.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            dst.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+            dst.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        }
+        if (hasDepthBuffer)
+        {
+            VkAttachmentDescription& dst = attachmentDesc[numAttachments++];
+
+            dst.flags = 0;
+            dst.format = VulkanUtil::getVkFormat(depthFormat);
+            dst.samples = VK_SAMPLE_COUNT_1_BIT;
+            dst.loadOp = shouldClearDepth ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
+            dst.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            dst.stencilLoadOp = shouldClearStencil ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
+            dst.stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+            dst.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+            dst.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        }
+
+        VkAttachmentReference colorAttachments[kMaxRenderTargets] = {};
+        for (int i = 0; i < numRenderTargets; ++i)
+        {
+            VkAttachmentReference& dst = colorAttachments[i];
+            dst.attachment = i;
+            dst.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        }
+
+        VkAttachmentReference depthAttachment = {};
+        depthAttachment.attachment = numRenderTargets;
+        depthAttachment.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+        VkSubpassDescription subpassDesc = {};
+        subpassDesc.flags = 0;
+        subpassDesc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        subpassDesc.inputAttachmentCount = 0u;
+        subpassDesc.pInputAttachments = nullptr;
+        subpassDesc.colorAttachmentCount = numRenderTargets;
+        subpassDesc.pColorAttachments = colorAttachments;
+        subpassDesc.pResolveAttachments = nullptr;
+        subpassDesc.pDepthStencilAttachment = hasDepthBuffer ? &depthAttachment : nullptr;
+        subpassDesc.preserveAttachmentCount = 0u;
+        subpassDesc.pPreserveAttachments = nullptr;
+
+        VkRenderPassCreateInfo renderPassCreateInfo = {};
+        renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+        renderPassCreateInfo.attachmentCount = numAttachments;
+        renderPassCreateInfo.pAttachments = attachmentDesc;
+        renderPassCreateInfo.subpassCount = 1;
+        renderPassCreateInfo.pSubpasses = &subpassDesc;
+        SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateRenderPass(m_device, &renderPassCreateInfo, nullptr, &m_renderPass));
+    }
 
     // frame buffer
+    SLANG_RETURN_ON_FAIL(m_swapChain.createFrameBuffers(m_renderPass));
 
-
-
-    // create semaphores for sync
+    _beginRender();
 
     return SLANG_OK;
+}
+
+void VKRenderer::submitGpuWork()
+{
+    m_deviceQueue.flush();
+}
+
+void VKRenderer::waitForGpu()
+{
+    m_deviceQueue.flushAndWait();
 }
 
 void VKRenderer::setClearColor(const float color[4])
@@ -585,7 +1001,13 @@ void VKRenderer::clearFrame()
 }
 
 void VKRenderer::presentFrame()
-{
+{   
+    _endRender();
+
+    const bool vsync = true;
+    m_swapChain.present(vsync);
+
+    _beginRender();
 }
 
 SlangResult VKRenderer::captureScreenShot(char const* outputPath)
@@ -672,11 +1094,11 @@ BufferResource* VKRenderer::createBufferResource(Resource::Usage initialUsage, c
     }
 
     RefPtr<BufferResourceImpl> buffer(new BufferResourceImpl(initialUsage, desc, this));
-    SLANG_RETURN_NULL_ON_FAIL(_initBuffer(desc.sizeInBytes, usage, reqMemoryProperties, buffer->m_buffer));
+    SLANG_RETURN_NULL_ON_FAIL(buffer->m_buffer.init(m_api, desc.sizeInBytes, usage, reqMemoryProperties));
 
     if ((desc.cpuAccessFlags & Resource::AccessFlag::Write) || initData)
     {
-        SLANG_RETURN_NULL_ON_FAIL(_initBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, buffer->m_uploadBuffer));
+        SLANG_RETURN_NULL_ON_FAIL(buffer->m_uploadBuffer.init(m_api, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
     }
 
     if (initData)
@@ -686,36 +1108,66 @@ BufferResource* VKRenderer::createBufferResource(Resource::Usage initialUsage, c
         // directly.
         // Copy into staging buffer
         void* mappedData = nullptr;
-        checkResult(vkMapMemory(m_device, buffer->m_uploadBuffer.m_memory, 0, bufferSize, 0, &mappedData));
-        memcpy(mappedData, initData, bufferSize);
-        vkUnmapMemory(m_device, buffer->m_uploadBuffer.m_memory);
+        SLANG_VK_CHECK(m_api.vkMapMemory(m_device, buffer->m_uploadBuffer.m_memory, 0, bufferSize, 0, &mappedData));
+        ::memcpy(mappedData, initData, bufferSize);
+        m_api.vkUnmapMemory(m_device, buffer->m_uploadBuffer.m_memory);
 
         // Copy from staging buffer to real buffer
-        VkCommandBuffer commandBuffer = beginCommandBuffer();
-
+        VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
+        
         VkBufferCopy copyInfo = {};
         copyInfo.size = bufferSize;
-        vkCmdCopyBuffer(commandBuffer, buffer->m_uploadBuffer.m_buffer, buffer->m_buffer.m_buffer, 1, &copyInfo);
+        m_api.vkCmdCopyBuffer(commandBuffer, buffer->m_uploadBuffer.m_buffer, buffer->m_buffer.m_buffer, 1, &copyInfo);
 
-        flushCommandBuffer(commandBuffer);
+        //flushCommandBuffer(commandBuffer);
     }
 
     return buffer.detach();
 }
 
-InputLayout* VKRenderer::createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) 
+InputLayout* VKRenderer::createInputLayout(const InputElementDesc* elements, UInt numElements) 
 {
-    InputLayoutImpl* impl = new InputLayoutImpl;
+    RefPtr<InputLayoutImpl> layout(new InputLayoutImpl);
 
-    // TODO: actually initialize things
+    List<VkVertexInputAttributeDescription>& dstVertexDescs = layout->m_vertexDescs;
 
-    return (InputLayout*)impl;
+    size_t vertexSize = 0;
+    dstVertexDescs.SetSize(numElements);
+
+    for (UInt i = 0; i <  numElements; ++i)
+    {
+        const InputElementDesc& srcDesc = elements[i];
+        VkVertexInputAttributeDescription& dstDesc = dstVertexDescs[i];
+
+        dstDesc.location = uint32_t(i);
+        dstDesc.binding = 0;
+        dstDesc.format = VulkanUtil::getVkFormat(srcDesc.format);
+        if (dstDesc.format == VK_FORMAT_UNDEFINED)
+        {
+            return nullptr;
+        }
+
+        dstDesc.offset = uint32_t(srcDesc.offset); 
+    
+        const size_t elementSize = RendererUtil::getFormatSize(srcDesc.format);
+        assert(elementSize > 0);
+        const size_t endElement = srcDesc.offset + elementSize;
+
+        vertexSize = (vertexSize < endElement) ? endElement : vertexSize;
+    }
+
+    // Work out the overall size
+    layout->m_vertexSize = int(vertexSize);
+    return layout.detach();
 }
 
 void* VKRenderer::map(BufferResource* bufferIn, MapFlavor flavor)
 {
     BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(bufferIn);
     assert(buffer->m_mapFlavor == MapFlavor::Unknown);
+
+    // Make sure everything has completed before reading...
+    m_deviceQueue.flushAndWait();
 
     const size_t bufferSize = buffer->getDesc().sizeInBytes;
 
@@ -730,7 +1182,7 @@ void* VKRenderer::map(BufferResource* bufferIn, MapFlavor flavor)
             }
 
             void* mappedData = nullptr;
-            checkResult(vkMapMemory(m_device, buffer->m_uploadBuffer.m_memory, 0, bufferSize, 0, &mappedData));
+            SLANG_VK_CHECK(m_api.vkMapMemory(m_device, buffer->m_uploadBuffer.m_memory, 0, bufferSize, 0, &mappedData));
             buffer->m_mapFlavor = flavor;
             return mappedData;
         }
@@ -742,23 +1194,25 @@ void* VKRenderer::map(BufferResource* bufferIn, MapFlavor flavor)
             // create staging buffer
             Buffer staging;
 
-            SLANG_RETURN_NULL_ON_FAIL(_initBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, staging));
+            SLANG_RETURN_NULL_ON_FAIL(staging.init(m_api, bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
 
             // Copy from real buffer to staging buffer
-            VkCommandBuffer commandBuffer = beginCommandBuffer();
+            VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
 
             VkBufferCopy copyInfo = {};
             copyInfo.size = bufferSize;
-            vkCmdCopyBuffer(commandBuffer, buffer->m_buffer.m_buffer, staging.m_buffer, 1, &copyInfo);
+            m_api.vkCmdCopyBuffer(commandBuffer, buffer->m_buffer.m_buffer, staging.m_buffer, 1, &copyInfo);
 
-            flushCommandBuffer(commandBuffer);
+            m_deviceQueue.flushAndWait();
 
             // Write out the data from the buffer
             void* mappedData = nullptr;
-            checkResult(vkMapMemory(m_device, staging.m_memory, 0, bufferSize, 0, &mappedData));
+            SLANG_VK_CHECK(m_api.vkMapMemory(m_device, staging.m_memory, 0, bufferSize, 0, &mappedData));
 
             ::memcpy(buffer->m_readBuffer.Buffer(), mappedData, bufferSize);
-            vkUnmapMemory(m_device, staging.m_memory);
+            m_api.vkUnmapMemory(m_device, staging.m_memory);
+
+            buffer->m_mapFlavor = flavor;
 
             return buffer->m_readBuffer.Buffer();
         }
@@ -779,16 +1233,17 @@ void VKRenderer::unmap(BufferResource* bufferIn)
         case MapFlavor::WriteDiscard:
         case MapFlavor::HostWrite:
         {
-            vkUnmapMemory(m_device, buffer->m_uploadBuffer.m_memory);
+            m_api.vkUnmapMemory(m_device, buffer->m_uploadBuffer.m_memory);
 
             // Copy from staging buffer to real buffer
-            VkCommandBuffer commandBuffer = beginCommandBuffer();
+            VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
 
             VkBufferCopy copyInfo = {};
             copyInfo.size = bufferSize;
-            vkCmdCopyBuffer(commandBuffer, buffer->m_uploadBuffer.m_buffer, buffer->m_buffer.m_buffer, 1, &copyInfo);
+            m_api.vkCmdCopyBuffer(commandBuffer, buffer->m_uploadBuffer.m_buffer, buffer->m_buffer.m_buffer, 1, &copyInfo);
 
-            flushCommandBuffer(commandBuffer);
+            // TODO: is this necessary?
+            //m_deviceQueue.flushAndWait();
             break;
         }
         default: break;
@@ -800,14 +1255,37 @@ void VKRenderer::unmap(BufferResource* bufferIn)
 
 void VKRenderer::setInputLayout(InputLayout* inputLayout)
 {
+    m_currentInputLayout = static_cast<InputLayoutImpl*>(inputLayout);
 }
 
 void VKRenderer::setPrimitiveTopology(PrimitiveTopology topology)
 {
+    m_primitiveTopology = VulkanUtil::getVkPrimitiveTopology(topology);
 }
 
 void VKRenderer::setVertexBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* strides, const UInt* offsets)
 {
+    {
+        const UInt num = startSlot + slotCount;
+        if (num > m_boundVertexBuffers.Count())
+        {
+            m_boundVertexBuffers.SetSize(num);
+        }
+    }
+
+    for (UInt i = 0; i < slotCount; i++)
+    {
+        BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(buffers[i]);
+        if (buffer)
+        {
+            assert(buffer->m_initialUsage == Resource::Usage::VertexBuffer);
+        }
+
+        BoundVertexBuffer& boundBuffer = m_boundVertexBuffers[startSlot + i];
+        boundBuffer.m_buffer = buffer;
+        boundBuffer.m_stride = int(strides[i]);
+        boundBuffer.m_offset = int(offsets[i]);
+    }
 }
 
 void VKRenderer::setShaderProgram(ShaderProgram* program)
@@ -815,12 +1293,58 @@ void VKRenderer::setShaderProgram(ShaderProgram* program)
     m_currentProgram = (ShaderProgramImpl*)program;
 }
 
-void VKRenderer::setConstantBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* offsets) 
-{
-}
-
 void VKRenderer::draw(UInt vertexCount, UInt startVertex = 0)
 {
+    Pipeline* pipeline = _getPipeline();
+    if (!pipeline || pipeline->m_shaderProgram->m_pipelineType != PipelineType::Graphics)
+    {
+        assert(!"Invalid render pipeline");
+        return;
+    }
+
+    SLANG_RETURN_VOID_ON_FAIL(_beginPass());
+
+    // Also create descriptor sets based on the given pipeline layout
+    VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
+
+    m_api.vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->m_pipeline);
+    m_api.vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->m_pipelineLayout,
+        0, 1, &pipeline->m_descriptorSet, 0, nullptr);
+
+    // Bind the vertex buffer
+    if (m_boundVertexBuffers.Count() > 0 && m_boundVertexBuffers[0].m_buffer)
+    {
+        const BoundVertexBuffer& boundVertexBuffer = m_boundVertexBuffers[0];
+
+        VkBuffer vertexBuffers[] = { boundVertexBuffer.m_buffer->m_buffer.m_buffer };
+        VkDeviceSize offsets[] = { VkDeviceSize(boundVertexBuffer.m_offset) };
+
+        m_api.vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+    }
+
+    m_api.vkCmdDraw(commandBuffer, static_cast<uint32_t>(vertexCount), 1, 0, 0);
+
+    _endPass();
+}
+
+void VKRenderer::dispatchCompute(int x, int y, int z)
+{
+    Pipeline* pipeline = _getPipeline();
+    if (!pipeline || pipeline->m_shaderProgram->m_pipelineType != PipelineType::Compute)
+    {
+        assert(!"Invalid render pipeline");
+        return;
+    }
+
+    // Also create descriptor sets based on the given pipeline layout
+    VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
+
+    m_api.vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->m_pipeline);
+
+    m_api.vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->m_pipelineLayout,
+        0, 1, &pipeline->m_descriptorSet, 0, nullptr);
+
+    m_api.vkCmdDispatch(commandBuffer, x, y, z);
 }
 
 BindingState* VKRenderer::createBindingState(const BindingState::Desc& bindingStateDesc)
@@ -871,172 +1395,12 @@ void VKRenderer::setBindingState(BindingState* state)
     m_currentBindingState = static_cast<BindingStateImpl*>(state);
 }
 
-void VKRenderer::dispatchCompute(int x, int y, int z)
-{
-    // HACK: create a new pipeline for every call
-
-    // First create a pipeline layout based on what is bound
-
-    const auto& srcDetails = m_currentBindingState->m_bindingDetails;
-    const auto& srcBindings = m_currentBindingState->getDesc().m_bindings;
-
-    const int numBindings = int(srcBindings.Count());
-
-    Slang::List<VkDescriptorSetLayoutBinding> dstBindings;
-    for (int i = 0; i < numBindings; ++i)
-    {
-        const auto& srcDetail = srcDetails[i];
-        const auto& srcBinding = srcBindings[i];
-
-        switch (srcBinding.bindingType)
-        {
-            case BindingType::Buffer:
-            {
-                BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(srcBinding.resource.Ptr());
-                const BufferResource::Desc& bufferResourceDesc = bufferResource->getDesc();
-
-                if (bufferResourceDesc.bindFlags & Resource::BindFlag::UnorderedAccess)
-                {
-                    VkDescriptorSetLayoutBinding dstBinding = {};
-                    dstBinding.binding = srcDetail.m_binding;
-                    dstBinding.descriptorCount = 1;
-                    dstBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-                    dstBinding.stageFlags = VK_SHADER_STAGE_ALL;
-
-                    dstBindings.Add(dstBinding);
-                }    
-            
-                break;
-            }
-            default:
-                // TODO: handle the other cases
-                break;
-        }
-    }
-
-    VkDescriptorSetLayoutCreateInfo descriptorSetLayoutInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
-    descriptorSetLayoutInfo.bindingCount = uint32_t(dstBindings.Count());
-    descriptorSetLayoutInfo.pBindings = dstBindings.Buffer();
-
-    VkDescriptorSetLayout descriptorSetLayout = 0;
-    checkResult(vkCreateDescriptorSetLayout(m_device, &descriptorSetLayoutInfo, nullptr, &descriptorSetLayout));
-
-    // Create a descriptor pool for allocating sets
-
-    VkDescriptorPoolSize poolSizes[] =
-    {
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 128 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 128 },
-        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 128 },
-    };
-
-    VkDescriptorPoolCreateInfo descriptorPoolInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
-    descriptorPoolInfo.maxSets = 128; // TODO: actually pick a size
-    descriptorPoolInfo.poolSizeCount = sizeof(poolSizes) / sizeof(poolSizes[0]);
-    descriptorPoolInfo.pPoolSizes = poolSizes;
-
-    VkDescriptorPool descriptorPool;
-    checkResult(vkCreateDescriptorPool(m_device, &descriptorPoolInfo, nullptr, &descriptorPool));
-
-    // Create a descriptor set based on our layout
-
-    VkDescriptorSetAllocateInfo descriptorSetAllocInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
-    descriptorSetAllocInfo.descriptorPool = descriptorPool;
-    descriptorSetAllocInfo.descriptorSetCount = 1;
-    descriptorSetAllocInfo.pSetLayouts = &descriptorSetLayout;
-
-    VkDescriptorSet descriptorSet;
-    checkResult(vkAllocateDescriptorSets(m_device, &descriptorSetAllocInfo, &descriptorSet));
-
-    // Fill in the descriptor set, using our binding information
-
-    for (int i = 0; i < numBindings; ++i)
-    {
-        const auto& srcDetail = srcDetails[i];
-        const auto& srcBinding = srcBindings[i];
-    
-        switch (srcBinding.bindingType)
-        {
-            case BindingType::Buffer:
-            {
-                BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(srcBinding.resource.Ptr());
-                const BufferResource::Desc& bufferResourceDesc = bufferResource->getDesc();
-
-                if (bufferResourceDesc.bindFlags & Resource::BindFlag::UnorderedAccess)
-                {
-                    VkDescriptorBufferInfo bufferInfo;
-                    bufferInfo.buffer = bufferResource->m_buffer.m_buffer;
-                    bufferInfo.offset = 0;
-                    bufferInfo.range = bufferResourceDesc.sizeInBytes;
-                        
-                    VkWriteDescriptorSet writeInfo = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-                    writeInfo.descriptorCount = 1;
-                    writeInfo.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-                    writeInfo.dstSet = descriptorSet;
-                    writeInfo.dstBinding = srcDetail.m_binding;
-                    writeInfo.dstArrayElement = 0;
-                    writeInfo.pBufferInfo = &bufferInfo;
-
-                    vkUpdateDescriptorSets(m_device, 1, &writeInfo, 0, nullptr);
-                }
-                break;
-            }
-            default:
-            {
-                // handle other cases
-                break;
-            }
-        }
-    }
-
-    // Create a pipeline layout based on our descriptor set layout(s)
-
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
-    pipelineLayoutInfo.setLayoutCount = 1;
-    pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
-
-    VkPipelineLayout pipelineLayout = 0;
-    checkResult(vkCreatePipelineLayout(m_device, &pipelineLayoutInfo, nullptr, &pipelineLayout));
-
-    // Then create a pipeline to use that layout
-
-    VkComputePipelineCreateInfo computePipelineInfo = { VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
-    computePipelineInfo.stage = m_currentProgram->m_compute;
-    computePipelineInfo.layout = pipelineLayout;
-
-    VkPipelineCache pipelineCache = 0;
-
-    VkPipeline pipeline;
-    checkResult(vkCreateComputePipelines(m_device, pipelineCache, 1, &computePipelineInfo, nullptr, &pipeline));
-
-    // Also create descriptor sets based on the given pipeline layout
-
-    VkCommandBuffer commandBuffer = beginCommandBuffer();
-
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
-
-    vkCmdBindDescriptorSets(
-        commandBuffer,
-        VK_PIPELINE_BIND_POINT_COMPUTE,
-        pipelineLayout,
-        0, 1,
-        &descriptorSet,
-        0,
-        nullptr);
-
-    vkCmdDispatch(commandBuffer, x, y, z);
-
-    flushCommandBuffer(commandBuffer);
-
-    vkDestroyPipeline(m_device, pipeline, nullptr);
-
-    // TODO: need to free up the other resources too...
-}
-
 // ShaderCompiler interface
-ShaderProgram* VKRenderer::compileProgram(const ShaderCompileRequest & request) 
+ShaderProgram* VKRenderer::compileProgram(const ShaderCompileRequest& request) 
 {
-    ShaderProgramImpl* impl = new ShaderProgramImpl;
+    const PipelineType pipelineType = request.computeShader.name ? PipelineType::Compute : PipelineType::Graphics;
+
+    ShaderProgramImpl* impl = new ShaderProgramImpl(pipelineType);
     if (request.computeShader.name)
     {
         impl->m_compute = compileEntryPoint(request.computeShader, VK_SHADER_STAGE_COMPUTE_BIT, impl->m_buffers[0]);

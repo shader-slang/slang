@@ -1,4 +1,6 @@
 ﻿// render-d3d12.cpp
+#define _CRT_SECURE_NO_WARNINGS
+
 #include "render-d3d12.h"
 
 #include "options.h"
@@ -23,18 +25,13 @@
 
 #include "../../source/core/slang-com-ptr.h"
 
+#include "png-serialize-util.h"
+
 #include "resource-d3d12.h"
 #include "descriptor-heap-d3d12.h"
 #include "circular-resource-heap-d3d12.h"
 
 #include "d3d-util.h"
-
-#ifdef _MSC_VER
-#pragma warning(disable: 4996)
-#endif
-
-//#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "external/stb/stb_image_write.h"
 
 // We will use the C standard library just for printing error messages.
 #include <stdio.h>
@@ -56,7 +53,7 @@ class D3D12Renderer : public Renderer, public ShaderCompiler
 {
 public:
     // Renderer    implementation
-    virtual SlangResult initialize(void* inWindowHandle) override;
+    virtual SlangResult initialize(const Desc& desc, void* inWindowHandle) override;
     virtual void setClearColor(const float color[4]) override;
     virtual void clearFrame() override;
     virtual void presentFrame() override;
@@ -73,11 +70,11 @@ public:
     virtual void setBindingState(BindingState* state);
     virtual void setVertexBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* strides, const UInt* offsets) override;
     virtual void setShaderProgram(ShaderProgram* inProgram) override;
-    virtual void setConstantBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* offsets) override;
     virtual void draw(UInt vertexCount, UInt startVertex) override;
     virtual void dispatchCompute(int x, int y, int z) override;
     virtual void submitGpuWork() override;
     virtual void waitForGpu() override;
+    virtual RendererType getRendererType() const override { return RendererType::DirectX12; }
 
     // ShaderCompiler implementation
     virtual ShaderProgram* compileProgram(const ShaderCompileRequest& request) override;
@@ -88,12 +85,6 @@ protected:
     static const Int kMaxNumRenderFrames = 4;
     static const Int kMaxNumRenderTargets = 3;
     
-    enum class ProgramType
-    {
-        Compute,
-        Graphics,
-    };
-
     struct Submitter
     {
         virtual void setRootConstantBufferView(int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation) = 0;
@@ -115,7 +106,7 @@ protected:
     class ShaderProgramImpl: public ShaderProgram
     {
         public:
-        ProgramType m_programType;
+        PipelineType m_pipelineType; 
         List<uint8_t> m_vertexShader;
         List<uint8_t> m_pixelShader;
         List<uint8_t> m_computeShader;
@@ -350,7 +341,7 @@ protected:
     Result _bindRenderState(RenderState* renderState, ID3D12GraphicsCommandList* commandList, Submitter* submitter);
     
     Result _calcBindParameters(BindParameters& params);
-    RenderState* findRenderState(ProgramType programType);
+    RenderState* findRenderState(PipelineType pipelineType);
 
     PFN_D3D12_SERIALIZE_ROOT_SIGNATURE m_D3D12SerializeRootSignature = nullptr;
 
@@ -359,7 +350,6 @@ protected:
     int m_commandListOpenCount = 0;            ///< If >0 the command list should be open
 
     List<BoundVertexBuffer> m_boundVertexBuffers;
-    List<RefPtr<BufferResourceImpl> > m_boundConstantBuffers;
 
     RefPtr<ShaderProgramImpl> m_boundShaderProgram;
     RefPtr<InputLayoutImpl> m_boundInputLayout;
@@ -374,9 +364,8 @@ protected:
     int m_numTargetSamples = 1;                                ///< The number of multi sample samples
     int m_targetSampleQuality = 0;                            ///< The multi sample quality
 
-    int m_windowWidth = 0;
-    int m_windowHeight = 0;
-
+    Desc m_desc;
+    
     bool m_isInitialized = false;
 
     D3D12_PRIMITIVE_TOPOLOGY_TYPE m_primitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
@@ -797,7 +786,6 @@ Result D3D12Renderer::captureTextureToFile(D3D12Resource& resource, const char* 
     // Submit the copy, and wait for copy to complete
     submitGpuWorkAndWait();
 
-    int stbResult = 0;
     {
         ID3D12Resource* dxResource = stagingResource;
 
@@ -806,17 +794,13 @@ Result D3D12Renderer::captureTextureToFile(D3D12Resource& resource, const char* 
         
         SLANG_RETURN_ON_FAIL(dxResource->Map(0, &readRange, reinterpret_cast<void**>(&data)));
         
-        stbResult = stbi_write_png(outputPath, int(desc.Width), int(desc.Height), 4, data, int(rowPitch));
-        
-        dxResource->Unmap(0, nullptr);
-    }
+        Surface surface;
+        surface.setUnowned(int(desc.Width), int(desc.Height), Format::RGBA_Unorm_UInt8, int(rowPitch), data);
+        Result res = PngSerializeUtil::write(outputPath, surface);
 
-    if (!stbResult)
-    {
-        fprintf(stderr, "ERROR: failed to write texture to file\n");
-        return SLANG_FAIL;
+        dxResource->Unmap(0, nullptr);
+        return res;
     }
-    return SLANG_OK;
 }
 
 Result D3D12Renderer::calcComputePipelineState(ComPtr<ID3D12RootSignature>& signatureOut, ComPtr<ID3D12PipelineState>& pipelineStateOut)
@@ -971,11 +955,11 @@ Result D3D12Renderer::calcGraphicsPipelineState(ComPtr<ID3D12RootSignature>& sig
     return SLANG_OK;
 }
 
-D3D12Renderer::RenderState* D3D12Renderer::findRenderState(ProgramType programType)
+D3D12Renderer::RenderState* D3D12Renderer::findRenderState(PipelineType pipelineType)
 {
-    switch (programType)
+    switch (pipelineType)
     {
-        case ProgramType::Compute:
+        case PipelineType::Compute:
         {
             // Check if current state is a match
             if (m_currentRenderState)
@@ -999,7 +983,7 @@ D3D12Renderer::RenderState* D3D12Renderer::findRenderState(ProgramType programTy
             }
             break;
         }
-        case ProgramType::Graphics:
+        case PipelineType::Graphics:
         {
             if (m_currentRenderState)
             {
@@ -1040,7 +1024,7 @@ D3D12Renderer::RenderState* D3D12Renderer::calcRenderState()
     {
         return nullptr;
     }
-    m_currentRenderState = findRenderState(m_boundShaderProgram->m_programType);
+    m_currentRenderState = findRenderState(m_boundShaderProgram->m_pipelineType);
     if (m_currentRenderState)
     {
         return m_currentRenderState;
@@ -1049,9 +1033,9 @@ D3D12Renderer::RenderState* D3D12Renderer::calcRenderState()
     ComPtr<ID3D12RootSignature> rootSignature;
     ComPtr<ID3D12PipelineState> pipelineState;
 
-    switch (m_boundShaderProgram->m_programType)
+    switch (m_boundShaderProgram->m_pipelineType)
     {
-        case ProgramType::Compute:
+        case PipelineType::Compute:
         {
             if (SLANG_FAILED(calcComputePipelineState(rootSignature, pipelineState)))
             {
@@ -1059,7 +1043,7 @@ D3D12Renderer::RenderState* D3D12Renderer::calcRenderState()
             }
             break;
         }
-        case ProgramType::Graphics:
+        case PipelineType::Graphics:
         {
             if (SLANG_FAILED(calcGraphicsPipelineState(rootSignature, pipelineState)))
             {
@@ -1170,28 +1154,6 @@ Result D3D12Renderer::_calcBindParameters(BindParameters& params)
         }
     }
 
-#if 1
-    // Okay we need to try and create a render state
-    for (int i = 0; i < int(m_boundConstantBuffers.Count()); i++)
-    {
-        const BufferResourceImpl* buffer = m_boundConstantBuffers[i];
-        if (buffer)
-        {
-            assert(buffer->m_backingStyle == BufferResourceImpl::BackingStyle::MemoryBacked);
-
-            D3D12_ROOT_PARAMETER& param = params.nextParameter();
-            param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-            param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-
-            D3D12_ROOT_DESCRIPTOR& descriptor = param.Descriptor;
-            descriptor.ShaderRegister = numConstantBuffers;
-            descriptor.RegisterSpace = 0;
-
-            numConstantBuffers++;
-        }
-    }
-#endif
-
     // All the samplers are in one continuous section of the sampler heap
     if (m_boundBindingState && m_boundBindingState->m_samplerHeap.getUsedSize() > 0)
     {
@@ -1275,17 +1237,6 @@ Result D3D12Renderer::_bindRenderState(RenderState* renderState, ID3D12GraphicsC
                     }
                 }
             }
-
-            // Okay we need to try and create a render state
-            for (int i = 0; i < int(m_boundConstantBuffers.Count()); i++)
-            {
-                const BufferResourceImpl* buffer = m_boundConstantBuffers[i];
-                if (buffer)
-                {
-                    buffer->bindConstantBufferView(m_circularResourceHeap, index++, submitter);
-                    numConstantBuffers++;
-                }
-            }
         }
 
         if (bindingState && bindingState->m_samplerHeap.getUsedSize() > 0)
@@ -1299,7 +1250,7 @@ Result D3D12Renderer::_bindRenderState(RenderState* renderState, ID3D12GraphicsC
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! Renderer interface !!!!!!!!!!!!!!!!!!!!!!!!!!
 
-Result D3D12Renderer::initialize(void* inWindowHandle)
+Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
 {
     m_hwnd = (HWND)inWindowHandle;
     // Rather than statically link against D3D, we load it dynamically.
@@ -1412,13 +1363,12 @@ Result D3D12Renderer::initialize(void* inWindowHandle)
     m_numRenderFrames = 3;
     m_numRenderTargets = 2;
     
-    m_windowWidth = gWindowWidth;
-    m_windowHeight = gWindowHeight;
-
+    m_desc = desc;
+    
     // set viewport
     {
-        m_viewport.Width = float(m_windowWidth);
-        m_viewport.Height = float(m_windowHeight);
+        m_viewport.Width = float(m_desc.width);
+        m_viewport.Height = float(m_desc.height);
         m_viewport.MinDepth = 0;
         m_viewport.MaxDepth = 1;
         m_viewport.TopLeftX = 0;
@@ -1428,8 +1378,8 @@ Result D3D12Renderer::initialize(void* inWindowHandle)
     {
         m_scissorRect.left = 0;
         m_scissorRect.top = 0;
-        m_scissorRect.right = m_windowWidth;
-        m_scissorRect.bottom = m_windowHeight;
+        m_scissorRect.right = m_desc.width;
+        m_scissorRect.bottom = m_desc.height;
     }
 
     // Describe and create the command queue.
@@ -1442,8 +1392,8 @@ Result D3D12Renderer::initialize(void* inWindowHandle)
     // Describe the swap chain.
     DXGI_SWAP_CHAIN_DESC swapChainDesc = {};
     swapChainDesc.BufferCount = m_numRenderTargets;
-    swapChainDesc.BufferDesc.Width = m_windowWidth;
-    swapChainDesc.BufferDesc.Height = m_windowHeight;
+    swapChainDesc.BufferDesc.Width = m_desc.width;
+    swapChainDesc.BufferDesc.Height = m_desc.height; 
     swapChainDesc.BufferDesc.Format = m_targetFormat;
     swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
@@ -1611,7 +1561,7 @@ Result D3D12Renderer::createFrameResources()
 
     {
         D3D12_RESOURCE_DESC desc = m_backBuffers[0]->getResource()->GetDesc();
-        assert(desc.Width == UINT64(m_windowWidth) && desc.Height == UINT64(m_windowHeight));
+        assert(desc.Width == UINT64(m_desc.width) && desc.Height == UINT64(m_desc.height));
     }
 
     // Create the depth stencil view.
@@ -1638,8 +1588,8 @@ Result D3D12Renderer::createFrameResources()
         D3D12_RESOURCE_DESC resourceDesc = {};
         resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
         resourceDesc.Format = resourceFormat;
-        resourceDesc.Width = m_windowWidth;
-        resourceDesc.Height = m_windowHeight;
+        resourceDesc.Width = m_desc.width; 
+        resourceDesc.Height = m_desc.height;
         resourceDesc.DepthOrArraySize = 1;
         resourceDesc.MipLevels = 1;
         resourceDesc.SampleDesc.Count = m_numTargetSamples;
@@ -1661,12 +1611,12 @@ Result D3D12Renderer::createFrameResources()
         m_depthStencilView = m_dsvHeap->GetCPUDescriptorHandleForHeapStart();
     }
 
-    m_viewport.Width = static_cast<float>(m_windowWidth);
-    m_viewport.Height = static_cast<float>(m_windowHeight);
+    m_viewport.Width = static_cast<float>(m_desc.width);
+    m_viewport.Height = static_cast<float>(m_desc.height);
     m_viewport.MaxDepth = 1.0f;
 
-    m_scissorRect.right = static_cast<LONG>(m_windowWidth);
-    m_scissorRect.bottom = static_cast<LONG>(m_windowHeight);
+    m_scissorRect.right = static_cast<LONG>(m_desc.width);
+    m_scissorRect.bottom = static_cast<LONG>(m_desc.height);
 
     return SLANG_OK;
 }
@@ -2275,27 +2225,6 @@ void D3D12Renderer::setShaderProgram(ShaderProgram* inProgram)
     m_boundShaderProgram = static_cast<ShaderProgramImpl*>(inProgram);
 }
 
-void D3D12Renderer::setConstantBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* offsets)
-{
-    {
-        const UInt num = startSlot + slotCount;
-        if (num > m_boundConstantBuffers.Count())
-        {
-            m_boundConstantBuffers.SetSize(num);
-        }
-    }
-
-    for (UInt i = 0; i < slotCount; i++)
-    {
-        BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(buffers[i]);
-        if (buffer)
-        {
-            assert(buffer->m_initialUsage == Resource::Usage::ConstantBuffer); 
-        }
-        m_boundConstantBuffers[startSlot + i] = buffer;
-    }
-}
-
 void D3D12Renderer::draw(UInt vertexCount, UInt startVertex)
 {
     ID3D12GraphicsCommandList* commandList = m_commandList;
@@ -2527,7 +2456,7 @@ ShaderProgram* D3D12Renderer::compileProgram(const ShaderCompileRequest& request
 
     if (request.computeShader.name)
     {
-        program->m_programType = ProgramType::Compute;
+        program->m_pipelineType = PipelineType::Compute;
         ComPtr<ID3DBlob> computeShaderBlob;
         SLANG_RETURN_NULL_ON_FAIL(D3DUtil::compileHLSLShader(request.computeShader.source.path, request.computeShader.source.dataBegin, request.computeShader.name, request.computeShader.profile, computeShaderBlob));
 
@@ -2535,7 +2464,7 @@ ShaderProgram* D3D12Renderer::compileProgram(const ShaderCompileRequest& request
     }
     else
     {
-        program->m_programType = ProgramType::Graphics;
+        program->m_pipelineType = PipelineType::Graphics;
         ComPtr<ID3DBlob> vertexShaderBlob, fragmentShaderBlob;
         SLANG_RETURN_NULL_ON_FAIL(D3DUtil::compileHLSLShader(request.vertexShader.source.path, request.vertexShader.source.dataBegin, request.vertexShader.name, request.vertexShader.profile, vertexShaderBlob));
         SLANG_RETURN_NULL_ON_FAIL(D3DUtil::compileHLSLShader(request.fragmentShader.source.path, request.fragmentShader.source.dataBegin, request.fragmentShader.name, request.fragmentShader.profile, fragmentShaderBlob));

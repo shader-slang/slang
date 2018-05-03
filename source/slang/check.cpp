@@ -9,6 +9,174 @@
 
 namespace Slang
 {
+    // A flat representation of basic types (scalars, vectors and matrices)
+    // that can be used as lookup key in caches
+    struct BasicTypeKey
+    {
+        union
+        {
+            struct
+            {
+                unsigned char type : 4;
+                unsigned char dim1 : 2;
+                unsigned char dim2 : 2;
+            } data;
+            unsigned char aggVal;
+        };
+        bool fromType(Type* typeIn)
+        {
+            aggVal = 0;
+            if (auto basicType = typeIn->AsBasicType())
+            {
+                data.type = (unsigned char)basicType->baseType;
+                data.dim1 = data.dim2 = 0;
+            }
+            else if (auto vectorType = typeIn->AsVectorType())
+            {
+                if (auto elemCount = vectorType->elementCount.As<ConstantIntVal>())
+                {
+                    data.dim1 = elemCount->value - 1;
+                    data.type = (unsigned char)vectorType->elementType->AsBasicType()->baseType;
+                    data.dim2 = 0;
+                }
+                else
+                    return false;
+            }
+            else if (auto matrixType = typeIn->AsMatrixType())
+            {
+                if (auto elemCount1 = dynamic_cast<ConstantIntVal*>(matrixType->getRowCount()))
+                {
+                    if (auto elemCount2 = dynamic_cast<ConstantIntVal*>(matrixType->getColumnCount()))
+                    {
+                        data.type = (unsigned char)matrixType->getElementType()->AsBasicType()->baseType;
+                        data.dim1 = elemCount1->value - 1;
+                        data.dim2 = elemCount2->value - 1;
+                    }
+                }
+                else
+                    return false;
+            }
+            else
+                return false;
+            return true;
+        }
+    };
+
+    struct BasicTypeKeyPair
+    {
+        BasicTypeKey type1, type2;
+        bool operator == (BasicTypeKeyPair p)
+        {
+            return type1.aggVal == p.type1.aggVal && type2.aggVal == p.type2.aggVal;
+        }
+        int GetHashCode()
+        {
+            return combineHash(type1.aggVal, type2.aggVal);
+        }
+    };
+
+    struct OverloadCandidate
+    {
+        enum class Flavor
+        {
+            Func,
+            Generic,
+            UnspecializedGeneric,
+        };
+        Flavor flavor;
+
+        enum class Status
+        {
+            GenericArgumentInferenceFailed,
+            Unchecked,
+            ArityChecked,
+            FixityChecked,
+            TypeChecked,
+            DirectionChecked,
+            Appicable,
+        };
+        Status status = Status::Unchecked;
+
+        // Reference to the declaration being applied
+        LookupResultItem item;
+
+        // The type of the result expression if this candidate is selected
+        RefPtr<Type>	resultType;
+
+        // A system for tracking constraints introduced on generic parameters
+        //            ConstraintSystem constraintSystem;
+
+        // How much conversion cost should be considered for this overload,
+        // when ranking candidates.
+        ConversionCost conversionCostSum = kConversionCost_None;
+
+        // When required, a candidate can store a pre-checked list of
+        // arguments so that we don't have to repeat work across checking
+        // phases. Currently this is only needed for generics.
+        RefPtr<Substitutions>   subst;
+    };
+
+    struct OperatorOverloadCacheKey
+    {
+        IROp operatorName;
+        BasicTypeKey args[2];
+        bool operator == (OperatorOverloadCacheKey key)
+        {
+            return operatorName == key.operatorName && args[0].aggVal == key.args[0].aggVal
+                && args[1].aggVal == key.args[1].aggVal;
+        }
+        int GetHashCode()
+        {
+            return ((int)(UInt64)(void*)(operatorName) << 16) ^ (args[0].aggVal << 8) ^ (args[1].aggVal);
+        }
+        bool fromOperatorExpr(OperatorExpr* opExpr)
+        {
+            args[0].aggVal = 0;
+            args[1].aggVal = 0;
+            if (opExpr->Arguments.Count() > 2)
+                return false;
+            if (auto overloadedBase = opExpr->FunctionExpr->As<OverloadedExpr>())
+            {
+                Decl* funcDecl = overloadedBase->lookupResult2.item.declRef.decl;
+                if (auto genDecl = funcDecl->As<GenericDecl>())
+                    funcDecl = genDecl->inner.Ptr();
+                if (auto intrinsicOp = funcDecl->FindModifier<IntrinsicOpModifier>())
+                {
+                    operatorName = intrinsicOp->op;
+                    for (UInt i = 0; i < opExpr->Arguments.Count(); i++)
+                    {
+                        if (!args[i].fromType(opExpr->Arguments[i]->type.Ptr()))
+                            return false;
+                    }
+                }
+                else
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+    };
+
+    struct TypeCheckingCache
+    {
+        Dictionary<OperatorOverloadCacheKey, OverloadCandidate> resolvedOperatorOverloadCache;
+        Dictionary<BasicTypeKeyPair, ConversionCost> conversionCostCache;
+    };
+
+    TypeCheckingCache* Session::getTypeCheckingCache()
+    {
+        if (!typeCheckingCache)
+            typeCheckingCache = new TypeCheckingCache();
+        return typeCheckingCache;
+    }
+
+    void Session::destroyTypeCheckingCache()
+    {
+        delete typeCheckingCache;
+        typeCheckingCache = nullptr;
+    }
+
     bool IsNumeric(BaseType t)
     {
         return t == BaseType::Int || t == BaseType::Float || t == BaseType::UInt;
@@ -1233,12 +1401,40 @@ namespace Slang
             RefPtr<Type>			fromType,		// the source type for the conversion
             ConversionCost*					outCost = 0)	// (optional) a place to stuff the conversion cost
         {
-            return TryCoerceImpl(
+            BasicTypeKey key1, key2;
+            BasicTypeKeyPair cacheKey;
+            bool shouldAddToCache = false;
+            ConversionCost cost;
+            TypeCheckingCache* typeCheckingCache = getSession()->getTypeCheckingCache();
+            if (key1.fromType(toType.Ptr()) && key2.fromType(fromType.Ptr()))
+            {
+                cacheKey.type1 = key1;
+                cacheKey.type2 = key2;
+
+                if (typeCheckingCache->conversionCostCache.TryGetValue(cacheKey, cost))
+                {
+                    if (outCost)
+                        *outCost = cost;
+                    return cost != kConversionCost_Impossible;
+                }
+                else
+                    shouldAddToCache = true;
+            }
+            bool rs = TryCoerceImpl(
                 toType,
                 nullptr,
                 fromType,
                 nullptr,
-                outCost);
+                &cost);
+            if (outCost)
+                *outCost = cost;
+            if (shouldAddToCache)
+            {
+                if (!rs)
+                    cost = kConversionCost_Impossible;
+                typeCheckingCache->conversionCostCache[cacheKey] = cost;
+            }
+            return rs;
         }
 
         RefPtr<TypeCastExpr> createImplicitCastExpr()
@@ -4803,51 +4999,7 @@ namespace Slang
             return resultSubst;
         }
 
-        //
-
-        struct OverloadCandidate
-        {
-            enum class Flavor
-            {
-                Func,
-                Generic,
-                UnspecializedGeneric,
-            };
-            Flavor flavor;
-
-            enum class Status
-            {
-                GenericArgumentInferenceFailed,
-                Unchecked,
-                ArityChecked,
-                FixityChecked,
-                TypeChecked,
-                DirectionChecked,
-                Appicable,
-            };
-            Status status = Status::Unchecked;
-
-            // Reference to the declaration being applied
-            LookupResultItem item;
-
-            // The type of the result expression if this candidate is selected
-            RefPtr<Type>	resultType;
-
-            // A system for tracking constraints introduced on generic parameters
-//            ConstraintSystem constraintSystem;
-
-            // How much conversion cost should be considered for this overload,
-            // when ranking candidates.
-            ConversionCost conversionCostSum = kConversionCost_None;
-
-            // When required, a candidate can store a pre-checked list of
-            // arguments so that we don't have to repeat work across checking
-            // phases. Currently this is only needed for generics.
-            RefPtr<Substitutions>   subst;
-        };
-
-
-
+      
         // State related to overload resolution for a call
         // to an overloaded symbol
         struct OverloadResolveContext
@@ -6522,6 +6674,29 @@ namespace Slang
 
         RefPtr<Expr> ResolveInvoke(InvokeExpr * expr)
         {
+            OverloadResolveContext context;
+            // check if this is a stdlib operator call, if so we want to use cached results
+            // to speed up compilation
+            bool shouldAddToCache = false;
+            OperatorOverloadCacheKey key;
+            TypeCheckingCache* typeCheckingCache = getSession()->getTypeCheckingCache();
+            if (auto opExpr = expr->As<OperatorExpr>())
+            {
+                if (key.fromOperatorExpr(opExpr))
+                {
+                    OverloadCandidate candidate;
+                    if (typeCheckingCache->resolvedOperatorOverloadCache.TryGetValue(key, candidate))
+                    {
+                        context.bestCandidateStorage = candidate;
+                        context.bestCandidate = &context.bestCandidateStorage;
+                    }
+                    else
+                    {
+                        shouldAddToCache = true;
+                    }
+                }
+            }
+
             // Look at the base expression for the call, and figure out how to invoke it.
             auto funcExpr = expr->FunctionExpr;
             auto funcExprType = funcExpr->type;
@@ -6539,8 +6714,6 @@ namespace Slang
                 if (IsErrorExpr(arg))
                     return CreateErrorExpr(expr);
             }
-
-            OverloadResolveContext context;
 
             context.originalExpr = expr;
             context.funcLoc = funcExpr->loc;
@@ -6561,7 +6734,11 @@ namespace Slang
             {
                 context.baseExpr = funcOverloadExpr2->base;
             }
-            AddOverloadCandidates(funcExpr, context);
+
+            if (!context.bestCandidate)
+            {
+                AddOverloadCandidates(funcExpr, context);
+            }
 
             if (context.bestCandidates.Count() > 0)
             {
@@ -6660,6 +6837,8 @@ namespace Slang
                 // applicable in the end.
                 // We will report errors for this one candidate, then, to give
                 // the user the most help we can.
+                if (shouldAddToCache)
+                    typeCheckingCache->resolvedOperatorOverloadCache[key] = *context.bestCandidate;
                 return CompleteOverloadCandidate(context, *context.bestCandidate);
             }
             else

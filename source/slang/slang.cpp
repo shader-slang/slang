@@ -823,6 +823,8 @@ Session::~Session()
     irBasicBlockType = nullptr;
     constExprRate = nullptr;
 
+    destroyTypeCheckingCache();
+    
     builtinTypes = decltype(builtinTypes)();
     // destroy modules next
     loadedModuleCode = decltype(loadedModuleCode)();

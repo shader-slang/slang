@@ -11,13 +11,17 @@ namespace renderer_test {
 Options gOptions;
 
 // Only set it, if the 
-void setDefaultRendererID(RendererID id)
+void setDefaultRendererType(RendererType type)
 {
-    gOptions.rendererID = (gOptions.rendererID == RendererID::NONE) ? id : gOptions.rendererID;
+    gOptions.rendererType = (gOptions.rendererType == RendererType::Unknown) ? type : gOptions.rendererType;
 }
 
 SlangResult parseOptions(int* argc, char** argv)
 {
+    typedef Options::ShaderProgramType ShaderProgramType;
+    typedef Options::InputLanguageID InputLanguageID;
+
+
     int argCount = *argc;
     char const* const* argCursor = argv;
     char const* const* argEnd = argCursor + argCount;
@@ -60,32 +64,32 @@ SlangResult parseOptions(int* argc, char** argv)
         }
         else if( strcmp(arg, "-hlsl") == 0 )
         {
-            setDefaultRendererID( RendererID::D3D11);
+            setDefaultRendererType( RendererType::DirectX11);
             gOptions.inputLanguageID = InputLanguageID::Native;
         }
         else if( strcmp(arg, "-glsl") == 0 )
         {
-            setDefaultRendererID(RendererID::GL);
+            setDefaultRendererType( RendererType::OpenGl);
             gOptions.inputLanguageID = InputLanguageID::Native;
         }
         else if( strcmp(arg, "-hlsl-rewrite") == 0 )
         {
-            setDefaultRendererID(RendererID::D3D11);
+            setDefaultRendererType( RendererType::DirectX11);
             gOptions.inputLanguageID = InputLanguageID::NativeRewrite;
         }
         else if( strcmp(arg, "-glsl-rewrite") == 0 )
         {
-            setDefaultRendererID(RendererID::GL);
+            setDefaultRendererType(RendererType::OpenGl);
             gOptions.inputLanguageID = InputLanguageID::NativeRewrite;
         }
         else if( strcmp(arg, "-slang") == 0 )
         {
-            setDefaultRendererID(RendererID::D3D11);
+            setDefaultRendererType( RendererType::DirectX11);
             gOptions.inputLanguageID = InputLanguageID::Slang;
         }
         else if( strcmp(arg, "-glsl-cross") == 0 )
         {
-            setDefaultRendererID(RendererID::GL);
+            setDefaultRendererType(RendererType::OpenGl);
             gOptions.inputLanguageID = InputLanguageID::Slang;
         }
         else if( strcmp(arg, "-xslang") == 0 )
@@ -97,9 +101,9 @@ SlangResult parseOptions(int* argc, char** argv)
                 fprintf(stderr, "expected argument for '%s' option\n", arg);
                 return SLANG_FAIL;
             }
-            if( gOptions.slangArgCount == kMaxSlangArgs )
+            if( gOptions.slangArgCount == Options::kMaxSlangArgs )
             {
-                fprintf(stderr, "maximum number of '%s' options exceeded (%d)\n", arg, kMaxSlangArgs);
+                fprintf(stderr, "maximum number of '%s' options exceeded (%d)\n", arg, Options::kMaxSlangArgs);
                 return SLANG_FAIL;
             }
             gOptions.slangArgs[gOptions.slangArgCount++] = *argCursor++;
@@ -119,21 +123,21 @@ SlangResult parseOptions(int* argc, char** argv)
         else if (strcmp(arg, "-vk") == 0
             || strcmp(arg, "-vulkan") == 0)
         {
-            gOptions.rendererID = RendererID::VK;
+            gOptions.rendererType = RendererType::Vulkan;
         }
         else if (strcmp(arg, "-d3d12") == 0
             || strcmp(arg, "-dx12") == 0)
         {
-            gOptions.rendererID = RendererID::D3D12;
+            gOptions.rendererType = RendererType::DirectX12;
         }
         else if(strcmp(arg, "-gl") == 0)
         {
-            gOptions.rendererID = RendererID::GL;
+            gOptions.rendererType = RendererType::OpenGl;
         }
         else if (strcmp(arg, "-d3d11") == 0 
             || strcmp(arg, "-dx11") == 0)
         {
-            gOptions.rendererID = RendererID::D3D11;
+            gOptions.rendererType = RendererType::DirectX11;
         }
         else
         {

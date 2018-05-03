@@ -1232,7 +1232,92 @@ void maybeSetRate(
     }
 }
 
+static Name* getNameForNameHint(
+    IRGenContext*   context,
+    Decl*           decl)
+{
+    // We will use a bit of an ad hoc convention here for now.
 
+    Name* leafName = decl->getName();
+
+    // Handle custom name for a global parameter group (e.g., a `cbuffer`)
+    if(auto reflectionNameModifier = decl->FindModifier<ParameterGroupReflectionName>())
+    {
+        leafName = reflectionNameModifier->nameAndLoc.name;
+    }
+
+    // There is no point in trying to provide a name hint for something with no name,
+    // or with an empty name
+    if(!leafName)
+        return nullptr;
+    if(leafName->text.Length() == 0)
+        return nullptr;
+
+
+    if(auto varDecl = dynamic_cast<VarDeclBase*>(decl))
+    {
+        // For an ordinary local variable, global variable,
+        // parameter, or field, we will just use the name
+        // as declared, and now work in anything from
+        // its parent declaration(s).
+        //
+        // TODO: consider whether global/static variables should
+        // follow different rules.
+        //
+        return leafName;
+    }
+
+    // For other cases of declaration, we want to consider
+    // merging its name with the name of its parent declaration.
+    auto parentDecl = decl->ParentDecl;
+
+    // Skip past a generic parent, if we are a declaration nested in a generic.
+    if(auto genericParentDecl = dynamic_cast<GenericDecl*>(parentDecl))
+        parentDecl = genericParentDecl->ParentDecl;
+
+    auto parentName = getNameForNameHint(context, parentDecl);
+    if(!parentName)
+    {
+        return leafName;
+    }
+
+    // TODO: at some point we will start giving `ModuleDecl`s names,
+    // and in that case we need to think carefully about whether to
+    // include their names here or not.
+
+    // We will now construct a new `Name` to use as the hint,
+    // combining the name of the parent and the leaf declaration.
+
+    StringBuilder sb;
+    sb.append(parentName->text);
+    sb.append(".");
+    sb.append(leafName->text);
+
+    return context->getSession()->getNameObj(sb.ProduceString());
+}
+
+/// Try to add an appropriate name hint to the instruction,
+/// that can be used for back-end code emission or debug info.
+static void addNameHint(
+    IRGenContext*   context,
+    IRInst*         inst,
+    Decl*           decl)
+{
+    Name* name = getNameForNameHint(context, decl);
+    if(!name)
+        return;    
+    context->irBuilder->addDecoration<IRNameHintDecoration>(inst)->name = name;
+}
+
+/// Add a name hint based on a fixed string.
+static void addNameHint(
+    IRGenContext*   context,
+    IRInst*         inst,
+    char const*     text)
+{
+    Name* name = context->getSession()->getNameObj(text);
+    context->irBuilder->addDecoration<IRNameHintDecoration>(inst)->name = name;
+}
 
 LoweredValInfo createVar(
     IRGenContext*   context,
@@ -1249,6 +1334,8 @@ LoweredValInfo createVar(
         addVarDecorations(context, irAlloc, decl);
 
         builder->addHighLevelDeclDecoration(irAlloc, decl);
+
+        addNameHint(context, irAlloc, decl);
     }
 
     return LoweredValInfo::ptr(irAlloc);
@@ -1914,13 +2001,58 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
 
         RefPtr<SwizzledLValueInfo> swizzledLValue = new SwizzledLValueInfo();
         swizzledLValue->type = irType;
-        swizzledLValue->base = loweredBase;
 
         UInt elementCount = (UInt)expr->elementCount;
         swizzledLValue->elementCount = elementCount;
-        for (UInt ii = 0; ii < elementCount; ++ii)
+
+        // As a small optimization, we will detect if the base expression
+        // has also lowered into a swizzle and only return a single
+        // swizzle instead of nested swizzles.
+        //
+        // E.g., if we have input like `foo[i].zw.y` we should optimize it
+        // down to just `foo[i].w`.
+        //
+        if(loweredBase.flavor == LoweredValInfo::Flavor::SwizzledLValue)
         {
-            swizzledLValue->elementIndices[ii] = (UInt) expr->elementIndices[ii];
+            auto baseSwizzleInfo = loweredBase.getSwizzledLValueInfo();
+
+            // Our new swizzle witll use the same base expression (e.g.,
+            // `foo[i]` in our example above), but will need to remap
+            // the swizzle indices it uses.
+            //
+            swizzledLValue->base = baseSwizzleInfo->base;
+            for (UInt ii = 0; ii < elementCount; ++ii)
+            {
+                // First we get the swizzle element of the "outer" swizzle,
+                // as it was written by the user. In our running example of
+                // `foo[i].zw.y` this is the `y` element reference.
+                //
+                UInt originalElementIndex = UInt(expr->elementIndices[ii]);
+
+                // Next we will use that original element index to figure
+                // out which of the elements of the original swizzle this
+                // should map to.
+                //
+                // In our example, `y` means index 1, and so we fetch
+                // element 1 from the inner swizzle sequence `zw`, to get `w`.
+                //
+                SLANG_ASSERT(originalElementIndex < baseSwizzleInfo->elementCount);
+                UInt remappedElementIndex = baseSwizzleInfo->elementIndices[originalElementIndex];
+
+                swizzledLValue->elementIndices[ii] = remappedElementIndex;
+            }
+        }
+        else
+        {
+            // In the default case, we can just copy the indices being
+            // used for the swizzle over directly from the expression,
+            // and use the base as-is.
+            //
+            swizzledLValue->base = loweredBase;
+            for (UInt ii = 0; ii < elementCount; ++ii)
+            {
+                swizzledLValue->elementIndices[ii] = (UInt) expr->elementIndices[ii];
+            }
         }
 
         context->shared->extValues.Add(swizzledLValue);
@@ -2836,52 +2968,78 @@ top:
 
     case LoweredValInfo::Flavor::SwizzledLValue:
         {
-            // The `left` value is of the form `<someLValue>.<swizzleElements>`.
-            //
-            // We could conceivably define a custom "swizzled store" instruction
-            // that would handle the common case where the base l-value is
-            // a simple lvalue (`LowerdValInfo::Flavor::Ptr`):
-            //
-            //     float4 foo;
-            //     foo.zxy = float3(...);
-            //
-            // However, this doesn't handle complex cases like the following:
-            //
-            //     RWStructureBuffer<float4> foo;
-            //     ...
-            //     foo[index].xzy = float3(...);
-            //
-            // In a case like that, we really need to lower through a temp:
-            //
-            //     float4 tmp = foo[index];
-            //     tmp.xzy = float3(...);
-            //     foo[index] = tmp;
-            //
-            // We want to handle the general case, we we might as well
-            // try to handle everything uniformly.
-            //
+            // The `left` value is of the form `<base>.<swizzleElements>`.
+            // How we will handle this depends on what `base` looks like:
             auto swizzleInfo = left.getSwizzledLValueInfo();
             auto loweredBase = swizzleInfo->base;
 
-            // Load from the base value:
-            IRInst* irLeftVal = getSimpleVal(context, loweredBase);
-            IRInst* irRightVal = getSimpleVal(context, right);
+            switch( loweredBase.flavor )
+            {
+            default:
+                {
+                    // Our fallback position is to lower via a temporary, e.g.:
+                    //
+                    //      float4 tmp = <base>;
+                    //      tmp.xyz = float3(...);
+                    //      <base> = tmp;
+                    //
 
-            // Now apply the swizzle
-            IRInst* irSwizzled = builder->emitSwizzleSet(
-                irLeftVal->getDataType(),
-                irLeftVal,
-                irRightVal,
-                swizzleInfo->elementCount,
-                swizzleInfo->elementIndices);
+                    // Load from the base value
+                    IRInst* irLeftVal = getSimpleVal(context, loweredBase);
 
-            // And finally, store the value back where we got it.
-            //
-            // Note: this is effectively a recursive call to
-            // `assign()`, so we do a simple tail-recursive call here.
-            left = loweredBase;
-            right = LoweredValInfo::simple(irSwizzled);
-            goto top;
+                    // Extract a simple value for the right-hand side
+                    IRInst* irRightVal = getSimpleVal(context, right);
+
+                    // Apply the swizzle
+                    IRInst* irSwizzled = builder->emitSwizzleSet(
+                        irLeftVal->getDataType(),
+                        irLeftVal,
+                        irRightVal,
+                        swizzleInfo->elementCount,
+                        swizzleInfo->elementIndices);
+
+                    // And finally, store the value back where we got it.
+                    //
+                    // Note: this is effectively a recursive call to
+                    // `assign()`, so we do a simple tail-recursive call here.
+                    left = loweredBase;
+                    right = LoweredValInfo::simple(irSwizzled);
+                    goto top;
+                }
+                break;
+
+            case LoweredValInfo::Flavor::Ptr:
+                {
+                    // We are writing through a pointer, which might be
+                    // pointing into a UAV or other memory resource, so
+                    // we can't introduce use a temporary like the case
+                    // above, because then we would read and write bytes
+                    // that are not strictly required for the store.
+                    //
+                    // Note that the messy case of a "swizzle of a swizzle"
+                    // was handled already in lowering of a `SwizzleExpr`,
+                    // so that we don't need to deal with that case here.
+                    //
+                    // TODO: we may need to consider whether there is
+                    // enough value in a masked store like this to keep
+                    // it around, in comparison to a simpler model where
+                    // we simply form a pointer to each of the vector
+                    // elements and write to them individually.
+                    //
+                    // TODO: we might also consider just special-casing
+                    // single-element swizzles so that the common case
+                    // can turn into a simple `store` instead of a
+                    // `swizzledStore`.
+                    //
+                    IRInst* irRightVal = getSimpleVal(context, right);
+                    builder->emitSwizzledStore(
+                        loweredBase.val,
+                        irRightVal,
+                        swizzleInfo->elementCount,
+                        swizzleInfo->elementIndices);
+                }
+                break;
+            }
         }
         break;
 
@@ -3335,6 +3493,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             globalVal = LoweredValInfo::ptr(irGlobal);
         }
         irGlobal->mangledName = context->getSession()->getNameObj(getMangledName(decl));
+        addNameHint(context, irGlobal, decl);
 
         maybeSetRate(context, irGlobal, decl);
 
@@ -3534,6 +3693,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         subContext->irBuilder = subBuilder;
 
         IRStructType* irStruct = subBuilder->createStructType();
+        addNameHint(context, irStruct, decl);
 
         setMangledName(irStruct, getMangledName(decl));
 
@@ -3593,6 +3753,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         auto builder = getBuilder();
         auto irFieldKey = builder->createStructKey();
+        addNameHint(context, irFieldKey, fieldDecl);
 
         addVarDecorations(context, irFieldKey, fieldDecl);
 
@@ -4003,12 +4164,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 // TODO: use a `TypeKind` to represent the
                 // classifier of the parameter.
                 auto param = subBuilder->emitParam(nullptr);
+                addNameHint(context, param, typeParamDecl);
                 setValue(subContext, typeParamDecl, LoweredValInfo::simple(param));
             }
             else if (auto valDecl = member.As<GenericValueParamDecl>())
             {
                 auto paramType = lowerType(subContext, valDecl->getType());
                 auto param = subBuilder->emitParam(paramType);
+                addNameHint(context, param, valDecl);
                 setValue(subContext, valDecl, LoweredValInfo::simple(param));
             }
         }
@@ -4021,6 +4184,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 // TODO: use a `WitnessTableKind` to represent the
                 // classifier of the parameter.
                 auto param = subBuilder->emitParam(nullptr);
+                addNameHint(context, param, constraintDecl);
                 setValue(subContext, constraintDecl, LoweredValInfo::simple(param));
             }
         }
@@ -4101,6 +4265,18 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
     }
 
+    void addParamNameHint(IRInst* inst, ParameterInfo info)
+    {
+        if(auto decl = info.decl)
+        {
+            addNameHint(context, inst, decl);
+        }
+        else if( info.isThisParam )
+        {
+            addNameHint(context, inst, "this");
+        }
+    }
+
     LoweredValInfo lowerFuncDecl(FunctionDeclBase* decl)
     {
         // We are going to use a nested builder, because we will
@@ -4150,6 +4326,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // need to create an IR function here
 
         IRFunc* irFunc = subBuilder->createFunc();
+        addNameHint(context, irFunc, decl);
 
         setMangledName(irFunc, getMangledName(decl));
 
@@ -4264,6 +4441,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         {
                             subBuilder->addHighLevelDeclDecoration(irParamPtr, paramDecl);
                         }
+                        addParamNameHint(irParamPtr, paramInfo);
 
                         paramVal = LoweredValInfo::ptr(irParamPtr);
 
@@ -4290,6 +4468,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         {
                             subBuilder->addHighLevelDeclDecoration(irParam, paramDecl);
                         }
+                        addParamNameHint(irParam, paramInfo);
                         paramVal = LoweredValInfo::simple(irParam);
                         //
                         // HLSL allows a function parameter to be used as a local
@@ -4345,7 +4524,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 // Add the IR parameter for the new value
                 IRType* irParamType = irResultType;
-                subBuilder->emitParam(irParamType);
+                auto irParam = subBuilder->emitParam(irParamType);
+                addNameHint(context, irParam, "newValue");
 
                 // TODO: we need some way to wire this up to the `newValue`
                 // or whatever name we give for that parameter inside

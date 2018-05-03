@@ -164,7 +164,9 @@ SYNTAX_CLASS(HLSLLayoutSemantic, HLSLSemantic)
 END_SYNTAX_CLASS()
 
 // An HLSL `register` semantic
-SIMPLE_SYNTAX_CLASS(HLSLRegisterSemantic, HLSLLayoutSemantic)
+SYNTAX_CLASS(HLSLRegisterSemantic, HLSLLayoutSemantic)
+    FIELD(Token, spaceName)
+END_SYNTAX_CLASS()
 
 // TODO(tfoley): `packoffset`
 SIMPLE_SYNTAX_CLASS(HLSLPackOffsetSemantic, HLSLLayoutSemantic)

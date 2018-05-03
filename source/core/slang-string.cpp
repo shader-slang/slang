@@ -298,6 +298,11 @@ namespace Slang
         append(slice.begin(), slice.end());
     }
 
+    void String::append(UnownedStringSlice const& slice)
+    {
+        append(slice.begin(), slice.end());
+    }
+
     void String::append(int32_t value, int radix)
     {
         enum { kCount = 33 };
