@@ -33,7 +33,7 @@ public:
     enum { kMaxRenderTargets = 8, kMaxAttachments = kMaxRenderTargets + 1 };
     
     // Renderer    implementation
-    virtual SlangResult initialize(void* inWindowHandle) override;
+    virtual SlangResult initialize(const Desc& desc, void* inWindowHandle) override;
     virtual void setClearColor(const float color[4]) override;
     virtual void clearFrame() override;
     virtual void presentFrame() override;
@@ -254,6 +254,8 @@ public:
     int m_swapChainImageIndex = -1;
 
     float m_clearColor[4] = { 0, 0, 0, 0 };
+
+    Desc m_desc;
 };
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! VkRenderer::Buffer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -774,10 +776,12 @@ VkPipelineShaderStageCreateInfo VKRenderer::compileEntryPoint(const ShaderCompil
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! Renderer interface !!!!!!!!!!!!!!!!!!!!!!!!!!
 
-SlangResult VKRenderer::initialize(void* inWindowHandle)
+SlangResult VKRenderer::initialize(const Desc& desc, void* inWindowHandle)
 {
     SLANG_RETURN_ON_FAIL(m_module.init());
     SLANG_RETURN_ON_FAIL(m_api.initGlobalProcs(m_module));
+
+    m_desc = desc;
 
     VkApplicationInfo applicationInfo = { VK_STRUCTURE_TYPE_APPLICATION_INFO };
     applicationInfo.pApplicationName = "slang-render-test";

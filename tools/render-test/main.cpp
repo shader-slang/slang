@@ -430,7 +430,11 @@ SlangResult innerMain(int argc, char** argv)
 			return SLANG_FAIL;
 	}
 
-	SLANG_RETURN_ON_FAIL(renderer->initialize(windowHandle));
+    Renderer::Desc desc;
+    desc.width = gWindowWidth;
+    desc.height = gWindowHeight;
+
+	SLANG_RETURN_ON_FAIL(renderer->initialize(desc, windowHandle));
 
 	auto shaderCompiler = renderer->getShaderCompiler();
 	switch (gOptions.inputLanguageID)
@@ -500,7 +504,12 @@ SlangResult innerMain(int argc, char** argv)
                     }
 					else
                     {
-						SLANG_RETURN_ON_FAIL(renderer->captureScreenShot(gOptions.outputPath));
+						Result res = renderer->captureScreenShot(gOptions.outputPath);
+                        if (SLANG_FAILED(res))
+                        {
+                            fprintf(stderr, "ERROR: failed to write screen capture to file\n");
+                            return res;   
+                        }
                     }
 					return SLANG_OK;
 				}
