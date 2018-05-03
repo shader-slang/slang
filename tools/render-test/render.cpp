@@ -6,7 +6,7 @@
 namespace renderer_test {
 using namespace Slang;
 
-/* static */const Resource::BindFlag::Enum Resource::s_requiredBinding[int(Usage::CountOf)] = 
+/* static */const Resource::BindFlag::Enum Resource::s_requiredBinding[] = 
 {
     BindFlag::VertexBuffer,                 // VertexBuffer
     BindFlag::IndexBuffer,                  // IndexBuffer
@@ -20,6 +20,12 @@ using namespace Slang;
     BindFlag::NonPixelShaderResource,       // NonPixelShaderResource
     BindFlag::Enum(BindFlag::PixelShaderResource | BindFlag::NonPixelShaderResource), // GenericRead
 }; 
+
+
+/* static */void Resource::compileTimeAsserts()
+{
+    SLANG_COMPILE_TIME_ASSERT(SLANG_COUNT_OF(s_requiredBinding) == int(Usage::CountOf));
+}
 
 static const Resource::DescBase s_emptyDescBase = {};
 
@@ -38,7 +44,7 @@ const Resource::DescBase& Resource::getDescBase() const
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! RendererUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-/* static */const uint8_t RendererUtil::s_formatSize[int(Format::CountOf)] = 
+/* static */const uint8_t RendererUtil::s_formatSize[] = 
 {
     0,                               // Unknown,
 
@@ -52,6 +58,12 @@ const Resource::DescBase& Resource::getDescBase() const
     uint8_t(sizeof(float)),          // D_Float32,
     uint8_t(sizeof(uint32_t)),       // D_Unorm24_S8,
 };
+
+
+/* static */void RendererUtil::compileTimeAsserts()
+{
+    SLANG_COMPILE_TIME_ASSERT(SLANG_COUNT_OF(s_formatSize) == int(Format::CountOf));
+}
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!! BindingState::Desc !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 

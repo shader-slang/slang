@@ -214,12 +214,14 @@ class Resource: public Slang::RefObject
     bool canBind(BindFlag::Enum bindFlag) const { return getDescBase().canBind(bindFlag); }
 
         /// For a usage gives the required binding flags
-    static const BindFlag::Enum s_requiredBinding[int(Usage::CountOf)]; 
+    static const BindFlag::Enum s_requiredBinding[];    /// Maps Usage to bind flags required  
 
     protected:
     Resource(Type type):
         m_type(type)
     {}
+
+    static void compileTimeAsserts();
 
     Type m_type;
 };
@@ -336,10 +338,10 @@ class TextureResource: public Resource
         ///         forall (depth levels)
     struct Data
     {
-        ptrdiff_t* mipRowStrides;        /// The row stride for a mip map
-        int numMips;                    ///< The number of mip maps 
-        const void*const* subResources;  ///< Pointers to each full mip subResource 
-        int numSubResources;            /// The total amount of subResources. Typically = numMips * depth * arraySize 
+        ptrdiff_t* mipRowStrides;           ///< The row stride for a mip map
+        int numMips;                        ///< The number of mip maps 
+        const void*const* subResources;     ///< Pointers to each full mip subResource 
+        int numSubResources;                ///< The total amount of subResources. Typically = numMips * depth * arraySize 
     };
 
         /// Get the description of the texture
@@ -598,7 +600,8 @@ struct RendererUtil
     static void getIdentityProjection(ProjectionStyle style, float projMatrix[16]);
 
     private:
-    static const uint8_t s_formatSize[int(Format::CountOf)];
+    static void compileTimeAsserts();
+    static const uint8_t s_formatSize[]; // Maps Format::XXX to a size in bytes;
 };
 
 } // renderer_test
