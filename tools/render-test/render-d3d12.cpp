@@ -1,4 +1,6 @@
 ﻿// render-d3d12.cpp
+#define _CRT_SECURE_NO_WARNINGS
+
 #include "render-d3d12.h"
 
 #include "options.h"
@@ -23,18 +25,13 @@
 
 #include "../../source/core/slang-com-ptr.h"
 
+#include "png-serialize-util.h"
+
 #include "resource-d3d12.h"
 #include "descriptor-heap-d3d12.h"
 #include "circular-resource-heap-d3d12.h"
 
 #include "d3d-util.h"
-
-#ifdef _MSC_VER
-#pragma warning(disable: 4996)
-#endif
-
-//#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "external/stb/stb_image_write.h"
 
 // We will use the C standard library just for printing error messages.
 #include <stdio.h>
@@ -56,7 +53,7 @@ class D3D12Renderer : public Renderer, public ShaderCompiler
 {
 public:
     // Renderer    implementation
-    virtual SlangResult initialize(void* inWindowHandle) override;
+    virtual SlangResult initialize(const Desc& desc, void* inWindowHandle) override;
     virtual void setClearColor(const float color[4]) override;
     virtual void clearFrame() override;
     virtual void presentFrame() override;
@@ -367,9 +364,8 @@ protected:
     int m_numTargetSamples = 1;                                ///< The number of multi sample samples
     int m_targetSampleQuality = 0;                            ///< The multi sample quality
 
-    int m_windowWidth = 0;
-    int m_windowHeight = 0;
-
+    Desc m_desc;
+    
     bool m_isInitialized = false;
 
     D3D12_PRIMITIVE_TOPOLOGY_TYPE m_primitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
@@ -790,7 +786,6 @@ Result D3D12Renderer::captureTextureToFile(D3D12Resource& resource, const char* 
     // Submit the copy, and wait for copy to complete
     submitGpuWorkAndWait();
 
-    int stbResult = 0;
     {
         ID3D12Resource* dxResource = stagingResource;
 
@@ -799,17 +794,13 @@ Result D3D12Renderer::captureTextureToFile(D3D12Resource& resource, const char* 
         
         SLANG_RETURN_ON_FAIL(dxResource->Map(0, &readRange, reinterpret_cast<void**>(&data)));
         
-        stbResult = stbi_write_png(outputPath, int(desc.Width), int(desc.Height), 4, data, int(rowPitch));
-        
-        dxResource->Unmap(0, nullptr);
-    }
+        Surface surface;
+        surface.setUnowned(int(desc.Width), int(desc.Height), Format::RGBA_Unorm_UInt8, int(rowPitch), data);
+        Result res = PngSerializeUtil::write(outputPath, surface);
 
-    if (!stbResult)
-    {
-        fprintf(stderr, "ERROR: failed to write texture to file\n");
-        return SLANG_FAIL;
+        dxResource->Unmap(0, nullptr);
+        return res;
     }
-    return SLANG_OK;
 }
 
 Result D3D12Renderer::calcComputePipelineState(ComPtr<ID3D12RootSignature>& signatureOut, ComPtr<ID3D12PipelineState>& pipelineStateOut)
@@ -1259,7 +1250,7 @@ Result D3D12Renderer::_bindRenderState(RenderState* renderState, ID3D12GraphicsC
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! Renderer interface !!!!!!!!!!!!!!!!!!!!!!!!!!
 
-Result D3D12Renderer::initialize(void* inWindowHandle)
+Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
 {
     m_hwnd = (HWND)inWindowHandle;
     // Rather than statically link against D3D, we load it dynamically.
@@ -1372,13 +1363,12 @@ Result D3D12Renderer::initialize(void* inWindowHandle)
     m_numRenderFrames = 3;
     m_numRenderTargets = 2;
     
-    m_windowWidth = gWindowWidth;
-    m_windowHeight = gWindowHeight;
-
+    m_desc = desc;
+    
     // set viewport
     {
-        m_viewport.Width = float(m_windowWidth);
-        m_viewport.Height = float(m_windowHeight);
+        m_viewport.Width = float(m_desc.width);
+        m_viewport.Height = float(m_desc.height);
         m_viewport.MinDepth = 0;
         m_viewport.MaxDepth = 1;
         m_viewport.TopLeftX = 0;
@@ -1388,8 +1378,8 @@ Result D3D12Renderer::initialize(void* inWindowHandle)
     {
         m_scissorRect.left = 0;
         m_scissorRect.top = 0;
-        m_scissorRect.right = m_windowWidth;
-        m_scissorRect.bottom = m_windowHeight;
+        m_scissorRect.right = m_desc.width;
+        m_scissorRect.bottom = m_desc.height;
     }
 
     // Describe and create the command queue.
@@ -1402,8 +1392,8 @@ Result D3D12Renderer::initialize(void* inWindowHandle)
     // Describe the swap chain.
     DXGI_SWAP_CHAIN_DESC swapChainDesc = {};
     swapChainDesc.BufferCount = m_numRenderTargets;
-    swapChainDesc.BufferDesc.Width = m_windowWidth;
-    swapChainDesc.BufferDesc.Height = m_windowHeight;
+    swapChainDesc.BufferDesc.Width = m_desc.width;
+    swapChainDesc.BufferDesc.Height = m_desc.height; 
     swapChainDesc.BufferDesc.Format = m_targetFormat;
     swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
@@ -1571,7 +1561,7 @@ Result D3D12Renderer::createFrameResources()
 
     {
         D3D12_RESOURCE_DESC desc = m_backBuffers[0]->getResource()->GetDesc();
-        assert(desc.Width == UINT64(m_windowWidth) && desc.Height == UINT64(m_windowHeight));
+        assert(desc.Width == UINT64(m_desc.width) && desc.Height == UINT64(m_desc.height));
     }
 
     // Create the depth stencil view.
@@ -1598,8 +1588,8 @@ Result D3D12Renderer::createFrameResources()
         D3D12_RESOURCE_DESC resourceDesc = {};
         resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
         resourceDesc.Format = resourceFormat;
-        resourceDesc.Width = m_windowWidth;
-        resourceDesc.Height = m_windowHeight;
+        resourceDesc.Width = m_desc.width; 
+        resourceDesc.Height = m_desc.height;
         resourceDesc.DepthOrArraySize = 1;
         resourceDesc.MipLevels = 1;
         resourceDesc.SampleDesc.Count = m_numTargetSamples;
@@ -1621,12 +1611,12 @@ Result D3D12Renderer::createFrameResources()
         m_depthStencilView = m_dsvHeap->GetCPUDescriptorHandleForHeapStart();
     }
 
-    m_viewport.Width = static_cast<float>(m_windowWidth);
-    m_viewport.Height = static_cast<float>(m_windowHeight);
+    m_viewport.Width = static_cast<float>(m_desc.width);
+    m_viewport.Height = static_cast<float>(m_desc.height);
     m_viewport.MaxDepth = 1.0f;
 
-    m_scissorRect.right = static_cast<LONG>(m_windowWidth);
-    m_scissorRect.bottom = static_cast<LONG>(m_windowHeight);
+    m_scissorRect.right = static_cast<LONG>(m_desc.width);
+    m_scissorRect.bottom = static_cast<LONG>(m_desc.height);
 
     return SLANG_OK;
 }

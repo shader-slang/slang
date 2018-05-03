@@ -11,6 +11,9 @@
 #include "core/secure-crt.h"
 #include "external/stb/stb_image_write.h"
 
+#include "surface.h"
+#include "png-serialize-util.h"
+
 // TODO(tfoley): eventually we should be able to run these
 // tests on non-Windows targets to confirm that cross-compilation
 // at least *works* on those platforms...
@@ -78,7 +81,7 @@ class GLRenderer : public Renderer, public ShaderCompiler
 public:
     
     // Renderer    implementation
-    virtual SlangResult initialize(void* inWindowHandle) override;
+    virtual SlangResult initialize(const Desc& desc, void* inWindowHandle) override;
     virtual void setClearColor(const float color[4]) override;
     virtual void clearFrame() override;
     virtual void presentFrame() override;
@@ -273,6 +276,8 @@ public:
     GLuint  m_boundVertexStreamBuffers[kMaxVertexStreams];
     UInt    m_boundVertexStreamStrides[kMaxVertexStreams];
     UInt    m_boundVertexStreamOffsets[kMaxVertexStreams];
+
+    Desc m_desc;
 
     // Declare a function pointer for each OpenGL
     // extension function we need to load
@@ -513,9 +518,10 @@ void GLRenderer::destroyBindingEntries(const BindingState::Desc& desc, const Bin
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! Renderer interface !!!!!!!!!!!!!!!!!!!!!!!!!!
 
-SlangResult GLRenderer::initialize(void* inWindowHandle)
+SlangResult GLRenderer::initialize(const Desc& desc, void* inWindowHandle)
 {
     auto windowHandle = (HWND)inWindowHandle;
+    m_desc = desc;
 
     m_hdc = ::GetDC(windowHandle);
 
@@ -546,7 +552,7 @@ SlangResult GLRenderer::initialize(void* inWindowHandle)
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
 
-    glViewport(0, 0, gWindowWidth, gWindowHeight);
+    glViewport(0, 0, desc.width, desc.height);
 
     if (glDebugMessageCallback)
     {
@@ -575,48 +581,11 @@ void GLRenderer::presentFrame()
 
 SlangResult GLRenderer::captureScreenShot(const char* outputPath)
 {
-    int width = gWindowWidth;
-    int height = gWindowHeight;
-
-    int components = 4;
-    int rowStride = width*components;
-
-    GLubyte* buffer = (GLubyte*)::malloc(components * width * height);
-
-    glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
-
-    // OpenGL's "upside down" convention bites us here, so we need
-    // to flip the data in the buffer by swapping rows
-    int halfHeight = height / 2;
-    for (int hh = 0; hh < halfHeight; ++hh)
-    {
-        // Get a pointer to the row data, and a pointer
-        // to the row on the "other end" of the image
-        GLubyte* rowA = buffer + rowStride*hh;
-        GLubyte* rowB = buffer + rowStride*(height - (hh + 1));
-
-        for (int ii = 0; ii < rowStride; ++ii)
-        {
-            auto a = rowA[ii];
-            auto b = rowB[ii];
-
-            rowA[ii] = b;
-            rowB[ii] = a;
-        }
-    }
-
-    //
-    int stbResult = stbi_write_png(outputPath, width, height, components, buffer, rowStride);
-
-    ::free(buffer);
-
-    if (!stbResult)
-    {
-        assert(!"unexpected");
-        return SLANG_FAIL;
-    }
-
-    return SLANG_OK;
+    Surface surface;
+    surface.allocate(m_desc.width, m_desc.height, Format::RGBA_Unorm_UInt8, 1, SurfaceAllocator::getMallocAllocator());
+    glReadPixels(0, 0, m_desc.width, m_desc.height, GL_RGBA, GL_UNSIGNED_BYTE, surface.m_data);
+    surface.flipInplaceVertically();
+    return PngSerializeUtil::write(outputPath, surface);
 }
 
 ShaderCompiler* GLRenderer::getShaderCompiler()

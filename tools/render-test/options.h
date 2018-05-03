@@ -51,10 +51,6 @@ struct Options
 
 extern Options gOptions;
 
-extern int gWindowWidth;
-extern int gWindowHeight;
-
-
 SlangResult parseOptions(int* argc, char** argv);
 
 } // renderer_test

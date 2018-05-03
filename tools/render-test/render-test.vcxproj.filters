@@ -72,6 +72,12 @@
     <ClCompile Include="vk-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="surface.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="png-serialize-util.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="options.h">
@@ -129,6 +135,12 @@
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="vk-util.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="surface.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="png-serialize-util.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>

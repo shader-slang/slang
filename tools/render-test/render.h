@@ -532,12 +532,13 @@ class Renderer: public Slang::RefObject
 {
 public:
     
-    struct Info
+    struct Desc
     {
-        ProjectionStyle m_projectionStyle;
+        int width;          ///< Width in pixels
+        int height;         ///< height in pixels
     };
 
-    virtual SlangResult initialize(void* inWindowHandle) = 0;
+    virtual SlangResult initialize(const Desc& desc, void* inWindowHandle) = 0;
 
     virtual void setClearColor(const float color[4]) = 0;
     virtual void clearFrame() = 0;

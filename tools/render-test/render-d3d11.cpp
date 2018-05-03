@@ -1,4 +1,7 @@
 ﻿// render-d3d11.cpp
+
+#define _CRT_SECURE_NO_WARNINGS
+
 #include "render-d3d11.h"
 
 #include "options.h"
@@ -11,11 +14,7 @@
 
 #include "../../source/core/slang-com-ptr.h"
 
-#ifdef _MSC_VER
-#pragma warning(disable: 4996)
-#endif
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "external/stb/stb_image_write.h"
+#include "png-serialize-util.h"
 
 // We will be rendering with Direct3D 11, so we need to include
 // the Windows and D3D11 headers
@@ -47,7 +46,7 @@ class D3D11Renderer : public Renderer, public ShaderCompiler
 {
 public:
     // Renderer    implementation
-    virtual SlangResult initialize(void* inWindowHandle) override;
+    virtual SlangResult initialize(const Desc& desc, void* inWindowHandle) override;
     virtual void setClearColor(const float color[4]) override;
     virtual void clearFrame() override;
     virtual void presentFrame() override;
@@ -156,6 +155,8 @@ public:
 
     RefPtr<BindingStateImpl> m_currentBindings;
 
+    Desc m_desc;
+
     float m_clearColor[4] = { 0, 0, 0, 0 };
 };
 
@@ -215,26 +216,22 @@ Renderer* createD3D11Renderer()
         return hr;
     }
 
-    int stbResult = stbi_write_png(outputPath, textureDesc.Width, textureDesc.Height, 4,
-        mappedResource.pData, mappedResource.RowPitch);
+    Surface surface;
+    surface.setUnowned(textureDesc.Width, textureDesc.Height, Format::RGBA_Unorm_UInt8, mappedResource.RowPitch, mappedResource.pData);
+
+    Result res = PngSerializeUtil::write(outputPath, surface);
 
     // Make sure to unmap
     context->Unmap(stagingTexture, 0);
-
-    if (!stbResult)
-    {
-        fprintf(stderr, "ERROR: failed to write texture to file\n");
-        return E_UNEXPECTED;
-    }
-
-    return S_OK;
+    return res;
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! Renderer interface !!!!!!!!!!!!!!!!!!!!!!!!!!
 
-SlangResult D3D11Renderer::initialize(void* inWindowHandle)
+SlangResult D3D11Renderer::initialize(const Desc& desc, void* inWindowHandle)
 {
     auto windowHandle = (HWND)inWindowHandle;
+    m_desc = desc;
 
     // Rather than statically link against D3D, we load it dynamically.
     HMODULE d3dModule = LoadLibraryA("d3d11.dll");
@@ -287,8 +284,8 @@ SlangResult D3D11Renderer::initialize(void* inWindowHandle)
         D3D_FEATURE_LEVEL_9_1,
     };
     D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_9_1;
-    const int totalNumFeatureLevels = sizeof(featureLevels) / sizeof(featureLevels[0]);
-
+    const int totalNumFeatureLevels = SLANG_COUNT_OF(featureLevels);
+    
     // On a machine that does not have an up-to-date version of D3D installed,
     // the `D3D11CreateDeviceAndSwapChain` call will fail with `E_INVALIDARG`
     // if you ask for featuer level 11_1. The workaround is to call
@@ -360,8 +357,8 @@ SlangResult D3D11Renderer::initialize(void* inWindowHandle)
     D3D11_VIEWPORT viewport;
     viewport.TopLeftX = 0;
     viewport.TopLeftY = 0;
-    viewport.Width = (float)gWindowWidth;
-    viewport.Height = (float)gWindowHeight;
+    viewport.Width = (float)desc.width;
+    viewport.Height = (float)desc.height; 
     viewport.MaxDepth = 1; // TODO(tfoley): use reversed depth
     viewport.MinDepth = 0;
     m_immediateContext->RSSetViewports(1, &viewport);
