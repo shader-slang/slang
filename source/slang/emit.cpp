@@ -3317,6 +3317,31 @@ struct EmitVisitor
                 emit(";\n");
             }
             break;
+
+        case kIROp_SwizzledStore:
+            {
+                auto ii = cast<IRSwizzledStore>(inst);
+                emit("(");
+                emitIROperand(ctx, ii->getDest(), mode);
+                emit(").");
+                UInt elementCount = ii->getElementCount();
+                for (UInt ee = 0; ee < elementCount; ++ee)
+                {
+                    IRInst* irElementIndex = ii->getElementIndex(ee);
+                    assert(irElementIndex->op == kIROp_IntLit);
+                    IRConstant* irConst = (IRConstant*)irElementIndex;
+
+                    UInt elementIndex = (UInt)irConst->u.intVal;
+                    assert(elementIndex < 4);
+
+                    char const* kComponents[] = { "x", "y", "z", "w" };
+                    emit(kComponents[elementIndex]);
+                }
+                emit(" = ");
+                emitIROperand(ctx, ii->getSource(), mode);
+                emit(";\n");
+            }
+            break;
         }
     }
 

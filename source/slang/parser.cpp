@@ -1835,24 +1835,76 @@ namespace Slang
         }
     }
 
-    //
-    // layout-semantic ::= (register | packoffset) '(' register-name component-mask? ')'
-    // register-name ::= identifier
-    // component-mask ::= '.' identifier
-    //
-    static void ParseHLSLLayoutSemantic(
-        Parser*				parser,
-        HLSLLayoutSemantic*	semantic)
+    /// Parse the "register name" part of a `register` or `packoffset` semantic.
+    ///
+    /// The syntax matched is:
+    ///
+    ///     register-name-and-component-mask ::= register-name component-mask?
+    ///     register-name ::= identifier
+    ///     component-mask ::= '.' identifier
+    ///
+    static void parseHLSLRegisterNameAndOptionalComponentMask(
+        Parser*             parser,
+        HLSLLayoutSemantic* semantic)
     {
-        semantic->name = parser->ReadToken(TokenType::Identifier);
-
-        parser->ReadToken(TokenType::LParent);
         semantic->registerName = parser->ReadToken(TokenType::Identifier);
         if (AdvanceIf(parser, TokenType::Dot))
         {
             semantic->componentMask = parser->ReadToken(TokenType::Identifier);
         }
+    }
+
+    /// Parse an HLSL `register` semantic.
+    ///
+    /// The syntax matched is:
+    ///
+    ///     register-semantic ::= 'register' '(' register-name-and-component-mask register-space? ')'
+    ///     register-space ::= ',' identifier
+    ///
+    static void parseHLSLRegisterSemantic(
+        Parser*                 parser,
+        HLSLRegisterSemantic*   semantic)
+    {
+        // Read the `register` keyword
+        semantic->name = parser->ReadToken(TokenType::Identifier);
+
+        // Expect a parenthized list of additional arguments
+        parser->ReadToken(TokenType::LParent);
+
+        // First argument is a required register name and optional component mask
+        parseHLSLRegisterNameAndOptionalComponentMask(parser, semantic);
+
+        // Second argument is an optional register space
+        if(AdvanceIf(parser, TokenType::Comma))
+        {
+            semantic->spaceName = parser->ReadToken(TokenType::Identifier);
+        }
+
         parser->ReadToken(TokenType::RParent);
+    }
+
+    /// Parse an HLSL `packoffset` semantic.
+    ///
+    /// The syntax matched is:
+    ///
+    ///     packoffset-semantic ::= 'packoffset' '(' register-name-and-component-mask ')'
+    ///
+    static void parseHLSLPackOffsetSemantic(
+        Parser*                 parser,
+        HLSLPackOffsetSemantic* semantic)
+    {
+        // Read the `packoffset` keyword
+        semantic->name = parser->ReadToken(TokenType::Identifier);
+
+        // Expect a parenthized list of additional arguments
+        parser->ReadToken(TokenType::LParent);
+
+        // First and only argument is a required register name and optional component mask
+        parseHLSLRegisterNameAndOptionalComponentMask(parser, semantic);
+
+        parser->ReadToken(TokenType::RParent);
+
+        parser->sink->diagnose(semantic, Diagnostics::packOffsetNotSupported);
     }
 
     //
@@ -1864,18 +1916,21 @@ namespace Slang
         if (parser->LookAheadToken("register"))
         {
             RefPtr<HLSLRegisterSemantic> semantic = new HLSLRegisterSemantic();
-            ParseHLSLLayoutSemantic(parser, semantic.Ptr());
+            parser->FillPosition(semantic);
+            parseHLSLRegisterSemantic(parser, semantic.Ptr());
             return semantic;
         }
         else if (parser->LookAheadToken("packoffset"))
         {
             RefPtr<HLSLPackOffsetSemantic> semantic = new HLSLPackOffsetSemantic();
-            ParseHLSLLayoutSemantic(parser, semantic.Ptr());
+            parser->FillPosition(semantic);
+            parseHLSLPackOffsetSemantic(parser, semantic.Ptr());
             return semantic;
         }
         else if (parser->LookAheadToken(TokenType::Identifier))
         {
             RefPtr<HLSLSimpleSemantic> semantic = new HLSLSimpleSemantic();
+            parser->FillPosition(semantic);
             semantic->name = parser->ReadToken(TokenType::Identifier);
             return semantic;
         }

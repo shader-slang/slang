@@ -360,6 +360,11 @@ struct IRGenContext
     {
         return shared->compileRequest;
     }
+
+    DiagnosticSink* getSink()
+    {
+        return &getCompileRequest()->mSink;
+    }
 };
 
 void setGlobalValue(SharedIRGenContext* sharedContext, Decl* decl, LoweredValInfo value)
@@ -1909,13 +1914,58 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
 
         RefPtr<SwizzledLValueInfo> swizzledLValue = new SwizzledLValueInfo();
         swizzledLValue->type = irType;
-        swizzledLValue->base = loweredBase;
 
         UInt elementCount = (UInt)expr->elementCount;
         swizzledLValue->elementCount = elementCount;
-        for (UInt ii = 0; ii < elementCount; ++ii)
+
+        // As a small optimization, we will detect if the base expression
+        // has also lowered into a swizzle and only return a single
+        // swizzle instead of nested swizzles.
+        //
+        // E.g., if we have input like `foo[i].zw.y` we should optimize it
+        // down to just `foo[i].w`.
+        //
+        if(loweredBase.flavor == LoweredValInfo::Flavor::SwizzledLValue)
         {
-            swizzledLValue->elementIndices[ii] = (UInt) expr->elementIndices[ii];
+            auto baseSwizzleInfo = loweredBase.getSwizzledLValueInfo();
+
+            // Our new swizzle witll use the same base expression (e.g.,
+            // `foo[i]` in our example above), but will need to remap
+            // the swizzle indices it uses.
+            //
+            swizzledLValue->base = baseSwizzleInfo->base;
+            for (UInt ii = 0; ii < elementCount; ++ii)
+            {
+                // First we get the swizzle element of the "outer" swizzle,
+                // as it was written by the user. In our running example of
+                // `foo[i].zw.y` this is the `y` element reference.
+                //
+                UInt originalElementIndex = UInt(expr->elementIndices[ii]);
+
+                // Next we will use that original element index to figure
+                // out which of the elements of the original swizzle this
+                // should map to.
+                //
+                // In our example, `y` means index 1, and so we fetch
+                // element 1 from the inner swizzle sequence `zw`, to get `w`.
+                //
+                SLANG_ASSERT(originalElementIndex < baseSwizzleInfo->elementCount);
+                UInt remappedElementIndex = baseSwizzleInfo->elementIndices[originalElementIndex];
+
+                swizzledLValue->elementIndices[ii] = remappedElementIndex;
+            }
+        }
+        else
+        {
+            // In the default case, we can just copy the indices being
+            // used for the swizzle over directly from the expression,
+            // and use the base as-is.
+            //
+            swizzledLValue->base = loweredBase;
+            for (UInt ii = 0; ii < elementCount; ++ii)
+            {
+                swizzledLValue->elementIndices[ii] = (UInt) expr->elementIndices[ii];
+            }
         }
 
         context->shared->extValues.Add(swizzledLValue);
@@ -2049,9 +2099,35 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         return getBuilder()->createBlock();
     }
 
-    // Insert a block at the current location (ending
-    // the previous block with an unconditional jump
-    // if needed).
+    /// Does the given block have a terminator?
+    bool isBlockTerminated(IRBlock* block)
+    {
+        return block->getTerminator() != nullptr;
+    }
+
+    /// Emit a branch to the target block if the current
+    /// block being inserted into is not already terminated.
+    void emitBranchIfNeeded(IRBlock* targetBlock)
+    {
+        auto builder = getBuilder();
+        auto currentBlock = builder->getBlock();
+
+        // Don't emit if there is no current block.
+        if(!currentBlock)
+            return;
+
+        // Don't emit if the block already has a terminator.
+        if(isBlockTerminated(currentBlock))
+            return;
+
+        // The block is unterminated, so cap it off with
+        // a terminator that branches to the target.
+        builder->emitBranch(targetBlock);
+    }
+
+    /// Insert a block at the current location (ending
+    /// the previous block with an unconditional jump
+    /// if needed).
     void insertBlock(IRBlock* block)
     {
         auto builder = getBuilder();
@@ -2062,13 +2138,11 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // If the previous block doesn't already have
         // a terminator instruction, then be sure to
         // emit a branch to the new block.
-        if (prevBlock && !prevBlock->getTerminator())
-        {
-            builder->emitBranch(block);
-        }
+        emitBranchIfNeeded(block);
 
+        // Add the new block to the function we are building,
+        // and setit as the block we will be inserting into.
         parentFunc->addBlock(block);
-
         builder->setInsertInto(block);
     }
 
@@ -2082,9 +2156,43 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         return block;
     }
 
+    /// Start a new block if there isn't a current
+    /// block that we can append to.
+    ///
+    /// The `stmt` parameter is the statement we
+    /// are about to emit.
+    void startBlockIfNeeded(Stmt* stmt)
+    {
+        auto builder = getBuilder();
+        auto currentBlock = builder->getBlock();
+
+        // If there is a current block and it hasn't
+        // been terminated, then we can just use that.
+        if(currentBlock && !isBlockTerminated(currentBlock))
+        {
+            return;
+        }
+
+        // We are about to emit code *after* a terminator
+        // instruction, and there is no label to allow
+        // branching into this code, so whatever we are
+        // about to emit is going to be unreachable.
+        //
+        // Let's diagnose that here just to help the user.
+        //
+        // TODO: We might want to have a more robust check
+        // for unreachable code based on IR analysis instead,
+        // at which point we'd probably disable this check.
+        //
+        context->getSink()->diagnose(stmt, Diagnostics::unreachableCode);
+
+        startBlock();
+    }
+
     void visitIfStmt(IfStmt* stmt)
     {
         auto builder = getBuilder();
+        startBlockIfNeeded(stmt);
 
         auto condExpr = stmt->Predicate;
         auto thenStmt = stmt->PositiveStatement;
@@ -2103,7 +2211,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
             insertBlock(thenBlock);
             lowerStmt(context, thenStmt);
-            builder->emitBranch(afterBlock);
+            emitBranchIfNeeded(afterBlock);
 
             insertBlock(elseBlock);
             lowerStmt(context, elseStmt);
@@ -2139,6 +2247,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     void visitForStmt(ForStmt* stmt)
     {
         auto builder = getBuilder();
+        startBlockIfNeeded(stmt);
 
         // The initializer clause for the statement
         // can always safetly be emitted to the current block.
@@ -2199,7 +2308,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         }
 
         // At the end of the body we need to jump back to the top.
-        builder->emitBranch(loopHead);
+        emitBranchIfNeeded(loopHead);
 
         // Finally we insert the label that a `break` will jump to
         insertBlock(breakLabel);
@@ -2211,6 +2320,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // `for` statement, but without a lot of the complications.
 
         auto builder = getBuilder();
+        startBlockIfNeeded(stmt);
 
         // We will create blocks for the various places
         // we need to jump to inside the control flow,
@@ -2260,7 +2370,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         lowerStmt(context, stmt->Statement);
 
         // At the end of the body we need to jump back to the top.
-        builder->emitBranch(loopHead);
+        emitBranchIfNeeded(loopHead);
 
         // Finally we insert the label that a `break` will jump to
         insertBlock(breakLabel);
@@ -2272,6 +2382,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // `while` statement, just with the test in a different place
 
         auto builder = getBuilder();
+        startBlockIfNeeded(stmt);
 
         // We will create blocks for the various places
         // we need to jump to inside the control flow,
@@ -2328,6 +2439,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
     void visitExpressionStmt(ExpressionStmt* stmt)
     {
+        startBlockIfNeeded(stmt);
+
         // The statement evaluates an expression
         // (for side effects, one assumes) and then
         // discards the result. As such, we simply
@@ -2343,6 +2456,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
     void visitDeclStmt(DeclStmt* stmt)
     {
+        startBlockIfNeeded(stmt);
+
         // For now, we lower a declaration directly
         // into the current context.
         //
@@ -2376,6 +2491,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
     void visitReturnStmt(ReturnStmt* stmt)
     {
+        startBlockIfNeeded(stmt);
+
         // A `return` statement turns into a return
         // instruction. If the statement had an argument
         // expression, then we need to lower that to
@@ -2392,13 +2509,16 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         }
     }
 
-    void visitDiscardStmt(DiscardStmt* /*stmt*/)
+    void visitDiscardStmt(DiscardStmt* stmt)
     {
+        startBlockIfNeeded(stmt);
         getBuilder()->emitDiscard();
     }
 
     void visitBreakStmt(BreakStmt* stmt)
     {
+        startBlockIfNeeded(stmt);
+
         // Semantic checking is responsible for finding
         // the statement taht this `break` breaks out of
         auto parentStmt = stmt->parentStmt;
@@ -2415,6 +2535,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
     void visitContinueStmt(ContinueStmt* stmt)
     {
+        startBlockIfNeeded(stmt);
+
         // Semantic checking is responsible for finding
         // the loop that this `continue` statement continues
         auto parentStmt = stmt->parentStmt;
@@ -2575,6 +2697,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     void visitSwitchStmt(SwitchStmt* stmt)
     {
         auto builder = getBuilder();
+        startBlockIfNeeded(stmt);
 
         // Given a statement:
         //
@@ -2758,52 +2881,78 @@ top:
 
     case LoweredValInfo::Flavor::SwizzledLValue:
         {
-            // The `left` value is of the form `<someLValue>.<swizzleElements>`.
-            //
-            // We could conceivably define a custom "swizzled store" instruction
-            // that would handle the common case where the base l-value is
-            // a simple lvalue (`LowerdValInfo::Flavor::Ptr`):
-            //
-            //     float4 foo;
-            //     foo.zxy = float3(...);
-            //
-            // However, this doesn't handle complex cases like the following:
-            //
-            //     RWStructureBuffer<float4> foo;
-            //     ...
-            //     foo[index].xzy = float3(...);
-            //
-            // In a case like that, we really need to lower through a temp:
-            //
-            //     float4 tmp = foo[index];
-            //     tmp.xzy = float3(...);
-            //     foo[index] = tmp;
-            //
-            // We want to handle the general case, we we might as well
-            // try to handle everything uniformly.
-            //
+            // The `left` value is of the form `<base>.<swizzleElements>`.
+            // How we will handle this depends on what `base` looks like:
             auto swizzleInfo = left.getSwizzledLValueInfo();
             auto loweredBase = swizzleInfo->base;
 
-            // Load from the base value:
-            IRInst* irLeftVal = getSimpleVal(context, loweredBase);
-            IRInst* irRightVal = getSimpleVal(context, right);
+            switch( loweredBase.flavor )
+            {
+            default:
+                {
+                    // Our fallback position is to lower via a temporary, e.g.:
+                    //
+                    //      float4 tmp = <base>;
+                    //      tmp.xyz = float3(...);
+                    //      <base> = tmp;
+                    //
 
-            // Now apply the swizzle
-            IRInst* irSwizzled = builder->emitSwizzleSet(
-                irLeftVal->getDataType(),
-                irLeftVal,
-                irRightVal,
-                swizzleInfo->elementCount,
-                swizzleInfo->elementIndices);
+                    // Load from the base value
+                    IRInst* irLeftVal = getSimpleVal(context, loweredBase);
 
-            // And finally, store the value back where we got it.
-            //
-            // Note: this is effectively a recursive call to
-            // `assign()`, so we do a simple tail-recursive call here.
-            left = loweredBase;
-            right = LoweredValInfo::simple(irSwizzled);
-            goto top;
+                    // Extract a simple value for the right-hand side
+                    IRInst* irRightVal = getSimpleVal(context, right);
+
+                    // Apply the swizzle
+                    IRInst* irSwizzled = builder->emitSwizzleSet(
+                        irLeftVal->getDataType(),
+                        irLeftVal,
+                        irRightVal,
+                        swizzleInfo->elementCount,
+                        swizzleInfo->elementIndices);
+
+                    // And finally, store the value back where we got it.
+                    //
+                    // Note: this is effectively a recursive call to
+                    // `assign()`, so we do a simple tail-recursive call here.
+                    left = loweredBase;
+                    right = LoweredValInfo::simple(irSwizzled);
+                    goto top;
+                }
+                break;
+
+            case LoweredValInfo::Flavor::Ptr:
+                {
+                    // We are writing through a pointer, which might be
+                    // pointing into a UAV or other memory resource, so
+                    // we can't introduce use a temporary like the case
+                    // above, because then we would read and write bytes
+                    // that are not strictly required for the store.
+                    //
+                    // Note that the messy case of a "swizzle of a swizzle"
+                    // was handled already in lowering of a `SwizzleExpr`,
+                    // so that we don't need to deal with that case here.
+                    //
+                    // TODO: we may need to consider whether there is
+                    // enough value in a masked store like this to keep
+                    // it around, in comparison to a simpler model where
+                    // we simply form a pointer to each of the vector
+                    // elements and write to them individually.
+                    //
+                    // TODO: we might also consider just special-casing
+                    // single-element swizzles so that the common case
+                    // can turn into a simple `store` instead of a
+                    // `swizzledStore`.
+                    //
+                    IRInst* irRightVal = getSimpleVal(context, right);
+                    builder->emitSwizzledStore(
+                        loweredBase.val,
+                        irRightVal,
+                        swizzleInfo->elementCount,
+                        swizzleInfo->elementIndices);
+                }
+                break;
+            }
         }
         break;
 

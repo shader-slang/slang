@@ -253,18 +253,6 @@ DIAGNOSTIC(39999, Error, tooManyArguments, "too many arguments to call (got $0, 
 DIAGNOSTIC(39999, Error, invalidIntegerLiteralSuffix, "invalid suffix '$0' on integer literal")
 DIAGNOSTIC(39999, Error, invalidFloatingPOintLiteralSuffix, "invalid suffix '$0' on floating-point literal")
 
-DIAGNOSTIC(39999, Error, conflictingExplicitBindingsForParameter, "conflicting explicit bindings for parameter '$0'")
-DIAGNOSTIC(39999, Warning, parameterBindingsOverlap, "explicit binding for parameter '$0' overlaps with parameter '$1'")
-
-
-DIAGNOSTIC(39999, Error, shaderParameterDeclarationsDontMatch, "declarations of shader parameter '$0' in different translation units don't match")
-
-DIAGNOSTIC(39999, Note, shaderParameterTypeMismatch, "type is declared as '$0' in one translation unit, and '$0' in another")
-DIAGNOSTIC(39999, Note, fieldTypeMisMatch, "type of field '$0' is declared as '$1' in one translation unit, and '$2' in another")
-DIAGNOSTIC(39999, Note, fieldDeclarationsDontMatch, "type '$0' is declared with different fields in each translation unit")
-DIAGNOSTIC(39999, Note, usedInDeclarationOf, "used in declaration of '$0'")
-
-
 
 
 
@@ -287,6 +275,26 @@ DIAGNOSTIC(38021, Error, typeArgumentDoesNotConformToInterface, "type argument `
 DIAGNOSTIC(38200, Error, recursiveModuleImport, "module `$0` recursively imports itself")
 DIAGNOSTIC(39999, Fatal, errorInImportedModule, "error in imported module, compilation ceased.")
 
+// 39xxx - Type layout and parameter binding.
+
+DIAGNOSTIC(39000, Error, conflictingExplicitBindingsForParameter, "conflicting explicit bindings for parameter '$0'")
+DIAGNOSTIC(39001, Warning, parameterBindingsOverlap, "explicit binding for parameter '$0' overlaps with parameter '$1'")
+
+
+DIAGNOSTIC(39002, Error, shaderParameterDeclarationsDontMatch, "declarations of shader parameter '$0' in different translation units don't match")
+
+DIAGNOSTIC(39003, Note, shaderParameterTypeMismatch, "type is declared as '$0' in one translation unit, and '$0' in another")
+DIAGNOSTIC(39004, Note, fieldTypeMisMatch, "type of field '$0' is declared as '$1' in one translation unit, and '$2' in another")
+DIAGNOSTIC(39005, Note, fieldDeclarationsDontMatch, "type '$0' is declared with different fields in each translation unit")
+DIAGNOSTIC(39006, Note, usedInDeclarationOf, "used in declaration of '$0'")
+
+DIAGNOSTIC(39007, Error, unknownRegisterClass, "unknown register class: '$0'")
+DIAGNOSTIC(39008, Error, expectedARegisterIndex, "expected a register index after '$0'")
+DIAGNOSTIC(39009, Error, expectedSpace, "expected 'space', got '$0'")
+DIAGNOSTIC(39010, Error, expectedSpaceIndex, "expected a register space index after 'space'")
+DIAGNOSTIC(39011, Error, componentMaskNotSupported, "explicit register component masks are not yet supported in Slang")
+DIAGNOSTIC(39012, Error, packOffsetNotSupported, "explicit 'packoffset' bindings are not yet supported in Slang")
+
 //
 // 4xxxx - IL code generation.
 //
@@ -302,6 +310,11 @@ DIAGNOSTIC(49999, Error, unknownSystemValueSemantic, "unknown system-value seman
 DIAGNOSTIC(40006, Error, needCompileTimeConstant, "expected a compile-time constant")
 
 DIAGNOSTIC(40007, Internal, irValidationFailed, "IR validation failed: $0")
+
+// 41000 - IR-level validation issues
+
+DIAGNOSTIC(41000, Warning, unreachableCode, "unreachable code detected")
+
 
 //
 // 5xxxx - Target code generation.

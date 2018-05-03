@@ -1,0 +1,17 @@
+result code = 0
+standard error = {
+}
+standard output = {
+{
+    "parameters": [
+        {
+            "name": "tx",
+            "binding": {"kind": "shaderResource", "space": 2, "index": 1},
+            "type": {
+                "kind": "resource",
+                "baseShape": "texture2D"
+            }
+        }
+    ]
+}
+}
