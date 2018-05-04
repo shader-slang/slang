@@ -8,6 +8,8 @@
 #include "render-vk.h"
 
 #include "slang-support.h"
+#include "surface.h"
+#include "png-serialize-util.h"
 
 #include "shader-renderer-util.h"
 
@@ -68,6 +70,8 @@ class RenderTestApp
 
     Result writeBindingOutput(const char* fileName);
     
+    Result writeScreen(const char* filename);
+
 	protected:
 		/// Called in initialize
 	Result initializeShaders(ShaderCompiler* shaderCompiler);
@@ -312,6 +316,14 @@ Result RenderTestApp::writeBindingOutput(const char* fileName)
     return SLANG_OK;
 }
 
+
+Result RenderTestApp::writeScreen(const char* filename)
+{
+    Surface surface;
+    SLANG_RETURN_ON_FAIL(m_renderer->captureScreenSurface(surface));
+    return PngSerializeUtil::write(filename, surface);
+}
+
 //
 // We use a bare-minimum window procedure to get things up and running.
 //
@@ -504,7 +516,8 @@ SlangResult innerMain(int argc, char** argv)
                     }
 					else
                     {
-						Result res = renderer->captureScreenShot(gOptions.outputPath);
+						Result res = app.writeScreen(gOptions.outputPath);
+                        
                         if (SLANG_FAILED(res))
                         {
                             fprintf(stderr, "ERROR: failed to write screen capture to file\n");

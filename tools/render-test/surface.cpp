@@ -188,4 +188,35 @@ void Surface::flipInplaceVertically()
     }
 }
 
+SlangResult Surface::set(int width, int height, Format format, int srcRowStride, const void* data, SurfaceAllocator* allocator)
+{
+    if (hasContents() && m_width == width && m_height == height && m_format == format)
+    {
+        // I can just overwrite the contents that is there
+    }
+    else
+    {
+        SLANG_RETURN_ON_FAIL(allocate(width, height, format, 0, allocator));
+    }
+
+    // Okay just need to set the contents
+
+    {
+        const size_t rowSize = calcRowSize(format, width);
+
+        const uint8_t* srcRow = (const uint8_t*)data;
+        uint8_t* dstRow = (uint8_t*)m_data;
+
+        for (int i = 0; i < m_numRows; i++)
+        {
+            ::memcpy(dstRow, srcRow, rowSize);    
+            
+            srcRow += srcRowStride;
+            dstRow += m_rowStrideInBytes;
+        }
+    }
+
+    return SLANG_OK;
+}
+
 } // renderer_test

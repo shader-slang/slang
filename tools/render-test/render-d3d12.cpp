@@ -6,6 +6,8 @@
 #include "options.h"
 #include "render.h"
 
+#include "surface.h"
+
 // In order to use the Slang API, we need to include its header
 
 #include <slang.h>
@@ -24,8 +26,6 @@
 #include <d3dcompiler.h>
 
 #include "../../source/core/slang-com-ptr.h"
-
-#include "png-serialize-util.h"
 
 #include "resource-d3d12.h"
 #include "descriptor-heap-d3d12.h"
@@ -59,7 +59,7 @@ public:
     virtual void presentFrame() override;
     virtual TextureResource* createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData) override;
     virtual BufferResource* createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& bufferDesc, const void* initData) override;
-    virtual SlangResult captureScreenShot(const char* outputPath) override;
+    virtual SlangResult captureScreenSurface(Surface& surfaceOut) override;
     virtual InputLayout* createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) override;
     virtual BindingState* createBindingState(const BindingState::Desc& bindingStateDesc) override;
     virtual ShaderCompiler* getShaderCompiler() override;
@@ -326,7 +326,7 @@ protected:
     void submitGpuWorkAndWait();
     void _resetCommandList();
 
-    Result captureTextureToFile(D3D12Resource& resource, const char* outputPath);
+    Result captureTextureToSurface(D3D12Resource& resource, Surface& surfaceOut);
 
     FrameInfo& getFrame() { return m_frameInfos[m_frameIndex]; }
     const FrameInfo& getFrame() const { return m_frameInfos[m_frameIndex]; }
@@ -721,7 +721,7 @@ void D3D12Renderer::submitGpuWorkAndWait()
     waitForGpu();
 }
 
-Result D3D12Renderer::captureTextureToFile(D3D12Resource& resource, const char* outputPath)
+Result D3D12Renderer::captureTextureToSurface(D3D12Resource& resource, Surface& surfaceOut)
 {
     const D3D12_RESOURCE_STATES initialState = resource.getState();
 
@@ -794,9 +794,7 @@ Result D3D12Renderer::captureTextureToFile(D3D12Resource& resource, const char* 
         
         SLANG_RETURN_ON_FAIL(dxResource->Map(0, &readRange, reinterpret_cast<void**>(&data)));
         
-        Surface surface;
-        surface.setUnowned(int(desc.Width), int(desc.Height), Format::RGBA_Unorm_UInt8, int(rowPitch), data);
-        Result res = PngSerializeUtil::write(outputPath, surface);
+        Result res = surfaceOut.set(int(desc.Width), int(desc.Height), Format::RGBA_Unorm_UInt8, int(rowPitch), data, SurfaceAllocator::getMallocAllocator());
 
         dxResource->Unmap(0, nullptr);
         return res;
@@ -1681,9 +1679,9 @@ void D3D12Renderer::presentFrame()
     beginRender();
 }
 
-SlangResult D3D12Renderer::captureScreenShot(const char* outputPath)
+SlangResult D3D12Renderer::captureScreenSurface(Surface& surfaceOut)
 {
-    return captureTextureToFile(*m_renderTargets[m_renderTargetIndex], outputPath);
+    return captureTextureToSurface(*m_renderTargets[m_renderTargetIndex], surfaceOut);
 }
 
 ShaderCompiler* D3D12Renderer::getShaderCompiler() 
