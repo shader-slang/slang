@@ -38,7 +38,15 @@ enum OutputMode
     // We currently don't specialize for Travis, but maybe
     // we should.
     kOutputMode_Travis,
+
+    // xUnit original format
+    // https://nose.readthedocs.io/en/latest/plugins/xunit.html
+    kOutputMode_xUnit,
+
+    // https://xunit.github.io/docs/format-xml-v2
+    kOutputMode_xUnit2,
 };
+
 
 struct TestCategory;
 TestCategory* findTestCategory(String const& name);
@@ -165,6 +173,16 @@ Result parseOptions(int* argc, char** argv)
         else if( strcmp(arg, "-travis") == 0 )
         {
             options.outputMode = kOutputMode_Travis;
+            options.dumpOutputOnFailure = true;
+        }
+        else if (strcmp(arg, "-xunit") == 0)
+        {
+            options.outputMode = kOutputMode_xUnit;
+            options.dumpOutputOnFailure = true;
+        }
+        else if (strcmp(arg, "-xunit2") == 0)
+        {
+            options.outputMode = kOutputMode_xUnit2;
             options.dumpOutputOnFailure = true;
         }
         else if( strcmp(arg, "-category") == 0 )
@@ -626,8 +644,6 @@ String getOutput(OSProcessSpawner& spawner)
 
     return actualOutputBuilder.ProduceString();
 }
-
-List<String> gFailedTests;
 
 struct TestInput
 {
@@ -1585,10 +1601,56 @@ TestResult runTest(
 
 struct TestContext
 {
-    int totalTestCount;
-    int passedTestCount;
-    int failedTestCount;
-    int ignoredTestCount;
+    struct TestInfo
+    {
+        String name;
+        TestResult testResult;
+    };
+
+    void addResult(const String& testName, TestResult testResult)
+    {
+        m_totalTestCount++;
+
+        switch (testResult)
+        {
+            case kTestResult_Fail:
+                m_failedTestCount++;
+                break;
+
+            case kTestResult_Pass:
+                m_passedTestCount++;
+                break;
+
+            case kTestResult_Ignored:
+                m_ignoredTestCount++;
+                break;
+
+            default:
+                assert(!"unexpected");
+                break;
+        }
+
+        TestInfo info;
+        info.name = testName;
+        info.testResult = testResult;
+
+        m_testInfos.Add(info);
+    }
+
+    TestContext()
+    {
+        m_totalTestCount = 0;
+        m_passedTestCount = 0;
+        m_failedTestCount = 0;
+        m_ignoredTestCount = 0;
+    }
+
+    List<TestInfo> m_testInfos;
+
+    int m_totalTestCount;
+    int m_passedTestCount;
+    int m_failedTestCount;
+    int m_ignoredTestCount;
 };
 
 // deal with the fallout of a test having completed, whether
@@ -1598,48 +1660,33 @@ void handleTestResult(
     String const&   testName,
     TestResult      testResult)
 {
-    context->totalTestCount++;
-
-    switch( testResult )
-    {
-    case kTestResult_Fail:
-        context->failedTestCount++;
-        gFailedTests.Add(testName);
-        break;
-
-    case kTestResult_Pass:
-        context->passedTestCount++;
-        break;
-
-    case kTestResult_Ignored:
-        context->ignoredTestCount++;
-        break;
-
-    default:
-        assert(!"unexpected");
-        break;
-    }
+    context->addResult(testName, testResult);
 
 //    printf("OUTPUT_MODE: %d\n", options.outputMode);
     switch( options.outputMode )
     {
-    default :
+        default:
         {
             char const* resultString = "UNEXPECTED";
             switch( testResult )
             {
-            case kTestResult_Fail:      resultString = "FAILED";  break;
-            case kTestResult_Pass:      resultString = "passed";  break;
-            case kTestResult_Ignored:   resultString = "ignored"; break;
-            default:
-                assert(!"unexpected");
-                break;
+                case kTestResult_Fail:      resultString = "FAILED";  break;
+                case kTestResult_Pass:      resultString = "passed";  break;
+                case kTestResult_Ignored:   resultString = "ignored"; break;
+                default:
+                    assert(!"unexpected");
+                    break;
             }
             printf("%s test: '%S'\n", resultString, testName.ToWString().begin());
+            break;
         }
-        break;
-
-    case kOutputMode_AppVeyor:
+        case kOutputMode_xUnit2:
+        case kOutputMode_xUnit:
+        {
+            // Don't output anything -> we'll output all in one go at the end
+            break;
+        }
+        case kOutputMode_AppVeyor:
         {
             char const* resultString = "None";
             switch( testResult )
@@ -1651,7 +1698,6 @@ void handleTestResult(
                 assert(!"unexpected");
                 break;
             }
-
 
             OSProcessSpawner spawner;
             spawner.pushExecutableName("appveyor");
@@ -1678,8 +1724,9 @@ void handleTestResult(
                     spawner.getStandardError().begin());
 #endif
             }
+        
+            break;
         }
-        break;
     }
 }
 
@@ -1912,41 +1959,78 @@ int main(
         options.excludeCategories.Add(vulkanTestCategory, vulkanTestCategory);
     }
 
-    TestContext context = { 0 };
-
+    TestContext context;
+    
     // Enumerate test files according to policy
     // TODO: add more directories to this list
     // TODO: allow for a command-line argument to select a particular directory
     runTestsInDirectory(&context, "tests/");
 
-    if (!context.totalTestCount)
-    {
-        printf("no tests run\n");
-        return 0;
-    }
-
-    auto passCount = context.passedTestCount;
-    auto rawTotal = context.totalTestCount;
-    auto ignoredCount = context.ignoredTestCount;
+    auto passCount = context.m_passedTestCount;
+    auto rawTotal = context.m_totalTestCount;
+    auto ignoredCount = context.m_ignoredTestCount;
 
     auto runTotal = rawTotal - ignoredCount;
 
-    printf("\n===\n%d%% of tests passed (%d/%d)", (passCount*100) / runTotal, passCount, runTotal);
-    if(ignoredCount)
+    switch (options.outputMode)
     {
-        printf(", %d tests ignored", ignoredCount);
-    }
-    printf("\n===\n\n");
-
-    if(context.failedTestCount)
-    {
-        printf("failing tests:\n");
-        printf("---\n");
-        for(auto name : gFailedTests)
+        default:
         {
-            printf("%s\n", name.Buffer());
+            if (!context.m_totalTestCount)
+            {
+                printf("no tests run\n");
+                return 0;
+            }
+
+            printf("\n===\n%d%% of tests passed (%d/%d)", (passCount*100) / runTotal, passCount, runTotal);
+            if(ignoredCount)
+            {
+                printf(", %d tests ignored", ignoredCount);
+            }
+            printf("\n===\n\n");
+
+            if(context.m_failedTestCount)
+            {
+                printf("failing tests:\n");
+                printf("---\n");
+                for(const auto& testInfo : context.m_testInfos)
+                {
+                    if (testInfo.testResult == kTestResult_Fail)
+                    {
+                        printf("%s\n", testInfo.name.Buffer());
+                    }
+                }
+                printf("---\n");
+            }
+            break;
         }
-        printf("---\n");
+        case kOutputMode_xUnit:
+        {
+            // xUnit 1.0 format  
+            
+            printf("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+            printf("<testsuites tests=\"%d\" failures=\"%d\" disabled=\"%d\" errors=\"0\" name=\"AllTests\">\n", context.m_totalTestCount, context.m_failedTestCount, context.m_ignoredTestCount);
+            
+            for (const auto& testInfo : context.m_testInfos)
+            {
+                const int numFailed = (testInfo.testResult == kTestResult_Fail);
+                const int numIgnored = (testInfo.testResult == kTestResult_Ignored);
+                //int numPassed = (testInfo.testResult == kTestResult_Pass);
+
+                printf("  <testsuite name=\"%s\" tests=\"1\" failures=\"%d\" disabled=\"%d\" errors=\"0\" time=\"0\">\n", testInfo.name.Buffer(), numFailed, numIgnored); 
+                printf("    <testcase name=\"%s\" status=\"run\"/>\n", testInfo.name.Buffer());
+                printf("  </testsuite>\n");
+            }
+
+            printf("</testSuites>\n");
+            break;
+        }
+        case kOutputMode_xUnit2:
+        {
+            // https://xunit.github.io/docs/format-xml-v2
+            assert("Not currently supported");
+            break;
+        }
     }
 
     return passCount == runTotal ? 0 : 1;
