@@ -555,7 +555,7 @@ public:
         /// Create a buffer resource
     virtual BufferResource* createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& desc, const void* initData = nullptr) { return nullptr; } 
 
-        /// Captures the back buffer and stores the result in surfaceOut. If the surface contains data, this will likely be freed in the process.
+        /// Captures the back buffer and stores the result in surfaceOut. If the surface contains data - it will either be overwritten (if same size and format), or freed and a re-allocated.
     virtual SlangResult captureScreenSurface(Surface& surfaceOut) = 0;
 
     virtual InputLayout* createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) = 0;
