@@ -3021,7 +3021,7 @@ namespace Slang
         void ValidateFunctionRedeclaration(FuncDecl* funcDecl)
         {
             auto parentDecl = funcDecl->ParentDecl;
-            SLANG_RELEASE_ASSERT(parentDecl);
+            SLANG_ASSERT(parentDecl);
             if (!parentDecl) return;
 
             Decl* childDecl = funcDecl;
@@ -3094,7 +3094,7 @@ namespace Slang
                 // consider if their generic signatures match.
                 if (genericDecl)
                 {
-                    assert(prevGenericDecl);
+                    SLANG_ASSERT(prevGenericDecl); // already checked above
                     if (!doGenericSignaturesMatch(genericDecl, prevGenericDecl))
                         continue;
 
@@ -4436,6 +4436,9 @@ namespace Slang
         // in order for checking to suceed.
         struct ConstraintSystem
         {
+            // A source location to use in reporting any issues
+            SourceLoc loc;
+
             // The generic declaration whose parameters we
             // are trying to solve for.
             RefPtr<GenericDecl> genericDecl;
@@ -4750,7 +4753,7 @@ namespace Slang
                         return left;
                     else
                     {
-                        SLANG_ASSERT(rightFlavor > leftFlavor);
+                        SLANG_ASSERT(rightFlavor > leftFlavor); // equality was handles at the top of this function
                         return right;
                     }
                 }
@@ -5377,13 +5380,13 @@ namespace Slang
                 return true;
 
             auto genericDeclRef = candidate.item.declRef.As<GenericDecl>();
-            assert(genericDeclRef);
+            SLANG_ASSERT(genericDeclRef); // otherwise we wouldn't be a generic candidate...
 
             // We should have the existing arguments to the generic
             // handy, so that we can construct a substitution list.
 
             RefPtr<GenericSubstitution> subst = candidate.subst.As<GenericSubstitution>();
-            assert(subst);
+            SLANG_ASSERT(subst);
 
             subst->genericDecl = genericDeclRef.getDecl();
             subst->outer = genericDeclRef.substitutions.substitutions;
@@ -5853,15 +5856,15 @@ namespace Slang
                 {
                     auto constraintDecl1 = fstWit->declRef.As<TypeConstraintDecl>();
                     auto constraintDecl2 = sndWit->declRef.As<TypeConstraintDecl>();
-                    assert(constraintDecl1);
-                    assert(constraintDecl2);
+                    SLANG_ASSERT(constraintDecl1);
+                    SLANG_ASSERT(constraintDecl2);
                     return TryUnifyTypes(constraints,
                         constraintDecl1.getDecl()->getSup().type,
                         constraintDecl2.getDecl()->getSup().type);
                 }
             }
 
-            throw "unimplemented";
+            SLANG_UNIMPLEMENTED(getSink(), constraints.loc, "value unification case");
 
             // default: fail
             return false;
@@ -6111,6 +6114,7 @@ namespace Slang
             if (auto extGenericDecl = GetOuterGeneric(extDecl))
             {
                 ConstraintSystem constraints;
+                constraints.loc = extDecl->loc;
                 constraints.genericDecl = extGenericDecl;
 
                 if (!TryUnifyTypes(constraints, extDecl->targetType.Ptr(), type))
@@ -6229,12 +6233,13 @@ namespace Slang
         // so that the resulting inner declaration can be applicable in
         // a particular context...
         DeclRef<Decl> SpecializeGenericForOverload(
-            DeclRef<GenericDecl>			genericDeclRef,
-            OverloadResolveContext&	context)
+            DeclRef<GenericDecl>    genericDeclRef,
+            OverloadResolveContext& context)
         {
             checkDecl(genericDeclRef.getDecl());
 
             ConstraintSystem constraints;
+            constraints.loc = context.loc;
             constraints.genericDecl = genericDeclRef.getDecl();
 
             // Construct a reference to the inner declaration that has any generic
@@ -6363,7 +6368,7 @@ namespace Slang
 
             // We expect the parent of the generic type parameter to be a generic...
             auto genericDeclRef = typeDeclRef.GetParent().As<GenericDecl>();
-            assert(genericDeclRef);
+            SLANG_ASSERT(genericDeclRef);
 
             for(auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(genericDeclRef))
             {
@@ -7585,7 +7590,7 @@ namespace Slang
     bool isPrimaryDecl(
         CallableDecl*   decl)
     {
-        assert(decl);
+        SLANG_ASSERT(decl);
         return (!decl->primaryDecl) || (decl == decl->primaryDecl);
     }
 

@@ -68,7 +68,7 @@ LegalVal LegalVal::implicitDeref(LegalVal const& val)
 
 LegalVal LegalVal::getImplicitDeref()
 {
-    assert(flavor == Flavor::implicitDeref);
+    SLANG_ASSERT(flavor == Flavor::implicitDeref);
     return obj.As<ImplicitDerefVal>()->val;
 }
 
@@ -622,10 +622,10 @@ static LegalVal legalizeGetElementPtr(
             RefPtr<TuplePseudoVal> resTupleInfo = new TuplePseudoVal();
 
             auto tupleType = type.getTuple();
-            assert(tupleType);
+            SLANG_ASSERT(tupleType);
 
             auto elemCount = ptrTupleInfo->elements.Count();
-            assert(elemCount == tupleType->elements.Count());
+            SLANG_ASSERT(elemCount == tupleType->elements.Count());
 
             for(UInt ee = 0; ee < elemCount; ++ee)
             {
@@ -951,7 +951,7 @@ static void addParamType(List<IRType*>& ioParamTypes, LegalType t)
     }
     break;
     default:
-        SLANG_ASSERT(false);
+        SLANG_UNEXPECTED("unknown legalized type flavor");
     }
 }
 

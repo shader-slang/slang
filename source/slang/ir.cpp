@@ -322,8 +322,8 @@ namespace Slang
             break;
 
         default:
-            assert(!"unepxected");
-            return IRBlock::SuccessorList(nullptr, nullptr);
+            SLANG_UNEXPECTED("unhandled terminator instruction");
+            UNREACHABLE_RETURN(IRBlock::SuccessorList(nullptr, nullptr));
         }
 
         return IRBlock::SuccessorList(begin, end, stride);
@@ -790,7 +790,7 @@ namespace Slang
             size = sizeof(T);
         }
 
-        assert(module);
+        SLANG_ASSERT(module);
         T* inst = (T*)module->memoryPool.allocZero(size);
         new(inst)T();
 
@@ -2846,7 +2846,7 @@ namespace Slang
         {
             // The uses had better all be uses of this
             // instruction, or invariants are broken.
-            assert(uu->get() == this);
+            SLANG_ASSERT(uu->get() == this);
 
             // Swap this use over to use the other value.
             uu->usedValue = other;
@@ -2863,7 +2863,7 @@ namespace Slang
         // We are at the last use (and there must
         // be at least one, because we handled
         // the case of an empty list earlier).
-        assert(uu);
+        SLANG_ASSERT(uu);
 
         // Our job at this point is to splice
         // our list of uses onto the other
@@ -2906,13 +2906,13 @@ namespace Slang
     // as `other`, right before it.
     void IRInst::insertBefore(IRInst* other)
     {
-        assert(other);
+        SLANG_ASSERT(other);
         insertBefore(other, other->parent);
     }
 
     void IRInst::insertAtStart(IRParentInst* newParent)
     {
-        assert(newParent);
+        SLANG_ASSERT(newParent);
         insertBefore(newParent->children.first, newParent);
     }
 
@@ -2928,10 +2928,10 @@ namespace Slang
         // Make sure this instruction has been removed from any previous parent
         this->removeFromParent();
 
-        assert(other || newParent);
+        SLANG_ASSERT(other || newParent);
         if (!other) other = newParent->children.first;
         if (!newParent) newParent = other->parent;
-        assert(newParent);
+        SLANG_ASSERT(newParent);
 
         auto nn = other;
         auto pp = other ? other->getPrevInst() : nullptr;
@@ -2961,13 +2961,13 @@ namespace Slang
 
     void IRInst::insertAfter(IRInst* other)
     {
-        assert(other);
+        SLANG_ASSERT(other);
         insertAfter(other, other->parent);
     }
 
     void IRInst::insertAtEnd(IRParentInst* newParent)
     {
-        assert(newParent);
+        SLANG_ASSERT(newParent);
         insertAfter(newParent->children.last, newParent);
     }
 
@@ -2983,10 +2983,10 @@ namespace Slang
         // Make sure this instruction has been removed from any previous parent
         this->removeFromParent();
 
-        assert(other || newParent);
+        SLANG_ASSERT(other || newParent);
         if (!other) other = newParent->children.last;
         if (!newParent) newParent = other->parent;
-        assert(newParent);
+        SLANG_ASSERT(newParent);
 
         auto pp = other;
         auto nn = other ? other->next : nullptr;
@@ -3509,7 +3509,8 @@ namespace Slang
         RefPtr<TypeLayout> typeLayout = inTypeLayout;
         for( auto dd = declarator; dd; dd = dd->next )
         {
-            assert(dd->flavor == GlobalVaryingDeclarator::Flavor::array);
+            // We only have one declarator case right now...
+            SLANG_ASSERT(dd->flavor == GlobalVaryingDeclarator::Flavor::array);
 
             auto arrayType = builder->getArrayType(
                 type,
@@ -3682,7 +3683,7 @@ namespace Slang
             IRType* fullType = type;
             for( auto dd = declarator; dd; dd = dd->next )
             {
-                assert(dd->flavor == GlobalVaryingDeclarator::Flavor::array);
+                SLANG_ASSERT(dd->flavor == GlobalVaryingDeclarator::Flavor::array);
                 fullType = builder->getArrayType(
                     fullType,
                     dd->elementCount);
@@ -4011,7 +4012,7 @@ namespace Slang
         ScalarizedVal   val)
     {
         auto tupleVal = val.impl.As<ScalarizedTupleValImpl>();
-        assert(tupleVal);
+        SLANG_ASSERT(tupleVal);
 
         UInt elementCount = tupleVal->elements.Count();
         auto type = tupleVal->type;
@@ -4150,7 +4151,7 @@ namespace Slang
         // TODO: the right thing to do here is to split any
         // function that both gets called as an entry point
         // and as an ordinary function.
-        assert(!func->firstUse);
+        SLANG_ASSERT(!func->firstUse);
 
         // We create a dummy IR builder, since some of
         // the functions require it.
@@ -4260,7 +4261,7 @@ namespace Slang
                 // Note that this means that any transformations that mess
                 // with function signatures will need to also update layout info...
                 //
-                assert(entryPointLayout->fields.Count() > paramIndex);
+                SLANG_ASSERT(entryPointLayout->fields.Count() > paramIndex);
                 auto paramLayout = entryPointLayout->fields[paramIndex];
 
                 // We need to create a global variable that will replace the parameter.
@@ -5123,7 +5124,7 @@ namespace Slang
             IRBlock* cb = clonedValue->getFirstBlock();
             while (ob)
             {
-                assert(cb);
+                SLANG_ASSERT(cb);
 
                 builder->setInsertInto(cb);
                 for (auto oi = ob->getFirstInst(); oi; oi = oi->getNextInst())
