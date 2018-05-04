@@ -284,6 +284,17 @@ struct IRInst : public IRObject
     // for those values.
     void removeArguments();
 
+    /// Does this instruction have any uses?
+    bool hasUses() const { return firstUse != nullptr; }
+
+    /// Does this instructiomn have more than one use?
+    bool hasMoreThanOneUse() const { return firstUse != nullptr && firstUse->nextUse != nullptr; }
+
+    /// It is possible that this instruction has side effects?
+    ///
+    /// This is a conservative test, and will return `true` if an exact answer can't be determined.
+    bool mightHaveSideEffects();
+
     // RTTI support
     static bool isaImpl(IROp) { return true; }
 };

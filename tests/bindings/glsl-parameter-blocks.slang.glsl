@@ -13,10 +13,9 @@
 #define main_result _S2
 #define uv _S3
 
-#define temp_uv _S4
-#define temp_a _S5
-#define temp_sample _S6
-#define temp_add _S7
+#define temp_a _S4
+#define temp_sample _S5
+#define temp_add _S2
 
 struct Test
 {
@@ -43,14 +42,11 @@ in vec2 uv;
 
 void main()
 {
-	vec2 temp_uv = uv;
-
 	vec4 temp_a = gTest.a;
 
-    vec4 temp_sample = texture(sampler2D(gTest_t, gTest_s), temp_uv);
+    vec4 temp_sample = texture(sampler2D(gTest_t, gTest_s), uv);
 
-    vec4 temp_add = temp_a + temp_sample;
-	main_result = temp_add;
+    main_result = temp_a + temp_sample;
 
 	return;
 }
