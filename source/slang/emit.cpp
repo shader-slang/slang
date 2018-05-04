@@ -2213,21 +2213,43 @@ struct EmitVisitor
         IRInst*        inst,
         IREmitMode      mode)
     {
-        // Certain opcodes should always be folded in
+        // Certain opcodes should never/always be folded in
         switch( inst->op )
         {
         default:
             break;
 
+        // Never fold these in, because they represent declarations
+        //
         case kIROp_Var:
         case kIROp_GlobalVar:
         case kIROp_GlobalConstant:
         case kIROp_Param:
             return false;
 
+        // HACK: don't fold these in because we currently lower
+        // them to initializer lists, which aren't allowed in
+        // general expression contexts.
+        //
+        case kIROp_makeStruct:
+        case kIROp_makeArray:
+            return false;
+
+        // Always fold these in, because they are trivial
+        //
         case kIROp_IntLit:
         case kIROp_FloatLit:
         case kIROp_boolConst:
+            return true;
+
+        // Always fold these in, because their results
+        // cannot be represented in the type system of
+        // our current targets.
+        //
+        // TODO: when we add C/C++ as an optional target,
+        // we could consider lowering insts that result
+        // in pointers directly.
+        //
         case kIROp_FieldAddress:
         case kIROp_getElementPtr:
         case kIROp_Specialize:
@@ -2239,11 +2261,13 @@ struct EmitVisitor
         if (mode == IREmitMode::GlobalConstant)
             return true;
 
-        // Certain *types* will usually want to be folded in,
-        // because they aren't allowed as types for temporary
-        // variables.
+        // Instructions with specific result *types* will usually
+        // want to be folded in, because they aren't allowed as types
+        // for temporary variables.
         auto type = inst->getDataType();
 
+        // First we unwrap any layers of pointer-ness and array-ness
+        // from the types to get at the underlying data type.
         while (auto ptrType = as<IRPtrTypeBase>(type))
         {
             type = ptrType->getValueType();
@@ -2253,6 +2277,15 @@ struct EmitVisitor
             type = ptrType->getElementType();
         }
 
+        // First we check for uniform parameter groups,
+        // because a `cbuffer` or GLSL `uniform` block
+        // does not have a first-class type that we can
+        // pass around.
+        //
+        // TODO: We need to ensure that type legalization
+        // cleans up cases where we use a parameter group
+        // or parameter block type as a function parameter...
+        //
         if(as<IRUniformParameterGroupType>(type))
         {
             // TODO: we need to be careful here, because
@@ -2260,6 +2293,12 @@ struct EmitVisitor
             // types.
             return true;
         }
+        //
+        // The stream-output and patch types need to be handled
+        // too, because they are not really first class (especially
+        // not in GLSL, but they also seem to confuse the HLSL
+        // compiler when they get used as temporaries).
+        //
         else if (as<IRHLSLStreamOutputType>(type))
         {
             return true;
@@ -2289,8 +2328,56 @@ struct EmitVisitor
             }
         }
 
-        // By default we will *not* fold things into their use sites.
-        return false;
+        // Having dealt with all of the cases where we *must* fold things
+        // above, we can now deal with the more general cases where we
+        // *should not* fold things.
+
+        // Don't fold somethin with no users:
+        if(!inst->hasUses())
+            return false;
+
+        // Don't fold something that has multiple users:
+        if(inst->hasMoreThanOneUse())
+            return false;
+
+        // Don't fold something that might have side effects:
+        if(inst->mightHaveSideEffects())
+            return false;
+
+        // Okay, at this point we know our instruction must have a single use.
+        auto use = inst->firstUse;
+        SLANG_ASSERT(use);
+        SLANG_ASSERT(!use->nextUse);
+
+        auto user = use->getUser();
+
+        // We'd like to figure out if it is safe to fold our instruction into `user`
+
+        // First, let's make sure they are in the same block/parent:
+        if(inst->getParent() != user->getParent())
+            return false;
+
+        // Now let's look at all the instructions between this instruction
+        // and the user. If any of them might have side effects, then lets
+        // bail out now.
+        for(auto ii = inst->getNextInst(); ii != user; ii = ii->getNextInst())
+        {
+            if(!ii)
+            {
+                // We somehow reached the end of the block without finding
+                // the user, which doesn't make sense if uses dominate
+                // defs. Let's just play it safe and bail out.
+                return false;
+            }
+
+            if(ii->mightHaveSideEffects())
+                return false;
+        }
+
+        // Okay, if we reach this point then the user comes later in
+        // the same block, and there are no instructions with side
+        // effects in between, so it seems safe to fold things in.
+        return true;
     }
 
     bool isDerefBaseImplicit(
