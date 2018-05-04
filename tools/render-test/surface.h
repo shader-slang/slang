@@ -37,6 +37,9 @@ class Surface
         /// Set unowned
     void setUnowned(int width, int height, Format format, int strideInBytes, void* data); 
 
+        /// Set the contents - the memory will be owned by this surface (ie will be freed by the allocator when goes out of scope or is deallocated)
+    Slang::Result set(int width, int height, Format format, int strideInBytes, const void* data, SurfaceAllocator* allocator);
+    
     template <typename T>
     T* calcNextRow(T* ptr) const { return (T*)calcNextRow((void*)ptr); }
     template <typename T>

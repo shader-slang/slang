@@ -15,6 +15,9 @@ namespace renderer_test {
 typedef intptr_t Int;
 typedef uintptr_t UInt;
 
+// pre declare types
+class Surface;
+
 // Declare opaque type
 class InputLayout: public Slang::RefObject
 {
@@ -552,7 +555,8 @@ public:
         /// Create a buffer resource
     virtual BufferResource* createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& desc, const void* initData = nullptr) { return nullptr; } 
 
-    virtual SlangResult captureScreenShot(const char* outputPath) = 0;
+        /// Captures the back buffer and stores the result in surfaceOut. If the surface contains data, this will likely be freed in the process.
+    virtual SlangResult captureScreenSurface(Surface& surfaceOut) = 0;
 
     virtual InputLayout* createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) = 0;
     virtual BindingState* createBindingState(const BindingState::Desc& desc) { return nullptr; }

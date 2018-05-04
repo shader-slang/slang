@@ -12,7 +12,6 @@
 #include "external/stb/stb_image_write.h"
 
 #include "surface.h"
-#include "png-serialize-util.h"
 
 // TODO(tfoley): eventually we should be able to run these
 // tests on non-Windows targets to confirm that cross-compilation
@@ -87,7 +86,7 @@ public:
     virtual void presentFrame() override;
     virtual TextureResource* createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData) override;
     virtual BufferResource* createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& descIn, const void* initData) override;
-    virtual SlangResult captureScreenShot(char const* outputPath) override;
+    virtual SlangResult captureScreenSurface(Surface& surfaceOut) override;
     virtual InputLayout* createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) override;
     virtual BindingState* createBindingState(const BindingState::Desc& bindingStateDesc) override;
     virtual ShaderCompiler* getShaderCompiler() override;
@@ -586,13 +585,12 @@ void GLRenderer::presentFrame()
     ::SwapBuffers(m_hdc);
 }
 
-SlangResult GLRenderer::captureScreenShot(const char* outputPath)
+SlangResult GLRenderer::captureScreenSurface(Surface& surfaceOut)
 {
-    Surface surface;
-    surface.allocate(m_desc.width, m_desc.height, Format::RGBA_Unorm_UInt8, 1, SurfaceAllocator::getMallocAllocator());
-    glReadPixels(0, 0, m_desc.width, m_desc.height, GL_RGBA, GL_UNSIGNED_BYTE, surface.m_data);
-    surface.flipInplaceVertically();
-    return PngSerializeUtil::write(outputPath, surface);
+    SLANG_RETURN_ON_FAIL(surfaceOut.allocate(m_desc.width, m_desc.height, Format::RGBA_Unorm_UInt8, 1, SurfaceAllocator::getMallocAllocator()));
+    glReadPixels(0, 0, m_desc.width, m_desc.height, GL_RGBA, GL_UNSIGNED_BYTE, surfaceOut.m_data);
+    surfaceOut.flipInplaceVertically();
+    return SLANG_OK;
 }
 
 ShaderCompiler* GLRenderer::getShaderCompiler()

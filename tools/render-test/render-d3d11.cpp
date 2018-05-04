@@ -8,13 +8,13 @@
 #include "render.h"
 #include "d3d-util.h"
 
+#include "surface.h"
+
 // In order to use the Slang API, we need to include its header
 
 #include <slang.h>
 
 #include "../../source/core/slang-com-ptr.h"
-
-#include "png-serialize-util.h"
 
 // We will be rendering with Direct3D 11, so we need to include
 // the Windows and D3D11 headers
@@ -52,7 +52,7 @@ public:
     virtual void presentFrame() override;
     virtual TextureResource* createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData) override;
     virtual BufferResource* createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& bufferDesc, const void* initData) override;
-    virtual SlangResult captureScreenShot(char const* outputPath) override;
+    virtual SlangResult captureScreenSurface(Surface& surfaceOut) override;
     virtual InputLayout* createInputLayout( const InputElementDesc* inputElements, UInt inputElementCount) override;
     virtual BindingState* createBindingState(const BindingState::Desc& desc) override;
     virtual ShaderCompiler* getShaderCompiler() override;
@@ -141,7 +141,7 @@ public:
 	};
 
         /// Capture a texture to a file
-    static HRESULT captureTextureToFile(ID3D11Device* device, ID3D11DeviceContext* context, ID3D11Texture2D* texture, char const* outputPath);
+    static HRESULT captureTextureToSurface(ID3D11Device* device, ID3D11DeviceContext* context, ID3D11Texture2D* texture, Surface& surfaceOut);
 
     void _applyBindingState(bool isCompute);
 
@@ -165,8 +165,7 @@ Renderer* createD3D11Renderer()
     return new D3D11Renderer();
 }
 
-/* static */HRESULT D3D11Renderer::captureTextureToFile(ID3D11Device* device, ID3D11DeviceContext* context,
-    ID3D11Texture2D* texture, char const* outputPath)
+/* static */HRESULT D3D11Renderer::captureTextureToSurface(ID3D11Device* device, ID3D11DeviceContext* context, ID3D11Texture2D* texture, Surface& surfaceOut)
 {
     if (!context) return E_INVALIDARG;
     if (!texture) return E_INVALIDARG;
@@ -207,23 +206,16 @@ Renderer* createD3D11Renderer()
     }
 
     // Now just read back texels from the staging textures
-
-    D3D11_MAPPED_SUBRESOURCE mappedResource;
-    hr = context->Map(stagingTexture, 0, D3D11_MAP_READ, 0, &mappedResource);
-    if (FAILED(hr))
     {
-        fprintf(stderr, "ERROR: failed to map texture for read\n");
-        return hr;
+        D3D11_MAPPED_SUBRESOURCE mappedResource;
+        SLANG_RETURN_ON_FAIL(context->Map(stagingTexture, 0, D3D11_MAP_READ, 0, &mappedResource));
+
+        Result res = surfaceOut.set(textureDesc.Width, textureDesc.Height, Format::RGBA_Unorm_UInt8, mappedResource.RowPitch, mappedResource.pData, SurfaceAllocator::getMallocAllocator());
+
+        // Make sure to unmap
+        context->Unmap(stagingTexture, 0);
+        return res;
     }
-
-    Surface surface;
-    surface.setUnowned(textureDesc.Width, textureDesc.Height, Format::RGBA_Unorm_UInt8, mappedResource.RowPitch, mappedResource.pData);
-
-    Result res = PngSerializeUtil::write(outputPath, surface);
-
-    // Make sure to unmap
-    context->Unmap(stagingTexture, 0);
-    return res;
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! Renderer interface !!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -385,15 +377,9 @@ void D3D11Renderer::presentFrame()
     m_swapChain->Present(0, 0);
 }
 
-SlangResult D3D11Renderer::captureScreenShot(const char* outputPath)
+SlangResult D3D11Renderer::captureScreenSurface(Surface& surfaceOut)
 {
-    HRESULT hr = captureTextureToFile(m_device, m_immediateContext, m_renderTargetTextures[0], outputPath);
-    if (FAILED(hr))
-    {
-        fprintf(stderr, "error: could not capture screen-shot to '%s'\n", outputPath);
-        SLANG_RETURN_ON_FAIL(hr);
-    }
-    return SLANG_OK;
+    return captureTextureToSurface(m_device, m_immediateContext, m_renderTargetTextures[0], surfaceOut);
 }
 
 ShaderCompiler* D3D11Renderer::getShaderCompiler()

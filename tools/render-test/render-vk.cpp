@@ -39,7 +39,7 @@ public:
     virtual void presentFrame() override;
     virtual TextureResource* createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData) override;
     virtual BufferResource* createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& bufferDesc, const void* initData) override;
-    virtual SlangResult captureScreenShot(const char* outputPath) override;
+    virtual SlangResult captureScreenSurface(Surface& surface) override;
     virtual InputLayout* createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) override;
     virtual BindingState* createBindingState(const BindingState::Desc& bindingStateDesc) override;
     virtual ShaderCompiler* getShaderCompiler() override;
@@ -1010,7 +1010,7 @@ void VKRenderer::presentFrame()
     _beginRender();
 }
 
-SlangResult VKRenderer::captureScreenShot(char const* outputPath)
+SlangResult VKRenderer::captureScreenSurface(Surface& surfaceOut)
 {
     return SLANG_FAIL;
 }
