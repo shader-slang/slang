@@ -3071,6 +3071,78 @@ namespace Slang
         deallocate();
     }
 
+    bool IRInst::mightHaveSideEffects()
+    {
+        // TODO: We should drive this based on flags specified
+        // in `ir-inst-defs.h` isntead of hard-coding things here,
+        // but this is good enough for now if we are conservative:
+
+        if(as<IRType>(this))
+            return false;
+
+        if(as<IRGlobalValue>(this))
+            return false;
+
+        if(as<IRConstant>(this))
+            return false;
+
+        switch(op)
+        {
+        // By default, assume that we might have side effects,
+        // to safely cover all the instructions we haven't had time to think about.
+        default:
+            return true;
+
+        case kIROp_Call:
+            // This is the most interesting.
+            return true;
+
+        case kIROp_Nop:
+        case kIROp_Specialize:
+        case kIROp_lookup_interface_method:
+        case kIROp_Construct:
+        case kIROp_makeVector:
+        case kIROp_makeMatrix:
+        case kIROp_makeArray:
+        case kIROp_makeStruct:
+        case kIROp_Load:    // We are ignoring the possibility of loads from bad addresses, or `volatile` loads
+        case kIROp_BufferLoad:
+        case kIROp_FieldExtract:
+        case kIROp_FieldAddress:
+        case kIROp_getElement:
+        case kIROp_getElementPtr:
+        case kIROp_constructVectorFromScalar:
+        case kIROp_swizzle:
+        case kIROp_swizzleSet:  // Doesn't actually "set" anything - just returns the resulting vector
+        case kIROp_Add:
+        case kIROp_Sub:
+        case kIROp_Mul:
+        //case kIROp_Div:   // TODO: We could split out integer vs. floating-point div/mod and assume the floating-point cases have no side effects
+        //case kIROp_Mod:
+        case kIROp_Lsh:
+        case kIROp_Rsh:
+        case kIROp_Eql:
+        case kIROp_Neq:
+        case kIROp_Greater:
+        case kIROp_Less:
+        case kIROp_Geq:
+        case kIROp_Leq:
+        case kIROp_BitAnd:
+        case kIROp_BitXor:
+        case kIROp_BitOr:
+        case kIROp_And:
+        case kIROp_Or:
+        case kIROp_Neg:
+        case kIROp_Not:
+        case kIROp_BitNot:
+        case kIROp_Select:
+        case kIROp_Dot:
+        case kIROp_Mul_Vector_Matrix:
+        case kIROp_Mul_Matrix_Vector:
+        case kIROp_Mul_Matrix_Matrix:
+            return false;
+        }
+    }
 
     //
     // Legalization of entry points for GLSL:
