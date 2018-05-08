@@ -407,6 +407,12 @@ void TestContext::message(MessageType type, const String& message)
             fprintf(stderr, message.Buffer());
         }
     }
+
+    if (m_currentMessage.Length() > 0)
+    {
+        m_currentMessage << "\n";
+    }
+    m_currentMessage.Append(message);
 }
 
 void TestContext::messageFormat(MessageType type, char const* format, ...)
@@ -415,7 +421,7 @@ void TestContext::messageFormat(MessageType type, char const* format, ...)
     
     va_list args;
     va_start(args, format);
-    append(builder, args);
+    append(format, args, builder);
     va_end(args);
 
     message(type, builder);
@@ -2094,6 +2100,61 @@ void runTestsInDirectory(
     }
 }
 
+static void appendXmlEncode(char c, StringBuilder& out)
+{
+    switch (c)
+    {
+        case '&':   out << "&amp;"; break;
+        case '<':   out << "&lt;"; break;
+        case '>':   out << "&gt;"; break;
+        case '\'':  out << "&apos;"; break;
+        case '"':   out << "&quot;"; break;
+        default:    out.Append(c);  
+    }
+}
+
+static bool isXmlEncodeChar(char c)
+{
+    switch (c)
+    {
+        case '&':
+        case '<':
+        case '>':
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+static void appendXmlEncode(const String& in, StringBuilder& out)
+{
+    const char* cur = in.Buffer();
+    const char* end = cur + in.Length();
+
+    while (cur < end)
+    {
+        const char* start = cur;
+        // Look for a run of non encoded
+        while (cur < end && !isXmlEncodeChar(*cur))
+        {
+            cur++;
+        }
+        // Write it
+        if (cur > start)
+        {
+            out.Append(start, UInt(end - start));
+        }
+
+        if (cur < end && isXmlEncodeChar(*cur))
+        {
+            appendXmlEncode(*cur, out);
+            cur++;
+        }
+    }
+}
+
+
 //
 
 int main(
@@ -2195,18 +2256,45 @@ int main(
             
             printf("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
             printf("<testsuites tests=\"%d\" failures=\"%d\" disabled=\"%d\" errors=\"0\" name=\"AllTests\">\n", context.m_totalTestCount, context.m_failedTestCount, context.m_ignoredTestCount);
-            
+            printf("  <testsuite name=\"all\" tests=\"%d\" failures=\"%d\" disabled=\"%d\" errors=\"0\" time=\"0\">\n", context.m_totalTestCount, context.m_failedTestCount, context.m_ignoredTestCount);
+
             for (const auto& testInfo : context.m_testInfos)
             {
                 const int numFailed = (testInfo.testResult == kTestResult_Fail);
                 const int numIgnored = (testInfo.testResult == kTestResult_Ignored);
                 //int numPassed = (testInfo.testResult == kTestResult_Pass);
 
-                printf("  <testsuite name=\"%s\" tests=\"1\" failures=\"%d\" disabled=\"%d\" errors=\"0\" time=\"0\">\n", testInfo.name.Buffer(), numFailed, numIgnored); 
-                printf("    <testcase name=\"%s\" status=\"run\"/>\n", testInfo.name.Buffer());
-                printf("  </testsuite>\n");
+                if (testInfo.testResult == kTestResult_Pass)
+                {
+                    printf("    <testcase name=\"%s\" status=\"run\"/>\n", testInfo.name.Buffer());
+                }
+                else
+                {
+                    printf("    <testcase name=\"%s\" status=\"run\">\n", testInfo.name.Buffer());
+                    switch (testInfo.testResult)
+                    {
+                        case kTestResult_Fail:
+                        {
+                            StringBuilder buf;
+                            appendXmlEncode(testInfo.message, buf);
+
+                            printf("      <error>\n");
+                            printf("%s", buf.Buffer());
+                            printf("      </error>\n");
+                            break;
+                        }
+                        case kTestResult_Ignored:
+                        {
+                            printf("      <skip>Ignored</skip>\n");
+                            break;
+                        }
+                        default: break;
+                    }
+                    printf("    </testcase>\n");
+                }
             }
 
+            printf("  </testsuite>\n");
             printf("</testSuites>\n");
             break;
         }
