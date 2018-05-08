@@ -387,7 +387,7 @@ void TestContext::message(MessageType type, const String& message)
     {
         if (m_isVerbose && canWriteStdError())
         {
-            fprintf(stderr, message.Buffer());
+            fputs(message.Buffer(), stderr);
         }
 
         // Just dump out if can dump out
@@ -399,12 +399,12 @@ void TestContext::message(MessageType type, const String& message)
         if (type == MessageType::RUN_ERROR || type == MessageType::TEST_FAILURE)
         {
             fprintf(stderr, "error: ");
-            fprintf(stderr, message.Buffer());
+            fputs(message.Buffer(), stderr);
             fprintf(stderr, "\n");
         }
         else
         {
-            fprintf(stderr, message.Buffer());
+            fputs(message.Buffer(), stderr);
         }
     }
 
@@ -431,7 +431,18 @@ void TestContext::messageFormat(MessageType type, char const* format, ...)
 
 void append(const char* format, va_list args, StringBuilder& buf)
 {
-    int numChars = _vscprintf(format, args);
+    int numChars = 0;
+
+#if SLANG_WINDOWS_FAMILY
+    numChars = _vscprintf(format, args);
+#else
+    {
+        va_list argsCopy;
+        va_copy(argCopy, args);
+        numChars = vsnprintf(nullptr, 0, format, argsCopy);
+        va_end(argsCopy); 
+    }
+#endif
 
     List<char> chars;
     chars.SetSize(numChars + 1);
@@ -558,12 +569,10 @@ Result parseOptions(int* argc, char** argv)
         else if (strcmp(arg, "-xunit") == 0)
         {
             g_options.outputMode = kOutputMode_xUnit;
-            g_options.dumpOutputOnFailure = true;
         }
         else if (strcmp(arg, "-xunit2") == 0)
         {
             g_options.outputMode = kOutputMode_xUnit2;
-            g_options.dumpOutputOnFailure = true;
         }
         else if( strcmp(arg, "-category") == 0 )
         {
