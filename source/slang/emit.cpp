@@ -534,92 +534,96 @@ struct EmitVisitor
         sprintf(buffer, "%llu", (unsigned long long)sourceLocation.line);
         emitRawText(buffer);
 
-        emitRawText(" ");
-
-        bool shouldUseGLSLStyleLineDirective = false;
-
-        auto mode = context->shared->entryPoint->compileRequest->lineDirectiveMode;
-        switch (mode)
+        // Only emit the path part of a `#line` directive if needed
+        if(sourceLocation.path != context->shared->loc.path)
         {
-        case LineDirectiveMode::None:
-        case LineDirectiveMode::Default:
-            SLANG_UNEXPECTED("should not be trying to emit '#line' directive");
-            return;
+            emitRawText(" ");
 
-        default:
-            // To try to make the default behavior reasonable, we will
-            // always use C-style line directives (to give the user
-            // good source locations on error messages from downstream
-            // compilers) *unless* they requested raw GLSL as the
-            // output (in which case we want to maximize compatibility
-            // with downstream tools).
-            if (context->shared->finalTarget == CodeGenTarget::GLSL)
+            bool shouldUseGLSLStyleLineDirective = false;
+
+            auto mode = context->shared->entryPoint->compileRequest->lineDirectiveMode;
+            switch (mode)
             {
-                shouldUseGLSLStyleLineDirective = true;
-            }
-            break;
+            case LineDirectiveMode::None:
+                SLANG_UNEXPECTED("should not be trying to emit '#line' directive");
+                return;
 
-        case LineDirectiveMode::Standard:
-            break;
-
-        case LineDirectiveMode::GLSL:
-            shouldUseGLSLStyleLineDirective = true;
-            break;
-        }
-
-        if(shouldUseGLSLStyleLineDirective)
-        {
-            auto path = sourceLocation.getPath();
-
-            // GLSL doesn't support the traditional form of a `#line` directive without
-            // an extension. Rather than depend on that extension we will output
-            // a directive in the traditional GLSL fashion.
-            //
-            // TODO: Add some kind of configuration where we require the appropriate
-            // extension and then emit a traditional line directive.
-
-            int id = 0;
-            if(!context->shared->mapGLSLSourcePathToID.TryGetValue(path, id))
-            {
-                id = context->shared->glslSourceIDCount++;
-                context->shared->mapGLSLSourcePathToID.Add(path, id);
-            }
-
-            sprintf(buffer, "%d", id);
-            emitRawText(buffer);
-        }
-        else
-        {
-            // The simple case is to emit the path for the current source
-            // location. We need to be a little bit careful with this,
-            // because the path might include backslash characters if we
-            // are on Windows, and we want to canonicalize those over
-            // to forward slashes.
-            //
-            // TODO: Canonicalization like this should be done centrally
-            // in a module that tracks source files.
-
-            emitRawText("\"");
-            for(auto c : sourceLocation.getPath())
-            {
-                char charBuffer[] = { c, 0 };
-                switch(c)
+            case LineDirectiveMode::Default:
+            default:
+                // To try to make the default behavior reasonable, we will
+                // always use C-style line directives (to give the user
+                // good source locations on error messages from downstream
+                // compilers) *unless* they requested raw GLSL as the
+                // output (in which case we want to maximize compatibility
+                // with downstream tools).
+                if (context->shared->finalTarget == CodeGenTarget::GLSL)
                 {
-                default:
-                    emitRawText(charBuffer);
-                    break;
-
-                // The incoming file path might use `/` and/or `\\` as
-                // a directory separator. We want to canonicalize this.
-                //
-                // TODO: should probably canonicalize paths to not use backslash somewhere else
-                // in the compilation pipeline...
-                case '\\':
-                    emitRawText("/");
-                    break;
+                    shouldUseGLSLStyleLineDirective = true;
                 }
+                break;
+
+            case LineDirectiveMode::Standard:
+                break;
+
+            case LineDirectiveMode::GLSL:
+                shouldUseGLSLStyleLineDirective = true;
+                break;
             }
-            emitRawText("\"");
+
+            if(shouldUseGLSLStyleLineDirective)
+            {
+                auto path = sourceLocation.getPath();
+
+                // GLSL doesn't support the traditional form of a `#line` directive without
+                // an extension. Rather than depend on that extension we will output
+                // a directive in the traditional GLSL fashion.
+                //
+                // TODO: Add some kind of configuration where we require the appropriate
+                // extension and then emit a traditional line directive.
+
+                int id = 0;
+                if(!context->shared->mapGLSLSourcePathToID.TryGetValue(path, id))
+                {
+                    id = context->shared->glslSourceIDCount++;
+                    context->shared->mapGLSLSourcePathToID.Add(path, id);
+                }
+
+                sprintf(buffer, "%d", id);
+                emitRawText(buffer);
+            }
+            else
+            {
+                // The simple case is to emit the path for the current source
+                // location. We need to be a little bit careful with this,
+                // because the path might include backslash characters if we
+                // are on Windows, and we want to canonicalize those over
+                // to forward slashes.
+                //
+                // TODO: Canonicalization like this should be done centrally
+                // in a module that tracks source files.
+
+                emitRawText("\"");
+                for(auto c : sourceLocation.getPath())
+                {
+                    char charBuffer[] = { c, 0 };
+                    switch(c)
+                    {
+                    default:
+                        emitRawText(charBuffer);
+                        break;
+
+                    // The incoming file path might use `/` and/or `\\` as
+                    // a directory separator. We want to canonicalize this.
+                    //
+                    // TODO: should probably canonicalize paths to not use backslash somewhere else
+                    // in the compilation pipeline...
+                    case '\\':
+                        emitRawText("/");
+                        break;
+                    }
+                }
+                emitRawText("\"");
+            }
         }
 
         emitRawText("\n");
@@ -648,11 +652,9 @@ struct EmitVisitor
         switch(mode)
         {
         case LineDirectiveMode::None:
-        case LineDirectiveMode::Default:
-            // Default behavior is to not emit line directives, since they
-            // don't help readability much for IR-based output.
             return;
 
+        case LineDirectiveMode::Default:
         default:
             break;
         }
@@ -3176,8 +3178,6 @@ struct EmitVisitor
         IRInst*         inst,
         IREmitMode      mode)
     {
-        advanceToSourceLocation(inst->sourceLoc);
-
         switch(inst->op)
         {
         case kIROp_IntLit:
@@ -4506,10 +4506,6 @@ struct EmitVisitor
     {
         auto resultType = func->getResultType();
 
-        // Put a newline before the function so that
-        // the output will be more readable.
-        emit("\n");
-
         // Deal with decorations that need
         // to be emitted as attributes
         auto entryPointLayout = asEntryPoint(func);
@@ -4572,11 +4568,11 @@ struct EmitVisitor
             emitIRStmtsForBlocks(ctx, func->getFirstBlock(), nullptr, nullptr);
 
             dedent();
-            emit("}\n");
+            emit("}\n\n");
         }
         else
         {
-            emit(";\n");
+            emit(";\n\n");
         }
     }
 
@@ -4665,7 +4661,7 @@ struct EmitVisitor
 
             emitIRParamType(ctx, paramType, paramName);
         }
-        emit(");\n");
+        emit(");\n\n");
     }
 
     EntryPointLayout* getEntryPointLayout(
@@ -4788,7 +4784,7 @@ struct EmitVisitor
         }
 
         dedent();
-        emit("};\n");
+        emit("};\n\n");
     }
 
     void emitIRMatrixLayoutModifiers(
@@ -5439,9 +5435,6 @@ struct EmitVisitor
             Emit("}\n");
         }
 
-        // Emit a blank line so that the formatting is nicer.
-        emit("\n");
-
         if (auto paramBlockType = as<IRUniformParameterGroupType>(varType))
         {
             emitIRParameterGroup(
@@ -5518,7 +5511,7 @@ struct EmitVisitor
             Emit("()");
         }
 
-        emit(";\n");
+        emit(";\n\n");
     }
 
     void emitIRGlobalConstantInitializer(
@@ -5575,6 +5568,8 @@ struct EmitVisitor
         EmitContext*    ctx,
         IRInst*         inst)
     {
+        advanceToSourceLocation(inst->sourceLoc);
+
         switch(inst->op)
         {
         case kIROp_Func:
