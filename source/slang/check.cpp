@@ -5864,7 +5864,7 @@ namespace Slang
                 }
             }
 
-            SLANG_UNIMPLEMENTED(getSink(), constraints.loc, "value unification case");
+            SLANG_UNIMPLEMENTED_X("value unification case");
 
             // default: fail
             return false;
