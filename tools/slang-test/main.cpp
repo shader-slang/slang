@@ -438,7 +438,7 @@ void append(const char* format, va_list args, StringBuilder& buf)
 #else
     {
         va_list argsCopy;
-        va_copy(argCopy, args);
+        va_copy(argsCopy, args);
         numChars = vsnprintf(nullptr, 0, format, argsCopy);
         va_end(argsCopy); 
     }
