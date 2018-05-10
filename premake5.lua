@@ -166,13 +166,19 @@ function baseSlangProject(name, baseDir)
     -- virtual subdirectories (VS calls them "filters") for
     -- header and source files respectively.
     --
-    -- BUG: Premake seems to get confused at times, and
-    -- will sort a file like `foo.cpp.h` according to the
-    -- `.cpp` part and not the final `.h` part.
+    -- Note: We are setting `vpaths` using a list of key/value
+    -- tables instead of just a key/value table, since this
+    -- appears to be an (undocumented) way to fix the order
+    -- in which the filters are tested. Otherwise we have
+    -- issues where premake will nondeterministically decide
+    -- the check something against the `**.cpp` filter first,
+    -- and decide that a `foo.cpp.h` file should go into
+    -- the `"Source Files"` vpath. That behavior seems buggy,
+    -- but at least we appear to have a workaround.
     --
     vpaths {
-       ["Header Files"] = { "**.h", "**.hpp"},
-       ["Source Files"] = { "**.cpp", "**.slang", "**.natvis" },
+       { ["Header Files"] = { "**.h", "**.hpp"} },
+       { ["Source Files"] = { "**.cpp", "**.slang", "**.natvis" } },
     }
 end
 
