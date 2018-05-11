@@ -1,6 +1,5 @@
 ﻿// main.cpp
 
-#define SLANG_DYNAMIC
 #include "../../slang.h"
 
 SLANG_API void spSetCommandLineCompilerMode(SlangCompileRequest* request);

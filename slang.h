@@ -1,10 +1,8 @@
 #ifndef SLANG_H
 #define SLANG_H
 
-#if defined(SLANG_DYNAMIC_EXPORT)
-    #if !defined(SLANG_DYNAMIC)
-        #define SLANG_DYNAMIC
-    #endif
+#if !defined(SLANG_STATIC) && !defined(SLANG_STATIC)
+    #define SLANG_DYNAMIC
 #endif
 
 #if defined(SLANG_DYNAMIC)
@@ -1257,48 +1255,6 @@ namespace slang
     };
 }
 
-#endif
-
-#ifdef SLANG_INCLUDE_IMPLEMENTATION
-
-#include "source/core/platform.cpp"
-#include "source/core/slang-io.cpp"
-#include "source/core/slang-string.cpp"
-#include "source/core/stream.cpp"
-#include "source/core/text-io.cpp"
-#include "source/slang/bytecode.cpp"
-#include "source/slang/diagnostics.cpp"
-#include "source/slang/dxc-support.cpp"
-#include "source/slang/emit.cpp"
-#include "source/slang/ir.cpp"
-#include "source/slang/ir-constexpr.cpp"
-#include "source/slang/ir-dominators.cpp"
-#include "source/slang/ir-legalize-types.cpp"
-#include "source/slang/ir-ssa.cpp"
-#include "source/slang/ir-validate.cpp"
-#include "source/slang/legalize-types.cpp"
-#include "source/slang/lexer.cpp"
-#include "source/slang/mangle.cpp"
-#include "source/slang/memory_pool.cpp"
-#include "source/slang/name.cpp"
-#include "source/slang/options.cpp"
-#include "source/slang/parameter-binding.cpp"
-#include "source/slang/parser.cpp"
-#include "source/slang/preprocessor.cpp"
-#include "source/slang/profile.cpp"
-#include "source/slang/lookup.cpp"
-#include "source/slang/lower-to-ir.cpp"
-#include "source/slang/check.cpp"
-#include "source/slang/compiler.cpp"
-#include "source/slang/slang-stdlib.cpp"
-#include "source/slang/source-loc.cpp"
-#include "source/slang/syntax.cpp"
-#include "source/slang/token.cpp"
-#include "source/slang/type-layout.cpp"
-#include "source/slang/reflection.cpp"
-#include "source/slang/slang.cpp"
-#include "source/slang/vm.cpp"
-#include "source/slang/type-system-shared.cpp"
 #endif
 
 #endif

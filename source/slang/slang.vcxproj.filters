@@ -1,93 +1,271 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Natvis Include="slang.natvis" />
-    <Natvis Include="..\core\core.natvis" />
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{21EB8090-0D4E-1035-B6D3-48EBA215DCB7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{E9C7FDCE-D52A-8D73-7EB0-C5296AF258F6}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="compiler.h" />
-    <ClInclude Include="diagnostic-defs.h" />
-    <ClInclude Include="diagnostics.h" />
-    <ClInclude Include="emit.h" />
-    <ClInclude Include="lexer.h" />
-    <ClInclude Include="lookup.h" />
-    <ClInclude Include="parameter-binding.h" />
-    <ClInclude Include="parser.h" />
-    <ClInclude Include="preprocessor.h" />
-    <ClInclude Include="profile.h" />
-    <ClInclude Include="profile-defs.h" />
-    <ClInclude Include="reflection.h" />
-    <ClInclude Include="source-loc.h" />
-    <ClInclude Include="syntax.h" />
-    <ClInclude Include="syntax-visitors.h" />
-    <ClInclude Include="token.h" />
-    <ClInclude Include="token-defs.h" />
-    <ClInclude Include="type-layout.h" />
-    <ClInclude Include="..\..\slang.h" />
-    <ClInclude Include="syntax-defs.h" />
-    <ClInclude Include="decl-defs.h" />
-    <ClInclude Include="expr-defs.h" />
-    <ClInclude Include="modifier-defs.h" />
-    <ClInclude Include="stmt-defs.h" />
-    <ClInclude Include="object-meta-begin.h" />
-    <ClInclude Include="object-meta-end.h" />
-    <ClInclude Include="syntax-base-defs.h" />
-    <ClInclude Include="type-defs.h" />
-    <ClInclude Include="val-defs.h" />
-    <ClInclude Include="visitor.h" />
-    <ClInclude Include="name.h" />
-    <ClInclude Include="ir.h" />
-    <ClInclude Include="lower-to-ir.h" />
-    <ClInclude Include="ir-inst-defs.h" />
-    <ClInclude Include="ir-insts.h" />
-    <ClInclude Include="bytecode.h" />
-    <ClInclude Include="vm.h" />
-    <ClInclude Include="mangle.h" />
-    <ClInclude Include="legalize-types.h" />
-    <ClInclude Include="ir-ssa.h" />
-    <ClInclude Include="memory_pool.h" />
-    <ClInclude Include="ir-constexpr.h" />
-    <ClInclude Include="type-system-shared.h" />
-    <ClInclude Include="ir-validate.h" />
-    <ClInclude Include="ir-dominators.h" />
+    <ClInclude Include="..\..\slang.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="bytecode.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="compiler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="core.meta.slang.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="decl-defs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="diagnostic-defs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="diagnostics.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="emit.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="expr-defs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="glsl.meta.slang.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="hlsl.meta.slang.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ir-constexpr.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ir-dominators.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ir-inst-defs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ir-insts.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ir-ssa.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ir-validate.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ir.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="legalize-types.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="lexer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="lookup.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="lower-to-ir.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="mangle.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="memory_pool.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="modifier-defs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="name.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="object-meta-begin.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="object-meta-end.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="parameter-binding.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="parser.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="preprocessor.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="profile-defs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="profile.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="reflection.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="source-loc.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="stmt-defs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="syntax-base-defs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="syntax-defs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="syntax-visitors.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="syntax.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="token-defs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="token.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="type-defs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="type-layout.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="type-system-shared.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="val-defs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="visitor.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vm.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="check.cpp" />
-    <ClCompile Include="compiler.cpp" />
-    <ClCompile Include="diagnostics.cpp" />
-    <ClCompile Include="emit.cpp" />
-    <ClCompile Include="lexer.cpp" />
-    <ClCompile Include="lookup.cpp" />
-    <ClCompile Include="parameter-binding.cpp" />
-    <ClCompile Include="parser.cpp" />
-    <ClCompile Include="preprocessor.cpp" />
-    <ClCompile Include="profile.cpp" />
-    <ClCompile Include="reflection.cpp" />
-    <ClCompile Include="slang.cpp" />
-    <ClCompile Include="slang-stdlib.cpp" />
-    <ClCompile Include="syntax.cpp" />
-    <ClCompile Include="token.cpp" />
-    <ClCompile Include="type-layout.cpp" />
-    <ClCompile Include="options.cpp" />
-    <ClCompile Include="source-loc.cpp" />
-    <ClCompile Include="name.cpp" />
-    <ClCompile Include="ir.cpp" />
-    <ClCompile Include="lower-to-ir.cpp" />
-    <ClCompile Include="bytecode.cpp" />
-    <ClCompile Include="vm.cpp" />
-    <ClCompile Include="mangle.cpp" />
-    <ClCompile Include="dxc-support.cpp" />
-    <ClCompile Include="ir-legalize-types.cpp" />
-    <ClCompile Include="legalize-types.cpp" />
-    <ClCompile Include="ir-ssa.cpp" />
-    <ClCompile Include="memory_pool.cpp" />
-    <ClCompile Include="ir-constexpr.cpp" />
-    <ClCompile Include="type-system-shared.cpp" />
-    <ClCompile Include="ir-validate.cpp" />
-    <ClCompile Include="ir-dominators.cpp" />
+    <ClCompile Include="bytecode.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="check.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="compiler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="diagnostics.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="dxc-support.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="emit.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ir-constexpr.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ir-dominators.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ir-legalize-types.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ir-ssa.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ir-validate.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ir.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="legalize-types.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="lexer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="lookup.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="lower-to-ir.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="mangle.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="memory_pool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="name.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="options.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="parameter-binding.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="parser.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="preprocessor.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="profile.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="reflection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-stdlib.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="source-loc.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="syntax.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="token.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="type-layout.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="type-system-shared.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="vm.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="core.meta.slang" />
-    <CustomBuild Include="hlsl.meta.slang" />
+    <None Include="slang.natvis">
+      <Filter>Source Files</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="core.meta.slang">
+      <Filter>Source Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="hlsl.meta.slang">
+      <Filter>Source Files</Filter>
+    </CustomBuild>
   </ItemGroup>
 </Project>

@@ -103,7 +103,7 @@ SLANGC_SOURCES += $(CORE_SOURCES)
 SLANG_GLSLANG_SOURCES := source/slang-glslang/*.cpp
 SLANG_GLSLANG_HEADERS := source/slang-glslang/*.h
 
-SLANG_EVAL_TEST_SOURCES := tools/eval-test/*.cpp
+SLANG_EVAL_TEST_SOURCES := tools/slang-eval-test/*.cpp
 SLANG_EVAL_TEST_HEADERS :=
 
 SLANG_REFLECTION_TEST_SOURCES := tools/slang-reflection-test/*.cpp

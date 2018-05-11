@@ -12,13 +12,6 @@ We recommend using a pre-built binary package, available through GitHub [release
 
 Just add the downloaded package to your include path, and make sure to add (or copy) the `slang.dll` and `slang-glslang.dll` libraries into the path of your executable.
 
-When using a binary release, you'll need to define the `SLANG_DYNAMIC` macro to indicate that you want to dynamically link against the API functions:
-
-```c++
-#define SLANG_DYNAMIC
-#include <slang.h>
-```
-
 Getting Started with the API
 ----------------------------
 
