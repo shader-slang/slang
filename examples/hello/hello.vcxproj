@@ -167,6 +167,11 @@
   <ItemGroup>
     <None Include="hello.slang" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\source\slang\slang.vcxproj">
+      <Project>{DB00DA62-0533-4AFD-B59F-A67D5B3A0808}</Project>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

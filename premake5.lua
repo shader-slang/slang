@@ -253,6 +253,10 @@ function example(name)
     -- include path here rather than make each example do it.
     --
     includedirs { "." }
+
+    -- The examples also need to link against the slang library,
+    -- so we specify that here rather than in each example.
+    links { "slang" }
 end
 
 --
@@ -274,10 +278,6 @@ example "hello"
 -- Studio solutions). Without this call, Premake will generate
 -- a fresh UUID for a project each time its generation logic
 -- runs, which can create spurious diffs.
---
--- TODO: Premake does not allow a UUID to be specified for
--- a `group()`, so we will still end up with some amount of
--- churn in the generated files.
 --
 
 -- Most of the other projects have more interesting configuration going
@@ -405,14 +405,10 @@ standardProject "slang"
     flags { "FatalWarnings" }
 
     -- The way that we currently configure things through `slang.h`,
-    -- we need to set up some preprocessor definitions to ensure that
+    -- we need to set a preprocessor definitions to ensure that
     -- we declare the Slang API functions for *export* and not *import*.
     --
-    defines
-    {
-        "SLANG_DYNAMIC",
-        "SLANG_DYNAMIC_EXPORT",
-    }
+    defines { "SLANG_DYNAMIC_EXPORT" }
 
     -- The `standardProject` operation already added all the code in
     -- `source/slang/*`, but we also want to incldue the umbrella

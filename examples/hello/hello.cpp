@@ -2,7 +2,6 @@
 
 // In order to use the Slang API, we need to include its header
 
-#define SLANG_INCLUDE_IMPLEMENTATION
 #include <slang.h>
 
 // We will be rendering with Direct3D 11, so we need to include
@@ -577,13 +576,3 @@ int WINAPI WinMain(
 
     return 0;
 }
-
-
-//
-// In order to actually use Slang in our application, we need to link in its
-// implementation. The easiest way to accomplish this is by directly inlcuding
-// the (concatenated) Slang source code into our app.
-//
-
-#define SLANG_INCLUDE_IMPLEMENTATION
-#include <slang.h>
