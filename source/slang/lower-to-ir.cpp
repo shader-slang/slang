@@ -1058,9 +1058,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     IRType* visitNamedExpressionType(NamedExpressionType* type)
     {
-        return (IRType*) getSimpleVal(context,
-            emitDeclRef(context, type->declRef,
-                context->irBuilder->getTypeKind()));
+        return (IRType*)getSimpleVal(context, dispatchType(type->GetCanonicalType()));
     }
 
     IRType* visitBasicExpressionType(BasicExpressionType* type)
