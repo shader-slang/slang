@@ -823,7 +823,7 @@ struct IRBuilder
     template<typename T>
     T* addDecoration(IRInst* value, IRDecorationOp op)
     {
-        assert(getModule());
+        SLANG_ASSERT(getModule());
         auto decorationSize = sizeof(T);
         auto decoration = (T*)getModule()->memoryPool.allocZero(decorationSize);
         new(decoration)T();
@@ -867,7 +867,7 @@ struct IRBuilderSourceLocRAII
 
     ~IRBuilderSourceLocRAII()
     {
-        assert(builder->sourceLocInfo == this);
+        SLANG_ASSERT(builder->sourceLocInfo == this);
         builder->sourceLocInfo = next;
     }
 };

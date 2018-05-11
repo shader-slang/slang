@@ -3453,11 +3453,11 @@ struct EmitVisitor
                 for (UInt ee = 0; ee < elementCount; ++ee)
                 {
                     IRInst* irElementIndex = ii->getElementIndex(ee);
-                    assert(irElementIndex->op == kIROp_IntLit);
+                    SLANG_RELEASE_ASSERT(irElementIndex->op == kIROp_IntLit);
                     IRConstant* irConst = (IRConstant*)irElementIndex;
 
                     UInt elementIndex = (UInt)irConst->u.intVal;
-                    assert(elementIndex < 4);
+                    SLANG_RELEASE_ASSERT(elementIndex < 4);
 
                     char const* kComponents[] = { "x", "y", "z", "w" };
                     emit(kComponents[elementIndex]);
@@ -3510,6 +3510,25 @@ struct EmitVisitor
     }
 
     void emitIRInst(
+        EmitContext*    ctx,
+        IRInst*         inst,
+        IREmitMode      mode)
+    {
+        try
+        {
+            emitIRInstImpl(ctx, inst, mode);
+        }
+        // Don't emit any context message for an explicit `AbortCompilationException`
+        // because it should only happen when an error is already emitted.
+        catch(AbortCompilationException&) { throw; }
+        catch(...)
+        {
+            ctx->shared->entryPoint->compileRequest->noteInternalErrorLoc(inst->sourceLoc);
+            throw;
+        }
+    }
+
+    void emitIRInstImpl(
         EmitContext*    ctx,
         IRInst*         inst,
         IREmitMode      mode)
@@ -3584,11 +3603,11 @@ struct EmitVisitor
                 for (UInt ee = 0; ee < elementCount; ++ee)
                 {
                     IRInst* irElementIndex = ii->getElementIndex(ee);
-                    assert(irElementIndex->op == kIROp_IntLit);
+                    SLANG_RELEASE_ASSERT(irElementIndex->op == kIROp_IntLit);
                     IRConstant* irConst = (IRConstant*)irElementIndex;
 
                     UInt elementIndex = (UInt)irConst->u.intVal;
-                    assert(elementIndex < 4);
+                    SLANG_RELEASE_ASSERT(elementIndex < 4);
 
                     char const* kComponents[] = { "x", "y", "z", "w" };
                     emit(kComponents[elementIndex]);
@@ -3609,11 +3628,11 @@ struct EmitVisitor
                 for (UInt ee = 0; ee < elementCount; ++ee)
                 {
                     IRInst* irElementIndex = ii->getElementIndex(ee);
-                    assert(irElementIndex->op == kIROp_IntLit);
+                    SLANG_RELEASE_ASSERT(irElementIndex->op == kIROp_IntLit);
                     IRConstant* irConst = (IRConstant*)irElementIndex;
 
                     UInt elementIndex = (UInt)irConst->u.intVal;
-                    assert(elementIndex < 4);
+                    SLANG_RELEASE_ASSERT(elementIndex < 4);
 
                     char const* kComponents[] = { "x", "y", "z", "w" };
                     emit(kComponents[elementIndex]);
@@ -3717,7 +3736,7 @@ struct EmitVisitor
 
             if (argIndex >= argCount)
             {
-                assert(!"not enough arguments for branch");
+                SLANG_UNEXPECTED("not enough arguments for branch");
                 break;
             }
 
@@ -3822,7 +3841,7 @@ struct EmitVisitor
 
             // Start by emitting the non-terminator instructions in the block.
             auto terminator = block->getLastInst();
-            assert(as<IRTerminatorInst>(terminator));
+            SLANG_ASSERT(as<IRTerminatorInst>(terminator));
             for (auto inst = block->getFirstInst(); inst != terminator; inst = inst->getNextInst())
             {
                 emitIRInst(ctx, inst, IREmitMode::Default);
@@ -5003,7 +5022,7 @@ struct EmitVisitor
         Emit(ctx->shared->uniqueIDCounter++);
 
         auto varLayout = getVarLayout(ctx, varDecl);
-        assert(varLayout);
+        SLANG_RELEASE_ASSERT(varLayout);
 
         EmitVarChain blockChain(varLayout);
 
@@ -5051,7 +5070,7 @@ struct EmitVisitor
         emit(getIRName(varDecl));
 
         auto varLayout = getVarLayout(ctx, varDecl);
-        assert(varLayout);
+        SLANG_RELEASE_ASSERT(varLayout);
 
         EmitVarChain blockChain(varLayout);
 
@@ -5077,7 +5096,7 @@ struct EmitVisitor
         if(auto structType = as<IRStructType>(elementType))
         {
             auto structTypeLayout = typeLayout.As<StructTypeLayout>();
-            assert(structTypeLayout);
+            SLANG_RELEASE_ASSERT(structTypeLayout);
 
             UInt fieldIndex = 0;
             for(auto ff : structType->getFields())
@@ -5133,7 +5152,7 @@ struct EmitVisitor
         IRParameterBlockType*   type)
     {
         auto varLayout = getVarLayout(ctx, varDecl);
-        assert(varLayout);
+        SLANG_RELEASE_ASSERT(varLayout);
 
         EmitVarChain blockChain(varLayout);
 
@@ -5180,7 +5199,7 @@ struct EmitVisitor
         }
 
         auto varLayout = getVarLayout(ctx, varDecl);
-        assert(varLayout);
+        SLANG_RELEASE_ASSERT(varLayout);
 
         EmitVarChain blockChain(varLayout);
 
@@ -5218,7 +5237,7 @@ struct EmitVisitor
         if(auto structType = as<IRStructType>(elementType))
         {
             auto structTypeLayout = typeLayout.As<StructTypeLayout>();
-            assert(structTypeLayout);
+            SLANG_RELEASE_ASSERT(structTypeLayout);
 
             UInt fieldIndex = 0;
             for(auto ff : structType->getFields())
@@ -5501,13 +5520,13 @@ struct EmitVisitor
     {
         // We expect to see only a single block
         auto block = valDecl->getFirstBlock();
-        assert(block);
-        assert(!block->getNextBlock());
+        SLANG_RELEASE_ASSERT(block);
+        SLANG_RELEASE_ASSERT(!block->getNextBlock());
 
         // We expect the terminator to be a `return`
         // instruction with a value.
         auto returnInst = (IRReturnVal*) block->getLastInst();
-        assert(returnInst->op == kIROp_ReturnVal);
+        SLANG_RELEASE_ASSERT(returnInst->op == kIROp_ReturnVal);
 
         // Now we want to emit the expression form of
         // the value being returned, and force any

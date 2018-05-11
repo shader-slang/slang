@@ -80,7 +80,7 @@ struct LegalType
 
     IRType* getSimple() const
     {
-        assert(flavor == Flavor::simple);
+        SLANG_ASSERT(flavor == Flavor::simple);
         return irType;
     }
 
@@ -89,7 +89,7 @@ struct LegalType
 
     RefPtr<ImplicitDerefType> getImplicitDeref() const
     {
-        assert(flavor == Flavor::implicitDeref);
+        SLANG_ASSERT(flavor == Flavor::implicitDeref);
         return obj.As<ImplicitDerefType>();
     }
 
@@ -98,7 +98,7 @@ struct LegalType
 
     RefPtr<TuplePseudoType> getTuple() const
     {
-        assert(flavor == Flavor::tuple);
+        SLANG_ASSERT(flavor == Flavor::tuple);
         return obj.As<TuplePseudoType>();
     }
 
@@ -112,7 +112,7 @@ struct LegalType
 
     RefPtr<PairPseudoType> getPair() const
     {
-        assert(flavor == Flavor::pair);
+        SLANG_ASSERT(flavor == Flavor::pair);
         return obj.As<PairPseudoType>();
     }
 };
@@ -292,7 +292,7 @@ struct LegalVal
 
     IRInst* getSimple()
     {
-        assert(flavor == Flavor::simple);
+        SLANG_ASSERT(flavor == Flavor::simple);
         return irValue;
     }
 
@@ -300,7 +300,7 @@ struct LegalVal
 
     RefPtr<TuplePseudoVal> getTuple()
     {
-        assert(flavor == Flavor::tuple);
+        SLANG_ASSERT(flavor == Flavor::tuple);
         return obj.As<TuplePseudoVal>();
     }
 
@@ -315,7 +315,7 @@ struct LegalVal
 
     RefPtr<PairPseudoVal> getPair()
     {
-        assert(flavor == Flavor::pair);
+        SLANG_ASSERT(flavor == Flavor::pair);
         return obj.As<PairPseudoVal>();
     }
 };

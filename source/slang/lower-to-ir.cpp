@@ -168,7 +168,7 @@ struct LoweredValInfo
 
     BoundMemberInfo* getBoundMemberInfo()
     {
-        assert(flavor == Flavor::BoundMember);
+        SLANG_ASSERT(flavor == Flavor::BoundMember);
         return (BoundMemberInfo*)ext;
     }
 
@@ -177,7 +177,7 @@ struct LoweredValInfo
 
     SubscriptInfo* getSubscriptInfo()
     {
-        assert(flavor == Flavor::Subscript);
+        SLANG_ASSERT(flavor == Flavor::Subscript);
         return (SubscriptInfo*)ext;
     }
 
@@ -186,7 +186,7 @@ struct LoweredValInfo
 
     BoundSubscriptInfo* getBoundSubscriptInfo()
     {
-        assert(flavor == Flavor::BoundSubscript);
+        SLANG_ASSERT(flavor == Flavor::BoundSubscript);
         return (BoundSubscriptInfo*)ext;
     }
 
@@ -195,7 +195,7 @@ struct LoweredValInfo
 
     SwizzledLValueInfo* getSwizzledLValueInfo()
     {
-        assert(flavor == Flavor::SwizzledLValue);
+        SLANG_ASSERT(flavor == Flavor::SwizzledLValue);
         return (SwizzledLValueInfo*)ext;
     }
 };
@@ -410,7 +410,7 @@ IROp getIntrinsicOp(
     auto nameText = getText(name);
 
     IROp op = findIROp(nameText.Buffer());
-    assert(op != kIROp_Invalid);
+    SLANG_ASSERT(op != kIROp_Invalid);
     return op;
 }
 
@@ -443,7 +443,7 @@ LoweredValInfo emitCompoundAssignOp(
 {
     auto builder = context->irBuilder;
     SLANG_UNREFERENCED_PARAMETER(argCount);
-    assert(argCount == 2);
+    SLANG_ASSERT(argCount == 2);
     auto leftPtr = args[0];
     auto rightVal = args[1];
 
@@ -492,7 +492,7 @@ LoweredValInfo emitPreOp(
 {
     auto builder = context->irBuilder;
     SLANG_UNREFERENCED_PARAMETER(argCount);
-    assert(argCount == 1);
+    SLANG_ASSERT(argCount == 1);
     auto argPtr = args[0];
 
     auto preVal = builder->emitLoad(argPtr);
@@ -516,7 +516,7 @@ LoweredValInfo emitPostOp(
 {
     auto builder = context->irBuilder;
     SLANG_UNREFERENCED_PARAMETER(argCount);
-    assert(argCount == 1);
+    SLANG_ASSERT(argCount == 1);
     auto argPtr = args[0];
 
     auto preVal = builder->emitLoad(argPtr);
@@ -1709,7 +1709,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
                 // Now we can pass the address of the temporary variable
                 // to the callee as the actual argument for the `in out`
-                assert(tempVar.flavor == LoweredValInfo::Flavor::Ptr);
+                SLANG_ASSERT(tempVar.flavor == LoweredValInfo::Flavor::Ptr);
                 (*ioArgs).Add(tempVar.val);
 
                 // Finally, after the call we will need
@@ -3712,7 +3712,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             IRInst* fieldKeyInst = getSimpleVal(context,
                 ensureDecl(context, fieldDecl));
             auto fieldKey = as<IRStructKey>(fieldKeyInst);
-            assert(fieldKey);
+            SLANG_ASSERT(fieldKey);
 
             // Note: we lower the type of the field in the "sub"
             // context, so that any generic parameters that were
@@ -4626,12 +4626,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // to avoid emitting a bunch of extra definitions in the IR.
 
         auto primaryFuncDecl = dynamic_cast<FunctionDeclBase*>(primaryDecl);
-        assert(primaryFuncDecl);
+        SLANG_ASSERT(primaryFuncDecl);
         LoweredValInfo result = lowerFuncDecl(primaryFuncDecl);
         for (auto dd = primaryDecl->nextDecl; dd; dd = dd->nextDecl)
         {
             auto funcDecl = dynamic_cast<FunctionDeclBase*>(dd);
-            assert(funcDecl);
+            SLANG_ASSERT(funcDecl);
             lowerFuncDecl(funcDecl);
         }
         return result;
