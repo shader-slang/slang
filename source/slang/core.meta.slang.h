@@ -243,6 +243,16 @@ for (int N = 2; N <= 4; ++N)
         sb << ");\n";
     }
 
+    // Initialize from a vector of size M > N,
+    // but issue a warning if this is used for
+    // implicit conversion, informing the user
+    // that this is a bad idea.
+    for (int M = N+1; M <= 4; ++M)
+    {
+        sb << "__implicit_conversion(" << kConversionCost_VectorTruncation << ")\n";
+        sb << "__init(vector<T," << M << "> " << kVectorNames[M] << ");\n";
+    }
+
     sb << "}\n";
 }
 
