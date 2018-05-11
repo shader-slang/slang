@@ -5701,6 +5701,12 @@ struct EmitVisitor
 
         for(auto inst : module->getGlobalInsts())
         {
+            if( as<IRType>(inst) )
+            {
+                // Don't emit a type unless it is actually used.
+                continue;
+            }
+
             ensureGlobalInst(&ctx, inst, EmitAction::Level::Definition);
         }
     }
