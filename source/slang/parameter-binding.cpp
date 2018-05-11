@@ -447,7 +447,7 @@ static void diagnoseParameterTypeMismatch(
     ParameterBindingContext*    context,
     StructuralTypeMatchStack*   inStack)
 {
-    assert(inStack);
+    SLANG_ASSERT(inStack);
 
     // The bottom-most entry in the stack should represent
     // the shader parameters that kicked things off
@@ -466,7 +466,7 @@ static void diagnoseTypeMismatch(
     StructuralTypeMatchStack*   inStack)
 {
     auto stack = inStack;
-    assert(stack);
+    SLANG_ASSERT(stack);
     diagnoseParameterTypeMismatch(context, stack);
 
     auto leftType = GetType(stack->leftDecl);

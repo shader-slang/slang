@@ -189,7 +189,7 @@ bool isPromotableVar(
             {
                 // A load has only a single argument, so
                 // it had better be our pointer.
-                assert(u == &((IRLoad*) user)->ptr);
+                SLANG_ASSERT(u == &((IRLoad*) user)->ptr);
             }
             break;
 
@@ -206,7 +206,7 @@ bool isPromotableVar(
                 // Otherwise our variable is being used
                 // as the destination for the store, and
                 // that is okay by us.
-                assert(u == &storeInst->ptr);
+                SLANG_ASSERT(u == &storeInst->ptr);
             }
             break;
 
@@ -410,7 +410,7 @@ IRInst* tryRemoveTrivialPhi(
     for (auto u : phiInfo->operands)
     {
         auto usedVal = u.get();
-        assert(usedVal);
+        SLANG_ASSERT(usedVal);
 
         if (usedVal == same || usedVal == phi)
         {
@@ -440,8 +440,7 @@ IRInst* tryRemoveTrivialPhi(
         // There were no operands other than the phi itself.
         // This implies that the value at the use sites should
         // actually be undefined.
-
-        assert(!"unimplemented");
+        SLANG_UNIMPLEMENTED_X("trivial phi");
     }
 
     // Removing this phi as trivial may make other phi nodes
@@ -504,7 +503,7 @@ IRInst* addPhiOperands(
         // Precondition: if we have multiple predecessors, then
         // each must have only one successor (no critical edges).
         //
-        assert(predBlock->getSuccessors().getCount() == 1);
+        SLANG_ASSERT(predBlock->getSuccessors().getCount() == 1);
 
         auto predInfo = *context->blockInfos.TryGetValue(predBlock);
 
@@ -888,11 +887,8 @@ static void breakCriticalEdges(
 
     for (auto edgeUse : criticalEdges)
     {
-        auto pred = (IRBlock*) edgeUse->getUser()->parent;
-        assert(pred->op == kIROp_Block);
-
-        auto succ = (IRBlock*)edgeUse->get();
-        assert(succ->op == kIROp_Block);
+        auto pred = cast<IRBlock>(edgeUse->getUser()->parent);
+        auto succ = cast<IRBlock>(edgeUse->get());
 
         IRBuilder builder;
         builder.sharedBuilder = &context->sharedBuilder;
@@ -999,8 +995,8 @@ void constructSSA(ConstructSSAContext* context)
         auto blockInfo = * context->blockInfos.TryGetValue(bb);
 
         // Sanity check: all blocks should be filled and sealed.
-        assert(blockInfo->isSealed);
-        assert(blockInfo->isFilled);
+        SLANG_ASSERT(blockInfo->isSealed);
+        SLANG_ASSERT(blockInfo->isFilled);
 
         // Don't do any work for blocks that don't need to pass along
         // values to the sucessor block.
@@ -1012,7 +1008,7 @@ void constructSSA(ConstructSSAContext* context)
         // has additional arguments.
 
         IRTerminatorInst* oldTerminator = bb->getTerminator();
-        assert(oldTerminator);
+        SLANG_ASSERT(oldTerminator);
 
         blockInfo->builder.setInsertInto(bb);
 
@@ -1041,7 +1037,7 @@ void constructSSA(ConstructSSAContext* context)
 
         // A terminator better not have uses, so we shouldn't have
         // to replace them.
-        assert(!oldTerminator->firstUse);
+        SLANG_ASSERT(!oldTerminator->firstUse);
 
 
         // Okay, we should be clear to remove the old terminator
