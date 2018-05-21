@@ -669,6 +669,122 @@ static LegalVal legalizeGetElementPtr(
         indexOperand);
 }
 
+static LegalVal legalizeMakeStruct(
+    IRTypeLegalizationContext*  context,
+    LegalType                   legalType,
+    LegalVal const*             legalArgs,
+    UInt                        argCount)
+{
+    auto builder = context->builder;
+
+    switch(legalType.flavor)
+    {
+    case LegalType::Flavor::simple:
+        {
+            List<IRInst*> args;
+            for(UInt aa = 0; aa < argCount; ++aa)
+            {
+                // Note: we assume that all the arguments
+                // must be simple here, because otherwise
+                // the `struct` type with them as fields
+                // would not be simple...
+                //
+                args.Add(legalArgs[aa].getSimple());
+            }
+            return LegalVal::simple(
+                builder->emitMakeStruct(
+                    legalType.getSimple(),
+                    argCount,
+                    args.Buffer()));
+        }
+
+    case LegalType::Flavor::pair:
+        {
+            // There are two sides, the ordinary and the special,
+            // and we basically just dispatch to both of them.
+            auto pairType = legalType.getPair();
+            auto pairInfo = pairType->pairInfo;
+            LegalType ordinaryType = pairType->ordinaryType;
+            LegalType specialType = pairType->specialType;
+
+            List<LegalVal> ordinaryArgs;
+            List<LegalVal> specialArgs;
+            UInt argCounter = 0;
+            for(auto ee : pairInfo->elements)
+            {
+                UInt argIndex = argCounter++;
+                LegalVal arg = legalArgs[argIndex];
+
+                if((ee.flags & Slang::PairInfo::kFlag_hasOrdinaryAndSpecial) == Slang::PairInfo::kFlag_hasOrdinaryAndSpecial)
+                {
+                    // The field is itself a pair type, so we expect
+                    // the argument value to be one too...
+                    auto argPair = arg.getPair();
+                    ordinaryArgs.Add(argPair->ordinaryVal);
+                    specialArgs.Add(argPair->specialVal);
+                }
+                else if(ee.flags & Slang::PairInfo::kFlag_hasOrdinary)
+                {
+                    ordinaryArgs.Add(arg);
+                }
+                else if(ee.flags & Slang::PairInfo::kFlag_hasSpecial)
+                {
+                    specialArgs.Add(arg);
+                }
+            }
+
+            LegalVal ordinaryVal = legalizeMakeStruct(
+                context,
+                ordinaryType,
+                ordinaryArgs.Buffer(),
+                ordinaryArgs.Count());
+
+            LegalVal specialVal = legalizeMakeStruct(
+                context,
+                specialType,
+                specialArgs.Buffer(),
+                specialArgs.Count());
+
+            return LegalVal::pair(ordinaryVal, specialVal, pairInfo);
+        }
+        break;
+
+    case LegalType::Flavor::tuple:
+        {
+            // We are constructing a tuple of values from
+            // the individual fields. We need to identify
+            // for each tuple element what field it uses,
+            // and then extract that field's value.
+
+            auto tupleType = legalType.getTuple();
+
+            RefPtr<TuplePseudoVal> resTupleInfo = new TuplePseudoVal();
+            UInt argCounter = 0;
+            for(auto typeElem : tupleType->elements)
+            {
+                auto elemKey = typeElem.key;
+                UInt argIndex = argCounter++;
+                SLANG_ASSERT(argIndex < argCount);
+
+                LegalVal argVal = legalArgs[argIndex];
+
+                TuplePseudoVal::Element resElem;
+                resElem.key = elemKey;
+                resElem.val = argVal;
+
+                resTupleInfo->elements.Add(resElem);
+            }
+            return LegalVal::tuple(resTupleInfo);
+        }
+
+    default:
+        SLANG_UNEXPECTED("unhandled");
+        UNREACHABLE_RETURN(LegalVal());
+    }
+}
+
+
+
 static LegalVal legalizeInst(
     IRTypeLegalizationContext*    context,
     IRInst*                     inst,
@@ -694,6 +810,13 @@ static LegalVal legalizeInst(
 
     case kIROp_Call:
         return legalizeCall(context, (IRCall*)inst);
+
+    case kIROp_makeStruct:
+        return legalizeMakeStruct(
+            context,
+            type,
+            args,
+            inst->getOperandCount());
 
     default:
         // TODO: produce a user-visible diagnostic here

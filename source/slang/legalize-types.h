@@ -290,7 +290,7 @@ struct LegalVal
         return result;
     }
 
-    IRInst* getSimple()
+    IRInst* getSimple() const
     {
         SLANG_ASSERT(flavor == Flavor::simple);
         return irValue;
@@ -298,7 +298,7 @@ struct LegalVal
 
     static LegalVal tuple(RefPtr<TuplePseudoVal> tupleVal);
 
-    RefPtr<TuplePseudoVal> getTuple()
+    RefPtr<TuplePseudoVal> getTuple() const
     {
         SLANG_ASSERT(flavor == Flavor::tuple);
         return obj.As<TuplePseudoVal>();
@@ -313,7 +313,7 @@ struct LegalVal
         LegalVal const&     specialVal,
         RefPtr<PairInfo>    pairInfo);
 
-    RefPtr<PairPseudoVal> getPair()
+    RefPtr<PairPseudoVal> getPair() const
     {
         SLANG_ASSERT(flavor == Flavor::pair);
         return obj.As<PairPseudoVal>();
