@@ -11,6 +11,8 @@
 #include "vk-device-queue.h"
 #include "vk-swap-chain.h"
 
+#include "surface.h"
+
 // Vulkan has a different coordinate system to ogl
 // http://anki3d.org/vulkan-coordinate-system/
 
@@ -122,6 +124,45 @@ public:
         MapFlavor m_mapFlavor = MapFlavor::Unknown;         ///< If resource is mapped, records what kind of mapping else Unknown (if not mapped)
     };
 
+    class TextureResourceImpl : public TextureResource
+    {
+    public:
+        typedef TextureResource Parent;
+
+        TextureResourceImpl(Type type, const Desc& desc, Usage initialUsage, const VulkanApi* api) :
+            Parent(type, desc),
+            m_initialUsage(initialUsage),
+            m_api(api)
+        {
+        }
+        ~TextureResourceImpl()
+        {
+            if (m_api)
+            {
+                if (m_imageView != VK_NULL_HANDLE)
+                {
+                    m_api->vkDestroyImageView(m_api->m_device, m_imageView, nullptr);
+                }
+                if (m_imageMemory != VK_NULL_HANDLE)
+                {
+                    m_api->vkFreeMemory(m_api->m_device, m_imageMemory, nullptr);
+                }
+                if (m_image != VK_NULL_HANDLE)
+                {
+                    m_api->vkDestroyImage(m_api->m_device, m_image, nullptr);
+                }
+            }
+        }
+
+        Usage m_initialUsage;
+        
+        VkImage m_image = VK_NULL_HANDLE; 
+        VkDeviceMemory m_imageMemory = VK_NULL_HANDLE;
+        VkImageView m_imageView = VK_NULL_HANDLE;
+
+        const VulkanApi* m_api;
+    };
+
 	class ShaderProgramImpl: public ShaderProgram
     {
 		public:
@@ -227,6 +268,7 @@ public:
 
     Slang::Result _beginPass();
     void _endPass();
+    void _transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
 
     VkDebugReportCallbackEXT m_debugReportCallback;
 
@@ -1020,11 +1062,6 @@ ShaderCompiler* VKRenderer::getShaderCompiler()
     return this;
 }
 
-TextureResource* VKRenderer::createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData)
-{
-    return nullptr;
-}
-
 static VkBufferUsageFlagBits _calcUsageFlagBit(Resource::BindFlag::Enum bind)
 {
     typedef Resource::BindFlag BindFlag;
@@ -1060,29 +1097,328 @@ static VkBufferUsageFlagBits _calcUsageFlagBit(int bindFlags)
     return VkBufferUsageFlagBits(dstFlags);
 }
 
-BufferResource* VKRenderer::createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& descIn, const void* initData)
+static VkBufferUsageFlags _calcUsageFlagBit(int bindFlags, int cpuAccessFlags, const void* initData)
 {
-    BufferResource::Desc desc(descIn);
-    if (desc.bindFlags == 0)
-    {
-        desc.bindFlags = Resource::s_requiredBinding[int(initialUsage)];
-    }
+    VkBufferUsageFlags usage = _calcUsageFlagBit(bindFlags);
 
-    const size_t bufferSize = desc.sizeInBytes;
-
-    VkBufferUsageFlags usage = _calcUsageFlagBit(desc.bindFlags);
-    VkMemoryPropertyFlags reqMemoryProperties = 0;
-
-    if (desc.cpuAccessFlags & Resource::AccessFlag::Read)
+    if (cpuAccessFlags & Resource::AccessFlag::Read)
     {
         // If it can be read from, set this
         usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
     }
-    if ((desc.cpuAccessFlags & Resource::AccessFlag::Write) || initData)
+    if ((cpuAccessFlags & Resource::AccessFlag::Write) || initData)
     {
         usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     }
 
+    return usage;    
+}
+
+void VKRenderer::_transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout) 
+{
+    VkImageMemoryBarrier barrier = {};
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.oldLayout = oldLayout;
+    barrier.newLayout = newLayout;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image = image;
+    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barrier.subresourceRange.baseMipLevel = 0;
+    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = 1;
+
+    VkPipelineStageFlags sourceStage;
+    VkPipelineStageFlags destinationStage;
+
+    if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) 
+    {
+        barrier.srcAccessMask = 0;
+        barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+        sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    }
+    else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) 
+    {
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+        sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    }
+    else 
+    {
+        assert(!"unsupported layout transition!");
+        return;
+    }
+
+    VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
+
+    m_api.vkCmdPipelineBarrier(commandBuffer, sourceStage, destinationStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+}
+
+TextureResource* VKRenderer::createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& descIn, const TextureResource::Data* initData)
+{
+    TextureResource::Desc desc(descIn);
+    desc.setDefaults(type, initialUsage);
+
+    const VkFormat format = VulkanUtil::getVkFormat(desc.format);
+    if (format == VK_FORMAT_UNDEFINED)
+    {
+        assert(!"Unhandled image format");
+        return nullptr;
+    }
+
+    const int arraySize = desc.calcEffectiveArraySize(type);
+
+    RefPtr<TextureResourceImpl> texture(new TextureResourceImpl(type, desc, initialUsage, &m_api));
+
+    VkImageViewType imageViewType = VK_IMAGE_VIEW_TYPE_MAX_ENUM;
+
+    // Create the image
+    {
+        VkImageCreateInfo imageInfo = {VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
+
+        switch (type)
+        {
+            case Resource::Type::Texture1D:
+            {
+                imageViewType = desc.arraySize > 1 ? VK_IMAGE_VIEW_TYPE_1D_ARRAY : VK_IMAGE_VIEW_TYPE_1D;
+
+                imageInfo.imageType = VK_IMAGE_TYPE_1D;
+                imageInfo.extent = VkExtent3D{ uint32_t(descIn.size.width), 1, 1 };
+                break;
+            }
+            case Resource::Type::Texture2D:
+            {
+                imageViewType = desc.arraySize > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
+
+                imageInfo.imageType = VK_IMAGE_TYPE_2D;
+                imageInfo.extent = VkExtent3D{ uint32_t(descIn.size.width), uint32_t(descIn.size.height), 1 };
+                break;
+            }
+            case Resource::Type::TextureCube:
+            {
+                imageViewType = desc.arraySize > 1 ? VK_IMAGE_VIEW_TYPE_CUBE_ARRAY : VK_IMAGE_VIEW_TYPE_CUBE;
+
+                imageInfo.imageType = VK_IMAGE_TYPE_2D;
+                imageInfo.extent = VkExtent3D{ uint32_t(descIn.size.width), uint32_t(descIn.size.height), 1 };
+                break;
+            }
+            case Resource::Type::Texture3D:
+            {
+                // Can't have an array and 3d texture
+                assert(desc.arraySize <= 1);
+
+                imageViewType = VK_IMAGE_VIEW_TYPE_3D; 
+                
+                imageInfo.imageType = VK_IMAGE_TYPE_3D;
+                imageInfo.extent = VkExtent3D{ uint32_t(descIn.size.width), uint32_t(descIn.size.height), uint32_t(descIn.size.depth) };
+                break;
+            }
+            default:
+            {
+                assert(!"Unhandled type");
+                return nullptr;
+            }
+        }
+
+        imageInfo.mipLevels = desc.numMipLevels;
+        imageInfo.arrayLayers = arraySize;
+        
+        imageInfo.format = format;
+
+        imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;    
+        imageInfo.usage = _calcUsageFlagBit(desc.bindFlags, desc.cpuAccessFlags, initData) | VK_IMAGE_USAGE_SAMPLED_BIT;
+        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+        imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+        imageInfo.flags = 0; // Optional
+
+        SLANG_VK_RETURN_NULL_ON_FAIL(m_api.vkCreateImage(m_device, &imageInfo, nullptr, &texture->m_image));
+    }
+    
+    VkMemoryRequirements memRequirements;
+    m_api.vkGetImageMemoryRequirements(m_device, texture->m_image, &memRequirements);
+
+    // Allocate the memory
+    {
+        VkMemoryPropertyFlags reqMemoryProperties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+
+        VkMemoryAllocateInfo allocInfo = {VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
+   
+        int memoryTypeIndex = m_api.findMemoryTypeIndex(memRequirements.memoryTypeBits, reqMemoryProperties);
+        assert(memoryTypeIndex >= 0);
+        
+        VkMemoryPropertyFlags actualMemoryProperites = m_api.m_deviceMemoryProperties.memoryTypes[memoryTypeIndex].propertyFlags;
+    
+        allocInfo.allocationSize = memRequirements.size;
+        allocInfo.memoryTypeIndex = memoryTypeIndex;
+
+        SLANG_VK_RETURN_NULL_ON_FAIL(m_api.vkAllocateMemory(m_device, &allocInfo, nullptr, &texture->m_imageMemory));
+    }
+    
+    // Bind the memory to the image
+    m_api.vkBindImageMemory(m_device, texture->m_image, texture->m_imageMemory, 0);
+
+
+    if (initData)
+    {
+        struct SubResource  
+        {
+            size_t offset;
+            TextureResource::Size mipSize;
+        };
+
+        List<SubResource> subResources;
+
+        VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
+
+        const int numMipMaps = desc.numMipLevels;
+        assert(initData->numMips == numMipMaps);
+
+        // Calculate how large the buffer has to be
+        size_t bufferSize = 0;
+        // Calculate how large an array entry is
+        for (int j = 0; j < numMipMaps; ++j)
+        {
+            const TextureResource::Size mipSize = desc.size.calcMipSize(j);
+
+            const int rowSizeInBytes = Surface::calcRowSize(desc.format, mipSize.width);
+            const int numRows =  Surface::calcNumRows(desc.format, mipSize.height);
+
+            SubResource subResource;
+            subResource.offset = bufferSize;
+            subResource.mipSize = mipSize;
+
+            subResources.Add(subResource);
+
+            bufferSize += (rowSizeInBytes * numRows) * mipSize.depth;
+        }
+
+        
+        // Calculate the total size taking into account the array 
+        bufferSize *= arraySize;
+
+        Buffer uploadBuffer;
+        SLANG_RETURN_NULL_ON_FAIL(uploadBuffer.init(m_api, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
+
+        assert(subResources.Count() == numMipMaps);
+
+        // Copy into upload buffer
+        {
+            int subResourceIndex = 0;
+
+            uint8_t* dstData;
+            m_api.vkMapMemory(m_device, uploadBuffer.m_memory, 0, bufferSize, 0, (void**)&dstData);
+            
+            for (int i = 0; i < arraySize; ++i)
+            {
+                for (int j = 0; j < int(subResources.Count()); ++j)
+                {
+                    const SubResource& subResource = subResources[j];
+
+                    const ptrdiff_t srcRowStride = initData->mipRowStrides[j];
+                    const int dstRowSizeInBytes = Surface::calcRowSize(desc.format, subResource.mipSize.width);
+                    const int numRows = Surface::calcNumRows(desc.format, subResource.mipSize.height);
+
+                    for (int k = 0; k < subResource.mipSize.depth; k++)
+                    {
+                        const uint8_t* srcData = (const uint8_t*)(initData->subResources[subResourceIndex]); 
+
+                        for (int l = 0; l < numRows; l++)
+                        {
+                            ::memcpy(dstData, srcData, dstRowSizeInBytes);
+                            
+                            dstData += dstRowSizeInBytes;
+                            srcData += srcRowStride;
+                        }
+
+                        subResourceIndex++;
+                    }
+                }
+            }
+
+            m_api.vkUnmapMemory(m_device, uploadBuffer.m_memory);
+        }
+
+        _transitionImageLayout(texture->m_image, format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        
+        {
+            size_t srcOffset = 0;
+            for (int i = 0; i < arraySize; ++i)
+            {
+                for (int j = 0; j < int(subResources.Count()); ++j)
+                {
+                    const SubResource& subResource = subResources[j];
+                    const TextureResource::Size& mipSize = subResource.mipSize;
+
+                    const int rowSizeInBytes = Surface::calcRowSize(desc.format, mipSize.width);
+                    const int numRows = Surface::calcNumRows(desc.format, mipSize.height);
+
+                    VkBufferImageCopy region = {};
+
+                    region.bufferOffset = srcOffset;
+                    region.bufferRowLength = rowSizeInBytes;
+                    region.bufferImageHeight = numRows;
+                    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                    region.imageSubresource.mipLevel = j;
+                    region.imageSubresource.baseArrayLayer = i;
+                    region.imageSubresource.layerCount = 1;
+                    region.imageOffset = { 0, 0, 0 };
+                    region.imageExtent = { uint32_t(mipSize.width), uint32_t(mipSize.height), uint32_t(mipSize.depth) };
+
+                    // Do the copy
+                    m_api.vkCmdCopyBufferToImage(commandBuffer, uploadBuffer.m_buffer, texture->m_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+
+                    // Next
+                    srcOffset += rowSizeInBytes * numRows * mipSize.depth;
+                }
+            }
+        }
+
+        _transitionImageLayout(texture->m_image, format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+        m_deviceQueue.flushAndWait();
+    }
+
+    // Create the image view
+    {
+        VkImageViewCreateInfo viewInfo = {};
+        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        viewInfo.image = texture->m_image;
+        viewInfo.viewType = imageViewType;
+        viewInfo.format = format;
+        viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        viewInfo.subresourceRange.baseMipLevel = 0;
+        viewInfo.subresourceRange.levelCount = 1;
+        viewInfo.subresourceRange.baseArrayLayer = 0;
+        viewInfo.subresourceRange.layerCount = 1;
+
+        viewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+        viewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+        viewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+        viewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+        
+        SLANG_VK_RETURN_NULL_ON_FAIL(m_api.vkCreateImageView(m_device, &viewInfo, nullptr, &texture->m_imageView));
+    }
+
+    return texture.detach();
+}
+
+BufferResource* VKRenderer::createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& descIn, const void* initData)
+{
+    BufferResource::Desc desc(descIn);
+    desc.setDefaults(initialUsage);
+
+    const size_t bufferSize = desc.sizeInBytes;
+
+    VkMemoryPropertyFlags reqMemoryProperties = 0;
+
+    VkBufferUsageFlags usage = _calcUsageFlagBit(desc.bindFlags, desc.cpuAccessFlags, initData);
+    
     switch (initialUsage)
     {
         case Resource::Usage::ConstantBuffer:

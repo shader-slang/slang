@@ -762,11 +762,7 @@ static GLenum _calcTarget(Resource::Usage usage)
 BufferResource* GLRenderer::createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& descIn, const void* initData) 
 {
     BufferResource::Desc desc(descIn);
-
-    if (desc.bindFlags == 0)
-    {
-        desc.bindFlags = Resource::s_requiredBinding[int(initialUsage)];
-    }
+    desc.setDefaults(initialUsage);
 
     const GLenum target = _calcTarget(initialUsage);
     // TODO: should derive from desc...
