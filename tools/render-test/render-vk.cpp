@@ -1668,6 +1668,30 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
     m_api.vkCmdDispatch(commandBuffer, x, y, z);
 }
 
+static VkImageViewType _calcImageViewType(TextureResource::Type type, const TextureResource::Desc& desc)
+{
+    switch (type)
+    {
+        case Resource::Type::Texture1D:        return desc.arraySize > 1 ? VK_IMAGE_VIEW_TYPE_1D_ARRAY : VK_IMAGE_VIEW_TYPE_1D;
+        case Resource::Type::Texture2D:        return desc.arraySize > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
+        case Resource::Type::TextureCube:      return desc.arraySize > 1 ? VK_IMAGE_VIEW_TYPE_CUBE_ARRAY : VK_IMAGE_VIEW_TYPE_CUBE;
+        case Resource::Type::Texture3D:
+        {
+            // Can't have an array and 3d texture
+            assert(desc.arraySize <= 1);
+            if (desc.arraySize <= 1)
+            {
+                return VK_IMAGE_VIEW_TYPE_3D;
+            }
+            break;
+        }
+        default: break;
+    }
+
+    return VK_IMAGE_VIEW_TYPE_MAX_ENUM;
+}
+
+
 BindingState* VKRenderer::createBindingState(const BindingState::Desc& bindingStateDesc)
 {   
     RefPtr<BindingStateImpl> bindingState(new BindingStateImpl(bindingStateDesc, &m_api));
@@ -1739,39 +1763,12 @@ BindingState* VKRenderer::createBindingState(const BindingState::Desc& bindingSt
                 TextureResourceImpl* textureResource = static_cast<TextureResourceImpl*>(srcBinding.resource.Ptr());
                 const TextureResource::Desc& texDesc = textureResource->getDesc();
 
-                VkImageViewType imageViewType = VK_IMAGE_VIEW_TYPE_MAX_ENUM;               
-                switch (textureResource->getType())
+                VkImageViewType imageViewType = _calcImageViewType(textureResource->getType(), texDesc);
+                if (imageViewType == VK_IMAGE_VIEW_TYPE_MAX_ENUM)
                 {
-                    case Resource::Type::Texture1D:
-                    {
-                        imageViewType = texDesc.arraySize > 1 ? VK_IMAGE_VIEW_TYPE_1D_ARRAY : VK_IMAGE_VIEW_TYPE_1D;
-                        break;
-                    }
-                    case Resource::Type::Texture2D:
-                    {
-                        imageViewType = texDesc.arraySize > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
-                        break;
-                    }
-                    case Resource::Type::TextureCube:
-                    {
-                        imageViewType = texDesc.arraySize > 1 ? VK_IMAGE_VIEW_TYPE_CUBE_ARRAY : VK_IMAGE_VIEW_TYPE_CUBE;
-                        break;
-                    }
-                    case Resource::Type::Texture3D:
-                    {
-                        // Can't have an array and 3d texture
-                        assert(texDesc.arraySize <= 1);
-
-                        imageViewType = VK_IMAGE_VIEW_TYPE_3D;
-                        break;
-                    }
-                    default:
-                    {
-                        assert(!"Unhandled type");
-                        return nullptr;
-                    }
+                    assert(!"Invalid view type");
+                    return nullptr;
                 }
-
                 const VkFormat format = VulkanUtil::getVkFormat(texDesc.format);
                 if (format == VK_FORMAT_UNDEFINED)
                 {
