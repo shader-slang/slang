@@ -139,10 +139,6 @@ public:
         {
             if (m_api)
             {
-                if (m_imageView != VK_NULL_HANDLE)
-                {
-                    m_api->vkDestroyImageView(m_api->m_device, m_imageView, nullptr);
-                }
                 if (m_imageMemory != VK_NULL_HANDLE)
                 {
                     m_api->vkFreeMemory(m_api->m_device, m_imageMemory, nullptr);
@@ -158,8 +154,7 @@ public:
         
         VkImage m_image = VK_NULL_HANDLE; 
         VkDeviceMemory m_imageMemory = VK_NULL_HANDLE;
-        VkImageView m_imageView = VK_NULL_HANDLE;
-
+        
         const VulkanApi* m_api;
     };
 
@@ -182,9 +177,9 @@ public:
 
     struct BindingDetail
     {
-        VkImageView     m_srv;
-        VkBufferView    m_uav;
-        VkSampler       m_samplerState;
+        VkImageView     m_srv = VK_NULL_HANDLE;
+        VkBufferView    m_uav = VK_NULL_HANDLE;
+        VkSampler       m_sampler = VK_NULL_HANDLE;
         int             m_binding = 0;
     };
 
@@ -193,13 +188,32 @@ public:
 		public:
         typedef BindingState Parent;
 
-		BindingStateImpl(const Desc& desc, VKRenderer* renderer):
+		BindingStateImpl(const Desc& desc, const VulkanApi* api):
             Parent(desc), 
-			m_renderer(renderer)
+			m_api(api)
 		{
 		}
+        ~BindingStateImpl()
+        {
+            for (int i = 0; i < int(m_bindingDetails.Count()); ++i)
+            {
+                BindingDetail& detail = m_bindingDetails[i];
+                if (detail.m_sampler != VK_NULL_HANDLE)
+                {
+                    m_api->vkDestroySampler(m_api->m_device, detail.m_sampler, nullptr);
+                }
+                if (detail.m_srv != VK_NULL_HANDLE)
+                {
+                    m_api->vkDestroyImageView(m_api->m_device, detail.m_srv, nullptr);
+                }
+                if (detail.m_uav != VK_NULL_HANDLE)
+                {
+                    m_api->vkDestroyBufferView(m_api->m_device, detail.m_uav, nullptr);
+                }
+            }
+        }
 
-		VKRenderer* m_renderer;
+        const VulkanApi* m_api;
         List<BindingDetail> m_bindingDetails;
     };
 
@@ -1175,8 +1189,6 @@ TextureResource* VKRenderer::createTextureResource(Resource::Type type, Resource
 
     RefPtr<TextureResourceImpl> texture(new TextureResourceImpl(type, desc, initialUsage, &m_api));
 
-    VkImageViewType imageViewType = VK_IMAGE_VIEW_TYPE_MAX_ENUM;
-
     // Create the image
     {
         VkImageCreateInfo imageInfo = {VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
@@ -1185,24 +1197,18 @@ TextureResource* VKRenderer::createTextureResource(Resource::Type type, Resource
         {
             case Resource::Type::Texture1D:
             {
-                imageViewType = desc.arraySize > 1 ? VK_IMAGE_VIEW_TYPE_1D_ARRAY : VK_IMAGE_VIEW_TYPE_1D;
-
                 imageInfo.imageType = VK_IMAGE_TYPE_1D;
                 imageInfo.extent = VkExtent3D{ uint32_t(descIn.size.width), 1, 1 };
                 break;
             }
             case Resource::Type::Texture2D:
             {
-                imageViewType = desc.arraySize > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
-
                 imageInfo.imageType = VK_IMAGE_TYPE_2D;
                 imageInfo.extent = VkExtent3D{ uint32_t(descIn.size.width), uint32_t(descIn.size.height), 1 };
                 break;
             }
             case Resource::Type::TextureCube:
             {
-                imageViewType = desc.arraySize > 1 ? VK_IMAGE_VIEW_TYPE_CUBE_ARRAY : VK_IMAGE_VIEW_TYPE_CUBE;
-
                 imageInfo.imageType = VK_IMAGE_TYPE_2D;
                 imageInfo.extent = VkExtent3D{ uint32_t(descIn.size.width), uint32_t(descIn.size.height), 1 };
                 break;
@@ -1212,8 +1218,6 @@ TextureResource* VKRenderer::createTextureResource(Resource::Type type, Resource
                 // Can't have an array and 3d texture
                 assert(desc.arraySize <= 1);
 
-                imageViewType = VK_IMAGE_VIEW_TYPE_3D; 
-                
                 imageInfo.imageType = VK_IMAGE_TYPE_3D;
                 imageInfo.extent = VkExtent3D{ uint32_t(descIn.size.width), uint32_t(descIn.size.height), uint32_t(descIn.size.depth) };
                 break;
@@ -1384,26 +1388,7 @@ TextureResource* VKRenderer::createTextureResource(Resource::Type type, Resource
         m_deviceQueue.flushAndWait();
     }
 
-    // Create the image view
-    {
-        VkImageViewCreateInfo viewInfo = {};
-        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        viewInfo.image = texture->m_image;
-        viewInfo.viewType = imageViewType;
-        viewInfo.format = format;
-        viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        viewInfo.subresourceRange.baseMipLevel = 0;
-        viewInfo.subresourceRange.levelCount = 1;
-        viewInfo.subresourceRange.baseArrayLayer = 0;
-        viewInfo.subresourceRange.layerCount = 1;
-
-        viewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-        viewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-        viewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-        viewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-        
-        SLANG_VK_RETURN_NULL_ON_FAIL(m_api.vkCreateImageView(m_device, &viewInfo, nullptr, &texture->m_imageView));
-    }
+    
 
     return texture.detach();
 }
@@ -1685,7 +1670,7 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
 
 BindingState* VKRenderer::createBindingState(const BindingState::Desc& bindingStateDesc)
 {   
-    RefPtr<BindingStateImpl> bindingState(new BindingStateImpl(bindingStateDesc, this));
+    RefPtr<BindingStateImpl> bindingState(new BindingStateImpl(bindingStateDesc, &m_api));
 
     const auto& srcBindings = bindingStateDesc.m_bindings;
     const int numBindings = int(srcBindings.Count());
@@ -1705,7 +1690,12 @@ BindingState* VKRenderer::createBindingState(const BindingState::Desc& bindingSt
         {
             case BindingType::Buffer:
             {
-                assert(srcBinding.resource && srcBinding.resource->isBuffer());
+                if (!srcBinding.resource || !srcBinding.resource->isBuffer())
+                {
+                    assert(!"Needs to have a buffer resource set");
+                    return nullptr;
+                }
+
                 //BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(srcBinding.resource.Ptr());
                 //const BufferResource::Desc& bufferResourceDesc = bufferResource->getDesc();
 
@@ -1714,11 +1704,107 @@ BindingState* VKRenderer::createBindingState(const BindingState::Desc& bindingSt
                 // VkImageView srv
                 break;
             }
-            case BindingType::Texture:
             case BindingType::Sampler:
+            {
+                VkSamplerCreateInfo samplerInfo = { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
+                
+                samplerInfo.magFilter = VK_FILTER_LINEAR;
+                samplerInfo.minFilter = VK_FILTER_LINEAR;
+                
+                samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+                samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+                samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+
+                samplerInfo.anisotropyEnable = VK_FALSE;
+                samplerInfo.maxAnisotropy = 1;
+
+                samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+                samplerInfo.unnormalizedCoordinates = VK_FALSE;
+                samplerInfo.compareEnable = VK_FALSE;
+                samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+                samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+
+                SLANG_VK_RETURN_NULL_ON_FAIL(m_api.vkCreateSampler(m_device, &samplerInfo, nullptr, &dstDetail.m_sampler));
+
+                break;
+            }
+            case BindingType::Texture:
+            {
+                if (!srcBinding.resource || !srcBinding.resource->isTexture())
+                {
+                    assert(!"Needs to have a texture resource set");
+                    return nullptr;
+                }
+
+                TextureResourceImpl* textureResource = static_cast<TextureResourceImpl*>(srcBinding.resource.Ptr());
+                const TextureResource::Desc& texDesc = textureResource->getDesc();
+
+                VkImageViewType imageViewType = VK_IMAGE_VIEW_TYPE_MAX_ENUM;               
+                switch (textureResource->getType())
+                {
+                    case Resource::Type::Texture1D:
+                    {
+                        imageViewType = texDesc.arraySize > 1 ? VK_IMAGE_VIEW_TYPE_1D_ARRAY : VK_IMAGE_VIEW_TYPE_1D;
+                        break;
+                    }
+                    case Resource::Type::Texture2D:
+                    {
+                        imageViewType = texDesc.arraySize > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
+                        break;
+                    }
+                    case Resource::Type::TextureCube:
+                    {
+                        imageViewType = texDesc.arraySize > 1 ? VK_IMAGE_VIEW_TYPE_CUBE_ARRAY : VK_IMAGE_VIEW_TYPE_CUBE;
+                        break;
+                    }
+                    case Resource::Type::Texture3D:
+                    {
+                        // Can't have an array and 3d texture
+                        assert(texDesc.arraySize <= 1);
+
+                        imageViewType = VK_IMAGE_VIEW_TYPE_3D;
+                        break;
+                    }
+                    default:
+                    {
+                        assert(!"Unhandled type");
+                        return nullptr;
+                    }
+                }
+
+                const VkFormat format = VulkanUtil::getVkFormat(texDesc.format);
+                if (format == VK_FORMAT_UNDEFINED)
+                {
+                    assert(!"Unhandled image format");
+                    return nullptr;
+                }
+
+                // Create the image view
+                
+                VkImageViewCreateInfo viewInfo = {};
+                viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+                viewInfo.image = textureResource->m_image;
+                viewInfo.viewType = imageViewType;
+                viewInfo.format = format;
+                viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                viewInfo.subresourceRange.baseMipLevel = 0;
+                viewInfo.subresourceRange.levelCount = 1;
+                viewInfo.subresourceRange.baseArrayLayer = 0;
+                viewInfo.subresourceRange.layerCount = 1;
+
+                viewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+                viewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+                viewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+                viewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+                SLANG_VK_RETURN_NULL_ON_FAIL(m_api.vkCreateImageView(m_device, &viewInfo, nullptr, &dstDetail.m_srv));
+                
+                break;
+            }
             case BindingType::CombinedTextureSampler:
             {
                 assert(!"not implemented");
+                return nullptr;
             }
         }
     }

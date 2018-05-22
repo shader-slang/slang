@@ -58,6 +58,10 @@ namespace renderer_test {
     x(vkDestroyRenderPass) \
     x(vkCreateCommandPool) \
     x(vkDestroyCommandPool) \
+    x(vkCreateSampler) \
+    x(vkDestroySampler) \
+    x(vkCreateBufferView) \
+    x(vkDestroyBufferView) \
     \
     x(vkGetBufferMemoryRequirements) \
     x(vkGetImageMemoryRequirements) \
