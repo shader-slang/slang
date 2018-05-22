@@ -16,6 +16,15 @@ size_t RoundToAlignment(size_t offset, size_t alignment)
         return offset + (alignment - remainder);
 }
 
+LayoutSize RoundToAlignment(LayoutSize offset, size_t alignment)
+{
+    // An infinite size is assumed to be maximally aligned.
+    if(offset.isInfinite())
+        return LayoutSize::infinite();
+
+    return RoundToAlignment(offset.getFiniteValue(), alignment);
+}
+
 static size_t RoundUpToPowerOfTwo( size_t value )
 {
     // TODO(tfoley): I know this isn't a fast approach
@@ -66,9 +75,10 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         }
     }
 
-    SimpleArrayLayoutInfo GetArrayLayout( SimpleLayoutInfo elementInfo, size_t elementCount) override
+    SimpleArrayLayoutInfo GetArrayLayout( SimpleLayoutInfo elementInfo, LayoutSize elementCount) override
     {
-        size_t stride = elementInfo.size;
+        SLANG_RELEASE_ASSERT(elementInfo.size.isFinite());
+        auto stride = elementInfo.size.getFiniteValue();
 
         SimpleArrayLayoutInfo arrayInfo;
         arrayInfo.kind = elementInfo.kind;
@@ -109,7 +119,7 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         return structInfo;
     }
 
-    size_t AddStructField(UniformLayoutInfo* ioStructInfo, UniformLayoutInfo fieldInfo) override
+    LayoutSize AddStructField(UniformLayoutInfo* ioStructInfo, UniformLayoutInfo fieldInfo) override
     {
         // Skip zero-size fields
         if(fieldInfo.size == 0)
@@ -117,7 +127,7 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
 
         ioStructInfo->alignment = std::max(ioStructInfo->alignment, fieldInfo.alignment);
         ioStructInfo->size = RoundToAlignment(ioStructInfo->size, fieldInfo.alignment);
-        size_t fieldOffset = ioStructInfo->size;
+        LayoutSize fieldOffset = ioStructInfo->size;
         ioStructInfo->size += fieldInfo.size;
         return fieldOffset;
     }
@@ -136,7 +146,7 @@ struct DefaultConstantBufferLayoutRulesImpl : DefaultLayoutRulesImpl
     // be a multiple of 16 bytes.
     //
     // HLSL agrees.
-    SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, size_t elementCount) override
+    SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, LayoutSize elementCount) override
     {
         if(elementInfo.kind == LayoutResourceKind::Uniform)
         {
@@ -171,7 +181,9 @@ static SimpleLayoutInfo getGLSLVectorLayout(
     SimpleLayoutInfo elementInfo, size_t elementCount)
 {
     SLANG_RELEASE_ASSERT(elementInfo.kind == LayoutResourceKind::Uniform);
-    auto size = elementInfo.size * elementCount;
+    SLANG_RELEASE_ASSERT(elementInfo.size.isFinite());
+
+    auto size = elementInfo.size.getFiniteValue() * elementCount;
     SimpleLayoutInfo vectorInfo(
         LayoutResourceKind::Uniform,
         size,
@@ -193,7 +205,7 @@ struct Std140LayoutRulesImpl : GLSLConstantBufferLayoutRulesImpl
 struct HLSLConstantBufferLayoutRulesImpl : DefaultConstantBufferLayoutRulesImpl
 {
     // Can't let a `struct` field straddle a register (16-byte) boundary
-    size_t AddStructField(UniformLayoutInfo* ioStructInfo, UniformLayoutInfo fieldInfo) override
+    LayoutSize AddStructField(UniformLayoutInfo* ioStructInfo, UniformLayoutInfo fieldInfo) override
     {
         // Skip zero-size fields
         if(fieldInfo.size == 0)
@@ -202,8 +214,8 @@ struct HLSLConstantBufferLayoutRulesImpl : DefaultConstantBufferLayoutRulesImpl
         ioStructInfo->alignment = std::max(ioStructInfo->alignment, fieldInfo.alignment);
         ioStructInfo->size = RoundToAlignment(ioStructInfo->size, fieldInfo.alignment);
 
-        size_t fieldOffset = ioStructInfo->size;
-        size_t fieldSize = fieldInfo.size;
+        LayoutSize fieldOffset = ioStructInfo->size;
+        LayoutSize fieldSize = fieldInfo.size;
 
         // Would this field cross a 16-byte boundary?
         auto registerSize = 16;
@@ -690,19 +702,30 @@ TypeLayoutContext getInitialLayoutContextForTarget(TargetRequest* targetReq)
 }
 
 
-static int GetElementCount(RefPtr<IntVal> val)
+static LayoutSize GetElementCount(RefPtr<IntVal> val)
 {
+    // Lack of a size indicates an unbounded array.
+    if(!val)
+        return LayoutSize::infinite();
+
     if (auto constantVal = val.As<ConstantIntVal>())
     {
-        return (int) constantVal->value;
+        return LayoutSize(LayoutSize::RawValue(constantVal->value));
     }
     else if( auto varRefVal = val.As<GenericParamIntVal>() )
     {
-        // TODO(tfoley): do something sensible in this case
+        // TODO: We want to treat the case where the number of
+        // elements in an array depends on a generic parameter
+        // much like the case where the number of elements is
+        // unbounded, *but* we can't just blindly do that because
+        // an API might disallow unbounded arrays in various
+        // cases where a generic bound might work (because
+        // any concrete specialization will have a finite bound...)
+        //
         return 0;
     }
     SLANG_UNEXPECTED("unhandled integer literal kind");
-    return 0;
+    UNREACHABLE_RETURN(LayoutSize(0));
 }
 
 bool IsResourceKind(LayoutResourceKind kind)
@@ -721,7 +744,7 @@ bool IsResourceKind(LayoutResourceKind kind)
 
 SimpleLayoutInfo GetSimpleLayoutImpl(
     SimpleLayoutInfo        info,
-    RefPtr<Type>  type,
+    RefPtr<Type>            type,
     LayoutRulesImpl*        rules,
     RefPtr<TypeLayout>*     outTypeLayout)
 {
@@ -944,7 +967,10 @@ RefPtr<TypeLayout> applyOffsetToTypeLayout(
                 newResInfo->space = oldResInfo.space;
                 if (auto offsetResInfo = offsetTypeLayout->FindResourceInfo(oldResInfo.kind))
                 {
-                    newResInfo->index += offsetResInfo->count;
+                    // We should not be trying to offset things by an infinite amount,
+                    // since that would leave all the indices undefined.
+                    SLANG_RELEASE_ASSERT(offsetResInfo->count.isFinite());
+                    newResInfo->index += offsetResInfo->count.getFiniteValue();
                 }
             }
 
@@ -1017,7 +1043,7 @@ createParameterGroupTypeLayout(
 
     // Make sure that we allocate resource usage for the
     // parameter block itself.
-    if( parameterGroupInfo.size )
+    if( parameterGroupInfo.size != 0 )
     {
         containerTypeLayout->addResourceUsage(
             parameterGroupInfo.kind,
@@ -1121,7 +1147,8 @@ createParameterGroupTypeLayout(
         auto elementVarResInfo = elementVarLayout->findOrAddResourceInfo(kind);
         if( auto containerTypeResInfo = containerTypeLayout->FindResourceInfo(kind) )
         {
-            elementVarResInfo->index += containerTypeResInfo->count;
+            SLANG_RELEASE_ASSERT(containerTypeResInfo->count.isFinite());
+            elementVarResInfo->index += containerTypeResInfo->count.getFiniteValue();
         }
     }
     typeLayout->elementVarLayout = elementVarLayout;
@@ -1460,9 +1487,11 @@ bool doesResourceRequireAdjustmentForArrayOfStructs(LayoutResourceKind kind)
 //
 // and then we expect `foo_b` to get `register(t8)`, rather
 // than `register(t1)`.
-static RefPtr<TypeLayout>maybeAdjustLayoutForArrayElementType(
+//
+static RefPtr<TypeLayout> maybeAdjustLayoutForArrayElementType(
     RefPtr<TypeLayout>  originalTypeLayout,
-    UInt                elementCount)
+    LayoutSize          elementCount,
+    UInt&               ioAdditionalSpacesNeeded)
 {
     // We will start by looking for cases that we can reject out
     // of hand.
@@ -1494,7 +1523,8 @@ static RefPtr<TypeLayout>maybeAdjustLayoutForArrayElementType(
         auto originalInnerElementTypeLayout = originalArrayTypeLayout->elementTypeLayout;
         auto adjustedInnerElementTypeLayout = maybeAdjustLayoutForArrayElementType(
             originalInnerElementTypeLayout,
-            elementCount);
+            elementCount,
+            ioAdditionalSpacesNeeded);
 
         // If nothing needed to be changed on the inner element type,
         // then we are done.
@@ -1516,7 +1546,8 @@ static RefPtr<TypeLayout>maybeAdjustLayoutForArrayElementType(
         auto originalInnerElementTypeLayout = originalParameterGroupTypeLayout->elementVarLayout->typeLayout;
         auto adjustedInnerElementTypeLayout = maybeAdjustLayoutForArrayElementType(
             originalInnerElementTypeLayout,
-            elementCount);
+            elementCount,
+            ioAdditionalSpacesNeeded);
 
         // If nothing needed to be changed on the inner element type,
         // then we are done.
@@ -1537,20 +1568,37 @@ static RefPtr<TypeLayout>maybeAdjustLayoutForArrayElementType(
         if(fieldCount == 0)
             return originalTypeLayout;
 
-        // TODO: we could try to special-case a `struct` type with a single
-        // field that needs no adjustment, just to avoid some extra allocation.
-
         RefPtr<StructTypeLayout> adjustedStructTypeLayout = new StructTypeLayout();
         copyTypeLayoutFields(adjustedStructTypeLayout, originalStructTypeLayout);
+
+        // If the array type adjustment forces us to give a whole space to
+        // one or more fields, then we'll need to carefully compute the space
+        // index for each field as we go.
+        //
+        LayoutSize nextSpaceIndex = 0;
 
         Dictionary<RefPtr<VarLayout>, RefPtr<VarLayout>> mapOriginalFieldToAdjusted;
         for( auto originalField : originalStructTypeLayout->fields )
         {
-            // Compute the adjusted type for the field
             auto originalFieldTypeLayout = originalField->typeLayout;
+
+            LayoutSize originalFieldSpaceCount = 0;
+            if(auto resInfo = originalFieldTypeLayout->FindResourceInfo(LayoutResourceKind::RegisterSpace))
+                originalFieldSpaceCount = resInfo->count;
+
+            // Compute the adjusted type for the field
+            UInt fieldAdditionalSpaces = 0;
             auto adjustedFieldTypeLayout = maybeAdjustLayoutForArrayElementType(
                 originalFieldTypeLayout,
-                elementCount);
+                elementCount,
+                fieldAdditionalSpaces);
+
+            LayoutSize adjustedFieldSpaceCount = originalFieldSpaceCount + fieldAdditionalSpaces;
+
+            LayoutSize spaceOffsetForField = nextSpaceIndex;
+            nextSpaceIndex += adjustedFieldSpaceCount;
+
+            ioAdditionalSpacesNeeded += fieldAdditionalSpaces;
 
             // Create an adjusted field variable, that is mostly
             // a clone of the original field (just with our
@@ -1559,16 +1607,31 @@ static RefPtr<TypeLayout>maybeAdjustLayoutForArrayElementType(
             copyVarLayoutFields(adjustedField, originalField);
             adjustedField->typeLayout = adjustedFieldTypeLayout;
 
-            // Finally we get down to the real meat of the change,
-            // which is that the field offsets for any resource-type
-            // fields need to be "adjusted" which amounts to just
-            // multiplying them by the element count of the array.
-
-            for( auto& resInfo : adjustedField->resourceInfos )
+            // We will now walk through the resource usage for
+            // the adjusted field, and try to figure out what
+            // to do with it all.
+            //
+            for(auto& resInfo : adjustedField->resourceInfos )
             {
                 if( doesResourceRequireAdjustmentForArrayOfStructs(resInfo.kind) )
                 {
-                    resInfo.index *= elementCount;
+                    if(elementCount.isFinite())
+                    {
+                        // If the array size is finite, then the field's index/offset
+                        // is just going to be strided by the array size since we
+                        // are effectively doing AoS to SoA conversion.
+                        //
+                        resInfo.index *= elementCount.getFiniteValue();
+                    }
+                    else
+                    {
+                        // If we are making an unbounded array, then a `struct`
+                        // field with resource type will turn into its own space,
+                        // and it will start at regsiter zero in that space.
+                        //
+                        resInfo.index = 0;
+                        resInfo.space = spaceOffsetForField.getFiniteValue();
+                    }
                 }
             }
 
@@ -1592,8 +1655,16 @@ static RefPtr<TypeLayout>maybeAdjustLayoutForArrayElementType(
     }
     else
     {
-        // If the leaf type layout isn't some kind of aggregate,
-        // then we can just bail out here.
+        // In the leaf case, we must have a field that used up some resource
+        // that requires adjustment. Because there is no sub-structure to work
+        // with, we can just return the type layout as-is, but we also want
+        // to make a note that this value should consume an additional register
+        // space *if* the element count is unbounded.
+        if( elementCount.isInfinite() )
+        {
+            ioAdditionalSpacesNeeded++;
+        }
+
         return originalTypeLayout;
     }
 }
@@ -1822,12 +1893,27 @@ SimpleLayoutInfo GetLayoutImpl(
             arrayType->baseType.Ptr(),
             outTypeLayout ? &elementTypeLayout : nullptr);
 
-        // For layout purposes, we treat an unsized array as an array of zero elements.
+        // To a first approximation, an array will usually be laid out
+        // by taking the element's type layout and laying out `elementCount`
+        // copies of it. There are of course many details that make
+        // this simplistic version of things not quite work.
         //
-        // TODO: Longer term we are going to need to be careful to include some indication
-        // that a type has logically "infinite" size in some resource kind. In particular
-        // this affects how we would allocate space for parameter binding purposes.
-        auto elementCount = arrayType->ArrayLength ? GetElementCount(arrayType->ArrayLength) : 0;
+        // An important complication to deal with is the possibility of
+        // having "unbounded" arrays, which don't specify a size.'
+        // The layout rules for these vary heavily by resource kind and API.
+        //
+
+        auto elementCount = GetElementCount(arrayType->ArrayLength);
+
+        //
+        // We can compute the uniform storage layout of an array using
+        // the rules for the target API.
+        //
+        // TODO: ensure that this does something reasonable with the unbounded
+        // case, or else issue an error message that the target doesn't
+        // support unbounded types.
+        //
+        
         auto arrayUniformInfo = rules->GetArrayLayout(
             elementInfo,
             elementCount).getUniformLayout();
@@ -1837,53 +1923,116 @@ SimpleLayoutInfo GetLayoutImpl(
             RefPtr<ArrayTypeLayout> typeLayout = new ArrayTypeLayout();
             *outTypeLayout = typeLayout;
 
-            // If we construct an array over an aggregate type that contains
-            // resource fields, we may need to adjust the layout we create
-            // for the element type to
-            RefPtr<TypeLayout> adjustedElementTypeLayout = maybeAdjustLayoutForArrayElementType(
-                elementTypeLayout,
-                elementCount);
-
+            // Some parts of the array type layout object are easy to fill in:
             typeLayout->type = type;
-            typeLayout->originalElementTypeLayout = elementTypeLayout;
-            typeLayout->elementTypeLayout = adjustedElementTypeLayout;
             typeLayout->rules = rules;
-
+            typeLayout->originalElementTypeLayout = elementTypeLayout;
             typeLayout->uniformAlignment = arrayUniformInfo.alignment;
             typeLayout->uniformStride = arrayUniformInfo.elementStride;
 
             typeLayout->addResourceUsage(LayoutResourceKind::Uniform, arrayUniformInfo.size);
 
-            // translate element-type resources into array-type resources
+            //
+            // The tricky part in constructing an array type layout comes when
+            // the element type is (or nests) a structure with resource-type
+            // fields, because in that case we need to perform AoS-to-SoA
+            // conversion as part of computing the final type layout, and
+            // we also need to pre-compute an "adjusted" element type
+            // layout that accounts for the striding that happens with
+            // resource-type contents.
+            //
+            // This complication is only made worse when we have to deal with
+            // unbounded-size arrays over such element types, since those
+            // resource-type fields will each end up consuming a full space
+            // in the resulting layout.
+            //
+            // The `maybeAdjustLayoutForArrayElementType` computes an "adjusted"
+            // type layout for the element type which takes the array stride into
+            // acount. If it returns the same type layout that was passed in,
+            // then that means no adjustement took place.
+            //
+            // The `additionalSpacesNeededForAdjustedElementType` variable counts
+            // the number of additional register spaces that were consumed,
+            // in the case of an unbounded array.
+            //
+            UInt additionalSpacesNeededForAdjustedElementType = 0;
+            RefPtr<TypeLayout> adjustedElementTypeLayout = maybeAdjustLayoutForArrayElementType(
+                elementTypeLayout,
+                elementCount,
+                additionalSpacesNeededForAdjustedElementType);
+
+            typeLayout->elementTypeLayout = adjustedElementTypeLayout;
+
+            // We will now iterate over the resources consumed by the element
+            // type to compute how they contribute to the resource usage
+            // of the overall array type.
+            //
             for( auto elementResourceInfo : elementTypeLayout->resourceInfos )
             {
                 // The uniform case was already handled above
                 if( elementResourceInfo.kind == LayoutResourceKind::Uniform )
                     continue;
 
+                LayoutSize arrayResourceCount = 0;
+
                 // In almost all cases, the resources consumed by an array
                 // will be its element count times the resources consumed
-                // by its element type. The one exception to this is
-                // arrays of resources in Vulkan GLSL, where an entire array
+                // by its element type.
+                //
+                // The first exception to this is arrays of resources when
+                // compiling to GLSL for Vulkan, where an entire array
                 // only consumes a single descriptor-table slot.
                 //
-                // Note: We extend this logic to arbitrary arrays-of-structs,
-                // under the assumption that downstream legalization will
-                // turn those into scalarized structs-of-arrays and this
-                // logic will work out.
-                UInt arrayResourceCount = 0;
                 if (elementResourceInfo.kind == LayoutResourceKind::DescriptorTableSlot)
                 {
                     arrayResourceCount = elementResourceInfo.count;
+                }
+                //
+                // The next big exception is when we are forming an unbounded-size
+                // array and the element type got "adjusted," because that means
+                // the array type will need to allocate full spaces for any resource-type
+                // fields in the element type.
+                //
+                // Note: we carefully carve things out so that the case of a simple
+                // array of resources does *not* lead to the element type being adjusted,
+                // so that this logic doesn't trigger and we instead handle it with
+                // the default logic below.
+                //
+                else if(
+                    elementCount.isInfinite()
+                    && adjustedElementTypeLayout != elementTypeLayout
+                    && doesResourceRequireAdjustmentForArrayOfStructs(elementResourceInfo.kind) )
+                {
+                    // We want to ignore resource types consumed by the element type
+                    // that need adjustement if the array size is infinite, since
+                    // we will be allocating whole spaces for that part of the
+                    // element's resource usage.
                 }
                 else
                 {
                     arrayResourceCount = elementResourceInfo.count * elementCount;
                 }
-            
+
+                // Now that we've computed how the resource usage of the element type
+                // should contribute to the resource usage of the array, we can
+                // add in that resource usage.
+                //
                 typeLayout->addResourceUsage(
                     elementResourceInfo.kind,
                     arrayResourceCount);
+            }
+
+            // The loop above to compute the resource usage of the array from its
+            // element type ignored any resource-type fields in an unbounded-size
+            // array if they would have been allocated as full register spaces.
+            // Those same fields were counted in `additionalSpacesNeededForAdjustedElementType`,
+            // and need to be added into the total resource usage for the array
+            // if we skipped them as part of the loop (which happens when
+            // we detect that the element type layout had been "adjusted").
+            //
+            if( adjustedElementTypeLayout != elementTypeLayout )
+            {
+                typeLayout->addResourceUsage(LayoutResourceKind::RegisterSpace, additionalSpacesNeededForAdjustedElementType);
             }
         }
         return arrayUniformInfo;
@@ -1902,6 +2051,14 @@ SimpleLayoutInfo GetLayoutImpl(
                 typeLayout->rules = rules;
                 *outTypeLayout = typeLayout;
             }
+
+            // The layout of a `struct` type is computed in the somewhat
+            // obvious fashion by keeping a running counter of the resource
+            // usage for each kind of resource, and then for a field that
+            // uses a given resource, assigning it the current offset and
+            // then bumping the offset by the field size. In the case of
+            // uniform data we also need to deal with alignment and other
+            // detailed layout rules.
 
             UniformLayoutInfo info = rules->BeginStructLayout();
 
@@ -1922,7 +2079,7 @@ SimpleLayoutInfo GetLayoutImpl(
                 // This means that the code to generate final
                 // declarations needs to *also* eliminate zero-size
                 // fields to be safe...
-                size_t uniformOffset = info.size;
+                LayoutSize uniformOffset = info.size;
                 if(fieldInfo.size != 0)
                 {
                     uniformOffset = rules->AddStructField(&info, fieldInfo);
@@ -1942,7 +2099,7 @@ SimpleLayoutInfo GetLayoutImpl(
                     // Set up uniform offset information, if there is any uniform data in the field
                     if( fieldTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform) )
                     {
-                        fieldLayout->AddResourceInfo(LayoutResourceKind::Uniform)->index = uniformOffset;
+                        fieldLayout->AddResourceInfo(LayoutResourceKind::Uniform)->index = uniformOffset.getFiniteValue();
                     }
 
                     // Add offset information for any other resource kinds
@@ -1958,10 +2115,39 @@ SimpleLayoutInfo GetLayoutImpl(
                         // The field will need offset information for this kind
                         auto fieldResourceInfo = fieldLayout->AddResourceInfo(fieldTypeResourceInfo.kind);
 
-                        // Check how many slots of the given kind have already been added to the type
-                        auto structTypeResourceInfo = typeLayout->findOrAddResourceInfo(fieldTypeResourceInfo.kind);
-                        fieldResourceInfo->index = structTypeResourceInfo->count;
-                        structTypeResourceInfo->count += fieldTypeResourceInfo.count;
+                        // It is possible for a `struct` field to use an unbounded array
+                        // type, and in the D3D case that would consume an unbounded number
+                        // of registers. What is more, a single `struct` could have multiple
+                        // such fields, or ordinary resource fields after an unbounded field.
+                        //
+                        // We handle this case by allocating a distinct register space for
+                        // any field that consumes an unbounded amount of registers.
+                        //
+                        if( fieldTypeResourceInfo.count.isInfinite() )
+                        {
+                            // We need to add one register space to own the storage for this field.
+                            //
+                            auto structTypeSpaceResourceInfo = typeLayout->findOrAddResourceInfo(LayoutResourceKind::RegisterSpace);
+                            auto spaceOffset = structTypeSpaceResourceInfo->count;
+                            structTypeSpaceResourceInfo->count += 1;
+
+                            // The field itself will record itself as having a zero offset into
+                            // the chosen space.
+                            //
+                            fieldResourceInfo->space = spaceOffset.getFiniteValue();
+                            fieldResourceInfo->index = 0;
+                        }
+                        else
+                        {
+                            // In the case where the field consumes a finite number of slots, we
+                            // can simply set its offset/index to the number of such slots consumed
+                            // so far, and then increment the number of slots consumed by the
+                            // `struct` type itself.
+                            //
+                            auto structTypeResourceInfo = typeLayout->findOrAddResourceInfo(fieldTypeResourceInfo.kind);
+                            fieldResourceInfo->index = structTypeResourceInfo->count.getFiniteValue();
+                            structTypeResourceInfo->count += fieldTypeResourceInfo.count;
+                        }
                     }
                 }
             }
@@ -1989,7 +2175,7 @@ SimpleLayoutInfo GetLayoutImpl(
                 genParamTypeLayout->type = type;
                 genParamTypeLayout->paramIndex = findGenericParam(context.targetReq->layout->globalGenericParams, genParamTypeLayout->getGlobalGenericParamDecl());
                 genParamTypeLayout->rules = rules;
-                genParamTypeLayout->findOrAddResourceInfo(LayoutResourceKind::GenericResource)->count++;
+                genParamTypeLayout->findOrAddResourceInfo(LayoutResourceKind::GenericResource)->count += 1;
                 *outTypeLayout = genParamTypeLayout;
             }
             return info;

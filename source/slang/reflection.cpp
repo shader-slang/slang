@@ -513,6 +513,17 @@ SLANG_API SlangReflectionType* spReflectionTypeLayout_GetType(SlangReflectionTyp
     return (SlangReflectionType*) typeLayout->type.Ptr();
 }
 
+namespace
+{
+    static size_t getReflectionSize(LayoutSize size)
+    {
+        if(size.isFinite())
+            return size.getFiniteValue();
+
+        return SLANG_UNBOUNDED_SIZE;
+    }
+}
+
 SLANG_API size_t spReflectionTypeLayout_GetSize(SlangReflectionTypeLayout* inTypeLayout, SlangParameterCategory category)
 {
     auto typeLayout = convert(inTypeLayout);
@@ -521,7 +532,7 @@ SLANG_API size_t spReflectionTypeLayout_GetSize(SlangReflectionTypeLayout* inTyp
     auto info = typeLayout->FindResourceInfo(LayoutResourceKind(category));
     if(!info) return 0;
 
-    return info->count;
+    return getReflectionSize(info->count);
 }
 
 SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_GetFieldByIndex(SlangReflectionTypeLayout* inTypeLayout, unsigned index)
@@ -558,10 +569,10 @@ SLANG_API size_t spReflectionTypeLayout_GetElementStride(SlangReflectionTypeLayo
                 auto elementTypeLayout = arrayTypeLayout->elementTypeLayout;
                 auto info = elementTypeLayout->FindResourceInfo(LayoutResourceKind(category));
                 if(!info) return 0;
-                return info->count;
+                return getReflectionSize(info->count);
             }
 
-        // An import special case, though, is Vulkan descriptor-table slots,
+        // An important special case, though, is Vulkan descriptor-table slots,
         // where an entire array will use a single `binding`, so that the
         // effective stride is zero:
         case SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT:
@@ -1210,5 +1221,5 @@ SLANG_API size_t spReflection_getGlobalConstantBufferSize(SlangReflection* inPro
     auto structLayout = getGlobalStructLayout(program);
     auto uniform = structLayout->FindResourceInfo(LayoutResourceKind::Uniform);
     if (!uniform) return 0;
-    return uniform->count;
+    return getReflectionSize(uniform->count);
 }

@@ -419,6 +419,19 @@ namespace Slang
             break;
         }
 
+        // Some of the `D3DCOMPILE_*` constants aren't available in all
+        // versions of `d3dcompiler.h`, so we define them here just in case
+        #ifndef D3DCOMPILE_ENABLE_UNBOUNDED_DESCRIPTOR_TABLES
+        #define D3DCOMPILE_ENABLE_UNBOUNDED_DESCRIPTOR_TABLES (1 << 20)
+        #endif
+
+        #ifndef D3DCOMPILE_ALL_RESOURCES_BOUND
+        #define D3DCOMPILE_ALL_RESOURCES_BOUND (1 << 21)
+        #endif
+
+        flags |= D3DCOMPILE_ENABLE_STRICTNESS;
+        flags |= D3DCOMPILE_ENABLE_UNBOUNDED_DESCRIPTOR_TABLES;
+
         ID3DBlob* codeBlob;
         ID3DBlob* diagnosticsBlob;
         HRESULT hr = compileFunc(
