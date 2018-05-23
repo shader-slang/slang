@@ -27,6 +27,7 @@ struct RenderApiFlag
         AllOf = (1 << int(RenderApiType::CountOf)) - 1                   ///< All bits set
     };
 };
+typedef uint32_t RenderApiFlags;
 
 struct RenderApiUtil
 {
