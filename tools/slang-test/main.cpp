@@ -2155,10 +2155,12 @@ static void appendXmlEncode(const String& in, StringBuilder& out)
             out.Append(start, UInt(end - start));
         }
 
-        if (cur < end && isXmlEncodeChar(*cur))
+        // if not at the end, we must be on an xml encoded character, so just output it xml encoded.
+        if (cur < end)
         {
-            appendXmlEncode(*cur, out);
-            cur++;
+            const char encodeChar = *cur++;
+            assert(isXmlEncodeChar(encodeChar));
+            appendXmlEncode(encodeChar, out);
         }
     }
 }
