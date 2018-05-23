@@ -404,6 +404,9 @@ Slang::Result VKRenderer::_createPipeline(RefPtr<Pipeline>& pipelineOut)
 
     const int numBindings = int(srcBindings.Count());
 
+    int numBuffers = 0;
+    int numImages = 0;
+
     Slang::List<VkDescriptorSetLayoutBinding> dstBindings;
     for (int i = 0; i < numBindings; ++i)
     {
@@ -417,32 +420,77 @@ Slang::Result VKRenderer::_createPipeline(RefPtr<Pipeline>& pipelineOut)
                 BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(srcBinding.resource.Ptr());
                 const BufferResource::Desc& bufferResourceDesc = bufferResource->getDesc();
 
+                VkDescriptorSetLayoutBinding dstBinding = {};
+                dstBinding.binding = srcDetail.m_binding;
+                dstBinding.descriptorCount = 1;
+
                 if (bufferResourceDesc.bindFlags & Resource::BindFlag::UnorderedAccess)
                 {
-                    VkDescriptorSetLayoutBinding dstBinding = {};
-                    dstBinding.binding = srcDetail.m_binding;
-                    dstBinding.descriptorCount = 1;
                     dstBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
                     dstBinding.stageFlags = VK_SHADER_STAGE_ALL;
-
                     dstBindings.Add(dstBinding);
+
+                    numBuffers++;
                 }
                 else if (bufferResourceDesc.bindFlags & Resource::BindFlag::ConstantBuffer)
                 {
-                    VkDescriptorSetLayoutBinding dstBinding = {};
-                    dstBinding.binding = srcDetail.m_binding;
-                    dstBinding.descriptorCount = 1;
                     dstBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
                     dstBinding.stageFlags = VK_SHADER_STAGE_ALL;
-
                     dstBindings.Add(dstBinding);
+
+                    numBuffers++;
                 }
 
                 break;
             }
-            default:
-                // TODO: handle the other cases
+            case BindingType::Texture:
+            {
+                VkDescriptorSetLayoutBinding dstBinding = {};
+
+                dstBinding.binding = srcDetail.m_binding;
+                dstBinding.descriptorCount = 1;
+                dstBinding.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE; 
+                dstBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+                dstBindings.Add(dstBinding);
+
+                numImages++;
                 break;
+            }
+            case BindingType::Sampler:
+            {
+                VkDescriptorSetLayoutBinding dstBinding = {};
+                
+                dstBinding.binding = srcDetail.m_binding;
+                dstBinding.descriptorCount = 1;
+                dstBinding.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER; 
+                dstBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+                dstBindings.Add(dstBinding);
+
+                numImages++;
+                break;
+            }
+
+            case BindingType::CombinedTextureSampler:
+            {
+                VkDescriptorSetLayoutBinding dstBinding = {};
+
+                dstBinding.binding = srcDetail.m_binding;
+                dstBinding.descriptorCount = 1;
+                dstBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                dstBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+                dstBindings.Add(dstBinding);
+
+                numImages++;
+                break;
+            }
+            default:
+            {
+                assert(!"Unhandled type");
+                return SLANG_FAIL;
+            }
         }
     }
 
@@ -471,12 +519,20 @@ Slang::Result VKRenderer::_createPipeline(RefPtr<Pipeline>& pipelineOut)
 
     VkDescriptorSetAllocateInfo descriptorSetAllocInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
     descriptorSetAllocInfo.descriptorPool = pipeline->m_descriptorPool;
-    descriptorSetAllocInfo.descriptorSetCount = 1;
+    descriptorSetAllocInfo.descriptorSetCount = 1; 
     descriptorSetAllocInfo.pSetLayouts = &pipeline->m_descriptorSetLayout;
 
     SLANG_VK_CHECK(m_api.vkAllocateDescriptorSets(m_device, &descriptorSetAllocInfo, &pipeline->m_descriptorSet));
 
     // Fill in the descriptor set, using our binding information
+
+    List<VkDescriptorImageInfo> imageInfos;
+    List<VkDescriptorBufferInfo> bufferInfos;
+    List<VkWriteDescriptorSet> writes;
+
+    // Make sure there is enough space...
+    imageInfos.Reserve(numImages);
+    bufferInfos.Reserve(numBuffers);
 
     int elementIndex = 0;
 
@@ -485,21 +541,29 @@ Slang::Result VKRenderer::_createPipeline(RefPtr<Pipeline>& pipelineOut)
         const auto& srcDetail = srcDetails[i];
         const auto& srcBinding = srcBindings[i];
 
+        VkWriteDescriptorSet writeInfo = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+        writeInfo.descriptorCount = 1;
+        writeInfo.dstSet = pipeline->m_descriptorSet;
+        writeInfo.dstBinding = srcDetail.m_binding;
+        writeInfo.dstArrayElement = 0;
+
         switch (srcBinding.bindingType)
         {
             case BindingType::Buffer:
             {
+                assert(srcBinding.resource && srcBinding.resource->isBuffer());
                 BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(srcBinding.resource.Ptr());
                 const BufferResource::Desc& bufferResourceDesc = bufferResource->getDesc();
 
-                VkDescriptorBufferInfo bufferInfo;
-                bufferInfo.buffer = bufferResource->m_buffer.m_buffer;
-                bufferInfo.offset = 0;
-                bufferInfo.range = bufferResourceDesc.sizeInBytes;
+                {
+                    VkDescriptorBufferInfo bufferInfo;
+                    bufferInfo.buffer = bufferResource->m_buffer.m_buffer;
+                    bufferInfo.offset = 0;
+                    bufferInfo.range = bufferResourceDesc.sizeInBytes;
 
-                VkWriteDescriptorSet writeInfo = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-                writeInfo.descriptorCount = 1;
-                
+                    bufferInfos.Add(bufferInfo);
+                }
+
                 writeInfo.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
                 if (bufferResource->m_initialUsage == Resource::Usage::UnorderedAccess)
                 {
@@ -510,23 +574,62 @@ Slang::Result VKRenderer::_createPipeline(RefPtr<Pipeline>& pipelineOut)
                     writeInfo.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
                 }
 
-                writeInfo.dstSet = pipeline->m_descriptorSet;
-                writeInfo.dstBinding = srcDetail.m_binding;
-                writeInfo.dstArrayElement = 0; 
-                writeInfo.pBufferInfo = &bufferInfo;
+                writeInfo.pBufferInfo = &bufferInfos.Last();
+                
+                writes.Add(writeInfo);
+                break;
+            }
+            case BindingType::Texture:
+            {
+                assert(srcBinding.resource && srcBinding.resource->isTexture());
 
-                m_api.vkUpdateDescriptorSets(m_device, 1, &writeInfo, 0, nullptr);
-           
+                TextureResourceImpl* textureResource = static_cast<TextureResourceImpl*>(srcBinding.resource.Ptr());
+                const TextureResource::Desc& textureResourceDesc = textureResource->getDesc();
+
+                {
+                    VkDescriptorImageInfo imageInfo = {};
+                    imageInfo.imageView = srcDetail.m_srv;
+                    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                    imageInfos.Add(imageInfo);
+                }
+
+                writeInfo.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+                writeInfo.pImageInfo = &imageInfos.Last();
+
+                writes.Add(writeInfo);
+                break;
+            }
+            case BindingType::Sampler:
+            {
+                {
+                    VkDescriptorImageInfo imageInfo = {};
+                    imageInfo.sampler = srcDetail.m_sampler;
+                    //imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                    imageInfos.Add(imageInfo);
+                }
+
+                writeInfo.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+                writeInfo.pImageInfo = &imageInfos.Last();
+
+                writes.Add(writeInfo);
                 break;
             }
             default:
             {
-                // handle other cases
-                break;
+                assert(!"Binding not currently handled");
+                return SLANG_FAIL;
             }
         }
     }
 
+    assert(imageInfos.Count() == numImages);
+    assert(bufferInfos.Count() == numBuffers);
+
+    // Write into the descriptor set
+    {
+        m_api.vkUpdateDescriptorSets(m_device, uint32_t(writes.Count()), writes.Buffer(), 0, nullptr);
+    }
+    
     // Create a pipeline layout based on our descriptor set layout(s)
 
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
