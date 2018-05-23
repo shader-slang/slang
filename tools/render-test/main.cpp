@@ -87,7 +87,8 @@ class RenderTestApp
 	RefPtr<ShaderProgram>   m_shaderProgram;
 	RefPtr<BindingState>    m_bindingState;
 
-	ShaderInputLayout m_shaderInputLayout;
+	ShaderInputLayout m_shaderInputLayout;              ///< The binding layout
+    int m_numAddedConstantBuffers;                      ///< Constant buffers can be added to the binding directly. Will be added at the end.
 };
 
 // Entry point name to use for vertex/fragment shader
@@ -105,6 +106,7 @@ SlangResult RenderTestApp::initialize(Renderer* renderer, ShaderCompiler* shader
 {
     SLANG_RETURN_ON_FAIL(initializeShaders(shaderCompiler));
 
+    m_numAddedConstantBuffers = 0;
 	m_renderer = renderer;
 
     // TODO(tfoley): use each API's reflection interface to query the constant-buffer size needed
@@ -135,6 +137,8 @@ SlangResult RenderTestApp::initialize(Renderer* renderer, ShaderCompiler* shader
             shaderBindSet.setAll(bindingStateDesc.makeCompactSlice(0));
 
             bindingStateDesc.addResource(BindingType::Buffer, m_constantBuffer, shaderBindSet);
+
+            m_numAddedConstantBuffers++;
         }
 
         m_bindingState = m_renderer->createBindingState(bindingStateDesc);
@@ -275,9 +279,9 @@ Result RenderTestApp::writeBindingOutput(const char* fileName)
 
     const BindingState::Desc& bindingStateDesc = m_bindingState->getDesc();
     // Must be the same amount of entries
-    assert(bindingStateDesc.m_bindings.Count() == m_shaderInputLayout.entries.Count());
+    assert(bindingStateDesc.m_bindings.Count() == m_shaderInputLayout.entries.Count() + m_numAddedConstantBuffers);
 
-    const int numBindings = int(bindingStateDesc.m_bindings.Count());
+    const int numBindings = int(m_shaderInputLayout.entries.Count());
 
     for (int i = 0; i < numBindings; ++i)
     {
