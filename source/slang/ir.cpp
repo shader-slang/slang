@@ -4515,9 +4515,17 @@ namespace Slang
                             break;
                         }
 
-                        builder.setInsertBefore(terminatorInst);
+                        // We dont' re-use `builder` here because we don't want to
+                        // disrupt the source location it is using for inserting
+                        // temporary variables at the top of the function.
+                        //
+                        IRBuilder terminatorBuilder;
+                        terminatorBuilder.sharedBuilder = builder.sharedBuilder;
+                        terminatorBuilder.setInsertBefore(terminatorInst);
 
-                        assign(&builder, globalOutputVal, localVal);
+                        // Assign from the local variabel to the global output
+                        // variable before the actual `return` takes place.
+                        assign(&terminatorBuilder, globalOutputVal, localVal);
                     }
                 }
                 else
