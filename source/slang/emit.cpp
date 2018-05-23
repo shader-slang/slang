@@ -972,9 +972,36 @@ struct EmitVisitor
         case CodeGenTarget::GLSL_Vulkan:
         case CodeGenTarget::GLSL_Vulkan_OneDesc:
             {
-                emitGLSLTypePrefix(vecType->getElementType());
-                Emit("vec");
-                EmitVal(vecType->getElementCount());
+                // Need to special case if there is a single element in the vector
+                // as there is no such thing in glsl as vec1 
+                IRInst* elementCountInst = vecType->getElementCount();
+
+                if (elementCountInst->op != kIROp_IntLit)
+                {
+                    SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "Expecting an integral size for vector size");
+                    return;
+                }
+
+                const IRConstant* irConst = (const IRConstant*)elementCountInst;
+                const IRIntegerValue elementCount = irConst->u.intVal;
+                if (elementCount <= 0)
+                {
+                    SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "Vector size must be greater than 0");
+                    return;
+                }
+
+                auto* elementType = vecType->getElementType();
+
+                if (elementCount > 1)
+                {
+                    emitGLSLTypePrefix(elementType);
+                    Emit("vec");
+                    emit(elementCount);
+                }
+                else
+                {
+                    emitSimpleTypeImpl(elementType);
+                }
             }
             break;
 
