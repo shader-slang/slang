@@ -1267,16 +1267,9 @@ TextureResource* VKRenderer::createTextureResource(Resource::Type type, Resource
     // Bind the memory to the image
     m_api.vkBindImageMemory(m_device, texture->m_image, texture->m_imageMemory, 0);
 
-
     if (initData)
     {
-        struct SubResource  
-        {
-            size_t offset;
-            TextureResource::Size mipSize;
-        };
-
-        List<SubResource> subResources;
+        List<TextureResource::Size> mipSizes;
 
         VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
 
@@ -1293,11 +1286,7 @@ TextureResource* VKRenderer::createTextureResource(Resource::Type type, Resource
             const int rowSizeInBytes = Surface::calcRowSize(desc.format, mipSize.width);
             const int numRows =  Surface::calcNumRows(desc.format, mipSize.height);
 
-            SubResource subResource;
-            subResource.offset = bufferSize;
-            subResource.mipSize = mipSize;
-
-            subResources.Add(subResource);
+            mipSizes.Add(mipSize);
 
             bufferSize += (rowSizeInBytes * numRows) * mipSize.depth;
         }
@@ -1309,7 +1298,7 @@ TextureResource* VKRenderer::createTextureResource(Resource::Type type, Resource
         Buffer uploadBuffer;
         SLANG_RETURN_NULL_ON_FAIL(uploadBuffer.init(m_api, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
 
-        assert(subResources.Count() == numMipMaps);
+        assert(mipSizes.Count() == numMipMaps);
 
         // Copy into upload buffer
         {
@@ -1320,15 +1309,15 @@ TextureResource* VKRenderer::createTextureResource(Resource::Type type, Resource
             
             for (int i = 0; i < arraySize; ++i)
             {
-                for (int j = 0; j < int(subResources.Count()); ++j)
+                for (int j = 0; j < int(mipSizes.Count()); ++j)
                 {
-                    const SubResource& subResource = subResources[j];
+                    const auto& mipSize = mipSizes[j];
 
                     const ptrdiff_t srcRowStride = initData->mipRowStrides[j];
-                    const int dstRowSizeInBytes = Surface::calcRowSize(desc.format, subResource.mipSize.width);
-                    const int numRows = Surface::calcNumRows(desc.format, subResource.mipSize.height);
+                    const int dstRowSizeInBytes = Surface::calcRowSize(desc.format, mipSize.width);
+                    const int numRows = Surface::calcNumRows(desc.format, mipSize.height);
 
-                    for (int k = 0; k < subResource.mipSize.depth; k++)
+                    for (int k = 0; k < mipSize.depth; k++)
                     {
                         const uint8_t* srcData = (const uint8_t*)(initData->subResources[subResourceIndex]); 
 
@@ -1354,19 +1343,24 @@ TextureResource* VKRenderer::createTextureResource(Resource::Type type, Resource
             size_t srcOffset = 0;
             for (int i = 0; i < arraySize; ++i)
             {
-                for (int j = 0; j < int(subResources.Count()); ++j)
+                for (int j = 0; j < int(mipSizes.Count()); ++j)
                 {
-                    const SubResource& subResource = subResources[j];
-                    const TextureResource::Size& mipSize = subResource.mipSize;
-
+                    const auto& mipSize = mipSizes[j];
+                    
                     const int rowSizeInBytes = Surface::calcRowSize(desc.format, mipSize.width);
                     const int numRows = Surface::calcNumRows(desc.format, mipSize.height);
+
+                    // https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkBufferImageCopy.html
+                    // bufferRowLength and bufferImageHeight specify the data in buffer memory as a subregion of a larger two- or three-dimensional image,
+                    // and control the addressing calculations of data in buffer memory. If either of these values is zero, that aspect of the buffer memory 
+                    // is considered to be tightly packed according to the imageExtent.
 
                     VkBufferImageCopy region = {};
 
                     region.bufferOffset = srcOffset;
                     region.bufferRowLength = rowSizeInBytes;
-                    region.bufferImageHeight = numRows;
+                    region.bufferImageHeight = 0; 
+                    
                     region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
                     region.imageSubresource.mipLevel = j;
                     region.imageSubresource.baseArrayLayer = i;
@@ -1374,7 +1368,7 @@ TextureResource* VKRenderer::createTextureResource(Resource::Type type, Resource
                     region.imageOffset = { 0, 0, 0 };
                     region.imageExtent = { uint32_t(mipSize.width), uint32_t(mipSize.height), uint32_t(mipSize.depth) };
 
-                    // Do the copy
+                    // Do the copy (do all depths in a single go)
                     m_api.vkCmdCopyBufferToImage(commandBuffer, uploadBuffer.m_buffer, texture->m_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
                     // Next
@@ -1387,8 +1381,6 @@ TextureResource* VKRenderer::createTextureResource(Resource::Type type, Resource
 
         m_deviceQueue.flushAndWait();
     }
-
-    
 
     return texture.detach();
 }
