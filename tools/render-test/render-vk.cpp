@@ -1179,7 +1179,7 @@ ShaderCompiler* VKRenderer::getShaderCompiler()
     return this;
 }
 
-static VkBufferUsageFlagBits _calcUsageFlagBit(Resource::BindFlag::Enum bind)
+static VkBufferUsageFlagBits _calcBufferUsageFlags(Resource::BindFlag::Enum bind)
 {
     typedef Resource::BindFlag BindFlag;
 
@@ -1202,21 +1202,21 @@ static VkBufferUsageFlagBits _calcUsageFlagBit(Resource::BindFlag::Enum bind)
     }
 }
 
-static VkBufferUsageFlagBits _calcUsageFlagBit(int bindFlags)
+static VkBufferUsageFlagBits _calcBufferUsageFlags(int bindFlags)
 {
     int dstFlags = 0;
     while (bindFlags)
     {
         int lsb = bindFlags & -bindFlags;
-        dstFlags |= _calcUsageFlagBit(Resource::BindFlag::Enum(lsb));
+        dstFlags |= _calcBufferUsageFlags(Resource::BindFlag::Enum(lsb));
         bindFlags &= ~lsb;
     }
     return VkBufferUsageFlagBits(dstFlags);
 }
 
-static VkBufferUsageFlags _calcUsageFlagBit(int bindFlags, int cpuAccessFlags, const void* initData)
+static VkBufferUsageFlags _calcBufferUsageFlags(int bindFlags, int cpuAccessFlags, const void* initData)
 {
-    VkBufferUsageFlags usage = _calcUsageFlagBit(bindFlags);
+    VkBufferUsageFlags usage = _calcBufferUsageFlags(bindFlags);
 
     if (cpuAccessFlags & Resource::AccessFlag::Read)
     {
@@ -1229,6 +1229,59 @@ static VkBufferUsageFlags _calcUsageFlagBit(int bindFlags, int cpuAccessFlags, c
     }
 
     return usage;    
+}
+
+static VkImageUsageFlagBits _calcImageUsageFlags(Resource::BindFlag::Enum bind)
+{
+    typedef Resource::BindFlag BindFlag;
+
+    switch (bind)
+    {
+        case BindFlag::RenderTarget:            return VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+        case BindFlag::DepthStencil:            return VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+        case BindFlag::NonPixelShaderResource:
+        case BindFlag::PixelShaderResource:
+        {
+            // Ignore
+            return VkImageUsageFlagBits(0);
+        }
+        default:
+        {
+            assert(!"Unsupported");
+            return VkImageUsageFlagBits(0);
+        }
+    }
+}
+
+static VkImageUsageFlagBits _calcImageUsageFlags(int bindFlags)
+{
+    int dstFlags = 0;
+    while (bindFlags)
+    {
+        int lsb = bindFlags & -bindFlags;
+        dstFlags |= _calcImageUsageFlags(Resource::BindFlag::Enum(lsb));
+        bindFlags &= ~lsb;
+    }
+    return VkImageUsageFlagBits(dstFlags);
+}
+
+static VkImageUsageFlags _calcImageUsageFlags(int bindFlags, int cpuAccessFlags, const void* initData)
+{
+    VkImageUsageFlags usage = _calcImageUsageFlags(bindFlags);
+    
+    usage |= VK_IMAGE_USAGE_SAMPLED_BIT;
+
+    if (cpuAccessFlags & Resource::AccessFlag::Read)
+    {
+        // If it can be read from, set this
+        usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    }
+    if ((cpuAccessFlags & Resource::AccessFlag::Write) || initData)
+    {
+        usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    }
+
+    return usage;
 }
 
 void VKRenderer::_transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout) 
@@ -1338,7 +1391,7 @@ TextureResource* VKRenderer::createTextureResource(Resource::Type type, Resource
         imageInfo.format = format;
 
         imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;    
-        imageInfo.usage = _calcUsageFlagBit(desc.bindFlags, desc.cpuAccessFlags, initData) | VK_IMAGE_USAGE_SAMPLED_BIT;
+        imageInfo.usage = _calcImageUsageFlags(desc.bindFlags, desc.cpuAccessFlags, initData);
         imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
         imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -1497,7 +1550,7 @@ BufferResource* VKRenderer::createBufferResource(Resource::Usage initialUsage, c
 
     VkMemoryPropertyFlags reqMemoryProperties = 0;
 
-    VkBufferUsageFlags usage = _calcUsageFlagBit(desc.bindFlags, desc.cpuAccessFlags, initData);
+    VkBufferUsageFlags usage = _calcBufferUsageFlags(desc.bindFlags, desc.cpuAccessFlags, initData);
     
     switch (initialUsage)
     {
