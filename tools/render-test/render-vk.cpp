@@ -282,7 +282,7 @@ public:
 
     Slang::Result _beginPass();
     void _endPass();
-    void _transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
+    void _transitionImageLayout(VkImage image, VkFormat format, const TextureResource::Desc& desc, VkImageLayout oldLayout, VkImageLayout newLayout);
 
     VkDebugReportCallbackEXT m_debugReportCallback;
 
@@ -1284,7 +1284,7 @@ static VkImageUsageFlags _calcImageUsageFlags(int bindFlags, int cpuAccessFlags,
     return usage;
 }
 
-void VKRenderer::_transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout) 
+void VKRenderer::_transitionImageLayout(VkImage image, VkFormat format, const TextureResource::Desc& desc, VkImageLayout oldLayout, VkImageLayout newLayout) 
 {
     VkImageMemoryBarrier barrier = {};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -1295,7 +1295,7 @@ void VKRenderer::_transitionImageLayout(VkImage image, VkFormat format, VkImageL
     barrier.image = image;
     barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     barrier.subresourceRange.baseMipLevel = 0;
-    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.levelCount = desc.numMipLevels;
     barrier.subresourceRange.baseArrayLayer = 0;
     barrier.subresourceRange.layerCount = 1;
 
@@ -1493,7 +1493,7 @@ TextureResource* VKRenderer::createTextureResource(Resource::Type type, Resource
             m_api.vkUnmapMemory(m_device, uploadBuffer.m_memory);
         }
 
-        _transitionImageLayout(texture->m_image, format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        _transitionImageLayout(texture->m_image, format, texture->getDesc(), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
         
         {
             size_t srcOffset = 0;
@@ -1514,7 +1514,7 @@ TextureResource* VKRenderer::createTextureResource(Resource::Type type, Resource
                     VkBufferImageCopy region = {};
 
                     region.bufferOffset = srcOffset;
-                    region.bufferRowLength = rowSizeInBytes;
+                    region.bufferRowLength = 0; //rowSizeInBytes;
                     region.bufferImageHeight = 0; 
                     
                     region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -1533,7 +1533,7 @@ TextureResource* VKRenderer::createTextureResource(Resource::Type type, Resource
             }
         }
 
-        _transitionImageLayout(texture->m_image, format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        _transitionImageLayout(texture->m_image, format, texture->getDesc(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
         m_deviceQueue.flushAndWait();
     }
