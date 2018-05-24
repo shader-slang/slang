@@ -2891,12 +2891,6 @@ namespace Slang
         ff->debugValidate();
     }
 
-    void IRInst::deallocate()
-    {
-        // Run destructor to be sure...
-        this->~IRInst();
-    }
-
     void IRInst::dispose()
     {
         IRObject::dispose();
@@ -3055,6 +3049,7 @@ namespace Slang
 
     void IRInst::removeArguments()
     {
+        typeUse.clear();
         for( UInt aa = 0; aa < operandCount; ++aa )
         {
             IRUse& use = getOperands()[aa];
@@ -3068,7 +3063,9 @@ namespace Slang
     {
         removeFromParent();
         removeArguments();
-        deallocate();
+
+        // Run destructor to be sure...
+        this->~IRInst();
     }
 
     bool IRInst::mightHaveSideEffects()
@@ -4555,8 +4552,7 @@ namespace Slang
             for( auto pp = firstBlock->getFirstParam(); pp; )
             {
                 auto next = pp->getNextParam();
-                pp->removeFromParent();
-                pp->deallocate();
+                pp->removeAndDeallocate();
                 pp = next;
             }
         }

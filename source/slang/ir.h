@@ -247,10 +247,6 @@ struct IRInst : public IRObject
     // that this value will now have no uses.
     void replaceUsesWith(IRInst* other);
 
-    // Free a value (which needs to have been removed
-    // from its parent, had its uses eliminated, etc.)
-    void deallocate();
-
     // Clean up any non-pool resources used by this instruction
     virtual void dispose() override;
 
