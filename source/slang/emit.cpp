@@ -3340,14 +3340,7 @@ struct EmitVisitor
 
         case kIROp_Not:
             {
-                if (as<IRBoolType>(inst->getDataType()))
-                {
-                    emit("!");
-                }
-                else
-                {
-                    emit("~");
-                }
+                emit("!");
                 emitIROperand(ctx, inst->getOperand(0), mode);
             }
             break;
@@ -3360,7 +3353,14 @@ struct EmitVisitor
             break;
         case kIROp_BitNot:
             {
-                emit("~");
+                if (as<IRBoolType>(inst->getDataType()))
+                {
+                    emit("!");
+                }
+                else
+                {
+                    emit("~");
+                }
                 emitIROperand(ctx, inst->getOperand(0), mode);
             }
             break;
