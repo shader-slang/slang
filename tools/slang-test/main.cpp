@@ -1888,6 +1888,14 @@ bool hasRenderOption(RenderApiType apiType, const FileTestList& testList)
     return false;
 }
 
+bool isHLSLTest(const String& command)
+{
+    return command == "COMPARE_HLSL" || 
+        command == "COMPARE_HLSL_RENDER" || 
+        command == "COMPARE_HLSL_CROSS_COMPILE_RENDER" || 
+        command == "COMPARE_HLSL_GLSL_RENDER";
+}
+
 bool isRenderTest(const String& command)
 {
     return command == "COMPARE_COMPUTE" ||
@@ -2054,7 +2062,7 @@ void runTestsOnFile(
         return;
     }
 
-    List<TestOptions> sythesizedTests;
+    List<TestOptions> synthesizedTests;
 
     // If dx12 is available synthesize Dx12 test
     if ((g_options.enabledApis & RenderApiFlag::D3D12) != 0)
@@ -2073,13 +2081,13 @@ void runTestsOnFile(
                     TestOptions testOptionsCopy(testOptions);
                     testOptionsCopy.args.Add("-dx12");
 
-                    sythesizedTests.Add(testOptionsCopy);
+                    synthesizedTests.Add(testOptionsCopy);
                 }
             }
         }
     }
 
-#if 0
+#if 1
     // If Vulkan is available synthesize Vulkan test
     if ((g_options.enabledApis & RenderApiFlag::Vulkan) != 0)
     {
@@ -2091,13 +2099,20 @@ void runTestsOnFile(
             {
                 const TestOptions& testOptions = testList.tests[i];
                 // If it's a render test, and there is on d3d option, add one
-                if (isRenderTest(testOptions.command) && !hasRenderOption(RenderApiType::Vulkan, testOptions))
+                if (isRenderTest(testOptions.command) && !isHLSLTest(testOptions.command) && !hasRenderOption(RenderApiType::Vulkan, testOptions))
                 {
                     // Add with -dx12 option
                     TestOptions testOptionsCopy(testOptions);
                     testOptionsCopy.args.Add("-vk");
 
-                    sythesizedTests.Add(testOptionsCopy);
+                    UInt index = testOptionsCopy.args.IndexOf("-hlsl");
+                    if (index != UInt(-1))
+                    {
+                        testOptionsCopy.args.RemoveAt(index);
+                    }
+
+
+                    synthesizedTests.Add(testOptionsCopy);
                 }
             }
         }
@@ -2105,9 +2120,9 @@ void runTestsOnFile(
 #endif
 
     // Add any tests that were synthesized
-    for (UInt i = 0; i < sythesizedTests.Count(); ++i)
+    for (UInt i = 0; i < synthesizedTests.Count(); ++i)
     {
-        testList.tests.Add(sythesizedTests[i]);
+        testList.tests.Add(synthesizedTests[i]);
     }
 
     // We have found a test to run!
