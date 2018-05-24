@@ -3,6 +3,7 @@
 
 #include "ir-insts.h"
 #include "ir-restructure.h"
+#include "ir-restructure-scoping.h"
 #include "ir-ssa.h"
 #include "ir-validate.h"
 #include "legalize-types.h"
@@ -4285,10 +4286,31 @@ struct EmitVisitor
         EmitContext*            ctx,
         IRGlobalValueWithCode*  code)
     {
+        // Compute a structured region tree that can represent
+        // the control flow of our function.
+        //
         RefPtr<RegionTree> regionTree = generateRegionTreeForFunc(
             code,
             ctx->getSink());
 
+        // Now that we've computed the region tree, we have
+        // an opportunity to perform some last-minute transformations
+        // on the code to make sure it follows our rules.
+        //
+        // TODO: it would be better to do these transformations earlier,
+        // so that we can, e.g., dump the final IR code *before* emission
+        // starts, but that gets a bit compilcated because we also want
+        // to have the region tree avalable without having to recompute it.
+        //
+        // For now we are just going to do things the expedient way, but
+        // eventually we should allow an IR module to have side-band
+        // storage for dervied structured like the region tree (and logic
+        // for invalidating them when a transformation would break them).
+        //
+        fixValueScoping(regionTree);
+
+        // Now emit high-level code from that structured region tree.
+        //
         emitRegionTree(ctx, regionTree);
     }
 

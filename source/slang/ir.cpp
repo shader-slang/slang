@@ -1564,6 +1564,7 @@ namespace Slang
             nullptr,
             nullptr);
         module->moduleInst = moduleInst;
+        moduleInst->module = module;
 
         return module;
     }
@@ -3140,6 +3141,20 @@ namespace Slang
             return false;
         }
     }
+
+    IRModule* IRInst::getModule()
+    {
+        IRInst* ii = this;
+        while(ii)
+        {
+            if(auto moduleInst = as<IRModuleInst>(ii))
+                return moduleInst->module;
+
+            ii = ii->getParent();
+        }
+        return nullptr;
+    }
+
 
     //
     // Legalization of entry points for GLSL:

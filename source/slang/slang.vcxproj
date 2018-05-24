@@ -185,6 +185,7 @@
     <ClInclude Include="ir-dominators.h" />
     <ClInclude Include="ir-inst-defs.h" />
     <ClInclude Include="ir-insts.h" />
+    <ClInclude Include="ir-restructure-scoping.h" />
     <ClInclude Include="ir-restructure.h" />
     <ClInclude Include="ir-ssa.h" />
     <ClInclude Include="ir-validate.h" />
@@ -230,6 +231,7 @@
     <ClCompile Include="ir-constexpr.cpp" />
     <ClCompile Include="ir-dominators.cpp" />
     <ClCompile Include="ir-legalize-types.cpp" />
+    <ClCompile Include="ir-restructure-scoping.cpp" />
     <ClCompile Include="ir-restructure.cpp" />
     <ClCompile Include="ir-ssa.cpp" />
     <ClCompile Include="ir-validate.cpp" />

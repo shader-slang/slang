@@ -293,6 +293,12 @@ struct IRInst : public IRObject
 
     // RTTI support
     static bool isaImpl(IROp) { return true; }
+
+    /// Find the module that this instruction is nested under.
+    ///
+    /// If this instruction is transitively nested inside some IR module,
+    /// this function will return it, and will otherwise return `null`.
+    IRModule* getModule();
 };
 
 // `dynamic_cast` equivalent

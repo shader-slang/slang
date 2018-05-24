@@ -156,6 +156,7 @@
     <ClInclude Include="ir-restructure.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ir-restructure-scoping.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="bytecode.cpp">
@@ -260,6 +261,7 @@
     <ClCompile Include="ir-restructure.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ir-restructure-scoping.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="slang.natvis">
