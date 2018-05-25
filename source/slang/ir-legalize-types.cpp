@@ -818,6 +818,8 @@ static LegalVal legalizeInst(
             args,
             inst->getOperandCount());
 
+    case kIROp_undefined:
+        return LegalVal();
     default:
         // TODO: produce a user-visible diagnostic here
         SLANG_UNEXPECTED("non-simple operand(s)!");
