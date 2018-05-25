@@ -1462,7 +1462,7 @@ static void legalizeTypes(
     // Clean up after any instructions we replaced along the way.
     for (auto& lv : context->replacedInstructions)
     {
-        lv->deallocate();
+        lv->removeAndDeallocate();
     }
 }
 

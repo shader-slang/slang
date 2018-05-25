@@ -352,6 +352,8 @@ DIAGNOSTIC(51090, Error, cannotGenerateCodeForExternComponentType, "cannot gener
 DIAGNOSTIC(51091, Error, typeCannotBePlacedInATexture, "type '$0' cannot be placed in a texture.")
 DIAGNOSTIC(51092, Error, stageDoesntHaveInputWorld, "'$0' doesn't appear to have any input world");
 
+DIAGNOSTIC(52000, Error, multiLevelBreakUnsupported, "control flow appears to require multi-level `break`, which Slang does not yet support");
+
 
 // 99999 - Internal compiler errors, and not-yet-classified diagnostics.
 
