@@ -407,11 +407,17 @@ Slang::Result VKRenderer::_createPipeline(RefPtr<Pipeline>& pipelineOut)
     int numBuffers = 0;
     int numImages = 0;
 
+    int numDescriptorByType[VK_DESCRIPTOR_TYPE_RANGE_SIZE] = { 0, };
+
     Slang::List<VkDescriptorSetLayoutBinding> dstBindings;
     for (int i = 0; i < numBindings; ++i)
     {
         const auto& srcDetail = srcDetails[i];
         const auto& srcBinding = srcBindings[i];
+
+        VkDescriptorSetLayoutBinding dstBinding = {};
+        dstBinding.binding = srcDetail.m_binding;
+        dstBinding.descriptorCount = 1;
 
         switch (srcBinding.bindingType)
         {
@@ -420,16 +426,13 @@ Slang::Result VKRenderer::_createPipeline(RefPtr<Pipeline>& pipelineOut)
                 BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(srcBinding.resource.Ptr());
                 const BufferResource::Desc& bufferResourceDesc = bufferResource->getDesc();
 
-                VkDescriptorSetLayoutBinding dstBinding = {};
-                dstBinding.binding = srcDetail.m_binding;
-                dstBinding.descriptorCount = 1;
-
                 if (bufferResourceDesc.bindFlags & Resource::BindFlag::UnorderedAccess)
                 {
                     dstBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
                     dstBinding.stageFlags = VK_SHADER_STAGE_ALL;
                     dstBindings.Add(dstBinding);
 
+                    numDescriptorByType[dstBinding.descriptorType] ++;
                     numBuffers++;
                 }
                 else if (bufferResourceDesc.bindFlags & Resource::BindFlag::ConstantBuffer)
@@ -438,51 +441,39 @@ Slang::Result VKRenderer::_createPipeline(RefPtr<Pipeline>& pipelineOut)
                     dstBinding.stageFlags = VK_SHADER_STAGE_ALL;
                     dstBindings.Add(dstBinding);
 
+                    numDescriptorByType[dstBinding.descriptorType] ++;
                     numBuffers++;
                 }
-
                 break;
             }
             case BindingType::Texture:
             {
-                VkDescriptorSetLayoutBinding dstBinding = {};
-
-                dstBinding.binding = srcDetail.m_binding;
-                dstBinding.descriptorCount = 1;
                 dstBinding.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE; 
                 dstBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
                 dstBindings.Add(dstBinding);
 
+                numDescriptorByType[dstBinding.descriptorType] ++;
                 numImages++;
                 break;
             }
             case BindingType::Sampler:
             {
-                VkDescriptorSetLayoutBinding dstBinding = {};
-                
-                dstBinding.binding = srcDetail.m_binding;
-                dstBinding.descriptorCount = 1;
                 dstBinding.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER; 
                 dstBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
                 dstBindings.Add(dstBinding);
 
+                numDescriptorByType[dstBinding.descriptorType] ++;
                 numImages++;
                 break;
             }
 
             case BindingType::CombinedTextureSampler:
             {
-                VkDescriptorSetLayoutBinding dstBinding = {};
-
-                dstBinding.binding = srcDetail.m_binding;
-                dstBinding.descriptorCount = 1;
                 dstBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
                 dstBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
                 dstBindings.Add(dstBinding);
 
+                numDescriptorByType[dstBinding.descriptorType] ++;
                 numImages++;
                 break;
             }
@@ -494,35 +485,54 @@ Slang::Result VKRenderer::_createPipeline(RefPtr<Pipeline>& pipelineOut)
         }
     }
 
-    VkDescriptorSetLayoutCreateInfo descriptorSetLayoutInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
-    descriptorSetLayoutInfo.bindingCount = uint32_t(dstBindings.Count());
-    descriptorSetLayoutInfo.pBindings = dstBindings.Buffer();
-
-    SLANG_VK_CHECK(m_api.vkCreateDescriptorSetLayout(m_device, &descriptorSetLayoutInfo, nullptr, &pipeline->m_descriptorSetLayout));
-
     // Create a descriptor pool for allocating sets
-    VkDescriptorPoolSize poolSizes[] =
     {
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 128 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 128 },
-        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 128 },
+#if 0
+        VkDescriptorPoolSize poolSizes[] =
+        {
+            { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 128 },
+            { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 128 },
+            { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 128 },
     };
+#endif
 
-    VkDescriptorPoolCreateInfo descriptorPoolInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
-    descriptorPoolInfo.maxSets = 128; // TODO: actually pick a size
-    descriptorPoolInfo.poolSizeCount = SLANG_COUNT_OF(poolSizes);
-    descriptorPoolInfo.pPoolSizes = poolSizes;
+        List<VkDescriptorPoolSize> poolSizes;
+        for (int i = 0; i < SLANG_COUNT_OF(numDescriptorByType); ++i)
+        {
+            int numDescriptors = numDescriptorByType[i];
+            if (numDescriptors > 0)
+            {
+                const VkDescriptorPoolSize poolSize = { VkDescriptorType(i), uint32_t(numDescriptors) };
+                poolSizes.Add(poolSize);
+            }
+        }
+        VkDescriptorPoolCreateInfo descriptorPoolInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
+   
+        descriptorPoolInfo.maxSets = 128; // TODO: actually pick a size. 
+        descriptorPoolInfo.poolSizeCount = uint32_t(poolSizes.Count());
+        descriptorPoolInfo.pPoolSizes = poolSizes.Buffer();
 
-    SLANG_VK_CHECK(m_api.vkCreateDescriptorPool(m_device, &descriptorPoolInfo, nullptr, &pipeline->m_descriptorPool));
+        SLANG_VK_CHECK(m_api.vkCreateDescriptorPool(m_device, &descriptorPoolInfo, nullptr, &pipeline->m_descriptorPool));
+    }
 
+    // Create the layout
+    {
+        VkDescriptorSetLayoutCreateInfo descriptorSetLayoutInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
+        descriptorSetLayoutInfo.bindingCount = uint32_t(dstBindings.Count());
+        descriptorSetLayoutInfo.pBindings = dstBindings.Buffer();
+
+        SLANG_VK_CHECK(m_api.vkCreateDescriptorSetLayout(m_device, &descriptorSetLayoutInfo, nullptr, &pipeline->m_descriptorSetLayout));
+    } 
+        
     // Create a descriptor set based on our layout
+    {
+        VkDescriptorSetAllocateInfo descriptorSetAllocInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+        descriptorSetAllocInfo.descriptorPool = pipeline->m_descriptorPool;
+        descriptorSetAllocInfo.descriptorSetCount = 1; 
+        descriptorSetAllocInfo.pSetLayouts = &pipeline->m_descriptorSetLayout;
 
-    VkDescriptorSetAllocateInfo descriptorSetAllocInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
-    descriptorSetAllocInfo.descriptorPool = pipeline->m_descriptorPool;
-    descriptorSetAllocInfo.descriptorSetCount = 1; 
-    descriptorSetAllocInfo.pSetLayouts = &pipeline->m_descriptorSetLayout;
-
-    SLANG_VK_CHECK(m_api.vkAllocateDescriptorSets(m_device, &descriptorSetAllocInfo, &pipeline->m_descriptorSet));
+        SLANG_VK_CHECK(m_api.vkAllocateDescriptorSets(m_device, &descriptorSetAllocInfo, &pipeline->m_descriptorSet));
+    }
 
     // Fill in the descriptor set, using our binding information
 
@@ -882,8 +892,15 @@ VkBool32 VKRenderer::handleDebugMessage(VkDebugReportFlagsEXT flags, VkDebugRepo
     if (flags & VK_DEBUG_REPORT_ERROR_BIT_EXT)
         severity = "error";
 
-    char buffer[1024];
+    // pMsg can be really big (it can be assembler dump for example)
+    // Use a dynamic buffer to store
+    size_t bufferSize = strlen(pMsg) + 1 + 1024;
+    List<char> bufferArray;
+    bufferArray.SetSize(bufferSize);
+    char* buffer = bufferArray.Buffer();
+
     sprintf_s(buffer,
+        bufferSize,
         "%s: %s %d: %s\n",
         pLayerPrefix,
         severity,
@@ -1195,7 +1212,7 @@ static VkBufferUsageFlagBits _calcBufferUsageFlags(Resource::BindFlag::Enum bind
             assert(!"Not supported yet");
             return VkBufferUsageFlagBits(0);
         }
-        case BindFlag::UnorderedAccess:         return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+        case BindFlag::UnorderedAccess:         return VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT;
         case BindFlag::PixelShaderResource:     return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
         case BindFlag::NonPixelShaderResource:  return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
         default:                                return VkBufferUsageFlagBits(0);
@@ -1868,12 +1885,34 @@ BindingState* VKRenderer::createBindingState(const BindingState::Desc& bindingSt
                     return nullptr;
                 }
 
-                //BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(srcBinding.resource.Ptr());
-                //const BufferResource::Desc& bufferResourceDesc = bufferResource->getDesc();
+                BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(srcBinding.resource.Ptr());
+                const BufferResource::Desc& bufferResourceDesc = bufferResource->getDesc();
+
+                if (bufferResourceDesc.bindFlags & Resource::BindFlag::UnorderedAccess)
+                {
+                    // VkBufferView uav
+
+                    VkBufferViewCreateInfo info = { VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO };
+
+                    info.format = VK_FORMAT_R32_SFLOAT;
+                    // TODO:
+                    // Not sure how to handle typeless?
+                    if (bufferResourceDesc.elementSize == 0)
+                    {
+                        info.format = VK_FORMAT_R32_SFLOAT;  // DXGI_FORMAT_R32_TYPELESS ? 
+                    }
+
+                    info.buffer = bufferResource->m_buffer.m_buffer;
+                    info.offset = 0;
+                    info.range = bufferResourceDesc.sizeInBytes;
+
+                    SLANG_VK_RETURN_NULL_ON_FAIL(m_api.vkCreateBufferView(m_device, &info, nullptr, &dstDetail.m_uav));
+                }
 
                 // TODO: Setup views. 
-                // VkBufferView uav
                 // VkImageView srv
+
+
                 break;
             }
             case BindingType::Sampler:
