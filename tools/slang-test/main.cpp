@@ -2087,7 +2087,7 @@ void runTestsOnFile(
         }
     }
 
-#if 1
+#if 0
     // If Vulkan is available synthesize Vulkan test
     if ((g_options.enabledApis & RenderApiFlag::Vulkan) != 0)
     {
