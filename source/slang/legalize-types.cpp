@@ -301,6 +301,12 @@ struct TupleTypeBuilder
 
     LegalType getResult()
     {
+        // If this is an empty struct, return a none type
+        // This helps get rid of emtpy structs that often trips up the 
+        // downstream compiler
+        if (!anyOrdinary && !anySpecial && !anyComplex)
+            return LegalType::tuple(new TuplePseudoType());
+
         // If we didn't see anything "special"
         // then we can use the type as-is.
         // we can conceivably just use the type as-is

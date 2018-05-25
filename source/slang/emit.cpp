@@ -2,6 +2,8 @@
 #include "emit.h"
 
 #include "ir-insts.h"
+#include "ir-restructure.h"
+#include "ir-restructure-scoping.h"
 #include "ir-ssa.h"
 #include "ir-validate.h"
 #include "legalize-types.h"
@@ -144,12 +146,16 @@ struct SharedEmitContext
     // Map an IR instruction to the name that we've decided
     // to use for it when emitting code.
     Dictionary<IRInst*, String> mapInstToName;
+
+    DiagnosticSink* getSink() { return &entryPoint->compileRequest->mSink; }
 };
 
 struct EmitContext
 {
     // The shared context that is in effect
     SharedEmitContext* shared;
+
+    DiagnosticSink* getSink() { return shared->getSink(); }
 };
 
 //
@@ -3340,14 +3346,7 @@ struct EmitVisitor
 
         case kIROp_Not:
             {
-                if (as<IRBoolType>(inst->getDataType()))
-                {
-                    emit("!");
-                }
-                else
-                {
-                    emit("~");
-                }
+                emit("!");
                 emitIROperand(ctx, inst->getOperand(0), mode);
             }
             break;
@@ -3360,7 +3359,14 @@ struct EmitVisitor
             break;
         case kIROp_BitNot:
             {
-                emit("~");
+                if (as<IRBoolType>(inst->getDataType()))
+                {
+                    emit("!");
+                }
+                else
+                {
+                    emit("~");
+                }
                 emitIROperand(ctx, inst->getOperand(0), mode);
             }
             break;
@@ -3776,203 +3782,173 @@ struct EmitVisitor
         }
     }
 
-    enum LabelOp
-    {
-        kLabelOp_break,
-        kLabelOp_continue,
-
-        kLabelOpCount,
-    };
-
-    struct LabelStack
-    {
-        LabelStack* parent;
-        IRBlock*    block;
-        LabelOp     op;
-    };
-
-    // We want to emit a range of code in the IR, represented
-    // by the blocks that are logically in the interval [begin, end)
-    // which we consider as a single-entry multiple-exit region.
-    //
-    // Note: because there are multiple exists, control flow
-    // may exit this region with operations that do *not* branch
-    // to `end`, but such non-local control flow will hopefully
-    // be captured.
-    //
-    void emitIRStmtsForBlocks(
+    /// Emit high-level language statements from a structrured region.
+    void emitRegion(
         EmitContext*    ctx,
-        IRBlock*        begin,
-        IRBlock*        end,
-
-        // Labels to use at the start
-        LabelStack*     initialLabels,
-
-        // Labels to switch to after emitting first basic block
-        LabelStack*     labels = nullptr)
+        Region*         inRegion)
     {
-        if(!labels)
-            labels = initialLabels;
-
-        auto useLabels = initialLabels;
-
-        IRBlock* block = begin;
-        while(block != end)
+        // We will use a loop so that we can process sequential (simple)
+        // regions iteratively rather than recursively.
+        // This is effectively an emulation of tail recursion.
+        Region* region = inRegion;
+        while(region)
         {
-            // If the block we are trying to emit has been registered as a
-            // destination label (e.g. for a loop or `switch`) then we
-            // may need to emit a `break` or `continue` as needed.
-            //
-            // TODO: we eventually need to handle the possibility of
-            // multi-level break/continue targets, which could be challenging.
-
-            // First, figure out which block has been registered as
-            // the current `break` and `continue` target.
-            IRBlock* registeredBlock[kLabelOpCount] = {};
-            for( auto ll = labels; ll; ll = ll->parent )
+            // What flavor of region are we trying to emit?
+            switch(region->getFlavor())
             {
-                if(!registeredBlock[ll->op])
+            case Region::Flavor::Simple:
                 {
-                    registeredBlock[ll->op] = ll->block;
-                }
-            }
+                    // A simple region consists of a basic block followed
+                    // by another region.
+                    //
+                    auto simpleRegion = (SimpleRegion*) region;
 
-            // Next, search in the active labels we are allowed to use,
-            // and see if the block we are trying to branch to is an
-            // available break/continue target.
-            for(auto ll = useLabels; ll; ll = ll->parent)
-            {
-                if(ll->block == block)
-                {
-                    // We are trying to go to a block that has been regsitered as a label.
-
-                    if(block != registeredBlock[ll->op])
+                    // We start by outputting all of the non-terminator
+                    // instructions in the block.
+                    //
+                    auto block = simpleRegion->block;
+                    auto terminator = block->getTerminator();
+                    for (auto inst = block->getFirstInst(); inst != terminator; inst = inst->getNextInst())
                     {
-                        // ERROR: need support for multi-level break/continue to pull this one off!
+                        emitIRInst(ctx, inst, IREmitMode::Default);
                     }
 
-                    switch(ll->op)
+                    // Next we have to deal with the terminator instruction
+                    // itself. In many cases, the terminator will have been
+                    // turned into a block of its own, but certain cases
+                    // of terminators are simple enough that we just fold
+                    // them into the current block.
+                    //
+                    advanceToSourceLocation(terminator->sourceLoc);
+                    switch(terminator->op)
                     {
-                    case kLabelOp_break:
-                        emit("break;\n");
+                    default:
+                        // Don't do anything with the terminator, and assume
+                        // its behavior has been folded into the next region.
                         break;
 
-                    case kLabelOp_continue:
-                        emit("continue;\n");
+                    case kIROp_ReturnVal:
+                    case kIROp_ReturnVoid:
+                    case kIROp_discard:
+                        // For extremely simple terminators, we just handle
+                        // them here, so that we don't have to allocate
+                        // separate `Region`s for them.
+                        emitIRInst(ctx, terminator, IREmitMode::Default);
+                        break;
+
+                    // We will also handle any unconditional branches
+                    // here, since they may have arguments to pass
+                    // to the target block (our encoding of SSA
+                    // "phi" operations).
+                    //
+                    // TODO: A better approach would be to move out of SSA
+                    // as an IR pass, and introduce explicit variables to
+                    // replace any "phi nodes." This would avoid possible
+                    // complications if we ever end up in the bad case where
+                    // one of the block arguments on a branch is also
+                    // a paremter of the target block, so that the order
+                    // of operations is important.
+                    //
+                    case kIROp_unconditionalBranch:
+                        {
+                            auto t = (IRUnconditionalBranch*)terminator;
+                            UInt argCount = t->getOperandCount();
+                            static const UInt kFixedArgCount = 1;
+                            emitPhiVarAssignments(
+                                ctx,
+                                argCount - kFixedArgCount,
+                                t->getOperands() + kFixedArgCount,
+                                t->getTargetBlock());
+                        }
+                        break;
+                    case kIROp_loop:
+                        {
+                            auto t = (IRLoop*) terminator;
+                            UInt argCount = t->getOperandCount();
+                            static const UInt kFixedArgCount = 3;
+                            emitPhiVarAssignments(
+                                ctx,
+                                argCount - kFixedArgCount,
+                                t->getOperands() + kFixedArgCount,
+                                t->getTargetBlock());
+
+                        }
                         break;
                     }
 
-                    return;
+                    // If the terminator required a full region to represent
+                    // its behavior in a structured form, then we will move
+                    // along to that region now.
+                    //
+                    // We do this iteratively rather than recursively, by
+                    // jumping back to the top of our loop with a new
+                    // value for `region`.
+                    //
+                    region = simpleRegion->nextRegion;
+                    continue;
                 }
-            }
 
-            // Start by emitting the non-terminator instructions in the block.
-            auto terminator = block->getLastInst();
-            SLANG_ASSERT(as<IRTerminatorInst>(terminator));
-            for (auto inst = block->getFirstInst(); inst != terminator; inst = inst->getNextInst())
-            {
-                emitIRInst(ctx, inst, IREmitMode::Default);
-            }
+            // Break and continue regions are trivial to handle, as long as we
+            // don't need to consider multi-level break/continue (which we
+            // don't for now).
+            case Region::Flavor::Break:
+                emit("break;\n");
+                break;
+            case Region::Flavor::Continue:
+                emit("continue;\n");
+                break;
 
-            // Now look at the terminator instruction, which will tell us what we need to emit next.
-
-            advanceToSourceLocation(terminator->sourceLoc);
-
-            switch (terminator->op)
-            {
-            default:
-                SLANG_UNEXPECTED("terminator inst");
-                return;
-
-            case kIROp_unreachable:
-                return;
-
-            case kIROp_ReturnVal:
-            case kIROp_ReturnVoid:
-            case kIROp_discard:
-                emitIRInst(ctx, terminator, IREmitMode::Default);
-                return;
-
-            case kIROp_ifElse:
+            case Region::Flavor::If:
                 {
-                    // Two-sided `if` statement
-                    auto t = (IRIfElse*)terminator;
-
-                    auto trueBlock = t->getTrueBlock();
-                    auto falseBlock = t->getFalseBlock();
-                    auto afterBlock = t->getAfterBlock();
+                    auto ifRegion = (IfRegion*) region;
 
                     // TODO: consider simplifying the code in
-                    // the case where `trueBlock == afterBlock`
-                    // so that we output `if(!cond) { falseBlock }`
-                    // instead of the current `if(cond) {} else {falseBlock}`
+                    // the case where `ifRegion == null`
+                    // so that we output `if(!condition) { elseRegion }`
+                    // instead of the current `if(condition) {} else { elseRegion }`
 
                     emit("if(");
-                    emitIROperand(ctx, t->getCondition(), IREmitMode::Default);
+                    emitIROperand(ctx, ifRegion->condition, IREmitMode::Default);
                     emit(")\n{\n");
                     indent();
-                    emitIRStmtsForBlocks(
-                        ctx,
-                        trueBlock,
-                        afterBlock,
-                        labels);
+                    emitRegion(ctx, ifRegion->thenRegion);
                     dedent();
                     emit("}\n");
-                    // Don't emit the false block if it would be empty
-                    if(falseBlock != afterBlock)
+
+                    // Don't emit the `else` region if it would be empty
+                    //
+                    if(auto elseRegion = ifRegion->elseRegion)
                     {
                         emit("else\n{\n");
                         indent();
-                        emitIRStmtsForBlocks(
-                            ctx,
-                            falseBlock,
-                            afterBlock,
-                            labels);
+                        emitRegion(ctx, elseRegion);
                         dedent();
                         emit("}\n");
                     }
 
-                    // Continue with the block after the `if`
-                    block = afterBlock;
+                    // Continue with the region after the `if`.
+                    //
+                    // TODO: consider just constructing a `SimpleRegion`
+                    // around an `IfRegion` to handle this sequencing,
+                    // rather than making `IfRegion` serve as both a
+                    // conditional and a sequence.
+                    //
+                    region = ifRegion->nextRegion;
+                    continue;
                 }
                 break;
 
-            case kIROp_loop:
+            case Region::Flavor::Loop:
                 {
-                    // Header for a `while` or `for` loop
-                    auto t = (IRLoop*)terminator;
+                    auto loopRegion = (LoopRegion*) region;
+                    auto loopInst = loopRegion->loopInst;
 
-                    auto targetBlock = t->getTargetBlock();
-                    auto breakBlock = t->getBreakBlock();
-
-                    UInt argCount = t->getOperandCount();
-                    static const UInt kFixedArgCount = 3;
-                    emitPhiVarAssignments(
-                        ctx,
-                        argCount - kFixedArgCount,
-                        t->getOperands() + kFixedArgCount,
-                        targetBlock);
-
-                    // Set up entries on our label stack for break/continue
-
-                    LabelStack subBreakLabel;
-                    subBreakLabel.parent = labels;
-                    subBreakLabel.block = breakBlock;
-                    subBreakLabel.op = kLabelOp_break;
-
-                    // Note: when forming the `continue` label, we don't
-                    // actually point at the "continue block" from the loop
-                    // statement, because we aren't actually going to
-                    // generate an ordinary continue caluse in a `for` loop.
+                    // If the user applied an explicit decoration to the loop,
+                    // to control its unrolling behavior, then pass that
+                    // along in the output code (if the target language
+                    // supports the semantics of the decoration).
                     //
-                    // Instead, our `continue` label will always be the
-                    // loop header.
-                    LabelStack subContinueLabel;
-                    subContinueLabel.parent = &subBreakLabel;
-                    subContinueLabel.block = targetBlock;
-                    subContinueLabel.op = kLabelOp_continue;
-
-                    if (auto loopControlDecoration = t->findDecoration<IRLoopControlDecoration>())
+                    if (auto loopControlDecoration = loopInst->findDecoration<IRLoopControlDecoration>())
                     {
                         switch (loopControlDecoration->mode)
                         {
@@ -3991,287 +3967,65 @@ struct EmitVisitor
 
                     emit("for(;;)\n{\n");
                     indent();
-                    emitIRStmtsForBlocks(
-                        ctx,
-                        targetBlock,
-                        nullptr,
-                        // For the first block, we only want the `break` label active
-                        &subBreakLabel,
-                        // After the first block, we can safely use the `continue` label too
-                        &subContinueLabel);
+                    emitRegion(ctx, loopRegion->body);
                     dedent();
                     emit("}\n");
 
-                    // Continue with the block after the loop
-                    block = breakBlock;
+                    // Continue with the region after the loop
+                    region = loopRegion->nextRegion;
+                    continue;
                 }
-                break;
 
-#if 0
-            case kIROp_break:
+            case Region::Flavor::Switch:
                 {
-                    auto t = (IRBreak*)terminator;
-                    auto targetBlock = t->getTargetBlock();
-
-                    UInt argCount = t->getArgCount();
-                    static const UInt kFixedArgCount = 1;
-                    emitPhiVarAssignments(
-                        ctx,
-                        argCount - kFixedArgCount,
-                        t->getArgs() + kFixedArgCount,
-                        targetBlock);
-
-                    emit("break;\n");
-                }
-                return;
-
-            case kIROp_continue:
-                // With out current strategy for outputting loops,
-                // just outputting an AST-level `continue` here won't
-                // actually execute the statements in the continue block.
-                //
-                // Instead, we have to manually output those statements
-                // directly here, and *then* do an AST-level `continue`.
-                //
-                // This leads to code duplication when we have multiple
-                // `continue` sites in the original program, but it avoids
-                // introducing additional temporaries for control flow.
-                {
-                    auto continueInst = (IRContinue*) terminator;
-                    auto targetBlock = continueInst->getTargetBlock();
-
-                    UInt argCount = continueInst->getArgCount();
-                    static const UInt kFixedArgCount = 1;
-                    emitPhiVarAssignments(
-                        ctx,
-                        argCount - kFixedArgCount,
-                        continueInst->getArgs() + kFixedArgCount,
-                        targetBlock);
-
-                    IRBlock* loopHead = nullptr;
-                    ctx->shared->irMapContinueTargetToLoopHead.TryGetValue(targetBlock, loopHead);
-                    SLANG_ASSERT(loopHead);
-                    emitIRStmtsForBlocks(
-                        ctx,
-                        targetBlock,
-                        loopHead);
-                    emit("continue;\n");
-                }
-                return;
-
-            case kIROp_loopTest:
-                {
-                    // Loop condition being tested
-                    auto t = (IRLoopTest*)terminator;
-
-                    auto afterBlock = t->getTrueBlock();
-                    auto exitBlock = t->getFalseBlock();
-
-                    emit("if(");
-                    emitIROperand(ctx, t->getCondition());
-                    emit(")\n{} else {\n");
-                    emitIRStmtsForBlocks(
-                        ctx,
-                        exitBlock,
-                        nullptr);
-                    emit("}\n");
-
-                    // Continue with the block after the test
-                    block = afterBlock;
-                }
-                break;
-#endif
-
-            case kIROp_unconditionalBranch:
-                {
-                    // Unconditional branch as part of normal
-                    // control flow. This is either a forward
-                    // edge to the "next" block in an ordinary
-                    // block, or a backward edge to the top
-                    // of a loop.
-                    auto t = (IRUnconditionalBranch*)terminator;
-                    auto targetBlock = t->getTargetBlock();
-
-                    UInt argCount = t->getOperandCount();
-                    static const UInt kFixedArgCount = 1;
-                    emitPhiVarAssignments(
-                        ctx,
-                        argCount - kFixedArgCount,
-                        t->getOperands() + kFixedArgCount,
-                        targetBlock);
-
-                    block = t->getTargetBlock();
-                }
-                break;
-
-            case kIROp_conditionalBranch:
-                // Note: We currently do not generate any plain
-                // `conditionalBranch` instructions when lowering
-                // to IR, because these would not have the annotations
-                // needed to be able to emit high-level control
-                // flow from them.
-                SLANG_UNEXPECTED("terminator inst");
-                return;
-
-
-            case kIROp_switch:
-                {
-                    // A `switch` instruction will always translate
-                    // to a `switch` statement, but we need to
-                    // take some care to emit the `case`s in ways
-                    // that avoid code duplication.
-
-                    // TODO: Eventually, the "right" way to handle `switch`
-                    // statements while being more robust about Duff's Device, etc.
-                    // would be to register each of the case labels in a lookup
-                    // table, and then walk the blocks in the region between
-                    // the `switch` and the `break` and then whenever we see a block
-                    // that matches one of the registered labels, emit the appropriate
-                    // `case ...:` or `default:` label.
-
-                    auto t = (IRSwitch*) terminator;
-
-                    // Extract the fixed arguments.
-                    auto conditionVal = t->getCondition();
-                    auto breakLabel = t->getBreakLabel();
-                    auto defaultLabel = t->getDefaultLabel();
-
-                    // Register the block to be used for our `break` target
-                    LabelStack subLabels;
-                    subLabels.parent = labels;
-                    subLabels.op = kLabelOp_break;
-                    subLabels.block = breakLabel;
-
-                    // We need to track whether we've dealt with
-                    // the `default` case already.
-                    bool defaultLabelHandled = false;
-
-                    // If the `default` case just branches to
-                    // the join point, then we don't need to
-                    // do anything with it.
-                    if(defaultLabel == breakLabel)
-                        defaultLabelHandled = true;
+                    auto switchRegion = (SwitchRegion*) region;
 
                     // Emit the start of our statement.
                     emit("switch(");
-                    emitIROperand(ctx, conditionVal, IREmitMode::Default);
+                    emitIROperand(ctx, switchRegion->condition, IREmitMode::Default);
                     emit(")\n{\n");
 
-                    // Now iterate over the `case`s of the branch
-                    UInt caseIndex = 0;
-                    UInt caseCount = t->getCaseCount();
-                    while(caseIndex < caseCount)
+                    auto defaultCase = switchRegion->defaultCase;
+                    for(auto currentCase : switchRegion->cases)
                     {
-                        // We are going to extract one case here,
-                        // but we might need to fold additional
-                        // cases into it, if they share the
-                        // same label.
-                        //
-                        // Note: this makes assumptions that the
-                        // IR code generator orders cases such
-                        // that: (1) cases with the same label
-                        // are consecutive, and (2) any case
-                        // that "falls through" to another must
-                        // come right before it in the list.
-                        auto caseVal = t->getCaseValue(caseIndex);
-                        auto caseLabel = t->getCaseLabel(caseIndex);
-                        caseIndex++;
-
-                        // Emit the `case ...:` for this case, and any
-                        // others that share the same label
-                        for(;;)
+                        for(auto caseVal : currentCase->values)
                         {
                             emit("case ");
                             emitIROperand(ctx, caseVal, IREmitMode::Default);
                             emit(":\n");
-
-                            if(caseIndex >= caseCount)
-                                break;
-
-                            auto nextCaseLabel = t->getCaseLabel(caseIndex);
-                            if(nextCaseLabel != caseLabel)
-                                break;
-
-                            caseVal = t->getCaseValue(caseIndex);
-                            caseIndex++;
                         }
-
-                        // The label for the current `case` might also
-                        // be the label used by the `default` case, so
-                        // check for that here.
-                        if(caseLabel == defaultLabel)
+                        if(currentCase.Ptr() == defaultCase)
                         {
                             emit("default:\n");
-                            defaultLabelHandled = true;
                         }
 
-                        // Now we need to emit the statements that make
-                        // up this case. The 99% case will be that it
-                        // will terminate with a `break` (or a `return`,
-                        // `continue`, etc.) and so we can pass in
-                        // `nullptr` for the ending block.
-                        IRBlock* caseEndLabel = nullptr;
-
-                        // However, there is also the possibility that
-                        // this case will fall through to the next, and
-                        // so we need to prepare for that possibility here.
-                        //
-                        // If there is a next case, then we will set its
-                        // label up as the "end" label when emitting
-                        // the statements inside the block.
-                        if(caseIndex < caseCount)
-                        {
-                            caseEndLabel = t->getCaseLabel(caseIndex);
-                        }
-
-                        // Now emit the statements for this case.
                         indent();
                         emit("{\n");
                         indent();
-                        emitIRStmtsForBlocks(ctx, caseLabel, caseEndLabel, &subLabels);
-                        dedent();
-                        emit("}\n");
-                        dedent();
-                    }
-
-                    // If we've gone through all the cases and haven't
-                    // managed to encounter the `default:` label,
-                    // then assume it is a distinct case and handle it here.
-                    if(!defaultLabelHandled)
-                    {
-                        emit("default:\n");
-                        indent();
-                        emit("{\n");
-                        indent();
-                        emitIRStmtsForBlocks(ctx, defaultLabel, breakLabel, &subLabels);
-                        emit("break;\n");
+                        emitRegion(ctx, currentCase->body);
                         dedent();
                         emit("}\n");
                         dedent();
                     }
 
                     emit("}\n");
-                    block = breakLabel;
 
+                    // Continue with the region after the `switch`
+                    region = switchRegion->nextRegion;
+                    continue;
                 }
                 break;
             }
-
-            // After we've emitted the first block, we are safe from accidental
-            // cases where we'd emit an entire loop body as a single `continue`,
-            // so we can safely switch in whatever labels are intended to be used.
-            useLabels = labels;
-
-            // If we reach this point, then we've emitted
-            // one block, and we have a new block where
-            // control flow continues.
-            //
-            // We need to handle a special case here,
-            // when control flow jumps back to the
-            // starting block of the range we were
-            // asked to work with:
-            if (block == begin) return;
+            break;
         }
+    }
+
+    /// Emit high-level language statements from a structrured region tree.
+    void emitRegionTree(
+        EmitContext*    ctx,
+        RegionTree*     regionTree)
+    {
+        emitRegion(ctx, regionTree->rootRegion);
     }
 
     // Is an IR function a definition? (otherwise it is a declaration)
@@ -4527,6 +4281,39 @@ struct EmitVisitor
         }
     }
 
+    /// Emit high-level statements for the body of a function.
+    void emitIRFunctionBody(
+        EmitContext*            ctx,
+        IRGlobalValueWithCode*  code)
+    {
+        // Compute a structured region tree that can represent
+        // the control flow of our function.
+        //
+        RefPtr<RegionTree> regionTree = generateRegionTreeForFunc(
+            code,
+            ctx->getSink());
+
+        // Now that we've computed the region tree, we have
+        // an opportunity to perform some last-minute transformations
+        // on the code to make sure it follows our rules.
+        //
+        // TODO: it would be better to do these transformations earlier,
+        // so that we can, e.g., dump the final IR code *before* emission
+        // starts, but that gets a bit compilcated because we also want
+        // to have the region tree avalable without having to recompute it.
+        //
+        // For now we are just going to do things the expedient way, but
+        // eventually we should allow an IR module to have side-band
+        // storage for dervied structured like the region tree (and logic
+        // for invalidating them when a transformation would break them).
+        //
+        fixValueScoping(regionTree);
+
+        // Now emit high-level code from that structured region tree.
+        //
+        emitRegionTree(ctx, regionTree);
+    }
+
     void emitIRSimpleFunc(
         EmitContext*    ctx,
         IRFunc*         func)
@@ -4591,8 +4378,7 @@ struct EmitVisitor
             emitPhiVarDecls(ctx, func);
 
             // Need to emit the operations in the blocks of the function
-
-            emitIRStmtsForBlocks(ctx, func->getFirstBlock(), nullptr, nullptr);
+            emitIRFunctionBody(ctx, func);
 
             dedent();
             emit("}\n\n");
@@ -5457,7 +5243,7 @@ struct EmitVisitor
             emitIRType(ctx, varType, initFuncName);
             Emit("()\n{\n");
             indent();
-            emitIRStmtsForBlocks(ctx, varDecl->getFirstBlock(), nullptr, nullptr);
+            emitIRFunctionBody(ctx, varDecl);
             dedent();
             Emit("}\n");
         }

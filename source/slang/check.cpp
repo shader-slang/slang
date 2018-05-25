@@ -131,30 +131,58 @@ namespace Slang
         }
         bool fromOperatorExpr(OperatorExpr* opExpr)
         {
+            // First, lets see if the argument types are ones
+            // that we can encode in our space of keys.
             args[0].aggVal = 0;
             args[1].aggVal = 0;
             if (opExpr->Arguments.Count() > 2)
                 return false;
+
+            for (UInt i = 0; i < opExpr->Arguments.Count(); i++)
+            {
+                if (!args[i].fromType(opExpr->Arguments[i]->type.Ptr()))
+                    return false;
+            }
+
+            // Next, lets see if we can find an intrinsic opcode
+            // attached to an overloaded definition (filtered for
+            // definitions that could conceivably apply to us).
+            //
+            // TODO: This should really be pased on the operator name
+            // plus fixity, rather than the intrinsic opcode...
+            //
+            // We will need to reject postfix definitions for prefix
+            // operators, and vice versa, to ensure things work.
+            //
+            auto prefixExpr = opExpr->As<PrefixExpr>();
+            auto postfixExpr = opExpr->As<PostfixExpr>();
+
             if (auto overloadedBase = opExpr->FunctionExpr->As<OverloadedExpr>())
             {
-                Decl* funcDecl = overloadedBase->lookupResult2.item.declRef.decl;
-                if (auto genDecl = funcDecl->As<GenericDecl>())
-                    funcDecl = genDecl->inner.Ptr();
-                if (auto intrinsicOp = funcDecl->FindModifier<IntrinsicOpModifier>())
+                for(auto item : overloadedBase->lookupResult2 )
                 {
-                    operatorName = intrinsicOp->op;
-                    for (UInt i = 0; i < opExpr->Arguments.Count(); i++)
+                    // Look at a candidate definition to be called and
+                    // see if it gives us a key to work with.
+                    //
+                    Decl* funcDecl = overloadedBase->lookupResult2.item.declRef.decl;
+                    if (auto genDecl = funcDecl->As<GenericDecl>())
+                        funcDecl = genDecl->inner.Ptr();
+
+                    // Reject definitions that have the wrong fixity.
+                    //
+                    if(prefixExpr && !funcDecl->FindModifier<PrefixModifier>())
+                        continue;
+                    if(postfixExpr && !funcDecl->FindModifier<PostfixModifier>())
+                        continue;
+
+                    if (auto intrinsicOp = funcDecl->FindModifier<IntrinsicOpModifier>())
                     {
-                        if (!args[i].fromType(opExpr->Arguments[i]->type.Ptr()))
-                            return false;
+                        operatorName = intrinsicOp->op;
+                        return true;
                     }
                 }
-                else
-                {
-                    return false;
-                }
             }
-            return true;
+            return false;
         }
     };
 

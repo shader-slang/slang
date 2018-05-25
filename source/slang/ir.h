@@ -247,10 +247,6 @@ struct IRInst : public IRObject
     // that this value will now have no uses.
     void replaceUsesWith(IRInst* other);
 
-    // Free a value (which needs to have been removed
-    // from its parent, had its uses eliminated, etc.)
-    void deallocate();
-
     // Clean up any non-pool resources used by this instruction
     virtual void dispose() override;
 
@@ -297,6 +293,12 @@ struct IRInst : public IRObject
 
     // RTTI support
     static bool isaImpl(IROp) { return true; }
+
+    /// Find the module that this instruction is nested under.
+    ///
+    /// If this instruction is transitively nested inside some IR module,
+    /// this function will return it, and will otherwise return `null`.
+    IRModule* getModule();
 };
 
 // `dynamic_cast` equivalent

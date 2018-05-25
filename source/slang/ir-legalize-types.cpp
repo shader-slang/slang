@@ -818,6 +818,8 @@ static LegalVal legalizeInst(
             args,
             inst->getOperandCount());
 
+    case kIROp_undefined:
+        return LegalVal();
     default:
         // TODO: produce a user-visible diagnostic here
         SLANG_UNEXPECTED("non-simple operand(s)!");
@@ -1462,7 +1464,7 @@ static void legalizeTypes(
     // Clean up after any instructions we replaced along the way.
     for (auto& lv : context->replacedInstructions)
     {
-        lv->deallocate();
+        lv->removeAndDeallocate();
     }
 }
 
