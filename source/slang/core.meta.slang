@@ -117,6 +117,12 @@ __intrinsic_type($(kIROp_InOutType))
 struct InOut
 {};
 
+__generic<T>
+__magic_type(RefType)
+__intrinsic_type($(kIROp_RefType))
+struct Ref
+{};
+
 __magic_type(StringType)
 __intrinsic_type($(kIROp_StringType))
 struct String

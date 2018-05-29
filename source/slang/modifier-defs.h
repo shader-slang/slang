@@ -71,7 +71,11 @@ SYNTAX_CLASS(RequiredGLSLVersionModifier, Modifier)
 FIELD(Token, versionNumberToken)
 END_SYNTAX_CLASS()
 
+
 SIMPLE_SYNTAX_CLASS(InOutModifier, OutModifier)
+
+// `__ref` modifier for by-reference parameter passing
+SIMPLE_SYNTAX_CLASS(RefModifier, Modifier)
 
 // This is a special sentinel modifier that gets added
 // to the list when we have multiple variable declarations

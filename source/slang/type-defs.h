@@ -355,6 +355,10 @@ END_SYNTAX_CLASS()
 SYNTAX_CLASS(InOutType, OutTypeBase)
 END_SYNTAX_CLASS()
 
+// The type for an `ref` parameter, e.g., `ref T`
+SYNTAX_CLASS(RefType, PtrTypeBase)
+END_SYNTAX_CLASS()
+
 // A type alias of some kind (e.g., via `typedef`)
 SYNTAX_CLASS(NamedExpressionType, Type)
 DECL_FIELD(DeclRef<TypeDefDecl>, declRef)

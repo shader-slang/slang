@@ -828,6 +828,7 @@ struct IRPtrType : IRPtrTypeBase
 SIMPLE_IR_PARENT_TYPE(OutTypeBase, PtrTypeBase)
 SIMPLE_IR_TYPE(OutType, OutTypeBase)
 SIMPLE_IR_TYPE(InOutType, OutTypeBase)
+SIMPLE_IR_TYPE(RefType, OutTypeBase)
 
 struct IRFuncType : IRType
 {

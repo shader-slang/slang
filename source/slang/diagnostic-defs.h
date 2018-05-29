@@ -311,6 +311,8 @@ DIAGNOSTIC(40006, Error, needCompileTimeConstant, "expected a compile-time const
 
 DIAGNOSTIC(40007, Internal, irValidationFailed, "IR validation failed: $0")
 
+DIAGNOSTIC(40008, Error, invalidLValueForRefParameter, "the form of this l-value argument is not valid for a `ref` parameter")
+
 // 41000 - IR-level validation issues
 
 DIAGNOSTIC(41000, Warning, unreachableCode, "unreachable code detected")

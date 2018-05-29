@@ -617,32 +617,32 @@ __target_intrinsic(glsl, "groupMemoryBarrier()); (barrier()")
 void GroupMemoryBarrierWithGroupSync();
 
 // Atomics
-void InterlockedAdd(in out  int dest,  int value, out  int original_value);
-void InterlockedAdd(in out uint dest, uint value, out uint original_value);
+void InterlockedAdd(__ref  int dest,  int value, out  int original_value);
+void InterlockedAdd(__ref uint dest, uint value, out uint original_value);
 
-void InterlockedAnd(in out  int dest,  int value, out  int original_value);
-void InterlockedAnd(in out uint dest, uint value, out uint original_value);
+void InterlockedAnd(__ref  int dest,  int value, out  int original_value);
+void InterlockedAnd(__ref uint dest, uint value, out uint original_value);
 
-void InterlockedCompareExchange(in out  int dest,  int compare_value,  int value, out  int original_value);
-void InterlockedCompareExchange(in out uint dest, uint compare_value, uint value, out uint original_value);
+void InterlockedCompareExchange(__ref  int dest,  int compare_value,  int value, out  int original_value);
+void InterlockedCompareExchange(__ref uint dest, uint compare_value, uint value, out uint original_value);
 
-void InterlockedCompareStore(in out  int dest,  int compare_value,  int value);
-void InterlockedCompareStore(in out uint dest, uint compare_value, uint value);
+void InterlockedCompareStore(__ref  int dest,  int compare_value,  int value);
+void InterlockedCompareStore(__ref uint dest, uint compare_value, uint value);
 
-void InterlockedExchange(in out  int dest,  int value, out  int original_value);
-void InterlockedExchange(in out uint dest, uint value, out uint original_value);
+void InterlockedExchange(__ref  int dest,  int value, out  int original_value);
+void InterlockedExchange(__ref uint dest, uint value, out uint original_value);
 
-void InterlockedMax(in out  int dest,  int value, out  int original_value);
-void InterlockedMax(in out uint dest, uint value, out uint original_value);
+void InterlockedMax(__ref  int dest,  int value, out  int original_value);
+void InterlockedMax(__ref uint dest, uint value, out uint original_value);
 
 void InterlockedMin(in out  int dest,  int value, out  int original_value);
 void InterlockedMin(in out uint dest, uint value, out uint original_value);
 
-void InterlockedOr(in out  int dest,  int value, out  int original_value);
-void InterlockedOr(in out uint dest, uint value, out uint original_value);
+void InterlockedOr(__ref  int dest,  int value, out  int original_value);
+void InterlockedOr(__ref uint dest, uint value, out uint original_value);
 
-void InterlockedXor(in out  int dest,  int value, out  int original_value);
-void InterlockedXor(in out uint dest, uint value, out uint original_value);
+void InterlockedXor(__ref  int dest,  int value, out  int original_value);
+void InterlockedXor(__ref uint dest, uint value, out uint original_value);
 
 // Is floating-point value finite?
 __generic<T : __BuiltinFloatingPointType> bool isfinite(T x);

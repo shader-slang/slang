@@ -3011,6 +3011,11 @@ namespace Slang
                 // because there is no way for overload resolution to pick between them.
                 if (fstParam.getDecl()->HasModifier<OutModifier>() != sndParam.getDecl()->HasModifier<OutModifier>())
                     return false;
+
+                // If one parameter is `ref` and the other isn't, then they don't match.
+                //
+                if(fstParam.getDecl()->HasModifier<RefModifier>() != sndParam.getDecl()->HasModifier<RefModifier>())
+                    return false;
             }
 
             // Note(tfoley): return type doesn't enter into it, because we can't take
@@ -7046,8 +7051,15 @@ namespace Slang
                     for (UInt pp = 0; pp < paramCount; ++pp)
                     {
                         auto paramType = funcType->getParamType(pp);
-                        if (auto outParamType = paramType->As<OutTypeBase>())
+                        if (paramType->As<OutTypeBase>() || paramType->As<RefType>())
                         {
+                            // `out`, `inout`, and `ref` parameters currently require
+                            // an *exact* match on the type of the argument.
+                            //
+                            // TODO: relax this requirement by allowing an argument
+                            // for an `inout` parameter to be converted in both
+                            // directions.
+                            //
                             if( pp < expr->Arguments.Count() )
                             {
                                 auto argExpr = expr->Arguments[pp];
