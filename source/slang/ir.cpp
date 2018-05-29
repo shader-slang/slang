@@ -1308,6 +1308,11 @@ namespace Slang
         return (IRInOutType*) getPtrType(kIROp_InOutType, valueType);
     }
 
+    IRRefType* IRBuilder::getRefType(IRType* valueType)
+    {
+        return (IRRefType*) getPtrType(kIROp_RefType, valueType);
+    }
+
     IRPtrTypeBase* IRBuilder::getPtrType(IROp op, IRType* valueType)
     {
         IRInst* operands[] = { valueType };

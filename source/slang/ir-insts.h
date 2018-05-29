@@ -559,6 +559,7 @@ struct IRBuilder
     IRPtrType*  getPtrType(IRType* valueType);
     IROutType*  getOutType(IRType* valueType);
     IRInOutType*  getInOutType(IRType* valueType);
+    IRRefType*  getRefType(IRType* valueType);
     IRPtrTypeBase*  getPtrType(IROp op, IRType* valueType);
 
     IRArrayTypeBase* getArrayTypeBase(

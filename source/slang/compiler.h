@@ -520,6 +520,9 @@ namespace Slang
         // Construct the type `InOut<valueType>`
         RefPtr<InOutType> getInOutType(RefPtr<Type> valueType);
 
+        // Construct the type `Ref<valueType>`
+        RefPtr<RefType> getRefType(RefPtr<Type> valueType);
+
         // Construct a pointer type like `Ptr<valueType>`, but where
         // the actual type name for the pointer type is given by `ptrTypeName`
         RefPtr<PtrTypeBase> getPtrType(RefPtr<Type> valueType, char const* ptrTypeName);
