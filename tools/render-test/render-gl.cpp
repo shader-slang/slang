@@ -190,7 +190,6 @@ public:
     struct BindingDetail
     {
         GLuint m_samplerHandle = 0;
-        int m_firstBinding;                      //< Holds binding index if not sampler (which has multiple, and can be read from the BindingState::Desc)
     };
 
     class BindingStateImpl: public BindingState
@@ -893,8 +892,6 @@ BindingState* GLRenderer::createBindingState(const BindingState::Desc& bindingSt
         auto& dstDetail = dstDetails[i];
         const auto& srcBinding = srcBindings[i];
 
-        // Copy over the bindings 
-        dstDetail.m_firstBinding = bindingStateDesc.getFirst(BindingState::ShaderStyle::Glsl, srcBinding.shaderBindSet);
         
         switch (srcBinding.bindingType)
         {
@@ -973,16 +970,17 @@ void GLRenderer::setBindingState(BindingState* stateIn)
         {
             case BindingType::Buffer:
             {
+                const int bindingIndex = binding.bindingRegister.getSingleIndex();
+
                 BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(binding.resource.Ptr());
-                glBindBufferBase(buffer->m_target, detail.m_firstBinding, buffer->m_handle);
+                glBindBufferBase(buffer->m_target, bindingIndex, buffer->m_handle);
                 break;
             }
             case BindingType::Sampler:
             {
-                auto bindings = bindingDesc.asSlice(BindingState::ShaderStyle::Glsl, binding.shaderBindSet);
-                for (auto b : bindings)
+                for (int index = binding.bindingRegister.index; index < binding.bindingRegister.index + binding.bindingRegister.size; ++index)
                 {
-                    glBindSampler(b, detail.m_samplerHandle);
+                    glBindSampler(index, detail.m_samplerHandle);
                 }
                 break;
             }
@@ -991,7 +989,9 @@ void GLRenderer::setBindingState(BindingState* stateIn)
             {
                 BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(binding.resource.Ptr());
 
-                glActiveTexture(GL_TEXTURE0 + detail.m_firstBinding);
+                const int bindingIndex = binding.bindingRegister.getSingleIndex();
+
+                glActiveTexture(GL_TEXTURE0 + bindingIndex);
                 glBindTexture(buffer->m_target, buffer->m_handle);
                 break;
             }

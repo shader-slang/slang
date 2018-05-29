@@ -198,7 +198,6 @@ protected:
         int m_srvIndex = -1;
         int m_uavIndex = -1;
         int m_samplerIndex = -1;
-        int m_binding = 0;
     };
 
     class BindingStateImpl: public BindingState
@@ -1089,6 +1088,8 @@ Result D3D12Renderer::_calcBindParameters(BindParameters& params)
                 const auto& binding = bindings[i];
                 const auto& detail = details[i];
 
+                const int bindingIndex = binding.bindingRegister.getSingleIndex();
+
                 if (binding.bindingType == BindingType::Buffer)
                 {
                     assert(binding.resource && binding.resource->isBuffer());
@@ -1102,7 +1103,7 @@ Result D3D12Renderer::_calcBindParameters(BindParameters& params)
                         param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
                         D3D12_ROOT_DESCRIPTOR& descriptor = param.Descriptor;
-                        descriptor.ShaderRegister = detail.m_binding;
+                        descriptor.ShaderRegister = bindingIndex;
                         descriptor.RegisterSpace = 0;
 
                         numConstantBuffers++;
@@ -1115,7 +1116,7 @@ Result D3D12Renderer::_calcBindParameters(BindParameters& params)
                         
                     range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
                     range.NumDescriptors = 1;
-                    range.BaseShaderRegister = detail.m_binding;
+                    range.BaseShaderRegister = bindingIndex;
                     range.RegisterSpace = 0;
                     range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
@@ -1135,7 +1136,7 @@ Result D3D12Renderer::_calcBindParameters(BindParameters& params)
                         
                     range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
                     range.NumDescriptors = 1;
-                    range.BaseShaderRegister = detail.m_binding;
+                    range.BaseShaderRegister = bindingIndex;
                     range.RegisterSpace = 0;
                     range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
@@ -2297,8 +2298,8 @@ BindingState* D3D12Renderer::createBindingState(const BindingState::Desc& bindin
         const auto& srcEntry = srcBindings[i];
         auto& dstDetail = dstDetails[i];
 
-        dstDetail.m_binding = bindingStateDesc.getFirst(BindingState::ShaderStyle::Hlsl, srcEntry.shaderBindSet);
-        
+        const int bindingIndex = srcEntry.bindingRegister.getSingleIndex();
+
         switch (srcEntry.bindingType)
         {
             case BindingType::Buffer:
@@ -2405,7 +2406,7 @@ BindingState* D3D12Renderer::createBindingState(const BindingState::Desc& bindin
             {
                 const BindingState::SamplerDesc& samplerDesc = bindingStateDesc.m_samplerDescs[srcEntry.descIndex];
 
-                const int samplerIndex = bindingStateDesc.getFirst(BindingState::ShaderStyle::Hlsl, srcEntry.shaderBindSet);
+                const int samplerIndex = bindingIndex;
                 dstDetail.m_samplerIndex = samplerIndex;
                 bindingState->m_samplerHeap.placeAt(samplerIndex);
 

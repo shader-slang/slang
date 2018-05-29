@@ -131,12 +131,9 @@ SlangResult RenderTestApp::initialize(Renderer* renderer, ShaderCompiler* shader
         // in the test file 
 
         if ((gOptions.shaderType == Options::ShaderProgramType::Graphics || gOptions.shaderType == Options::ShaderProgramType::GraphicsCompute)
-            && bindingStateDesc.findBindingIndex(Resource::BindFlag::ConstantBuffer, -1, 0) < 0)
+            && bindingStateDesc.findBindingIndex(Resource::BindFlag::ConstantBuffer, 0) < 0)
         {
-            BindingState::ShaderBindSet shaderBindSet;
-            shaderBindSet.setAll(bindingStateDesc.makeCompactSlice(0));
-
-            bindingStateDesc.addResource(BindingType::Buffer, m_constantBuffer, shaderBindSet);
+            bindingStateDesc.addResource(BindingType::Buffer, m_constantBuffer, BindingState::BindingRegister{ 0, 1 } );
 
             m_numAddedConstantBuffers++;
         }

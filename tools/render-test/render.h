@@ -392,90 +392,23 @@ enum class BindingType
 class BindingState : public Slang::RefObject
 {
 public:
-
-    typedef uint16_t BindIndex;
-
-        /// Shader binding style
-    enum class ShaderStyle
+    struct BindingRegister
     {
-        Hlsl,
-        Glsl,
-        CountOf,
+            /// True if contains valid contents
+        bool isValid() const { return index >= 0 && size > 0; }
+            /// True if valid single value
+        bool isSingle() const { return size == 1 && index >= 0; }
+            /// Get as a single index (must be at least one index)
+        int getSingleIndex() const { return (size == 1 && index >= 0) ? index : -1; }
+            /// Return the first index
+        int getFirstIndex() const { return index; }
+            /// True if contains register index
+        bool hasRegister(int registerIndex) const { return registerIndex >= index && registerIndex < index + size; }
+
+        int16_t index;              ///< The base index
+        uint16_t size;              ///< The amount of register indices
     };
-
-    struct ShaderStyleFlag
-    {
-        enum Enum 
-        {
-            Hlsl = 1 << int(ShaderStyle::Hlsl),
-            Glsl = 1 << int(ShaderStyle::Glsl),
-        };
-    };
-    typedef int ShaderStyleFlags;           ///< Combination of ShaderStyleFlag 
-
-        /// A 'compact' representation of a 0 or more BindIndices.  
-        /// A Slice in this context is effectively an unowned array. 
-        /// If only a single index is he held (which is common) it's held directly in the m_indexOrBase member, otherwise m_indexOrBase is an index into the 
-        /// m_indices list of the Desc. Can be turned into a BindIndexSlice (which is easier to use, and iterable) using asBindIndexSlice method on Desc 
-    struct CompactBindIndexSlice
-    {
-        typedef uint16_t SizeType;
-        /// Default Ctor makes an empty set
-        SLANG_FORCE_INLINE CompactBindIndexSlice() :
-            m_size(0),
-            m_indexOrBase(0)
-        {}
-            /// Ctor for one or more. NOTE! Meaning if indexIn changes depending if numIndices > 1.
-        SLANG_FORCE_INLINE CompactBindIndexSlice(int indexIn, int sizeIn) :
-            m_size(SizeType(sizeIn)),
-            m_indexOrBase(BindIndex(indexIn))
-        {
-        }
-        SizeType m_size;
-        BindIndex m_indexOrBase;                 ///< Meaning changes depending on numIndices. If 1, it is the index if larger than 1, then is an index into 'indices'  
-    };
-
-        /// Holds the BindIndex slice associated with each ShaderStyle
-    struct ShaderBindSet
-    {
-        void set(ShaderStyle style, const CompactBindIndexSlice& slice) { shaderSlices[int(style)] = slice; }
-        void setAll(const CompactBindIndexSlice& slice) 
-        {
-            for (int i = 0; i < int(ShaderStyle::CountOf); ++i)
-            {
-                shaderSlices[i] = slice;
-            }
-        }
-
-        CompactBindIndexSlice shaderSlices[int(ShaderStyle::CountOf)];
-    };
-
-        /// A slice (non owned array) of BindIndices
-        /// TODO: have a generic Slice<T> type instead of this specific type
-    struct BindIndexSlice
-    {
-        const BindIndex* begin() const { return data; }
-        const BindIndex* end() const { return data + size; }
-
-        int indexOf(BindIndex index) const 
-        {
-            for (int i = 0; i < size; ++i)
-            {
-                if (data[i] == index) 
-                {
-                    return i;
-                }   
-            }
-            return -1;
-        }
-
-        int getSize() const { return int(size); }
-        BindIndex operator[](int i) const { assert(i >= 0 && i < size); return data[i]; }
-
-        const BindIndex* data;
-        int size;
-    };
-
+    
     struct SamplerDesc
     {
         bool isCompareSampler;
@@ -486,50 +419,31 @@ public:
         BindingType bindingType;                ///< Type of binding
         int descIndex;                          ///< The description index associated with type. -1 if not used. For example if bindingType is Sampler, the descIndex is into m_samplerDescs.
         Slang::RefPtr<Resource> resource;       ///< Associated resource. nullptr if not used
-        ShaderBindSet shaderBindSet;            ///< Holds BindIndices associated with each ShaderStyle 
+        BindingRegister bindingRegister;        /// Defines the registers for binding
     };
 
     struct Desc
     {        
-            /// Given a RegisterSet, return as a RegisterList, that can be easily iterated over
-        BindIndexSlice asSlice(const CompactBindIndexSlice& set) const;
-            /// Given a RegisterDesc and a style returns a RegisterList, that can be easily iterated over
-        BindIndexSlice asSlice(ShaderStyle style, const ShaderBindSet& shaderBindSet) const;
-
-            /// Returns the first member of the set, or returns -1 if is empty
-        int getFirst(const CompactBindIndexSlice& set) const;
-            /// Returns the first member of the set, or returns -1 if is empty
-        int getFirst(ShaderStyle style, const ShaderBindSet& shaderBindSet) const;
-
             /// Add a resource - assumed that the binding will match the Desc of the resource
-        void addResource(BindingType bindingType, Resource* resource, const ShaderBindSet& shaderBindSet);
+        void addResource(BindingType bindingType, Resource* resource, const BindingRegister& bindingRegister);
             /// Add a sampler        
-        void addSampler(const SamplerDesc& desc, const ShaderBindSet& shaderBindSet);
+        void addSampler(const SamplerDesc& desc, const BindingRegister& bindingRegister);
             /// Add a BufferResource 
-        void addBufferResource(BufferResource* resource, const ShaderBindSet& shaderBindSet) { addResource(BindingType::Buffer, resource, shaderBindSet); }
+        void addBufferResource(BufferResource* resource, const BindingRegister& bindingRegister) { addResource(BindingType::Buffer, resource, bindingRegister); }
             /// Add a texture 
-        void addTextureResource(TextureResource* resource, const ShaderBindSet& shaderBindSet) { addResource(BindingType::Texture, resource, shaderBindSet); }
+        void addTextureResource(TextureResource* resource, const BindingRegister& bindingRegister) { addResource(BindingType::Texture, resource, bindingRegister); }
             /// Add combined texture a
-        void addCombinedTextureSampler(TextureResource* resource, const SamplerDesc& samplerDesc, const ShaderBindSet& shaderBindSet);
+        void addCombinedTextureSampler(TextureResource* resource, const SamplerDesc& samplerDesc, const BindingRegister& bindingRegister);
+
+            /// Returns the bind index, that has the bind flag, and indexes the specified register
+        int findBindingIndex(Resource::BindFlag::Enum bindFlag, int registerIndex) const;
 
             /// Clear the contents 
         void clear();
 
-            /// Given an index, makes a CompactBindIndexSlice. If index is < 0, assumes means no indices, and just returns the empty slice
-        CompactBindIndexSlice makeCompactSlice(int index);
-            /// Given a list of indices, makes a CompactBindIndexSlice. Note does check for indices being unique and the order is maintained. 
-            /// Only >= 0 indices are valid
-        CompactBindIndexSlice makeCompactSlice(const int* indices, int numIndices);
-
-            /// Returns the index of the element in the slice
-        int indexOf(const CompactBindIndexSlice& slice, BindIndex index) const { return asSlice(slice).indexOf(index); }
-
-            /// Find the 
-        int findBindingIndex(Resource::BindFlag::Enum bindFlag, ShaderStyleFlags shaderStyleFlags, BindIndex index) const;
-
         Slang::List<Binding> m_bindings;                            ///< All of the bindings in order
         Slang::List<SamplerDesc> m_samplerDescs;                    ///< Holds the SamplerDesc for the binding - indexed by the descIndex member of Binding 
-        Slang::List<BindIndex> m_sharedBindIndices;                 ///< Used to store BindIndex slices that don't fit into CompactBindIndexSlice
+        
         int m_numRenderTargets = 1;
     };
 

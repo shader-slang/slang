@@ -180,7 +180,6 @@ public:
         VkImageView     m_srv = VK_NULL_HANDLE;
         VkBufferView    m_uav = VK_NULL_HANDLE;
         VkSampler       m_sampler = VK_NULL_HANDLE;
-        int             m_binding = 0;
     };
 
     class BindingStateImpl: public BindingState
@@ -416,7 +415,7 @@ Slang::Result VKRenderer::_createPipeline(RefPtr<Pipeline>& pipelineOut)
         const auto& srcBinding = srcBindings[i];
 
         VkDescriptorSetLayoutBinding dstBinding = {};
-        dstBinding.binding = srcDetail.m_binding;
+    
         dstBinding.descriptorCount = 1;
 
         switch (srcBinding.bindingType)
@@ -551,10 +550,12 @@ Slang::Result VKRenderer::_createPipeline(RefPtr<Pipeline>& pipelineOut)
         const auto& srcDetail = srcDetails[i];
         const auto& srcBinding = srcBindings[i];
 
+        const int bindingIndex = srcBinding.bindingRegister.getSingleIndex();
+
         VkWriteDescriptorSet writeInfo = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
         writeInfo.descriptorCount = 1;
         writeInfo.dstSet = pipeline->m_descriptorSet;
-        writeInfo.dstBinding = srcDetail.m_binding;
+        writeInfo.dstBinding = bindingIndex;
         writeInfo.dstArrayElement = 0;
 
         switch (srcBinding.bindingType)
@@ -1873,7 +1874,7 @@ BindingState* VKRenderer::createBindingState(const BindingState::Desc& bindingSt
         const auto& srcBinding = srcBindings[i];
 
         // For now use Glsl binding
-        dstDetail.m_binding = bindingStateDesc.getFirst(BindingState::ShaderStyle::Glsl, srcBinding.shaderBindSet);
+        //const int bindingIndex = srcBinding.bindingRegister.getFirstIndex();
         
         switch (srcBinding.bindingType)
         {
