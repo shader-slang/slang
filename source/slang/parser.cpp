@@ -4399,6 +4399,7 @@ namespace Slang
         MODIFIER(input,     InputModifier);
         MODIFIER(out,       OutModifier);
         MODIFIER(inout,     InOutModifier);
+        MODIFIER(__ref,     RefModifier);
         MODIFIER(const,     ConstModifier);
         MODIFIER(instance,  InstanceModifier);
         MODIFIER(__builtin, BuiltinModifier);

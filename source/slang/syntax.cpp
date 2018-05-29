@@ -303,6 +303,11 @@ void Type::accept(IValVisitor* visitor, void* extra)
         return getPtrType(valueType, "InOutType").As<InOutType>();
     }
 
+    RefPtr<RefType> Session::getRefType(RefPtr<Type> valueType)
+    {
+        return getPtrType(valueType, "RefType").As<RefType>();
+    }
+
     RefPtr<PtrTypeBase> Session::getPtrType(RefPtr<Type> valueType, char const* ptrTypeName)
     {
         auto genericDecl = findMagicDecl(
@@ -2085,7 +2090,11 @@ void Type::accept(IValVisitor* visitor, void* extra)
         {
             auto paramDecl = paramDeclRef.getDecl();
             auto paramType = GetType(paramDeclRef);
-            if( paramDecl->FindModifier<OutModifier>() )
+            if( paramDecl->FindModifier<RefModifier>() )
+            {
+                paramType = session->getRefType(paramType);
+            }
+            else if( paramDecl->FindModifier<OutModifier>() )
             {
                 if(paramDecl->FindModifier<InOutModifier>() || paramDecl->FindModifier<InModifier>())
                 {
