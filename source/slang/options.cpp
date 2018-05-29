@@ -760,7 +760,7 @@ struct OptionsParser
             UInt targetCount = requestImpl->targets.Count();
             for(UInt tt = 0; tt < targetCount; ++tt)
             {
-                spSetTargetMatrixLayoutMode(compileRequest, tt, defaultMatrixLayoutMode);
+                spSetTargetMatrixLayoutMode(compileRequest, int(tt), defaultMatrixLayoutMode);
             }
         }
 
