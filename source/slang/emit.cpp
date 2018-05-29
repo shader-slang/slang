@@ -4408,6 +4408,13 @@ struct EmitVisitor
             emit("inout ");
             type = inOutType->getValueType();
         }
+        else if( auto refType = as<IRRefType>(type))
+        {
+            // Note: There is no HLSL/GLSL equivalent for by-reference parameters,
+            // so we don't actually expect to encounter these in user code.
+            emit("inout ");
+            type = inOutType->getValueType();
+        }
 
         emitIRType(ctx, type, name);
     }

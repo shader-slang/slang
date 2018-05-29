@@ -922,6 +922,11 @@ void assign(
     LoweredValInfo const&   left,
     LoweredValInfo const&   right);
 
+IRInst* getAddress(
+    IRGenContext*           context,
+    LoweredValInfo const&   inVal,
+    SourceLoc               diagnosticLocation);
+
 void lowerStmt(
     IRGenContext*   context,
     Stmt*           stmt);
@@ -1668,7 +1673,24 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                 // make a conscious decision at some point.
             }
 
-            if (paramDecl->HasModifier<OutModifier>()
+            if(paramDecl->HasModifier<RefModifier>())
+            {
+                // A `ref` qualified parameter must be implemented with by-reference
+                // parameter passing, so the argument value should be lowered as
+                // an l-value.
+                //
+                LoweredValInfo loweredArg = lowerLValueExpr(context, argExpr);
+
+                // According to our "calling convention" we need to
+                // pass a pointer into the callee. Unlike the case for
+                // `out` and `inout` below, it is never valid to do
+                // copy-in/copy-out for a `ref` parameter, so we just
+                // pass in the actual pointer.
+                //
+                IRInst* argPtr = getAddress(context, loweredArg, argExpr->loc);
+                (*ioArgs).Add(argPtr);
+            }
+            else if (paramDecl->HasModifier<OutModifier>()
                 || paramDecl->HasModifier<InOutModifier>())
             {
                 // This is a `out` or `inout` parameter, and so
@@ -2930,6 +2952,26 @@ static LoweredValInfo maybeMoveMutableTemp(
     }
 }
 
+IRInst* getAddress(
+    IRGenContext*           context,
+    LoweredValInfo const&   inVal,
+    SourceLoc               diagnosticLocation)
+{
+    LoweredValInfo val = inVal;
+    switch(val.flavor)
+    {
+    case LoweredValInfo::Flavor::Ptr:
+        return val.val;
+
+    // TODO: are there other cases we need to handle here (e.g.,
+    // turning a bound subscript/property into an address)
+
+    default:
+        context->getSink()->diagnose(diagnosticLocation, Diagnostics::invalidLValueForRefParameter);
+        return nullptr;
+    }
+}
+
 void assign(
     IRGenContext*           context,
     LoweredValInfo const&   inLeft,
@@ -3831,9 +3873,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     //
     enum ParameterDirection
     {
-        kParameterDirection_In,
-        kParameterDirection_Out,
-        kParameterDirection_InOut,
+        kParameterDirection_In,     ///< Copy in
+        kParameterDirection_Out,    ///< Copy out
+        kParameterDirection_InOut,  ///< Copy in, copy out
+        kParameterDirection_Ref,    ///< By-reference
     };
     struct ParameterInfo
     {
@@ -3856,6 +3899,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     //
     ParameterDirection getParameterDirection(VarDeclBase* paramDecl)
     {
+        if( paramDecl->HasModifier<RefModifier>() )
+        {
+            // The AST specified `ref`:
+            return kParameterDirection_Ref;
+        }
         if( paramDecl->HasModifier<InOutModifier>() )
         {
             // The AST specified `inout`:
@@ -4349,6 +4397,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 break;
             case kParameterDirection_InOut:
                 irParamType = subBuilder->getInOutType(irParamType);
+                break;
+            case kParameterDirection_Ref:
+                irParamType = subBuilder->getRefType(irParamType);
                 break;
 
             default:
