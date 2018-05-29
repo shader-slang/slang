@@ -133,7 +133,7 @@ SlangResult RenderTestApp::initialize(Renderer* renderer, ShaderCompiler* shader
         if ((gOptions.shaderType == Options::ShaderProgramType::Graphics || gOptions.shaderType == Options::ShaderProgramType::GraphicsCompute)
             && bindingStateDesc.findBindingIndex(Resource::BindFlag::ConstantBuffer, 0) < 0)
         {
-            bindingStateDesc.addResource(BindingType::Buffer, m_constantBuffer, BindingState::BindingRegister{ 0, 1 } );
+            bindingStateDesc.addResource(BindingType::Buffer, m_constantBuffer, BindingState::RegisterSet{ 0, 1 } );
 
             m_numAddedConstantBuffers++;
         }

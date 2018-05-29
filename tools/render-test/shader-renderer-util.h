@@ -24,7 +24,7 @@ struct ShaderRendererUtil
     static Slang::Result createBindingStateDesc(ShaderInputLayoutEntry* srcEntries, int numEntries, Renderer* renderer, BindingState::Desc& descOut);
 
         /// Get the binding register associated with this binding (or -1 if none defined)
-    static BindingState::BindingRegister calcBindingRegister(Renderer* renderer, const ShaderInputLayoutEntry& entry);
+    static BindingState::RegisterSet calcRegisterSet(Renderer* renderer, const ShaderInputLayoutEntry& entry);
 
 };
 

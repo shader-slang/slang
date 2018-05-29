@@ -1088,7 +1088,7 @@ Result D3D12Renderer::_calcBindParameters(BindParameters& params)
                 const auto& binding = bindings[i];
                 const auto& detail = details[i];
 
-                const int bindingIndex = binding.bindingRegister.getSingleIndex();
+                const int bindingIndex = binding.registerSet.getSingleIndex();
 
                 if (binding.bindingType == BindingType::Buffer)
                 {
@@ -2298,7 +2298,7 @@ BindingState* D3D12Renderer::createBindingState(const BindingState::Desc& bindin
         const auto& srcEntry = srcBindings[i];
         auto& dstDetail = dstDetails[i];
 
-        const int bindingIndex = srcEntry.bindingRegister.getSingleIndex();
+        const int bindingIndex = srcEntry.registerSet.getSingleIndex();
 
         switch (srcEntry.bindingType)
         {

@@ -131,15 +131,15 @@ static BindingState::SamplerDesc _calcSamplerDesc(const InputSamplerDesc& srcDes
     return dstDesc;
 }
 
-/* static */BindingState::BindingRegister ShaderRendererUtil::calcBindingRegister(Renderer* renderer, const ShaderInputLayoutEntry& entry)
+/* static */BindingState::RegisterSet ShaderRendererUtil::calcRegisterSet(Renderer* renderer, const ShaderInputLayoutEntry& entry)
 {
-    typedef BindingState::BindingRegister BindingRegister;
+    typedef BindingState::RegisterSet RegisterSet;
 
     BindingStyle bindingStyle = RendererUtil::getBindingStyle(renderer->getRendererType());
 
     switch (bindingStyle)
     {
-        case BindingStyle::DirectX:         return BindingRegister{ int16_t( entry.hlslBinding), 1 };
+        case BindingStyle::DirectX:         return RegisterSet{ int16_t( entry.hlslBinding), 1 };
         case BindingStyle::Vulkan:
         {
             // USe OpenGls for now
@@ -164,7 +164,7 @@ static BindingState::SamplerDesc _calcSamplerDesc(const InputSamplerDesc& srcDes
                     break;
                 }
             }
-            return BindingRegister{int16_t(baseIndex), uint16_t(count)};
+            return RegisterSet{int16_t(baseIndex), uint16_t(count)};
         }
         /* case BindingStyle::Vulkan:
         {
@@ -172,7 +172,7 @@ static BindingState::SamplerDesc _calcSamplerDesc(const InputSamplerDesc& srcDes
         default: break;
     }
     // Return invalid
-    return BindingRegister{ -1, 0 };
+    return RegisterSet{ -1, 0 };
 }
 
 /* static */Result ShaderRendererUtil::createBindingStateDesc(ShaderInputLayoutEntry* srcEntries, int numEntries, Renderer* renderer, BindingState::Desc& descOut)
@@ -184,8 +184,8 @@ static BindingState::SamplerDesc _calcSamplerDesc(const InputSamplerDesc& srcDes
     {
         const ShaderInputLayoutEntry& srcEntry = srcEntries[i];
 
-        const BindingState::BindingRegister bindingRegister = calcBindingRegister(renderer, srcEntry);
-        if (!bindingRegister.isValid())
+        const BindingState::RegisterSet registerSet = calcRegisterSet(renderer, srcEntry);
+        if (!registerSet.isValid())
         {
             assert(!"Couldn't find a binding");
             return SLANG_FAIL;
@@ -202,14 +202,14 @@ static BindingState::SamplerDesc _calcSamplerDesc(const InputSamplerDesc& srcDes
                 RefPtr<BufferResource> bufferResource;
                 SLANG_RETURN_ON_FAIL(createBufferResource(srcEntry.bufferDesc, srcEntry.isOutput, bufferSize, srcEntry.bufferData.Buffer(), renderer, bufferResource));
                 
-                descOut.addBufferResource(bufferResource, bindingRegister);
+                descOut.addBufferResource(bufferResource, registerSet);
                 break;
             }
             case ShaderInputType::CombinedTextureSampler:
             {
                 RefPtr<TextureResource> texture;
                 SLANG_RETURN_ON_FAIL(generateTextureResource(srcEntry.textureDesc, textureBindFlags, renderer, texture));
-                descOut.addCombinedTextureSampler(texture, _calcSamplerDesc(srcEntry.samplerDesc), bindingRegister);
+                descOut.addCombinedTextureSampler(texture, _calcSamplerDesc(srcEntry.samplerDesc), registerSet);
                 break;
             }
             case ShaderInputType::Texture:
@@ -217,12 +217,12 @@ static BindingState::SamplerDesc _calcSamplerDesc(const InputSamplerDesc& srcDes
                 RefPtr<TextureResource> texture;
                 SLANG_RETURN_ON_FAIL(generateTextureResource(srcEntry.textureDesc, textureBindFlags, renderer, texture));
 
-                descOut.addTextureResource(texture, bindingRegister);
+                descOut.addTextureResource(texture, registerSet);
                 break;
             }
             case ShaderInputType::Sampler:
             {
-                descOut.addSampler(_calcSamplerDesc(srcEntry.samplerDesc), bindingRegister);
+                descOut.addSampler(_calcSamplerDesc(srcEntry.samplerDesc), registerSet);
                 break;
             }
             default: 

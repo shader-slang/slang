@@ -970,7 +970,7 @@ void GLRenderer::setBindingState(BindingState* stateIn)
         {
             case BindingType::Buffer:
             {
-                const int bindingIndex = binding.bindingRegister.getSingleIndex();
+                const int bindingIndex = binding.registerSet.getSingleIndex();
 
                 BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(binding.resource.Ptr());
                 glBindBufferBase(buffer->m_target, bindingIndex, buffer->m_handle);
@@ -978,7 +978,7 @@ void GLRenderer::setBindingState(BindingState* stateIn)
             }
             case BindingType::Sampler:
             {
-                for (int index = binding.bindingRegister.index; index < binding.bindingRegister.index + binding.bindingRegister.size; ++index)
+                for (int index = binding.registerSet.index; index < binding.registerSet.index + binding.registerSet.size; ++index)
                 {
                     glBindSampler(index, detail.m_samplerHandle);
                 }
@@ -989,7 +989,7 @@ void GLRenderer::setBindingState(BindingState* stateIn)
             {
                 BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(binding.resource.Ptr());
 
-                const int bindingIndex = binding.bindingRegister.getSingleIndex();
+                const int bindingIndex = binding.registerSet.getSingleIndex();
 
                 glActiveTexture(GL_TEXTURE0 + bindingIndex);
                 glBindTexture(buffer->m_target, buffer->m_handle);

@@ -838,7 +838,7 @@ BindingState* D3D11Renderer::createBindingState(const BindingState::Desc& bindin
         auto& dstDetail = dstDetails[i];
         const auto& srcBinding = srcBindings[i];
         
-        assert(srcBinding.bindingRegister.isSingle());
+        assert(srcBinding.registerSet.isSingle());
 
         switch (srcBinding.bindingType)
         {
@@ -1026,7 +1026,7 @@ void D3D11Renderer::_applyBindingState(bool isCompute)
         const auto& binding = bindings[i];
         const auto& detail = details[i];
 
-        const int bindingIndex = binding.bindingRegister.getSingleIndex();
+        const int bindingIndex = binding.registerSet.getSingleIndex();
 
         switch (binding.bindingType)
         {

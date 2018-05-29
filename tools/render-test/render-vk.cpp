@@ -550,7 +550,7 @@ Slang::Result VKRenderer::_createPipeline(RefPtr<Pipeline>& pipelineOut)
         const auto& srcDetail = srcDetails[i];
         const auto& srcBinding = srcBindings[i];
 
-        const int bindingIndex = srcBinding.bindingRegister.getSingleIndex();
+        const int bindingIndex = srcBinding.registerSet.getSingleIndex();
 
         VkWriteDescriptorSet writeInfo = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
         writeInfo.descriptorCount = 1;
@@ -1874,7 +1874,7 @@ BindingState* VKRenderer::createBindingState(const BindingState::Desc& bindingSt
         const auto& srcBinding = srcBindings[i];
 
         // For now use Glsl binding
-        //const int bindingIndex = srcBinding.bindingRegister.getFirstIndex();
+        //const int bindingIndex = srcBinding.registerSet.getFirstIndex();
         
         switch (srcBinding.bindingType)
         {

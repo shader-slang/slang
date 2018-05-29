@@ -392,7 +392,9 @@ enum class BindingType
 class BindingState : public Slang::RefObject
 {
 public:
-    struct BindingRegister
+        /// A register set consists of one or more contiguous indices. 
+        /// To be valid index >= 0 and size >= 1
+    struct RegisterSet
     {
             /// True if contains valid contents
         bool isValid() const { return index >= 0 && size > 0; }
@@ -419,21 +421,21 @@ public:
         BindingType bindingType;                ///< Type of binding
         int descIndex;                          ///< The description index associated with type. -1 if not used. For example if bindingType is Sampler, the descIndex is into m_samplerDescs.
         Slang::RefPtr<Resource> resource;       ///< Associated resource. nullptr if not used
-        BindingRegister bindingRegister;        /// Defines the registers for binding
+        RegisterSet registerSet;        /// Defines the registers for binding
     };
 
     struct Desc
     {        
             /// Add a resource - assumed that the binding will match the Desc of the resource
-        void addResource(BindingType bindingType, Resource* resource, const BindingRegister& bindingRegister);
+        void addResource(BindingType bindingType, Resource* resource, const RegisterSet& registerSet);
             /// Add a sampler        
-        void addSampler(const SamplerDesc& desc, const BindingRegister& bindingRegister);
+        void addSampler(const SamplerDesc& desc, const RegisterSet& registerSet);
             /// Add a BufferResource 
-        void addBufferResource(BufferResource* resource, const BindingRegister& bindingRegister) { addResource(BindingType::Buffer, resource, bindingRegister); }
+        void addBufferResource(BufferResource* resource, const RegisterSet& registerSet) { addResource(BindingType::Buffer, resource, registerSet); }
             /// Add a texture 
-        void addTextureResource(TextureResource* resource, const BindingRegister& bindingRegister) { addResource(BindingType::Texture, resource, bindingRegister); }
+        void addTextureResource(TextureResource* resource, const RegisterSet& registerSet) { addResource(BindingType::Texture, resource, registerSet); }
             /// Add combined texture a
-        void addCombinedTextureSampler(TextureResource* resource, const SamplerDesc& samplerDesc, const BindingRegister& bindingRegister);
+        void addCombinedTextureSampler(TextureResource* resource, const SamplerDesc& samplerDesc, const RegisterSet& registerSet);
 
             /// Returns the bind index, that has the bind flag, and indexes the specified register
         int findBindingIndex(Resource::BindFlag::Enum bindFlag, int registerIndex) const;
