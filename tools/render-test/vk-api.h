@@ -5,57 +5,70 @@
 
 namespace renderer_test {
 
-#define VK_API_GLOBAL_PROCS(x)          \
-    x(vkGetInstanceProcAddr)            \
-    x(vkCreateInstance)                 \
+#define VK_API_GLOBAL_PROCS(x) \
+    x(vkGetInstanceProcAddr) \
+    x(vkCreateInstance) \
     /* */
 
-#define VK_API_INSTANCE_PROCS(x)                \
-    x(vkCreateDevice)                           \
-    x(vkCreateDebugReportCallbackEXT)           \
-    x(vkDestroyDebugReportCallbackEXT)          \
-    x(vkDebugReportMessageEXT)                  \
-    x(vkEnumeratePhysicalDevices)               \
-    x(vkGetPhysicalDeviceProperties)            \
-    x(vkGetPhysicalDeviceFeatures)              \
-    x(vkGetPhysicalDeviceMemoryProperties)      \
+#define VK_API_INSTANCE_PROCS(x) \
+    x(vkCreateDevice) \
+    x(vkCreateDebugReportCallbackEXT) \
+    x(vkDestroyDebugReportCallbackEXT) \
+    x(vkDebugReportMessageEXT) \
+    x(vkEnumeratePhysicalDevices) \
+    x(vkGetPhysicalDeviceProperties) \
+    x(vkGetPhysicalDeviceFeatures) \
+    x(vkGetPhysicalDeviceMemoryProperties) \
     x(vkGetPhysicalDeviceQueueFamilyProperties) \
     x(vkGetPhysicalDeviceFormatProperties) \
-    x(vkGetDeviceProcAddr)                      \
+    x(vkGetDeviceProcAddr) \
     /* */
 
-#define VK_API_DEVICE_PROCS(x)          \
-    x(vkCreateDescriptorPool)           \
-    x(vkDestroyDescriptorPool)          \
-    x(vkGetDeviceQueue)                 \
-    x(vkQueueSubmit)                    \
-    x(vkQueueWaitIdle)                  \
-    x(vkCreateBuffer)                   \
-    x(vkGetBufferMemoryRequirements)    \
-    x(vkAllocateMemory)                 \
-    x(vkBindBufferMemory)               \
-    x(vkMapMemory)                      \
-    x(vkUnmapMemory)                    \
-    x(vkCmdCopyBuffer)                  \
-    x(vkDestroyBuffer)                  \
-    x(vkFreeMemory)                     \
-    x(vkCreateDescriptorSetLayout)      \
-    x(vkDestroyDescriptorSetLayout)     \
-    x(vkAllocateDescriptorSets)         \
-    x(vkUpdateDescriptorSets)           \
-    x(vkCreatePipelineLayout)           \
-    x(vkDestroyPipelineLayout)          \
-    x(vkCreateComputePipelines)         \
-    x(vkCreateGraphicsPipelines)        \
-    x(vkDestroyPipeline)                \
-    x(vkCreateShaderModule)             \
-    x(vkDestroyShaderModule)            \
+#define VK_API_DEVICE_PROCS(x) \
+    x(vkCreateDescriptorPool) \
+    x(vkDestroyDescriptorPool) \
+    x(vkGetDeviceQueue) \
+    x(vkQueueSubmit) \
+    x(vkQueueWaitIdle) \
+    x(vkCreateBuffer) \
+    x(vkAllocateMemory) \
+    x(vkMapMemory) \
+    x(vkUnmapMemory) \
+    x(vkCmdCopyBuffer) \
+    x(vkDestroyBuffer) \
+    x(vkFreeMemory) \
+    x(vkCreateDescriptorSetLayout) \
+    x(vkDestroyDescriptorSetLayout) \
+    x(vkAllocateDescriptorSets) \
+    x(vkUpdateDescriptorSets) \
+    x(vkCreatePipelineLayout) \
+    x(vkDestroyPipelineLayout) \
+    x(vkCreateComputePipelines) \
+    x(vkCreateGraphicsPipelines) \
+    x(vkDestroyPipeline) \
+    x(vkCreateShaderModule) \
+    x(vkDestroyShaderModule) \
     x(vkCreateFramebuffer) \
     x(vkDestroyFramebuffer) \
+    x(vkCreateImage) \
+    x(vkDestroyImage) \
+    x(vkCreateImageView) \
+    x(vkDestroyImageView) \
+    x(vkCreateRenderPass) \
+    x(vkDestroyRenderPass) \
+    x(vkCreateCommandPool) \
+    x(vkDestroyCommandPool) \
+    x(vkCreateSampler) \
+    x(vkDestroySampler) \
+    x(vkCreateBufferView) \
+    x(vkDestroyBufferView) \
     \
-    x(vkCmdBindPipeline)                \
-    x(vkCmdBindDescriptorSets)          \
-    x(vkCmdDispatch)                    \
+    x(vkGetBufferMemoryRequirements) \
+    x(vkGetImageMemoryRequirements) \
+    \
+    x(vkCmdBindPipeline) \
+    x(vkCmdBindDescriptorSets) \
+    x(vkCmdDispatch) \
     x(vkCmdDraw) \
     x(vkCmdSetScissor) \
     x(vkCmdSetViewport) \
@@ -63,6 +76,8 @@ namespace renderer_test {
     x(vkCmdBindIndexBuffer) \
     x(vkCmdBeginRenderPass) \
     x(vkCmdEndRenderPass) \
+    x(vkCmdPipelineBarrier) \
+    x(vkCmdCopyBufferToImage)\
     \
     x(vkCreateFence) \
     x(vkDestroyFence) \
@@ -79,20 +94,14 @@ namespace renderer_test {
     x(vkSetEvent) \
     x(vkResetEvent) \
     \
-    x(vkCreateCommandPool)              \
-    x(vkDestroyCommandPool) \
-    \
-    x(vkFreeCommandBuffers)             \
-    x(vkAllocateCommandBuffers)         \
-    x(vkBeginCommandBuffer)             \
-    x(vkEndCommandBuffer)               \
+    x(vkFreeCommandBuffers) \
+    x(vkAllocateCommandBuffers) \
+    x(vkBeginCommandBuffer) \
+    x(vkEndCommandBuffer) \
     x(vkResetCommandBuffer) \
     \
-    x(vkCreateImageView) \
-    x(vkDestroyImageView) \
-    \
-    x(vkCreateRenderPass) \
-    x(vkDestroyRenderPass) \
+    x(vkBindImageMemory) \
+    x(vkBindBufferMemory) \
     /* */
 
 #if SLANG_WINDOWS_FAMILY

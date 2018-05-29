@@ -11,6 +11,8 @@
 #include "vk-device-queue.h"
 #include "vk-swap-chain.h"
 
+#include "surface.h"
+
 // Vulkan has a different coordinate system to ogl
 // http://anki3d.org/vulkan-coordinate-system/
 
@@ -122,6 +124,40 @@ public:
         MapFlavor m_mapFlavor = MapFlavor::Unknown;         ///< If resource is mapped, records what kind of mapping else Unknown (if not mapped)
     };
 
+    class TextureResourceImpl : public TextureResource
+    {
+    public:
+        typedef TextureResource Parent;
+
+        TextureResourceImpl(Type type, const Desc& desc, Usage initialUsage, const VulkanApi* api) :
+            Parent(type, desc),
+            m_initialUsage(initialUsage),
+            m_api(api)
+        {
+        }
+        ~TextureResourceImpl()
+        {
+            if (m_api)
+            {
+                if (m_imageMemory != VK_NULL_HANDLE)
+                {
+                    m_api->vkFreeMemory(m_api->m_device, m_imageMemory, nullptr);
+                }
+                if (m_image != VK_NULL_HANDLE)
+                {
+                    m_api->vkDestroyImage(m_api->m_device, m_image, nullptr);
+                }
+            }
+        }
+
+        Usage m_initialUsage;
+        
+        VkImage m_image = VK_NULL_HANDLE; 
+        VkDeviceMemory m_imageMemory = VK_NULL_HANDLE;
+        
+        const VulkanApi* m_api;
+    };
+
 	class ShaderProgramImpl: public ShaderProgram
     {
 		public:
@@ -141,9 +177,9 @@ public:
 
     struct BindingDetail
     {
-        VkImageView     m_srv;
-        VkBufferView    m_uav;
-        VkSampler       m_samplerState;
+        VkImageView     m_srv = VK_NULL_HANDLE;
+        VkBufferView    m_uav = VK_NULL_HANDLE;
+        VkSampler       m_sampler = VK_NULL_HANDLE;
         int             m_binding = 0;
     };
 
@@ -152,13 +188,32 @@ public:
 		public:
         typedef BindingState Parent;
 
-		BindingStateImpl(const Desc& desc, VKRenderer* renderer):
+		BindingStateImpl(const Desc& desc, const VulkanApi* api):
             Parent(desc), 
-			m_renderer(renderer)
+			m_api(api)
 		{
 		}
+        ~BindingStateImpl()
+        {
+            for (int i = 0; i < int(m_bindingDetails.Count()); ++i)
+            {
+                BindingDetail& detail = m_bindingDetails[i];
+                if (detail.m_sampler != VK_NULL_HANDLE)
+                {
+                    m_api->vkDestroySampler(m_api->m_device, detail.m_sampler, nullptr);
+                }
+                if (detail.m_srv != VK_NULL_HANDLE)
+                {
+                    m_api->vkDestroyImageView(m_api->m_device, detail.m_srv, nullptr);
+                }
+                if (detail.m_uav != VK_NULL_HANDLE)
+                {
+                    m_api->vkDestroyBufferView(m_api->m_device, detail.m_uav, nullptr);
+                }
+            }
+        }
 
-		VKRenderer* m_renderer;
+        const VulkanApi* m_api;
         List<BindingDetail> m_bindingDetails;
     };
 
@@ -227,6 +282,7 @@ public:
 
     Slang::Result _beginPass();
     void _endPass();
+    void _transitionImageLayout(VkImage image, VkFormat format, const TextureResource::Desc& desc, VkImageLayout oldLayout, VkImageLayout newLayout);
 
     VkDebugReportCallbackEXT m_debugReportCallback;
 
@@ -348,11 +404,20 @@ Slang::Result VKRenderer::_createPipeline(RefPtr<Pipeline>& pipelineOut)
 
     const int numBindings = int(srcBindings.Count());
 
+    int numBuffers = 0;
+    int numImages = 0;
+
+    int numDescriptorByType[VK_DESCRIPTOR_TYPE_RANGE_SIZE] = { 0, };
+
     Slang::List<VkDescriptorSetLayoutBinding> dstBindings;
     for (int i = 0; i < numBindings; ++i)
     {
         const auto& srcDetail = srcDetails[i];
         const auto& srcBinding = srcBindings[i];
+
+        VkDescriptorSetLayoutBinding dstBinding = {};
+        dstBinding.binding = srcDetail.m_binding;
+        dstBinding.descriptorCount = 1;
 
         switch (srcBinding.bindingType)
         {
@@ -363,64 +428,121 @@ Slang::Result VKRenderer::_createPipeline(RefPtr<Pipeline>& pipelineOut)
 
                 if (bufferResourceDesc.bindFlags & Resource::BindFlag::UnorderedAccess)
                 {
-                    VkDescriptorSetLayoutBinding dstBinding = {};
-                    dstBinding.binding = srcDetail.m_binding;
-                    dstBinding.descriptorCount = 1;
                     dstBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
                     dstBinding.stageFlags = VK_SHADER_STAGE_ALL;
-
                     dstBindings.Add(dstBinding);
+
+                    numDescriptorByType[dstBinding.descriptorType] ++;
+                    numBuffers++;
                 }
                 else if (bufferResourceDesc.bindFlags & Resource::BindFlag::ConstantBuffer)
                 {
-                    VkDescriptorSetLayoutBinding dstBinding = {};
-                    dstBinding.binding = srcDetail.m_binding;
-                    dstBinding.descriptorCount = 1;
                     dstBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
                     dstBinding.stageFlags = VK_SHADER_STAGE_ALL;
-
                     dstBindings.Add(dstBinding);
-                }
 
+                    numDescriptorByType[dstBinding.descriptorType] ++;
+                    numBuffers++;
+                }
+                break;
+            }
+            case BindingType::Texture:
+            {
+                dstBinding.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE; 
+                dstBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+                dstBindings.Add(dstBinding);
+
+                numDescriptorByType[dstBinding.descriptorType] ++;
+                numImages++;
+                break;
+            }
+            case BindingType::Sampler:
+            {
+                dstBinding.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER; 
+                dstBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+                dstBindings.Add(dstBinding);
+
+                numDescriptorByType[dstBinding.descriptorType] ++;
+                numImages++;
+                break;
+            }
+
+            case BindingType::CombinedTextureSampler:
+            {
+                dstBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                dstBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+                dstBindings.Add(dstBinding);
+
+                numDescriptorByType[dstBinding.descriptorType] ++;
+                numImages++;
                 break;
             }
             default:
-                // TODO: handle the other cases
-                break;
+            {
+                assert(!"Unhandled type");
+                return SLANG_FAIL;
+            }
         }
     }
 
-    VkDescriptorSetLayoutCreateInfo descriptorSetLayoutInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
-    descriptorSetLayoutInfo.bindingCount = uint32_t(dstBindings.Count());
-    descriptorSetLayoutInfo.pBindings = dstBindings.Buffer();
-
-    SLANG_VK_CHECK(m_api.vkCreateDescriptorSetLayout(m_device, &descriptorSetLayoutInfo, nullptr, &pipeline->m_descriptorSetLayout));
-
     // Create a descriptor pool for allocating sets
-    VkDescriptorPoolSize poolSizes[] =
     {
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 128 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 128 },
-        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 128 },
+#if 0
+        VkDescriptorPoolSize poolSizes[] =
+        {
+            { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 128 },
+            { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 128 },
+            { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 128 },
     };
+#endif
 
-    VkDescriptorPoolCreateInfo descriptorPoolInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
-    descriptorPoolInfo.maxSets = 128; // TODO: actually pick a size
-    descriptorPoolInfo.poolSizeCount = SLANG_COUNT_OF(poolSizes);
-    descriptorPoolInfo.pPoolSizes = poolSizes;
+        List<VkDescriptorPoolSize> poolSizes;
+        for (int i = 0; i < SLANG_COUNT_OF(numDescriptorByType); ++i)
+        {
+            int numDescriptors = numDescriptorByType[i];
+            if (numDescriptors > 0)
+            {
+                const VkDescriptorPoolSize poolSize = { VkDescriptorType(i), uint32_t(numDescriptors) };
+                poolSizes.Add(poolSize);
+            }
+        }
+        VkDescriptorPoolCreateInfo descriptorPoolInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
+   
+        descriptorPoolInfo.maxSets = 128; // TODO: actually pick a size. 
+        descriptorPoolInfo.poolSizeCount = uint32_t(poolSizes.Count());
+        descriptorPoolInfo.pPoolSizes = poolSizes.Buffer();
 
-    SLANG_VK_CHECK(m_api.vkCreateDescriptorPool(m_device, &descriptorPoolInfo, nullptr, &pipeline->m_descriptorPool));
+        SLANG_VK_CHECK(m_api.vkCreateDescriptorPool(m_device, &descriptorPoolInfo, nullptr, &pipeline->m_descriptorPool));
+    }
 
+    // Create the layout
+    {
+        VkDescriptorSetLayoutCreateInfo descriptorSetLayoutInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
+        descriptorSetLayoutInfo.bindingCount = uint32_t(dstBindings.Count());
+        descriptorSetLayoutInfo.pBindings = dstBindings.Buffer();
+
+        SLANG_VK_CHECK(m_api.vkCreateDescriptorSetLayout(m_device, &descriptorSetLayoutInfo, nullptr, &pipeline->m_descriptorSetLayout));
+    } 
+        
     // Create a descriptor set based on our layout
+    {
+        VkDescriptorSetAllocateInfo descriptorSetAllocInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+        descriptorSetAllocInfo.descriptorPool = pipeline->m_descriptorPool;
+        descriptorSetAllocInfo.descriptorSetCount = 1; 
+        descriptorSetAllocInfo.pSetLayouts = &pipeline->m_descriptorSetLayout;
 
-    VkDescriptorSetAllocateInfo descriptorSetAllocInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
-    descriptorSetAllocInfo.descriptorPool = pipeline->m_descriptorPool;
-    descriptorSetAllocInfo.descriptorSetCount = 1;
-    descriptorSetAllocInfo.pSetLayouts = &pipeline->m_descriptorSetLayout;
-
-    SLANG_VK_CHECK(m_api.vkAllocateDescriptorSets(m_device, &descriptorSetAllocInfo, &pipeline->m_descriptorSet));
+        SLANG_VK_CHECK(m_api.vkAllocateDescriptorSets(m_device, &descriptorSetAllocInfo, &pipeline->m_descriptorSet));
+    }
 
     // Fill in the descriptor set, using our binding information
+
+    List<VkDescriptorImageInfo> imageInfos;
+    List<VkDescriptorBufferInfo> bufferInfos;
+    List<VkWriteDescriptorSet> writes;
+
+    // Make sure there is enough space...
+    imageInfos.Reserve(numImages);
+    bufferInfos.Reserve(numBuffers);
 
     int elementIndex = 0;
 
@@ -429,21 +551,29 @@ Slang::Result VKRenderer::_createPipeline(RefPtr<Pipeline>& pipelineOut)
         const auto& srcDetail = srcDetails[i];
         const auto& srcBinding = srcBindings[i];
 
+        VkWriteDescriptorSet writeInfo = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+        writeInfo.descriptorCount = 1;
+        writeInfo.dstSet = pipeline->m_descriptorSet;
+        writeInfo.dstBinding = srcDetail.m_binding;
+        writeInfo.dstArrayElement = 0;
+
         switch (srcBinding.bindingType)
         {
             case BindingType::Buffer:
             {
+                assert(srcBinding.resource && srcBinding.resource->isBuffer());
                 BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(srcBinding.resource.Ptr());
                 const BufferResource::Desc& bufferResourceDesc = bufferResource->getDesc();
 
-                VkDescriptorBufferInfo bufferInfo;
-                bufferInfo.buffer = bufferResource->m_buffer.m_buffer;
-                bufferInfo.offset = 0;
-                bufferInfo.range = bufferResourceDesc.sizeInBytes;
+                {
+                    VkDescriptorBufferInfo bufferInfo;
+                    bufferInfo.buffer = bufferResource->m_buffer.m_buffer;
+                    bufferInfo.offset = 0;
+                    bufferInfo.range = bufferResourceDesc.sizeInBytes;
 
-                VkWriteDescriptorSet writeInfo = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-                writeInfo.descriptorCount = 1;
-                
+                    bufferInfos.Add(bufferInfo);
+                }
+
                 writeInfo.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
                 if (bufferResource->m_initialUsage == Resource::Usage::UnorderedAccess)
                 {
@@ -454,23 +584,62 @@ Slang::Result VKRenderer::_createPipeline(RefPtr<Pipeline>& pipelineOut)
                     writeInfo.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
                 }
 
-                writeInfo.dstSet = pipeline->m_descriptorSet;
-                writeInfo.dstBinding = srcDetail.m_binding;
-                writeInfo.dstArrayElement = 0; 
-                writeInfo.pBufferInfo = &bufferInfo;
+                writeInfo.pBufferInfo = &bufferInfos.Last();
+                
+                writes.Add(writeInfo);
+                break;
+            }
+            case BindingType::Texture:
+            {
+                assert(srcBinding.resource && srcBinding.resource->isTexture());
 
-                m_api.vkUpdateDescriptorSets(m_device, 1, &writeInfo, 0, nullptr);
-           
+                TextureResourceImpl* textureResource = static_cast<TextureResourceImpl*>(srcBinding.resource.Ptr());
+                const TextureResource::Desc& textureResourceDesc = textureResource->getDesc();
+
+                {
+                    VkDescriptorImageInfo imageInfo = {};
+                    imageInfo.imageView = srcDetail.m_srv;
+                    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                    imageInfos.Add(imageInfo);
+                }
+
+                writeInfo.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+                writeInfo.pImageInfo = &imageInfos.Last();
+
+                writes.Add(writeInfo);
+                break;
+            }
+            case BindingType::Sampler:
+            {
+                {
+                    VkDescriptorImageInfo imageInfo = {};
+                    imageInfo.sampler = srcDetail.m_sampler;
+                    //imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                    imageInfos.Add(imageInfo);
+                }
+
+                writeInfo.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+                writeInfo.pImageInfo = &imageInfos.Last();
+
+                writes.Add(writeInfo);
                 break;
             }
             default:
             {
-                // handle other cases
-                break;
+                assert(!"Binding not currently handled");
+                return SLANG_FAIL;
             }
         }
     }
 
+    assert(imageInfos.Count() == numImages);
+    assert(bufferInfos.Count() == numBuffers);
+
+    // Write into the descriptor set
+    {
+        m_api.vkUpdateDescriptorSets(m_device, uint32_t(writes.Count()), writes.Buffer(), 0, nullptr);
+    }
+    
     // Create a pipeline layout based on our descriptor set layout(s)
 
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
@@ -723,8 +892,15 @@ VkBool32 VKRenderer::handleDebugMessage(VkDebugReportFlagsEXT flags, VkDebugRepo
     if (flags & VK_DEBUG_REPORT_ERROR_BIT_EXT)
         severity = "error";
 
-    char buffer[1024];
+    // pMsg can be really big (it can be assembler dump for example)
+    // Use a dynamic buffer to store
+    size_t bufferSize = strlen(pMsg) + 1 + 1024;
+    List<char> bufferArray;
+    bufferArray.SetSize(bufferSize);
+    char* buffer = bufferArray.Buffer();
+
     sprintf_s(buffer,
+        bufferSize,
         "%s: %s %d: %s\n",
         pLayerPrefix,
         severity,
@@ -1020,12 +1196,7 @@ ShaderCompiler* VKRenderer::getShaderCompiler()
     return this;
 }
 
-TextureResource* VKRenderer::createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData)
-{
-    return nullptr;
-}
-
-static VkBufferUsageFlagBits _calcUsageFlagBit(Resource::BindFlag::Enum bind)
+static VkBufferUsageFlagBits _calcBufferUsageFlags(Resource::BindFlag::Enum bind)
 {
     typedef Resource::BindFlag BindFlag;
 
@@ -1041,48 +1212,363 @@ static VkBufferUsageFlagBits _calcUsageFlagBit(Resource::BindFlag::Enum bind)
             assert(!"Not supported yet");
             return VkBufferUsageFlagBits(0);
         }
-        case BindFlag::UnorderedAccess:         return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+        case BindFlag::UnorderedAccess:         return VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT;
         case BindFlag::PixelShaderResource:     return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
         case BindFlag::NonPixelShaderResource:  return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
         default:                                return VkBufferUsageFlagBits(0);
     }
 }
 
-static VkBufferUsageFlagBits _calcUsageFlagBit(int bindFlags)
+static VkBufferUsageFlagBits _calcBufferUsageFlags(int bindFlags)
 {
     int dstFlags = 0;
     while (bindFlags)
     {
         int lsb = bindFlags & -bindFlags;
-        dstFlags |= _calcUsageFlagBit(Resource::BindFlag::Enum(lsb));
+        dstFlags |= _calcBufferUsageFlags(Resource::BindFlag::Enum(lsb));
         bindFlags &= ~lsb;
     }
     return VkBufferUsageFlagBits(dstFlags);
 }
 
-BufferResource* VKRenderer::createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& descIn, const void* initData)
+static VkBufferUsageFlags _calcBufferUsageFlags(int bindFlags, int cpuAccessFlags, const void* initData)
 {
-    BufferResource::Desc desc(descIn);
-    if (desc.bindFlags == 0)
-    {
-        desc.bindFlags = Resource::s_requiredBinding[int(initialUsage)];
-    }
+    VkBufferUsageFlags usage = _calcBufferUsageFlags(bindFlags);
 
-    const size_t bufferSize = desc.sizeInBytes;
-
-    VkBufferUsageFlags usage = _calcUsageFlagBit(desc.bindFlags);
-    VkMemoryPropertyFlags reqMemoryProperties = 0;
-
-    if (desc.cpuAccessFlags & Resource::AccessFlag::Read)
+    if (cpuAccessFlags & Resource::AccessFlag::Read)
     {
         // If it can be read from, set this
         usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
     }
-    if ((desc.cpuAccessFlags & Resource::AccessFlag::Write) || initData)
+    if ((cpuAccessFlags & Resource::AccessFlag::Write) || initData)
     {
         usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     }
 
+    return usage;    
+}
+
+static VkImageUsageFlagBits _calcImageUsageFlags(Resource::BindFlag::Enum bind)
+{
+    typedef Resource::BindFlag BindFlag;
+
+    switch (bind)
+    {
+        case BindFlag::RenderTarget:            return VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+        case BindFlag::DepthStencil:            return VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+        case BindFlag::NonPixelShaderResource:
+        case BindFlag::PixelShaderResource:
+        {
+            // Ignore
+            return VkImageUsageFlagBits(0);
+        }
+        default:
+        {
+            assert(!"Unsupported");
+            return VkImageUsageFlagBits(0);
+        }
+    }
+}
+
+static VkImageUsageFlagBits _calcImageUsageFlags(int bindFlags)
+{
+    int dstFlags = 0;
+    while (bindFlags)
+    {
+        int lsb = bindFlags & -bindFlags;
+        dstFlags |= _calcImageUsageFlags(Resource::BindFlag::Enum(lsb));
+        bindFlags &= ~lsb;
+    }
+    return VkImageUsageFlagBits(dstFlags);
+}
+
+static VkImageUsageFlags _calcImageUsageFlags(int bindFlags, int cpuAccessFlags, const void* initData)
+{
+    VkImageUsageFlags usage = _calcImageUsageFlags(bindFlags);
+    
+    usage |= VK_IMAGE_USAGE_SAMPLED_BIT;
+
+    if (cpuAccessFlags & Resource::AccessFlag::Read)
+    {
+        // If it can be read from, set this
+        usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    }
+    if ((cpuAccessFlags & Resource::AccessFlag::Write) || initData)
+    {
+        usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    }
+
+    return usage;
+}
+
+void VKRenderer::_transitionImageLayout(VkImage image, VkFormat format, const TextureResource::Desc& desc, VkImageLayout oldLayout, VkImageLayout newLayout) 
+{
+    VkImageMemoryBarrier barrier = {};
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.oldLayout = oldLayout;
+    barrier.newLayout = newLayout;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image = image;
+    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barrier.subresourceRange.baseMipLevel = 0;
+    barrier.subresourceRange.levelCount = desc.numMipLevels;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = 1;
+
+    VkPipelineStageFlags sourceStage;
+    VkPipelineStageFlags destinationStage;
+
+    if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) 
+    {
+        barrier.srcAccessMask = 0;
+        barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+        sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    }
+    else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) 
+    {
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+        sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    }
+    else 
+    {
+        assert(!"unsupported layout transition!");
+        return;
+    }
+
+    VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
+
+    m_api.vkCmdPipelineBarrier(commandBuffer, sourceStage, destinationStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+}
+
+TextureResource* VKRenderer::createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& descIn, const TextureResource::Data* initData)
+{
+    TextureResource::Desc desc(descIn);
+    desc.setDefaults(type, initialUsage);
+
+    const VkFormat format = VulkanUtil::getVkFormat(desc.format);
+    if (format == VK_FORMAT_UNDEFINED)
+    {
+        assert(!"Unhandled image format");
+        return nullptr;
+    }
+
+    const int arraySize = desc.calcEffectiveArraySize(type);
+
+    RefPtr<TextureResourceImpl> texture(new TextureResourceImpl(type, desc, initialUsage, &m_api));
+
+    // Create the image
+    {
+        VkImageCreateInfo imageInfo = {VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
+
+        switch (type)
+        {
+            case Resource::Type::Texture1D:
+            {
+                imageInfo.imageType = VK_IMAGE_TYPE_1D;
+                imageInfo.extent = VkExtent3D{ uint32_t(descIn.size.width), 1, 1 };
+                break;
+            }
+            case Resource::Type::Texture2D:
+            {
+                imageInfo.imageType = VK_IMAGE_TYPE_2D;
+                imageInfo.extent = VkExtent3D{ uint32_t(descIn.size.width), uint32_t(descIn.size.height), 1 };
+                break;
+            }
+            case Resource::Type::TextureCube:
+            {
+                imageInfo.imageType = VK_IMAGE_TYPE_2D;
+                imageInfo.extent = VkExtent3D{ uint32_t(descIn.size.width), uint32_t(descIn.size.height), 1 };
+                break;
+            }
+            case Resource::Type::Texture3D:
+            {
+                // Can't have an array and 3d texture
+                assert(desc.arraySize <= 1);
+
+                imageInfo.imageType = VK_IMAGE_TYPE_3D;
+                imageInfo.extent = VkExtent3D{ uint32_t(descIn.size.width), uint32_t(descIn.size.height), uint32_t(descIn.size.depth) };
+                break;
+            }
+            default:
+            {
+                assert(!"Unhandled type");
+                return nullptr;
+            }
+        }
+
+        imageInfo.mipLevels = desc.numMipLevels;
+        imageInfo.arrayLayers = arraySize;
+        
+        imageInfo.format = format;
+
+        imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;    
+        imageInfo.usage = _calcImageUsageFlags(desc.bindFlags, desc.cpuAccessFlags, initData);
+        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+        imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+        imageInfo.flags = 0; // Optional
+
+        SLANG_VK_RETURN_NULL_ON_FAIL(m_api.vkCreateImage(m_device, &imageInfo, nullptr, &texture->m_image));
+    }
+    
+    VkMemoryRequirements memRequirements;
+    m_api.vkGetImageMemoryRequirements(m_device, texture->m_image, &memRequirements);
+
+    // Allocate the memory
+    {
+        VkMemoryPropertyFlags reqMemoryProperties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+
+        VkMemoryAllocateInfo allocInfo = {VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
+   
+        int memoryTypeIndex = m_api.findMemoryTypeIndex(memRequirements.memoryTypeBits, reqMemoryProperties);
+        assert(memoryTypeIndex >= 0);
+        
+        VkMemoryPropertyFlags actualMemoryProperites = m_api.m_deviceMemoryProperties.memoryTypes[memoryTypeIndex].propertyFlags;
+    
+        allocInfo.allocationSize = memRequirements.size;
+        allocInfo.memoryTypeIndex = memoryTypeIndex;
+
+        SLANG_VK_RETURN_NULL_ON_FAIL(m_api.vkAllocateMemory(m_device, &allocInfo, nullptr, &texture->m_imageMemory));
+    }
+    
+    // Bind the memory to the image
+    m_api.vkBindImageMemory(m_device, texture->m_image, texture->m_imageMemory, 0);
+
+    if (initData)
+    {
+        List<TextureResource::Size> mipSizes;
+
+        VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
+
+        const int numMipMaps = desc.numMipLevels;
+        assert(initData->numMips == numMipMaps);
+
+        // Calculate how large the buffer has to be
+        size_t bufferSize = 0;
+        // Calculate how large an array entry is
+        for (int j = 0; j < numMipMaps; ++j)
+        {
+            const TextureResource::Size mipSize = desc.size.calcMipSize(j);
+
+            const int rowSizeInBytes = Surface::calcRowSize(desc.format, mipSize.width);
+            const int numRows =  Surface::calcNumRows(desc.format, mipSize.height);
+
+            mipSizes.Add(mipSize);
+
+            bufferSize += (rowSizeInBytes * numRows) * mipSize.depth;
+        }
+
+        
+        // Calculate the total size taking into account the array 
+        bufferSize *= arraySize;
+
+        Buffer uploadBuffer;
+        SLANG_RETURN_NULL_ON_FAIL(uploadBuffer.init(m_api, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
+
+        assert(mipSizes.Count() == numMipMaps);
+
+        // Copy into upload buffer
+        {
+            int subResourceIndex = 0;
+
+            uint8_t* dstData;
+            m_api.vkMapMemory(m_device, uploadBuffer.m_memory, 0, bufferSize, 0, (void**)&dstData);
+            
+            for (int i = 0; i < arraySize; ++i)
+            {
+                for (int j = 0; j < int(mipSizes.Count()); ++j)
+                {
+                    const auto& mipSize = mipSizes[j];
+
+                    const ptrdiff_t srcRowStride = initData->mipRowStrides[j];
+                    const int dstRowSizeInBytes = Surface::calcRowSize(desc.format, mipSize.width);
+                    const int numRows = Surface::calcNumRows(desc.format, mipSize.height);
+
+                    for (int k = 0; k < mipSize.depth; k++)
+                    {
+                        const uint8_t* srcData = (const uint8_t*)(initData->subResources[subResourceIndex]); 
+
+                        for (int l = 0; l < numRows; l++)
+                        {
+                            ::memcpy(dstData, srcData, dstRowSizeInBytes);
+                            
+                            dstData += dstRowSizeInBytes;
+                            srcData += srcRowStride;
+                        }
+
+                        subResourceIndex++;
+                    }
+                }
+            }
+
+            m_api.vkUnmapMemory(m_device, uploadBuffer.m_memory);
+        }
+
+        _transitionImageLayout(texture->m_image, format, texture->getDesc(), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        
+        {
+            size_t srcOffset = 0;
+            for (int i = 0; i < arraySize; ++i)
+            {
+                for (int j = 0; j < int(mipSizes.Count()); ++j)
+                {
+                    const auto& mipSize = mipSizes[j];
+                    
+                    const int rowSizeInBytes = Surface::calcRowSize(desc.format, mipSize.width);
+                    const int numRows = Surface::calcNumRows(desc.format, mipSize.height);
+
+                    // https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkBufferImageCopy.html
+                    // bufferRowLength and bufferImageHeight specify the data in buffer memory as a subregion of a larger two- or three-dimensional image,
+                    // and control the addressing calculations of data in buffer memory. If either of these values is zero, that aspect of the buffer memory 
+                    // is considered to be tightly packed according to the imageExtent.
+
+                    VkBufferImageCopy region = {};
+
+                    region.bufferOffset = srcOffset;
+                    region.bufferRowLength = 0; //rowSizeInBytes;
+                    region.bufferImageHeight = 0; 
+                    
+                    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                    region.imageSubresource.mipLevel = j;
+                    region.imageSubresource.baseArrayLayer = i;
+                    region.imageSubresource.layerCount = 1;
+                    region.imageOffset = { 0, 0, 0 };
+                    region.imageExtent = { uint32_t(mipSize.width), uint32_t(mipSize.height), uint32_t(mipSize.depth) };
+
+                    // Do the copy (do all depths in a single go)
+                    m_api.vkCmdCopyBufferToImage(commandBuffer, uploadBuffer.m_buffer, texture->m_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+
+                    // Next
+                    srcOffset += rowSizeInBytes * numRows * mipSize.depth;
+                }
+            }
+        }
+
+        _transitionImageLayout(texture->m_image, format, texture->getDesc(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+        m_deviceQueue.flushAndWait();
+    }
+
+    return texture.detach();
+}
+
+BufferResource* VKRenderer::createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& descIn, const void* initData)
+{
+    BufferResource::Desc desc(descIn);
+    desc.setDefaults(initialUsage);
+
+    const size_t bufferSize = desc.sizeInBytes;
+
+    VkMemoryPropertyFlags reqMemoryProperties = 0;
+
+    VkBufferUsageFlags usage = _calcBufferUsageFlags(desc.bindFlags, desc.cpuAccessFlags, initData);
+    
     switch (initialUsage)
     {
         case Resource::Usage::ConstantBuffer:
@@ -1347,9 +1833,33 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
     m_api.vkCmdDispatch(commandBuffer, x, y, z);
 }
 
+static VkImageViewType _calcImageViewType(TextureResource::Type type, const TextureResource::Desc& desc)
+{
+    switch (type)
+    {
+        case Resource::Type::Texture1D:        return desc.arraySize > 1 ? VK_IMAGE_VIEW_TYPE_1D_ARRAY : VK_IMAGE_VIEW_TYPE_1D;
+        case Resource::Type::Texture2D:        return desc.arraySize > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
+        case Resource::Type::TextureCube:      return desc.arraySize > 1 ? VK_IMAGE_VIEW_TYPE_CUBE_ARRAY : VK_IMAGE_VIEW_TYPE_CUBE;
+        case Resource::Type::Texture3D:
+        {
+            // Can't have an array and 3d texture
+            assert(desc.arraySize <= 1);
+            if (desc.arraySize <= 1)
+            {
+                return VK_IMAGE_VIEW_TYPE_3D;
+            }
+            break;
+        }
+        default: break;
+    }
+
+    return VK_IMAGE_VIEW_TYPE_MAX_ENUM;
+}
+
+
 BindingState* VKRenderer::createBindingState(const BindingState::Desc& bindingStateDesc)
 {   
-    RefPtr<BindingStateImpl> bindingState(new BindingStateImpl(bindingStateDesc, this));
+    RefPtr<BindingStateImpl> bindingState(new BindingStateImpl(bindingStateDesc, &m_api));
 
     const auto& srcBindings = bindingStateDesc.m_bindings;
     const int numBindings = int(srcBindings.Count());
@@ -1369,20 +1879,116 @@ BindingState* VKRenderer::createBindingState(const BindingState::Desc& bindingSt
         {
             case BindingType::Buffer:
             {
-                assert(srcBinding.resource && srcBinding.resource->isBuffer());
-                //BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(srcBinding.resource.Ptr());
-                //const BufferResource::Desc& bufferResourceDesc = bufferResource->getDesc();
+                if (!srcBinding.resource || !srcBinding.resource->isBuffer())
+                {
+                    assert(!"Needs to have a buffer resource set");
+                    return nullptr;
+                }
+
+                BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(srcBinding.resource.Ptr());
+                const BufferResource::Desc& bufferResourceDesc = bufferResource->getDesc();
+
+                if (bufferResourceDesc.bindFlags & Resource::BindFlag::UnorderedAccess)
+                {
+                    // VkBufferView uav
+
+                    VkBufferViewCreateInfo info = { VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO };
+
+                    info.format = VK_FORMAT_R32_SFLOAT;
+                    // TODO:
+                    // Not sure how to handle typeless?
+                    if (bufferResourceDesc.elementSize == 0)
+                    {
+                        info.format = VK_FORMAT_R32_SFLOAT;  // DXGI_FORMAT_R32_TYPELESS ? 
+                    }
+
+                    info.buffer = bufferResource->m_buffer.m_buffer;
+                    info.offset = 0;
+                    info.range = bufferResourceDesc.sizeInBytes;
+
+                    SLANG_VK_RETURN_NULL_ON_FAIL(m_api.vkCreateBufferView(m_device, &info, nullptr, &dstDetail.m_uav));
+                }
 
                 // TODO: Setup views. 
-                // VkBufferView uav
                 // VkImageView srv
+
+
+                break;
+            }
+            case BindingType::Sampler:
+            {
+                VkSamplerCreateInfo samplerInfo = { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
+                
+                samplerInfo.magFilter = VK_FILTER_LINEAR;
+                samplerInfo.minFilter = VK_FILTER_LINEAR;
+                
+                samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+                samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+                samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+
+                samplerInfo.anisotropyEnable = VK_FALSE;
+                samplerInfo.maxAnisotropy = 1;
+
+                samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+                samplerInfo.unnormalizedCoordinates = VK_FALSE;
+                samplerInfo.compareEnable = VK_FALSE;
+                samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+                samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+
+                SLANG_VK_RETURN_NULL_ON_FAIL(m_api.vkCreateSampler(m_device, &samplerInfo, nullptr, &dstDetail.m_sampler));
+
                 break;
             }
             case BindingType::Texture:
-            case BindingType::Sampler:
+            {
+                if (!srcBinding.resource || !srcBinding.resource->isTexture())
+                {
+                    assert(!"Needs to have a texture resource set");
+                    return nullptr;
+                }
+
+                TextureResourceImpl* textureResource = static_cast<TextureResourceImpl*>(srcBinding.resource.Ptr());
+                const TextureResource::Desc& texDesc = textureResource->getDesc();
+
+                VkImageViewType imageViewType = _calcImageViewType(textureResource->getType(), texDesc);
+                if (imageViewType == VK_IMAGE_VIEW_TYPE_MAX_ENUM)
+                {
+                    assert(!"Invalid view type");
+                    return nullptr;
+                }
+                const VkFormat format = VulkanUtil::getVkFormat(texDesc.format);
+                if (format == VK_FORMAT_UNDEFINED)
+                {
+                    assert(!"Unhandled image format");
+                    return nullptr;
+                }
+
+                // Create the image view
+                
+                VkImageViewCreateInfo viewInfo = {};
+                viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+                viewInfo.image = textureResource->m_image;
+                viewInfo.viewType = imageViewType;
+                viewInfo.format = format;
+                viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                viewInfo.subresourceRange.baseMipLevel = 0;
+                viewInfo.subresourceRange.levelCount = 1;
+                viewInfo.subresourceRange.baseArrayLayer = 0;
+                viewInfo.subresourceRange.layerCount = 1;
+
+                viewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+                viewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+                viewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+                viewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+                SLANG_VK_RETURN_NULL_ON_FAIL(m_api.vkCreateImageView(m_device, &viewInfo, nullptr, &dstDetail.m_srv));
+                
+                break;
+            }
             case BindingType::CombinedTextureSampler:
             {
                 assert(!"not implemented");
+                return nullptr;
             }
         }
     }
