@@ -952,6 +952,16 @@ SLANG_API void spSetTargetFlags(
     req->targets[targetIndex]->targetFlags = flags;
 }
 
+SLANG_API void spSetTargetMatrixLayoutMode(
+    SlangCompileRequest*    request,
+    int                     targetIndex,
+    SlangMatrixLayoutMode   mode)
+{
+    auto req = REQ(request);
+    req->targets[targetIndex]->defaultMatrixLayoutMode = Slang::MatrixLayoutMode(mode);
+}
+
+
 SLANG_API void spSetOutputContainerFormat(
     SlangCompileRequest*    request,
     SlangContainerFormat    format)

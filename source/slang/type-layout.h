@@ -361,16 +361,6 @@ public:
 };
 
 
-// When storing the layout for a matrix-type
-// value, we need to know whether it has been
-// laid ot with row-major or column-major
-// storage.
-//
-enum MatrixLayoutMode
-{
-    kMatrixLayoutMode_RowMajor,
-    kMatrixLayoutMode_ColumnMajor,
-};
 class MatrixTypeLayout : public TypeLayout
 {
 public:
@@ -603,8 +593,6 @@ struct LayoutRulesImpl
     //
 
     LayoutRulesFamilyImpl* getLayoutRulesFamily() { return family; }
-
-    MatrixLayoutMode getDefaultMatrixLayoutMode();
 };
 
 struct LayoutRulesFamilyImpl
@@ -617,8 +605,6 @@ struct LayoutRulesFamilyImpl
     virtual LayoutRulesImpl* getSpecializationConstantRules()= 0;
     virtual LayoutRulesImpl* getShaderStorageBufferRules()  = 0;
     virtual LayoutRulesImpl* getParameterBlockRules()       = 0;
-
-    virtual MatrixLayoutMode getDefaultMatrixLayoutMode() = 0;
 };
 
 struct TypeLayoutContext

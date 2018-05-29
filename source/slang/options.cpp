@@ -247,6 +247,8 @@ struct OptionsParser
 
         //
 
+        SlangMatrixLayoutMode defaultMatrixLayoutMode = SLANG_MATRIX_LAYOUT_MODE_UNKNOWN;
+
         char const* const* argCursor = &argv[0];
         char const* const* argEnd = &argv[argc];
         while (argCursor != argEnd)
@@ -487,6 +489,14 @@ struct OptionsParser
                     if (!outputPath) continue;
 
                     addOutputPath(outputPath);
+                }
+                else if(argStr == "-matrix-layout-row-major")
+                {
+                    defaultMatrixLayoutMode = kMatrixLayoutMode_RowMajor;
+                }
+                else if(argStr == "-matrix-layout-column-major")
+                {
+                    defaultMatrixLayoutMode = kMatrixLayoutMode_ColumnMajor;
                 }
                 else if (argStr == "--")
                 {
@@ -743,6 +753,15 @@ struct OptionsParser
         if(targetFlags)
         {
             spSetTargetFlags(compileRequest, 0, targetFlags);
+        }
+
+        if(defaultMatrixLayoutMode != SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)
+        {
+            UInt targetCount = requestImpl->targets.Count();
+            for(UInt tt = 0; tt < targetCount; ++tt)
+            {
+                spSetTargetMatrixLayoutMode(compileRequest, tt, defaultMatrixLayoutMode);
+            }
         }
 
         // Next, we want to make sure that entry points get attached to the appropriate translation
