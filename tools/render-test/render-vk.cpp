@@ -39,7 +39,7 @@ public:
     virtual void setClearColor(const float color[4]) override;
     virtual void clearFrame() override;
     virtual void presentFrame() override;
-    virtual TextureResource* createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData) override;
+    virtual TextureResource* createTextureResource(Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData) override;
     virtual BufferResource* createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& bufferDesc, const void* initData) override;
     virtual SlangResult captureScreenSurface(Surface& surface) override;
     virtual InputLayout* createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) override;
@@ -129,8 +129,8 @@ public:
     public:
         typedef TextureResource Parent;
 
-        TextureResourceImpl(Type type, const Desc& desc, Usage initialUsage, const VulkanApi* api) :
-            Parent(type, desc),
+        TextureResourceImpl(const Desc& desc, Usage initialUsage, const VulkanApi* api) :
+            Parent(desc),
             m_initialUsage(initialUsage),
             m_api(api)
         {
@@ -1346,10 +1346,10 @@ void VKRenderer::_transitionImageLayout(VkImage image, VkFormat format, const Te
     m_api.vkCmdPipelineBarrier(commandBuffer, sourceStage, destinationStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 }
 
-TextureResource* VKRenderer::createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& descIn, const TextureResource::Data* initData)
+TextureResource* VKRenderer::createTextureResource(Resource::Usage initialUsage, const TextureResource::Desc& descIn, const TextureResource::Data* initData)
 {
     TextureResource::Desc desc(descIn);
-    desc.setDefaults(type, initialUsage);
+    desc.setDefaults(initialUsage);
 
     const VkFormat format = VulkanUtil::getVkFormat(desc.format);
     if (format == VK_FORMAT_UNDEFINED)
@@ -1358,15 +1358,15 @@ TextureResource* VKRenderer::createTextureResource(Resource::Type type, Resource
         return nullptr;
     }
 
-    const int arraySize = desc.calcEffectiveArraySize(type);
+    const int arraySize = desc.calcEffectiveArraySize();
 
-    RefPtr<TextureResourceImpl> texture(new TextureResourceImpl(type, desc, initialUsage, &m_api));
+    RefPtr<TextureResourceImpl> texture(new TextureResourceImpl(desc, initialUsage, &m_api));
 
     // Create the image
     {
         VkImageCreateInfo imageInfo = {VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
 
-        switch (type)
+        switch (desc.type)
         {
             case Resource::Type::Texture1D:
             {

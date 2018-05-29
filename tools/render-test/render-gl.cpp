@@ -84,7 +84,7 @@ public:
     virtual void setClearColor(const float color[4]) override;
     virtual void clearFrame() override;
     virtual void presentFrame() override;
-    virtual TextureResource* createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData) override;
+    virtual TextureResource* createTextureResource(Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData) override;
     virtual BufferResource* createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& descIn, const void* initData) override;
     virtual SlangResult captureScreenSurface(Surface& surfaceOut) override;
     virtual InputLayout* createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) override;
@@ -164,8 +164,8 @@ public:
         public:
         typedef TextureResource Parent;
 
-        TextureResourceImpl(Type type, Usage initialUsage, const Desc& desc, GLRenderer* renderer):
-            Parent(type, desc),
+        TextureResourceImpl(Usage initialUsage, const Desc& desc, GLRenderer* renderer):
+            Parent(desc),
             m_initialUsage(initialUsage),
             m_renderer(renderer)
         {
@@ -598,10 +598,10 @@ ShaderCompiler* GLRenderer::getShaderCompiler()
     return this;
 }
 
-TextureResource* GLRenderer::createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& descIn, const TextureResource::Data* initData)
+TextureResource* GLRenderer::createTextureResource(Resource::Usage initialUsage, const TextureResource::Desc& descIn, const TextureResource::Data* initData)
 {
     TextureResource::Desc srcDesc(descIn);
-    srcDesc.setDefaults(type, initialUsage);
+    srcDesc.setDefaults(initialUsage);
 
     GlPixelFormat pixelFormat = _getGlPixelFormat(srcDesc.format);
     if (pixelFormat == GlPixelFormat::Unknown)
@@ -615,13 +615,13 @@ TextureResource* GLRenderer::createTextureResource(Resource::Type type, Resource
     const GLenum format = info.format;
     const GLenum formatType = info.formatType;
     
-    RefPtr<TextureResourceImpl> texture(new TextureResourceImpl(type, initialUsage, srcDesc, this));
+    RefPtr<TextureResourceImpl> texture(new TextureResourceImpl(initialUsage, srcDesc, this));
 
     GLenum target = 0;
     GLuint handle = 0;
     glGenTextures(1, &handle);
 
-    const int effectiveArraySize = srcDesc.calcEffectiveArraySize(type);
+    const int effectiveArraySize = srcDesc.calcEffectiveArraySize();
 
     assert(initData);
     assert(initData->numSubResources == srcDesc.numMipLevels * srcDesc.size.depth * effectiveArraySize);
@@ -630,7 +630,7 @@ TextureResource* GLRenderer::createTextureResource(Resource::Type type, Resource
     texture->m_handle = handle;
     const void*const*const data = initData->subResources;
 
-    switch (type)
+    switch (srcDesc.type)
     {
         case Resource::Type::Texture1D:
         {
@@ -664,7 +664,7 @@ TextureResource* GLRenderer::createTextureResource(Resource::Type type, Resource
         {
             if (srcDesc.arraySize > 0)
             {
-                if (type == Resource::Type::TextureCube)
+                if (srcDesc.type == Resource::Type::TextureCube)
                 {
                     target = GL_TEXTURE_CUBE_MAP_ARRAY;
                 }
@@ -686,7 +686,7 @@ TextureResource* GLRenderer::createTextureResource(Resource::Type type, Resource
             }
             else
             {
-                if (type == Resource::Type::TextureCube)
+                if (srcDesc.type == Resource::Type::TextureCube)
                 {
                     target = GL_TEXTURE_CUBE_MAP;
                     glBindTexture(target, handle);

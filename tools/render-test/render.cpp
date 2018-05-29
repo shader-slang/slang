@@ -59,10 +59,19 @@ const Resource::DescBase& Resource::getDescBase() const
     uint8_t(sizeof(uint32_t)),       // D_Unorm24_S8,
 };
 
+/* static */const BindingStyle RendererUtil::s_rendererTypeToBindingStyle[] =
+{
+    BindingStyle::Unknown,      // Unknown,
+    BindingStyle::DirectX,      // DirectX11,
+    BindingStyle::DirectX,      // DirectX12,
+    BindingStyle::OpenGl,       // OpenGl,
+    BindingStyle::Vulkan,       // Vulkan
+};
 
 /* static */void RendererUtil::compileTimeAsserts()
 {
     SLANG_COMPILE_TIME_ASSERT(SLANG_COUNT_OF(s_formatSize) == int(Format::CountOf));
+    SLANG_COMPILE_TIME_ASSERT(SLANG_COUNT_OF(s_rendererTypeToBindingStyle) == int(RendererType::CountOf));
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!! BindingState::Desc !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -236,15 +245,15 @@ void BufferResource::Desc::setDefaults(Usage initialUsage)
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! TextureResource::Desc !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-int TextureResource::Desc::calcNumMipLevels(Type type) const
+int TextureResource::Desc::calcNumMipLevels() const
 {
     const int maxDimensionSize = this->size.calcMaxDimension(type);
     return (maxDimensionSize > 0) ? (Math::Log2Floor(maxDimensionSize) + 1) : 0;
 }
 
-int TextureResource::Desc::calcNumSubResources(Type type) const
+int TextureResource::Desc::calcNumSubResources() const
 {
-    const int numMipMaps = (this->numMipLevels > 0) ? this->numMipLevels : calcNumMipLevels(type);
+    const int numMipMaps = (this->numMipLevels > 0) ? this->numMipLevels : calcNumMipLevels();
     const int arrSize = (this->arraySize > 0) ? this->arraySize : 1;
 
     switch (type)
@@ -269,7 +278,7 @@ int TextureResource::Desc::calcNumSubResources(Type type) const
     } 
 }
 
-void TextureResource::Desc::fixSize(Type type)
+void TextureResource::Desc::fixSize()
 {
     switch (type)
     {
@@ -295,20 +304,20 @@ void TextureResource::Desc::fixSize(Type type)
     }
 }
 
-void TextureResource::Desc::setDefaults(Type type, Usage initialUsage)
+void TextureResource::Desc::setDefaults(Usage initialUsage)
 {
-    fixSize(type);
+    fixSize();
     if (this->bindFlags == 0)
     {
         this->bindFlags = Resource::s_requiredBinding[int(initialUsage)];
     }
     if (this->numMipLevels <= 0)
     {
-        this->numMipLevels = calcNumMipLevels(type);
+        this->numMipLevels = calcNumMipLevels();
     }
 }
 
-int TextureResource::Desc::calcEffectiveArraySize(Type type) const
+int TextureResource::Desc::calcEffectiveArraySize() const
 {
     const int arrSize = (this->arraySize > 0) ? this->arraySize : 1;
 
@@ -325,8 +334,9 @@ int TextureResource::Desc::calcEffectiveArraySize(Type type) const
     }
 }
 
-void TextureResource::Desc::init()
+void TextureResource::Desc::init(Type typeIn)
 {
+    this->type = typeIn;
     this->size.init();
     
     this->format = Format::Unknown;
@@ -340,6 +350,7 @@ void TextureResource::Desc::init()
 
 void TextureResource::Desc::init1D(Format formatIn, int widthIn, int numMipMapsIn)
 {
+    this->type = Type::Texture1D;
     this->size.init(widthIn);
     
     this->format = format;
@@ -351,8 +362,11 @@ void TextureResource::Desc::init1D(Format formatIn, int widthIn, int numMipMapsI
     this->cpuAccessFlags = 0; 
 }
 
-void TextureResource::Desc::init2D(Format formatIn, int widthIn, int heightIn, int numMipMapsIn)
+void TextureResource::Desc::init2D(Type typeIn, Format formatIn, int widthIn, int heightIn, int numMipMapsIn)
 {
+    assert(typeIn == Type::Texture2D || typeIn == Type::TextureCube);
+
+    this->type = type;
     this->size.init(widthIn, heightIn);
     
     this->format = format;
@@ -366,6 +380,7 @@ void TextureResource::Desc::init2D(Format formatIn, int widthIn, int heightIn, i
 
 void TextureResource::Desc::init3D(Format formatIn, int widthIn, int heightIn, int depthIn, int numMipMapsIn)
 {
+    this->type = Type::Texture3D;
     this->size.init(widthIn, heightIn, depthIn);
 
     this->format = format;

@@ -51,6 +51,16 @@ enum class ProjectionStyle
     CountOf,
 };
 
+/// The style of the binding
+enum class BindingStyle
+{
+    Unknown,
+    DirectX,
+    OpenGl,
+    Vulkan,
+    CountOf,
+};
+
 class ShaderProgram: public Slang::RefObject
 {
 	public:
@@ -200,6 +210,8 @@ class Resource: public Slang::RefObject
         bool canBind(BindFlag::Enum bindFlag) const { return (bindFlags & bindFlag) != 0; }
         bool hasCpuAccessFlag(AccessFlag::Enum accessFlag) { return (cpuAccessFlags & accessFlag) != 0; }
 
+        Type type = Type::Unknown;
+
         int bindFlags = 0;          ///< Combination of Resource::BindFlag or 0 (and will use initialUsage to set)
         int cpuAccessFlags = 0;     ///< Combination of Resource::AccessFlag 
     };
@@ -303,28 +315,28 @@ class TextureResource: public Resource
     struct Desc: public DescBase
     {
             /// Initialize with default values
-        void init();
+        void init(Type typeIn);
             /// Initialize different dimensions. For cubemap, use init2D
         void init1D(Format format, int width, int numMipMaps = 0);
-        void init2D(Format format, int width, int height, int numMipMaps = 0);
+        void init2D(Type typeIn, Format format, int width, int height, int numMipMaps = 0);
         void init3D(Format format, int width, int height, int depth, int numMipMaps = 0);
 
             /// Given the type, calculates the number of mip maps. 0 on error
-        int calcNumMipLevels(Type type) const;
+        int calcNumMipLevels() const;
             /// Calculate the total number of sub resources. 0 on error.
-        int calcNumSubResources(Type type) const;
+        int calcNumSubResources() const;
 
             /// Calculate the effective array size - in essence the amount if mip map sets needed. 
             /// In practice takes into account if the arraySize is 0 (it's not an array, but it will still have at least one mip set) 
             /// and if the type is a cubemap (multiplies the amount of mip sets by 6) 
-        int calcEffectiveArraySize(Type type) const;
+        int calcEffectiveArraySize() const;
 
             /// Use type to fix the size values (and array size). 
             /// For example a 1d texture, should have height and depth set to 1.
-        void fixSize(Type type);
+        void fixSize();
 
             /// Set up default parameters based on type and usage
-        void setDefaults(Type type, Usage initialUsage);
+        void setDefaults(Usage initialUsage);
 
         Size size; 
 
@@ -351,8 +363,8 @@ class TextureResource: public Resource
     SLANG_FORCE_INLINE const Desc& getDesc() const { return m_desc; }
 
         /// Ctor
-    TextureResource(Type type, const Desc& desc):
-        Parent(type),
+    TextureResource(const Desc& desc):
+        Parent(desc.type),
         m_desc(desc)
     {
     }
@@ -551,7 +563,7 @@ public:
     virtual void presentFrame() = 0;
 
         /// Create a texture resource. initData holds the initialize data to set the contents of the texture when constructed. 
-    virtual TextureResource* createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData = nullptr) { return nullptr; }
+    virtual TextureResource* createTextureResource(Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData = nullptr) { return nullptr; }
         /// Create a buffer resource
     virtual BufferResource* createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& desc, const void* initData = nullptr) { return nullptr; } 
 
@@ -604,9 +616,13 @@ struct RendererUtil
         /// Given the projection style returns an 'identity' matrix, which ensures x,y mapping to pixels is the same on all targets
     static void getIdentityProjection(ProjectionStyle style, float projMatrix[16]);
 
+        /// Get the binding style from the type
+    static BindingStyle getBindingStyle(RendererType type) { return s_rendererTypeToBindingStyle[int(type)]; }
+
     private:
     static void compileTimeAsserts();
     static const uint8_t s_formatSize[]; // Maps Format::XXX to a size in bytes;
+    static const BindingStyle s_rendererTypeToBindingStyle[];           ///< Maps a RendererType to a BindingStyle
 };
 
 } // renderer_test

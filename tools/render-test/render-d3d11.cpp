@@ -50,7 +50,7 @@ public:
     virtual void setClearColor(const float color[4]) override;
     virtual void clearFrame() override;
     virtual void presentFrame() override;
-    virtual TextureResource* createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData) override;
+    virtual TextureResource* createTextureResource(Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData) override;
     virtual BufferResource* createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& bufferDesc, const void* initData) override;
     virtual SlangResult captureScreenSurface(Surface& surfaceOut) override;
     virtual InputLayout* createInputLayout( const InputElementDesc* inputElements, UInt inputElementCount) override;
@@ -125,8 +125,8 @@ public:
     public:
         typedef TextureResource Parent;
 
-        TextureResourceImpl(Type type, const Desc& desc, Usage initialUsage) :
-            Parent(type, desc),
+        TextureResourceImpl(const Desc& desc, Usage initialUsage) :
+            Parent(desc),
             m_initialUsage(initialUsage)
         {
         }
@@ -431,12 +431,12 @@ static int _calcResourceAccessFlags(int accessFlags)
     }
 }
 
-TextureResource* D3D11Renderer::createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& descIn, const TextureResource::Data* initData)
+TextureResource* D3D11Renderer::createTextureResource(Resource::Usage initialUsage, const TextureResource::Desc& descIn, const TextureResource::Data* initData)
 {
     TextureResource::Desc srcDesc(descIn);
-    srcDesc.setDefaults(type, initialUsage);
+    srcDesc.setDefaults(initialUsage);
  
-    const int effectiveArraySize = srcDesc.calcEffectiveArraySize(type);
+    const int effectiveArraySize = srcDesc.calcEffectiveArraySize();
     
     assert(initData);
     assert(initData->numSubResources == srcDesc.numMipLevels * effectiveArraySize * srcDesc.size.depth);
@@ -474,9 +474,9 @@ TextureResource* D3D11Renderer::createTextureResource(Resource::Type type, Resou
 
     const int accessFlags = _calcResourceAccessFlags(srcDesc.cpuAccessFlags);
 
-    RefPtr<TextureResourceImpl> texture(new TextureResourceImpl(type, srcDesc, initialUsage));
+    RefPtr<TextureResourceImpl> texture(new TextureResourceImpl(srcDesc, initialUsage));
 
-    switch (type)
+    switch (srcDesc.type)
     {
         case Resource::Type::Texture1D:
         {
@@ -513,7 +513,7 @@ TextureResource* D3D11Renderer::createTextureResource(Resource::Type type, Resou
             desc.SampleDesc.Count = srcDesc.sampleDesc.numSamples;
             desc.SampleDesc.Quality = srcDesc.sampleDesc.quality;
 
-            if (type == Resource::Type::TextureCube)
+            if (srcDesc.type == Resource::Type::TextureCube)
             {
                 desc.MiscFlags |= D3D11_RESOURCE_MISC_TEXTURECUBE;
             }

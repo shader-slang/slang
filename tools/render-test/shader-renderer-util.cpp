@@ -16,7 +16,7 @@ using namespace Slang;
 /* static */Result ShaderRendererUtil::createTextureResource(const InputTextureDesc& inputDesc, const TextureData& texData, int bindFlags, Renderer* renderer, RefPtr<TextureResource>& textureOut)
 {
     TextureResource::Desc textureResourceDesc;
-    textureResourceDesc.init();
+    textureResourceDesc.init(Resource::Type::Unknown);
 
     textureResourceDesc.format = Format::RGBA_Unorm_UInt8;
     textureResourceDesc.numMipLevels = texData.mipLevels;
@@ -24,31 +24,30 @@ using namespace Slang;
     textureResourceDesc.bindFlags = bindFlags;
 
     // It's the same size in all dimensions 
-    Resource::Type type = Resource::Type::Unknown;
     switch (inputDesc.dimension)
     {
         case 1:
         {
-            type = Resource::Type::Texture1D;
+            textureResourceDesc.type = Resource::Type::Texture1D;
             textureResourceDesc.size.init(inputDesc.size);
             break;
         }
         case 2:
         {
-            type = inputDesc.isCube ? Resource::Type::TextureCube : Resource::Type::Texture2D;
+            textureResourceDesc.type = inputDesc.isCube ? Resource::Type::TextureCube : Resource::Type::Texture2D;
             textureResourceDesc.size.init(inputDesc.size, inputDesc.size);
             break;
         }
         case 3:
         {
-            type = Resource::Type::Texture3D;
+            textureResourceDesc.type = Resource::Type::Texture3D;
             textureResourceDesc.size.init(inputDesc.size, inputDesc.size, inputDesc.size);
             break;
         }
     }
 
-    const int effectiveArraySize = textureResourceDesc.calcEffectiveArraySize(type);
-    const int numSubResources = textureResourceDesc.calcNumSubResources(type);
+    const int effectiveArraySize = textureResourceDesc.calcEffectiveArraySize();
+    const int numSubResources = textureResourceDesc.calcNumSubResources();
 
     Resource::Usage initialUsage = Resource::Usage::GenericRead;
     TextureResource::Data initData;
@@ -82,7 +81,7 @@ using namespace Slang;
     initData.numSubResources = numSubResources;
     initData.subResources = subResources.Buffer();
 
-    textureOut = renderer->createTextureResource(type, Resource::Usage::GenericRead, textureResourceDesc, &initData);
+    textureOut = renderer->createTextureResource(Resource::Usage::GenericRead, textureResourceDesc, &initData);
 
     return textureOut ? SLANG_OK : SLANG_FAIL;
 }

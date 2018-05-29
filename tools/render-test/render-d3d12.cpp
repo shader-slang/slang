@@ -57,7 +57,7 @@ public:
     virtual void setClearColor(const float color[4]) override;
     virtual void clearFrame() override;
     virtual void presentFrame() override;
-    virtual TextureResource* createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData) override;
+    virtual TextureResource* createTextureResource(Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData) override;
     virtual BufferResource* createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& bufferDesc, const void* initData) override;
     virtual SlangResult captureScreenSurface(Surface& surfaceOut) override;
     virtual InputLayout* createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) override;
@@ -178,8 +178,8 @@ protected:
         public:
         typedef TextureResource Parent;
 
-        TextureResourceImpl(Type type, const Desc& desc):
-            Parent(type, desc)
+        TextureResourceImpl(const Desc& desc):
+            Parent(desc)
         {
         }
 
@@ -1750,13 +1750,13 @@ static D3D12_RESOURCE_DIMENSION _calcResourceDimension(Resource::Type type)
     }
 }
 
-TextureResource* D3D12Renderer::createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& descIn, const TextureResource::Data* initData)
+TextureResource* D3D12Renderer::createTextureResource(Resource::Usage initialUsage, const TextureResource::Desc& descIn, const TextureResource::Data* initData)
 {
     // Description of uploading on Dx12
     // https://msdn.microsoft.com/en-us/library/windows/desktop/dn899215%28v=vs.85%29.aspx
 
     TextureResource::Desc srcDesc(descIn);
-    srcDesc.setDefaults(type, initialUsage);
+    srcDesc.setDefaults(initialUsage);
 
     const DXGI_FORMAT pixelFormat = D3DUtil::getMapFormat(srcDesc.format);
     if (pixelFormat == DXGI_FORMAT_UNKNOWN)
@@ -1764,9 +1764,9 @@ TextureResource* D3D12Renderer::createTextureResource(Resource::Type type, Resou
         return nullptr;
     }
         
-    const int arraySize = srcDesc.calcEffectiveArraySize(type);
+    const int arraySize = srcDesc.calcEffectiveArraySize();
     
-    const D3D12_RESOURCE_DIMENSION dimension = _calcResourceDimension(type);
+    const D3D12_RESOURCE_DIMENSION dimension = _calcResourceDimension(srcDesc.type);
     if (dimension == D3D12_RESOURCE_DIMENSION_UNKNOWN)
     {   
         return nullptr;
@@ -1791,7 +1791,7 @@ TextureResource* D3D12Renderer::createTextureResource(Resource::Type type, Resou
     resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
     resourceDesc.Alignment = 0;
 
-    RefPtr<TextureResourceImpl> texture(new TextureResourceImpl(type, srcDesc));
+    RefPtr<TextureResourceImpl> texture(new TextureResourceImpl(srcDesc));
 
     // Create the target resource
     {
