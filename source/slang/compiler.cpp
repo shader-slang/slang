@@ -279,13 +279,43 @@ namespace Slang
 
         auto profile = getEffectiveProfile(entryPoint, targetReq);
 
+        // If we have been invoked in a pass-through mode, then we need to make sure
+        // that the downstream compiler sees whatever options were passed to Slang
+        // via the command line or API.
+        //
+        // TODO: more pieces of information should be added here as needed.
+        //
+        List<D3D_SHADER_MACRO> dxMacrosStorage;
+        D3D_SHADER_MACRO const* dxMacros = nullptr;
+        if( entryPoint->compileRequest->passThrough != PassThroughMode::None )
+        {
+            for( auto& define :  entryPoint->compileRequest->preprocessorDefinitions )
+            {
+                D3D_SHADER_MACRO dxMacro;
+                dxMacro.Name = define.Key.Buffer();
+                dxMacro.Definition = define.Value.Buffer();
+                dxMacrosStorage.Add(dxMacro);
+            }
+            for( auto& define : entryPoint->getTranslationUnit()->preprocessorDefinitions )
+            {
+                D3D_SHADER_MACRO dxMacro;
+                dxMacro.Name = define.Key.Buffer();
+                dxMacro.Definition = define.Value.Buffer();
+                dxMacrosStorage.Add(dxMacro);
+            }
+            D3D_SHADER_MACRO nullTerminator = { 0, 0 };
+            dxMacrosStorage.Add(nullTerminator);
+
+            dxMacros = dxMacrosStorage.Buffer();
+        }
+
         ID3DBlob* codeBlob;
         ID3DBlob* diagnosticsBlob;
         HRESULT hr = D3DCompile_(
             hlslCode.begin(),
             hlslCode.Length(),
             "slang",
-            nullptr,
+            dxMacros,
             nullptr,
             getText(entryPoint->name).begin(),
             GetHLSLProfileName(profile),
@@ -300,7 +330,17 @@ namespace Slang
             data.AddRange((uint8_t const*)codeBlob->GetBufferPointer(), (int)codeBlob->GetBufferSize());
             codeBlob->Release();
         }
-        if (diagnosticsBlob)
+
+        // Note: we will only output diagnostics coming from a downstream
+        // compiler in the event of an error (although in that case we will
+        // end up including any warning diagnostics that are produced as well).
+        //
+        // TODO: some day we should aspire to make Slang's output always compile
+        // cleanly without warnings on downstream compilers (or else suppress those
+        // warnings), but this is difficult to do in practice without a lot of
+        // tailoring for the quirks of each compiler (version).
+        //
+        if (diagnosticsBlob && FAILED(hr))
         {
             // TODO(tfoley): need a better policy for how we translate diagnostics
             // back into the Slang world (although we should always try to generate

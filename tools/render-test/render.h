@@ -32,6 +32,18 @@ enum class PipelineType
     CountOf,
 };
 
+enum class StageType
+{
+    Unknown,
+    Vertex,
+    Hull,
+    Domain,
+    Geometry,
+    Fragment,
+    Compute,
+    CountOf,
+};
+
 enum class RendererType
 {
     Unknown,
@@ -63,7 +75,32 @@ enum class BindingStyle
 
 class ShaderProgram: public Slang::RefObject
 {
-	public:
+public:
+
+    struct KernelDesc
+    {
+        StageType   stage;
+        void const* codeBegin;
+        void const* codeEnd;
+
+        UInt getCodeSize() const { return (char const*)codeEnd - (char const*)codeBegin; }
+    };
+
+    struct Desc
+    {
+        PipelineType        pipelineType;
+        KernelDesc const*   kernels;
+        Int                 kernelCount;
+
+            /// Find and return the kernel for `stage`, if present.
+        KernelDesc const* findKernel(StageType stage) const
+        {
+            for(Int ii = 0; ii < kernelCount; ++ii)
+                if(kernels[ii].stage == stage)
+                    return &kernels[ii];
+            return nullptr;
+        }
+    };
 };
 
 struct ShaderCompileRequest
@@ -84,8 +121,6 @@ struct ShaderCompileRequest
     struct EntryPoint
     {
         char const* name = nullptr;
-        char const* profile = nullptr;
-
         SourceInfo  source;
     };
 
@@ -94,12 +129,6 @@ struct ShaderCompileRequest
     EntryPoint fragmentShader;
     EntryPoint computeShader;
     Slang::List<Slang::String> entryPointTypeArguments;
-};
-
-class ShaderCompiler
-{
-public:
-    virtual ShaderProgram* compileProgram(ShaderCompileRequest const& request) = 0;
 };
 
 /// Different formats of things like pixels or elements of vertices
@@ -496,7 +525,8 @@ public:
 
     virtual InputLayout* createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) = 0;
     virtual BindingState* createBindingState(const BindingState::Desc& desc) { return nullptr; }
-    virtual ShaderCompiler* getShaderCompiler() = 0;
+
+    virtual ShaderProgram* createProgram(const ShaderProgram::Desc& desc) = 0;
 
     virtual void* map(BufferResource* buffer, MapFlavor flavor) = 0;
     virtual void unmap(BufferResource* buffer) = 0;

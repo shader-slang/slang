@@ -75,7 +75,7 @@ using namespace Slang;
 
 namespace renderer_test {
 
-class GLRenderer : public Renderer, public ShaderCompiler
+class GLRenderer : public Renderer
 {
 public:
     
@@ -89,7 +89,7 @@ public:
     virtual SlangResult captureScreenSurface(Surface& surfaceOut) override;
     virtual InputLayout* createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) override;
     virtual BindingState* createBindingState(const BindingState::Desc& bindingStateDesc) override;
-    virtual ShaderCompiler* getShaderCompiler() override;
+    virtual ShaderProgram* createProgram(const ShaderProgram::Desc& desc) override;
     virtual void* map(BufferResource* buffer, MapFlavor flavor) override;
     virtual void unmap(BufferResource* buffer) override;
     virtual void setInputLayout(InputLayout* inputLayout) override;
@@ -102,9 +102,6 @@ public:
     virtual void submitGpuWork() override {}
     virtual void waitForGpu() override {}
     virtual RendererType getRendererType() const override { return RendererType::OpenGl; }
-
-    // ShaderCompiler implementation
-    virtual ShaderProgram* compileProgram(const ShaderCompileRequest& request) override;
 
     protected:
     enum
@@ -592,11 +589,6 @@ SlangResult GLRenderer::captureScreenSurface(Surface& surfaceOut)
     return SLANG_OK;
 }
 
-ShaderCompiler* GLRenderer::getShaderCompiler()
-{
-    return this;
-}
-
 TextureResource* GLRenderer::createTextureResource(Resource::Usage initialUsage, const TextureResource::Desc& descIn, const TextureResource::Data* initData)
 {
     TextureResource::Desc srcDesc(descIn);
@@ -999,22 +991,24 @@ void GLRenderer::setBindingState(BindingState* stateIn)
     }
 }
 
-// ShaderCompiler interface
-
-ShaderProgram* GLRenderer::compileProgram(const ShaderCompileRequest& request) 
+ShaderProgram* GLRenderer::createProgram(const ShaderProgram::Desc& desc)
 {
     auto programID = glCreateProgram();
-    if (request.computeShader.name)
+    if(desc.pipelineType == PipelineType::Compute )
     {
-        auto computeShaderID = loadShader(GL_COMPUTE_SHADER, request.computeShader.source.dataBegin);
+        auto computeKernel = desc.findKernel(StageType::Compute);
+        auto computeShaderID = loadShader(GL_COMPUTE_SHADER, (char const*) computeKernel->codeBegin);
         glAttachShader(programID, computeShaderID);
         glLinkProgram(programID);
         glDeleteShader(computeShaderID);
     }
     else
     {
-        auto vertexShaderID = loadShader(GL_VERTEX_SHADER, request.vertexShader.source.dataBegin);
-        auto fragmentShaderID = loadShader(GL_FRAGMENT_SHADER, request.fragmentShader.source.dataBegin);
+        auto vertexKernel = desc.findKernel(StageType::Vertex);
+        auto fragmentKernel = desc.findKernel(StageType::Fragment);
+
+        auto vertexShaderID = loadShader(GL_VERTEX_SHADER, (char const*) vertexKernel->codeBegin);
+        auto fragmentShaderID = loadShader(GL_FRAGMENT_SHADER, (char const*) fragmentKernel->codeBegin);
 
         glAttachShader(programID, vertexShaderID);
         glAttachShader(programID, fragmentShaderID);

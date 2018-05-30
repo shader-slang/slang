@@ -42,7 +42,7 @@ using namespace Slang;
 
 namespace renderer_test {
 
-class D3D11Renderer : public Renderer, public ShaderCompiler
+class D3D11Renderer : public Renderer
 {
 public:
     // Renderer    implementation
@@ -55,7 +55,7 @@ public:
     virtual SlangResult captureScreenSurface(Surface& surfaceOut) override;
     virtual InputLayout* createInputLayout( const InputElementDesc* inputElements, UInt inputElementCount) override;
     virtual BindingState* createBindingState(const BindingState::Desc& desc) override;
-    virtual ShaderCompiler* getShaderCompiler() override;
+    virtual ShaderProgram* createProgram(const ShaderProgram::Desc& desc) override;
     virtual void* map(BufferResource* buffer, MapFlavor flavor) override;
     virtual void unmap(BufferResource* buffer) override;
     virtual void setInputLayout(InputLayout* inputLayout) override;
@@ -68,9 +68,6 @@ public:
     virtual void submitGpuWork() override {}
     virtual void waitForGpu() override {}
     virtual RendererType getRendererType() const override { return RendererType::DirectX11; }
-
-    // ShaderCompiler implementation
-    virtual ShaderProgram* compileProgram(ShaderCompileRequest const& request) override;
 
     protected:
 
@@ -378,11 +375,6 @@ void D3D11Renderer::presentFrame()
 SlangResult D3D11Renderer::captureScreenSurface(Surface& surfaceOut)
 {
     return captureTextureToSurface(m_device, m_immediateContext, m_renderTargetTextures[0], surfaceOut);
-}
-
-ShaderCompiler* D3D11Renderer::getShaderCompiler()
-{
-    return this;
 }
 
 static D3D11_BIND_FLAG _calcResourceFlag(Resource::BindFlag::Enum bindFlag)
@@ -784,15 +776,14 @@ void D3D11Renderer::draw(UInt vertexCount, UInt startVertex)
     m_immediateContext->Draw((UINT)vertexCount, (UINT)startVertex);
 }
 
-ShaderProgram* D3D11Renderer::compileProgram(const ShaderCompileRequest& request)
+ShaderProgram* D3D11Renderer::createProgram(const ShaderProgram::Desc& desc)
 {
-    if (request.computeShader.name)
+    if (desc.pipelineType == PipelineType::Compute)
     {
-		ComPtr<ID3DBlob> computeShaderBlob;
-		SLANG_RETURN_NULL_ON_FAIL(D3DUtil::compileHLSLShader(request.computeShader.source.path, request.computeShader.source.dataBegin, request.computeShader.name, request.computeShader.profile, computeShaderBlob));
+        auto computeKernel = desc.findKernel(StageType::Compute);
 
         ComPtr<ID3D11ComputeShader> computeShader;
-        SLANG_RETURN_NULL_ON_FAIL(m_device->CreateComputeShader(computeShaderBlob->GetBufferPointer(), computeShaderBlob->GetBufferSize(), nullptr, computeShader.writeRef()));
+        SLANG_RETURN_NULL_ON_FAIL(m_device->CreateComputeShader(computeKernel->codeBegin, computeKernel->getCodeSize(), nullptr, computeShader.writeRef()));
 
         ShaderProgramImpl* shaderProgram = new ShaderProgramImpl();
         shaderProgram->m_computeShader.swap(computeShader);
@@ -800,15 +791,14 @@ ShaderProgram* D3D11Renderer::compileProgram(const ShaderCompileRequest& request
     }
     else
     {
-		ComPtr<ID3DBlob> vertexShaderBlob, fragmentShaderBlob;
-        SLANG_RETURN_NULL_ON_FAIL(D3DUtil::compileHLSLShader(request.vertexShader.source.path, request.vertexShader.source.dataBegin, request.vertexShader.name, request.vertexShader.profile, vertexShaderBlob));
-        SLANG_RETURN_NULL_ON_FAIL(D3DUtil::compileHLSLShader(request.fragmentShader.source.path, request.fragmentShader.source.dataBegin, request.fragmentShader.name, request.fragmentShader.profile, fragmentShaderBlob));
+        auto vertexKernel = desc.findKernel(StageType::Vertex);
+        auto fragmentKernel = desc.findKernel(StageType::Fragment);
 
         ComPtr<ID3D11VertexShader> vertexShader;
         ComPtr<ID3D11PixelShader> pixelShader;
 
-        SLANG_RETURN_NULL_ON_FAIL(m_device->CreateVertexShader(vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize(), nullptr, vertexShader.writeRef()));
-        SLANG_RETURN_NULL_ON_FAIL(m_device->CreatePixelShader(fragmentShaderBlob->GetBufferPointer(), fragmentShaderBlob->GetBufferSize(), nullptr, pixelShader.writeRef()));
+        SLANG_RETURN_NULL_ON_FAIL(m_device->CreateVertexShader(vertexKernel->codeBegin, vertexKernel->getCodeSize(), nullptr, vertexShader.writeRef()));
+        SLANG_RETURN_NULL_ON_FAIL(m_device->CreatePixelShader(fragmentKernel->codeBegin, fragmentKernel->getCodeSize(), nullptr, pixelShader.writeRef()));
 
         ShaderProgramImpl* shaderProgram = new ShaderProgramImpl();
         shaderProgram->m_vertexShader.swap(vertexShader);

@@ -9,9 +9,17 @@
 
 namespace renderer_test {
 
-ShaderCompiler* createSlangShaderCompiler(
-    ShaderCompiler*     innerCompiler,
-    SlangSourceLanguage sourceLanguage,
-    SlangCompileTarget  target);
+struct ShaderCompiler
+{
+    Renderer*               renderer;
+    SlangCompileTarget      target;
+    SlangSourceLanguage     sourceLanguage;
+    SlangPassThrough        passThrough;
+    char const*             profile;
+
+    ShaderProgram* compileProgram(
+        ShaderCompileRequest const& request);
+};
+
 
 } // renderer_test

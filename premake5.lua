@@ -366,7 +366,13 @@ tool "render-test"
     includedirs { ".", "external", "source" }
     links { "core", "slang" }
     filter { "system:windows" }
+
         systemversion "10.0.14393.0"
+
+        -- For Windows targets, we want to copy d3dcompiler_47.dll,
+        -- dxcompiler.dll, and dxil.dll from the Windows SDK redistributable
+        -- directory into the output directory.
+        postbuildcommands { '"$(SolutionDir)tools\\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/%{cfg.platform:lower()}/" "%{cfg.targetdir}/"'}
 
 --
 -- The `slangc` command-line application is just a very thin wrapper

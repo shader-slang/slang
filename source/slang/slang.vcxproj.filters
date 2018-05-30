@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="Header Files">
@@ -52,6 +52,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ir-insts.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ir-restructure-scoping.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ir-restructure.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ir-ssa.h">
@@ -153,10 +159,6 @@
     <ClInclude Include="vm.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ir-restructure.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ir-restructure-scoping.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="bytecode.cpp">
@@ -184,6 +186,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ir-legalize-types.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ir-restructure-scoping.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ir-restructure.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ir-ssa.cpp">
@@ -258,10 +266,6 @@
     <ClCompile Include="vm.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="ir-restructure.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ir-restructure-scoping.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="slang.natvis">

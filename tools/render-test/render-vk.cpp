@@ -29,7 +29,7 @@
 namespace renderer_test {
 using namespace Slang;
 
-class VKRenderer : public Renderer, public ShaderCompiler
+class VKRenderer : public Renderer
 {
 public:
     enum { kMaxRenderTargets = 8, kMaxAttachments = kMaxRenderTargets + 1 };
@@ -44,7 +44,7 @@ public:
     virtual SlangResult captureScreenSurface(Surface& surface) override;
     virtual InputLayout* createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) override;
     virtual BindingState* createBindingState(const BindingState::Desc& bindingStateDesc) override;
-    virtual ShaderCompiler* getShaderCompiler() override;
+    virtual ShaderProgram* createProgram(const ShaderProgram::Desc& desc) override;
     virtual void* map(BufferResource* buffer, MapFlavor flavor) override;
     virtual void unmap(BufferResource* buffer) override;
     virtual void setInputLayout(InputLayout* inputLayout) override;
@@ -57,9 +57,6 @@ public:
     virtual void submitGpuWork() override;
     virtual void waitForGpu() override;
     virtual RendererType getRendererType() const override { return RendererType::Vulkan; }
-
-    // ShaderCompiler implementation
-    virtual ShaderProgram* compileProgram(const ShaderCompileRequest& request) override;
 
         /// Dtor
     ~VKRenderer();
@@ -267,7 +264,10 @@ public:
     VkBool32 handleDebugMessage(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t srcObject,
         size_t location, int32_t msgCode, const char* pLayerPrefix, const char* pMsg);
     
-    VkPipelineShaderStageCreateInfo compileEntryPoint(const ShaderCompileRequest::EntryPoint& entryPointRequest, VkShaderStageFlagBits stage, List<char>& bufferOut);
+    VkPipelineShaderStageCreateInfo compileEntryPoint(
+        ShaderProgram::KernelDesc const&    kernelDesc,
+        VkShaderStageFlagBits stage,
+        List<char>& bufferOut);
 
     static VKAPI_ATTR VkBool32 VKAPI_CALL debugMessageCallback(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t srcObject,
         size_t location, int32_t msgCode, const char* pLayerPrefix, const char* pMsg, void* pUserData);
@@ -922,10 +922,13 @@ VkBool32 VKRenderer::handleDebugMessage(VkDebugReportFlagsEXT flags, VkDebugRepo
     return ((VKRenderer*)pUserData)->handleDebugMessage(flags, objType, srcObject, location, msgCode, pLayerPrefix, pMsg);
 }
 
-VkPipelineShaderStageCreateInfo VKRenderer::compileEntryPoint(const ShaderCompileRequest::EntryPoint& entryPointRequest, VkShaderStageFlagBits stage, List<char>& bufferOut)
+VkPipelineShaderStageCreateInfo VKRenderer::compileEntryPoint(
+    ShaderProgram::KernelDesc const&    kernelDesc,
+    VkShaderStageFlagBits stage,
+    List<char>& bufferOut)
 {
-    char const* dataBegin = entryPointRequest.source.dataBegin;
-    char const* dataEnd = entryPointRequest.source.dataEnd;
+    char const* dataBegin = (char const*) kernelDesc.codeBegin;
+    char const* dataEnd = (char const*) kernelDesc.codeEnd;
 
     // We need to make a copy of the code, since the Slang compiler
     // will free the memory after a compile request is closed.
@@ -1190,11 +1193,6 @@ void VKRenderer::presentFrame()
 SlangResult VKRenderer::captureScreenSurface(Surface& surfaceOut)
 {
     return SLANG_FAIL;
-}
-
-ShaderCompiler* VKRenderer::getShaderCompiler() 
-{
-    return this;
 }
 
 static VkBufferUsageFlagBits _calcBufferUsageFlags(Resource::BindFlag::Enum bind)
@@ -1999,20 +1997,21 @@ void VKRenderer::setBindingState(BindingState* state)
     m_currentBindingState = static_cast<BindingStateImpl*>(state);
 }
 
-// ShaderCompiler interface
-ShaderProgram* VKRenderer::compileProgram(const ShaderCompileRequest& request) 
+ShaderProgram* VKRenderer::createProgram(const ShaderProgram::Desc& desc)
 {
-    const PipelineType pipelineType = request.computeShader.name ? PipelineType::Compute : PipelineType::Graphics;
-
-    ShaderProgramImpl* impl = new ShaderProgramImpl(pipelineType);
-    if (request.computeShader.name)
+    ShaderProgramImpl* impl = new ShaderProgramImpl(desc.pipelineType);
+    if( desc.pipelineType == PipelineType::Compute)
     {
-        impl->m_compute = compileEntryPoint(request.computeShader, VK_SHADER_STAGE_COMPUTE_BIT, impl->m_buffers[0]);
+        auto computeKernel = desc.findKernel(StageType::Compute);
+        impl->m_compute = compileEntryPoint(*computeKernel, VK_SHADER_STAGE_COMPUTE_BIT, impl->m_buffers[0]);
     }
     else
     {
-        impl->m_vertex = compileEntryPoint(request.vertexShader, VK_SHADER_STAGE_VERTEX_BIT, impl->m_buffers[0]);
-        impl->m_fragment = compileEntryPoint(request.fragmentShader, VK_SHADER_STAGE_FRAGMENT_BIT, impl->m_buffers[1]);
+        auto vertexKernel = desc.findKernel(StageType::Vertex);
+        auto fragmentKernel = desc.findKernel(StageType::Fragment);
+
+        impl->m_vertex = compileEntryPoint(*vertexKernel, VK_SHADER_STAGE_VERTEX_BIT, impl->m_buffers[0]);
+        impl->m_fragment = compileEntryPoint(*fragmentKernel, VK_SHADER_STAGE_FRAGMENT_BIT, impl->m_buffers[1]);
     }
     return impl;
 }
