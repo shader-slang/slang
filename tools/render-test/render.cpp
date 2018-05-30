@@ -76,7 +76,7 @@ const Resource::DescBase& Resource::getDescBase() const
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!! BindingState::Desc !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-void BindingState::Desc::addSampler(const SamplerDesc& desc, const RegisterSet& registerSet)
+void BindingState::Desc::addSampler(const SamplerDesc& desc, const RegisterRange& registerRange)
 {
     int descIndex = int(m_samplerDescs.Count());
     m_samplerDescs.Add(desc);
@@ -84,13 +84,13 @@ void BindingState::Desc::addSampler(const SamplerDesc& desc, const RegisterSet& 
     Binding binding;
     binding.bindingType = BindingType::Sampler;
     binding.resource = nullptr;
-    binding.registerSet = registerSet;
+    binding.registerRange = registerRange;
     binding.descIndex = descIndex;
 
     m_bindings.Add(binding);
 }
 
-void BindingState::Desc::addResource(BindingType bindingType, Resource* resource, const RegisterSet& registerSet)
+void BindingState::Desc::addResource(BindingType bindingType, Resource* resource, const RegisterRange& registerRange)
 {
     assert(resource);
 
@@ -98,11 +98,11 @@ void BindingState::Desc::addResource(BindingType bindingType, Resource* resource
     binding.bindingType = bindingType;
     binding.resource = resource;
     binding.descIndex = -1;
-    binding.registerSet = registerSet;
+    binding.registerRange = registerRange;
     m_bindings.Add(binding);
 }
 
-void BindingState::Desc::addCombinedTextureSampler(TextureResource* resource, const SamplerDesc& samplerDesc, const RegisterSet& registerSet)
+void BindingState::Desc::addCombinedTextureSampler(TextureResource* resource, const SamplerDesc& samplerDesc, const RegisterRange& registerRange)
 {
     assert(resource);
 
@@ -113,7 +113,7 @@ void BindingState::Desc::addCombinedTextureSampler(TextureResource* resource, co
     binding.bindingType = BindingType::CombinedTextureSampler;
     binding.resource = resource;
     binding.descIndex = samplerDescIndex;
-    binding.registerSet = registerSet;
+    binding.registerRange = registerRange;
     m_bindings.Add(binding);
 }
 
@@ -132,7 +132,7 @@ int BindingState::Desc::findBindingIndex(Resource::BindFlag::Enum bindFlag, int 
         const Binding& binding = m_bindings[i];
         if (binding.resource && (binding.resource->getDescBase().bindFlags & bindFlag) != 0)
         {
-            if (binding.registerSet.hasRegister(registerIndex))
+            if (binding.registerRange.hasRegister(registerIndex))
             {
                 return i;
             }
@@ -141,7 +141,6 @@ int BindingState::Desc::findBindingIndex(Resource::BindFlag::Enum bindFlag, int 
 
     return -1;
 }
-
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!! TextureResource::Size !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 

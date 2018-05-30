@@ -394,18 +394,22 @@ class BindingState : public Slang::RefObject
 public:
         /// A register set consists of one or more contiguous indices. 
         /// To be valid index >= 0 and size >= 1
-    struct RegisterSet
+    struct RegisterRange
     {
             /// True if contains valid contents
-        bool isValid() const { return index >= 0 && size > 0; }
+        bool isValid() const { return size > 0; }
             /// True if valid single value
-        bool isSingle() const { return size == 1 && index >= 0; }
+        bool isSingle() const { return size == 1; }
             /// Get as a single index (must be at least one index)
-        int getSingleIndex() const { return (size == 1 && index >= 0) ? index : -1; }
+        int getSingleIndex() const { return (size == 1) ? index : -1; }
             /// Return the first index
-        int getFirstIndex() const { return index; }
+        int getFirstIndex() const { return (size > 0) ? index : -1; }
             /// True if contains register index
         bool hasRegister(int registerIndex) const { return registerIndex >= index && registerIndex < index + size; }
+
+        static RegisterRange makeInvalid() { return RegisterRange{ -1, 0 }; }
+        static RegisterRange makeSingle(int index) { return RegisterRange{ int16_t(index), 1 }; }
+        static RegisterRange makeRange(int index, int size) { return RegisterRange{ int16_t(index), uint16_t(size) }; }
 
         int16_t index;              ///< The base index
         uint16_t size;              ///< The amount of register indices
@@ -421,21 +425,21 @@ public:
         BindingType bindingType;                ///< Type of binding
         int descIndex;                          ///< The description index associated with type. -1 if not used. For example if bindingType is Sampler, the descIndex is into m_samplerDescs.
         Slang::RefPtr<Resource> resource;       ///< Associated resource. nullptr if not used
-        RegisterSet registerSet;        /// Defines the registers for binding
+        RegisterRange registerRange;        /// Defines the registers for binding
     };
 
     struct Desc
     {        
             /// Add a resource - assumed that the binding will match the Desc of the resource
-        void addResource(BindingType bindingType, Resource* resource, const RegisterSet& registerSet);
+        void addResource(BindingType bindingType, Resource* resource, const RegisterRange& registerRange);
             /// Add a sampler        
-        void addSampler(const SamplerDesc& desc, const RegisterSet& registerSet);
+        void addSampler(const SamplerDesc& desc, const RegisterRange& registerRange);
             /// Add a BufferResource 
-        void addBufferResource(BufferResource* resource, const RegisterSet& registerSet) { addResource(BindingType::Buffer, resource, registerSet); }
+        void addBufferResource(BufferResource* resource, const RegisterRange& registerRange) { addResource(BindingType::Buffer, resource, registerRange); }
             /// Add a texture 
-        void addTextureResource(TextureResource* resource, const RegisterSet& registerSet) { addResource(BindingType::Texture, resource, registerSet); }
+        void addTextureResource(TextureResource* resource, const RegisterRange& registerRange) { addResource(BindingType::Texture, resource, registerRange); }
             /// Add combined texture a
-        void addCombinedTextureSampler(TextureResource* resource, const SamplerDesc& samplerDesc, const RegisterSet& registerSet);
+        void addCombinedTextureSampler(TextureResource* resource, const SamplerDesc& samplerDesc, const RegisterRange& registerRange);
 
             /// Returns the bind index, that has the bind flag, and indexes the specified register
         int findBindingIndex(Resource::BindFlag::Enum bindFlag, int registerIndex) const;

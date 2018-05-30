@@ -550,7 +550,7 @@ Slang::Result VKRenderer::_createPipeline(RefPtr<Pipeline>& pipelineOut)
         const auto& srcDetail = srcDetails[i];
         const auto& srcBinding = srcBindings[i];
 
-        const int bindingIndex = srcBinding.registerSet.getSingleIndex();
+        const int bindingIndex = srcBinding.registerRange.getSingleIndex();
 
         VkWriteDescriptorSet writeInfo = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
         writeInfo.descriptorCount = 1;

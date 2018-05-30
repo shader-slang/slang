@@ -131,15 +131,18 @@ static BindingState::SamplerDesc _calcSamplerDesc(const InputSamplerDesc& srcDes
     return dstDesc;
 }
 
-/* static */BindingState::RegisterSet ShaderRendererUtil::calcRegisterSet(Renderer* renderer, const ShaderInputLayoutEntry& entry)
+/* static */BindingState::RegisterRange ShaderRendererUtil::calcRegisterRange(Renderer* renderer, const ShaderInputLayoutEntry& entry)
 {
-    typedef BindingState::RegisterSet RegisterSet;
+    typedef BindingState::RegisterRange RegisterRange;
 
     BindingStyle bindingStyle = RendererUtil::getBindingStyle(renderer->getRendererType());
 
     switch (bindingStyle)
     {
-        case BindingStyle::DirectX:         return RegisterSet{ int16_t( entry.hlslBinding), 1 };
+        case BindingStyle::DirectX:         
+        {
+            return RegisterRange::makeSingle(entry.hlslBinding);
+        }
         case BindingStyle::Vulkan:
         {
             // USe OpenGls for now
@@ -164,7 +167,7 @@ static BindingState::SamplerDesc _calcSamplerDesc(const InputSamplerDesc& srcDes
                     break;
                 }
             }
-            return RegisterSet{int16_t(baseIndex), uint16_t(count)};
+            return RegisterRange::makeRange(baseIndex, count); 
         }
         /* case BindingStyle::Vulkan:
         {
@@ -172,7 +175,7 @@ static BindingState::SamplerDesc _calcSamplerDesc(const InputSamplerDesc& srcDes
         default: break;
     }
     // Return invalid
-    return RegisterSet{ -1, 0 };
+    return RegisterRange::makeInvalid();
 }
 
 /* static */Result ShaderRendererUtil::createBindingStateDesc(ShaderInputLayoutEntry* srcEntries, int numEntries, Renderer* renderer, BindingState::Desc& descOut)
@@ -184,7 +187,7 @@ static BindingState::SamplerDesc _calcSamplerDesc(const InputSamplerDesc& srcDes
     {
         const ShaderInputLayoutEntry& srcEntry = srcEntries[i];
 
-        const BindingState::RegisterSet registerSet = calcRegisterSet(renderer, srcEntry);
+        const BindingState::RegisterRange registerSet = calcRegisterRange(renderer, srcEntry);
         if (!registerSet.isValid())
         {
             assert(!"Couldn't find a binding");

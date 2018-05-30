@@ -1026,7 +1026,7 @@ void D3D11Renderer::_applyBindingState(bool isCompute)
         const auto& binding = bindings[i];
         const auto& detail = details[i];
 
-        const int bindingIndex = binding.registerSet.getSingleIndex();
+        const int bindingIndex = binding.registerRange.getSingleIndex();
 
         switch (binding.bindingType)
         {
