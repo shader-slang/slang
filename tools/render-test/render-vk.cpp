@@ -1873,9 +1873,6 @@ BindingState* VKRenderer::createBindingState(const BindingState::Desc& bindingSt
         auto& dstDetail = dstDetails[i];
         const auto& srcBinding = srcBindings[i];
 
-        // For now use Glsl binding
-        //const int bindingIndex = srcBinding.registerSet.getFirstIndex();
-        
         switch (srcBinding.bindingType)
         {
             case BindingType::Buffer:
