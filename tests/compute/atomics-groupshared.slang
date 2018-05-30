@@ -13,17 +13,17 @@ uint test(uint val)
 {
     uint originalValue;
 
-    outputBuffer[val] = 0;
+    shared[val] = 0;
 
     GroupMemoryBarrierWithGroupSync();
 
-	InterlockedAdd(outputBuffer[val], 		val, 		originalValue);
-	InterlockedAdd(outputBuffer[val ^ 1], 	val*16, 	originalValue);
-	InterlockedAdd(outputBuffer[val ^ 2], 	val*16*16, 	originalValue);
-
+	InterlockedAdd(shared[val], 		val, 		originalValue);
+	InterlockedAdd(shared[val ^ 1], 	val*16, 	originalValue);
+	InterlockedAdd(shared[val ^ 2], 	val*16*16, 	originalValue);
+	
     GroupMemoryBarrierWithGroupSync();
 
-    return outputBuffer[val];
+    return shared[val];
 }
 
 [numthreads(4, 1, 1)]
