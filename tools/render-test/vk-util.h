@@ -10,6 +10,8 @@
 /// Calls handleFail which on debug builds asserts
 #define SLANG_VK_RETURN_ON_FAIL(x) { VkResult _res = x; if (_res != VK_SUCCESS) { return VulkanUtil::handleFail(_res); }  }
 
+#define SLANG_VK_RETURN_NULL_ON_FAIL(x) { VkResult _res = x; if (_res != VK_SUCCESS) { VulkanUtil::handleFail(_res); return nullptr; }  }
+
 /// Is similar to SLANG_VK_RETURN_ON_FAIL, but does not return. Will call checkFail on failure - which asserts on debug builds. 
 #define SLANG_VK_CHECK(x) {  VkResult _res = x; if (_res != VK_SUCCESS) { VulkanUtil::checkFail(_res); }  } 
     

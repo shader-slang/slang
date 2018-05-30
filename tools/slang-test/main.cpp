@@ -1830,23 +1830,70 @@ TestResult skipTest(TestContext* /* context */, TestInput& /*input*/)
     return kTestResult_Ignored;
 }
 
-static bool hasD3D12Option(const TestOptions& testOptions)
+
+static bool hasRenderOption(RenderApiType apiType, const List<String>& options)
 {
-    return (testOptions.args.IndexOf("-dx12") != UInt(-1) ||
-        testOptions.args.IndexOf("-d3d12") != UInt(-1));
+    const RenderApiUtil::Info& info = RenderApiUtil::getInfo(apiType);
+
+    List<UnownedStringSlice> namesList;
+
+    for (UInt i = 0; i < options.Count(); ++i)
+    {
+        const String& option = options[i];
+
+        if (option.StartsWith("-"))
+        {
+            const UnownedStringSlice parameter(option.Buffer() + 1, option.Buffer() + option.Length());
+            // See if we have a match
+            for (int j = 0; j < SLANG_COUNT_OF(RenderApiUtil::s_infos); j++)
+            {
+                const auto& apiInfo = RenderApiUtil::s_infos[j];
+                const UnownedStringSlice names(info.names);
+
+                if (names.indexOf(',') >= 0)
+                {
+                    StringUtil::split(names, ',', namesList);
+
+                    if (namesList.IndexOf(parameter) != UInt(-1))
+                    {
+                        return true;
+                    }
+                }
+                else if (names == parameter)
+                {
+                    return true;
+                }
+            }
+        }
+    }
+
+    return false;
 }
 
-bool hasD3D12Option(const FileTestList& testList)
+bool hasRenderOption(RenderApiType apiType, const TestOptions& options)
+{
+    return hasRenderOption(apiType, options.args);
+}
+
+bool hasRenderOption(RenderApiType apiType, const FileTestList& testList)
 {
     const int numTests = int(testList.tests.Count());
     for (int i = 0; i < numTests; i++)
     {
-        if (hasD3D12Option(testList.tests[i]))
+        if (hasRenderOption(apiType, testList.tests[i].args))
         {
             return true;
         }
     }
     return false;
+}
+
+bool isHLSLTest(const String& command)
+{
+    return command == "COMPARE_HLSL" || 
+        command == "COMPARE_HLSL_RENDER" || 
+        command == "COMPARE_HLSL_CROSS_COMPILE_RENDER" || 
+        command == "COMPARE_HLSL_GLSL_RENDER";
 }
 
 bool isRenderTest(const String& command)
@@ -1860,6 +1907,22 @@ bool isRenderTest(const String& command)
         command == "COMPARE_HLSL_GLSL_RENDER";
 }
 
+static bool canIgnoreTestWithDisabledRenderer(const TestOptions& testOptions)
+{
+    for (int i = 0; i < int(RenderApiType::CountOf); ++i)
+    {
+        RenderApiType apiType = RenderApiType(i);
+        RenderApiFlag::Enum apiFlag = RenderApiFlag::Enum(1 << i);
+        
+        if (hasRenderOption(apiType, testOptions) && (g_options.enabledApis & apiFlag) == 0)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 TestResult runTest(
     TestContext*        context, 
     String const&       filePath,
@@ -1867,8 +1930,8 @@ TestResult runTest(
     TestOptions const&  testOptions,
     FileTestList const& testList)
 {
-    // If this is d3d12 test
-    if (hasD3D12Option(testOptions) && (g_options.enabledApis & RenderApiFlag::D3D12) == 0)
+    // If this test can be ignored
+    if (canIgnoreTestWithDisabledRenderer(testOptions))
     {
         return kTestResult_Ignored;
     }
@@ -1999,27 +2062,67 @@ void runTestsOnFile(
         return;
     }
 
+    List<TestOptions> synthesizedTests;
+
     // If dx12 is available synthesize Dx12 test
     if ((g_options.enabledApis & RenderApiFlag::D3D12) != 0)
     {
         // If doesn't have option generate dx12 options from dx11
-        if (!hasD3D12Option(testList))
+        if (!hasRenderOption(RenderApiType::D3D12, testList))
         {
             const int numTests = int(testList.tests.Count());
             for (int i = 0; i < numTests; i++)
             {
                 const TestOptions& testOptions = testList.tests[i];
                 // If it's a render test, and there is on d3d option, add one
-                if (isRenderTest(testOptions.command) && !hasD3D12Option(testOptions))
+                if (isRenderTest(testOptions.command) && !hasRenderOption(RenderApiType::D3D12, testOptions))
                 {
                     // Add with -dx12 option
                     TestOptions testOptionsCopy(testOptions);
                     testOptionsCopy.args.Add("-dx12");
 
-                    testList.tests.Add(testOptionsCopy);
+                    synthesizedTests.Add(testOptionsCopy);
                 }
             }
         }
+    }
+
+#if 0
+    // If Vulkan is available synthesize Vulkan test
+    if ((g_options.enabledApis & RenderApiFlag::Vulkan) != 0)
+    {
+        // If doesn't have option generate dx12 options from dx11
+        if (!hasRenderOption(RenderApiType::Vulkan, testList))
+        {
+            const int numTests = int(testList.tests.Count());
+            for (int i = 0; i < numTests; i++)
+            {
+                const TestOptions& testOptions = testList.tests[i];
+                // If it's a render test, and there is on d3d option, add one
+                if (isRenderTest(testOptions.command) && !isHLSLTest(testOptions.command) && !hasRenderOption(RenderApiType::Vulkan, testOptions))
+                {
+                    // Add with -dx12 option
+                    TestOptions testOptionsCopy(testOptions);
+                    testOptionsCopy.args.Add("-vk");
+
+                    UInt index = testOptionsCopy.args.IndexOf("-hlsl");
+                    if (index != UInt(-1))
+                    {
+                        testOptionsCopy.args.RemoveAt(index);
+                    }
+
+
+                    synthesizedTests.Add(testOptionsCopy);
+                }
+            }
+        }
+    }
+#endif
+
+    // Add any tests that were synthesized
+    for (UInt i = 0; i < synthesizedTests.Count(); ++i)
+    {
+        testList.tests.Add(synthesizedTests[i]);
     }
 
     // We have found a test to run!
@@ -2155,10 +2258,12 @@ static void appendXmlEncode(const String& in, StringBuilder& out)
             out.Append(start, UInt(end - start));
         }
 
-        if (cur < end && isXmlEncodeChar(*cur))
+        // if not at the end, we must be on an xml encoded character, so just output it xml encoded.
+        if (cur < end)
         {
-            appendXmlEncode(*cur, out);
-            cur++;
+            const char encodeChar = *cur++;
+            assert(isXmlEncodeChar(encodeChar));
+            appendXmlEncode(encodeChar, out);
         }
     }
 }
