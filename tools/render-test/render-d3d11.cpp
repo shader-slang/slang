@@ -838,7 +838,7 @@ BindingState* D3D11Renderer::createBindingState(const BindingState::Desc& bindin
         auto& dstDetail = dstDetails[i];
         const auto& srcBinding = srcBindings[i];
         
-        assert(srcBinding.registerSet.isSingle());
+        assert(srcBinding.registerRange.isSingle());
 
         switch (srcBinding.bindingType)
         {
