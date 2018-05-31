@@ -1,0 +1,121 @@
+result code = 0
+standard error = {
+}
+standard output = {
+{
+    "parameters": [
+        {
+            "name": "A",
+            "binding": {"kind": "constantBuffer", "index": 0},
+            "type": {
+                "kind": "constantBuffer",
+                "elementType": {
+                    "kind": "struct",
+                    "fields": [
+                        {
+                            "name": "aa",
+                            "type": {
+                                "kind": "matrix",
+                                "rowCount": 3,
+                                "columnCount": 4,
+                                "elementType": {
+                                    "kind": "scalar",
+                                    "scalarType": "float32"
+                                }
+                            },
+                            "binding": {"kind": "uniform", "offset": 0, "size": 64}
+                        },
+                        {
+                            "name": "ab",
+                            "type": {
+                                "kind": "matrix",
+                                "rowCount": 3,
+                                "columnCount": 4,
+                                "elementType": {
+                                    "kind": "scalar",
+                                    "scalarType": "float32"
+                                }
+                            },
+                            "binding": {"kind": "uniform", "offset": 64, "size": 48}
+                        },
+                        {
+                            "name": "ac",
+                            "type": {
+                                "kind": "matrix",
+                                "rowCount": 3,
+                                "columnCount": 4,
+                                "elementType": {
+                                    "kind": "scalar",
+                                    "scalarType": "float32"
+                                }
+                            },
+                            "binding": {"kind": "uniform", "offset": 112, "size": 64}
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "B",
+            "binding": {"kind": "constantBuffer", "index": 1},
+            "type": {
+                "kind": "constantBuffer",
+                "elementType": {
+                    "kind": "struct",
+                    "fields": [
+                        {
+                            "name": "b",
+                            "type": {
+                                "kind": "struct",
+                                "name": "SB",
+                                "fields": [
+                                    {
+                                        "name": "ba",
+                                        "type": {
+                                            "kind": "matrix",
+                                            "rowCount": 3,
+                                            "columnCount": 4,
+                                            "elementType": {
+                                                "kind": "scalar",
+                                                "scalarType": "float32"
+                                            }
+                                        },
+                                        "binding": {"kind": "uniform", "offset": 0, "size": 64}
+                                    },
+                                    {
+                                        "name": "bb",
+                                        "type": {
+                                            "kind": "matrix",
+                                            "rowCount": 3,
+                                            "columnCount": 4,
+                                            "elementType": {
+                                                "kind": "scalar",
+                                                "scalarType": "float32"
+                                            }
+                                        },
+                                        "binding": {"kind": "uniform", "offset": 64, "size": 48}
+                                    },
+                                    {
+                                        "name": "bc",
+                                        "type": {
+                                            "kind": "matrix",
+                                            "rowCount": 3,
+                                            "columnCount": 4,
+                                            "elementType": {
+                                                "kind": "scalar",
+                                                "scalarType": "float32"
+                                            }
+                                        },
+                                        "binding": {"kind": "uniform", "offset": 112, "size": 64}
+                                    }
+                                ]
+                            },
+                            "binding": {"kind": "uniform", "offset": 0, "size": 176}
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}
+}
