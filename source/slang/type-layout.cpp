@@ -27,12 +27,6 @@ static size_t RoundUpToPowerOfTwo( size_t value )
 
 //
 
-MatrixLayoutMode LayoutRulesImpl::getDefaultMatrixLayoutMode() {
-    return family->getDefaultMatrixLayoutMode();
-}
-
-//
-
 struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
 {
     // Get size and alignment for a single value of base type.
@@ -428,25 +422,6 @@ struct GLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     virtual LayoutRulesImpl* getSpecializationConstantRules() override;
     virtual LayoutRulesImpl* getShaderStorageBufferRules() override;
     virtual LayoutRulesImpl* getParameterBlockRules() override;
-
-    virtual MatrixLayoutMode getDefaultMatrixLayoutMode() override
-    {
-        // The default matrix layout mode in GLSL is specified
-        // to be "column major" but what GLSL calls a "column"
-        // is actually what HLSL (and hence Slang) calls a row.
-        //
-        // That is, an HLSL `float3x4` has 3 rows and 4 columns,
-        // and indexing yields a `float4`.
-        //
-        // A GLSL `mat3x4` has 3 "columns" and 4 "rows", and
-        // indexing into it yields a `vec4`.
-        //
-        // The Slang compiler needs to be consistent about this mess,
-        // and so when the GLSL spec says that "column"-major is
-        // the default, we know that they actually mean what we
-        // call row-major.
-        return kMatrixLayoutMode_RowMajor;
-    }
 };
 
 struct HLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
@@ -459,11 +434,6 @@ struct HLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     virtual LayoutRulesImpl* getSpecializationConstantRules() override;
     virtual LayoutRulesImpl* getShaderStorageBufferRules() override;
     virtual LayoutRulesImpl* getParameterBlockRules() override;
-
-    virtual MatrixLayoutMode getDefaultMatrixLayoutMode() override
-    {
-        return kMatrixLayoutMode_ColumnMajor;
-    }
 };
 
 GLSLLayoutRulesFamilyImpl kGLSLLayoutRulesFamilyImpl;
@@ -644,12 +614,11 @@ TypeLayoutContext getInitialLayoutContextForTarget(TargetRequest* targetReq)
     TypeLayoutContext context;
     context.targetReq = targetReq;
     context.rules = nullptr;
-    context.matrixLayoutMode = MatrixLayoutMode::kMatrixLayoutMode_RowMajor;
+    context.matrixLayoutMode = targetReq->getDefaultMatrixLayoutMode();
 
     if( rulesFamily )
     {
         context.rules = rulesFamily->getConstantBufferRules();
-        context.matrixLayoutMode = rulesFamily->getDefaultMatrixLayoutMode();
     }
 
     return context;
@@ -1150,7 +1119,7 @@ createParameterGroupTypeLayout(
     RefPtr<TypeLayout>          elementTypeLayout)
 {
     return createParameterGroupTypeLayout(
-        context.with(parameterGroupRules).with(parameterGroupRules->getDefaultMatrixLayoutMode()),
+        context.with(parameterGroupRules).with(context.targetReq->getDefaultMatrixLayoutMode()),
         parameterGroupType,
         parameterGroupInfo,
         elementTypeLayout);

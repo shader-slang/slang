@@ -170,6 +170,14 @@ extern "C"
         SLANG_PROFILE_UNKNOWN,
     };
 
+    typedef unsigned int SlangMatrixLayoutMode;
+    enum
+    {
+        SLANG_MATRIX_LAYOUT_MODE_UNKNOWN = 0,
+        SLANG_MATRIX_LAYOUT_ROW_MAJOR,
+        SLANG_MATRIX_LAYOUT_COLUMN_MAJOR,
+    };
+
 //#define SLANG_LAYOUT_UNIFORM 0
 //#define SLANG_LAYOUT_PACKED 1
 //#define SLANG_LAYOUT_STORAGE 2
@@ -270,6 +278,11 @@ extern "C"
         SlangCompileRequest*    request,
         int                     targetIndex,
         SlangTargetFlags        flags);
+
+    SLANG_API void spSetTargetMatrixLayoutMode(
+        SlangCompileRequest*    request,
+        int                     targetIndex,
+        SlangMatrixLayoutMode   mode);
 
     /*!
     @brief Set the container format to be used for binary output.
@@ -683,6 +696,8 @@ extern "C"
     SLANG_API unsigned spReflectionTypeLayout_GetCategoryCount(SlangReflectionTypeLayout* type);
     SLANG_API SlangParameterCategory spReflectionTypeLayout_GetCategoryByIndex(SlangReflectionTypeLayout* type, unsigned index);
 
+    SLANG_API SlangMatrixLayoutMode spReflectionTypeLayout_GetMatrixLayoutMode(SlangReflectionTypeLayout* type);
+
     // Variable Reflection
 
     SLANG_API char const* spReflectionVariable_GetName(SlangReflectionVariable* var);
@@ -1039,6 +1054,12 @@ namespace slang
         {
             return getType()->getName();
         }
+
+        SlangMatrixLayoutMode getMatrixLayoutMode()
+        {
+            return spReflectionTypeLayout_GetMatrixLayoutMode((SlangReflectionTypeLayout*) this);
+        }
+
     };
 
     struct Modifier

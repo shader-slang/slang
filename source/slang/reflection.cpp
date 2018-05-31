@@ -658,6 +658,23 @@ SLANG_API SlangParameterCategory spReflectionTypeLayout_GetCategoryByIndex(Slang
     return typeLayout->resourceInfos[index].kind;
 }
 
+SLANG_API SlangMatrixLayoutMode spReflectionTypeLayout_GetMatrixLayoutMode(SlangReflectionTypeLayout* inTypeLayout)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return SLANG_MATRIX_LAYOUT_MODE_UNKNOWN;
+
+    if( auto matrixLayout = dynamic_cast<MatrixTypeLayout*>(typeLayout) )
+    {
+        return matrixLayout->mode;
+    }
+    else
+    {
+        return SLANG_MATRIX_LAYOUT_MODE_UNKNOWN;
+    }
+
+}
+
+
 // Variable Reflection
 
 SLANG_API char const* spReflectionVariable_GetName(SlangReflectionVariable* inVar)

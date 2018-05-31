@@ -73,6 +73,18 @@ namespace Slang
         Binary
     };
 
+    // When storing the layout for a matrix-type
+    // value, we need to know whether it has been
+    // laid ot with row-major or column-major
+    // storage.
+    //
+    enum MatrixLayoutMode
+    {
+        kMatrixLayoutMode_RowMajor      = SLANG_MATRIX_LAYOUT_ROW_MAJOR,
+        kMatrixLayoutMode_ColumnMajor   = SLANG_MATRIX_LAYOUT_COLUMN_MAJOR,
+    };
+
+
     class CompileRequest;
     class TranslationUnitRequest;
 
@@ -221,6 +233,10 @@ namespace Slang
 
         // TypeLayouts created on the fly by reflection API
         Dictionary<Type*, RefPtr<TypeLayout>> typeLayouts;
+
+        /// The layout to use for matrices by default (row/column major)
+        MatrixLayoutMode defaultMatrixLayoutMode = kMatrixLayoutMode_ColumnMajor;
+        MatrixLayoutMode getDefaultMatrixLayoutMode() { return defaultMatrixLayoutMode; }
     };
 
     // Compute the "effective" profile to use when outputting the given entry point
