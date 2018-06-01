@@ -84,7 +84,7 @@ public:
     virtual void setClearColor(const float color[4]) override;
     virtual void clearFrame() override;
     virtual void presentFrame() override;
-    virtual TextureResource* createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData) override;
+    virtual TextureResource* createTextureResource(Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData) override;
     virtual BufferResource* createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& descIn, const void* initData) override;
     virtual SlangResult captureScreenSurface(Surface& surfaceOut) override;
     virtual InputLayout* createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) override;
@@ -164,8 +164,8 @@ public:
         public:
         typedef TextureResource Parent;
 
-        TextureResourceImpl(Type type, Usage initialUsage, const Desc& desc, GLRenderer* renderer):
-            Parent(type, desc),
+        TextureResourceImpl(Usage initialUsage, const Desc& desc, GLRenderer* renderer):
+            Parent(desc),
             m_initialUsage(initialUsage),
             m_renderer(renderer)
         {
@@ -190,7 +190,6 @@ public:
     struct BindingDetail
     {
         GLuint m_samplerHandle = 0;
-        int m_firstBinding;                      //< Holds binding index if not sampler (which has multiple, and can be read from the BindingState::Desc)
     };
 
     class BindingStateImpl: public BindingState
@@ -598,10 +597,10 @@ ShaderCompiler* GLRenderer::getShaderCompiler()
     return this;
 }
 
-TextureResource* GLRenderer::createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& descIn, const TextureResource::Data* initData)
+TextureResource* GLRenderer::createTextureResource(Resource::Usage initialUsage, const TextureResource::Desc& descIn, const TextureResource::Data* initData)
 {
     TextureResource::Desc srcDesc(descIn);
-    srcDesc.setDefaults(type, initialUsage);
+    srcDesc.setDefaults(initialUsage);
 
     GlPixelFormat pixelFormat = _getGlPixelFormat(srcDesc.format);
     if (pixelFormat == GlPixelFormat::Unknown)
@@ -615,13 +614,13 @@ TextureResource* GLRenderer::createTextureResource(Resource::Type type, Resource
     const GLenum format = info.format;
     const GLenum formatType = info.formatType;
     
-    RefPtr<TextureResourceImpl> texture(new TextureResourceImpl(type, initialUsage, srcDesc, this));
+    RefPtr<TextureResourceImpl> texture(new TextureResourceImpl(initialUsage, srcDesc, this));
 
     GLenum target = 0;
     GLuint handle = 0;
     glGenTextures(1, &handle);
 
-    const int effectiveArraySize = srcDesc.calcEffectiveArraySize(type);
+    const int effectiveArraySize = srcDesc.calcEffectiveArraySize();
 
     assert(initData);
     assert(initData->numSubResources == srcDesc.numMipLevels * srcDesc.size.depth * effectiveArraySize);
@@ -630,7 +629,7 @@ TextureResource* GLRenderer::createTextureResource(Resource::Type type, Resource
     texture->m_handle = handle;
     const void*const*const data = initData->subResources;
 
-    switch (type)
+    switch (srcDesc.type)
     {
         case Resource::Type::Texture1D:
         {
@@ -664,7 +663,7 @@ TextureResource* GLRenderer::createTextureResource(Resource::Type type, Resource
         {
             if (srcDesc.arraySize > 0)
             {
-                if (type == Resource::Type::TextureCube)
+                if (srcDesc.type == Resource::Type::TextureCube)
                 {
                     target = GL_TEXTURE_CUBE_MAP_ARRAY;
                 }
@@ -686,7 +685,7 @@ TextureResource* GLRenderer::createTextureResource(Resource::Type type, Resource
             }
             else
             {
-                if (type == Resource::Type::TextureCube)
+                if (srcDesc.type == Resource::Type::TextureCube)
                 {
                     target = GL_TEXTURE_CUBE_MAP;
                     glBindTexture(target, handle);
@@ -893,8 +892,6 @@ BindingState* GLRenderer::createBindingState(const BindingState::Desc& bindingSt
         auto& dstDetail = dstDetails[i];
         const auto& srcBinding = srcBindings[i];
 
-        // Copy over the bindings 
-        dstDetail.m_firstBinding = bindingStateDesc.getFirst(BindingState::ShaderStyle::Glsl, srcBinding.shaderBindSet);
         
         switch (srcBinding.bindingType)
         {
@@ -973,16 +970,17 @@ void GLRenderer::setBindingState(BindingState* stateIn)
         {
             case BindingType::Buffer:
             {
+                const int bindingIndex = binding.registerRange.getSingleIndex();
+
                 BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(binding.resource.Ptr());
-                glBindBufferBase(buffer->m_target, detail.m_firstBinding, buffer->m_handle);
+                glBindBufferBase(buffer->m_target, bindingIndex, buffer->m_handle);
                 break;
             }
             case BindingType::Sampler:
             {
-                auto bindings = bindingDesc.asSlice(BindingState::ShaderStyle::Glsl, binding.shaderBindSet);
-                for (auto b : bindings)
+                for (int index = binding.registerRange.index; index < binding.registerRange.index + binding.registerRange.size; ++index)
                 {
-                    glBindSampler(b, detail.m_samplerHandle);
+                    glBindSampler(index, detail.m_samplerHandle);
                 }
                 break;
             }
@@ -991,7 +989,9 @@ void GLRenderer::setBindingState(BindingState* stateIn)
             {
                 BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(binding.resource.Ptr());
 
-                glActiveTexture(GL_TEXTURE0 + detail.m_firstBinding);
+                const int bindingIndex = binding.registerRange.getSingleIndex();
+
+                glActiveTexture(GL_TEXTURE0 + bindingIndex);
                 glBindTexture(buffer->m_target, buffer->m_handle);
                 break;
             }

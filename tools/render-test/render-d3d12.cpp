@@ -57,7 +57,7 @@ public:
     virtual void setClearColor(const float color[4]) override;
     virtual void clearFrame() override;
     virtual void presentFrame() override;
-    virtual TextureResource* createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData) override;
+    virtual TextureResource* createTextureResource(Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData) override;
     virtual BufferResource* createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& bufferDesc, const void* initData) override;
     virtual SlangResult captureScreenSurface(Surface& surfaceOut) override;
     virtual InputLayout* createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) override;
@@ -178,8 +178,8 @@ protected:
         public:
         typedef TextureResource Parent;
 
-        TextureResourceImpl(Type type, const Desc& desc):
-            Parent(type, desc)
+        TextureResourceImpl(const Desc& desc):
+            Parent(desc)
         {
         }
 
@@ -198,7 +198,6 @@ protected:
         int m_srvIndex = -1;
         int m_uavIndex = -1;
         int m_samplerIndex = -1;
-        int m_binding = 0;
     };
 
     class BindingStateImpl: public BindingState
@@ -1089,6 +1088,8 @@ Result D3D12Renderer::_calcBindParameters(BindParameters& params)
                 const auto& binding = bindings[i];
                 const auto& detail = details[i];
 
+                const int bindingIndex = binding.registerRange.getSingleIndex();
+
                 if (binding.bindingType == BindingType::Buffer)
                 {
                     assert(binding.resource && binding.resource->isBuffer());
@@ -1102,7 +1103,7 @@ Result D3D12Renderer::_calcBindParameters(BindParameters& params)
                         param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
                         D3D12_ROOT_DESCRIPTOR& descriptor = param.Descriptor;
-                        descriptor.ShaderRegister = detail.m_binding;
+                        descriptor.ShaderRegister = bindingIndex;
                         descriptor.RegisterSpace = 0;
 
                         numConstantBuffers++;
@@ -1115,7 +1116,7 @@ Result D3D12Renderer::_calcBindParameters(BindParameters& params)
                         
                     range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
                     range.NumDescriptors = 1;
-                    range.BaseShaderRegister = detail.m_binding;
+                    range.BaseShaderRegister = bindingIndex;
                     range.RegisterSpace = 0;
                     range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
@@ -1135,7 +1136,7 @@ Result D3D12Renderer::_calcBindParameters(BindParameters& params)
                         
                     range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
                     range.NumDescriptors = 1;
-                    range.BaseShaderRegister = detail.m_binding;
+                    range.BaseShaderRegister = bindingIndex;
                     range.RegisterSpace = 0;
                     range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
@@ -1750,13 +1751,13 @@ static D3D12_RESOURCE_DIMENSION _calcResourceDimension(Resource::Type type)
     }
 }
 
-TextureResource* D3D12Renderer::createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& descIn, const TextureResource::Data* initData)
+TextureResource* D3D12Renderer::createTextureResource(Resource::Usage initialUsage, const TextureResource::Desc& descIn, const TextureResource::Data* initData)
 {
     // Description of uploading on Dx12
     // https://msdn.microsoft.com/en-us/library/windows/desktop/dn899215%28v=vs.85%29.aspx
 
     TextureResource::Desc srcDesc(descIn);
-    srcDesc.setDefaults(type, initialUsage);
+    srcDesc.setDefaults(initialUsage);
 
     const DXGI_FORMAT pixelFormat = D3DUtil::getMapFormat(srcDesc.format);
     if (pixelFormat == DXGI_FORMAT_UNKNOWN)
@@ -1764,9 +1765,9 @@ TextureResource* D3D12Renderer::createTextureResource(Resource::Type type, Resou
         return nullptr;
     }
         
-    const int arraySize = srcDesc.calcEffectiveArraySize(type);
+    const int arraySize = srcDesc.calcEffectiveArraySize();
     
-    const D3D12_RESOURCE_DIMENSION dimension = _calcResourceDimension(type);
+    const D3D12_RESOURCE_DIMENSION dimension = _calcResourceDimension(srcDesc.type);
     if (dimension == D3D12_RESOURCE_DIMENSION_UNKNOWN)
     {   
         return nullptr;
@@ -1791,7 +1792,7 @@ TextureResource* D3D12Renderer::createTextureResource(Resource::Type type, Resou
     resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
     resourceDesc.Alignment = 0;
 
-    RefPtr<TextureResourceImpl> texture(new TextureResourceImpl(type, srcDesc));
+    RefPtr<TextureResourceImpl> texture(new TextureResourceImpl(srcDesc));
 
     // Create the target resource
     {
@@ -2297,8 +2298,8 @@ BindingState* D3D12Renderer::createBindingState(const BindingState::Desc& bindin
         const auto& srcEntry = srcBindings[i];
         auto& dstDetail = dstDetails[i];
 
-        dstDetail.m_binding = bindingStateDesc.getFirst(BindingState::ShaderStyle::Hlsl, srcEntry.shaderBindSet);
-        
+        const int bindingIndex = srcEntry.registerRange.getSingleIndex();
+
         switch (srcEntry.bindingType)
         {
             case BindingType::Buffer:
@@ -2405,7 +2406,7 @@ BindingState* D3D12Renderer::createBindingState(const BindingState::Desc& bindin
             {
                 const BindingState::SamplerDesc& samplerDesc = bindingStateDesc.m_samplerDescs[srcEntry.descIndex];
 
-                const int samplerIndex = bindingStateDesc.getFirst(BindingState::ShaderStyle::Hlsl, srcEntry.shaderBindSet);
+                const int samplerIndex = bindingIndex;
                 dstDetail.m_samplerIndex = samplerIndex;
                 bindingState->m_samplerHeap.placeAt(samplerIndex);
 

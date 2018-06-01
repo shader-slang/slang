@@ -59,15 +59,24 @@ const Resource::DescBase& Resource::getDescBase() const
     uint8_t(sizeof(uint32_t)),       // D_Unorm24_S8,
 };
 
+/* static */const BindingStyle RendererUtil::s_rendererTypeToBindingStyle[] =
+{
+    BindingStyle::Unknown,      // Unknown,
+    BindingStyle::DirectX,      // DirectX11,
+    BindingStyle::DirectX,      // DirectX12,
+    BindingStyle::OpenGl,       // OpenGl,
+    BindingStyle::Vulkan,       // Vulkan
+};
 
 /* static */void RendererUtil::compileTimeAsserts()
 {
     SLANG_COMPILE_TIME_ASSERT(SLANG_COUNT_OF(s_formatSize) == int(Format::CountOf));
+    SLANG_COMPILE_TIME_ASSERT(SLANG_COUNT_OF(s_rendererTypeToBindingStyle) == int(RendererType::CountOf));
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!! BindingState::Desc !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-void BindingState::Desc::addSampler(const SamplerDesc& desc, const ShaderBindSet& shaderBindSet)
+void BindingState::Desc::addSampler(const SamplerDesc& desc, const RegisterRange& registerRange)
 {
     int descIndex = int(m_samplerDescs.Count());
     m_samplerDescs.Add(desc);
@@ -75,13 +84,13 @@ void BindingState::Desc::addSampler(const SamplerDesc& desc, const ShaderBindSet
     Binding binding;
     binding.bindingType = BindingType::Sampler;
     binding.resource = nullptr;
-    binding.shaderBindSet = shaderBindSet;
+    binding.registerRange = registerRange;
     binding.descIndex = descIndex;
 
     m_bindings.Add(binding);
 }
 
-void BindingState::Desc::addResource(BindingType bindingType, Resource* resource, const ShaderBindSet& shaderBindSet)
+void BindingState::Desc::addResource(BindingType bindingType, Resource* resource, const RegisterRange& registerRange)
 {
     assert(resource);
 
@@ -89,11 +98,11 @@ void BindingState::Desc::addResource(BindingType bindingType, Resource* resource
     binding.bindingType = bindingType;
     binding.resource = resource;
     binding.descIndex = -1;
-    binding.shaderBindSet = shaderBindSet;
+    binding.registerRange = registerRange;
     m_bindings.Add(binding);
 }
 
-void BindingState::Desc::addCombinedTextureSampler(TextureResource* resource, const SamplerDesc& samplerDesc, const ShaderBindSet& shaderBindSet)
+void BindingState::Desc::addCombinedTextureSampler(TextureResource* resource, const SamplerDesc& samplerDesc, const RegisterRange& registerRange)
 {
     assert(resource);
 
@@ -104,81 +113,18 @@ void BindingState::Desc::addCombinedTextureSampler(TextureResource* resource, co
     binding.bindingType = BindingType::CombinedTextureSampler;
     binding.resource = resource;
     binding.descIndex = samplerDescIndex;
-    binding.shaderBindSet = shaderBindSet;
+    binding.registerRange = registerRange;
     m_bindings.Add(binding);
-}
-
-BindingState::CompactBindIndexSlice BindingState::Desc::makeCompactSlice(int index)
-{
-    if (index < 0)
-    {
-        return CompactBindIndexSlice();
-    }
-    return CompactBindIndexSlice(index, 1);
-}
-
-BindingState::CompactBindIndexSlice BindingState::Desc::makeCompactSlice(const int* srcIndices, int numIndices)
-{
-    assert(numIndices >= 0);
-    switch (numIndices)
-    {
-        case 0:     return CompactBindIndexSlice(); 
-        case 1:     return CompactBindIndexSlice(srcIndices[0], 1);
-        default:
-        {
-            int startIndex = int(m_sharedBindIndices.Count());
-            m_sharedBindIndices.SetSize(startIndex + numIndices);
-            uint16_t* dstIndices = m_sharedBindIndices.Buffer() + startIndex;
-            for (int i = 0; i < numIndices; i++)
-            {
-                assert(srcIndices[i] >= 0);
-                dstIndices[i] = uint16_t(srcIndices[i]);
-            }
-            return CompactBindIndexSlice(startIndex, numIndices);
-        }
-    }
-}
-
-int BindingState::Desc::getFirst(const CompactBindIndexSlice& set) const
-{
-    switch (set.m_size)
-    {
-        case 0:             return -1;
-        case 1:             return set.m_indexOrBase;
-        default:            return m_sharedBindIndices[set.m_indexOrBase];
-    }
-}
-
-int BindingState::Desc::getFirst(ShaderStyle style, const ShaderBindSet& shaderBindSet) const
-{
-    return getFirst(shaderBindSet.shaderSlices[int(style)]); 
 }
 
 void BindingState::Desc::clear()
 {
     m_bindings.Clear();
     m_samplerDescs.Clear();
-    m_sharedBindIndices.Clear();
     m_numRenderTargets = 1;
 }
 
-BindingState::BindIndexSlice BindingState::Desc::asSlice(const CompactBindIndexSlice& compactSlice) const
-{
-    switch (compactSlice.m_size)
-    {
-        case 0:     return BindIndexSlice{ nullptr, 0 };
-        case 1:     return BindIndexSlice{ &compactSlice.m_indexOrBase, 1 };
-        default:    return BindIndexSlice{ m_sharedBindIndices.Buffer() + compactSlice.m_indexOrBase, compactSlice.m_size };
-    }
-}
-
-BindingState::BindIndexSlice BindingState::Desc::asSlice(ShaderStyle style, const ShaderBindSet& shaderBindSet) const
-{
-    return asSlice(shaderBindSet.shaderSlices[int(style)]);
-}
-
-
-int BindingState::Desc::findBindingIndex(Resource::BindFlag::Enum bindFlag, ShaderStyleFlags shaderStyleFlags, BindIndex index) const
+int BindingState::Desc::findBindingIndex(Resource::BindFlag::Enum bindFlag, int registerIndex) const
 {
     const int numBindings = int(m_bindings.Count());
     for (int i = 0; i < numBindings; ++i)
@@ -186,18 +132,16 @@ int BindingState::Desc::findBindingIndex(Resource::BindFlag::Enum bindFlag, Shad
         const Binding& binding = m_bindings[i];
         if (binding.resource && (binding.resource->getDescBase().bindFlags & bindFlag) != 0)
         {
-            for (int j = 0; j < int(ShaderStyle::CountOf); ++j)
+            if (binding.registerRange.hasRegister(registerIndex))
             {
-                if (indexOf(binding.shaderBindSet.shaderSlices[j], index) >= 0)
-                {
-                    return i;
-                }
+                return i;
             }
         }
     }
 
     return -1;
 }
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!! TextureResource::Size !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 int TextureResource::Size::calcMaxDimension(Type type) const
@@ -236,15 +180,15 @@ void BufferResource::Desc::setDefaults(Usage initialUsage)
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! TextureResource::Desc !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-int TextureResource::Desc::calcNumMipLevels(Type type) const
+int TextureResource::Desc::calcNumMipLevels() const
 {
     const int maxDimensionSize = this->size.calcMaxDimension(type);
     return (maxDimensionSize > 0) ? (Math::Log2Floor(maxDimensionSize) + 1) : 0;
 }
 
-int TextureResource::Desc::calcNumSubResources(Type type) const
+int TextureResource::Desc::calcNumSubResources() const
 {
-    const int numMipMaps = (this->numMipLevels > 0) ? this->numMipLevels : calcNumMipLevels(type);
+    const int numMipMaps = (this->numMipLevels > 0) ? this->numMipLevels : calcNumMipLevels();
     const int arrSize = (this->arraySize > 0) ? this->arraySize : 1;
 
     switch (type)
@@ -269,7 +213,7 @@ int TextureResource::Desc::calcNumSubResources(Type type) const
     } 
 }
 
-void TextureResource::Desc::fixSize(Type type)
+void TextureResource::Desc::fixSize()
 {
     switch (type)
     {
@@ -295,20 +239,20 @@ void TextureResource::Desc::fixSize(Type type)
     }
 }
 
-void TextureResource::Desc::setDefaults(Type type, Usage initialUsage)
+void TextureResource::Desc::setDefaults(Usage initialUsage)
 {
-    fixSize(type);
+    fixSize();
     if (this->bindFlags == 0)
     {
         this->bindFlags = Resource::s_requiredBinding[int(initialUsage)];
     }
     if (this->numMipLevels <= 0)
     {
-        this->numMipLevels = calcNumMipLevels(type);
+        this->numMipLevels = calcNumMipLevels();
     }
 }
 
-int TextureResource::Desc::calcEffectiveArraySize(Type type) const
+int TextureResource::Desc::calcEffectiveArraySize() const
 {
     const int arrSize = (this->arraySize > 0) ? this->arraySize : 1;
 
@@ -325,8 +269,9 @@ int TextureResource::Desc::calcEffectiveArraySize(Type type) const
     }
 }
 
-void TextureResource::Desc::init()
+void TextureResource::Desc::init(Type typeIn)
 {
+    this->type = typeIn;
     this->size.init();
     
     this->format = Format::Unknown;
@@ -340,6 +285,7 @@ void TextureResource::Desc::init()
 
 void TextureResource::Desc::init1D(Format formatIn, int widthIn, int numMipMapsIn)
 {
+    this->type = Type::Texture1D;
     this->size.init(widthIn);
     
     this->format = format;
@@ -351,8 +297,11 @@ void TextureResource::Desc::init1D(Format formatIn, int widthIn, int numMipMapsI
     this->cpuAccessFlags = 0; 
 }
 
-void TextureResource::Desc::init2D(Format formatIn, int widthIn, int heightIn, int numMipMapsIn)
+void TextureResource::Desc::init2D(Type typeIn, Format formatIn, int widthIn, int heightIn, int numMipMapsIn)
 {
+    assert(typeIn == Type::Texture2D || typeIn == Type::TextureCube);
+
+    this->type = type;
     this->size.init(widthIn, heightIn);
     
     this->format = format;
@@ -366,6 +315,7 @@ void TextureResource::Desc::init2D(Format formatIn, int widthIn, int heightIn, i
 
 void TextureResource::Desc::init3D(Format formatIn, int widthIn, int heightIn, int depthIn, int numMipMapsIn)
 {
+    this->type = Type::Texture3D;
     this->size.init(widthIn, heightIn, depthIn);
 
     this->format = format;

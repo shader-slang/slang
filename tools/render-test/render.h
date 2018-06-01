@@ -51,6 +51,16 @@ enum class ProjectionStyle
     CountOf,
 };
 
+/// The style of the binding
+enum class BindingStyle
+{
+    Unknown,
+    DirectX,
+    OpenGl,
+    Vulkan,
+    CountOf,
+};
+
 class ShaderProgram: public Slang::RefObject
 {
 	public:
@@ -200,6 +210,8 @@ class Resource: public Slang::RefObject
         bool canBind(BindFlag::Enum bindFlag) const { return (bindFlags & bindFlag) != 0; }
         bool hasCpuAccessFlag(AccessFlag::Enum accessFlag) { return (cpuAccessFlags & accessFlag) != 0; }
 
+        Type type = Type::Unknown;
+
         int bindFlags = 0;          ///< Combination of Resource::BindFlag or 0 (and will use initialUsage to set)
         int cpuAccessFlags = 0;     ///< Combination of Resource::AccessFlag 
     };
@@ -303,28 +315,28 @@ class TextureResource: public Resource
     struct Desc: public DescBase
     {
             /// Initialize with default values
-        void init();
+        void init(Type typeIn);
             /// Initialize different dimensions. For cubemap, use init2D
         void init1D(Format format, int width, int numMipMaps = 0);
-        void init2D(Format format, int width, int height, int numMipMaps = 0);
+        void init2D(Type typeIn, Format format, int width, int height, int numMipMaps = 0);
         void init3D(Format format, int width, int height, int depth, int numMipMaps = 0);
 
             /// Given the type, calculates the number of mip maps. 0 on error
-        int calcNumMipLevels(Type type) const;
+        int calcNumMipLevels() const;
             /// Calculate the total number of sub resources. 0 on error.
-        int calcNumSubResources(Type type) const;
+        int calcNumSubResources() const;
 
             /// Calculate the effective array size - in essence the amount if mip map sets needed. 
             /// In practice takes into account if the arraySize is 0 (it's not an array, but it will still have at least one mip set) 
             /// and if the type is a cubemap (multiplies the amount of mip sets by 6) 
-        int calcEffectiveArraySize(Type type) const;
+        int calcEffectiveArraySize() const;
 
             /// Use type to fix the size values (and array size). 
             /// For example a 1d texture, should have height and depth set to 1.
-        void fixSize(Type type);
+        void fixSize();
 
             /// Set up default parameters based on type and usage
-        void setDefaults(Type type, Usage initialUsage);
+        void setDefaults(Usage initialUsage);
 
         Size size; 
 
@@ -351,8 +363,8 @@ class TextureResource: public Resource
     SLANG_FORCE_INLINE const Desc& getDesc() const { return m_desc; }
 
         /// Ctor
-    TextureResource(Type type, const Desc& desc):
-        Parent(type),
+    TextureResource(const Desc& desc):
+        Parent(desc.type),
         m_desc(desc)
     {
     }
@@ -380,90 +392,29 @@ enum class BindingType
 class BindingState : public Slang::RefObject
 {
 public:
-
-    typedef uint16_t BindIndex;
-
-        /// Shader binding style
-    enum class ShaderStyle
+        /// A register set consists of one or more contiguous indices. 
+        /// To be valid index >= 0 and size >= 1
+    struct RegisterRange
     {
-        Hlsl,
-        Glsl,
-        CountOf,
+            /// True if contains valid contents
+        bool isValid() const { return size > 0; }
+            /// True if valid single value
+        bool isSingle() const { return size == 1; }
+            /// Get as a single index (must be at least one index)
+        int getSingleIndex() const { return (size == 1) ? index : -1; }
+            /// Return the first index
+        int getFirstIndex() const { return (size > 0) ? index : -1; }
+            /// True if contains register index
+        bool hasRegister(int registerIndex) const { return registerIndex >= index && registerIndex < index + size; }
+
+        static RegisterRange makeInvalid() { return RegisterRange{ -1, 0 }; }
+        static RegisterRange makeSingle(int index) { return RegisterRange{ int16_t(index), 1 }; }
+        static RegisterRange makeRange(int index, int size) { return RegisterRange{ int16_t(index), uint16_t(size) }; }
+
+        int16_t index;              ///< The base index
+        uint16_t size;              ///< The amount of register indices
     };
-
-    struct ShaderStyleFlag
-    {
-        enum Enum 
-        {
-            Hlsl = 1 << int(ShaderStyle::Hlsl),
-            Glsl = 1 << int(ShaderStyle::Glsl),
-        };
-    };
-    typedef int ShaderStyleFlags;           ///< Combination of ShaderStyleFlag 
-
-        /// A 'compact' representation of a 0 or more BindIndices.  
-        /// A Slice in this context is effectively an unowned array. 
-        /// If only a single index is he held (which is common) it's held directly in the m_indexOrBase member, otherwise m_indexOrBase is an index into the 
-        /// m_indices list of the Desc. Can be turned into a BindIndexSlice (which is easier to use, and iterable) using asBindIndexSlice method on Desc 
-    struct CompactBindIndexSlice
-    {
-        typedef uint16_t SizeType;
-        /// Default Ctor makes an empty set
-        SLANG_FORCE_INLINE CompactBindIndexSlice() :
-            m_size(0),
-            m_indexOrBase(0)
-        {}
-            /// Ctor for one or more. NOTE! Meaning if indexIn changes depending if numIndices > 1.
-        SLANG_FORCE_INLINE CompactBindIndexSlice(int indexIn, int sizeIn) :
-            m_size(SizeType(sizeIn)),
-            m_indexOrBase(BindIndex(indexIn))
-        {
-        }
-        SizeType m_size;
-        BindIndex m_indexOrBase;                 ///< Meaning changes depending on numIndices. If 1, it is the index if larger than 1, then is an index into 'indices'  
-    };
-
-        /// Holds the BindIndex slice associated with each ShaderStyle
-    struct ShaderBindSet
-    {
-        void set(ShaderStyle style, const CompactBindIndexSlice& slice) { shaderSlices[int(style)] = slice; }
-        void setAll(const CompactBindIndexSlice& slice) 
-        {
-            for (int i = 0; i < int(ShaderStyle::CountOf); ++i)
-            {
-                shaderSlices[i] = slice;
-            }
-        }
-
-        CompactBindIndexSlice shaderSlices[int(ShaderStyle::CountOf)];
-    };
-
-        /// A slice (non owned array) of BindIndices
-        /// TODO: have a generic Slice<T> type instead of this specific type
-    struct BindIndexSlice
-    {
-        const BindIndex* begin() const { return data; }
-        const BindIndex* end() const { return data + size; }
-
-        int indexOf(BindIndex index) const 
-        {
-            for (int i = 0; i < size; ++i)
-            {
-                if (data[i] == index) 
-                {
-                    return i;
-                }   
-            }
-            return -1;
-        }
-
-        int getSize() const { return int(size); }
-        BindIndex operator[](int i) const { assert(i >= 0 && i < size); return data[i]; }
-
-        const BindIndex* data;
-        int size;
-    };
-
+    
     struct SamplerDesc
     {
         bool isCompareSampler;
@@ -474,50 +425,31 @@ public:
         BindingType bindingType;                ///< Type of binding
         int descIndex;                          ///< The description index associated with type. -1 if not used. For example if bindingType is Sampler, the descIndex is into m_samplerDescs.
         Slang::RefPtr<Resource> resource;       ///< Associated resource. nullptr if not used
-        ShaderBindSet shaderBindSet;            ///< Holds BindIndices associated with each ShaderStyle 
+        RegisterRange registerRange;        /// Defines the registers for binding
     };
 
     struct Desc
     {        
-            /// Given a RegisterSet, return as a RegisterList, that can be easily iterated over
-        BindIndexSlice asSlice(const CompactBindIndexSlice& set) const;
-            /// Given a RegisterDesc and a style returns a RegisterList, that can be easily iterated over
-        BindIndexSlice asSlice(ShaderStyle style, const ShaderBindSet& shaderBindSet) const;
-
-            /// Returns the first member of the set, or returns -1 if is empty
-        int getFirst(const CompactBindIndexSlice& set) const;
-            /// Returns the first member of the set, or returns -1 if is empty
-        int getFirst(ShaderStyle style, const ShaderBindSet& shaderBindSet) const;
-
             /// Add a resource - assumed that the binding will match the Desc of the resource
-        void addResource(BindingType bindingType, Resource* resource, const ShaderBindSet& shaderBindSet);
+        void addResource(BindingType bindingType, Resource* resource, const RegisterRange& registerRange);
             /// Add a sampler        
-        void addSampler(const SamplerDesc& desc, const ShaderBindSet& shaderBindSet);
+        void addSampler(const SamplerDesc& desc, const RegisterRange& registerRange);
             /// Add a BufferResource 
-        void addBufferResource(BufferResource* resource, const ShaderBindSet& shaderBindSet) { addResource(BindingType::Buffer, resource, shaderBindSet); }
+        void addBufferResource(BufferResource* resource, const RegisterRange& registerRange) { addResource(BindingType::Buffer, resource, registerRange); }
             /// Add a texture 
-        void addTextureResource(TextureResource* resource, const ShaderBindSet& shaderBindSet) { addResource(BindingType::Texture, resource, shaderBindSet); }
+        void addTextureResource(TextureResource* resource, const RegisterRange& registerRange) { addResource(BindingType::Texture, resource, registerRange); }
             /// Add combined texture a
-        void addCombinedTextureSampler(TextureResource* resource, const SamplerDesc& samplerDesc, const ShaderBindSet& shaderBindSet);
+        void addCombinedTextureSampler(TextureResource* resource, const SamplerDesc& samplerDesc, const RegisterRange& registerRange);
+
+            /// Returns the bind index, that has the bind flag, and indexes the specified register
+        int findBindingIndex(Resource::BindFlag::Enum bindFlag, int registerIndex) const;
 
             /// Clear the contents 
         void clear();
 
-            /// Given an index, makes a CompactBindIndexSlice. If index is < 0, assumes means no indices, and just returns the empty slice
-        CompactBindIndexSlice makeCompactSlice(int index);
-            /// Given a list of indices, makes a CompactBindIndexSlice. Note does check for indices being unique and the order is maintained. 
-            /// Only >= 0 indices are valid
-        CompactBindIndexSlice makeCompactSlice(const int* indices, int numIndices);
-
-            /// Returns the index of the element in the slice
-        int indexOf(const CompactBindIndexSlice& slice, BindIndex index) const { return asSlice(slice).indexOf(index); }
-
-            /// Find the 
-        int findBindingIndex(Resource::BindFlag::Enum bindFlag, ShaderStyleFlags shaderStyleFlags, BindIndex index) const;
-
         Slang::List<Binding> m_bindings;                            ///< All of the bindings in order
         Slang::List<SamplerDesc> m_samplerDescs;                    ///< Holds the SamplerDesc for the binding - indexed by the descIndex member of Binding 
-        Slang::List<BindIndex> m_sharedBindIndices;                 ///< Used to store BindIndex slices that don't fit into CompactBindIndexSlice
+        
         int m_numRenderTargets = 1;
     };
 
@@ -551,7 +483,7 @@ public:
     virtual void presentFrame() = 0;
 
         /// Create a texture resource. initData holds the initialize data to set the contents of the texture when constructed. 
-    virtual TextureResource* createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData = nullptr) { return nullptr; }
+    virtual TextureResource* createTextureResource(Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData = nullptr) { return nullptr; }
         /// Create a buffer resource
     virtual BufferResource* createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& desc, const void* initData = nullptr) { return nullptr; } 
 
@@ -604,9 +536,13 @@ struct RendererUtil
         /// Given the projection style returns an 'identity' matrix, which ensures x,y mapping to pixels is the same on all targets
     static void getIdentityProjection(ProjectionStyle style, float projMatrix[16]);
 
+        /// Get the binding style from the type
+    static BindingStyle getBindingStyle(RendererType type) { return s_rendererTypeToBindingStyle[int(type)]; }
+
     private:
     static void compileTimeAsserts();
     static const uint8_t s_formatSize[]; // Maps Format::XXX to a size in bytes;
+    static const BindingStyle s_rendererTypeToBindingStyle[];           ///< Maps a RendererType to a BindingStyle
 };
 
 } // renderer_test

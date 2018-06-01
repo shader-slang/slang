@@ -16,7 +16,7 @@ using namespace Slang;
 /* static */Result ShaderRendererUtil::createTextureResource(const InputTextureDesc& inputDesc, const TextureData& texData, int bindFlags, Renderer* renderer, RefPtr<TextureResource>& textureOut)
 {
     TextureResource::Desc textureResourceDesc;
-    textureResourceDesc.init();
+    textureResourceDesc.init(Resource::Type::Unknown);
 
     textureResourceDesc.format = Format::RGBA_Unorm_UInt8;
     textureResourceDesc.numMipLevels = texData.mipLevels;
@@ -24,31 +24,30 @@ using namespace Slang;
     textureResourceDesc.bindFlags = bindFlags;
 
     // It's the same size in all dimensions 
-    Resource::Type type = Resource::Type::Unknown;
     switch (inputDesc.dimension)
     {
         case 1:
         {
-            type = Resource::Type::Texture1D;
+            textureResourceDesc.type = Resource::Type::Texture1D;
             textureResourceDesc.size.init(inputDesc.size);
             break;
         }
         case 2:
         {
-            type = inputDesc.isCube ? Resource::Type::TextureCube : Resource::Type::Texture2D;
+            textureResourceDesc.type = inputDesc.isCube ? Resource::Type::TextureCube : Resource::Type::Texture2D;
             textureResourceDesc.size.init(inputDesc.size, inputDesc.size);
             break;
         }
         case 3:
         {
-            type = Resource::Type::Texture3D;
+            textureResourceDesc.type = Resource::Type::Texture3D;
             textureResourceDesc.size.init(inputDesc.size, inputDesc.size, inputDesc.size);
             break;
         }
     }
 
-    const int effectiveArraySize = textureResourceDesc.calcEffectiveArraySize(type);
-    const int numSubResources = textureResourceDesc.calcNumSubResources(type);
+    const int effectiveArraySize = textureResourceDesc.calcEffectiveArraySize();
+    const int numSubResources = textureResourceDesc.calcNumSubResources();
 
     Resource::Usage initialUsage = Resource::Usage::GenericRead;
     TextureResource::Data initData;
@@ -82,7 +81,7 @@ using namespace Slang;
     initData.numSubResources = numSubResources;
     initData.subResources = subResources.Buffer();
 
-    textureOut = renderer->createTextureResource(type, Resource::Usage::GenericRead, textureResourceDesc, &initData);
+    textureOut = renderer->createTextureResource(Resource::Usage::GenericRead, textureResourceDesc, &initData);
 
     return textureOut ? SLANG_OK : SLANG_FAIL;
 }
@@ -132,6 +131,53 @@ static BindingState::SamplerDesc _calcSamplerDesc(const InputSamplerDesc& srcDes
     return dstDesc;
 }
 
+/* static */BindingState::RegisterRange ShaderRendererUtil::calcRegisterRange(Renderer* renderer, const ShaderInputLayoutEntry& entry)
+{
+    typedef BindingState::RegisterRange RegisterRange;
+
+    BindingStyle bindingStyle = RendererUtil::getBindingStyle(renderer->getRendererType());
+
+    switch (bindingStyle)
+    {
+        case BindingStyle::DirectX:         
+        {
+            return RegisterRange::makeSingle(entry.hlslBinding);
+        }
+        case BindingStyle::Vulkan:
+        {
+            // USe OpenGls for now
+            // fallthru
+        }
+        case BindingStyle::OpenGl:
+        {
+            const int count = int(entry.glslBinding.Count());
+
+            if (count <= 0)
+            {
+                break;
+            }
+
+            int baseIndex = entry.glslBinding[0];
+            // Make sure they are contiguous
+            for (int i = 1; i < int(entry.glslBinding.Count()); ++i)
+            {
+                if (baseIndex + i != entry.glslBinding[i])
+                {
+                    assert("Bindings must be contiguous");
+                    break;
+                }
+            }
+            return RegisterRange::makeRange(baseIndex, count); 
+        }
+        /* case BindingStyle::Vulkan:
+        {
+        } */
+        default: break;
+    }
+    // Return invalid
+    return RegisterRange::makeInvalid();
+}
+
 /* static */Result ShaderRendererUtil::createBindingStateDesc(ShaderInputLayoutEntry* srcEntries, int numEntries, Renderer* renderer, BindingState::Desc& descOut)
 {
     const int textureBindFlags = Resource::BindFlag::NonPixelShaderResource | Resource::BindFlag::PixelShaderResource;
@@ -141,9 +187,12 @@ static BindingState::SamplerDesc _calcSamplerDesc(const InputSamplerDesc& srcDes
     {
         const ShaderInputLayoutEntry& srcEntry = srcEntries[i];
 
-        BindingState::ShaderBindSet shaderBindSet;
-        shaderBindSet.set(BindingState::ShaderStyle::Hlsl, descOut.makeCompactSlice(srcEntry.hlslBinding));
-        shaderBindSet.set(BindingState::ShaderStyle::Glsl, descOut.makeCompactSlice(srcEntry.glslBinding.Buffer(), int(srcEntry.glslBinding.Count())));
+        const BindingState::RegisterRange registerSet = calcRegisterRange(renderer, srcEntry);
+        if (!registerSet.isValid())
+        {
+            assert(!"Couldn't find a binding");
+            return SLANG_FAIL;
+        }
 
         switch (srcEntry.type)
         {
@@ -156,14 +205,14 @@ static BindingState::SamplerDesc _calcSamplerDesc(const InputSamplerDesc& srcDes
                 RefPtr<BufferResource> bufferResource;
                 SLANG_RETURN_ON_FAIL(createBufferResource(srcEntry.bufferDesc, srcEntry.isOutput, bufferSize, srcEntry.bufferData.Buffer(), renderer, bufferResource));
                 
-                descOut.addBufferResource(bufferResource, shaderBindSet);
+                descOut.addBufferResource(bufferResource, registerSet);
                 break;
             }
             case ShaderInputType::CombinedTextureSampler:
             {
                 RefPtr<TextureResource> texture;
                 SLANG_RETURN_ON_FAIL(generateTextureResource(srcEntry.textureDesc, textureBindFlags, renderer, texture));
-                descOut.addCombinedTextureSampler(texture, _calcSamplerDesc(srcEntry.samplerDesc), shaderBindSet);
+                descOut.addCombinedTextureSampler(texture, _calcSamplerDesc(srcEntry.samplerDesc), registerSet);
                 break;
             }
             case ShaderInputType::Texture:
@@ -171,12 +220,12 @@ static BindingState::SamplerDesc _calcSamplerDesc(const InputSamplerDesc& srcDes
                 RefPtr<TextureResource> texture;
                 SLANG_RETURN_ON_FAIL(generateTextureResource(srcEntry.textureDesc, textureBindFlags, renderer, texture));
 
-                descOut.addTextureResource(texture, shaderBindSet);
+                descOut.addTextureResource(texture, registerSet);
                 break;
             }
             case ShaderInputType::Sampler:
             {
-                descOut.addSampler(_calcSamplerDesc(srcEntry.samplerDesc), shaderBindSet);
+                descOut.addSampler(_calcSamplerDesc(srcEntry.samplerDesc), registerSet);
                 break;
             }
             default: 

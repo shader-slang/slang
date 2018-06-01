@@ -50,7 +50,7 @@ public:
     virtual void setClearColor(const float color[4]) override;
     virtual void clearFrame() override;
     virtual void presentFrame() override;
-    virtual TextureResource* createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData) override;
+    virtual TextureResource* createTextureResource(Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData) override;
     virtual BufferResource* createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& bufferDesc, const void* initData) override;
     virtual SlangResult captureScreenSurface(Surface& surfaceOut) override;
     virtual InputLayout* createInputLayout( const InputElementDesc* inputElements, UInt inputElementCount) override;
@@ -79,8 +79,6 @@ public:
         ComPtr<ID3D11ShaderResourceView> m_srv;
         ComPtr<ID3D11UnorderedAccessView> m_uav;
         ComPtr<ID3D11SamplerState> m_samplerState;
-
-        int m_binding = 0;
     };
 
     class BindingStateImpl: public BindingState
@@ -125,8 +123,8 @@ public:
     public:
         typedef TextureResource Parent;
 
-        TextureResourceImpl(Type type, const Desc& desc, Usage initialUsage) :
-            Parent(type, desc),
+        TextureResourceImpl(const Desc& desc, Usage initialUsage) :
+            Parent(desc),
             m_initialUsage(initialUsage)
         {
         }
@@ -431,12 +429,12 @@ static int _calcResourceAccessFlags(int accessFlags)
     }
 }
 
-TextureResource* D3D11Renderer::createTextureResource(Resource::Type type, Resource::Usage initialUsage, const TextureResource::Desc& descIn, const TextureResource::Data* initData)
+TextureResource* D3D11Renderer::createTextureResource(Resource::Usage initialUsage, const TextureResource::Desc& descIn, const TextureResource::Data* initData)
 {
     TextureResource::Desc srcDesc(descIn);
-    srcDesc.setDefaults(type, initialUsage);
+    srcDesc.setDefaults(initialUsage);
  
-    const int effectiveArraySize = srcDesc.calcEffectiveArraySize(type);
+    const int effectiveArraySize = srcDesc.calcEffectiveArraySize();
     
     assert(initData);
     assert(initData->numSubResources == srcDesc.numMipLevels * effectiveArraySize * srcDesc.size.depth);
@@ -474,9 +472,9 @@ TextureResource* D3D11Renderer::createTextureResource(Resource::Type type, Resou
 
     const int accessFlags = _calcResourceAccessFlags(srcDesc.cpuAccessFlags);
 
-    RefPtr<TextureResourceImpl> texture(new TextureResourceImpl(type, srcDesc, initialUsage));
+    RefPtr<TextureResourceImpl> texture(new TextureResourceImpl(srcDesc, initialUsage));
 
-    switch (type)
+    switch (srcDesc.type)
     {
         case Resource::Type::Texture1D:
         {
@@ -513,7 +511,7 @@ TextureResource* D3D11Renderer::createTextureResource(Resource::Type type, Resou
             desc.SampleDesc.Count = srcDesc.sampleDesc.numSamples;
             desc.SampleDesc.Quality = srcDesc.sampleDesc.quality;
 
-            if (type == Resource::Type::TextureCube)
+            if (srcDesc.type == Resource::Type::TextureCube)
             {
                 desc.MiscFlags |= D3D11_RESOURCE_MISC_TEXTURECUBE;
             }
@@ -840,7 +838,7 @@ BindingState* D3D11Renderer::createBindingState(const BindingState::Desc& bindin
         auto& dstDetail = dstDetails[i];
         const auto& srcBinding = srcBindings[i];
         
-        dstDetail.m_binding = bindingStateDesc.getFirst(BindingState::ShaderStyle::Hlsl, srcBinding.shaderBindSet);
+        assert(srcBinding.registerRange.isSingle());
 
         switch (srcBinding.bindingType)
         {
@@ -1028,6 +1026,8 @@ void D3D11Renderer::_applyBindingState(bool isCompute)
         const auto& binding = bindings[i];
         const auto& detail = details[i];
 
+        const int bindingIndex = binding.registerRange.getSingleIndex();
+
         switch (binding.bindingType)
         {
             case BindingType::Buffer:
@@ -1037,29 +1037,29 @@ void D3D11Renderer::_applyBindingState(bool isCompute)
                 {
                     ID3D11Buffer* buffer = static_cast<BufferResourceImpl*>(binding.resource.Ptr())->m_buffer;
                     if (isCompute)
-                        context->CSSetConstantBuffers(detail.m_binding, 1, &buffer); 
+                        context->CSSetConstantBuffers(bindingIndex, 1, &buffer); 
                     else
                     {
-                        context->VSSetConstantBuffers(detail.m_binding, 1, &buffer);
-                        context->PSSetConstantBuffers(detail.m_binding, 1, &buffer);
+                        context->VSSetConstantBuffers(bindingIndex, 1, &buffer);
+                        context->PSSetConstantBuffers(bindingIndex, 1, &buffer);
                     }
                 }
                 else if (detail.m_uav)
                 {
                     if (isCompute)
-                        context->CSSetUnorderedAccessViews(detail.m_binding, 1, detail.m_uav.readRef(), nullptr);
+                        context->CSSetUnorderedAccessViews(bindingIndex, 1, detail.m_uav.readRef(), nullptr);
                     else
                         context->OMSetRenderTargetsAndUnorderedAccessViews(m_currentBindings->getDesc().m_numRenderTargets,
-                            m_renderTargetViews.Buffer()->readRef(), nullptr, detail.m_binding, 1, detail.m_uav.readRef(), nullptr);
+                            m_renderTargetViews.Buffer()->readRef(), nullptr, bindingIndex, 1, detail.m_uav.readRef(), nullptr);
                 }
                 else
                 {
                     if (isCompute)
-                        context->CSSetShaderResources(detail.m_binding, 1, detail.m_srv.readRef());
+                        context->CSSetShaderResources(bindingIndex, 1, detail.m_srv.readRef());
                     else
                     {
-                        context->PSSetShaderResources(detail.m_binding, 1, detail.m_srv.readRef());
-                        context->VSSetShaderResources(detail.m_binding, 1, detail.m_srv.readRef());
+                        context->PSSetShaderResources(bindingIndex, 1, detail.m_srv.readRef());
+                        context->VSSetShaderResources(bindingIndex, 1, detail.m_srv.readRef());
                     }
                 }
                 break;
@@ -1069,19 +1069,19 @@ void D3D11Renderer::_applyBindingState(bool isCompute)
                 if (detail.m_uav)
                 {
                     if (isCompute)
-                        context->CSSetUnorderedAccessViews(detail.m_binding, 1, detail.m_uav.readRef(), nullptr);
+                        context->CSSetUnorderedAccessViews(bindingIndex, 1, detail.m_uav.readRef(), nullptr);
                     else
                         context->OMSetRenderTargetsAndUnorderedAccessViews(D3D11_KEEP_RENDER_TARGETS_AND_DEPTH_STENCIL,
-                            nullptr, nullptr, detail.m_binding, 1, detail.m_uav.readRef(), nullptr);
+                            nullptr, nullptr, bindingIndex, 1, detail.m_uav.readRef(), nullptr);
                 }
                 else
                 {
                     if (isCompute)
-                        context->CSSetShaderResources(detail.m_binding, 1, detail.m_srv.readRef());
+                        context->CSSetShaderResources(bindingIndex, 1, detail.m_srv.readRef());
                     else
                     {
-                        context->PSSetShaderResources(detail.m_binding, 1, detail.m_srv.readRef());
-                        context->VSSetShaderResources(detail.m_binding, 1, detail.m_srv.readRef());
+                        context->PSSetShaderResources(bindingIndex, 1, detail.m_srv.readRef());
+                        context->VSSetShaderResources(bindingIndex, 1, detail.m_srv.readRef());
                     }
                 }
                 break;
@@ -1089,11 +1089,11 @@ void D3D11Renderer::_applyBindingState(bool isCompute)
             case BindingType::Sampler: 
             {
                 if (isCompute)
-                    context->CSSetSamplers(detail.m_binding, 1, detail.m_samplerState.readRef());
+                    context->CSSetSamplers(bindingIndex, 1, detail.m_samplerState.readRef());
                 else
                 {
-                    context->PSSetSamplers(detail.m_binding, 1, detail.m_samplerState.readRef());
-                    context->VSSetSamplers(detail.m_binding, 1, detail.m_samplerState.readRef());
+                    context->PSSetSamplers(bindingIndex, 1, detail.m_samplerState.readRef());
+                    context->VSSetSamplers(bindingIndex, 1, detail.m_samplerState.readRef());
                 }
                 break;
             }
