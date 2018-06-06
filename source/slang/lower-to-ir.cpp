@@ -573,6 +573,7 @@ LoweredValInfo emitCallToDeclRef(
         bool justAGetter = true;
         for (auto accessorDeclRef : getMembersOfType<AccessorDecl>(subscriptDeclRef))
         {
+#if 0
             // If the subscript declares a `ref` accessor, then we can just
             // invoke that directly to get an l-value we can use.
             if(auto refAccessorDeclRef = accessorDeclRef.As<RefAccessorDecl>())
@@ -596,6 +597,7 @@ LoweredValInfo emitCallToDeclRef(
                 // so that it can work as an l-value of the desired result type.
                 return LoweredValInfo::ptr(getSimpleVal(context, callVal));
             }
+#endif
 
             // If we don't find a `ref` accessor, then we want to track whether
             // this subscript has any accessors other than `get` (assuming
@@ -821,6 +823,15 @@ top:
         {
             auto boundSubscriptInfo = lowered.getBoundSubscriptInfo();
 
+            // We are being asked to extract a value from a subscript call
+            // (e.g., `base[index]`). We will first check if the subscript
+            // declared a getter and use that if possible, and then fall
+            // back to a `ref` accessor if one is defined.
+            //
+            // (Picking the `get` over the `ref` accessor simplifies things
+            // in case the `get` operation has a natural translation for
+            // a target, while the general `ref` case does not...)
+
             auto getters = getMembersOfType<GetterDecl>(boundSubscriptInfo->declRef);
             if (getters.Count())
             {
@@ -830,6 +841,27 @@ top:
                     *getters.begin(),
                     nullptr,
                     boundSubscriptInfo->args);
+                goto top;
+            }
+
+            auto refAccessors = getMembersOfType<RefAccessorDecl>(boundSubscriptInfo->declRef);
+            if(refAccessors.Count())
+            {
+                // The `ref` accessor will return a pointer to the value, so
+                // we need to reflect that in the type of our `call` instruction.
+                IRType* ptrType = context->irBuilder->getPtrType(boundSubscriptInfo->type);
+
+                LoweredValInfo refVal = emitCallToDeclRef(
+                    context,
+                    ptrType,
+                    *refAccessors.begin(),
+                    nullptr,
+                    boundSubscriptInfo->args);
+
+                // The result from the call needs to be implicitly dereferenced,
+                // so that it can work as an l-value of the desired result type.
+                lowered = LoweredValInfo::ptr(getSimpleVal(context, refVal));
+
                 goto top;
             }
 
@@ -1308,7 +1340,7 @@ static void addNameHint(
 {
     Name* name = getNameForNameHint(context, decl);
     if(!name)
-        return;    
+        return;
     context->irBuilder->addDecoration<IRNameHintDecoration>(inst)->name = name;
 }
 
@@ -2958,18 +2990,51 @@ IRInst* getAddress(
     SourceLoc               diagnosticLocation)
 {
     LoweredValInfo val = inVal;
+
     switch(val.flavor)
     {
     case LoweredValInfo::Flavor::Ptr:
         return val.val;
 
-    // TODO: are there other cases we need to handle here (e.g.,
-    // turning a bound subscript/property into an address)
+    case LoweredValInfo::Flavor::BoundSubscript:
+        {
+            // If we are are trying to turn a subscript operation like `buffer[index]`
+            // into a pointer, then we need to find a `ref` accessor declared
+            // as part of the subscript operation being referenced.
+            //
+            auto subscriptInfo = val.getBoundSubscriptInfo();
+            auto refAccessors = getMembersOfType<RefAccessorDecl>(subscriptInfo->declRef);
+            if(refAccessors.Count())
+            {
+                // The `ref` accessor will return a pointer to the value, so
+                // we need to reflect that in the type of our `call` instruction.
+                IRType* ptrType = context->irBuilder->getPtrType(subscriptInfo->type);
+
+                LoweredValInfo refVal = emitCallToDeclRef(
+                    context,
+                    ptrType,
+                    *refAccessors.begin(),
+                    nullptr,
+                    subscriptInfo->args);
+
+                // The result from the call should be a pointer, and it
+                // is the address that we wanted in the first place.
+                return getSimpleVal(context, refVal);
+            }
+
+            // Otherwise, there was no `ref` accessor, and so it is not possible
+            // to materialize this location into a pointer for whatever purpose
+            // we have in mind (e.g., passing it to an atomic operation).
+        }
+
+    // TODO: are there other cases we need to handled here?
 
     default:
-        context->getSink()->diagnose(diagnosticLocation, Diagnostics::invalidLValueForRefParameter);
-        return nullptr;
+        break;
     }
+
+    context->getSink()->diagnose(diagnosticLocation, Diagnostics::invalidLValueForRefParameter);
+    return nullptr;
 }
 
 void assign(
@@ -3090,7 +3155,10 @@ top:
             // `someStructuredBuffer[index]`.
             //
             // When storing to such a value, we need to emit a call
-            // to the appropriate builtin "setter" accessor.
+            // to the appropriate builtin "setter" accessor, if there
+            // is one, and then fall back to a `ref` accessor if
+            // there is no setter.
+            //
             auto subscriptInfo = left.getBoundSubscriptInfo();
 
             // Search for an appropriate "setter" declaration
@@ -3098,7 +3166,6 @@ top:
             if (setters.Count())
             {
                 auto allArgs = subscriptInfo->args;
-
                 addArgs(context, &allArgs, right);
 
                 emitCallToDeclRef(
@@ -3108,6 +3175,28 @@ top:
                     nullptr,
                     allArgs);
                 return;
+            }
+
+            auto refAccessors = getMembersOfType<RefAccessorDecl>(subscriptInfo->declRef);
+            if(refAccessors.Count())
+            {
+                // The `ref` accessor will return a pointer to the value, so
+                // we need to reflect that in the type of our `call` instruction.
+                IRType* ptrType = context->irBuilder->getPtrType(subscriptInfo->type);
+
+                LoweredValInfo refVal = emitCallToDeclRef(
+                    context,
+                    ptrType,
+                    *refAccessors.begin(),
+                    nullptr,
+                    subscriptInfo->args);
+
+                // The result from the call needs to be implicitly dereferenced,
+                // so that it can work as an l-value of the desired result type.
+                left = LoweredValInfo::ptr(getSimpleVal(context, refVal));
+
+                // Tail-recursively attempt assignment again on the new l-value.
+                goto top;
             }
 
             // No setter found? Then we have an error!

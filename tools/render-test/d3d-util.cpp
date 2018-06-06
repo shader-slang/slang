@@ -31,6 +31,7 @@ using namespace Slang;
         case Format::RG_Float32:            return DXGI_FORMAT_R32G32_FLOAT;
         case Format::R_Float32:             return DXGI_FORMAT_R32_FLOAT;
         case Format::RGBA_Unorm_UInt8:      return DXGI_FORMAT_R8G8B8A8_UNORM;
+        case Format::R_UInt32:              return DXGI_FORMAT_R32_UINT;
 
         case Format::D_Float32:             return DXGI_FORMAT_D32_FLOAT;
         case Format::D_Unorm24_S8:          return DXGI_FORMAT_D24_UNORM_S8_UINT;
@@ -47,7 +48,8 @@ using namespace Slang;
         switch (format)
         {
             case DXGI_FORMAT_R32_FLOAT:     /* fallthru */
-            case DXGI_FORMAT_D32_FLOAT:            
+            case DXGI_FORMAT_R32_UINT:
+            case DXGI_FORMAT_D32_FLOAT:
             {
                 return DXGI_FORMAT_R32_TYPELESS;
             }
@@ -73,7 +75,7 @@ using namespace Slang;
             switch (format)
             {
                 case DXGI_FORMAT_D32_FLOAT:     /* fallthru */
-                case DXGI_FORMAT_R32_TYPELESS:            
+                case DXGI_FORMAT_R32_TYPELESS:
                 {
                     return DXGI_FORMAT_D32_FLOAT;
                 }
@@ -88,7 +90,7 @@ using namespace Slang;
             switch (format)
             {
                 case DXGI_FORMAT_D32_FLOAT:     /* fallthru */
-                case DXGI_FORMAT_D24_UNORM_S8_UINT: 
+                case DXGI_FORMAT_D24_UNORM_S8_UINT:
                 {
                     return DXGI_FORMAT_UNKNOWN;
                 }
@@ -102,7 +104,7 @@ using namespace Slang;
             switch (format)
             {
                 case DXGI_FORMAT_D32_FLOAT:     /* fallthru */
-                case DXGI_FORMAT_R32_TYPELESS:            
+                case DXGI_FORMAT_R32_TYPELESS:
                 {
                     return DXGI_FORMAT_R32_FLOAT;
                 }

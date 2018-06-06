@@ -78,13 +78,13 @@ public:
 
     // ShaderCompiler implementation
     virtual ShaderProgram* compileProgram(const ShaderCompileRequest& request) override;
-    
+
     ~D3D12Renderer();
 
 protected:
     static const Int kMaxNumRenderFrames = 4;
     static const Int kMaxNumRenderTargets = 3;
-    
+
     struct Submitter
     {
         virtual void setRootConstantBufferView(int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation) = 0;
@@ -106,7 +106,7 @@ protected:
     class ShaderProgramImpl: public ShaderProgram
     {
         public:
-        PipelineType m_pipelineType; 
+        PipelineType m_pipelineType;
         List<uint8_t> m_vertexShader;
         List<uint8_t> m_pixelShader;
         List<uint8_t> m_computeShader;
@@ -116,7 +116,7 @@ protected:
     {
         public:
         typedef BufferResource Parent;
-        
+
         enum class BackingStyle
         {
             Unknown,
@@ -164,8 +164,8 @@ protected:
         }
 
         BackingStyle m_backingStyle;        ///< How the resource is 'backed' - either as a resource or cpu memory. Cpu memory is typically used for constant buffers.
-        D3D12Resource m_resource;           ///< The resource typically in gpu memory             
-        D3D12Resource m_uploadResource;     ///< If the resource can be written to, and is in gpu memory (ie not Memory backed), will have upload resource 
+        D3D12Resource m_resource;           ///< The resource typically in gpu memory
+        D3D12Resource m_uploadResource;     ///< If the resource can be written to, and is in gpu memory (ie not Memory backed), will have upload resource
 
         Usage m_initialUsage;
 
@@ -219,8 +219,8 @@ protected:
         {}
 
         List<BindingDetail> m_bindingDetails;       ///< These match 1-1 to the bindings in the m_desc
-        
-        D3D12DescriptorHeap m_viewHeap;            ///< Cbv, Srv, Uav 
+
+        D3D12DescriptorHeap m_viewHeap;            ///< Cbv, Srv, Uav
         D3D12DescriptorHeap m_samplerHeap;        ///< Heap for samplers
     };
 
@@ -245,10 +245,10 @@ protected:
 
     struct BindParameters
     {
-        enum 
-        { 
-            kMaxRanges = 16, 
-            kMaxParameters = 32 
+        enum
+        {
+            kMaxRanges = 16,
+            kMaxParameters = 32
         };
 
         D3D12_DESCRIPTOR_RANGE& nextRange() { return m_ranges[m_rangeIndex++]; }
@@ -273,7 +273,7 @@ protected:
         }
         virtual void setRootDescriptorTable(int index, D3D12_GPU_DESCRIPTOR_HANDLE baseDescriptor) override
         {
-            m_commandList->SetGraphicsRootDescriptorTable(index, baseDescriptor); 
+            m_commandList->SetGraphicsRootDescriptorTable(index, baseDescriptor);
         }
         void setRootSignature(ID3D12RootSignature* rootSignature)
         {
@@ -317,7 +317,7 @@ protected:
     void releaseFrameResources();
 
     Result createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const void* srcData, D3D12Resource& uploadResource, D3D12_RESOURCE_STATES finalState, D3D12Resource& resourceOut);
-    
+
     void beginRender();
 
     void endRender();
@@ -338,7 +338,7 @@ protected:
     Result calcComputePipelineState(ComPtr<ID3D12RootSignature>& signatureOut, ComPtr<ID3D12PipelineState>& pipelineStateOut);
 
     Result _bindRenderState(RenderState* renderState, ID3D12GraphicsCommandList* commandList, Submitter* submitter);
-    
+
     Result _calcBindParameters(BindParameters& params);
     RenderState* findRenderState(PipelineType pipelineType);
 
@@ -364,7 +364,7 @@ protected:
     int m_targetSampleQuality = 0;                            ///< The multi sample quality
 
     Desc m_desc;
-    
+
     bool m_isInitialized = false;
 
     D3D12_PRIMITIVE_TOPOLOGY_TYPE m_primitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
@@ -556,7 +556,7 @@ static void _initBufferResourceDesc(size_t bufferSize, D3D12_RESOURCE_DESC& out)
 Result D3D12Renderer::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const void* srcData, D3D12Resource& uploadResource, D3D12_RESOURCE_STATES finalState, D3D12Resource& resourceOut)
 {
    const  size_t bufferSize = size_t(resourceDesc.Width);
- 
+
     {
         D3D12_HEAP_PROPERTIES heapProps;
         heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -580,25 +580,25 @@ Result D3D12Renderer::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, cons
 
         D3D12_RESOURCE_DESC uploadResourceDesc(resourceDesc);
         uploadResourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-        
+
         SLANG_RETURN_ON_FAIL(uploadResource.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, uploadResourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr));
     }
 
     if (srcData)
-    {   
-        // Copy data to the intermediate upload heap and then schedule a copy 
+    {
+        // Copy data to the intermediate upload heap and then schedule a copy
         // from the upload heap to the vertex buffer.
         UINT8* dstData;
         D3D12_RANGE readRange = {};         // We do not intend to read from this resource on the CPU.
 
         ID3D12Resource* dxUploadResource = uploadResource.getResource();
-        
+
         SLANG_RETURN_ON_FAIL(dxUploadResource->Map(0, &readRange, reinterpret_cast<void**>(&dstData)));
         ::memcpy(dstData, srcData, bufferSize);
         dxUploadResource->Unmap(0, nullptr);
 
         m_commandList->CopyBufferRegion(resourceOut, 0, uploadResource, 0, bufferSize);
-    
+
         // Make sure it's in the right state
         {
             D3D12BarrierSubmitter submitter(m_commandList);
@@ -641,7 +641,7 @@ void D3D12Renderer::beginRender()
     m_circularResourceHeap.updateCompleted();
 
     getFrame().m_commandAllocator->Reset();
-    
+
     _resetCommandList();
 
     // Indicate that the render target needs to be writable
@@ -665,7 +665,7 @@ void D3D12Renderer::endRender()
     D3D12Resource& backBuffer = *m_backBuffers[m_renderTargetIndex];
     if (m_isMultiSampled)
     {
-        // MSAA resolve    
+        // MSAA resolve
         D3D12Resource& renderTarget = *m_renderTargets[m_renderTargetIndex];
         assert(&renderTarget != &backBuffer);
         // Barriers to wait for the render target, and the backbuffer to be in correct state
@@ -674,7 +674,7 @@ void D3D12Renderer::endRender()
             renderTarget.transition(D3D12_RESOURCE_STATE_RESOLVE_SOURCE, submitter);
             backBuffer.transition(D3D12_RESOURCE_STATE_RESOLVE_DEST, submitter);
         }
-        
+
         // Do the resolve...
         m_commandList->ResolveSubresource(backBuffer, 0, renderTarget, 0, m_targetFormat);
     }
@@ -760,16 +760,16 @@ Result D3D12Renderer::captureTextureToSurface(D3D12Resource& resource, Surface& 
     // Do the copy
     {
         D3D12_TEXTURE_COPY_LOCATION srcLoc;
-        srcLoc.pResource = resource; 
+        srcLoc.pResource = resource;
         srcLoc.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
         srcLoc.SubresourceIndex = 0;
 
         D3D12_TEXTURE_COPY_LOCATION dstLoc;
-        dstLoc.pResource = stagingResource; 
+        dstLoc.pResource = stagingResource;
         dstLoc.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
         dstLoc.PlacedFootprint.Offset = 0;
         dstLoc.PlacedFootprint.Footprint.Format = desc.Format;
-        dstLoc.PlacedFootprint.Footprint.Width = UINT(desc.Width); 
+        dstLoc.PlacedFootprint.Footprint.Width = UINT(desc.Width);
         dstLoc.PlacedFootprint.Footprint.Height = UINT(desc.Height);
         dstLoc.PlacedFootprint.Footprint.Depth = 1;
         dstLoc.PlacedFootprint.Footprint.RowPitch = UINT(rowPitch);
@@ -789,10 +789,10 @@ Result D3D12Renderer::captureTextureToSurface(D3D12Resource& resource, Surface& 
         ID3D12Resource* dxResource = stagingResource;
 
         UINT8* data;
-        D3D12_RANGE readRange = {0, bufferSize};         
-        
+        D3D12_RANGE readRange = {0, bufferSize};
+
         SLANG_RETURN_ON_FAIL(dxResource->Map(0, &readRange, reinterpret_cast<void**>(&data)));
-        
+
         Result res = surfaceOut.set(int(desc.Width), int(desc.Height), Format::RGBA_Unorm_UInt8, int(rowPitch), data, SurfaceAllocator::getMallocAllocator());
 
         dxResource->Unmap(0, nullptr);
@@ -823,7 +823,7 @@ Result D3D12Renderer::calcComputePipelineState(ComPtr<ID3D12RootSignature>& sign
     }
 
     {
-        // Describe and create the compute pipeline state object 
+        // Describe and create the compute pipeline state object
         D3D12_COMPUTE_PIPELINE_STATE_DESC computeDesc = {};
         computeDesc.pRootSignature = rootSignature;
         computeDesc.CS = { m_boundShaderProgram->m_computeShader.Buffer(), m_boundShaderProgram->m_computeShader.Count() };
@@ -933,8 +933,8 @@ Result D3D12Renderer::calcGraphicsPipelineState(ComPtr<ID3D12RootSignature>& sig
                 ds.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
                 ds.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
                 const D3D12_DEPTH_STENCILOP_DESC defaultStencilOp =
-                { 
-                    D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS 
+                {
+                    D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS
                 };
                 ds.FrontFace = defaultStencilOp;
                 ds.BackFace = defaultStencilOp;
@@ -1057,7 +1057,7 @@ D3D12Renderer::RenderState* D3D12Renderer::calcRenderState()
     renderState->m_bindingState = m_boundBindingState;
     renderState->m_inputLayout = m_boundInputLayout;
     renderState->m_shaderProgram = m_boundShaderProgram;
-    
+
     renderState->m_rootSignature.swap(rootSignature);
     renderState->m_pipelineState.swap(pipelineState);
 
@@ -1077,7 +1077,7 @@ Result D3D12Renderer::_calcBindParameters(BindParameters& params)
             const int numBoundConstantBuffers = numConstantBuffers;
 
             const BindingState::Desc& bindingStateDesc = m_boundBindingState->getDesc();
-            
+
             const auto& bindings = bindingStateDesc.m_bindings;
             const auto& details = m_boundBindingState->m_bindingDetails;
 
@@ -1109,11 +1109,11 @@ Result D3D12Renderer::_calcBindParameters(BindParameters& params)
                         numConstantBuffers++;
                     }
                 }
-                
+
                 if (detail.m_srvIndex >= 0)
                 {
                     D3D12_DESCRIPTOR_RANGE& range = params.nextRange();
-                        
+
                     range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
                     range.NumDescriptors = 1;
                     range.BaseShaderRegister = bindingIndex;
@@ -1121,7 +1121,7 @@ Result D3D12Renderer::_calcBindParameters(BindParameters& params)
                     range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
                     D3D12_ROOT_PARAMETER& param = params.nextParameter();
-                        
+
                     param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
                     param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
@@ -1133,7 +1133,7 @@ Result D3D12Renderer::_calcBindParameters(BindParameters& params)
                 if (detail.m_uavIndex >= 0)
                 {
                     D3D12_DESCRIPTOR_RANGE& range = params.nextRange();
-                        
+
                     range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
                     range.NumDescriptors = 1;
                     range.BaseShaderRegister = bindingIndex;
@@ -1141,7 +1141,7 @@ Result D3D12Renderer::_calcBindParameters(BindParameters& params)
                     range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
                     D3D12_ROOT_PARAMETER& param = params.nextParameter();
-                        
+
                     param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
                     param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
@@ -1157,7 +1157,7 @@ Result D3D12Renderer::_calcBindParameters(BindParameters& params)
     if (m_boundBindingState && m_boundBindingState->m_samplerHeap.getUsedSize() > 0)
     {
         D3D12_DESCRIPTOR_RANGE& range = params.nextRange();
-        
+
         range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
         range.NumDescriptors = m_boundBindingState->m_samplerHeap.getUsedSize();
         range.BaseShaderRegister = 0;
@@ -1165,7 +1165,7 @@ Result D3D12Renderer::_calcBindParameters(BindParameters& params)
         range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
         D3D12_ROOT_PARAMETER& param = params.nextParameter();
-        
+
         param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
         param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
@@ -1213,7 +1213,7 @@ Result D3D12Renderer::_bindRenderState(RenderState* renderState, ID3D12GraphicsC
                 {
                     const auto& detail = details[i];
                     const auto& binding = bindings[i];
-                    
+
                     if (binding.bindingType == BindingType::Buffer)
                     {
                         assert(binding.resource && binding.resource->isBuffer());
@@ -1270,9 +1270,9 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
 
 
 #define LOAD_D3D_PROC(TYPE, NAME) \
-        TYPE NAME##_ = (TYPE) loadProc(d3dModule, #NAME); 
+        TYPE NAME##_ = (TYPE) loadProc(d3dModule, #NAME);
 #define LOAD_DXGI_PROC(TYPE, NAME) \
-        TYPE NAME##_ = (TYPE) loadProc(dxgiModule, #NAME); 
+        TYPE NAME##_ = (TYPE) loadProc(dxgiModule, #NAME);
 
     UINT dxgiFactoryFlags = 0;
 
@@ -1307,12 +1307,12 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
         }
         SLANG_RETURN_ON_FAIL(CreateDXGIFactory2_(dxgiFactoryFlags, IID_PPV_ARGS(dxgiFactory.writeRef())));
     }
-    
+
     D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_11_0;
 
     // Search for an adapter that meets our requirements
     ComPtr<IDXGIAdapter> adapter;
-    
+
     LOAD_D3D_PROC(PFN_D3D12_CREATE_DEVICE, D3D12CreateDevice);
     if (!D3D12CreateDevice_)
     {
@@ -1358,12 +1358,12 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
         // Couldn't find an adapter
         return SLANG_FAIL;
     }
-    
+
     m_numRenderFrames = 3;
     m_numRenderTargets = 2;
-    
+
     m_desc = desc;
-    
+
     // set viewport
     {
         m_viewport.Width = float(m_desc.width);
@@ -1392,7 +1392,7 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
     DXGI_SWAP_CHAIN_DESC swapChainDesc = {};
     swapChainDesc.BufferCount = m_numRenderTargets;
     swapChainDesc.BufferDesc.Width = m_desc.width;
-    swapChainDesc.BufferDesc.Height = m_desc.height; 
+    swapChainDesc.BufferDesc.Height = m_desc.height;
     swapChainDesc.BufferDesc.Format = m_targetFormat;
     swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
@@ -1493,7 +1493,7 @@ Result D3D12Renderer::createFrameResources()
     {
         D3D12_CPU_DESCRIPTOR_HANDLE rtvStart(m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
 
-        // Work out target format 
+        // Work out target format
         D3D12_RESOURCE_DESC resourceDesc;
         {
             ComPtr<ID3D12Resource> backBuffer;
@@ -1527,7 +1527,7 @@ Result D3D12Renderer::createFrameResources()
                 heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
                 heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
                 heapProps.CreationNodeMask = 1;
-                heapProps.VisibleNodeMask = 1;        
+                heapProps.VisibleNodeMask = 1;
                 D3D12_CLEAR_VALUE clearValue = {};
                 clearValue.Format = m_targetFormat;
 
@@ -1539,7 +1539,7 @@ Result D3D12Renderer::createFrameResources()
                 desc.Format = resourceFormat;
                 desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
                 desc.SampleDesc.Count = m_numTargetSamples;
-                desc.SampleDesc.Quality = m_targetSampleQuality; 
+                desc.SampleDesc.Quality = m_targetSampleQuality;
                 desc.Alignment = 0;
 
                 SLANG_RETURN_ON_FAIL(m_renderTargetResources[i].initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, desc, D3D12_RESOURCE_STATE_RENDER_TARGET, &clearValue));
@@ -1587,7 +1587,7 @@ Result D3D12Renderer::createFrameResources()
         D3D12_RESOURCE_DESC resourceDesc = {};
         resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
         resourceDesc.Format = resourceFormat;
-        resourceDesc.Width = m_desc.width; 
+        resourceDesc.Width = m_desc.width;
         resourceDesc.Height = m_desc.height;
         resourceDesc.DepthOrArraySize = 1;
         resourceDesc.MipLevels = 1;
@@ -1661,7 +1661,7 @@ void D3D12Renderer::presentFrame()
         }
     }
 
-    // Increment the fence value. Save on the frame - we'll know that frame is done when the fence value >= 
+    // Increment the fence value. Save on the frame - we'll know that frame is done when the fence value >=
     m_frameInfos[m_frameIndex].m_fenceValue = m_fence.nextSignal(m_commandQueue);
 
     // increment frame index after signal
@@ -1669,7 +1669,7 @@ void D3D12Renderer::presentFrame()
     // Update the render target index.
     m_renderTargetIndex = m_swapChain->GetCurrentBackBufferIndex();
 
-    // On the current frame wait until it is completed 
+    // On the current frame wait until it is completed
     {
         FrameInfo& frame = m_frameInfos[m_frameIndex];
         // If the next frame is not ready to be rendered yet, wait until it is ready.
@@ -1685,7 +1685,7 @@ SlangResult D3D12Renderer::captureScreenSurface(Surface& surfaceOut)
     return captureTextureToSurface(*m_renderTargets[m_renderTargetIndex], surfaceOut);
 }
 
-ShaderCompiler* D3D12Renderer::getShaderCompiler() 
+ShaderCompiler* D3D12Renderer::getShaderCompiler()
 {
     return this;
 }
@@ -1764,26 +1764,26 @@ TextureResource* D3D12Renderer::createTextureResource(Resource::Usage initialUsa
     {
         return nullptr;
     }
-        
+
     const int arraySize = srcDesc.calcEffectiveArraySize();
-    
+
     const D3D12_RESOURCE_DIMENSION dimension = _calcResourceDimension(srcDesc.type);
     if (dimension == D3D12_RESOURCE_DIMENSION_UNKNOWN)
-    {   
+    {
         return nullptr;
     }
 
     const int numMipMaps = srcDesc.numMipLevels;
-    
+
     // Setup desc
     D3D12_RESOURCE_DESC resourceDesc;
 
-    resourceDesc.Dimension = dimension; 
+    resourceDesc.Dimension = dimension;
     resourceDesc.Format = pixelFormat;
     resourceDesc.Width = srcDesc.size.width;
     resourceDesc.Height = srcDesc.size.height;
-    resourceDesc.DepthOrArraySize = (srcDesc.size.depth > 1) ? srcDesc.size.depth : arraySize; 
-    
+    resourceDesc.DepthOrArraySize = (srcDesc.size.depth > 1) ? srcDesc.size.depth : arraySize;
+
     resourceDesc.MipLevels = numMipMaps;
     resourceDesc.SampleDesc.Count = srcDesc.sampleDesc.numSamples;
     resourceDesc.SampleDesc.Quality = srcDesc.sampleDesc.quality;
@@ -1809,7 +1809,7 @@ TextureResource* D3D12Renderer::createTextureResource(Resource::Usage initialUsa
         texture->m_resource.setDebugName(L"Texture");
     }
 
-    // Calculate the layout 
+    // Calculate the layout
     List<D3D12_PLACED_SUBRESOURCE_FOOTPRINT> layouts;
     layouts.SetSize(numMipMaps);
     List<UInt64> mipRowSizeInBytes;
@@ -1877,8 +1877,8 @@ TextureResource* D3D12Renderer::createTextureResource(Resource::Usage initialUsa
             assert(footprint.Width == mipSize.width && footprint.Height == mipSize.height && footprint.Depth == mipSize.depth);
 
             const ptrdiff_t dstMipRowPitch = ptrdiff_t(layouts[j].Footprint.RowPitch);
-            const ptrdiff_t srcMipRowPitch = ptrdiff_t(initData->mipRowStrides[j]); 
-            
+            const ptrdiff_t srcMipRowPitch = ptrdiff_t(initData->mipRowStrides[j]);
+
             assert(dstMipRowPitch >= srcMipRowPitch);
 
             const uint8_t* srcRow = (const uint8_t*)initData->subResources[subResourceIndex];
@@ -1937,7 +1937,7 @@ TextureResource* D3D12Renderer::createTextureResource(Resource::Usage initialUsa
 BufferResource* D3D12Renderer::createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& descIn, const void* initData)
 {
     typedef BufferResourceImpl::BackingStyle Style;
-    
+
     BufferResource::Desc srcDesc(descIn);
     srcDesc.setDefaults(initialUsage);
 
@@ -1955,8 +1955,8 @@ BufferResource* D3D12Renderer::createBufferResource(Resource::Usage initialUsage
     {
         case Style::MemoryBacked:
         {
-            // Assume the constant buffer will change every frame. We'll just keep a copy of the contents 
-            // in regular memory until it needed 
+            // Assume the constant buffer will change every frame. We'll just keep a copy of the contents
+            // in regular memory until it needed
             buffer->m_memory.SetSize(UInt(srcDesc.sizeInBytes));
             // Initialize
             if (initData)
@@ -1977,7 +1977,7 @@ BufferResource* D3D12Renderer::createBufferResource(Resource::Usage initialUsage
     return buffer.detach();
 }
 
-InputLayout* D3D12Renderer::createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) 
+InputLayout* D3D12Renderer::createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount)
 {
     RefPtr<InputLayoutImpl> layout(new InputLayoutImpl);
 
@@ -1991,7 +1991,7 @@ InputLayout* D3D12Renderer::createInputLayout(const InputElementDesc* inputEleme
     layout->m_text.SetSize(textSize);
     char* textPos = layout->m_text.Buffer();
 
-    // 
+    //
     List<D3D12_INPUT_ELEMENT_DESC>& elements = layout->m_elements;
     elements.SetSize(inputElementCount);
 
@@ -2023,7 +2023,7 @@ InputLayout* D3D12Renderer::createInputLayout(const InputElementDesc* inputEleme
     return layout.detach();
 }
 
-void* D3D12Renderer::map(BufferResource* bufferIn, MapFlavor flavor) 
+void* D3D12Renderer::map(BufferResource* bufferIn, MapFlavor flavor)
 {
     typedef BufferResourceImpl::BackingStyle Style;
 
@@ -2031,7 +2031,7 @@ void* D3D12Renderer::map(BufferResource* bufferIn, MapFlavor flavor)
     buffer->m_mapFlavor = flavor;
 
     const size_t bufferSize = buffer->getDesc().sizeInBytes;
-    
+
     switch (buffer->m_backingStyle)
     {
         case Style::ResourceBacked:
@@ -2098,11 +2098,11 @@ void* D3D12Renderer::map(BufferResource* bufferIn, MapFlavor flavor)
                         D3D12_RANGE readRange = { 0, bufferSize };
 
                         SLANG_RETURN_NULL_ON_FAIL(stageBuf.getResource()->Map(0, &readRange, reinterpret_cast<void**>(&data)));
-                        
+
                         // Copy to memory buffer
                         buffer->m_memory.SetSize(bufferSize);
                         ::memcpy(buffer->m_memory.Buffer(), data, bufferSize);
-                        
+
                         stageBuf.getResource()->Unmap(0, nullptr);
                     }
 
@@ -2172,12 +2172,12 @@ void D3D12Renderer::unmap(BufferResource* bufferIn)
     }
 }
 
-void D3D12Renderer::setInputLayout(InputLayout* inputLayout) 
+void D3D12Renderer::setInputLayout(InputLayout* inputLayout)
 {
     m_boundInputLayout = static_cast<InputLayoutImpl*>(inputLayout);
 }
 
-void D3D12Renderer::setPrimitiveTopology(PrimitiveTopology topology) 
+void D3D12Renderer::setPrimitiveTopology(PrimitiveTopology topology)
 {
     switch (topology)
     {
@@ -2209,7 +2209,7 @@ void D3D12Renderer::setVertexBuffers(UInt startSlot, UInt slotCount, BufferResou
         BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(buffers[i]);
         if (buffer)
         {
-            assert(buffer->m_initialUsage == Resource::Usage::VertexBuffer); 
+            assert(buffer->m_initialUsage == Resource::Usage::VertexBuffer);
         }
 
         BoundVertexBuffer& boundBuffer = m_boundVertexBuffers[startSlot + i];
@@ -2227,16 +2227,16 @@ void D3D12Renderer::setShaderProgram(ShaderProgram* inProgram)
 void D3D12Renderer::draw(UInt vertexCount, UInt startVertex)
 {
     ID3D12GraphicsCommandList* commandList = m_commandList;
-    
+
     RenderState* renderState = calcRenderState();
     if (!renderState)
     {
         assert(!"Couldn't create render state");
-        return;    
+        return;
     }
 
     BindingStateImpl* bindingState = m_boundBindingState;
-        
+
     // Submit - setting for graphics
     {
         GraphicsSubmitter submitter(commandList);
@@ -2286,7 +2286,7 @@ BindingState* D3D12Renderer::createBindingState(const BindingState::Desc& bindin
     RefPtr<BindingStateImpl> bindingState(new BindingStateImpl(bindingStateDesc));
 
     SLANG_RETURN_NULL_ON_FAIL(bindingState->init(m_device));
-    
+
     const auto& srcBindings = bindingStateDesc.m_bindings;
     const int numBindings = int(srcBindings.Count());
 
@@ -2307,7 +2307,7 @@ BindingState* D3D12Renderer::createBindingState(const BindingState::Desc& bindin
                 assert(srcEntry.resource && srcEntry.resource->isBuffer());
                 BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(srcEntry.resource.Ptr());
                 const BufferResource::Desc& bufferDesc = bufferResource->getDesc();
- 
+
                 const size_t bufferSize = bufferDesc.sizeInBytes;
                 const int elemSize = bufferDesc.elementSize <= 0 ? sizeof(uint32_t) : bufferDesc.elementSize;
 
@@ -2315,7 +2315,7 @@ BindingState* D3D12Renderer::createBindingState(const BindingState::Desc& bindin
 
                 // NOTE! In this arrangement the buffer can either be a ConstantBuffer or a 'StorageBuffer'.
                 // If it's a storage buffer then it has a 'uav'.
-                // In neither circumstance is there an associated srv 
+                // In neither circumstance is there an associated srv
                 // This departs a little from dx11 code - in that it will create srv and uav for a storage buffer.
                 if (bufferDesc.bindFlags & Resource::BindFlag::UnorderedAccess)
                 {
@@ -2328,7 +2328,7 @@ BindingState* D3D12Renderer::createBindingState(const BindingState::Desc& bindin
                     D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
 
                     uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-                    uavDesc.Format = DXGI_FORMAT_UNKNOWN;
+                    uavDesc.Format = D3DUtil::getMapFormat(bufferDesc.format);
 
                     uavDesc.Buffer.StructureByteStride = elemSize;
 
@@ -2336,10 +2336,8 @@ BindingState* D3D12Renderer::createBindingState(const BindingState::Desc& bindin
                     uavDesc.Buffer.NumElements = (UINT)(bufferSize / elemSize);
                     uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
 
-                    if (bufferDesc.elementSize == 0)
+                    if (bufferDesc.elementSize == 0 && bufferDesc.format == Format::Unknown)
                     {
-                        // TODO: are there UAV cases we need to handle that are neither
-                        // raw nor structured? RWBuffer<T> would be one...
                         uavDesc.Buffer.Flags |= D3D12_BUFFER_UAV_FLAG_RAW;
                         uavDesc.Format = DXGI_FORMAT_R32_TYPELESS;
 
@@ -2388,7 +2386,7 @@ BindingState* D3D12Renderer::createBindingState(const BindingState::Desc& bindin
                 {
                     return nullptr;
                 }
-                
+
                 {
                     const D3D12_RESOURCE_DESC resourceDesc = textureResource->m_resource.getResource()->GetDesc();
                     const DXGI_FORMAT pixelFormat = resourceDesc.Format;

@@ -23,7 +23,7 @@ using namespace Slang;
     textureResourceDesc.arraySize = inputDesc.arrayLength;
     textureResourceDesc.bindFlags = bindFlags;
 
-    // It's the same size in all dimensions 
+    // It's the same size in all dimensions
     switch (inputDesc.dimension)
     {
         case 1:
@@ -92,6 +92,7 @@ using namespace Slang;
 
     BufferResource::Desc srcDesc;
     srcDesc.init(bufferSize);
+    srcDesc.format = inputDesc.format;
 
     int bindFlags = 0;
     if (inputDesc.type == InputBufferType::ConstantBuffer)
@@ -123,7 +124,7 @@ using namespace Slang;
     bufferOut = bufferResource;
     return SLANG_OK;
 }
-    
+
 static BindingState::SamplerDesc _calcSamplerDesc(const InputSamplerDesc& srcDesc)
 {
     BindingState::SamplerDesc dstDesc;
@@ -139,7 +140,7 @@ static BindingState::SamplerDesc _calcSamplerDesc(const InputSamplerDesc& srcDes
 
     switch (bindingStyle)
     {
-        case BindingStyle::DirectX:         
+        case BindingStyle::DirectX:
         {
             return RegisterRange::makeSingle(entry.hlslBinding);
         }
@@ -167,7 +168,7 @@ static BindingState::SamplerDesc _calcSamplerDesc(const InputSamplerDesc& srcDes
                     break;
                 }
             }
-            return RegisterRange::makeRange(baseIndex, count); 
+            return RegisterRange::makeRange(baseIndex, count);
         }
         /* case BindingStyle::Vulkan:
         {
@@ -204,7 +205,7 @@ static BindingState::SamplerDesc _calcSamplerDesc(const InputSamplerDesc& srcDes
 
                 RefPtr<BufferResource> bufferResource;
                 SLANG_RETURN_ON_FAIL(createBufferResource(srcEntry.bufferDesc, srcEntry.isOutput, bufferSize, srcEntry.bufferData.Buffer(), renderer, bufferResource));
-                
+
                 descOut.addBufferResource(bufferResource, registerSet);
                 break;
             }
@@ -228,13 +229,13 @@ static BindingState::SamplerDesc _calcSamplerDesc(const InputSamplerDesc& srcDes
                 descOut.addSampler(_calcSamplerDesc(srcEntry.samplerDesc), registerSet);
                 break;
             }
-            default: 
+            default:
             {
                 assert(!"Unhandled type");
                 return SLANG_FAIL;
             }
         }
-    }    
+    }
 
     return SLANG_OK;
 }

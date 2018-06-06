@@ -1,6 +1,8 @@
 #include "shader-input-layout.h"
 #include "core/token-reader.h"
 
+#include "render.h"
+
 namespace renderer_test
 {
     using namespace Slang;
@@ -177,6 +179,13 @@ namespace renderer_test
                                     else
                                         entry.textureDesc.content = InputTextureContent::Gradient;
                                 }
+                                else if(word == "format")
+                                {
+                                    parser.Read("=");
+                                    auto formatWord = parser.ReadWord();
+                                    if(formatWord == "R_UInt32")
+                                        entry.bufferDesc.format = Format::R_UInt32;
+                                }
                                 if (parser.LookAhead(","))
                                     parser.Read(",");
                                 else
@@ -229,8 +238,8 @@ namespace renderer_test
                 }
             }
         }
-        
-        
+
+
     }
     void generateTextureData(TextureData & output, const InputTextureDesc & inputDesc)
     {

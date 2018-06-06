@@ -61,7 +61,7 @@ public:
     virtual void setInputLayout(InputLayout* inputLayout) override;
     virtual void setPrimitiveTopology(PrimitiveTopology topology) override;
     virtual void setBindingState(BindingState * state);
-    virtual void setVertexBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* strides,  const UInt* offsets) override;    
+    virtual void setVertexBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* strides,  const UInt* offsets) override;
     virtual void setShaderProgram(ShaderProgram* inProgram) override;
     virtual void draw(UInt vertexCount, UInt startVertex) override;
     virtual void dispatchCompute(int x, int y, int z) override;
@@ -133,7 +133,7 @@ public:
     };
 
 	class InputLayoutImpl: public InputLayout
-	{	
+	{
 		public:
 		ComPtr<ID3D11InputLayout> m_layout;
 	};
@@ -180,7 +180,7 @@ Renderer* createD3D11Renderer()
 
     HRESULT hr = S_OK;
     ComPtr<ID3D11Texture2D> stagingTexture;
-	
+
     if (textureDesc.Usage == D3D11_USAGE_STAGING && (textureDesc.CPUAccessFlags & D3D11_CPU_ACCESS_READ))
     {
         stagingTexture = texture;
@@ -275,7 +275,7 @@ SlangResult D3D11Renderer::initialize(const Desc& desc, void* inWindowHandle)
     };
     D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_9_1;
     const int totalNumFeatureLevels = SLANG_COUNT_OF(featureLevels);
-    
+
     // On a machine that does not have an up-to-date version of D3D installed,
     // the `D3D11CreateDeviceAndSwapChain` call will fail with `E_INVALIDARG`
     // if you ask for featuer level 11_1. The workaround is to call
@@ -301,7 +301,7 @@ SlangResult D3D11Renderer::initialize(const Desc& desc, void* inWindowHandle)
             m_immediateContext.writeRef());
 
         // Failures with `E_INVALIDARG` might be due to feature level 11_1
-        // not being supported. 
+        // not being supported.
         if (hr == E_INVALIDARG)
         {
             continue;
@@ -348,7 +348,7 @@ SlangResult D3D11Renderer::initialize(const Desc& desc, void* inWindowHandle)
     viewport.TopLeftX = 0;
     viewport.TopLeftY = 0;
     viewport.Width = (float)desc.width;
-    viewport.Height = (float)desc.height; 
+    viewport.Height = (float)desc.height;
     viewport.MaxDepth = 1; // TODO(tfoley): use reversed depth
     viewport.MinDepth = 0;
     m_immediateContext->RSSetViewports(1, &viewport);
@@ -433,9 +433,9 @@ TextureResource* D3D11Renderer::createTextureResource(Resource::Usage initialUsa
 {
     TextureResource::Desc srcDesc(descIn);
     srcDesc.setDefaults(initialUsage);
- 
+
     const int effectiveArraySize = srcDesc.calcEffectiveArraySize();
-    
+
     assert(initData);
     assert(initData->numSubResources == srcDesc.numMipLevels * effectiveArraySize * srcDesc.size.depth);
 
@@ -484,10 +484,10 @@ TextureResource* D3D11Renderer::createTextureResource(Resource::Usage initialUsa
             desc.Format = format;
             desc.MiscFlags = 0;
             desc.MipLevels = srcDesc.numMipLevels;
-            desc.ArraySize = effectiveArraySize; 
-            desc.Width = srcDesc.size.width; 
+            desc.ArraySize = effectiveArraySize;
+            desc.Width = srcDesc.size.width;
             desc.Usage = D3D11_USAGE_DEFAULT;
-            
+
             ComPtr<ID3D11Texture1D> texture1D;
             SLANG_RETURN_NULL_ON_FAIL(m_device->CreateTexture1D(&desc, subRes.Buffer(), texture1D.writeRef()));
 
@@ -503,8 +503,8 @@ TextureResource* D3D11Renderer::createTextureResource(Resource::Usage initialUsa
             desc.Format = format;
             desc.MiscFlags = 0;
             desc.MipLevels = srcDesc.numMipLevels;
-            desc.ArraySize = effectiveArraySize; 
-       
+            desc.ArraySize = effectiveArraySize;
+
             desc.Width = srcDesc.size.width;
             desc.Height = srcDesc.size.height;
             desc.Usage = D3D11_USAGE_DEFAULT;
@@ -530,11 +530,11 @@ TextureResource* D3D11Renderer::createTextureResource(Resource::Usage initialUsa
             desc.Format = format;
             desc.MiscFlags = 0;
             desc.MipLevels = srcDesc.numMipLevels;
-            desc.Width = srcDesc.size.width; 
+            desc.Width = srcDesc.size.width;
             desc.Height = srcDesc.size.height;
             desc.Depth = srcDesc.size.depth;
             desc.Usage = D3D11_USAGE_DEFAULT;
-            
+
             ComPtr<ID3D11Texture3D> texture3D;
             SLANG_RETURN_NULL_ON_FAIL(m_device->CreateTexture3D(&desc, subRes.Buffer(), texture3D.writeRef()));
 
@@ -548,13 +548,13 @@ TextureResource* D3D11Renderer::createTextureResource(Resource::Usage initialUsa
 }
 
 BufferResource* D3D11Renderer::createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& descIn, const void* initData)
-{    
+{
     BufferResource::Desc srcDesc(descIn);
     srcDesc.setDefaults(initialUsage);
 
     // Make aligned to 256 bytes... not sure why, but if you remove this the tests do fail.
     const size_t alignedSizeInBytes = D3DUtil::calcAligned(srcDesc.sizeInBytes, 256);
-        
+
     // Hack to make the initialization never read from out of bounds memory, by copying into a buffer
     List<uint8_t> initDataBuffer;
     if (initData && alignedSizeInBytes > srcDesc.sizeInBytes)
@@ -608,7 +608,7 @@ BufferResource* D3D11Renderer::createBufferResource(Resource::Usage initialUsage
     RefPtr<BufferResourceImpl> buffer(new BufferResourceImpl(srcDesc, initialUsage));
 
 	SLANG_RETURN_NULL_ON_FAIL(m_device->CreateBuffer(&bufferDesc, initData ? &subResourceData : nullptr, buffer->m_buffer.writeRef()));
-    
+
     if (srcDesc.cpuAccessFlags & Resource::AccessFlag::Read)
     {
         D3D11_BUFFER_DESC bufDesc = {};
@@ -650,7 +650,7 @@ InputLayout* D3D11Renderer::createInputLayout(const InputElementDesc* inputEleme
         char const* typeName = "Unknown";
         switch (inputElementsIn[ii].format)
         {
-            case Format::RGBA_Float32:  
+            case Format::RGBA_Float32:
                 typeName = "float4";
                 break;
             case Format::RGB_Float32:
@@ -705,13 +705,13 @@ void* D3D11Renderer::map(BufferResource* bufferIn, MapFlavor flavor)
             break;
         case MapFlavor::HostRead:
             mapType = D3D11_MAP_READ;
-    
+
             buffer = bufferResource->m_staging;
             if (!buffer)
             {
                 return nullptr;
             }
-          
+
             // Okay copy the data over
             m_immediateContext->CopyResource(buffer, bufferResource->m_buffer);
 
@@ -746,7 +746,7 @@ void D3D11Renderer::setInputLayout(InputLayout* inputLayoutIn)
 
 void D3D11Renderer::setPrimitiveTopology(PrimitiveTopology topology)
 {
-    m_immediateContext->IASetPrimitiveTopology(D3DUtil::getPrimitiveTopology(topology)); 
+    m_immediateContext->IASetPrimitiveTopology(D3DUtil::getPrimitiveTopology(topology));
 }
 
 void D3D11Renderer::setVertexBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffersIn, const UInt* stridesIn, const UInt* offsetsIn)
@@ -803,7 +803,7 @@ ShaderProgram* D3D11Renderer::compileProgram(const ShaderCompileRequest& request
 		ComPtr<ID3DBlob> vertexShaderBlob, fragmentShaderBlob;
         SLANG_RETURN_NULL_ON_FAIL(D3DUtil::compileHLSLShader(request.vertexShader.source.path, request.vertexShader.source.dataBegin, request.vertexShader.name, request.vertexShader.profile, vertexShaderBlob));
         SLANG_RETURN_NULL_ON_FAIL(D3DUtil::compileHLSLShader(request.fragmentShader.source.path, request.fragmentShader.source.dataBegin, request.fragmentShader.name, request.fragmentShader.profile, fragmentShaderBlob));
-        
+
         ComPtr<ID3D11VertexShader> vertexShader;
         ComPtr<ID3D11PixelShader> pixelShader;
 
@@ -829,7 +829,7 @@ BindingState* D3D11Renderer::createBindingState(const BindingState::Desc& bindin
 
     const auto& srcBindings = bindingStateDesc.m_bindings;
     const int numBindings = int(srcBindings.Count());
-    
+
     auto& dstDetails = bindingState->m_bindingDetails;
     dstDetails.SetSize(numBindings);
 
@@ -837,7 +837,7 @@ BindingState* D3D11Renderer::createBindingState(const BindingState::Desc& bindin
     {
         auto& dstDetail = dstDetails[i];
         const auto& srcBinding = srcBindings[i];
-        
+
         assert(srcBinding.registerRange.isSingle());
 
         switch (srcBinding.bindingType)
@@ -846,7 +846,7 @@ BindingState* D3D11Renderer::createBindingState(const BindingState::Desc& bindin
             {
                 assert(srcBinding.resource && srcBinding.resource->isBuffer());
 
-                BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(srcBinding.resource.Ptr());            
+                BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(srcBinding.resource.Ptr());
                 const BufferResource::Desc& bufferDesc = buffer->getDesc();
 
                 const int elemSize = bufferDesc.elementSize <= 0 ? 1 : bufferDesc.elementSize;
@@ -859,20 +859,17 @@ BindingState* D3D11Renderer::createBindingState(const BindingState::Desc& bindin
                     viewDesc.Buffer.NumElements = (UINT)(bufferDesc.sizeInBytes / elemSize);
                     viewDesc.Buffer.Flags = 0;
                     viewDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
-                    viewDesc.Format = DXGI_FORMAT_UNKNOWN;
+                    viewDesc.Format = D3DUtil::getMapFormat(bufferDesc.format);
 
-                    if (bufferDesc.elementSize == 0)
+                    if (bufferDesc.elementSize == 0 && bufferDesc.format == Format::Unknown)
                     {
-                        // TODO: are there UAV cases we need to handle that are neither
-                        // raw nor structured? RWBuffer<T> would be one...
-
                         viewDesc.Buffer.Flags |= D3D11_BUFFER_UAV_FLAG_RAW;
                         viewDesc.Format = DXGI_FORMAT_R32_TYPELESS;
                     }
 
                     SLANG_RETURN_NULL_ON_FAIL(m_device->CreateUnorderedAccessView(buffer->m_buffer, &viewDesc, dstDetail.m_uav.writeRef()));
                 }
-                if (bufferDesc.bindFlags & (Resource::BindFlag::NonPixelShaderResource | Resource::BindFlag::PixelShaderResource)) 
+                if (bufferDesc.bindFlags & (Resource::BindFlag::NonPixelShaderResource | Resource::BindFlag::PixelShaderResource))
                 {
                     D3D11_SHADER_RESOURCE_VIEW_DESC viewDesc;
                     memset(&viewDesc, 0, sizeof(viewDesc));
@@ -896,7 +893,7 @@ BindingState* D3D11Renderer::createBindingState(const BindingState::Desc& bindin
             case BindingType::CombinedTextureSampler:
             {
                 assert(srcBinding.resource && srcBinding.resource->isTexture());
-            
+
                 TextureResourceImpl* texture = static_cast<TextureResourceImpl*>(srcBinding.resource.Ptr());
 
                 const TextureResource::Desc& textureDesc = texture->getDesc();
@@ -1037,7 +1034,7 @@ void D3D11Renderer::_applyBindingState(bool isCompute)
                 {
                     ID3D11Buffer* buffer = static_cast<BufferResourceImpl*>(binding.resource.Ptr())->m_buffer;
                     if (isCompute)
-                        context->CSSetConstantBuffers(bindingIndex, 1, &buffer); 
+                        context->CSSetConstantBuffers(bindingIndex, 1, &buffer);
                     else
                     {
                         context->VSSetConstantBuffers(bindingIndex, 1, &buffer);
@@ -1064,7 +1061,7 @@ void D3D11Renderer::_applyBindingState(bool isCompute)
                 }
                 break;
             }
-            case BindingType::Texture: 
+            case BindingType::Texture:
             {
                 if (detail.m_uav)
                 {
@@ -1086,7 +1083,7 @@ void D3D11Renderer::_applyBindingState(bool isCompute)
                 }
                 break;
             }
-            case BindingType::Sampler: 
+            case BindingType::Sampler:
             {
                 if (isCompute)
                     context->CSSetSamplers(bindingIndex, 1, detail.m_samplerState.readRef());

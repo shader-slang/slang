@@ -15,6 +15,7 @@ namespace renderer_test {
         case Format::RG_Float32:        return VK_FORMAT_R32G32_SFLOAT;
         case Format::R_Float32:         return VK_FORMAT_R32_SFLOAT;
         case Format::RGBA_Unorm_UInt8:  return VK_FORMAT_R8G8B8A8_UNORM;
+        case Format::R_UInt32:          return VK_FORMAT_R32_UINT;
 
         case Format::D_Float32:         return VK_FORMAT_D32_SFLOAT;
         case Format::D_Unorm24_S8:      return VK_FORMAT_D24_UNORM_S8_UINT;

@@ -6,7 +6,7 @@
 namespace renderer_test {
 using namespace Slang;
 
-/* static */const Resource::BindFlag::Enum Resource::s_requiredBinding[] = 
+/* static */const Resource::BindFlag::Enum Resource::s_requiredBinding[] =
 {
     BindFlag::VertexBuffer,                 // VertexBuffer
     BindFlag::IndexBuffer,                  // IndexBuffer
@@ -19,7 +19,7 @@ using namespace Slang;
     BindFlag::PixelShaderResource,          // PixelShaderResource
     BindFlag::NonPixelShaderResource,       // NonPixelShaderResource
     BindFlag::Enum(BindFlag::PixelShaderResource | BindFlag::NonPixelShaderResource), // GenericRead
-}; 
+};
 
 
 /* static */void Resource::compileTimeAsserts()
@@ -44,7 +44,7 @@ const Resource::DescBase& Resource::getDescBase() const
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! RendererUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-/* static */const uint8_t RendererUtil::s_formatSize[] = 
+/* static */const uint8_t RendererUtil::s_formatSize[] =
 {
     0,                               // Unknown,
 
@@ -54,6 +54,8 @@ const Resource::DescBase& Resource::getDescBase() const
     uint8_t(sizeof(float) * 1),      // R_Float32,
 
     uint8_t(sizeof(uint32_t)),       // RGBA_Unorm_UInt8,
+
+    uint8_t(sizeof(uint32_t)),       // R_UInt32,
 
     uint8_t(sizeof(float)),          // D_Float32,
     uint8_t(sizeof(uint32_t)),       // D_Unorm24_S8,
@@ -151,7 +153,7 @@ int TextureResource::Size::calcMaxDimension(Type type) const
         case Resource::Type::Texture1D:     return this->width;
         case Resource::Type::Texture3D:     return std::max(std::max(this->width, this->height), this->depth);
         case Resource::Type::TextureCube:   // fallthru
-        case Resource::Type::Texture2D:     
+        case Resource::Type::Texture2D:
         {
             return std::max(this->width, this->height);
         }
@@ -193,24 +195,24 @@ int TextureResource::Desc::calcNumSubResources() const
 
     switch (type)
     {
-        case Resource::Type::Texture1D:     
-        case Resource::Type::Texture2D:     
+        case Resource::Type::Texture1D:
+        case Resource::Type::Texture2D:
         {
             return numMipMaps * arrSize;
         }
-        case Resource::Type::Texture3D:     
+        case Resource::Type::Texture3D:
         {
             // can't have arrays of 3d textures
             assert(this->arraySize <= 1);
-            return numMipMaps * this->size.depth;  
+            return numMipMaps * this->size.depth;
         }
-        case Resource::Type::TextureCube:   
+        case Resource::Type::TextureCube:
         {
             // There are 6 faces to a cubemap
             return numMipMaps * arrSize * 6;
         }
         default:                            return 0;
-    } 
+    }
 }
 
 void TextureResource::Desc::fixSize()
@@ -259,7 +261,7 @@ int TextureResource::Desc::calcEffectiveArraySize() const
     switch (type)
     {
         case Resource::Type::Texture1D:         // fallthru
-        case Resource::Type::Texture2D:         
+        case Resource::Type::Texture2D:
         {
             return arrSize;
         }
@@ -273,7 +275,7 @@ void TextureResource::Desc::init(Type typeIn)
 {
     this->type = typeIn;
     this->size.init();
-    
+
     this->format = Format::Unknown;
     this->arraySize = 0;
     this->numMipLevels = 0;
@@ -287,14 +289,14 @@ void TextureResource::Desc::init1D(Format formatIn, int widthIn, int numMipMapsI
 {
     this->type = Type::Texture1D;
     this->size.init(widthIn);
-    
+
     this->format = format;
     this->arraySize = 0;
     this->numMipLevels = numMipMapsIn;
     this->sampleDesc.init();
 
     this->bindFlags = 0;
-    this->cpuAccessFlags = 0; 
+    this->cpuAccessFlags = 0;
 }
 
 void TextureResource::Desc::init2D(Type typeIn, Format formatIn, int widthIn, int heightIn, int numMipMapsIn)
@@ -303,7 +305,7 @@ void TextureResource::Desc::init2D(Type typeIn, Format formatIn, int widthIn, in
 
     this->type = type;
     this->size.init(widthIn, heightIn);
-    
+
     this->format = format;
     this->arraySize = 0;
     this->numMipLevels = numMipMapsIn;
@@ -357,7 +359,7 @@ ProjectionStyle RendererUtil::getProjectionStyle(RendererType type)
         case ProjectionStyle::OpenGl:
         {
             static const float kIdentity[] =
-            { 
+            {
                 1, 0, 0, 0,
                 0, 1, 0, 0,
                 0, 0, 1, 0,
@@ -378,7 +380,7 @@ ProjectionStyle RendererUtil::getProjectionStyle(RendererType type)
             ::memcpy(projMatrix, kIdentity, sizeof(kIdentity));
             break;
         }
-        default: 
+        default:
         {
             assert(!"Not handled");
         }

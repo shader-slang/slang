@@ -47,7 +47,7 @@ enum class ProjectionStyle
     Unknown,
     OpenGl,
     DirectX,
-    Vulkan, 
+    Vulkan,
     CountOf,
 };
 
@@ -103,7 +103,7 @@ public:
 };
 
 /// Different formats of things like pixels or elements of vertices
-/// NOTE! Any change to this type (adding, removing, changing order) - must also be reflected in changes to RendererUtil 
+/// NOTE! Any change to this type (adding, removing, changing order) - must also be reflected in changes to RendererUtil
 enum class Format
 {
     Unknown,
@@ -115,10 +115,12 @@ enum class Format
 
     RGBA_Unorm_UInt8,
 
-    D_Float32, 
+    R_UInt32,
+
+    D_Float32,
     D_Unorm24_S8,
 
-    CountOf, 
+    CountOf,
 };
 
 struct InputElementDesc
@@ -183,14 +185,14 @@ class Resource: public Slang::RefObject
         enum Enum
         {
             VertexBuffer            = 0x001,
-            IndexBuffer             = 0x002, 
-            ConstantBuffer          = 0x004, 
-            StreamOutput            = 0x008, 
-            RenderTarget            = 0x010, 
-            DepthStencil            = 0x020, 
-            UnorderedAccess         = 0x040, 
-            PixelShaderResource     = 0x080, 
-            NonPixelShaderResource  = 0x100, 
+            IndexBuffer             = 0x002,
+            ConstantBuffer          = 0x004,
+            StreamOutput            = 0x008,
+            RenderTarget            = 0x010,
+            DepthStencil            = 0x020,
+            UnorderedAccess         = 0x040,
+            PixelShaderResource     = 0x080,
+            NonPixelShaderResource  = 0x100,
         };
     };
 
@@ -213,7 +215,7 @@ class Resource: public Slang::RefObject
         Type type = Type::Unknown;
 
         int bindFlags = 0;          ///< Combination of Resource::BindFlag or 0 (and will use initialUsage to set)
-        int cpuAccessFlags = 0;     ///< Combination of Resource::AccessFlag 
+        int cpuAccessFlags = 0;     ///< Combination of Resource::AccessFlag
     };
 
         /// Get the type
@@ -229,7 +231,7 @@ class Resource: public Slang::RefObject
     bool canBind(BindFlag::Enum bindFlag) const { return getDescBase().canBind(bindFlag); }
 
         /// For a usage gives the required binding flags
-    static const BindFlag::Enum s_requiredBinding[];    /// Maps Usage to bind flags required  
+    static const BindFlag::Enum s_requiredBinding[];    /// Maps Usage to bind flags required
 
     protected:
     Resource(Type type):
@@ -252,12 +254,14 @@ class BufferResource: public Resource
         {
             sizeInBytes = sizeInBytesIn;
             elementSize = 0;
+            format = Format::Unknown;
         }
             /// Set up default parameters based on usage
         void setDefaults(Usage initialUsage);
 
-        size_t sizeInBytes;     ///< Total size in bytes 
+        size_t sizeInBytes;     ///< Total size in bytes
         int elementSize;        ///< Get the element stride. If > 0, this is a structured buffer
+        Format format;
     };
 
         /// Get the buffer description
@@ -289,7 +293,7 @@ class TextureResource: public Resource
         int numSamples;                     ///< Number of samples per pixel
         int quality;                        ///< The quality measure for the samples
     };
-    
+
     struct Size
     {
         void init()
@@ -299,8 +303,8 @@ class TextureResource: public Resource
         void init(int widthIn, int heightIn = 1, int depthIn = 1)
         {
             width = widthIn;
-            height = heightIn; 
-            depth = depthIn; 
+            height = heightIn;
+            depth = depthIn;
         }
             /// Given the type works out the maximum dimension size
         int calcMaxDimension(Type type) const;
@@ -309,7 +313,7 @@ class TextureResource: public Resource
 
         int width;              ///< Width in pixels
         int height;             ///< Height in pixels (if 2d or 3d)
-        int depth;              ///< Depth (if 3d) 
+        int depth;              ///< Depth (if 3d)
     };
 
     struct Desc: public DescBase
@@ -326,21 +330,21 @@ class TextureResource: public Resource
             /// Calculate the total number of sub resources. 0 on error.
         int calcNumSubResources() const;
 
-            /// Calculate the effective array size - in essence the amount if mip map sets needed. 
-            /// In practice takes into account if the arraySize is 0 (it's not an array, but it will still have at least one mip set) 
-            /// and if the type is a cubemap (multiplies the amount of mip sets by 6) 
+            /// Calculate the effective array size - in essence the amount if mip map sets needed.
+            /// In practice takes into account if the arraySize is 0 (it's not an array, but it will still have at least one mip set)
+            /// and if the type is a cubemap (multiplies the amount of mip sets by 6)
         int calcEffectiveArraySize() const;
 
-            /// Use type to fix the size values (and array size). 
+            /// Use type to fix the size values (and array size).
             /// For example a 1d texture, should have height and depth set to 1.
         void fixSize();
 
             /// Set up default parameters based on type and usage
         void setDefaults(Usage initialUsage);
 
-        Size size; 
+        Size size;
 
-        int arraySize;          ///< Array size 
+        int arraySize;          ///< Array size
 
         int numMipLevels;       ///< Number of mip levels - if 0 will create all mip levels
         Format format;          ///< The resources format
@@ -354,9 +358,9 @@ class TextureResource: public Resource
     struct Data
     {
         ptrdiff_t* mipRowStrides;           ///< The row stride for a mip map
-        int numMips;                        ///< The number of mip maps 
-        const void*const* subResources;     ///< Pointers to each full mip subResource 
-        int numSubResources;                ///< The total amount of subResources. Typically = numMips * depth * arraySize 
+        int numMips;                        ///< The number of mip maps
+        const void*const* subResources;     ///< Pointers to each full mip subResource
+        int numSubResources;                ///< The total amount of subResources. Typically = numMips * depth * arraySize
     };
 
         /// Get the description of the texture
@@ -374,7 +378,7 @@ class TextureResource: public Resource
         width = width >> mipLevel;
         return width > 0 ? width : 1;
     }
-    
+
     protected:
     Desc m_desc;
 };
@@ -392,7 +396,7 @@ enum class BindingType
 class BindingState : public Slang::RefObject
 {
 public:
-        /// A register set consists of one or more contiguous indices. 
+        /// A register set consists of one or more contiguous indices.
         /// To be valid index >= 0 and size >= 1
     struct RegisterRange
     {
@@ -414,7 +418,7 @@ public:
         int16_t index;              ///< The base index
         uint16_t size;              ///< The amount of register indices
     };
-    
+
     struct SamplerDesc
     {
         bool isCompareSampler;
@@ -429,14 +433,14 @@ public:
     };
 
     struct Desc
-    {        
+    {
             /// Add a resource - assumed that the binding will match the Desc of the resource
         void addResource(BindingType bindingType, Resource* resource, const RegisterRange& registerRange);
-            /// Add a sampler        
+            /// Add a sampler
         void addSampler(const SamplerDesc& desc, const RegisterRange& registerRange);
-            /// Add a BufferResource 
+            /// Add a BufferResource
         void addBufferResource(BufferResource* resource, const RegisterRange& registerRange) { addResource(BindingType::Buffer, resource, registerRange); }
-            /// Add a texture 
+            /// Add a texture
         void addTextureResource(TextureResource* resource, const RegisterRange& registerRange) { addResource(BindingType::Texture, resource, registerRange); }
             /// Add combined texture a
         void addCombinedTextureSampler(TextureResource* resource, const SamplerDesc& samplerDesc, const RegisterRange& registerRange);
@@ -444,12 +448,12 @@ public:
             /// Returns the bind index, that has the bind flag, and indexes the specified register
         int findBindingIndex(Resource::BindFlag::Enum bindFlag, int registerIndex) const;
 
-            /// Clear the contents 
+            /// Clear the contents
         void clear();
 
         Slang::List<Binding> m_bindings;                            ///< All of the bindings in order
-        Slang::List<SamplerDesc> m_samplerDescs;                    ///< Holds the SamplerDesc for the binding - indexed by the descIndex member of Binding 
-        
+        Slang::List<SamplerDesc> m_samplerDescs;                    ///< Holds the SamplerDesc for the binding - indexed by the descIndex member of Binding
+
         int m_numRenderTargets = 1;
     };
 
@@ -468,7 +472,7 @@ public:
 class Renderer: public Slang::RefObject
 {
 public:
-    
+
     struct Desc
     {
         int width;          ///< Width in pixels
@@ -482,10 +486,10 @@ public:
 
     virtual void presentFrame() = 0;
 
-        /// Create a texture resource. initData holds the initialize data to set the contents of the texture when constructed. 
+        /// Create a texture resource. initData holds the initialize data to set the contents of the texture when constructed.
     virtual TextureResource* createTextureResource(Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData = nullptr) { return nullptr; }
         /// Create a buffer resource
-    virtual BufferResource* createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& desc, const void* initData = nullptr) { return nullptr; } 
+    virtual BufferResource* createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& desc, const void* initData = nullptr) { return nullptr; }
 
         /// Captures the back buffer and stores the result in surfaceOut. If the surface contains data - it will either be overwritten (if same size and format), or freed and a re-allocated.
     virtual SlangResult captureScreenSurface(Surface& surfaceOut) = 0;
@@ -509,7 +513,7 @@ public:
     virtual void draw(UInt vertexCount, UInt startVertex = 0) = 0;
     virtual void dispatchCompute(int x, int y, int z) = 0;
 
-        /// Commit any buffered state changes or draw calls. 
+        /// Commit any buffered state changes or draw calls.
         /// presentFrame will commitAll implicitly before doing a present
     virtual void submitGpuWork() = 0;
         /// Blocks until Gpu work is complete

@@ -2363,15 +2363,18 @@ struct EmitVisitor
         // for temporary variables.
         auto type = inst->getDataType();
 
-        // First we unwrap any layers of pointer-ness and array-ness
-        // from the types to get at the underlying data type.
-        while (auto ptrType = as<IRPtrTypeBase>(type))
+        // Unwrap any layers of array-ness from the type, so that
+        // we can look at the underlying data type, in case we
+        // should *never* expose a value of that type
+        while (auto arrayType = as<IRArrayTypeBase>(type))
         {
-            type = ptrType->getValueType();
+            type = arrayType->getElementType();
         }
-        while (auto ptrType = as<IRArrayTypeBase>(type))
+
+        // Don't allow temporaries of pointer types to be created.
+        if(as<IRPtrTypeBase>(type))
         {
-            type = ptrType->getElementType();
+            return true;
         }
 
         // First we check for uniform parameter groups,
