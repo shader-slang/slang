@@ -133,7 +133,7 @@ namespace Slang
         IDxcOperationResult* dxcResult = nullptr;
         if (FAILED(dxcCompiler->Compile(dxcSourceBlob,
             L"slang",
-            wideEntryPointName.begin(),
+            profile.GetStage() == Stage::Unknown ? L"" : wideEntryPointName.begin(),
             wideProfileName.begin(),
             args,
             argCount,

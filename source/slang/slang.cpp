@@ -154,7 +154,15 @@ Profile getEffectiveProfile(EntryPointRequest* entryPoint, TargetRequest* target
         case Stage::AnyHit:
         case Stage::Miss:
         case Stage::Callable:
-            stageMinVersion = ProfileVersion::DX_6_1;
+            stageMinVersion = ProfileVersion::DX_6_3;
+
+            // When compiling for DXR, we don't actually have distinct
+            // profiles for all of the DXR stages (e.g., there is no
+            // `raygeneration_6_3` profile), so we will clear out
+            // the stage part of the effective profile to avoid
+            // using a stage that isn't allowed downstream.
+            //
+            effectiveProfile.setStage(Stage::Unknown);
             break;
 
         //  TODO: Add equivalent logic for geometry, tessellation, and compute stages.
