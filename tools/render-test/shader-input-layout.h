@@ -3,6 +3,8 @@
 
 #include "core/basic.h"
 
+#include "render.h"
+
 namespace renderer_test {
 
 enum class ShaderInputType
@@ -35,6 +37,7 @@ struct InputBufferDesc
 {
     InputBufferType type = InputBufferType::ConstantBuffer;
     int stride = 0; // stride == 0 indicates an unstructured buffer.
+    Format format = Format::Unknown;
 };
 
 struct InputSamplerDesc
@@ -52,7 +55,7 @@ public:
     InputSamplerDesc samplerDesc;
     bool isOutput = false;
     int hlslBinding = -1;
-    Slang::List<int> glslBinding;       
+    Slang::List<int> glslBinding;
 };
 
 struct TextureData

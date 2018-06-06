@@ -341,7 +341,7 @@ for( int C = 2; C <= 4; ++C )
 sb << "__magic_type(SamplerState," << int(SamplerStateFlavor::SamplerState) << ")\n";
 sb << "__intrinsic_type(" << kIROp_SamplerStateType << ")\n";
 sb << "struct SamplerState {};";
-        
+
 sb << "__magic_type(SamplerState," << int(SamplerStateFlavor::SamplerComparisonState) << ")\n";
 sb << "__intrinsic_type(" << kIROp_SamplerComparisonStateType << ")\n";
 sb << "struct SamplerComparisonState {};";
@@ -703,6 +703,11 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
                 default:
                     sb << "__target_intrinsic(glsl, \"imageStore($0, " << ivecN << "($1), $2)\") set;\n";
+
+                    // TODO: really need a way to map access through `ref` accessor (e.g., when
+                    // used with an atomic operation) over to GLSL equivalent.
+                    //
+                    sb << "ref;\n";
                     break;
                 }
 
@@ -926,7 +931,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                     auto componentName = kk.componentName;
 
                     EMIT_LINE_DIRECTIVE();
-                            
+
                     sb << "__target_intrinsic(glsl, \"textureGather($p, $2, " << componentIndex << ")\")\n";
                     sb << "vector<T, 4> Gather" << componentName << "(SamplerState s, ";
                     sb << "float" << kBaseTextureTypes[tt].coordCount << " location);\n";

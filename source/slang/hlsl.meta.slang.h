@@ -1177,7 +1177,7 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
 
     if (kBaseBufferAccessLevels[aa].access != SLANG_RESOURCE_ACCESS_READ)
     {
-        sb << "set;\n";
+        sb << "ref;\n";
     }
 
     sb << "}\n";
