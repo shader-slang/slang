@@ -573,35 +573,8 @@ LoweredValInfo emitCallToDeclRef(
         bool justAGetter = true;
         for (auto accessorDeclRef : getMembersOfType<AccessorDecl>(subscriptDeclRef))
         {
-#if 0
-            // If the subscript declares a `ref` accessor, then we can just
-            // invoke that directly to get an l-value we can use.
-            if(auto refAccessorDeclRef = accessorDeclRef.As<RefAccessorDecl>())
-            {
-                // The `ref` accessor will return a pointer to the value, so
-                // we need to reflect that in the type of our `call` instruction.
-                IRType* ptrType = context->irBuilder->getPtrType(type);
-
-                // Rather than call `emitCallToVal` here, we make a recursive call
-                // to `emitCallToDeclRef` so that it can handle things like intrinsic-op
-                // modifiers attached to the acecssor.
-                LoweredValInfo callVal = emitCallToDeclRef(
-                    context,
-                    ptrType,
-                    refAccessorDeclRef,
-                    funcType,
-                    argCount,
-                    args);
-
-                // The result from the call needs to be implicitly dereferenced,
-                // so that it can work as an l-value of the desired result type.
-                return LoweredValInfo::ptr(getSimpleVal(context, callVal));
-            }
-#endif
-
-            // If we don't find a `ref` accessor, then we want to track whether
-            // this subscript has any accessors other than `get` (assuming
-            // that everything except `get` can be used for setting...).
+            // We want to track whether this subscript has any accessors other than
+            // `get` (assuming that everything except `get` can be used for setting...).
 
             if (auto foundGetterDeclRef = accessorDeclRef.As<GetterDecl>())
             {
