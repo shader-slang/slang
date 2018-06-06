@@ -4134,7 +4134,7 @@ struct EmitVisitor
         EntryPointLayout*   entryPointLayout)
     {
         auto profile = ctx->shared->effectiveProfile;
-        auto stage = profile.GetStage();
+        auto stage = entryPointLayout->profile.GetStage();
 
         if(profile.getFamily() == ProfileFamily::DX)
         {

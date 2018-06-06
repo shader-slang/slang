@@ -86,16 +86,17 @@ PROFILE_FAMILY(SPRIV)
 // Profile versions
 
 
-PROFILE_VERSION(DX_4_0,				DX)
-PROFILE_VERSION(DX_4_0_Level_9_0,	DX)
-PROFILE_VERSION(DX_4_0_Level_9_1,	DX)
-PROFILE_VERSION(DX_4_0_Level_9_3,	DX)
-PROFILE_VERSION(DX_4_1,				DX)
-PROFILE_VERSION(DX_5_0,				DX)
-PROFILE_VERSION(DX_5_1,				DX)
-PROFILE_VERSION(DX_6_0,				DX)
-PROFILE_VERSION(DX_6_1,				DX)
-PROFILE_VERSION(DX_6_2,				DX)
+PROFILE_VERSION(DX_4_0,             DX)
+PROFILE_VERSION(DX_4_0_Level_9_0,   DX)
+PROFILE_VERSION(DX_4_0_Level_9_1,   DX)
+PROFILE_VERSION(DX_4_0_Level_9_3,   DX)
+PROFILE_VERSION(DX_4_1,             DX)
+PROFILE_VERSION(DX_5_0,             DX)
+PROFILE_VERSION(DX_5_1,             DX)
+PROFILE_VERSION(DX_6_0,             DX)
+PROFILE_VERSION(DX_6_1,             DX)
+PROFILE_VERSION(DX_6_2,             DX)
+PROFILE_VERSION(DX_6_3,             DX)
 
 PROFILE_VERSION(GLSL_110,           GLSL)
 PROFILE_VERSION(GLSL_120,           GLSL)
@@ -120,12 +121,14 @@ PROFILE(DX_Compute_5_1,				cs_5_1,				Compute,	DX_5_1)
 PROFILE(DX_Compute_6_0,				cs_6_0,				Compute,	DX_6_0)
 PROFILE(DX_Compute_6_1,				cs_6_1,				Compute,	DX_6_1)
 PROFILE(DX_Compute_6_2,				cs_6_2,				Compute,	DX_6_2)
+PROFILE(DX_Compute_6_3,				cs_6_3,				Compute,	DX_6_3)
 
 PROFILE(DX_Domain_5_0,				ds_5_0,				Domain,		DX_5_0)
 PROFILE(DX_Domain_5_1,				ds_5_1,				Domain,		DX_5_1)
 PROFILE(DX_Domain_6_0,				ds_6_0,				Domain,		DX_6_0)
 PROFILE(DX_Domain_6_1,				ds_6_1,				Domain,		DX_6_1)
 PROFILE(DX_Domain_6_2,				ds_6_2,				Domain,		DX_6_2)
+PROFILE(DX_Domain_6_3,				ds_6_3,				Domain,		DX_6_3)
 
 PROFILE(DX_Geometry_4_0,			gs_4_0,				Geometry,	DX_4_0)
 PROFILE(DX_Geometry_4_1,			gs_4_1,				Geometry,	DX_4_1)
@@ -134,6 +137,7 @@ PROFILE(DX_Geometry_5_1,			gs_5_1,				Geometry,	DX_5_1)
 PROFILE(DX_Geometry_6_0,			gs_6_0,				Geometry,	DX_6_0)
 PROFILE(DX_Geometry_6_1,			gs_6_1,				Geometry,	DX_6_1)
 PROFILE(DX_Geometry_6_2,			gs_6_2,				Geometry,	DX_6_2)
+PROFILE(DX_Geometry_6_3,			gs_6_3,				Geometry,	DX_6_3)
 
 
 PROFILE(DX_Hull_5_0,				hs_5_0,				Hull,		DX_5_0)
@@ -141,6 +145,7 @@ PROFILE(DX_Hull_5_1,				hs_5_1,				Hull,		DX_5_1)
 PROFILE(DX_Hull_6_0,			    hs_6_0,				Hull,   	DX_6_0)
 PROFILE(DX_Hull_6_1,			    hs_6_1,				Hull,   	DX_6_1)
 PROFILE(DX_Hull_6_2,			    hs_6_2,				Hull,   	DX_6_2)
+PROFILE(DX_Hull_6_3,			    hs_6_3,				Hull,   	DX_6_3)
 
 
 PROFILE(DX_Fragment_4_0,			ps_4_0,				Fragment,	DX_4_0)
@@ -153,6 +158,7 @@ PROFILE(DX_Fragment_5_1,			ps_5_1,				Fragment,	DX_5_1)
 PROFILE(DX_Fragment_6_0,			ps_6_0,				Fragment,	DX_6_0)
 PROFILE(DX_Fragment_6_1,			ps_6_1,				Fragment,	DX_6_1)
 PROFILE(DX_Fragment_6_2,			ps_6_2,				Fragment,	DX_6_2)
+PROFILE(DX_Fragment_6_3,			ps_6_3,				Fragment,	DX_6_3)
 
 
 PROFILE(DX_Vertex_4_0,				vs_4_0,				Vertex,		DX_4_0)
@@ -165,6 +171,7 @@ PROFILE(DX_Vertex_5_1,				vs_5_1,				Vertex,		DX_5_1)
 PROFILE(DX_Vertex_6_0,			    vs_6_0,				Vertex,	DX_6_0)
 PROFILE(DX_Vertex_6_1,			    vs_6_1,				Vertex,	DX_6_1)
 PROFILE(DX_Vertex_6_2,			    vs_6_2,				Vertex,	DX_6_2)
+PROFILE(DX_Vertex_6_3,			    vs_6_3,				Vertex,	DX_6_3)
 
 // TODO: consider making `lib_*_*` alias these...
 PROFILE(DX_None_4_0,              sm_4_0,             Unknown, DX_4_0)
@@ -175,8 +182,26 @@ PROFILE(DX_None_4_1,              sm_4_1,             Unknown, DX_4_1)
 PROFILE(DX_None_5_0,              sm_5_0,             Unknown, DX_5_0)
 PROFILE(DX_None_5_1,              sm_5_1,             Unknown, DX_5_1)
 PROFILE(DX_None_6_0,              sm_6_0,             Unknown, DX_6_0)
-PROFILE(DX_None_6_1,              sm_6_1,             Unknown, DX_6_1)
-PROFILE(DX_None_6_2,              sm_6_2,             Unknown, DX_6_2)
+
+// From Shader Model 6.1 on, the dxc compiler recognizes a `lib` profile
+// that can be used to compile multiple entry points. We want that
+// `lib` name to be the default for how we render these profiles when
+// invoking downstream tools, so we use that instead of the `sm_`
+// prefix, and then re-introduce the `sm_` variants as aliases.
+//
+// TODO: We may eventually want a split between how Slang represents
+// profiles and their names to users, vs. how it renders them when
+// invoking downstream tools, so that the profile name in any
+// error messages can be consistent with our `sm_*` naems above
+//
+PROFILE(DX_Lib_6_1,              lib_6_1,             Unknown, DX_6_1)
+PROFILE(DX_Lib_6_2,              lib_6_2,             Unknown, DX_6_2)
+PROFILE(DX_Lib_6_3,              lib_6_3,             Unknown, DX_6_3)
+
+PROFILE_ALIAS(DX_None_6_1,  DX_Lib_6_1,     sm_6_1)
+PROFILE_ALIAS(DX_None_6_2,  DX_Lib_6_2,     sm_6_2)
+PROFILE_ALIAS(DX_None_6_3,  DX_Lib_6_3,     sm_6_3)
+
 
 // Define all the GLSL profiles
 
