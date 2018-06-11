@@ -3,6 +3,9 @@
 #define SLANG_SOURCE_LOC_H_INCLUDED
 
 #include "../core/basic.h"
+#include "../core/slang-com-ptr.h"
+
+#include "../../slang.h"
 
 namespace Slang {
 
@@ -73,8 +76,11 @@ public:
     // The logical file path to report for locations inside this span.
     String path;
 
-    // The actual contents of the file.
-    String content;
+    /// A blob that owns the storage for the file contents
+    ComPtr<ISlangBlob> contentBlob;
+
+    /// The actual contents of the file.
+    UnownedStringSlice content;
 
     // The range of source locations that the span covers
     SourceRange sourceRange;
@@ -131,6 +137,10 @@ struct SourceManager
         SourceManager*  parent);
 
     SourceRange allocateSourceRange(UInt size);
+
+    SourceFile* allocateSourceFile(
+        String const&   path,
+        ISlangBlob*     content);
 
     SourceFile* allocateSourceFile(
         String const&   path,

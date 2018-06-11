@@ -1581,7 +1581,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
     auto expandedDirectiveLoc = context->preprocessor->translationUnit->compileRequest->getSourceManager()->expandSourceLoc(directiveLoc);
     String pathIncludedFrom = expandedDirectiveLoc.getSpellingPath();
     String foundPath;
-    String foundSource;
+    ComPtr<ISlangBlob> foundSourceBlob;
 
     IncludeHandler* includeHandler = context->preprocessor->includeHandler;
     if (!includeHandler)
@@ -1590,7 +1590,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
         GetSink(context)->diagnose(pathToken.loc, Diagnostics::noIncludeHandlerSpecified);
         return;
     }
-    auto includeResult = includeHandler->TryToFindIncludeFile(path, pathIncludedFrom, &foundPath, &foundSource);
+    auto includeResult = includeHandler->TryToFindIncludeFile(path, pathIncludedFrom, &foundPath, foundSourceBlob.writeRef());
 
     switch (includeResult)
     {
@@ -1611,7 +1611,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
     // Push the new file onto our stack of input streams
     // TODO(tfoley): check if we have made our include stack too deep
 
-    SourceFile* sourceFile = context->preprocessor->getCompileRequest()->getSourceManager()->allocateSourceFile(foundPath, foundSource);
+    SourceFile* sourceFile = context->preprocessor->getCompileRequest()->getSourceManager()->allocateSourceFile(foundPath, foundSourceBlob);
 
     PreprocessorInputStream* inputStream = CreateInputStreamForSource(context->preprocessor, sourceFile);
     inputStream->parent = context->preprocessor->inputStream;

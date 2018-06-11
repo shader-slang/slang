@@ -52,7 +52,7 @@
 
 // Includes to allow us to control console
 // output when writing assembly dumps.
-#include <fcntl.h> 
+#include <fcntl.h>
 #ifdef _WIN32
 #include <io.h>
 #else
@@ -95,6 +95,28 @@ namespace Slang
         {
             outputBinary.AddRange(result.outputBinary.Buffer(), result.outputBinary.Count());
         }
+    }
+
+    ComPtr<ISlangBlob> CompileResult::getBlob()
+    {
+        if(!blob)
+        {
+            switch(format)
+            {
+            case ResultFormat::None:
+            default:
+                break;
+
+            case ResultFormat::Text:
+                blob = createStringBlob(outputString);
+                break;
+
+            case ResultFormat::Binary:
+                blob = createRawBlob(outputBinary.Buffer(), outputBinary.Count());
+                break;
+            }
+        }
+        return blob;
     }
 
     // EntryPointRequest
@@ -149,6 +171,7 @@ namespace Slang
                     }
                 }
                 codeBuilder << "\"\n";
+
                 codeBuilder << sourceFile->content << "\n";
             }
 
@@ -846,7 +869,7 @@ String dissassembleDXILUsingDXC(
     void emitEntryPoints(
         TargetRequest*          /*targetReq*/)
     {
-        
+
     }
 
     void generateOutputForTarget(

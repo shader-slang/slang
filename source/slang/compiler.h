@@ -2,6 +2,7 @@
 #define RASTER_SHADER_COMPILER_H
 
 #include "../core/basic.h"
+#include "../core/slang-com-ptr.h"
 
 #include "diagnostics.h"
 #include "name.h"
@@ -99,9 +100,13 @@ namespace Slang
 
         void append(CompileResult const& result);
 
+        ComPtr<ISlangBlob> getBlob();
+
         ResultFormat format = ResultFormat::None;
         String outputString;
         List<uint8_t> outputBinary;
+
+        ComPtr<ISlangBlob> blob;
     };
 
     // Describes an entry point that we've been requested to compile
@@ -113,8 +118,8 @@ namespace Slang
 
         // The name of the entry point function (e.g., `main`)
         Name* name;
-        
-        // The type names we want to substitute into the 
+
+        // The type names we want to substitute into the
         // global generic type parameters
         List<String> genericParameterTypeNames;
 
@@ -281,6 +286,14 @@ namespace Slang
 
     class Session;
 
+    /// Create a blob that will retain a string for its lifetime.
+    ///
+    ComPtr<ISlangBlob> createStringBlob(String const& string);
+
+    /// Create a blob that will retain (a copy of) raw data.
+    ///
+    ComPtr<ISlangBlob> createRawBlob(void const* data, size_t size);
+
     class CompileRequest : public RefObject
     {
     public:
@@ -348,6 +361,9 @@ namespace Slang
         DiagnosticSink mSink;
         String mDiagnosticOutput;
 
+        /// A blob holding the diagnostic output
+        ComPtr<ISlangBlob> diagnosticOutputBlob;
+
         // Files that compilation depended on
         List<String> mDependencyFilePaths;
 
@@ -368,12 +384,27 @@ namespace Slang
         // The resulting specialized IR module for each entry point request
         List<RefPtr<IRModule>> compiledModules;
 
+        /// File system implementation to use when loading files from disk.
+        ///
+        /// If this member is `null`, a default implementation that tries
+        /// to use the native OS filesystem will be used instead.
+        ///
+        ComPtr<ISlangFileSystem> fileSystem;
+
+        /// Load a file into memory using the configured file system.
+        ///
+        /// @param path The path to attempt to load from
+        /// @param outBlob A destination pointer to receive the loaded blob
+        /// @returns A `SlangResult` to indicate success or failure.
+        ///
+        SlangResult loadFile(String const& path, ISlangBlob** outBlob);
+
         CompileRequest(Session* session);
 
         ~CompileRequest();
 
         RefPtr<Expr> parseTypeString(TranslationUnitRequest * translationUnit, String typeStr, RefPtr<Scope> scope);
-        
+
         Type* getTypeFromString(String typeStr);
 
         void parseTranslationUnit(
@@ -393,6 +424,11 @@ namespace Slang
         void addTranslationUnitSourceFile(
             int             translationUnitIndex,
             SourceFile*     sourceFile);
+
+        void CompileRequest::addTranslationUnitSourceBlob(
+            int             translationUnitIndex,
+            String const&   path,
+            ISlangBlob*     sourceBlob);
 
         void addTranslationUnitSourceString(
             int             translationUnitIndex,
@@ -415,7 +451,7 @@ namespace Slang
         RefPtr<ModuleDecl> loadModule(
             Name*               name,
             String const&       path,
-            String const&       source,
+            ISlangBlob*         sourceBlob,
             SourceLoc const& loc);
 
         void loadParsedModule(

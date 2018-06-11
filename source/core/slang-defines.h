@@ -2,140 +2,15 @@
 #define SLANG_DEFINES_H
 
 /*
+Some of our `#define`s are needed in the public API header as well, so
+we will go ahead and include that here so that we can share the definitions.
+*/
+#include "../../slang.h"
+
+/*
 The following preprocessor identifiers specify compiler, OS, and architecture.
 All definitions have a value of 1 or 0, use '#if' instead of '#ifdef'.
 */
-
-#ifndef SLANG_COMPILER
-#	define SLANG_COMPILER
-
-/*
-Compiler defines, see http://sourceforge.net/p/predef/wiki/Compilers/
-NOTE that SLANG_VC holds the compiler version - not just 1 or 0
-*/
-#	if defined(_MSC_VER)
-#		if _MSC_VER >= 1900
-#			define SLANG_VC 14
-#		elif _MSC_VER >= 1800
-#			define SLANG_VC 12
-#		elif _MSC_VER >= 1700
-#			define SLANG_VC 11
-#		elif _MSC_VER >= 1600
-#			define SLANG_VC 10
-#		elif _MSC_VER >= 1500
-#			define SLANG_VC 9
-#		else
-#			error "Unknown VC version"
-#		endif
-#	elif defined(__clang__)
-#		define SLANG_CLANG 1
-#	elif defined(__SNC__)
-#		define SLANG_SNC 1
-#	elif defined(__ghs__)
-#		define SLANG_GHS 1
-#	elif defined(__GNUC__) // note: __clang__, __SNC__, or __ghs__ imply __GNUC__
-#		define SLANG_GCC 1
-#	else
-#		error "Unknown compiler"
-#	endif
-
-// Zero unset
-#	ifndef SLANG_VC
-#		define SLANG_VC 0
-#	endif
-#	ifndef SLANG_CLANG
-#		define SLANG_CLANG 0
-#	endif
-#	ifndef SLANG_SNC
-#		define SLANG_SNC 0
-#	endif
-#	ifndef SLANG_GHS
-#		define SLANG_GHS 0
-#	endif
-#	ifndef SLANG_GCC
-#		define SLANG_GCC 0
-#	endif
-
-#endif // SLANG_COMPILER
-
-#ifndef SLANG_PLATFORM
-#	define SLANG_PLATFORM
-
-/**
-Operating system defines, see http://sourceforge.net/p/predef/wiki/OperatingSystems/
-*/
-#	if defined(WINAPI_FAMILY) && WINAPI_FAMILY == WINAPI_PARTITION_APP
-#		define SLANG_WINRT 1 // Windows Runtime, either on Windows RT or Windows 8
-#	elif defined(XBOXONE)
-#		define SLANG_XBOXONE 1
-#	elif defined(_WIN64) // note: XBOXONE implies _WIN64
-#		define SLANG_WIN64 1
-#	elif defined(_M_PPC)
-#		define SLANG_X360 1
-#	elif defined(_WIN32) // note: _M_PPC implies _WIN32
-#		define SLANG_WIN32 1
-#	elif defined(__ANDROID__)
-#		define SLANG_ANDROID 1
-#	elif defined(__linux__) || defined(__CYGWIN__) // note: __ANDROID__ implies __linux__
-#		define SLANG_LINUX 1
-#	elif defined(__APPLE__) && (defined(__arm__) || defined(__arm64__))
-#		define SLANG_IOS 1
-#	elif defined(__APPLE__)
-#		define SLANG_OSX 1
-#	elif defined(__CELLOS_LV2__)
-#		define SLANG_PS3 1
-#	elif defined(__ORBIS__)
-#		define SLANG_PS4 1
-#	elif defined(__SNC__) && defined(__arm__)
-#		define SLANG_PSP2 1
-#	elif defined(__ghs__)
-#		define SLANG_WIIU 1
-#	else
-#		error "Unknown operating system"
-#	endif
-
-// zero unset
-#	ifndef SLANG_WINRT
-#		define SLANG_WINRT 0
-#	endif
-#	ifndef SLANG_XBOXONE
-#		define SLANG_XBOXONE 0
-#	endif
-#	ifndef SLANG_WIN64
-#		define SLANG_WIN64 0
-#	endif
-#	ifndef SLANG_X360
-#		define SLANG_X360 0
-#	endif
-#	ifndef SLANG_WIN32
-#		define SLANG_WIN32 0
-#	endif
-#	ifndef SLANG_ANDROID
-#		define SLANG_ANDROID 0
-#	endif
-#	ifndef SLANG_LINUX
-#		define SLANG_LINUX 0
-#	endif
-#	ifndef SLANG_IOS
-#		define SLANG_IOS 0
-#	endif
-#	ifndef SLANG_OSX
-#		define SLANG_OSX 0
-#	endif
-#	ifndef SLANG_PS3
-#		define SLANG_PS3 0
-#	endif
-#	ifndef SLANG_PS4
-#		define SLANG_PS4 0
-#	endif
-#	ifndef SLANG_PSP2
-#		define SLANG_PSP2 0
-#	endif
-#	ifndef SLANG_WIIU
-#		define SLANG_WIIU 0
-#	endif
-
-#endif // SLANG_PLATFORM
 
 #ifndef SLANG_PROCESSOR
 #	define SLANG_PROCESSOR
@@ -217,15 +92,6 @@ define anything not defined through the command line to 0
 /**
 family shortcuts
 */
-// compiler
-#define SLANG_GCC_FAMILY (SLANG_CLANG || SLANG_SNC || SLANG_GHS || SLANG_GCC)
-
-// os
-#define SLANG_WINDOWS_FAMILY (SLANG_WINRT || SLANG_WIN32 || SLANG_WIN64)
-#define SLANG_MICROSOFT_FAMILY (SLANG_XBOXONE || SLANG_X360 || SLANG_WINDOWS_FAMILY)
-#define SLANG_LINUX_FAMILY (SLANG_LINUX || SLANG_ANDROID)
-#define SLANG_APPLE_FAMILY (SLANG_IOS || SLANG_OSX)                  // equivalent to #if __APPLE__
-#define SLANG_UNIX_FAMILY (SLANG_LINUX_FAMILY || SLANG_APPLE_FAMILY) // shortcut for unix/posix platforms
 // architecture
 #define SLANG_INTEL_FAMILY (SLANG_X64 || SLANG_X86)					// Intel x86 family
 #define SLANG_ARM_FAMILY (SLANG_ARM || SLANG_A64)
@@ -233,9 +99,9 @@ family shortcuts
 
 #define SLANG_P64_FAMILY (SLANG_X64 || SLANG_A64) // shortcut for 64-bit architectures
 
-// Use for getting the amount of members of a standard C array. 
+// Use for getting the amount of members of a standard C array.
 #define SLANG_COUNT_OF(x) (sizeof(x)/sizeof(x[0]))
-/// SLANG_INLINE exists to have a way to inline consistent with SLANG_ALWAYS_INLINE  
+/// SLANG_INLINE exists to have a way to inline consistent with SLANG_ALWAYS_INLINE
 #define SLANG_INLINE inline
 
 // Other defines
@@ -253,7 +119,7 @@ family shortcuts
 General defines
 */
 
-// GCC Specific 
+// GCC Specific
 #if SLANG_GCC_FAMILY
 #	define SLANG_NO_INLINE __attribute__((noinline))
 
@@ -264,7 +130,7 @@ General defines
 
 #	if !SLANG_SNC && !SLANG_GHS
 #		define SLANG_OFFSET_OF(X, Y) __builtin_offsetof(X, Y)
-#	endif 
+#	endif
 
 //#	if !SLANG_LINUX // Workaround; Fedora Core 3 do not agree with force inline
 #	define SLANG_FORCE_INLINE inline __attribute__((always_inline))
@@ -314,7 +180,6 @@ General defines
 #	define SLANG_INT64(x) (x##i64)
 #	define SLANG_UINT64(x) (x##ui64)
 
-#	define SLANG_STDCALL __stdcall
 #	define SLANG_CALL_CONV __cdecl
 
 #endif // SLANG_MICROSOFT_FAMILY
@@ -340,7 +205,7 @@ General defines
 #ifndef SLANG_FORCE_INLINE
 #	define SLANG_FORCE_INLINE inline
 #endif
-#ifndef SLANG_NO_INLINE 
+#ifndef SLANG_NO_INLINE
 #	define SLANG_NO_INLINE
 #endif
 #ifndef SLANG_NO_ALIAS
@@ -364,15 +229,12 @@ General defines
 #	define SLANG_FUNCTION_SIG SLANG_FUNCTION_NAME
 #endif
 
-#ifndef SLANG_STDCALL
-#	define SLANG_STDCALL 
-#endif
 #ifndef SLANG_CALL_CONV
 #	define SLANG_CALL_CONV
 #endif
 
 //! casting the null ptr takes a special-case code path, which we don't want
-#define SLANG_OFFSETOF_BASE 0x100 
+#define SLANG_OFFSETOF_BASE 0x100
 #define SLANG_OFFSET_OF_RT(Class, Member)                                                                                 \
 	(reinterpret_cast<size_t>(&reinterpret_cast<Class*>(SLANG_OFFSETOF_BASE)->Member) - size_t(SLANG_OFFSETOF_BASE))
 
@@ -404,17 +266,12 @@ General defines
 #				define SLANG_HAS_ENUM_CLASS 1
 #			endif
 #			if (__GNUC__ * 100 + __GNUC_MINOR__) >= 407
-#				define SLANG_OVERRIDE override 
+#				define SLANG_OVERRIDE override
 #			endif
 #		endif
 #	endif // SLANG_GCC_FAMILY
 
 // Visual Studio
-
-// Macro for declaring if a method is no throw. Should be set before the return parameter. 
-#if SLANG_WINDOWS_FAMILY && !defined(SLANG_DISABLE_EXCEPTIONS)
-#	define SLANG_NO_THROW __declspec(nothrow) 
-#endif
 
 #	if SLANG_VC
 // C4481: nonstandard extension used: override specifier 'override'
@@ -434,7 +291,7 @@ General defines
 #	if SLANG_CLANG
 #	endif // SLANG_CLANG
 
-// Set non set  
+// Set non set
 
 #ifndef SLANG_NO_THROW
 #	define SLANG_NO_THROW
@@ -448,8 +305,6 @@ General defines
 #ifndef SLANG_HAS_MOVE_SEMANTICS
 #	define SLANG_HAS_MOVE_SEMANTICS 0
 #endif
-
-#define SLANG_MCALL SLANG_STDCALL
 
 #include <new>		// For placement new
 
