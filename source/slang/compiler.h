@@ -425,7 +425,7 @@ namespace Slang
             int             translationUnitIndex,
             SourceFile*     sourceFile);
 
-        void CompileRequest::addTranslationUnitSourceBlob(
+        void addTranslationUnitSourceBlob(
             int             translationUnitIndex,
             String const&   path,
             ISlangBlob*     sourceBlob);
