@@ -169,6 +169,9 @@ Any platforms not detected by the above logic are now now explicitly zeroed out.
 #       define SLANG_NO_THROW __declspec(nothrow)
 #   endif
 #endif
+#ifndef SLANG_NO_THROW
+#   define SLANG_NO_THROW
+#endif
 
 /* The `SLANG_STDCALL` and `SLANG_MCALL` defines are used to set the calling
 convention for interface methods.
