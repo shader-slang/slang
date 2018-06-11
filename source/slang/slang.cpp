@@ -208,7 +208,7 @@ static const Guid IID_ISlangBlob    = SLANG_UUID_ISlangBlob;
 
 /** Base class for simple blobs.
 */
-class BlobBase : ISlangBlob
+class BlobBase : public ISlangBlob
 {
 public:
     BlobBase() {}
