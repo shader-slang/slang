@@ -1200,10 +1200,13 @@ SLANG_API char const* spGetDiagnosticOutput(
     return req->mDiagnosticOutput.begin();
 }
 
-SLANG_API ISlangBlob* spGetDiagnosticOutputBlob(
-    SlangCompileRequest*    request)
+SLANG_API SlangResult spGetDiagnosticOutputBlob(
+        SlangCompileRequest*    request,
+        ISlangBlob**            outBlob)
 {
-    if(!request) return 0;
+    if(!request) return SLANG_ERROR_INVALID_PARAMETER;
+    if(!outBlob) return SLANG_ERROR_INVALID_PARAMETER;
+
     auto req = REQ(request);
 
     if(!req->diagnosticOutputBlob)
@@ -1212,7 +1215,8 @@ SLANG_API ISlangBlob* spGetDiagnosticOutputBlob(
     }
 
     Slang::ComPtr<ISlangBlob> resultBlob = req->diagnosticOutputBlob;
-    return resultBlob.detach();
+    *outBlob = resultBlob.detach();
+    return SLANG_OK;
 }
 
 // New-fangled compilation API
@@ -1500,28 +1504,33 @@ SLANG_API void const* spGetEntryPointCode(
     return data;
 }
 
-SLANG_API ISlangBlob* spGetEntryPointCodeBlob(
-    SlangCompileRequest*    request,
-    int                     entryPointIndex,
-    int                     targetIndex)
+SLANG_API SlangResult spGetEntryPointCodeBlob(
+        SlangCompileRequest*    request,
+        int                     entryPointIndex,
+        int                     targetIndex,
+        ISlangBlob**            outBlob)
 {
+    if(!request) return SLANG_ERROR_INVALID_PARAMETER;
+    if(!outBlob) return SLANG_ERROR_INVALID_PARAMETER;
+
     auto req = REQ(request);
 
     int targetCount = (int) req->targets.Count();
     if((targetIndex < 0) || (targetIndex >= targetCount))
     {
-        return nullptr;
+        return SLANG_ERROR_INVALID_PARAMETER;
     }
     auto targetReq = req->targets[targetIndex];
 
     int entryPointCount = (int) req->entryPoints.Count();
     if((entryPointIndex < 0) || (entryPointIndex >= entryPointCount))
     {
-        return nullptr;
+        return SLANG_ERROR_INVALID_PARAMETER;
     }
     Slang::CompileResult& result = targetReq->entryPointResults[entryPointIndex];
 
-    return result.getBlob().detach();
+    *outBlob = result.getBlob().detach();
+    return SLANG_OK;
 }
 
 SLANG_API char const* spGetEntryPointSource(

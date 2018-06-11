@@ -768,10 +768,13 @@ extern "C"
 
     /** Get diagnostic messages reported by the compiler.
 
-    @returns A blob holding a nul-terminated UTF-8 encoded string of diagnostic messages.
+    @param request The compile request to get output from.
+    @param outBlob A pointer to receive a blob holding a nul-terminated UTF-8 encoded string of diagnostic messages.
+    @returns A `SlangResult` indicating success or failure.
     */
-    SLANG_API ISlangBlob* spGetDiagnosticOutputBlob(
-        SlangCompileRequest*    request);
+    SLANG_API SlangResult spGetDiagnosticOutputBlob(
+        SlangCompileRequest*    request,
+        ISlangBlob**            outBlob);
 
 
     /** Get the number of files that this compilation depended on.
@@ -818,13 +821,16 @@ extern "C"
 
     @param entryPointIndex The index of the entry point to get code for.
     @param targetIndex The index of the target to get code for (default: zero).
+    @param outBlob A pointer that will receive the blob of code
+    @returns A `SlangResult` to indicate success or failure.
 
     The lifetime of the output pointer is the same as `request`.
     */
-    SLANG_API ISlangBlob* spGetEntryPointCodeBlob(
+    SLANG_API SlangResult spGetEntryPointCodeBlob(
         SlangCompileRequest*    request,
         int                     entryPointIndex,
-        int                     targetIndex);
+        int                     targetIndex,
+        ISlangBlob**            outBlob);
 
     /** Get the output bytecode associated with an entire compile request.
 
