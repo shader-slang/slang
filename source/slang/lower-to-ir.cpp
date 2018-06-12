@@ -2668,6 +2668,9 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     // so we need to track a bit of extra data:
     struct SwitchStmtInfo
     {
+        // The block that will be made to contain the `switch` statement
+        IRBlock* initialBlock = nullptr;
+
         // The label for the `default` case, if any.
         IRBlock*    defaultLabel = nullptr;
 
@@ -2757,11 +2760,20 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             // for the best.
             //
             // TODO: figure out something cleaner.
-            auto caseVal = getSimpleVal(context, lowerRValueExpr(context, caseStmt->expr));
+
+            // Actually, one gotcha is that if we ever allow non-constant
+            // expressions here (or anything that requires instructions
+            // to be emitted to yield its value), then those instructions
+            // need to go into an appropriate block.
+
+            IRGenContext subContext = *context;
+            IRBuilder subBuilder = *getBuilder();
+            subBuilder.setInsertInto(info->initialBlock);
+            subContext.irBuilder = &subBuilder;
+            auto caseVal = getSimpleVal(context, lowerRValueExpr(&subContext, caseStmt->expr));
 
             // Figure out where we are branching to.
             auto label = getLabelForCase(info);
-
 
             // Add this `case` to the list for the enclosing `switch`.
             info->cases.Add(caseVal);
@@ -2863,6 +2875,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // Iterate over the body of the statement, looking
         // for `case` or `default` statements:
         SwitchStmtInfo info;
+        info.initialBlock = initialBlock;
         info.defaultLabel = nullptr;
         lowerSwitchCases(stmt->body, &info);
 
@@ -3760,17 +3773,65 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         setMangledName(inst, context->getSession()->getNameObj(name));
     }
 
+    LoweredValInfo visitEnumCaseDecl(EnumCaseDecl* decl)
+    {
+        // A case within an `enum` decl will lower to a value
+        // of the `enum`'s "tag" type.
+        //
+        // TODO: a bit more work will be needed if we allow for
+        // enum cases that have payloads, because then we need
+        // a function that constructs the value given arguments.
+
+        IRBuilder subBuilderStorage = *getBuilder();
+        IRBuilder* subBuilder = &subBuilderStorage;
+
+        // Emit any generics that should wrap the actual type.
+        emitOuterGenerics(subBuilder, decl, decl);
+
+        IRGenContext subContextStorage = *context;
+        IRGenContext* subContext = &subContextStorage;
+        subContext->irBuilder = subBuilder;
+
+        return lowerRValueExpr(subContext, decl->initExpr);
+    }
+
+    LoweredValInfo visitEnumDecl(EnumDecl* decl)
+    {
+        // Given a declaration of a type, we need to make sure
+        // to output "witness tables" for any interfaces this
+        // type has declared conformance to.
+        for( auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>() )
+        {
+            ensureDecl(context, inheritanceDecl);
+        }
+
+        IRBuilder subBuilderStorage = *getBuilder();
+        IRBuilder* subBuilder = &subBuilderStorage;
+        emitOuterGenerics(subBuilder, decl, decl);
+
+        IRGenContext subContextStorage = *context;
+        IRGenContext* subContext = &subContextStorage;
+        subContext->irBuilder = subBuilder;
+
+        // An `enum` declaration will currently lower directly to its "tag"
+        // type, so that any references to the `enum` become referenes to
+        // the tag type instead.
+        //
+        // TODO: if we ever support `enum` types with payloads, we would
+        // need to make the `enum` lower to some kind of custom "tagged union"
+        // type.
+
+        IRType* loweredTagType = lowerType(subContext, decl->tagType);
+
+        return LoweredValInfo::simple(finishOuterGenerics(subBuilder, loweredTagType));
+    }
+
     LoweredValInfo visitAggTypeDecl(AggTypeDecl* decl)
     {
         // Don't generate an IR `struct` for intrinsic types
         if(decl->FindModifier<IntrinsicTypeModifier>() || decl->FindModifier<BuiltinTypeModifier>())
         {
             return LoweredValInfo();
-        }
-
-        if(getMangledName(decl) == "_ST03int")
-        {
-            decl = decl;
         }
 
         // Given a declaration of a type, we need to make sure
