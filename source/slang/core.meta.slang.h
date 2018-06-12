@@ -49,7 +49,9 @@ for (int tt = 0; tt < kBaseTypeCount; ++tt)
 
     switch (kBaseTypes[tt].tag)
     {
+    case BaseType::Half:
     case BaseType::Float:
+    case BaseType::Double:
         sb << "\n    , __BuiltinFloatingPointType\n";
         sb << "\n    ,  __BuiltinRealType\n";
         // fall through to:
