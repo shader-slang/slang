@@ -113,8 +113,8 @@ namespace Slang
 
         // The name of the entry point function (e.g., `main`)
         Name* name;
-        
-        // The type names we want to substitute into the 
+
+        // The type names we want to substitute into the
         // global generic type parameters
         List<String> genericParameterTypeNames;
 
@@ -373,7 +373,7 @@ namespace Slang
         ~CompileRequest();
 
         RefPtr<Expr> parseTypeString(TranslationUnitRequest * translationUnit, String typeStr, RefPtr<Scope> scope);
-        
+
         Type* getTypeFromString(String typeStr);
 
         void parseTranslationUnit(
@@ -525,6 +525,8 @@ namespace Slang
         Type* getOverloadedType();
         Type* getErrorType();
         Type* getStringType();
+
+        Type* getEnumTypeType();
 
         // Construct the type `Ptr<valueType>`, where `Ptr`
         // is looked up as a builtin type.
