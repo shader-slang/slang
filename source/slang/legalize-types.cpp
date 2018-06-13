@@ -22,6 +22,8 @@ LegalType LegalType::implicitDeref(
 LegalType LegalType::tuple(
     RefPtr<TuplePseudoType>   tupleType)
 {
+    SLANG_ASSERT(tupleType->elements.Count());
+
     LegalType result;
     result.flavor = Flavor::tuple;
     result.obj = tupleType;
@@ -173,6 +175,10 @@ struct TupleTypeBuilder
             }
             break;
 
+        case LegalType::Flavor::none:
+            anyComplex = true;
+            break;
+
         case LegalType::Flavor::implicitDeref:
             {
                 // TODO: we may want to say that any use
@@ -305,7 +311,7 @@ struct TupleTypeBuilder
         // This helps get rid of emtpy structs that often trips up the 
         // downstream compiler
         if (!anyOrdinary && !anySpecial && !anyComplex)
-            return LegalType::tuple(new TuplePseudoType());
+            return LegalType();
 
         // If we didn't see anything "special"
         // then we can use the type as-is.
@@ -437,6 +443,9 @@ static LegalType createLegalUniformBufferType(
 {
     switch (legalElementType.flavor)
     {
+    case LegalType::Flavor::none:
+        return LegalType();
+
     case LegalType::Flavor::simple:
         {
             // Easy case: we just have a simple element type,
@@ -540,6 +549,9 @@ static LegalType createLegalPtrType(
 {
     switch (legalValueType.flavor)
     {
+    case LegalType::Flavor::none:
+        return LegalType();
+
     case LegalType::Flavor::simple:
         {
             // Easy case: we just have a simple element type,
@@ -675,6 +687,9 @@ static LegalType wrapLegalType(
 {
     switch (legalType.flavor)
     {
+    case LegalType::Flavor::none:
+        return LegalType();
+
     case LegalType::Flavor::simple:
         {
             return ordinaryWrapper->wrap(context, legalType.getSimple());

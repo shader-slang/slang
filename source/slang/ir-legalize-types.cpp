@@ -21,6 +21,8 @@ namespace Slang
 
 LegalVal LegalVal::tuple(RefPtr<TuplePseudoVal> tupleVal)
 {
+    SLANG_ASSERT(tupleVal->elements.Count());
+
     LegalVal result;
     result.flavor = LegalVal::Flavor::tuple;
     result.obj = tupleVal;
@@ -343,6 +345,9 @@ static LegalVal legalizeFieldAddress(
 
     switch (legalPtrOperand.flavor)
     {
+    case LegalVal::Flavor::none:
+        return LegalVal();
+
     case LegalVal::Flavor::simple:
         return LegalVal::simple(
             builder->emitFieldAddress(
@@ -457,6 +462,9 @@ static LegalVal legalizeFieldExtract(
 
     switch (legalStructOperand.flavor)
     {
+    case LegalVal::Flavor::none:
+        return LegalVal();
+
     case LegalVal::Flavor::simple:
         return LegalVal::simple(
             builder->emitFieldExtract(
@@ -571,6 +579,9 @@ static LegalVal legalizeGetElementPtr(
 
     switch (legalPtrOperand.flavor)
     {
+    case LegalVal::Flavor::none:
+        return LegalVal();
+
     case LegalVal::Flavor::simple:
         return LegalVal::simple(
             builder->emitElementAddress(
@@ -679,6 +690,9 @@ static LegalVal legalizeMakeStruct(
 
     switch(legalType.flavor)
     {
+    case LegalType::Flavor::none:
+        return LegalVal();
+
     case LegalType::Flavor::simple:
         {
             List<IRInst*> args;
