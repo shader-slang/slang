@@ -96,12 +96,6 @@ static const char vertexEntryPointName[]    = "vertexMain";
 static const char fragmentEntryPointName[]  = "fragmentMain";
 static const char computeEntryPointName[]	= "computeMain";
 
-// "Profile" to use when compiling for HLSL targets
-// TODO: does this belong here?
-static const char vertexProfileName[]   = "vs_5_0";
-static const char fragmentProfileName[] = "ps_5_0";
-static const char computeProfileName[]	= "cs_5_0";
-
 SlangResult RenderTestApp::initialize(Renderer* renderer, ShaderCompiler* shaderCompiler)
 {
     SLANG_RETURN_ON_FAIL(initializeShaders(shaderCompiler));
@@ -201,16 +195,13 @@ Result RenderTestApp::initializeShaders(ShaderCompiler* shaderCompiler)
 	{
 		compileRequest.vertexShader.source = sourceInfo;
 		compileRequest.vertexShader.name = vertexEntryPointName;
-		compileRequest.vertexShader.profile = vertexProfileName;
 		compileRequest.fragmentShader.source = sourceInfo;
 		compileRequest.fragmentShader.name = fragmentEntryPointName;
-		compileRequest.fragmentShader.profile = fragmentProfileName;
 	}
 	else
 	{
 		compileRequest.computeShader.source = sourceInfo;
 		compileRequest.computeShader.name = computeEntryPointName;
-		compileRequest.computeShader.profile = computeProfileName;
 	}
 	compileRequest.entryPointTypeArguments = m_shaderInputLayout.globalTypeArguments;
 	m_shaderProgram = shaderCompiler->compileProgram(compileRequest);
@@ -412,30 +403,40 @@ SlangResult innerMain(int argc, char** argv)
 
 	SlangSourceLanguage nativeLanguage = SLANG_SOURCE_LANGUAGE_UNKNOWN;
 	SlangCompileTarget slangTarget = SLANG_TARGET_NONE;
+    SlangPassThrough slangPassThrough = SLANG_PASS_THROUGH_NONE;
+    char const* profileName = "";
 	switch (gOptions.rendererType)
 	{
 		case RendererType::DirectX11:
 			renderer = createD3D11Renderer();
-			slangTarget = SLANG_HLSL;
+			slangTarget = SLANG_DXBC;
 			nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
+            slangPassThrough = SLANG_PASS_THROUGH_FXC;
+            profileName = "sm_5_0";
 			break;
 
 		case RendererType::DirectX12:
 			renderer = createD3D12Renderer();
-			slangTarget = SLANG_HLSL;
+			slangTarget = SLANG_DXBC;
 			nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
+            slangPassThrough = SLANG_PASS_THROUGH_FXC;
+            profileName = "sm_5_0";
 			break;
 
 		case RendererType::OpenGl:
 			renderer = createGLRenderer();
 			slangTarget = SLANG_GLSL;
 			nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;
+            slangPassThrough = SLANG_PASS_THROUGH_GLSLANG;
+            profileName = "glsl_430";
 			break;
 
 		case RendererType::Vulkan:
 			renderer = createVKRenderer();
 			slangTarget = SLANG_SPIRV;
 			nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;
+            slangPassThrough = SLANG_PASS_THROUGH_GLSLANG;
+            profileName = "glsl_430";
 			break;
 
 		default:
@@ -449,15 +450,20 @@ SlangResult innerMain(int argc, char** argv)
 
 	SLANG_RETURN_ON_FAIL(renderer->initialize(desc, windowHandle));
 
-	auto shaderCompiler = renderer->getShaderCompiler();
+    ShaderCompiler shaderCompiler;
+    shaderCompiler.renderer = renderer;
+    shaderCompiler.target = slangTarget;
+    shaderCompiler.profile = profileName;
 	switch (gOptions.inputLanguageID)
 	{
 		case Options::InputLanguageID::Slang:
-			shaderCompiler = createSlangShaderCompiler(shaderCompiler, SLANG_SOURCE_LANGUAGE_SLANG, slangTarget);
+            shaderCompiler.sourceLanguage = SLANG_SOURCE_LANGUAGE_SLANG;
+            shaderCompiler.passThrough = SLANG_PASS_THROUGH_NONE;
 			break;
 
-		case Options::InputLanguageID::NativeRewrite:
-			shaderCompiler = createSlangShaderCompiler(shaderCompiler, nativeLanguage, slangTarget);
+        case Options::InputLanguageID::Native:
+            shaderCompiler.sourceLanguage = nativeLanguage;
+            shaderCompiler.passThrough = slangPassThrough;
 			break;
 
 		default:
@@ -467,7 +473,7 @@ SlangResult innerMain(int argc, char** argv)
 	{
 		RenderTestApp app;
 
-		SLANG_RETURN_ON_FAIL(app.initialize(renderer, shaderCompiler));
+		SLANG_RETURN_ON_FAIL(app.initialize(renderer, &shaderCompiler));
 
 		// Once initialization is all complete, we show the window...
 		ShowWindow(windowHandle, showCommand);

@@ -75,12 +75,12 @@ SlangResult parseOptions(int* argc, char** argv)
         else if( strcmp(arg, "-hlsl-rewrite") == 0 )
         {
             setDefaultRendererType( RendererType::DirectX11);
-            gOptions.inputLanguageID = InputLanguageID::NativeRewrite;
+            gOptions.inputLanguageID = InputLanguageID::Slang;
         }
         else if( strcmp(arg, "-glsl-rewrite") == 0 )
         {
             setDefaultRendererType(RendererType::OpenGl);
-            gOptions.inputLanguageID = InputLanguageID::NativeRewrite;
+            gOptions.inputLanguageID = InputLanguageID::Slang;
         }
         else if( strcmp(arg, "-slang") == 0 )
         {

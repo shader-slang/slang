@@ -205,6 +205,19 @@ PROFILE_ALIAS(DX_None_6_3,  DX_Lib_6_3,     sm_6_3)
 
 // Define all the GLSL profiles
 
+PROFILE(GLSL_None_110, glsl_110, Unknown, GLSL_110)
+PROFILE(GLSL_None_120, glsl_120, Unknown, GLSL_120)
+PROFILE(GLSL_None_130, glsl_130, Unknown, GLSL_130)
+PROFILE(GLSL_None_140, glsl_140, Unknown, GLSL_140)
+PROFILE(GLSL_None_150, glsl_150, Unknown, GLSL_150)
+PROFILE(GLSL_None_330, glsl_330, Unknown, GLSL_330)
+PROFILE(GLSL_None_400, glsl_400, Unknown, GLSL_400)
+PROFILE(GLSL_None_410, glsl_410, Unknown, GLSL_410)
+PROFILE(GLSL_None_420, glsl_420, Unknown, GLSL_420)
+PROFILE(GLSL_None_430, glsl_430, Unknown, GLSL_430)
+PROFILE(GLSL_None_440, glsl_440, Unknown, GLSL_440)
+PROFILE(GLSL_None_450, glsl_450, Unknown, GLSL_450)
+
 #define P(UPPER, LOWER, VERSION) \
 PROFILE(GLSL_##UPPER##_##VERSION,   glsl_##LOWER##_##VERSION, UPPER, GLSL_##VERSION)
 
