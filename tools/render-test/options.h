@@ -24,9 +24,6 @@ struct Options
 
         // Raw HLSL or GLSL input, bypassing Slang
         Native,
-
-        // Raw HLSL or GLSL input, passed through the Slang rewriter
-        NativeRewrite
     };
    
 

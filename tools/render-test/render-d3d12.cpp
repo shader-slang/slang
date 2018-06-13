@@ -49,7 +49,7 @@
 namespace renderer_test {
 using namespace Slang;
 
-class D3D12Renderer : public Renderer, public ShaderCompiler
+class D3D12Renderer : public Renderer
 {
 public:
     // Renderer    implementation
@@ -62,7 +62,7 @@ public:
     virtual SlangResult captureScreenSurface(Surface& surfaceOut) override;
     virtual InputLayout* createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount) override;
     virtual BindingState* createBindingState(const BindingState::Desc& bindingStateDesc) override;
-    virtual ShaderCompiler* getShaderCompiler() override;
+    virtual ShaderProgram* createProgram(const ShaderProgram::Desc& desc) override;
     virtual void* map(BufferResource* buffer, MapFlavor flavor) override;
     virtual void unmap(BufferResource* buffer) override;
     virtual void setInputLayout(InputLayout* inputLayout) override;
@@ -75,9 +75,6 @@ public:
     virtual void submitGpuWork() override;
     virtual void waitForGpu() override;
     virtual RendererType getRendererType() const override { return RendererType::DirectX12; }
-
-    // ShaderCompiler implementation
-    virtual ShaderProgram* compileProgram(const ShaderCompileRequest& request) override;
 
     ~D3D12Renderer();
 
@@ -1685,11 +1682,6 @@ SlangResult D3D12Renderer::captureScreenSurface(Surface& surfaceOut)
     return captureTextureToSurface(*m_renderTargets[m_renderTargetIndex], surfaceOut);
 }
 
-ShaderCompiler* D3D12Renderer::getShaderCompiler()
-{
-    return this;
-}
-
 static D3D12_RESOURCE_STATES _calcResourceState(Resource::Usage usage)
 {
     typedef Resource::Usage Usage;
@@ -2343,6 +2335,10 @@ BindingState* D3D12Renderer::createBindingState(const BindingState::Desc& bindin
 
                         uavDesc.Buffer.StructureByteStride = 0;
                     }
+                    else if( bufferDesc.format != Format::Unknown )
+                    {
+                        uavDesc.Buffer.StructureByteStride = 0;
+                    }
 
                     m_device->CreateUnorderedAccessView(bufferResource->m_resource, nullptr, &uavDesc, bindingState->m_viewHeap.getCpuHandle(dstDetail.m_uavIndex));
                 }
@@ -2445,29 +2441,23 @@ void D3D12Renderer::setBindingState(BindingState* state)
     m_boundBindingState = static_cast<BindingStateImpl*>(state);
 }
 
-// ShaderCompiler interface
-
-ShaderProgram* D3D12Renderer::compileProgram(const ShaderCompileRequest& request)
+ShaderProgram* D3D12Renderer::createProgram(const ShaderProgram::Desc& desc)
 {
-    RefPtr<ShaderProgramImpl> program(new ShaderProgramImpl);
+    RefPtr<ShaderProgramImpl> program(new ShaderProgramImpl());
+    program->m_pipelineType = desc.pipelineType;
 
-    if (request.computeShader.name)
+    if (desc.pipelineType == PipelineType::Compute)
     {
-        program->m_pipelineType = PipelineType::Compute;
-        ComPtr<ID3DBlob> computeShaderBlob;
-        SLANG_RETURN_NULL_ON_FAIL(D3DUtil::compileHLSLShader(request.computeShader.source.path, request.computeShader.source.dataBegin, request.computeShader.name, request.computeShader.profile, computeShaderBlob));
-
-        program->m_computeShader.InsertRange(0, (const uint8_t*)computeShaderBlob->GetBufferPointer(), UInt(computeShaderBlob->GetBufferSize()));
+        auto computeKernel = desc.findKernel(StageType::Compute);
+        program->m_computeShader.InsertRange(0, (const uint8_t*) computeKernel->codeBegin, computeKernel->getCodeSize());
     }
     else
     {
-        program->m_pipelineType = PipelineType::Graphics;
-        ComPtr<ID3DBlob> vertexShaderBlob, fragmentShaderBlob;
-        SLANG_RETURN_NULL_ON_FAIL(D3DUtil::compileHLSLShader(request.vertexShader.source.path, request.vertexShader.source.dataBegin, request.vertexShader.name, request.vertexShader.profile, vertexShaderBlob));
-        SLANG_RETURN_NULL_ON_FAIL(D3DUtil::compileHLSLShader(request.fragmentShader.source.path, request.fragmentShader.source.dataBegin, request.fragmentShader.name, request.fragmentShader.profile, fragmentShaderBlob));
+        auto vertexKernel = desc.findKernel(StageType::Vertex);
+        auto fragmentKernel = desc.findKernel(StageType::Fragment);
 
-        program->m_vertexShader.InsertRange(0, (const uint8_t*)vertexShaderBlob->GetBufferPointer(), UInt(vertexShaderBlob->GetBufferSize()));
-        program->m_pixelShader.InsertRange(0, (const uint8_t*)fragmentShaderBlob->GetBufferPointer(), UInt(fragmentShaderBlob->GetBufferSize()));
+        program->m_vertexShader.InsertRange(0, (const uint8_t*) vertexKernel->codeBegin, vertexKernel->getCodeSize());
+        program->m_pixelShader.InsertRange(0, (const uint8_t*) fragmentKernel->codeBegin, fragmentKernel->getCodeSize());
     }
 
     return program.detach();

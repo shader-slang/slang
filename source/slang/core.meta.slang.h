@@ -28,6 +28,23 @@ SLANG_RAW("    // a floating-point value...\n")
 SLANG_RAW("    __init(float value);\n")
 SLANG_RAW("}\n")
 SLANG_RAW("\n")
+SLANG_RAW("// A type resulting from an `enum` declaration.\n")
+SLANG_RAW("__magic_type(EnumTypeType)\n")
+SLANG_RAW("interface __EnumType\n")
+SLANG_RAW("{\n")
+SLANG_RAW("    // The type of tags for this `enum`\n")
+SLANG_RAW("    //\n")
+SLANG_RAW("    // Note: using `__Tag` instead of `Tag` to avoid any\n")
+SLANG_RAW("    // conflict if a user had an `enum` case called `Tag`\n")
+SLANG_RAW("    associatedtype __Tag : __BuiltinIntegerType;\n")
+SLANG_RAW("};\n")
+SLANG_RAW("\n")
+SLANG_RAW("// A type resulting from an `enum` declaration\n")
+SLANG_RAW("// with the `[flags]` attribute.\n")
+SLANG_RAW("interface __FlagsEnumType : __EnumType\n")
+SLANG_RAW("{\n")
+SLANG_RAW("};\n")
+SLANG_RAW("\n")
 SLANG_RAW("__generic<T,U> __intrinsic_op(Sequence) U operator,(T left, U right);\n")
 SLANG_RAW("\n")
 SLANG_RAW("__generic<T> __intrinsic_op(select) T operator?:(bool condition, T ifTrue, T ifFalse);\n")
@@ -92,6 +109,28 @@ for (int tt = 0; tt < kBaseTypeCount; ++tt)
 
         EMIT_LINE_DIRECTIVE();
         sb << "__init(" << kBaseTypes[ss].name << " value);\n";
+    }
+
+    // If this is a basic integer type, then define explicit
+    // initializers that take a value of an `enum` type.
+    //
+    // TODO: This should actually be restricted, so that this
+    // only applies `where T.__Tag == Self`, but we don't have
+    // the needed features in our type system to implement
+    // that constraint right now.
+    //
+    switch (kBaseTypes[tt].tag)
+    {
+    case BaseType::Int:
+    case BaseType::UInt:
+SLANG_RAW("\n")
+SLANG_RAW("        __generic<T:__EnumType>\n")
+SLANG_RAW("        __init(T value);\n")
+
+        break;
+
+    default:
+        break;
     }
 
     sb << "};\n";
@@ -1066,6 +1105,15 @@ for (auto op : binaryOps)
     }
 }
 SLANG_RAW("\n")
+SLANG_RAW("\n")
+SLANG_RAW("// Operators to apply to `enum` types\n")
+SLANG_RAW("\n")
+SLANG_RAW("__generic<E : __EnumType>\n")
+SLANG_RAW("__intrinsic_op(")
+SLANG_SPLICE(kIROp_Eql
+)
+SLANG_RAW(")\n")
+SLANG_RAW("bool operator==(E left, E right);\n")
 SLANG_RAW("\n")
 SLANG_RAW("// Statement Attributes\n")
 SLANG_RAW("\n")

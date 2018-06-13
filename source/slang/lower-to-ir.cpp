@@ -2668,6 +2668,9 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     // so we need to track a bit of extra data:
     struct SwitchStmtInfo
     {
+        // The block that will be made to contain the `switch` statement
+        IRBlock* initialBlock = nullptr;
+
         // The label for the `default` case, if any.
         IRBlock*    defaultLabel = nullptr;
 
@@ -2757,11 +2760,20 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             // for the best.
             //
             // TODO: figure out something cleaner.
-            auto caseVal = getSimpleVal(context, lowerRValueExpr(context, caseStmt->expr));
+
+            // Actually, one gotcha is that if we ever allow non-constant
+            // expressions here (or anything that requires instructions
+            // to be emitted to yield its value), then those instructions
+            // need to go into an appropriate block.
+
+            IRGenContext subContext = *context;
+            IRBuilder subBuilder = *getBuilder();
+            subBuilder.setInsertInto(info->initialBlock);
+            subContext.irBuilder = &subBuilder;
+            auto caseVal = getSimpleVal(context, lowerRValueExpr(&subContext, caseStmt->expr));
 
             // Figure out where we are branching to.
             auto label = getLabelForCase(info);
-
 
             // Add this `case` to the list for the enclosing `switch`.
             info->cases.Add(caseVal);
@@ -2863,6 +2875,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // Iterate over the body of the statement, looking
         // for `case` or `default` statements:
         SwitchStmtInfo info;
+        info.initialBlock = initialBlock;
         info.defaultLabel = nullptr;
         lowerSwitchCases(stmt->body, &info);
 
@@ -2935,39 +2948,32 @@ void lowerStmt(
     }
 }
 
-static LoweredValInfo maybeMoveMutableTemp(
+/// Create and return a mutable temporary initialized with `val`
+static LoweredValInfo moveIntoMutableTemp(
     IRGenContext*           context,
     LoweredValInfo const&   val)
 {
-    switch(val.flavor)
-    {
-    case LoweredValInfo::Flavor::Ptr:
-        return val;
+    IRInst* irVal = getSimpleVal(context, val);
+    auto type = irVal->getDataType();
+    auto var = createVar(context, type);
 
-    default:
-        {
-            IRInst* irVal = getSimpleVal(context, val);
-            auto type = irVal->getDataType();
-            auto var = createVar(context, type);
-
-            assign(context, var, LoweredValInfo::simple(irVal));
-            return var;
-        }
-        break;
-    }
+    assign(context, var, LoweredValInfo::simple(irVal));
+    return var;
 }
 
-IRInst* getAddress(
+/// Try to coerce `inVal` into a `LoweredValInfo::ptr()` with a simple address.
+LoweredValInfo tryGetAddress(
     IRGenContext*           context,
-    LoweredValInfo const&   inVal,
-    SourceLoc               diagnosticLocation)
+    LoweredValInfo const&   inVal)
 {
     LoweredValInfo val = inVal;
 
     switch(val.flavor)
     {
     case LoweredValInfo::Flavor::Ptr:
-        return val.val;
+        // The `Ptr` case means that we already have an IR value with
+        // the address of our value. Easy!
+        return val;
 
     case LoweredValInfo::Flavor::BoundSubscript:
         {
@@ -2992,18 +2998,82 @@ IRInst* getAddress(
 
                 // The result from the call should be a pointer, and it
                 // is the address that we wanted in the first place.
-                return getSimpleVal(context, refVal);
+                return LoweredValInfo::ptr(getSimpleVal(context, refVal));
             }
 
             // Otherwise, there was no `ref` accessor, and so it is not possible
             // to materialize this location into a pointer for whatever purpose
             // we have in mind (e.g., passing it to an atomic operation).
         }
+        break;
+
+    case LoweredValInfo::Flavor::BoundMember:
+        {
+            auto boundMemberInfo = val.getBoundMemberInfo();
+
+            // If we hit this case, then it means that we have a reference
+            // to a single field in something, but for whatever reason the
+            // higher-level logic was not able to turn it into a pointer
+            // already (maybe the base value for the field reference is
+            // a `BoundSubscript`, etc.).
+            //
+            // We need to read the entire base value out, modify the field
+            // we care about, and then write it back.
+
+            auto declRef = boundMemberInfo->declRef;
+            if( auto fieldDeclRef = declRef.As<StructField>() )
+            {
+                auto baseVal = boundMemberInfo->base;
+                auto basePtr = tryGetAddress(context, baseVal);
+
+                return extractField(context, boundMemberInfo->type, basePtr, fieldDeclRef);
+            }
+
+        }
+        break;
+
+    case LoweredValInfo::Flavor::SwizzledLValue:
+        {
+            auto originalSwizzleInfo = val.getSwizzledLValueInfo();
+            auto originalBase = originalSwizzleInfo->base;
+
+            UInt elementCount = originalSwizzleInfo->elementCount;
+
+            auto newBase = tryGetAddress(context, originalBase);
+            RefPtr<SwizzledLValueInfo> newSwizzleInfo = new SwizzledLValueInfo();
+            context->shared->extValues.Add(newSwizzleInfo);
+
+            newSwizzleInfo->base = newBase;
+            newSwizzleInfo->type = originalSwizzleInfo->type;
+            newSwizzleInfo->elementCount = elementCount;
+            for(UInt ee = 0; ee < elementCount; ++ee)
+                newSwizzleInfo->elementIndices[ee] = originalSwizzleInfo->elementIndices[ee];
+
+            return LoweredValInfo::swizzledLValue(newSwizzleInfo);
+        }
+        break;
 
     // TODO: are there other cases we need to handled here?
 
     default:
         break;
+    }
+
+    // If none of the special cases above applied, then we werent' able to make
+    // this value into a pointer, and we should just return it as-is.
+    return val;
+}
+
+IRInst* getAddress(
+    IRGenContext*           context,
+    LoweredValInfo const&   inVal,
+    SourceLoc               diagnosticLocation)
+{
+    LoweredValInfo val = tryGetAddress(context, inVal);
+
+    if( val.flavor == LoweredValInfo::Flavor::Ptr )
+    {
+        return val.val;
     }
 
     context->getSink()->diagnose(diagnosticLocation, Diagnostics::invalidLValueForRefParameter);
@@ -3018,29 +3088,26 @@ void assign(
     LoweredValInfo left = inLeft;
     LoweredValInfo right = inRight;
 
+    // Before doing the case analysis on the shape of the `left` value,
+    // we might as well go ahead and see if we can coerce it into
+    // a simple pointer, since that would make our life a lot easier
+    // when handling complex cases.
+    //
+    left = tryGetAddress(context, left);
+
     auto builder = context->irBuilder;
 
 top:
     switch (left.flavor)
     {
     case LoweredValInfo::Flavor::Ptr:
-        switch (right.flavor)
         {
-        case LoweredValInfo::Flavor::Simple:
-        case LoweredValInfo::Flavor::Ptr:
-        case LoweredValInfo::Flavor::SwizzledLValue:
-        case LoweredValInfo::Flavor::BoundSubscript:
-        case LoweredValInfo::Flavor::BoundMember:
-            {
-                builder->emitStore(
-                    left.val,
-                    getSimpleVal(context, right));
-            }
-            break;
-
-        default:
-            SLANG_UNIMPLEMENTED_X("assignment");
-            break;
+            // The `left` value is just a pointer, so we can emit
+            // a store to it directly.
+            //
+            builder->emitStore(
+                left.val,
+                getSimpleVal(context, right));
         }
         break;
 
@@ -3050,6 +3117,11 @@ top:
             // How we will handle this depends on what `base` looks like:
             auto swizzleInfo = left.getSwizzledLValueInfo();
             auto loweredBase = swizzleInfo->base;
+
+            // Note that the call to `tryGetAddress` at the start should
+            // ensure that `loweredBase` has been simplified as much as
+            // possible (e.g., if it is possible to turn it into a
+            // `LoweredValInfo::ptr()` then that will have been done).
 
             switch( loweredBase.flavor )
             {
@@ -3196,7 +3268,7 @@ top:
                 // materialize the base value and move it into
                 // a mutable temporary if needed
                 auto baseVal = boundMemberInfo->base;
-                auto tempVal = maybeMoveMutableTemp(context, materialize(context, baseVal));
+                auto tempVal = moveIntoMutableTemp(context, baseVal);
 
                 // extract the field l-value out of the temporary
                 auto tempFieldVal = extractField(context, boundMemberInfo->type, tempVal, fieldDeclRef);
@@ -3206,6 +3278,8 @@ top:
 
                 // write back the modified temporary to the base l-value
                 assign(context, baseVal, tempVal);
+
+                return;
             }
             else
             {
@@ -3760,17 +3834,65 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         setMangledName(inst, context->getSession()->getNameObj(name));
     }
 
+    LoweredValInfo visitEnumCaseDecl(EnumCaseDecl* decl)
+    {
+        // A case within an `enum` decl will lower to a value
+        // of the `enum`'s "tag" type.
+        //
+        // TODO: a bit more work will be needed if we allow for
+        // enum cases that have payloads, because then we need
+        // a function that constructs the value given arguments.
+
+        IRBuilder subBuilderStorage = *getBuilder();
+        IRBuilder* subBuilder = &subBuilderStorage;
+
+        // Emit any generics that should wrap the actual type.
+        emitOuterGenerics(subBuilder, decl, decl);
+
+        IRGenContext subContextStorage = *context;
+        IRGenContext* subContext = &subContextStorage;
+        subContext->irBuilder = subBuilder;
+
+        return lowerRValueExpr(subContext, decl->initExpr);
+    }
+
+    LoweredValInfo visitEnumDecl(EnumDecl* decl)
+    {
+        // Given a declaration of a type, we need to make sure
+        // to output "witness tables" for any interfaces this
+        // type has declared conformance to.
+        for( auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>() )
+        {
+            ensureDecl(context, inheritanceDecl);
+        }
+
+        IRBuilder subBuilderStorage = *getBuilder();
+        IRBuilder* subBuilder = &subBuilderStorage;
+        emitOuterGenerics(subBuilder, decl, decl);
+
+        IRGenContext subContextStorage = *context;
+        IRGenContext* subContext = &subContextStorage;
+        subContext->irBuilder = subBuilder;
+
+        // An `enum` declaration will currently lower directly to its "tag"
+        // type, so that any references to the `enum` become referenes to
+        // the tag type instead.
+        //
+        // TODO: if we ever support `enum` types with payloads, we would
+        // need to make the `enum` lower to some kind of custom "tagged union"
+        // type.
+
+        IRType* loweredTagType = lowerType(subContext, decl->tagType);
+
+        return LoweredValInfo::simple(finishOuterGenerics(subBuilder, loweredTagType));
+    }
+
     LoweredValInfo visitAggTypeDecl(AggTypeDecl* decl)
     {
         // Don't generate an IR `struct` for intrinsic types
         if(decl->FindModifier<IntrinsicTypeModifier>() || decl->FindModifier<BuiltinTypeModifier>())
         {
             return LoweredValInfo();
-        }
-
-        if(getMangledName(decl) == "_ST03int")
-        {
-            decl = decl;
         }
 
         // Given a declaration of a type, we need to make sure
