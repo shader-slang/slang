@@ -87,6 +87,19 @@ SIMPLE_SYNTAX_CLASS(StructDecl, AggTypeDecl)
 
 SIMPLE_SYNTAX_CLASS(ClassDecl, AggTypeDecl)
 
+// TODO: Is it appropriate to treat an `enum` as an aggregate type?
+// Most code that looks for, e.g., conformances assumes user-defined
+// types are all `AggTypeDecl`, so this is the right choice for now
+// if we want `enum` types to be able to implement interfaces, etc.
+//
+SYNTAX_CLASS(EnumDecl, AggTypeDecl)
+RAW(
+    RefPtr<Type> tagType;
+)
+END_SYNTAX_CLASS()
+
+SIMPLE_SYNTAX_CLASS(EnumCaseDecl, VarDeclBase)
+
 // An interface which other types can conform to
 SIMPLE_SYNTAX_CLASS(InterfaceDecl, AggTypeDecl)
 
@@ -135,7 +148,7 @@ END_SYNTAX_CLASS()
 SYNTAX_CLASS(AssocTypeDecl, AggTypeDecl)
 END_SYNTAX_CLASS()
 
-// A '__generic_param' declaration, which defines a generic 
+// A '__generic_param' declaration, which defines a generic
 // entry-point parameter. Is a container of GenericTypeConstraintDecl
 SYNTAX_CLASS(GlobalGenericParamDecl, AggTypeDecl)
 END_SYNTAX_CLASS()

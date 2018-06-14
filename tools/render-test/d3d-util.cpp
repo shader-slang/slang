@@ -214,6 +214,10 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
     }
 }
 
+// Note: this subroutine is now only used by D3D11 for generating bytecode to go into input layouts.
+//
+// TODO: we can probably remove that code completely by switching to a PSO-like model across all APIs.
+//
 /* static */Result D3DUtil::compileHLSLShader(char const* sourcePath, char const* source, char const* entryPointName, char const* dxProfileName, ComPtr<ID3DBlob>& shaderBlobOut)
 {
     // Rather than statically link against the `d3dcompile` library, we

@@ -750,6 +750,27 @@ __generic<T : __BuiltinArithmeticType, let R : int, let N : int, let C : int> __
 float noise(float x);
 __generic<let N : int> float noise(vector<float, N> x);
 
+/// Indicate that an index may be non-uniform at execution time.
+///
+/// Shader Model 5.1 and 6.x introduce support for dynamic indexing
+/// of arrays of resources, but place the restriction that *by default*
+/// the implementation can assume that any value used as an index into
+/// such arrays will be dynamically uniform across an entire `Draw` or `Dispatch`
+/// (when using instancing, the value must be uniform across all instances;
+/// it does not seem that the restriction extends to draws within a multi-draw).
+///
+/// In order to indicate to the implementation that it cannot make the
+/// uniformity assumption, a shader programmer is required to pass the index
+/// to the `NonUniformResourceIndex` function before using it as an index.
+/// The function superficially acts like an identity function.
+///
+/// Note: a future version of Slang may take responsibility for inserting calls
+/// to this function as necessary in output code, rather than make this
+/// the user's responsibility, so that the default behavior of the language
+/// is more semantically "correct."
+uint NonUniformResourceIndex(uint index);
+int NonUniformResourceIndex(int index);
+
 // Normalize a vector
 __generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> normalize(vector<T,N> x);
 

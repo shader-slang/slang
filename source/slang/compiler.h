@@ -562,6 +562,8 @@ namespace Slang
         Type* getErrorType();
         Type* getStringType();
 
+        Type* getEnumTypeType();
+
         // Construct the type `Ptr<valueType>`, where `Ptr`
         // is looked up as a builtin type.
         RefPtr<PtrType> getPtrType(RefPtr<Type> valueType);

@@ -286,6 +286,13 @@ void Type::accept(IValVisitor* visitor, void* extra)
         return DeclRefType::Create(this, makeDeclRef<Decl>(stringTypeDecl));
     }
 
+    Type* Session::getEnumTypeType()
+    {
+        auto enumTypeTypeDecl = findMagicDecl(this, "EnumTypeType");
+        return DeclRefType::Create(this, makeDeclRef<Decl>(enumTypeTypeDecl));
+    }
+
+
     RefPtr<PtrType> Session::getPtrType(
         RefPtr<Type>    valueType)
     {
@@ -1618,7 +1625,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
             newSubst->paramDecl = appGlobalGenericSubst->paramDecl;
             newSubst->actualType = appGlobalGenericSubst->actualType;
             newSubst->constraintArgs = appGlobalGenericSubst->constraintArgs;
-            
+
             *link = newSubst;
             link = &newSubst->outer;
         }
@@ -1834,7 +1841,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
             &diff);
 
         if (!diff)
-            return *this; 
+            return *this;
 
         *ioDiff += diff;
 
@@ -2413,7 +2420,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         // TODO: need to print out substitutions too!
         return name->text;
     }
-    
+
     bool SubstitutionSet::Equals(SubstitutionSet substSet) const
     {
         if(!substitutions || !substSet.substitutions)

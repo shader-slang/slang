@@ -21,6 +21,8 @@ namespace Slang
 #define DEFINE_BASE_TYPE(NAME) NAME,
 FOREACH_BASE_TYPE(DEFINE_BASE_TYPE)
 #undef DEFINE_BASE_TYPE
+
+        CountOf,
     };
 
     struct TextureFlavor
@@ -39,7 +41,7 @@ FOREACH_BASE_TYPE(DEFINE_BASE_TYPE)
             // Whether or not this is a shadow texture
             //
             // TODO(tfoley): is this even meaningful/used?
-            // ShadowFlag		= 0x80, 
+            // ShadowFlag		= 0x80,
         };
 
         enum Shape : uint8_t

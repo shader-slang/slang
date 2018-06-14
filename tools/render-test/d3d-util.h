@@ -36,9 +36,7 @@ class D3DUtil
         /// Calculate size taking into account alignment. Alignment must be a power of 2
     static UInt calcAligned(UInt size, UInt alignment) { return (size + alignment - 1) & ~(alignment - 1); }
 
-        /// The Slang compiler currently generates HLSL source, so we'll need a utility
-        /// routine (defined later) to translate that into D3D11 shader bytecode.
-        /// Definition of the HLSL-to-bytecode compilation logic.
+        /// Compile HLSL code to DXBC
     static Slang::Result compileHLSLShader(char const* sourcePath, char const* source, char const* entryPointName, char const* dxProfileName, Slang::ComPtr<ID3DBlob>& shaderBlobOut);
 
         /// Given a slang pixel format returns the equivalent DXGI_ pixel format. If the format is not known, will return DXGI_FORMAT_UNKNOWN

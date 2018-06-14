@@ -127,6 +127,8 @@ namespace Slang
         ContainerDecl*				containerDecl,
         TokenType	                closingToken);
 
+    static RefPtr<Decl> parseEnumDecl(Parser* parser);
+
     // Parse the `{}`-delimeted body of an aggregate type declaration
     static void parseAggTypeDeclBody(
         Parser*             parser,
@@ -215,7 +217,7 @@ namespace Slang
         return tokenType;
     }
 
-    // Skip balanced 
+    // Skip balanced
     static TokenType SkipToMatchingToken(
         TokenReader*                reader,
         TokenType    tokenType)
@@ -403,7 +405,7 @@ namespace Slang
 
             // Skip balanced tokens and try again.
             TokenType skipped = SkipBalancedToken(tokenReader);
-                
+
             // If we happened to find a matched pair of tokens, and
             // the end of it was a token we were looking for,
             // then recover here
@@ -1097,7 +1099,7 @@ namespace Slang
     {
     public:
         RefPtr<Scope> scope;
-        void visitDeclRefExpr(DeclRefExpr* expr) 
+        void visitDeclRefExpr(DeclRefExpr* expr)
         {
             expr->scope = scope;
         }
@@ -1161,7 +1163,7 @@ namespace Slang
         }
         else
             parseFuncDeclHeaderInner(nullptr);
-        
+
         return retDecl;
     }
 
@@ -1471,7 +1473,7 @@ namespace Slang
             RefPtr<Decl>    newDecl)
         {
             SLANG_ASSERT(newDecl);
-            
+
             if( decl )
             {
                 group = new DeclGroup();
@@ -1655,10 +1657,23 @@ namespace Slang
     {
         TypeSpec typeSpec;
 
-        // We may see a `struct` type specified here, and need to act accordingly
+        // We may see a `struct` (or `enum` or `class`) tag specified here, and need to act accordingly
         //
         // TODO(tfoley): Handle the case where the user is just using `struct`
         // as a way to name an existing struct "tag" (e.g., `struct Foo foo;`)
+        //
+        // TODO: We should really make these keywords be registered like any other
+        // syntax category, rather than be special-cased here. The main issue here
+        // is that we need to allow them to be used as type specififers, as in:
+        //
+        //      struct Foo { int x } foo;
+        //
+        // The ideal answer would be to register certain keywords as being able
+        // to parse a type specififer, and look for those keywords here.
+        // We should ideally add special case logic that bails out of declarator
+        // parsing iff we have one of these kinds of type specififers and the
+        // closing `}` is at the end of its line, as a bit of a special case
+        // to allow the common idiom.
         //
         if( parser->LookAheadToken("struct") )
         {
@@ -1670,6 +1685,13 @@ namespace Slang
         else if( parser->LookAheadToken("class") )
         {
             auto decl = parser->ParseClass();
+            typeSpec.decl = decl;
+            typeSpec.expr = createDeclRefType(parser, decl);
+            return typeSpec;
+        }
+        else if(parser->LookAheadToken("enum"))
+        {
+            auto decl = parseEnumDecl(parser);
             typeSpec.decl = decl;
             typeSpec.expr = createDeclRefType(parser, decl);
             return typeSpec;
@@ -1740,6 +1762,51 @@ namespace Slang
                 parser->sink->diagnose(startPosition, Diagnostics::declarationDidntDeclareAnything);
             }
             return result;
+        }
+
+        // It is possible that we have a plain `struct`, `enum`,
+        // or similar declaration that isn't being used to declare
+        // any variable, and the user didn't put a trailing
+        // semicolon on it:
+        //
+        //      struct Batman
+        //      {
+        //          int cape;
+        //      }
+        //
+        // We want to allow this syntax (rather than give an
+        // inscrutable error), but also support the less common
+        // idiom where that declaration is used as part of
+        // a variable declaration:
+        //
+        //      struct Robin
+        //      {
+        //          float tights;
+        //      } boyWonder;
+        //
+        // As a bit of a hack (insofar as it means we aren't
+        // *really* compatible with arbitrary HLSL code), we
+        // will check if there are any more tokens on the
+        // same line as the closing `}`, and if not, we
+        // will treat it like the end of the declaration.
+        //
+        // Just as a safety net, only apply this logic for
+        // a file that is being passed in as "true" Slang code.
+        //
+        if(parser->translationUnit->sourceLanguage == SourceLanguage::Slang)
+        {
+            if(typeSpec.decl)
+            {
+                if(peekToken(parser).flags & TokenFlag::AtStartOfLine)
+                {
+                    // The token after the `}` is at the start of its
+                    // own line, which means it can't be on the same line.
+                    //
+                    // This means the programmer probably wants to
+                    // just treat this as a declaration.
+                    return declGroupBuilder.getResult();
+                }
+            }
         }
 
 
@@ -1978,7 +2045,7 @@ namespace Slang
             //
             // However, that is an uncommon occurence, and trying
             // to continue parsing semantics here even if we didn't
-            // see a colon forces us to be careful about 
+            // see a colon forces us to be careful about
             // avoiding an infinite loop here.
             if (!AdvanceIf(parser, TokenType::Colon))
             {
@@ -2921,6 +2988,71 @@ namespace Slang
         return rs;
     }
 
+    static RefPtr<EnumCaseDecl> parseEnumCaseDecl(Parser* parser)
+    {
+        RefPtr<EnumCaseDecl> decl = new EnumCaseDecl();
+        decl->nameAndLoc = expectIdentifier(parser);
+
+        if(AdvanceIf(parser, TokenType::OpAssign))
+        {
+            decl->initExpr = parser->ParseArgExpr();
+        }
+
+        return decl;
+    }
+
+    static RefPtr<Decl> parseEnumDecl(Parser* parser)
+    {
+        RefPtr<EnumDecl> decl = new EnumDecl();
+        parser->FillPosition(decl);
+
+        parser->ReadToken("enum");
+
+        // HACK: allow the user to write `enum class` in case
+        // they are trying to share a header between C++ and Slang.
+        //
+        // TODO: diagnose this with a warning some day, and move
+        // toward deprecating it.
+        //
+        AdvanceIf(parser, "class");
+
+        decl->nameAndLoc = expectIdentifier(parser);
+
+        auto parseEnumDeclInner = [&](GenericDecl*)
+        {
+            parseOptionalInheritanceClause(parser, decl);
+            parser->ReadToken(TokenType::LBrace);
+
+            while(!AdvanceIfMatch(parser, TokenType::RBrace))
+            {
+                RefPtr<EnumCaseDecl> caseDecl = parseEnumCaseDecl(parser);
+                AddMember(decl, caseDecl);
+
+                if(AdvanceIf(parser, TokenType::RBrace))
+                    break;
+
+                parser->ReadToken(TokenType::Comma);
+            }
+            return decl;
+        };
+
+        if (parser->LookAheadToken(TokenType::OpLess))
+        {
+            RefPtr<GenericDecl> genericDecl = new GenericDecl();
+            parser->FillPosition(genericDecl);
+            parser->PushScope(genericDecl);
+            ParseGenericDeclImpl(parser, genericDecl, parseEnumDeclInner);
+            parser->PopScope();
+            return genericDecl;
+        }
+        else
+        {
+            parseEnumDeclInner(nullptr);
+        }
+
+        return decl;
+    }
+
     static RefPtr<Stmt> ParseSwitchStmt(Parser* parser)
     {
         RefPtr<SwitchStmt> stmt = new SwitchStmt();
@@ -3205,7 +3337,7 @@ namespace Slang
         Modifiers modifiers)
     {
         RefPtr<DeclStmt>varDeclrStatement = new DeclStmt();
-        
+
         FillPosition(varDeclrStatement.Ptr());
         auto decl = ParseDeclWithModifiers(this, currentScope->containerDecl, modifiers);
         varDeclrStatement->decl = decl;
@@ -3348,10 +3480,10 @@ namespace Slang
     RefPtr<ExpressionStmt> Parser::ParseExpressionStatement()
     {
         RefPtr<ExpressionStmt> statement = new ExpressionStmt();
-            
+
         FillPosition(statement.Ptr());
         statement->Expression = ParseExpression();
-            
+
         ReadToken(TokenType::Semicolon);
         return statement;
     }
@@ -3544,7 +3676,7 @@ namespace Slang
             for(;;)
             {
                 auto nextOpPrec = GetOpLevel(parser, parser->tokenReader.PeekTokenType());
-                
+
                 if((GetAssociativityFromLevel(nextOpPrec) == Associativity::Right) ? (nextOpPrec < opPrec) : (nextOpPrec <= opPrec))
                     break;
 
@@ -3632,7 +3764,7 @@ namespace Slang
         }
 #endif
     }
-    
+
     // We *might* be looking at an application of a generic to arguments,
     // but we need to disambiguate to make sure.
     static RefPtr<Expr> maybeParseGenericApp(
@@ -4021,7 +4153,7 @@ namespace Slang
 
                     parser->FillPosition(memberExpr.Ptr());
                     memberExpr->BaseExpression = expr;
-                    parser->ReadToken(TokenType::Dot); 
+                    parser->ReadToken(TokenType::Dot);
                     memberExpr->name = expectIdentifier(parser).name;
 
                     if (peekTokenType(parser) == TokenType::OpLess)
