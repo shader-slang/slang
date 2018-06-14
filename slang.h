@@ -1,6 +1,193 @@
 #ifndef SLANG_H
 #define SLANG_H
 
+/** \file slang.h
+
+The Slang API provides services to compile, reflect, and specialize code
+written in the Slang shading language.
+*/
+
+/*
+The following section attempts to detect the compiler and version in use.
+
+If an application defines `SLANG_COMPILER` before including this header,
+they take responsibility for setting any compiler-dependent macros
+used later in the file.
+
+Most applications should not need to touch this section.
+*/
+#ifndef SLANG_COMPILER
+#	define SLANG_COMPILER
+
+/*
+Compiler defines, see http://sourceforge.net/p/predef/wiki/Compilers/
+NOTE that SLANG_VC holds the compiler version - not just 1 or 0
+*/
+#	if defined(_MSC_VER)
+#		if _MSC_VER >= 1900
+#			define SLANG_VC 14
+#		elif _MSC_VER >= 1800
+#			define SLANG_VC 12
+#		elif _MSC_VER >= 1700
+#			define SLANG_VC 11
+#		elif _MSC_VER >= 1600
+#			define SLANG_VC 10
+#		elif _MSC_VER >= 1500
+#			define SLANG_VC 9
+#		else
+#			error "unknown version of Visual C++ compiler"
+#		endif
+#	elif defined(__clang__)
+#		define SLANG_CLANG 1
+#	elif defined(__SNC__)
+#		define SLANG_SNC 1
+#	elif defined(__ghs__)
+#		define SLANG_GHS 1
+#	elif defined(__GNUC__) /* note: __clang__, __SNC__, or __ghs__ imply __GNUC__ */
+#		define SLANG_GCC 1
+#	else
+#		error "unknown compiler"
+#	endif
+/*
+Any compilers not detected by the above logic are now now explicitly zeroed out.
+*/
+#	ifndef SLANG_VC
+#		define SLANG_VC 0
+#	endif
+#	ifndef SLANG_CLANG
+#		define SLANG_CLANG 0
+#	endif
+#	ifndef SLANG_SNC
+#		define SLANG_SNC 0
+#	endif
+#	ifndef SLANG_GHS
+#		define SLANG_GHS 0
+#	endif
+#	ifndef SLANG_GCC
+#		define SLANG_GCC 0
+#	endif
+#endif /* SLANG_COMPILER */
+
+/*
+The following section attempts to detect the target platform being compiled for.
+
+If an application defines `SLANG_PLATFORM` before including this header,
+they take responsibility for setting any compiler-dependent macros
+used later in the file.
+
+Most applications should not need to touch this section.
+*/
+#ifndef SLANG_PLATFORM
+#	define SLANG_PLATFORM
+/**
+Operating system defines, see http://sourceforge.net/p/predef/wiki/OperatingSystems/
+*/
+#	if defined(WINAPI_FAMILY) && WINAPI_FAMILY == WINAPI_PARTITION_APP
+#		define SLANG_WINRT 1 /* Windows Runtime, either on Windows RT or Windows 8 */
+#	elif defined(XBOXONE)
+#		define SLANG_XBOXONE 1
+#	elif defined(_WIN64) /* note: XBOXONE implies _WIN64 */
+#		define SLANG_WIN64 1
+#	elif defined(_M_PPC)
+#		define SLANG_X360 1
+#	elif defined(_WIN32) /* note: _M_PPC implies _WIN32 */
+#		define SLANG_WIN32 1
+#	elif defined(__ANDROID__)
+#		define SLANG_ANDROID 1
+#	elif defined(__linux__) || defined(__CYGWIN__) /* note: __ANDROID__ implies __linux__ */
+#		define SLANG_LINUX 1
+#	elif defined(__APPLE__) && (defined(__arm__) || defined(__arm64__))
+#		define SLANG_IOS 1
+#	elif defined(__APPLE__)
+#		define SLANG_OSX 1
+#	elif defined(__CELLOS_LV2__)
+#		define SLANG_PS3 1
+#	elif defined(__ORBIS__)
+#		define SLANG_PS4 1
+#	elif defined(__SNC__) && defined(__arm__)
+#		define SLANG_PSP2 1
+#	elif defined(__ghs__)
+#		define SLANG_WIIU 1
+#	else
+#		error "unknown target platform"
+#	endif
+/*
+Any platforms not detected by the above logic are now now explicitly zeroed out.
+*/
+#	ifndef SLANG_WINRT
+#		define SLANG_WINRT 0
+#	endif
+#	ifndef SLANG_XBOXONE
+#		define SLANG_XBOXONE 0
+#	endif
+#	ifndef SLANG_WIN64
+#		define SLANG_WIN64 0
+#	endif
+#	ifndef SLANG_X360
+#		define SLANG_X360 0
+#	endif
+#	ifndef SLANG_WIN32
+#		define SLANG_WIN32 0
+#	endif
+#	ifndef SLANG_ANDROID
+#		define SLANG_ANDROID 0
+#	endif
+#	ifndef SLANG_LINUX
+#		define SLANG_LINUX 0
+#	endif
+#	ifndef SLANG_IOS
+#		define SLANG_IOS 0
+#	endif
+#	ifndef SLANG_OSX
+#		define SLANG_OSX 0
+#	endif
+#	ifndef SLANG_PS3
+#		define SLANG_PS3 0
+#	endif
+#	ifndef SLANG_PS4
+#		define SLANG_PS4 0
+#	endif
+#	ifndef SLANG_PSP2
+#		define SLANG_PSP2 0
+#	endif
+#	ifndef SLANG_WIIU
+#		define SLANG_WIIU 0
+#	endif
+#endif /* SLANG_PLATFORM */
+
+/* Shorthands for "families" of compilers/platforms */
+#define SLANG_GCC_FAMILY (SLANG_CLANG || SLANG_SNC || SLANG_GHS || SLANG_GCC)
+#define SLANG_WINDOWS_FAMILY (SLANG_WINRT || SLANG_WIN32 || SLANG_WIN64)
+#define SLANG_MICROSOFT_FAMILY (SLANG_XBOXONE || SLANG_X360 || SLANG_WINDOWS_FAMILY)
+#define SLANG_LINUX_FAMILY (SLANG_LINUX || SLANG_ANDROID)
+#define SLANG_APPLE_FAMILY (SLANG_IOS || SLANG_OSX)                  /* equivalent to #if __APPLE__ */
+#define SLANG_UNIX_FAMILY (SLANG_LINUX_FAMILY || SLANG_APPLE_FAMILY) /* shortcut for unix/posix platforms */
+
+/* Macro for declaring if a method is no throw. Should be set before the return parameter. */
+#ifndef SLANG_NO_THROW
+#   if SLANG_WINDOWS_FAMILY && !defined(SLANG_DISABLE_EXCEPTIONS)
+#       define SLANG_NO_THROW __declspec(nothrow)
+#   endif
+#endif
+#ifndef SLANG_NO_THROW
+#   define SLANG_NO_THROW
+#endif
+
+/* The `SLANG_STDCALL` and `SLANG_MCALL` defines are used to set the calling
+convention for interface methods.
+*/
+#ifndef SLANG_STDCALL
+#   if SLANG_MICROSOFT_FAMILY
+#       define SLANG_STDCALL __stdcall
+#   else
+#       define SLANG_STDCALL
+#   endif
+#endif
+#ifndef SLANG_MCALL
+#   define SLANG_MCALL SLANG_STDCALL
+#endif
+
+
 #if !defined(SLANG_STATIC) && !defined(SLANG_STATIC)
     #define SLANG_DYNAMIC
 #endif
@@ -178,12 +365,95 @@ extern "C"
         SLANG_MATRIX_LAYOUT_COLUMN_MAJOR,
     };
 
-//#define SLANG_LAYOUT_UNIFORM 0
-//#define SLANG_LAYOUT_PACKED 1
-//#define SLANG_LAYOUT_STORAGE 2
+    /** A result code for a Slang API operation.
 
-#define SLANG_ERROR_INSUFFICIENT_BUFFER -1
-#define SLANG_ERROR_INVALID_PARAMETER -2
+    This type is generally compatible with the Windows API
+    `HRESULT` type. In particular, negative values indicate
+    failure results, while zero or positive results indicate
+    success.
+
+    In general, Slang APIs always return a zero result on
+    success, unless documented otherwise.
+    */
+    typedef int32_t SlangResult;
+
+    /** A "Universally Unique Identifier" (UUID)
+
+    The Slang API uses UUIDs to identify interfaces when
+    using `queryInterface`.
+
+    This type is compatible with the `GUID` type defined
+    by the Component Object Model (COM), but Slang is
+    not dependent on COM.
+    */
+    struct SlangUUID
+    {
+        uint32_t data1;
+        uint16_t data2;
+        uint16_t data3;
+        uint8_t  data4[8];
+    };
+
+    /** Base interface for components exchanged through the API.
+
+    This interface definition is compatible with the COM `IUnknown`,
+    and uses the same UUID, but Slang does not require applications
+    to use or initialize COM.
+    */
+    struct ISlangUnknown
+    {
+    public:
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject) = 0;
+        virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() = 0;
+        virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() = 0;
+
+        /*
+        Inline methods are provided to allow the above operations to be called
+        using their traditional COM names/signatures:
+        */
+        SlangResult QueryInterface(struct _GUID const& uuid, void** outObject) { return queryInterface(*(SlangUUID const*)&uuid, outObject); }
+        uint32_t AddRef() { return addRef(); }
+        uint32_t Release() { return release(); }
+    };
+    #define SLANG_UUID_ISlangUnknown { 0x00000000, 0x0000, 0x0000, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46 }
+
+    /** A "blob" of binary data.
+
+    This interface definition is compatible with the `ID3DBlob` and `ID3D10Blob` interfaces.
+    */
+    struct ISlangBlob : public ISlangUnknown
+    {
+    public:
+        virtual SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() = 0;
+        virtual SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() = 0;
+    };
+    #define SLANG_UUID_ISlangBlob { 0x8BA5FB08, 0x5195, 0x40e2, 0xAC, 0x58, 0x0D, 0x98, 0x9C, 0x3A, 0x01, 0x02 }
+
+    /** A (real or virtual) file system.
+
+    Slang can make use of this interface whenever it would otherwise try to load files
+    from disk, allowing applications to hook and/or overide filesystem access from
+    the compiler.
+    */
+    struct ISlangFileSystem : public ISlangUnknown
+    {
+    public:
+        /** Load a file from `path` and return a blob of its contents
+
+        @param path The path to load from, as a nul-terminated UTF-8 string.
+        @param outBlob A destination pointer to receive the blob of the file contents.
+        @returns A `SlangResult` to indicate success or failure in loading the file.
+
+        If load is successful, the implementation should create a blob to hold
+        the file's content, store it to `outBlob`, and return 0.
+        If the load fails, the implementation should return a failure status
+        (any negative value will do).
+        */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadFile(
+            char const*     path,
+            ISlangBlob**    outBlob) = 0;
+    };
+    #define SLANG_UUID_ISlangFileSystem { 0x003A09FC, 0x3A4D, 0x4BA0, 0xAD, 0x60, 0x1F, 0xD8, 0x63, 0xA9, 0x15, 0xAB }
 
     /*!
     @brief An instance of the Slang library.
@@ -197,9 +467,8 @@ extern "C"
 
     /*!
     @brief Initialize an instance of the Slang library.
-    @param cacheDir The directory used to store cached compilation results. Pass NULL to disable caching.
     */
-    SLANG_API SlangSession* spCreateSession(const char * cacheDir);
+    SLANG_API SlangSession* spCreateSession(const char* deprecated = 0);
 
     /*!
     @brief Clean up after an instance of the Slang library.
@@ -227,6 +496,21 @@ extern "C"
     */
     SLANG_API void spDestroyCompileRequest(
         SlangCompileRequest*    request);
+
+    /** Set the filesystem hook to use for a compile request
+
+    The provided `fileSystem` will be used to load any files that
+    need to be loaded during processing of the compile `request`.
+    This includes:
+
+      - Source files loaded via `spAddTranslationUnitSourceFile`
+      - Files referenced via `#include`
+      - Files loaded to resolve `#import` operations
+
+    */
+    SLANG_API void spSetFileSystem(
+        SlangCompileRequest*    request,
+        ISlangFileSystem*       fileSystem);
 
 
     /*!
@@ -355,22 +639,84 @@ extern "C"
         const char*             value);
 
 
-    /** Add a source file to the given translation unit
+    /** Add a source file to the given translation unit.
+
+    If a user-defined file system has been specified via
+    `spSetFileSystem`, then it will be used to load the
+    file at `path`. Otherwise, Slang will use the OS
+    file system.
+
+    This function does *not* search for a file using
+    the registered search paths (`spAddSearchPath`),
+    and instead using the given `path` as-is.
     */
     SLANG_API void spAddTranslationUnitSourceFile(
         SlangCompileRequest*    request,
         int                     translationUnitIndex,
         char const*             path);
 
-    /** Add a source string to the given translation unit
+    /** Add a source string to the given translation unit.
 
-    The `path` will be used in any diagnostic output.
+    @param request The comile request that owns the translation unit.
+    @param translationUnitIndex The index of the translation unit to add source to.
+    @param path The file-system path that should be assumed for the source code.
+    @param source A nul-terminated UTF-8 encoded string of source code.
+
+    The implementation will make a copy of the source code data.
+    An application may free the buffer immediately after this call returns.
+
+    The `path` will be used in any diagnostic output, as well
+    as to determine the base path when resolving relative
+    `#include`s.
     */
     SLANG_API void spAddTranslationUnitSourceString(
         SlangCompileRequest*    request,
         int                     translationUnitIndex,
         char const*             path,
         char const*             source);
+
+
+    /** Add a source string to the given translation unit.
+
+    @param request The comile request that owns the translation unit.
+    @param translationUnitIndex The index of the translation unit to add source to.
+    @param path The file-system path that should be assumed for the source code.
+    @param sourceBegin A pointer to a buffer of UTF-8 encoded source code.
+    @param sourceEnd A pointer to to the end of the buffer specified in `sourceBegin`
+
+    The implementation will make a copy of the source code data.
+    An application may free the buffer immediately after this call returns.
+
+    The `path` will be used in any diagnostic output, as well
+    as to determine the base path when resolving relative
+    `#include`s.
+    */
+    SLANG_API void spAddTranslationUnitSourceStringSpan(
+        SlangCompileRequest*    request,
+        int                     translationUnitIndex,
+        char const*             path,
+        char const*             sourceBegin,
+        char const*             sourceEnd);
+
+    /** Add a blob of source code to the given translation unit.
+
+    @param request The comile request that owns the translation unit.
+    @param translationUnitIndex The index of the translation unit to add source to.
+    @param path The file-system path that should be assumed for the source code.
+    @param sourceBlob A blob containing UTF-8 encoded source code.
+    @param sourceEnd A pointer to to the end of the buffer specified in `sourceBegin`
+
+    The compile request will retain a reference to the blob.
+
+    The `path` will be used in any diagnostic output, as well
+    as to determine the base path when resolving relative
+    `#include`s.
+    */
+    SLANG_API void spAddTranslationUnitSourceBlob(
+        SlangCompileRequest*    request,
+        int                     translationUnitIndex,
+        char const*             path,
+        ISlangBlob*             sourceBlob);
 
     /** Look up a compilation profile by name.
 
@@ -409,9 +755,27 @@ extern "C"
 
 
     /** Get any diagnostic messages reported by the compiler.
+
+    @returns A nul-terminated UTF-8 encoded string of diagnostic messages.
+
+    The returned pointer is only guaranteed to be valid
+    until `reqeust` is destroyed. Applications that wish to
+    hold on to the diagnostic output for longer should use
+    `spGetDiagnosticOutputBlob`.
     */
     SLANG_API char const* spGetDiagnosticOutput(
         SlangCompileRequest*    request);
+
+    /** Get diagnostic messages reported by the compiler.
+
+    @param request The compile request to get output from.
+    @param outBlob A pointer to receive a blob holding a nul-terminated UTF-8 encoded string of diagnostic messages.
+    @returns A `SlangResult` indicating success or failure.
+    */
+    SLANG_API SlangResult spGetDiagnosticOutputBlob(
+        SlangCompileRequest*    request,
+        ISlangBlob**            outBlob);
+
 
     /** Get the number of files that this compilation depended on.
 
@@ -436,14 +800,6 @@ extern "C"
     spGetTranslationUnitCount(
         SlangCompileRequest*    request);
 
-    /** Get the output code associated with a specific translation unit.
-
-    The lifetime of the output pointer is the same as `request`.
-    */
-    SLANG_API char const* spGetTranslationUnitSource(
-        SlangCompileRequest*    request,
-        int                     translationUnitIndex);
-
     /** Get the output source code associated with a specific entry point.
 
     The lifetime of the output pointer is the same as `request`.
@@ -460,6 +816,21 @@ extern "C"
         SlangCompileRequest*    request,
         int                     entryPointIndex,
         size_t*                 outSize);
+
+    /** Get the output code associated with a specific entry point.
+
+    @param entryPointIndex The index of the entry point to get code for.
+    @param targetIndex The index of the target to get code for (default: zero).
+    @param outBlob A pointer that will receive the blob of code
+    @returns A `SlangResult` to indicate success or failure.
+
+    The lifetime of the output pointer is the same as `request`.
+    */
+    SLANG_API SlangResult spGetEntryPointCodeBlob(
+        SlangCompileRequest*    request,
+        int                     entryPointIndex,
+        int                     targetIndex,
+        ISlangBlob**            outBlob);
 
     /** Get the output bytecode associated with an entire compile request.
 
@@ -1276,6 +1647,30 @@ namespace slang
     };
 }
 
+#endif
+
+/* DEPRECATED DEFINITIONS
+
+Everything below this point represents deprecated APIs/definition that are only
+being kept around for source/binary compatibility with old client code. New
+code should not use any of these declarations, and the Slang API will drop these
+declarations over time.
+*/
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
+#define SLANG_ERROR_INSUFFICIENT_BUFFER -1
+#define SLANG_ERROR_INVALID_PARAMETER -2
+
+SLANG_API char const* spGetTranslationUnitSource(
+    SlangCompileRequest*    request,
+    int                     translationUnitIndex);
+
+#ifdef __cplusplus
+}
 #endif
 
 #endif

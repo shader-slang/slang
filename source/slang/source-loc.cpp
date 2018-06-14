@@ -1,6 +1,8 @@
 // source-loc.cpp
 #include "source-loc.h"
 
+#include "compiler.h"
+
 namespace Slang {
 
 String ExpandedSourceLoc::getPath() const
@@ -70,15 +72,18 @@ SourceRange SourceManager::allocateSourceRange(UInt size)
 
 SourceFile* SourceManager::allocateSourceFile(
     String const&   path,
-    String const&   content)
+    ISlangBlob*     contentBlob)
 {
-    UInt size = content.Length();
+    char const* contentBegin = (char const*) contentBlob->getBufferPointer();
+    UInt contentSize = contentBlob->getBufferSize();
+    char const* contentEnd = contentBegin + contentSize;
 
-    SourceRange sourceRange = allocateSourceRange(size);
+    SourceRange sourceRange = allocateSourceRange(contentSize);
 
     SourceFile* sourceFile = new SourceFile();
     sourceFile->path = path;
-    sourceFile->content = content;
+    sourceFile->contentBlob = contentBlob;
+    sourceFile->content = UnownedStringSlice(contentBegin, contentEnd);
     sourceFile->sourceRange = sourceRange;
 
     Entry entry;
@@ -89,6 +94,14 @@ SourceFile* SourceManager::allocateSourceFile(
     sourceFiles.Add(entry);
 
     return sourceFile;
+}
+
+SourceFile* SourceManager::allocateSourceFile(
+    String const&   path,
+    String const&   content)
+{
+    ComPtr<ISlangBlob> contentBlob = createStringBlob(content);
+    return allocateSourceFile(path, contentBlob);
 }
 
 SourceLoc SourceManager::allocateSourceFileForLineDirective(

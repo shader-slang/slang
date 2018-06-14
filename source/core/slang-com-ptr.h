@@ -8,17 +8,17 @@
 
 namespace Slang {
 
-/*! \brief ComPtr is a simple smart pointer that manages types which implement COM based interfaces. 
+/*! \brief ComPtr is a simple smart pointer that manages types which implement COM based interfaces.
 \details A class that implements a COM, must derive from the IUnknown interface or a type that matches
 it's layout exactly (such as IForwardUnknown). Trying to use this template with a class that doesn't follow
-these rules, will lead to undefined behavior. 
-This is a 'strong' pointer type, and will AddRef when a non null pointer is set and Release when the pointer 
-leaves scope. 
+these rules, will lead to undefined behavior.
+This is a 'strong' pointer type, and will AddRef when a non null pointer is set and Release when the pointer
+leaves scope.
 Using 'detach' allows a pointer to be removed from the management of the ComPtr.
 To set the smart pointer to null, there is the method setNull, or alternatively just assign SLANG_NULL/nullptr.
 
 One edge case using the template is that sometimes you want access as a pointer to a pointer. Sometimes this
-is to write into the smart pointer, other times to pass as an array. To handle these different behaviors 
+is to write into the smart pointer, other times to pass as an array. To handle these different behaviors
 there are the methods readRef and writeRef, which are used instead of the & (ref) operator. For example
 
 \code
@@ -31,7 +31,7 @@ ComPtr<ID3D12Resource> resources[3];
 doSomething(resources[0].readRef(), SLANG_COUNT_OF(resource));
 \endcode
 
-A more common scenario writing to the pointer 
+A more common scenario writing to the pointer
 
 \code
 IUnknown* unk = ...;
@@ -40,35 +40,29 @@ ComPtr<ID3D12Resource> resource;
 Result res = unk->QueryInterface(resource.writeRef());
 \endcode
 */
- 
-struct Guid
-{
-    uint32_t data1;     ///< Low field of the timestamp
-    uint16_t data2;     ///< Middle field of the timestamp
-    uint16_t data3;     ///< High field of the timestamp with multiplexed version number
-    uint8_t  data4[8];  ///< 0, 1 = clock_seq_hi_and_reserved, clock_seq_low, followed by 'spatially unique node' (48 bits) 
-};
+
+typedef SlangUUID Guid;
 
 SLANG_FORCE_INLINE bool operator==(const Guid& aIn, const Guid& bIn)
 {
-	// Use the largest type the honors the alignment of Guid
-	typedef uint32_t CmpType;
-    struct GuidCompare
+    // Use the largest type the honors the alignment of Guid
+    typedef uint32_t CmpType;
+    union GuidCompare
     {
         Guid guid;
-		CmpType data[sizeof(Guid) / sizeof(CmpType)];
+        CmpType data[sizeof(Guid) / sizeof(CmpType)];
     };
-	// Type pun - so compiler can 'see' the pun and not break aliasing rules 
+    // Type pun - so compiler can 'see' the pun and not break aliasing rules
     const CmpType* a = reinterpret_cast<const GuidCompare&>(aIn).data;
     const CmpType* b = reinterpret_cast<const GuidCompare&>(bIn).data;
-	// Make the guid comparison a single branch, by not using short circuit
-	return ((a[0] ^ b[0]) | (a[1] ^ b[1]) | (a[2] ^ b[2]) | (a[3] ^ b[3])) == 0;
-} 
+    // Make the guid comparison a single branch, by not using short circuit
+    return ((a[0] ^ b[0]) | (a[1] ^ b[1]) | (a[2] ^ b[2]) | (a[3] ^ b[3])) == 0;
+}
 
 SLANG_FORCE_INLINE bool operator!=(const Guid& a, const Guid& b)
 {
     return !(a == b);
-} 
+}
 
 // Allows for defining of a GUID that works in C++ and C which defines in a format similar to microsofts INTERFACE style
 // MIDL_INTERFACE("00000000-0000-0000-C000-00 00 00 00 00 46")
@@ -84,16 +78,9 @@ SLANG_FORCE_INLINE bool operator!=(const Guid& a, const Guid& b)
 // Compatible with Microsoft IUnknown
 static const Guid IID_IComUnknown = SLANG_MAKE_GUID(00000000, 0000, 0000, C000, 000000000046);
 
-/// ! Must be kept in sync with IUnknown
-class IComUnknown
-{
-public:
-    virtual SLANG_NO_THROW Result SLANG_MCALL queryInterface(const Guid& iid, void* objOut) = 0;
-    virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() = 0;
-    virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() = 0;
-};
+typedef ISlangUnknown IComUnknown;
 
-// Enum to force initializing as an attach (without adding a reference) 
+// Enum to force initializing as an attach (without adding a reference)
 enum InitAttach
 {
     INIT_ATTACH
@@ -139,7 +126,7 @@ public:
 		/// For making method invocations through the smart pointer work through the dumb pointer
 	SLANG_FORCE_INLINE T* operator->() const { return m_ptr; }
 
-		/// Assign 
+		/// Assign
 	SLANG_FORCE_INLINE const ThisType &operator=(const ThisType& rhs);
 		/// Assign from dumb ptr
 	SLANG_FORCE_INLINE T* operator=(T* in);
@@ -202,7 +189,7 @@ T* ComPtr<T>::operator=(T* ptr)
 {
 	if (ptr) ((Ptr)ptr)->addRef();
 	if (m_ptr) ((Ptr)m_ptr)->release();
-	m_ptr = ptr;           
+	m_ptr = ptr;
 	return m_ptr;
 }
 //----------------------------------------------------------------------------
@@ -214,6 +201,6 @@ void ComPtr<T>::swap(ThisType& rhs)
 	rhs.m_ptr = tmp;
 }
 
-} // namespace Slang 
+} // namespace Slang
 
 #endif // SLANG_COM_PTR_H

@@ -81,32 +81,29 @@ struct IncludeHandlerImpl : IncludeHandler
         String const& pathToInclude,
         String const& pathIncludedFrom,
         String* outFoundPath,
-        String* outFoundSource) override
+        ISlangBlob** outFoundSourceBlob) override
     {
         String path = Path::Combine(Path::GetDirectoryName(pathIncludedFrom), pathToInclude);
-        if (File::Exists(path))
+
+        if(SLANG_SUCCEEDED(request->loadFile(path, outFoundSourceBlob)))
         {
             *outFoundPath = path;
-            *outFoundSource = File::ReadAllText(path);
-
             request->mDependencyFilePaths.Add(path);
-
             return IncludeResult::Found;
         }
 
         for (auto & dir : request->searchDirectories)
         {
             path = Path::Combine(dir.path, pathToInclude);
-            if (File::Exists(path))
+
+            if(SLANG_SUCCEEDED(request->loadFile(path, outFoundSourceBlob)))
             {
                 *outFoundPath = path;
-                *outFoundSource = File::ReadAllText(path);
-
                 request->mDependencyFilePaths.Add(path);
-
                 return IncludeResult::Found;
             }
         }
+
         return IncludeResult::NotFound;
     }
 };
@@ -205,11 +202,168 @@ CompileRequest::~CompileRequest()
     types = decltype(types)();
 }
 
+// Allocate static const storage for the various interface IDs that the Slang API needs to expose
+static const Guid IID_ISlangUnknown = SLANG_UUID_ISlangUnknown;
+static const Guid IID_ISlangBlob    = SLANG_UUID_ISlangBlob;
+
+/** Base class for simple blobs.
+*/
+class BlobBase : public ISlangBlob
+{
+public:
+    BlobBase() {}
+    virtual ~BlobBase() {}
+
+    uint32_t referenceCount = 0;
+
+    // ISlangUnknown
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE
+    {
+        if(uuid == IID_IComUnknown)
+        {
+            *(ISlangUnknown**)outObject = this;
+            addRef();
+            return SLANG_OK;
+        }
+        else if(uuid == IID_ISlangBlob)
+        {
+            *(ISlangBlob**)outObject = this;
+            addRef();
+            return SLANG_OK;
+        }
+
+        return SLANG_FAIL;
+    }
+
+    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE
+    {
+        referenceCount++;
+        return 0;
+    }
+
+    SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE
+    {
+        if(--referenceCount == 0)
+        {
+            delete this;
+        }
+        return 0;
+    }
+
+};
+
+/** A blob that uses a `String` for its storage.
+*/
+class StringBlob : public BlobBase
+{
+public:
+    String string;
+
+    explicit StringBlob(String const& string)
+        : string(string)
+    {}
+
+    // ISlangBlob
+
+    SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() SLANG_OVERRIDE
+    {
+        return string.Buffer();
+    }
+
+    SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE
+    {
+        return string.Length();
+    }
+};
+
+ComPtr<ISlangBlob> createStringBlob(String const& string)
+{
+    return ComPtr<ISlangBlob>(new StringBlob(string));
+}
+
+/** A blob that manages some raw data that it owns.
+*/
+class RawBlob : public BlobBase
+{
+public:
+    void* data;
+    size_t size;
+
+    ~RawBlob()
+    {
+        free(data);
+    }
+
+    // ISlangBlob
+
+    SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() SLANG_OVERRIDE
+    {
+        return data;
+    }
+
+    SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE
+    {
+        return size;
+    }
+};
+
+
+ComPtr<ISlangBlob> createRawBlob(void const* inData, size_t size)
+{
+    void* dataCopy = malloc(size);
+    memcpy(dataCopy, inData, size);
+
+    RawBlob* rawBlob = new RawBlob();
+    rawBlob->data = dataCopy;
+    rawBlob->size = size;
+
+    return ComPtr<ISlangBlob>(rawBlob);
+}
+
+
+SlangResult CompileRequest::loadFile(String const& path, ISlangBlob** outBlob)
+{
+    // If there is a used-defined filesystem, then use that to load files.
+    //
+    if(fileSystem)
+    {
+        return fileSystem->loadFile(path.Buffer(), outBlob);
+    }
+
+    // Otherwise, fall back to a default implementation that uses the `core`
+    // libraries facilities for talking to the OS filesystem.
+    //
+    // TODO: we might want to conditionally compile these in, so that
+    // a user could create a build of Slang that doesn't include any OS
+    // filesystem calls.
+    //
+
+    if (!File::Exists(path))
+    {
+        return SLANG_FAIL;
+    }
+
+    try
+    {
+        String sourceString = File::ReadAllText(path);
+        ComPtr<ISlangBlob> sourceBlob = createStringBlob(sourceString);
+        *outBlob = sourceBlob.detach();
+
+        return SLANG_OK;
+    }
+    catch(...)
+    {
+    }
+    return SLANG_FAIL;
+
+}
+
 
 RefPtr<Expr> CompileRequest::parseTypeString(TranslationUnitRequest * translationUnit, String typeStr, RefPtr<Scope> scope)
 {
     Slang::SourceFile srcFile;
-    srcFile.content = typeStr;
+    srcFile.content = UnownedStringSlice(typeStr.begin(), typeStr.end());
     DiagnosticSink sink;
     sink.sourceManager = sourceManager;
     auto tokens = preprocessSource(
@@ -484,6 +638,16 @@ void CompileRequest::addTranslationUnitSourceFile(
     translationUnits[translationUnitIndex]->sourceFiles.Add(sourceFile);
 }
 
+void CompileRequest::addTranslationUnitSourceBlob(
+    int             translationUnitIndex,
+    String const&   path,
+    ISlangBlob*     sourceBlob)
+{
+    RefPtr<SourceFile> sourceFile = getSourceManager()->allocateSourceFile(path, sourceBlob);
+
+    addTranslationUnitSourceFile(translationUnitIndex, sourceFile);
+}
+
 void CompileRequest::addTranslationUnitSourceString(
     int             translationUnitIndex,
     String const&   path,
@@ -498,12 +662,17 @@ void CompileRequest::addTranslationUnitSourceFile(
     int             translationUnitIndex,
     String const&   path)
 {
-    String source;
-    try
-    {
-        source = File::ReadAllText(path);
-    }
-    catch (...)
+    // TODO: We need to consider whether a relative `path` should cause
+    // us to look things up using the registered search paths.
+    //
+    // This behavior wouldn't make sense for command-line invocations
+    // of `slangc`, but at least one API user wondered by the search
+    // paths were not taken into account by this function.
+    //
+
+    ComPtr<ISlangBlob> sourceBlob;
+    SlangResult result = loadFile(path, sourceBlob.writeRef());
+    if(SLANG_FAILED(result))
     {
         // Emit a diagnostic!
         mSink.diagnose(
@@ -513,10 +682,10 @@ void CompileRequest::addTranslationUnitSourceFile(
         return;
     }
 
-    addTranslationUnitSourceString(
+    addTranslationUnitSourceBlob(
         translationUnitIndex,
         path,
-        source);
+        sourceBlob);
 
     mDependencyFilePaths.Add(path);
 }
@@ -590,7 +759,7 @@ void CompileRequest::loadParsedModule(
 RefPtr<ModuleDecl> CompileRequest::loadModule(
     Name*               name,
     String const&       path,
-    String const&       source,
+    ISlangBlob*         sourceBlob,
     SourceLoc const&    srcLoc)
 {
     RefPtr<TranslationUnitRequest> translationUnit = new TranslationUnitRequest();
@@ -603,7 +772,7 @@ RefPtr<ModuleDecl> CompileRequest::loadModule(
     // TODO: decide which options, if any, should be inherited.
     translationUnit->compileFlags = 0;
 
-    RefPtr<SourceFile> sourceFile = getSourceManager()->allocateSourceFile(path, source);
+    RefPtr<SourceFile> sourceFile = getSourceManager()->allocateSourceFile(path, sourceBlob);
 
     translationUnit->sourceFiles.Add(sourceFile);
 
@@ -687,8 +856,8 @@ RefPtr<ModuleDecl> CompileRequest::findOrImportModule(
     String pathIncludedFrom = expandedLoc.getSpellingPath();
 
     String foundPath;
-    String foundSource;
-    IncludeResult includeResult = includeHandler.TryToFindIncludeFile(fileName, pathIncludedFrom, &foundPath, &foundSource);
+    ComPtr<ISlangBlob> foundSourceBlob;
+    IncludeResult includeResult = includeHandler.TryToFindIncludeFile(fileName, pathIncludedFrom, &foundPath, foundSourceBlob.writeRef());
     switch( includeResult )
     {
     case IncludeResult::NotFound:
@@ -715,7 +884,7 @@ RefPtr<ModuleDecl> CompileRequest::findOrImportModule(
     return loadModule(
         name,
         foundPath,
-        foundSource,
+        foundSourceBlob,
         loc);
 }
 
@@ -832,7 +1001,7 @@ Session::~Session()
     constExprRate = nullptr;
 
     destroyTypeCheckingCache();
-    
+
     builtinTypes = decltype(builtinTypes)();
     // destroy modules next
     loadedModuleCode = decltype(loadedModuleCode)();
@@ -894,6 +1063,16 @@ SLANG_API void spDestroyCompileRequest(
     auto req = REQ(request);
     delete req;
 }
+
+SLANG_API void spSetFileSystem(
+    SlangCompileRequest*    request,
+    ISlangFileSystem*       fileSystem)
+{
+    if(!request) return;
+    auto req = REQ(request);
+    req->fileSystem = fileSystem;
+}
+
 
 SLANG_API void spSetCompileFlags(
     SlangCompileRequest*    request,
@@ -1021,6 +1200,25 @@ SLANG_API char const* spGetDiagnosticOutput(
     return req->mDiagnosticOutput.begin();
 }
 
+SLANG_API SlangResult spGetDiagnosticOutputBlob(
+        SlangCompileRequest*    request,
+        ISlangBlob**            outBlob)
+{
+    if(!request) return SLANG_ERROR_INVALID_PARAMETER;
+    if(!outBlob) return SLANG_ERROR_INVALID_PARAMETER;
+
+    auto req = REQ(request);
+
+    if(!req->diagnosticOutputBlob)
+    {
+        req->diagnosticOutputBlob = Slang::createStringBlob(req->mDiagnosticOutput);
+    }
+
+    Slang::ComPtr<ISlangBlob> resultBlob = req->diagnosticOutputBlob;
+    *outBlob = resultBlob.detach();
+    return SLANG_OK;
+}
+
 // New-fangled compilation API
 
 SLANG_API int spAddTranslationUnit(
@@ -1063,16 +1261,31 @@ SLANG_API void spAddTranslationUnitSourceFile(
         path);
 }
 
-// Add a source string to the given translation unit
 SLANG_API void spAddTranslationUnitSourceString(
     SlangCompileRequest*    request,
     int                     translationUnitIndex,
     char const*             path,
     char const*             source)
 {
+    if(!source) return;
+    spAddTranslationUnitSourceStringSpan(
+        request,
+        translationUnitIndex,
+        path,
+        source,
+        source + strlen(source));
+}
+
+SLANG_API void spAddTranslationUnitSourceStringSpan(
+    SlangCompileRequest*    request,
+    int                     translationUnitIndex,
+    char const*             path,
+    char const*             sourceBegin,
+    char const*             sourceEnd)
+{
     if(!request) return;
     auto req = REQ(request);
-    if(!source) return;
+    if(!sourceBegin) return;
     if(translationUnitIndex < 0) return;
     if(Slang::UInt(translationUnitIndex) >= req->translationUnits.Count()) return;
 
@@ -1081,9 +1294,33 @@ SLANG_API void spAddTranslationUnitSourceString(
     req->addTranslationUnitSourceString(
         translationUnitIndex,
         path,
-        source);
-
+        Slang::UnownedStringSlice(sourceBegin, sourceEnd));
 }
+
+SLANG_API void spAddTranslationUnitSourceBlob(
+    SlangCompileRequest*    request,
+    int                     translationUnitIndex,
+    char const*             path,
+    ISlangBlob*             sourceBlob)
+{
+    if(!request) return;
+    auto req = REQ(request);
+    if(!sourceBlob) return;
+    if(translationUnitIndex < 0) return;
+    if(Slang::UInt(translationUnitIndex) >= req->translationUnits.Count()) return;
+
+    if(!path) path = "";
+
+    req->addTranslationUnitSourceBlob(
+        translationUnitIndex,
+        path,
+        sourceBlob);
+}
+
+
+
+
+
 
 SLANG_API SlangProfileID spFindProfile(
     SlangSession*,
@@ -1265,6 +1502,35 @@ SLANG_API void const* spGetEntryPointCode(
 
     if(outSize) *outSize = size;
     return data;
+}
+
+SLANG_API SlangResult spGetEntryPointCodeBlob(
+        SlangCompileRequest*    request,
+        int                     entryPointIndex,
+        int                     targetIndex,
+        ISlangBlob**            outBlob)
+{
+    if(!request) return SLANG_ERROR_INVALID_PARAMETER;
+    if(!outBlob) return SLANG_ERROR_INVALID_PARAMETER;
+
+    auto req = REQ(request);
+
+    int targetCount = (int) req->targets.Count();
+    if((targetIndex < 0) || (targetIndex >= targetCount))
+    {
+        return SLANG_ERROR_INVALID_PARAMETER;
+    }
+    auto targetReq = req->targets[targetIndex];
+
+    int entryPointCount = (int) req->entryPoints.Count();
+    if((entryPointIndex < 0) || (entryPointIndex >= entryPointCount))
+    {
+        return SLANG_ERROR_INVALID_PARAMETER;
+    }
+    Slang::CompileResult& result = targetReq->entryPointResults[entryPointIndex];
+
+    *outBlob = result.getBlob().detach();
+    return SLANG_OK;
 }
 
 SLANG_API char const* spGetEntryPointSource(

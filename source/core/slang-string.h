@@ -172,7 +172,7 @@ namespace Slang
                 {
                     return i;
                 }
-            } 
+            }
             return -1;
         }
 
@@ -408,6 +408,11 @@ namespace Slang
 		}
 
         String(StringSlice const& slice)
+        {
+            append(slice);
+        }
+
+        String(UnownedStringSlice const& slice)
         {
             append(slice);
         }
@@ -739,6 +744,11 @@ namespace Slang
 		StringBuilder & operator << (const String & str)
 		{
 			Append(str);
+			return *this;
+		}
+		StringBuilder & operator << (UnownedStringSlice const& str)
+		{
+			append(str);
 			return *this;
 		}
 		StringBuilder & operator << (const _EndLine)

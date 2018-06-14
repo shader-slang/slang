@@ -26,7 +26,7 @@ struct IncludeHandler
         String const& pathToInclude,
         String const& pathIncludedFrom,
         String* outFoundPath,
-        String* outFoundSource) = 0;
+        ISlangBlob** outFoundSourceBlob) = 0;
 };
 
 // Take a string of source code and preprocess it into a list of tokens.
