@@ -5117,21 +5117,119 @@ namespace Slang
             return result;
         }
 
+        /// Does there exist an implicit conversion from `fromType` to `toType`?
+        bool canConvertImplicitly(
+            RefPtr<Type> toType,
+            RefPtr<Type> fromType)
+        {
+            // Can we convert at all?
+            ConversionCost conversionCost;
+            if(!CanCoerce(toType, fromType, &conversionCost))
+                return false;
+
+            // Is the conversion cheap enough to be done implicitly?
+            if(conversionCost >= kConversionCost_GeneralConversion)
+                return false;
+
+            return true;
+        }
+
         RefPtr<Type> TryJoinTypeWithInterface(
-            RefPtr<Type>  type,
-            DeclRef<InterfaceDecl>        interfaceDeclRef)
+            RefPtr<Type>            type,
+            DeclRef<InterfaceDecl>      interfaceDeclRef)
         {
             // The most basic test here should be: does the type declare conformance to the trait.
             if(DoesTypeConformToInterface(type, interfaceDeclRef))
                 return type;
 
-            // There is a more nuanced case if `type` is a builtin type, and we need to make it
-            // conform to a trait that some but not all builtin types support (the main problem
-            // here is when an operation wants an integer type, but one of our operands is a `float`.
-            // The HLSL rules will allow that, with implicit conversion, but our default join rules
-            // will end up picking `float` and we don't want that...).
+            // Just because `type` doesn't conform to the given `interfaceDeclRef`, that
+            // doesn't necessarily indicate a failure. It is possible that we have a call
+            // like `sqrt(2)` so that `type` is `int` and `interfaceDeclRef` is
+            // `__BuiltinFloatingPointType`. The "obvious" answer is that we should infer
+            // the type `float`, but it seems like the compiler would have to synthesize
+            // that answer from thin air.
+            //
+            // A robsut/correct solution here might be to enumerate set of types types `S`
+            // such that for each type `X` in `S`:
+            //
+            // * `type` is implicitly convertible to `X`
+            // * `X` conforms to the interface named by `interfaceDeclRef`
+            //
+            // If the set `S` is non-empty then we would try to pick the "best" type from `S`.
+            // The "best" type would be a type `Y` such that `Y` is implicitly convertible to
+            // every other type in `S`.
+            //
+            // We are going to implement a much simpler strategy for now, where we only apply
+            // the search process if `type` is a builtin scalar type, and then we only search
+            // through types `X` that are also builtin scalar types.
+            //
+            RefPtr<Type> bestType;
+            if(auto basicType = type.As<BasicExpressionType>())
+            {
+                basicType->baseType;
+                for(Int baseTypeFlavorIndex = 0; baseTypeFlavorIndex < Int(BaseType::CountOf); baseTypeFlavorIndex++)
+                {
+                    // Don't consider `type`, since we already know it doesn't work.
+                    if(baseTypeFlavorIndex == Int(basicType->baseType))
+                        continue;
 
-            // For now we don't handle the hard case and just bail
+                    // Look up the type in our session.
+                    auto candidateType = type->getSession()->getBuiltinType(BaseType(baseTypeFlavorIndex));
+                    if(!candidateType)
+                        continue;
+
+                    // We only want to consider types that implement the target interface.
+                    if(!DoesTypeConformToInterface(candidateType, interfaceDeclRef))
+                        continue;
+
+                    // We only want to consider types where we can implicitly convert from `type`
+                    if(!canConvertImplicitly(candidateType, type))
+                        continue;
+
+                    // At this point, we have a candidate type that is usable.
+                    //
+                    // If this is our first viable candidate, then it is our best one:
+                    //
+                    if(!bestType)
+                    {
+                        bestType = candidateType;
+                    }
+                    else
+                    {
+                        // Otherwise, we want to pick the "better" type between `candidateType`
+                        // and `bestType`.
+                        //
+                        // We are going to be a bit loose here, and not worry about the
+                        // case where conversion is allowed in both directions.
+                        //
+                        // TODO: make this completely robust.
+                        //
+                        if(canConvertImplicitly(bestType, candidateType))
+                        {
+                            // Our candidate can convert to the current "best" type, so
+                            // it is logically a more specific type that satisfies our
+                            // constraints, thereforce we should keep it.
+                            //
+                            bestType = candidateType;
+                        }
+                    }
+                }
+                if(bestType)
+                    return bestType;
+            }
+
+            // For all other cases, we will just bail out for now.
+            //
+            // TODO: In the future we should build some kind of side data structure
+            // to accelerate either one or both of these queries:
+            //
+            // * Given a type `T`, what types `U` can it convert to implicitly?
+            //
+            // * Given an interface `I`, what types `U` conform to it?
+            //
+            // The intersection of the sets returned by these two queries is
+            // the set of candidates we would like to consider here.
+
             return nullptr;
         }
 
