@@ -45,12 +45,6 @@
     <ClInclude Include="secure-crt.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="slang-com-ptr.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="slang-defines.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="slang-free-list.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -58,9 +52,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-math.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="slang-result.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-string-util.h">

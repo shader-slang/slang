@@ -6,6 +6,8 @@
 
 #include <assert.h>
 
+#include "../../slang.h"
+
 namespace Slang
 {
     // TODO: Need to centralize these typedefs
@@ -199,12 +201,16 @@ namespace Slang
 
         T* detach()
         {
-            if (pointer)
-                dynamic_cast<RefObject*>(pointer)->decreaseReference();
             auto rs = pointer;
             pointer = nullptr;
             return rs;
         }
+
+        /// Get ready for writing (nulls contents)
+        SLANG_FORCE_INLINE T** writeRef() { *this = nullptr; return &pointer; }
+
+        /// Get for read access
+        SLANG_FORCE_INLINE T*const* readRef() const { return &pointer; }
 
     private:
         T* pointer;

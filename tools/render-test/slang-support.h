@@ -11,13 +11,13 @@ namespace renderer_test {
 
 struct ShaderCompiler
 {
-    Renderer*               renderer;
+    RefPtr<Renderer>        renderer;
     SlangCompileTarget      target;
     SlangSourceLanguage     sourceLanguage;
     SlangPassThrough        passThrough;
     char const*             profile;
 
-    ShaderProgram* compileProgram(
+    RefPtr<ShaderProgram> compileProgram(
         ShaderCompileRequest const& request);
 };
 

@@ -11,7 +11,7 @@
 
 namespace renderer_test {
 
-ShaderProgram* ShaderCompiler::compileProgram(
+RefPtr<ShaderProgram> ShaderCompiler::compileProgram(
     ShaderCompileRequest const& request)
 {
     SlangSession* slangSession = spCreateSession(NULL);
@@ -92,7 +92,7 @@ ShaderProgram* ShaderCompiler::compileProgram(
     }
 
 
-    ShaderProgram * shaderProgram = nullptr;
+    RefPtr<ShaderProgram> shaderProgram;
     Slang::List<const char*> rawTypeNames;
     for (auto typeName : request.entryPointTypeArguments)
         rawTypeNames.Add(typeName.Buffer());

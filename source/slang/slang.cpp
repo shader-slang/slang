@@ -979,9 +979,6 @@ SLANG_API void spDestroySession(
 {
     if(!session) return;
     delete SESSION(session);
-#ifdef _MSC_VER
-    _CrtDumpMemoryLeaks();
-#endif
 }
 
 SLANG_API void spAddBuiltins(
@@ -1483,7 +1480,8 @@ SLANG_API SlangResult spGetEntryPointCodeBlob(
     }
     Slang::CompileResult& result = targetReq->entryPointResults[entryPointIndex];
 
-    *outBlob = result.getBlob().detach();
+    auto blob = result.getBlob();
+    *outBlob = blob.detach();
     return SLANG_OK;
 }
 

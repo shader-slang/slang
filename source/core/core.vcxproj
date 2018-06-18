@@ -182,12 +182,9 @@
     <ClInclude Include="list.h" />
     <ClInclude Include="platform.h" />
     <ClInclude Include="secure-crt.h" />
-    <ClInclude Include="slang-com-ptr.h" />
-    <ClInclude Include="slang-defines.h" />
     <ClInclude Include="slang-free-list.h" />
     <ClInclude Include="slang-io.h" />
     <ClInclude Include="slang-math.h" />
-    <ClInclude Include="slang-result.h" />
     <ClInclude Include="slang-string-util.h" />
     <ClInclude Include="slang-string.h" />
     <ClInclude Include="smart-pointer.h" />

@@ -131,6 +131,14 @@ function baseSlangProject(name, baseDir)
     --
     project(name)
 
+    -- We need every project to have a stable UUID for
+    -- output formats (like Visual Studio and XCode projects)
+    -- that use UUIDs rather than names to uniquely identify
+    -- projects. If we don't have a stable UUID, then the
+    -- output files might have spurious diffs whenever we
+    -- re-run premake generation.
+    uuid(os.uuid(projectDir))
+
     -- Set the location where the project file will be placed.
     -- We set the project files to reside in their source
     -- directory, because in Visual Studio the default
@@ -252,11 +260,16 @@ function example(name)
     -- if it is going to use Slang, so we might as well set up a suitable
     -- include path here rather than make each example do it.
     --
-    includedirs { "." }
+    -- Most of the examples also need the `gfx` library,
+    -- which lives under `tools/`, so we will add that to the path as well.
+    --
+    includedirs { ".", "tools" }
 
     -- The examples also need to link against the slang library,
-    -- so we specify that here rather than in each example.
-    links { "slang" }
+    -- and the `gfx` abstraction layer (which in turn
+    -- depends on the `core` library). We specify all of that here,
+    -- rather than in each example.
+    links { "slang", "core", "gfx" }
 end
 
 --
@@ -264,23 +277,17 @@ end
 -- actual projects quite simply. For example, here is the entire
 -- declaration of the "Hello, World" example project:
 --
-example "hello"
-    uuid "E6385042-1649-4803-9EBD-168F8B7EF131"
-    includedirs { ".", "tools" }
-    links { "core", "slang-graphics" }
+example "hello-world"
 --
 -- Note how we are calling our custom `example()` subroutine with
 -- the same syntax sugar that Premake usually advocates for their
 -- `project()` function. This allows us to treat `example` as
 -- a kind of specialized "subclass" of `project`
 --
--- The call to `uuid()` in the definition of `hello` establishes
--- the UUID/GUID that will be used for the project in generated
--- formats that use these as unique identifiers (e.g., Visual
--- Studio solutions). Without this call, Premake will generate
--- a fresh UUID for a project each time its generation logic
--- runs, which can create spurious diffs.
---
+
+-- Let's go ahead and set up the projects for our other example now.
+example "model-viewer"
+
 
 -- Most of the other projects have more interesting configuration going
 -- on, so let's walk through them in order of increasing complexity.
@@ -364,8 +371,8 @@ tool "slang-eval-test"
 
 tool "render-test"
     uuid "96610759-07B9-4EEB-A974-5C634A2E742B"
-    includedirs { ".", "external", "source", "tools/slang-graphics" }
-    links { "core", "slang", "slang-graphics" }
+    includedirs { ".", "external", "source", "tools/gfx" }
+    links { "core", "slang", "gfx" }
     filter { "system:windows" }
 
         systemversion "10.0.14393.0"
@@ -376,12 +383,12 @@ tool "render-test"
         postbuildcommands { '"$(SolutionDir)tools\\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/%{cfg.platform:lower()}/" "%{cfg.targetdir}/"'}
 
 --
--- `slang-graphics` is a utility library for doing GPU rendering
+-- `gfx` is a utility library for doing GPU rendering
 -- and compute, which is used by both our testing and exmaples.
 -- It depends on teh `core` library, so we need to declare that:
 --
 
-tool "slang-graphics"
+tool "gfx"
     uuid "222F7498-B40C-4F3F-A704-DDEB91A4484A"
     -- Unlike most of the code under `tools/`, this is a library
     -- rather than a stand-alone executable.

@@ -7,7 +7,7 @@
 
 namespace renderer_test {
 
-using namespace slang_graphics;
+using namespace gfx;
 
 enum class ShaderInputType
 {

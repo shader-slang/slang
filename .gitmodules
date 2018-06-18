@@ -1,3 +1,9 @@
 [submodule "external/glslang"]
 	path = external/glslang
 	url = https://github.com/KhronosGroup/glslang.git
+[submodule "external/tinyobjloader"]
+	path = external/tinyobjloader
+	url = https://github.com/syoyo/tinyobjloader
+[submodule "external/glm"]
+	path = external/glm
+	url = https://github.com/g-truc/glm.git
