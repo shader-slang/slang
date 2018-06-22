@@ -1,6 +1,6 @@
-#pragma once
+﻿#pragma once
 
-#include "../../source/core/slang-com-ptr.h"
+#include "../../slang-com-ptr.h"
 #include "../../source/core/list.h"
 #include "../../source/core/slang-free-list.h"
 

@@ -5,7 +5,7 @@
 
 #include "../../slang-com-helper.h"
 
-#include "../../source/core/slang-com-ptr.h"
+#include "../../slang-com-ptr.h"
 #include "../../source/core/list.h"
 
 #include "render.h"

@@ -1,4 +1,4 @@
-#ifndef SLANG_DEFINES_H
+﻿#ifndef SLANG_DEFINES_H
 #define SLANG_DEFINES_H
 
 /*
@@ -253,57 +253,10 @@ General defines
 // C++ Symbols
 #ifdef __cplusplus
 
-// C++ specific macros
-
-// Gcc
-#	if SLANG_GCC_FAMILY
-// Check for C++11
-#		if (__cplusplus >= 201103L)
-#			if (__GNUC__ * 100 + __GNUC_MINOR__) >= 405
-#				define SLANG_HAS_MOVE_SEMANTICS 1
-#			endif
-#			if (__GNUC__ * 100 + __GNUC_MINOR__) >= 406
-#				define SLANG_HAS_ENUM_CLASS 1
-#			endif
-#			if (__GNUC__ * 100 + __GNUC_MINOR__) >= 407
-#				define SLANG_OVERRIDE override
-#			endif
-#		endif
-#	endif // SLANG_GCC_FAMILY
-
-// Visual Studio
-
-#	if SLANG_VC
-// C4481: nonstandard extension used: override specifier 'override'
-#		if _MSC_VER < 1700
-#			pragma warning(disable : 4481)
-#		endif
-#		define SLANG_OVERRIDE	override
-#		if _MSC_VER >= 1600
-#			define SLANG_HAS_MOVE_SEMANTICS 1
-#		endif
-#	    if _MSC_VER >= 1700
-#		    define SLANG_HAS_ENUM_CLASS 1
-#       endif
-#   endif // SLANG_VC
-
-// Clang specific
-#	if SLANG_CLANG
-#	endif // SLANG_CLANG
-
 // Set non set
 
 #ifndef SLANG_NO_THROW
 #	define SLANG_NO_THROW
-#endif
-#ifndef SLANG_OVERRIDE
-#	define SLANG_OVERRIDE
-#endif
-#ifndef SLANG_HAS_ENUM_CLASS
-#	define SLANG_HAS_ENUM_CLASS 0
-#endif
-#ifndef SLANG_HAS_MOVE_SEMANTICS
-#	define SLANG_HAS_MOVE_SEMANTICS 0
 #endif
 
 #include <new>		// For placement new

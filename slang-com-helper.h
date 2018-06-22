@@ -34,6 +34,29 @@ namespace Slang {
 
 // Alias SlangResult to Slang::Result
 typedef SlangResult Result;
+// Alias SlangUUID to Slang::Guid
+typedef SlangUUID Guid;
+
+SLANG_FORCE_INLINE bool operator==(const Guid& aIn, const Guid& bIn)
+{
+    // Use the largest type the honors the alignment of Guid
+    typedef uint32_t CmpType;
+    union GuidCompare
+    {
+        Guid guid;
+        CmpType data[sizeof(Guid) / sizeof(CmpType)];
+    };
+    // Type pun - so compiler can 'see' the pun and not break aliasing rules
+    const CmpType* a = reinterpret_cast<const GuidCompare&>(aIn).data;
+    const CmpType* b = reinterpret_cast<const GuidCompare&>(bIn).data;
+    // Make the guid comparison a single branch, by not using short circuit
+    return ((a[0] ^ b[0]) | (a[1] ^ b[1]) | (a[2] ^ b[2]) | (a[3] ^ b[3])) == 0;
+}
+
+SLANG_FORCE_INLINE bool operator!=(const Guid& a, const Guid& b)
+{
+    return !(a == b);
+}
 
 } // namespace Slang
 #endif // defined(__cplusplus)

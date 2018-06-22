@@ -1,4 +1,4 @@
-#include "../../slang.h"
+﻿#include "../../slang.h"
 
 #include "../core/slang-io.h"
 #include "parameter-binding.h"
@@ -220,7 +220,7 @@ public:
 
     SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE
     {
-        if(uuid == IID_IComUnknown)
+        if(uuid == IID_ISlangUnknown)
         {
             *(ISlangUnknown**)outObject = this;
             addRef();
