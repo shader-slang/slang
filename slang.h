@@ -1,4 +1,4 @@
-#ifndef SLANG_H
+﻿#ifndef SLANG_H
 #define SLANG_H
 
 /** \file slang.h
@@ -17,55 +17,55 @@ used later in the file.
 Most applications should not need to touch this section.
 */
 #ifndef SLANG_COMPILER
-#	define SLANG_COMPILER
+#    define SLANG_COMPILER
 
 /*
 Compiler defines, see http://sourceforge.net/p/predef/wiki/Compilers/
 NOTE that SLANG_VC holds the compiler version - not just 1 or 0
 */
-#	if defined(_MSC_VER)
-#		if _MSC_VER >= 1900
-#			define SLANG_VC 14
-#		elif _MSC_VER >= 1800
-#			define SLANG_VC 12
-#		elif _MSC_VER >= 1700
-#			define SLANG_VC 11
-#		elif _MSC_VER >= 1600
-#			define SLANG_VC 10
-#		elif _MSC_VER >= 1500
-#			define SLANG_VC 9
-#		else
-#			error "unknown version of Visual C++ compiler"
-#		endif
-#	elif defined(__clang__)
-#		define SLANG_CLANG 1
-#	elif defined(__SNC__)
-#		define SLANG_SNC 1
-#	elif defined(__ghs__)
-#		define SLANG_GHS 1
-#	elif defined(__GNUC__) /* note: __clang__, __SNC__, or __ghs__ imply __GNUC__ */
-#		define SLANG_GCC 1
-#	else
-#		error "unknown compiler"
-#	endif
+#    if defined(_MSC_VER)
+#        if _MSC_VER >= 1900
+#            define SLANG_VC 14
+#        elif _MSC_VER >= 1800
+#            define SLANG_VC 12
+#        elif _MSC_VER >= 1700
+#            define SLANG_VC 11
+#        elif _MSC_VER >= 1600
+#            define SLANG_VC 10
+#        elif _MSC_VER >= 1500
+#            define SLANG_VC 9
+#        else
+#            error "unknown version of Visual C++ compiler"
+#        endif
+#    elif defined(__clang__)
+#        define SLANG_CLANG 1
+#    elif defined(__SNC__)
+#        define SLANG_SNC 1
+#    elif defined(__ghs__)
+#        define SLANG_GHS 1
+#    elif defined(__GNUC__) /* note: __clang__, __SNC__, or __ghs__ imply __GNUC__ */
+#        define SLANG_GCC 1
+#    else
+#        error "unknown compiler"
+#    endif
 /*
 Any compilers not detected by the above logic are now now explicitly zeroed out.
 */
-#	ifndef SLANG_VC
-#		define SLANG_VC 0
-#	endif
-#	ifndef SLANG_CLANG
-#		define SLANG_CLANG 0
-#	endif
-#	ifndef SLANG_SNC
-#		define SLANG_SNC 0
-#	endif
-#	ifndef SLANG_GHS
-#		define SLANG_GHS 0
-#	endif
-#	ifndef SLANG_GCC
-#		define SLANG_GCC 0
-#	endif
+#    ifndef SLANG_VC
+#        define SLANG_VC 0
+#    endif
+#    ifndef SLANG_CLANG
+#        define SLANG_CLANG 0
+#    endif
+#    ifndef SLANG_SNC
+#        define SLANG_SNC 0
+#    endif
+#    ifndef SLANG_GHS
+#        define SLANG_GHS 0
+#    endif
+#    ifndef SLANG_GCC
+#        define SLANG_GCC 0
+#    endif
 #endif /* SLANG_COMPILER */
 
 /*
@@ -78,81 +78,81 @@ used later in the file.
 Most applications should not need to touch this section.
 */
 #ifndef SLANG_PLATFORM
-#	define SLANG_PLATFORM
+#    define SLANG_PLATFORM
 /**
 Operating system defines, see http://sourceforge.net/p/predef/wiki/OperatingSystems/
 */
-#	if defined(WINAPI_FAMILY) && WINAPI_FAMILY == WINAPI_PARTITION_APP
-#		define SLANG_WINRT 1 /* Windows Runtime, either on Windows RT or Windows 8 */
-#	elif defined(XBOXONE)
-#		define SLANG_XBOXONE 1
-#	elif defined(_WIN64) /* note: XBOXONE implies _WIN64 */
-#		define SLANG_WIN64 1
-#	elif defined(_M_PPC)
-#		define SLANG_X360 1
-#	elif defined(_WIN32) /* note: _M_PPC implies _WIN32 */
-#		define SLANG_WIN32 1
-#	elif defined(__ANDROID__)
-#		define SLANG_ANDROID 1
-#	elif defined(__linux__) || defined(__CYGWIN__) /* note: __ANDROID__ implies __linux__ */
-#		define SLANG_LINUX 1
-#	elif defined(__APPLE__) && (defined(__arm__) || defined(__arm64__))
-#		define SLANG_IOS 1
-#	elif defined(__APPLE__)
-#		define SLANG_OSX 1
-#	elif defined(__CELLOS_LV2__)
-#		define SLANG_PS3 1
-#	elif defined(__ORBIS__)
-#		define SLANG_PS4 1
-#	elif defined(__SNC__) && defined(__arm__)
-#		define SLANG_PSP2 1
-#	elif defined(__ghs__)
-#		define SLANG_WIIU 1
-#	else
-#		error "unknown target platform"
-#	endif
+#    if defined(WINAPI_FAMILY) && WINAPI_FAMILY == WINAPI_PARTITION_APP
+#        define SLANG_WINRT 1 /* Windows Runtime, either on Windows RT or Windows 8 */
+#    elif defined(XBOXONE)
+#        define SLANG_XBOXONE 1
+#    elif defined(_WIN64) /* note: XBOXONE implies _WIN64 */
+#        define SLANG_WIN64 1
+#    elif defined(_M_PPC)
+#        define SLANG_X360 1
+#    elif defined(_WIN32) /* note: _M_PPC implies _WIN32 */
+#        define SLANG_WIN32 1
+#    elif defined(__ANDROID__)
+#        define SLANG_ANDROID 1
+#    elif defined(__linux__) || defined(__CYGWIN__) /* note: __ANDROID__ implies __linux__ */
+#        define SLANG_LINUX 1
+#    elif defined(__APPLE__) && (defined(__arm__) || defined(__arm64__))
+#        define SLANG_IOS 1
+#    elif defined(__APPLE__)
+#        define SLANG_OSX 1
+#    elif defined(__CELLOS_LV2__)
+#        define SLANG_PS3 1
+#    elif defined(__ORBIS__)
+#        define SLANG_PS4 1
+#    elif defined(__SNC__) && defined(__arm__)
+#        define SLANG_PSP2 1
+#    elif defined(__ghs__)
+#        define SLANG_WIIU 1
+#    else
+#        error "unknown target platform"
+#    endif
 /*
 Any platforms not detected by the above logic are now now explicitly zeroed out.
 */
-#	ifndef SLANG_WINRT
-#		define SLANG_WINRT 0
-#	endif
-#	ifndef SLANG_XBOXONE
-#		define SLANG_XBOXONE 0
-#	endif
-#	ifndef SLANG_WIN64
-#		define SLANG_WIN64 0
-#	endif
-#	ifndef SLANG_X360
-#		define SLANG_X360 0
-#	endif
-#	ifndef SLANG_WIN32
-#		define SLANG_WIN32 0
-#	endif
-#	ifndef SLANG_ANDROID
-#		define SLANG_ANDROID 0
-#	endif
-#	ifndef SLANG_LINUX
-#		define SLANG_LINUX 0
-#	endif
-#	ifndef SLANG_IOS
-#		define SLANG_IOS 0
-#	endif
-#	ifndef SLANG_OSX
-#		define SLANG_OSX 0
-#	endif
-#	ifndef SLANG_PS3
-#		define SLANG_PS3 0
-#	endif
-#	ifndef SLANG_PS4
-#		define SLANG_PS4 0
-#	endif
-#	ifndef SLANG_PSP2
-#		define SLANG_PSP2 0
-#	endif
-#	ifndef SLANG_WIIU
-#		define SLANG_WIIU 0
-#	endif
+#    ifndef SLANG_WINRT
+#        define SLANG_WINRT 0
+#    endif
+#    ifndef SLANG_XBOXONE
+#        define SLANG_XBOXONE 0
+#    endif
+#    ifndef SLANG_WIN64
+#        define SLANG_WIN64 0
+#    endif
+#    ifndef SLANG_X360
+#        define SLANG_X360 0
+#    endif
+#    ifndef SLANG_WIN32
+#        define SLANG_WIN32 0
+#    endif
+#    ifndef SLANG_ANDROID
+#        define SLANG_ANDROID 0
+#    endif
+#    ifndef SLANG_LINUX
+#        define SLANG_LINUX 0
+#    endif
+#    ifndef SLANG_IOS
+#        define SLANG_IOS 0
+#    endif
+#    ifndef SLANG_OSX
+#        define SLANG_OSX 0
+#    endif
+#    ifndef SLANG_PS3
+#        define SLANG_PS3 0
+#    endif
+#    ifndef SLANG_PS4
+#        define SLANG_PS4 0
+#    endif
+#    ifndef SLANG_PSP2
+#        define SLANG_PSP2 0
+#    endif
+#    ifndef SLANG_WIIU
+#        define SLANG_WIIU 0
+#    endif
 #endif /* SLANG_PLATFORM */
 
 /* Shorthands for "families" of compilers/platforms */
@@ -367,15 +367,114 @@ extern "C"
 
     /** A result code for a Slang API operation.
 
-    This type is generally compatible with the Windows API
-    `HRESULT` type. In particular, negative values indicate
-    failure results, while zero or positive results indicate
-    success.
+    This type is generally compatible with the Windows API `HRESULT` type. In particular, negative values indicate
+    failure results, while zero or positive results indicate success.
 
-    In general, Slang APIs always return a zero result on
-    success, unless documented otherwise.
+    In general, Slang APIs always return a zero result on success, unless documented otherwise. Strictly speaking 
+    a negative value indicates an error, a positive (or 0) value indicates success. This can be tested for with the macros
+    SLANG_SUCCEEDED(x) or SLANG_FAILED(x).
+    
+    It can represent if the call was successful or not. It can also specify in an extensible manner what facility 
+    produced the result (as the integral 'facility') as well as what caused it (as an integral 'code').
+    Under the covers SlangResult is represented as a int32_t. 
+
+    SlangResult is designed to be compatible with COM HRESULT.
+
+    It's layout in bits is as follows
+
+    Severity | Facility | Code
+    ---------|----------|-----
+    31       |    30-16 | 15-0
+
+    Severity - 1 fail, 0 is success - as SlangResult is signed 32 bits, means negative number indicates failure.
+    Facility is where the error originated from. Code is the code specific to the facility.
+
+    Result codes have the following styles, 
+    1) SLANG_name
+    2) SLANG_s_f_name
+    3) SLANG_s_name
+
+    where s is S for success, E for error 
+    f is the short version of the facility name
+
+    Style 1 is reserved for SLANG_OK and SLANG_FAIL as they are so commonly used.
+
+    It is acceptable to expand 'f' to a longer name to differentiate a name or drop if unique without it.
+    ie for a facility 'DRIVER' it might make sense to have an error of the form SLANG_E_DRIVER_OUT_OF_MEMORY
     */
+
     typedef int32_t SlangResult;
+
+    //! Use to test if a result was failure. Never use result != SLANG_OK to test for failure, as there may be successful codes != SLANG_OK.
+#define SLANG_FAILED(status) ((status) < 0)
+    //! Use to test if a result succeeded. Never use result == SLANG_OK to test for success, as will detect other successful codes as a failure.
+#define SLANG_SUCCEEDED(status) ((status) >= 0)
+
+    //! Get the facility the result is associated with
+#define SLANG_GET_RESULT_FACILITY(r)    ((int32_t)(((r) >> 16) & 0x7fff))
+    //! Get the result code for the facility 
+#define SLANG_GET_RESULT_CODE(r)        ((int32_t)((r) & 0xffff))
+
+#define SLANG_MAKE_ERROR(fac, code)        ((((int32_t)(fac)) << 16) | ((int32_t)(code)) | 0x80000000)
+#define SLANG_MAKE_SUCCESS(fac, code)    ((((int32_t)(fac)) << 16) | ((int32_t)(code)))
+
+    /*************************** Facilities ************************************/
+
+    //! Facilities compatible with windows COM - only use if known code is compatible
+#define SLANG_FACILITY_WIN_GENERAL      0
+#define SLANG_FACILITY_WIN_INTERFACE    4
+#define SLANG_FACILITY_WIN_API          7
+
+    //! Base facility -> so as to not clash with HRESULT values (values in 0x200 range do not appear used)
+#define SLANG_FACILITY_BASE         0x200                
+
+    /*! Facilities numbers must be unique across a project to make the resulting result a unique number.
+    It can be useful to have a consistent short name for a facility, as used in the name prefix */
+#define SLANG_FACILITY_CORE            SLANG_FACILITY_BASE
+
+    /// Base for external facilities. Facilities should be unique across modules. 
+#define SLANG_FACILITY_EXTERNAL_BASE 0x210
+
+    /* ************************ Win COM compatible Results ******************************/
+    // https://msdn.microsoft.com/en-us/library/windows/desktop/aa378137(v=vs.85).aspx
+
+    //! SLANG_OK indicates success, and is equivalent to SLANG_MAKE_SUCCESS(SLANG_FACILITY_WIN_GENERAL, 0)
+#define SLANG_OK                          0
+    //! SLANG_FAIL is the generic failure code - meaning a serious error occurred and the call couldn't complete
+#define SLANG_FAIL                          SLANG_MAKE_ERROR(SLANG_FACILITY_WIN_INTERFACE, 5)
+
+#define SLANG_MAKE_WIN_INTERFACE_ERROR(code)    SLANG_MAKE_ERROR(SLANG_FACILITY_WIN_INTERFACE, code)
+#define SLANG_MAKE_WIN_API_ERROR(code)          SLANG_MAKE_ERROR(SLANG_FACILITY_WIN_API, code)     
+
+    //! Functionality is not implemented 
+#define SLANG_E_NOT_IMPLEMENTED             SLANG_MAKE_WIN_INTERFACE_ERROR(1)
+    //! Interface not be found 
+#define SLANG_E_NO_INTERFACE                SLANG_MAKE_WIN_INTERFACE_ERROR(2)
+    //! Operation was aborted (did not correctly complete) 
+#define SLANG_E_ABORT                       SLANG_MAKE_WIN_INTERFACE_ERROR(4)
+
+    //! Indicates that a handle passed in as parameter to a method is invalid. 
+#define SLANG_E_INVALID_HANDLE              SLANG_MAKE_ERROR(SLANG_FACILITY_WIN_API, 6)
+    //! Indicates that an argument passed in as parameter to a method is invalid. 
+#define SLANG_E_INVALID_ARG                 SLANG_MAKE_ERROR(SLANG_FACILITY_WIN_API, 0x57)
+    //! Operation could not complete - ran out of memory
+#define SLANG_E_OUT_OF_MEMORY               SLANG_MAKE_ERROR(SLANG_FACILITY_WIN_API, 0xe)
+
+    /* *************************** other Results **************************************/
+
+#define SLANG_MAKE_CORE_ERROR(code)         SLANG_MAKE_ERROR(SLANG_FACILITY_CORE, code)
+
+    // Supplied buffer is too small to be able to complete
+#define SLANG_E_BUFFER_TOO_SMALL            SLANG_MAKE_CORE_ERROR(1)
+    //! Used to identify a Result that has yet to be initialized.  
+    //! It defaults to failure such that if used incorrectly will fail, as similar in concept to using an uninitialized variable. 
+#define SLANG_E_UNINITIALIZED               SLANG_MAKE_CORE_ERROR(2)
+    //! Returned from an async method meaning the output is invalid (thus an error), but a result for the request is pending, and will be returned on a subsequent call with the async handle.             
+#define SLANG_E_PENDING                     SLANG_MAKE_CORE_ERROR(3)
+    //! Indicates a file/resource could not be opened
+#define SLANG_E_CANNOT_OPEN                 SLANG_MAKE_CORE_ERROR(4)
+    //! Indicates a file/resource could not be found
+#define SLANG_E_NOT_FOUND                   SLANG_MAKE_CORE_ERROR(5)
 
     /** A "Universally Unique Identifier" (UUID)
 
