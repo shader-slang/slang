@@ -1,8 +1,10 @@
-#ifndef SLANG_FREE_LIST_H
+﻿#ifndef SLANG_FREE_LIST_H
 #define SLANG_FREE_LIST_H
 
 #include "slang-defines.h"
-#include "slang-result.h"
+
+#include <assert.h>
+
 #include <stdlib.h>
 #include <string.h>
 

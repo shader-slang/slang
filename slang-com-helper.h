@@ -1,17 +1,17 @@
-﻿#ifndef SLANG_RESULT_H
-#define SLANG_RESULT_H
+﻿#ifndef SLANG_COM_HELPER_H
+#define SLANG_COM_HELPER_H
 
-#include <cstdint>
-#include <assert.h>
+/** \file slang-com-helper.h
+*/
 
-#include "../../slang.h"
+#include "slang.h"
+
+/* !!!!!!!!!!!!!!!!!!!!! Macros to help checking SlangResult !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 
 /*! Set SLANG_HANDLE_RESULT_FAIL(x) to code to be executed whenever an error occurs, and is detected by one of the macros */
 #ifndef SLANG_HANDLE_RESULT_FAIL
 #	define SLANG_HANDLE_RESULT_FAIL(x)
 #endif
-
-/* !!!!!!!!!!!!!!!!!!!!!!!!! Checking codes !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 //! Helper macro, that makes it easy to add result checking to calls in functions/methods that themselves return Result. 
 #define SLANG_RETURN_ON_FAIL(x) { SlangResult _res = (x); if (SLANG_FAILED(_res)) { SLANG_HANDLE_RESULT_FAIL(_res); return _res; } }
@@ -27,10 +27,15 @@
 //! Helper macro that will assert if the result from a call is a failure, also returns. 
 #define SLANG_ASSERT_VOID_ON_FAIL(x) { SlangResult _res = (x); if (SLANG_FAILED(_res)) { assert(false); return; } }
 
+/* !!!!!!!!!!!!!!!!!!!!!!! C++ helpers !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
+
 #if defined(__cplusplus)
 namespace Slang {
+
+// Alias SlangResult to Slang::Result
 typedef SlangResult Result;
+
 } // namespace Slang
 #endif // defined(__cplusplus)
 
-#endif // SLANG_RESULT_H
+#endif
