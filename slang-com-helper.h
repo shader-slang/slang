@@ -58,6 +58,49 @@ SLANG_FORCE_INLINE bool operator!=(const Guid& a, const Guid& b)
     return !(a == b);
 }
 
+
+/* !!!!!!!! Macros to simplify implementing COM interfaces !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+/* Assumes underlying implementation has a member m_refCount that is initialized to 0 and can have ++ and -- operate on it. 
+For SLANG_IUNKNOWN_QUERY_INTERFACE to work - must have a method 'getInterface' that returns valid pointers for the Guid, or nullptr 
+if not found. */
+
+#define SLANG_IUNKNOWN_QUERY_INTERFACE \
+SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject) \
+{ \
+    ISlangUnknown* intf = getInterface(uuid); \
+    if (intf) \
+    { \
+        addRef(); \
+        *outObject = intf; \
+        return SLANG_OK;\
+    } \
+    return SLANG_E_NO_INTERFACE;\
+}
+
+#define SLANG_IUNKNOWN_ADD_REF \
+SLANG_NO_THROW uint32_t SLANG_MCALL addRef() \
+{ \
+    return ++m_refCount; \
+}
+
+#define SLANG_IUNKNOWN_RELEASE \
+SLANG_NO_THROW uint32_t SLANG_MCALL release() \
+{ \
+    --m_refCount; \
+    if (m_refCount == 0) \
+    { \
+        delete this; \
+        return 0; \
+    } \
+    return m_refCount; \
+} \
+
+#define SLANG_IUNKNOWN_ALL \
+    SLANG_IUNKNOWN_QUERY_INTERFACE \
+    SLANG_IUNKNOWN_ADD_REF \
+    SLANG_IUNKNOWN_RELEASE 
+
 } // namespace Slang
 #endif // defined(__cplusplus)
 
