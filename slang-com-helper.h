@@ -37,8 +37,13 @@ typedef SlangResult Result;
 // Alias SlangUUID to Slang::Guid
 typedef SlangUUID Guid;
 
-SLANG_FORCE_INLINE bool operator==(const Guid& aIn, const Guid& bIn)
+} // namespace Slang
+
+// Operator == and != for Guid/SlangUUID
+
+SLANG_FORCE_INLINE bool operator==(const Slang::Guid& aIn, const Slang::Guid& bIn)
 {
+    using namespace Slang;
     // Use the largest type the honors the alignment of Guid
     typedef uint32_t CmpType;
     union GuidCompare
@@ -53,11 +58,10 @@ SLANG_FORCE_INLINE bool operator==(const Guid& aIn, const Guid& bIn)
     return ((a[0] ^ b[0]) | (a[1] ^ b[1]) | (a[2] ^ b[2]) | (a[3] ^ b[3])) == 0;
 }
 
-SLANG_FORCE_INLINE bool operator!=(const Guid& a, const Guid& b)
+SLANG_FORCE_INLINE bool operator!=(const Slang::Guid& a, const Slang::Guid& b)
 {
     return !(a == b);
 }
-
 
 /* !!!!!!!! Macros to simplify implementing COM interfaces !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -101,7 +105,6 @@ SLANG_NO_THROW uint32_t SLANG_MCALL release() \
     SLANG_IUNKNOWN_ADD_REF \
     SLANG_IUNKNOWN_RELEASE 
 
-} // namespace Slang
 #endif // defined(__cplusplus)
 
 #endif

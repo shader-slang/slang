@@ -81,13 +81,18 @@ after_build:
         $env:SLANG_DEPLOY_PLATFORM = "win32"
       }
       $env:SLANG_BINARY_ARCHIVE = "slang-$($env:SLANG_VERSION)-$($env:SLANG_DEPLOY_PLATFORM).zip"
-      $env:SLANG_SOURCE_ARCHIVE = "slang-$($env:SLANG_VERSION)-source.zip"
+
       7z a "$env:SLANG_BINARY_ARCHIVE" slang.h
+      7z a "$env:SLANG_BINARY_ARCHIVE" slang-com-helper.h
+      7z a "$env:SLANG_BINARY_ARCHIVE" slang-com-ptr.h
       7z a "$env:SLANG_BINARY_ARCHIVE" bin\*\*\slang.dll
       7z a "$env:SLANG_BINARY_ARCHIVE" bin\*\*\slang.lib
       7z a "$env:SLANG_BINARY_ARCHIVE" bin\*\*\slang-glslang.dll
       7z a "$env:SLANG_BINARY_ARCHIVE" bin\*\*\slangc.exe
       7z a "$env:SLANG_BINARY_ARCHIVE" docs\*.md
+
+      $env:SLANG_SOURCE_ARCHIVE = "slang-$($env:SLANG_VERSION)-source.zip"
+      
       7z a "$env:SLANG_SOURCE_ARCHIVE" slang.h
       7z a "$env:SLANG_SOURCE_ARCHIVE" slang-com-helper.h
       7z a "$env:SLANG_SOURCE_ARCHIVE" slang-com-ptr.h
