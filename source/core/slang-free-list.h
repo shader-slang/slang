@@ -1,7 +1,7 @@
 ﻿#ifndef SLANG_FREE_LIST_H
 #define SLANG_FREE_LIST_H
 
-#include "slang-defines.h"
+#include "../../slang.h"
 
 #include <assert.h>
 

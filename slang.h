@@ -213,6 +213,11 @@ convention for interface methods.
 
 // GCC Specific
 #if SLANG_GCC_FAMILY
+// This doesn't work on clang - because the typedef is seen as multiply defined, use the line numbered version defined later
+#	if !defined(__clang__) && (defined(__GNUC__) && (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 7)) || defined(__ORBIS__))
+#		define SLANG_COMPILE_TIME_ASSERT(exp) typedef char SlangCompileTimeAssert_Dummy[(exp) ? 1 : -1] __attribute__((unused))
+#	endif
+
 #	define SLANG_NO_INLINE __attribute__((noinline))
 #	define SLANG_FORCE_INLINE inline __attribute__((always_inline))
 #   define SLANG_BREAKPOINT(id) __builtin_trap();
@@ -232,6 +237,35 @@ convention for interface methods.
 #endif
 #ifndef SLANG_NO_INLINE
 #	define SLANG_NO_INLINE
+#endif
+
+#ifndef SLANG_COMPILE_TIME_ASSERT
+#	define SLANG_COMPILE_TIME_ASSERT(exp) typedef char SLANG_CONCAT(SlangCompileTimeAssert,__LINE__)[(exp) ? 1 : -1]
+#endif
+
+#ifndef SLANG_OFFSET_OF
+#	define SLANG_OFFSET_OF(X, Y) offsetof(X, Y)
+#endif
+
+#ifndef SLANG_BREAKPOINT
+// Make it crash with a write to 0!
+#   define SLANG_BREAKPOINT(id) (*((int*)0) = int(id));
+#endif
+
+// Use for getting the amount of members of a standard C array.
+#define SLANG_COUNT_OF(x) (sizeof(x)/sizeof(x[0]))
+/// SLANG_INLINE exists to have a way to inline consistent with SLANG_ALWAYS_INLINE
+#define SLANG_INLINE inline
+
+// Other defines
+#define SLANG_STRINGIZE_HELPER(X) #X
+#define SLANG_STRINGIZE(X) SLANG_STRINGIZE_HELPER(X)
+
+#define SLANG_CONCAT_HELPER(X, Y) X##Y
+#define SLANG_CONCAT(X, Y) SLANG_CONCAT_HELPER(X, Y)
+
+#ifndef SLANG_UNUSED
+#	define SLANG_UNUSED(v) (void)v;
 #endif
 
 #ifdef __cplusplus

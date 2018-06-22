@@ -1,7 +1,7 @@
 ﻿// vk-module.h
 #pragma once
 
-#include "../../source/core/slang-defines.h"
+#include "../../slang.h"
 
 #include "../../slang-com-helper.h"
 
