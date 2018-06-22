@@ -1,8 +1,9 @@
-// vk-module.h
+﻿// vk-module.h
 #pragma once
 
-#include "../../source/core/slang-defines.h"
-#include "../../source/core/slang-result.h"
+#include "../../slang.h"
+
+#include "../../slang-com-helper.h"
 
 #if SLANG_WINDOWS_FAMILY
 #   define VK_USE_PLATFORM_WIN32_KHR 1

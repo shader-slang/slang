@@ -1,9 +1,11 @@
-// d3d-util.h
+﻿// d3d-util.h
 #pragma once
 
 #include <stdint.h>
-#include "../../source/core/slang-result.h"
-#include "../../source/core/slang-com-ptr.h"
+
+#include "../../slang-com-helper.h"
+
+#include "../../slang-com-ptr.h"
 #include "../../source/core/list.h"
 
 #include "render.h"

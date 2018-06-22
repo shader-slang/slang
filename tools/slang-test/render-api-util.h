@@ -1,9 +1,9 @@
-#ifndef SLANG_RENDER_API_UTIL_H
+﻿#ifndef SLANG_RENDER_API_UTIL_H
 #define SLANG_RENDER_API_UTIL_H
 
 #include "../../source/core/slang-string.h"
-#include "../../source/core/slang-result.h"
 
+#include "../../slang-com-helper.h"
 
 enum class RenderApiType
 {

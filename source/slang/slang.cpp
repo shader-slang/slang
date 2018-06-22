@@ -1,4 +1,4 @@
-#include "../../slang.h"
+﻿#include "../../slang.h"
 
 #include "../core/slang-io.h"
 #include "parameter-binding.h"
@@ -211,46 +211,20 @@ static const Guid IID_ISlangBlob    = SLANG_UUID_ISlangBlob;
 class BlobBase : public ISlangBlob
 {
 public:
-    BlobBase() {}
-    virtual ~BlobBase() {}
-
-    uint32_t referenceCount = 0;
+    uint32_t m_refCount = 0;
 
     // ISlangUnknown
+    SLANG_IUNKNOWN_ALL
 
-    SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE
+        /// Need virtual dtor, because BlobBase is derived from and release impl used is the one in the base class (that doesn't know the derived type)
+        /// Alternatively could be implemented by always using SLANG_IUNKNOWN_RELEASE in derived types - this would make derived types slightly smaller/faster
+    virtual ~BlobBase() {}
+
+protected:
+    SLANG_FORCE_INLINE ISlangUnknown* getInterface(const Guid& guid)
     {
-        if(uuid == IID_IComUnknown)
-        {
-            *(ISlangUnknown**)outObject = this;
-            addRef();
-            return SLANG_OK;
-        }
-        else if(uuid == IID_ISlangBlob)
-        {
-            *(ISlangBlob**)outObject = this;
-            addRef();
-            return SLANG_OK;
-        }
-
-        return SLANG_FAIL;
+        return (guid == IID_ISlangUnknown || guid == IID_ISlangBlob) ? static_cast<ISlangBlob*>(this) : nullptr;
     }
-
-    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE
-    {
-        referenceCount++;
-        return 0;
-    }
-
-    SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE
-    {
-        if(--referenceCount == 0)
-        {
-            delete this;
-        }
-        return 0;
-    }
-
 };
 
 /** A blob that uses a `String` for its storage.
@@ -258,23 +232,15 @@ public:
 class StringBlob : public BlobBase
 {
 public:
-    String string;
-
-    explicit StringBlob(String const& string)
-        : string(string)
-    {}
-
     // ISlangBlob
-
-    SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() SLANG_OVERRIDE
-    {
-        return string.Buffer();
-    }
-
-    SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE
-    {
-        return string.Length();
-    }
+    SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() SLANG_OVERRIDE { return m_string.Buffer(); }
+    SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE { return m_string.Length(); }
+    
+    explicit StringBlob(String const& string)
+        : m_string(string)
+    {}
+protected:
+    String m_string;
 };
 
 ComPtr<ISlangBlob> createStringBlob(String const& string)
@@ -287,40 +253,31 @@ ComPtr<ISlangBlob> createStringBlob(String const& string)
 class RawBlob : public BlobBase
 {
 public:
-    void* data;
-    size_t size;
+    // ISlangBlob
+    SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() SLANG_OVERRIDE { return m_data; }
+    SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE { return m_size; }
 
+    // Ctor
+    RawBlob(const void* data, size_t size):
+        m_size(size)
+    {
+        m_data = malloc(size);
+        memcpy(m_data, data, size);
+    }
     ~RawBlob()
     {
-        free(data);
+        free(m_data);
     }
 
-    // ISlangBlob
-
-    SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() SLANG_OVERRIDE
-    {
-        return data;
-    }
-
-    SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE
-    {
-        return size;
-    }
+protected:
+    void* m_data;
+    size_t m_size;
 };
-
 
 ComPtr<ISlangBlob> createRawBlob(void const* inData, size_t size)
 {
-    void* dataCopy = malloc(size);
-    memcpy(dataCopy, inData, size);
-
-    RawBlob* rawBlob = new RawBlob();
-    rawBlob->data = dataCopy;
-    rawBlob->size = size;
-
-    return ComPtr<ISlangBlob>(rawBlob);
+    return ComPtr<ISlangBlob>(new RawBlob(inData, size));
 }
-
 
 SlangResult CompileRequest::loadFile(String const& path, ISlangBlob** outBlob)
 {

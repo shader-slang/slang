@@ -1,8 +1,8 @@
-#ifndef RASTER_SHADER_COMPILER_H
+﻿#ifndef RASTER_SHADER_COMPILER_H
 #define RASTER_SHADER_COMPILER_H
 
 #include "../core/basic.h"
-#include "../core/slang-com-ptr.h"
+#include "../../slang-com-ptr.h"
 
 #include "diagnostics.h"
 #include "name.h"
