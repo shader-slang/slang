@@ -1898,6 +1898,15 @@ namespace Slang
 
                     entryPointAttr->stage = stage;
                 }
+                else if ((attr.As<DomainAttribute>()) || 
+                         (attr.As<MaxTessFactorAttribute>()) ||
+                         (attr.As<OutputControlPointsAttribute>()) ||
+                         (attr.As<OutputTopologyAttribute>()) ||
+                         (attr.As<PartitioningAttribute>()) ||
+                         (attr.As<PatchConstantFuncAttribute>()))
+                {
+                    // Let it go thru
+                }
                 else
                 {
                     if(attr->args.Count() == 0)
@@ -8231,10 +8240,84 @@ namespace Slang
         return type;
     }
 
+
+    FuncDecl* findFunctionDeclByName(EntryPointRequest* entryPoint, Name* name)
+    {
+        auto translationUnit = entryPoint->getTranslationUnit();
+        auto sink = &entryPoint->compileRequest->mSink;
+        auto translationUnitSyntax = translationUnit->SyntaxNode;
+
+        // Make sure we've got a query-able member dictionary
+        buildMemberDictionary(translationUnitSyntax);
+
+        // We will look up any global-scope declarations in the translation
+        // unit that match the name of our entry point.
+        Decl* firstDeclWithName = nullptr;
+        if (!translationUnitSyntax->memberDictionary.TryGetValue(name, firstDeclWithName))
+        {
+            // If there doesn't appear to be any such declaration, then we are done.
+
+            sink->diagnose(translationUnitSyntax, Diagnostics::entryPointFunctionNotFound, name);
+
+            return nullptr;
+        }
+
+        // We found at least one global-scope declaration with the right name,
+        // but (1) it might not be a function, and (2) there might be
+        // more than one function.
+        //
+        // We'll walk the linked list of declarations with the same name,
+        // to see what we find. Along the way we'll keep track of the
+        // first function declaration we find, if any:
+        FuncDecl* entryPointFuncDecl = nullptr;
+        for (auto ee = firstDeclWithName; ee; ee = ee->nextInContainerWithSameName)
+        {
+            // Is this declaration a function?
+            if (auto funcDecl = dynamic_cast<FuncDecl*>(ee))
+            {
+                // Skip non-primary declarations, so that
+                // we don't give an error when an entry
+                // point is forward-declared.
+                if (!isPrimaryDecl(funcDecl))
+                    continue;
+
+                // is this the first one we've seen?
+                if (!entryPointFuncDecl)
+                {
+                    // If so, this is a candidate to be
+                    // the entry point function.
+                    entryPointFuncDecl = funcDecl;
+                }
+                else
+                {
+                    // Uh-oh! We've already seen a function declaration with this
+                    // name before, so the whole thing is ambiguous. We need
+                    // to diagnose and bail out.
+
+                    sink->diagnose(translationUnitSyntax, Diagnostics::ambiguousEntryPoint, name);
+
+                    // List all of the declarations that the user *might* mean
+                    for (auto ff = firstDeclWithName; ff; ff = ff->nextInContainerWithSameName)
+                    {
+                        if (auto candidate = dynamic_cast<FuncDecl*>(ff))
+                        {
+                            sink->diagnose(candidate, Diagnostics::entryPointCandidate, candidate->getName());
+                        }
+                    }
+
+                    // Bail out.
+                    return nullptr;
+                }
+            }
+        }
+
+        return entryPointFuncDecl;
+    }
+
     // Validate that an entry point function conforms to any additional
     // constraints based on the stage (and profile?) it specifies.
     void validateEntryPoint(
-        EntryPointRequest*  /*entryPoint*/)
+        EntryPointRequest* entryPoint)
     {
         // TODO: We currently don't do any checking here, but this is the
         // right place to perform the following validation checks:
@@ -8263,6 +8346,42 @@ namespace Slang
         //   `Texture2D.Sample`, then that should produce an error because
         //   that function is specific to the fragment profile/stage.
         //
+
+        if (entryPoint->getStage() == Stage::Hull)
+        {
+            auto translationUnit = entryPoint->getTranslationUnit();
+            auto sink = &entryPoint->compileRequest->mSink;
+            auto translationUnitSyntax = translationUnit->SyntaxNode;
+
+            auto attr = entryPoint->decl->FindModifier<PatchConstantFuncAttribute>();
+
+            if (attr)
+            {
+                if (attr->args.Count() != 1)
+                {
+                    sink->diagnose(translationUnitSyntax, Diagnostics::expectedPatchConstantFunc, entryPoint->name);
+                    return;
+                }
+
+                Expr* expr = attr->args[0];
+                StringLiteralExpr* stringLit = expr->As<StringLiteralExpr>();
+
+                if (!stringLit)
+                {
+                    sink->diagnose(translationUnitSyntax, Diagnostics::expectedPatchConstantFunc, entryPoint->name);
+                    return;
+                }
+
+                Name* name = entryPoint->compileRequest->getNamePool()->getName(stringLit->value);
+                FuncDecl* funcDecl = findFunctionDeclByName(entryPoint, name);
+                if (!funcDecl)
+                {
+                    return;
+                }
+
+                attr->patchConstantFuncDecl = funcDecl;
+            }
+        }
     }
 
     // Given an `EntryPointRequest` specified via API or command line options,

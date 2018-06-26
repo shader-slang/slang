@@ -203,6 +203,9 @@ DIAGNOSTIC(30100, Error, staticRefToNonStaticMember, "type '$0' cannot be used t
 DIAGNOSTIC(33070, Error, expectedFunction, "expression preceding parenthesis of apparent call must have function type.")
 DIAGNOSTIC(33071, Error, expectedAStringLiteral, "expected a string literal")
 
+
+DIAGNOSTIC(33072, Error, expectedPatchConstantFunc, "hull shader '$0' must a valid attribute 'patchconstantfunc(\"function_name\")' defined.");
+
 // Attributes
 DIAGNOSTIC(31000, Error, unknownAttributeName, "unknown attribute '$0'")
 DIAGNOSTIC(31001, Error, attributeArgumentCountMismatch, "attribute '$0' expects $1 arguments ($2 provided)")
@@ -262,7 +265,6 @@ DIAGNOSTIC(39999, Error, tooManyArguments, "too many arguments to call (got $0, 
 
 DIAGNOSTIC(39999, Error, invalidIntegerLiteralSuffix, "invalid suffix '$0' on integer literal")
 DIAGNOSTIC(39999, Error, invalidFloatingPOintLiteralSuffix, "invalid suffix '$0' on floating-point literal")
-
 
 
 

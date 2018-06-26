@@ -353,6 +353,8 @@ INST(SampleGrad, sampleGrad, 4, 0)
 
 INST(GroupMemoryBarrierWithGroupSync, GroupMemoryBarrierWithGroupSync, 0, 0)
 
+INST(NotePatchConstantFunc, notePatchConstantFunc, 1, 0)
+
 PSEUDO_INST(Pos)
 PSEUDO_INST(PreInc)
 

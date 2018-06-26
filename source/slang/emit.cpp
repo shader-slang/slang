@@ -3654,6 +3654,12 @@ struct EmitVisitor
             }
             break;
 
+        case kIROp_NotePatchConstantFunc:
+        {
+            // No-op
+            break;
+        }
+
         case kIROp_Var:
             {
                 auto ptrType = cast<IRPtrType>(inst->getDataType());
@@ -4129,7 +4135,82 @@ struct EmitVisitor
         }
     }
 
+    template <typename T>
+    void emitFuncDeclSingleAttribute(const char* name, FuncDecl* funcDecl)
+    {
+        if (Attribute* attrib = funcDecl->FindModifier<T>())
+        {
+            attrib->args.Count();
+            if (attrib->args.Count() != 1)
+            {
+                /// Failed!
+                return;
+            }
+
+            Expr* expr = attrib->args[0];
+
+            //FloatingPointLiteralExpr
+            //BoolLiteralExpr
+          
+            emit("[");
+            emit(name);
+            emit("(");
+
+            if(auto stringLitExpr = expr->As<StringLiteralExpr>())
+            {
+                emit('\"');
+                emit(stringLitExpr->value);
+                emit('\"');
+            }
+            else if (auto intLitExpr = expr->As<IntegerLiteralExpr>())
+            {
+                emit(intLitExpr->value);
+            }
+
+            //Emit(attrib->value);
+            emit(")]\n");
+        }
+    }
+
+    IRInst* findFirstInst(IRFunc* irFunc, IROp op)
+    {
+        for (auto block : irFunc->getBlocks())
+        {
+            for (auto inst : block->getChildren())
+            {
+                if (inst->op == op)
+                {
+                    return inst;
+                }
+            }
+        }
+        return nullptr;
+    }
+
+    void emitFuncDeclPatchConstantFuncAttribute(IRFunc* irFunc, FuncDecl* funcDecl)
+    {
+        if (PatchConstantFuncAttribute* attrib = funcDecl->FindModifier<PatchConstantFuncAttribute>())
+        {
+            //FuncDecl* patchConstantFuncDecl = attrib->patchConstantFuncDecl;
+            //assert(patchConstantFuncDecl);
+           
+            auto irPatchFunc = static_cast<IRNotePatchConstantFunc*>(findFirstInst(irFunc, kIROp_NotePatchConstantFunc));
+            assert(irPatchFunc);
+            if (!irPatchFunc)
+            {
+                return;
+            }
+
+            String irName = getIRName(irPatchFunc->getFunc());
+
+            emit("[patchconstantfunc(\"");
+            emit(irName);
+            emit("\")]\n");
+        }
+    }
+
     void emitIREntryPointAttributes_HLSL(
+        IRFunc*             irFunc, 
         EmitContext*        ctx,
         EntryPointLayout*   entryPointLayout)
     {
@@ -4199,8 +4280,36 @@ struct EmitVisitor
                 Emit(attrib->value);
                 emit(")]\n");
             }
+            break;
         }
-        break;
+        case Stage::Domain:
+        {
+            /* [domain("isoline")] */
+
+            FuncDecl* entryPoint = entryPointLayout->entryPoint;
+
+            emitFuncDeclSingleAttribute<DomainAttribute>("domain", entryPoint);
+            
+            break;
+        }
+        case Stage::Hull:
+        {
+            /* [domain("isoline")]
+            [partitioning("integer")]
+            [outputtopology("line")]
+            [outputcontrolpoints(4)]
+            [patchconstantfunc("HSConst")] */
+
+            FuncDecl* entryPoint = entryPointLayout->entryPoint;
+
+            emitFuncDeclSingleAttribute<DomainAttribute>("domain", entryPoint);
+            emitFuncDeclSingleAttribute<PartitioningAttribute>("partitioning", entryPoint);
+            emitFuncDeclSingleAttribute<OutputTopologyAttribute>("outputtopology", entryPoint);
+            emitFuncDeclSingleAttribute<OutputControlPointsAttribute>("outputcontrolpoints", entryPoint);
+            emitFuncDeclPatchConstantFuncAttribute(irFunc, entryPoint);
+
+            break;
+        }
         // TODO: There are other stages that will need this kind of handling.
         default:
             break;
@@ -4208,6 +4317,7 @@ struct EmitVisitor
     }
 
     void emitIREntryPointAttributes_GLSL(
+        IRFunc*             /*irFunc*/,
         EmitContext*        /*ctx*/,
         EntryPointLayout*   entryPointLayout)
     {
@@ -4310,17 +4420,18 @@ struct EmitVisitor
     }
 
     void emitIREntryPointAttributes(
+        IRFunc*             irFunc,
         EmitContext*        ctx,
         EntryPointLayout*   entryPointLayout)
     {
         switch(getTarget(ctx))
         {
         case CodeGenTarget::HLSL:
-            emitIREntryPointAttributes_HLSL(ctx, entryPointLayout);
+            emitIREntryPointAttributes_HLSL(irFunc, ctx, entryPointLayout);
             break;
 
         case CodeGenTarget::GLSL:
-            emitIREntryPointAttributes_GLSL(ctx, entryPointLayout);
+            emitIREntryPointAttributes_GLSL(irFunc, ctx, entryPointLayout);
             break;
         }
     }
@@ -4390,7 +4501,7 @@ struct EmitVisitor
         auto entryPointLayout = asEntryPoint(func);
         if (entryPointLayout)
         {
-            emitIREntryPointAttributes(ctx, entryPointLayout);
+            emitIREntryPointAttributes(func, ctx, entryPointLayout);
         }
 
         auto name = getIRFuncName(func);

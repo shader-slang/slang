@@ -66,9 +66,7 @@ for (int tt = 0; tt < kBaseTypeCount; ++tt)
 
     switch (kBaseTypes[tt].tag)
     {
-    case BaseType::Half:
     case BaseType::Float:
-    case BaseType::Double:
         sb << "\n    , __BuiltinFloatingPointType\n";
         sb << "\n    ,  __BuiltinRealType\n";
         // fall through to:
@@ -1156,7 +1154,7 @@ SLANG_RAW("__attributeTarget(FuncDecl)\n")
 SLANG_RAW("attribute_syntax [outputcontrolpoints(count: int)]  : OutputControlPointsAttribute;\n")
 SLANG_RAW("\n")
 SLANG_RAW("__attributeTarget(FuncDecl)\n")
-SLANG_RAW("attribute_syntax [outputtopology(topology)]         : OuptutTopologyAttribute;\n")
+SLANG_RAW("attribute_syntax [outputtopology(topology)]         : OutputTopologyAttribute;\n")
 SLANG_RAW("\n")
 SLANG_RAW("__attributeTarget(FuncDecl)\n")
 SLANG_RAW("attribute_syntax [partitioning(mode)]               : PartitioningAttribute;\n")
