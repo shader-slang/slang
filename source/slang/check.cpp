@@ -8362,13 +8362,10 @@ namespace Slang
     void validateEntryPoint(
         EntryPointRequest* entryPoint)
     {
-        // TODO: We currently don't do any checking here, but this is the
+        // TODO: We currently do minimal checking here, but this is the
         // right place to perform the following validation checks:
         //
-        // * Does the entry point specify all of the attributes required
-        //   by the chosen stage (e.g., a `[domain(...)]` attribute for]
-        //   a hull shader.
-        //
+        
         // * Are the function input/output parameters and result type
         //   all valid for the chosen stage? (e.g., there shouldn't be
         //   an `OutputStream<X>` type in a vertex shader signature)
@@ -8419,6 +8416,7 @@ namespace Slang
                 FuncDecl* funcDecl = findFunctionDeclByName(entryPoint, name);
                 if (!funcDecl)
                 {
+                    sink->diagnose(translationUnitSyntax, Diagnostics::attributeFunctionNotFound, name, "patchconstantfunc");
                     return;
                 }
 

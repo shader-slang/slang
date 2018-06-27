@@ -213,6 +213,9 @@ DIAGNOSTIC(31003, Error, badlyDefinedPatchConstantFunc, "hull shader '$0' has ha
 DIAGNOSTIC(31004, Error, expectedSingleIntArg, "attribute '$0' expects a single int argument")
 DIAGNOSTIC(31005, Error, expectedSingleStringArg, "attribute '$0' expects a single string argument")
 
+DIAGNOSTIC(31006, Error, attributeFunctionNotFound, "Could not find function '$0' for attribute'$1'")
+
+
 DIAGNOSTIC(31100, Error, unknownStageName,  "unknown stage name '$0'")
 
 

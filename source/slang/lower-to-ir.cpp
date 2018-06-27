@@ -4795,9 +4795,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
 
             {
+                
                 auto attr = decl->FindModifier<PatchConstantFuncAttribute>();
 
-                if (attr)
+                // I needed to test for patchConstantFuncDecl here
+                // because it is only set if validateEntryPoint is called with Hull as the required stage
+                // If I just build domain shader, and then the attribute exists, but patchConstantFuncDecl is not set
+                // and thus leads to a crash.
+                if (attr && attr->patchConstantFuncDecl)
                 {
                     // We need to lower the function
                     FuncDecl* patchConstantFunc = attr->patchConstantFuncDecl;
