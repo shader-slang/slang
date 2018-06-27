@@ -4311,6 +4311,9 @@ struct EmitVisitor
         }
         case Stage::Hull:
         {
+            // Lists these are only attributes for hull shader
+            // https://docs.microsoft.com/en-us/windows/desktop/direct3d11/direct3d-11-advanced-stages-hull-shader-design
+
             FuncDecl* entryPoint = entryPointLayout->entryPoint;
 
             /* [domain("isoline")] */
