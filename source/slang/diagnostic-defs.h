@@ -203,13 +203,12 @@ DIAGNOSTIC(30100, Error, staticRefToNonStaticMember, "type '$0' cannot be used t
 DIAGNOSTIC(33070, Error, expectedFunction, "expression preceding parenthesis of apparent call must have function type.")
 DIAGNOSTIC(33071, Error, expectedAStringLiteral, "expected a string literal")
 
-
-DIAGNOSTIC(33072, Error, expectedPatchConstantFunc, "hull shader '$0' must a valid attribute 'patchconstantfunc(\"function_name\")' defined.");
-
 // Attributes
 DIAGNOSTIC(31000, Error, unknownAttributeName, "unknown attribute '$0'")
 DIAGNOSTIC(31001, Error, attributeArgumentCountMismatch, "attribute '$0' expects $1 arguments ($2 provided)")
-DIAGNOSTIC(31001, Error, attributeNotApplicable, "attribute '$0' is not valid here")
+DIAGNOSTIC(31002, Error, attributeNotApplicable, "attribute '$0' is not valid here")
+
+DIAGNOSTIC(31003, Error, badlyDefinedPatchConstantFunc, "hull shader '$0' has has badly defined 'patchconstantfunc' attribute.");
 
 DIAGNOSTIC(31100, Error, unknownStageName,  "unknown stage name '$0'")
 

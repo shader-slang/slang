@@ -8359,7 +8359,7 @@ namespace Slang
             {
                 if (attr->args.Count() != 1)
                 {
-                    sink->diagnose(translationUnitSyntax, Diagnostics::expectedPatchConstantFunc, entryPoint->name);
+                    sink->diagnose(translationUnitSyntax, Diagnostics::badlyDefinedPatchConstantFunc, entryPoint->name);
                     return;
                 }
 
@@ -8368,7 +8368,7 @@ namespace Slang
 
                 if (!stringLit)
                 {
-                    sink->diagnose(translationUnitSyntax, Diagnostics::expectedPatchConstantFunc, entryPoint->name);
+                    sink->diagnose(translationUnitSyntax, Diagnostics::badlyDefinedPatchConstantFunc, entryPoint->name);
                     return;
                 }
 
