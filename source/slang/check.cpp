@@ -1847,7 +1847,7 @@ namespace Slang
 
         bool hasIntArgs(Attribute* attr, int numArgs)
         {
-            if (attr->args.Count() != numArgs)
+            if (int(attr->args.Count()) != numArgs)
             {
                 return false;
             }
@@ -1863,7 +1863,7 @@ namespace Slang
 
         bool hasStringArgs(Attribute* attr, int numArgs)
         {
-            if (attr->args.Count() != numArgs)
+            if (int(attr->args.Count()) != numArgs)
             {
                 return false;
             }
