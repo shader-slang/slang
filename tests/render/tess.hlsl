@@ -1,5 +1,4 @@
-//TEST:SIMPLE: -target dxbc-assembly -profile hs_5_1 -entry HS 
-//TEST:SIMPLE: -target dxbc-assembly -profile ds_5_1 -entry DS 
+//TEST:COMPARE_HLSL: -target dxbc-assembly -profile hs_5_1 -entry HS -profile ds_5_1 -entry DS 
 
 // tests/render/tess.hlsl
 
