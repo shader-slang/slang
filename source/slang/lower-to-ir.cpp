@@ -1142,6 +1142,27 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             &irElementType);
     }
 
+    IRType* lowerGenericIntrinsicType(DeclRefType* type, Type* elementType, IntVal* count)
+    {
+        auto intrinsicTypeModifier = type->declRef.getDecl()->FindModifier<IntrinsicTypeModifier>();
+        SLANG_ASSERT(intrinsicTypeModifier);
+        IROp op = IROp(intrinsicTypeModifier->irOp);
+        IRInst* irElementType = lowerType(context, elementType);
+
+        IRInst* irCount = lowerSimpleVal(context, count);
+
+        IRInst* const operands[2] =
+        {
+            irElementType,
+            irCount,
+        };
+
+        return getBuilder()->getType(
+            op,
+            SLANG_COUNT_OF(operands),
+            operands);
+    }
+
     IRType* visitResourceType(ResourceType* type)
     {
         return lowerGenericIntrinsicType(type, type->elementType);
@@ -1160,6 +1181,14 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     IRType* visitUntypedBufferResourceType(UntypedBufferResourceType* type)
     {
         return lowerSimpleIntrinsicType(type);
+    }
+
+    IRType* visitHLSLPatchType(HLSLPatchType* type)
+    {
+        Type* elementType = type->getElementType();
+        IntVal* count = type->getElementCount();
+
+        return lowerGenericIntrinsicType(type, elementType, count);
     }
 
     // We do not expect to encounter the following types in ASTs that have
@@ -4765,6 +4794,34 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 // the setter body.
             }
 
+            {
+
+                auto attr = decl->FindModifier<PatchConstantFuncAttribute>();
+
+                // I needed to test for patchConstantFuncDecl here
+                // because it is only set if validateEntryPoint is called with Hull as the required stage
+                // If I just build domain shader, and then the attribute exists, but patchConstantFuncDecl is not set
+                // and thus leads to a crash.
+                if (attr && attr->patchConstantFuncDecl)
+                {
+                    // We need to lower the function
+                    FuncDecl* patchConstantFunc = attr->patchConstantFuncDecl;
+                    assert(patchConstantFunc);
+
+                    // Convert the patch constant function into IRInst
+                    IRInst* irPatchConstantFunc = getSimpleVal(context, ensureDecl(subContext, patchConstantFunc));
+
+                    // Emit the note patch constant func
+                    subContext->irBuilder->emitIntrinsicInst(
+                        nullptr,
+                        kIROp_NotePatchConstantFunc,
+                        1,
+                        &irPatchConstantFunc);
+
+                }
+            }
+
+            // Lower body
 
             lowerStmt(subContext, decl->Body);
 

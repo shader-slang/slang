@@ -206,9 +206,19 @@ DIAGNOSTIC(33071, Error, expectedAStringLiteral, "expected a string literal")
 // Attributes
 DIAGNOSTIC(31000, Error, unknownAttributeName, "unknown attribute '$0'")
 DIAGNOSTIC(31001, Error, attributeArgumentCountMismatch, "attribute '$0' expects $1 arguments ($2 provided)")
-DIAGNOSTIC(31001, Error, attributeNotApplicable, "attribute '$0' is not valid here")
+DIAGNOSTIC(31002, Error, attributeNotApplicable, "attribute '$0' is not valid here")
+
+DIAGNOSTIC(31003, Error, badlyDefinedPatchConstantFunc, "hull shader '$0' has has badly defined 'patchconstantfunc' attribute.");
+
+DIAGNOSTIC(31004, Error, expectedSingleIntArg, "attribute '$0' expects a single int argument")
+DIAGNOSTIC(31005, Error, expectedSingleStringArg, "attribute '$0' expects a single string argument")
+
+DIAGNOSTIC(31006, Error, attributeFunctionNotFound, "Could not find function '$0' for attribute'$1'")
+
 
 DIAGNOSTIC(31100, Error, unknownStageName,  "unknown stage name '$0'")
+
+
 
 // Enums
 
@@ -262,7 +272,6 @@ DIAGNOSTIC(39999, Error, tooManyArguments, "too many arguments to call (got $0, 
 
 DIAGNOSTIC(39999, Error, invalidIntegerLiteralSuffix, "invalid suffix '$0' on integer literal")
 DIAGNOSTIC(39999, Error, invalidFloatingPOintLiteralSuffix, "invalid suffix '$0' on floating-point literal")
-
 
 
 

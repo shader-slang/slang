@@ -1136,7 +1136,7 @@ __attributeTarget(FuncDecl)
 attribute_syntax [outputcontrolpoints(count: int)]  : OutputControlPointsAttribute;
 
 __attributeTarget(FuncDecl)
-attribute_syntax [outputtopology(topology)]         : OuptutTopologyAttribute;
+attribute_syntax [outputtopology(topology)]         : OutputTopologyAttribute;
 
 __attributeTarget(FuncDecl)
 attribute_syntax [partitioning(mode)]               : PartitioningAttribute;

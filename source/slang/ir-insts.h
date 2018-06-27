@@ -381,6 +381,13 @@ struct IRSwizzledStore : IRInst
     IR_LEAF_ISA(SwizzledStore)
 };
 
+
+struct IRNotePatchConstantFunc: IRInst
+{
+    IRInst* getFunc() { return getOperand(0); }
+    IR_LEAF_ISA(NotePatchConstantFunc)
+}; 
+
 // An IR `var` instruction conceptually represents
 // a stack allocation of some memory.
 struct IRVar : IRInst
@@ -689,10 +696,15 @@ struct IRBuilder
     IRBlock* createBlock();
     IRBlock* emitBlock();
 
+    
+
     IRParam* createParam(
         IRType* type);
     IRParam* emitParam(
         IRType* type);
+
+    IRNotePatchConstantFunc* emitNotePatchConstantFunc(
+        IRInst* func);
 
     IRVar* emitVar(
         IRType* type);
