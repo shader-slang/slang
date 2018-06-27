@@ -4135,42 +4135,7 @@ struct EmitVisitor
         }
     }
 
-    template <typename T>
-    void emitFuncDeclSingleAttribute(const char* name, FuncDecl* funcDecl)
-    {
-        if (Attribute* attrib = funcDecl->FindModifier<T>())
-        {
-            attrib->args.Count();
-            if (attrib->args.Count() != 1)
-            {
-                /// Failed!
-                return;
-            }
-
-            Expr* expr = attrib->args[0];
-
-            //FloatingPointLiteralExpr
-            //BoolLiteralExpr
-          
-            emit("[");
-            emit(name);
-            emit("(");
-
-            if(auto stringLitExpr = expr->As<StringLiteralExpr>())
-            {
-                emit('\"');
-                emit(stringLitExpr->value);
-                emit('\"');
-            }
-            else if (auto intLitExpr = expr->As<IntegerLiteralExpr>())
-            {
-                emit(intLitExpr->value);
-            }
-
-            //Emit(attrib->value);
-            emit(")]\n");
-        }
-    }
+    
 
     IRInst* findFirstInst(IRFunc* irFunc, IROp op)
     {
@@ -4187,26 +4152,77 @@ struct EmitVisitor
         return nullptr;
     }
 
-    void emitFuncDeclPatchConstantFuncAttribute(IRFunc* irFunc, FuncDecl* funcDecl)
+    void emitAttributeSingleString(const char* name, FuncDecl* entryPoint, Attribute* attrib)
     {
-        if (PatchConstantFuncAttribute* attrib = funcDecl->FindModifier<PatchConstantFuncAttribute>())
+        assert(attrib);
+        
+        attrib->args.Count();
+        if (attrib->args.Count() != 1)
         {
-            //FuncDecl* patchConstantFuncDecl = attrib->patchConstantFuncDecl;
-            //assert(patchConstantFuncDecl);
-           
-            auto irPatchFunc = static_cast<IRNotePatchConstantFunc*>(findFirstInst(irFunc, kIROp_NotePatchConstantFunc));
-            assert(irPatchFunc);
-            if (!irPatchFunc)
-            {
-                return;
-            }
-
-            String irName = getIRName(irPatchFunc->getFunc());
-
-            emit("[patchconstantfunc(\"");
-            emit(irName);
-            emit("\")]\n");
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Attribute expects single parameter");
+            return;
         }
+
+        Expr* expr = attrib->args[0];
+
+        auto stringLitExpr = expr->As<StringLiteralExpr>();
+        if (!stringLitExpr)
+        {
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Attribute parameter expecting to be a string ");
+            return;
+        }
+
+        emit("[");
+        emit(name);
+        emit("(\"");
+        emit(stringLitExpr->value); 
+        emit("\")]\n");
+    }
+
+    void emitAttributeSingleInt(const char* name, FuncDecl* entryPoint, Attribute* attrib)
+    {
+        assert(attrib);
+
+        attrib->args.Count();
+        if (attrib->args.Count() != 1)
+        {
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Attribute expects single parameter");
+            return;
+        }
+
+        Expr* expr = attrib->args[0];
+
+        auto intLitExpr = expr->As<IntegerLiteralExpr>();
+        if (!intLitExpr)
+        {
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Attribute expects an int");
+            return;
+        }
+
+        emit("[");
+        emit(name);
+        emit("(");
+        emit(intLitExpr->value);
+        emit(")]\n");
+    }
+
+    void emitFuncDeclPatchConstantFuncAttribute(IRFunc* irFunc, FuncDecl* entryPoint, PatchConstantFuncAttribute* attrib)
+    {
+        SLANG_UNUSED(attrib);
+
+        auto irPatchFunc = static_cast<IRNotePatchConstantFunc*>(findFirstInst(irFunc, kIROp_NotePatchConstantFunc));
+        assert(irPatchFunc);
+        if (!irPatchFunc)
+        {
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Unable to find NotePatchConstantFunc instruction");
+            return;
+        }
+
+        const String irName = getIRName(irPatchFunc->getFunc());
+
+        emit("[patchconstantfunc(\"");
+        emit(irName);
+        emit("\")]\n");
     }
 
     void emitIREntryPointAttributes_HLSL(
@@ -4284,29 +4300,44 @@ struct EmitVisitor
         }
         case Stage::Domain:
         {
-            /* [domain("isoline")] */
-
             FuncDecl* entryPoint = entryPointLayout->entryPoint;
+            /* [domain("isoline")] */
+            if (auto attrib = entryPoint->FindModifier<DomainAttribute>())
+            {
+                emitAttributeSingleString("domain", entryPoint, attrib);
+            }
 
-            emitFuncDeclSingleAttribute<DomainAttribute>("domain", entryPoint);
-            
             break;
         }
         case Stage::Hull:
         {
-            /* [domain("isoline")]
-            [partitioning("integer")]
-            [outputtopology("line")]
-            [outputcontrolpoints(4)]
-            [patchconstantfunc("HSConst")] */
-
             FuncDecl* entryPoint = entryPointLayout->entryPoint;
 
-            emitFuncDeclSingleAttribute<DomainAttribute>("domain", entryPoint);
-            emitFuncDeclSingleAttribute<PartitioningAttribute>("partitioning", entryPoint);
-            emitFuncDeclSingleAttribute<OutputTopologyAttribute>("outputtopology", entryPoint);
-            emitFuncDeclSingleAttribute<OutputControlPointsAttribute>("outputcontrolpoints", entryPoint);
-            emitFuncDeclPatchConstantFuncAttribute(irFunc, entryPoint);
+            /* [domain("isoline")] */
+            if (auto attrib = entryPoint->FindModifier<DomainAttribute>())
+            {
+                emitAttributeSingleString("domain", entryPoint, attrib);
+            }
+            /* [domain("partitioning")] */
+            if (auto attrib = entryPoint->FindModifier<PartitioningAttribute>())
+            {
+                emitAttributeSingleString("partitioning", entryPoint, attrib);
+            }
+            /* [outputtopology("line")] */
+            if (auto attrib = entryPoint->FindModifier<OutputTopologyAttribute>())
+            {
+                emitAttributeSingleString("outputtopology", entryPoint, attrib);
+            }
+            /* [outputcontrolpoints(4)] */
+            if (auto attrib = entryPoint->FindModifier<OutputControlPointsAttribute>())
+            {
+                emitAttributeSingleInt("outputcontrolpoints", entryPoint, attrib);
+            }
+            /* [patchconstantfunc("HSConst")] */
+            if (auto attrib = entryPoint->FindModifier<PatchConstantFuncAttribute>())
+            {
+                emitFuncDeclPatchConstantFuncAttribute(irFunc, entryPoint, attrib);
+            }
 
             break;
         }

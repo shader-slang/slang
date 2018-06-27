@@ -1845,6 +1845,38 @@ namespace Slang
             return Stage::Unknown;
         }
 
+        bool hasIntArgs(Attribute* attr, int numArgs)
+        {
+            if (attr->args.Count() != numArgs)
+            {
+                return false;
+            }
+            for (int i = 0; i < numArgs; ++i)
+            {
+                if (!attr->args[i]->As<IntegerLiteralExpr>())
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        bool hasStringArgs(Attribute* attr, int numArgs)
+        {
+            if (attr->args.Count() != numArgs)
+            {
+                return false;
+            }
+            for (int i = 0; i < numArgs; ++i)
+            {
+                if (!attr->args[i]->As<StringLiteralExpr>())
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+        
         bool validateAttribute(RefPtr<Attribute> attr)
         {
                 if(auto numThreadsAttr = attr.As<NumThreadsAttribute>())
@@ -1900,14 +1932,25 @@ namespace Slang
                 }
                 else if ((attr.As<DomainAttribute>()) || 
                          (attr.As<MaxTessFactorAttribute>()) ||
-                         (attr.As<OutputControlPointsAttribute>()) ||
                          (attr.As<OutputTopologyAttribute>()) ||
                          (attr.As<PartitioningAttribute>()) ||
                          (attr.As<PatchConstantFuncAttribute>()))
                 {
-                    // Let it go thru
+                    // Let it go thru iff single string attribute
+                    if (!hasStringArgs(attr, 1))
+                    {
+                        getSink()->diagnose(attr, Diagnostics::expectedSingleStringArg, attr->name);
+                    }
                 }
-                else
+                else if (attr.As<OutputControlPointsAttribute>())
+                {
+                    // Let it go thru iff single integral attribute
+                    if (!hasIntArgs(attr, 1))
+                    {
+                        getSink()->diagnose(attr, Diagnostics::expectedSingleIntArg, attr->name);
+                    }
+                }
+                else 
                 {
                     if(attr->args.Count() == 0)
                     {
@@ -8564,7 +8607,7 @@ namespace Slang
             // set to `Batman` to know whether the setting for `B` is valid. In this limit
             // the constraints can be mutually recursive (so `A : IMentor<B>`).
             //
-            // The only way to check things corectly is to validate each conformance under
+            // The only way to check things correctly is to validate each conformance under
             // a set of assumptions (substitutions) that includes all the type substitutions,
             // and possibly also all the other constraints *except* the one to be validated.
             //

@@ -210,7 +210,12 @@ DIAGNOSTIC(31002, Error, attributeNotApplicable, "attribute '$0' is not valid he
 
 DIAGNOSTIC(31003, Error, badlyDefinedPatchConstantFunc, "hull shader '$0' has has badly defined 'patchconstantfunc' attribute.");
 
+DIAGNOSTIC(31004, Error, expectedSingleIntArg, "attribute '$0' expects a single int argument")
+DIAGNOSTIC(31005, Error, expectedSingleStringArg, "attribute '$0' expects a single string argument")
+
 DIAGNOSTIC(31100, Error, unknownStageName,  "unknown stage name '$0'")
+
+
 
 // Enums
 
