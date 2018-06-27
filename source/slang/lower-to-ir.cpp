@@ -1147,14 +1147,14 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto intrinsicTypeModifier = type->declRef.getDecl()->FindModifier<IntrinsicTypeModifier>();
         SLANG_ASSERT(intrinsicTypeModifier);
         IROp op = IROp(intrinsicTypeModifier->irOp);
-        IRInst* irElementType = lowerType(context, elementType); 
+        IRInst* irElementType = lowerType(context, elementType);
 
         IRInst* irCount = lowerSimpleVal(context, count);
-        
-        IRInst* const operands[2] = 
+
+        IRInst* const operands[2] =
         {
             irElementType,
-            irCount, 
+            irCount,
         };
 
         return getBuilder()->getType(
@@ -1187,7 +1187,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     {
         Type* elementType = type->getElementType();
         IntVal* count = type->getElementCount();
-        
+
         return lowerGenericIntrinsicType(type, elementType, count);
     }
 
@@ -4795,7 +4795,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
 
             {
-                
+
                 auto attr = decl->FindModifier<PatchConstantFuncAttribute>();
 
                 // I needed to test for patchConstantFuncDecl here
@@ -4808,9 +4808,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     FuncDecl* patchConstantFunc = attr->patchConstantFuncDecl;
                     assert(patchConstantFunc);
 
-                    // Lower the patch constant function
-                    lowerFuncDecl(patchConstantFunc);
-
                     // Convert the patch constant function into IRInst
                     IRInst* irPatchConstantFunc = getSimpleVal(context, ensureDecl(subContext, patchConstantFunc));
 
@@ -4820,7 +4817,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         kIROp_NotePatchConstantFunc,
                         1,
                         &irPatchConstantFunc);
-                    
+
                 }
             }
 
