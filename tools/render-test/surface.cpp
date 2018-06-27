@@ -1,4 +1,4 @@
-// surface.cpp
+﻿// surface.cpp
 #include "surface.h"
 
 #include <stdlib.h>
@@ -46,7 +46,7 @@ Slang::Result MallocSurfaceAllocator::allocate(int width, int height, Format for
     uint8_t* data = (uint8_t*)::malloc(totalSize);
     if (!data)
     {
-        return SLANG_E_MEM_OUT_OF_MEMORY;
+        return SLANG_E_OUT_OF_MEMORY;
     }
 
     surface.m_data = data;

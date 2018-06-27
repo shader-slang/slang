@@ -1,8 +1,9 @@
-// vk-device-queue.cpp
+﻿// vk-device-queue.cpp
 #include "vk-device-queue.h"
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <assert.h>
 
 namespace renderer_test {
 using namespace Slang;

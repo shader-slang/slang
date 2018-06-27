@@ -14,7 +14,7 @@
 
 #include <slang.h>
 
-#include "../../source/core/slang-com-ptr.h"
+#include "../../slang-com-ptr.h"
 
 // We will be rendering with Direct3D 11, so we need to include
 // the Windows and D3D11 headers

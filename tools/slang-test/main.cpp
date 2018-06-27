@@ -1,9 +1,10 @@
-// main.cpp
+﻿// main.cpp
 
 #include "../../source/core/slang-io.h"
 #include "../../source/core/token-reader.h"
 
-#include "../../source/core/slang-result.h"
+#include "../../slang-com-helper.h"
+
 #include "../../source/core/slang-string-util.h"
 
 using namespace Slang;
