@@ -1,8 +1,9 @@
-// module.cpp
+﻿// module.cpp
 #include "vk-module.h"
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <assert.h>
 
 #if SLANG_WINDOWS_FAMILY
 #   include <windows.h>

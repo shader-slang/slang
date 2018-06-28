@@ -1,8 +1,7 @@
-#ifndef SLANG_COM_PTR_H
+﻿#ifndef SLANG_COM_PTR_H
 #define SLANG_COM_PTR_H
 
-#include "slang-defines.h"
-#include "slang-result.h"
+#include "slang-com-helper.h"
 
 #include <assert.h>
 
@@ -10,7 +9,7 @@ namespace Slang {
 
 /*! \brief ComPtr is a simple smart pointer that manages types which implement COM based interfaces.
 \details A class that implements a COM, must derive from the IUnknown interface or a type that matches
-it's layout exactly (such as IForwardUnknown). Trying to use this template with a class that doesn't follow
+it's layout exactly (such as ISlangUnknown). Trying to use this template with a class that doesn't follow
 these rules, will lead to undefined behavior.
 This is a 'strong' pointer type, and will AddRef when a non null pointer is set and Release when the pointer
 leaves scope.
@@ -22,12 +21,9 @@ is to write into the smart pointer, other times to pass as an array. To handle t
 there are the methods readRef and writeRef, which are used instead of the & (ref) operator. For example
 
 \code
-
 Void doSomething(ID3D12Resource** resources, IndexT numResources);
-
 // ...
 ComPtr<ID3D12Resource> resources[3];
-
 doSomething(resources[0].readRef(), SLANG_COUNT_OF(resource));
 \endcode
 
@@ -41,45 +37,6 @@ Result res = unk->QueryInterface(resource.writeRef());
 \endcode
 */
 
-typedef SlangUUID Guid;
-
-SLANG_FORCE_INLINE bool operator==(const Guid& aIn, const Guid& bIn)
-{
-    // Use the largest type the honors the alignment of Guid
-    typedef uint32_t CmpType;
-    union GuidCompare
-    {
-        Guid guid;
-        CmpType data[sizeof(Guid) / sizeof(CmpType)];
-    };
-    // Type pun - so compiler can 'see' the pun and not break aliasing rules
-    const CmpType* a = reinterpret_cast<const GuidCompare&>(aIn).data;
-    const CmpType* b = reinterpret_cast<const GuidCompare&>(bIn).data;
-    // Make the guid comparison a single branch, by not using short circuit
-    return ((a[0] ^ b[0]) | (a[1] ^ b[1]) | (a[2] ^ b[2]) | (a[3] ^ b[3])) == 0;
-}
-
-SLANG_FORCE_INLINE bool operator!=(const Guid& a, const Guid& b)
-{
-    return !(a == b);
-}
-
-// Allows for defining of a GUID that works in C++ and C which defines in a format similar to microsofts INTERFACE style
-// MIDL_INTERFACE("00000000-0000-0000-C000-00 00 00 00 00 46")
-
-#define SLANG_GUID_BYTE(x, index) ((uint8_t)(SLANG_UINT64(0x##x) >> (8 * index)))
-
-#define SLANG_MAKE_GUID(data0, data1, data2, shortTail, tail) \
-	{ (uint32_t)(0x##data0), (uint16_t)(0x##data1), (uint16_t)(0x##data2), \
-		{ (uint8_t)(0x##shortTail >> 8), (uint8_t)(0x##shortTail & 0xff), \
-		SLANG_GUID_BYTE(tail,5), SLANG_GUID_BYTE(tail,4), SLANG_GUID_BYTE(tail,3), SLANG_GUID_BYTE(tail,2), SLANG_GUID_BYTE(tail,1), SLANG_GUID_BYTE(tail,0) \
-	}}
-
-// Compatible with Microsoft IUnknown
-static const Guid IID_IComUnknown = SLANG_MAKE_GUID(00000000, 0000, 0000, C000, 000000000046);
-
-typedef ISlangUnknown IComUnknown;
-
 // Enum to force initializing as an attach (without adding a reference)
 enum InitAttach
 {
@@ -92,7 +49,7 @@ class ComPtr
 public:
 	typedef T Type;
 	typedef ComPtr ThisType;
-	typedef IComUnknown* Ptr;
+	typedef ISlangUnknown* Ptr;
 
 		/// Constructors
 		/// Default Ctor. Sets to nullptr
@@ -152,7 +109,7 @@ public:
 protected:
 	/// Gets the address of the dumb pointer.
     // Disabled: use writeRef and readRef to get a reference based on usage.
-	SLANG_FORCE_INLINE T** operator&();
+	SLANG_FORCE_INLINE T** operator&() = delete;
 
 	T* m_ptr;
 };
@@ -167,13 +124,6 @@ void ComPtr<T>::setNull()
 		m_ptr = nullptr;
 	}
 }
-//----------------------------------------------------------------------------
-/* template <typename T>
-T** ComPtr<T>::operator&()
-{
-	assert(m_ptr == nullptr);
-	return &m_ptr;
-} */
 //----------------------------------------------------------------------------
 template <typename T>
 const ComPtr<T>& ComPtr<T>::operator=(const ThisType& rhs)

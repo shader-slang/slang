@@ -25,7 +25,7 @@
 #include <d3d12.h>
 #include <d3dcompiler.h>
 
-#include "../../source/core/slang-com-ptr.h"
+#include "../../slang-com-ptr.h"
 
 #include "resource-d3d12.h"
 #include "descriptor-heap-d3d12.h"

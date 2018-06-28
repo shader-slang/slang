@@ -1,7 +1,7 @@
-
+﻿
 #include "render-api-util.h"
 
-#include "../../source/core/slang-defines.h"
+#include "../../slang.h"
 
 #include "../../source/core/list.h"
 #include "../../source/core/slang-string-util.h"

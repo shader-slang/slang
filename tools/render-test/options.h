@@ -1,9 +1,9 @@
-// options.h
+﻿// options.h
 #pragma once
 
 #include <stdint.h>
 
-#include "../../source/core/slang-result.h"
+#include "../../slang-com-helper.h"
 
 #include "render.h"
 

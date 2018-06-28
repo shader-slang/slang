@@ -1898,6 +1898,19 @@ namespace Slang
         return inst;
     }
 
+    IRNotePatchConstantFunc* IRBuilder::emitNotePatchConstantFunc(
+        IRInst* func)
+    {
+        auto inst = createInst<IRNotePatchConstantFunc>(
+            this,
+            kIROp_NotePatchConstantFunc,
+            nullptr,
+            func);
+
+        addInst(inst);
+        return inst;
+    }
+
     IRInst* IRBuilder::emitFieldExtract(
         IRType* type,
         IRInst* base,

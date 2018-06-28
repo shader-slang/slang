@@ -1,11 +1,12 @@
-// render.h
+﻿// render.h
 #pragma once
 
 #include "window.h"
 
 //#include "shader-input-layout.h"
 
-#include "../../source/core/slang-result.h"
+#include "../../slang-com-helper.h"
+
 #include "../../source/core/smart-pointer.h"
 #include "../../source/core/list.h"
 

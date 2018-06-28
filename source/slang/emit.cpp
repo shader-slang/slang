@@ -3654,6 +3654,12 @@ struct EmitVisitor
             }
             break;
 
+        case kIROp_NotePatchConstantFunc:
+        {
+            // No-op
+            break;
+        }
+
         case kIROp_Var:
             {
                 auto ptrType = cast<IRPtrType>(inst->getDataType());
@@ -4129,7 +4135,98 @@ struct EmitVisitor
         }
     }
 
+    
+
+    IRInst* findFirstInst(IRFunc* irFunc, IROp op)
+    {
+        for (auto block : irFunc->getBlocks())
+        {
+            for (auto inst : block->getChildren())
+            {
+                if (inst->op == op)
+                {
+                    return inst;
+                }
+            }
+        }
+        return nullptr;
+    }
+
+    void emitAttributeSingleString(const char* name, FuncDecl* entryPoint, Attribute* attrib)
+    {
+        assert(attrib);
+        
+        attrib->args.Count();
+        if (attrib->args.Count() != 1)
+        {
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Attribute expects single parameter");
+            return;
+        }
+
+        Expr* expr = attrib->args[0];
+
+        auto stringLitExpr = expr->As<StringLiteralExpr>();
+        if (!stringLitExpr)
+        {
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Attribute parameter expecting to be a string ");
+            return;
+        }
+
+        emit("[");
+        emit(name);
+        emit("(\"");
+        emit(stringLitExpr->value); 
+        emit("\")]\n");
+    }
+
+    void emitAttributeSingleInt(const char* name, FuncDecl* entryPoint, Attribute* attrib)
+    {
+        assert(attrib);
+
+        attrib->args.Count();
+        if (attrib->args.Count() != 1)
+        {
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Attribute expects single parameter");
+            return;
+        }
+
+        Expr* expr = attrib->args[0];
+
+        auto intLitExpr = expr->As<IntegerLiteralExpr>();
+        if (!intLitExpr)
+        {
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Attribute expects an int");
+            return;
+        }
+
+        emit("[");
+        emit(name);
+        emit("(");
+        emit(intLitExpr->value);
+        emit(")]\n");
+    }
+
+    void emitFuncDeclPatchConstantFuncAttribute(IRFunc* irFunc, FuncDecl* entryPoint, PatchConstantFuncAttribute* attrib)
+    {
+        SLANG_UNUSED(attrib);
+
+        auto irPatchFunc = static_cast<IRNotePatchConstantFunc*>(findFirstInst(irFunc, kIROp_NotePatchConstantFunc));
+        assert(irPatchFunc);
+        if (!irPatchFunc)
+        {
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Unable to find NotePatchConstantFunc instruction");
+            return;
+        }
+
+        const String irName = getIRName(irPatchFunc->getFunc());
+
+        emit("[patchconstantfunc(\"");
+        emit(irName);
+        emit("\")]\n");
+    }
+
     void emitIREntryPointAttributes_HLSL(
+        IRFunc*             irFunc, 
         EmitContext*        ctx,
         EntryPointLayout*   entryPointLayout)
     {
@@ -4199,8 +4296,54 @@ struct EmitVisitor
                 Emit(attrib->value);
                 emit(")]\n");
             }
+            break;
         }
-        break;
+        case Stage::Domain:
+        {
+            FuncDecl* entryPoint = entryPointLayout->entryPoint;
+            /* [domain("isoline")] */
+            if (auto attrib = entryPoint->FindModifier<DomainAttribute>())
+            {
+                emitAttributeSingleString("domain", entryPoint, attrib);
+            }
+
+            break;
+        }
+        case Stage::Hull:
+        {
+            // Lists these are only attributes for hull shader
+            // https://docs.microsoft.com/en-us/windows/desktop/direct3d11/direct3d-11-advanced-stages-hull-shader-design
+
+            FuncDecl* entryPoint = entryPointLayout->entryPoint;
+
+            /* [domain("isoline")] */
+            if (auto attrib = entryPoint->FindModifier<DomainAttribute>())
+            {
+                emitAttributeSingleString("domain", entryPoint, attrib);
+            }
+            /* [domain("partitioning")] */
+            if (auto attrib = entryPoint->FindModifier<PartitioningAttribute>())
+            {
+                emitAttributeSingleString("partitioning", entryPoint, attrib);
+            }
+            /* [outputtopology("line")] */
+            if (auto attrib = entryPoint->FindModifier<OutputTopologyAttribute>())
+            {
+                emitAttributeSingleString("outputtopology", entryPoint, attrib);
+            }
+            /* [outputcontrolpoints(4)] */
+            if (auto attrib = entryPoint->FindModifier<OutputControlPointsAttribute>())
+            {
+                emitAttributeSingleInt("outputcontrolpoints", entryPoint, attrib);
+            }
+            /* [patchconstantfunc("HSConst")] */
+            if (auto attrib = entryPoint->FindModifier<PatchConstantFuncAttribute>())
+            {
+                emitFuncDeclPatchConstantFuncAttribute(irFunc, entryPoint, attrib);
+            }
+
+            break;
+        }
         // TODO: There are other stages that will need this kind of handling.
         default:
             break;
@@ -4208,6 +4351,7 @@ struct EmitVisitor
     }
 
     void emitIREntryPointAttributes_GLSL(
+        IRFunc*             /*irFunc*/,
         EmitContext*        /*ctx*/,
         EntryPointLayout*   entryPointLayout)
     {
@@ -4310,17 +4454,18 @@ struct EmitVisitor
     }
 
     void emitIREntryPointAttributes(
+        IRFunc*             irFunc,
         EmitContext*        ctx,
         EntryPointLayout*   entryPointLayout)
     {
         switch(getTarget(ctx))
         {
         case CodeGenTarget::HLSL:
-            emitIREntryPointAttributes_HLSL(ctx, entryPointLayout);
+            emitIREntryPointAttributes_HLSL(irFunc, ctx, entryPointLayout);
             break;
 
         case CodeGenTarget::GLSL:
-            emitIREntryPointAttributes_GLSL(ctx, entryPointLayout);
+            emitIREntryPointAttributes_GLSL(irFunc, ctx, entryPointLayout);
             break;
         }
     }
@@ -4390,7 +4535,7 @@ struct EmitVisitor
         auto entryPointLayout = asEntryPoint(func);
         if (entryPointLayout)
         {
-            emitIREntryPointAttributes(ctx, entryPointLayout);
+            emitIREntryPointAttributes(func, ctx, entryPointLayout);
         }
 
         auto name = getIRFuncName(func);

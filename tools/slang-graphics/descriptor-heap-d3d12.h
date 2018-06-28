@@ -1,10 +1,10 @@
-#pragma once
+﻿#pragma once
 
 
 #include <dxgi.h>
 #include <d3d12.h>
 
-#include "../../source/core/slang-com-ptr.h"
+#include "../../slang-com-ptr.h"
 
 namespace slang_graphics {
 

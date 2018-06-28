@@ -335,9 +335,11 @@ SIMPLE_SYNTAX_CLASS(CallAttribute, Attribute)               // `[call]`
 
 SIMPLE_SYNTAX_CLASS(MaxTessFactorAttribute, Attribute)
 SIMPLE_SYNTAX_CLASS(OutputControlPointsAttribute, Attribute)
-SIMPLE_SYNTAX_CLASS(OuptutTopologyAttribute, Attribute)
+SIMPLE_SYNTAX_CLASS(OutputTopologyAttribute, Attribute)
 SIMPLE_SYNTAX_CLASS(PartitioningAttribute, Attribute)
-SIMPLE_SYNTAX_CLASS(PatchConstantFuncAttribute, Attribute)
+SYNTAX_CLASS(PatchConstantFuncAttribute, Attribute)
+    FIELD(RefPtr<FuncDecl>, patchConstantFuncDecl)
+END_SYNTAX_CLASS()
 SIMPLE_SYNTAX_CLASS(DomainAttribute, Attribute)
 
 SIMPLE_SYNTAX_CLASS(EarlyDepthStencilAttribute, Attribute)

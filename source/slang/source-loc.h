@@ -1,9 +1,9 @@
-// source-loc.h
+﻿// source-loc.h
 #ifndef SLANG_SOURCE_LOC_H_INCLUDED
 #define SLANG_SOURCE_LOC_H_INCLUDED
 
 #include "../core/basic.h"
-#include "../core/slang-com-ptr.h"
+#include "../../slang-com-ptr.h"
 
 #include "../../slang.h"
 
