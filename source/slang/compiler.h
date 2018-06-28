@@ -416,8 +416,8 @@ namespace Slang
 
         void generateIR();
 
-        int executeActionsInner();
-        int executeActions();
+        SlangResult executeActionsInner();
+        SlangResult executeActions();
 
         int addTranslationUnit(SourceLanguage language, String const& name);
 

@@ -47,9 +47,9 @@ ShaderProgram* ShaderCompiler::compileProgram(
         spSetPassThrough(slangRequest, passThrough);
     }
 
-    // Preocess any additional command-line options specified for Slang using
+    // Process any additional command-line options specified for Slang using
     // the `-xslang <arg>` option to `render-test`.
-    spProcessCommandLineArguments(slangRequest, &gOptions.slangArgs[0], gOptions.slangArgCount);
+    SLANG_RETURN_NULL_ON_FAIL(spProcessCommandLineArguments(slangRequest, &gOptions.slangArgs[0], gOptions.slangArgCount));
 
     int computeTranslationUnit = 0;
     int vertexTranslationUnit = 0;
@@ -92,7 +92,7 @@ ShaderProgram* ShaderCompiler::compileProgram(
     }
 
 
-    ShaderProgram * result = nullptr;
+    ShaderProgram * shaderProgram = nullptr;
     Slang::List<const char*> rawTypeNames;
     for (auto typeName : request.entryPointTypeArguments)
         rawTypeNames.Add(typeName.Buffer());
@@ -105,12 +105,12 @@ ShaderProgram* ShaderCompiler::compileProgram(
             rawTypeNames.Buffer());
 
         spSetLineDirectiveMode(slangRequest, SLANG_LINE_DIRECTIVE_MODE_NONE);
-        int compileErr = spCompile(slangRequest);
+        const SlangResult res = spCompile(slangRequest);
         if (auto diagnostics = spGetDiagnosticOutput(slangRequest))
         {
             fprintf(stderr, "%s", diagnostics);
         }
-        if (!compileErr)
+        if (SLANG_SUCCEEDED(res))
         {
             size_t codeSize = 0;
             char const* code = (char const*) spGetEntryPointCode(slangRequest, computeEntryPoint, &codeSize);
@@ -125,7 +125,7 @@ ShaderProgram* ShaderCompiler::compileProgram(
             desc.kernels = &kernelDesc;
             desc.kernelCount = 1;
 
-            result = renderer->createProgram(desc);
+            shaderProgram = renderer->createProgram(desc);
         }
     }
     else
@@ -133,14 +133,14 @@ ShaderProgram* ShaderCompiler::compileProgram(
         int vertexEntryPoint = spAddEntryPointEx(slangRequest, vertexTranslationUnit, vertexEntryPointName, SLANG_STAGE_VERTEX, (int)rawTypeNames.Count(), rawTypeNames.Buffer());
         int fragmentEntryPoint = spAddEntryPointEx(slangRequest, fragmentTranslationUnit, fragmentEntryPointName, SLANG_STAGE_FRAGMENT, (int)rawTypeNames.Count(), rawTypeNames.Buffer());
 
-        int compileErr = spCompile(slangRequest);
+        const SlangResult res = spCompile(slangRequest);
         if (auto diagnostics = spGetDiagnosticOutput(slangRequest))
         {
             // TODO(tfoley): re-enable when I get a logging solution in place
 //            OutputDebugStringA(diagnostics);
             fprintf(stderr, "%s", diagnostics);
         }
-        if (!compileErr)
+        if (SLANG_SUCCEEDED(res))
         {
             size_t vertexCodeSize = 0;
             char const* vertexCode = (char const*) spGetEntryPointCode(slangRequest, vertexEntryPoint, &vertexCodeSize);
@@ -165,7 +165,7 @@ ShaderProgram* ShaderCompiler::compileProgram(
             desc.kernels = &kernelDescs[0];
             desc.kernelCount = kDescCount;
 
-            result = renderer->createProgram(desc);
+            shaderProgram = renderer->createProgram(desc);
         }
     }
     // We clean up the Slang compilation context and result *after*
@@ -175,7 +175,7 @@ ShaderProgram* ShaderCompiler::compileProgram(
     spDestroyCompileRequest(slangRequest);
     spDestroySession(slangSession);
 
-    return result;
+    return shaderProgram;
 }
 
 } // renderer_test

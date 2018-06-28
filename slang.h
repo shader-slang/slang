@@ -418,7 +418,7 @@ extern "C"
         SLANG_COMPILE_FLAG_NO_CODEGEN                = 1 << 4,
 
         /* Deprecated flags: kept around to allow existing applications to
-        compmile. Note that the relevant features will still be left in
+        compile. Note that the relevant features will still be left in
         their default state. */
         SLANG_COMPILE_FLAG_NO_CHECKING = 0,
         SLANG_COMPILE_FLAG_SPLIT_MIXED_TYPES = 0,
@@ -534,7 +534,10 @@ extern "C"
 
     /*! Facilities numbers must be unique across a project to make the resulting result a unique number.
     It can be useful to have a consistent short name for a facility, as used in the name prefix */
-#define SLANG_FACILITY_CORE            SLANG_FACILITY_BASE
+#define SLANG_FACILITY_CORE             SLANG_FACILITY_BASE
+    /* Facility for codes, that are not uniquely defined/protected. Can be used to pass back a specific error without requiring system wide facility uniqueness. Codes
+    should never be part of a public API. */
+#define SLANG_FACILITY_INTERNAL         SLANG_FACILITY_BASE + 1
 
     /// Base for external facilities. Facilities should be unique across modules. 
 #define SLANG_FACILITY_EXTERNAL_BASE 0x210
@@ -635,7 +638,7 @@ extern "C"
     /** A (real or virtual) file system.
 
     Slang can make use of this interface whenever it would otherwise try to load files
-    from disk, allowing applications to hook and/or overide filesystem access from
+    from disk, allowing applications to hook and/or override filesystem access from
     the compiler.
     */
     struct ISlangFileSystem : public ISlangUnknown
@@ -643,7 +646,7 @@ extern "C"
     public:
         /** Load a file from `path` and return a blob of its contents
 
-        @param path The path to load from, as a nul-terminated UTF-8 string.
+        @param path The path to load from, as a null-terminated UTF-8 string.
         @param outBlob A destination pointer to receive the blob of the file contents.
         @returns A `SlangResult` to indicate success or failure in loading the file.
 
@@ -664,7 +667,7 @@ extern "C"
     typedef struct SlangSession SlangSession;
 
     /*!
-    @bref A request for one or more compilation actions to be performed.
+    @brief A request for one or more compilation actions to be performed.
     */
     typedef struct SlangCompileRequest SlangCompileRequest;
 
@@ -731,7 +734,7 @@ extern "C"
         int                     enable);
 
     /*!
-    @brief Set whether (and how) `#line` directives hsould be output.
+    @brief Set whether (and how) `#line` directives should be output.
     */
     SLANG_API void spSetLineDirectiveMode(
         SlangCompileRequest*    request,
@@ -739,15 +742,15 @@ extern "C"
 
     /*!
     @brief Sets the target for code generation.
-    @param ctx The compilation context.
+    @param request The compilation context.
     @param target The code generation target. Possible values are:
     - SLANG_GLSL. Generates GLSL code.
     - SLANG_HLSL. Generates HLSL code.
     - SLANG_SPIRV. Generates SPIR-V code.
-    */
+    */ 
     SLANG_API void spSetCodeGenTarget(
         SlangCompileRequest*    request,
-        int target);
+        SlangCompileTarget target);
 
     /*!
     @brief Add a code-generation target to be used.
@@ -813,8 +816,9 @@ extern "C"
 
     /*!
     @brief Set options using arguments as if specified via command line.
+    @return Returns SlangResult. On success SLANG_SUCCEEDED(result) is true.  
     */
-    SLANG_API int spProcessCommandLineArguments(
+    SLANG_API SlangResult spProcessCommandLineArguments(
         SlangCompileRequest*    request,
         char const* const*      args,
         int                     argCount);
@@ -860,10 +864,10 @@ extern "C"
 
     /** Add a source string to the given translation unit.
 
-    @param request The comile request that owns the translation unit.
+    @param request The compile request that owns the translation unit.
     @param translationUnitIndex The index of the translation unit to add source to.
     @param path The file-system path that should be assumed for the source code.
-    @param source A nul-terminated UTF-8 encoded string of source code.
+    @param source A null-terminated UTF-8 encoded string of source code.
 
     The implementation will make a copy of the source code data.
     An application may free the buffer immediately after this call returns.
@@ -881,7 +885,7 @@ extern "C"
 
     /** Add a source string to the given translation unit.
 
-    @param request The comile request that owns the translation unit.
+    @param request The compile request that owns the translation unit.
     @param translationUnitIndex The index of the translation unit to add source to.
     @param path The file-system path that should be assumed for the source code.
     @param sourceBegin A pointer to a buffer of UTF-8 encoded source code.
@@ -903,7 +907,7 @@ extern "C"
 
     /** Add a blob of source code to the given translation unit.
 
-    @param request The comile request that owns the translation unit.
+    @param request The compile request that owns the translation unit.
     @param translationUnitIndex The index of the translation unit to add source to.
     @param path The file-system path that should be assumed for the source code.
     @param sourceBlob A blob containing UTF-8 encoded source code.
@@ -951,18 +955,18 @@ extern "C"
 
     /** Execute the compilation request.
 
-    Returns zero on success, non-zero on failure.
+    @returns  SlangResult, SLANG_OK on success. Use SLANG_SUCCEEDED() and SLANG_FAILED() to test SlangResult.
     */
-    SLANG_API int spCompile(
+    SLANG_API SlangResult spCompile(
         SlangCompileRequest*    request);
 
 
     /** Get any diagnostic messages reported by the compiler.
 
-    @returns A nul-terminated UTF-8 encoded string of diagnostic messages.
+    @returns A null-terminated UTF-8 encoded string of diagnostic messages.
 
     The returned pointer is only guaranteed to be valid
-    until `reqeust` is destroyed. Applications that wish to
+    until `request` is destroyed. Applications that wish to
     hold on to the diagnostic output for longer should use
     `spGetDiagnosticOutputBlob`.
     */
@@ -990,14 +994,14 @@ extern "C"
     spGetDependencyFileCount(
         SlangCompileRequest*    request);
 
-    /** Get the path to a file this compilation dependend on.
+    /** Get the path to a file this compilation depended on.
     */
     SLANG_API char const*
     spGetDependencyFilePath(
         SlangCompileRequest*    request,
         int                     index);
 
-    /** Get the number of tranlsation units associated with the compilation request
+    /** Get the number of translation units associated with the compilation request
     */
     SLANG_API int
     spGetTranslationUnitCount(

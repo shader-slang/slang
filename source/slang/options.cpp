@@ -12,28 +12,29 @@
 
 namespace Slang {
 
-char const* tryReadCommandLineArgumentRaw(char const* option, char const* const**ioCursor, char const* const*end)
+SlangResult tryReadCommandLineArgumentRaw(char const* option, char const* const**ioCursor, char const* const*end, char const** argOut)
 {
+    *argOut = nullptr;
     char const* const*& cursor = *ioCursor;
     if (cursor == end)
     {
         fprintf(stderr, "expected an argument for command-line option '%s'", option);
-        exit(1);
+        return SLANG_FAIL;
     }
     else
     {
-        return *cursor++;
+        *argOut = *cursor++;
+        return SLANG_OK;
     }
 }
 
-String tryReadCommandLineArgument(char const* option, char const* const**ioCursor, char const* const*end)
+SlangResult tryReadCommandLineArgument(char const* option, char const* const**ioCursor, char const* const*end, String& argOut)
 {
-    return String(tryReadCommandLineArgumentRaw(option, ioCursor, end));
+    const char* arg;
+    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgumentRaw(option, ioCursor, end, &arg));
+    argOut = arg;
+    return SLANG_OK;
 }
-
-
-
-
 
 struct OptionsParser
 {
@@ -144,7 +145,7 @@ struct OptionsParser
             path.begin());
     }
 
-    void addInputPath(
+    SlangResult addInputPath(
         char const*  inPath)
     {
         inputPathCount++;
@@ -182,8 +183,9 @@ struct OptionsParser
         else
         {
             fprintf(stderr, "error: can't deduce language for input file '%s'\n", inPath);
-            exit(1);
+            return SLANG_FAIL;
         }
+        return SLANG_OK;
     }
 
     void addOutputPath(
@@ -237,7 +239,7 @@ struct OptionsParser
         }
     }
 
-    int parse(
+    SlangResult parse(
         int             argc,
         char const* const*  argv)
     {
@@ -292,7 +294,9 @@ struct OptionsParser
                 }
                 else if (argStr == "-backend" || argStr == "-target")
                 {
-                    String name = tryReadCommandLineArgument(arg, &argCursor, argEnd);
+                    String name;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(arg, &argCursor, argEnd, name));
+
                     SlangCompileTarget target = SLANG_TARGET_UNKNOWN;
 
                     if (name == "glsl")
@@ -337,7 +341,7 @@ struct OptionsParser
                     else
                     {
                         fprintf(stderr, "unknown code generation target '%S'\n", name.ToWString().begin());
-                        exit(1);
+                        return SLANG_FAIL;
                     }
 
                     this->chosenTarget = target;
@@ -347,7 +351,8 @@ struct OptionsParser
                 // of capability required by the program.
                 else if (argStr == "-profile")
                 {
-                    String name = tryReadCommandLineArgument(arg, &argCursor, argEnd);
+                    String name;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(arg, &argCursor, argEnd, name));
 
                     SlangProfileID profileID = spFindProfile(session, name.begin());
                     if( profileID == SLANG_PROFILE_UNKNOWN )
@@ -362,7 +367,8 @@ struct OptionsParser
                 }
                 else if (argStr == "-entry")
                 {
-                    String name = tryReadCommandLineArgument(arg, &argCursor, argEnd);
+                    String name;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(arg, &argCursor, argEnd, name));
 
                     RawEntryPoint entry;
                     entry.name = name;
@@ -384,7 +390,9 @@ struct OptionsParser
 #if 0
                 else if (argStr == "-stage")
                 {
-                    String name = tryReadCommandLineArgument(arg, &argCursor, argEnd);
+                    String name;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(arg, &argCursor, argEnd, name));
+
                     StageTarget stage = StageTarget::Unknown;
                     if (name == "vertex") { stage = StageTarget::VertexShader; }
                     else if (name == "fragment") { stage = StageTarget::FragmentShader; }
@@ -400,7 +408,9 @@ struct OptionsParser
 #endif
                 else if (argStr == "-pass-through")
                 {
-                    String name = tryReadCommandLineArgument(arg, &argCursor, argEnd);
+                    String name;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(arg, &argCursor, argEnd, name));
+
                     SlangPassThrough passThrough = SLANG_PASS_THROUGH_NONE;
                     if (name == "fxc") { passThrough = SLANG_PASS_THROUGH_FXC; }
                     else if (name == "dxc") { passThrough = SLANG_PASS_THROUGH_DXC; }
@@ -408,7 +418,7 @@ struct OptionsParser
                     else
                     {
                         fprintf(stderr, "unknown pass-through target '%S'\n", name.ToWString().begin());
-                        exit(1);
+                        return SLANG_FAIL;
                     }
 
                     spSetPassThrough(
@@ -427,7 +437,7 @@ struct OptionsParser
                     if (defineStr[0] == 0)
                     {
                         // Need to read another argument from the command line
-                        defineStr = tryReadCommandLineArgumentRaw(arg, &argCursor, argEnd);
+                        SLANG_RETURN_ON_FAIL(tryReadCommandLineArgumentRaw(arg, &argCursor, argEnd, &defineStr));
                     }
                     // The string that sets up the define can have an `=` between
                     // the name to be defined and its value, so we search for one.
@@ -473,7 +483,7 @@ struct OptionsParser
                     if (includeDirStr[0] == 0)
                     {
                         // Need to read another argument from the command line
-                        includeDirStr = tryReadCommandLineArgumentRaw(arg, &argCursor, argEnd);
+                        SLANG_RETURN_ON_FAIL(tryReadCommandLineArgumentRaw(arg, &argCursor, argEnd, &includeDirStr));
                     }
 
                     spAddSearchPath(
@@ -484,8 +494,8 @@ struct OptionsParser
                 // A `-o` option is used to specify a desired output file.
                 else if (argStr == "-o")
                 {
-                    char const* outputPath = tryReadCommandLineArgumentRaw(
-                        arg, &argCursor, argEnd);
+                    char const* outputPath = nullptr;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgumentRaw(arg, &argCursor, argEnd, &outputPath));
                     if (!outputPath) continue;
 
                     addOutputPath(outputPath);
@@ -504,7 +514,7 @@ struct OptionsParser
                     // and treat the rest of the command line as input file names:
                     while (argCursor != argEnd)
                     {
-                        addInputPath(*argCursor++);
+                        SLANG_RETURN_ON_FAIL(addInputPath(*argCursor++));
                     }
                     break;
                 }
@@ -512,12 +522,12 @@ struct OptionsParser
                 {
                     fprintf(stderr, "unknown command-line option '%S'\n", argStr.ToWString().begin());
                     // TODO: print a usage message
-                    exit(1);
+                    return SLANG_FAIL;
                 }
             }
             else
             {
-                addInputPath(arg);
+                SLANG_RETURN_ON_FAIL(addInputPath(arg));
             }
         }
 
@@ -529,14 +539,14 @@ struct OptionsParser
         if (inputPathCount == 0)
         {
             fprintf(stderr, "error: no input file specified\n");
-            exit(1);
+            return SLANG_E_INVALID_ARG; 
         }
 
         // No point in moving forward if there is nothing to compile
         if( translationUnitCount == 0 )
         {
             fprintf(stderr, "error: no compilation requested\n");
-            exit(1);
+            return SLANG_FAIL; 
         }
 #endif
 
@@ -599,7 +609,7 @@ struct OptionsParser
                 && currentProfileID == SLANG_PROFILE_UNKNOWN)
             {
                 fprintf(stderr, "error: no profile specified; use the '-profile <profile name>' option\n");
-                exit(1);
+                return SLANG_E_INVALID_ARG;
             }
             // Issue an error if we have mulitple `-profile` options *and*
             // there were entry points that didn't get a profile, *and*
@@ -610,7 +620,7 @@ struct OptionsParser
                 if (rawEntryPoints.Count() > 1)
                 {
                     fprintf(stderr, "error: when multiple entry points are specified, each must have a profile given (with '-profile') before the '-entry' option\n");
-                    exit(1);
+                    return SLANG_E_INVALID_ARG;
                 }
             }
             // TODO: need to issue an error on a `-profile` option that doesn't actually
@@ -748,7 +758,7 @@ struct OptionsParser
             }
         }
 
-        // If the user specifed and per-compilation-target flags, make sure
+        // If the user specified and per-compilation-target flags, make sure
         // to apply them here.
         if(targetFlags)
         {
@@ -781,7 +791,7 @@ struct OptionsParser
             if( anyEntryPointWithoutTranslationUnit && translationUnitCount != 1 )
             {
                 fprintf(stderr, "error: when using multiple translation units, entry points must be specified after their translation unit file(s)\n");
-                exit(1);
+                return SLANG_FAIL;
             }
 
             // Now place all those entry points where they belong
@@ -815,15 +825,12 @@ struct OptionsParser
         }
 #endif
 
-        if (requestImpl->mSink.GetErrorCount() != 0)
-            return 1;
-
-        return 0;
+        return (requestImpl->mSink.GetErrorCount() == 0) ? SLANG_OK : SLANG_FAIL;
     }
 };
 
 
-int parseOptions(
+SlangResult parseOptions(
     SlangCompileRequest*    compileRequest,
     int                     argc,
     char const* const*      argv)
@@ -837,7 +844,7 @@ int parseOptions(
 
 } // namespace Slang
 
-SLANG_API int spProcessCommandLineArguments(
+SLANG_API SlangResult spProcessCommandLineArguments(
     SlangCompileRequest*    request,
     char const* const*      args,
     int                     argCount)

@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include <slang.h>
+#include <slang-com-helper.h>
 
 struct PrettyWriter
 {
@@ -854,10 +855,17 @@ void emitReflectionJSON(
     emitReflectionJSON(writer, programReflection);
 }
 
+static SlangResult maybeDumpDiagnostic(SlangResult res, SlangCompileRequest* request)
+{
+    const char* diagnostic;
+    if (SLANG_FAILED(res) && (diagnostic = spGetDiagnosticOutput(request)))
+    {
+        fputs(diagnostic, stderr);
+    }
+    return res;
+}
 
-int main(
-    int argc,
-    char** argv)
+static SlangResult innerMain(int argc, char*const*argv)
 {
     // Parse any command-line options
 
@@ -865,22 +873,10 @@ int main(
     SlangCompileRequest* request = spCreateCompileRequest(session);
 
     char const* appName = "slang-reflection-test";
-    if(argc > 0) appName = argv[0];
+    if (argc > 0) appName = argv[0];
 
-    int err = spProcessCommandLineArguments(request, &argv[1], argc - 1);
-    if( err )
-    {
-        char const* output = spGetDiagnosticOutput(request);
-        fputs(output, stderr);
-        exit(1);
-    }
-
-    if( spCompile(request) != 0 )
-    {
-        char const* output = spGetDiagnosticOutput(request);
-        fputs(output, stderr);
-        exit(1);
-    }
+    SLANG_RETURN_ON_FAIL(maybeDumpDiagnostic(spProcessCommandLineArguments(request, &argv[1], argc - 1), request));
+    SLANG_RETURN_ON_FAIL(maybeDumpDiagnostic(spCompile(request), request));
 
     // Okay, let's go through and emit reflection info on whatever
     // we have.
@@ -891,5 +887,13 @@ int main(
     spDestroyCompileRequest(request);
     spDestroySession(session);
 
-    return 0;
+    return SLANG_OK;
+}
+
+int main(
+    int argc,
+    char** argv)
+{
+    SlangResult res = innerMain(argc, argv);
+    return SLANG_FAILED(res) ? 1 : 0;
 }
