@@ -462,7 +462,7 @@ static SourceLanguage inferSourceLanguage(CompileRequest* request)
     return language;
 }
 
-int CompileRequest::executeActionsInner()
+SlangResult CompileRequest::executeActionsInner()
 {
     // Do some cleanup on settings specified by user.
     // In particular, we want to propagate flags from the overall request down to
@@ -510,7 +510,7 @@ int CompileRequest::executeActionsInner()
 
             case SourceLanguage::GLSL:
                 mSink.diagnose(SourceLoc(), Diagnostics::glslIsNotSupported);
-                return 1;
+                return SLANG_FAIL;
             }
         }
 
@@ -521,12 +521,12 @@ int CompileRequest::executeActionsInner()
             parseTranslationUnit(translationUnit.Ptr());
         }
         if (mSink.GetErrorCount() != 0)
-            return 1;
+            return SLANG_FAIL;
 
         // Perform semantic checking on the whole collection
         checkAllTranslationUnits();
         if (mSink.GetErrorCount() != 0)
-            return 1;
+            return SLANG_FAIL;
 
         if ((compileFlags & SLANG_COMPILE_FLAG_NO_CODEGEN) == 0)
         {
@@ -536,18 +536,18 @@ int CompileRequest::executeActionsInner()
         }
 
         if (mSink.GetErrorCount() != 0)
-            return 1;
+            return SLANG_FAIL;
 
         // For each code generation target generate
         // parameter binding information.
-        // This step is done globaly, because all translation
+        // This step is done globally, because all translation
         // units and entry points need to agree on where
         // parameters are allocated.
         for (auto targetReq : targets)
         {
             generateParameterBindings(targetReq);
             if (mSink.GetErrorCount() != 0)
-                return 1;
+                return SLANG_FAIL;
         }
     }
 
@@ -555,24 +555,22 @@ int CompileRequest::executeActionsInner()
     // Note: this is a debugging option.
     if (shouldSkipCodegen ||
         ((compileFlags & SLANG_COMPILE_FLAG_NO_CODEGEN) != 0))
-        return 0;
+        return SLANG_OK;
 
     // Generate output code, in whatever format was requested
     generateOutput(this);
     if (mSink.GetErrorCount() != 0)
-        return 1;
+        return SLANG_FAIL;
 
-    return 0;
+    return SLANG_OK;
 }
 
 // Act as expected of the API-based compiler
-int CompileRequest::executeActions()
+SlangResult CompileRequest::executeActions()
 {
-    int err = executeActionsInner();
-
+    SlangResult res = executeActionsInner();
     mDiagnosticOutput = mSink.outputBuffer.ProduceString();
-
-    return err;
+    return res;
 }
 
 int CompileRequest::addTranslationUnit(SourceLanguage language, String const&)
@@ -903,8 +901,8 @@ void Session::addBuiltinSource(
         path,
         source);
 
-    int err = compileRequest->executeActions();
-    if (err)
+    SlangResult res = compileRequest->executeActions();
+    if (SLANG_FAILED(res))
     {
         fprintf(stderr, "%s", compileRequest->mDiagnosticOutput.Buffer());
 
@@ -1063,7 +1061,7 @@ SLANG_API void spSetCommandLineCompilerMode(
 
 SLANG_API void spSetCodeGenTarget(
         SlangCompileRequest*    request,
-        int target)
+        SlangCompileTarget target)
 {
     auto req = REQ(request);
     req->targets.Clear();
@@ -1330,7 +1328,7 @@ SLANG_API int spAddEntryPointEx(
 
 
 // Compile in a context that already has its translation units specified
-SLANG_API int spCompile(
+SLANG_API SlangResult spCompile(
     SlangCompileRequest*    request)
 {
     auto req = REQ(request);
@@ -1345,16 +1343,16 @@ SLANG_API int spCompile(
     //
     // TODO: Consider supporting Windows "Structured Exception Handling"
     // so that we can also recover from a wider class of crashes.
-    int anyErrors = 1;
+    SlangResult res = SLANG_FAIL; 
     try
     {
-        anyErrors = req->executeActions();
+        res = req->executeActions();
     }
     catch (Slang::AbortCompilationException&)
     {
-        // This situation indicates a fatal (but not necesarily internal) error
+        // This situation indicates a fatal (but not necessarily internal) error
         // that forced compilation to terminate. There should already have been
-        // a diagnositc produced, so we don't need to add one here.
+        // a diagnostic produced, so we don't need to add one here.
     }
     catch (Slang::Exception& e)
     {
@@ -1373,13 +1371,12 @@ SLANG_API int spCompile(
         req->mSink.diagnose(Slang::SourceLoc(), Slang::Diagnostics::compilationAborted);
     }
     req->mDiagnosticOutput = req->mSink.outputBuffer.ProduceString();
-    return anyErrors;
+    return res;
 #else
     // When debugging, we probably don't want to filter out any errors, since
     // we are probably trying to root-cause and *fix* those errors.
     {
-        int anyErrors = req->executeActions();
-        return anyErrors;
+        return req->executeActions();
     }
 #endif
 }

@@ -26,7 +26,10 @@ static void diagnosticCallback(
 #define MAIN main
 #endif
 
-int MAIN(int argc, char** argv)
+// Used to identify that compilation was the failure - with a unique 'internal' code
+#define SLANG_E_INTERNAL_COMPILE_FAILED SLANG_MAKE_ERROR(SLANG_FACILITY_INTERNAL, 0x7fab)
+
+static SlangResult innerMain(int argc, char** argv)
 {
     // Parse any command-line options
 
@@ -41,16 +44,16 @@ int MAIN(int argc, char** argv)
     spSetCommandLineCompilerMode(compileRequest);
 
     char const* appName = "slangc";
-    if(argc > 0) appName = argv[0];
+    if (argc > 0) appName = argv[0];
 
-    int err = spProcessCommandLineArguments(compileRequest, &argv[1], argc - 1);
-    if( err )
     {
-        // TODO: print usage message
-        exit(1);
+        const SlangResult res = spProcessCommandLineArguments(compileRequest, &argv[1], argc - 1);
+        if (SLANG_FAILED(res))
+        {
+            // TODO: print usage message
+            return res;
+        }
     }
-
-    // Invoke the compiler
 
 #ifndef _DEBUG
     try
@@ -58,11 +61,11 @@ int MAIN(int argc, char** argv)
     {
         // Run the compiler (this will produce any diagnostics through
         // our callback above).
-        int result = spCompile(compileRequest);
-        if( result != 0 )
+        if (SLANG_FAILED(spCompile(compileRequest)))
         {
             // If the compilation failed, then get out of here...
-            exit(-1);
+            // Turn into an internal Result -> such that return code can be used to vary result to match previous behavior
+            return SLANG_E_INTERNAL_COMPILE_FAILED;
         }
 
         // Now that we are done, clean up after ourselves
@@ -74,11 +77,25 @@ int MAIN(int argc, char** argv)
     catch (Exception & e)
     {
         printf("internal compiler error: %S\n", e.Message.ToWString().begin());
-        return 1;
+        return SLANG_FAIL;
     }
 #endif
+    return SLANG_OK;    
+}
 
-    return 0;
+int MAIN(int argc, char** argv)
+{
+    SlangResult res =  innerMain(argc, argv);
+
+    if (SLANG_SUCCEEDED(res))
+    {
+        return 0;
+    }
+    else if (res == SLANG_E_INTERNAL_COMPILE_FAILED)
+    {
+        return -1;
+    }
+    return 1;
 }
 
 #ifdef _WIN32

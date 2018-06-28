@@ -3,6 +3,7 @@
 // In order to use the Slang API, we need to include its header
 
 #include <slang.h>
+#include <slang-com-helper.h>
 
 // We will be rendering with Direct3D 11, so we need to include
 // the Windows and D3D11 headers
@@ -67,6 +68,17 @@ ID3DBlob* compileHLSLShader(
     char const* entryPointName,
     char const* dxProfileName);
 
+static SlangResult maybeDumpDiagnostic(SlangResult res, SlangCompileRequest* request)
+{
+    const char* diagnostics;
+    if (SLANG_FAILED(res) && (diagnostics = spGetDiagnosticOutput(request)))
+    {
+        OutputDebugStringA(diagnostics);
+        fprintf(stderr, "%s", diagnostics);
+    }
+    return res;
+}
+
 //
 // At initialization time, we are going to load and compile our Slang shader
 // code, and then create the D3D11 API objects we need for rendering.
@@ -102,16 +114,7 @@ HRESULT initialize( ID3D11Device* dxDevice )
     int vertexIndex = spAddEntryPoint(slangRequest, translationUnitIndex, vertexEntryPointName,   spFindProfile(slangSession, vertexProfileName));
     int fragmentIndex = spAddEntryPoint(slangRequest, translationUnitIndex, fragmentEntryPointName, spFindProfile(slangSession, fragmentProfileName));
 
-    int compileErr = spCompile(slangRequest);
-    if(auto diagnostics = spGetDiagnosticOutput(slangRequest))
-    {
-        OutputDebugStringA(diagnostics);
-        fprintf(stderr, "%s", diagnostics);
-    }
-    if(compileErr)
-    {
-        return E_FAIL;
-    }
+    SLANG_RETURN_ON_FAIL(maybeDumpDiagnostic(spCompile(slangRequest), slangRequest));
 
     char const* vertexCode = spGetEntryPointSource(slangRequest, vertexIndex);
     char const* fragmentCode = spGetEntryPointSource(slangRequest, fragmentIndex);
@@ -121,10 +124,10 @@ HRESULT initialize( ID3D11Device* dxDevice )
 
     // Compile the generated HLSL code
     ID3DBlob* dxVertexShaderBlob = compileHLSLShader(vertexCode, vertexEntryPointName, vertexProfileName);
-    if(!dxVertexShaderBlob) return E_FAIL;
+    if(!dxVertexShaderBlob) return SLANG_FAIL;
 
     ID3DBlob* dxPixelShaderBlob = compileHLSLShader(fragmentCode, fragmentEntryPointName, fragmentProfileName);
-    if(!dxPixelShaderBlob) return E_FAIL;
+    if(!dxPixelShaderBlob) return SLANG_FAIL;
 
     HRESULT hr = S_OK;
 
@@ -135,11 +138,7 @@ HRESULT initialize( ID3D11Device* dxDevice )
     dxConstantBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
     dxConstantBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
-    hr = dxDevice->CreateBuffer(
-        &dxConstantBufferDesc,
-        NULL,
-        &dxConstantBuffer);
-    if(FAILED(hr)) return hr;
+    SLANG_RETURN_ON_FAIL(dxDevice->CreateBuffer(&dxConstantBufferDesc, NULL, &dxConstantBuffer));
 
     // We clean up the Slang compilation context and result *after*
     // we have done the HLSL-to-bytecode compilation, because Slang
@@ -159,13 +158,12 @@ HRESULT initialize( ID3D11Device* dxDevice )
         {"A", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(Vertex, position), D3D11_INPUT_PER_VERTEX_DATA, 0 },
         {"A", 1, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(Vertex, color), D3D11_INPUT_PER_VERTEX_DATA, 0 },
     };
-    hr = dxDevice->CreateInputLayout(
+    SLANG_RETURN_ON_FAIL(dxDevice->CreateInputLayout(
         &dxInputElements[0],
         2,
         dxVertexShaderBlob->GetBufferPointer(),
         dxVertexShaderBlob->GetBufferSize(),
-        &dxInputLayout);
-    if(FAILED(hr)) return hr;
+        &dxInputLayout));
 
     D3D11_BUFFER_DESC dxVertexBufferDesc = { 0 };
     dxVertexBufferDesc.ByteWidth = kVertexCount * sizeof(Vertex);
@@ -175,11 +173,7 @@ HRESULT initialize( ID3D11Device* dxDevice )
     D3D11_SUBRESOURCE_DATA dxVertexBufferInitData = { 0 };
     dxVertexBufferInitData.pSysMem = &kVertexData[0];
 
-    hr = dxDevice->CreateBuffer(
-        &dxVertexBufferDesc,
-        &dxVertexBufferInitData,
-        &dxVertexBuffer);
-    if(FAILED(hr)) return hr;
+    SLANG_RETURN_ON_FAIL(dxDevice->CreateBuffer(&dxVertexBufferDesc, &dxVertexBufferInitData, &dxVertexBuffer));
 
     // Vertex Shader (VS)
 
@@ -193,7 +187,7 @@ HRESULT initialize( ID3D11Device* dxDevice )
 
     // Pixel Shader (PS)
 
-    hr = dxDevice->CreatePixelShader(
+    dxDevice->CreatePixelShader(
         dxPixelShaderBlob->GetBufferPointer(),
         dxPixelShaderBlob->GetBufferSize(),
         NULL,
@@ -202,7 +196,7 @@ HRESULT initialize( ID3D11Device* dxDevice )
     if(FAILED(hr)) return hr;
 #endif
 
-    return S_OK;
+    return SLANG_OK;
 }
 
 void renderFrame(ID3D11DeviceContext* dxContext)
@@ -277,14 +271,14 @@ ID3DBlob* compileHLSLShader(
         if(!d3dcompiler)
         {
             fprintf(stderr, "error: failed load 'd3dcompiler_47.dll'\n");
-            exit(1);
+            return nullptr; 
         }
 
         D3DCompile_ = (pD3DCompile)GetProcAddress(d3dcompiler, "D3DCompile");
         if( !D3DCompile_ )
         {
             fprintf(stderr, "error: failed load symbol 'D3DCompile'\n");
-            exit(1);
+            return nullptr; 
         }
     }
 
@@ -350,19 +344,14 @@ static LRESULT CALLBACK windowProc(
     return DefWindowProcW(windowHandle, message, wParam, lParam);
 }
 
-//
-// Our `WinMain` handles the basic task of getting a window and rendering
-// context up and running. There should be nothing suprising or interesting
-// here.
-//
-
-int WINAPI WinMain(
+static SlangResult innerWinMain(
     HINSTANCE instance,
     HINSTANCE /* prevInstance */,
     LPSTR     /* commandLine */,
-    int       showCommand)
+    int       showCommand, 
+    int* exitCodeOut)
 {
-    // First we register a window class.
+    *exitCodeOut = 0;
 
     WNDCLASSEXW windowClassDesc;
     windowClassDesc.cbSize = sizeof(windowClassDesc);
@@ -378,10 +367,10 @@ int WINAPI WinMain(
     windowClassDesc.lpszClassName = L"HelloWorld";
     windowClassDesc.hIconSm = 0;
     ATOM windowClassAtom = RegisterClassExW(&windowClassDesc);
-    if(!windowClassAtom)
+    if (!windowClassAtom)
     {
         fprintf(stderr, "error: failed to register window class\n");
-        return 1;
+        return SLANG_FAIL;
     }
 
     // Next, we create a window using that window class.
@@ -400,31 +389,29 @@ int WINAPI WinMain(
         NULL, // menu
         instance,
         NULL);
-    if(!windowHandle)
+    if (!windowHandle)
     {
         fprintf(stderr, "error: failed to create window\n");
-        return 1;
+        return SLANG_FAIL;
     }
 
-
     // Rather than statically link against D3D, we load it dynamically.
-
     HMODULE d3d11 = LoadLibraryA("d3d11.dll");
-    if(!d3d11)
+    if (!d3d11)
     {
         fprintf(stderr, "error: failed load 'd3d11.dll'\n");
-        return 1;
+        return SLANG_FAIL;
     }
 
     PFN_D3D11_CREATE_DEVICE_AND_SWAP_CHAIN D3D11CreateDeviceAndSwapChain_ =
         (PFN_D3D11_CREATE_DEVICE_AND_SWAP_CHAIN)GetProcAddress(
             d3d11,
             "D3D11CreateDeviceAndSwapChain");
-    if(!D3D11CreateDeviceAndSwapChain_)
+    if (!D3D11CreateDeviceAndSwapChain_)
     {
         fprintf(stderr,
             "error: failed load symbol 'D3D11CreateDeviceAndSwapChain'\n");
-        return 1;
+        return SLANG_FAIL;
     }
 
     // We create our device in debug mode, just so that we can check that the
@@ -469,7 +456,7 @@ int WINAPI WinMain(
     ID3D11Device* dxDevice = NULL;
     ID3D11DeviceContext* dxImmediateContext = NULL;
     HRESULT hr = S_OK;
-    for( int ii = 0; ii < 2; ++ii )
+    for (int ii = 0; ii < 2; ++ii)
     {
         hr = D3D11CreateDeviceAndSwapChain_(
             NULL,                    // adapter (use default)
@@ -487,14 +474,11 @@ int WINAPI WinMain(
 
         // Failures with `E_INVALIDARG` might be due to feature level 11_1
         // not being supported. Other failures are real, though.
-        if( hr != E_INVALIDARG )
+        if (hr != E_INVALIDARG)
             break;
     }
-    if( FAILED(hr) )
-    {
-        return 1;
-    }
-
+    SLANG_RETURN_ON_FAIL(hr);
+    
     // After we've created the swap chain, we can request a pointer to the
     // back buffer as a D3D11 texture, and create a render-target view from it.
 
@@ -525,25 +509,21 @@ int WINAPI WinMain(
     D3D11_VIEWPORT dxViewport;
     dxViewport.TopLeftX = 0;
     dxViewport.TopLeftY = 0;
-    dxViewport.Width = (float) gWindowWidth;
-    dxViewport.Height = (float) gWindowHeight;
+    dxViewport.Width = (float)gWindowWidth;
+    dxViewport.Height = (float)gWindowHeight;
     dxViewport.MaxDepth = 1; // TODO(tfoley): use reversed depth
     dxViewport.MinDepth = 0;
     dxImmediateContext->RSSetViewports(1, &dxViewport);
 
     // Once we've done the general-purpose initialization, we
     // initialize anything specific to the "hello world" application
-    hr = initialize( dxDevice );
-    if( FAILED(hr) )
-    {
-        exit(1);
-    }
+    SLANG_RETURN_ON_FAIL(initialize(dxDevice));
 
     // Once initialization is all complete, we show the window...
     ShowWindow(windowHandle, showCommand);
 
     // ... and enter the event loop:
-    for(;;)
+    for (;;)
     {
         MSG message;
 
@@ -552,7 +532,8 @@ int WINAPI WinMain(
         {
             if (message.message == WM_QUIT)
             {
-                return (int)message.wParam;
+                *exitCodeOut = (int)message.wParam;
+                return SLANG_OK;
             }
 
             TranslateMessage(&message);
@@ -568,11 +549,29 @@ int WINAPI WinMain(
                 dxBackBufferRTV,
                 kClearColor);
 
-            renderFrame( dxImmediateContext );
+            renderFrame(dxImmediateContext);
 
             dxSwapChain->Present(0, 0);
         }
     }
+}
 
-    return 0;
+
+//
+// Our `WinMain` handles the basic task of getting a window and rendering
+// context up and running. There should be nothing surprising or interesting
+// here.
+//
+
+int WINAPI WinMain(
+    HINSTANCE instance,
+    HINSTANCE prevInstance,
+    LPSTR     commandLine,
+    int       showCommand)
+{
+    // First we register a window class.
+    int exitCode = 0;
+    SlangResult res = innerWinMain(instance, prevInstance, commandLine, showCommand, &exitCode);
+
+    return SLANG_FAILED(res) ? 1 : exitCode;
 }
