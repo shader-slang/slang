@@ -9,6 +9,8 @@
 
 namespace renderer_test {
 
+using namespace slang_graphics;
+
 struct Options
 {
     enum
@@ -25,7 +27,7 @@ struct Options
         // Raw HLSL or GLSL input, bypassing Slang
         Native,
     };
-   
+
 
     enum class ShaderProgramType
     {
