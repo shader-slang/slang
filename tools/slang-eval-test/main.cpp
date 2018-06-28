@@ -6,9 +6,7 @@
 #include "../../source/core/secure-crt.h"
 #include <slang.h>
 
-int main(
-    int argc,
-    char** argv)
+static SlangResult innerMain(int argc, char*const* argv)
 {
     // TODO: parse arguments
 
@@ -24,7 +22,7 @@ int main(
     size_t inputSize = ftell(inputFile);
     fseek(inputFile, 0, SEEK_SET);
 
-    char* inputText = (char*) malloc(inputSize + 1);
+    char* inputText = (char*)malloc(inputSize + 1);
     fread(inputText, inputSize, 1, inputFile);
     inputText[inputSize] = 0;
     fclose(inputFile);
@@ -59,11 +57,11 @@ int main(
         "main",
         spFindProfile(session, "cs_5_0"));
 
-    if( spCompile(request) != 0 )
+    if (SLANG_FAILED(spCompile(request)))
     {
         char const* output = spGetDiagnosticOutput(request);
         fputs(output, stderr);
-        exit(1);
+        return SLANG_FAIL;
     }
 
     // Things compiled, so now we need to run them...
@@ -129,5 +127,13 @@ int main(
     spDestroyCompileRequest(request);
     spDestroySession(session);
 
-    return 0;
+    return SLANG_OK;
+}
+
+int main(
+    int argc,
+    char** argv)
+{
+    SlangResult res = innerMain(argc, argv);
+    return SLANG_FAILED(res) ? 1 : 0;
 }
