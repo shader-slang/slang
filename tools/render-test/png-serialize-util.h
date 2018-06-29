@@ -2,10 +2,12 @@
 #pragma once
 
 #include "surface.h"
-    
+
 namespace renderer_test {
 
-struct PngSerializeUtil 
+using namespace slang_graphics;
+
+struct PngSerializeUtil
 {
     static Slang::Result write(const char* filename, const Surface& surface);
 

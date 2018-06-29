@@ -266,6 +266,8 @@ end
 --
 example "hello"
     uuid "E6385042-1649-4803-9EBD-168F8B7EF131"
+    includedirs { ".", "tools" }
+    links { "core", "slang-graphics" }
 --
 -- Note how we are calling our custom `example()` subroutine with
 -- the same syntax sugar that Premake usually advocates for their
@@ -299,7 +301,6 @@ standardProject "core"
     --
     warnings "Extra"
     flags { "FatalWarnings" }
-
 
 --
 -- `slang-generate` is a tool we use for source code generation on
@@ -363,8 +364,8 @@ tool "slang-eval-test"
 
 tool "render-test"
     uuid "96610759-07B9-4EEB-A974-5C634A2E742B"
-    includedirs { ".", "external", "source" }
-    links { "core", "slang" }
+    includedirs { ".", "external", "source", "tools/slang-graphics" }
+    links { "core", "slang", "slang-graphics" }
     filter { "system:windows" }
 
         systemversion "10.0.14393.0"
@@ -373,6 +374,31 @@ tool "render-test"
         -- dxcompiler.dll, and dxil.dll from the Windows SDK redistributable
         -- directory into the output directory.
         postbuildcommands { '"$(SolutionDir)tools\\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/%{cfg.platform:lower()}/" "%{cfg.targetdir}/"'}
+
+--
+-- `slang-graphics` is a utility library for doing GPU rendering
+-- and compute, which is used by both our testing and exmaples.
+-- It depends on teh `core` library, so we need to declare that:
+--
+
+tool "slang-graphics"
+    uuid "222F7498-B40C-4F3F-A704-DDEB91A4484A"
+    -- Unlike most of the code under `tools/`, this is a library
+    -- rather than a stand-alone executable.
+    kind "StaticLib"
+
+    includedirs { ".", "external", "source" }
+
+    filter { "system:windows" }
+
+        systemversion "10.0.14393.0"
+
+        -- For Windows targets, we want to copy d3dcompiler_47.dll,
+        -- dxcompiler.dll, and dxil.dll from the Windows SDK redistributable
+        -- directory into the output directory.
+        postbuildcommands { '"$(SolutionDir)tools\\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/%{cfg.platform:lower()}/" "%{cfg.targetdir}/"'}
+
+
 
 --
 -- The `slangc` command-line application is just a very thin wrapper

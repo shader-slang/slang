@@ -9,37 +9,10 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="circular-resource-heap-d3d12.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="d3d-util.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="descriptor-heap-d3d12.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="options.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="png-serialize-util.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="render-d3d11.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="render-d3d12.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="render-gl.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="render-vk.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="render.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="resource-d3d12.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="shader-input-layout.h">
@@ -51,38 +24,8 @@
     <ClInclude Include="slang-support.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="surface.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="vk-api.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="vk-device-queue.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="vk-module.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="vk-swap-chain.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="vk-util.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="window.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="circular-resource-heap-d3d12.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="d3d-util.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="descriptor-heap-d3d12.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -92,24 +35,6 @@
     <ClCompile Include="png-serialize-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="render-d3d11.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="render-d3d12.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="render-gl.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="render-vk.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="render.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="resource-d3d12.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="shader-input-layout.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -117,24 +42,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-support.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="surface.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="vk-api.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="vk-device-queue.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="vk-module.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="vk-swap-chain.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="vk-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

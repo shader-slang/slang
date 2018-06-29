@@ -7,6 +7,8 @@
 
 namespace renderer_test {
 
+using namespace slang_graphics;
+
 enum class ShaderInputType
 {
     Buffer, Texture, Sampler, CombinedTextureSampler
