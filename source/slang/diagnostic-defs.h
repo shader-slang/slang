@@ -52,24 +52,27 @@ DIAGNOSTIC(    2, Error, cannotFindFile, "cannot find file '$0'.")
 DIAGNOSTIC(    2, Error, unsupportedCompilerMode, "unsupported compiler mode.")
 DIAGNOSTIC(    4, Error, cannotWriteOutputFile, "cannot write output file '$0'.")
 DIAGNOSTIC(    5, Error, failedToLoadDynamicLibrary, "failed to load dynamic library '$0'")
+DIAGNOSTIC(    6, Error, tooManyOutputPathsSpecified, "$0 output paths specified, but only $1 entry points given")
 
-DIAGNOSTIC(    6, Error, tooManyOutputPathsSpecified,
-    "$0 output paths specified, but only $1 entry points given")
-
-DIAGNOSTIC(    6, Error, noOutputPathSpecifiedForEntryPoint,
+DIAGNOSTIC(    7, Error, noOutputPathSpecifiedForEntryPoint,
     "no output path specified for entry point '$0' (the '-o' option for an entry point must precede the corresponding '-entry')")
 
-DIAGNOSTIC(    6, Error, outputPathsImplyDifferentFormats,
+DIAGNOSTIC(    8, Error, outputPathsImplyDifferentFormats,
     "the output paths '$0' and '$1' require different code-generation targets")
 
-DIAGNOSTIC(    6, Error, cannotDeduceOutputFormatFromPath,
-    "cannot deduce an output format from the output path '$0'")
-
-DIAGNOSTIC(    6, Error, explicitOutputPathsAndMultipleTargets,
-    "canot use both explicit output paths ('-o') and multiple targets ('-target')")
-
-DIAGNOSTIC(    7, Error, glslIsNotSupported,
-    "the Slang compiler does not support GLSL as a source language");
+DIAGNOSTIC(    9, Error, cannotDeduceOutputFormatFromPath, "cannot deduce an output format from the output path '$0'")
+DIAGNOSTIC(    10, Error, explicitOutputPathsAndMultipleTargets, "canot use both explicit output paths ('-o') and multiple targets ('-target')")
+DIAGNOSTIC(    11, Error, glslIsNotSupported, "the Slang compiler does not support GLSL as a source language");
+DIAGNOSTIC(    12, Error, cannotDeduceSourceLanguage, "can't deduce language for input file '$0'");
+DIAGNOSTIC(    13, Error, unknownCodeGenerationTarget, "unknown code generation target '$0'");
+DIAGNOSTIC(    14, Error, unknownProfile, "unknown profile '$0'");
+DIAGNOSTIC(    15, Error, unknownStage, "unknown stage '$0'");
+DIAGNOSTIC(    16, Error, unknownPassThroughTarget, "unknown pass-through target '$0'");    
+DIAGNOSTIC(    17, Error, unknownCommandLineOption, "unknown command-line option '$0'");
+DIAGNOSTIC(    18, Error, noProfileSpecified, "no profile specified; use the '-profile <profile name>' option");
+DIAGNOSTIC(    19, Error, multipleEntryPointsNeedMulitpleProfiles, "when multiple entry points are specified, each must have a profile given (with '-profile') before the '-entry' option");
+DIAGNOSTIC(    20, Error, multipleTranslationUnitsNeedEntryPoints, "when using multiple translation units, entry points must be specified after their translation unit file(s)");
+DIAGNOSTIC(    21, Error, expectedArgumentForOption, "expected an argument for command-line option '$0'");
 
 //
 // 1xxxx - Lexical anaylsis

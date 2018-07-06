@@ -12,28 +12,29 @@
 
 namespace Slang {
 
-char const* tryReadCommandLineArgumentRaw(char const* option, char const* const**ioCursor, char const* const*end)
+SlangResult tryReadCommandLineArgumentRaw(DiagnosticSink* sink, char const* option, char const* const**ioCursor, char const* const*end, char const** argOut)
 {
+    *argOut = nullptr;
     char const* const*& cursor = *ioCursor;
     if (cursor == end)
     {
-        fprintf(stderr, "expected an argument for command-line option '%s'", option);
-        exit(1);
+        sink->diagnose(SourceLoc(), Diagnostics::expectedArgumentForOption, option);
+        return SLANG_FAIL;
     }
     else
     {
-        return *cursor++;
+        *argOut = *cursor++;
+        return SLANG_OK;
     }
 }
 
-String tryReadCommandLineArgument(char const* option, char const* const**ioCursor, char const* const*end)
+SlangResult tryReadCommandLineArgument(DiagnosticSink* sink, char const* option, char const* const**ioCursor, char const* const*end, String& argOut)
 {
-    return String(tryReadCommandLineArgumentRaw(option, ioCursor, end));
+    const char* arg;
+    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgumentRaw(sink, option, ioCursor, end, &arg));
+    argOut = arg;
+    return SLANG_OK;
 }
-
-
-
-
 
 struct OptionsParser
 {
@@ -144,7 +145,58 @@ struct OptionsParser
             path.begin());
     }
 
-    void addInputPath(
+    static Profile::RawVal findGlslProfileFromPath(const String& path)
+    {
+        struct Entry
+        {
+            const char* ext;
+            Profile::RawVal profileId;
+        };
+
+        static const Entry entries[] = 
+        {
+            { ".frag", Profile::GLSL_Fragment },
+            { ".geom", Profile::GLSL_Geometry },
+            { ".tesc", Profile::GLSL_TessControl },
+            { ".tese", Profile::GLSL_TessEval },
+            { ".comp", Profile::GLSL_Compute } 
+        };
+
+        for (int i = 0; i < SLANG_COUNT_OF(entries); ++i)
+        {
+            const Entry& entry = entries[i];
+            if (path.EndsWith(entry.ext))
+            {
+                return entry.profileId;
+            }
+        }
+        return Profile::Unknown;
+    }
+
+    static SlangSourceLanguage findSourceLanguageFromPath(const String& path, SlangProfileID* profileOut)
+    {
+        *profileOut = SLANG_PROFILE_UNKNOWN;
+
+        if (path.EndsWith(".hlsl") ||
+            path.EndsWith(".fx"))
+        {
+            return SLANG_SOURCE_LANGUAGE_HLSL;
+        }
+        if (path.EndsWith(".glsl"))
+        {
+            return SLANG_SOURCE_LANGUAGE_GLSL;
+        }
+
+        Profile::RawVal profile = findGlslProfileFromPath(path);
+        if (profile != Profile::Unknown)
+        {
+            *profileOut = SlangProfileID(profile);
+            return SLANG_SOURCE_LANGUAGE_GLSL;
+        }
+        return SLANG_SOURCE_LANGUAGE_UNKNOWN;
+    }
+
+    SlangResult addInputPath(
         char const*  inPath)
     {
         inputPathCount++;
@@ -157,33 +209,21 @@ struct OptionsParser
         {
             // Plain old slang code
             addInputSlangPath(path);
+            return SLANG_OK;
         }
-#define CASE(EXT, LANG) \
-        else if(path.EndsWith(EXT)) do { addInputForeignShaderPath(path, SLANG_SOURCE_LANGUAGE_##LANG); } while(0)
-
-        CASE(".hlsl", HLSL);
-        CASE(".fx",   HLSL);
-
-        CASE(".glsl", GLSL);
-#undef CASE
-
-#define CASE(EXT, LANG, PROFILE) \
-        else if(path.EndsWith(EXT)) do { addInputForeignShaderPath(path, SLANG_SOURCE_LANGUAGE_##LANG, SlangProfileID(Slang::Profile::PROFILE)); } while(0)
-        // TODO: need a way to pass along stage/profile and entry-point info for these cases...
-        CASE(".vert", GLSL, GLSL_Vertex);
-        CASE(".frag", GLSL, GLSL_Fragment);
-        CASE(".geom", GLSL, GLSL_Geometry);
-        CASE(".tesc", GLSL, GLSL_TessControl);
-        CASE(".tese", GLSL, GLSL_TessEval);
-        CASE(".comp", GLSL, GLSL_Compute);
-
-#undef CASE
-
-        else
+        
+        SlangProfileID profileID;
+        SlangSourceLanguage sourceLanguage = findSourceLanguageFromPath(path, &profileID);
+        
+        if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
         {
-            fprintf(stderr, "error: can't deduce language for input file '%s'\n", inPath);
-            exit(1);
+            requestImpl->mSink.diagnose(SourceLoc(), Diagnostics::cannotDeduceSourceLanguage, inPath);
+            return SLANG_FAIL;
         }
+
+        addInputForeignShaderPath(path, sourceLanguage, profileID);
+
+        return SLANG_OK;
     }
 
     void addOutputPath(
@@ -237,7 +277,7 @@ struct OptionsParser
         }
     }
 
-    int parse(
+    SlangResult parse(
         int             argc,
         char const* const*  argv)
     {
@@ -245,7 +285,7 @@ struct OptionsParser
         // after some other initialization has been performed.
         flags = requestImpl->compileFlags;
 
-        //
+        DiagnosticSink* sink = &requestImpl->mSink;
 
         SlangMatrixLayoutMode defaultMatrixLayoutMode = SLANG_MATRIX_LAYOUT_MODE_UNKNOWN;
 
@@ -292,7 +332,9 @@ struct OptionsParser
                 }
                 else if (argStr == "-backend" || argStr == "-target")
                 {
-                    String name = tryReadCommandLineArgument(arg, &argCursor, argEnd);
+                    String name;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
+
                     SlangCompileTarget target = SLANG_TARGET_UNKNOWN;
 
                     if (name == "glsl")
@@ -336,8 +378,8 @@ struct OptionsParser
 
                     else
                     {
-                        fprintf(stderr, "unknown code generation target '%S'\n", name.ToWString().begin());
-                        exit(1);
+                        sink->diagnose(SourceLoc(), Diagnostics::unknownCodeGenerationTarget, name);
+                        return SLANG_FAIL;
                     }
 
                     this->chosenTarget = target;
@@ -347,12 +389,14 @@ struct OptionsParser
                 // of capability required by the program.
                 else if (argStr == "-profile")
                 {
-                    String name = tryReadCommandLineArgument(arg, &argCursor, argEnd);
+                    String name;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
 
                     SlangProfileID profileID = spFindProfile(session, name.begin());
                     if( profileID == SLANG_PROFILE_UNKNOWN )
                     {
-                        fprintf(stderr, "unknown profile '%s'\n", name.begin());
+                        sink->diagnose(SourceLoc(), Diagnostics::unknownProfile, name);
+                        return SLANG_FAIL;
                     }
                     else
                     {
@@ -362,7 +406,8 @@ struct OptionsParser
                 }
                 else if (argStr == "-entry")
                 {
-                    String name = tryReadCommandLineArgument(arg, &argCursor, argEnd);
+                    String name;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
 
                     RawEntryPoint entry;
                     entry.name = name;
@@ -384,7 +429,9 @@ struct OptionsParser
 #if 0
                 else if (argStr == "-stage")
                 {
-                    String name = tryReadCommandLineArgument(arg, &argCursor, argEnd);
+                    String name;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
+
                     StageTarget stage = StageTarget::Unknown;
                     if (name == "vertex") { stage = StageTarget::VertexShader; }
                     else if (name == "fragment") { stage = StageTarget::FragmentShader; }
@@ -393,22 +440,25 @@ struct OptionsParser
                     else if (name == "compute") { stage = StageTarget::ComputeShader; }
                     else
                     {
-                        fprintf(stderr, "unknown stage '%S'\n", name.ToWString());
+                        sink->diagnose(SourceLoc(), Diagnostics::unknownStage, name);
+                        return SLANG_FAIL;
                     }
                     options.stage = stage;
                 }
 #endif
                 else if (argStr == "-pass-through")
                 {
-                    String name = tryReadCommandLineArgument(arg, &argCursor, argEnd);
+                    String name;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
+
                     SlangPassThrough passThrough = SLANG_PASS_THROUGH_NONE;
                     if (name == "fxc") { passThrough = SLANG_PASS_THROUGH_FXC; }
                     else if (name == "dxc") { passThrough = SLANG_PASS_THROUGH_DXC; }
                     else if (name == "glslang") { passThrough = SLANG_PASS_THROUGH_GLSLANG; }
                     else
                     {
-                        fprintf(stderr, "unknown pass-through target '%S'\n", name.ToWString().begin());
-                        exit(1);
+                        sink->diagnose(SourceLoc(), Diagnostics::unknownPassThroughTarget, name);
+                        return SLANG_FAIL;
                     }
 
                     spSetPassThrough(
@@ -427,7 +477,7 @@ struct OptionsParser
                     if (defineStr[0] == 0)
                     {
                         // Need to read another argument from the command line
-                        defineStr = tryReadCommandLineArgumentRaw(arg, &argCursor, argEnd);
+                        SLANG_RETURN_ON_FAIL(tryReadCommandLineArgumentRaw(sink, arg, &argCursor, argEnd, &defineStr));
                     }
                     // The string that sets up the define can have an `=` between
                     // the name to be defined and its value, so we search for one.
@@ -473,7 +523,7 @@ struct OptionsParser
                     if (includeDirStr[0] == 0)
                     {
                         // Need to read another argument from the command line
-                        includeDirStr = tryReadCommandLineArgumentRaw(arg, &argCursor, argEnd);
+                        SLANG_RETURN_ON_FAIL(tryReadCommandLineArgumentRaw(sink, arg, &argCursor, argEnd, &includeDirStr));
                     }
 
                     spAddSearchPath(
@@ -484,8 +534,8 @@ struct OptionsParser
                 // A `-o` option is used to specify a desired output file.
                 else if (argStr == "-o")
                 {
-                    char const* outputPath = tryReadCommandLineArgumentRaw(
-                        arg, &argCursor, argEnd);
+                    char const* outputPath = nullptr;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgumentRaw(sink, arg, &argCursor, argEnd, &outputPath));
                     if (!outputPath) continue;
 
                     addOutputPath(outputPath);
@@ -504,20 +554,20 @@ struct OptionsParser
                     // and treat the rest of the command line as input file names:
                     while (argCursor != argEnd)
                     {
-                        addInputPath(*argCursor++);
+                        SLANG_RETURN_ON_FAIL(addInputPath(*argCursor++));
                     }
                     break;
                 }
                 else
                 {
-                    fprintf(stderr, "unknown command-line option '%S'\n", argStr.ToWString().begin());
+                    sink->diagnose(SourceLoc(), Diagnostics::unknownCommandLineOption, argStr);
                     // TODO: print a usage message
-                    exit(1);
+                    return SLANG_FAIL;
                 }
             }
             else
             {
-                addInputPath(arg);
+                SLANG_RETURN_ON_FAIL(addInputPath(arg));
             }
         }
 
@@ -529,14 +579,14 @@ struct OptionsParser
         if (inputPathCount == 0)
         {
             fprintf(stderr, "error: no input file specified\n");
-            exit(1);
+            return SLANG_E_INVALID_ARG; 
         }
 
         // No point in moving forward if there is nothing to compile
         if( translationUnitCount == 0 )
         {
             fprintf(stderr, "error: no compilation requested\n");
-            exit(1);
+            return SLANG_FAIL; 
         }
 #endif
 
@@ -598,8 +648,8 @@ struct OptionsParser
             if( anyEntryPointWithoutProfile
                 && currentProfileID == SLANG_PROFILE_UNKNOWN)
             {
-                fprintf(stderr, "error: no profile specified; use the '-profile <profile name>' option\n");
-                exit(1);
+                sink->diagnose(SourceLoc(), Diagnostics::noProfileSpecified);
+                return SLANG_E_INVALID_ARG;
             }
             // Issue an error if we have mulitple `-profile` options *and*
             // there were entry points that didn't get a profile, *and*
@@ -609,8 +659,8 @@ struct OptionsParser
             {
                 if (rawEntryPoints.Count() > 1)
                 {
-                    fprintf(stderr, "error: when multiple entry points are specified, each must have a profile given (with '-profile') before the '-entry' option\n");
-                    exit(1);
+                    sink->diagnose(SourceLoc(), Diagnostics::multipleEntryPointsNeedMulitpleProfiles);
+                    return SLANG_E_INVALID_ARG;
                 }
             }
             // TODO: need to issue an error on a `-profile` option that doesn't actually
@@ -631,11 +681,8 @@ struct OptionsParser
         // for direct output files for entry points, that is an error.
         if (rawOutputPaths.Count() != 0 && requestImpl->targets.Count() > 1)
         {
-            requestImpl->mSink.diagnose(
-                SourceLoc(),
-                Diagnostics::explicitOutputPathsAndMultipleTargets);
+            sink->diagnose(SourceLoc(), Diagnostics::explicitOutputPathsAndMultipleTargets);
         }
-
 
         // Did the user try to specify output path(s)?
         if (rawOutputPaths.Count() != 0)
@@ -648,11 +695,8 @@ struct OptionsParser
             }
             else if (rawOutputPaths.Count() > rawEntryPoints.Count())
             {
-                requestImpl->mSink.diagnose(
-                    SourceLoc(),
-                    Diagnostics::tooManyOutputPathsSpecified,
-                    rawOutputPaths.Count(),
-                    rawEntryPoints.Count());
+                sink->diagnose(SourceLoc(), Diagnostics::tooManyOutputPathsSpecified,
+                    rawOutputPaths.Count(), rawEntryPoints.Count());
             }
             else
             {
@@ -663,10 +707,7 @@ struct OptionsParser
                 {
                     if (entryPoint.outputPathIndex < 0)
                     {
-                        requestImpl->mSink.diagnose(
-                            SourceLoc(),
-                            Diagnostics::noOutputPathSpecifiedForEntryPoint,
-                            entryPoint.name);
+                        sink->diagnose(SourceLoc(), Diagnostics::noOutputPathSpecifiedForEntryPoint, entryPoint.name);
 
                         // Don't emit this same error for other entry
                         // points, even if we have more
@@ -691,10 +732,7 @@ struct OptionsParser
                         {
                             // This file didn't imply a target, and that
                             // needs to be an error:
-                            requestImpl->mSink.diagnose(
-                                SourceLoc(),
-                                Diagnostics::cannotDeduceOutputFormatFromPath,
-                                rawOutputPath.path);
+                            sink->diagnose(SourceLoc(), Diagnostics::cannotDeduceOutputFormatFromPath, rawOutputPath.path);
 
                             // Don't keep looking for errors
                             anyUnknownTargets = true;
@@ -721,7 +759,7 @@ struct OptionsParser
                             {
                                 // This file didn't imply a target, and that
                                 // needs to be an error:
-                                requestImpl->mSink.diagnose(
+                                sink->diagnose(
                                     SourceLoc(),
                                     Diagnostics::outputPathsImplyDifferentFormats,
                                     rawOutputPaths[0].path,
@@ -748,7 +786,7 @@ struct OptionsParser
             }
         }
 
-        // If the user specifed and per-compilation-target flags, make sure
+        // If the user specified and per-compilation-target flags, make sure
         // to apply them here.
         if(targetFlags)
         {
@@ -780,8 +818,8 @@ struct OptionsParser
 
             if( anyEntryPointWithoutTranslationUnit && translationUnitCount != 1 )
             {
-                fprintf(stderr, "error: when using multiple translation units, entry points must be specified after their translation unit file(s)\n");
-                exit(1);
+                sink->diagnose(SourceLoc(), Diagnostics::multipleTranslationUnitsNeedEntryPoints);
+                return SLANG_FAIL;
             }
 
             // Now place all those entry points where they belong
@@ -815,15 +853,12 @@ struct OptionsParser
         }
 #endif
 
-        if (requestImpl->mSink.GetErrorCount() != 0)
-            return 1;
-
-        return 0;
+        return (sink->GetErrorCount() == 0) ? SLANG_OK : SLANG_FAIL;
     }
 };
 
 
-int parseOptions(
+SlangResult parseOptions(
     SlangCompileRequest*    compileRequest,
     int                     argc,
     char const* const*      argv)
@@ -837,7 +872,7 @@ int parseOptions(
 
 } // namespace Slang
 
-SLANG_API int spProcessCommandLineArguments(
+SLANG_API SlangResult spProcessCommandLineArguments(
     SlangCompileRequest*    request,
     char const* const*      args,
     int                     argCount)

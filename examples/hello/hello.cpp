@@ -85,28 +85,28 @@ ShaderProgram* loadShaderProgram(Renderer* renderer)
     // translation unit in which that function can be found, and the stage
     // that we need to compile for (e.g., vertex, fragment, geometry, ...).
     //
-    char const* vertexEntryPointName    = "vertexMain";
-    char const* fragmentEntryPointName  = "fragmentMain";
-    int vertexIndex   = spAddEntryPoint(slangRequest, translationUnitIndex, vertexEntryPointName,   SLANG_STAGE_VERTEX);
+    char const* vertexEntryPointName = "vertexMain";
+    char const* fragmentEntryPointName = "fragmentMain";
+    int vertexIndex = spAddEntryPoint(slangRequest, translationUnitIndex, vertexEntryPointName, SLANG_STAGE_VERTEX);
     int fragmentIndex = spAddEntryPoint(slangRequest, translationUnitIndex, fragmentEntryPointName, SLANG_STAGE_FRAGMENT);
 
-    // Once all of the input options for hte compiler have been specified,
+    // Once all of the input options for the compiler have been specified,
     // we can invoke `spCompile` to run the compiler and see if any errors
     // were detected.
     //
-    int compileErr = spCompile(slangRequest);
+    const SlangResult compileRes = spCompile(slangRequest);
 
     // Even if there were no errors that forced compilation to fail, the
     // compiler may have produced "diagnostic" output such as warnings.
     // We will go ahead and print that output here.
     //
-    if(auto diagnostics = spGetDiagnosticOutput(slangRequest))
+    if (auto diagnostics = spGetDiagnosticOutput(slangRequest))
     {
         reportError("%s", diagnostics);
     }
 
     // If compilation failed, there is no point in continuing any further.
-    if(compileErr)
+    if (SLANG_FAILED(compileRes))
     {
         spDestroyCompileRequest(slangRequest);
         spDestroySession(slangSession);
@@ -128,10 +128,10 @@ ShaderProgram* loadShaderProgram(Renderer* renderer)
 
     // We extract the begin/end pointers to the output code buffers
     // using operations on the `ISlangBlob` interface.
-    char const* vertexCode = (char const*) vertexShaderBlob->getBufferPointer();
+    char const* vertexCode = (char const*)vertexShaderBlob->getBufferPointer();
     char const* vertexCodeEnd = vertexCode + vertexShaderBlob->getBufferSize();
 
-    char const* fragmentCode = (char const*) fragmentShaderBlob->getBufferPointer();
+    char const* fragmentCode = (char const*)fragmentShaderBlob->getBufferPointer();
     char const* fragmentCodeEnd = fragmentCode + fragmentShaderBlob->getBufferSize();
 
     // Once we have extract the output blobs, it is safe to destroy
@@ -148,8 +148,8 @@ ShaderProgram* loadShaderProgram(Renderer* renderer)
 
     ShaderProgram::KernelDesc kernelDescs[] =
     {
-        { StageType::Vertex,    vertexCode,     vertexCodeEnd},
-        { StageType::Fragment,  fragmentCode,   fragmentCodeEnd},
+        { StageType::Vertex,    vertexCode,     vertexCodeEnd },
+        { StageType::Fragment,  fragmentCode,   fragmentCodeEnd },
     };
 
     ShaderProgram::Desc programDesc;
@@ -196,9 +196,9 @@ struct Vertex
 static const int kVertexCount = 3;
 static const Vertex kVertexData[kVertexCount] =
 {
-    { { 0,  0, 0.5 }, {1, 0, 0} },
-    { { 0,  1, 0.5 }, {0, 0, 1} },
-    { { 1,  0, 0.5 }, {0, 1, 0} },
+    { { 0,  0, 0.5 },{ 1, 0, 0 } },
+    { { 0,  1, 0.5 },{ 0, 0, 1 } },
+    { { 1,  0, 0.5 },{ 0, 1, 0 } },
 };
 
 // We will define global variables for the various platform and
@@ -217,13 +217,7 @@ BufferResource* gVertexBuffer;
 ShaderProgram* gShaderProgram;
 BindingState* gBindingState;
 
-enum
-{
-    OKAY,
-    FAILURE,
-};
-
-int initialize()
+SlangResult initialize()
 {
     // Create a window for our application to render into.
     WindowDesc windowDesc;
@@ -243,7 +237,10 @@ int initialize()
     Renderer::Desc rendererDesc;
     rendererDesc.width = gWindowWidth;
     rendererDesc.height = gWindowHeight;
-    gRenderer->initialize(rendererDesc, getPlatformWindowHandle(gWindow));
+    {
+        const SlangResult res = gRenderer->initialize(rendererDesc, getPlatformWindowHandle(gWindow));
+        if (SLANG_FAILED(res)) return res;
+    }
 
     // Create a constant buffer for passing the model-view-projection matrix.
     //
@@ -261,20 +258,20 @@ int initialize()
     gConstantBuffer = gRenderer->createBufferResource(
         Resource::Usage::ConstantBuffer,
         constantBufferDesc);
-    if(!gConstantBuffer) return FAILURE;
+    if (!gConstantBuffer) return SLANG_FAIL;
 
     // Input Assembler (IA)
 
     // Input Layout
 
     InputElementDesc inputElements[] = {
-        {"POSITION", 0, Format::RGB_Float32, offsetof(Vertex, position) },
-        {"COLOR",    0, Format::RGB_Float32, offsetof(Vertex, color) },
+        { "POSITION", 0, Format::RGB_Float32, offsetof(Vertex, position) },
+        { "COLOR",    0, Format::RGB_Float32, offsetof(Vertex, color) },
     };
     gInputLayout = gRenderer->createInputLayout(
         &inputElements[0],
         2);
-    if(!gInputLayout) return FAILURE;
+    if (!gInputLayout) return SLANG_FAIL;
 
     // Vertex Buffer
 
@@ -286,12 +283,12 @@ int initialize()
         Resource::Usage::VertexBuffer,
         vertexBufferDesc,
         &kVertexData[0]);
-    if(!gVertexBuffer) return FAILURE;
+    if (!gVertexBuffer) return SLANG_FAIL;
 
     // Shaders (VS, PS, ...)
 
     gShaderProgram = loadShaderProgram(gRenderer);
-    if(!gShaderProgram) return FAILURE;
+    if (!gShaderProgram) return SLANG_FAIL;
 
     // Resource binding state
 
@@ -304,7 +301,7 @@ int initialize()
 
     showWindow(gWindow);
 
-    return OKAY;
+    return SLANG_OK;
 }
 
 void renderFrame()
@@ -315,15 +312,14 @@ void renderFrame()
     gRenderer->setClearColor(kClearColor);
     gRenderer->clearFrame();
 
-
     // We update our constant buffer per-frame, just for the purposes
     // of the example, but we don't actually load different data
     // per-frame (we always use an identity projection).
     //
-    if(float* data = (float*) gRenderer->map(gConstantBuffer, MapFlavor::WriteDiscard))
+    if (float* data = (float*)gRenderer->map(gConstantBuffer, MapFlavor::WriteDiscard))
     {
-        static const float kIdentity[] =
-        { 1, 0, 0, 0,
+        static const float kIdentity[] = {
+            1, 0, 0, 0,
             0, 1, 0, 0,
             0, 0, 1, 0,
             0, 0, 0, 1 };
@@ -365,12 +361,12 @@ void finalize()
 //
 void innerMain(ApplicationContext* context)
 {
-    if(initialize() != OKAY)
+    if (SLANG_FAILED(initialize()))
     {
-        exitApplication(context, 1);
+        return exitApplication(context, 1);
     }
 
-    while(dispatchEvents(context))
+    while (dispatchEvents(context))
     {
         renderFrame();
     }
