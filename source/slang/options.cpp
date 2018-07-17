@@ -859,14 +859,26 @@ struct OptionsParser
 
 
 SlangResult parseOptions(
-    SlangCompileRequest*    compileRequest,
+    SlangCompileRequest*    compileRequestIn,
     int                     argc,
     char const* const*      argv)
 {
+    Slang::CompileRequest* compileRequest = (Slang::CompileRequest*) compileRequestIn;
+
     OptionsParser parser;
-    parser.compileRequest = compileRequest;
-    parser.requestImpl = (Slang::CompileRequest*) compileRequest;
-    return parser.parse(argc, argv);
+    parser.compileRequest = compileRequestIn;
+    parser.requestImpl = compileRequest;
+
+    Result res = parser.parse(argc, argv);
+
+    DiagnosticSink* sink = &compileRequest->mSink;
+    if (sink->GetErrorCount() > 0)
+    {
+        // Put the errors in the diagnostic 
+        compileRequest->mDiagnosticOutput = sink->outputBuffer.ProduceString();
+    }
+
+    return res;
 }
 
 
