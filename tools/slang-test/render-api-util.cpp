@@ -59,7 +59,7 @@ static int _calcAvailableApis()
     return RenderApiType::Unknown;
 }
 
-/* static */int RenderApiUtil::findApiFlagsByName(const Slang::UnownedStringSlice& name)
+/* static */RenderApiFlags RenderApiUtil::findApiFlagsByName(const Slang::UnownedStringSlice& name)
 {
     // Special case 'all'
     if (name == "all")
@@ -70,37 +70,75 @@ static int _calcAvailableApis()
     return (type == RenderApiType::Unknown) ? 0 : (1 << int(type));
 }
 
-/* static */Slang::Result RenderApiUtil::parseApiFlags(const Slang::UnownedStringSlice& text, int* apiBitsOut)
+static bool isNameStartChar(char c)
+{
+    return (c >= 'a' && c <='z') || (c >= 'A' && c <= 'Z') || (c == '_');
+}
+
+static bool isNameNextChar(char c)
+{
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c == '_') || (c >= '0' && c <= '9');
+}
+
+static Slang::UnownedStringSlice _extractApiEntry(const Slang::UnownedStringSlice& text)
 {
     using namespace Slang;
 
-    int apiBits = 0;
-
-    List<UnownedStringSlice> slices;
-    StringUtil::split(text, ',', slices);
-
-    for (int i = 0; i < int(slices.Count()); ++i)
+    const char* cur = text.begin();
+    const char* end = text.end();
+    if (cur == end)
     {
-        UnownedStringSlice slice = slices[i];
-        bool add = true;
-        if (slice.size() <= 0)
+        // Error
+        return UnownedStringSlice();
+    }
+
+    // Remove optional + or -
+    if (*cur == '+' || *cur == '-')
+    {
+        cur++;
+    }
+
+    // First can only be alpha or under score
+    if (cur >= end || !isNameStartChar(*cur++))
+    {
+        // Error
+        return UnownedStringSlice();
+    }
+    // Look for the end
+    while (cur < end && isNameNextChar(*cur))
+    {
+        cur++;
+    }
+    return UnownedStringSlice(text.begin(), cur);
+}
+
+/* static */Slang::Result RenderApiUtil::parseApiFlags(const Slang::UnownedStringSlice& text, RenderApiFlags initialFlags, RenderApiFlags* apiBitsOut)
+{
+    using namespace Slang;
+
+    RenderApiFlags apiBits = initialFlags;
+
+    Slang::UnownedStringSlice remainingText(text);
+    while (remainingText.size() > 0)
+    {
+        Slang::UnownedStringSlice extract(_extractApiEntry(remainingText));
+        if (extract.size() <= 0)
         {
+            // Didn't extract...
             return SLANG_FAIL;
         }
-        if (slice[0] == '+')
+
+        const char c = extract[0];
+        const bool add = !(c == '-');
+
+        // Strip first char if its +/-
+        if (c == '+' || c == '-')
         {
-            // Drop the +
-            slice = UnownedStringSlice(slice.begin() + 1, slice.end());
-        }
-        else if (slice[0] == '-')
-        {
-            add = false;
-            // Drop the +
-            slice = UnownedStringSlice(slice.begin() + 1, slice.end());
+            extract = UnownedStringSlice(extract.begin() + 1, extract.end());
         }
 
         // We need to find the bits... 
-        int bits = findApiFlagsByName(slice);
+        const int bits = findApiFlagsByName(extract);
         // 0 means an error
         if (bits == 0)
         {
@@ -115,6 +153,9 @@ static int _calcAvailableApis()
         {
             apiBits &= ~bits;
         }
+
+        // Move along to remaining text
+        remainingText = UnownedStringSlice(extract.end(), remainingText.end());
     }
 
     *apiBitsOut = apiBits;

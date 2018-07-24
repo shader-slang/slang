@@ -46,11 +46,11 @@ struct RenderApiUtil
         /// Returns -1 if unknown
     static RenderApiType findApiTypeByName(const Slang::UnownedStringSlice& name);
         /// Returns 0 if none found.
-    static int findApiFlagsByName(const Slang::UnownedStringSlice& name);
+    static RenderApiFlags findApiFlagsByName(const Slang::UnownedStringSlice& name);
 
         /// Parse api flags string (comma delimited list of api names, or 'all' for all)
         /// For example "all,-dx12" would be all apis, except dx12
-    static Slang::Result parseApiFlags(const Slang::UnownedStringSlice& text, int* apiBitsOut);
+    static Slang::Result parseApiFlags(const Slang::UnownedStringSlice& text, RenderApiFlags initialFlags, RenderApiFlags* apiBitsOut);
 
         /// Get information about a render API
     static const Info& getInfo(RenderApiType type) { return s_infos[int(type)]; }
