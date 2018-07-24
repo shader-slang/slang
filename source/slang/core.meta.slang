@@ -704,17 +704,33 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 // subscript operator
                 sb << "__subscript(" << uintN << " location) -> T {\n";
 
-                sb << "__target_intrinsic(glsl, \"texelFetch($P, " << ivecN << "($1)";
+                // GLSL/SPIR-V distinguished sampled vs. non-sampled images
+                switch( access )
+                {
+                case SLANG_RESOURCE_ACCESS_NONE:
+                case SLANG_RESOURCE_ACCESS_READ:
+                    sb << "__target_intrinsic(glsl, \"texelFetch($P, " << ivecN << "($1)";
+                    if( !isMultisample )
+                    {
+                        sb << ", 0";
+                    }
+                    else
+                    {
+                        // TODO: how to handle passing through sample index?
+                        sb << ", 0";
+                    }
+                    break;
 
-                if( !isMultisample )
-                {
-                    sb << ", 0";
+                default:
+                    sb << "__target_intrinsic(glsl, \"imageLoad($0, " << ivecN << "($1)";
+                    if( isMultisample )
+                    {
+                        // TODO: how to handle passing through sample index?
+                        sb << ", 0";
+                    }
+                    break;
                 }
-                else
-                {
-                    // TODO: how to handle this...
-                    sb << ", 0";
-                }
+
 
                 sb << ")$z\") get;\n";
 
@@ -730,10 +746,11 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 default:
                     sb << "__target_intrinsic(glsl, \"imageStore($0, " << ivecN << "($1), $2)\") set;\n";
 
-                    // TODO: really need a way to map access through `ref` accessor (e.g., when
-                    // used with an atomic operation) over to GLSL equivalent.
+                    // Note: HLSL doesn't support component-granularity access into typed UAVs,
+                    // and also doesn't support atomic operations on them. As such, there should
+                    // be no reason why a `ref` accessor is required here.
                     //
-                    sb << "ref;\n";
+                    // sb << "ref;\n";
                     break;
                 }
 
