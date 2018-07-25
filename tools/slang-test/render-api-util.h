@@ -43,14 +43,16 @@ struct RenderApiUtil
         /// Returns a combination of RenderApiFlag bits which if set indicates that the API is available.
     static int getAvailableApis();
 
-        /// Returns -1 if unknown
+        /// Returns RenderApiType::Unknown if not found
     static RenderApiType findApiTypeByName(const Slang::UnownedStringSlice& name);
-        /// Returns 0 if none found.
-    static int findApiFlagsByName(const Slang::UnownedStringSlice& name);
+        /// FlagsOut will have flag/flags specified by a name if returns with successful result code.
+    static Slang::Result findApiFlagsByName(const Slang::UnownedStringSlice& name, RenderApiFlags* flagsOut);
 
-        /// Parse api flags string (comma delimited list of api names, or 'all' for all)
-        /// For example "all,-dx12" would be all apis, except dx12
-    static Slang::Result parseApiFlags(const Slang::UnownedStringSlice& text, int* apiBitsOut);
+        /// Parse api flags string, returning SLANG_OK on success.
+        /// If first character is + or - the flags will be applied to initialFlags, else initialFlags is ignored.
+        /// For example "all-dx12" would be all apis, except dx12
+        /// -vk would be whatever is in initial flags, but not vulkan.
+    static Slang::Result parseApiFlags(const Slang::UnownedStringSlice& text, RenderApiFlags initialFlags, RenderApiFlags* apiBitsOut);
 
         /// Get information about a render API
     static const Info& getInfo(RenderApiType type) { return s_infos[int(type)]; }

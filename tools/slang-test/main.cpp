@@ -199,7 +199,11 @@ struct Options
     Dictionary<TestCategory*, TestCategory*> excludeCategories;
 
     // By default we can test against all apis
-    int enabledApis = int(RenderApiFlag::AllOf);
+    RenderApiFlags enabledApis = RenderApiFlag::AllOf;
+
+    // By default we potentially synthesize test for all 
+    // TODO: Vulkan is disabled by default for now as the majority as vulkan synthesized tests fail  
+    RenderApiFlags synthesizedTestApis = RenderApiFlag::AllOf & ~RenderApiFlag::Vulkan;
 };
 
 // Globals
@@ -605,15 +609,31 @@ Result parseOptions(int* argc, char** argv)
         {
             if (argCursor == argEnd)
             {
-                fprintf(stderr, "error: expected comma separated list of apis '%s'\n", arg);
+                fprintf(stderr, "error: expecting an api expression (eg 'vk+dx12' or '+dx11') '%s'\n", arg);
                 return SLANG_FAIL;
             }
             const char* apiList = *argCursor++;
 
-            SlangResult res = RenderApiUtil::parseApiFlags(UnownedStringSlice(apiList), &g_options.enabledApis);
+            SlangResult res = RenderApiUtil::parseApiFlags(UnownedStringSlice(apiList), g_options.enabledApis, &g_options.enabledApis);
             if (SLANG_FAILED(res))
             {
-                fprintf(stderr, "error: unable to parse api list '%s'\n", apiList);
+                fprintf(stderr, "error: unable to parse api expression '%s'\n", apiList);
+                return res;
+            }
+        }
+        else if (strcmp(arg, "-synthesizedTestApi") == 0)
+        {
+            if (argCursor == argEnd)
+            {
+                fprintf(stderr, "error: expected an api expression (eg 'vk+dx12' or '+dx11') '%s'\n", arg);
+                return SLANG_FAIL;
+            }
+            const char* apiList = *argCursor++;
+
+            SlangResult res = RenderApiUtil::parseApiFlags(UnownedStringSlice(apiList), g_options.synthesizedTestApis, &g_options.synthesizedTestApis);
+            if (SLANG_FAILED(res))
+            {
+                fprintf(stderr, "error: unable to parse api expression '%s'\n", apiList);
                 return res;
             }
         }
@@ -629,6 +649,9 @@ Result parseOptions(int* argc, char** argv)
         const int availableApis = RenderApiUtil::getAvailableApis();
         // Only allow apis we know are available
         g_options.enabledApis &= availableApis;
+
+        // Can only synth for apis that are available
+        g_options.synthesizedTestApis &= g_options.enabledApis;
     }
 
     // any arguments left over were positional arguments
@@ -2066,7 +2089,7 @@ void runTestsOnFile(
     List<TestOptions> synthesizedTests;
 
     // If dx12 is available synthesize Dx12 test
-    if ((g_options.enabledApis & RenderApiFlag::D3D12) != 0)
+    if ((g_options.synthesizedTestApis & RenderApiFlag::D3D12) != 0)
     {
         // If doesn't have option generate dx12 options from dx11
         if (!hasRenderOption(RenderApiType::D3D12, testList))
@@ -2088,9 +2111,8 @@ void runTestsOnFile(
         }
     }
 
-#if 0
     // If Vulkan is available synthesize Vulkan test
-    if ((g_options.enabledApis & RenderApiFlag::Vulkan) != 0)
+    if ((g_options.synthesizedTestApis & RenderApiFlag::Vulkan) != 0)
     {
         // If doesn't have option generate dx12 options from dx11
         if (!hasRenderOption(RenderApiType::Vulkan, testList))
@@ -2102,7 +2124,7 @@ void runTestsOnFile(
                 // If it's a render test, and there is on d3d option, add one
                 if (isRenderTest(testOptions.command) && !isHLSLTest(testOptions.command) && !hasRenderOption(RenderApiType::Vulkan, testOptions))
                 {
-                    // Add with -dx12 option
+                    // Add with -vk option
                     TestOptions testOptionsCopy(testOptions);
                     testOptionsCopy.args.Add("-vk");
 
@@ -2112,13 +2134,11 @@ void runTestsOnFile(
                         testOptionsCopy.args.RemoveAt(index);
                     }
 
-
                     synthesizedTests.Add(testOptionsCopy);
                 }
             }
         }
     }
-#endif
 
     // Add any tests that were synthesized
     for (UInt i = 0; i < synthesizedTests.Count(); ++i)
