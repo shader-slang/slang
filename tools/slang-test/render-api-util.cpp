@@ -59,66 +59,142 @@ static int _calcAvailableApis()
     return RenderApiType::Unknown;
 }
 
-/* static */int RenderApiUtil::findApiFlagsByName(const Slang::UnownedStringSlice& name)
+/* static */ Slang::Result RenderApiUtil::findApiFlagsByName(const Slang::UnownedStringSlice& name, RenderApiFlags* flagsOut)
 {
     // Special case 'all'
     if (name == "all")
     {
-        return int(RenderApiFlag::AllOf);
+        *flagsOut = RenderApiFlags(RenderApiFlag::AllOf);
+        return SLANG_OK;
+    }
+    if (name == "none")
+    {
+        *flagsOut = RenderApiFlags(0);
+        return SLANG_OK;
     }
     RenderApiType type = findApiTypeByName(name);
-    return (type == RenderApiType::Unknown) ? 0 : (1 << int(type));
+    if (type == RenderApiType::Unknown)
+    {
+        return SLANG_FAIL;
+    }
+    *flagsOut = RenderApiFlags(1) << int(type);
+    return SLANG_OK;
 }
 
-/* static */Slang::Result RenderApiUtil::parseApiFlags(const Slang::UnownedStringSlice& text, int* apiBitsOut)
+static bool isNameStartChar(char c)
+{
+    return (c >= 'a' && c <='z') || (c >= 'A' && c <= 'Z') || (c == '_');
+}
+
+static bool isNameNextChar(char c)
+{
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c == '_') || (c >= '0' && c <= '9');
+}
+
+namespace { // anonymous
+enum class Token 
+{
+    eError,
+    eOp,
+    eId,
+    eEnd,
+};
+}
+
+static Token nextToken(Slang::UnownedStringSlice& textInOut, Slang::UnownedStringSlice& lexemeOut)
+{
+    using namespace Slang;
+    if (textInOut.size() <= 0)
+    {
+        return Token::eEnd;
+    }
+    const char* start = textInOut.begin();
+    const char* end = textInOut.end();
+
+    const char firstChar = start[0];
+    if (firstChar == '-' || firstChar == '+')
+    {
+        lexemeOut = UnownedStringSlice(start, start + 1);
+        textInOut = UnownedStringSlice(start + 1, end);
+        return Token::eOp;
+    }
+
+    if (!isNameStartChar(firstChar))
+    {
+        lexemeOut = UnownedStringSlice(start, start + 1);
+        return Token::eError;
+    }
+    const char* cur = start + 1;
+    while (cur < end && isNameNextChar(*cur))
+    {
+        cur++;
+    }
+
+    lexemeOut = UnownedStringSlice(start, cur);
+    textInOut = UnownedStringSlice(cur, end);
+    return Token::eId;
+}
+
+/* static */Slang::Result RenderApiUtil::parseApiFlags(const Slang::UnownedStringSlice& textIn, RenderApiFlags initialFlags, RenderApiFlags* apiFlagsOut)
 {
     using namespace Slang;
 
-    int apiBits = 0;
+    UnownedStringSlice text(textIn);
+    UnownedStringSlice lexeme;
 
-    List<UnownedStringSlice> slices;
-    StringUtil::split(text, ',', slices);
-
-    for (int i = 0; i < int(slices.Count()); ++i)
+    RenderApiFlags apiFlags = 0; 
+    
+    switch (nextToken(text, lexeme))
     {
-        UnownedStringSlice slice = slices[i];
-        bool add = true;
-        if (slice.size() <= 0)
+        case Token::eOp:
+        {
+            // If we start with an op - we use the passed in values as the default
+            // Rewind back to the start
+            text = textIn;
+            apiFlags = initialFlags;
+            break;
+        }
+        case Token::eId:
+        {
+            // If we start with an Id - we use that as the starting state
+            SLANG_RETURN_ON_FAIL(findApiFlagsByName(lexeme, &apiFlags));
+            break;
+        }
+        default: return SLANG_FAIL;
+    }
+    
+    while (true)
+    {
+        // Must have an op followed by an id unless we are at the end
+        switch (nextToken(text, lexeme))
+        {
+            case Token::eEnd:
+            {
+                *apiFlagsOut = apiFlags;
+                return SLANG_OK;
+            }
+            case Token::eOp:    break;
+            default:            return SLANG_FAIL;
+        }
+
+        const char op = lexeme[0];
+        if (nextToken(text, lexeme) != Token::eId)
         {
             return SLANG_FAIL;
         }
-        if (slice[0] == '+')
-        {
-            // Drop the +
-            slice = UnownedStringSlice(slice.begin() + 1, slice.end());
-        }
-        else if (slice[0] == '-')
-        {
-            add = false;
-            // Drop the +
-            slice = UnownedStringSlice(slice.begin() + 1, slice.end());
-        }
 
-        // We need to find the bits... 
-        int bits = findApiFlagsByName(slice);
-        // 0 means an error
-        if (bits == 0)
-        {
-            return SLANG_FAIL;
-        }
+        RenderApiFlags flags;
+        SLANG_RETURN_ON_FAIL(findApiFlagsByName(lexeme, &flags));
 
-        if (add)
+        if (op == '+')
         {
-            apiBits |= bits;
+            apiFlags |= flags;
         }
         else
         {
-            apiBits &= ~bits;
+            apiFlags &= ~flags;
         }
     }
-
-    *apiBitsOut = apiBits;
-    return SLANG_OK;
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!! Platform specific stuff !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */

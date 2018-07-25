@@ -16,6 +16,32 @@ slang-test -bindir E:\slang\bin\windows-x64\Debug\\ -category full tests/compute
 * The -category full means that all tests can be run.
 * The final 'free parameter' is 'tests/compute/array-param' and means only tests starting with this string will run.
 
+The command line can control which tests are run with a couple of switches
+
+* -api - Overall controls over which apis will be tested against 
+* -synthesizedTestApi - Controls which apis will have tests synthesized for them from other apis. Tests can be synthesized for dx12 and vulkan.
+
+The parameter afterwards is an 'api expression' used to control which apis will or wont be used. This is somewhat like a mathematical expression with only + and - operations and api names. If the first operation is + or - it will be applied to whatever the default is, otherwise the defaults are ignored.
+
+* vk - just for vulkan
+* +vk - Whatever the defaults are including vulkan
+* -dx12 - Whatever the defaults are excluding vulkan
+* all - for all apis, none - for no apis
+* all-vk - all apis but not vulkan (vk)
+* all-vk-dx12 - all apis but not vulkan (vk) or directx12 (dx12)
+* gl+dx11 - just on opengl (gl) and directx11 (dx11)
+* +none - same as defaults 
+
+So if you wanted to test for all apis, except opengl you'd put on the command line '-api all-gl'
+
+The different APIs are 
+
+* OpenGL - gl,ogl,opengl
+* Vulkan - vk,vulkan
+* DirectD3D12 - dx12,d3d12
+* DirectD3D11 -dx11,d3d11
+
+
 It may also be necessary to have the working directory the root directory of the slang distribution - in the example above this would be "E:\slang\". 
 
 ## Test Categories
