@@ -21,7 +21,7 @@ The command line can control which tests are run with a couple of switches
 * -api - Overall controls over which apis will be tested against 
 * -synthesizedTestApi - Controls which apis will have tests synthesized for them from other apis. Tests can be synthesized for dx12 and vulkan.
 
-The parameter afterwards is a simple 'language' to control which apis will or wont be used. The basis is this is like a mathematical expression with only + and - operations. If the first operation is + or - it will be applied to whatever the default is, otherwise the defaults are ignored.
+The parameter afterwards is an 'api expression' used to control which apis will or wont be used. This is somewhat like a mathematical expression with only + and - operations and api names. If the first operation is + or - it will be applied to whatever the default is, otherwise the defaults are ignored.
 
 * vk - just for vulkan
 * +vk - Whatever the defaults are including vulkan
@@ -30,6 +30,7 @@ The parameter afterwards is a simple 'language' to control which apis will or wo
 * all-vk - all apis but not vulkan (vk)
 * all-vk-dx12 - all apis but not vulkan (vk) or directx12 (dx12)
 * gl+dx11 - just on opengl (gl) and directx11 (dx11)
+* +none - same as defaults 
 
 So if you wanted to test for all apis, except opengl you'd put on the command line '-api all-gl'
 

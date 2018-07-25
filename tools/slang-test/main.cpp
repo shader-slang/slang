@@ -609,7 +609,7 @@ Result parseOptions(int* argc, char** argv)
         {
             if (argCursor == argEnd)
             {
-                fprintf(stderr, "error: expected comma separated list of apis '%s'\n", arg);
+                fprintf(stderr, "error: expecting an api expression (eg 'vk+dx12' or '+dx11') '%s'\n", arg);
                 return SLANG_FAIL;
             }
             const char* apiList = *argCursor++;
@@ -617,7 +617,7 @@ Result parseOptions(int* argc, char** argv)
             SlangResult res = RenderApiUtil::parseApiFlags(UnownedStringSlice(apiList), g_options.enabledApis, &g_options.enabledApis);
             if (SLANG_FAILED(res))
             {
-                fprintf(stderr, "error: unable to parse api list '%s'\n", apiList);
+                fprintf(stderr, "error: unable to parse api expression '%s'\n", apiList);
                 return res;
             }
         }
@@ -625,7 +625,7 @@ Result parseOptions(int* argc, char** argv)
         {
             if (argCursor == argEnd)
             {
-                fprintf(stderr, "error: expected comma separated list of apis '%s'\n", arg);
+                fprintf(stderr, "error: expected an api expression (eg 'vk+dx12' or '+dx11') '%s'\n", arg);
                 return SLANG_FAIL;
             }
             const char* apiList = *argCursor++;
@@ -633,7 +633,7 @@ Result parseOptions(int* argc, char** argv)
             SlangResult res = RenderApiUtil::parseApiFlags(UnownedStringSlice(apiList), g_options.synthesizedTestApis, &g_options.synthesizedTestApis);
             if (SLANG_FAILED(res))
             {
-                fprintf(stderr, "error: unable to parse api list '%s'\n", apiList);
+                fprintf(stderr, "error: unable to parse api expression '%s'\n", apiList);
                 return res;
             }
         }
