@@ -325,6 +325,12 @@ namespace Slang
 
         emitName(context, declRef.GetName());
 
+        // Special case: accessors need some way to distinguish themselves
+        // so that a getter/setter/ref-er don't all compile to the same name.
+        if(declRef.As<GetterDecl>())        emitRaw(context, "Ag");
+        if(declRef.As<SetterDecl>())        emitRaw(context, "As");
+        if(declRef.As<RefAccessorDecl>())   emitRaw(context, "Ar");
+
         // Are we the "inner" declaration beneath a generic decl?
         if(parentGenericDeclRef && (parentGenericDeclRef.getDecl()->inner.Ptr() == declRef.getDecl()))
         {

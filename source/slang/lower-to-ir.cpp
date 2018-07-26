@@ -2990,10 +2990,39 @@ static LoweredValInfo moveIntoMutableTemp(
     return var;
 }
 
+// When we try to turn a `LoweredValInfo` into an address of some temporary storage,
+// we can either do it "aggressively" or not (what we'll call the "default" behavior,
+// although it isn't strictly more common).
+//
+// The case that this is mostly there to address is when somebody writes an operation
+// like:
+//
+//      foo[a] = b;
+//
+// In that case, we might as well just use the `set` accessor if there is one, rather
+// than complicate things. However, in more complex cases like:
+//
+//      foo[a].x = b;
+//
+// there is no way to satisfy the semantics of the code the user wrote (in terms of
+// only writing one vector component, and not a full vector) by using the `set`
+// accessor, and we need to be "aggressive" in turning the lvalue `foo[a]` into
+// an address.
+//
+// TODO: realistically IR lowering is too early to be binding to this choice,
+// because different accessors might be supported on different targets.
+//
+enum class TryGetAddressMode
+{
+    Default,
+    Aggressive,
+};
+
 /// Try to coerce `inVal` into a `LoweredValInfo::ptr()` with a simple address.
 LoweredValInfo tryGetAddress(
     IRGenContext*           context,
-    LoweredValInfo const&   inVal)
+    LoweredValInfo const&   inVal,
+    TryGetAddressMode       mode)
 {
     LoweredValInfo val = inVal;
 
@@ -3011,6 +3040,19 @@ LoweredValInfo tryGetAddress(
             // as part of the subscript operation being referenced.
             //
             auto subscriptInfo = val.getBoundSubscriptInfo();
+
+            // We don't want to immediately bind to a `ref` accessor if there is
+            // a `set` accessor available, unless we are in an "aggressive" mode
+            // where we really want/need a pointer to be able to make progress.
+            //
+            if(mode != TryGetAddressMode::Aggressive
+                && getMembersOfType<SetterDecl>(subscriptInfo->declRef).Count())
+            {
+                // There is a setter that we should consider using,
+                // so don't go and aggressively collapse things just yet.
+                return val;
+            }
+
             auto refAccessors = getMembersOfType<RefAccessorDecl>(subscriptInfo->declRef);
             if(refAccessors.Count())
             {
@@ -3053,7 +3095,7 @@ LoweredValInfo tryGetAddress(
             if( auto fieldDeclRef = declRef.As<StructField>() )
             {
                 auto baseVal = boundMemberInfo->base;
-                auto basePtr = tryGetAddress(context, baseVal);
+                auto basePtr = tryGetAddress(context, baseVal, TryGetAddressMode::Aggressive);
 
                 return extractField(context, boundMemberInfo->type, basePtr, fieldDeclRef);
             }
@@ -3068,7 +3110,7 @@ LoweredValInfo tryGetAddress(
 
             UInt elementCount = originalSwizzleInfo->elementCount;
 
-            auto newBase = tryGetAddress(context, originalBase);
+            auto newBase = tryGetAddress(context, originalBase, TryGetAddressMode::Aggressive);
             RefPtr<SwizzledLValueInfo> newSwizzleInfo = new SwizzledLValueInfo();
             context->shared->extValues.Add(newSwizzleInfo);
 
@@ -3098,7 +3140,7 @@ IRInst* getAddress(
     LoweredValInfo const&   inVal,
     SourceLoc               diagnosticLocation)
 {
-    LoweredValInfo val = tryGetAddress(context, inVal);
+    LoweredValInfo val = tryGetAddress(context, inVal, TryGetAddressMode::Aggressive);
 
     if( val.flavor == LoweredValInfo::Flavor::Ptr )
     {
@@ -3122,7 +3164,7 @@ void assign(
     // a simple pointer, since that would make our life a lot easier
     // when handling complex cases.
     //
-    left = tryGetAddress(context, left);
+    left = tryGetAddress(context, left, TryGetAddressMode::Default);
 
     auto builder = context->irBuilder;
 
