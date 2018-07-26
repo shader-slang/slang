@@ -4805,7 +4805,7 @@ struct EmitVisitor
             // Note: GLSL doesn't support interpolation modifiers on `struct` fields
             if( ctx->shared->target != CodeGenTarget::GLSL )
             {
-                emitInterpolationModifiers(ctx, fieldKey, fieldType);
+                emitInterpolationModifiers(ctx, fieldKey, fieldType, nullptr);
             }
 
             emitIRType(ctx, fieldType, getIRName(fieldKey));
@@ -4902,12 +4902,12 @@ struct EmitVisitor
     void emitInterpolationModifiers(
         EmitContext*    ctx,
         IRInst*         varInst,
-        IRType*         valueType)
+        IRType*         valueType,
+        VarLayout*      layout)
     {
         bool isGLSL = (ctx->shared->target == CodeGenTarget::GLSL);
         bool anyModifiers = false;
 
-        anyModifiers = true;
         for(auto dd = varInst->firstDecoration; dd; dd = dd->next)
         {
             if(dd->op != kIRDecorationOp_InterpolationMode)
@@ -4953,7 +4953,22 @@ struct EmitVisitor
         // add the `flat` modifier for GLSL.
         if(!anyModifiers && isGLSL)
         {
-            maybeEmitGLSLFlatModifier(ctx, valueType);
+            // Only emit a deault `flat` for fragment
+            // stage varying inputs.
+            //
+            // TODO: double-check that this works for
+            // signature matching even if the producing
+            // stage didnt' use `flat`.
+            //
+            // If this ends up being a problem we can instead
+            // output everything with `flat` except for
+            // fragment *outputs* (and maybe vertex inputs).
+            //
+            if(layout && layout->stage == Stage::Fragment
+                && layout->FindResourceInfo(LayoutResourceKind::VaryingInput))
+            {
+                maybeEmitGLSLFlatModifier(ctx, valueType);
+            }
         }
     }
 
@@ -5000,7 +5015,7 @@ struct EmitVisitor
         if(layout->FindResourceInfo(LayoutResourceKind::VaryingInput)
             || layout->FindResourceInfo(LayoutResourceKind::VaryingOutput))
         {
-            emitInterpolationModifiers(ctx, varDecl, varType);
+            emitInterpolationModifiers(ctx, varDecl, varType, layout);
         }
 
         if (ctx->shared->target == CodeGenTarget::GLSL)
