@@ -128,8 +128,6 @@ SIMPLE_SYNTAX_CLASS(GLSLUnparsedLayoutModifier   , GLSLLayoutModifier)
 
 // Specific cases for known GLSL `layout` modifiers that we need to work with
 SIMPLE_SYNTAX_CLASS(GLSLConstantIDLayoutModifier , GLSLParsedLayoutModifier)
-SIMPLE_SYNTAX_CLASS(GLSLBindingLayoutModifier    , GLSLParsedLayoutModifier)
-SIMPLE_SYNTAX_CLASS(GLSLSetLayoutModifier        , GLSLParsedLayoutModifier)
 SIMPLE_SYNTAX_CLASS(GLSLLocationLayoutModifier   , GLSLParsedLayoutModifier)
 SIMPLE_SYNTAX_CLASS(GLSLPushConstantLayoutModifier, GLSLParsedLayoutModifier)
 
@@ -332,8 +330,8 @@ SIMPLE_SYNTAX_CLASS(CallAttribute, Attribute)               // `[call]`
 
 // [[vk_binding]]
 SYNTAX_CLASS(GLSLBindingAttribute, Attribute)
-    FIELD(int32_t, binding)
-    FIELD(int32_t, set)
+    FIELD(int32_t, binding = 0)
+    FIELD(int32_t, set = 0)
 END_SYNTAX_CLASS()
 
 // TODO: for attributes that take arguments, the syntax node

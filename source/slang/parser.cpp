@@ -11,6 +11,48 @@ namespace Slang
     // Pre-declare
     static Name* getName(Parser* parser, String const& text);
 
+    // Helper class useful to build a list of modifiers. 
+    struct ModifierListBuilder
+    {
+        ModifierListBuilder()
+        {
+            m_next = &m_result;
+        }
+        void add(Modifier* modifier)
+        {
+            // Doesn't handle SharedModifiers
+            SLANG_ASSERT(modifier->As<SharedModifiers>() == nullptr);
+
+            // Splice at end
+            *m_next = modifier;
+            m_next = &modifier->next;
+        }
+        template <typename T>
+        T* find() const
+        {
+            Modifier* cur = m_result;
+            while (cur)
+            {
+                T* castCur = cur->As<T>();
+                if (castCur)
+                {
+                    return castCur;
+                }
+                cur = cur->next;
+            }
+            return nullptr;
+        }
+        template <typename T>
+        bool hasType() const
+        {
+            return find<T>() != nullptr;
+        }
+        RefPtr<Modifier> getFirst() { return m_result; };
+    protected:
+
+        RefPtr<Modifier> m_result;
+        RefPtr<Modifier>* m_next;
+    };
 
     enum Precedence : int
     {
@@ -571,7 +613,9 @@ namespace Slang
             // About to look at shared modifiers? Done.
             RefPtr<Modifier> linkMod = *modifierLink;
             if(linkMod.As<SharedModifiers>())
+            {
                 break;
+            }
 
             // Otherwise: keep traversing the modifier list.
             modifierLink = &(*modifierLink)->next;
@@ -4426,60 +4470,86 @@ namespace Slang
         return modifier;
     }
 
+
+
     static RefPtr<RefObject> parseLayoutModifier(Parser* parser, void* /*userData*/)
     {
-        Modifiers modifiers;
-        RefPtr<Modifier>* modifierLink = &modifiers.first;
+        ModifierListBuilder listBuilder;
 
-        auto beginMarker = new GLSLLayoutModifierGroupBegin();
-        AddModifier(&modifierLink, beginMarker);
-
+        listBuilder.add(new GLSLLayoutModifierGroupBegin());
+        
         parser->ReadToken(TokenType::LParent);
         while (!AdvanceIfMatch(parser, TokenType::RParent))
         {
             auto nameAndLoc = expectIdentifier(parser);
+            const String& nameText = nameAndLoc.name->text;
 
-            RefPtr<GLSLLayoutModifier> modifier;
+            if (nameText == "binding" ||
+                nameText == "set")
+            {
+                GLSLBindingAttribute* attr = listBuilder.find<GLSLBindingAttribute>();
+                if (!attr)
+                {
+                    attr = new GLSLBindingAttribute();
+                    listBuilder.add(attr);
+                }
 
-            // TODO: better handling of this choice (e.g., lookup in scope)
-            if(0) {}
-        #define CASE(KEYWORD, CLASS) \
-            else if(getText(nameAndLoc.name) == #KEYWORD) modifier = new CLASS()
+                parser->ReadToken(TokenType::OpAssign);
 
-            CASE(constant_id,   GLSLConstantIDLayoutModifier);
-            CASE(binding,       GLSLBindingLayoutModifier);
-            CASE(set,           GLSLSetLayoutModifier);
-            CASE(location,      GLSLLocationLayoutModifier);
-            CASE(push_constant, GLSLPushConstantLayoutModifier);
-            CASE(local_size_x,  GLSLLocalSizeXLayoutModifier);
-            CASE(local_size_y,  GLSLLocalSizeYLayoutModifier);
-            CASE(local_size_z,  GLSLLocalSizeZLayoutModifier);
+                Token valToken = parser->ReadToken(TokenType::IntegerLiteral);
+                // Work out the value
+                auto value = getIntegerLiteralValue(valToken);
 
-        #undef CASE
+                if (nameText == "binding")
+                {
+                    attr->binding = int32_t(value);
+                }
+                else
+                {
+                    attr->set = int32_t(value);
+                }
+            }
             else
             {
-                modifier = new GLSLUnparsedLayoutModifier();
+                RefPtr<GLSLLayoutModifier> modifier;
+
+                // TODO: better handling of this choice (e.g., lookup in scope)
+                if(0) {}
+            #define CASE(KEYWORD, CLASS) \
+                else if(getText(nameAndLoc.name) == #KEYWORD) modifier = new CLASS()
+
+                CASE(constant_id,   GLSLConstantIDLayoutModifier);
+                CASE(location,      GLSLLocationLayoutModifier);
+                CASE(push_constant, GLSLPushConstantLayoutModifier);
+                CASE(local_size_x,  GLSLLocalSizeXLayoutModifier);
+                CASE(local_size_y,  GLSLLocalSizeYLayoutModifier);
+                CASE(local_size_z,  GLSLLocalSizeZLayoutModifier);
+
+            #undef CASE
+                else
+                {
+                    modifier = new GLSLUnparsedLayoutModifier();
+                }
+
+                modifier->name = nameAndLoc.name;
+                modifier->loc = nameAndLoc.loc;
+
+                if(AdvanceIf(parser, TokenType::OpAssign))
+                {
+                    modifier->valToken = parser->ReadToken(TokenType::IntegerLiteral);
+                }
+
+                listBuilder.add(modifier);
             }
-
-            modifier->name = nameAndLoc.name;
-            modifier->loc = nameAndLoc.loc;
-
-            if(AdvanceIf(parser, TokenType::OpAssign))
-            {
-                modifier->valToken = parser->ReadToken(TokenType::IntegerLiteral);
-            }
-
-            AddModifier(&modifierLink, modifier);
 
             if (AdvanceIf(parser, TokenType::RParent))
                 break;
             parser->ReadToken(TokenType::Comma);
         }
 
-        auto endMarker = new GLSLLayoutModifierGroupEnd();
-        AddModifier(&modifierLink, endMarker);
+        listBuilder.add(new GLSLLayoutModifierGroupEnd());
 
-        return modifiers.first;
+        return listBuilder.getFirst();
     }
 
     static RefPtr<RefObject> parseBuiltinTypeModifier(Parser* parser, void* /*userData*/)

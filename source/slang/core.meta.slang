@@ -1119,6 +1119,9 @@ bool operator==(E left, E right);
 __attributeTarget(DeclBase)
 attribute_syntax [vk_binding(binding: int, set: int = 0)]			: GLSLBindingAttribute;
 
+__attributeTarget(DeclBase)
+attribute_syntax [gl_binding(binding: int, set: int = 0)]			: GLSLBindingAttribute;
+
 // Statement Attributes
 
 __attributeTarget(LoopStmt)
