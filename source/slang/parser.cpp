@@ -8,6 +8,10 @@
 
 namespace Slang
 {
+    // Pre-declare
+    static Name* getName(Parser* parser, String const& text);
+
+
     enum Precedence : int
     {
         Invalid = -1,
@@ -598,10 +602,57 @@ namespace Slang
         AddModifier(&modifierLink, modifier);
     }
 
+    // 
+    // '::'? identifier ('::' identifier)* 
+    static Token parseAttributeName(Parser* parser)
+    {
+        const SourceLoc scopedIdSourceLoc = parser->tokenReader.PeekLoc();
+
+        // Strip initial :: if there is one
+        const TokenType initialTokenType = parser->tokenReader.PeekTokenType();
+        if (initialTokenType == TokenType::Scope)
+        {
+            parser->ReadToken(TokenType::Scope); 
+        }
+
+        const Token firstIdentifier = parser->ReadToken(TokenType::Identifier);
+        if (initialTokenType != TokenType::Scope && parser->tokenReader.PeekTokenType() != TokenType::Scope)
+        {
+            return firstIdentifier;
+        }
+
+        // Build up scoped string
+        StringBuilder scopedIdentifierBuilder;
+        if (initialTokenType == TokenType::Scope)
+        {
+            scopedIdentifierBuilder.Append('_'); 
+        }
+        scopedIdentifierBuilder.Append(firstIdentifier.Content);
+
+        while (parser->tokenReader.PeekTokenType() == TokenType::Scope)
+        {
+            parser->ReadToken(TokenType::Scope);
+            scopedIdentifierBuilder.Append('_'); 
+            
+            const Token nextIdentifier(parser->ReadToken(TokenType::Identifier));
+            scopedIdentifierBuilder.Append(nextIdentifier.Content);
+        }
+
+        // Make a 'token'
+        const String scopedIdentifier(scopedIdentifierBuilder.ToString());
+        Token token(TokenType::Identifier, scopedIdentifier, scopedIdSourceLoc);
+        token.ptrValue = getName(parser, token.Content);
+
+        return token;
+    }
+
     // Parse HLSL-style `[name(arg, ...)]` style "attribute" modifiers
     static void ParseSquareBracketAttributes(Parser* parser, RefPtr<Modifier>** ioModifierLink)
     {
         parser->ReadToken(TokenType::LBracket);
+
+        const bool hasDoubleBracket = AdvanceIf(parser, TokenType::LBracket);
+
         for(;;)
         {
             // Note: When parsing we just construct an AST node for an
@@ -613,7 +664,8 @@ namespace Slang
             // seems better to not complicate the parsing process any more.
             //
 
-            auto nameToken = parser->ReadToken(TokenType::Identifier);
+            Token nameToken = parseAttributeName(parser);
+
             RefPtr<UncheckedAttribute> modifier = new UncheckedAttribute();
             modifier->name = nameToken.getName();
             modifier->loc = nameToken.getLoc();
@@ -644,6 +696,12 @@ namespace Slang
                 break;
 
             parser->ReadToken(TokenType::Comma);
+        }
+
+        if (hasDoubleBracket)
+        {
+            // Read the second ]
+            parser->ReadToken(TokenType::RBracket);
         }
     }
 
