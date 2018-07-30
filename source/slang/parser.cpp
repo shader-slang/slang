@@ -575,7 +575,7 @@ namespace Slang
 
         // Splice the modifier into the linked list
 
-        // We need to deal with the case where the modifeir to
+        // We need to deal with the case where the modifier to
         // be spliced in might actually be a modifier *list*,
         // so that we actually want to splice in at the
         // end of the new list...
