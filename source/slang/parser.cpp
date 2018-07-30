@@ -4383,7 +4383,7 @@ namespace Slang
 
             RefPtr<GLSLLayoutModifier> modifier;
 
-            // TODO: better handling of this choise (e.g., lookup in scope)
+            // TODO: better handling of this choice (e.g., lookup in scope)
             if(0) {}
         #define CASE(KEYWORD, CLASS) \
             else if(getText(nameAndLoc.name) == #KEYWORD) modifier = new CLASS()

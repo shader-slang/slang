@@ -1192,7 +1192,16 @@ namespace Slang
 
         case '~': advance(lexer); return TokenType::OpBitNot;
 
-        case ':': advance(lexer); return TokenType::Colon;
+        case ':': 
+        {
+            advance(lexer);
+            if (peek(lexer) == ':')
+            {
+                advance(lexer);
+                return TokenType::Scope;
+            }
+            return TokenType::Colon;
+        }
         case ';': advance(lexer); return TokenType::Semicolon;
         case ',': advance(lexer); return TokenType::Comma;
 
