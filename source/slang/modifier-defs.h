@@ -330,6 +330,12 @@ SIMPLE_SYNTAX_CLASS(FlattenAttribute, Attribute)            // `[flatten]`
 SIMPLE_SYNTAX_CLASS(ForceCaseAttribute, Attribute)          // `[forcecase]`
 SIMPLE_SYNTAX_CLASS(CallAttribute, Attribute)               // `[call]`
 
+// [[vk_binding]]
+SYNTAX_CLASS(GLSLBindingAttribute, Attribute)
+    FIELD(int32_t, binding)
+    FIELD(int32_t, set)
+END_SYNTAX_CLASS()
+
 // TODO: for attributes that take arguments, the syntax node
 // classes should provide accessors for the values of those arguments.
 

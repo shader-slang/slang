@@ -1894,6 +1894,15 @@ namespace Slang
                     numThreadsAttr->y          = (int32_t) yVal->value;
                     numThreadsAttr->z          = (int32_t) zVal->value;
                 }
+                else if (auto bindingAttr = attr.As<GLSLBindingAttribute>())
+                {
+                    SLANG_ASSERT(attr->args.Count() == 2);
+                    auto binding = checkConstantIntVal(attr->args[0]);
+                    auto set = checkConstantIntVal(attr->args[1]);
+
+                    bindingAttr->binding = int32_t(binding->value);
+                    bindingAttr->set = int32_t(set->value);
+                }
                 else if (auto maxVertexCountAttr = attr.As<MaxVertexCountAttribute>())
                 {
                     SLANG_ASSERT(attr->args.Count() == 1);
