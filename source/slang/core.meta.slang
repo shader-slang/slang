@@ -744,7 +744,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                     break;
 
                 default:
-                    sb << "__target_intrinsic(glsl, \"imageStore($0, " << ivecN << "($1), $2)\") set;\n";
+                    sb << "__target_intrinsic(glsl, \"imageStore($0, " << ivecN << "($1), $V2)\") set;\n";
 
                     // Note: HLSL doesn't support component-granularity access into typed UAVs,
                     // and also doesn't support atomic operations on them. As such, there should
