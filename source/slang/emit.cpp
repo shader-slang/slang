@@ -969,8 +969,7 @@ struct EmitVisitor
         }
     }
 
-
-    void emitVectorTypeImpl(IRVectorType* vecType)
+    void emitVectorTypeName(IRType* elementType, IRIntegerValue elementCount)
     {
         switch(context->shared->target)
         {
@@ -978,26 +977,6 @@ struct EmitVisitor
         case CodeGenTarget::GLSL_Vulkan:
         case CodeGenTarget::GLSL_Vulkan_OneDesc:
             {
-                // Need to special case if there is a single element in the vector
-                // as there is no such thing in glsl as vec1
-                IRInst* elementCountInst = vecType->getElementCount();
-
-                if (elementCountInst->op != kIROp_IntLit)
-                {
-                    SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "Expecting an integral size for vector size");
-                    return;
-                }
-
-                const IRConstant* irConst = (const IRConstant*)elementCountInst;
-                const IRIntegerValue elementCount = irConst->u.intVal;
-                if (elementCount <= 0)
-                {
-                    SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "Vector size must be greater than 0");
-                    return;
-                }
-
-                auto* elementType = vecType->getElementType();
-
                 if (elementCount > 1)
                 {
                     emitGLSLTypePrefix(elementType);
@@ -1014,9 +993,9 @@ struct EmitVisitor
         case CodeGenTarget::HLSL:
             // TODO(tfoley): should really emit these with sugar
             Emit("vector<");
-            EmitType(vecType->getElementType());
+            EmitType(elementType);
             Emit(",");
-            EmitVal(vecType->getElementCount());
+            emit(elementCount);
             Emit(">");
             break;
 
@@ -1024,6 +1003,28 @@ struct EmitVisitor
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled code generation target");
             break;
         }
+    }
+
+    void emitVectorTypeImpl(IRVectorType* vecType)
+    {
+        IRInst* elementCountInst = vecType->getElementCount();
+        if (elementCountInst->op != kIROp_IntLit)
+        {
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "Expecting an integral size for vector size");
+            return;
+        }
+
+        const IRConstant* irConst = (const IRConstant*)elementCountInst;
+        const IRIntegerValue elementCount = irConst->u.intVal;
+        if (elementCount <= 0)
+        {
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "Vector size must be greater than 0");
+            return;
+        }
+
+        auto* elementType = vecType->getElementType();
+
+        emitVectorTypeName(elementType, elementCount);
     }
 
     void emitMatrixTypeImpl(IRMatrixType* matType)
@@ -3120,6 +3121,58 @@ struct EmitVisitor
                     }
                     break;
 
+                case 'V':
+                    {
+                        // Take an argument of some scalar/vector type and pad
+                        // it out to a 4-vector with the same element type
+                        // (this is the inverse of `$z`).
+                        //
+                        SLANG_RELEASE_ASSERT(*cursor >= '0' && *cursor <= '9');
+                        UInt argIndex = (*cursor++) - '0';
+                        SLANG_RELEASE_ASSERT(argCount > argIndex);
+
+                        auto arg = args[argIndex].get();
+                        IRIntegerValue elementCount = 1;
+                        IRType* elementType = arg->getDataType();
+                        if (auto vectorType = as<IRVectorType>(elementType))
+                        {
+                            elementCount = GetIntVal(vectorType->getElementCount());
+                            elementType = vectorType->getElementType();
+                        }
+
+                        if(elementCount == 4)
+                        {
+                            // In the simple case, the operand is already a 4-vector,
+                            // so we can just emit it as-is.
+                            emitIROperand(ctx, arg, mode);
+                        }
+                        else
+                        {
+                            // Othwerwise, we need to construct a 4-vector from the
+                            // value we have, padding it out with zero elements as
+                            // needed.
+                            //
+                            emitVectorTypeName(elementType, 4);
+                            Emit("(");
+                            emitIROperand(ctx, arg, mode);
+                            for(IRIntegerValue ii = elementCount; ii < 4; ++ii)
+                            {
+                                Emit(", ");
+                                if(getTarget(ctx) == CodeGenTarget::GLSL)
+                                {
+                                    emitSimpleTypeImpl(elementType);
+                                    Emit("(0)");
+                                }
+                                else
+                                {
+                                    Emit("0");
+                                }
+                            }
+                            Emit(")");
+                        }
+                    }
+                    break;
+
 
                 default:
                     SLANG_UNEXPECTED("bad format in intrinsic definition");
@@ -4135,7 +4188,7 @@ struct EmitVisitor
         }
     }
 
-    
+
 
     IRInst* findFirstInst(IRFunc* irFunc, IROp op)
     {
@@ -4155,7 +4208,7 @@ struct EmitVisitor
     void emitAttributeSingleString(const char* name, FuncDecl* entryPoint, Attribute* attrib)
     {
         assert(attrib);
-        
+
         attrib->args.Count();
         if (attrib->args.Count() != 1)
         {
@@ -4175,7 +4228,7 @@ struct EmitVisitor
         emit("[");
         emit(name);
         emit("(\"");
-        emit(stringLitExpr->value); 
+        emit(stringLitExpr->value);
         emit("\")]\n");
     }
 
@@ -4226,7 +4279,7 @@ struct EmitVisitor
     }
 
     void emitIREntryPointAttributes_HLSL(
-        IRFunc*             irFunc, 
+        IRFunc*             irFunc,
         EmitContext*        ctx,
         EntryPointLayout*   entryPointLayout)
     {
@@ -4994,15 +5047,90 @@ struct EmitVisitor
                 case SLANG_RESOURCE_ACCESS_READ_WRITE:
                 case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
                     {
-                        // TODO: at this point we need to look at the element
-                        // type and figure out what format we want.
+                        // We have a resource type like `RWTexture2D<X>` and when we emit
+                        // this as an image declaration in GLSL, we need to specify the
+                        // correct in-memory format for the image (e.g., `layout(rgba32f)`).
                         //
-                        // For now just hack it and assume a fixed format.
-                        Emit("layout(rgba32f)");
+                        // TODO: There are modifiers in GLSL that can specify this information,
+                        // and we should support the same ones that dxc does (e.g.,
+                        // some kind of `[[vk::format(...)]]` or what-have-you.
+                        //
+                        // For now we will simply infer a reasonable format from the
+                        // element type that was specified.
+                        //
+                        auto elementType = resourceType->getElementType();
+                        Int vectorWidth = 1;
+                        if(auto elementVecType = as<IRVectorType>(elementType))
+                        {
+                            if(auto intLitVal = as<IRIntLit>(elementVecType->getElementCount()))
+                            {
+                                vectorWidth = (Int) intLitVal->getValue();
+                            }
+                            else
+                            {
+                                vectorWidth = 0;
+                            }
+                            elementType = elementVecType->getElementType();
+                        }
+                        if(auto elementBasicType = as<IRBasicType>(elementType))
+                        {
+                            Emit("layout(");
+                            switch(vectorWidth)
+                            {
+                            default: Emit("rgba");  break;
 
-                        // TODO: we also need a way for users to specify what
-                        // the format should be explicitly, to avoid having
-                        // to have us infer things...
+                            // TODO: GLSL doesn't actually seem to support 3-component formats
+                            // universally, so this might cause problems.
+                            case 3:  Emit("rgb");   break;
+
+                            case 2:  Emit("rg");    break;
+                            case 1:  Emit("r");     break;
+                            }
+                            switch(elementBasicType->getBaseType())
+                            {
+                            default:
+                            case BaseType::Float:   Emit("32f");  break;
+                            case BaseType::Half:    Emit("16f");  break;
+                            case BaseType::UInt:    Emit("32ui"); break;
+                            case BaseType::Int:     Emit("32i"); break;
+
+                            // TODO: Here are formats that are available in GLSL,
+                            // but that are not handled by the above cases.
+                            //
+                            // r11f_g11f_b10f
+                            //
+                            // rgba16
+                            // rgb10_a2
+                            // rgba8
+                            // rg16
+                            // rg8
+                            // r16
+                            // r8
+                            //
+                            // rgba16_snorm
+                            // rgba8_snorm
+                            // rg16_snorm
+                            // rg8_snorm
+                            // r16_snorm
+                            // r8_snorm
+                            //
+                            // rgba16i
+                            // rgba8i
+                            // rg16i
+                            // rg8i
+                            // r16i
+                            // r8i
+                            //
+                            // rgba16ui
+                            // rgb10_a2ui
+                            // rgba8ui
+                            // rg16ui
+                            // rg8ui
+                            // r16ui
+                            // r8ui
+                            }
+                            Emit(")\n");
+                        }
                     }
                     break;
 
