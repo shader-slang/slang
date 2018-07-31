@@ -1114,6 +1114,14 @@ __generic<E : __EnumType>
 __intrinsic_op($(kIROp_Eql))
 bool operator==(E left, E right);
 
+// Binding Attributes
+
+__attributeTarget(DeclBase)
+attribute_syntax [vk_binding(binding: int, set: int = 0)]			: GLSLBindingAttribute;
+
+__attributeTarget(DeclBase)
+attribute_syntax [gl_binding(binding: int, set: int = 0)]			: GLSLBindingAttribute;
+
 // Statement Attributes
 
 __attributeTarget(LoopStmt)
@@ -1181,3 +1189,4 @@ attribute_syntax [earlydepthstencil]    : EarlyDepthStencilAttribute;
 // Compute Shader
 __attributeTarget(FuncDecl)
 attribute_syntax [numthreads(x: int, y: int = 1, z: int = 1)]   : NumThreadsAttribute;
+
