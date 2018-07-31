@@ -41,15 +41,15 @@ public:
     Token() = default;
 
     Token(
-        TokenType type,
-        const String & content,
-        SourceLoc loc,
-        TokenFlags flags = 0)
-        : flags(flags)
+        TokenType typeIn,
+        const String & contentIn,
+        SourceLoc locIn,
+        TokenFlags flagsIn = 0)
+        : flags(flagsIn)
 	{
-		type = type;
-		Content = content;
-        loc = loc;
+		type = typeIn;
+		Content = contentIn;
+        loc = locIn;
         ptrValue = nullptr;
 	}
 

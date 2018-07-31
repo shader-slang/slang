@@ -85,6 +85,7 @@ For completeness, here are the options that `slangc` currently accepts:
 * `-pass-through <name>`: Don't actually perform Slang parsing/checking/etc. on the input and instead pass it through more or less modified to the existing compiler `<name>`"
   * `fxc`: Use the `D3DCompile` API as exposed by `d3dcompiler_47.dll`
   * `glslang`: Use Slang's internal version of `glslang` as exposed by `slang-glslang.dll`
+  * 'dxc': Use DirectXShaderCompiler (https://github.com/Microsoft/DirectXShaderCompiler)
   * These are intended for debugging/testing purposes, when you want to be able to see what these existing compilers do with the "same" input and options
 
 * `-profile <profile>`: Specify the language "profile" to use. This is a combination of the pipeline stage (vertex, fragment, compute, etc.) and an abstract feature level. E.g., the `ps_5_0` profile specifies the fragment stage, with the Direc3D "Shader Model 5" feature level. To summarize the available profiles:

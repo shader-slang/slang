@@ -1413,10 +1413,13 @@ static void addExplicitParameterBindings_GLSL(
     if( (resInfo = typeLayout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot)) != nullptr )
     {
         // Try to find `binding` and `set`
-        if(!findLayoutArg<GLSLBindingLayoutModifier>(varDecl, &semanticInfo.index))
+        auto attr = varDecl.getDecl()->FindModifier<GLSLBindingAttribute>();
+        if (!attr)
+        {
             return;
-
-        findLayoutArg<GLSLSetLayoutModifier>(varDecl, &semanticInfo.space);
+        }
+        semanticInfo.index = attr->binding;
+        semanticInfo.space = attr->set;
     }
     else if( (resInfo = typeLayout->FindResourceInfo(LayoutResourceKind::VertexInput)) != nullptr )
     {

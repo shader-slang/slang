@@ -22,7 +22,7 @@ namespace Slang
         OpInc, OpDec, OpAddAssign, OpSubAssign, OpMulAssign, OpDivAssign, OpModAssign,
         OpShlAssign, OpShrAssign, OpOrAssign, OpAndAssign, OpXorAssign,
 
-        QuestionMark, Colon, RightArrow, At, Pound, PoundPound,
+        QuestionMark, Colon, RightArrow, At, Pound, PoundPound, Scope,
     };
 
     class CodePosition
