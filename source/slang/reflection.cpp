@@ -443,7 +443,7 @@ SLANG_API SlangReflectionType * spReflection_FindTypeByName(SlangReflection * re
 
 SLANG_API SlangReflectionTypeLayout* spReflection_GetTypeLayout(
     SlangReflection* reflection,
-    SlangReflectionType* inType, 
+    SlangReflectionType* inType,
     SlangLayoutRules /*rules*/)
 {
     auto context = convert(reflection);
@@ -672,6 +672,21 @@ SLANG_API SlangMatrixLayoutMode spReflectionTypeLayout_GetMatrixLayoutMode(Slang
         return SLANG_MATRIX_LAYOUT_MODE_UNKNOWN;
     }
 
+}
+
+SLANG_API int spReflectionTypeLayout_getGenericParamIndex(SlangReflectionTypeLayout* inTypeLayout)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return -1;
+
+    if(auto genericParamTypeLayout = dynamic_cast<GenericParamTypeLayout*>(typeLayout))
+    {
+        return genericParamTypeLayout->paramIndex;
+    }
+    else
+    {
+        return -1;
+    }
 }
 
 
@@ -925,7 +940,7 @@ namespace Slang
 
         return 0;
     }
-    
+
     static VarLayout* getParameterByIndex(RefPtr<TypeLayout> typeLayout, unsigned index)
     {
         if(auto parameterGroupLayout = typeLayout.As<ParameterGroupTypeLayout>())
@@ -1146,6 +1161,24 @@ SLANG_API SlangReflectionEntryPoint* spReflection_getEntryPointByIndex(SlangRefl
 
     return convert(program->entryPoints[(int) index].Ptr());
 }
+
+SLANG_API SlangReflectionEntryPoint* spReflection_findEntryPointByName(SlangReflection* inProgram, char const* name)
+{
+    auto program = convert(inProgram);
+    if(!program) return 0;
+
+    // TODO: improve on dumb linear search
+    for(auto ep : program->entryPoints)
+    {
+        if(ep->entryPoint->getName()->text == name)
+        {
+            return convert(ep);
+        }
+    }
+
+    return nullptr;
+}
+
 
 SLANG_API SlangUInt spReflection_getGlobalConstantBufferBinding(SlangReflection* inProgram)
 {

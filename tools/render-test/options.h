@@ -9,7 +9,7 @@
 
 namespace renderer_test {
 
-using namespace slang_graphics;
+using namespace gfx;
 
 struct Options
 {

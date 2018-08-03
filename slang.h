@@ -474,13 +474,13 @@ extern "C"
     This type is generally compatible with the Windows API `HRESULT` type. In particular, negative values indicate
     failure results, while zero or positive results indicate success.
 
-    In general, Slang APIs always return a zero result on success, unless documented otherwise. Strictly speaking 
+    In general, Slang APIs always return a zero result on success, unless documented otherwise. Strictly speaking
     a negative value indicates an error, a positive (or 0) value indicates success. This can be tested for with the macros
     SLANG_SUCCEEDED(x) or SLANG_FAILED(x).
-    
-    It can represent if the call was successful or not. It can also specify in an extensible manner what facility 
+
+    It can represent if the call was successful or not. It can also specify in an extensible manner what facility
     produced the result (as the integral 'facility') as well as what caused it (as an integral 'code').
-    Under the covers SlangResult is represented as a int32_t. 
+    Under the covers SlangResult is represented as a int32_t.
 
     SlangResult is designed to be compatible with COM HRESULT.
 
@@ -493,12 +493,12 @@ extern "C"
     Severity - 1 fail, 0 is success - as SlangResult is signed 32 bits, means negative number indicates failure.
     Facility is where the error originated from. Code is the code specific to the facility.
 
-    Result codes have the following styles, 
+    Result codes have the following styles,
     1) SLANG_name
     2) SLANG_s_f_name
     3) SLANG_s_name
 
-    where s is S for success, E for error 
+    where s is S for success, E for error
     f is the short version of the facility name
 
     Style 1 is reserved for SLANG_OK and SLANG_FAIL as they are so commonly used.
@@ -516,7 +516,7 @@ extern "C"
 
     //! Get the facility the result is associated with
 #define SLANG_GET_RESULT_FACILITY(r)    ((int32_t)(((r) >> 16) & 0x7fff))
-    //! Get the result code for the facility 
+    //! Get the result code for the facility
 #define SLANG_GET_RESULT_CODE(r)        ((int32_t)((r) & 0xffff))
 
 #define SLANG_MAKE_ERROR(fac, code)        ((((int32_t)(fac)) << 16) | ((int32_t)(code)) | 0x80000000)
@@ -530,7 +530,7 @@ extern "C"
 #define SLANG_FACILITY_WIN_API          7
 
     //! Base facility -> so as to not clash with HRESULT values (values in 0x200 range do not appear used)
-#define SLANG_FACILITY_BASE         0x200                
+#define SLANG_FACILITY_BASE         0x200
 
     /*! Facilities numbers must be unique across a project to make the resulting result a unique number.
     It can be useful to have a consistent short name for a facility, as used in the name prefix */
@@ -539,7 +539,7 @@ extern "C"
     should never be part of a public API. */
 #define SLANG_FACILITY_INTERNAL         SLANG_FACILITY_BASE + 1
 
-    /// Base for external facilities. Facilities should be unique across modules. 
+    /// Base for external facilities. Facilities should be unique across modules.
 #define SLANG_FACILITY_EXTERNAL_BASE 0x210
 
     /* ************************ Win COM compatible Results ******************************/
@@ -551,18 +551,18 @@ extern "C"
 #define SLANG_FAIL                          SLANG_MAKE_ERROR(SLANG_FACILITY_WIN_INTERFACE, 5)
 
 #define SLANG_MAKE_WIN_INTERFACE_ERROR(code)    SLANG_MAKE_ERROR(SLANG_FACILITY_WIN_INTERFACE, code)
-#define SLANG_MAKE_WIN_API_ERROR(code)          SLANG_MAKE_ERROR(SLANG_FACILITY_WIN_API, code)     
+#define SLANG_MAKE_WIN_API_ERROR(code)          SLANG_MAKE_ERROR(SLANG_FACILITY_WIN_API, code)
 
-    //! Functionality is not implemented 
+    //! Functionality is not implemented
 #define SLANG_E_NOT_IMPLEMENTED             SLANG_MAKE_WIN_INTERFACE_ERROR(1)
-    //! Interface not be found 
+    //! Interface not be found
 #define SLANG_E_NO_INTERFACE                SLANG_MAKE_WIN_INTERFACE_ERROR(2)
-    //! Operation was aborted (did not correctly complete) 
+    //! Operation was aborted (did not correctly complete)
 #define SLANG_E_ABORT                       SLANG_MAKE_WIN_INTERFACE_ERROR(4)
 
-    //! Indicates that a handle passed in as parameter to a method is invalid. 
+    //! Indicates that a handle passed in as parameter to a method is invalid.
 #define SLANG_E_INVALID_HANDLE              SLANG_MAKE_ERROR(SLANG_FACILITY_WIN_API, 6)
-    //! Indicates that an argument passed in as parameter to a method is invalid. 
+    //! Indicates that an argument passed in as parameter to a method is invalid.
 #define SLANG_E_INVALID_ARG                 SLANG_MAKE_ERROR(SLANG_FACILITY_WIN_API, 0x57)
     //! Operation could not complete - ran out of memory
 #define SLANG_E_OUT_OF_MEMORY               SLANG_MAKE_ERROR(SLANG_FACILITY_WIN_API, 0xe)
@@ -573,10 +573,10 @@ extern "C"
 
     // Supplied buffer is too small to be able to complete
 #define SLANG_E_BUFFER_TOO_SMALL            SLANG_MAKE_CORE_ERROR(1)
-    //! Used to identify a Result that has yet to be initialized.  
-    //! It defaults to failure such that if used incorrectly will fail, as similar in concept to using an uninitialized variable. 
+    //! Used to identify a Result that has yet to be initialized.
+    //! It defaults to failure such that if used incorrectly will fail, as similar in concept to using an uninitialized variable.
 #define SLANG_E_UNINITIALIZED               SLANG_MAKE_CORE_ERROR(2)
-    //! Returned from an async method meaning the output is invalid (thus an error), but a result for the request is pending, and will be returned on a subsequent call with the async handle.             
+    //! Returned from an async method meaning the output is invalid (thus an error), but a result for the request is pending, and will be returned on a subsequent call with the async handle.
 #define SLANG_E_PENDING                     SLANG_MAKE_CORE_ERROR(3)
     //! Indicates a file/resource could not be opened
 #define SLANG_E_CANNOT_OPEN                 SLANG_MAKE_CORE_ERROR(4)
@@ -747,7 +747,7 @@ extern "C"
     - SLANG_GLSL. Generates GLSL code.
     - SLANG_HLSL. Generates HLSL code.
     - SLANG_SPIRV. Generates SPIR-V code.
-    */ 
+    */
     SLANG_API void spSetCodeGenTarget(
         SlangCompileRequest*    request,
         SlangCompileTarget target);
@@ -816,7 +816,7 @@ extern "C"
 
     /*!
     @brief Set options using arguments as if specified via command line.
-    @return Returns SlangResult. On success SLANG_SUCCEEDED(result) is true.  
+    @return Returns SlangResult. On success SLANG_SUCCEEDED(result) is true.
     */
     SLANG_API SlangResult spProcessCommandLineArguments(
         SlangCompileRequest*    request,
@@ -1276,6 +1276,8 @@ extern "C"
 
     SLANG_API SlangMatrixLayoutMode spReflectionTypeLayout_GetMatrixLayoutMode(SlangReflectionTypeLayout* type);
 
+    SLANG_API int spReflectionTypeLayout_getGenericParamIndex(SlangReflectionTypeLayout* type);
+
     // Variable Reflection
 
     SLANG_API char const* spReflectionVariable_GetName(SlangReflectionVariable* var);
@@ -1353,8 +1355,9 @@ extern "C"
     SLANG_API SlangReflectionTypeLayout* spReflection_GetTypeLayout(SlangReflection* reflection, SlangReflectionType* reflectionType, SlangLayoutRules rules);
 
     SLANG_API SlangUInt spReflection_getEntryPointCount(SlangReflection* reflection);
-
     SLANG_API SlangReflectionEntryPoint* spReflection_getEntryPointByIndex(SlangReflection* reflection, SlangUInt index);
+    SLANG_API SlangReflectionEntryPoint* spReflection_findEntryPointByName(SlangReflection* reflection, char const* name);
+
     SLANG_API SlangUInt spReflection_getGlobalConstantBufferBinding(SlangReflection* reflection);
     SLANG_API size_t spReflection_getGlobalConstantBufferSize(SlangReflection* reflection);
 
@@ -1638,6 +1641,11 @@ namespace slang
             return spReflectionTypeLayout_GetMatrixLayoutMode((SlangReflectionTypeLayout*) this);
         }
 
+        int getGenericParamIndex()
+        {
+            return spReflectionTypeLayout_getGenericParamIndex(
+                (SlangReflectionTypeLayout*) this);
+        }
     };
 
     struct Modifier
@@ -1800,6 +1808,11 @@ namespace slang
         }
     };
 
+    enum class LayoutRules : SlangLayoutRules
+    {
+        Default = SLANG_LAYOUT_RULES_DEFAULT,
+    };
+
     struct ShaderReflection
     {
         unsigned getParameterCount()
@@ -1850,6 +1863,30 @@ namespace slang
         size_t getGlobalConstantBufferSize()
         {
             return spReflection_getGlobalConstantBufferSize((SlangReflection*)this);
+        }
+
+        TypeReflection* findTypeByName(const char* name)
+        {
+            return (TypeReflection*)spReflection_FindTypeByName(
+                (SlangReflection*) this,
+                name);
+        }
+
+        TypeLayoutReflection* getTypeLayout(
+            TypeReflection* type,
+            LayoutRules     rules = LayoutRules::Default)
+        {
+            return (TypeLayoutReflection*)spReflection_GetTypeLayout(
+                (SlangReflection*) this,
+                (SlangReflectionType*)type,
+                SlangLayoutRules(rules));
+        }
+
+        EntryPointReflection* findEntryPointByName(const char* name)
+        {
+            return (EntryPointReflection*)spReflection_findEntryPointByName(
+                (SlangReflection*) this,
+                name);
         }
     };
 }
