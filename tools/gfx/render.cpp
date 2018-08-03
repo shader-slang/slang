@@ -55,6 +55,7 @@ const Resource::DescBase& Resource::getDescBase() const
 
     uint8_t(sizeof(uint32_t)),       // RGBA_Unorm_UInt8,
 
+    uint8_t(sizeof(uint16_t)),       // R_UInt16,
     uint8_t(sizeof(uint32_t)),       // R_UInt32,
 
     uint8_t(sizeof(float)),          // D_Float32,

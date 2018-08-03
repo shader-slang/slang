@@ -199,6 +199,13 @@ namespace Slang
             return pointer;
         }
 
+        void attach(T* p)
+        {
+            T* old = pointer;
+            pointer = p;
+            releaseReference(old);
+        }
+
         T* detach()
         {
             auto rs = pointer;

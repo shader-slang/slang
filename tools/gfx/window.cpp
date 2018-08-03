@@ -111,7 +111,13 @@ int runWindowsApplication(
 struct Window
 {
     HWND handle;
+    WNDPROC nativeHook;
 };
+
+void setNativeWindowHook(Window* window, WNDPROC proc)
+{
+    window->nativeHook = proc;
+}
 
 static LRESULT CALLBACK windowProc(
     HWND    windowHandle,
@@ -119,13 +125,38 @@ static LRESULT CALLBACK windowProc(
     WPARAM  wParam,
     LPARAM  lParam)
 {
+    Window* window = (Window*) GetWindowLongPtrW(windowHandle, GWLP_USERDATA);
+
+    // Give the installed filter a chance to intercept messages.
+    // (This is used for ImGui)
+    if( window )
+    {
+        if(auto nativeHook = window->nativeHook)
+        {
+            auto result = nativeHook(windowHandle, message, wParam, lParam);
+            if(result)
+                return result;
+        }
+    }
+
     // TODO: Actually implement some reasonable logic here.
     switch (message)
     {
+    case WM_CREATE:
+        {
+            auto createInfo = (CREATESTRUCTW*) lParam;
+            window = (Window*) createInfo->lpCreateParams;
+            window->handle = windowHandle;
+
+            SetWindowLongPtrW(windowHandle, GWLP_USERDATA, (LONG)window);
+        }
+        break;
+
     case WM_CLOSE:
         PostQuitMessage(0);
         return 0;
     }
+
 
     return DefWindowProcW(windowHandle, message, wParam, lParam);
 }
@@ -159,6 +190,8 @@ static ATOM getWindowClassAtom()
 Window* createWindow(WindowDesc const& desc)
 {
     Window* window = new Window();
+    window->handle = nullptr;
+    window->nativeHook = nullptr;
 
     OSString windowTitle(desc.title);
 

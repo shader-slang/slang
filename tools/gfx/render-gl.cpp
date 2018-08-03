@@ -114,6 +114,8 @@ public:
     virtual void setVertexBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* strides, const UInt* offsets) override;
     virtual void setIndexBuffer(BufferResource* buffer, Format indexFormat, UInt offset) override;
     virtual void setDepthStencilTarget(ResourceView* depthStencilView) override;
+    void setViewports(UInt count, Viewport const* viewports) override;
+    void setScissorRects(UInt count, ScissorRect const* rects) override;
     virtual void setPipelineState(PipelineType pipelineType, PipelineState* state) override;
     virtual void draw(UInt vertexCount, UInt startVertex) override;
     virtual void drawIndexed(UInt indexCount, UInt startIndex, UInt baseVertex) override;
@@ -1028,6 +1030,46 @@ void GLRenderer::setIndexBuffer(BufferResource* buffer, Format indexFormat, UInt
 
 void GLRenderer::setDepthStencilTarget(ResourceView* depthStencilView)
 {
+}
+
+void GLRenderer::setViewports(UInt count, Viewport const* viewports)
+{
+    assert(count == 1);
+    auto viewport = viewports[0];
+    glViewport(
+        (GLint)     viewport.originX,
+        (GLint)     viewport.originY,
+        (GLsizei)   viewport.extentX,
+        (GLsizei)   viewport.extentY);
+    glDepthRange(viewport.minZ, viewport.maxZ);
+}
+
+void GLRenderer::setScissorRects(UInt count, ScissorRect const* rects)
+{
+    assert(count <= 1);
+    if( count )
+    {
+        // TODO: this isn't goign to be quite right because of the
+        // flipped coordinate system in GL.
+        //
+        // The best way around this is probably to *always* render
+        // things internally into textures with "flipped" conventions,
+        // and then only deal with the flipping as part of a final
+        // "present" step that copies to the primary back-buffer.
+        //
+        auto rect = rects[0];
+        glScissor(
+            rect.minX,
+            rect.minY,
+            rect.maxX - rect.minX,
+            rect.maxY - rect.minY);
+
+        glEnable(GL_SCISSOR_TEST);
+    }
+    else
+    {
+        glDisable(GL_SCISSOR_TEST);
+    }
 }
 
 void GLRenderer::setPipelineState(PipelineType pipelineType, PipelineState* state)
