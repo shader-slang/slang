@@ -86,6 +86,8 @@ public:
     virtual void setVertexBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* strides,  const UInt* offsets) override;
     virtual void setIndexBuffer(BufferResource* buffer, Format indexFormat, UInt offset) override;
     virtual void setDepthStencilTarget(ResourceView* depthStencilView) override;
+    void setViewports(UInt count, Viewport const* viewports) override;
+    void setScissorRects(UInt count, ScissorRect const* rects) override;
     virtual void setPipelineState(PipelineType pipelineType, PipelineState* state) override;
     virtual void draw(UInt vertexCount, UInt startVertex) override;
     virtual void drawIndexed(UInt indexCount, UInt startIndex, UInt baseVertex) override;
@@ -282,8 +284,11 @@ public:
         RefPtr<InputLayoutImpl>         m_inputLayout;
         ComPtr<ID3D11DepthStencilState> m_depthStencilState;
         ComPtr<ID3D11RasterizerState>   m_rasterizerState;
+        ComPtr<ID3D11BlendState>        m_blendState;
 
         UINT                            m_stencilRef;
+        float                           m_blendColor[4];
+        UINT                            m_sampleMask;
     };
 
     class ComputePipelineStateImpl : public PipelineStateImpl
@@ -1111,6 +1116,7 @@ Result D3D11Renderer::createInputLayout(const InputElementDesc* inputElementsIn,
         switch (inputElementsIn[ii].format)
         {
             case Format::RGBA_Float32:
+            case Format::RGBA_Unorm_UInt8:
                 typeName = "float4";
                 break;
             case Format::RGB_Float32:
@@ -1245,6 +1251,49 @@ void D3D11Renderer::setDepthStencilTarget(ResourceView* depthStencilView)
     m_targetBindingsDirty[int(PipelineType::Graphics)] = true;
 }
 
+void D3D11Renderer::setViewports(UInt count, Viewport const* viewports)
+{
+    static const int kMaxViewports = D3D11_VIEWPORT_AND_SCISSORRECT_MAX_INDEX + 1;
+    assert(count <= kMaxViewports);
+
+    D3D11_VIEWPORT dxViewports[kMaxViewports];
+    for(UInt ii = 0; ii < count; ++ii)
+    {
+        auto& inViewport = viewports[ii];
+        auto& dxViewport = dxViewports[ii];
+
+        dxViewport.TopLeftX = inViewport.originX;
+        dxViewport.TopLeftY = inViewport.originY;
+        dxViewport.Width    = inViewport.extentX;
+        dxViewport.Height   = inViewport.extentY;
+        dxViewport.MinDepth = inViewport.minZ;
+        dxViewport.MaxDepth = inViewport.maxZ;
+    }
+
+    m_immediateContext->RSSetViewports(count, dxViewports);
+}
+
+void D3D11Renderer::setScissorRects(UInt count, ScissorRect const* rects)
+{
+    static const int kMaxScissorRects = D3D11_VIEWPORT_AND_SCISSORRECT_MAX_INDEX + 1;
+    assert(count <= kMaxScissorRects);
+
+    D3D11_RECT dxRects[kMaxScissorRects];
+    for(UInt ii = 0; ii < count; ++ii)
+    {
+        auto& inRect = rects[ii];
+        auto& dxRect = dxRects[ii];
+
+        dxRect.left     = inRect.minX;
+        dxRect.top      = inRect.minY;
+        dxRect.right    = inRect.maxX;
+        dxRect.bottom   = inRect.maxY;
+    }
+
+    m_immediateContext->RSSetScissorRects(count, dxRects);
+}
+
+
 void D3D11Renderer::setPipelineState(PipelineType pipelineType, PipelineState* state)
 {
     switch(pipelineType)
@@ -1288,6 +1337,7 @@ void D3D11Renderer::setPipelineState(PipelineType pipelineType, PipelineState* s
 
             // OM
 
+            m_immediateContext->OMSetBlendState(stateImpl->m_blendState, stateImpl->m_blendColor, stateImpl->m_sampleMask);
             m_immediateContext->OMSetDepthStencilState(stateImpl->m_depthStencilState, stateImpl->m_stencilRef);
 
             m_currentGraphicsState = stateImpl;
@@ -1409,6 +1459,82 @@ static D3D11_CULL_MODE translateCullMode(CullMode mode)
     }
 }
 
+bool isBlendDisabled(AspectBlendDesc const& desc)
+{
+    return desc.op == BlendOp::Add
+        && desc.srcFactor == BlendFactor::One
+        && desc.dstFactor == BlendFactor::Zero;
+}
+
+
+bool isBlendDisabled(TargetBlendDesc const& desc)
+{
+    return isBlendDisabled(desc.color)
+        && isBlendDisabled(desc.alpha);
+}
+
+D3D11_BLEND_OP translateBlendOp(BlendOp op)
+{
+    switch(op)
+    {
+    default:
+        assert(!"unimplemented");
+        return (D3D11_BLEND_OP) -1;
+
+#define CASE(FROM, TO) case BlendOp::FROM: return D3D11_BLEND_OP_##TO
+    CASE(Add,               ADD);
+    CASE(Subtract,          SUBTRACT);
+    CASE(ReverseSubtract,   REV_SUBTRACT);
+    CASE(Min,               MIN);
+    CASE(Max,               MAX);
+#undef CASE
+    }
+}
+
+D3D11_BLEND translateBlendFactor(BlendFactor factor)
+{
+    switch(factor)
+    {
+    default:
+        assert(!"unimplemented");
+        return (D3D11_BLEND) -1;
+
+#define CASE(FROM, TO) case BlendFactor::FROM: return D3D11_BLEND_##TO
+    CASE(Zero,                  ZERO);
+    CASE(One,                   ONE);
+    CASE(SrcColor,              SRC_COLOR);
+    CASE(InvSrcColor,           INV_SRC_COLOR);
+    CASE(SrcAlpha,              SRC_ALPHA);
+    CASE(InvSrcAlpha,           INV_SRC_ALPHA);
+    CASE(DestAlpha,             DEST_ALPHA);
+    CASE(InvDestAlpha,          INV_DEST_ALPHA);
+    CASE(DestColor,             DEST_COLOR);
+    CASE(InvDestColor,          INV_DEST_ALPHA);
+    CASE(SrcAlphaSaturate,      SRC_ALPHA_SAT);
+    CASE(BlendColor,            BLEND_FACTOR);
+    CASE(InvBlendColor,         INV_BLEND_FACTOR);
+    CASE(SecondarySrcColor,     SRC1_COLOR);
+    CASE(InvSecondarySrcColor,  INV_SRC1_COLOR);
+    CASE(SecondarySrcAlpha,     SRC1_ALPHA);
+    CASE(InvSecondarySrcAlpha,  INV_SRC1_ALPHA);
+#undef CASE
+    }
+}
+
+D3D11_COLOR_WRITE_ENABLE translateRenderTargetWriteMask(RenderTargetWriteMaskT mask)
+{
+    UINT result = 0;
+#define CASE(FROM, TO) if(mask & RenderTargetWriteMask::Enable##FROM) result |= D3D11_COLOR_WRITE_ENABLE_##TO
+
+    CASE(Red,   RED);
+    CASE(Green, GREEN);
+    CASE(Blue,  BLUE);
+    CASE(Alpha, ALPHA);
+
+#undef CASE
+    return D3D11_COLOR_WRITE_ENABLE(result);
+}
+
 Result D3D11Renderer::createGraphicsPipelineState(const GraphicsPipelineStateDesc& desc, PipelineState** outState)
 {
     auto programImpl = (ShaderProgramImpl*) desc.program;
@@ -1458,14 +1584,81 @@ Result D3D11Renderer::createGraphicsPipelineState(const GraphicsPipelineStateDes
 
     }
 
+    ComPtr<ID3D11BlendState> blendState;
+    {
+        auto& srcDesc = desc.blend;
+        D3D11_BLEND_DESC dstDesc = {};
+
+        TargetBlendDesc defaultTargetBlendDesc;
+
+        static const UInt kMaxTargets = D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT;
+        if(srcDesc.targetCount > kMaxTargets) return SLANG_FAIL;
+
+        for(UInt ii = 0; ii < kMaxTargets; ++ii)
+        {
+            TargetBlendDesc const* srcTargetBlendDescPtr = nullptr;
+            if(ii < srcDesc.targetCount)
+            {
+                srcTargetBlendDescPtr = &srcDesc.targets[ii];
+            }
+            else if(srcDesc.targetCount == 0)
+            {
+                srcTargetBlendDescPtr = &defaultTargetBlendDesc;
+            }
+            else
+            {
+                srcTargetBlendDescPtr = &srcDesc.targets[srcDesc.targetCount-1];
+            }
+
+            auto& srcTargetBlendDesc = *srcTargetBlendDescPtr;
+            auto& dstTargetBlendDesc = dstDesc.RenderTarget[ii];
+
+            if(isBlendDisabled(srcTargetBlendDesc))
+            {
+                dstTargetBlendDesc.BlendEnable      = false;
+                dstTargetBlendDesc.BlendOp          = D3D11_BLEND_OP_ADD;
+                dstTargetBlendDesc.BlendOpAlpha     = D3D11_BLEND_OP_ADD;
+                dstTargetBlendDesc.SrcBlend         = D3D11_BLEND_ONE;
+                dstTargetBlendDesc.SrcBlendAlpha    = D3D11_BLEND_ONE;
+                dstTargetBlendDesc.DestBlend        = D3D11_BLEND_ZERO;
+                dstTargetBlendDesc.DestBlendAlpha   = D3D11_BLEND_ZERO;
+            }
+            else
+            {
+                dstTargetBlendDesc.BlendEnable = true;
+                dstTargetBlendDesc.BlendOp          = translateBlendOp(srcTargetBlendDesc.color.op);
+                dstTargetBlendDesc.BlendOpAlpha     = translateBlendOp(srcTargetBlendDesc.alpha.op);
+                dstTargetBlendDesc.SrcBlend         = translateBlendFactor(srcTargetBlendDesc.color.srcFactor);
+                dstTargetBlendDesc.SrcBlendAlpha    = translateBlendFactor(srcTargetBlendDesc.alpha.srcFactor);
+                dstTargetBlendDesc.DestBlend        = translateBlendFactor(srcTargetBlendDesc.color.dstFactor);
+                dstTargetBlendDesc.DestBlendAlpha   = translateBlendFactor(srcTargetBlendDesc.alpha.dstFactor);
+            }
+
+            dstTargetBlendDesc.RenderTargetWriteMask = translateRenderTargetWriteMask(srcTargetBlendDesc.writeMask);
+        }
+
+        dstDesc.IndependentBlendEnable = srcDesc.targetCount > 1;
+        dstDesc.AlphaToCoverageEnable = srcDesc.alphaToCoverateEnable;
+
+        SLANG_RETURN_ON_FAIL(m_device->CreateBlendState(
+            &dstDesc,
+            blendState.writeRef()));
+    }
+
     RefPtr<GraphicsPipelineStateImpl> state = new GraphicsPipelineStateImpl();
     state->m_program = programImpl;
     state->m_stencilRef = desc.depthStencil.stencilRef;
     state->m_depthStencilState = depthStencilState;
     state->m_rasterizerState = rasterizerState;
+    state->m_blendState = blendState;
     state->m_pipelineLayout = (PipelineLayoutImpl*) desc.pipelineLayout;
     state->m_inputLayout = (InputLayoutImpl*) desc.inputLayout;
     state->m_rtvCount = desc.renderTargetCount;
+    state->m_blendColor[0] = 0;
+    state->m_blendColor[1] = 0;
+    state->m_blendColor[2] = 0;
+    state->m_blendColor[3] = 0;
+    state->m_sampleMask = 0xFFFFFFFF;
 
     *outState = state.detach();
     return SLANG_OK;

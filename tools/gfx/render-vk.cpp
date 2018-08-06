@@ -75,6 +75,8 @@ public:
     virtual void setVertexBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* strides, const UInt* offsets) override;
     virtual void setIndexBuffer(BufferResource* buffer, Format indexFormat, UInt offset) override;
     virtual void setDepthStencilTarget(ResourceView* depthStencilView) override;
+    void setViewports(UInt count, Viewport const* viewports) override;
+    void setScissorRects(UInt count, ScissorRect const* rects) override;
     virtual void setPipelineState(PipelineType pipelineType, PipelineState* state) override;
     virtual void draw(UInt vertexCount, UInt startVertex) override;
     virtual void drawIndexed(UInt indexCount, UInt startIndex, UInt baseVertex) override;
@@ -1875,6 +1877,50 @@ void VKRenderer::setIndexBuffer(BufferResource* buffer, Format indexFormat, UInt
 
 void VKRenderer::setDepthStencilTarget(ResourceView* depthStencilView)
 {
+}
+
+void VKRenderer::setViewports(UInt count, Viewport const* viewports)
+{
+    static const int kMaxViewports = 8; // TODO: base on device caps
+    assert(count <= kMaxViewports);
+
+    VkViewport vkViewports[kMaxViewports];
+    for(UInt ii = 0; ii < count; ++ii)
+    {
+        auto& inViewport = viewports[ii];
+        auto& vkViewport = vkViewports[ii];
+
+        vkViewport.x        = inViewport.originX;
+        vkViewport.y        = inViewport.originY;
+        vkViewport.width    = inViewport.extentX;
+        vkViewport.height   = inViewport.extentY;
+        vkViewport.minDepth = inViewport.minZ;
+        vkViewport.maxDepth = inViewport.maxZ;
+    }
+
+    VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
+    m_api.vkCmdSetViewport(commandBuffer, 0, count, vkViewports);
+}
+
+void VKRenderer::setScissorRects(UInt count, ScissorRect const* rects)
+{
+    static const int kMaxScissorRects = 8; // TODO: base on device caps
+    assert(count <= kMaxScissorRects);
+
+    VkRect2D vkRects[kMaxScissorRects];
+    for(UInt ii = 0; ii < count; ++ii)
+    {
+        auto& inRect = rects[ii];
+        auto& vkRect = vkRects[ii];
+
+        vkRect.offset.x         = inRect.minX;
+        vkRect.offset.y         = inRect.minY;
+        vkRect.extent.width     = inRect.maxX - inRect.minX;
+        vkRect.extent.height    = inRect.maxY - inRect.minY;
+    }
+
+    VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
+    m_api.vkCmdSetScissor(commandBuffer, 0, count, vkRects);
 }
 
 void VKRenderer::setPipelineState(PipelineType pipelineType, PipelineState* state)

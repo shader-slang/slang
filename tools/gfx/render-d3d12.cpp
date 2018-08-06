@@ -88,6 +88,8 @@ public:
     virtual void setVertexBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* strides, const UInt* offsets) override;
     virtual void setIndexBuffer(BufferResource* buffer, Format indexFormat, UInt offset) override;
     virtual void setDepthStencilTarget(ResourceView* depthStencilView) override;
+    void setViewports(UInt count, Viewport const* viewports) override;
+    void setScissorRects(UInt count, ScissorRect const* rects) override;
     virtual void setPipelineState(PipelineType pipelineType, PipelineState* state) override;
     virtual void draw(UInt vertexCount, UInt startVertex) override;
     virtual void drawIndexed(UInt indexCount, UInt startIndex, UInt baseVertex) override;
@@ -2543,6 +2545,48 @@ void D3D12Renderer::setIndexBuffer(BufferResource* buffer, Format indexFormat, U
 
 void D3D12Renderer::setDepthStencilTarget(ResourceView* depthStencilView)
 {
+}
+
+void D3D12Renderer::setViewports(UInt count, Viewport const* viewports)
+{
+    static const int kMaxViewports = D3D12_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
+    assert(count <= kMaxViewports);
+
+    D3D12_VIEWPORT dxViewports[kMaxViewports];
+    for(UInt ii = 0; ii < count; ++ii)
+    {
+        auto& inViewport = viewports[ii];
+        auto& dxViewport = dxViewports[ii];
+
+        dxViewport.TopLeftX = inViewport.originX;
+        dxViewport.TopLeftY = inViewport.originY;
+        dxViewport.Width    = inViewport.extentX;
+        dxViewport.Height   = inViewport.extentY;
+        dxViewport.MinDepth = inViewport.minZ;
+        dxViewport.MaxDepth = inViewport.maxZ;
+    }
+
+    m_commandList->RSSetViewports(count, dxViewports);
+}
+
+void D3D12Renderer::setScissorRects(UInt count, ScissorRect const* rects)
+{
+    static const int kMaxScissorRects = D3D12_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
+    assert(count <= kMaxScissorRects);
+
+    D3D12_RECT dxRects[kMaxScissorRects];
+    for(UInt ii = 0; ii < count; ++ii)
+    {
+        auto& inRect = rects[ii];
+        auto& dxRect = dxRects[ii];
+
+        dxRect.left     = inRect.minX;
+        dxRect.top      = inRect.minY;
+        dxRect.right    = inRect.maxX;
+        dxRect.bottom   = inRect.maxY;
+    }
+
+    m_commandList->RSSetScissorRects(count, dxRects);
 }
 
 void D3D12Renderer::setPipelineState(PipelineType pipelineType, PipelineState* state)

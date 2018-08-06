@@ -21,6 +21,7 @@
 #include "gfx/render-d3d11.h"
 #include "gfx/vector-math.h"
 #include "gfx/window.h"
+#include "gfx/gui.h"
 using namespace gfx;
 
 // We will use a few utilities from the C++ standard library,
@@ -1273,6 +1274,7 @@ RefPtr<ParameterBlockLayout> gPerViewParameterBlockLayout;
 RefPtr<ParameterBlockLayout> gPerModelParameterBlockLayout;
 
 RefPtr<ShaderCache> shaderCache;
+RefPtr<GUI>         gui;
 
 // Most of the application state is stored in the list of loaded models.
 //
@@ -1421,7 +1423,11 @@ Result initialize()
     // Support for loading more interesting/complex models will be added
     // to this example over time (although model loading is *not* the focus).
     //
-    loadAndAddModel("cube.obj");
+    loadAndAddModel("cube.obj", ModelLoader::LoadFlag::FlipWinding);
+
+    // We will do some GUI rendering in this app, using "Dear, IMGUI",
+    // so we need to do the appropriate initialization work here.
+    gui = new GUI(gWindow, gRenderer);
 
     showWindow(gWindow);
 
@@ -1434,6 +1440,8 @@ Result initialize()
 //
 void renderFrame()
 {
+    gui->beginFrame();
+
     // In order to see that things are rendering properly we need some
     // kind of animation, so we will compute a crude delta-time value here.
     //
@@ -1454,7 +1462,10 @@ void renderFrame()
         1000.0f);
 
     glm::mat4x4 view = identity;
-    view = translate(view, glm::vec3(0, 0, -5));
+    view = glm::lookAt(
+        glm::vec3(4, 5, -5),
+        glm::vec3(0),
+        glm::vec3(0, 1, 0));
 
     glm::mat4x4 viewProjection = projection * view;
 
@@ -1584,6 +1595,18 @@ void renderFrame()
         }
     }
 
+#if 0
+    ImGui::Begin("Model Viewer");
+    ImGui::Text("Average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+    if (ImGui::Button("Load Model"))
+    {
+        // need to do a file open box, and then try to open the resulting file
+
+    }
+    ImGui::End();
+#endif
+
+    gui->endFrame();
     gRenderer->presentFrame();
 }
 

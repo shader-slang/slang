@@ -394,7 +394,7 @@ tool "gfx"
     -- rather than a stand-alone executable.
     kind "StaticLib"
 
-    includedirs { ".", "external", "source" }
+    includedirs { ".", "external", "source", "external/imgui" }
 
     filter { "system:windows" }
 

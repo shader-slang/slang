@@ -155,6 +155,7 @@ enum class Format
 
     RGBA_Unorm_UInt8,
 
+    R_UInt16,
     R_UInt32,
 
     D_Float32,
@@ -647,6 +648,80 @@ struct RasterizerDesc
     bool            antialiasedLineEnable   = false;
 };
 
+enum class LogicOp
+{
+    NoOp,
+};
+
+enum class BlendOp
+{
+    Add,
+    Subtract,
+    ReverseSubtract,
+    Min,
+    Max,
+};
+
+enum class BlendFactor
+{
+    Zero,
+    One,
+    SrcColor,
+    InvSrcColor,
+    SrcAlpha,
+    InvSrcAlpha,
+    DestAlpha,
+    InvDestAlpha,
+    DestColor,
+    InvDestColor,
+    SrcAlphaSaturate,
+    BlendColor,
+    InvBlendColor,
+    SecondarySrcColor,
+    InvSecondarySrcColor,
+    SecondarySrcAlpha,
+    InvSecondarySrcAlpha,
+};
+
+namespace RenderTargetWriteMask
+{
+    typedef uint8_t Type;
+    enum
+    {
+        EnableNone  = 0,
+        EnableRed   = 0x01,
+        EnableGreen = 0x02,
+        EnableBlue  = 0x04,
+        EnableAlpha = 0x08,
+        EnableAll   = 0x0F,
+    };
+};
+typedef RenderTargetWriteMask::Type RenderTargetWriteMaskT;
+
+struct AspectBlendDesc
+{
+    BlendFactor     srcFactor   = BlendFactor::One;
+    BlendFactor     dstFactor   = BlendFactor::Zero;
+    BlendOp         op          = BlendOp::Add;
+};
+
+struct TargetBlendDesc
+{
+    AspectBlendDesc color;
+    AspectBlendDesc alpha;
+
+    LogicOp                 logicOp     = LogicOp::NoOp;
+    RenderTargetWriteMaskT  writeMask   = RenderTargetWriteMask::EnableAll;
+};
+
+struct BlendDesc
+{
+    TargetBlendDesc const*  targets     = nullptr;
+    UInt                    targetCount = 0;
+
+    bool alphaToCoverateEnable  = false;
+};
+
 struct GraphicsPipelineStateDesc
 {
     ShaderProgram*      program;
@@ -657,6 +732,7 @@ struct GraphicsPipelineStateDesc
     UInt                renderTargetCount;
     DepthStencilDesc    depthStencil;
     RasterizerDesc      rasterizer;
+    BlendDesc           blend;
 };
 
 struct ComputePipelineStateDesc
@@ -668,6 +744,24 @@ struct ComputePipelineStateDesc
 class PipelineState : public Slang::RefObject
 {
 public:
+};
+
+struct ScissorRect
+{
+    Int minX;
+    Int minY;
+    Int maxX;
+    Int maxY;
+};
+
+struct Viewport
+{
+    float originX = 0.0f;
+    float originY = 0.0f;
+    float extentX = 0.0f;
+    float extentY = 0.0f;
+    float minZ    = 0.0f;
+    float maxZ    = 1.0f;
 };
 
 class Renderer: public Slang::RefObject
@@ -822,6 +916,18 @@ public:
     virtual void setIndexBuffer(BufferResource* buffer, Format indexFormat, UInt offset = 0) = 0;
 
     virtual void setDepthStencilTarget(ResourceView* depthStencilView) = 0;
+
+    virtual void setViewports(UInt count, Viewport const* viewports) = 0;
+    inline void setViewport(Viewport const& viewport)
+    {
+        setViewports(1, &viewport);
+    }
+
+    virtual void setScissorRects(UInt count, ScissorRect const* rects) = 0;
+    inline void setScissorRect(ScissorRect const& rect)
+    {
+        setScissorRects(1, &rect);
+    }
 
     virtual void setPipelineState(PipelineType pipelineType, PipelineState* state) = 0;
 
