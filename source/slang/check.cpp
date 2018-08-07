@@ -888,7 +888,7 @@ namespace Slang
                         {
                             if (diagSink)
                             {
-                                diagSink->diagnose(typeExp.exp.Ptr(), Diagnostics::unimplemented, "can't fill in default for generic type parameter");
+                                diagSink->diagnose(typeExp.exp.Ptr(), Diagnostics::genericTypeNeedsArgs, typeExp);
                                 *outProperType = getSession()->getErrorType();
                             }
                             return false;

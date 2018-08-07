@@ -13,7 +13,24 @@ namespace gfx {
 #ifdef _WIN32
 LRESULT CALLBACK guiWindowProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
-    return ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam);
+    LRESULT handled = ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam);
+    if(handled) return handled;
+    ImGuiIO& io = ImGui::GetIO();
+
+    switch( msg )
+    {
+    case WM_LBUTTONDOWN:
+    case WM_LBUTTONUP:
+        if(io.WantCaptureMouse) handled = 1;
+        break;
+
+    case WM_KEYDOWN:
+    case WM_KEYUP:
+        if(io.WantCaptureKeyboard) handled = 1;
+        break;
+    }
+
+    return handled;
 }
 void setNativeWindowHook(Window* window, WNDPROC proc);
 #endif
@@ -314,7 +331,7 @@ void GUI::endFrame()
     viewport.extentX = draw_data->DisplaySize.x;
     viewport.extentY = draw_data->DisplaySize.y;
     viewport.minZ = 0;
-    viewport.maxZ = 0;
+    viewport.maxZ = 1;
 
     renderer->setViewport(viewport);
 

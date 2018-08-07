@@ -5,18 +5,62 @@
 
 namespace gfx {
 
-struct WindowDesc
+typedef struct Window Window;
+
+enum class KeyCode
 {
-    char const* title;
-    int width;
-    int height;
+    Unknown,
+
+    // TODO: extend this to cover at least a standard US-English keyboard
+
+    A, B, C, D, E, F, G, H, I, J,
+    K, L, M, N, O, P, Q, R, S, T,
+    U, V, W, X, Y, Z,
+
+    Space,
 };
 
-typedef struct Window Window;
+enum class EventCode : uint32_t
+{
+    MouseDown,
+    MouseUp,
+    MouseMoved,
+    KeyDown,
+    KeyUp,
+};
+
+struct Event
+{
+    EventCode   code;
+    Window*     window;
+    union
+    {
+        struct
+        {
+            float x;
+            float y;
+        } mouse;
+
+        KeyCode key;
+    } u;
+};
+
+typedef void (*EventHandler)(Event const&);
+
+struct WindowDesc
+{
+    char const* title = nullptr;
+    void* userData = nullptr;
+    int width = 0;
+    int height = 0;
+    EventHandler eventHandler = nullptr;
+};
 
 Window* createWindow(WindowDesc const& desc);
 void showWindow(Window* window);
+
 void* getPlatformWindowHandle(Window* window);
+void* getUserData(Window* window);
 
 /// Opaque state provided by platform for a running application.
 typedef struct ApplicationContext ApplicationContext;

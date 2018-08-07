@@ -13,6 +13,9 @@ struct ModelLoader
     struct MaterialData
     {
         glm::vec3                   diffuseColor;
+        glm::vec3                   specularColor;
+        float                       specularity;
+
         RefPtr<TextureResource>     diffuseMap;
     };
 
