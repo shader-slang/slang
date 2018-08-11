@@ -205,6 +205,12 @@ Result ModelLoader::load(
     std::vector<tinyobj::shape_t> objShapes;
     std::vector<tinyobj::material_t> objMaterials;
 
+    std::string baseDir;
+    if( auto lastSlash = strrchr(inputPath, '/') )
+    {
+        baseDir = std::string(inputPath, lastSlash);
+    }
+
     std::string diagnostics;
     bool shouldTriangulate = true;
     bool success = tinyobj::LoadObj(
@@ -213,7 +219,7 @@ Result ModelLoader::load(
         &objMaterials,
         &diagnostics,
         inputPath,
-        nullptr,
+        baseDir.size() ? baseDir.c_str() : nullptr,
         shouldTriangulate);
 
     if(!diagnostics.empty())
@@ -237,6 +243,13 @@ Result ModelLoader::load(
             objMaterial.diffuse[0],
             objMaterial.diffuse[1],
             objMaterial.diffuse[2]);
+
+        materialData.specularColor = glm::vec3(
+            objMaterial.specular[0],
+            objMaterial.specular[1],
+            objMaterial.specular[2]);
+
+        materialData.specularity = objMaterial.shininess;
 
         // load any referenced textures here
         if(objMaterial.diffuse_texname.length())
@@ -416,6 +429,8 @@ Result ModelLoader::load(
 
     std::vector<void*> meshes;
 
+    void* defaultMaterial = nullptr;
+
     for(auto& objShape : objShapes)
     {
         size_t objIndexCounter = 0;
@@ -424,7 +439,21 @@ Result ModelLoader::load(
         {
             size_t objFaceIndex = objFaceCounter++;
             int faceMaterialID = objShape.mesh.material_ids[objFaceIndex];
-            void* faceMaterial = materials[faceMaterialID];
+            void* faceMaterial = nullptr;
+            if( faceMaterialID < 0 )
+            {
+                if( !defaultMaterial )
+                {
+                    MaterialData defaultMaterialData;
+                    defaultMaterialData.diffuseColor = glm::vec3(0.5, 0.5, 0.5);
+                    defaultMaterial = callbacks->createMaterial(defaultMaterialData);
+                }
+                faceMaterial = defaultMaterial;
+            }
+            else
+            {
+                faceMaterial = materials[faceMaterialID];
+            }
 
             if(!currentMesh || (faceMaterial != currentMesh->material))
             {

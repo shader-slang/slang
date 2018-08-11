@@ -16,6 +16,7 @@
 
 #if _WIN32
 #include <Windows.h>
+#include <Windowsx.h>
 #else
 #error "The slang-graphics library currently only supports Windows platforms"
 #endif
@@ -110,13 +111,37 @@ int runWindowsApplication(
 
 struct Window
 {
-    HWND handle;
-    WNDPROC nativeHook;
+    HWND            handle;
+    WNDPROC         nativeHook;
+    EventHandler    eventHandler;
+    void*           userData;
 };
 
 void setNativeWindowHook(Window* window, WNDPROC proc)
 {
     window->nativeHook = proc;
+}
+
+static KeyCode translateKeyCode(int vkey)
+{
+    switch( vkey )
+    {
+    default:
+        return KeyCode::Unknown;
+
+#define CASE(FROM, TO) case FROM: return KeyCode::TO;
+    CASE('A', A); CASE('B', B); CASE('C', C); CASE('D', D); CASE('E', E);
+    CASE('F', F); CASE('G', G); CASE('H', H); CASE('I', I); CASE('J', J);
+    CASE('K', K); CASE('L', M); CASE('M', M); CASE('N', N); CASE('O', O);
+    CASE('P', P); CASE('Q', Q); CASE('R', R); CASE('S', S); CASE('T', T);
+    CASE('U', U); CASE('V', V); CASE('W', W); CASE('X', X); CASE('Y', Y);
+    CASE('Z', Z);
+#undef CASE
+
+#define CASE(FROM, TO) case VK_##FROM: return KeyCode::TO;
+    CASE(SPACE, Space);
+#undef CASE
+    }
 }
 
 static LRESULT CALLBACK windowProc(
@@ -139,7 +164,8 @@ static LRESULT CALLBACK windowProc(
         }
     }
 
-    // TODO: Actually implement some reasonable logic here.
+    auto eventHandler = window ? window->eventHandler : nullptr;
+
     switch (message)
     {
     case WM_CREATE:
@@ -149,6 +175,51 @@ static LRESULT CALLBACK windowProc(
             window->handle = windowHandle;
 
             SetWindowLongPtrW(windowHandle, GWLP_USERDATA, (LONG)window);
+        }
+        break;
+
+    case WM_KEYDOWN:
+    case WM_KEYUP:
+        {
+            int virtualKey = (int) wParam;
+            auto keyCode = translateKeyCode(virtualKey);
+            if(eventHandler)
+            {
+                Event event;
+                event.window = window;
+                event.code = message == WM_KEYDOWN ? EventCode::KeyDown : EventCode::KeyUp;
+                event.u.key = keyCode;
+                eventHandler(event);
+            }
+        }
+        break;
+
+    case WM_LBUTTONDOWN:
+    case WM_LBUTTONUP:
+        {
+            if(eventHandler)
+            {
+                Event event;
+                event.window = window;
+                event.code = message == WM_LBUTTONDOWN ? EventCode::MouseDown : EventCode::MouseUp;
+                event.u.mouse.x = (float) GET_X_LPARAM(lParam);
+                event.u.mouse.y = (float) GET_Y_LPARAM(lParam);
+                eventHandler(event);
+            }
+        }
+        break;
+
+    case WM_MOUSEMOVE:
+        {
+            if(eventHandler)
+            {
+                Event event;
+                event.window = window;
+                event.code = EventCode::MouseMoved;
+                event.u.mouse.x = (float) GET_X_LPARAM(lParam);
+                event.u.mouse.y = (float) GET_Y_LPARAM(lParam);
+                eventHandler(event);
+            }
         }
         break;
 
@@ -192,6 +263,8 @@ Window* createWindow(WindowDesc const& desc)
     Window* window = new Window();
     window->handle = nullptr;
     window->nativeHook = nullptr;
+    window->eventHandler = desc.eventHandler;
+    window->userData = desc.userData;
 
     OSString windowTitle(desc.title);
 
@@ -230,6 +303,11 @@ void showWindow(Window* window)
 void* getPlatformWindowHandle(Window* window)
 {
     return window->handle;
+}
+
+void* getUserData(Window* window)
+{
+    return window->userData;
 }
 
 bool dispatchEvents(ApplicationContext* context)

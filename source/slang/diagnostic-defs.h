@@ -239,6 +239,9 @@ DIAGNOSTIC(30301, Error, globalGenParamInGlobalScopeOnly, "'__generic_param' can
 DIAGNOSTIC(39999, Fatal, cyclicReference, "cyclic reference '$0'.")
 DIAGNOSTIC(39999, Fatal, localVariableUsedBeforeDeclared, "local variable '$0' is being used before its declaration.")
 
+// 304xx: generics
+DIAGNOSTIC(30400, Error, genericTypeNeedsArgs, "generic type '$0' used without argument")
+
 DIAGNOSTIC(39999, Error, expectedIntegerConstantWrongType, "expected integer constant (found: '$0')")
 DIAGNOSTIC(39999, Error, expectedIntegerConstantNotConstant, "expression does not evaluate to a compile-time constant")
 DIAGNOSTIC(39999, Error, expectedIntegerConstantNotLiteral, "could not extract value from integer constant")
