@@ -77,9 +77,21 @@ struct OutputPatch
     __subscript(uint index) -> T;
 };
 
-__magic_type(HLSLRWByteAddressBufferType)
-__intrinsic_type($(kIROp_HLSLRWByteAddressBufferType))
-struct RWByteAddressBuffer
+${{{{
+static const struct {
+    IROp op;
+    char const* name;
+} kMutableByteAddressBufferCases[] =
+{
+    { kIROp_HLSLRWByteAddressBufferType,                "RWByteAddressBuffer" },
+    { kIROp_HLSLRasterizerOrderedByteAddressBufferType, "RasterizerOrderedByteAddressBuffer" },
+};
+for(auto item : kMutableByteAddressBufferCases) {
+}}}}
+
+__magic_type(HLSL$(item.name)Type)
+__intrinsic_type($(item.op))
+struct $(item.name)
 {
     // Note(tfoley): supports alll operations from `ByteAddressBuffer`
     // TODO(tfoley): can this be made a sub-type?
@@ -192,10 +204,27 @@ struct RWByteAddressBuffer
         uint4 value);
 };
 
+${{{{
+}
+}}}}
+
+${{{{
+static const struct {
+    IROp op;
+    char const* name;
+} kMutableStructuredBufferCases[] =
+{
+    { kIROp_HLSLRWStructuredBufferType,                "RWStructuredBuffer" },
+    { kIROp_HLSLRasterizerOrderedStructuredBufferType, "RasterizerOrderedStructuredBuffer" },
+};
+for(auto item : kMutableStructuredBufferCases) {
+}}}}
+
+
 __generic<T>
-__magic_type(HLSLRWStructuredBufferType)
-__intrinsic_type($(kIROp_HLSLRWStructuredBufferType))
-struct RWStructuredBuffer
+__magic_type(HLSL$(item.name)Type)
+__intrinsic_type($(item.op))
+struct $(item.name)
 {
     uint DecrementCounter();
 
@@ -214,6 +243,10 @@ struct RWStructuredBuffer
         ref;
 	}
 };
+
+${{{{
+}
+}}}}
 
 __generic<T>
 __magic_type(HLSLPointStreamType)

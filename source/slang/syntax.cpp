@@ -873,6 +873,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
             CASE(HLSLStructuredBufferType, HLSLStructuredBufferType)
             CASE(HLSLRWStructuredBufferType, HLSLRWStructuredBufferType)
+            CASE(HLSLRasterizerOrderedStructuredBufferType, HLSLRasterizerOrderedStructuredBufferType)
             CASE(HLSLAppendStructuredBufferType, HLSLAppendStructuredBufferType)
             CASE(HLSLConsumeStructuredBufferType, HLSLConsumeStructuredBufferType)
 
@@ -893,6 +894,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
             CASE(HLSLByteAddressBufferType, HLSLByteAddressBufferType)
             CASE(HLSLRWByteAddressBufferType, HLSLRWByteAddressBufferType)
+            CASE(HLSLRasterizerOrderedByteAddressBufferType, HLSLRasterizerOrderedByteAddressBufferType)
             CASE(UntypedBufferResourceType, UntypedBufferResourceType)
 
             CASE(GLSLInputAttachmentType, GLSLInputAttachmentType)
