@@ -24,9 +24,8 @@ struct MyPushConstantStruct
 [[vk::push_constant]] MyPushConstantStruct pushConstantBuffer;
 */
 
-/* This style does work 
+// This style does work 
 [[vk::push_constant]]ConstantBuffer<MyPushConstantStruct> pushConstantBuffer;
-*/
  
 /* This style works too
 layout(push_constant)  
@@ -37,11 +36,13 @@ cbuffer MyPushConstantBuffer
 } 
 */
  
+/* This works too
 [[vk::push_constant]] cbuffer MyPushConstantBuffer
 {
 	float pushX;
 	float pushY;
 } 
+*/
 
 [[vk::binding(1,2)]] Texture2D tx;
 [gl::binding(2,3)] Texture2D ta;
@@ -52,5 +53,5 @@ SamplerState sy;
 
 float4 main() : SV_Target
 {
-	return 0.0 + pushX;
+	return 0.0 + pushConstantBuffer.pushX;
 }
