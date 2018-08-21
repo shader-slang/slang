@@ -114,6 +114,7 @@ static void emitReflectionVarBindingInfoJSON(
     CASE(VARYING_OUTPUT, varyingOutput);
     CASE(SAMPLER_STATE, samplerState);
     CASE(UNIFORM, uniform);
+    CASE(PUSH_CONSTANT_BUFFER, pushConstantBuffer);
     CASE(DESCRIPTOR_TABLE_SLOT, descriptorTableSlot);
     CASE(SPECIALIZATION_CONSTANT, specializationConstant);
     CASE(MIXED, mixed);

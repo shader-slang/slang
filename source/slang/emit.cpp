@@ -5390,6 +5390,7 @@ struct EmitVisitor
         }
 
         emitGLSLLayoutQualifier(LayoutResourceKind::DescriptorTableSlot, &containerChain);
+        emitGLSLLayoutQualifier(LayoutResourceKind::PushConstantBuffer, &containerChain);
 
         if(as<IRGLSLShaderStorageBufferType>(type))
         {

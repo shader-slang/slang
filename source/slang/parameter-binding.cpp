@@ -977,7 +977,7 @@ getTypeLayoutForGlobalShaderParameter_GLSL(
 
     // We want to check for a constant-buffer type with a `push_constant` layout
     // qualifier before we move on to anything else.
-    if( varDecl->HasModifier<GLSLPushConstantLayoutModifier>() && type->As<ConstantBufferType>() )
+    if( varDecl->HasModifier<PushConstantAttribute>() && type->As<ConstantBufferType>() )
     {
         return CreateTypeLayout(
             layoutContext.with(rules->getPushConstantBufferRules()),
@@ -1042,6 +1042,15 @@ getTypeLayoutForGlobalShaderParameter_HLSL(
     auto layoutContext = context->layoutContext;
     auto rules = layoutContext.getRulesFamily();
     auto type = varDecl->getType();
+
+    // We want to check for a constant-buffer type with a `push_constant` layout
+    // qualifier before we move on to anything else.
+    if (varDecl->HasModifier<PushConstantAttribute>() && type->As<ConstantBufferType>())
+    {
+        return CreateTypeLayout(
+            layoutContext.with(rules->getPushConstantBufferRules()),
+            type);
+    }
 
     // HLSL `static` modifier indicates "thread local"
     if(varDecl->HasModifier<HLSLStaticModifier>())

@@ -1959,6 +1959,11 @@ namespace Slang
                         getSink()->diagnose(attr, Diagnostics::expectedSingleIntArg, attr->name);
                     }
                 }
+                else if (attr.As<PushConstantAttribute>())
+                {
+                    // Has no args
+                    SLANG_ASSERT(attr->args.Count() == 0);
+                }
                 else 
                 {
                     if(attr->args.Count() == 0)
