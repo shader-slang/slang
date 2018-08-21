@@ -143,10 +143,12 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
 
     CASE(HLSLStructuredBufferType);
     CASE(HLSLRWStructuredBufferType);
+    CASE(HLSLRasterizerOrderedStructuredBufferType);
     CASE(HLSLAppendStructuredBufferType);
     CASE(HLSLConsumeStructuredBufferType);
     CASE(HLSLByteAddressBufferType);
     CASE(HLSLRWByteAddressBufferType);
+    CASE(HLSLRasterizerOrderedByteAddressBufferType);
     CASE(UntypedBufferResourceType);
 #undef CASE
 
@@ -364,13 +366,15 @@ SLANG_API SlangResourceShape spReflectionType_GetResourceShape(SlangReflectionTy
         return SHAPE;               \
     } while(0)
 
-    CASE(HLSLStructuredBufferType,          SLANG_STRUCTURED_BUFFER, SLANG_RESOURCE_ACCESS_READ);
-    CASE(HLSLRWStructuredBufferType,        SLANG_STRUCTURED_BUFFER, SLANG_RESOURCE_ACCESS_READ_WRITE);
-    CASE(HLSLAppendStructuredBufferType,    SLANG_STRUCTURED_BUFFER, SLANG_RESOURCE_ACCESS_APPEND);
-    CASE(HLSLConsumeStructuredBufferType,   SLANG_STRUCTURED_BUFFER, SLANG_RESOURCE_ACCESS_CONSUME);
-    CASE(HLSLByteAddressBufferType,         SLANG_BYTE_ADDRESS_BUFFER,  SLANG_RESOURCE_ACCESS_READ);
-    CASE(HLSLRWByteAddressBufferType,       SLANG_BYTE_ADDRESS_BUFFER,  SLANG_RESOURCE_ACCESS_READ_WRITE);
-    CASE(UntypedBufferResourceType,         SLANG_BYTE_ADDRESS_BUFFER,  SLANG_RESOURCE_ACCESS_READ);
+    CASE(HLSLStructuredBufferType,                      SLANG_STRUCTURED_BUFFER,    SLANG_RESOURCE_ACCESS_READ);
+    CASE(HLSLRWStructuredBufferType,                    SLANG_STRUCTURED_BUFFER,    SLANG_RESOURCE_ACCESS_READ_WRITE);
+    CASE(HLSLRasterizerOrderedStructuredBufferType,     SLANG_STRUCTURED_BUFFER,    SLANG_RESOURCE_ACCESS_RASTER_ORDERED);
+    CASE(HLSLAppendStructuredBufferType,                SLANG_STRUCTURED_BUFFER,    SLANG_RESOURCE_ACCESS_APPEND);
+    CASE(HLSLConsumeStructuredBufferType,               SLANG_STRUCTURED_BUFFER,    SLANG_RESOURCE_ACCESS_CONSUME);
+    CASE(HLSLByteAddressBufferType,                     SLANG_BYTE_ADDRESS_BUFFER,  SLANG_RESOURCE_ACCESS_READ);
+    CASE(HLSLRWByteAddressBufferType,                   SLANG_BYTE_ADDRESS_BUFFER,  SLANG_RESOURCE_ACCESS_READ_WRITE);
+    CASE(HLSLRasterizerOrderedByteAddressBufferType,    SLANG_BYTE_ADDRESS_BUFFER,  SLANG_RESOURCE_ACCESS_RASTER_ORDERED);
+    CASE(UntypedBufferResourceType,                     SLANG_BYTE_ADDRESS_BUFFER,  SLANG_RESOURCE_ACCESS_READ);
 #undef CASE
 
     return SLANG_RESOURCE_NONE;
@@ -397,16 +401,18 @@ SLANG_API SlangResourceAccess spReflectionType_GetResourceAccess(SlangReflection
         return ACCESS;              \
     } while(0)
 
-    CASE(HLSLStructuredBufferType,          SLANG_STRUCTURED_BUFFER, SLANG_RESOURCE_ACCESS_READ);
-    CASE(HLSLRWStructuredBufferType,        SLANG_STRUCTURED_BUFFER, SLANG_RESOURCE_ACCESS_READ_WRITE);
-    CASE(HLSLAppendStructuredBufferType,    SLANG_STRUCTURED_BUFFER, SLANG_RESOURCE_ACCESS_APPEND);
-    CASE(HLSLConsumeStructuredBufferType,   SLANG_STRUCTURED_BUFFER, SLANG_RESOURCE_ACCESS_CONSUME);
-    CASE(HLSLByteAddressBufferType,         SLANG_BYTE_ADDRESS_BUFFER,  SLANG_RESOURCE_ACCESS_READ);
-    CASE(HLSLRWByteAddressBufferType,       SLANG_BYTE_ADDRESS_BUFFER,  SLANG_RESOURCE_ACCESS_READ_WRITE);
-    CASE(UntypedBufferResourceType,         SLANG_BYTE_ADDRESS_BUFFER,  SLANG_RESOURCE_ACCESS_READ);
+    CASE(HLSLStructuredBufferType,                      SLANG_STRUCTURED_BUFFER,    SLANG_RESOURCE_ACCESS_READ);
+    CASE(HLSLRWStructuredBufferType,                    SLANG_STRUCTURED_BUFFER,    SLANG_RESOURCE_ACCESS_READ_WRITE);
+    CASE(HLSLRasterizerOrderedStructuredBufferType,     SLANG_STRUCTURED_BUFFER,    SLANG_RESOURCE_ACCESS_RASTER_ORDERED);
+    CASE(HLSLAppendStructuredBufferType,                SLANG_STRUCTURED_BUFFER,    SLANG_RESOURCE_ACCESS_APPEND);
+    CASE(HLSLConsumeStructuredBufferType,               SLANG_STRUCTURED_BUFFER,    SLANG_RESOURCE_ACCESS_CONSUME);
+    CASE(HLSLByteAddressBufferType,                     SLANG_BYTE_ADDRESS_BUFFER,  SLANG_RESOURCE_ACCESS_READ);
+    CASE(HLSLRWByteAddressBufferType,                   SLANG_BYTE_ADDRESS_BUFFER,  SLANG_RESOURCE_ACCESS_READ_WRITE);
+    CASE(HLSLRasterizerOrderedByteAddressBufferType,    SLANG_BYTE_ADDRESS_BUFFER,  SLANG_RESOURCE_ACCESS_RASTER_ORDERED);
+    CASE(UntypedBufferResourceType,                     SLANG_BYTE_ADDRESS_BUFFER,  SLANG_RESOURCE_ACCESS_READ);
 
     // This isn't entirely accurate, but I can live with it for now
-    CASE(GLSLShaderStorageBufferType,       SLANG_STRUCTURED_BUFFER, SLANG_RESOURCE_ACCESS_READ_WRITE);
+    CASE(GLSLShaderStorageBufferType, SLANG_STRUCTURED_BUFFER, SLANG_RESOURCE_ACCESS_READ_WRITE);
 #undef CASE
 
     return SLANG_RESOURCE_ACCESS_NONE;
@@ -480,10 +486,11 @@ SLANG_API SlangReflectionType* spReflectionType_GetResourceResultType(SlangRefle
 
     // TODO: structured buffer needs to expose type layout!
 
-    CASE(HLSLStructuredBufferType,          SLANG_STRUCTURED_BUFFER, SLANG_RESOURCE_ACCESS_READ);
-    CASE(HLSLRWStructuredBufferType,        SLANG_STRUCTURED_BUFFER, SLANG_RESOURCE_ACCESS_READ_WRITE);
-    CASE(HLSLAppendStructuredBufferType,    SLANG_STRUCTURED_BUFFER, SLANG_RESOURCE_ACCESS_APPEND);
-    CASE(HLSLConsumeStructuredBufferType,   SLANG_STRUCTURED_BUFFER, SLANG_RESOURCE_ACCESS_CONSUME);
+    CASE(HLSLStructuredBufferType,                  SLANG_STRUCTURED_BUFFER, SLANG_RESOURCE_ACCESS_READ);
+    CASE(HLSLRWStructuredBufferType,                SLANG_STRUCTURED_BUFFER, SLANG_RESOURCE_ACCESS_READ_WRITE);
+    CASE(HLSLRasterizerOrderedStructuredBufferType, SLANG_STRUCTURED_BUFFER, SLANG_RESOURCE_ACCESS_RASTER_ORDERED);
+    CASE(HLSLAppendStructuredBufferType,            SLANG_STRUCTURED_BUFFER, SLANG_RESOURCE_ACCESS_APPEND);
+    CASE(HLSLConsumeStructuredBufferType,           SLANG_STRUCTURED_BUFFER, SLANG_RESOURCE_ACCESS_CONSUME);
 #undef CASE
 
     return nullptr;

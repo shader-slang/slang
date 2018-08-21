@@ -95,12 +95,30 @@ SLANG_RAW("{\n")
 SLANG_RAW("    __subscript(uint index) -> T;\n")
 SLANG_RAW("};\n")
 SLANG_RAW("\n")
-SLANG_RAW("__magic_type(HLSLRWByteAddressBufferType)\n")
+
+static const struct {
+    IROp op;
+    char const* name;
+} kMutableByteAddressBufferCases[] =
+{
+    { kIROp_HLSLRWByteAddressBufferType,                "RWByteAddressBuffer" },
+    { kIROp_HLSLRasterizerOrderedByteAddressBufferType, "RasterizerOrderedByteAddressBuffer" },
+};
+for(auto item : kMutableByteAddressBufferCases) {
+SLANG_RAW("\n")
+SLANG_RAW("\n")
+SLANG_RAW("__magic_type(HLSL")
+SLANG_SPLICE(item.name
+)
+SLANG_RAW("Type)\n")
 SLANG_RAW("__intrinsic_type(")
-SLANG_SPLICE(kIROp_HLSLRWByteAddressBufferType
+SLANG_SPLICE(item.op
 )
 SLANG_RAW(")\n")
-SLANG_RAW("struct RWByteAddressBuffer\n")
+SLANG_RAW("struct ")
+SLANG_SPLICE(item.name
+)
+SLANG_RAW("\n")
 SLANG_RAW("{\n")
 SLANG_RAW("    // Note(tfoley): supports alll operations from `ByteAddressBuffer`\n")
 SLANG_RAW("    // TODO(tfoley): can this be made a sub-type?\n")
@@ -213,13 +231,36 @@ SLANG_RAW("        uint address,\n")
 SLANG_RAW("        uint4 value);\n")
 SLANG_RAW("};\n")
 SLANG_RAW("\n")
+
+}
+SLANG_RAW("\n")
+SLANG_RAW("\n")
+
+static const struct {
+    IROp op;
+    char const* name;
+} kMutableStructuredBufferCases[] =
+{
+    { kIROp_HLSLRWStructuredBufferType,                "RWStructuredBuffer" },
+    { kIROp_HLSLRasterizerOrderedStructuredBufferType, "RasterizerOrderedStructuredBuffer" },
+};
+for(auto item : kMutableStructuredBufferCases) {
+SLANG_RAW("\n")
+SLANG_RAW("\n")
+SLANG_RAW("\n")
 SLANG_RAW("__generic<T>\n")
-SLANG_RAW("__magic_type(HLSLRWStructuredBufferType)\n")
+SLANG_RAW("__magic_type(HLSL")
+SLANG_SPLICE(item.name
+)
+SLANG_RAW("Type)\n")
 SLANG_RAW("__intrinsic_type(")
-SLANG_SPLICE(kIROp_HLSLRWStructuredBufferType
+SLANG_SPLICE(item.op
 )
 SLANG_RAW(")\n")
-SLANG_RAW("struct RWStructuredBuffer\n")
+SLANG_RAW("struct ")
+SLANG_SPLICE(item.name
+)
+SLANG_RAW("\n")
 SLANG_RAW("{\n")
 SLANG_RAW("    uint DecrementCounter();\n")
 SLANG_RAW("\n")
@@ -238,6 +279,10 @@ SLANG_RAW("        __intrinsic_op(bufferElementRef)\n")
 SLANG_RAW("        ref;\n")
 SLANG_RAW("\t}\n")
 SLANG_RAW("};\n")
+SLANG_RAW("\n")
+
+}
+SLANG_RAW("\n")
 SLANG_RAW("\n")
 SLANG_RAW("__generic<T>\n")
 SLANG_RAW("__magic_type(HLSLPointStreamType)\n")

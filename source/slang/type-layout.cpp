@@ -1659,10 +1659,11 @@ SimpleLayoutInfo GetLayoutImpl(
         return info;                                                    \
     } while(0)
 
-    CASE(HLSLStructuredBufferType,          StructuredBuffer);
-    CASE(HLSLRWStructuredBufferType,        MutableStructuredBuffer);
-    CASE(HLSLAppendStructuredBufferType,    MutableStructuredBuffer);
-    CASE(HLSLConsumeStructuredBufferType,   MutableStructuredBuffer);
+    CASE(HLSLStructuredBufferType,                  StructuredBuffer);
+    CASE(HLSLRWStructuredBufferType,                MutableStructuredBuffer);
+    CASE(HLSLRasterizerOrderedStructuredBufferType, MutableStructuredBuffer);
+    CASE(HLSLAppendStructuredBufferType,            MutableStructuredBuffer);
+    CASE(HLSLConsumeStructuredBufferType,           MutableStructuredBuffer);
 
 #undef CASE
 
@@ -1675,8 +1676,9 @@ SimpleLayoutInfo GetLayoutImpl(
             type, rules, outTypeLayout);                        \
     } while(0)
 
-    CASE(HLSLByteAddressBufferType,         RawBuffer);
-    CASE(HLSLRWByteAddressBufferType,       MutableRawBuffer);
+    CASE(HLSLByteAddressBufferType,                     RawBuffer);
+    CASE(HLSLRWByteAddressBufferType,                   MutableRawBuffer);
+    CASE(HLSLRasterizerOrderedByteAddressBufferType,    MutableRawBuffer);
 
     CASE(GLSLInputAttachmentType,           InputRenderTarget);
 
