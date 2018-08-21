@@ -709,11 +709,12 @@ SIMPLE_IR_PARENT_TYPE(PointerLikeType, BuiltinGenericType);
 SIMPLE_IR_PARENT_TYPE(HLSLStructuredBufferTypeBase, BuiltinGenericType)
 SIMPLE_IR_TYPE(HLSLStructuredBufferType, HLSLStructuredBufferTypeBase)
 SIMPLE_IR_TYPE(HLSLRWStructuredBufferType, HLSLStructuredBufferTypeBase)
-// TODO: need raster-ordered case here
+SIMPLE_IR_TYPE(HLSLRasterizerOrderedStructuredBufferType, HLSLStructuredBufferTypeBase)
 
 SIMPLE_IR_PARENT_TYPE(UntypedBufferResourceType, Type)
 SIMPLE_IR_TYPE(HLSLByteAddressBufferType, UntypedBufferResourceType)
 SIMPLE_IR_TYPE(HLSLRWByteAddressBufferType, UntypedBufferResourceType)
+SIMPLE_IR_TYPE(HLSLRasterizerOrderedByteAddressBufferType, UntypedBufferResourceType)
 
 SIMPLE_IR_TYPE(HLSLAppendStructuredBufferType, HLSLStructuredBufferTypeBase)
 SIMPLE_IR_TYPE(HLSLConsumeStructuredBufferType, HLSLStructuredBufferTypeBase)

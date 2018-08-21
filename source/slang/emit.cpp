@@ -1101,10 +1101,11 @@ struct EmitVisitor
             {
                 switch (type->op)
                 {
-                case kIROp_HLSLStructuredBufferType:        Emit("StructuredBuffer");           break;
-                case kIROp_HLSLRWStructuredBufferType:      Emit("RWStructuredBuffer");         break;
-                case kIROp_HLSLAppendStructuredBufferType:  Emit("AppendStructuredBuffer");     break;
-                case kIROp_HLSLConsumeStructuredBufferType: Emit("ConsumeStructuredBuffer");    break;
+                case kIROp_HLSLStructuredBufferType:                    Emit("StructuredBuffer");                   break;
+                case kIROp_HLSLRWStructuredBufferType:                  Emit("RWStructuredBuffer");                 break;
+                case kIROp_HLSLRasterizerOrderedStructuredBufferType:   Emit("RasterizerOrderedStructuredBuffer");  break;
+                case kIROp_HLSLAppendStructuredBufferType:              Emit("AppendStructuredBuffer");             break;
+                case kIROp_HLSLConsumeStructuredBufferType:             Emit("ConsumeStructuredBuffer");            break;
 
                 default:
                     SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled structured buffer type");
@@ -1139,9 +1140,10 @@ struct EmitVisitor
             {
                 switch (type->op)
                 {
-                case kIROp_HLSLByteAddressBufferType:           Emit("ByteAddressBuffer");                  break;
-                case kIROp_HLSLRWByteAddressBufferType:         Emit("RWByteAddressBuffer");                break;
-                case kIROp_RaytracingAccelerationStructureType: Emit("RaytracingAccelerationStructure");    break;
+                case kIROp_HLSLByteAddressBufferType:                   Emit("ByteAddressBuffer");                  break;
+                case kIROp_HLSLRWByteAddressBufferType:                 Emit("RWByteAddressBuffer");                break;
+                case kIROp_HLSLRasterizerOrderedByteAddressBufferType:  Emit("RasterizerOrderedByteAddressBuffer"); break;
+                case kIROp_RaytracingAccelerationStructureType:         Emit("RaytracingAccelerationStructure");    break;
 
                 default:
                     SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled buffer type");
@@ -1152,11 +1154,13 @@ struct EmitVisitor
 
         case CodeGenTarget::GLSL:
             {
+                // TODO: This "translation" is obviously wrong for GLSL.
                 switch (type->op)
                 {
-                case kIROp_HLSLByteAddressBufferType:           Emit("ByteAddressBuffer");                  break;
-                case kIROp_HLSLRWByteAddressBufferType:         Emit("RWByteAddressBuffer");                break;
-                case kIROp_RaytracingAccelerationStructureType: Emit("RaytracingAccelerationStructure");    break;
+                case kIROp_HLSLByteAddressBufferType:                   Emit("ByteAddressBuffer");                  break;
+                case kIROp_HLSLRWByteAddressBufferType:                 Emit("RWByteAddressBuffer");                break;
+                case kIROp_HLSLRasterizerOrderedByteAddressBufferType:  Emit("RasterizerOrderedByteAddressBuffer"); break;
+                case kIROp_RaytracingAccelerationStructureType:         Emit("RaytracingAccelerationStructure");    break;
 
                 default:
                     SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled buffer type");

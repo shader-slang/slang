@@ -195,11 +195,12 @@ SIMPLE_SYNTAX_CLASS(PointerLikeType, BuiltinGenericType)
 SIMPLE_SYNTAX_CLASS(HLSLStructuredBufferTypeBase, BuiltinGenericType)
 SIMPLE_SYNTAX_CLASS(HLSLStructuredBufferType, HLSLStructuredBufferTypeBase)
 SIMPLE_SYNTAX_CLASS(HLSLRWStructuredBufferType, HLSLStructuredBufferTypeBase)
-// TODO: need raster-ordered case here
+SIMPLE_SYNTAX_CLASS(HLSLRasterizerOrderedStructuredBufferType, HLSLStructuredBufferTypeBase)
 
 SIMPLE_SYNTAX_CLASS(UntypedBufferResourceType, BuiltinType)
 SIMPLE_SYNTAX_CLASS(HLSLByteAddressBufferType, UntypedBufferResourceType)
 SIMPLE_SYNTAX_CLASS(HLSLRWByteAddressBufferType, UntypedBufferResourceType)
+SIMPLE_SYNTAX_CLASS(HLSLRasterizerOrderedByteAddressBufferType, UntypedBufferResourceType)
 SIMPLE_SYNTAX_CLASS(RaytracingAccelerationStructureType, UntypedBufferResourceType)
 
 SIMPLE_SYNTAX_CLASS(HLSLAppendStructuredBufferType, HLSLStructuredBufferTypeBase)
