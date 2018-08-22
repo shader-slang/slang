@@ -131,6 +131,10 @@ DIAGNOSTIC(15403, Error, expectedTokenInMacroParameters, "expected '$0' in macro
 DIAGNOSTIC(15500, Warning, expectedTokenInMacroArguments, "expected '$0' in macro invocation")
 DIAGNOSTIC(15501, Error, wrongNumberOfArgumentsToMacro, "wrong number of arguments to macro (expected $0, got $1)")
 
+// 156xx - pragmas
+DIAGNOSTIC(15600, Error, expectedPragmaDirectiveName, "expected a name after '#pragma'")
+DIAGNOSTIC(15601, Warning, unknownPragmaDirectiveIgnored, "ignoring unknown directive '#pragma $0'")
+
 // 159xx - user-defined error/warning
 DIAGNOSTIC(15900, Error,    userDefinedError,   "#error: $0")
 DIAGNOSTIC(15901, Warning,  userDefinedWarning, "#warning: $0")

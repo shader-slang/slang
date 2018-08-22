@@ -1818,12 +1818,74 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
     inputStream->primaryStream->lexer.startOverridingSourceLocations(newLoc);
 }
 
+#define SLANG_PRAGMA_DIRECTIVE_CALLBACK(NAME) \
+    void NAME(PreprocessorDirectiveContext* context, Token subDirectiveToken)
+
+// Callback interface used by `#pragma` directives
+typedef SLANG_PRAGMA_DIRECTIVE_CALLBACK((*PragmaDirectiveCallback));
+
+SLANG_PRAGMA_DIRECTIVE_CALLBACK(handleUnknownPragmaDirective)
+{
+    GetSink(context)->diagnose(subDirectiveToken, Diagnostics::unknownPragmaDirectiveIgnored, subDirectiveToken.getName());
+    SkipToEndOfLine(context);
+    return;
+}
+
+
+// Information about a specific `#pragma` directive
+struct PragmaDirective
+{
+    // name of the directive
+    char const*             name;
+
+    // Callback to handle the directive
+    PragmaDirectiveCallback callback;
+};
+
+// A simple array of all the  `#pragma` directives we know how to handle.
+static const PragmaDirective kPragmaDirectives[] =
+{
+    { NULL, NULL },
+};
+
+static const PragmaDirective kUnknownPragmaDirective = {
+    NULL, &handleUnknownPragmaDirective,
+};
+
+// Look up the `#pragma` directive with the given name.
+static PragmaDirective const* findPragmaDirective(String const& name)
+{
+    char const* nameStr = name.Buffer();
+    for (int ii = 0; kPragmaDirectives[ii].name; ++ii)
+    {
+        if (strcmp(kPragmaDirectives[ii].name, nameStr) != 0)
+            continue;
+
+        return &kPragmaDirectives[ii];
+    }
+
+    return &kUnknownPragmaDirective;
+}
+
 // Handle a `#pragma` directive
 static void HandlePragmaDirective(PreprocessorDirectiveContext* context)
 {
-    // TODO(tfoley): figure out which pragmas to parse,
-    // and which to pass along
-    SkipToEndOfLine(context);
+    // Try to read the sub-directive name.
+    Token subDirectiveToken = PeekRawToken(context);
+
+    // The sub-directive had better be an identifier
+    if (subDirectiveToken.type != TokenType::Identifier)
+    {
+        GetSink(context)->diagnose(GetDirectiveLoc(context), Diagnostics::expectedPragmaDirectiveName);
+        SkipToEndOfLine(context);
+        return;
+    }
+
+    // Look up the handler for the sub-directive.
+    PragmaDirective const* subDirective = findPragmaDirective(subDirectiveToken.getName()->text);
+
+    // Apply the sub-directive-specific callback
+    (subDirective->callback)(context, subDirectiveToken);
 }
 
 // Handle a `#version` directive
