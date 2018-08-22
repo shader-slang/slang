@@ -4513,7 +4513,7 @@ namespace Slang
             {
                 if (nameText == "push_constant")
                 {
-                    RefPtr<Modifier> modifier(new PushConstantAttribute);
+                    RefPtr<PushConstantAttribute> modifier(new PushConstantAttribute);
 
                     modifier->name = nameAndLoc.name;
                     modifier->loc = nameAndLoc.loc;
