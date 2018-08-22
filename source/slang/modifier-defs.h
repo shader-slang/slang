@@ -129,7 +129,6 @@ SIMPLE_SYNTAX_CLASS(GLSLUnparsedLayoutModifier   , GLSLLayoutModifier)
 // Specific cases for known GLSL `layout` modifiers that we need to work with
 SIMPLE_SYNTAX_CLASS(GLSLConstantIDLayoutModifier , GLSLParsedLayoutModifier)
 SIMPLE_SYNTAX_CLASS(GLSLLocationLayoutModifier   , GLSLParsedLayoutModifier)
-SIMPLE_SYNTAX_CLASS(GLSLPushConstantLayoutModifier, GLSLParsedLayoutModifier)
 
 SIMPLE_SYNTAX_CLASS(GLSLLocalSizeLayoutModifier,    GLSLUnparsedLayoutModifier)
 SIMPLE_SYNTAX_CLASS(GLSLLocalSizeXLayoutModifier,    GLSLLocalSizeLayoutModifier)
@@ -327,6 +326,9 @@ SIMPLE_SYNTAX_CLASS(BranchAttribute, Attribute)             // `[branch]`
 SIMPLE_SYNTAX_CLASS(FlattenAttribute, Attribute)            // `[flatten]`
 SIMPLE_SYNTAX_CLASS(ForceCaseAttribute, Attribute)          // `[forcecase]`
 SIMPLE_SYNTAX_CLASS(CallAttribute, Attribute)               // `[call]`
+
+// [[vk_push_constant]] [[push_constant]]
+SIMPLE_SYNTAX_CLASS(PushConstantAttribute, Attribute)
 
 // [[vk_binding]]
 SYNTAX_CLASS(GLSLBindingAttribute, Attribute)

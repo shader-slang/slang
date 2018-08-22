@@ -1122,6 +1122,11 @@ attribute_syntax [vk_binding(binding: int, set: int = 0)]			: GLSLBindingAttribu
 __attributeTarget(DeclBase)
 attribute_syntax [gl_binding(binding: int, set: int = 0)]			: GLSLBindingAttribute;
 
+__attributeTarget(DeclBase)
+attribute_syntax [vk_push_constant]									: PushConstantAttribute;
+__attributeTarget(DeclBase)
+attribute_syntax [push_constant]									: PushConstantAttribute;
+
 // Statement Attributes
 
 __attributeTarget(LoopStmt)
