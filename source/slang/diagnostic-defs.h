@@ -42,6 +42,7 @@ DIAGNOSTIC(-1, Note, doYouForgetToMakeComponentAccessible, "do you forget to mak
 
 DIAGNOSTIC(-1, Note, seeDeclarationOf, "see declaration of '$0'")
 DIAGNOSTIC(-1, Note, seeOtherDeclarationOf, "see other declaration of '$0'")
+DIAGNOSTIC(-1, Note, seePreviousDeclarationOf, "see previous declaration of '$0'")
 
 //
 // 0xxxx -  Command line and interaction with host platform APIs.
@@ -67,7 +68,7 @@ DIAGNOSTIC(    12, Error, cannotDeduceSourceLanguage, "can't deduce language for
 DIAGNOSTIC(    13, Error, unknownCodeGenerationTarget, "unknown code generation target '$0'");
 DIAGNOSTIC(    14, Error, unknownProfile, "unknown profile '$0'");
 DIAGNOSTIC(    15, Error, unknownStage, "unknown stage '$0'");
-DIAGNOSTIC(    16, Error, unknownPassThroughTarget, "unknown pass-through target '$0'");    
+DIAGNOSTIC(    16, Error, unknownPassThroughTarget, "unknown pass-through target '$0'");
 DIAGNOSTIC(    17, Error, unknownCommandLineOption, "unknown command-line option '$0'");
 DIAGNOSTIC(    18, Error, noProfileSpecified, "no profile specified; use the '-profile <profile name>' option");
 DIAGNOSTIC(    19, Error, multipleEntryPointsNeedMulitpleProfiles, "when multiple entry points are specified, each must have a profile given (with '-profile') before the '-entry' option");
@@ -160,7 +161,6 @@ DIAGNOSTIC(20011, Error, unexpectedColon, "unexpected ':'.")
 // 3xxxx - Semantic analysis
 //
 
-DIAGNOSTIC(30001, Error, functionRedefinitionWithArgList, "'$0$1': function redefinition.")
 DIAGNOSTIC(30002, Error, parameterAlreadyDefined, "parameter '$0' already defined.")
 DIAGNOSTIC(30003, Error, breakOutsideLoop, "'break' must appear inside loop constructs.")
 DIAGNOSTIC(30004, Error, continueOutsideLoop, "'continue' must appear inside loop constructs.")
@@ -203,8 +203,14 @@ DIAGNOSTIC(30052, Error, invalidSwizzleExpr, "invalid swizzle pattern '$0' on ty
 
 DIAGNOSTIC(30100, Error, staticRefToNonStaticMember, "type '$0' cannot be used to refer to non-static member '$1'")
 
+DIAGNOSTIC(30201, Error, functionRedefinition, "function '$0' already has a body")
+DIAGNOSTIC(30202, Error, functionRedeclarationWithDifferentReturnType, "function '$0' declared to return '$1' was previously declared to return '$2'")
+
+
 DIAGNOSTIC(33070, Error, expectedFunction, "expression preceding parenthesis of apparent call must have function type.")
 DIAGNOSTIC(33071, Error, expectedAStringLiteral, "expected a string literal")
+
+
 
 // Attributes
 DIAGNOSTIC(31000, Error, unknownAttributeName, "unknown attribute '$0'")
