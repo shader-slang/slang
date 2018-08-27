@@ -1876,7 +1876,7 @@ namespace Slang
             }
             return true;
         }
-        
+
         bool validateAttribute(RefPtr<Attribute> attr)
         {
                 if(auto numThreadsAttr = attr.As<NumThreadsAttribute>())
@@ -1939,7 +1939,7 @@ namespace Slang
 
                     entryPointAttr->stage = stage;
                 }
-                else if ((attr.As<DomainAttribute>()) || 
+                else if ((attr.As<DomainAttribute>()) ||
                          (attr.As<MaxTessFactorAttribute>()) ||
                          (attr.As<OutputTopologyAttribute>()) ||
                          (attr.As<PartitioningAttribute>()) ||
@@ -1964,7 +1964,7 @@ namespace Slang
                     // Has no args
                     SLANG_ASSERT(attr->args.Count() == 0);
                 }
-                else 
+                else
                 {
                     if(attr->args.Count() == 0)
                     {
@@ -3639,8 +3639,9 @@ namespace Slang
                 auto prevResultType = GetResultType(prevFuncDeclRef);
                 if (!resultType->Equals(prevResultType))
                 {
-                    // Bad dedeclaration
-                    getSink()->diagnose(funcDecl, Diagnostics::unimplemented, "redeclaration has a different return type");
+                    // Bad redeclaration
+                    getSink()->diagnose(funcDecl, Diagnostics::functionRedeclarationWithDifferentReturnType, funcDecl->getName(), resultType, prevResultType);
+                    getSink()->diagnose(prevFuncDecl, Diagnostics::seePreviousDeclarationOf, funcDecl->getName());
 
                     // Don't bother emitting other errors at this point
                     break;
@@ -3671,7 +3672,8 @@ namespace Slang
                 if (funcDecl->Body && prevFuncDecl->Body)
                 {
                     // Redefinition
-                    getSink()->diagnose(funcDecl, Diagnostics::unimplemented, "function redefinition");
+                    getSink()->diagnose(funcDecl, Diagnostics::functionRedefinition, funcDecl->getName());
+                    getSink()->diagnose(prevFuncDecl, Diagnostics::seePreviousDefinitionOf, funcDecl->getName());
 
                     // Don't bother emitting other errors
                     break;
@@ -8379,7 +8381,7 @@ namespace Slang
         // TODO: We currently do minimal checking here, but this is the
         // right place to perform the following validation checks:
         //
-        
+
         // * Are the function input/output parameters and result type
         //   all valid for the chosen stage? (e.g., there shouldn't be
         //   an `OutputStream<X>` type in a vertex shader signature)

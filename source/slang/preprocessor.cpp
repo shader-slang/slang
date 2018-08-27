@@ -197,6 +197,11 @@ struct Preprocessor
     // The translation unit that is being parsed
     TranslationUnitRequest*                 translationUnit;
 
+    // Any paths that have issued `#pragma once` directives to
+    // stop them from being included again.
+    HashSet<String>                         pragmaOncePaths;
+
+
     TranslationUnitRequest* getTranslationUnit()
     {
         return translationUnit;
@@ -1608,6 +1613,12 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
     // a switch of input stream
     expectEndOfDirective(context);
 
+    // Check whether we've previously included this file and seen a `#pragma once` directive
+    if(context->preprocessor->pragmaOncePaths.Contains(foundPath))
+    {
+        return;
+    }
+
     // Push the new file onto our stack of input streams
     // TODO(tfoley): check if we have made our include stack too deep
 
@@ -1818,12 +1829,100 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
     inputStream->primaryStream->lexer.startOverridingSourceLocations(newLoc);
 }
 
+#define SLANG_PRAGMA_DIRECTIVE_CALLBACK(NAME) \
+    void NAME(PreprocessorDirectiveContext* context, Token subDirectiveToken)
+
+// Callback interface used by `#pragma` directives
+typedef SLANG_PRAGMA_DIRECTIVE_CALLBACK((*PragmaDirectiveCallback));
+
+SLANG_PRAGMA_DIRECTIVE_CALLBACK(handleUnknownPragmaDirective)
+{
+    GetSink(context)->diagnose(subDirectiveToken, Diagnostics::unknownPragmaDirectiveIgnored, subDirectiveToken.getName());
+    SkipToEndOfLine(context);
+    return;
+}
+
+SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaOnceDirective)
+{
+    // We need to identify the path of the file we are preprocessing,
+    // so that we can avoid including it again.
+    //
+    // Note: for now we are doing a very simplistic check where
+    // we use the raw file path as the key for our duplicate checking.
+    //
+    // TODO: a more refined implementation should probably apply Unicode
+    // normalization and case-folding to the path, and then use that
+    // plus a hash of the file contents to determine whether things
+    // represent the "same" file.
+    //
+    // TODO: even for our simplistic implementation, we need to add
+    // logic to deal with `../` segments in path names to detect
+    // trivial cases of the "same" path.
+    //
+    auto directiveLoc = GetDirectiveLoc(context);
+    auto expandedDirectiveLoc = context->preprocessor->translationUnit->compileRequest->getSourceManager()->expandSourceLoc(directiveLoc);
+    String pathIssuedFrom = expandedDirectiveLoc.getSpellingPath();
+
+    context->preprocessor->pragmaOncePaths.Add(pathIssuedFrom);
+}
+
+// Information about a specific `#pragma` directive
+struct PragmaDirective
+{
+    // name of the directive
+    char const*             name;
+
+    // Callback to handle the directive
+    PragmaDirectiveCallback callback;
+};
+
+// A simple array of all the  `#pragma` directives we know how to handle.
+static const PragmaDirective kPragmaDirectives[] =
+{
+    { "once", &handlePragmaOnceDirective },
+
+    { NULL, NULL },
+};
+
+static const PragmaDirective kUnknownPragmaDirective = {
+    NULL, &handleUnknownPragmaDirective,
+};
+
+// Look up the `#pragma` directive with the given name.
+static PragmaDirective const* findPragmaDirective(String const& name)
+{
+    char const* nameStr = name.Buffer();
+    for (int ii = 0; kPragmaDirectives[ii].name; ++ii)
+    {
+        if (strcmp(kPragmaDirectives[ii].name, nameStr) != 0)
+            continue;
+
+        return &kPragmaDirectives[ii];
+    }
+
+    return &kUnknownPragmaDirective;
+}
+
 // Handle a `#pragma` directive
 static void HandlePragmaDirective(PreprocessorDirectiveContext* context)
 {
-    // TODO(tfoley): figure out which pragmas to parse,
-    // and which to pass along
-    SkipToEndOfLine(context);
+    // Try to read the sub-directive name.
+    Token subDirectiveToken = PeekRawToken(context);
+
+    // The sub-directive had better be an identifier
+    if (subDirectiveToken.type != TokenType::Identifier)
+    {
+        GetSink(context)->diagnose(GetDirectiveLoc(context), Diagnostics::expectedPragmaDirectiveName);
+        SkipToEndOfLine(context);
+        return;
+    }
+    AdvanceRawToken(context);
+
+    // Look up the handler for the sub-directive.
+    PragmaDirective const* subDirective = findPragmaDirective(subDirectiveToken.getName()->text);
+
+    // Apply the sub-directive-specific callback
+    (subDirective->callback)(context, subDirectiveToken);
 }
 
 // Handle a `#version` directive
