@@ -77,7 +77,7 @@ void Mt19937RandomGenerator::_generate()
     {
         const int i = kNumEntries - 1;
         const uint32_t y = (m_mt[i] & 0x80000000) + (m_mt[0] & 0x7fffffff);
-        const int32_t o = (i + 397 - kNumEntries);
+        const int32_t o = ((i + 397) - kNumEntries);
 
         m_mt[i] = m_mt[o] ^ (y >> 1);
         // If y is odd
@@ -107,8 +107,8 @@ int32_t Mt19937RandomGenerator::nextInt32()
 
     uint32_t y = m_mt[m_index++];
     y = y ^ (y >> 11);
-    y = y ^ ((y << 7) & uint32_t(2636928640u));
-    y = y ^ ((y << 15) & uint32_t(4022730752u));
+    y = y ^ ((y << 7) & uint32_t(0x9d2c5680u));
+    y = y ^ ((y << 15) & uint32_t(0xefc6000u)); 
     y = y ^ (y >> 18);
 
     return int32_t(y);

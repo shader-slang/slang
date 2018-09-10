@@ -1728,7 +1728,7 @@ void runTestsOnFile(
     // Note cases where a test file exists, but we found nothing to run
     if( testList.tests.Count() == 0 )
     {
-        context->addResult(filePath, TestResult::eIgnored);
+        context->addTest(filePath, TestResult::eIgnored);
         return;
     }
 

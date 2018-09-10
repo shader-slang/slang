@@ -10,6 +10,8 @@
 
 using namespace Slang;
 
+/* static */TestContext* TestContext::s_context = nullptr;
+
 TestContext::TestContext(TestOutputMode outputMode) :
     m_outputMode(outputMode)
 {
@@ -58,6 +60,13 @@ TestResult TestContext::endTest(TestResult result)
     m_inTest = false;
 
     return result;
+}
+
+TestResult TestContext::addTest(const String& testName, bool isPass)
+{
+    const TestResult res = isPass ? TestResult::ePass : TestResult::eFail;
+    addTest(testName, res);
+    return res;
 }
 
 void TestContext::dumpOutputDifference(const String& expectedOutput, const String& actualOutput)
@@ -175,7 +184,7 @@ void TestContext::_addResult(const TestInfo& info)
     }
 }
 
-void TestContext::addResult(const String& testName, TestResult testResult)
+void TestContext::addTest(const String& testName, TestResult testResult)
 {
     // Can't add this way if in test
     assert(!m_inTest);

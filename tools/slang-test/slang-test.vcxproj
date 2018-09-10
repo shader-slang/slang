@@ -165,12 +165,14 @@
     <ClInclude Include="os.h" />
     <ClInclude Include="render-api-util.h" />
     <ClInclude Include="test-context.h" />
+    <ClInclude Include="unit-test-free-list.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="os.cpp" />
     <ClCompile Include="render-api-util.cpp" />
     <ClCompile Include="test-context.cpp" />
+    <ClCompile Include="unit-test-free-list.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\source\core\core.vcxproj">

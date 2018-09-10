@@ -2,6 +2,8 @@
 
 #include "../../source/core/slang-string-util.h"
 
+#define SLANG_CHECK(x) TestContext::get()->addTest(#x, (x)); 
+
 enum class TestOutputMode
 {
     eDefault = 0,   ///< Default mode is to write test results to the console
@@ -35,11 +37,14 @@ class TestContext
         Slang::String name;
         Slang::String message;                 ///< Message that is specific for the testResult
     };
-
-    void addResult(const Slang::String& testName, TestResult testResult);
-
+    
     void startTest(const Slang::String& testName);
     TestResult endTest(TestResult result);
+    
+        /// Runs start/endTest and outputs the result
+    TestResult addTest(const Slang::String& testName, bool isPass);
+        /// Effectively runs start/endTest (so cannot be called inside start/endTest). 
+    void addTest(const Slang::String& testName, TestResult testResult);
 
         // Called for an error in the test-runner (not for an error involving a test itself).
     void message(TestMessageType type, const Slang::String& errorText);
@@ -52,6 +57,9 @@ class TestContext
 
         /// Ctor
     TestContext(TestOutputMode outputMode);
+
+    static TestContext* get() { return s_context; }
+    static void set(TestContext* context) { s_context = context; }
 
     Slang::List<TestInfo> m_testInfos;
 
@@ -71,6 +79,8 @@ protected:
 
     TestInfo m_currentInfo;
     bool m_inTest;
+
+    static TestContext* s_context;
 };
 
 

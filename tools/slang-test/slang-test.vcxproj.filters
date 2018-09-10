@@ -18,6 +18,9 @@
     <ClInclude Include="test-context.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="unit-test-free-list.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -30,6 +33,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="test-context.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="unit-test-free-list.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
