@@ -10,7 +10,7 @@
 
 using namespace Slang;
 
-TestContext::TestContext(OutputMode outputMode) :
+TestContext::TestContext(TestOutputMode outputMode) :
     m_outputMode(outputMode)
 {
     m_totalTestCount = 0;
@@ -27,8 +27,8 @@ bool TestContext::canWriteStdError() const
 {
     switch (m_outputMode)
     {
-        case kOutputMode_xUnit:
-        case kOutputMode_xUnit2:
+        case TestOutputMode::eXUnit:
+        case TestOutputMode::eXUnit2:
         {
             return false;
         }
@@ -88,15 +88,15 @@ void TestContext::_addResult(const TestInfo& info)
 
     switch (info.testResult)
     {
-        case kTestResult_Fail:
+        case TestResult::eFail:
             m_failedTestCount++;
             break;
 
-        case kTestResult_Pass:
+        case TestResult::ePass:
             m_passedTestCount++;
             break;
 
-        case kTestResult_Ignored:
+        case TestResult::eIgnored:
             m_ignoredTestCount++;
             break;
 
@@ -115,9 +115,9 @@ void TestContext::_addResult(const TestInfo& info)
             char const* resultString = "UNEXPECTED";
             switch (info.testResult)
             {
-                case kTestResult_Fail:      resultString = "FAILED";  break;
-                case kTestResult_Pass:      resultString = "passed";  break;
-                case kTestResult_Ignored:   resultString = "ignored"; break;
+                case TestResult::eFail:      resultString = "FAILED";  break;
+                case TestResult::ePass:      resultString = "passed";  break;
+                case TestResult::eIgnored:   resultString = "ignored"; break;
                 default:
                     assert(!"unexpected");
                     break;
@@ -125,20 +125,20 @@ void TestContext::_addResult(const TestInfo& info)
             printf("%s test: '%S'\n", resultString, info.name.ToWString().begin());
             break;
         }
-        case kOutputMode_xUnit2:
-        case kOutputMode_xUnit:
+        case TestOutputMode::eXUnit2:
+        case TestOutputMode::eXUnit:
         {
             // Don't output anything -> we'll output all in one go at the end
             break;
         }
-        case kOutputMode_AppVeyor:
+        case TestOutputMode::eAppVeyor:
         {
             char const* resultString = "None";
             switch (info.testResult)
             {
-                case kTestResult_Fail:      resultString = "Failed";  break;
-                case kTestResult_Pass:      resultString = "Passed";  break;
-                case kTestResult_Ignored:   resultString = "Ignored"; break;
+                case TestResult::eFail:      resultString = "Failed";  break;
+                case TestResult::ePass:      resultString = "Passed";  break;
+                case TestResult::eIgnored:   resultString = "Ignored"; break;
                 default:
                     assert(!"unexpected");
                     break;

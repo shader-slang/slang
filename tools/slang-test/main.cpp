@@ -99,7 +99,7 @@ struct Options
     bool dumpOutputOnFailure = false;
 
     // kind of output to generate
-    OutputMode outputMode = kOutputMode_Default;
+    TestOutputMode outputMode = TestOutputMode::eDefault;
 
     // Only run tests that match one of the given categories
     Dictionary<TestCategory*, TestCategory*> includeCategories;
@@ -209,21 +209,21 @@ Result parseOptions(int* argc, char** argv)
         }
         else if( strcmp(arg, "-appveyor") == 0 )
         {
-            g_options.outputMode = kOutputMode_AppVeyor;
+            g_options.outputMode = TestOutputMode::eAppVeyor;
             g_options.dumpOutputOnFailure = true;
         }
         else if( strcmp(arg, "-travis") == 0 )
         {
-            g_options.outputMode = kOutputMode_Travis;
+            g_options.outputMode = TestOutputMode::eTravis;
             g_options.dumpOutputOnFailure = true;
         }
         else if (strcmp(arg, "-xunit") == 0)
         {
-            g_options.outputMode = kOutputMode_xUnit;
+            g_options.outputMode = TestOutputMode::eXUnit;
         }
         else if (strcmp(arg, "-xunit2") == 0)
         {
-            g_options.outputMode = kOutputMode_xUnit2;
+            g_options.outputMode = TestOutputMode::eXUnit2;
         }
         else if( strcmp(arg, "-category") == 0 )
         {
@@ -477,7 +477,7 @@ TestResult gatherTestOptions(
 
                     if(!category)
                     {
-                        return kTestResult_Fail;
+                        return TestResult::eFail;
                     }
 
                     testOptions.categories.Add(category);
@@ -492,7 +492,7 @@ TestResult gatherTestOptions(
                 break;
         
             case 0: case '\r': case '\n':
-                return kTestResult_Fail;
+                return TestResult::eFail;
             }
 
             break;
@@ -509,7 +509,7 @@ TestResult gatherTestOptions(
         cursor++;
     else
     {
-        return kTestResult_Fail;
+        return TestResult::eFail;
     }
 
     // Next scan for a sub-command name
@@ -526,7 +526,7 @@ TestResult gatherTestOptions(
             break;
         
         case 0: case '\r': case '\n':
-            return kTestResult_Fail;
+            return TestResult::eFail;
         }
 
         break;
@@ -539,7 +539,7 @@ TestResult gatherTestOptions(
         cursor++;
     else
     {
-        return kTestResult_Fail;
+        return TestResult::eFail;
     }
 
     // Now scan for arguments. For now we just assume that
@@ -555,7 +555,7 @@ TestResult gatherTestOptions(
         case 0: case '\r': case '\n':
             skipToEndOfLine(&cursor);
             testList->tests.Add(testOptions);
-            return kTestResult_Pass;
+            return TestResult::ePass;
 
         default:
             break;
@@ -596,7 +596,7 @@ TestResult gatherTestsForFile(
     }
     catch (Slang::IOException)
     {
-        return kTestResult_Fail;
+        return TestResult::eFail;
     }
 
 
@@ -612,12 +612,12 @@ TestResult gatherTestsForFile(
         // Look for a pattern that matches what we want
         if(match(&cursor, "//TEST_IGNORE_FILE"))
         {
-            return kTestResult_Ignored;
+            return TestResult::eIgnored;
         }
         else if(match(&cursor, "//TEST"))
         {
-            if(gatherTestOptions(&cursor, testList) != kTestResult_Pass)
-                return kTestResult_Fail;
+            if(gatherTestOptions(&cursor, testList) != TestResult::ePass)
+                return TestResult::eFail;
         }
         else
         {
@@ -625,7 +625,7 @@ TestResult gatherTestsForFile(
         }
     }
 
-    return kTestResult_Pass;
+    return TestResult::ePass;
 }
 
 OSError spawnAndWait(TestContext* context, const String& testPath, OSProcessSpawner& spawner)
@@ -724,7 +724,7 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
 
     if (spawnAndWait(context, outputStem, spawner) != kOSError_None)
     {
-        return kTestResult_Fail;
+        return TestResult::eFail;
     }
 
     String actualOutput = getOutput(spawner);
@@ -746,19 +746,19 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
         expectedOutput = "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n";
     }
 
-    TestResult result = kTestResult_Pass;
+    TestResult result = TestResult::ePass;
 
     // Otherwise we compare to the expected output
     if (actualOutput != expectedOutput)
     {
         context->dumpOutputDifference(expectedOutput, actualOutput);
-        result = kTestResult_Fail;
+        result = TestResult::eFail;
     }
 
     // If the test failed, then we write the actual output to a file
     // so that we can easily diff it from the command line and
     // diagnose the problem.
-    if (result == kTestResult_Fail)
+    if (result == TestResult::eFail)
     {
         String actualOutputPath = outputStem + ".actual";
         Slang::File::WriteAllText(actualOutputPath, actualOutput);
@@ -786,7 +786,7 @@ TestResult runReflectionTest(TestContext* context, TestInput& input)
 
     if (spawnAndWait(context, outputStem, spawner) != kOSError_None)
     {
-        return kTestResult_Fail;
+        return TestResult::eFail;
     }
 
     String actualOutput = getOutput(spawner);
@@ -808,18 +808,18 @@ TestResult runReflectionTest(TestContext* context, TestInput& input)
         expectedOutput = "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n";
     }
 
-    TestResult result = kTestResult_Pass;
+    TestResult result = TestResult::ePass;
 
     // Otherwise we compare to the expected output
     if (actualOutput != expectedOutput)
     {
-        result = kTestResult_Fail;
+        result = TestResult::eFail;
     }
 
     // If the test failed, then we write the actual output to a file
     // so that we can easily diff it from the command line and
     // diagnose the problem.
-    if (result == kTestResult_Fail)
+    if (result == TestResult::eFail)
     {
         String actualOutputPath = outputStem + ".actual";
         Slang::File::WriteAllText(actualOutputPath, actualOutput);
@@ -871,24 +871,24 @@ TestResult runEvalTest(TestContext* context, TestInput& input)
 
     if (spawnAndWait(context, outputStem, spawner) != kOSError_None)
     {
-        return kTestResult_Fail;
+        return TestResult::eFail;
     }
 
     String actualOutput = getOutput(spawner);
     String expectedOutput = getExpectedOutput(outputStem);
 
-    TestResult result = kTestResult_Pass;
+    TestResult result = TestResult::ePass;
 
     // Otherwise we compare to the expected output
     if (actualOutput != expectedOutput)
     {
-        result = kTestResult_Fail;
+        result = TestResult::eFail;
     }
 
     // If the test failed, then we write the actual output to a file
     // so that we can easily diff it from the command line and
     // diagnose the problem.
-    if (result == kTestResult_Fail)
+    if (result == TestResult::eFail)
     {
         String actualOutputPath = outputStem + ".actual";
         Slang::File::WriteAllText(actualOutputPath, actualOutput);
@@ -927,7 +927,7 @@ TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
 
     if (spawnAndWait(context, outputStem, expectedSpawner) != kOSError_None)
     {
-        return kTestResult_Fail;
+        return TestResult::eFail;
     }
 
     String expectedOutput = getOutput(expectedSpawner);
@@ -938,27 +938,27 @@ TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
     }
     catch (Slang::IOException)
     {
-        return kTestResult_Fail;
+        return TestResult::eFail;
     }
 
     if (spawnAndWait(context, outputStem, actualSpawner) != kOSError_None)
     {
-        return kTestResult_Fail;
+        return TestResult::eFail;
     }
     String actualOutput = getOutput(actualSpawner);
 
-    TestResult result = kTestResult_Pass;
+    TestResult result = TestResult::ePass;
 
     // Otherwise we compare to the expected output
     if (actualOutput != expectedOutput)
     {
-        result = kTestResult_Fail;
+        result = TestResult::eFail;
     }
 
     // If the test failed, then we write the actual output to a file
     // so that we can easily diff it from the command line and
     // diagnose the problem.
-    if (result == kTestResult_Fail)
+    if (result == TestResult::eFail)
     {
         String actualOutputPath = outputStem + ".actual";
         Slang::File::WriteAllText(actualOutputPath, actualOutput);
@@ -992,7 +992,7 @@ TestResult generateHLSLBaseline(TestContext* context, TestInput& input)
 
     if (spawnAndWait(context, outputStem, spawner) != kOSError_None)
     {
-        return kTestResult_Fail;
+        return TestResult::eFail;
     }
 
     String expectedOutput = getOutput(spawner);
@@ -1003,9 +1003,9 @@ TestResult generateHLSLBaseline(TestContext* context, TestInput& input)
     }
     catch (Slang::IOException)
     {
-        return kTestResult_Fail;
+        return TestResult::eFail;
     }
-    return kTestResult_Pass;
+    return TestResult::ePass;
 }
 
 TestResult runHLSLComparisonTest(TestContext* context, TestInput& input)
@@ -1040,7 +1040,7 @@ TestResult runHLSLComparisonTest(TestContext* context, TestInput& input)
 
     if (spawnAndWait(context, outputStem, spawner) != kOSError_None)
     {
-        return kTestResult_Fail;
+        return TestResult::eFail;
     }
 
     // We ignore output to stdout, and only worry about what the compiler
@@ -1072,26 +1072,26 @@ TestResult runHLSLComparisonTest(TestContext* context, TestInput& input)
     {
     }
 
-    TestResult result = kTestResult_Pass;
+    TestResult result = TestResult::ePass;
 
     // If no expected output file was found, then we
     // expect everything to be empty
     if (expectedOutput.Length() == 0)
     {
-        if (resultCode != 0)				result = kTestResult_Fail;
-        if (standardError.Length() != 0)	result = kTestResult_Fail;
-        if (standardOutput.Length() != 0)	result = kTestResult_Fail;
+        if (resultCode != 0)				result = TestResult::eFail;
+        if (standardError.Length() != 0)	result = TestResult::eFail;
+        if (standardOutput.Length() != 0)	result = TestResult::eFail;
     }
     // Otherwise we compare to the expected output
     else if (actualOutput != expectedOutput)
     {
-        result = kTestResult_Fail;
+        result = TestResult::eFail;
     }
 
     // If the test failed, then we write the actual output to a file
     // so that we can easily diff it from the command line and
     // diagnose the problem.
-    if (result == kTestResult_Fail)
+    if (result == TestResult::eFail)
     {
         String actualOutputPath = outputStem + ".actual";
         Slang::File::WriteAllText(actualOutputPath, actualOutput);
@@ -1140,7 +1140,7 @@ TestResult doGLSLComparisonTestRun(TestContext* context,
 
     if (spawnAndWait(context, outputStem, spawner) != kOSError_None)
     {
-        return kTestResult_Fail;
+        return TestResult::eFail;
     }
 
     OSProcessSpawner::ResultCode resultCode = spawner.getResultCode();
@@ -1163,7 +1163,7 @@ TestResult doGLSLComparisonTestRun(TestContext* context,
 
     *outOutput = output;
 
-    return kTestResult_Pass;
+    return TestResult::ePass;
 }
 
 TestResult runGLSLComparisonTest(TestContext* context, TestInput& input)
@@ -1180,17 +1180,17 @@ TestResult runGLSLComparisonTest(TestContext* context, TestInput& input)
     Slang::File::WriteAllText(outputStem + ".expected", expectedOutput);
     Slang::File::WriteAllText(outputStem + ".actual",   actualOutput);
 
-    if( hlslResult  == kTestResult_Fail )   return kTestResult_Fail;
-    if( slangResult == kTestResult_Fail )   return kTestResult_Fail;
+    if( hlslResult  == TestResult::eFail )   return TestResult::eFail;
+    if( slangResult == TestResult::eFail )   return TestResult::eFail;
 
     if (actualOutput != expectedOutput)
     {
         context->dumpOutputDifference(expectedOutput, actualOutput);
 
-        return kTestResult_Fail;
+        return TestResult::eFail;
     }
 
-    return kTestResult_Pass;
+    return TestResult::ePass;
 }
 
 
@@ -1203,7 +1203,7 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
     const String referenceOutput = findExpectedPath(input, ".expected.txt");
     if (referenceOutput.Length() <= 0)
     {
-        return kTestResult_Fail;
+        return TestResult::eFail;
     }
 
 	OSProcessSpawner spawner;
@@ -1227,7 +1227,7 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
 	if (spawnAndWait(context, outputStem, spawner) != kOSError_None)
 	{
         printf("error spawning render-test\n");
-		return kTestResult_Fail;
+		return TestResult::eFail;
 	}
 
     auto actualOutput = getOutput(spawner);
@@ -1239,7 +1239,7 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
         String actualOutputPath = outputStem + ".actual";
         Slang::File::WriteAllText(actualOutputPath, actualOutput);
 
-        return kTestResult_Fail;
+        return TestResult::eFail;
     }
 
 	// check against reference output
@@ -1247,12 +1247,12 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
     {
         printf("render-test not producing expected outputs.\n");
         printf("render-test output:\n%s\n", actualOutput.Buffer());
-		return kTestResult_Fail;
+		return TestResult::eFail;
     }
     if (!File::Exists(referenceOutput))
     {
         printf("referenceOutput %s not found.\n", referenceOutput.Buffer());
-		return kTestResult_Fail;
+		return TestResult::eFail;
     }
     auto actualOutputContent = File::ReadAllText(actualOutputFile);
 	auto actualProgramOutput = Split(actualOutputContent, '\n');
@@ -1264,7 +1264,7 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
     if (actualProgramOutput.Count() < referenceProgramOutput.Count())
     {
         printOutput();
-		return kTestResult_Fail;
+		return TestResult::eFail;
     }
 	for (int i = 0; i < (int)referenceProgramOutput.Count(); i++)
 	{
@@ -1278,13 +1278,13 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
             if (actual != uval)
             {
                 printOutput();
-			    return kTestResult_Fail;
+			    return TestResult::eFail;
             }
             else
-                return kTestResult_Pass;
+                return TestResult::ePass;
         }
 	}
-	return kTestResult_Pass;
+	return TestResult::ePass;
 }
 
 TestResult runSlangComputeComparisonTest(TestContext* context, TestInput& input)
@@ -1330,7 +1330,7 @@ TestResult doRenderComparisonTestRun(TestContext* context, TestInput& input, cha
 
     if (spawnAndWait(context, outputStem, spawner) != kOSError_None)
     {
-        return kTestResult_Fail;
+        return TestResult::eFail;
     }
 
     OSProcessSpawner::ResultCode resultCode = spawner.getResultCode();
@@ -1353,7 +1353,7 @@ TestResult doRenderComparisonTestRun(TestContext* context, TestInput& input, cha
 
     *outOutput = output;
 
-    return kTestResult_Pass;
+    return TestResult::ePass;
 }
 
 TestResult doImageComparison(TestContext* context, String const& filePath)
@@ -1376,18 +1376,18 @@ TestResult doImageComparison(TestContext* context, String const& filePath)
     if(!expectedData)   
     {
         context->messageFormat(TestMessageType::eRunError, "Unable to load image ;%s'", expectedPath.Buffer());
-        return kTestResult_Fail;
+        return TestResult::eFail;
     }
     if(!actualData)
     {
         context->messageFormat(TestMessageType::eRunError, "Unable to load image '%s'", actualPath.Buffer());
-        return kTestResult_Fail;
+        return TestResult::eFail;
     }
 
     if(expectedX != actualX || expectedY != actualY || expectedN != actualN)    
     {
         context->messageFormat(TestMessageType::eTestFailure, "Images are different sizes '%s' '%s'", actualPath.Buffer(), expectedPath.Buffer());
-        return kTestResult_Fail;
+        return TestResult::eFail;
     }
 
     unsigned char* expectedCursor = expectedData;
@@ -1435,12 +1435,12 @@ TestResult doImageComparison(TestContext* context, String const& filePath)
                     relativeDiff);
 
 			    // There was a difference we couldn't excuse!
-			    return kTestResult_Fail;
+			    return TestResult::eFail;
 		    }
 		}
 	}
 
-    return kTestResult_Pass;
+    return TestResult::ePass;
 }
 
 TestResult runHLSLRenderComparisonTestImpl(
@@ -1461,23 +1461,23 @@ TestResult runHLSLRenderComparisonTestImpl(
     Slang::File::WriteAllText(outputStem + ".expected", expectedOutput);
     Slang::File::WriteAllText(outputStem + ".actual",   actualOutput);
 
-    if( hlslResult  == kTestResult_Fail )   return kTestResult_Fail;
-    if( slangResult == kTestResult_Fail )   return kTestResult_Fail;
+    if( hlslResult  == TestResult::eFail )   return TestResult::eFail;
+    if( slangResult == TestResult::eFail )   return TestResult::eFail;
 
     if (actualOutput != expectedOutput)
     {
         context->dumpOutputDifference(expectedOutput, actualOutput);
 
-        return kTestResult_Fail;
+        return TestResult::eFail;
     }
 
     // Next do an image comparison on the expected output images!
 
     TestResult imageCompareResult = doImageComparison(context, outputStem);
-    if(imageCompareResult != kTestResult_Pass)
+    if(imageCompareResult != TestResult::ePass)
         return imageCompareResult;
 
-    return kTestResult_Pass;
+    return TestResult::ePass;
 }
 
 TestResult runHLSLRenderComparisonTest(TestContext* context, TestInput& input)
@@ -1497,7 +1497,7 @@ TestResult runHLSLAndGLSLRenderComparisonTest(TestContext* context, TestInput& i
 
 TestResult skipTest(TestContext* /* context */, TestInput& /*input*/)
 {
-    return kTestResult_Ignored;
+    return TestResult::eIgnored;
 }
 
 
@@ -1603,7 +1603,7 @@ TestResult runTest(
     // If this test can be ignored
     if (canIgnoreTestWithDisabledRenderer(testOptions))
     {
-        return kTestResult_Ignored;
+        return TestResult::eIgnored;
     }
     
     // based on command name, dispatch to an appropriate callback
@@ -1660,7 +1660,7 @@ TestResult runTest(
 
     // No actual test runner found!
 
-    return kTestResult_Fail;
+    return TestResult::eFail;
 }
 
 bool testCategoryMatches(
@@ -1719,7 +1719,7 @@ void runTestsOnFile(
     // Gather a list of tests to run
     FileTestList testList;
 
-    if( gatherTestsForFile(filePath, &testList) == kTestResult_Ignored )
+    if( gatherTestsForFile(filePath, &testList) == TestResult::eIgnored )
     {
         // Test was explicitly ignored
         return;
@@ -1728,7 +1728,7 @@ void runTestsOnFile(
     // Note cases where a test file exists, but we found nothing to run
     if( testList.tests.Count() == 0 )
     {
-        context->addResult(filePath, kTestResult_Ignored);
+        context->addResult(filePath, TestResult::eIgnored);
         return;
     }
 
@@ -1976,7 +1976,7 @@ int main(
     // Exclude rendering tests when building under AppVeyor.
     //
     // TODO: this is very ad hoc, and we should do something cleaner.
-    if( g_options.outputMode == kOutputMode_AppVeyor )
+    if( g_options.outputMode == TestOutputMode::eAppVeyor )
     {
         g_options.excludeCategories.Add(renderTestCategory, renderTestCategory);
         g_options.excludeCategories.Add(vulkanTestCategory, vulkanTestCategory);
@@ -2022,7 +2022,7 @@ int main(
                 printf("---\n");
                 for(const auto& testInfo : context.m_testInfos)
                 {
-                    if (testInfo.testResult == kTestResult_Fail)
+                    if (testInfo.testResult == TestResult::eFail)
                     {
                         printf("%s\n", testInfo.name.Buffer());
                     }
@@ -2031,7 +2031,7 @@ int main(
             }
             break;
         }
-        case kOutputMode_xUnit:
+        case TestOutputMode::eXUnit:
         {
             // xUnit 1.0 format  
             
@@ -2041,11 +2041,11 @@ int main(
 
             for (const auto& testInfo : context.m_testInfos)
             {
-                const int numFailed = (testInfo.testResult == kTestResult_Fail);
-                const int numIgnored = (testInfo.testResult == kTestResult_Ignored);
-                //int numPassed = (testInfo.testResult == kTestResult_Pass);
+                const int numFailed = (testInfo.testResult == TestResult::eFail);
+                const int numIgnored = (testInfo.testResult == TestResult::eIgnored);
+                //int numPassed = (testInfo.testResult == TestResult::ePass);
 
-                if (testInfo.testResult == kTestResult_Pass)
+                if (testInfo.testResult == TestResult::ePass)
                 {
                     printf("    <testcase name=\"%s\" status=\"run\"/>\n", testInfo.name.Buffer());
                 }
@@ -2054,7 +2054,7 @@ int main(
                     printf("    <testcase name=\"%s\" status=\"run\">\n", testInfo.name.Buffer());
                     switch (testInfo.testResult)
                     {
-                        case kTestResult_Fail:
+                        case TestResult::eFail:
                         {
                             StringBuilder buf;
                             appendXmlEncode(testInfo.message, buf);
@@ -2064,7 +2064,7 @@ int main(
                             printf("      </error>\n");
                             break;
                         }
-                        case kTestResult_Ignored:
+                        case TestResult::eIgnored:
                         {
                             printf("      <skip>Ignored</skip>\n");
                             break;
@@ -2079,7 +2079,7 @@ int main(
             printf("</testSuites>\n");
             break;
         }
-        case kOutputMode_xUnit2:
+        case TestOutputMode::eXUnit2:
         {
             // https://xunit.github.io/docs/format-xml-v2
             assert("Not currently supported");

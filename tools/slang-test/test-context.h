@@ -2,33 +2,20 @@
 
 #include "../../source/core/slang-string-util.h"
 
-enum OutputMode
+enum class TestOutputMode
 {
-    // Default mode is to write test results to the console
-    kOutputMode_Default = 0,
-
-    // When running under AppVeyor continuous integration, we
-    // need to output test results in a way that the AppVeyor
-    // environment can pick up and display.
-    kOutputMode_AppVeyor,
-
-    // We currently don't specialize for Travis, but maybe
-    // we should.
-    kOutputMode_Travis,
-
-    // xUnit original format
-    // https://nose.readthedocs.io/en/latest/plugins/xunit.html
-    kOutputMode_xUnit,
-
-    // https://xunit.github.io/docs/format-xml-v2
-    kOutputMode_xUnit2,
+    eDefault = 0,   ///< Default mode is to write test results to the console
+    eAppVeyor,      ///< For AppVeyor continuous integration 
+    eTravis,        ///< We currently don't specialize for Travis, but maybe we should.
+    eXUnit,         ///< xUnit original format  https://nose.readthedocs.io/en/latest/plugins/xunit.html
+    eXUnit2,        ///< https://xunit.github.io/docs/format-xml-v2
 };
 
-enum TestResult
+enum class TestResult
 {
-    kTestResult_Fail,
-    kTestResult_Pass,
-    kTestResult_Ignored,
+    eFail,
+    ePass,
+    eIgnored,
 };
 
 enum class TestMessageType
@@ -44,7 +31,7 @@ class TestContext
 
     struct TestInfo
     {
-        TestResult testResult = TestResult::kTestResult_Ignored;
+        TestResult testResult = TestResult::eIgnored;
         Slang::String name;
         Slang::String message;                 ///< Message that is specific for the testResult
     };
@@ -64,7 +51,7 @@ class TestContext
     bool canWriteStdError() const;
 
         /// Ctor
-    TestContext(OutputMode outputMode);
+    TestContext(TestOutputMode outputMode);
 
     Slang::List<TestInfo> m_testInfos;
 
@@ -73,7 +60,7 @@ class TestContext
     int m_failedTestCount;
     int m_ignoredTestCount;
 
-    OutputMode m_outputMode = kOutputMode_Default;
+    TestOutputMode m_outputMode = TestOutputMode::eDefault;
     bool m_dumpOutputOnFailure;
     bool m_isVerbose;
 
