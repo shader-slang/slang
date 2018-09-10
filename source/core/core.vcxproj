@@ -186,6 +186,7 @@
     <ClInclude Include="slang-io.h" />
     <ClInclude Include="slang-math.h" />
     <ClInclude Include="slang-memory-arena.h" />
+    <ClInclude Include="slang-random-generator.h" />
     <ClInclude Include="slang-string-util.h" />
     <ClInclude Include="slang-string.h" />
     <ClInclude Include="smart-pointer.h" />
@@ -199,6 +200,7 @@
     <ClCompile Include="slang-free-list.cpp" />
     <ClCompile Include="slang-io.cpp" />
     <ClCompile Include="slang-memory-arena.cpp" />
+    <ClCompile Include="slang-random-generator.cpp" />
     <ClCompile Include="slang-string-util.cpp" />
     <ClCompile Include="slang-string.cpp" />
     <ClCompile Include="stream.cpp" />
