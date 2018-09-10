@@ -26,4 +26,52 @@ namespace Slang {
     }
 }
 
+
+/* static */void StringUtil::append(const char* format, va_list args, StringBuilder& buf)
+{
+    int numChars = 0;
+
+#if SLANG_WINDOWS_FAMILY
+    numChars = _vscprintf(format, args);
+#else
+    {
+        va_list argsCopy;
+        va_copy(argsCopy, args);
+        numChars = vsnprintf(nullptr, 0, format, argsCopy);
+        va_end(argsCopy);
+    }
+#endif
+
+    List<char> chars;
+    chars.SetSize(numChars + 1);
+
+#if SLANG_WINDOWS_FAMILY
+    vsnprintf_s(chars.Buffer(), numChars + 1, _TRUNCATE, format, args);
+#else
+    vsnprintf(chars.Buffer(), numChars + 1, format, args);
+#endif
+
+    buf.Append(chars.Buffer(), numChars);
+}
+
+/* static */void StringUtil::appendFormat(StringBuilder& buf, const char* format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    append(format, args, buf);
+    va_end(args);
+}
+
+/* static */String StringUtil::makeStringWithFormat(const char* format, ...)
+{
+    StringBuilder builder;
+
+    va_list args;
+    va_start(args, format);
+    append(format, args, builder);
+    va_end(args);
+
+    return builder;
+}
+
 } // namespace Slang

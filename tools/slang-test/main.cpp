@@ -11,6 +11,7 @@ using namespace Slang;
 
 #include "os.h"
 #include "render-api-util.h"
+#include "test-context.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "external/stb/stb_image.h"
@@ -26,98 +27,6 @@ using namespace Slang;
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
-enum OutputMode
-{
-    // Default mode is to write test results to the console
-    kOutputMode_Default = 0,
-
-    // When running under AppVeyor continuous integration, we
-    // need to output test results in a way that the AppVeyor
-    // environment can pick up and display.
-    kOutputMode_AppVeyor,
-
-    // We currently don't specialize for Travis, but maybe
-    // we should.
-    kOutputMode_Travis,
-
-    // xUnit original format
-    // https://nose.readthedocs.io/en/latest/plugins/xunit.html
-    kOutputMode_xUnit,
-
-    // https://xunit.github.io/docs/format-xml-v2
-    kOutputMode_xUnit2,
-};
-
-enum TestResult
-{
-    kTestResult_Fail,
-    kTestResult_Pass,
-    kTestResult_Ignored,
-};
-
-enum class MessageType
-{
-    INFO,                   ///< General info (may not be shown depending on verbosity setting)
-    TEST_FAILURE,           ///< Describes how a test failure took place
-    RUN_ERROR,              ///< Describes an error that caused a test not to actually correctly run
-};
-
-struct TestContext
-{
-    struct TestInfo
-    {
-        TestResult testResult = TestResult::kTestResult_Ignored;
-        String name;                    
-        String message;                 ///< Message that is specific for the testResult
-    };
-
-    void addResult(const String& testName, TestResult testResult);
-  
-    void startTest(const String& testName);
-    TestResult endTest(TestResult result);
-
-        // Called for an error in the test-runner (not for an error involving
-        // a test itself).
-    void message(MessageType type, const String& errorText);
-    void messageFormat(MessageType type, char const* message, ...);
-
-    void dumpOutputDifference(const String& expectedOutput, const String& actualOutput);
-
-    bool canWriteStdError() const
-    {
-        switch (m_outputMode)
-        {
-            case kOutputMode_xUnit:
-            case kOutputMode_xUnit2:
-            {
-                return false;
-            }
-            default: return true;
-        }
-    }
-
-        /// Ctor
-    TestContext(OutputMode outputMode);
-
-    List<TestInfo> m_testInfos;
-
-    int m_totalTestCount;
-    int m_passedTestCount;
-    int m_failedTestCount;
-    int m_ignoredTestCount;
-
-    OutputMode m_outputMode = kOutputMode_Default;
-    bool m_dumpOutputOnFailure;
-    bool m_isVerbose;
-
-    protected:
-    void _addResult(const TestInfo& info);
-    
-    StringBuilder m_currentMessage;
-
-    TestInfo m_currentInfo;
-    bool m_inTest;
-};
 
 // A category that a test can be tagged with
 struct TestCategory
@@ -216,270 +125,7 @@ TestCategory* g_defaultTestCategory;
 
 TestCategory* findTestCategory(String const& name);
 
-void append(const char* format, va_list args, StringBuilder& buf);
-
-void appendFormat(StringBuilder& buf, const char* format, ...);
-String makeStringWithFormat(const char* format, ...);
-
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! TestContext !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-TestContext::TestContext(OutputMode outputMode):
-    m_outputMode(outputMode)
-{
-    m_totalTestCount = 0;
-    m_passedTestCount = 0;
-    m_failedTestCount = 0;
-    m_ignoredTestCount = 0;
-
-    m_inTest = false;
-    m_dumpOutputOnFailure = false;
-    m_isVerbose = false;
-}
-
-void TestContext::startTest(const String& testName)
-{
-    assert(!m_inTest);
-    m_inTest = true;
-
-    m_currentInfo = TestInfo();
-    m_currentInfo.name = testName;
-    m_currentMessage.Clear();
-}
-
-TestResult TestContext::endTest(TestResult result)
-{
-    assert(m_inTest);
-
-    m_currentInfo.testResult = result;
-    m_currentInfo.message = m_currentMessage;
-
-    _addResult(m_currentInfo);
-
-    m_inTest = false;
-
-    return result;
-}
-
-void TestContext::dumpOutputDifference(const String& expectedOutput, const String& actualOutput)
-{
-    StringBuilder builder;
-
-    appendFormat(builder, 
-        "ERROR:\n"
-        "EXPECTED{{{\n%s}}}\n"
-        "ACTUAL{{{\n%s}}}\n",
-        expectedOutput.Buffer(),
-        actualOutput.Buffer());
-
-
-    if (m_dumpOutputOnFailure && canWriteStdError())
-    {
-        fprintf(stderr, "%s", builder.Buffer());
-        fflush(stderr);
-    }
-
-    // Add to the m_currentInfo
-    message(MessageType::TEST_FAILURE, builder);
-}
-
-void TestContext::_addResult(const TestInfo& info)
-{
-    m_totalTestCount++;
-
-    switch (info.testResult)
-    {
-        case kTestResult_Fail:
-            m_failedTestCount++;
-            break;
-
-        case kTestResult_Pass:
-            m_passedTestCount++;
-            break;
-
-        case kTestResult_Ignored:
-            m_ignoredTestCount++;
-            break;
-
-        default:
-            assert(!"unexpected");
-            break;
-    }
-
-    m_testInfos.Add(info);
-
-    //    printf("OUTPUT_MODE: %d\n", options.outputMode);
-    switch (m_outputMode)
-    {
-        default:
-        {
-            char const* resultString = "UNEXPECTED";
-            switch (info.testResult)
-            {
-                case kTestResult_Fail:      resultString = "FAILED";  break;
-                case kTestResult_Pass:      resultString = "passed";  break;
-                case kTestResult_Ignored:   resultString = "ignored"; break;
-                default:
-                    assert(!"unexpected");
-                    break;
-            }
-            printf("%s test: '%S'\n", resultString, info.name.ToWString().begin());
-            break;
-        }
-        case kOutputMode_xUnit2:
-        case kOutputMode_xUnit:
-        {
-            // Don't output anything -> we'll output all in one go at the end
-            break;
-        }
-        case kOutputMode_AppVeyor:
-        {
-            char const* resultString = "None";
-            switch (info.testResult)
-            {
-                case kTestResult_Fail:      resultString = "Failed";  break;
-                case kTestResult_Pass:      resultString = "Passed";  break;
-                case kTestResult_Ignored:   resultString = "Ignored"; break;
-                default:
-                    assert(!"unexpected");
-                    break;
-            }
-
-            OSProcessSpawner spawner;
-            spawner.pushExecutableName("appveyor");
-            spawner.pushArgument("AddTest");
-            spawner.pushArgument(info.name);
-            spawner.pushArgument("-FileName");
-            // TODO: this isn't actually a file name in all cases
-            spawner.pushArgument(info.name);
-            spawner.pushArgument("-Framework");
-            spawner.pushArgument("slang-test");
-            spawner.pushArgument("-Outcome");
-            spawner.pushArgument(resultString);
-
-            auto err = spawner.spawnAndWaitForCompletion();
-
-            if (err != kOSError_None)
-            {
-                messageFormat(MessageType::INFO, "failed to add appveyor test results for '%S'\n", info.name.ToWString().begin());
-
-#if 0
-                fprintf(stderr, "[%d] TEST RESULT: %s {%d} {%s} {%s}\n", err, spawner.commandLine_.Buffer(),
-                    spawner.getResultCode(),
-                    spawner.getStandardOutput().begin(),
-                    spawner.getStandardError().begin());
-#endif
-            }
-
-            break;
-        }
-    }
-}
-
-void TestContext::addResult(const String& testName, TestResult testResult)
-{
-    // Can't add this way if in test
-    assert(!m_inTest);
-    
-    TestInfo info;
-    info.name = testName;
-    info.testResult = testResult;
-    _addResult(info);    
-}
-
-void TestContext::message(MessageType type, const String& message)
-{
-    if (type == MessageType::INFO)
-    {
-        if (m_isVerbose && canWriteStdError())
-        {
-            fputs(message.Buffer(), stderr);
-        }
-
-        // Just dump out if can dump out
-        return;
-    }
-
-    if (canWriteStdError())
-    {
-        if (type == MessageType::RUN_ERROR || type == MessageType::TEST_FAILURE)
-        {
-            fprintf(stderr, "error: ");
-            fputs(message.Buffer(), stderr);
-            fprintf(stderr, "\n");
-        }
-        else
-        {
-            fputs(message.Buffer(), stderr);
-        }
-    }
-
-    if (m_currentMessage.Length() > 0)
-    {
-        m_currentMessage << "\n";
-    }
-    m_currentMessage.Append(message);
-}
-
-void TestContext::messageFormat(MessageType type, char const* format, ...)
-{
-    StringBuilder builder;
-    
-    va_list args;
-    va_start(args, format);
-    append(format, args, builder);
-    va_end(args);
-
-    message(type, builder);
-}
-
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! Functions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-void append(const char* format, va_list args, StringBuilder& buf)
-{
-    int numChars = 0;
-
-#if SLANG_WINDOWS_FAMILY
-    numChars = _vscprintf(format, args);
-#else
-    {
-        va_list argsCopy;
-        va_copy(argsCopy, args);
-        numChars = vsnprintf(nullptr, 0, format, argsCopy);
-        va_end(argsCopy); 
-    }
-#endif
-
-    List<char> chars;
-    chars.SetSize(numChars + 1);
-
-#if SLANG_WINDOWS_FAMILY
-    vsnprintf_s(chars.Buffer(), numChars + 1, _TRUNCATE, format, args);
-#else
-    vsnprintf(chars.Buffer(), numChars + 1, format, args);
-#endif
-
-    buf.Append(chars.Buffer(), numChars);
-}
-
-void appendFormat(StringBuilder& buf, const char* format, ...)
-{
-    va_list args;
-    va_start(args, format);
-    append(format, args, buf);
-    va_end(args);
-}
-
-String makeStringWithFormat(const char* format, ...)
-{
-    StringBuilder builder;
-
-    va_list args;
-    va_start(args, format);
-    append(format, args, builder);
-    va_end(args);
-
-    return builder;
-}
 
 
 Result parseOptions(int* argc, char** argv)
@@ -989,14 +635,14 @@ OSError spawnAndWait(TestContext* context, const String& testPath, OSProcessSpaw
     if(context->m_isVerbose)
     {
         String commandLine = spawner.getCommandLine();
-        context->messageFormat(MessageType::INFO, "%s\n", commandLine.begin());
+        context->messageFormat(TestMessageType::eInfo, "%s\n", commandLine.begin());
     }
     
     OSError err = spawner.spawnAndWaitForCompletion();
     if (err != kOSError_None)
     {
 //        fprintf(stderr, "failed to run test '%S'\n", testPath.ToWString());
-        context->messageFormat(MessageType::RUN_ERROR, "failed to run test '%S'", testPath.ToWString().begin());
+        context->messageFormat(TestMessageType::eRunError, "failed to run test '%S'", testPath.ToWString().begin());
     }
     return err;
 }
@@ -1613,7 +1259,7 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
 	auto referenceProgramOutput = Split(File::ReadAllText(referenceOutput), '\n');
     auto printOutput = [&]()
     {
-        context->messageFormat(MessageType::TEST_FAILURE, "output mismatch! actual output: {\n%s\n}, \n%s\n", actualOutputContent.Buffer(), actualOutput.Buffer());
+        context->messageFormat(TestMessageType::eTestFailure, "output mismatch! actual output: {\n%s\n}, \n%s\n", actualOutputContent.Buffer(), actualOutput.Buffer());
     };
     if (actualProgramOutput.Count() < referenceProgramOutput.Count())
     {
@@ -1729,18 +1375,18 @@ TestResult doImageComparison(TestContext* context, String const& filePath)
 
     if(!expectedData)   
     {
-        context->messageFormat(MessageType::RUN_ERROR, "Unable to load image ;%s'", expectedPath.Buffer());
+        context->messageFormat(TestMessageType::eRunError, "Unable to load image ;%s'", expectedPath.Buffer());
         return kTestResult_Fail;
     }
     if(!actualData)
     {
-        context->messageFormat(MessageType::RUN_ERROR, "Unable to load image '%s'", actualPath.Buffer());
+        context->messageFormat(TestMessageType::eRunError, "Unable to load image '%s'", actualPath.Buffer());
         return kTestResult_Fail;
     }
 
     if(expectedX != actualX || expectedY != actualY || expectedN != actualN)    
     {
-        context->messageFormat(MessageType::TEST_FAILURE, "Images are different sizes '%s' '%s'", actualPath.Buffer(), expectedPath.Buffer());
+        context->messageFormat(TestMessageType::eTestFailure, "Images are different sizes '%s' '%s'", actualPath.Buffer(), expectedPath.Buffer());
         return kTestResult_Fail;
     }
 
@@ -1781,7 +1427,7 @@ TestResult doImageComparison(TestContext* context, String const& filePath)
 				// cases where vertex shader results lead to rendering that is off
 				// by one pixel...
 
-                context->messageFormat(MessageType::TEST_FAILURE, "image compare failure at (%d,%d) channel %d. expected %d got %d (absolute error: %d, relative error: %f)\n",
+                context->messageFormat(TestMessageType::eTestFailure, "image compare failure at (%d,%d) channel %d. expected %d got %d (absolute error: %d, relative error: %f)\n",
                     x, y, n,
                     expectedVal,
                     actualVal,
