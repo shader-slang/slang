@@ -230,6 +230,9 @@ convention for interface methods.
 #	define SLANG_FORCE_INLINE __forceinline
 #	define SLANG_BREAKPOINT(id) __debugbreak();
 #	define SLANG_ALIGN_OF(T) __alignof(T)
+
+#   define SLANG_INT64(x) (x##i64)
+#   define SLANG_UINT64(x) (x##ui64)
 #endif // SLANG_MICROSOFT_FAMILY
 
 #ifndef SLANG_FORCE_INLINE
@@ -268,6 +271,14 @@ convention for interface methods.
 #	define SLANG_UNUSED(v) (void)v;
 #endif
 
+// Used for doing constant literals
+#ifndef SLANG_INT64
+#	define SLANG_INT64(x) (x##ll)
+#endif
+#ifndef SLANG_UINT64
+#	define SLANG_UINT64(x) (x##ull)
+#endif
+
 #ifdef __cplusplus
 // C++ specific macros
 // Gcc
@@ -300,6 +311,7 @@ convention for interface methods.
 #	    if _MSC_VER >= 1700
 #		    define SLANG_HAS_ENUM_CLASS 1
 #       endif
+
 #   endif // SLANG_VC
 
 // Set non set

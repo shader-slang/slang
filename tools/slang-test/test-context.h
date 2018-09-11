@@ -2,7 +2,28 @@
 
 #include "../../source/core/slang-string-util.h"
 
-#define SLANG_CHECK(x) TestContext::get()->addTest(#x, (x)); 
+#define SLANG_CHECK(x) TestContext::get()->addTestWithLocation(__FILE__, __LINE__, #x, (x)); 
+
+struct TestRegister
+{
+    typedef void (*TestFunc)();
+
+    TestRegister(const char* name, TestFunc func):
+        m_next(s_first),
+        m_name(name),
+        m_func(func)
+    {
+        s_first = this;
+    }
+
+    TestFunc m_func;
+    const char* m_name;
+    TestRegister* m_next;
+
+    static TestRegister* s_first;
+};
+
+#define SLANG_UNIT_TEST(name, func) static TestRegister s_unitTest##__LINE__(name, func)
 
 enum class TestOutputMode
 {
@@ -46,6 +67,9 @@ class TestContext
         /// Effectively runs start/endTest (so cannot be called inside start/endTest). 
     void addTest(const Slang::String& testName, TestResult testResult);
 
+    void addTestWithLocation(const char* file, int line, const char* testText, bool isPass);
+
+
         // Called for an error in the test-runner (not for an error involving a test itself).
     void message(TestMessageType type, const Slang::String& errorText);
     void messageFormat(TestMessageType type, char const* message, ...);
@@ -54,6 +78,12 @@ class TestContext
 
         /// True if can write output directly to stderr
     bool canWriteStdError() const;
+
+        /// Call at end of tests 
+    void outputSummary();
+
+        /// Returns true if all run tests succeeded
+    bool didAllSucceed() const;
 
         /// Ctor
     TestContext(TestOutputMode outputMode);

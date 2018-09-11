@@ -113,6 +113,9 @@ struct Options
     // By default we potentially synthesize test for all 
     // TODO: Vulkan is disabled by default for now as the majority as vulkan synthesized tests fail  
     RenderApiFlags synthesizedTestApis = RenderApiFlag::AllOf & ~RenderApiFlag::Vulkan;
+
+    // Set this to turn on unit tests
+    bool unitTests = false;
 };
 
 // Globals
@@ -282,6 +285,10 @@ Result parseOptions(int* argc, char** argv)
                 fprintf(stderr, "error: unable to parse api expression '%s'\n", apiList);
                 return res;
             }
+        }
+        else if (strcmp(arg, "-unitTests") == 0)
+        {
+            g_options.unitTests = true;
         }
         else
         {
@@ -1879,62 +1886,6 @@ void runTestsInDirectory(
     }
 }
 
-static void appendXmlEncode(char c, StringBuilder& out)
-{
-    switch (c)
-    {
-        case '&':   out << "&amp;"; break;
-        case '<':   out << "&lt;"; break;
-        case '>':   out << "&gt;"; break;
-        case '\'':  out << "&apos;"; break;
-        case '"':   out << "&quot;"; break;
-        default:    out.Append(c);  
-    }
-}
-
-static bool isXmlEncodeChar(char c)
-{
-    switch (c)
-    {
-        case '&':
-        case '<':
-        case '>':
-        {
-            return true;
-        }
-    }
-    return false;
-}
-
-static void appendXmlEncode(const String& in, StringBuilder& out)
-{
-    const char* cur = in.Buffer();
-    const char* end = cur + in.Length();
-
-    while (cur < end)
-    {
-        const char* start = cur;
-        // Look for a run of non encoded
-        while (cur < end && !isXmlEncodeChar(*cur))
-        {
-            cur++;
-        }
-        // Write it
-        if (cur > start)
-        {
-            out.Append(start, UInt(end - start));
-        }
-
-        // if not at the end, we must be on an xml encoded character, so just output it xml encoded.
-        if (cur < end)
-        {
-            const char encodeChar = *cur++;
-            assert(isXmlEncodeChar(encodeChar));
-            appendXmlEncode(encodeChar, out);
-        }
-    }
-}
-
 
 //
 
@@ -1988,104 +1939,33 @@ int main(
     context.m_dumpOutputOnFailure = g_options.dumpOutputOnFailure;
     context.m_isVerbose = g_options.shouldBeVerbose;
 
-    // Enumerate test files according to policy
-    // TODO: add more directories to this list
-    // TODO: allow for a command-line argument to select a particular directory
-    runTestsInDirectory(&context, "tests/");
-
-    auto passCount = context.m_passedTestCount;
-    auto rawTotal = context.m_totalTestCount;
-    auto ignoredCount = context.m_ignoredTestCount;
-
-    auto runTotal = rawTotal - ignoredCount;
-
-    switch (g_options.outputMode)
+    if (g_options.unitTests)
     {
-        default:
+        TestContext::set(&context);
+
+        // Run the unit tests
+        TestRegister* cur = TestRegister::s_first;
+        while (cur)
         {
-            if (!context.m_totalTestCount)
-            {
-                printf("no tests run\n");
-                return 0;
-            }
+            // Run the test funcion
+            cur->m_func();
 
-            printf("\n===\n%d%% of tests passed (%d/%d)", (passCount*100) / runTotal, passCount, runTotal);
-            if(ignoredCount)
-            {
-                printf(", %d tests ignored", ignoredCount);
-            }
-            printf("\n===\n\n");
-
-            if(context.m_failedTestCount)
-            {
-                printf("failing tests:\n");
-                printf("---\n");
-                for(const auto& testInfo : context.m_testInfos)
-                {
-                    if (testInfo.testResult == TestResult::eFail)
-                    {
-                        printf("%s\n", testInfo.name.Buffer());
-                    }
-                }
-                printf("---\n");
-            }
-            break;
+            // Next
+            cur->m_next;
         }
-        case TestOutputMode::eXUnit:
-        {
-            // xUnit 1.0 format  
-            
-            printf("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-            printf("<testsuites tests=\"%d\" failures=\"%d\" disabled=\"%d\" errors=\"0\" name=\"AllTests\">\n", context.m_totalTestCount, context.m_failedTestCount, context.m_ignoredTestCount);
-            printf("  <testsuite name=\"all\" tests=\"%d\" failures=\"%d\" disabled=\"%d\" errors=\"0\" time=\"0\">\n", context.m_totalTestCount, context.m_failedTestCount, context.m_ignoredTestCount);
 
-            for (const auto& testInfo : context.m_testInfos)
-            {
-                const int numFailed = (testInfo.testResult == TestResult::eFail);
-                const int numIgnored = (testInfo.testResult == TestResult::eIgnored);
-                //int numPassed = (testInfo.testResult == TestResult::ePass);
+        TestContext::set(nullptr);
+    }
+    else
+    {
+        // Enumerate test files according to policy
+        // TODO: add more directories to this list
+        // TODO: allow for a command-line argument to select a particular directory
+        runTestsInDirectory(&context, "tests/");
 
-                if (testInfo.testResult == TestResult::ePass)
-                {
-                    printf("    <testcase name=\"%s\" status=\"run\"/>\n", testInfo.name.Buffer());
-                }
-                else
-                {
-                    printf("    <testcase name=\"%s\" status=\"run\">\n", testInfo.name.Buffer());
-                    switch (testInfo.testResult)
-                    {
-                        case TestResult::eFail:
-                        {
-                            StringBuilder buf;
-                            appendXmlEncode(testInfo.message, buf);
-
-                            printf("      <error>\n");
-                            printf("%s", buf.Buffer());
-                            printf("      </error>\n");
-                            break;
-                        }
-                        case TestResult::eIgnored:
-                        {
-                            printf("      <skip>Ignored</skip>\n");
-                            break;
-                        }
-                        default: break;
-                    }
-                    printf("    </testcase>\n");
-                }
-            }
-
-            printf("  </testsuite>\n");
-            printf("</testSuites>\n");
-            break;
-        }
-        case TestOutputMode::eXUnit2:
-        {
-            // https://xunit.github.io/docs/format-xml-v2
-            assert("Not currently supported");
-            break;
-        }
     }
 
-    return passCount == runTotal ? 0 : 1;
+    context.outputSummary();
+
+    return context.didAllSucceed() ? 0 : 1; 
 }

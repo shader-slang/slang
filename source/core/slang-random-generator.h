@@ -32,6 +32,23 @@ class RandomGenerator: public RefObject
         /// Get the next bool
     virtual bool nextBool();
 
+        /// Next Int32 which can only be positive
+    int32_t nextPositiveInt32() { return nextInt32() & 0x7fffffff; }
+        /// Next Int64 which can only be positive
+    int64_t nextPositiveInt64() { return nextInt64() & SLANG_INT64(0x7fffffffffffffff); }
+
+        /// Returns value up to BUT NOT INCLUDING maxValue. 
+    int32_t nextInt32UpTo(int32_t maxValue) { assert(maxValue > 0); return (maxValue <= 1) ? 0 : (nextPositiveInt32() % maxValue); }
+
+        /// Returns value from min up to BUT NOT INCLUDING max
+    int32_t nextInt32InRange(int32_t min, int32_t max);
+
+        /// Returns value up to BUT NOT INCLUDING maxValue
+    int64_t nextInt64UpTo(int64_t maxValue) { assert(maxValue > 0); return (maxValue <= 1) ? 0 : (nextPositiveInt64() % maxValue); }
+
+        /// Returns value from min up to BUT NOT INCLUDING max
+    int64_t nextInt64InRange(int64_t min, int64_t max);
+
         /// Create a RandomGenerator with specified seed using default generator type
     static RandomGenerator* create(int32_t seed);
 };

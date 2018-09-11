@@ -32,6 +32,27 @@ int64_t RandomGenerator::nextInt64()
     return (int64_t(high) << 32) | low;
 }
 
+int32_t RandomGenerator::nextInt32InRange(int32_t min, int32_t max)
+{
+    int32_t diff = max - min;
+    if (diff <= 1)
+    {
+        return min;
+    }
+
+    return (nextPositiveInt32() % diff) + min;
+}
+
+int64_t RandomGenerator::nextInt64InRange(int64_t min, int64_t max)
+{
+    int64_t diff = max - min;
+    if (diff <= 1)
+    {
+        return min;
+    }
+    return (nextPositiveInt64() % diff) + min;
+}
+
 /* static */RandomGenerator* RandomGenerator::create(int32_t seed)
 {
     return new DefaultRandomGenerator(seed);
@@ -86,6 +107,8 @@ void Mt19937RandomGenerator::_generate()
             m_mt[i] = m_mt[i] ^ xorValue;
         }
     }
+
+    m_index = 0;
 }
 
 void Mt19937RandomGenerator::reset(int32_t seedIn)
@@ -113,5 +136,8 @@ int32_t Mt19937RandomGenerator::nextInt32()
 
     return int32_t(y);
 }
+
+
+
 
 } // namespace Slang

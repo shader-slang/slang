@@ -11,6 +11,63 @@
 using namespace Slang;
 
 /* static */TestContext* TestContext::s_context = nullptr;
+/* static */TestRegister* TestRegister::s_first;
+
+static void appendXmlEncode(char c, StringBuilder& out)
+{
+    switch (c)
+    {
+        case '&':   out << "&amp;"; break;
+        case '<':   out << "&lt;"; break;
+        case '>':   out << "&gt;"; break;
+        case '\'':  out << "&apos;"; break;
+        case '"':   out << "&quot;"; break;
+        default:    out.Append(c);
+    }
+}
+
+static bool isXmlEncodeChar(char c)
+{
+    switch (c)
+    {
+        case '&':
+        case '<':
+        case '>':
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+static void appendXmlEncode(const String& in, StringBuilder& out)
+{
+    const char* cur = in.Buffer();
+    const char* end = cur + in.Length();
+
+    while (cur < end)
+    {
+        const char* start = cur;
+        // Look for a run of non encoded
+        while (cur < end && !isXmlEncodeChar(*cur))
+        {
+            cur++;
+        }
+        // Write it
+        if (cur > start)
+        {
+            out.Append(start, UInt(end - start));
+        }
+
+        // if not at the end, we must be on an xml encoded character, so just output it xml encoded.
+        if (cur < end)
+        {
+            const char encodeChar = *cur++;
+            assert(isXmlEncodeChar(encodeChar));
+            appendXmlEncode(encodeChar, out);
+        }
+    }
+}
 
 TestContext::TestContext(TestOutputMode outputMode) :
     m_outputMode(outputMode)
@@ -68,6 +125,30 @@ TestResult TestContext::addTest(const String& testName, bool isPass)
     addTest(testName, res);
     return res;
 }
+
+void TestContext::addTestWithLocation(const char* file, int line, const char* testText, bool isPass)
+{
+    // Can't add this way if in test
+    assert(!m_inTest);
+
+    StringBuilder testName;
+    testName << testText << " : " << file << " (" << line << ")";
+
+    const TestResult testResult = isPass ? TestResult::ePass : TestResult::eFail;
+    m_currentMessage.Clear();
+    
+    if (!isPass)
+    {
+        message(TestMessageType::eTestFailure, testName);
+    }
+
+    TestInfo info;
+    info.name = testName;
+    info.message = m_currentMessage;
+    info.testResult = testResult;
+    _addResult(info);
+}
+
 
 void TestContext::dumpOutputDifference(const String& expectedOutput, const String& actualOutput)
 {
@@ -239,4 +320,106 @@ void TestContext::messageFormat(TestMessageType type, char const* format, ...)
     va_end(args);
 
     message(type, builder);
+}
+
+bool TestContext::didAllSucceed() const
+{
+    return m_passedTestCount == (m_totalTestCount - m_ignoredTestCount);
+}
+
+void TestContext::outputSummary()
+{
+    auto passCount = m_passedTestCount;
+    auto rawTotal = m_totalTestCount;
+    auto ignoredCount = m_ignoredTestCount;
+
+    auto runTotal = rawTotal - ignoredCount;
+
+    switch (m_outputMode)
+    {
+        default:
+        {
+            if (!m_totalTestCount)
+            {
+                printf("no tests run\n");
+                return;
+            }
+
+            printf("\n===\n%d%% of tests passed (%d/%d)", (passCount * 100) / runTotal, passCount, runTotal);
+            if (ignoredCount)
+            {
+                printf(", %d tests ignored", ignoredCount);
+            }
+            printf("\n===\n\n");
+
+            if (m_failedTestCount)
+            {
+                printf("failing tests:\n");
+                printf("---\n");
+                for (const auto& testInfo : m_testInfos)
+                {
+                    if (testInfo.testResult == TestResult::eFail)
+                    {
+                        printf("%s\n", testInfo.name.Buffer());
+                    }
+                }
+                printf("---\n");
+            }
+            break;
+        }
+        case TestOutputMode::eXUnit:
+        {
+            // xUnit 1.0 format  
+
+            printf("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+            printf("<testsuites tests=\"%d\" failures=\"%d\" disabled=\"%d\" errors=\"0\" name=\"AllTests\">\n", m_totalTestCount, m_failedTestCount, m_ignoredTestCount);
+            printf("  <testsuite name=\"all\" tests=\"%d\" failures=\"%d\" disabled=\"%d\" errors=\"0\" time=\"0\">\n", m_totalTestCount, m_failedTestCount, m_ignoredTestCount);
+
+            for (const auto& testInfo : m_testInfos)
+            {
+                const int numFailed = (testInfo.testResult == TestResult::eFail);
+                const int numIgnored = (testInfo.testResult == TestResult::eIgnored);
+                //int numPassed = (testInfo.testResult == TestResult::ePass);
+
+                if (testInfo.testResult == TestResult::ePass)
+                {
+                    printf("    <testcase name=\"%s\" status=\"run\"/>\n", testInfo.name.Buffer());
+                }
+                else
+                {
+                    printf("    <testcase name=\"%s\" status=\"run\">\n", testInfo.name.Buffer());
+                    switch (testInfo.testResult)
+                    {
+                        case TestResult::eFail:
+                        {
+                            StringBuilder buf;
+                            appendXmlEncode(testInfo.message, buf);
+
+                            printf("      <error>\n");
+                            printf("%s", buf.Buffer());
+                            printf("      </error>\n");
+                            break;
+                        }
+                        case TestResult::eIgnored:
+                        {
+                            printf("      <skip>Ignored</skip>\n");
+                            break;
+                        }
+                        default: break;
+                    }
+                    printf("    </testcase>\n");
+                }
+            }
+
+            printf("  </testsuite>\n");
+            printf("</testSuites>\n");
+            break;
+        }
+        case TestOutputMode::eXUnit2:
+        {
+            // https://xunit.github.io/docs/format-xml-v2
+            assert("Not currently supported");
+            break;
+        }
+    }
 }

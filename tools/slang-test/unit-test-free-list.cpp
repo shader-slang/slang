@@ -13,8 +13,7 @@
 
 using namespace Slang;
 
-
-void unitTestFreeList()
+static void unitTestFreeList()
 {
     FreeList freeList;
     freeList.init(sizeof(int), sizeof(void*), 10);
@@ -25,20 +24,21 @@ void unitTestFreeList()
 
     for (int i = 0; i < 1000; i++)
     {
-        const int numAlloc = randGen.nextInt32() % 20;
-
+        const int numAlloc = randGen.nextInt32UpTo(20);
+        
         for (int j = 0; j < numAlloc; j++)
         {
             int* ptr = (int*)freeList.allocate();
             *ptr = i;
+            allocs.Add(ptr);
         }
 
-        int numDealloc = rand() % 19;
+        int numDealloc = randGen.nextInt32UpTo(19);
         numDealloc = int(allocs.Count()) < numDealloc ? int(allocs.Count()) : numDealloc;
 
         for (int j = 0; j < numDealloc; j++)
         {
-            const int index = randGen.nextInt32() % int(allocs.Count());
+            const int index = randGen.nextInt32UpTo(int(allocs.Count()));
 
             int* alloc = allocs[index];
 
@@ -51,3 +51,5 @@ void unitTestFreeList()
         }
     }
 }
+
+SLANG_UNIT_TEST("FreeList", unitTestFreeList);
