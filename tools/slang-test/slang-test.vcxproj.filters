@@ -18,9 +18,6 @@
     <ClInclude Include="test-context.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="unit-test-free-list.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">

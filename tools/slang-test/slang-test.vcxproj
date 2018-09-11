@@ -165,7 +165,6 @@
     <ClInclude Include="os.h" />
     <ClInclude Include="render-api-util.h" />
     <ClInclude Include="test-context.h" />
-    <ClInclude Include="unit-test-free-list.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
