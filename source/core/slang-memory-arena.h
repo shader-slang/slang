@@ -76,6 +76,12 @@ public:
          @return The allocation (or nullptr if unable to allocate). Will be at least 'alignment' alignment or better. */
     void* allocateAligned(size_t sizeInBytes, size_t alignment);
 
+        /** Allocate some aligned memory of at least size bytes 
+        @param size Size of allocation wanted (must be > 0).
+        @param alignment Alignment of allocation - must be a power of 2.
+        @return The allocation (or nullptr if unable to allocate). Will be at least 'alignment' alignment or better. */
+    void* allocateUnaligned(size_t sizeInBytes);
+
         /** Allocates a null terminated string.
         @param str A null-terminated string
         @return A copy of the string held on the arena */
@@ -99,6 +105,10 @@ public:
     template <typename T>
     T* allocateAndCopyArray(const T* src, size_t size);  
 
+        /// Allocate an array of a specified type, and zero it.
+    template <typename T>
+    T* allocateAndZeroArray(size_t size);
+
         /// Deallocate the last allocation. If data is not from the last allocation then the behavior is undefined.
     void deallocateLast(void* data);
 
@@ -120,8 +130,8 @@ public:
 
         /// Default Ctor
     MemoryArena();
-        /// Construct with block size and alignment. Alignment must be a power of 2.
-    MemoryArena(size_t blockSize, size_t alignment = kMinAlignment);
+        /// Construct with block size and alignment. Block alignment must be a power of 2.
+    MemoryArena(size_t blockSize, size_t blockAlignment = kMinAlignment);
 
         /// Dtor
     ~MemoryArena();
@@ -179,6 +189,23 @@ inline bool MemoryArena::isValid(const void* data, size_t size) const
 }
 
 // --------------------------------------------------------------------------
+SLANG_FORCE_INLINE void* MemoryArena::allocateUnaligned(size_t size)
+{
+    // Align with the minimum alignment
+    uint8_t* mem = m_current;
+    uint8_t* end = mem + size;
+    if (end <= m_end)
+    {
+        m_current = end;
+        return mem;
+    }
+    else
+    {
+        return _allocateAligned(size, m_blockAlignment);
+    }
+}
+
+// --------------------------------------------------------------------------
 SLANG_FORCE_INLINE void* MemoryArena::allocate(size_t size)
 {
     // Align with the minimum alignment
@@ -225,7 +252,7 @@ inline const char* MemoryArena::allocateString(const char* str)
     {
         return "";
     }
-    char* dst = (char*)allocate(size + 1);
+    char* dst = (char*)allocateUnaligned(size + 1);
     ::memcpy(dst, str, size + 1);
     return dst;
 }
@@ -237,7 +264,7 @@ inline const char* MemoryArena::allocateString(const char* chars, size_t charsCo
     {
         return "";
     }
-    char* dst = (char*)allocate(charsCount + 1);
+    char* dst = (char*)allocateUnaligned(charsCount + 1);
     ::memcpy(dst, chars, charsCount);
 
     // Add null-terminating zero
@@ -268,6 +295,20 @@ inline T* MemoryArena::allocateAndCopyArray(const T* arr, size_t size)
         const size_t totalSize = sizeof(T) * size;
         void* ptr = allocateAligned(totalSize, SLANG_ALIGN_OF(T));
         ::memcpy(ptr, arr, totalSize);
+        return reinterpret_cast<T*>(ptr);
+    }
+    return nullptr;
+}
+
+// ---------------------------------------------------------------------------
+template <typename T>
+inline T* MemoryArena::allocateAndZeroArray(size_t size)
+{
+    if (size > 0)
+    {
+        const size_t totalSize = sizeof(T) * size;
+        void* ptr = allocateAligned(totalSize, SLANG_ALIGN_OF(T));
+        ::memset(ptr, 0, totalSize);
         return reinterpret_cast<T*>(ptr);
     }
     return nullptr;

@@ -35,5 +35,8 @@
     <ClCompile Include="unit-test-free-list.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="unit-test-memory-arena.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

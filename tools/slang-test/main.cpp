@@ -1661,8 +1661,14 @@ TestResult runTest(
         testInput.testOptions = &testOptions;
         testInput.testList = &testList;
 
-        context->startTest(outputStem);
-        return context->endTest(ii->callback(context, testInput));
+        {
+            TestContext::Scope scope(context, outputStem);
+
+            TestResult testResult = ii->callback(context, testInput);
+            context->addResult(testResult); 
+
+            return testResult;
+       }
     }
 
     // No actual test runner found!
@@ -1947,11 +1953,15 @@ int main(
         TestRegister* cur = TestRegister::s_first;
         while (cur)
         {
-            // Run the test funcion
+            context.startTest(cur->m_name);
+
+            // Run the test function
             cur->m_func();
 
+            context.endTest();
+
             // Next
-            cur->m_next;
+            cur = cur->m_next;
         }
 
         TestContext::set(nullptr);

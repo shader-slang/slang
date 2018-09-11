@@ -77,6 +77,8 @@ TestContext::TestContext(TestOutputMode outputMode) :
     m_failedTestCount = 0;
     m_ignoredTestCount = 0;
 
+    m_maxTestResults = 10;
+
     m_inTest = false;
     m_dumpOutputOnFailure = false;
     m_isVerbose = false;
@@ -100,23 +102,64 @@ void TestContext::startTest(const String& testName)
     assert(!m_inTest);
     m_inTest = true;
 
+    m_numCurrentResults = 0;
     m_currentInfo = TestInfo();
     m_currentInfo.name = testName;
     m_currentMessage.Clear();
 }
 
-TestResult TestContext::endTest(TestResult result)
+void TestContext::endTest()
 {
     assert(m_inTest);
 
-    m_currentInfo.testResult = result;
     m_currentInfo.message = m_currentMessage;
 
     _addResult(m_currentInfo);
 
     m_inTest = false;
+}
 
-    return result;
+void TestContext::addResult(TestResult result)
+{
+    assert(m_inTest);
+
+    m_currentInfo.testResult = combine(m_currentInfo.testResult, result);
+    m_numCurrentResults++;
+}
+
+void TestContext::addResultWithLocation(TestResult result, const char* testText, const char* file, int line)
+{
+    assert(m_inTest);
+    m_numCurrentResults++;
+
+    m_currentInfo.testResult = combine(m_currentInfo.testResult, result);
+    if (result != TestResult::eFail)
+    {
+        // We don't need to output the result if it 
+        return;
+    }
+
+    if (m_maxTestResults > 0)
+    {
+        if (m_numCurrentResults > m_maxTestResults)
+        {
+            if (m_numCurrentResults == m_maxTestResults + 1)
+            {
+                message(TestMessageType::eInfo, "...");
+            }
+            return;
+        }
+    } 
+
+    StringBuilder buf;
+    buf <<  testText << " - " << file << " (" << line << ")";
+
+    message(TestMessageType::eTestFailure, buf);
+}
+
+void TestContext::addResultWithLocation(bool testSucceeded, const char* testText, const char* file, int line)
+{
+    addResultWithLocation(testSucceeded ? TestResult::ePass : TestResult::eFail, testText, file, line);
 }
 
 TestResult TestContext::addTest(const String& testName, bool isPass)
@@ -125,30 +168,6 @@ TestResult TestContext::addTest(const String& testName, bool isPass)
     addTest(testName, res);
     return res;
 }
-
-void TestContext::addTestWithLocation(const char* file, int line, const char* testText, bool isPass)
-{
-    // Can't add this way if in test
-    assert(!m_inTest);
-
-    StringBuilder testName;
-    testName << testText << " : " << file << " (" << line << ")";
-
-    const TestResult testResult = isPass ? TestResult::ePass : TestResult::eFail;
-    m_currentMessage.Clear();
-    
-    if (!isPass)
-    {
-        message(TestMessageType::eTestFailure, testName);
-    }
-
-    TestInfo info;
-    info.name = testName;
-    info.message = m_currentMessage;
-    info.testResult = testResult;
-    _addResult(info);
-}
-
 
 void TestContext::dumpOutputDifference(const String& expectedOutput, const String& actualOutput)
 {
@@ -345,7 +364,13 @@ void TestContext::outputSummary()
                 return;
             }
 
-            printf("\n===\n%d%% of tests passed (%d/%d)", (passCount * 100) / runTotal, passCount, runTotal);
+            int percentPassed = 0;
+            if (runTotal > 0)
+            {
+                percentPassed = (passCount * 100) / runTotal;
+            }
+
+            printf("\n===\n%d%% of tests passed (%d/%d)", percentPassed, passCount, runTotal);
             if (ignoredCount)
             {
                 printf(", %d tests ignored", ignoredCount);

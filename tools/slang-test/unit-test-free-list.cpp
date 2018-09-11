@@ -13,7 +13,7 @@
 
 using namespace Slang;
 
-static void unitTestFreeList()
+static void freeListUnitTest()
 {
     FreeList freeList;
     freeList.init(sizeof(int), sizeof(void*), 10);
@@ -52,4 +52,4 @@ static void unitTestFreeList()
     }
 }
 
-SLANG_UNIT_TEST("FreeList", unitTestFreeList);
+SLANG_UNIT_TEST("FreeList", freeListUnitTest);

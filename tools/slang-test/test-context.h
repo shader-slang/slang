@@ -2,7 +2,7 @@
 
 #include "../../source/core/slang-string-util.h"
 
-#define SLANG_CHECK(x) TestContext::get()->addTestWithLocation(__FILE__, __LINE__, #x, (x)); 
+#define SLANG_CHECK(x) TestContext::get()->addResultWithLocation((x), #x, __FILE__, __LINE__); 
 
 struct TestRegister
 {
@@ -36,9 +36,9 @@ enum class TestOutputMode
 
 enum class TestResult
 {
-    eFail,
-    ePass,
     eIgnored,
+    ePass,
+    eFail,
 };
 
 enum class TestMessageType
@@ -59,16 +59,34 @@ class TestContext
         Slang::String message;                 ///< Message that is specific for the testResult
     };
     
+    class Scope
+    {
+    public:
+        Scope(TestContext* context, const Slang::String& testName) :
+            m_context(context)
+        {
+            context->startTest(testName);
+        }
+        ~Scope()
+        {
+            m_context->endTest();
+        }
+
+    protected:
+        TestContext* m_context;
+    };
+
     void startTest(const Slang::String& testName);
-    TestResult endTest(TestResult result);
+    void addResult(TestResult result);
+    void addResultWithLocation(TestResult result, const char* testText, const char* file, int line);
+    void addResultWithLocation(bool testSucceeded, const char* testText, const char* file, int line);
+
+    void endTest();
     
         /// Runs start/endTest and outputs the result
     TestResult addTest(const Slang::String& testName, bool isPass);
         /// Effectively runs start/endTest (so cannot be called inside start/endTest). 
     void addTest(const Slang::String& testName, TestResult testResult);
-
-    void addTestWithLocation(const char* file, int line, const char* testText, bool isPass);
-
 
         // Called for an error in the test-runner (not for an error involving a test itself).
     void message(TestMessageType type, const Slang::String& errorText);
@@ -88,6 +106,8 @@ class TestContext
         /// Ctor
     TestContext(TestOutputMode outputMode);
 
+    static TestResult combine(TestResult a, TestResult b) { return (a > b) ? a : b; }
+
     static TestContext* get() { return s_context; }
     static void set(TestContext* context) { s_context = context; }
 
@@ -98,6 +118,8 @@ class TestContext
     int m_failedTestCount;
     int m_ignoredTestCount;
 
+    int m_maxTestResults;                   ///< Maximum amount of results per test. If 0 it's infinite.
+
     TestOutputMode m_outputMode = TestOutputMode::eDefault;
     bool m_dumpOutputOnFailure;
     bool m_isVerbose;
@@ -106,10 +128,11 @@ protected:
     void _addResult(const TestInfo& info);
 
     Slang::StringBuilder m_currentMessage;
-
     TestInfo m_currentInfo;
-    bool m_inTest;
+    int m_numCurrentResults;
 
+    bool m_inTest;
+    
     static TestContext* s_context;
 };
 
