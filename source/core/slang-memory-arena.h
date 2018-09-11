@@ -276,7 +276,7 @@ inline const char* MemoryArena::allocateString(const char* chars, size_t charsCo
 template <typename T>
 inline T* MemoryArena::allocate()
 {
-    return reinterpret_cast<T*>(allocateAligned(sizeof(T), CARB_ALIGN_OF(T)));
+    return reinterpret_cast<T*>(allocateAligned(sizeof(T), SLANG_ALIGN_OF(T)));
 }
 
 // --------------------------------------------------------------------------
