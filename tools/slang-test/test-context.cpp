@@ -77,7 +77,7 @@ TestContext::TestContext(TestOutputMode outputMode) :
     m_failedTestCount = 0;
     m_ignoredTestCount = 0;
 
-    m_maxTestResults = 10;
+    m_maxFailTestResults = 10;
 
     m_inTest = false;
     m_dumpOutputOnFailure = false;
@@ -103,6 +103,8 @@ void TestContext::startTest(const String& testName)
     m_inTest = true;
 
     m_numCurrentResults = 0;
+    m_numFailResults = 0;
+
     m_currentInfo = TestInfo();
     m_currentInfo.name = testName;
     m_currentMessage.Clear();
@@ -139,13 +141,16 @@ void TestContext::addResultWithLocation(TestResult result, const char* testText,
         return;
     }
 
-    if (m_maxTestResults > 0)
+    m_numFailResults++;
+
+    if (m_maxFailTestResults > 0)
     {
-        if (m_numCurrentResults > m_maxTestResults)
+        if (m_numFailResults > m_maxFailTestResults)
         {
-            if (m_numCurrentResults == m_maxTestResults + 1)
+            if (m_numFailResults == m_maxFailTestResults + 1)
             {
-                message(TestMessageType::eInfo, "...");
+                // It's a failure, but to show that there are more than are going to be shown, just show '...'
+                message(TestMessageType::eTestFailure, "...");
             }
             return;
         }

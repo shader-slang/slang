@@ -118,7 +118,7 @@ class TestContext
     int m_failedTestCount;
     int m_ignoredTestCount;
 
-    int m_maxTestResults;                   ///< Maximum amount of results per test. If 0 it's infinite.
+    int m_maxFailTestResults;                   ///< Maximum amount of results per test. If 0 it's infinite.
 
     TestOutputMode m_outputMode = TestOutputMode::eDefault;
     bool m_dumpOutputOnFailure;
@@ -130,6 +130,7 @@ protected:
     Slang::StringBuilder m_currentMessage;
     TestInfo m_currentInfo;
     int m_numCurrentResults;
+    int m_numFailResults;
 
     bool m_inTest;
     
