@@ -88,8 +88,8 @@ bool TestContext::canWriteStdError() const
 {
     switch (m_outputMode)
     {
-        case TestOutputMode::eXUnit:
-        case TestOutputMode::eXUnit2:
+        case TestOutputMode::XUnit:
+        case TestOutputMode::XUnit2:
         {
             return false;
         }
@@ -135,7 +135,7 @@ void TestContext::addResultWithLocation(TestResult result, const char* testText,
     m_numCurrentResults++;
 
     m_currentInfo.testResult = combine(m_currentInfo.testResult, result);
-    if (result != TestResult::eFail)
+    if (result != TestResult::Fail)
     {
         // We don't need to output the result if it 
         return;
@@ -150,7 +150,7 @@ void TestContext::addResultWithLocation(TestResult result, const char* testText,
             if (m_numFailResults == m_maxFailTestResults + 1)
             {
                 // It's a failure, but to show that there are more than are going to be shown, just show '...'
-                message(TestMessageType::eTestFailure, "...");
+                message(TestMessageType::TestFailure, "...");
             }
             return;
         }
@@ -159,17 +159,17 @@ void TestContext::addResultWithLocation(TestResult result, const char* testText,
     StringBuilder buf;
     buf <<  testText << " - " << file << " (" << line << ")";
 
-    message(TestMessageType::eTestFailure, buf);
+    message(TestMessageType::TestFailure, buf);
 }
 
 void TestContext::addResultWithLocation(bool testSucceeded, const char* testText, const char* file, int line)
 {
-    addResultWithLocation(testSucceeded ? TestResult::ePass : TestResult::eFail, testText, file, line);
+    addResultWithLocation(testSucceeded ? TestResult::Pass : TestResult::Fail, testText, file, line);
 }
 
 TestResult TestContext::addTest(const String& testName, bool isPass)
 {
-    const TestResult res = isPass ? TestResult::ePass : TestResult::eFail;
+    const TestResult res = isPass ? TestResult::Pass : TestResult::Fail;
     addTest(testName, res);
     return res;
 }
@@ -193,7 +193,7 @@ void TestContext::dumpOutputDifference(const String& expectedOutput, const Strin
     }
 
     // Add to the m_currentInfo
-    message(TestMessageType::eTestFailure, builder);
+    message(TestMessageType::TestFailure, builder);
 }
 
 void TestContext::_addResult(const TestInfo& info)
@@ -202,15 +202,15 @@ void TestContext::_addResult(const TestInfo& info)
 
     switch (info.testResult)
     {
-        case TestResult::eFail:
+        case TestResult::Fail:
             m_failedTestCount++;
             break;
 
-        case TestResult::ePass:
+        case TestResult::Pass:
             m_passedTestCount++;
             break;
 
-        case TestResult::eIgnored:
+        case TestResult::Ignored:
             m_ignoredTestCount++;
             break;
 
@@ -229,9 +229,9 @@ void TestContext::_addResult(const TestInfo& info)
             char const* resultString = "UNEXPECTED";
             switch (info.testResult)
             {
-                case TestResult::eFail:      resultString = "FAILED";  break;
-                case TestResult::ePass:      resultString = "passed";  break;
-                case TestResult::eIgnored:   resultString = "ignored"; break;
+                case TestResult::Fail:      resultString = "FAILED";  break;
+                case TestResult::Pass:      resultString = "passed";  break;
+                case TestResult::Ignored:   resultString = "ignored"; break;
                 default:
                     assert(!"unexpected");
                     break;
@@ -239,20 +239,20 @@ void TestContext::_addResult(const TestInfo& info)
             printf("%s test: '%S'\n", resultString, info.name.ToWString().begin());
             break;
         }
-        case TestOutputMode::eXUnit2:
-        case TestOutputMode::eXUnit:
+        case TestOutputMode::XUnit2:
+        case TestOutputMode::XUnit:
         {
             // Don't output anything -> we'll output all in one go at the end
             break;
         }
-        case TestOutputMode::eAppVeyor:
+        case TestOutputMode::AppVeyor:
         {
             char const* resultString = "None";
             switch (info.testResult)
             {
-                case TestResult::eFail:      resultString = "Failed";  break;
-                case TestResult::ePass:      resultString = "Passed";  break;
-                case TestResult::eIgnored:   resultString = "Ignored"; break;
+                case TestResult::Fail:      resultString = "Failed";  break;
+                case TestResult::Pass:      resultString = "Passed";  break;
+                case TestResult::Ignored:   resultString = "Ignored"; break;
                 default:
                     assert(!"unexpected");
                     break;
@@ -274,7 +274,7 @@ void TestContext::_addResult(const TestInfo& info)
 
             if (err != kOSError_None)
             {
-                messageFormat(TestMessageType::eInfo, "failed to add appveyor test results for '%S'\n", info.name.ToWString().begin());
+                messageFormat(TestMessageType::Info, "failed to add appveyor test results for '%S'\n", info.name.ToWString().begin());
 
 #if 0
                 fprintf(stderr, "[%d] TEST RESULT: %s {%d} {%s} {%s}\n", err, spawner.commandLine_.Buffer(),
@@ -302,7 +302,7 @@ void TestContext::addTest(const String& testName, TestResult testResult)
 
 void TestContext::message(TestMessageType type, const String& message)
 {
-    if (type == TestMessageType::eInfo)
+    if (type == TestMessageType::Info)
     {
         if (m_isVerbose && canWriteStdError())
         {
@@ -315,7 +315,7 @@ void TestContext::message(TestMessageType type, const String& message)
 
     if (canWriteStdError())
     {
-        if (type == TestMessageType::eRunError || type == TestMessageType::eTestFailure)
+        if (type == TestMessageType::RunError || type == TestMessageType::TestFailure)
         {
             fprintf(stderr, "error: ");
             fputs(message.Buffer(), stderr);
@@ -388,7 +388,7 @@ void TestContext::outputSummary()
                 printf("---\n");
                 for (const auto& testInfo : m_testInfos)
                 {
-                    if (testInfo.testResult == TestResult::eFail)
+                    if (testInfo.testResult == TestResult::Fail)
                     {
                         printf("%s\n", testInfo.name.Buffer());
                     }
@@ -397,7 +397,7 @@ void TestContext::outputSummary()
             }
             break;
         }
-        case TestOutputMode::eXUnit:
+        case TestOutputMode::XUnit:
         {
             // xUnit 1.0 format  
 
@@ -407,11 +407,11 @@ void TestContext::outputSummary()
 
             for (const auto& testInfo : m_testInfos)
             {
-                const int numFailed = (testInfo.testResult == TestResult::eFail);
-                const int numIgnored = (testInfo.testResult == TestResult::eIgnored);
+                const int numFailed = (testInfo.testResult == TestResult::Fail);
+                const int numIgnored = (testInfo.testResult == TestResult::Ignored);
                 //int numPassed = (testInfo.testResult == TestResult::ePass);
 
-                if (testInfo.testResult == TestResult::ePass)
+                if (testInfo.testResult == TestResult::Pass)
                 {
                     printf("    <testcase name=\"%s\" status=\"run\"/>\n", testInfo.name.Buffer());
                 }
@@ -420,7 +420,7 @@ void TestContext::outputSummary()
                     printf("    <testcase name=\"%s\" status=\"run\">\n", testInfo.name.Buffer());
                     switch (testInfo.testResult)
                     {
-                        case TestResult::eFail:
+                        case TestResult::Fail:
                         {
                             StringBuilder buf;
                             appendXmlEncode(testInfo.message, buf);
@@ -430,7 +430,7 @@ void TestContext::outputSummary()
                             printf("      </error>\n");
                             break;
                         }
-                        case TestResult::eIgnored:
+                        case TestResult::Ignored:
                         {
                             printf("      <skip>Ignored</skip>\n");
                             break;
@@ -445,7 +445,7 @@ void TestContext::outputSummary()
             printf("</testSuites>\n");
             break;
         }
-        case TestOutputMode::eXUnit2:
+        case TestOutputMode::XUnit2:
         {
             // https://xunit.github.io/docs/format-xml-v2
             assert("Not currently supported");

@@ -128,6 +128,14 @@ static void memoryArenaUnitTest()
         blocks.Add(arena.allocate(blockSize * 2));
 
         arena.reset();
+
+        {
+            uint32_t data[] = { 1, 2, 3 };
+
+            const uint32_t* copy = arena.allocateAndCopyArray(data, SLANG_COUNT_OF(data));
+
+            SLANG_CHECK(::memcmp(copy, data, sizeof(data)) == 0);
+        }
     }
 
     {

@@ -78,8 +78,7 @@ public:
 
         /** Allocate some aligned memory of at least size bytes 
         @param size Size of allocation wanted (must be > 0).
-        @param alignment Alignment of allocation - must be a power of 2.
-        @return The allocation (or nullptr if unable to allocate). Will be at least 'alignment' alignment or better. */
+        @return The allocation (or nullptr if unable to allocate).  */
     void* allocateUnaligned(size_t sizeInBytes);
 
         /** Allocates a null terminated string.
@@ -201,6 +200,7 @@ inline bool MemoryArena::isValid(const void* data, size_t size) const
 // --------------------------------------------------------------------------
 SLANG_FORCE_INLINE void* MemoryArena::allocateUnaligned(size_t size)
 {
+    assert(size > 0);
     // Align with the minimum alignment
     uint8_t* mem = m_current;
     uint8_t* end = mem + size;
@@ -218,6 +218,7 @@ SLANG_FORCE_INLINE void* MemoryArena::allocateUnaligned(size_t size)
 // --------------------------------------------------------------------------
 SLANG_FORCE_INLINE void* MemoryArena::allocate(size_t size)
 {
+    assert(size > 0);
     // Align with the minimum alignment
     const size_t alignMask = kMinAlignment - 1;
     uint8_t* mem = (uint8_t*)((size_t(m_current) + alignMask) & ~alignMask);
@@ -236,6 +237,7 @@ SLANG_FORCE_INLINE void* MemoryArena::allocate(size_t size)
 // --------------------------------------------------------------------------
 inline void* MemoryArena::allocateAligned(size_t size, size_t alignment)
 {
+    assert(size > 0);
     // Alignment must be a power of 2
     assert(((alignment - 1) & alignment) == 0);
 
@@ -300,6 +302,8 @@ inline T* MemoryArena::allocateArray(size_t count)
 template <typename T>
 inline T* MemoryArena::allocateAndCopyArray(const T* arr, size_t size)
 {
+    SLANG_COMPILE_TIME_ASSERT(std::is_pod<T>::value);
+
     if (size > 0)
     {
         const size_t totalSize = sizeof(T) * size;

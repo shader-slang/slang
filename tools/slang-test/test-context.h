@@ -27,25 +27,27 @@ struct TestRegister
 
 enum class TestOutputMode
 {
-    eDefault = 0,   ///< Default mode is to write test results to the console
-    eAppVeyor,      ///< For AppVeyor continuous integration 
-    eTravis,        ///< We currently don't specialize for Travis, but maybe we should.
-    eXUnit,         ///< xUnit original format  https://nose.readthedocs.io/en/latest/plugins/xunit.html
-    eXUnit2,        ///< https://xunit.github.io/docs/format-xml-v2
+    Default = 0,   ///< Default mode is to write test results to the console
+    AppVeyor,      ///< For AppVeyor continuous integration 
+    Travis,        ///< We currently don't specialize for Travis, but maybe we should.
+    XUnit,         ///< xUnit original format  https://nose.readthedocs.io/en/latest/plugins/xunit.html
+    XUnit2,        ///< https://xunit.github.io/docs/format-xml-v2
 };
 
 enum class TestResult
 {
-    eIgnored,
-    ePass,
-    eFail,
+    // NOTE! Must keep in order such that combine is meaningful. That is larger values are higher precident - and a series of tests that has lots of passes
+    // and a fail, is still a fail overall. 
+    Ignored,
+    Pass,
+    Fail,
 };
 
 enum class TestMessageType
 {
-    eInfo,                   ///< General info (may not be shown depending on verbosity setting)
-    eTestFailure,           ///< Describes how a test failure took place
-    eRunError,              ///< Describes an error that caused a test not to actually correctly run
+    Info,                   ///< General info (may not be shown depending on verbosity setting)
+    TestFailure,           ///< Describes how a test failure took place
+    RunError,              ///< Describes an error that caused a test not to actually correctly run
 };
 
 class TestContext
@@ -54,7 +56,7 @@ class TestContext
 
     struct TestInfo
     {
-        TestResult testResult = TestResult::eIgnored;
+        TestResult testResult = TestResult::Ignored;
         Slang::String name;
         Slang::String message;                 ///< Message that is specific for the testResult
     };
@@ -120,7 +122,7 @@ class TestContext
 
     int m_maxFailTestResults;                   ///< Maximum amount of results per test. If 0 it's infinite.
 
-    TestOutputMode m_outputMode = TestOutputMode::eDefault;
+    TestOutputMode m_outputMode = TestOutputMode::Default;
     bool m_dumpOutputOnFailure;
     bool m_isVerbose;
 
