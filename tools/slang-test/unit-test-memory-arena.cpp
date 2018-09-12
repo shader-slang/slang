@@ -123,15 +123,15 @@ static void memoryArenaUnitTest()
         blocks.Add(arena.allocate(blockSize * 2));
         blocks.Add(arena.allocate(100));
 
-        while (blocks.Count())
-        {
-            arena.deallocateLast(blocks.Last());
-            blocks.RemoveLast();
-        }
+        arena.deallocateAll();
+        blocks.Add(arena.allocate(100));
+        blocks.Add(arena.allocate(blockSize * 2));
+
+        arena.reset();
     }
 
     {
-
+        int count = 0;
         const size_t blockSize = 1024;
 
         for (TestMode mode = TestMode(0); int(mode) < int(TestMode::eCount); mode = TestMode(int(mode) + 1))
@@ -143,32 +143,30 @@ static void memoryArenaUnitTest()
 
             List<Block> blocks;
 
-            for (int i = 0; i < 1000; i++)
+            for (int i = 0; i < 10000; i++)
             {
-                int var = randGen.nextInt32() & 0x3ff;
+                count++;
+
+                const int var = randGen.nextInt32() & 0x3ff;
                 if (var < 3 && blocks.Count() > 0)
                 {
-                    if (var == 0)
-                    {
-                        // Do a single dealloc
-                        arena.deallocateLast(blocks.Last().m_data);
-                        blocks.RemoveLast();
-                    }
-                    else if (var == 1)
+                    if (var == 1)
                     {
                         // Deallocate everything
                         arena.deallocateAll();
                         blocks.Clear();
+                    }   
+                    else if (var == 2)
+                    {
+                        arena.reset();
+                        blocks.Clear();
                     }
                     else
                     {
-                        // Do a multiple dealloc
-                        int index = randGen.nextInt32UpTo(int(blocks.Count()));
+                        size_t usedMemory = arena.calcTotalMemoryUsed();
+                        size_t allocatedMemory = arena.calcTotalMemoryAllocated();
 
-                        // Deallocate all afterwards
-                        arena.deallocateAllFrom(blocks[index].m_data);
-
-                        blocks.SetSize(index);
+                        SLANG_CHECK(allocatedMemory >= usedMemory);
                     }
                 }
                 else
@@ -179,6 +177,11 @@ static void memoryArenaUnitTest()
                     if ((randGen.nextInt32() & 0xff) < 2)
                     {
                         sizeInBytes += blockSize;
+                    }
+                    else if ((randGen.nextInt32() & 0xff) < 2)
+                    {
+                        // Let's try for a block that's awkwardly sized 
+                        sizeInBytes = blockSize / 3 + 10;
                     }
 
                     const uint8_t value = uint8_t(randGen.nextInt32());

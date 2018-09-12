@@ -1972,7 +1972,6 @@ int main(
         // TODO: add more directories to this list
         // TODO: allow for a command-line argument to select a particular directory
         runTestsInDirectory(&context, "tests/");
-
     }
 
     context.outputSummary();
