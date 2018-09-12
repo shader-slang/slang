@@ -338,7 +338,7 @@ Result RenderTestApp::writeBindingOutput(const char* fileName)
             }
             else
             {
-                printf("invalid output type at %d.\n", i);
+                printf("invalid output type at %d.\n", int(i));
             }
         }
     }
