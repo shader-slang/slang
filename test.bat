@@ -56,3 +56,4 @@ SET "PATH=%PATH%;%SLANG_TEST_BIN_DIR%"
 :: TODO: Maybe we should actually invoke `msbuild` to make sure all the code is up to date?
 
 "%SLANG_TEST_BIN_DIR%slang-test.exe" -bindir "%SLANG_TEST_BIN_DIR%\" %*
+"%SLANG_TEST_BIN_DIR%slang-test.exe" -bindir "%SLANG_TEST_BIN_DIR%\" -unitTests

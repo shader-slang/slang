@@ -199,6 +199,15 @@ namespace Slang
 			return buffer[_count-1];
 		}
 
+        void RemoveLast()
+        {
+#ifdef _DEBUG
+            if (_count == 0)
+                throw "Index out of range.";
+#endif        
+            _count--;
+        }
+
 		inline void SwapWith(List<T, TAllocator> & other)
 		{
 			T* tmpBuffer = this->buffer;
