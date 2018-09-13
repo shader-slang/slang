@@ -8,6 +8,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <type_traits>
+
 #include "slang-free-list.h"
 
 namespace Slang { 
