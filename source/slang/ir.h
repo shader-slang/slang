@@ -983,7 +983,7 @@ struct IRModule : RefObject
 {
     enum 
     {
-        kMemoryArenaBlockSize = 4 * 1024,           ///< Use 4k block size for memory arena
+        kMemoryArenaBlockSize = 16 * 1024,           ///< Use 16k block size for memory arena
     };
 
     SLANG_FORCE_INLINE Session* getSession() const { return session; }
