@@ -5420,7 +5420,7 @@ namespace Slang
                 continue;
 
             auto decoration = (IRTargetDecoration*) dd;
-            if(StringRepresentation::equal(decoration->targetName, targetName.getStringRepresentation()))
+            if(String(decoration->targetName) == targetName)
                 return TargetSpecializationLevel::specializedForTarget;
 
             result = TargetSpecializationLevel::specializedForOtherTarget;
