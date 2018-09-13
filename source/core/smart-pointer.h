@@ -61,6 +61,18 @@ namespace Slang
         {
             return referenceCount;
         }
+
+        // Use instead of dynamic_cast as it allows for replacement without using Rtti in the future
+        template<typename T>
+        SLANG_FORCE_INLINE const T* dynamicCast() const
+        {
+            return dynamic_cast<const T*>(this);
+        }
+        template<typename T>
+        SLANG_FORCE_INLINE T* dynamicCast()
+        {
+            return dynamic_cast<T*>(this);
+        }
     };
 
     inline void addReference(RefObject* obj)
@@ -78,7 +90,7 @@ namespace Slang
     struct RefPtr
     {
         RefPtr()
-            : pointer(0)
+            : pointer(nullptr)
         {}
 
         RefPtr(T* p)
@@ -96,7 +108,7 @@ namespace Slang
         RefPtr(RefPtr<T>&& p)
             : pointer(p.pointer)
         {
-            p.pointer = 0;
+            p.pointer = nullptr;
         }
 
         template <typename U>
@@ -170,8 +182,7 @@ namespace Slang
         template<typename U>
         RefPtr<U> As() const
         {
-            RefPtr<U> result(dynamic_cast<U*>(pointer));
-            return result;
+            return RefPtr<U>(pointer->dynamicCast<U>());
         }
 
         ~RefPtr()

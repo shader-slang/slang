@@ -75,9 +75,33 @@ namespace Slang
             return length;
         }
 
-        char* getData()
+        SLANG_FORCE_INLINE char* getData()
         {
             return (char*) (this + 1);
+        }
+        SLANG_FORCE_INLINE const char* getData() const
+        {
+            return (const char*)(this + 1);
+        }
+
+        static const char* getData(const StringRepresentation* stringRep)
+        {
+            return stringRep ? stringRep->getData() : "";
+        }
+
+        static bool equal(const StringRepresentation* a, const StringRepresentation* b)
+        {
+            if ( a == b)
+            {
+                return true;
+            }
+            // If either is null then can't be the same 
+            if (a || b)
+            {
+                return false;
+            }
+            // Must be same length
+            return (a->length != b->length) && ::memcmp(a->getData(), b->getData(), a->length) == 0;
         }
 
         static StringRepresentation* createWithCapacityAndLength(UInt capacity, UInt length)
@@ -300,11 +324,12 @@ namespace Slang
 
         RefPtr<StringRepresentation> buffer;
 
-        String(StringRepresentation* buffer)
+    public:
+
+        explicit String(StringRepresentation* buffer)
             : buffer(buffer)
         {}
 
-    public:
 		static String FromWString(const wchar_t * wstr);
 		static String FromWString(const wchar_t * wstr, const wchar_t * wend);
 		static String FromWChar(const wchar_t ch);
@@ -312,6 +337,8 @@ namespace Slang
 		String()
 		{
 		}
+
+        SLANG_FORCE_INLINE StringRepresentation* getStringRepresentation() const { return buffer; }
 
 		const char * begin() const
 		{

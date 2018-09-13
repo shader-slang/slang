@@ -222,6 +222,16 @@ MemoryArena::Block* MemoryArena::_newBlock(size_t allocSize, size_t alignment)
     return block;
 }
 
+void* MemoryArena::_allocateAlignedFromNewBlockAndZero(size_t sizeInBytes, size_t alignment)
+{
+    void* mem = _allocateAlignedFromNewBlock(sizeInBytes, alignment);
+    if (mem)
+    {
+        ::memset(mem, 0, sizeInBytes);
+    }
+    return mem;
+}
+
 void* MemoryArena::_allocateAlignedFromNewBlock(size_t size, size_t alignment)
 {
     // Make sure init has been called (or has been set up in parameterized constructor)

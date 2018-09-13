@@ -763,7 +763,7 @@ namespace Slang
 
     // Create an IR instruction/value and initialize it.
     //
-    // In this case `argCount` and `args` represnt the
+    // In this case `argCount` and `args` represent the
     // arguments *after* the type (which is a mandatory
     // argument for all instructions).
     template<typename T>
@@ -791,9 +791,10 @@ namespace Slang
         }
 
         SLANG_ASSERT(module);
-        T* inst = (T*)module->memoryPool.allocZero(size);
-        new(inst)T();
+        T* inst = (T*)module->memoryArena.allocateAndZero(size);
 
+        // TODO: Do we need to run ctor after zeroing?
+        new(inst)T();
 
         inst->operandCount = (uint32_t)(fixedArgCount + varArgCount);
 
@@ -833,7 +834,6 @@ namespace Slang
                 operand++;
             }
         }
-        module->irObjectsToFree.Add(inst);
         return inst;
     }
 
@@ -2285,7 +2285,7 @@ namespace Slang
     IRLayoutDecoration* IRBuilder::addLayoutDecoration(IRInst* inst, Layout* layout)
     {
         auto decoration = addDecoration<IRLayoutDecoration>(inst);
-        decoration->layout = layout;
+        decoration->layout = addRefObjectToFree(layout);
         return decoration;
     }
 
@@ -2534,7 +2534,7 @@ namespace Slang
                     dump(context, "\n");
                     dumpIndent(context);
                     dump(context, "[target(");
-                    dump(context, decoration->targetName.Buffer());
+                    dump(context, StringRepresentation::getData(decoration->targetName));
                     dump(context, ")]");
                 }
                 break;
@@ -2908,11 +2908,6 @@ namespace Slang
         this->firstUse = nullptr;
 
         ff->debugValidate();
-    }
-
-    void IRInst::dispose()
-    {
-        IRObject::dispose();
     }
 
     // Insert this instruction into the same basic block
@@ -4223,7 +4218,7 @@ namespace Slang
                 continue;
 
             auto decoration = (IRTargetIntrinsicDecoration*) dd;
-            if(decoration->targetName == targetName)
+            if(String(decoration->targetName) == targetName)
                 return decoration;
         }
 
@@ -4469,7 +4464,7 @@ namespace Slang
                                 if(!decoration)
                                     continue;
 
-                                if(decoration->definition != "EmitVertex()")
+                                if(String(decoration->definition) != "EmitVertex()")
                                 {
                                     continue;
                                 }
@@ -5425,7 +5420,7 @@ namespace Slang
                 continue;
 
             auto decoration = (IRTargetDecoration*) dd;
-            if(decoration->targetName == targetName)
+            if(StringRepresentation::equal(decoration->targetName, targetName.getStringRepresentation()))
                 return TargetSpecializationLevel::specializedForTarget;
 
             result = TargetSpecializationLevel::specializedForOtherTarget;

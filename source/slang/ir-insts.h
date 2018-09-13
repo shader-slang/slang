@@ -32,12 +32,7 @@ struct IRLayoutDecoration : IRDecoration
 {
     enum { kDecorationOp = kIRDecorationOp_Layout };
 
-    RefPtr<Layout>  layout;
-    virtual void dispose() override
-    {
-        IRDecoration::dispose();
-        layout = nullptr;
-    }
+    Layout* layout;
 };
 
 enum IRLoopControl
@@ -56,12 +51,7 @@ struct IRLoopControlDecoration : IRDecoration
 struct IRTargetSpecificDecoration : IRDecoration
 {
     // TODO: have a more structured representation of target specifiers
-    String targetName;
-    virtual void dispose()override
-    {
-        IRDecoration::dispose();
-        targetName = String();
-    }
+    StringRepresentation* targetName;
 };
 
 struct IRTargetDecoration : IRTargetSpecificDecoration
@@ -73,12 +63,7 @@ struct IRTargetIntrinsicDecoration : IRTargetSpecificDecoration
 {
     enum { kDecorationOp = kIRDecorationOp_TargetIntrinsic };
 
-    String definition;
-    virtual void dispose()override
-    {
-        IRTargetSpecificDecoration::dispose();
-        definition = String();
-    }
+    StringRepresentation* definition;
 };
 
 struct IRGLSLOuterArrayDecoration : IRDecoration
@@ -138,12 +123,7 @@ struct IRNameHintDecoration : IRDecoration
 // declaration.
 struct IRDeclRef : IRInst
 {
-    DeclRef<Decl> declRef;
-    virtual void dispose() override
-    {
-        IRInst::dispose();
-        declRef = decltype(declRef)();
-    }
+    Decl* declRef;
 };
 
 // An instruction that specializes another IR value
@@ -838,16 +818,31 @@ struct IRBuilder
     {
         SLANG_ASSERT(getModule());
         auto decorationSize = sizeof(T);
-        auto decoration = (T*)getModule()->memoryPool.allocZero(decorationSize);
+        auto decoration = (T*)getModule()->memoryArena.allocateAndZero(decorationSize);
+
+        // TODO: Do we need to run ctor after zeroing?
         new(decoration)T();
 
         decoration->op = op;
 
         decoration->next = value->firstDecoration;
         value->firstDecoration = decoration;
-        getModule()->irObjectsToFree.Add(decoration);
         return decoration;
     }
+
+    template <typename T>
+    T* addRefObjectToFree(T* ptr)
+    {
+        getModule()->addRefObjectToFree(ptr);
+        return ptr;
+    }
+    StringRepresentation* addStringToFree(const String& string)
+    {
+        StringRepresentation* stringRep = string.getStringRepresentation();
+        getModule()->addRefObjectToFree(stringRep);
+        return stringRep;
+    }
+
 
     template<typename T>
     T* addDecoration(IRInst* value)

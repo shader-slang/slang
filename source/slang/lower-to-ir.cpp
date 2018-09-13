@@ -4549,19 +4549,21 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         IRInst* irInst,
         Decl*   decl)
     {
+        auto builder = getBuilder();
+
         for (auto targetMod : decl->GetModifiersOfType<TargetIntrinsicModifier>())
         {
-            auto decoration = getBuilder()->addDecoration<IRTargetIntrinsicDecoration>(irInst);
-            decoration->targetName = targetMod->targetToken.Content;
-
+            auto decoration = builder->addDecoration<IRTargetIntrinsicDecoration>(irInst);
+            decoration->targetName = builder->addStringToFree(targetMod->targetToken.Content);
+            
             auto definitionToken = targetMod->definitionToken;
             if (definitionToken.type == TokenType::StringLiteral)
             {
-                decoration->definition = getStringLiteralTokenValue(definitionToken);
+                decoration->definition = builder->addStringToFree(getStringLiteralTokenValue(definitionToken));
             }
             else
             {
-                decoration->definition = definitionToken.Content;
+                decoration->definition = builder->addStringToFree(definitionToken.Content);
             }
         }
     }
@@ -4900,7 +4902,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // target, and we need to reflect that at the IR level.
 
             auto decoration = getBuilder()->addDecoration<IRTargetDecoration>(irFunc);
-            decoration->targetName = targetMod->targetToken.Content;
+            decoration->targetName = getBuilder()->addStringToFree(targetMod->targetToken.Content);
         }
 
         // If this declaration was marked as having a target-specific lowering

@@ -844,7 +844,7 @@ static LegalVal legalizeInst(
 RefPtr<VarLayout> findVarLayout(IRInst* value)
 {
     if (auto layoutDecoration = value->findDecoration<IRLayoutDecoration>())
-        return layoutDecoration->layout.As<VarLayout>();
+        return layoutDecoration->layout->dynamicCast<VarLayout>();
     return nullptr;
 }
 

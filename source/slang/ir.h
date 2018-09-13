@@ -10,7 +10,9 @@
 #include "../core/basic.h"
 
 #include "source-loc.h"
-#include "memory_pool.h"
+
+#include "../core/slang-memory-arena.h"
+
 #include "type-system-shared.h"
 
 namespace Slang {
@@ -128,18 +130,9 @@ enum IRDecorationOp : uint16_t
     kIRDecorationOp_NameHint,
 };
 
-// represents an object allocated in an IR memory pool
+// represents an object allocated in an IR memory arena
 struct IRObject
 {
-    bool isDestroyed = false;
-    virtual void dispose()
-    {
-        isDestroyed = true;
-    }
-    virtual ~IRObject()
-    {
-        isDestroyed = true;
-    }
 };
 
 // A "decoration" that gets applied to an instruction.
@@ -247,9 +240,6 @@ struct IRInst : public IRObject
     // that this value will now have no uses.
     void replaceUsesWith(IRInst* other);
 
-    // Clean up any non-pool resources used by this instruction
-    virtual void dispose() override;
-
     // Insert this instruction into the same basic block
     // as `other`, right before/after it.
     void insertBefore(IRInst* other);
@@ -332,8 +322,8 @@ struct IRInstListBase
 
 
 
-    IRInst* first = 0;
-    IRInst* last = 0;
+    IRInst* first = nullptr;
+    IRInst* last = nullptr;
 
     IRInst* getFirst() { return first; }
     IRInst* getLast() { return last; }
@@ -991,23 +981,50 @@ struct IRModuleInst : IRParentInst
 
 struct IRModule : RefObject
 {
-    // The compilation session in use.
-    Session*    session;
-    MemoryPool  memoryPool;
-    List<IRObject*> irObjectsToFree; // list of ir objects to run destructor upon destruction
+    enum 
+    {
+        kMemoryArenaBlockSize = 4 * 1024,           ///< Use 4k block size for memory arena
+    };
 
-    IRModuleInst* moduleInst;
-    IRModuleInst* getModuleInst() { return moduleInst;  }
+    SLANG_FORCE_INLINE Session* getSession() const { return session; }
+    SLANG_FORCE_INLINE IRModuleInst* getModuleInst() const { return moduleInst;  }
 
-    IRInstListBase getGlobalInsts() { return getModuleInst()->getChildren(); }
+    IRInstListBase getGlobalInsts() const { return getModuleInst()->getChildren(); }
+
+    void addRefObjectToFree(RefObject* obj)
+    {
+        if (obj)
+        {
+            obj->addReference();
+            m_refObjectsToFree.Add(obj);
+        }
+    }
+    
+        /// Ctor
+    IRModule():
+        memoryArena(kMemoryArenaBlockSize)
+    {
+    }
 
     ~IRModule()
-    {
-        for (auto val : irObjectsToFree)
-            if (!val->isDestroyed)
-                val->dispose();
-        irObjectsToFree = List<IRObject*>();
+    { 
+        // Release all ref objects
+        for (RefObject* ptr: m_refObjectsToFree)
+        {
+            ptr->releaseReference();
+        }
+        // Clear any memory too
+        m_refObjectsToFree = List<RefObject*>();
     }
+
+    MemoryArena memoryArena;
+
+    // The compilation session in use.
+    Session*    session;
+    IRModuleInst* moduleInst;
+
+    protected:
+    List<RefObject*> m_refObjectsToFree;
 };
 
 void printSlangIRAssembly(StringBuilder& builder, IRModule* module);
