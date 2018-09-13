@@ -4464,7 +4464,7 @@ namespace Slang
                                 if(!decoration)
                                     continue;
 
-                                if(StringRepresentation::asSlice(decoration->definition) != UnownedStringSlice("EmitVertex()"))
+                                if(StringRepresentation::asSlice(decoration->definition) != UnownedStringSlice::fromLiteral("EmitVertex()"))
                                 {
                                     continue;
                                 }

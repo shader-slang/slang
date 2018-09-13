@@ -137,6 +137,9 @@ namespace Slang
         bool endsWith(UnownedStringSlice const& other) const;
         bool endsWith(char const* str) const;
 
+        template <size_t SIZE> 
+        SLANG_FORCE_INLINE static UnownedStringSlice fromLiteral(const char (&in)[SIZE]) { return UnownedStringSlice(in, SIZE - 1); }
+
     private:
         char const* beginData;
         char const* endData;
