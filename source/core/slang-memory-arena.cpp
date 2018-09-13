@@ -7,32 +7,34 @@ MemoryArena::MemoryArena()
 {
     // Mark as invalid so any alloc call will fail
     m_blockAlignment = 0;
-    m_blockSize = 0;
+    m_blockAllocSize = 0;
 
     // Set up as empty
-    m_blocks = nullptr;
-    _setCurrentBlock(nullptr);
+    m_usedOddBlocks = nullptr;
+    m_availableBlocks = nullptr;
+
+    _resetCurrentBlock();
+
     m_blockFreeList.init(sizeof(Block), sizeof(void*), 16);
 }
 
 MemoryArena::~MemoryArena()
 {
-    _deallocateBlocks();
+    reset();
 }
 
-MemoryArena::MemoryArena(size_t blockSize, size_t blockAlignment)
+MemoryArena::MemoryArena(size_t blockPayloadSize, size_t blockAlignment)
 {
-    _initialize(blockSize, blockAlignment);
+    _initialize(blockPayloadSize, blockAlignment);
 }
 
-void MemoryArena::init(size_t blockSize, size_t blockAlignment)
+void MemoryArena::init(size_t blockPayloadSize, size_t blockAlignment)
 {
-    _deallocateBlocks();
-    m_blockFreeList.reset();
-    _initialize(blockSize, blockAlignment);
+    reset();
+    _initialize(blockPayloadSize, blockAlignment);
 }
   
-void MemoryArena::_initialize(size_t blockSize, size_t alignment)
+void MemoryArena::_initialize(size_t blockPayloadSize, size_t alignment)
 {
     // Alignment must be a power of 2
     assert(((alignment - 1) & alignment) == 0);
@@ -40,99 +42,156 @@ void MemoryArena::_initialize(size_t blockSize, size_t alignment)
     // Must be at least sizeof(void*) in size, as that is the minimum the backing allocator will be
     alignment = (alignment < kMinAlignment) ? kMinAlignment : alignment;
 
+    m_blockPayloadSize = blockPayloadSize;
+    size_t blockAllocSize = blockPayloadSize;
+
     // If alignment required is larger then the backing allocators then
     // make larger to ensure when alignment correction takes place it will be aligned
     if (alignment > kMinAlignment)
     {
-        blockSize += alignment;
+        blockAllocSize += alignment;
     }
 
-    m_blockSize = blockSize;
+    m_blockAllocSize = blockAllocSize;
     m_blockAlignment = alignment;
-    m_blocks = nullptr;
-    _setCurrentBlock(nullptr);
+
+    m_availableBlocks = nullptr;
+    m_usedOddBlocks = nullptr;
+
     m_blockFreeList.init(sizeof(Block), sizeof(void*), 16);
+
+    _resetCurrentBlock();
 }
 
-void* MemoryArena::_allocateAligned(size_t size, size_t alignment)
+void MemoryArena::_resetCurrentBlock()
 {
-    assert(size);
-    // Can't be space in the current block -> so we can either place in next, or in a new block
-    _newCurrentBlock(size, alignment);
-    uint8_t* const current = m_current;
-    // If everything has gone to plan, must be space here...
-    assert(current + size <= m_end);
-    m_current = current + size;
-    return current;
+    m_start = nullptr;
+    m_end = nullptr;
+    m_current = nullptr;
+
+    m_usedBlocks = nullptr;
 }
 
-void MemoryArena::_deallocateBlocks()
+void MemoryArena::_addCurrentBlock(Block* block)
 {
-    Block* currentBlock = m_blocks;
-    while (currentBlock)
+    // Set up for allocation from
+    m_end = block->m_end;
+    m_start = block->m_start;
+    m_current = m_start;
+
+    // Add to linked list of used block, making it the top used block
+    block->m_next = m_usedBlocks;
+    m_usedBlocks = block;
+}
+
+void MemoryArena::_deallocateBlocksPayload(Block* start)
+{
+    Block* cur = start;
+    while (cur)
     {
         // Deallocate the block
-        ::free(currentBlock->m_alloc);
-        // next block
-        currentBlock = currentBlock->m_next;
+        ::free(cur->m_alloc);
+        cur = cur->m_next;
     }
-    // Can deallocate all blocks to
-    m_blockFreeList.deallocateAll();
 }
 
-void MemoryArena::_setCurrentBlock(Block* block)
+void MemoryArena::_deallocateBlocks(Block* start)
 {
-    if (block)
+    Block* cur = start;
+    while (cur)
     {
-        m_end = block->m_end;
-        m_start = block->m_start;
-        m_current = m_start;
+        Block* next = cur->m_next;
+        // Deallocate the block
+        ::free(cur->m_alloc);
+
+        m_blockFreeList.deallocate(cur);
+        cur = next;
     }
-    else
-    {
-        m_start = nullptr;
-        m_end = nullptr;
-        m_current = nullptr;
-    }
-    m_currentBlock = block;
 }
 
-MemoryArena::Block* MemoryArena::_newCurrentBlock(size_t size, size_t alignment)
+/* static */MemoryArena::Block* MemoryArena::_joinBlocks(Block* pre, Block* post)
 {
-    // Make sure init has been called (or has been set up in parameterized constructor)
-    assert(m_blockSize > 0);
-    // Alignment must be a power of 2
-    assert(((alignment - 1) & alignment) == 0);
-
-    // Alignment must at a minimum be block alignment (such if reused the constraints hold)
-    alignment = (alignment < m_blockAlignment) ? m_blockAlignment : alignment;
-
-    const size_t alignMask = alignment - 1;
-
-    // First try the next block (if there is one)
+    if (pre && post)
     {
-        Block* next = m_currentBlock ? m_currentBlock->m_next : m_blocks;
-        if (next)
+        // If both are actual lists, concat post at end of pre
+        Block* cur = pre;
+        while (cur->m_next)
         {
-            // Align could be done from the actual allocation start, but doing so would mean a pointer which
-            // didn't hit the constraint of being between start/end
-            // So have to align conservatively using start
-            uint8_t* memory = (uint8_t*)((size_t(next->m_start) + alignMask) & ~alignMask);
-
-            // Check if can fit block in
-            if (memory + size <= next->m_end)
-            {
-                _setCurrentBlock(next);
-                return next;
-            }
+            cur = cur->m_next;
         }
+        // Attach post to end of pre
+        cur->m_next = post;
+    }
+    return pre ? pre : post;
+}
+
+void MemoryArena::deallocateAll()
+{
+    // Free all oversized
+    _deallocateBlocks(m_usedOddBlocks);
+    m_usedOddBlocks = nullptr;
+    // We want to put used blocks onto the start of the available list
+    m_availableBlocks = _joinBlocks(m_usedBlocks, m_availableBlocks);
+
+    // Reset current block
+    _resetCurrentBlock();
+}
+
+void MemoryArena::reset()
+{
+    _deallocateBlocksPayload(m_usedOddBlocks);
+    _deallocateBlocksPayload(m_usedBlocks);
+    _deallocateBlocksPayload(m_availableBlocks);
+
+    m_blockFreeList.reset();
+
+    m_usedOddBlocks = nullptr;
+    m_availableBlocks = nullptr;
+
+    _resetCurrentBlock();
+}
+
+const MemoryArena::Block* MemoryArena::_findNonCurrent(const void* data, size_t size) const
+{
+    // It must either be m_usedOversizedBlocks or after m_usedBlocks (because m_usedBlocks is m_current)
+    const Block* block = _findInBlocks(m_usedOddBlocks, data, size);
+    if (block) 
+    {
+        return block;
+    }
+    return m_usedBlocks ? _findInBlocks(m_usedBlocks->m_next, data, size) : nullptr;
+}
+
+const MemoryArena::Block* MemoryArena::_findInBlocks(const Block* block, const void* data, size_t size) const
+{
+    const uint8_t* ptr = (const uint8_t*)data;
+    while (block)
+    {
+        if (ptr >= block->m_start && ptr + size <= block->m_end)
+        {
+            return block;
+        }
+        block = block->m_next;
+    }
+    return nullptr;
+}
+
+MemoryArena::Block* MemoryArena::_newNormalBlock()
+{
+    if (m_availableBlocks)
+    {
+        // We have an available block..
+        Block* block = m_availableBlocks;
+        m_availableBlocks = block->m_next;
+        return block;
     }
 
-    // The size of the block must be at least large enough to take into account alignment
-    size_t allocSize = (alignment <= kMinAlignment) ? size : (size + alignment);
+    return _newBlock(m_blockAllocSize, m_blockAlignment);
+}
 
-    // The minimum block size should be at least m_blockSize
-    allocSize = (allocSize < m_blockSize) ? m_blockSize : allocSize;
+MemoryArena::Block* MemoryArena::_newBlock(size_t allocSize, size_t alignment)
+{
+    assert(alignment >= m_blockAlignment);
 
     // Allocate block
     Block* block = (Block*)m_blockFreeList.allocate();
@@ -140,6 +199,7 @@ MemoryArena::Block* MemoryArena::_newCurrentBlock(size_t size, size_t alignment)
     {
         return nullptr;
     }
+
     // Allocate the memory
     uint8_t* alloc = (uint8_t*)::malloc(allocSize);
     if (!alloc)
@@ -147,6 +207,9 @@ MemoryArena::Block* MemoryArena::_newCurrentBlock(size_t size, size_t alignment)
         m_blockFreeList.deallocate(block);
         return nullptr;
     }
+
+    const size_t alignMask = alignment - 1;
+
     // Do the alignment on the allocation
     uint8_t* const start = (uint8_t*)((size_t(alloc) + alignMask) & ~alignMask);
 
@@ -156,89 +219,103 @@ MemoryArena::Block* MemoryArena::_newCurrentBlock(size_t size, size_t alignment)
     block->m_end = alloc + allocSize;
     block->m_next = nullptr;
 
-    // Insert block into list
-    if (m_currentBlock)
-    {
-        // Insert after current block
-        block->m_next = m_currentBlock->m_next;
-        m_currentBlock->m_next = block;
-    }
-    else
-    {
-        // Add to start of the list of the blocks
-        block->m_next = m_blocks;
-        m_blocks = block;
-    }
-    _setCurrentBlock(block);
     return block;
 }
 
-MemoryArena::Block* MemoryArena::_findBlock(const void* alloc, Block* endBlock) const
+void* MemoryArena::_allocateAlignedFromNewBlock(size_t size, size_t alignment)
 {
-    const uint8_t* ptr = (const uint8_t*)alloc;
+    // Make sure init has been called (or has been set up in parameterized constructor)
+    assert(m_blockAllocSize > 0);
+    // Alignment must be a power of 2
+    assert(((alignment - 1) & alignment) == 0);
 
-    Block* block = m_blocks;
-    while (block != endBlock)
+    // Alignment must at a minimum be block alignment (such if reused the constraints hold)
+    alignment = (alignment < m_blockAlignment) ? m_blockAlignment : alignment;
+
+    const size_t alignMask = alignment - 1;
+
+    // The size of the block must be at least large enough to take into account alignment
+    size_t allocSize = (alignment <= kMinAlignment) ? size : (size + alignment);
+
+    const size_t currentRemainSize = size_t(m_end - m_current);
+
+    // a) Allocate a new normal block and make current
+    // b) Allocate a new normal block (leave current)
+    // c) Allocate a new 'oversized' block (leave current)
+    // 
+    // We only bother with a and c here, as b is only really usable if size is close to m_blockAllocSize
+
+    // If there is > 1/3 of block remaining, or the block required is too big to fit use an 'oversized' block
+    if ((currentRemainSize * 3 > m_blockPayloadSize) || (allocSize > m_blockAllocSize))
     {
-        if (ptr >= block->m_start && ptr < block->m_end)
+        // We don't change current because there is enough remaining
+        Block* block = _newBlock(allocSize, alignment);
+        if (!block)
         {
-            return block;
+            return nullptr;
         }
-        block = block->m_next;
+        // Add to odd used blocks list
+        block->m_next = m_usedOddBlocks;
+        m_usedOddBlocks = block;
+        // NOTE! We are keeping the previous m_current current, so any remaining space can still be used
+        // Return the address
+        return block->m_start;
     }
-    return nullptr;
+
+    // Must be allocatable within a normal block
+    assert(allocSize <= m_blockAllocSize);
+    Block* block = _newNormalBlock();
+    if (!block)
+    {
+        return nullptr;
+    }
+    // It's a new regular block...
+    _addCurrentBlock(block);
+
+    // Do the aligned allocation (which must fit) by aligning the pointer
+    uint8_t* memory = (uint8_t*)((size_t(m_current) + alignMask) & ~alignMask);
+    // It must fit if the previous code is correct...
+    assert(memory + size <= m_end);
+    // Move the current pointer
+    m_current = memory + size;
+    return memory;
 }
 
-MemoryArena::Block* MemoryArena::_findPreviousBlock(Block* block)
+size_t MemoryArena::_calcBlocksUsedMemory(const Block* block) const
 {
-    Block* currentBlock = m_blocks;
-    while (currentBlock)
-    {
-        if (currentBlock->m_next == block)
-        {
-            return currentBlock;
-        }
-        currentBlock = currentBlock->m_next;
-    }
-    return nullptr;
-}
-
-void MemoryArena::deallocateAll()
-{
-    Block** prev = &m_blocks;
-    Block* block = m_blocks;
-
+    size_t total = 0;
     while (block)
     {
-        if (size_t(block->m_end - block->m_alloc) > m_blockSize)
-        {
-            // Oversized block so we need to free it and remove from the list
-            Block* nextBlock = block->m_next;
-            *prev = nextBlock;
-            // Free the backing memory
-            ::free(block->m_alloc);
-            // Free the block
-            m_blockFreeList.deallocate(block);
-            // prev stays the same, now working on next tho
-            block = nextBlock;
-        }
-        else
-        {
-            // Onto next
-            prev = &block->m_next;
-            block = block->m_next;
-        }
+        total += size_t(block->m_end - block->m_start);
+        block = block->m_next;
     }
-
-    // Make the first current (if any)
-    _setCurrentBlock(m_blocks);
+    return total;
 }
 
-void MemoryArena::reset()
+size_t MemoryArena::_calcBlocksAllocatedMemory(const Block* block) const
 {
-    _deallocateBlocks();
-    m_blocks = nullptr;
-    _setCurrentBlock(nullptr);
+    size_t total = 0;
+    while (block)
+    {
+        total += size_t(block->m_end - block->m_alloc);
+        block = block->m_next;
+    }
+    return total;
 }
+
+size_t MemoryArena::calcTotalMemoryUsed() const
+{
+    return _calcBlocksUsedMemory(m_usedOddBlocks)
+        + (m_usedBlocks ? _calcBlocksUsedMemory(m_usedBlocks->m_next) : 0) +
+        size_t(m_current - m_start);
+}
+
+size_t MemoryArena::calcTotalMemoryAllocated() const
+{
+    return _calcBlocksAllocatedMemory(m_usedOddBlocks) + 
+        _calcBlocksAllocatedMemory(m_usedBlocks) +
+        _calcBlocksAllocatedMemory(m_availableBlocks);
+}
+
 
 } // namespace Slang

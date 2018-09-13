@@ -8,18 +8,16 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <type_traits>
+
 #include "slang-free-list.h"
 
 namespace Slang { 
 
-/** Defines arena allocator where allocations are made very quickly, but that deallocations
-can only be performed in reverse order, or with the client code knowing a previous deallocation (say with
- deallocateAllFrom), automatically deallocates everything after it.
+/** MemoryArena provides provides very fast allocation of small blocks, by aggregating many small allocations 
+over smaller amount of larger blocks. A typical small unaligned allocation is a pointer bump.  
 
-It works by allocating large blocks and then cutting out smaller pieces as requested. If a piece of memory is
-deallocated, it either MUST be in reverse allocation order OR the subsequent allocations are implicitly 
-deallocated too, and therefore accessing their memory is now undefined behavior. Allocations are made 
-contiguously from the current block. If there is no space in the current block, the 
+Allocations are made contiguously from the current block. If there is no space in the current block, the 
 next block (which is unused) if available is checked. If that works, an allocation is made from the next block. 
 If not a new block is allocated that can hold at least the allocation with required alignment.
  
@@ -27,7 +25,7 @@ All memory allocated can be deallocated very quickly and without a client having
 All memory allocated will be freed on destruction - or with reset.
 
 A memory arena can have requests larger than the block size. When that happens they will just be allocated
-from the heap. As such 'oversized blocks' are seen as unusual and potentially wasteful they are deallocated
+from the heap. As such 'odd blocks' are seen as unusual and potentially wasteful so they are deallocated
 when deallocateAll is called, whereas regular size blocks will remain allocated for fast subsequent allocation.
 
 It is intentional that blocks information is stored separately from the allocations that store the
@@ -35,18 +33,22 @@ user data. This is so that alignment permitting, block allocations sizes can be 
 For large power of 2 backing allocations this might mean a page/pages directly allocated by the OS for example.
 Also means better cache coherency when traversing blocks -> as generally they will be contiguous in memory.
 
-Also note that allocateUnaligned can be used for slightly faster aligned allocations. All blocks allocated internally
+Note that allocateUnaligned can be used for slightly faster aligned allocations. All blocks allocated internally
 are aligned to the blockAlignment passed to the constructor. If subsequent allocations (of any type) sizes are of that
 alignment or larger then no alignment fixing is required (because allocations are contiguous) and so 'allocateUnaligned'
 will return allocations of blockAlignment alignment.
+
+If many 'odd' allocations occur it probably means that the block size should be increased. 
 */
 class MemoryArena
 {
 public:
     typedef MemoryArena ThisType;
 
-    static const size_t kMinAlignment = sizeof(void*);  ///< The minimum alignment of the backing memory allocator.
-
+        /** The minimum alignment of the backing memory allocator.
+        NOTE! That this should not be greater than the alignment of the underlying allocator.
+        */
+    static const size_t kMinAlignment = sizeof(void*);  
         /** Determines if an allocation is consistent with an allocation from this arena.
 
         The test cannot say definitively if this was such an allocation, because the exact details
@@ -78,8 +80,7 @@ public:
 
         /** Allocate some aligned memory of at least size bytes 
         @param size Size of allocation wanted (must be > 0).
-        @param alignment Alignment of allocation - must be a power of 2.
-        @return The allocation (or nullptr if unable to allocate). Will be at least 'alignment' alignment or better. */
+        @return The allocation (or nullptr if unable to allocate).  */
     void* allocateUnaligned(size_t sizeInBytes);
 
         /** Allocates a null terminated string.
@@ -109,12 +110,6 @@ public:
     template <typename T>
     T* allocateAndZeroArray(size_t size);
 
-        /// Deallocate the last allocation. If data is not from the last allocation then the behavior is undefined.
-    void deallocateLast(void* data);
-
-        /// Deallocate this allocation and all remaining after it.
-    void deallocateAllFrom(void* dataStart);
-
         /** Deallocates all allocated memory. That backing memory will generally not be released so
          subsequent allocation will be fast, and from the same memory. Note though that 'oversize' blocks
          will be deallocated. */
@@ -128,10 +123,15 @@ public:
         /// Gets the block alignment that is passed at initialization otherwise 0 an invalid block alignment.
     size_t getBlockAlignment() const { return m_blockAlignment; }
 
+        /// Estimate of total amount of memory used in bytes. The number can never be smaller than actual used memory but may be larger
+    size_t calcTotalMemoryUsed() const;
+        /// Total memory allocated in bytes
+    size_t calcTotalMemoryAllocated() const;
+
         /// Default Ctor
     MemoryArena();
         /// Construct with block size and alignment. Block alignment must be a power of 2.
-    MemoryArena(size_t blockSize, size_t blockAlignment = kMinAlignment);
+    MemoryArena(size_t blockPayloadSize, size_t blockAlignment = kMinAlignment);
 
         /// Dtor
     ~MemoryArena();
@@ -139,32 +139,51 @@ public:
 protected:
     struct Block
     {
-        Block* m_next;
-        uint8_t* m_alloc;
-        uint8_t* m_start;
-        uint8_t* m_end;
+        Block* m_next;                  ///< Singly linked list of blocks
+        uint8_t* m_alloc;               ///< Allocation start (ie what to free)
+        uint8_t* m_start;               ///< Start of payload (takes into account alignment)
+        uint8_t* m_end;                 ///< End of payload (m_start to m_end defines payload)
     };
 
-    void _initialize(size_t blockSize, size_t blockAlignment);
+    void _initialize(size_t blockPayloadSize, size_t blockAlignment);
 
-    void* _allocateAligned(size_t size, size_t alignment);
-    void _deallocateBlocks();
+        /// Delete the linked list of blocks specified by start
+    void _deallocateBlocks(Block* start);
+        /// Delete the linked list of blocks payloads specified by start
+    void _deallocateBlocksPayload(Block* start);
 
-    void _setCurrentBlock(Block* block);
+    void _resetCurrentBlock();
+    void _addCurrentBlock(Block* block);
 
-    Block* _newCurrentBlock(size_t size, size_t alignment);
-    Block* _findBlock(const void* alloc, Block* endBlock = nullptr) const;
-    Block* _findPreviousBlock(Block* block);
+    static Block* _joinBlocks(Block* pre, Block* post);
 
-    uint8_t* m_start;
-    uint8_t* m_end;
-    uint8_t* m_current;
-    size_t m_blockSize; 
-    size_t m_blockAlignment;
-    Block* m_blocks;
-    Block* m_currentBlock;
+        /// Create a new block with regular block alignment 
+    Block* _newNormalBlock();
+        /// Allocates a new block with allocSize and alignment 
+    Block* _newBlock(size_t allocSize, size_t alignment);
 
-    FreeList m_blockFreeList;
+    void* _allocateAlignedFromNewBlock(size_t size, size_t alignment);
+
+        /// Find block that contains data/size that is _NOT_ current (ie not first block in m_usedBlocks)
+    const Block* _findNonCurrent(const void* data, size_t size) const;
+    const Block* _findInBlocks(const Block* block, const void* data, size_t size) const;
+
+    size_t _calcBlocksUsedMemory(const Block* block) const;
+    size_t _calcBlocksAllocatedMemory(const Block* block) const;
+
+    uint8_t* m_start;               ///< The start of the current block (pointed to by m_usedBlocks)
+    uint8_t* m_end;                 ///< The end of the current block
+    uint8_t* m_current;             ///< The current position in current block
+
+    size_t m_blockPayloadSize;      ///< The size of the payload of a block
+    size_t m_blockAllocSize;        ///< The size of a block allocation (must be the same size or bigger than m_blockPayloadSize)
+    size_t m_blockAlignment;        ///< The alignment applied to used blocks
+
+    Block* m_availableBlocks;       ///< Standard sized blocks that are available
+    Block* m_usedBlocks;            ///< List of all normal sized used blocks. The first one is the 'current block'
+    Block* m_usedOddBlocks;         ///< Used 'odd' blocks - blocks can actually be smaller than normal blocks, but are typically larger. 
+
+    FreeList m_blockFreeList;       ///< Holds all of the blocks for fast allocation/free
 
     private:
     // Disable
@@ -176,21 +195,14 @@ protected:
 inline bool MemoryArena::isValid(const void* data, size_t size) const
 {
     assert(size);
-
     uint8_t* ptr = (uint8_t*)data;
-    // Is it in current
-    if (ptr >= m_start && ptr + size <= m_current)
-    {
-        return true;
-    }
-    // Is it in a previous block?
-    Block* block = _findBlock(data, m_currentBlock);
-    return block && (ptr >= block->m_start && (ptr + size) <= block->m_end);
+    return (ptr >= m_start && ptr + size <= m_current) || _findNonCurrent(data, size) != nullptr;
 }
 
 // --------------------------------------------------------------------------
 SLANG_FORCE_INLINE void* MemoryArena::allocateUnaligned(size_t size)
 {
+    assert(size > 0);
     // Align with the minimum alignment
     uint8_t* mem = m_current;
     uint8_t* end = mem + size;
@@ -201,13 +213,14 @@ SLANG_FORCE_INLINE void* MemoryArena::allocateUnaligned(size_t size)
     }
     else
     {
-        return _allocateAligned(size, m_blockAlignment);
+        return _allocateAlignedFromNewBlock(size, kMinAlignment);
     }
 }
 
 // --------------------------------------------------------------------------
 SLANG_FORCE_INLINE void* MemoryArena::allocate(size_t size)
 {
+    assert(size > 0);
     // Align with the minimum alignment
     const size_t alignMask = kMinAlignment - 1;
     uint8_t* mem = (uint8_t*)((size_t(m_current) + alignMask) & ~alignMask);
@@ -219,13 +232,14 @@ SLANG_FORCE_INLINE void* MemoryArena::allocate(size_t size)
     }
     else
     {
-        return _allocateAligned(size, kMinAlignment);
+        return _allocateAlignedFromNewBlock(size, kMinAlignment);
     }
 }
 
 // --------------------------------------------------------------------------
 inline void* MemoryArena::allocateAligned(size_t size, size_t alignment)
 {
+    assert(size > 0);
     // Alignment must be a power of 2
     assert(((alignment - 1) & alignment) == 0);
 
@@ -240,7 +254,7 @@ inline void* MemoryArena::allocateAligned(size_t size, size_t alignment)
     }
     else
     {
-        return _allocateAligned(size, alignment);
+        return _allocateAlignedFromNewBlock(size, alignment);
     }
 }
 
@@ -290,6 +304,8 @@ inline T* MemoryArena::allocateArray(size_t count)
 template <typename T>
 inline T* MemoryArena::allocateAndCopyArray(const T* arr, size_t size)
 {
+    SLANG_COMPILE_TIME_ASSERT(std::is_pod<T>::value);
+
     if (size > 0)
     {
         const size_t totalSize = sizeof(T) * size;
@@ -315,59 +331,6 @@ inline T* MemoryArena::allocateAndZeroArray(size_t size)
 }
 
 // --------------------------------------------------------------------------
-inline void MemoryArena::deallocateLast(void* data)
-{
-    // See if it's in current block
-    uint8_t* ptr = (uint8_t*)data;
-    if (ptr >= m_start && ptr < m_current)
-    {
-        // Then just go back
-        m_current = ptr;
-    }
-    else
-    {
-        // Only called if not in the current block. Therefore can only be in previous
-        Block* prevBlock = _findPreviousBlock(m_currentBlock);
-        if (prevBlock == nullptr || (!(ptr >= prevBlock->m_start && ptr < prevBlock->m_end)))
-        {
-            assert(!"Allocation not found");
-            return;
-        }
-
-        // Make the previous block the current
-        _setCurrentBlock(prevBlock);
-        // Make the current the alloc freed
-        m_current = ptr;
-    }
-}
-
-// --------------------------------------------------------------------------
-inline void MemoryArena::deallocateAllFrom(void* data)
-{
-    // See if it's in current block, and is allocated (ie < m_current)
-    uint8_t* ptr = (uint8_t*)data;
-    if (ptr >= m_start && ptr < m_current)
-    {
-        // If it's in current block, then just go back
-        m_current = ptr;
-        return;
-    }
-
-    // Search all blocks prior to current block
-    Block* block = _findBlock(data, m_currentBlock);
-    assert(block);
-    if (!block)
-    {
-        return;
-    }
-    // Make this current block
-    _setCurrentBlock(block);
-
-    // Move the pointer to the allocations position
-    m_current = ptr;
-}
-
-// --------------------------------------------------------------------------
 inline void MemoryArena::adjustToBlockAlignment()
 {
     const size_t alignMask = m_blockAlignment - 1;
@@ -377,8 +340,9 @@ inline void MemoryArena::adjustToBlockAlignment()
     // This test could be avoided if we aligned m_end, but depending on block alignment that might waste some space
     if (ptr > m_end)
     {
-        // We'll need a new block to make this alignment
-        _newCurrentBlock(0, m_blockAlignment);
+        // We'll need a new block to make this alignment. Allocate a byte, and then rewind it.
+        _allocateAlignedFromNewBlock(1, 1);
+        m_current = m_usedBlocks->m_start; 
     }
     else
     {
