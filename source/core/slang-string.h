@@ -62,90 +62,25 @@ namespace Slang
 		return (((unsigned char)ch) & 0xC0) == 0x80;
 	}
 
-    // A `StringRepresentation` provides the backing storage for
-    // all reference-counted string-related types.
-    class StringRepresentation : public RefObject
-    {
-    public:
-        UInt length;
-        UInt capacity;
-
-        UInt getLength()
-        {
-            return length;
-        }
-
-        char* getData()
-        {
-            return (char*) (this + 1);
-        }
-
-        static StringRepresentation* createWithCapacityAndLength(UInt capacity, UInt length)
-        {
-            SLANG_ASSERT(capacity >= length);
-            void* allocation = operator new(sizeof(StringRepresentation) + capacity + 1);
-            StringRepresentation* obj = new(allocation) StringRepresentation();
-            obj->capacity = capacity;
-            obj->length = length;
-            obj->getData()[length] = 0;
-            return obj;
-        }
-
-        static StringRepresentation* createWithCapacity(UInt capacity)
-        {
-            return createWithCapacityAndLength(capacity, 0);
-        }
-
-        static StringRepresentation* createWithLength(UInt length)
-        {
-            return createWithCapacityAndLength(length, length);
-        }
-
-        StringRepresentation* cloneWithCapacity(UInt newCapacity)
-        {
-            StringRepresentation* newObj = createWithCapacityAndLength(newCapacity, length);
-            memcpy(getData(), newObj->getData(), length + 1);
-            return newObj;
-        }
-
-        StringRepresentation* clone()
-        {
-            return cloneWithCapacity(length);
-        }
-
-        StringRepresentation* ensureCapacity(UInt required)
-        {
-            if (capacity >= required) return this;
-
-            UInt newCapacity = capacity;
-            if (!newCapacity) newCapacity = 16; // TODO: figure out good value for minimum capacity
-
-            while (newCapacity < required)
-            {
-                newCapacity = 2 * newCapacity;
-            }
-
-            return cloneWithCapacity(newCapacity);
-        }
-    };
-
-    class String;
-
     struct UnownedStringSlice
     {
     public:
         UnownedStringSlice()
             : beginData(nullptr)
-            , endData(0)
+            , endData(nullptr)
         {}
 
-        explicit UnownedStringSlice(char const* a):
+        explicit UnownedStringSlice(char const* a) :
             beginData(a),
             endData(a + strlen(a))
         {}
         UnownedStringSlice(char const* b, char const* e)
             : beginData(b)
             , endData(e)
+        {}
+        UnownedStringSlice(char const* b, size_t len)
+            : beginData(b)
+            , endData(b + len)
         {}
 
         char const* begin() const
@@ -202,10 +137,103 @@ namespace Slang
         bool endsWith(UnownedStringSlice const& other) const;
         bool endsWith(char const* str) const;
 
+        template <size_t SIZE> 
+        SLANG_FORCE_INLINE static UnownedStringSlice fromLiteral(const char (&in)[SIZE]) { return UnownedStringSlice(in, SIZE - 1); }
+
     private:
         char const* beginData;
         char const* endData;
     };
+
+    // A `StringRepresentation` provides the backing storage for
+    // all reference-counted string-related types.
+    class StringRepresentation : public RefObject
+    {
+    public:
+        UInt length;
+        UInt capacity;
+
+        SLANG_FORCE_INLINE UInt getLength() const
+        {
+            return length;
+        }
+
+        SLANG_FORCE_INLINE char* getData()
+        {
+            return (char*) (this + 1);
+        }
+        SLANG_FORCE_INLINE const char* getData() const
+        {
+            return (const char*)(this + 1);
+        }
+
+        static const char* getData(const StringRepresentation* stringRep)
+        {
+            return stringRep ? stringRep->getData() : "";
+        }
+
+        static UnownedStringSlice asSlice(const StringRepresentation* rep)
+        {
+            return rep ? UnownedStringSlice(rep->getData(), rep->getLength()) : UnownedStringSlice();
+        }
+
+        static bool equal(const StringRepresentation* a, const StringRepresentation* b)
+        {
+            return (a == b) || asSlice(a) == asSlice(b);
+        }
+
+        static StringRepresentation* createWithCapacityAndLength(UInt capacity, UInt length)
+        {
+            SLANG_ASSERT(capacity >= length);
+            void* allocation = operator new(sizeof(StringRepresentation) + capacity + 1);
+            StringRepresentation* obj = new(allocation) StringRepresentation();
+            obj->capacity = capacity;
+            obj->length = length;
+            obj->getData()[length] = 0;
+            return obj;
+        }
+
+        static StringRepresentation* createWithCapacity(UInt capacity)
+        {
+            return createWithCapacityAndLength(capacity, 0);
+        }
+
+        static StringRepresentation* createWithLength(UInt length)
+        {
+            return createWithCapacityAndLength(length, length);
+        }
+
+        StringRepresentation* cloneWithCapacity(UInt newCapacity)
+        {
+            StringRepresentation* newObj = createWithCapacityAndLength(newCapacity, length);
+            memcpy(getData(), newObj->getData(), length + 1);
+            return newObj;
+        }
+
+        StringRepresentation* clone()
+        {
+            return cloneWithCapacity(length);
+        }
+
+        StringRepresentation* ensureCapacity(UInt required)
+        {
+            if (capacity >= required) return this;
+
+            UInt newCapacity = capacity;
+            if (!newCapacity) newCapacity = 16; // TODO: figure out good value for minimum capacity
+
+            while (newCapacity < required)
+            {
+                newCapacity = 2 * newCapacity;
+            }
+
+            return cloneWithCapacity(newCapacity);
+        }
+    };
+
+    class String;
+
+
 
     struct UnownedTerminatedStringSlice : public UnownedStringSlice
     {
@@ -300,11 +328,12 @@ namespace Slang
 
         RefPtr<StringRepresentation> buffer;
 
-        String(StringRepresentation* buffer)
+    public:
+
+        explicit String(StringRepresentation* buffer)
             : buffer(buffer)
         {}
 
-    public:
 		static String FromWString(const wchar_t * wstr);
 		static String FromWString(const wchar_t * wstr, const wchar_t * wend);
 		static String FromWChar(const wchar_t ch);
@@ -312,6 +341,8 @@ namespace Slang
 		String()
 		{
 		}
+
+        SLANG_FORCE_INLINE StringRepresentation* getStringRepresentation() const { return buffer; }
 
 		const char * begin() const
 		{

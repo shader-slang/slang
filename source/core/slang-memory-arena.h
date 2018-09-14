@@ -46,7 +46,7 @@ public:
     typedef MemoryArena ThisType;
 
         /** The minimum alignment of the backing memory allocator.
-        NOTE! That this should not be greater than the alignment of the underlying allocator.
+        NOTE! That this should not be greater than the alignment of the underlying allocator, and should never be less than sizeof(void*).
         */
     static const size_t kMinAlignment = sizeof(void*);  
         /** Determines if an allocation is consistent with an allocation from this arena.
@@ -60,7 +60,7 @@ public:
 
         /** Initialize the arena with specified block size and alignment 
         If the arena has been previously initialized will free and deallocate all memory */
-    void init(size_t blockSize, size_t blockAlignment = kMinAlignment);
+    void init(size_t blockSizeInBytes, size_t blockAlignment = kMinAlignment);
 
         /** Allocate some memory of at least size bytes without having any specific alignment.
 
@@ -71,6 +71,11 @@ public:
          @param size The size of the allocation requested (in bytes and must be > 0).
          @return The allocation. Can be nullptr if backing allocator was not able to request required memory */
     void* allocate(size_t sizeInBytes);
+
+        /** Same as allocate, but zeros memory before returning 
+        @param size The size of the allocation requested (in bytes and must be > 0).
+        @return The allocation. Can be nullptr if backing allocator was not able to request required memory */
+    void* allocateAndZero(size_t sizeInBytes); 
 
         /** Allocate some aligned memory of at least size bytes 
          @param size Size of allocation wanted (must be > 0).
@@ -100,15 +105,15 @@ public:
 
         /// Allocate an array of a specified type. NOTE Constructor of T is NOT executed.
     template <typename T>
-    T* allocateArray(size_t size);
+    T* allocateArray(size_t numElems);
 
         /// Allocate an array of a specified type, and copy array passed into it.
     template <typename T>
-    T* allocateAndCopyArray(const T* src, size_t size);  
+    T* allocateAndCopyArray(const T* src, size_t numElems);  
 
         /// Allocate an array of a specified type, and zero it.
     template <typename T>
-    T* allocateAndZeroArray(size_t size);
+    T* allocateAndZeroArray(size_t numElems);
 
         /** Deallocates all allocated memory. That backing memory will generally not be released so
          subsequent allocation will be fast, and from the same memory. Note though that 'oversize' blocks
@@ -160,13 +165,14 @@ protected:
         /// Create a new block with regular block alignment 
     Block* _newNormalBlock();
         /// Allocates a new block with allocSize and alignment 
-    Block* _newBlock(size_t allocSize, size_t alignment);
+    Block* _newBlock(size_t allocSizeInBytes, size_t alignment);
 
-    void* _allocateAlignedFromNewBlock(size_t size, size_t alignment);
+    void* _allocateAlignedFromNewBlock(size_t sizeInBytes, size_t alignment);
+    void* _allocateAlignedFromNewBlockAndZero(size_t sizeInBytes, size_t alignment);
 
         /// Find block that contains data/size that is _NOT_ current (ie not first block in m_usedBlocks)
-    const Block* _findNonCurrent(const void* data, size_t size) const;
-    const Block* _findInBlocks(const Block* block, const void* data, size_t size) const;
+    const Block* _findNonCurrent(const void* data, size_t sizeInBytes) const;
+    const Block* _findInBlocks(const Block* block, const void* data, size_t sizeInBytes) const;
 
     size_t _calcBlocksUsedMemory(const Block* block) const;
     size_t _calcBlocksAllocatedMemory(const Block* block) const;
@@ -192,7 +198,7 @@ protected:
 };
 
 // --------------------------------------------------------------------------
-inline bool MemoryArena::isValid(const void* data, size_t size) const
+SLANG_FORCE_INLINE bool MemoryArena::isValid(const void* data, size_t size) const
 {
     assert(size);
     uint8_t* ptr = (uint8_t*)data;
@@ -200,12 +206,12 @@ inline bool MemoryArena::isValid(const void* data, size_t size) const
 }
 
 // --------------------------------------------------------------------------
-SLANG_FORCE_INLINE void* MemoryArena::allocateUnaligned(size_t size)
+SLANG_FORCE_INLINE void* MemoryArena::allocateUnaligned(size_t sizeInBytes)
 {
-    assert(size > 0);
+    assert(sizeInBytes > 0);
     // Align with the minimum alignment
     uint8_t* mem = m_current;
-    uint8_t* end = mem + size;
+    uint8_t* end = mem + sizeInBytes;
     if (end <= m_end)
     {
         m_current = end;
@@ -213,33 +219,54 @@ SLANG_FORCE_INLINE void* MemoryArena::allocateUnaligned(size_t size)
     }
     else
     {
-        return _allocateAlignedFromNewBlock(size, kMinAlignment);
+        return _allocateAlignedFromNewBlock(sizeInBytes, kMinAlignment);
     }
 }
 
 // --------------------------------------------------------------------------
-SLANG_FORCE_INLINE void* MemoryArena::allocate(size_t size)
+SLANG_FORCE_INLINE void* MemoryArena::allocate(size_t sizeInBytes)
 {
-    assert(size > 0);
+    assert(sizeInBytes > 0);
     // Align with the minimum alignment
     const size_t alignMask = kMinAlignment - 1;
     uint8_t* mem = (uint8_t*)((size_t(m_current) + alignMask) & ~alignMask);
 
-    if (mem + size <= m_end)
+    if (mem + sizeInBytes <= m_end)
     {
-        m_current = mem + size;
+        m_current = mem + sizeInBytes;
         return mem;
     }
     else
     {
-        return _allocateAlignedFromNewBlock(size, kMinAlignment);
+        return _allocateAlignedFromNewBlock(sizeInBytes, kMinAlignment);
     }
 }
 
 // --------------------------------------------------------------------------
-inline void* MemoryArena::allocateAligned(size_t size, size_t alignment)
+SLANG_FORCE_INLINE void* MemoryArena::allocateAndZero(size_t sizeInBytes)
 {
-    assert(size > 0);
+    // Implement without calling ::allocate, because in most common case we don't need to test for null.
+    assert(sizeInBytes > 0);
+    // Align with the minimum alignment
+    const size_t alignMask = kMinAlignment - 1;
+    uint8_t* mem = (uint8_t*)((size_t(m_current) + alignMask) & ~alignMask);
+    uint8_t* end = mem + sizeInBytes;
+    if ( end <= m_end)
+    {
+        ::memset(mem, 0, sizeInBytes);
+        m_current = end; 
+        return mem;
+    }
+    else
+    {
+        return _allocateAlignedFromNewBlockAndZero(sizeInBytes, kMinAlignment);
+    }
+} 
+
+// --------------------------------------------------------------------------
+SLANG_FORCE_INLINE void* MemoryArena::allocateAligned(size_t sizeInBytes, size_t alignment)
+{
+    assert(sizeInBytes > 0);
     // Alignment must be a power of 2
     assert(((alignment - 1) & alignment) == 0);
 
@@ -247,19 +274,19 @@ inline void* MemoryArena::allocateAligned(size_t size, size_t alignment)
     const size_t alignMask = alignment - 1;
     uint8_t* memory = (uint8_t*)((size_t(m_current) + alignMask) & ~alignMask);
 
-    if (memory + size <= m_end)
+    if (memory + sizeInBytes <= m_end)
     {
-        m_current = memory + size;
+        m_current = memory + sizeInBytes;
         return memory;
     }
     else
     {
-        return _allocateAlignedFromNewBlock(size, alignment);
+        return _allocateAlignedFromNewBlock(sizeInBytes, alignment);
     }
 }
 
 // --------------------------------------------------------------------------
-inline const char* MemoryArena::allocateString(const char* str)
+SLANG_FORCE_INLINE const char* MemoryArena::allocateString(const char* str)
 {
     size_t size = ::strlen(str);
     if (size == 0)
@@ -272,43 +299,42 @@ inline const char* MemoryArena::allocateString(const char* str)
 }
 
 // --------------------------------------------------------------------------
-inline const char* MemoryArena::allocateString(const char* chars, size_t charsCount)
+inline const char* MemoryArena::allocateString(const char* chars, size_t numChars)
 {
-    if (charsCount == 0)
+    if (numChars == 0)
     {
         return "";
     }
-    char* dst = (char*)allocateUnaligned(charsCount + 1);
-    ::memcpy(dst, chars, charsCount);
+    char* dst = (char*)allocateUnaligned(numChars + 1);
+    ::memcpy(dst, chars, numChars);
 
     // Add null-terminating zero
-    dst[charsCount] = 0;
+    dst[numChars] = 0;
     return dst;
 } 
 
 // --------------------------------------------------------------------------
 template <typename T>
-inline T* MemoryArena::allocate()
+SLANG_FORCE_INLINE T* MemoryArena::allocate()
 {
     return reinterpret_cast<T*>(allocateAligned(sizeof(T), SLANG_ALIGN_OF(T)));
 }
 
 // --------------------------------------------------------------------------
 template <typename T>
-inline T* MemoryArena::allocateArray(size_t count)
+SLANG_FORCE_INLINE T* MemoryArena::allocateArray(size_t numElems)
 {
-    return (count > 0) ? reinterpret_cast<T*>(allocateAligned(sizeof(T) * count, SLANG_ALIGN_OF(T))) : nullptr;
+    return (numElems > 0) ? reinterpret_cast<T*>(allocateAligned(sizeof(T) * numElems, SLANG_ALIGN_OF(T))) : nullptr;
 }
 
 // --------------------------------------------------------------------------
 template <typename T>
-inline T* MemoryArena::allocateAndCopyArray(const T* arr, size_t size)
+SLANG_FORCE_INLINE T* MemoryArena::allocateAndCopyArray(const T* arr, size_t numElems)
 {
     SLANG_COMPILE_TIME_ASSERT(std::is_pod<T>::value);
-
-    if (size > 0)
+    if (numElems > 0)
     {
-        const size_t totalSize = sizeof(T) * size;
+        const size_t totalSize = sizeof(T) * numElems;
         void* ptr = allocateAligned(totalSize, SLANG_ALIGN_OF(T));
         ::memcpy(ptr, arr, totalSize);
         return reinterpret_cast<T*>(ptr);
@@ -318,11 +344,11 @@ inline T* MemoryArena::allocateAndCopyArray(const T* arr, size_t size)
 
 // ---------------------------------------------------------------------------
 template <typename T>
-inline T* MemoryArena::allocateAndZeroArray(size_t size)
+SLANG_FORCE_INLINE T* MemoryArena::allocateAndZeroArray(size_t numElems)
 {
-    if (size > 0)
+    if (numElems > 0)
     {
-        const size_t totalSize = sizeof(T) * size;
+        const size_t totalSize = sizeof(T) * numElems;
         void* ptr = allocateAligned(totalSize, SLANG_ALIGN_OF(T));
         ::memset(ptr, 0, totalSize);
         return reinterpret_cast<T*>(ptr);

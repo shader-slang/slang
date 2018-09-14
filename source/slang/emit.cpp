@@ -1389,7 +1389,7 @@ struct EmitVisitor
     bool isTargetIntrinsicModifierApplicable(
         IRTargetIntrinsicDecoration*    decoration)
     {
-        auto targetName = decoration->targetName;
+        auto targetName = String(decoration->targetName);
 
         // If no target name was specified, then the modifier implicitly
         // applies to all targets.
@@ -2133,7 +2133,7 @@ struct EmitVisitor
         // then use that name instead.
         if(auto intrinsicDecoration = findTargetIntrinsicDecoration(context, inst))
         {
-            return intrinsicDecoration->definition;
+            return String(intrinsicDecoration->definition);
         }
 
         // If we have a name hint on the instruction, then we will try to use that
@@ -2945,7 +2945,7 @@ struct EmitVisitor
         args++;
         argCount--;
 
-        auto name = targetIntrinsic->definition;
+        auto name = String(targetIntrinsic->definition);
 
 
         if(isOrdinaryName(name))
@@ -3845,11 +3845,11 @@ struct EmitVisitor
         if(auto layoutDecoration = inst->findDecoration<IRLayoutDecoration>())
         {
             auto layout = layoutDecoration->layout;
-            if(auto varLayout = layout.As<VarLayout>())
+            if(auto varLayout = layout->dynamicCast<VarLayout>())
             {
                 emitIRSemantics(ctx, varLayout);
             }
-            else if (auto entryPointLayout = layout.As<EntryPointLayout>())
+            else if (auto entryPointLayout = layout->dynamicCast<EntryPointLayout>())
             {
                 emitIRSemantics(ctx, entryPointLayout->resultLayout);
             }
@@ -3864,7 +3864,7 @@ struct EmitVisitor
         if (!decoration)
             return nullptr;
 
-        return (VarLayout*) decoration->layout.Ptr();
+        return (VarLayout*) decoration->layout;
     }
 
     void emitIRLayoutSemantics(
@@ -4757,7 +4757,7 @@ struct EmitVisitor
     {
         if( auto layoutDecoration = func->findDecoration<IRLayoutDecoration>() )
         {
-            return layoutDecoration->layout.As<EntryPointLayout>();
+            return layoutDecoration->layout->dynamicCast<EntryPointLayout>();
         }
         return nullptr;
     }
@@ -4766,7 +4766,7 @@ struct EmitVisitor
     {
         if (auto layoutDecoration = func->findDecoration<IRLayoutDecoration>())
         {
-            if (auto entryPointLayout = layoutDecoration->layout.As<EntryPointLayout>())
+            if (auto entryPointLayout = layoutDecoration->layout->dynamicCast<EntryPointLayout>())
             {
                 return entryPointLayout;
             }
