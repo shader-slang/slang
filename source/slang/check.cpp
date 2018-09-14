@@ -8635,6 +8635,42 @@ namespace Slang
                 SLANG_ASSERT(argIndex < globalGenericArgs.Count());
                 auto globalGenericArg = globalGenericArgs[argIndex];
 
+                // As a quick sanity check, see if the argument that is being supplied for a parameter
+                // is just the parameter itself, because this should always be an error:
+                //
+                if( auto argDeclRefType = globalGenericArg->As<DeclRefType>() )
+                {
+                    auto argDeclRef = argDeclRefType->declRef;
+                    if(auto argGenericParamDeclRef = argDeclRef.As<GlobalGenericParamDecl>())
+                    {
+                        if(argGenericParamDeclRef.getDecl() == globalGenericParam)
+                        {
+                            // We are trying to specialize a generic parameter using itself.
+                            sink->diagnose(globalGenericParam,
+                                Diagnostics::cannotSpecializeGlobalGenericToItself,
+                                globalGenericParam->getName());
+                            sink->diagnose(entryPointFuncDecl,
+                                Diagnostics::noteWhenCompilingEntryPoint,
+                                entryPointFuncDecl->getName());
+                            continue;
+                        }
+                        else
+                        {
+                            // We are trying to specialize a generic parameter using a *different*
+                            // global generic type parameter.
+                            sink->diagnose(globalGenericParam,
+                                Diagnostics::cannotSpecializeGlobalGenericToAnotherGenericParam,
+                                globalGenericParam->getName(),
+                                argGenericParamDeclRef.GetName());
+                            sink->diagnose(entryPointFuncDecl,
+                                Diagnostics::noteWhenCompilingEntryPoint,
+                                entryPointFuncDecl->getName());
+                            continue;
+                        }
+                    }
+                }
+
+
                 // Create a substitution for this parameter/argument.
                 RefPtr<GlobalGenericParamSubstitution> subst = new GlobalGenericParamSubstitution();
                 subst->paramDecl = globalGenericParam;
