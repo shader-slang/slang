@@ -112,6 +112,13 @@ namespace Slang
 
             currentScope = newScope;
         }
+
+        void pushScopeAndSetParent(ContainerDecl* containerDecl)
+        {
+            containerDecl->ParentDecl = currentScope->containerDecl;
+            PushScope(containerDecl);
+        }
+
         void PopScope()
         {
             currentScope = currentScope->parent;
@@ -3256,7 +3263,7 @@ namespace Slang
         parser->ReadToken(TokenType::RParent);
         parser->ReadToken(TokenType::RParent);
 
-        parser->PushScope(scopeDecl);
+        parser->pushScopeAndSetParent(scopeDecl);
         AddMember(parser->currentScope, varDecl);
 
         stmt->body = parser->ParseStatement();
@@ -3372,7 +3379,7 @@ namespace Slang
             statement = ParseExpressionStatement();
         }
 
-        if (statement)
+        if (statement && !statement->As<DeclStmt>())
         {
             // Install any modifiers onto the statement.
             // Note: this path is bypassed in the case of a
@@ -3389,7 +3396,7 @@ namespace Slang
         RefPtr<ScopeDecl> scopeDecl = new ScopeDecl();
         RefPtr<BlockStmt> blockStatement = new BlockStmt();
         blockStatement->scopeDecl = scopeDecl;
-        PushScope(scopeDecl.Ptr());
+        pushScopeAndSetParent(scopeDecl.Ptr());
         ReadToken(TokenType::LBrace);
 
         RefPtr<Stmt> body;
@@ -3491,7 +3498,7 @@ namespace Slang
         stmt->scopeDecl = scopeDecl;
 
         if(!brokenScoping)
-            PushScope(scopeDecl.Ptr());
+            pushScopeAndSetParent(scopeDecl.Ptr());
         FillPosition(stmt.Ptr());
         ReadToken("for");
         ReadToken(TokenType::LParent);

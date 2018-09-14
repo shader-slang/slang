@@ -1782,34 +1782,6 @@ namespace Slang
             }
         }
 
-        Stage findStageByName(String const& name)
-        {
-            static const struct
-            {
-                char const* name;
-                Stage       stage;
-            } kStages[] =
-            {
-            #define PROFILE_STAGE(ID, NAME, ENUM) \
-                { #NAME,    Stage::ID },
-
-            #define PROFILE_STAGE_ALIAS(ID, NAME, VAL) \
-                { #NAME,    Stage::ID },
-
-            #include "profile-defs.h"
-            };
-
-            for(auto entry : kStages)
-            {
-                if(name == entry.name)
-                {
-                    return entry.stage;
-                }
-            }
-
-            return Stage::Unknown;
-        }
-
         bool hasIntArgs(Attribute* attr, int numArgs)
         {
             if (int(attr->args.Count()) != numArgs)
@@ -3746,6 +3718,7 @@ namespace Slang
             // and trying to special case `DeclGroup*` here feels silly.
             //
             dispatchDecl(stmt->decl);
+            checkModifiers(stmt->decl);
         }
 
         void visitBlockStmt(BlockStmt* stmt)

@@ -56,7 +56,7 @@ struct OptionsParser
     struct RawEntryPoint
     {
         String          name;
-        SlangProfileID  profileID = SLANG_PROFILE_UNKNOWN;
+        Profile         profile;
         int             translationUnitIndex = -1;
         int             outputPathIndex = -1;
     };
@@ -75,10 +75,12 @@ struct OptionsParser
     int translationUnitCount = 0;
     int currentTranslationUnitIndex = -1;
 
-    SlangProfileID currentProfileID = SLANG_PROFILE_UNKNOWN;
+    // The currently specified '-profile' and/or '-stage' options.
+    Profile currentProfile = Profile::Unknown;
 
-    // How many times were `-profile` options given?
+    // How many times were `-profile` and '-stage' options given?
     int profileOptionCount = 0;
+    int stageOptionCount = 0;
 
     SlangCompileFlags flags = 0;
     SlangTargetFlags targetFlags = 0;
@@ -400,8 +402,34 @@ struct OptionsParser
                     }
                     else
                     {
-                        currentProfileID = profileID;
+                        auto newProfile = Profile(profileID);
+                        currentProfile.setVersion(newProfile.GetVersion());
                         profileOptionCount++;
+
+                        // A `-profile` option that also specifies a stage (e.g., `-profile vs_5_0`)
+                        // should be treated like a composite (e.g., `-profile sm_5_0 -stage vertex`)
+                        if(newProfile.GetStage() != Stage::Unknown)
+                        {
+                            currentProfile.setStage(newProfile.GetStage());
+                            stageOptionCount++;
+                        }
+                    }
+                }
+                else if (argStr == "-stage")
+                {
+                    String name;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
+
+                    Stage stage = findStageByName(name);
+                    if( stage == Stage::Unknown )
+                    {
+                        sink->diagnose(SourceLoc(), Diagnostics::unknownStage, name);
+                        return SLANG_FAIL;
+                    }
+                    else
+                    {
+                        currentProfile.setStage(stage);
+                        stageOptionCount++;
                     }
                 }
                 else if (argStr == "-entry")
@@ -417,12 +445,7 @@ struct OptionsParser
                     int currentOutputPathIndex = outputPathCount - 1;
                     entry.outputPathIndex = currentOutputPathIndex;
 
-                    // TODO(tfoley): Allow user to fold a specification of a profile into the entry-point name,
-                    // for the case where they might be compiling multiple entry points in one invocation...
-                    //
-                    // For now, just use the last profile set on the command-line to specify this
-
-                    entry.profileID = currentProfileID;
+                    entry.profile = currentProfile;
 
                     rawEntryPoints.Add(entry);
                 }
@@ -548,6 +571,25 @@ struct OptionsParser
                 {
                     defaultMatrixLayoutMode = kMatrixLayoutMode_ColumnMajor;
                 }
+                else if(argStr == "-line-directive-mode")
+                {
+                    String name;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
+
+                    SlangLineDirectiveMode mode = SLANG_LINE_DIRECTIVE_MODE_DEFAULT;
+                    if(name == "none")
+                    {
+                        mode = SLANG_LINE_DIRECTIVE_MODE_NONE;
+                    }
+                    else
+                    {
+                        sink->diagnose(SourceLoc(), Diagnostics::unknownLineDirectiveMode, name);
+                        return SLANG_FAIL;
+                    }
+
+                    spSetLineDirectiveMode(compileRequest, mode);
+
+                }
                 else if (argStr == "--")
                 {
                     // The `--` option causes us to stop trying to parse options,
@@ -605,25 +647,32 @@ struct OptionsParser
                 // Use a default entry point name
                 char const* entryPointName = "main";
 
-                // Try to determine a profile
-                SlangProfileID entryPointProfile = SLANG_PROFILE_UNKNOWN;
+                // Try to determine a profile and stage
 
-                // If a profile was specified on the command line, then we use it
-                if(currentProfileID != SLANG_PROFILE_UNKNOWN)
-                {
-                    entryPointProfile = currentProfileID;
-                }
+                // If a profile and/or stage was specified on the command line, then we use it
+                Profile entryPointProfile = currentProfile;
+
                 // Otherwise, check if the translation unit implied a profile
                 // (e.g., a `*.vert` file implies the `GLSL_Vertex` profile)
-                else if(rawTranslationUnit.implicitProfile != SLANG_PROFILE_UNKNOWN)
+                //
+                // TODO: most of this is just there to support GLSL files
+                // as input, which doesn't make sense when we don't support
+                // GLSL at all other than for pass-through. We should ditch
+                // as much of this complexity as possible.
+                //
+                if(entryPointProfile.raw == SLANG_PROFILE_UNKNOWN)
                 {
-                    entryPointProfile = rawTranslationUnit.implicitProfile;
+                    if(rawTranslationUnit.implicitProfile != SLANG_PROFILE_UNKNOWN)
+                    {
+                        entryPointProfile = rawTranslationUnit.implicitProfile;
+                    }
                 }
+
 
                 RawEntryPoint entry;
                 entry.name = entryPointName;
                 entry.translationUnitIndex = rawTranslationUnit.translationUnitIndex;
-                entry.profileID = entryPointProfile;
+                entry.profile = entryPointProfile;
                 rawEntryPoints.Add(entry);
             }
         }
@@ -633,46 +682,83 @@ struct OptionsParser
         if( rawEntryPoints.Count() != 0 )
         {
             bool anyEntryPointWithoutProfile = false;
+            bool anyEntryPointWithoutStage = false;
             for( auto& entryPoint : rawEntryPoints )
             {
-                // Skip entry points that are already associated with a translation unit...
-                if( entryPoint.profileID != SLANG_PROFILE_UNKNOWN )
-                    continue;
-
-                anyEntryPointWithoutProfile = true;
-                break;
-            }
-
-            // Issue an error if there are entry points without a profile,
-            // and no profile was specified.
-            if( anyEntryPointWithoutProfile
-                && currentProfileID == SLANG_PROFILE_UNKNOWN)
-            {
-                sink->diagnose(SourceLoc(), Diagnostics::noProfileSpecified);
-                return SLANG_E_INVALID_ARG;
-            }
-            // Issue an error if we have mulitple `-profile` options *and*
-            // there were entry points that didn't get a profile, *and*
-            // there we m
-            if (anyEntryPointWithoutProfile
-                && profileOptionCount > 1)
-            {
-                if (rawEntryPoints.Count() > 1)
+                if(entryPoint.profile.GetStage() == Stage::Unknown)
                 {
-                    sink->diagnose(SourceLoc(), Diagnostics::multipleEntryPointsNeedMulitpleProfiles);
-                    return SLANG_E_INVALID_ARG;
+                    anyEntryPointWithoutStage = true;
+                }
+
+                if(entryPoint.profile.getFamily() == ProfileFamily::Unknown)
+                {
+                    anyEntryPointWithoutProfile = true;
                 }
             }
-            // TODO: need to issue an error on a `-profile` option that doesn't actually
-            // affect any entry point...
 
-            // Take the profile that was specified on the command line, and
-            // apply it to any entry points that don't already have a profile.
-            for( auto& e : rawEntryPoints )
+            if(anyEntryPointWithoutStage)
             {
-                if( e.profileID == SLANG_PROFILE_UNKNOWN )
+                // If there are entry points that never got a stage specified, and
+                // the user used multiple `-profile` and `-stage` options to try
+                // and establish stages, then that is an error, because we can't
+                // infer a stage for whatever is left.
+                if(stageOptionCount > 1)
                 {
-                    e.profileID = currentProfileID;
+                    if (rawEntryPoints.Count() > 1)
+                    {
+                        sink->diagnose(SourceLoc(), Diagnostics::multipleEntryPointsNeedMulitpleStages);
+                        return SLANG_E_INVALID_ARG;
+                    }
+                }
+
+                // If a stage never got specified, then that is an error.
+                if(currentProfile.GetStage() == Stage::Unknown)
+                {
+                    sink->diagnose(SourceLoc(), Diagnostics::noStageSpecified);
+                    return SLANG_E_INVALID_ARG;
+                }
+
+                // Otherwise, exactly one stage was specified on the command line,
+                // and that should implicitly apply to all the entry points.
+                for( auto& e : rawEntryPoints )
+                {
+                    if(e.profile.GetStage() == Stage::Unknown)
+                    {
+                        e.profile.setStage(currentProfile.GetStage());
+                    }
+                }
+            }
+
+            if(anyEntryPointWithoutProfile )
+            {
+                // If there are entry points that never got a profile specified, and
+                // the user used multiple `-profile` options to try and establish
+                // different profiles, then that is an error, because we can't
+                // infer a stage for whatever is left.
+                if(profileOptionCount > 1)
+                {
+                    if (rawEntryPoints.Count() > 1)
+                    {
+                        sink->diagnose(SourceLoc(), Diagnostics::multipleEntryPointsNeedMulitpleProfiles);
+                        return SLANG_E_INVALID_ARG;
+                    }
+                }
+
+                // If a profile never got specified, then that is an error.
+                if(currentProfile.getFamily() == ProfileFamily::Unknown)
+                {
+                    sink->diagnose(SourceLoc(), Diagnostics::noProfileSpecified);
+                    return SLANG_E_INVALID_ARG;
+                }
+
+                // Otherwise, exactly one profile was specified on the command line,
+                // and that should implicitly apply to all the entry points.
+                for( auto& e : rawEntryPoints )
+                {
+                    if(e.profile.getFamily() == ProfileFamily::Unknown)
+                    {
+                        e.profile.setVersion(currentProfile.GetVersion());
+                    }
                 }
             }
         }
@@ -829,7 +915,7 @@ struct OptionsParser
                     compileRequest,
                     entryPoint.translationUnitIndex,
                     entryPoint.name.begin(),
-                    entryPoint.profileID);
+                    entryPoint.profile.raw);
 
                 // If an output path was specified for the entry point,
                 // when we need to provide it here.

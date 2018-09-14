@@ -935,7 +935,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
                 // `SampleLevel`
 
-                sb << "__target_intrinsic(glsl, \"textureLod($p, $2, $3)\")\n";
+                sb << "__target_intrinsic(glsl, \"textureLod($p, $2, $3)$z\")\n";
                 sb << "T SampleLevel(SamplerState s, ";
                 sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                 sb << "float level);\n";
@@ -1229,3 +1229,9 @@ attribute_syntax [earlydepthstencil]    : EarlyDepthStencilAttribute;
 __attributeTarget(FuncDecl)
 attribute_syntax [numthreads(x: int, y: int = 1, z: int = 1)]   : NumThreadsAttribute;
 
+//
+__attributeTarget(VarDeclBase)
+attribute_syntax [__vulkanRayPayload] : VulkanRayPayloadAttribute;
+
+__attributeTarget(VarDeclBase)
+attribute_syntax [__vulkanHitAttributes] : VulkanHitAttributesAttribute;

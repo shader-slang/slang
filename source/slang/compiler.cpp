@@ -137,6 +137,35 @@ namespace Slang
         return Profile::Unknown;
     }
 
+    Stage findStageByName(String const& name)
+    {
+        static const struct
+        {
+            char const* name;
+            Stage       stage;
+        } kStages[] =
+        {
+        #define PROFILE_STAGE(ID, NAME, ENUM) \
+            { #NAME,    Stage::ID },
+
+        #define PROFILE_STAGE_ALIAS(ID, NAME, VAL) \
+            { #NAME,    Stage::ID },
+
+        #include "profile-defs.h"
+        };
+
+        for(auto entry : kStages)
+        {
+            if(name == entry.name)
+            {
+                return entry.stage;
+            }
+        }
+
+        return Stage::Unknown;
+    }
+
+
     //
 
     String emitHLSLForEntryPoint(

@@ -387,6 +387,18 @@ SYNTAX_CLASS(EntryPointAttribute, Attribute)
     FIELD(Stage, stage);
 END_SYNTAX_CLASS()
 
+// A `[__vulkanRayPayload]` attribute, which is used in the
+// standard library implementation to indicate that a variable
+// actually represents the input/output interface for a Vulkan
+// ray tracing shader to pass per-ray payload information.
+SIMPLE_SYNTAX_CLASS(VulkanRayPayloadAttribute, Attribute)
+
+// A `[__vulkanHitAttributes]` attribute, which is used in the
+// standard library implementation to indicate that a variable
+// actually represents the output interface for a Vulkan
+// intersection shader to pass hit attribute information.
+SIMPLE_SYNTAX_CLASS(VulkanHitAttributesAttribute, Attribute)
+
 // HLSL modifiers for geometry shader input topology
 SIMPLE_SYNTAX_CLASS(HLSLGeometryShaderInputPrimitiveTypeModifier, Modifier)
 SIMPLE_SYNTAX_CLASS(HLSLPointModifier        , HLSLGeometryShaderInputPrimitiveTypeModifier)

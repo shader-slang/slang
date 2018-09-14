@@ -71,9 +71,12 @@ DIAGNOSTIC(    15, Error, unknownStage, "unknown stage '$0'");
 DIAGNOSTIC(    16, Error, unknownPassThroughTarget, "unknown pass-through target '$0'");
 DIAGNOSTIC(    17, Error, unknownCommandLineOption, "unknown command-line option '$0'");
 DIAGNOSTIC(    18, Error, noProfileSpecified, "no profile specified; use the '-profile <profile name>' option");
-DIAGNOSTIC(    19, Error, multipleEntryPointsNeedMulitpleProfiles, "when multiple entry points are specified, each must have a profile given (with '-profile') before the '-entry' option");
+DIAGNOSTIC(    19, Error, multipleEntryPointsNeedMulitpleProfiles, "when specifying multiple profiles on the command line, each '-entry' option must be preceded by a '-profile' option");
 DIAGNOSTIC(    20, Error, multipleTranslationUnitsNeedEntryPoints, "when using multiple translation units, entry points must be specified after their translation unit file(s)");
 DIAGNOSTIC(    21, Error, expectedArgumentForOption, "expected an argument for command-line option '$0'");
+DIAGNOSTIC(    22, Error, noStageSpecified, "no stage specified; use the '-stage <stage name>' option");
+DIAGNOSTIC(    23, Error, multipleEntryPointsNeedMulitpleStages, "when multiple entry points are specified on the command line, each '-entry' point must be given a stage by a preceding '-stage' option");
+DIAGNOSTIC(    24, Error, unknownLineDirectiveMode, "unknown '#line' directive mode '$0'");
 
 //
 // 1xxxx - Lexical anaylsis
@@ -335,6 +338,9 @@ DIAGNOSTIC(39009, Error, expectedSpace, "expected 'space', got '$0'")
 DIAGNOSTIC(39010, Error, expectedSpaceIndex, "expected a register space index after 'space'")
 DIAGNOSTIC(39011, Error, componentMaskNotSupported, "explicit register component masks are not yet supported in Slang")
 DIAGNOSTIC(39012, Error, packOffsetNotSupported, "explicit 'packoffset' bindings are not yet supported in Slang")
+
+DIAGNOSTIC(39013, Error, dontExpectOutParametersForStage, "the '$0' stage does not support `out` or `inout` entry point parameters")
+DIAGNOSTIC(39014, Error, dontExpectInParametersForStage, "the '$0' stage does not support `in` entry point parameters")
 
 //
 // 4xxxx - IL code generation.

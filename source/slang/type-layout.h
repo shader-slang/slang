@@ -594,6 +594,9 @@ struct LayoutRulesFamilyImpl
     virtual LayoutRulesImpl* getSpecializationConstantRules()= 0;
     virtual LayoutRulesImpl* getShaderStorageBufferRules()  = 0;
     virtual LayoutRulesImpl* getParameterBlockRules()       = 0;
+
+    virtual LayoutRulesImpl* getRayPayloadParameterRules()  = 0;
+    virtual LayoutRulesImpl* getHitAttributesParameterRules()= 0;
 };
 
 struct TypeLayoutContext

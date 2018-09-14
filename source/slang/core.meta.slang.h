@@ -950,7 +950,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
                 // `SampleLevel`
 
-                sb << "__target_intrinsic(glsl, \"textureLod($p, $2, $3)\")\n";
+                sb << "__target_intrinsic(glsl, \"textureLod($p, $2, $3)$z\")\n";
                 sb << "T SampleLevel(SamplerState s, ";
                 sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                 sb << "float level);\n";
@@ -1247,3 +1247,9 @@ SLANG_RAW("// Compute Shader\n")
 SLANG_RAW("__attributeTarget(FuncDecl)\n")
 SLANG_RAW("attribute_syntax [numthreads(x: int, y: int = 1, z: int = 1)]   : NumThreadsAttribute;\n")
 SLANG_RAW("\n")
+SLANG_RAW("//\n")
+SLANG_RAW("__attributeTarget(VarDeclBase)\n")
+SLANG_RAW("attribute_syntax [__vulkanRayPayload] : VulkanRayPayloadAttribute;\n")
+SLANG_RAW("\n")
+SLANG_RAW("__attributeTarget(VarDeclBase)\n")
+SLANG_RAW("attribute_syntax [__vulkanHitAttributes] : VulkanHitAttributesAttribute;\n")
