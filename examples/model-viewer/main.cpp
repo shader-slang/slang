@@ -576,7 +576,7 @@ struct ParameterBlockEncoder
     {
         assert(slangTypeLayout->getKind() == slang::TypeReflection::Kind::Struct);
 
-        auto slangField = slangTypeLayout->getFieldByIndex(fieldIndex);
+        auto slangField = slangTypeLayout->getFieldByIndex((unsigned int)fieldIndex);
         auto fieldUniformOffset = slangField->getOffset();
 
         // TODO: this type needs to be extended to handle resource fields.
@@ -881,7 +881,7 @@ RefPtr<EffectVariant> createEffectVaraint(
     int translationUnitIndex = spAddTranslationUnit(slangRequest, SLANG_SOURCE_LANGUAGE_SLANG, nullptr);
     spAddTranslationUnitSourceFile(slangRequest, translationUnitIndex, program->shaderModule->inputPath.c_str());
 
-    int entryPointCont = program->entryPoints.size();
+    const int entryPointCont = int(program->entryPoints.size());
     for(int ii = 0; ii < entryPointCont; ++ii)
     {
         auto entryPoint = program->entryPoints[ii];
@@ -895,7 +895,7 @@ RefPtr<EffectVariant> createEffectVaraint(
             translationUnitIndex,
             entryPoint->name.c_str(),
             entryPoint->slangStage,
-            genericArgs.size(),
+            int(genericArgs.size()),
             genericArgs.data());
     }
 
@@ -1877,7 +1877,7 @@ struct LightEnv : public RefObject
                 // The more interesting case is when we have a `LightArray<L,N>`,
                 // in which case we need to encode the first field (the light count)...
                 //
-                lightTypeEncoder.writeField<int32_t>(0, lightTypeArray->lights.size());
+                lightTypeEncoder.writeField<int32_t>(0, int32_t(lightTypeArray->lights.size()));
                 //
                 // ... followed by an array of values of type `L` in the second field.
                 // We will only write to the first `lightCount` entries, which may be

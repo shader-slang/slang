@@ -1899,7 +1899,7 @@ void VKRenderer::setViewports(UInt count, Viewport const* viewports)
     }
 
     VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
-    m_api.vkCmdSetViewport(commandBuffer, 0, count, vkViewports);
+    m_api.vkCmdSetViewport(commandBuffer, 0, uint32_t(count), vkViewports);
 }
 
 void VKRenderer::setScissorRects(UInt count, ScissorRect const* rects)
@@ -1913,14 +1913,14 @@ void VKRenderer::setScissorRects(UInt count, ScissorRect const* rects)
         auto& inRect = rects[ii];
         auto& vkRect = vkRects[ii];
 
-        vkRect.offset.x         = inRect.minX;
-        vkRect.offset.y         = inRect.minY;
-        vkRect.extent.width     = inRect.maxX - inRect.minX;
-        vkRect.extent.height    = inRect.maxY - inRect.minY;
+        vkRect.offset.x         = int32_t(inRect.minX);
+        vkRect.offset.y         = int32_t(inRect.minY);
+        vkRect.extent.width     = uint32_t(inRect.maxX - inRect.minX);
+        vkRect.extent.height    = uint32_t(inRect.maxY - inRect.minY);
     }
 
     VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
-    m_api.vkCmdSetScissor(commandBuffer, 0, count, vkRects);
+    m_api.vkCmdSetScissor(commandBuffer, 0, uint32_t(count), vkRects);
 }
 
 void VKRenderer::setPipelineState(PipelineType pipelineType, PipelineState* state)
@@ -1946,7 +1946,7 @@ void VKRenderer::draw(UInt vertexCount, UInt startVertex = 0)
 
     auto pipelineLayoutImpl = pipeline->m_pipelineLayout.Ptr();
     m_api.vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayoutImpl->m_pipelineLayout,
-        0, pipelineLayoutImpl->m_descriptorSetCount,
+        0, uint32_t(pipelineLayoutImpl->m_descriptorSetCount),
         &m_currentDescriptorSets[0],
         0, nullptr);
 
@@ -1986,7 +1986,7 @@ void VKRenderer::dispatchCompute(int x, int y, int z)
 
     auto pipelineLayoutImpl = pipeline->m_pipelineLayout.Ptr();
     m_api.vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayoutImpl->m_pipelineLayout,
-        0, pipelineLayoutImpl->m_descriptorSetCount,
+        0, uint32_t(pipelineLayoutImpl->m_descriptorSetCount),
         &m_currentDescriptorSets[0],
         0, nullptr);
 
@@ -2196,13 +2196,13 @@ Result VKRenderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc& de
         VkDescriptorType dstDescriptorType = translateDescriptorType(srcRange.type);
 
         VkDescriptorSetLayoutBinding dstBinding;
-        dstBinding.binding = rr;
+        dstBinding.binding = uint32_t(rr);
         dstBinding.descriptorType = dstDescriptorType;
-        dstBinding.descriptorCount = srcRange.count;
+        dstBinding.descriptorCount = uint32_t(srcRange.count);
         dstBinding.stageFlags = VK_SHADER_STAGE_ALL;
         dstBinding.pImmutableSamplers = nullptr;
 
-        descriptorCountForTypes[dstDescriptorType] += srcRange.count;
+        descriptorCountForTypes[dstDescriptorType] += uint32_t(srcRange.count);
 
         dstBindings.Add(dstBinding);
 
@@ -2259,7 +2259,7 @@ Result VKRenderer::createPipelineLayout(const PipelineLayout::Desc& desc, Pipeli
     }
 
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
-    pipelineLayoutInfo.setLayoutCount = desc.descriptorSetCount;
+    pipelineLayoutInfo.setLayoutCount = uint32_t(desc.descriptorSetCount);
     pipelineLayoutInfo.pSetLayouts = &descriptorSetLayouts[0];
 
     VkPipelineLayout pipelineLayout;
@@ -2303,8 +2303,8 @@ void VKRenderer::DescriptorSetImpl::setConstantBuffer(UInt range, UInt index, Bu
 
     VkWriteDescriptorSet writeInfo = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
     writeInfo.dstSet = m_descriptorSet;
-    writeInfo.dstBinding = range;
-    writeInfo.dstArrayElement = index;
+    writeInfo.dstBinding = uint32_t(range);
+    writeInfo.dstArrayElement = uint32_t(index);
     writeInfo.descriptorCount = 1;
     writeInfo.descriptorType = m_layout->m_ranges[range].descriptorType;
     writeInfo.pBufferInfo = &bufferInfo;
@@ -2327,8 +2327,8 @@ void VKRenderer::DescriptorSetImpl::setResource(UInt range, UInt index, Resource
 
             VkWriteDescriptorSet writeInfo = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
             writeInfo.dstSet = m_descriptorSet;
-            writeInfo.dstBinding = range;
-            writeInfo.dstArrayElement = index;
+            writeInfo.dstBinding = uint32_t(range);
+            writeInfo.dstArrayElement = uint32_t(index);
             writeInfo.descriptorCount = 1;
             writeInfo.descriptorType = m_layout->m_ranges[range].descriptorType;
             writeInfo.pImageInfo = &imageInfo;
@@ -2343,8 +2343,8 @@ void VKRenderer::DescriptorSetImpl::setResource(UInt range, UInt index, Resource
 
             VkWriteDescriptorSet writeInfo = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
             writeInfo.dstSet = m_descriptorSet;
-            writeInfo.dstBinding = range;
-            writeInfo.dstArrayElement = index;
+            writeInfo.dstBinding = uint32_t(range);
+            writeInfo.dstArrayElement = uint32_t(index);
             writeInfo.descriptorCount = 1;
             writeInfo.descriptorType = m_layout->m_ranges[range].descriptorType;
             writeInfo.pTexelBufferView = &bufferViewImpl->m_view;
@@ -2364,8 +2364,8 @@ void VKRenderer::DescriptorSetImpl::setResource(UInt range, UInt index, Resource
 
             VkWriteDescriptorSet writeInfo = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
             writeInfo.dstSet = m_descriptorSet;
-            writeInfo.dstBinding = range;
-            writeInfo.dstArrayElement = index;
+            writeInfo.dstBinding = uint32_t(range);
+            writeInfo.dstArrayElement = uint32_t(index);
             writeInfo.descriptorCount = 1;
             writeInfo.descriptorType = m_layout->m_ranges[range].descriptorType;
             writeInfo.pBufferInfo = &bufferInfo;
@@ -2441,8 +2441,8 @@ Result VKRenderer::createGraphicsPipelineState(const GraphicsPipelineStateDesc& 
     auto pipelineLayoutImpl = (PipelineLayoutImpl*) desc.pipelineLayout;
     auto inputLayoutImpl = (InputLayoutImpl*) desc.inputLayout;
 
-    int width = desc.framebufferWidth;
-    int height = desc.framebufferHeight;
+    const int width = int(desc.framebufferWidth);
+    const int height = int(desc.framebufferHeight);
 
     // Shader Stages
     //
