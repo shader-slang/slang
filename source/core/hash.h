@@ -57,7 +57,7 @@ namespace Slang
 		template<typename TKey>
 		static int GetHashCode(TKey & key)
 		{
-			return key.GetHashCode();
+			return int(key.GetHashCode());
 		}
 	};
 	template<int IsPointer>
