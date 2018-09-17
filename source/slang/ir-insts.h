@@ -117,19 +117,9 @@ struct IRNameHintDecoration : IRDecoration
     Name* name;
 };
 
-//
-
-// An IR node to represent a reference to an AST-level
-// declaration.
-struct IRDeclRef : IRInst
-{
-    Decl* declRef;
-};
-
 // An instruction that specializes another IR value
-// (representing a generic) to a particular set of
-// generic arguments (encoded via an `IRDeclRef`)
-//
+// (representing a generic) to a particular set of generic arguments 
+// (instructions representing types, witness tables, etc.)
 struct IRSpecialize : IRInst
 {
     // The "base" for the call is the generic to be specialized
@@ -141,7 +131,6 @@ struct IRSpecialize : IRInst
     IRInst* getArg(UInt index) { return getOperand(index + 1); }
 
     IR_LEAF_ISA(Specialize)
-
 };
 
 // An instruction that looks up the implementation
