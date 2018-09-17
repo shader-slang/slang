@@ -1239,36 +1239,36 @@ Result D3D12Renderer::_bindRenderState(PipelineStateImpl* pipelineStateImpl, ID3
             if(auto descriptorCount = descriptorSetLayout->m_resourceCount)
             {
                 auto& gpuHeap = m_viewHeap;
-                auto gpuDescriptorTable = gpuHeap.allocate(descriptorCount);
+                auto gpuDescriptorTable = gpuHeap.allocate(int(descriptorCount));
 
                 auto& cpuHeap = *descriptorSet->m_resourceHeap;
                 auto cpuDescriptorTable = descriptorSet->m_resourceTable;
 
                 m_device->CopyDescriptorsSimple(
-                    descriptorCount,
+                    UINT(descriptorCount),
                     gpuHeap.getCpuHandle(gpuDescriptorTable),
-                    cpuHeap.getCpuHandle(cpuDescriptorTable),
+                    cpuHeap.getCpuHandle(int(cpuDescriptorTable)),
                     D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-                submitter->setRootDescriptorTable(rootParameterIndex++, gpuHeap.getGpuHandle(gpuDescriptorTable));
+                submitter->setRootDescriptorTable(int(rootParameterIndex++), gpuHeap.getGpuHandle(gpuDescriptorTable));
             }
         }
         {
             if(auto descriptorCount = descriptorSetLayout->m_samplerCount)
             {
                 auto& gpuHeap = m_samplerHeap;
-                auto gpuDescriptorTable = gpuHeap.allocate(descriptorCount);
+                auto gpuDescriptorTable = gpuHeap.allocate(int(descriptorCount));
 
                 auto& cpuHeap = *descriptorSet->m_samplerHeap;
                 auto cpuDescriptorTable = descriptorSet->m_samplerTable;
 
                 m_device->CopyDescriptorsSimple(
-                    descriptorCount,
+                    UINT(descriptorCount),
                     gpuHeap.getCpuHandle(gpuDescriptorTable),
-                    cpuHeap.getCpuHandle(cpuDescriptorTable),
+                    cpuHeap.getCpuHandle(int(cpuDescriptorTable)),
                     D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
 
-                submitter->setRootDescriptorTable(rootParameterIndex++, gpuHeap.getGpuHandle(gpuDescriptorTable));
+                submitter->setRootDescriptorTable(int(rootParameterIndex++), gpuHeap.getGpuHandle(gpuDescriptorTable));
             }
         }
     }
@@ -2244,12 +2244,12 @@ Result D3D12Renderer::createBufferView(BufferResource* buffer, ResourceView::Des
             uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
             uavDesc.Format = D3DUtil::getMapFormat(desc.format);
             uavDesc.Buffer.FirstElement = 0;
-            uavDesc.Buffer.NumElements = resourceDesc.sizeInBytes;
+            uavDesc.Buffer.NumElements = UINT(resourceDesc.sizeInBytes);
 
             if(resourceDesc.elementSize)
             {
                 uavDesc.Buffer.StructureByteStride = resourceDesc.elementSize;
-                uavDesc.Buffer.NumElements = resourceDesc.sizeInBytes / resourceDesc.elementSize;
+                uavDesc.Buffer.NumElements = UINT(resourceDesc.sizeInBytes / resourceDesc.elementSize);
             }
             else if(desc.format == Format::Unknown)
             {
@@ -2273,12 +2273,12 @@ Result D3D12Renderer::createBufferView(BufferResource* buffer, ResourceView::Des
             srvDesc.Format = D3DUtil::getMapFormat(desc.format);
             srvDesc.Buffer.StructureByteStride = 0;
             srvDesc.Buffer.FirstElement = 0;
-            srvDesc.Buffer.NumElements = resourceDesc.sizeInBytes;
+            srvDesc.Buffer.NumElements = UINT(resourceDesc.sizeInBytes);
 
             if(resourceDesc.elementSize)
             {
                 srvDesc.Buffer.StructureByteStride = resourceDesc.elementSize;
-                srvDesc.Buffer.NumElements = resourceDesc.sizeInBytes / resourceDesc.elementSize;
+                srvDesc.Buffer.NumElements = UINT(resourceDesc.sizeInBytes / resourceDesc.elementSize);
             }
 
             SLANG_RETURN_ON_FAIL(m_viewAllocator.allocate(&viewImpl->m_descriptor));
@@ -2540,7 +2540,7 @@ void D3D12Renderer::setIndexBuffer(BufferResource* buffer, Format indexFormat, U
 {
     m_boundIndexBuffer = (BufferResourceImpl*) buffer;
     m_boundIndexFormat = D3DUtil::getMapFormat(indexFormat);
-    m_boundIndexOffset = offset;
+    m_boundIndexOffset = UINT(offset);
 }
 
 void D3D12Renderer::setDepthStencilTarget(ResourceView* depthStencilView)
@@ -2566,7 +2566,7 @@ void D3D12Renderer::setViewports(UInt count, Viewport const* viewports)
         dxViewport.MaxDepth = inViewport.maxZ;
     }
 
-    m_commandList->RSSetViewports(count, dxViewports);
+    m_commandList->RSSetViewports(UINT(count), dxViewports);
 }
 
 void D3D12Renderer::setScissorRects(UInt count, ScissorRect const* rects)
@@ -2580,13 +2580,13 @@ void D3D12Renderer::setScissorRects(UInt count, ScissorRect const* rects)
         auto& inRect = rects[ii];
         auto& dxRect = dxRects[ii];
 
-        dxRect.left     = inRect.minX;
-        dxRect.top      = inRect.minY;
-        dxRect.right    = inRect.maxX;
-        dxRect.bottom   = inRect.maxY;
+        dxRect.left     = LONG(inRect.minX);
+        dxRect.top      = LONG(inRect.minY);
+        dxRect.right    = LONG(inRect.maxX);
+        dxRect.bottom   = LONG(inRect.maxY);
     }
 
-    m_commandList->RSSetScissorRects(count, dxRects);
+    m_commandList->RSSetScissorRects(UINT(count), dxRects);
 }
 
 void D3D12Renderer::setPipelineState(PipelineType pipelineType, PipelineState* state)
@@ -2626,8 +2626,8 @@ void D3D12Renderer::draw(UInt vertexCount, UInt startVertex)
                 D3D12_VERTEX_BUFFER_VIEW& vertexView = vertexViews[numVertexViews++];
                 vertexView.BufferLocation = buffer->m_resource.getResource()->GetGPUVirtualAddress()
                     + boundVertexBuffer.m_offset;
-                vertexView.SizeInBytes = buffer->getDesc().sizeInBytes - boundVertexBuffer.m_offset;
-                vertexView.StrideInBytes = boundVertexBuffer.m_stride;
+                vertexView.SizeInBytes = UINT(buffer->getDesc().sizeInBytes - boundVertexBuffer.m_offset);
+                vertexView.StrideInBytes = UINT(boundVertexBuffer.m_stride);
             }
         }
         commandList->IASetVertexBuffers(0, numVertexViews, vertexViews);
@@ -2639,7 +2639,7 @@ void D3D12Renderer::draw(UInt vertexCount, UInt startVertex)
         D3D12_INDEX_BUFFER_VIEW indexBufferView;
         indexBufferView.BufferLocation = m_boundIndexBuffer->m_resource.getResource()->GetGPUVirtualAddress()
             + m_boundIndexOffset;
-        indexBufferView.SizeInBytes = m_boundIndexBuffer->getDesc().sizeInBytes - m_boundIndexOffset;
+        indexBufferView.SizeInBytes = UINT(m_boundIndexBuffer->getDesc().sizeInBytes - m_boundIndexOffset);
         indexBufferView.Format = m_boundIndexFormat;
 
         commandList->IASetIndexBuffer(&indexBufferView);
@@ -2849,7 +2849,7 @@ void D3D12Renderer::DescriptorSetImpl::setConstantBuffer(UInt range, UInt index,
 
     D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
     cbvDesc.BufferLocation = resourceImpl->m_resource.getResource()->GetGPUVirtualAddress();
-    cbvDesc.SizeInBytes = alignedSizeInBytes;
+    cbvDesc.SizeInBytes = UINT(alignedSizeInBytes);
 
     auto& rangeInfo = m_layout->m_ranges[range];
 
@@ -2872,7 +2872,7 @@ void D3D12Renderer::DescriptorSetImpl::setConstantBuffer(UInt range, UInt index,
     m_resourceObjects[arrayIndex] = resourceImpl;
     dxDevice->CreateConstantBufferView(
         &cbvDesc,
-        m_resourceHeap->getCpuHandle(descriptorIndex));
+        m_resourceHeap->getCpuHandle(int(descriptorIndex)));
 }
 
 void D3D12Renderer::DescriptorSetImpl::setResource(UInt range, UInt index, ResourceView* view)
@@ -2891,7 +2891,7 @@ void D3D12Renderer::DescriptorSetImpl::setResource(UInt range, UInt index, Resou
     m_resourceObjects[arrayIndex] = viewImpl;
     dxDevice->CopyDescriptorsSimple(
         1,
-        m_resourceHeap->getCpuHandle(descriptorIndex),
+        m_resourceHeap->getCpuHandle(int(descriptorIndex)),
         viewImpl->m_descriptor.cpuHandle,
         D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 }
@@ -2922,7 +2922,7 @@ void D3D12Renderer::DescriptorSetImpl::setSampler(UInt range, UInt index, Sample
     m_samplerObjects[arrayIndex] = samplerImpl;
     dxDevice->CopyDescriptorsSimple(
         1,
-        m_samplerHeap->getCpuHandle(descriptorIndex),
+        m_samplerHeap->getCpuHandle(int(descriptorIndex)),
         samplerImpl->m_cpuHandle,
         D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
 }
@@ -2959,14 +2959,14 @@ void D3D12Renderer::DescriptorSetImpl::setCombinedTextureSampler(
     m_resourceObjects[arrayIndex] = viewImpl;
     dxDevice->CopyDescriptorsSimple(
         1,
-        m_resourceHeap->getCpuHandle(resourceDescriptorIndex),
+        m_resourceHeap->getCpuHandle(int(resourceDescriptorIndex)),
         viewImpl->m_descriptor.cpuHandle,
         D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
     m_samplerObjects[arrayIndex] = samplerImpl;
     dxDevice->CopyDescriptorsSimple(
         1,
-        m_samplerHeap->getCpuHandle(samplerDescriptorIndex),
+        m_samplerHeap->getCpuHandle(int(samplerDescriptorIndex)),
         samplerImpl->m_cpuHandle,
         D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
 }
@@ -3085,14 +3085,14 @@ Result D3D12Renderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc&
     {
         D3D12_ROOT_PARAMETER dxRootParameter = {};
         dxRootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        dxRootParameter.DescriptorTable.NumDescriptorRanges = totalResourceRangeCount;
+        dxRootParameter.DescriptorTable.NumDescriptorRanges = UINT(totalResourceRangeCount);
         descriptorSetLayoutImpl->m_dxRootParameters.Add(dxRootParameter);
     }
     if( totalSamplerRangeCount )
     {
         D3D12_ROOT_PARAMETER dxRootParameter = {};
         dxRootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        dxRootParameter.DescriptorTable.NumDescriptorRanges = totalSamplerRangeCount;
+        dxRootParameter.DescriptorTable.NumDescriptorRanges = UINT(totalSamplerRangeCount);
         descriptorSetLayoutImpl->m_dxRootParameters.Add(dxRootParameter);
     }
 
@@ -3221,9 +3221,9 @@ Result D3D12Renderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc&
                     UInt bindingIndex = samplerCounter; samplerCounter += bindingCount;
 
                     dxRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
-                    dxRange.NumDescriptors = bindingCount;
-                    dxRange.BaseShaderRegister = bindingIndex;
-                    dxRange.RegisterSpace = bindingSpace;
+                    dxRange.NumDescriptors = UINT(bindingCount);
+                    dxRange.BaseShaderRegister = UINT(bindingIndex);
+                    dxRange.RegisterSpace = UINT(bindingSpace);
                     dxRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
                 }
                 break;
@@ -3234,9 +3234,9 @@ Result D3D12Renderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc&
                     UInt bindingIndex = srvCounter; srvCounter += bindingCount;
 
                     dxRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-                    dxRange.NumDescriptors = bindingCount;
-                    dxRange.BaseShaderRegister = bindingIndex;
-                    dxRange.RegisterSpace = bindingSpace;
+                    dxRange.NumDescriptors = UINT(bindingCount);
+                    dxRange.BaseShaderRegister = UINT(bindingIndex);
+                    dxRange.RegisterSpace = UINT(bindingSpace);
                     dxRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
                 }
                 break;
@@ -3252,9 +3252,9 @@ Result D3D12Renderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc&
                         UInt bindingIndex = srvCounter; srvCounter += bindingCount;
 
                         dxRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-                        dxRange.NumDescriptors = bindingCount;
-                        dxRange.BaseShaderRegister = bindingIndex;
-                        dxRange.RegisterSpace = bindingSpace;
+                        dxRange.NumDescriptors = UINT(bindingCount);
+                        dxRange.BaseShaderRegister = UINT(bindingIndex);
+                        dxRange.RegisterSpace = UINT(bindingSpace);
                         dxRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
                     }
 
@@ -3266,9 +3266,9 @@ Result D3D12Renderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc&
                         UInt pairedSamplerBindingIndex = srvCounter; srvCounter += bindingCount;
 
                         dxPairedSamplerRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
-                        dxPairedSamplerRange.NumDescriptors = bindingCount;
-                        dxPairedSamplerRange.BaseShaderRegister = pairedSamplerBindingIndex;
-                        dxPairedSamplerRange.RegisterSpace = bindingSpace;
+                        dxPairedSamplerRange.NumDescriptors = UINT(bindingCount);
+                        dxPairedSamplerRange.BaseShaderRegister = UINT(pairedSamplerBindingIndex);
+                        dxPairedSamplerRange.RegisterSpace = UINT(bindingSpace);
                         dxPairedSamplerRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
                     }
 
@@ -3285,9 +3285,9 @@ Result D3D12Renderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc&
                     UInt bindingIndex = uavCounter; uavCounter += bindingCount;
 
                     dxRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-                    dxRange.NumDescriptors = bindingCount;
-                    dxRange.BaseShaderRegister = bindingIndex;
-                    dxRange.RegisterSpace = bindingSpace;
+                    dxRange.NumDescriptors = UINT(bindingCount);
+                    dxRange.BaseShaderRegister = UINT(bindingIndex);
+                    dxRange.RegisterSpace = UINT(bindingSpace);
                     dxRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
                 }
                 break;
@@ -3298,9 +3298,9 @@ Result D3D12Renderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc&
                     UInt bindingIndex = cbvCounter; cbvCounter += bindingCount;
 
                     dxRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-                    dxRange.NumDescriptors = bindingCount;
-                    dxRange.BaseShaderRegister = bindingIndex;
-                    dxRange.RegisterSpace = bindingSpace;
+                    dxRange.NumDescriptors = UINT(bindingCount);
+                    dxRange.BaseShaderRegister = UINT(bindingIndex);
+                    dxRange.RegisterSpace = UINT(bindingSpace);
                     dxRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
                 }
                 break;
@@ -3357,7 +3357,7 @@ Result D3D12Renderer::createPipelineLayout(const PipelineLayout::Desc& desc, Pip
         {
             auto& range = ranges[rangeCount++];
             range = setDescriptorRange;
-            range.RegisterSpace = bindingSpace;
+            range.RegisterSpace = UINT(bindingSpace);
 
             // HACK: in order to deal with SM5.0 shaders, `u` registers
             // in `space0` need to start with a number *after* the number
@@ -3374,7 +3374,7 @@ Result D3D12Renderer::createPipelineLayout(const PipelineLayout::Desc& desc, Pip
             if( range.RegisterSpace == 0
                 && range.RangeType == D3D12_DESCRIPTOR_RANGE_TYPE_UAV )
             {
-                range.BaseShaderRegister += desc.renderTargetCount;
+                range.BaseShaderRegister += UINT(desc.renderTargetCount);
             }
         }
     }
@@ -3408,7 +3408,7 @@ Result D3D12Renderer::createPipelineLayout(const PipelineLayout::Desc& desc, Pip
     }
 
     D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
-    rootSignatureDesc.NumParameters = rootParameterCount;
+    rootSignatureDesc.NumParameters = UINT(rootParameterCount);
     rootSignatureDesc.pParameters = rootParameters;
 
     // TODO: static samplers should be reasonably easy to support...
@@ -3462,7 +3462,7 @@ Result D3D12Renderer::createDescriptorSet(DescriptorSetLayout* layout, Descripto
     {
         auto resourceHeap = &m_cpuViewHeap;
         descriptorSetImpl->m_resourceHeap = resourceHeap;
-        descriptorSetImpl->m_resourceTable = resourceHeap->allocate(resourceCount);
+        descriptorSetImpl->m_resourceTable = resourceHeap->allocate(int(resourceCount));
         descriptorSetImpl->m_resourceObjects.SetSize(resourceCount);
     }
 
@@ -3471,7 +3471,7 @@ Result D3D12Renderer::createDescriptorSet(DescriptorSetLayout* layout, Descripto
     {
         auto samplerHeap = &m_cpuSamplerHeap;
         descriptorSetImpl->m_samplerHeap = samplerHeap;
-        descriptorSetImpl->m_samplerTable = samplerHeap->allocate(samplerCount);
+        descriptorSetImpl->m_samplerTable = samplerHeap->allocate(int(samplerCount));
         descriptorSetImpl->m_samplerObjects.SetSize(samplerCount);
     }
 
@@ -3497,7 +3497,7 @@ Result D3D12Renderer::createGraphicsPipelineState(const GraphicsPipelineStateDes
     psoDesc.PrimitiveTopologyType = m_primitiveTopologyType;
 
     {
-        const int numRenderTargets = desc.renderTargetCount;
+        const int numRenderTargets = int(desc.renderTargetCount);
 
         psoDesc.DSVFormat = m_depthStencilFormat;
         psoDesc.NumRenderTargets = numRenderTargets;

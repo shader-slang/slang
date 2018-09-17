@@ -141,7 +141,7 @@ RefPtr<TextureResource> loadTextureImage(
         int prevExtentX = extentX;
         int prevExtentY = extentY;
         stbi_uc* prevData = data;
-        ptrdiff_t prevStride = stride;
+        int prevStride = int(stride);
 
         for(;;)
         {
@@ -155,7 +155,7 @@ RefPtr<TextureResource> loadTextureImage(
             if(!newExtentY) newExtentY = 1;
 
             stbi_uc* newData = (stbi_uc*) malloc(newExtentX * newExtentY * channelCount * sizeof(stbi_uc));
-            ptrdiff_t newStride = newExtentX * channelCount * sizeof(stbi_uc);
+            int newStride = int(newExtentX * channelCount * sizeof(stbi_uc));
 
             stbir_resize_uint8_srgb(
                 prevData, prevExtentX, prevExtentY, prevStride,
@@ -303,8 +303,8 @@ Result ModelLoader::load(
         size_t objFaceCounter = 0;
         for(auto objFaceVertexCount : objShape.mesh.num_face_vertices)
         {
-            size_t flatFaceIndex = flatFaceCounter++;
-            size_t objFaceIndex = objFaceCounter++;
+            const size_t flatFaceIndex = flatFaceCounter++;
+            const size_t objFaceIndex = objFaceCounter++;
             size_t smoothingGroup = objShape.mesh.smoothing_group_ids[objFaceIndex];
             if(!smoothingGroup)
             {
@@ -330,7 +330,7 @@ Result ModelLoader::load(
 
                         smoothedVertexNormals.insert(std::make_pair(smoothVertexID, normalID));
 
-                        objIndex.normal_index = normalID;
+                        objIndex.normal_index = int(normalID);
                     }
                 }
             }
@@ -348,9 +348,9 @@ Result ModelLoader::load(
         size_t objFaceCounter = 0;
         for(auto objFaceVertexCount : objShape.mesh.num_face_vertices)
         {
-            size_t flatFaceIndex = flatFaceCounter++;
-            size_t objFaceIndex = objFaceCounter++;
-            unsigned int smoothingGroup = objShape.mesh.smoothing_group_ids[objFaceIndex];
+            const size_t flatFaceIndex = flatFaceCounter++;
+            const size_t objFaceIndex = objFaceCounter++;
+            size_t smoothingGroup = objShape.mesh.smoothing_group_ids[objFaceIndex];
             if(!smoothingGroup)
             {
                 smoothingGroup = ~flatFaceIndex;
@@ -506,7 +506,7 @@ Result ModelLoader::load(
                             objVertexAttributes.texcoords[2 * objIndex.texcoord_index + 1]);
                     }
 
-                    flatIndex = flatVertices.size();
+                    flatIndex = uint32_t(flatVertices.size());
                     mapObjIndexToFlatIndex.insert(std::make_pair(objIndexKey, flatIndex));
                     flatVertices.push_back(flatVertex);
                 }
@@ -528,7 +528,7 @@ Result ModelLoader::load(
     modelData.vertexCount = (int)flatVertices.size();
     modelData.indexCount = (int)flatIndices.size();
 
-    modelData.meshCount = meshes.size();
+    modelData.meshCount = int(meshes.size());
     modelData.meshes = meshes.data();
 
     BufferResource::Desc vertexBufferDesc;
