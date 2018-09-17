@@ -490,7 +490,7 @@ void GLRenderer::flushStateForDraw()
             for(Int ii = 0; ii < count; ++ii)
             {
                 auto bufferImpl = descriptorSet->m_constantBuffers[ii];
-                glBindBufferBase(GL_UNIFORM_BUFFER, ii, bufferImpl->m_handle);
+                glBindBufferBase(GL_UNIFORM_BUFFER, GLuint(ii), bufferImpl->m_handle);
             }
         }
 
@@ -511,10 +511,10 @@ void GLRenderer::flushStateForDraw()
                 auto textureViewImpl = descriptorSet->m_textures[ii];
                 auto samplerImpl = descriptorSet->m_samplers[ii];
 
-                glActiveTexture(GL_TEXTURE0 + ii);
+                glActiveTexture(GLuint(GL_TEXTURE0 + ii));
                 glBindTexture(GL_TEXTURE_2D, textureViewImpl->m_textureID);
 
-                glBindSampler(baseIndex + ii, samplerImpl->m_samplerID);
+                glBindSampler(GLuint(baseIndex + ii), samplerImpl->m_samplerID);
             }
         }
     }
@@ -1059,10 +1059,10 @@ void GLRenderer::setScissorRects(UInt count, ScissorRect const* rects)
         //
         auto rect = rects[0];
         glScissor(
-            rect.minX,
-            rect.minY,
-            rect.maxX - rect.minX,
-            rect.maxY - rect.minY);
+            GLint(rect.minX),
+            GLint(rect.minY),
+            GLsizei(rect.maxX - rect.minX),
+            GLsizei(rect.maxY - rect.minY));
 
         glEnable(GL_SCISSOR_TEST);
     }

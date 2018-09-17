@@ -113,9 +113,6 @@ struct Options
     // By default we potentially synthesize test for all 
     // TODO: Vulkan is disabled by default for now as the majority as vulkan synthesized tests fail  
     RenderApiFlags synthesizedTestApis = RenderApiFlag::AllOf & ~RenderApiFlag::Vulkan;
-
-    // Set this to turn on unit tests
-    bool unitTests = false;
 };
 
 // Globals
@@ -285,10 +282,6 @@ Result parseOptions(int* argc, char** argv)
                 fprintf(stderr, "error: unable to parse api expression '%s'\n", apiList);
                 return res;
             }
-        }
-        else if (strcmp(arg, "-unitTests") == 0)
-        {
-            g_options.unitTests = true;
         }
         else
         {
@@ -1845,6 +1838,7 @@ static bool endsWithAllowedExtension(
         ".tesc",
         ".tese",
         ".comp",
+        ".internal",
         nullptr };
 
     for( auto ii = allowedExtensions; *ii; ++ii )
@@ -1913,6 +1907,7 @@ int main(
 
     auto vulkanTestCategory = addTestCategory("vulkan", fullTestCategory);
 
+    auto unitTestCatagory = addTestCategory("unit-test", fullTestCategory);
 
     // An un-categorized test will always belong to the `full` category
     g_defaultTestCategory = fullTestCategory;
@@ -1944,8 +1939,14 @@ int main(
    
     context.m_dumpOutputOnFailure = g_options.dumpOutputOnFailure;
     context.m_isVerbose = g_options.shouldBeVerbose;
-
-    if (g_options.unitTests)
+ 
+    // Enumerate test files according to policy
+    // TODO: add more directories to this list
+    // TODO: allow for a command-line argument to select a particular directory
+    runTestsInDirectory(&context, "tests/");
+    
+    // Run the unit tests (these are internal C++ tests - not specified via files in a directory) 
+    // They are registered with SLANG_UNIT_TEST macro
     {
         TestContext::set(&context);
 
@@ -1953,26 +1954,35 @@ int main(
         TestRegister* cur = TestRegister::s_first;
         while (cur)
         {
-            context.startTest(cur->m_name);
+            StringBuilder filePath;
+            filePath << "unit-tests/" << cur->m_name << ".internal";
 
-            // Run the test function
-            cur->m_func();
+            TestOptions testOptions;
+            testOptions.categories.Add(unitTestCatagory);
+            testOptions.command = filePath;
 
-            context.endTest();
-
+            if (shouldRunTest(&context, testOptions.command))
+            {
+                if (testPassesCategoryMask(&context, testOptions))
+                {
+                    context.startTest(testOptions.command);
+                    // Run the test function
+                    cur->m_func();
+                    context.endTest();
+                }
+                else
+                {
+                    context.addTest(testOptions.command, TestResult::Ignored);
+                }
+            }
+                
             // Next
             cur = cur->m_next;
         }
 
         TestContext::set(nullptr);
     }
-    else
-    {
-        // Enumerate test files according to policy
-        // TODO: add more directories to this list
-        // TODO: allow for a command-line argument to select a particular directory
-        runTestsInDirectory(&context, "tests/");
-    }
+        
 
     context.outputSummary();
 

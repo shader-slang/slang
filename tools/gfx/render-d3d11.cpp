@@ -1036,11 +1036,11 @@ Result D3D11Renderer::createBufferView(BufferResource* buffer, ResourceView::Des
             uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
             uavDesc.Format = D3DUtil::getMapFormat(desc.format);
             uavDesc.Buffer.FirstElement = 0;
-            uavDesc.Buffer.NumElements = resourceDesc.sizeInBytes;
+            uavDesc.Buffer.NumElements = UINT(resourceDesc.sizeInBytes);
 
             if(resourceDesc.elementSize)
             {
-                uavDesc.Buffer.NumElements = resourceDesc.sizeInBytes / resourceDesc.elementSize;
+                uavDesc.Buffer.NumElements = UINT(resourceDesc.sizeInBytes / resourceDesc.elementSize);
             }
             else if(desc.format == Format::Unknown)
             {
@@ -1067,12 +1067,12 @@ Result D3D11Renderer::createBufferView(BufferResource* buffer, ResourceView::Des
             srvDesc.Buffer.ElementOffset = 0;
             srvDesc.Buffer.ElementWidth = 1;
             srvDesc.Buffer.FirstElement = 0;
-            srvDesc.Buffer.NumElements = resourceDesc.sizeInBytes;
+            srvDesc.Buffer.NumElements = UINT(resourceDesc.sizeInBytes);
 
             if(resourceDesc.elementSize)
             {
                 srvDesc.Buffer.ElementWidth = resourceDesc.elementSize;
-                srvDesc.Buffer.NumElements = resourceDesc.sizeInBytes / resourceDesc.elementSize;
+                srvDesc.Buffer.NumElements = UINT(resourceDesc.sizeInBytes / resourceDesc.elementSize);
             }
 
             ComPtr<ID3D11ShaderResourceView> srv;
@@ -1242,7 +1242,7 @@ void D3D11Renderer::setVertexBuffers(UInt startSlot, UInt slotCount, BufferResou
 void D3D11Renderer::setIndexBuffer(BufferResource* buffer, Format indexFormat, UInt offset)
 {
     DXGI_FORMAT dxFormat = D3DUtil::getMapFormat(indexFormat);
-    m_immediateContext->IASetIndexBuffer(((BufferResourceImpl*)buffer)->m_buffer, dxFormat, offset);
+    m_immediateContext->IASetIndexBuffer(((BufferResourceImpl*)buffer)->m_buffer, dxFormat, UINT(offset));
 }
 
 void D3D11Renderer::setDepthStencilTarget(ResourceView* depthStencilView)
@@ -1270,7 +1270,7 @@ void D3D11Renderer::setViewports(UInt count, Viewport const* viewports)
         dxViewport.MaxDepth = inViewport.maxZ;
     }
 
-    m_immediateContext->RSSetViewports(count, dxViewports);
+    m_immediateContext->RSSetViewports(UINT(count), dxViewports);
 }
 
 void D3D11Renderer::setScissorRects(UInt count, ScissorRect const* rects)
@@ -1284,13 +1284,13 @@ void D3D11Renderer::setScissorRects(UInt count, ScissorRect const* rects)
         auto& inRect = rects[ii];
         auto& dxRect = dxRects[ii];
 
-        dxRect.left     = inRect.minX;
-        dxRect.top      = inRect.minY;
-        dxRect.right    = inRect.maxX;
-        dxRect.bottom   = inRect.maxY;
+        dxRect.left     = LONG(inRect.minX);
+        dxRect.top      = LONG(inRect.minY);
+        dxRect.right    = LONG(inRect.maxX);
+        dxRect.bottom   = LONG(inRect.maxY);
     }
 
-    m_immediateContext->RSSetScissorRects(count, dxRects);
+    m_immediateContext->RSSetScissorRects(UINT(count), dxRects);
 }
 
 
@@ -1370,7 +1370,7 @@ void D3D11Renderer::draw(UInt vertexCount, UInt startVertex)
 void D3D11Renderer::drawIndexed(UInt indexCount, UInt startIndex, UInt baseVertex)
 {
     _flushGraphicsState();
-    m_immediateContext->DrawIndexed((UINT)indexCount, (UINT)startIndex, (UInt)baseVertex);
+    m_immediateContext->DrawIndexed((UINT)indexCount, (UINT)startIndex, (INT)baseVertex);
 }
 
 Result D3D11Renderer::createProgram(const ShaderProgram::Desc& desc, ShaderProgram** outProgram)
@@ -1653,7 +1653,7 @@ Result D3D11Renderer::createGraphicsPipelineState(const GraphicsPipelineStateDes
     state->m_blendState = blendState;
     state->m_pipelineLayout = (PipelineLayoutImpl*) desc.pipelineLayout;
     state->m_inputLayout = (InputLayoutImpl*) desc.inputLayout;
-    state->m_rtvCount = desc.renderTargetCount;
+    state->m_rtvCount = UINT(desc.renderTargetCount);
     state->m_blendColor[0] = 0;
     state->m_blendColor[1] = 0;
     state->m_blendColor[2] = 0;
@@ -1782,7 +1782,7 @@ Result D3D11Renderer::createPipelineLayout(const PipelineLayout::Desc& desc, Pip
         pipelineLayoutImpl->m_descriptorSets.Add(setInfo);
     }
 
-    pipelineLayoutImpl->m_uavCount = counts[int(D3D11DescriptorSlotType::UnorderedAccessView)];
+    pipelineLayoutImpl->m_uavCount = UINT(counts[int(D3D11DescriptorSlotType::UnorderedAccessView)]);
 
     *outLayout = pipelineLayoutImpl.detach();
     return SLANG_OK;
@@ -2226,11 +2226,11 @@ void D3D11Renderer::setDescriptorSet(PipelineType pipelineType, PipelineLayout* 
     // for each stage.
 
     {
-        int slotType = int(D3D11DescriptorSlotType::ConstantBuffer);
-        UInt slotCount = setInfo.layout->m_counts[slotType];
+        const int slotType = int(D3D11DescriptorSlotType::ConstantBuffer);
+        const UINT slotCount = UINT(setInfo.layout->m_counts[slotType]);
         if(slotCount)
         {
-            UInt startSlot = setInfo.baseIndices[slotType];
+            const UINT startSlot = UINT(setInfo.baseIndices[slotType]);
 
             auto cbs = descriptorSetImpl->m_cbs[0].readRef();
 
@@ -2243,11 +2243,11 @@ void D3D11Renderer::setDescriptorSet(PipelineType pipelineType, PipelineLayout* 
     }
 
     {
-        int slotType = int(D3D11DescriptorSlotType::ShaderResourceView);
-        UInt slotCount = setInfo.layout->m_counts[slotType];
+        const int slotType = int(D3D11DescriptorSlotType::ShaderResourceView);
+        const UINT slotCount = UINT(setInfo.layout->m_counts[slotType]);
         if(slotCount)
         {
-            UInt startSlot = setInfo.baseIndices[slotType];
+            const UINT startSlot = UINT(setInfo.baseIndices[slotType]);
 
             auto srvs = descriptorSetImpl->m_srvs[0].readRef();
 
@@ -2260,11 +2260,11 @@ void D3D11Renderer::setDescriptorSet(PipelineType pipelineType, PipelineLayout* 
     }
 
     {
-        int slotType = int(D3D11DescriptorSlotType::Sampler);
-        UInt slotCount = setInfo.layout->m_counts[slotType];
+        const int slotType = int(D3D11DescriptorSlotType::Sampler);
+        const UINT slotCount = UINT(setInfo.layout->m_counts[slotType]);
         if(slotCount)
         {
-            UInt startSlot = setInfo.baseIndices[slotType];
+            const UINT startSlot = UINT(setInfo.baseIndices[slotType]);
 
             auto samplers = descriptorSetImpl->m_samplers[0].readRef();
 
@@ -2283,8 +2283,8 @@ void D3D11Renderer::setDescriptorSet(PipelineType pipelineType, PipelineLayout* 
         // the UAV bindings with `m_uavBindings` and then flush them
         // as needed right before a draw/dispatch.
         //
-        int slotType = int(D3D11DescriptorSlotType::UnorderedAccessView);
-        UInt slotCount = setInfo.layout->m_counts[slotType];
+        const int slotType = int(D3D11DescriptorSlotType::UnorderedAccessView);
+        const UInt slotCount = setInfo.layout->m_counts[slotType];
         if(slotCount)
         {
             UInt startSlot = setInfo.baseIndices[slotType];
