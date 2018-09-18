@@ -717,6 +717,11 @@ namespace Slang
 		{
 			return Slang::GetHashCode((const char*)begin());
 		}
+
+        UnownedStringSlice getUnownedSlice() const
+        {
+            return StringRepresentation::asSlice(buffer);
+        }
 	};
 
 	class StringBuilder : public String

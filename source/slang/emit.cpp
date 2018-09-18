@@ -1015,7 +1015,7 @@ struct EmitVisitor
         }
 
         const IRConstant* irConst = (const IRConstant*)elementCountInst;
-        const IRIntegerValue elementCount = irConst->u.intVal;
+        const IRIntegerValue elementCount = irConst->value.intVal;
         if (elementCount <= 0)
         {
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "Vector size must be greater than 0");
@@ -2277,16 +2277,16 @@ struct EmitVisitor
         switch(inst->op)
         {
         case kIROp_IntLit:
-            emit(((IRConstant*) inst)->u.intVal);
+            emit(((IRConstant*) inst)->value.intVal);
             break;
 
         case kIROp_FloatLit:
-            Emit(((IRConstant*) inst)->u.floatVal);
+            Emit(((IRConstant*) inst)->value.floatVal);
             break;
 
         case kIROp_boolConst:
             {
-                bool val = ((IRConstant*)inst)->u.intVal != 0;
+                bool val = ((IRConstant*)inst)->value.intVal != 0;
                 emit(val ? "true" : "false");
             }
             break;
@@ -3611,7 +3611,7 @@ struct EmitVisitor
                     SLANG_RELEASE_ASSERT(irElementIndex->op == kIROp_IntLit);
                     IRConstant* irConst = (IRConstant*)irElementIndex;
 
-                    UInt elementIndex = (UInt)irConst->u.intVal;
+                    UInt elementIndex = (UInt)irConst->value.intVal;
                     SLANG_RELEASE_ASSERT(elementIndex < 4);
 
                     char const* kComponents[] = { "x", "y", "z", "w" };
@@ -3767,7 +3767,7 @@ struct EmitVisitor
                     SLANG_RELEASE_ASSERT(irElementIndex->op == kIROp_IntLit);
                     IRConstant* irConst = (IRConstant*)irElementIndex;
 
-                    UInt elementIndex = (UInt)irConst->u.intVal;
+                    UInt elementIndex = (UInt)irConst->value.intVal;
                     SLANG_RELEASE_ASSERT(elementIndex < 4);
 
                     char const* kComponents[] = { "x", "y", "z", "w" };
@@ -3792,7 +3792,7 @@ struct EmitVisitor
                     SLANG_RELEASE_ASSERT(irElementIndex->op == kIROp_IntLit);
                     IRConstant* irConst = (IRConstant*)irElementIndex;
 
-                    UInt elementIndex = (UInt)irConst->u.intVal;
+                    UInt elementIndex = (UInt)irConst->value.intVal;
                     SLANG_RELEASE_ASSERT(elementIndex < 4);
 
                     char const* kComponents[] = { "x", "y", "z", "w" };
