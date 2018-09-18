@@ -205,41 +205,6 @@ namespace Slang
         typeCheckingCache = nullptr;
     }
 
-    bool IsNumeric(BaseType t)
-    {
-        return t == BaseType::Int || t == BaseType::Float || t == BaseType::UInt;
-    }
-
-    String TranslateHLSLTypeNames(String name)
-    {
-        if (name == "float2" || name == "half2")
-            return "vec2";
-        else if (name == "float3" || name == "half3")
-            return "vec3";
-        else if (name == "float4" || name == "half4")
-            return "vec4";
-        else if (name == "half")
-            return "float";
-        else if (name == "int2")
-            return "ivec2";
-        else if (name == "int3")
-            return "ivec3";
-        else if (name == "int4")
-            return "ivec4";
-        else if (name == "uint2")
-            return "uvec2";
-        else if (name == "uint3")
-            return "uvec3";
-        else if (name == "uint4")
-            return "uvec4";
-        else if (name == "float3x3" || name == "half3x3")
-            return "mat3";
-        else if (name == "float4x4" || name == "half4x4")
-            return "mat4";
-        else
-            return name;
-    }
-
     enum class CheckingPhase
     {
         Header, Body
@@ -2916,25 +2881,37 @@ namespace Slang
             decl->SetCheckState(getCheckedState());
         }
 
+        bool isIntegerBaseType(BaseType baseType)
+        {
+            switch(baseType)
+            {
+            default:
+                return false;
+
+            case BaseType::Int8:
+            case BaseType::Int16:
+            case BaseType::Int:
+            case BaseType::Int64:
+            case BaseType::UInt8:
+            case BaseType::UInt16:
+            case BaseType::UInt:
+            case BaseType::UInt64:
+                return true;
+            }
+        }
+
         // Validate that `type` is a suitable type to use
         // as the tag type for an `enum`
         void validateEnumTagType(Type* type, SourceLoc const& loc)
         {
             if(auto basicType = type->As<BasicExpressionType>())
             {
-                switch(basicType->baseType)
-                {
-                default:
-                    // By default, don't allow a type to be used
-                    // as an `enum` tag type.
-                    break;
-
-                case BaseType::Int:
-                case BaseType::UInt:
-                case BaseType::UInt64:
-                    // These are all allowed.
+                // Allow the built-in intteger types.
+                if(isIntegerBaseType(basicType->baseType))
                     return;
-                }
+
+                // By default, don't allow other types to be used
+                // as an `enum` tag type.
             }
 
             getSink()->diagnose(loc, Diagnostics::invalidEnumTagType, type);
@@ -4420,16 +4397,8 @@ namespace Slang
             // Check if type is acceptable for an integer constant expression
             if(auto basicType = exp->type.type->As<BasicExpressionType>())
             {
-                switch(basicType->baseType)
-                {
-                default:
+                if(!isIntegerBaseType(basicType->baseType))
                     return nullptr;
-
-                case BaseType::Int:
-                case BaseType::UInt:
-                case BaseType::UInt64:
-                    break;
-                }
             }
             else
             {
@@ -7724,46 +7693,6 @@ namespace Slang
             // Now process this like any other explicit call (so casts
             // and constructor calls are semantically equivalent).
             return CheckInvokeExprWithCheckedOperands(expr);
-
-#if 0
-            expr->Expression = CheckTerm(expr->Expression);
-            auto targetType = CheckProperType(expr->TargetType);
-            expr->TargetType = targetType;
-
-            // The way to perform casting depends on the types involved
-            if (expr->Expression->type->Equals(getSession()->getErrorType()))
-            {
-                // If the expression being casted has an error type, then just silently succeed
-                expr->type = targetType.Ptr();
-                return expr;
-            }
-            else if (auto targetArithType = targetType->AsArithmeticType())
-            {
-                if (auto exprArithType = expr->Expression->type->AsArithmeticType())
-                {
-                    // Both source and destination types are arithmetic, so we might
-                    // have a valid cast
-                    auto targetScalarType = targetArithType->GetScalarType();
-                    auto exprScalarType = exprArithType->GetScalarType();
-
-                    if (!IsNumeric(exprScalarType->baseType)) goto fail;
-                    if (!IsNumeric(targetScalarType->baseType)) goto fail;
-
-                    // TODO(tfoley): this checking is incomplete here, and could
-                    // lead to downstream compilation failures
-                    expr->type = targetType.Ptr();
-                    return expr;
-                }
-            }
-            // TODO: other cases? Should we allow a cast to succeeed whenever
-            // a single-argument constructor for the target type would work?
-
-        fail:
-            // Default: in no other case succeds, then the cast failed and we emit a diagnostic.
-            getSink()->diagnose(expr, Diagnostics::invalidTypeCast, expr->Expression->type, targetType->ToString());
-            expr->type = QualType(getSession()->getErrorType());
-            return expr;
-#endif
         }
 
         // Get the type to use when referencing a declaration

@@ -78,6 +78,33 @@ namespace Slang
         emitVal(context, val);
     }
 
+    void emitBaseType(
+        ManglingContext*    context,
+        BaseType            baseType)
+    {
+        switch( baseType )
+        {
+        case BaseType::Void:    emitRaw(context, "V");  break;
+        case BaseType::Bool:    emitRaw(context, "b");  break;
+        case BaseType::Int8:    emitRaw(context, "c");  break;
+        case BaseType::Int16:   emitRaw(context, "s");  break;
+        case BaseType::Int:     emitRaw(context, "i");  break;
+        case BaseType::Int64:   emitRaw(context, "I");  break;
+        case BaseType::UInt8:   emitRaw(context, "C");  break;
+        case BaseType::UInt16:  emitRaw(context, "S");  break;
+        case BaseType::UInt:    emitRaw(context, "u");  break;
+        case BaseType::UInt64:  emitRaw(context, "U");  break;
+        case BaseType::Half:    emitRaw(context, "h");  break;
+        case BaseType::Float:   emitRaw(context, "f");  break;
+        case BaseType::Double:  emitRaw(context, "d");  break;
+            break;
+
+        default:
+            SLANG_UNEXPECTED("unimplemented case in mangling");
+            break;
+        }
+    }
+
     void emitType(
         ManglingContext*    context,
         Type*               type)
@@ -86,22 +113,7 @@ namespace Slang
 
         if( auto basicType = dynamic_cast<BasicExpressionType*>(type) )
         {
-            switch( basicType->baseType )
-            {
-            case BaseType::Void:    emitRaw(context, "V");  break;
-            case BaseType::Bool:    emitRaw(context, "b");  break;
-            case BaseType::Int:     emitRaw(context, "i");  break;
-            case BaseType::UInt:    emitRaw(context, "u");  break;
-            case BaseType::UInt64:  emitRaw(context, "U");  break;
-            case BaseType::Half:    emitRaw(context, "h");  break;
-            case BaseType::Float:   emitRaw(context, "f");  break;
-            case BaseType::Double:  emitRaw(context, "d");  break;
-                break;
-
-            default:
-                SLANG_UNEXPECTED("unimplemented case in mangling");
-                break;
-            }
+            emitBaseType(context, basicType->baseType);
         }
         else if( auto vecType = dynamic_cast<VectorExpressionType*>(type) )
         {
@@ -212,19 +224,10 @@ namespace Slang
         ManglingContext*    context,
         IRInst*             inst)
     {
-        switch (inst->op)
+        if(auto basicType = as<IRBasicType>(inst) )
         {
-        case kIROp_VoidType:    emitRaw(context, "V");  return;
-        case kIROp_BoolType:    emitRaw(context, "b");  return;
-        case kIROp_IntType:     emitRaw(context, "i");  return;
-        case kIROp_UIntType:    emitRaw(context, "u");  return;
-        case kIROp_UInt64Type:  emitRaw(context, "U");  return;
-        case kIROp_HalfType:    emitRaw(context, "h");  return;
-        case kIROp_FloatType:   emitRaw(context, "f");  return;
-        case kIROp_DoubleType:  emitRaw(context, "d");  return;
-
-        default:
-            break;
+            emitBaseType(context, basicType->getBaseType());
+            return;
         }
 
         if (auto globalVal = as<IRGlobalValue>(inst))

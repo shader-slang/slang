@@ -786,10 +786,20 @@ struct EmitVisitor
             // no prefix
             break;
 
-        case kIROp_IntType:		Emit("i");		break;
-        case kIROp_UIntType:	Emit("u");		break;
-        case kIROp_BoolType:	Emit("b");		break;
-        case kIROp_DoubleType:	Emit("d");		break;
+        case kIROp_Int8Type:    Emit("i8");     break;
+        case kIROp_Int16Type:   Emit("i16");    break;
+        case kIROp_IntType:     Emit("i");      break;
+        case kIROp_Int64Type:   Emit("i64");    break;
+
+        case kIROp_UInt8Type:   Emit("u8");     break;
+        case kIROp_UInt16Type:  Emit("u16");    break;
+        case kIROp_UIntType:    Emit("u");      break;
+        case kIROp_UInt64Type:  Emit("u64");    break;
+
+        case kIROp_BoolType:    Emit("b");		break;
+
+        case kIROp_HalfType:    Emit("f16");		break;
+        case kIROp_DoubleType:  Emit("d");		break;
 
         case kIROp_VectorType:
             emitGLSLTypePrefix(cast<IRVectorType>(type)->getElementType());
@@ -1179,9 +1189,18 @@ struct EmitVisitor
             break;
 
         case kIROp_VoidType:    Emit("void");       return;
-        case kIROp_IntType:     Emit("int");        return;
-        case kIROp_UIntType:    Emit("uint");       return;
         case kIROp_BoolType:    Emit("bool");       return;
+
+        case kIROp_Int8Type:    Emit("int8_t");     return;
+        case kIROp_Int16Type:   Emit("int16_t");    return;
+        case kIROp_IntType:     Emit("int");        return;
+        case kIROp_Int64Type:   Emit("int64_t");    return;
+
+        case kIROp_UInt8Type:   Emit("uint8_t");    return;
+        case kIROp_UInt16Type:  Emit("uint16_t");   return;
+        case kIROp_UIntType:    Emit("uint");       return;
+        case kIROp_UInt64Type:  Emit("uint64_t");   return;
+
         case kIROp_HalfType:    Emit("half");       return;
         case kIROp_FloatType:   Emit("float");      return;
         case kIROp_DoubleType:  Emit("double");     return;

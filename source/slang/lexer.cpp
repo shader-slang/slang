@@ -393,55 +393,28 @@ namespace Slang
 
     static TokenType maybeLexNumberSuffix(Lexer* lexer, TokenType tokenType)
     {
-        // First check for suffixes that
-        // indicate a floating-point number
-        switch(peek(lexer))
+        // Be liberal in what we accept here, so that figuring out
+        // the semantics of a numeric suffix is left up to the parser
+        // and semantic checking logic.
+        //
+        for( ;;)
         {
-        case 'f': case 'F':
-            advance(lexer);
-            return TokenType::FloatingPointLiteral;
+            int c = peek(lexer);
 
-        default:
-            break;
-        }
-
-        // Once we've ruled out floating-point
-        // suffixes, we can check for the inter cases
-
-        // TODO: allow integer suffixes in any order...
-
-        // Leading `u` or `U` for unsigned
-        switch(peek(lexer))
-        {
-        default:
-            break;
-
-        case 'u': case 'U':
-            advance(lexer);
-            break;
-        }
-
-        // Optional `l`, `L`, `ll`, or `LL`
-        switch(peek(lexer))
-        {
-        default:
-            break;
-
-        case 'l': case 'L':
-            advance(lexer);
-            switch(peek(lexer))
+            // Accept any alphanumeric character, plus underscores.
+            if(('a' <= c ) && (c <= 'z')
+                || ('A' <= c) && (c <= 'Z')
+                || ('0' <= c) && (c <= '9')
+                || (c == '_'))
             {
-            default:
-                break;
-
-            case 'l': case 'L':
                 advance(lexer);
-                break;
+                continue;
             }
-            break;
-        }
 
-        return tokenType;
+            // Stop at the first character that isn't
+            // alphanumeric.
+            return tokenType;
+        }
     }
 
     static bool isNumberExponent(int c, int base)

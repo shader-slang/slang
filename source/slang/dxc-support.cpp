@@ -129,6 +129,21 @@ namespace Slang
         String profileName = GetHLSLProfileName(profile);
         OSString wideProfileName = profileName.ToWString();
 
+        // We will enable the flag to generate proper code for 16-bit types
+        // by default, as long as the user is requesting a sufficiently
+        // high shader model.
+        //
+        // TODO: Need to check that this is safe to enable in all cases,
+        // or if it will make a shader demand hardware features that
+        // aren't always present.
+        //
+        // TODO: Ideally the dxc back-end should be passed some information
+        // on the "capabilities" that were used and/or requested in the code.
+        //
+        if( profile.GetVersion() >= ProfileVersion::DX_6_2 )
+        {
+            args[argCount++] = L"-enable-16bit-types";
+        }
 
         IDxcOperationResult* dxcResult = nullptr;
         if (FAILED(dxcCompiler->Compile(dxcSourceBlob,

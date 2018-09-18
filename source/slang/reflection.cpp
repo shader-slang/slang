@@ -326,12 +326,19 @@ SLANG_API SlangScalarType spReflectionType_GetScalarType(SlangReflectionType* in
 #define CASE(BASE, TAG) \
         case BaseType::BASE: return SLANG_SCALAR_TYPE_##TAG
 
-            CASE(Void, VOID);
-            CASE(Int, INT32);
-            CASE(Float, FLOAT32);
-            CASE(UInt, UINT32);
-            CASE(Bool, BOOL);
-            CASE(UInt64, UINT64);
+            CASE(Void,      VOID);
+            CASE(Bool,      BOOL);
+            CASE(Int8,      INT8);
+            CASE(Int16,     INT16);
+            CASE(Int,       INT32);
+            CASE(Int64,     INT64);
+            CASE(UInt8,     UINT8);
+            CASE(UInt16,    UINT16);
+            CASE(UInt,      UINT32);
+            CASE(UInt64,    UINT64);
+            CASE(Half,      FLOAT16);
+            CASE(Float,     FLOAT32);
+            CASE(Double,    FLOAT64);
 
 #undef CASE
 

@@ -8,7 +8,12 @@ namespace Slang
 #define FOREACH_BASE_TYPE(X)    \
     X(Void)                     \
     X(Bool)                     \
+    X(Int8)                     \
+    X(Int16)                    \
     X(Int)                      \
+    X(Int64)                    \
+    X(UInt8)                    \
+    X(UInt16)                   \
     X(UInt)                     \
     X(UInt64)                   \
     X(Half)                     \
