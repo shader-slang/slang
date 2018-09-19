@@ -34,7 +34,16 @@ namespace Slang
 	{
 		return GetHashCode(const_cast<const char *>(buffer));
 	}
-
+    inline int GetHashCode(const char * buffer, size_t numChars)
+    {
+        int hash = 0;
+        for (size_t i = 0; i < numChars; ++i)
+        {      
+            hash = int(buffer[i]) + (hash << 6) + (hash << 16) - hash;
+        }
+        return hash;
+    }
+    
 	template<int IsInt>
 	class Hash
 	{
