@@ -1061,7 +1061,9 @@ namespace Slang
     UnownedStringSlice IRConstant::getStringSlice() const
     {
         assert(op == kIROp_StringLit);
-        // If no type, then it is a non heap allocated, and so the chars are just held as a slice
+        // If the transitory decoration is set, then this is uses the transitoryStringVal for the text storage.
+        // This is typically used when we are using a transitory IRInst held on the stack (such that it can be looked up in cached), 
+        // that just points to a string elsewhere, and NOT the typical normal style, where the string is held after the instruction in memory.
         if (firstDecoration && firstDecoration->op == kIRDecorationOp_Transitory)
         {
             return UnownedStringSlice(value.transitoryStringVal.chars, value.transitoryStringVal.numChars);
