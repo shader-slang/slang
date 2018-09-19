@@ -1213,6 +1213,7 @@ static PreprocessorExpressionValue ParseAndEvaluateUnaryExpression(PreprocessorD
             // An identifier here means it was not defined as a macro (or
             // it is defined, but as a function-like macro. These should
             // just evaluate to zero (possibly with a warning)
+            GetSink(context)->diagnose(token.loc, Diagnostics::undefinedIdentifierInPreprocessorExpression, token.getName());
             return 0;
         }
 
