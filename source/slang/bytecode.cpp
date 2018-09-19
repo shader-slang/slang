@@ -382,7 +382,7 @@ void generateBytecodeForInst(
 
             // TODO: probably want distinct encodings
             // for signed vs. unsigned here.
-            encodeUInt(context, UInt(ii->u.intVal));
+            encodeUInt(context, UInt(ii->value.intVal));
 
             // destination:
             encodeOperand(context, inst);
@@ -397,7 +397,7 @@ void generateBytecodeForInst(
 
             static const UInt size = sizeof(IRFloatingPointValue);
             unsigned char buffer[size];
-            memcpy(buffer, &cInst->u.floatVal, sizeof(buffer));
+            memcpy(buffer, &cInst->value.floatVal, sizeof(buffer));
 
             for(UInt ii = 0; ii < size; ++ii)
             {
@@ -413,7 +413,7 @@ void generateBytecodeForInst(
         {
             auto ii = (IRConstant*) inst;
             encodeUInt(context, ii->op);
-            encodeUInt(context, ii->u.intVal ? 1 : 0);
+            encodeUInt(context, ii->value.intVal ? 1 : 0);
 
             // destination:
             encodeOperand(context, inst);
@@ -962,7 +962,7 @@ BytecodeGenerationPtr<BCModule> generateBytecodeForModule(
         case kIROp_IntLit:
             {
                 auto ptr = allocate<IRIntegerValue>(context);
-                *ptr = irConstant->u.intVal;
+                *ptr = irConstant->value.intVal;
                 bcConstants[cc].ptr = ptr.bitCast<uint8_t>();
             }
             break;

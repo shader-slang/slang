@@ -189,7 +189,8 @@ INST_RANGE(ParentInst, StructType, Block)
     INST(boolConst, boolConst, 0, 0)
     INST(IntLit, integer_constant, 0, 0)
     INST(FloatLit, float_constant, 0, 0)
-INST_RANGE(Constant, boolConst, FloatLit)
+    INST(StringLit, string_constant, 0, 0)
+INST_RANGE(Constant, boolConst, StringLit)
 
 INST(undefined, undefined, 0, 0)
 

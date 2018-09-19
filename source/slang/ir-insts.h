@@ -460,9 +460,9 @@ struct IRConstantKey
 {
     IRConstant* inst;
 
-    int GetHashCode();
+    bool operator==(const IRConstantKey& rhs) const { return inst->equal(*rhs.inst); }
+    int GetHashCode() const { return inst->getHashCode(); }
 };
-bool operator==(IRConstantKey const& left, IRConstantKey const& right);
 
 struct SharedIRBuilder
 {
@@ -520,11 +520,14 @@ struct IRBuilder
     IRInst* getBoolValue(bool value);
     IRInst* getIntValue(IRType* type, IRIntegerValue value);
     IRInst* getFloatValue(IRType* type, IRFloatingPointValue value);
+    IRStringLit* getStringValue(const UnownedStringSlice& slice);
 
     IRBasicType* getBasicType(BaseType baseType);
     IRBasicType* getVoidType();
     IRBasicType* getBoolType();
     IRBasicType* getIntType();
+    IRStringType* getStringType();
+
     IRBasicBlockType*   getBasicBlockType();
     IRType* getWitnessTableType() { return nullptr; }
     IRType* getKeyType() { return nullptr; }

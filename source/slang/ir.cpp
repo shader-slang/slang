@@ -172,7 +172,7 @@ namespace Slang
             UNREACHABLE_RETURN(0);
 
         case kIROp_IntLit:
-            return ((IRConstant*)inst)->u.intVal;
+            return static_cast<IRConstant*>(inst)->value.intVal;
             break;
         }
     }
@@ -837,6 +837,28 @@ namespace Slang
         return inst;
     }
 
+    static IRInst* createInstWithSizeImpl(
+        IRBuilder*      builder,
+        IROp            op,
+        IRType*         type,
+        size_t          sizeInBytes)
+    {
+        auto module = builder->getModule();
+        IRInst* inst = (IRInst*)module->memoryArena.allocate(sizeInBytes);
+        // Zero only the 'type'
+        memset(inst, 0, sizeof(IRInst));
+        // TODO: Do we need to run ctor after zeroing?
+        new (inst) IRInst;
+
+        inst->op = op;
+        if (type)
+        {
+            inst->typeUse.init(inst, type);
+        }
+        maybeSetSourceLoc(builder, inst);
+        return inst; 
+    }
+
     template<typename T>
     static T* createInstImpl(
         IRBuilder*      builder,
@@ -1036,38 +1058,96 @@ namespace Slang
         return code;
     }
 
-    //
-
-    bool operator==(IRConstantKey const& left, IRConstantKey const& right)
+    UnownedStringSlice IRConstant::getStringSlice() const
     {
-        if(left.inst->op            != right.inst->op)              return false;
-        if(left.inst->getFullType() != right.inst->getFullType())       return false;
-        if(left.inst->u.ptrData[0]  != right.inst->u.ptrData[0])    return false;
-        if(left.inst->u.ptrData[1]  != right.inst->u.ptrData[1])    return false;
-        return true;
+        assert(op == kIROp_StringLit);
+        // If the transitory decoration is set, then this is uses the transitoryStringVal for the text storage.
+        // This is typically used when we are using a transitory IRInst held on the stack (such that it can be looked up in cached), 
+        // that just points to a string elsewhere, and NOT the typical normal style, where the string is held after the instruction in memory.
+        if (firstDecoration && firstDecoration->op == kIRDecorationOp_Transitory)
+        {
+            return UnownedStringSlice(value.transitoryStringVal.chars, value.transitoryStringVal.numChars);
+        }
+        else
+        {
+            return UnownedStringSlice(value.stringVal.chars, value.stringVal.numChars);
+        }
     }
 
-    int IRConstantKey::GetHashCode()
+    /// True if constants are equal
+    bool IRConstant::equal(IRConstant& rhs)
     {
-        auto code = Slang::GetHashCode(inst->op);
-        code = combineHash(code, Slang::GetHashCode(inst->getFullType()));
-        code = combineHash(code, Slang::GetHashCode(inst->u.ptrData[0]));
-        code = combineHash(code, Slang::GetHashCode(inst->u.ptrData[1]));
-        return code;
+        // If they are literally the same thing.. 
+        if (this == &rhs)
+        {
+            return true;
+        }
+        // Check the type and they are the same op
+        if (op != rhs.op || 
+           getFullType() != rhs.getFullType())
+        {
+            return false;
+        }
+        switch (op)
+        {
+            case kIROp_boolConst:
+            case kIROp_FloatLit:
+            case kIROp_IntLit:
+            {
+                SLANG_COMPILE_TIME_ASSERT(sizeof(IRFloatingPointValue) == sizeof(IRIntegerValue));
+                // ... we can just compare as bits
+                return value.intVal == rhs.value.intVal;
+            }
+            case kIROp_StringLit:
+            {
+                return getStringSlice() == rhs.getStringSlice();
+            }
+            default: break;
+        }
+
+        SLANG_ASSERT(!"Unhandled type");
+        return false;
+    }
+
+    int IRConstant::getHashCode()
+    {
+        auto code = Slang::GetHashCode(op);
+        code = combineHash(code, Slang::GetHashCode(getFullType()));
+
+        switch (op)
+        {
+            case kIROp_boolConst:
+            case kIROp_FloatLit:
+            case kIROp_IntLit:
+            {
+                SLANG_COMPILE_TIME_ASSERT(sizeof(IRFloatingPointValue) == sizeof(IRIntegerValue));
+                // ... we can just compare as bits
+                return combineHash(code, Slang::GetHashCode(value.intVal));
+            }
+            case kIROp_StringLit:
+            {
+                const UnownedStringSlice slice = getStringSlice();
+                return combineHash(code, Slang::GetHashCode(slice.begin(), slice.size()));
+            }
+            default:
+            {
+                SLANG_ASSERT(!"Invalid type");
+                return 0;
+            }
+        }
     }
 
     static IRConstant* findOrEmitConstant(
         IRBuilder*      builder,
-        IROp            op,
-        IRType*         type,
-        UInt            valueSize,
-        void const*     value)
+        IRConstant&     keyInst)
     {
-        IRConstant keyInst;
-        memset(&keyInst, 0, sizeof(keyInst));
-        keyInst.op = op;
-        keyInst.typeUse.usedValue = type;
-        memcpy(&keyInst.u, value, valueSize);
+        // We now know where we want to insert, but there might
+        // already be an equivalent instruction in that block.
+        //
+        // We will check for such an instruction in a slightly hacky
+        // way: we will construct a temporary instruction and
+        // then use it to look up in a cache of instructions.
+        // The 'fake' instruction is passed in as keyInst.
 
         IRConstantKey key;
         key.inst = &keyInst;
@@ -1078,16 +1158,45 @@ namespace Slang
             // We found a match, so just use that.
             return irValue;
         }
+    
+        // Calculate the minimum object size (ie not including the payload of value)    
+        const size_t prefixSize = offsetof(IRConstant, value);
 
-        // We now know where we want to insert, but there might
-        // already be an equivalent instruction in that block.
-        //
-        // We will check for such an instruction in a slightly hacky
-        // way: we will construct a temporary instruction and
-        // then use it to look up in a cache of instructions.
+        switch (keyInst.op)
+        {
+            case kIROp_boolConst:
+            case kIROp_IntLit:
+            {
+                irValue = static_cast<IRConstant*>(createInstWithSizeImpl(builder, keyInst.op, keyInst.getFullType(), prefixSize + sizeof(IRIntegerValue)));
+                irValue->value.intVal = keyInst.value.intVal;
+                break; 
+            }
+            case kIROp_FloatLit:
+            {
+                irValue = static_cast<IRConstant*>(createInstWithSizeImpl(builder, keyInst.op, keyInst.getFullType(), prefixSize + sizeof(IRFloatingPointValue)));
+                irValue->value.floatVal = keyInst.value.floatVal;
+                break;
+            }
+            case kIROp_StringLit:
+            {
+                const UnownedStringSlice slice = keyInst.getStringSlice();
 
-        irValue = createInst<IRConstant>(builder, op, type);
-        memcpy(&irValue->u, value, valueSize);
+                const size_t sliceSize = slice.size();
+                const size_t instSize = prefixSize + offsetof(IRConstant::StringValue, chars) + sliceSize; 
+
+                irValue = static_cast<IRConstant*>(createInstWithSizeImpl(builder, keyInst.op, keyInst.getFullType(), instSize));
+
+                IRConstant::StringValue& dstString = irValue->value.stringVal;
+
+                dstString.numChars = uint32_t(sliceSize);
+                // Turn into pointer to avoid warning of array overrun
+                char* dstChars = dstString.chars;
+                // Copy the chars
+                memcpy(dstChars, slice.begin(), sliceSize); 
+
+                break;
+            }
+        }
 
         key.inst = irValue;
         builder->sharedBuilder->constantMap.Add(key, irValue);
@@ -1097,40 +1206,57 @@ namespace Slang
         return irValue;
     }
 
-
     //
 
     IRInst* IRBuilder::getBoolValue(bool inValue)
     {
-        IRIntegerValue value = inValue;
-        return findOrEmitConstant(
-            this,
-            kIROp_boolConst,
-            getBoolType(),
-            sizeof(value),
-            &value);
+        IRConstant keyInst;
+        memset(&keyInst, 0, sizeof(keyInst));
+        keyInst.op = kIROp_boolConst;
+        keyInst.typeUse.usedValue = getBoolType();
+        keyInst.value.intVal = IRIntegerValue(inValue);
+        return findOrEmitConstant(this, keyInst);
     }
 
-    IRInst* IRBuilder::getIntValue(IRType* type, IRIntegerValue value)
+    IRInst* IRBuilder::getIntValue(IRType* type, IRIntegerValue inValue)
     {
-        return findOrEmitConstant(
-            this,
-            kIROp_IntLit,
-            type,
-            sizeof(value),
-            &value);
+        IRConstant keyInst;
+        memset(&keyInst, 0, sizeof(keyInst));
+        keyInst.op = kIROp_IntLit;
+        keyInst.typeUse.usedValue = type;
+        keyInst.value.intVal = inValue;
+        return findOrEmitConstant(this, keyInst);
     }
 
-    IRInst* IRBuilder::getFloatValue(IRType* type, IRFloatingPointValue value)
+    IRInst* IRBuilder::getFloatValue(IRType* type, IRFloatingPointValue inValue)
     {
-        return findOrEmitConstant(
-            this,
-            kIROp_FloatLit,
-            type,
-            sizeof(value),
-            &value);
+        IRConstant keyInst;
+        memset(&keyInst, 0, sizeof(keyInst));
+        keyInst.op = kIROp_FloatLit;
+        keyInst.typeUse.usedValue = type;
+        keyInst.value.floatVal = inValue;
+        return findOrEmitConstant(this, keyInst);
     }
 
+    IRStringLit* IRBuilder::getStringValue(const UnownedStringSlice& inSlice)
+    {
+        IRConstant keyInst;
+        memset(&keyInst, 0, sizeof(keyInst));
+        
+        // Mark that this is on the stack...
+        static IRDecoration stackDecoration = IRDecoration::make(kIRDecorationOp_Transitory);
+        keyInst.firstDecoration = &stackDecoration;
+            
+        keyInst.op = kIROp_StringLit;
+        keyInst.typeUse.usedValue = getStringType();
+        
+        IRConstant::StringSliceValue& dstSlice = keyInst.value.transitoryStringVal;
+        dstSlice.chars = const_cast<char*>(inSlice.begin());
+        dstSlice.numChars = uint32_t(inSlice.size());
+
+        return static_cast<IRStringLit*>(findOrEmitConstant(this, keyInst));
+    }
+ 
     IRInst* findOrEmitHoistableInst(
         IRBuilder*              builder,
         IRType*                 type,
@@ -1276,6 +1402,11 @@ namespace Slang
     IRBasicType* IRBuilder::getIntType()
     {
         return (IRBasicType*)getType(kIROp_IntType);
+    }
+
+    IRStringType* IRBuilder::getStringType()
+    {
+        return (IRStringType*)getType(kIROp_StringType);
     }
 
     IRBasicBlockType*   IRBuilder::getBasicBlockType()
@@ -2405,6 +2536,110 @@ namespace Slang
         }
     }
 
+
+    
+    struct StringEncoder
+    {
+        static char getHexChar(int v)
+        {
+            return (v <= 9) ? char(v + '0') : char(v - 10 + 'A');
+        }
+
+        void flush(const char* pos)
+        {
+            if (pos > m_runStart)
+            {
+                m_builder->append(m_runStart, pos);
+            }
+            m_runStart = pos + 1;
+        }
+
+        void appendEscapedChar(const char* pos, char encodeChar)
+        {
+            flush(pos);
+            const char chars[] = { '\\', encodeChar };
+            m_builder->Append(chars, 2);
+        }
+        
+        void appendAsHex(const char* pos)
+        {
+            flush(pos);
+
+            const int v = *(const uint8_t*)pos;
+
+            char buf[5];
+            buf[0] = '\\';
+            buf[1] = 'x';
+            buf[2] = '0';
+
+            buf[3] = getHexChar(v >> 4);
+            buf[4] = getHexChar(v & 0xf);
+
+            m_builder->Append(buf, 5);
+        }
+
+        StringEncoder(StringBuilder* builder, const char* start):
+            m_runStart(start),
+            m_builder(builder)
+        {}
+
+        StringBuilder* m_builder;
+        const char* m_runStart;
+    };
+
+    static void dumpEncodeString(
+        IRDumpContext*  context, 
+        const UnownedStringSlice& slice)
+    {
+        // https://msdn.microsoft.com/en-us/library/69ze775t.aspx
+
+        StringBuilder& builder = *context->builder;
+        builder.Append('"');
+        
+        {
+            const char* cur = slice.begin();
+            StringEncoder encoder(&builder, cur);
+            const char* end = slice.end();
+
+            for (; cur < end; cur++)
+            {
+                const int8_t c = uint8_t(*cur);
+                switch (c)
+                {
+                    case '\\':
+                        encoder.appendEscapedChar(cur, '\\');
+                        break;
+                    case '"':
+                        encoder.appendEscapedChar(cur, '"');
+                        break;
+                    case '\n': 
+                        encoder.appendEscapedChar(cur, 'n');
+                        break;
+                    case '\t':
+                        encoder.appendEscapedChar(cur, 't');
+                        break;
+                    case '\r':
+                        encoder.appendEscapedChar(cur, 'r');
+                        break;
+                    case '\0':
+                        encoder.appendEscapedChar(cur, '0');
+                        break;
+                    default:
+                    {
+                        if (c < 32)
+                        {
+                            encoder.appendAsHex(cur);
+                        }
+                        break;
+                    }
+                }
+            }
+            encoder.flush(end);
+        }
+        
+        builder.Append('"');
+    }
+
     static void dumpType(
         IRDumpContext*  context,
         IRType*         type);
@@ -2427,15 +2662,18 @@ namespace Slang
         switch (inst->op)
         {
         case kIROp_IntLit:
-            dump(context, ((IRConstant*)inst)->u.intVal);
+            dump(context, ((IRConstant*)inst)->value.intVal);
             return;
 
         case kIROp_FloatLit:
-            dump(context, ((IRConstant*)inst)->u.floatVal);
+            dump(context, ((IRConstant*)inst)->value.floatVal);
             return;
 
         case kIROp_boolConst:
-            dump(context, ((IRConstant*)inst)->u.intVal ? "true" : "false");
+            dump(context, ((IRConstant*)inst)->value.intVal ? "true" : "false");
+            return;
+        case kIROp_StringLit:
+            dumpEncodeString(context, static_cast<IRConstant*>(inst)->getStringSlice());
             return;
 
         default:
@@ -2763,6 +3001,7 @@ namespace Slang
         case kIROp_IntLit:
         case kIROp_FloatLit:
         case kIROp_boolConst:
+        case kIROp_StringLit:
             dumpOperand(context, inst);
             break;
 
@@ -4870,7 +5109,7 @@ namespace Slang
         case kIROp_boolConst:
             {
                 IRConstant* c = (IRConstant*)originalValue;
-                return builder->getBoolValue(c->u.intVal != 0);
+                return builder->getBoolValue(c->value.intVal != 0);
             }
             break;
 
@@ -4878,14 +5117,14 @@ namespace Slang
         case kIROp_IntLit:
             {
                 IRConstant* c = (IRConstant*)originalValue;
-                return builder->getIntValue(cloneType(this, c->getDataType()), c->u.intVal);
+                return builder->getIntValue(cloneType(this, c->getDataType()), c->value.intVal);
             }
             break;
 
         case kIROp_FloatLit:
             {
                 IRConstant* c = (IRConstant*)originalValue;
-                return builder->getFloatValue(cloneType(this, c->getDataType()), c->u.floatVal);
+                return builder->getFloatValue(cloneType(this, c->getDataType()), c->value.floatVal);
             }
             break;
 

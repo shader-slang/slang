@@ -1638,9 +1638,9 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         return LoweredValInfo::simple(context->irBuilder->getFloatValue(type, expr->value));
     }
 
-    LoweredValInfo visitStringLiteralExpr(StringLiteralExpr*)
+    LoweredValInfo visitStringLiteralExpr(StringLiteralExpr* expr)
     {
-        SLANG_UNEXPECTED("string literal encountered during code emit");
+        return LoweredValInfo::simple(context->irBuilder->getStringValue(expr->value.getUnownedSlice()));
     }
 
     LoweredValInfo visitAggTypeCtorExpr(AggTypeCtorExpr* /*expr*/)

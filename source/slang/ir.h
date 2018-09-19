@@ -128,6 +128,10 @@ enum IRDecorationOp : uint16_t
     kIRDecorationOp_Semantic,
     kIRDecorationOp_InterpolationMode,
     kIRDecorationOp_NameHint,
+        /**  The _instruction_ is transitory. Such a decoration should NEVER be found on an output instruction a module. 
+        Typically used mark an instruction so can be specially handled - say when creating a IRConstant literal, and the payload of 
+        needs to be special cased for lookup. */ 
+    kIRDecorationOp_Transitory,             
 };
 
 // represents an object allocated in an IR memory arena
@@ -140,6 +144,14 @@ struct IRObject
 // for preserving high-level source information.
 struct IRDecoration : public IRObject
 {
+    static IRDecoration make(IRDecorationOp opIn, IRDecoration* nextIn = nullptr)
+    {
+        IRDecoration dec;
+        dec.next = nextIn;
+        dec.op = opIn;
+        return dec;
+    }
+
     // Next decoration attached to the same instruction
     IRDecoration* next;
 
@@ -172,7 +184,6 @@ struct IRInst : public IRObject
     {
         return operandCount;
     }
-
 
     // Source location information for this value, if any
     SourceLoc sourceLoc;
@@ -427,6 +438,8 @@ struct IRBoolType : IRBasicType
     IR_LEAF_ISA(BoolType)
 };
 
+SIMPLE_IR_TYPE(StringType, Type)
+
 // Constant Instructions
 
 typedef int64_t IRIntegerValue;
@@ -434,21 +447,47 @@ typedef double IRFloatingPointValue;
 
 struct IRConstant : IRInst
 {
-    union
+    struct StringValue
+    {   
+        uint32_t numChars;           ///< The number of chars
+        char chars[1];               ///< Chars added at end. NOTE! Must be last member of struct! 
+    };
+    struct StringSliceValue
     {
-        IRIntegerValue          intVal;
+        uint32_t numChars;
+        char* chars;
+    };
+
+    union ValueUnion
+    {
+        IRIntegerValue          intVal;         ///< Used for integrals and boolean
         IRFloatingPointValue    floatVal;
 
-        // HACK: allows us to hash the value easily
-        void*                   ptrData[2];
-    } u;
+        /// Either of these types could be set with kIROp_StringLit. 
+        /// Which is used is currently determined with IRDecorationOp - if a kDecorationOp_Transitory is set, then the transitory StringVal is used, else stringVal
+        // which relies on chars being held after the struct).
+        StringValue             stringVal;
+        StringSliceValue        transitoryStringVal;           
+    };
+
+        /// Returns a string slice (or empty string if not appropriate)
+    UnownedStringSlice getStringSlice() const;
+
+        /// True if constants are equal
+    bool equal(IRConstant& rhs);
+        /// Get the hash 
+    int getHashCode();
 
     IR_PARENT_ISA(Constant)
+
+    // Must be last member, because data may be held behind
+    // NOTE! The total size of IRConstant may not be allocated - only enough space is allocated for the value type held in the union.
+    ValueUnion value;
 };
 
 struct IRIntLit : IRConstant
 {
-    IRIntegerValue getValue() { return u.intVal; }
+    IRIntegerValue getValue() { return value.intVal; }
 
     IR_LEAF_ISA(IntLit);
 };
@@ -456,6 +495,12 @@ struct IRIntLit : IRConstant
 // Get the compile-time constant integer value of an instruction,
 // if it has one, and assert-fail otherwise.
 IRIntegerValue GetIntVal(IRInst* inst);
+
+struct IRStringLit : IRConstant
+{
+    
+    IR_LEAF_ISA(StringLit);
+};
 
 // A instruction that ends a basic block (usually because of control flow)
 struct IRTerminatorInst : IRInst
