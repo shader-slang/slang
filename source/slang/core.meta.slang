@@ -544,7 +544,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
             {
                 {
                     sb << "__glsl_version(450)\n";
-                    sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)"
+                    sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
                     sb << "__target_intrinsic(glsl, \"(";
 
                     int aa = 1;
@@ -681,12 +681,12 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
                 if (isMultisample)
                 {
-                    sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)"
+                    sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
                     sb << "__target_intrinsic(glsl, \"texelFetch($0, $1, $3)\")\n";
                 }
                 else
                 {
-                    sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)"
+                    sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
                     sb << "__target_intrinsic(glsl, \"texelFetch($0, ($1)." << kGLSLLoadCoordsSwizzle[loadCoordCount] << ", ($1)." << kGLSLLoadLODSwizzle[loadCoordCount] << ")\")\n";
                 }
                 sb << "T Load(";
@@ -699,12 +699,12 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
                 if (isMultisample)
                 {
-                    sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)"
+                    sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
                     sb << "__target_intrinsic(glsl, \"texelFetchOffset($0, $0, $1, $2)\")\n";
                 }
                 else
                 {
-                    sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)"
+                    sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
                     sb << "__target_intrinsic(glsl, \"texelFetch($0, ($1)." << kGLSLLoadCoordsSwizzle[loadCoordCount] << ", ($1)." << kGLSLLoadLODSwizzle[loadCoordCount] << ", $2)\")\n";
                 }
                 sb << "T Load(";
@@ -746,7 +746,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 {
                 case SLANG_RESOURCE_ACCESS_NONE:
                 case SLANG_RESOURCE_ACCESS_READ:
-                    sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)"
+                    sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
                     sb << "__target_intrinsic(glsl, \"texelFetch($0, " << ivecN << "($1)";
                     if( !isMultisample )
                     {
