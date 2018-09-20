@@ -1,5 +1,14 @@
 // Slang `core` library
 
+// Aliases for base types
+typedef half float16_t;
+typedef float float32_t;
+typedef double float64_t;
+
+typedef int int32_t;
+typedef uint uint32_t;
+
+
 // Modifier for variables that must resolve to compile-time constants
 // as part of translation.
 syntax constexpr : ConstExprModifier;
@@ -72,9 +81,14 @@ for (int tt = 0; tt < kBaseTypeCount; ++tt)
         sb << "\n    , __BuiltinFloatingPointType\n";
         sb << "\n    ,  __BuiltinRealType\n";
         // fall through to:
+    case BaseType::Int8:
+    case BaseType::Int16:
     case BaseType::Int:
+    case BaseType::Int64:
         sb << "\n    ,  __BuiltinSignedArithmeticType\n";
         // fall through to:
+    case BaseType::UInt8:
+    case BaseType::UInt16:
     case BaseType::UInt:
     case BaseType::UInt64:
         sb << "\n    ,  __BuiltinArithmeticType\n";
@@ -121,6 +135,7 @@ for (int tt = 0; tt < kBaseTypeCount; ++tt)
     //
     switch (kBaseTypes[tt].tag)
     {
+        // TODO: should this cover the full gamut of integer types?
     case BaseType::Int:
     case BaseType::UInt:
 }}}}
@@ -196,10 +211,27 @@ static const struct {
     char const* glslPrefix;
 } kTypes[] =
 {
-    {"float", ""},
-    {"int", "i"},
-    {"uint", "u"},
-    {"bool", "b"},
+    {"half",        "f16"},
+    {"float",       ""},
+    {"double",      "d"},
+
+    {"float16_t",   "f16"},
+    {"float32_t",   "f32"},
+    {"float64_t",   "f64"},
+
+    {"int8_t",      "i8"},
+    {"int16_t",     "i16"},
+    {"int32_t",     "i32"},
+    {"int",         "i"},
+    {"int64_t",     "i64"},
+
+    {"uint8_t",     "u8"},
+    {"uint16_t",    "u16"},
+    {"uint32_t",    "u32"},
+    {"uint",        "u"},
+    {"uint64_t",    "u64"},
+
+    {"bool",        "b"},
 };
 static const int kTypeCount = sizeof(kTypes) / sizeof(kTypes[0]);
 

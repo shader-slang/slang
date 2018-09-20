@@ -102,15 +102,19 @@ namespace Slang
 
         { "bool",	BaseType::Bool,     BOOL_MASK,  kBaseTypeConversionKind_Unsigned,   kBaseTypeConversionRank_Bool },
 
-        // TODO: should declare explicit types for 8-, 16-, 32- and 64-bit integers
-        { "int",	BaseType::Int,      SINT_MASK,  kBaseTypeConversionKind_Signed,     kBaseTypeConversionRank_Int32},
+        { "int8_t",	    BaseType::Int8,     SINT_MASK,  kBaseTypeConversionKind_Signed,     kBaseTypeConversionRank_Int8},
+        { "int16_t",	BaseType::Int16,    SINT_MASK,  kBaseTypeConversionKind_Signed,     kBaseTypeConversionRank_Int16},
+        { "int",	    BaseType::Int,      SINT_MASK,  kBaseTypeConversionKind_Signed,     kBaseTypeConversionRank_Int32},
+        { "int64_t",	BaseType::Int64,    SINT_MASK,  kBaseTypeConversionKind_Signed,     kBaseTypeConversionRank_Int64},
 
         { "half",	BaseType::Half,     FLOAT_MASK, kBaseTypeConversionKind_Float,      kBaseTypeConversionRank_Int16},
         { "float",	BaseType::Float,    FLOAT_MASK, kBaseTypeConversionKind_Float,      kBaseTypeConversionRank_Int32},
         { "double",	BaseType::Double,   FLOAT_MASK, kBaseTypeConversionKind_Float,      kBaseTypeConversionRank_Int64},
 
-        { "uint",	BaseType::UInt,     UINT_MASK,  kBaseTypeConversionKind_Unsigned,   kBaseTypeConversionRank_Int32},
-        { "uint64_t", BaseType::UInt64, UINT_MASK,  kBaseTypeConversionKind_Unsigned,   kBaseTypeConversionRank_Int64},
+        { "uint8_t",	BaseType::UInt8,    UINT_MASK,  kBaseTypeConversionKind_Unsigned,   kBaseTypeConversionRank_Int8},
+        { "uint16_t",	BaseType::UInt16,   UINT_MASK,  kBaseTypeConversionKind_Unsigned,   kBaseTypeConversionRank_Int16},
+        { "uint",	    BaseType::UInt,     UINT_MASK,  kBaseTypeConversionKind_Unsigned,   kBaseTypeConversionRank_Int32},
+        { "uint64_t",   BaseType::UInt64,   UINT_MASK,  kBaseTypeConversionKind_Unsigned,   kBaseTypeConversionRank_Int64},
     };
 
     // Given two base types, we need to be able to compute the cost of converting between them.

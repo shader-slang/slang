@@ -550,10 +550,13 @@ namespace Slang
         void initializeTypes();
 
         Type* getBoolType();
+        Type* getHalfType();
         Type* getFloatType();
         Type* getDoubleType();
         Type* getIntType();
+        Type* getInt64Type();
         Type* getUIntType();
+        Type* getUInt64Type();
         Type* getVoidType();
         Type* getBuiltinType(BaseType flavor);
 

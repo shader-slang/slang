@@ -510,7 +510,6 @@ struct SimpleLayoutRulesImpl
 {
     // Get size and alignment for a single value of base type.
     virtual SimpleLayoutInfo GetScalarLayout(BaseType baseType) = 0;
-    virtual SimpleLayoutInfo GetScalarLayout(slang::TypeReflection::ScalarType scalarType) = 0;
 
     // Get size and alignment for an array of elements
     virtual SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, size_t elementCount) = 0;
@@ -546,11 +545,6 @@ struct LayoutRulesImpl
     SimpleLayoutInfo GetScalarLayout(BaseType baseType)
     {
         return simpleRules->GetScalarLayout(baseType);
-    }
-
-    SimpleLayoutInfo GetScalarLayout(slang::TypeReflection::ScalarType scalarType)
-    {
-        return simpleRules->GetScalarLayout(scalarType);
     }
 
     SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, size_t elementCount)

@@ -24,42 +24,6 @@ namespace Slang
         return this;
     }
 
-    Slang::String BasicExpressionType::ToString()
-    {
-        Slang::StringBuilder res;
-
-        switch (this->baseType)
-        {
-        case Slang::BaseType::Int:
-            res.Append("int");
-            break;
-        case Slang::BaseType::UInt:
-            res.Append("uint");
-            break;
-        case Slang::BaseType::UInt64:
-            res.Append("uint64_t");
-            break;
-        case Slang::BaseType::Bool:
-            res.Append("bool");
-            break;
-        case Slang::BaseType::Float:
-            res.Append("float");
-            break;
-        case Slang::BaseType::Double:
-            res.Append("double");
-            break;
-        case Slang::BaseType::Half:
-            res.Append("half");
-            break;
-        case Slang::BaseType::Void:
-            res.Append("void");
-            break;
-        default:
-            break;
-        }
-        return res.ProduceString();
-    }
-
     // Generate dispatch logic and other definitions for all syntax classes
 #define SYNTAX_CLASS(NAME, BASE) /* empty */
 #include "object-meta-begin.h"
@@ -235,6 +199,11 @@ void Type::accept(IValVisitor* visitor, void* extra)
         return getBuiltinType(BaseType::Bool);
     }
 
+    Type* Session::getHalfType()
+    {
+        return getBuiltinType(BaseType::Half);
+    }
+
     Type* Session::getFloatType()
     {
         return getBuiltinType(BaseType::Float);
@@ -250,9 +219,19 @@ void Type::accept(IValVisitor* visitor, void* extra)
         return getBuiltinType(BaseType::Int);
     }
 
+    Type* Session::getInt64Type()
+    {
+        return getBuiltinType(BaseType::Int64);
+    }
+
     Type* Session::getUIntType()
     {
         return getBuiltinType(BaseType::UInt);
+    }
+
+    Type* Session::getUInt64Type()
+    {
+        return getBuiltinType(BaseType::UInt64);
     }
 
     Type* Session::getVoidType()

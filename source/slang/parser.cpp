@@ -4035,8 +4035,17 @@ namespace Slang
                     {
                         suffixType = parser->getSession()->getIntType();
                     }
-                    // TODO: probably need `ll` and `ull`
-                    // TODO: are there other suffixes we need to handle?
+                    // `ull` suffix -> `uint64_t`
+                    else if(uCount == 1 && lCount == 2)
+                    {
+                        suffixType = parser->getSession()->getUInt64Type();
+                    }
+                    // `ll` suffix -> `int64_t`
+                    else if(uCount == 0 && lCount == 2)
+                    {
+                        suffixType = parser->getSession()->getInt64Type();
+                    }
+                    // TODO: do we need suffixes for smaller integer types?
                     else
                     {
                         parser->sink->diagnose(token, Diagnostics::invalidIntegerLiteralSuffix, suffix);
@@ -4070,6 +4079,7 @@ namespace Slang
                 {
                     int fCount = 0;
                     int lCount = 0;
+                    int hCount = 0;
                     int unknownCount = 0;
                     while(*suffixCursor)
                     {
@@ -4081,6 +4091,10 @@ namespace Slang
 
                         case 'l': case 'L':
                             lCount++;
+                            break;
+
+                        case 'h': case 'H':
+                            hCount++;
                             break;
 
                         default:
@@ -4099,10 +4113,15 @@ namespace Slang
                     {
                         suffixType = parser->getSession()->getFloatType();
                     }
-                    // `l` or `lf` suffix on float -> `double`
+                    // `l` or `lf` suffix on floating-point literal -> `double`
                     else if(lCount == 1 && (fCount <= 1))
                     {
                         suffixType = parser->getSession()->getDoubleType();
+                    }
+                    // `h` or `hf` suffix on floating-point literal -> `half`
+                    else if(lCount == 1 && (fCount <= 1))
+                    {
+                        suffixType = parser->getSession()->getHalfType();
                     }
                     // TODO: are there other suffixes we need to handle?
                     else

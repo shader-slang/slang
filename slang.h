@@ -1145,6 +1145,10 @@ extern "C"
         SLANG_SCALAR_TYPE_FLOAT16,
         SLANG_SCALAR_TYPE_FLOAT32,
         SLANG_SCALAR_TYPE_FLOAT64,
+        SLANG_SCALAR_TYPE_INT8,
+        SLANG_SCALAR_TYPE_UINT8,
+        SLANG_SCALAR_TYPE_INT16,
+        SLANG_SCALAR_TYPE_UINT16,
     };
 
     typedef unsigned int SlangResourceShape;

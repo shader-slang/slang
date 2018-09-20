@@ -49,7 +49,7 @@ namespace Slang
         kConversionCost_CastToInterface = 50,
 
         // Conversion that is lossless and keeps the "kind" of the value the same
-        kConversionCost_RankPromotion = 100,
+        kConversionCost_RankPromotion = 150,
 
         // Conversions that are lossless, but change "kind"
         kConversionCost_UnsignedToSignedPromotion = 200,

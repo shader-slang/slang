@@ -34,43 +34,35 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
     {
         switch (baseType)
         {
-        case BaseType::Int:
-        case BaseType::UInt:
-        case BaseType::Float:
-        case BaseType::Bool:
-            return SimpleLayoutInfo( LayoutResourceKind::Uniform, 4, 4 );
+        case BaseType::Void:    return SimpleLayoutInfo();
 
-        case BaseType::Double:
-            return SimpleLayoutInfo( LayoutResourceKind::Uniform, 8, 8 );
+        // Note: By convention, a `bool` in a constant buffer is stored as an `int.
+        // This default may eventually change, at which point this logic will need
+        // to be updated.
+        //
+        // TODO: We should probably warn in this case, since storing a `bool` in
+        // a constant buffer seems like a Bad Idea anyway.
+        //
+        case BaseType::Bool:    return SimpleLayoutInfo( LayoutResourceKind::Uniform, 4, 4 );
+
+
+        case BaseType::Int8:    return SimpleLayoutInfo( LayoutResourceKind::Uniform, 1,1);
+        case BaseType::Int16:   return SimpleLayoutInfo( LayoutResourceKind::Uniform, 2,2);
+        case BaseType::Int:     return SimpleLayoutInfo( LayoutResourceKind::Uniform, 4,4);
+        case BaseType::Int64:   return SimpleLayoutInfo( LayoutResourceKind::Uniform, 8,8);
+
+        case BaseType::UInt8:   return SimpleLayoutInfo( LayoutResourceKind::Uniform, 1,1);
+        case BaseType::UInt16:  return SimpleLayoutInfo( LayoutResourceKind::Uniform, 2,2);
+        case BaseType::UInt:    return SimpleLayoutInfo( LayoutResourceKind::Uniform, 4,4);
+        case BaseType::UInt64:  return SimpleLayoutInfo( LayoutResourceKind::Uniform, 8,8);
+
+        case BaseType::Half:    return SimpleLayoutInfo( LayoutResourceKind::Uniform, 2,2);
+        case BaseType::Float:   return SimpleLayoutInfo( LayoutResourceKind::Uniform, 4,4);
+        case BaseType::Double:  return SimpleLayoutInfo( LayoutResourceKind::Uniform, 8,8);
 
         default:
             SLANG_UNEXPECTED("uhandled scalar type");
             UNREACHABLE_RETURN(SimpleLayoutInfo( LayoutResourceKind::Uniform, 0, 1 ));
-        }
-    }
-
-    virtual SimpleLayoutInfo GetScalarLayout(slang::TypeReflection::ScalarType scalarType)
-    {
-        switch( scalarType )
-        {
-        case slang::TypeReflection::ScalarType::Void:       return SimpleLayoutInfo();
-        case slang::TypeReflection::ScalarType::None:       return SimpleLayoutInfo();
-
-        // TODO(tfoley): At some point we don't want to lay out `bool` as 4 bytes by default...
-        case slang::TypeReflection::ScalarType::Bool:       return SimpleLayoutInfo( LayoutResourceKind::Uniform, 4,4);
-        case slang::TypeReflection::ScalarType::Int32:      return SimpleLayoutInfo( LayoutResourceKind::Uniform, 4,4);
-        case slang::TypeReflection::ScalarType::UInt32:     return SimpleLayoutInfo( LayoutResourceKind::Uniform, 4,4);
-        case slang::TypeReflection::ScalarType::Int64:      return SimpleLayoutInfo( LayoutResourceKind::Uniform, 8,8);
-        case slang::TypeReflection::ScalarType::UInt64:     return SimpleLayoutInfo( LayoutResourceKind::Uniform, 8,8);
-
-        // TODO(tfoley): What actually happens if you use `half` in a constant buffer?
-        case slang::TypeReflection::ScalarType::Float16:    return SimpleLayoutInfo( LayoutResourceKind::Uniform, 2,2);
-        case slang::TypeReflection::ScalarType::Float32:    return SimpleLayoutInfo( LayoutResourceKind::Uniform, 4,4);
-        case slang::TypeReflection::ScalarType::Float64:    return SimpleLayoutInfo( LayoutResourceKind::Uniform, 8,8);
-
-        default:
-            SLANG_UNEXPECTED("unhandled scalar type");
-            UNREACHABLE_RETURN(SimpleLayoutInfo());
         }
     }
 
@@ -267,14 +259,6 @@ struct DefaultVaryingLayoutRulesImpl : DefaultLayoutRulesImpl
             1);
     }
 
-    virtual SimpleLayoutInfo GetScalarLayout(slang::TypeReflection::ScalarType)
-    {
-        // Assume that all scalars take up one "slot"
-        return SimpleLayoutInfo(
-            getKind(),
-            1);
-    }
-
     SimpleLayoutInfo GetVectorLayout(SimpleLayoutInfo, size_t) override
     {
         // Vectors take up one slot by default
@@ -311,14 +295,6 @@ struct GLSLSpecializationConstantLayoutRulesImpl : DefaultLayoutRulesImpl
     }
 
     SimpleLayoutInfo GetScalarLayout(BaseType) override
-    {
-        // Assume that all scalars take up one "slot"
-        return SimpleLayoutInfo(
-            getKind(),
-            1);
-    }
-
-    virtual SimpleLayoutInfo GetScalarLayout(slang::TypeReflection::ScalarType)
     {
         // Assume that all scalars take up one "slot"
         return SimpleLayoutInfo(

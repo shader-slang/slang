@@ -85,7 +85,6 @@ RAW(
         Slang::BaseType baseType)
         : baseType(baseType)
     {}
-    virtual Slang::String ToString() override;
 protected:
     virtual BasicExpressionType* GetScalarType() override;
     virtual bool EqualsImpl(Type * type) override;
