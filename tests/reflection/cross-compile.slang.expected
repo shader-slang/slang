@@ -42,13 +42,6 @@ standard output = {
                     ]
                 }
             }
-        },
-        {
-            "name": "SLANG_hack_samplerForTexelFetch",
-            "binding": {"kind": "descriptorTableSlot", "index": 3},
-            "type": {
-                "kind": "samplerState"
-            }
         }
     ]
 }
