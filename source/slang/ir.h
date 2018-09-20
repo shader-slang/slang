@@ -40,31 +40,29 @@ enum : IROpFlags
 
 enum IROp : int32_t
 {
+    // Main instructions
 #define INST(ID, MNEMONIC, ARG_COUNT, FLAGS)  \
     kIROp_##ID,
-
-#define MANUAL_INST_RANGE(ID, START, COUNT) \
-    kIROp_First##ID = START, kIROp_Last##ID = kIROp_First##ID + ((COUNT) - 1),
-
 #include "ir-inst-defs.h"
+    kIROp_MainInstructionCount,
 
-    kIROpCount,
-
+    // Psuedo ops
     // We use the negative range of opcode values
     // to encode "pseudo" instructions that should
     // not appear in valid IR.
-
     kIRPseduoOp_FirstPseudo = -1000,
-
 #define INST(ID, MNEMONIC, ARG_COUNT, FLAGS) /* empty */
 #define PSEUDO_INST(ID) kIRPseudoOp_##ID,
-
 #include "ir-inst-defs.h"
 
+    // Ranges
 #define INST(ID, MNEMONIC, ARG_COUNT, FLAGS) /* empty */
+    // Ranges, manual and otherwise
 #define INST_RANGE(BASE, FIRST, LAST)       \
     kIROp_First##BASE   = kIROp_##FIRST,    \
     kIROp_Last##BASE    = kIROp_##LAST,
+#define MANUAL_INST_RANGE(ID, START, COUNT) \
+    kIROp_First##ID = START, kIROp_Last##ID = kIROp_First##ID + ((COUNT) - 1),
 
 #include "ir-inst-defs.h"
 
