@@ -88,6 +88,10 @@ INST(Nop, nop, 0, 0)
                 MANUAL_INST_RANGE(TextureSamplerType, 0x20000, TextureFlavor::Count)
                 /* GLSLImageType */
                 MANUAL_INST_RANGE(GLSLImageType, 0x30000, TextureFlavor::Count)
+
+                // Define the manual range that type uses
+                MANUAL_INST_RANGE(TypeManualRange, 0x10000, 0x30000 + TextureFlavor::Count - 0x10000)
+
             INST_RANGE(TextureTypeBase, FirstTextureType, LastGLSLImageType)
         INST_RANGE(ResourceType, FirstTextureType, LastGLSLImageType)
     INST_RANGE(ResourceTypeBase, FirstTextureType, LastGLSLImageType)

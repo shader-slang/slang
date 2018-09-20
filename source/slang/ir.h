@@ -406,6 +406,8 @@ struct IRInstList : IRInstListBase
 #define IR_LEAF_ISA(NAME) static bool isaImpl(IROp op) { return op == kIROp_##NAME; }
 #define IR_PARENT_ISA(NAME) static bool isaImpl(IROp op) { return op >= kIROp_First##NAME && op <= kIROp_Last##NAME; }
 
+#define IR_PARENT_ISA_WITH_MANUAL_RANGE(NAME, MANUAL_RANGE) static bool isaImpl(IROp op) {  return (op >= kIROp_First##NAME && op <= kIROp_Last##NAME) || (op >= kIROp_First##MANUAL_RANGE && op <= kIROp_Last##MANUAL_RANGE); }
+
 #define SIMPLE_IR_TYPE(NAME, BASE) struct IR##NAME : IR##BASE { IR_LEAF_ISA(NAME) };
 #define SIMPLE_IR_PARENT_TYPE(NAME, BASE) struct IR##NAME : IR##BASE { IR_PARENT_ISA(NAME) };
 
@@ -416,7 +418,7 @@ struct IRType : IRInst
 {
     IRType* getCanonicalType() { return this; }
 
-    IR_PARENT_ISA(Type)
+    IR_PARENT_ISA_WITH_MANUAL_RANGE(Type, TypeManualRange)
 };
 
 struct IRBasicType : IRType
