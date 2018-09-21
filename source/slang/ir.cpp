@@ -25,15 +25,40 @@ namespace Slang
     // a hash table to be stored as a `static const` array.
     static const IROpMapEntry kIROps[] =
     {
-        { kIROp_Invalid, { "invalid", 0, 0 } },
-
+        
+    // Main ops in order
 #define INST(ID, MNEMONIC, ARG_COUNT, FLAGS)  \
     { kIROp_##ID, { #MNEMONIC, ARG_COUNT, FLAGS, } },
+
+    // Pseudo ops
+    { kIROp_Invalid,{ "invalid", 0, 0 } },
 #define PSEUDO_INST(ID)  \
     { kIRPseudoOp_##ID, { #ID, 0, 0 } },
 #include "ir-inst-defs.h"
 
     };
+
+    IROpInfo getIROpInfo(IROp opIn)
+    {
+        int op = opIn & kIROp_Mask_OpMask;
+        if (op & kIROp_Mask_IsPseudoOp)
+        {
+            SLANG_ASSERT(op < kIRPseudoOp_LastPlusOne);
+            const int index = op - kIRPseudoOp_First;
+
+            return kIROps[kIROpCount + index].info;
+
+
+        }
+
+        for (auto ee : kIROps)
+        {
+            if (ee.op == op)
+                return ee.info;
+        }
+
+        return kIROps[0].info;
+    }
 
     //
 
@@ -48,16 +73,7 @@ namespace Slang
         return IROp(kIROp_Invalid);
     }
 
-    IROpInfo getIROpInfo(IROp op)
-    {
-        for (auto ee : kIROps)
-        {
-            if (ee.op == op)
-                return ee.info;
-        }
-
-        return kIROps[0].info;
-    }
+    
 
     //
 

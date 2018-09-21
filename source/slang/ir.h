@@ -63,10 +63,13 @@ enum IROp : int32_t
 
     
     kIROp_Invalid = 0x100,                                      ///< If bit set, then in pseudo/not normal space 
-    kIRPseduoOp_FirstPseudo,
+    kIROp_Mask_IsPseudoOp = kIROp_Invalid,                     ///< 'And' with op, if set, the op is a psuedo op
+    kIRPseudoOp_First = kIROp_Invalid,
 
 #define INST(ID, MNEMONIC, ARG_COUNT, FLAGS) /* empty */
 #define PSEUDO_INST(ID) kIRPseudoOp_##ID,
+
+    kIRPseudoOp_LastPlusOne,
 
 #include "ir-inst-defs.h"
 
@@ -83,7 +86,7 @@ enum IROp : int32_t
 };
 
 // True if op is pseudo (or invalid which is 'pseudo-like' at least in as so far as current behavior)
-SLANG_FORCE_INLINE bool isPseudoOp(IROp op) { return (op & kIROp_Invalid) != 0; }
+SLANG_FORCE_INLINE bool isPseudoOp(IROp op) { return (op & kIROp_Mask_IsPseudoOp) != 0; }
 
 IROp findIROp(char const* name);
 
