@@ -176,6 +176,7 @@
     <ClInclude Include="..\..\external\glslang\SPIRV\Logger.h" />
     <ClInclude Include="..\..\external\glslang\SPIRV\SPVRemapper.h" />
     <ClInclude Include="..\..\external\glslang\SPIRV\SpvBuilder.h" />
+    <ClInclude Include="..\..\external\glslang\SPIRV\SpvTools.h" />
     <ClInclude Include="..\..\external\glslang\SPIRV\bitutils.h" />
     <ClInclude Include="..\..\external\glslang\SPIRV\disassemble.h" />
     <ClInclude Include="..\..\external\glslang\SPIRV\doc.h" />
@@ -213,6 +214,8 @@
     <ClCompile Include="..\..\external\glslang\SPIRV\Logger.cpp" />
     <ClCompile Include="..\..\external\glslang\SPIRV\SPVRemapper.cpp" />
     <ClCompile Include="..\..\external\glslang\SPIRV\SpvBuilder.cpp" />
+    <ClCompile Include="..\..\external\glslang\SPIRV\SpvPostProcess.cpp" />
+    <ClCompile Include="..\..\external\glslang\SPIRV\SpvTools.cpp" />
     <ClCompile Include="..\..\external\glslang\SPIRV\disassemble.cpp" />
     <ClCompile Include="..\..\external\glslang\SPIRV\doc.cpp" />
     <ClCompile Include="..\..\external\glslang\StandAlone\ResourceLimits.cpp" />

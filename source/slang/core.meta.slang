@@ -544,6 +544,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
             {
                 {
                     sb << "__glsl_version(450)\n";
+                    sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
                     sb << "__target_intrinsic(glsl, \"(";
 
                     int aa = 1;
@@ -556,7 +557,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                         lodStr.append(")");
                     }
 
-                    String opStr = " = textureSize($P" + lodStr;
+                    String opStr = " = textureSize($0" + lodStr;
                     switch( access )
                     {
                     case SLANG_RESOURCE_ACCESS_READ_WRITE:
@@ -603,12 +604,12 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
                     if(isMultisample)
                     {
-                        sb << ", ($" << aa++ << " = textureSamples($P))";
+                        sb << ", ($" << aa++ << " = textureSamples($0))";
                     }
 
                     if (includeMipInfo)
                     {
-                        sb << ", ($" << aa++ << " = textureQueryLevels($P))";
+                        sb << ", ($" << aa++ << " = textureQueryLevels($0))";
                     }
 
 
@@ -680,11 +681,13 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
                 if (isMultisample)
                 {
-                    sb << "__target_intrinsic(glsl, \"texelFetch($P, $1, $3)\")\n";
+                    sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
+                    sb << "__target_intrinsic(glsl, \"texelFetch($0, $1, $3)\")\n";
                 }
                 else
                 {
-                    sb << "__target_intrinsic(glsl, \"texelFetch($P, ($1)." << kGLSLLoadCoordsSwizzle[loadCoordCount] << ", ($1)." << kGLSLLoadLODSwizzle[loadCoordCount] << ")\")\n";
+                    sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
+                    sb << "__target_intrinsic(glsl, \"texelFetch($0, ($1)." << kGLSLLoadCoordsSwizzle[loadCoordCount] << ", ($1)." << kGLSLLoadLODSwizzle[loadCoordCount] << ")\")\n";
                 }
                 sb << "T Load(";
                 sb << "int" << loadCoordCount << " location";
@@ -696,11 +699,13 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
                 if (isMultisample)
                 {
-                    sb << "__target_intrinsic(glsl, \"texelFetchOffset($P, $0, $1, $2)\")\n";
+                    sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
+                    sb << "__target_intrinsic(glsl, \"texelFetchOffset($0, $0, $1, $2)\")\n";
                 }
                 else
                 {
-                    sb << "__target_intrinsic(glsl, \"texelFetch($P, ($1)." << kGLSLLoadCoordsSwizzle[loadCoordCount] << ", ($1)." << kGLSLLoadLODSwizzle[loadCoordCount] << ", $2)\")\n";
+                    sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
+                    sb << "__target_intrinsic(glsl, \"texelFetch($0, ($1)." << kGLSLLoadCoordsSwizzle[loadCoordCount] << ", ($1)." << kGLSLLoadLODSwizzle[loadCoordCount] << ", $2)\")\n";
                 }
                 sb << "T Load(";
                 sb << "int" << loadCoordCount << " location";
@@ -741,7 +746,8 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 {
                 case SLANG_RESOURCE_ACCESS_NONE:
                 case SLANG_RESOURCE_ACCESS_READ:
-                    sb << "__target_intrinsic(glsl, \"texelFetch($P, " << ivecN << "($1)";
+                    sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
+                    sb << "__target_intrinsic(glsl, \"texelFetch($0, " << ivecN << "($1)";
                     if( !isMultisample )
                     {
                         sb << ", 0";
