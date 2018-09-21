@@ -34,7 +34,7 @@ enum : IROpFlags
 {
     kIROpFlags_None = 0,
     kIROpFlag_Parent = 1 << 0,                  ///< This op is a parent op
-    kIROpFlag_UseOther = 2 << 0,                ///< If set this op can use 'other bits' to store information
+    kIROpFlag_UseOther = 1 << 1,                ///< If set this op can use 'other bits' to store information
 };
 
 /* Bit usage of IROp is a follows
