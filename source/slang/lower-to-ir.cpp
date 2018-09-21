@@ -623,7 +623,7 @@ LoweredValInfo emitCallToDeclRef(
     {
         auto op = getIntrinsicOp(funcDecl, intrinsicOpModifier);
 
-        if (Int(op) < 0)
+        if (isPseudoOp(op))
         {
             switch (op)
             {
