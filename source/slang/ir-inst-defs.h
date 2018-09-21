@@ -13,6 +13,7 @@
 #endif
 
 #define PARENT kIROpFlag_Parent
+#define USE_OTHER kIROpFlag_UseOther
 
 INST(Nop, nop, 0, 0)
 
@@ -80,11 +81,11 @@ INST(Nop, nop, 0, 0)
             /* TextureTypeBase */
                 // NOTE! TextureFlavor::Flavor is stored in 'other' bits for these types.
                 /* TextureType */
-                INST(TextureType, TextureType, 0, 0)
+                INST(TextureType, TextureType, 0, USE_OTHER)
                 /* TextureSamplerType */
-                INST(TextureSamplerType, TextureSamplerType, 0, 0)
+                INST(TextureSamplerType, TextureSamplerType, 0, USE_OTHER)
                 /* GLSLImageType */
-                INST(GLSLImageType, GLSLImageType, 0, 0) 
+                INST(GLSLImageType, GLSLImageType, 0, USE_OTHER)
             INST_RANGE(TextureTypeBase, TextureType, GLSLImageType)
         INST_RANGE(ResourceType, TextureType, GLSLImageType)
     INST_RANGE(ResourceTypeBase, TextureType, GLSLImageType)
@@ -380,6 +381,7 @@ PSEUDO_INST(Or)
 
 #undef PSEUDO_INST
 #undef PARENT
+#undef USE_OTHER
 #undef INST_RANGE
 #undef INST
 
