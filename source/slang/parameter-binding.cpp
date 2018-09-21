@@ -2231,44 +2231,6 @@ static void collectParameters(
     }
 }
 
-static bool isGLSLCrossCompilerNeeded(
-    TargetRequest*  targetReq)
-{
-    auto compileReq = targetReq->compileRequest;
-
-    // We only need cross-compilation if we
-    // are targetting something GLSL-based.
-    switch (targetReq->target)
-    {
-    default:
-        return false;
-
-    case CodeGenTarget::GLSL:
-    case CodeGenTarget::SPIRV:
-    case CodeGenTarget::SPIRVAssembly:
-        break;
-    }
-
-    // If we `import`ed any Slang code, then the
-    // cross compiler is definitely needed, to
-    // translate that Slang over to GLSL.
-    if (compileReq->loadedModulesList.Count() != 0)
-        return true;
-
-    // If there are any non-GLSL translation units,
-    // then we need to cross compile those...
-    for (auto tu : compileReq->translationUnits)
-    {
-        if (tu->sourceLanguage != SourceLanguage::GLSL)
-            return true;
-    }
-
-    // If we get to this point, then we have plain vanilla
-    // GLSL input, with no `import` declarations, so we
-    // are able to output GLSL without cross compilation.
-    return false;
-}
-
 void generateParameterBindings(
     TargetRequest*     targetReq)
 {
@@ -2355,12 +2317,6 @@ void generateParameterBindings(
                 }
             }
         }
-    }
-    // If we are having to insert our "hack" default sampler, then
-    // we need to put it in the default space.
-    if (isGLSLCrossCompilerNeeded(targetReq))
-    {
-        needDefaultSpace = true;
     }
 
     // If we need a space for default bindings, then allocate it here.
@@ -2504,39 +2460,6 @@ void generateParameterBindings(
         globalScopeLayout = globalConstantBufferLayout;
     }
 
-    // Final final step: pick a binding for the "hack sampler", if needed...
-    //
-    // We only want to do this if the GLSL cross-compilation support is
-    // being invoked, so that we don't gum up other shaders.
-    if(isGLSLCrossCompilerNeeded(targetReq))
-    {
-        UInt space = sharedContext.defaultSpace;
-        auto hackSamplerUsedRanges = findUsedRangeSetForSpace(&context, space);
-
-        UInt binding = hackSamplerUsedRanges->usedResourceRanges[(int)LayoutResourceKind::DescriptorTableSlot].Allocate(nullptr, 1);
-
-        programLayout->bindingForHackSampler = (int)binding;
-
-        RefPtr<Variable> var = new Variable();
-        var->nameAndLoc.name = compileReq->getNamePool()->getName("SLANG_hack_samplerForTexelFetch");
-        var->type.type = getSamplerStateType(compileReq->mSession);
-
-        auto typeLayout = new TypeLayout();
-        typeLayout->type = var->type.type;
-        typeLayout->addResourceUsage(LayoutResourceKind::DescriptorTableSlot, 1);
-
-        auto varLayout = new VarLayout();
-        varLayout->varDecl = makeDeclRef(var.Ptr());
-        varLayout->typeLayout = typeLayout;
-        auto resInfo = varLayout->AddResourceInfo(LayoutResourceKind::DescriptorTableSlot);
-        resInfo->index = binding;
-        resInfo->space = space;
-
-        programLayout->hackSamplerVar = var;
-
-        globalScopeStructLayout->fields.Add(varLayout);
-    }
-
     // We now have a bunch of layout information, which we should
     // record into a suitable object that represents the program
     RefPtr<VarLayout> globalVarLayout = new VarLayout();
@@ -2561,8 +2484,6 @@ RefPtr<ProgramLayout> specializeProgramLayout(
     RefPtr<ProgramLayout> newProgramLayout;
     newProgramLayout = new ProgramLayout();
     newProgramLayout->targetRequest = targetReq;
-    newProgramLayout->bindingForHackSampler = programLayout->bindingForHackSampler;
-    newProgramLayout->hackSamplerVar = programLayout->hackSamplerVar;
     newProgramLayout->globalGenericParams = programLayout->globalGenericParams;
 
     List<RefPtr<TypeLayout>> paramTypeLayouts;
