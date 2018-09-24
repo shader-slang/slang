@@ -146,10 +146,13 @@ enum IRDecorationOp : uint16_t
     kIRDecorationOp_Semantic,
     kIRDecorationOp_InterpolationMode,
     kIRDecorationOp_NameHint,
+
         /**  The _instruction_ is transitory. Such a decoration should NEVER be found on an output instruction a module. 
         Typically used mark an instruction so can be specially handled - say when creating a IRConstant literal, and the payload of 
         needs to be special cased for lookup. */ 
-    kIRDecorationOp_Transitory,             
+    kIRDecorationOp_Transitory,   
+    
+    kIRDecorationOp_CountOf          
 };
 
 // represents an object allocated in an IR memory arena
