@@ -8,7 +8,7 @@
 
 namespace Slang {
 
-struct IRSerialInfo
+struct IRSerialData
 {
     enum class InstIndex : uint32_t;
     enum class StringIndex : uint32_t;
@@ -101,7 +101,7 @@ struct IRSerialInfo
     UnownedStringSlice getStringSlice(StringIndex index) const;
 
         /// Ctor
-    IRSerialInfo():
+    IRSerialData():
         m_decorationBaseIndex(0)
     {}
 
@@ -118,20 +118,47 @@ struct IRSerialInfo
     int m_decorationBaseIndex;                  ///< All decorations insts are at indices >= to this value
 };
 
-struct IRSerializer
+#define SLANG_FOUR_CC(c0, c1, c2, c3) ((uint32_t(c0) << 24) | (uint32_t(c0) << 16) | (uint32_t(c0) << 8) | (uint32_t(c0) << 0)) 
+
+struct IRSerialBinary
 {
     // http://fileformats.archiveteam.org/wiki/RIFF
     // http://www.fileformat.info/format/riff/egff.htm
-
-    typedef IRSerialInfo Ser;
 
     struct Chunk
     {
         uint32_t m_type;
         uint32_t m_size;
     };
+    static const uint32_t kRiffFourCc = SLANG_FOUR_CC('R', 'I', 'F', 'F');
+    static const uint32_t kSlangFourCc = SLANG_FOUR_CC('S', 'L', 'N', 'G');             ///< Holds all the slang specific chunks
 
-    Result write(IRModule* module, IRSerialInfo* serialInfo);
+    static const uint32_t kInstFourCc = SLANG_FOUR_CC('S', 'L', 'i', 'n');
+    static const uint32_t kDecoratorRunFourCc = SLANG_FOUR_CC('S', 'L', 'd', 'r');
+    static const uint32_t kChildRunFourCc = SLANG_FOUR_CC('S', 'L', 'c', 'r');
+    static const uint32_t kExternalOperandsFourCc = SLANG_FOUR_CC('S', 'L', 'e', 'o');
+    static const uint32_t kStringFourCc = SLANG_FOUR_CC('S', 'L', 's', 't');
+
+    struct SlangHeader
+    {
+        Chunk m_chunk;
+        uint32_t m_decorationBase;
+    };
+    struct ArrayHeader
+    {
+        Chunk m_chunk;
+        uint32_t m_numEntries;
+    };
+};
+
+struct IRSerialWriter
+{
+
+    typedef IRSerialData Ser;
+
+    Result write(IRModule* module, IRSerialData* serialData);
+
+    static Result writeStream(const IRSerialData& data, Stream* stream);
 
         /// Get an instruction index from an instruction
     Ser::InstIndex getInstIndex(IRInst* inst) const { return inst ? Ser::InstIndex(m_instMap[inst]) : Ser::InstIndex(0); }
@@ -139,9 +166,10 @@ struct IRSerializer
     Ser::StringIndex getStringIndex(StringRepresentation* string) { return string ? getStringIndex(StringRepresentation::asSlice(string)) : Ser::kNullStringIndex; }
     Ser::StringIndex getStringIndex(const UnownedStringSlice& string);
     Ser::StringIndex getStringIndex(Name* name) { return name ? getStringIndex(name->text.getUnownedSlice()) : Ser::kNullStringIndex; }
+    Ser::StringIndex getStringIndex(const char* chars) { return chars ? getStringIndex(UnownedStringSlice(chars)) : Ser::kNullStringIndex; }
 
-    IRSerializer():
-        m_serialInfo(nullptr),
+    IRSerialWriter():
+        m_serialData(nullptr),
         m_arena(1024 * 4)
     {}
 
@@ -159,16 +187,14 @@ struct IRSerializer
 
     MemoryArena m_arena;
 
-    IRSerialInfo* m_serialInfo;                               ///< Where the data is stored
+    IRSerialData* m_serialData;                               ///< Where the data is stored
 };
 
-
-#define SLANG_FOUR_CC(c0, c1, c2, c3) ((uint32_t(c0) << 24) | (uint32_t(c0) << 16) | (uint32_t(c0) << 8) | (uint32_t(c0) << 0)) 
 
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! IRSerialInfo !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-UnownedStringSlice IRSerialInfo::getStringSlice(StringIndex index) const
+UnownedStringSlice IRSerialData::getStringSlice(StringIndex index) const
 {
     if (index == StringIndex(0))
     {
@@ -189,10 +215,9 @@ UnownedStringSlice IRSerialInfo::getStringSlice(StringIndex index) const
     return UnownedStringSlice(reader.m_pos, len);
 }
 
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! IRSerialWriter !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! IRSerializer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-void IRSerializer::_addInstruction(IRInst* inst)
+void IRSerialWriter::_addInstruction(IRInst* inst)
 {
     // It cannot already be in the map
     SLANG_ASSERT(!m_instMap.ContainsKey(inst));
@@ -225,11 +250,11 @@ void IRSerializer::_addInstruction(IRInst* inst)
         run.m_startInstIndex = Ser::InstIndex(initialNumDecor);
         run.m_numChildren = numDecor;
 
-        m_serialInfo->m_decorationRuns.Add(run);
+        m_serialData->m_decorationRuns.Add(run);
     }
 }
 
-Result IRSerializer::write(IRModule* module, IRSerialInfo* serialInfo)
+Result IRSerialWriter::write(IRModule* module, IRSerialData* serialInfo)
 {
     // Lets find all of the instructions
     // Each instruction can only have one parent
@@ -237,7 +262,7 @@ Result IRSerializer::write(IRModule* module, IRSerialInfo* serialInfo)
     // Then all 'child' nodes will be in order, and thus we only have to store the start instruction
     // and the amount of instructions 
 
-    m_serialInfo = serialInfo;
+    m_serialData = serialInfo;
 
     serialInfo->clear();
 
@@ -295,35 +320,35 @@ Result IRSerializer::write(IRModule* module, IRSerialInfo* serialInfo)
             run.m_startInstIndex = startChildInstIndex;
             run.m_numChildren = Ser::SizeType(m_insts.Count() - int(startChildInstIndex));
 
-            m_serialInfo->m_childRuns.Add(run);
+            m_serialData->m_childRuns.Add(run);
         }
     }
 
     // Now fix the decorations 
     {
         const int decorationBaseIndex = int(m_insts.Count());
-        m_serialInfo->m_decorationBaseIndex = decorationBaseIndex;
-        const int numDecorRuns = int(m_serialInfo->m_decorationRuns.Count());
+        m_serialData->m_decorationBaseIndex = decorationBaseIndex;
+        const int numDecorRuns = int(m_serialData->m_decorationRuns.Count());
 
         // Work out the total num of decoration
         int totalNumDecorations = 0;
         if (numDecorRuns)
         {
-            const auto& lastDecorInfo = m_serialInfo->m_decorationRuns.Last();
+            const auto& lastDecorInfo = m_serialData->m_decorationRuns.Last();
             totalNumDecorations = int(lastDecorInfo.m_startInstIndex) + lastDecorInfo.m_numChildren;
         }
 
         // Fix the indices
         for (int i = 0; i < numDecorRuns; ++i)
         {
-            Ser::InstRun& info = m_serialInfo->m_decorationRuns[i];
+            Ser::InstRun& info = m_serialData->m_decorationRuns[i];
             info.m_startInstIndex = Ser::InstIndex(decorationBaseIndex + int(info.m_startInstIndex));
         }
 
         // Set to the right size
-        m_serialInfo->m_insts.SetSize(decorationBaseIndex + totalNumDecorations);
+        m_serialData->m_insts.SetSize(decorationBaseIndex + totalNumDecorations);
         // Clear all instructions
-        memset(m_serialInfo->m_insts.begin(), 0, sizeof(Ser::Inst) * m_serialInfo->m_insts.Count());
+        memset(m_serialData->m_insts.begin(), 0, sizeof(Ser::Inst) * m_serialData->m_insts.Count());
     }
 
     // Need to set up the actual instructions
@@ -333,7 +358,7 @@ Result IRSerializer::write(IRModule* module, IRSerialInfo* serialInfo)
         for (int i = 1; i < numInsts; ++i)
         {
             IRInst* srcInst = m_insts[i];
-            Ser::Inst& dstInst = m_serialInfo->m_insts[i];
+            Ser::Inst& dstInst = m_serialData->m_insts[i];
             
             dstInst.m_op = uint8_t(srcInst->op);
             dstInst.m_payloadType = Ser::Inst::PayloadType::Empty;
@@ -394,10 +419,10 @@ Result IRSerializer::write(IRModule* module, IRSerialInfo* serialInfo)
             {
                 dstInst.m_payloadType = Ser::Inst::PayloadType::ExternalOperand;
 
-                int operandArrayBaseIndex = int(m_serialInfo->m_externalOperands.Count());
-                m_serialInfo->m_externalOperands.SetSize(operandArrayBaseIndex + numOperands);
+                int operandArrayBaseIndex = int(m_serialData->m_externalOperands.Count());
+                m_serialData->m_externalOperands.SetSize(operandArrayBaseIndex + numOperands);
 
-                dstOperands = m_serialInfo->m_externalOperands.begin() + operandArrayBaseIndex; 
+                dstOperands = m_serialData->m_externalOperands.begin() + operandArrayBaseIndex; 
 
                 auto& externalOperands = dstInst.m_payload.m_externalOperand;
                 externalOperands.m_arrayIndex = Ser::ArrayIndex(operandArrayBaseIndex);
@@ -415,9 +440,9 @@ Result IRSerializer::write(IRModule* module, IRSerialInfo* serialInfo)
     // Now need to do the decorations
 
     {
-        const int decorationBaseIndex = m_serialInfo->m_decorationBaseIndex;
+        const int decorationBaseIndex = m_serialData->m_decorationBaseIndex;
         const int numDecor = int(m_decorations.Count());
-        SLANG_ASSERT(decorationBaseIndex + numDecor == m_serialInfo->m_insts.Count());
+        SLANG_ASSERT(decorationBaseIndex + numDecor == m_serialData->m_insts.Count());
 
         // Have to be able to store in a byte!
         SLANG_COMPILE_TIME_ASSERT(kIROpCount + kIRDecorationOp_CountOf < 0x100);
@@ -425,7 +450,7 @@ Result IRSerializer::write(IRModule* module, IRSerialInfo* serialInfo)
         for (int i = 0; i < numDecor; ++i)
         {
             IRDecoration* srcDecor = m_decorations[i];
-            Ser::Inst& dstInst = m_serialInfo->m_insts[decorationBaseIndex + i];
+            Ser::Inst& dstInst = m_serialData->m_insts[decorationBaseIndex + i];
 
             dstInst.m_op = uint8_t(kIROpCount + srcDecor->op);
 
@@ -473,9 +498,7 @@ Result IRSerializer::write(IRModule* module, IRSerialInfo* serialInfo)
                     auto arrayDecor = static_cast<IRGLSLOuterArrayDecoration*>(srcDecor);
                     dstInst.m_payloadType = Ser::Inst::PayloadType::String_1;
 
-                    UnownedStringSlice slice = arrayDecor->outerArrayName ? UnownedStringSlice(arrayDecor->outerArrayName) : UnownedStringSlice();
-
-                    dstInst.m_payload.m_stringIndices[0] = getStringIndex(slice);
+                    dstInst.m_payload.m_stringIndices[0] = getStringIndex(arrayDecor->outerArrayName);
                     break;
                 }
                 case kIRDecorationOp_Semantic:
@@ -503,12 +526,12 @@ Result IRSerializer::write(IRModule* module, IRSerialInfo* serialInfo)
         }
     }
 
-    m_serialInfo = nullptr;
+    m_serialData = nullptr;
 
     return SLANG_OK;
 }
 
-IRSerialInfo::StringIndex IRSerializer::getStringIndex(const UnownedStringSlice& slice)
+IRSerialData::StringIndex IRSerialWriter::getStringIndex(const UnownedStringSlice& slice)
 {
     const int len = int(slice.size());
     if (len <= 0)
@@ -525,11 +548,11 @@ IRSerialInfo::StringIndex IRSerializer::getStringIndex(const UnownedStringSlice&
     // We need to write into the the string array
     char prefixBytes[6];
     const int numPrefixBytes = EncodeUnicodePointToUTF8(prefixBytes, len);
-    const int baseIndex = int(m_serialInfo->m_strings.Count());
+    const int baseIndex = int(m_serialData->m_strings.Count());
 
-    m_serialInfo->m_strings.SetSize(baseIndex + numPrefixBytes + len);
+    m_serialData->m_strings.SetSize(baseIndex + numPrefixBytes + len);
 
-    char* dst = m_serialInfo->m_strings.begin() + baseIndex;
+    char* dst = m_serialData->m_strings.begin() + baseIndex;
 
     memcpy(dst, prefixBytes, numPrefixBytes);
     memcpy(dst + numPrefixBytes, slice.begin(), len);
@@ -542,22 +565,102 @@ IRSerialInfo::StringIndex IRSerializer::getStringIndex(const UnownedStringSlice&
     return Ser::StringIndex(baseIndex);
 }
 
+template <typename T>
+static size_t _calcChunkSize(const List<T>& array)
+{
+    typedef IRSerialBinary Bin;
+
+    if (array.Count())
+    {
+        return sizeof(Bin::ArrayHeader) - sizeof(Bin::Chunk) + sizeof(T) * array.Count();
+    }
+    else
+    {
+        return 0;
+    }
+}
+
+template <typename T>
+Result _writeArrayChunk(uint32_t chunkId, const List<T>& array, Stream* stream)
+{
+    typedef IRSerialBinary Bin;
+
+    if (array.Count() == 0)
+    {
+        return SLANG_OK;
+    }
+
+    size_t payloadSize = sizeof(Bin::ArrayHeader) - sizeof(Bin::Chunk) + sizeof(T) * array.Count();
+
+    Bin::ArrayHeader header;
+    header.m_chunk.m_type = chunkId;
+    header.m_chunk.m_size = uint32_t(payloadSize);
+    header.m_numEntries = uint32_t(array.Count());
+
+    stream->Write(&header, sizeof(header));
+
+    stream->Write(array.begin(), sizeof(T) * array.Count());
+
+    // All chunks have sizes rounded to dword size
+    if (payloadSize & 3)
+    {
+        const uint8_t pad[4] = { 0, 0, 0, 0 };
+        // Pad outs
+        int padSize = 4 - (payloadSize & 3);
+        stream->Write(pad, padSize);
+    }
+
+    return SLANG_OK;
+}
+
+/* static */Result IRSerialWriter::writeStream(const IRSerialData& data, Stream* stream)
+{
+    size_t totalSize = 0;
+
+    typedef IRSerialBinary Bin;
+
+    totalSize += sizeof(Bin::SlangHeader) + 
+        _calcChunkSize(data.m_insts) + 
+        _calcChunkSize(data.m_childRuns) +
+        _calcChunkSize(data.m_decorationRuns) +
+        _calcChunkSize(data.m_externalOperands) +
+        _calcChunkSize(data.m_strings);
+
+    {
+        Bin::Chunk riffHeader;
+        riffHeader.m_type = Bin::kRiffFourCc;
+        riffHeader.m_size = uint32_t(totalSize);
+
+        stream->Write(&riffHeader, sizeof(riffHeader));
+    }
+    {
+        Bin::SlangHeader slangHeader;
+        slangHeader.m_chunk.m_type = Bin::kSlangFourCc;
+        slangHeader.m_chunk.m_size = uint32_t(sizeof(slangHeader) - sizeof(Bin::Chunk));
+        slangHeader.m_decorationBase = uint32_t(data.m_decorationBaseIndex);
+
+        stream->Write(&slangHeader, sizeof(slangHeader));
+    }
+
+    _writeArrayChunk(Bin::kInstFourCc, data.m_insts, stream);
+    _writeArrayChunk(Bin::kChildRunFourCc, data.m_childRuns, stream);
+    _writeArrayChunk(Bin::kDecoratorRunFourCc, data.m_decorationRuns, stream);
+    _writeArrayChunk(Bin::kExternalOperandsFourCc, data.m_externalOperands, stream);
+    _writeArrayChunk(Bin::kStringFourCc, data.m_strings, stream);
+    
+    return SLANG_OK;
+}
+
 Result serializeModule(IRModule* module, Stream* stream)
 {
-   IRSerializer serializer;
-   IRSerialInfo info;
+   IRSerialWriter serializer;
+   IRSerialData serialData;
 
-   SLANG_RETURN_ON_FAIL(serializer.write(module, &info));
+   SLANG_RETURN_ON_FAIL(serializer.write(module, &serialData));
 
    if (stream)
    {
-        // 
-        IRSerializer::Chunk riffChunk;
-        riffChunk.m_type = SLANG_FOUR_CC('R', 'I', 'F', 'F');
-        riffChunk.m_size = 0;                                       ///< We need to work out the overall size
-
-        // Write initial marker
-        stream->Write(&riffChunk, sizeof(riffChunk));
+        SLANG_RETURN_ON_FAIL(IRSerialWriter::writeStream(serialData, stream));
     }
 
     return SLANG_OK;

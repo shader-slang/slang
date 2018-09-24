@@ -6087,9 +6087,12 @@ String emitEntryPoint(
         validateIRModuleIfEnabled(compileRequest, irModule);
 
 
-        // HACK! To see what serialization does
-        serializeModule(irModule, nullptr);
-        
+        {
+            FileStream file("module.slangbin", FileMode::CreateNew, FileAccess::Write, FileShare::WriteOnly);
+
+            // HACK! To see what serialization does
+            serializeModule(irModule, &file);
+        }
 
         // If the user specified the flag that they want us to dump
         // IR, then do it here, for the target-specific, but
