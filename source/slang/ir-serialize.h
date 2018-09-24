@@ -124,7 +124,7 @@ struct IRSerialData
     int m_decorationBaseIndex;                  ///< All decorations insts are at indices >= to this value
 };
 
-#define SLANG_FOUR_CC(c0, c1, c2, c3) ((uint32_t(c0) << 24) | (uint32_t(c1) << 16) | (uint32_t(c2) << 8) | (uint32_t(c3) << 0)) 
+#define SLANG_FOUR_CC(c0, c1, c2, c3) ((uint32_t(c0) << 0) | (uint32_t(c1) << 8) | (uint32_t(c2) << 16) | (uint32_t(c3) << 24)) 
 
 struct IRSerialBinary
 {
