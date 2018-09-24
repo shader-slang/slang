@@ -6088,10 +6088,15 @@ String emitEntryPoint(
 
 
         {
-            FileStream file("module.slangbin", FileMode::CreateNew, FileAccess::Write, FileShare::WriteOnly);
+            FileStream file("module.slangbin", FileMode::Create, FileAccess::Write, FileShare::WriteOnly);
 
             // HACK! To see what serialization does
             serializeModule(irModule, &file);
+        }
+        {
+            FileStream file("module.slangbin", FileMode::Open, FileAccess::Read, FileShare::ReadOnly);
+
+            readModule(&file);
         }
 
         // If the user specified the flag that they want us to dump

@@ -2,195 +2,10 @@
 #include "ir-serialize.h"
 
 #include "../core/text-io.h"
-#include "../core/slang-memory-arena.h"
 
 #include "ir-insts.h"
 
 namespace Slang {
-
-struct IRSerialData
-{
-    enum class InstIndex : uint32_t;
-    enum class StringIndex : uint32_t;
-    enum class ArrayIndex : uint32_t;
-    enum class SourceLoc : uint32_t;
-    typedef uint32_t SizeType;
-
-    static const StringIndex kNullStringIndex = StringIndex(0);
-    static const StringIndex kEmptyStringIndex = StringIndex(1);
-
-    enum
-    {
-        kNumOperands = 2,
-    };
-
-    /// A run of instructions
-    struct InstRun
-    {
-        InstIndex m_parentIndex;            ///< The parent instruction
-        InstIndex m_startInstIndex;         ///< The index to the first instruction
-        SizeType m_numChildren;                 ///< The number of children
-    };
-
-    // Instruction...
-    // We can store SourceLoc values separately. Just store per index information.
-    // Parent information is stored in m_childRuns
-    // Decoration information is stored in m_decorationRuns
-    struct Inst
-    {
-        enum class PayloadType : uint8_t
-        {
-            Empty,                          ///< Has no payload (or operands)
-            Operand_1,                      ///< 1 Operand
-            Operand_2,                      ///< 2 Operands
-            ExternalOperand,                ///< Operands are held externally
-            String_1,                       ///< 1 String
-            String_2,                       ///< 2 Strings
-            UInt32,                         ///< Holds an unsigned 32 bit integral (might represent a type)
-            Float64,
-            Int64,
-            CountOf,
-        };
-
-        uint8_t m_op;                       ///< For now one of IROp 
-        PayloadType m_payloadType;	 		///< The type of payload 
-        uint16_t m_pad0;                    ///< Not currently used             
-
-        InstIndex m_resultTypeIndex;	    //< 0 if has no type. The result type of this instruction
-
-        struct ExternalOperandPayload
-        {
-            ArrayIndex m_arrayIndex;                        ///< Index into the m_externalOperands table
-            SizeType m_size;                                ///< The amount of entries in that table
-        };
-        
-        union Payload
-        {
-            double m_float64;
-            int64_t m_int64;
-            uint32_t m_uint32;                              ///< Unsigned integral value
-            IRFloatingPointValue m_float;              ///< Floating point value
-            IRIntegerValue m_int;                      ///< Integral value
-            InstIndex m_operands[kNumOperands];	            ///< For items that 2 or less operands it can use this.  
-            StringIndex m_stringIndices[kNumOperands];
-            ExternalOperandPayload m_externalOperand;              ///< Operands are stored in an an index of an operand array 
-        };
-
-        Payload m_payload;
-    };
-
-        /// Clear to initial state
-    void clear()
-    {
-        // First Instruction is null
-        m_insts.SetSize(1);
-        memset(&m_insts[0], 0, sizeof(Inst));
-
-        m_childRuns.Clear();
-        m_decorationRuns.Clear();
-        m_externalOperands.Clear();
-
-        m_strings.SetSize(2);           
-        m_strings[int(kNullStringIndex)] = 0;  
-        m_strings[int(kEmptyStringIndex)] = 0; 
-
-        m_decorationBaseIndex = 0;
-    }
-
-        /// Get a slice from an index
-    UnownedStringSlice getStringSlice(StringIndex index) const;
-
-        /// Ctor
-    IRSerialData():
-        m_decorationBaseIndex(0)
-    {}
-
-
-    List<Inst> m_insts;                         ///< The instructions
-
-    List<InstRun> m_childRuns;                  ///< Holds the information about children that belong to an instruction
-    List<InstRun> m_decorationRuns;             ///< Holds instruction decorations    
-
-    List<InstIndex> m_externalOperands;         ///< Holds external operands (for instructions with more than kNumOperands)
-
-    List<char> m_strings;                       ///< All strings. Indexed into by StringIndex
-
-    int m_decorationBaseIndex;                  ///< All decorations insts are at indices >= to this value
-};
-
-#define SLANG_FOUR_CC(c0, c1, c2, c3) ((uint32_t(c0) << 24) | (uint32_t(c0) << 16) | (uint32_t(c0) << 8) | (uint32_t(c0) << 0)) 
-
-struct IRSerialBinary
-{
-    // http://fileformats.archiveteam.org/wiki/RIFF
-    // http://www.fileformat.info/format/riff/egff.htm
-
-    struct Chunk
-    {
-        uint32_t m_type;
-        uint32_t m_size;
-    };
-    static const uint32_t kRiffFourCc = SLANG_FOUR_CC('R', 'I', 'F', 'F');
-    static const uint32_t kSlangFourCc = SLANG_FOUR_CC('S', 'L', 'N', 'G');             ///< Holds all the slang specific chunks
-
-    static const uint32_t kInstFourCc = SLANG_FOUR_CC('S', 'L', 'i', 'n');
-    static const uint32_t kDecoratorRunFourCc = SLANG_FOUR_CC('S', 'L', 'd', 'r');
-    static const uint32_t kChildRunFourCc = SLANG_FOUR_CC('S', 'L', 'c', 'r');
-    static const uint32_t kExternalOperandsFourCc = SLANG_FOUR_CC('S', 'L', 'e', 'o');
-    static const uint32_t kStringFourCc = SLANG_FOUR_CC('S', 'L', 's', 't');
-
-    struct SlangHeader
-    {
-        Chunk m_chunk;
-        uint32_t m_decorationBase;
-    };
-    struct ArrayHeader
-    {
-        Chunk m_chunk;
-        uint32_t m_numEntries;
-    };
-};
-
-struct IRSerialWriter
-{
-
-    typedef IRSerialData Ser;
-
-    Result write(IRModule* module, IRSerialData* serialData);
-
-    static Result writeStream(const IRSerialData& data, Stream* stream);
-
-        /// Get an instruction index from an instruction
-    Ser::InstIndex getInstIndex(IRInst* inst) const { return inst ? Ser::InstIndex(m_instMap[inst]) : Ser::InstIndex(0); }
-
-    Ser::StringIndex getStringIndex(StringRepresentation* string) { return string ? getStringIndex(StringRepresentation::asSlice(string)) : Ser::kNullStringIndex; }
-    Ser::StringIndex getStringIndex(const UnownedStringSlice& string);
-    Ser::StringIndex getStringIndex(Name* name) { return name ? getStringIndex(name->text.getUnownedSlice()) : Ser::kNullStringIndex; }
-    Ser::StringIndex getStringIndex(const char* chars) { return chars ? getStringIndex(UnownedStringSlice(chars)) : Ser::kNullStringIndex; }
-
-    IRSerialWriter():
-        m_serialData(nullptr),
-        m_arena(1024 * 4)
-    {}
-
-    protected:
-    void _addInstruction(IRInst* inst);
-
-    List<IRInst*> m_insts;                              ///< Instructions in same order as stored in the 
-
-    List<IRDecoration*> m_decorations;                  ///< Holds all decorations in order of the instructions as found
-    List<IRInst*> m_instWithFirstDecoration;            ///< All decorations are held in this order after all the regular instructions
-  
-    Dictionary<IRInst*, Ser::InstIndex> m_instMap;      ///< Map an instruction to an instruction index
-
-    Dictionary<UnownedStringSlice, Ser::StringIndex> m_stringMap;       ///< String map
-
-    MemoryArena m_arena;
-
-    IRSerialData* m_serialData;                               ///< Where the data is stored
-};
-
-
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! IRSerialInfo !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -252,6 +67,11 @@ void IRSerialWriter::_addInstruction(IRInst* inst)
 
         m_serialData->m_decorationRuns.Add(run);
     }
+}
+
+IRSerialData::StringIndex IRSerialWriter::getStringIndex(Name* name) 
+{ 
+    return name ? getStringIndex(name->text.getUnownedSlice()) : Ser::kNullStringIndex; 
 }
 
 Result IRSerialWriter::write(IRModule* module, IRSerialData* serialInfo)
@@ -572,7 +392,8 @@ static size_t _calcChunkSize(const List<T>& array)
 
     if (array.Count())
     {
-        return sizeof(Bin::ArrayHeader) - sizeof(Bin::Chunk) + sizeof(T) * array.Count();
+        const size_t size = sizeof(Bin::ArrayHeader) + sizeof(T) * array.Count();
+        return (size + 3) & ~size_t(3);
     }
     else
     {
@@ -615,10 +436,10 @@ Result _writeArrayChunk(uint32_t chunkId, const List<T>& array, Stream* stream)
 
 /* static */Result IRSerialWriter::writeStream(const IRSerialData& data, Stream* stream)
 {
-    size_t totalSize = 0;
-
     typedef IRSerialBinary Bin;
 
+    size_t totalSize = 0;
+    
     totalSize += sizeof(Bin::SlangHeader) + 
         _calcChunkSize(data.m_insts) + 
         _calcChunkSize(data.m_childRuns) +
@@ -661,6 +482,141 @@ Result serializeModule(IRModule* module, Stream* stream)
    if (stream)
    {
         SLANG_RETURN_ON_FAIL(IRSerialWriter::writeStream(serialData, stream));
+    }
+
+    return SLANG_OK;
+}
+
+Result readModule(Stream* stream)
+{
+    IRSerialData serialData;
+    IRSerialReader::readStream(stream, &serialData);
+
+    return SLANG_OK;
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! IRSerialReader !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+template <typename T>
+Result _readArrayChunk(const IRSerialBinary::Chunk& chunk, Stream* stream, List<T>& arrayOut)
+{
+    typedef IRSerialBinary Bin;
+
+    Bin::ArrayHeader header;
+    header.m_chunk = chunk;
+
+    stream->Read(&header.m_chunk + 1, sizeof(header) - sizeof(Bin::Chunk));
+
+    size_t payloadSize = sizeof(Bin::ArrayHeader) - sizeof(Bin::Chunk) + sizeof(T) * header.m_numEntries;
+    if (payloadSize != header.m_chunk.m_size)
+    {
+        return SLANG_FAIL;
+    }
+
+    arrayOut.SetSize(header.m_numEntries);
+
+    stream->Read(arrayOut.begin(), sizeof(T) * header.m_numEntries);
+
+    // All chunks have sizes rounded to dword size
+    if (payloadSize & 3)
+    {
+        const uint8_t pad[4] = { 0, 0, 0, 0 };
+        // Pad outs
+        int padSize = 4 - (payloadSize & 3);
+        stream->Seek(SeekOrigin::Current, padSize);
+    }
+
+    return SLANG_OK;
+}
+
+int64_t _calcChunkTotalSize(const IRSerialBinary::Chunk& chunk)
+{
+    int64_t size = chunk.m_size + sizeof(IRSerialBinary::Chunk);
+    return (size + 3) & ~int64_t(3);
+}
+
+/* static */Result IRSerialReader::readStream(Stream* stream, IRSerialData* dataOut)
+{
+    typedef IRSerialBinary Bin;
+
+    dataOut->clear();
+
+    int64_t remainingBytes = 0;
+    {
+        Bin::Chunk header;
+        stream->Read(&header, sizeof(header));
+        if (header.m_type != Bin::kRiffFourCc)
+        {
+            return SLANG_FAIL;
+        }
+
+        remainingBytes = header.m_size;
+    }
+    
+    while (remainingBytes > 0)
+    {
+        Bin::Chunk chunk;
+
+        stream->Read(&chunk, sizeof(chunk));
+
+        switch (chunk.m_type)
+        {
+            case Bin::kSlangFourCc:
+            {
+                // Slang header
+                Bin::SlangHeader header;
+                header.m_chunk = chunk;
+
+                // NOTE! Really we should only read what we know the size to be...
+                // and skip if it's larger
+
+                stream->Read(&header.m_chunk + 1, sizeof(header) - sizeof(chunk));
+
+                dataOut->m_decorationBaseIndex = header.m_decorationBase;
+
+                remainingBytes -= _calcChunkTotalSize(chunk);
+                break;
+            }
+            case Bin::kInstFourCc:
+            {
+                SLANG_RETURN_ON_FAIL(_readArrayChunk(chunk, stream, dataOut->m_insts));
+                remainingBytes -= _calcChunkTotalSize(chunk);
+                break;    
+            }
+            case Bin::kDecoratorRunFourCc:
+            {
+                SLANG_RETURN_ON_FAIL(_readArrayChunk(chunk, stream, dataOut->m_decorationRuns));
+                remainingBytes -= _calcChunkTotalSize(chunk);
+                break;
+            }
+            case Bin::kChildRunFourCc:
+            {
+                SLANG_RETURN_ON_FAIL(_readArrayChunk(chunk, stream, dataOut->m_childRuns));
+                remainingBytes -= _calcChunkTotalSize(chunk);
+                break;
+            }
+            case Bin::kExternalOperandsFourCc:
+            {
+                SLANG_RETURN_ON_FAIL(_readArrayChunk(chunk, stream, dataOut->m_externalOperands));
+                remainingBytes -= _calcChunkTotalSize(chunk);
+                break;
+            }
+            case Bin::kStringFourCc:
+            {
+                SLANG_RETURN_ON_FAIL(_readArrayChunk(chunk, stream, dataOut->m_strings));
+                remainingBytes -= _calcChunkTotalSize(chunk);
+                break;
+            }
+            default:
+            {
+                remainingBytes -= _calcChunkTotalSize(chunk);
+
+                // Unhandled chunk... skip it
+                int skipSize = (chunk.m_size + 3) & ~3;   
+                stream->Seek(SeekOrigin::Current, skipSize);
+                break;
+            }
+        }
     }
 
     return SLANG_OK;
