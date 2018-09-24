@@ -8,10 +8,6 @@
 #define INST_RANGE(BASE, FIRST, LAST) /* empty */
 #endif
 
-#ifndef MANUAL_INST_RANGE
-#define MANUAL_INST_RANGE(NAME, START, COUNT) /* empty */
-#endif
-
 #ifndef PSEUDO_INST
 #define PSEUDO_INST(ID) /* empty */
 #endif
@@ -82,15 +78,17 @@ INST(Nop, nop, 0, 0)
     /* ResourceTypeBase */
         /* ResourceType */
             /* TextureTypeBase */
+                // NOTE! TextureFlavor::Flavor is stored in 'other' bits for these types.
                 /* TextureType */
-                MANUAL_INST_RANGE(TextureType, 0x10000, TextureFlavor::Count)
+                INST(TextureType, TextureType, 0, 0)
                 /* TextureSamplerType */
-                MANUAL_INST_RANGE(TextureSamplerType, 0x20000, TextureFlavor::Count)
+                INST(TextureSamplerType, TextureSamplerType, 0, 0)
                 /* GLSLImageType */
-                MANUAL_INST_RANGE(GLSLImageType, 0x30000, TextureFlavor::Count)
-            INST_RANGE(TextureTypeBase, FirstTextureType, LastGLSLImageType)
-        INST_RANGE(ResourceType, FirstTextureType, LastGLSLImageType)
-    INST_RANGE(ResourceTypeBase, FirstTextureType, LastGLSLImageType)
+                INST(GLSLImageType, GLSLImageType, 0, 0) 
+            INST_RANGE(TextureTypeBase, TextureType, GLSLImageType)
+        INST_RANGE(ResourceType, TextureType, GLSLImageType)
+    INST_RANGE(ResourceTypeBase, TextureType, GLSLImageType)
+
 
     /* UntypedBufferResourceType */
         INST(HLSLByteAddressBufferType,                     ByteAddressBuffer,   0, 0)
@@ -382,7 +380,6 @@ PSEUDO_INST(Or)
 
 #undef PSEUDO_INST
 #undef PARENT
-#undef MANUAL_INST_RANGE
 #undef INST_RANGE
 #undef INST
 
