@@ -1,36 +1,30 @@
 // ir-serialize.cpp
 #include "ir-serialize.h"
 
+#include "../core/text-io.h"
+#include "../core/slang-memory-arena.h"
+
 #include "ir-insts.h"
 
 namespace Slang {
 
-
-struct IRSerializer
+struct IRSerialInfo
 {
-    // http://fileformats.archiveteam.org/wiki/RIFF
-    // http://www.fileformat.info/format/riff/egff.htm
-
     enum class InstIndex : uint32_t;
     enum class StringIndex : uint32_t;
     enum class ArrayIndex : uint32_t;
     enum class SourceLoc : uint32_t;
     typedef uint32_t SizeType;
 
-    struct Chunk
-    {
-        uint32_t m_type;
-        uint32_t m_size;
-    };
+    static const StringIndex kNullStringIndex = StringIndex(0);
+    static const StringIndex kEmptyStringIndex = StringIndex(1);
 
-    enum 
+    enum
     {
         kNumOperands = 2,
     };
 
-    
-
-        /// A run of instructions
+    /// A run of instructions
     struct InstRun
     {
         InstIndex m_parentIndex;            ///< The parent instruction
@@ -39,8 +33,10 @@ struct IRSerializer
     };
 
     // Instruction...
-    // 
-    struct SerialInst
+    // We can store SourceLoc values separately. Just store per index information.
+    // Parent information is stored in m_childRuns
+    // Decoration information is stored in m_decorationRuns
+    struct Inst
     {
         enum class PayloadType : uint8_t
         {
@@ -50,36 +46,31 @@ struct IRSerializer
             ExternalOperand,                ///< Operands are held externally
             String_1,                       ///< 1 String
             String_2,                       ///< 2 Strings
-            UnsignedIntegral,               ///< Holds an unsigned 32 bit integral (might represent a type)
+            UInt32,                         ///< Holds an unsigned 32 bit integral (might represent a type)
+            Float64,
+            Int64,
+            CountOf,
         };
 
         uint8_t m_op;                       ///< For now one of IROp 
         PayloadType m_payloadType;	 		///< The type of payload 
         uint16_t m_pad0;                    ///< Not currently used             
-        
-        // If I have the parent index, it is not necessary to store all the children.
-        // On the other hand I've arranged such that all of the children are in order, 
-        // so all that is really needed is the first instruction and the amount of children, which whilst awkward saves space
-        // I could just hold the 'children' as an array (and only use a single index)
-        // 
-        // Perhaps I should just store the children information separately, store the parent, the start index, and num children)
-        InstIndex m_resultTypeIndex;	//< 0 if has no type. The result type of this instruction
+
+        InstIndex m_resultTypeIndex;	    //< 0 if has no type. The result type of this instruction
 
         struct ExternalOperandPayload
         {
             ArrayIndex m_arrayIndex;                        ///< Index into the m_externalOperands table
             SizeType m_size;                                ///< The amount of entries in that table
         };
-        struct UIntPayload
-        {
-            uint32_t m_value;
-        };
-
+        
         union Payload
         {
-            UIntPayload m_uint;                             ///< Unsigned integral value
-            IRFloatingPointValue m_floatValue;              ///< Floating point value
-            IRIntegerValue m_intValue;                      ///< Integral value
+            double m_float64;
+            int64_t m_int64;
+            uint32_t m_uint32;                              ///< Unsigned integral value
+            IRFloatingPointValue m_float;              ///< Floating point value
+            IRIntegerValue m_int;                      ///< Integral value
             InstIndex m_operands[kNumOperands];	            ///< For items that 2 or less operands it can use this.  
             StringIndex m_stringIndices[kNumOperands];
             ExternalOperandPayload m_externalOperand;              ///< Operands are stored in an an index of an operand array 
@@ -88,45 +79,118 @@ struct IRSerializer
         Payload m_payload;
     };
 
-    Result init(IRModule* module);
+        /// Clear to initial state
+    void clear()
+    {
+        // First Instruction is null
+        m_insts.SetSize(1);
+        memset(&m_insts[0], 0, sizeof(Inst));
+
+        m_childRuns.Clear();
+        m_decorationRuns.Clear();
+        m_externalOperands.Clear();
+
+        m_strings.SetSize(2);           
+        m_strings[int(kNullStringIndex)] = 0;  
+        m_strings[int(kEmptyStringIndex)] = 0; 
+
+        m_decorationBaseIndex = 0;
+    }
+
+        /// Get a slice from an index
+    UnownedStringSlice getStringSlice(StringIndex index) const;
+
+        /// Ctor
+    IRSerialInfo():
+        m_decorationBaseIndex(0)
+    {}
+
+
+    List<Inst> m_insts;                         ///< The instructions
+
+    List<InstRun> m_childRuns;                  ///< Holds the information about children that belong to an instruction
+    List<InstRun> m_decorationRuns;             ///< Holds instruction decorations    
+
+    List<InstIndex> m_externalOperands;         ///< Holds external operands (for instructions with more than kNumOperands)
+
+    List<char> m_strings;                       ///< All strings. Indexed into by StringIndex
+
+    int m_decorationBaseIndex;                  ///< All decorations insts are at indices >= to this value
+};
+
+struct IRSerializer
+{
+    // http://fileformats.archiveteam.org/wiki/RIFF
+    // http://www.fileformat.info/format/riff/egff.htm
+
+    typedef IRSerialInfo Ser;
+
+    struct Chunk
+    {
+        uint32_t m_type;
+        uint32_t m_size;
+    };
+
+    Result write(IRModule* module, IRSerialInfo* serialInfo);
 
         /// Get an instruction index from an instruction
-    InstIndex getInstIndex(IRInst* inst) const { return inst ? InstIndex(m_instMap[inst]) : InstIndex(0); }
+    Ser::InstIndex getInstIndex(IRInst* inst) const { return inst ? Ser::InstIndex(m_instMap[inst]) : Ser::InstIndex(0); }
 
-    StringIndex getStringIndex(StringRepresentation* string) { SLANG_UNUSED(string); return StringIndex(0); }
-    StringIndex getStringIndex(const UnownedStringSlice& string) { SLANG_UNUSED(string); return StringIndex(0); }
-    StringIndex getStringIndex(Name* name) { return name ? getStringIndex(name->text.getUnownedSlice()) : StringIndex(0); }
+    Ser::StringIndex getStringIndex(StringRepresentation* string) { return string ? getStringIndex(StringRepresentation::asSlice(string)) : Ser::kNullStringIndex; }
+    Ser::StringIndex getStringIndex(const UnownedStringSlice& string);
+    Ser::StringIndex getStringIndex(Name* name) { return name ? getStringIndex(name->text.getUnownedSlice()) : Ser::kNullStringIndex; }
 
     IRSerializer():
-        m_module(nullptr)
+        m_serialInfo(nullptr),
+        m_arena(1024 * 4)
     {}
 
     protected:
     void _addInstruction(IRInst* inst);
 
-    List<IRInst*> m_insts;    
+    List<IRInst*> m_insts;                              ///< Instructions in same order as stored in the 
 
     List<IRDecoration*> m_decorations;                  ///< Holds all decorations in order of the instructions as found
     List<IRInst*> m_instWithFirstDecoration;            ///< All decorations are held in this order after all the regular instructions
-    
-    Dictionary<IRInst*, InstIndex> m_instMap;   ///< Map an instruction to an instruction index
-    
-    List<SerialInst> m_serialInsts;
+  
+    Dictionary<IRInst*, Ser::InstIndex> m_instMap;      ///< Map an instruction to an instruction index
 
-    List<InstRun> m_childInfos;                 ///< Holds the information about children that belong to an instruction
-    List<InstRun> m_decorationInfos;            ///< Holds instruction decorations    
+    Dictionary<UnownedStringSlice, Ser::StringIndex> m_stringMap;       ///< String map
 
-    List<InstIndex> m_externalOperands;         ///< Holds external operands (for instructions with more than kNumOperands)
+    MemoryArena m_arena;
 
-    // We can store SourceLoc values separately. Just store per index information.
-
-    int m_decorationBaseIndex;
-
-    IRModule* m_module;
+    IRSerialInfo* m_serialInfo;                               ///< Where the data is stored
 };
 
 
 #define SLANG_FOUR_CC(c0, c1, c2, c3) ((uint32_t(c0) << 24) | (uint32_t(c0) << 16) | (uint32_t(c0) << 8) | (uint32_t(c0) << 0)) 
+
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! IRSerialInfo !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+UnownedStringSlice IRSerialInfo::getStringSlice(StringIndex index) const
+{
+    if (index == StringIndex(0))
+    {
+        return UnownedStringSlice(m_strings.begin() + 1, UInt(0));
+    }
+
+    const char* prefix = m_strings.begin() + int(index);
+
+    struct Reader
+    {
+        char operator()(int pos) const { SLANG_UNUSED(pos); return *m_pos++; } 
+        Reader(const char* pos):m_pos(pos) {}
+        mutable const char* m_pos;
+    };
+
+    Reader reader(prefix);
+    const int len = GetUnicodePointFromUTF8(reader);
+    return UnownedStringSlice(reader.m_pos, len);
+}
+
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! IRSerializer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 void IRSerializer::_addInstruction(IRInst* inst)
 {
@@ -134,7 +198,7 @@ void IRSerializer::_addInstruction(IRInst* inst)
     SLANG_ASSERT(!m_instMap.ContainsKey(inst));
 
     // Add to the map
-    m_instMap.Add(inst, InstIndex(m_insts.Count()));
+    m_instMap.Add(inst, Ser::InstIndex(m_insts.Count()));
     m_insts.Add(inst);
 
     // Add all the decorations, to the list. 
@@ -152,20 +216,20 @@ void IRSerializer::_addInstruction(IRInst* inst)
             decor = decor->next;
         }
         
-        const SizeType numDecor = SizeType(int(m_decorations.Count()) - initialNumDecor);
+        const Ser::SizeType numDecor = Ser::SizeType(int(m_decorations.Count()) - initialNumDecor);
         
-        InstRun info;
-        info.m_parentIndex = m_instMap[inst];
+        Ser::InstRun run;
+        run.m_parentIndex = m_instMap[inst];
 
         // NOTE! This isn't quite correct, as we need to correct for when all the instructions are added, this is done at the end
-        info.m_startInstIndex = InstIndex(initialNumDecor);
-        info.m_numChildren = numDecor;
+        run.m_startInstIndex = Ser::InstIndex(initialNumDecor);
+        run.m_numChildren = numDecor;
 
-        m_decorationInfos.Add(info);
+        m_serialInfo->m_decorationRuns.Add(run);
     }
 }
 
-Result IRSerializer::init(IRModule* module)
+Result IRSerializer::write(IRModule* module, IRSerialInfo* serialInfo)
 {
     // Lets find all of the instructions
     // Each instruction can only have one parent
@@ -173,8 +237,10 @@ Result IRSerializer::init(IRModule* module)
     // Then all 'child' nodes will be in order, and thus we only have to store the start instruction
     // and the amount of instructions 
 
-    m_serialInsts.Clear();
-    
+    m_serialInfo = serialInfo;
+
+    serialInfo->clear();
+
     // We reserve 0 for null
     m_insts.Clear();
     m_insts.Add(nullptr);
@@ -204,7 +270,7 @@ Result IRSerializer::init(IRModule* module)
         // Okay we go through each of the children in order. If they are IRInstParent derived, we add to stack to process later 
         // cos we want breadth first...
 
-        const InstIndex startChildInstIndex = InstIndex(m_insts.Count());
+        const Ser::InstIndex startChildInstIndex = Ser::InstIndex(m_insts.Count());
         
         IRInstListBase childrenList = parentInst->getChildren();
         for (IRInst* child : childrenList)
@@ -221,45 +287,43 @@ Result IRSerializer::init(IRModule* module)
             }
         }
 
-        // If it had any children, then store the information it
-        if (InstIndex(m_insts.Count()) != startChildInstIndex)
+        // If it had any children, then store the information about it
+        if (Ser::InstIndex(m_insts.Count()) != startChildInstIndex)
         {
-            // Look up the parent index
-            InstIndex parentInstIndex = m_instMap[parentInst];
+            Ser::InstRun run;
+            run.m_parentIndex = m_instMap[parentInst];
+            run.m_startInstIndex = startChildInstIndex;
+            run.m_numChildren = Ser::SizeType(m_insts.Count() - int(startChildInstIndex));
 
-            InstRun childInfo;
-            childInfo.m_parentIndex = parentInstIndex;
-            childInfo.m_startInstIndex = startChildInstIndex;
-            childInfo.m_numChildren = SizeType(m_insts.Count() - int(startChildInstIndex));
-
-            m_childInfos.Add(childInfo);
+            m_serialInfo->m_childRuns.Add(run);
         }
     }
 
     // Now fix the decorations 
     {
-        m_decorationBaseIndex = int(m_insts.Count());
-        const int numDecorInfos = int(m_decorationInfos.Count());
+        const int decorationBaseIndex = int(m_insts.Count());
+        m_serialInfo->m_decorationBaseIndex = decorationBaseIndex;
+        const int numDecorRuns = int(m_serialInfo->m_decorationRuns.Count());
 
         // Work out the total num of decoration
         int totalNumDecorations = 0;
-        if (numDecorInfos)
+        if (numDecorRuns)
         {
-            const auto& lastDecorInfo = m_decorationInfos.Last();
+            const auto& lastDecorInfo = m_serialInfo->m_decorationRuns.Last();
             totalNumDecorations = int(lastDecorInfo.m_startInstIndex) + lastDecorInfo.m_numChildren;
         }
 
         // Fix the indices
-        for (int i = 0; i < numDecorInfos; ++i)
+        for (int i = 0; i < numDecorRuns; ++i)
         {
-            InstRun& info = m_decorationInfos[i];
-            info.m_startInstIndex = InstIndex(m_decorationBaseIndex + int(info.m_startInstIndex));
+            Ser::InstRun& info = m_serialInfo->m_decorationRuns[i];
+            info.m_startInstIndex = Ser::InstIndex(decorationBaseIndex + int(info.m_startInstIndex));
         }
 
         // Set to the right size
-        m_serialInsts.SetSize(m_decorationBaseIndex + totalNumDecorations);
+        m_serialInfo->m_insts.SetSize(decorationBaseIndex + totalNumDecorations);
         // Clear all instructions
-        memset(m_serialInsts.begin(), 0, sizeof(SerialInst) * m_serialInsts.Count());
+        memset(m_serialInfo->m_insts.begin(), 0, sizeof(Ser::Inst) * m_serialInfo->m_insts.Count());
     }
 
     // Need to set up the actual instructions
@@ -269,10 +333,10 @@ Result IRSerializer::init(IRModule* module)
         for (int i = 1; i < numInsts; ++i)
         {
             IRInst* srcInst = m_insts[i];
-            SerialInst& dstInst = m_serialInsts[i];
+            Ser::Inst& dstInst = m_serialInfo->m_insts[i];
             
             dstInst.m_op = uint8_t(srcInst->op);
-            dstInst.m_payloadType = SerialInst::PayloadType::Empty;
+            dstInst.m_payloadType = Ser::Inst::PayloadType::Empty;
             
             dstInst.m_resultTypeIndex = getInstIndex(srcInst->getFullType());
 
@@ -291,18 +355,27 @@ Result IRSerializer::init(IRModule* module)
                     case kIROp_StringLit:
                     {
                         auto stringLit = static_cast<IRStringLit*>(srcInst);
-                        dstInst.m_payloadType = SerialInst::PayloadType::String_1;
+                        dstInst.m_payloadType = Ser::Inst::PayloadType::String_1;
                         dstInst.m_payload.m_stringIndices[0] = getStringIndex(stringLit->getStringSlice());
                         break;
                     }
                     case kIROp_IntLit:
                     {
+                        dstInst.m_payloadType = Ser::Inst::PayloadType::Int64;
+                        dstInst.m_payload.m_int64 = irConst->value.intVal;
+                        break;
                     }
                     case kIROp_FloatLit:
                     {
+                        dstInst.m_payloadType = Ser::Inst::PayloadType::Float64;
+                        dstInst.m_payload.m_float64 = irConst->value.floatVal; 
+                        break;
                     }
                     case kIROp_boolConst:
                     {
+                        dstInst.m_payloadType = Ser::Inst::PayloadType::String_1;
+                        dstInst.m_payload.m_uint32 = irConst->value.intVal ? 1 : 0;
+                        break;
                     }
                 }
                 
@@ -310,30 +383,30 @@ Result IRSerializer::init(IRModule* module)
             }
 
             const int numOperands = int(srcInst->operandCount);
-            InstIndex* dstOperands = nullptr;
+            Ser::InstIndex* dstOperands = nullptr;
 
-            if (numOperands <= kNumOperands)
+            if (numOperands <= Ser::kNumOperands)
             {
                 dstOperands = dstInst.m_payload.m_operands;
-                dstInst.m_payloadType = SerialInst::PayloadType(numOperands);
+                dstInst.m_payloadType = Ser::Inst::PayloadType(numOperands);
             }
             else
             {
-                dstInst.m_payloadType = SerialInst::PayloadType::ExternalOperand;
+                dstInst.m_payloadType = Ser::Inst::PayloadType::ExternalOperand;
 
-                int operandArrayBaseIndex = int(m_externalOperands.Count());
-                m_externalOperands.SetSize(operandArrayBaseIndex + numOperands);
+                int operandArrayBaseIndex = int(m_serialInfo->m_externalOperands.Count());
+                m_serialInfo->m_externalOperands.SetSize(operandArrayBaseIndex + numOperands);
 
-                dstOperands = m_externalOperands.begin() + operandArrayBaseIndex; 
+                dstOperands = m_serialInfo->m_externalOperands.begin() + operandArrayBaseIndex; 
 
                 auto& externalOperands = dstInst.m_payload.m_externalOperand;
-                externalOperands.m_arrayIndex = ArrayIndex(operandArrayBaseIndex);
-                externalOperands.m_size = SizeType(numOperands);
+                externalOperands.m_arrayIndex = Ser::ArrayIndex(operandArrayBaseIndex);
+                externalOperands.m_size = Ser::SizeType(numOperands);
             }
 
             for (int j = 0; j < numOperands; ++j)
             {
-                const InstIndex dstInstIndex = getInstIndex(srcInst->getOperand(j));
+                const Ser::InstIndex dstInstIndex = getInstIndex(srcInst->getOperand(j));
                 dstOperands[j] = dstInstIndex;
             }
         }
@@ -342,9 +415,9 @@ Result IRSerializer::init(IRModule* module)
     // Now need to do the decorations
 
     {
-        const int decorationBaseIndex = m_decorationBaseIndex;
+        const int decorationBaseIndex = m_serialInfo->m_decorationBaseIndex;
         const int numDecor = int(m_decorations.Count());
-        SLANG_ASSERT(decorationBaseIndex + numDecor == m_serialInsts.Count());
+        SLANG_ASSERT(decorationBaseIndex + numDecor == m_serialInfo->m_insts.Count());
 
         // Have to be able to store in a byte!
         SLANG_COMPILE_TIME_ASSERT(kIROpCount + kIRDecorationOp_CountOf < 0x100);
@@ -352,7 +425,7 @@ Result IRSerializer::init(IRModule* module)
         for (int i = 0; i < numDecor; ++i)
         {
             IRDecoration* srcDecor = m_decorations[i];
-            SerialInst& dstInst = m_serialInsts[decorationBaseIndex + i];
+            Ser::Inst& dstInst = m_serialInfo->m_insts[decorationBaseIndex + i];
 
             dstInst.m_op = uint8_t(kIROpCount + srcDecor->op);
 
@@ -374,22 +447,22 @@ Result IRSerializer::init(IRModule* module)
                 {
                     auto loopDecor = static_cast<IRLoopControlDecoration*>(srcDecor);
 
-                    dstInst.m_payloadType = SerialInst::PayloadType::UnsignedIntegral;
-                    dstInst.m_payload.m_uint.m_value = uint32_t(loopDecor->mode);
+                    dstInst.m_payloadType = Ser::Inst::PayloadType::UInt32;
+                    dstInst.m_payload.m_uint32 = uint32_t(loopDecor->mode);
                     break;
                 }
                 case kIRDecorationOp_Target:
                 {
                     auto targetDecor = static_cast<IRTargetDecoration*>(srcDecor);
 
-                    dstInst.m_payloadType = SerialInst::PayloadType::String_1;
+                    dstInst.m_payloadType = Ser::Inst::PayloadType::String_1;
                     dstInst.m_payload.m_stringIndices[0] = getStringIndex(targetDecor->targetName);
                     break;
                 }
                 case kIRDecorationOp_TargetIntrinsic:
                 {
                     auto targetDecor = static_cast<IRTargetIntrinsicDecoration*>(srcDecor);
-                    dstInst.m_payloadType = SerialInst::PayloadType::String_2;
+                    dstInst.m_payloadType = Ser::Inst::PayloadType::String_2;
 
                     dstInst.m_payload.m_stringIndices[0] = getStringIndex(targetDecor->targetName);
                     dstInst.m_payload.m_stringIndices[1] = getStringIndex(targetDecor->definition);
@@ -398,7 +471,7 @@ Result IRSerializer::init(IRModule* module)
                 case kIRDecorationOp_GLSLOuterArray:
                 {
                     auto arrayDecor = static_cast<IRGLSLOuterArrayDecoration*>(srcDecor);
-                    dstInst.m_payloadType = SerialInst::PayloadType::String_1;
+                    dstInst.m_payloadType = Ser::Inst::PayloadType::String_1;
 
                     UnownedStringSlice slice = arrayDecor->outerArrayName ? UnownedStringSlice(arrayDecor->outerArrayName) : UnownedStringSlice();
 
@@ -409,7 +482,7 @@ Result IRSerializer::init(IRModule* module)
                 {
                     auto semanticDecor = static_cast<IRSemanticDecoration*>(srcDecor);
 
-                    dstInst.m_payloadType = SerialInst::PayloadType::String_1;
+                    dstInst.m_payloadType = Ser::Inst::PayloadType::String_1;
                     dstInst.m_payload.m_stringIndices[0] = getStringIndex(semanticDecor->semanticName);
                     break;
                 }
@@ -417,7 +490,7 @@ Result IRSerializer::init(IRModule* module)
                 {
                     auto nameDecor = static_cast<IRNameHintDecoration*>(srcDecor);
 
-                    dstInst.m_payloadType = SerialInst::PayloadType::String_1;
+                    dstInst.m_payloadType = Ser::Inst::PayloadType::String_1;
                     dstInst.m_payload.m_stringIndices[0] = getStringIndex(nameDecor->name);
                     break;
                 }
@@ -430,14 +503,51 @@ Result IRSerializer::init(IRModule* module)
         }
     }
 
+    m_serialInfo = nullptr;
+
     return SLANG_OK;
+}
+
+IRSerialInfo::StringIndex IRSerializer::getStringIndex(const UnownedStringSlice& slice)
+{
+    const int len = int(slice.size());
+    if (len <= 0)
+    {
+        return Ser::kEmptyStringIndex;
+    }
+
+    Ser::StringIndex index;
+    if (m_stringMap.TryGetValue(slice, index))
+    {
+        return index;
+    }
+
+    // We need to write into the the string array
+    char prefixBytes[6];
+    const int numPrefixBytes = EncodeUnicodePointToUTF8(prefixBytes, len);
+    const int baseIndex = int(m_serialInfo->m_strings.Count());
+
+    m_serialInfo->m_strings.SetSize(baseIndex + numPrefixBytes + len);
+
+    char* dst = m_serialInfo->m_strings.begin() + baseIndex;
+
+    memcpy(dst, prefixBytes, numPrefixBytes);
+    memcpy(dst + numPrefixBytes, slice.begin(), len);
+
+    // Add to the map. Unfortunately we can't use the string storage in the array, because the address changes with size
+    // so we have to store backing string in an arena
+    const char* arenaChars = m_arena.allocateString(slice.begin(), len);
+    m_stringMap.Add(UnownedStringSlice(arenaChars, len), Ser::StringIndex(baseIndex));
+
+    return Ser::StringIndex(baseIndex);
 }
 
 Result serializeModule(IRModule* module, Stream* stream)
 {
    IRSerializer serializer;
+   IRSerialInfo info;
 
-   SLANG_RETURN_ON_FAIL(serializer.init(module));
+   SLANG_RETURN_ON_FAIL(serializer.write(module, &info));
 
    if (stream)
    {
