@@ -39,6 +39,9 @@
     <ClInclude Include="..\..\external\glslang\SPIRV\SpvBuilder.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\external\glslang\SPIRV\SpvTools.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\external\glslang\SPIRV\bitutils.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -144,6 +147,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\external\glslang\SPIRV\SpvBuilder.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\external\glslang\SPIRV\SpvPostProcess.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\external\glslang\SPIRV\SpvTools.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\external\glslang\SPIRV\disassemble.cpp">

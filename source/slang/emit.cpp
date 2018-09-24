@@ -115,8 +115,6 @@ struct SharedEmitContext
 
     ModuleDecl*  program;
 
-    bool                needHackSamplerForTexelFetch = false;
-
     ExtensionUsageTracker extensionUsageTracker;
 
     UInt uniqueIDCounter = 1;
@@ -3043,36 +3041,6 @@ struct EmitVisitor
                             emitIROperand(ctx, textureArg, mode);
                             Emit(",");
                             emitIROperand(ctx, samplerArg, mode);
-                            Emit(")");
-                        }
-                        else
-                        {
-                            SLANG_UNEXPECTED("bad format in intrinsic definition");
-                        }
-                    }
-                    break;
-
-                case 'P':
-                    {
-                        // Okay, we need a collosal hack to deal with the fact that GLSL `texelFetch()`
-                        // for Vulkan seems to be completely broken by design. It's signature wants
-                        // a `sampler2D` for consistency with its peers, but the actual SPIR-V operation
-                        // ignores the sampler paart of it, and just used the `texture2D` part.
-                        //
-                        // The HLSL equivalent (e.g., `Texture2D.Load()`) doesn't provide a sampler
-                        // argument, so we seemingly need to conjure one out of thin air. :(
-                        //
-                        // We are going to hack this *hard* for now.
-
-                        auto textureArg = args[0].get();
-                        if (auto baseTextureType = as<IRTextureType>(textureArg->getDataType()))
-                        {
-                            emitGLSLTextureOrTextureSamplerType(baseTextureType, "sampler");
-                            Emit("(");
-                            emitIROperand(ctx, textureArg, mode);
-                            Emit(",");
-                            Emit("SLANG_hack_samplerForTexelFetch");
-                            context->shared->needHackSamplerForTexelFetch = true;
                             Emit(")");
                         }
                         else
@@ -6203,14 +6171,6 @@ String emitEntryPoint(
     finalResultBuilder << prefix;
 
     finalResultBuilder << sharedContext.extensionUsageTracker.glslExtensionRequireLines.ProduceString();
-
-    if (sharedContext.needHackSamplerForTexelFetch)
-    {
-        finalResultBuilder
-            << "layout(set = 0, binding = "
-            << programLayout->bindingForHackSampler
-            << ") uniform sampler SLANG_hack_samplerForTexelFetch;\n";
-    }
 
     finalResultBuilder << code;
 

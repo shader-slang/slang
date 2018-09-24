@@ -39,13 +39,6 @@ standard output = {
                 "kind": "resource",
                 "baseShape": "texture2D"
             }
-        },
-        {
-            "name": "SLANG_hack_samplerForTexelFetch",
-            "binding": {"kind": "descriptorTableSlot", "index": 1},
-            "type": {
-                "kind": "samplerState"
-            }
         }
     ]
 }
