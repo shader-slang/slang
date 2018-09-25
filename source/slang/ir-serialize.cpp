@@ -7,7 +7,58 @@
 
 namespace Slang {
 
+/* Note that an IRInst can be derived from, but when it derived from it's new members are IRUse variables, and they in 
+effect alias over the operands - and reflected in the operand count. There _could_ be other members after these IRUse 
+variables, but in practice there do not appear to be.
+
+The only difference to this is IRParentInst derived types, as it contains IRInstListBase children. Thus IRParentInst derived classes can 
+have no operands - because it would write over the top of IRInstListBase.  BUT they can contain members after the list 
+types which do this are
+
+* IRModuleInst      - Presumably we can just set to the module pointer on reconstruction
+* IRGlobalValue     - There are types derived from this type, but they don't add a parameter
+
+Note! That on an IRInst there is an IRType* variable (accessed as getFullType()). As it stands it may NOT actually point 
+to an IRType derived type. Its 'ok' as long as it's an instruction that can be used in the place of the type. So this code does not 
+bother to check if it's correct, and just casts it.
+*/
+
+static bool isParentDerived(IROp opIn)
+{
+    const int op = (kIROpMeta_OpMask & opIn);
+    return op >= kIROp_FirstParentInst && op <= kIROp_LastParentInst;
+}
+
+static bool isGlobalValueDerived(IROp opIn)
+{
+    const int op = (kIROpMeta_OpMask & opIn);
+    return op >= kIROp_FirstGlobalValue && op <= kIROp_LastGlobalValue;
+}
+
+struct PrefixString;
+
+namespace { // anonymous
+
+struct Reader
+{
+    char operator()(int pos) const { SLANG_UNUSED(pos); return *m_pos++; }
+    Reader(const char* pos) :m_pos(pos) {}
+    mutable const char* m_pos;
+};
+
+} // anonymous
+
+static UnownedStringSlice asStringSlice(const PrefixString* prefixString)
+{
+    const char* prefix = (char*)prefixString;
+
+    Reader reader(prefix);
+    const int len = GetUnicodePointFromUTF8(reader);
+    return UnownedStringSlice(reader.m_pos, len);
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! IRSerialInfo !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 
 UnownedStringSlice IRSerialData::getStringSlice(StringIndex index) const
 {
@@ -15,19 +66,7 @@ UnownedStringSlice IRSerialData::getStringSlice(StringIndex index) const
     {
         return UnownedStringSlice(m_strings.begin() + 1, UInt(0));
     }
-
-    const char* prefix = m_strings.begin() + int(index);
-
-    struct Reader
-    {
-        char operator()(int pos) const { SLANG_UNUSED(pos); return *m_pos++; } 
-        Reader(const char* pos):m_pos(pos) {}
-        mutable const char* m_pos;
-    };
-
-    Reader reader(prefix);
-    const int len = GetUnicodePointFromUTF8(reader);
-    return UnownedStringSlice(reader.m_pos, len);
+    return asStringSlice((const PrefixString*)(m_strings.begin() + int(index)));
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! IRSerialWriter !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -76,12 +115,6 @@ IRSerialData::StringIndex IRSerialWriter::getStringIndex(Name* name)
 
 Result IRSerialWriter::write(IRModule* module, IRSerialData* serialInfo)
 {
-    // Lets find all of the instructions
-    // Each instruction can only have one parent
-    // That being the case if we traverse the module in breadth first order (following children specifically)
-    // Then all 'child' nodes will be in order, and thus we only have to store the start instruction
-    // and the amount of instructions 
-
     m_serialData = serialInfo;
 
     serialInfo->clear();
@@ -111,10 +144,8 @@ Result IRSerialWriter::write(IRModule* module, IRSerialData* serialInfo)
         parentInstStack.RemoveLast();
         SLANG_ASSERT(m_instMap.ContainsKey(parentInst));
 
-        
         // Okay we go through each of the children in order. If they are IRInstParent derived, we add to stack to process later 
-        // cos we want breadth first...
-
+        // cos we want breadth first so the order of children is the same as their index order, meaning we don't need to store explicit indices
         const Ser::InstIndex startChildInstIndex = Ser::InstIndex(m_insts.Count());
         
         IRInstListBase childrenList = parentInst->getChildren();
@@ -192,11 +223,12 @@ Result IRSerialWriter::write(IRModule* module, IRSerialData* serialInfo)
                 continue;
             }
             
-            IRConstant* irConst = as<IRConstant>(srcInst);    
+            IRConstant* irConst = as<IRConstant>(srcInst);
             if (irConst)
             {
                 switch (srcInst->op)
                 {
+                    // Special handling for the ir const derived types
                     case kIROp_StringLit:
                     {
                         auto stringLit = static_cast<IRStringLit*>(srcInst);
@@ -222,11 +254,25 @@ Result IRSerialWriter::write(IRModule* module, IRSerialData* serialInfo)
                         dstInst.m_payload.m_uint32 = irConst->value.intVal ? 1 : 0;
                         break;
                     }
+                    default:
+                    {
+                        SLANG_RELEASE_ASSERT(!"Unhandled constant type");
+                        return SLANG_FAIL;
+                    }
                 }
-                
+                continue;
+            }
+            IRGlobalValue* globValue = as<IRGlobalValue>(srcInst);
+            if (globValue)
+            {
+                dstInst.m_payloadType = Ser::Inst::PayloadType::String_1;
+                dstInst.m_payload.m_stringIndices[0] = getStringIndex(globValue->mangledName);
                 continue;
             }
 
+            // ModuleInst is different, in so far as it holds a pointer to IRModule, but we don't need 
+            // to save that off in a special way, so can just use regular path
+             
             const int numOperands = int(srcInst->operandCount);
             Ser::InstIndex* dstOperands = nullptr;
 
@@ -472,29 +518,6 @@ Result _writeArrayChunk(uint32_t chunkId, const List<T>& array, Stream* stream)
     return SLANG_OK;
 }
 
-Result serializeModule(IRModule* module, Stream* stream)
-{
-   IRSerialWriter serializer;
-   IRSerialData serialData;
-
-   SLANG_RETURN_ON_FAIL(serializer.write(module, &serialData));
-
-   if (stream)
-   {
-        SLANG_RETURN_ON_FAIL(IRSerialWriter::writeStream(serialData, stream));
-    }
-
-    return SLANG_OK;
-}
-
-Result readModule(Stream* stream)
-{
-    IRSerialData serialData;
-    IRSerialReader::readStream(stream, &serialData);
-
-    return SLANG_OK;
-}
-
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! IRSerialReader !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 template <typename T>
@@ -621,5 +644,419 @@ int64_t _calcChunkTotalSize(const IRSerialBinary::Chunk& chunk)
 
     return SLANG_OK;
 }
+
+Name* IRSerialReader::getName(Ser::StringIndex index)
+{
+    if (index == Ser::kNullStringIndex)
+    {
+        return nullptr;
+    }
+
+    StringRepresentation* rep = getStringRepresentation(index);
+    String string(rep);
+    Session* session = m_module->getSession();
+
+    return session->getNameObj(string);
+}
+
+String IRSerialReader::getString(Ser::StringIndex index)
+{
+    return String(getStringRepresentation(index));
+}
+
+UnownedStringSlice IRSerialReader::getStringSlice(Ser::StringIndex index)
+{
+    return asStringSlice((PrefixString*)(m_serialData->m_strings.begin() + int(index)));
+}
+
+StringRepresentation* IRSerialReader::getStringRepresentation(Ser::StringIndex index)
+{
+    if (index == Ser::kNullStringIndex)
+    {
+        return nullptr;
+    }
+
+    const int linearIndex = findStringLinearIndex(index);
+    StringRepresentation* rep = m_stringRepresentationCache[linearIndex];
+    if (rep)
+    {
+        return rep;
+    }
+
+    const UnownedStringSlice slice = getStringSlice(index);
+    String string(slice);
+
+    StringRepresentation* stringRep = string.getStringRepresentation();   
+    m_module->addRefObjectToFree(stringRep);
+
+    m_stringRepresentationCache[linearIndex] = stringRep;
+
+    return stringRep;
+}
+
+char* IRSerialReader::getCStr(Ser::StringIndex index)
+{
+    // It turns out StringRepresentation is always 0 terminated, so can just use that
+    StringRepresentation* rep = getStringRepresentation(index);
+    return rep->getData();
+}
+
+int IRSerialReader::findStringLinearIndex(Ser::StringIndex index)
+{
+    // Binary chop to find the linear index
+    int start = 0;
+    int end = int(m_stringStarts.Count());
+
+    while (start < end)
+    {
+        int center = (start + end) >> 1;
+        const Ser::StringIndex cur = m_stringStarts[center];
+
+        if (cur == index)
+        {
+            return center;
+        }
+
+        if (cur < index)
+        {
+            start = center + 1;
+        }
+        else 
+        {
+            end = center;
+        }
+    }
+
+    return -1;
+}
+
+void IRSerialReader::_calcStringStarts()
+{
+    m_stringStarts.Clear();
+
+    const char* start = m_serialData->m_strings.begin();
+    const char* cur = start;
+    const char* end = m_serialData->m_strings.end();
+
+    while (cur < end)
+    {
+        m_stringStarts.Add(Ser::StringIndex(cur - start));
+
+        Reader reader(cur);
+        const int len = GetUnicodePointFromUTF8(reader);
+        cur = reader.m_pos + len;
+    }
+
+    m_stringRepresentationCache.Clear();
+    // Resize cache
+    m_stringRepresentationCache.SetSize(m_stringStarts.Count());
+    // Make sure all values are null initially
+    memset(m_stringRepresentationCache.begin(), 0, sizeof(StringRepresentation*) * m_stringStarts.Count());
+}
+
+/* static */Result IRSerialReader::read(const IRSerialData& data, TranslationUnitRequest* translationUnit, IRModule** moduleOut)
+{
+    typedef Ser::Inst::PayloadType PayloadType;
+
+    *moduleOut = nullptr;
+
+    m_serialData = &data;
+    _calcStringStarts();
+
+    auto compileRequest = translationUnit->compileRequest;
+
+    //SharedIRGenContext sharedContextStorage;
+    //SharedIRGenContext* sharedContext = &sharedContextStorage;
+
+    //sharedContext->compileRequest = compileRequest;
+    //sharedContext->mainModuleDecl = translationUnit->SyntaxNode;
+
+    //IRGenContext contextStorage(sharedContext);
+    //IRGenContext* context = &contextStorage;
+
+    SharedIRBuilder sharedBuilderStorage;
+    SharedIRBuilder* sharedBuilder = &sharedBuilderStorage;
+    sharedBuilder->module = nullptr;
+    sharedBuilder->session = compileRequest->mSession;
+
+    IRBuilder builderStorage;
+    IRBuilder* builder = &builderStorage;
+    builder->sharedBuilder = sharedBuilder;
+
+    RefPtr<IRModule> module = builder->createModule();
+    sharedBuilder->module = module;
+
+    m_module = module;
+    
+    //context->irBuilder = builder;
+
+    // Add all the instructions
+
+    List<IRInst*> insts;
+    List<IRDecoration*> decorations;
+
+    const int numInsts = data.m_decorationBaseIndex;
+    const int numDecorations = int(data.m_insts.Count() - numInsts);
+
+    SLANG_ASSERT(numInsts > 0);
+
+    insts.SetSize(numInsts);
+    insts[0] = nullptr;
+
+    decorations.SetSize(numDecorations);
+
+    for (int i = 1; i < numInsts; ++i)
+    {
+        const Ser::Inst& srcInst = data.m_insts[i];
+
+        const IROp op((IROp)srcInst.m_op);
+
+        if (isParentDerived(op))
+        {
+            // Cannot have operands
+            SLANG_ASSERT(srcInst.getNumOperands() == 0);
+
+            if (isGlobalValueDerived(op))
+            {
+                IRGlobalValue* globalValueInst = static_cast<IRGlobalValue*>(createEmptyInstWithSize(module, op, sizeof(IRGlobalValue)));
+                insts[i] = globalValueInst;
+                // Set the global value
+                SLANG_ASSERT(srcInst.m_payloadType == IRSerialData::Inst::PayloadType::String_1);
+                globalValueInst->mangledName = getName(srcInst.m_payload.m_stringIndices[0]);
+            }
+            else
+            {
+                // Just needs to big enough to hold IRParentInst
+                IRParentInst* parentInst = static_cast<IRParentInst*>(createEmptyInstWithSize(module, op, sizeof(IRParentInst)));
+                insts[i] = parentInst;
+            }
+        }
+        else
+        {
+            int numOperands = srcInst.getNumOperands();
+            insts[i] = createEmptyInst(module, op, numOperands);
+        }                    
+    } 
+
+    // Patch up the operands
+    
+    for (int i = 1; i < numInsts; ++i)
+    {
+        const Ser::Inst& srcInst = data.m_insts[i];
+        const IROp op((IROp)srcInst.m_op);
+
+        IRInst* dstInst = insts[i];
+
+        // Set the result type
+        if (srcInst.m_resultTypeIndex != Ser::InstIndex(0))
+        {
+            IRInst* resultInst = insts[int(srcInst.m_resultTypeIndex)];
+            // NOTE! Counter intuitively the IRType* paramter may not be IRType* derived for example 
+            // IRGlobalGenericParam is valid, but isn't IRType* derived
+
+            //SLANG_RELEASE_ASSERT(as<IRType>(resultInst));
+            dstInst->setFullType(static_cast<IRType*>(resultInst));
+        }
+       
+        //if (!isParentDerived(op))
+        {
+            const Ser::InstIndex* srcOperandIndices;
+            const int numOperands = data.getOperands(srcInst, &srcOperandIndices);
+                         
+            for (int j = 0; j < numOperands; j++)
+            {
+                dstInst->setOperand(j, insts[int(srcOperandIndices[j])]);
+            }
+        }
+    }
+    
+    // Patch up the children
+
+    {
+        const int numChildRuns = int(data.m_childRuns.Count());
+        for (int i = 0; i < numChildRuns; i++)
+        {
+            const auto& run = data.m_childRuns[i];
+
+            IRInst* inst = insts[int(run.m_parentIndex)];
+            IRParentInst* parentInst = as<IRParentInst>(inst);
+            SLANG_ASSERT(parentInst);
+
+            for (int j = 0; j < int(run.m_numChildren); ++j)
+            {
+                IRInst* child = insts[j + int(run.m_startInstIndex)];
+                child->insertAtEnd(parentInst);
+            }
+        }
+    }
+
+    // Add the decorations
+    for (int i = 0; i < numDecorations; ++i)
+    {
+        const Ser::Inst& srcInst = data.m_insts[i + numInsts];
+        IRDecorationOp decorOp = IRDecorationOp(srcInst.m_op - kIROpCount);
+        SLANG_ASSERT(decorOp < kIRDecorationOp_CountOf);
+
+        switch (decorOp)
+        {
+            case kIRDecorationOp_HighLevelDecl:
+            {
+                auto decor = createEmptyDecoration<IRHighLevelDeclDecoration>(m_module);
+                decorations[i] = decor;
+
+                // TODO!
+                // Decl* decl;
+                break;
+            }
+            case kIRDecorationOp_Layout:
+            {
+                auto decor = createEmptyDecoration<IRLayoutDecoration>(m_module);
+                decorations[i] = decor;
+
+                // TODO!
+                // Layout* layout;
+                break;
+            }
+            case kIRDecorationOp_LoopControl:
+            {
+                auto decor = createEmptyDecoration<IRLoopControlDecoration>(m_module);
+                decorations[i] = decor;
+
+                SLANG_ASSERT(srcInst.m_payloadType == PayloadType::UInt32);
+                decor->mode = IRLoopControl(srcInst.m_payload.m_uint32);
+                
+                break;
+            }
+            case kIRDecorationOp_Target:
+            {
+                auto decor = createEmptyDecoration<IRTargetDecoration>(m_module);
+                decorations[i] = decor;
+
+                SLANG_ASSERT(srcInst.m_payloadType == PayloadType::String_1);
+                decor->targetName = getStringRepresentation(srcInst.m_payload.m_stringIndices[0]);
+                break;
+            }
+            case kIRDecorationOp_TargetIntrinsic:
+            {
+                auto decor = createEmptyDecoration<IRTargetIntrinsicDecoration>(m_module);
+                decorations[i] = decor;
+
+                SLANG_ASSERT(srcInst.m_payloadType == PayloadType::String_2);
+                decor->targetName = getStringRepresentation(srcInst.m_payload.m_stringIndices[0]);
+                decor->definition = getStringRepresentation(srcInst.m_payload.m_stringIndices[1]);
+                break;
+            }
+            case kIRDecorationOp_GLSLOuterArray:
+            {
+                auto decor = createEmptyDecoration<IRGLSLOuterArrayDecoration>(m_module);
+                decorations[i] = decor;
+
+                SLANG_ASSERT(srcInst.m_payloadType == PayloadType::String_1);
+                decor->outerArrayName = getCStr(srcInst.m_payload.m_stringIndices[0]);
+                break;
+            }
+            case kIRDecorationOp_Semantic:
+            {
+                auto decor = createEmptyDecoration<IRSemanticDecoration>(m_module);
+                decorations[i] = decor;
+
+                SLANG_ASSERT(srcInst.m_payloadType == PayloadType::String_1);
+                decor->semanticName = getName(srcInst.m_payload.m_stringIndices[0]);
+                break;
+            }
+            case kIRDecorationOp_NameHint:
+            {
+                auto decor = createEmptyDecoration<IRNameHintDecoration>(m_module);
+                decorations[i] = decor;
+
+                SLANG_ASSERT(srcInst.m_payloadType == PayloadType::String_1);
+                decor->name = getName(srcInst.m_payload.m_stringIndices[0]);
+                break;
+            }
+            default:
+            {
+                SLANG_ASSERT(!"Unhandled decoration type");
+                return SLANG_FAIL;
+            }
+        }
+        
+        // Make sure something is set
+        SLANG_ASSERT(decorations[i]);
+    }
+
+    // Associate the decorations with the instructions
+
+    {
+        const int decorationBaseIndex = m_serialData->m_decorationBaseIndex;
+
+        const int numRuns = int(m_serialData->m_decorationRuns.Count());
+        for (int i = 0; i < numRuns; ++i)
+        {
+            const Ser::InstRun& run = m_serialData->m_decorationRuns[i];
+
+            // Decorations must be associated with instructions
+            SLANG_ASSERT(int(run.m_parentIndex) < decorationBaseIndex);
+
+            IRInst* inst = insts[int(run.m_parentIndex)];
+            SLANG_ASSERT(int(run.m_startInstIndex) >= decorationBaseIndex && int(run.m_startInstIndex) + run.m_numChildren <= m_serialData->m_insts.Count());
+
+            // Go in reverse order so that linked list is in same order as original
+            for (int j = int(run.m_numChildren) - 1; j >= 0; --j)
+            {
+                IRDecoration* decor = decorations[int(run.m_startInstIndex) + j - decorationBaseIndex];
+
+                // And to the linked list on the 
+                decor->next = inst->firstDecoration;
+                inst->firstDecoration = decor;
+            }
+        }
+    }
+
+    //
+    {
+        IRInst* inst = insts[1];            /// Presumably IRModule
+        IRModuleInst* moduleInst = as<IRModuleInst>(inst);
+        moduleInst->module = module;
+
+        module->moduleInst = moduleInst;
+    }
+
+    *moduleOut = module.detach();
+    return SLANG_OK;
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!! Free functions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+Result serializeModule(IRModule* module, Stream* stream)
+{
+    IRSerialWriter serializer;
+    IRSerialData serialData;
+
+    SLANG_RETURN_ON_FAIL(serializer.write(module, &serialData));
+
+    if (stream)
+    {
+        SLANG_RETURN_ON_FAIL(IRSerialWriter::writeStream(serialData, stream));
+    }
+
+    return SLANG_OK;
+}
+
+Result readModule(TranslationUnitRequest* translationUnit, Stream* stream)
+{
+    IRSerialData serialData;
+    IRSerialReader::readStream(stream, &serialData);
+
+    RefPtr<IRModule> module;
+    IRSerialReader reader;
+
+    SLANG_RETURN_ON_FAIL(reader.read(serialData, translationUnit, module.writeRef()));
+
+    dumpIR(module);
+
+    return SLANG_OK;
+}
+
 
 } // namespace Slang

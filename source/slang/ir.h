@@ -1101,6 +1101,27 @@ void dumpIR(IRGlobalValue* globalVal);
 
 String dumpIRFunc(IRFunc* func);
 
+IRInst* createEmptyInst(
+    IRModule*   module,
+    IROp        op,
+    int         totalArgCount);
+
+IRInst* createEmptyInstWithSize(
+    IRModule*   module,
+    IROp        op,
+    size_t      totalSizeInBytes);
+
+IRDecoration* createEmptyDecoration(
+    IRModule* module, 
+    IRDecorationOp op, 
+    size_t sizeInBytes);
+
+template <typename T>
+T* createEmptyDecoration(IRModule* module)
+{
+    return static_cast<T*>(createEmptyDecoration(module, IRDecorationOp(T::kDecorationOp), sizeof(T)));
+}
+
 }
 
 

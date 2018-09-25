@@ -9,6 +9,9 @@
 
 #include "ir.h"
 
+// For TranslationUnitRequest
+#include "compiler.h"
+
 namespace Slang {
 
 // Pre-declare
@@ -58,6 +61,19 @@ struct IRSerialData
             CountOf,
         };
 
+            /// Get the number of operands
+        int getNumOperands() const 
+        {
+            switch (m_payloadType)
+            {
+                default: /* fallthru */
+                case PayloadType::Empty: return 0;
+                case PayloadType::Operand_1: return 1;
+                case PayloadType::Operand_2: return 2;
+                case PayloadType::ExternalOperand: return m_payload.m_externalOperand.m_size;
+            }
+        }
+
         uint8_t m_op;                       ///< For now one of IROp 
         PayloadType m_payloadType;	 		///< The type of payload 
         uint16_t m_pad0;                    ///< Not currently used             
@@ -101,6 +117,30 @@ struct IRSerialData
         m_strings[int(kEmptyStringIndex)] = 0;
 
         m_decorationBaseIndex = 0;
+    }
+
+    int getOperands(const Inst& inst, const InstIndex** operandsOut) const
+    {
+        switch (inst.m_payloadType)
+        {
+            default:
+            case Inst::PayloadType::Empty:
+            {
+                *operandsOut = nullptr;
+                return 0;
+            }
+            case Inst::PayloadType::Operand_1:
+            case Inst::PayloadType::Operand_2:
+            {
+                *operandsOut = inst.m_payload.m_operands;
+                return int(inst.m_payloadType) - int(Inst::PayloadType::Empty);
+            }
+            case Inst::PayloadType::ExternalOperand:
+            {
+                *operandsOut = m_externalOperands.begin() + int(inst.m_payload.m_externalOperand.m_arrayIndex);
+                return int(inst.m_payload.m_externalOperand.m_size);
+            }
+        }
     }
 
     /// Get a slice from an index
@@ -197,12 +237,43 @@ protected:
 
 struct IRSerialReader
 {
+    typedef IRSerialData Ser;
+
+        /// Read a stream to fill in dataOut IRSerialData
     static Result readStream(Stream* stream, IRSerialData* dataOut);
+
+        /// Read a module from serial data
+    Result read(const IRSerialData& data, TranslationUnitRequest* translationUnit, IRModule** moduleOut);
+
+    Name* getName(Ser::StringIndex index);
+    String getString(Ser::StringIndex index);
+    UnownedStringSlice getStringSlice(Ser::StringIndex index);
+    StringRepresentation* getStringRepresentation(Ser::StringIndex index);
+    char* getCStr(Ser::StringIndex index);
+
+        /// Given a string index, gives a linear position to it, or -1 if not found
+    int findStringLinearIndex(Ser::StringIndex index);
+
+    IRSerialReader():
+        m_serialData(nullptr),
+        m_module(nullptr)
+    {
+    }
+
+    protected:
+
+    void _calcStringStarts();
+
+    List<Ser::StringIndex> m_stringStarts;
+    List<StringRepresentation*> m_stringRepresentationCache;
+
+    const IRSerialData* m_serialData;
+    IRModule* m_module;
 };
 
 
 Result serializeModule(IRModule* module, Stream* stream);
-Result readModule(Stream* stream);
+Result readModule(TranslationUnitRequest* translationUnit, Stream* stream);
 
 } // namespace Slang
 
