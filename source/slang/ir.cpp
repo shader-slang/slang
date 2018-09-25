@@ -49,7 +49,7 @@ namespace Slang
 
     IROpInfo getIROpInfo(IROp opIn)
     {
-        const int op = opIn & kIROpMeta_OpMask;
+        const int op = opIn & kIROpMeta_PseudoOpMask;
         if ((op & kIROpMeta_IsPseudoOp) && op < kIRPseudoOp_LastPlusOne)
         {
             // It's a pseudo op

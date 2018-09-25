@@ -25,14 +25,20 @@ bother to check if it's correct, and just casts it.
 
 static bool isParentDerived(IROp opIn)
 {
-    const int op = (kIROpMeta_OpMask & opIn);
+    const int op = (kIROpMeta_PseudoOpMask & opIn);
     return op >= kIROp_FirstParentInst && op <= kIROp_LastParentInst;
 }
 
 static bool isGlobalValueDerived(IROp opIn)
 {
-    const int op = (kIROpMeta_OpMask & opIn);
+    const int op = (kIROpMeta_PseudoOpMask & opIn);
     return op >= kIROp_FirstGlobalValue && op <= kIROp_LastGlobalValue;
+}
+
+static bool isTextureTypeBase(IROp opIn)
+{
+    const int op = (kIROpMeta_PseudoOpMask & opIn);
+    return op >= kIROp_FirstTextureTypeBase && op <= kIROp_LastTextureTypeBase;
 }
 
 struct PrefixString;
@@ -211,18 +217,14 @@ Result IRSerialWriter::write(IRModule* module, IRSerialData* serialInfo)
             IRInst* srcInst = m_insts[i];
             Ser::Inst& dstInst = m_serialData->m_insts[i];
             
-            dstInst.m_op = uint8_t(srcInst->op);
+            // Can't be any psuedo ops
+            SLANG_ASSERT(!isPseudoOp(srcInst->op)); 
+
+            dstInst.m_op = uint8_t(srcInst->op & kIROpMeta_OpMask);
             dstInst.m_payloadType = Ser::Inst::PayloadType::Empty;
             
             dstInst.m_resultTypeIndex = getInstIndex(srcInst->getFullType());
 
-            // Need to special case 
-            if (srcInst->op != (srcInst->op & kIROpMeta_OpMask))
-            {
-                // For now ignore
-                continue;
-            }
-            
             IRConstant* irConst = as<IRConstant>(srcInst);
             if (irConst)
             {
@@ -267,6 +269,14 @@ Result IRSerialWriter::write(IRModule* module, IRSerialData* serialInfo)
             {
                 dstInst.m_payloadType = Ser::Inst::PayloadType::String_1;
                 dstInst.m_payload.m_stringIndices[0] = getStringIndex(globValue->mangledName);
+                continue;
+            }
+
+            IRTextureTypeBase* textureBase = as<IRTextureTypeBase>(srcInst);
+            if (textureBase)
+            {
+                dstInst.m_payloadType = Ser::Inst::PayloadType::UInt32;
+                dstInst.m_payload.m_uint32 = uint32_t(srcInst->op) >> kIROpMeta_OtherShift;
                 continue;
             }
 
@@ -821,7 +831,7 @@ void IRSerialReader::_calcStringStarts()
                 IRGlobalValue* globalValueInst = static_cast<IRGlobalValue*>(createEmptyInstWithSize(module, op, sizeof(IRGlobalValue)));
                 insts[i] = globalValueInst;
                 // Set the global value
-                SLANG_ASSERT(srcInst.m_payloadType == IRSerialData::Inst::PayloadType::String_1);
+                SLANG_ASSERT(srcInst.m_payloadType == PayloadType::String_1);
                 globalValueInst->mangledName = getName(srcInst.m_payload.m_stringIndices[0]);
             }
             else
@@ -833,8 +843,22 @@ void IRSerialReader::_calcStringStarts()
         }
         else
         {
-            int numOperands = srcInst.getNumOperands();
-            insts[i] = createEmptyInst(module, op, numOperands);
+            if (isTextureTypeBase(op))
+            {
+                IRTextureTypeBase* inst = static_cast<IRTextureTypeBase*>(createEmptyInstWithSize(module, op, sizeof(IRTextureTypeBase)));
+                SLANG_ASSERT(srcInst.m_payloadType == PayloadType::UInt32);
+
+                // Reintroduce the texture type bits into the the
+                const uint32_t other = srcInst.m_payload.m_uint32;
+                inst->op = IROp(uint32_t(inst->op) | (other << kIROpMeta_OtherShift));
+
+                insts[i] = inst;
+            }
+            else
+            {
+                int numOperands = srcInst.getNumOperands();
+                insts[i] = createEmptyInst(module, op, numOperands);
+            }
         }                    
     } 
 

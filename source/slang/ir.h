@@ -81,9 +81,10 @@ enum IROp : int32_t
 /* IROpMeta describe values for layout of IROp, as well as values for accessing aspects of IROp bits. */
 enum IROpMeta
 {
-    kIROpMeta_Shift = 9,                                            ///< Number of bits for op/pseudo ops (shift right by this to get the other bits)
-    kIROpMeta_OpMask = (int32_t(1) << kIROpMeta_Shift) - 1,         ///< Mask for regular ops
-    kIrOpMeta_OtherMask = ~kIROpMeta_OpMask,                        ///< Mask for bits that can be used for other purposes than 'op' ('other' bits)
+    kIROpMeta_OtherShift = 9,                                            ///< Number of bits for op/pseudo ops (shift right by this to get the other bits)
+    kIROpMeta_PseudoOpMask = (int32_t(1) << kIROpMeta_OtherShift) - 1,   ///< Mask for ops including pseudo ops
+    kIROpMeta_OpMask = 0xff,                                        ///< Mask for just ops
+    kIrOpMeta_OtherMask = ~kIROpMeta_PseudoOpMask,                  ///< Mask for bits that can be used for other purposes than 'op' ('other' bits)
     kIROpMeta_IsPseudoOp = kIROp_Invalid,                           ///< 'And' with op, if set, the op is a pseudo op
 };
 
@@ -426,8 +427,8 @@ struct IRInstList : IRInstListBase
 
 // Types
 
-#define IR_LEAF_ISA(NAME) static bool isaImpl(IROp op) { return (kIROpMeta_OpMask & op) == kIROp_##NAME; }
-#define IR_PARENT_ISA(NAME) static bool isaImpl(IROp opIn) { const int op = (kIROpMeta_OpMask & opIn); return op >= kIROp_First##NAME && op <= kIROp_Last##NAME; }
+#define IR_LEAF_ISA(NAME) static bool isaImpl(IROp op) { return (kIROpMeta_PseudoOpMask & op) == kIROp_##NAME; }
+#define IR_PARENT_ISA(NAME) static bool isaImpl(IROp opIn) { const int op = (kIROpMeta_PseudoOpMask & opIn); return op >= kIROp_First##NAME && op <= kIROp_Last##NAME; }
 
 #define SIMPLE_IR_TYPE(NAME, BASE) struct IR##NAME : IR##BASE { IR_LEAF_ISA(NAME) };
 #define SIMPLE_IR_PARENT_TYPE(NAME, BASE) struct IR##NAME : IR##BASE { IR_PARENT_ISA(NAME) };
@@ -704,7 +705,7 @@ struct IRResourceTypeBase : IRType
 {
     TextureFlavor getFlavor() const
     {
-        return TextureFlavor((op >> kIROpMeta_Shift) & 0xFFFF);
+        return TextureFlavor((op >> kIROpMeta_OtherShift) & 0xFFFF);
     }
 
     TextureFlavor::Shape GetBaseShape() const
