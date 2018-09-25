@@ -33,9 +33,8 @@ typedef unsigned int IROpFlags;
 enum : IROpFlags
 {
     kIROpFlags_None = 0,
-
-    // This op is a parent op
-    kIROpFlag_Parent = 1 << 0,
+    kIROpFlag_Parent = 1 << 0,                  ///< This op is a parent op
+    kIROpFlag_UseOther = 1 << 1,                ///< If set this op can use 'other bits' to store information
 };
 
 /* Bit usage of IROp is a follows
@@ -45,7 +44,7 @@ Bit range: 0-7   |    8   | Remaining bits
 
 If an instruction is 'pseudo' (ie shouldn't appear in output IR), then the Pseudo bit is set - and 'Invalid' falls into 
 this category as well as all pseudo ops.
-For doing range checks (for example for doing isa tests), the value is masked by kIROp_Mask_OpMask, such that the Other bits don't interfere.
+For doing range checks (for example for doing isa tests), the value is masked by kIROpMeta_OpMask, such that the Other bits don't interfere.
 The other bits can be used for storage for anything that needs to identify as a different 'op' or 'type'. It is currently 
 used currently for storing the TextureFlavor of a IRResourceTypeBase derived types for example. 
 */
@@ -61,12 +60,13 @@ enum IROp : int32_t
     // We use the range 0x100 to 0x1ff set for pseudo/non main codes
     // Instructions that should not appear in valid IR.
 
-    
     kIROp_Invalid = 0x100,                                      ///< If bit set, then in pseudo/not normal space 
-    kIRPseduoOp_FirstPseudo,
+    kIRPseudoOp_First = kIROp_Invalid,
 
 #define INST(ID, MNEMONIC, ARG_COUNT, FLAGS) /* empty */
 #define PSEUDO_INST(ID) kIRPseudoOp_##ID,
+
+    kIRPseudoOp_LastPlusOne,
 
 #include "ir-inst-defs.h"
 
@@ -76,14 +76,19 @@ enum IROp : int32_t
     kIROp_Last##BASE    = kIROp_##LAST,
 
 #include "ir-inst-defs.h"
+};
 
-    kIROp_Mask_Shift = 9,
-    kIROp_Mask_OpMask = (int32_t(1) << kIROp_Mask_Shift) - 1,                                      ///< Mask for regular ops
-    kIROp_Mask_OtherMask = ~kIROp_Mask_OpMask,
+/* IROpMeta describe values for layout of IROp, as well as values for accessing aspects of IROp bits. */
+enum IROpMeta
+{
+    kIROpMeta_Shift = 9,                                            ///< Number of bits for op/pseudo ops (shift right by this to get the other bits)
+    kIROpMeta_OpMask = (int32_t(1) << kIROpMeta_Shift) - 1,         ///< Mask for regular ops
+    kIrOpMeta_OtherMask = ~kIROpMeta_OpMask,                        ///< Mask for bits that can be used for other purposes than 'op' ('other' bits)
+    kIROpMeta_IsPseudoOp = kIROp_Invalid,                           ///< 'And' with op, if set, the op is a pseudo op
 };
 
 // True if op is pseudo (or invalid which is 'pseudo-like' at least in as so far as current behavior)
-SLANG_FORCE_INLINE bool isPseudoOp(IROp op) { return (op & kIROp_Invalid) != 0; }
+SLANG_FORCE_INLINE bool isPseudoOp(IROp op) { return (op & kIROpMeta_IsPseudoOp) != 0; }
 
 IROp findIROp(char const* name);
 
@@ -418,8 +423,8 @@ struct IRInstList : IRInstListBase
 
 // Types
 
-#define IR_LEAF_ISA(NAME) static bool isaImpl(IROp op) { return (kIROp_Mask_OpMask & op) == kIROp_##NAME; }
-#define IR_PARENT_ISA(NAME) static bool isaImpl(IROp opIn) { const int op = (kIROp_Mask_OpMask & opIn); return op >= kIROp_First##NAME && op <= kIROp_Last##NAME; }
+#define IR_LEAF_ISA(NAME) static bool isaImpl(IROp op) { return (kIROpMeta_OpMask & op) == kIROp_##NAME; }
+#define IR_PARENT_ISA(NAME) static bool isaImpl(IROp opIn) { const int op = (kIROpMeta_OpMask & opIn); return op >= kIROp_First##NAME && op <= kIROp_Last##NAME; }
 
 #define SIMPLE_IR_TYPE(NAME, BASE) struct IR##NAME : IR##BASE { IR_LEAF_ISA(NAME) };
 #define SIMPLE_IR_PARENT_TYPE(NAME, BASE) struct IR##NAME : IR##BASE { IR_PARENT_ISA(NAME) };
@@ -696,7 +701,7 @@ struct IRResourceTypeBase : IRType
 {
     TextureFlavor getFlavor() const
     {
-        return TextureFlavor((op >> kIROp_Mask_Shift) & 0xFFFF);
+        return TextureFlavor((op >> kIROpMeta_Shift) & 0xFFFF);
     }
 
     TextureFlavor::Shape GetBaseShape() const

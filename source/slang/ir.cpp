@@ -23,19 +23,55 @@ namespace Slang
     // TODO: We should ideally be speeding up the name->inst
     // mapping by using a dictionary, or even by pre-computing
     // a hash table to be stored as a `static const` array.
+    //
+    // NOTE! That this array is now constructed in such a way that looking up 
+    // an entry from an op is fast, by keeping blocks of main, and pseudo ops in same order
+    // as the ops themselves. Care must be taken to keep this constraint.
     static const IROpMapEntry kIROps[] =
     {
-        { kIROp_Invalid, { "invalid", 0, 0 } },
-
+        
+    // Main ops in order
 #define INST(ID, MNEMONIC, ARG_COUNT, FLAGS)  \
     { kIROp_##ID, { #MNEMONIC, ARG_COUNT, FLAGS, } },
+#include "ir-inst-defs.h"
+
+    // Pseudo ops
+#define INST(ID, MNEMONIC, ARG_COUNT, FLAGS)  /* empty */
 #define PSEUDO_INST(ID)  \
     { kIRPseudoOp_##ID, { #ID, 0, 0 } },
+
+    // First is 'invalid' 
+    { kIROp_Invalid,{ "invalid", 0, 0 } },
+    // Then all the other psuedo ops
 #include "ir-inst-defs.h"
 
     };
 
-    //
+    IROpInfo getIROpInfo(IROp opIn)
+    {
+        const int op = opIn & kIROpMeta_OpMask;
+        if ((op & kIROpMeta_IsPseudoOp) && op < kIRPseudoOp_LastPlusOne)
+        {
+            // It's a pseudo op
+            const int index = op - kIRPseudoOp_First;
+            // Pseudo ops start from kIROpcount
+            const auto& entry =  kIROps[kIROpCount + index];
+            SLANG_ASSERT(entry.op == op);
+            return entry.info;
+        }
+        else if (op < kIROpCount)
+        {
+            // It's a main op
+            const auto& entry = kIROps[op];
+            SLANG_ASSERT(entry.op == op);
+            return entry.info;
+        }
+
+        // Don't know what this is
+        SLANG_ASSERT(!"Invalid op");
+        SLANG_ASSERT(kIROps[kIROpCount].op == kIROp_Invalid);
+        return kIROps[kIROpCount].info;
+    }
 
     IROp findIROp(char const* name)
     {
@@ -48,16 +84,7 @@ namespace Slang
         return IROp(kIROp_Invalid);
     }
 
-    IROpInfo getIROpInfo(IROp op)
-    {
-        for (auto ee : kIROps)
-        {
-            if (ee.op == op)
-                return ee.info;
-        }
-
-        return kIROps[0].info;
-    }
+    
 
     //
 
