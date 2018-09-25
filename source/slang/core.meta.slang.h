@@ -476,7 +476,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
             sb << "__generic<T = float4> ";
 
             sb << "__magic_type(TextureSampler," << int(flavor) << ")\n";
-            sb << "__intrinsic_type(" << (kIROp_FirstTextureSamplerType + flavor) << ")\n";
+            sb << "__intrinsic_type(" << (kIROp_TextureSamplerType + (int(flavor) << kIROp_Mask_Shift)) << ")\n";
             sb << "struct Sampler";
             sb << kBaseTextureAccessLevels[accessLevel].name;
             sb << name;
@@ -534,7 +534,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
             sb << "__generic<T = float4> ";
 
             sb << "__magic_type(Texture," << int(flavor) << ")\n";
-            sb << "__intrinsic_type(" << (kIROp_FirstTextureType + flavor) << ")\n";
+            sb << "__intrinsic_type(" << (kIROp_TextureType + (int(flavor) << kIROp_Mask_Shift)) << ")\n";
             sb << "struct ";
             sb << kBaseTextureAccessLevels[accessLevel].name;
             sb << name;

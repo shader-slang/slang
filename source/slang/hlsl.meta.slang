@@ -1250,7 +1250,7 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
     auto flavor = TextureFlavor::create(TextureFlavor::Shape::ShapeBuffer, kBaseBufferAccessLevels[aa].access).flavor;
     sb << "__generic<T>\n";
     sb << "__magic_type(Texture," << int(flavor) << ")\n";
-    sb << "__intrinsic_type(" << (kIROp_FirstTextureType + flavor) << ")\n";
+    sb << "__intrinsic_type(" << (kIROp_TextureType + (int(flavor) << kIROp_Mask_Shift)) << ")\n";
     sb << "struct ";
     sb << kBaseBufferAccessLevels[aa].name;
     sb << "Buffer {\n";

@@ -38,23 +38,32 @@ enum : IROpFlags
     kIROpFlag_Parent = 1 << 0,
 };
 
+/* Bit usage of IROp is a follows
+
+          MainOp | Pseudo | Other
+Bit range: 0-7   |    8   | Remaining bits
+
+If an instruction is 'pseudo' (ie shouldn't appear in output IR), then the Pseudo bit is set - and 'Invalid' falls into 
+this category as well as all pseudo ops.
+For doing range checks (for example for doing isa tests), the value is masked by kIROp_Mask_OpMask, such that the Other bits don't interfere.
+The other bits can be used for storage for anything that needs to identify as a different 'op' or 'type'. It is currently 
+used currently for storing the TextureFlavor of a IRResourceTypeBase derived types for example. 
+*/
 enum IROp : int32_t
 {
 #define INST(ID, MNEMONIC, ARG_COUNT, FLAGS)  \
     kIROp_##ID,
 
-#define MANUAL_INST_RANGE(ID, START, COUNT) \
-    kIROp_First##ID = START, kIROp_Last##ID = kIROp_First##ID + ((COUNT) - 1),
-
 #include "ir-inst-defs.h"
 
     kIROpCount,
 
-    // We use the negative range of opcode values
-    // to encode "pseudo" instructions that should
-    // not appear in valid IR.
+    // We use the range 0x100 to 0x1ff set for pseudo/non main codes
+    // Instructions that should not appear in valid IR.
 
-    kIRPseduoOp_FirstPseudo = -1000,
+    
+    kIROp_Invalid = 0x100,                                      ///< If bit set, then in pseudo/not normal space 
+    kIRPseduoOp_FirstPseudo,
 
 #define INST(ID, MNEMONIC, ARG_COUNT, FLAGS) /* empty */
 #define PSEUDO_INST(ID) kIRPseudoOp_##ID,
@@ -68,9 +77,13 @@ enum IROp : int32_t
 
 #include "ir-inst-defs.h"
 
-    kIROp_Invalid = -1,
-
+    kIROp_Mask_Shift = 9,
+    kIROp_Mask_OpMask = (int32_t(1) << kIROp_Mask_Shift) - 1,                                      ///< Mask for regular ops
+    kIROp_Mask_OtherMask = ~kIROp_Mask_OpMask,
 };
+
+// True if op is pseudo (or invalid which is 'pseudo-like' at least in as so far as current behavior)
+SLANG_FORCE_INLINE bool isPseudoOp(IROp op) { return (op & kIROp_Invalid) != 0; }
 
 IROp findIROp(char const* name);
 
@@ -405,8 +418,8 @@ struct IRInstList : IRInstListBase
 
 // Types
 
-#define IR_LEAF_ISA(NAME) static bool isaImpl(IROp op) { return op == kIROp_##NAME; }
-#define IR_PARENT_ISA(NAME) static bool isaImpl(IROp op) { return op >= kIROp_First##NAME && op <= kIROp_Last##NAME; }
+#define IR_LEAF_ISA(NAME) static bool isaImpl(IROp op) { return (kIROp_Mask_OpMask & op) == kIROp_##NAME; }
+#define IR_PARENT_ISA(NAME) static bool isaImpl(IROp opIn) { const int op = (kIROp_Mask_OpMask & opIn); return op >= kIROp_First##NAME && op <= kIROp_Last##NAME; }
 
 #define SIMPLE_IR_TYPE(NAME, BASE) struct IR##NAME : IR##BASE { IR_LEAF_ISA(NAME) };
 #define SIMPLE_IR_PARENT_TYPE(NAME, BASE) struct IR##NAME : IR##BASE { IR_PARENT_ISA(NAME) };
@@ -683,7 +696,7 @@ struct IRResourceTypeBase : IRType
 {
     TextureFlavor getFlavor() const
     {
-        return TextureFlavor(op & 0xFFFF);
+        return TextureFlavor((op >> kIROp_Mask_Shift) & 0xFFFF);
     }
 
     TextureFlavor::Shape GetBaseShape() const
@@ -712,17 +725,17 @@ struct IRTextureTypeBase : IRResourceType
 
 struct IRTextureType : IRTextureTypeBase
 {
-    IR_PARENT_ISA(TextureType)
+    IR_LEAF_ISA(TextureType)
 };
 
 struct IRTextureSamplerType : IRTextureTypeBase
 {
-    IR_PARENT_ISA(TextureSamplerType)
+    IR_LEAF_ISA(TextureSamplerType)
 };
 
 struct IRGLSLImageType : IRTextureTypeBase
 {
-    IR_PARENT_ISA(GLSLImageType)
+    IR_LEAF_ISA(GLSLImageType)
 };
 
 struct IRSamplerStateTypeBase : IRType
