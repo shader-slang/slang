@@ -41,6 +41,12 @@ static bool isTextureTypeBase(IROp opIn)
     return op >= kIROp_FirstTextureTypeBase && op <= kIROp_LastTextureTypeBase;
 }
 
+static bool isConstant(IROp opIn)
+{
+    const int op = (kIROpMeta_PseudoOpMask & opIn);
+    return op >= kIROp_FirstConstant && op <= kIROp_LastConstant;
+}
+
 struct PrefixString;
 
 namespace { // anonymous
@@ -252,7 +258,7 @@ Result IRSerialWriter::write(IRModule* module, IRSerialData* serialInfo)
                     }
                     case kIROp_boolConst:
                     {
-                        dstInst.m_payloadType = Ser::Inst::PayloadType::String_1;
+                        dstInst.m_payloadType = Ser::Inst::PayloadType::UInt32;
                         dstInst.m_payload.m_uint32 = irConst->value.intVal ? 1 : 0;
                         break;
                     }
@@ -815,7 +821,24 @@ void IRSerialReader::_calcStringStarts()
 
     decorations.SetSize(numDecorations);
 
-    for (int i = 1; i < numInsts; ++i)
+    // 0 holds null
+    // The first instruction must be the module
+    {
+        const Ser::Inst& srcInst = data.m_insts[1];
+        SLANG_ASSERT(srcInst.m_op == kIROp_Module);
+        SLANG_ASSERT(srcInst.getNumOperands() == 0);
+        SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Empty);
+
+        // We need to create directly, because it has extra data
+        IRModuleInst* moduleInst = static_cast<IRModuleInst*>(createEmptyInstWithSize(module, kIROp_Module, sizeof(IRModuleInst)));
+        
+        moduleInst->module = module;
+        module->moduleInst = moduleInst;
+
+        insts[1] = moduleInst;
+    }
+
+    for (int i = 2; i < numInsts; ++i)
     {
         const Ser::Inst& srcInst = data.m_insts[i];
 
@@ -843,7 +866,67 @@ void IRSerialReader::_calcStringStarts()
         }
         else
         {
-            if (isTextureTypeBase(op))
+            if (isConstant(op))
+            {
+                // Handling of constants
+
+                // Calculate the minimum object size (ie not including the payload of value)    
+                const size_t prefixSize = offsetof(IRConstant, value);
+
+                IRConstant* irConst = nullptr;
+                switch (op)
+                {                    
+                    case kIROp_boolConst:
+                    {
+                        SLANG_ASSERT(srcInst.m_payloadType == PayloadType::UInt32);
+                        irConst = static_cast<IRConstant*>(createEmptyInstWithSize(module, op, prefixSize + sizeof(IRIntegerValue)));
+                        irConst->value.intVal = srcInst.m_payload.m_uint32 != 0;
+                        break;
+                    }
+                    case kIROp_IntLit:
+                    {
+                        SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Int64);
+                        irConst = static_cast<IRConstant*>(createEmptyInstWithSize(module, op, prefixSize + sizeof(IRIntegerValue)));
+                        irConst->value.intVal = srcInst.m_payload.m_int64; 
+                        break;
+                    }
+                    case kIROp_FloatLit:
+                    {
+                        SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Float64);
+                        irConst = static_cast<IRConstant*>(createEmptyInstWithSize(module, op,  prefixSize + sizeof(IRFloatingPointValue)));
+                        irConst->value.floatVal = srcInst.m_payload.m_float64;
+                        break;
+                    }
+                    case kIROp_StringLit:
+                    {
+                        SLANG_ASSERT(srcInst.m_payloadType == PayloadType::String_1);
+
+                        const UnownedStringSlice slice = getStringSlice(srcInst.m_payload.m_stringIndices[0]);
+                        
+                        const size_t sliceSize = slice.size();
+                        const size_t instSize = prefixSize + offsetof(IRConstant::StringValue, chars) + sliceSize;
+
+                        irConst = static_cast<IRConstant*>(createEmptyInstWithSize(module, op, instSize));
+
+                        IRConstant::StringValue& dstString = irConst->value.stringVal;
+
+                        dstString.numChars = uint32_t(sliceSize);
+                        // Turn into pointer to avoid warning of array overrun
+                        char* dstChars = dstString.chars;
+                        // Copy the chars
+                        memcpy(dstChars, slice.begin(), sliceSize);
+                        break;
+                    }
+                    default:
+                    {
+                        SLANG_ASSERT(!"Unknown constant type");
+                        return SLANG_FAIL;
+                    }
+                }
+
+                insts[i] = irConst;
+            }
+            else if (isTextureTypeBase(op))
             {
                 IRTextureTypeBase* inst = static_cast<IRTextureTypeBase*>(createEmptyInstWithSize(module, op, sizeof(IRTextureTypeBase)));
                 SLANG_ASSERT(srcInst.m_payloadType == PayloadType::UInt32);
@@ -909,6 +992,8 @@ void IRSerialReader::_calcStringStarts()
             for (int j = 0; j < int(run.m_numChildren); ++j)
             {
                 IRInst* child = insts[j + int(run.m_startInstIndex)];
+                SLANG_ASSERT(child->parent == nullptr);
+                //child->parent = parentInst;
                 child->insertAtEnd(parentInst);
             }
         }
@@ -1034,15 +1119,6 @@ void IRSerialReader::_calcStringStarts()
                 inst->firstDecoration = decor;
             }
         }
-    }
-
-    //
-    {
-        IRInst* inst = insts[1];            /// Presumably IRModule
-        IRModuleInst* moduleInst = as<IRModuleInst>(inst);
-        moduleInst->module = module;
-
-        module->moduleInst = moduleInst;
     }
 
     *moduleOut = module.detach();

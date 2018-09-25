@@ -6097,6 +6097,10 @@ String emitEntryPoint(
             FileStream file("module.slangbin", FileMode::Open, FileAccess::Read, FileShare::ReadOnly);
 
             readModule(translationUnit, &file);
+
+
+
+            dumpIR(irModule);
         }
 
         // If the user specified the flag that they want us to dump
