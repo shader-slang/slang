@@ -14,8 +14,6 @@
 #include "type-layout.h"
 #include "visitor.h"
 
-#include "ir-serialize.h"
-
 #include <assert.h>
 
 // Note: using C++ stdio just to get a locale-independent
@@ -6085,26 +6083,6 @@ String emitEntryPoint(
 #endif
 
         validateIRModuleIfEnabled(compileRequest, irModule);
-
-
-
-
-        // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        // HACK! To see what serialization does
-        {
-            FileStream file("module.slangbin", FileMode::Create, FileAccess::Write, FileShare::WriteOnly);
-            serializeModule(irModule, &file);
-        }
-        {
-            RefPtr<IRModule> irReadModule;
-            FileStream file("module.slangbin", FileMode::Open, FileAccess::Read, FileShare::ReadOnly);
-            readModule(translationUnit, &file, irReadModule.writeRef());
-
-            dumpIR(irReadModule);
-
-            dumpIR(irModule);
-        }
-        // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
         // If the user specified the flag that they want us to dump
         // IR, then do it here, for the target-specific, but
