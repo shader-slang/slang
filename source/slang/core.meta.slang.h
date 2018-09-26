@@ -799,11 +799,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 default:
                     sb << "__target_intrinsic(glsl, \"imageStore($0, " << ivecN << "($1), $V2)\") set;\n";
 
-                    // Note: HLSL doesn't support component-granularity access into typed UAVs,
-                    // and also doesn't support atomic operations on them. As such, there should
-                    // be no reason why a `ref` accessor is required here.
-                    //
-                    // sb << "ref;\n";
+                    sb << "__intrinsic_op(" << int(kIROp_ImageSubscript) << ") ref;\n";
                     break;
                 }
 

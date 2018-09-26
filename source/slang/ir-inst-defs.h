@@ -227,6 +227,9 @@ INST(FieldAddress, get_field_addr, 2, 0)
 INST(getElement, getElement, 2, 0)
 INST(getElementPtr, getElementPtr, 2, 0)
 
+// "Subscript" an image at a pixel coordinate to get pointer
+INST(ImageSubscript, imageSubscript, 2, 0)
+
 // Construct a vector from a scalar
 //
 // %dst = constructVectorFromScalar %T %N %val

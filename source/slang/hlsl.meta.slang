@@ -650,31 +650,101 @@ __target_intrinsic(glsl, "groupMemoryBarrier()); (barrier()")
 void GroupMemoryBarrierWithGroupSync();
 
 // Atomics
+
+__target_intrinsic(glsl, "$atomicAdd($A, $1)")
+void InterlockedAdd(__ref  int dest,  int value);
+
+__target_intrinsic(glsl, "$atomicAdd($A, $1)")
+void InterlockedAdd(__ref uint dest, uint value);
+
+__target_intrinsic(glsl, "($2 = $atomicAdd($A, $1))")
 void InterlockedAdd(__ref  int dest,  int value, out  int original_value);
+
+__target_intrinsic(glsl, "($2 = $atomicAdd($A, $1))")
 void InterlockedAdd(__ref uint dest, uint value, out uint original_value);
 
+__target_intrinsic(glsl, "$atomicAnd($A, $1)")
+void InterlockedAnd(__ref  int dest,  int value);
+
+__target_intrinsic(glsl, "$atomicAnd($A, $1)")
+void InterlockedAnd(__ref uint dest, uint value);
+
+__target_intrinsic(glsl, "($2 = $atomicAnd($A, $1))")
 void InterlockedAnd(__ref  int dest,  int value, out  int original_value);
+
+__target_intrinsic(glsl, "($2 = $atomicAnd($A, $1))")
 void InterlockedAnd(__ref uint dest, uint value, out uint original_value);
 
+__target_intrinsic(glsl, "($3 = $atomicCompSwap($A, $1, $2))")
 void InterlockedCompareExchange(__ref  int dest,  int compare_value,  int value, out  int original_value);
+
+__target_intrinsic(glsl, "($3 = $atomicCompSwap($A, $1, $2))")
 void InterlockedCompareExchange(__ref uint dest, uint compare_value, uint value, out uint original_value);
 
+__target_intrinsic(glsl, "$atomicCompSwap($A, $1, $2)")
 void InterlockedCompareStore(__ref  int dest,  int compare_value,  int value);
+
+__target_intrinsic(glsl, "$atomicCompSwap($A, $1, $2)")
 void InterlockedCompareStore(__ref uint dest, uint compare_value, uint value);
 
+__target_intrinsic(glsl, "$atomicExchange($A, $1)")
+void InterlockedExchange(__ref  int dest,  int value);
+
+__target_intrinsic(glsl, "$atomicExchange($A, $1)")
+void InterlockedExchange(__ref uint dest, uint value);
+
+__target_intrinsic(glsl, "($2 = $atomicExchange($A, $1))")
 void InterlockedExchange(__ref  int dest,  int value, out  int original_value);
+
+__target_intrinsic(glsl, "($2 = $atomicExchange($A, $1))")
 void InterlockedExchange(__ref uint dest, uint value, out uint original_value);
 
+__target_intrinsic(glsl, "$atomicMax($A, $1)")
+void InterlockedMax(__ref  int dest,  int value);
+
+__target_intrinsic(glsl, "$atomicMax($A, $1)")
+void InterlockedMax(__ref uint dest, uint value);
+
+__target_intrinsic(glsl, "($2 = $atomicMax($A, $1))")
 void InterlockedMax(__ref  int dest,  int value, out  int original_value);
+
+__target_intrinsic(glsl, "($2 = $atomicMax($A, $1))")
 void InterlockedMax(__ref uint dest, uint value, out uint original_value);
 
+__target_intrinsic(glsl, "$atomicMin($A, $1)")
+void InterlockedMin(in out  int dest,  int value);
+
+__target_intrinsic(glsl, "$atomicMin($A, $1)")
+void InterlockedMin(in out uint dest, uint value);
+
+__target_intrinsic(glsl, "($2 = $atomicMin($A, $1))")
 void InterlockedMin(in out  int dest,  int value, out  int original_value);
+
+__target_intrinsic(glsl, "($2 = $atomicMin($A, $1))")
 void InterlockedMin(in out uint dest, uint value, out uint original_value);
 
+__target_intrinsic(glsl, "$atomicOr($A, $1)")
+void InterlockedOr(__ref  int dest,  int value);
+
+__target_intrinsic(glsl, "$atomicOr($A, $1)")
+void InterlockedOr(__ref uint dest, uint value);
+
+__target_intrinsic(glsl, "($2 = $atomicOr($A, $1))")
 void InterlockedOr(__ref  int dest,  int value, out  int original_value);
+
+__target_intrinsic(glsl, "($2 = $atomicOr($A, $1))")
 void InterlockedOr(__ref uint dest, uint value, out uint original_value);
 
+__target_intrinsic(glsl, "$atomicXor($A, $1)")
+void InterlockedXor(__ref  int dest,  int value);
+
+__target_intrinsic(glsl, "$atomicXor($A, $1)")
+void InterlockedXor(__ref uint dest, uint value);
+
+__target_intrinsic(glsl, "($2 = $atomicXor($A, $1))")
 void InterlockedXor(__ref  int dest,  int value, out  int original_value);
+
+__target_intrinsic(glsl, "($2 = $atomicXor($A, $1))")
 void InterlockedXor(__ref uint dest, uint value, out uint original_value);
 
 // Is floating-point value finite?

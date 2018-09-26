@@ -3164,6 +3164,77 @@ struct EmitVisitor
                     }
                     break;
 
+                case 'a':
+                    {
+                        // We have an operation that needs to lower to either
+                        // `atomic*` or `imageAtomic*` for GLSL, depending on
+                        // whether its first operand is a subscript into an
+                        // array. This `$a` is the first `a` in `atomic`,
+                        // so we will replace it accordingly.
+                        //
+                        // TODO: This distinction should be made earlier,
+                        // with the front-end picking the right overload
+                        // based on the "address space" of the argument.
+
+                        UInt argIndex = 0;
+                        SLANG_RELEASE_ASSERT(argCount > argIndex);
+
+                        auto arg = args[argIndex].get();
+                        if(arg->op == kIROp_ImageSubscript)
+                        {
+                            Emit("imageA");
+                        }
+                        else
+                        {
+                            Emit("a");
+                        }
+                    }
+                    break;
+
+                case 'A':
+                    {
+                        // We have an operand that represents the destination
+                        // of an atomic operation in GLSL, and it should
+                        // be lowered based on whether it is an ordinary l-value,
+                        // or an image subscript. In the image subscript case
+                        // this operand will turn into multiple arguments
+                        // to the `imageAtomic*` function.
+                        //
+
+                        UInt argIndex = 0;
+                        SLANG_RELEASE_ASSERT(argCount > argIndex);
+
+                        auto arg = args[argIndex].get();
+                        if(arg->op == kIROp_ImageSubscript)
+                        {
+                            if(getTarget(ctx) == CodeGenTarget::GLSL)
+                            {
+                                // TODO: we don't handle the multisample
+                                // case correctly here, where the last
+                                // component of the image coordinate needs
+                                // to be broken out into its own argument.
+                                //
+                                Emit("(");
+                                emitIROperand(ctx, arg->getOperand(0), mode);
+                                Emit("), (");
+                                emitIROperand(ctx, arg->getOperand(1), mode);
+                                Emit(")");
+                            }
+                            else
+                            {
+                                Emit("(");
+                                emitIROperand(ctx, arg, mode);
+                                Emit(")");
+                            }
+                        }
+                        else
+                        {
+                            Emit("(");
+                            emitIROperand(ctx, arg, mode);
+                            Emit(")");
+                        }
+                    }
+                    break;
 
                 default:
                     SLANG_UNEXPECTED("bad format in intrinsic definition");
@@ -3542,6 +3613,7 @@ struct EmitVisitor
 
         case kIROp_getElement:
         case kIROp_getElementPtr:
+        case kIROp_ImageSubscript:
             // HACK: deal with translation of GLSL geometry shader input arrays.
             if(auto decoration = inst->getOperand(0)->findDecoration<IRGLSLOuterArrayDecoration>())
             {
