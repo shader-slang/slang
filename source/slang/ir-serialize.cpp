@@ -69,18 +69,6 @@ static UnownedStringSlice asStringSlice(const PrefixString* prefixString)
     return UnownedStringSlice(reader.m_pos, len);
 }
 
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! IRSerialInfo !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-
-UnownedStringSlice IRSerialData::getStringSlice(StringIndex index) const
-{
-    if (index == StringIndex(0))
-    {
-        return UnownedStringSlice(m_strings.begin() + 1, UInt(0));
-    }
-    return asStringSlice((const PrefixString*)(m_strings.begin() + int(index)));
-}
-
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! IRSerialWriter !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 void IRSerialWriter::_addInstruction(IRInst* inst)
@@ -120,16 +108,35 @@ void IRSerialWriter::_addInstruction(IRInst* inst)
     }
 }
 
+UnownedStringSlice IRSerialWriter::getStringSlice(Ser::StringIndex index) const
+{
+    Ser::StringOffset offset = m_stringStarts[int(index)];
+    return asStringSlice((const PrefixString*)(m_serialData->m_strings.begin() + int(offset)));
+}
+
 IRSerialData::StringIndex IRSerialWriter::getStringIndex(Name* name) 
 { 
     return name ? getStringIndex(name->text.getUnownedSlice()) : Ser::kNullStringIndex; 
 }
 
-Result IRSerialWriter::write(IRModule* module, IRSerialData* serialInfo)
+Result IRSerialWriter::write(IRModule* module, IRSerialData* serialData)
 {
-    m_serialData = serialInfo;
+    m_serialData = serialData;
 
-    serialInfo->clear();
+    serialData->clear();
+
+    // Set up the stringStarts
+    m_stringStarts.SetSize(2);
+    m_stringStarts[0] = Ser::StringOffset(0);                  // Null
+    m_stringStarts[1] = Ser::StringOffset(1);                  // Empty
+    SLANG_ASSERT(serialData->m_strings.Count() == 2);
+
+    m_stringMap.Clear();
+
+    // Add the empty string index. 
+    // We can't add the null string index, because that doesn't have any meaning as an UnownedStringSlice
+    // 
+    m_stringMap.Add(UnownedStringSlice(""), Ser::kEmptyStringIndex);
 
     // We reserve 0 for null
     m_insts.Clear();
@@ -439,12 +446,18 @@ IRSerialData::StringIndex IRSerialWriter::getStringIndex(const UnownedStringSlic
     memcpy(dst, prefixBytes, numPrefixBytes);
     memcpy(dst + numPrefixBytes, slice.begin(), len);
 
+    // We need to add 1, because the 0 is used for null, which is not in the map
+    const Ser::StringIndex stringIndex = Ser::StringIndex(m_stringMap.Count() + 1);
+
+    // Add the start offset
+    m_stringStarts.Add(Ser::StringOffset(baseIndex));
+
     // Add to the map. Unfortunately we can't use the string storage in the array, because the address changes with size
     // so we have to store backing string in an arena
     const char* arenaChars = m_arena.allocateString(slice.begin(), len);
-    m_stringMap.Add(UnownedStringSlice(arenaChars, len), Ser::StringIndex(baseIndex));
+    m_stringMap.Add(UnownedStringSlice(arenaChars, len), stringIndex);
 
-    return Ser::StringIndex(baseIndex);
+    return stringIndex; 
 }
 
 template <typename T>
@@ -680,9 +693,9 @@ String IRSerialReader::getString(Ser::StringIndex index)
     return String(getStringRepresentation(index));
 }
 
-UnownedStringSlice IRSerialReader::getStringSlice(Ser::StringIndex index)
+UnownedStringSlice IRSerialReader::getStringSlice(Ser::StringOffset offset)
 {
-    return asStringSlice((PrefixString*)(m_serialData->m_strings.begin() + int(index)));
+    return asStringSlice((PrefixString*)(m_serialData->m_strings.begin() + int(offset)));
 }
 
 StringRepresentation* IRSerialReader::getStringRepresentation(Ser::StringIndex index)
@@ -692,8 +705,7 @@ StringRepresentation* IRSerialReader::getStringRepresentation(Ser::StringIndex i
         return nullptr;
     }
 
-    const int linearIndex = findStringLinearIndex(index);
-    StringRepresentation* rep = m_stringRepresentationCache[linearIndex];
+    StringRepresentation* rep = m_stringRepresentationCache[int(index)];
     if (rep)
     {
         return rep;
@@ -705,7 +717,7 @@ StringRepresentation* IRSerialReader::getStringRepresentation(Ser::StringIndex i
     StringRepresentation* stringRep = string.getStringRepresentation();   
     m_module->addRefObjectToFree(stringRep);
 
-    m_stringRepresentationCache[linearIndex] = stringRep;
+    m_stringRepresentationCache[int(index)] = stringRep;
 
     return stringRep;
 }
@@ -715,35 +727,6 @@ char* IRSerialReader::getCStr(Ser::StringIndex index)
     // It turns out StringRepresentation is always 0 terminated, so can just use that
     StringRepresentation* rep = getStringRepresentation(index);
     return rep->getData();
-}
-
-int IRSerialReader::findStringLinearIndex(Ser::StringIndex index)
-{
-    // Binary chop to find the linear index
-    int start = 0;
-    int end = int(m_stringStarts.Count());
-
-    while (start < end)
-    {
-        int center = (start + end) >> 1;
-        const Ser::StringIndex cur = m_stringStarts[center];
-
-        if (cur == index)
-        {
-            return center;
-        }
-
-        if (cur < index)
-        {
-            start = center + 1;
-        }
-        else 
-        {
-            end = center;
-        }
-    }
-
-    return -1;
 }
 
 void IRSerialReader::_calcStringStarts()
@@ -756,7 +739,7 @@ void IRSerialReader::_calcStringStarts()
 
     while (cur < end)
     {
-        m_stringStarts.Add(Ser::StringIndex(cur - start));
+        m_stringStarts.Add(Ser::StringOffset(cur - start));
 
         CharReader reader(cur);
         const int len = GetUnicodePointFromUTF8(reader);

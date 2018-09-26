@@ -23,6 +23,8 @@ struct IRSerialData
     enum class StringIndex : uint32_t;
     enum class ArrayIndex : uint32_t;
     enum class SourceLoc : uint32_t;
+    enum class StringOffset : uint32_t;             ///< Offset into the m_stringsBuffer
+    
     typedef uint32_t SizeType;
 
     static const StringIndex kNullStringIndex = StringIndex(0);
@@ -143,9 +145,6 @@ struct IRSerialData
         }
     }
 
-    /// Get a slice from an index
-    UnownedStringSlice getStringSlice(StringIndex index) const;
-
     /// Ctor
     IRSerialData() :
         m_decorationBaseIndex(0)
@@ -197,6 +196,7 @@ struct IRSerialBinary
     };
 };
 
+
 struct IRSerialWriter
 {
     typedef IRSerialData Ser;
@@ -204,6 +204,9 @@ struct IRSerialWriter
     Result write(IRModule* module, IRSerialData* serialData);
 
     static Result writeStream(const IRSerialData& data, Stream* stream);
+
+        /// Get a slice from an index
+    UnownedStringSlice getStringSlice(Ser::StringIndex index) const;
 
     /// Get an instruction index from an instruction
     Ser::InstIndex getInstIndex(IRInst* inst) const { return inst ? Ser::InstIndex(m_instMap[inst]) : Ser::InstIndex(0); }
@@ -228,6 +231,11 @@ protected:
 
     Dictionary<IRInst*, Ser::InstIndex> m_instMap;      ///< Map an instruction to an instruction index
 
+    List<Ser::StringOffset> m_stringStarts;                      ///< Offset for each string index into the m_strings 
+
+    // TODO (JS):
+    // We could perhaps improve this, if we stored at string indices (when linearized) the StringRepresentation
+    // Doing so would mean if a String or Name was looked up we wouldn't have to re-allocate on the arena 
     Dictionary<UnownedStringSlice, Ser::StringIndex> m_stringMap;       ///< String map
 
     MemoryArena m_arena;
@@ -247,12 +255,11 @@ struct IRSerialReader
 
     Name* getName(Ser::StringIndex index);
     String getString(Ser::StringIndex index);
-    UnownedStringSlice getStringSlice(Ser::StringIndex index);
     StringRepresentation* getStringRepresentation(Ser::StringIndex index);
+    UnownedStringSlice getStringSlice(Ser::StringIndex index) { return getStringSlice(m_stringStarts[int(index)]); }
     char* getCStr(Ser::StringIndex index);
 
-        /// Given a string index, gives a linear position to it, or -1 if not found
-    int findStringLinearIndex(Ser::StringIndex index);
+    UnownedStringSlice getStringSlice(Ser::StringOffset offset);
 
     IRSerialReader():
         m_serialData(nullptr),
@@ -264,7 +271,7 @@ struct IRSerialReader
 
     void _calcStringStarts();
 
-    List<Ser::StringIndex> m_stringStarts;
+    List<Ser::StringOffset> m_stringStarts;
     List<StringRepresentation*> m_stringRepresentationCache;
 
     const IRSerialData* m_serialData;
