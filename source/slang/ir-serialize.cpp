@@ -108,15 +108,16 @@ void IRSerialWriter::_addInstruction(IRInst* inst)
     }
 }
 
+
+IRSerialData::StringIndex IRSerialWriter::getStringIndex(Name* name) 
+{ 
+    return name ? getStringIndex(name->text.getStringRepresentation()) : Ser::kNullStringIndex; 
+}
+
 UnownedStringSlice IRSerialWriter::getStringSlice(Ser::StringIndex index) const
 {
     Ser::StringOffset offset = m_stringStarts[int(index)];
     return asStringSlice((const PrefixString*)(m_serialData->m_strings.begin() + int(offset)));
-}
-
-IRSerialData::StringIndex IRSerialWriter::getStringIndex(Name* name) 
-{ 
-    return name ? getStringIndex(name->text.getUnownedSlice()) : Ser::kNullStringIndex; 
 }
 
 Result IRSerialWriter::write(IRModule* module, IRSerialData* serialData)
@@ -131,11 +132,15 @@ Result IRSerialWriter::write(IRModule* module, IRSerialData* serialData)
     m_stringStarts[1] = Ser::StringOffset(1);                  // Empty
     SLANG_ASSERT(serialData->m_strings.Count() == 2);
 
+    // We'll keep StringRepresentations in scope (and for simplicity keep in order of StringIndex)
+    m_scopeStrings.SetSize(2);
+    m_scopeStrings[0] = nullptr;
+    m_scopeStrings[1] = nullptr;
+
     m_stringMap.Clear();
 
     // Add the empty string index. 
     // We can't add the null string index, because that doesn't have any meaning as an UnownedStringSlice
-    // 
     m_stringMap.Add(UnownedStringSlice(""), Ser::kEmptyStringIndex);
 
     // We reserve 0 for null
@@ -420,13 +425,15 @@ Result IRSerialWriter::write(IRModule* module, IRSerialData* serialData)
     return SLANG_OK;
 }
 
-IRSerialData::StringIndex IRSerialWriter::getStringIndex(const UnownedStringSlice& slice)
+IRSerialData::StringIndex IRSerialWriter::getStringIndex(StringRepresentation* rep)
 {
-    const int len = int(slice.size());
-    if (len <= 0)
+    if (rep == nullptr)
     {
-        return Ser::kEmptyStringIndex;
+        return Ser::kNullStringIndex;
     }
+
+    const UnownedStringSlice slice(rep->getData(), rep->getLength());
+    const int len = int(rep->getLength());
 
     Ser::StringIndex index;
     if (m_stringMap.TryGetValue(slice, index))
@@ -449,15 +456,42 @@ IRSerialData::StringIndex IRSerialWriter::getStringIndex(const UnownedStringSlic
     // We need to add 1, because the 0 is used for null, which is not in the map
     const Ser::StringIndex stringIndex = Ser::StringIndex(m_stringMap.Count() + 1);
 
+    SLANG_ASSERT(stringIndex == Ser::StringIndex(m_scopeStrings.Count()));
+    // Make sure the rep stays in scope (because the UnownedStringSlice is pointing to it's contents)
+    m_scopeStrings.Add(rep);
+
     // Add the start offset
     m_stringStarts.Add(Ser::StringOffset(baseIndex));
+    m_stringMap.Add(slice, stringIndex);
 
-    // Add to the map. Unfortunately we can't use the string storage in the array, because the address changes with size
-    // so we have to store backing string in an arena
-    const char* arenaChars = m_arena.allocateString(slice.begin(), len);
-    m_stringMap.Add(UnownedStringSlice(arenaChars, len), stringIndex);
+    return stringIndex;
+}
 
-    return stringIndex; 
+IRSerialData::StringIndex IRSerialWriter::getStringIndex(const char* chars)
+{
+    if (!chars)
+    {
+        return Ser::kNullStringIndex;
+    }
+    if (chars[0] == 0)
+    {
+        return Ser::kEmptyStringIndex;
+    }
+
+    // Get as a StringRepresentation
+    String string(chars);
+    return getStringIndex(string.getStringRepresentation());
+}
+
+IRSerialData::StringIndex IRSerialWriter::getStringIndex(const UnownedStringSlice& slice)
+{
+    const int len = int(slice.size());
+    if (len <= 0)
+    {
+        return Ser::kEmptyStringIndex;
+    }
+    String string(slice);
+    return getStringIndex(string.getStringRepresentation());
 }
 
 template <typename T>

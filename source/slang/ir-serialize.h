@@ -5,8 +5,6 @@
 #include "../core/basic.h"
 #include "../core/stream.h"
 
-#include "../core/slang-memory-arena.h"
-
 #include "ir.h"
 
 // For TranslationUnitRequest
@@ -211,14 +209,13 @@ struct IRSerialWriter
     /// Get an instruction index from an instruction
     Ser::InstIndex getInstIndex(IRInst* inst) const { return inst ? Ser::InstIndex(m_instMap[inst]) : Ser::InstIndex(0); }
 
-    Ser::StringIndex getStringIndex(StringRepresentation* string) { return string ? getStringIndex(StringRepresentation::asSlice(string)) : Ser::kNullStringIndex; }
+    Ser::StringIndex getStringIndex(StringRepresentation* string); 
     Ser::StringIndex getStringIndex(const UnownedStringSlice& string);
     Ser::StringIndex getStringIndex(Name* name);
-    Ser::StringIndex getStringIndex(const char* chars) { return chars ? getStringIndex(UnownedStringSlice(chars)) : Ser::kNullStringIndex; }
-
+    Ser::StringIndex getStringIndex(const char* chars);
+    
     IRSerialWriter() :
-        m_serialData(nullptr),
-        m_arena(1024 * 4)
+        m_serialData(nullptr)
     {}
 
 protected:
@@ -237,9 +234,8 @@ protected:
     // We could perhaps improve this, if we stored at string indices (when linearized) the StringRepresentation
     // Doing so would mean if a String or Name was looked up we wouldn't have to re-allocate on the arena 
     Dictionary<UnownedStringSlice, Ser::StringIndex> m_stringMap;       ///< String map
-
-    MemoryArena m_arena;
-
+    List<RefPtr<StringRepresentation> > m_scopeStrings;                 ///< 
+    
     IRSerialData* m_serialData;                               ///< Where the data is stored
 };
 
