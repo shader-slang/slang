@@ -235,7 +235,7 @@ Result IRSerialWriter::write(IRModule* module, IRSerialData* serialData)
             IRInst* srcInst = m_insts[i];
             Ser::Inst& dstInst = m_serialData->m_insts[i];
             
-            // Can't be any psuedo ops
+            // Can't be any pseudo ops
             SLANG_ASSERT(!isPseudoOp(srcInst->op)); 
 
             dstInst.m_op = uint8_t(srcInst->op & kIROpMeta_OpMask);
@@ -421,7 +421,6 @@ Result IRSerialWriter::write(IRModule* module, IRSerialData* serialData)
     }
 
     m_serialData = nullptr;
-
     return SLANG_OK;
 }
 
@@ -841,18 +840,15 @@ void IRSerialReader::_calcStringStarts()
     // 0 holds null
     // The first instruction must be the module
     {
+        // Check that insts[1] is the module inst
         const Ser::Inst& srcInst = data.m_insts[1];
         SLANG_ASSERT(srcInst.m_op == kIROp_Module);
         SLANG_ASSERT(srcInst.getNumOperands() == 0);
         SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Empty);
 
-        // We need to create directly, because it has extra data
-        IRModuleInst* moduleInst = static_cast<IRModuleInst*>(createEmptyInstWithSize(module, kIROp_Module, sizeof(IRModuleInst)));
-        
-        moduleInst->module = module;
-        module->moduleInst = moduleInst;
-
-        insts[1] = moduleInst;
+        // We don't need to create the moduleInst, because it's constructed via the createModule call
+        SLANG_ASSERT(module->moduleInst);
+        insts[1] = module->moduleInst;
     }
 
     for (int i = 2; i < numInsts; ++i)
