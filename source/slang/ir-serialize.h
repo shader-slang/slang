@@ -273,7 +273,7 @@ struct IRSerialReader
 
 
 Result serializeModule(IRModule* module, Stream* stream);
-Result readModule(TranslationUnitRequest* translationUnit, Stream* stream);
+Result readModule(TranslationUnitRequest* translationUnit, Stream* stream, IRModule** moduleOut);
 
 } // namespace Slang
 

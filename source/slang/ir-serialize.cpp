@@ -51,10 +51,10 @@ struct PrefixString;
 
 namespace { // anonymous
 
-struct Reader
+struct CharReader
 {
     char operator()(int pos) const { SLANG_UNUSED(pos); return *m_pos++; }
-    Reader(const char* pos) :m_pos(pos) {}
+    CharReader(const char* pos) :m_pos(pos) {}
     mutable const char* m_pos;
 };
 
@@ -64,7 +64,7 @@ static UnownedStringSlice asStringSlice(const PrefixString* prefixString)
 {
     const char* prefix = (char*)prefixString;
 
-    Reader reader(prefix);
+    CharReader reader(prefix);
     const int len = GetUnicodePointFromUTF8(reader);
     return UnownedStringSlice(reader.m_pos, len);
 }
@@ -758,7 +758,7 @@ void IRSerialReader::_calcStringStarts()
     {
         m_stringStarts.Add(Ser::StringIndex(cur - start));
 
-        Reader reader(cur);
+        CharReader reader(cur);
         const int len = GetUnicodePointFromUTF8(reader);
         cur = reader.m_pos + len;
     }
@@ -1143,8 +1143,10 @@ Result serializeModule(IRModule* module, Stream* stream)
     return SLANG_OK;
 }
 
-Result readModule(TranslationUnitRequest* translationUnit, Stream* stream)
+Result readModule(TranslationUnitRequest* translationUnit, Stream* stream, IRModule** moduleOut)
 {
+    *moduleOut = nullptr;
+
     IRSerialData serialData;
     IRSerialReader::readStream(stream, &serialData);
 
@@ -1153,7 +1155,7 @@ Result readModule(TranslationUnitRequest* translationUnit, Stream* stream)
 
     SLANG_RETURN_ON_FAIL(reader.read(serialData, translationUnit, module.writeRef()));
 
-    dumpIR(module);
+    *moduleOut = module.detach();
 
     return SLANG_OK;
 }
