@@ -842,7 +842,7 @@ void IRSerialReader::_calcStringStarts()
     {
         // Check that insts[1] is the module inst
         const Ser::Inst& srcInst = data.m_insts[1];
-        SLANG_ASSERT(srcInst.m_op == kIROp_Module);
+        SLANG_RELEASE_ASSERT(srcInst.m_op == kIROp_Module);
         SLANG_ASSERT(srcInst.getNumOperands() == 0);
         SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Empty);
 
