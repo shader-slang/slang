@@ -91,7 +91,7 @@ static bool hasValue(const uint8_t* data, size_t size, uint8_t value)
     // Expand the byte up to a word size
     size_t wordValue = (size_t(value) << 8) | value;
     wordValue = (wordValue << 16) | wordValue;
-    wordValue = (sizeof(size_t) > 4) ? ((wordValue << 32) | wordValue) : wordValue;
+    wordValue = (sizeof(size_t) > 4) ? size_t((uint64_t(wordValue) << 32) | wordValue) : wordValue;
 
     const size_t* wordData = (const size_t*)data;
     for (size_t i = 0; i < numWords; ++i)

@@ -340,7 +340,7 @@ Result IRSerialWriter::write(IRModule* module, IRSerialData* serialData)
     {
         const int decorationBaseIndex = m_serialData->m_decorationBaseIndex;
         const int numDecor = int(m_decorations.Count());
-        SLANG_ASSERT(decorationBaseIndex + numDecor == m_serialData->m_insts.Count());
+        SLANG_ASSERT(decorationBaseIndex + numDecor == int(m_serialData->m_insts.Count()));
 
         // Have to be able to store in a byte!
         SLANG_COMPILE_TIME_ASSERT(kIROpCount + kIRDecorationOp_CountOf < 0x100);
