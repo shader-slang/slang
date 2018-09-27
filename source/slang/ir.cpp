@@ -49,7 +49,7 @@ namespace Slang
 
     IROpInfo getIROpInfo(IROp opIn)
     {
-        const int op = opIn & kIROpMeta_OpMask;
+        const int op = opIn & kIROpMeta_PseudoOpMask;
         if ((op & kIROpMeta_IsPseudoOp) && op < kIRPseudoOp_LastPlusOne)
         {
             // It's a pseudo op
@@ -712,6 +712,51 @@ namespace Slang
         return parent;
     }
 
+    IRInst* createEmptyInst(
+        IRModule*   module,
+        IROp        op,
+        int         totalArgCount)
+    {
+        size_t size = sizeof(IRInst) + (totalArgCount) * sizeof(IRUse);
+
+        SLANG_ASSERT(module);
+        IRInst* inst = (IRInst*)module->memoryArena.allocateAndZero(size);
+
+        inst->operandCount = uint32_t(totalArgCount);
+        inst->op = op;
+
+        return inst;
+    }
+
+    IRInst* createEmptyInstWithSize(
+        IRModule*   module,
+        IROp        op,
+        size_t      totalSizeInBytes)
+    {
+        SLANG_ASSERT(totalSizeInBytes >= sizeof(IRInst));
+
+        SLANG_ASSERT(module);
+        IRInst* inst = (IRInst*)module->memoryArena.allocateAndZero(totalSizeInBytes);
+
+        inst->operandCount = 0;
+        inst->op = op;
+
+        return inst;
+    }
+
+
+    IRDecoration* createEmptyDecoration(
+        IRModule* module,
+        IRDecorationOp op,
+        size_t sizeInBytes)
+    {
+        SLANG_ASSERT(sizeInBytes >= sizeof(IRDecoration));
+        SLANG_ASSERT(module);
+        IRDecoration* decor = (IRDecoration*)module->memoryArena.allocateAndZero(sizeInBytes);
+        decor->op = op;
+        return decor;
+    }
+
     // Given an instruction that represents a constant, a type, etc.
     // Try to "hoist" it as far toward the global scope as possible
     // to insert it at a location where it will be maximally visible.
@@ -1187,7 +1232,7 @@ namespace Slang
         }
     
         // Calculate the minimum object size (ie not including the payload of value)    
-        const size_t prefixSize = offsetof(IRConstant, value);
+        const size_t prefixSize = SLANG_OFFSET_OF(IRConstant, value);
 
         switch (keyInst.op)
         {
