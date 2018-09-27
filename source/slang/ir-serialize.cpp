@@ -27,6 +27,20 @@ to an IRType derived type. Its 'ok' as long as it's an instruction that can be u
 bother to check if it's correct, and just casts it.
 */
 
+/* static */const IRSerialData::PayloadInfo IRSerialData::s_payloadInfos[int(Inst::PayloadType::CountOf)] = 
+{
+    { 0, 0 },   // Empty
+    { 1, 0 },   // Operand_1
+    { 2, 0 },   // Operand_2
+    { 1, 0 },   // OperandAndUInt32,
+    { 0, 0 },   // OperandExternal - This isn't correct, Operand has to be specially handled
+    { 0, 1 },   // String_1,              
+    { 0, 2 },   // String_2,              
+    { 0, 0 },   // UInt32,               
+    { 0, 0 },   // Float64,
+    { 0, 0 }    // Int64,
+};
+
 static bool isParentDerived(IROp opIn)
 {
     const int op = (kIROpMeta_PseudoOpMask & opIn);
@@ -111,7 +125,6 @@ void IRSerialWriter::_addInstruction(IRInst* inst)
         m_serialData->m_decorationRuns.Add(run);
     }
 }
-
 
 IRSerialData::StringIndex IRSerialWriter::getStringIndex(Name* name) 
 { 
@@ -297,8 +310,9 @@ Result IRSerialWriter::write(IRModule* module, IRSerialData* serialData)
             IRTextureTypeBase* textureBase = as<IRTextureTypeBase>(srcInst);
             if (textureBase)
             {
-                dstInst.m_payloadType = Ser::Inst::PayloadType::UInt32;
-                dstInst.m_payload.m_uint32 = uint32_t(srcInst->op) >> kIROpMeta_OtherShift;
+                dstInst.m_payloadType = Ser::Inst::PayloadType::OperandAndUInt32;
+                dstInst.m_payload.m_operandAndUInt32.m_uint32 = uint32_t(srcInst->op) >> kIROpMeta_OtherShift;
+                dstInst.m_payload.m_operandAndUInt32.m_operand = getInstIndex(textureBase->getElementType());
                 continue;
             }
 
@@ -315,7 +329,7 @@ Result IRSerialWriter::write(IRModule* module, IRSerialData* serialData)
             }
             else
             {
-                dstInst.m_payloadType = Ser::Inst::PayloadType::ExternalOperand;
+                dstInst.m_payloadType = Ser::Inst::PayloadType::OperandExternal;
 
                 int operandArrayBaseIndex = int(m_serialData->m_externalOperands.Count());
                 m_serialData->m_externalOperands.SetSize(operandArrayBaseIndex + numOperands);
@@ -405,6 +419,13 @@ Result IRSerialWriter::write(IRModule* module, IRSerialData* serialData)
 
                     dstInst.m_payloadType = Ser::Inst::PayloadType::String_1;
                     dstInst.m_payload.m_stringIndices[0] = getStringIndex(semanticDecor->semanticName);
+                    break;
+                }
+                case kIRDecorationOp_InterpolationMode:
+                {
+                    auto semanticDecor = static_cast<IRInterpolationModeDecoration*>(srcDecor);
+                    dstInst.m_payloadType = Ser::Inst::PayloadType::UInt32;
+                    dstInst.m_payload.m_uint32 = uint32_t(semanticDecor->mode);
                     break;
                 }
                 case kIRDecorationOp_NameHint:
@@ -847,6 +868,13 @@ IRDecoration* IRSerialReader::_createDecoration(const Ser::Inst& srcInst)
             decor->semanticName = getName(srcInst.m_payload.m_stringIndices[0]);
             return decor;
         }
+        case kIRDecorationOp_InterpolationMode:
+        {
+            auto decor = createEmptyDecoration<IRInterpolationModeDecoration>(m_module);
+            SLANG_ASSERT(srcInst.m_payloadType == Ser::Inst::PayloadType::UInt32);
+            decor->mode = IRInterpolationMode(srcInst.m_payload.m_uint32);
+            return decor;
+        }
         case kIRDecorationOp_NameHint:
         {
             auto decor = createEmptyDecoration<IRNameHintDecoration>(m_module);
@@ -997,11 +1025,11 @@ IRDecoration* IRSerialReader::_createDecoration(const Ser::Inst& srcInst)
             }
             else if (isTextureTypeBase(op))
             {
-                IRTextureTypeBase* inst = static_cast<IRTextureTypeBase*>(createEmptyInstWithSize(module, op, sizeof(IRTextureTypeBase)));
-                SLANG_ASSERT(srcInst.m_payloadType == PayloadType::UInt32);
+                IRTextureTypeBase* inst = static_cast<IRTextureTypeBase*>(createEmptyInst(module, op, 1));
+                SLANG_ASSERT(srcInst.m_payloadType == PayloadType::OperandAndUInt32);
 
                 // Reintroduce the texture type bits into the the
-                const uint32_t other = srcInst.m_payload.m_uint32;
+                const uint32_t other = srcInst.m_payload.m_operandAndUInt32.m_uint32;
                 inst->op = IROp(uint32_t(inst->op) | (other << kIROpMeta_OtherShift));
 
                 insts[i] = inst;
