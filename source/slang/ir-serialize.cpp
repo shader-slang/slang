@@ -7,6 +7,10 @@
 
 namespace Slang {
 
+// Needed for linkage with some compilers
+/* static */ const IRSerialData::StringIndex IRSerialData::kNullStringIndex;
+/* static */ const IRSerialData::StringIndex IRSerialData::kEmptyStringIndex;
+
 /* Note that an IRInst can be derived from, but when it derived from it's new members are IRUse variables, and they in 
 effect alias over the operands - and reflected in the operand count. There _could_ be other members after these IRUse 
 variables, but in practice there do not appear to be.
@@ -884,7 +888,7 @@ void IRSerialReader::_calcStringStarts()
                 // Handling of constants
 
                 // Calculate the minimum object size (ie not including the payload of value)    
-                const size_t prefixSize = offsetof(IRConstant, value);
+                const size_t prefixSize = SLANG_OFFSET_OF(IRConstant, value);
 
                 IRConstant* irConst = nullptr;
                 switch (op)
@@ -917,7 +921,7 @@ void IRSerialReader::_calcStringStarts()
                         const UnownedStringSlice slice = getStringSlice(srcInst.m_payload.m_stringIndices[0]);
                         
                         const size_t sliceSize = slice.size();
-                        const size_t instSize = prefixSize + offsetof(IRConstant::StringValue, chars) + sliceSize;
+                        const size_t instSize = prefixSize + SLANG_OFFSET_OF(IRConstant::StringValue, chars) + sliceSize;
 
                         irConst = static_cast<IRConstant*>(createEmptyInstWithSize(module, op, instSize));
 

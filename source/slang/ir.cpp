@@ -1232,7 +1232,7 @@ namespace Slang
         }
     
         // Calculate the minimum object size (ie not including the payload of value)    
-        const size_t prefixSize = offsetof(IRConstant, value);
+        const size_t prefixSize = SLANG_OFFSET_OF(IRConstant, value);
 
         switch (keyInst.op)
         {
