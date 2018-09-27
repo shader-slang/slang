@@ -28,11 +28,7 @@ struct IRSerialData
     static const StringIndex kNullStringIndex = StringIndex(0);
     static const StringIndex kEmptyStringIndex = StringIndex(1);
 
-    enum
-    {
-        kNumOperands = 2,
-    };
-
+    
     /// A run of instructions
     struct InstRun
     {
@@ -53,12 +49,19 @@ struct IRSerialData
     // Decoration information is stored in m_decorationRuns
     struct Inst
     {
-        // NOTE! Can't change order or list without changing approprite s_payloadInfos
+        enum
+        {
+            kMaxOperands = 2,           ///< Maximum number of operands that can be held in an instruction (otherwise held 'externally')
+        };
+
+        // NOTE! Can't change order or list without changing appropriate s_payloadInfos
         enum class PayloadType : uint8_t
         {
+            // First 3 must be in this order so a cast from 0-2 is directly represented as number of operands 
             Empty,                          ///< Has no payload (or operands)
             Operand_1,                      ///< 1 Operand
             Operand_2,                      ///< 2 Operands
+
             OperandAndUInt32,               ///< 1 Operand and a single UInt32
             OperandExternal,                ///< Operands are held externally
             String_1,                       ///< 1 String
@@ -71,10 +74,7 @@ struct IRSerialData
         };
 
             /// Get the number of operands
-        SLANG_FORCE_INLINE int getNumOperands() const 
-        {
-            return (m_payloadType == PayloadType::OperandExternal) ? m_payload.m_externalOperand.m_size : s_payloadInfos[int(m_payloadType)].m_numOperands;
-        }
+        SLANG_FORCE_INLINE int getNumOperands() const;
 
         uint8_t m_op;                       ///< For now one of IROp 
         PayloadType m_payloadType;	 		///< The type of payload 
@@ -101,8 +101,8 @@ struct IRSerialData
             uint32_t m_uint32;                              ///< Unsigned integral value
             IRFloatingPointValue m_float;              ///< Floating point value
             IRIntegerValue m_int;                      ///< Integral value
-            InstIndex m_operands[kNumOperands];	            ///< For items that 2 or less operands it can use this.  
-            StringIndex m_stringIndices[kNumOperands];
+            InstIndex m_operands[kMaxOperands];	            ///< For items that 2 or less operands it can use this.  
+            StringIndex m_stringIndices[kMaxOperands];
             ExternalOperandPayload m_externalOperand;              ///< Operands are stored in an an index of an operand array 
             OperandAndUInt32 m_operandAndUInt32;
         };
@@ -110,43 +110,18 @@ struct IRSerialData
         Payload m_payload;
     };
 
-    /// Clear to initial state
-    void clear()
-    {
-        // First Instruction is null
-        m_insts.SetSize(1);
-        memset(&m_insts[0], 0, sizeof(Inst));
+        /// Clear to initial state
+    void clear();
+        /// Get the operands of an instruction
+    SLANG_FORCE_INLINE int getOperands(const Inst& inst, const InstIndex** operandsOut) const;
 
-        m_childRuns.Clear();
-        m_decorationRuns.Clear();
-        m_externalOperands.Clear();
-
-        m_strings.SetSize(2);
-        m_strings[int(kNullStringIndex)] = 0;
-        m_strings[int(kEmptyStringIndex)] = 0;
-
-        m_decorationBaseIndex = 0;
-    }
-
-    SLANG_FORCE_INLINE int getOperands(const Inst& inst, const InstIndex** operandsOut) const
-    {
-        if (inst.m_payloadType == Inst::PayloadType::OperandExternal)
-        {
-            *operandsOut = m_externalOperands.begin() + int(inst.m_payload.m_externalOperand.m_arrayIndex);
-            return int(inst.m_payload.m_externalOperand.m_size);
-        }
-        else
-        {
-            *operandsOut = inst.m_payload.m_operands;
-            return s_payloadInfos[int(inst.m_payloadType)].m_numOperands;
-        }
-    }
+        /// Calculate the amount of memory used by this IRSerialData
+    size_t calcSizeInBytes() const;
 
     /// Ctor
     IRSerialData() :
         m_decorationBaseIndex(0)
     {}
-
 
     List<Inst> m_insts;                         ///< The instructions
 
@@ -157,10 +132,34 @@ struct IRSerialData
 
     List<char> m_strings;                       ///< All strings. Indexed into by StringIndex
 
+    List<SourceLoc> m_instSourceLocs;           ///< A source location per instruction
+
     static const PayloadInfo s_payloadInfos[int(Inst::PayloadType::CountOf)];
     
     int m_decorationBaseIndex;                  ///< All decorations insts are at indices >= to this value
 };
+
+// --------------------------------------------------------------------------
+SLANG_FORCE_INLINE int IRSerialData::Inst::getNumOperands() const
+{
+    return (m_payloadType == PayloadType::OperandExternal) ? m_payload.m_externalOperand.m_size : s_payloadInfos[int(m_payloadType)].m_numOperands;
+}
+
+// --------------------------------------------------------------------------
+SLANG_FORCE_INLINE int IRSerialData::getOperands(const Inst& inst, const InstIndex** operandsOut) const
+{
+    if (inst.m_payloadType == Inst::PayloadType::OperandExternal)
+    {
+        *operandsOut = m_externalOperands.begin() + int(inst.m_payload.m_externalOperand.m_arrayIndex);
+        return int(inst.m_payload.m_externalOperand.m_size);
+    }
+    else
+    {
+        *operandsOut = inst.m_payload.m_operands;
+        return s_payloadInfos[int(inst.m_payloadType)].m_numOperands;
+    }
+}
+
 
 #define SLANG_FOUR_CC(c0, c1, c2, c3) ((uint32_t(c0) << 0) | (uint32_t(c1) << 8) | (uint32_t(c2) << 16) | (uint32_t(c3) << 24)) 
 
@@ -182,6 +181,7 @@ struct IRSerialBinary
     static const uint32_t kChildRunFourCc = SLANG_FOUR_CC('S', 'L', 'c', 'r');
     static const uint32_t kExternalOperandsFourCc = SLANG_FOUR_CC('S', 'L', 'e', 'o');
     static const uint32_t kStringFourCc = SLANG_FOUR_CC('S', 'L', 's', 't');
+    static const uint32_t kInstSourceLocFourCc = SLANG_FOUR_CC('S', 'L', 's', 'l');
 
     struct SlangHeader
     {
@@ -200,7 +200,17 @@ struct IRSerialWriter
 {
     typedef IRSerialData Ser;
 
-    Result write(IRModule* module, IRSerialData* serialData);
+    struct OptionFlag
+    {
+        typedef uint32_t Type;
+        enum Enum: Type
+        {
+            SourceLocation,
+        };
+    };
+    typedef OptionFlag::Type OptionFlags;
+
+    Result write(IRModule* module, OptionFlags options, IRSerialData* serialData);
 
     static Result writeStream(const IRSerialData& data, Stream* stream);
 
