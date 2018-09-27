@@ -247,7 +247,7 @@ struct IRSerialReader
     static Result readStream(Stream* stream, IRSerialData* dataOut);
 
         /// Read a module from serial data
-    Result read(const IRSerialData& data, TranslationUnitRequest* translationUnit, IRModule** moduleOut);
+    Result read(const IRSerialData& data, Session* session, RefPtr<IRModule>& moduleOut);
 
     Name* getName(Ser::StringIndex index);
     String getString(Ser::StringIndex index);
@@ -266,6 +266,7 @@ struct IRSerialReader
     protected:
 
     void _calcStringStarts();
+    IRDecoration* _createDecoration(const Ser::Inst& srcIns);
 
     List<Ser::StringOffset> m_stringStarts;
     List<StringRepresentation*> m_stringRepresentationCache;
@@ -276,7 +277,7 @@ struct IRSerialReader
 
 
 Result serializeModule(IRModule* module, Stream* stream);
-Result readModule(TranslationUnitRequest* translationUnit, Stream* stream, IRModule** moduleOut);
+Result readModule(Session* session, Stream* stream, RefPtr<IRModule>& moduleOut);
 
 } // namespace Slang
 
