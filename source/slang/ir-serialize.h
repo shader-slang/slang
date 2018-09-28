@@ -41,37 +41,39 @@ struct IRSerialData
         SizeType m_numChildren;                 ///< The number of children
     };
 
+    struct PayloadInfo
+    {
+        uint8_t m_numOperands;
+        uint8_t m_numStrings;
+    };
+
     // Instruction...
     // We can store SourceLoc values separately. Just store per index information.
     // Parent information is stored in m_childRuns
     // Decoration information is stored in m_decorationRuns
     struct Inst
     {
+        // NOTE! Can't change order or list without changing approprite s_payloadInfos
         enum class PayloadType : uint8_t
         {
             Empty,                          ///< Has no payload (or operands)
             Operand_1,                      ///< 1 Operand
             Operand_2,                      ///< 2 Operands
-            ExternalOperand,                ///< Operands are held externally
+            OperandAndUInt32,               ///< 1 Operand and a single UInt32
+            OperandExternal,                ///< Operands are held externally
             String_1,                       ///< 1 String
             String_2,                       ///< 2 Strings
             UInt32,                         ///< Holds an unsigned 32 bit integral (might represent a type)
-            Float64,
+            Float64,                    
             Int64,
+            
             CountOf,
         };
 
             /// Get the number of operands
-        int getNumOperands() const 
+        SLANG_FORCE_INLINE int getNumOperands() const 
         {
-            switch (m_payloadType)
-            {
-                default: /* fallthru */
-                case PayloadType::Empty: return 0;
-                case PayloadType::Operand_1: return 1;
-                case PayloadType::Operand_2: return 2;
-                case PayloadType::ExternalOperand: return m_payload.m_externalOperand.m_size;
-            }
+            return (m_payloadType == PayloadType::OperandExternal) ? m_payload.m_externalOperand.m_size : s_payloadInfos[int(m_payloadType)].m_numOperands;
         }
 
         uint8_t m_op;                       ///< For now one of IROp 
@@ -86,6 +88,12 @@ struct IRSerialData
             SizeType m_size;                                ///< The amount of entries in that table
         };
 
+        struct OperandAndUInt32
+        {
+            InstIndex m_operand;
+            uint32_t m_uint32;
+        };
+
         union Payload
         {
             double m_float64;
@@ -96,6 +104,7 @@ struct IRSerialData
             InstIndex m_operands[kNumOperands];	            ///< For items that 2 or less operands it can use this.  
             StringIndex m_stringIndices[kNumOperands];
             ExternalOperandPayload m_externalOperand;              ///< Operands are stored in an an index of an operand array 
+            OperandAndUInt32 m_operandAndUInt32;
         };
 
         Payload m_payload;
@@ -119,27 +128,17 @@ struct IRSerialData
         m_decorationBaseIndex = 0;
     }
 
-    int getOperands(const Inst& inst, const InstIndex** operandsOut) const
+    SLANG_FORCE_INLINE int getOperands(const Inst& inst, const InstIndex** operandsOut) const
     {
-        switch (inst.m_payloadType)
+        if (inst.m_payloadType == Inst::PayloadType::OperandExternal)
         {
-            default:
-            case Inst::PayloadType::Empty:
-            {
-                *operandsOut = nullptr;
-                return 0;
-            }
-            case Inst::PayloadType::Operand_1:
-            case Inst::PayloadType::Operand_2:
-            {
-                *operandsOut = inst.m_payload.m_operands;
-                return int(inst.m_payloadType) - int(Inst::PayloadType::Empty);
-            }
-            case Inst::PayloadType::ExternalOperand:
-            {
-                *operandsOut = m_externalOperands.begin() + int(inst.m_payload.m_externalOperand.m_arrayIndex);
-                return int(inst.m_payload.m_externalOperand.m_size);
-            }
+            *operandsOut = m_externalOperands.begin() + int(inst.m_payload.m_externalOperand.m_arrayIndex);
+            return int(inst.m_payload.m_externalOperand.m_size);
+        }
+        else
+        {
+            *operandsOut = inst.m_payload.m_operands;
+            return s_payloadInfos[int(inst.m_payloadType)].m_numOperands;
         }
     }
 
@@ -158,6 +157,8 @@ struct IRSerialData
 
     List<char> m_strings;                       ///< All strings. Indexed into by StringIndex
 
+    static const PayloadInfo s_payloadInfos[int(Inst::PayloadType::CountOf)];
+    
     int m_decorationBaseIndex;                  ///< All decorations insts are at indices >= to this value
 };
 
@@ -247,7 +248,7 @@ struct IRSerialReader
     static Result readStream(Stream* stream, IRSerialData* dataOut);
 
         /// Read a module from serial data
-    Result read(const IRSerialData& data, TranslationUnitRequest* translationUnit, IRModule** moduleOut);
+    Result read(const IRSerialData& data, Session* session, RefPtr<IRModule>& moduleOut);
 
     Name* getName(Ser::StringIndex index);
     String getString(Ser::StringIndex index);
@@ -266,6 +267,7 @@ struct IRSerialReader
     protected:
 
     void _calcStringStarts();
+    IRDecoration* _createDecoration(const Ser::Inst& srcIns);
 
     List<Ser::StringOffset> m_stringStarts;
     List<StringRepresentation*> m_stringRepresentationCache;
@@ -276,7 +278,7 @@ struct IRSerialReader
 
 
 Result serializeModule(IRModule* module, Stream* stream);
-Result readModule(TranslationUnitRequest* translationUnit, Stream* stream, IRModule** moduleOut);
+Result readModule(Session* session, Stream* stream, RefPtr<IRModule>& moduleOut);
 
 } // namespace Slang
 
