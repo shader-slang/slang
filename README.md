@@ -35,7 +35,7 @@ For users getting started with Slang, it may help to start by looking at our exa
 
 * The [`model-viewer`](examples/model-viewer/) example shows a more involved rendering application that uses Slang's new language features to perform efficient shader specialization and parameter binding while maintaining clear and modular shader code.
 
-A [paper](http://graphics.cs.cmu.edu/projects/slang/) on the Slang system was accepted into SIGGRAPH 2018, and it provides an overview of the language and the design of the impelemtnation.
+A [paper](http://graphics.cs.cmu.edu/projects/slang/) on the Slang system was accepted into SIGGRAPH 2018, and it provides an overview of the language and the compiler implementation. See also Yong He's [dissertation](http://graphics.cs.cmu.edu/projects/renderergenerator/yong_he_thesis.pdf) for the detailed thinking behind the design of the Slang system.
 
 The Slang [language guide](docs/language-guide.md) provides information on extended language features that Slang provides for user code.
 
