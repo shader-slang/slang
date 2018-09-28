@@ -20,7 +20,8 @@ struct IRSerialData
     enum class InstIndex : uint32_t;
     enum class StringIndex : uint32_t;
     enum class ArrayIndex : uint32_t;
-    enum class SourceLoc : uint32_t;
+
+    enum class RawSourceLoc : SourceLoc::RawValue;             ///< This is just to copy over source loc data (ie not strictly serialize)
     enum class StringOffset : uint32_t;             ///< Offset into the m_stringsBuffer
     
     typedef uint32_t SizeType;
@@ -28,7 +29,6 @@ struct IRSerialData
     static const StringIndex kNullStringIndex = StringIndex(0);
     static const StringIndex kEmptyStringIndex = StringIndex(1);
 
-    
     /// A run of instructions
     struct InstRun
     {
@@ -132,7 +132,7 @@ struct IRSerialData
 
     List<char> m_strings;                       ///< All strings. Indexed into by StringIndex
 
-    List<SourceLoc> m_instSourceLocs;           ///< A source location per instruction
+    List<RawSourceLoc> m_rawSourceLocs;         ///< A source location per instruction (saved without modification from IRInst)s
 
     static const PayloadInfo s_payloadInfos[int(Inst::PayloadType::CountOf)];
     
@@ -181,7 +181,10 @@ struct IRSerialBinary
     static const uint32_t kChildRunFourCc = SLANG_FOUR_CC('S', 'L', 'c', 'r');
     static const uint32_t kExternalOperandsFourCc = SLANG_FOUR_CC('S', 'L', 'e', 'o');
     static const uint32_t kStringFourCc = SLANG_FOUR_CC('S', 'L', 's', 't');
-    static const uint32_t kInstSourceLocFourCc = SLANG_FOUR_CC('S', 'L', 's', 'l');
+        /// 4 bytes per entry
+    static const uint32_t kUInt32SourceLocFourCc = SLANG_FOUR_CC('S', 'r', 's', '4');
+        /// 8 bytes per entry
+    static const uint32_t kUInt64SourceLocFourCc = SLANG_FOUR_CC('S', 'r', 's', '8');
 
     struct SlangHeader
     {
@@ -205,12 +208,12 @@ struct IRSerialWriter
         typedef uint32_t Type;
         enum Enum: Type
         {
-            SourceLocation,
+            RawSourceLocation = 1,
         };
     };
     typedef OptionFlag::Type OptionFlags;
 
-    Result write(IRModule* module, OptionFlags options, IRSerialData* serialData);
+    Result write(IRModule* module, SourceManager* sourceManager, OptionFlags options, IRSerialData* serialData);
 
     static Result writeStream(const IRSerialData& data, Stream* stream);
 
@@ -278,6 +281,7 @@ struct IRSerialReader
 
     void _calcStringStarts();
     IRDecoration* _createDecoration(const Ser::Inst& srcIns);
+    static Result _skip(const IRSerialBinary::Chunk& chunk, Stream* stream, int64_t* remainingBytesInOut);
 
     List<Ser::StringOffset> m_stringStarts;
     List<StringRepresentation*> m_stringRepresentationCache;
@@ -287,7 +291,7 @@ struct IRSerialReader
 };
 
 
-Result serializeModule(IRModule* module, Stream* stream);
+Result serializeModule(IRModule* module, SourceManager* sourceManager, Stream* stream);
 Result readModule(Session* session, Stream* stream, RefPtr<IRModule>& moduleOut);
 
 } // namespace Slang

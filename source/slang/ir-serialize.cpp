@@ -102,7 +102,7 @@ size_t IRSerialData::calcSizeInBytes() const
         _calcArraySize(m_childRuns) + 
         _calcArraySize(m_decorationRuns) + 
         _calcArraySize(m_externalOperands) + 
-        _calcArraySize(m_instSourceLocs) + 
+        _calcArraySize(m_rawSourceLocs) + 
         _calcArraySize(m_strings);
 }
 
@@ -115,7 +115,7 @@ void IRSerialData::clear()
     m_childRuns.Clear();
     m_decorationRuns.Clear();
     m_externalOperands.Clear();
-    m_instSourceLocs.Clear();
+    m_rawSourceLocs.Clear();
 
     m_strings.SetSize(2);
     m_strings[int(kNullStringIndex)] = 0;
@@ -174,9 +174,11 @@ UnownedStringSlice IRSerialWriter::getStringSlice(Ser::StringIndex index) const
     return asStringSlice((const PrefixString*)(m_serialData->m_strings.begin() + int(offset)));
 }
 
-Result IRSerialWriter::write(IRModule* module, OptionFlags options, IRSerialData* serialData)
+Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, OptionFlags options, IRSerialData* serialData)
 {
     typedef Ser::Inst::PayloadType PayloadType;
+
+    SLANG_UNUSED(sourceManager);
 
     m_serialData = serialData;
 
@@ -487,18 +489,46 @@ Result IRSerialWriter::write(IRModule* module, OptionFlags options, IRSerialData
         }
     }
 
-    if (options & OptionFlag::SourceLocation)
+    // I don't think this SourceLoc value system is going to work. 
+    if (options & OptionFlag::RawSourceLocation)
     {
-        const int numInsts = int(m_insts.Count());
-        serialData->m_instSourceLocs.SetSize(numInsts);
+        // Lets go through all instructions and see how source locs are determined
 
-        Ser::SourceLoc* dstLocs =  serialData->m_instSourceLocs.begin();
+#if 0
+        if (sourceManager)
+        {
+            const int numInsts = m_insts.Count();
+
+            for (int i = 0; i < numInsts; ++i)
+            {
+                IRInst* inst = m_insts[i];
+
+                if (inst == nullptr || !inst->sourceLoc.isValid())
+                {
+                    continue;
+                }
+
+                ExpandedSourceLoc expandedSourceLoc = sourceManager->expandSourceLoc(inst->sourceLoc);
+
+
+                HumaneSourceLoc humaneLoc = sourceManager->getHumaneLoc(expandedSourceLoc);
+
+
+            }
+        }
+#endif
+
+
+        const int numInsts = int(m_insts.Count());
+        serialData->m_rawSourceLocs.SetSize(numInsts);
+
+        Ser::RawSourceLoc* dstLocs =  serialData->m_rawSourceLocs.begin();
         // 0 is null, just mark as no location
-        dstLocs[0] = Ser::SourceLoc(0);
+        dstLocs[0] = Ser::RawSourceLoc(0);
         for (int i = 1; i < numInsts; ++i)
         {
             IRInst* srcInst = m_insts[i];
-            dstLocs[i] = Ser::SourceLoc(srcInst->sourceLoc.getRaw());
+            dstLocs[i] = Ser::RawSourceLoc(srcInst->sourceLoc.getRaw());
         }
     }
 
@@ -636,7 +666,7 @@ Result _writeArrayChunk(uint32_t chunkId, const List<T>& array, Stream* stream)
         _calcChunkSize(data.m_decorationRuns) +
         _calcChunkSize(data.m_externalOperands) +
         _calcChunkSize(data.m_strings) + 
-        _calcChunkSize(data.m_instSourceLocs);
+        _calcChunkSize(data.m_rawSourceLocs);
 
     {
         Bin::Chunk riffHeader;
@@ -659,8 +689,12 @@ Result _writeArrayChunk(uint32_t chunkId, const List<T>& array, Stream* stream)
     _writeArrayChunk(Bin::kDecoratorRunFourCc, data.m_decorationRuns, stream);
     _writeArrayChunk(Bin::kExternalOperandsFourCc, data.m_externalOperands, stream);
     _writeArrayChunk(Bin::kStringFourCc, data.m_strings, stream);
-    _writeArrayChunk(Bin::kInstSourceLocFourCc, data.m_instSourceLocs, stream);
-    
+
+    {
+        uint32_t fourCc = sizeof(IRSerialData::RawSourceLoc) == 4 ? Bin::kUInt32SourceLocFourCc : Bin::kUInt64SourceLocFourCc;
+        _writeArrayChunk(fourCc, data.m_rawSourceLocs, stream);
+    }
+
     return SLANG_OK;
 }
 
@@ -702,6 +736,20 @@ int64_t _calcChunkTotalSize(const IRSerialBinary::Chunk& chunk)
 {
     int64_t size = chunk.m_size + sizeof(IRSerialBinary::Chunk);
     return (size + 3) & ~int64_t(3);
+}
+
+/* static */Result IRSerialReader::_skip(const IRSerialBinary::Chunk& chunk, Stream* stream, int64_t* remainingBytesInOut)
+{
+    typedef IRSerialBinary Bin;
+    int64_t chunkSize = _calcChunkTotalSize(chunk);
+    if (remainingBytesInOut)
+    {
+        *remainingBytesInOut -= chunkSize;
+    }
+
+    // Skip the payload (we don't need to skip the Chunk because that was already read
+    stream->Seek(SeekOrigin::Current, chunkSize - sizeof(IRSerialBinary::Chunk));
+    return SLANG_OK;
 }
 
 /* static */Result IRSerialReader::readStream(Stream* stream, IRSerialData* dataOut)
@@ -776,19 +824,24 @@ int64_t _calcChunkTotalSize(const IRSerialBinary::Chunk& chunk)
                 remainingBytes -= _calcChunkTotalSize(chunk);
                 break;
             }
-            case Bin::kInstSourceLocFourCc:
+            case Bin::kUInt32SourceLocFourCc:
+            case Bin::kUInt64SourceLocFourCc:
             {
-                SLANG_RETURN_ON_FAIL(_readArrayChunk(chunk, stream, dataOut->m_instSourceLocs));
-                remainingBytes -= _calcChunkTotalSize(chunk);
+                if ((sizeof(IRSerialData::RawSourceLoc) == 4 && chunk.m_type == Bin::kUInt32SourceLocFourCc) ||
+                    (sizeof(IRSerialData::RawSourceLoc) == 8 && chunk.m_type == Bin::kUInt64SourceLocFourCc))
+                {
+                    SLANG_RETURN_ON_FAIL(_readArrayChunk(chunk, stream, dataOut->m_rawSourceLocs));
+                    remainingBytes -= _calcChunkTotalSize(chunk);
+                }
+                else
+                {
+                    SLANG_RETURN_ON_FAIL(_skip(chunk, stream, &remainingBytes));
+                }
                 break;
             }
             default:
             {
-                remainingBytes -= _calcChunkTotalSize(chunk);
-
-                // Unhandled chunk... skip it
-                int skipSize = (chunk.m_size + 3) & ~3;   
-                stream->Seek(SeekOrigin::Current, skipSize);
+                SLANG_RETURN_ON_FAIL(_skip(chunk, stream, &remainingBytes));
                 break;
             }
         }
@@ -1201,12 +1254,13 @@ IRDecoration* IRSerialReader::_createDecoration(const Ser::Inst& srcInst)
     }
 
     // Re-add source locations, if they are defined
-    if (int(m_serialData->m_instSourceLocs.Count()) == numInsts)
+    if (int(m_serialData->m_rawSourceLocs.Count()) == numInsts)
     {
-        const Ser::SourceLoc* srcLocs = m_serialData->m_instSourceLocs.begin();
-        for (int i = 0; i < numInsts; ++i)
+        const Ser::RawSourceLoc* srcLocs = m_serialData->m_rawSourceLocs.begin();
+        for (int i = 1; i < numInsts; ++i)
         {
             IRInst* dstInst = insts[i];
+            
             dstInst->sourceLoc.setRaw(Slang::SourceLoc::RawValue(srcLocs[i]));
         }
     }
@@ -1216,12 +1270,12 @@ IRDecoration* IRSerialReader::_createDecoration(const Ser::Inst& srcInst)
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! Free functions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-Result serializeModule(IRModule* module, Stream* stream)
+Result serializeModule(IRModule* module, SourceManager* sourceManager, Stream* stream)
 {
     IRSerialWriter serializer;
     IRSerialData serialData;
 
-    SLANG_RETURN_ON_FAIL(serializer.write(module, IRSerialWriter::OptionFlag::SourceLocation, &serialData));
+    SLANG_RETURN_ON_FAIL(serializer.write(module, sourceManager, IRSerialWriter::OptionFlag::RawSourceLocation, &serialData));
 
     if (stream)
     {
