@@ -489,36 +489,9 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
         }
     }
 
-    // I don't think this SourceLoc value system is going to work. 
+    // If the option to use RawSourceLocations is enabled, serialize out as is
     if (options & OptionFlag::RawSourceLocation)
     {
-        // Lets go through all instructions and see how source locs are determined
-
-#if 0
-        if (sourceManager)
-        {
-            const int numInsts = m_insts.Count();
-
-            for (int i = 0; i < numInsts; ++i)
-            {
-                IRInst* inst = m_insts[i];
-
-                if (inst == nullptr || !inst->sourceLoc.isValid())
-                {
-                    continue;
-                }
-
-                ExpandedSourceLoc expandedSourceLoc = sourceManager->expandSourceLoc(inst->sourceLoc);
-
-
-                HumaneSourceLoc humaneLoc = sourceManager->getHumaneLoc(expandedSourceLoc);
-
-
-            }
-        }
-#endif
-
-
         const int numInsts = int(m_insts.Count());
         serialData->m_rawSourceLocs.SetSize(numInsts);
 
