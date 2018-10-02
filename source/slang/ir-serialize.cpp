@@ -87,6 +87,43 @@ static UnownedStringSlice asStringSlice(const PrefixString* prefixString)
     return UnownedStringSlice(reader.m_pos, len);
 }
 
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! IRSerialData !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+template<typename T>
+static size_t _calcArraySize(const List<T>& list)
+{
+    return list.Count() * sizeof(T);
+}
+
+size_t IRSerialData::calcSizeInBytes() const
+{
+    return 
+        _calcArraySize(m_insts) + 
+        _calcArraySize(m_childRuns) + 
+        _calcArraySize(m_decorationRuns) + 
+        _calcArraySize(m_externalOperands) + 
+        _calcArraySize(m_rawSourceLocs) + 
+        _calcArraySize(m_strings);
+}
+
+void IRSerialData::clear()
+{
+    // First Instruction is null
+    m_insts.SetSize(1);
+    memset(&m_insts[0], 0, sizeof(Inst));
+
+    m_childRuns.Clear();
+    m_decorationRuns.Clear();
+    m_externalOperands.Clear();
+    m_rawSourceLocs.Clear();
+
+    m_strings.SetSize(2);
+    m_strings[int(kNullStringIndex)] = 0;
+    m_strings[int(kEmptyStringIndex)] = 0;
+
+    m_decorationBaseIndex = 0;
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! IRSerialWriter !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 void IRSerialWriter::_addInstruction(IRInst* inst)
@@ -137,8 +174,12 @@ UnownedStringSlice IRSerialWriter::getStringSlice(Ser::StringIndex index) const
     return asStringSlice((const PrefixString*)(m_serialData->m_strings.begin() + int(offset)));
 }
 
-Result IRSerialWriter::write(IRModule* module, IRSerialData* serialData)
+Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, OptionFlags options, IRSerialData* serialData)
 {
+    typedef Ser::Inst::PayloadType PayloadType;
+
+    SLANG_UNUSED(sourceManager);
+
     m_serialData = serialData;
 
     serialData->clear();
@@ -256,7 +297,7 @@ Result IRSerialWriter::write(IRModule* module, IRSerialData* serialData)
             SLANG_ASSERT(!isPseudoOp(srcInst->op)); 
 
             dstInst.m_op = uint8_t(srcInst->op & kIROpMeta_OpMask);
-            dstInst.m_payloadType = Ser::Inst::PayloadType::Empty;
+            dstInst.m_payloadType = PayloadType::Empty;
             
             dstInst.m_resultTypeIndex = getInstIndex(srcInst->getFullType());
 
@@ -269,25 +310,25 @@ Result IRSerialWriter::write(IRModule* module, IRSerialData* serialData)
                     case kIROp_StringLit:
                     {
                         auto stringLit = static_cast<IRStringLit*>(srcInst);
-                        dstInst.m_payloadType = Ser::Inst::PayloadType::String_1;
+                        dstInst.m_payloadType = PayloadType::String_1;
                         dstInst.m_payload.m_stringIndices[0] = getStringIndex(stringLit->getStringSlice());
                         break;
                     }
                     case kIROp_IntLit:
                     {
-                        dstInst.m_payloadType = Ser::Inst::PayloadType::Int64;
+                        dstInst.m_payloadType = PayloadType::Int64;
                         dstInst.m_payload.m_int64 = irConst->value.intVal;
                         break;
                     }
                     case kIROp_FloatLit:
                     {
-                        dstInst.m_payloadType = Ser::Inst::PayloadType::Float64;
+                        dstInst.m_payloadType = PayloadType::Float64;
                         dstInst.m_payload.m_float64 = irConst->value.floatVal; 
                         break;
                     }
                     case kIROp_boolConst:
                     {
-                        dstInst.m_payloadType = Ser::Inst::PayloadType::UInt32;
+                        dstInst.m_payloadType = PayloadType::UInt32;
                         dstInst.m_payload.m_uint32 = irConst->value.intVal ? 1 : 0;
                         break;
                     }
@@ -302,7 +343,7 @@ Result IRSerialWriter::write(IRModule* module, IRSerialData* serialData)
             IRGlobalValue* globValue = as<IRGlobalValue>(srcInst);
             if (globValue)
             {
-                dstInst.m_payloadType = Ser::Inst::PayloadType::String_1;
+                dstInst.m_payloadType = PayloadType::String_1;
                 dstInst.m_payload.m_stringIndices[0] = getStringIndex(globValue->mangledName);
                 continue;
             }
@@ -310,7 +351,7 @@ Result IRSerialWriter::write(IRModule* module, IRSerialData* serialData)
             IRTextureTypeBase* textureBase = as<IRTextureTypeBase>(srcInst);
             if (textureBase)
             {
-                dstInst.m_payloadType = Ser::Inst::PayloadType::OperandAndUInt32;
+                dstInst.m_payloadType = PayloadType::OperandAndUInt32;
                 dstInst.m_payload.m_operandAndUInt32.m_uint32 = uint32_t(srcInst->op) >> kIROpMeta_OtherShift;
                 dstInst.m_payload.m_operandAndUInt32.m_operand = getInstIndex(textureBase->getElementType());
                 continue;
@@ -322,14 +363,17 @@ Result IRSerialWriter::write(IRModule* module, IRSerialData* serialData)
             const int numOperands = int(srcInst->operandCount);
             Ser::InstIndex* dstOperands = nullptr;
 
-            if (numOperands <= Ser::kNumOperands)
+            if (numOperands <= Ser::Inst::kMaxOperands)
             {
+                // Checks the compile below is valid
+                SLANG_COMPILE_TIME_ASSERT(PayloadType(0) == PayloadType::Empty && PayloadType(1) == PayloadType::Operand_1 && PayloadType(2) == PayloadType::Operand_2);
+                
+                dstInst.m_payloadType = PayloadType(numOperands);
                 dstOperands = dstInst.m_payload.m_operands;
-                dstInst.m_payloadType = Ser::Inst::PayloadType(numOperands);
             }
             else
             {
-                dstInst.m_payloadType = Ser::Inst::PayloadType::OperandExternal;
+                dstInst.m_payloadType = PayloadType::OperandExternal;
 
                 int operandArrayBaseIndex = int(m_serialData->m_externalOperands.Count());
                 m_serialData->m_externalOperands.SetSize(operandArrayBaseIndex + numOperands);
@@ -384,7 +428,7 @@ Result IRSerialWriter::write(IRModule* module, IRSerialData* serialData)
                 {
                     auto loopDecor = static_cast<IRLoopControlDecoration*>(srcDecor);
 
-                    dstInst.m_payloadType = Ser::Inst::PayloadType::UInt32;
+                    dstInst.m_payloadType = PayloadType::UInt32;
                     dstInst.m_payload.m_uint32 = uint32_t(loopDecor->mode);
                     break;
                 }
@@ -392,14 +436,14 @@ Result IRSerialWriter::write(IRModule* module, IRSerialData* serialData)
                 {
                     auto targetDecor = static_cast<IRTargetDecoration*>(srcDecor);
 
-                    dstInst.m_payloadType = Ser::Inst::PayloadType::String_1;
+                    dstInst.m_payloadType = PayloadType::String_1;
                     dstInst.m_payload.m_stringIndices[0] = getStringIndex(targetDecor->targetName);
                     break;
                 }
                 case kIRDecorationOp_TargetIntrinsic:
                 {
                     auto targetDecor = static_cast<IRTargetIntrinsicDecoration*>(srcDecor);
-                    dstInst.m_payloadType = Ser::Inst::PayloadType::String_2;
+                    dstInst.m_payloadType = PayloadType::String_2;
 
                     dstInst.m_payload.m_stringIndices[0] = getStringIndex(targetDecor->targetName);
                     dstInst.m_payload.m_stringIndices[1] = getStringIndex(targetDecor->definition);
@@ -408,7 +452,7 @@ Result IRSerialWriter::write(IRModule* module, IRSerialData* serialData)
                 case kIRDecorationOp_GLSLOuterArray:
                 {
                     auto arrayDecor = static_cast<IRGLSLOuterArrayDecoration*>(srcDecor);
-                    dstInst.m_payloadType = Ser::Inst::PayloadType::String_1;
+                    dstInst.m_payloadType = PayloadType::String_1;
 
                     dstInst.m_payload.m_stringIndices[0] = getStringIndex(arrayDecor->outerArrayName);
                     break;
@@ -417,14 +461,14 @@ Result IRSerialWriter::write(IRModule* module, IRSerialData* serialData)
                 {
                     auto semanticDecor = static_cast<IRSemanticDecoration*>(srcDecor);
 
-                    dstInst.m_payloadType = Ser::Inst::PayloadType::String_1;
+                    dstInst.m_payloadType = PayloadType::String_1;
                     dstInst.m_payload.m_stringIndices[0] = getStringIndex(semanticDecor->semanticName);
                     break;
                 }
                 case kIRDecorationOp_InterpolationMode:
                 {
                     auto semanticDecor = static_cast<IRInterpolationModeDecoration*>(srcDecor);
-                    dstInst.m_payloadType = Ser::Inst::PayloadType::UInt32;
+                    dstInst.m_payloadType = PayloadType::UInt32;
                     dstInst.m_payload.m_uint32 = uint32_t(semanticDecor->mode);
                     break;
                 }
@@ -432,7 +476,7 @@ Result IRSerialWriter::write(IRModule* module, IRSerialData* serialData)
                 {
                     auto nameDecor = static_cast<IRNameHintDecoration*>(srcDecor);
 
-                    dstInst.m_payloadType = Ser::Inst::PayloadType::String_1;
+                    dstInst.m_payloadType = PayloadType::String_1;
                     dstInst.m_payload.m_stringIndices[0] = getStringIndex(nameDecor->name);
                     break;
                 }
@@ -442,6 +486,22 @@ Result IRSerialWriter::write(IRModule* module, IRSerialData* serialData)
                     return SLANG_FAIL;
                 }
             }
+        }
+    }
+
+    // If the option to use RawSourceLocations is enabled, serialize out as is
+    if (options & OptionFlag::RawSourceLocation)
+    {
+        const int numInsts = int(m_insts.Count());
+        serialData->m_rawSourceLocs.SetSize(numInsts);
+
+        Ser::RawSourceLoc* dstLocs =  serialData->m_rawSourceLocs.begin();
+        // 0 is null, just mark as no location
+        dstLocs[0] = Ser::RawSourceLoc(0);
+        for (int i = 1; i < numInsts; ++i)
+        {
+            IRInst* srcInst = m_insts[i];
+            dstLocs[i] = Ser::RawSourceLoc(srcInst->sourceLoc.getRaw());
         }
     }
 
@@ -578,7 +638,8 @@ Result _writeArrayChunk(uint32_t chunkId, const List<T>& array, Stream* stream)
         _calcChunkSize(data.m_childRuns) +
         _calcChunkSize(data.m_decorationRuns) +
         _calcChunkSize(data.m_externalOperands) +
-        _calcChunkSize(data.m_strings);
+        _calcChunkSize(data.m_strings) + 
+        _calcChunkSize(data.m_rawSourceLocs);
 
     {
         Bin::Chunk riffHeader;
@@ -601,7 +662,12 @@ Result _writeArrayChunk(uint32_t chunkId, const List<T>& array, Stream* stream)
     _writeArrayChunk(Bin::kDecoratorRunFourCc, data.m_decorationRuns, stream);
     _writeArrayChunk(Bin::kExternalOperandsFourCc, data.m_externalOperands, stream);
     _writeArrayChunk(Bin::kStringFourCc, data.m_strings, stream);
-    
+
+    {
+        uint32_t fourCc = sizeof(IRSerialData::RawSourceLoc) == 4 ? Bin::kUInt32SourceLocFourCc : Bin::kUInt64SourceLocFourCc;
+        _writeArrayChunk(fourCc, data.m_rawSourceLocs, stream);
+    }
+
     return SLANG_OK;
 }
 
@@ -643,6 +709,20 @@ int64_t _calcChunkTotalSize(const IRSerialBinary::Chunk& chunk)
 {
     int64_t size = chunk.m_size + sizeof(IRSerialBinary::Chunk);
     return (size + 3) & ~int64_t(3);
+}
+
+/* static */Result IRSerialReader::_skip(const IRSerialBinary::Chunk& chunk, Stream* stream, int64_t* remainingBytesInOut)
+{
+    typedef IRSerialBinary Bin;
+    int64_t chunkSize = _calcChunkTotalSize(chunk);
+    if (remainingBytesInOut)
+    {
+        *remainingBytesInOut -= chunkSize;
+    }
+
+    // Skip the payload (we don't need to skip the Chunk because that was already read
+    stream->Seek(SeekOrigin::Current, chunkSize - sizeof(IRSerialBinary::Chunk));
+    return SLANG_OK;
 }
 
 /* static */Result IRSerialReader::readStream(Stream* stream, IRSerialData* dataOut)
@@ -717,13 +797,24 @@ int64_t _calcChunkTotalSize(const IRSerialBinary::Chunk& chunk)
                 remainingBytes -= _calcChunkTotalSize(chunk);
                 break;
             }
+            case Bin::kUInt32SourceLocFourCc:
+            case Bin::kUInt64SourceLocFourCc:
+            {
+                if ((sizeof(IRSerialData::RawSourceLoc) == 4 && chunk.m_type == Bin::kUInt32SourceLocFourCc) ||
+                    (sizeof(IRSerialData::RawSourceLoc) == 8 && chunk.m_type == Bin::kUInt64SourceLocFourCc))
+                {
+                    SLANG_RETURN_ON_FAIL(_readArrayChunk(chunk, stream, dataOut->m_rawSourceLocs));
+                    remainingBytes -= _calcChunkTotalSize(chunk);
+                }
+                else
+                {
+                    SLANG_RETURN_ON_FAIL(_skip(chunk, stream, &remainingBytes));
+                }
+                break;
+            }
             default:
             {
-                remainingBytes -= _calcChunkTotalSize(chunk);
-
-                // Unhandled chunk... skip it
-                int skipSize = (chunk.m_size + 3) & ~3;   
-                stream->Seek(SeekOrigin::Current, skipSize);
+                SLANG_RETURN_ON_FAIL(_skip(chunk, stream, &remainingBytes));
                 break;
             }
         }
@@ -1135,17 +1226,29 @@ IRDecoration* IRSerialReader::_createDecoration(const Ser::Inst& srcInst)
         }
     }
 
+    // Re-add source locations, if they are defined
+    if (int(m_serialData->m_rawSourceLocs.Count()) == numInsts)
+    {
+        const Ser::RawSourceLoc* srcLocs = m_serialData->m_rawSourceLocs.begin();
+        for (int i = 1; i < numInsts; ++i)
+        {
+            IRInst* dstInst = insts[i];
+            
+            dstInst->sourceLoc.setRaw(Slang::SourceLoc::RawValue(srcLocs[i]));
+        }
+    }
+
     return SLANG_OK;
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! Free functions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-Result serializeModule(IRModule* module, Stream* stream)
+Result serializeModule(IRModule* module, SourceManager* sourceManager, Stream* stream)
 {
     IRSerialWriter serializer;
     IRSerialData serialData;
 
-    SLANG_RETURN_ON_FAIL(serializer.write(module, &serialData));
+    SLANG_RETURN_ON_FAIL(serializer.write(module, sourceManager, IRSerialWriter::OptionFlag::RawSourceLocation, &serialData));
 
     if (stream)
     {
