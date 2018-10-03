@@ -171,6 +171,7 @@
     <ClCompile Include="os.cpp" />
     <ClCompile Include="render-api-util.cpp" />
     <ClCompile Include="test-context.cpp" />
+    <ClCompile Include="unit-test-byte-encode.cpp" />
     <ClCompile Include="unit-test-free-list.cpp" />
     <ClCompile Include="unit-test-memory-arena.cpp" />
   </ItemGroup>
@@ -182,4 +183,4 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
-</Project> 
+</Project>
