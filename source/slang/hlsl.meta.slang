@@ -1398,8 +1398,22 @@ uint InstanceID();
 uint PrimitiveIndex();
 float3 ObjectRayOrigin();
 float3 ObjectRayDirection();
-float3x4 ObjectToWorld();
-float3x4 WorldToObject();
+
+float3x4 ObjectToWorld3x4();
+float4x3 ObjectToWorld4x3();
+float3x4 WorldToObject3x4();
+float4x3 WorldToObject4x3();
+// Note: The provisional DXR spec included these unadorned
+// `ObjectToWorld()` and `WorldToObject()` functions, so
+// we will forward them to the new names as a convience
+// for users who are porting their code.
+//
+// TODO: Should we provide a deprecation warning on these
+// declarations, so that users can know they aren't coding
+// against the final spec?
+//
+float3x4 ObjectToWorld() { return ObjectToWorld3x4(); }
+float3x4 WorldToObject() { return WorldToObject3x4(); }
 
 // 10.4.4 - Hit Specific System values
 uint HitKind();
