@@ -1382,8 +1382,8 @@ void AcceptHitAndEndSearch();
 // they can only be accessed from specific stages.
 
 // 10.4.1 - Ray Dispatch System Values
-uint2 DispatchRaysIndex();
-uint2 DispatchRaysDimensions();
+uint3 DispatchRaysIndex();
+uint3 DispatchRaysDimensions();
 
 // 10.4.2 - Ray System Values
 float3 WorldRayOrigin();
