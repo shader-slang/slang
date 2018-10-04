@@ -1,4 +1,17 @@
-//TEST:COMPARE_HLSL: -target dxbc-assembly -profile vs_4_0 -entry ParticleVS -profile gs_4_0 -entry ParticleGS -profile ps_4_0 -entry ParticlePS
+//TEST:COMPARE_HLSL:-no-mangle -target dxbc-assembly -profile vs_4_0 -entry ParticleVS -profile gs_4_0 -entry ParticleGS -profile ps_4_0 -entry ParticlePS
+
+#ifndef __SLANG__
+#define ParticlesRO ParticlesRO_0
+#define ParticleDensityRO ParticleDensityRO_0
+#define cbRenderConstants cbRenderConstants_0
+#define g_mViewProjection g_mViewProjection_0
+#define g_fParticleSize g_fParticleSize_0
+#define density density_0
+#define position position_0
+#define velocity velocity_0
+
+#endif
+
 //--------------------------------------------------------------------------------------
 // File: FluidRender.hlsl
 //
@@ -68,7 +81,7 @@ float4 VisualizeNumber(float n, float lower, float upper)
 // Vertex Shader
 //--------------------------------------------------------------------------------------
 
-VSParticleOut ParticleVS(uint ID : SV_VertexID)
+VSParticleOut ParticleVS(uint ID : SV_VERTEXID) 
 {
     VSParticleOut Out; //  = { { 0, 0 } , { 0, 0, 0, 0 } }; // (VSParticleOut)0;
     Out.position = ParticlesRO[ID].position;
@@ -105,7 +118,7 @@ void ParticleGS(point VSParticleOut In[1], inout TriangleStream<GSParticleOut> S
 // Pixel Shader
 //--------------------------------------------------------------------------------------
 
-float4 ParticlePS(GSParticleOut In) : SV_Target
+float4 ParticlePS(GSParticleOut In) : SV_TARGET
 {
     return In.color;
 }
