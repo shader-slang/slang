@@ -1350,7 +1350,7 @@ struct BuiltInTriangleIntersectionAttributes
 // 10.3 - Intrinsics
 
 // 10.3.1
-__target_intrinsic(glsl, "callableShadersAreNotYesAvailableInVulkan")
+__target_intrinsic(glsl, "callableShadersAreNotYetAvailableInVulkan")
 void CallShader<param_t>(uint ShaderIndex, inout param_t Parameter);
 
 // 10.3.2

@@ -4575,7 +4575,7 @@ namespace Slang
             // This is either an `out` or `in out` parameter.
             // We want to treat `out` parameters the same
             // as `in out` for our purposes, since there are
-            // no pure `out` parameters defiend for the ray
+            // no pure `out` parameters defined for the ray
             // tracing stages.
 
             // Unlike the default legalization strategy for
@@ -4805,7 +4805,7 @@ namespace Slang
             // itself (which is an `alloca`d pointer) directly:
             pp->replaceUsesWith(localVariable);
 
-            // We also need one or more global variabels to write the output to
+            // We also need one or more global variables to write the output to
             // when the function is done. We create them here.
             auto globalOutputVal = createGLSLGlobalVaryings(
                     context,

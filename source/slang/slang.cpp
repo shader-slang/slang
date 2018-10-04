@@ -116,7 +116,7 @@ Profile getEffectiveProfile(EntryPointRequest* entryPoint, TargetRequest* target
     auto entryPointProfile = entryPoint->profile;
     auto targetProfile = target->targetProfile;
 
-    // Dependong in the target *format* we might have to restrict the
+    // Depending on the target *format* we might have to restrict the
     // profile family to one that makes sense.
     //
     // TODO: Some of this should really be handled as validation at
