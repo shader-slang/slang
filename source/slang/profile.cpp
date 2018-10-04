@@ -14,4 +14,21 @@ ProfileFamily getProfileFamily(ProfileVersion version)
     }
 }
 
+const char* getStageName(Stage stage)
+{
+    switch(stage)
+    {
+#define PROFILE_STAGE(ID, NAME, ENUM) \
+    case Stage::ID: return #NAME;
+
+#include "profile-defs.h"
+
+    default:
+        return nullptr;
+    }
+
+}
+
+
+
 }

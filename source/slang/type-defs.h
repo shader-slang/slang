@@ -205,9 +205,6 @@ SIMPLE_SYNTAX_CLASS(RaytracingAccelerationStructureType, UntypedBufferResourceTy
 SIMPLE_SYNTAX_CLASS(HLSLAppendStructuredBufferType, HLSLStructuredBufferTypeBase)
 SIMPLE_SYNTAX_CLASS(HLSLConsumeStructuredBufferType, HLSLStructuredBufferTypeBase)
 
-SIMPLE_SYNTAX_CLASS(RayDescType, BuiltinType)
-SIMPLE_SYNTAX_CLASS(BuiltInTriangleIntersectionAttributesType, BuiltinType)
-
 SYNTAX_CLASS(HLSLPatchType, BuiltinType)
 RAW(
     Type* getElementType();

@@ -152,6 +152,8 @@ enum IRDecorationOp : uint16_t
         Typically used mark an instruction so can be specially handled - say when creating a IRConstant literal, and the payload of 
         needs to be special cased for lookup. */ 
     kIRDecorationOp_Transitory,   
+    kIRDecorationOp_VulkanRayPayload,
+    kIRDecorationOp_VulkanHitAttributes,
     
     kIRDecorationOp_CountOf          
 };

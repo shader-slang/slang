@@ -480,6 +480,12 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
                     dstInst.m_payload.m_stringIndices[0] = getStringIndex(nameDecor->name);
                     break;
                 }
+                case kIRDecorationOp_VulkanRayPayload:
+                case kIRDecorationOp_VulkanHitAttributes:
+                {
+                    dstInst.m_payloadType = PayloadType::Empty;
+                    break;
+                }
                 default:
                 {
                     SLANG_ASSERT(!"Unhandled decoration type");
@@ -971,6 +977,18 @@ IRDecoration* IRSerialReader::_createDecoration(const Ser::Inst& srcInst)
             auto decor = createEmptyDecoration<IRNameHintDecoration>(m_module);
             SLANG_ASSERT(srcInst.m_payloadType == PayloadType::String_1);
             decor->name = getName(srcInst.m_payload.m_stringIndices[0]);
+            return decor;
+        }
+        case kIRDecorationOp_VulkanRayPayload:
+        {
+            auto decor = createEmptyDecoration<IRVulkanRayPayloadDecoration>(m_module);
+            SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Empty);
+            return decor;
+        }
+        case kIRDecorationOp_VulkanHitAttributes:
+        {
+            auto decor = createEmptyDecoration<IRVulkanHitAttributesDecoration>(m_module);
+            SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Empty);
             return decor;
         }
         default:

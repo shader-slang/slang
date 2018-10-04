@@ -117,6 +117,22 @@ struct IRNameHintDecoration : IRDecoration
     Name* name;
 };
 
+/// A decoration that indicates that a variable represents
+/// a vulkan ray payload, and should have a location assigned
+/// to it.
+struct IRVulkanRayPayloadDecoration : IRDecoration
+{
+    enum { kDecorationOp = kIRDecorationOp_VulkanRayPayload };
+};
+
+/// A decoration that indicates that a variable represents
+/// vulkan hit attributes, and should have a location assigned
+/// to it.
+struct IRVulkanHitAttributesDecoration : IRDecoration
+{
+    enum { kDecorationOp = kIRDecorationOp_VulkanHitAttributes };
+};
+
 // An instruction that specializes another IR value
 // (representing a generic) to a particular set of generic arguments 
 // (instructions representing types, witness tables, etc.)

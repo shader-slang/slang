@@ -2849,6 +2849,30 @@ namespace Slang
                 }
                 break;
 
+            case kIRDecorationOp_TargetIntrinsic:
+                {
+                    auto decoration = (IRTargetIntrinsicDecoration*) dd;
+
+                    dump(context, "\n");
+                    dumpIndent(context);
+                    dump(context, "[targetIntrinsic(");
+                    dump(context, StringRepresentation::getData(decoration->targetName));
+                    dump(context, ", ");
+                    dump(context, StringRepresentation::getData(decoration->definition));
+                    dump(context, ")]");
+                }
+                break;
+
+            case kIRDecorationOp_VulkanRayPayload:
+                {
+                    dump(context, "\n[__vulkanRayPayload]");
+                }
+                break;
+            case kIRDecorationOp_VulkanHitAttributes:
+                {
+                    dump(context, "\n[__vulkanHitAttributes]");
+                }
+                break;
             }
         }
     }
@@ -2857,9 +2881,6 @@ namespace Slang
         IRDumpContext*          context,
         IRGlobalValueWithCode*  code)
     {
-        // TODO: should apply this to all instructions
-        dumpIRDecorations(context, code);
-
         auto opInfo = getIROpInfo(code->op);
 
         dump(context, "\n");
@@ -2920,9 +2941,6 @@ namespace Slang
         IRDumpContext*  context,
         IRParentInst*   inst)
     {
-        // TODO: should apply this to all instructions
-        dumpIRDecorations(context, inst);
-
         auto opInfo = getIROpInfo(inst->op);
 
         dump(context, "\n");
@@ -2987,6 +3005,8 @@ namespace Slang
         }
 
         auto op = inst->op;
+
+        dumpIRDecorations(context, inst);
 
         // There are several ops we want to special-case here,
         // so that they will be more pleasant to look at.
@@ -4188,11 +4208,17 @@ namespace Slang
                     fieldKey));
 
         case ScalarizedVal::Flavor::address:
-            return ScalarizedVal::address(
-                builder->emitFieldAddress(
-                    getFieldType(val.irValue->getDataType(), fieldKey),
-                    val.irValue,
-                    fieldKey));
+            {
+                auto ptrType = as<IRPtrTypeBase>(val.irValue->getDataType());
+                auto valType = ptrType->getValueType();
+                auto fieldType = getFieldType(valType, fieldKey);
+                auto fieldPtrType = builder->getPtrType(ptrType->op, fieldType);
+                return ScalarizedVal::address(
+                    builder->emitFieldAddress(
+                        fieldPtrType,
+                        val.irValue,
+                        fieldKey));
+            }
 
         case ScalarizedVal::Flavor::tuple:
             {
@@ -4536,6 +4562,308 @@ namespace Slang
         return nullptr;
     }
 
+    void legalizeRayTracingEntryPointParameterForGLSL(
+        GLSLLegalizationContext*    context,
+        IRParam*                    pp,
+        VarLayout*                  paramLayout)
+    {
+        auto builder = context->getBuilder();
+        auto paramType = pp->getDataType();
+
+        if(auto paramPtrType = as<IROutTypeBase>(paramType) )
+        {
+            // This is either an `out` or `in out` parameter.
+            // We want to treat `out` parameters the same
+            // as `in out` for our purposes, since there are
+            // no pure `out` parameters defined for the ray
+            // tracing stages.
+
+            // Unlike the default legalization strategy for
+            // `out` and `in out` entry point parameters,
+            // we will not introduce an intermediate temporary.
+            //
+            // Instead we will simply create a global variable
+            // and replace uses of the parameter with uses
+            // of that global variable.
+
+            auto valueType = paramPtrType->getValueType();
+
+            auto globalVariable = addGlobalVariable(builder->getModule(), valueType);
+            builder->addLayoutDecoration(globalVariable, paramLayout);
+            moveValueBefore(globalVariable, builder->getFunc());
+
+            pp->replaceUsesWith(globalVariable);
+        }
+        else
+        {
+            // This is the `in` parameter case, so that the parameter
+            // was not a pointer. We will allocate a global variable
+            // to represent the parameter, and then perform a load
+            // form it at the start of the function.
+            //
+            auto valueType = paramType;
+            auto globalVariable = addGlobalVariable(builder->getModule(), valueType);
+            builder->addLayoutDecoration(globalVariable, paramLayout);
+            moveValueBefore(globalVariable, builder->getFunc());
+
+            auto irLoad = builder->emitLoad(globalVariable);
+            pp->replaceUsesWith(irLoad);
+        }
+
+    }
+
+    void legalizeEntryPointParameterForGLSL(
+        GLSLLegalizationContext*    context,
+        IRFunc*                     func,
+        IRParam*                    pp,
+        VarLayout*                  paramLayout)
+    {
+        auto builder = context->getBuilder();
+        auto stage = context->getStage();
+
+        // We need to create a global variable that will replace the parameter.
+        // It seems superficially obvious that the variable should have
+        // the same type as the parameter.
+        // However, if the parameter was a pointer, in order to
+        // support `out` or `in out` parameter passing, we need
+        // to be sure to allocate a variable of the pointed-to
+        // type instead.
+        //
+        // We also need to replace uses of the parameter with
+        // uses of the variable, and the exact logic there
+        // will differ a bit between the pointer and non-pointer
+        // cases.
+        auto paramType = pp->getDataType();
+
+        // First we will special-case stage input/outputs that
+        // don't fit into the standard varying model.
+        // For right now we are only doing special-case handling
+        // of geometry shader output streams.
+        if( auto paramPtrType = as<IROutTypeBase>(paramType) )
+        {
+            auto valueType = paramPtrType->getValueType();
+            if( auto gsStreamType = as<IRHLSLStreamOutputType>(valueType) )
+            {
+                // An output stream type like `TriangleStream<Foo>` should
+                // more or less translate into `out Foo` (plus scalarization).
+
+                auto globalOutputVal = createGLSLGlobalVaryings(
+                    context,
+                    builder,
+                    valueType,
+                    paramLayout,
+                    LayoutResourceKind::VaryingOutput,
+                    stage);
+
+                // TODO: a GS output stream might be passed into other
+                // functions, so that we should really be modifying
+                // any function that has one of these in its parameter
+                // list (and in the limit we should be leagalizing any
+                // type that nests these...).
+                //
+                // For now we will just try to deal with `Append` calls
+                // directly in this function.
+
+
+
+                for( auto bb = func->getFirstBlock(); bb; bb = bb->getNextBlock() )
+                {
+                    for( auto ii = bb->getFirstInst(); ii; ii = ii->getNextInst() )
+                    {
+                        // Is it a call?
+                        if(ii->op != kIROp_Call)
+                            continue;
+
+                        // Is it calling the append operation?
+                        auto callee = ii->getOperand(0);
+                        for(;;)
+                        {
+                            // If the instruction is `specialize(X,...)` then
+                            // we want to look at `X`, and if it is `generic { ... return R; }`
+                            // then we want to look at `R`. We handle this
+                            // iteratively here.
+                            //
+                            // TODO: This idiom seems to come up enough that we
+                            // should probably have a dedicated convenience routine
+                            // for this.
+                            //
+                            // Alternatively, we could switch the IR encoding so
+                            // that decorations are added to the generic instead of the
+                            // value it returns.
+                            //
+                            switch(callee->op)
+                            {
+                            case kIROp_Specialize:
+                                {
+                                    callee = cast<IRSpecialize>(callee)->getOperand(0);
+                                    continue;
+                                }
+
+                            case kIROp_Generic:
+                                {
+                                    auto genericResult = findGenericReturnVal(cast<IRGeneric>(callee));
+                                    if(genericResult)
+                                    {
+                                        callee = genericResult;
+                                        continue;
+                                    }
+                                }
+
+                            default:
+                                break;
+                            }
+                            break;
+                        }
+                        if(callee->op != kIROp_Func)
+                            continue;
+
+                        // HACK: we will identify the operation based
+                        // on the target-intrinsic definition that was
+                        // given to it.
+                        auto decoration = findTargetIntrinsicDecoration(callee, "glsl");
+                        if(!decoration)
+                            continue;
+
+                        if(StringRepresentation::asSlice(decoration->definition) != UnownedStringSlice::fromLiteral("EmitVertex()"))
+                        {
+                            continue;
+                        }
+
+                        // Okay, we have a declaration, and we want to modify it!
+
+                        builder->setInsertBefore(ii);
+
+                        assign(builder, globalOutputVal, ScalarizedVal::value(ii->getOperand(2)));
+                    }
+                }
+
+                return;
+            }
+        }
+
+        // When we have an HLSL ray tracing shader entry point,
+        // we don't want to translate the inputs/outputs for GLSL/SPIR-V
+        // according to our default rules, for two reasons:
+        //
+        // 1. The input and output for these stages are expected to
+        // be packaged into `struct` types rather than be scalarized,
+        // so the usual scalarization approach we take here should
+        // not be applied.
+        //
+        // 2. An `in out` parameter isn't just sugar for a combination
+        // of an `in` and an `out` parameter, and instead represents the
+        // read/write "payload" that was passed in. It should legalize
+        // to a single variable, and we can lower reads/writes of it
+        // directly, rather than introduce an intermediate temporary.
+        //
+        switch( stage )
+        {
+        default:
+            break;
+
+        case Stage::AnyHit:
+        case Stage::Callable:
+        case Stage::ClosestHit:
+        case Stage::Intersection:
+        case Stage::Miss:
+        case Stage::RayGeneration:
+            legalizeRayTracingEntryPointParameterForGLSL(context, pp, paramLayout);
+            return;
+        }
+
+        // Is the parameter type a special pointer type
+        // that indicates the parameter is used for `out`
+        // or `inout` access?
+        if(auto paramPtrType = as<IROutTypeBase>(paramType) )
+        {
+            // Okay, we have the more interesting case here,
+            // where the parameter was being passed by reference.
+            // We are going to create a local variable of the appropriate
+            // type, which will replace the parameter, along with
+            // one or more global variables for the actual input/output.
+
+            auto valueType = paramPtrType->getValueType();
+
+            auto localVariable = builder->emitVar(valueType);
+            auto localVal = ScalarizedVal::address(localVariable);
+
+            if( auto inOutType = as<IRInOutType>(paramPtrType) )
+            {
+                // In the `in out` case we need to declare two
+                // sets of global variables: one for the `in`
+                // side and one for the `out` side.
+                auto globalInputVal = createGLSLGlobalVaryings(
+                    context,
+                    builder, valueType, paramLayout, LayoutResourceKind::VaryingInput, stage);
+
+                assign(builder, localVal, globalInputVal);
+            }
+
+            // Any places where the original parameter was used inside
+            // the function body should instead use the new local variable.
+            // Since the parameter was a pointer, we use the variable instruction
+            // itself (which is an `alloca`d pointer) directly:
+            pp->replaceUsesWith(localVariable);
+
+            // We also need one or more global variables to write the output to
+            // when the function is done. We create them here.
+            auto globalOutputVal = createGLSLGlobalVaryings(
+                    context,
+                    builder, valueType, paramLayout, LayoutResourceKind::VaryingOutput, stage);
+
+            // Now we need to iterate over all the blocks in the function looking
+            // for any `return*` instructions, so that we can write to the output variable
+            for( auto bb = func->getFirstBlock(); bb; bb = bb->getNextBlock() )
+            {
+                auto terminatorInst = bb->getLastInst();
+                if(!terminatorInst)
+                    continue;
+
+                switch( terminatorInst->op )
+                {
+                default:
+                    continue;
+
+                case kIROp_ReturnVal:
+                case kIROp_ReturnVoid:
+                    break;
+                }
+
+                // We dont' re-use `builder` here because we don't want to
+                // disrupt the source location it is using for inserting
+                // temporary variables at the top of the function.
+                //
+                IRBuilder terminatorBuilder;
+                terminatorBuilder.sharedBuilder = builder->sharedBuilder;
+                terminatorBuilder.setInsertBefore(terminatorInst);
+
+                // Assign from the local variabel to the global output
+                // variable before the actual `return` takes place.
+                assign(&terminatorBuilder, globalOutputVal, localVal);
+            }
+        }
+        else
+        {
+            // This is the "easy" case where the parameter wasn't
+            // being passed by reference. We start by just creating
+            // one or more global variables to represent the parameter,
+            // and attach the required layout information to it along
+            // the way.
+
+            auto globalValue = createGLSLGlobalVaryings(
+                context,
+                builder, paramType, paramLayout, LayoutResourceKind::VaryingInput, stage);
+
+            // Next we need to replace uses of the parameter with
+            // references to the variable(s). We are going to do that
+            // somewhat naively, by simply materializing the
+            // variables at the start.
+            IRInst* materialized = materializeValue(builder, globalValue);
+
+            pp->replaceUsesWith(materialized);
+        }
+    }
+
     void legalizeEntryPointForGLSL(
         Session*                session,
         IRModule*               module,
@@ -4672,218 +5000,11 @@ namespace Slang
                 SLANG_ASSERT(entryPointLayout->fields.Count() > paramIndex);
                 auto paramLayout = entryPointLayout->fields[paramIndex];
 
-                // We need to create a global variable that will replace the parameter.
-                // It seems superficially obvious that the variable should have
-                // the same type as the parameter.
-                // However, if the parameter was a pointer, in order to
-                // support `out` or `in out` parameter passing, we need
-                // to be sure to allocate a variable of the pointed-to
-                // type instead.
-                //
-                // We also need to replace uses of the parameter with
-                // uses of the variable, and the exact logic there
-                // will differ a bit between the pointer and non-pointer
-                // cases.
-                auto paramType = pp->getDataType();
-
-                // First we will special-case stage input/outputs that
-                // don't fit into the standard varying model.
-                // For right now we are only doing special-case handling
-                // of geometry shader output streams.
-                if( auto paramPtrType = as<IROutTypeBase>(paramType) )
-                {
-                    auto valueType = paramPtrType->getValueType();
-                    if( auto gsStreamType = as<IRHLSLStreamOutputType>(valueType) )
-                    {
-                        // An output stream type like `TriangleStream<Foo>` should
-                        // more or less translate into `out Foo` (plus scalarization).
-
-                        auto globalOutputVal = createGLSLGlobalVaryings(
-                            &context,
-                            &builder,
-                            valueType,
-                            paramLayout,
-                            LayoutResourceKind::VaryingOutput,
-                            stage);
-
-                        // TODO: a GS output stream might be passed into other
-                        // functions, so that we should really be modifying
-                        // any function that has one of these in its parameter
-                        // list (and in the limit we should be leagalizing any
-                        // type that nests these...).
-                        //
-                        // For now we will just try to deal with `Append` calls
-                        // directly in this function.
-
-
-
-                        for( auto bb = func->getFirstBlock(); bb; bb = bb->getNextBlock() )
-                        {
-                            for( auto ii = bb->getFirstInst(); ii; ii = ii->getNextInst() )
-                            {
-                                // Is it a call?
-                                if(ii->op != kIROp_Call)
-                                    continue;
-
-                                // Is it calling the append operation?
-                                auto callee = ii->getOperand(0);
-                                for(;;)
-                                {
-                                    // If the instruction is `specialize(X,...)` then
-                                    // we want to look at `X`, and if it is `generic { ... return R; }`
-                                    // then we want to look at `R`. We handle this
-                                    // iteratively here.
-                                    //
-                                    // TODO: This idiom seems to come up enough that we
-                                    // should probably have a dedicated convenience routine
-                                    // for this.
-                                    //
-                                    // Alternatively, we could switch the IR encoding so
-                                    // that decorations are added to the generic instead of the
-                                    // value it returns.
-                                    //
-                                    switch(callee->op)
-                                    {
-                                    case kIROp_Specialize:
-                                        {
-                                            callee = cast<IRSpecialize>(callee)->getOperand(0);
-                                            continue;
-                                        }
-
-                                    case kIROp_Generic:
-                                        {
-                                            auto genericResult = findGenericReturnVal(cast<IRGeneric>(callee));
-                                            if(genericResult)
-                                            {
-                                                callee = genericResult;
-                                                continue;
-                                            }
-                                        }
-
-                                    default:
-                                        break;
-                                    }
-                                    break;
-                                }
-                                if(callee->op != kIROp_Func)
-                                    continue;
-
-                                // HACK: we will identify the operation based
-                                // on the target-intrinsic definition that was
-                                // given to it.
-                                auto decoration = findTargetIntrinsicDecoration(callee, "glsl");
-                                if(!decoration)
-                                    continue;
-
-                                if(StringRepresentation::asSlice(decoration->definition) != UnownedStringSlice::fromLiteral("EmitVertex()"))
-                                {
-                                    continue;
-                                }
-
-                                // Okay, we have a declaration, and we want to modify it!
-
-                                builder.setInsertBefore(ii);
-
-                                assign(&builder, globalOutputVal, ScalarizedVal::value(ii->getOperand(2)));
-                            }
-                        }
-
-                        continue;
-                    }
-                }
-
-
-                // Is the parameter type a special pointer type
-                // that indicates the parameter is used for `out`
-                // or `inout` access?
-                if(auto paramPtrType = as<IROutTypeBase>(paramType) )
-                {
-                    // Okay, we have the more interesting case here,
-                    // where the parameter was being passed by reference.
-                    // We are going to create a local variable of the appropriate
-                    // type, which will replace the parameter, along with
-                    // one or more global variables for the actual input/output.
-
-                    auto valueType = paramPtrType->getValueType();
-
-                    auto localVariable = builder.emitVar(valueType);
-                    auto localVal = ScalarizedVal::address(localVariable);
-
-                    if( auto inOutType = as<IRInOutType>(paramPtrType) )
-                    {
-                        // In the `in out` case we need to declare two
-                        // sets of global variables: one for the `in`
-                        // side and one for the `out` side.
-                        auto globalInputVal = createGLSLGlobalVaryings(
-                            &context,
-                            &builder, valueType, paramLayout, LayoutResourceKind::VaryingInput, stage);
-
-                        assign(&builder, localVal, globalInputVal);
-                    }
-
-                    // Any places where the original parameter was used inside
-                    // the function body should instead use the new local variable.
-                    // Since the parameter was a pointer, we use the variable instruction
-                    // itself (which is an `alloca`d pointer) directly:
-                    pp->replaceUsesWith(localVariable);
-
-                    // We also need one or more global variabels to write the output to
-                    // when the function is done. We create them here.
-                    auto globalOutputVal = createGLSLGlobalVaryings(
-                            &context,
-                            &builder, valueType, paramLayout, LayoutResourceKind::VaryingOutput, stage);
-
-                    // Now we need to iterate over all the blocks in the function looking
-                    // for any `return*` instructions, so that we can write to the output variable
-                    for( auto bb = func->getFirstBlock(); bb; bb = bb->getNextBlock() )
-                    {
-                        auto terminatorInst = bb->getLastInst();
-                        if(!terminatorInst)
-                            continue;
-
-                        switch( terminatorInst->op )
-                        {
-                        default:
-                            continue;
-
-                        case kIROp_ReturnVal:
-                        case kIROp_ReturnVoid:
-                            break;
-                        }
-
-                        // We dont' re-use `builder` here because we don't want to
-                        // disrupt the source location it is using for inserting
-                        // temporary variables at the top of the function.
-                        //
-                        IRBuilder terminatorBuilder;
-                        terminatorBuilder.sharedBuilder = builder.sharedBuilder;
-                        terminatorBuilder.setInsertBefore(terminatorInst);
-
-                        // Assign from the local variabel to the global output
-                        // variable before the actual `return` takes place.
-                        assign(&terminatorBuilder, globalOutputVal, localVal);
-                    }
-                }
-                else
-                {
-                    // This is the "easy" case where the parameter wasn't
-                    // being passed by reference. We start by just creating
-                    // one or more global variables to represent the parameter,
-                    // and attach the required layout information to it along
-                    // the way.
-
-                    auto globalValue = createGLSLGlobalVaryings(
-                        &context,
-                        &builder, paramType, paramLayout, LayoutResourceKind::VaryingInput, stage);
-
-                    // Next we need to replace uses of the parameter with
-                    // references to the variable(s). We are going to do that
-                    // somewhat naively, by simply materializing the
-                    // variables at the start.
-                    IRInst* materialized = materializeValue(&builder, globalValue);
-
-                    pp->replaceUsesWith(materialized);
-                }
+                legalizeEntryPointParameterForGLSL(
+                    &context,
+                    func,
+                    pp,
+                    paramLayout);
             }
 
             // At this point we should have eliminated all uses of the
@@ -5134,6 +5255,18 @@ namespace Slang
                     auto originalDecoration = (IRNameHintDecoration*)dd;
                     auto newDecoration = context->builder->addDecoration<IRNameHintDecoration>(clonedValue);
                     newDecoration->name = originalDecoration->name;
+                }
+                break;
+
+            case kIRDecorationOp_VulkanRayPayload:
+                {
+                    context->builder->addDecoration<IRVulkanRayPayloadDecoration>(clonedValue);
+                }
+                break;
+
+            case kIRDecorationOp_VulkanHitAttributes:
+                {
+                    context->builder->addDecoration<IRVulkanHitAttributesDecoration>(clonedValue);
                 }
                 break;
 
@@ -5721,9 +5854,26 @@ namespace Slang
     };
 
     TargetSpecializationLevel getTargetSpecialiationLevel(
-        IRGlobalValue*  val,
+        IRGlobalValue*  inVal,
         String const&   targetName)
     {
+        // HACK: Currently the front-end is placing modifiers related
+        // to target specialization on nodes like functions, even when
+        // those functions are being returned by a generic. This
+        // means that we need to try and inspect the value being
+        // returned by the generic if we are looking at a generic.
+        IRInst* val = inVal;
+        while( auto genericVal = as<IRGeneric>(val) )
+        {
+            auto firstBlock = genericVal->getFirstBlock();
+            if(!firstBlock) break;
+
+            auto returnInst = as<IRReturnVal>(firstBlock->getLastInst());
+            if(!returnInst) break;
+
+            val = returnInst->getVal();
+        }
+
         TargetSpecializationLevel result = TargetSpecializationLevel::notSpecialized;
         for( auto dd = val->firstDecoration; dd; dd = dd->next )
         {
@@ -5776,13 +5926,13 @@ namespace Slang
         switch (val->op)
         {
         case kIROp_WitnessTable:
-        case kIROp_GlobalVar:
         case kIROp_GlobalConstant:
         case kIROp_Func:
         case kIROp_Generic:
             return ((IRParentInst*)val)->getFirstChild() != nullptr;
 
         case kIROp_StructType:
+        case kIROp_GlobalVar:
             return true;
 
         default:

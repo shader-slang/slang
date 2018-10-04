@@ -1247,6 +1247,14 @@ void addVarDecorations(
         {
             builder->addDecoration<IRInterpolationModeDecoration>(inst)->mode = IRInterpolationMode::Centroid;
         }
+        else if(mod.As<VulkanRayPayloadAttribute>())
+        {
+            builder->addDecoration<IRVulkanRayPayloadDecoration>(inst);
+        }
+        else if(mod.As<VulkanHitAttributesAttribute>())
+        {
+            builder->addDecoration<IRVulkanHitAttributesDecoration>(inst);
+        }
 
         // TODO: what are other modifiers we need to propagate through?
     }
@@ -3419,13 +3427,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // A type alias declaration may be generic, if it is
         // nested under a generic type/function/etc.
         //
-        IRBuilder subBuilderStorage = *getBuilder();
-        IRBuilder* subBuilder = &subBuilderStorage;
-        IRGeneric* outerGeneric = emitOuterGenerics(subBuilder, decl, decl);
-
-        IRGenContext subContextStorage = *context;
-        IRGenContext* subContext = &subContextStorage;
-        subContext->irBuilder = subBuilder;
+        NestedContext nested(this);
+        auto subBuilder = nested.getBuilder();
+        auto subContext = nested.getContet();
+        IRGeneric* outerGeneric = emitOuterGenerics(subContext, decl, decl);
 
         // TODO: if a type alias declaration can have linkage,
         // we will need to lower it to some kind of global
@@ -3624,13 +3629,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // declaration (either a type declaration or an `extension`)
         // is generic.
         //
-        IRBuilder subBuilderStorage = *getBuilder();
-        IRBuilder* subBuilder = &subBuilderStorage;
-        emitOuterGenerics(subBuilder, inheritanceDecl, inheritanceDecl);
-
-        IRGenContext subContextStorage = *context;
-        IRGenContext* subContext = &subContextStorage;
-        subContext->irBuilder = subBuilder;
+        NestedContext nested(this);
+        auto subBuilder = nested.getBuilder();
+        auto subContext = nested.getContet();
+        emitOuterGenerics(subContext, inheritanceDecl, inheritanceDecl);
 
         // Lower the super-type to force its declaration to be lowered.
         //
@@ -3784,6 +3786,236 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return globalVal;
     }
 
+    bool isFunctionStaticVarDecl(VarDeclBase* decl)
+    {
+        // Only a variable marked `static` can be static.
+        if(!decl->FindModifier<HLSLStaticModifier>())
+            return false;
+
+        // The immediate parent of a function-scope variable
+        // declaration will be a `ScopeDecl`.
+        //
+        // TODO: right now the parent links for scopes are *not*
+        // set correctly, so we can't just scan up and look
+        // for a function in the parent chain...
+        auto parent = decl->ParentDecl;
+        if( dynamic_cast<ScopeDecl*>(parent) )
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    IRInst* defaultSpecializeOuterGeneric(
+        IRInst*         outerVal,
+        IRType*         type,
+        GenericDecl*    genericDecl)
+    {
+        auto builder = getBuilder();
+
+        // We need to specialize any generics that are further out...
+        auto specialiedOuterVal = defaultSpecializeOuterGenerics(
+            outerVal,
+            builder->getGenericKind(),
+            genericDecl);
+
+        List<IRInst*> genericArgs;
+
+        // Walk the parameters of the generic, and emit an argument for each,
+        // which will be a reference to binding for that parameter in the
+        // current scope.
+        //
+        // First we start with type and value parameters,
+        // in the order they were declared.
+        for (auto member : genericDecl->Members)
+        {
+            if (auto typeParamDecl = member.As<GenericTypeParamDecl>())
+            {
+                genericArgs.Add(getSimpleVal(context, ensureDecl(context, typeParamDecl)));
+            }
+            else if (auto valDecl = member.As<GenericValueParamDecl>())
+            {
+                genericArgs.Add(getSimpleVal(context, ensureDecl(context, valDecl)));
+            }
+        }
+        // Then we emit constraint parameters, again in
+        // declaration order.
+        for (auto member : genericDecl->Members)
+        {
+            if (auto constraintDecl = member.As<GenericTypeConstraintDecl>())
+            {
+                genericArgs.Add(getSimpleVal(context, ensureDecl(context, constraintDecl)));
+            }
+        }
+
+        return builder->emitSpecializeInst(type, specialiedOuterVal, genericArgs.Count(), genericArgs.Buffer());
+    }
+
+    IRInst* defaultSpecializeOuterGenerics(
+        IRInst* val,
+        IRType* type,
+        Decl*   decl)
+    {
+        if(!val) return nullptr;
+
+        auto parentVal = val->getParent();
+        while(parentVal)
+        {
+            if(as<IRGeneric>(parentVal))
+                break;
+            parentVal = parentVal->getParent();
+        }
+        if(!parentVal)
+            return val;
+
+        for(auto pp = decl->ParentDecl; pp; pp = pp->ParentDecl)
+        {
+            if(auto genericAncestor = dynamic_cast<GenericDecl*>(pp))
+            {
+                return defaultSpecializeOuterGeneric(parentVal, type, genericAncestor);
+            }
+        }
+
+        return val;
+    }
+
+    struct NestedContext
+    {
+        IRGenEnv        subEnvStorage;
+        IRBuilder       subBuilderStorage;
+        IRGenContext    subContextStorage;
+
+        NestedContext(DeclLoweringVisitor* outer)
+            : subBuilderStorage(*outer->getBuilder())
+            , subContextStorage(*outer->context)
+        {
+            auto outerContext = outer->context;
+
+            subEnvStorage.outer = outerContext->env;
+
+            subContextStorage.irBuilder = &subBuilderStorage;
+            subContextStorage.env = &subEnvStorage;
+        }
+
+        IRBuilder* getBuilder() { return &subBuilderStorage; }
+        IRGenContext* getContet() { return &subContextStorage; }
+    };
+
+
+    LoweredValInfo lowerFunctionStaticVarDecl(
+        VarDeclBase*    decl)
+    {
+        // A global variable may need to be generic, if one
+        // of the outer declarations is generic.
+        NestedContext nestedContext(this);
+        auto subBuilder = nestedContext.getBuilder();
+        auto subContext = nestedContext.getContet();
+        subBuilder->setInsertInto(subBuilder->getModule()->getModuleInst());
+        emitOuterGenerics(subContext, decl, decl);
+
+        IRType* subVarType = lowerType(subContext, decl->getType());
+
+        IRGlobalValueWithCode* irGlobal = subBuilder->createGlobalVar(subVarType);
+        addVarDecorations(subContext, irGlobal, decl);
+
+        addNameHint(context, irGlobal, decl);
+        maybeSetRate(context, irGlobal, decl);
+
+        subBuilder->addHighLevelDeclDecoration(irGlobal, decl);
+
+        // We are inside of a function, and that function might be generic,
+        // in which case the `static` variable will be lowered to another
+        // generic. Let's start with a terrible example:
+        //
+        //      interface IHasCount { int getCount(); }
+        //      int incrementCounter<T : IHasCount >(T val) {
+        //          static int counter = 0;
+        //          counter += val.getCount();
+        //          return counter;
+        //      }
+        //
+        // In this case, `incrementCounter` will lower to a function
+        // nested in a generic, while `counter` will be lowered to
+        // a global variable nested in a *different* generic.
+        // The net result is something like this:
+        //
+        //      int counter<T:IHasCount> = 0;
+        //
+        //      int incrementCounter<T:IHasCount>(T val) {
+        //          counter<T> += val.getCount();
+        //          return counter<T>;
+        //
+        // The references to `counter` inside of `incrementCounter`
+        // become references to `counter<T>`.
+        //
+        // At the IR level, this means that the value we install
+        // for `decl` needs to be a specialized reference to `irGlobal`,
+        // for any outer generics.
+        //
+        IRType* varType = lowerType(context, decl->getType());
+        IRType* varPtrType = getBuilder()->getPtrType(varType);
+        auto irSpecializedGlobal = defaultSpecializeOuterGenerics(irGlobal, varPtrType, decl);
+        LoweredValInfo globalVal = LoweredValInfo::ptr(irSpecializedGlobal);
+        setValue(context, decl, globalVal);
+
+        // A `static` variable with an initializer needs special handling,
+        // at least if the initializer isn't a compile-time constant.
+        if( auto initExpr = decl->initExpr )
+        {
+            // We must create an ordinary global `bool isInitialized = false`
+            // to represent whether we've initialized this before.
+            // Then emit code like:
+            //
+            //      if(!isInitialized) { <globalVal> = <initExpr>; isInitialized = true; }
+            //
+            // TODO: we could conceivably optimize this by detecting
+            // when the `initExpr` lowers to just a reference to a constant,
+            // and then either deleting the extra code structure there,
+            // or not generating it in the first place. That is a bit
+            // more complexity than I'm ready for at the moment.
+            //
+
+            // Of course, if we are under a generic, then the Boolean
+            // variable need to be generic as well!
+            NestedContext nestedBoolContext(this);
+            auto boolBuilder = nestedBoolContext.getBuilder();
+            auto boolContext = nestedBoolContext.getContet();
+            boolBuilder->setInsertInto(boolBuilder->getModule()->getModuleInst());
+            emitOuterGenerics(boolContext, decl, decl);
+
+            auto irBoolType = boolBuilder->getBoolType();
+            auto irBool = boolBuilder->createGlobalVar(irBoolType);
+            boolBuilder->setInsertInto(irBool);
+            boolBuilder->setInsertInto(boolBuilder->createBlock());
+            boolBuilder->emitReturn(boolBuilder->getBoolValue(false));
+
+            auto boolVal = LoweredValInfo::ptr(defaultSpecializeOuterGenerics(irBool, irBoolType, decl));
+
+
+            // Okay, with our global Boolean created, we can move on to
+            // generating the code we actually care about, back in the original function.
+
+            auto builder = getBuilder();
+            auto initBlock = builder->createBlock();
+            auto afterBlock = builder->createBlock();
+
+            builder->emitIfElse(getSimpleVal(context, boolVal), afterBlock, initBlock, afterBlock);
+
+            builder->setInsertInto(initBlock);
+            LoweredValInfo initVal = lowerLValueExpr(context, initExpr);
+            assign(context, globalVal, initVal);
+            assign(context, boolVal, LoweredValInfo::simple(builder->getBoolValue(true)));
+            builder->emitBranch(afterBlock);
+
+            builder->setInsertInto(afterBlock);
+        }
+
+        irGlobal->moveToEnd();
+        finishOuterGenerics(subBuilder, irGlobal);
+        return globalVal;
+    }
+
     LoweredValInfo visitGenericValueParamDecl(GenericValueParamDecl* decl)
     {
         return emitDeclRef(context, makeDeclRef(decl),
@@ -3797,6 +4029,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         if (isGlobalVarDecl(decl))
         {
             return lowerGlobalVarDecl(decl);
+        }
+
+        if(isFunctionStaticVarDecl(decl))
+        {
+            return lowerFunctionStaticVarDecl(decl);
         }
 
         // A user-defined variable declaration will usually turn into
@@ -3913,16 +4150,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // TODO: a bit more work will be needed if we allow for
         // enum cases that have payloads, because then we need
         // a function that constructs the value given arguments.
-
-        IRBuilder subBuilderStorage = *getBuilder();
-        IRBuilder* subBuilder = &subBuilderStorage;
+        //
+        NestedContext nestedContext(this);
+        auto subContext = nestedContext.getContet();
 
         // Emit any generics that should wrap the actual type.
-        emitOuterGenerics(subBuilder, decl, decl);
-
-        IRGenContext subContextStorage = *context;
-        IRGenContext* subContext = &subContextStorage;
-        subContext->irBuilder = subBuilder;
+        emitOuterGenerics(subContext, decl, decl);
 
         return lowerRValueExpr(subContext, decl->initExpr);
     }
@@ -3937,13 +4170,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             ensureDecl(context, inheritanceDecl);
         }
 
-        IRBuilder subBuilderStorage = *getBuilder();
-        IRBuilder* subBuilder = &subBuilderStorage;
-        emitOuterGenerics(subBuilder, decl, decl);
-
-        IRGenContext subContextStorage = *context;
-        IRGenContext* subContext = &subContextStorage;
-        subContext->irBuilder = subBuilder;
+        NestedContext nestedContext(this);
+        auto subBuilder = nestedContext.getBuilder();
+        auto subContext = nestedContext.getContet();
+        emitOuterGenerics(subContext, decl, decl);
 
         // An `enum` declaration will currently lower directly to its "tag"
         // type, so that any references to the `enum` become referenes to
@@ -3977,15 +4207,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // We are going to create nested IR building state
         // to use when emitting the members of the type.
         //
-        IRBuilder subBuilderStorage = *getBuilder();
-        IRBuilder* subBuilder = &subBuilderStorage;
+        NestedContext nestedContext(this);
+        auto subBuilder = nestedContext.getBuilder();
+        auto subContext = nestedContext.getContet();
 
         // Emit any generics that should wrap the actual type.
-        emitOuterGenerics(subBuilder, decl, decl);
-
-        IRGenContext subContextStorage = *context;
-        IRGenContext* subContext = &subContextStorage;
-        subContext->irBuilder = subBuilder;
+        emitOuterGenerics(subContext, decl, decl);
 
         IRStructType* irStruct = subBuilder->createStructType();
         addNameHint(context, irStruct, decl);
@@ -4031,6 +4258,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // member functions).
 
         irStruct->moveToEnd();
+
+        addTargetIntrinsicDecorations(irStruct, decl);
+
 
         return LoweredValInfo::simple(finishOuterGenerics(subBuilder, irStruct));
     }
@@ -4426,17 +4656,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     }
 
     IRGeneric* emitOuterGeneric(
-        IRBuilder*      subBuilder,
+        IRGenContext*   subContext,
         GenericDecl*    genericDecl,
         Decl*           leafDecl)
     {
+        auto subBuilder = subContext->irBuilder;
+
         // Of course, a generic might itself be nested inside of other generics...
-        auto nextOuterGeneric = emitOuterGenerics(subBuilder, genericDecl, leafDecl);
-
-        IRGenContext subContextStorage = *context;
-        IRGenContext* subContext = &subContextStorage;
-        subContext->irBuilder = subBuilder;
-
+        auto nextOuterGeneric = emitOuterGenerics(subContext, genericDecl, leafDecl);
 
         // We need to create an IR generic
 
@@ -4498,13 +4725,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     // The `leafDecl` represents the inner-most declaration we are actually
     // trying to emit, which is the one that should receive the mangled name.
     //
-    IRGeneric* emitOuterGenerics(IRBuilder* subBuilder, Decl* decl, Decl* leafDecl)
+    IRGeneric* emitOuterGenerics(IRGenContext* subContext, Decl* decl, Decl* leafDecl)
     {
         for(auto pp = decl->ParentDecl; pp; pp = pp->ParentDecl)
         {
             if(auto genericAncestor = dynamic_cast<GenericDecl*>(pp))
             {
-                return emitOuterGeneric(subBuilder, genericAncestor, leafDecl);
+                return emitOuterGeneric(subContext, genericAncestor, leafDecl);
             }
         }
 
@@ -4584,16 +4811,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     {
         // We are going to use a nested builder, because we will
         // change the parent node that things get nested into.
-
-        IRBuilder subBuilderStorage = *getBuilder();
-        IRBuilder* subBuilder = &subBuilderStorage;
-
+        //
+        NestedContext nestedContext(this);
+        auto subBuilder = nestedContext.getBuilder();
+        auto subContext = nestedContext.getContet();
 
         // The actual `IRFunction` that we emit needs to be nested
         // inside of one `IRGeneric` for every outer `GenericDecl`
         // in the declaration hierarchy.
 
-        emitOuterGenerics(subBuilder, decl, decl);
+        emitOuterGenerics(subContext, decl, decl);
 
         // Collect the parameter lists we will use for our new function.
         ParameterLists parameterLists;
@@ -4620,11 +4847,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 declForReturnType = subscriptDecl;
             }
         }
-
-
-        IRGenContext subContextStorage = *context;
-        IRGenContext* subContext = &subContextStorage;
-        subContext->irBuilder = subBuilder;
 
         // need to create an IR function here
 
@@ -4980,17 +5202,8 @@ LoweredValInfo lowerDecl(
 {
     IRBuilderSourceLocRAII sourceLocInfo(context->irBuilder, decl->loc);
 
-    IRGenEnv subEnv;
-    subEnv.outer = context->env;
-
-    IRGenContext subContext = *context;
-    subContext.env = &subEnv;
-
-
     DeclLoweringVisitor visitor;
-    visitor.context = &subContext;
-
-
+    visitor.context = context;
 
     try
     {
@@ -5030,9 +5243,12 @@ LoweredValInfo ensureDecl(
     subIRBuilder.sharedBuilder = context->irBuilder->sharedBuilder;
     subIRBuilder.setInsertInto(subIRBuilder.sharedBuilder->module->getModuleInst());
 
-    IRGenContext subContext = *context;
+    IRGenEnv subEnv;
+    subEnv.outer = context->env;
 
+    IRGenContext subContext = *context;
     subContext.irBuilder = &subIRBuilder;
+    subContext.env = &subEnv;
 
     result = lowerDecl(&subContext, decl);
 

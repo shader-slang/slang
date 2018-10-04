@@ -1839,6 +1839,10 @@ static bool endsWithAllowedExtension(
         ".tese",
         ".comp",
         ".internal",
+        ".ahit",
+        ".chit",
+        ".miss",
+        ".rgen",
         nullptr };
 
     for( auto ii = allowedExtensions; *ii; ++ii )

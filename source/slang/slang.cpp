@@ -116,6 +116,40 @@ Profile getEffectiveProfile(EntryPointRequest* entryPoint, TargetRequest* target
     auto entryPointProfile = entryPoint->profile;
     auto targetProfile = target->targetProfile;
 
+    // Depending on the target *format* we might have to restrict the
+    // profile family to one that makes sense.
+    //
+    // TODO: Some of this should really be handled as validation at
+    // the front-end. People shouldn't be allowed to ask for SPIR-V
+    // output with Shader Model 5.0...
+    switch(target->target)
+    {
+    default:
+        break;
+
+    case CodeGenTarget::GLSL:
+    case CodeGenTarget::GLSL_Vulkan:
+    case CodeGenTarget::GLSL_Vulkan_OneDesc:
+    case CodeGenTarget::SPIRV:
+    case CodeGenTarget::SPIRVAssembly:
+        if(targetProfile.getFamily() != ProfileFamily::GLSL)
+        {
+            targetProfile.setVersion(ProfileVersion::GLSL_110);
+        }
+        break;
+
+    case CodeGenTarget::HLSL:
+    case CodeGenTarget::DXBytecode:
+    case CodeGenTarget::DXBytecodeAssembly:
+    case CodeGenTarget::DXIL:
+    case CodeGenTarget::DXILAssembly:
+        if(targetProfile.getFamily() != ProfileFamily::DX)
+        {
+            targetProfile.setVersion(ProfileVersion::DX_4_0);
+        }
+        break;
+    }
+
     auto entryPointProfileVersion = entryPointProfile.GetVersion();
     auto targetProfileVersion = targetProfile.GetVersion();
 
@@ -166,7 +200,24 @@ Profile getEffectiveProfile(EntryPointRequest* entryPoint, TargetRequest* target
         }
         break;
 
-    // TODO: Add equivalent logic for the GL/VK case.
+    case ProfileFamily::GLSL:
+        switch(effectiveProfile.GetStage())
+        {
+        default:
+            break;
+
+        case Stage::RayGeneration:
+        case Stage::Intersection:
+        case Stage::ClosestHit:
+        case Stage::AnyHit:
+        case Stage::Miss:
+        case Stage::Callable:
+            stageMinVersion = ProfileVersion::GLSL_460;
+            break;
+
+        //  TODO: Add equivalent logic for geometry, tessellation, and compute stages.
+        }
+        break;
 
     default:
         break;

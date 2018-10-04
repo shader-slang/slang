@@ -29,8 +29,6 @@ INST(Nop, nop, 0, 0)
     INST_RANGE(BasicType, VoidType, AfterBaseType)
 
     INST(StringType, String, 0, 0)
-    INST(RayDescType, RayDesc, 0, 0)
-    INST(BuiltInTriangleIntersectionAttributesType, BuiltInTriangleIntersectionAttributes, 0, 0)
 
     /* ArrayTypeBase */
         INST(ArrayType, Array, 2, 0)

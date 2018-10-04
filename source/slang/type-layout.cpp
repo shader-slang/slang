@@ -375,6 +375,23 @@ struct HLSLObjectLayoutRulesImpl : ObjectLayoutRulesImpl
 };
 HLSLObjectLayoutRulesImpl kHLSLObjectLayoutRulesImpl;
 
+// HACK: Treating ray-tracing input/output as if it was another
+// case of varying input/output when it really needs to be
+// based on byte storage/layout.
+//
+struct GLSLRayTracingLayoutRulesImpl : DefaultVaryingLayoutRulesImpl
+{
+    GLSLRayTracingLayoutRulesImpl(LayoutResourceKind kind)
+        : DefaultVaryingLayoutRulesImpl(kind)
+    {}
+};
+struct HLSLRayTracingLayoutRulesImpl : DefaultVaryingLayoutRulesImpl
+{
+    HLSLRayTracingLayoutRulesImpl(LayoutResourceKind kind)
+        : DefaultVaryingLayoutRulesImpl(kind)
+    {}
+};
+
 Std140LayoutRulesImpl kStd140LayoutRulesImpl;
 Std430LayoutRulesImpl kStd430LayoutRulesImpl;
 HLSLConstantBufferLayoutRulesImpl kHLSLConstantBufferLayoutRulesImpl;
@@ -383,8 +400,14 @@ HLSLStructuredBufferLayoutRulesImpl kHLSLStructuredBufferLayoutRulesImpl;
 GLSLVaryingLayoutRulesImpl kGLSLVaryingInputLayoutRulesImpl(LayoutResourceKind::VertexInput);
 GLSLVaryingLayoutRulesImpl kGLSLVaryingOutputLayoutRulesImpl(LayoutResourceKind::FragmentOutput);
 
+GLSLRayTracingLayoutRulesImpl kGLSLRayPayloadParameterLayoutRulesImpl(LayoutResourceKind::RayPayload);
+GLSLRayTracingLayoutRulesImpl kGLSLHitAttributesParameterLayoutRulesImpl(LayoutResourceKind::HitAttributes);
+
 HLSLVaryingLayoutRulesImpl kHLSLVaryingInputLayoutRulesImpl(LayoutResourceKind::VertexInput);
 HLSLVaryingLayoutRulesImpl kHLSLVaryingOutputLayoutRulesImpl(LayoutResourceKind::FragmentOutput);
+
+HLSLRayTracingLayoutRulesImpl kHLSLRayPayloadParameterLayoutRulesImpl(LayoutResourceKind::RayPayload);
+HLSLRayTracingLayoutRulesImpl kHLSLHitAttributesParameterLayoutRulesImpl(LayoutResourceKind::HitAttributes);
 
 //
 
@@ -398,6 +421,9 @@ struct GLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     virtual LayoutRulesImpl* getSpecializationConstantRules() override;
     virtual LayoutRulesImpl* getShaderStorageBufferRules() override;
     virtual LayoutRulesImpl* getParameterBlockRules() override;
+
+    LayoutRulesImpl* getRayPayloadParameterRules()      override;
+    LayoutRulesImpl* getHitAttributesParameterRules()    override;
 };
 
 struct HLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
@@ -410,6 +436,9 @@ struct HLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     virtual LayoutRulesImpl* getSpecializationConstantRules() override;
     virtual LayoutRulesImpl* getShaderStorageBufferRules() override;
     virtual LayoutRulesImpl* getParameterBlockRules() override;
+
+    LayoutRulesImpl* getRayPayloadParameterRules()      override;
+    LayoutRulesImpl* getHitAttributesParameterRules()    override;
 };
 
 GLSLLayoutRulesFamilyImpl kGLSLLayoutRulesFamilyImpl;
@@ -442,6 +471,14 @@ LayoutRulesImpl kGLSLSpecializationConstantLayoutRulesImpl_ = {
     &kGLSLLayoutRulesFamilyImpl, &kGLSLSpecializationConstantLayoutRulesImpl, &kGLSLObjectLayoutRulesImpl,
 };
 
+LayoutRulesImpl kGLSLRayPayloadParameterLayoutRulesImpl_ = {
+    &kGLSLLayoutRulesFamilyImpl, &kGLSLRayPayloadParameterLayoutRulesImpl, &kGLSLObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kGLSLHitAttributesParameterLayoutRulesImpl_ = {
+    &kGLSLLayoutRulesFamilyImpl, &kGLSLHitAttributesParameterLayoutRulesImpl, &kGLSLObjectLayoutRulesImpl,
+};
+
 // HLSL cases
 
 LayoutRulesImpl kHLSLConstantBufferLayoutRulesImpl_ = {
@@ -458,6 +495,14 @@ LayoutRulesImpl kHLSLVaryingInputLayoutRulesImpl_ = {
 
 LayoutRulesImpl kHLSLVaryingOutputLayoutRulesImpl_ = {
     &kHLSLLayoutRulesFamilyImpl, &kHLSLVaryingOutputLayoutRulesImpl, &kHLSLObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kHLSLRayPayloadParameterLayoutRulesImpl_ = {
+    &kHLSLLayoutRulesFamilyImpl, &kHLSLRayPayloadParameterLayoutRulesImpl, &kHLSLObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kHLSLHitAttributesParameterLayoutRulesImpl_ = {
+    &kHLSLLayoutRulesFamilyImpl, &kHLSLHitAttributesParameterLayoutRulesImpl, &kHLSLObjectLayoutRulesImpl,
 };
 
 //
@@ -503,6 +548,16 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getShaderStorageBufferRules()
     return &kStd430LayoutRulesImpl_;
 }
 
+LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getRayPayloadParameterRules()
+{
+    return &kGLSLRayPayloadParameterLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getHitAttributesParameterRules()
+{
+    return &kGLSLHitAttributesParameterLayoutRulesImpl_;
+}
+
 //
 
 LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getConstantBufferRules()
@@ -546,6 +601,18 @@ LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getShaderStorageBufferRules()
 {
     return nullptr;
 }
+
+LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getRayPayloadParameterRules()
+{
+    return &kHLSLRayPayloadParameterLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getHitAttributesParameterRules()
+{
+    return &kHLSLHitAttributesParameterLayoutRulesImpl_;
+}
+
+
 
 //
 
