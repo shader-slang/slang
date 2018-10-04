@@ -4654,36 +4654,50 @@ struct EmitVisitor
             emitIREntryPointAttributes(func, ctx, entryPointLayout);
         }
 
+        const CodeGenTarget target = ctx->shared->target;
+
         auto name = getIRFuncName(func);
 
         EmitType(resultType, name);
 
         emit("(");
         auto firstParam = func->getFirstParam();
-        for( auto pp = firstParam; pp; pp = pp->getNextParam() )
+        for( auto pp = firstParam; pp; pp = pp->getNextParam())
         {
             if(pp != firstParam)
                 emit(", ");
 
             auto paramName = getIRName(pp);
             auto paramType = pp->getDataType();
-            if (auto decor = pp->findDecoration<IRHighLevelDeclDecoration>())
+
+            if (target == CodeGenTarget::HLSL)
             {
-                if (decor->decl)
+                if (auto layoutDecor = pp->findDecoration<IRLayoutDecoration>())
                 {
-                    auto primType = decor->decl->FindModifier<HLSLGeometryShaderInputPrimitiveTypeModifier>();
-                    if (dynamic_cast<HLSLTriangleModifier*>(primType))
-                        emit("triangle ");
-                    else if (dynamic_cast<HLSLPointModifier*>(primType))
-                        emit("point ");
-                    else if (dynamic_cast<HLSLLineModifier*>(primType))
-                        emit("line ");
-                    else if (dynamic_cast<HLSLLineAdjModifier*>(primType))
-                        emit("lineadj ");
-                    else if (dynamic_cast<HLSLTriangleAdjModifier*>(primType))
-                        emit("triangleadj ");
+                    Layout* layout = layoutDecor->layout;
+                    VarLayout* varLayout = dynamic_cast<VarLayout*>(layout);
+
+                    if (varLayout)
+                    {
+                        auto var = varLayout->getVariable();
+
+                        if (auto primTypeModifier = var->FindModifier<HLSLGeometryShaderInputPrimitiveTypeModifier>())
+                        {
+                            if (dynamic_cast<HLSLTriangleModifier*>(primTypeModifier))
+                                emit("triangle ");
+                            else if (dynamic_cast<HLSLPointModifier*>(primTypeModifier))
+                                emit("point ");
+                            else if (dynamic_cast<HLSLLineModifier*>(primTypeModifier))
+                                emit("line ");
+                            else if (dynamic_cast<HLSLLineAdjModifier*>(primTypeModifier))
+                                emit("lineadj ");
+                            else if (dynamic_cast<HLSLTriangleAdjModifier*>(primTypeModifier))
+                                emit("triangleadj ");
+                        }
+                    }
                 }
             }
+
             emitIRParamType(ctx, paramType, paramName);
 
             emitIRSemantics(ctx, pp);
