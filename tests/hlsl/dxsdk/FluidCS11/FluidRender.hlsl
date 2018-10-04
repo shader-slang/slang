@@ -1,5 +1,17 @@
-//TEST_IGNORE_FILE: Currently failing due to Slang compiler issues.
-//TEST:COMPARE_HLSL: -target dxbc-assembly -profile vs_4_0 -entry ParticleVS -profile gs_4_0 -entry ParticleGS -profile ps_4_0 -entry ParticlePS
+//TEST:COMPARE_HLSL:-no-mangle -target dxbc-assembly -profile vs_4_0 -entry ParticleVS -profile gs_4_0 -entry ParticleGS -profile ps_4_0 -entry ParticlePS
+
+#ifndef __SLANG__
+#define ParticlesRO ParticlesRO_0
+#define ParticleDensityRO ParticleDensityRO_0
+#define cbRenderConstants cbRenderConstants_0
+#define g_mViewProjection g_mViewProjection_0
+#define g_fParticleSize g_fParticleSize_0
+#define density density_0
+#define position position_0
+#define velocity velocity_0
+
+#endif
+
 //--------------------------------------------------------------------------------------
 // File: FluidRender.hlsl
 //
@@ -56,7 +68,7 @@ static const float4 Rainbow[5] = {
 
 float4 VisualizeNumber(float n)
 {
-    return lerp( Rainbow[ floor(n * 4.0f) ], Rainbow[ ceil(n * 4.0f) ], frac(n * 4.0f) );
+    return lerp( Rainbow[ int(floor(n * 4.0f)) ], Rainbow[ int(ceil(n * 4.0f)) ], frac(n * 4.0f) );
 }
 
 float4 VisualizeNumber(float n, float lower, float upper)
@@ -69,9 +81,9 @@ float4 VisualizeNumber(float n, float lower, float upper)
 // Vertex Shader
 //--------------------------------------------------------------------------------------
 
-VSParticleOut ParticleVS(uint ID : SV_VertexID)
+VSParticleOut ParticleVS(uint ID : SV_VERTEXID) 
 {
-    VSParticleOut Out = (VSParticleOut)0;
+    VSParticleOut Out; //  = { { 0, 0 } , { 0, 0, 0, 0 } }; // (VSParticleOut)0;
     Out.position = ParticlesRO[ID].position;
     Out.color = VisualizeNumber(ParticleDensityRO[ID].density, 1000.0f, 2000.0f);
     return Out;
@@ -91,7 +103,7 @@ void ParticleGS(point VSParticleOut In[1], inout TriangleStream<GSParticleOut> S
     [unroll]
     for (int i = 0; i < 4; i++)
     {
-        GSParticleOut Out = (GSParticleOut)0;
+        GSParticleOut Out; // = (GSParticleOut)0;
         float4 position = float4(In[0].position, 0, 1) + g_fParticleSize * float4(g_positions[i], 0, 0);
         Out.position = mul(position, g_mViewProjection);
         Out.color = In[0].color;
@@ -106,7 +118,7 @@ void ParticleGS(point VSParticleOut In[1], inout TriangleStream<GSParticleOut> S
 // Pixel Shader
 //--------------------------------------------------------------------------------------
 
-float4 ParticlePS(GSParticleOut In) : SV_Target
+float4 ParticlePS(GSParticleOut In) : SV_TARGET
 {
     return In.color;
 }
