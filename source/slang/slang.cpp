@@ -487,12 +487,12 @@ void CompileRequest::generateIR()
     for( auto& translationUnit : translationUnits )
     {
         if (useSerialIRBottleneck)
-        {   
-            /// Generate IR for translation unit
-            RefPtr<IRModule> irModule(generateIRForTranslationUnit(translationUnit));
-
+        {              
             IRSerialData serialData;
             {
+                /// Generate IR for translation unit
+                RefPtr<IRModule> irModule(generateIRForTranslationUnit(translationUnit));
+
                 // Write IR out to serialData - copying over SourceLoc information directly
                 IRSerialWriter writer;
                 writer.write(irModule, sourceManager, IRSerialWriter::OptionFlag::RawSourceLocation, &serialData);

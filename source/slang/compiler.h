@@ -320,7 +320,7 @@ namespace Slang
         List<RefPtr<TranslationUnitRequest> > translationUnits;
 
         // Entry points we've been asked to compile (each
-        // assocaited with a translation unit).
+        // associated with a translation unit).
         List<RefPtr<EntryPointRequest> > entryPoints;
 
         // Types constructed by reflection API
