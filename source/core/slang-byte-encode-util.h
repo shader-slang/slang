@@ -153,7 +153,8 @@ SLANG_FORCE_INLINE /* static */int ByteEncodeUtil::calcMsByte32(uint32_t in)
 {
     return (in & 0xffff0000) ?
         ((in & 0xff000000) ? 3 : 2) :
-        ((in & 0x0000ff00) ? 1 : 0);
+        ((in & 0x0000ff00) ? 1 : 
+            ((in == 0) ? -1 : 0));
 }
 
 // ---------------------------------------------------------------------------
