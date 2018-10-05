@@ -7,12 +7,6 @@ namespace Slang {
 // Descriptions of algorithms here...
 // https://github.com/stoklund/varint
 
-enum 
-{
-    kLiteCut1 = 185,
-    kLiteCut2 = 249,
-};
-
 #if SLANG_LITTLE_ENDIAN && SLANG_UNALIGNED_ACCESS
 // Testing on i7, unaligned access is around 40% faster
 #   define SLANG_BYTE_ENCODE_USE_UNALIGNED_ACCESS 1
@@ -64,7 +58,6 @@ enum
             totalNumEncodeBytes += calcNonZeroMsByte32(v) + 2;
         }
     }
-
     return totalNumEncodeBytes;
 }
 
@@ -102,6 +95,65 @@ enum
         }
     }
     return size_t(encodeOut - encodeStart);
+}
+
+/* static */void ByteEncodeUtil::encodeLiteUInt32(const uint32_t* in, size_t num, List<uint8_t>& encodeArrayOut)
+{
+    // Make sure there is at least enough space for all bytes
+    encodeArrayOut.SetSize(num);
+
+    uint8_t* encodeOut = encodeArrayOut.begin();
+    uint8_t* encodeOutEnd = encodeArrayOut.end();
+
+    for (size_t i = 0; i < num; ++i)
+    {
+        // Check if we need some more space
+        if (encodeOut + kMaxLiteEncodeUInt32 > encodeOutEnd)
+        {
+            const size_t offset = size_t(encodeOut - encodeArrayOut.begin());
+
+            const UInt oldCapacity = encodeArrayOut.Capacity();
+           
+            // Make some more space
+            encodeArrayOut.Reserve(oldCapacity + (oldCapacity >> 1) + kMaxLiteEncodeUInt32);
+            // Make the size the capacity
+            const UInt capacity = encodeArrayOut.Capacity();
+            encodeArrayOut.SetSize(capacity);
+
+            encodeOut = encodeArrayOut.begin() + offset;
+            encodeOutEnd = encodeArrayOut.end();
+        }
+
+        uint32_t v = in[i];
+
+        if (v < kLiteCut1)
+        {
+            *encodeOut++ = uint8_t(v);
+        }
+        else if (v <= kLiteCut1 + 255 * (kLiteCut2 - 1 - kLiteCut1))
+        {
+            v -= kLiteCut1;
+
+            encodeOut[0] = uint8_t(kLiteCut1 + (v >> 8));
+            encodeOut[1] = uint8_t(v);
+            encodeOut += 2;
+        }
+        else
+        {
+            uint8_t* encodeOutStart = encodeOut++;
+            while (v)
+            {
+                *encodeOut++ = uint8_t(v);
+                v >>= 8;
+            }
+            // Finally write the size to the start
+            const int numBytes = int(encodeOut - encodeOutStart);
+            encodeOutStart[0] = uint8_t(kLiteCut2 + (numBytes - 2));
+        }
+    }
+
+    encodeArrayOut.SetSize(UInt(encodeOut - encodeArrayOut.begin()));
+    encodeArrayOut.Compress();
 }
 
 /* static */int ByteEncodeUtil::encodeLiteUInt32(uint32_t in, uint8_t out[kMaxLiteEncodeUInt32])

@@ -12,6 +12,9 @@ struct ByteEncodeUtil
     enum
     {
         kMaxLiteEncodeUInt32 = 5,                   /// One byte for prefix, the remaining 4 bytes hold the value
+        // Cut values for 'Lite' encoding style
+        kLiteCut1 = 185,
+        kLiteCut2 = 249,
     };
 
         /** Find the most significant bit for 8 bits 
@@ -42,6 +45,9 @@ struct ByteEncodeUtil
         /// Calculate the size of encoding bytes
     static size_t calcEncodeLiteSizeUInt32(const uint32_t* in, size_t num);
 
+        /// Calculate the size of a single value
+    static size_t calcEncodeLiteSizeUInt32(uint32_t in);
+    
         /** Encodes a uint32_t as an integer
          @return the number of bytes needed to encode */
     static int encodeLiteUInt32(uint32_t in, uint8_t out[kMaxLiteEncodeUInt32]);
@@ -61,6 +67,13 @@ struct ByteEncodeUtil
     static size_t encodeLiteUInt32(const uint32_t* in, size_t num, uint8_t* encodeOut);
 
         /** Encode an array of uint32_t
+        @param in The values to encode
+        @param num The amount of values to encode
+        @param encodeOut The buffer to hold the encoded value. 
+        */
+    static void encodeLiteUInt32(const uint32_t* in, size_t num, List<uint8_t>& encodeOut);
+
+        /** Encode an array of uint32_t
         @param encodeIn The encoded values
         @param numValues The amount of values to be decoded (NOTE! This is the number of valuesOut, not encodeIn)
         @param valuesOut The buffer to hold the encoded value. MUST be large enough to hold the encoding
@@ -73,7 +86,7 @@ struct ByteEncodeUtil
 };
 
 #if SLANG_VC 
-// Work on ARM and x86/64 on visual studio compiler
+// Works on ARM and x86/64 on visual studio compiler
 
 // ---------------------------------------------------------------------------
 SLANG_FORCE_INLINE int ByteEncodeUtil::calcNonZeroMsByte32(uint32_t in)
@@ -160,6 +173,22 @@ SLANG_FORCE_INLINE /* static */int ByteEncodeUtil::calcMsb32(uint32_t v)
 
 #endif
 
+// ---------------------------------------------------------------------------
+inline /* static */size_t ByteEncodeUtil::calcEncodeLiteSizeUInt32(uint32_t v)
+{
+    if (v < kLiteCut1)
+    {
+        return 1;
+    }
+    else if (v <= kLiteCut1 + 255 * (kLiteCut2 - 1 - kLiteCut1))
+    {
+        return 2;
+    }
+    else
+    {
+        return calcNonZeroMsByte32(v) + 2;
+    }
+}
 
 } // namespace Slang
 
