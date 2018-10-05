@@ -342,6 +342,10 @@ namespace Slang
         bool shouldValidateIR = false;
         bool shouldSkipCodegen = false;
 
+        // If true then generateIR will serialize out IR, and serialize back in again. Making 
+        // serialization a bottleneck or firewall between the front end and the backend
+        bool useSerialIRBottleneck = false; 
+
         // How should `#line` directives be emitted (if at all)?
         LineDirectiveMode lineDirectiveMode = LineDirectiveMode::Default;
 
