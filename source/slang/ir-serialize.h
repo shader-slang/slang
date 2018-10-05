@@ -290,7 +290,6 @@ struct IRSerialWriter
         enum Enum: Type
         {
             RawSourceLocation       = 0x01,
-            ByteCompress            = 0x02,
         };
     };
     typedef OptionFlag::Type OptionFlags;
