@@ -97,9 +97,16 @@ static int glslang_compileGLSLToSPIRV(glslang_CompileRequest* request)
     CASE(DOMAIN,    TessEvaluation);
     CASE(COMPUTE,   Compute);
 
+    CASE(RAY_GENERATION,    RayGenNV);
+    CASE(INTERSECTION,      IntersectNV);
+    CASE(ANY_HIT,           AnyHitNV);
+    CASE(CLOSEST_HIT,       ClosestHitNV);
+    CASE(MISS,              MissNV);
+
 #undef CASE
 
     default:
+        dumpDiagnostics(request, "internal error: stage unsupported by glslang\n");
         return 1;
     }
 

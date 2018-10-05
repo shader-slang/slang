@@ -45,6 +45,8 @@ namespace Slang
 #include "profile-defs.h"
     };
 
+    const char* getStageName(Stage stage);
+
     ProfileFamily getProfileFamily(ProfileVersion version);
 
     struct Profile
@@ -85,6 +87,8 @@ namespace Slang
 
         RawVal raw = Unknown;
     };
+
+    Stage findStageByName(String const& name);
 }
 
 #endif

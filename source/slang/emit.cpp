@@ -146,6 +146,8 @@ struct SharedEmitContext
     Dictionary<IRInst*, String> mapInstToName;
 
     DiagnosticSink* getSink() { return &entryPoint->compileRequest->mSink; }
+
+    Dictionary<IRInst*, UInt> mapIRValueToRayPayloadLocation;
 };
 
 struct EmitContext
@@ -1162,13 +1164,17 @@ struct EmitVisitor
 
         case CodeGenTarget::GLSL:
             {
-                // TODO: This "translation" is obviously wrong for GLSL.
                 switch (type->op)
                 {
+                case kIROp_RaytracingAccelerationStructureType:
+                    requireGLSLExtension("GL_NVX_raytracing");
+                    Emit("accelerationStructureNVX");
+                    break;
+
+                // TODO: These "translations" are obviously wrong for GLSL.
                 case kIROp_HLSLByteAddressBufferType:                   Emit("ByteAddressBuffer");                  break;
                 case kIROp_HLSLRWByteAddressBufferType:                 Emit("RWByteAddressBuffer");                break;
                 case kIROp_HLSLRasterizerOrderedByteAddressBufferType:  Emit("RasterizerOrderedByteAddressBuffer"); break;
-                case kIROp_RaytracingAccelerationStructureType:         Emit("RaytracingAccelerationStructure");    break;
 
                 default:
                     SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled buffer type");
@@ -1886,6 +1892,7 @@ struct EmitVisitor
         CASE(GLSL_430, 430);
         CASE(GLSL_440, 440);
         CASE(GLSL_450, 450);
+        CASE(GLSL_460, 460);
 #undef CASE
 
         default:
@@ -2441,6 +2448,10 @@ struct EmitVisitor
                 return true;
             }
             else if(as<IRHLSLStructuredBufferTypeBase>(type))
+            {
+                return true;
+            }
+            else if(as<IRUntypedBufferResourceType>(type))
             {
                 return true;
             }
@@ -3236,6 +3247,57 @@ struct EmitVisitor
                     }
                     break;
 
+                // We will use the `$X` case as a prefix for
+                // special logic needed when cross-compiling ray-tracing
+                // shaders.
+                case 'X':
+                    {
+                        SLANG_RELEASE_ASSERT(*cursor);
+                        switch(*cursor++)
+                        {
+                        case 'P':
+                            {
+                                // The `$XP` case handles looking up
+                                // the assocaited `location` for a variable
+                                // used as the argument ray payload at a
+                                // trace call site.
+
+                                UInt argIndex = 0;
+                                SLANG_RELEASE_ASSERT(argCount > argIndex);
+                                auto arg = args[argIndex].get();
+                                auto argLoad = as<IRLoad>(arg);
+                                SLANG_RELEASE_ASSERT(argLoad);
+                                auto argVar = argLoad->getOperand(0);
+                                Emit(getRayPayloadLocation(ctx, argVar));
+                            }
+                            break;
+
+                        case 'T':
+                            {
+                                // The `$XT` case handles selecting between
+                                // the `gl_HitTNVX` and `gl_RayTmaxNVX` builtins,
+                                // based on what stage we are using:
+                                switch( ctx->shared->entryPoint->getStage() )
+                                {
+                                default:
+                                    Emit("gl_RayTmaxNVX");
+                                    break;
+
+                                case Stage::AnyHit:
+                                case Stage::ClosestHit:
+                                    Emit("gl_HitTNVX");
+                                    break;
+                                }
+                            }
+                            break;
+
+                        default:
+                            SLANG_RELEASE_ASSERT(false);
+                            break;
+                        }
+                    }
+                    break;
+
                 default:
                     SLANG_UNEXPECTED("bad format in intrinsic definition");
                     break;
@@ -3910,7 +3972,10 @@ struct EmitVisitor
             }
             else if (auto entryPointLayout = layout->dynamicCast<EntryPointLayout>())
             {
-                emitIRSemantics(ctx, entryPointLayout->resultLayout);
+                if(auto resultLayout = entryPointLayout->resultLayout)
+                {
+                    emitIRSemantics(ctx, resultLayout);
+                }
             }
         }
     }
@@ -4353,18 +4418,7 @@ struct EmitVisitor
         {
             if(profile.GetVersion() >= ProfileVersion::DX_6_1 )
             {
-                char const* stageName = nullptr;
-                switch(stage)
-                {
-            #define PROFILE_STAGE(ID, NAME, ENUM) \
-                case Stage::ID: stageName = #NAME; break;
-
-            #include "profile-defs.h"
-
-                default:
-                    break;
-                }
-
+                char const* stageName = getStageName(stage);
                 if(stageName)
                 {
                     emit("[shader(\"");
@@ -4917,6 +4971,13 @@ struct EmitVisitor
         EmitContext*    ctx,
         IRStructType*   structType)
     {
+        // If the selected `struct` type is actually an intrinsic
+        // on our target, then we don't want to emit anything at all.
+        if(auto intrinsicDecoration = findTargetIntrinsicDecoration(ctx, structType))
+        {
+            return;
+        }
+
         emit("struct ");
         emit(getIRName(structType));
         emit("\n{\n");
@@ -5102,12 +5163,43 @@ struct EmitVisitor
         }
     }
 
+    UInt getRayPayloadLocation(
+        EmitContext*    ctx,
+        IRInst*         inst)
+    {
+        auto& map = ctx->shared->mapIRValueToRayPayloadLocation;
+        UInt value = 0;
+        if(map.TryGetValue(inst, value))
+            return value;
+
+        value = map.Count();
+        map.Add(inst, value);
+        return value;
+    }
+
     void emitIRVarModifiers(
         EmitContext*    ctx,
         VarLayout*      layout,
         IRInst*         varDecl,
         IRType*         varType)
     {
+        // Deal with Vulkan raytracing layout stuff *before* we
+        // do the check for whether `layout` is null, because
+        // the payload won't automatically get a layout applied
+        // (it isn't part of the user-visible interface...)
+        //
+        if(varDecl->findDecoration<IRVulkanRayPayloadDecoration>())
+        {
+            emit("layout(location = ");
+            Emit(getRayPayloadLocation(ctx, varDecl));
+            emit(")\n");
+            emit("rayPayloadNVX\n");
+        }
+        if(varDecl->findDecoration<IRVulkanHitAttributesDecoration>())
+        {
+            emit("hitAttributeNVX\n");
+        }
+
         if (!layout)
             return;
 
@@ -5249,6 +5341,18 @@ struct EmitVisitor
                 case LayoutResourceKind::VaryingOutput:
                     {
                         emit("out ");
+                    }
+                    break;
+
+                case LayoutResourceKind::RayPayload:
+                    {
+                        emit("rayPayloadInNVX ");
+                    }
+                    break;
+
+                case LayoutResourceKind::HitAttributes:
+                    {
+                        emit("hitAttributeNVX ");
                     }
                     break;
 
@@ -6238,6 +6342,27 @@ String emitEntryPoint(
         targetRequest->compileRequest->compiledModules.Add(irModule);
     }
     destroyIRSpecializationState(irSpecializationState);
+
+    // Deal with cases where a particular stage requires certain GLSL versions
+    // and/or extensions.
+    switch( entryPoint->getStage() )
+    {
+    default:
+        break;
+
+    case Stage::AnyHit:
+    case Stage::Callable:
+    case Stage::ClosestHit:
+    case Stage::Intersection:
+    case Stage::Miss:
+    case Stage::RayGeneration:
+        if( target == CodeGenTarget::GLSL )
+        {
+            requireGLSLExtension(&context.shared->extensionUsageTracker, "GL_NVX_raytracing");
+            requireGLSLVersionImpl(&context.shared->extensionUsageTracker, ProfileVersion::GLSL_460);
+        }
+        break;
+    }
 
     String code = sharedContext.sb.ProduceString();
     sharedContext.sb.Clear();

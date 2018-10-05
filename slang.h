@@ -472,8 +472,8 @@ extern "C"
         SLANG_TARGET_UNKNOWN,
         SLANG_TARGET_NONE,
         SLANG_GLSL,
-        SLANG_GLSL_VULKAN,
-        SLANG_GLSL_VULKAN_ONE_DESC,
+        SLANG_GLSL_VULKAN,          //< deprecated: just use `SLANG_GLSL`
+        SLANG_GLSL_VULKAN_ONE_DESC, //< deprecated
         SLANG_HLSL,
         SLANG_SPIRV,
         SLANG_SPIRV_ASM,
@@ -1302,6 +1302,9 @@ extern "C"
         // A parameter whose type is to be specialized by a global generic type argument
         SLANG_PARAMETER_CATEGORY_GENERIC,
 
+        SLANG_PARAMETER_CATEGORY_RAY_PAYLOAD,
+        SLANG_PARAMETER_CATEGORY_HIT_ATTRIBUTES,
+
         //
         SLANG_PARAMETER_CATEGORY_COUNT,
 
@@ -1622,6 +1625,9 @@ namespace slang
         PushConstantBuffer = SLANG_PARAMETER_CATEGORY_PUSH_CONSTANT_BUFFER,
         RegisterSpace = SLANG_PARAMETER_CATEGORY_REGISTER_SPACE,
         GenericResource = SLANG_PARAMETER_CATEGORY_GENERIC,
+
+        RayPayload = SLANG_PARAMETER_CATEGORY_RAY_PAYLOAD,
+        HitAttributes = SLANG_PARAMETER_CATEGORY_HIT_ATTRIBUTES,
 
         // DEPRECATED:
         VertexInput = SLANG_PARAMETER_CATEGORY_VERTEX_INPUT,

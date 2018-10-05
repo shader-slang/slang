@@ -1303,9 +1303,7 @@ static const RAY_FLAG RAY_FLAG_CULL_NON_OPAQUE                  = 0x80;
 
 // 10.1.2 - Ray Description Structure
 
-__builtin
-__magic_type(RayDescType)
-__intrinsic_type($(kIROp_RayDescType))
+__target_intrinsic(hlsl, RayDesc)
 struct RayDesc
 {
     __target_intrinsic(hlsl, Origin)
@@ -1337,9 +1335,7 @@ struct RaytracingAccelerationStructure {};
 
 // 10.1.5 - Intersection Attributes Structure
 
-__builtin
-__magic_type(BuiltInTriangleIntersectionAttributesType)
-__intrinsic_type($(kIROp_BuiltInTriangleIntersectionAttributesType))
+__target_intrinsic(hlsl, BuiltInTriangleIntersectionAttributes)
 struct BuiltInTriangleIntersectionAttributes
 {
     __target_intrinsic(hlsl, barycentrics)
@@ -1354,6 +1350,7 @@ struct BuiltInTriangleIntersectionAttributes
 // 10.3 - Intrinsics
 
 // 10.3.1
+__target_intrinsic(glsl, "callableShadersAreNotYetAvailableInVulkan")
 void CallShader<param_t>(uint ShaderIndex, inout param_t Parameter);
 
 // 10.3.2
@@ -1367,13 +1364,84 @@ void TraceRay<payload_t>(
     RayDesc                         Ray,
     inout payload_t                 Payload);
 
+__target_intrinsic(glsl, "traceNVX")
+void __traceNVX(
+    RaytracingAccelerationStructure AccelerationStructure,
+    uint                            RayFlags,
+    uint                            InstanceInclusionMask,
+    uint                            RayContributionToHitGroupIndex,
+    uint                            MultiplierForGeometryContributionToHitGroupIndex,
+    uint                            MissShaderIndex,
+    float3                          Origin,
+    float                           TMin,
+    float3                          Direction,
+    float                           TMax,
+    int                             PayloadLocation);
+
+// TODO: Slang's parsing logic currently puts modifiers on
+// the `GenericDecl` rather than the inner decl when
+// using our default syntax, which seems wrong. We need
+// to fix this, but for now using the expanded `__generic`
+// syntax works in a pinch.
+//
+__generic<Payload>
+__target_intrinsic(glsl, "$XP")
+int __rayPayloadLocation(Payload payload);
+
+__generic<payload_t>
+__specialized_for_target(glsl)
+void TraceRay(
+    RaytracingAccelerationStructure AccelerationStructure,
+    uint                            RayFlags,
+    uint                            InstanceInclusionMask,
+    uint                            RayContributionToHitGroupIndex,
+    uint                            MultiplierForGeometryContributionToHitGroupIndex,
+    uint                            MissShaderIndex,
+    RayDesc                         Ray,
+    inout payload_t                 Payload)
+{
+    [__vulkanRayPayload]
+    static payload_t p;
+
+    p = Payload;
+    __traceNVX(
+        AccelerationStructure,
+        RayFlags,
+        InstanceInclusionMask,
+        RayContributionToHitGroupIndex,
+        MultiplierForGeometryContributionToHitGroupIndex,
+        MissShaderIndex,
+        Ray.Origin,
+        Ray.TMin,
+        Ray.Direction,
+        Ray.TMax,
+        __rayPayloadLocation(p));
+    Payload = p;
+}
+
 // 10.3.3
-bool ReportHit<attr_t>(float THit, uint HitKind, attr_t Attributes);
+bool ReportHit<A>(float tHit, uint hitKind, A attributes);
+
+__target_intrinsic(glsl, "reportIntersectionNVX")
+bool __reportIntersectionNVX(float tHit, uint hitKind);
+
+__generic<A>
+__specialized_for_target(glsl)
+bool ReportHit(float tHit, uint hitKind, A attributes)
+{
+    [__vulkanHitAttributes]
+    static A a;
+
+    a = attributes;
+    return __reportIntersectionNVX(tHit, hitKind);
+}
 
 // 10.3.4
+__target_intrinsic(glsl, ignoreIntersectionNVX)
 void IgnoreHit();
 
 // 10.3.5
+__target_intrinsic(glsl, terminateRayNVX)
 void AcceptHitAndEndSearch();
 
 // 10.4 - System Values and Special Semantics
@@ -1382,27 +1450,69 @@ void AcceptHitAndEndSearch();
 // they can only be accessed from specific stages.
 
 // 10.4.1 - Ray Dispatch System Values
+
+__target_intrinsic(glsl, "uvec3(gl_LaunchIDNVX, 0)")
 uint3 DispatchRaysIndex();
+
+__target_intrinsic(glsl, "uvec3(gl_LaunchSizeNVX, 0)")
 uint3 DispatchRaysDimensions();
 
 // 10.4.2 - Ray System Values
+
+__target_intrinsic(glsl, "(gl_WorldRayOriginNVX)")
 float3 WorldRayOrigin();
+
+__target_intrinsic(glsl, "(gl_WorldRayDirectionNVX)")
 float3 WorldRayDirection();
+
+__target_intrinsic(glsl, "(gl_RayTminNVX)")
 float RayTMin();
+
+// Note: The `RayTCurrent()` intrinsic should translate to
+// either `gl_HitTNVX` (for hit shaders) or `gl_RayTmaxNVX`
+// (for intersection shaders). Right now we are handling this
+// during code emission, for simplicity.
+//
+// TODO: Once the compiler supports a more refined concept
+// of profiles/capabilities and overloading based on them,
+// we should simply provide two overloads here, specialized
+// to the appropriate Vulkan stages.
+//
+__target_intrinsic(glsl, "$XT")
 float RayTCurrent();
+
+__target_intrinsic(glsl, "(gl_RayFlagsNVX)")
 uint RayFlags();
 
 // 10.4.3 - Primitive/Object Space System Values
+
+__target_intrinsic(glsl, "(gl_InstanceCustomIndexNVX)")
 uint InstanceIndex();
+
+__target_intrinsic(glsl, "(gl_InstanceID)")
 uint InstanceID();
+
+__target_intrinsic(glsl, "(gl_PrimitiveID)")
 uint PrimitiveIndex();
+
+__target_intrinsic(glsl, "(gl_ObjectRayOriginNVX)")
 float3 ObjectRayOrigin();
+
+__target_intrinsic(glsl, "(gl_ObjectRayDirectionNVX)")
 float3 ObjectRayDirection();
 
+__target_intrinsic(glsl, "transpose(gl_ObjectToWorldNVX)")
 float3x4 ObjectToWorld3x4();
-float4x3 ObjectToWorld4x3();
+
+__target_intrinsic(glsl, "transpose(gl_WorldToObjectNVX)")
 float3x4 WorldToObject3x4();
-float4x3 WorldToObject4x3();
+
+__target_intrinsic(glsl, "(gl_ObjectToWorldNVX)")
+float4x3 ObjectToWorld4x3();
+
+__target_intrinsic(glsl, "(gl_WorldToObjectNVX)")
+float4x3 WorldToObject4x3();
+
 // Note: The provisional DXR spec included these unadorned
 // `ObjectToWorld()` and `WorldToObject()` functions, so
 // we will forward them to the new names as a convience
@@ -1416,4 +1526,5 @@ float3x4 ObjectToWorld() { return ObjectToWorld3x4(); }
 float3x4 WorldToObject() { return WorldToObject3x4(); }
 
 // 10.4.4 - Hit Specific System values
+__target_intrinsic(glsl, "(gl_HitKindNVX)")
 uint HitKind();

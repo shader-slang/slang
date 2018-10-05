@@ -1112,6 +1112,7 @@ struct EntryPointParameterState
     int                                 semanticSlotCount;
     Stage                               stage = Stage::Unknown;
     bool                                isSampleRate = false;
+    SourceLoc                           loc;
 };
 
 
@@ -1133,6 +1134,7 @@ static void collectGlobalScopeGLSLVaryingParameter(
     state.directionMask = direction;
     state.ioSemanticIndex = &defaultSemanticIndex;
     state.stage = context->stage;
+    state.loc = varDecl->loc;
 
     RefPtr<VarLayout> varLayout = new VarLayout();
     varLayout->varDecl = makeDeclRef(varDecl.Ptr());
@@ -1842,7 +1844,6 @@ static RefPtr<TypeLayout> processEntryPointParameterDecl(
     return processEntryPointParameter(context, type, state, varLayout);
 }
 
-
 static RefPtr<TypeLayout> processEntryPointParameter(
     ParameterBindingContext*        context,
     RefPtr<Type>                    type,
@@ -1871,6 +1872,7 @@ static RefPtr<TypeLayout> processEntryPointParameter(
         elementState.optSemanticName = nullptr;
         elementState.semanticSlotCount = 0;
         elementState.stage = state.stage;
+        elementState.loc = state.loc;
 
         auto elementTypeLayout = processEntryPointParameter(context, elementType, elementState, nullptr);
 
@@ -1883,6 +1885,68 @@ static RefPtr<TypeLayout> processEntryPointParameter(
             typeLayout->addResourceUsage(resInfo);
 
         return typeLayout;
+    }
+
+    // Raytracing shaders have a slightly different interpretation of their
+    // "varying" input/output parameters, since they don't have the same
+    // idea of previous/next stage as the rasterization shader types.
+    //
+    if( state.directionMask & kEntryPointParameterDirection_Output )
+    {
+        // Note: we are silently treating `out` parameters as if they
+        // were `in out` for this test, under the assumption that
+        // an `out` parameter represents a write-only payload.
+
+        switch(state.stage)
+        {
+        default:
+            // Not a raytracing shader.
+            break;
+
+        case Stage::Intersection:
+        case Stage::RayGeneration:
+            // Don't expect this case to have any `in out` parameters.
+            getSink(context)->diagnose(state.loc, Diagnostics::dontExpectOutParametersForStage, getStageName(state.stage));
+            break;
+
+        case Stage::AnyHit:
+        case Stage::Callable:
+        case Stage::ClosestHit:
+        case Stage::Miss:
+            // `in out` or `out` parameter is payload
+            return CreateTypeLayout(context->layoutContext.with(
+                context->getRulesFamily()->getRayPayloadParameterRules()),
+                type);
+        }
+    }
+    else
+    {
+        switch(state.stage)
+        {
+        default:
+            // Not a raytracing shader.
+            break;
+
+        case Stage::Intersection:
+        case Stage::RayGeneration:
+        case Stage::Miss:
+        case Stage::Callable:
+            // Don't expect this case to have any `in` parameters.
+            //
+            // TODO: For a miss or callable shader we could interpret
+            // an `in` parameter as indicating a payload that the
+            // programmer doesn't intend to write to.
+            //
+            getSink(context)->diagnose(state.loc, Diagnostics::dontExpectInParametersForStage, getStageName(state.stage));
+            break;
+
+        case Stage::AnyHit:
+        case Stage::ClosestHit:
+            // `in` parameter is hit attributes
+            return CreateTypeLayout(context->layoutContext.with(
+                context->getRulesFamily()->getHitAttributesParameterRules()),
+                type);
+        }
     }
 
     // If there is an available semantic name and index,
@@ -2067,6 +2131,7 @@ static void collectEntryPointParameters(
             continue;
 
         // We have an entry-point parameter, and need to figure out what to do with it.
+        state.loc = paramDecl->loc;
 
         // TODO: need to handle `uniform`-qualified parameters here
         if (paramDecl->HasModifier<HLSLUniformModifier>())
@@ -2113,10 +2178,12 @@ static void collectEntryPointParameters(
         entryPointLayout->mapVarToLayout.Add(paramDecl, paramVarLayout);
     }
 
-    // If we can find an output type for the entry point, then process it as
+    // If we have a non-`void` output type for the entry point, then process it as
     // an output parameter.
-    if( auto resultType = entryPointFuncDecl->ReturnType.type )
+    auto resultType = entryPointFuncDecl->ReturnType.type;
+    if( !resultType->Equals(resultType->getSession()->getVoidType()) )
     {
+        state.loc = entryPointFuncDecl->loc;
         state.directionMask = kEntryPointParameterDirection_Output;
 
         RefPtr<VarLayout> resultLayout = new VarLayout();
