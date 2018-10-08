@@ -750,7 +750,10 @@ Result _encodeInsts(IRSerialBinary::CompressionType compressionType, const List<
     uint8_t* encodeOut = encodeArrayOut.begin();
     uint8_t* encodeEnd = encodeArrayOut.end();
 
-    const size_t maxInstSize = 2 + Math::Max(sizeof(insts->m_payload.m_float64), size_t(3 * ByteEncodeUtil::kMaxLiteEncodeUInt32));
+    // Calculate the maximum instruction size with worst case possible encoding
+    // 2 bytes hold the payload size, and the result type
+    // Note that if there were some free bits, we could encode some of this stuff into bits, but if we remove payloadType, then there are no free bits
+    const size_t maxInstSize = 2 + ByteEncodeUtil::kMaxLiteEncodeUInt32 + Math::Max(sizeof(insts->m_payload.m_float64), size_t(2 * ByteEncodeUtil::kMaxLiteEncodeUInt32));
 
     for (size_t i = 0; i < numInsts; ++i)
     {
