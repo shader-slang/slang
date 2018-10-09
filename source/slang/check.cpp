@@ -475,11 +475,13 @@ namespace Slang
         }
 
         RefPtr<Expr> createImplicitThisMemberExpr(
-            Type*       type,
-            SourceLoc   loc)
+            Type*                                           type,
+            SourceLoc                                       loc,
+            LookupResultItem::Breadcrumb::ThisParameterMode thisParameterMode)
         {
             RefPtr<ThisExpr> expr = new ThisExpr();
             expr->type = type;
+            expr->type.IsLeftValue = thisParameterMode == LookupResultItem::Breadcrumb::ThisParameterMode::Mutating;
             expr->loc = loc;
             return expr;
         }
@@ -528,14 +530,16 @@ namespace Slang
                         {
                             bb = createImplicitThisMemberExpr(
                                 GetTargetType(extensionDeclRef),
-                                loc);
+                                loc,
+                                breadcrumb->thisParameterMode);
                         }
                         else
                         {
                             auto type = DeclRefType::Create(getSession(), breadcrumb->declRef);
                             bb = createImplicitThisMemberExpr(
                                 type,
-                                loc);
+                                loc,
+                                breadcrumb->thisParameterMode);
                         }
                     }
                     break;
@@ -778,6 +782,10 @@ namespace Slang
             {
                 decl->SetCheckState(DeclCheckState::CheckingHeader);
             }
+
+            // Check the modifiers on the declaration first, in case
+            // semantics of the body itself will depend on them.
+            checkModifiers(decl);
 
             // Use visitor pattern to dispatch to correct case
             dispatchDecl(decl);
@@ -2197,12 +2205,6 @@ namespace Slang
                     EnusreAllDeclsRec(d);
                 }
 
-                // Do any semantic checking required on modifiers?
-                for (auto d : programNode->Members)
-                {
-                    checkModifiers(d.Ptr());
-                }
-
                 if (pass == 0)
                 {
                     // now we can check all interface conformances
@@ -2236,6 +2238,14 @@ namespace Slang
             DeclRef<CallableDecl>   requiredMemberDeclRef,
             RefPtr<WitnessTable>    witnessTable)
         {
+            if(satisfyingMemberDeclRef.getDecl()->HasModifier<MutatingAttribute>()
+                && !requiredMemberDeclRef.getDecl()->HasModifier<MutatingAttribute>())
+            {
+                // A `[mutating]` method can't satisfy a non-`[mutating]` requirement,
+                // but vice-versa is okay.
+                return false;
+            }
+
             // TODO: actually implement matching here. For now we'll
             // just pretend that things are satisfied in order to make progress..
             witnessTable->requirementDictionary.Add(
@@ -4599,6 +4609,44 @@ namespace Slang
 
         //
 
+            /// Given an immutable `expr` used as an l-value emit a special diagnostic if it was derived from `this`.
+        void maybeDiagnoseThisNotLValue(Expr* expr)
+        {
+            // We will try to handle expressions of the form:
+            //
+            //      e ::= "this"
+            //          | e . name
+            //          | e [ expr ]
+            //
+            // We will unwrap the `e.name` and `e[expr]` cases in a loop.
+            RefPtr<Expr> e = expr;
+            for(;;)
+            {
+                if(auto memberExpr = e.As<MemberExpr>())
+                {
+                    e = memberExpr->BaseExpression;
+                }
+                else if(auto subscriptExpr = e.As<IndexExpr>())
+                {
+                    e = subscriptExpr->BaseExpression;
+                }
+                else
+                {
+                    break;
+                }
+            }
+            //
+            // Now we check to see if we have a `this` expression,
+            // and if it is immutable.
+            if(auto thisExpr = e.As<ThisExpr>())
+            {
+                if(!thisExpr->type.IsLeftValue)
+                {
+                    getSink()->diagnose(thisExpr, Diagnostics::thisIsImmutableByDefault);
+                }
+            }
+        }
+
         RefPtr<Expr> visitAssignExpr(AssignExpr* expr)
         {
             expr->left = CheckExpr(expr->left);
@@ -4622,40 +4670,7 @@ namespace Slang
                     // is immutable. We can give the user a bit more context into
                     // what is going on.
                     //
-                    // We will try to handle expressions of the form:
-                    //
-                    //      e ::= "this"
-                    //          | e . name
-                    //          | e [ expr ]
-                    //
-                    // We will unwrap the `e.name` and `e[expr]` cases in a loop.
-                    RefPtr<Expr> e = expr->left;
-                    for(;;)
-                    {
-                        if(auto memberExpr = e.As<MemberExpr>())
-                        {
-                            e = memberExpr->BaseExpression;
-                        }
-                        else if(auto subscriptExpr = e.As<IndexExpr>())
-                        {
-                            e = subscriptExpr->BaseExpression;
-                        }
-                        else
-                        {
-                            break;
-                        }
-                    }
-                    //
-                    // Now we check to see if we have a `this` expression,
-                    // and if it is immutable.
-                    if(auto thisExpr = e.As<ThisExpr>())
-                    {
-                        if(!thisExpr->type.IsLeftValue)
-                        {
-                            getSink()->diagnose(thisExpr, Diagnostics::thisIsImmutableByDefault);
-                        }
-                    }
-
+                    maybeDiagnoseThisNotLValue(expr->left);
                 }
             }
             expr->type = type;
@@ -6298,7 +6313,10 @@ namespace Slang
 
             LookupResultItem ctorItem;
             ctorItem.declRef = ctorDeclRef;
-            ctorItem.breadcrumbs = new LookupResultItem::Breadcrumb(LookupResultItem::Breadcrumb::Kind::Member, typeItem.declRef, typeItem.breadcrumbs);
+            ctorItem.breadcrumbs = new LookupResultItem::Breadcrumb(
+                LookupResultItem::Breadcrumb::Kind::Member,
+                typeItem.declRef,
+                typeItem.breadcrumbs);
 
             OverloadCandidate candidate;
             candidate.flavor = OverloadCandidate::Flavor::Func;
@@ -7585,6 +7603,8 @@ namespace Slang
                                             implicitCastExpr->Arguments[0]->type,
                                             implicitCastExpr->type);
                                     }
+
+                                    maybeDiagnoseThisNotLValue(argExpr);
                                 }
                             }
                             else
@@ -8132,6 +8152,9 @@ namespace Slang
         // expression.
         RefPtr<Expr> visitThisExpr(ThisExpr* expr)
         {
+            // A `this` expression will default to immutable.
+            expr->type.IsLeftValue = false;
+
             // We will do an upwards search starting in the current
             // scope, looking for a surrounding type (or `extension`)
             // declaration that could be the referrant of the expression.
@@ -8139,14 +8162,22 @@ namespace Slang
             while (scope)
             {
                 auto containerDecl = scope->containerDecl;
-                if (auto aggTypeDecl = containerDecl->As<AggTypeDecl>())
+
+                if( auto funcDeclBase = containerDecl->As<FunctionDeclBase>() )
+                {
+                    if( funcDeclBase->HasModifier<MutatingAttribute>() )
+                    {
+                        expr->type.IsLeftValue = true;
+                    }
+                }
+                else if (auto aggTypeDecl = containerDecl->As<AggTypeDecl>())
                 {
                     checkDecl(aggTypeDecl);
 
                     // Okay, we are using `this` in the context of an
                     // aggregate type, so the expression should be
                     // of the corresponding type.
-                    expr->type = DeclRefType::Create(
+                    expr->type.type = DeclRefType::Create(
                         getSession(),
                         makeDeclRef(aggTypeDecl));
                     return expr;
@@ -8165,7 +8196,7 @@ namespace Slang
                     // if there are multiple extensions in scope that add
                     // members with the same name...
                     //
-                    expr->type = QualType(extensionDecl->targetType.type);
+                    expr->type.type = extensionDecl->targetType.type;
                     return expr;
                 }
 

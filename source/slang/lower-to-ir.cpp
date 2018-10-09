@@ -4494,19 +4494,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     // parameter for the enclosing type:
     //
     void addThisParameter(
+        ParameterDirection  direction,
         Type*               type,
         ParameterLists*     ioParameterLists)
     {
-        // For now we make any `this` parameter default to `in`. Eventually
-        // we should add a way for the user to opt in to mutability of `this`
-        // in cases where they really want it.
-        //
-        // Note: an alternative here might be to have the built-in types like
-        // `Texture2D` actually use `class` declarations and say that the
-        // `this` parameter for a class type is always `in`, while `struct`
-        // types can default to `in out`.
-        ParameterDirection direction = kParameterDirection_In;
-
         ParameterInfo info;
         info.type = type;
         info.decl = nullptr;
@@ -4516,6 +4507,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         ioParameterLists->params.Add(info);
     }
     void addThisParameter(
+        ParameterDirection  direction,
         AggTypeDecl*        typeDecl,
         ParameterLists*     ioParameterLists)
     {
@@ -4526,6 +4518,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         auto declRef = createDefaultSpecializedDeclRef(typeDecl);
         RefPtr<Type> type = DeclRefType::Create(context->getSession(), declRef);
         addThisParameter(
+            direction,
             type,
             ioParameterLists);
     }
@@ -4558,13 +4551,26 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // parameter corresponding to the outer declaration.
             if( innerMode != kParameterListCollectMode_Static )
             {
+                // For now we make any `this` parameter default to `in`.
+                //
+                ParameterDirection direction = kParameterDirection_In;
+                //
+                // Applications can opt in to a mutable `this` parameter,
+                // by applying the `[mutating]` attribute to their
+                // declaration.
+                //
+                if( decl->HasModifier<MutatingAttribute>() )
+                {
+                    direction = kParameterDirection_InOut;
+                }
+
                 if( auto aggTypeDecl = dynamic_cast<AggTypeDecl*>(parentDecl) )
                 {
-                    addThisParameter(aggTypeDecl, ioParameterLists);
+                    addThisParameter(direction, aggTypeDecl, ioParameterLists);
                 }
                 else if( auto extensionDecl = dynamic_cast<ExtensionDecl*>(parentDecl) )
                 {
-                    addThisParameter(extensionDecl->targetType, ioParameterLists);
+                    addThisParameter(direction, extensionDecl->targetType, ioParameterLists);
                 }
             }
         }

@@ -399,6 +399,12 @@ SIMPLE_SYNTAX_CLASS(VulkanRayPayloadAttribute, Attribute)
 // intersection shader to pass hit attribute information.
 SIMPLE_SYNTAX_CLASS(VulkanHitAttributesAttribute, Attribute)
 
+// A `[mutating]` attribute, which indicates that a member
+// function is allowed to modify things through its `this`
+// argument.
+//
+SIMPLE_SYNTAX_CLASS(MutatingAttribute, Attribute)
+
 // HLSL modifiers for geometry shader input topology
 SIMPLE_SYNTAX_CLASS(HLSLGeometryShaderInputPrimitiveTypeModifier, Modifier)
 SIMPLE_SYNTAX_CLASS(HLSLPointModifier        , HLSLGeometryShaderInputPrimitiveTypeModifier)
