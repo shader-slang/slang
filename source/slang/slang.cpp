@@ -946,8 +946,6 @@ void Session::addBuiltinSource(
 
     auto translationUnitIndex = compileRequest->addTranslationUnit(SourceLanguage::Slang, path);
 
-    RefPtr<SourceFile> sourceFile = builtinSourceManager.newSourceFile(path, source);
-
     compileRequest->addTranslationUnitSourceString(
         translationUnitIndex,
         path,

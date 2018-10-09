@@ -53,7 +53,7 @@ void SourceUnit::addLineDirective(SourceLoc directiveLoc, StringSlicePool::Handl
     SLANG_ASSERT(m_range.contains(directiveLoc));
 
     // Check that the directiveLoc values are always increasing
-    SLANG_ASSERT(m_entries.Count() == 0 || (m_entries.Last().startLoc.getRaw() < directiveLoc.getRaw()));
+    SLANG_ASSERT(m_entries.Count() == 0 || (m_entries.Last().m_startLoc.getRaw() < directiveLoc.getRaw()));
 
     // Calculate the offset
     const int offset = m_range.getOffset(directiveLoc);
@@ -68,8 +68,9 @@ void SourceUnit::addLineDirective(SourceLoc directiveLoc, StringSlicePool::Handl
     // We also need to make sure that any lookups for line numbers will
     // get corrected based on this files location.
     // We assume the line number coming in is a line number, NOT an index so the correction needs + 1
-    entry.m_lineAdjust = line - (lineIndex + 1);
-    
+    // There is an additional + 1 because we want the NEXT line to be 99 (ie +2 is correct 'fix')
+    entry.m_lineAdjust = line - (lineIndex + 2);
+
     m_entries.Add(entry);
 }
 
@@ -83,7 +84,7 @@ void SourceUnit::addDefaultLineDirective(SourceLoc directiveLoc)
 {
     SLANG_ASSERT(m_range.contains(directiveLoc));
     // Check that the directiveLoc values are always increasing
-    SLANG_ASSERT(m_entries.Count() == 0 || (m_entries.Last().startLoc.getRaw() < directiveLoc.getRaw()));
+    SLANG_ASSERT(m_entries.Count() == 0 || (m_entries.Last().m_startLoc.getRaw() < directiveLoc.getRaw()));
 
     // Well if there are no entries, or the last one puts it in default case, then we don't need to add anything
     if (m_entries.Count() == 0 || (m_entries.Count() && m_entries.Last().isDefault()))
@@ -337,7 +338,6 @@ SourceUnit* SourceManager::findSourceUnit(SourceLoc loc)
 {
     SourceLoc::RawValue rawLoc = loc.getRaw();
 
-    int lo = 0;
     int hi = int(m_sourceUnits.Count());
 
     if (hi == 0)
@@ -345,6 +345,7 @@ SourceUnit* SourceManager::findSourceUnit(SourceLoc loc)
         return nullptr;
     }
 
+    int lo = 0;
     while (lo + 1 < hi)
     {
         int mid = (hi + lo) >> 1;
@@ -366,6 +367,15 @@ SourceUnit* SourceManager::findSourceUnit(SourceLoc loc)
         {
             // The location we seek is before this entry
             hi = mid;
+        }
+    }
+
+    // Check if low is a hit
+    {
+        SourceUnit* unit = m_sourceUnits[lo];
+        if (unit->getRange().contains(loc))
+        {
+            return unit;
         }
     }
 
