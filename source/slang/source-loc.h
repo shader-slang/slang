@@ -14,7 +14,7 @@ namespace Slang {
 class SourceLoc
 {
 public:
-    typedef UInt RawValue;
+    typedef uint32_t RawValue;
 
 private:
     RawValue raw;
@@ -47,7 +47,7 @@ public:
 
 inline SourceLoc operator+(SourceLoc loc, Int offset)
 {
-    return SourceLoc::fromRaw(loc.getRaw() + UInt(offset));
+    return SourceLoc::fromRaw(SourceLoc::RawValue(Int(loc.getRaw()) + offset));
 }
 
 // A range of locations in the input source
