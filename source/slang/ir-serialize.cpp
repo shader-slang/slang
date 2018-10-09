@@ -2,8 +2,11 @@
 #include "ir-serialize.h"
 
 #include "../core/text-io.h"
+#include "../core/slang-byte-encode-util.h"
 
 #include "ir-insts.h"
+
+#include "../core/slang-math.h"
 
 namespace Slang {
 
@@ -122,6 +125,48 @@ void IRSerialData::clear()
     m_strings[int(kEmptyStringIndex)] = 0;
 
     m_decorationBaseIndex = 0;
+}
+
+template <typename T>
+static bool _isEqual(const List<T>& aIn, const List<T>& bIn)
+{
+    if (aIn.Count() != bIn.Count())
+    {
+        return false;
+    }
+
+    size_t size = size_t(aIn.Count());
+
+    const T* a = aIn.begin();
+    const T* b = bIn.begin();
+
+    if (a == b)
+    {
+        return true;
+    }
+
+    for (size_t i = 0; i < size; ++i)
+    {
+        if (a[i] != b[i])
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+
+bool IRSerialData::operator==(const ThisType& rhs) const
+{
+    return (this == &rhs) || 
+        (m_decorationBaseIndex == rhs.m_decorationBaseIndex &&
+        _isEqual(m_insts, rhs.m_insts) &&
+        _isEqual(m_childRuns, rhs.m_childRuns) &&
+        _isEqual(m_decorationRuns, rhs.m_decorationRuns) &&
+        _isEqual(m_externalOperands, rhs.m_externalOperands) &&
+        _isEqual(m_rawSourceLocs, rhs.m_rawSourceLocs) &&
+        _isEqual(m_strings, rhs.m_strings));
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! IRSerialWriter !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -585,14 +630,31 @@ IRSerialData::StringIndex IRSerialWriter::getStringIndex(const UnownedStringSlic
 }
 
 template <typename T>
-static size_t _calcChunkSize(const List<T>& array)
+static size_t _calcChunkSize(IRSerialBinary::CompressionType compressionType, const List<T>& array)
 {
     typedef IRSerialBinary Bin;
 
     if (array.Count())
     {
-        const size_t size = sizeof(Bin::ArrayHeader) + sizeof(T) * array.Count();
-        return (size + 3) & ~size_t(3);
+        switch (compressionType)
+        {
+            case Bin::CompressionType::None:
+            {
+                const size_t size = sizeof(Bin::ArrayHeader) + sizeof(T) * array.Count();
+                return (size + 3) & ~size_t(3);
+            }
+            case Bin::CompressionType::VariableByteLite:
+            {
+                const size_t payloadSize = ByteEncodeUtil::calcEncodeLiteSizeUInt32((const uint32_t*)array.begin(), (array.Count() * sizeof(T)) / sizeof(uint32_t));
+                const size_t size = sizeof(Bin::CompressedArrayHeader) + payloadSize;
+                return (size + 3) & ~size_t(3);
+            }
+            default:
+            {
+                SLANG_ASSERT(!"Unhandled compression type");
+                return 0;
+            }
+        }
     }
     else
     {
@@ -600,27 +662,59 @@ static size_t _calcChunkSize(const List<T>& array)
     }
 }
 
-template <typename T>
-Result _writeArrayChunk(uint32_t chunkId, const List<T>& array, Stream* stream)
+static Result _writeArrayChunk(IRSerialBinary::CompressionType compressionType, uint32_t chunkId, const void* data, size_t numEntries, size_t typeSize, Stream* stream)
 {
     typedef IRSerialBinary Bin;
 
-    if (array.Count() == 0)
+    if (numEntries == 0)
     {
         return SLANG_OK;
     }
 
-    size_t payloadSize = sizeof(Bin::ArrayHeader) - sizeof(Bin::Chunk) + sizeof(T) * array.Count();
+    size_t payloadSize;
 
-    Bin::ArrayHeader header;
-    header.m_chunk.m_type = chunkId;
-    header.m_chunk.m_size = uint32_t(payloadSize);
-    header.m_numEntries = uint32_t(array.Count());
+    switch (compressionType)
+    {
+        case Bin::CompressionType::None:
+        {
+            payloadSize = sizeof(Bin::ArrayHeader) - sizeof(Bin::Chunk) + typeSize * numEntries;
 
-    stream->Write(&header, sizeof(header));
+            Bin::ArrayHeader header;
+            header.m_chunk.m_type = chunkId;
+            header.m_chunk.m_size = uint32_t(payloadSize);
+            header.m_numEntries = uint32_t(numEntries);
 
-    stream->Write(array.begin(), sizeof(T) * array.Count());
+            stream->Write(&header, sizeof(header));
 
+            stream->Write(data, typeSize * numEntries);
+            break;
+        }
+        case Bin::CompressionType::VariableByteLite:
+        {
+            List<uint8_t> compressedPayload;
+
+            size_t numCompressedEntries = (numEntries * typeSize) / sizeof(uint32_t);
+
+            ByteEncodeUtil::encodeLiteUInt32((const uint32_t*)data, numCompressedEntries, compressedPayload);
+
+            payloadSize = sizeof(Bin::CompressedArrayHeader) - sizeof(Bin::Chunk) + compressedPayload.Count();
+
+            Bin::CompressedArrayHeader header;
+            header.m_chunk.m_type = SLANG_MAKE_COMPRESSED_FOUR_CC(chunkId);
+            header.m_chunk.m_size = uint32_t(payloadSize);
+            header.m_numEntries = uint32_t(numEntries);
+            header.m_numCompressedEntries = uint32_t(numCompressedEntries);
+
+            stream->Write(&header, sizeof(header));
+
+            stream->Write(compressedPayload.begin(), compressedPayload.Count());
+            break;
+        }
+        default:
+        {
+            return SLANG_FAIL;
+        }
+    }
     // All chunks have sizes rounded to dword size
     if (payloadSize & 3)
     {
@@ -633,25 +727,237 @@ Result _writeArrayChunk(uint32_t chunkId, const List<T>& array, Stream* stream)
     return SLANG_OK;
 }
 
-/* static */Result IRSerialWriter::writeStream(const IRSerialData& data, Stream* stream)
+template <typename T>
+Result _writeArrayChunk(IRSerialBinary::CompressionType compressionType, uint32_t chunkId, const List<T>& array, Stream* stream)
+{
+    return _writeArrayChunk(compressionType, chunkId, array.begin(), size_t(array.Count()), sizeof(T), stream);
+}
+
+Result _encodeInsts(IRSerialBinary::CompressionType compressionType, const List<IRSerialData::Inst>& instsIn, List<uint8_t>& encodeArrayOut)
 {
     typedef IRSerialBinary Bin;
+    typedef IRSerialData::Inst::PayloadType PayloadType;
 
+    if (compressionType != Bin::CompressionType::VariableByteLite)
+    {
+        return SLANG_FAIL;
+    }
+    encodeArrayOut.Clear();
+    
+    const size_t numInsts = size_t(instsIn.Count());
+    const IRSerialData::Inst* insts = instsIn.begin();
+        
+    uint8_t* encodeOut = encodeArrayOut.begin();
+    uint8_t* encodeEnd = encodeArrayOut.end();
+
+    // Calculate the maximum instruction size with worst case possible encoding
+    // 2 bytes hold the payload size, and the result type
+    // Note that if there were some free bits, we could encode some of this stuff into bits, but if we remove payloadType, then there are no free bits
+    const size_t maxInstSize = 2 + ByteEncodeUtil::kMaxLiteEncodeUInt32 + Math::Max(sizeof(insts->m_payload.m_float64), size_t(2 * ByteEncodeUtil::kMaxLiteEncodeUInt32));
+
+    for (size_t i = 0; i < numInsts; ++i)
+    {
+        const auto& inst = insts[i];
+
+        // Make sure there is space for the largest possible instruction
+        if (encodeOut + maxInstSize >= encodeEnd)
+        {
+            const size_t offset = size_t(encodeOut - encodeArrayOut.begin());
+            
+            const UInt oldCapacity = encodeArrayOut.Capacity();
+
+            encodeArrayOut.Reserve(oldCapacity + (oldCapacity >> 1) + maxInstSize);
+            const UInt capacity = encodeArrayOut.Capacity();
+            encodeArrayOut.SetSize(capacity);
+
+            encodeOut = encodeArrayOut.begin() + offset;
+            encodeEnd = encodeArrayOut.end();
+        }
+
+        *encodeOut++ = uint8_t(inst.m_op);
+        *encodeOut++ = uint8_t(inst.m_payloadType);
+
+        encodeOut += ByteEncodeUtil::encodeLiteUInt32((uint32_t)inst.m_resultTypeIndex, encodeOut);
+
+        switch (inst.m_payloadType)
+        {
+            case PayloadType::Empty:
+            {
+                break;
+            }
+            case PayloadType::Operand_1:
+            case PayloadType::String_1:
+            case PayloadType::UInt32:
+            {
+                // 1 UInt32
+                encodeOut += ByteEncodeUtil::encodeLiteUInt32((uint32_t)inst.m_payload.m_operands[0], encodeOut);
+                break;
+            }
+            case PayloadType::Operand_2:
+            case PayloadType::OperandAndUInt32:
+            case PayloadType::OperandExternal:
+            case PayloadType::String_2:
+            {
+                // 2 UInt32
+                encodeOut += ByteEncodeUtil::encodeLiteUInt32((uint32_t)inst.m_payload.m_operands[0], encodeOut);
+                encodeOut += ByteEncodeUtil::encodeLiteUInt32((uint32_t)inst.m_payload.m_operands[1], encodeOut);
+                break;
+            }
+            case PayloadType::Float64:
+            {
+                memcpy(encodeOut, &inst.m_payload.m_float64, sizeof(inst.m_payload.m_float64));
+                encodeOut += sizeof(inst.m_payload.m_float64);
+                break;
+            }
+            case PayloadType::Int64:
+            {
+                memcpy(encodeOut, &inst.m_payload.m_int64, sizeof(inst.m_payload.m_int64));
+                encodeOut += sizeof(inst.m_payload.m_int64);
+                break;
+            }
+        }
+    }
+
+    // Fix the size 
+    encodeArrayOut.SetSize(UInt(encodeOut - encodeArrayOut.begin()));
+    return SLANG_OK;
+}
+
+Result _writeInstArrayChunk(IRSerialBinary::CompressionType compressionType, uint32_t chunkId, const List<IRSerialData::Inst>& array, Stream* stream)
+{
+    typedef IRSerialBinary Bin;
+    if (array.Count() == 0)
+    {
+        return SLANG_OK;
+    }
+
+    switch (compressionType)
+    {
+        case Bin::CompressionType::None:
+        {
+            return _writeArrayChunk(compressionType, chunkId, array, stream);
+        }
+        case Bin::CompressionType::VariableByteLite:
+        {
+            List<uint8_t> compressedPayload;
+            SLANG_RETURN_ON_FAIL(_encodeInsts(compressionType, array, compressedPayload));
+            
+            size_t payloadSize = sizeof(Bin::CompressedArrayHeader) - sizeof(Bin::Chunk) + compressedPayload.Count();
+
+            Bin::CompressedArrayHeader header;
+            header.m_chunk.m_type = SLANG_MAKE_COMPRESSED_FOUR_CC(chunkId);
+            header.m_chunk.m_size = uint32_t(payloadSize);
+            header.m_numEntries = uint32_t(array.Count());
+            header.m_numCompressedEntries = 0;          
+
+            stream->Write(&header, sizeof(header));
+            stream->Write(compressedPayload.begin(), compressedPayload.Count());
+    
+            // All chunks have sizes rounded to dword size
+            if (payloadSize & 3)
+            {
+                const uint8_t pad[4] = { 0, 0, 0, 0 };
+                // Pad outs
+                int padSize = 4 - (payloadSize & 3);
+                stream->Write(pad, padSize);
+            }
+            return SLANG_OK;
+        }
+        default: break;
+    }
+    return SLANG_FAIL;
+}
+
+static size_t _calcInstChunkSize(IRSerialBinary::CompressionType compressionType, const List<IRSerialData::Inst>& instsIn)
+{
+    typedef IRSerialBinary Bin;
+    typedef IRSerialData::Inst::PayloadType PayloadType;
+
+    switch (compressionType)
+    {
+        case Bin::CompressionType::None:
+        {
+            return _calcChunkSize(compressionType, instsIn);
+        }
+        case Bin::CompressionType::VariableByteLite:
+        {
+            size_t size = sizeof(Bin::CompressedArrayHeader);
+
+            size_t numInsts = size_t(instsIn.Count());
+            size += numInsts * 2;           // op and payload
+
+            
+            IRSerialData::Inst* insts = instsIn.begin();
+
+            for (size_t i = 0; i < numInsts; ++i)
+            {
+                const auto& inst = insts[i];
+
+                size += ByteEncodeUtil::calcEncodeLiteSizeUInt32((uint32_t)inst.m_resultTypeIndex);
+
+                switch (inst.m_payloadType)
+                {
+                    case PayloadType::Empty:    
+                    {
+                        break;
+                    }
+                    case PayloadType::Operand_1:
+                    case PayloadType::String_1:
+                    case PayloadType::UInt32:
+                    {
+                        // 1 UInt32
+                        size += ByteEncodeUtil::calcEncodeLiteSizeUInt32((uint32_t)inst.m_payload.m_operands[0]);
+                        break;
+                    }
+                    case PayloadType::Operand_2:
+                    case PayloadType::OperandAndUInt32:
+                    case PayloadType::OperandExternal:
+                    case PayloadType::String_2:
+                    {
+                        // 2 UInt32
+                        size += ByteEncodeUtil::calcEncodeLiteSizeUInt32((uint32_t)inst.m_payload.m_operands[0]);
+                        size += ByteEncodeUtil::calcEncodeLiteSizeUInt32((uint32_t)inst.m_payload.m_operands[1]);
+                        break;
+                    }
+                    case PayloadType::Float64:
+                    {
+                        size += sizeof(inst.m_payload.m_float64);
+                        break;
+                    }
+                    case PayloadType::Int64:
+                    {
+                        size += sizeof(inst.m_payload.m_int64);
+                        break;
+                    }
+                }
+            }
+
+            return (size + 3) & ~size_t(3);
+        }
+        default: break;
+    }
+
+    SLANG_ASSERT(!"Unhandled compression type");
+    return 0;
+}
+
+/* static */Result IRSerialWriter::writeStream(const IRSerialData& data, Bin::CompressionType compressionType, Stream* stream)
+{
     size_t totalSize = 0;
     
     totalSize += sizeof(Bin::SlangHeader) + 
-        _calcChunkSize(data.m_insts) + 
-        _calcChunkSize(data.m_childRuns) +
-        _calcChunkSize(data.m_decorationRuns) +
-        _calcChunkSize(data.m_externalOperands) +
-        _calcChunkSize(data.m_strings) + 
-        _calcChunkSize(data.m_rawSourceLocs);
+        _calcInstChunkSize(compressionType, data.m_insts) +
+        _calcChunkSize(compressionType, data.m_childRuns) +
+        _calcChunkSize(compressionType, data.m_decorationRuns) +
+        _calcChunkSize(compressionType, data.m_externalOperands) +
+        _calcChunkSize(Bin::CompressionType::None, data.m_strings) + 
+        _calcChunkSize(Bin::CompressionType::None, data.m_rawSourceLocs);
 
     {
         Bin::Chunk riffHeader;
         riffHeader.m_type = Bin::kRiffFourCc;
         riffHeader.m_size = uint32_t(totalSize);
-
+        
         stream->Write(&riffHeader, sizeof(riffHeader));
     }
     {
@@ -659,19 +965,20 @@ Result _writeArrayChunk(uint32_t chunkId, const List<T>& array, Stream* stream)
         slangHeader.m_chunk.m_type = Bin::kSlangFourCc;
         slangHeader.m_chunk.m_size = uint32_t(sizeof(slangHeader) - sizeof(Bin::Chunk));
         slangHeader.m_decorationBase = uint32_t(data.m_decorationBaseIndex);
+        slangHeader.m_compressionType = uint32_t(Bin::CompressionType::VariableByteLite);
 
         stream->Write(&slangHeader, sizeof(slangHeader));
     }
 
-    _writeArrayChunk(Bin::kInstFourCc, data.m_insts, stream);
-    _writeArrayChunk(Bin::kChildRunFourCc, data.m_childRuns, stream);
-    _writeArrayChunk(Bin::kDecoratorRunFourCc, data.m_decorationRuns, stream);
-    _writeArrayChunk(Bin::kExternalOperandsFourCc, data.m_externalOperands, stream);
-    _writeArrayChunk(Bin::kStringFourCc, data.m_strings, stream);
+    SLANG_RETURN_ON_FAIL(_writeInstArrayChunk(compressionType, Bin::kInstFourCc, data.m_insts, stream));
+    SLANG_RETURN_ON_FAIL(_writeArrayChunk(compressionType, Bin::kChildRunFourCc, data.m_childRuns, stream));
+    SLANG_RETURN_ON_FAIL(_writeArrayChunk(compressionType, Bin::kDecoratorRunFourCc, data.m_decorationRuns, stream));
+    SLANG_RETURN_ON_FAIL(_writeArrayChunk(compressionType, Bin::kExternalOperandsFourCc, data.m_externalOperands, stream));
+    SLANG_RETURN_ON_FAIL(_writeArrayChunk(Bin::CompressionType::None, Bin::kStringFourCc, data.m_strings, stream));
 
     {
         uint32_t fourCc = sizeof(IRSerialData::RawSourceLoc) == 4 ? Bin::kUInt32SourceLocFourCc : Bin::kUInt64SourceLocFourCc;
-        _writeArrayChunk(fourCc, data.m_rawSourceLocs, stream);
+        SLANG_RETURN_ON_FAIL(_writeArrayChunk(Bin::CompressionType::None, fourCc, data.m_rawSourceLocs, stream));
     }
 
     return SLANG_OK;
@@ -679,33 +986,250 @@ Result _writeArrayChunk(uint32_t chunkId, const List<T>& array, Stream* stream)
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! IRSerialReader !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+class ListResizer
+{
+    public:
+    virtual void* setSize(size_t newSize) = 0;
+    SLANG_FORCE_INLINE size_t getTypeSize() const { return m_typeSize; }
+    ListResizer(size_t typeSize):m_typeSize(typeSize) {}
+
+    protected:
+    size_t m_typeSize;
+};
+
 template <typename T>
-Result _readArrayChunk(const IRSerialBinary::Chunk& chunk, Stream* stream, List<T>& arrayOut)
+class ListResizerForType: public ListResizer
+{
+    public:
+    typedef ListResizer Parent;
+
+    SLANG_FORCE_INLINE ListResizerForType(List<T>& list):
+        Parent(sizeof(T)), 
+        m_list(list) 
+    {}
+    
+    virtual void* setSize(size_t newSize) SLANG_OVERRIDE
+    {
+        m_list.SetSize(UInt(newSize));
+        return (void*)m_list.begin();
+    }
+
+    protected:
+    List<T>& m_list;
+};
+
+static Result _readArrayChunk(IRSerialBinary::CompressionType compressionType, const IRSerialBinary::Chunk& chunk, Stream* stream, size_t* numReadInOut, ListResizer& listOut)
 {
     typedef IRSerialBinary Bin;
 
-    Bin::ArrayHeader header;
-    header.m_chunk = chunk;
+    const size_t typeSize = listOut.getTypeSize();
 
-    stream->Read(&header.m_chunk + 1, sizeof(header) - sizeof(Bin::Chunk));
+    switch (compressionType)
+    {
+        case Bin::CompressionType::VariableByteLite:
+        {
+            // We have a compressed header
+            Bin::CompressedArrayHeader header;
+            header.m_chunk = chunk;
 
-    size_t payloadSize = sizeof(Bin::ArrayHeader) - sizeof(Bin::Chunk) + sizeof(T) * header.m_numEntries;
-    if (payloadSize != header.m_chunk.m_size)
+            stream->Read(&header.m_chunk + 1, sizeof(header) - sizeof(Bin::Chunk));
+            *numReadInOut += sizeof(header) - sizeof(Bin::Chunk);
+
+            void* data = listOut.setSize(header.m_numEntries);
+            
+            // Need to read all the compressed data... 
+            size_t payloadSize = header.m_chunk.m_size - (sizeof(header) - sizeof(Bin::Chunk));
+
+            List<uint8_t> compressedPayload;
+            compressedPayload.SetSize(payloadSize);
+
+            stream->Read(compressedPayload.begin(), payloadSize);
+            *numReadInOut += payloadSize;
+        
+            SLANG_ASSERT(header.m_numCompressedEntries == uint32_t((header.m_numEntries * typeSize) / sizeof(uint32_t)));
+
+            // Decode..
+            ByteEncodeUtil::decodeLiteUInt32(compressedPayload.begin(), header.m_numCompressedEntries, (uint32_t*)data);
+            break;
+        }
+        case Bin::CompressionType::None:
+        {
+            // Read uncompressed
+            Bin::ArrayHeader header;
+            header.m_chunk = chunk;
+
+            stream->Read(&header.m_chunk + 1, sizeof(header) - sizeof(Bin::Chunk));
+            *numReadInOut += sizeof(header) - sizeof(Bin::Chunk);
+
+            const size_t payloadSize = header.m_numEntries * typeSize;
+
+            void* data = listOut.setSize(header.m_numEntries);
+
+            stream->Read(data, payloadSize);
+            *numReadInOut += payloadSize;
+            break;
+        }
+    }
+
+    // All chunks have sizes rounded to dword size
+    if (*numReadInOut & 3)
+    {
+        const uint8_t pad[4] = { 0, 0, 0, 0 };
+        // Pad outs
+        int padSize = 4 - int(*numReadInOut & 3);
+        stream->Seek(SeekOrigin::Current, padSize);
+
+        *numReadInOut += padSize;
+    }
+
+    return SLANG_OK;
+}
+
+template <typename T>
+Result _readArrayChunk(const IRSerialBinary::SlangHeader& header, const IRSerialBinary::Chunk& chunk, Stream* stream, size_t* numReadInOut, List<T>& arrayOut)
+{
+    typedef IRSerialBinary Bin;
+
+    Bin::CompressionType compressionType = Bin::CompressionType::None;
+
+    if (chunk.m_type == SLANG_MAKE_COMPRESSED_FOUR_CC(chunk.m_type))
+    {
+        // If it has compression, use the compression type set in the header
+        compressionType = Bin::CompressionType(header.m_compressionType);
+    }
+    ListResizerForType<T> resizer(arrayOut);
+    return _readArrayChunk(compressionType, chunk, stream, numReadInOut, resizer);
+}  
+
+template <typename T>
+Result _readArrayUncompressedChunk(const IRSerialBinary::SlangHeader& header, const IRSerialBinary::Chunk& chunk, Stream* stream, size_t* numReadInOut, List<T>& arrayOut)
+{
+    typedef IRSerialBinary Bin;
+    SLANG_UNUSED(header);
+    ListResizerForType<T> resizer(arrayOut);
+    return _readArrayChunk(Bin::CompressionType::None, chunk, stream, numReadInOut, resizer);
+}
+
+static Result _decodeInsts(IRSerialBinary::CompressionType compressionType, const List<uint8_t>& encodeIn, List<IRSerialData::Inst>& instsOut)
+{
+    typedef IRSerialBinary Bin;
+    typedef IRSerialData::Inst::PayloadType PayloadType;
+
+    if (compressionType != Bin::CompressionType::VariableByteLite)
     {
         return SLANG_FAIL;
     }
 
-    arrayOut.SetSize(header.m_numEntries);
+    const size_t numInsts = size_t(instsOut.Count());
+    IRSerialData::Inst* insts = instsOut.begin();
 
-    stream->Read(arrayOut.begin(), sizeof(T) * header.m_numEntries);
+    const uint8_t* encodeCur = encodeIn.begin();
+
+    for (size_t i = 0; i < numInsts; ++i)
+    {
+        auto& inst = insts[i];
+
+        inst.m_op = *encodeCur++;
+        const PayloadType payloadType = PayloadType(*encodeCur++);
+        inst.m_payloadType = payloadType;
+        
+        // Read the result value
+        encodeCur += ByteEncodeUtil::decodeLiteUInt32(encodeCur, (uint32_t*)&inst.m_resultTypeIndex);
+
+        switch (inst.m_payloadType)
+        {
+            case PayloadType::Empty:
+            {
+                break;
+            }
+            case PayloadType::Operand_1:
+            case PayloadType::String_1:
+            case PayloadType::UInt32:
+            {
+                // 1 UInt32
+                encodeCur += ByteEncodeUtil::decodeLiteUInt32(encodeCur, (uint32_t*)&inst.m_payload.m_operands[0]);
+                break;
+            }
+            case PayloadType::Operand_2:
+            case PayloadType::OperandAndUInt32:
+            case PayloadType::OperandExternal:
+            case PayloadType::String_2:
+            {
+                // 2 UInt32
+                encodeCur += ByteEncodeUtil::decodeLiteUInt32(encodeCur, 2, (uint32_t*)&inst.m_payload.m_operands[0]);
+                break;
+            }
+            case PayloadType::Float64:
+            {
+                memcpy(&inst.m_payload.m_float64, encodeCur, sizeof(inst.m_payload.m_float64));
+                encodeCur += sizeof(inst.m_payload.m_float64);
+                break;
+            }
+            case PayloadType::Int64:
+            {
+                memcpy(&inst.m_payload.m_int64, encodeCur, sizeof(inst.m_payload.m_int64));
+                encodeCur += sizeof(inst.m_payload.m_int64);
+                break;
+            }
+        }
+    }
+
+    return SLANG_OK;
+}
+
+Result _readInstArrayChunk(const IRSerialBinary::SlangHeader& slangHeader, const IRSerialBinary::Chunk& chunk, Stream* stream, size_t* numReadInOut, List<IRSerialData::Inst>& arrayOut)
+{
+    typedef IRSerialBinary Bin;
+
+    Bin::CompressionType compressionType = Bin::CompressionType::None;
+    if (chunk.m_type == SLANG_MAKE_COMPRESSED_FOUR_CC(chunk.m_type))
+    {
+        compressionType = Bin::CompressionType(slangHeader.m_compressionType);
+    }
+
+    switch (compressionType)
+    {
+        case Bin::CompressionType::None:
+        {
+            ListResizerForType<IRSerialData::Inst> resizer(arrayOut);
+            return _readArrayChunk(compressionType, chunk, stream, numReadInOut, resizer);
+        }
+        case Bin::CompressionType::VariableByteLite:
+        {
+            // We have a compressed header
+            Bin::CompressedArrayHeader header;
+            header.m_chunk = chunk;
+
+            stream->Read(&header.m_chunk + 1, sizeof(header) - sizeof(Bin::Chunk));
+            *numReadInOut += sizeof(header) - sizeof(Bin::Chunk);
+            
+            // Need to read all the compressed data... 
+            size_t payloadSize = header.m_chunk.m_size - (sizeof(header) - sizeof(Bin::Chunk));
+
+            List<uint8_t> compressedPayload;
+            compressedPayload.SetSize(payloadSize);
+
+            stream->Read(compressedPayload.begin(), payloadSize);
+            *numReadInOut += payloadSize;
+
+            arrayOut.SetSize(header.m_numEntries);
+
+            SLANG_RETURN_ON_FAIL(_decodeInsts(compressionType, compressedPayload, arrayOut));
+            break;
+        }
+        default:
+        {
+            return SLANG_FAIL;
+        }
+    }
 
     // All chunks have sizes rounded to dword size
-    if (payloadSize & 3)
+    if (*numReadInOut & 3)
     {
-        const uint8_t pad[4] = { 0, 0, 0, 0 };
         // Pad outs
-        int padSize = 4 - (payloadSize & 3);
+        int padSize = 4 - int(*numReadInOut & 3);
         stream->Seek(SeekOrigin::Current, padSize);
+        *numReadInOut += padSize;
     }
 
     return SLANG_OK;
@@ -749,57 +1273,66 @@ int64_t _calcChunkTotalSize(const IRSerialBinary::Chunk& chunk)
         remainingBytes = header.m_size;
     }
     
+    // Header
+    // Chunk will not be kSlangFourCC if not read yet
+    Bin::SlangHeader slangHeader;
+    memset(&slangHeader, 0, sizeof(slangHeader));
+
     while (remainingBytes > 0)
     {
         Bin::Chunk chunk;
 
         stream->Read(&chunk, sizeof(chunk));
 
+        size_t bytesRead = sizeof(chunk);
+
         switch (chunk.m_type)
         {
             case Bin::kSlangFourCc:
             {
                 // Slang header
-                Bin::SlangHeader header;
-                header.m_chunk = chunk;
+                slangHeader.m_chunk = chunk;
 
                 // NOTE! Really we should only read what we know the size to be...
                 // and skip if it's larger
 
-                stream->Read(&header.m_chunk + 1, sizeof(header) - sizeof(chunk));
+                stream->Read(&slangHeader.m_chunk + 1, sizeof(slangHeader) - sizeof(chunk));
 
-                dataOut->m_decorationBaseIndex = header.m_decorationBase;
-
+                dataOut->m_decorationBaseIndex = slangHeader.m_decorationBase;
                 remainingBytes -= _calcChunkTotalSize(chunk);
                 break;
             }
+            case SLANG_MAKE_COMPRESSED_FOUR_CC(Bin::kInstFourCc):
             case Bin::kInstFourCc:
             {
-                SLANG_RETURN_ON_FAIL(_readArrayChunk(chunk, stream, dataOut->m_insts));
+                SLANG_RETURN_ON_FAIL(_readInstArrayChunk(slangHeader, chunk, stream, &bytesRead, dataOut->m_insts));
                 remainingBytes -= _calcChunkTotalSize(chunk);
                 break;    
             }
+            case SLANG_MAKE_COMPRESSED_FOUR_CC(Bin::kDecoratorRunFourCc):
             case Bin::kDecoratorRunFourCc:
             {
-                SLANG_RETURN_ON_FAIL(_readArrayChunk(chunk, stream, dataOut->m_decorationRuns));
+                SLANG_RETURN_ON_FAIL(_readArrayChunk(slangHeader, chunk, stream, &bytesRead, dataOut->m_decorationRuns));
                 remainingBytes -= _calcChunkTotalSize(chunk);
                 break;
             }
+            case SLANG_MAKE_COMPRESSED_FOUR_CC(Bin::kChildRunFourCc):
             case Bin::kChildRunFourCc:
             {
-                SLANG_RETURN_ON_FAIL(_readArrayChunk(chunk, stream, dataOut->m_childRuns));
+                SLANG_RETURN_ON_FAIL(_readArrayChunk(slangHeader, chunk, stream, &bytesRead, dataOut->m_childRuns));
                 remainingBytes -= _calcChunkTotalSize(chunk);
                 break;
             }
+            case SLANG_MAKE_COMPRESSED_FOUR_CC(Bin::kExternalOperandsFourCc):
             case Bin::kExternalOperandsFourCc:
             {
-                SLANG_RETURN_ON_FAIL(_readArrayChunk(chunk, stream, dataOut->m_externalOperands));
+                SLANG_RETURN_ON_FAIL(_readArrayChunk(slangHeader, chunk, stream, &bytesRead, dataOut->m_externalOperands));
                 remainingBytes -= _calcChunkTotalSize(chunk);
                 break;
             }
             case Bin::kStringFourCc:
             {
-                SLANG_RETURN_ON_FAIL(_readArrayChunk(chunk, stream, dataOut->m_strings));
+                SLANG_RETURN_ON_FAIL(_readArrayUncompressedChunk(slangHeader, chunk, stream, &bytesRead, dataOut->m_strings));
                 remainingBytes -= _calcChunkTotalSize(chunk);
                 break;
             }
@@ -809,7 +1342,7 @@ int64_t _calcChunkTotalSize(const IRSerialBinary::Chunk& chunk)
                 if ((sizeof(IRSerialData::RawSourceLoc) == 4 && chunk.m_type == Bin::kUInt32SourceLocFourCc) ||
                     (sizeof(IRSerialData::RawSourceLoc) == 8 && chunk.m_type == Bin::kUInt64SourceLocFourCc))
                 {
-                    SLANG_RETURN_ON_FAIL(_readArrayChunk(chunk, stream, dataOut->m_rawSourceLocs));
+                    SLANG_RETURN_ON_FAIL(_readArrayUncompressedChunk(slangHeader, chunk, stream, &bytesRead, dataOut->m_rawSourceLocs));
                     remainingBytes -= _calcChunkTotalSize(chunk);
                 }
                 else
@@ -1270,7 +1803,7 @@ Result serializeModule(IRModule* module, SourceManager* sourceManager, Stream* s
 
     if (stream)
     {
-        SLANG_RETURN_ON_FAIL(IRSerialWriter::writeStream(serialData, stream));
+        SLANG_RETURN_ON_FAIL(IRSerialWriter::writeStream(serialData, IRSerialBinary::CompressionType::VariableByteLite, stream));
     }
 
     return SLANG_OK;
