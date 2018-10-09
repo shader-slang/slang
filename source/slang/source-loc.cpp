@@ -96,6 +96,28 @@ void SourceUnit::addLineDirective(SourceLoc directiveLoc, StringSlicePool::Handl
     m_entries.Add(entry);
 }
 
+void SourceUnit::addDefaultLineDirective(SourceLoc directiveLoc)
+{
+    SLANG_ASSERT(m_range.contains(directiveLoc));
+    // Check that the directiveLoc values are always increasing
+    SLANG_ASSERT(m_entries.Count() == 0 || (m_entries.Last().startLoc.getRaw() < directiveLoc.getRaw()));
+
+    // Well if there are no entries, or the last one puts it in default case, then we don't need to add anything
+    if (m_entries.Count() == 0 || (m_entries.Count() && m_entries.Last().isDefault()))
+    {
+        return;
+    }
+
+    Entry entry;
+    entry.m_startLoc = directiveLoc;
+    entry.m_lineAdjust = 0;                                 // No line adjustment... we are going back to default
+    entry.m_pathHandle = StringSlicePool::Handle(0);        // Mark that there is no path, and that this is a 'default'
+
+    SLANG_ASSERT(entry.isDefault());
+
+    m_entries.Add(entry);
+}
+
 HumaneSourceLoc SourceUnit::getHumaneLoc(HumaneSourceLocType type, SourceLoc loc)
 {
     const int offset = m_range.getOffset(loc);
@@ -115,21 +137,32 @@ HumaneSourceLoc SourceUnit::getHumaneLoc(HumaneSourceLocType type, SourceLoc loc
 
     HumaneSourceLoc humaneLoc;
     humaneLoc.column = columnIndex + 1;
+    humaneLoc.line = lineIndex + 1;
+
+    // Make up a default entry
+    StringSlicePool::Handle pathHandle = StringSlicePool::Handle(0);
 
     // Only bother looking up the entry information if we want a 'Normal' lookup
     const int entryIndex = (type == HumaneSourceLocType::Normal) ? findEntryIndex(loc) : -1;
     if (entryIndex >= 0)
     {
         const Entry& entry = m_entries[entryIndex];
-        humaneLoc.line = lineIndex + entry.m_lineAdjust + 1;
-        humaneLoc.path = m_sourceManager->getStringSlicePool().getSlice(entry.m_pathHandle);
+        // Adjust the line
+        humaneLoc.line += entry.m_lineAdjust;
+        // Get the pathHandle..
+        pathHandle = entry.m_pathHandle;
+    }
+
+    // If there is no override path, then just the source files path
+    if (pathHandle == StringSlicePool::Handle(0))
+    {
+        humaneLoc.path = m_sourceFile->path;
     }
     else
     {
-        humaneLoc.line = lineIndex + 1;
-        humaneLoc.path = m_sourceFile->path;
+        humaneLoc.path = m_sourceManager->getStringSlicePool().getSlice(pathHandle);
     }
-        
+    
     return humaneLoc;
 }
 

@@ -170,8 +170,11 @@ class SourceUnit: public RefObject
     // all map to the same logical file.
     struct Entry
     {
+            /// True if this resets the line numbering. It is distinct from a m_lineAdjust from 0, because it also means the path returns to the default.
+        bool isDefault() const { return m_pathHandle == StringSlicePool::Handle(0); }
+
         SourceLoc m_startLoc;                       ///< Where does this entry begin?
-        StringSlicePool::Handle m_pathHandle;        ///< What is the presumed path for this entry
+        StringSlicePool::Handle m_pathHandle;       ///< What is the presumed path for this entry. If 0 it means there is no path.
         int32_t m_lineAdjust;                       ///< Adjustment to apply to source line numbers when printing presumed locations. Relative to the line number in the underlying file. 
     };
 
@@ -184,6 +187,9 @@ class SourceUnit: public RefObject
         /// The path handle, must have been constructed on the SourceManager associated with the unit
         /// NOTE! Directives are assumed to be added IN ORDER during parsing such that every directiveLoc > previous 
     void addLineDirective(SourceLoc directiveLoc, StringSlicePool::Handle pathHandle, int line);
+
+        /// Removes any corrections on line numbers, or the path
+    void addDefaultLineDirective(SourceLoc directiveLoc);
 
         /// Get the range that this unit applies to
     const SourceRange& getRange() const { return m_range; }
