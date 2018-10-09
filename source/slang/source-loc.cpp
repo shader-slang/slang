@@ -224,7 +224,7 @@ const List<uint32_t>& SourceFile::getLineBreakOffsets()
 
 int SourceFile::calcLineIndexFromOffset(int offset)
 {
-    SLANG_ASSERT(offset <= content.size());
+    SLANG_ASSERT(UInt(offset) <= content.size());
 
     // Make sure we have the line break offsets
     const auto& lineBreakOffsets = getLineBreakOffsets();
