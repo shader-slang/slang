@@ -11,6 +11,16 @@
 
 namespace Slang {
 
+/** Overview: 
+
+SourceFile - Is the immutable contents of a file (or perhaps some generated source - say from doing a macro substitution)
+SourceUnit - Tracks a single parse of a SourceFile. Each SourceUnit defines a range of source locations used. If a SourceFile is parsed twice, two 
+SourceUnits are used, with unique SourceRanges - such that it is possible to tell which specific parse a SourceLoc is from. Not only that but the SourceUnit 
+contains the modifications of the interpretations of source (say by #line) directives. It is necessary to have these different 'views' on the 
+source because if a file is included twice, it may be used in different ways and have different #line directives.
+
+*/
+
 class SourceLoc
 {
 public:
