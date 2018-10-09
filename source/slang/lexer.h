@@ -73,7 +73,7 @@ namespace Slang
     struct Lexer
     {
         void initialize(
-            SourceFile*     sourceFile,
+            SourceUnit*     sourceUnit,
             DiagnosticSink* sink,
             NamePool*       namePool);
 
@@ -83,15 +83,7 @@ namespace Slang
 
         TokenList lexAllTokens();
 
-        // Begin overriding the reported locations of tokens,
-        // based on a `#line` directives
-        void startOverridingSourceLocations(SourceLoc loc);
-
-        // Stop overriding source locations, and go back
-        // to reporting source locations in the original file
-        void stopOverridingSourceLocations();
-
-        SourceFile*     sourceFile;
+        SourceUnit*     sourceUnit;
         DiagnosticSink* sink;
         NamePool*       namePool;
 
@@ -100,13 +92,16 @@ namespace Slang
         char const*     begin;
         char const*     end;
 
+        /// The starting sourceLoc (same as first location of SourceUnit)
+        SourceLoc       startLoc;           
+
         // The starting source location for the code as written,
         // which cannot be overridden.
-        SourceLoc       spellingStartLoc;
+        //SourceLoc       spellingStartLoc;
 
         // The nominal starting location for the file, taking
         // any active `#line` directive into account.
-        SourceLoc       presumedStartLoc;
+        //SourceLoc       presumedStartLoc;
 
         TokenFlags      tokenFlags;
         LexerFlags      lexerFlags;

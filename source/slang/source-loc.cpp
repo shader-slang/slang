@@ -5,30 +5,6 @@
 
 namespace Slang {
 
-String ExpandedSourceLoc::getPath() const
-{
-    if(!sourceManager)
-        return String();
-
-    return sourceManager->sourceFiles[entryIndex].path;
-}
-
-String ExpandedSourceLoc::getSpellingPath() const
-{
-    if(!sourceManager)
-        return String();
-
-    return sourceManager->sourceFiles[entryIndex].sourceFile->path;
-}
-
-SourceFile* ExpandedSourceLoc::getSourceFile() const
-{
-    if(!sourceManager)
-        return nullptr;
-
-    return sourceManager->sourceFiles[entryIndex].sourceFile;
-}
-
 /* !!!!!!!!!!!!!!!!!!!!!!!!! SourceUnit !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 int SourceUnit::findEntryIndex(SourceLoc sourceLoc) const
@@ -73,6 +49,7 @@ int SourceUnit::findEntryIndex(SourceLoc sourceLoc) const
 
 void SourceUnit::addLineDirective(SourceLoc directiveLoc, StringSlicePool::Handle pathHandle, int line)
 {
+    SLANG_ASSERT(pathHandle != StringSlicePool::Handle(0));
     SLANG_ASSERT(m_range.contains(directiveLoc));
 
     // Check that the directiveLoc values are always increasing
@@ -94,6 +71,12 @@ void SourceUnit::addLineDirective(SourceLoc directiveLoc, StringSlicePool::Handl
     entry.m_lineAdjust = line - (lineIndex + 1);
     
     m_entries.Add(entry);
+}
+
+void SourceUnit::addLineDirective(SourceLoc directiveLoc, const String& path, int line)
+{
+    StringSlicePool::Handle pathHandle = m_sourceManager->getStringSlicePool().add(path.getUnownedSlice());
+    return addLineDirective(directiveLoc, pathHandle, line);
 }
 
 void SourceUnit::addDefaultLineDirective(SourceLoc directiveLoc)
@@ -118,7 +101,7 @@ void SourceUnit::addDefaultLineDirective(SourceLoc directiveLoc)
     m_entries.Add(entry);
 }
 
-HumaneSourceLoc SourceUnit::getHumaneLoc(HumaneSourceLocType type, SourceLoc loc)
+HumaneSourceLoc SourceUnit::getHumaneLoc(SourceLoc loc, SourceLocType type)
 {
     const int offset = m_range.getOffset(loc);
 
@@ -143,7 +126,7 @@ HumaneSourceLoc SourceUnit::getHumaneLoc(HumaneSourceLocType type, SourceLoc loc
     StringSlicePool::Handle pathHandle = StringSlicePool::Handle(0);
 
     // Only bother looking up the entry information if we want a 'Normal' lookup
-    const int entryIndex = (type == HumaneSourceLocType::Normal) ? findEntryIndex(loc) : -1;
+    const int entryIndex = (type == SourceLocType::Normal) ? findEntryIndex(loc) : -1;
     if (entryIndex >= 0)
     {
         const Entry& entry = m_entries[entryIndex];
@@ -164,6 +147,27 @@ HumaneSourceLoc SourceUnit::getHumaneLoc(HumaneSourceLocType type, SourceLoc loc
     }
     
     return humaneLoc;
+}
+
+String SourceUnit::getPath(SourceLoc loc, SourceLocType type)
+{
+    if (type == SourceLocType::Original)
+    {
+        return m_sourceFile->path;
+    }
+
+    const int entryIndex = findEntryIndex(loc);
+    const StringSlicePool::Handle pathHandle = (entryIndex >= 0) ? m_entries[entryIndex].m_pathHandle : StringSlicePool::Handle(0);
+   
+    // If there is no override path, then just the source files path
+    if (pathHandle == StringSlicePool::Handle(0))
+    {
+        return m_sourceFile->path;
+    }
+    else
+    {
+        return m_sourceManager->getStringSlicePool().getSlice(pathHandle);
+    }
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!! SourceFile !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -296,7 +300,7 @@ SourceRange SourceManager::allocateSourceRange(UInt size)
     return SourceRange(beginLoc, endLoc);
 }
 
-SourceFile* SourceManager::allocateSourceFile(
+SourceFile* SourceManager::newSourceFile(
     String const&   path,
     ISlangBlob*     contentBlob)
 {
@@ -304,30 +308,20 @@ SourceFile* SourceManager::allocateSourceFile(
     UInt contentSize = contentBlob->getBufferSize();
     char const* contentEnd = contentBegin + contentSize;
 
-    SourceRange sourceRange = allocateSourceRange(contentSize);
-
     SourceFile* sourceFile = new SourceFile();
     sourceFile->path = path;
     sourceFile->contentBlob = contentBlob;
     sourceFile->content = UnownedStringSlice(contentBegin, contentEnd);
-    sourceFile->sourceRange = sourceRange;
-
-    Entry entry;
-    entry.sourceFile = sourceFile;
-    entry.startLoc = sourceRange.begin;
-    entry.path = path;
-
-    sourceFiles.Add(entry);
-
+ 
     return sourceFile;
 }
 
-SourceFile* SourceManager::allocateSourceFile(
+SourceFile* SourceManager::newSourceFile(
     String const&   path,
     String const&   content)
 {
     ComPtr<ISlangBlob> contentBlob = createStringBlob(content);
-    return allocateSourceFile(path, contentBlob);
+    return newSourceFile(path, contentBlob);
 }
 
 SourceUnit* SourceManager::newSourceUnit(SourceFile* sourceFile)
@@ -395,179 +389,31 @@ void SourceManager::addSourceFile(const String& path, SourceFile* sourceFile)
     m_sourceFiles.Add(path, sourceFile);
 }
 
-SourceLoc SourceManager::allocateSourceFileForLineDirective(
-    SourceLoc const&    directiveLoc,
-    String const&       path,
-    UInt                line)
+HumaneSourceLoc SourceManager::getHumaneLoc(SourceLoc loc, SourceLocType type)
 {
-    // First, we need to find out what file we are being asked to remap
-    ExpandedSourceLoc expandedDirectiveLoc = expandSourceLoc(getSpellingLoc(directiveLoc));
-    HumaneSourceLoc humaneDirectiveLoc = getHumaneLoc(expandedDirectiveLoc);
-
-    SourceFile* sourceFile = expandedDirectiveLoc.getSourceFile();
-    if(!sourceFile)
-        return SourceLoc();
-
-    // We are going to be wasteful here and allocate a range of source locations
-    // that can cover the entire input file. This will lead to a problem with
-    // memory usage if we ever had a large input file that used many `#line` directives,
-    // since our usage of ranges would be quadratic!
-
-    // Count how many locations we'd need to reserve for a complete clone of the input
-    UInt size = sourceFile->sourceRange.end.getRaw() - sourceFile->sourceRange.begin.getRaw();
-
-    // Allocate a fresh range for our logically remapped file
-    SourceRange sourceRange = allocateSourceRange(size);
-
-    // Now fill in an entry that will point at the original source file,
-    // but use our new range.
-    Entry entry;
-    entry.sourceFile = sourceFile;
-    entry.startLoc = sourceRange.begin;
-    entry.path = path;
-
-    // We also need to make sure that any lookups for line numbers will
-    // get corrected based on this files location.
-    entry.lineAdjust = Int(line) - Int(humaneDirectiveLoc.line + 1);
-
-    sourceFiles.Add(entry);
-
-    return entry.startLoc;
-}
-
-static ExpandedSourceLoc expandSourceLoc(
-    SourceManager*      inSourceManager,
-    SourceLoc const&    loc)
-{
-    SourceManager* sourceManager = inSourceManager;
-
-    ExpandedSourceLoc expanded;
-
-    SourceLoc::RawValue rawValue = loc.getRaw();
-
-    // Invalid location? -> invalid expanded location
-    if(rawValue == 0)
-        return expanded;
-
-    // Past the end of what we can handle? -> invalid
-    if(rawValue >= sourceManager->nextLoc.getRaw())
-        return expanded;
-
-    // Maybe the location came from a parent source manager
-    while( rawValue < sourceManager->startLoc.getRaw()
-        && sourceManager->parent)
+    SourceUnit* sourceUnit = findSourceUnit(loc);
+    if (sourceUnit)
     {
-        sourceManager = sourceManager->parent;
+        return sourceUnit->getHumaneLoc(loc, type);
     }
-
-    SLANG_ASSERT(sourceManager->sourceFiles.Count() > 0);
-
-    UInt lo = 0;
-    UInt hi = sourceManager->sourceFiles.Count();
-
-    while( lo+1 < hi )
+    else
     {
-        UInt mid = lo + (hi - lo) / 2;
-
-        SourceManager::Entry const& midEntry = sourceManager->sourceFiles[mid];
-        SourceLoc::RawValue midValue = midEntry.startLoc.getRaw();
-
-        if( midValue <= rawValue )
-        {
-            // The location we seek is at or after this entry
-            lo = mid;
-        }
-        else
-        {
-            // The location we seek is before this entry
-            hi = mid;
-        }
-    }
-
-    // `lo` should now point at the entry we want
-    UInt entryIndex = lo;
-
-    expanded.setRaw(loc.getRaw());
-    expanded.sourceManager = sourceManager;
-    expanded.entryIndex = entryIndex;
-
-    return expanded;
-}
-
-ExpandedSourceLoc SourceManager::expandSourceLoc(SourceLoc const& loc)
-{
-    return Slang::expandSourceLoc(this, loc);
-}
-
-HumaneSourceLoc getHumaneLoc(ExpandedSourceLoc const& loc)
-{
-    // First check if this location maps to an actual file.
-    SourceFile* sourceFile = loc.getSourceFile();
-    if(!sourceFile)
         return HumaneSourceLoc();
-
-    auto sourceManager = loc.sourceManager;
-
-    auto& entry = sourceManager->sourceFiles[loc.entryIndex];
-    int offset = int(loc.getRaw() - entry.startLoc.getRaw());
-
-    auto lineIndex = sourceFile->calcLineIndexFromOffset(offset);
-    const auto byteIndexInLine = sourceFile->calcColumnIndex(lineIndex, offset);
-
-    // Apply adjustment to the line number
-    lineIndex = lineIndex + int(entry.lineAdjust);
-
-    // TODO: we should really translate the byte index in the line
-    // to deal with:
-    //
-    // - Non-ASCII characters, while might consume multiple bytes
-    //
-    // - Tab characters, which should really adjust how we report
-    //   columns (although how are we supposed to know the setting
-    //   that an IDE expects us to use when reporting locations?)
-
-    HumaneSourceLoc humaneLoc;
-    humaneLoc.path = entry.path;
-    humaneLoc.line = lineIndex + 1;
-    humaneLoc.column = byteIndexInLine + 1;
-
-    return humaneLoc;
+    }
 }
 
-HumaneSourceLoc ExpandedSourceLoc::getHumaneLoc()
+String SourceManager::getPath(SourceLoc loc, SourceLocType type)
 {
-    return Slang::getHumaneLoc(*this);
+    SourceUnit* sourceUnit = findSourceUnit(loc);
+    if (sourceUnit)
+    {
+        return sourceUnit->getPath(loc, type);
+    }
+    else
+    {
+        return String("unknown");
+    }
 }
 
-HumaneSourceLoc SourceManager::getHumaneLoc(SourceLoc const& loc)
-{
-    return expandSourceLoc(loc).getHumaneLoc();
-}
-
-SourceLoc SourceManager::getSpellingLoc(ExpandedSourceLoc const& loc)
-{
-    // First check if this location maps to some raw source file,
-    // so that a "spelling" is even possible
-    SourceFile* sourceFile = loc.getSourceFile();
-    if(!sourceFile)
-        return loc;
-
-    // If we mapped to a source file, then the location must represent
-    // some offset from an entry in our array.
-    auto& entry = sourceFiles[loc.entryIndex];
-
-    // We extract the offset of the location from the start of the entry
-    SourceLoc::RawValue offsetFromStart = loc.getRaw() - entry.startLoc.getRaw();
-
-    // And instead apply that offset to the spelling location of the file start
-    SourceLoc result = sourceFile->sourceRange.begin + offsetFromStart;
-
-    return result;
-}
-
-SourceLoc SourceManager::getSpellingLoc(SourceLoc const& loc)
-{
-    return getSpellingLoc(expandSourceLoc(loc));
-}
 
 } // namespace Slang

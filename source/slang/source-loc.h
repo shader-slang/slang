@@ -103,9 +103,6 @@ public:
     /// The actual contents of the file.
     UnownedStringSlice content;
 
-    // The range of source locations that the span covers
-    SourceRange sourceRange;
-
     protected:
     // In order to speed up lookup of line number information,
     // we will cache the starting offset of each line break in
@@ -115,7 +112,7 @@ public:
 
 struct SourceManager;
 
-enum class HumaneSourceLocType
+enum class SourceLocType
 {
     Normal,                 ///< Takes into account #line directives
     Original,               ///< Ignores #line directives - humane location as seen in the actual file
@@ -132,31 +129,6 @@ struct HumaneSourceLoc
     Int getLine() const { return line; }
     Int getColumn() const { return column; }
 };
-
-// A source location that has been expanded with the info
-// needed to reconstruct a "humane" location if needed.
-struct ExpandedSourceLoc : public SourceLoc
-{
-    // The source manager that owns this location
-    SourceManager*  sourceManager = nullptr;
-
-    // The entry index that is used to understand the location
-    UInt            entryIndex = 0;
-
-    // Get the nominal path for this location
-    String getPath() const;
-
-    // Get the actual file path where this location appears
-    String getSpellingPath() const;
-
-    // Get the original source file that holds this location
-    SourceFile* getSourceFile() const;
-
-    // Get a "humane" version of a source location
-    HumaneSourceLoc getHumaneLoc();
-};
-
-HumaneSourceLoc getHumaneLoc(ExpandedSourceLoc const& loc);
 
 /* A SourceUnit maps to a single span of SourceLoc range and is equivalent to a single include or use of a source file. 
 It is distinct from a SourceFile - because a SourceFile may be included multiple times, with different interpretations (depending 
@@ -188,7 +160,9 @@ class SourceUnit: public RefObject
         /// NOTE! Directives are assumed to be added IN ORDER during parsing such that every directiveLoc > previous 
     void addLineDirective(SourceLoc directiveLoc, StringSlicePool::Handle pathHandle, int line);
 
-        /// Removes any corrections on line numbers, or the path
+    void addLineDirective(SourceLoc directiveLoc, const String& path, int line);
+
+        /// Removes any corrections on line numbers and reverts to the source files path
     void addDefaultLineDirective(SourceLoc directiveLoc);
 
         /// Get the range that this unit applies to
@@ -201,7 +175,11 @@ class SourceUnit: public RefObject
     SourceManager* getSourceManager() const { return m_sourceManager; }
 
         /// Get the humane location 
-    HumaneSourceLoc getHumaneLoc(HumaneSourceLocType type, SourceLoc loc);
+        /// Type determines if the location wanted is the original, or the 'normal' (which modifys behavior based on #line directives)
+    HumaneSourceLoc getHumaneLoc(SourceLoc loc, SourceLocType type = SourceLocType::Normal);
+
+        /// Get the path associated with a location
+    String getPath(SourceLoc loc, SourceLocType type = SourceLocType::Normal);
 
         /// Ctor
     SourceUnit(SourceManager* sourceManager, SourceFile* sourceFile, SourceRange range):
@@ -227,32 +205,22 @@ struct SourceManager
 
     SourceRange allocateSourceRange(UInt size);
 
-    SourceFile* allocateSourceFile(
+    SourceFile* newSourceFile(
         String const&   path,
         ISlangBlob*     content);
 
-    SourceFile* allocateSourceFile(
+    SourceFile* newSourceFile(
         String const&   path,
         String const&   content);
 
-    SourceLoc allocateSourceFileForLineDirective(
-        SourceLoc const&    directiveLoc,
-        String const&       path,
-        UInt                line);
+        /// Get the humane source location
+    HumaneSourceLoc getHumaneLoc(SourceLoc loc, SourceLocType type = SourceLocType::Normal);
 
-    // Expand a source location to include more explicit info
-    ExpandedSourceLoc expandSourceLoc(SourceLoc const& loc);
-
-    // Get a "humane" version of a source location
-    HumaneSourceLoc getHumaneLoc(SourceLoc const& loc);
+        /// Get the path associated with a location 
+    String getPath(SourceLoc loc, SourceLocType type = SourceLocType::Normal);
 
         /// Allocate a new source unit from a file
     SourceUnit* newSourceUnit(SourceFile* sourceFile);
-
-
-    // Get the source location that represents the spelling location corresponding to a location.
-    SourceLoc getSpellingLoc(ExpandedSourceLoc const& loc);
-    SourceLoc getSpellingLoc(SourceLoc const& loc);
 
         /// Find a unit by a source file location. If not found in this will look in the parent/
         /// Returns nullptr if not found
@@ -262,7 +230,7 @@ struct SourceManager
         /// If not found returns nullptr.    
     SourceFile* findSourceFile(const String& path);
 
-        /// Add a source file
+        /// Add a source file, path must be unique for this manager AND any parents
     void addSourceFile(const String& path, SourceFile* sourceFile);
 
         /// Get the slice pool
@@ -278,27 +246,6 @@ struct SourceManager
 
     // The location to be used by the next source file to be loaded
     SourceLoc nextLoc;
-
-    // Each entry represents some contiguous span of locations that
-    // all map to the same logical file.
-    struct Entry
-    {
-        // Where does this entry begin?
-        SourceLoc        startLoc;
-
-        // The soure file that represents the actual data
-        RefPtr<SourceFile>  sourceFile;
-
-        // What is the presumed path for this entry
-        String path;
-
-        // Adjustment to apply to source line numbers when printing presumed locations
-        Int lineAdjust = 0;
-    };
-
-    // An array of soure files we have loaded, ordered by
-    // increasing starting location
-    List<Entry> sourceFiles;
 
     protected:
 

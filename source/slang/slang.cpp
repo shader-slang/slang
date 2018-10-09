@@ -9,6 +9,8 @@
 #include "syntax-visitors.h"
 #include "../slang/type-layout.h"
 
+#include "ir-serialize.h"
+
 // Used to print exception type names in internal-compiler-error messages
 #include <typeinfo>
 
@@ -370,12 +372,12 @@ SlangResult CompileRequest::loadFile(String const& path, ISlangBlob** outBlob)
 
 RefPtr<Expr> CompileRequest::parseTypeString(TranslationUnitRequest * translationUnit, String typeStr, RefPtr<Scope> scope)
 {
-    Slang::SourceFile srcFile;
-    srcFile.content = UnownedStringSlice(typeStr.begin(), typeStr.end());
+    Slang::RefPtr<Slang::SourceFile> srcFile = sourceManager->newSourceFile(String("type string"), typeStr);
+    
     DiagnosticSink sink;
     sink.sourceManager = sourceManager;
     auto tokens = preprocessSource(
-        &srcFile,
+        srcFile,
         &sink,
         nullptr,
         Dictionary<String,String>(),
@@ -649,7 +651,7 @@ void CompileRequest::addTranslationUnitSourceBlob(
     String const&   path,
     ISlangBlob*     sourceBlob)
 {
-    RefPtr<SourceFile> sourceFile = getSourceManager()->allocateSourceFile(path, sourceBlob);
+    RefPtr<SourceFile> sourceFile = getSourceManager()->newSourceFile(path, sourceBlob);
 
     addTranslationUnitSourceFile(translationUnitIndex, sourceFile);
 }
@@ -659,7 +661,7 @@ void CompileRequest::addTranslationUnitSourceString(
     String const&   path,
     String const&   source)
 {
-    RefPtr<SourceFile> sourceFile = getSourceManager()->allocateSourceFile(path, source);
+    RefPtr<SourceFile> sourceFile = getSourceManager()->newSourceFile(path, source);
 
     addTranslationUnitSourceFile(translationUnitIndex, sourceFile);
 }
@@ -778,7 +780,7 @@ RefPtr<ModuleDecl> CompileRequest::loadModule(
     // TODO: decide which options, if any, should be inherited.
     translationUnit->compileFlags = 0;
 
-    RefPtr<SourceFile> sourceFile = getSourceManager()->allocateSourceFile(path, sourceBlob);
+    RefPtr<SourceFile> sourceFile = getSourceManager()->newSourceFile(path, sourceBlob);
 
     translationUnit->sourceFiles.Add(sourceFile);
 
@@ -857,10 +859,9 @@ RefPtr<ModuleDecl> CompileRequest::findOrImportModule(
     IncludeHandlerImpl includeHandler;
     includeHandler.request = this;
 
-    auto expandedLoc = getSourceManager()->expandSourceLoc(loc);
-
-    String pathIncludedFrom = expandedLoc.getSpellingPath();
-
+    // Get the original path
+    String pathIncludedFrom= getSourceManager()->getPath(loc, SourceLocType::Original);
+    
     String foundPath;
     ComPtr<ISlangBlob> foundSourceBlob;
     IncludeResult includeResult = includeHandler.TryToFindIncludeFile(fileName, pathIncludedFrom, &foundPath, foundSourceBlob.writeRef());
@@ -945,7 +946,7 @@ void Session::addBuiltinSource(
 
     auto translationUnitIndex = compileRequest->addTranslationUnit(SourceLanguage::Slang, path);
 
-    RefPtr<SourceFile> sourceFile = builtinSourceManager.allocateSourceFile(path, source);
+    RefPtr<SourceFile> sourceFile = builtinSourceManager.newSourceFile(path, source);
 
     compileRequest->addTranslationUnitSourceString(
         translationUnitIndex,
