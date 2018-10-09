@@ -976,8 +976,11 @@ static size_t _calcInstChunkSize(IRSerialBinary::CompressionType compressionType
     SLANG_RETURN_ON_FAIL(_writeArrayChunk(compressionType, Bin::kExternalOperandsFourCc, data.m_externalOperands, stream));
     SLANG_RETURN_ON_FAIL(_writeArrayChunk(Bin::CompressionType::None, Bin::kStringFourCc, data.m_strings, stream));
 
-    SLANG_RETURN_ON_FAIL(_writeArrayChunk(Bin::CompressionType::None, Bin::kUInt32SourceLocFourCc, data.m_rawSourceLocs, stream));
-    
+    {
+        uint32_t fourCc = sizeof(IRSerialData::RawSourceLoc) == 4 ? Bin::kUInt32SourceLocFourCc : Bin::kUInt64SourceLocFourCc;
+        SLANG_RETURN_ON_FAIL(_writeArrayChunk(Bin::CompressionType::None, fourCc, data.m_rawSourceLocs, stream));
+    }
+
     return SLANG_OK;
 }
 
@@ -1334,10 +1337,18 @@ int64_t _calcChunkTotalSize(const IRSerialBinary::Chunk& chunk)
                 break;
             }
             case Bin::kUInt32SourceLocFourCc:
+            case Bin::kUInt64SourceLocFourCc:
             {
-                
-                SLANG_RETURN_ON_FAIL(_readArrayUncompressedChunk(slangHeader, chunk, stream, &bytesRead, dataOut->m_rawSourceLocs));
-                remainingBytes -= _calcChunkTotalSize(chunk);
+                if ((sizeof(IRSerialData::RawSourceLoc) == 4 && chunk.m_type == Bin::kUInt32SourceLocFourCc) ||
+                    (sizeof(IRSerialData::RawSourceLoc) == 8 && chunk.m_type == Bin::kUInt64SourceLocFourCc))
+                {
+                    SLANG_RETURN_ON_FAIL(_readArrayUncompressedChunk(slangHeader, chunk, stream, &bytesRead, dataOut->m_rawSourceLocs));
+                    remainingBytes -= _calcChunkTotalSize(chunk);
+                }
+                else
+                {
+                    SLANG_RETURN_ON_FAIL(_skip(chunk, stream, &remainingBytes));
+                }
                 break;
             }
             default:
