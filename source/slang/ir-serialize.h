@@ -17,6 +17,8 @@ class Name;
 
 struct IRSerialData
 {
+    typedef IRSerialData ThisType;
+
     enum class InstIndex : uint32_t;
     enum class StringIndex : uint32_t;
     enum class ArrayIndex : uint32_t;
@@ -32,6 +34,15 @@ struct IRSerialData
     /// A run of instructions
     struct InstRun
     {
+        typedef InstRun ThisType;
+        SLANG_FORCE_INLINE bool operator==(const ThisType& rhs) const 
+        {
+            return m_parentIndex == rhs.m_parentIndex &&
+                m_startInstIndex == rhs.m_startInstIndex &&
+                m_numChildren == rhs.m_numChildren;
+        }
+        SLANG_FORCE_INLINE bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+
         InstIndex m_parentIndex;            ///< The parent instruction
         InstIndex m_startInstIndex;         ///< The index to the first instruction
         SizeType m_numChildren;                 ///< The number of children
@@ -49,6 +60,7 @@ struct IRSerialData
     // Decoration information is stored in m_decorationRuns
     struct Inst
     {
+        typedef Inst ThisType;
         enum
         {
             kMaxOperands = 2,           ///< Maximum number of operands that can be held in an instruction (otherwise held 'externally')
@@ -75,6 +87,10 @@ struct IRSerialData
 
             /// Get the number of operands
         SLANG_FORCE_INLINE int getNumOperands() const;
+
+        bool operator==(const ThisType& rhs) const;
+        
+        SLANG_FORCE_INLINE bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 
         uint8_t m_op;                       ///< For now one of IROp 
         PayloadType m_payloadType;	 		///< The type of payload 
@@ -115,6 +131,10 @@ struct IRSerialData
         /// Get the operands of an instruction
     SLANG_FORCE_INLINE int getOperands(const Inst& inst, const InstIndex** operandsOut) const;
 
+        /// ==
+    bool operator==(const ThisType& rhs) const;
+    SLANG_FORCE_INLINE bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+
         /// Calculate the amount of memory used by this IRSerialData
     size_t calcSizeInBytes() const;
 
@@ -146,6 +166,43 @@ SLANG_FORCE_INLINE int IRSerialData::Inst::getNumOperands() const
 }
 
 // --------------------------------------------------------------------------
+SLANG_FORCE_INLINE bool IRSerialData::Inst::operator==(const ThisType& rhs) const
+{
+    if (m_op == rhs.m_op && 
+        m_payloadType == rhs.m_payloadType &&
+        m_resultTypeIndex == rhs.m_resultTypeIndex)
+    {
+        switch (m_payloadType)
+        {
+            case PayloadType::Empty: 
+            {
+                return true;
+            }
+            case PayloadType::Operand_1:
+            case PayloadType::String_1:
+            case PayloadType::UInt32:
+            {
+                return m_payload.m_operands[0] == rhs.m_payload.m_operands[0];
+            }
+            case PayloadType::OperandAndUInt32:
+            case PayloadType::OperandExternal:
+            case PayloadType::Operand_2:
+            case PayloadType::String_2:
+            {
+                return m_payload.m_operands[0] == rhs.m_payload.m_operands[0] &&
+                       m_payload.m_operands[1] == rhs.m_payload.m_operands[1];
+            } 
+            case PayloadType::Float64:
+            case PayloadType::Int64:
+            {
+                return m_payload.m_int64 == rhs.m_payload.m_int64;
+            }
+            default: break;
+        }
+    }
+    return false;
+}
+// --------------------------------------------------------------------------
 SLANG_FORCE_INLINE int IRSerialData::getOperands(const Inst& inst, const InstIndex** operandsOut) const
 {
     if (inst.m_payloadType == Inst::PayloadType::OperandExternal)
@@ -163,6 +220,8 @@ SLANG_FORCE_INLINE int IRSerialData::getOperands(const Inst& inst, const InstInd
 
 #define SLANG_FOUR_CC(c0, c1, c2, c3) ((uint32_t(c0) << 0) | (uint32_t(c1) << 8) | (uint32_t(c2) << 16) | (uint32_t(c3) << 24)) 
 
+#define SLANG_MAKE_COMPRESSED_FOUR_CC(fourCc) (((fourCc) & 0xffff00ff) | (uint32_t('c') << 8))
+
 struct IRSerialBinary
 {
     // http://fileformats.archiveteam.org/wiki/RIFF
@@ -173,6 +232,14 @@ struct IRSerialBinary
         uint32_t m_type;
         uint32_t m_size;
     };
+
+    enum class CompressionType
+    {
+        None,
+        VariableByteLite,
+    };
+
+    
     static const uint32_t kRiffFourCc = SLANG_FOUR_CC('R', 'I', 'F', 'F');
     static const uint32_t kSlangFourCc = SLANG_FOUR_CC('S', 'L', 'N', 'G');             ///< Holds all the slang specific chunks
 
@@ -180,6 +247,12 @@ struct IRSerialBinary
     static const uint32_t kDecoratorRunFourCc = SLANG_FOUR_CC('S', 'L', 'd', 'r');
     static const uint32_t kChildRunFourCc = SLANG_FOUR_CC('S', 'L', 'c', 'r');
     static const uint32_t kExternalOperandsFourCc = SLANG_FOUR_CC('S', 'L', 'e', 'o');
+
+    static const uint32_t kCompressedInstFourCc = SLANG_MAKE_COMPRESSED_FOUR_CC(kInstFourCc);
+    static const uint32_t kCompressedDecoratorRunFourCc = SLANG_MAKE_COMPRESSED_FOUR_CC(kDecoratorRunFourCc);
+    static const uint32_t kCompressedChildRunFourCc = SLANG_MAKE_COMPRESSED_FOUR_CC(kChildRunFourCc);
+    static const uint32_t kCompressedExternalOperandsFourCc = SLANG_MAKE_COMPRESSED_FOUR_CC(kExternalOperandsFourCc);
+
     static const uint32_t kStringFourCc = SLANG_FOUR_CC('S', 'L', 's', 't');
         /// 4 bytes per entry
     static const uint32_t kUInt32SourceLocFourCc = SLANG_FOUR_CC('S', 'r', 's', '4');
@@ -190,11 +263,18 @@ struct IRSerialBinary
     {
         Chunk m_chunk;
         uint32_t m_decorationBase;
+        uint32_t m_compressionType;         ///< Holds the compression type used (if used at all)
     };
     struct ArrayHeader
     {
         Chunk m_chunk;
         uint32_t m_numEntries;
+    };
+    struct CompressedArrayHeader
+    {
+        Chunk m_chunk;
+        uint32_t m_numEntries;              ///< The number of entries
+        uint32_t m_numCompressedEntries;    ///< The amount of compressed entries
     };
 };
 
@@ -202,20 +282,21 @@ struct IRSerialBinary
 struct IRSerialWriter
 {
     typedef IRSerialData Ser;
+    typedef IRSerialBinary Bin;
 
     struct OptionFlag
     {
         typedef uint32_t Type;
         enum Enum: Type
         {
-            RawSourceLocation = 1,
+            RawSourceLocation       = 0x01,
         };
     };
     typedef OptionFlag::Type OptionFlags;
 
     Result write(IRModule* module, SourceManager* sourceManager, OptionFlags options, IRSerialData* serialData);
 
-    static Result writeStream(const IRSerialData& data, Stream* stream);
+    static Result writeStream(const IRSerialData& data, Bin::CompressionType compressionType, Stream* stream);
 
         /// Get a slice from an index
     UnownedStringSlice getStringSlice(Ser::StringIndex index) const;

@@ -472,7 +472,7 @@ namespace Slang
 			if (bufferSize > _count && _count > 0)
 			{
 				T * newBuffer = Allocate(_count);
-				for (int i = 0; i < _count; i++)
+				for (UInt i = 0; i < _count; i++)
 					newBuffer[i] = static_cast<T&&>(buffer[i]);
 				FreeBuffer();
 				buffer = newBuffer;
