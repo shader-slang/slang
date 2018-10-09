@@ -29,6 +29,138 @@ SourceFile* ExpandedSourceLoc::getSourceFile() const
     return sourceManager->sourceFiles[entryIndex].sourceFile;
 }
 
+/* !!!!!!!!!!!!!!!!!!!!!!!!! SourceUnit !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+int SourceUnit::findEntryIndex(SourceLoc sourceLoc) const
+{
+    if (!m_range.contains(sourceLoc))
+    {
+        return -1;
+    }
+
+    const auto rawValue = sourceLoc.getRaw();
+
+    int lo = 0;
+    int hi = int(m_entries.Count());
+    
+    if (hi == 0)
+    {
+        return -1;
+    }
+
+    while (lo + 1 < hi)
+    {
+        int mid = (hi + lo) >> 1;
+
+        const Entry& midEntry = m_entries[mid];
+        SourceLoc::RawValue midValue = midEntry.m_startLoc.getRaw();
+
+        if (midValue <= rawValue)
+        {
+            // The location we seek is at or after this entry
+            lo = mid;
+        }
+        else
+        {
+            // The location we seek is before this entry
+            hi = mid;
+        }
+    }
+ 
+    return lo;
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!! SourceFile !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+const List<uint32_t>& SourceFile::getLineBreakOffsets()
+{
+    // We now have a raw input file that we can search for line breaks.
+    // We obviously don't want to do a linear scan over and over, so we will
+    // cache an array of line break locations in the file.
+    if (m_lineBreakOffsets.Count() == 0)
+    {
+        char const* begin = content.begin();
+        char const* end = content.end();
+
+        char const* cursor = begin;
+
+        // Treat the beginning of the file as a line break
+        m_lineBreakOffsets.Add(0);
+
+        while (cursor != end)
+        {
+            int c = *cursor++;
+            switch (c)
+            {
+                case '\r': case '\n':
+                {
+                    // When we see a line-break character we need
+                    // to record the line break, but we also need
+                    // to deal with the annoying issue of encodings,
+                    // where a multi-byte sequence might encode
+                    // the line break.
+
+                    int d = *cursor;
+                    if ((c^d) == ('\r' ^ '\n'))
+                        cursor++;
+
+                    m_lineBreakOffsets.Add(uint32_t(cursor - begin));
+                }
+                break;
+
+                default:
+                    break;
+            }
+        }
+
+        // Note that we do *not* treat the end of the file as a line
+        // break, because otherwise we would report errors like
+        // "end of file inside string literal" with a line number
+        // that points at a line that doesn't exist.
+    }
+
+    return m_lineBreakOffsets;
+}
+
+int SourceFile::calcLineFromOffset(size_t offset)
+{
+    SLANG_ASSERT(offset <= content.size());
+
+    // Make sure we have the line break offsets
+    const auto& lineBreakOffsets = getLineBreakOffsets();
+
+    // At this point we can assume the `lineBreakOffsets` array has been filled in.
+    // We will use a binary search to find the line index that contains our
+    // chosen offset.
+    int lo = 0;
+    int hi = int(lineBreakOffsets.Count());
+
+    while (lo + 1 < hi)
+    {
+        int mid = (hi + lo) >> 1; 
+
+        uint32_t midOffset = lineBreakOffsets[mid];
+        if (midOffset <= offset)
+        {
+            lo = mid;
+        }
+        else
+        {
+            hi = mid;
+        }
+    }
+
+    return lo;
+}
+
+int SourceFile::calcLineColumnIndex(int line, int offset)
+{
+    const auto& lineBreakOffsets = getLineBreakOffsets();
+    return offset - lineBreakOffsets[line];   
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!! SourceManager !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
 void SourceManager::initialize(
     SourceManager*  p)
 {
@@ -103,6 +235,56 @@ SourceFile* SourceManager::allocateSourceFile(
     ComPtr<ISlangBlob> contentBlob = createStringBlob(content);
     return allocateSourceFile(path, contentBlob);
 }
+
+SourceUnit* SourceManager::newSourceUnit(SourceFile* sourceFile)
+{
+    SourceRange range = allocateSourceRange(sourceFile->content.size());
+    SourceUnit* sourceUnit = new SourceUnit(this, sourceFile, range);
+    m_sourceUnits.Add(sourceUnit);
+
+    return sourceUnit;
+}
+
+SourceUnit* SourceManager::findSourceUnit(SourceLoc loc)
+{
+    SourceLoc::RawValue rawLoc = loc.getRaw();
+
+    int lo = 0;
+    int hi = int(m_sourceUnits.Count());
+
+    if (hi == 0)
+    {
+        return nullptr;
+    }
+
+    while (lo + 1 < hi)
+    {
+        int mid = (hi + lo) >> 1;
+
+        SourceUnit* midEntry = m_sourceUnits[mid];
+        if (midEntry->getRange().contains(loc))
+        {
+            return midEntry;
+        }
+
+        SourceLoc::RawValue midValue = midEntry->getRange().begin.getRaw();
+
+        if (midValue <= rawLoc)
+        {
+            // The location we seek is at or after this entry
+            lo = mid;
+        }
+        else
+        {
+            // The location we seek is before this entry
+            hi = mid;
+        }
+    }
+
+    // Check the parent if there is a parent
+    return (parent) ? parent->findSourceUnit(loc) : nullptr;
+}
+
 
 SourceLoc SourceManager::allocateSourceFileForLineDirective(
     SourceLoc const&    directiveLoc,
@@ -201,8 +383,6 @@ static ExpandedSourceLoc expandSourceLoc(
     expanded.entryIndex = entryIndex;
 
     return expanded;
-
-
 }
 
 ExpandedSourceLoc SourceManager::expandSourceLoc(SourceLoc const& loc)
@@ -220,80 +400,13 @@ HumaneSourceLoc getHumaneLoc(ExpandedSourceLoc const& loc)
     auto sourceManager = loc.sourceManager;
 
     auto& entry = sourceManager->sourceFiles[loc.entryIndex];
-    UInt offset = loc.getRaw() - entry.startLoc.getRaw();
+    int offset = int(loc.getRaw() - entry.startLoc.getRaw());
 
-    // We now have a raw input file that we can search for line breaks.
-    // We obviously don't want to do a linear scan over and over, so we will
-    // cache an array of line break locations in the file.
-    auto& lineBreakOffsets = sourceFile->lineBreakOffsets;
-    if( lineBreakOffsets.Count() == 0 )
-    {
-        char const* begin = sourceFile->content.begin();
-        char const* end = sourceFile->content.end();
-
-        char const* cursor = begin;
-
-        // Treat the beginning of the file as a line break
-        lineBreakOffsets.Add(0);
-
-        while( cursor != end )
-        {
-            int c = *cursor++;
-            switch( c )
-            {
-            case '\r': case '\n':
-                {
-                    // When we see a line-break character we need
-                    // to record the line break, but we also need
-                    // to deal with the annoying issue of encodings,
-                    // where a multi-byte sequence might encode
-                    // the line break.
-
-                    int d = *cursor;
-                    if( (c^d) == ('\r' ^ '\n'))
-                        cursor++;
-
-                    lineBreakOffsets.Add(cursor - begin);
-                }
-                break;
-
-            default:
-                break;
-            }
-        }
-
-        // Note taht we do *not* treat the end of the file as a line
-        // break, because otherwise we would report errors like
-        // "end of file inside string literal" with a line number
-        // that points at a line that doesn't exist.
-    }
-
-    // At this point we can assume the `lineBreakOffsets` array has been filled in.
-    // We will use a binary search to find the line index that contains our
-    // chosen offset.
-    UInt lo = 0;
-    UInt hi = lineBreakOffsets.Count();
-
-    while( lo+1 < hi )
-    {
-        UInt mid = lo + (hi - lo)/2;
-
-        UInt midOffset = lineBreakOffsets[mid];
-        if( midOffset <= offset )
-        {
-            lo = mid;
-        }
-        else
-        {
-            hi = mid;
-        }
-    }
-
-    UInt lineIndex = lo;
-    UInt byteIndexInLine = offset - lineBreakOffsets[lineIndex];
+    auto lineIndex = sourceFile->calcLineFromOffset(offset);
+    const auto byteIndexInLine = sourceFile->calcLineColumnIndex(lineIndex, offset);
 
     // Apply adjustment to the line number
-    lineIndex = lineIndex + entry.lineAdjust;
+    lineIndex = lineIndex + int(entry.lineAdjust);
 
     // TODO: we should really translate the byte index in the line
     // to deal with:

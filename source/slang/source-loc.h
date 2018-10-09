@@ -3,8 +3,10 @@
 #define SLANG_SOURCE_LOC_H_INCLUDED
 
 #include "../core/basic.h"
-#include "../../slang-com-ptr.h"
+#include "../core/slang-memory-arena.h"
+#include "../core/slang-string-slice-pool.h"
 
+#include "../../slang-com-ptr.h"
 #include "../../slang.h"
 
 namespace Slang {
@@ -51,6 +53,11 @@ inline SourceLoc operator+(SourceLoc loc, Int offset)
 // A range of locations in the input source
 struct SourceRange
 {
+        /// True if the loc is in the range. Range is inclusive on begin to end.
+    bool contains(SourceLoc loc) const { const auto rawLoc = loc.getRaw(); return rawLoc >= begin.getRaw() && rawLoc <= end.getRaw(); }
+        /// Get the total size
+    UInt getSize() const { return UInt(end.getRaw() - begin.getRaw()); }
+
     SourceRange()
     {}
 
@@ -68,11 +75,22 @@ struct SourceRange
     SourceLoc end;
 };
 
-// A logical or phyiscal storage object for a range of input code
+// A logical or physical storage object for a range of input code
 // that has logically contiguous source locations.
 class SourceFile : public RefObject
 {
 public:
+
+        /// Returns the line break offsets (in bytes from start of content)
+        /// Note that this is lazily evaluated - the line breaks are only calculated on the first request 
+    const List<uint32_t>& getLineBreakOffsets();
+
+        /// Calculate the line based on the offset 
+    int calcLineFromOffset(size_t offset);
+
+        /// Calculate the offset for a line
+    int calcLineColumnIndex(int line, int offset);
+
     // The logical file path to report for locations inside this span.
     String path;
 
@@ -85,10 +103,11 @@ public:
     // The range of source locations that the span covers
     SourceRange sourceRange;
 
+    protected:
     // In order to speed up lookup of line number information,
     // we will cache the starting offset of each line break in
     // the input file:
-    List<UInt> lineBreakOffsets;
+    List<uint32_t> m_lineBreakOffsets;
 };
 
 struct SourceManager;
@@ -130,6 +149,53 @@ struct ExpandedSourceLoc : public SourceLoc
 
 HumaneSourceLoc getHumaneLoc(ExpandedSourceLoc const& loc);
 
+/* A SourceUnit maps to a single span of SourceLoc range and is equivalent to a single include or use of a source file. 
+It is distinct from a SourceFile - because a SourceFile may be included multiple times, with different interpretations (depending 
+on #defines for example).s
+*/ 
+class SourceUnit: public RefObject
+{
+    public:
+
+    // Each entry represents some contiguous span of locations that
+    // all map to the same logical file.
+    struct Entry
+    {
+        SourceLoc m_startLoc;                       ///< Where does this entry begin?
+        StringSlicePool::Handle m_pathIndex;        ///< What is the presumed path for this entry
+        int32_t m_lineAdjust;                       ///< Adjustment to apply to source line numbers when printing presumed locations. Relative to the line number in the underlying file. 
+    };
+
+        /// Given a sourceLoc finds the entry associated with it. If returns -1 then no entry is 
+        /// associated with this location, and therefore the location should be interpreted as an offset 
+        /// into the underlying sourceFile.
+    int findEntryIndex(SourceLoc sourceLoc) const;
+
+        /// Get the range that this unit applies to
+    const SourceRange& getRange() const { return m_range; }
+        /// Get the entries
+    const List<Entry>& getEntries() const { return m_entries; }
+        /// Get the source file holds the contents this 'unit' 
+    SourceFile* getSourceFile() const { return m_sourceFile; }
+        /// Get the source manager
+    SourceManager* getSourceManager() const { return m_sourceManager; }
+
+        /// Ctor
+    SourceUnit(SourceManager* sourceManager, SourceFile* sourceFile, SourceRange range):
+        m_sourceManager(sourceManager),
+        m_range(range),
+        m_sourceFile(sourceFile)
+    {
+    }
+
+    protected:
+    
+    SourceManager* m_sourceManager;     /// Get the manager this belongs to 
+    SourceRange m_range;                ///< The range that this SourceUnit applies to
+    RefPtr<SourceFile> m_sourceFile;    ///< The source file can hold the line breaks
+    List<Entry> m_entries;              ///< An array entries describing how we should interpret a range, starting from the start location. 
+};
+
 struct SourceManager
 {
     // Initialize a source manager, with an optional parent
@@ -157,11 +223,19 @@ struct SourceManager
     // Get a "humane" version of a source location
     HumaneSourceLoc getHumaneLoc(SourceLoc const& loc);
 
+        /// Allocate a new source unit from a file
+    SourceUnit* newSourceUnit(SourceFile* sourceFile);
+
 
     // Get the source location that represents the spelling location corresponding to a location.
     SourceLoc getSpellingLoc(ExpandedSourceLoc const& loc);
     SourceLoc getSpellingLoc(SourceLoc const& loc);
 
+        /// Find a unit by a source file location. If not found in this will look in the parent/
+        /// Returns nullptr if not found
+    SourceUnit* findSourceUnit(SourceLoc loc);
+
+    
     // The first location available to this source manager
     // (may not be the first location of all, because we might
     // have a parent source manager)
@@ -193,6 +267,12 @@ struct SourceManager
     // An array of soure files we have loaded, ordered by
     // increasing starting location
     List<Entry> sourceFiles;
+
+    protected:
+
+    // All of the source units. These are held in increasing order of range, so can find by doing a binary chop.
+    List<RefPtr<SourceUnit> > m_sourceUnits;                
+    StringSlicePool m_slicePool;
 };
 
 
