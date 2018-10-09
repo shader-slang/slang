@@ -58,6 +58,9 @@ struct SourceRange
         /// Get the total size
     UInt getSize() const { return UInt(end.getRaw() - begin.getRaw()); }
 
+        /// Get the offset of a loc in this range
+    int getOffset(SourceLoc loc) const { SLANG_ASSERT(contains(loc)); return int(loc.getRaw() - begin.getRaw()); }
+
     SourceRange()
     {}
 
@@ -86,10 +89,10 @@ public:
     const List<uint32_t>& getLineBreakOffsets();
 
         /// Calculate the line based on the offset 
-    int calcLineFromOffset(size_t offset);
+    int calcLineIndexFromOffset(int offset);
 
         /// Calculate the offset for a line
-    int calcLineColumnIndex(int line, int offset);
+    int calcColumnIndex(int line, int offset);
 
     // The logical file path to report for locations inside this span.
     String path;
@@ -111,6 +114,12 @@ public:
 };
 
 struct SourceManager;
+
+enum class HumaneSourceLocType
+{
+    Normal,                 ///< Takes into account #line directives
+    Original,               ///< Ignores #line directives - humane location as seen in the actual file
+};
 
 // A source location in a format a human might like to see
 struct HumaneSourceLoc
@@ -162,7 +171,7 @@ class SourceUnit: public RefObject
     struct Entry
     {
         SourceLoc m_startLoc;                       ///< Where does this entry begin?
-        StringSlicePool::Handle m_pathIndex;        ///< What is the presumed path for this entry
+        StringSlicePool::Handle m_pathHandle;        ///< What is the presumed path for this entry
         int32_t m_lineAdjust;                       ///< Adjustment to apply to source line numbers when printing presumed locations. Relative to the line number in the underlying file. 
     };
 
@@ -170,6 +179,11 @@ class SourceUnit: public RefObject
         /// associated with this location, and therefore the location should be interpreted as an offset 
         /// into the underlying sourceFile.
     int findEntryIndex(SourceLoc sourceLoc) const;
+
+        /// Add a line directive for this unit. The directiveLoc must of course be in this SourceUnit
+        /// The path handle, must have been constructed on the SourceManager associated with the unit
+        /// NOTE! Directives are assumed to be added IN ORDER during parsing such that every directiveLoc > previous 
+    void addLineDirective(SourceLoc directiveLoc, StringSlicePool::Handle pathHandle, int line);
 
         /// Get the range that this unit applies to
     const SourceRange& getRange() const { return m_range; }
@@ -179,6 +193,9 @@ class SourceUnit: public RefObject
     SourceFile* getSourceFile() const { return m_sourceFile; }
         /// Get the source manager
     SourceManager* getSourceManager() const { return m_sourceManager; }
+
+        /// Get the humane location 
+    HumaneSourceLoc getHumaneLoc(HumaneSourceLocType type, SourceLoc loc);
 
         /// Ctor
     SourceUnit(SourceManager* sourceManager, SourceFile* sourceFile, SourceRange range):
@@ -235,7 +252,16 @@ struct SourceManager
         /// Returns nullptr if not found
     SourceUnit* findSourceUnit(SourceLoc loc);
 
-    
+        /// Searches this manager, and then the parent to see if can find a match for path. 
+        /// If not found returns nullptr.    
+    SourceFile* findSourceFile(const String& path);
+
+        /// Add a source file
+    void addSourceFile(const String& path, SourceFile* sourceFile);
+
+        /// Get the slice pool
+    StringSlicePool& getStringSlicePool() { return m_slicePool; }
+
     // The first location available to this source manager
     // (may not be the first location of all, because we might
     // have a parent source manager)
@@ -273,6 +299,8 @@ struct SourceManager
     // All of the source units. These are held in increasing order of range, so can find by doing a binary chop.
     List<RefPtr<SourceUnit> > m_sourceUnits;                
     StringSlicePool m_slicePool;
+
+    Dictionary<String, RefPtr<SourceFile> > m_sourceFiles;
 };
 
 

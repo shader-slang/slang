@@ -40,14 +40,15 @@ int SourceUnit::findEntryIndex(SourceLoc sourceLoc) const
 
     const auto rawValue = sourceLoc.getRaw();
 
-    int lo = 0;
-    int hi = int(m_entries.Count());
-    
-    if (hi == 0)
+    int hi = int(m_entries.Count());    
+    // If there are no entries, or it is in front of the first entry, then there is no associated entry
+    if (hi == 0 || 
+        m_entries[0].m_startLoc.getRaw() > sourceLoc.getRaw())
     {
         return -1;
     }
 
+    int lo = 0;
     while (lo + 1 < hi)
     {
         int mid = (hi + lo) >> 1;
@@ -66,8 +67,70 @@ int SourceUnit::findEntryIndex(SourceLoc sourceLoc) const
             hi = mid;
         }
     }
- 
+
     return lo;
+}
+
+void SourceUnit::addLineDirective(SourceLoc directiveLoc, StringSlicePool::Handle pathHandle, int line)
+{
+    SLANG_ASSERT(m_range.contains(directiveLoc));
+
+    // Check that the directiveLoc values are always increasing
+    SLANG_ASSERT(m_entries.Count() == 0 || (m_entries.Last().startLoc.getRaw() < directiveLoc.getRaw()));
+
+    // Calculate the offset
+    const int offset = m_range.getOffset(directiveLoc);
+    
+    // Get the line index in the original file
+    const int lineIndex = m_sourceFile->calcLineIndexFromOffset(offset);
+
+    Entry entry;
+    entry.m_startLoc = directiveLoc;
+    entry.m_pathHandle = pathHandle;
+    
+    // We also need to make sure that any lookups for line numbers will
+    // get corrected based on this files location.
+    // We assume the line number coming in is a line number, NOT an index so the correction needs + 1
+    entry.m_lineAdjust = line - (lineIndex + 1);
+    
+    m_entries.Add(entry);
+}
+
+HumaneSourceLoc SourceUnit::getHumaneLoc(HumaneSourceLocType type, SourceLoc loc)
+{
+    const int offset = m_range.getOffset(loc);
+
+    // We need the line index from the original source file
+    const int lineIndex = m_sourceFile->calcLineIndexFromOffset(offset);
+    
+    // TODO: we should really translate the byte index in the line
+    // to deal with:
+    //
+    // - Non-ASCII characters, while might consume multiple bytes
+    //
+    // - Tab characters, which should really adjust how we report
+    //   columns (although how are we supposed to know the setting
+    //   that an IDE expects us to use when reporting locations?)    
+    const int columnIndex = m_sourceFile->calcColumnIndex(lineIndex, offset);
+
+    HumaneSourceLoc humaneLoc;
+    humaneLoc.column = columnIndex + 1;
+
+    // Only bother looking up the entry information if we want a 'Normal' lookup
+    const int entryIndex = (type == HumaneSourceLocType::Normal) ? findEntryIndex(loc) : -1;
+    if (entryIndex >= 0)
+    {
+        const Entry& entry = m_entries[entryIndex];
+        humaneLoc.line = lineIndex + entry.m_lineAdjust + 1;
+        humaneLoc.path = m_sourceManager->getStringSlicePool().getSlice(entry.m_pathHandle);
+    }
+    else
+    {
+        humaneLoc.line = lineIndex + 1;
+        humaneLoc.path = m_sourceFile->path;
+    }
+        
+    return humaneLoc;
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!! SourceFile !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -105,9 +168,8 @@ const List<uint32_t>& SourceFile::getLineBreakOffsets()
                         cursor++;
 
                     m_lineBreakOffsets.Add(uint32_t(cursor - begin));
+                    break;
                 }
-                break;
-
                 default:
                     break;
             }
@@ -122,7 +184,7 @@ const List<uint32_t>& SourceFile::getLineBreakOffsets()
     return m_lineBreakOffsets;
 }
 
-int SourceFile::calcLineFromOffset(size_t offset)
+int SourceFile::calcLineIndexFromOffset(int offset)
 {
     SLANG_ASSERT(offset <= content.size());
 
@@ -137,10 +199,9 @@ int SourceFile::calcLineFromOffset(size_t offset)
 
     while (lo + 1 < hi)
     {
-        int mid = (hi + lo) >> 1; 
-
-        uint32_t midOffset = lineBreakOffsets[mid];
-        if (midOffset <= offset)
+        const int mid = (hi + lo) >> 1; 
+        const uint32_t midOffset = lineBreakOffsets[mid];
+        if (midOffset <= uint32_t(offset))
         {
             lo = mid;
         }
@@ -153,10 +214,10 @@ int SourceFile::calcLineFromOffset(size_t offset)
     return lo;
 }
 
-int SourceFile::calcLineColumnIndex(int line, int offset)
+int SourceFile::calcColumnIndex(int lineIndex, int offset)
 {
     const auto& lineBreakOffsets = getLineBreakOffsets();
-    return offset - lineBreakOffsets[line];   
+    return offset - lineBreakOffsets[lineIndex];   
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! SourceManager !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -285,6 +346,21 @@ SourceUnit* SourceManager::findSourceUnit(SourceLoc loc)
     return (parent) ? parent->findSourceUnit(loc) : nullptr;
 }
 
+SourceFile* SourceManager::findSourceFile(const String& path)
+{
+    RefPtr<SourceFile>* filePtr = m_sourceFiles.TryGetValue(path);
+    if (filePtr)
+    {
+        return filePtr->Ptr();
+    }
+    return parent ? parent->findSourceFile(path) : nullptr;
+}
+
+void SourceManager::addSourceFile(const String& path, SourceFile* sourceFile)
+{
+    SLANG_ASSERT(!findSourceFile(path));
+    m_sourceFiles.Add(path, sourceFile);
+}
 
 SourceLoc SourceManager::allocateSourceFileForLineDirective(
     SourceLoc const&    directiveLoc,
@@ -402,8 +478,8 @@ HumaneSourceLoc getHumaneLoc(ExpandedSourceLoc const& loc)
     auto& entry = sourceManager->sourceFiles[loc.entryIndex];
     int offset = int(loc.getRaw() - entry.startLoc.getRaw());
 
-    auto lineIndex = sourceFile->calcLineFromOffset(offset);
-    const auto byteIndexInLine = sourceFile->calcLineColumnIndex(lineIndex, offset);
+    auto lineIndex = sourceFile->calcLineIndexFromOffset(offset);
+    const auto byteIndexInLine = sourceFile->calcColumnIndex(lineIndex, offset);
 
     // Apply adjustment to the line number
     lineIndex = lineIndex + int(entry.lineAdjust);
