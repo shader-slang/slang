@@ -9,6 +9,8 @@
 #include "syntax-visitors.h"
 #include "../slang/type-layout.h"
 
+#include "ir-serialize.h"
+
 // Used to print exception type names in internal-compiler-error messages
 #include <typeinfo>
 
@@ -484,7 +486,31 @@ void CompileRequest::generateIR()
     // in isolation.
     for( auto& translationUnit : translationUnits )
     {
-        translationUnit->irModule = generateIRForTranslationUnit(translationUnit);
+        if (useSerialIRBottleneck)
+        {              
+            IRSerialData serialData;
+            {
+                /// Generate IR for translation unit
+                RefPtr<IRModule> irModule(generateIRForTranslationUnit(translationUnit));
+
+                // Write IR out to serialData - copying over SourceLoc information directly
+                IRSerialWriter writer;
+                writer.write(irModule, sourceManager, IRSerialWriter::OptionFlag::RawSourceLocation, &serialData);
+            }
+            RefPtr<IRModule> irReadModule;
+            {
+                // Read IR back from serialData
+                IRSerialReader reader;
+                reader.read(serialData, mSession, irReadModule);
+            }
+
+            // Use the serialized irModule
+            translationUnit->irModule = irReadModule;
+        }
+        else
+        {
+            translationUnit->irModule = generateIRForTranslationUnit(translationUnit);
+        }
     }
 }
 

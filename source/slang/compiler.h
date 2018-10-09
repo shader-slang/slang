@@ -320,7 +320,7 @@ namespace Slang
         List<RefPtr<TranslationUnitRequest> > translationUnits;
 
         // Entry points we've been asked to compile (each
-        // assocaited with a translation unit).
+        // associated with a translation unit).
         List<RefPtr<EntryPointRequest> > entryPoints;
 
         // Types constructed by reflection API
@@ -341,6 +341,10 @@ namespace Slang
         bool shouldDumpIR = false;
         bool shouldValidateIR = false;
         bool shouldSkipCodegen = false;
+
+        // If true then generateIR will serialize out IR, and serialize back in again. Making 
+        // serialization a bottleneck or firewall between the front end and the backend
+        bool useSerialIRBottleneck = false; 
 
         // How should `#line` directives be emitted (if at all)?
         LineDirectiveMode lineDirectiveMode = LineDirectiveMode::Default;
