@@ -5884,10 +5884,17 @@ struct EmitVisitor
         auto returnInst = (IRReturnVal*) block->getLastInst();
         SLANG_RELEASE_ASSERT(returnInst->op == kIROp_ReturnVal);
 
-        // Now we want to emit the expression form of
-        // the value being returned, and force any
-        // sub-expressions to be included.
-        emitIRInstExpr(ctx, returnInst->getVal(), IREmitMode::GlobalConstant);
+        // We will emit the value in the `GlobalConstant` mode, which
+        // more or less says to fold all instructions into their use
+        // sites, so that we end up with a single expression tree even
+        // in cases that would otherwise trip up our analysis.
+        //
+        // Note: We are emitting the value as an *operand* here instead
+        // of directly calling `emitIRInstExpr` because we need to handle
+        // cases where the value might *need* to emit as a named referenced
+        // (e.g., when it names another constant directly).
+        //
+        emitIROperand(ctx, returnInst->getVal(), IREmitMode::GlobalConstant);
     }
 
     void emitIRGlobalConstant(
