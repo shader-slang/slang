@@ -2353,14 +2353,6 @@ struct EmitVisitor
         case kIROp_Param:
             return false;
 
-        // HACK: don't fold these in because we currently lower
-        // them to initializer lists, which aren't allowed in
-        // general expression contexts.
-        //
-        case kIROp_makeStruct:
-        case kIROp_makeArray:
-            return false;
-
         // Always fold these in, because they are trivial
         //
         case kIROp_IntLit:
@@ -2386,6 +2378,25 @@ struct EmitVisitor
         // Always fold when we are inside a global constant initializer
         if (mode == IREmitMode::GlobalConstant)
             return true;
+
+        switch( inst->op )
+        {
+        default:
+            break;
+
+        // HACK: don't fold these in because we currently lower
+        // them to initializer lists, which aren't allowed in
+        // general expression contexts.
+        //
+        // Note: we are doing this check *after* the check for `GlobalConstant`
+        // mode, because otherwise we'd fail to emit initializer lists in
+        // the main place where we want/need them.
+        //
+        case kIROp_makeStruct:
+        case kIROp_makeArray:
+            return false;
+
+        }
 
         // Instructions with specific result *types* will usually
         // want to be folded in, because they aren't allowed as types
@@ -2539,9 +2550,25 @@ struct EmitVisitor
     {
         if( shouldFoldIRInstIntoUseSites(ctx, inst, mode) )
         {
-            emit("(");
-            emitIRInstExpr(ctx, inst, mode);
-            emit(")");
+            // HACK: Don't emit parentheses for cases that will
+            // wrap themsevles in `{}` to begin with.
+            //
+            // TODO: This shouldn't be needed once we are more
+            // systematic about not emitting redundant parentheses.
+            //
+            switch(inst->op)
+            {
+            case kIROp_makeArray:
+            case kIROp_makeStruct:
+                emitIRInstExpr(ctx, inst, mode);
+                break;
+
+            default:
+                emit("(");
+                emitIRInstExpr(ctx, inst, mode);
+                emit(")");
+                break;
+            }
             return;
         }
 
