@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="Header Files">
@@ -45,6 +45,12 @@
     <ClInclude Include="secure-crt.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-byte-encode-util.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-cpu-defines.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-free-list.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -58,6 +64,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-random-generator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-string-slice-pool.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-string-util.h">
@@ -81,12 +90,12 @@
     <ClInclude Include="type-traits.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="slang-byte-encode-util.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="platform.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-byte-encode-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-free-list.cpp">
@@ -99,6 +108,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-random-generator.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-string-slice-pool.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-string-util.cpp">
@@ -116,13 +128,10 @@
     <ClCompile Include="token-reader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="slang-byte-encode-util.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="core.natvis">
+    <Natvis Include="core.natvis">
       <Filter>Source Files</Filter>
-    </None>
+    </Natvis>
   </ItemGroup>
 </Project>

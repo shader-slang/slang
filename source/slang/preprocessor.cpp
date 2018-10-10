@@ -265,13 +265,13 @@ static NamePool* getNamePool(Preprocessor* preprocessor)
 // TODO(tfoley): pre-tokenizing files isn't going to work in the long run.
 static PreprocessorInputStream* CreateInputStreamForSource(
     Preprocessor*   preprocessor,
-    SourceFile*     sourceFile)
+    SourceUnit*     sourceUnit)
 {
     PrimaryInputStream* inputStream = new PrimaryInputStream();
     initializePrimaryInputStream(preprocessor, inputStream);
 
     // initialize the embedded lexer so that it can generate a token stream
-    inputStream->lexer.initialize(sourceFile, GetSink(preprocessor), getNamePool(preprocessor));
+    inputStream->lexer.initialize(sourceUnit, GetSink(preprocessor), getNamePool(preprocessor));
     inputStream->token = inputStream->lexer.lexToken();
 
     return inputStream;
@@ -835,11 +835,15 @@ top:
 
         // Now re-lex the input
 
+        SourceManager* sourceManager = preprocessor->getCompileRequest()->getSourceManager();
+
         // We create a dummy file to represent the token-paste operation
-        SourceFile* sourceFile = preprocessor->getCompileRequest()->getSourceManager()->allocateSourceFile("token paste", sb.ProduceString());
+        SourceFile* sourceFile = sourceManager->newSourceFile("token paste", sb.ProduceString());
+
+        SourceUnit* sourceUnit = sourceManager->newSourceUnit(sourceFile);
 
         Lexer lexer;
-        lexer.initialize(sourceFile, GetSink(preprocessor), getNamePool(preprocessor));
+        lexer.initialize(sourceUnit, GetSink(preprocessor), getNamePool(preprocessor));
 
         SimpleTokenInputStream* inputStream = new SimpleTokenInputStream();
         initializeInputStream(preprocessor, inputStream);
@@ -1584,8 +1588,8 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
     String path = getFileNameTokenValue(pathToken);
 
     auto directiveLoc = GetDirectiveLoc(context);
-    auto expandedDirectiveLoc = context->preprocessor->translationUnit->compileRequest->getSourceManager()->expandSourceLoc(directiveLoc);
-    String pathIncludedFrom = expandedDirectiveLoc.getSpellingPath();
+    
+    String pathIncludedFrom = context->preprocessor->translationUnit->compileRequest->getSourceManager()->getPath(directiveLoc, SourceLocType::Original);
     String foundPath;
     ComPtr<ISlangBlob> foundSourceBlob;
 
@@ -1622,10 +1626,21 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
 
     // Push the new file onto our stack of input streams
     // TODO(tfoley): check if we have made our include stack too deep
+    auto sourceManager = context->preprocessor->getCompileRequest()->getSourceManager();
 
-    SourceFile* sourceFile = context->preprocessor->getCompileRequest()->getSourceManager()->allocateSourceFile(foundPath, foundSourceBlob);
+    // See if this an already loaded source file
+    SourceFile* sourceFile = sourceManager->findSourceFile(foundPath);
+    // If not create a new one, and add to the list of known source files
+    if (!sourceFile)
+    {
+        sourceFile = sourceManager->newSourceFile(foundPath, foundSourceBlob);
+        sourceManager->addSourceFile(foundPath, sourceFile);
+    }
 
-    PreprocessorInputStream* inputStream = CreateInputStreamForSource(context->preprocessor, sourceFile);
+    // This is a new parse (even if it's a pre-existing source file), so create a new SourceUnit
+    SourceUnit* sourceUnit = sourceManager->newSourceUnit(sourceFile);
+
+    PreprocessorInputStream* inputStream = CreateInputStreamForSource(context->preprocessor, sourceUnit);
     inputStream->parent = context->preprocessor->inputStream;
     context->preprocessor->inputStream = inputStream;
 }
@@ -1771,6 +1786,8 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
 
     int line = 0;
 
+    SourceLoc directiveLoc = GetDirectiveLoc(context);
+
     // `#line <integer-literal> ...`
     if (PeekTokenType(context) == TokenType::IntegerLiteral)
     {
@@ -1785,8 +1802,9 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
     {
         AdvanceToken(context);
 
-        // Stop overiding soure locations.
-        inputStream->primaryStream->lexer.stopOverridingSourceLocations();
+        // Stop overriding source locations.
+        auto sourceUnit = inputStream->primaryStream->lexer.sourceUnit;
+        sourceUnit->addDefaultLineDirective(directiveLoc);
         return;
     }
     else
@@ -1799,15 +1817,12 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
         return;
     }
 
-    SourceLoc directiveLoc = GetDirectiveLoc(context);
-
     auto sourceManager = context->preprocessor->translationUnit->compileRequest->getSourceManager();
-    auto expandedDirectiveLoc = sourceManager->expandSourceLoc(directiveLoc);
-
+    
     String file;
     if (PeekTokenType(context) == TokenType::EndOfDirective)
     {
-        file = expandedDirectiveLoc.getPath();
+        file = sourceManager->getPath(directiveLoc);
     }
     else if (PeekTokenType(context) == TokenType::StringLiteral)
     {
@@ -1825,9 +1840,8 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
         return;
     }
 
-    SourceLoc newLoc = sourceManager->allocateSourceFileForLineDirective(expandedDirectiveLoc, file, line);
-
-    inputStream->primaryStream->lexer.startOverridingSourceLocations(newLoc);
+    auto sourceUnit = inputStream->primaryStream->lexer.sourceUnit;
+    sourceUnit->addLineDirective(directiveLoc, file, line);
 }
 
 #define SLANG_PRAGMA_DIRECTIVE_CALLBACK(NAME) \
@@ -1861,8 +1875,7 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaOnceDirective)
     // trivial cases of the "same" path.
     //
     auto directiveLoc = GetDirectiveLoc(context);
-    auto expandedDirectiveLoc = context->preprocessor->translationUnit->compileRequest->getSourceManager()->expandSourceLoc(directiveLoc);
-    String pathIssuedFrom = expandedDirectiveLoc.getSpellingPath();
+    auto pathIssuedFrom = context->preprocessor->translationUnit->compileRequest->getSourceManager()->getPath(directiveLoc, SourceLocType::Original);
 
     context->preprocessor->pragmaOncePaths.Add(pathIssuedFrom);
 }
@@ -2233,19 +2246,24 @@ static void DefineMacro(
     String fileName = "command line";
     PreprocessorMacro* macro = CreateMacro(preprocessor);
 
-    SourceFile* keyFile = preprocessor->translationUnit->compileRequest->getSourceManager()->allocateSourceFile(fileName, key);
-    SourceFile* valueFile = preprocessor->translationUnit->compileRequest->getSourceManager()->allocateSourceFile(fileName, value);
+    auto sourceManager = preprocessor->translationUnit->compileRequest->getSourceManager();
+
+    SourceFile* keyFile = sourceManager->newSourceFile(fileName, key);
+    SourceFile* valueFile = sourceManager->newSourceFile(fileName, value);
+
+    SourceUnit* keyUnit = sourceManager->newSourceUnit(keyFile);
+    SourceUnit* valueUnit = sourceManager->newSourceUnit(valueFile);
 
     // Use existing `Lexer` to generate a token stream.
     Lexer lexer;
-    lexer.initialize(valueFile, GetSink(preprocessor), getNamePool(preprocessor));
+    lexer.initialize(valueUnit, GetSink(preprocessor), getNamePool(preprocessor));
     macro->tokens = lexer.lexAllTokens();
 
     Name* keyName = preprocessor->translationUnit->compileRequest->getNamePool()->getName(key);
 
     macro->nameAndLoc.name = keyName;
-    macro->nameAndLoc.loc = keyFile->sourceRange.begin;
-
+    macro->nameAndLoc.loc = keyUnit->getRange().begin;
+    
     PreprocessorMacro* oldMacro = NULL;
     if (preprocessor->globalEnv.macros.TryGetValue(keyName, oldMacro))
     {
@@ -2291,8 +2309,12 @@ TokenList preprocessSource(
         DefineMacro(&preprocessor, p.Key, p.Value);
     }
 
+    SourceManager* sourceManager = translationUnit->compileRequest->getSourceManager();
+
+    SourceUnit* sourceUnit = sourceManager->newSourceUnit(file);
+
     // create an initial input stream based on the provided buffer
-    preprocessor.inputStream = CreateInputStreamForSource(&preprocessor, file);
+    preprocessor.inputStream = CreateInputStreamForSource(&preprocessor, sourceUnit);
 
     TokenList tokens = ReadAllTokens(&preprocessor);
 

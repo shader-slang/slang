@@ -256,8 +256,6 @@ struct IRSerialBinary
     static const uint32_t kStringFourCc = SLANG_FOUR_CC('S', 'L', 's', 't');
         /// 4 bytes per entry
     static const uint32_t kUInt32SourceLocFourCc = SLANG_FOUR_CC('S', 'r', 's', '4');
-        /// 8 bytes per entry
-    static const uint32_t kUInt64SourceLocFourCc = SLANG_FOUR_CC('S', 'r', 's', '8');
 
     struct SlangHeader
     {

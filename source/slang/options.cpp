@@ -320,6 +320,10 @@ struct OptionsParser
                 {
                     requestImpl->shouldDumpIR = true;
                 }
+                else if (argStr == "-serial-ir")
+                {
+                    requestImpl->useSerialIRBottleneck = true;
+                }
                 else if(argStr == "-validate-ir" )
                 {
                     requestImpl->shouldValidateIR = true;
