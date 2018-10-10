@@ -20,7 +20,7 @@ public:
     int findIndex(const Slice& slice) const;
 
         /// True if has the slice
-    bool has(const Slice& slice) { return findIndex(slice) < 0; }
+    bool has(const Slice& slice) { return findIndex(slice) >= 0; }
         /// Add a slice 
     Handle add(const Slice& slice);
 
