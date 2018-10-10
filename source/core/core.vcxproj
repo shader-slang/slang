@@ -213,7 +213,7 @@
     <ClCompile Include="token-reader.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <Natvis Include="core.natvis" />
+    <None Include="core.natvis" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

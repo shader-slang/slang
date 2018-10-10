@@ -371,7 +371,7 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
                         dstInst.m_payload.m_float64 = irConst->value.floatVal; 
                         break;
                     }
-                    case kIROp_boolConst:
+                    case kIROp_BoolLit:
                     {
                         dstInst.m_payloadType = PayloadType::UInt32;
                         dstInst.m_payload.m_uint32 = irConst->value.intVal ? 1 : 0;
@@ -1604,7 +1604,7 @@ IRDecoration* IRSerialReader::_createDecoration(const Ser::Inst& srcInst)
                 IRConstant* irConst = nullptr;
                 switch (op)
                 {                    
-                    case kIROp_boolConst:
+                    case kIROp_BoolLit:
                     {
                         SLANG_ASSERT(srcInst.m_payloadType == PayloadType::UInt32);
                         irConst = static_cast<IRConstant*>(createEmptyInstWithSize(module, op, prefixSize + sizeof(IRIntegerValue)));

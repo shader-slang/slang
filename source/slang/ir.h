@@ -516,6 +516,14 @@ struct IRIntLit : IRConstant
     IR_LEAF_ISA(IntLit);
 };
 
+struct IRBoolLit : IRConstant
+{
+    bool getValue() { return value.intVal != 0; }
+
+    IR_LEAF_ISA(BoolLit);
+};
+
+
 // Get the compile-time constant integer value of an instruction,
 // if it has one, and assert-fail otherwise.
 IRIntegerValue GetIntVal(IRInst* inst);
@@ -560,6 +568,8 @@ struct IRParentInst : IRInst
     IRInst* getFirstChild() { return children.first; }
     IRInst* getLastChild()  { return children.last;  }
     IRInstListBase getChildren() { return children; }
+
+    void removeAndDeallocateAllChildren();
 
     IR_PARENT_ISA(ParentInst)
 };
@@ -642,6 +652,7 @@ struct IRBlock : IRParentInst
         IRUse* b;
 
         UInt getCount();
+        bool isEmpty();
 
         struct Iterator
         {
