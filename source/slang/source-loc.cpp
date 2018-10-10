@@ -5,29 +5,260 @@
 
 namespace Slang {
 
-String ExpandedSourceLoc::getPath() const
-{
-    if(!sourceManager)
-        return String();
+/* !!!!!!!!!!!!!!!!!!!!!!!!! SourceUnit !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-    return sourceManager->sourceFiles[entryIndex].path;
+int SourceUnit::findEntryIndex(SourceLoc sourceLoc) const
+{
+    if (!m_range.contains(sourceLoc))
+    {
+        return -1;
+    }
+
+    const auto rawValue = sourceLoc.getRaw();
+
+    int hi = int(m_entries.Count());    
+    // If there are no entries, or it is in front of the first entry, then there is no associated entry
+    if (hi == 0 || 
+        m_entries[0].m_startLoc.getRaw() > sourceLoc.getRaw())
+    {
+        return -1;
+    }
+
+    int lo = 0;
+    while (lo + 1 < hi)
+    {
+        int mid = (hi + lo) >> 1;
+
+        const Entry& midEntry = m_entries[mid];
+        SourceLoc::RawValue midValue = midEntry.m_startLoc.getRaw();
+
+        if (midValue <= rawValue)
+        {
+            // The location we seek is at or after this entry
+            lo = mid;
+        }
+        else
+        {
+            // The location we seek is before this entry
+            hi = mid;
+        }
+    }
+
+    return lo;
 }
 
-String ExpandedSourceLoc::getSpellingPath() const
+void SourceUnit::addLineDirective(SourceLoc directiveLoc, StringSlicePool::Handle pathHandle, int line)
 {
-    if(!sourceManager)
-        return String();
+    SLANG_ASSERT(pathHandle != StringSlicePool::Handle(0));
+    SLANG_ASSERT(m_range.contains(directiveLoc));
 
-    return sourceManager->sourceFiles[entryIndex].sourceFile->path;
+    // Check that the directiveLoc values are always increasing
+    SLANG_ASSERT(m_entries.Count() == 0 || (m_entries.Last().m_startLoc.getRaw() < directiveLoc.getRaw()));
+
+    // Calculate the offset
+    const int offset = m_range.getOffset(directiveLoc);
+    
+    // Get the line index in the original file
+    const int lineIndex = m_sourceFile->calcLineIndexFromOffset(offset);
+
+    Entry entry;
+    entry.m_startLoc = directiveLoc;
+    entry.m_pathHandle = pathHandle;
+    
+    // We also need to make sure that any lookups for line numbers will
+    // get corrected based on this files location.
+    // We assume the line number coming in is a line number, NOT an index so the correction needs + 1
+    // There is an additional + 1 because we want the NEXT line to be 99 (ie +2 is correct 'fix')
+    entry.m_lineAdjust = line - (lineIndex + 2);
+
+    m_entries.Add(entry);
 }
 
-SourceFile* ExpandedSourceLoc::getSourceFile() const
+void SourceUnit::addLineDirective(SourceLoc directiveLoc, const String& path, int line)
 {
-    if(!sourceManager)
-        return nullptr;
-
-    return sourceManager->sourceFiles[entryIndex].sourceFile;
+    StringSlicePool::Handle pathHandle = m_sourceManager->getStringSlicePool().add(path.getUnownedSlice());
+    return addLineDirective(directiveLoc, pathHandle, line);
 }
+
+void SourceUnit::addDefaultLineDirective(SourceLoc directiveLoc)
+{
+    SLANG_ASSERT(m_range.contains(directiveLoc));
+    // Check that the directiveLoc values are always increasing
+    SLANG_ASSERT(m_entries.Count() == 0 || (m_entries.Last().m_startLoc.getRaw() < directiveLoc.getRaw()));
+
+    // Well if there are no entries, or the last one puts it in default case, then we don't need to add anything
+    if (m_entries.Count() == 0 || (m_entries.Count() && m_entries.Last().isDefault()))
+    {
+        return;
+    }
+
+    Entry entry;
+    entry.m_startLoc = directiveLoc;
+    entry.m_lineAdjust = 0;                                 // No line adjustment... we are going back to default
+    entry.m_pathHandle = StringSlicePool::Handle(0);        // Mark that there is no path, and that this is a 'default'
+
+    SLANG_ASSERT(entry.isDefault());
+
+    m_entries.Add(entry);
+}
+
+HumaneSourceLoc SourceUnit::getHumaneLoc(SourceLoc loc, SourceLocType type)
+{
+    const int offset = m_range.getOffset(loc);
+
+    // We need the line index from the original source file
+    const int lineIndex = m_sourceFile->calcLineIndexFromOffset(offset);
+    
+    // TODO: we should really translate the byte index in the line
+    // to deal with:
+    //
+    // - Non-ASCII characters, while might consume multiple bytes
+    //
+    // - Tab characters, which should really adjust how we report
+    //   columns (although how are we supposed to know the setting
+    //   that an IDE expects us to use when reporting locations?)    
+    const int columnIndex = m_sourceFile->calcColumnIndex(lineIndex, offset);
+
+    HumaneSourceLoc humaneLoc;
+    humaneLoc.column = columnIndex + 1;
+    humaneLoc.line = lineIndex + 1;
+
+    // Make up a default entry
+    StringSlicePool::Handle pathHandle = StringSlicePool::Handle(0);
+
+    // Only bother looking up the entry information if we want a 'Normal' lookup
+    const int entryIndex = (type == SourceLocType::Normal) ? findEntryIndex(loc) : -1;
+    if (entryIndex >= 0)
+    {
+        const Entry& entry = m_entries[entryIndex];
+        // Adjust the line
+        humaneLoc.line += entry.m_lineAdjust;
+        // Get the pathHandle..
+        pathHandle = entry.m_pathHandle;
+    }
+
+    // If there is no override path, then just the source files path
+    if (pathHandle == StringSlicePool::Handle(0))
+    {
+        humaneLoc.path = m_sourceFile->path;
+    }
+    else
+    {
+        humaneLoc.path = m_sourceManager->getStringSlicePool().getSlice(pathHandle);
+    }
+    
+    return humaneLoc;
+}
+
+String SourceUnit::getPath(SourceLoc loc, SourceLocType type)
+{
+    if (type == SourceLocType::Original)
+    {
+        return m_sourceFile->path;
+    }
+
+    const int entryIndex = findEntryIndex(loc);
+    const StringSlicePool::Handle pathHandle = (entryIndex >= 0) ? m_entries[entryIndex].m_pathHandle : StringSlicePool::Handle(0);
+   
+    // If there is no override path, then just the source files path
+    if (pathHandle == StringSlicePool::Handle(0))
+    {
+        return m_sourceFile->path;
+    }
+    else
+    {
+        return m_sourceManager->getStringSlicePool().getSlice(pathHandle);
+    }
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!! SourceFile !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+const List<uint32_t>& SourceFile::getLineBreakOffsets()
+{
+    // We now have a raw input file that we can search for line breaks.
+    // We obviously don't want to do a linear scan over and over, so we will
+    // cache an array of line break locations in the file.
+    if (m_lineBreakOffsets.Count() == 0)
+    {
+        char const* begin = content.begin();
+        char const* end = content.end();
+
+        char const* cursor = begin;
+
+        // Treat the beginning of the file as a line break
+        m_lineBreakOffsets.Add(0);
+
+        while (cursor != end)
+        {
+            int c = *cursor++;
+            switch (c)
+            {
+                case '\r': case '\n':
+                {
+                    // When we see a line-break character we need
+                    // to record the line break, but we also need
+                    // to deal with the annoying issue of encodings,
+                    // where a multi-byte sequence might encode
+                    // the line break.
+
+                    int d = *cursor;
+                    if ((c^d) == ('\r' ^ '\n'))
+                        cursor++;
+
+                    m_lineBreakOffsets.Add(uint32_t(cursor - begin));
+                    break;
+                }
+                default:
+                    break;
+            }
+        }
+
+        // Note that we do *not* treat the end of the file as a line
+        // break, because otherwise we would report errors like
+        // "end of file inside string literal" with a line number
+        // that points at a line that doesn't exist.
+    }
+
+    return m_lineBreakOffsets;
+}
+
+int SourceFile::calcLineIndexFromOffset(int offset)
+{
+    SLANG_ASSERT(UInt(offset) <= content.size());
+
+    // Make sure we have the line break offsets
+    const auto& lineBreakOffsets = getLineBreakOffsets();
+
+    // At this point we can assume the `lineBreakOffsets` array has been filled in.
+    // We will use a binary search to find the line index that contains our
+    // chosen offset.
+    int lo = 0;
+    int hi = int(lineBreakOffsets.Count());
+
+    while (lo + 1 < hi)
+    {
+        const int mid = (hi + lo) >> 1; 
+        const uint32_t midOffset = lineBreakOffsets[mid];
+        if (midOffset <= uint32_t(offset))
+        {
+            lo = mid;
+        }
+        else
+        {
+            hi = mid;
+        }
+    }
+
+    return lo;
+}
+
+int SourceFile::calcColumnIndex(int lineIndex, int offset)
+{
+    const auto& lineBreakOffsets = getLineBreakOffsets();
+    return offset - lineBreakOffsets[lineIndex];   
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!! SourceManager !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 void SourceManager::initialize(
     SourceManager*  p)
@@ -70,7 +301,7 @@ SourceRange SourceManager::allocateSourceRange(UInt size)
     return SourceRange(beginLoc, endLoc);
 }
 
-SourceFile* SourceManager::allocateSourceFile(
+SourceFile* SourceManager::newSourceFile(
     String const&   path,
     ISlangBlob*     contentBlob)
 {
@@ -78,110 +309,56 @@ SourceFile* SourceManager::allocateSourceFile(
     UInt contentSize = contentBlob->getBufferSize();
     char const* contentEnd = contentBegin + contentSize;
 
-    SourceRange sourceRange = allocateSourceRange(contentSize);
-
     SourceFile* sourceFile = new SourceFile();
     sourceFile->path = path;
     sourceFile->contentBlob = contentBlob;
     sourceFile->content = UnownedStringSlice(contentBegin, contentEnd);
-    sourceFile->sourceRange = sourceRange;
-
-    Entry entry;
-    entry.sourceFile = sourceFile;
-    entry.startLoc = sourceRange.begin;
-    entry.path = path;
-
-    sourceFiles.Add(entry);
-
+ 
     return sourceFile;
 }
 
-SourceFile* SourceManager::allocateSourceFile(
+SourceFile* SourceManager::newSourceFile(
     String const&   path,
     String const&   content)
 {
     ComPtr<ISlangBlob> contentBlob = createStringBlob(content);
-    return allocateSourceFile(path, contentBlob);
+    return newSourceFile(path, contentBlob);
 }
 
-SourceLoc SourceManager::allocateSourceFileForLineDirective(
-    SourceLoc const&    directiveLoc,
-    String const&       path,
-    UInt                line)
+SourceUnit* SourceManager::newSourceUnit(SourceFile* sourceFile)
 {
-    // First, we need to find out what file we are being asked to remap
-    ExpandedSourceLoc expandedDirectiveLoc = expandSourceLoc(getSpellingLoc(directiveLoc));
-    HumaneSourceLoc humaneDirectiveLoc = getHumaneLoc(expandedDirectiveLoc);
+    SourceRange range = allocateSourceRange(sourceFile->content.size());
+    SourceUnit* sourceUnit = new SourceUnit(this, sourceFile, range);
+    m_sourceUnits.Add(sourceUnit);
 
-    SourceFile* sourceFile = expandedDirectiveLoc.getSourceFile();
-    if(!sourceFile)
-        return SourceLoc();
-
-    // We are going to be wasteful here and allocate a range of source locations
-    // that can cover the entire input file. This will lead to a problem with
-    // memory usage if we ever had a large input file that used many `#line` directives,
-    // since our usage of ranges would be quadratic!
-
-    // Count how many locations we'd need to reserve for a complete clone of the input
-    UInt size = sourceFile->sourceRange.end.getRaw() - sourceFile->sourceRange.begin.getRaw();
-
-    // Allocate a fresh range for our logically remapped file
-    SourceRange sourceRange = allocateSourceRange(size);
-
-    // Now fill in an entry that will point at the original source file,
-    // but use our new range.
-    Entry entry;
-    entry.sourceFile = sourceFile;
-    entry.startLoc = sourceRange.begin;
-    entry.path = path;
-
-    // We also need to make sure that any lookups for line numbers will
-    // get corrected based on this files location.
-    entry.lineAdjust = Int(line) - Int(humaneDirectiveLoc.line + 1);
-
-    sourceFiles.Add(entry);
-
-    return entry.startLoc;
+    return sourceUnit;
 }
 
-static ExpandedSourceLoc expandSourceLoc(
-    SourceManager*      inSourceManager,
-    SourceLoc const&    loc)
+SourceUnit* SourceManager::findSourceUnit(SourceLoc loc)
 {
-    SourceManager* sourceManager = inSourceManager;
+    SourceLoc::RawValue rawLoc = loc.getRaw();
 
-    ExpandedSourceLoc expanded;
+    int hi = int(m_sourceUnits.Count());
 
-    SourceLoc::RawValue rawValue = loc.getRaw();
-
-    // Invalid location? -> invalid expanded location
-    if(rawValue == 0)
-        return expanded;
-
-    // Past the end of what we can handle? -> invalid
-    if(rawValue >= sourceManager->nextLoc.getRaw())
-        return expanded;
-
-    // Maybe the location came from a parent source manager
-    while( rawValue < sourceManager->startLoc.getRaw()
-        && sourceManager->parent)
+    if (hi == 0)
     {
-        sourceManager = sourceManager->parent;
+        return nullptr;
     }
 
-    SLANG_ASSERT(sourceManager->sourceFiles.Count() > 0);
-
-    UInt lo = 0;
-    UInt hi = sourceManager->sourceFiles.Count();
-
-    while( lo+1 < hi )
+    int lo = 0;
+    while (lo + 1 < hi)
     {
-        UInt mid = lo + (hi - lo) / 2;
+        int mid = (hi + lo) >> 1;
 
-        SourceManager::Entry const& midEntry = sourceManager->sourceFiles[mid];
-        SourceLoc::RawValue midValue = midEntry.startLoc.getRaw();
+        SourceUnit* midEntry = m_sourceUnits[mid];
+        if (midEntry->getRange().contains(loc))
+        {
+            return midEntry;
+        }
 
-        if( midValue <= rawValue )
+        SourceLoc::RawValue midValue = midEntry->getRange().begin.getRaw();
+
+        if (midValue <= rawLoc)
         {
             // The location we seek is at or after this entry
             lo = mid;
@@ -193,159 +370,60 @@ static ExpandedSourceLoc expandSourceLoc(
         }
     }
 
-    // `lo` should now point at the entry we want
-    UInt entryIndex = lo;
+    // Check if low is a hit
+    {
+        SourceUnit* unit = m_sourceUnits[lo];
+        if (unit->getRange().contains(loc))
+        {
+            return unit;
+        }
+    }
 
-    expanded.setRaw(loc.getRaw());
-    expanded.sourceManager = sourceManager;
-    expanded.entryIndex = entryIndex;
-
-    return expanded;
-
-
+    // Check the parent if there is a parent
+    return (parent) ? parent->findSourceUnit(loc) : nullptr;
 }
 
-ExpandedSourceLoc SourceManager::expandSourceLoc(SourceLoc const& loc)
+SourceFile* SourceManager::findSourceFile(const String& path)
 {
-    return Slang::expandSourceLoc(this, loc);
+    RefPtr<SourceFile>* filePtr = m_sourceFiles.TryGetValue(path);
+    if (filePtr)
+    {
+        return filePtr->Ptr();
+    }
+    return parent ? parent->findSourceFile(path) : nullptr;
 }
 
-HumaneSourceLoc getHumaneLoc(ExpandedSourceLoc const& loc)
+void SourceManager::addSourceFile(const String& path, SourceFile* sourceFile)
 {
-    // First check if this location maps to an actual file.
-    SourceFile* sourceFile = loc.getSourceFile();
-    if(!sourceFile)
+    SLANG_ASSERT(!findSourceFile(path));
+    m_sourceFiles.Add(path, sourceFile);
+}
+
+HumaneSourceLoc SourceManager::getHumaneLoc(SourceLoc loc, SourceLocType type)
+{
+    SourceUnit* sourceUnit = findSourceUnit(loc);
+    if (sourceUnit)
+    {
+        return sourceUnit->getHumaneLoc(loc, type);
+    }
+    else
+    {
         return HumaneSourceLoc();
-
-    auto sourceManager = loc.sourceManager;
-
-    auto& entry = sourceManager->sourceFiles[loc.entryIndex];
-    UInt offset = loc.getRaw() - entry.startLoc.getRaw();
-
-    // We now have a raw input file that we can search for line breaks.
-    // We obviously don't want to do a linear scan over and over, so we will
-    // cache an array of line break locations in the file.
-    auto& lineBreakOffsets = sourceFile->lineBreakOffsets;
-    if( lineBreakOffsets.Count() == 0 )
-    {
-        char const* begin = sourceFile->content.begin();
-        char const* end = sourceFile->content.end();
-
-        char const* cursor = begin;
-
-        // Treat the beginning of the file as a line break
-        lineBreakOffsets.Add(0);
-
-        while( cursor != end )
-        {
-            int c = *cursor++;
-            switch( c )
-            {
-            case '\r': case '\n':
-                {
-                    // When we see a line-break character we need
-                    // to record the line break, but we also need
-                    // to deal with the annoying issue of encodings,
-                    // where a multi-byte sequence might encode
-                    // the line break.
-
-                    int d = *cursor;
-                    if( (c^d) == ('\r' ^ '\n'))
-                        cursor++;
-
-                    lineBreakOffsets.Add(cursor - begin);
-                }
-                break;
-
-            default:
-                break;
-            }
-        }
-
-        // Note taht we do *not* treat the end of the file as a line
-        // break, because otherwise we would report errors like
-        // "end of file inside string literal" with a line number
-        // that points at a line that doesn't exist.
     }
+}
 
-    // At this point we can assume the `lineBreakOffsets` array has been filled in.
-    // We will use a binary search to find the line index that contains our
-    // chosen offset.
-    UInt lo = 0;
-    UInt hi = lineBreakOffsets.Count();
-
-    while( lo+1 < hi )
+String SourceManager::getPath(SourceLoc loc, SourceLocType type)
+{
+    SourceUnit* sourceUnit = findSourceUnit(loc);
+    if (sourceUnit)
     {
-        UInt mid = lo + (hi - lo)/2;
-
-        UInt midOffset = lineBreakOffsets[mid];
-        if( midOffset <= offset )
-        {
-            lo = mid;
-        }
-        else
-        {
-            hi = mid;
-        }
+        return sourceUnit->getPath(loc, type);
     }
-
-    UInt lineIndex = lo;
-    UInt byteIndexInLine = offset - lineBreakOffsets[lineIndex];
-
-    // Apply adjustment to the line number
-    lineIndex = lineIndex + entry.lineAdjust;
-
-    // TODO: we should really translate the byte index in the line
-    // to deal with:
-    //
-    // - Non-ASCII characters, while might consume multiple bytes
-    //
-    // - Tab characters, which should really adjust how we report
-    //   columns (although how are we supposed to know the setting
-    //   that an IDE expects us to use when reporting locations?)
-
-    HumaneSourceLoc humaneLoc;
-    humaneLoc.path = entry.path;
-    humaneLoc.line = lineIndex + 1;
-    humaneLoc.column = byteIndexInLine + 1;
-
-    return humaneLoc;
+    else
+    {
+        return String("unknown");
+    }
 }
 
-HumaneSourceLoc ExpandedSourceLoc::getHumaneLoc()
-{
-    return Slang::getHumaneLoc(*this);
-}
-
-HumaneSourceLoc SourceManager::getHumaneLoc(SourceLoc const& loc)
-{
-    return expandSourceLoc(loc).getHumaneLoc();
-}
-
-SourceLoc SourceManager::getSpellingLoc(ExpandedSourceLoc const& loc)
-{
-    // First check if this location maps to some raw source file,
-    // so that a "spelling" is even possible
-    SourceFile* sourceFile = loc.getSourceFile();
-    if(!sourceFile)
-        return loc;
-
-    // If we mapped to a source file, then the location must represent
-    // some offset from an entry in our array.
-    auto& entry = sourceFiles[loc.entryIndex];
-
-    // We extract the offset of the location from the start of the entry
-    SourceLoc::RawValue offsetFromStart = loc.getRaw() - entry.startLoc.getRaw();
-
-    // And instead apply that offset to the spelling location of the file start
-    SourceLoc result = sourceFile->sourceRange.begin + offsetFromStart;
-
-    return result;
-}
-
-SourceLoc SourceManager::getSpellingLoc(SourceLoc const& loc)
-{
-    return getSpellingLoc(expandSourceLoc(loc));
-}
 
 } // namespace Slang

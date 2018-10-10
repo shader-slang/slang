@@ -183,11 +183,13 @@
     <ClInclude Include="platform.h" />
     <ClInclude Include="secure-crt.h" />
     <ClInclude Include="slang-byte-encode-util.h" />
+    <ClInclude Include="slang-cpu-defines.h" />
     <ClInclude Include="slang-free-list.h" />
     <ClInclude Include="slang-io.h" />
     <ClInclude Include="slang-math.h" />
     <ClInclude Include="slang-memory-arena.h" />
     <ClInclude Include="slang-random-generator.h" />
+    <ClInclude Include="slang-string-slice-pool.h" />
     <ClInclude Include="slang-string-util.h" />
     <ClInclude Include="slang-string.h" />
     <ClInclude Include="smart-pointer.h" />
@@ -203,6 +205,7 @@
     <ClCompile Include="slang-io.cpp" />
     <ClCompile Include="slang-memory-arena.cpp" />
     <ClCompile Include="slang-random-generator.cpp" />
+    <ClCompile Include="slang-string-slice-pool.cpp" />
     <ClCompile Include="slang-string-util.cpp" />
     <ClCompile Include="slang-string.cpp" />
     <ClCompile Include="stream.cpp" />
@@ -210,7 +213,7 @@
     <ClCompile Include="token-reader.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="core.natvis" />
+    <Natvis Include="core.natvis" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

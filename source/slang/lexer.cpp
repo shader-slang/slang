@@ -84,22 +84,22 @@ namespace Slang
     // Lexer
 
     void Lexer::initialize(
-        SourceFile*     inSourceFile,
+        SourceUnit*     inSourceUnit,
         DiagnosticSink* inSink,
         NamePool*       inNamePool)
     {
-        sourceFile  = inSourceFile;
+        sourceUnit  = inSourceUnit;
         sink        = inSink;
         namePool    = inNamePool;
 
-        auto content = inSourceFile->content;
+        auto content = inSourceUnit->getSourceFile()->content;
 
         begin   = content.begin();
         cursor  = content.begin();
         end     = content.end();
 
-        spellingStartLoc = inSourceFile->sourceRange.begin;
-        presumedStartLoc = spellingStartLoc;
+        // Set the start location
+        startLoc = inSourceUnit->getRange().begin;
 
         tokenFlags = TokenFlag::AtStartOfLine | TokenFlag::AfterWhitespace;
         lexerFlags = 0;
@@ -227,7 +227,7 @@ namespace Slang
                     lexer->tokenFlags |= TokenFlag::ScrubbingNeeded;
 
                     // Now try again, looking at the character after the
-                    // escaped nmewline.
+                    // escaped newline.
                     continue;
 
                 default:
@@ -333,23 +333,7 @@ namespace Slang
 
     static SourceLoc getSourceLoc(Lexer* lexer)
     {
-        return lexer->presumedStartLoc + (lexer->cursor - lexer->begin);
-    }
-
-    // Begin overriding the reported locations of tokens,
-    // based on a `#line` directives
-    void Lexer::startOverridingSourceLocations(
-        SourceLoc loc)
-    {
-        if(loc.isValid())
-        {
-            presumedStartLoc = loc;
-        }
-    }
-
-    void Lexer::stopOverridingSourceLocations()
-    {
-        presumedStartLoc = spellingStartLoc;
+        return lexer->startLoc + (lexer->cursor - lexer->begin);
     }
 
     static void lexDigits(Lexer* lexer, int base)

@@ -169,8 +169,7 @@ static void formatDiagnostic(
 {
     auto sourceManager = sink->sourceManager;
 
-    auto expandedLoc = sourceManager->expandSourceLoc(diagnostic.loc);
-    auto humaneLoc = getHumaneLoc(expandedLoc);
+    auto humaneLoc = sourceManager->getHumaneLoc(diagnostic.loc);
 
     sb << humaneLoc.getPath();
     sb << "(";
