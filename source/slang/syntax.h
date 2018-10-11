@@ -864,7 +864,7 @@ namespace Slang
         class Breadcrumb : public RefObject
         {
         public:
-            enum class Kind
+            enum class Kind : uint8_t
             {
                 // The lookup process looked "through" an in-scope
                 // declaration to the fields inside of it, so that
@@ -895,6 +895,16 @@ namespace Slang
             // The kind of lookup step that was performed
             Kind kind;
 
+            // For the `Kind::This` case, is the `this` parameter
+            // mutable or not?
+            enum class ThisParameterMode : uint8_t
+            {
+                Default,
+                Mutating,
+            };
+            ThisParameterMode thisParameterMode = ThisParameterMode::Default;
+
+
             // As needed, a reference to the declaration that faciliated
             // the lookup step.
             //
@@ -910,8 +920,13 @@ namespace Slang
             // arrive at a final value.
             RefPtr<Breadcrumb> next;
 
-            Breadcrumb(Kind kind, DeclRef<Decl> declRef, RefPtr<Breadcrumb> next)
+            Breadcrumb(
+                Kind                kind,
+                DeclRef<Decl>       declRef,
+                RefPtr<Breadcrumb>  next,
+                ThisParameterMode   thisParameterMode = ThisParameterMode::Default)
                 : kind(kind)
+                , thisParameterMode(thisParameterMode)
                 , declRef(declRef)
                 , next(next)
             {}

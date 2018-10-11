@@ -20,6 +20,7 @@ DeclRef<ExtensionDecl> ApplyExtensionToType(
 struct BreadcrumbInfo
 {
     LookupResultItem::Breadcrumb::Kind kind;
+    LookupResultItem::Breadcrumb::ThisParameterMode thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::Default;
     DeclRef<Decl> declRef;
     BreadcrumbInfo* prev = nullptr;
 };
@@ -161,7 +162,8 @@ LookupResultItem CreateLookupResultItem(
         breadcrumbs = new LookupResultItem::Breadcrumb(
             bb->kind,
             bb->declRef,
-            breadcrumbs);
+            breadcrumbs,
+            bb->thisParameterMode);
     }
     item.breadcrumbs = breadcrumbs;
     return item;
@@ -433,6 +435,8 @@ void DoLookupImpl(
     LookupRequest const&    request,
     LookupResult&           result)
 {
+    auto thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::Default;
+
     auto scope      = request.scope;
     auto endScope   = request.endScope;
     for (;scope != endScope; scope = scope->parent)
@@ -464,6 +468,7 @@ void DoLookupImpl(
             if (auto aggTypeDeclRef = containerDeclRef.As<AggTypeDeclBase>())
             {
                 breadcrumb.kind = LookupResultItem::Breadcrumb::Kind::This;
+                breadcrumb.thisParameterMode = thisParameterMode;
                 breadcrumb.declRef = aggTypeDeclRef;
                 breadcrumb.prev = nullptr;
 
@@ -488,6 +493,18 @@ void DoLookupImpl(
             DoLocalLookupImpl(
                 session,
                 name, containerDeclRef, request, result, breadcrumbs);
+
+            if( auto funcDeclRef = containerDeclRef.As<FunctionDeclBase>() )
+            {
+                if( funcDeclRef.getDecl()->HasModifier<MutatingAttribute>() )
+                {
+                    thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::Mutating;
+                }
+                else
+                {
+                    thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::Default;
+                }
+            }
         }
 
         if (result.isValid())
