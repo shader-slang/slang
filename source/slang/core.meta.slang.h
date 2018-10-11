@@ -1253,3 +1253,6 @@ SLANG_RAW("attribute_syntax [__vulkanRayPayload] : VulkanRayPayloadAttribute;\n"
 SLANG_RAW("\n")
 SLANG_RAW("__attributeTarget(VarDeclBase)\n")
 SLANG_RAW("attribute_syntax [__vulkanHitAttributes] : VulkanHitAttributesAttribute;\n")
+SLANG_RAW("\n")
+SLANG_RAW("__attributeTarget(FunctionDeclBase)\n")
+SLANG_RAW("attribute_syntax [mutating] : MutatingAttribute;\n")

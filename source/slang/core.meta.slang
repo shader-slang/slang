@@ -1235,3 +1235,6 @@ attribute_syntax [__vulkanRayPayload] : VulkanRayPayloadAttribute;
 
 __attributeTarget(VarDeclBase)
 attribute_syntax [__vulkanHitAttributes] : VulkanHitAttributesAttribute;
+
+__attributeTarget(FunctionDeclBase)
+attribute_syntax [mutating] : MutatingAttribute;
