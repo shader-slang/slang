@@ -134,8 +134,8 @@ public:
 
 enum class SourceLocType
 {
-    Normal,                 ///< Takes into account #line directives
-    Spelling,               ///< Ignores #line directives - humane location as seen in the actual file
+    Nominal,                ///< The normal interpretation which takes into account #line directives 
+    Actual,                 ///< Ignores #line directives - and is the location as seen in the actual file
 };
 
 // A source location in a format a human might like to see
@@ -197,10 +197,10 @@ class SourceView: public RefObject
 
         /// Get the humane location 
         /// Type determines if the location wanted is the original, or the 'normal' (which modifys behavior based on #line directives)
-    HumaneSourceLoc getHumaneLoc(SourceLoc loc, SourceLocType type = SourceLocType::Normal);
+    HumaneSourceLoc getHumaneLoc(SourceLoc loc, SourceLocType type = SourceLocType::Nominal);
 
         /// Get the path associated with a location
-    String getPath(SourceLoc loc, SourceLocType type = SourceLocType::Normal);
+    String getPath(SourceLoc loc, SourceLocType type = SourceLocType::Nominal);
 
         /// Ctor
     SourceView(SourceManager* sourceManager, SourceFile* sourceFile, SourceRange range):
@@ -232,10 +232,10 @@ struct SourceManager
     SourceFile* createSourceFile(String const& path, String const& content);
 
         /// Get the humane source location
-    HumaneSourceLoc getHumaneLoc(SourceLoc loc, SourceLocType type = SourceLocType::Normal);
+    HumaneSourceLoc getHumaneLoc(SourceLoc loc, SourceLocType type = SourceLocType::Nominal);
 
         /// Get the path associated with a location 
-    String getPath(SourceLoc loc, SourceLocType type = SourceLocType::Normal);
+    String getPath(SourceLoc loc, SourceLocType type = SourceLocType::Nominal);
 
         /// Create a new source view from a file
     SourceView* createSourceView(SourceFile* sourceFile);

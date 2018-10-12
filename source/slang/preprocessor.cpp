@@ -1589,7 +1589,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
 
     auto directiveLoc = GetDirectiveLoc(context);
     
-    String pathIncludedFrom = context->preprocessor->translationUnit->compileRequest->getSourceManager()->getPath(directiveLoc, SourceLocType::Spelling);
+    String pathIncludedFrom = context->preprocessor->translationUnit->compileRequest->getSourceManager()->getPath(directiveLoc, SourceLocType::Actual);
     String foundPath;
     ComPtr<ISlangBlob> foundSourceBlob;
 
@@ -1875,7 +1875,7 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaOnceDirective)
     // trivial cases of the "same" path.
     //
     auto directiveLoc = GetDirectiveLoc(context);
-    auto pathIssuedFrom = context->preprocessor->translationUnit->compileRequest->getSourceManager()->getPath(directiveLoc, SourceLocType::Spelling);
+    auto pathIssuedFrom = context->preprocessor->translationUnit->compileRequest->getSourceManager()->getPath(directiveLoc, SourceLocType::Actual);
 
     context->preprocessor->pragmaOncePaths.Add(pathIssuedFrom);
 }

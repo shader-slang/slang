@@ -127,7 +127,7 @@ HumaneSourceLoc SourceView::getHumaneLoc(SourceLoc loc, SourceLocType type)
     StringSlicePool::Handle pathHandle = StringSlicePool::Handle(0);
 
     // Only bother looking up the entry information if we want a 'Normal' lookup
-    const int entryIndex = (type == SourceLocType::Normal) ? findEntryIndex(loc) : -1;
+    const int entryIndex = (type == SourceLocType::Nominal) ? findEntryIndex(loc) : -1;
     if (entryIndex >= 0)
     {
         const Entry& entry = m_entries[entryIndex];
@@ -152,7 +152,7 @@ HumaneSourceLoc SourceView::getHumaneLoc(SourceLoc loc, SourceLocType type)
 
 String SourceView::getPath(SourceLoc loc, SourceLocType type)
 {
-    if (type == SourceLocType::Spelling)
+    if (type == SourceLocType::Actual)
     {
         return m_sourceFile->path;
     }

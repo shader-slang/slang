@@ -884,7 +884,7 @@ RefPtr<ModuleDecl> CompileRequest::findOrImportModule(
     includeHandler.request = this;
 
     // Get the original path
-    String pathIncludedFrom= getSourceManager()->getPath(loc, SourceLocType::Spelling);
+    String pathIncludedFrom= getSourceManager()->getPath(loc, SourceLocType::Actual);
     
     String foundPath;
     ComPtr<ISlangBlob> foundSourceBlob;
