@@ -152,7 +152,7 @@ HumaneSourceLoc SourceUnit::getHumaneLoc(SourceLoc loc, SourceLocType type)
 
 String SourceUnit::getPath(SourceLoc loc, SourceLocType type)
 {
-    if (type == SourceLocType::Original)
+    if (type == SourceLocType::Spelling)
     {
         return m_sourceFile->path;
     }
@@ -334,17 +334,31 @@ SourceUnit* SourceManager::newSourceUnit(SourceFile* sourceFile)
     return sourceUnit;
 }
 
-SourceUnit* SourceManager::findSourceUnit(SourceLoc loc)
+SourceUnit* SourceManager::findSourceUnit(SourceLoc loc) const
 {
-    SourceLoc::RawValue rawLoc = loc.getRaw();
-
     int hi = int(m_sourceUnits.Count());
-
-    if (hi == 0)
+    // It must be in the range and we have associated units for it to possibly be a hit
+    if (!getSourceRange().contains(loc) || hi == 0)
     {
         return nullptr;
     }
+    const SourceLoc::RawValue rawLoc = loc.getRaw();
 
+    // If we don't have very many, we may as well just linearly search
+    if (hi <= 8)
+    {
+        for (int i = 0; i < hi; ++i)
+        {
+            SourceUnit* entry = m_sourceUnits[i];
+            if (entry->getRange().contains(loc))
+            {
+                return entry;
+            }
+        }
+        return nullptr;
+    }
+
+    // Binary chop to see if we can find the associated SourceUnit
     int lo = 0;
     while (lo + 1 < hi)
     {
@@ -356,8 +370,7 @@ SourceUnit* SourceManager::findSourceUnit(SourceLoc loc)
             return midEntry;
         }
 
-        SourceLoc::RawValue midValue = midEntry->getRange().begin.getRaw();
-
+        const SourceLoc::RawValue midValue = midEntry->getRange().begin.getRaw();
         if (midValue <= rawLoc)
         {
             // The location we seek is at or after this entry
@@ -370,17 +383,30 @@ SourceUnit* SourceManager::findSourceUnit(SourceLoc loc)
         }
     }
 
-    // Check if low is a hit
-    {
-        SourceUnit* unit = m_sourceUnits[lo];
-        if (unit->getRange().contains(loc))
-        {
-            return unit;
-        }
-    }
+    // Check if low is actually a hit
+    SourceUnit* unit = m_sourceUnits[lo];
+    return (unit->getRange().contains(loc)) ? unit : nullptr;
+}
 
-    // Check the parent if there is a parent
-    return (parent) ? parent->findSourceUnit(loc) : nullptr;
+SourceUnit* SourceManager::findSourceUnitRecursively(SourceLoc loc) const
+{
+    // Start with this manager
+    const SourceManager* manager = this;
+    do 
+    {
+        SourceUnit* sourceUnit = findSourceUnit(loc);
+        // If we found a hit we are done
+        if (sourceUnit)
+        {
+            return sourceUnit;
+        }
+        
+        // Try the parent
+        manager = manager->parent;
+    }
+    while (manager);
+    // Didn't find it
+    return nullptr;
 }
 
 SourceFile* SourceManager::findSourceFile(const String& path)
@@ -401,7 +427,7 @@ void SourceManager::addSourceFile(const String& path, SourceFile* sourceFile)
 
 HumaneSourceLoc SourceManager::getHumaneLoc(SourceLoc loc, SourceLocType type)
 {
-    SourceUnit* sourceUnit = findSourceUnit(loc);
+    SourceUnit* sourceUnit = findSourceUnitRecursively(loc);
     if (sourceUnit)
     {
         return sourceUnit->getHumaneLoc(loc, type);
@@ -414,7 +440,7 @@ HumaneSourceLoc SourceManager::getHumaneLoc(SourceLoc loc, SourceLocType type)
 
 String SourceManager::getPath(SourceLoc loc, SourceLocType type)
 {
-    SourceUnit* sourceUnit = findSourceUnit(loc);
+    SourceUnit* sourceUnit = findSourceUnitRecursively(loc);
     if (sourceUnit)
     {
         return sourceUnit->getPath(loc, type);

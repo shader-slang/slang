@@ -92,8 +92,8 @@ namespace Slang
         sink        = inSink;
         namePool    = inNamePool;
 
-        auto content = inSourceUnit->getSourceFile()->content;
-
+        auto content = inSourceUnit->getContent();
+        
         begin   = content.begin();
         cursor  = content.begin();
         end     = content.end();

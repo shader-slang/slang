@@ -125,7 +125,7 @@ struct SourceManager;
 enum class SourceLocType
 {
     Normal,                 ///< Takes into account #line directives
-    Original,               ///< Ignores #line directives - humane location as seen in the actual file
+    Spelling,               ///< Ignores #line directives - humane location as seen in the actual file
 };
 
 // A source location in a format a human might like to see
@@ -184,6 +184,9 @@ class SourceUnit: public RefObject
         /// Get the source manager
     SourceManager* getSourceManager() const { return m_sourceManager; }
 
+        /// Get the associated 'content' (the source text)
+    const UnownedStringSlice& getContent() const { return m_sourceFile->content; }
+
         /// Get the humane location 
         /// Type determines if the location wanted is the original, or the 'normal' (which modifys behavior based on #line directives)
     HumaneSourceLoc getHumaneLoc(SourceLoc loc, SourceLocType type = SourceLocType::Normal);
@@ -232,9 +235,14 @@ struct SourceManager
         /// Allocate a new source unit from a file
     SourceUnit* newSourceUnit(SourceFile* sourceFile);
 
-        /// Find a unit by a source file location. If not found in this will look in the parent/
+        /// Find a unit by a source file location. 
+        /// If not found in this will look in the parent SourceManager
         /// Returns nullptr if not found
-    SourceUnit* findSourceUnit(SourceLoc loc);
+    SourceUnit* findSourceUnitRecursively(SourceLoc loc) const;
+
+        /// Find the SourceUnit associated with this manager for a specified location
+        /// If the loc isn't found in this manager it will return nullptr to indicate it's not found
+    SourceUnit* findSourceUnit(SourceLoc loc) const;
 
         /// Searches this manager, and then the parent to see if can find a match for path. 
         /// If not found returns nullptr.    
@@ -245,6 +253,10 @@ struct SourceManager
 
         /// Get the slice pool
     StringSlicePool& getStringSlicePool() { return m_slicePool; }
+
+        /// Get the source range for just this manager
+        /// Caution - the range will change if allocations are made to this manager.
+    SourceRange getSourceRange() const { return SourceRange(startLoc, nextLoc); } 
 
     // The first location available to this source manager
     // (may not be the first location of all, because we might

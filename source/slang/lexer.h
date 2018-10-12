@@ -95,14 +95,6 @@ namespace Slang
         /// The starting sourceLoc (same as first location of SourceUnit)
         SourceLoc       startLoc;           
 
-        // The starting source location for the code as written,
-        // which cannot be overridden.
-        //SourceLoc       spellingStartLoc;
-
-        // The nominal starting location for the file, taking
-        // any active `#line` directive into account.
-        //SourceLoc       presumedStartLoc;
-
         TokenFlags      tokenFlags;
         LexerFlags      lexerFlags;
     };
