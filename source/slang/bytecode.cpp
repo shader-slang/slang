@@ -409,7 +409,7 @@ void generateBytecodeForInst(
         }
         break;
 
-    case kIROp_boolConst:
+    case kIROp_BoolLit:
         {
             auto ii = (IRConstant*) inst;
             encodeUInt(context, ii->op);

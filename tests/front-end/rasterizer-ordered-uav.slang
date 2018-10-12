@@ -17,4 +17,9 @@ RasterizerOrderedTexture3D<int>			b7;
 
 float4 test(uint4 coord, float4 value)
 {
+	value += b0[coord.x];
+
+	// TODO: use the rest of the `b*`
+
+	return value;
 }

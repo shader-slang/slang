@@ -319,7 +319,8 @@ namespace Slang
         {
         case kIROp_ReturnVal:
         case kIROp_ReturnVoid:
-        case kIROp_unreachable:
+        case kIROp_Unreachable:
+        case kIROp_MissingReturn:
         case kIROp_discard:
             break;
 
@@ -337,7 +338,7 @@ namespace Slang
             end = begin + 2;
             break;
 
-        case kIROp_switch:
+        case kIROp_Switch:
             // switch <val> <break> <default> <caseVal1> <caseBlock1> ...
             begin = operands + 2;
 
@@ -423,6 +424,12 @@ namespace Slang
         return count;
     }
 
+    bool IRBlock::PredecessorList::isEmpty()
+    {
+        return !(begin() != end());
+    }
+
+
     void IRBlock::PredecessorList::Iterator::operator++()
     {
         if (!use) return;
@@ -471,6 +478,43 @@ namespace Slang
         return (IRBlock*)use->get();
     }
 
+    UInt IRUnconditionalBranch::getArgCount()
+    {
+        switch(op)
+        {
+        case kIROp_unconditionalBranch:
+            return getOperandCount() - 1;
+
+        case kIROp_loop:
+            return getOperandCount() - 3;
+
+        default:
+            SLANG_UNEXPECTED("unhandled unconditional branch opcode");
+            UNREACHABLE_RETURN(0);
+        }
+    }
+
+    IRUse* IRUnconditionalBranch::getArgs()
+    {
+        switch(op)
+        {
+        case kIROp_unconditionalBranch:
+            return getOperands() + 1;
+
+        case kIROp_loop:
+            return getOperands() + 3;
+
+        default:
+            SLANG_UNEXPECTED("unhandled unconditional branch opcode");
+            UNREACHABLE_RETURN(0);
+        }
+    }
+
+    IRInst* IRUnconditionalBranch::getArg(UInt index)
+    {
+        return getArgs()[index].usedValue;
+    }
+
     IRParam* IRGlobalValueWithParams::getFirstParam()
     {
         auto entryBlock = getFirstBlock();
@@ -506,8 +550,9 @@ namespace Slang
         case kIROp_loop:
         case kIROp_ifElse:
         case kIROp_discard:
-        case kIROp_switch:
-        case kIROp_unreachable:
+        case kIROp_Switch:
+        case kIROp_Unreachable:
+        case kIROp_MissingReturn:
             return true;
         }
     }
@@ -1162,7 +1207,7 @@ namespace Slang
         }
         switch (op)
         {
-            case kIROp_boolConst:
+            case kIROp_BoolLit:
             case kIROp_FloatLit:
             case kIROp_IntLit:
             {
@@ -1188,7 +1233,7 @@ namespace Slang
 
         switch (op)
         {
-            case kIROp_boolConst:
+            case kIROp_BoolLit:
             case kIROp_FloatLit:
             case kIROp_IntLit:
             {
@@ -1236,7 +1281,7 @@ namespace Slang
 
         switch (keyInst.op)
         {
-            case kIROp_boolConst:
+            case kIROp_BoolLit:
             case kIROp_IntLit:
             {
                 irValue = static_cast<IRConstant*>(createInstWithSizeImpl(builder, keyInst.op, keyInst.getFullType(), prefixSize + sizeof(IRIntegerValue)));
@@ -1284,7 +1329,7 @@ namespace Slang
     {
         IRConstant keyInst;
         memset(&keyInst, 0, sizeof(keyInst));
-        keyInst.op = kIROp_boolConst;
+        keyInst.op = kIROp_BoolLit;
         keyInst.typeUse.usedValue = getBoolType();
         keyInst.value.intVal = IRIntegerValue(inValue);
         return findOrEmitConstant(this, keyInst);
@@ -2320,7 +2365,17 @@ namespace Slang
     {
         auto inst = createInst<IRUnreachable>(
             this,
-            kIROp_unreachable,
+            kIROp_Unreachable,
+            nullptr);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitMissingReturn()
+    {
+        auto inst = createInst<IRMissingReturn>(
+            this,
+            kIROp_MissingReturn,
             nullptr);
         addInst(inst);
         return inst;
@@ -2444,7 +2499,7 @@ namespace Slang
 
         auto inst = createInstWithTrailingArgs<IRSwitch>(
             this,
-            kIROp_switch,
+            kIROp_Switch,
             nullptr,
             fixedArgCount,
             fixedArgs,
@@ -2741,7 +2796,7 @@ namespace Slang
             dump(context, ((IRConstant*)inst)->value.floatVal);
             return;
 
-        case kIROp_boolConst:
+        case kIROp_BoolLit:
             dump(context, ((IRConstant*)inst)->value.intVal ? "true" : "false");
             return;
         case kIROp_StringLit:
@@ -3092,7 +3147,7 @@ namespace Slang
         {
         case kIROp_IntLit:
         case kIROp_FloatLit:
-        case kIROp_boolConst:
+        case kIROp_BoolLit:
         case kIROp_StringLit:
             dumpOperand(context, inst);
             break;
@@ -3409,9 +3464,28 @@ namespace Slang
         removeFromParent();
         removeArguments();
 
+        // If this is a parent instruction then we had
+        // better remove all its children as well.
+        //
+        if(auto parentInst = as<IRParentInst>(this))
+        {
+            parentInst->removeAndDeallocateAllChildren();
+        }
+
         // Run destructor to be sure...
         this->~IRInst();
     }
+
+    void IRParentInst::removeAndDeallocateAllChildren()
+    {
+        IRInst* nextChild = nullptr;
+        for( IRInst* child = getFirstChild(); child; child = nextChild )
+        {
+            nextChild = child->getNextInst();
+            child->removeAndDeallocate();
+        }
+    }
+
 
     bool IRInst::mightHaveSideEffects()
     {
@@ -5311,7 +5385,7 @@ namespace Slang
 
         switch (originalValue->op)
         {
-        case kIROp_boolConst:
+        case kIROp_BoolLit:
             {
                 IRConstant* c = (IRConstant*)originalValue;
                 return builder->getBoolValue(c->value.intVal != 0);

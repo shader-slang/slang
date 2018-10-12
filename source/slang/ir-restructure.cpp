@@ -251,7 +251,8 @@ namespace Slang
                 //
                 SLANG_UNEXPECTED("unhandled terminator instruction opcode");
                 // fall through to:
-            case kIROp_unreachable:
+            case kIROp_Unreachable:
+            case kIROp_MissingReturn:
             case kIROp_ReturnVal:
             case kIROp_ReturnVoid:
             case kIROp_discard:
@@ -446,7 +447,7 @@ namespace Slang
                 }
                 break;
 
-            case kIROp_switch:
+            case kIROp_Switch:
                 {
                     // A `switch` instruction will always translate
                     // to a `SwitchRegion` and then to a `switch` statement.

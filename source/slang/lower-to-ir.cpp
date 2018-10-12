@@ -6,6 +6,8 @@
 #include "ir.h"
 #include "ir-constexpr.h"
 #include "ir-insts.h"
+#include "ir-missing-return.h"
+#include "ir-sccp.h"
 #include "ir-ssa.h"
 #include "ir-validate.h"
 #include "mangle.h"
@@ -5114,7 +5116,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     // this by putting an `unreachable` terminator here,
                     // and then emit a dataflow error if this block
                     // can't be eliminated.
-                    subContext->irBuilder->emitUnreachable();
+                    subContext->irBuilder->emitMissingReturn();
                 }
             }
         }
@@ -5563,7 +5565,10 @@ IRModule* generateIRForTranslationUnit(
     // temporaries whenever possible.
     constructSSA(module);
 
-    // TODO: Do basic constant folding and DCE
+    // Do basic constant folding and dead code elimination
+    // using Sparse Conditional Constant Propagation (SCCP)
+    //
+    applySparseConditionalConstantPropagation(module);
 
     // Propagate `constexpr`-ness through the dataflow graph (and the
     // call graph) based on constraints imposed by different instructions.
@@ -5571,6 +5576,8 @@ IRModule* generateIRForTranslationUnit(
 
     // TODO: give error messages if any `undefined` or
     // `unreachable` instructions remain.
+
+    checkForMissingReturns(module, &compileRequest->mSink);
 
     // TODO: consider doing some more aggressive optimizations
     // (in particular specialization of generics) here, so

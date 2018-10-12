@@ -364,6 +364,7 @@ DIAGNOSTIC(40008, Error, invalidLValueForRefParameter, "the form of this l-value
 
 DIAGNOSTIC(41000, Warning, unreachableCode, "unreachable code detected")
 
+DIAGNOSTIC(41010, Warning, missingReturn, "control flow may reach end of non-'void' function")
 
 //
 // 5xxxx - Target code generation.
