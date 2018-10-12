@@ -13,12 +13,29 @@ namespace Slang {
 
 /** Overview: 
 
-SourceFile - Is the immutable contents of a file (or perhaps some generated source - say from doing a macro substitution)
-SourceView - Tracks a single parse of a SourceFile. Each SourceView defines a range of source locations used. If a SourceFile is parsed twice, two 
-SourceViews are used, with unique SourceRanges - such that it is possible to tell which specific parse a SourceLoc is from. Not only that but the SourceView 
-contains the modifications of the interpretations of source (say by #line) directives. It is necessary to have these different 'views' on the 
-source because if a file is included twice, it may be used in different ways and have different #line directives.
+There needs to be a mechanism where we can easily and quickly track a specific locations in any source file used during a compilation. 
+This is important because that original location is meaningful to the user as it relates to their original source. Thus SourceLoc are 
+used so we can display meaningful and accurate errors/warnings as well as being able to always map generated code locations back to their origins.
 
+A 'SourceLoc' along with associated structures (SourceView, SourceFile, SourceMangager) this can pinpoint the location down to the byte across the 
+compilation. This could be achieved by storing for every token and instruction the file, line and column number came from. The SourceLoc is used in 
+lots of places - every AST node, every Token from the lexer, every IRInst - so we really want to make it small. So for this reason we actually 
+encode SourceLoc as a single integer and then use the associated structures when needed to determine what the location actually refers to - 
+the source file, line and column number, or in effect the byte in the original file.  
+
+Unfortunately there is extra complications. When a source is parsed it's interpretation (in terms of how a piece of source maps to an 'original' file etc)
+can be overridden - for example by using #line directives. Moreover a single source file can be parsed multiple times. When it's parsed multiple times the 
+interpretation of the mapping (#line directives for example) can change. This is the purpose of the SourceView - it holds the interpretation of a source file 
+for a specific Lex/Parse. 
+
+Another complication is that not all 'source' comes from SourceFiles, a macro expansion, may generate new 'source' we need to handle this, but also be able 
+to have a SourceLoc map to the expansion unambiguously. This is handled by creating a SourceFile and SourceView that holds only the macro generated 
+specific information.  
+
+SourceFile - Is the immutable text contents of a file (or perhaps some generated source - say from doing a macro substitution)
+SourceView - Tracks a single parse of a SourceFile. Each SourceView defines a range of source locations used. If a SourceFile is parsed twice, two 
+SourceViews are created, with unique SourceRanges. This is so that it is possible to tell which specific parse a SourceLoc is from - and so know the right
+interpretation for that lex/parse. 
 */
 
 class SourceLoc
@@ -104,14 +121,9 @@ public:
         /// Calculate the offset for a line
     int calcColumnIndex(int line, int offset);
 
-    // The logical file path to report for locations inside this span.
-    String path;
-
-    /// A blob that owns the storage for the file contents
-    ComPtr<ISlangBlob> contentBlob;
-
-    /// The actual contents of the file.
-    UnownedStringSlice content;
+    String path;                        ///< The logical file path to report for locations inside this span.
+    ComPtr<ISlangBlob> contentBlob;     ///< A blob that owns the storage for the file contents
+    UnownedStringSlice content;         ///< The actual contents of the file.
 
     protected:
     // In order to speed up lookup of line number information,
@@ -119,8 +131,6 @@ public:
     // the input file:
     List<uint32_t> m_lineBreakOffsets;
 };
-
-struct SourceManager;
 
 enum class SourceLocType
 {
@@ -134,11 +144,10 @@ struct HumaneSourceLoc
     String  path;
     Int     line = 0;
     Int     column = 0;
-
-    String const& getPath() const { return path; }
-    Int getLine() const { return line; }
-    Int getColumn() const { return column; }
 };
+
+// Pre-declare
+struct SourceManager;
 
 /* A SourceView maps to a single span of SourceLoc range and is equivalent to a single include or more precisely use of a source file. 
 It is distinct from a SourceFile - because a SourceFile may be included multiple times, with different interpretations (depending 
@@ -152,7 +161,7 @@ class SourceView: public RefObject
     // all map to the same logical file.
     struct Entry
     {
-            /// True if this resets the line numbering. It is distinct from a m_lineAdjust from 0, because it also means the path returns to the default.
+            /// True if this resets the line numbering. It is distinct from a m_lineAdjust being 0, because it also means the path returns to the default.
         bool isDefault() const { return m_pathHandle == StringSlicePool::Handle(0); }
 
         SourceLoc m_startLoc;                       ///< Where does this entry begin?
@@ -211,21 +220,16 @@ class SourceView: public RefObject
 
 struct SourceManager
 {
-    // Initialize a source manager, with an optional parent
-    void initialize(
-        SourceManager*  parent);
+        // Initialize a source manager, with an optional parent
+    void initialize(SourceManager*  parent);
 
         /// Allocate a range of SourceLoc locations, these can be used to identify a specific location in the source
     SourceRange allocateSourceRange(UInt size);
 
         /// Create a SourceFile defined with the specified path, and content held within a blob
-    SourceFile* createSourceFile(
-        String const&   path,
-        ISlangBlob*     content);
+    SourceFile* createSourceFile(String const& path, ISlangBlob* content);
         /// Create a SourceFile with specified path. Create a Blob that contains the content.
-    SourceFile* createSourceFile(
-        String const&   path,
-        String const&   content);
+    SourceFile* createSourceFile(String const& path, String const& content);
 
         /// Get the humane source location
     HumaneSourceLoc getHumaneLoc(SourceLoc loc, SourceLocType type = SourceLocType::Normal);
@@ -257,20 +261,23 @@ struct SourceManager
 
         /// Get the source range for just this manager
         /// Caution - the range will change if allocations are made to this manager.
-    SourceRange getSourceRange() const { return SourceRange(startLoc, nextLoc); } 
+    SourceRange getSourceRange() const { return SourceRange(m_startLoc, m_nextLoc); } 
+    
+        /// Get the parent manager to this manager. Returns nullptr if there isn't any.
+    SourceManager* getParent() const { return m_parent; }
+
+    protected:
 
     // The first location available to this source manager
     // (may not be the first location of all, because we might
     // have a parent source manager)
-    SourceLoc startLoc;
+    SourceLoc m_startLoc;
 
     // The "parent" source manager that owns locations ahead of `startLoc`
-    SourceManager* parent = nullptr;
+    SourceManager* m_parent = nullptr;
 
     // The location to be used by the next source file to be loaded
-    SourceLoc nextLoc;
-
-    protected:
+    SourceLoc m_nextLoc;
 
     // All of the SourceViews. These are held in increasing order of range, so can find by doing a binary chop.
     List<RefPtr<SourceView> > m_sourceViews;                
@@ -278,7 +285,6 @@ struct SourceManager
 
     Dictionary<String, RefPtr<SourceFile> > m_sourceFiles;
 };
-
 
 } // namespace Slang
 

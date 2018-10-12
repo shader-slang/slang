@@ -171,7 +171,7 @@ static void formatDiagnostic(
 
     auto humaneLoc = sourceManager->getHumaneLoc(diagnostic.loc);
 
-    sb << humaneLoc.getPath();
+    sb << humaneLoc.path;
     sb << "(";
     sb << humaneLoc.line;
     sb << "): ";

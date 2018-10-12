@@ -263,7 +263,7 @@ int SourceFile::calcColumnIndex(int lineIndex, int offset)
 void SourceManager::initialize(
     SourceManager*  p)
 {
-    parent = p;
+    m_parent = p;
 
     if( p )
     {
@@ -272,16 +272,16 @@ void SourceManager::initialize(
         // right after those from the parent.
         //
         // TODO: more clever allocation in cases where that might not be reasonable
-        startLoc = p->nextLoc;
+        m_startLoc = p->m_nextLoc;
     }
     else
     {
         // Location zero is reserved for an invalid location,
         // so we need to start reserving locations starting at 1.
-        startLoc = SourceLoc::fromRaw(1);
+        m_startLoc = SourceLoc::fromRaw(1);
     }
 
-    nextLoc = startLoc;
+    m_nextLoc = m_startLoc;
 }
 
 SourceRange SourceManager::allocateSourceRange(UInt size)
@@ -289,14 +289,14 @@ SourceRange SourceManager::allocateSourceRange(UInt size)
     // TODO: consider using atomics here
 
 
-    SourceLoc beginLoc  = nextLoc;
+    SourceLoc beginLoc  = m_nextLoc;
     SourceLoc endLoc    = beginLoc + size;
 
     // We need to be able to represent the location that is *at* the end of
     // the input source, so the next available location for a new file
     // must be placed one after the end of this one.
 
-    nextLoc = endLoc + 1;
+    m_nextLoc = endLoc + 1;
 
     return SourceRange(beginLoc, endLoc);
 }
@@ -402,7 +402,7 @@ SourceView* SourceManager::findSourceViewRecursively(SourceLoc loc) const
         }
         
         // Try the parent
-        manager = manager->parent;
+        manager = manager->m_parent;
     }
     while (manager);
     // Didn't find it
@@ -416,7 +416,7 @@ SourceFile* SourceManager::findSourceFile(const String& path)
     {
         return filePtr->Ptr();
     }
-    return parent ? parent->findSourceFile(path) : nullptr;
+    return m_parent ? m_parent->findSourceFile(path) : nullptr;
 }
 
 void SourceManager::addSourceFile(const String& path, SourceFile* sourceFile)
