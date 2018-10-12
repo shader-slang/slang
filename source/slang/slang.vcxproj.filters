@@ -54,10 +54,16 @@
     <ClInclude Include="ir-insts.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ir-missing-return.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="ir-restructure-scoping.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ir-restructure.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ir-sccp.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ir-serialize.h">
@@ -188,10 +194,16 @@
     <ClCompile Include="ir-legalize-types.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ir-missing-return.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="ir-restructure-scoping.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ir-restructure.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ir-sccp.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ir-serialize.cpp">
@@ -268,16 +280,16 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <None Include="slang.natvis">
+      <Filter>Source Files</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
     <CustomBuild Include="core.meta.slang">
       <Filter>Source Files</Filter>
     </CustomBuild>
     <CustomBuild Include="hlsl.meta.slang">
       <Filter>Source Files</Filter>
     </CustomBuild>
-  </ItemGroup>
-  <ItemGroup>
-    <Natvis Include="slang.natvis">
-      <Filter>Source Files</Filter>
-    </Natvis>
   </ItemGroup>
 </Project>

@@ -227,7 +227,14 @@ struct IRDiscard : IRTerminatorInst
 // that a block ending in one of these can actually be
 // executed.
 struct IRUnreachable : IRTerminatorInst
-{};
+{
+    IR_PARENT_ISA(Unreachable);
+};
+
+struct IRMissingReturn : IRUnreachable
+{
+    IR_LEAF_ISA(MissingReturn);
+};
 
 struct IRBlock;
 
@@ -236,6 +243,12 @@ struct IRUnconditionalBranch : IRTerminatorInst
     IRUse block;
 
     IRBlock* getTargetBlock() { return (IRBlock*)block.get(); }
+
+    UInt getArgCount();
+    IRUse* getArgs();
+    IRInst* getArg(UInt index);
+
+    IR_PARENT_ISA(UnconditionalBranch);
 };
 
 // Special cases of unconditional branch, to handle
@@ -264,6 +277,8 @@ struct IRLoop : IRUnconditionalBranch
 
 struct IRConditionalBranch : IRTerminatorInst
 {
+    IR_PARENT_ISA(ConditionalBranch)
+
     IRUse condition;
     IRUse trueBlock;
     IRUse falseBlock;
@@ -303,6 +318,8 @@ struct IRIfElse : IRConditionalBranch
 // A multi-way branch that represents a source-level `switch`
 struct IRSwitch : IRTerminatorInst
 {
+    IR_LEAF_ISA(Switch);
+
     IRUse condition;
     IRUse breakLabel;
     IRUse defaultLabel;
@@ -772,6 +789,7 @@ struct IRBuilder
     IRInst* emitDiscard();
 
     IRInst* emitUnreachable();
+    IRInst* emitMissingReturn();
 
     IRInst* emitBranch(
         IRBlock*    block);

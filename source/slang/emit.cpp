@@ -2308,7 +2308,7 @@ struct EmitVisitor
             Emit(((IRConstant*) inst)->value.floatVal);
             break;
 
-        case kIROp_boolConst:
+        case kIROp_BoolLit:
             {
                 bool val = ((IRConstant*)inst)->value.intVal != 0;
                 emit(val ? "true" : "false");
@@ -2357,7 +2357,7 @@ struct EmitVisitor
         //
         case kIROp_IntLit:
         case kIROp_FloatLit:
-        case kIROp_boolConst:
+        case kIROp_BoolLit:
             return true;
 
         // Always fold these in, because their results
@@ -3484,7 +3484,7 @@ struct EmitVisitor
         {
         case kIROp_IntLit:
         case kIROp_FloatLit:
-        case kIROp_boolConst:
+        case kIROp_BoolLit:
             emitIRSimpleValue(ctx, inst);
             break;
 

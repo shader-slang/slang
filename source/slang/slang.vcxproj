@@ -185,8 +185,10 @@
     <ClInclude Include="ir-dominators.h" />
     <ClInclude Include="ir-inst-defs.h" />
     <ClInclude Include="ir-insts.h" />
+    <ClInclude Include="ir-missing-return.h" />
     <ClInclude Include="ir-restructure-scoping.h" />
     <ClInclude Include="ir-restructure.h" />
+    <ClInclude Include="ir-sccp.h" />
     <ClInclude Include="ir-serialize.h" />
     <ClInclude Include="ir-ssa.h" />
     <ClInclude Include="ir-validate.h" />
@@ -231,8 +233,10 @@
     <ClCompile Include="ir-constexpr.cpp" />
     <ClCompile Include="ir-dominators.cpp" />
     <ClCompile Include="ir-legalize-types.cpp" />
+    <ClCompile Include="ir-missing-return.cpp" />
     <ClCompile Include="ir-restructure-scoping.cpp" />
     <ClCompile Include="ir-restructure.cpp" />
+    <ClCompile Include="ir-sccp.cpp" />
     <ClCompile Include="ir-serialize.cpp" />
     <ClCompile Include="ir-ssa.cpp" />
     <ClCompile Include="ir-validate.cpp" />
@@ -259,13 +263,16 @@
     <ClCompile Include="vm.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="slang.natvis" />
+  </ItemGroup>
+  <ItemGroup>
     <CustomBuild Include="core.meta.slang">
       <FileType>Document</FileType>
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">"../../bin/windows-x86/debug/slang-generate" %(Identity)</Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">"../../bin/windows-x64/debug/slang-generate" %(Identity)</Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"../../bin/windows-x86/release/slang-generate" %(Identity)</Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"../../bin/windows-x64/release/slang-generate" %(Identity)</Command>
-      <Outputs>../../core.meta.slang.h</Outputs>
+      <Outputs>%(Identity).h</Outputs>
       <Message>slang-generate %(Identity)</Message>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">../../bin/windows-x86/debug/slang-generate.exe</AdditionalInputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">../../bin/windows-x64/debug/slang-generate.exe</AdditionalInputs>
@@ -278,16 +285,13 @@
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">"../../bin/windows-x64/debug/slang-generate" %(Identity)</Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"../../bin/windows-x86/release/slang-generate" %(Identity)</Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"../../bin/windows-x64/release/slang-generate" %(Identity)</Command>
-      <Outputs>../../hlsl.meta.slang.h</Outputs>
+      <Outputs>%(Identity).h</Outputs>
       <Message>slang-generate %(Identity)</Message>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">../../bin/windows-x86/debug/slang-generate.exe</AdditionalInputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">../../bin/windows-x64/debug/slang-generate.exe</AdditionalInputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">../../bin/windows-x86/release/slang-generate.exe</AdditionalInputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">../../bin/windows-x64/release/slang-generate.exe</AdditionalInputs>
     </CustomBuild>
-  </ItemGroup>
-  <ItemGroup>
-    <Natvis Include="slang.natvis" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\core\core.vcxproj">

@@ -183,11 +183,11 @@ INST_RANGE(Type, VoidType, StructType)
 INST_RANGE(ParentInst, StructType, Block)
 
 /* IRConstant */
-    INST(boolConst, boolConst, 0, 0)
+    INST(BoolLit, boolConst, 0, 0)
     INST(IntLit, integer_constant, 0, 0)
     INST(FloatLit, float_constant, 0, 0)
     INST(StringLit, string_constant, 0, 0)
-INST_RANGE(Constant, boolConst, StringLit)
+INST_RANGE(Constant, BoolLit, StringLit)
 
 INST(undefined, undefined, 0, 0)
 
@@ -294,25 +294,34 @@ INST(SwizzledStore, swizzledStore, 2, 0)
     INST(ReturnVal, return_val, 1, 0)
     INST(ReturnVoid, return_void, 1, 0)
 
-    // unconditionalBranch <target>
-    INST(unconditionalBranch, unconditionalBranch, 1, 0)
+    /* IRUnconditionalBranch */
+        // unconditionalBranch <target>
+        INST(unconditionalBranch, unconditionalBranch, 1, 0)
 
-    // loop <target> <breakLabel> <continueLabel>
-    INST(loop, loop, 3, 0)
+        // loop <target> <breakLabel> <continueLabel>
+        INST(loop, loop, 3, 0)
+    INST_RANGE(UnconditionalBranch, unconditionalBranch, loop)
 
-    // conditionalBranch <condition> <trueBlock> <falseBlock>
-    INST(conditionalBranch, conditionalBranch, 3, 0)
+    /* IRConditionalbranch */
 
-    // ifElse <condition> <trueBlock> <falseBlock> <mergeBlock>
-    INST(ifElse, ifElse, 4, 0)
+        // conditionalBranch <condition> <trueBlock> <falseBlock>
+        INST(conditionalBranch, conditionalBranch, 3, 0)
+
+        // ifElse <condition> <trueBlock> <falseBlock> <mergeBlock>
+        INST(ifElse, ifElse, 4, 0)
+    INST_RANGE(ConditionalBranch, conditionalBranch, ifElse)
 
     // switch <val> <break> <default> <caseVal1> <caseBlock1> ...
-    INST(switch, switch, 3, 0)
+    INST(Switch, switch, 3, 0)
 
     INST(discard, discard, 0, 0)
-    INST(unreachable, unreachable, 0, 0)
 
-INST_RANGE(TerminatorInst, ReturnVal, unreachable)
+    /* IRUnreachable */
+        INST(MissingReturn, missingReturn, 0, 0)
+        INST(Unreachable, unreachable, 0, 0)
+    INST_RANGE(Unreachable, MissingReturn, Unreachable)
+
+INST_RANGE(TerminatorInst, ReturnVal, Unreachable)
 
 INST(Add, add, 2, 0)
 INST(Sub, sub, 2, 0)

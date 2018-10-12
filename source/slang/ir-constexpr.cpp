@@ -48,7 +48,7 @@ bool isConstExpr(IRInst* value)
     {
     case kIROp_IntLit:
     case kIROp_FloatLit:
-    case kIROp_boolConst:
+    case kIROp_BoolLit:
     case kIROp_Func:
         return true;
 
@@ -68,7 +68,7 @@ bool opCanBeConstExpr(IROp op)
     {
     case kIROp_IntLit:
     case kIROp_FloatLit:
-    case kIROp_boolConst:
+    case kIROp_BoolLit:
     case kIROp_Add:
     case kIROp_Sub:
     case kIROp_Mul:
