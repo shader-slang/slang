@@ -426,12 +426,7 @@ namespace Slang
 
     bool IRBlock::PredecessorList::isEmpty()
     {
-        for (auto ii : *this)
-        {
-            (void)ii;
-            return false;
-        }
-        return true;
+        return !(begin() != end());
     }
 
 
