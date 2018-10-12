@@ -84,22 +84,22 @@ namespace Slang
     // Lexer
 
     void Lexer::initialize(
-        SourceUnit*     inSourceUnit,
+        SourceView*     inSourceView,
         DiagnosticSink* inSink,
         NamePool*       inNamePool)
     {
-        sourceUnit  = inSourceUnit;
+        sourceView  = inSourceView;
         sink        = inSink;
         namePool    = inNamePool;
 
-        auto content = inSourceUnit->getContent();
+        auto content = inSourceView->getContent();
         
         begin   = content.begin();
         cursor  = content.begin();
         end     = content.end();
 
         // Set the start location
-        startLoc = inSourceUnit->getRange().begin;
+        startLoc = inSourceView->getRange().begin;
 
         tokenFlags = TokenFlag::AtStartOfLine | TokenFlag::AfterWhitespace;
         lexerFlags = 0;

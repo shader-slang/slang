@@ -7,7 +7,7 @@ namespace Slang {
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! SourceUnit !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-int SourceUnit::findEntryIndex(SourceLoc sourceLoc) const
+int SourceView::findEntryIndex(SourceLoc sourceLoc) const
 {
     if (!m_range.contains(sourceLoc))
     {
@@ -47,7 +47,7 @@ int SourceUnit::findEntryIndex(SourceLoc sourceLoc) const
     return lo;
 }
 
-void SourceUnit::addLineDirective(SourceLoc directiveLoc, StringSlicePool::Handle pathHandle, int line)
+void SourceView::addLineDirective(SourceLoc directiveLoc, StringSlicePool::Handle pathHandle, int line)
 {
     SLANG_ASSERT(pathHandle != StringSlicePool::Handle(0));
     SLANG_ASSERT(m_range.contains(directiveLoc));
@@ -74,13 +74,13 @@ void SourceUnit::addLineDirective(SourceLoc directiveLoc, StringSlicePool::Handl
     m_entries.Add(entry);
 }
 
-void SourceUnit::addLineDirective(SourceLoc directiveLoc, const String& path, int line)
+void SourceView::addLineDirective(SourceLoc directiveLoc, const String& path, int line)
 {
     StringSlicePool::Handle pathHandle = m_sourceManager->getStringSlicePool().add(path.getUnownedSlice());
     return addLineDirective(directiveLoc, pathHandle, line);
 }
 
-void SourceUnit::addDefaultLineDirective(SourceLoc directiveLoc)
+void SourceView::addDefaultLineDirective(SourceLoc directiveLoc)
 {
     SLANG_ASSERT(m_range.contains(directiveLoc));
     // Check that the directiveLoc values are always increasing
@@ -102,7 +102,7 @@ void SourceUnit::addDefaultLineDirective(SourceLoc directiveLoc)
     m_entries.Add(entry);
 }
 
-HumaneSourceLoc SourceUnit::getHumaneLoc(SourceLoc loc, SourceLocType type)
+HumaneSourceLoc SourceView::getHumaneLoc(SourceLoc loc, SourceLocType type)
 {
     const int offset = m_range.getOffset(loc);
 
@@ -150,7 +150,7 @@ HumaneSourceLoc SourceUnit::getHumaneLoc(SourceLoc loc, SourceLocType type)
     return humaneLoc;
 }
 
-String SourceUnit::getPath(SourceLoc loc, SourceLocType type)
+String SourceView::getPath(SourceLoc loc, SourceLocType type)
 {
     if (type == SourceLocType::Spelling)
     {
@@ -301,7 +301,7 @@ SourceRange SourceManager::allocateSourceRange(UInt size)
     return SourceRange(beginLoc, endLoc);
 }
 
-SourceFile* SourceManager::newSourceFile(
+SourceFile* SourceManager::createSourceFile(
     String const&   path,
     ISlangBlob*     contentBlob)
 {
@@ -317,26 +317,26 @@ SourceFile* SourceManager::newSourceFile(
     return sourceFile;
 }
 
-SourceFile* SourceManager::newSourceFile(
+SourceFile* SourceManager::createSourceFile(
     String const&   path,
     String const&   content)
 {
     ComPtr<ISlangBlob> contentBlob = createStringBlob(content);
-    return newSourceFile(path, contentBlob);
+    return createSourceFile(path, contentBlob);
 }
 
-SourceUnit* SourceManager::newSourceUnit(SourceFile* sourceFile)
+SourceView* SourceManager::createSourceView(SourceFile* sourceFile)
 {
     SourceRange range = allocateSourceRange(sourceFile->content.size());
-    SourceUnit* sourceUnit = new SourceUnit(this, sourceFile, range);
-    m_sourceUnits.Add(sourceUnit);
+    SourceView* sourceView = new SourceView(this, sourceFile, range);
+    m_sourceViews.Add(sourceView);
 
-    return sourceUnit;
+    return sourceView;
 }
 
-SourceUnit* SourceManager::findSourceUnit(SourceLoc loc) const
+SourceView* SourceManager::findSourceView(SourceLoc loc) const
 {
-    int hi = int(m_sourceUnits.Count());
+    int hi = int(m_sourceViews.Count());
     // It must be in the range and we have associated units for it to possibly be a hit
     if (!getSourceRange().contains(loc) || hi == 0)
     {
@@ -349,10 +349,10 @@ SourceUnit* SourceManager::findSourceUnit(SourceLoc loc) const
     {
         for (int i = 0; i < hi; ++i)
         {
-            SourceUnit* entry = m_sourceUnits[i];
-            if (entry->getRange().contains(loc))
+            SourceView* view = m_sourceViews[i];
+            if (view->getRange().contains(loc))
             {
-                return entry;
+                return view;
             }
         }
         return nullptr;
@@ -364,13 +364,13 @@ SourceUnit* SourceManager::findSourceUnit(SourceLoc loc) const
     {
         int mid = (hi + lo) >> 1;
 
-        SourceUnit* midEntry = m_sourceUnits[mid];
-        if (midEntry->getRange().contains(loc))
+        SourceView* midView = m_sourceViews[mid];
+        if (midView->getRange().contains(loc))
         {
-            return midEntry;
+            return midView;
         }
 
-        const SourceLoc::RawValue midValue = midEntry->getRange().begin.getRaw();
+        const SourceLoc::RawValue midValue = midView->getRange().begin.getRaw();
         if (midValue <= rawLoc)
         {
             // The location we seek is at or after this entry
@@ -384,21 +384,21 @@ SourceUnit* SourceManager::findSourceUnit(SourceLoc loc) const
     }
 
     // Check if low is actually a hit
-    SourceUnit* unit = m_sourceUnits[lo];
-    return (unit->getRange().contains(loc)) ? unit : nullptr;
+    SourceView* view = m_sourceViews[lo];
+    return (view->getRange().contains(loc)) ? view : nullptr;
 }
 
-SourceUnit* SourceManager::findSourceUnitRecursively(SourceLoc loc) const
+SourceView* SourceManager::findSourceViewRecursively(SourceLoc loc) const
 {
     // Start with this manager
     const SourceManager* manager = this;
     do 
     {
-        SourceUnit* sourceUnit = findSourceUnit(loc);
+        SourceView* sourceView = findSourceView(loc);
         // If we found a hit we are done
-        if (sourceUnit)
+        if (sourceView)
         {
-            return sourceUnit;
+            return sourceView;
         }
         
         // Try the parent
@@ -427,10 +427,10 @@ void SourceManager::addSourceFile(const String& path, SourceFile* sourceFile)
 
 HumaneSourceLoc SourceManager::getHumaneLoc(SourceLoc loc, SourceLocType type)
 {
-    SourceUnit* sourceUnit = findSourceUnitRecursively(loc);
-    if (sourceUnit)
+    SourceView* sourceView = findSourceViewRecursively(loc);
+    if (sourceView)
     {
-        return sourceUnit->getHumaneLoc(loc, type);
+        return sourceView->getHumaneLoc(loc, type);
     }
     else
     {
@@ -440,10 +440,10 @@ HumaneSourceLoc SourceManager::getHumaneLoc(SourceLoc loc, SourceLocType type)
 
 String SourceManager::getPath(SourceLoc loc, SourceLocType type)
 {
-    SourceUnit* sourceUnit = findSourceUnitRecursively(loc);
-    if (sourceUnit)
+    SourceView* sourceView = findSourceViewRecursively(loc);
+    if (sourceView)
     {
-        return sourceUnit->getPath(loc, type);
+        return sourceView->getPath(loc, type);
     }
     else
     {

@@ -73,7 +73,7 @@ namespace Slang
     struct Lexer
     {
         void initialize(
-            SourceUnit*     sourceUnit,
+            SourceView*     sourceView,
             DiagnosticSink* sink,
             NamePool*       namePool);
 
@@ -83,7 +83,7 @@ namespace Slang
 
         TokenList lexAllTokens();
 
-        SourceUnit*     sourceUnit;
+        SourceView*     sourceView;
         DiagnosticSink* sink;
         NamePool*       namePool;
 
@@ -92,7 +92,7 @@ namespace Slang
         char const*     begin;
         char const*     end;
 
-        /// The starting sourceLoc (same as first location of SourceUnit)
+        /// The starting sourceLoc (same as first location of SourceView)
         SourceLoc       startLoc;           
 
         TokenFlags      tokenFlags;

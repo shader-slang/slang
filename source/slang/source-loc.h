@@ -14,8 +14,8 @@ namespace Slang {
 /** Overview: 
 
 SourceFile - Is the immutable contents of a file (or perhaps some generated source - say from doing a macro substitution)
-SourceUnit - Tracks a single parse of a SourceFile. Each SourceUnit defines a range of source locations used. If a SourceFile is parsed twice, two 
-SourceUnits are used, with unique SourceRanges - such that it is possible to tell which specific parse a SourceLoc is from. Not only that but the SourceUnit 
+SourceView - Tracks a single parse of a SourceFile. Each SourceView defines a range of source locations used. If a SourceFile is parsed twice, two 
+SourceViews are used, with unique SourceRanges - such that it is possible to tell which specific parse a SourceLoc is from. Not only that but the SourceView 
 contains the modifications of the interpretations of source (say by #line) directives. It is necessary to have these different 'views' on the 
 source because if a file is included twice, it may be used in different ways and have different #line directives.
 
@@ -140,11 +140,11 @@ struct HumaneSourceLoc
     Int getColumn() const { return column; }
 };
 
-/* A SourceUnit maps to a single span of SourceLoc range and is equivalent to a single include or use of a source file. 
+/* A SourceView maps to a single span of SourceLoc range and is equivalent to a single include or more precisely use of a source file. 
 It is distinct from a SourceFile - because a SourceFile may be included multiple times, with different interpretations (depending 
-on #defines for example).s
+on #defines for example).
 */ 
-class SourceUnit: public RefObject
+class SourceView: public RefObject
 {
     public:
 
@@ -165,21 +165,20 @@ class SourceUnit: public RefObject
         /// into the underlying sourceFile.
     int findEntryIndex(SourceLoc sourceLoc) const;
 
-        /// Add a line directive for this unit. The directiveLoc must of course be in this SourceUnit
-        /// The path handle, must have been constructed on the SourceManager associated with the unit
+        /// Add a line directive for this view. The directiveLoc must of course be in this SourceView
+        /// The path handle, must have been constructed on the SourceManager associated with the view
         /// NOTE! Directives are assumed to be added IN ORDER during parsing such that every directiveLoc > previous 
     void addLineDirective(SourceLoc directiveLoc, StringSlicePool::Handle pathHandle, int line);
-
     void addLineDirective(SourceLoc directiveLoc, const String& path, int line);
 
         /// Removes any corrections on line numbers and reverts to the source files path
     void addDefaultLineDirective(SourceLoc directiveLoc);
 
-        /// Get the range that this unit applies to
+        /// Get the range that this view applies to
     const SourceRange& getRange() const { return m_range; }
         /// Get the entries
     const List<Entry>& getEntries() const { return m_entries; }
-        /// Get the source file holds the contents this 'unit' 
+        /// Get the source file holds the contents this view 
     SourceFile* getSourceFile() const { return m_sourceFile; }
         /// Get the source manager
     SourceManager* getSourceManager() const { return m_sourceManager; }
@@ -195,7 +194,7 @@ class SourceUnit: public RefObject
     String getPath(SourceLoc loc, SourceLocType type = SourceLocType::Normal);
 
         /// Ctor
-    SourceUnit(SourceManager* sourceManager, SourceFile* sourceFile, SourceRange range):
+    SourceView(SourceManager* sourceManager, SourceFile* sourceFile, SourceRange range):
         m_sourceManager(sourceManager),
         m_range(range),
         m_sourceFile(sourceFile)
@@ -205,7 +204,7 @@ class SourceUnit: public RefObject
     protected:
     
     SourceManager* m_sourceManager;     /// Get the manager this belongs to 
-    SourceRange m_range;                ///< The range that this SourceUnit applies to
+    SourceRange m_range;                ///< The range that this SourceView applies to
     RefPtr<SourceFile> m_sourceFile;    ///< The source file can hold the line breaks
     List<Entry> m_entries;              ///< An array entries describing how we should interpret a range, starting from the start location. 
 };
@@ -216,13 +215,15 @@ struct SourceManager
     void initialize(
         SourceManager*  parent);
 
+        /// Allocate a range of SourceLoc locations, these can be used to identify a specific location in the source
     SourceRange allocateSourceRange(UInt size);
 
-    SourceFile* newSourceFile(
+        /// Create a SourceFile defined with the specified path, and content held within a blob
+    SourceFile* createSourceFile(
         String const&   path,
         ISlangBlob*     content);
-
-    SourceFile* newSourceFile(
+        /// Create a SourceFile with specified path. Create a Blob that contains the content.
+    SourceFile* createSourceFile(
         String const&   path,
         String const&   content);
 
@@ -232,17 +233,17 @@ struct SourceManager
         /// Get the path associated with a location 
     String getPath(SourceLoc loc, SourceLocType type = SourceLocType::Normal);
 
-        /// Allocate a new source unit from a file
-    SourceUnit* newSourceUnit(SourceFile* sourceFile);
+        /// Create a new source view from a file
+    SourceView* createSourceView(SourceFile* sourceFile);
 
-        /// Find a unit by a source file location. 
-        /// If not found in this will look in the parent SourceManager
-        /// Returns nullptr if not found
-    SourceUnit* findSourceUnitRecursively(SourceLoc loc) const;
+        /// Find a view by a source file location. 
+        /// If not found in this manager will look in the parent SourceManager
+        /// Returns nullptr if not found.
+    SourceView* findSourceViewRecursively(SourceLoc loc) const;
 
-        /// Find the SourceUnit associated with this manager for a specified location
-        /// If the loc isn't found in this manager it will return nullptr to indicate it's not found
-    SourceUnit* findSourceUnit(SourceLoc loc) const;
+        /// Find the SourceView associated with this manager for a specified location
+        /// Returns nullptr if not found. 
+    SourceView* findSourceView(SourceLoc loc) const;
 
         /// Searches this manager, and then the parent to see if can find a match for path. 
         /// If not found returns nullptr.    
@@ -271,8 +272,8 @@ struct SourceManager
 
     protected:
 
-    // All of the source units. These are held in increasing order of range, so can find by doing a binary chop.
-    List<RefPtr<SourceUnit> > m_sourceUnits;                
+    // All of the SourceViews. These are held in increasing order of range, so can find by doing a binary chop.
+    List<RefPtr<SourceView> > m_sourceViews;                
     StringSlicePool m_slicePool;
 
     Dictionary<String, RefPtr<SourceFile> > m_sourceFiles;
