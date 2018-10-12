@@ -657,7 +657,28 @@ struct SCCPContext
                 // to update the value for the instruction, since
                 // it might never be used anyway.
                 //
-                IRBlock* block = cast<IRBlock>(inst->getParent());
+                IRBlock* block = as<IRBlock>(inst->getParent());
+
+                // It is possible that an instruction ended up on
+                // our SSA work list because it is a user of an
+                // instruction in a block of `code`, but it is not
+                // itself an instruction a block of `code`.
+                //
+                // For example, if `code` is an `IRGeneric` that
+                // yields a function, then `inst` might be an
+                // instruction of that nested function, and not
+                // an instruction of the generic itself.
+                // Note that in such a case, the `inst` cannot
+                // possible affect the values computed in the outer
+                // generic, or the control-flow paths it might take,
+                // so there is no reason to consider it.
+                //
+                // We guard against this case by only processing `inst`
+                // if it is a child of a block in the current `code`.
+                //
+                if(!block || block->getParent() != code)
+                    continue;
+
                 if( isMarkedAsExecuted(block) )
                 {
                     // If the instruction is potentially executed, we update
