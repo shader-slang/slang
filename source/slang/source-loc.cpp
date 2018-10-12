@@ -337,12 +337,11 @@ SourceView* SourceManager::createSourceView(SourceFile* sourceFile)
 SourceView* SourceManager::findSourceView(SourceLoc loc) const
 {
     int hi = int(m_sourceViews.Count());
-    // It must be in the range and we have associated units for it to possibly be a hit
+    // It must be in the range of this manager and have associated views for it to possibly be a hit
     if (!getSourceRange().contains(loc) || hi == 0)
     {
         return nullptr;
     }
-    const SourceLoc::RawValue rawLoc = loc.getRaw();
 
     // If we don't have very many, we may as well just linearly search
     if (hi <= 8)
@@ -357,6 +356,8 @@ SourceView* SourceManager::findSourceView(SourceLoc loc) const
         }
         return nullptr;
     }
+
+    const SourceLoc::RawValue rawLoc = loc.getRaw();
 
     // Binary chop to see if we can find the associated SourceUnit
     int lo = 0;
