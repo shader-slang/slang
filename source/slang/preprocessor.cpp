@@ -265,13 +265,13 @@ static NamePool* getNamePool(Preprocessor* preprocessor)
 // TODO(tfoley): pre-tokenizing files isn't going to work in the long run.
 static PreprocessorInputStream* CreateInputStreamForSource(
     Preprocessor*   preprocessor,
-    SourceUnit*     sourceUnit)
+    SourceView*     sourceView)
 {
     PrimaryInputStream* inputStream = new PrimaryInputStream();
     initializePrimaryInputStream(preprocessor, inputStream);
 
     // initialize the embedded lexer so that it can generate a token stream
-    inputStream->lexer.initialize(sourceUnit, GetSink(preprocessor), getNamePool(preprocessor));
+    inputStream->lexer.initialize(sourceView, GetSink(preprocessor), getNamePool(preprocessor));
     inputStream->token = inputStream->lexer.lexToken();
 
     return inputStream;
@@ -838,12 +838,12 @@ top:
         SourceManager* sourceManager = preprocessor->getCompileRequest()->getSourceManager();
 
         // We create a dummy file to represent the token-paste operation
-        SourceFile* sourceFile = sourceManager->newSourceFile("token paste", sb.ProduceString());
+        SourceFile* sourceFile = sourceManager->createSourceFile("token paste", sb.ProduceString());
 
-        SourceUnit* sourceUnit = sourceManager->newSourceUnit(sourceFile);
+        SourceView* sourceView = sourceManager->createSourceView(sourceFile);
 
         Lexer lexer;
-        lexer.initialize(sourceUnit, GetSink(preprocessor), getNamePool(preprocessor));
+        lexer.initialize(sourceView, GetSink(preprocessor), getNamePool(preprocessor));
 
         SimpleTokenInputStream* inputStream = new SimpleTokenInputStream();
         initializeInputStream(preprocessor, inputStream);
@@ -1589,7 +1589,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
 
     auto directiveLoc = GetDirectiveLoc(context);
     
-    String pathIncludedFrom = context->preprocessor->translationUnit->compileRequest->getSourceManager()->getPath(directiveLoc, SourceLocType::Original);
+    String pathIncludedFrom = context->preprocessor->translationUnit->compileRequest->getSourceManager()->getPath(directiveLoc, SourceLocType::Actual);
     String foundPath;
     ComPtr<ISlangBlob> foundSourceBlob;
 
@@ -1633,14 +1633,14 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
     // If not create a new one, and add to the list of known source files
     if (!sourceFile)
     {
-        sourceFile = sourceManager->newSourceFile(foundPath, foundSourceBlob);
+        sourceFile = sourceManager->createSourceFile(foundPath, foundSourceBlob);
         sourceManager->addSourceFile(foundPath, sourceFile);
     }
 
     // This is a new parse (even if it's a pre-existing source file), so create a new SourceUnit
-    SourceUnit* sourceUnit = sourceManager->newSourceUnit(sourceFile);
+    SourceView* sourceView = sourceManager->createSourceView(sourceFile);
 
-    PreprocessorInputStream* inputStream = CreateInputStreamForSource(context->preprocessor, sourceUnit);
+    PreprocessorInputStream* inputStream = CreateInputStreamForSource(context->preprocessor, sourceView);
     inputStream->parent = context->preprocessor->inputStream;
     context->preprocessor->inputStream = inputStream;
 }
@@ -1803,8 +1803,8 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
         AdvanceToken(context);
 
         // Stop overriding source locations.
-        auto sourceUnit = inputStream->primaryStream->lexer.sourceUnit;
-        sourceUnit->addDefaultLineDirective(directiveLoc);
+        auto sourceView = inputStream->primaryStream->lexer.sourceView;
+        sourceView->addDefaultLineDirective(directiveLoc);
         return;
     }
     else
@@ -1840,8 +1840,8 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
         return;
     }
 
-    auto sourceUnit = inputStream->primaryStream->lexer.sourceUnit;
-    sourceUnit->addLineDirective(directiveLoc, file, line);
+    auto sourceView = inputStream->primaryStream->lexer.sourceView;
+    sourceView->addLineDirective(directiveLoc, file, line);
 }
 
 #define SLANG_PRAGMA_DIRECTIVE_CALLBACK(NAME) \
@@ -1875,7 +1875,7 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaOnceDirective)
     // trivial cases of the "same" path.
     //
     auto directiveLoc = GetDirectiveLoc(context);
-    auto pathIssuedFrom = context->preprocessor->translationUnit->compileRequest->getSourceManager()->getPath(directiveLoc, SourceLocType::Original);
+    auto pathIssuedFrom = context->preprocessor->translationUnit->compileRequest->getSourceManager()->getPath(directiveLoc, SourceLocType::Actual);
 
     context->preprocessor->pragmaOncePaths.Add(pathIssuedFrom);
 }
@@ -2248,21 +2248,21 @@ static void DefineMacro(
 
     auto sourceManager = preprocessor->translationUnit->compileRequest->getSourceManager();
 
-    SourceFile* keyFile = sourceManager->newSourceFile(fileName, key);
-    SourceFile* valueFile = sourceManager->newSourceFile(fileName, value);
+    SourceFile* keyFile = sourceManager->createSourceFile(fileName, key);
+    SourceFile* valueFile = sourceManager->createSourceFile(fileName, value);
 
-    SourceUnit* keyUnit = sourceManager->newSourceUnit(keyFile);
-    SourceUnit* valueUnit = sourceManager->newSourceUnit(valueFile);
+    SourceView* keyView = sourceManager->createSourceView(keyFile);
+    SourceView* valueView = sourceManager->createSourceView(valueFile);
 
     // Use existing `Lexer` to generate a token stream.
     Lexer lexer;
-    lexer.initialize(valueUnit, GetSink(preprocessor), getNamePool(preprocessor));
+    lexer.initialize(valueView, GetSink(preprocessor), getNamePool(preprocessor));
     macro->tokens = lexer.lexAllTokens();
 
     Name* keyName = preprocessor->translationUnit->compileRequest->getNamePool()->getName(key);
 
     macro->nameAndLoc.name = keyName;
-    macro->nameAndLoc.loc = keyUnit->getRange().begin;
+    macro->nameAndLoc.loc = keyView->getRange().begin;
     
     PreprocessorMacro* oldMacro = NULL;
     if (preprocessor->globalEnv.macros.TryGetValue(keyName, oldMacro))
@@ -2311,10 +2311,10 @@ TokenList preprocessSource(
 
     SourceManager* sourceManager = translationUnit->compileRequest->getSourceManager();
 
-    SourceUnit* sourceUnit = sourceManager->newSourceUnit(file);
+    SourceView* sourceView = sourceManager->createSourceView(file);
 
     // create an initial input stream based on the provided buffer
-    preprocessor.inputStream = CreateInputStreamForSource(&preprocessor, sourceUnit);
+    preprocessor.inputStream = CreateInputStreamForSource(&preprocessor, sourceView);
 
     TokenList tokens = ReadAllTokens(&preprocessor);
 

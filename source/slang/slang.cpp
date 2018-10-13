@@ -372,7 +372,7 @@ SlangResult CompileRequest::loadFile(String const& path, ISlangBlob** outBlob)
 
 RefPtr<Expr> CompileRequest::parseTypeString(TranslationUnitRequest * translationUnit, String typeStr, RefPtr<Scope> scope)
 {
-    Slang::RefPtr<Slang::SourceFile> srcFile = sourceManager->newSourceFile(String("type string"), typeStr);
+    Slang::RefPtr<Slang::SourceFile> srcFile = sourceManager->createSourceFile(String("type string"), typeStr);
     
     DiagnosticSink sink;
     sink.sourceManager = sourceManager;
@@ -675,7 +675,7 @@ void CompileRequest::addTranslationUnitSourceBlob(
     String const&   path,
     ISlangBlob*     sourceBlob)
 {
-    RefPtr<SourceFile> sourceFile = getSourceManager()->newSourceFile(path, sourceBlob);
+    RefPtr<SourceFile> sourceFile = getSourceManager()->createSourceFile(path, sourceBlob);
 
     addTranslationUnitSourceFile(translationUnitIndex, sourceFile);
 }
@@ -685,7 +685,7 @@ void CompileRequest::addTranslationUnitSourceString(
     String const&   path,
     String const&   source)
 {
-    RefPtr<SourceFile> sourceFile = getSourceManager()->newSourceFile(path, source);
+    RefPtr<SourceFile> sourceFile = getSourceManager()->createSourceFile(path, source);
 
     addTranslationUnitSourceFile(translationUnitIndex, sourceFile);
 }
@@ -804,7 +804,7 @@ RefPtr<ModuleDecl> CompileRequest::loadModule(
     // TODO: decide which options, if any, should be inherited.
     translationUnit->compileFlags = 0;
 
-    RefPtr<SourceFile> sourceFile = getSourceManager()->newSourceFile(path, sourceBlob);
+    RefPtr<SourceFile> sourceFile = getSourceManager()->createSourceFile(path, sourceBlob);
 
     translationUnit->sourceFiles.Add(sourceFile);
 
@@ -884,7 +884,7 @@ RefPtr<ModuleDecl> CompileRequest::findOrImportModule(
     includeHandler.request = this;
 
     // Get the original path
-    String pathIncludedFrom= getSourceManager()->getPath(loc, SourceLocType::Original);
+    String pathIncludedFrom= getSourceManager()->getPath(loc, SourceLocType::Actual);
     
     String foundPath;
     ComPtr<ISlangBlob> foundSourceBlob;

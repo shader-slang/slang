@@ -7,7 +7,7 @@ namespace Slang {
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! SourceUnit !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-int SourceUnit::findEntryIndex(SourceLoc sourceLoc) const
+int SourceView::findEntryIndex(SourceLoc sourceLoc) const
 {
     if (!m_range.contains(sourceLoc))
     {
@@ -47,7 +47,7 @@ int SourceUnit::findEntryIndex(SourceLoc sourceLoc) const
     return lo;
 }
 
-void SourceUnit::addLineDirective(SourceLoc directiveLoc, StringSlicePool::Handle pathHandle, int line)
+void SourceView::addLineDirective(SourceLoc directiveLoc, StringSlicePool::Handle pathHandle, int line)
 {
     SLANG_ASSERT(pathHandle != StringSlicePool::Handle(0));
     SLANG_ASSERT(m_range.contains(directiveLoc));
@@ -74,13 +74,13 @@ void SourceUnit::addLineDirective(SourceLoc directiveLoc, StringSlicePool::Handl
     m_entries.Add(entry);
 }
 
-void SourceUnit::addLineDirective(SourceLoc directiveLoc, const String& path, int line)
+void SourceView::addLineDirective(SourceLoc directiveLoc, const String& path, int line)
 {
     StringSlicePool::Handle pathHandle = m_sourceManager->getStringSlicePool().add(path.getUnownedSlice());
     return addLineDirective(directiveLoc, pathHandle, line);
 }
 
-void SourceUnit::addDefaultLineDirective(SourceLoc directiveLoc)
+void SourceView::addDefaultLineDirective(SourceLoc directiveLoc)
 {
     SLANG_ASSERT(m_range.contains(directiveLoc));
     // Check that the directiveLoc values are always increasing
@@ -102,7 +102,7 @@ void SourceUnit::addDefaultLineDirective(SourceLoc directiveLoc)
     m_entries.Add(entry);
 }
 
-HumaneSourceLoc SourceUnit::getHumaneLoc(SourceLoc loc, SourceLocType type)
+HumaneSourceLoc SourceView::getHumaneLoc(SourceLoc loc, SourceLocType type)
 {
     const int offset = m_range.getOffset(loc);
 
@@ -127,7 +127,7 @@ HumaneSourceLoc SourceUnit::getHumaneLoc(SourceLoc loc, SourceLocType type)
     StringSlicePool::Handle pathHandle = StringSlicePool::Handle(0);
 
     // Only bother looking up the entry information if we want a 'Normal' lookup
-    const int entryIndex = (type == SourceLocType::Normal) ? findEntryIndex(loc) : -1;
+    const int entryIndex = (type == SourceLocType::Nominal) ? findEntryIndex(loc) : -1;
     if (entryIndex >= 0)
     {
         const Entry& entry = m_entries[entryIndex];
@@ -150,9 +150,9 @@ HumaneSourceLoc SourceUnit::getHumaneLoc(SourceLoc loc, SourceLocType type)
     return humaneLoc;
 }
 
-String SourceUnit::getPath(SourceLoc loc, SourceLocType type)
+String SourceView::getPath(SourceLoc loc, SourceLocType type)
 {
-    if (type == SourceLocType::Original)
+    if (type == SourceLocType::Actual)
     {
         return m_sourceFile->path;
     }
@@ -263,7 +263,7 @@ int SourceFile::calcColumnIndex(int lineIndex, int offset)
 void SourceManager::initialize(
     SourceManager*  p)
 {
-    parent = p;
+    m_parent = p;
 
     if( p )
     {
@@ -272,16 +272,16 @@ void SourceManager::initialize(
         // right after those from the parent.
         //
         // TODO: more clever allocation in cases where that might not be reasonable
-        startLoc = p->nextLoc;
+        m_startLoc = p->m_nextLoc;
     }
     else
     {
         // Location zero is reserved for an invalid location,
         // so we need to start reserving locations starting at 1.
-        startLoc = SourceLoc::fromRaw(1);
+        m_startLoc = SourceLoc::fromRaw(1);
     }
 
-    nextLoc = startLoc;
+    m_nextLoc = m_startLoc;
 }
 
 SourceRange SourceManager::allocateSourceRange(UInt size)
@@ -289,19 +289,19 @@ SourceRange SourceManager::allocateSourceRange(UInt size)
     // TODO: consider using atomics here
 
 
-    SourceLoc beginLoc  = nextLoc;
+    SourceLoc beginLoc  = m_nextLoc;
     SourceLoc endLoc    = beginLoc + size;
 
     // We need to be able to represent the location that is *at* the end of
     // the input source, so the next available location for a new file
     // must be placed one after the end of this one.
 
-    nextLoc = endLoc + 1;
+    m_nextLoc = endLoc + 1;
 
     return SourceRange(beginLoc, endLoc);
 }
 
-SourceFile* SourceManager::newSourceFile(
+SourceFile* SourceManager::createSourceFile(
     String const&   path,
     ISlangBlob*     contentBlob)
 {
@@ -317,47 +317,61 @@ SourceFile* SourceManager::newSourceFile(
     return sourceFile;
 }
 
-SourceFile* SourceManager::newSourceFile(
+SourceFile* SourceManager::createSourceFile(
     String const&   path,
     String const&   content)
 {
     ComPtr<ISlangBlob> contentBlob = createStringBlob(content);
-    return newSourceFile(path, contentBlob);
+    return createSourceFile(path, contentBlob);
 }
 
-SourceUnit* SourceManager::newSourceUnit(SourceFile* sourceFile)
+SourceView* SourceManager::createSourceView(SourceFile* sourceFile)
 {
     SourceRange range = allocateSourceRange(sourceFile->content.size());
-    SourceUnit* sourceUnit = new SourceUnit(this, sourceFile, range);
-    m_sourceUnits.Add(sourceUnit);
+    SourceView* sourceView = new SourceView(this, sourceFile, range);
+    m_sourceViews.Add(sourceView);
 
-    return sourceUnit;
+    return sourceView;
 }
 
-SourceUnit* SourceManager::findSourceUnit(SourceLoc loc)
+SourceView* SourceManager::findSourceView(SourceLoc loc) const
 {
-    SourceLoc::RawValue rawLoc = loc.getRaw();
-
-    int hi = int(m_sourceUnits.Count());
-
-    if (hi == 0)
+    int hi = int(m_sourceViews.Count());
+    // It must be in the range of this manager and have associated views for it to possibly be a hit
+    if (!getSourceRange().contains(loc) || hi == 0)
     {
         return nullptr;
     }
 
+    // If we don't have very many, we may as well just linearly search
+    if (hi <= 8)
+    {
+        for (int i = 0; i < hi; ++i)
+        {
+            SourceView* view = m_sourceViews[i];
+            if (view->getRange().contains(loc))
+            {
+                return view;
+            }
+        }
+        return nullptr;
+    }
+
+    const SourceLoc::RawValue rawLoc = loc.getRaw();
+
+    // Binary chop to see if we can find the associated SourceUnit
     int lo = 0;
     while (lo + 1 < hi)
     {
         int mid = (hi + lo) >> 1;
 
-        SourceUnit* midEntry = m_sourceUnits[mid];
-        if (midEntry->getRange().contains(loc))
+        SourceView* midView = m_sourceViews[mid];
+        if (midView->getRange().contains(loc))
         {
-            return midEntry;
+            return midView;
         }
 
-        SourceLoc::RawValue midValue = midEntry->getRange().begin.getRaw();
-
+        const SourceLoc::RawValue midValue = midView->getRange().begin.getRaw();
         if (midValue <= rawLoc)
         {
             // The location we seek is at or after this entry
@@ -370,17 +384,30 @@ SourceUnit* SourceManager::findSourceUnit(SourceLoc loc)
         }
     }
 
-    // Check if low is a hit
-    {
-        SourceUnit* unit = m_sourceUnits[lo];
-        if (unit->getRange().contains(loc))
-        {
-            return unit;
-        }
-    }
+    // Check if low is actually a hit
+    SourceView* view = m_sourceViews[lo];
+    return (view->getRange().contains(loc)) ? view : nullptr;
+}
 
-    // Check the parent if there is a parent
-    return (parent) ? parent->findSourceUnit(loc) : nullptr;
+SourceView* SourceManager::findSourceViewRecursively(SourceLoc loc) const
+{
+    // Start with this manager
+    const SourceManager* manager = this;
+    do 
+    {
+        SourceView* sourceView = findSourceView(loc);
+        // If we found a hit we are done
+        if (sourceView)
+        {
+            return sourceView;
+        }
+        
+        // Try the parent
+        manager = manager->m_parent;
+    }
+    while (manager);
+    // Didn't find it
+    return nullptr;
 }
 
 SourceFile* SourceManager::findSourceFile(const String& path)
@@ -390,7 +417,7 @@ SourceFile* SourceManager::findSourceFile(const String& path)
     {
         return filePtr->Ptr();
     }
-    return parent ? parent->findSourceFile(path) : nullptr;
+    return m_parent ? m_parent->findSourceFile(path) : nullptr;
 }
 
 void SourceManager::addSourceFile(const String& path, SourceFile* sourceFile)
@@ -401,10 +428,10 @@ void SourceManager::addSourceFile(const String& path, SourceFile* sourceFile)
 
 HumaneSourceLoc SourceManager::getHumaneLoc(SourceLoc loc, SourceLocType type)
 {
-    SourceUnit* sourceUnit = findSourceUnit(loc);
-    if (sourceUnit)
+    SourceView* sourceView = findSourceViewRecursively(loc);
+    if (sourceView)
     {
-        return sourceUnit->getHumaneLoc(loc, type);
+        return sourceView->getHumaneLoc(loc, type);
     }
     else
     {
@@ -414,10 +441,10 @@ HumaneSourceLoc SourceManager::getHumaneLoc(SourceLoc loc, SourceLocType type)
 
 String SourceManager::getPath(SourceLoc loc, SourceLocType type)
 {
-    SourceUnit* sourceUnit = findSourceUnit(loc);
-    if (sourceUnit)
+    SourceView* sourceView = findSourceViewRecursively(loc);
+    if (sourceView)
     {
-        return sourceUnit->getPath(loc, type);
+        return sourceView->getPath(loc, type);
     }
     else
     {

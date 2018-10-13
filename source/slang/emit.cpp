@@ -578,8 +578,8 @@ struct EmitVisitor
 
             if(shouldUseGLSLStyleLineDirective)
             {
-                auto path = sourceLocation.getPath();
-
+                auto path = sourceLocation.path;
+                
                 // GLSL doesn't support the traditional form of a `#line` directive without
                 // an extension. Rather than depend on that extension we will output
                 // a directive in the traditional GLSL fashion.
@@ -609,7 +609,7 @@ struct EmitVisitor
                 // in a module that tracks source files.
 
                 emitRawText("\"");
-                for(auto c : sourceLocation.getPath())
+                for(auto c : sourceLocation.path)
                 {
                     char charBuffer[] = { c, 0 };
                     switch(c)
