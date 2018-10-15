@@ -372,16 +372,47 @@ SlangResult CompileRequest::loadFile(String const& path, ISlangBlob** outBlob)
 
 RefPtr<Expr> CompileRequest::parseTypeString(TranslationUnitRequest * translationUnit, String typeStr, RefPtr<Scope> scope)
 {
-    Slang::RefPtr<Slang::SourceFile> srcFile = sourceManager->createSourceFile(String("type string"), typeStr);
+    // Create a SourceManager on the stack, so any allocations for 'SourceFile'/'SourceView' etc will be cleaned up
+    SourceManager localSourceManager;
+    localSourceManager.initialize(sourceManager);
+        
+    Slang::RefPtr<Slang::SourceFile> srcFile(localSourceManager.createSourceFile(String("type string"), typeStr));
     
+    // We'll use a temporary diagnostic sink  
     DiagnosticSink sink;
-    sink.sourceManager = sourceManager;
+    sink.sourceManager = &localSourceManager;
+
+    // RAII type to make make sure current SourceManager is restored after parse.
+    // Use RAII - to make sure everything is reset even if an exception is thrown.
+    struct ScopeReplaceSourceManager
+    {
+        ScopeReplaceSourceManager(CompileRequest* request, SourceManager* replaceManager):
+            m_request(request),
+            m_originalSourceManager(request->getSourceManager())
+        {
+            request->setSourceManager(replaceManager);
+        }
+
+        ~ScopeReplaceSourceManager()
+        {
+            m_request->setSourceManager(m_originalSourceManager);
+        }
+
+        private:
+        CompileRequest* m_request;
+        SourceManager* m_originalSourceManager;
+    };
+
+    // We need to temporarily replace the SourceManager for this CompileRequest
+    ScopeReplaceSourceManager scopeReplaceSourceManager(this, &localSourceManager);
+
     auto tokens = preprocessSource(
         srcFile,
         &sink,
         nullptr,
         Dictionary<String,String>(),
         translationUnit);
+
     return parseTypeFromSourceFile(translationUnit, tokens, &sink, scope);
 }
 

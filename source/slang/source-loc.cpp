@@ -27,11 +27,9 @@ int SourceView::findEntryIndex(SourceLoc sourceLoc) const
     int lo = 0;
     while (lo + 1 < hi)
     {
-        int mid = (hi + lo) >> 1;
-
+        const int mid = (hi + lo) >> 1;
         const Entry& midEntry = m_entries[mid];
         SourceLoc::RawValue midValue = midEntry.m_startLoc.getRaw();
-
         if (midValue <= rawValue)
         {
             // The location we seek is at or after this entry
@@ -67,8 +65,9 @@ void SourceView::addLineDirective(SourceLoc directiveLoc, StringSlicePool::Handl
     
     // We also need to make sure that any lookups for line numbers will
     // get corrected based on this files location.
-    // We assume the line number coming in is a line number, NOT an index so the correction needs + 1
-    // There is an additional + 1 because we want the NEXT line to be 99 (ie +2 is correct 'fix')
+    // We assume the line number coming from the directive is a line number, NOT an index, so the correction needs + 1
+    // There is an additional + 1 because we want the NEXT line - ie the line after the #line directive, to the specified value
+    // Taking both into account means +2 is correct 'fix'
     entry.m_lineAdjust = line - (lineIndex + 2);
 
     m_entries.Add(entry);
@@ -451,6 +450,5 @@ String SourceManager::getPath(SourceLoc loc, SourceLocType type)
         return String("unknown");
     }
 }
-
 
 } // namespace Slang
