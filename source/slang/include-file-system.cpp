@@ -10,8 +10,11 @@ namespace Slang
 // Allocate static const storage for the various interface IDs that the Slang API needs to expose
 static const Guid IID_ISlangUnknown = SLANG_UUID_ISlangUnknown;
 static const Guid IID_ISlangFileSystem = SLANG_UUID_ISlangFileSystem;
+static const Guid IID_ISlangFileSystemExt = SLANG_UUID_ISlangFileSystemExt;
 
-/* static */ISlangFileSystem* IncludeFileSystem::getDefault()
+/* !!!!!!!!!!!!!!!!!!!!!!!!!! IncludeFileSystem !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
+
+/* static */ISlangFileSystemExt* IncludeFileSystem::getDefault()
 {
     static IncludeFileSystem s_includeFileSystem;
     s_includeFileSystem.ensureRef();
@@ -20,7 +23,7 @@ static const Guid IID_ISlangFileSystem = SLANG_UUID_ISlangFileSystem;
 
 ISlangUnknown* IncludeFileSystem::getInterface(const Guid& guid)
 {
-    return (guid == IID_ISlangUnknown || guid == IID_ISlangFileSystem) ? static_cast<ISlangFileSystem*>(this) : nullptr;
+    return (guid == IID_ISlangUnknown || guid == IID_ISlangFileSystem || guid == IID_ISlangFileSystemExt) ? static_cast<ISlangFileSystemExt*>(this) : nullptr;
 }
 
 SlangResult IncludeFileSystem::getCanoncialPath(const char* path, ISlangBlob** canonicalPathOut)
@@ -79,6 +82,20 @@ SlangResult SLANG_MCALL IncludeFileSystem::loadFile(char const* path, ISlangBlob
     {
     }
     return SLANG_E_CANNOT_OPEN;
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!! WrapFileSystem !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
+
+SlangResult SLANG_MCALL WrapFileSystem::loadFile(char const* path, ISlangBlob** outBlob)
+{
+    return m_fileSystem->loadFile(path, outBlob);
+}
+
+SlangResult WrapFileSystem::getCanoncialPath(const char* path, ISlangBlob** canonicalPathOut)
+{
+    String canonicalPath(path);
+    *canonicalPathOut = createStringBlob(canonicalPath).detach();
+    return SLANG_OK;
 }
 
 } 

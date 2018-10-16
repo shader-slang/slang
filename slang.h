@@ -651,33 +651,65 @@ extern "C"
     };
     #define SLANG_UUID_ISlangBlob { 0x8BA5FB08, 0x5195, 0x40e2, 0xAC, 0x58, 0x0D, 0x98, 0x9C, 0x3A, 0x01, 0x02 }
 
-    typedef unsigned int SlangPathType;
-    enum
-    {
-        SLANG_PATH_TYPE_DIRECTORY ,     /**< Path specified specifies a directory. */
-        SLANG_PATH_TYPE_FILE,           /**< Path specified is to a file. */
-    };
-
     /** A (real or virtual) file system.
 
     Slang can make use of this interface whenever it would otherwise try to load files
     from disk, allowing applications to hook and/or override filesystem access from
     the compiler.
 
-    All paths as input char*, or output as ISlangBlobs are always encoded as UTF-8 strings.
-    Blobs that contain strings are always zero terminated. It is the responsibility of 
+    It is the responsibility of 
     the caller of any method that returns a ISlangBlob to release the blob when it is no 
     longer used (using 'release').
     */
+
     struct ISlangFileSystem : public ISlangUnknown
     {
     public:
-        /** Get a canonical path - that uniquely identifies an object of the file system.
-        
+        /** Load a file from `path` and return a blob of its contents
+        @param path The path to load from, as a null-terminated UTF-8 string.
+        @param outBlob A destination pointer to receive the blob of the file contents.
+        @returns A `SlangResult` to indicate success or failure in loading the file.
+
+        If load is successful, the implementation should create a blob to hold
+        the file's content, store it to `outBlob`, and return 0.
+        If the load fails, the implementation should return a failure status
+        (any negative value will do).
+        */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadFile(
+            char const*     path,
+            ISlangBlob** outBlob) = 0;
+    };
+    #define SLANG_UUID_ISlangFileSystem { 0x003A09FC, 0x3A4D, 0x4BA0, 0xAD, 0x60, 0x1F, 0xD8, 0x63, 0xA9, 0x15, 0xAB }
+
+    /* Type that identifies how a path should be interpreted */
+    typedef unsigned int SlangPathType;
+    enum
+    {
+        SLANG_PATH_TYPE_DIRECTORY,     /**< Path specified specifies a directory. */
+        SLANG_PATH_TYPE_FILE,           /**< Path specified is to a file. */
+    };
+
+    /** An extended file system abstraction.
+    
+    Implementing and using this interface over ISlangFileSystem gives much more control over how paths
+    are managed, as well as how it is determined if two files 'are the same'.
+
+    All paths as input char*, or output as ISlangBlobs are always encoded as UTF-8 strings.
+    Blobs that contain strings are always zero terminated.
+    */
+    struct ISlangFileSystemExt : public ISlangFileSystem
+    {
+    public:
+        /** Get a canonical path which uniquely identifies an object of the file system.
+           
         Given a path, returns a 'canonical' path which will return the same path for the same file/directory. 
         The canonical path is used to compare if two includes are the same file. 
         The string for the canonical path is held zero terminated in the ISlangBlob of canonicalPathOut. 
-        
+   
+        Note that a canonical path doesn't *have* to be a 'canonical' path, or a path at all
+        - it can just be a string that uniquely identifies a file. For example another possible mechanism
+        could be to store the filename combined with the file date time to uniquely identify it.
+     
         The client must ensure the blob be released when no longer used, otherwise memory will leak.
 
         @param path
@@ -702,24 +734,10 @@ extern "C"
             SlangPathType fromPathType,
             const char* fromPath,
             const char* path,
-            ISlangBlob** pathOut) = 0;
-            
-        /** Load a file from `path` and return a blob of its contents
-
-        @param path The path to load from, as a null-terminated UTF-8 string.
-        @param outBlob A destination pointer to receive the blob of the file contents.
-        @returns A `SlangResult` to indicate success or failure in loading the file.
-
-        If load is successful, the implementation should create a blob to hold
-        the file's content, store it to `outBlob`, and return 0.
-        If the load fails, the implementation should return a failure status
-        (any negative value will do).
-        */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadFile(
-            char const*     path,
-            ISlangBlob**    outBlob) = 0;
+            ISlangBlob** pathOut) = 0;            
     };
-    #define SLANG_UUID_ISlangFileSystem { 0x003A09FC, 0x3A4D, 0x4BA0, 0xAD, 0x60, 0x1F, 0xD8, 0x63, 0xA9, 0x15, 0xAB }
+
+    #define SLANG_UUID_ISlangFileSystemExt { 0x5fb632d2, 0x979d, 0x4481, { 0x9f, 0xee, 0x66, 0x3c, 0x3f, 0x14, 0x49, 0xe1 } }
 
     /*!
     @brief An instance of the Slang library.

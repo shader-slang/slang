@@ -396,6 +396,11 @@ namespace Slang
         ///
         ComPtr<ISlangFileSystem> fileSystem;
 
+        /// The extended file system implementation. Will be set to a default implementation
+        /// if fileSystem is nullptr. Otherwise it will either be fileSystem's interface, 
+        /// or a wrapped impl that makes fileSystem operate as fileSystemExt
+        ComPtr<ISlangFileSystemExt> fileSystemExt;
+
         /// Load a file into memory using the configured file system.
         ///
         /// @param path The path to attempt to load from

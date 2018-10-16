@@ -100,18 +100,18 @@ struct IncludeHandlerImpl : IncludeHandler
 {
     CompileRequest* request;
 
-    ISlangFileSystem* _getFileSystem()
+    ISlangFileSystemExt* _getFileSystemExt()
     {
-        return request->fileSystem ? request->fileSystem : IncludeFileSystem::getDefault();
+        return request->fileSystemExt;
     }
 
     SlangResult _findFile(SlangPathType fromPathType, const String& fromPath, const String& path, PathInfo& pathInfoOut)
     {
-        ISlangFileSystem* fileSystem = _getFileSystem();
+        ISlangFileSystemExt* fileSystemExt = _getFileSystemExt();
 
         // Get relative path
         ComPtr<ISlangBlob> relPathBlob;
-        SLANG_RETURN_ON_FAIL(fileSystem->calcRelativePath(fromPathType, fromPath.begin(), path.begin(), relPathBlob.writeRef()));
+        SLANG_RETURN_ON_FAIL(fileSystemExt->calcRelativePath(fromPathType, fromPath.begin(), path.begin(), relPathBlob.writeRef()));
         String relPath(getString(relPathBlob));
         if (relPath.Length() <= 0)
         {
@@ -120,7 +120,7 @@ struct IncludeHandlerImpl : IncludeHandler
      
         // Get the canonical path
         ComPtr<ISlangBlob> canonicalPathBlob;
-        SLANG_RETURN_ON_FAIL(fileSystem->getCanoncialPath(relPath.begin(), canonicalPathBlob.writeRef()));
+        SLANG_RETURN_ON_FAIL(fileSystemExt->getCanoncialPath(relPath.begin(), canonicalPathBlob.writeRef()));
 
         // If the rel path exists -> the canonical path MUST exists too
         String canonicalPath(getString(canonicalPathBlob));
@@ -169,8 +169,8 @@ struct IncludeHandlerImpl : IncludeHandler
     virtual SlangResult readFile(const String& path,
         ISlangBlob** blobOut) override
     {
-        ISlangFileSystem* fileSystem = _getFileSystem();
-        SLANG_RETURN_ON_FAIL(fileSystem->loadFile(path.begin(), blobOut));
+        ISlangFileSystem* fileSystemExt = _getFileSystemExt();
+        SLANG_RETURN_ON_FAIL(fileSystemExt->loadFile(path.begin(), blobOut));
 
         request->mDependencyFilePaths.Add(path);
 
@@ -313,6 +313,10 @@ CompileRequest::CompileRequest(Session* session)
     setSourceManager(&sourceManagerStorage);
 
     sourceManager->initialize(session->getBuiltinSourceManager());
+
+    // Set up the default file system
+    SLANG_ASSERT(fileSystem == nullptr);
+    fileSystemExt = IncludeFileSystem::getDefault();
 }
 
 CompileRequest::~CompileRequest()
@@ -1195,13 +1199,35 @@ SLANG_API void spDestroyCompileRequest(
     delete req;
 }
 
+static const Slang::Guid IID_ISlangFileSystemExt = SLANG_UUID_ISlangFileSystemExt;
+
 SLANG_API void spSetFileSystem(
     SlangCompileRequest*    request,
     ISlangFileSystem*       fileSystem)
 {
     if(!request) return;
     auto req = REQ(request);
+
+    // Set the fileSystem
     req->fileSystem = fileSystem;
+
+    // Set up fileSystemExt appropriately
+    if (fileSystem == nullptr)
+    {
+        req->fileSystemExt = Slang::IncludeFileSystem::getDefault();
+    }
+    else
+    {
+        // See if we have the interface 
+        fileSystem->queryInterface(IID_ISlangFileSystemExt, (void**)req->fileSystemExt.writeRef()); 
+
+        // If not wrap with WrapFileSytem that keeps the old behavior
+        if (!req->fileSystemExt)
+        {
+            // Construct a wrapper to emulate the extended interface behavior
+            req->fileSystemExt = new Slang::WrapFileSystem(fileSystem);
+        }
+    }
 }
 
 
