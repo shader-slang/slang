@@ -5,7 +5,19 @@
 
 namespace Slang {
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!! SourceUnit !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+/* !!!!!!!!!!!!!!!!!!!!!!!!! SourceView !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+const String PathInfo::getMostUniquePath() const
+{
+    switch (type)
+    {
+        case Type::Normal:      return canonicalPath;
+        case Type::FoundPath:   return foundPath;
+        default:                return "";
+    }
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!! SourceView !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 int SourceView::findEntryIndex(SourceLoc sourceLoc) const
 {
@@ -150,7 +162,7 @@ PathInfo SourceView::_getPathInfo(StringSlicePool::Handle pathHandle) const
     else
     {
         // We don't have a full normal path (including 'canonical') so just go with FoundPath
-        return PathInfo::makeFoundPath(m_sourceManager->getStringSlicePool().getSlice(pathHandle));
+        return PathInfo::makePath(m_sourceManager->getStringSlicePool().getSlice(pathHandle));
     }
 }
 

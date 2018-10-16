@@ -125,6 +125,8 @@ DIAGNOSTIC(-1, Note, seeOpeningToken, "see opening '$0'")
 DIAGNOSTIC(15300, Error, includeFailed, "failed to find include file '$0'")
 DIAGNOSTIC(15301, Error, importFailed, "failed to find imported file '$0'")
 DIAGNOSTIC(-1, Error, noIncludeHandlerSpecified, "no `#include` handler was specified")
+DIAGNOSTIC(15302, Error, noCanonicalPath, "`#include` handler didn't generate a canonical path for '$0'")
+
 
 // 154xx - macro definition
 DIAGNOSTIC(15400, Warning, macroRedefinition, "redefinition of macro '$0'")
@@ -138,7 +140,7 @@ DIAGNOSTIC(15501, Error, wrongNumberOfArgumentsToMacro, "wrong number of argumen
 // 156xx - pragmas
 DIAGNOSTIC(15600, Error, expectedPragmaDirectiveName, "expected a name after '#pragma'")
 DIAGNOSTIC(15601, Warning, unknownPragmaDirectiveIgnored, "ignoring unknown directive '#pragma $0'")
-DIAGNOSTIC(15602, Warning, pragmaOnceIgnored, "pragma once was ignored - this is typically because it is in a tranlation unit, or a macro, not in an include")
+DIAGNOSTIC(15602, Warning, pragmaOnceIgnored, "pragma once was ignored - this is typically because is not placed in an include")
 
 // 159xx - user-defined error/warning
 DIAGNOSTIC(15900, Error,    userDefinedError,   "#error: $0")

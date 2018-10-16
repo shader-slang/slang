@@ -48,22 +48,27 @@ struct PathInfo
         FoundPath,                  ///< Just has a found path (canonical path is unknown, or even 'unknowable') 
         TokenPaste,                 ///< No paths, just created to do a macro expansion
         TypeParse,                  ///< No path, just created to do a type parse
+        CommandLine,                ///< A macro constructed from the command line
     };
 
         /// True if has a canonical path
-    SLANG_FORCE_INLINE bool hasCanonicalPath() const { return type == Type::Normal; }
+    SLANG_FORCE_INLINE bool hasCanonicalPath() const { return type == Type::Normal && canonicalPath.Length() > 0; }
         /// True if has a regular found path
     SLANG_FORCE_INLINE bool hasFoundPath() const { return type == Type::Normal || type == Type::FoundPath; }
+
+        /// The canonical path is unique, so return that if we have it. If not the regular path, otherwise the empty string.
+    const String getMostUniquePath() const;
 
     // So simplify construction. In normal usage it's safer to use make methods over constructing directly.
     static PathInfo makeUnknown() { return PathInfo { Type::Unknown, "unknown" }; }
     static PathInfo makeTokenPaste() { return PathInfo{ Type::TokenPaste, "token paste" }; }
     static PathInfo makeNormal(const String& foundPathIn, const String& canonicalPathIn) { SLANG_ASSERT(canonicalPathIn.Length() > 0 && foundPathIn.Length() > 0); return PathInfo { Type::Normal, foundPathIn, canonicalPathIn }; }
-    static PathInfo makeFoundPath(const String& foundPathIn) { SLANG_ASSERT(foundPathIn.Length() > 0); return PathInfo { Type::FoundPath, foundPathIn }; }
-    static PathInfo makeTypeParse() { return PathInfo { Type::TypeParse, "type string" };}
+    static PathInfo makePath(const String& pathIn) { SLANG_ASSERT(pathIn.Length() > 0); return PathInfo { Type::FoundPath, pathIn }; }
+    static PathInfo makeTypeParse() { return PathInfo { Type::TypeParse, "type string" }; }
+    static PathInfo makeCommandLine() { return PathInfo { Type::CommandLine, "command line" }; }
 
     Type type;                      ///< The type of path
-    String foundPath;               ///< The path where the file was found (might contain relative elements)
+    String foundPath;               ///< The path where the file was found (might contain relative elements) 
     String canonicalPath;           ///< Canonical version of the found path
 };
 

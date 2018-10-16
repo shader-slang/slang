@@ -1,6 +1,6 @@
 result code = 0
 standard error = {
-tests/preprocessor/inappropriate-once.slang(4): warning 15602: pragma once was ignored - this is typically because it is in a tranlation unit, or a macro, not in an include
+tests/preprocessor/inappropriate-once.slang(4): warning 15602: pragma once was ignored - this is typically because is not placed in an include
 }
 standard output = {
 }

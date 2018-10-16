@@ -462,7 +462,7 @@ namespace Slang
         void loadParsedModule(
             RefPtr<TranslationUnitRequest> const&   translationUnit,
             Name*                                   name,
-            String const&                           path);
+            PathInfo const&                         pathInfo);
 
         RefPtr<ModuleDecl> findOrImportModule(
             Name*               name,

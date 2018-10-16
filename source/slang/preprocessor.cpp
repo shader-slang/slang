@@ -1609,6 +1609,12 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
         return;
     }
 
+    // We must have a canonical path to be compare
+    if (!filePathInfo.hasCanonicalPath())
+    {
+        GetSink(context)->diagnose(pathToken.loc, Diagnostics::noCanonicalPath, path);
+        return;
+    }
 
     // Do all checking related to the end of this directive before we push a new stream,
     // just to avoid complications where that check would need to deal with
@@ -2254,9 +2260,8 @@ static void DefineMacro(
     String const&   key,
     String const&   value)
 {
-    PathInfo pathInfo;
-    pathInfo.foundPath = "command line";
-
+    PathInfo pathInfo = PathInfo::makeCommandLine();
+    
     PreprocessorMacro* macro = CreateMacro(preprocessor);
 
     auto sourceManager = preprocessor->translationUnit->compileRequest->getSourceManager();

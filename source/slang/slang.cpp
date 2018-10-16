@@ -77,15 +77,23 @@ Session::Session()
     addBuiltinSource(hlslLanguageScope, "hlsl", getHLSLLibraryCode());
 }
 
-static const char* getString(ISlangBlob* blob)
+static String getString(ISlangBlob* blob)
 {
     if (blob)
     {
-        //const size_t size = blob->getBufferSize();
-        const char* contents = (const char*)blob->getBufferPointer();
-        return contents;
+        size_t size = blob->getBufferSize();
+        if (size > 0)
+        {
+            const char* contents = (const char*)blob->getBufferPointer();
+            // Check it has terminating 0, if not we must construct as if it does
+            if (contents[size - 1] == 0)
+            {
+                size --;
+            }
+            return String(contents, contents + size);
+        }
     }
-    return nullptr;
+    return String();
 }
 
 struct IncludeHandlerImpl : IncludeHandler
@@ -104,21 +112,24 @@ struct IncludeHandlerImpl : IncludeHandler
         // Get relative path
         ComPtr<ISlangBlob> relPathBlob;
         SLANG_RETURN_ON_FAIL(fileSystem->calcRelativePath(fromPathType, fromPath.begin(), path.begin(), relPathBlob.writeRef()));
-        String relPath = getString(relPathBlob);
-
-        if (!File::Exists(relPath))
+        String relPath(getString(relPathBlob));
+        if (relPath.Length() <= 0)
         {
-            return SLANG_E_NOT_FOUND;
+            return SLANG_FAIL;
         }
-
+     
         // Get the canonical path
         ComPtr<ISlangBlob> canonicalPathBlob;
         SLANG_RETURN_ON_FAIL(fileSystem->getCanoncialPath(relPath.begin(), canonicalPathBlob.writeRef()));
 
         // If the rel path exists -> the canonical path MUST exists too
         String canonicalPath(getString(canonicalPathBlob));
-        SLANG_ASSERT(File::Exists(canonicalPath));
-
+        if (canonicalPath.Length() <= 0)
+        {   
+            // Canonical path can't be empty
+            return SLANG_FAIL;
+        }
+        
         pathInfoOut.type = PathInfo::Type::Normal;
         pathInfoOut.foundPath = relPath;
         pathInfoOut.canonicalPath = canonicalPath;
@@ -764,7 +775,7 @@ void CompileRequest::addTranslationUnitSourceBlob(
     String const&   path,
     ISlangBlob*     sourceBlob)
 {
-    PathInfo pathInfo = PathInfo::makeFoundPath(path);
+    PathInfo pathInfo = PathInfo::makePath(path);
     RefPtr<SourceFile> sourceFile = getSourceManager()->createSourceFile(pathInfo, sourceBlob);
 
     addTranslationUnitSourceFile(translationUnitIndex, sourceFile);
@@ -775,7 +786,7 @@ void CompileRequest::addTranslationUnitSourceString(
     String const&   path,
     String const&   source)
 {
-    PathInfo pathInfo = PathInfo::makeFoundPath(path);
+    PathInfo pathInfo = PathInfo::makePath(path);
     RefPtr<SourceFile> sourceFile = getSourceManager()->createSourceFile(pathInfo, source);
 
     addTranslationUnitSourceFile(translationUnitIndex, sourceFile);
@@ -849,13 +860,18 @@ UInt CompileRequest::addTarget(
 void CompileRequest::loadParsedModule(
     RefPtr<TranslationUnitRequest> const&   translationUnit,
     Name*                                   name,
-    String const&                           path)
+    const PathInfo&                         pathInfo)
 {
     // Note: we add the loaded module to our name->module listing
     // before doing semantic checking, so that if it tries to
     // recursively `import` itself, we can detect it.
     RefPtr<LoadedModule> loadedModule = new LoadedModule();
-    mapPathToLoadedModule.Add(path, loadedModule);
+
+    // Get a path
+    String mostUniquePath = pathInfo.getMostUniquePath();
+    SLANG_ASSERT(mostUniquePath.Length() > 0);
+
+    mapPathToLoadedModule.Add(mostUniquePath, loadedModule);
     mapNameToLoadedModules.Add(name, loadedModule);
 
     int errorCountBefore = mSink.GetErrorCount();
@@ -914,7 +930,7 @@ RefPtr<ModuleDecl> CompileRequest::loadModule(
     loadParsedModule(
         translationUnit,
         name,
-        filePathInfo.canonicalPath);
+        filePathInfo);
 
     errorCountAfter = mSink.GetErrorCount();
 
