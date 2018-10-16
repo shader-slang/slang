@@ -47,12 +47,6 @@ SlangResult IncludeFileSystem::calcRelativePath(SlangPathType fromPathType, cons
             relPath = Path::Combine(fromPath, path);
             break;
         }
-        case SLANG_PATH_TYPE_NONE:
-        {
-            SLANG_ASSERT(fromPath == nullptr);
-            relPath = path;
-            break;
-        }
     }
 
     *pathOut = createStringBlob(relPath).detach();

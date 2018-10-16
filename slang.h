@@ -654,7 +654,6 @@ extern "C"
     typedef unsigned int SlangPathType;
     enum
     {
-        SLANG_PATH_TYPE_NONE,           /**< No path is defined */
         SLANG_PATH_TYPE_DIRECTORY ,     /**< Path specified specifies a directory. */
         SLANG_PATH_TYPE_FILE,           /**< Path specified is to a file. */
     };
