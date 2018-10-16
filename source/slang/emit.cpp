@@ -762,7 +762,7 @@ struct EmitVisitor
             Emit("[");
             if(auto elementCount = declarator->elementCount)
             {
-                EmitVal(elementCount);
+                EmitVal(elementCount, kEOp_General);
             }
             Emit("]");
             break;
@@ -1048,11 +1048,11 @@ struct EmitVisitor
             {
                 emitGLSLTypePrefix(matType->getElementType());
                 Emit("mat");
-                EmitVal(matType->getRowCount());
+                EmitVal(matType->getRowCount(), kEOp_General);
                 // TODO(tfoley): only emit the next bit
                 // for non-square matrix
                 Emit("x");
-                EmitVal(matType->getColumnCount());
+                EmitVal(matType->getColumnCount(), kEOp_General);
             }
             break;
 
@@ -1061,9 +1061,9 @@ struct EmitVisitor
             Emit("matrix<");
             EmitType(matType->getElementType());
             Emit(",");
-            EmitVal(matType->getRowCount());
+            EmitVal(matType->getRowCount(), kEOp_General);
             Emit(",");
-            EmitVal(matType->getColumnCount());
+            EmitVal(matType->getColumnCount(), kEOp_General);
             Emit("> ");
             break;
 
@@ -1271,7 +1271,7 @@ struct EmitVisitor
                 for(UInt ii = 0; ii < operandCount; ++ii)
                 {
                     if(ii != 0) emit(", ");
-                    EmitVal(type->getOperand(ii));
+                    EmitVal(type->getOperand(ii), kEOp_General);
                 }
                 emit(" >");
             }
@@ -1368,7 +1368,7 @@ struct EmitVisitor
     // Expressions
     //
 
-    bool MaybeEmitParens(EOpInfo& outerPrec, EOpInfo prec)
+    bool maybeEmitParens(EOpInfo& outerPrec, EOpInfo prec)
     {
         bool needParens = (prec.leftPrecedence <= outerPrec.leftPrecedence)
             || (prec.rightPrecedence <= outerPrec.rightPrecedence);
@@ -1380,6 +1380,11 @@ struct EmitVisitor
             outerPrec = kEOp_None;
         }
         return needParens;
+    }
+
+    void maybeCloseParens(bool needClose)
+    {
+        if(needClose) Emit(")");
     }
 
     bool isTargetIntrinsicModifierApplicable(
@@ -1517,7 +1522,9 @@ struct EmitVisitor
         }
     }
 
-    void EmitVal(IRInst* val)
+    void EmitVal(
+        IRInst*         val,
+        EOpInfo const&  outerPrec)
     {
         if(auto type = as<IRType>(val))
         {
@@ -1525,7 +1532,7 @@ struct EmitVisitor
         }
         else
         {
-            emitIRInstExpr(context, val, IREmitMode::Default);
+            emitIRInstExpr(context, val, IREmitMode::Default, outerPrec);
         }
     }
 
@@ -2289,7 +2296,7 @@ struct EmitVisitor
         case IRDeclaratorInfo::Flavor::Array:
             emitDeclarator(ctx, declarator->next);
             emit("[");
-            emitIROperand(ctx, declarator->elementCount, IREmitMode::Default);
+            emitIROperand(ctx, declarator->elementCount, IREmitMode::Default, kEOp_General);
             emit("]");
             break;
         }
@@ -2547,29 +2554,12 @@ struct EmitVisitor
     void emitIROperand(
         EmitContext*    ctx,
         IRInst*         inst,
-        IREmitMode      mode)
+        IREmitMode      mode,
+        EOpInfo const&  outerPrec)
     {
         if( shouldFoldIRInstIntoUseSites(ctx, inst, mode) )
         {
-            // HACK: Don't emit parentheses for cases that will
-            // wrap themsevles in `{}` to begin with.
-            //
-            // TODO: This shouldn't be needed once we are more
-            // systematic about not emitting redundant parentheses.
-            //
-            switch(inst->op)
-            {
-            case kIROp_makeArray:
-            case kIROp_makeStruct:
-                emitIRInstExpr(ctx, inst, mode);
-                break;
-
-            default:
-                emit("(");
-                emitIRInstExpr(ctx, inst, mode);
-                emit(")");
-                break;
-            }
+            emitIRInstExpr(ctx, inst, mode, outerPrec);
             return;
         }
 
@@ -2594,7 +2584,7 @@ struct EmitVisitor
         for(UInt aa = 0; aa < argCount; ++aa)
         {
             if(aa != 0) emit(", ");
-            emitIROperand(ctx, args[aa].get(), mode);
+            emitIROperand(ctx, args[aa].get(), mode, kEOp_General);
         }
         emit(")");
     }
@@ -2992,8 +2982,11 @@ struct EmitVisitor
         IRCall*                         inst,
         IRFunc*                         /* func */,
         IRTargetIntrinsicDecoration*    targetIntrinsic,
-        IREmitMode                      mode)
+        IREmitMode                      mode,
+        EOpInfo const&                  inOuterPrec)
     {
+        auto outerPrec = inOuterPrec;
+
         IRUse* args = inst->getOperands();
         UInt argCount = inst->getOperandCount();
 
@@ -3007,15 +3000,19 @@ struct EmitVisitor
         if(isOrdinaryName(name))
         {
             // Simple case: it is just an ordinary name, so we call it like a builtin.
+            auto prec = kEOp_Postfix;
+            bool needClose = maybeEmitParens(outerPrec, prec);
 
             emit(name);
             Emit("(");
             for (UInt aa = 0; aa < argCount; ++aa)
             {
                 if (aa != 0) Emit(", ");
-                emitIROperand(ctx, args[aa].get(), mode);
+                emitIROperand(ctx, args[aa].get(), mode, kEOp_General);
             }
             Emit(")");
+
+            maybeCloseParens(needClose);
             return;
         }
         else
@@ -3049,7 +3046,7 @@ struct EmitVisitor
                         UInt argIndex = d - '0';
                         SLANG_RELEASE_ASSERT((0 <= argIndex) && (argIndex < argCount));
                         Emit("(");
-                        emitIROperand(ctx, args[argIndex].get(), mode);
+                        emitIROperand(ctx, args[argIndex].get(), mode, kEOp_General);
                         Emit(")");
                     }
                     break;
@@ -3077,9 +3074,9 @@ struct EmitVisitor
                             }
 
                             Emit("(");
-                            emitIROperand(ctx, textureArg, mode);
+                            emitIROperand(ctx, textureArg, mode, kEOp_General);
                             Emit(",");
-                            emitIROperand(ctx, samplerArg, mode);
+                            emitIROperand(ctx, samplerArg, mode, kEOp_General);
                             Emit(")");
                         }
                         else
@@ -3174,7 +3171,7 @@ struct EmitVisitor
                         {
                             // In the simple case, the operand is already a 4-vector,
                             // so we can just emit it as-is.
-                            emitIROperand(ctx, arg, mode);
+                            emitIROperand(ctx, arg, mode, kEOp_General);
                         }
                         else
                         {
@@ -3184,7 +3181,7 @@ struct EmitVisitor
                             //
                             emitVectorTypeName(elementType, 4);
                             Emit("(");
-                            emitIROperand(ctx, arg, mode);
+                            emitIROperand(ctx, arg, mode, kEOp_General);
                             for(IRIntegerValue ii = elementCount; ii < 4; ++ii)
                             {
                                 Emit(", ");
@@ -3254,22 +3251,22 @@ struct EmitVisitor
                                 // to be broken out into its own argument.
                                 //
                                 Emit("(");
-                                emitIROperand(ctx, arg->getOperand(0), mode);
+                                emitIROperand(ctx, arg->getOperand(0), mode, kEOp_General);
                                 Emit("), (");
-                                emitIROperand(ctx, arg->getOperand(1), mode);
+                                emitIROperand(ctx, arg->getOperand(1), mode, kEOp_General);
                                 Emit(")");
                             }
                             else
                             {
                                 Emit("(");
-                                emitIROperand(ctx, arg, mode);
+                                emitIROperand(ctx, arg, mode, kEOp_General);
                                 Emit(")");
                             }
                         }
                         else
                         {
                             Emit("(");
-                            emitIROperand(ctx, arg, mode);
+                            emitIROperand(ctx, arg, mode, kEOp_General);
                             Emit(")");
                         }
                     }
@@ -3340,8 +3337,12 @@ struct EmitVisitor
         EmitContext*    ctx,
         IRCall*         inst,
         IRFunc*         func,
-        IREmitMode      mode)
+        IREmitMode      mode,
+        EOpInfo const&  inOuterPrec)
     {
+        auto outerPrec = inOuterPrec;
+        bool needClose = false;
+
         // For a call with N arguments, the instruction will
         // have N+1 operands. We will start consuming operands
         // starting at the index 1.
@@ -3358,7 +3359,8 @@ struct EmitVisitor
                 inst,
                 func,
                 targetIntrinsicDecoration,
-                mode);
+                mode,
+                outerPrec);
             return;
         }
 
@@ -3407,19 +3409,27 @@ struct EmitVisitor
         if(name == "operator[]")
         {
             // The user is invoking a built-in subscript operator
-            emit("(");
-            emitIROperand(ctx, inst->getOperand(operandIndex++), mode);
-            emit(")[");
-            emitIROperand(ctx, inst->getOperand(operandIndex++), mode);
+
+            auto prec = kEOp_Postfix;
+            needClose = maybeEmitParens(outerPrec, prec);
+
+            emitIROperand(ctx, inst->getOperand(operandIndex++), mode, leftSide(outerPrec, prec));
+            emit("[");
+            emitIROperand(ctx, inst->getOperand(operandIndex++), mode, kEOp_General);
             emit("]");
 
             if(operandIndex < operandCount)
             {
                 emit(" = ");
-                emitIROperand(ctx, inst->getOperand(operandIndex++), mode);
+                emitIROperand(ctx, inst->getOperand(operandIndex++), mode, kEOp_General);
             }
+
+            maybeCloseParens(needClose);
             return;
         }
+
+        auto prec = kEOp_Postfix;
+        needClose = maybeEmitParens(outerPrec, prec);
 
         // The mangled function name currently records
         // the number of explicit parameters, and thus
@@ -3431,10 +3441,8 @@ struct EmitVisitor
         if(argCount != paramCount)
         {
             // Looks like a member function call
-            emit("(");
-            emitIROperand(ctx, inst->getOperand(operandIndex), mode);
-            emit(").");
-
+            emitIROperand(ctx, inst->getOperand(operandIndex), mode, leftSide(outerPrec, prec));
+            emit(".");
             operandIndex++;
         }
 
@@ -3444,43 +3452,54 @@ struct EmitVisitor
         for(; operandIndex < operandCount; ++operandIndex )
         {
             if(!first) emit(", ");
-            emitIROperand(ctx, inst->getOperand(operandIndex), mode);
+            emitIROperand(ctx, inst->getOperand(operandIndex), mode, kEOp_General);
             first = false;
         }
         emit(")");
+
+        maybeCloseParens(needClose);
     }
 
     void emitIRCallExpr(
         EmitContext*    ctx,
         IRCall*         inst,
-        IREmitMode      mode)
+        IREmitMode      mode,
+        EOpInfo         outerPrec)
     {
         // We want to detect any call to an intrinsic operation,
         // that we can emit it directly without mangling, etc.
         auto funcValue = inst->getOperand(0);
         if(auto irFunc = asTargetIntrinsic(ctx, funcValue))
         {
-            emitIntrinsicCallExpr(ctx, inst, irFunc, mode);
+            emitIntrinsicCallExpr(ctx, inst, irFunc, mode, outerPrec);
         }
         else
         {
-            emitIROperand(ctx, funcValue, mode);
+            auto prec = kEOp_Postfix;
+            bool needClose = maybeEmitParens(outerPrec, prec);
+
+            emitIROperand(ctx, funcValue, mode, leftSide(outerPrec, prec));
             emit("(");
             UInt argCount = inst->getOperandCount();
             for( UInt aa = 1; aa < argCount; ++aa )
             {
                 if(aa != 1) emit(", ");
-                emitIROperand(ctx, inst->getOperand(aa), mode);
+                emitIROperand(ctx, inst->getOperand(aa), mode, kEOp_General);
             }
             emit(")");
+
+            maybeCloseParens(needClose);
         }
     }
 
     void emitIRInstExpr(
         EmitContext*    ctx,
         IRInst*         inst,
-        IREmitMode      mode)
+        IREmitMode      mode,
+        EOpInfo const&  inOuterPrec)
     {
+        EOpInfo outerPrec = inOuterPrec;
+        bool needClose = false;
         switch(inst->op)
         {
         case kIROp_IntLit:
@@ -3495,11 +3514,14 @@ struct EmitVisitor
             // Simple constructor call
             if( inst->getOperandCount() == 1 && getTarget(ctx) == CodeGenTarget::HLSL)
             {
+                auto prec = kEOp_Prefix;
+                needClose = maybeEmitParens(outerPrec, prec);
+
                 // Need to emit as cast for HLSL
                 emit("(");
                 emitIRType(ctx, inst->getDataType());
                 emit(") ");
-                emitIROperand(ctx, inst->getOperand(0), mode);
+                emitIROperand(ctx, inst->getOperand(0), mode, rightSide(outerPrec,prec));
             }
             else
             {
@@ -3509,6 +3531,7 @@ struct EmitVisitor
             break;
 
         case kIROp_constructVectorFromScalar:
+
             // Simple constructor call
             if( getTarget(ctx) == CodeGenTarget::HLSL )
             {
@@ -3521,7 +3544,7 @@ struct EmitVisitor
                 emitIRType(ctx, inst->getDataType());
             }
             emit("(");
-            emitIROperand(ctx, inst->getOperand(0), mode);
+            emitIROperand(ctx, inst->getOperand(0), mode, kEOp_General);
             emit(")");
             break;
 
@@ -3533,7 +3556,10 @@ struct EmitVisitor
 
                 if (!isDerefBaseImplicit(ctx, fieldExtract->getBase()))
                 {
-                    emitIROperand(ctx, fieldExtract->getBase(), mode);
+                    auto prec = kEOp_Postfix;
+                    needClose = maybeEmitParens(outerPrec, prec);
+
+                    emitIROperand(ctx, fieldExtract->getBase(), mode, leftSide(outerPrec, prec));
                     emit(".");
                 }
                 emit(getIRName(fieldExtract->getField()));
@@ -3548,7 +3574,10 @@ struct EmitVisitor
 
                 if (!isDerefBaseImplicit(ctx, ii->getBase()))
                 {
-                    emitIROperand(ctx, ii->getBase(), mode);
+                    auto prec = kEOp_Postfix;
+                    needClose = maybeEmitParens(outerPrec, prec);
+
+                    emitIROperand(ctx, ii->getBase(), mode, leftSide(outerPrec, prec));
                     emit(".");
                 }
 
@@ -3556,36 +3585,37 @@ struct EmitVisitor
             }
             break;
 
-#define CASE(OPCODE, OP)                                    \
-        case OPCODE:                                        \
-            emitIROperand(ctx, inst->getOperand(0), mode);  \
-            emit(" " #OP " ");                              \
-            emitIROperand(ctx, inst->getOperand(1), mode);  \
+#define CASE(OPCODE, PREC, OP)                                                                  \
+        case OPCODE:                                                                            \
+            needClose = maybeEmitParens(outerPrec, kEOp_##PREC);                                \
+            emitIROperand(ctx, inst->getOperand(0), mode, leftSide(outerPrec, kEOp_##PREC));    \
+            emit(" " #OP " ");                                                                  \
+            emitIROperand(ctx, inst->getOperand(1), mode, rightSide(outerPrec, kEOp_##PREC));   \
             break
 
-        CASE(kIROp_Add, +);
-        CASE(kIROp_Sub, -);
-        CASE(kIROp_Div, /);
-        CASE(kIROp_Mod, %);
+        CASE(kIROp_Add, Add, +);
+        CASE(kIROp_Sub, Sub, -);
+        CASE(kIROp_Div, Div, /);
+        CASE(kIROp_Mod, Mod, %);
 
-        CASE(kIROp_Lsh, <<);
-        CASE(kIROp_Rsh, >>);
+        CASE(kIROp_Lsh, Lsh, <<);
+        CASE(kIROp_Rsh, Rsh, >>);
 
         // TODO: Need to pull out component-wise
         // comparison cases for matrices/vectors
-        CASE(kIROp_Eql, ==);
-        CASE(kIROp_Neq, !=);
-        CASE(kIROp_Greater, >);
-        CASE(kIROp_Less, <);
-        CASE(kIROp_Geq, >=);
-        CASE(kIROp_Leq, <=);
+        CASE(kIROp_Eql, Eql, ==);
+        CASE(kIROp_Neq, Neq, !=);
+        CASE(kIROp_Greater, Greater, >);
+        CASE(kIROp_Less, Less, <);
+        CASE(kIROp_Geq, Geq, >=);
+        CASE(kIROp_Leq, Leq, <=);
 
-        CASE(kIROp_BitAnd, &);
-        CASE(kIROp_BitXor, ^);
-        CASE(kIROp_BitOr, |);
+        CASE(kIROp_BitAnd, BitAnd, &);
+        CASE(kIROp_BitXor, BitXor, ^);
+        CASE(kIROp_BitOr,  BitOr,  |);
 
-        CASE(kIROp_And, &&);
-        CASE(kIROp_Or, ||);
+        CASE(kIROp_And, And, &&);
+        CASE(kIROp_Or,  Or,  ||);
 
 #undef CASE
 
@@ -3599,36 +3629,47 @@ struct EmitVisitor
                 && as<IRMatrixType>(inst->getOperand(1)->getDataType()))
             {
                 emit("matrixCompMult(");
-                emitIROperand(ctx, inst->getOperand(0), mode);
+                emitIROperand(ctx, inst->getOperand(0), mode, kEOp_General);
                 emit(", ");
-                emitIROperand(ctx, inst->getOperand(1), mode);
+                emitIROperand(ctx, inst->getOperand(1), mode, kEOp_General);
                 emit(")");
             }
             else
             {
                 // Default handling is to just rely on infix
                 // `operator*`.
-                emitIROperand(ctx, inst->getOperand(0), mode);
+                auto prec = kEOp_Mul;
+                needClose = maybeEmitParens(outerPrec, prec);
+                emitIROperand(ctx, inst->getOperand(0), mode, leftSide(outerPrec, prec));
                 emit(" * ");
-                emitIROperand(ctx, inst->getOperand(1), mode);
+                emitIROperand(ctx, inst->getOperand(1), mode, rightSide(prec, outerPrec));
             }
             break;
 
         case kIROp_Not:
             {
+                auto prec = kEOp_Prefix;
+                needClose = maybeEmitParens(outerPrec, prec);
+
                 emit("!");
-                emitIROperand(ctx, inst->getOperand(0), mode);
+                emitIROperand(ctx, inst->getOperand(0), mode, rightSide(prec, outerPrec));
             }
             break;
 
         case kIROp_Neg:
             {
+                auto prec = kEOp_Prefix;
+                needClose = maybeEmitParens(outerPrec, prec);
+
                 emit("-");
-                emitIROperand(ctx, inst->getOperand(0), mode);
+                emitIROperand(ctx, inst->getOperand(0), mode, rightSide(prec, outerPrec));
             }
             break;
         case kIROp_BitNot:
             {
+                auto prec = kEOp_Prefix;
+                needClose = maybeEmitParens(outerPrec, prec);
+
                 if (as<IRBoolType>(inst->getDataType()))
                 {
                     emit("!");
@@ -3637,64 +3678,62 @@ struct EmitVisitor
                 {
                     emit("~");
                 }
-                emitIROperand(ctx, inst->getOperand(0), mode);
+                emitIROperand(ctx, inst->getOperand(0), mode, rightSide(prec, outerPrec));
             }
-            break;
-        case kIROp_Sample:
-            emitIROperand(ctx, inst->getOperand(0), mode);
-            emit(".Sample(");
-            emitIROperand(ctx, inst->getOperand(1), mode);
-            emit(", ");
-            emitIROperand(ctx, inst->getOperand(2), mode);
-            emit(")");
-            break;
-
-        case kIROp_SampleGrad:
-            // argument 0 is the instruction's type
-            emitIROperand(ctx, inst->getOperand(0), mode);
-            emit(".SampleGrad(");
-            emitIROperand(ctx, inst->getOperand(1), mode);
-            emit(", ");
-            emitIROperand(ctx, inst->getOperand(2), mode);
-            emit(", ");
-            emitIROperand(ctx, inst->getOperand(3), mode);
-            emit(", ");
-            emitIROperand(ctx, inst->getOperand(4), mode);
-            emit(")");
             break;
 
         case kIROp_Load:
-            // TODO: this logic will really only work for a simple variable reference...
-            emitIROperand(ctx, inst->getOperand(0), mode);
+            emitIROperand(ctx, inst->getOperand(0), mode, outerPrec);
             break;
 
         case kIROp_Store:
-            // TODO: this logic will really only work for a simple variable reference...
-            emitIROperand(ctx, inst->getOperand(0), mode);
-            emit(" = ");
-            emitIROperand(ctx, inst->getOperand(1), mode);
+            {
+                auto prec = kEOp_Assign;
+                needClose = maybeEmitParens(outerPrec, prec);
+
+                emitIROperand(ctx, inst->getOperand(0), mode, leftSide(outerPrec, prec));
+                emit(" = ");
+                emitIROperand(ctx, inst->getOperand(1), mode, rightSide(prec, outerPrec));
+            }
             break;
 
         case kIROp_Call:
             {
-                emitIRCallExpr(ctx, (IRCall*)inst, mode);
+                emitIRCallExpr(ctx, (IRCall*)inst, mode, outerPrec);
             }
             break;
 
         case kIROp_BufferLoad:
         case kIROp_BufferElementRef:
-            emitIROperand(ctx, inst->getOperand(0), mode);
-            emit("[");
-            emitIROperand(ctx, inst->getOperand(1), mode);
-            emit("]");
+            {
+                auto prec = kEOp_Postfix;
+                needClose = maybeEmitParens(outerPrec, prec);
+
+                emitIROperand(ctx, inst->getOperand(0), mode, leftSide(outerPrec, prec));
+                emit("[");
+                emitIROperand(ctx, inst->getOperand(1), mode, kEOp_General);
+                emit("]");
+            }
             break;
 
         case kIROp_BufferStore:
-            emitIROperand(ctx, inst->getOperand(0), mode);
-            emit("[");
-            emitIROperand(ctx, inst->getOperand(1), mode);
-            emit("] = ");
-            emitIROperand(ctx, inst->getOperand(2), mode);
+            {
+                auto precAssign = kEOp_Assign;
+                needClose = maybeEmitParens(outerPrec, precAssign);
+
+                auto outerPrecSubscript = precAssign;
+                auto precSubscript = kEOp_Postfix;
+                bool needCloseSubscript = maybeEmitParens(outerPrecSubscript, precSubscript);
+
+                emitIROperand(ctx, inst->getOperand(0), mode, leftSide(outerPrecSubscript, precSubscript));
+                emit("[");
+                emitIROperand(ctx, inst->getOperand(1), mode, kEOp_General);
+                emit("]");
+                maybeCloseParens(needCloseSubscript);
+
+                emit(" = ");
+                emitIROperand(ctx, inst->getOperand(2), mode, rightSide(outerPrec, precAssign));
+            }
             break;
 
         case kIROp_GroupMemoryBarrierWithGroupSync:
@@ -3707,18 +3746,26 @@ struct EmitVisitor
             // HACK: deal with translation of GLSL geometry shader input arrays.
             if(auto decoration = inst->getOperand(0)->findDecoration<IRGLSLOuterArrayDecoration>())
             {
+                auto prec = kEOp_Postfix;
+                needClose = maybeEmitParens(outerPrec, prec);
+
                 emit(decoration->outerArrayName);
                 emit("[");
-                emitIROperand(ctx, inst->getOperand(1), mode);
+                emitIROperand(ctx, inst->getOperand(1), mode, kEOp_General);
                 emit("].");
-                emitIROperand(ctx, inst->getOperand(0), mode);
+                emitIROperand(ctx, inst->getOperand(0), mode, rightSide(prec, outerPrec));
                 break;
             }
+            else
+            {
+                auto prec = kEOp_Postfix;
+                needClose = maybeEmitParens(outerPrec, prec);
 
-            emitIROperand(ctx, inst->getOperand(0), mode);
-            emit("[");
-            emitIROperand(ctx, inst->getOperand(1), mode);
-            emit("]");
+                emitIROperand(ctx, inst->getOperand(0), mode, leftSide(outerPrec, prec));
+                emit("[");
+                emitIROperand(ctx, inst->getOperand(1), mode, kEOp_General);
+                emit("]");
+            }
             break;
 
         case kIROp_Mul_Vector_Matrix:
@@ -3734,24 +3781,30 @@ struct EmitVisitor
                 // because the notion of what is a "row" vs. a "column"
                 // is reversed between HLSL/Slang and GLSL.
                 //
-                emitIROperand(ctx, inst->getOperand(1), mode);
+                auto prec = kEOp_Mul;
+                needClose = maybeEmitParens(outerPrec, prec);
+
+                emitIROperand(ctx, inst->getOperand(1), mode, leftSide(outerPrec, prec));
                 emit(" * ");
-                emitIROperand(ctx, inst->getOperand(0), mode);
+                emitIROperand(ctx, inst->getOperand(0), mode, rightSide(prec, outerPrec));
             }
             else
             {
                 emit("mul(");
-                emitIROperand(ctx, inst->getOperand(0), mode);
+                emitIROperand(ctx, inst->getOperand(0), mode, kEOp_General);
                 emit(", ");
-                emitIROperand(ctx, inst->getOperand(1), mode);
+                emitIROperand(ctx, inst->getOperand(1), mode, kEOp_General);
                 emit(")");
             }
             break;
 
         case kIROp_swizzle:
             {
+                auto prec = kEOp_Postfix;
+                needClose = maybeEmitParens(outerPrec, prec);
+
                 auto ii = (IRSwizzle*)inst;
-                emitIROperand(ctx, ii->getBase(), mode);
+                emitIROperand(ctx, ii->getBase(), mode, leftSide(outerPrec, prec));
                 emit(".");
                 UInt elementCount = ii->getElementCount();
                 for (UInt ee = 0; ee < elementCount; ++ee)
@@ -3771,17 +3824,20 @@ struct EmitVisitor
 
         case kIROp_Specialize:
             {
-                emitIROperand(ctx, inst->getOperand(0), mode);
+                emitIROperand(ctx, inst->getOperand(0), mode, outerPrec);
             }
             break;
 
         case kIROp_Select:
             {
-                emitIROperand(ctx, inst->getOperand(0), mode);
+                auto prec = kEOp_Conditional;
+                needClose = maybeEmitParens(outerPrec, prec);
+
+                emitIROperand(ctx, inst->getOperand(0), mode, leftSide(outerPrec, prec));
                 emit(" ? ");
-                emitIROperand(ctx, inst->getOperand(1), mode);
+                emitIROperand(ctx, inst->getOperand(1), mode, prec);
                 emit(" : ");
-                emitIROperand(ctx, inst->getOperand(2), mode);
+                emitIROperand(ctx, inst->getOperand(2), mode, rightSide(prec, outerPrec));
             }
             break;
 
@@ -3801,7 +3857,7 @@ struct EmitVisitor
                 for (UInt aa = 0; aa < argCount; ++aa)
                 {
                     if (aa != 0) emit(", ");
-                    emitIROperand(ctx, inst->getOperand(aa), mode);
+                    emitIROperand(ctx, inst->getOperand(aa), mode, kEOp_General);
                 }
                 emit(" }");
             }
@@ -3811,6 +3867,7 @@ struct EmitVisitor
             emit("/* unhandled */");
             break;
         }
+        maybeCloseParens(needClose);
     }
 
     void emitIRInst(
@@ -3848,7 +3905,7 @@ struct EmitVisitor
         {
         default:
             emitIRInstResultDecl(ctx, inst);
-            emitIRInstExpr(ctx, inst, mode);
+            emitIRInstExpr(ctx, inst, mode, kEOp_General);
             emit(";\n");
             break;
 
@@ -3893,7 +3950,7 @@ struct EmitVisitor
 
         case kIROp_ReturnVal:
             emit("return ");
-            emitIROperand(ctx, ((IRReturnVal*) inst)->getVal(), mode);
+            emitIROperand(ctx, ((IRReturnVal*) inst)->getVal(), mode, kEOp_General);
             emit(";\n");
             break;
 
@@ -3905,9 +3962,14 @@ struct EmitVisitor
             {
                 auto ii = (IRSwizzleSet*)inst;
                 emitIRInstResultDecl(ctx, inst);
-                emitIROperand(ctx, inst->getOperand(0), mode);
+                emitIROperand(ctx, inst->getOperand(0), mode, kEOp_General);
                 emit(";\n");
-                emitIROperand(ctx, inst, mode);
+
+                auto subscriptOuter = kEOp_General;
+                auto subscriptPrec = kEOp_Postfix;
+                bool needCloseSubscript = maybeEmitParens(subscriptOuter, subscriptPrec);
+
+                emitIROperand(ctx, inst, mode, leftSide(subscriptOuter, subscriptPrec));
                 emit(".");
                 UInt elementCount = ii->getElementCount();
                 for (UInt ee = 0; ee < elementCount; ++ee)
@@ -3922,18 +3984,24 @@ struct EmitVisitor
                     char const* kComponents[] = { "x", "y", "z", "w" };
                     emit(kComponents[elementIndex]);
                 }
+                maybeCloseParens(needCloseSubscript);
+
                 emit(" = ");
-                emitIROperand(ctx, inst->getOperand(1), mode);
+                emitIROperand(ctx, inst->getOperand(1), mode, kEOp_General);
                 emit(";\n");
             }
             break;
 
         case kIROp_SwizzledStore:
             {
+                auto subscriptOuter = kEOp_General;
+                auto subscriptPrec = kEOp_Postfix;
+                bool needCloseSubscript = maybeEmitParens(subscriptOuter, subscriptPrec);
+
+
                 auto ii = cast<IRSwizzledStore>(inst);
-                emit("(");
-                emitIROperand(ctx, ii->getDest(), mode);
-                emit(").");
+                emitIROperand(ctx, ii->getDest(), mode, leftSide(subscriptOuter, subscriptPrec));
+                emit(".");
                 UInt elementCount = ii->getElementCount();
                 for (UInt ee = 0; ee < elementCount; ++ee)
                 {
@@ -3947,8 +4015,10 @@ struct EmitVisitor
                     char const* kComponents[] = { "x", "y", "z", "w" };
                     emit(kComponents[elementIndex]);
                 }
+                maybeCloseParens(needCloseSubscript);
+
                 emit(" = ");
-                emitIROperand(ctx, ii->getSource(), mode);
+                emitIROperand(ctx, ii->getSource(), mode, kEOp_General);
                 emit(";\n");
             }
             break;
@@ -4055,9 +4125,12 @@ struct EmitVisitor
 
             IRInst* arg = args[argIndex].get();
 
-            emitIROperand(ctx, pp, IREmitMode::Default);
+            auto outerPrec = kEOp_General;
+            auto prec = kEOp_Assign;
+
+            emitIROperand(ctx, pp, IREmitMode::Default, leftSide(outerPrec, prec));
             emit(" = ");
-            emitIROperand(ctx, arg, IREmitMode::Default);
+            emitIROperand(ctx, arg, IREmitMode::Default, rightSide(prec, outerPrec));
             emit(";\n");
         }
     }
@@ -4188,7 +4261,7 @@ struct EmitVisitor
                     // instead of the current `if(condition) {} else { elseRegion }`
 
                     emit("if(");
-                    emitIROperand(ctx, ifRegion->condition, IREmitMode::Default);
+                    emitIROperand(ctx, ifRegion->condition, IREmitMode::Default, kEOp_General);
                     emit(")\n{\n");
                     indent();
                     emitRegion(ctx, ifRegion->thenRegion);
@@ -4262,7 +4335,7 @@ struct EmitVisitor
 
                     // Emit the start of our statement.
                     emit("switch(");
-                    emitIROperand(ctx, switchRegion->condition, IREmitMode::Default);
+                    emitIROperand(ctx, switchRegion->condition, IREmitMode::Default, kEOp_General);
                     emit(")\n{\n");
 
                     auto defaultCase = switchRegion->defaultCase;
@@ -4271,7 +4344,7 @@ struct EmitVisitor
                         for(auto caseVal : currentCase->values)
                         {
                             emit("case ");
-                            emitIROperand(ctx, caseVal, IREmitMode::Default);
+                            emitIROperand(ctx, caseVal, IREmitMode::Default, kEOp_General);
                             emit(":\n");
                         }
                         if(currentCase.Ptr() == defaultCase)
@@ -5922,7 +5995,7 @@ struct EmitVisitor
         // cases where the value might *need* to emit as a named referenced
         // (e.g., when it names another constant directly).
         //
-        emitIROperand(ctx, returnInst->getVal(), IREmitMode::GlobalConstant);
+        emitIROperand(ctx, returnInst->getVal(), IREmitMode::GlobalConstant, kEOp_General);
     }
 
     void emitIRGlobalConstant(
