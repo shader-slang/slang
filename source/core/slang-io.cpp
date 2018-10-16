@@ -132,7 +132,7 @@ namespace Slang
 #endif
 	}
 
-    /* static */SlangResult Path::GetCanonical(const String & path, String& canonicalPathOut)
+    /* static */SlangResult Path::GetCanonical(const String & path, String & canonicalPathOut)
     {
 #if defined(_WIN32)
         // https://msdn.microsoft.com/en-us/library/506720ff.aspx
@@ -147,7 +147,7 @@ namespace Slang
         return SLANG_OK;
 #else
         // http://man7.org/linux/man-pages/man3/realpath.3.html
-        char* canonicalPath = ::realpath(path.begin(), nullptr)
+        char* canonicalPath = ::realpath(path.begin(), nullptr);
         if (canonicalPath)
         {
             canonicalPathOut = canonicalPath;
