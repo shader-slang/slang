@@ -541,7 +541,7 @@ struct EmitVisitor
         emitRawText(buffer);
 
         // Only emit the path part of a `#line` directive if needed
-        if(sourceLocation.path != context->shared->loc.path)
+        if(sourceLocation.pathInfo.foundPath != context->shared->loc.pathInfo.foundPath)
         {
             emitRawText(" ");
 
@@ -578,7 +578,7 @@ struct EmitVisitor
 
             if(shouldUseGLSLStyleLineDirective)
             {
-                auto path = sourceLocation.path;
+                auto path = sourceLocation.pathInfo.foundPath;
                 
                 // GLSL doesn't support the traditional form of a `#line` directive without
                 // an extension. Rather than depend on that extension we will output
@@ -609,7 +609,8 @@ struct EmitVisitor
                 // in a module that tracks source files.
 
                 emitRawText("\"");
-                for(auto c : sourceLocation.path)
+                const auto& path = sourceLocation.pathInfo.foundPath;
+                for(auto c : path)
                 {
                     char charBuffer[] = { c, 0 };
                     switch(c)
@@ -673,7 +674,7 @@ struct EmitVisitor
         // a differnet file or line, *or* if the source location is
         // somehow later on the line than what we want to emit,
         // then we need to emit a new `#line` directive.
-        if(sourceLocation.path != context->shared->loc.path
+        if(sourceLocation.pathInfo.foundPath != context->shared->loc.pathInfo.foundPath
             || sourceLocation.line != context->shared->loc.line
             || sourceLocation.column < context->shared->loc.column)
         {
@@ -682,7 +683,7 @@ struct EmitVisitor
             // to get us caught up.
             enum { kSmallLineCount = 3 };
             auto lineDiff = sourceLocation.line - context->shared->loc.line;
-            if(sourceLocation.path == context->shared->loc.path
+            if(sourceLocation.pathInfo.foundPath == context->shared->loc.pathInfo.foundPath
                 && sourceLocation.line > context->shared->loc.line
                 && lineDiff <= kSmallLineCount)
             {

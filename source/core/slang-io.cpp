@@ -1,12 +1,23 @@
 #include "slang-io.h"
 #include "exception.h"
+
 #ifndef __STDC__
-#define __STDC__ 1
+#   define __STDC__ 1
 #endif
+
 #include <sys/stat.h>
+
 #ifdef _WIN32
-#include <direct.h>
+#   include <direct.h>
+#   ifndef WIN32_LEAN_AND_MEAN
+#       define WIN32_LEAN_AND_MEAN
+#       include <windows.h>
+#   endif
 #endif
+
+#include <limits.h> /* PATH_MAX */
+#include <stdio.h>
+#include <stdlib.h>
 
 namespace Slang
 {
@@ -125,6 +136,63 @@ namespace Slang
 #endif
 	}
 
+    /* static */SlangResult Path::GetCanonical(const String & path, String& canonicalPathOut)
+    {
+#if defined(_WIN32)
+#if 1
+        // https://msdn.microsoft.com/en-us/library/506720ff.aspx
+        WCHAR* absPath = _wfullpath(nullptr, path.ToWString(), 0);
+        if (!absPath)
+        {
+            return SLANG_FAIL;
+        }  
+
+        canonicalPathOut =  String::FromWString(absPath);
+        ::free(absPath);
+        return SLANG_OK;
+#else
+        // https://docs.microsoft.com/en-us/windows/desktop/api/fileapi/nf-fileapi-getfullpathnamea
+        List<WCHAR> buffer;
+        buffer.SetSize(_MAX_PATH);
+
+        WCHAR* name;
+        LONG res = ::GetFullPathNameW(path.ToWString(), DWORD(buffer.Count()), buffer.begin(), &name);
+        if (res > 0)
+        {
+            buffer.SetSize(res + 1);
+            res = ::GetFullPathNameW(path.ToWString(), DWORD(buffer.Count()), buffer.begin(), &name);
+        }
+        if (!res)
+        {
+            return SLANG_FAIL;
+        }
+        // https://msdn.microsoft.com/en-us/library/14h5k7ff.aspx
+        // Check file/directory exists
+        {
+            struct _stat32 statVar;
+            if (::_wstat32(buffer.begin(), &statVar) == -1)
+            {
+                return SLANG_FAIL;
+            }
+        }
+ 
+        // Turn back to a string
+        canonicalPathOut = String::FromWString(buffer.begin());
+        return SLANG_OK;
+#endif
+#else
+        // http://man7.org/linux/man-pages/man3/realpath.3.html
+        char* canonicalPath = ::realpath(path.begin(), nullptr)
+        if (canonicalPath)
+        {
+            canonicalPathOut = canonicalPath;
+            ::free(canonicalPath);
+            return SLANG_OK;
+        }
+        return SLANG_FAIL;
+#endif
+    }
+
 	Slang::String File::ReadAllText(const Slang::String & fileName)
 	{
 		StreamReader reader(new FileStream(fileName, FileMode::Open, FileAccess::Read, FileShare::ReadWrite));
@@ -152,4 +220,7 @@ namespace Slang
 		StreamWriter writer(new FileStream(fileName, FileMode::Create));
 		writer.Write(text);
 	}
+
+
 }
+

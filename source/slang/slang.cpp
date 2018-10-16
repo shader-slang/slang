@@ -9,6 +9,8 @@
 #include "syntax-visitors.h"
 #include "../slang/type-layout.h"
 
+#include "include-file-system.h"
+
 #include "ir-serialize.h"
 
 // Used to print exception type names in internal-compiler-error messages
@@ -75,39 +77,92 @@ Session::Session()
     addBuiltinSource(hlslLanguageScope, "hlsl", getHLSLLibraryCode());
 }
 
+static const char* getString(ISlangBlob* blob)
+{
+    if (blob)
+    {
+        //const size_t size = blob->getBufferSize();
+        const char* contents = (const char*)blob->getBufferPointer();
+        return contents;
+    }
+    return nullptr;
+}
+
 struct IncludeHandlerImpl : IncludeHandler
 {
     CompileRequest* request;
 
-    virtual IncludeResult TryToFindIncludeFile(
-        String const& pathToInclude,
-        String const& pathIncludedFrom,
-        String* outFoundPath,
-        ISlangBlob** outFoundSourceBlob) override
+    ISlangFileSystem* _getFileSystem()
     {
-        String path = Path::Combine(Path::GetDirectoryName(pathIncludedFrom), pathToInclude);
+        return request->fileSystem ? request->fileSystem : IncludeFileSystem::getDefault();
+    }
 
-        if(SLANG_SUCCEEDED(request->loadFile(path, outFoundSourceBlob)))
+    SlangResult _findFile(SlangPathType fromPathType, const String& fromPath, const String& path, PathInfo& pathInfoOut)
+    {
+        ISlangFileSystem* fileSystem = _getFileSystem();
+
+        // Get relative path
+        ComPtr<ISlangBlob> relPathBlob;
+        SLANG_RETURN_ON_FAIL(fileSystem->calcRelativePath(fromPathType, fromPath.begin(), path.begin(), relPathBlob.writeRef()));
+        String relPath = getString(relPathBlob);
+
+        if (!File::Exists(relPath))
         {
-            *outFoundPath = path;
-            request->mDependencyFilePaths.Add(path);
-            return IncludeResult::Found;
+            return SLANG_E_NOT_FOUND;
         }
 
-        for (auto & dir : request->searchDirectories)
-        {
-            path = Path::Combine(dir.path, pathToInclude);
+        // Get the canonical path
+        ComPtr<ISlangBlob> canonicalPathBlob;
+        SLANG_RETURN_ON_FAIL(fileSystem->getCanoncialPath(relPath.begin(), canonicalPathBlob.writeRef()));
 
-            if(SLANG_SUCCEEDED(request->loadFile(path, outFoundSourceBlob)))
+        // If the rel path exists -> the canonical path MUST exists too
+        String canonicalPath(getString(canonicalPathBlob));
+        SLANG_ASSERT(File::Exists(canonicalPath));
+
+        pathInfoOut.foundPath = relPath;
+        pathInfoOut.canonicalPath = canonicalPath;
+        return SLANG_OK;     
+    }
+
+    virtual SlangResult findFile(
+        String const& pathToInclude,
+        String const& pathIncludedFrom,
+        PathInfo& pathInfoOut) override
+    {
+        // Try just relative to current path
+        {
+            SlangResult res = _findFile(SLANG_PATH_TYPE_FILE, pathIncludedFrom, pathToInclude, pathInfoOut);
+            // It either succeeded or wasn't found, anything else is a failure passed back
+            if (SLANG_SUCCEEDED(res) || res != SLANG_E_NOT_FOUND)
             {
-                *outFoundPath = path;
-                request->mDependencyFilePaths.Add(path);
-                return IncludeResult::Found;
+                return res;
             }
         }
 
-        return IncludeResult::NotFound;
+        // Search all the searchDirectories
+        for (auto & dir : request->searchDirectories)
+        {
+            SlangResult res = _findFile(SLANG_PATH_TYPE_DIRECTORY, dir.path, pathToInclude, pathInfoOut);
+            if (SLANG_SUCCEEDED(res) || res != SLANG_E_NOT_FOUND)
+            {
+                return res;
+            }
+        }
+
+        return SLANG_E_NOT_FOUND;
     }
+
+    virtual SlangResult readFile(const String& path,
+        ISlangBlob** blobOut) override
+    {
+        ISlangFileSystem* fileSystem = _getFileSystem();
+        SLANG_RETURN_ON_FAIL(fileSystem->loadFile(path.begin(), blobOut));
+
+        request->mDependencyFilePaths.Add(path);
+
+        return SLANG_OK;
+    }
+
 };
 
 //
@@ -376,7 +431,10 @@ RefPtr<Expr> CompileRequest::parseTypeString(TranslationUnitRequest * translatio
     SourceManager localSourceManager;
     localSourceManager.initialize(sourceManager);
         
-    Slang::RefPtr<Slang::SourceFile> srcFile(localSourceManager.createSourceFile(String("type string"), typeStr));
+    PathInfo pathInfo;
+    pathInfo.foundPath = "type string";
+
+    Slang::RefPtr<Slang::SourceFile> srcFile(localSourceManager.createSourceFile(pathInfo, typeStr));
     
     // We'll use a temporary diagnostic sink  
     DiagnosticSink sink;
@@ -706,7 +764,10 @@ void CompileRequest::addTranslationUnitSourceBlob(
     String const&   path,
     ISlangBlob*     sourceBlob)
 {
-    RefPtr<SourceFile> sourceFile = getSourceManager()->createSourceFile(path, sourceBlob);
+    PathInfo pathInfo;
+    pathInfo.foundPath = path;
+
+    RefPtr<SourceFile> sourceFile = getSourceManager()->createSourceFile(pathInfo, sourceBlob);
 
     addTranslationUnitSourceFile(translationUnitIndex, sourceFile);
 }
@@ -716,7 +777,10 @@ void CompileRequest::addTranslationUnitSourceString(
     String const&   path,
     String const&   source)
 {
-    RefPtr<SourceFile> sourceFile = getSourceManager()->createSourceFile(path, source);
+    PathInfo pathInfo;
+    pathInfo.foundPath = path;
+
+    RefPtr<SourceFile> sourceFile = getSourceManager()->createSourceFile(pathInfo, source);
 
     addTranslationUnitSourceFile(translationUnitIndex, sourceFile);
 }
@@ -821,8 +885,8 @@ void CompileRequest::loadParsedModule(
 
 RefPtr<ModuleDecl> CompileRequest::loadModule(
     Name*               name,
-    String const&       path,
-    ISlangBlob*         sourceBlob,
+    const PathInfo&     filePathInfo,
+    ISlangBlob*         sourceBlob, 
     SourceLoc const&    srcLoc)
 {
     RefPtr<TranslationUnitRequest> translationUnit = new TranslationUnitRequest();
@@ -835,10 +899,10 @@ RefPtr<ModuleDecl> CompileRequest::loadModule(
     // TODO: decide which options, if any, should be inherited.
     translationUnit->compileFlags = 0;
 
-    RefPtr<SourceFile> sourceFile = getSourceManager()->createSourceFile(path, sourceBlob);
+    // Create with the 'friendly' name
+    RefPtr<SourceFile> sourceFile = getSourceManager()->createSourceFile(filePathInfo, sourceBlob);
 
     translationUnit->sourceFiles.Add(sourceFile);
-
 
     int errorCountBefore = mSink.GetErrorCount();
     parseTranslationUnit(translationUnit.Ptr());
@@ -854,7 +918,7 @@ RefPtr<ModuleDecl> CompileRequest::loadModule(
     loadParsedModule(
         translationUnit,
         name,
-        path);
+        filePathInfo.canonicalPath);
 
     errorCountAfter = mSink.GetErrorCount();
 
@@ -891,7 +955,7 @@ RefPtr<ModuleDecl> CompileRequest::findOrImportModule(
     }
 
     // Derive a file name for the module, by taking the given
-    // identifier, replacing all occurences of `_` with `-`,
+    // identifier, replacing all occurrences of `_` with `-`,
     // and then appending `.slang`.
     //
     // For example, `foo_bar` becomes `foo-bar.slang`.
@@ -914,39 +978,37 @@ RefPtr<ModuleDecl> CompileRequest::findOrImportModule(
     IncludeHandlerImpl includeHandler;
     includeHandler.request = this;
 
-    // Get the original path
-    String pathIncludedFrom= getSourceManager()->getPath(loc, SourceLocType::Actual);
-    
-    String foundPath;
-    ComPtr<ISlangBlob> foundSourceBlob;
-    IncludeResult includeResult = includeHandler.TryToFindIncludeFile(fileName, pathIncludedFrom, &foundPath, foundSourceBlob.writeRef());
-    switch( includeResult )
+    // Get the original path info
+    PathInfo pathIncludedFromInfo = getSourceManager()->getPathInfo(loc, SourceLocType::Actual);
+    PathInfo filePathInfo;
+
+    // There is an argument to passing in the 'canonicalPath' instead of the foundPath, but either should work here
+    if (SLANG_FAILED(includeHandler.findFile(fileName, pathIncludedFromInfo.foundPath, filePathInfo)))
     {
-    case IncludeResult::NotFound:
-    case IncludeResult::Error:
-        {
-            this->mSink.diagnose(loc, Diagnostics::cannotFindFile, fileName);
-
-            mapNameToLoadedModules[name] = nullptr;
-            return nullptr;
-        }
-        break;
-
-    default:
-        break;
+        this->mSink.diagnose(loc, Diagnostics::cannotFindFile, fileName);
+        mapNameToLoadedModules[name] = nullptr;
+        return nullptr;
     }
 
     // Maybe this was loaded previously at a different relative name?
-    if (mapPathToLoadedModule.TryGetValue(foundPath, loadedModule))
+    if (mapPathToLoadedModule.TryGetValue(filePathInfo.canonicalPath, loadedModule))
         return loadedModule->moduleDecl;
 
+    // Try to load it
+    ComPtr<ISlangBlob> fileContents;
+    if (SLANG_FAILED(includeHandler.readFile(filePathInfo.canonicalPath, fileContents.writeRef())))
+    {
+        this->mSink.diagnose(loc, Diagnostics::cannotOpenFile, fileName);
+        mapNameToLoadedModules[name] = nullptr;
+        return nullptr;
+    }
 
     // We've found a file that we can load for the given module, so
     // go ahead and perform the module-load action
     return loadModule(
         name,
-        foundPath,
-        foundSourceBlob,
+        filePathInfo,
+        fileContents,
         loc);
 }
 

@@ -651,6 +651,14 @@ extern "C"
     };
     #define SLANG_UUID_ISlangBlob { 0x8BA5FB08, 0x5195, 0x40e2, 0xAC, 0x58, 0x0D, 0x98, 0x9C, 0x3A, 0x01, 0x02 }
 
+    typedef unsigned int SlangPathType;
+    enum
+    {
+        SLANG_PATH_TYPE_NONE,           /**< No path is defined */
+        SLANG_PATH_TYPE_DIRECTORY ,     /**< Path specified specifies a directory. */
+        SLANG_PATH_TYPE_FILE,           /**< Path specified is to a file. */
+    };
+
     /** A (real or virtual) file system.
 
     Slang can make use of this interface whenever it would otherwise try to load files
@@ -660,6 +668,32 @@ extern "C"
     struct ISlangFileSystem : public ISlangUnknown
     {
     public:
+        /** Get a canonical path - a path that uniquely identifies a file 
+        
+        Given a path, returns a 'canonical' path which will return the same path for the same file. 
+        It is the canonical path that is used to compare if two includes are the same. 
+
+        @param path
+        @param canonicalPathOut
+        @returns A `SlangResult` to indicate success or failure in loading the file.
+        */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCanoncialPath(
+            const char* path,
+            ISlangBlob** canonicalPathOut) = 0;
+
+        /** Get a path relative to a 'from' path.
+
+        @param fromPathType How to interpret the from path
+        @param fromPath The from path, must be null ptr if SLANG_PATH_NONE, must be set otherwise. 
+        @param path Path to be determined relative to the fromPath
+        @returns A `SlangResult` to indicate success or failure in loading the file.
+        */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcRelativePath(
+            SlangPathType fromPathType,
+            const char* fromPath,
+            const char* path,
+            ISlangBlob** pathOutUnk) = 0;
+            
         /** Load a file from `path` and return a blob of its contents
 
         @param path The path to load from, as a null-terminated UTF-8 string.

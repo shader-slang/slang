@@ -136,38 +136,36 @@ HumaneSourceLoc SourceView::getHumaneLoc(SourceLoc loc, SourceLocType type)
         pathHandle = entry.m_pathHandle;
     }
 
-    // If there is no override path, then just the source files path
-    if (pathHandle == StringSlicePool::Handle(0))
-    {
-        humaneLoc.path = m_sourceFile->path;
-    }
-    else
-    {
-        humaneLoc.path = m_sourceManager->getStringSlicePool().getSlice(pathHandle);
-    }
-    
+    humaneLoc.pathInfo = _getPathInfo(pathHandle);
     return humaneLoc;
 }
 
-String SourceView::getPath(SourceLoc loc, SourceLocType type)
+PathInfo SourceView::_getPathInfo(StringSlicePool::Handle pathHandle) const
 {
-    if (type == SourceLocType::Actual)
-    {
-        return m_sourceFile->path;
-    }
-
-    const int entryIndex = findEntryIndex(loc);
-    const StringSlicePool::Handle pathHandle = (entryIndex >= 0) ? m_entries[entryIndex].m_pathHandle : StringSlicePool::Handle(0);
-   
     // If there is no override path, then just the source files path
     if (pathHandle == StringSlicePool::Handle(0))
     {
-        return m_sourceFile->path;
+        return m_sourceFile->pathInfo;
     }
     else
     {
-        return m_sourceManager->getStringSlicePool().getSlice(pathHandle);
+        PathInfo pathInfo;
+        pathInfo.foundPath = m_sourceManager->getStringSlicePool().getSlice(pathHandle);
+        // NOTE! Currently we don't set canonical path -> because a 'canonical path' is not assoicated with an #line directive, and may be impossible
+        // to determine
+        return pathInfo;
     }
+}
+
+PathInfo SourceView::getPathInfo(SourceLoc loc, SourceLocType type)
+{
+    if (type == SourceLocType::Actual)
+    {
+        return m_sourceFile->pathInfo;
+    }
+
+    const int entryIndex = findEntryIndex(loc);
+    return _getPathInfo((entryIndex >= 0) ? m_entries[entryIndex].m_pathHandle : StringSlicePool::Handle(0));
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!! SourceFile !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -300,28 +298,24 @@ SourceRange SourceManager::allocateSourceRange(UInt size)
     return SourceRange(beginLoc, endLoc);
 }
 
-SourceFile* SourceManager::createSourceFile(
-    String const&   path,
-    ISlangBlob*     contentBlob)
+SourceFile* SourceManager::createSourceFile(const PathInfo& pathInfo, ISlangBlob* contentBlob)
 {
     char const* contentBegin = (char const*) contentBlob->getBufferPointer();
     UInt contentSize = contentBlob->getBufferSize();
     char const* contentEnd = contentBegin + contentSize;
 
     SourceFile* sourceFile = new SourceFile();
-    sourceFile->path = path;
+    sourceFile->pathInfo = pathInfo;
     sourceFile->contentBlob = contentBlob;
     sourceFile->content = UnownedStringSlice(contentBegin, contentEnd);
  
     return sourceFile;
 }
-
-SourceFile* SourceManager::createSourceFile(
-    String const&   path,
-    String const&   content)
+ 
+SourceFile* SourceManager::createSourceFile(const PathInfo& pathInfo, const String& content)
 {
     ComPtr<ISlangBlob> contentBlob = createStringBlob(content);
-    return createSourceFile(path, contentBlob);
+    return createSourceFile(pathInfo, contentBlob);
 }
 
 SourceView* SourceManager::createSourceView(SourceFile* sourceFile)
@@ -409,20 +403,20 @@ SourceView* SourceManager::findSourceViewRecursively(SourceLoc loc) const
     return nullptr;
 }
 
-SourceFile* SourceManager::findSourceFile(const String& path)
+SourceFile* SourceManager::findSourceFile(const String& canonicalPath)
 {
-    RefPtr<SourceFile>* filePtr = m_sourceFiles.TryGetValue(path);
+    RefPtr<SourceFile>* filePtr = m_sourceFiles.TryGetValue(canonicalPath);
     if (filePtr)
     {
         return filePtr->Ptr();
     }
-    return m_parent ? m_parent->findSourceFile(path) : nullptr;
+    return m_parent ? m_parent->findSourceFile(canonicalPath) : nullptr;
 }
 
-void SourceManager::addSourceFile(const String& path, SourceFile* sourceFile)
+void SourceManager::addSourceFile(const String& canonicalPath, SourceFile* sourceFile)
 {
-    SLANG_ASSERT(!findSourceFile(path));
-    m_sourceFiles.Add(path, sourceFile);
+    SLANG_ASSERT(!findSourceFile(canonicalPath));
+    m_sourceFiles.Add(canonicalPath, sourceFile);
 }
 
 HumaneSourceLoc SourceManager::getHumaneLoc(SourceLoc loc, SourceLocType type)
@@ -438,16 +432,20 @@ HumaneSourceLoc SourceManager::getHumaneLoc(SourceLoc loc, SourceLocType type)
     }
 }
 
-String SourceManager::getPath(SourceLoc loc, SourceLocType type)
+PathInfo SourceManager::getPathInfo(SourceLoc loc, SourceLocType type)
 {
     SourceView* sourceView = findSourceViewRecursively(loc);
     if (sourceView)
     {
-        return sourceView->getPath(loc, type);
+        return sourceView->getPathInfo(loc, type);
     }
     else
     {
-        return String("unknown");
+        PathInfo pathInfo;
+        pathInfo.foundPath = "unknown";
+        // Canonical path is not defined
+
+        return pathInfo;
     }
 }
 

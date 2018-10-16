@@ -13,6 +13,7 @@
 
 namespace Slang
 {
+    struct PathInfo;
     struct IncludeHandler;
     class CompileRequest;
     class ProgramLayout;
@@ -454,8 +455,8 @@ namespace Slang
 
         RefPtr<ModuleDecl> loadModule(
             Name*               name,
-            String const&       path,
-            ISlangBlob*         sourceBlob,
+            const PathInfo&     filePathInfo,
+            ISlangBlob*         fileContentsBlob,
             SourceLoc const& loc);
 
         void loadParsedModule(

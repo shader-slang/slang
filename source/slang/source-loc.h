@@ -38,6 +38,12 @@ SourceViews are created, with unique SourceRanges. This is so that it is possibl
 interpretation for that lex/parse. 
 */
 
+struct PathInfo
+{
+    String foundPath;               ///< The path where the file was found (might contain relative elements)
+    String canonicalPath;           ///< Canonical version of the found path
+};
+
 class SourceLoc
 {
 public:
@@ -121,7 +127,7 @@ public:
         /// Calculate the offset for a line
     int calcColumnIndex(int line, int offset);
 
-    String path;                        ///< The logical file path to report for locations inside this span.
+    PathInfo pathInfo;                  ///< The path The logical file path to report for locations inside this span.
     ComPtr<ISlangBlob> contentBlob;     ///< A blob that owns the storage for the file contents
     UnownedStringSlice content;         ///< The actual contents of the file.
 
@@ -141,7 +147,7 @@ enum class SourceLocType
 // A source location in a format a human might like to see
 struct HumaneSourceLoc
 {
-    String  path;
+    PathInfo pathInfo;
     Int     line = 0;
     Int     column = 0;
 };
@@ -200,7 +206,7 @@ class SourceView: public RefObject
     HumaneSourceLoc getHumaneLoc(SourceLoc loc, SourceLocType type = SourceLocType::Nominal);
 
         /// Get the path associated with a location
-    String getPath(SourceLoc loc, SourceLocType type = SourceLocType::Nominal);
+    PathInfo getPathInfo(SourceLoc loc, SourceLocType type = SourceLocType::Nominal);
 
         /// Ctor
     SourceView(SourceManager* sourceManager, SourceFile* sourceFile, SourceRange range):
@@ -211,7 +217,8 @@ class SourceView: public RefObject
     }
 
     protected:
-    
+    PathInfo _getPathInfo(StringSlicePool::Handle pathHandle) const;
+
     SourceManager* m_sourceManager;     /// Get the manager this belongs to 
     SourceRange m_range;                ///< The range that this SourceView applies to
     RefPtr<SourceFile> m_sourceFile;    ///< The source file can hold the line breaks
@@ -227,15 +234,15 @@ struct SourceManager
     SourceRange allocateSourceRange(UInt size);
 
         /// Create a SourceFile defined with the specified path, and content held within a blob
-    SourceFile* createSourceFile(String const& path, ISlangBlob* content);
+    SourceFile* createSourceFile(const PathInfo& pathInfo, ISlangBlob* content);
         /// Create a SourceFile with specified path. Create a Blob that contains the content.
-    SourceFile* createSourceFile(String const& path, String const& content);
+    SourceFile* createSourceFile(const PathInfo& pathInfo, String const& content);
 
         /// Get the humane source location
     HumaneSourceLoc getHumaneLoc(SourceLoc loc, SourceLocType type = SourceLocType::Nominal);
 
         /// Get the path associated with a location 
-    String getPath(SourceLoc loc, SourceLocType type = SourceLocType::Nominal);
+    PathInfo getPathInfo(SourceLoc loc, SourceLocType type = SourceLocType::Nominal);
 
         /// Create a new source view from a file
     SourceView* createSourceView(SourceFile* sourceFile);
@@ -251,10 +258,10 @@ struct SourceManager
 
         /// Searches this manager, and then the parent to see if can find a match for path. 
         /// If not found returns nullptr.    
-    SourceFile* findSourceFile(const String& path);
+    SourceFile* findSourceFile(const String& canonicalPath);
 
         /// Add a source file, path must be unique for this manager AND any parents
-    void addSourceFile(const String& path, SourceFile* sourceFile);
+    void addSourceFile(const String& canonicalPath, SourceFile* sourceFile);
 
         /// Get the slice pool
     StringSlicePool& getStringSlicePool() { return m_slicePool; }
@@ -283,7 +290,8 @@ struct SourceManager
     List<RefPtr<SourceView> > m_sourceViews;                
     StringSlicePool m_slicePool;
 
-    Dictionary<String, RefPtr<SourceFile> > m_sourceFiles;
+    // Maps canonical paths to source files
+    Dictionary<String, RefPtr<SourceFile> > m_sourceFiles;  
 };
 
 } // namespace Slang

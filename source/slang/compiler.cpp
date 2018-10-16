@@ -186,7 +186,10 @@ namespace Slang
             for(auto sourceFile : translationUnit->sourceFiles)
             {
                 codeBuilder << "#line 1 \"";
-                for(auto c : sourceFile->path)
+
+                const String& path = sourceFile->pathInfo.foundPath;
+
+                for(auto c : path)
                 {
                     char buffer[] = { c, 0 };
                     switch(c)
