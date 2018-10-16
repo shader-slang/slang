@@ -13,6 +13,7 @@
 
 namespace Slang
 {
+    struct PathInfo;
     struct IncludeHandler;
     class CompileRequest;
     class ProgramLayout;
@@ -395,6 +396,11 @@ namespace Slang
         ///
         ComPtr<ISlangFileSystem> fileSystem;
 
+        /// The extended file system implementation. Will be set to a default implementation
+        /// if fileSystem is nullptr. Otherwise it will either be fileSystem's interface, 
+        /// or a wrapped impl that makes fileSystem operate as fileSystemExt
+        ComPtr<ISlangFileSystemExt> fileSystemExt;
+
         /// Load a file into memory using the configured file system.
         ///
         /// @param path The path to attempt to load from
@@ -454,14 +460,14 @@ namespace Slang
 
         RefPtr<ModuleDecl> loadModule(
             Name*               name,
-            String const&       path,
-            ISlangBlob*         sourceBlob,
+            const PathInfo&     filePathInfo,
+            ISlangBlob*         fileContentsBlob,
             SourceLoc const& loc);
 
         void loadParsedModule(
             RefPtr<TranslationUnitRequest> const&   translationUnit,
             Name*                                   name,
-            String const&                           path);
+            PathInfo const&                         pathInfo);
 
         RefPtr<ModuleDecl> findOrImportModule(
             Name*               name,

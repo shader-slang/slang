@@ -838,7 +838,9 @@ top:
         SourceManager* sourceManager = preprocessor->getCompileRequest()->getSourceManager();
 
         // We create a dummy file to represent the token-paste operation
-        SourceFile* sourceFile = sourceManager->createSourceFile("token paste", sb.ProduceString());
+        PathInfo pathInfo = PathInfo::makeTokenPaste();
+       
+        SourceFile* sourceFile = sourceManager->createSourceFile(pathInfo, sb.ProduceString());
 
         SourceView* sourceView = sourceManager->createSourceView(sourceFile);
 
@@ -1589,10 +1591,8 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
 
     auto directiveLoc = GetDirectiveLoc(context);
     
-    String pathIncludedFrom = context->preprocessor->translationUnit->compileRequest->getSourceManager()->getPath(directiveLoc, SourceLocType::Actual);
-    String foundPath;
-    ComPtr<ISlangBlob> foundSourceBlob;
-
+    PathInfo includedFromPathInfo = context->preprocessor->translationUnit->compileRequest->getSourceManager()->getPathInfo(directiveLoc, SourceLocType::Actual);
+    
     IncludeHandler* includeHandler = context->preprocessor->includeHandler;
     if (!includeHandler)
     {
@@ -1600,17 +1600,20 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
         GetSink(context)->diagnose(pathToken.loc, Diagnostics::noIncludeHandlerSpecified);
         return;
     }
-    auto includeResult = includeHandler->TryToFindIncludeFile(path, pathIncludedFrom, &foundPath, foundSourceBlob.writeRef());
-
-    switch (includeResult)
+    
+    /* Find the path relative to the foundPath */
+    PathInfo filePathInfo;
+    if (SLANG_FAILED(includeHandler->findFile(path, includedFromPathInfo.foundPath, filePathInfo)))
     {
-    case IncludeResult::NotFound:
-    case IncludeResult::Error:
         GetSink(context)->diagnose(pathToken.loc, Diagnostics::includeFailed, path);
         return;
+    }
 
-    case IncludeResult::Found:
-        break;
+    // We must have a canonical path to be compare
+    if (!filePathInfo.hasCanonicalPath())
+    {
+        GetSink(context)->diagnose(pathToken.loc, Diagnostics::noCanonicalPath, path);
+        return;
     }
 
     // Do all checking related to the end of this directive before we push a new stream,
@@ -1619,7 +1622,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
     expectEndOfDirective(context);
 
     // Check whether we've previously included this file and seen a `#pragma once` directive
-    if(context->preprocessor->pragmaOncePaths.Contains(foundPath))
+    if(context->preprocessor->pragmaOncePaths.Contains(filePathInfo.canonicalPath))
     {
         return;
     }
@@ -1629,12 +1632,19 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
     auto sourceManager = context->preprocessor->getCompileRequest()->getSourceManager();
 
     // See if this an already loaded source file
-    SourceFile* sourceFile = sourceManager->findSourceFile(foundPath);
+    SourceFile* sourceFile = sourceManager->findSourceFileRecursively(filePathInfo.canonicalPath);
     // If not create a new one, and add to the list of known source files
     if (!sourceFile)
     {
-        sourceFile = sourceManager->createSourceFile(foundPath, foundSourceBlob);
-        sourceManager->addSourceFile(foundPath, sourceFile);
+        ComPtr<ISlangBlob> foundSourceBlob;
+        if (SLANG_FAILED(includeHandler->readFile(filePathInfo.canonicalPath, foundSourceBlob.writeRef())))
+        {
+            GetSink(context)->diagnose(pathToken.loc, Diagnostics::includeFailed, path);
+            return;
+        }
+
+        sourceFile = sourceManager->createSourceFile(filePathInfo, foundSourceBlob);
+        sourceManager->addSourceFile(filePathInfo.canonicalPath, sourceFile);
     }
 
     // This is a new parse (even if it's a pre-existing source file), so create a new SourceUnit
@@ -1822,7 +1832,7 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
     String file;
     if (PeekTokenType(context) == TokenType::EndOfDirective)
     {
-        file = sourceManager->getPath(directiveLoc);
+        file = sourceManager->getPathInfo(directiveLoc).foundPath;
     }
     else if (PeekTokenType(context) == TokenType::StringLiteral)
     {
@@ -1875,9 +1885,16 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaOnceDirective)
     // trivial cases of the "same" path.
     //
     auto directiveLoc = GetDirectiveLoc(context);
-    auto pathIssuedFrom = context->preprocessor->translationUnit->compileRequest->getSourceManager()->getPath(directiveLoc, SourceLocType::Actual);
+    auto issuedFromPathInfo = context->preprocessor->translationUnit->compileRequest->getSourceManager()->getPathInfo(directiveLoc, SourceLocType::Actual);
 
-    context->preprocessor->pragmaOncePaths.Add(pathIssuedFrom);
+    // Must have a canonical path for a #pragma once to work
+    if (!issuedFromPathInfo.hasCanonicalPath())
+    {
+        GetSink(context)->diagnose(subDirectiveToken, Diagnostics::pragmaOnceIgnored);
+        return;
+    }
+
+    context->preprocessor->pragmaOncePaths.Add(issuedFromPathInfo.canonicalPath);
 }
 
 // Information about a specific `#pragma` directive
@@ -2243,13 +2260,14 @@ static void DefineMacro(
     String const&   key,
     String const&   value)
 {
-    String fileName = "command line";
+    PathInfo pathInfo = PathInfo::makeCommandLine();
+    
     PreprocessorMacro* macro = CreateMacro(preprocessor);
 
     auto sourceManager = preprocessor->translationUnit->compileRequest->getSourceManager();
 
-    SourceFile* keyFile = sourceManager->createSourceFile(fileName, key);
-    SourceFile* valueFile = sourceManager->createSourceFile(fileName, value);
+    SourceFile* keyFile = sourceManager->createSourceFile(pathInfo, key);
+    SourceFile* valueFile = sourceManager->createSourceFile(pathInfo, value);
 
     SourceView* keyView = sourceManager->createSourceView(keyFile);
     SourceView* valueView = sourceManager->createSourceView(valueFile);

@@ -11,22 +11,17 @@ class DiagnosticSink;
 class ModuleDecl;
 class TranslationUnitRequest;
 
-enum class IncludeResult
-{
-    Error,
-    NotFound,
-    Found,
-};
-
 // Callback interface for the preprocessor to use when looking
 // for files in `#include` directives.
 struct IncludeHandler
 {
-    virtual IncludeResult TryToFindIncludeFile(
-        String const& pathToInclude,
-        String const& pathIncludedFrom,
-        String* outFoundPath,
-        ISlangBlob** outFoundSourceBlob) = 0;
+    
+    virtual SlangResult findFile(const String& pathToInclude,
+        const String& pathIncludedFrom,
+        PathInfo& pathInfoOut) = 0;
+
+    virtual SlangResult readFile(const String& path, 
+        ISlangBlob** blobOut) = 0;        
 };
 
 // Take a string of source code and preprocess it into a list of tokens.

@@ -656,12 +656,16 @@ extern "C"
     Slang can make use of this interface whenever it would otherwise try to load files
     from disk, allowing applications to hook and/or override filesystem access from
     the compiler.
+
+    It is the responsibility of 
+    the caller of any method that returns a ISlangBlob to release the blob when it is no 
+    longer used (using 'release').
     */
+
     struct ISlangFileSystem : public ISlangUnknown
     {
     public:
         /** Load a file from `path` and return a blob of its contents
-
         @param path The path to load from, as a null-terminated UTF-8 string.
         @param outBlob A destination pointer to receive the blob of the file contents.
         @returns A `SlangResult` to indicate success or failure in loading the file.
@@ -673,9 +677,67 @@ extern "C"
         */
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadFile(
             char const*     path,
-            ISlangBlob**    outBlob) = 0;
+            ISlangBlob** outBlob) = 0;
     };
     #define SLANG_UUID_ISlangFileSystem { 0x003A09FC, 0x3A4D, 0x4BA0, 0xAD, 0x60, 0x1F, 0xD8, 0x63, 0xA9, 0x15, 0xAB }
+
+    /* Type that identifies how a path should be interpreted */
+    typedef unsigned int SlangPathType;
+    enum
+    {
+        SLANG_PATH_TYPE_DIRECTORY,     /**< Path specified specifies a directory. */
+        SLANG_PATH_TYPE_FILE,           /**< Path specified is to a file. */
+    };
+
+    /** An extended file system abstraction.
+    
+    Implementing and using this interface over ISlangFileSystem gives much more control over how paths
+    are managed, as well as how it is determined if two files 'are the same'.
+
+    All paths as input char*, or output as ISlangBlobs are always encoded as UTF-8 strings.
+    Blobs that contain strings are always zero terminated.
+    */
+    struct ISlangFileSystemExt : public ISlangFileSystem
+    {
+    public:
+        /** Get a canonical path which uniquely identifies an object of the file system.
+           
+        Given a path, returns a 'canonical' path which will return the same path for the same file/directory. 
+        The canonical path is used to compare if two includes are the same file. 
+        The string for the canonical path is held zero terminated in the ISlangBlob of canonicalPathOut. 
+   
+        Note that a canonical path doesn't *have* to be a 'canonical' path, or a path at all
+        - it can just be a string that uniquely identifies a file. For example another possible mechanism
+        could be to store the filename combined with the file date time to uniquely identify it.
+     
+        The client must ensure the blob be released when no longer used, otherwise memory will leak.
+
+        @param path
+        @param canonicalPathOut
+        @returns A `SlangResult` to indicate success or failure getting the canonical path.
+        */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCanoncialPath(
+            const char* path,
+            ISlangBlob** canonicalPathOut) = 0;
+
+        /** Get a path relative to a 'from' path.
+
+        The client must ensure the blob be released when no longer used, otherwise memory will leak.
+
+        @param fromPathType How to interpret the from path - as a file or a directory.
+        @param fromPath The from path. 
+        @param path Path to be determined relative to the fromPath
+        @param pathOut Holds the string which is the relative path. The string is held in the blob zero terminated.  
+        @returns A `SlangResult` to indicate success or failure in loading the file.
+        */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcRelativePath(
+            SlangPathType fromPathType,
+            const char* fromPath,
+            const char* path,
+            ISlangBlob** pathOut) = 0;            
+    };
+
+    #define SLANG_UUID_ISlangFileSystemExt { 0x5fb632d2, 0x979d, 0x4481, { 0x9f, 0xee, 0x66, 0x3c, 0x3f, 0x14, 0x49, 0xe1 } }
 
     /*!
     @brief An instance of the Slang library.

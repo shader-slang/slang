@@ -1,12 +1,19 @@
 #include "slang-io.h"
 #include "exception.h"
+
 #ifndef __STDC__
-#define __STDC__ 1
+#   define __STDC__ 1
 #endif
+
 #include <sys/stat.h>
+
 #ifdef _WIN32
-#include <direct.h>
+#   include <direct.h>
 #endif
+
+#include <limits.h> /* PATH_MAX */
+#include <stdio.h>
+#include <stdlib.h>
 
 namespace Slang
 {
@@ -125,6 +132,32 @@ namespace Slang
 #endif
 	}
 
+    /* static */SlangResult Path::GetCanonical(const String & path, String & canonicalPathOut)
+    {
+#if defined(_WIN32)
+        // https://msdn.microsoft.com/en-us/library/506720ff.aspx
+        wchar_t* absPath = ::_wfullpath(nullptr, path.ToWString(), 0);
+        if (!absPath)
+        {
+            return SLANG_FAIL;
+        }  
+
+        canonicalPathOut =  String::FromWString(absPath);
+        ::free(absPath);
+        return SLANG_OK;
+#else
+        // http://man7.org/linux/man-pages/man3/realpath.3.html
+        char* canonicalPath = ::realpath(path.begin(), nullptr);
+        if (canonicalPath)
+        {
+            canonicalPathOut = canonicalPath;
+            ::free(canonicalPath);
+            return SLANG_OK;
+        }
+        return SLANG_FAIL;
+#endif
+    }
+
 	Slang::String File::ReadAllText(const Slang::String & fileName)
 	{
 		StreamReader reader(new FileStream(fileName, FileMode::Open, FileAccess::Read, FileShare::ReadWrite));
@@ -152,4 +185,7 @@ namespace Slang
 		StreamWriter writer(new FileStream(fileName, FileMode::Create));
 		writer.Write(text);
 	}
+
+
 }
+
